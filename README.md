@@ -11,6 +11,8 @@ cd reconftw
 
 ## Summary
 
+**Important: set your tools path in the script in $tools var (line 10)**
+
 This is a simple script intended to perform a full recon on an objective with multiple subdomains. It performs multiples steps listed below:
 
 0. Tools checker
@@ -39,5 +41,6 @@ It generates and output in Recon/ folder with the name of the target domain, for
 ## Short-term improvement plan:
 - [ ] Enhance this Readme
 - [ ] Customize output folder
+- [ ] Install script
 - [ ] Notification support (Slack, Discord and Telegram)
 - [ ] Any other interesting suggestion
