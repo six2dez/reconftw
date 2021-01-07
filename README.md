@@ -42,5 +42,6 @@ It generates and output in Recon/ folder with the name of the target domain, for
 - [ ] Enhance this Readme
 - [ ] Customize output folder
 - [ ] Install script
+- [ ] Interlace usage
 - [ ] Notification support (Slack, Discord and Telegram)
 - [ ] Any other interesting suggestion
