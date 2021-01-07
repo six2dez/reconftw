@@ -440,14 +440,20 @@ all(){
 }
 
 help(){
-	printf "\n Params ${red}(required)${reset}\n";
-	printf "        $0 -d	Target domain\n";
-	printf "\n Flags ${red}(required)${reset}\n";
+	printf "\n Params:\n";
+	printf "        $0 -d target.com	Target domain ${red}(required always)${reset}\n";
+    printf "        $0 -l targets.txt	Web list ${red}(required only with -w)${reset}\n";
+	printf "\n Flags:\n";
 	printf "        $0 -a	All checks ${bgreen}(default and recommended)${reset}\n";
 	printf "        $0 -s	Only subdomains\n";
 	printf "        $0 -g	Google Dorks\n";
 	printf "        $0 -w	Only web scan\n";
 	printf "        $0 -h	Show this help\n";
+    printf "\n Examples: \n";
+    printf "        ./reconftw.sh -d target.com -a	-	All checks\n";
+    printf "        ./reconftw.sh -d target.com -s	-	Only subdomains\n";
+    printf "        ./reconftw.sh -d target.com -g	-	Only Google Dorks\n";
+    printf "        ./reconftw.sh -d target.com -l targets.txt -w	-	Only Web Scan (Target list required)\n";
 }
 
 banner
