@@ -19,7 +19,7 @@ This is a simple script intended to perform a full recon on an objective with mu
 
 0. Tools checker
 1. Google Dorks (based on deggogle_hunter)
-2. Subdomain enumeration (multiple tools: pasive, resolution, bruteforce and permutations)
+2. Subdomain enumeration (multiple tools: passive, resolution, bruteforce and permutations)
 3. Sub TKO (subjack and nuclei)
 4. Probing (httpx)
 5. Websscreenshot (aquatone)
