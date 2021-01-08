@@ -19,7 +19,7 @@ This is a simple script intended to perform a full recon on an objective with mu
 
 0. Tools checker
 1. Google Dorks (based on deggogle_hunter)
-2. Subdomain enumeration (multiple tools: pasive, resolution, bruteforce and permutations)
+2. Subdomain enumeration (multiple tools: passive, resolution, bruteforce and permutations)
 3. Sub TKO (subjack and nuclei)
 4. Probing (httpx)
 5. Websscreenshot (aquatone)
@@ -45,4 +45,5 @@ It generates and output in Recon/ folder with the name of the target domain, for
 - [ ] Customize output folder
 - [ ] Interlace usage
 - [ ] Notification support (Slack, Discord and Telegram)
+- [ ] CMS tools (wpscan, drupwn/droopescan, joomscan)
 - [ ] Any other interesting suggestion
