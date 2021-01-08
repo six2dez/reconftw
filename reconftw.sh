@@ -28,11 +28,11 @@ start(){
     tools_installed
 	dir=$PWD/Recon/$domain
 	mkdir -p $dir
-    cat $list
     if [ -v "$list" ]
     then
         cp $list $domain_probed.txt 
     fi
+    
 	cd $dir
 	printf "\n"
     printf "${bgreen}#######################################################################\n"
