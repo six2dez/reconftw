@@ -45,4 +45,5 @@ It generates and output in Recon/ folder with the name of the target domain, for
 - [ ] Customize output folder
 - [ ] Interlace usage
 - [ ] Notification support (Slack, Discord and Telegram)
+- [ ] CMS tools (wpscan, drupwn/droopescan, joomscan)
 - [ ] Any other interesting suggestion
