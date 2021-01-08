@@ -11,19 +11,21 @@ sudo apt install python3-pip
 sudo apt install ruby
 sudo apt install screen
 sudo apt install git
-sudo apt install amass
-mkdir ~/.gf
-mkdir ~/Tools
+sudo apt install libpcap-dev
+mkdir -p ~/.gf
+mkdir -p ~/Tools
 dir=~/Tools
 
 go get -u github.com/tomnomnom/gf
+GO111MODULE=on go get -v github.com/OWASP/Amass/v3/...
 go get -u github.com/ffuf/ffuf
 go get -u github.com/tomnomnom/assetfinder
-go get -u github.com/projectdiscovery/naabu/v2/cmd/naabu
+GO111MODULE=on go get -v github.com/projectdiscovery/naabu/v2/cmd/naabu
 go get -u github.com/tomnomnom/hacks/waybackurls
-go get -u github.com/projectdiscovery/nuclei/v2/cmd/nuclei
+GO111MODULE=on go get -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei
 go get -u github.com/michenriksen/aquatone
 go get -u github.com/tomnomnom/anew
+go get -u github.com/tomnomnom/unfurl
 git clone https://github.com/projectdiscovery/nuclei-templates ~/nuclei-templates
 nuclei -update-templates
 go get -u github.com/haccer/subjack
@@ -41,7 +43,7 @@ go get -u github.com/KathanP19/Gxss
 git clone https://github.com/blechschmidt/massdns $dir/massdns
 git clone https://github.com/devanshbatham/ParamSpider $dir/ParamSpider
 git clone https://github.com/maurosoria/dirsearch $dir/dirsearch
-go get -u github.com/projectdiscovery/shuffledns/cmd/shuffledns
+GO111MODULE=on go get -v github.com/projectdiscovery/shuffledns/cmd/shuffledns
 go get -u github.com/cgboal/sonarsearch/crobat
 git clone https://github.com/KathanP19/JSFScan.sh $dir/JSFScan.sh
 git clone https://github.com/six2dez/degoogle_hunter $dir/degoogle_hunter
@@ -60,6 +62,8 @@ sudo cp findomain-linux /usr/local/bin/findomain
 cd $dir/massdns; make
 cp $dir/massdns/bin/massdns /usr/bin/
 cd ~/.gf; wget https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json
+wget -O subdomains.txt https://gist.githubusercontent.com/jhaddix/86a06c5dc309d08580a018c66354a056/raw/96f4e51d96b2203f19f6381c8c545b278eaa0837/all.txt
+wget -O resolvers.txt https://raw.githubusercontent.com/danielmiessler/SecLists/master/Miscellaneous/dns-resolvers.txt
 
 printf "${bgreen} Finished!${reset}\n\n"
 printf "\n\n${bgreen}#######################################################################\n"
