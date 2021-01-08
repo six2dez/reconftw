@@ -5,13 +5,15 @@
 ```bash
 git clone https://github.com/six2dez/reconftw
 cd reconftw
+chmod +x install.sh
+./install.sh
 ./reconftw.sh -d target.com -a
 ```
 ![Banner](banner.png)
 
 ## Summary
 
-**Important: set your tools path in the script in $tools var (line 10)**
+**Important: run install script or set your tools path in the script in $tools var (line 10)**
 
 This is a simple script intended to perform a full recon on an objective with multiple subdomains. It performs multiples steps listed below:
 
@@ -41,7 +43,6 @@ It generates and output in Recon/ folder with the name of the target domain, for
 ## Short-term improvement plan:
 - [ ] Enhance this Readme
 - [ ] Customize output folder
-- [ ] Install script
 - [ ] Interlace usage
 - [ ] Notification support (Slack, Discord and Telegram)
 - [ ] Any other interesting suggestion

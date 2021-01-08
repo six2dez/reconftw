@@ -42,7 +42,7 @@ start(){
 function tools_installed(){
 
     printf "\n\n${bgreen}#######################################################################\n"
-    printf "${bred} Pre-Step : ${bgreen} Checking installed tools ${reset}\n\n"
+    printf "${bred} Step 0/17 : ${bgreen} Checking installed tools ${reset}\n\n"
 
     [ -f $tools/degoogle_hunter/degoogle.py ] && printf "${bgreen}[*] degoogle		[YES]\n" || printf "${bred}[*] degoogle		[NO]\n"
     [ -f $tools/ParamSpider/paramspider.py ] && printf "${bgreen}[*] Paramspider		[YES]\n" || printf "${bred}[*] Paramspider		[NO]\n"
