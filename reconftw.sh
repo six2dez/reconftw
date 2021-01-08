@@ -185,7 +185,7 @@ subdomains(){
     grep -v "Not Vulnerable" <$domain_all-takeover-checks.txt >$domain_takeover.txt
 	rm $domain_all-takeover-checks.txt
     printf "${yellow}\n\n Running : Nuclei SubTko${reset}\n\n"
-    cat $domain_subdomains.txt | nuclei -c 500 -silent -t ~/nuclei-templates/subdomain-takeover -o $domain_nuclei_subtko.txt;
+    cat $domain_subdomains.txt | nuclei -silent -t ~/nuclei-templates/subdomain-takeover -o $domain_nuclei_subtko.txt;
     cat $domain_nuclei_subtko.txt 2>/dev/null
     cat $domain_takeover.txt 2>/dev/null;
     printf "${bred}\n Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
@@ -220,34 +220,34 @@ nuclei(){
     printf "${bgreen}#######################################################################\n"
     printf "${bred} Step 6/17 : ${bgreen} Template Scanning with Nuclei ${reset}\n\n"
     printf "${yellow} Running : Nuclei Technologies${reset}\n\n"
-    cat $domain_probed.txt | nuclei -c 500 -silent -t ~/nuclei-templates/technologies/ -o $domain_nuclei_technologies.txt;
+    cat $domain_probed.txt | nuclei -silent -t ~/nuclei-templates/technologies/ -o $domain_nuclei_technologies.txt;
     cat $domain_nuclei_technologies.txt 2>/dev/null
     printf "${yellow}\n\n Running : Nuclei Tokens${reset}\n\n"
-    cat $domain_probed.txt | nuclei -c 500 -silent -t ~/nuclei-templates/tokens/ -o $domain_nuclei_tokens.txt;
+    cat $domain_probed.txt | nuclei -silent -t ~/nuclei-templates/tokens/ -o $domain_nuclei_tokens.txt;
     cat $domain_nuclei_tokens.txt 2>/dev/null
     printf "${yellow}\n\n Running : Nuclei Generic detections ${reset}\n\n"
-    cat $domain_probed.txt | nuclei -c 500 -silent -t ~/nuclei-templates/generic-detections/ -o $domain_nuclei_generic_detections.txt;
+    cat $domain_probed.txt | nuclei -silent -t ~/nuclei-templates/generic-detections/ -o $domain_nuclei_generic_detections.txt;
     cat $domain_nuclei_generic_detections.txt 2>/dev/null
     printf "${yellow}\n\n Running : Nuclei CVEs ${reset}\n\n"
-    cat $domain_probed.txt | nuclei -c 500 -silent -t ~/nuclei-templates/cves/ -o $domain_nuclei_cves.txt;
+    cat $domain_probed.txt | nuclei -silent -t ~/nuclei-templates/cves/ -o $domain_nuclei_cves.txt;
     cat $domain_nuclei_cves.txt 2>/dev/null
     printf "${yellow}\n\n Running : Nuclei Default Creds ${reset}\n\n"
-    cat $domain_probed.txt | nuclei -c 500 -silent -t ~/nuclei-templates/default-creds/ -o $domain_nuclei_default_creds.txt;
+    cat $domain_probed.txt | nuclei -silent -t ~/nuclei-templates/default-creds/ -o $domain_nuclei_default_creds.txt;
     cat $domain_nuclei_default_creds.txt 2>/dev/null
     printf "${yellow}\n\n Running : Nuclei DNS ${reset}\n\n"
-    cat $domain_probed.txt | nuclei -c 500 -silent -t ~/nuclei-templates/dns/ -o $domain_nuclei_dns.txt;
+    cat $domain_probed.txt | nuclei -silent -t ~/nuclei-templates/dns/ -o $domain_nuclei_dns.txt;
     cat $domain_nuclei_dns.txt 2>/dev/null
     printf "${yellow}\n\n Running : Nuclei Files ${reset}\n\n"
-    cat $domain_probed.txt | nuclei -c 500 -silent -t ~/nuclei-templates/files/ -o $domain_nuclei_files.txt;
+    cat $domain_probed.txt | nuclei -silent -t ~/nuclei-templates/files/ -o $domain_nuclei_files.txt;
     cat $domain_nuclei_files.txt 2>/dev/null
     printf "${yellow}\n\n Running : Nuclei Panels ${reset}\n\n"
-    cat $domain_probed.txt | nuclei -c 500 -silent -t ~/nuclei-templates/panels/ -o $domain_nuclei_panels.txt;
+    cat $domain_probed.txt | nuclei -silent -t ~/nuclei-templates/panels/ -o $domain_nuclei_panels.txt;
     cat $domain_nuclei_panels.txt 2>/dev/null
     printf "${yellow}\n\n Running : Nuclei Security Misconfiguration ${reset}\n\n"
-    cat $domain_probed.txt | nuclei -c 500 -silent -t ~/nuclei-templates/security-misconfiguration/ -o $domain_nuclei_security_misconfigurations.txt;
+    cat $domain_probed.txt | nuclei -silent -t ~/nuclei-templates/security-misconfiguration/ -o $domain_nuclei_security_misconfigurations.txt;
     cat $domain_nuclei_security_misconfigurations.txt 2>/dev/null
     printf "${yellow}\n\n Running : Nuclei Generic detections ${reset}\n\n"
-    cat $domain_probed.txt | nuclei -c 500 -silent -t ~/nuclei-templates/vulnerabilities/ -o $domain_nuclei_vulnerabilities.txt;
+    cat $domain_probed.txt | nuclei -silent -t ~/nuclei-templates/vulnerabilities/ -o $domain_nuclei_vulnerabilities.txt;
     cat $domain_nuclei_vulnerabilities.txt 2>/dev/null
     printf "\n\n"
     printf "${bred} Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
