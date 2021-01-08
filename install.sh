@@ -6,12 +6,8 @@ reset='\033[0m'
 printf "\n\n${bgreen}#######################################################################\n"
 printf "${bgreen} Install script (Kali Linux based)${reset}\n\n"
 
-sudo apt install python3
-sudo apt install python3-pip
-sudo apt install ruby
-sudo apt install screen
-sudo apt install git
-sudo apt install libpcap-dev
+sudo apt update -y
+sudo apt install python3 python3-pip ruby screen git libpcap-dev -y
 mkdir -p ~/.gf
 mkdir -p ~/Tools
 dir=~/Tools
@@ -35,7 +31,7 @@ git clone https://github.com/1ndianl33t/Gf-Patterns $dir/Gf-Patterns
 mkdir ~/.gf
 cp -r $GOPATH/src/github.com/tomnomnom/gf/examples ~/.gf
 mv $dir/Gf-Patterns/*.json ~/.gf
-GO111MODULE=on go get -u -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder
+GO111MODULE=on go get -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder
 go get -u github.com/projectdiscovery/chaos-client/cmd/chaos
 go get -u github.com/hahwul/dalfox
 go get -u github.com/lc/gau
@@ -51,9 +47,7 @@ git clone https://github.com/s0md3v/Arjun $dir/Arjun
 git clone https://github.com/pielco11/fav-up $dir/fav-up
 git clone https://github.com/chenjj/CORScanner $dir/CORScanner
 git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh
-git clone https://github.com/ProjectAnte/dnsgen
-pip3 install -r $dir/*/requirements.txt
-python3 $dir/dnsgen/setup.py install
+pip3 install dnsgen
 sudo chmod +x $dir/JSFScan.sh/install.sh && $dir/JSFScan.sh/install.sh
 wget https://github.com/ezekg/git-hound/releases/download/1.0.0/git-hound_linux_amd64
 sudo cp git-hound_linux_amd64 /usr/local/bin/git-hound
