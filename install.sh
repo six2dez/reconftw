@@ -52,11 +52,13 @@ pip3 install dnsgen
 sudo chmod +x $dir/JSFScan.sh/install.sh && $dir/JSFScan.sh/install.sh
 wget https://github.com/ezekg/git-hound/releases/download/1.0.0/git-hound_linux_amd64
 sudo cp git-hound_linux_amd64 /usr/local/bin/git-hound
+chmod 755 /usr/local/bin/git-hound
 wget https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-linux
 sudo cp findomain-linux /usr/local/bin/findomain
+chmod 755 /usr/local/bin/findomain
 cd $dir/massdns; make
 cp $dir/massdns/bin/massdns /usr/bin/
-cd ~/.gf; wget https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json
+cd ~/.gf; wget https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json; cd $dir
 wget -O subdomains.txt https://gist.githubusercontent.com/jhaddix/86a06c5dc309d08580a018c66354a056/raw/96f4e51d96b2203f19f6381c8c545b278eaa0837/all.txt
 wget -O resolvers.txt https://raw.githubusercontent.com/janmasarik/resolvers/master/resolvers.txt
 
