@@ -19,6 +19,7 @@ go get -u github.com/tomnomnom/assetfinder
 GO111MODULE=on go get -v github.com/projectdiscovery/naabu/v2/cmd/naabu
 go get -u github.com/tomnomnom/hacks/waybackurls
 GO111MODULE=on go get -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei
+GO111MODULE=on go get -v github.com/projectdiscovery/dnsx/cmd/dnsx
 go get -u github.com/michenriksen/aquatone
 go get -u github.com/tomnomnom/anew
 go get -u github.com/tomnomnom/unfurl

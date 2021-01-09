@@ -57,10 +57,10 @@ function tools_installed(){
     type -P findomain &>/dev/null && printf "${bgreen}[*] Findomain		[YES]\n" || { printf "${bred}[*] Findomain		[NO]\n"; }
     type -P amass &>/dev/null && printf "${bgreen}[*] Amass		[YES]\n" || { printf "${bred}[*] Amass		[NO]\n"; }
     type -P crobat &>/dev/null && printf "${bgreen}[*] Crobat		[YES]\n" || { printf "${bred}[*] Crobat		[NO]\n"; }
-    type -P chaos &>/dev/null && printf "${bgreen}[*] Chaos		[YES]\n" || { printf "${bred}[*] Chaos		[NO]\n"; }
     type -P waybackurls &>/dev/null && printf "${bgreen}[*] Waybackurls		[YES]\n" || { printf "${bred}[*] Waybackurls		[NO]\n"; }
     type -P gau &>/dev/null && printf "${bgreen}[*] Gau		        [YES]\n" || { printf "${bred}[*] Gau		[NO]\n"; }
     type -P shuffledns &>/dev/null && printf "${bgreen}[*] ShuffleDns		[YES]\n" || { printf "${bred}[*] ShuffleDns		[NO]\n"; }
+    type -P dnsx &>/dev/null && printf "${bgreen}[*] dnsx		[YES]\n" || { printf "${bred}[*] dnsx		[NO]\n"; }
     type -P subjack &>/dev/null && printf "${bgreen}[*] Subjack		[YES]\n" || { printf "${bred}[*] Subjack		[NO]\n"; }
     [ -f $tools/subjack/fingerprints.json ] && printf "${bgreen}[*] Subjack fingerprints[YES]\n" || printf "${bred}[*] Subjack fingerprints[NO]\n"
     type -P nuclei &>/dev/null && printf "${bgreen}[*] Nuclei		[YES]\n" || { printf "${bred}[*] Nuclei		[NO]\n"; }
@@ -134,10 +134,9 @@ subdomains(){
     amass enum -passive -d $domain -o amass.txt &>/dev/null
     findomain --quiet -t $domain -u findomain.txt &>/dev/null
     crobat -s $domain | anew -q crobat.txt &>/dev/null
-    chaos -silent -d $domain -o chaos.txt &>/dev/null
     waybackurls $domain | unfurl -u domains | anew -q waybackurls.txt &>/dev/null
-    cat subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt chaos.txt waybackurls.txt | sed "s/*.//" | anew -q passive.txt
-    rm subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt chaos.txt waybackurls.txt 2>/dev/null
+    cat subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt waybackurls.txt | sed "s/*.//" | anew -q passive.txt
+    rm subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt waybackurls.txt 2>/dev/null
 
     # Bruteforce
     printf "${yellow} Running : Bruteforce Subdomain Enumeration ${reset}\n\n"
@@ -147,7 +146,7 @@ subdomains(){
 
     # Active
     printf "${yellow} Running : Active Subdomain Enumeration${reset}\n\n"
-    cat active.txt passive.txt 2>/dev/null | sort -u | shuffledns -d $domain -r ../../resolvers.txt -o active_passive.txt &>/dev/null
+    cat active.txt passive.txt 2>/dev/null | sort -u | dnsx -silent -o active_passive.txt &>/dev/null
     rm active.txt passive.txt 2>/dev/null
 
     # Permutations
@@ -168,30 +167,20 @@ subdomains(){
     fi
 
     # Final subdomains
+<<<<<<< Updated upstream
     cat active_passive.txt permute.txt 2>/dev/null | sort -u | shuffledns -d $domain -r ../../resolvers.txt -silent -o ${domain}_subdomains.txt &>/dev/null
+=======
+    cat active_passive.txt permute.txt 2>/dev/null | sort -u | dnsx -silent -o ${domain}_subdomains.txt &>/dev/null
+>>>>>>> Stashed changes
     rm active_passive.txt permute.txt 2>/dev/null
     
     cat ${domain}_subdomains.txt 2>/dev/null
     printf "${bred}\n Finished : Results are saved in ${dir} folder ${reset}\n"
     printf "${bgreen}#######################################################################\n\n"
 	# Finished Subdomain Enumeration 
+}
 
-	# Performing Subdomain Takeover
-    printf "${bgreen}#######################################################################\n"
-    printf "${bred} Step 3/17 : ${bgreen} Subdomain Takeover ${reset}\n\n"
-    touch ${domain}_takeover.txt
-    printf "${yellow}\n\n Running : subjack test ${reset}\n\n"
-    subjack -w ${domain}_subdomains.txt -a -ssl -t 50 -v -c $tools/subjack/fingerprints.json -ssl -o ${domain}_all-takeover-checks.txt &>/dev/null;
-    grep -v "Not Vulnerable" <${domain}_all-takeover-checks.txt >${domain}_takeover.txt
-	rm ${domain}_all-takeover-checks.txt
-    printf "${yellow}\n\n Running : Nuclei SubTko${reset}\n\n"
-    cat ${domain}_subdomains.txt | nuclei -silent -l ${domain}_subdomains.txt -t ~/nuclei-templates/subdomain-takeover/ -o ${domain}_nuclei_subtko.txt;
-    cat ${domain}_nuclei_subtko.txt 2>/dev/null
-    cat ${domain}_takeover.txt 2>/dev/null;
-    printf "${bred}\n Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
-    printf "${bgreen}#######################################################################\n\n"
-   	# Finished Subdomain Takeover
-
+webprobe(){
 	# Performing Probing
     printf "${bgreen}#######################################################################\n"
     printf "${bred} Step 4/17 : ${bgreen} Probing ${reset}\n\n"
@@ -213,6 +202,24 @@ subdomains(){
     printf "${bred}\n Finished : ${bgreen} Results are saved in ${dir}/screenshots folder ${reset}\n"
     printf "${bgreen}#######################################################################\n"
 	# Finished webscreenshot
+}
+
+subtakeover(){
+	# Performing Subdomain Takeover
+    printf "${bgreen}#######################################################################\n"
+    printf "${bred} Step 3/17 : ${bgreen} Subdomain Takeover ${reset}\n\n"
+    touch ${domain}_takeover.txt
+    printf "${yellow}\n\n Running : subjack test ${reset}\n\n"
+    subjack -w ${domain}_subdomains.txt -a -ssl -t 50 -v -c $tools/subjack/fingerprints.json -ssl -o ${domain}_all-takeover-checks.txt &>/dev/null;
+    grep -v "Not Vulnerable" <${domain}_all-takeover-checks.txt >${domain}_takeover.txt
+	rm ${domain}_all-takeover-checks.txt
+    printf "${yellow}\n\n Running : Nuclei SubTko${reset}\n\n"
+    cat ${domain}_subdomains.txt | nuclei -silent -l ${domain}_subdomains.txt -t ~/nuclei-templates/subdomain-takeover/ -o ${domain}_nuclei_subtko.txt;
+    cat ${domain}_nuclei_subtko.txt 2>/dev/null
+    cat ${domain}_takeover.txt 2>/dev/null;
+    printf "${bred}\n Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
+    printf "${bgreen}#######################################################################\n\n"
+   	# Finished Subdomain Takeover
 }
 
 nuclei_check(){
@@ -425,6 +432,8 @@ all(){
 	start
 	dorks
 	subdomains
+    subtakeover
+    webprobe
 	nuclei
 	portscan
 	urlcheks
@@ -448,12 +457,14 @@ help(){
 	printf "        $0 -s	Only subdomains\n";
 	printf "        $0 -g	Only Google Dorks\n";
 	printf "        $0 -w	Only web scan\n";
+    printf "        $0 -t	Only web scan\n";
 	printf "        $0 -h	Show this help\n";
     printf "\n Examples: \n\n";
     printf " ./reconftw.sh -d target.com -a -> All checks\n";
     printf " ./reconftw.sh -d target.com -s -> Only subdomains\n";
     printf " ./reconftw.sh -d target.com -g	-> Only Google Dorks\n";
     printf " ./reconftw.sh -d target.com -l targets.txt -w -> Only Web Scan (Target list required)\n";
+    printf " ./reconftw.sh -d target.com -l targets.txt -t -> Check SubTko (Target list required)\n";
 }
 
 banner
@@ -464,7 +475,7 @@ then
    exit
 fi
 
-while getopts ":hd:-:l:aswg" opt; do
+while getopts ":hd:-:l:aswgt" opt; do
 	case ${opt} in
 		d ) domain=$OPTARG
 		    ;;
@@ -472,6 +483,8 @@ while getopts ":hd:-:l:aswg" opt; do
             ;;
 		s ) start
 			subdomains
+            subtakeover
+            webprobe
 			end
 		    ;;
 		a ) all
@@ -486,6 +499,9 @@ while getopts ":hd:-:l:aswg" opt; do
 			cors
 			testssl
 			;;
+        t ) start
+            subtakeover
+            ;;
 		g ) start
 			dorks
 			;;
