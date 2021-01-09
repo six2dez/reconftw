@@ -52,8 +52,10 @@ git clone https://github.com/chenjj/CORScanner $dir/CORScanner &>/dev/null
 git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh &>/dev/null
 pip3 install dnsgen &>/dev/null
 sudo chmod +x $dir/JSFScan.sh/install.sh && $dir/JSFScan.sh/install.sh &>/dev/null
-wget https://github.com/ezekg/git-hound/releases/download/1.0.0/git-hound_linux_amd64 &>/dev/null
-sudo mv git-hound_linux_amd64 /usr/local/bin/git-hound
+wget https://github.com/tillson/git-hound/releases/download/v1.3/git-hound_1.3_Linux_x86_64.tar.gz &>/dev/null
+tar -xf git-hound_1.3_Linux_x86_64.tar.gz git-hound
+rm -f git-hound_1.3_Linux_x86_64.tar.gz
+sudo mv git-hound /usr/local/bin/git-hound
 sudo chmod 755 /usr/local/bin/git-hound
 wget https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-linux &>/dev/null
 sudo mv findomain-linux /usr/local/bin/findomain
