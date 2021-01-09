@@ -11,6 +11,7 @@ sudo apt install python3 python3-pip ruby screen git libpcap-dev -y
 mkdir -p ~/.gf
 mkdir -p ~/Tools
 dir=~/Tools
+pwd=pwd
 
 go get -u github.com/tomnomnom/gf
 GO111MODULE=on go get -v github.com/OWASP/Amass/v3/...
@@ -57,8 +58,8 @@ sudo chmod +x /usr/local/bin/findomain
 cd $dir/massdns; make
 cp $dir/massdns/bin/massdns /usr/bin/
 cd ~/.gf; wget https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json
-wget -O subdomains.txt https://gist.githubusercontent.com/jhaddix/86a06c5dc309d08580a018c66354a056/raw/96f4e51d96b2203f19f6381c8c545b278eaa0837/all.txt
-wget -O resolvers.txt https://raw.githubusercontent.com/danielmiessler/SecLists/master/Miscellaneous/dns-resolvers.txt
+wget -O $pwd/subdomains.txt https://gist.githubusercontent.com/jhaddix/86a06c5dc309d08580a018c66354a056/raw/96f4e51d96b2203f19f6381c8c545b278eaa0837/all.txt
+wget -O $pwd/resolvers.txt https://raw.githubusercontent.com/danielmiessler/SecLists/master/Miscellaneous/dns-resolvers.txt
 
 printf "${bgreen} Finished!${reset}\n\n"
 printf "\n\n${bgreen}#######################################################################\n"
