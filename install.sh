@@ -32,7 +32,7 @@ mkdir ~/.gf
 cp -r $GOPATH/src/github.com/tomnomnom/gf/examples ~/.gf
 mv $dir/Gf-Patterns/*.json ~/.gf
 GO111MODULE=on go get -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder
-go get -u github.com/projectdiscovery/chaos-client/cmd/chaos
+GO111MODULE=on go get -u github.com/projectdiscovery/chaos-client/cmd/chaos
 go get -u github.com/hahwul/dalfox
 go get -u github.com/lc/gau
 go get -u github.com/KathanP19/Gxss
