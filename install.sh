@@ -53,6 +53,7 @@ wget https://github.com/ezekg/git-hound/releases/download/1.0.0/git-hound_linux_
 sudo cp git-hound_linux_amd64 /usr/local/bin/git-hound
 wget https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-linux
 sudo cp findomain-linux /usr/local/bin/findomain
+sudo chmod +x /usr/local/bin/findomain
 cd $dir/massdns; make
 cp $dir/massdns/bin/massdns /usr/bin/
 cd ~/.gf; wget https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json
