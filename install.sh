@@ -30,7 +30,6 @@ go get -u github.com/haccer/subjack &>/dev/null
 GO111MODULE=on go get -v github.com/projectdiscovery/httpx/cmd/httpx &>/dev/null
 git clone https://github.com/haccer/subjack $dir/subjack &>/dev/null
 git clone https://github.com/1ndianl33t/Gf-Patterns $dir/Gf-Patterns &>/dev/null
-mkdir ~/.gf
 cp -r $GOPATH/src/github.com/tomnomnom/gf/examples ~/.gf
 mv $dir/Gf-Patterns/*.json ~/.gf
 GO111MODULE=on go get -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder &>/dev/null
@@ -54,12 +53,12 @@ pip3 install dnsgen &>/dev/null
 sudo chmod +x $dir/JSFScan.sh/install.sh && $dir/JSFScan.sh/install.sh &>/dev/null
 wget https://github.com/ezekg/git-hound/releases/download/1.0.0/git-hound_linux_amd64 &>/dev/null
 sudo cp git-hound_linux_amd64 /usr/local/bin/git-hound
-chmod 755 /usr/local/bin/git-hound
+sudo chmod 755 /usr/local/bin/git-hound
 wget https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-linux &>/dev/null
 sudo cp findomain-linux /usr/local/bin/findomain
-chmod 755 /usr/local/bin/findomain
+sudo chmod 755 /usr/local/bin/findomain
 cd $dir/massdns; make &>/dev/null
-cp $dir/massdns/bin/massdns /usr/bin/
+sudo cp $dir/massdns/bin/massdns /usr/bin/
 cd ~/.gf; wget https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json &>/dev/null; cd $dir
 wget -O subdomains.txt https://gist.githubusercontent.com/jhaddix/86a06c5dc309d08580a018c66354a056/raw/96f4e51d96b2203f19f6381c8c545b278eaa0837/all.txt &>/dev/null
 wget -O resolvers.txt https://raw.githubusercontent.com/janmasarik/resolvers/master/resolvers.txt &>/dev/null
