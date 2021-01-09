@@ -59,7 +59,7 @@ sudo mv findomain-linux /usr/local/bin/findomain
 sudo chmod 755 /usr/local/bin/findomain
 cd $dir/massdns; make &>/dev/null
 sudo cp $dir/massdns/bin/massdns /usr/bin/
-find $dir -name 'requirements.txt' -exec pip3 install -r {} \;
+find $dir -name 'requirements.txt' -exec pip3 install -r {} \; &>/dev/null
 cd ~/.gf; wget https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json &>/dev/null; cd $dir
 wget -O subdomains.txt https://gist.githubusercontent.com/jhaddix/86a06c5dc309d08580a018c66354a056/raw/96f4e51d96b2203f19f6381c8c545b278eaa0837/all.txt &>/dev/null
 wget -O resolvers.txt https://raw.githubusercontent.com/janmasarik/resolvers/master/resolvers.txt &>/dev/null
