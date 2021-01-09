@@ -167,11 +167,7 @@ subdomains(){
     fi
 
     # Final subdomains
-<<<<<<< Updated upstream
-    cat active_passive.txt permute.txt 2>/dev/null | sort -u | shuffledns -d $domain -r ../../resolvers.txt -silent -o ${domain}_subdomains.txt &>/dev/null
-=======
     cat active_passive.txt permute.txt 2>/dev/null | sort -u | dnsx -silent -o ${domain}_subdomains.txt &>/dev/null
->>>>>>> Stashed changes
     rm active_passive.txt permute.txt 2>/dev/null
     
     cat ${domain}_subdomains.txt 2>/dev/null
