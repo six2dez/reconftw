@@ -30,7 +30,8 @@ go get -u github.com/haccer/subjack &>/dev/null
 GO111MODULE=on go get -v github.com/projectdiscovery/httpx/cmd/httpx &>/dev/null
 git clone https://github.com/haccer/subjack $dir/subjack &>/dev/null
 git clone https://github.com/1ndianl33t/Gf-Patterns $dir/Gf-Patterns &>/dev/null
-cp -r $GOPATH/src/github.com/tomnomnom/gf/examples ~/.gf
+git clone https://github.com/tomnomnom/gf $dir/gf &>/dev/null
+cp -r $dir/gf/examples ~/.gf
 mv $dir/Gf-Patterns/*.json ~/.gf
 GO111MODULE=on go get -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder &>/dev/null
 printf "${bgreen} 50%% done${reset}\n\n"
