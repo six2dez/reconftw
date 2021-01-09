@@ -7,7 +7,7 @@ printf "\n\n${bgreen}###########################################################
 printf "${bgreen} Install script (Kali Linux based)${reset}\n\n"
 
 sudo apt update -y
-sudo apt install python3 python3-pip ruby screen git libpcap-dev -y
+sudo apt install python3 python3-pip ruby screen git libpcap-dev golang -y
 mkdir -p ~/.gf
 mkdir -p ~/Tools
 dir=~/Tools
