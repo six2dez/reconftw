@@ -52,10 +52,10 @@ git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh &>/dev/null
 pip3 install dnsgen &>/dev/null
 sudo chmod +x $dir/JSFScan.sh/install.sh && $dir/JSFScan.sh/install.sh &>/dev/null
 wget https://github.com/ezekg/git-hound/releases/download/1.0.0/git-hound_linux_amd64 &>/dev/null
-sudo cp git-hound_linux_amd64 /usr/local/bin/git-hound
+sudo mv git-hound_linux_amd64 /usr/local/bin/git-hound
 sudo chmod 755 /usr/local/bin/git-hound
 wget https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-linux &>/dev/null
-sudo cp findomain-linux /usr/local/bin/findomain
+sudo mv findomain-linux /usr/local/bin/findomain
 sudo chmod 755 /usr/local/bin/findomain
 cd $dir/massdns; make &>/dev/null
 sudo cp $dir/massdns/bin/massdns /usr/bin/
