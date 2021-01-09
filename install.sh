@@ -41,6 +41,7 @@ go get -u github.com/KathanP19/Gxss &>/dev/null
 git clone https://github.com/blechschmidt/massdns $dir/massdns &>/dev/null
 git clone https://github.com/devanshbatham/ParamSpider $dir/ParamSpider &>/dev/null
 git clone https://github.com/maurosoria/dirsearch $dir/dirsearch &>/dev/null
+git clone https://github.com/six2dez/OneListForAll $dir/OneListForAll &>/dev/null
 GO111MODULE=on go get -v github.com/projectdiscovery/shuffledns/cmd/shuffledns &>/dev/null
 go get -u github.com/cgboal/sonarsearch/crobat &>/dev/null
 git clone https://github.com/KathanP19/JSFScan.sh $dir/JSFScan.sh &>/dev/null
