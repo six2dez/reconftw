@@ -2,6 +2,9 @@
 
 ## tl;dr
 
+- Requires [Go](https://golang.org/dl/)
+- install.sh uses apt for installing packages, modify for your needs
+
 ```bash
 git clone https://github.com/six2dez/reconftw
 cd reconftw
@@ -13,13 +16,13 @@ chmod +x *.sh
 
 ## Summary
 
-**Important: run install script or set your tools path in the script in $tools var (line 10)**
+**Important: run install.sh script or set your tools path in the script in $tools var (line 10)**
 
 This is a simple script intended to perform a full recon on an objective with multiple subdomains. It performs multiples steps listed below:
 
 0. Tools checker
 1. Google Dorks (based on deggogle_hunter)
-2. Subdomain enumeration (multiple tools: passive, resolution, bruteforce and permutations)
+2. Subdomain enumeration (passive, resolution, bruteforce and permutations)
 3. Sub TKO (subjack and nuclei)
 4. Probing (httpx)
 5. Websscreenshot (aquatone)
@@ -39,6 +42,38 @@ This is a simple script intended to perform a full recon on an objective with mu
 Also you can perform just subdomain scan, webscan or google dorks. Remember webscan needs target lists with -l flag.
 
 It generates and output in Recon/ folder with the name of the target domain, for example Recon/target.com/
+
+## Installation
+
+Run install.sh and it will install all the tools needed.
+
+## Usage
+
+### Full scan:
+```bash
+./reconftw.sh -d target.com -a
+```
+
+### Subdomains scan:
+```bash
+./reconftw.sh -d target.com -s
+```
+
+### Web scan (target list required):
+```bash
+./reconftw.sh -d target.com -l targets.txt -w
+```
+
+### Dorks:
+```bash
+./reconftw.sh -d target.com -g
+```
+
+## Notes
+
+- Some tools in this script need or can use multiple API keys, such as amass, subfinder, or git-hound. It is up to you to configure them correctly, consult the documentation of each tool to do it correctly.
+
+- This script uses dalfox with blind-xss option, you must change to your own server, check xsshunter.com.
 
 ## Short-term improvement plan:
 - [ ] Enhance this Readme
