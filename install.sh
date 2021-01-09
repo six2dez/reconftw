@@ -8,8 +8,8 @@ printf "${bgreen} Install script (Kali Linux based)${reset}\n\n"
 
 sudo apt update -y &>/dev/null
 sudo apt install python3 python3-pip ruby screen git libpcap-dev chromium-browser -y &>/dev/null
-mkdir -p ~/.gf
-mkdir -p ~/Tools
+[ ! -d "~/.gf" ] && mkdir -p ~/.gf
+[ ! -d "~/Tools" ] && mkdir -p ~/Tools
 dir=~/Tools
 
 go get -u github.com/tomnomnom/gf &>/dev/null
@@ -23,7 +23,7 @@ GO111MODULE=on go get -v github.com/projectdiscovery/dnsx/cmd/dnsx &>/dev/null
 go get -u github.com/michenriksen/aquatone &>/dev/null
 go get -u github.com/tomnomnom/anew &>/dev/null
 go get -u github.com/tomnomnom/unfurl &>/dev/null
-printf "${bgreen} 25% done${reset}\n\n"
+printf "${bgreen} 25%% done${reset}\n\n"
 git clone https://github.com/projectdiscovery/nuclei-templates ~/nuclei-templates &>/dev/null
 nuclei -update-templates &>/dev/null
 go get -u github.com/haccer/subjack &>/dev/null
@@ -34,7 +34,7 @@ mkdir ~/.gf
 cp -r $GOPATH/src/github.com/tomnomnom/gf/examples ~/.gf
 mv $dir/Gf-Patterns/*.json ~/.gf
 GO111MODULE=on go get -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder &>/dev/null
-printf "${bgreen} 50% done${reset}\n\n"
+printf "${bgreen} 50%% done${reset}\n\n"
 go get -u github.com/hahwul/dalfox &>/dev/null
 go get -u github.com/lc/gau &>/dev/null
 go get -u github.com/KathanP19/Gxss &>/dev/null
@@ -47,7 +47,7 @@ git clone https://github.com/KathanP19/JSFScan.sh $dir/JSFScan.sh &>/dev/null
 git clone https://github.com/six2dez/degoogle_hunter $dir/degoogle_hunter &>/dev/null
 git clone https://github.com/s0md3v/Arjun $dir/Arjun &>/dev/null
 git clone https://github.com/pielco11/fav-up $dir/fav-up &>/dev/null
-printf "${bgreen} 75% done${reset}\n\n"
+printf "${bgreen} 75%% done${reset}\n\n"
 git clone https://github.com/chenjj/CORScanner $dir/CORScanner &>/dev/null
 git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh &>/dev/null
 pip3 install dnsgen &>/dev/null
