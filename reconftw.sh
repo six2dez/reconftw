@@ -140,7 +140,7 @@ subdomains(){
 
     # Bruteforce
     printf "${yellow} Running : Bruteforce Subdomain Enumeration ${reset}\n\n"
-    shuffledns -d $domain -w $reconftw/subdomains.txt -r $reconftw/resolvers.txt -o active_tmp.txt &>/dev/null
+    shuffledns -d $domain -w $tools/subdomains.txt -r $reconftw/resolvers.txt -o active_tmp.txt &>/dev/null
     cat active_tmp.txt | sed "s/*.//" | anew -q active.txt
     rm active_tmp.txt 2>/dev/null
 
