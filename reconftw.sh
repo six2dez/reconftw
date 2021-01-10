@@ -21,18 +21,17 @@ banner(){
 	printf "   ░░   ░    ░   ░        ░ ░ ░ ▒     ░   ░ ░  ░ ░      ░        ░   ░  \n"
 	printf "    ░        ░  ░░ ░          ░ ░           ░                      ░    \n"
 	printf "                 ░                                                      \n"
-	printf "			by @six2dez1(Twitter) or @six2dez(rest of sites)${reset}\n"
+	printf "			                        by @six2dez1(Twitter)${reset}\n"
 }
 
 start(){
     tools_installed
 	dir=$PWD/Recon/$domain
 	mkdir -p $dir
-    if [ -v "$list" ]
+    if [ -n "$list" ]
     then
-        cp $list ${domain}_probed.txt 
+        cp $list $dir/${domain}_probed.txt 
     fi
-    reconftw=$PWD
 	cd $dir
 	printf "\n"
     printf "${bgreen}#######################################################################\n"
