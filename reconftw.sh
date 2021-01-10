@@ -331,7 +331,7 @@ github(){
 	# Performing GitHub Scanning 
     printf "${bgreen}#######################################################################\n"
     printf "${bred} Step 12/17 : ${bgreen} GitHub Scanning ${reset}\n\n"
-    cat ${domain}_probed.txt | git-hound --dig-files --dig-commits --threads 100 tee ${domain}_gitrecon.txt
+    cat ${domain}_probed.txt | git-hound --dig-files --dig-commits --threads 100 | tee ${domain}_gitrecon.txt
     printf "${bred} Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
     printf "${bgreen}#######################################################################\n"
 	# Finished GitHub Scanning
