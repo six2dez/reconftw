@@ -53,6 +53,7 @@ git clone https://github.com/chenjj/CORScanner $dir/CORScanner &>/dev/null
 git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh &>/dev/null
 pip3 install dnsgen &>/dev/null
 sudo chmod +x $dir/JSFScan.sh/install.sh && $dir/JSFScan.sh/install.sh &>/dev/null
+sudo chmod 755 $dir/JSFScan.sh/JSFScan.sh
 wget https://github.com/tillson/git-hound/releases/download/v1.3/git-hound_1.3_Linux_x86_64.tar.gz &>/dev/null
 tar -xf git-hound_1.3_Linux_x86_64.tar.gz git-hound
 rm -f git-hound_1.3_Linux_x86_64.tar.gz
