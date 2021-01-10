@@ -261,7 +261,7 @@ portscan(){
 	# Performing Port Scanning with Naabu
     printf "${bgreen}#######################################################################\n"
     printf "${bred} Step 7/17 : ${bgreen} Port Scanning with Naabu ${reset}\n\n"
-    naabu -p - -silent -exclude-cdn -nmap-cli 'nmap -sV --script /usr/share/nmap/scripts/vulners.nse,http-title.nse --min-rate 40000 -T4 --max-retries 2' -iL ${domain}_subdomains.txt > ${domain}_portscan.txt;
+    naabu -top-ports 1000 -silent -exclude-cdn -nmap-cli 'nmap -sV --script /usr/share/nmap/scripts/vulners.nse,http-title.nse --min-rate 40000 -T4 --max-retries 2' -iL ${domain}_subdomains.txt > ${domain}_portscan.txt;
     cat ${domain}_portscan.txt 2>/dev/null
     printf "\n\n"
     printf "${bred} Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
