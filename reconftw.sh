@@ -134,13 +134,13 @@ subdomains(){
     amass enum -passive -d $domain -o amass.txt &>/dev/null
     findomain --quiet -t $domain -u findomain.txt &>/dev/null
     crobat -s $domain | anew -q crobat.txt &>/dev/null
-    waybackurls $domain | unfurl -u domains | anew -q waybackurls.txt &>/dev/null
-    cat subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt waybackurls.txt | sed "s/*.//" | anew -q passive.txt
+#    waybackurls $domain | unfurl -u domains | anew -q waybackurls.txt &>/dev/null
+    cat subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt waybackurls.txt 2>/dev/null | sed "s/*.//" | anew -q passive.txt
     rm subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt waybackurls.txt 2>/dev/null
 
     # Bruteforce
     printf "${yellow} Running : Bruteforce Subdomain Enumeration ${reset}\n\n"
-    shuffledns -d $domain -w $dir/subdomains.txt -r $dir/resolvers.txt -o active_tmp.txt &>/dev/null
+    shuffledns -d $domain -w $PWD/subdomains.txt -r $PWD/resolvers.txt -o active_tmp.txt &>/dev/null
     cat active_tmp.txt | sed "s/*.//" | anew -q active.txt
     rm active_tmp.txt 2>/dev/null
 
@@ -153,15 +153,15 @@ subdomains(){
     printf "${yellow} Running : Permutations Subdomain Enumeration${reset}\n\n"
     if [[ $(cat active_passive.txt | wc -l) -le 50 ]]
         then
-            dnsgen active_passive.txt | shuffledns -d $domain -r $dir/resolvers.txt -o permute1_tmp.txt &>/dev/null
+            dnsgen active_passive.txt | shuffledns -d $domain -r $PWD/resolvers.txt -o permute1_tmp.txt &>/dev/null
             cat permute1_tmp.txt | anew -q permute1.txt 
-            dnsgen permute1.txt | shuffledns -d $domain -r $dir/resolvers.txt -o permute2_tmp.txt &>/dev/null
+            dnsgen permute1.txt | shuffledns -d $domain -r $PWD/resolvers.txt -o permute2_tmp.txt &>/dev/null
             cat permute2_tmp.txt | anew -q permute2.txt
             cat permute1.txt permute2.txt | anew -q permute.txt
             rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt 2>/dev/null
         elif [[ $(cat active_passive.txt | wc -l) -le 100 ]]
         then
-            dnsgen active_passive.txt | shuffledns -d $domain -r $dir/resolvers.txt -o permute_tmp.txt &>/dev/null
+            dnsgen active_passive.txt | shuffledns -d $domain -r $PWD/resolvers.txt -o permute_tmp.txt &>/dev/null
             cat permute_tmp.txt | anew -q permute.txt
             rm permute_tmp.txt 2>/dev/null
     fi
