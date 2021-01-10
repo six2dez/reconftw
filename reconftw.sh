@@ -140,7 +140,7 @@ subdomains(){
 
     # Bruteforce
     printf "${yellow} Running : Bruteforce Subdomain Enumeration ${reset}\n\n"
-    shuffledns -d $domain -w $reconftw/subdomains.txt -r $tools/resolvers.txt -o active_tmp.txt &>/dev/null
+    shuffledns -d $domain -w $tools/subdomains.txt -r $tools/resolvers.txt -o active_tmp.txt &>/dev/null
     cat active_tmp.txt | sed "s/*.//" | anew -q active.txt
     rm active_tmp.txt 2>/dev/null
 
@@ -161,7 +161,7 @@ subdomains(){
             rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt 2>/dev/null
         elif [[ $(cat active_passive.txt | wc -l) -le 100 ]]
         then
-            dnsgen active_passive.txt | shuffledns -d $domain -r $reconftw/resolvers.txt -o permute_tmp.txt &>/dev/null
+            dnsgen active_passive.txt | shuffledns -d $domain -r $tools/resolvers.txt -o permute_tmp.txt &>/dev/null
             cat permute_tmp.txt | anew -q permute.txt
             rm permute_tmp.txt 2>/dev/null
     fi
