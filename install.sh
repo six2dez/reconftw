@@ -40,7 +40,6 @@ GO111MODULE=on go get -v github.com/projectdiscovery/naabu/v2/cmd/naabu &>/dev/n
 printf "${bgreen} 10%% done${reset}\n\n"
 go get -v github.com/tomnomnom/hacks/waybackurls &>/dev/null
 GO111MODULE=on go get -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei &>/dev/null
-GO111MODULE=on go get -v github.com/projectdiscovery/dnsx/cmd/dnsx &>/dev/null
 go get -v github.com/michenriksen/aquatone &>/dev/null
 go get -v github.com/tomnomnom/anew &>/dev/null
 printf "${bgreen} 20%% done${reset}\n\n"
@@ -73,6 +72,7 @@ git clone https://github.com/six2dez/degoogle_hunter $dir/degoogle_hunter &>/dev
 git clone https://github.com/s0md3v/Arjun $dir/Arjun &>/dev/null
 git clone https://github.com/pielco11/fav-up $dir/fav-up &>/dev/null
 git clone https://github.com/chenjj/CORScanner $dir/CORScanner &>/dev/null
+git clone https://github.com/nsonaniya2010/SubDomainizer $dir/SubDomainizer &>/dev/null
 printf "${bgreen} 70%% done${reset}\n\n"
 git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh &>/dev/null
 pip3 install dnsgen &>/dev/null
