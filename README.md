@@ -84,6 +84,7 @@ Run install.sh and it will install all the tools needed.
 - [ ] Any other interesting suggestion
 - [ ] Add menu option for every feature
 - [ ] Crawler
+- [ ] Arch based installer support
 
 ## Thanks
 For their great feedback, support, help or for nothing special but well deserved:
