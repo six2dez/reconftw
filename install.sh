@@ -17,49 +17,55 @@ GO111MODULE=on go get -v github.com/OWASP/Amass/v3/... &>/dev/null
 go get -u github.com/ffuf/ffuf &>/dev/null
 go get -u github.com/tomnomnom/assetfinder &>/dev/null
 GO111MODULE=on go get -v github.com/projectdiscovery/naabu/v2/cmd/naabu &>/dev/null
+printf "${bgreen} 10%% done${reset}\n\n"
 go get -u github.com/tomnomnom/hacks/waybackurls &>/dev/null
 GO111MODULE=on go get -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei &>/dev/null
 GO111MODULE=on go get -v github.com/projectdiscovery/dnsx/cmd/dnsx &>/dev/null
 go get -u github.com/michenriksen/aquatone &>/dev/null
 go get -u github.com/tomnomnom/anew &>/dev/null
+printf "${bgreen} 20%% done${reset}\n\n"
 go get -u github.com/tomnomnom/unfurl &>/dev/null
-printf "${bgreen} 25%% done${reset}\n\n"
 git clone https://github.com/projectdiscovery/nuclei-templates ~/nuclei-templates &>/dev/null
 nuclei -update-templates &>/dev/null
 go get -u github.com/haccer/subjack &>/dev/null
 GO111MODULE=on go get -v github.com/projectdiscovery/httpx/cmd/httpx &>/dev/null
+printf "${bgreen} 30%% done${reset}\n\n"
 git clone https://github.com/haccer/subjack $dir/subjack &>/dev/null
 git clone https://github.com/1ndianl33t/Gf-Patterns $dir/Gf-Patterns &>/dev/null
 git clone https://github.com/tomnomnom/gf $dir/gf &>/dev/null
 cp -r $dir/gf/examples ~/.gf
 mv $dir/Gf-Patterns/*.json ~/.gf
+printf "${bgreen} 40%% done${reset}\n\n"
 GO111MODULE=on go get -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder &>/dev/null
-printf "${bgreen} 50%% done${reset}\n\n"
 go get -u github.com/hahwul/dalfox &>/dev/null
 go get -u github.com/lc/gau &>/dev/null
 go get -u github.com/KathanP19/Gxss &>/dev/null
 git clone https://github.com/blechschmidt/massdns $dir/massdns &>/dev/null
+printf "${bgreen} 50%% done${reset}\n\n"
 git clone https://github.com/devanshbatham/ParamSpider $dir/ParamSpider &>/dev/null
 git clone https://github.com/maurosoria/dirsearch $dir/dirsearch &>/dev/null
 git clone https://github.com/six2dez/OneListForAll $dir/OneListForAll &>/dev/null
 GO111MODULE=on go get -v github.com/projectdiscovery/shuffledns/cmd/shuffledns &>/dev/null
 go get -u github.com/cgboal/sonarsearch/crobat &>/dev/null
+printf "${bgreen} 60%% done${reset}\n\n"
 git clone https://github.com/KathanP19/JSFScan.sh $dir/JSFScan.sh &>/dev/null
 git clone https://github.com/six2dez/degoogle_hunter $dir/degoogle_hunter &>/dev/null
 git clone https://github.com/s0md3v/Arjun $dir/Arjun &>/dev/null
 git clone https://github.com/pielco11/fav-up $dir/fav-up &>/dev/null
-printf "${bgreen} 75%% done${reset}\n\n"
 git clone https://github.com/chenjj/CORScanner $dir/CORScanner &>/dev/null
+printf "${bgreen} 70%% done${reset}\n\n"
 git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh &>/dev/null
 pip3 install dnsgen &>/dev/null
 sudo chmod +x $dir/JSFScan.sh/install.sh && $dir/JSFScan.sh/install.sh &>/dev/null
 sudo chmod 755 $dir/JSFScan.sh/JSFScan.sh
 wget https://github.com/tillson/git-hound/releases/download/v1.3/git-hound_1.3_Linux_x86_64.tar.gz &>/dev/null
+printf "${bgreen} 80%% done${reset}\n\n"
 tar -xf git-hound_1.3_Linux_x86_64.tar.gz git-hound
 rm -f git-hound_1.3_Linux_x86_64.tar.gz
 sudo mv git-hound /usr/local/bin/git-hound
 sudo chmod 755 /usr/local/bin/git-hound
 wget https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-linux &>/dev/null
+printf "${bgreen} 90%% done${reset}\n\n"
 sudo mv findomain-linux /usr/local/bin/findomain
 sudo chmod 755 /usr/local/bin/findomain
 cd $dir/massdns; make &>/dev/null
