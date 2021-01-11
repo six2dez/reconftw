@@ -177,21 +177,18 @@ subdomains(){
 
     # SubDomainizer
     printf "${yellow} Running : SubDomainizer${reset}\n"
-    cat active_passive.txt permute.txt > final_subdomains_tmp.txt
-    shuffledns -d $domain -list final_subdomains_tmp.txt -r $tools/resolvers.txt -o pre_subdomains.txt &>/dev/null
-    cat pre_subdomains.txt | httpx -threads 100 -silent -o pre_subdomains_probed.txt &>/dev/null
-    python3 $tools/SubDomainizer/SubDomainizer.py -l pre_subdomains.txt -o SubDomainizer_subdomains.txt -k &>/dev/null
+    domain_probed=$(echo $domain | httpx -threads 100 -silent)
+    python3 $tools/SubDomainizer/SubDomainizer.py -u $domain_probed -o SubDomainizer_subdomains.txt -k &>/dev/null
     NUMOFLINES=$(wc -l < SubDomainizer_subdomains.txt)
     printf "${green} SubDomainizer: ${NUMOFLINES}${reset}\n\n"
 
     # Final subdomains
-    cat SubDomainizer_subdomains.txt pre_subdomains.txt > final_subdomains_tmp2.txt
-    shuffledns -d $domain -list final_subdomains_tmp2.txt -r $tools/resolvers.txt -o ${domain}_subdomains.txt &>/dev/null
-    
-    rm active_passive.txt permute.txt final_subdomains_tmp.txt 2>/dev/null
+    cat active_passive.txt permute.txt SubDomainizer_subdomains > final_subdomains.txt
+    shuffledns -d $domain -list final_subdomains.txt -r $tools/resolvers.txt -o ${domain}_subdomains.txt &>/dev/null
+    rm active_passive.txt permute.txt SubDomainizer_subdomains.txt final_subdomains.txt 2>/dev/null
     NUMOFLINES=$(wc -l < ${domain}_subdomains.txt)
     printf "${bgreen} Total active subdomains found: ${NUMOFLINES}${reset}\n\n"
-    
+
     cat ${domain}_subdomains.txt 2>/dev/null
     printf "${bred}\n Finished : Results are saved in ${dir} folder ${reset}\n"
     printf "${bgreen}#######################################################################\n\n"
