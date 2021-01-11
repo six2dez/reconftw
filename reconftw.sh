@@ -51,6 +51,7 @@ function tools_installed(){
     [ -f $tools/dirsearch/dirsearch.py ] && printf "${bgreen}[*] dirsearch		[YES]\n" || printf "${bred}[*] dirsearch		[NO]\n"
     [ -f $tools/CORScanner/cors_scan.py ] && printf "${bgreen}[*] CORScanner		[YES]\n" || printf "${bred}[*] CORScanner		[NO]\n"
     [ -f $tools/testssl.sh/testssl.sh ] && printf "${bgreen}[*] testssl		[YES]\n" || printf "${bred}[*] testssl		[NO]\n"
+    [ -f $tools/SubDomainizer/SubDomainizer.py ] && printf "${bgreen}[*] SubDomainizer		[YES]\n" || printf "${bred}[*] SubDomainizer		[NO]\n"
     type -P subfinder &>/dev/null && printf "${bgreen}[*] Subfinder		[YES]\n" || { printf "${bred}[*] Subfinder		[NO]\n"; }
     type -P assetfinder &>/dev/null && printf "${bgreen}[*] Assetfinder		[YES]\n" || { printf "${bred}[*] Assetfinder		[NO]\n"; }
     type -P findomain &>/dev/null && printf "${bgreen}[*] Findomain		[YES]\n" || { printf "${bred}[*] Findomain		[NO]\n"; }
@@ -59,7 +60,6 @@ function tools_installed(){
     type -P waybackurls &>/dev/null && printf "${bgreen}[*] Waybackurls		[YES]\n" || { printf "${bred}[*] Waybackurls		[NO]\n"; }
     type -P gau &>/dev/null && printf "${bgreen}[*] Gau		        [YES]\n" || { printf "${bred}[*] Gau		[NO]\n"; }
     type -P shuffledns &>/dev/null && printf "${bgreen}[*] ShuffleDns		[YES]\n" || { printf "${bred}[*] ShuffleDns		[NO]\n"; }
-    type -P dnsx &>/dev/null && printf "${bgreen}[*] dnsx		[YES]\n" || { printf "${bred}[*] dnsx		[NO]\n"; }
     type -P subjack &>/dev/null && printf "${bgreen}[*] Subjack		[YES]\n" || { printf "${bred}[*] Subjack		[NO]\n"; }
     [ -f $tools/subjack/fingerprints.json ] && printf "${bgreen}[*] Subjack fingerprints[YES]\n" || printf "${bred}[*] Subjack fingerprints[NO]\n"
     type -P nuclei &>/dev/null && printf "${bgreen}[*] Nuclei		[YES]\n" || { printf "${bred}[*] Nuclei		[NO]\n"; }
@@ -127,7 +127,7 @@ subdomains(){
     printf "${bgreen}#######################################################################\n"
     printf "${bred} Step 2/17 : Subdomain Enumeration\n\n"
     # Passive scan
-    printf "${yellow} Running : Passive Subdomain Enumeration${reset}\n\n"
+    printf "${yellow} Running : Passive Subdomain Enumeration${reset}\n"
     subfinder -d $domain -o subfinder.txt &>/dev/null
     assetfinder --subs-only $domain | anew -q assetfinder.txt
     amass enum -passive -d $domain -o amass.txt &>/dev/null
@@ -136,20 +136,28 @@ subdomains(){
 #    waybackurls $domain | unfurl -u domains | anew -q waybackurls.txt &>/dev/null
     cat subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt waybackurls.txt 2>/dev/null | sed "s/*.//" | anew -q passive.txt
     rm subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt waybackurls.txt 2>/dev/null
+    NUMOFLINES=$(wc -l < passive.txt)
+    printf "${green} Passive subdomains found: ${NUMOFLINES}${reset}\n\n"
 
     # Bruteforce
-    printf "${yellow} Running : Bruteforce Subdomain Enumeration ${reset}\n\n"
+    printf "${yellow} Running : Bruteforce Subdomain Enumeration ${reset}\n"
     shuffledns -d $domain -w $tools/subdomains.txt -r $tools/resolvers.txt -o active_tmp.txt &>/dev/null
     cat active_tmp.txt | sed "s/*.//" | anew -q active.txt
     rm active_tmp.txt 2>/dev/null
+    NUMOFLINES=$(wc -l < active.txt)
+    printf "${green} Bruteforce subdomains found: ${NUMOFLINES}${reset}\n\n"
+
 
     # Active
-    printf "${yellow} Running : Active Subdomain Enumeration${reset}\n\n"
-    cat active.txt passive.txt 2>/dev/null | sort -u | dnsx -silent -o active_passive.txt &>/dev/null
-    rm active.txt passive.txt 2>/dev/null
+    printf "${yellow} Running : Active Subdomain Enumeration${reset}\n"
+    cat active.txt passive.txt > active_passive_tmp.txt
+    shuffledns -d $domain -list active_passive_tmp.txt -r $tools/resolvers.txt -o active_passive.txt &>/dev/null
+    rm active.txt passive.txt active_passive_tmp.txt 2>/dev/null
+    NUMOFLINES=$(wc -l < active_passive.txt)
+    printf "${green} Active subdomains found: ${NUMOFLINES}${reset}\n\n"
 
     # Permutations
-    printf "${yellow} Running : Permutations Subdomain Enumeration${reset}\n\n"
+    printf "${yellow} Running : Permutations Subdomain Enumeration${reset}\n"
     if [[ $(cat active_passive.txt | wc -l) -le 50 ]]
         then
             dnsgen active_passive.txt | shuffledns -d $domain -r $tools/resolvers.txt -o permute1_tmp.txt &>/dev/null
@@ -164,10 +172,25 @@ subdomains(){
             cat permute_tmp.txt | anew -q permute.txt
             rm permute_tmp.txt 2>/dev/null
     fi
+    NUMOFLINES=$(wc -l < permute.txt)
+    printf "${green} Permutation subdomains found: ${NUMOFLINES}${reset}\n\n"
+
+    # SubDomainizer
+    printf "${yellow} Running : SubDomainizer${reset}\n"
+    cat active_passive.txt permute.txt > final_subdomains_tmp.txt
+    shuffledns -d $domain -list final_subdomains_tmp.txt -r $tools/resolvers.txt -o pre_subdomains.txt &>/dev/null
+    cat pre_subdomains.txt | httpx -threads 100 -silent -o pre_subdomains_probed.txt &>/dev/null
+    python3 $tools/SubDomainizer/SubDomainizer.py -l pre_subdomains.txt -o SubDomainizer_subdomains.txt -k &>/dev/null
+    NUMOFLINES=$(wc -l < SubDomainizer_subdomains.txt)
+    printf "${green} SubDomainizer: ${NUMOFLINES}${reset}\n\n"
 
     # Final subdomains
-    cat active_passive.txt permute.txt 2>/dev/null | sort -u | dnsx -silent -o ${domain}_subdomains.txt &>/dev/null
-    rm active_passive.txt permute.txt 2>/dev/null
+    cat SubDomainizer_subdomains.txt pre_subdomains.txt > final_subdomains_tmp2.txt
+    shuffledns -d $domain -list final_subdomains_tmp2.txt -r $tools/resolvers.txt -o ${domain}_subdomains.txt &>/dev/null
+    
+    rm active_passive.txt permute.txt final_subdomains_tmp.txt 2>/dev/null
+    NUMOFLINES=$(wc -l < ${domain}_subdomains.txt)
+    printf "${bgreen} Total active subdomains found: ${NUMOFLINES}${reset}\n\n"
     
     cat ${domain}_subdomains.txt 2>/dev/null
     printf "${bred}\n Finished : Results are saved in ${dir} folder ${reset}\n"
