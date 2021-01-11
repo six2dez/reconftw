@@ -18,7 +18,7 @@ install_yum(){
 
 install_pacman(){
     sudo pacman -Syu -y &>/dev/null
-    sudo yum install python python-pip ruby git libpcap chromium wget -y &>/dev/null
+    sudo pacman -Sy install python python-pip ruby git libpcap chromium wget -y &>/dev/null
 }
 
 test -f /etc/debian_version && install_apt
