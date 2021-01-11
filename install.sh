@@ -13,7 +13,7 @@ install_apt(){
 
 install_yum(){
     sudo yum update -y &>/dev/null
-    sudo yum install python3 python3-pip ruby git libpcap-dev chromium wget -y &>/dev/null
+    sudo yum install python3 python3-pip ruby git libpcap-devel chromium wget golang -y &>/dev/null
 }
 
 install_pacman(){
