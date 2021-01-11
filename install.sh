@@ -4,10 +4,30 @@ bgreen='\033[1;32m'
 reset='\033[0m'	
 
 printf "\n\n${bgreen}#######################################################################\n"
-printf "${bgreen} Install script (Kali Linux based)${reset}\n\n"
+printf "${bgreen} reconftw installer script (apt/rpm/pacman compatible)${reset}\n\n"
 
-sudo apt update -y &>/dev/null
-sudo apt install python3 python3-pip ruby screen git libpcap-dev chromium-browser -y &>/dev/null
+install_apt(){
+    sudo apt update -y &>/dev/null
+    sudo apt install python3 python3-pip ruby git libpcap-dev chromium-browser wget -y &>/dev/null
+}
+
+install_yum(){
+    sudo yum update -y &>/dev/null
+    sudo yum install python3 python3-pip ruby git libpcap-dev chromium wget -y &>/dev/null
+}
+
+install_pacman(){
+    sudo pacman -Syu -y &>/dev/null
+    sudo yum install python python-pip ruby git libpcap chromium wget -y &>/dev/null
+}
+
+test -f /etc/debian_version && install_apt
+test -f /etc/redhat-release && install_yum
+#test -f /etc/gentoo-release && install_emerge
+#test -f /etc/SuSE-release && install_zypp
+test -f /etc/os-release && install_yum
+test -f /etc/arch-release && install_pacman
+
 [ ! -d "~/.gf" ] && mkdir -p ~/.gf
 [ ! -d "~/Tools" ] && mkdir -p ~/Tools
 dir=~/Tools

@@ -386,7 +386,7 @@ fuzz(){
     mv $tools/dirsearch/reports/ directoryEnum/;
     for sub in $(cat ${domain}_probed.txt); do
         printf "${yellow}\n\n Running : Running ffuf in ${sub} with onelistforallmicro.txt${reset}\n"
-        ffuf -mc all -ac -w $tools/OneListForAll/onelistforallmicro.txt -u $sub/FUZZ -od directoryEnum -or -o ${sub}_ffuf.txt &>/dev/null 
+        ffuf -mc all -ac -w $tools/OneListForAll/onelistforallmicro.txt -maxtime 900 -u $sub/FUZZ -od directoryEnum -or -o ${sub}_ffuf.txt &>/dev/null 
     done
     printf "${bred} Finished : ${bgreen} Results are saved in ${dir}/directoryEnum folder ${reset}\n"
     printf "${bgreen}#######################################################################\n"
