@@ -129,7 +129,7 @@ subdomains(){
     # Passive scan
     printf "${yellow} Running : Passive Subdomain Enumeration${reset}\n\n"
     subfinder -d $domain -o subfinder.txt &>/dev/null
-    assetfinder --subs-only $domain | sort -u > assetfinder.txt
+    assetfinder --subs-only $domain | anew -q assetfinder.txt
     amass enum -passive -d $domain -o amass.txt &>/dev/null
     findomain --quiet -t $domain -u findomain.txt &>/dev/null
     crobat -s $domain | anew -q crobat.txt &>/dev/null
@@ -273,10 +273,8 @@ urlcheks(){
 	# Performing URL Extraction
     printf "${bgreen}#######################################################################\n"
     printf "${bred} Step 8/17 : ${bgreen} URL Extraction ${reset}\n\n"
-    waybackurls $domain > ${domain}_extraction.txt
-    gau $domain >> ${domain}_extraction.txt
-    cat ${domain}_extraction.txt | anew -q ${domain}_archive_extracts.txt
-    rm ${domain}_extraction.txt
+    waybackurls $domain > ${domain}_archive_extracts.txt
+    gau $domain | anew -q ${domain}_archive_extracts.txt
     printf "${bred} Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
     printf "${bgreen}#######################################################################\n"
 	# Finished URL Extraction
@@ -284,14 +282,14 @@ urlcheks(){
 	# Performing Vulnerable Pattern Search
     printf "${bgreen}#######################################################################\n"
     printf "${bred} Step 9/17 : ${bgreen} Vulnerable Pattern Search ${reset}\n"
-    gf xss ${domain}_archive_extracts.txt | cut -d : -f3- | sort -u > ${domain}_xss.txt;
-    gf ssti ${domain}_archive_extracts.txt | sort -u > ${domain}_ssti.txt;
-    gf ssrf ${domain}_archive_extracts.txt | sort -u > ${domain}_ssrf.txt;
-    gf sqli ${domain}_archive_extracts.txt | sort -u > ${domain}_sqli.txt;
-    gf redirect  ${domain}_archive_extracts.txt | cut -d : -f3- | sort -u > ${domain}_redirect.txt;
-    gf rce  ${domain}_archive_extracts.txt | sort -u > ${domain}_rce.txt;
-    gf potential ${domain}_archive_extracts.txt| cut -d : -f3- | sort -u > ${domain}_potential.txt;
-    gf lfi  ${domain}_archive_extracts.txt | sort -u > ${domain}_lfi.txt;
+    gf xss ${domain}_archive_extracts.txt | cut -d : -f3- | anew -q ${domain}_xss.txt;
+    gf ssti ${domain}_archive_extracts.txt | anew -q ${domain}_ssti.txt;
+    gf ssrf ${domain}_archive_extracts.txt | anew -q ${domain}_ssrf.txt;
+    gf sqli ${domain}_archive_extracts.txt | anew -q ${domain}_sqli.txt;
+    gf redirect  ${domain}_archive_extracts.txt | cut -d : -f3- | anew -q ${domain}_redirect.txt;
+    gf rce  ${domain}_archive_extracts.txt | anew -q ${domain}_rce.txt;
+    gf potential ${domain}_archive_extracts.txt| cut -d : -f3- | anew -q ${domain}_potential.txt;
+    gf lfi  ${domain}_archive_extracts.txt | anew -q ${domain}_lfi.txt;
     printf "${bred} Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
     printf "${bgreen}#######################################################################\n"
 	# Finished Vulnerable Pattern Search
@@ -305,7 +303,7 @@ params(){
         printf "${yellow}\n\n Running : Finding ${sub} params with paramspider${reset}\n"
         python3 $tools/ParamSpider/paramspider.py -d $sub -l high -q --exclude woff,css,js,png,svg,php,jpg &>/dev/null
     done
-    cat output/* | sort -u > ${domain}_param.txt
+    find output/ -name '*.txt' -exec cat {} \; | anew -q ${domain}_param.txt
     sed '/^FUZZ/d' -i ${domain}_param.txt
     rm -rf output/
     printf "${yellow}\n\n Running : Checking ${sub} with Arjun${reset}\n"
