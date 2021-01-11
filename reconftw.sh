@@ -183,7 +183,7 @@ subdomains(){
     printf "${green} SubDomainizer: ${NUMOFLINES}${reset}\n\n"
 
     # Final subdomains
-    cat active_passive.txt permute.txt SubDomainizer_subdomains > final_subdomains.txt
+    cat active_passive.txt permute.txt SubDomainizer_subdomains.txt > final_subdomains.txt
     shuffledns -d $domain -list final_subdomains.txt -r $tools/resolvers.txt -o ${domain}_subdomains.txt &>/dev/null
     rm active_passive.txt permute.txt SubDomainizer_subdomains.txt final_subdomains.txt 2>/dev/null
     NUMOFLINES=$(wc -l < ${domain}_subdomains.txt)
