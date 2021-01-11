@@ -51,7 +51,7 @@ function tools_installed(){
     [ -f $tools/dirsearch/dirsearch.py ] && printf "${bgreen}[*] dirsearch		[YES]\n" || printf "${bred}[*] dirsearch		[NO]\n"
     [ -f $tools/CORScanner/cors_scan.py ] && printf "${bgreen}[*] CORScanner		[YES]\n" || printf "${bred}[*] CORScanner		[NO]\n"
     [ -f $tools/testssl.sh/testssl.sh ] && printf "${bgreen}[*] testssl		[YES]\n" || printf "${bred}[*] testssl		[NO]\n"
-    [ -f $tools/SubDomainizer/SubDomainizer.py ] && printf "${bgreen}[*] SubDomainizer		[YES]\n" || printf "${bred}[*] SubDomainizer		[NO]\n"
+    [ -f $tools/SubDomainizer/SubDomainizer.py ] && printf "${bgreen}[*] SubDomainizer	[YES]\n" || printf "${bred}[*] SubDomainizer	[NO]\n"
     type -P subfinder &>/dev/null && printf "${bgreen}[*] Subfinder		[YES]\n" || { printf "${bred}[*] Subfinder		[NO]\n"; }
     type -P assetfinder &>/dev/null && printf "${bgreen}[*] Assetfinder		[YES]\n" || { printf "${bred}[*] Assetfinder		[NO]\n"; }
     type -P findomain &>/dev/null && printf "${bgreen}[*] Findomain		[YES]\n" || { printf "${bred}[*] Findomain		[NO]\n"; }
