@@ -34,6 +34,7 @@ start(){
     fi
 	cd $dir
 	printf "\n"
+	nuclei -update-templates &>/dev/null
     printf "${bgreen}#######################################################################\n"
     printf "${bred} Target: ${domain}\n\n"
 }
@@ -229,7 +230,7 @@ subtakeover(){
     grep -v "Not Vulnerable" <${domain}_all-takeover-checks.txt >${domain}_takeover.txt
 	rm ${domain}_all-takeover-checks.txt
     printf "${yellow}\n\n Running : Nuclei SubTko${reset}\n\n"
-    cat ${domain}_subdomains.txt | nuclei -silent -l ${domain}_subdomains.txt -t ~/nuclei-templates/subdomain-takeover/ -o ${domain}_nuclei_subtko.txt;
+    cat ${domain}_subdomains.txt | nuclei -silent -l ${domain}_subdomains.txt -t ~/nuclei-templates/takeovers/ -o ${domain}_nuclei_subtko.txt;
     cat ${domain}_nuclei_subtko.txt 2>/dev/null
     cat ${domain}_takeover.txt 2>/dev/null;
     printf "${bred}\n Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
@@ -245,8 +246,11 @@ nuclei_check(){
     cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/technologies/ -o ${domain}_nuclei_technologies.txt;
     cat ${domain}_nuclei_technologies.txt 2>/dev/null
     printf "${yellow}\n\n Running : Nuclei Tokens${reset}\n\n"
-    cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/tokens/ -o ${domain}_nuclei_tokens.txt;
+    cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o ${domain}_nuclei_tokens.txt;
     cat ${domain}_nuclei_tokens.txt 2>/dev/null
+    printf "${yellow}\n\n Running : Nuclei Exposures${reset}\n\n"
+    cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/exposures/ -o ${domain}_nuclei_exposures.txt;
+    cat ${domain}_nuclei_exposures.txt 2>/dev/null
     printf "${yellow}\n\n Running : Nuclei Generic detections ${reset}\n\n"
     cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/generic-detections/ -o ${domain}_nuclei_generic_detections.txt;
     cat ${domain}_nuclei_generic_detections.txt 2>/dev/null
@@ -254,7 +258,7 @@ nuclei_check(){
     cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/cves/ -o ${domain}_nuclei_cves.txt;
     cat ${domain}_nuclei_cves.txt 2>/dev/null
     printf "${yellow}\n\n Running : Nuclei Default Creds ${reset}\n\n"
-    cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/default-credentials/ -o ${domain}_nuclei_default_creds.txt;
+    cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/default-logins/ -o ${domain}_nuclei_default_creds.txt;
     cat ${domain}_nuclei_default_creds.txt 2>/dev/null
     printf "${yellow}\n\n Running : Nuclei DNS ${reset}\n\n"
     cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/dns/ -o ${domain}_nuclei_dns.txt;
@@ -263,11 +267,11 @@ nuclei_check(){
     cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/files/ -o ${domain}_nuclei_files.txt;
     cat ${domain}_nuclei_files.txt 2>/dev/null
     printf "${yellow}\n\n Running : Nuclei Panels ${reset}\n\n"
-    cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/panels/ -o ${domain}_nuclei_panels.txt;
+    cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/exposed-panels/ -o ${domain}_nuclei_panels.txt;
     cat ${domain}_nuclei_panels.txt 2>/dev/null
     printf "${yellow}\n\n Running : Nuclei Security Misconfiguration ${reset}\n\n"
-    cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/security-misconfiguration/ -o ${domain}_nuclei_security_misconfigurations.txt;
-    cat ${domain}_nuclei_security_misconfigurations.txt 2>/dev/null
+    cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/misconfiguration/ -o ${domain}_nuclei_misconfigurations.txt;
+    cat ${domain}_nuclei_misconfigurations.txt 2>/dev/null
     printf "${yellow}\n\n Running : Nuclei Generic detections ${reset}\n\n"
     cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/vulnerabilities/ -o ${domain}_nuclei_vulnerabilities.txt;
     cat ${domain}_nuclei_vulnerabilities.txt 2>/dev/null
