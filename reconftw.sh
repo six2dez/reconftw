@@ -286,8 +286,9 @@ urlcheks(){
 	# Performing URL Extraction
     printf "${bgreen}#######################################################################\n"
     printf "${bred} Step 8/17 : ${bgreen} URL Extraction ${reset}\n\n"
-    waybackurls $domain > ${domain}_archive_extracts.txt
-    gau $domain | anew -q ${domain}_archive_extracts.txt
+    waybackurls $domain > ${domain}_url_extract.txt
+    gau $domain | anew -q ${domain}_url_extract.txt
+    hakrawler -url sciencedirect.com -plain -depth 3 | anew -q ${domain}_url_extract.txt
     printf "${bred} Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
     printf "${bgreen}#######################################################################\n"
 	# Finished URL Extraction
@@ -295,14 +296,14 @@ urlcheks(){
 	# Performing Vulnerable Pattern Search
     printf "${bgreen}#######################################################################\n"
     printf "${bred} Step 9/17 : ${bgreen} Vulnerable Pattern Search ${reset}\n"
-    gf xss ${domain}_archive_extracts.txt | cut -d : -f3- | anew -q ${domain}_xss.txt;
-    gf ssti ${domain}_archive_extracts.txt | anew -q ${domain}_ssti.txt;
-    gf ssrf ${domain}_archive_extracts.txt | anew -q ${domain}_ssrf.txt;
-    gf sqli ${domain}_archive_extracts.txt | anew -q ${domain}_sqli.txt;
-    gf redirect  ${domain}_archive_extracts.txt | cut -d : -f3- | anew -q ${domain}_redirect.txt;
-    gf rce  ${domain}_archive_extracts.txt | anew -q ${domain}_rce.txt;
-    gf potential ${domain}_archive_extracts.txt| cut -d : -f3- | anew -q ${domain}_potential.txt;
-    gf lfi  ${domain}_archive_extracts.txt | anew -q ${domain}_lfi.txt;
+    gf xss ${domain}_url_extract.txt | cut -d : -f3- | anew -q ${domain}_xss.txt;
+    gf ssti ${domain}_url_extract.txt | anew -q ${domain}_ssti.txt;
+    gf ssrf ${domain}_url_extract.txt | anew -q ${domain}_ssrf.txt;
+    gf sqli ${domain}_url_extract.txt | anew -q ${domain}_sqli.txt;
+    gf redirect  ${domain}_url_extract.txt | cut -d : -f3- | anew -q ${domain}_redirect.txt;
+    gf rce  ${domain}_url_extract.txt | anew -q ${domain}_rce.txt;
+    gf potential ${domain}_url_extract.txt| cut -d : -f3- | anew -q ${domain}_potential.txt;
+    gf lfi  ${domain}_url_extract.txt | anew -q ${domain}_lfi.txt;
     printf "${bred} Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
     printf "${bgreen}#######################################################################\n"
 	# Finished Vulnerable Pattern Search
