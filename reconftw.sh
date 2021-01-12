@@ -288,7 +288,7 @@ urlcheks(){
     printf "${bred} Step 8/17 : ${bgreen} URL Extraction ${reset}\n\n"
     waybackurls $domain > ${domain}_url_extract.txt
     gau $domain | anew -q ${domain}_url_extract.txt
-    hakrawler -url sciencedirect.com -plain -depth 3 | anew -q ${domain}_url_extract.txt
+    hakrawler -url $domain -plain -depth 3 | anew -q ${domain}_url_extract.txt
     printf "${bred} Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
     printf "${bgreen}#######################################################################\n"
 	# Finished URL Extraction
