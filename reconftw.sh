@@ -254,7 +254,7 @@ nuclei_check(){
     cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/cves/ -o ${domain}_nuclei_cves.txt;
     cat ${domain}_nuclei_cves.txt 2>/dev/null
     printf "${yellow}\n\n Running : Nuclei Default Creds ${reset}\n\n"
-    cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/default-creds/ -o ${domain}_nuclei_default_creds.txt;
+    cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/default-credentials/ -o ${domain}_nuclei_default_creds.txt;
     cat ${domain}_nuclei_default_creds.txt 2>/dev/null
     printf "${yellow}\n\n Running : Nuclei DNS ${reset}\n\n"
     cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/dns/ -o ${domain}_nuclei_dns.txt;
