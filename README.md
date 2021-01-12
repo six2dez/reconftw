@@ -82,8 +82,8 @@ Run install.sh and it will install all the tools needed.
 - [ ] Notification support (Slack, Discord and Telegram)
 - [ ] CMS tools (wpscan, drupwn/droopescan, joomscan)
 - [ ] Add menu option for every feature
-- [ ] Crawler
 - [ ] Any other interesting suggestion
+- [X] Crawler
 - [X] SubDomainizer
 - [X] Install script
 - [X] Apt,rpm,pacman compatible installer
