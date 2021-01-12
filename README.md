@@ -81,10 +81,12 @@ Run install.sh and it will install all the tools needed.
 - [ ] Interlace usage
 - [ ] Notification support (Slack, Discord and Telegram)
 - [ ] CMS tools (wpscan, drupwn/droopescan, joomscan)
-- [ ] Any other interesting suggestion
 - [ ] Add menu option for every feature
 - [ ] Crawler
-- [ ] Arch based installer support
+- [ ] Any other interesting suggestion
+- [X] SubDomainizer
+- [X] Install script
+- [X] Apt,rpm,pacman compatible installer
 
 ## Thanks
 For their great feedback, support, help or for nothing special but well deserved:
