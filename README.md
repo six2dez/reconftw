@@ -1,5 +1,14 @@
 # reconftw
 
+-   [tl;dr](#tldr)
+-   [Summary](#summary)
+-   [Features](#features)
+-   [Mindmap](#mindmapworkflow)
+-   [Requirements](#requirements)
+-   [Usage examples](#usage-examples)
+-   [Improvement plan](#improvement-plan)
+-   [Thanks](#thanks)
+
 ## tl;dr
 
 - Requires [Go](https://golang.org/dl/)
@@ -49,7 +58,7 @@ This is a simple script intended to perform a full recon on an objective with mu
 
 ## Requirements
 
-- Golang > 1.14 installed and env vars correctly set ($GOPATH,$GOROOT)
+- [Golang](https://golang.org/dl/) > 1.14 installed and env vars correctly set ($GOPATH,$GOROOT)
 - Run ./install.sh
 - It is highly recommended, and in some cases essential, set your api keys:
   - amass (~/.config/amass/config.ini)
@@ -58,10 +67,6 @@ This is a simple script intended to perform a full recon on an objective with mu
   - github-endpoints.py (GITHUB_TOKEN env var)
   - favup (shodan init SHODANPAIDAPIKEY)
 - This script uses dalfox with blind-xss option, you must change to your own server, check xsshunter.com.
-
-## Installation
-
-Run ./install.sh and it will install all the tools needed.
 
 ## Usage examples
 
@@ -85,7 +90,7 @@ Run ./install.sh and it will install all the tools needed.
 ./reconftw.sh -d target.com -g
 ```
 
-## Short-term improvement plan:
+## Improvement plan:
 
 - [ ] Notification support (Slack, Discord and Telegram)
 - [ ] CMS tools (wpscan, drupwn/droopescan, joomscan)
