@@ -42,17 +42,24 @@ start(){
 function tools_installed(){
 
     printf "\n\n${bgreen}#######################################################################\n"
-    printf "${bred} Step 0/17 : ${bgreen} Checking installed tools ${reset}\n\n"
+    printf "${bred} Pre-Step : ${bgreen} Checking installed tools ${reset}\n\n"
 
     [ -f $tools/degoogle_hunter/degoogle.py ] && printf "${bgreen}[*] degoogle		[YES]\n" || printf "${bred}[*] degoogle		[NO]\n"
     [ -f $tools/ParamSpider/paramspider.py ] && printf "${bgreen}[*] Paramspider		[YES]\n" || printf "${bred}[*] Paramspider		[NO]\n"
     [ -f $tools/Arjun/arjun.py ] && printf "${bgreen}[*] Arjun		[YES]\n" || printf "${bred}[*] Arjun		[NO]\n"
     [ -f $tools/fav-up/favUp.py ] && printf "${bgreen}[*] fav-up		[YES]\n" || printf "${bred}[*] fav-up		[NO]\n"
-    [ -f $tools/JSFScan.sh/JSFScan.sh ] && printf "${bgreen}[*] JSFScan.sh		[YES]\n" || printf "${bred}[*] JSFScan.sh		[NO]\n"
-    [ -f $tools/dirsearch/dirsearch.py ] && printf "${bgreen}[*] dirsearch		[YES]\n" || printf "${bred}[*] dirsearch		[NO]\n"
-    [ -f $tools/CORScanner/cors_scan.py ] && printf "${bgreen}[*] CORScanner		[YES]\n" || printf "${bred}[*] CORScanner		[NO]\n"
+    [ -f $tools/Corsy/corsy.py ] && printf "${bgreen}[*] Corsy		[YES]\n" || printf "${bred}[*] Corsy		[NO]\n"
     [ -f $tools/testssl.sh/testssl.sh ] && printf "${bgreen}[*] testssl		[YES]\n" || printf "${bred}[*] testssl		[NO]\n"
     [ -f $tools/SubDomainizer/SubDomainizer.py ] && printf "${bgreen}[*] SubDomainizer	[YES]\n" || printf "${bred}[*] SubDomainizer	[NO]\n"
+    [ -f $tools/SecretFinder/SecretFinder.py ] && printf "${bgreen}[*] SecretFinder	[YES]\n" || printf "${bred}[*] SecretFinder	[NO]\n"
+    [ -f $tools/OneListForAll/onelistforallmicro.txt ] && printf "${bgreen}[*] OneListForAll	[YES]\n" || printf "${bred}[*] OneListForAll	[NO]\n"
+    [ -f $tools/LinkFinder/linkfinder.py ] && printf "${bgreen}[*] LinkFinder	        [YES]\n" || printf "${bred}[*] LinkFinder	        [NO]\n"
+    [ -f $tools/github-endpoints.py ] && printf "${bgreen}[*] github-endpoints.py	[YES]\n" || printf "${bred}[*] github-endpoints.py	[NO]\n"
+    [ -f $tools/github-search/github-endpoints.py ] && printf "${bgreen}[*] github-search	[YES]\n" || printf "${bred}[*] github-search	[NO]\n"
+    [ -f $tools/getjswords.py ] && printf "${bgreen}[*] getjswords.py	[YES]\n" || printf "${bred}[*] getjswords.py	[NO]\n"
+    [ -f $tools/subdomains.txt ] && printf "${bgreen}[*] subdomains.txt	[YES]\n" || printf "${bred}[*] subdomains.txt	[NO]\n"
+    [ -f $tools/resolvers.txt ] && printf "${bgreen}[*] resolvers.txt	[YES]\n" || printf "${bred}[*] resolvers.txt	[NO]\n"
+    type -P hakrawler &>/dev/null && printf "${bgreen}[*] hakrawler		[YES]\n" || { printf "${bred}[*] hakrawler		[NO]\n"; }
     type -P subfinder &>/dev/null && printf "${bgreen}[*] Subfinder		[YES]\n" || { printf "${bred}[*] Subfinder		[NO]\n"; }
     type -P assetfinder &>/dev/null && printf "${bgreen}[*] Assetfinder		[YES]\n" || { printf "${bred}[*] Assetfinder		[NO]\n"; }
     type -P findomain &>/dev/null && printf "${bgreen}[*] Findomain		[YES]\n" || { printf "${bred}[*] Findomain		[NO]\n"; }
@@ -69,12 +76,15 @@ function tools_installed(){
     type -P naabu &>/dev/null && printf "${bgreen}[*] Naabu		[YES]\n" || { printf "${bred}[*] Naabu		[NO]\n"; }
     type -P gf &>/dev/null && printf "${bgreen}[*] Gf		        [YES]\n" || { printf "${bred}[*] Gf		[NO]\n"; }
     type -P Gxss &>/dev/null && printf "${bgreen}[*] Gxss		[YES]\n" || { printf "${bred}[*] Gxss		[NO]\n"; }
+    type -P subjs &>/dev/null && printf "${bgreen}[*] subjs		[YES]\n" || { printf "${bred}[*] subjs		[NO]\n"; }
     type -P dalfox &>/dev/null && printf "${bgreen}[*] dalfox		[YES]\n" || { printf "${bred}[*] dalfox		[NO]\n"; }
     type -P git-hound &>/dev/null && printf "${bgreen}[*] git-hound		[YES]\n" || { printf "${bred}[*] git-hound		[NO]\n"; }
     type -P ffuf &>/dev/null && printf "${bgreen}[*] ffuf		[YES]\n" || { printf "${bred}[*] ffuf		[NO]\n"; }
     type -P massdns &>/dev/null && printf "${bgreen}[*] Massdns		[YES]\n" || { printf "${bred}[*] Massdns		[NO]\n"; }
+    type -P interlace &>/dev/null && printf "${bgreen}[*] interlace		[YES]\n" || { printf "${bred}[*] interlace		[NO]\n"; }
     type -P dnsgen &>/dev/null && printf "${bgreen}[*] DnsGen		[YES]\n" || { printf "${bred}[*] DnsGen		[NO]\n"; }
     type -P anew &>/dev/null && printf "${bgreen}[*] Anew		[YES]\n" || { printf "${bred}[*] Anew		[NO]\n"; }
+    type -P unfurl &>/dev/null && printf "${bgreen}[*] unfurl		[YES]\n" || { printf "${bred}[*] unfurl		[NO]\n"; }
     type -P httpx &>/dev/null && printf "${bgreen}[*] Httpx		[YES]\n${reset}" || { printf "${bred}[*] Httpx		[NO]\n${reset}"; }
     
     printf "\n${yellow} If any tool is not installed under $tools, I trust in your ability to install it :D\n Also remember to set the ${bred}\$tools${yellow} variable on line 10 of this script.\n If you have any problem you can always ping me ;) ${reset}\n\n"
@@ -85,7 +95,7 @@ function tools_installed(){
 dorks(){
     printf "${bgreen}#######################################################################\n"
     printf "${bred} Step 1/17 : ${bgreen} Performing Google Dorks ${reset}\n\n"
-    printf "${yellow} This will take a long, check this dorks: ${reset}\n\n"
+    printf "${yellow} This will take a long, meanwhile check this dorks: ${reset}\n\n"
     
 	hostname=$domain
 	target=${hostname%%.*}
@@ -120,7 +130,7 @@ dorks(){
 	for c in "${!dorks[@]}"; do
     	printf "\n\e[32m"%s"\e[0m\n" "$c" && python3 $tools/degoogle_hunter/degoogle.py -j "${dorks[$c]}"
 	done
-    printf "${bred} Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
+    printf "${bred} Finished : ${bgreen} Happy hunting! ${reset}\n"
     printf "${bgreen}#######################################################################\n"    
 }
 
@@ -134,7 +144,7 @@ subdomains(){
     amass enum -passive -d $domain -o amass.txt &>/dev/null
     findomain --quiet -t $domain -u findomain.txt &>/dev/null
     crobat -s $domain | anew -q crobat.txt &>/dev/null
-#    waybackurls $domain | unfurl -u domains | anew -q waybackurls.txt &>/dev/null
+    timeout 5m waybackurls $domain | unfurl -u domains | anew -q waybackurls.txt &>/dev/null
     cat subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt waybackurls.txt 2>/dev/null | sed "s/*.//" | anew -q passive.txt
     rm subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt waybackurls.txt 2>/dev/null
     NUMOFLINES=$(wc -l < passive.txt)
@@ -148,7 +158,6 @@ subdomains(){
     NUMOFLINES=$(wc -l < active.txt)
     printf "${green} Bruteforce subdomains found: ${NUMOFLINES}${reset}\n\n"
 
-
     # Active
     printf "${yellow} Running : Active Subdomain Enumeration${reset}\n"
     cat active.txt passive.txt > active_passive_tmp.txt
@@ -161,15 +170,15 @@ subdomains(){
     printf "${yellow} Running : Permutations Subdomain Enumeration${reset}\n"
     if [[ $(cat active_passive.txt | wc -l) -le 50 ]]
         then
-            dnsgen active_passive.txt | shuffledns -d $domain -r $tools/resolvers.txt -o permute1_tmp.txt &>/dev/null
+            dnsgen active_passive.txt 2>/dev/null | shuffledns -d $domain -r $tools/resolvers.txt -o permute1_tmp.txt 2>/dev/null
             cat permute1_tmp.txt | anew -q permute1.txt 
-            dnsgen permute1.txt | shuffledns -d $domain -r $tools/resolvers.txt -o permute2_tmp.txt &>/dev/null
+            dnsgen permute1.txt 2>/dev/null | shuffledns -d $domain -r $tools/resolvers.txt -o permute2_tmp.txt 2>/dev/null
             cat permute2_tmp.txt | anew -q permute2.txt
             cat permute1.txt permute2.txt | anew -q permute.txt
             rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt 2>/dev/null
         elif [[ $(cat active_passive.txt | wc -l) -le 100 ]]
         then
-            dnsgen active_passive.txt | shuffledns -d $domain -r $tools/resolvers.txt -o permute_tmp.txt &>/dev/null
+            dnsgen active_passive.txt 2>/dev/null | shuffledns -d $domain -r $tools/resolvers.txt -o permute_tmp.txt 2>/dev/null
             cat permute_tmp.txt | anew -q permute.txt
             rm permute_tmp.txt 2>/dev/null
     fi
@@ -184,16 +193,32 @@ subdomains(){
     printf "${green} SubDomainizer: ${NUMOFLINES}${reset}\n\n"
 
     # Final subdomains
-    cat active_passive.txt permute.txt SubDomainizer_subdomains.txt > final_subdomains.txt
+    cat active_passive.txt permute.txt SubDomainizer_subdomains.txt > final_subdomains.txt 2>/dev/null
     shuffledns -d $domain -list final_subdomains.txt -r $tools/resolvers.txt -o ${domain}_subdomains.txt &>/dev/null
     rm active_passive.txt permute.txt SubDomainizer_subdomains.txt final_subdomains.txt 2>/dev/null
     NUMOFLINES=$(wc -l < ${domain}_subdomains.txt)
     printf "${bgreen} Total active subdomains found: ${NUMOFLINES}${reset}\n\n"
 
     cat ${domain}_subdomains.txt 2>/dev/null
-    printf "${bred}\n Finished : Results are saved in ${dir} folder ${reset}\n"
+    printf "${bred}\n Finished : Results are saved in ${domain}_subdomains.txt ${reset}\n"
     printf "${bgreen}#######################################################################\n\n"
 	# Finished Subdomain Enumeration 
+}
+
+subtakeover(){
+	# Performing Subdomain Takeover
+    printf "${bgreen}#######################################################################\n"
+    printf "${bred} Step 3/17 : ${bgreen} Subdomain Takeover ${reset}\n\n"
+    subjack -w ${domain}_subdomains.txt -a -ssl -t 50 -v -c $tools/subjack/fingerprints.json -ssl -o ${domain}_all-takeover-checks.txt &>/dev/null;
+    grep -v "Not Vulnerable" <${domain}_all-takeover-checks.txt > ${domain}_subjack.txt
+	rm ${domain}_all-takeover-checks.txt
+    cat ${domain}_subdomains.txt | nuclei -silent -l ${domain}_subdomains.txt -t ~/nuclei-templates/takeovers/ -o ${domain}_nuclei_subtko.txt;
+    cat ${domain}_nuclei_subtko.txt ${domain}_subjack.txt | anew -q ${domain}_takeover.txt 2>/dev/null
+    cat ${domain}_takeover.txt 2>/dev/null
+    rm ${domain}_nuclei_subtko.txt ${domain}_subjack.txt 2>/dev/null
+    printf "${bred}\n Finished : ${bgreen} Results are saved in ${domain}_takeover.txt ${reset}\n"
+    printf "${bgreen}#######################################################################\n\n"
+   	# Finished Subdomain Takeover
 }
 
 webprobe(){
@@ -207,7 +232,7 @@ webprobe(){
     cat ${domain}_probed.txt 2>/dev/null
     printf "\n"
     cat ${domain}_probed_uncommon_ports.txt 2>/dev/null
-    printf "${bred}\n Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
+    printf "${bred}\n Finished : ${bgreen} Results are saved in ${domain}_probed_uncommon_ports.txt ${reset}\n"
     printf "${bgreen}#######################################################################\n"
 	# Finished Probing
 
@@ -215,33 +240,27 @@ webprobe(){
     printf "${bgreen}#######################################################################\n"
     printf "${bred} Step 5/17 : ${bgreen} Web Screenshot ${reset}\n\n"
     cat ${domain}_probed.txt | aquatone -out screenshots -threads 16 -silent
-    printf "${bred}\n Finished : ${bgreen} Results are saved in ${dir}/screenshots folder ${reset}\n"
+    printf "${bred}\n Finished : ${bgreen} Check results in screenshots/aquatone_report.html folder ${reset}\n"
     printf "${bgreen}#######################################################################\n"
 	# Finished webscreenshot
 }
 
-subtakeover(){
-	# Performing Subdomain Takeover
+portscan(){
+	# Performing Port Scanning with Naabu
     printf "${bgreen}#######################################################################\n"
-    printf "${bred} Step 3/17 : ${bgreen} Subdomain Takeover ${reset}\n\n"
-    touch ${domain}_takeover.txt
-    printf "${yellow}\n\n Running : subjack test ${reset}\n\n"
-    subjack -w ${domain}_subdomains.txt -a -ssl -t 50 -v -c $tools/subjack/fingerprints.json -ssl -o ${domain}_all-takeover-checks.txt &>/dev/null;
-    grep -v "Not Vulnerable" <${domain}_all-takeover-checks.txt >${domain}_takeover.txt
-	rm ${domain}_all-takeover-checks.txt
-    printf "${yellow}\n\n Running : Nuclei SubTko${reset}\n\n"
-    cat ${domain}_subdomains.txt | nuclei -silent -l ${domain}_subdomains.txt -t ~/nuclei-templates/takeovers/ -o ${domain}_nuclei_subtko.txt;
-    cat ${domain}_nuclei_subtko.txt 2>/dev/null
-    cat ${domain}_takeover.txt 2>/dev/null;
-    printf "${bred}\n Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
-    printf "${bgreen}#######################################################################\n\n"
-   	# Finished Subdomain Takeover
+    printf "${bred} Step 6/17 : ${bgreen} Port Scanning with Naabu ${reset}\n\n"
+    naabu -top-ports 1000 -silent -exclude-cdn -nmap-cli 'nmap -sV --script /usr/share/nmap/scripts/vulners.nse,http-title.nse --min-rate 40000 -T4 --max-retries 2' -iL ${domain}_subdomains.txt > ${domain}_portscan.txt;
+    cat ${domain}_portscan.txt 2>/dev/null
+    printf "\n\n"
+    printf "${bred} Finished : ${bgreen} Results are saved in ${domain}_portscan.txt ${reset}\n"
+    printf "${bgreen}#######################################################################\n"
+	# Finished Port Scanning with Naabu
 }
 
 nuclei_check(){
 	# Performing Template Scanning with Nuclei
     printf "${bgreen}#######################################################################\n"
-    printf "${bred} Step 6/17 : ${bgreen} Template Scanning with Nuclei ${reset}\n\n"
+    printf "${bred} Step 7/17 : ${bgreen} Template Scanning with Nuclei ${reset}\n\n"
     printf "${yellow} Running : Nuclei Technologies${reset}\n\n"
     cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/technologies/ -o ${domain}_nuclei_technologies.txt;
     printf "${yellow}\n\n Running : Nuclei Tokens${reset}\n\n"
@@ -265,21 +284,9 @@ nuclei_check(){
     printf "${yellow}\n\n Running : Nuclei Generic detections ${reset}\n\n"
     cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/vulnerabilities/ -o ${domain}_nuclei_vulnerabilities.txt;
     printf "\n\n"
-    printf "${bred} Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
+    printf "${bred} Finished : ${bgreen} Results are saved in ${domain}_nuclei_*.txt files ${reset}\n"
     printf "${bgreen}#######################################################################\n"
 	# Finished Template Scanning with Nuclei
-}
-
-portscan(){
-	# Performing Port Scanning with Naabu
-    printf "${bgreen}#######################################################################\n"
-    printf "${bred} Step 7/17 : ${bgreen} Port Scanning with Naabu ${reset}\n\n"
-    naabu -top-ports 1000 -silent -exclude-cdn -nmap-cli 'nmap -sV --script /usr/share/nmap/scripts/vulners.nse,http-title.nse --min-rate 40000 -T4 --max-retries 2' -iL ${domain}_subdomains.txt > ${domain}_portscan.txt;
-    cat ${domain}_portscan.txt 2>/dev/null
-    printf "\n\n"
-    printf "${bred} Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
-    printf "${bgreen}#######################################################################\n"
-	# Finished Port Scanning with Naabu
 }
 
 urlcheks(){
@@ -288,41 +295,67 @@ urlcheks(){
     printf "${bred} Step 8/17 : ${bgreen} URL Extraction ${reset}\n\n"
     waybackurls $domain > ${domain}_url_extract.txt
     gau $domain | anew -q ${domain}_url_extract.txt
-    hakrawler -url $domain -plain -depth 3 | anew -q ${domain}_url_extract.txt
-    printf "${bred} Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
+    hakrawler -url $domain -depth 2 -scope subs -plain -insecure | anew -q ${domain}_url_extract.txt
+    if [ -n "$GITHUB_TOKEN" ]; then
+        python3 $tools/github-endpoints.py -d $domain -t $GITHUB_TOKEN | anew -q ${domain}_url_extract.txt
+    else
+        python3 $tools/github-endpoints.py -d $domain | anew -q ${domain}_url_extract.txt
+    fi
+    printf "${bred} Finished : ${bgreen} Results are saved in ${domain}_url_extract.txt ${reset}\n"
     printf "${bgreen}#######################################################################\n"
 	# Finished URL Extraction
 
 	# Performing Vulnerable Pattern Search
     printf "${bgreen}#######################################################################\n"
-    printf "${bred} Step 9/17 : ${bgreen} Vulnerable Pattern Search ${reset}\n"
-    gf xss ${domain}_url_extract.txt | cut -d : -f3- | anew -q ${domain}_xss.txt;
+    printf "${bred} Step 9/17 : ${bgreen} Vulnerable Pattern Search ${reset}\n\n"
+    gf xss ${domain}_url_extract.txt | anew -q ${domain}_xss.txt;
     gf ssti ${domain}_url_extract.txt | anew -q ${domain}_ssti.txt;
     gf ssrf ${domain}_url_extract.txt | anew -q ${domain}_ssrf.txt;
     gf sqli ${domain}_url_extract.txt | anew -q ${domain}_sqli.txt;
-    gf redirect  ${domain}_url_extract.txt | cut -d : -f3- | anew -q ${domain}_redirect.txt;
-    gf rce  ${domain}_url_extract.txt | anew -q ${domain}_rce.txt;
-    gf potential ${domain}_url_extract.txt| cut -d : -f3- | anew -q ${domain}_potential.txt;
-    gf lfi  ${domain}_url_extract.txt | anew -q ${domain}_lfi.txt;
-    printf "${bred} Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
+    gf redirect ${domain}_url_extract.txt | anew -q ${domain}_redirect.txt;
+    gf rce ${domain}_url_extract.txt | anew -q ${domain}_rce.txt;
+    gf potential ${domain}_url_extract.txt | anew -q ${domain}_potential.txt;
+    gf lfi ${domain}_url_extract.txt | anew -q ${domain}_lfi.txt;
+    cat ${domain}_url_extract.txt | unfurl -u format %s://%d%p > ${domain}_url_endpoints.txt
+    printf "${bred} Finished : ${bgreen} Results are saved in ${domain}_*gfpattern*.txt ${reset}\n"
     printf "${bgreen}#######################################################################\n"
 	# Finished Vulnerable Pattern Search
+}
+
+jschecks(){
+	# Performing Javascript Scan
+    printf "${bgreen}#######################################################################\n"
+    printf "${bred} Step 10/17 : ${bgreen} Javascript Scan ${reset}\n\n"
+    printf "${yellow} Running : Fetching Urls${reset}\n"
+    # Gather JSFilesUrls
+    cat ${domain}_url_extract.txt | grep -iE "\.js$" | anew -q ${domain}_jsfile_links.txt;
+    cat ${domain}_url_extract.txt | subjs >> ${domain}_jsfile_links.txt;
+    #Open JSUrlFiles
+    cat ${domain}_jsfile_links.txt | httpx -follow-redirects -silent -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt;
+    #Gather Endpoints From JsFiles
+    interlace -tL ${domain}_js_livelinks.txt -threads 5 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> ${domain}_js_endpoints.txt" &>/dev/null
+    #Gather Secrets From Js Files
+    interlace -tL ${domain}_js_livelinks.txt -threads 5 -c "python3 $tools/SecretFinder/SecretFinder.py -i _target_ -o cli >> ${domain}_js_linksecret.txt" &>/dev/null
+    #Gather JSFilesWordlist
+    cat ${domain}_js_livelinks.txt | python3 $tools/getjswords.py | anew -q ${domain}_js_Wordlist.txt;
+	# Finished Javascript Scan
+    printf "${bred} Finished : ${bgreen} Results are saved in ${domain}_js_*.txt files ${reset}\n"
+    printf "${bgreen}#######################################################################\n"
+	# Finished Secret Finder
 }
 
 params(){
 	# Performing Parameter Discovery
     printf "${bgreen}#######################################################################\n"
-    printf "${bred} Step 10/17 : ${bgreen} Parameter Discovery ${reset}\n"
-    for sub in $(cat ${domain}_probed.txt); do
-        printf "${yellow}\n\n Running : Finding ${sub} params with paramspider${reset}\n"
-        python3 $tools/ParamSpider/paramspider.py -d $sub -l high -q --exclude woff,css,js,png,svg,php,jpg &>/dev/null
-    done
+    printf "${bred} Step 11/17 : ${bgreen} Parameter Discovery ${reset}\n"
+    printf "${yellow}\n\n Running : Finding params with paramspider${reset}\n"
+    interlace -tL ${domain}_probed.txt -threads 5 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,js &>/dev/null" &>/dev/null
     find output/ -name '*.txt' -exec cat {} \; | anew -q ${domain}_param.txt
     sed '/^FUZZ/d' -i ${domain}_param.txt
     rm -rf output/
-    printf "${yellow}\n\n Running : Checking ${sub} with Arjun${reset}\n"
-    python3 $tools/Arjun/arjun.py -i ${domain}_param.txt -t 20 -o ${domain}_arjun.json &>/dev/null
-    printf "${bred} Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
+    printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
+    python3 $tools/Arjun/arjun.py -i ${domain}_url_endpoints.txt -t 20 -o ${domain}_arjun.json &>/dev/null
+    printf "${bred} Finished : ${bgreen} Results are saved in ${domain}_param.txt and ${domain}_arjun.json under ${dir} ${reset}\n"
     printf "${bgreen}#######################################################################\n"
 	# Finished Parameter Discovery
 }
@@ -330,10 +363,10 @@ params(){
 xss(){
 	# Performing XSS Automation
     printf "${bgreen}#######################################################################\n"
-    printf "${bred} Step 11/17 : ${bgreen} XSS Automation ${reset}\n\n"
+    printf "${bred} Step 12/17 : ${bgreen} XSS Automation ${reset}\n\n"
     # Set your own blind xss server, I will not advice you if I receive some data in my server :P
     cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | dalfox -b six2dez.xss.ht pipe -o ${domain}_dalfox_xss.txt &>/dev/null
-    printf "${bred} Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
+    printf "${bred} Finished : ${bgreen} Results are saved in ${domain}_dalfox_xss.txt ${reset}\n"
     printf "${bgreen}#######################################################################\n"
 	# Finished XSS Automation
 }
@@ -341,9 +374,9 @@ xss(){
 github(){
 	# Performing GitHub Scanning 
     printf "${bgreen}#######################################################################\n"
-    printf "${bred} Step 12/17 : ${bgreen} GitHub Scanning ${reset}\n\n"
+    printf "${bred} Step 13/17 : ${bgreen} GitHub Scanning ${reset}\n\n"
     cat ${domain}_probed.txt | git-hound --dig-files --dig-commits --threads 100 | tee ${domain}_gitrecon.txt
-    printf "${bred} Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
+    printf "${bred} Finished : ${bgreen} Results are saved in ${domain}_gitrecon.txt ${reset}\n"
     printf "${bgreen}#######################################################################\n"
 	# Finished GitHub Scanning
 }
@@ -351,58 +384,20 @@ github(){
 favicon(){
 	# Performing FavIcon Hash Extraction
     printf "${bgreen}#######################################################################\n"
-    printf "${bred} Step 13/17 : ${bgreen} Performing FavIcon Hash Extraction ${reset}\n\n"
-    python3 $tools/fav-up/favUp.py -wl ${domain}_probed.txt -sc -o ${domain}_faviconhash.txt &>/dev/null
-    printf "${bred} Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
+    printf "${bred} Step 14/17 : ${bgreen} Performing FavIcon Hash Extraction ${reset}\n\n"
+    cd $tools/fav-up && python3 favUp.py -w $domain -sc > ${dir}/${domain}_favicontest.txt && cd ${dir} && cat ${domain}_favicontest.txt | grep found_ips
+    printf "${bred} Finished : ${bgreen} Results are saved in ${dir}/${domain}_favicontest.txt ${reset}\n"
     printf "${bgreen}#######################################################################\n"
 	# Finished FavIcon Hash Extraction
-}
-
-jschecks(){
-	# Performing Javascript Scan
-    printf "${bgreen}#######################################################################\n"
-    printf "${bred} Step 14/17 : ${bgreen} Javascript Scan ${reset}\n\n"
-    printf "${yellow} Running : Fetching Urls${reset}\n"
-
-    # JSFScan is the best solution for JS
-    $tools/JSFScan.sh/JSFScan.sh -l ${domain}_probed.txt
-#    echo $domain | gau | grep -iE "\.js$" | anew -q ${domain}_jsfile_links.txt;
-#    echo $domain | subjs >> ${domain}_jsfile_links.txt;
-#    echo $domain | hakrawler -js -depth 2 -scope subs -plain >> ${domain}_jsfile_links.txt;
-#    printf "${yellow}\n\n Running : Resolving JS Urls${reset}\n"
-#    cat ${domain}_jsfile_links.txt | httpx -follow-redirects -silent -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_live_jsfile_links.txt;
-#    printf "${yellow}\n\n Running : Linkfinder${reset}\n"
-#    python3 $tools/LinkFinder/linkfinder.py -d -i ${domain}_live_jsfile_links.txt -o cli >> ${domain}_JSEndpoints.txt;
-#    cat ${domain}_live_jsfile_links.txt | python3 $tools/getjswords.py | anew -q ${domain}_JSWords.txt;
-#    cat ${domain}_live_jsfile_links.txt | while read url ; do bash $tools/jsvar.sh $url | sort -u | tee ${domain}_JSXSS.txt;done; 
-#    printf "${bred} Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
-#    printf "${bgreen}#######################################################################\n"
-#	# Finished Javascript Scan
-#
-#	# Performing Secret Finder
-#    printf "${bgreen}#######################################################################\n"
-#    printf "${bred} Step 15/17 : ${bgreen} Performing Secret Finder ${reset}\n\n"
-#    cat ${domain}_probed.txt | xargs -I %% bash -c 'python3 $tools/SecretFinder/SecretFinder.py -i %% -e -o cli' > ${domain}_secretfinder.txt &>/dev/null 
-#    cat ${domain}_secretfinder.txt | grep 'google_api' -B 1 | sort -u > ${domain}_gmapapi.txt;
-#    cat ${domain}_secretfinder.txt 2>/dev/null
-    printf "${bred} Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
-    printf "${bgreen}#######################################################################\n"
-	# Finished Secret Finder
 }
 
 fuzz(){
 	# Performing Directory Fuzzing
     printf "${bgreen}#######################################################################\n"
     printf "${bred} Step 15/17 : ${bgreen} Performing Directory Fuzzing ${reset}\n"
-    printf "${yellow}\n\n Running : dirsearch in all hosts ${reset}\n"
-    mkdir directoryEnum;
-    python3 $tools/dirsearch/dirsearch.py -l ${domain}_probed.txt -t 300 -i 200,201,202,203,204,301,302,303,304 -b &>/dev/null 
-    mv $tools/dirsearch/reports/ directoryEnum/;
-    for sub in $(cat ${domain}_probed.txt); do
-        printf "${yellow}\n\n Running : Running ffuf in ${sub} with onelistforallmicro.txt${reset}\n"
-        ffuf -mc all -ac -w $tools/OneListForAll/onelistforallmicro.txt -maxtime 900 -u $sub/FUZZ -od directoryEnum -or -o ${sub}_ffuf.txt &>/dev/null 
-    done
-    printf "${bred} Finished : ${bgreen} Results are saved in ${dir}/directoryEnum folder ${reset}\n"
+    printf "${yellow}\n\n Running : Running ffuf in every subdomain with onelistforallmicro.txt${reset}\n"
+    interlace -tL ${domain}_probed.txt -threads 5 -c "ffuf -mc all -ac -w $tools/OneListForAll/onelistforallmicro.txt -maxtime 900 -u _target_/FUZZ -or -o _target_ffuf.txt &>/dev/null" &>/dev/null
+    printf "${bred} Finished : ${bgreen} Results are saved in *subdomain*_ffuf.txt ${reset}\n"
     printf "${bgreen}#######################################################################\n"
 	# Finished Directory Fuzzing 
 }
@@ -411,9 +406,9 @@ cors(){
 	# Performing CORS Scan
     printf "${bgreen}#######################################################################\n"
     printf "${bred} Step 16/17 : ${bgreen} Performing CORS Scan ${reset}\n\n"
-    python $tools/CORScanner/cors_scan.py -i ${domain}_probed.txt -t 200 > ${domain}_cors.txt &>/dev/null 
+    python3 $tools/Corsy/corsy.py -i ${domain}_probed.txt -t 200 > ${domain}_cors.txt &>/dev/null
     cat ${domain}_cors.txt 2>/dev/null
-    printf "${bred} Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
+    printf "${bred} Finished : ${bgreen} Results are saved in ${domain}_cors.txt ${reset}\n"
     printf "${bgreen}#######################################################################\n"
 	# Finished CORS Scan
 }
@@ -422,16 +417,21 @@ testssl(){
 	# Performing testssl Scan
     printf "${bgreen}#######################################################################\n"
     printf "${bred} Step 17/17 : ${bgreen} Performing SSL test ${reset}\n"
-    $tools/testssl.sh/testssl.sh --quiet -U -iL ${domain}_probed.txt > ${domain}_testssl.txt
-    printf "${bred} Finished : ${bgreen} Results are saved in ${dir} folder ${reset}\n"
+    $tools/testssl.sh/testssl.sh --quiet -U -iL ${domain}_subdomains.txt > ${domain}_testssl.txt
+    printf "${bred} Finished : ${bgreen} Results are saved in ${domain}_testssl.txt ${reset}\n"
     printf "${bgreen}#######################################################################\n"
 	# Finished testssl Scan
 }
 
 end(){
 	# Finished Recon 
+    if [ -n "$dir_output" ]
+    then
+        output
+        finaldir=$dir_output
+    fi
     printf "${bgreen}#######################################################################\n"
-    printf "${bred} Finished Recon on: ${bgreen} ${domain} ${reset}\n"
+    printf "${bred} Finished Recon on: ${bgreen} ${domain} under ${finaldir} ${reset}\n"
     printf "${bgreen}#######################################################################\n"
 }
 
@@ -441,37 +441,44 @@ all(){
 	subdomains
     subtakeover
     webprobe
-	nuclei
-	portscan
+    portscan
+    nuclei_check
 	urlcheks
-	params
-	xss
-	github
-	favicon
 	jschecks
+    params
+	xss
+    github
+    favicon
 	fuzz
 	cors
 	testssl
-	end
+    end
 }
 
 help(){
-	printf "\n Params ${red}(-d always required)${reset}:\n";
-	printf "        $0 -d target.com	Target domain ${red}(required always)${reset}\n";
-    printf "        $0 -l targets.txt	Web list ${red}(required only with -w)${reset}\n";
-	printf "\n Flags ${red}(1 required)${reset}: \n";
+	printf "\n Params ${yellow}(-d always required)${reset}:\n";
+	printf "        $0 -d target.com	Target domain ${yellow}(required always)${reset}\n";
+    printf "        $0 -l targets.txt	Web list ${yellow}(required only with -w or -t)${reset}\n";
+	printf "\n Flags ${yellow}(1 required)${reset}: \n";
 	printf "        $0 -a	All checks ${bgreen}(default and recommended)${reset}\n";
 	printf "        $0 -s	Only subdomains\n";
 	printf "        $0 -g	Only Google Dorks\n";
 	printf "        $0 -w	Only web scan\n";
     printf "        $0 -t	Only web scan\n";
-	printf "        $0 -h	Show this help\n";
+	printf "        $0 -o	Output folder\n";
+    printf "        $0 -h	Show this help\n";
     printf "\n Examples: \n\n";
     printf " ./reconftw.sh -d target.com -a -> All checks\n";
     printf " ./reconftw.sh -d target.com -s -> Only subdomains\n";
+    printf " ./reconftw.sh -d target.com -s -o my/path -> Only subdomains with custom output\n";
     printf " ./reconftw.sh -d target.com -g	-> Only Google Dorks\n";
     printf " ./reconftw.sh -d target.com -l targets.txt -w -> Only Web Scan (Target list required)\n";
     printf " ./reconftw.sh -d target.com -l targets.txt -t -> Check SubTko (Target list required)\n";
+}
+
+output(){
+    mkdir -p $dir_output
+    mv $dir $dir_output
 }
 
 banner
@@ -479,10 +486,11 @@ banner
 if [ -z "$1" ]
 then
    help
+   tools_installed
    exit
 fi
 
-while getopts ":hd:-:l:aswgt" opt; do
+while getopts ":hd:-:l:aswgto:" opt; do
 	case ${opt} in
 		d ) domain=$OPTARG
 		    ;;
@@ -499,19 +507,25 @@ while getopts ":hd:-:l:aswgt" opt; do
 		w ) start
 			nuclei_check
 			urlcheks
-			params
-			xss
 			jschecks
+            params
+			xss
 			fuzz
 			cors
 			testssl
+            end
 			;;
         t ) start
             subtakeover
+            end
             ;;
 		g ) start
 			dorks
+            end
 			;;
+        o ) dir_output=$OPTARG
+		    output
+		    ;;
 		\? | h | : | * ) 
 			help
 		    ;;
