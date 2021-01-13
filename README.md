@@ -16,8 +16,6 @@ chmod +x *.sh
 
 ## Summary
 
-**Important: run install.sh script or set your tools path in the script in $tools var (line 10)**
-
 This is a simple script intended to perform a full recon on an objective with multiple subdomains
 
 ## Features
