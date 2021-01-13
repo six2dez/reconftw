@@ -354,7 +354,7 @@ params(){
     sed '/^FUZZ/d' -i ${domain}_param.txt
     rm -rf output/
     printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
-    python3 $tools/Arjun/arjun.py -i ${domain}_url_endpoints.txt -t 20 -o ${domain}_arjun.json &>/dev/null
+    python3 $tools/Arjun/arjun.py -i ${domain}_param.txt -t 20 -o ${domain}_arjun.json &>/dev/null
     printf "${bred} Finished : ${bgreen} Results are saved in ${domain}_param.txt and ${domain}_arjun.json under ${dir} ${reset}\n"
     printf "${bgreen}#######################################################################\n"
 	# Finished Parameter Discovery
