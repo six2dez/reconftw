@@ -1,25 +1,29 @@
 #!/bin/bash
 
 bgreen='\033[1;32m'
+yellow='\033[0;33m'
 reset='\033[0m'	
+bred='\033[1;31m'
 
 printf "\n\n${bgreen}#######################################################################\n"
 printf "${bgreen} reconftw installer script (apt/rpm/pacman compatible)${reset}\n\n"
 
 install_apt(){
     sudo apt update -y &>/dev/null
-    sudo apt install python3 python3-pip ruby git libpcap-dev chromium-browser wget -y &>/dev/null
+    sudo apt install python3 python3-pip ruby git libpcap-dev chromium-browser wget python-dev python3-dev build-essential libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev python-pip -y &>/dev/null
 }
 
 install_yum(){
     sudo yum update -y &>/dev/null
-    sudo yum install python3 python3-pip ruby git libpcap-devel chromium wget golang -y &>/dev/null
+    sudo yum install python3 python3-pip ruby git libpcap-devel chromium wget openssl-devel python3-devel libxslt-devel libffi-devel libxml2-devel zlib-devel -y &>/dev/null
 }
 
 install_pacman(){
     sudo pacman -Syu -y &>/dev/null
     sudo pacman -Sy install python python-pip ruby git libpcap chromium wget -y &>/dev/null
 }
+
+type -P go &>/dev/null && printf "${bgreen} Golang detected\n" || printf "${bred} Golang no detected, install it before run this script\n Check https://golang.org/doc/install\n" && exit
 
 test -f /etc/debian_version && install_apt
 test -f /etc/redhat-release && install_yum
@@ -31,6 +35,8 @@ test -f /etc/arch-release && install_pacman
 [ ! -d "~/.gf" ] && mkdir -p ~/.gf
 [ ! -d "~/Tools" ] && mkdir -p ~/Tools
 dir=~/Tools
+
+
 
 go get -v github.com/tomnomnom/gf &>/dev/null
 GO111MODULE=on go get -v github.com/OWASP/Amass/v3/... &>/dev/null
@@ -47,53 +53,62 @@ go get -v github.com/tomnomnom/unfurl &>/dev/null
 git clone https://github.com/projectdiscovery/nuclei-templates ~/nuclei-templates &>/dev/null
 nuclei -update-templates &>/dev/null
 go get -v github.com/haccer/subjack &>/dev/null
+git clone https://github.com/haccer/subjack $dir/subjack &>/dev/null
 GO111MODULE=on go get -v github.com/projectdiscovery/httpx/cmd/httpx &>/dev/null
 printf "${bgreen} 30%% done${reset}\n\n"
-git clone https://github.com/haccer/subjack $dir/subjack &>/dev/null
 git clone https://github.com/1ndianl33t/Gf-Patterns $dir/Gf-Patterns &>/dev/null
 git clone https://github.com/tomnomnom/gf $dir/gf &>/dev/null
 cp -r $dir/gf/examples ~/.gf
-mv $dir/Gf-Patterns/*.json ~/.gf
+cp $dir/Gf-Patterns/*.json ~/.gf
 printf "${bgreen} 40%% done${reset}\n\n"
 GO111MODULE=on go get -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder &>/dev/null
 go get -v github.com/hahwul/dalfox &>/dev/null
 go get -v github.com/lc/gau &>/dev/null
+GO111MODULE=on go get -u -v github.com/lc/subjs &>/dev/null
 go get -v github.com/KathanP19/Gxss &>/dev/null
 git clone https://github.com/blechschmidt/massdns $dir/massdns &>/dev/null
 printf "${bgreen} 50%% done${reset}\n\n"
 git clone https://github.com/devanshbatham/ParamSpider $dir/ParamSpider &>/dev/null
-git clone https://github.com/maurosoria/dirsearch $dir/dirsearch &>/dev/null
 git clone https://github.com/six2dez/OneListForAll $dir/OneListForAll &>/dev/null
+git clone https://github.com/dark-warlord14/LinkFinder $dir/LinkFinder &>/dev/null
 GO111MODULE=on go get -v github.com/projectdiscovery/shuffledns/cmd/shuffledns &>/dev/null
+go get -v github.com/hakluke/hakrawler
 go get -v github.com/cgboal/sonarsearch/crobat &>/dev/null
 printf "${bgreen} 60%% done${reset}\n\n"
-git clone https://github.com/KathanP19/JSFScan.sh $dir/JSFScan.sh &>/dev/null
 git clone https://github.com/six2dez/degoogle_hunter $dir/degoogle_hunter &>/dev/null
 git clone https://github.com/s0md3v/Arjun $dir/Arjun &>/dev/null
 git clone https://github.com/pielco11/fav-up $dir/fav-up &>/dev/null
-git clone https://github.com/chenjj/CORScanner $dir/CORScanner &>/dev/null
+git clone https://github.com/s0md3v/Corsy $dir/Corsy &>/dev/null
 git clone https://github.com/nsonaniya2010/SubDomainizer $dir/SubDomainizer &>/dev/null
+git clone https://github.com/codingo/Interlace $dir/Interlace &>/dev/null
+git clone https://github.com/m4ll0k/SecretFinder $dir/SecretFinder &>/dev/null
+git clone https://github.com/gwen001/github-search $dir/github-search &>/dev/null
 printf "${bgreen} 70%% done${reset}\n\n"
 git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh &>/dev/null
 pip3 install dnsgen &>/dev/null
-sudo chmod +x $dir/JSFScan.sh/install.sh && $dir/JSFScan.sh/install.sh &>/dev/null
-sudo chmod 755 $dir/JSFScan.sh/JSFScan.sh
 wget https://github.com/tillson/git-hound/releases/download/v1.3/git-hound_1.3_Linux_x86_64.tar.gz &>/dev/null
-printf "${bgreen} 80%% done${reset}\n\n"
 tar -xf git-hound_1.3_Linux_x86_64.tar.gz git-hound
 rm -f git-hound_1.3_Linux_x86_64.tar.gz
 sudo mv git-hound /usr/local/bin/git-hound
 sudo chmod 755 /usr/local/bin/git-hound
+printf "${bgreen} 80%% done${reset}\n\n"
 wget https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-linux &>/dev/null
-printf "${bgreen} 90%% done${reset}\n\n"
 sudo mv findomain-linux /usr/local/bin/findomain
 sudo chmod 755 /usr/local/bin/findomain
 cd $dir/massdns; make &>/dev/null
 sudo cp $dir/massdns/bin/massdns /usr/bin/
-find $dir -name 'requirements.txt' -exec pip3 install -r {} \; &>/dev/null
+sudo pip3 install mmh3==2.5.1
+find $dir -name 'requirements.txt' -exec pip3 install --user -r {} \; &>/dev/null
+sudo python3 $dir/Interlace/setup.py install
+python3 $dir/LinkFinder/setup.py install
+printf "${bgreen} 90%% done${reset}\n\n"
 cd ~/.gf; wget https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json &>/dev/null; cd $dir
+wget https://gist.githubusercontent.com/six2dez/d1d516b606557526e9a78d7dd49cacd3/raw/8e7f1e1139ba3501d15dcd2ad82338d303f0b404/github-endpoints.py &>/dev/null
+wget https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py &>/dev/null
 wget -O subdomains.txt https://gist.githubusercontent.com/jhaddix/86a06c5dc309d08580a018c66354a056/raw/96f4e51d96b2203f19f6381c8c545b278eaa0837/all.txt &>/dev/null
 wget -O resolvers.txt https://raw.githubusercontent.com/janmasarik/resolvers/master/resolvers.txt &>/dev/null
+
+printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - git-hound (~/.githound/config.yml)\n - github-endpoints.py ($tools/.github_tokens or GITHUB_TOKEN env var)\n - favup (shodan init SHODANPAIDAPIKEY) ${reset}\n"
 
 printf "${bgreen} Finished!${reset}\n\n"
 printf "\n\n${bgreen}#######################################################################\n"
