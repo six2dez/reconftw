@@ -18,38 +18,54 @@ chmod +x *.sh
 
 **Important: run install.sh script or set your tools path in the script in $tools var (line 10)**
 
-This is a simple script intended to perform a full recon on an objective with multiple subdomains. It performs multiples steps listed below:
+This is a simple script intended to perform a full recon on an objective with multiple subdomains
 
-0. Tools checker
-1. Google Dorks (based on deggogle_hunter)
-2. Subdomain enumeration (passive, resolution, bruteforce and permutations)
-3. Sub TKO (subjack and nuclei)
-4. Probing (httpx)
-5. Websscreenshot (aquatone)
-6. Template scanner (nuclei)
-7. Port Scan (naabu)
-8. Url extraction (waybackurls and gau)
-9. Pattern Search (gf and gf-patterns)
-10. Param discovery (paramspider and arjun)
-11. XSS (Gxss and dalfox)
-12. Github Check (git-hound)
-13. Favicon Real IP (fav-up)
-14. Javascript Checks (JSFScan.sh)
-15. Directory fuzzing/discovery (dirsearch and ffuf)
-16. Cors (CORScanner)
-17. SSL Check (testssl)
+## Features
+
+- Tools checker
+- Google Dorks (based on deggogle_hunter)
+- Subdomain enumeration (passive, resolution, bruteforce and permutations)
+- Sub TKO (subjack and nuclei)
+- Web Prober (httpx)
+- Web screenshot (aquatone)
+- Template scanner (nuclei)
+- Port Scanner (naabu)
+- Url extraction (waybackurls, gau, hakrawler, github-endpoints)
+- Pattern Search (gf and gf-patterns)
+- Param discovery (paramspider and arjun)
+- XSS (Gxss and dalfox)
+- Github Check (git-hound)
+- Favicon Real IP (fav-up)
+- JS Checks (LinkFinder, SecretFinder, scripts from JSFScan)
+- Fuzzing (ffuf)
+- Cors (Corsy)
+- SSL Check (testssl)
+- Interlace integration
+- Custom output folder (default under Recon/target.com/)
+- Run standalone steps (subdomains, subtko, web, gdorks...)
+- Polished installer compatible with most distros
+
+## Mindmap/Workflow
 
 ![Mindmap](mindmap.png)
 
-Also you can perform just subdomain scan, webscan, google dorks, subdomain takeover. Remember webscan needs target lists with -l flag.
+## Requirements
 
-It generates and output in Recon/ folder with the name of the target domain, for example Recon/target.com/
+- Golang > 1.14 installed and env vars correctly set ($GOPATH,$GOROOT)
+- Run ./install.sh
+- It is highly recommended, and in some cases essential, set your api keys:
+  - amass (~/.config/amass/config.ini)
+  - subfinder (~/.config/subfinder/config.yaml)
+  - git-hound (~/.githound/config.yml)
+  - github-endpoints.py (GITHUB_TOKEN env var)
+  - favup (shodan init SHODANPAIDAPIKEY)
+- This script uses dalfox with blind-xss option, you must change to your own server, check xsshunter.com.
 
 ## Installation
 
 Run ./install.sh and it will install all the tools needed.
 
-## Usage
+## Usage examples
 
 ### Full scan:
 ```bash
@@ -70,12 +86,6 @@ Run ./install.sh and it will install all the tools needed.
 ```bash
 ./reconftw.sh -d target.com -g
 ```
-
-## Notes
-
-- Some tools in this script need or can use multiple API keys, such as amass, subfinder, or git-hound. It is up to you to configure them correctly, consult the documentation of each tool to do it correctly.
-
-- This script uses dalfox with blind-xss option, you must change to your own server, check xsshunter.com.
 
 ## Short-term improvement plan:
 
