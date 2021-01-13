@@ -76,13 +76,14 @@ Run install.sh and it will install all the tools needed.
 - This script uses dalfox with blind-xss option, you must change to your own server, check xsshunter.com.
 
 ## Short-term improvement plan:
-- [ ] Enhance this Readme
-- [ ] Customize output folder
-- [ ] Interlace usage
+
 - [ ] Notification support (Slack, Discord and Telegram)
 - [ ] CMS tools (wpscan, drupwn/droopescan, joomscan)
 - [ ] Add menu option for every feature
 - [ ] Any other interesting suggestion
+- [X] Enhance this Readme
+- [X] Customize output folder
+- [X] Interlace usage
 - [X] Crawler
 - [X] SubDomainizer
 - [X] Install script
