@@ -3,7 +3,7 @@
 ## tl;dr
 
 - Requires [Go](https://golang.org/dl/)
-- install.sh uses apt for installing packages, modify for your needs
+- Run ./install.sh before first run (apt, rpm, pacman compatible)
 
 ```bash
 git clone https://github.com/six2dez/reconftw
@@ -39,13 +39,15 @@ This is a simple script intended to perform a full recon on an objective with mu
 16. Cors (CORScanner)
 17. SSL Check (testssl)
 
-Also you can perform just subdomain scan, webscan or google dorks. Remember webscan needs target lists with -l flag.
+![Mindmap](mindmap.png)
+
+Also you can perform just subdomain scan, webscan, google dorks, subdomain takeover. Remember webscan needs target lists with -l flag.
 
 It generates and output in Recon/ folder with the name of the target domain, for example Recon/target.com/
 
 ## Installation
 
-Run install.sh and it will install all the tools needed.
+Run ./install.sh and it will install all the tools needed.
 
 ## Usage
 
