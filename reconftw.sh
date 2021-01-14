@@ -138,7 +138,7 @@ subdomains(){
     printf "${bgreen}#######################################################################\n"
     printf "${bred} Step 2/17 : Subdomain Enumeration\n\n"
     # Passive scan
-    printf "${yellow} Running : Passive Subdomain Enumeration${reset}\n"
+    printf "${yellow} Running : Passive Subdomain Enumeration 1/6${reset}\n"
     subfinder -d $domain -o subfinder.txt &>/dev/null
     assetfinder --subs-only $domain | anew -q assetfinder.txt
     amass enum -passive -d $domain -o amass.txt &>/dev/null
@@ -151,7 +151,7 @@ subdomains(){
     printf "${green} Passive subdomains found: ${NUMOFLINES}${reset}\n\n"
 
     # Bruteforce
-    printf "${yellow} Running : Bruteforce Subdomain Enumeration ${reset}\n"
+    printf "${yellow} Running : Bruteforce Subdomain Enumeration 2/6${reset}\n"
     shuffledns -d $domain -w $tools/subdomains.txt -r $tools/resolvers.txt -o active_tmp.txt &>/dev/null
     cat active_tmp.txt | sed "s/*.//" | anew -q active.txt
     rm active_tmp.txt 2>/dev/null
@@ -159,7 +159,7 @@ subdomains(){
     printf "${green} Bruteforce subdomains found: ${NUMOFLINES}${reset}\n\n"
 
     # Active
-    printf "${yellow} Running : Active Subdomain Enumeration${reset}\n"
+    printf "${yellow} Running : Active Subdomain Enumeration 3/6${reset}\n"
     cat active.txt passive.txt > active_passive_tmp.txt
     shuffledns -d $domain -list active_passive_tmp.txt -r $tools/resolvers.txt -o active_passive.txt &>/dev/null
     rm active.txt passive.txt active_passive_tmp.txt 2>/dev/null
@@ -167,7 +167,7 @@ subdomains(){
     printf "${green} Active subdomains found: ${NUMOFLINES}${reset}\n\n"
 
     # Permutations
-    printf "${yellow} Running : Permutations Subdomain Enumeration${reset}\n"
+    printf "${yellow} Running : Permutations Subdomain Enumeration 4/6${reset}\n"
     if [[ $(cat active_passive.txt | wc -l) -le 50 ]]
         then
             dnsgen active_passive.txt --wordlist $tools/permutations_list.txt 2>/dev/null | shuffledns -d $domain -r $tools/resolvers.txt -o permute1_tmp.txt 2>/dev/null
@@ -186,13 +186,14 @@ subdomains(){
     printf "${green} Permutation subdomains found: ${NUMOFLINES}${reset}\n\n"
 
     # SubDomainizer
-    printf "${yellow} Running : SubDomainizer${reset}\n"
+    printf "${yellow} Running : SubDomainizer 5/6${reset}\n"
     domain_probed=$(echo $domain | httpx -threads 100 -silent)
     python3 $tools/SubDomainizer/SubDomainizer.py -u $domain_probed -o SubDomainizer_subdomains.txt -k &>/dev/null
     NUMOFLINES=$(wc -l < SubDomainizer_subdomains.txt)
     printf "${green} SubDomainizer: ${NUMOFLINES}${reset}\n\n"
 
     # Final subdomains
+    printf "${yellow} Running : Final DNS Resolution 6/6${reset}\n"
     cat active_passive.txt permute.txt SubDomainizer_subdomains.txt > final_subdomains.txt 2>/dev/null
     shuffledns -d $domain -list final_subdomains.txt -r $tools/resolvers.txt -o ${domain}_subdomains.txt &>/dev/null
     rm active_passive.txt permute.txt SubDomainizer_subdomains.txt final_subdomains.txt 2>/dev/null
