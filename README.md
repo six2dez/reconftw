@@ -106,6 +106,10 @@ This is a simple script intended to perform a full recon on an objective with mu
 - [X] Install script
 - [X] Apt,rpm,pacman compatible installer
 
+You can support this work buying me a coffee:
+
+[<img src="https://cdn.buymeacoffee.com/buttons/v2/default-green.png">](https://www.buymeacoffee.com/six2dez)
+
 ## Thanks
 For their great feedback, support, help or for nothing special but well deserved:
 - [@detonXX](https://twitter.com/detonXX)
