@@ -99,6 +99,7 @@ This is a simple script intended to perform a full recon on an objective with mu
 - [ ] Open Redirect with Oralyzer
 - [ ] More verbose
 - [ ] Fast mode
+- [ ] Docker image
 - [X] Enhance this Readme
 - [X] Customize output folder
 - [X] Interlace usage
