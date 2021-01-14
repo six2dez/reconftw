@@ -396,7 +396,12 @@ fuzz(){
     printf "${bgreen}#######################################################################\n"
     printf "${bred} Step 15/17 : ${bgreen} Performing Directory Fuzzing ${reset}\n"
     printf "${yellow}\n\n Running : Running ffuf in every subdomain with onelistforallmicro.txt${reset}\n"
-    interlace -tL ${domain}_probed.txt -threads 5 -c "ffuf -mc all -ac -w $tools/OneListForAll/onelistforallmicro.txt -maxtime 900 -u _target_/FUZZ -or -o _target_ffuf.txt &>/dev/null" &>/dev/null
+    mkdir -p $dir/fuzzing
+    for sub in $(cat ${domain}_probed.txt); do
+        printf "${yellow}\n\n Running : Running ffuf in ${sub} with onelistforallmicro.txt${reset}\n"
+        sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
+        ffuf -mc all -ac -w $tools/OneListForAll/onelistforallmicro.txt -maxtime 900 -u $sub/FUZZ -or -of md -o $dir/fuzzing/${sub_out}.md &>/dev/null
+    done
     printf "${bred} Finished : ${bgreen} Results are saved in *subdomain*_ffuf.txt ${reset}\n"
     printf "${bgreen}#######################################################################\n"
 	# Finished Directory Fuzzing 
