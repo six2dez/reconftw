@@ -170,15 +170,15 @@ subdomains(){
     printf "${yellow} Running : Permutations Subdomain Enumeration${reset}\n"
     if [[ $(cat active_passive.txt | wc -l) -le 50 ]]
         then
-            dnsgen active_passive.txt 2>/dev/null | shuffledns -d $domain -r $tools/resolvers.txt -o permute1_tmp.txt 2>/dev/null
+            dnsgen active_passive.txt --wordlist $tools/permutations_list.txt 2>/dev/null | shuffledns -d $domain -r $tools/resolvers.txt -o permute1_tmp.txt 2>/dev/null
             cat permute1_tmp.txt | anew -q permute1.txt 
-            dnsgen permute1.txt 2>/dev/null | shuffledns -d $domain -r $tools/resolvers.txt -o permute2_tmp.txt 2>/dev/null
+            dnsgen permute1.txt --wordlist $tools/permutations_list.txt 2>/dev/null | shuffledns -d $domain -r $tools/resolvers.txt -o permute2_tmp.txt 2>/dev/null
             cat permute2_tmp.txt | anew -q permute2.txt
             cat permute1.txt permute2.txt | anew -q permute.txt
             rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt 2>/dev/null
         elif [[ $(cat active_passive.txt | wc -l) -le 100 ]]
         then
-            dnsgen active_passive.txt 2>/dev/null | shuffledns -d $domain -r $tools/resolvers.txt -o permute_tmp.txt 2>/dev/null
+            dnsgen active_passive.txt --wordlist $tools/permutations_list.txt 2>/dev/null | shuffledns -d $domain -r $tools/resolvers.txt -o permute_tmp.txt 2>/dev/null
             cat permute_tmp.txt | anew -q permute.txt
             rm permute_tmp.txt 2>/dev/null
     fi
