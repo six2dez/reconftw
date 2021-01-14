@@ -96,8 +96,9 @@ This is a simple script intended to perform a full recon on an objective with mu
 - [ ] Notification support (Slack, Discord and Telegram)
 - [ ] CMS tools (wpscan, drupwn/droopescan, joomscan)
 - [ ] Add menu option for every feature
-- [ ] Any other interesting suggestion
 - [ ] Open Redirect with Oralyzer
+- [ ] More verbose
+- [ ] Fast mode
 - [X] Enhance this Readme
 - [X] Customize output folder
 - [X] Interlace usage
