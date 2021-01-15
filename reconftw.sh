@@ -274,11 +274,13 @@ nuclei_check(){
 	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/default-logins/ -o ${domain}_nuclei_default_creds.txt;
 	printf "${yellow}\n\n Running : Nuclei DNS ${reset}\n\n"
 	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/dns/ -o ${domain}_nuclei_dns.txt;
+	printf "${yellow}\n\n Running : Nuclei Miscellaneous ${reset}\n\n"
+	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/miscellaneous/ -o ${domain}_nuclei_miscellaneous.txt;
 	printf "${yellow}\n\n Running : Nuclei Panels ${reset}\n\n"
 	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/exposed-panels/ -o ${domain}_nuclei_panels.txt;
 	printf "${yellow}\n\n Running : Nuclei Security Misconfiguration ${reset}\n\n"
 	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/misconfiguration/ -o ${domain}_nuclei_misconfigurations.txt;
-	printf "${yellow}\n\n Running : Nuclei Generic detections ${reset}\n\n"
+	printf "${yellow}\n\n Running : Nuclei Vulnerabilites ${reset}\n\n"
 	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/vulnerabilities/ -o ${domain}_nuclei_vulnerabilities.txt;
 	printf "\n\n"
 	printf "${bred} Finished : ${bgreen} Results are saved in ${domain}_nuclei_*.txt files ${reset}\n"
