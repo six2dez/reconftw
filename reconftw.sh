@@ -268,16 +268,12 @@ nuclei_check(){
 	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o ${domain}_nuclei_tokens.txt;
 	printf "${yellow}\n\n Running : Nuclei Exposures${reset}\n\n"
 	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/exposures/ -o ${domain}_nuclei_exposures.txt;
-	printf "${yellow}\n\n Running : Nuclei Generic detections ${reset}\n\n"
-	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/generic-detections/ -o ${domain}_nuclei_generic_detections.txt;
 	printf "${yellow}\n\n Running : Nuclei CVEs ${reset}\n\n"
 	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/cves/ -o ${domain}_nuclei_cves.txt;
 	printf "${yellow}\n\n Running : Nuclei Default Creds ${reset}\n\n"
 	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/default-logins/ -o ${domain}_nuclei_default_creds.txt;
 	printf "${yellow}\n\n Running : Nuclei DNS ${reset}\n\n"
 	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/dns/ -o ${domain}_nuclei_dns.txt;
-	printf "${yellow}\n\n Running : Nuclei Files ${reset}\n\n"
-	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/files/ -o ${domain}_nuclei_files.txt;
 	printf "${yellow}\n\n Running : Nuclei Panels ${reset}\n\n"
 	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/exposed-panels/ -o ${domain}_nuclei_panels.txt;
 	printf "${yellow}\n\n Running : Nuclei Security Misconfiguration ${reset}\n\n"
