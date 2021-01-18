@@ -587,7 +587,7 @@ help(){
 	printf " ./reconftw.sh -d example.com -a -o custom/path\n"
 	printf " \n"
 	printf " Full Subdomain scanning with multiple targets:\n"
-	printf " ./reconftw.sh -d example.com -l targets.txt -s\n"
+	printf " ./reconftw.sh -l targets.txt -s\n"
 	printf " \n"
 	printf " Permutations subdomain scan:\n"
 	printf " ./reconftw.sh -d example.com -l targets.txt --sr\n"
