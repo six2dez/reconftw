@@ -200,7 +200,7 @@ subdomains(){
 	NUMOFLINES=$(wc -l < ${domain}_subdomains.txt)
 	printf "${bgreen} Total active subdomains found: ${NUMOFLINES}${reset}\n\n"
 
-	cat ${domain}_subdomains.txt 2>/dev/null
+	cat ${domain}_subdomains.txt | sort 2>/dev/null
 	printf "${bred}\n Finished : Results are saved in ${domain}_subdomains.txt ${reset}\n"
 	printf "${bgreen}#######################################################################\n\n"
 	# Finished Subdomain Enumeration
@@ -211,12 +211,9 @@ subtakeover(){
 	printf "${bgreen}#######################################################################\n"
 	printf "${bred} Step 3/17 : ${bgreen} Subdomain Takeover ${reset}\n\n"
 	subjack -w ${domain}_subdomains.txt -a -ssl -t 50 -v -c $tools/subjack/fingerprints.json -ssl -o ${domain}_all-takeover-checks.txt &>/dev/null;
-	grep -v "Not Vulnerable" <${domain}_all-takeover-checks.txt > ${domain}_subjack.txt
-	rm ${domain}_all-takeover-checks.txt
-	cat ${domain}_subdomains.txt | nuclei -silent -l ${domain}_subdomains.txt -t ~/nuclei-templates/takeovers/ -o ${domain}_nuclei_subtko.txt;
-	cat ${domain}_nuclei_subtko.txt ${domain}_subjack.txt | anew -q ${domain}_takeover.txt 2>/dev/null
+	grep -v "Not Vulnerable" <${domain}_all-takeover-checks.txt > ${domain}_takeover.txt
+	rm ${domain}_all-takeover-checks.txt 2>/dev/null
 	cat ${domain}_takeover.txt 2>/dev/null
-	rm ${domain}_nuclei_subtko.txt ${domain}_subjack.txt 2>/dev/null
 	printf "${bred}\n Finished : ${bgreen} Results are saved in ${domain}_takeover.txt ${reset}\n"
 	printf "${bgreen}#######################################################################\n\n"
 	# Finished Subdomain Takeover
@@ -272,6 +269,8 @@ nuclei_check(){
 	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/cves/ -o ${domain}_nuclei_cves.txt;
 	printf "${yellow}\n\n Running : Nuclei Default Creds ${reset}\n\n"
 	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/default-logins/ -o ${domain}_nuclei_default_creds.txt;
+	printf "${yellow}\n\n Running : Nuclei SubTko ${reset}\n\n"
+	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/takeovers/ -o ${domain}_nuclei_subtko.txt;
 	printf "${yellow}\n\n Running : Nuclei DNS ${reset}\n\n"
 	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/dns/ -o ${domain}_nuclei_dns.txt;
 	printf "${yellow}\n\n Running : Nuclei Miscellaneous ${reset}\n\n"
