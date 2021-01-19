@@ -611,7 +611,6 @@ end(){
 }
 
 all(){
-	start
 	if [ -n "$list" ]
 	then
 		for domain in $(cat $list); do
