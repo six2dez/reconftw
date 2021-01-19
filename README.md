@@ -98,9 +98,10 @@ This is a simple script intended to perform a full recon on an objective with mu
 - [ ] Add menu option for every feature
 - [ ] Open Redirect with Oralyzer
 - [ ] CRLF checks
-- [ ] More verbose
 - [ ] Fast mode
 - [ ] Docker image
+- [ ] More error checks
+- [X] More verbose
 - [X] Enhance this Readme
 - [X] Customize output folder
 - [X] Interlace usage
