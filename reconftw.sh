@@ -35,10 +35,12 @@ start(){
 		printf "\n\n${bred} No domain or list provided ${reset}\n\n"
 		exit
 	fi
-
 	dir=$PWD/Recon/$domain
-
-	[ ! -d "$dir" ] || mkdir -p $dir
+	
+	if [ ! -d "$dir" ]
+	then
+		mkdir -p $dir
+	fi
 
 	if [ -n "$list" ]
 	then
