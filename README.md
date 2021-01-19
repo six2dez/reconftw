@@ -41,6 +41,8 @@ This is a simple script intended to perform a full recon on an objective with mu
 - Pattern Search (gf and gf-patterns)
 - Param discovery (paramspider and arjun)
 - XSS (Gxss and dalfox)
+- Open redirect (Openredirex)
+- SSRF checks (from m4ll0k/Bug-Bounty-Toolz/SSRF.py)
 - Github Check (git-hound)
 - Favicon Real IP (fav-up)
 - JS Checks (LinkFinder, SecretFinder, scripts from JSFScan)
@@ -62,12 +64,13 @@ This is a simple script intended to perform a full recon on an objective with mu
 - [Golang](https://golang.org/dl/) > 1.14 installed and env vars correctly set ($GOPATH,$GOROOT)
 - Run ./install.sh
 > Installer is provided as is. Nobody knows your system better than you, so nobody can debug your system better than you. If you are experiencing some issues with the installer script I can help you out, but keep in mind that is not my main priority.
-- It is highly recommended, and in some cases essential, set your api keys:
+- It is highly recommended, and in some cases essential, set your api keys or env vars:
   - amass (~/.config/amass/config.ini)
   - subfinder (~/.config/subfinder/config.yaml)
   - git-hound (~/.githound/config.yml)
   - github-endpoints.py (GITHUB_TOKEN env var)
   - favup (shodan init SHODANPAIDAPIKEY)
+  - SSRF Server (COLLAB_SERVER env var) 
 - This script uses dalfox with blind-xss option, you must change to your own server, check xsshunter.com.
 
 ## Usage examples
@@ -97,11 +100,12 @@ This is a simple script intended to perform a full recon on an objective with mu
 - [ ] Notification support (Slack, Discord and Telegram)
 - [ ] CMS tools (wpscan, drupwn/droopescan, joomscan)
 - [ ] Add menu option for every feature
-- [ ] Open Redirect with Oralyzer
 - [ ] CRLF checks
 - [ ] Fast mode
 - [ ] Docker image
 - [ ] Diff support
+- [X] Open Redirect with Openredirex
+- [X] SSRF Checks
 - [X] More error checks
 - [X] More verbose
 - [X] Enhance this Readme
