@@ -22,7 +22,7 @@ elif [ -f /etc/os-release ]; then sudo yum install git wget;
 fi
 
 #Tools to be updated
-repos="s0md3v/Arjun six2dez/degoogle_hunter 1ndianl33t/Gf-Patterns gwen001/github-search dark-warlord14/LinkFinder projectdiscovery/nuclei-templates devanshbatham/ParamSpider nsonaniya2010/SubDomainizer haccer/subjack s0md3v/Corsy pielco11/fav-up tomnomnom/gf codingo/Interlace blechschmidt/massdns six2dez/OneListForAll m4ll0k/SecretFinder"
+repos="s0md3v/Arjun six2dez/degoogle_hunter 1ndianl33t/Gf-Patterns gwen001/github-search dark-warlord14/LinkFinder projectdiscovery/nuclei-templates devanshbatham/ParamSpider nsonaniya2010/SubDomainizer haccer/subjack s0md3v/Corsy pielco11/fav-up tomnomnom/gf codingo/Interlace blechschmidt/massdns six2dez/OneListForAll m4ll0k/SecretFinder devanshbatham/OpenRedireX"
 
 printf "\n${bgreen}--==[ ************************************************************************************ ]==--\n"
 printf "${bred}                reconftw updater script (apt/rpm/pacman compatible)${reset}\n"
@@ -32,10 +32,10 @@ for repo in ${repos}; do
     printf "${bgreen}#######################################################################\n"
     printf "${bblue} Updating ${repo} ${reset}\n"
     if [ ! -d "$dir/$(basename $repo)" ]; then
-        git clone https://github.com/$repo "$dir/$(basename $repo)" #&>/dev/null
+        git clone https://github.com/$repo "$dir/$(basename $repo)" &>/dev/null
     else
         cd "$dir/$(basename $repo)"
-        git pull origin master #&>/dev/null
+        git pull origin master &>/dev/null
     fi
     printf "${bblue}\n Updating ${repo} is finished ${reset}\n"
     printf "${bgreen}#######################################################################\n"
