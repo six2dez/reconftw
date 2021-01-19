@@ -11,7 +11,7 @@
 
 ## tl;dr
 
-- Requires [Go](https://golang.org/dl/)
+- Requires [Golang](https://golang.org/dl/) > 1.14 installed and env vars correctly set ($GOPATH,$GOROOT)
 - Run ./install.sh before first run (apt, rpm, pacman compatible)
 
 ```bash
