@@ -629,7 +629,7 @@ all(){
 
 help(){
 	printf "\n Usage: $0 [-h] [-i] [-d DOMAIN] [-l list.txt] [-a] [-g] [-w] [-t]"
-	printf "\n           	      [-s] [--sp] [--sb] [--sr] [--ss] [--sw] [-o OUTPUT]\n\n"
+	printf "\n           	      [-s] [--sp] [--sb] [--sr] [--ss] [--sw] [-v] [-o OUTPUT]\n\n"
 	printf " ${bblue}TARGET OPTIONS${reset}\n"
 	printf "   -d DOMAIN        Target domain\n"
 	printf "   -l list.txt      Targets list, one per line\n"
