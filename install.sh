@@ -27,18 +27,18 @@ type go >/dev/null 2>&1 || { printf "${bred} Golang no detected, install and con
 [ -n "$GOPATH" ] || { printf "${bred} GOPATH env var no detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
 [ -n "$GOROOT" ] || { printf "${bred} GOROOT env var no detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
 
-test -f /etc/debian_version && install_apt
-test -f /etc/redhat-release && install_yum
+if [ -f /etc/debian_version ]; then install_apt;
+elif [ -f /etc/redhat-release ]; then install_yum;
+elif [ -f /etc/arch-release ]; then install_pacman;
+elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for some RedHat and Amazon Linux instances
+fi
+
 #test -f /etc/gentoo-release && install_emerge
 #test -f /etc/SuSE-release && install_zypp
-#test -f /etc/os-release && install_yum
-test -f /etc/arch-release && install_pacman
 
 [ ! -d "~/.gf" ] && mkdir -p ~/.gf
 [ ! -d "~/Tools" ] && mkdir -p ~/Tools
 dir=~/Tools
-
-
 
 go get -v github.com/tomnomnom/gf &>/dev/null
 go get -v github.com/tomnomnom/qsreplace &>/dev/null
