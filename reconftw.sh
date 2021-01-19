@@ -567,6 +567,10 @@ testssl(){
 	printf "${bgreen}#######################################################################\n"
 }
 
+#open_redirec(){
+#	
+#}
+
 end(){
 	if [ -n "$dir_output" ]
 	then
@@ -576,7 +580,6 @@ end(){
 	printf "${bgreen}#######################################################################\n"
 	printf "${bred} Finished Recon on: ${domain} under ${finaldir} ${reset}\n"
 	printf "${bgreen}#######################################################################\n"
-	exit
 }
 
 all(){
@@ -706,8 +709,10 @@ while getopts ":hd:-:l:vaisxwgto:" opt; do
 				subtakeover
 				end
 			fi
+			exit
 			;;
 		a ) all
+			exit
 			;;
 		w ) start
 			if [ -n "$list" ]
@@ -724,6 +729,7 @@ while getopts ":hd:-:l:vaisxwgto:" opt; do
 			params
 			xss
 			end
+			exit
 			;;
 		t ) start
 			if [ -n "$list" ]
@@ -738,7 +744,7 @@ while getopts ":hd:-:l:vaisxwgto:" opt; do
 			end
 			;;
 		i ) tools_full
-			exit 1
+			exit
 			;;
 		-)  case "${OPTARG}" in
             	sp)	if [ -n "$list" ]
@@ -757,6 +763,7 @@ while getopts ":hd:-:l:vaisxwgto:" opt; do
 						webprobe_simple
 						end
 					fi
+					exit
                 	;;
                 sb)	if [ -n "$list" ]
 					then
@@ -774,16 +781,19 @@ while getopts ":hd:-:l:vaisxwgto:" opt; do
 						webprobe_simple
 						end
 					fi
+					exit
 					;;
 				sr) start
 					cp $list $dir/${domain}_subdomains.txt
 					sub_permut
 					end
+					exit
 					;;
 				ss)	start
 					cp $list $dir/${domain}_probed.txt
 					sub_scraping
 					end
+					exit
 					;;
             esac;;		
 		o ) dir_output=$OPTARG
