@@ -51,6 +51,7 @@ This is a simple script intended to perform a full recon on an objective with mu
 - Custom output folder (default under Recon/target.com/)
 - Run standalone steps (subdomains, subtko, web, gdorks...)
 - Polished installer compatible with most distros
+- Verbose mode
 
 ## Mindmap/Workflow
 
@@ -100,7 +101,8 @@ This is a simple script intended to perform a full recon on an objective with mu
 - [ ] CRLF checks
 - [ ] Fast mode
 - [ ] Docker image
-- [ ] More error checks
+- [ ] Diff support
+- [X] More error checks
 - [X] More verbose
 - [X] Enhance this Readme
 - [X] Customize output folder
