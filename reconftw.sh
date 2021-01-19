@@ -48,7 +48,7 @@ start(){
 	then
 		cp $list $dir/${domain}_probed.txt
 	fi
-	fuzz_wordlist=$tools/onelistforallmicro/onelistforallmicro.txt
+	fuzz_wordlist=$tools/OneListForAll/onelistforallmicro.txt
 	cd $dir
 	printf "\n"
 	eval nuclei -update-templates $DEBUG_STD
