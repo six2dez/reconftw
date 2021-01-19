@@ -450,7 +450,7 @@ favicon(){
 	cd $tools/fav-up && python3 favUp.py -w $domain -sc > ${dir}/${domain}_favicontest.txt && cd ${dir} && cat ${domain}_favicontest.txt | grep found_ips
 	end=`date +%s`
 	runtime=$((end-start))
-	printf "${bblue}\n GitHub Scanning Finished in ${runtime} secs\n"
+	printf "${bblue}\n FavIcon Hash Extraction Finished in ${runtime} secs\n"
 	printf "${bblue} Results are saved in in ${domain}_favicontest.txt${reset}\n"
 	printf "${bgreen}#######################################################################\n\n"
 }
