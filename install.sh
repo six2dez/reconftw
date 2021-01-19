@@ -104,6 +104,7 @@ sudo pip3 install mmh3==2.5.1
 find $dir -name 'requirements.txt' -exec pip3 install --user -r {} \; &>/dev/null
 sudo python3 $dir/Interlace/setup.py install
 python3 $dir/LinkFinder/setup.py install
+git clone https://github.com/devanshbatham/OpenRedireX $dir/OpenRedireX &>/dev/null
 printf "${bgreen} 90%% done${reset}\n\n"
 cd ~/.gf; wget -O potential.json https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json &>/dev/null; cd $dir
 wget -O github-endpoints.py https://gist.githubusercontent.com/six2dez/d1d516b606557526e9a78d7dd49cacd3/raw/8e7f1e1139ba3501d15dcd2ad82338d303f0b404/github-endpoints.py &>/dev/null
