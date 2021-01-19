@@ -35,8 +35,11 @@ start(){
 		printf "\n\n${bred} No domain or list provided ${reset}\n\n"
 		exit
 	fi
-	dir=$PWD/Recon/$domain
-	mkdir -p $dir
+
+	dir=Recon/$domain
+
+	[ ! -d "$dir" ] || mkdir -p $dir
+
 	if [ -n "$list" ]
 	then
 		cp $list $dir/${domain}_probed.txt
