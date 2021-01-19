@@ -12,6 +12,7 @@ reset='\033[0m'
 tools=~/Tools
 DEBUG_STD="&>/dev/null"
 DEBUG_ERROR="2>/dev/null"
+SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 banner(){
 	printf "\n${bgreen}"
@@ -35,7 +36,8 @@ start(){
 		printf "\n\n${bred} No domain or list provided ${reset}\n\n"
 		exit
 	fi
-	dir=$PWD/Recon/$domain
+	
+	dir=$SCRIPTPATH/Recon/$domain
 	
 	if [ ! -d "$dir" ]
 	then
