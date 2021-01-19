@@ -36,7 +36,7 @@ start(){
 		exit
 	fi
 
-	dir=Recon/$domain
+	dir=$PWD/Recon/$domain
 
 	[ ! -d "$dir" ] || mkdir -p $dir
 
