@@ -10,6 +10,8 @@ green='\033[0;32m'
 reset='\033[0m'
 
 tools=~/Tools
+DEBUG_STD="&>/dev/null"
+DEBUG_ERROR="2>/dev/null"
 
 banner(){
 	printf "\n${bgreen}"
@@ -42,59 +44,127 @@ start(){
 	fuzz_wordlist=$tools/onelistforallmicro/onelistforallmicro.txt
 	cd $dir
 	printf "\n"
-	nuclei -update-templates &>/dev/null
+	eval nuclei -update-templates $DEBUG_STD
 	printf "${bred} Target: ${domain}\n\n"
 }
 
 function tools_installed(){
 
-	printf "\n\n${bgreen}#######################################################################\n\n"
+	printf "\n\n${bgreen}#######################################################################\n"
 	printf "${bblue} Checking installed tools ${reset}\n\n"
 
-	[ -f $tools/degoogle_hunter/degoogle.py ] && printf "${bgreen}[*] degoogle		[YES]\n" || printf "${bred}[*] degoogle		[NO]\n"
-	[ -f $tools/ParamSpider/paramspider.py ] && printf "${bgreen}[*] Paramspider		[YES]\n" || printf "${bred}[*] Paramspider		[NO]\n"
-	[ -f $tools/Arjun/arjun.py ] && printf "${bgreen}[*] Arjun		[YES]\n" || printf "${bred}[*] Arjun		[NO]\n"
-	[ -f $tools/fav-up/favUp.py ] && printf "${bgreen}[*] fav-up		[YES]\n" || printf "${bred}[*] fav-up		[NO]\n"
-	[ -f $tools/Corsy/corsy.py ] && printf "${bgreen}[*] Corsy		[YES]\n" || printf "${bred}[*] Corsy		[NO]\n"
-	[ -f $tools/testssl.sh/testssl.sh ] && printf "${bgreen}[*] testssl		[YES]\n" || printf "${bred}[*] testssl		[NO]\n"
-	[ -f $tools/SubDomainizer/SubDomainizer.py ] && printf "${bgreen}[*] SubDomainizer	[YES]\n" || printf "${bred}[*] SubDomainizer	[NO]\n"
-	[ -f $tools/SecretFinder/SecretFinder.py ] && printf "${bgreen}[*] SecretFinder	[YES]\n" || printf "${bred}[*] SecretFinder	[NO]\n"
-	[ -f $tools/OneListForAll/onelistforallmicro.txt ] && printf "${bgreen}[*] OneListForAll	[YES]\n" || printf "${bred}[*] OneListForAll	[NO]\n"
-	[ -f $tools/LinkFinder/linkfinder.py ] && printf "${bgreen}[*] LinkFinder	        [YES]\n" || printf "${bred}[*] LinkFinder	        [NO]\n"
-	[ -f $tools/github-endpoints.py ] && printf "${bgreen}[*] github-endpoints.py	[YES]\n" || printf "${bred}[*] github-endpoints.py	[NO]\n"
-	[ -f $tools/github-search/github-endpoints.py ] && printf "${bgreen}[*] github-search	[YES]\n" || printf "${bred}[*] github-search	[NO]\n"
-	[ -f $tools/getjswords.py ] && printf "${bgreen}[*] getjswords.py	[YES]\n" || printf "${bred}[*] getjswords.py	[NO]\n"
-	[ -f $tools/subdomains.txt ] && printf "${bgreen}[*] subdomains.txt	[YES]\n" || printf "${bred}[*] subdomains.txt	[NO]\n"
-	[ -f $tools/resolvers.txt ] && printf "${bgreen}[*] resolvers.txt	[YES]\n" || printf "${bred}[*] resolvers.txt	[NO]\n"
-	type -P hakrawler &>/dev/null && printf "${bgreen}[*] hakrawler		[YES]\n" || { printf "${bred}[*] hakrawler		[NO]\n"; }
-	type -P subfinder &>/dev/null && printf "${bgreen}[*] Subfinder		[YES]\n" || { printf "${bred}[*] Subfinder		[NO]\n"; }
-	type -P assetfinder &>/dev/null && printf "${bgreen}[*] Assetfinder		[YES]\n" || { printf "${bred}[*] Assetfinder		[NO]\n"; }
-	type -P findomain &>/dev/null && printf "${bgreen}[*] Findomain		[YES]\n" || { printf "${bred}[*] Findomain		[NO]\n"; }
-	type -P amass &>/dev/null && printf "${bgreen}[*] Amass		[YES]\n" || { printf "${bred}[*] Amass		[NO]\n"; }
-	type -P crobat &>/dev/null && printf "${bgreen}[*] Crobat		[YES]\n" || { printf "${bred}[*] Crobat		[NO]\n"; }
-	type -P waybackurls &>/dev/null && printf "${bgreen}[*] Waybackurls		[YES]\n" || { printf "${bred}[*] Waybackurls		[NO]\n"; }
-	type -P gau &>/dev/null && printf "${bgreen}[*] Gau		        [YES]\n" || { printf "${bred}[*] Gau		[NO]\n"; }
-	type -P shuffledns &>/dev/null && printf "${bgreen}[*] ShuffleDns		[YES]\n" || { printf "${bred}[*] ShuffleDns		[NO]\n"; }
-	type -P subjack &>/dev/null && printf "${bgreen}[*] Subjack		[YES]\n" || { printf "${bred}[*] Subjack		[NO]\n"; }
-	[ -f $tools/subjack/fingerprints.json ] && printf "${bgreen}[*] Subjack fingerprints[YES]\n" || printf "${bred}[*] Subjack fingerprints[NO]\n"
-	type -P nuclei &>/dev/null && printf "${bgreen}[*] Nuclei		[YES]\n" || { printf "${bred}[*] Nuclei		[NO]\n"; }
-	[ -d ~/nuclei-templates ] && printf "${bgreen}[*] Nuclei templates    [YES]\n" || printf "${bred}[*] Nuclei templates    [NO]\n"
-	type -P aquatone &>/dev/null && printf "${bgreen}[*] Aquatone		[YES]\n" || { printf "${bred}[*] Aquatone		[NO]\n"; }
-	type -P naabu &>/dev/null && printf "${bgreen}[*] Naabu		[YES]\n" || { printf "${bred}[*] Naabu		[NO]\n"; }
-	type -P gf &>/dev/null && printf "${bgreen}[*] Gf		        [YES]\n" || { printf "${bred}[*] Gf		[NO]\n"; }
-	type -P Gxss &>/dev/null && printf "${bgreen}[*] Gxss		[YES]\n" || { printf "${bred}[*] Gxss		[NO]\n"; }
-	type -P subjs &>/dev/null && printf "${bgreen}[*] subjs		[YES]\n" || { printf "${bred}[*] subjs		[NO]\n"; }
-	type -P dalfox &>/dev/null && printf "${bgreen}[*] dalfox		[YES]\n" || { printf "${bred}[*] dalfox		[NO]\n"; }
-	type -P git-hound &>/dev/null && printf "${bgreen}[*] git-hound		[YES]\n" || { printf "${bred}[*] git-hound		[NO]\n"; }
-	type -P ffuf &>/dev/null && printf "${bgreen}[*] ffuf		[YES]\n" || { printf "${bred}[*] ffuf		[NO]\n"; }
-	type -P massdns &>/dev/null && printf "${bgreen}[*] Massdns		[YES]\n" || { printf "${bred}[*] Massdns		[NO]\n"; }
-	type -P interlace &>/dev/null && printf "${bgreen}[*] interlace		[YES]\n" || { printf "${bred}[*] interlace		[NO]\n"; }
-	type -P dnsgen &>/dev/null && printf "${bgreen}[*] DnsGen		[YES]\n" || { printf "${bred}[*] DnsGen		[NO]\n"; }
-	type -P anew &>/dev/null && printf "${bgreen}[*] Anew		[YES]\n" || { printf "${bred}[*] Anew		[NO]\n"; }
-	type -P unfurl &>/dev/null && printf "${bgreen}[*] unfurl		[YES]\n" || { printf "${bred}[*] unfurl		[NO]\n"; }
-	type -P httpx &>/dev/null && printf "${bgreen}[*] Httpx		[YES]\n${reset}" || { printf "${bred}[*] Httpx		[NO]\n${reset}"; }
+	allinstalled=true
 
-	printf "\n${yellow} If any tool is not installed under $tools, I trust in your ability to install it :D\n Also remember to set the ${bred}\$tools${yellow} variable on line 10 of this script.\n If you have any problem you can always ping me ;) ${reset}\n\n"
+	[ -n "$GOPATH" ] || { printf "${bred} [*] GOPATH var		[NO]\n"; allinstalled=false;}
+	[ -n "$GOROOT" ] || { printf "${bred} [*] GOROOT var		[NO]\n"; allinstalled=false;}
+	[ -n "$PATH" ] || { printf "${bred} [*] PATH var		[NO]\n"; allinstalled=false;}
+	[ -f $tools/degoogle_hunter/degoogle.py ] || { printf "${bred} [*] degoogle		[NO]\n"; allinstalled=false;}
+	[ -f $tools/ParamSpider/paramspider.py ] || { printf "${bred} [*] Paramspider	[NO]\n"; allinstalled=false;}
+	[ -f $tools/Arjun/arjun.py ] || { printf "${bred} [*] Arjun		[NO]\n"; allinstalled=false;}
+	[ -f $tools/fav-up/favUp.py ] || { printf "${bred} [*] fav-up		[NO]\n"; allinstalled=false;}
+	[ -f $tools/Corsy/corsy.py ] || { printf "${bred} [*] Corsy		[NO]\n"; allinstalled=false;}
+	[ -f $tools/testssl.sh/testssl.sh ] || { printf "${bred} [*] testssl		[NO]\n"; allinstalled=false;}
+	[ -f $tools/SubDomainizer/SubDomainizer.py ] || { printf "${bred} [*] SubDomainizer	[NO]\n"; allinstalled=false;}
+	[ -f $tools/SecretFinder/SecretFinder.py ] || { printf "${bred} [*] SecretFinder	[NO]\n"; allinstalled=false;}
+	[ -f $tools/OneListForAll/onelistforallmicro.txt ] || { printf "${bred} [*] OneListForAll	[NO]\n"; allinstalled=false;}
+	[ -f $tools/LinkFinder/linkfinder.py ] || { printf "${bred} [*] LinkFinder	        [NO]\n"; allinstalled=false;}
+	[ -f $tools/github-endpoints.py ] || { printf "${bred} [*] github-endpoints   [NO]\n"; allinstalled=false;}
+	[ -f $tools/github-search/github-endpoints.py ] || { printf "${bred} [*] github-search	[NO]\n"; allinstalled=false;}
+	[ -f $tools/getjswords.py ] || { printf "${bred} [*] getjswords   	[NO]\n"; allinstalled=false;}
+	[ -f $tools/subdomains.txt ] || { printf "${bred} [*] subdomains   	[NO]\n"; allinstalled=false;}
+	[ -f $tools/resolvers.txt ] || { printf "${bred} [*] resolvers   	[NO]\n"; allinstalled=false;}
+	eval type -P hakrawler $DEBUG_STD || { printf "${bred} [*] hakrawler		[NO]\n"; allinstalled=false;}
+	eval type -P subfinder $DEBUG_STD || { printf "${bred} [*] Subfinder		[NO]\n"; allinstalled=false;}
+	eval type -P assetfinder $DEBUG_STD || { printf "${bred} [*] Assetfinder		[NO]\n"; allinstalled=false;}
+	eval type -P findomain $DEBUG_STD || { printf "${bred} [*] Findomain		[NO]\n"; allinstalled=false;}
+	eval type -P amass $DEBUG_STD || { printf "${bred} [*] Amass		[NO]\n"; allinstalled=false;}
+	eval type -P crobat $DEBUG_STD || { printf "${bred} [*] Crobat		[NO]\n"; allinstalled=false;}
+	eval type -P waybackurls $DEBUG_STD || { printf "${bred} [*] Waybackurls		[NO]\n"; allinstalled=false;}
+	eval type -P gau $DEBUG_STD || { printf "${bred} [*] Gau		[NO]\n"; allinstalled=false;}
+	eval type -P shuffledns $DEBUG_STD || { printf "${bred} [*] ShuffleDns		[NO]\n"; allinstalled=false;}
+	eval type -P subjack $DEBUG_STD || { printf "${bred} [*] Subjack		[NO]\n"; allinstalled=false;}
+	[ -f $tools/subjack/fingerprints.json ] || { printf "${bred} [*] Subjack fingers 	[NO]\n"; allinstalled=false;}
+	eval type -P nuclei $DEBUG_STD || { printf "${bred} [*] Nuclei		[NO]\n"; allinstalled=false;}
+	[ -d ~/nuclei-templates ] || { printf "${bred} [*] Nuclei templates    [NO]\n"; allinstalled=false;}
+	eval type -P aquatone $DEBUG_STD || { printf "${bred} [*] Aquatone		[NO]\n"; allinstalled=false;}
+	eval type -P naabu $DEBUG_STD || { printf "${bred} [*] Naabu		[NO]\n"; allinstalled=false;}
+	eval type -P gf $DEBUG_STD || { printf "${bred} [*] Gf		[NO]\n"; allinstalled=false;}
+	eval type -P Gxss $DEBUG_STD || { printf "${bred} [*] Gxss		[NO]\n"; allinstalled=false;}
+	eval type -P subjs $DEBUG_STD || { printf "${bred} [*] subjs		[NO]\n"; allinstalled=false;}
+	eval type -P dalfox $DEBUG_STD || { printf "${bred} [*] dalfox		[NO]\n"; allinstalled=false;}
+	eval type -P git-hound $DEBUG_STD || { printf "${bred} [*] git-hound		[NO]\n"; allinstalled=false;}
+	eval type -P ffuf $DEBUG_STD || { printf "${bred} [*] ffuf		[NO]\n"; allinstalled=false;}
+	eval type -P massdns $DEBUG_STD || { printf "${bred} [*] Massdns		[NO]\n"; allinstalled=false;}
+	eval type -P interlace $DEBUG_STD || { printf "${bred} [*] interlace		[NO]\n"; allinstalled=false;}
+	eval type -P dnsgen $DEBUG_STD || { printf "${bred} [*] DnsGen		[NO]\n"; allinstalled=false;}
+	eval type -P anew $DEBUG_STD || { printf "${bred} [*] Anew		[NO]\n"; allinstalled=false;}
+	eval type -P unfurl $DEBUG_STD || { printf "${bred} [*] unfurl		[NO]\n"; allinstalled=false;}
+	eval type -P httpx $DEBUG_STD || { printf "${bred} [*] Httpx		[NO]\n${reset}"; allinstalled=false;}
+
+	if [ "${allinstalled}" = true ] ; then
+    	printf "${bgreen} Good! All installed! ${reset}\n\n"
+	else
+		printf "\n${yellow} Try running the installer script again ./install.sh"
+		printf "\n${yellow} If it fails for any reason try to install manually the tools missed"
+		printf "\n${yellow} Finally remember to set the ${bred}\$tools${yellow} variable at the start of this script"
+		printf "\n${yellow} If nothing works and the world is gonna end you can always ping me :D ${reset}\n\n"
+	fi
+
+	printf "${bblue} Tools check finished\n"
+	printf "${bgreen}#######################################################################\n"
+}
+
+function tools_full(){
+
+	printf "\n\n${bgreen}#######################################################################\n"
+	printf "${bblue} Checking installed tools ${reset}\n\n"
+	[ -n "$GOPATH" ] && printf "${bgreen}[*] GOPATH var		[YES]\n" || { printf "${bred} [*] GOPATH var		[NO]\n"; }
+	[ -n "$GOROOT" ] && printf "${bgreen}[*] GOROOT var		[YES]\n" || { printf "${bred} [*] GOROOT var		[NO]\n"; }
+	[ -n "$PATH" ] && printf "${bgreen}[*] PATH var		[YES]\n" || { printf "${bred} [*] PATH var		[NO]\n"; }
+	[ -f $tools/degoogle_hunter/degoogle.py ] && printf "${bgreen}[*] degoogle		[YES]\n" || printf "${bred} [*] degoogle		[NO]\n"
+	[ -f $tools/ParamSpider/paramspider.py ] && printf "${bgreen}[*] Paramspider		[YES]\n" || printf "${bred} [*] Paramspider		[NO]\n"
+	[ -f $tools/Arjun/arjun.py ] && printf "${bgreen}[*] Arjun		[YES]\n" || printf "${bred} [*] Arjun		[NO]\n"
+	[ -f $tools/fav-up/favUp.py ] && printf "${bgreen}[*] fav-up		[YES]\n" || printf "${bred} [*] fav-up		[NO]\n"
+	[ -f $tools/Corsy/corsy.py ] && printf "${bgreen}[*] Corsy		[YES]\n" || printf "${bred} [*] Corsy		[NO]\n"
+	[ -f $tools/testssl.sh/testssl.sh ] && printf "${bgreen}[*] testssl		[YES]\n" || printf "${bred} [*] testssl		[NO]\n"
+	[ -f $tools/SubDomainizer/SubDomainizer.py ] && printf "${bgreen}[*] SubDomainizer	[YES]\n" || printf "${bred} [*] SubDomainizer	[NO]\n"
+	[ -f $tools/SecretFinder/SecretFinder.py ] && printf "${bgreen}[*] SecretFinder	[YES]\n" || printf "${bred} [*] SecretFinder	[NO]\n"
+	[ -f $tools/OneListForAll/onelistforallmicro.txt ] && printf "${bgreen}[*] OneListForAll	[YES]\n" || printf "${bred} [*] OneListForAll	[NO]\n"
+	[ -f $tools/LinkFinder/linkfinder.py ] && printf "${bgreen}[*] LinkFinder	        [YES]\n" || printf "${bred} [*] LinkFinder	        [NO]\n"
+	[ -f $tools/github-endpoints.py ] && printf "${bgreen}[*] github-endpoints.py	[YES]\n" || printf "${bred} [*] github-endpoints.py	[NO]\n"
+	[ -f $tools/github-search/github-endpoints.py ] && printf "${bgreen}[*] github-search	[YES]\n" || printf "${bred} [*] github-search	[NO]\n"
+	[ -f $tools/getjswords.py ] && printf "${bgreen}[*] getjswords.py	[YES]\n" || printf "${bred} [*] getjswords.py	[NO]\n"
+	[ -f $tools/subdomains.txt ] && printf "${bgreen}[*] subdomains.txt	[YES]\n" || printf "${bred} [*] subdomains.txt	[NO]\n"
+	[ -f $tools/resolvers.txt ] && printf "${bgreen}[*] resolvers.txt	[YES]\n" || printf "${bred} [*] resolvers.txt	[NO]\n"
+	eval type -P hakrawler $DEBUG_STD && printf "${bgreen}[*] hakrawler		[YES]\n" || { printf "${bred} [*] hakrawler		[NO]\n"; }
+	eval type -P subfinder $DEBUG_STD && printf "${bgreen}[*] Subfinder		[YES]\n" || { printf "${bred} [*] Subfinder		[NO]\n"; }
+	eval type -P assetfinder $DEBUG_STD && printf "${bgreen}[*] Assetfinder		[YES]\n" || { printf "${bred} [*] Assetfinder		[NO]\n"; }
+	eval type -P findomain $DEBUG_STD && printf "${bgreen}[*] Findomain		[YES]\n" || { printf "${bred} [*] Findomain		[NO]\n"; }
+	eval type -P amass $DEBUG_STD && printf "${bgreen}[*] Amass		[YES]\n" || { printf "${bred} [*] Amass		[NO]\n"; }
+	eval type -P crobat $DEBUG_STD && printf "${bgreen}[*] Crobat		[YES]\n" || { printf "${bred} [*] Crobat		[NO]\n"; }
+	eval type -P waybackurls $DEBUG_STD && printf "${bgreen}[*] Waybackurls		[YES]\n" || { printf "${bred} [*] Waybackurls		[NO]\n"; }
+	eval type -P gau $DEBUG_STD && printf "${bgreen}[*] Gau		        [YES]\n" || { printf "${bred} [*] Gau		[NO]\n"; }
+	eval type -P shuffledns $DEBUG_STD && printf "${bgreen}[*] ShuffleDns		[YES]\n" || { printf "${bred} [*] ShuffleDns		[NO]\n"; }
+	eval type -P subjack $DEBUG_STD && printf "${bgreen}[*] Subjack		[YES]\n" || { printf "${bred} [*] Subjack		[NO]\n"; }
+	[ -f $tools/subjack/fingerprints.json ] && printf "${bgreen}[*] Subjack fingerprints[YES]\n" || printf "${bred} [*] Subjack fingerprints[NO]\n"
+	eval type -P nuclei $DEBUG_STD && printf "${bgreen}[*] Nuclei		[YES]\n" || { printf "${bred} [*] Nuclei		[NO]\n"; }
+	[ -d ~/nuclei-templates ] && printf "${bgreen}[*] Nuclei templates    [YES]\n" || printf "${bred} [*] Nuclei templates    [NO]\n"
+	eval type -P aquatone $DEBUG_STD && printf "${bgreen}[*] Aquatone		[YES]\n" || { printf "${bred} [*] Aquatone		[NO]\n"; }
+	eval type -P naabu $DEBUG_STD && printf "${bgreen}[*] Naabu		[YES]\n" || { printf "${bred} [*] Naabu		[NO]\n"; }
+	eval type -P gf $DEBUG_STD && printf "${bgreen}[*] Gf		        [YES]\n" || { printf "${bred} [*] Gf		[NO]\n"; }
+	eval type -P Gxss $DEBUG_STD && printf "${bgreen}[*] Gxss		[YES]\n" || { printf "${bred} [*] Gxss		[NO]\n"; }
+	eval type -P subjs $DEBUG_STD && printf "${bgreen}[*] subjs		[YES]\n" || { printf "${bred} [*] subjs		[NO]\n"; }
+	eval type -P dalfox $DEBUG_STD && printf "${bgreen}[*] dalfox		[YES]\n" || { printf "${bred} [*] dalfox		[NO]\n"; }
+	eval type -P git-hound $DEBUG_STD && printf "${bgreen}[*] git-hound		[YES]\n" || { printf "${bred} [*] git-hound		[NO]\n"; }
+	eval type -P ffuf $DEBUG_STD && printf "${bgreen}[*] ffuf		[YES]\n" || { printf "${bred} [*] ffuf		[NO]\n"; }
+	eval type -P massdns $DEBUG_STD && printf "${bgreen}[*] Massdns		[YES]\n" || { printf "${bred} [*] Massdns		[NO]\n"; }
+	eval type -P interlace $DEBUG_STD && printf "${bgreen}[*] interlace		[YES]\n" || { printf "${bred} [*] interlace		[NO]\n"; }
+	eval type -P dnsgen $DEBUG_STD && printf "${bgreen}[*] DnsGen		[YES]\n" || { printf "${bred} [*] DnsGen		[NO]\n"; }
+	eval type -P anew $DEBUG_STD && printf "${bgreen}[*] Anew		[YES]\n" || { printf "${bred} [*] Anew		[NO]\n"; }
+	eval type -P unfurl $DEBUG_STD && printf "${bgreen}[*] unfurl		[YES]\n" || { printf "${bred} [*] unfurl		[NO]\n"; }
+	eval type -P httpx $DEBUG_STD && printf "${bgreen}[*] Httpx		[YES]\n${reset}" || { printf "${bred} [*] Httpx		[NO]\n${reset}"; }
+
+	printf "\n${yellow} If any tool is not installed under $tools, I trust in your ability to install it :D\n Also remember to set the ${bred}\$tools${yellow} variable at the start of this script.\n If you have any problem you can always ping me ;) ${reset}\n\n"
 	printf "${bblue} Tools check finished\n"
 	printf "${bgreen}#######################################################################\n"
 }
@@ -102,7 +172,6 @@ function tools_installed(){
 dorks(){
 	printf "${bgreen}#######################################################################\n"
 	printf "${bblue} Performing Google Dorks ${reset}\n\n"
-	printf "${yellow} This will take a long, meanwhile check this dorks: ${reset}\n\n"
 
 	hostname=$domain
 	target=${hostname%%.*}
@@ -141,7 +210,7 @@ dorks(){
 	printf "${bgreen}#######################################################################\n"
 }
 
-subdomains(){
+subdomains_full(){
 	printf "${bgreen}#######################################################################\n\n"
 	printf "${bblue} Subdomain Enumeration\n\n"
 	sub_passive
@@ -150,14 +219,14 @@ subdomains(){
 	sub_permut
 	webprobe_simple
 	sub_scraping
-	rm -f *_subs.txt 2>/dev/null
+	eval rm -f *_subs.txt $DEBUG_ERROR
 	NUMOFLINES_subs=$(wc -l < ${domain}_subdomains.txt)
 	NUMOFLINES_probed=$(wc -l < ${domain}_probed.txt)
 	printf "${bblue}\n Final results: ${reset}\n"
 	printf "${bred}\n - ${NUMOFLINES_subs} alive subdomains${reset}\n\n"
-	cat ${domain}_subdomains.txt | sort 2>/dev/null
+	eval cat ${domain}_subdomains.txt $DEBUG_ERROR | sort 
 	printf "${bred}\n - ${NUMOFLINES_probed} web probed${reset}\n\n"
-	cat ${domain}_probed.txt | sort 2>/dev/null
+	eval cat ${domain}_probed.txt $DEBUG_ERROR | sort 
 	printf "${bblue}\n Subdomain Enumeration Finished\n"
 	printf "${bblue} Results are saved in ${domain}_subdomains.txt and ${domain}_probed.txt${reset}\n"
 	printf "${bgreen}#######################################################################\n\n"
@@ -166,14 +235,14 @@ subdomains(){
 sub_passive(){
 	start=`date +%s`
 	printf "${yellow} Running : Passive Subdomain Enumeration 1/6${reset}\n"
-	subfinder -d $domain -o subfinder.txt &>/dev/null
+	eval subfinder -d $domain -o subfinder.txt $DEBUG_STD
 	assetfinder --subs-only $domain | anew -q assetfinder.txt
-	amass enum -passive -d $domain -o amass.txt &>/dev/null
-	findomain --quiet -t $domain -u findomain.txt &>/dev/null
+	eval amass enum -passive -d $domain -o amass.txt $DEBUG_STD
+	eval findomain --quiet -t $domain -u findomain.txt $DEBUG_STD
 	crobat -s $domain | anew -q crobat.txt
 	timeout 5m waybackurls $domain | unfurl -u domains | anew -q waybackurls.txt
-	cat subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt waybackurls.txt 2>/dev/null | sed "s/*.//" | anew -q passive_subs.txt
-	rm subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt waybackurls.txt 2>/dev/null
+	eval cat subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt waybackurls.txt $DEBUG_ERROR | sed "s/*.//" | anew -q passive_subs.txt
+	eval rm subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt waybackurls.txt $DEBUG_ERROR
 	NUMOFLINES=$(wc -l < passive_subs.txt)
 	end=`date +%s`
 	runtime=$((end-start))
@@ -183,9 +252,9 @@ sub_passive(){
 sub_brute(){
 	start=`date +%s`
 	printf "${yellow} Running : Bruteforce Subdomain Enumeration 2/6${reset}\n"
-	shuffledns -d $domain -w $tools/subdomains.txt -r $tools/resolvers.txt -o active_tmp.txt &>/dev/null
+	eval shuffledns -d $domain -w $tools/subdomains.txt -r $tools/resolvers.txt -o active_tmp.txt $DEBUG_STD
 	cat active_tmp.txt | sed "s/*.//" | anew -q brute_subs.txt
-	rm active_tmp.txt 2>/dev/null
+	eval rm active_tmp.txt $DEBUG_ERROR
 	NUMOFLINES=$(wc -l < brute_subs.txt)
 	end=`date +%s`
 	runtime=$((end-start))
@@ -196,7 +265,7 @@ sub_dns(){
 	start=`date +%s`
 	printf "${yellow} Running : Active Subdomain Enumeration 3/6${reset}\n"
 	cat *_subs.txt > tmp_subs_resolution.txt
-	shuffledns -d $domain -list tmp_subs_resolution.txt -r $tools/resolvers.txt -o ${domain}_subdomains.txt &>/dev/null
+	eval shuffledns -d $domain -list tmp_subs_resolution.txt -r $tools/resolvers.txt -o ${domain}_subdomains.txt $DEBUG_STD
 	NUMOFLINES=$(wc -l < ${domain}_subdomains.txt)
 	end=`date +%s`
 	runtime=$((end-start))
@@ -206,12 +275,12 @@ sub_dns(){
 sub_permut(){
 	start=`date +%s`
 	printf "${yellow} Running : Permutations Subdomain Enumeration 4/6${reset}\n"
-	dnsgen tmp_subs_resolution.txt --wordlist $tools/permutations_list.txt 2>/dev/null | shuffledns -d $domain -r $tools/resolvers.txt -o permute1_tmp.txt &>/dev/null
+	eval dnsgen tmp_subs_resolution.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute1_tmp.txt $DEBUG_STD
 	cat permute1_tmp.txt | anew -q permute1.txt
-	dnsgen permute1.txt --wordlist $tools/permutations_list.txt 2>/dev/null | shuffledns -d $domain -r $tools/resolvers.txt -o permute2_tmp.txt &>/dev/null
+	eval dnsgen permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute2_tmp.txt $DEBUG_STD
 	cat permute2_tmp.txt | anew -q permute2.txt
 	cat permute1.txt permute2.txt | anew -q permute_subs.txt
-	rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt tmp_subs_resolution.txt 2>/dev/null
+	eval rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt tmp_subs_resolution.txt $DEBUG_ERROR
 	NUMOFLINES=$(wc -l < permute_subs.txt)
 	end=`date +%s`
 	runtime=$((end-start))
@@ -231,7 +300,7 @@ webprobe_simple(){
 sub_scraping(){
 	start=`date +%s`
 	printf "${yellow} Running : JS scraping subdomain search 6/6${reset}\n"
-	python3 $tools/SubDomainizer/SubDomainizer.py -l ${domain}_probed.txt -k -g -gt $GITHUB_TOKEN -san all -o JS_subs.txt &>/dev/null
+	eval python3 $tools/SubDomainizer/SubDomainizer.py -l ${domain}_probed.txt -k -g -gt $GITHUB_TOKEN -san all -o JS_subs.txt $DEBUG_STD
 	NUMOFLINES=$(wc -l < JS_subs.txt)
 	cat JS_subs.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed.txt
 	cat JS_subs.txt | sed 's/https\?:\/\///' | anew -q ${domain}_subdomains.txt
@@ -244,14 +313,14 @@ subtakeover(){
 	printf "${bgreen}#######################################################################\n"
 	printf "${bblue} Subdomain Takeover ${reset}\n\n"
 	start=`date +%s`
-	subjack -w ${domain}_subdomains.txt -a -ssl -t 50 -v -c $tools/subjack/fingerprints.json -ssl -o ${domain}_all-takeover-checks.txt &>/dev/null;
+	eval subjack -w ${domain}_subdomains.txt -a -ssl -t 50 -v -c $tools/subjack/fingerprints.json -ssl -o ${domain}_all-takeover-checks.txt $DEBUG_STD;
 	grep -v "Not Vulnerable" <${domain}_all-takeover-checks.txt > ${domain}_takeover.txt
-	rm ${domain}_all-takeover-checks.txt 2>/dev/null
+	eval rm ${domain}_all-takeover-checks.txt $DEBUG_ERROR
 	end=`date +%s`
 	runtime=$((end-start))
 	NUMOFLINES=$(wc -l < ${domain}_takeover.txt)
 	printf "${bred}\n Subtko: ${NUMOFLINES} subdomains in ${runtime} secs${reset}\n\n"
-	cat ${domain}_takeover.txt 2>/dev/null
+	eval cat ${domain}_takeover.txt $DEBUG_ERROR
 	printf "${bblue}\n Subdomain Takeover Finished\n"
 	printf "${bblue} Results are saved in ${domain}_takeover.txt${reset}\n"
 	printf "${bgreen}#######################################################################\n\n"
@@ -267,7 +336,7 @@ webprobe_full(){
 	runtime=$((end-start))
 	NUMOFLINES=$(wc -l < ${domain}_probed_uncommon_ports.txt)
 	printf "${bred}\n Uncommon web ports: ${NUMOFLINES} subdomains in ${runtime} secs${reset}\n\n"
-	cat ${domain}_probed_uncommon_ports.txt 2>/dev/null
+	eval cat ${domain}_probed_uncommon_ports.txt $DEBUG_ERROR
 	printf "${bblue}\n Web Probe Finished\n"
 	printf "${bblue} Results are saved in ${domain}_takeover.txt${reset}\n"
 	printf "${bgreen}#######################################################################\n\n"
@@ -293,7 +362,7 @@ portscan(){
 	end=`date +%s`
 	runtime=$((end-start))
 	printf "${bred}\n Port scan results in ${runtime} secs${reset}\n\n"
-	cat ${domain}_portscan.txt 2>/dev/null
+	eval cat ${domain}_portscan.txt $DEBUG_ERROR
 	printf "\n"
 	printf "${bblue}\n Port Scan Finished\n"
 	printf "${bblue} Results are saved in in ${domain}_portscan.txt${reset}\n"
@@ -385,9 +454,9 @@ jschecks(){
 	printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
 	cat ${domain}_jsfile_links.txt | httpx -follow-redirects -silent -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt;
 	printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
-	interlace -tL ${domain}_js_livelinks.txt -threads 5 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> ${domain}_js_endpoints.txt" &>/dev/null
+	eval interlace -tL ${domain}_js_livelinks.txt -threads 5 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> ${domain}_js_endpoints.txt" $DEBUG_STD
 	printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
-	interlace -tL ${domain}_js_livelinks.txt -threads 5 -c "python3 $tools/SecretFinder/SecretFinder.py -i _target_ -o cli >> ${domain}_js_linksecret.txt" &>/dev/null
+	eval interlace -tL ${domain}_js_livelinks.txt -threads 5 -c "python3 $tools/SecretFinder/SecretFinder.py -i _target_ -o cli >> ${domain}_js_linksecret.txt" $DEBUG_STD
 	printf "${yellow} Running : Building wordlist 5/5${reset}\n"
 	cat ${domain}_js_livelinks.txt | python3 $tools/getjswords.py | anew -q ${domain}_js_Wordlist.txt;
 	end=`date +%s`
@@ -402,12 +471,12 @@ params(){
 	printf "${bblue} Parameter Discovery ${reset}\n"
 	start=`date +%s`
 	printf "${yellow}\n\n Running : Finding params with paramspider${reset}\n"
-	interlace -tL ${domain}_probed.txt -threads 5 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,js &>/dev/null" &>/dev/null
+	eval interlace -tL ${domain}_probed.txt -threads 5 -c "eval python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,js $DEBUG_STD" $DEBUG_STD
 	find output/ -name '*.txt' -exec cat {} \; | anew -q ${domain}_param.txt
 	sed '/^FUZZ/d' -i ${domain}_param.txt
 	rm -rf output/
 	printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
-	python3 $tools/Arjun/arjun.py -i ${domain}_param.txt -t 20 -o ${domain}_arjun.json &>/dev/null
+	eval python3 $tools/Arjun/arjun.py -i ${domain}_param.txt -t 20 -o ${domain}_arjun.json $DEBUG_STD
 	end=`date +%s`
 	runtime=$((end-start))
 	printf "${bblue}\n Parameter Discovery Finished in ${runtime} secs\n"
@@ -423,7 +492,7 @@ xss(){
 	# Xsstrike
 	# Xsstrike blind payload defined in $tools/xsstrike/core/config.py
 	# python xsstrike.py --seeds ${domain}_xss.txt -t 30 --timeout=4 --blind --skip
-	cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | dalfox -b six2dez.xss.ht pipe -o ${domain}_dalfox_xss.txt &>/dev/null
+	cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox -b six2dez.xss.ht pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD
 	end=`date +%s`
 	runtime=$((end-start))
 	printf "${bblue}\n XSS Analysis Finished in ${runtime} secs\n"
@@ -464,7 +533,7 @@ fuzz(){
 	for sub in $(cat ${domain}_probed.txt); do
 		printf "${yellow}\n\n Running: Fuzzing in ${sub}${reset}\n"
 		sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-		ffuf -mc all -ac -w $fuzz_wordlist -maxtime 900 -u $sub/FUZZ -or -of md -o $dir/fuzzing/${sub_out}.md &>/dev/null
+		ffuf -mc all -ac -w $fuzz_wordlist -maxtime 900 -u $sub/FUZZ -or -of md -o $dir/fuzzing/${sub_out}.md $DEBUG_STD
 	done
 	end=`date +%s`
 	runtime=$((end-start))
@@ -477,8 +546,8 @@ cors(){
 	printf "${bgreen}#######################################################################\n"
 	printf "${bblue} CORS Scan ${reset}\n\n"
 	start=`date +%s`
-	python3 $tools/Corsy/corsy.py -i ${domain}_probed.txt -t 200 > ${domain}_cors.txt &>/dev/null
-	cat ${domain}_cors.txt 2>/dev/null
+	eval python3 $tools/Corsy/corsy.py -i ${domain}_probed.txt -t 200 > ${domain}_cors.txt $DEBUG_STD
+	eval cat ${domain}_cors.txt $DEBUG_ERROR
 	end=`date +%s`
 	runtime=$((end-start))
 	printf "${bblue}\n CORS Scan Finished in ${runtime} secs\n"
@@ -517,7 +586,7 @@ all(){
 		for domain in $(cat $list); do
 			start
 			dorks
-			subdomains
+			subdomains_full
 			subtakeover
 			webprobe_full
 			screenshot
@@ -538,7 +607,7 @@ all(){
 	else
 		start
 		dorks
-		subdomains
+		subdomains_full
 		subtakeover
 		webprobe_full
 		screenshot
@@ -559,7 +628,7 @@ all(){
 }
 
 help(){
-	printf "\n Usage: $0 [-h] [-d DOMAIN] [-l list.txt] [-a] [-g] [-w] [-t]"
+	printf "\n Usage: $0 [-h] [-i] [-d DOMAIN] [-l list.txt] [-a] [-g] [-w] [-t]"
 	printf "\n           	      [-s] [--sp] [--sb] [--sr] [--ss] [--sw] [-o OUTPUT]\n\n"
 	printf " ${bblue}TARGET OPTIONS${reset}\n"
 	printf "   -d DOMAIN        Target domain\n"
@@ -571,6 +640,8 @@ help(){
 	printf "   -g               Google dorks searchs\n"
 	printf "   -w               Perform web checks only without subs ${yellow}(-l required)${reset}\n"
 	printf "   -t               Check subdomain takeover ${yellow}(-l required)${reset}\n"
+	printf "   -i               Check all needed tools\n"
+	printf "   -v               Debug/verbose mode, no file descriptor redir\n"
 	printf "   -h               Show this help\n"
 	printf " \n"
 	printf " ${bblue}SUBDOMAIN OPTIONS${reset}\n"
@@ -610,7 +681,12 @@ then
    exit
 fi
 
-while getopts ":hd:-:l:asxwgto:" opt; do
+while getopts ":hd:-:l:vaisxwgto:" opt; do
+	verbose=$@
+	if [[ $verbose == *"-v"* ]]; then
+  		unset DEBUG_STD
+		unset DEBUG_ERROR
+	fi
 	case ${opt} in
 		d ) domain=$OPTARG
 			;;
@@ -620,13 +696,13 @@ while getopts ":hd:-:l:asxwgto:" opt; do
 			then
 				for domain in $(cat $list); do
 					start
-					subdomains
+					subdomains_full
 					subtakeover
 					end
 				done
 			else
 				start
-				subdomains
+				subdomains_full
 				subtakeover
 				end
 			fi
@@ -660,6 +736,9 @@ while getopts ":hd:-:l:asxwgto:" opt; do
 		g ) start
 			dorks
 			end
+			;;
+		i ) tools_full
+			exit 1
 			;;
 		-)  case "${OPTARG}" in
             	sp)	if [ -n "$list" ]
