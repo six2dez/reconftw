@@ -31,7 +31,7 @@ test -f /etc/debian_version && install_apt
 test -f /etc/redhat-release && install_yum
 #test -f /etc/gentoo-release && install_emerge
 #test -f /etc/SuSE-release && install_zypp
-test -f /etc/os-release && install_yum
+#test -f /etc/os-release && install_yum
 test -f /etc/arch-release && install_pacman
 
 [ ! -d "~/.gf" ] && mkdir -p ~/.gf
@@ -41,6 +41,7 @@ dir=~/Tools
 
 
 go get -v github.com/tomnomnom/gf &>/dev/null
+go get -v github.com/tomnomnom/qsreplace &>/dev/null
 GO111MODULE=on go get -v github.com/OWASP/Amass/v3/... &>/dev/null
 go get -v github.com/ffuf/ffuf &>/dev/null
 go get -v github.com/tomnomnom/assetfinder &>/dev/null
@@ -110,8 +111,9 @@ wget -O getjswords.py https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/
 wget -O subdomains.txt https://gist.githubusercontent.com/jhaddix/86a06c5dc309d08580a018c66354a056/raw/96f4e51d96b2203f19f6381c8c545b278eaa0837/all.txt &>/dev/null
 wget -O resolvers.txt https://raw.githubusercontent.com/janmasarik/resolvers/master/resolvers.txt &>/dev/null
 wget -O permutations_list.txt https://gist.githubusercontent.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw/137bb6b60c616552c705e93a345c06cec3a2cb1f/permutations_list.txt &>/dev/null
+wget -O ssrf.py https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/ssrf.py &>/dev/null
 
-printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - git-hound (~/.githound/config.yml)\n - github-endpoints.py ($tools/.github_tokens or GITHUB_TOKEN env var)\n - favup (shodan init SHODANPAIDAPIKEY) ${reset}\n"
+printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - git-hound (~/.githound/config.yml)\n - github-endpoints.py ($tools/.github_tokens or GITHUB_TOKEN env var)\n - favup (shodan init SHODANPAIDAPIKEY)\n - SSRF Server (COLLAB_SERVER env var) ${reset}\n"
 
 printf "${bgreen} Finished!${reset}\n\n"
 printf "\n\n${bgreen}#######################################################################\n"

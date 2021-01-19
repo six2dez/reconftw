@@ -95,6 +95,7 @@ function tools_installed(){
 	eval type -P git-hound $DEBUG_STD || { printf "${bred} [*] git-hound		[NO]\n"; allinstalled=false;}
 	eval type -P ffuf $DEBUG_STD || { printf "${bred} [*] ffuf		[NO]\n"; allinstalled=false;}
 	eval type -P massdns $DEBUG_STD || { printf "${bred} [*] Massdns		[NO]\n"; allinstalled=false;}
+	eval type -P qsreplace $DEBUG_STD || { printf "${bred} [*] qsreplace		[NO]\n"; allinstalled=false;}
 	eval type -P interlace $DEBUG_STD || { printf "${bred} [*] interlace		[NO]\n"; allinstalled=false;}
 	eval type -P dnsgen $DEBUG_STD || { printf "${bred} [*] DnsGen		[NO]\n"; allinstalled=false;}
 	eval type -P anew $DEBUG_STD || { printf "${bred} [*] Anew		[NO]\n"; allinstalled=false;}
@@ -158,6 +159,7 @@ function tools_full(){
 	eval type -P git-hound $DEBUG_STD && printf "${bgreen}[*] git-hound		[YES]\n" || { printf "${bred} [*] git-hound		[NO]\n"; }
 	eval type -P ffuf $DEBUG_STD && printf "${bgreen}[*] ffuf		[YES]\n" || { printf "${bred} [*] ffuf		[NO]\n"; }
 	eval type -P massdns $DEBUG_STD && printf "${bgreen}[*] Massdns		[YES]\n" || { printf "${bred} [*] Massdns		[NO]\n"; }
+	eval type -P qsreplace $DEBUG_STD && printf "${bgreen}[*] qsreplace		[YES]\n" || { printf "${bred} [*] qsreplace		[NO]\n"; }
 	eval type -P interlace $DEBUG_STD && printf "${bgreen}[*] interlace		[YES]\n" || { printf "${bred} [*] interlace		[NO]\n"; }
 	eval type -P dnsgen $DEBUG_STD && printf "${bgreen}[*] DnsGen		[YES]\n" || { printf "${bred} [*] DnsGen		[NO]\n"; }
 	eval type -P anew $DEBUG_STD && printf "${bgreen}[*] Anew		[YES]\n" || { printf "${bred} [*] Anew		[NO]\n"; }
@@ -428,14 +430,14 @@ url_gf(){
 	printf "${bgreen}#######################################################################\n"
 	printf "${bblue} Vulnerable Pattern Search ${reset}\n\n"
 	start=`date +%s`
-	gf xss ${domain}_url_extract.txt | anew -q ${domain}_xss.txt;
-	gf ssti ${domain}_url_extract.txt | anew -q ${domain}_ssti.txt;
-	gf ssrf ${domain}_url_extract.txt | anew -q ${domain}_ssrf.txt;
-	gf sqli ${domain}_url_extract.txt | anew -q ${domain}_sqli.txt;
-	gf redirect ${domain}_url_extract.txt | anew -q ${domain}_redirect.txt;
-	gf rce ${domain}_url_extract.txt | anew -q ${domain}_rce.txt;
-	gf potential ${domain}_url_extract.txt | anew -q ${domain}_potential.txt;
-	gf lfi ${domain}_url_extract.txt | anew -q ${domain}_lfi.txt;
+	gf xss ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_xss.txt;
+	gf ssti ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_ssti.txt;
+	gf ssrf ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_ssrf.txt;
+	gf sqli ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_sqli.txt;
+	gf redirect ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_redirect.txt;
+	gf rce ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_rce.txt;
+	gf potential ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_potential.txt;
+	gf lfi ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_lfi.txt;
 	end=`date +%s`
 	runtime=$((end-start))
 	cat ${domain}_url_extract.txt | unfurl -u format %s://%d%p > ${domain}_url_endpoints.txt
@@ -567,9 +569,35 @@ testssl(){
 	printf "${bgreen}#######################################################################\n"
 }
 
-#open_redirec(){
-#	
-#}
+open_redirect(){
+	printf "${bgreen}#######################################################################\n"
+	printf "${bblue} Open redirects checks ${reset}\n"
+	start=`date +%s`
+	cat ${domain}_redirect.txt | qsreplace FUZZ > test_redirect.txt
+	eval python3 $tools/OpenRedireX/openredirex.py -l test_redirect.txt --keyword FUZZ > ${domain}_openredirex.txt $DEBUG_STD
+	eval rm test_redirect.txt $DEBUG_ERROR
+	end=`date +%s`
+	runtime=$((end-start))
+	printf "${bblue}\n Open Redirects Finished in ${runtime} secs\n"
+	printf "${bblue} Results are saved in ${domain}_testssl.txt ${reset}\n"
+	printf "${bgreen}#######################################################################\n"
+}
+
+ssrf_checks(){
+	printf "${bgreen}#######################################################################\n"
+	printf "${bblue} SSRF checks ${reset}\n"
+	if [ -n "$COLLAB_SERVER" ]; then
+		start=`date +%s`
+		eval cat ${domain}_ssrf.txt $DEBUG_ERROR | eval python3 ssrf.py $COLLAB_SERVER > ${domain}_ssrf_confirmed.txt $DEBUG_STD
+		end=`date +%s`
+		runtime=$((end-start))
+	else
+		printf "${bblue}\n No COLLAB_SERVER defined ${runtime} secs\n"
+	fi
+	printf "${bblue}\n SSRF Finished in ${runtime} secs\n"
+	printf "${bblue} Results are saved in ${domain}_testssl.txt ${reset}\n"
+	printf "${bgreen}#######################################################################\n"
+}
 
 end(){
 	if [ -n "$dir_output" ]
@@ -602,6 +630,8 @@ all(){
 			testssl
 			urlchecks
 			url_gf
+			open_redirect
+			ssrf_checks
 			jschecks
 			params
 			xss
@@ -623,6 +653,8 @@ all(){
 		testssl
 		urlchecks
 		url_gf
+		open_redirect
+		ssrf_checks
 		jschecks
 		params
 		xss
@@ -725,6 +757,8 @@ while getopts ":hd:-:l:vaisxwgto:" opt; do
 			testssl
 			urlchecks
 			url_gf
+			open_redirect
+			ssrf_checks
 			jschecks
 			params
 			xss
