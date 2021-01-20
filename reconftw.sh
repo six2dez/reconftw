@@ -599,7 +599,7 @@ open_redirect(){
 	end=`date +%s`
 	runtime=$((end-start))
 	printf "${bblue}\n Open Redirects Finished in ${runtime} secs\n"
-	printf "${bblue} Results are saved in ${domain}_testssl.txt ${reset}\n"
+	printf "${bblue} Results are saved in ${domain}_openredirex.txt ${reset}\n"
 	printf "${bgreen}#######################################################################\n"
 }
 
@@ -615,7 +615,7 @@ ssrf_checks(){
 	else
 		printf "${bblue}\n No COLLAB_SERVER defined\n"
 	fi
-	printf "${bblue} Results are saved in ${domain}_testssl.txt ${reset}\n"
+	printf "${bblue} Results are saved in ${domain}_ssrf_confirmed.txt ${reset}\n"
 	printf "${bgreen}#######################################################################\n"
 }
 
