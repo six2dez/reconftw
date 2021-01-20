@@ -10,17 +10,17 @@ printf "${bgreen} reconftw installer script (apt/rpm/pacman compatible)${reset}\
 
 install_apt(){
     sudo apt update -y &>/dev/null
-    sudo apt install python3 python3-pip ruby git libpcap-dev chromium-browser wget python-dev python3-dev build-essential libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev python-pip -y &>/dev/null
+    sudo apt install python3 python3-pip ruby git libpcap-dev chromium-browser wget python-dev python3-dev build-essential libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap python-pip -y &>/dev/null
 }
 
 install_yum(){
     sudo yum update -y &>/dev/null
-    sudo yum install python3 python3-pip ruby git libpcap-devel chromium wget openssl-devel python3-devel libxslt-devel libffi-devel libxml2-devel zlib-devel -y &>/dev/null
+    sudo yum install python3 python3-pip ruby git libpcap-devel chromium wget openssl-devel python3-devel libxslt-devel libffi-devel libxml2-devel nmap zlib-devel -y &>/dev/null
 }
 
 install_pacman(){
     sudo pacman -Syu -y &>/dev/null
-    sudo pacman -Sy install python python-pip ruby git libpcap chromium wget -y &>/dev/null
+    sudo pacman -Sy install python python-pip ruby git libpcap nmap chromium wget -y &>/dev/null
 }
 
 type go >/dev/null 2>&1 || { printf "${bred} Golang no detected, install and configure it before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
