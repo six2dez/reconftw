@@ -14,6 +14,12 @@ DEBUG_STD="&>/dev/null"
 DEBUG_ERROR="2>/dev/null"
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
+# Uncomment this only if it is not already in your env .bashrc or .zshrc
+#GITHUB_TOKEN=XXXXXXXXXXXXXXXXX
+#COLLAB_SERVER=XXXXXXXXXXXXXXXXX
+#XSS_SERVER=XXXXXXXXXXXXXXXXX
+
+
 banner(){
 	printf "\n${bgreen}"
 	printf "  ██▀███  ▓█████  ▄████▄   ▒█████   ███▄    █   █████▒▄▄▄█████▓ █     █░\n"
