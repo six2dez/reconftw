@@ -48,7 +48,7 @@ start(){
 	then
 		cp $list $dir/${domain}_probed.txt
 	fi
-	fuzz_wordlist=$tools/onelistforallmicro/onelistforallmicro.txt
+	fuzz_wordlist=$tools/OneListForAll/onelistforallmicro.txt
 	cd $dir
 	printf "\n"
 	eval nuclei -update-templates $DEBUG_STD
@@ -525,7 +525,7 @@ favicon(){
 	printf "${bgreen}#######################################################################\n"
 	printf "${bblue} FavIcon Hash Extraction ${reset}\n\n"
 	start=`date +%s`
-	cd $tools/fav-up && python3 favUp.py -w $domain -sc > ${dir}/${domain}_favicontest.txt && cd ${dir} && cat ${domain}_favicontest.txt | grep found_ips
+	eval python3 $tools/fav-up/favUp.py -w $domain -sc > ${domain}_favicontest.txt && cat ${domain}_favicontest.txt | grep found_ips
 	end=`date +%s`
 	runtime=$((end-start))
 	printf "${bblue}\n FavIcon Hash Extraction Finished in ${runtime} secs\n"
