@@ -465,7 +465,7 @@ jschecks(){
 	start=`date +%s`
 	printf "${yellow} Running : Fetching Urls 1/5${reset}\n"
 	cat ${domain}_url_extract.txt | grep -iE "\.js$" | anew -q ${domain}_jsfile_links.txt;
-	cat ${domain}_url_extract.txt | subjs >> ${domain}_jsfile_links.txt;
+	cat ${domain}_url_extract.txt | subjs | anew -q ${domain}_jsfile_links.txt;
 	printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
 	cat ${domain}_jsfile_links.txt | httpx -follow-redirects -silent -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt;
 	printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
