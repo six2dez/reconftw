@@ -1,4 +1,5 @@
-![Help](banner_large.png)
+# reconftw
+
 -   [tl;dr](#tldr)
 -   [Summary](#summary)
 -   [Features](#features)
