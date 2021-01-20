@@ -608,7 +608,7 @@ ssrf_checks(){
 	printf "${bblue} SSRF checks ${reset}\n"
 	if [ -n "$COLLAB_SERVER" ]; then
 		start=`date +%s`
-		eval cat ${domain}_ssrf.txt $DEBUG_ERROR | eval python3 ssrf.py $COLLAB_SERVER > ${domain}_ssrf_confirmed.txt $DEBUG_STD
+		eval cat ${domain}_ssrf.txt $DEBUG_ERROR | eval python3 $tools/ssrf.py $COLLAB_SERVER > ${domain}_ssrf_confirmed.txt $DEBUG_STD
 		end=`date +%s`
 		runtime=$((end-start))
 		printf "${bblue}\n SSRF Finished in ${runtime} secs\n"
