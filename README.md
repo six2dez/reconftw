@@ -9,6 +9,8 @@
 -   [Improvement plan](#improvement-plan)
 -   [Thanks](#thanks)
 
+![Help](banner_large.png)
+
 ## tl;dr
 
 - Requires [Golang](https://golang.org/dl/) > 1.14 installed and env vars correctly set ($GOPATH,$GOROOT)
