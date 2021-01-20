@@ -501,10 +501,16 @@ xss(){
 	# Xsstrike
 	# Xsstrike blind payload defined in $tools/xsstrike/core/config.py
 	# python xsstrike.py --seeds ${domain}_xss.txt -t 30 --timeout=4 --blind --skip
-	cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox -b six2dez.xss.ht pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD
-	end=`date +%s`
-	runtime=$((end-start))
-	printf "${bblue}\n XSS Analysis Finished in ${runtime} secs\n"
+	if [ -n "$XSS_SERVER" ]; then
+		cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox -b six2dez.xss.ht pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD
+		end=`date +%s`
+		runtime=$((end-start))
+	else
+		printf "${bblue}\n No XSS_SERVER defined, blind xss skipped\n"
+		cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD
+		end=`date +%s`
+		runtime=$((end-start))
+	fi
 	printf "${bblue} Results are saved in in ${domain}_dalfox_xss.txt${reset}\n"
 	printf "${bgreen}#######################################################################\n\n"
 }
@@ -599,10 +605,10 @@ ssrf_checks(){
 		eval cat ${domain}_ssrf.txt $DEBUG_ERROR | eval python3 ssrf.py $COLLAB_SERVER > ${domain}_ssrf_confirmed.txt $DEBUG_STD
 		end=`date +%s`
 		runtime=$((end-start))
+		printf "${bblue}\n SSRF Finished in ${runtime} secs\n"
 	else
-		printf "${bblue}\n No COLLAB_SERVER defined ${runtime} secs\n"
+		printf "${bblue}\n No COLLAB_SERVER defined\n"
 	fi
-	printf "${bblue}\n SSRF Finished in ${runtime} secs\n"
 	printf "${bblue} Results are saved in ${domain}_testssl.txt ${reset}\n"
 	printf "${bgreen}#######################################################################\n"
 }
