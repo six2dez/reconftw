@@ -525,7 +525,8 @@ favicon(){
 	printf "${bgreen}#######################################################################\n"
 	printf "${bblue} FavIcon Hash Extraction ${reset}\n\n"
 	start=`date +%s`
-	eval python3 $tools/fav-up/favUp.py -w $domain -sc > ${domain}_favicontest.txt && cat ${domain}_favicontest.txt | grep found_ips
+	eval python3 $tools/fav-up/favUp.py -w $domain -sc > ${domain}_favicontest.txt $DEBUG_STD
+	eval cat ${domain}_favicontest.txt $DEBUG_STD | grep found_ips
 	end=`date +%s`
 	runtime=$((end-start))
 	printf "${bblue}\n FavIcon Hash Extraction Finished in ${runtime} secs\n"
