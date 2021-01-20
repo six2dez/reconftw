@@ -1,5 +1,4 @@
-# reconftw
-
+![Help](banner_large.png)
 -   [tl;dr](#tldr)
 -   [Summary](#summary)
 -   [Features](#features)
@@ -8,8 +7,6 @@
 -   [Usage examples](#usage-examples)
 -   [Improvement plan](#improvement-plan)
 -   [Thanks](#thanks)
-
-![Help](banner_large.png)
 
 ## tl;dr
 
