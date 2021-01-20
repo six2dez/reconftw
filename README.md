@@ -54,6 +54,7 @@ This is a simple script intended to perform a full recon on an objective with mu
 - Run standalone steps (subdomains, subtko, web, gdorks...)
 - Polished installer compatible with most distros
 - Verbose mode
+- Update tools script
 
 ## Mindmap/Workflow
 
