@@ -127,6 +127,6 @@ For their great feedback, support, help or for nothing special but well deserved
 - [@detonXX](https://twitter.com/detonXX)
 - [@cyph3r_asr](https://twitter.com/cyph3r_asr)
 - [@h4ms1k](https://twitter.com/h4ms1k)
-- [@BilelTech](https://twitter.com/BilelEljaamii)
+- [@Bileltechno](https://twitter.com/BilelEljaamii)
 
 
