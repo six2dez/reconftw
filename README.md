@@ -21,7 +21,7 @@ chmod +x *.sh
 ./install.sh
 ./reconftw.sh -d target.com -a
 ```
-![Help](help.png)
+![Help](images/help.png)
 
 ## Summary
 
@@ -58,7 +58,7 @@ This is a simple script intended to perform a full recon on an objective with mu
 
 ## Mindmap/Workflow
 
-![Mindmap](mindmap.png)
+![Mindmap](images/mindmap.png)
 
 ## Requirements
 

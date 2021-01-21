@@ -467,11 +467,12 @@ jschecks(){
 	cat ${domain}_url_extract.txt | grep -iE "\.js$" | anew -q ${domain}_jsfile_links.txt;
 	cat ${domain}_url_extract.txt | subjs | anew -q ${domain}_jsfile_links.txt;
 	printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
-	cat ${domain}_jsfile_links.txt | httpx -follow-redirects -silent -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt;
+	cat ${domain}_jsfile_links.txt | httpx -follow-redirects -silent -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt
 	printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
-	eval interlace -tL ${domain}_js_livelinks.txt -threads 5 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> ${domain}_js_endpoints.txt" $DEBUG_STD
+	interlace -tL ${domain}_js_livelinks.txt -threads 5 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> ${domain}_js_endpoints.txt" &>/dev/null
+	sed -i '/^Running against/d; /^Invalid input/d; /^$/d' ${domain}_js_endpoints.txt
 	printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
-	eval interlace -tL ${domain}_js_livelinks.txt -threads 5 -c "python3 $tools/SecretFinder/SecretFinder.py -i _target_ -o cli >> ${domain}_js_linksecret.txt" $DEBUG_STD
+	interlace -tL ${domain}_js_livelinks.txt -threads 5 -c "python3 $tools/SecretFinder/SecretFinder.py -i _target_ -o cli >> ${domain}_js_linksecret.txt" &>/dev/null
 	printf "${yellow} Running : Building wordlist 5/5${reset}\n"
 	cat ${domain}_js_livelinks.txt | python3 $tools/getjswords.py | anew -q ${domain}_js_Wordlist.txt;
 	end=`date +%s`
@@ -486,7 +487,7 @@ params(){
 	printf "${bblue} Parameter Discovery ${reset}\n"
 	start=`date +%s`
 	printf "${yellow}\n\n Running : Finding params with paramspider${reset}\n"
-	eval interlace -tL ${domain}_probed.txt -threads 5 -c "eval python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,js $DEBUG_STD" $DEBUG_STD
+	interlace -tL ${domain}_probed.txt -threads 5 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,js" &>/dev/null
 	find output/ -name '*.txt' -exec cat {} \; | anew -q ${domain}_param.txt
 	sed '/^FUZZ/d' -i ${domain}_param.txt
 	rm -rf output/
