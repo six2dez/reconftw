@@ -291,17 +291,20 @@ sub_permut(){
 	start=`date +%s`
 	printf "${yellow} Running : Permutations Subdomain Enumeration 4/6${reset}\n"
 	if [[ $(cat tmp_subs_resolution.txt | wc -l) -le 100 ]]
-		then
-			eval dnsgen tmp_subs_resolution.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute1_tmp.txt $DEBUG_STD
-			cat permute1_tmp.txt | anew -q permute1.txt
-			eval dnsgen permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute2_tmp.txt $DEBUG_STD
-			cat permute2_tmp.txt | anew -q permute2.txt
-			cat permute1.txt permute2.txt | anew -q permute.txt
-			eval rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt $DEBUG_ERROR
-		else
-			eval dnsgen tmp_subs_resolution.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute_tmp.txt $DEBUG_STD
-			cat permute_tmp.txt | anew -q permute.txt
-			eval rm permute_tmp.txt $DEBUG_ERROR
+	then
+		eval dnsgen tmp_subs_resolution.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute1_tmp.txt $DEBUG_STD
+		cat permute1_tmp.txt | anew -q permute1.txt
+		eval dnsgen permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute2_tmp.txt $DEBUG_STD
+		cat permute2_tmp.txt | anew -q permute2.txt
+		cat permute1.txt permute2.txt | anew -q permute_subs.txt
+		eval rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt $DEBUG_ERROR
+	elif [[ $(cat active_passive.txt | wc -l) -le 200 ]]
+	then
+		eval dnsgen tmp_subs_resolution.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute_tmp.txt $DEBUG_STD
+		cat permute_tmp.txt | anew -q permute_subs.txt
+		eval rm permute_tmp.txt $DEBUG_ERROR
+	else
+		printf "\n${yellow} Skipping Permutations: Too Much Subdomains${reset}\n"
 	fi
 	NUMOFLINES=$(wc -l < permute_subs.txt)
 	end=`date +%s`
