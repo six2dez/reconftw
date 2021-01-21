@@ -1,9 +1,10 @@
 #!/bin/bash
 
 #@TODO:
-    # - Compile massdns if it is updated
     # - Update testssl.sh
     # - Auto update precompiled binaries
+    # - Update python packages
+    # - Update Go packages
 
 bred='\033[1;31m'
 bblue='\033[1;34m'
@@ -36,6 +37,13 @@ for repo in ${repos}; do
     else
         cd "$dir/$(basename $repo)"
         git pull origin master &>/dev/null
+        if [ "massdns" = "$(basename $repo)" ]; then
+            make &>/dev/null && sudo cp bin/massdns /usr/bin/
+        elif [ "Gf-Patterns" = "$(basename $repo)" ]; then
+            cp *.json ~/.gf
+        elif [ "gf" = "$(basename $repo)" ]; then
+            cp -r examples ~/.gf
+        fi
     fi
     printf "${bblue}\n Updating ${repo} is finished ${reset}\n"
     printf "${bgreen}#######################################################################\n"
