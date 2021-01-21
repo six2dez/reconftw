@@ -328,10 +328,13 @@ sub_permut(){
 					cat permute2_tmp.txt | anew -q permute2.txt
 					cat permute1.txt permute2.txt | anew -q permute.txt
 					eval rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
-				else
+				elif [[ $(cat tmp_subs_resolution.txt | wc -l) -le 200 ]]
+	      then
 					eval dnsgen tmp_subs_resolution.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute_tmp.txt $DEBUG_STD
 					cat permute_tmp.txt | anew -q permute.txt
 					eval rm permute_tmp.txt $DEBUG_ERROR  && touch $called_fn_dir/.${FUNCNAME[0]}
+        else
+          printf "\n${yellow} Skipping Permutations: Too Much Subdomains${reset}\n"
 			fi
 			NUMOFLINES=$(wc -l < permute_subs.txt)
 			end=`date +%s`
