@@ -2,9 +2,8 @@
 
 #@TODO:
     # - Update testssl.sh
-    # - Auto update precompiled binaries
-    # - Update python packages
     # - Update Go packages
+    # - Get git-hound latest version
 
 bred='\033[1;31m'
 bblue='\033[1;34m'
@@ -63,6 +62,9 @@ wget -N -c -O $dir/permutations_list.txt https://gist.githubusercontent.com/six2
 wget -N -c -O $dir/ssrf.py https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/ssrf.py &>/dev/null
 
 nuclei -update-templates &>/dev/null
+
+#Updating installed python packages
+cat $dir/*/requirements.txt | grep -v "=" | uniq | xargs pip3 install -U
 
 printf "\n${bgreen}--==[ ************************************************************************************ ]==--\n"
 printf "${bred}                You are up to date, happy hacking${reset}\n"
