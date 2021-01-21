@@ -43,6 +43,8 @@ for repo in ${repos}; do
             cp *.json ~/.gf
         elif [ "gf" = "$(basename $repo)" ]; then
             cp -r examples ~/.gf
+        elif [ "Interlace" = "$(basename $repo)" ] || [ "LinkFinder" = "$(basename $repo)" ]; then
+            sudo python3 setup.py install &>/dev/null
         fi
     fi
     printf "${bblue}\n Updating ${repo} is finished ${reset}\n"
