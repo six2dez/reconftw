@@ -61,10 +61,23 @@ wget -N -c -O $dir/resolvers.txt https://raw.githubusercontent.com/janmasarik/re
 wget -N -c -O $dir/permutations_list.txt https://gist.githubusercontent.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw/137bb6b60c616552c705e93a345c06cec3a2cb1f/permutations_list.txt &>/dev/null
 wget -N -c -O $dir/ssrf.py https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/ssrf.py &>/dev/null
 
+printf "${bblue}\n Updating Files is finished ${reset}\n"
+printf "${bgreen}#######################################################################\n"
+
+#Updating Nuclei templates
+printf "${bgreen}#######################################################################\n"
+printf "${bblue} Updating Nuclei templates \n"
 nuclei -update-templates &>/dev/null
+printf "${bblue}\n Updating Nuclei templates is finished ${reset}\n"
+printf "${bgreen}#######################################################################\n"
 
 #Updating installed python packages
-cat $dir/*/requirements.txt | grep -v "=" | uniq | xargs pip3 install -U
+printf "${bgreen}#######################################################################\n"
+printf "${bblue} Updating installed python packag \n"
+cat $dir/*/requirements.txt | grep -v "=" | uniq | xargs pip3 install -U &>/dev/null
+printf "${bblue}\n Updating installed python packag is finished ${reset}\n"
+printf "${bgreen}#######################################################################\n"
+
 
 printf "\n${bgreen}--==[ ************************************************************************************ ]==--\n"
 printf "${bred}                You are up to date, happy hacking${reset}\n"
