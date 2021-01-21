@@ -9,6 +9,11 @@
 -   [Improvement plan](#improvement-plan)
 -   [Thanks](#thanks)
 
+:warning: Warning :warning:
+
+This is a live development project, until the first stable release (1.0) it will be constantly updated in master branch, so if you have detected any bug, you can open an issue or ping me over Telegram (@six2dez) or Twitter (@six2dez1) and I will try to do my best :)
+
+
 ## tl;dr
 
 - Requires [Golang](https://golang.org/dl/) > 1.14 installed and env vars correctly set ($GOPATH,$GOROOT)
@@ -99,13 +104,17 @@ This is a simple script intended to perform a full recon on an objective with mu
 
 ## Improvement plan:
 
+Anyone can take one of these features and start working on it, just ping me to keep in mind and avoid duplicate efforts:
+
 - [ ] Notification support (Slack, Discord and Telegram)
 - [ ] CMS tools (wpscan, drupwn/droopescan, joomscan)
 - [ ] Add menu option for every feature
 - [ ] CRLF checks
-- [ ] Fast mode
+- [ ] Fast mode (Like -a but only passive cheks, maxtime, etc)
 - [ ] Docker image
 - [ ] Diff support
+- [ ] Performance options to avoid net overload (soft, default, hard)
+- [ ] Nice and easily readable final html report
 - [X] Open Redirect with Openredirex
 - [X] SSRF Checks
 - [X] More error checks
