@@ -44,7 +44,13 @@ start(){
 	fi
 	
 	dir=$SCRIPTPATH/Recon/$domain
-	
+	called_fn_dir=$dir/.called_fn
+
+	if [ ! -d "$called_fn_dir" ]
+	then
+		mkdir -p $called_fn_dir
+	fi
+
 	if [ ! -d "$dir" ]
 	then
 		mkdir -p $dir
@@ -57,7 +63,6 @@ start(){
 	fuzz_wordlist=$tools/OneListForAll/onelistforallmicro.txt
 	cd $dir
 	printf "\n"
-	eval nuclei -update-templates $DEBUG_STD
 	printf "${bred} Target: ${domain}\n\n"
 }
 
@@ -226,6 +231,8 @@ dorks(){
 }
 
 subdomains_full(){
+	NUMOFLINES_subs="0"
+	NUMOFLINES_probed="0"
 	printf "${bgreen}#######################################################################\n\n"
 	printf "${bblue} Subdomain Enumeration\n\n"
 	sub_passive
@@ -235,8 +242,14 @@ subdomains_full(){
 	webprobe_simple
 	sub_scraping
 	eval rm -f *_subs.txt $DEBUG_ERROR
-	NUMOFLINES_subs=$(wc -l < ${domain}_subdomains.txt)
-	NUMOFLINES_probed=$(wc -l < ${domain}_probed.txt)
+	if [ -f "${domain}_subdomains.txt" ]
+		then
+			NUMOFLINES_subs=$(wc -l < ${domain}_subdomains.txt)
+	fi
+	if [ -f "${domain}_probed.txt" ]
+		then
+			NUMOFLINES_probed=$(wc -l < ${domain}_probed.txt)
+	fi
 	printf "${bblue}\n Final results: ${reset}\n"
 	printf "${bred}\n - ${NUMOFLINES_subs} alive subdomains${reset}\n\n"
 	eval cat ${domain}_subdomains.txt $DEBUG_ERROR | sort 
@@ -248,383 +261,499 @@ subdomains_full(){
 }
 
 sub_passive(){
-	start=`date +%s`
-	printf "${yellow} Running : Passive Subdomain Enumeration 1/6${reset}\n"
-	eval subfinder -d $domain -o subfinder.txt $DEBUG_STD
-	assetfinder --subs-only $domain | anew -q assetfinder.txt
-	eval amass enum -passive -d $domain -o amass.txt $DEBUG_STD
-	eval findomain --quiet -t $domain -u findomain.txt $DEBUG_STD
-	crobat -s $domain | anew -q crobat.txt
-	timeout 5m waybackurls $domain | unfurl -u domains | anew -q waybackurls.txt
-	eval cat subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt waybackurls.txt $DEBUG_ERROR | sed "s/*.//" | anew -q passive_subs.txt
-	eval rm subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt waybackurls.txt $DEBUG_ERROR
-	NUMOFLINES=$(wc -l < passive_subs.txt)
-	end=`date +%s`
-	runtime=$((end-start))
-	printf "${green} ${NUMOFLINES} subdomains found in ${runtime} secs${reset}\n\n"
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			start=`date +%s`
+			printf "${yellow} Running : Passive Subdomain Enumeration 1/6${reset}\n"
+			eval subfinder -d $domain -o subfinder.txt $DEBUG_STD
+			assetfinder --subs-only $domain | anew -q assetfinder.txt
+			eval amass enum -passive -d $domain -o amass.txt $DEBUG_STD
+			eval findomain --quiet -t $domain -u findomain.txt $DEBUG_STD
+			crobat -s $domain | anew -q crobat.txt
+			timeout 5m waybackurls $domain | unfurl -u domains | anew -q waybackurls.txt
+			eval cat subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt waybackurls.txt $DEBUG_ERROR | sed "s/*.//" | anew -q passive_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			eval rm subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt waybackurls.txt $DEBUG_ERROR
+			NUMOFLINES=$(wc -l < passive_subs.txt)
+			end=`date +%s`
+			runtime=$((end-start))
+			printf "${green} ${NUMOFLINES} subdomains found in ${runtime} secs${reset}\n\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
 }
 
 sub_brute(){
-	start=`date +%s`
-	printf "${yellow} Running : Bruteforce Subdomain Enumeration 2/6${reset}\n"
-	eval shuffledns -d $domain -w $tools/subdomains.txt -r $tools/resolvers.txt -o active_tmp.txt $DEBUG_STD
-	cat active_tmp.txt | sed "s/*.//" | anew -q brute_subs.txt
-	eval rm active_tmp.txt $DEBUG_ERROR
-	NUMOFLINES=$(wc -l < brute_subs.txt)
-	end=`date +%s`
-	runtime=$((end-start))
-	printf "${green} ${NUMOFLINES} subdomains found in ${runtime} secs${reset}\n\n"
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			start=`date +%s`
+			printf "${yellow} Running : Bruteforce Subdomain Enumeration 2/6${reset}\n"
+			eval shuffledns -d $domain -w $tools/subdomains.txt -r $tools/resolvers.txt -o active_tmp.txt $DEBUG_STD
+			cat active_tmp.txt | sed "s/*.//" | anew -q brute_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			eval rm active_tmp.txt $DEBUG_ERROR
+			NUMOFLINES=$(wc -l < brute_subs.txt)
+			end=`date +%s`
+			runtime=$((end-start))
+			printf "${green} ${NUMOFLINES} subdomains found in ${runtime} secs${reset}\n\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
 }
 
 sub_dns(){
-	start=`date +%s`
-	printf "${yellow} Running : Active Subdomain Enumeration 3/6${reset}\n"
-	cat *_subs.txt > tmp_subs_resolution.txt
-	eval shuffledns -d $domain -list tmp_subs_resolution.txt -r $tools/resolvers.txt -o ${domain}_subdomains.txt $DEBUG_STD
-	NUMOFLINES=$(wc -l < ${domain}_subdomains.txt)
-	end=`date +%s`
-	runtime=$((end-start))
-	printf "${green} ${NUMOFLINES} subdomains found in ${runtime} secs${reset}\n\n"
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			start=`date +%s`
+			printf "${yellow} Running : Active Subdomain Enumeration 3/6${reset}\n"
+			cat *_subs.txt > tmp_subs_resolution.txt
+			eval shuffledns -d $domain -list tmp_subs_resolution.txt -r $tools/resolvers.txt -o ${domain}_subdomains.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+			NUMOFLINES=$(wc -l < ${domain}_subdomains.txt)
+			end=`date +%s`
+			runtime=$((end-start))
+			printf "${green} ${NUMOFLINES} subdomains found in ${runtime} secs${reset}\n\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
 }
 
 sub_permut(){
-	start=`date +%s`
-	printf "${yellow} Running : Permutations Subdomain Enumeration 4/6${reset}\n"
-	if [[ $(cat tmp_subs_resolution.txt | wc -l) -le 100 ]]
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
 		then
-			eval dnsgen tmp_subs_resolution.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute1_tmp.txt $DEBUG_STD
-			cat permute1_tmp.txt | anew -q permute1.txt
-			eval dnsgen permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute2_tmp.txt $DEBUG_STD
-			cat permute2_tmp.txt | anew -q permute2.txt
-			cat permute1.txt permute2.txt | anew -q permute.txt
-			eval rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt $DEBUG_ERROR
+			start=`date +%s`
+			printf "${yellow} Running : Permutations Subdomain Enumeration 4/6${reset}\n"
+			if [[ $(cat tmp_subs_resolution.txt | wc -l) -le 100 ]]
+				then
+					eval dnsgen tmp_subs_resolution.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute1_tmp.txt $DEBUG_STD
+					cat permute1_tmp.txt | anew -q permute1.txt
+					eval dnsgen permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute2_tmp.txt $DEBUG_STD
+					cat permute2_tmp.txt | anew -q permute2.txt
+					cat permute1.txt permute2.txt | anew -q permute.txt
+					eval rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
+				else
+					eval dnsgen tmp_subs_resolution.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute_tmp.txt $DEBUG_STD
+					cat permute_tmp.txt | anew -q permute.txt
+					eval rm permute_tmp.txt $DEBUG_ERROR  && touch $called_fn_dir/.${FUNCNAME[0]}
+			fi
+			NUMOFLINES=$(wc -l < permute_subs.txt)
+			end=`date +%s`
+			runtime=$((end-start))
+			printf "${green} ${NUMOFLINES} subdomains found in ${runtime} secs${reset}\n\n"
 		else
-			eval dnsgen tmp_subs_resolution.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute_tmp.txt $DEBUG_STD
-			cat permute_tmp.txt | anew -q permute.txt
-			eval rm permute_tmp.txt $DEBUG_ERROR
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
-	NUMOFLINES=$(wc -l < permute_subs.txt)
-	end=`date +%s`
-	runtime=$((end-start))
-	printf "${green} ${NUMOFLINES} subdomains found in ${runtime} secs${reset}\n\n"
 }
 
 webprobe_simple(){
-	start=`date +%s`
-	printf "${yellow} Running : Http probing 5/6${reset}\n\n"
-	cat ${domain}_subdomains.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' > ${domain}_probed.txt
-	NUMOFLINES=$(wc -l < ${domain}_probed.txt)
-	end=`date +%s`
-	runtime=$((end-start))
-	printf "${green} ${NUMOFLINES} subdomains resolved in ${runtime} secs${reset}\n\n"
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			start=`date +%s`
+			printf "${yellow} Running : Http probing 5/6${reset}\n\n"
+			cat ${domain}_subdomains.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' > ${domain}_probed.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			NUMOFLINES=$(wc -l < ${domain}_probed.txt)
+			end=`date +%s`
+			runtime=$((end-start))
+			printf "${green} ${NUMOFLINES} subdomains resolved in ${runtime} secs${reset}\n\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
 }
 
 sub_scraping(){
-	start=`date +%s`
-	printf "${yellow} Running : JS scraping subdomain search 6/6${reset}\n"
-	eval python3 $tools/SubDomainizer/SubDomainizer.py -l ${domain}_probed.txt -k -g -gt $GITHUB_TOKEN -san all -o JS_subs.txt $DEBUG_STD
-	NUMOFLINES=$(wc -l < JS_subs.txt)
-	cat JS_subs.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed.txt
-	cat JS_subs.txt | sed 's/https\?:\/\///' | anew -q ${domain}_subdomains.txt
-	end=`date +%s`
-	runtime=$((end-start))
-	printf "${green} ${NUMOFLINES} subdomains found in ${runtime} secs${reset}\n\n"
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			start=`date +%s`
+			printf "${yellow} Running : JS scraping subdomain search 6/6${reset}\n"
+			eval python3 $tools/SubDomainizer/SubDomainizer.py -l ${domain}_probed.txt -k -g -gt $GITHUB_TOKEN -san all -o JS_subs.txt $DEBUG_STD
+			NUMOFLINES=$(wc -l < JS_subs.txt)
+			cat JS_subs.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed.txt
+			cat JS_subs.txt | sed 's/https\?:\/\///' | anew -q ${domain}_subdomains.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			end=`date +%s`
+			runtime=$((end-start))
+			printf "${green} ${NUMOFLINES} subdomains found in ${runtime} secs${reset}\n\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
 }
 
 subtakeover(){
-	printf "${bgreen}#######################################################################\n"
-	printf "${bblue} Subdomain Takeover ${reset}\n\n"
-	start=`date +%s`
-	eval subjack -w ${domain}_subdomains.txt -a -ssl -t 50 -v -c $tools/subjack/fingerprints.json -ssl -o ${domain}_all-takeover-checks.txt $DEBUG_STD;
-	grep -v "Not Vulnerable" <${domain}_all-takeover-checks.txt > ${domain}_takeover.txt
-	eval rm ${domain}_all-takeover-checks.txt $DEBUG_ERROR
-	end=`date +%s`
-	runtime=$((end-start))
-	NUMOFLINES=$(wc -l < ${domain}_takeover.txt)
-	printf "${bred}\n Subtko: ${NUMOFLINES} subdomains in ${runtime} secs${reset}\n\n"
-	eval cat ${domain}_takeover.txt $DEBUG_ERROR
-	printf "${bblue}\n Subdomain Takeover Finished\n"
-	printf "${bblue} Results are saved in ${domain}_takeover.txt${reset}\n"
-	printf "${bgreen}#######################################################################\n\n"
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} Subdomain Takeover ${reset}\n\n"
+			start=`date +%s`
+			eval subjack -w ${domain}_subdomains.txt -a -ssl -t 50 -v -c $tools/subjack/fingerprints.json -ssl -o ${domain}_all-takeover-checks.txt $DEBUG_STD;
+			grep -v "Not Vulnerable" <${domain}_all-takeover-checks.txt > ${domain}_takeover.txt
+			eval rm ${domain}_all-takeover-checks.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
+			end=`date +%s`
+			runtime=$((end-start))
+			NUMOFLINES=$(wc -l < ${domain}_takeover.txt)
+			printf "${bred}\n Subtko: ${NUMOFLINES} subdomains in ${runtime} secs${reset}\n\n"
+			eval cat ${domain}_takeover.txt $DEBUG_ERROR
+			printf "${bblue}\n Subdomain Takeover Finished\n"
+			printf "${bblue} Results are saved in ${domain}_takeover.txt${reset}\n"
+			printf "${bgreen}#######################################################################\n\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
 }
 
 webprobe_full(){
-	printf "${bgreen}#######################################################################\n"
-	printf "${bblue} ${bgreen} Web Probe ${reset}\n\n"
-	printf "${yellow} Running : Http probing non standard ports${reset}\n\n"
-	start=`date +%s`
-	cat ${domain}_subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55672 -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' > ${domain}_probed_uncommon_ports.txt
-	end=`date +%s`
-	runtime=$((end-start))
-	NUMOFLINES=$(wc -l < ${domain}_probed_uncommon_ports.txt)
-	printf "${bred}\n Uncommon web ports: ${NUMOFLINES} subdomains in ${runtime} secs${reset}\n\n"
-	eval cat ${domain}_probed_uncommon_ports.txt $DEBUG_ERROR
-	printf "${bblue}\n Web Probe Finished\n"
-	printf "${bblue} Results are saved in ${domain}_takeover.txt${reset}\n"
-	printf "${bgreen}#######################################################################\n\n"
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} ${bgreen} Web Probe ${reset}\n\n"
+			printf "${yellow} Running : Http probing non standard ports${reset}\n\n"
+			start=`date +%s`
+			cat ${domain}_subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55672 -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' > ${domain}_probed_uncommon_ports.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			end=`date +%s`
+			runtime=$((end-start))
+			NUMOFLINES=$(wc -l < ${domain}_probed_uncommon_ports.txt)
+			printf "${bred}\n Uncommon web ports: ${NUMOFLINES} subdomains in ${runtime} secs${reset}\n\n"
+			eval cat ${domain}_probed_uncommon_ports.txt $DEBUG_ERROR
+			printf "${bblue}\n Web Probe Finished\n"
+			printf "${bblue} Results are saved in ${domain}_takeover.txt${reset}\n"
+			printf "${bgreen}#######################################################################\n\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
 }
 
 screenshot(){
-	printf "${bgreen}#######################################################################\n"
-	printf "${bblue} ${bgreen} Web Screenshot ${reset}\n\n"
-	start=`date +%s`
-	cat ${domain}_probed.txt | aquatone -out screenshots -threads 16 -silent
-	end=`date +%s`
-	runtime=$((end-start))
-	printf "${bblue}\n Web Screenshot Finished in ${runtime} secs\n"
-	printf "${bblue} Results are saved in in screenshots/aquatone_report.html folder${reset}\n"
-	printf "${bgreen}#######################################################################\n\n"
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} ${bgreen} Web Screenshot ${reset}\n\n"
+			start=`date +%s`
+			cat ${domain}_probed.txt | aquatone -out screenshots -threads 16 -silent && touch $called_fn_dir/.${FUNCNAME[0]}
+			end=`date +%s`
+			runtime=$((end-start))
+			printf "${bblue}\n Web Screenshot Finished in ${runtime} secs\n"
+			printf "${bblue} Results are saved in in screenshots/aquatone_report.html folder${reset}\n"
+			printf "${bgreen}#######################################################################\n\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
 }
 
 portscan(){
-	printf "${bgreen}#######################################################################\n"
-	printf "${bblue} Port Scan ${reset}\n\n"
-	start=`date +%s`
-	naabu -top-ports 1000 -silent -exclude-cdn -nmap-cli 'nmap -sV --script /usr/share/nmap/scripts/vulners.nse,http-title.nse --min-rate 40000 -T4 --max-retries 2' -iL ${domain}_subdomains.txt > ${domain}_portscan.txt;
-	end=`date +%s`
-	runtime=$((end-start))
-	printf "${bred}\n Port scan results in ${runtime} secs${reset}\n\n"
-	eval cat ${domain}_portscan.txt $DEBUG_ERROR
-	printf "\n"
-	printf "${bblue}\n Port Scan Finished\n"
-	printf "${bblue} Results are saved in in ${domain}_portscan.txt${reset}\n"
-	printf "${bgreen}#######################################################################\n\n"
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} Port Scan ${reset}\n\n"
+			start=`date +%s`
+			naabu -top-ports 1000 -silent -exclude-cdn -nmap-cli 'nmap -sV --script /usr/share/nmap/scripts/vulners.nse,http-title.nse --min-rate 40000 -T4 --max-retries 2' -iL ${domain}_subdomains.txt > ${domain}_portscan.txt;
+			end=`date +%s`
+			runtime=$((end-start))
+			printf "${bred}\n Port scan results in ${runtime} secs${reset}\n\n"
+			eval cat ${domain}_portscan.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
+			printf "\n"
+			printf "${bblue}\n Port Scan Finished\n"
+			printf "${bblue} Results are saved in in ${domain}_portscan.txt${reset}\n"
+			printf "${bgreen}#######################################################################\n\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
 }
 
 nuclei_check(){
-	printf "${bgreen}#######################################################################\n"
-	printf "${bblue} Template Scanning with Nuclei ${reset}\n\n"
-	start=`date +%s`
-	printf "${yellow} Running : Nuclei Technologies${reset}\n\n"
-	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/technologies/ -o ${domain}_nuclei_technologies.txt;
-	printf "${yellow}\n\n Running : Nuclei Tokens${reset}\n\n"
-	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o ${domain}_nuclei_tokens.txt;
-	printf "${yellow}\n\n Running : Nuclei Exposures${reset}\n\n"
-	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/exposures/ -o ${domain}_nuclei_exposures.txt;
-	printf "${yellow}\n\n Running : Nuclei CVEs ${reset}\n\n"
-	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/cves/ -o ${domain}_nuclei_cves.txt;
-	printf "${yellow}\n\n Running : Nuclei Default Creds ${reset}\n\n"
-	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/default-logins/ -o ${domain}_nuclei_default_creds.txt;
-	printf "${yellow}\n\n Running : Nuclei SubTko ${reset}\n\n"
-	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/takeovers/ -o ${domain}_nuclei_subtko.txt;
-	printf "${yellow}\n\n Running : Nuclei DNS ${reset}\n\n"
-	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/dns/ -o ${domain}_nuclei_dns.txt;
-	printf "${yellow}\n\n Running : Nuclei Miscellaneous ${reset}\n\n"
-	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/miscellaneous/ -o ${domain}_nuclei_miscellaneous.txt;
-	printf "${yellow}\n\n Running : Nuclei Panels ${reset}\n\n"
-	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/exposed-panels/ -o ${domain}_nuclei_panels.txt;
-	printf "${yellow}\n\n Running : Nuclei Security Misconfiguration ${reset}\n\n"
-	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/misconfiguration/ -o ${domain}_nuclei_misconfigurations.txt;
-	printf "${yellow}\n\n Running : Nuclei Vulnerabilites ${reset}\n\n"
-	cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/vulnerabilities/ -o ${domain}_nuclei_vulnerabilities.txt;
-	printf "\n\n"
-	end=`date +%s`
-	runtime=$((end-start))
-	printf "${bblue}\n Port Scan Finished in ${runtime} secs\n"
-	printf "${bblue} Results are saved in in ${domain}_nuclei_*.txt files${reset}\n"
-	printf "${bgreen}#######################################################################\n\n"
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} Template Scanning with Nuclei ${reset}\n\n"
+			start=`date +%s`
+			printf "${yellow} Running : Nuclei Technologies${reset}\n\n"
+			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/technologies/ -o ${domain}_nuclei_technologies.txt;
+			printf "${yellow}\n\n Running : Nuclei Tokens${reset}\n\n"
+			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o ${domain}_nuclei_tokens.txt;
+			printf "${yellow}\n\n Running : Nuclei Exposures${reset}\n\n"
+			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/exposures/ -o ${domain}_nuclei_exposures.txt;
+			printf "${yellow}\n\n Running : Nuclei CVEs ${reset}\n\n"
+			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/cves/ -o ${domain}_nuclei_cves.txt;
+			printf "${yellow}\n\n Running : Nuclei Default Creds ${reset}\n\n"
+			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/default-logins/ -o ${domain}_nuclei_default_creds.txt;
+			printf "${yellow}\n\n Running : Nuclei SubTko ${reset}\n\n"
+			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/takeovers/ -o ${domain}_nuclei_subtko.txt;
+			printf "${yellow}\n\n Running : Nuclei DNS ${reset}\n\n"
+			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/dns/ -o ${domain}_nuclei_dns.txt;
+			printf "${yellow}\n\n Running : Nuclei Miscellaneous ${reset}\n\n"
+			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/miscellaneous/ -o ${domain}_nuclei_miscellaneous.txt;
+			printf "${yellow}\n\n Running : Nuclei Panels ${reset}\n\n"
+			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/exposed-panels/ -o ${domain}_nuclei_panels.txt;
+			printf "${yellow}\n\n Running : Nuclei Security Misconfiguration ${reset}\n\n"
+			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/misconfiguration/ -o ${domain}_nuclei_misconfigurations.txt;
+			printf "${yellow}\n\n Running : Nuclei Vulnerabilites ${reset}\n\n"
+			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/vulnerabilities/ -o ${domain}_nuclei_vulnerabilities.txt && touch $called_fn_dir/.${FUNCNAME[0]};
+			printf "\n\n"
+			end=`date +%s`
+			runtime=$((end-start))
+			printf "${bblue}\n Port Scan Finished in ${runtime} secs\n"
+			printf "${bblue} Results are saved in in ${domain}_nuclei_*.txt files${reset}\n"
+			printf "${bgreen}#######################################################################\n\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
 }
 
 urlchecks(){
-	printf "${bgreen}#######################################################################\n"
-	printf "${bblue} URL Extraction ${reset}\n\n"
-	start=`date +%s`
-	cat ${domain}_probed.txt | waybackurls > ${domain}_url_extract.txt
-	cat ${domain}_probed.txt | gau | anew -q ${domain}_url_extract.txt
-	cat ${domain}_probed.txt | hakrawler -depth 2 -scope subs -plain -insecure | anew -q ${domain}_url_extract.txt
-	if [ -n "$GITHUB_TOKEN" ]; then
-		python3 $tools/github-endpoints.py -d $domain -t $GITHUB_TOKEN | anew -q ${domain}_url_extract.txt
-	else
-		python3 $tools/github-endpoints.py -d $domain | anew -q ${domain}_url_extract.txt
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} URL Extraction ${reset}\n\n"
+			start=`date +%s`
+			cat ${domain}_probed.txt | waybackurls > ${domain}_url_extract.txt
+			cat ${domain}_probed.txt | gau | anew -q ${domain}_url_extract.txt
+			cat ${domain}_probed.txt | hakrawler -depth 2 -scope subs -plain -insecure | anew -q ${domain}_url_extract.txt
+			if [ -n "$GITHUB_TOKEN" ]; then
+				python3 $tools/github-endpoints.py -d $domain -t $GITHUB_TOKEN | anew -q ${domain}_url_extract.txt  && touch $called_fn_dir/.${FUNCNAME[0]}
+			else
+				python3 $tools/github-endpoints.py -d $domain | anew -q ${domain}_url_extract.txt  && touch $called_fn_dir/.${FUNCNAME[0]}
+			fi
+			end=`date +%s`
+			runtime=$((end-start))
+			NUMOFLINES=$(wc -l < ${domain}_url_extract.txt)
+			printf "${bblue}\n URL Extraction Finished\n"
+			printf "${bblue}\n ${NUMOFLINES} in ${runtime} secs\n"
+			printf "${bblue} Results are saved in in ${domain}_url_extract.txt${reset}\n"
+			printf "${bgreen}#######################################################################\n\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
-	end=`date +%s`
-	runtime=$((end-start))
-	NUMOFLINES=$(wc -l < ${domain}_url_extract.txt)
-	printf "${bblue}\n URL Extraction Finished\n"
-	printf "${bblue}\n ${NUMOFLINES} in ${runtime} secs\n"
-	printf "${bblue} Results are saved in in ${domain}_url_extract.txt${reset}\n"
-	printf "${bgreen}#######################################################################\n\n"
 }
 
 url_gf(){
-	printf "${bgreen}#######################################################################\n"
-	printf "${bblue} Vulnerable Pattern Search ${reset}\n\n"
-	start=`date +%s`
-	gf xss ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_xss.txt;
-	gf ssti ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_ssti.txt;
-	gf ssrf ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_ssrf.txt;
-	gf sqli ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_sqli.txt;
-	gf redirect ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_redirect.txt;
-	gf rce ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_rce.txt;
-	gf potential ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_potential.txt;
-	gf lfi ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_lfi.txt;
-	end=`date +%s`
-	runtime=$((end-start))
-	cat ${domain}_url_extract.txt | unfurl -u format %s://%d%p > ${domain}_url_endpoints.txt
-	printf "${bblue}\n Vulnerable Pattern Search Finished in ${runtime} secs\n"
-	printf "${bblue} Results are saved in in ${domain}_*gfpattern*.txt files${reset}\n"
-	printf "${bgreen}#######################################################################\n\n"
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} Vulnerable Pattern Search ${reset}\n\n"
+			start=`date +%s`
+			gf xss ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_xss.txt;
+			gf ssti ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_ssti.txt;
+			gf ssrf ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_ssrf.txt;
+			gf sqli ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_sqli.txt;
+			gf redirect ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_redirect.txt;
+			gf rce ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_rce.txt;
+			gf potential ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_potential.txt;
+			gf lfi ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_lfi.txt && touch $called_fn_dir/.${FUNCNAME[0]};
+			end=`date +%s`
+			runtime=$((end-start))
+			cat ${domain}_url_extract.txt | unfurl -u format %s://%d%p > ${domain}_url_endpoints.txt
+			printf "${bblue}\n Vulnerable Pattern Search Finished in ${runtime} secs\n"
+			printf "${bblue} Results are saved in in ${domain}_*gfpattern*.txt files${reset}\n"
+			printf "${bgreen}#######################################################################\n\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
 }
 
 jschecks(){
-	printf "${bgreen}#######################################################################\n"
-	printf "${bblue} Javascript Scan ${reset}\n\n"
-	start=`date +%s`
-	printf "${yellow} Running : Fetching Urls 1/5${reset}\n"
-	cat ${domain}_url_extract.txt | grep -iE "\.js$" | anew -q ${domain}_jsfile_links.txt;
-	cat ${domain}_url_extract.txt | subjs | anew -q ${domain}_jsfile_links.txt;
-	printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
-	cat ${domain}_jsfile_links.txt | httpx -follow-redirects -silent -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt
-	printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
-	interlace -tL ${domain}_js_livelinks.txt -threads 5 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> ${domain}_js_endpoints.txt" &>/dev/null
-	sed -i '/^Running against/d; /^Invalid input/d; /^$/d' ${domain}_js_endpoints.txt
-	printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
-	interlace -tL ${domain}_js_livelinks.txt -threads 5 -c "python3 $tools/SecretFinder/SecretFinder.py -i _target_ -o cli >> ${domain}_js_linksecret.txt" &>/dev/null
-	printf "${yellow} Running : Building wordlist 5/5${reset}\n"
-	cat ${domain}_js_livelinks.txt | python3 $tools/getjswords.py | anew -q ${domain}_js_Wordlist.txt;
-	end=`date +%s`
-	runtime=$((end-start))
-	printf "${bblue}\n Javascript Scan Finished in ${runtime} secs\n"
-	printf "${bblue} Results are saved in in ${domain}_js_*.txt files${reset}\n"
-	printf "${bgreen}#######################################################################\n\n"
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} Javascript Scan ${reset}\n\n"
+			start=`date +%s`
+			printf "${yellow} Running : Fetching Urls 1/5${reset}\n"
+			cat ${domain}_url_extract.txt | grep -iE "\.js$" | anew -q ${domain}_jsfile_links.txt;
+			cat ${domain}_url_extract.txt | subjs | anew -q ${domain}_jsfile_links.txt;
+			printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
+			cat ${domain}_jsfile_links.txt | httpx -follow-redirects -silent -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt
+			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
+			interlace -tL ${domain}_js_livelinks.txt -threads 5 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> ${domain}_js_endpoints.txt" &>/dev/null
+			sed -i '/^Running against/d; /^Invalid input/d; /^$/d' ${domain}_js_endpoints.txt
+			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
+			interlace -tL ${domain}_js_livelinks.txt -threads 5 -c "python3 $tools/SecretFinder/SecretFinder.py -i _target_ -o cli >> ${domain}_js_linksecret.txt" &>/dev/null
+			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
+			cat ${domain}_js_livelinks.txt | python3 $tools/getjswords.py | anew -q ${domain}_js_Wordlist.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			end=`date +%s`
+			runtime=$((end-start))
+			printf "${bblue}\n Javascript Scan Finished in ${runtime} secs\n"
+			printf "${bblue} Results are saved in in ${domain}_js_*.txt files${reset}\n"
+			printf "${bgreen}#######################################################################\n\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
 }
 
 params(){
-	printf "${bgreen}#######################################################################\n"
-	printf "${bblue} Parameter Discovery ${reset}\n"
-	start=`date +%s`
-	printf "${yellow}\n\n Running : Finding params with paramspider${reset}\n"
-	interlace -tL ${domain}_probed.txt -threads 5 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,js" &>/dev/null
-	find output/ -name '*.txt' -exec cat {} \; | anew -q ${domain}_param.txt
-	sed '/^FUZZ/d' -i ${domain}_param.txt
-	rm -rf output/
-	printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
-	eval python3 $tools/Arjun/arjun.py -i ${domain}_param.txt -t 20 -o ${domain}_arjun.json $DEBUG_STD
-	end=`date +%s`
-	runtime=$((end-start))
-	printf "${bblue}\n Parameter Discovery Finished in ${runtime} secs\n"
-	printf "${bblue} Results are saved in in ${domain}_param.txt and ${domain}_arjun.json${reset}\n"
-	printf "${bgreen}#######################################################################\n\n"
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} Parameter Discovery ${reset}\n"
+			start=`date +%s`
+			printf "${yellow}\n\n Running : Finding params with paramspider${reset}\n"
+			interlace -tL ${domain}_probed.txt -threads 5 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,js" &>/dev/null
+			find output/ -name '*.txt' -exec cat {} \; | anew -q ${domain}_param.txt
+			sed '/^FUZZ/d' -i ${domain}_param.txt
+			rm -rf output/
+			printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
+			eval python3 $tools/Arjun/arjun.py -i ${domain}_param.txt -t 20 -o ${domain}_arjun.json $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+			end=`date +%s`
+			runtime=$((end-start))
+			printf "${bblue}\n Parameter Discovery Finished in ${runtime} secs\n"
+			printf "${bblue} Results are saved in in ${domain}_param.txt and ${domain}_arjun.json${reset}\n"
+			printf "${bgreen}#######################################################################\n\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
 }
 
 xss(){
-	printf "${bgreen}#######################################################################\n"
-	printf "${bblue} XSS Analysis ${reset}\n\n"
-	start=`date +%s`
-	# Set your own blind xss server, I will not advice you if I receive some data in my server :P
-	# Xsstrike
-	# Xsstrike blind payload defined in $tools/xsstrike/core/config.py
-	# python xsstrike.py --seeds ${domain}_xss.txt -t 30 --timeout=4 --blind --skip
-	if [ -n "$XSS_SERVER" ]; then
-		cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox -b six2dez.xss.ht pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD
-		end=`date +%s`
-		runtime=$((end-start))
-	else
-		printf "${bblue}\n No XSS_SERVER defined, blind xss skipped\n"
-		cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD
-		end=`date +%s`
-		runtime=$((end-start))
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} XSS Analysis ${reset}\n\n"
+			start=`date +%s`
+			# Set your own blind xss server, I will not advice you if I receive some data in my server :P
+			# Xsstrike
+			# Xsstrike blind payload defined in $tools/xsstrike/core/config.py
+			# python xsstrike.py --seeds ${domain}_xss.txt -t 30 --timeout=4 --blind --skip
+			if [ -n "$XSS_SERVER" ]; then
+				cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox -b six2dez.xss.ht pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				end=`date +%s`
+				runtime=$((end-start))
+			else
+				printf "${bblue}\n No XSS_SERVER defined, blind xss skipped\n"
+				cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				end=`date +%s`
+				runtime=$((end-start))
+			fi
+			printf "${bblue} Results are saved in in ${domain}_dalfox_xss.txt${reset}\n"
+			printf "${bgreen}#######################################################################\n\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
-	printf "${bblue} Results are saved in in ${domain}_dalfox_xss.txt${reset}\n"
-	printf "${bgreen}#######################################################################\n\n"
 }
 
 github(){
-	printf "${bgreen}#######################################################################\n"
-	printf "${bblue} GitHub Scanning ${reset}\n\n"
-	start=`date +%s`
-	cat ${domain}_probed.txt | git-hound --dig-files --dig-commits --threads 100 | tee ${domain}_gitrecon.txt
-	end=`date +%s`
-	runtime=$((end-start))
-	printf "${bblue}\n GitHub Scanning Finished in ${runtime} secs\n"
-	printf "${bblue} Results are saved in in ${domain}_gitrecon.txt${reset}\n"
-	printf "${bgreen}#######################################################################\n\n"
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} GitHub Scanning ${reset}\n\n"
+			start=`date +%s`
+			cat ${domain}_probed.txt | git-hound --dig-files --dig-commits --threads 100 | tee ${domain}_gitrecon.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			end=`date +%s`
+			runtime=$((end-start))
+			printf "${bblue}\n GitHub Scanning Finished in ${runtime} secs\n"
+			printf "${bblue} Results are saved in in ${domain}_gitrecon.txt${reset}\n"
+			printf "${bgreen}#######################################################################\n\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
 }
 
 favicon(){
-	printf "${bgreen}#######################################################################\n"
-	printf "${bblue} FavIcon Hash Extraction ${reset}\n\n"
-	start=`date +%s`
-	eval python3 $tools/fav-up/favUp.py -w $domain -sc > ${domain}_favicontest.txt $DEBUG_STD
-	eval cat ${domain}_favicontest.txt $DEBUG_STD | grep found_ips
-	end=`date +%s`
-	runtime=$((end-start))
-	printf "${bblue}\n FavIcon Hash Extraction Finished in ${runtime} secs\n"
-	printf "${bblue} Results are saved in in ${domain}_favicontest.txt${reset}\n"
-	printf "${bgreen}#######################################################################\n\n"
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} FavIcon Hash Extraction ${reset}\n\n"
+			start=`date +%s`
+			eval python3 $tools/fav-up/favUp.py -w $domain -sc > ${domain}_favicontest.txt $DEBUG_STD
+			eval cat ${domain}_favicontest.txt $DEBUG_STD | grep found_ips && touch $called_fn_dir/.${FUNCNAME[0]}
+			end=`date +%s`
+			runtime=$((end-start))
+			printf "${bblue}\n FavIcon Hash Extraction Finished in ${runtime} secs\n"
+			printf "${bblue} Results are saved in in ${domain}_favicontest.txt${reset}\n"
+			printf "${bgreen}#######################################################################\n\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
 }
 
 fuzz(){
-	printf "${bgreen}#######################################################################\n"
-	printf "${bblue} Directory Fuzzing ${reset}\n"
-	printf "${yellow}\n\n Fuzzing subdomains with ${fuzz_wordlist}${reset}\n"
-	start=`date +%s`
-	mkdir -p $dir/fuzzing
-	for sub in $(cat ${domain}_probed.txt); do
-		printf "${yellow}\n\n Running: Fuzzing in ${sub}${reset}\n"
-		sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-		ffuf -mc all -ac -w $fuzz_wordlist -maxtime 900 -u $sub/FUZZ -or -of md -o $dir/fuzzing/${sub_out}.md $DEBUG_STD
-	done
-	end=`date +%s`
-	runtime=$((end-start))
-	printf "${bblue}\n Directory Fuzzing Finished in ${runtime} secs\n"
-	printf "${bblue} Results are saved in fuzzing/*subdomain*.md${reset}\n"
-	printf "${bgreen}#######################################################################\n\n"
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} Directory Fuzzing ${reset}\n"
+			printf "${yellow}\n\n Fuzzing subdomains with ${fuzz_wordlist}${reset}\n"
+			start=`date +%s`
+			mkdir -p $dir/fuzzing
+			for sub in $(cat ${domain}_probed.txt); do
+				printf "${yellow}\n\n Running: Fuzzing in ${sub}${reset}\n"
+				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
+				ffuf -mc all -ac -w $fuzz_wordlist -maxtime 900 -u $sub/FUZZ -or -of md -o $dir/fuzzing/${sub_out}.md $DEBUG_STD
+			done
+			touch $called_fn_dir/.${FUNCNAME[0]}
+			end=`date +%s`
+			runtime=$((end-start))
+			printf "${bblue}\n Directory Fuzzing Finished in ${runtime} secs\n"
+			printf "${bblue} Results are saved in fuzzing/*subdomain*.md${reset}\n"
+			printf "${bgreen}#######################################################################\n\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
 }
 
 cors(){
-	printf "${bgreen}#######################################################################\n"
-	printf "${bblue} CORS Scan ${reset}\n\n"
-	start=`date +%s`
-	eval python3 $tools/Corsy/corsy.py -i ${domain}_probed.txt -t 200 > ${domain}_cors.txt $DEBUG_STD
-	eval cat ${domain}_cors.txt $DEBUG_ERROR
-	end=`date +%s`
-	runtime=$((end-start))
-	printf "${bblue}\n CORS Scan Finished in ${runtime} secs\n"
-	printf "${bblue} Results are saved in ${domain}_cors.txt ${reset}\n"
-	printf "${bgreen}#######################################################################\n"
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} CORS Scan ${reset}\n\n"
+			start=`date +%s`
+			eval python3 $tools/Corsy/corsy.py -i ${domain}_probed.txt -t 200 > ${domain}_cors.txt $DEBUG_STD
+			eval cat ${domain}_cors.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
+			end=`date +%s`
+			runtime=$((end-start))
+			printf "${bblue}\n CORS Scan Finished in ${runtime} secs\n"
+			printf "${bblue} Results are saved in ${domain}_cors.txt ${reset}\n"
+			printf "${bgreen}#######################################################################\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
 }
 
 testssl(){
-	printf "${bgreen}#######################################################################\n"
-	printf "${bblue} SSL Test ${reset}\n"
-	start=`date +%s`
-	$tools/testssl.sh/testssl.sh --quiet -U -iL ${domain}_subdomains.txt > ${domain}_testssl.txt
-	end=`date +%s`
-	runtime=$((end-start))
-	printf "${bblue}\n SSL Test Finished in ${runtime} secs\n"
-	printf "${bblue} Results are saved in ${domain}_testssl.txt ${reset}\n"
-	printf "${bgreen}#######################################################################\n"
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} SSL Test ${reset}\n"
+			start=`date +%s`
+			$tools/testssl.sh/testssl.sh --quiet -U -iL ${domain}_subdomains.txt > ${domain}_testssl.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			end=`date +%s`
+			runtime=$((end-start))
+			printf "${bblue}\n SSL Test Finished in ${runtime} secs\n"
+			printf "${bblue} Results are saved in ${domain}_testssl.txt ${reset}\n"
+			printf "${bgreen}#######################################################################\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
 }
 
 open_redirect(){
-	printf "${bgreen}#######################################################################\n"
-	printf "${bblue} Open redirects checks ${reset}\n"
-	start=`date +%s`
-	cat ${domain}_redirect.txt | qsreplace FUZZ > test_redirect.txt
-	eval python3 $tools/OpenRedireX/openredirex.py -l test_redirect.txt --keyword FUZZ > ${domain}_openredirex.txt $DEBUG_STD
-	eval rm test_redirect.txt $DEBUG_ERROR
-	end=`date +%s`
-	runtime=$((end-start))
-	printf "${bblue}\n Open Redirects Finished in ${runtime} secs\n"
-	printf "${bblue} Results are saved in ${domain}_openredirex.txt ${reset}\n"
-	printf "${bgreen}#######################################################################\n"
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} Open redirects checks ${reset}\n"
+			start=`date +%s`
+			cat ${domain}_redirect.txt | qsreplace FUZZ > test_redirect.txt
+			eval python3 $tools/OpenRedireX/openredirex.py -l test_redirect.txt --keyword FUZZ > ${domain}_openredirex.txt $DEBUG_STD
+			eval rm test_redirect.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
+			end=`date +%s`
+			runtime=$((end-start))
+			printf "${bblue}\n Open Redirects Finished in ${runtime} secs\n"
+			printf "${bblue} Results are saved in ${domain}_openredirex.txt ${reset}\n"
+			printf "${bgreen}#######################################################################\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
 }
 
 ssrf_checks(){
-	printf "${bgreen}#######################################################################\n"
-	printf "${bblue} SSRF checks ${reset}\n"
-	if [ -n "$COLLAB_SERVER" ]; then
-		start=`date +%s`
-		eval cat ${domain}_ssrf.txt $DEBUG_ERROR | eval python3 $tools/ssrf.py $COLLAB_SERVER > ${domain}_ssrf_confirmed.txt $DEBUG_STD
-		end=`date +%s`
-		runtime=$((end-start))
-		printf "${bblue}\n SSRF Finished in ${runtime} secs\n"
-	else
-		printf "${bblue}\n No COLLAB_SERVER defined\n"
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} SSRF checks ${reset}\n"
+			if [ -n "$COLLAB_SERVER" ]; then
+				start=`date +%s`
+				eval cat ${domain}_ssrf.txt $DEBUG_ERROR | eval python3 $tools/ssrf.py $COLLAB_SERVER > ${domain}_ssrf_confirmed.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				end=`date +%s`
+				runtime=$((end-start))
+				printf "${bblue}\n SSRF Finished in ${runtime} secs\n"
+			else
+				printf "${bblue}\n No COLLAB_SERVER defined\n"
+			fi
+			printf "${bblue} Results are saved in ${domain}_ssrf_confirmed.txt ${reset}\n"
+			printf "${bgreen}#######################################################################\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
-	printf "${bblue} Results are saved in ${domain}_ssrf_confirmed.txt ${reset}\n"
-	printf "${bgreen}#######################################################################\n"
 }
 
 end(){
