@@ -370,10 +370,13 @@ sub_scraping(){
 		then
 			start=`date +%s`
 			printf "${yellow} Running : JS scraping subdomain search 6/6${reset}\n"
-			eval python3 $tools/SubDomainizer/SubDomainizer.py -l ${domain}_probed.txt -k -g -gt $GITHUB_TOKEN -san all -o JS_subs.txt $DEBUG_STD
-			NUMOFLINES=$(wc -l < JS_subs.txt)
-			cat JS_subs.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed.txt
-			cat JS_subs.txt | sed 's/https\?:\/\///' | anew -q ${domain}_subdomains.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			eval timeout 10m python3 $tools/SubDomainizer/SubDomainizer.py -l ${domain}_probed.txt -k -g -gt $GITHUB_TOKEN -san same -o JS_subs.txt $DEBUG_STD
+            if [[ $(cat JS_subs.txt | wc -l) -gt 0 ]]
+            then
+			    NUMOFLINES=$(wc -l < JS_subs.txt)
+			    cat JS_subs.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed.txt
+			    cat JS_subs.txt | sed 's/https\?:\/\///' | anew -q ${domain}_subdomains.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+            fi
 			end=`date +%s`
 			runtime=$((end-start))
 			printf "${green} ${NUMOFLINES} subdomains found in ${runtime} secs${reset}\n\n"
