@@ -11,7 +11,7 @@ printf "${bgreen} reconftw installer script (apt/rpm/pacman compatible)${reset}\
 
 install_apt(){
     sudo apt update -y &>/dev/null
-    sudo apt install python3 python3-pip ruby git libpcap-dev chromium-browser wget python-dev python3-dev build-essential libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap python-pip -y &>/dev/null
+    sudo apt install python3 python3-pip ruby git libpcap-dev chromium-browser wget python-dev python3-dev build-essential libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap make python-pip -y &>/dev/null
 }
 
 install_yum(){
