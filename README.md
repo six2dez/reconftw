@@ -115,6 +115,7 @@ Anyone can take one of these features and start working on it, just ping me to k
 - [ ] Diff support
 - [ ] Performance options to avoid net overload (soft, default, hard)
 - [ ] Nice and easily readable final html report
+- [ ] Metadata Checks (pymeta)
 - [X] Open Redirect with Openredirex
 - [X] SSRF Checks
 - [X] More error checks
