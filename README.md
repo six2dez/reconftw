@@ -106,10 +106,12 @@ This is a simple script intended to perform a full recon on an objective with mu
 
 Anyone can take one of these features and start working on it, just ping me to keep in mind and avoid duplicate efforts:
 
+(yeah, this has become my backlog)
+
 - [ ] Notification support (Slack, Discord and Telegram)
 - [ ] CMS tools (wpscan, drupwn/droopescan, joomscan)
 - [ ] Add menu option for every feature
-- [ ] CRLF checks
+- [ ] CRLF checks, manual or [this scanner](https://github.com/MichaelStott/CRLF-Injection-Scanner)
 - [ ] Fast mode (Like -a but only passive cheks, maxtime, etc)
 - [ ] Docker image
 - [ ] Diff support

@@ -1,4 +1,5 @@
 #!/bin/bash
+GOROOT=$(which go)
 
 bgreen='\033[1;32m'
 yellow='\033[0;33m'
@@ -105,9 +106,11 @@ sudo chmod 755 /usr/local/bin/findomain
 cd $dir/massdns; make $DEBUG_STD
 sudo cp $dir/massdns/bin/massdns /usr/bin/
 sudo pip3 install mmh3==2.5.1
+
 find $dir -name 'requirements.txt' -exec pip3 install --user -r {} \; $DEBUG_STD
-sudo python3 $dir/Interlace/setup.py install
-python3 $dir/LinkFinder/setup.py install
+cd $dir/Interlace && sudo python3 setup.py install
+cd $dir/LinkFinder && python3 setup.py install
+cd $dir
 python3 $dir/pymeta/setup.py install
 git clone https://github.com/devanshbatham/OpenRedireX $dir/OpenRedireX $DEBUG_STD
 printf "${bgreen} 90%% done${reset}\n\n"
@@ -118,6 +121,7 @@ wget -O subdomains.txt https://gist.githubusercontent.com/jhaddix/86a06c5dc309d0
 wget -O resolvers.txt https://raw.githubusercontent.com/janmasarik/resolvers/master/resolvers.txt $DEBUG_STD
 wget -O permutations_list.txt https://gist.githubusercontent.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw/137bb6b60c616552c705e93a345c06cec3a2cb1f/permutations_list.txt $DEBUG_STD
 wget -O ssrf.py https://gist.githubusercontent.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw/ea0774de5e27f9bc855207b175249edae2e9ccef/asyncio_ssrf.py $DEBUG_STD
+
 
 
 printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - git-hound (~/.githound/config.yml)\n - github-endpoints.py ($tools/.github_tokens or GITHUB_TOKEN env var)\n - favup (shodan init SHODANPAIDAPIKEY)\n - SSRF Server (COLLAB_SERVER env var) ${reset}\n"
