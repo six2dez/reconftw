@@ -1,5 +1,5 @@
 #!/bin/bash
-GOROOT=$(which go)
+#GOROOT=$(which go)
 
 bgreen='\033[1;32m'
 yellow='\033[0;33m'
