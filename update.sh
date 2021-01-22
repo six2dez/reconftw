@@ -75,9 +75,9 @@ printf "${bgreen}###############################################################
 
 #Updating installed python packages
 printf "${bgreen}#######################################################################\n"
-printf "${bblue} Updating installed python packag \n"
+printf "${bblue} Updating installed python packages \n"
 cat $dir/*/requirements.txt | grep -v "=" | uniq | xargs pip3 install -U $DEBUG_STD
-printf "${bblue}\n Updating installed python packag is finished ${reset}\n"
+printf "${bblue}\n Updating installed python packages is finished ${reset}\n"
 printf "${bgreen}#######################################################################\n"
 
 
