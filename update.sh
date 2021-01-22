@@ -10,7 +10,7 @@ bblue='\033[1;34m'
 bgreen='\033[1;32m'
 reset='\033[0m'
 
-#DEBUG_STD="&>/dev/null"
+DEBUG_STD="&>/dev/null"
 DEBUG_ERROR="2>/dev/null"
 
 [ ! -d "~/.gf" ] && mkdir -p ~/.gf
