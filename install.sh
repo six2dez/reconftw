@@ -1,4 +1,5 @@
 #!/bin/bash
+GOROOT=$(which go)
 
 bgreen='\033[1;32m'
 yellow='\033[0;33m'
@@ -88,7 +89,7 @@ git clone https://github.com/m4ll0k/SecretFinder $dir/SecretFinder &>/dev/null
 git clone https://github.com/gwen001/github-search $dir/github-search &>/dev/null
 printf "${bgreen} 70%% done${reset}\n\n"
 git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh &>/dev/null
-pip3 install dnsgen &>/dev/null
+sudo pip3 install dnsgen &>/dev/null
 wget https://github.com/tillson/git-hound/releases/download/v1.3/git-hound_1.3_Linux_x86_64.tar.gz &>/dev/null
 tar -xf git-hound_1.3_Linux_x86_64.tar.gz git-hound
 rm -f git-hound_1.3_Linux_x86_64.tar.gz
@@ -102,8 +103,8 @@ cd $dir/massdns; make &>/dev/null
 sudo cp $dir/massdns/bin/massdns /usr/bin/
 sudo pip3 install mmh3==2.5.1
 find $dir -name 'requirements.txt' -exec pip3 install --user -r {} \; &>/dev/null
-sudo python3 $dir/Interlace/setup.py install
-python3 $dir/LinkFinder/setup.py install
+cd $dir/Interlace && sudo python3 setup.py install
+cd $dir/LinkFinder && python3 setup.py install
 git clone https://github.com/devanshbatham/OpenRedireX $dir/OpenRedireX &>/dev/null
 printf "${bgreen} 90%% done${reset}\n\n"
 cd ~/.gf; wget -O potential.json https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json &>/dev/null; cd $dir
