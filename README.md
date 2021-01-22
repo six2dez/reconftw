@@ -114,7 +114,9 @@ Anyone can take one of these features and start working on it, just ping me to k
 - [ ] Docker image
 - [ ] Diff support
 - [ ] Performance options to avoid net overload (soft, default, hard)
-- [ ] Nice and easily readable final html report
+- [ ] Nice and easily readable final html repor
+- [ ] Add [autosubtakeover](https://github.com/JordyZomer/autoSubTakeover) before subjack
+- [ ] Public S3 Checker, [this](https://gist.githubusercontent.com/random-robbie/b0c8603e55e22b21c49fd80072392873/raw/bucket_list.sh) or [this](https://gist.githubusercontent.com/jhaddix/4769f5e3e4dbcaaf9032fbb741ef6f83/raw/fdfc8ded52a6746d8ecb0fc522cf492e42ba0dec/bucket-disclose.sh)
 - [ ] Metadata Checks (pymeta)
 - [X] Open Redirect with Openredirex
 - [X] SSRF Checks
