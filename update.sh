@@ -1,9 +1,9 @@
 #!/bin/bash
 
 #@TODO:
-    # - Compile massdns if it is updated
     # - Update testssl.sh
-    # - Auto update precompiled binaries
+    # - Update Go packages
+    # - Get git-hound latest version
 
 bred='\033[1;31m'
 bblue='\033[1;34m'
@@ -36,6 +36,15 @@ for repo in ${repos}; do
     else
         cd "$dir/$(basename $repo)"
         git pull origin master &>/dev/null
+        if [ "massdns" = "$(basename $repo)" ]; then
+            make &>/dev/null && sudo cp bin/massdns /usr/bin/
+        elif [ "Gf-Patterns" = "$(basename $repo)" ]; then
+            cp *.json ~/.gf
+        elif [ "gf" = "$(basename $repo)" ]; then
+            cp -r examples ~/.gf
+        elif [ "Interlace" = "$(basename $repo)" ] || [ "LinkFinder" = "$(basename $repo)" ]; then
+            sudo python3 setup.py install &>/dev/null
+        fi
     fi
     printf "${bblue}\n Updating ${repo} is finished ${reset}\n"
     printf "${bgreen}#######################################################################\n"
@@ -52,7 +61,23 @@ wget -N -c -O $dir/resolvers.txt https://raw.githubusercontent.com/janmasarik/re
 wget -N -c -O $dir/permutations_list.txt https://gist.githubusercontent.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw/137bb6b60c616552c705e93a345c06cec3a2cb1f/permutations_list.txt &>/dev/null
 wget -N -c -O $dir/ssrf.py https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/ssrf.py &>/dev/null
 
+printf "${bblue}\n Updating Files is finished ${reset}\n"
+printf "${bgreen}#######################################################################\n"
+
+#Updating Nuclei templates
+printf "${bgreen}#######################################################################\n"
+printf "${bblue} Updating Nuclei templates \n"
 nuclei -update-templates &>/dev/null
+printf "${bblue}\n Updating Nuclei templates is finished ${reset}\n"
+printf "${bgreen}#######################################################################\n"
+
+#Updating installed python packages
+printf "${bgreen}#######################################################################\n"
+printf "${bblue} Updating installed python packag \n"
+cat $dir/*/requirements.txt | grep -v "=" | uniq | xargs pip3 install -U &>/dev/null
+printf "${bblue}\n Updating installed python packag is finished ${reset}\n"
+printf "${bgreen}#######################################################################\n"
+
 
 printf "\n${bgreen}--==[ ************************************************************************************ ]==--\n"
 printf "${bred}                You are up to date, happy hacking${reset}\n"
