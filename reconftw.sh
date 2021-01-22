@@ -42,7 +42,7 @@ start(){
 		printf "\n\n${bred} No domain or list provided ${reset}\n\n"
 		exit
 	fi
-	
+
 	dir=$SCRIPTPATH/Recon/$domain
 	called_fn_dir=$dir/.called_fn
 
@@ -252,9 +252,9 @@ subdomains_full(){
 	fi
 	printf "${bblue}\n Final results: ${reset}\n"
 	printf "${bred}\n - ${NUMOFLINES_subs} alive subdomains${reset}\n\n"
-	eval cat ${domain}_subdomains.txt $DEBUG_ERROR | sort 
+	eval cat ${domain}_subdomains.txt $DEBUG_ERROR | sort
 	printf "${bred}\n - ${NUMOFLINES_probed} web probed${reset}\n\n"
-	eval cat ${domain}_probed.txt $DEBUG_ERROR | sort 
+	eval cat ${domain}_probed.txt $DEBUG_ERROR | sort
 	printf "${bblue}\n Subdomain Enumeration Finished\n"
 	printf "${bblue} Results are saved in ${domain}_subdomains.txt and ${domain}_probed.txt${reset}\n"
 	printf "${bgreen}#######################################################################\n\n"
@@ -451,6 +451,24 @@ screenshot(){
 			runtime=$((end-start))
 			printf "${bblue}\n Web Screenshot Finished in ${runtime} secs\n"
 			printf "${bblue} Results are saved in in screenshots/aquatone_report.html folder${reset}\n"
+			printf "${bgreen}#######################################################################\n\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
+}
+
+metadata(){
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} ${bgreen} Metadat Checks ${reset}\n\n"
+			start=`date +%s`
+			mkdir -p $dir/metadata
+			pymeta -d ${domain} -s all -m 500 -j 5 -o $dir/metadata -f ${domain}_metadata.csv && touch $called_fn_dir/.${FUNCNAME[0]}
+			end=`date +%s`
+			runtime=$((end-start))
+			printf "${bblue}\n Metadat Checks  Finished in ${runtime} secs\n"
+			printf "${bblue} Results are saved in in metadata folder and ${domain}_metadata.csv ${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -800,6 +818,7 @@ all(){
 			subtakeover
 			webprobe_full
 			screenshot
+			metadata
 			portscan
 			nuclei_check
 			github
@@ -823,6 +842,7 @@ all(){
 		subtakeover
 		webprobe_full
 		screenshot
+		metadata
 		portscan
 		nuclei_check
 		github
@@ -1008,7 +1028,7 @@ while getopts ":hd:-:l:vaisxwgto:" opt; do
 					end
 					exit
 					;;
-			esac;;		
+			esac;;
 		o ) dir_output=$OPTARG
 			output
 			;;
