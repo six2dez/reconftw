@@ -121,7 +121,7 @@ function tools_installed(){
 	eval type -P httpx $DEBUG_STD || { printf "${bred} [*] Httpx		[NO]\n${reset}"; allinstalled=false;}
 
 	if [ "${allinstalled}" = true ] ; then
-    	printf "${bgreen} Good! All installed! ${reset}\n\n"
+		printf "${bgreen} Good! All installed! ${reset}\n\n"
 	else
 		printf "\n${yellow} Try running the installer script again ./install.sh"
 		printf "\n${yellow} If it fails for any reason try to install manually the tools missed"
@@ -329,19 +329,19 @@ sub_permut(){
 					cat permute1.txt permute2.txt | anew -q permute.txt
 					eval rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 				elif [[ $(cat tmp_subs_resolution.txt | wc -l) -le 200 ]]
-	      		then
+		  		then
 					eval dnsgen tmp_subs_resolution.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -retries 2 -t 5000 -d $domain -r $tools/resolvers.txt -o permute_tmp.txt $DEBUG_STD
 					cat permute_tmp.txt | anew -q permute.txt
 					eval rm permute_tmp.txt $DEBUG_ERROR  && touch $called_fn_dir/.${FUNCNAME[0]}
-        		else
-          			printf "\n${bred} Skipping Permutations: Too Much Subdomains${reset}\n"
+				else
+		  			printf "\n${bred} Skipping Permutations: Too Much Subdomains${reset}\n"
 			fi
-            if [ -f "permute_subs.txt" ]
-            then
-			    NUMOFLINES=$(wc -l < permute_subs.txt)
-            else
-                NUMOFLINES=0
-            fi
+			if [ -f "permute_subs.txt" ]
+			then
+				NUMOFLINES=$(wc -l < permute_subs.txt)
+			else
+				NUMOFLINES=0
+			fi
 			end=`date +%s`
 			runtime=$((end-start))
 			printf "${green} ${NUMOFLINES} subdomains found in ${runtime} secs${reset}\n\n"
@@ -356,7 +356,12 @@ webprobe_simple(){
 			start=`date +%s`
 			printf "${yellow} Running : Http probing 5/6${reset}\n\n"
 			cat ${domain}_subdomains.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' > ${domain}_probed.txt && touch $called_fn_dir/.${FUNCNAME[0]}
-			NUMOFLINES=$(wc -l < ${domain}_probed.txt)
+			if [ -f "${domain}_probed.txt" ]
+			then
+				NUMOFLINES=$(wc -l < ${domain}_probed.txt)
+			else
+				NUMOFLINES=0
+			fi
 			end=`date +%s`
 			runtime=$((end-start))
 			printf "${green} ${NUMOFLINES} subdomains resolved in ${runtime} secs${reset}\n\n"
@@ -371,12 +376,14 @@ sub_scraping(){
 			start=`date +%s`
 			printf "${yellow} Running : JS scraping subdomain search 6/6${reset}\n"
 			eval timeout 10m python3 $tools/SubDomainizer/SubDomainizer.py -l ${domain}_probed.txt -k -g -gt $GITHUB_TOKEN -san same -o JS_subs.txt $DEBUG_STD
-            if [[ $(cat JS_subs.txt | wc -l) -gt 0 ]]
-            then
-			    NUMOFLINES=$(wc -l < JS_subs.txt)
-			    cat JS_subs.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed.txt
-			    cat JS_subs.txt | sed 's/https\?:\/\///' | anew -q ${domain}_subdomains.txt && touch $called_fn_dir/.${FUNCNAME[0]}
-            fi
+			if [[ $(cat JS_subs.txt | wc -l) -gt 0 ]]
+			then
+				NUMOFLINES=$(wc -l < JS_subs.txt)
+				cat JS_subs.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed.txt
+				cat JS_subs.txt | sed 's/https\?:\/\///' | anew -q ${domain}_subdomains.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			else
+				NUMOFLINES=0
+			fi
 			end=`date +%s`
 			runtime=$((end-start))
 			printf "${green} ${NUMOFLINES} subdomains found in ${runtime} secs${reset}\n\n"
@@ -396,7 +403,12 @@ subtakeover(){
 			eval rm ${domain}_all-takeover-checks.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			runtime=$((end-start))
-			NUMOFLINES=$(wc -l < ${domain}_takeover.txt)
+			if [ -f "${domain}_takeover.txt" ]
+			then
+				NUMOFLINES=$(wc -l < ${domain}_takeover.txt)
+			else
+				NUMOFLINES=0
+			fi
 			printf "${bred}\n Subtko: ${NUMOFLINES} subdomains in ${runtime} secs${reset}\n\n"
 			eval cat ${domain}_takeover.txt $DEBUG_ERROR
 			printf "${bblue}\n Subdomain Takeover Finished\n"
@@ -948,7 +960,7 @@ while getopts ":hd:-:l:vaisxwgto:" opt; do
 			exit
 			;;
 		-)  case "${OPTARG}" in
-            	sp)	if [ -n "$list" ]
+				sp)	if [ -n "$list" ]
 					then
 						for domain in $(cat $list); do
 							start
@@ -965,8 +977,8 @@ while getopts ":hd:-:l:vaisxwgto:" opt; do
 						end
 					fi
 					exit
-                	;;
-                sb)	if [ -n "$list" ]
+					;;
+				sb)	if [ -n "$list" ]
 					then
 						for domain in $(cat $list); do
 							start
@@ -996,7 +1008,7 @@ while getopts ":hd:-:l:vaisxwgto:" opt; do
 					end
 					exit
 					;;
-            esac;;		
+			esac;;		
 		o ) dir_output=$OPTARG
 			output
 			;;
