@@ -1,3 +1,8 @@
 #Ignoring output directories
-Recon
-output
+Recon/
+output/
+
+#Ignoring compressed files
+*.tar
+*.tar.*
+*.zip
