@@ -47,7 +47,7 @@ for repo in ${repos}; do
         cd "$dir/$(basename $repo)"
         eval git pull origin master $DEBUG_STD
         if [ "massdns" = "$(basename $repo)" ]; then
-            make $DEBUG_STD && sudo cp bin/massdns /usr/bin/
+            make && sudo cp bin/massdns /usr/bin/
         elif [ "Gf-Patterns" = "$(basename $repo)" ]; then
             cp *.json ~/.gf
         elif [ "gf" = "$(basename $repo)" ]; then
@@ -57,7 +57,7 @@ for repo in ${repos}; do
         fi
         if [ "True" = "$IS_ARM" ] && [ "git-hound" = "$(basename $repo)" ]
             then
-                go build && chmod 754 git-hound && mv git-hound /usr/local/bin/
+                go build && chmod 754 git-hound && sudo mv git-hound /usr/local/bin/
         fi
     fi
     printf "${bblue}\n Updating ${repo} is finished ${reset}\n"
