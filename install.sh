@@ -9,6 +9,13 @@ bred='\033[1;31m'
 DEBUG_STD="&>/dev/null"
 DEBUG_ERROR="2>/dev/null"
 
+if grep -q "ARMv"  /proc/cpuinfo
+then
+   IS_ARM="True";
+else
+   IS_ARM="False";
+fi
+
 printf "\n\n${bgreen}#######################################################################\n"
 printf "${bgreen} reconftw installer script (apt/rpm/pacman compatible)${reset}\n\n"
 
@@ -93,19 +100,34 @@ eval git clone https://github.com/gwen001/github-search $dir/github-search $DEBU
 printf "${bgreen} 70%% done${reset}\n\n"
 eval git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh $DEBUG_STD
 eval pip3 install dnsgen $DEBUG_STD
-eval wget https://github.com/tillson/git-hound/releases/download/v1.3/git-hound_1.3_Linux_x86_64.tar.gz $DEBUG_STD
-tar -xf git-hound_1.3_Linux_x86_64.tar.gz git-hound
-rm -f git-hound_1.3_Linux_x86_64.tar.gz
-sudo mv git-hound /usr/local/bin/git-hound
-sudo chmod 755 /usr/local/bin/git-hound
+
+if [ "True" = "$IS_ARM" ]
+    then
+        eval git clone https://github.com/tillson/git-hound $dir/git-hound $DEBUG_STD
+        cd $dir/git-hound && go build && chmod 754 git-hound && mv $dir/git-hound/git-hound /usr/local/bin  && cd $dir
+    else
+        eval wget https://github.com/tillson/git-hound/releases/download/v1.3/git-hound_1.3_Linux_x86_64.tar.gz $DEBUG_STD
+        tar -xf git-hound_1.3_Linux_x86_64.tar.gz git-hound
+        rm -f git-hound_1.3_Linux_x86_64.tar.gz
+        sudo mv git-hound /usr/local/bin/git-hound
+        sudo chmod 755 /usr/local/bin/git-hound
+fi
 printf "${bgreen} 80%% done${reset}\n\n"
 eval git clone https://github.com/m8r0wn/pymeta $dir/pymeta $DEBUG_STD
-eval wget https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-linux $DEBUG_STD
-sudo mv findomain-linux /usr/local/bin/findomain
+if [ "True" = "$IS_ARM" ]
+    then
+        eval wget https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-rpi $DEBUG_STD
+        sudo mv findomain-rpi /usr/local/bin/findomain
+    else
+        eval wget https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-linux $DEBUG_STD
+        sudo mv findomain-linux /usr/local/bin/findomain
+fi
+
 sudo chmod 755 /usr/local/bin/findomain
 cd $dir/massdns; eval make $DEBUG_STD
 sudo cp $dir/massdns/bin/massdns /usr/bin/
 
+eval find $dir -name 'requirements.txt' -exec pip3 install --user -r {} \; $DEBUG_STD
 cd $dir/Interlace && sudo python3 setup.py install
 cd $dir/LinkFinder && python3 setup.py install
 cd $dir

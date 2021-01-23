@@ -60,6 +60,7 @@ This is a simple script intended to perform a full recon on an objective with mu
 - Polished installer compatible with most distros
 - Verbose mode
 - Update tools script
+- Raspberry supported
 
 ## Mindmap/Workflow
 
