@@ -86,7 +86,7 @@ eval git clone https://github.com/devanshbatham/ParamSpider $dir/ParamSpider $DE
 eval git clone https://github.com/six2dez/OneListForAll $dir/OneListForAll $DEBUG_STD
 eval git clone https://github.com/dark-warlord14/LinkFinder $dir/LinkFinder $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/projectdiscovery/shuffledns/cmd/shuffledns $DEBUG_STD
-go get -v github.com/hakluke/hakrawler
+eval go get -v github.com/hakluke/hakrawler $DEBUG_STD
 eval go get -v github.com/cgboal/sonarsearch/crobat $DEBUG_STD
 printf "${bgreen} 60%% done${reset}\n\n"
 eval git clone https://github.com/six2dez/degoogle_hunter $dir/degoogle_hunter $DEBUG_STD
@@ -100,6 +100,7 @@ eval git clone https://github.com/gwen001/github-search $dir/github-search $DEBU
 printf "${bgreen} 70%% done${reset}\n\n"
 eval git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh $DEBUG_STD
 eval pip3 install dnsgen $DEBUG_STD
+
 if [ "True" = "$IS_ARM" ]
     then
         eval git clone https://github.com/tillson/git-hound $dir/git-hound $DEBUG_STD
@@ -121,10 +122,10 @@ if [ "True" = "$IS_ARM" ]
         eval wget https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-linux $DEBUG_STD
         sudo mv findomain-linux /usr/local/bin/findomain
 fi
+
 sudo chmod 755 /usr/local/bin/findomain
 cd $dir/massdns; eval make $DEBUG_STD
 sudo cp $dir/massdns/bin/massdns /usr/bin/
-sudo pip3 install mmh3==2.5.1
 
 eval find $dir -name 'requirements.txt' -exec pip3 install --user -r {} \; $DEBUG_STD
 cd $dir/Interlace && sudo python3 setup.py install
@@ -140,6 +141,8 @@ eval wget -O subdomains.txt https://gist.githubusercontent.com/jhaddix/86a06c5dc
 eval wget -O resolvers.txt https://raw.githubusercontent.com/janmasarik/resolvers/master/resolvers.txt $DEBUG_STD
 eval wget -O permutations_list.txt https://gist.githubusercontent.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw/137bb6b60c616552c705e93a345c06cec3a2cb1f/permutations_list.txt $DEBUG_STD
 eval wget -O ssrf.py https://gist.githubusercontent.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw/ea0774de5e27f9bc855207b175249edae2e9ccef/asyncio_ssrf.py $DEBUG_STD
+eval wget -O all_requirements.txt https://gist.githubusercontent.com/detonxx/92118db85d97f6edb54a0a427ae96a2e/raw/95c0517bdcd1467e9a82992097b7c3e66afccfab/all_requirements.txt $DEBUG_STD
+eval pip3 install -r $dir/all_requirements.txt $DEBUG_STD
 
 printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - git-hound (~/.githound/config.yml)\n - github-endpoints.py ($tools/.github_tokens or GITHUB_TOKEN env var)\n - favup (shodan init SHODANPAIDAPIKEY)\n - SSRF Server (COLLAB_SERVER env var) ${reset}\n"
 
