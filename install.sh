@@ -155,9 +155,9 @@ $SUDO cp $dir/massdns/bin/massdns /usr/bin/
 
 eval find $dir -name 'requirements.txt' -exec pip3 install --user -r {} \; $DEBUG_STD
 cd $dir/Interlace && $SUDO python3 setup.py install
-cd $dir/LinkFinder && python3 setup.py install
+cd $dir/LinkFinder && $SUDO python3 setup.py install
 cd $dir
-python3 $dir/pymeta/setup.py install
+$SUDO python3 $dir/pymeta/setup.py install
 eval git clone https://github.com/devanshbatham/OpenRedireX $dir/OpenRedireX $DEBUG_STD
 printf "${bgreen} 90%% done${reset}\n\n"
 cd ~/.gf; eval wget -O potential.json https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json $DEBUG_STD; cd $dir
