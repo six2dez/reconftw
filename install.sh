@@ -97,6 +97,7 @@ eval git clone https://github.com/nsonaniya2010/SubDomainizer $dir/SubDomainizer
 eval git clone https://github.com/codingo/Interlace $dir/Interlace $DEBUG_STD
 eval git clone https://github.com/m4ll0k/SecretFinder $dir/SecretFinder $DEBUG_STD
 eval git clone https://github.com/gwen001/github-search $dir/github-search $DEBUG_STD
+eval git clone https://github.com/six2dez/degoogle_hunter $dir/degoogle_hunter $DEBUG_STD
 printf "${bgreen} 70%% done${reset}\n\n"
 eval git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh $DEBUG_STD
 eval pip3 install dnsgen $DEBUG_STD

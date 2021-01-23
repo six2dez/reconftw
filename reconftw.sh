@@ -87,6 +87,7 @@ function tools_installed(){
 	[ -f $tools/OneListForAll/onelistforallmicro.txt ] || { printf "${bred} [*] OneListForAll	[NO]\n"; allinstalled=false;}
 	[ -f $tools/LinkFinder/linkfinder.py ] || { printf "${bred} [*] LinkFinder	        [NO]\n"; allinstalled=false;}
 	[ -f $tools/github-endpoints.py ] || { printf "${bred} [*] github-endpoints   [NO]\n"; allinstalled=false;}
+	[ -f $tools/degoogle_hunter/degoogle_hunter.sh ] || { printf "${bred} [*] degoogle_hunter   [NO]\n"; allinstalled=false;}
 	[ -f $tools/github-search/github-endpoints.py ] || { printf "${bred} [*] github-search	[NO]\n"; allinstalled=false;}
 	[ -f $tools/getjswords.py ] || { printf "${bred} [*] getjswords   	[NO]\n"; allinstalled=false;}
 	[ -f $tools/subdomains.txt ] || { printf "${bred} [*] subdomains   	[NO]\n"; allinstalled=false;}
@@ -151,6 +152,7 @@ function tools_full(){
 	[ -f $tools/OneListForAll/onelistforallmicro.txt ] && printf "${bgreen}[*] OneListForAll	[YES]\n" || printf "${bred} [*] OneListForAll	[NO]\n"
 	[ -f $tools/LinkFinder/linkfinder.py ] && printf "${bgreen}[*] LinkFinder	        [YES]\n" || printf "${bred} [*] LinkFinder	        [NO]\n"
 	[ -f $tools/github-endpoints.py ] && printf "${bgreen}[*] github-endpoints.py	[YES]\n" || printf "${bred} [*] github-endpoints.py	[NO]\n"
+	[ -f $tools/degoogle_hunter/degoogle_hunter.sh ] && printf "${bgreen}[*] degoogle_hunter	[YES]\n" || printf "${bred} [*] degoogle_hunter	[NO]\n"
 	[ -f $tools/github-search/github-endpoints.py ] && printf "${bgreen}[*] github-search	[YES]\n" || printf "${bred} [*] github-search	[NO]\n"
 	[ -f $tools/getjswords.py ] && printf "${bgreen}[*] getjswords.py	[YES]\n" || printf "${bred} [*] getjswords.py	[NO]\n"
 	[ -f $tools/subdomains.txt ] && printf "${bgreen}[*] subdomains.txt	[YES]\n" || printf "${bred} [*] subdomains.txt	[NO]\n"
@@ -193,39 +195,8 @@ dorks(){
 	printf "${bgreen}#######################################################################\n"
 	printf "${bblue} Performing Google Dorks ${reset}\n\n"
 
-	hostname=$domain
-	target=${hostname%%.*}
+	$tools/degoogle_hunter/degoogle_hunter.sh $domain | tee ${domain}_dorks.txt
 
-	declare -A dorks
-
-	dorks["# Other 3rd parties sites (https://www.google.com/search?q=site%3Agitter.im%20%7C%20site%3Apapaly.com%20%7C%20site%3Aproductforums.google.com%20%7C%20site%3Acoggle.it%20%7C%20site%3Areplt.it%20%7C%20site%3Aycombinator.com%20%7C%20site%3Alibraries.io%20%7C%20site%3Anpm.runkit.com%20%7C%20site%3Anpmjs.com%20%7C%20site%3Ascribd.com%20%22$target%22)"]="site:gitter.im | site:papaly.com | site:productforums.google.com | site:coggle.it | site:replt.it | site:ycombinator.com | site:libraries.io | site:npm.runkit.com | site:npmjs.com | site:scribd.com \"$target\""
-	dorks["# Code share sites (https://www.google.com/search?q=site%3Asharecode.io%20%7C%20site%3Acontrolc.com%20%7C%20site%3Acodepad.co%20%7Csite%3Aideone.com%20%7C%20site%3Acodebeautify.org%20%7C%20site%3Ajsdelivr.com%20%7C%20site%3Acodeshare.io%20%7C%20site%3Acodepen.io%20%7C%20site%3Arepl.it%20%7C%20site%3Ajsfiddle.net%20%22$target%22)"]="site:sharecode.io | site:controlc.com | site:codepad.co |site:ideone.com | site:codebeautify.org | site:jsdelivr.com | site:codeshare.io | site:codepen.io | site:repl.it | site:jsfiddle.net \"$target\""
-	dorks["# GitLab/GitHub/Bitbucket (https://www.google.com/search?q=site%3Agithub.com%20%7C%20site%3Agitlab.com%20%7C%20site%3Abitbucket.org%20%22$target%22)"]="site:github.com | site:gitlab.com | site:bitbucket.org \"$target\""
-	dorks["# Stackoverflow (https://www.google.com/search?q=site%3Astackoverflow.com%20%22$domain%22)"]="site:stackoverflow.com \"$domain\""
-	dorks["# Project management sites (https://www.google.com/search?q=site%3Atrello.com%20%7C%20site%3A*.atlassian.net%20%22$target%22)"]="site:trello.com | site:*.atlassian.net \"$target\""
-	dorks["# Pastebin-like sites (https://www.google.com/search?q=site%3Ajustpaste.it%20%7C%20site%3Aheypasteit.com%20%7C%20site%3Apastebin.com%20%22$target%22)"]="site:justpaste.it | site:heypasteit.com | site:pastebin.com \"$target\""
-	dorks["# Config files (https://www.google.com/search?q=site%3A$domain%20ext%3Axml%20%7C%20ext%3Aconf%20%7C%20ext%3Acnf%20%7C%20ext%3Areg%20%7C%20ext%3Ainf%20%7C%20ext%3Ardp%20%7C%20ext%3Acfg%20%7C%20ext%3Atxt%20%7C%20ext%3Aora%20%7C%20ext%3Aenv%20%7C%20ext%3Aini)"]="site:$domain ext:xml | ext:conf | ext:cnf | ext:reg | ext:inf | ext:rdp | ext:cfg | ext:txt | ext:ora | ext:env | ext:ini"
-	dorks["# Database files (https://www.google.com/search?q=site%3A$domain%20ext%3Asql%20%7C%20ext%3Adbf%20%7C%20ext%3Amdb)"]="site:$domain ext:sql | ext:dbf | ext:mdb"
-	dorks["# Backup files (https://www.google.com/search?q=site%3A$domain%20ext%3Abkf%20%7C%20ext%3Abkp%20%7C%20ext%3Abak%20%7C%20ext%3Aold%20%7C%20ext%3Abackup)"]="site:$domain ext:bkf | ext:bkp | ext:bak | ext:old | ext:backup"
-	dorks["# .git folder (https://www.google.com/search?q=inurl%3A%5C%22%2F.git%5C%22%20$domain%20-github)"]="inurl:\"/.git\" $domain -github"
-	dorks["# Exposed documents (https://www.google.com/search?q=site%3A$domain%20ext%3Adoc%20%7C%20ext%3Adocx%20%7C%20ext%3Aodt%20%7C%20ext%3Apdf%20%7C%20ext%3Artf%20%7C%20ext%3Asxw%20%7C%20ext%3Apsw%20%7C%20ext%3Appt%20%7C%20ext%3Apptx%20%7C%20ext%3Apps%20%7C%20ext%3Acsv)"]="site:$domain ext:doc | ext:docx | ext:odt | ext:pdf | ext:rtf | ext:sxw | ext:psw | ext:ppt | ext:pptx | ext:pps | ext:csv"
-	dorks["# Other files (https://www.google.com/search?q=site%3A$domain%20intitle%3Aindex.of%20%7C%20ext%3Alog%20%7C%20ext%3Aphp%20intitle%3Aphpinfo%20%5C%22published%20by%20the%20PHP%20Group%5C%22%20%7C%20inurl%3Ashell%20%7C%20inurl%3Abackdoor%20%7C%20inurl%3Awso%20%7C%20inurl%3Acmd%20%7C%20shadow%20%7C%20passwd%20%7C%20boot.ini%20%7C%20inurl%3Abackdoor%20%7C%20inurl%3Areadme%20%7C%20inurl%3Alicense%20%7C%20inurl%3Ainstall%20%7C%20inurl%3Asetup%20%7C%20inurl%3Aconfig%20%7C%20inurl%3A%5C%22%2Fphpinfo.php%5C%22%20%7C%20inurl%3A%5C%22.htaccess%5C%22%20%7C%20ext%3Aswf)"]="site:$domain intitle:index.of | ext:log | ext:php intitle:phpinfo \"published by the PHP Group\" | inurl:shell | inurl:backdoor | inurl:wso | inurl:cmd | shadow | passwd | boot.ini | inurl:backdoor | inurl:readme | inurl:license | inurl:install | inurl:setup | inurl:config | inurl:\"/phpinfo.php\" | inurl:\".htaccess\" | ext:swf"
-	dorks["# SQL errors (https://www.google.com/search?q=site%3A$domain%20intext%3A%5C%22sql%20syntax%20near%5C%22%20%7C%20intext%3A%5C%22syntax%20error%20has%20occurred%5C%22%20%7C%20intext%3A%5C%22incorrect%20syntax%20near%5C%22%20%7C%20intext%3A%5C%22unexpected%20end%20of%20SQL%20command%5C%22%20%7C%20intext%3A%5C%22Warning%3A%20mysql_connect()%5C%22%20%7C%20intext%3A%5C%22Warning%3A%20mysql_query()%5C%22%20%7C%20intext%3A%5C%22Warning%3A%20pg_connect()%5C%22)"]="site:$domain intext:\"sql syntax near\" | intext:\"syntax error has occurred\" | intext:\"incorrect syntax near\" | intext:\"unexpected end of SQL command\" | intext:\"Warning: mysql_connect()\" | intext:\"Warning: mysql_query()\" | intext:\"Warning: pg_connect()\""
-	dorks["# PHP errors (https://www.google.com/search?q=site%3A$domain%20%5C%22PHP%20Parse%20error%5C%22%20%7C%20%5C%22PHP%20Warning%5C%22%20%7C%20%5C%22PHP%20Error%5C%22)"]="site:$domain \"PHP Parse error\" | \"PHP Warning\" | \"PHP Error\""
-	dorks["# Login pages (https://www.google.com/search?q=site%3A$domain%20inurl%3Asignup%20%7C%20inurl%3Aregister%20%7C%20intitle%3ASignup)"]="site:$domain inurl:signup | inurl:register | intitle:Signup"
-	dorks["# Open redirects (https://www.google.com/search?q=site%3A$domain%20inurl%3Aredir%20%7C%20inurl%3Aurl%20%7C%20inurl%3Aredirect%20%7C%20inurl%3Areturn%20%7C%20inurl%3Asrc%3Dhttp%20%7C%20inurl%3Ar%3Dhttp)"]="site:$domain inurl:redir | inurl:url | inurl:redirect | inurl:return | inurl:src=http | inurl:r=http"
-	dorks["# Apache Struts RCE (https://www.google.com/search?q=site%3A$domain%20ext%3Aaction%20%7C%20ext%3Astruts%20%7C%20ext%3Ado)"]="site:$domain ext:action | ext:struts | ext:do"
-	dorks["# Linkedin employees (https://www.google.com/search?q=site%3Alinkedin.com%20employees%20$domain)"]="site:linkedin.com employees $domain"
-	dorks["# Wordpress files (https://www.google.com/search?q=site%3A$domain%20inurl%3Awp-content%20%7C%20inurl%3Awp-includes)"]="site:$domain inurl:wp-content | inurl:wp-includes"
-	dorks["# Subdomains (https://www.google.com/search?q=site%3A*.$domain)"]="site:*.$domain"
-	dorks["# Sub-subdomains (https://www.google.com/search?q=site%3A*.*.$domain)"]="site:*.*.$domain"
-	dorks["# Cloud buckets S3/GCP (https://www.google.com/search?q=site%3A.s3.amazonaws.com%20%7C%20site%3Astorage.googleapis.com%20%7C%20site%3Aamazonaws.com%20%22$target%22)"]="site:.s3.amazonaws.com | site:storage.googleapis.com | site:amazonaws.com \"$target\""
-	dorks["# Traefik (https://www.google.com/search?q=intitle%3Atraefik%20inurl%3A8080%2Fdashboard%20%22$target%22)"]="intitle:traefik inurl:8080/dashboard \"$target\""
-	dorks["# Jenkins (https://www.google.com/search?q=intitle%3A%5C%22Dashboard%20%5BJenkins%5D%5C%22%20%22$target%22)"]="intitle:\"Dashboard [Jenkins]\" \"$target\""
-
-	for c in "${!dorks[@]}"; do
-		printf "\n\e[32m"%s"\e[0m\n" "$c" && python3 $tools/degoogle_hunter/degoogle.py -j "${dorks[$c]}"
-	done
 	printf "${bblue} Finished : ${bblue} Happy hunting! ${reset}\n"
 	printf "${bgreen}#######################################################################\n"
 }
