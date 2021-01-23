@@ -57,8 +57,6 @@ if [[ $(type go | grep -o 'go is') == "go is" ]]
             $SUDO tar -C /usr/local -xzf go$LATEST_GO.linux-amd64.tar.gz
             $SUDO cp /usr/local/go/bin/go /usr/bin
         fi
-        echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.profile
-        source ~/.profile
         rm -rf go$LATEST_GO*
 fi
 
