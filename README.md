@@ -105,24 +105,8 @@ This is a simple script intended to perform a full recon on an objective with mu
 
 ## Improvement plan:
 
-Anyone can take one of these features and start working on it, just ping me to keep in mind and avoid duplicate efforts:
+These are the last features that we have implemented, take a look at our pending [features](https://github.com/six2dez/reconftw/labels/feature) or suggest a new feature in the issues section:
 
-(yeah, this has become my backlog)
-
-- [ ] Notification support for Slack, Discord and Telegram (slackcat? notify.sh?)
-- [ ] CMS tools (wpscan, drupwn/droopescan, joomscan)
-- [ ] Add menu option for every feature
-- [ ] CRLF checks, manual or [this scanner](https://github.com/MichaelStott/CRLF-Injection-Scanner)
-- [ ] Fast mode (Like -a but only passive cheks, maxtime, etc)
-- [ ] Docker image
-- [ ] Diff support
-- [ ] Performance options to avoid net overload (soft, default, hard)
-- [ ] Nice and easily readable final html report
-- [ ] Add [autosubtakeover](https://github.com/JordyZomer/autoSubTakeover) before subjack
-- [ ] Public S3 Checker, [this](https://gist.githubusercontent.com/random-robbie/b0c8603e55e22b21c49fd80072392873/raw/bucket_list.sh) or [this](https://gist.githubusercontent.com/jhaddix/4769f5e3e4dbcaaf9032fbb741ef6f83/raw/fdfc8ded52a6746d8ecb0fc522cf492e42ba0dec/bucket-disclose.sh)
-- [ ] Check git-hound replacements (GitGraber or truffleHog or other)
-- [ ] Metadata Checks (pymeta)
-- [ ] Check xsstrike instead dalfox
 - [X] Open Redirect with Openredirex
 - [X] SSRF Checks
 - [X] More error checks
