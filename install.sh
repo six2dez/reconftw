@@ -34,7 +34,26 @@ install_pacman(){
     eval sudo pacman -Sy install python python-pip ruby git libpcap nmap chromium wget -y $DEBUG_STD
 }
 
-type go >/dev/null 2>&1 || { printf "${bred} Golang no detected, install and configure it before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
+#installing latest Golang version
+if [[ $(type go | grep -o 'go is') == "go is" ]]
+    then
+        printf "${bgreen} Golang is already installed ${reset}\n"
+    else
+        printf "${bgreen} Installing Golang ${reset}\n"
+        if [ "True" = "$IS_ARM" ]; then
+            LATEST_GO=$(wget -qO- https://golang.org/dl/ | grep -oP 'go([0-9\.]+)\.linux-armv6l\.tar\.gz' | head -n 1 | grep -oP 'go[0-9\.]+' | grep -oP '[0-9\.]+' | head -c -2)
+            wget https://dl.google.com/go/go$LATEST_GO.linux-armv6l.tar.gz
+            sudo tar -C /usr/local -xzf go$LATEST_GO.linux-armv6l.tar.gz
+        else
+            LATEST_GO=$(wget -qO- https://golang.org/dl/ | grep -oP 'go([0-9\.]+)\.linux-amd64\.tar\.gz' | head -n 1 | grep -oP 'go[0-9\.]+' | grep -oP '[0-9\.]+' | head -c -2)
+            wget https://dl.google.com/go/go$LATEST_GO.linux-amd64.tar.gz
+            sudo tar -C /usr/local -xzf go$LATEST_GO.linux-amd64.tar.gz
+        fi
+        echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.profile
+        source ~/.profile
+        rm -rf go$LATEST_GO*
+fi
+
 [ -n "$GOPATH" ] || { printf "${bred} GOPATH env var no detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
 [ -n "$GOROOT" ] || { printf "${bred} GOROOT env var no detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
 
@@ -97,7 +116,6 @@ eval git clone https://github.com/nsonaniya2010/SubDomainizer $dir/SubDomainizer
 eval git clone https://github.com/codingo/Interlace $dir/Interlace $DEBUG_STD
 eval git clone https://github.com/m4ll0k/SecretFinder $dir/SecretFinder $DEBUG_STD
 eval git clone https://github.com/gwen001/github-search $dir/github-search $DEBUG_STD
-eval git clone https://github.com/six2dez/degoogle_hunter $dir/degoogle_hunter $DEBUG_STD
 printf "${bgreen} 70%% done${reset}\n\n"
 eval git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh $DEBUG_STD
 eval pip3 install dnsgen $DEBUG_STD
