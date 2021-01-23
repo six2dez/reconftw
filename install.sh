@@ -59,11 +59,20 @@ if [[ $(type go | grep -o 'go is') == "go is" ]]
         if [ "True" = "$IS_ARM" ]; then
             LATEST_GO=$(wget -qO- https://golang.org/dl/ | grep -oP 'go([0-9\.]+)\.linux-armv6l\.tar\.gz' | head -n 1 | grep -oP 'go[0-9\.]+' | grep -oP '[0-9\.]+' | head -c -2)
             wget https://dl.google.com/go/go$LATEST_GO.linux-armv6l.tar.gz
-            sudo tar -C /usr/local -xzf go$LATEST_GO.linux-armv6l.tar.gz
+            if ! test `which sudo`; then
+                tar -C /usr/local -xzf go$LATEST_GO.linux-armv6l.tar.gz
+            else
+                sudo tar -C /usr/local -xzf go$LATEST_GO.linux-armv6l.tar.gz
+            fi
+            
         else
             LATEST_GO=$(wget -qO- https://golang.org/dl/ | grep -oP 'go([0-9\.]+)\.linux-amd64\.tar\.gz' | head -n 1 | grep -oP 'go[0-9\.]+' | grep -oP '[0-9\.]+' | head -c -2)
             wget https://dl.google.com/go/go$LATEST_GO.linux-amd64.tar.gz
-            sudo tar -C /usr/local -xzf go$LATEST_GO.linux-amd64.tar.gz
+            if ! test `which sudo`; then
+                tar -C /usr/local -xzf go$LATEST_GO.linux-amd64.tar.gz
+            else
+                sudo tar -C /usr/local -xzf go$LATEST_GO.linux-amd64.tar.gz
+            fi
         fi
         echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.profile
         source ~/.profile
