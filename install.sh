@@ -79,7 +79,7 @@ eval git clone https://github.com/devanshbatham/ParamSpider $dir/ParamSpider $DE
 eval git clone https://github.com/six2dez/OneListForAll $dir/OneListForAll $DEBUG_STD
 eval git clone https://github.com/dark-warlord14/LinkFinder $dir/LinkFinder $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/projectdiscovery/shuffledns/cmd/shuffledns $DEBUG_STD
-go get -v github.com/hakluke/hakrawler
+eval go get -v github.com/hakluke/hakrawler $DEBUG_STD
 eval go get -v github.com/cgboal/sonarsearch/crobat $DEBUG_STD
 printf "${bgreen} 60%% done${reset}\n\n"
 eval git clone https://github.com/six2dez/degoogle_hunter $dir/degoogle_hunter $DEBUG_STD
