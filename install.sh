@@ -20,18 +20,34 @@ printf "\n\n${bgreen}###########################################################
 printf "${bgreen} reconftw installer script (apt/rpm/pacman compatible)${reset}\n\n"
 
 install_apt(){
-    eval sudo apt update -y $DEBUG_STD
-    eval sudo apt install python3 python3-pip ruby git libpcap-dev chromium-browser wget python-dev python3-dev build-essential libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap -y $DEBUG_STD
+    if ! test `which sudo`; then
+    	eval apt update -y $DEBUG_STD
+        eval apt install python3 python3-pip ruby git libpcap-dev chromium-browser wget python-dev python3-dev build-essential libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap -y $DEBUG_STD
+    else
+        eval sudo apt update -y $DEBUG_STD
+        eval sudo apt install python3 python3-pip ruby git libpcap-dev chromium-browser wget python-dev python3-dev build-essential libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap -y $DEBUG_STD
+    fi
 }
 
 install_yum(){
-    eval sudo yum update -y $DEBUG_STD
-    eval sudo yum install python3 python3-pip ruby git libpcap-devel chromium wget openssl-devel python3-devel libxslt-devel libffi-devel libxml2-devel nmap zlib-devel -y $DEBUG_STD
+    if ! test `which sudo`; then
+    	eval yum update -y $DEBUG_STD
+        eval yum install python3 python3-pip ruby git libpcap-devel chromium wget openssl-devel python3-devel libxslt-devel libffi-devel libxml2-devel nmap zlib-devel -y $DEBUG_STD
+    else
+        eval sudo yum update -y $DEBUG_STD
+        eval sudo yum install python3 python3-pip ruby git libpcap-devel chromium wget openssl-devel python3-devel libxslt-devel libffi-devel libxml2-devel nmap zlib-devel -y $DEBUG_STD
+    fi
+    
 }
 
 install_pacman(){
-    eval sudo pacman -Syu -y $DEBUG_STD
-    eval sudo pacman -Sy install python python-pip ruby git libpcap nmap chromium wget -y $DEBUG_STD
+    if ! test `which sudo`; then
+    	eval pacman -Syu -y $DEBUG_STD
+        eval pacman -Sy install python python-pip ruby git libpcap nmap chromium wget -y $DEBUG_STD
+    else
+        eval sudo pacman -Syu -y $DEBUG_STD
+        eval sudo pacman -Sy install python python-pip ruby git libpcap nmap chromium wget -y $DEBUG_STD
+    fi
 }
 
 #installing latest Golang version
@@ -116,6 +132,7 @@ eval git clone https://github.com/nsonaniya2010/SubDomainizer $dir/SubDomainizer
 eval git clone https://github.com/codingo/Interlace $dir/Interlace $DEBUG_STD
 eval git clone https://github.com/m4ll0k/SecretFinder $dir/SecretFinder $DEBUG_STD
 eval git clone https://github.com/gwen001/github-search $dir/github-search $DEBUG_STD
+eval git clone https://github.com/six2dez/degoogle_hunter $dir/degoogle_hunter $DEBUG_STD
 printf "${bgreen} 70%% done${reset}\n\n"
 eval git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh $DEBUG_STD
 eval pip3 install dnsgen $DEBUG_STD
@@ -128,26 +145,54 @@ if [ "True" = "$IS_ARM" ]
         eval wget https://github.com/tillson/git-hound/releases/download/v1.3/git-hound_1.3_Linux_x86_64.tar.gz $DEBUG_STD
         tar -xf git-hound_1.3_Linux_x86_64.tar.gz git-hound
         rm -f git-hound_1.3_Linux_x86_64.tar.gz
-        sudo mv git-hound /usr/local/bin/git-hound
-        sudo chmod 755 /usr/local/bin/git-hound
+        if ! test `which sudo`; then
+    	    mv git-hound /usr/local/bin/git-hound
+            chmod 755 /usr/local/bin/git-hound
+        else
+            sudo mv git-hound /usr/local/bin/git-hound
+            sudo chmod 755 /usr/local/bin/git-hound
+        fi
 fi
 printf "${bgreen} 80%% done${reset}\n\n"
 eval git clone https://github.com/m8r0wn/pymeta $dir/pymeta $DEBUG_STD
 if [ "True" = "$IS_ARM" ]
     then
         eval wget https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-rpi $DEBUG_STD
-        sudo mv findomain-rpi /usr/local/bin/findomain
+        if ! test `which sudo`; then
+            mv findomain-rpi /usr/local/bin/findomain
+        else
+            sudo mv findomain-rpi /usr/local/bin/findomain
+        fi
     else
         eval wget https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-linux $DEBUG_STD
-        sudo mv findomain-linux /usr/local/bin/findomain
+        if ! test `which sudo`; then
+            mv findomain-linux /usr/local/bin/findomain
+        else
+            sudo mv findomain-linux /usr/local/bin/findomain
+        fi
 fi
 
-sudo chmod 755 /usr/local/bin/findomain
+if ! test `which sudo`; then
+    chmod 755 /usr/local/bin/findomain
+else
+    sudo chmod 755 /usr/local/bin/findomain
+fi
+
 cd $dir/massdns; eval make $DEBUG_STD
-sudo cp $dir/massdns/bin/massdns /usr/bin/
+
+if ! test `which sudo`; then
+    cp $dir/massdns/bin/massdns /usr/bin/
+else
+    sudo cp $dir/massdns/bin/massdns /usr/bin/
+fi
 
 eval find $dir -name 'requirements.txt' -exec pip3 install --user -r {} \; $DEBUG_STD
-cd $dir/Interlace && sudo python3 setup.py install
+if ! test `which sudo`; then
+    cd $dir/Interlace && python3 setup.py install
+else
+    cd $dir/Interlace && sudo python3 setup.py install
+fi
+
 cd $dir/LinkFinder && python3 setup.py install
 cd $dir
 python3 $dir/pymeta/setup.py install
