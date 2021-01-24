@@ -16,7 +16,7 @@ else
    IS_ARM="False";
 fi
 
-if ! test `which sudo`; then
+if [[ $(id -u | grep -o '^0$') == "0" ]]; then
     SUDO=" "
 else
     SUDO="sudo"
