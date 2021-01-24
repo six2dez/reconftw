@@ -60,7 +60,7 @@ start(){
 	then
 		cp $list $dir/${domain}_probed.txt
 	fi
-	fuzz_wordlist=$tools/OneListForAll/onelistforallmicro.txt
+	fuzz_wordlist=$tools/fuzz_wordlist.txt
 	cd $dir
 	printf "\n"
 	printf "${bred} Target: ${domain}\n\n"
@@ -84,7 +84,7 @@ function tools_installed(){
 	[ -f $tools/testssl.sh/testssl.sh ] || { printf "${bred} [*] testssl		[NO]\n"; allinstalled=false;}
 	[ -f $tools/SubDomainizer/SubDomainizer.py ] || { printf "${bred} [*] SubDomainizer	[NO]\n"; allinstalled=false;}
 	[ -f $tools/SecretFinder/SecretFinder.py ] || { printf "${bred} [*] SecretFinder	[NO]\n"; allinstalled=false;}
-	[ -f $tools/OneListForAll/onelistforallmicro.txt ] || { printf "${bred} [*] OneListForAll	[NO]\n"; allinstalled=false;}
+	[ -f $tools/fuzz_wordlist.txt ] || { printf "${bred} [*] OneListForAll	[NO]\n"; allinstalled=false;}
 	[ -f $tools/LinkFinder/linkfinder.py ] || { printf "${bred} [*] LinkFinder	        [NO]\n"; allinstalled=false;}
 	[ -f $tools/github-endpoints.py ] || { printf "${bred} [*] github-endpoints   [NO]\n"; allinstalled=false;}
 	[ -f $tools/degoogle_hunter/degoogle_hunter.sh ] || { printf "${bred} [*] degoogle_hunter   [NO]\n"; allinstalled=false;}
@@ -143,16 +143,16 @@ function tools_full(){
 	[ -n "$GOROOT" ] && printf "${bgreen}[*] GOROOT var		[YES]\n" || { printf "${bred} [*] GOROOT var		[NO]\n"; }
 	[ -n "$PATH" ] && printf "${bgreen}[*] PATH var		[YES]\n" || { printf "${bred} [*] PATH var		[NO]\n"; }
 	[ -f $tools/degoogle_hunter/degoogle.py ] && printf "${bgreen}[*] degoogle		[YES]\n" || printf "${bred} [*] degoogle		[NO]\n"
-	[ -f $tools/ParamSpider/paramspider.py ] && printf "${bgreen}[*] Paramspider		[YES]\n" || printf "${bred} [*] Paramspider		[NO]\n"
+	[ -f $tools/ParamSpider/paramspider.py ] && printf "${bgreen}[*] Paramspider		[YES]\n" || printf "${bred} [*] Paramspider	[NO]\n"
 	[ -f $tools/Arjun/arjun.py ] && printf "${bgreen}[*] Arjun		[YES]\n" || printf "${bred} [*] Arjun		[NO]\n"
 	[ -f $tools/fav-up/favUp.py ] && printf "${bgreen}[*] fav-up		[YES]\n" || printf "${bred} [*] fav-up		[NO]\n"
 	[ -f $tools/Corsy/corsy.py ] && printf "${bgreen}[*] Corsy		[YES]\n" || printf "${bred} [*] Corsy		[NO]\n"
 	[ -f $tools/testssl.sh/testssl.sh ] && printf "${bgreen}[*] testssl		[YES]\n" || printf "${bred} [*] testssl		[NO]\n"
 	[ -f $tools/SubDomainizer/SubDomainizer.py ] && printf "${bgreen}[*] SubDomainizer	[YES]\n" || printf "${bred} [*] SubDomainizer	[NO]\n"
 	[ -f $tools/SecretFinder/SecretFinder.py ] && printf "${bgreen}[*] SecretFinder	[YES]\n" || printf "${bred} [*] SecretFinder	[NO]\n"
-	[ -f $tools/OneListForAll/onelistforallmicro.txt ] && printf "${bgreen}[*] OneListForAll	[YES]\n" || printf "${bred} [*] OneListForAll	[NO]\n"
+	[ -f $tools/fuzz_wordlist.txt ] && printf "${bgreen}[*] OneListForAll	[YES]\n" || printf "${bred} [*] OneListForAll	[NO]\n"
 	[ -f $tools/LinkFinder/linkfinder.py ] && printf "${bgreen}[*] LinkFinder	        [YES]\n" || printf "${bred} [*] LinkFinder	        [NO]\n"
-	[ -f $tools/github-endpoints.py ] && printf "${bgreen}[*] github-endpoints.py	[YES]\n" || printf "${bred} [*] github-endpoints.py	[NO]\n"
+	[ -f $tools/github-endpoints.py ] && printf "${bgreen}[*] github-endpoints	[YES]\n" || printf "${bred} [*] github-endpoints[NO]\n"
 	[ -f $tools/degoogle_hunter/degoogle_hunter.sh ] && printf "${bgreen}[*] degoogle_hunter	[YES]\n" || printf "${bred} [*] degoogle_hunter	[NO]\n"
 	[ -f $tools/github-search/github-endpoints.py ] && printf "${bgreen}[*] github-search	[YES]\n" || printf "${bred} [*] github-search	[NO]\n"
 	[ -f $tools/getjswords.py ] && printf "${bgreen}[*] getjswords.py	[YES]\n" || printf "${bred} [*] getjswords.py	[NO]\n"
@@ -160,20 +160,20 @@ function tools_full(){
 	[ -f $tools/resolvers.txt ] && printf "${bgreen}[*] resolvers.txt	[YES]\n" || printf "${bred} [*] resolvers.txt	[NO]\n"
 	eval type -P hakrawler $DEBUG_STD && printf "${bgreen}[*] hakrawler		[YES]\n" || { printf "${bred} [*] hakrawler		[NO]\n"; }
 	eval type -P subfinder $DEBUG_STD && printf "${bgreen}[*] Subfinder		[YES]\n" || { printf "${bred} [*] Subfinder		[NO]\n"; }
-	eval type -P assetfinder $DEBUG_STD && printf "${bgreen}[*] Assetfinder		[YES]\n" || { printf "${bred} [*] Assetfinder		[NO]\n"; }
+	eval type -P assetfinder $DEBUG_STD && printf "${bgreen}[*] Assetfinder		[YES]\n" || { printf "${bred} [*] Assetfinder	[NO]\n"; }
 	eval type -P findomain $DEBUG_STD && printf "${bgreen}[*] Findomain		[YES]\n" || { printf "${bred} [*] Findomain		[NO]\n"; }
 	eval type -P amass $DEBUG_STD && printf "${bgreen}[*] Amass		[YES]\n" || { printf "${bred} [*] Amass		[NO]\n"; }
 	eval type -P crobat $DEBUG_STD && printf "${bgreen}[*] Crobat		[YES]\n" || { printf "${bred} [*] Crobat		[NO]\n"; }
-	eval type -P waybackurls $DEBUG_STD && printf "${bgreen}[*] Waybackurls		[YES]\n" || { printf "${bred} [*] Waybackurls		[NO]\n"; }
+	eval type -P waybackurls $DEBUG_STD && printf "${bgreen}[*] Waybackurls		[YES]\n" || { printf "${bred} [*] Waybackurls	[NO]\n"; }
 	eval type -P gau $DEBUG_STD && printf "${bgreen}[*] Gau		        [YES]\n" || { printf "${bred} [*] Gau		[NO]\n"; }
 	eval type -P shuffledns $DEBUG_STD && printf "${bgreen}[*] ShuffleDns		[YES]\n" || { printf "${bred} [*] ShuffleDns		[NO]\n"; }
 	eval type -P subjack $DEBUG_STD && printf "${bgreen}[*] Subjack		[YES]\n" || { printf "${bred} [*] Subjack		[NO]\n"; }
-	[ -f $tools/subjack/fingerprints.json ] && printf "${bgreen}[*] Subjack fingerprints[YES]\n" || printf "${bred} [*] Subjack fingerprints[NO]\n"
+	[ -f $tools/subjack/fingerprints.json ] && printf "${bgreen}[*] Subjack fings	[YES]\n" || printf "${bred} [*] Subjack fings	[NO]\n"
 	eval type -P nuclei $DEBUG_STD && printf "${bgreen}[*] Nuclei		[YES]\n" || { printf "${bred} [*] Nuclei		[NO]\n"; }
-	[ -d ~/nuclei-templates ] && printf "${bgreen}[*] Nuclei templates    [YES]\n" || printf "${bred} [*] Nuclei templates    [NO]\n"
+	[ -d ~/nuclei-templates ] && printf "${bgreen}[*] Nuclei templates   [YES]\n" || printf "${bred} [*] Nuclei templates   [NO]\n"
 	eval type -P aquatone $DEBUG_STD && printf "${bgreen}[*] Aquatone		[YES]\n" || { printf "${bred} [*] Aquatone		[NO]\n"; }
 	eval type -P naabu $DEBUG_STD && printf "${bgreen}[*] Naabu		[YES]\n" || { printf "${bred} [*] Naabu		[NO]\n"; }
-	eval type -P gf $DEBUG_STD && printf "${bgreen}[*] Gf		        [YES]\n" || { printf "${bred} [*] Gf		[NO]\n"; }
+	eval type -P gf $DEBUG_STD && printf "${bgreen}[*] Gf		        [YES]\n" || { printf "${bred} [*] Gf			[NO]\n"; }
 	eval type -P Gxss $DEBUG_STD && printf "${bgreen}[*] Gxss		[YES]\n" || { printf "${bred} [*] Gxss		[NO]\n"; }
 	eval type -P subjs $DEBUG_STD && printf "${bgreen}[*] subjs		[YES]\n" || { printf "${bred} [*] subjs		[NO]\n"; }
 	eval type -P dalfox $DEBUG_STD && printf "${bgreen}[*] dalfox		[YES]\n" || { printf "${bred} [*] dalfox		[NO]\n"; }

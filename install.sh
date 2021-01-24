@@ -108,7 +108,6 @@ eval go get -v github.com/KathanP19/Gxss $DEBUG_STD
 eval git clone https://github.com/blechschmidt/massdns $dir/massdns $DEBUG_STD
 printf "${bgreen} 50%% done${reset}\n\n"
 eval git clone https://github.com/devanshbatham/ParamSpider $dir/ParamSpider $DEBUG_STD
-eval git clone https://github.com/six2dez/OneListForAll $dir/OneListForAll $DEBUG_STD
 eval git clone https://github.com/dark-warlord14/LinkFinder $dir/LinkFinder $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/projectdiscovery/shuffledns/cmd/shuffledns $DEBUG_STD
 eval go get -v github.com/hakluke/hakrawler $DEBUG_STD
@@ -123,7 +122,6 @@ eval git clone https://github.com/nsonaniya2010/SubDomainizer $dir/SubDomainizer
 eval git clone https://github.com/codingo/Interlace $dir/Interlace $DEBUG_STD
 eval git clone https://github.com/m4ll0k/SecretFinder $dir/SecretFinder $DEBUG_STD
 eval git clone https://github.com/gwen001/github-search $dir/github-search $DEBUG_STD
-eval git clone https://github.com/six2dez/degoogle_hunter $dir/degoogle_hunter $DEBUG_STD
 printf "${bgreen} 70%% done${reset}\n\n"
 eval git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh $DEBUG_STD
 eval pip3 install dnsgen $DEBUG_STD
@@ -170,6 +168,7 @@ eval wget -O subdomains.txt https://gist.githubusercontent.com/jhaddix/86a06c5dc
 eval wget -O resolvers.txt https://raw.githubusercontent.com/janmasarik/resolvers/master/resolvers.txt $DEBUG_STD
 eval wget -O permutations_list.txt https://gist.githubusercontent.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw/137bb6b60c616552c705e93a345c06cec3a2cb1f/permutations_list.txt $DEBUG_STD
 eval wget -O ssrf.py https://gist.githubusercontent.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw/ea0774de5e27f9bc855207b175249edae2e9ccef/asyncio_ssrf.py $DEBUG_STD
+eval wget -O fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt
 eval wget -O all_requirements.txt https://gist.githubusercontent.com/detonxx/92118db85d97f6edb54a0a427ae96a2e/raw/95c0517bdcd1467e9a82992097b7c3e66afccfab/all_requirements.txt $DEBUG_STD
 eval pip3 install -r $dir/all_requirements.txt $DEBUG_STD
 
