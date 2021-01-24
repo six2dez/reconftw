@@ -119,6 +119,7 @@ function tools_installed(){
 	eval type -P dnsgen $DEBUG_STD || { printf "${bred} [*] DnsGen		[NO]\n"; allinstalled=false;}
 	eval type -P anew $DEBUG_STD || { printf "${bred} [*] Anew		[NO]\n"; allinstalled=false;}
 	eval type -P unfurl $DEBUG_STD || { printf "${bred} [*] unfurl		[NO]\n"; allinstalled=false;}
+	eval type -P crlfuzz $DEBUG_STD || { printf "${bred} [*] crlfuzz		[NO]\n"; allinstalled=false;}
 	eval type -P httpx $DEBUG_STD || { printf "${bred} [*] Httpx		[NO]\n${reset}"; allinstalled=false;}
 
 	if [ "${allinstalled}" = true ] ; then
@@ -184,6 +185,7 @@ function tools_full(){
 	eval type -P dnsgen $DEBUG_STD && printf "${bgreen}[*] DnsGen		[YES]\n" || { printf "${bred} [*] DnsGen		[NO]\n"; }
 	eval type -P anew $DEBUG_STD && printf "${bgreen}[*] Anew		[YES]\n" || { printf "${bred} [*] Anew		[NO]\n"; }
 	eval type -P unfurl $DEBUG_STD && printf "${bgreen}[*] unfurl		[YES]\n" || { printf "${bred} [*] unfurl		[NO]\n"; }
+	eval type -P crlfuzz $DEBUG_STD && printf "${bgreen}[*] crlfuzz		[YES]\n" || { printf "${bred} [*] crlfuzz		[NO]\n"; }
 	eval type -P httpx $DEBUG_STD && printf "${bgreen}[*] Httpx		[YES]\n${reset}" || { printf "${bred} [*] Httpx		[NO]\n${reset}"; }
 
 	printf "\n${yellow} If any tool is not installed under $tools, I trust in your ability to install it :D\n Also remember to set the ${bred}\$tools${yellow} variable at the start of this script.\n If you have any problem you can always ping me ;) ${reset}\n\n"
@@ -768,6 +770,23 @@ ssrf_checks(){
 	fi
 }
 
+crlf_checks(){
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} CRLF checks ${reset}\n"
+			start=`date +%s`
+			eval crlfuzz -l ${domain}_probed.txt -o ${domain}_crlf.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+			end=`date +%s`
+			runtime=$((end-start))
+			printf "${bblue}\n CRLF Finished in ${runtime} secs\n"
+			printf "${bblue} Results are saved in ${domain}_crlf.txt ${reset}\n"
+			printf "${bgreen}#######################################################################\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
+}
+
 end(){
 	if [ -n "$dir_output" ]
 	then
@@ -801,6 +820,7 @@ all(){
 			url_gf
 			open_redirect
 			ssrf_checks
+			crlf_checks
 			jschecks
 			params
 			xss
@@ -825,6 +845,7 @@ all(){
 		url_gf
 		open_redirect
 		ssrf_checks
+		crlf_checks
 		jschecks
 		params
 		xss
@@ -929,6 +950,7 @@ while getopts ":hd:-:l:vaisxwgto:" opt; do
 			url_gf
 			open_redirect
 			ssrf_checks
+			crlf_checks
 			jschecks
 			params
 			xss
