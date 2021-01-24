@@ -1,5 +1,4 @@
 #!/bin/bash
-#GOROOT=$(which go)
 
 bgreen='\033[1;32m'
 yellow='\033[0;33m'
@@ -15,6 +14,95 @@ then
 else
    IS_ARM="False";
 fi
+
+# https://stackoverflow.com/questions/4023830/how-to-compare-two-strings-in-dot-separated-version-format-in-bash
+vercomp () {
+    if [[ $1 == $2 ]]
+    then
+        return 0
+    fi
+    local IFS=.
+    local i ver1=($1) ver2=($2)
+    # fill empty fields in ver1 with zeros
+    for ((i=${#ver1[@]}; i<${#ver2[@]}; i++))
+    do
+        ver1[i]=0
+    done
+    for ((i=0; i<${#ver1[@]}; i++))
+    do
+        if [[ -z ${ver2[i]} ]]
+        then
+            # fill empty fields in ver2 with zeros
+            ver2[i]=0
+        fi
+        if ((10#${ver1[i]} > 10#${ver2[i]}))
+        then
+            return 1
+        fi
+        if ((10#${ver1[i]} < 10#${ver2[i]}))
+        then
+            return 2
+        fi
+    done
+    return 0
+}
+
+testvercomp () {
+    vercomp $1 $2
+    case $? in
+        0) op='=';;
+        1) op='>';;
+        2) op='<';;
+    esac
+    if [ $op == '<' ]
+    then
+        echo 1
+    else
+        echo 0
+    fi
+}
+
+install_go () {
+  eval wget https://golang.org/dl/go1.15.7.linux-amd64.tar.gz $DEBUG_STD
+  sudo rm -rf /usr/local/go
+  sudo tar -C /usr/local -xzf go1.15.7.linux-amd64.tar.gz
+}
+
+check_go () {
+  goCheck=$(which go)
+  if [[ $goCheck = "" ]]; then
+    echo "Golang not Found, Installing"
+    install_go
+  else
+    ver=$(echo $(go version) | cut -d ' ' -f 3 | tail -c 7)
+    res=$(testvercomp "$ver" 1.15.0)
+    if [[ $res = "1" ]]; then
+      echo "Updating Go to Latest Version"
+      install_go
+    else
+      echo "Latest Go Version Found"
+    fi
+  fi
+  echo "Checking GOROOT,GOPATH Env Variables..."
+  if [[ -z $GOROOT ]]; then
+    if [[ -z $(which go) ]]; then
+      printf "export GOROOT=/usr/local/go/bin\n" >> ~/.bashrc
+      GOROOT='/usr/local/go/bin'
+     else
+      printf "export GOROOT=$(which go)\n" >> ~/.bashrc
+      GOROOT=$(which go)
+     fi
+  fi
+
+  if [[ -z $GOPATH ]]; then
+    printf "export GOROOT=$HOME/go\n" >> ~/.bashrc
+    GOPATH="$HOME/go"
+  fi
+
+  if [[ -z $(which go) ]]; then
+    printf "export PATH=$GOPATH/bin:$GOROOT:$PATH\n" >> ~/.bashrc && PATH="$GOPATH/bin:$GOROOT:$PATH"
+  fi
+}
 
 printf "\n\n${bgreen}#######################################################################\n"
 printf "${bgreen} reconftw installer script (apt/rpm/pacman compatible)${reset}\n\n"
@@ -34,15 +122,20 @@ install_pacman(){
     eval sudo pacman -Sy install python python-pip ruby git libpcap nmap chromium wget -y $DEBUG_STD
 }
 
-type go >/dev/null 2>&1 || { printf "${bred} Golang no detected, install and configure it before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
-[ -n "$GOPATH" ] || { printf "${bred} GOPATH env var no detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
-[ -n "$GOROOT" ] || { printf "${bred} GOROOT env var no detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
-
 if [ -f /etc/debian_version ]; then install_apt;
 elif [ -f /etc/redhat-release ]; then install_yum;
 elif [ -f /etc/arch-release ]; then install_pacman;
 elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for some RedHat and Amazon Linux instances
 fi
+
+#Check And Install or Update Golang
+check_go
+
+#Confirm Golang Is Installed Properly Or Not
+type go >/dev/null 2>&1 || { printf "${bred} Golang no detected, install and configure it before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
+[ -n "$GOPATH" ] || { printf "${bred} GOPATH env var no detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
+[ -n "$GOROOT" ] || { printf "${bred} GOROOT env var no detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
+echo "Golang Check Completed"
 
 #test -f /etc/gentoo-release && install_emerge
 #test -f /etc/SuSE-release && install_zypp
@@ -131,8 +224,8 @@ sudo cp $dir/massdns/bin/massdns /usr/bin/
 eval find $dir -name 'requirements.txt' -exec pip3 install --user -r {} \; $DEBUG_STD
 cd $dir/Interlace && sudo python3 setup.py install
 cd $dir/LinkFinder && python3 setup.py install
+cd $dir/pymeta && python3 setup.py install
 cd $dir
-python3 $dir/pymeta/setup.py install
 eval git clone https://github.com/devanshbatham/OpenRedireX $dir/OpenRedireX $DEBUG_STD
 printf "${bgreen} 90%% done${reset}\n\n"
 cd ~/.gf; eval wget -O potential.json https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json $DEBUG_STD; cd $dir
