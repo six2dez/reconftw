@@ -20,15 +20,21 @@ else
    IS_ARM="False";
 fi
 
+if [[ $(id -u | grep -o '^0$') == "0" ]]; then
+    SUDO=" "
+else
+    SUDO="sudo"
+fi
+
 [ ! -d "~/.gf" ] && mkdir -p ~/.gf
 [ ! -d "~/Tools" ] && mkdir -p ~/Tools
 dir=~/Tools
 
-if [ -f /etc/debian_version ]; then sudo apt install git wget;
-elif [ -f /etc/redhat-release ]; then sudo yum install git wget;
-elif [ -f /etc/arch-release ]; then sudo pacman -Sy install git wget;
+if [ -f /etc/debian_version ]; then $SUDO apt install git wget;
+elif [ -f /etc/redhat-release ]; then $SUDO yum install git wget;
+elif [ -f /etc/arch-release ]; then $SUDO pacman -Sy install git wget;
 #/etc/os-release fall in yum for some RedHat and Amazon Linux instances
-elif [ -f /etc/os-release ]; then sudo yum install git wget;
+elif [ -f /etc/os-release ]; then $SUDO yum install git wget;
 fi
 
 #Tools to be updated
@@ -47,17 +53,17 @@ for repo in ${repos}; do
         cd "$dir/$(basename $repo)"
         eval git pull origin master $DEBUG_STD
         if [ "massdns" = "$(basename $repo)" ]; then
-            make && sudo cp bin/massdns /usr/bin/
+            make && $SUDO cp bin/massdns /usr/bin/
         elif [ "Gf-Patterns" = "$(basename $repo)" ]; then
             cp *.json ~/.gf
         elif [ "gf" = "$(basename $repo)" ]; then
             cp -r examples ~/.gf
         elif [ "Interlace" = "$(basename $repo)" ] || [ "LinkFinder" = "$(basename $repo)" ] || [ "pymeta" = "$(basename $repo)" ]; then
-            eval sudo python3 setup.py install $DEBUG_STD
+            eval $SUDO python3 setup.py install $DEBUG_STD
         fi
         if [ "True" = "$IS_ARM" ] && [ "git-hound" = "$(basename $repo)" ]
             then
-                go build && chmod 754 git-hound && sudo mv git-hound /usr/local/bin/
+                go build && chmod 754 git-hound && $SUDO mv git-hound /usr/local/bin/
         fi
     fi
     printf "${bblue}\n Updating ${repo} is finished ${reset}\n"
@@ -70,12 +76,12 @@ printf "${bblue} Updating Files \n"
 if [ "True" = "$IS_ARM" ]
     then
         eval wget -N -c https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-rpi  $DEBUG_STD
-        sudo mv findomain-rpi /usr/local/bin/findomain
+        $SUDO mv findomain-rpi /usr/local/bin/findomain
     else
         eval wget -N -c -O /usr/local/bin/findomain https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-linux  $DEBUG_STD
-        sudo mv findomain-linux /usr/local/bin/findomain
+        $SUDO mv findomain-linux /usr/local/bin/findomain
 fi
-sudo chmod 754 /usr/local/bin/findomain
+$SUDO chmod 754 /usr/local/bin/findomain
 
 eval wget -N -c -O ~/.gf/potential.json https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json $DEBUG_STD
 eval wget -N -c -O $dir/github-endpoints.py https://gist.githubusercontent.com/six2dez/d1d516b606557526e9a78d7dd49cacd3/raw/8e7f1e1139ba3501d15dcd2ad82338d303f0b404/github-endpoints.py $DEBUG_STD
