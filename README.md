@@ -6,7 +6,6 @@
 -   [Mindmap](#mindmapworkflow)
 -   [Requirements](#requirements)
 -   [Usage examples](#usage-examples)
--   [Improvement plan](#improvement-plan)
 -   [Thanks](#thanks)
 
 :warning: Warning :warning:
