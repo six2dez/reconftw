@@ -48,6 +48,7 @@ This is a simple script intended to perform a full recon on an objective with mu
 - XSS (Gxss and dalfox)
 - Open redirect (Openredirex)
 - SSRF checks (from m4ll0k/Bug-Bounty-Toolz/SSRF.py)
+- CRLF checks (crlfuzz)
 - Github Check (git-hound)
 - Favicon Real IP (fav-up)
 - JS Checks (LinkFinder, SecretFinder, scripts from JSFScan)
@@ -103,22 +104,6 @@ This is a simple script intended to perform a full recon on an objective with mu
 ./reconftw.sh -d target.com -g
 ```
 
-## Improvement plan:
-
-These are the last features that we have implemented, take a look at our pending [features](https://github.com/six2dez/reconftw/labels/feature) or suggest a new feature in the issues section:
-
-- [X] Open Redirect with Openredirex
-- [X] SSRF Checks
-- [X] More error checks
-- [X] More verbose
-- [X] Enhance this Readme
-- [X] Customize output folder
-- [X] Interlace usage
-- [X] Crawler
-- [X] SubDomainizer
-- [X] Install script
-- [X] Apt,rpm,pacman compatible installer
-
 You can support this work buying me a coffee:
 
 [<img src="https://cdn.buymeacoffee.com/buttons/v2/default-green.png">](https://www.buymeacoffee.com/six2dez)
@@ -129,5 +114,3 @@ For their great feedback, support, help or for nothing special but well deserved
 - [@cyph3r_asr](https://twitter.com/cyph3r_asr)
 - [@h4ms1k](https://twitter.com/h4ms1k)
 - [@Bileltechno](https://twitter.com/BilelEljaamii)
-
-
