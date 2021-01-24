@@ -260,7 +260,7 @@ sub_brute(){
 		then
 			start=`date +%s`
 			printf "${yellow} Running : Bruteforce Subdomain Enumeration 2/6${reset}\n"
-			eval shuffledns -retries 2 -t 5000 -d $domain -w $tools/subdomains.txt -r $tools/resolvers.txt -o active_tmp.txt $DEBUG_STD
+			eval shuffledns -d $domain -w $tools/subdomains.txt -r $tools/resolvers.txt -o active_tmp.txt $DEBUG_STD
 			cat active_tmp.txt | sed "s/*.//" | anew -q brute_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			eval rm active_tmp.txt $DEBUG_ERROR
 			NUMOFLINES=$(wc -l < brute_subs.txt)
@@ -278,7 +278,7 @@ sub_dns(){
 			start=`date +%s`
 			printf "${yellow} Running : Active Subdomain Enumeration 3/6${reset}\n"
 			cat *_subs.txt > tmp_subs_resolution.txt
-			eval shuffledns -retries 2 -t 5000 -d $domain -list tmp_subs_resolution.txt -r $tools/resolvers.txt -o ${domain}_subdomains.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+			eval shuffledns -d $domain -list tmp_subs_resolution.txt -r $tools/resolvers.txt -o ${domain}_subdomains.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			NUMOFLINES=$(wc -l < ${domain}_subdomains.txt)
 			end=`date +%s`
 			runtime=$((end-start))
@@ -295,15 +295,15 @@ sub_permut(){
 			printf "${yellow} Running : Permutations Subdomain Enumeration 4/6${reset}\n"
 			if [[ $(cat tmp_subs_resolution.txt | wc -l) -le 100 ]]
 				then
-					eval dnsgen tmp_subs_resolution.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -retries 2 -t 5000 -d $domain -r $tools/resolvers.txt -o permute1_tmp.txt $DEBUG_STD
+					eval dnsgen tmp_subs_resolution.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute1_tmp.txt $DEBUG_STD
 					cat permute1_tmp.txt | anew -q permute1.txt
-					eval dnsgen permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -retries 2 -t 5000 -d $domain -r $tools/resolvers.txt -o permute2_tmp.txt $DEBUG_STD
+					eval dnsgen permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute2_tmp.txt $DEBUG_STD
 					cat permute2_tmp.txt | anew -q permute2.txt
 					cat permute1.txt permute2.txt | anew -q permute.txt
 					eval rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 				elif [[ $(cat tmp_subs_resolution.txt | wc -l) -le 200 ]]
 		  		then
-					eval dnsgen tmp_subs_resolution.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -retries 2 -t 5000 -d $domain -r $tools/resolvers.txt -o permute_tmp.txt $DEBUG_STD
+					eval dnsgen tmp_subs_resolution.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute_tmp.txt $DEBUG_STD
 					cat permute_tmp.txt | anew -q permute.txt
 					eval rm permute_tmp.txt $DEBUG_ERROR  && touch $called_fn_dir/.${FUNCNAME[0]}
 				else
