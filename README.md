@@ -1,22 +1,49 @@
-# reconftw
+<h1 align="center">
+  <br>
+  <a href="https://github.com/six2dez/reconftw"><img src="images/banner_small.png" alt="reconftw"></a>
+  <br>
+  ReconFTW
+  <br>
+</h1>
 
--   [tl;dr](#tldr)
+<h4 align="center">A simple bash script for full recon</h4>
+
+<p align="center">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/0.9-beta1">
+    <img src="https://img.shields.io/badge/release-0.9--beta1-green">
+  </a>
+   </a>
+  <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
+      <img src="https://img.shields.io/badge/license-GPL3-_red.svg">
+  </a>
+  <a href="https://twitter.com/Six2dez1">
+    <img src="https://img.shields.io/badge/twitter-%40Six2dez1-blue">
+  </a>
+</p>
+
+:warning: ***Warning*** :warning:
+
+This is a live development project, until the first stable release (1.0) it will be constantly updated in master branch, so if you have detected any bug, you can open an issue or ping me over [Telegram](https://t.me/six2dez) or [Twitter](https://twitter.com/Six2dez1) and I will try to do my best :)
+
+# Table of Contents
 -   [Summary](#summary)
+-   [Installation](#installation)
+-   [Usage](#usage)
 -   [Features](#features)
 -   [Mindmap](#mindmapworkflow)
--   [Requirements](#requirements)
--   [Usage examples](#usage-examples)
+-   [Improvement plan](#improvement-plan)
 -   [Thanks](#thanks)
 
-:warning: Warning :warning:
-
-This is a live development project, until the first stable release (1.0) it will be constantly updated in master branch, so if you have detected any bug, you can open an issue or ping me over Telegram (@six2dez) or Twitter (@six2dez1) and I will try to do my best :)
 
 
-## tl;dr
+## Summary
 
-- Requires [Golang](https://golang.org/dl/) > 1.14 installed and env vars correctly set ($GOPATH,$GOROOT)
-- Run ./install.sh before first run (apt, rpm, pacman compatible)
+ReconFTW performs automated enumeration of subdomains via various techniques and futher scanning for vulnerabilties, to give you a potential vulns.
+
+
+## Installation
+- Requires [Golang](https://golang.org/dl/) > 1.14 installed and paths correctly set ($GOPATH,$GOROOT)
+[Installation Guide](give link here)
 
 ```bash
 git clone https://github.com/six2dez/reconftw
@@ -25,15 +52,47 @@ chmod +x *.sh
 ./install.sh
 ./reconftw.sh -d target.com -a
 ```
-![Help](images/help.png)
 
-## Summary
+- It is highly recommended, and in some cases essential, to set your api keys or env variables:
+  - amass (```~/.config/amass/config.ini```)
+  - subfinder (```~/.config/subfinder/config.yaml```)
+  - git-hound (```~/.githound/config.yml```)
+  - github-endpoints.py (```GITHUB_TOKEN``` env var)
+  - favup (```shodan init <SHODANPAIDAPIKEY>```)
+  - SSRF Server (```COLLAB_SERVER``` env var) 
+  - Blind XSS Server (```XSS_SERVER``` env var) 
+- This script uses dalfox with blind-xss option, you must change to your own server, check xsshunter.com.
 
-This is a simple script intended to perform a full recon on an objective with multiple subdomains
+## Usage
+<pre>
 
-## Features
+<b>TARGET OPTIONS</b>
+-d DOMAIN        Target domain
+-l list.txt      Targets list, one per line
 
-- Tools checker
+<b>MODE OPTIONS</b>
+-a               Perform all checks
+-s               Full subdomains scan (Subs, tko and probe)
+-g               Google dorks searchs
+-w               Perform web checks only without subs (-l required)
+-t               Check subdomain takeover(-l required)
+-i               Check all needed tools
+-v               Debug/verbose mode, no file descriptor redir
+-h               Show this help
+
+<b>SUBDOMAIN OPTIONS</b>
+--sp             Passive subdomain scans
+--sb             Bruteforce subdomain resolution
+--sr             Subdomain permutations and resolution (-l required)
+--ss             Subdomain scan by scraping (-l required)
+
+<b>OUTPUT OPTIONS</b>
+-o output/path   Define output folder
+
+</pre>
+
+## Features 
+
 - Google Dorks (based on deggogle_hunter)
 - Subdomain enumeration (passive, resolution, bruteforce and permutations)
 - Sub TKO (subjack and nuclei)
@@ -47,7 +106,6 @@ This is a simple script intended to perform a full recon on an objective with mu
 - XSS (Gxss and dalfox)
 - Open redirect (Openredirex)
 - SSRF checks (from m4ll0k/Bug-Bounty-Toolz/SSRF.py)
-- CRLF checks (crlfuzz)
 - Github Check (git-hound)
 - Favicon Real IP (fav-up)
 - JS Checks (LinkFinder, SecretFinder, scripts from JSFScan)
@@ -107,6 +165,22 @@ export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
 ```bash
 ./reconftw.sh -d target.com -g
 ```
+## Improvement plan:
+
+These are the last features that we have implemented, take a look at our pending [features](https://github.com/six2dez/reconftw/labels/feature) or suggest a new feature in the issues section:
+
+:heavy_check_mark: Open Redirect with Openredirex  
+:heavy_check_mark: SSRF Checks  
+:heavy_check_mark: More error checks  
+:heavy_check_mark: More verbose  
+:heavy_check_mark: Enhance this Readme  
+:heavy_check_mark: Customize output folder  
+:heavy_check_mark: Interlace usage  
+:heavy_check_mark: Crawler  
+:heavy_check_mark: SubDomainizer  
+:heavy_check_mark: Install script  
+:heavy_check_mark: Apt,rpm,pacman compatible installer  
+
 
 You can support this work buying me a coffee:
 
