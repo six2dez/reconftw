@@ -16,27 +16,52 @@ else
    IS_ARM="False";
 fi
 
+if [[ $(id -u | grep -o '^0$') == "0" ]]; then
+    SUDO=" "
+else
+    SUDO="sudo"
+fi
+
 printf "\n\n${bgreen}#######################################################################\n"
 printf "${bgreen} reconftw installer script (apt/rpm/pacman compatible)${reset}\n\n"
 
 install_apt(){
-    eval sudo apt update -y $DEBUG_STD
-    eval sudo apt install python3 python3-pip ruby git libpcap-dev chromium-browser wget python-dev python3-dev build-essential libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap -y $DEBUG_STD
+    eval $SUDO apt update -y $DEBUG_STD
+    eval $SUDO apt install python3 python3-pip ruby git libpcap-dev chromium-browser wget python-dev python3-dev build-essential libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap -y $DEBUG_STD
 }
 
 install_yum(){
-    eval sudo yum update -y $DEBUG_STD
-    eval sudo yum install python3 python3-pip ruby git libpcap-devel chromium wget openssl-devel python3-devel libxslt-devel libffi-devel libxml2-devel nmap zlib-devel -y $DEBUG_STD
+    eval $SUDO yum update -y $DEBUG_STD
+    eval $SUDO yum install python3 python3-pip ruby git libpcap-devel chromium wget openssl-devel python3-devel libxslt-devel libffi-devel libxml2-devel nmap zlib-devel -y $DEBUG_STD
 }
 
 install_pacman(){
-    eval sudo pacman -Syu -y $DEBUG_STD
-    eval sudo pacman -Sy install python python-pip ruby git libpcap nmap chromium wget -y $DEBUG_STD
+    eval $SUDO pacman -Syu -y $DEBUG_STD
+    eval $SUDO pacman -Sy install python python-pip ruby git libpcap nmap chromium wget -y $DEBUG_STD
 }
 
-type go >/dev/null 2>&1 || { printf "${bred} Golang no detected, install and configure it before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
-[ -n "$GOPATH" ] || { printf "${bred} GOPATH env var no detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
-[ -n "$GOROOT" ] || { printf "${bred} GOROOT env var no detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
+#installing latest Golang version
+if [[ $(type go | grep -o 'go is') == "go is" ]]
+    then
+        printf "${bgreen} Golang is already installed ${reset}\n"
+    else
+        printf "${bgreen} Installing Golang ${reset}\n"
+        if [ "True" = "$IS_ARM" ]; then
+            LATEST_GO=$(wget -qO- https://golang.org/dl/ | grep -oP 'go([0-9\.]+)\.linux-armv6l\.tar\.gz' | head -n 1 | grep -oP 'go[0-9\.]+' | grep -oP '[0-9\.]+' | head -c -2)
+            wget https://dl.google.com/go/go$LATEST_GO.linux-armv6l.tar.gz
+            $SUDO tar -C /usr/local -xzf go$LATEST_GO.linux-armv6l.tar.gz
+            $SUDO cp /usr/local/go/bin/go /usr/bin
+        else
+            LATEST_GO=$(wget -qO- https://golang.org/dl/ | grep -oP 'go([0-9\.]+)\.linux-amd64\.tar\.gz' | head -n 1 | grep -oP 'go[0-9\.]+' | grep -oP '[0-9\.]+' | head -c -2)
+            wget https://dl.google.com/go/go$LATEST_GO.linux-amd64.tar.gz
+            $SUDO tar -C /usr/local -xzf go$LATEST_GO.linux-amd64.tar.gz
+            $SUDO cp /usr/local/go/bin/go /usr/bin
+        fi
+        rm -rf go$LATEST_GO*
+fi
+
+[ -n "$GOPATH" ] || { printf "${bred} GOPATH env var not detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
+[ -n "$GOROOT" ] || { printf "${bred} GOROOT env var not detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
 
 if [ -f /etc/debian_version ]; then install_apt;
 elif [ -f /etc/redhat-release ]; then install_yum;
@@ -83,11 +108,11 @@ eval go get -v github.com/KathanP19/Gxss $DEBUG_STD
 eval git clone https://github.com/blechschmidt/massdns $dir/massdns $DEBUG_STD
 printf "${bgreen} 50%% done${reset}\n\n"
 eval git clone https://github.com/devanshbatham/ParamSpider $dir/ParamSpider $DEBUG_STD
-eval git clone https://github.com/six2dez/OneListForAll $dir/OneListForAll $DEBUG_STD
 eval git clone https://github.com/dark-warlord14/LinkFinder $dir/LinkFinder $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/projectdiscovery/shuffledns/cmd/shuffledns $DEBUG_STD
 eval go get -v github.com/hakluke/hakrawler $DEBUG_STD
 eval go get -v github.com/cgboal/sonarsearch/crobat $DEBUG_STD
+eval GO111MODULE=on go get -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz $DEBUG_STD
 printf "${bgreen} 60%% done${reset}\n\n"
 eval git clone https://github.com/six2dez/degoogle_hunter $dir/degoogle_hunter $DEBUG_STD
 eval git clone https://github.com/s0md3v/Arjun $dir/Arjun $DEBUG_STD
@@ -97,7 +122,6 @@ eval git clone https://github.com/nsonaniya2010/SubDomainizer $dir/SubDomainizer
 eval git clone https://github.com/codingo/Interlace $dir/Interlace $DEBUG_STD
 eval git clone https://github.com/m4ll0k/SecretFinder $dir/SecretFinder $DEBUG_STD
 eval git clone https://github.com/gwen001/github-search $dir/github-search $DEBUG_STD
-eval git clone https://github.com/six2dez/degoogle_hunter $dir/degoogle_hunter $DEBUG_STD
 printf "${bgreen} 70%% done${reset}\n\n"
 eval git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh $DEBUG_STD
 eval pip3 install dnsgen $DEBUG_STD
@@ -110,31 +134,32 @@ if [ "True" = "$IS_ARM" ]
         eval wget https://github.com/tillson/git-hound/releases/download/v1.3/git-hound_1.3_Linux_x86_64.tar.gz $DEBUG_STD
         tar -xf git-hound_1.3_Linux_x86_64.tar.gz git-hound
         rm -f git-hound_1.3_Linux_x86_64.tar.gz
-        sudo mv git-hound /usr/local/bin/git-hound
-        sudo chmod 755 /usr/local/bin/git-hound
+        $SUDO mv git-hound /usr/local/bin/git-hound
+        $SUDO chmod 755 /usr/local/bin/git-hound
 fi
 printf "${bgreen} 80%% done${reset}\n\n"
-eval git clone https://github.com/m8r0wn/pymeta $dir/pymeta $DEBUG_STD
+eval pip3 install pymetadata $DEBUG_STD
 if [ "True" = "$IS_ARM" ]
     then
         eval wget https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-rpi $DEBUG_STD
-        sudo mv findomain-rpi /usr/local/bin/findomain
+        $SUDO mv findomain-rpi /usr/local/bin/findomain
     else
         eval wget https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-linux $DEBUG_STD
-        sudo mv findomain-linux /usr/local/bin/findomain
+        $SUDO mv findomain-linux /usr/local/bin/findomain
 fi
 
-sudo chmod 755 /usr/local/bin/findomain
+$SUDO chmod 755 /usr/local/bin/findomain
 cd $dir/massdns; eval make $DEBUG_STD
-sudo cp $dir/massdns/bin/massdns /usr/bin/
+$SUDO cp $dir/massdns/bin/massdns /usr/bin/
 
 eval find $dir -name 'requirements.txt' -exec pip3 install --user -r {} \; $DEBUG_STD
-cd $dir/Interlace && sudo python3 setup.py install
-cd $dir/LinkFinder && python3 setup.py install
+cd $dir/Interlace && $SUDO python3 setup.py install
+cd $dir/LinkFinder && $SUDO python3 setup.py install
 cd $dir
-python3 $dir/pymeta/setup.py install
 eval git clone https://github.com/devanshbatham/OpenRedireX $dir/OpenRedireX $DEBUG_STD
 printf "${bgreen} 90%% done${reset}\n\n"
+eval subfinder -version $DEBUG_STD
+eval wget -nc -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini $DEBUG_STD
 cd ~/.gf; eval wget -O potential.json https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json $DEBUG_STD; cd $dir
 eval wget -O github-endpoints.py https://gist.githubusercontent.com/six2dez/d1d516b606557526e9a78d7dd49cacd3/raw/8e7f1e1139ba3501d15dcd2ad82338d303f0b404/github-endpoints.py $DEBUG_STD
 eval wget -O getjswords.py https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py $DEBUG_STD
@@ -142,6 +167,7 @@ eval wget -O subdomains.txt https://gist.githubusercontent.com/jhaddix/86a06c5dc
 eval wget -O resolvers.txt https://raw.githubusercontent.com/janmasarik/resolvers/master/resolvers.txt $DEBUG_STD
 eval wget -O permutations_list.txt https://gist.githubusercontent.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw/137bb6b60c616552c705e93a345c06cec3a2cb1f/permutations_list.txt $DEBUG_STD
 eval wget -O ssrf.py https://gist.githubusercontent.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw/ea0774de5e27f9bc855207b175249edae2e9ccef/asyncio_ssrf.py $DEBUG_STD
+eval wget -O fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD
 eval wget -O all_requirements.txt https://gist.githubusercontent.com/detonxx/92118db85d97f6edb54a0a427ae96a2e/raw/95c0517bdcd1467e9a82992097b7c3e66afccfab/all_requirements.txt $DEBUG_STD
 eval pip3 install -r $dir/all_requirements.txt $DEBUG_STD
 
