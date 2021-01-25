@@ -60,8 +60,8 @@ if [[ $(type go | grep -o 'go is') == "go is" ]]
         rm -rf go$LATEST_GO*
 fi
 
-[ -n "$GOPATH" ] || { printf "${bred} GOPATH env var no detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
-[ -n "$GOROOT" ] || { printf "${bred} GOROOT env var no detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
+[ -n "$GOPATH" ] || { printf "${bred} GOPATH env var not detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
+[ -n "$GOROOT" ] || { printf "${bred} GOROOT env var not detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
 
 if [ -f /etc/debian_version ]; then install_apt;
 elif [ -f /etc/redhat-release ]; then install_yum;
