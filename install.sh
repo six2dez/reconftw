@@ -34,9 +34,9 @@ install_pacman(){
     eval sudo pacman -Sy install python python-pip ruby git libpcap nmap chromium wget -y $DEBUG_STD
 }
 
-type go >/dev/null 2>&1 || { printf "${bred} Golang no detected, install and configure it before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
-[ -n "$GOPATH" ] || { printf "${bred} GOPATH env var no detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
-[ -n "$GOROOT" ] || { printf "${bred} GOROOT env var no detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
+type go >/dev/null 2>&1 || { printf "${bred} Golang not detected, install and configure it before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
+[ -n "$GOPATH" ] || { printf "${bred} GOPATH env var not detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
+[ -n "$GOROOT" ] || { printf "${bred} GOROOT env var not detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
 
 if [ -f /etc/debian_version ]; then install_apt;
 elif [ -f /etc/redhat-release ]; then install_yum;
