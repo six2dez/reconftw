@@ -124,47 +124,6 @@ chmod +x *.sh
 
 ![Mindmap](images/mindmap.png)
 
-## Requirements
-
-- [Golang](https://golang.org/dl/) > 1.14 installed and env vars correctly set ($GOPATH,$GOROOT)
-```
-export GOROOT=/usr/local/go
-export GOPATH=$HOME/go
-export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
-```
-- Run ./install.sh
-> Installer is provided as is. Nobody knows your system better than you, so nobody can debug your system better than you. If you are experiencing some issues with the installer script I can help you out, but keep in mind that is not my main priority.
-- It is highly recommended, and in some cases essential, set your api keys or env vars:
-  - amass (~/.config/amass/config.ini)
-  - subfinder (~/.config/subfinder/config.yaml)
-  - git-hound (~/.githound/config.yml)
-  - github-endpoints.py (GITHUB_TOKEN env var)
-  - favup (shodan init SHODANPAIDAPIKEY)
-  - SSRF Server (COLLAB_SERVER env var) 
-  - Blind XSS Server (XSS_SERVER env var) 
-- This script uses dalfox with blind-xss option, you must change to your own server, check xsshunter.com.
-
-## Usage examples
-
-### Full scan:
-```bash
-./reconftw.sh -d target.com -a
-```
-
-### Subdomains scan:
-```bash
-./reconftw.sh -d target.com -s
-```
-
-### Web scan (target list required):
-```bash
-./reconftw.sh -d target.com -l targets.txt -w
-```
-
-### Dorks:
-```bash
-./reconftw.sh -d target.com -g
-```
 ## Improvement plan:
 
 These are the last features that we have implemented, take a look at our pending [features](https://github.com/six2dez/reconftw/labels/feature) or suggest a new feature in the issues section:
