@@ -69,6 +69,11 @@ This is a simple script intended to perform a full recon on an objective with mu
 ## Requirements
 
 - [Golang](https://golang.org/dl/) > 1.14 installed and env vars correctly set ($GOPATH,$GOROOT)
+```
+export GOROOT=/usr/local/go
+export GOPATH=$HOME/go
+export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
+```
 - Run ./install.sh
 > Installer is provided as is. Nobody knows your system better than you, so nobody can debug your system better than you. If you are experiencing some issues with the installer script I can help you out, but keep in mind that is not my main priority.
 - It is highly recommended, and in some cases essential, set your api keys or env vars:
