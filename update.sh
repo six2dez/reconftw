@@ -36,9 +36,15 @@ elif [ -f /etc/arch-release ]; then $SUDO pacman -Sy install git wget;
 elif [ -f /etc/os-release ]; then $SUDO yum install git wget;
 fi
 
+#Updating installed python packages
+printf "${bgreen}#######################################################################\n"
+printf "${bblue} Updating installed python packages \n"
+eval pip3 install -U -r requirements.txt $DEBUG_STD
+printf "${bblue}\n Updating installed python packages is finished ${reset}\n"
+printf "${bgreen}#######################################################################\n"
+
 #Tools to be updated
 repos="s0md3v/Arjun six2dez/degoogle_hunter 1ndianl33t/Gf-Patterns gwen001/github-search dark-warlord14/LinkFinder projectdiscovery/nuclei-templates devanshbatham/ParamSpider nsonaniya2010/SubDomainizer haccer/subjack s0md3v/Corsy pielco11/fav-up tomnomnom/gf codingo/Interlace blechschmidt/massdns m4ll0k/SecretFinder devanshbatham/OpenRedireX tillson/git-hound"
-
 printf "\n${bgreen}--==[ ************************************************************************************ ]==--\n"
 printf "${bred}                reconftw updater script (apt/rpm/pacman compatible)${reset}\n"
 printf "\n${bgreen}--==[ ************************************************************************************ ]==--\n"
@@ -99,13 +105,6 @@ printf "${bgreen}###############################################################
 printf "${bblue} Updating Nuclei templates \n"
 nuclei -update-templates $DEBUG_STD
 printf "${bblue}\n Updating Nuclei templates is finished ${reset}\n"
-printf "${bgreen}#######################################################################\n"
-
-#Updating installed python packages
-printf "${bgreen}#######################################################################\n"
-printf "${bblue} Updating installed python packages \n"
-cat $dir/*/requirements.txt | grep -v "=" | uniq | xargs pip3 install -U
-printf "${bblue}\n Updating installed python packages is finished ${reset}\n"
 printf "${bgreen}#######################################################################\n"
 
 #Updating Golang
