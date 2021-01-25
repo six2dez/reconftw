@@ -135,6 +135,8 @@ eval rm -rf go$LATEST_GO* $DEBUG_STD
 printf "${bblue}\n Updating Golang is finished ${reset}\n"
 printf "${bgreen}#######################################################################\n"
 
+#stripping all Go binaries
+eval strip -s $HOME/go/bin/* $DEBUG_STD
 
 printf "\n${bgreen}--==[ ************************************************************************************ ]==--\n"
 printf "${bred}                You are up to date, happy hacking${reset}\n"
