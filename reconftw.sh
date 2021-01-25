@@ -298,7 +298,11 @@ sub_scraping(){
 		then
 			start=`date +%s`
 			printf "${yellow} Running : JS scraping subdomain search 4/6${reset}\n"
-			interlace -tL ${domain}_subdomains.txt -threads 20 -c "python3 $tools/SubDomainizer/SubDomainizer.py -u _target_ -k -g -gt $GITHUB_TOKEN -san all -o _target_-subdomainizer.txt -cop _target_-clouds.txt &>/dev/null" &>/dev/null
+			if [ -n "$GITHUB_TOKEN" ]; then
+				interlace -tL ${domain}_subdomains.txt -threads 20 -c "python3 $tools/SubDomainizer/SubDomainizer.py -u _target_ -k -g -gt $GITHUB_TOKEN -san all -o _target_-subdomainizer.txt -cop _target_-clouds.txt &>/dev/null" &>/dev/null
+			else
+				interlace -tL ${domain}_subdomains.txt -threads 20 -c "python3 $tools/SubDomainizer/SubDomainizer.py -u _target_ -k -san all -o _target_-subdomainizer.txt -cop _target_-clouds.txt &>/dev/null" &>/dev/null
+			fi
 			cat *-clouds.txt | anew -q ${domain}_clouds.txt
 			cat *-subdomainizer.txt | anew -q JS_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			eval rm -f *-clouds.txt $DEBUG_ERROR
