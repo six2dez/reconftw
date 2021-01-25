@@ -299,13 +299,13 @@ sub_scraping(){
 			start=`date +%s`
 			printf "${yellow} Running : JS scraping subdomain search 4/6${reset}\n"
 			if [ -n "$GITHUB_TOKEN" ]; then
-				interlace -tL ${domain}_subdomains.txt -threads 20 -c "python3 $tools/SubDomainizer/SubDomainizer.py -u _target_ -k -g -gt $GITHUB_TOKEN -san all -o _target_-subdomainizer.txt -cop _target_-clouds.txt &>/dev/null" &>/dev/null
+				interlace -tL ${domain}_subdomains.txt -threads 20 -c "python3 $tools/SubDomainizer/SubDomainizer.py -u _target_ -k -g -gt $GITHUB_TOKEN -san same -o _target_-subdomainizer.txt &>/dev/null" &>/dev/null
 			else
-				interlace -tL ${domain}_subdomains.txt -threads 20 -c "python3 $tools/SubDomainizer/SubDomainizer.py -u _target_ -k -san all -o _target_-subdomainizer.txt -cop _target_-clouds.txt &>/dev/null" &>/dev/null
+				interlace -tL ${domain}_subdomains.txt -threads 20 -c "python3 $tools/SubDomainizer/SubDomainizer.py -u _target_ -k -san same -o _target_-subdomainizer.txt &>/dev/null" &>/dev/null
 			fi
-			cat *-clouds.txt | anew -q ${domain}_clouds.txt
+#			cat *-clouds.txt | anew -q ${domain}_clouds.txt
 			cat *-subdomainizer.txt | anew -q JS_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
-			eval rm -f *-clouds.txt $DEBUG_ERROR
+#			eval rm -f *-clouds.txt $DEBUG_ERROR
 			eval rm -f *-subdomainizer.txt $DEBUG_ERROR
 			if [[ $(cat JS_subs.txt | wc -l) -gt 0 ]]
 			then
@@ -316,15 +316,16 @@ sub_scraping(){
 			else
 				NUMOFLINES=0
 			fi
-			if [[ $(cat ${domain}_clouds.txt | wc -l) -gt 0 ]]
-			then
-				NUMOFLINES_cloud=$(wc -l < ${domain}_clouds.txt)
-			else
-				NUMOFLINES_cloud=0
-			fi
+#			if [[ $(cat ${domain}_clouds.txt | wc -l) -gt 0 ]]
+#			then
+#				NUMOFLINES_cloud=$(wc -l < ${domain}_clouds.txt)
+#			else
+#				NUMOFLINES_cloud=0
+#			fi
 			end=`date +%s`
 			runtime=$((end-start))
-			printf "${green} ${NUMOFLINES} subdomains and ${NUMOFLINES_cloud} open buckets found in ${runtime} secs${reset}\n\n"
+#			printf "${green} ${NUMOFLINES} subdomains and ${NUMOFLINES_cloud} open buckets found in ${runtime} secs${reset}\n\n"
+			printf "${green} ${NUMOFLINES} subdomains found in ${runtime} secs${reset}\n\n"
 		else
 			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
