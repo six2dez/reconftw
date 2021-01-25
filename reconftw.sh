@@ -822,7 +822,7 @@ all(){
 			subtakeover
 			webprobe_full
 			screenshot
-			metadata
+#			metadata
 			portscan
 			nuclei_check
 			github
@@ -847,7 +847,7 @@ all(){
 		subtakeover
 		webprobe_full
 		screenshot
-		metadata
+#		metadata
 		portscan
 		nuclei_check
 		github
