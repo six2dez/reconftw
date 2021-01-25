@@ -73,7 +73,7 @@ chmod +x *.sh
 <b>MODE OPTIONS</b>
 -a               Perform all checks
 -s               Full subdomains scan (Subs, tko and probe)
--g               Google dorks searchs
+-g               Google dorks searches
 -w               Perform web checks only without subs (-l required)
 -t               Check subdomain takeover(-l required)
 -i               Check all needed tools
