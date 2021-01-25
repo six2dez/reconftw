@@ -1,0 +1,8 @@
+#Ignoring output directories
+Recon/
+output/
+
+#Ignoring compressed files
+*.tar
+*.tar.*
+*.zip
