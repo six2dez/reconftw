@@ -37,7 +37,7 @@ elif [ -f /etc/os-release ]; then $SUDO yum install git wget;
 fi
 
 #Tools to be updated
-repos="s0md3v/Arjun six2dez/degoogle_hunter 1ndianl33t/Gf-Patterns gwen001/github-search dark-warlord14/LinkFinder projectdiscovery/nuclei-templates devanshbatham/ParamSpider nsonaniya2010/SubDomainizer haccer/subjack s0md3v/Corsy pielco11/fav-up tomnomnom/gf codingo/Interlace blechschmidt/massdns m4ll0k/SecretFinder devanshbatham/OpenRedireX m8r0wn/pymeta tillson/git-hound"
+repos="s0md3v/Arjun six2dez/degoogle_hunter 1ndianl33t/Gf-Patterns gwen001/github-search dark-warlord14/LinkFinder projectdiscovery/nuclei-templates devanshbatham/ParamSpider nsonaniya2010/SubDomainizer haccer/subjack s0md3v/Corsy pielco11/fav-up tomnomnom/gf codingo/Interlace blechschmidt/massdns m4ll0k/SecretFinder devanshbatham/OpenRedireX tillson/git-hound"
 
 printf "\n${bgreen}--==[ ************************************************************************************ ]==--\n"
 printf "${bred}                reconftw updater script (apt/rpm/pacman compatible)${reset}\n"
@@ -57,7 +57,7 @@ for repo in ${repos}; do
             cp *.json ~/.gf
         elif [ "gf" = "$(basename $repo)" ]; then
             cp -r examples ~/.gf
-        elif [ "Interlace" = "$(basename $repo)" ] || [ "LinkFinder" = "$(basename $repo)" ] || [ "pymeta" = "$(basename $repo)" ]; then
+        elif [ "Interlace" = "$(basename $repo)" ] || [ "LinkFinder" = "$(basename $repo)" ]; then
             eval $SUDO python3 setup.py install $DEBUG_STD
         fi
         if [ "True" = "$IS_ARM" ] && [ "git-hound" = "$(basename $repo)" ]

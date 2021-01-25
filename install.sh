@@ -138,7 +138,7 @@ if [ "True" = "$IS_ARM" ]
         $SUDO chmod 755 /usr/local/bin/git-hound
 fi
 printf "${bgreen} 80%% done${reset}\n\n"
-eval git clone https://github.com/m8r0wn/pymeta $dir/pymeta $DEBUG_STD
+eval pip3 install pymetadata $DEBUG_STD
 if [ "True" = "$IS_ARM" ]
     then
         eval wget https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-rpi $DEBUG_STD
@@ -156,7 +156,6 @@ eval find $dir -name 'requirements.txt' -exec pip3 install --user -r {} \; $DEBU
 cd $dir/Interlace && $SUDO python3 setup.py install
 cd $dir/LinkFinder && $SUDO python3 setup.py install
 cd $dir
-$SUDO python3 $dir/pymeta/setup.py install
 eval git clone https://github.com/devanshbatham/OpenRedireX $dir/OpenRedireX $DEBUG_STD
 printf "${bgreen} 90%% done${reset}\n\n"
 eval subfinder -version $DEBUG_STD
@@ -168,7 +167,7 @@ eval wget -O subdomains.txt https://gist.githubusercontent.com/jhaddix/86a06c5dc
 eval wget -O resolvers.txt https://raw.githubusercontent.com/janmasarik/resolvers/master/resolvers.txt $DEBUG_STD
 eval wget -O permutations_list.txt https://gist.githubusercontent.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw/137bb6b60c616552c705e93a345c06cec3a2cb1f/permutations_list.txt $DEBUG_STD
 eval wget -O ssrf.py https://gist.githubusercontent.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw/ea0774de5e27f9bc855207b175249edae2e9ccef/asyncio_ssrf.py $DEBUG_STD
-eval wget -O fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt
+eval wget -O fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD
 eval wget -O all_requirements.txt https://gist.githubusercontent.com/detonxx/92118db85d97f6edb54a0a427ae96a2e/raw/95c0517bdcd1467e9a82992097b7c3e66afccfab/all_requirements.txt $DEBUG_STD
 eval pip3 install -r $dir/all_requirements.txt $DEBUG_STD
 

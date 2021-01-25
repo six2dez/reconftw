@@ -117,6 +117,7 @@ function tools_installed(){
 	eval type -P qsreplace $DEBUG_STD || { printf "${bred} [*] qsreplace		[NO]\n"; allinstalled=false;}
 	eval type -P interlace $DEBUG_STD || { printf "${bred} [*] interlace		[NO]\n"; allinstalled=false;}
 	eval type -P dnsgen $DEBUG_STD || { printf "${bred} [*] DnsGen		[NO]\n"; allinstalled=false;}
+	eval type -P pymeta $DEBUG_STD || { printf "${bred} [*] pymeta		[NO]\n"; allinstalled=false;}
 	eval type -P anew $DEBUG_STD || { printf "${bred} [*] Anew		[NO]\n"; allinstalled=false;}
 	eval type -P unfurl $DEBUG_STD || { printf "${bred} [*] unfurl		[NO]\n"; allinstalled=false;}
 	eval type -P crlfuzz $DEBUG_STD || { printf "${bred} [*] crlfuzz		[NO]\n"; allinstalled=false;}
@@ -170,7 +171,7 @@ function tools_full(){
 	eval type -P subjack $DEBUG_STD && printf "${bgreen}[*] Subjack		[YES]\n" || { printf "${bred} [*] Subjack		[NO]\n"; }
 	[ -f $tools/subjack/fingerprints.json ] && printf "${bgreen}[*] Subjack fings	[YES]\n" || printf "${bred} [*] Subjack fings	[NO]\n"
 	eval type -P nuclei $DEBUG_STD && printf "${bgreen}[*] Nuclei		[YES]\n" || { printf "${bred} [*] Nuclei		[NO]\n"; }
-	[ -d ~/nuclei-templates ] && printf "${bgreen}[*] Nuclei templates   [YES]\n" || printf "${bred} [*] Nuclei templates   [NO]\n"
+	[ -d ~/nuclei-templates ] && printf "${bgreen}[*] Nuclei templates  [YES]\n" || printf "${bred} [*] Nuclei templates  [NO]\n"
 	eval type -P aquatone $DEBUG_STD && printf "${bgreen}[*] Aquatone		[YES]\n" || { printf "${bred} [*] Aquatone		[NO]\n"; }
 	eval type -P naabu $DEBUG_STD && printf "${bgreen}[*] Naabu		[YES]\n" || { printf "${bred} [*] Naabu		[NO]\n"; }
 	eval type -P gf $DEBUG_STD && printf "${bgreen}[*] Gf		        [YES]\n" || { printf "${bred} [*] Gf			[NO]\n"; }
@@ -183,6 +184,7 @@ function tools_full(){
 	eval type -P qsreplace $DEBUG_STD && printf "${bgreen}[*] qsreplace		[YES]\n" || { printf "${bred} [*] qsreplace		[NO]\n"; }
 	eval type -P interlace $DEBUG_STD && printf "${bgreen}[*] interlace		[YES]\n" || { printf "${bred} [*] interlace		[NO]\n"; }
 	eval type -P dnsgen $DEBUG_STD && printf "${bgreen}[*] DnsGen		[YES]\n" || { printf "${bred} [*] DnsGen		[NO]\n"; }
+	eval type -P pymeta $DEBUG_STD && printf "${bgreen}[*] pymeta		[YES]\n" || { printf "${bred} [*] pymeta		[NO]\n"; }
 	eval type -P anew $DEBUG_STD && printf "${bgreen}[*] Anew		[YES]\n" || { printf "${bred} [*] Anew		[NO]\n"; }
 	eval type -P unfurl $DEBUG_STD && printf "${bgreen}[*] unfurl		[YES]\n" || { printf "${bred} [*] unfurl		[NO]\n"; }
 	eval type -P crlfuzz $DEBUG_STD && printf "${bgreen}[*] crlfuzz		[YES]\n" || { printf "${bred} [*] crlfuzz		[NO]\n"; }
@@ -211,9 +213,9 @@ subdomains_full(){
 	sub_passive
 	sub_brute
 	sub_dns
+	sub_scraping
 	sub_permut
 	webprobe_simple
-	sub_scraping
 	eval rm -f *_subs.txt $DEBUG_ERROR
 	if [ -f "${domain}_subdomains.txt" ]
 		then
@@ -288,6 +290,39 @@ sub_dns(){
 	fi
 }
 
+sub_scraping(){
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			start=`date +%s`
+			printf "${yellow} Running : JS scraping subdomain search 6/6${reset}\n"
+			interlace -tL ${domain}_subdomains.txt -threads 20 -c "python3 $tools/SubDomainizer/SubDomainizer.py -u _target_ -k -g -gt $GITHUB_TOKEN -san all -o _target_-subdomainizer.txt -cop _target_-clouds.txt &>/dev/null" &>/dev/null
+			cat *-clouds.txt | anew -q ${domain}_clouds.txt
+			cat *-subdomainizer.txt | anew -q JS_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			eval rm -f *-clouds.txt $DEBUG_ERROR
+			eval rm -f *-subdomainizer.txt $DEBUG_ERROR
+			if [[ $(cat JS_subs.txt | wc -l) -gt 0 ]]
+			then
+				NUMOFLINES=$(wc -l < JS_subs.txt)
+				cat JS_subs.txt | eval shuffledns -d $domain -r $tools/resolvers.txt -o JS_subs_temp.txt $DEBUG_STD
+				cat JS_subs_temp.txt | anew -q ${domain}_subdomains.txt
+				rm JS_subs_temp.txt
+			else
+				NUMOFLINES=0
+			fi
+			if [[ $(cat ${domain}_clouds.txt | wc -l) -gt 0 ]]
+			then
+				NUMOFLINES_cloud=$(wc -l < ${domain}_clouds.txt)
+			else
+				NUMOFLINES_cloud=0
+			fi
+			end=`date +%s`
+			runtime=$((end-start))
+			printf "${green} ${NUMOFLINES} subdomains and ${NUMOFLINES_cloud} open buckets found in ${runtime} secs${reset}\n\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
+}
+
 sub_permut(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
 		then
@@ -299,12 +334,12 @@ sub_permut(){
 					cat permute1_tmp.txt | anew -q permute1.txt
 					eval dnsgen permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute2_tmp.txt $DEBUG_STD
 					cat permute2_tmp.txt | anew -q permute2.txt
-					cat permute1.txt permute2.txt | anew -q permute.txt
+					cat permute1.txt permute2.txt | anew -q permute_subs.txt
 					eval rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 				elif [[ $(cat tmp_subs_resolution.txt | wc -l) -le 200 ]]
 		  		then
 					eval dnsgen tmp_subs_resolution.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute_tmp.txt $DEBUG_STD
-					cat permute_tmp.txt | anew -q permute.txt
+					cat permute_tmp.txt | anew -q permute_subs.txt
 					eval rm permute_tmp.txt $DEBUG_ERROR  && touch $called_fn_dir/.${FUNCNAME[0]}
 				else
 		  			printf "\n${bred} Skipping Permutations: Too Much Subdomains${reset}\n"
@@ -312,6 +347,7 @@ sub_permut(){
 			if [ -f "permute_subs.txt" ]
 			then
 				NUMOFLINES=$(wc -l < permute_subs.txt)
+				cat permute_subs.txt | anew -q ${domain}_subdomains.txt
 			else
 				NUMOFLINES=0
 			fi
@@ -338,28 +374,6 @@ webprobe_simple(){
 			end=`date +%s`
 			runtime=$((end-start))
 			printf "${green} ${NUMOFLINES} subdomains resolved in ${runtime} secs${reset}\n\n"
-		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
-	fi
-}
-
-sub_scraping(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
-		then
-			start=`date +%s`
-			printf "${yellow} Running : JS scraping subdomain search 6/6${reset}\n"
-			eval timeout 10m python3 $tools/SubDomainizer/SubDomainizer.py -l ${domain}_probed.txt -k -g -gt $GITHUB_TOKEN -san same -o JS_subs.txt $DEBUG_STD
-			if [[ $(cat JS_subs.txt | wc -l) -gt 0 ]]
-			then
-				NUMOFLINES=$(wc -l < JS_subs.txt)
-				cat JS_subs.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed.txt
-				cat JS_subs.txt | sed 's/https\?:\/\///' | anew -q ${domain}_subdomains.txt && touch $called_fn_dir/.${FUNCNAME[0]}
-			else
-				NUMOFLINES=0
-			fi
-			end=`date +%s`
-			runtime=$((end-start))
-			printf "${green} ${NUMOFLINES} subdomains found in ${runtime} secs${reset}\n\n"
 		else
 			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
@@ -570,10 +584,10 @@ jschecks(){
 			printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
 			cat ${domain}_jsfile_links.txt | httpx -follow-redirects -silent -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt
 			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
-			interlace -tL ${domain}_js_livelinks.txt -threads 5 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> ${domain}_js_endpoints.txt" &>/dev/null
+			interlace -tL ${domain}_js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> ${domain}_js_endpoints.txt" &>/dev/null
 			sed -i '/^Running against/d; /^Invalid input/d; /^$/d' ${domain}_js_endpoints.txt
 			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
-			interlace -tL ${domain}_js_livelinks.txt -threads 5 -c "python3 $tools/SecretFinder/SecretFinder.py -i _target_ -o cli >> ${domain}_js_linksecret.txt" &>/dev/null
+			interlace -tL ${domain}_js_livelinks.txt -threads 10 -c "python3 $tools/SecretFinder/SecretFinder.py -i _target_ -o cli >> ${domain}_js_linksecret.txt" &>/dev/null
 			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
 			cat ${domain}_js_livelinks.txt | python3 $tools/getjswords.py | anew -q ${domain}_js_Wordlist.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
@@ -593,7 +607,7 @@ params(){
 			printf "${bblue} Parameter Discovery ${reset}\n"
 			start=`date +%s`
 			printf "${yellow}\n\n Running : Finding params with paramspider${reset}\n"
-			interlace -tL ${domain}_probed.txt -threads 5 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,js" &>/dev/null
+			interlace -tL ${domain}_probed.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,js" &>/dev/null
 			find output/ -name '*.txt' -exec cat {} \; | anew -q ${domain}_param.txt
 			sed '/^FUZZ/d' -i ${domain}_param.txt
 			rm -rf output/
@@ -1016,7 +1030,7 @@ while getopts ":hd:-:l:vaisxwgto:" opt; do
 					exit
 					;;
 				ss)	start
-					cp $list $dir/${domain}_probed.txt
+					cp $list $dir/${domain}_subdomains.txt
 					sub_scraping
 					end
 					exit
