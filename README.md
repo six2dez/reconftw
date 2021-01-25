@@ -93,7 +93,7 @@ chmod +x *.sh
 
 ## Features 
 
-- Google Dorks (based on deggogle_hunter)
+- Google Dorks (based on degoogle_hunter)
 - Subdomain enumeration (passive, resolution, bruteforce and permutations)
 - Sub TKO (subjack and nuclei)
 - Web Prober (httpx)
