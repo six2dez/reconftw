@@ -219,10 +219,12 @@ subdomains_full(){
 	eval rm -f *_subs.txt $DEBUG_ERROR
 	if [ -f "${domain}_subdomains.txt" ]
 		then
+			deleteOutScoped $outOfScope_file ${domain}_subdomains.txt
 			NUMOFLINES_subs=$(wc -l < ${domain}_subdomains.txt)
 	fi
 	if [ -f "${domain}_probed.txt" ]
 		then
+			deleteOutScoped $outOfScope_file ${domain}_probed.txt
 			NUMOFLINES_probed=$(wc -l < ${domain}_probed.txt)
 	fi
 	printf "${bblue}\n Final results: ${reset}\n"
@@ -280,6 +282,7 @@ sub_dns(){
 			start=`date +%s`
 			printf "${yellow} Running : Active Subdomain Enumeration 3/6${reset}\n"
 			cat *_subs.txt > tmp_subs_resolution.txt
+			deleteOutScoped $outOfScope_file tmp_subs_resolution.txt
 			eval shuffledns -d $domain -list tmp_subs_resolution.txt -r $tools/resolvers.txt -o ${domain}_subdomains.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			NUMOFLINES=$(wc -l < ${domain}_subdomains.txt)
 			end=`date +%s`
@@ -294,7 +297,7 @@ sub_scraping(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
 		then
 			start=`date +%s`
-			printf "${yellow} Running : JS scraping subdomain search 6/6${reset}\n"
+			printf "${yellow} Running : JS scraping subdomain search 4/6${reset}\n"
 			interlace -tL ${domain}_subdomains.txt -threads 20 -c "python3 $tools/SubDomainizer/SubDomainizer.py -u _target_ -k -g -gt $GITHUB_TOKEN -san all -o _target_-subdomainizer.txt -cop _target_-clouds.txt &>/dev/null" &>/dev/null
 			cat *-clouds.txt | anew -q ${domain}_clouds.txt
 			cat *-subdomainizer.txt | anew -q JS_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
@@ -327,7 +330,7 @@ sub_permut(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
 		then
 			start=`date +%s`
-			printf "${yellow} Running : Permutations Subdomain Enumeration 4/6${reset}\n"
+			printf "${yellow} Running : Permutations Subdomain Enumeration 5/6${reset}\n"
 			if [[ $(cat tmp_subs_resolution.txt | wc -l) -le 100 ]]
 				then
 					eval dnsgen tmp_subs_resolution.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute1_tmp.txt $DEBUG_STD
@@ -346,6 +349,7 @@ sub_permut(){
 			fi
 			if [ -f "permute_subs.txt" ]
 			then
+				deleteOutScoped $outOfScope_file permute_subs.txt
 				NUMOFLINES=$(wc -l < permute_subs.txt)
 				cat permute_subs.txt | anew -q ${domain}_subdomains.txt
 			else
@@ -363,10 +367,11 @@ webprobe_simple(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
 		then
 			start=`date +%s`
-			printf "${yellow} Running : Http probing 5/6${reset}\n\n"
+			printf "${yellow} Running : Http probing 6/6${reset}\n\n"
 			cat ${domain}_subdomains.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' > ${domain}_probed.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			if [ -f "${domain}_probed.txt" ]
 			then
+				deleteOutScoped $outOfScope_file ${domain}_probed.txt
 				NUMOFLINES=$(wc -l < ${domain}_probed.txt)
 			else
 				NUMOFLINES=0
@@ -798,6 +803,22 @@ crlf_checks(){
 			printf "${bgreen}#######################################################################\n"
 		else
 			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
+}
+
+deleteOutScoped(){
+	if [ -z "$1" ]
+	then
+		cat $1 | while read outscoped
+		do
+			if  grep -q  "^[*]" <<< $outscoped
+			then
+				outscoped="${outscoped:1}"
+				sed -i /"$outscoped$"/d  $2
+			else
+			sed -i /$outscoped/d  $2
+			fi
+		done
 	fi
 }
 
