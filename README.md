@@ -42,6 +42,7 @@ ReconFTW performs automated enumeration of subdomains via various techniques and
 
 
 ## Installation
+- [Installation Guide](https://github.com/six2dez/reconftw/wiki)
 - Requires [Golang](https://golang.org/dl/) > 1.14 installed and paths correctly set ($GOPATH,$GOROOT)
 
 ```bash
