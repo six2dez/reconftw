@@ -82,7 +82,7 @@ function tools_installed(){
 	[ -f $tools/fav-up/favUp.py ] || { printf "${bred} [*] fav-up		[NO]\n"; allinstalled=false;}
 	[ -f $tools/Corsy/corsy.py ] || { printf "${bred} [*] Corsy		[NO]\n"; allinstalled=false;}
 	[ -f $tools/testssl.sh/testssl.sh ] || { printf "${bred} [*] testssl		[NO]\n"; allinstalled=false;}
-	[ -f $tools/SubDomainizer/SubDomainizer.py ] || { printf "${bred} [*] SubDomainizer	[NO]\n"; allinstalled=false;}
+	[ -f $tools/JSFinder/JSFinder.py ] || { printf "${bred} [*] JSFinder	[NO]\n"; allinstalled=false;}
 	[ -f $tools/fuzz_wordlist.txt ] || { printf "${bred} [*] OneListForAll	[NO]\n"; allinstalled=false;}
 	[ -f $tools/LinkFinder/linkfinder.py ] || { printf "${bred} [*] LinkFinder	        [NO]\n"; allinstalled=false;}
 	[ -f $tools/github-endpoints.py ] || { printf "${bred} [*] github-endpoints   [NO]\n"; allinstalled=false;}
@@ -148,7 +148,7 @@ function tools_full(){
 	[ -f $tools/fav-up/favUp.py ] && printf "${bgreen}[*] fav-up		[YES]\n" || printf "${bred} [*] fav-up		[NO]\n"
 	[ -f $tools/Corsy/corsy.py ] && printf "${bgreen}[*] Corsy		[YES]\n" || printf "${bred} [*] Corsy		[NO]\n"
 	[ -f $tools/testssl.sh/testssl.sh ] && printf "${bgreen}[*] testssl		[YES]\n" || printf "${bred} [*] testssl		[NO]\n"
-	[ -f $tools/SubDomainizer/SubDomainizer.py ] && printf "${bgreen}[*] SubDomainizer	[YES]\n" || printf "${bred} [*] SubDomainizer	[NO]\n"
+	[ -f $tools/JSFinder/JSFinder.py ] && printf "${bgreen}[*] JSFinder	[YES]\n" || printf "${bred} [*] JSFinder	[NO]\n"
 	[ -f $tools/fuzz_wordlist.txt ] && printf "${bgreen}[*] OneListForAll	[YES]\n" || printf "${bred} [*] OneListForAll	[NO]\n"
 	[ -f $tools/LinkFinder/linkfinder.py ] && printf "${bgreen}[*] LinkFinder	        [YES]\n" || printf "${bred} [*] LinkFinder	        [NO]\n"
 	[ -f $tools/github-endpoints.py ] && printf "${bgreen}[*] github-endpoints	[YES]\n" || printf "${bred} [*] github-endpoints[NO]\n"
@@ -296,33 +296,19 @@ sub_scraping(){
 		then
 			start=`date +%s`
 			printf "${yellow} Running : JS scraping subdomain search 4/6${reset}\n"
-			if [ -n "$GITHUB_TOKEN" ]; then
-				interlace -tL ${domain}_subdomains.txt -threads 20 -c "python3 $tools/SubDomainizer/SubDomainizer.py -u _target_ -k -g -gt $GITHUB_TOKEN -san same -o _target_-subdomainizer.txt &>/dev/null" &>/dev/null
-			else
-				interlace -tL ${domain}_subdomains.txt -threads 20 -c "python3 $tools/SubDomainizer/SubDomainizer.py -u _target_ -k -san same -o _target_-subdomainizer.txt &>/dev/null" &>/dev/null
-			fi
-#			cat *-clouds.txt | anew -q ${domain}_clouds.txt
-			cat *-subdomainizer.txt | anew -q JS_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
-#			eval rm -f *-clouds.txt $DEBUG_ERROR
-			eval rm -f *-subdomainizer.txt $DEBUG_ERROR
+			cat ${domain}_subdomains.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' > probed_tmp.txt
+			eval python3 $tools/JSFinder/JSFinder.py -f ${domain}_probed_tmp.txt -os JS_subs.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			if [[ $(cat JS_subs.txt | wc -l) -gt 0 ]]
 			then
 				NUMOFLINES=$(wc -l < JS_subs.txt)
 				cat JS_subs.txt | eval shuffledns -d $domain -r $tools/resolvers.txt -o JS_subs_temp.txt $DEBUG_STD
 				cat JS_subs_temp.txt | anew -q ${domain}_subdomains.txt
-				rm JS_subs_temp.txt
+				eval rm JS_subs_temp.txt probed_tmp.txt $DEBUG_ERROR
 			else
 				NUMOFLINES=0
 			fi
-#			if [[ $(cat ${domain}_clouds.txt | wc -l) -gt 0 ]]
-#			then
-#				NUMOFLINES_cloud=$(wc -l < ${domain}_clouds.txt)
-#			else
-#				NUMOFLINES_cloud=0
-#			fi
 			end=`date +%s`
 			getElapsedTime $start $end
-#			printf "${green} ${NUMOFLINES} subdomains and ${NUMOFLINES_cloud} open buckets found in ${runtime}${reset}\n\n"
 			printf "${green} ${NUMOFLINES} subdomains found in ${runtime}${reset}\n\n"
 		else
 			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -618,7 +604,7 @@ params(){
 			interlace -tL ${domain}_probed.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,js" &>/dev/null
 			find output/ -name '*.txt' -exec cat {} \; | anew -q ${domain}_param.txt
 			sed '/^FUZZ/d' -i ${domain}_param.txt
-			rm -rf output/
+			eval rm -rf output/ $DEBUG_ERROR
 			printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
 			eval python3 $tools/Arjun/arjun.py -i ${domain}_param.txt -t 20 -o ${domain}_arjun.json $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`

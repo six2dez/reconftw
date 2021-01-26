@@ -44,7 +44,7 @@ printf "${bblue}\n Updating installed python packages is finished ${reset}\n"
 printf "${bgreen}#######################################################################\n"
 
 #Tools to be updated
-repos="s0md3v/Arjun six2dez/degoogle_hunter 1ndianl33t/Gf-Patterns gwen001/github-search dark-warlord14/LinkFinder projectdiscovery/nuclei-templates devanshbatham/ParamSpider nsonaniya2010/SubDomainizer haccer/subjack s0md3v/Corsy pielco11/fav-up tomnomnom/gf codingo/Interlace blechschmidt/massdns devanshbatham/OpenRedireX tillson/git-hound"
+repos="s0md3v/Arjun six2dez/degoogle_hunter 1ndianl33t/Gf-Patterns gwen001/github-search dark-warlord14/LinkFinder projectdiscovery/nuclei-templates devanshbatham/ParamSpider Threezh1/JSFinder haccer/subjack s0md3v/Corsy pielco11/fav-up tomnomnom/gf codingo/Interlace blechschmidt/massdns devanshbatham/OpenRedireX tillson/git-hound"
 printf "\n${bgreen}--==[ ************************************************************************************ ]==--\n"
 printf "${bred}                reconftw updater script (apt/rpm/pacman compatible)${reset}\n"
 printf "\n${bgreen}--==[ ************************************************************************************ ]==--\n"
