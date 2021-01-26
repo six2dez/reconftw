@@ -93,32 +93,37 @@ chmod +x *.sh
 
 ## Features 
 
-- Google Dorks (based on degoogle_hunter)
-- Subdomain enumeration (passive, resolution, bruteforce and permutations)
-- Sub TKO (subjack and nuclei)
-- Web Prober (httpx)
-- Web screenshot (aquatone)
-- Template scanner (nuclei)
-- Port Scanner (naabu)
-- Url extraction (waybackurls, gau, hakrawler, github-endpoints)
-- Pattern Search (gf and gf-patterns)
-- Param discovery (paramspider and arjun)
-- XSS (Gxss and dalfox)
-- Open redirect (Openredirex)
-- SSRF checks (from m4ll0k/Bug-Bounty-Toolz/SSRF.py)
-- Github Check (git-hound)
-- Favicon Real IP (fav-up)
-- JS Checks (LinkFinder, SecretFinder, scripts from JSFScan)
-- Fuzzing (ffuf)
-- Cors (Corsy)
-- SSL Check (testssl)
-- Interlace integration
+- Google Dorks ([degoogle_hunter](https://github.com/six2dez/degoogle_hunter))
+- Multiple subdomain enumeration techniques (passive, bruteforce, permutations and scraping)
+  - Passive ([subfinder](https://github.com/projectdiscovery/subfinder), [assetfinder](https://github.com/tomnomnom/assetfinder), [amass](https://github.com/OWASP/Amass), [findomain](https://github.com/Findomain/Findomain), [crobat](https://github.com/cgboal/sonarsearch), [waybackurls](https://github.com/tomnomnom/waybackurls))
+  - Bruteforce ([shuffledns](https://github.com/projectdiscovery/shuffledns))
+  - Permutations ([dnsgen](https://github.com/ProjectAnte/dnsgen))
+  - Subdomain JS Scraping ([JSFinder](https://github.com/Threezh1/JSFinder))
+  - Resolution ([shuffledns](https://github.com/projectdiscovery/shuffledns))
+- Sub TKO ([subjack](https://github.com/haccer/subjack) and [nuclei](https://github.com/projectdiscovery/nuclei))
+- Web Prober ([httpx](https://github.com/projectdiscovery/httpx))
+- Web screenshot ([aquatone](https://github.com/michenriksen/aquatone))
+- Template scanner ([nuclei](https://github.com/projectdiscovery/nuclei))
+- Port Scanner ([naabu](https://github.com/projectdiscovery/naabu))
+- Url extraction ([waybackurls](https://github.com/tomnomnom/waybackurls), [gau](https://github.com/lc/gau), [hakrawler](https://github.com/hakluke/hakrawler), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3))
+- Pattern Search ([gf](https://github.com/tomnomnom/waybackurls) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns))
+- Param discovery ([paramspider](https://github.com/devanshbatham/ParamSpider) and [arjun](https://github.com/s0md3v/Arjun))
+- XSS ([Gxss](https://github.com/KathanP19/Gxss) and [dalfox](https://github.com/hahwul/dalfox))
+- Open redirect ([Openredirex](https://github.com/devanshbatham/OpenRedireX))
+- SSRF checks ([asyncio_ssrf.py](https://gist.github.com/h4ms1k/adcc340495d418fcd72ec727a116fea2))
+- Github Check ([git-hound](https://github.com/tillson/git-hound))
+- Favicon Real IP ([fav-up](https://github.com/pielco11/fav-up))
+- JS Checks ([LinkFinder](https://github.com/GerbenJavado/LinkFinder), scripts from [JSFScan](https://github.com/KathanP19/JSFScan.sh))
+- Fuzzing ([ffuf](https://github.com/ffuf/ffuf))
+- Cors ([Corsy](https://github.com/s0md3v/Corsy))
+- SSL Check ([testssl](https://github.com/drwetter/testssl.sh))
+- Multithread in some steps ([Interlace](https://github.com/codingo/Interlace))
 - Custom output folder (default under Recon/target.com/)
 - Run standalone steps (subdomains, subtko, web, gdorks...)
 - Polished installer compatible with most distros
 - Verbose mode
 - Update tools script
-- Raspberry supported
+- Raspberry Pi support
 
 ## Mindmap/Workflow
 
@@ -136,7 +141,7 @@ These are the last features that we have implemented, take a look at our pending
 :heavy_check_mark: Customize output folder  
 :heavy_check_mark: Interlace usage  
 :heavy_check_mark: Crawler  
-:heavy_check_mark: SubDomainizer  
+:heavy_check_mark: JSFinder  
 :heavy_check_mark: Install script  
 :heavy_check_mark: Apt,rpm,pacman compatible installer  
 
