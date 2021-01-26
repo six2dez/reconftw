@@ -69,6 +69,7 @@ chmod +x *.sh
 <b>TARGET OPTIONS</b>
 -d DOMAIN        Target domain
 -l list.txt      Targets list, one per line
+-x oos.txt       Exclude subdomains list (Out Of Scope)
 
 <b>MODE OPTIONS</b>
 -a               Perform all checks
@@ -132,6 +133,7 @@ chmod +x *.sh
 
 These are the last features that we have implemented, take a look at our pending [features](https://github.com/six2dez/reconftw/labels/feature) or suggest a new feature in the issues section:
 
+:heavy_check_mark: Exclude Out Of Scope  
 :heavy_check_mark: Better outputs  
 :heavy_check_mark: RPI support  
 :heavy_check_mark: Open Redirect with Openredirex  
