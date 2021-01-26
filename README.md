@@ -99,7 +99,6 @@ chmod +x *.sh
   - Bruteforce ([shuffledns](https://github.com/projectdiscovery/shuffledns))
   - Permutations ([dnsgen](https://github.com/ProjectAnte/dnsgen))
   - Subdomain JS Scraping ([JSFinder](https://github.com/Threezh1/JSFinder))
-  - Resolution ([shuffledns](https://github.com/projectdiscovery/shuffledns))
 - Sub TKO ([subjack](https://github.com/haccer/subjack) and [nuclei](https://github.com/projectdiscovery/nuclei))
 - Web Prober ([httpx](https://github.com/projectdiscovery/httpx))
 - Web screenshot ([aquatone](https://github.com/michenriksen/aquatone))
@@ -133,6 +132,8 @@ chmod +x *.sh
 
 These are the last features that we have implemented, take a look at our pending [features](https://github.com/six2dez/reconftw/labels/feature) or suggest a new feature in the issues section:
 
+:heavy_check_mark: Better outputs  
+:heavy_check_mark: RPI support  
 :heavy_check_mark: Open Redirect with Openredirex  
 :heavy_check_mark: SSRF Checks  
 :heavy_check_mark: More error checks  
