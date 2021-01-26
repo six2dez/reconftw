@@ -76,6 +76,7 @@ fi
 [ ! -d "~/Tools" ] && mkdir -p ~/Tools
 dir=~/Tools
 
+eval pip3 install -r requirements.txt $DEBUG_STD
 eval go get -v github.com/tomnomnom/gf $DEBUG_STD
 eval go get -v github.com/tomnomnom/qsreplace $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/OWASP/Amass/v3/... $DEBUG_STD
@@ -118,9 +119,8 @@ eval git clone https://github.com/six2dez/degoogle_hunter $dir/degoogle_hunter $
 eval git clone https://github.com/s0md3v/Arjun $dir/Arjun $DEBUG_STD
 eval git clone https://github.com/pielco11/fav-up $dir/fav-up $DEBUG_STD
 eval git clone https://github.com/s0md3v/Corsy $dir/Corsy $DEBUG_STD
-eval git clone https://github.com/nsonaniya2010/SubDomainizer $dir/SubDomainizer $DEBUG_STD
+eval git clone https://github.com/Threezh1/JSFinder $dir/JSFinder $DEBUG_STD
 eval git clone https://github.com/codingo/Interlace $dir/Interlace $DEBUG_STD
-eval git clone https://github.com/m4ll0k/SecretFinder $dir/SecretFinder $DEBUG_STD
 eval git clone https://github.com/gwen001/github-search $dir/github-search $DEBUG_STD
 printf "${bgreen} 70%% done${reset}\n\n"
 eval git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh $DEBUG_STD
@@ -168,7 +168,9 @@ eval wget -O resolvers.txt https://raw.githubusercontent.com/janmasarik/resolver
 eval wget -O permutations_list.txt https://gist.githubusercontent.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw/137bb6b60c616552c705e93a345c06cec3a2cb1f/permutations_list.txt $DEBUG_STD
 eval wget -O ssrf.py https://gist.githubusercontent.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw/ea0774de5e27f9bc855207b175249edae2e9ccef/asyncio_ssrf.py $DEBUG_STD
 eval wget -O fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD
-eval pip3 install -r $dir/reconftw/all_requirements.txt $DEBUG_STD
+
+#stripping all Go binaries
+eval strip -s $HOME/go/bin/* $DEBUG_STD
 
 printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - git-hound (~/.githound/config.yml)\n - github-endpoints.py ($tools/.github_tokens or GITHUB_TOKEN env var)\n - favup (shodan init SHODANPAIDAPIKEY)\n - SSRF Server (COLLAB_SERVER env var) ${reset}\n"
 

@@ -82,8 +82,7 @@ function tools_installed(){
 	[ -f $tools/fav-up/favUp.py ] || { printf "${bred} [*] fav-up		[NO]\n"; allinstalled=false;}
 	[ -f $tools/Corsy/corsy.py ] || { printf "${bred} [*] Corsy		[NO]\n"; allinstalled=false;}
 	[ -f $tools/testssl.sh/testssl.sh ] || { printf "${bred} [*] testssl		[NO]\n"; allinstalled=false;}
-	[ -f $tools/SubDomainizer/SubDomainizer.py ] || { printf "${bred} [*] SubDomainizer	[NO]\n"; allinstalled=false;}
-	[ -f $tools/SecretFinder/SecretFinder.py ] || { printf "${bred} [*] SecretFinder	[NO]\n"; allinstalled=false;}
+	[ -f $tools/JSFinder/JSFinder.py ] || { printf "${bred} [*] JSFinder	[NO]\n"; allinstalled=false;}
 	[ -f $tools/fuzz_wordlist.txt ] || { printf "${bred} [*] OneListForAll	[NO]\n"; allinstalled=false;}
 	[ -f $tools/LinkFinder/linkfinder.py ] || { printf "${bred} [*] LinkFinder	        [NO]\n"; allinstalled=false;}
 	[ -f $tools/github-endpoints.py ] || { printf "${bred} [*] github-endpoints   [NO]\n"; allinstalled=false;}
@@ -149,8 +148,7 @@ function tools_full(){
 	[ -f $tools/fav-up/favUp.py ] && printf "${bgreen}[*] fav-up		[YES]\n" || printf "${bred} [*] fav-up		[NO]\n"
 	[ -f $tools/Corsy/corsy.py ] && printf "${bgreen}[*] Corsy		[YES]\n" || printf "${bred} [*] Corsy		[NO]\n"
 	[ -f $tools/testssl.sh/testssl.sh ] && printf "${bgreen}[*] testssl		[YES]\n" || printf "${bred} [*] testssl		[NO]\n"
-	[ -f $tools/SubDomainizer/SubDomainizer.py ] && printf "${bgreen}[*] SubDomainizer	[YES]\n" || printf "${bred} [*] SubDomainizer	[NO]\n"
-	[ -f $tools/SecretFinder/SecretFinder.py ] && printf "${bgreen}[*] SecretFinder	[YES]\n" || printf "${bred} [*] SecretFinder	[NO]\n"
+	[ -f $tools/JSFinder/JSFinder.py ] && printf "${bgreen}[*] JSFinder	[YES]\n" || printf "${bred} [*] JSFinder	[NO]\n"
 	[ -f $tools/fuzz_wordlist.txt ] && printf "${bgreen}[*] OneListForAll	[YES]\n" || printf "${bred} [*] OneListForAll	[NO]\n"
 	[ -f $tools/LinkFinder/linkfinder.py ] && printf "${bgreen}[*] LinkFinder	        [YES]\n" || printf "${bred} [*] LinkFinder	        [NO]\n"
 	[ -f $tools/github-endpoints.py ] && printf "${bgreen}[*] github-endpoints	[YES]\n" || printf "${bred} [*] github-endpoints[NO]\n"
@@ -252,8 +250,8 @@ sub_passive(){
 			eval rm subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt waybackurls.txt $DEBUG_ERROR
 			NUMOFLINES=$(wc -l < passive_subs.txt)
 			end=`date +%s`
-			runtime=$((end-start))
-			printf "${green} ${NUMOFLINES} subdomains found in ${runtime} secs${reset}\n\n"
+			getElapsedTime $start $end
+			printf "${green} ${NUMOFLINES} subdomains found in ${runtime}${reset}\n\n"
 		else
 			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
@@ -269,8 +267,8 @@ sub_brute(){
 			eval rm active_tmp.txt $DEBUG_ERROR
 			NUMOFLINES=$(wc -l < brute_subs.txt)
 			end=`date +%s`
-			runtime=$((end-start))
-			printf "${green} ${NUMOFLINES} subdomains found in ${runtime} secs${reset}\n\n"
+			getElapsedTime $start $end
+			printf "${green} ${NUMOFLINES} subdomains found in ${runtime}${reset}\n\n"
 		else
 			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
@@ -286,8 +284,8 @@ sub_dns(){
 			eval shuffledns -d $domain -list tmp_subs_resolution.txt -r $tools/resolvers.txt -o ${domain}_subdomains.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			NUMOFLINES=$(wc -l < ${domain}_subdomains.txt)
 			end=`date +%s`
-			runtime=$((end-start))
-			printf "${green} ${NUMOFLINES} subdomains found in ${runtime} secs${reset}\n\n"
+			getElapsedTime $start $end
+			printf "${green} ${NUMOFLINES} subdomains found in ${runtime}${reset}\n\n"
 		else
 			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
@@ -298,34 +296,20 @@ sub_scraping(){
 		then
 			start=`date +%s`
 			printf "${yellow} Running : JS scraping subdomain search 4/6${reset}\n"
-			if [ -n "$GITHUB_TOKEN" ]; then
-				interlace -tL ${domain}_subdomains.txt -threads 20 -c "python3 $tools/SubDomainizer/SubDomainizer.py -u _target_ -k -g -gt $GITHUB_TOKEN -san same -o _target_-subdomainizer.txt &>/dev/null" &>/dev/null
-			else
-				interlace -tL ${domain}_subdomains.txt -threads 20 -c "python3 $tools/SubDomainizer/SubDomainizer.py -u _target_ -k -san same -o _target_-subdomainizer.txt &>/dev/null" &>/dev/null
-			fi
-#			cat *-clouds.txt | anew -q ${domain}_clouds.txt
-			cat *-subdomainizer.txt | anew -q JS_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
-#			eval rm -f *-clouds.txt $DEBUG_ERROR
-			eval rm -f *-subdomainizer.txt $DEBUG_ERROR
+			cat ${domain}_subdomains.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' > probed_tmp.txt
+			eval python3 $tools/JSFinder/JSFinder.py -f ${domain}_probed_tmp.txt -os JS_subs.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			if [[ $(cat JS_subs.txt | wc -l) -gt 0 ]]
 			then
 				NUMOFLINES=$(wc -l < JS_subs.txt)
 				cat JS_subs.txt | eval shuffledns -d $domain -r $tools/resolvers.txt -o JS_subs_temp.txt $DEBUG_STD
 				cat JS_subs_temp.txt | anew -q ${domain}_subdomains.txt
-				rm JS_subs_temp.txt
+				eval rm JS_subs_temp.txt probed_tmp.txt $DEBUG_ERROR
 			else
 				NUMOFLINES=0
 			fi
-#			if [[ $(cat ${domain}_clouds.txt | wc -l) -gt 0 ]]
-#			then
-#				NUMOFLINES_cloud=$(wc -l < ${domain}_clouds.txt)
-#			else
-#				NUMOFLINES_cloud=0
-#			fi
 			end=`date +%s`
-			runtime=$((end-start))
-#			printf "${green} ${NUMOFLINES} subdomains and ${NUMOFLINES_cloud} open buckets found in ${runtime} secs${reset}\n\n"
-			printf "${green} ${NUMOFLINES} subdomains found in ${runtime} secs${reset}\n\n"
+			getElapsedTime $start $end
+			printf "${green} ${NUMOFLINES} subdomains found in ${runtime}${reset}\n\n"
 		else
 			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
@@ -343,12 +327,12 @@ sub_permut(){
 					eval dnsgen permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute2_tmp.txt $DEBUG_STD
 					cat permute2_tmp.txt | anew -q permute2.txt
 					cat permute1.txt permute2.txt | anew -q permute_subs.txt
-					eval rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt tmp_subs_resolution.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 				elif [[ $(cat tmp_subs_resolution.txt | wc -l) -le 200 ]]
 		  		then
 					eval dnsgen tmp_subs_resolution.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute_tmp.txt $DEBUG_STD
 					cat permute_tmp.txt | anew -q permute_subs.txt
-					eval rm permute_tmp.txt $DEBUG_ERROR  && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval rm permute_tmp.txt tmp_subs_resolution.txt $DEBUG_ERROR  && touch $called_fn_dir/.${FUNCNAME[0]}
 				else
 		  			printf "\n${bred} Skipping Permutations: Too Much Subdomains${reset}\n"
 			fi
@@ -361,8 +345,8 @@ sub_permut(){
 				NUMOFLINES=0
 			fi
 			end=`date +%s`
-			runtime=$((end-start))
-			printf "${green} ${NUMOFLINES} subdomains found in ${runtime} secs${reset}\n\n"
+			getElapsedTime $start $end
+			printf "${green} ${NUMOFLINES} subdomains found in ${runtime}${reset}\n\n"
 		else
 			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
@@ -382,8 +366,8 @@ webprobe_simple(){
 				NUMOFLINES=0
 			fi
 			end=`date +%s`
-			runtime=$((end-start))
-			printf "${green} ${NUMOFLINES} subdomains resolved in ${runtime} secs${reset}\n\n"
+			getElapsedTime $start $end
+			printf "${green} ${NUMOFLINES} subdomains resolved in ${runtime}${reset}\n\n"
 		else
 			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
@@ -399,14 +383,14 @@ subtakeover(){
 			grep -v "Not Vulnerable" <${domain}_all-takeover-checks.txt > ${domain}_takeover.txt
 			eval rm ${domain}_all-takeover-checks.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
-			runtime=$((end-start))
+			getElapsedTime $start $end
 			if [ -f "${domain}_takeover.txt" ]
 			then
 				NUMOFLINES=$(wc -l < ${domain}_takeover.txt)
 			else
 				NUMOFLINES=0
 			fi
-			printf "${bred}\n Subtko: ${NUMOFLINES} subdomains in ${runtime} secs${reset}\n\n"
+			printf "${bred}\n Subtko: ${NUMOFLINES} subdomains in ${runtime}${reset}\n\n"
 			eval cat ${domain}_takeover.txt $DEBUG_ERROR
 			printf "${bblue}\n Subdomain Takeover Finished\n"
 			printf "${bblue} Results are saved in ${domain}_takeover.txt${reset}\n"
@@ -425,9 +409,9 @@ webprobe_full(){
 			start=`date +%s`
 			cat ${domain}_subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55672 -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' > ${domain}_probed_uncommon_ports.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
-			runtime=$((end-start))
+			getElapsedTime $start $end
 			NUMOFLINES=$(wc -l < ${domain}_probed_uncommon_ports.txt)
-			printf "${bred}\n Uncommon web ports: ${NUMOFLINES} subdomains in ${runtime} secs${reset}\n\n"
+			printf "${bred}\n Uncommon web ports: ${NUMOFLINES} subdomains in ${runtime}${reset}\n\n"
 			eval cat ${domain}_probed_uncommon_ports.txt $DEBUG_ERROR
 			printf "${bblue}\n Web Probe Finished\n"
 			printf "${bblue} Results are saved in ${domain}_takeover.txt${reset}\n"
@@ -445,8 +429,8 @@ screenshot(){
 			start=`date +%s`
 			cat ${domain}_probed.txt | aquatone -out screenshots -threads 16 -silent && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
-			runtime=$((end-start))
-			printf "${bblue}\n Web Screenshot Finished in ${runtime} secs\n"
+			getElapsedTime $start $end
+			printf "${bblue}\n Web Screenshot Finished in ${runtime}\n"
 			printf "${bblue} Results are saved in in screenshots/aquatone_report.html folder${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -463,8 +447,8 @@ metadata(){
 			mkdir -p $dir/metadata
 			pymeta -d ${domain} -s all -m 500 -j 5 -o $dir/metadata -f ${domain}_metadata.csv && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
-			runtime=$((end-start))
-			printf "${bblue}\n Metadat Checks  Finished in ${runtime} secs\n"
+			getElapsedTime $start $end
+			printf "${bblue}\n Metadat Checks  Finished in ${runtime}\n"
 			printf "${bblue} Results are saved in in metadata folder and ${domain}_metadata.csv ${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -480,8 +464,8 @@ portscan(){
 			start=`date +%s`
 			naabu -top-ports 1000 -silent -exclude-cdn -nmap-cli 'nmap -sV --script /usr/share/nmap/scripts/vulners.nse,http-title.nse --min-rate 40000 -T4 --max-retries 2' -iL ${domain}_subdomains.txt > ${domain}_portscan.txt;
 			end=`date +%s`
-			runtime=$((end-start))
-			printf "${bred}\n Port scan results in ${runtime} secs${reset}\n\n"
+			getElapsedTime $start $end
+			printf "${bred}\n Port scan results in ${runtime}${reset}\n\n"
 			eval cat ${domain}_portscan.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 			printf "\n"
 			printf "${bblue}\n Port Scan Finished\n"
@@ -522,8 +506,8 @@ nuclei_check(){
 			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/vulnerabilities/ -o ${domain}_nuclei_vulnerabilities.txt && touch $called_fn_dir/.${FUNCNAME[0]};
 			printf "\n\n"
 			end=`date +%s`
-			runtime=$((end-start))
-			printf "${bblue}\n Port Scan Finished in ${runtime} secs\n"
+			getElapsedTime $start $end
+			printf "${bblue}\n Port Scan Finished in ${runtime}\n"
 			printf "${bblue} Results are saved in in ${domain}_nuclei_*.txt files${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -546,10 +530,10 @@ urlchecks(){
 				python3 $tools/github-endpoints.py -d $domain | anew -q ${domain}_url_extract.txt  && touch $called_fn_dir/.${FUNCNAME[0]}
 			fi
 			end=`date +%s`
-			runtime=$((end-start))
+			getElapsedTime $start $end
 			NUMOFLINES=$(wc -l < ${domain}_url_extract.txt)
 			printf "${bblue}\n URL Extraction Finished\n"
-			printf "${bblue}\n ${NUMOFLINES} in ${runtime} secs\n"
+			printf "${bblue}\n ${NUMOFLINES} in ${runtime}\n"
 			printf "${bblue} Results are saved in in ${domain}_url_extract.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -572,9 +556,9 @@ url_gf(){
 			gf potential ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_potential.txt;
 			gf lfi ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_lfi.txt && touch $called_fn_dir/.${FUNCNAME[0]};
 			end=`date +%s`
-			runtime=$((end-start))
+			getElapsedTime $start $end
 			cat ${domain}_url_extract.txt | unfurl -u format %s://%d%p > ${domain}_url_endpoints.txt
-			printf "${bblue}\n Vulnerable Pattern Search Finished in ${runtime} secs\n"
+			printf "${bblue}\n Vulnerable Pattern Search Finished in ${runtime}\n"
 			printf "${bblue} Results are saved in in ${domain}_*gfpattern*.txt files${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -597,12 +581,12 @@ jschecks(){
 			interlace -tL ${domain}_js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> ${domain}_js_endpoints.txt" &>/dev/null
 			sed -i '/^Running against/d; /^Invalid input/d; /^$/d' ${domain}_js_endpoints.txt
 			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
-			interlace -tL ${domain}_js_livelinks.txt -threads 10 -c "python3 $tools/SecretFinder/SecretFinder.py -i _target_ -o cli >> ${domain}_js_linksecret.txt" &>/dev/null
+			cat ${domain}_js_livelinks.txt | nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o ${domain}_js_secrets.txt
 			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
 			cat ${domain}_js_livelinks.txt | python3 $tools/getjswords.py | anew -q ${domain}_js_Wordlist.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
-			runtime=$((end-start))
-			printf "${bblue}\n Javascript Scan Finished in ${runtime} secs\n"
+			getElapsedTime $start $end
+			printf "${bblue}\n Javascript Scan Finished in ${runtime}\n"
 			printf "${bblue} Results are saved in in ${domain}_js_*.txt files${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -620,12 +604,12 @@ params(){
 			interlace -tL ${domain}_probed.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,js" &>/dev/null
 			find output/ -name '*.txt' -exec cat {} \; | anew -q ${domain}_param.txt
 			sed '/^FUZZ/d' -i ${domain}_param.txt
-			rm -rf output/
+			eval rm -rf output/ $DEBUG_ERROR
 			printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
 			eval python3 $tools/Arjun/arjun.py -i ${domain}_param.txt -t 20 -o ${domain}_arjun.json $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
-			runtime=$((end-start))
-			printf "${bblue}\n Parameter Discovery Finished in ${runtime} secs\n"
+			getElapsedTime $start $end
+			printf "${bblue}\n Parameter Discovery Finished in ${runtime}\n"
 			printf "${bblue} Results are saved in in ${domain}_param.txt and ${domain}_arjun.json${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -646,12 +630,12 @@ xss(){
 			if [ -n "$XSS_SERVER" ]; then
 				cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox -b six2dez.xss.ht pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
-				runtime=$((end-start))
+				getElapsedTime $start $end
 			else
 				printf "${bblue}\n No XSS_SERVER defined, blind xss skipped\n"
 				cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
-				runtime=$((end-start))
+				getElapsedTime $start $end
 			fi
 			printf "${bblue} Results are saved in in ${domain}_dalfox_xss.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
@@ -668,8 +652,8 @@ github(){
 			start=`date +%s`
 			cat ${domain}_probed.txt | git-hound --dig-files --dig-commits --threads 100 | tee ${domain}_gitrecon.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
-			runtime=$((end-start))
-			printf "${bblue}\n GitHub Scanning Finished in ${runtime} secs\n"
+			getElapsedTime $start $end
+			printf "${bblue}\n GitHub Scanning Finished in ${runtime}\n"
 			printf "${bblue} Results are saved in in ${domain}_gitrecon.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -686,8 +670,8 @@ favicon(){
 			eval python3 $tools/fav-up/favUp.py -w $domain -sc > ${domain}_favicontest.txt $DEBUG_STD
 			eval cat ${domain}_favicontest.txt $DEBUG_STD | grep found_ips && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
-			runtime=$((end-start))
-			printf "${bblue}\n FavIcon Hash Extraction Finished in ${runtime} secs\n"
+			getElapsedTime $start $end
+			printf "${bblue}\n FavIcon Hash Extraction Finished in ${runtime}\n"
 			printf "${bblue} Results are saved in in ${domain}_favicontest.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -710,8 +694,8 @@ fuzz(){
 			done
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
-			runtime=$((end-start))
-			printf "${bblue}\n Directory Fuzzing Finished in ${runtime} secs\n"
+			getElapsedTime $start $end
+			printf "${bblue}\n Directory Fuzzing Finished in ${runtime}\n"
 			printf "${bblue} Results are saved in fuzzing/*subdomain*.md${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -728,8 +712,8 @@ cors(){
 			eval python3 $tools/Corsy/corsy.py -i ${domain}_probed.txt -t 200 > ${domain}_cors.txt $DEBUG_STD
 			eval cat ${domain}_cors.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
-			runtime=$((end-start))
-			printf "${bblue}\n CORS Scan Finished in ${runtime} secs\n"
+			getElapsedTime $start $end
+			printf "${bblue}\n CORS Scan Finished in ${runtime}\n"
 			printf "${bblue} Results are saved in ${domain}_cors.txt ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
@@ -745,8 +729,8 @@ testssl(){
 			start=`date +%s`
 			$tools/testssl.sh/testssl.sh --quiet -U -iL ${domain}_subdomains.txt > ${domain}_testssl.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
-			runtime=$((end-start))
-			printf "${bblue}\n SSL Test Finished in ${runtime} secs\n"
+			getElapsedTime $start $end
+			printf "${bblue}\n SSL Test Finished in ${runtime}\n"
 			printf "${bblue} Results are saved in ${domain}_testssl.txt ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
@@ -764,8 +748,8 @@ open_redirect(){
 			eval python3 $tools/OpenRedireX/openredirex.py -l test_redirect.txt --keyword FUZZ > ${domain}_openredirex.txt $DEBUG_STD
 			eval rm test_redirect.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
-			runtime=$((end-start))
-			printf "${bblue}\n Open Redirects Finished in ${runtime} secs\n"
+			getElapsedTime $start $end
+			printf "${bblue}\n Open Redirects Finished in ${runtime}\n"
 			printf "${bblue} Results are saved in ${domain}_openredirex.txt ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
@@ -782,8 +766,8 @@ ssrf_checks(){
 				start=`date +%s`
 				eval cat ${domain}_ssrf.txt $DEBUG_ERROR | eval python3 $tools/ssrf.py $COLLAB_SERVER > ${domain}_ssrf_confirmed.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
-				runtime=$((end-start))
-				printf "${bblue}\n SSRF Finished in ${runtime} secs\n"
+				getElapsedTime $start $end
+				printf "${bblue}\n SSRF Finished in ${runtime}\n"
 			else
 				printf "${bblue}\n No COLLAB_SERVER defined\n"
 			fi
@@ -802,8 +786,8 @@ crlf_checks(){
 			start=`date +%s`
 			eval crlfuzz -l ${domain}_probed.txt -o ${domain}_crlf.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
-			runtime=$((end-start))
-			printf "${bblue}\n CRLF Finished in ${runtime} secs\n"
+			getElapsedTime $start $end
+			printf "${bblue}\n CRLF Finished in ${runtime}${reset}\n"
 			printf "${bblue} Results are saved in ${domain}_crlf.txt ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
@@ -825,6 +809,20 @@ deleteOutScoped(){
 			fi
 		done
 	fi
+}
+
+function getElapsedTime {
+	runtime=""
+	local T=$2-$1
+	local D=$((T/60/60/24))
+	local H=$((T/60/60%24))
+	local M=$((T/60%60))
+	local S=$((T%60))
+	(( $D > 0 )) && runtime="$runtime$D days, "
+	(( $H > 0 )) && runtime="$runtime$H hours, "
+	(( $M > 0 )) && runtime="$runtime$M minutes, "
+	runtime="$runtime$S seconds."
+	#echo "$retVal"
 }
 
 end(){
