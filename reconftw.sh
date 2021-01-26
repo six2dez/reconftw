@@ -83,7 +83,6 @@ function tools_installed(){
 	[ -f $tools/Corsy/corsy.py ] || { printf "${bred} [*] Corsy		[NO]\n"; allinstalled=false;}
 	[ -f $tools/testssl.sh/testssl.sh ] || { printf "${bred} [*] testssl		[NO]\n"; allinstalled=false;}
 	[ -f $tools/SubDomainizer/SubDomainizer.py ] || { printf "${bred} [*] SubDomainizer	[NO]\n"; allinstalled=false;}
-	[ -f $tools/SecretFinder/SecretFinder.py ] || { printf "${bred} [*] SecretFinder	[NO]\n"; allinstalled=false;}
 	[ -f $tools/fuzz_wordlist.txt ] || { printf "${bred} [*] OneListForAll	[NO]\n"; allinstalled=false;}
 	[ -f $tools/LinkFinder/linkfinder.py ] || { printf "${bred} [*] LinkFinder	        [NO]\n"; allinstalled=false;}
 	[ -f $tools/github-endpoints.py ] || { printf "${bred} [*] github-endpoints   [NO]\n"; allinstalled=false;}
@@ -150,7 +149,6 @@ function tools_full(){
 	[ -f $tools/Corsy/corsy.py ] && printf "${bgreen}[*] Corsy		[YES]\n" || printf "${bred} [*] Corsy		[NO]\n"
 	[ -f $tools/testssl.sh/testssl.sh ] && printf "${bgreen}[*] testssl		[YES]\n" || printf "${bred} [*] testssl		[NO]\n"
 	[ -f $tools/SubDomainizer/SubDomainizer.py ] && printf "${bgreen}[*] SubDomainizer	[YES]\n" || printf "${bred} [*] SubDomainizer	[NO]\n"
-	[ -f $tools/SecretFinder/SecretFinder.py ] && printf "${bgreen}[*] SecretFinder	[YES]\n" || printf "${bred} [*] SecretFinder	[NO]\n"
 	[ -f $tools/fuzz_wordlist.txt ] && printf "${bgreen}[*] OneListForAll	[YES]\n" || printf "${bred} [*] OneListForAll	[NO]\n"
 	[ -f $tools/LinkFinder/linkfinder.py ] && printf "${bgreen}[*] LinkFinder	        [YES]\n" || printf "${bred} [*] LinkFinder	        [NO]\n"
 	[ -f $tools/github-endpoints.py ] && printf "${bgreen}[*] github-endpoints	[YES]\n" || printf "${bred} [*] github-endpoints[NO]\n"
@@ -343,12 +341,12 @@ sub_permut(){
 					eval dnsgen permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute2_tmp.txt $DEBUG_STD
 					cat permute2_tmp.txt | anew -q permute2.txt
 					cat permute1.txt permute2.txt | anew -q permute_subs.txt
-					eval rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt tmp_subs_resolution.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 				elif [[ $(cat tmp_subs_resolution.txt | wc -l) -le 200 ]]
 		  		then
 					eval dnsgen tmp_subs_resolution.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute_tmp.txt $DEBUG_STD
 					cat permute_tmp.txt | anew -q permute_subs.txt
-					eval rm permute_tmp.txt $DEBUG_ERROR  && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval rm permute_tmp.txt tmp_subs_resolution.txt $DEBUG_ERROR  && touch $called_fn_dir/.${FUNCNAME[0]}
 				else
 		  			printf "\n${bred} Skipping Permutations: Too Much Subdomains${reset}\n"
 			fi
@@ -597,7 +595,7 @@ jschecks(){
 			interlace -tL ${domain}_js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> ${domain}_js_endpoints.txt" &>/dev/null
 			sed -i '/^Running against/d; /^Invalid input/d; /^$/d' ${domain}_js_endpoints.txt
 			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
-			interlace -tL ${domain}_js_livelinks.txt -threads 10 -c "python3 $tools/SecretFinder/SecretFinder.py -i _target_ -o cli >> ${domain}_js_linksecret.txt" &>/dev/null
+			cat ${domain}_js_livelinks.txt | nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o ${domain}_js_secrets.txt
 			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
 			cat ${domain}_js_livelinks.txt | python3 $tools/getjswords.py | anew -q ${domain}_js_Wordlist.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`

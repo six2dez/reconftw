@@ -121,7 +121,6 @@ eval git clone https://github.com/pielco11/fav-up $dir/fav-up $DEBUG_STD
 eval git clone https://github.com/s0md3v/Corsy $dir/Corsy $DEBUG_STD
 eval git clone https://github.com/nsonaniya2010/SubDomainizer $dir/SubDomainizer $DEBUG_STD
 eval git clone https://github.com/codingo/Interlace $dir/Interlace $DEBUG_STD
-eval git clone https://github.com/m4ll0k/SecretFinder $dir/SecretFinder $DEBUG_STD
 eval git clone https://github.com/gwen001/github-search $dir/github-search $DEBUG_STD
 printf "${bgreen} 70%% done${reset}\n\n"
 eval git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh $DEBUG_STD
