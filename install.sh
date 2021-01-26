@@ -26,18 +26,15 @@ printf "\n\n${bgreen}###########################################################
 printf "${bgreen} reconftw installer script (apt/rpm/pacman compatible)${reset}\n\n"
 
 install_apt(){
-    eval $SUDO apt update -y $DEBUG_STD
-    eval $SUDO apt install python3 python3-pip ruby git libpcap-dev chromium-browser wget python-dev python3-dev build-essential libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap -y $DEBUG_STD
+    eval $SUDO apt install python3 python3-pip ruby git libpcap-dev chromium-browser wget python-dev python3-dev build-essential libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq -y $DEBUG_STD
 }
 
 install_yum(){
-    eval $SUDO yum update -y $DEBUG_STD
-    eval $SUDO yum install python3 python3-pip ruby git libpcap-devel chromium wget openssl-devel python3-devel libxslt-devel libffi-devel libxml2-devel nmap zlib-devel -y $DEBUG_STD
+    eval $SUDO yum install python3 python3-pip ruby git libpcap-devel chromium wget openssl-devel python3-devel libxslt-devel libffi-devel libxml2-devel nmap zlib-devel jq -y $DEBUG_STD
 }
 
 install_pacman(){
-    eval $SUDO pacman -Syu -y $DEBUG_STD
-    eval $SUDO pacman -Sy install python python-pip ruby git libpcap nmap chromium wget -y $DEBUG_STD
+    eval $SUDO pacman -Sy install python python-pip ruby git libpcap nmap chromium wget jq -y $DEBUG_STD
 }
 
 #installing latest Golang version
@@ -168,6 +165,8 @@ eval wget -O resolvers.txt https://raw.githubusercontent.com/janmasarik/resolver
 eval wget -O permutations_list.txt https://gist.githubusercontent.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw/137bb6b60c616552c705e93a345c06cec3a2cb1f/permutations_list.txt $DEBUG_STD
 eval wget -O ssrf.py https://gist.githubusercontent.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw/ea0774de5e27f9bc855207b175249edae2e9ccef/asyncio_ssrf.py $DEBUG_STD
 eval wget -O fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD
+
+sed -i 's/^miscellaneous/#miscellaneous/' ~/nuclei-templates/.nuclei-ignore
 
 #stripping all Go binaries
 eval strip -s $HOME/go/bin/* $DEBUG_STD

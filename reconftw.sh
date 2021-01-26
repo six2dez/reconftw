@@ -121,6 +121,7 @@ function tools_installed(){
 	eval type -P unfurl $DEBUG_STD || { printf "${bred} [*] unfurl		[NO]\n"; allinstalled=false;}
 	eval type -P crlfuzz $DEBUG_STD || { printf "${bred} [*] crlfuzz		[NO]\n"; allinstalled=false;}
 	eval type -P httpx $DEBUG_STD || { printf "${bred} [*] Httpx		[NO]\n${reset}"; allinstalled=false;}
+	eval type -P jq $DEBUG_STD || { printf "${bred} [*] jq			[NO]\n${reset}"; allinstalled=false;}
 
 	if [ "${allinstalled}" = true ] ; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
@@ -148,7 +149,7 @@ function tools_full(){
 	[ -f $tools/fav-up/favUp.py ] && printf "${bgreen}[*] fav-up		[YES]\n" || printf "${bred} [*] fav-up		[NO]\n"
 	[ -f $tools/Corsy/corsy.py ] && printf "${bgreen}[*] Corsy		[YES]\n" || printf "${bred} [*] Corsy		[NO]\n"
 	[ -f $tools/testssl.sh/testssl.sh ] && printf "${bgreen}[*] testssl		[YES]\n" || printf "${bred} [*] testssl		[NO]\n"
-	[ -f $tools/JSFinder/JSFinder.py ] && printf "${bgreen}[*] JSFinder	[YES]\n" || printf "${bred} [*] JSFinder	[NO]\n"
+	[ -f $tools/JSFinder/JSFinder.py ] && printf "${bgreen}[*] JSFinder		[YES]\n" || printf "${bred} [*] JSFinder	[NO]\n"
 	[ -f $tools/fuzz_wordlist.txt ] && printf "${bgreen}[*] OneListForAll	[YES]\n" || printf "${bred} [*] OneListForAll	[NO]\n"
 	[ -f $tools/LinkFinder/linkfinder.py ] && printf "${bgreen}[*] LinkFinder	        [YES]\n" || printf "${bred} [*] LinkFinder	        [NO]\n"
 	[ -f $tools/github-endpoints.py ] && printf "${bgreen}[*] github-endpoints	[YES]\n" || printf "${bred} [*] github-endpoints[NO]\n"
@@ -169,7 +170,7 @@ function tools_full(){
 	eval type -P subjack $DEBUG_STD && printf "${bgreen}[*] Subjack		[YES]\n" || { printf "${bred} [*] Subjack		[NO]\n"; }
 	[ -f $tools/subjack/fingerprints.json ] && printf "${bgreen}[*] Subjack fings	[YES]\n" || printf "${bred} [*] Subjack fings	[NO]\n"
 	eval type -P nuclei $DEBUG_STD && printf "${bgreen}[*] Nuclei		[YES]\n" || { printf "${bred} [*] Nuclei		[NO]\n"; }
-	[ -d ~/nuclei-templates ] && printf "${bgreen}[*] Nuclei templates  [YES]\n" || printf "${bred} [*] Nuclei templates  [NO]\n"
+	[ -d ~/nuclei-templates ] && printf "${bgreen}[*] Nuclei templates  	[YES]\n" || printf "${bred} [*] Nuclei templates  	[NO]\n"
 	eval type -P aquatone $DEBUG_STD && printf "${bgreen}[*] Aquatone		[YES]\n" || { printf "${bred} [*] Aquatone		[NO]\n"; }
 	eval type -P naabu $DEBUG_STD && printf "${bgreen}[*] Naabu		[YES]\n" || { printf "${bred} [*] Naabu		[NO]\n"; }
 	eval type -P gf $DEBUG_STD && printf "${bgreen}[*] Gf		        [YES]\n" || { printf "${bred} [*] Gf			[NO]\n"; }
@@ -187,6 +188,7 @@ function tools_full(){
 	eval type -P unfurl $DEBUG_STD && printf "${bgreen}[*] unfurl		[YES]\n" || { printf "${bred} [*] unfurl		[NO]\n"; }
 	eval type -P crlfuzz $DEBUG_STD && printf "${bgreen}[*] crlfuzz		[YES]\n" || { printf "${bred} [*] crlfuzz		[NO]\n"; }
 	eval type -P httpx $DEBUG_STD && printf "${bgreen}[*] Httpx		[YES]\n${reset}" || { printf "${bred} [*] Httpx		[NO]\n${reset}"; }
+	eval type -P jq $DEBUG_STD && printf "${bgreen}[*] jq			[YES]\n${reset}" || { printf "${bred} [*] jq			[NO]\n${reset}"; }
 
 	printf "\n${yellow} If any tool is not installed under $tools, I trust in your ability to install it :D\n Also remember to set the ${bred}\$tools${yellow} variable at the start of this script.\n If you have any problem you can always ping me ;) ${reset}\n\n"
 	printf "${bblue} Tools check finished\n"
@@ -296,6 +298,7 @@ sub_scraping(){
 		then
 			start=`date +%s`
 			printf "${yellow} Running : JS scraping subdomain search 4/6${reset}\n"
+			touch JS_subs.txt
 			cat ${domain}_subdomains.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' > probed_tmp.txt
 			eval python3 $tools/JSFinder/JSFinder.py -f ${domain}_probed_tmp.txt -os JS_subs.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			if [[ $(cat JS_subs.txt | wc -l) -gt 0 ]]
@@ -427,7 +430,7 @@ screenshot(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} ${bgreen} Web Screenshot ${reset}\n\n"
 			start=`date +%s`
-			cat ${domain}_probed.txt | aquatone -out screenshots -threads 16 -silent && touch $called_fn_dir/.${FUNCNAME[0]}
+			cat ${domain}_probed.txt | aquatone -out screenshots -threads 8 -silent && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Web Screenshot Finished in ${runtime}\n"
@@ -442,13 +445,13 @@ metadata(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
 		then
 			printf "${bgreen}#######################################################################\n"
-			printf "${bblue} ${bgreen} Metadat Checks ${reset}\n\n"
+			printf "${bblue} ${bgreen} Metadata Checks ${reset}\n\n"
 			start=`date +%s`
 			mkdir -p $dir/metadata
 			pymeta -d ${domain} -s all -m 500 -j 5 -o $dir/metadata -f ${domain}_metadata.csv && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${bblue}\n Metadat Checks  Finished in ${runtime}\n"
+			printf "${bblue}\n Metadata Checks  Finished in ${runtime}\n"
 			printf "${bblue} Results are saved in in metadata folder and ${domain}_metadata.csv ${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -894,11 +897,12 @@ all(){
 }
 
 help(){
-	printf "\n Usage: $0 [-h] [-i] [-d DOMAIN] [-l list.txt] [-a] [-g] [-w] [-t]"
-	printf "\n           	      [-s] [--sp] [--sb] [--sr] [--ss] [--sw] [-v] [-o OUTPUT]\n\n"
+	printf "\n Usage: $0 [-h] [-i] [-d DOMAIN] [-l list.txt] [-x oos.txt] [-a] [-g] [-w] "
+	printf "\n           	      [-t] [-s] [--sp] [--sb] [--sr] [--ss] [--sw] [-v] [-o OUTPUT]\n\n"
 	printf " ${bblue}TARGET OPTIONS${reset}\n"
 	printf "   -d DOMAIN        Target domain\n"
 	printf "   -l list.txt      Targets list, one per line\n"
+	printf "   -x oos.txt       Exclude subdomains list (Out Of Scope)\n"
 	printf " \n"
 	printf " ${bblue}MODE OPTIONS${reset}\n"
 	printf "   -a               Perform all checks\n"
@@ -920,8 +924,8 @@ help(){
 	printf "   -o output/path   Define output folder\n"
 	printf " \n"
 	printf " ${bblue}USAGE EXAMPLES${reset}\n"
-	printf " Full recon with custom output:\n"
-	printf " ./reconftw.sh -d example.com -a -o custom/path\n"
+	printf " Full recon with custom output and excluded subdomains list:\n"
+	printf " ./reconftw.sh -d example.com -x out.txt -a -o custom/path\n"
 	printf " \n"
 	printf " Full Subdomain scanning with multiple targets:\n"
 	printf " ./reconftw.sh -l targets.txt -s\n"
@@ -947,7 +951,7 @@ then
    exit
 fi
 
-while getopts ":hd:-:l:vaisxwgto:" opt; do
+while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 	verbose=$@
 	if [[ $verbose == *"-v"* ]]; then
   		unset DEBUG_STD
@@ -957,6 +961,8 @@ while getopts ":hd:-:l:vaisxwgto:" opt; do
 		d ) domain=$OPTARG
 			;;
 		l ) list=$OPTARG
+			;;
+		x ) outOfScope_file=$OPTARG
 			;;
 		s ) if [ -n "$list" ]
 			then
