@@ -19,5 +19,3 @@ beautifulsoup4==4.6.3
 htmlmin==0.1.12
 tldextract==2.2.0
 bs4
-awscli
-jq
