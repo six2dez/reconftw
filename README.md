@@ -118,14 +118,14 @@ chmod +x *.sh
 - Cors ([Corsy](https://github.com/s0md3v/Corsy))  
 - SSL tests ([testssl](https://github.com/drwetter/testssl.sh))  
 - Multithread in some steps ([Interlace](https://github.com/codingo/Interlace))  
-- Custom output folder (default under Recon/target.com/)  
+- Custom output folder (default under Recon/target.tld/)  
 - Run standalone steps (subdomains, subtko, web, gdorks...)  
 - Polished installer compatible with most distros  
 - Verbose mode  
 - Update tools script  
 - Raspberry Pi support  
 - Docker support  
-- CMS Scanner  
+- CMS Scanner ([CMSeeK](https://github.com/Tuhinshubhra/CMSeeK))
 - Out of Scope Support  
 
 ## Mindmap/Workflow
