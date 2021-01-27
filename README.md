@@ -132,14 +132,14 @@ chmod +x *.sh
 
 ![Mindmap](images/mindmap.png)
 
-## Improvement plan:
+## :hourglass: Improvement plan :hourglass:
 
 These are the next features that would come soon, take a look at all our pending [features](https://github.com/six2dez/reconftw/labels/feature) and feel free to contribute:
 
-:hourglass: Notificacion support  
-:hourglass: HTML Report  
-:hourglass: In Scope file support  
-:hourglass: ASN/CIDR/Name allowed as target  
+- Notificacion support  
+- HTML Report  
+- In Scope file support  
+- ASN/CIDR/Name allowed as target  
 
 You can support this work buying me a coffee:
 
