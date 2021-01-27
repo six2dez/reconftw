@@ -83,6 +83,7 @@ function tools_installed(){
 	[ -f $tools/Corsy/corsy.py ] || { printf "${bred} [*] Corsy		[NO]\n"; allinstalled=false;}
 	[ -f $tools/testssl.sh/testssl.sh ] || { printf "${bred} [*] testssl		[NO]\n"; allinstalled=false;}
 	[ -f $tools/JSFinder/JSFinder.py ] || { printf "${bred} [*] JSFinder	[NO]\n"; allinstalled=false;}
+	[ -f $tools/CMSeeK/cmseek.py ] || { printf "${bred} [*] CMSeeK	[NO]\n"; allinstalled=false;}
 	[ -f $tools/fuzz_wordlist.txt ] || { printf "${bred} [*] OneListForAll	[NO]\n"; allinstalled=false;}
 	[ -f $tools/LinkFinder/linkfinder.py ] || { printf "${bred} [*] LinkFinder	        [NO]\n"; allinstalled=false;}
 	[ -f $tools/github-endpoints.py ] || { printf "${bred} [*] github-endpoints   [NO]\n"; allinstalled=false;}
@@ -150,6 +151,7 @@ function tools_full(){
 	[ -f $tools/Corsy/corsy.py ] && printf "${bgreen}[*] Corsy		[YES]\n" || printf "${bred} [*] Corsy		[NO]\n"
 	[ -f $tools/testssl.sh/testssl.sh ] && printf "${bgreen}[*] testssl		[YES]\n" || printf "${bred} [*] testssl		[NO]\n"
 	[ -f $tools/JSFinder/JSFinder.py ] && printf "${bgreen}[*] JSFinder		[YES]\n" || printf "${bred} [*] JSFinder	[NO]\n"
+	[ -f $tools/CMSeeK/cmseek.py ] && printf "${bgreen}[*] CMSeeK		[YES]\n" || printf "${bred} [*] CMSeeK	[NO]\n"
 	[ -f $tools/fuzz_wordlist.txt ] && printf "${bgreen}[*] OneListForAll	[YES]\n" || printf "${bred} [*] OneListForAll	[NO]\n"
 	[ -f $tools/LinkFinder/linkfinder.py ] && printf "${bgreen}[*] LinkFinder	        [YES]\n" || printf "${bred} [*] LinkFinder	        [NO]\n"
 	[ -f $tools/github-endpoints.py ] && printf "${bgreen}[*] github-endpoints	[YES]\n" || printf "${bred} [*] github-endpoints[NO]\n"
@@ -706,7 +708,32 @@ fuzz(){
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Directory Fuzzing Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in fuzzing/*subdomain*.md${reset}\n"
+			printf "${bblue} Results are saved in fuzzing/*subdomain*.txt${reset}\n"
+			printf "${bgreen}#######################################################################\n\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
+}
+
+cms_scanner(){
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} CMS Scanner ${reset}\n"
+			start=`date +%s`
+			mkdir -p $dir/cms
+			tr '\n' ',' < ${domain}_probed.txt > ${domain}_cms.txt
+			eval python3 $tools/CMSeeK/cmseek.py -l ${domain}_cms.txt --batch -r $DEBUG_STD
+			for sub in $(cat ${domain}_probed.txt); do
+				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
+				mv $tools/CMSeeK/Result/${sub_out} $dir/cms/
+			done
+			eval rm ${domain}_cms.txt $DEBUG_ERROR
+			touch $called_fn_dir/.${FUNCNAME[0]}
+			end=`date +%s`
+			getElapsedTime $start $end
+			printf "${bblue}\n CMS Scanner finished in ${runtime}\n"
+			printf "${bblue} Results are saved in cms/*subdomain* folder${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -861,6 +888,7 @@ all(){
 			nuclei_check
 			github
 			favicon
+			cms_scanner
 			fuzz
 			cors
 			testssl
@@ -886,6 +914,7 @@ all(){
 		nuclei_check
 		github
 		favicon
+		cms_scanner
 		fuzz
 		cors
 		testssl
@@ -994,6 +1023,7 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 				cp $list $dir/${domain}_probed.txt
 			fi
 			nuclei_check
+			cms_scanner
 			fuzz
 			cors
 			testssl
