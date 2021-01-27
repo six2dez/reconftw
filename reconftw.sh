@@ -202,6 +202,7 @@ dorks(){
 	printf "${bblue} Performing Google Dorks ${reset}\n\n"
 
 	$tools/degoogle_hunter/degoogle_hunter.sh $domain | tee ${domain}_dorks.txt
+	sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" ${domain}_dorks.txt
 
 	printf "${bblue} Finished : ${bblue} Happy hunting! ${reset}\n"
 	printf "${bgreen}#######################################################################\n"
@@ -764,7 +765,7 @@ test_ssl(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} SSL Test ${reset}\n"
 			start=`date +%s`
-			$tools/testssl.sh/testssl.sh --quiet -U -iL ${domain}_subdomains.txt > ${domain}_testssl.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			$tools/testssl.sh/testssl.sh --quiet --color 0 -U -iL ${domain}_subdomains.txt > ${domain}_testssl.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n SSL Test Finished in ${runtime}\n"
