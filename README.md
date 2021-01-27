@@ -136,7 +136,7 @@ chmod +x *.sh
 
 These are the next features that would come soon, take a look at all our pending [features](https://github.com/six2dez/reconftw/labels/feature) and feel free to contribute:
 
-- Notificacion support  
+- Notification support  
 - HTML Report  
 - In Scope file support  
 - ASN/CIDR/Name allowed as target  
