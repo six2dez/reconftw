@@ -299,14 +299,14 @@ sub_scraping(){
 			start=`date +%s`
 			printf "${yellow} Running : JS scraping subdomain search 4/6${reset}\n"
 			touch JS_subs.txt
-			cat ${domain}_subdomains.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' > probed_tmp.txt
+			cat ${domain}_subdomains.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' > ${domain}_probed_tmp.txt
 			eval python3 $tools/JSFinder/JSFinder.py -f ${domain}_probed_tmp.txt -os JS_subs.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			if [[ $(cat JS_subs.txt | wc -l) -gt 0 ]]
 			then
 				NUMOFLINES=$(wc -l < JS_subs.txt)
 				cat JS_subs.txt | eval shuffledns -d $domain -r $tools/resolvers.txt -o JS_subs_temp.txt $DEBUG_STD
 				cat JS_subs_temp.txt | anew -q ${domain}_subdomains.txt
-				eval rm JS_subs_temp.txt probed_tmp.txt $DEBUG_ERROR
+				eval rm JS_subs_temp.txt ${domain}_probed_tmp.txt $DEBUG_ERROR
 			else
 				NUMOFLINES=0
 			fi
