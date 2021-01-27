@@ -92,7 +92,7 @@ function tools_installed(){
 	[ -f $tools/getjswords.py ] || { printf "${bred} [*] getjswords   	[NO]\n"; allinstalled=false;}
 	[ -f $tools/subdomains.txt ] || { printf "${bred} [*] subdomains   	[NO]\n"; allinstalled=false;}
 	[ -f $tools/resolvers.txt ] || { printf "${bred} [*] resolvers   	[NO]\n"; allinstalled=false;}
-	eval type -P hakrawler $DEBUG_STD || { printf "${bred} [*] hakrawler		[NO]\n"; allinstalled=false;}
+	eval type -P gospider $DEBUG_STD || { printf "${bred} [*] gospider		[NO]\n"; allinstalled=false;}
 	eval type -P subfinder $DEBUG_STD || { printf "${bred} [*] Subfinder		[NO]\n"; allinstalled=false;}
 	eval type -P assetfinder $DEBUG_STD || { printf "${bred} [*] Assetfinder		[NO]\n"; allinstalled=false;}
 	eval type -P findomain $DEBUG_STD || { printf "${bred} [*] Findomain		[NO]\n"; allinstalled=false;}
@@ -160,7 +160,7 @@ function tools_full(){
 	[ -f $tools/getjswords.py ] && printf "${bgreen}[*] getjswords.py	[YES]\n" || printf "${bred} [*] getjswords.py	[NO]\n"
 	[ -f $tools/subdomains.txt ] && printf "${bgreen}[*] subdomains.txt	[YES]\n" || printf "${bred} [*] subdomains.txt	[NO]\n"
 	[ -f $tools/resolvers.txt ] && printf "${bgreen}[*] resolvers.txt	[YES]\n" || printf "${bred} [*] resolvers.txt	[NO]\n"
-	eval type -P hakrawler $DEBUG_STD && printf "${bgreen}[*] hakrawler		[YES]\n" || { printf "${bred} [*] hakrawler		[NO]\n"; }
+	eval type -P gospider $DEBUG_STD && printf "${bgreen}[*] gospider		[YES]\n" || { printf "${bred} [*] gospider		[NO]\n"; }
 	eval type -P subfinder $DEBUG_STD && printf "${bgreen}[*] Subfinder		[YES]\n" || { printf "${bred} [*] Subfinder		[NO]\n"; }
 	eval type -P assetfinder $DEBUG_STD && printf "${bgreen}[*] Assetfinder		[YES]\n" || { printf "${bred} [*] Assetfinder	[NO]\n"; }
 	eval type -P findomain $DEBUG_STD && printf "${bgreen}[*] Findomain		[YES]\n" || { printf "${bred} [*] Findomain		[NO]\n"; }
@@ -529,7 +529,7 @@ urlchecks(){
 			start=`date +%s`
 			cat ${domain}_probed.txt | waybackurls | anew -q ${domain}_url_extract.txt
 			cat ${domain}_probed.txt | gau | anew -q ${domain}_url_extract.txt
-			cat ${domain}_probed.txt | hakrawler -depth 2 -scope subs -plain -insecure | anew -q ${domain}_url_extract.txt
+			gospider -S ${domain}_probed.txt -t 10 -c 40 -d 2 -a -w --js --sitemap --robots | sed "s/^.*http/http/p" | anew -q ${domain}_url_extract.txt
 			if [ -n "$GITHUB_TOKEN" ]; then
 				python3 $tools/github-endpoints.py -d $domain -t $GITHUB_TOKEN | anew -q ${domain}_url_extract.txt  && touch $called_fn_dir/.${FUNCNAME[0]}
 			else
@@ -783,7 +783,7 @@ open_redirect(){
 			printf "${bblue} Open redirects checks ${reset}\n"
 			start=`date +%s`
 			cat ${domain}_redirect.txt | qsreplace FUZZ | anew -q test_redirect.txt
-			eval python3 $tools/OpenRedireX/openredirex.py -l test_redirect.txt --keyword FUZZ > ${domain}_openredirex.txt $DEBUG_STD
+			eval python3 $tools/OpenRedireX/openredirex.py -l test_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt > ${domain}_openredirex.txt $DEBUG_STD
 			eval rm test_redirect.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
