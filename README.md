@@ -104,7 +104,7 @@ chmod +x *.sh
 - Web screenshot ([aquatone](https://github.com/michenriksen/aquatone))  
 - Template scanner ([nuclei](https://github.com/projectdiscovery/nuclei))  
 - Port Scanner ([naabu](https://github.com/projectdiscovery/naabu))  
-- Url extraction ([waybackurls](https://github.com/tomnomnom/waybackurls), [gau](https://github.com/lc/gau), [hakrawler](https://github.com/hakluke/hakrawler), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3))  
+- Url extraction ([waybackurls](https://github.com/tomnomnom/waybackurls), [gau](https://github.com/lc/gau), [gospider](https://github.com/jaeles-project/gospider), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3))  
 - Pattern Search ([gf](https://github.com/tomnomnom/waybackurls) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns))  
 - Param discovery ([paramspider](https://github.com/devanshbatham/ParamSpider) and [arjun](https://github.com/s0md3v/Arjun))  
 - XSS ([Gxss](https://github.com/KathanP19/Gxss) and [dalfox](https://github.com/hahwul/dalfox))  
