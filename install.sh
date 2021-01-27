@@ -107,13 +107,14 @@ eval git clone https://github.com/blechschmidt/massdns $dir/massdns $DEBUG_STD
 printf "${bgreen} 50%% done${reset}\n\n"
 eval git clone https://github.com/devanshbatham/ParamSpider $dir/ParamSpider $DEBUG_STD
 eval git clone https://github.com/dark-warlord14/LinkFinder $dir/LinkFinder $DEBUG_STD
+eval git clone https://github.com/six2dez/degoogle_hunter $dir/degoogle_hunter $DEBUG_STD
+eval git clone https://github.com/s0md3v/Arjun $dir/Arjun $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/projectdiscovery/shuffledns/cmd/shuffledns $DEBUG_STD
 eval go get -v github.com/hakluke/hakrawler $DEBUG_STD
 eval go get -v github.com/cgboal/sonarsearch/crobat $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz $DEBUG_STD
 printf "${bgreen} 60%% done${reset}\n\n"
-eval git clone https://github.com/six2dez/degoogle_hunter $dir/degoogle_hunter $DEBUG_STD
-eval git clone https://github.com/s0md3v/Arjun $dir/Arjun $DEBUG_STD
+eval git clone https://github.com/Tuhinshubhra/CMSeeK $dir/CMSeeK $DEBUG_STD
 eval git clone https://github.com/pielco11/fav-up $dir/fav-up $DEBUG_STD
 eval git clone https://github.com/s0md3v/Corsy $dir/Corsy $DEBUG_STD
 eval git clone https://github.com/Threezh1/JSFinder $dir/JSFinder $DEBUG_STD

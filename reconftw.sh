@@ -83,6 +83,7 @@ function tools_installed(){
 	[ -f $tools/Corsy/corsy.py ] || { printf "${bred} [*] Corsy		[NO]\n"; allinstalled=false;}
 	[ -f $tools/testssl.sh/testssl.sh ] || { printf "${bred} [*] testssl		[NO]\n"; allinstalled=false;}
 	[ -f $tools/JSFinder/JSFinder.py ] || { printf "${bred} [*] JSFinder	[NO]\n"; allinstalled=false;}
+	[ -f $tools/CMSeeK/cmseek.py ] || { printf "${bred} [*] CMSeeK	[NO]\n"; allinstalled=false;}
 	[ -f $tools/fuzz_wordlist.txt ] || { printf "${bred} [*] OneListForAll	[NO]\n"; allinstalled=false;}
 	[ -f $tools/LinkFinder/linkfinder.py ] || { printf "${bred} [*] LinkFinder	        [NO]\n"; allinstalled=false;}
 	[ -f $tools/github-endpoints.py ] || { printf "${bred} [*] github-endpoints   [NO]\n"; allinstalled=false;}
@@ -150,6 +151,7 @@ function tools_full(){
 	[ -f $tools/Corsy/corsy.py ] && printf "${bgreen}[*] Corsy		[YES]\n" || printf "${bred} [*] Corsy		[NO]\n"
 	[ -f $tools/testssl.sh/testssl.sh ] && printf "${bgreen}[*] testssl		[YES]\n" || printf "${bred} [*] testssl		[NO]\n"
 	[ -f $tools/JSFinder/JSFinder.py ] && printf "${bgreen}[*] JSFinder		[YES]\n" || printf "${bred} [*] JSFinder	[NO]\n"
+	[ -f $tools/CMSeeK/cmseek.py ] && printf "${bgreen}[*] CMSeeK		[YES]\n" || printf "${bred} [*] CMSeeK	[NO]\n"
 	[ -f $tools/fuzz_wordlist.txt ] && printf "${bgreen}[*] OneListForAll	[YES]\n" || printf "${bred} [*] OneListForAll	[NO]\n"
 	[ -f $tools/LinkFinder/linkfinder.py ] && printf "${bgreen}[*] LinkFinder	        [YES]\n" || printf "${bred} [*] LinkFinder	        [NO]\n"
 	[ -f $tools/github-endpoints.py ] && printf "${bgreen}[*] github-endpoints	[YES]\n" || printf "${bred} [*] github-endpoints[NO]\n"
@@ -281,7 +283,7 @@ sub_dns(){
 		then
 			start=`date +%s`
 			printf "${yellow} Running : Active Subdomain Enumeration 3/6${reset}\n"
-			cat *_subs.txt > tmp_subs_resolution.txt
+			cat *_subs.txt | anew -q tmp_subs_resolution.txt
 			deleteOutScoped $outOfScope_file tmp_subs_resolution.txt
 			eval shuffledns -d $domain -list tmp_subs_resolution.txt -r $tools/resolvers.txt -o ${domain}_subdomains.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			NUMOFLINES=$(wc -l < ${domain}_subdomains.txt)
@@ -299,7 +301,7 @@ sub_scraping(){
 			start=`date +%s`
 			printf "${yellow} Running : JS scraping subdomain search 4/6${reset}\n"
 			touch JS_subs.txt
-			cat ${domain}_subdomains.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' > ${domain}_probed_tmp.txt
+			cat ${domain}_subdomains.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed_tmp.txt
 			eval python3 $tools/JSFinder/JSFinder.py -f ${domain}_probed_tmp.txt -os JS_subs.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			if [[ $(cat JS_subs.txt | wc -l) -gt 0 ]]
 			then
@@ -360,7 +362,7 @@ webprobe_simple(){
 		then
 			start=`date +%s`
 			printf "${yellow} Running : Http probing 6/6${reset}\n\n"
-			cat ${domain}_subdomains.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' > ${domain}_probed.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			cat ${domain}_subdomains.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			if [ -f "${domain}_probed.txt" ]
 			then
 				deleteOutScoped $outOfScope_file ${domain}_probed.txt
@@ -410,7 +412,7 @@ webprobe_full(){
 			printf "${bblue} ${bgreen} Web Probe ${reset}\n\n"
 			printf "${yellow} Running : Http probing non standard ports${reset}\n\n"
 			start=`date +%s`
-			cat ${domain}_subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55672 -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' > ${domain}_probed_uncommon_ports.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			cat ${domain}_subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55672 -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed_uncommon_ports.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			NUMOFLINES=$(wc -l < ${domain}_probed_uncommon_ports.txt)
@@ -524,7 +526,7 @@ urlchecks(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} URL Extraction ${reset}\n\n"
 			start=`date +%s`
-			cat ${domain}_probed.txt | waybackurls > ${domain}_url_extract.txt
+			cat ${domain}_probed.txt | waybackurls | anew -q ${domain}_url_extract.txt
 			cat ${domain}_probed.txt | gau | anew -q ${domain}_url_extract.txt
 			cat ${domain}_probed.txt | hakrawler -depth 2 -scope subs -plain -insecure | anew -q ${domain}_url_extract.txt
 			if [ -n "$GITHUB_TOKEN" ]; then
@@ -560,7 +562,7 @@ url_gf(){
 			gf lfi ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_lfi.txt && touch $called_fn_dir/.${FUNCNAME[0]};
 			end=`date +%s`
 			getElapsedTime $start $end
-			cat ${domain}_url_extract.txt | unfurl -u format %s://%d%p > ${domain}_url_endpoints.txt
+			cat ${domain}_url_extract.txt | unfurl -u format %s://%d%p | anew -q ${domain}_url_endpoints.txt
 			printf "${bblue}\n Vulnerable Pattern Search Finished in ${runtime}\n"
 			printf "${bblue} Results are saved in in ${domain}_*gfpattern*.txt files${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
@@ -670,8 +672,13 @@ favicon(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} FavIcon Hash Extraction ${reset}\n\n"
 			start=`date +%s`
-			eval python3 $tools/fav-up/favUp.py -w $domain -sc > ${domain}_favicontest.txt $DEBUG_STD
-			eval cat ${domain}_favicontest.txt $DEBUG_STD | grep found_ips && touch $called_fn_dir/.${FUNCNAME[0]}
+			cd $tools/fav-up
+			eval python3 favUp.py -w $domain -sc -o favicontest.json $DEBUG_STD
+			mv favicontest.json $dir/favicontest.json
+			cd $dir
+			cat favicontest.json | jq > ${domain}_favicontest.txt
+			rm favicontest.json
+			eval cat ${domain}_favicontest.txt $DEBUG_ERROR | grep found_ips && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n FavIcon Hash Extraction Finished in ${runtime}\n"
@@ -694,14 +701,39 @@ fuzz(){
 				printf "${yellow}\n\n Running: Fuzzing in ${sub}${reset}\n"
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
 				ffuf -mc all -ac -sf -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -w $fuzz_wordlist -maxtime 900 -u $sub/FUZZ -or -o $dir/fuzzing/${sub_out}.tmp $DEBUG_STD
-				cat $dir/fuzzing/${sub_out}.tmp | jq '[.results[]|{status: .status, length: .length, url: .url}]' | grep -oP "status\":\s(\d{3})|length\":\s(\d{1,7})|url\":\s\"(http[s]?:\/\/.*?)\"" | paste -d' ' - - - | awk '{print $2" "$4" "$6}' | sed 's/\"//g' > $dir/fuzzing/${sub_out}.txt
+				cat $dir/fuzzing/${sub_out}.tmp | jq '[.results[]|{status: .status, length: .length, url: .url}]' | grep -oP "status\":\s(\d{3})|length\":\s(\d{1,7})|url\":\s\"(http[s]?:\/\/.*?)\"" | paste -d' ' - - - | awk '{print $2" "$4" "$6}' | sed 's/\"//g' | anew -q $dir/fuzzing/${sub_out}.txt
 				eval rm ${sub_out}.tmp $DEBUG_ERROR
 			done
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Directory Fuzzing Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in fuzzing/*subdomain*.md${reset}\n"
+			printf "${bblue} Results are saved in fuzzing/*subdomain*.txt${reset}\n"
+			printf "${bgreen}#######################################################################\n\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
+}
+
+cms_scanner(){
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} CMS Scanner ${reset}\n"
+			start=`date +%s`
+			mkdir -p $dir/cms
+			tr '\n' ',' < ${domain}_probed.txt > ${domain}_cms.txt
+			eval python3 $tools/CMSeeK/cmseek.py -l ${domain}_cms.txt --batch -r $DEBUG_STD
+			for sub in $(cat ${domain}_probed.txt); do
+				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
+				mv $tools/CMSeeK/Result/${sub_out} $dir/cms/
+			done
+			eval rm ${domain}_cms.txt $DEBUG_ERROR
+			touch $called_fn_dir/.${FUNCNAME[0]}
+			end=`date +%s`
+			getElapsedTime $start $end
+			printf "${bblue}\n CMS Scanner finished in ${runtime}\n"
+			printf "${bblue} Results are saved in cms/*subdomain* folder${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -726,7 +758,7 @@ cors(){
 	fi
 }
 
-testssl(){
+test_ssl(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
 		then
 			printf "${bgreen}#######################################################################\n"
@@ -749,7 +781,7 @@ open_redirect(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Open redirects checks ${reset}\n"
 			start=`date +%s`
-			cat ${domain}_redirect.txt | qsreplace FUZZ > test_redirect.txt
+			cat ${domain}_redirect.txt | qsreplace FUZZ | anew -q test_redirect.txt
 			eval python3 $tools/OpenRedireX/openredirex.py -l test_redirect.txt --keyword FUZZ > ${domain}_openredirex.txt $DEBUG_STD
 			eval rm test_redirect.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
@@ -856,9 +888,9 @@ all(){
 			nuclei_check
 			github
 			favicon
+			cms_scanner
 			fuzz
 			cors
-			testssl
 			urlchecks
 			url_gf
 			open_redirect
@@ -867,6 +899,7 @@ all(){
 			jschecks
 			params
 			xss
+			test_ssl
 			end
 		done
 	else
@@ -881,9 +914,9 @@ all(){
 		nuclei_check
 		github
 		favicon
+		cms_scanner
 		fuzz
 		cors
-		testssl
 		urlchecks
 		url_gf
 		open_redirect
@@ -892,6 +925,7 @@ all(){
 		jschecks
 		params
 		xss
+		test_ssl
 		end
 	fi
 }
@@ -989,9 +1023,9 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 				cp $list $dir/${domain}_probed.txt
 			fi
 			nuclei_check
+			cms_scanner
 			fuzz
 			cors
-			testssl
 			urlchecks
 			url_gf
 			open_redirect
@@ -1000,6 +1034,7 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 			jschecks
 			params
 			xss
+			test_ssl
 			end
 			exit
 			;;
