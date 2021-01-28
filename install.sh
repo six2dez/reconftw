@@ -127,7 +127,7 @@ eval pip3 install dnsgen $DEBUG_STD
 if [ "True" = "$IS_ARM" ]
     then
         eval git clone https://github.com/tillson/git-hound $dir/git-hound $DEBUG_STD
-        cd $dir/git-hound && go build && chmod 754 git-hound && mv $dir/git-hound/git-hound /usr/local/bin  && cd $dir
+        cd $dir/git-hound && go build && chmod 754 git-hound && $SUDO mv $dir/git-hound/git-hound /usr/local/bin  && cd $dir
     else
         eval wget https://github.com/tillson/git-hound/releases/download/v1.3/git-hound_1.3_Linux_x86_64.tar.gz $DEBUG_STD
         tar -xf git-hound_1.3_Linux_x86_64.tar.gz git-hound
