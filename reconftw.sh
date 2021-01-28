@@ -634,7 +634,7 @@ xss(){
 			# Xsstrike blind payload defined in $tools/xsstrike/core/config.py
 			# python xsstrike.py --seeds ${domain}_xss.txt -t 30 --timeout=4 --blind --skip
 			if [ -n "$XSS_SERVER" ]; then
-				cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox -b six2dez.xss.ht pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox -b $XSS_SERVER pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
 				getElapsedTime $start $end
 			else
