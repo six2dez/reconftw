@@ -468,7 +468,7 @@ portscan(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Port Scan ${reset}\n\n"
 			start=`date +%s`
-			naabu -top-ports 1000 -silent -exclude-cdn -nmap-cli 'nmap -sV --script /usr/share/nmap/scripts/vulners.nse,http-title.nse --min-rate 40000 -T4 --max-retries 2 -oG -' -iL ${domain}_subdomains.txt > ${domain}_portscan.txt;
+			naabu -top-ports 1000 -silent -exclude-cdn -nmap-cli 'nmap -sV --script /usr/share/nmap/scripts/vulners.nse,http-title.nse --min-rate 40000 -T4 --max-retries 2 -oG -' -iL ${domain}_subdomains.txt  | grep "^Host" | grep -v "Up$" > ${domain}_portscan.txt;
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bred}\n Port scan results in ${runtime}${reset}\n\n"
@@ -634,7 +634,7 @@ xss(){
 			# Xsstrike blind payload defined in $tools/xsstrike/core/config.py
 			# python xsstrike.py --seeds ${domain}_xss.txt -t 30 --timeout=4 --blind --skip
 			if [ -n "$XSS_SERVER" ]; then
-				cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox -b six2dez.xss.ht pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox -b $XSS_SERVER pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
 				getElapsedTime $start $end
 			else
@@ -677,9 +677,9 @@ favicon(){
 			eval python3 favUp.py -w $domain -sc -o favicontest.json $DEBUG_STD
 			mv favicontest.json $dir/favicontest.json
 			cd $dir
-			cat favicontest.json | jq > ${domain}_favicontest.txt
+			cat favicontest.json | jq > ${domain}_favicontest.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			rm favicontest.json
-			eval cat ${domain}_favicontest.txt $DEBUG_ERROR | grep found_ips && touch $called_fn_dir/.${FUNCNAME[0]}
+			eval cat ${domain}_favicontest.txt $DEBUG_ERROR | grep found_ips
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n FavIcon Hash Extraction Finished in ${runtime}\n"
@@ -860,7 +860,16 @@ function getElapsedTime {
 	(( $H > 0 )) && runtime="$runtime$H hours, "
 	(( $M > 0 )) && runtime="$runtime$M minutes, "
 	runtime="$runtime$S seconds."
-	#echo "$retVal"
+}
+
+function isAsciiText {
+	IS_ASCII="False";
+	if [[ $(file $1 | grep -o 'ASCII text$') == "ASCII text" ]]
+	then
+		IS_ASCII="True";
+	else
+		IS_ASCII="False";
+	fi
 }
 
 end(){
@@ -998,6 +1007,12 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 		l ) list=$OPTARG
 			;;
 		x ) outOfScope_file=$OPTARG
+			isAsciiText $outOfScope_file
+			if [ "False" = "$IS_ASCII" ]
+			then
+				printf "\n\n${bred} Out of Scope file is not a text file${reset}\n\n"
+				exit
+			fi
 			;;
 		s ) if [ -n "$list" ]
 			then
