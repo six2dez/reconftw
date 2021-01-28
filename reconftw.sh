@@ -860,7 +860,16 @@ function getElapsedTime {
 	(( $H > 0 )) && runtime="$runtime$H hours, "
 	(( $M > 0 )) && runtime="$runtime$M minutes, "
 	runtime="$runtime$S seconds."
-	#echo "$retVal"
+}
+
+function isAsciiText {
+	IS_ASCII="False";
+	if [[ $(file $1 | grep -o 'ASCII text$') == "ASCII text" ]]
+	then
+		IS_ASCII="True";
+	else
+		IS_ASCII="False";
+	fi
 }
 
 end(){
@@ -998,6 +1007,12 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 		l ) list=$OPTARG
 			;;
 		x ) outOfScope_file=$OPTARG
+			isAsciiText $outOfScope_file
+			if [ "False" = "$IS_ASCII" ]
+			then
+				printf "\n\n${bred} Out of Scope file is not a text file${reset}\n\n"
+				exit
+			fi
 			;;
 		s ) if [ -n "$list" ]
 			then
