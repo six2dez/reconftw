@@ -677,9 +677,9 @@ favicon(){
 			eval python3 favUp.py -w $domain -sc -o favicontest.json $DEBUG_STD
 			mv favicontest.json $dir/favicontest.json
 			cd $dir
-			cat favicontest.json | jq > ${domain}_favicontest.txt
+			cat favicontest.json | jq > ${domain}_favicontest.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			rm favicontest.json
-			eval cat ${domain}_favicontest.txt $DEBUG_ERROR | grep found_ips && touch $called_fn_dir/.${FUNCNAME[0]}
+			eval cat ${domain}_favicontest.txt $DEBUG_ERROR | grep found_ips
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n FavIcon Hash Extraction Finished in ${runtime}\n"
