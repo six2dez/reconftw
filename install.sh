@@ -126,21 +126,22 @@ eval git clone https://github.com/s0md3v/Corsy $dir/Corsy $DEBUG_STD
 eval git clone https://github.com/Threezh1/JSFinder $dir/JSFinder $DEBUG_STD
 eval git clone https://github.com/codingo/Interlace $dir/Interlace $DEBUG_STD
 eval git clone https://github.com/gwen001/github-search $dir/github-search $DEBUG_STD
+eval git clone https://github.com/obheda12/GitDorker $dir/GitDorker $DEBUG_STD
 printf "${bgreen} 70%% done${reset}\n\n"
 eval git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh $DEBUG_STD
 eval pip3 install dnsgen $DEBUG_STD
 
-if [ "True" = "$IS_ARM" ]
-    then
-        eval git clone https://github.com/tillson/git-hound $dir/git-hound $DEBUG_STD
-        cd $dir/git-hound && go build && chmod 754 git-hound && $SUDO mv $dir/git-hound/git-hound /usr/local/bin  && cd $dir
-    else
-        eval wget https://github.com/tillson/git-hound/releases/download/v1.3/git-hound_1.3_Linux_x86_64.tar.gz $DEBUG_STD
-        tar -xf git-hound_1.3_Linux_x86_64.tar.gz git-hound
-        rm -f git-hound_1.3_Linux_x86_64.tar.gz
-        $SUDO mv git-hound /usr/local/bin/git-hound
-        $SUDO chmod 755 /usr/local/bin/git-hound
-fi
+#if [ "True" = "$IS_ARM" ]
+#    then
+#        eval git clone https://github.com/tillson/git-hound $dir/git-hound $DEBUG_STD
+#        cd $dir/git-hound && go build && chmod 754 git-hound && $SUDO mv $dir/git-hound/git-hound /usr/local/bin  && cd $dir
+#    else
+#        eval wget https://github.com/tillson/git-hound/releases/download/v1.3/git-hound_1.3_Linux_x86_64.tar.gz $DEBUG_STD
+#        tar -xf git-hound_1.3_Linux_x86_64.tar.gz git-hound
+#        rm -f git-hound_1.3_Linux_x86_64.tar.gz
+#        $SUDO mv git-hound /usr/local/bin/git-hound
+#        $SUDO chmod 755 /usr/local/bin/git-hound
+#fi
 printf "${bgreen} 80%% done${reset}\n\n"
 eval pip3 install pymetadata $DEBUG_STD
 if [ "True" = "$IS_ARM" ]
@@ -177,7 +178,7 @@ sed -i 's/^miscellaneous/#miscellaneous/' ~/nuclei-templates/.nuclei-ignore
 #stripping all Go binaries
 eval strip -s $HOME/go/bin/* $DEBUG_STD
 
-printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - git-hound (~/.githound/config.yml)\n - github-endpoints.py ($tools/.github_tokens or GITHUB_TOKEN env var)\n - favup (shodan init SHODANPAIDAPIKEY)\n - SSRF Server (COLLAB_SERVER env var) ${reset}\n"
+printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - GitHub (${dir}/.github_tokens)\n - favup (shodan init SHODANPAIDAPIKEY)\n - SSRF Server (COLLAB_SERVER env var) ${reset}\n"
 
 printf "${bgreen} Finished!${reset}\n\n"
 printf "\n\n${bgreen}#######################################################################\n"

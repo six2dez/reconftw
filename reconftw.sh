@@ -15,7 +15,6 @@ DEBUG_ERROR="2>/dev/null"
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 # Uncomment this only if it is not already in your env .bashrc or .zshrc
-#GITHUB_TOKEN=XXXXXXXXXXXXXXXXX
 #COLLAB_SERVER=XXXXXXXXXXXXXXXXX
 #XSS_SERVER=XXXXXXXXXXXXXXXXX
 
@@ -86,6 +85,7 @@ function tools_installed(){
 	[ -f $tools/CMSeeK/cmseek.py ] || { printf "${bred} [*] CMSeeK	[NO]\n"; allinstalled=false;}
 	[ -f $tools/fuzz_wordlist.txt ] || { printf "${bred} [*] OneListForAll	[NO]\n"; allinstalled=false;}
 	[ -f $tools/LinkFinder/linkfinder.py ] || { printf "${bred} [*] LinkFinder	        [NO]\n"; allinstalled=false;}
+	[ -f $tools/GitDorker/GitDorker.py ] || { printf "${bred} [*] GitDorker	        [NO]\n"; allinstalled=false;}
 	[ -f $tools/github-endpoints.py ] || { printf "${bred} [*] github-endpoints   [NO]\n"; allinstalled=false;}
 	[ -f $tools/degoogle_hunter/degoogle_hunter.sh ] || { printf "${bred} [*] degoogle_hunter   [NO]\n"; allinstalled=false;}
 	[ -f $tools/github-search/github-endpoints.py ] || { printf "${bred} [*] github-search	[NO]\n"; allinstalled=false;}
@@ -109,7 +109,6 @@ function tools_installed(){
 	eval type -P gf $DEBUG_STD || { printf "${bred} [*] Gf		[NO]\n"; allinstalled=false;}
 	eval type -P Gxss $DEBUG_STD || { printf "${bred} [*] Gxss		[NO]\n"; allinstalled=false;}
 	eval type -P subjs $DEBUG_STD || { printf "${bred} [*] subjs		[NO]\n"; allinstalled=false;}
-	eval type -P git-hound $DEBUG_STD || { printf "${bred} [*] git-hound		[NO]\n"; allinstalled=false;}
 	eval type -P ffuf $DEBUG_STD || { printf "${bred} [*] ffuf		[NO]\n"; allinstalled=false;}
 	eval type -P massdns $DEBUG_STD || { printf "${bred} [*] Massdns		[NO]\n"; allinstalled=false;}
 	eval type -P qsreplace $DEBUG_STD || { printf "${bred} [*] qsreplace		[NO]\n"; allinstalled=false;}
@@ -156,6 +155,7 @@ function tools_full(){
 	[ -f $tools/github-endpoints.py ] && printf "${bgreen}[*] github-endpoints	[YES]\n" || printf "${bred} [*] github-endpoints[NO]\n"
 	[ -f $tools/degoogle_hunter/degoogle_hunter.sh ] && printf "${bgreen}[*] degoogle_hunter	[YES]\n" || printf "${bred} [*] degoogle_hunter	[NO]\n"
 	[ -f $tools/github-search/github-endpoints.py ] && printf "${bgreen}[*] github-search	[YES]\n" || printf "${bred} [*] github-search	[NO]\n"
+	[ -f $tools/GitDorker/GitDorker.py ] && printf "${bgreen}[*] GitDorker	[YES]\n" || printf "${bred} [*] GitDorker	[NO]\n"
 	[ -f $tools/getjswords.py ] && printf "${bgreen}[*] getjswords.py	[YES]\n" || printf "${bred} [*] getjswords.py	[NO]\n"
 	[ -f $tools/subdomains.txt ] && printf "${bgreen}[*] subdomains.txt	[YES]\n" || printf "${bred} [*] subdomains.txt	[NO]\n"
 	[ -f $tools/resolvers.txt ] && printf "${bgreen}[*] resolvers.txt	[YES]\n" || printf "${bred} [*] resolvers.txt	[NO]\n"
@@ -176,7 +176,6 @@ function tools_full(){
 	eval type -P gf $DEBUG_STD && printf "${bgreen}[*] Gf		        [YES]\n" || { printf "${bred} [*] Gf			[NO]\n"; }
 	eval type -P Gxss $DEBUG_STD && printf "${bgreen}[*] Gxss		[YES]\n" || { printf "${bred} [*] Gxss		[NO]\n"; }
 	eval type -P subjs $DEBUG_STD && printf "${bgreen}[*] subjs		[YES]\n" || { printf "${bred} [*] subjs		[NO]\n"; }
-	eval type -P git-hound $DEBUG_STD && printf "${bgreen}[*] git-hound		[YES]\n" || { printf "${bred} [*] git-hound		[NO]\n"; }
 	eval type -P ffuf $DEBUG_STD && printf "${bgreen}[*] ffuf		[YES]\n" || { printf "${bred} [*] ffuf		[NO]\n"; }
 	eval type -P massdns $DEBUG_STD && printf "${bgreen}[*] Massdns		[YES]\n" || { printf "${bred} [*] Massdns		[NO]\n"; }
 	eval type -P qsreplace $DEBUG_STD && printf "${bgreen}[*] qsreplace		[YES]\n" || { printf "${bred} [*] qsreplace		[NO]\n"; }
@@ -529,11 +528,7 @@ urlchecks(){
 			cat ${domain}_probed.txt | waybackurls | anew -q ${domain}_url_extract.txt
 			cat ${domain}_probed.txt | gau | anew -q ${domain}_url_extract.txt
 			gospider -S ${domain}_probed.txt -t 10 -c 40 -d 2 -a -w --js --sitemap --robots | sed "s/^.*http/http/p" | anew -q ${domain}_url_extract.txt
-			if [ -n "$GITHUB_TOKEN" ]; then
-				python3 $tools/github-endpoints.py -d $domain -t $GITHUB_TOKEN | anew -q ${domain}_url_extract.txt  && touch $called_fn_dir/.${FUNCNAME[0]}
-			else
-				python3 $tools/github-endpoints.py -d $domain | anew -q ${domain}_url_extract.txt  && touch $called_fn_dir/.${FUNCNAME[0]}
-			fi
+			python3 $tools/github-endpoints.py -d $domain | anew -q ${domain}_url_extract.txt  && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			NUMOFLINES=$(wc -l < ${domain}_url_extract.txt)
@@ -654,7 +649,13 @@ github(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} GitHub Scanning ${reset}\n\n"
 			start=`date +%s`
-			cat ${domain}_probed.txt | git-hound --dig-files --dig-commits --threads 100 | tee ${domain}_gitrecon.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			if [ -s "$tools/.github_tokens" ]
+			then
+				eval python3 $tools/GitDorker/GitDorker.py -tf $tools/.github_tokens -q $domain -e 10 -d $tools/GitDorker/Dorks/medium_dorks.txt -o ${domain}_gitrecon.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+			else
+				printf "\n${bred} Required file ${tools}/.github_tokens not exists or empty${reset}\n"
+			fi
+			#cat ${domain}_probed.txt | git-hound --dig-files --dig-commits --threads 100 | tee ${domain}_gitrecon.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n GitHub Scanning Finished in ${runtime}\n"
