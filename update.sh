@@ -44,7 +44,7 @@ printf "${bblue}\n Updating installed python packages is finished ${reset}\n"
 printf "${bgreen}#######################################################################\n"
 
 #Tools to be updated
-repos="s0md3v/Arjun six2dez/degoogle_hunter 1ndianl33t/Gf-Patterns gwen001/github-search dark-warlord14/LinkFinder devanshbatham/ParamSpider Threezh1/JSFinder haccer/subjack s0md3v/Corsy Tuhinshubhra/CMSeeK pielco11/fav-up tomnomnom/gf codingo/Interlace blechschmidt/massdns devanshbatham/OpenRedireX tillson/git-hound"
+repos="s0md3v/Arjun six2dez/degoogle_hunter 1ndianl33t/Gf-Patterns gwen001/github-search dark-warlord14/LinkFinder devanshbatham/ParamSpider Threezh1/JSFinder haccer/subjack s0md3v/Corsy Tuhinshubhra/CMSeeK pielco11/fav-up tomnomnom/gf codingo/Interlace blechschmidt/massdns devanshbatham/OpenRedireX obheda12/GitDorker"
 printf "\n${bgreen}--==[ ************************************************************************************ ]==--\n"
 printf "${bred}                reconftw updater script (apt/rpm/pacman compatible)${reset}\n"
 printf "\n${bgreen}--==[ ************************************************************************************ ]==--\n"
@@ -66,10 +66,10 @@ for repo in ${repos}; do
         elif [ "Interlace" = "$(basename $repo)" ] || [ "LinkFinder" = "$(basename $repo)" ]; then
             eval $SUDO python3 setup.py install $DEBUG_STD
         fi
-        if [ "True" = "$IS_ARM" ] && [ "git-hound" = "$(basename $repo)" ]
-            then
-                go build && chmod 754 git-hound && $SUDO mv git-hound /usr/local/bin/
-        fi
+#        if [ "True" = "$IS_ARM" ] && [ "git-hound" = "$(basename $repo)" ]
+#            then
+#                go build && chmod 754 git-hound && $SUDO mv git-hound /usr/local/bin/
+#        fi
     fi
     printf "${bblue}\n Updating ${repo} is finished ${reset}\n"
     printf "${bgreen}#######################################################################\n"
