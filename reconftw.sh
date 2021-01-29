@@ -105,12 +105,10 @@ function tools_installed(){
 	[ -f $tools/subjack/fingerprints.json ] || { printf "${bred} [*] Subjack fingers 	[NO]\n"; allinstalled=false;}
 	eval type -P nuclei $DEBUG_STD || { printf "${bred} [*] Nuclei		[NO]\n"; allinstalled=false;}
 	[ -d ~/nuclei-templates ] || { printf "${bred} [*] Nuclei templates    [NO]\n"; allinstalled=false;}
-	eval type -P aquatone $DEBUG_STD || { printf "${bred} [*] Aquatone		[NO]\n"; allinstalled=false;}
 	eval type -P naabu $DEBUG_STD || { printf "${bred} [*] Naabu		[NO]\n"; allinstalled=false;}
 	eval type -P gf $DEBUG_STD || { printf "${bred} [*] Gf		[NO]\n"; allinstalled=false;}
 	eval type -P Gxss $DEBUG_STD || { printf "${bred} [*] Gxss		[NO]\n"; allinstalled=false;}
 	eval type -P subjs $DEBUG_STD || { printf "${bred} [*] subjs		[NO]\n"; allinstalled=false;}
-	eval type -P dalfox $DEBUG_STD || { printf "${bred} [*] dalfox		[NO]\n"; allinstalled=false;}
 	eval type -P git-hound $DEBUG_STD || { printf "${bred} [*] git-hound		[NO]\n"; allinstalled=false;}
 	eval type -P ffuf $DEBUG_STD || { printf "${bred} [*] ffuf		[NO]\n"; allinstalled=false;}
 	eval type -P massdns $DEBUG_STD || { printf "${bred} [*] Massdns		[NO]\n"; allinstalled=false;}
@@ -174,12 +172,10 @@ function tools_full(){
 	[ -f $tools/subjack/fingerprints.json ] && printf "${bgreen}[*] Subjack fings	[YES]\n" || printf "${bred} [*] Subjack fings	[NO]\n"
 	eval type -P nuclei $DEBUG_STD && printf "${bgreen}[*] Nuclei		[YES]\n" || { printf "${bred} [*] Nuclei		[NO]\n"; }
 	[ -d ~/nuclei-templates ] && printf "${bgreen}[*] Nuclei templates  	[YES]\n" || printf "${bred} [*] Nuclei templates  	[NO]\n"
-	eval type -P aquatone $DEBUG_STD && printf "${bgreen}[*] Aquatone		[YES]\n" || { printf "${bred} [*] Aquatone		[NO]\n"; }
 	eval type -P naabu $DEBUG_STD && printf "${bgreen}[*] Naabu		[YES]\n" || { printf "${bred} [*] Naabu		[NO]\n"; }
 	eval type -P gf $DEBUG_STD && printf "${bgreen}[*] Gf		        [YES]\n" || { printf "${bred} [*] Gf			[NO]\n"; }
 	eval type -P Gxss $DEBUG_STD && printf "${bgreen}[*] Gxss		[YES]\n" || { printf "${bred} [*] Gxss		[NO]\n"; }
 	eval type -P subjs $DEBUG_STD && printf "${bgreen}[*] subjs		[YES]\n" || { printf "${bred} [*] subjs		[NO]\n"; }
-	eval type -P dalfox $DEBUG_STD && printf "${bgreen}[*] dalfox		[YES]\n" || { printf "${bred} [*] dalfox		[NO]\n"; }
 	eval type -P git-hound $DEBUG_STD && printf "${bgreen}[*] git-hound		[YES]\n" || { printf "${bred} [*] git-hound		[NO]\n"; }
 	eval type -P ffuf $DEBUG_STD && printf "${bgreen}[*] ffuf		[YES]\n" || { printf "${bred} [*] ffuf		[NO]\n"; }
 	eval type -P massdns $DEBUG_STD && printf "${bgreen}[*] Massdns		[YES]\n" || { printf "${bred} [*] Massdns		[NO]\n"; }
@@ -440,7 +436,7 @@ screenshot(){
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Web Screenshot Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in in screenshots/aquatone_report.html folder${reset}\n"
+			printf "${bblue} Results are saved in screenshots folder${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -645,7 +641,7 @@ xss(){
 				end=`date +%s`
 				getElapsedTime $start $end
 			fi
-			printf "${bblue} Results are saved in in ${domain}_dalfox_xss.txt${reset}\n"
+			printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"

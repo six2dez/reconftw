@@ -89,7 +89,6 @@ eval GO111MODULE=on go get -v github.com/projectdiscovery/naabu/v2/cmd/naabu $DE
 printf "${bgreen} 10%% done${reset}\n\n"
 eval go get -v github.com/tomnomnom/hacks/waybackurls $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei $DEBUG_STD
-eval go get -v github.com/michenriksen/aquatone $DEBUG_STD
 eval go get -v github.com/tomnomnom/anew $DEBUG_STD
 printf "${bgreen} 20%% done${reset}\n\n"
 eval go get -v github.com/tomnomnom/unfurl $DEBUG_STD
@@ -105,7 +104,6 @@ cp -r $dir/gf/examples ~/.gf
 cp $dir/Gf-Patterns/*.json ~/.gf
 printf "${bgreen} 40%% done${reset}\n\n"
 eval GO111MODULE=on go get -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder $DEBUG_STD
-eval go get -v github.com/hahwul/dalfox $DEBUG_STD
 eval go get -v github.com/lc/gau $DEBUG_STD
 eval GO111MODULE=on go get -u -v github.com/lc/subjs $DEBUG_STD
 eval go get -v github.com/KathanP19/Gxss $DEBUG_STD
