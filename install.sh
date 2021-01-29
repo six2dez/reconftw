@@ -8,6 +8,7 @@ bred='\033[1;31m'
 
 DEBUG_STD="&>/dev/null"
 DEBUG_ERROR="2>/dev/null"
+SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 if grep -q "ARMv"  /proc/cpuinfo
 then
@@ -73,6 +74,7 @@ then
     eval $SUDO wget https://bitbucket.org/ariya/phantomjs/downloads/phantomjs-2.1.1-linux-x86_64.tar.bz2 $DEBUG_STD
     eval $SUDO tar xvf phantomjs-2.1.1-linux-x86_64.tar.bz2 $DEBUG_STD
     eval $SUDO ln -s /opt/phantomjs-2.1.1-linux-x86_64/bin/phantomjs /usr/local/bin/phantomjs $DEBUG_STD
+    cd $SCRIPTPATH
 fi
 
 [ ! -d "~/.gf" ] && mkdir -p ~/.gf
