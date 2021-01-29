@@ -123,6 +123,7 @@ function tools_installed(){
 	eval type -P crlfuzz $DEBUG_STD || { printf "${bred} [*] crlfuzz		[NO]\n"; allinstalled=false;}
 	eval type -P httpx $DEBUG_STD || { printf "${bred} [*] Httpx		[NO]\n${reset}"; allinstalled=false;}
 	eval type -P jq $DEBUG_STD || { printf "${bred} [*] jq			[NO]\n${reset}"; allinstalled=false;}
+	eval type -P webscreenshot $DEBUG_STD || { printf "${bred} [*] webscreenshot	[NO]\n${reset}"; allinstalled=false;}
 
 	if [ "${allinstalled}" = true ] ; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
@@ -191,6 +192,7 @@ function tools_full(){
 	eval type -P crlfuzz $DEBUG_STD && printf "${bgreen}[*] crlfuzz		[YES]\n" || { printf "${bred} [*] crlfuzz		[NO]\n"; }
 	eval type -P httpx $DEBUG_STD && printf "${bgreen}[*] Httpx		[YES]\n${reset}" || { printf "${bred} [*] Httpx		[NO]\n${reset}"; }
 	eval type -P jq $DEBUG_STD && printf "${bgreen}[*] jq			[YES]\n${reset}" || { printf "${bred} [*] jq			[NO]\n${reset}"; }
+	eval type -P webscreenshot $DEBUG_STD && printf "${bgreen}[*] webscreenshot	[YES]\n${reset}" || { printf "${bred} [*] webscreenshot	[NO]\n${reset}"; }
 
 	printf "\n${yellow} If any tool is not installed under $tools, I trust in your ability to install it :D\n Also remember to set the ${bred}\$tools${yellow} variable at the start of this script.\n If you have any problem you can always ping me ;) ${reset}\n\n"
 	printf "${bblue} Tools check finished\n"
@@ -433,7 +435,8 @@ screenshot(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} ${bgreen} Web Screenshot ${reset}\n\n"
 			start=`date +%s`
-			cat ${domain}_probed.txt | aquatone -out screenshots -threads 8 -silent && touch $called_fn_dir/.${FUNCNAME[0]}
+			eval webscreenshot -i ${domain}_probed.txt -w 8 -a "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -o screenshots $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+			# cat ${domain}_probed.txt | aquatone -out screenshots -threads 8 -silent && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Web Screenshot Finished in ${runtime}\n"
@@ -468,7 +471,7 @@ portscan(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Port Scan ${reset}\n\n"
 			start=`date +%s`
-			naabu -top-ports 1000 -silent -exclude-cdn -nmap-cli 'nmap -sV --script /usr/share/nmap/scripts/vulners.nse,http-title.nse --min-rate 40000 -T4 --max-retries 2 -oG -' -iL ${domain}_subdomains.txt  | grep "^Host" | grep -v "Up$" > ${domain}_portscan.txt;
+			naabu -top-ports 1000 -silent -exclude-cdn -nmap-cli 'nmap -sV --min-rate 40000 -T4 --open --max-retries 2 -oG -' -iL ${domain}_subdomains.txt > ${domain}_portscan.txt;
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bred}\n Port scan results in ${runtime}${reset}\n\n"
@@ -629,17 +632,16 @@ xss(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} XSS Analysis ${reset}\n\n"
 			start=`date +%s`
-			# Set your own blind xss server, I will not advice you if I receive some data in my server :P
-			# Xsstrike
-			# Xsstrike blind payload defined in $tools/xsstrike/core/config.py
-			# python xsstrike.py --seeds ${domain}_xss.txt -t 30 --timeout=4 --blind --skip
 			if [ -n "$XSS_SERVER" ]; then
-				cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox -b $XSS_SERVER pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
+				eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --blind --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				#cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox -b $XSS_SERVER pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
 				getElapsedTime $start $end
 			else
 				printf "${bblue}\n No XSS_SERVER defined, blind xss skipped\n"
-				cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				#cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
 				getElapsedTime $start $end
 			fi
@@ -677,7 +679,7 @@ favicon(){
 			eval python3 favUp.py -w $domain -sc -o favicontest.json $DEBUG_STD
 			mv favicontest.json $dir/favicontest.json
 			cd $dir
-			cat favicontest.json | jq > ${domain}_favicontest.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			eval cat favicontest.json | jq > ${domain}_favicontest.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			rm favicontest.json
 			eval cat ${domain}_favicontest.txt $DEBUG_ERROR | grep found_ips
 			end=`date +%s`

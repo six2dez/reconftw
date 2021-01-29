@@ -26,15 +26,15 @@ printf "\n\n${bgreen}###########################################################
 printf "${bgreen} reconftw installer script (apt/rpm/pacman compatible)${reset}\n\n"
 
 install_apt(){
-    eval $SUDO apt install python3 python3-pip ruby git libpcap-dev chromium-browser wget python-dev python3-dev build-essential libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq -y $DEBUG_STD
+    eval $SUDO apt install python3 python3-pip ruby git libpcap-dev chromium-browser wget python-dev python3-dev build-essential phantomjs imagemagick xvfb libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq -y $DEBUG_STD
 }
 
 install_yum(){
-    eval $SUDO yum install python3 python3-pip ruby git libpcap-devel chromium wget openssl-devel python3-devel libxslt-devel libffi-devel libxml2-devel nmap zlib-devel jq -y $DEBUG_STD
+    eval $SUDO yum install python3 python3-pip ruby git libpcap-devel chromium wget openssl-devel python3-devel libxslt-devel libffi-devel imagemagick xorg-x11-server-Xvfb libxml2-devel nmap zlib-devel jq -y $DEBUG_STD
 }
 
 install_pacman(){
-    eval $SUDO pacman -Sy install python python-pip ruby git libpcap nmap chromium wget jq -y $DEBUG_STD
+    eval $SUDO pacman -Sy install python python-pip ruby git libpcap nmap chromium wget jq imagemagick xorg-server-xvfb -y $DEBUG_STD
 }
 
 #installing latest Golang version
@@ -60,14 +60,20 @@ fi
 [ -n "$GOPATH" ] || { printf "${bred} GOPATH env var not detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
 [ -n "$GOROOT" ] || { printf "${bred} GOROOT env var not detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
 
+
 if [ -f /etc/debian_version ]; then install_apt;
 elif [ -f /etc/redhat-release ]; then install_yum;
 elif [ -f /etc/arch-release ]; then install_pacman;
 elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for some RedHat and Amazon Linux instances
 fi
 
-#test -f /etc/gentoo-release && install_emerge
-#test -f /etc/SuSE-release && install_zypp
+if ! command -v phantomjs &> /dev/null
+then
+    cd /opt
+    eval $SUDO wget https://bitbucket.org/ariya/phantomjs/downloads/phantomjs-2.1.1-linux-x86_64.tar.bz2 $DEBUG_STD
+    eval $SUDO tar xvf phantomjs-2.1.1-linux-x86_64.tar.bz2 $DEBUG_STD
+    eval $SUDO ln -s /opt/phantomjs-2.1.1-linux-x86_64/bin/phantomjs /usr/local/bin/phantomjs $DEBUG_STD
+fi
 
 [ ! -d "~/.gf" ] && mkdir -p ~/.gf
 [ ! -d "~/Tools" ] && mkdir -p ~/Tools
