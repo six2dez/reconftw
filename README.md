@@ -29,9 +29,9 @@ This is a live development project, until the first stable release (1.0) it will
 -   [Summary](#summary)
 -   [Installation](#installation)
 -   [Usage](#usage)
--   [Features](#features)
+-   [Features](w#fire-features-fire)
 -   [Mindmap](#mindmapworkflow)
--   [Improvement plan](#improvement-plan)
+-   [Improvement plan](#hourglass-improvement-plan-hourglass)
 -   [Thanks](#thanks)
 
 ## Summary
@@ -59,7 +59,6 @@ chmod +x *.sh
   - favup (```shodan init <SHODANPAIDAPIKEY>```)
   - SSRF Server (```COLLAB_SERVER``` env var) 
   - Blind XSS Server (```XSS_SERVER``` env var) 
-- This script uses dalfox with blind-xss option, you must change to your own server, check xsshunter.com.
 
 ## Usage
 
@@ -101,13 +100,13 @@ chmod +x *.sh
   - Subdomain JS Scraping ([JSFinder](https://github.com/Threezh1/JSFinder))  
 - Sub TKO ([subjack](https://github.com/haccer/subjack) and [nuclei](https://github.com/projectdiscovery/nuclei))  
 - Web Prober ([httpx](https://github.com/projectdiscovery/httpx))  
-- Web screenshot ([aquatone](https://github.com/michenriksen/aquatone))  
+- Web screenshot ([webscreenshot](https://github.com/maaaaz/webscreenshot))  
 - Template scanner ([nuclei](https://github.com/projectdiscovery/nuclei))  
 - Port Scanner ([naabu](https://github.com/projectdiscovery/naabu))  
 - Url extraction ([waybackurls](https://github.com/tomnomnom/waybackurls), [gau](https://github.com/lc/gau), [gospider](https://github.com/jaeles-project/gospider), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3))  
 - Pattern Search ([gf](https://github.com/tomnomnom/waybackurls) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns))  
 - Param discovery ([paramspider](https://github.com/devanshbatham/ParamSpider) and [arjun](https://github.com/s0md3v/Arjun))  
-- XSS ([Gxss](https://github.com/KathanP19/Gxss) and [dalfox](https://github.com/hahwul/dalfox))  
+- XSS ([XSStrike](https://github.com/s0md3v/XSStrike))  
 - Open redirect ([Openredirex](https://github.com/devanshbatham/OpenRedireX))  
 - SSRF ([asyncio_ssrf.py](https://gist.github.com/h4ms1k/adcc340495d418fcd72ec727a116fea2))  
 - CRLF ([crlfuzz](https://github.com/dwisiswant0/crlfuzz))  
