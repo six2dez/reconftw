@@ -54,7 +54,7 @@ chmod +x *.sh
 - It is highly recommended, and in some cases essential, to set your api keys or env variables:
   - amass config file(```~/.config/amass/config.ini```)
   - subfinder config file(```~/.config/subfinder/config.yaml```)
-  - GitHub tokens file(```~/Tools/.github_tokens```) [check how](https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token)
+  - GitHub tokens file(```~/Tools/.github_tokens```) Recommended > 5, see how to create [here](https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token)
   - favup API(```shodan init <SHODANPAIDAPIKEY>```)
   - SSRF Server var(```COLLAB_SERVER``` env var) 
   - Blind XSS Server var(```XSS_SERVER``` env var) 
