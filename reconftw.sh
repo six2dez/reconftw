@@ -800,7 +800,8 @@ ssrf_checks(){
 			printf "${bblue} SSRF checks ${reset}\n"
 			if [ -n "$COLLAB_SERVER" ]; then
 				start=`date +%s`
-				eval cat ${domain}_ssrf.txt $DEBUG_ERROR | eval python3 $tools/ssrf.py $COLLAB_SERVER > ${domain}_ssrf_confirmed.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				COLLAB_SERVER_FIX=$(echo $COLLAB_SERVER | sed -r "s/https?:\/\///")
+				eval cat ${domain}_ssrf.txt $DEBUG_ERROR | eval python3 $tools/ssrf.py $COLLAB_SERVER_FIX > ${domain}_ssrf_confirmed.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
 				getElapsedTime $start $end
 				printf "${bblue}\n SSRF Finished in ${runtime}\n"
