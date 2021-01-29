@@ -109,7 +109,7 @@ chmod +x *.sh
 - Open redirect ([Openredirex](https://github.com/devanshbatham/OpenRedireX))  
 - SSRF ([asyncio_ssrf.py](https://gist.github.com/h4ms1k/adcc340495d418fcd72ec727a116fea2))  
 - CRLF ([crlfuzz](https://github.com/dwisiswant0/crlfuzz))  
-- Github ([git-hound](https://github.com/tillson/git-hound))  
+- Github ([GitDorker](https://github.com/obheda12/GitDorker))  
 - Favicon Real IP ([fav-up](https://github.com/pielco11/fav-up))  
 - Javascript analysis ([LinkFinder](https://github.com/GerbenJavado/LinkFinder), scripts from [JSFScan](https://github.com/KathanP19/JSFScan.sh))  
 - Fuzzing ([ffuf](https://github.com/ffuf/ffuf))  
