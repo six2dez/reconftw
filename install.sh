@@ -27,15 +27,15 @@ printf "\n\n${bgreen}###########################################################
 printf "${bgreen} reconftw installer script (apt/rpm/pacman compatible)${reset}\n\n"
 
 install_apt(){
-    eval $SUDO apt install python3 python3-pip ruby git libpcap-dev chromium-browser wget python-dev python3-dev build-essential phantomjs imagemagick xvfb libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq -y $DEBUG_STD
+    eval $SUDO apt install python3 python3-pip ruby git libpcap-dev chromium-browser wget python-dev python3-dev build-essential xvfb libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq -y $DEBUG_STD
 }
 
 install_yum(){
-    eval $SUDO yum install python3 python3-pip ruby git libpcap-devel chromium wget openssl-devel python3-devel libxslt-devel libffi-devel imagemagick xorg-x11-server-Xvfb libxml2-devel nmap zlib-devel jq -y $DEBUG_STD
+    eval $SUDO yum install python3 python3-pip ruby git libpcap-devel chromium wget openssl-devel python3-devel libxslt-devel libffi-devel xorg-x11-server-Xvfb libxml2-devel nmap zlib-devel jq -y $DEBUG_STD
 }
 
 install_pacman(){
-    eval $SUDO pacman -Sy install python python-pip ruby git libpcap nmap chromium wget jq imagemagick xorg-server-xvfb -y $DEBUG_STD
+    eval $SUDO pacman -Sy install python python-pip ruby git libpcap nmap chromium wget jq xorg-server-xvfb -y $DEBUG_STD
 }
 
 #installing latest Golang version
@@ -71,9 +71,16 @@ fi
 if ! command -v phantomjs &> /dev/null
 then
     cd /opt
-    eval $SUDO wget https://bitbucket.org/ariya/phantomjs/downloads/phantomjs-2.1.1-linux-x86_64.tar.bz2 $DEBUG_STD
-    eval $SUDO tar xvf phantomjs-2.1.1-linux-x86_64.tar.bz2 $DEBUG_STD
-    eval $SUDO ln -s /opt/phantomjs-2.1.1-linux-x86_64/bin/phantomjs /usr/local/bin/phantomjs $DEBUG_STD
+    if [ "True" = "$IS_ARM" ]; then
+        eval $SUDO mkdir -p phantomjs-armv6-rpi-v2.1.1 && cd phantomjs-armv6-rpi-v2.1.1 $DEBUG_STD
+        eval $SUDO wget https://github.com/piksel/phantomjs-raspberrypi/releases/download/v2.1.1-r/phantomjs-armv6-rpi-v2.1.1.tar.xz $DEBUG_STD
+        eval $SUDO tar xvf phantomjs-armv6-rpi-v2.1.1.tar.xz $DEBUG_STD
+        eval $SUDO ln -s /opt/phantomjs-armv6-rpi-v2.1.1/bin/phantomjs /usr/local/bin/phantomjs $DEBUG_STD
+    else
+        eval $SUDO wget https://bitbucket.org/ariya/phantomjs/downloads/phantomjs-2.1.1-linux-x86_64.tar.bz2 $DEBUG_STD
+        eval $SUDO tar xvf phantomjs-2.1.1-linux-x86_64.tar.bz2 $DEBUG_STD
+        eval $SUDO ln -s /opt/phantomjs-2.1.1-linux-x86_64/bin/phantomjs /usr/local/bin/phantomjs $DEBUG_STD
+    fi
     cd $SCRIPTPATH
 fi
 
@@ -178,7 +185,7 @@ sed -i 's/^miscellaneous/#miscellaneous/' ~/nuclei-templates/.nuclei-ignore
 #stripping all Go binaries
 eval strip -s $HOME/go/bin/* $DEBUG_STD
 
-printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - GitHub (${dir}/.github_tokens)\n - favup (shodan init SHODANPAIDAPIKEY)\n - SSRF Server (COLLAB_SERVER env var) ${reset}\n"
+printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - GitHub (${dir}/.github_tokens)\n - favup (shodan init SHODANPAIDAPIKEY)\n - SSRF Server (COLLAB_SERVER env var) ${reset}\n - Blind XSS Server (XSS_SERVER env var)\n"
 
 printf "${bgreen} Finished!${reset}\n\n"
 printf "\n\n${bgreen}#######################################################################\n"
