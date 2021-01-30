@@ -35,6 +35,7 @@ banner(){
 }
 
 start(){
+	global_start=`date +%s`
 	tools_installed
 	if [ -z "$domain" ]
 	then
@@ -190,13 +191,14 @@ function tools_full(){
 }
 
 dorks(){
+	start=`date +%s`
 	printf "${bgreen}#######################################################################\n"
 	printf "${bblue} Performing Google Dorks ${reset}\n\n"
-
 	$tools/degoogle_hunter/degoogle_hunter.sh $domain | tee ${domain}_dorks.txt
 	sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" ${domain}_dorks.txt
-
-	printf "${bblue} Finished : ${bblue} Happy hunting! ${reset}\n"
+	end=`date +%s`
+	getElapsedTime $start $end
+	printf "${bblue} Finished in ${runtime} Happy hunting! ${reset}\n"
 	printf "${bgreen}#######################################################################\n"
 }
 
@@ -250,7 +252,7 @@ sub_passive(){
 			getElapsedTime $start $end
 			printf "${green} ${NUMOFLINES} subdomains found in ${runtime}${reset}\n\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -267,7 +269,7 @@ sub_brute(){
 			getElapsedTime $start $end
 			printf "${green} ${NUMOFLINES} subdomains found in ${runtime}${reset}\n\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -284,7 +286,7 @@ sub_dns(){
 			getElapsedTime $start $end
 			printf "${green} ${NUMOFLINES} subdomains found in ${runtime}${reset}\n\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -309,7 +311,7 @@ sub_scraping(){
 			getElapsedTime $start $end
 			printf "${green} ${NUMOFLINES} subdomains found in ${runtime}${reset}\n\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -346,7 +348,7 @@ sub_permut(){
 			getElapsedTime $start $end
 			printf "${green} ${NUMOFLINES} subdomains found in ${runtime}${reset}\n\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -367,7 +369,7 @@ webprobe_simple(){
 			getElapsedTime $start $end
 			printf "${green} ${NUMOFLINES} subdomains resolved in ${runtime}${reset}\n\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -394,7 +396,7 @@ subtakeover(){
 			printf "${bblue} Results are saved in ${domain}_takeover.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -415,7 +417,7 @@ webprobe_full(){
 			printf "${bblue} Results are saved in ${domain}_takeover.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -433,7 +435,7 @@ screenshot(){
 			printf "${bblue} Results are saved in screenshots folder${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -451,7 +453,7 @@ metadata(){
 			printf "${bblue} Results are saved in in metadata folder and ${domain}_metadata.csv ${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -471,7 +473,7 @@ portscan(){
 			printf "${bblue} Results are saved in in ${domain}_portscan.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -510,7 +512,7 @@ nuclei_check(){
 			printf "${bblue} Results are saved in in ${domain}_nuclei_*.txt files${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -532,7 +534,7 @@ urlchecks(){
 			printf "${bblue} Results are saved in in ${domain}_url_extract.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -557,7 +559,7 @@ url_gf(){
 			printf "${bblue} Results are saved in in ${domain}_*gfpattern*.txt files${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -585,7 +587,7 @@ jschecks(){
 			printf "${bblue} Results are saved in in ${domain}_js_*.txt files${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -608,7 +610,7 @@ params(){
 			printf "${bblue} Results are saved in in ${domain}_param.txt and ${domain}_arjun.json${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -631,10 +633,11 @@ xss(){
 				end=`date +%s`
 				getElapsedTime $start $end
 			fi
+			printf "${bblue}\n XSS Analysis Finished in ${runtime}\n"
 			printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -657,7 +660,7 @@ github(){
 			printf "${bblue} Results are saved in in ${domain}_gitrecon.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -680,7 +683,7 @@ favicon(){
 			printf "${bblue} Results are saved in in ${domain}_favicontest.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -706,7 +709,7 @@ fuzz(){
 			printf "${bblue} Results are saved in fuzzing/*subdomain*.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -716,12 +719,18 @@ cms_scanner(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} CMS Scanner ${reset}\n"
 			start=`date +%s`
-			mkdir -p $dir/cms
+			mkdir -p $dir/cms && rm -rf $dir/cms/*
 			tr '\n' ',' < ${domain}_probed.txt > ${domain}_cms.txt
 			eval python3 $tools/CMSeeK/cmseek.py -l ${domain}_cms.txt --batch -r $DEBUG_STD
 			for sub in $(cat ${domain}_probed.txt); do
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-				mv $tools/CMSeeK/Result/${sub_out} $dir/cms/
+				cms_id=$(cat $tools/CMSeeK/Result/${sub_out}/cms.json | jq -r '.cms_id')
+				if [ -z "$cms_id" ]
+				then
+					rm -rf $tools/CMSeeK/Result/${sub_out}
+				else
+					mv -f $tools/CMSeeK/Result/${sub_out} $dir/cms/
+				fi
 			done
 			eval rm ${domain}_cms.txt $DEBUG_ERROR
 			touch $called_fn_dir/.${FUNCNAME[0]}
@@ -731,7 +740,7 @@ cms_scanner(){
 			printf "${bblue} Results are saved in cms/*subdomain* folder${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -749,7 +758,7 @@ cors(){
 			printf "${bblue} Results are saved in ${domain}_cors.txt ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -766,7 +775,7 @@ test_ssl(){
 			printf "${bblue} Results are saved in ${domain}_testssl.txt ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -785,7 +794,7 @@ open_redirect(){
 			printf "${bblue} Results are saved in ${domain}_openredirex.txt ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -807,7 +816,7 @@ ssrf_checks(){
 			printf "${bblue} Results are saved in ${domain}_ssrf_confirmed.txt ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -824,7 +833,7 @@ crlf_checks(){
 			printf "${bblue} Results are saved in ${domain}_crlf.txt ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -873,8 +882,10 @@ end(){
 		output
 		finaldir=$dir_output
 	fi
+	global_end=`date +%s`
+	getElapsedTime $global_start $global_end
 	printf "${bgreen}#######################################################################\n"
-	printf "${bred} Finished Recon on: ${domain} under ${finaldir} ${reset}\n"
+	printf "${bred} Finished Recon on: ${domain} under ${finaldir} in:${runtime} ${reset}\n"
 	printf "${bgreen}#######################################################################\n"
 }
 

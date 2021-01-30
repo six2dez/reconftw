@@ -20,3 +20,4 @@ htmlmin==0.1.12
 tldextract==2.2.0
 bs4
 webscreenshot
+colored
