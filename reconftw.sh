@@ -50,11 +50,6 @@ start(){
 		mkdir -p $called_fn_dir
 	fi
 
-	if [ ! -d "$dir" ]
-	then
-		mkdir -p $dir
-	fi
-
 	if [ -n "$list" ]
 	then
 		cp $list $dir/${domain}_probed.txt
