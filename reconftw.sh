@@ -722,12 +722,18 @@ cms_scanner(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} CMS Scanner ${reset}\n"
 			start=`date +%s`
-			mkdir -p $dir/cms
+			mkdir -p $dir/cms && rm -rf $dir/cms/*
 			tr '\n' ',' < ${domain}_probed.txt > ${domain}_cms.txt
 			eval python3 $tools/CMSeeK/cmseek.py -l ${domain}_cms.txt --batch -r $DEBUG_STD
 			for sub in $(cat ${domain}_probed.txt); do
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-				mv $tools/CMSeeK/Result/${sub_out} $dir/cms/
+				cms_id=$(cat $tools/CMSeeK/Result/${sub_out}/cms.json | jq -r '.cms_id')
+				if [ -z "$cms_id" ]
+				then
+					rm -rf $tools/CMSeeK/Result/${sub_out}
+				else
+					mv -f $tools/CMSeeK/Result/${sub_out} $dir/cms/
+				fi
 			done
 			eval rm ${domain}_cms.txt $DEBUG_ERROR
 			touch $called_fn_dir/.${FUNCNAME[0]}
