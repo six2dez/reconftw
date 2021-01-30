@@ -636,6 +636,7 @@ xss(){
 				end=`date +%s`
 				getElapsedTime $start $end
 			fi
+			printf "${bblue}\n XSS Analysis Finished in ${runtime}\n"
 			printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
