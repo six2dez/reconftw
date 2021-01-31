@@ -22,5 +22,4 @@ bs4
 webscreenshot
 colored
 aiohttp
-requests==2.24.0
 termcolors==0.1.0
