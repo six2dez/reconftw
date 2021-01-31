@@ -285,6 +285,11 @@ sub_crt(){
 			fi
 			eval rm ${outputfile}.txt $DEBUG_ERROR
 			cd $dir
+			if [ "$FULLSCOPE" = true ] ; then
+				curl "https://tls.bufferover.run/dns?q=${domain}" 2>/dev/null | jq -r .Results[] | cut -d ',' -f3 | sort -u | anew -q crtsh_subs.txt
+			else
+				curl "https://tls.bufferover.run/dns?q=${domain}" 2>/dev/null | jq -r .Results[] | cut -d ',' -f3 | sort -u | grep -F ".$domain" | anew -q crtsh_subs.txt
+			fi
 			NUMOFLINES=$(wc -l < crtsh_subs.txt)
 			getElapsedTime $start $end
 			printf "${green} ${NUMOFLINES} crtsh subdomains found in ${runtime}${reset}\n\n"
