@@ -84,7 +84,9 @@ chmod +x *.sh
 --sr             Subdomain permutations and resolution (-l required)
 --ss             Subdomain scan by scraping (-l required)
 
-<b>OUTPUT OPTIONS</b>
+<b>GENERAL OPTIONS</b>
+--deep           Deep scan (Enable some slow options for deeper scan)
+--fs             Full scope (Enable widest scope *domain* options)
 -o output/path   Define output folder
 
 </pre>
