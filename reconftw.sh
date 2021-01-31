@@ -12,6 +12,8 @@ reset='\033[0m'
 tools=~/Tools
 DEBUG_STD="&>/dev/null"
 DEBUG_ERROR="2>/dev/null"
+DEEP=false
+FULLSCOPE=false
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 # Uncomment this only if it is not already in your env .bashrc or .zshrc
@@ -115,7 +117,7 @@ function tools_installed(){
 	eval type -P qsreplace $DEBUG_STD || { printf "${bred} [*] qsreplace		[NO]\n"; allinstalled=false;}
 	eval type -P interlace $DEBUG_STD || { printf "${bred} [*] interlace		[NO]\n"; allinstalled=false;}
 	eval type -P dnsgen $DEBUG_STD || { printf "${bred} [*] DnsGen		[NO]\n"; allinstalled=false;}
-	eval type -P pymeta $DEBUG_STD || { printf "${bred} [*] pymeta		[NO]\n"; allinstalled=false;}
+#	eval type -P pymeta $DEBUG_STD || { printf "${bred} [*] pymeta		[NO]\n"; allinstalled=false;}
 	eval type -P anew $DEBUG_STD || { printf "${bred} [*] Anew		[NO]\n"; allinstalled=false;}
 	eval type -P unfurl $DEBUG_STD || { printf "${bred} [*] unfurl		[NO]\n"; allinstalled=false;}
 	eval type -P crlfuzz $DEBUG_STD || { printf "${bred} [*] crlfuzz		[NO]\n"; allinstalled=false;}
@@ -182,7 +184,7 @@ function tools_full(){
 	eval type -P qsreplace $DEBUG_STD && printf "${bgreen}[*] qsreplace		[YES]\n" || { printf "${bred} [*] qsreplace		[NO]\n"; }
 	eval type -P interlace $DEBUG_STD && printf "${bgreen}[*] interlace		[YES]\n" || { printf "${bred} [*] interlace		[NO]\n"; }
 	eval type -P dnsgen $DEBUG_STD && printf "${bgreen}[*] DnsGen		[YES]\n" || { printf "${bred} [*] DnsGen		[NO]\n"; }
-	eval type -P pymeta $DEBUG_STD && printf "${bgreen}[*] pymeta		[YES]\n" || { printf "${bred} [*] pymeta		[NO]\n"; }
+#	eval type -P pymeta $DEBUG_STD && printf "${bgreen}[*] pymeta		[YES]\n" || { printf "${bred} [*] pymeta		[NO]\n"; }
 	eval type -P anew $DEBUG_STD && printf "${bgreen}[*] Anew		[YES]\n" || { printf "${bred} [*] Anew		[NO]\n"; }
 	eval type -P unfurl $DEBUG_STD && printf "${bgreen}[*] unfurl		[YES]\n" || { printf "${bred} [*] unfurl		[NO]\n"; }
 	eval type -P crlfuzz $DEBUG_STD && printf "${bgreen}[*] crlfuzz		[YES]\n" || { printf "${bred} [*] crlfuzz		[NO]\n"; }
@@ -213,9 +215,12 @@ subdomains_full(){
 	printf "${bgreen}#######################################################################\n\n"
 	printf "${bblue} Subdomain Enumeration\n\n"
 	sub_passive
+	sub_crt
 	sub_brute
 	sub_dns
-	sub_scraping
+	if [ "$DEEP" = true ] ; then
+		sub_scraping
+	fi
 	sub_permut
 	webprobe_simple
 	eval rm -f *_subs.txt $DEBUG_ERROR
@@ -243,7 +248,7 @@ sub_passive(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
 		then
 			start=`date +%s`
-			printf "${yellow} Running : Passive Subdomain Enumeration 1/6${reset}\n"
+			printf "${yellow} Running : Passive Subdomain Enumeration${reset}\n"
 			eval subfinder -d $domain -o subfinder.txt $DEBUG_STD
 			assetfinder --subs-only $domain | anew -q assetfinder.txt
 			eval amass enum -passive -d $domain -o amass.txt $DEBUG_STD
@@ -261,11 +266,43 @@ sub_passive(){
 	fi
 }
 
+sub_crt(){
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			start=`date +%s`
+			printf "${yellow} Running : Crtsh Subdomain Enumeration${reset}\n"
+			cd $tools/crtfinder
+			eval python3 crtfinder.py -u $domain $DEBUG_STD
+			outputfile=${domain%%.*}
+			if [ "$FULLSCOPE" = true ] ; then
+				eval cat ${outputfile}.txt $DEBUG_ERROR | anew -q $dir/crtsh_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			else
+				eval cat ${outputfile}.txt $DEBUG_ERROR | grep -F ".$domain" | anew -q $dir/crtsh_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			fi
+			if [ "$DEEP" = true ] ; then
+				eval python3 dig.py ${outputfile}.txt > ${domain}_more.txt $DEBUG_STD
+				if [ "$FULLSCOPE" = true ] ; then
+					eval cat ${domain}_more.txt $DEBUG_ERROR | anew -q $dir/crtsh_subs.txt
+				else
+					eval cat ${domain}_more.txt $DEBUG_ERROR | grep -F ".$domain" | anew -q $dir/crtsh_subs.txt
+				fi
+				eval rm ${domain}_more.txt $DEBUG_ERROR
+			fi
+			eval rm ${outputfile}.txt $DEBUG_ERROR
+			cd $dir
+			NUMOFLINES=$(wc -l < crtsh_subs.txt)
+			getElapsedTime $start $end
+			printf "${green} ${NUMOFLINES} crtsh subdomains found in ${runtime}${reset}\n\n"
+		else
+			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
+}
+
 sub_brute(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
 		then
 			start=`date +%s`
-			printf "${yellow} Running : Bruteforce Subdomain Enumeration 2/6${reset}\n"
+			printf "${yellow} Running : Bruteforce Subdomain Enumeration${reset}\n"
 			eval shuffledns -d $domain -w $tools/subdomains.txt -r $tools/resolvers.txt -o active_tmp.txt $DEBUG_STD
 			cat active_tmp.txt | sed "s/*.//" | anew -q brute_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			eval rm active_tmp.txt $DEBUG_ERROR
@@ -282,7 +319,7 @@ sub_dns(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
 		then
 			start=`date +%s`
-			printf "${yellow} Running : Active Subdomain Enumeration 3/6${reset}\n"
+			printf "${yellow} Running : Active Subdomain Enumeration${reset}\n"
 			cat *_subs.txt | anew -q tmp_subs_resolution.txt
 			deleteOutScoped $outOfScope_file tmp_subs_resolution.txt
 			eval shuffledns -d $domain -list tmp_subs_resolution.txt -r $tools/resolvers.txt -o ${domain}_subdomains.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
@@ -299,7 +336,7 @@ sub_scraping(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
 		then
 			start=`date +%s`
-			printf "${yellow} Running : JS scraping subdomain search 4/6${reset}\n"
+			printf "${yellow} Running : JS scraping subdomain search${reset}\n"
 			touch JS_subs.txt
 			cat ${domain}_subdomains.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed_tmp.txt
 			eval python3 $tools/JSFinder/JSFinder.py -f ${domain}_probed_tmp.txt -os JS_subs.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
@@ -324,7 +361,7 @@ sub_permut(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
 		then
 			start=`date +%s`
-			printf "${yellow} Running : Permutations Subdomain Enumeration 5/6${reset}\n"
+			printf "${yellow} Running : Permutations Subdomain Enumeration${reset}\n"
 			if [[ $(cat tmp_subs_resolution.txt | wc -l) -le 100 ]]
 				then
 					eval dnsgen tmp_subs_resolution.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute1_tmp.txt $DEBUG_STD
@@ -339,7 +376,7 @@ sub_permut(){
 					cat permute_tmp.txt | anew -q permute_subs.txt
 					eval rm permute_tmp.txt tmp_subs_resolution.txt $DEBUG_ERROR  && touch $called_fn_dir/.${FUNCNAME[0]}
 				else
-		  			printf "\n${bred} Skipping Permutations: Too Much Subdomains${reset}\n"
+		  			printf "${bred} Skipping Permutations: Too Much Subdomains${reset}\n"
 			fi
 			if [ -f "permute_subs.txt" ]
 			then
@@ -361,7 +398,7 @@ webprobe_simple(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
 		then
 			start=`date +%s`
-			printf "${yellow} Running : Http probing 6/6${reset}\n\n"
+			printf "${yellow} Running : Http probing${reset}\n\n"
 			cat ${domain}_subdomains.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			if [ -f "${domain}_probed.txt" ]
 			then
@@ -529,14 +566,20 @@ urlchecks(){
 			start=`date +%s`
 			cat ${domain}_probed.txt | waybackurls | anew -q ${domain}_url_extract.txt
 			cat ${domain}_probed.txt | gau | anew -q ${domain}_url_extract.txt
-			gospider -S ${domain}_probed.txt -t 10 -c 40 -d 2 -a -w --js --sitemap --robots | sed "s/^.*http/http/p" | anew -q ${domain}_url_extract.txt
-			python3 $tools/github-endpoints.py -d $domain | anew -q ${domain}_url_extract.txt  && touch $called_fn_dir/.${FUNCNAME[0]}
+			if [ "$DEEP" = true ] ; then
+				gospider -S ${domain}_probed.txt -t 10 -c 40 -d 2 -a -w --js --sitemap --robots | sed "s/^.*http/http/p" | anew -q ${domain}_url_extract.txt
+			else
+				gospider -S ${domain}_probed.txt -t 10 -c 40 -d 1 -a -w --js --sitemap --robots | sed "s/^.*http/http/p" | anew -q ${domain}_url_extract.txt
+			fi
+			python3 $tools/github-endpoints.py -d $domain | anew -q ${domain}_url_extract.txt
+			sed -ni '/^http/!d' ${domain}_url_extract.txt
+			cat ${domain}_url_extract.txt | httpx -follow-redirects -silent -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_url_extract_live.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			NUMOFLINES=$(wc -l < ${domain}_url_extract.txt)
+			NUMOFLINES=$(wc -l < ${domain}_url_extract_live.txt)
 			printf "${bblue}\n URL Extraction Finished\n"
 			printf "${bblue}\n ${NUMOFLINES} in ${runtime}\n"
-			printf "${bblue} Results are saved in in ${domain}_url_extract.txt${reset}\n"
+			printf "${bblue} Results are saved in in ${domain}_url_extract_live.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -549,17 +592,17 @@ url_gf(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Vulnerable Pattern Search ${reset}\n\n"
 			start=`date +%s`
-			gf xss ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_xss.txt;
-			gf ssti ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_ssti.txt;
-			gf ssrf ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_ssrf.txt;
-			gf sqli ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_sqli.txt;
-			gf redirect ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_redirect.txt;
-			gf rce ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_rce.txt;
-			gf potential ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_potential.txt;
-			gf lfi ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_lfi.txt && touch $called_fn_dir/.${FUNCNAME[0]};
+			gf xss ${domain}_url_extract_live.txt | qsreplace -a | anew -q ${domain}_xss.txt;
+			gf ssti ${domain}_url_extract_live.txt | qsreplace -a | anew -q ${domain}_ssti.txt;
+			gf ssrf ${domain}_url_extract_live.txt | qsreplace -a | anew -q ${domain}_ssrf.txt;
+			gf sqli ${domain}_url_extract_live.txt | qsreplace -a | anew -q ${domain}_sqli.txt;
+			gf redirect ${domain}_url_extract_live.txt | qsreplace -a | anew -q ${domain}_redirect.txt;
+			gf rce ${domain}_url_extract_live.txt | qsreplace -a | anew -q ${domain}_rce.txt;
+			gf potential ${domain}_url_extract_live.txt | qsreplace -a | anew -q ${domain}_potential.txt;
+			gf lfi ${domain}_url_extract_live.txt | qsreplace -a | anew -q ${domain}_lfi.txt && touch $called_fn_dir/.${FUNCNAME[0]};
 			end=`date +%s`
 			getElapsedTime $start $end
-			cat ${domain}_url_extract.txt | unfurl -u format %s://%d%p | anew -q ${domain}_url_endpoints.txt
+			cat ${domain}_url_extract_live.txt | unfurl -u format %s://%d%p | anew -q ${domain}_url_endpoints.txt
 			printf "${bblue}\n Vulnerable Pattern Search Finished in ${runtime}\n"
 			printf "${bblue} Results are saved in in ${domain}_*gfpattern*.txt files${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
@@ -575,8 +618,8 @@ jschecks(){
 			printf "${bblue} Javascript Scan ${reset}\n\n"
 			start=`date +%s`
 			printf "${yellow} Running : Fetching Urls 1/5${reset}\n"
-			cat ${domain}_url_extract.txt | grep -iE "\.js$" | anew -q ${domain}_jsfile_links.txt;
-			cat ${domain}_url_extract.txt | subjs | anew -q ${domain}_jsfile_links.txt;
+			cat ${domain}_url_extract_live.txt | grep -iE "\.js$" | anew -q ${domain}_jsfile_links.txt;
+			cat ${domain}_url_extract_live.txt | subjs | anew -q ${domain}_jsfile_links.txt;
 			printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
 			cat ${domain}_jsfile_links.txt | httpx -follow-redirects -silent -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt
 			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
@@ -621,28 +664,53 @@ params(){
 
 xss(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
-		then
-			printf "${bgreen}#######################################################################\n"
-			printf "${bblue} XSS Analysis ${reset}\n\n"
-			start=`date +%s`
+	then
+		printf "${bgreen}#######################################################################\n"
+		printf "${bblue} XSS Analysis ${reset}\n\n"
+		start=`date +%s`
+		if [ "$DEEP" = true ] ; then
 			if [ -n "$XSS_SERVER" ]; then
 				sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
 				eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --blind --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				#cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox -b $XSS_SERVER pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
 				getElapsedTime $start $end
+				printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
 			else
 				printf "${bblue}\n No XSS_SERVER defined, blind xss skipped\n"
 				eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				#cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
 				getElapsedTime $start $end
+				printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
 			fi
-			printf "${bblue}\n XSS Analysis Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
-			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [[ $(cat ${domain}_xss.txt | wc -l) -le 1000 ]]
+			then
+				if [ -n "$XSS_SERVER" ]; then
+					sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
+					eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --blind --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+					#cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox -b $XSS_SERVER pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+					end=`date +%s`
+					getElapsedTime $start $end
+					printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
+				else
+					printf "${bblue}\n No XSS_SERVER defined, blind xss skipped\n"
+					eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+					#cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+					end=`date +%s`
+					getElapsedTime $start $end
+					printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
+				fi
+			else
+				printf "${bred} Skipping XSS: Too Much URLs to test, try with --deep flag${reset}\n"
+			fi
+		fi
+		printf "${bblue}\n XSS Analysis Finished in ${runtime}\n"
+		printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
+		printf "${bgreen}#######################################################################\n\n"
+	else
+		printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -787,16 +855,35 @@ test_ssl(){
 open_redirect(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
 		then
-			printf "${bgreen}#######################################################################\n"
-			printf "${bblue} Open redirects checks ${reset}\n"
-			start=`date +%s`
-			cat ${domain}_redirect.txt | qsreplace FUZZ | anew -q test_redirect.txt
-			eval python3 $tools/OpenRedireX/openredirex.py -l test_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt > ${domain}_openredirex.txt $DEBUG_STD
-			eval rm test_redirect.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
-			end=`date +%s`
-			getElapsedTime $start $end
-			printf "${bblue}\n Open Redirects Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in ${domain}_openredirex.txt ${reset}\n"
+			if [ "$DEEP" = true ] ; then
+				printf "${bgreen}#######################################################################\n"
+				printf "${bblue} Open redirects checks ${reset}\n"
+				start=`date +%s`
+				cat ${domain}_redirect.txt | qsreplace FUZZ | anew -q test_redirect.txt
+				eval python3 $tools/OpenRedireX/openredirex.py -l test_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt > ${domain}_openredirex.txt $DEBUG_STD
+				eval rm test_redirect.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
+				end=`date +%s`
+				getElapsedTime $start $end
+				printf "${bblue}\n Open Redirects Finished in ${runtime}\n"
+				printf "${bblue} Results are saved in ${domain}_openredirex.txt ${reset}\n"
+				printf "${bgreen}#######################################################################\n"
+			else
+				if [[ $(cat ${domain}_redirect.txt | wc -l) -le 1000 ]]
+				then
+					printf "${bgreen}#######################################################################\n"
+					printf "${bblue} Open redirects checks ${reset}\n"
+					start=`date +%s`
+					cat ${domain}_redirect.txt | qsreplace FUZZ | anew -q test_redirect.txt
+					eval python3 $tools/OpenRedireX/openredirex.py -l test_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt > ${domain}_openredirex.txt $DEBUG_STD
+					eval rm test_redirect.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
+					end=`date +%s`
+					getElapsedTime $start $end
+					printf "${bblue}\n Open Redirects Finished in ${runtime}\n"
+					printf "${bblue} Results are saved in ${domain}_openredirex.txt ${reset}\n"
+				else
+					printf "${bred} Skipping Open redirects: Too Much URLs to test, try with --deep flag${reset}\n"
+				fi
+			fi
 			printf "${bgreen}#######################################################################\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -805,23 +892,38 @@ open_redirect(){
 
 ssrf_checks(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
-		then
-			printf "${bgreen}#######################################################################\n"
-			printf "${bblue} SSRF checks ${reset}\n"
-			if [ -n "$COLLAB_SERVER" ]; then
+	then
+		printf "${bgreen}#######################################################################\n"
+		printf "${bblue} SSRF checks ${reset}\n"
+		if [ -n "$COLLAB_SERVER" ]; then
+			if [ "$DEEP" = true ] ; then
 				start=`date +%s`
 				COLLAB_SERVER_FIX=$(echo $COLLAB_SERVER | sed -r "s/https?:\/\///")
 				eval cat ${domain}_ssrf.txt $DEBUG_ERROR | eval python3 $tools/ssrf.py $COLLAB_SERVER_FIX > ${domain}_ssrf_confirmed.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
 				getElapsedTime $start $end
 				printf "${bblue}\n SSRF Finished in ${runtime}\n"
+				printf "${bblue} Results are saved in ${domain}_ssrf_confirmed.txt ${reset}\n"
 			else
-				printf "${bblue}\n No COLLAB_SERVER defined\n"
+				if [[ $(cat ${domain}_ssrf.txt | wc -l) -le 1000 ]]
+				then
+					start=`date +%s`
+					COLLAB_SERVER_FIX=$(echo $COLLAB_SERVER | sed -r "s/https?:\/\///")
+					eval cat ${domain}_ssrf.txt $DEBUG_ERROR | eval python3 $tools/ssrf.py $COLLAB_SERVER_FIX > ${domain}_ssrf_confirmed.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+					end=`date +%s`
+					getElapsedTime $start $end
+					printf "${bblue}\n SSRF Finished in ${runtime}\n"
+					printf "${bblue} Results are saved in ${domain}_ssrf_confirmed.txt ${reset}\n"
+				else
+					printf "${bred} Skipping SSRF: Too Much URLs to test, try with --deep flag${reset}\n"
+				fi
 			fi
-			printf "${bblue} Results are saved in ${domain}_ssrf_confirmed.txt ${reset}\n"
-			printf "${bgreen}#######################################################################\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${bblue}\n No COLLAB_SERVER defined\n"
+		fi
+		printf "${bgreen}#######################################################################\n"
+	else
+		printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -917,7 +1019,9 @@ all(){
 			open_redirect
 			ssrf_checks
 			crlf_checks
-			jschecks
+			if [ "$DEEP" = true ] ; then
+				jschecks
+			fi
 			params
 			xss
 			test_ssl
@@ -943,7 +1047,9 @@ all(){
 		open_redirect
 		ssrf_checks
 		crlf_checks
-		jschecks
+		if [ "$DEEP" = true ] ; then
+			jschecks
+		fi
 		params
 		xss
 		test_ssl
@@ -1007,11 +1113,18 @@ then
 fi
 
 while getopts ":hd:-:l:x:vaisxwgto:" opt; do
-	verbose=$@
-	if [[ $verbose == *"-v"* ]]; then
+	general=$@
+	if [[ $general == *"-v"* ]]; then
   		unset DEBUG_STD
 		unset DEBUG_ERROR
 	fi
+	if [[ $general == *"--deep"* ]]; then
+  		DEEP=true
+	fi
+	if [[ $general == *"--fs"* ]]; then
+  		FULLSCOPE=true
+	fi
+	exit
 	case ${opt} in
 		d ) domain=$OPTARG
 			;;
@@ -1058,7 +1171,9 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 			open_redirect
 			ssrf_checks
 			crlf_checks
-			jschecks
+			if [ "$DEEP" = true ] ; then
+				jschecks
+			fi
 			params
 			xss
 			test_ssl
@@ -1086,6 +1201,7 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 						for domain in $(cat $list); do
 							start
 							sub_passive
+							sub_crt
 							sub_dns
 							webprobe_simple
 							end
@@ -1093,6 +1209,7 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 					else
 						start
 						sub_passive
+						sub_crt
 						sub_dns
 						webprobe_simple
 						end

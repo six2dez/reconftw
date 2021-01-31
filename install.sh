@@ -102,6 +102,7 @@ eval go get -v github.com/tomnomnom/anew $DEBUG_STD
 printf "${bgreen} 20%% done${reset}\n\n"
 eval go get -v github.com/tomnomnom/unfurl $DEBUG_STD
 eval git clone https://github.com/projectdiscovery/nuclei-templates ~/nuclei-templates $DEBUG_STD
+eval git clone https://github.com/eslam3kl/crtfinder $dir/crtfinder $DEBUG_STD
 eval nuclei -update-templates $DEBUG_STD
 eval go get -v github.com/haccer/subjack $DEBUG_STD
 eval git clone https://github.com/haccer/subjack $dir/subjack $DEBUG_STD
@@ -150,7 +151,7 @@ eval pip3 install dnsgen $DEBUG_STD
 #        $SUDO chmod 755 /usr/local/bin/git-hound
 #fi
 printf "${bgreen} 80%% done${reset}\n\n"
-eval pip3 install pymetadata $DEBUG_STD
+#eval pip3 install pymetadata $DEBUG_STD
 if [ "True" = "$IS_ARM" ]
     then
         eval wget https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-rpi $DEBUG_STD
@@ -172,6 +173,7 @@ printf "${bgreen} 90%% done${reset}\n\n"
 eval subfinder $DEBUG_STD
 eval wget -nc -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini $DEBUG_STD
 cd ~/.gf; eval wget -O potential.json https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json $DEBUG_STD; cd $dir
+touch $dir/.github_tokens
 eval wget -O github-endpoints.py https://gist.githubusercontent.com/six2dez/d1d516b606557526e9a78d7dd49cacd3/raw/8e7f1e1139ba3501d15dcd2ad82338d303f0b404/github-endpoints.py $DEBUG_STD
 eval wget -O getjswords.py https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py $DEBUG_STD
 eval wget -O subdomains.txt https://gist.githubusercontent.com/jhaddix/86a06c5dc309d08580a018c66354a056/raw/96f4e51d96b2203f19f6381c8c545b278eaa0837/all.txt $DEBUG_STD
