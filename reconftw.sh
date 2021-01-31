@@ -218,9 +218,7 @@ subdomains_full(){
 	sub_crt
 	sub_brute
 	sub_dns
-	if [ "$DEEP" = true ] ; then
-		sub_scraping
-	fi
+	sub_scraping
 	sub_permut
 	webprobe_simple
 	eval rm -f *_subs.txt $DEBUG_ERROR
