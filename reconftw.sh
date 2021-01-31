@@ -1119,7 +1119,6 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 	if [[ $general == *"--fs"* ]]; then
   		FULLSCOPE=true
 	fi
-	exit
 	case ${opt} in
 		d ) domain=$OPTARG
 			;;
