@@ -1059,7 +1059,8 @@ all(){
 
 help(){
 	printf "\n Usage: $0 [-h] [-i] [-d DOMAIN] [-l list.txt] [-x oos.txt] [-a] [-g] [-w] "
-	printf "\n           	      [-t] [-s] [--sp] [--sb] [--sr] [--ss] [--sw] [-v] [-o OUTPUT]\n\n"
+	printf "\n           	      [-t] [-s] [--sp] [--sb] [--sr] [--ss] [--sw] [-v] [-o OUTPUT]"
+	printf "\n           	      [--deep] [--fs] [-o OUTPUT]\n\n"
 	printf " ${bblue}TARGET OPTIONS${reset}\n"
 	printf "   -d DOMAIN        Target domain\n"
 	printf "   -l list.txt      Targets list, one per line\n"
@@ -1081,7 +1082,9 @@ help(){
 	printf "   --sr             Subdomain permutations and resolution ${yellow}(-l required)${reset}\n"
 	printf "   --ss             Subdomain scan by scraping ${yellow}(-l required)${reset}\n"
 	printf " \n"
-	printf " ${bblue}OUTPUT OPTIONS${reset}\n"
+	printf " ${bblue}GENERAL OPTIONS${reset}\n"
+	printf "   --deep           Deep scan (Enable some slow options for deeper scan)\n"
+	printf "   --fs             Full scope (Enable widest scope *domain* options)\n"
 	printf "   -o output/path   Define output folder\n"
 	printf " \n"
 	printf " ${bblue}USAGE EXAMPLES${reset}\n"
