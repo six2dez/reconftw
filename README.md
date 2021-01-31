@@ -96,6 +96,7 @@ chmod +x *.sh
 - Google Dorks ([degoogle_hunter](https://github.com/six2dez/degoogle_hunter))  
 - Multiple subdomain enumeration techniques (passive, bruteforce, permutations and scraping)  
   - Passive ([subfinder](https://github.com/projectdiscovery/subfinder), [assetfinder](https://github.com/tomnomnom/assetfinder), [amass](https://github.com/OWASP/Amass), [findomain](https://github.com/Findomain/Findomain), [crobat](https://github.com/cgboal/sonarsearch), [waybackurls](https://github.com/tomnomnom/waybackurls))  
+  - Certificate transparency ([crtfinder](https://github.com/eslam3kl/crtfinder))
   - Bruteforce ([shuffledns](https://github.com/projectdiscovery/shuffledns))  
   - Permutations ([dnsgen](https://github.com/ProjectAnte/dnsgen))  
   - Subdomain JS Scraping ([JSFinder](https://github.com/Threezh1/JSFinder))  
