@@ -112,7 +112,6 @@ function tools_installed(){
 	eval type -P qsreplace $DEBUG_STD || { printf "${bred} [*] qsreplace		[NO]\n"; allinstalled=false;}
 	eval type -P interlace $DEBUG_STD || { printf "${bred} [*] interlace		[NO]\n"; allinstalled=false;}
 	eval type -P dnsgen $DEBUG_STD || { printf "${bred} [*] DnsGen		[NO]\n"; allinstalled=false;}
-#	eval type -P pymeta $DEBUG_STD || { printf "${bred} [*] pymeta		[NO]\n"; allinstalled=false;}
 	eval type -P anew $DEBUG_STD || { printf "${bred} [*] Anew		[NO]\n"; allinstalled=false;}
 	eval type -P unfurl $DEBUG_STD || { printf "${bred} [*] unfurl		[NO]\n"; allinstalled=false;}
 	eval type -P crlfuzz $DEBUG_STD || { printf "${bred} [*] crlfuzz		[NO]\n"; allinstalled=false;}
@@ -179,7 +178,6 @@ function tools_full(){
 	eval type -P qsreplace $DEBUG_STD && printf "${bgreen}[*] qsreplace		[YES]\n" || { printf "${bred} [*] qsreplace		[NO]\n"; }
 	eval type -P interlace $DEBUG_STD && printf "${bgreen}[*] interlace		[YES]\n" || { printf "${bred} [*] interlace		[NO]\n"; }
 	eval type -P dnsgen $DEBUG_STD && printf "${bgreen}[*] DnsGen		[YES]\n" || { printf "${bred} [*] DnsGen		[NO]\n"; }
-#	eval type -P pymeta $DEBUG_STD && printf "${bgreen}[*] pymeta		[YES]\n" || { printf "${bred} [*] pymeta		[NO]\n"; }
 	eval type -P anew $DEBUG_STD && printf "${bgreen}[*] Anew		[YES]\n" || { printf "${bred} [*] Anew		[NO]\n"; }
 	eval type -P unfurl $DEBUG_STD && printf "${bgreen}[*] unfurl		[YES]\n" || { printf "${bred} [*] unfurl		[NO]\n"; }
 	eval type -P crlfuzz $DEBUG_STD && printf "${bgreen}[*] crlfuzz		[YES]\n" || { printf "${bred} [*] crlfuzz		[NO]\n"; }
@@ -213,9 +211,7 @@ subdomains_full(){
 	sub_crt
 	sub_brute
 	sub_dns
-	if [ "$DEEP" = true ] ; then
-		sub_scraping
-	fi
+	sub_scraping
 	sub_permut
 	webprobe_simple
 	eval rm -f *_subs.txt $DEBUG_ERROR
@@ -471,29 +467,10 @@ screenshot(){
 			printf "${bblue} ${bgreen} Web Screenshot ${reset}\n\n"
 			start=`date +%s`
 			eval webscreenshot -i ${domain}_probed.txt -w 8 -a "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -o screenshots $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-			# cat ${domain}_probed.txt | aquatone -out screenshots -threads 8 -silent && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Web Screenshot Finished in ${runtime}\n"
 			printf "${bblue} Results are saved in screenshots folder${reset}\n"
-			printf "${bgreen}#######################################################################\n\n"
-		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
-	fi
-}
-
-metadata(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
-		then
-			printf "${bgreen}#######################################################################\n"
-			printf "${bblue} ${bgreen} Metadata Checks ${reset}\n\n"
-			start=`date +%s`
-			mkdir -p $dir/metadata
-			pymeta -d ${domain} -s all -m 500 -j 5 -o $dir/metadata -f ${domain}_metadata.csv && touch $called_fn_dir/.${FUNCNAME[0]}
-			end=`date +%s`
-			getElapsedTime $start $end
-			printf "${bblue}\n Metadata Checks  Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in in metadata folder and ${domain}_metadata.csv ${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -568,19 +545,19 @@ urlchecks(){
 			cat ${domain}_probed.txt | waybackurls | anew -q ${domain}_url_extract.txt
 			cat ${domain}_probed.txt | gau | anew -q ${domain}_url_extract.txt
 			if [ "$DEEP" = true ] ; then
-				gospider -S ${domain}_probed.txt -t 10 -c 40 -d 2 -a -w --js --sitemap --robots | sed "s/^.*http/http/p" | anew -q ${domain}_url_extract.txt
+				gospider -S ${domain}_probed.txt -t 100 -c 10 -d 2 -a -w --js --sitemap --robots --blacklist jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,pdf,svg,txt | sed "s/^.*http/http/p" | anew -q ${domain}_url_extract.txt
 			else
-				gospider -S ${domain}_probed.txt -t 10 -c 40 -d 1 -a -w --js --sitemap --robots | sed "s/^.*http/http/p" | anew -q ${domain}_url_extract.txt
+				gospider -S ${domain}_probed.txt -t 100 -c 10 -d 1 -a -w --js --sitemap --robots --blacklist jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,pdf,svg,txt | sed "s/^.*http/http/p" | anew -q ${domain}_url_extract.txt
 			fi
 			python3 $tools/github-endpoints.py -d $domain | anew -q ${domain}_url_extract.txt
 			sed -ni '/^http/!d' ${domain}_url_extract.txt
-			cat ${domain}_url_extract.txt | httpx -follow-redirects -silent -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_url_extract_live.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			#cat ${domain}_url_extract.txt | httpx -follow-redirects -threads 100 -silent -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_url_extract_live.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			NUMOFLINES=$(wc -l < ${domain}_url_extract_live.txt)
+			NUMOFLINES=$(wc -l < ${domain}_url_extract.txt)
 			printf "${bblue}\n URL Extraction Finished\n"
 			printf "${bblue}\n ${NUMOFLINES} in ${runtime}\n"
-			printf "${bblue} Results are saved in in ${domain}_url_extract_live.txt${reset}\n"
+			printf "${bblue} Results are saved in in ${domain}_url_extract.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -593,17 +570,17 @@ url_gf(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Vulnerable Pattern Search ${reset}\n\n"
 			start=`date +%s`
-			gf xss ${domain}_url_extract_live.txt | qsreplace -a | anew -q ${domain}_xss.txt;
-			gf ssti ${domain}_url_extract_live.txt | qsreplace -a | anew -q ${domain}_ssti.txt;
-			gf ssrf ${domain}_url_extract_live.txt | qsreplace -a | anew -q ${domain}_ssrf.txt;
-			gf sqli ${domain}_url_extract_live.txt | qsreplace -a | anew -q ${domain}_sqli.txt;
-			gf redirect ${domain}_url_extract_live.txt | qsreplace -a | anew -q ${domain}_redirect.txt;
-			gf rce ${domain}_url_extract_live.txt | qsreplace -a | anew -q ${domain}_rce.txt;
-			gf potential ${domain}_url_extract_live.txt | qsreplace -a | anew -q ${domain}_potential.txt;
-			gf lfi ${domain}_url_extract_live.txt | qsreplace -a | anew -q ${domain}_lfi.txt && touch $called_fn_dir/.${FUNCNAME[0]};
+			gf xss ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_xss.txt;
+			gf ssti ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_ssti.txt;
+			gf ssrf ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_ssrf.txt;
+			gf sqli ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_sqli.txt;
+			gf redirect ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_redirect.txt;
+			gf rce ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_rce.txt;
+			gf potential ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_potential.txt;
+			gf lfi ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_lfi.txt && touch $called_fn_dir/.${FUNCNAME[0]};
 			end=`date +%s`
 			getElapsedTime $start $end
-			cat ${domain}_url_extract_live.txt | unfurl -u format %s://%d%p | anew -q ${domain}_url_endpoints.txt
+			cat ${domain}_url_extract.txt | unfurl -u format %s://%d%p | anew -q ${domain}_url_endpoints.txt
 			printf "${bblue}\n Vulnerable Pattern Search Finished in ${runtime}\n"
 			printf "${bblue} Results are saved in in ${domain}_*gfpattern*.txt files${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
@@ -619,10 +596,10 @@ jschecks(){
 			printf "${bblue} Javascript Scan ${reset}\n\n"
 			start=`date +%s`
 			printf "${yellow} Running : Fetching Urls 1/5${reset}\n"
-			cat ${domain}_url_extract_live.txt | grep -iE "\.js$" | anew -q ${domain}_jsfile_links.txt;
-			cat ${domain}_url_extract_live.txt | subjs | anew -q ${domain}_jsfile_links.txt;
+			cat ${domain}_url_extract.txt | grep -iE "\.js$" | anew -q ${domain}_jsfile_links.txt;
+			cat ${domain}_url_extract.txt | subjs | anew -q ${domain}_jsfile_links.txt;
 			printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
-			cat ${domain}_jsfile_links.txt | httpx -follow-redirects -silent -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt
+			cat ${domain}_jsfile_links.txt | httpx -follow-redirects -silent -threads 100 -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt
 			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
 			interlace -tL ${domain}_js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> ${domain}_js_endpoints.txt" &>/dev/null
 			sed -i '/^Running against/d; /^Invalid input/d; /^$/d' ${domain}_js_endpoints.txt
@@ -673,14 +650,12 @@ xss(){
 			if [ -n "$XSS_SERVER" ]; then
 				sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
 				eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --blind --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-				#cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox -b $XSS_SERVER pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
 				getElapsedTime $start $end
 				printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
 			else
 				printf "${bblue}\n No XSS_SERVER defined, blind xss skipped\n"
 				eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-				#cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
 				getElapsedTime $start $end
 				printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
@@ -691,14 +666,12 @@ xss(){
 				if [ -n "$XSS_SERVER" ]; then
 					sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
 					eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --blind --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-					#cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox -b $XSS_SERVER pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 					end=`date +%s`
 					getElapsedTime $start $end
 					printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
 				else
 					printf "${bblue}\n No XSS_SERVER defined, blind xss skipped\n"
 					eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-					#cat ${domain}_xss.txt | Gxss -c 100 -p Xss | sort -u | eval dalfox pipe -o ${domain}_dalfox_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 					end=`date +%s`
 					getElapsedTime $start $end
 					printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
@@ -727,7 +700,6 @@ github(){
 			else
 				printf "\n${bred} Required file ${tools}/.github_tokens not exists or empty${reset}\n"
 			fi
-			#cat ${domain}_probed.txt | git-hound --dig-files --dig-commits --threads 100 | tee ${domain}_gitrecon.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n GitHub Scanning Finished in ${runtime}\n"
@@ -1009,7 +981,6 @@ all(){
 			subtakeover
 			webprobe_full
 			screenshot
-#			metadata
 			portscan
 			nuclei_check
 			github
@@ -1037,7 +1008,6 @@ all(){
 		subtakeover
 		webprobe_full
 		screenshot
-#		metadata
 		portscan
 		nuclei_check
 		github
