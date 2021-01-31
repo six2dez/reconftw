@@ -291,6 +291,7 @@ sub_crt(){
 				curl "https://tls.bufferover.run/dns?q=${domain}" 2>/dev/null | jq -r .Results[] | cut -d ',' -f3 | sort -u | grep -F ".$domain" | anew -q crtsh_subs.txt
 			fi
 			NUMOFLINES=$(wc -l < crtsh_subs.txt)
+			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${green} ${NUMOFLINES} crtsh subdomains found in ${runtime}${reset}\n\n"
 		else
@@ -988,11 +989,13 @@ end(){
 	then
 		output
 		finaldir=$dir_output
+	else
+		finaldir=$dir
 	fi
 	global_end=`date +%s`
 	getElapsedTime $global_start $global_end
 	printf "${bgreen}#######################################################################\n"
-	printf "${bred} Finished Recon on: ${domain} under ${finaldir} in:${runtime} ${reset}\n"
+	printf "${bred} Finished Recon on: ${domain} under ${finaldir} in: ${runtime} ${reset}\n"
 	printf "${bgreen}#######################################################################\n"
 }
 
