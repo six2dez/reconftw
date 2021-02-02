@@ -27,7 +27,7 @@ printf "\n\n${bgreen}###########################################################
 printf "${bgreen} reconftw installer script (apt/rpm/pacman compatible)${reset}\n\n"
 
 install_apt(){
-    eval (sudo apt install chromium-browser -y | sudo apt install chromium -y) $DEBUG_STD 
+    (eval $SUDO apt install chromium-browser -y $DEBUG_STD | eval $SUDO apt install chromium -y $DEBUG_STD)
     eval $SUDO apt install python3 python3-pip ruby git libpcap-dev wget python-dev python3-dev build-essential xvfb libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq -y $DEBUG_STD
 }
 
