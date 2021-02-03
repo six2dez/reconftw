@@ -548,7 +548,7 @@ urlchecks(){
 				gospider -S ${domain}_probed.txt -t 100 -c 10 -d 1 -a -w --js --sitemap --robots --blacklist jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,pdf,svg,txt | sed "s/^.*http/http/p" | anew -q ${domain}_url_extract.txt
 			fi
 			python3 $tools/github-endpoints.py -d $domain | anew -q ${domain}_url_extract.txt
-			sed -ni '/^http/!d' ${domain}_url_extract.txt
+			sed -ni '/^http/!d' ${domain}_url_extract.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			#cat ${domain}_url_extract.txt | httpx -follow-redirects -threads 100 -silent -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_url_extract_live.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
