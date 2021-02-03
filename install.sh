@@ -40,9 +40,9 @@ install_pacman(){
 }
 
 #installing latest Golang version
-if [[ $(type go | grep -o 'go is') == "go is" ]]
+if [[ $(type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]]
     then
-        printf "${bgreen} Golang is already installed ${reset}\n"
+        printf "${bgreen} Golang is already installed ${reset}\n\n"
     else
         printf "${bgreen} Installing Golang ${reset}\n"
         if [ "True" = "$IS_ARM" ]; then
@@ -59,8 +59,8 @@ if [[ $(type go | grep -o 'go is') == "go is" ]]
         rm -rf go$LATEST_GO*
 fi
 
-[ -n "$GOPATH" ] || { printf "${bred} GOPATH env var not detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
-[ -n "$GOROOT" ] || { printf "${bred} GOROOT env var not detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n"; exit 1; }
+[ -n "$GOPATH" ] || { printf "${bred} GOPATH env var not detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n Add Golang env vars to your \$HOME/.bashrc or \$HOME/.zshrc:\nexport GOROOT=/usr/local/go\nexport GOPATH=\$HOME/go\nexport PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH\n"; exit 1; }
+[ -n "$GOROOT" ] || { printf "${bred} GOROOT env var not detected, install and configure Golang before run this script\n Check https://golang.org/doc/install\n Add Golang env vars to your \$HOME/.bashrc or \$HOME/.zshrc:\n export GOROOT=/usr/local/go\n export GOPATH=\$HOME/go\n export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH\n"; exit 1; }
 
 
 if [ -f /etc/debian_version ]; then install_apt;
