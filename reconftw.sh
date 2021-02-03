@@ -484,13 +484,11 @@ portscan(){
 			printf "${bblue} Port Scan ${reset}\n\n"
 			start=`date +%s`
 			naabu -top-ports 1000 -silent -exclude-cdn -nmap-cli 'nmap -sV --min-rate 40000 -T4 --open --max-retries 2 -oG -' -iL ${domain}_subdomains.txt > ${domain}_portscan.txt;
+			eval cat ${domain}_portscan.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${bred}\n Port scan results in ${runtime}${reset}\n\n"
-			eval cat ${domain}_portscan.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
-			printf "\n"
-			printf "${bblue}\n Port Scan Finished\n"
-			printf "${bblue} Results are saved in in ${domain}_portscan.txt${reset}\n"
+			printf "${bred}\n Port scan Finished in ${runtime}${reset}\n"
+			printf "${bblue} Results are saved in ${domain}_portscan.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
