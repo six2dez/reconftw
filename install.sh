@@ -154,8 +154,8 @@ $SUDO chmod 755 /usr/local/bin/findomain
 cd $dir/massdns; eval make $DEBUG_STD
 $SUDO cp $dir/massdns/bin/massdns /usr/bin/
 
-cd $dir/Interlace && $SUDO python3 setup.py install
-cd $dir/LinkFinder && $SUDO python3 setup.py install
+cd $dir/Interlace && eval $SUDO python3 setup.py install $DEBUG_STD
+cd $dir/LinkFinder && eval $SUDO python3 setup.py install $DEBUG_STD
 cd $dir
 eval git clone https://github.com/devanshbatham/OpenRedireX $dir/OpenRedireX $DEBUG_STD
 printf "${bgreen} 90%% done${reset}\n\n"
