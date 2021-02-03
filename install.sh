@@ -40,7 +40,7 @@ install_pacman(){
 }
 
 #installing latest Golang version
-if [[ $(type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]]
+if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]]
     then
         printf "${bgreen} Golang is already installed ${reset}\n\n"
     else
