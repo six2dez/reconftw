@@ -28,15 +28,15 @@ printf "${bgreen} reconftw installer script (apt/rpm/pacman compatible)${reset}\
 
 install_apt(){
     (eval $SUDO apt install chromium-browser -y $DEBUG_STD | eval $SUDO apt install chromium -y $DEBUG_STD)
-    eval $SUDO apt install python3 python3-pip ruby git libpcap-dev wget python-dev python3-dev build-essential xvfb libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq -y $DEBUG_STD
+    eval $SUDO apt install python3 python3-pip ruby git libpcap-dev wget python-dev python3-dev dnsutils build-essential xvfb libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq -y $DEBUG_STD
 }
 
 install_yum(){
-    eval $SUDO yum install python3 python3-pip ruby git libpcap-devel chromium wget openssl-devel python3-devel libxslt-devel libffi-devel xorg-x11-server-Xvfb libxml2-devel nmap zlib-devel jq -y $DEBUG_STD
+    eval $SUDO yum install python3 python3-pip ruby git libpcap-devel chromium wget openssl-devel bind-utils python3-devel libxslt-devel libffi-devel xorg-x11-server-Xvfb libxml2-devel nmap zlib-devel jq -y $DEBUG_STD
 }
 
 install_pacman(){
-    eval $SUDO pacman -Sy install python python-pip ruby git libpcap nmap chromium wget jq xorg-server-xvfb -y $DEBUG_STD
+    eval $SUDO pacman -Sy install python python-pip dnsutils ruby git libpcap nmap chromium wget jq xorg-server-xvfb -y $DEBUG_STD
 }
 
 #installing latest Golang version
