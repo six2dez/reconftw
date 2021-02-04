@@ -61,7 +61,7 @@ if [ -f ~/.bashrc ]
 then
 cat << EOF >> ~/.bashrc
 
-\# Golang vars
+# Golang vars
 export GOROOT=/usr/local/go
 export GOPATH=\$HOME/go
 export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH
@@ -73,7 +73,7 @@ if [ -f ~/.zshrc ]
 then
 cat << EOF >> ~/.zshrc
 
-\# Golang vars
+# Golang vars
 export GOROOT=/usr/local/go
 export GOPATH=\$HOME/go
 export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH
