@@ -602,7 +602,7 @@ jschecks(){
 			cat ${domain}_jsfile_links.txt | httpx -follow-redirects -silent -threads 100 -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt
 			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
 			interlace -tL ${domain}_js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> ${domain}_js_endpoints.txt" &>/dev/null
-			cat ${domain}_js_livelinks.txt | grep -o -E "(https?://)?/?[{}a-z0-9A-Z_\.-]{2,}/[{}/a-z0-9A-Z_\.-]+" | anew -q ${domain}_js_endpoints.txt" &>/dev/null
+			
 			sed -i '/^Running against/d; /^Invalid input/d; /^$/d' ${domain}_js_endpoints.txt
 			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
 			cat ${domain}_js_livelinks.txt | nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o ${domain}_js_secrets.txt
