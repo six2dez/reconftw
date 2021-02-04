@@ -86,12 +86,13 @@ function tools_installed(){
 	[ -f $tools/fuzz_wordlist.txt ] || { printf "${bred} [*] OneListForAll	[NO]\n"; allinstalled=false;}
 	[ -f $tools/LinkFinder/linkfinder.py ] || { printf "${bred} [*] LinkFinder	        [NO]\n"; allinstalled=false;}
 	[ -f $tools/GitDorker/GitDorker.py ] || { printf "${bred} [*] GitDorker	        [NO]\n"; allinstalled=false;}
-	[ -f $tools/github-endpoints.py ] || { printf "${bred} [*] github-endpoints   [NO]\n"; allinstalled=false;}
+#	[ -f $tools/github-endpoints.py ] || { printf "${bred} [*] github-endpoints   [NO]\n"; allinstalled=false;}
 	[ -f $tools/degoogle_hunter/degoogle_hunter.sh ] || { printf "${bred} [*] degoogle_hunter   [NO]\n"; allinstalled=false;}
 	[ -f $tools/github-search/github-endpoints.py ] || { printf "${bred} [*] github-search	[NO]\n"; allinstalled=false;}
 	[ -f $tools/getjswords.py ] || { printf "${bred} [*] getjswords   	[NO]\n"; allinstalled=false;}
 	[ -f $tools/subdomains.txt ] || { printf "${bred} [*] subdomains   	[NO]\n"; allinstalled=false;}
 	[ -f $tools/resolvers.txt ] || { printf "${bred} [*] resolvers   	[NO]\n"; allinstalled=false;}
+	eval type -P github-endpoints $DEBUG_STD || { printf "${bred} [*] github-endpoints		[NO]\n"; allinstalled=false;}
 	eval type -P gospider $DEBUG_STD || { printf "${bred} [*] gospider		[NO]\n"; allinstalled=false;}
 	eval type -P subfinder $DEBUG_STD || { printf "${bred} [*] Subfinder		[NO]\n"; allinstalled=false;}
 	eval type -P assetfinder $DEBUG_STD || { printf "${bred} [*] Assetfinder		[NO]\n"; allinstalled=false;}
@@ -151,13 +152,14 @@ function tools_full(){
 	[ -f $tools/CMSeeK/cmseek.py ] && printf "${bgreen}[*] CMSeeK		[YES]\n" || printf "${bred} [*] CMSeeK	[NO]\n"
 	[ -f $tools/fuzz_wordlist.txt ] && printf "${bgreen}[*] OneListForAll	[YES]\n" || printf "${bred} [*] OneListForAll	[NO]\n"
 	[ -f $tools/LinkFinder/linkfinder.py ] && printf "${bgreen}[*] LinkFinder	        [YES]\n" || printf "${bred} [*] LinkFinder	        [NO]\n"
-	[ -f $tools/github-endpoints.py ] && printf "${bgreen}[*] github-endpoints	[YES]\n" || printf "${bred} [*] github-endpoints[NO]\n"
+#	[ -f $tools/github-endpoints.py ] && printf "${bgreen}[*] github-endpoints	[YES]\n" || printf "${bred} [*] github-endpoints[NO]\n"
 	[ -f $tools/degoogle_hunter/degoogle_hunter.sh ] && printf "${bgreen}[*] degoogle_hunter	[YES]\n" || printf "${bred} [*] degoogle_hunter	[NO]\n"
 	[ -f $tools/github-search/github-endpoints.py ] && printf "${bgreen}[*] github-search	[YES]\n" || printf "${bred} [*] github-search	[NO]\n"
 	[ -f $tools/GitDorker/GitDorker.py ] && printf "${bgreen}[*] GitDorker	[YES]\n" || printf "${bred} [*] GitDorker	[NO]\n"
 	[ -f $tools/getjswords.py ] && printf "${bgreen}[*] getjswords.py	[YES]\n" || printf "${bred} [*] getjswords.py	[NO]\n"
 	[ -f $tools/subdomains.txt ] && printf "${bgreen}[*] subdomains.txt	[YES]\n" || printf "${bred} [*] subdomains.txt	[NO]\n"
 	[ -f $tools/resolvers.txt ] && printf "${bgreen}[*] resolvers.txt	[YES]\n" || printf "${bred} [*] resolvers.txt	[NO]\n"
+	eval type -P github-endpoints $DEBUG_STD && printf "${bgreen}[*] github-endpoints		[YES]\n" || { printf "${bred} [*] github-endpoints		[NO]\n"; }
 	eval type -P gospider $DEBUG_STD && printf "${bgreen}[*] gospider		[YES]\n" || { printf "${bred} [*] gospider		[NO]\n"; }
 	eval type -P subfinder $DEBUG_STD && printf "${bgreen}[*] Subfinder		[YES]\n" || { printf "${bred} [*] Subfinder		[NO]\n"; }
 	eval type -P assetfinder $DEBUG_STD && printf "${bgreen}[*] Assetfinder		[YES]\n" || { printf "${bred} [*] Assetfinder	[NO]\n"; }
@@ -549,7 +551,7 @@ urlchecks(){
 			else
 				gospider -S ${domain}_probed.txt -t 100 -c 10 -d 1 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,pdf,svg,txt | sed "s/^.*http/http/p" | anew -q ${domain}_url_extract.txt
 			fi
-			python3 $tools/github-endpoints.py -d $domain | anew -q ${domain}_url_extract.txt
+			github-endpoints -d $domain -t $tools/.github_tokens -raw | anew -q ${domain}_url_extract.txt
 			sed -i '/^http/!d' ${domain}_url_extract.txt
 			#cat ${domain}_url_extract.txt | httpx -follow-redirects -threads 100 -silent -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_url_extract_live.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
