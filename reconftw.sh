@@ -602,7 +602,7 @@ jschecks(){
 			cat ${domain}_jsfile_links.txt | httpx -follow-redirects -silent -threads 100 -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt
 			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
 			interlace -tL ${domain}_js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> ${domain}_js_endpoints.txt" &>/dev/null
-			cat ${domain}_js_livelinks.txt | grep -o -E "(https?://)?/?[{}a-z0-9A-Z_\.-]{2,}/[{}/a-z0-9A-Z_\.-]+" | anew -q ${domain}_js_endpoints.txt" &>/dev/null
+			
 			sed -i '/^Running against/d; /^Invalid input/d; /^$/d' ${domain}_js_endpoints.txt
 			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
 			cat ${domain}_js_livelinks.txt | nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o ${domain}_js_secrets.txt
@@ -739,7 +739,7 @@ fuzz(){
 			for sub in $(cat ${domain}_probed.txt); do
 				printf "${yellow}\n\n Running: Fuzzing in ${sub}${reset}\n"
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-				ffuf -mc all -ac -sf -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -w $fuzz_wordlist -maxtime 900 -u $sub/FUZZ -or -o $dir/fuzzing/${sub_out}.tmp $DEBUG_STD
+				ffuf -mc all -ac -sf -w $fuzz_wordlist -maxtime 900 -u $sub/FUZZ -or -o $dir/fuzzing/${sub_out}.tmp $DEBUG_STD
 				cat $dir/fuzzing/${sub_out}.tmp | jq '[.results[]|{status: .status, length: .length, url: .url}]' | grep -oP "status\":\s(\d{3})|length\":\s(\d{1,7})|url\":\s\"(http[s]?:\/\/.*?)\"" | paste -d' ' - - - | awk '{print $2" "$4" "$6}' | sed 's/\"//g' | anew -q $dir/fuzzing/${sub_out}.txt
 				eval rm ${sub_out}.tmp $DEBUG_ERROR
 			done
