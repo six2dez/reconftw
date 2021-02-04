@@ -15,10 +15,12 @@ DEBUG_ERROR="2>/dev/null"
 DEEP=false
 FULLSCOPE=false
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+COOKIE=""
 
 # Uncomment this only if it is not already in your env .bashrc or .zshrc
 #COLLAB_SERVER=XXXXXXXXXXXXXXXXX
 #XSS_SERVER=XXXXXXXXXXXXXXXXX
+
 
 
 banner(){
@@ -543,9 +545,9 @@ urlchecks(){
 			cat ${domain}_probed.txt | waybackurls | anew -q ${domain}_url_extract.txt
 			cat ${domain}_probed.txt | gau | anew -q ${domain}_url_extract.txt
 			if [ "$DEEP" = true ] ; then
-				gospider -S ${domain}_probed.txt -t 100 -c 10 -d 2 -a -w --js --sitemap --robots --blacklist jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,pdf,svg,txt | sed "s/^.*http/http/p" | anew -q ${domain}_url_extract.txt
+				gospider -S ${domain}_probed.txt -t 100 -c 10 -d 2 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,pdf,svg,txt | sed "s/^.*http/http/p" | anew -q ${domain}_url_extract.txt
 			else
-				gospider -S ${domain}_probed.txt -t 100 -c 10 -d 1 -a -w --js --sitemap --robots --blacklist jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,pdf,svg,txt | sed "s/^.*http/http/p" | anew -q ${domain}_url_extract.txt
+				gospider -S ${domain}_probed.txt -t 100 -c 10 -d 1 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,pdf,svg,txt | sed "s/^.*http/http/p" | anew -q ${domain}_url_extract.txt
 			fi
 			python3 $tools/github-endpoints.py -d $domain | anew -q ${domain}_url_extract.txt
 			sed -i '/^http/!d' ${domain}_url_extract.txt
