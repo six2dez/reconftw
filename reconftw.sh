@@ -651,14 +651,10 @@ xss(){
 			if [ -n "$XSS_SERVER" ]; then
 				sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
 				eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --blind --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-				end=`date +%s`
-				getElapsedTime $start $end
 				printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
 			else
 				printf "${bblue}\n No XSS_SERVER defined, blind xss skipped\n"
 				eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-				end=`date +%s`
-				getElapsedTime $start $end
 				printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
 			fi
 		else
@@ -667,20 +663,18 @@ xss(){
 				if [ -n "$XSS_SERVER" ]; then
 					sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
 					eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --blind --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-					end=`date +%s`
-					getElapsedTime $start $end
 					printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
 				else
 					printf "${bblue}\n No XSS_SERVER defined, blind xss skipped\n"
 					eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-					end=`date +%s`
-					getElapsedTime $start $end
 					printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
 				fi
 			else
 				printf "${bred} Skipping XSS: Too Much URLs to test, try with --deep flag${reset}\n"
 			fi
 		fi
+		end=`date +%s`
+		getElapsedTime $start $end
 		printf "${bblue}\n XSS Analysis Finished in ${runtime}\n"
 		printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
 		printf "${bgreen}#######################################################################\n\n"
