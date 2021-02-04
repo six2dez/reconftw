@@ -57,6 +57,30 @@ if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]]
             $SUDO cp /usr/local/go/bin/go /usr/bin
         fi
         rm -rf go$LATEST_GO*
+if [ -f ~/.bashrc ]
+then
+cat << EOF >> ~/.bashrc
+
+\# Golang vars
+export GOROOT=/usr/local/go
+export GOPATH=\$HOME/go
+export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH
+EOF
+source ~/.bashrc
+fi
+
+if [ -f ~/.zshrc ]
+then
+cat << EOF >> ~/.zshrc
+
+\# Golang vars
+export GOROOT=/usr/local/go
+export GOPATH=\$HOME/go
+export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH
+EOF
+source ~/.bashrc
+fi
+
 fi
 
 [ -n "$GOPATH" ] || { printf "${bred} GOPATH env var not detected, add Golang env vars to your \$HOME/.bashrc or \$HOME/.zshrc:\n\n export GOROOT=/usr/local/go\n export GOPATH=\$HOME/go\n export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH\n\n"; exit 1; }
@@ -138,7 +162,8 @@ eval git clone https://github.com/gwen001/github-search $dir/github-search $DEBU
 eval git clone https://github.com/obheda12/GitDorker $dir/GitDorker $DEBUG_STD
 printf "${bgreen} 70%% done${reset}\n\n"
 eval git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh $DEBUG_STD
-eval pip3 install dnsgen $DEBUG_STD
+eval $SUDO pip3 install dnsgen $DEBUG_STD
+eval $SUDO pip3 install webscreenshot $DEBUG_STD
 
 printf "${bgreen} 80%% done${reset}\n\n"
 if [ "True" = "$IS_ARM" ]

@@ -484,13 +484,11 @@ portscan(){
 			printf "${bblue} Port Scan ${reset}\n\n"
 			start=`date +%s`
 			naabu -top-ports 1000 -silent -exclude-cdn -nmap-cli 'nmap -sV --min-rate 40000 -T4 --open --max-retries 2 -oG -' -iL ${domain}_subdomains.txt > ${domain}_portscan.txt;
+			eval cat ${domain}_portscan.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${bred}\n Port scan results in ${runtime}${reset}\n\n"
-			eval cat ${domain}_portscan.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
-			printf "\n"
-			printf "${bblue}\n Port Scan Finished\n"
-			printf "${bblue} Results are saved in in ${domain}_portscan.txt${reset}\n"
+			printf "${bred}\n Port scan Finished in ${runtime}${reset}\n"
+			printf "${bblue} Results are saved in ${domain}_portscan.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -602,6 +600,7 @@ jschecks(){
 			cat ${domain}_jsfile_links.txt | httpx -follow-redirects -silent -threads 100 -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt
 			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
 			interlace -tL ${domain}_js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> ${domain}_js_endpoints.txt" &>/dev/null
+			cat ${domain}_js_livelinks.txt | grep -o -E "(https?://)?/?[{}a-z0-9A-Z_\.-]{2,}/[{}/a-z0-9A-Z_\.-]+" | anew -q ${domain}_js_endpoints.txt" &>/dev/null
 			sed -i '/^Running against/d; /^Invalid input/d; /^$/d' ${domain}_js_endpoints.txt
 			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
 			cat ${domain}_js_livelinks.txt | nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o ${domain}_js_secrets.txt
