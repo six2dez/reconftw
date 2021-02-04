@@ -529,7 +529,7 @@ nuclei_check(){
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Port Scan Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in in ${domain}_nuclei_*.txt files${reset}\n"
+			printf "${bblue} Results are saved in ${domain}_nuclei_*.txt files${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -557,7 +557,7 @@ urlchecks(){
 			NUMOFLINES=$(wc -l < ${domain}_url_extract.txt)
 			printf "${bblue}\n URL Extraction Finished\n"
 			printf "${bblue}\n ${NUMOFLINES} in ${runtime}\n"
-			printf "${bblue} Results are saved in in ${domain}_url_extract.txt${reset}\n"
+			printf "${bblue} Results are saved in ${domain}_url_extract.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -582,7 +582,7 @@ url_gf(){
 			getElapsedTime $start $end
 			cat ${domain}_url_extract.txt | unfurl -u format %s://%d%p | anew -q ${domain}_url_endpoints.txt
 			printf "${bblue}\n Vulnerable Pattern Search Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in in ${domain}_*gfpattern*.txt files${reset}\n"
+			printf "${bblue} Results are saved in ${domain}_*gfpattern*.txt files${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -611,7 +611,7 @@ jschecks(){
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Javascript Scan Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in in ${domain}_js_*.txt files${reset}\n"
+			printf "${bblue} Results are saved in ${domain}_js_*.txt files${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -634,7 +634,7 @@ params(){
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Parameter Discovery Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in in ${domain}_param.txt and ${domain}_arjun.json${reset}\n"
+			printf "${bblue} Results are saved in ${domain}_param.txt and ${domain}_arjun.json${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -651,11 +651,11 @@ xss(){
 			if [ -n "$XSS_SERVER" ]; then
 				sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
 				eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --blind --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-				printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
+				printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 			else
 				printf "${bblue}\n No XSS_SERVER defined, blind xss skipped\n"
 				eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-				printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
+				printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 			fi
 		else
 			if [[ $(cat ${domain}_xss.txt | wc -l) -le 1000 ]]
@@ -663,11 +663,11 @@ xss(){
 				if [ -n "$XSS_SERVER" ]; then
 					sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
 					eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --blind --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-					printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
+					printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 				else
 					printf "${bblue}\n No XSS_SERVER defined, blind xss skipped\n"
 					eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-					printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
+					printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 				fi
 			else
 				printf "${bred} Skipping XSS: Too Much URLs to test, try with --deep flag${reset}\n"
@@ -676,7 +676,7 @@ xss(){
 		end=`date +%s`
 		getElapsedTime $start $end
 		printf "${bblue}\n XSS Analysis Finished in ${runtime}\n"
-		printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
+		printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 		printf "${bgreen}#######################################################################\n\n"
 	else
 		printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -698,7 +698,7 @@ github(){
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n GitHub Scanning Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in in ${domain}_gitrecon.txt${reset}\n"
+			printf "${bblue} Results are saved in ${domain}_gitrecon.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -721,7 +721,7 @@ favicon(){
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n FavIcon Hash Extraction Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in in ${domain}_favicontest.txt${reset}\n"
+			printf "${bblue} Results are saved in ${domain}_favicontest.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
