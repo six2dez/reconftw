@@ -86,12 +86,11 @@ function tools_installed(){
 	[ -f $tools/fuzz_wordlist.txt ] || { printf "${bred} [*] OneListForAll	[NO]\n"; allinstalled=false;}
 	[ -f $tools/LinkFinder/linkfinder.py ] || { printf "${bred} [*] LinkFinder	        [NO]\n"; allinstalled=false;}
 	[ -f $tools/GitDorker/GitDorker.py ] || { printf "${bred} [*] GitDorker	        [NO]\n"; allinstalled=false;}
-	[ -f $tools/github-endpoints.py ] || { printf "${bred} [*] github-endpoints   [NO]\n"; allinstalled=false;}
 	[ -f $tools/degoogle_hunter/degoogle_hunter.sh ] || { printf "${bred} [*] degoogle_hunter   [NO]\n"; allinstalled=false;}
-	[ -f $tools/github-search/github-endpoints.py ] || { printf "${bred} [*] github-search	[NO]\n"; allinstalled=false;}
 	[ -f $tools/getjswords.py ] || { printf "${bred} [*] getjswords   	[NO]\n"; allinstalled=false;}
 	[ -f $tools/subdomains.txt ] || { printf "${bred} [*] subdomains   	[NO]\n"; allinstalled=false;}
 	[ -f $tools/resolvers.txt ] || { printf "${bred} [*] resolvers   	[NO]\n"; allinstalled=false;}
+	eval type -P github-endpoints $DEBUG_STD || { printf "${bred} [*] github-endpoints		[NO]\n"; allinstalled=false;}
 	eval type -P gospider $DEBUG_STD || { printf "${bred} [*] gospider		[NO]\n"; allinstalled=false;}
 	eval type -P subfinder $DEBUG_STD || { printf "${bred} [*] Subfinder		[NO]\n"; allinstalled=false;}
 	eval type -P assetfinder $DEBUG_STD || { printf "${bred} [*] Assetfinder		[NO]\n"; allinstalled=false;}
@@ -151,13 +150,12 @@ function tools_full(){
 	[ -f $tools/CMSeeK/cmseek.py ] && printf "${bgreen}[*] CMSeeK		[YES]\n" || printf "${bred} [*] CMSeeK	[NO]\n"
 	[ -f $tools/fuzz_wordlist.txt ] && printf "${bgreen}[*] OneListForAll	[YES]\n" || printf "${bred} [*] OneListForAll	[NO]\n"
 	[ -f $tools/LinkFinder/linkfinder.py ] && printf "${bgreen}[*] LinkFinder	        [YES]\n" || printf "${bred} [*] LinkFinder	        [NO]\n"
-	[ -f $tools/github-endpoints.py ] && printf "${bgreen}[*] github-endpoints	[YES]\n" || printf "${bred} [*] github-endpoints[NO]\n"
 	[ -f $tools/degoogle_hunter/degoogle_hunter.sh ] && printf "${bgreen}[*] degoogle_hunter	[YES]\n" || printf "${bred} [*] degoogle_hunter	[NO]\n"
-	[ -f $tools/github-search/github-endpoints.py ] && printf "${bgreen}[*] github-search	[YES]\n" || printf "${bred} [*] github-search	[NO]\n"
 	[ -f $tools/GitDorker/GitDorker.py ] && printf "${bgreen}[*] GitDorker	[YES]\n" || printf "${bred} [*] GitDorker	[NO]\n"
 	[ -f $tools/getjswords.py ] && printf "${bgreen}[*] getjswords.py	[YES]\n" || printf "${bred} [*] getjswords.py	[NO]\n"
 	[ -f $tools/subdomains.txt ] && printf "${bgreen}[*] subdomains.txt	[YES]\n" || printf "${bred} [*] subdomains.txt	[NO]\n"
 	[ -f $tools/resolvers.txt ] && printf "${bgreen}[*] resolvers.txt	[YES]\n" || printf "${bred} [*] resolvers.txt	[NO]\n"
+	eval type -P github-endpoints $DEBUG_STD && printf "${bgreen}[*] github-endpoints		[YES]\n" || { printf "${bred} [*] github-endpoints		[NO]\n"; }
 	eval type -P gospider $DEBUG_STD && printf "${bgreen}[*] gospider		[YES]\n" || { printf "${bred} [*] gospider		[NO]\n"; }
 	eval type -P subfinder $DEBUG_STD && printf "${bgreen}[*] Subfinder		[YES]\n" || { printf "${bred} [*] Subfinder		[NO]\n"; }
 	eval type -P assetfinder $DEBUG_STD && printf "${bgreen}[*] Assetfinder		[YES]\n" || { printf "${bred} [*] Assetfinder	[NO]\n"; }
@@ -529,7 +527,7 @@ nuclei_check(){
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Port Scan Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in in ${domain}_nuclei_*.txt files${reset}\n"
+			printf "${bblue} Results are saved in ${domain}_nuclei_*.txt files${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -549,7 +547,7 @@ urlchecks(){
 			else
 				gospider -S ${domain}_probed.txt -t 100 -c 10 -d 1 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,pdf,svg,txt | sed "s/^.*http/http/p" | anew -q ${domain}_url_extract.txt
 			fi
-			python3 $tools/github-endpoints.py -d $domain | anew -q ${domain}_url_extract.txt
+			github-endpoints -d $domain -t $tools/.github_tokens -raw | anew -q ${domain}_url_extract.txt
 			sed -i '/^http/!d' ${domain}_url_extract.txt
 			#cat ${domain}_url_extract.txt | httpx -follow-redirects -threads 100 -silent -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_url_extract_live.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
@@ -557,7 +555,7 @@ urlchecks(){
 			NUMOFLINES=$(wc -l < ${domain}_url_extract.txt)
 			printf "${bblue}\n URL Extraction Finished\n"
 			printf "${bblue}\n ${NUMOFLINES} in ${runtime}\n"
-			printf "${bblue} Results are saved in in ${domain}_url_extract.txt${reset}\n"
+			printf "${bblue} Results are saved in ${domain}_url_extract.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -582,7 +580,7 @@ url_gf(){
 			getElapsedTime $start $end
 			cat ${domain}_url_extract.txt | unfurl -u format %s://%d%p | anew -q ${domain}_url_endpoints.txt
 			printf "${bblue}\n Vulnerable Pattern Search Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in in ${domain}_*gfpattern*.txt files${reset}\n"
+			printf "${bblue} Results are saved in ${domain}_*gfpattern*.txt files${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -602,8 +600,7 @@ jschecks(){
 			cat ${domain}_jsfile_links.txt | httpx -follow-redirects -silent -threads 100 -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt
 			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
 			interlace -tL ${domain}_js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> ${domain}_js_endpoints.txt" &>/dev/null
-			
-			sed -i '/^Running against/d; /^Invalid input/d; /^$/d' ${domain}_js_endpoints.txt
+			eval sed -i '/^Running against/d; /^Invalid input/d; /^$/d' ${domain}_js_endpoints.txt $DEBUG_ERROR
 			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
 			cat ${domain}_js_livelinks.txt | nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o ${domain}_js_secrets.txt
 			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
@@ -611,7 +608,7 @@ jschecks(){
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Javascript Scan Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in in ${domain}_js_*.txt files${reset}\n"
+			printf "${bblue} Results are saved in ${domain}_js_*.txt files${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -625,16 +622,18 @@ params(){
 			printf "${bblue} Parameter Discovery ${reset}\n"
 			start=`date +%s`
 			printf "${yellow}\n\n Running : Finding params with paramspider${reset}\n"
-			interlace -tL ${domain}_probed.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,js" &>/dev/null
-			find output/ -name '*.txt' -exec cat {} \; | anew -q ${domain}_param.txt
+			cat ${domain}_probed.txt | sed -r "s/https?:\/\///" | anew -q ${domain}_probed_nohttp.txt
+			interlace -tL ${domain}_probed_nohttp.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,js" &>/dev/null
+			eval find output/ -name '*.txt' -exec cat {} \; | anew -q ${domain}_param.txt $DEBUG_ERROR
 			sed '/^FUZZ/d' -i ${domain}_param.txt
 			eval rm -rf output/ $DEBUG_ERROR
+			eval rm ${domain}_probed_nohttp.txt $DEBUG_ERROR
 			printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
 			eval python3 $tools/Arjun/arjun.py -i ${domain}_param.txt -t 20 -o ${domain}_arjun.json $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Parameter Discovery Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in in ${domain}_param.txt and ${domain}_arjun.json${reset}\n"
+			printf "${bblue} Results are saved in ${domain}_param.txt and ${domain}_arjun.json${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -651,15 +650,11 @@ xss(){
 			if [ -n "$XSS_SERVER" ]; then
 				sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
 				eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --blind --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-				end=`date +%s`
-				getElapsedTime $start $end
-				printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
+				printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 			else
 				printf "${bblue}\n No XSS_SERVER defined, blind xss skipped\n"
 				eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-				end=`date +%s`
-				getElapsedTime $start $end
-				printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
+				printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 			fi
 		else
 			if [[ $(cat ${domain}_xss.txt | wc -l) -le 1000 ]]
@@ -667,22 +662,20 @@ xss(){
 				if [ -n "$XSS_SERVER" ]; then
 					sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
 					eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --blind --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-					end=`date +%s`
-					getElapsedTime $start $end
-					printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
+					printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 				else
 					printf "${bblue}\n No XSS_SERVER defined, blind xss skipped\n"
 					eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-					end=`date +%s`
-					getElapsedTime $start $end
-					printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
+					printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 				fi
 			else
 				printf "${bred} Skipping XSS: Too Much URLs to test, try with --deep flag${reset}\n"
 			fi
 		fi
+		end=`date +%s`
+		getElapsedTime $start $end
 		printf "${bblue}\n XSS Analysis Finished in ${runtime}\n"
-		printf "${bblue} Results are saved in in ${domain}_xsstrike_xss.txt${reset}\n"
+		printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 		printf "${bgreen}#######################################################################\n\n"
 	else
 		printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -704,7 +697,7 @@ github(){
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n GitHub Scanning Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in in ${domain}_gitrecon.txt${reset}\n"
+			printf "${bblue} Results are saved in ${domain}_gitrecon.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -727,7 +720,7 @@ favicon(){
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n FavIcon Hash Extraction Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in in ${domain}_favicontest.txt${reset}\n"
+			printf "${bblue} Results are saved in ${domain}_favicontest.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -745,7 +738,7 @@ fuzz(){
 			for sub in $(cat ${domain}_probed.txt); do
 				printf "${yellow}\n\n Running: Fuzzing in ${sub}${reset}\n"
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-				ffuf -mc all -ac -sf -w $fuzz_wordlist -maxtime 900 -u $sub/FUZZ -or -o $dir/fuzzing/${sub_out}.tmp $DEBUG_STD
+				ffuf -mc all -ac -sf -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -w $fuzz_wordlist -maxtime 900 -u $sub/FUZZ -or -o $dir/fuzzing/${sub_out}.tmp $DEBUG_STD
 				cat $dir/fuzzing/${sub_out}.tmp | jq '[.results[]|{status: .status, length: .length, url: .url}]' | grep -oP "status\":\s(\d{3})|length\":\s(\d{1,7})|url\":\s\"(http[s]?:\/\/.*?)\"" | paste -d' ' - - - | awk '{print $2" "$4" "$6}' | sed 's/\"//g' | anew -q $dir/fuzzing/${sub_out}.txt
 				eval rm ${sub_out}.tmp $DEBUG_ERROR
 			done
