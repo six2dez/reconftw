@@ -151,12 +151,12 @@ function tools_full(){
 	[ -f $tools/fuzz_wordlist.txt ] && printf "${bgreen}[*] OneListForAll	[YES]\n" || printf "${bred} [*] OneListForAll	[NO]\n"
 	[ -f $tools/LinkFinder/linkfinder.py ] && printf "${bgreen}[*] LinkFinder	        [YES]\n" || printf "${bred} [*] LinkFinder	        [NO]\n"
 	[ -f $tools/degoogle_hunter/degoogle_hunter.sh ] && printf "${bgreen}[*] degoogle_hunter	[YES]\n" || printf "${bred} [*] degoogle_hunter	[NO]\n"
-	[ -f $tools/GitDorker/GitDorker.py ] && printf "${bgreen}[*] GitDorker	[YES]\n" || printf "${bred} [*] GitDorker	[NO]\n"
+	[ -f $tools/GitDorker/GitDorker.py ] && printf "${bgreen}[*] GitDorker		[YES]\n" || printf "${bred} [*] GitDorker		[NO]\n"
 	[ -f $tools/webscreenshot/webscreenshot.py ] && printf "${bgreen}[*] webscreenshot	[YES]\n" || printf "${bred} [*] webscreenshot	[NO]\n"
 	[ -f $tools/getjswords.py ] && printf "${bgreen}[*] getjswords.py	[YES]\n" || printf "${bred} [*] getjswords.py	[NO]\n"
 	[ -f $tools/subdomains.txt ] && printf "${bgreen}[*] subdomains.txt	[YES]\n" || printf "${bred} [*] subdomains.txt	[NO]\n"
 	[ -f $tools/resolvers.txt ] && printf "${bgreen}[*] resolvers.txt	[YES]\n" || printf "${bred} [*] resolvers.txt	[NO]\n"
-	eval type -P github-endpoints $DEBUG_STD && printf "${bgreen}[*] github-endpoints		[YES]\n" || { printf "${bred} [*] github-endpoints		[NO]\n"; }
+	eval type -P github-endpoints $DEBUG_STD && printf "${bgreen}[*] github-endpoints	[YES]\n" || { printf "${bred} [*] github-endpoints	[NO]\n"; }
 	eval type -P gospider $DEBUG_STD && printf "${bgreen}[*] gospider		[YES]\n" || { printf "${bred} [*] gospider		[NO]\n"; }
 	eval type -P subfinder $DEBUG_STD && printf "${bgreen}[*] Subfinder		[YES]\n" || { printf "${bred} [*] Subfinder		[NO]\n"; }
 	eval type -P assetfinder $DEBUG_STD && printf "${bgreen}[*] Assetfinder		[YES]\n" || { printf "${bred} [*] Assetfinder	[NO]\n"; }

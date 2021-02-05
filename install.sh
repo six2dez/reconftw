@@ -163,7 +163,7 @@ eval git clone https://github.com/obheda12/GitDorker $dir/GitDorker $DEBUG_STD
 printf "${bgreen} 70%% done${reset}\n\n"
 eval git clone https://github.com/ProjectAnte/dnsgen $dir/dnsgen $DEBUG_STD
 eval git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh $DEBUG_STD
-eval git clone https://github.com/maaaaz/webscreenshot webscreenshot $DEBUG_STD
+eval git clone https://github.com/maaaaz/webscreenshot $dir/webscreenshot $DEBUG_STD
 
 printf "${bgreen} 80%% done${reset}\n\n"
 if [ "True" = "$IS_ARM" ]
