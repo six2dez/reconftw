@@ -81,8 +81,8 @@ function tools_installed(){
 	[ -f $tools/fav-up/favUp.py ] || { printf "${bred} [*] fav-up		[NO]\n"; allinstalled=false;}
 	[ -f $tools/Corsy/corsy.py ] || { printf "${bred} [*] Corsy		[NO]\n"; allinstalled=false;}
 	[ -f $tools/testssl.sh/testssl.sh ] || { printf "${bred} [*] testssl		[NO]\n"; allinstalled=false;}
-	[ -f $tools/JSFinder/JSFinder.py ] || { printf "${bred} [*] JSFinder	[NO]\n"; allinstalled=false;}
-	[ -f $tools/CMSeeK/cmseek.py ] || { printf "${bred} [*] CMSeeK	[NO]\n"; allinstalled=false;}
+	[ -f $tools/JSFinder/JSFinder.py ] || { printf "${bred} [*] JSFinder		[NO]\n"; allinstalled=false;}
+	[ -f $tools/CMSeeK/cmseek.py ] || { printf "${bred} [*] CMSeeK		[NO]\n"; allinstalled=false;}
 	[ -f $tools/fuzz_wordlist.txt ] || { printf "${bred} [*] OneListForAll	[NO]\n"; allinstalled=false;}
 	[ -f $tools/LinkFinder/linkfinder.py ] || { printf "${bred} [*] LinkFinder	        [NO]\n"; allinstalled=false;}
 	[ -f $tools/GitDorker/GitDorker.py ] || { printf "${bred} [*] GitDorker	        [NO]\n"; allinstalled=false;}
@@ -146,8 +146,8 @@ function tools_full(){
 	[ -f $tools/fav-up/favUp.py ] && printf "${bgreen}[*] fav-up		[YES]\n" || printf "${bred} [*] fav-up		[NO]\n"
 	[ -f $tools/Corsy/corsy.py ] && printf "${bgreen}[*] Corsy		[YES]\n" || printf "${bred} [*] Corsy		[NO]\n"
 	[ -f $tools/testssl.sh/testssl.sh ] && printf "${bgreen}[*] testssl		[YES]\n" || printf "${bred} [*] testssl		[NO]\n"
-	[ -f $tools/JSFinder/JSFinder.py ] && printf "${bgreen}[*] JSFinder		[YES]\n" || printf "${bred} [*] JSFinder	[NO]\n"
-	[ -f $tools/CMSeeK/cmseek.py ] && printf "${bgreen}[*] CMSeeK		[YES]\n" || printf "${bred} [*] CMSeeK	[NO]\n"
+	[ -f $tools/JSFinder/JSFinder.py ] && printf "${bgreen}[*] JSFinder		[YES]\n" || printf "${bred} [*] JSFinder		[NO]\n"
+	[ -f $tools/CMSeeK/cmseek.py ] && printf "${bgreen}[*] CMSeeK		[YES]\n" || printf "${bred} [*] CMSeeK		[NO]\n"
 	[ -f $tools/fuzz_wordlist.txt ] && printf "${bgreen}[*] OneListForAll	[YES]\n" || printf "${bred} [*] OneListForAll	[NO]\n"
 	[ -f $tools/LinkFinder/linkfinder.py ] && printf "${bgreen}[*] LinkFinder	        [YES]\n" || printf "${bred} [*] LinkFinder	        [NO]\n"
 	[ -f $tools/degoogle_hunter/degoogle_hunter.sh ] && printf "${bgreen}[*] degoogle_hunter	[YES]\n" || printf "${bred} [*] degoogle_hunter	[NO]\n"
