@@ -86,6 +86,7 @@ function tools_installed(){
 	[ -f $tools/fuzz_wordlist.txt ] || { printf "${bred} [*] OneListForAll	[NO]\n"; allinstalled=false;}
 	[ -f $tools/LinkFinder/linkfinder.py ] || { printf "${bred} [*] LinkFinder	        [NO]\n"; allinstalled=false;}
 	[ -f $tools/GitDorker/GitDorker.py ] || { printf "${bred} [*] GitDorker	        [NO]\n"; allinstalled=false;}
+	[ -f $tools/webscreenshot/webscreenshot.py ] || { printf "${bred} [*] webscreenshot	        [NO]\n"; allinstalled=false;}
 	[ -f $tools/degoogle_hunter/degoogle_hunter.sh ] || { printf "${bred} [*] degoogle_hunter   [NO]\n"; allinstalled=false;}
 	[ -f $tools/getjswords.py ] || { printf "${bred} [*] getjswords   	[NO]\n"; allinstalled=false;}
 	[ -f $tools/subdomains.txt ] || { printf "${bred} [*] subdomains   	[NO]\n"; allinstalled=false;}
@@ -118,7 +119,6 @@ function tools_installed(){
 	eval type -P crlfuzz $DEBUG_STD || { printf "${bred} [*] crlfuzz		[NO]\n"; allinstalled=false;}
 	eval type -P httpx $DEBUG_STD || { printf "${bred} [*] Httpx		[NO]\n${reset}"; allinstalled=false;}
 	eval type -P jq $DEBUG_STD || { printf "${bred} [*] jq			[NO]\n${reset}"; allinstalled=false;}
-	eval type -P webscreenshot $DEBUG_STD || { printf "${bred} [*] webscreenshot	[NO]\n${reset}"; allinstalled=false;}
 
 	if [ "${allinstalled}" = true ] ; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
@@ -152,6 +152,7 @@ function tools_full(){
 	[ -f $tools/LinkFinder/linkfinder.py ] && printf "${bgreen}[*] LinkFinder	        [YES]\n" || printf "${bred} [*] LinkFinder	        [NO]\n"
 	[ -f $tools/degoogle_hunter/degoogle_hunter.sh ] && printf "${bgreen}[*] degoogle_hunter	[YES]\n" || printf "${bred} [*] degoogle_hunter	[NO]\n"
 	[ -f $tools/GitDorker/GitDorker.py ] && printf "${bgreen}[*] GitDorker	[YES]\n" || printf "${bred} [*] GitDorker	[NO]\n"
+	[ -f $tools/webscreenshot/webscreenshot.py ] && printf "${bgreen}[*] webscreenshot	[YES]\n" || printf "${bred} [*] webscreenshot	[NO]\n"
 	[ -f $tools/getjswords.py ] && printf "${bgreen}[*] getjswords.py	[YES]\n" || printf "${bred} [*] getjswords.py	[NO]\n"
 	[ -f $tools/subdomains.txt ] && printf "${bgreen}[*] subdomains.txt	[YES]\n" || printf "${bred} [*] subdomains.txt	[NO]\n"
 	[ -f $tools/resolvers.txt ] && printf "${bgreen}[*] resolvers.txt	[YES]\n" || printf "${bred} [*] resolvers.txt	[NO]\n"
@@ -183,7 +184,6 @@ function tools_full(){
 	eval type -P crlfuzz $DEBUG_STD && printf "${bgreen}[*] crlfuzz		[YES]\n" || { printf "${bred} [*] crlfuzz		[NO]\n"; }
 	eval type -P httpx $DEBUG_STD && printf "${bgreen}[*] Httpx		[YES]\n${reset}" || { printf "${bred} [*] Httpx		[NO]\n${reset}"; }
 	eval type -P jq $DEBUG_STD && printf "${bgreen}[*] jq			[YES]\n${reset}" || { printf "${bred} [*] jq			[NO]\n${reset}"; }
-	eval type -P webscreenshot $DEBUG_STD && printf "${bgreen}[*] webscreenshot	[YES]\n${reset}" || { printf "${bred} [*] webscreenshot	[NO]\n${reset}"; }
 
 	printf "\n${yellow} If any tool is not installed under $tools, I trust in your ability to install it :D\n Also remember to set the ${bred}\$tools${yellow} variable at the start of this script.\n If you have any problem you can always ping me ;) ${reset}\n\n"
 	printf "${bblue} Tools check finished\n"
@@ -198,7 +198,7 @@ dorks(){
 	sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" ${domain}_dorks.txt
 	end=`date +%s`
 	getElapsedTime $start $end
-	printf "${bblue} Finished in ${runtime} Happy hunting! ${reset}\n"
+	printf "$\n{bblue} Finished in ${runtime} Happy hunting! ${reset}\n"
 	printf "${bgreen}#######################################################################\n"
 }
 
@@ -268,14 +268,14 @@ sub_crt(){
 			if [ "$FULLSCOPE" = true ] ; then
 				eval cat ${outputfile}.txt $DEBUG_ERROR | anew -q $dir/crtsh_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			else
-				eval cat ${outputfile}.txt $DEBUG_ERROR | grep -F ".$domain" | anew -q $dir/crtsh_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval cat ${outputfile}.txt $DEBUG_ERROR | grep ".$domain$" | anew -q $dir/crtsh_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			fi
 			if [ "$DEEP" = true ] ; then
 				eval python3 dig.py ${outputfile}.txt > ${domain}_more.txt $DEBUG_STD
 				if [ "$FULLSCOPE" = true ] ; then
 					eval cat ${domain}_more.txt $DEBUG_ERROR | anew -q $dir/crtsh_subs.txt
 				else
-					eval cat ${domain}_more.txt $DEBUG_ERROR | grep -F ".$domain" | anew -q $dir/crtsh_subs.txt
+					eval cat ${domain}_more.txt $DEBUG_ERROR | grep ".$domain$" | anew -q $dir/crtsh_subs.txt
 				fi
 				eval rm ${domain}_more.txt $DEBUG_ERROR
 			fi
@@ -291,7 +291,7 @@ sub_crt(){
 			getElapsedTime $start $end
 			printf "${green} ${NUMOFLINES} crtsh subdomains found in ${runtime}${reset}\n\n"
 		else
-			printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -466,7 +466,7 @@ screenshot(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} ${bgreen} Web Screenshot ${reset}\n\n"
 			start=`date +%s`
-			webscreenshot -i ${domain}_probed.txt -w 8 -a "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -o screenshots &>/dev/null && touch $called_fn_dir/.${FUNCNAME[0]}
+			python3 $tools/webscreenshot/webscreenshot.py -i ${domain}_probed.txt -w 8 -a "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -o screenshots &>/dev/null && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Web Screenshot Finished in ${runtime}\n"
@@ -678,7 +678,7 @@ xss(){
 		printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 		printf "${bgreen}#######################################################################\n\n"
 	else
-		printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
@@ -890,7 +890,7 @@ ssrf_checks(){
 		fi
 		printf "${bgreen}#######################################################################\n"
 	else
-		printf "${yellow} ${NUMOFLINES} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 

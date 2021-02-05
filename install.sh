@@ -28,15 +28,15 @@ printf "${bgreen} reconftw installer script (apt/rpm/pacman compatible)${reset}\
 
 install_apt(){
     (eval $SUDO apt install chromium-browser -y $DEBUG_STD | eval $SUDO apt install chromium -y $DEBUG_STD)
-    eval $SUDO apt install python3 python3-pip ruby git libpcap-dev wget python-dev python3-dev dnsutils build-essential xvfb libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq -y $DEBUG_STD
+    eval $SUDO apt install python3 python3-pip ruby git curl libpcap-dev wget python-dev python3-dev dnsutils build-essential xvfb libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq -y $DEBUG_STD
 }
 
 install_yum(){
-    eval $SUDO yum install python3 python3-pip ruby git libpcap-devel chromium wget openssl-devel bind-utils python3-devel libxslt-devel libffi-devel xorg-x11-server-Xvfb libxml2-devel nmap zlib-devel jq -y $DEBUG_STD
+    eval $SUDO yum install python3 python3-pip ruby git curl libpcap-devel chromium wget openssl-devel bind-utils python3-devel libxslt-devel libffi-devel xorg-x11-server-Xvfb libxml2-devel nmap zlib-devel jq -y $DEBUG_STD
 }
 
 install_pacman(){
-    eval $SUDO pacman -Sy install python python-pip dnsutils ruby git libpcap nmap chromium wget jq xorg-server-xvfb -y $DEBUG_STD
+    eval $SUDO pacman -Sy install python python-pip dnsutils ruby curl git libpcap nmap chromium wget jq xorg-server-xvfb -y $DEBUG_STD
 }
 
 #installing latest Golang version
@@ -161,9 +161,9 @@ eval git clone https://github.com/codingo/Interlace $dir/Interlace $DEBUG_STD
 eval git clone https://github.com/gwen001/github-search $dir/github-search $DEBUG_STD
 eval git clone https://github.com/obheda12/GitDorker $dir/GitDorker $DEBUG_STD
 printf "${bgreen} 70%% done${reset}\n\n"
+eval git clone https://github.com/ProjectAnte/dnsgen $dir/dnsgen $DEBUG_STD
 eval git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh $DEBUG_STD
-eval $SUDO pip3 install dnsgen $DEBUG_STD
-eval $SUDO pip3 install webscreenshot $DEBUG_STD
+eval git clone https://github.com/maaaaz/webscreenshot webscreenshot $DEBUG_STD
 
 printf "${bgreen} 80%% done${reset}\n\n"
 if [ "True" = "$IS_ARM" ]
@@ -181,6 +181,7 @@ $SUDO cp $dir/massdns/bin/massdns /usr/bin/
 
 cd $dir/Interlace && eval $SUDO python3 setup.py install $DEBUG_STD
 cd $dir/LinkFinder && eval $SUDO python3 setup.py install $DEBUG_STD
+cd $dir/dnsgen && eval $SUDO python3 setup.py install $DEBUG_STD
 cd $dir
 eval git clone https://github.com/devanshbatham/OpenRedireX $dir/OpenRedireX $DEBUG_STD
 printf "${bgreen} 90%% done${reset}\n\n"
