@@ -78,7 +78,7 @@ export GOPATH=\$HOME/go
 export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH
 EOF
 fi
-printf "${yellow} Golang installed! Open a new terminal and run again this script ${reset}"
+printf "${yellow} Golang installed! Open a new terminal and run again this script ${reset}\n"
 exit
 fi
 
