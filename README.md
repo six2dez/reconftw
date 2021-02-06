@@ -128,6 +128,7 @@ chmod +x *.sh
 - Docker support  
 - CMS Scanner ([CMSeeK](https://github.com/Tuhinshubhra/CMSeeK))
 - Out of Scope Support  
+- LFI Checks  
 
 ## Mindmap/Workflow
 
