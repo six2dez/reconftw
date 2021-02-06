@@ -543,12 +543,15 @@ urlchecks(){
 			cat ${domain}_probed.txt | waybackurls | anew -q ${domain}_url_extract.txt
 			cat ${domain}_probed.txt | gau | anew -q ${domain}_url_extract.txt
 			if [ "$DEEP" = true ] ; then
-				gospider -S ${domain}_probed.txt -t 100 -c 10 -d 2 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,pdf,svg,txt | sed "s/^.*http/http/p" | anew -q ${domain}_url_extract.txt
+				gospider -S ${domain}_probed.txt -t 100 -c 10 -d 2 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,pdf,svg,txt | grep -e "code-200" | awk '{print $5}' | anew -q ${domain}_url_extract.txt
 			else
-				gospider -S ${domain}_probed.txt -t 100 -c 10 -d 1 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,pdf,svg,txt | sed "s/^.*http/http/p" | anew -q ${domain}_url_extract.txt
+				gospider -S ${domain}_probed.txt -t 100 -c 10 -d 1 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,pdf,svg,txt | grep -e "code-200" | awk '{print $5}' | anew -q ${domain}_url_extract.txt
 			fi
-			github-endpoints -d $domain -t $tools/.github_tokens -raw | anew -q ${domain}_url_extract.txt
-			sed -i '/^http/!d' ${domain}_url_extract.txt
+			if [ -s "$tools/.github_tokens" ]
+			then
+				eval github-endpoints -d $domain -t $tools/.github_tokens -raw $DEBUG_ERROR | anew -q ${domain}_url_extract.txt
+			fi
+			sed -i '/^http/!d' ${domain}_url_extract.txt  && touch $called_fn_dir/.${FUNCNAME[0]}
 			#cat ${domain}_url_extract.txt | httpx -follow-redirects -threads 100 -silent -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_url_extract_live.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
@@ -574,7 +577,7 @@ url_gf(){
 			gf sqli ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_sqli.txt;
 			gf redirect ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_redirect.txt;
 			gf rce ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_rce.txt;
-			gf potential ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_potential.txt;
+			gf potential ${domain}_url_extract.txt | anew -q ${domain}_potential.txt;
 			gf lfi ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_lfi.txt && touch $called_fn_dir/.${FUNCNAME[0]};
 			end=`date +%s`
 			getElapsedTime $start $end
@@ -712,11 +715,16 @@ favicon(){
 			start=`date +%s`
 			cd $tools/fav-up
 			eval python3 favUp.py -w $domain -sc -o favicontest.json $DEBUG_STD
-			mv favicontest.json $dir/favicontest.json
-			cd $dir
-			eval cat favicontest.json | jq > ${domain}_favicontest.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-			rm favicontest.json
-			eval cat ${domain}_favicontest.txt $DEBUG_ERROR | grep found_ips
+			if [ ! -f "favicontest.json" ]
+			then
+				mv favicontest.json $dir/favicontest.json
+				cd $dir
+				eval cat favicontest.json | jq > ${domain}_favicontest.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				rm favicontest.json
+				eval cat ${domain}_favicontest.txt $DEBUG_ERROR | grep found_ips
+			else
+				cd $dir
+			fi
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n FavIcon Hash Extraction Finished in ${runtime}\n"
@@ -732,13 +740,13 @@ fuzz(){
 		then
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Directory Fuzzing ${reset}\n"
-			printf "${yellow}\n\n Fuzzing subdomains with ${fuzz_wordlist}${reset}\n"
+			printf "${yellow}\n\n Fuzzing subdomains with ${fuzz_wordlist}${reset}\n\n"
 			start=`date +%s`
 			mkdir -p $dir/fuzzing
 			for sub in $(cat ${domain}_probed.txt); do
 				printf "${yellow}\n\n Running: Fuzzing in ${sub}${reset}\n"
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-				ffuf -mc all -ac -sf -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -w $fuzz_wordlist -maxtime 900 -u $sub/FUZZ -or -o $dir/fuzzing/${sub_out}.tmp $DEBUG_STD
+				ffuf -mc all -fc 404 -ac -sf -s -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -w $fuzz_wordlist -maxtime 900 -u $sub/FUZZ -or -o $dir/fuzzing/${sub_out}.tmp $DEBUG_STD
 				cat $dir/fuzzing/${sub_out}.tmp | jq '[.results[]|{status: .status, length: .length, url: .url}]' | grep -oP "status\":\s(\d{3})|length\":\s(\d{1,7})|url\":\s\"(http[s]?:\/\/.*?)\"" | paste -d' ' - - - | awk '{print $2" "$4" "$6}' | sed 's/\"//g' | anew -q $dir/fuzzing/${sub_out}.txt
 				eval rm ${sub_out}.tmp $DEBUG_ERROR
 			done
