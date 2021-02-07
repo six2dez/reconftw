@@ -92,6 +92,8 @@ elif [ -f /etc/arch-release ]; then install_pacman;
 elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for some RedHat and Amazon Linux instances
 fi
 
+printf "${bgreen} System packages installed${reset}\n\n"
+
 if ! command -v phantomjs &> /dev/null
 then
     cd /opt
@@ -113,6 +115,7 @@ fi
 dir=~/Tools
 
 eval pip3 install -r requirements.txt $DEBUG_STD
+printf "${bgreen} Requirements installed\n\nInstallation begins!\n\n${reset}"
 eval go get -v github.com/tomnomnom/gf $DEBUG_STD
 eval go get -v github.com/tomnomnom/qsreplace $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/OWASP/Amass/v3/... $DEBUG_STD
