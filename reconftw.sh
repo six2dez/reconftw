@@ -368,7 +368,7 @@ sub_permut(){
 		then
 			start=`date +%s`
 			printf "${yellow} Running : Permutations Subdomain Enumeration${reset}\n"
-			if [[ $(cat tmp_subs_resolution.txt | wc -l) -le 100 ]]
+			if [[ $(cat tmp_subs_resolution.txt | wc -l) -le 50 ]]
 				then
 					eval dnsgen tmp_subs_resolution.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute1_tmp.txt $DEBUG_STD
 					cat permute1_tmp.txt | anew -q permute1.txt
@@ -376,7 +376,7 @@ sub_permut(){
 					cat permute2_tmp.txt | anew -q permute2.txt
 					cat permute1.txt permute2.txt | anew -q permute_subs.txt
 					eval rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt tmp_subs_resolution.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
-				elif [[ $(cat tmp_subs_resolution.txt | wc -l) -le 200 ]]
+				elif [[ $(cat tmp_subs_resolution.txt | wc -l) -le 100 ]]
 		  		then
 					eval dnsgen tmp_subs_resolution.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $tools/resolvers.txt -o permute_tmp.txt $DEBUG_STD
 					cat permute_tmp.txt | anew -q permute_subs.txt
