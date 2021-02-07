@@ -26,7 +26,8 @@ printf "\n\n${bgreen}###########################################################
 printf "${bgreen} reconftw installer script (apt/rpm/pacman compatible)${reset}\n\n"
 
 install_apt(){
-    (eval $SUDO apt install chromium-browser -y $DEBUG_STD | eval $SUDO apt install chromium -y $DEBUG_STD)
+    eval $SUDO apt install chromium-browser -y $DEBUG_STD
+    eval $SUDO apt install chromium -y $DEBUG_STD
     eval $SUDO apt install python3 python3-pip ruby git curl libpcap-dev wget python-dev python3-dev dnsutils build-essential xvfb libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq -y $DEBUG_STD
 }
 
@@ -91,6 +92,8 @@ elif [ -f /etc/arch-release ]; then install_pacman;
 elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for some RedHat and Amazon Linux instances
 fi
 
+printf "${bgreen} System packages installed${reset}\n\n"
+
 if ! command -v phantomjs &> /dev/null
 then
     cd /opt
@@ -112,6 +115,7 @@ fi
 dir=~/Tools
 
 eval pip3 install -r requirements.txt $DEBUG_STD
+printf "${bgreen} Requirements installed\n\nInstallation begins!\n\n${reset}"
 eval go get -v github.com/tomnomnom/gf $DEBUG_STD
 eval go get -v github.com/tomnomnom/qsreplace $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/OWASP/Amass/v3/... $DEBUG_STD
@@ -187,6 +191,7 @@ cd $dir
 eval git clone https://github.com/devanshbatham/OpenRedireX $dir/OpenRedireX $DEBUG_STD
 printf "${bgreen} 90%% done${reset}\n\n"
 eval subfinder $DEBUG_STD
+eval notify $DEBUG_STD
 mkdir -p ~/.config/amass/
 eval wget -nc -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini $DEBUG_STD
 cd ~/.gf; eval wget -O potential.json https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json $DEBUG_STD; cd $dir
