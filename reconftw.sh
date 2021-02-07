@@ -540,19 +540,25 @@ urlchecks(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} URL Extraction ${reset}\n\n"
 			start=`date +%s`
-			cat ${domain}_probed.txt | waybackurls | anew -q ${domain}_url_extract.txt
-			cat ${domain}_probed.txt | gau | anew -q ${domain}_url_extract.txt
+			cat ${domain}_probed.txt | waybackurls | anew -q ${domain}_url_extract_tmp.txt
+			cat ${domain}_probed.txt | gau | anew -q ${domain}_url_extract_tmp.txt
 			if [ "$DEEP" = true ] ; then
-				gospider -S ${domain}_probed.txt -t 100 -c 10 -d 2 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,pdf,svg,txt | grep -e "code-200" | awk '{print $5}' | anew -q ${domain}_url_extract.txt
+				gospider -S ${domain}_probed.txt -t 100 -c 10 -d 2 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt | grep -e "code-200" | awk '{print $5}' | anew -q ${domain}_url_extract_tmp.txt
 			else
-				gospider -S ${domain}_probed.txt -t 100 -c 10 -d 1 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,pdf,svg,txt | grep -e "code-200" | awk '{print $5}' | anew -q ${domain}_url_extract.txt
+				gospider -S ${domain}_probed.txt -t 100 -c 10 -d 1 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt | grep -e "code-200" | awk '{print $5}' | anew -q ${domain}_url_extract_tmp.txt
 			fi
 			if [ -s "$tools/.github_tokens" ]
 			then
-				eval github-endpoints -d $domain -t $tools/.github_tokens -raw $DEBUG_ERROR | anew -q ${domain}_url_extract.txt
+				eval github-endpoints -d $domain -t $tools/.github_tokens -raw $DEBUG_ERROR | anew -q ${domain}_url_extract_tmp.txt
 			fi
-			sed -i '/^http/!d' ${domain}_url_extract.txt  && touch $called_fn_dir/.${FUNCNAME[0]}
-			#cat ${domain}_url_extract.txt | httpx -follow-redirects -threads 100 -silent -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_url_extract_live.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			if [ "$FULLSCOPE" = true ] ; then
+				cat ${domain}_url_extract_tmp.txt | grep "=" | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | qsreplace -a | anew -q cat ${domain}_url_extract.txt && touch $called_fn_dir/.${FUNCNAME[0]};
+				cat ${domain}_url_extract_tmp.txt | egrep -iv ".(js)" | anew -q cat ${domain}_url_extract_js.txt
+			else
+				cat ${domain}_url_extract_tmp.txt | grep ".$domain$" | grep "=" | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | qsreplace -a | anew -q cat ${domain}_url_extract.txt && touch $called_fn_dir/.${FUNCNAME[0]};
+				cat ${domain}_url_extract_tmp.txt | grep ".$domain$" | egrep -iv ".(js)" | anew -q cat ${domain}_url_extract_js.txt
+			fi
+			eval rm ${domain}_url_extract_tmp.txt $DEBUG_ERROR
 			end=`date +%s`
 			getElapsedTime $start $end
 			NUMOFLINES=$(wc -l < ${domain}_url_extract.txt)
@@ -571,14 +577,14 @@ url_gf(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Vulnerable Pattern Search ${reset}\n\n"
 			start=`date +%s`
-			gf xss ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_xss.txt;
-			gf ssti ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_ssti.txt;
-			gf ssrf ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_ssrf.txt;
-			gf sqli ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_sqli.txt;
-			gf redirect ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_redirect.txt;
-			gf rce ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_rce.txt;
+			gf xss ${domain}_url_extract.txt | anew -q ${domain}_xss.txt;
+			gf ssti ${domain}_url_extract.txt | anew -q ${domain}_ssti.txt;
+			gf ssrf ${domain}_url_extract.txt | anew -q ${domain}_ssrf.txt;
+			gf sqli ${domain}_url_extract.txt | anew -q ${domain}_sqli.txt;
+			gf redirect ${domain}_url_extract.txt | anew -q ${domain}_redirect.txt;
+			gf rce ${domain}_url_extract.txt | anew -q ${domain}_rce.txt;
 			gf potential ${domain}_url_extract.txt | anew -q ${domain}_potential.txt;
-			gf lfi ${domain}_url_extract.txt | qsreplace -a | anew -q ${domain}_lfi.txt && touch $called_fn_dir/.${FUNCNAME[0]};
+			gf lfi ${domain}_url_extract.txt | anew -q ${domain}_lfi.txt && touch $called_fn_dir/.${FUNCNAME[0]};
 			end=`date +%s`
 			getElapsedTime $start $end
 			cat ${domain}_url_extract.txt | unfurl -u format %s://%d%p | anew -q ${domain}_url_endpoints.txt
@@ -597,8 +603,8 @@ jschecks(){
 			printf "${bblue} Javascript Scan ${reset}\n\n"
 			start=`date +%s`
 			printf "${yellow} Running : Fetching Urls 1/5${reset}\n"
-			cat ${domain}_url_extract.txt | grep -iE "\.js$" | anew -q ${domain}_jsfile_links.txt;
-			cat ${domain}_url_extract.txt | subjs | anew -q ${domain}_jsfile_links.txt;
+			cat ${domain}_url_extract_js.txt | grep -iE "\.js$" | anew -q ${domain}_jsfile_links.txt;
+			cat ${domain}_url_extract_js.txt | subjs | anew -q ${domain}_jsfile_links.txt;
 			printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
 			cat ${domain}_jsfile_links.txt | httpx -follow-redirects -silent -threads 100 -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt
 			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
@@ -627,7 +633,7 @@ params(){
 			printf "${yellow}\n\n Running : Finding params with paramspider${reset}\n"
 			cat ${domain}_probed.txt | sed -r "s/https?:\/\///" | anew -q ${domain}_probed_nohttp.txt
 			interlace -tL ${domain}_probed_nohttp.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,js" &>/dev/null
-			eval find output/ -name '*.txt' -exec cat {} \; | anew -q ${domain}_param.txt $DEBUG_ERROR
+			find output/ -name '*.txt' -exec cat {} \; | anew -q ${domain}_param.txt
 			sed '/^FUZZ/d' -i ${domain}_param.txt
 			eval rm -rf output/ $DEBUG_ERROR
 			eval rm ${domain}_probed_nohttp.txt $DEBUG_ERROR
@@ -649,26 +655,27 @@ xss(){
 		printf "${bgreen}#######################################################################\n"
 		printf "${bblue} XSS Analysis ${reset}\n\n"
 		start=`date +%s`
+		cat ${domain}_xss.txt | Gxss -c 100 -p Xss | anew -q ${domain}_xss_reflected.txt
 		if [ "$DEEP" = true ] ; then
 			if [ -n "$XSS_SERVER" ]; then
 				sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
-				eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --blind --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss_reflected.txt -t 30 --crawl --blind --skip > ${domain}_xsstrike_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 			else
 				printf "${bblue}\n No XSS_SERVER defined, blind xss skipped\n"
-				eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss_reflected.txt -t 30 --crawl --skip > ${domain}_xsstrike_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 			fi
 		else
-			if [[ $(cat ${domain}_xss.txt | wc -l) -le 1000 ]]
+			if [[ $(cat ${domain}_xss_reflected.txt | wc -l) -le 500 ]]
 			then
 				if [ -n "$XSS_SERVER" ]; then
 					sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
-					eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --blind --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss_reflected.txt -t 30 --crawl --blind --skip > ${domain}_xsstrike_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 					printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 				else
 					printf "${bblue}\n No XSS_SERVER defined, blind xss skipped\n"
-					eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss.txt -t 30 --crawl --skip $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss_reflected.txt -t 30 --crawl --skip > ${domain}_xsstrike_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 					printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 				fi
 			else
@@ -694,6 +701,8 @@ github(){
 			if [ -s "$tools/.github_tokens" ]
 			then
 				eval python3 $tools/GitDorker/GitDorker.py -tf $tools/.github_tokens -q $domain -e 10 -d $tools/GitDorker/Dorks/medium_dorks.txt -o ${domain}_gitrecon.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				cat ${domain}_gitrecon.txt_gh_dorks.csv | sort -n --field-separator=',' --key=3 | grep -v ",0" | awk -F "\"*,\"*" '{print $1,$2}' | sed 's/"""//' > ${domain}_gitrecon.txt
+				eval rm ${domain}_gitrecon.txt_gh_dorks.csv $DEBUG_ERROR
 			else
 				printf "\n${bred} Required file ${tools}/.github_tokens not exists or empty${reset}\n"
 			fi
@@ -714,12 +723,12 @@ favicon(){
 			printf "${bblue} FavIcon Hash Extraction ${reset}\n\n"
 			start=`date +%s`
 			cd $tools/fav-up
-			eval python3 favUp.py -w $domain -sc -o favicontest.json $DEBUG_STD
+			eval python3 favUp.py -w $domain -sc -o favicontest.json $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			if [ ! -f "favicontest.json" ]
 			then
 				mv favicontest.json $dir/favicontest.json
 				cd $dir
-				eval cat favicontest.json | jq > ${domain}_favicontest.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval cat favicontest.json | jq > ${domain}_favicontest.txt $DEBUG_STD
 				rm favicontest.json
 				eval cat ${domain}_favicontest.txt $DEBUG_ERROR | grep found_ips
 			else
