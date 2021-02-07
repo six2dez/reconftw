@@ -1070,9 +1070,8 @@ all(){
 }
 
 help(){
-	printf "\n Usage: $0 [-h] [-i] [-d DOMAIN] [-l list.txt] [-x oos.txt] [-a] [-g] [-w] "
-	printf "\n           	      [-t] [-s] [--sp] [--sb] [--sr] [--ss] [--sw] [-v] [-o OUTPUT]"
-	printf "\n           	      [--deep] [--fs] [-o OUTPUT]\n\n"
+	printf "\n Usage: $0 [-d DOMAIN] [-l list.txt] [-x oos.txt] [-a] [-s]"
+	printf "\n           	      [-w] [-i] [-v] [-h] [--deep] [--fs] [-o OUTPUT]\n\n"
 	printf " ${bblue}TARGET OPTIONS${reset}\n"
 	printf "   -d DOMAIN        Target domain\n"
 	printf "   -l list.txt      Targets list, one per line\n"
