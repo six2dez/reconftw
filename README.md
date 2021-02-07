@@ -129,6 +129,7 @@ chmod +x *.sh
 - CMS Scanner ([CMSeeK](https://github.com/Tuhinshubhra/CMSeeK))
 - Out of Scope Support  
 - LFI Checks  
+- Notification support for Slack, Discord and Telegram ([notify](https://github.com/projectdiscovery/notify))
 
 ## Mindmap/Workflow
 
