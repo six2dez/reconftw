@@ -61,35 +61,34 @@ chmod +x *.sh
 
 ## Usage
 
-<pre>
+<b>TARGET OPTIONS</b>  
 
-<b>TARGET OPTIONS</b>
--d DOMAIN        Target domain
--l list.txt      Targets list, one per line
--x oos.txt       Exclude subdomains list (Out Of Scope)
+| Flag | Description | Example |
+|------|-------------|---------|
+| -d	| Target domain 	|  ./reconftw.sh -d abc.com	|
+| -l  	| Targets list, one per line | ./reconftw.sh -l sites.txt |
+| -x 	| Exclude subdomains list (Out Of Scope) | ./reconftw.sh -x oos.txt |
 
-<b>MODE OPTIONS</b>
--a               Perform all checks
--s               Full subdomains scan (Subs, tko and probe)
--g               Google dorks searches
--w               Perform web checks only without subs (-l required)
--t               Check subdomain takeover(-l required)
--i               Check all needed tools
--v               Debug/verbose mode, no file descriptor redir
--h               Show this help
 
-<b>SUBDOMAIN OPTIONS</b>
---sp             Passive subdomain scans
---sb             Bruteforce subdomain resolution
---sr             Subdomain permutations and resolution (-l required)
---ss             Subdomain scan by scraping (-l required)
+<b>MODE OPTIONS</b>  
 
-<b>GENERAL OPTIONS</b>
---deep           Deep scan (Enable some slow options for deeper scan)
---fs             Full scope (Enable widest scope *domain* options)
--o output/path   Define output folder
+| Flag | Description | Example |
+|------|-------------|---------|
+| -a	| Perform all checks	|./reconftw.sh -d abc.com -a	|
+| -s 	| Full subdomains scan (Subs, tko and probe) | ./reconftw.sh -d abc.com -s |
+| -w| Perform web checks only without subs (-l required) | ./reconftw.sh -d abc.com -w |
+| -i  	| Check all needed tools | ./reconftw.sh -i |
+| -v 	| Debug/verbose mode, no file descriptor redir | ./reconftw.sh -d abc.com -v |
+| -h	| Show this help | ./reconftw.sh -h |
 
-</pre>
+
+<b>GENERAL OPTIONS</b>  
+
+| Flag | Description | Example |
+|------|-------------|---------|
+| --deep |  Deep scan (Enable some slow options for deeper scan)	|./reconftw -d abc.com -a --deep	|
+| --fs |  Full scope (Enable widest scope *domain* options) | ./reconftw -d abc.com -a --fs |
+| -o |  Subdomain permutations and resolution (-l required) |./reconftw -d abc.com -a -o /output/here/ |
 
 ## :fire: Features :fire:
 
