@@ -41,24 +41,31 @@ banner(){
 start(){
 	global_start=`date +%s`
 	tools_installed
+
+	dir=$SCRIPTPATH/Recon/$domain
+	called_fn_dir=$dir/.called_fn
+
+	if [ -n "$list" ]
+	then
+		if [ -z "$domain" ]
+		then
+			domain="Multi"
+			dir=$SCRIPTPATH/Recon/$domain
+		fi
+		cp $list $dir/${domain}_probed.txt
+	fi
+
 	if [ -z "$domain" ]
 	then
 		printf "\n\n${bred} No domain or list provided ${reset}\n\n"
 		exit
 	fi
 
-	dir=$SCRIPTPATH/Recon/$domain
-	called_fn_dir=$dir/.called_fn
-
 	if [ ! -d "$called_fn_dir" ]
 	then
 		mkdir -p $called_fn_dir
 	fi
 
-	if [ -n "$list" ]
-	then
-		cp $list $dir/${domain}_probed.txt
-	fi
 	fuzz_wordlist=$tools/fuzz_wordlist.txt
 	cd $dir
 	printf "\n"
@@ -119,6 +126,7 @@ function tools_installed(){
 	eval type -P crlfuzz $DEBUG_STD || { printf "${bred} [*] crlfuzz		[NO]\n"; allinstalled=false;}
 	eval type -P httpx $DEBUG_STD || { printf "${bred} [*] Httpx		[NO]\n${reset}"; allinstalled=false;}
 	eval type -P jq $DEBUG_STD || { printf "${bred} [*] jq			[NO]\n${reset}"; allinstalled=false;}
+	eval type -P notify $DEBUG_STD || { printf "${bred} [*] notify		[NO]\n${reset}"; allinstalled=false;}
 
 	if [ "${allinstalled}" = true ] ; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
@@ -184,6 +192,7 @@ function tools_full(){
 	eval type -P crlfuzz $DEBUG_STD && printf "${bgreen}[*] crlfuzz		[YES]\n" || { printf "${bred} [*] crlfuzz		[NO]\n"; }
 	eval type -P httpx $DEBUG_STD && printf "${bgreen}[*] Httpx		[YES]\n${reset}" || { printf "${bred} [*] Httpx		[NO]\n${reset}"; }
 	eval type -P jq $DEBUG_STD && printf "${bgreen}[*] jq			[YES]\n${reset}" || { printf "${bred} [*] jq			[NO]\n${reset}"; }
+	eval type -P notify $DEBUG_STD && printf "${bgreen}[*] notify		[YES]\n${reset}" || { printf "${bred} [*] notify		[NO]\n${reset}"; }
 
 	printf "\n${yellow} If any tool is not installed under $tools, I trust in your ability to install it :D\n Also remember to set the ${bred}\$tools${yellow} variable at the start of this script.\n If you have any problem you can always ping me ;) ${reset}\n\n"
 	printf "${bblue} Tools check finished\n"
@@ -198,7 +207,7 @@ dorks(){
 	sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" ${domain}_dorks.txt
 	end=`date +%s`
 	getElapsedTime $start $end
-	printf "$\n{bblue} Finished in ${runtime} Happy hunting! ${reset}\n"
+	printf "$\n${bblue} Finished in ${runtime} Happy hunting! ${reset}\n"
 	printf "${bgreen}#######################################################################\n"
 }
 
@@ -453,7 +462,7 @@ webprobe_full(){
 			printf "${bred}\n Uncommon web ports: ${NUMOFLINES} subdomains in ${runtime}${reset}\n\n"
 			eval cat ${domain}_probed_uncommon_ports.txt $DEBUG_ERROR
 			printf "${bblue}\n Web Probe Finished\n"
-			printf "${bblue} Results are saved in ${domain}_takeover.txt${reset}\n"
+			printf "${bblue} Results are saved in ${domain}_probed_uncommon_ports.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -1072,18 +1081,18 @@ help(){
 	printf " ${bblue}MODE OPTIONS${reset}\n"
 	printf "   -a               Perform all checks\n"
 	printf "   -s               Full subdomains scan (Subs, tko and probe)\n"
-	printf "   -g               Google dorks searchs\n"
+#	printf "   -g               Google dorks searchs\n"
 	printf "   -w               Perform web checks only without subs ${yellow}(-l required)${reset}\n"
-	printf "   -t               Check subdomain takeover ${yellow}(-l required)${reset}\n"
+#	printf "   -t               Check subdomain takeover ${yellow}(-l required)${reset}\n"
 	printf "   -i               Check all needed tools\n"
 	printf "   -v               Debug/verbose mode, no file descriptor redir\n"
 	printf "   -h               Show this help\n"
-	printf " \n"
-	printf " ${bblue}SUBDOMAIN OPTIONS${reset}\n"
-	printf "   --sp             Passive subdomain scans\n"
-	printf "   --sb             Bruteforce subdomain resolution \n"
-	printf "   --sr             Subdomain permutations and resolution ${yellow}(-l required)${reset}\n"
-	printf "   --ss             Subdomain scan by scraping ${yellow}(-l required)${reset}\n"
+#	printf " \n"
+#	printf " ${bblue}SUBDOMAIN OPTIONS${reset}\n"
+#	printf "   --sp             Passive subdomain scans\n"
+#	printf "   --sb             Bruteforce subdomain resolution \n"
+#	printf "   --sr             Subdomain permutations and resolution ${yellow}(-l required)${reset}\n"
+#	printf "   --ss             Subdomain scan by scraping ${yellow}(-l required)${reset}\n"
 	printf " \n"
 	printf " ${bblue}GENERAL OPTIONS${reset}\n"
 	printf "   --deep           Deep scan (Enable some slow options for deeper scan)\n"
@@ -1186,77 +1195,77 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 			end
 			exit
 			;;
-		t ) start
-			if [ -n "$list" ]
-			then
-				cp $list $dir/${domain}_subdomains.txt
-			fi
-			subtakeover
-			end
-			;;
-		g ) start
-			dorks
-			end
-			;;
+#		t ) start
+#			if [ -n "$list" ]
+#			then
+#				cp $list $dir/${domain}_subdomains.txt
+#			fi
+#			subtakeover
+#			end
+#			;;
+#		g ) start
+#			dorks
+#			end
+#			;;
 		i ) tools_full
 			exit
 			;;
-		-)  case "${OPTARG}" in
-				sp)	if [ -n "$list" ]
-					then
-						for domain in $(cat $list); do
-							start
-							sub_passive
-							sub_crt
-							sub_dns
-							webprobe_simple
-							end
-						done
-					else
-						start
-						sub_passive
-						sub_crt
-						sub_dns
-						webprobe_simple
-						end
-					fi
-					exit
-					;;
-				sb)	if [ -n "$list" ]
-					then
-						for domain in $(cat $list); do
-							start
-							sub_brute
-							sub_dns
-							webprobe_simple
-							end
-						done
-					else
-						start
-						sub_brute
-						sub_dns
-						webprobe_simple
-						end
-					fi
-					exit
-					;;
-				sr) start
-					cp $list $dir/${domain}_subdomains.txt
-					sub_permut
-					end
-					exit
-					;;
-				ss)	start
-					cp $list $dir/${domain}_subdomains.txt
-					sub_scraping
-					end
-					exit
-					;;
-			esac;;
+#		-)  case "${OPTARG}" in
+#				sp)	if [ -n "$list" ]
+#					then
+#						for domain in $(cat $list); do
+#							start
+#							sub_passive
+#							sub_crt
+#							sub_dns
+#							webprobe_simple
+#							end
+#						done
+#					else
+#						start
+#						sub_passive
+#						sub_crt
+#						sub_dns
+#						webprobe_simple
+#						end
+#					fi
+#					exit
+#					;;
+#				sb)	if [ -n "$list" ]
+#					then
+#						for domain in $(cat $list); do
+#							start
+#							sub_brute
+#							sub_dns
+#							webprobe_simple
+#							end
+#						done
+#					else
+#						start
+#						sub_brute
+#						sub_dns
+#						webprobe_simple
+#						end
+#					fi
+#					exit
+#					;;
+#				sr) start
+#					cp $list $dir/${domain}_subdomains.txt
+#					sub_permut
+#					end
+#					exit
+#					;;
+#				ss)	start
+#					cp $list $dir/${domain}_subdomains.txt
+#					sub_scraping
+#					end
+#					exit
+#					;;
+#			esac;;
 		o ) dir_output=$OPTARG
 			output
 			;;
-		\? | h | : | * )
+		\? | h | : | - | * )
 			help
 			;;
 	esac
