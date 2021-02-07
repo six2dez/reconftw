@@ -492,7 +492,7 @@ portscan(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Port Scan ${reset}\n\n"
 			start=`date +%s`
-			naabu -top-ports 1000 -silent -exclude-cdn -nmap-cli 'nmap -sV --min-rate 40000 -T4 --open --max-retries 2 -oG -' -iL ${domain}_subdomains.txt > ${domain}_portscan.txt;
+			naabu -top-ports 1000 -silent -exclude-cdn -nmap-cli 'nmap -sV --min-rate 40000 -T4 --open --max-retries 2 -oN -' -iL ${domain}_subdomains.txt > ${domain}_portscan.txt;
 			eval cat ${domain}_portscan.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
