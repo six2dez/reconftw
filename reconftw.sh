@@ -226,11 +226,11 @@ subdomains_full(){
 			NUMOFLINES_probed=$(wc -l < ${domain}_probed.txt)
 	fi
 	printf "${bblue}\n Final results: ${reset}\n"
-	printf "${bred}\n - ${NUMOFLINES_subs} alive subdomains${reset}\n\n"
+	printf "${bred}\n - ${NUMOFLINES_subs} alive subdomains${reset}\n\n" | notify -silent
 	eval cat ${domain}_subdomains.txt $DEBUG_ERROR | sort
-	printf "${bred}\n - ${NUMOFLINES_probed} web probed${reset}\n\n"
+	printf "${bred}\n - ${NUMOFLINES_probed} web probed${reset}\n\n" | notify -silent
 	eval cat ${domain}_probed.txt $DEBUG_ERROR | sort
-	printf "${bblue}\n Subdomain Enumeration Finished\n"
+	printf "${bblue}\n Subdomain Enumeration Finished\n" | notify -silent
 	printf "${bblue} Results are saved in ${domain}_subdomains.txt and ${domain}_probed.txt${reset}\n"
 	printf "${bgreen}#######################################################################\n\n"
 }
@@ -429,7 +429,7 @@ subtakeover(){
 			else
 				NUMOFLINES=0
 			fi
-			printf "${bred}\n Subtko: ${NUMOFLINES} subdomains in ${runtime}${reset}\n\n"
+			printf "${bred}\n Subtko: ${NUMOFLINES} subdomains in ${runtime}${reset}\n\n" | notify -silent
 			eval cat ${domain}_takeover.txt $DEBUG_ERROR
 			printf "${bblue}\n Subdomain Takeover Finished\n"
 			printf "${bblue} Results are saved in ${domain}_takeover.txt${reset}\n"
@@ -526,7 +526,7 @@ nuclei_check(){
 			printf "\n\n"
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${bblue}\n Port Scan Finished in ${runtime}\n"
+			printf "${bblue}\n Nuclei Scan Finished in ${runtime}\n" | notify -silent
 			printf "${bblue} Results are saved in ${domain}_nuclei_*.txt files${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -562,8 +562,8 @@ urlchecks(){
 			end=`date +%s`
 			getElapsedTime $start $end
 			NUMOFLINES=$(wc -l < ${domain}_url_extract.txt)
-			printf "${bblue}\n URL Extraction Finished\n"
-			printf "${bblue}\n ${NUMOFLINES} in ${runtime}\n"
+			printf "${bblue}\n URL Extraction Finished\n" | notify -silent
+			printf "${bblue}\n ${NUMOFLINES} in ${runtime}\n" | notify -silent
 			printf "${bblue} Results are saved in ${domain}_url_extract.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -995,7 +995,7 @@ end(){
 	global_end=`date +%s`
 	getElapsedTime $global_start $global_end
 	printf "${bgreen}#######################################################################\n"
-	printf "${bred} Finished Recon on: ${domain} under ${finaldir} in: ${runtime} ${reset}\n"
+	printf "${bred} Finished Recon on: ${domain} under ${finaldir} in: ${runtime} ${reset}\n" | notify -silent
 	printf "${bgreen}#######################################################################\n"
 }
 
