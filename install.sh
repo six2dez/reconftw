@@ -152,7 +152,6 @@ printf "${bgreen} 50%% done${reset}\n\n"
 eval git clone https://github.com/devanshbatham/ParamSpider $dir/ParamSpider $DEBUG_STD
 eval git clone https://github.com/dark-warlord14/LinkFinder $dir/LinkFinder $DEBUG_STD
 eval git clone https://github.com/six2dez/degoogle_hunter $dir/degoogle_hunter $DEBUG_STD
-eval git clone https://github.com/s0md3v/Arjun $dir/Arjun $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/projectdiscovery/shuffledns/cmd/shuffledns $DEBUG_STD
 eval go get -u github.com/jaeles-project/gospider $DEBUG_STD
 eval go get -v github.com/cgboal/sonarsearch/crobat $DEBUG_STD
@@ -202,6 +201,7 @@ eval wget -O resolvers.txt https://raw.githubusercontent.com/BBerastegui/fresh-d
 eval wget -O permutations_list.txt https://gist.githubusercontent.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw/137bb6b60c616552c705e93a345c06cec3a2cb1f/permutations_list.txt $DEBUG_STD
 eval wget -O ssrf.py https://gist.githubusercontent.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw/ea0774de5e27f9bc855207b175249edae2e9ccef/asyncio_ssrf.py $DEBUG_STD
 eval wget -O fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD
+eval wget -nc -O ~/.config/notify/notify.conf https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw/a66c4d8cf47a3bc95f5e9ba84773428662ea760c/notify_sample.conf
 
 sed -i 's/^miscellaneous/#miscellaneous/' ~/nuclei-templates/.nuclei-ignore
 
