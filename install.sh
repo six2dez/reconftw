@@ -152,7 +152,6 @@ printf "${bgreen} 50%% done${reset}\n\n"
 eval git clone https://github.com/devanshbatham/ParamSpider $dir/ParamSpider $DEBUG_STD
 eval git clone https://github.com/dark-warlord14/LinkFinder $dir/LinkFinder $DEBUG_STD
 eval git clone https://github.com/six2dez/degoogle_hunter $dir/degoogle_hunter $DEBUG_STD
-eval git clone https://github.com/s0md3v/Arjun $dir/Arjun $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/projectdiscovery/shuffledns/cmd/shuffledns $DEBUG_STD
 eval go get -u github.com/jaeles-project/gospider $DEBUG_STD
 eval go get -v github.com/cgboal/sonarsearch/crobat $DEBUG_STD

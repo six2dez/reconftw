@@ -79,54 +79,54 @@ function tools_installed(){
 
 	allinstalled=true
 
-	[ -n "$GOPATH" ] || { printf "${bred} [*] GOPATH var		[NO]\n"; allinstalled=false;}
-	[ -n "$GOROOT" ] || { printf "${bred} [*] GOROOT var		[NO]\n"; allinstalled=false;}
-	[ -n "$PATH" ] || { printf "${bred} [*] PATH var		[NO]\n"; allinstalled=false;}
-	[ -f $tools/degoogle_hunter/degoogle.py ] || { printf "${bred} [*] degoogle		[NO]\n"; allinstalled=false;}
-	[ -f $tools/ParamSpider/paramspider.py ] || { printf "${bred} [*] Paramspider	[NO]\n"; allinstalled=false;}
-	[ -f $tools/Arjun/arjun.py ] || { printf "${bred} [*] Arjun		[NO]\n"; allinstalled=false;}
-	[ -f $tools/fav-up/favUp.py ] || { printf "${bred} [*] fav-up		[NO]\n"; allinstalled=false;}
-	[ -f $tools/Corsy/corsy.py ] || { printf "${bred} [*] Corsy		[NO]\n"; allinstalled=false;}
-	[ -f $tools/testssl.sh/testssl.sh ] || { printf "${bred} [*] testssl		[NO]\n"; allinstalled=false;}
-	[ -f $tools/JSFinder/JSFinder.py ] || { printf "${bred} [*] JSFinder		[NO]\n"; allinstalled=false;}
-	[ -f $tools/CMSeeK/cmseek.py ] || { printf "${bred} [*] CMSeeK		[NO]\n"; allinstalled=false;}
-	[ -f $tools/fuzz_wordlist.txt ] || { printf "${bred} [*] OneListForAll	[NO]\n"; allinstalled=false;}
-	[ -f $tools/LinkFinder/linkfinder.py ] || { printf "${bred} [*] LinkFinder	        [NO]\n"; allinstalled=false;}
-	[ -f $tools/GitDorker/GitDorker.py ] || { printf "${bred} [*] GitDorker	        [NO]\n"; allinstalled=false;}
-	[ -f $tools/webscreenshot/webscreenshot.py ] || { printf "${bred} [*] webscreenshot	[NO]\n"; allinstalled=false;}
-	[ -f $tools/degoogle_hunter/degoogle_hunter.sh ] || { printf "${bred} [*] degoogle_hunter	[NO]\n"; allinstalled=false;}
-	[ -f $tools/getjswords.py ] || { printf "${bred} [*] getjswords   	[NO]\n"; allinstalled=false;}
-	[ -f $tools/subdomains.txt ] || { printf "${bred} [*] subdomains   	[NO]\n"; allinstalled=false;}
-	[ -f $tools/resolvers.txt ] || { printf "${bred} [*] resolvers   	[NO]\n"; allinstalled=false;}
-	eval type -P github-endpoints $DEBUG_STD || { printf "${bred} [*] github-endpoints		[NO]\n"; allinstalled=false;}
-	eval type -P gospider $DEBUG_STD || { printf "${bred} [*] gospider		[NO]\n"; allinstalled=false;}
-	eval type -P subfinder $DEBUG_STD || { printf "${bred} [*] Subfinder		[NO]\n"; allinstalled=false;}
-	eval type -P assetfinder $DEBUG_STD || { printf "${bred} [*] Assetfinder		[NO]\n"; allinstalled=false;}
-	eval type -P findomain $DEBUG_STD || { printf "${bred} [*] Findomain		[NO]\n"; allinstalled=false;}
-	eval type -P amass $DEBUG_STD || { printf "${bred} [*] Amass		[NO]\n"; allinstalled=false;}
-	eval type -P crobat $DEBUG_STD || { printf "${bred} [*] Crobat		[NO]\n"; allinstalled=false;}
-	eval type -P waybackurls $DEBUG_STD || { printf "${bred} [*] Waybackurls		[NO]\n"; allinstalled=false;}
-	eval type -P gau $DEBUG_STD || { printf "${bred} [*] Gau		[NO]\n"; allinstalled=false;}
-	eval type -P shuffledns $DEBUG_STD || { printf "${bred} [*] ShuffleDns		[NO]\n"; allinstalled=false;}
-	eval type -P subjack $DEBUG_STD || { printf "${bred} [*] Subjack		[NO]\n"; allinstalled=false;}
-	[ -f $tools/subjack/fingerprints.json ] || { printf "${bred} [*] Subjack fingers 	[NO]\n"; allinstalled=false;}
-	eval type -P nuclei $DEBUG_STD || { printf "${bred} [*] Nuclei		[NO]\n"; allinstalled=false;}
-	[ -d ~/nuclei-templates ] || { printf "${bred} [*] Nuclei templates    [NO]\n"; allinstalled=false;}
-	eval type -P naabu $DEBUG_STD || { printf "${bred} [*] Naabu		[NO]\n"; allinstalled=false;}
-	eval type -P gf $DEBUG_STD || { printf "${bred} [*] Gf		[NO]\n"; allinstalled=false;}
-	eval type -P Gxss $DEBUG_STD || { printf "${bred} [*] Gxss		[NO]\n"; allinstalled=false;}
-	eval type -P subjs $DEBUG_STD || { printf "${bred} [*] subjs		[NO]\n"; allinstalled=false;}
-	eval type -P ffuf $DEBUG_STD || { printf "${bred} [*] ffuf		[NO]\n"; allinstalled=false;}
-	eval type -P massdns $DEBUG_STD || { printf "${bred} [*] Massdns		[NO]\n"; allinstalled=false;}
-	eval type -P qsreplace $DEBUG_STD || { printf "${bred} [*] qsreplace		[NO]\n"; allinstalled=false;}
-	eval type -P interlace $DEBUG_STD || { printf "${bred} [*] interlace		[NO]\n"; allinstalled=false;}
-	eval type -P dnsgen $DEBUG_STD || { printf "${bred} [*] DnsGen		[NO]\n"; allinstalled=false;}
-	eval type -P anew $DEBUG_STD || { printf "${bred} [*] Anew		[NO]\n"; allinstalled=false;}
-	eval type -P unfurl $DEBUG_STD || { printf "${bred} [*] unfurl		[NO]\n"; allinstalled=false;}
-	eval type -P crlfuzz $DEBUG_STD || { printf "${bred} [*] crlfuzz		[NO]\n"; allinstalled=false;}
-	eval type -P httpx $DEBUG_STD || { printf "${bred} [*] Httpx		[NO]\n${reset}"; allinstalled=false;}
-	eval type -P jq $DEBUG_STD || { printf "${bred} [*] jq			[NO]\n${reset}"; allinstalled=false;}
-	eval type -P notify $DEBUG_STD || { printf "${bred} [*] notify		[NO]\n${reset}"; allinstalled=false;}
+	[ -n "$GOPATH" ] || { printf "${bred} [*] GOPATH var		[NO]${reset}\n"; allinstalled=false;}
+	[ -n "$GOROOT" ] || { printf "${bred} [*] GOROOT var		[NO]${reset}\n"; allinstalled=false;}
+	[ -n "$PATH" ] || { printf "${bred} [*] PATH var		[NO]${reset}\n"; allinstalled=false;}
+	[ -f $tools/degoogle_hunter/degoogle.py ] || { printf "${bred} [*] degoogle		[NO]${reset}\n"; allinstalled=false;}
+	[ -f $tools/ParamSpider/paramspider.py ] || { printf "${bred} [*] Paramspider	[NO]${reset}\n"; allinstalled=false;}
+	[ -f $tools/fav-up/favUp.py ] || { printf "${bred} [*] fav-up		[NO]${reset}\n"; allinstalled=false;}
+	[ -f $tools/Corsy/corsy.py ] || { printf "${bred} [*] Corsy		[NO]${reset}\n"; allinstalled=false;}
+	[ -f $tools/testssl.sh/testssl.sh ] || { printf "${bred} [*] testssl		[NO]${reset}\n"; allinstalled=false;}
+	[ -f $tools/JSFinder/JSFinder.py ] || { printf "${bred} [*] JSFinder		[NO]${reset}\n"; allinstalled=false;}
+	[ -f $tools/CMSeeK/cmseek.py ] || { printf "${bred} [*] CMSeeK		[NO]${reset}\n"; allinstalled=false;}
+	[ -f $tools/fuzz_wordlist.txt ] || { printf "${bred} [*] OneListForAll	[NO]${reset}\n"; allinstalled=false;}
+	[ -f $tools/LinkFinder/linkfinder.py ] || { printf "${bred} [*] LinkFinder	        [NO]${reset}\n"; allinstalled=false;}
+	[ -f $tools/GitDorker/GitDorker.py ] || { printf "${bred} [*] GitDorker	        [NO]${reset}\n"; allinstalled=false;}
+	[ -f $tools/webscreenshot/webscreenshot.py ] || { printf "${bred} [*] webscreenshot	[NO]${reset}\n"; allinstalled=false;}
+	[ -f $tools/degoogle_hunter/degoogle_hunter.sh ] || { printf "${bred} [*] degoogle_hunter	[NO]${reset}\n"; allinstalled=false;}
+	[ -f $tools/getjswords.py ] || { printf "${bred} [*] getjswords   	[NO]${reset}\n"; allinstalled=false;}
+	[ -f $tools/subdomains.txt ] || { printf "${bred} [*] subdomains   	[NO]${reset}\n"; allinstalled=false;}
+	[ -f $tools/resolvers.txt ] || { printf "${bred} [*] resolvers   	[NO]${reset}\n"; allinstalled=false;}
+	eval type -P github-endpoints $DEBUG_STD || { printf "${bred} [*] github-endpoints		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P arjun $DEBUG_STD || { printf "${bred} [*] arjun		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P gospider $DEBUG_STD || { printf "${bred} [*] gospider		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P subfinder $DEBUG_STD || { printf "${bred} [*] Subfinder		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P assetfinder $DEBUG_STD || { printf "${bred} [*] Assetfinder		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P findomain $DEBUG_STD || { printf "${bred} [*] Findomain		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P amass $DEBUG_STD || { printf "${bred} [*] Amass		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P crobat $DEBUG_STD || { printf "${bred} [*] Crobat		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P waybackurls $DEBUG_STD || { printf "${bred} [*] Waybackurls		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P gau $DEBUG_STD || { printf "${bred} [*] Gau		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P shuffledns $DEBUG_STD || { printf "${bred} [*] ShuffleDns		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P subjack $DEBUG_STD || { printf "${bred} [*] Subjack		[NO]${reset}\n"; allinstalled=false;}
+	[ -f $tools/subjack/fingerprints.json ] || { printf "${bred} [*] Subjack fingers 	[NO]${reset}\n"; allinstalled=false;}
+	eval type -P nuclei $DEBUG_STD || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; allinstalled=false;}
+	[ -d ~/nuclei-templates ] || { printf "${bred} [*] Nuclei templates    [NO]${reset}\n"; allinstalled=false;}
+	eval type -P naabu $DEBUG_STD || { printf "${bred} [*] Naabu		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P gf $DEBUG_STD || { printf "${bred} [*] Gf		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P Gxss $DEBUG_STD || { printf "${bred} [*] Gxss		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P subjs $DEBUG_STD || { printf "${bred} [*] subjs		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P ffuf $DEBUG_STD || { printf "${bred} [*] ffuf		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P massdns $DEBUG_STD || { printf "${bred} [*] Massdns		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P qsreplace $DEBUG_STD || { printf "${bred} [*] qsreplace		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P interlace $DEBUG_STD || { printf "${bred} [*] interlace		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P dnsgen $DEBUG_STD || { printf "${bred} [*] DnsGen		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P anew $DEBUG_STD || { printf "${bred} [*] Anew		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P unfurl $DEBUG_STD || { printf "${bred} [*] unfurl		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P crlfuzz $DEBUG_STD || { printf "${bred} [*] crlfuzz		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P httpx $DEBUG_STD || { printf "${bred} [*] Httpx		[NO]${reset}\n${reset}"; allinstalled=false;}
+	eval type -P jq $DEBUG_STD || { printf "${bred} [*] jq			[NO]${reset}\n${reset}"; allinstalled=false;}
+	eval type -P notify $DEBUG_STD || { printf "${bred} [*] notify		[NO]${reset}\n${reset}"; allinstalled=false;}
 
 	if [ "${allinstalled}" = true ] ; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
@@ -145,54 +145,54 @@ function tools_full(){
 
 	printf "\n\n${bgreen}#######################################################################\n"
 	printf "${bblue} Checking installed tools ${reset}\n\n"
-	[ -n "$GOPATH" ] && printf "${bgreen}[*] GOPATH var		[YES]\n" || { printf "${bred} [*] GOPATH var		[NO]\n"; }
-	[ -n "$GOROOT" ] && printf "${bgreen}[*] GOROOT var		[YES]\n" || { printf "${bred} [*] GOROOT var		[NO]\n"; }
-	[ -n "$PATH" ] && printf "${bgreen}[*] PATH var		[YES]\n" || { printf "${bred} [*] PATH var		[NO]\n"; }
-	[ -f $tools/degoogle_hunter/degoogle.py ] && printf "${bgreen}[*] degoogle		[YES]\n" || printf "${bred} [*] degoogle		[NO]\n"
-	[ -f $tools/ParamSpider/paramspider.py ] && printf "${bgreen}[*] Paramspider		[YES]\n" || printf "${bred} [*] Paramspider	[NO]\n"
-	[ -f $tools/Arjun/arjun.py ] && printf "${bgreen}[*] Arjun		[YES]\n" || printf "${bred} [*] Arjun		[NO]\n"
-	[ -f $tools/fav-up/favUp.py ] && printf "${bgreen}[*] fav-up		[YES]\n" || printf "${bred} [*] fav-up		[NO]\n"
-	[ -f $tools/Corsy/corsy.py ] && printf "${bgreen}[*] Corsy		[YES]\n" || printf "${bred} [*] Corsy		[NO]\n"
-	[ -f $tools/testssl.sh/testssl.sh ] && printf "${bgreen}[*] testssl		[YES]\n" || printf "${bred} [*] testssl		[NO]\n"
-	[ -f $tools/JSFinder/JSFinder.py ] && printf "${bgreen}[*] JSFinder		[YES]\n" || printf "${bred} [*] JSFinder		[NO]\n"
-	[ -f $tools/CMSeeK/cmseek.py ] && printf "${bgreen}[*] CMSeeK		[YES]\n" || printf "${bred} [*] CMSeeK		[NO]\n"
-	[ -f $tools/fuzz_wordlist.txt ] && printf "${bgreen}[*] OneListForAll	[YES]\n" || printf "${bred} [*] OneListForAll	[NO]\n"
-	[ -f $tools/LinkFinder/linkfinder.py ] && printf "${bgreen}[*] LinkFinder	        [YES]\n" || printf "${bred} [*] LinkFinder	        [NO]\n"
-	[ -f $tools/degoogle_hunter/degoogle_hunter.sh ] && printf "${bgreen}[*] degoogle_hunter	[YES]\n" || printf "${bred} [*] degoogle_hunter	[NO]\n"
-	[ -f $tools/GitDorker/GitDorker.py ] && printf "${bgreen}[*] GitDorker		[YES]\n" || printf "${bred} [*] GitDorker		[NO]\n"
-	[ -f $tools/webscreenshot/webscreenshot.py ] && printf "${bgreen}[*] webscreenshot	[YES]\n" || printf "${bred} [*] webscreenshot	[NO]\n"
-	[ -f $tools/getjswords.py ] && printf "${bgreen}[*] getjswords.py	[YES]\n" || printf "${bred} [*] getjswords.py	[NO]\n"
-	[ -f $tools/subdomains.txt ] && printf "${bgreen}[*] subdomains.txt	[YES]\n" || printf "${bred} [*] subdomains.txt	[NO]\n"
-	[ -f $tools/resolvers.txt ] && printf "${bgreen}[*] resolvers.txt	[YES]\n" || printf "${bred} [*] resolvers.txt	[NO]\n"
-	eval type -P github-endpoints $DEBUG_STD && printf "${bgreen}[*] github-endpoints	[YES]\n" || { printf "${bred} [*] github-endpoints	[NO]\n"; }
-	eval type -P gospider $DEBUG_STD && printf "${bgreen}[*] gospider		[YES]\n" || { printf "${bred} [*] gospider		[NO]\n"; }
-	eval type -P subfinder $DEBUG_STD && printf "${bgreen}[*] Subfinder		[YES]\n" || { printf "${bred} [*] Subfinder		[NO]\n"; }
-	eval type -P assetfinder $DEBUG_STD && printf "${bgreen}[*] Assetfinder		[YES]\n" || { printf "${bred} [*] Assetfinder	[NO]\n"; }
-	eval type -P findomain $DEBUG_STD && printf "${bgreen}[*] Findomain		[YES]\n" || { printf "${bred} [*] Findomain		[NO]\n"; }
-	eval type -P amass $DEBUG_STD && printf "${bgreen}[*] Amass		[YES]\n" || { printf "${bred} [*] Amass		[NO]\n"; }
-	eval type -P crobat $DEBUG_STD && printf "${bgreen}[*] Crobat		[YES]\n" || { printf "${bred} [*] Crobat		[NO]\n"; }
-	eval type -P waybackurls $DEBUG_STD && printf "${bgreen}[*] Waybackurls		[YES]\n" || { printf "${bred} [*] Waybackurls	[NO]\n"; }
-	eval type -P gau $DEBUG_STD && printf "${bgreen}[*] Gau		        [YES]\n" || { printf "${bred} [*] Gau		[NO]\n"; }
-	eval type -P shuffledns $DEBUG_STD && printf "${bgreen}[*] ShuffleDns		[YES]\n" || { printf "${bred} [*] ShuffleDns		[NO]\n"; }
-	eval type -P subjack $DEBUG_STD && printf "${bgreen}[*] Subjack		[YES]\n" || { printf "${bred} [*] Subjack		[NO]\n"; }
-	[ -f $tools/subjack/fingerprints.json ] && printf "${bgreen}[*] Subjack fings	[YES]\n" || printf "${bred} [*] Subjack fings	[NO]\n"
-	eval type -P nuclei $DEBUG_STD && printf "${bgreen}[*] Nuclei		[YES]\n" || { printf "${bred} [*] Nuclei		[NO]\n"; }
-	[ -d ~/nuclei-templates ] && printf "${bgreen}[*] Nuclei templates  	[YES]\n" || printf "${bred} [*] Nuclei templates  	[NO]\n"
-	eval type -P naabu $DEBUG_STD && printf "${bgreen}[*] Naabu		[YES]\n" || { printf "${bred} [*] Naabu		[NO]\n"; }
-	eval type -P gf $DEBUG_STD && printf "${bgreen}[*] Gf		        [YES]\n" || { printf "${bred} [*] Gf			[NO]\n"; }
-	eval type -P Gxss $DEBUG_STD && printf "${bgreen}[*] Gxss		[YES]\n" || { printf "${bred} [*] Gxss		[NO]\n"; }
-	eval type -P subjs $DEBUG_STD && printf "${bgreen}[*] subjs		[YES]\n" || { printf "${bred} [*] subjs		[NO]\n"; }
-	eval type -P ffuf $DEBUG_STD && printf "${bgreen}[*] ffuf		[YES]\n" || { printf "${bred} [*] ffuf		[NO]\n"; }
-	eval type -P massdns $DEBUG_STD && printf "${bgreen}[*] Massdns		[YES]\n" || { printf "${bred} [*] Massdns		[NO]\n"; }
-	eval type -P qsreplace $DEBUG_STD && printf "${bgreen}[*] qsreplace		[YES]\n" || { printf "${bred} [*] qsreplace		[NO]\n"; }
-	eval type -P interlace $DEBUG_STD && printf "${bgreen}[*] interlace		[YES]\n" || { printf "${bred} [*] interlace		[NO]\n"; }
-	eval type -P dnsgen $DEBUG_STD && printf "${bgreen}[*] DnsGen		[YES]\n" || { printf "${bred} [*] DnsGen		[NO]\n"; }
-	eval type -P anew $DEBUG_STD && printf "${bgreen}[*] Anew		[YES]\n" || { printf "${bred} [*] Anew		[NO]\n"; }
-	eval type -P unfurl $DEBUG_STD && printf "${bgreen}[*] unfurl		[YES]\n" || { printf "${bred} [*] unfurl		[NO]\n"; }
-	eval type -P crlfuzz $DEBUG_STD && printf "${bgreen}[*] crlfuzz		[YES]\n" || { printf "${bred} [*] crlfuzz		[NO]\n"; }
-	eval type -P httpx $DEBUG_STD && printf "${bgreen}[*] Httpx		[YES]\n${reset}" || { printf "${bred} [*] Httpx		[NO]\n${reset}"; }
-	eval type -P jq $DEBUG_STD && printf "${bgreen}[*] jq			[YES]\n${reset}" || { printf "${bred} [*] jq			[NO]\n${reset}"; }
-	eval type -P notify $DEBUG_STD && printf "${bgreen}[*] notify		[YES]\n${reset}" || { printf "${bred} [*] notify		[NO]\n${reset}"; }
+	[ -n "$GOPATH" ] && printf "${bgreen}[*] GOPATH var		[YES]${reset}\n" || { printf "${bred} [*] GOPATH var		[NO]${reset}\n"; }
+	[ -n "$GOROOT" ] && printf "${bgreen}[*] GOROOT var		[YES]${reset}\n" || { printf "${bred} [*] GOROOT var		[NO]${reset}\n"; }
+	[ -n "$PATH" ] && printf "${bgreen}[*] PATH var		[YES]${reset}\n" || { printf "${bred} [*] PATH var		[NO]${reset}\n"; }
+	[ -f $tools/degoogle_hunter/degoogle.py ] && printf "${bgreen}[*] degoogle		[YES]${reset}\n" || printf "${bred} [*] degoogle		[NO]${reset}\n"
+	[ -f $tools/ParamSpider/paramspider.py ] && printf "${bgreen}[*] Paramspider		[YES]${reset}\n" || printf "${bred} [*] Paramspider	[NO]${reset}\n"
+	[ -f $tools/fav-up/favUp.py ] && printf "${bgreen}[*] fav-up		[YES]${reset}\n" || printf "${bred} [*] fav-up		[NO]${reset}\n"
+	[ -f $tools/Corsy/corsy.py ] && printf "${bgreen}[*] Corsy		[YES]${reset}\n" || printf "${bred} [*] Corsy		[NO]${reset}\n"
+	[ -f $tools/testssl.sh/testssl.sh ] && printf "${bgreen}[*] testssl		[YES]${reset}\n" || printf "${bred} [*] testssl		[NO]${reset}\n"
+	[ -f $tools/JSFinder/JSFinder.py ] && printf "${bgreen}[*] JSFinder		[YES]${reset}\n" || printf "${bred} [*] JSFinder		[NO]${reset}\n"
+	[ -f $tools/CMSeeK/cmseek.py ] && printf "${bgreen}[*] CMSeeK		[YES]${reset}\n" || printf "${bred} [*] CMSeeK		[NO]${reset}\n"
+	[ -f $tools/fuzz_wordlist.txt ] && printf "${bgreen}[*] OneListForAll	[YES]${reset}\n" || printf "${bred} [*] OneListForAll	[NO]${reset}\n"
+	[ -f $tools/LinkFinder/linkfinder.py ] && printf "${bgreen}[*] LinkFinder	        [YES]${reset}\n" || printf "${bred} [*] LinkFinder	        [NO]${reset}\n"
+	[ -f $tools/degoogle_hunter/degoogle_hunter.sh ] && printf "${bgreen}[*] degoogle_hunter	[YES]${reset}\n" || printf "${bred} [*] degoogle_hunter	[NO]${reset}\n"
+	[ -f $tools/GitDorker/GitDorker.py ] && printf "${bgreen}[*] GitDorker		[YES]${reset}\n" || printf "${bred} [*] GitDorker		[NO]${reset}\n"
+	[ -f $tools/webscreenshot/webscreenshot.py ] && printf "${bgreen}[*] webscreenshot	[YES]${reset}\n" || printf "${bred} [*] webscreenshot	[NO]${reset}\n"
+	[ -f $tools/getjswords.py ] && printf "${bgreen}[*] getjswords.py	[YES]${reset}\n" || printf "${bred} [*] getjswords.py	[NO]${reset}\n"
+	[ -f $tools/subdomains.txt ] && printf "${bgreen}[*] subdomains.txt	[YES]${reset}\n" || printf "${bred} [*] subdomains.txt	[NO]${reset}\n"
+	[ -f $tools/resolvers.txt ] && printf "${bgreen}[*] resolvers.txt	[YES]${reset}\n" || printf "${bred} [*] resolvers.txt	[NO]${reset}\n"
+	eval type -P github-endpoints $DEBUG_STD && printf "${bgreen}[*] github-endpoints	[YES]${reset}\n" || { printf "${bred} [*] github-endpoints	[NO]${reset}\n"; }
+	eval type -P arjun $DEBUG_STD && printf "${bgreen}[*] arjun		[YES]${reset}\n" || { printf "${bred} [*] arjun		[NO]${reset}\n"; }
+	eval type -P gospider $DEBUG_STD && printf "${bgreen}[*] gospider		[YES]${reset}\n" || { printf "${bred} [*] gospider		[NO]${reset}\n"; }
+	eval type -P subfinder $DEBUG_STD && printf "${bgreen}[*] Subfinder		[YES]${reset}\n" || { printf "${bred} [*] Subfinder		[NO]${reset}\n"; }
+	eval type -P assetfinder $DEBUG_STD && printf "${bgreen}[*] Assetfinder		[YES]${reset}\n" || { printf "${bred} [*] Assetfinder	[NO]${reset}\n"; }
+	eval type -P findomain $DEBUG_STD && printf "${bgreen}[*] Findomain		[YES]${reset}\n" || { printf "${bred} [*] Findomain		[NO]${reset}\n"; }
+	eval type -P amass $DEBUG_STD && printf "${bgreen}[*] Amass		[YES]${reset}\n" || { printf "${bred} [*] Amass		[NO]${reset}\n"; }
+	eval type -P crobat $DEBUG_STD && printf "${bgreen}[*] Crobat		[YES]${reset}\n" || { printf "${bred} [*] Crobat		[NO]${reset}\n"; }
+	eval type -P waybackurls $DEBUG_STD && printf "${bgreen}[*] Waybackurls		[YES]${reset}\n" || { printf "${bred} [*] Waybackurls	[NO]${reset}\n"; }
+	eval type -P gau $DEBUG_STD && printf "${bgreen}[*] Gau		        [YES]${reset}\n" || { printf "${bred} [*] Gau		[NO]${reset}\n"; }
+	eval type -P shuffledns $DEBUG_STD && printf "${bgreen}[*] ShuffleDns		[YES]${reset}\n" || { printf "${bred} [*] ShuffleDns		[NO]${reset}\n"; }
+	eval type -P subjack $DEBUG_STD && printf "${bgreen}[*] Subjack		[YES]${reset}\n" || { printf "${bred} [*] Subjack		[NO]${reset}\n"; }
+	[ -f $tools/subjack/fingerprints.json ] && printf "${bgreen}[*] Subjack fings	[YES]${reset}\n" || printf "${bred} [*] Subjack fings	[NO]${reset}\n"
+	eval type -P nuclei $DEBUG_STD && printf "${bgreen}[*] Nuclei		[YES]${reset}\n" || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; }
+	[ -d ~/nuclei-templates ] && printf "${bgreen}[*] Nuclei templates  	[YES]${reset}\n" || printf "${bred} [*] Nuclei templates  	[NO]${reset}\n"
+	eval type -P naabu $DEBUG_STD && printf "${bgreen}[*] Naabu		[YES]${reset}\n" || { printf "${bred} [*] Naabu		[NO]${reset}\n"; }
+	eval type -P gf $DEBUG_STD && printf "${bgreen}[*] Gf		        [YES]${reset}\n" || { printf "${bred} [*] Gf			[NO]${reset}\n"; }
+	eval type -P Gxss $DEBUG_STD && printf "${bgreen}[*] Gxss		[YES]${reset}\n" || { printf "${bred} [*] Gxss		[NO]${reset}\n"; }
+	eval type -P subjs $DEBUG_STD && printf "${bgreen}[*] subjs		[YES]${reset}\n" || { printf "${bred} [*] subjs		[NO]${reset}\n"; }
+	eval type -P ffuf $DEBUG_STD && printf "${bgreen}[*] ffuf		[YES]${reset}\n" || { printf "${bred} [*] ffuf		[NO]${reset}\n"; }
+	eval type -P massdns $DEBUG_STD && printf "${bgreen}[*] Massdns		[YES]${reset}\n" || { printf "${bred} [*] Massdns		[NO]${reset}\n"; }
+	eval type -P qsreplace $DEBUG_STD && printf "${bgreen}[*] qsreplace		[YES]${reset}\n" || { printf "${bred} [*] qsreplace		[NO]${reset}\n"; }
+	eval type -P interlace $DEBUG_STD && printf "${bgreen}[*] interlace		[YES]${reset}\n" || { printf "${bred} [*] interlace		[NO]${reset}\n"; }
+	eval type -P dnsgen $DEBUG_STD && printf "${bgreen}[*] DnsGen		[YES]${reset}\n" || { printf "${bred} [*] DnsGen		[NO]${reset}\n"; }
+	eval type -P anew $DEBUG_STD && printf "${bgreen}[*] Anew		[YES]${reset}\n" || { printf "${bred} [*] Anew		[NO]${reset}\n"; }
+	eval type -P unfurl $DEBUG_STD && printf "${bgreen}[*] unfurl		[YES]${reset}\n" || { printf "${bred} [*] unfurl		[NO]${reset}\n"; }
+	eval type -P crlfuzz $DEBUG_STD && printf "${bgreen}[*] crlfuzz		[YES]${reset}\n" || { printf "${bred} [*] crlfuzz		[NO]${reset}\n"; }
+	eval type -P httpx $DEBUG_STD && printf "${bgreen}[*] Httpx		[YES]${reset}\n${reset}" || { printf "${bred} [*] Httpx		[NO]${reset}\n${reset}"; }
+	eval type -P jq $DEBUG_STD && printf "${bgreen}[*] jq			[YES]${reset}\n${reset}" || { printf "${bred} [*] jq			[NO]${reset}\n${reset}"; }
+	eval type -P notify $DEBUG_STD && printf "${bgreen}[*] notify		[YES]${reset}\n${reset}" || { printf "${bred} [*] notify		[NO]${reset}\n${reset}"; }
 
 	printf "\n${yellow} If any tool is not installed under $tools, I trust in your ability to install it :D\n Also remember to set the ${bred}\$tools${yellow} variable at the start of this script.\n If you have any problem you can always ping me ;) ${reset}\n\n"
 	printf "${bblue} Tools check finished\n"
@@ -647,7 +647,7 @@ params(){
 			eval rm -rf output/ $DEBUG_ERROR
 			eval rm ${domain}_probed_nohttp.txt $DEBUG_ERROR
 			printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
-			eval python3 $tools/Arjun/arjun.py -i ${domain}_param.txt -t 20 -o ${domain}_arjun.json $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+			eval arjun -i ${domain}_param.txt -t 20 -o ${domain}_arjun.json $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Parameter Discovery Finished in ${runtime}\n"
