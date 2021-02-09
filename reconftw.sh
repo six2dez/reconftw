@@ -492,7 +492,7 @@ portscan(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Port Scan ${reset}\n\n"
 			start=`date +%s`
-			naabu -top-ports 1000 -silent -exclude-cdn -nmap-cli 'nmap -sV --min-rate 40000 -T4 --open --max-retries 2 -oN -' -iL ${domain}_subdomains.txt > ${domain}_portscan.txt;
+			naabu -top-ports 1000 -silent -exclude-cdn -nmap-cli 'nmap -sV --min-rate 40000 -T4 --open --max-retries 2 -oN nmap_output.txt' -iL ${domain}_subdomains.txt > ${domain}_portscan.txt;
 			eval cat ${domain}_portscan.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
@@ -552,22 +552,23 @@ urlchecks(){
 			cat ${domain}_probed.txt | waybackurls | anew -q ${domain}_url_extract_tmp.txt
 			cat ${domain}_probed.txt | gau | anew -q ${domain}_url_extract_tmp.txt
 			if [ "$DEEP" = true ] ; then
-				gospider -S ${domain}_probed.txt -t 20 -c 10 -d 2 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt | grep -e "code-200" | awk '{print $5}' | anew -q ${domain}_url_extract_tmp.txt
+				gospider -S ${domain}_probed.txt -t 100 -c 10 -d 2 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt > gospider_tmp.txt
 			else
-				gospider -S ${domain}_probed.txt -t 20 -c 10 -d 1 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt | grep -e "code-200" | awk '{print $5}' | anew -q ${domain}_url_extract_tmp.txt
+				gospider -S ${domain}_probed.txt -t 100 -c 10 -d 1 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt > gospider_tmp.txt
 			fi
+			eval cat gospider_tmp.txt $DEBUG_ERROR | grep -e "code-200" | awk '{print $5}' | anew -q ${domain}_url_extract_tmp.txt
 			if [ -s "$tools/.github_tokens" ]
 			then
 				eval github-endpoints -q -k -d $domain -t $tools/.github_tokens -raw $DEBUG_ERROR | anew -q ${domain}_url_extract_tmp.txt
 			fi
 			if [ "$FULLSCOPE" = true ] ; then
-				cat ${domain}_url_extract_tmp.txt | grep "=" | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | qsreplace -a | anew -q cat ${domain}_url_extract.txt && touch $called_fn_dir/.${FUNCNAME[0]};
+				cat ${domain}_url_extract_tmp.txt | grep "=" | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | qsreplace | qsreplace -a | anew -q cat ${domain}_url_extract.txt && touch $called_fn_dir/.${FUNCNAME[0]};
 				cat ${domain}_url_extract_tmp.txt | egrep -iv ".(js)" | anew -q cat ${domain}_url_extract_js.txt
 			else
-				cat ${domain}_url_extract_tmp.txt | grep ".$domain$" | grep "=" | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | qsreplace -a | anew -q cat ${domain}_url_extract.txt && touch $called_fn_dir/.${FUNCNAME[0]};
+				cat ${domain}_url_extract_tmp.txt | grep ".$domain$" | grep "=" | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | qsreplace | qsreplace -a | anew -q cat ${domain}_url_extract.txt && touch $called_fn_dir/.${FUNCNAME[0]};
 				cat ${domain}_url_extract_tmp.txt | grep ".$domain$" | egrep -iv ".(js)" | anew -q cat ${domain}_url_extract_js.txt
 			fi
-			eval rm ${domain}_url_extract_tmp.txt $DEBUG_ERROR
+			eval rm ${domain}_url_extract_tmp.txt gospider_tmp.txt $DEBUG_ERROR
 			end=`date +%s`
 			getElapsedTime $start $end
 			NUMOFLINES=$(wc -l < ${domain}_url_extract.txt)
