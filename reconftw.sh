@@ -552,13 +552,13 @@ urlchecks(){
 			cat ${domain}_probed.txt | waybackurls | anew -q ${domain}_url_extract_tmp.txt
 			cat ${domain}_probed.txt | gau | anew -q ${domain}_url_extract_tmp.txt
 			if [ "$DEEP" = true ] ; then
-				gospider -S ${domain}_probed.txt -t 100 -c 10 -d 2 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt | grep -e "code-200" | awk '{print $5}' | anew -q ${domain}_url_extract_tmp.txt
+				gospider -S ${domain}_probed.txt -t 20 -c 10 -d 2 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt | grep -e "code-200" | awk '{print $5}' | anew -q ${domain}_url_extract_tmp.txt
 			else
-				gospider -S ${domain}_probed.txt -t 100 -c 10 -d 1 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt | grep -e "code-200" | awk '{print $5}' | anew -q ${domain}_url_extract_tmp.txt
+				gospider -S ${domain}_probed.txt -t 20 -c 10 -d 1 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt | grep -e "code-200" | awk '{print $5}' | anew -q ${domain}_url_extract_tmp.txt
 			fi
 			if [ -s "$tools/.github_tokens" ]
 			then
-				eval github-endpoints -d $domain -t $tools/.github_tokens -raw $DEBUG_ERROR | anew -q ${domain}_url_extract_tmp.txt
+				eval github-endpoints -q -k -d $domain -t $tools/.github_tokens -raw $DEBUG_ERROR | anew -q ${domain}_url_extract_tmp.txt
 			fi
 			if [ "$FULLSCOPE" = true ] ; then
 				cat ${domain}_url_extract_tmp.txt | grep "=" | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | qsreplace -a | anew -q cat ${domain}_url_extract.txt && touch $called_fn_dir/.${FUNCNAME[0]};
@@ -641,13 +641,15 @@ params(){
 			start=`date +%s`
 			printf "${yellow}\n\n Running : Finding params with paramspider${reset}\n"
 			cat ${domain}_probed.txt | sed -r "s/https?:\/\///" | anew -q ${domain}_probed_nohttp.txt
-			interlace -tL ${domain}_probed_nohttp.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,js" &>/dev/null
+			interlace -tL ${domain}_probed_nohttp.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,js" &>/dev/null && touch $called_fn_dir/.${FUNCNAME[0]}
 			find output/ -name '*.txt' -exec cat {} \; | anew -q ${domain}_param.txt
 			sed '/^FUZZ/d' -i ${domain}_param.txt
 			eval rm -rf output/ $DEBUG_ERROR
 			eval rm ${domain}_probed_nohttp.txt $DEBUG_ERROR
-			printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
-			eval arjun -i ${domain}_param.txt -t 20 -o ${domain}_arjun.json $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+			if [ "$DEEP" = true ] ; then
+				printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
+				eval arjun -i ${domain}_param.txt -t 20 -o ${domain}_arjun.json $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+			fi
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Parameter Discovery Finished in ${runtime}\n"
@@ -671,7 +673,7 @@ xss(){
 				eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss_reflected.txt -t 30 --crawl --blind --skip > ${domain}_xsstrike_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 			else
-				printf "${bblue}\n No XSS_SERVER defined, blind xss skipped\n"
+				printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n"
 				eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss_reflected.txt -t 30 --crawl --skip > ${domain}_xsstrike_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 			fi
@@ -683,7 +685,7 @@ xss(){
 					eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss_reflected.txt -t 30 --crawl --blind --skip > ${domain}_xsstrike_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 					printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 				else
-					printf "${bblue}\n No XSS_SERVER defined, blind xss skipped\n"
+					printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n"
 					eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss_reflected.txt -t 30 --crawl --skip > ${domain}_xsstrike_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 					printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 				fi
@@ -766,7 +768,7 @@ fuzz(){
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
 				ffuf -mc all -fc 404 -ac -sf -s -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -w $fuzz_wordlist -maxtime 900 -u $sub/FUZZ -or -o $dir/fuzzing/${sub_out}.tmp $DEBUG_STD
 				cat $dir/fuzzing/${sub_out}.tmp | jq '[.results[]|{status: .status, length: .length, url: .url}]' | grep -oP "status\":\s(\d{3})|length\":\s(\d{1,7})|url\":\s\"(http[s]?:\/\/.*?)\"" | paste -d' ' - - - | awk '{print $2" "$4" "$6}' | sed 's/\"//g' | anew -q $dir/fuzzing/${sub_out}.txt
-				eval rm ${sub_out}.tmp $DEBUG_ERROR
+				eval rm $dir/fuzzing/${sub_out}.tmp $DEBUG_ERROR
 			done
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
@@ -834,7 +836,7 @@ test_ssl(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} SSL Test ${reset}\n"
 			start=`date +%s`
-			$tools/testssl.sh/testssl.sh --quiet --color 0 -U -iL ${domain}_subdomains.txt > ${domain}_testssl.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			$tools/testssl.sh/testssl.sh --quiet --color 0 -U -iL ${domain}_probed.txt > ${domain}_testssl.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n SSL Test Finished in ${runtime}\n"
@@ -912,7 +914,7 @@ ssrf_checks(){
 				fi
 			fi
 		else
-			printf "${bblue}\n No COLLAB_SERVER defined\n"
+			printf "${bred}\n No COLLAB_SERVER defined\n"
 		fi
 		printf "${bgreen}#######################################################################\n"
 	else
