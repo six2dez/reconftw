@@ -27,68 +27,98 @@ This is a live development project, until the first stable release (1.0) it will
 
 # Table of Contents
 -   [Summary](#summary)
--   [Installation](#installation)
+-   [Installation Instructions](#installation-instructions)
 -   [Usage](#usage)
--   [Features](w#fire-features-fire)
+-   [Features](#fire-features-fire)
 -   [Mindmap](#mindmapworkflow)
 -   [Improvement plan](#hourglass-improvement-plan-hourglass)
 -   [Thanks](#thanks)
 
 ## Summary
 
-ReconFTW performs automated enumeration of subdomains via various techniques and futher scanning for vulnerabilties, to give you a potential vulns.
+ReconFTW is a tool designed to perform automated recon on a target domain by running the best set of tools to perform scanning and finding out vulnerabilities.
 
-## Installation
+## Installation Instructions:
 
-- [Installation Guide](https://github.com/six2dez/reconftw/wiki)
-- Requires [Golang](https://golang.org/dl/) > 1.14 installed and paths correctly set ($GOPATH,$GOROOT)
+- [Installation Guide](https://github.com/six2dez/reconftw/wiki) :book:
+- Requires [Golang](https://golang.org/dl/) > 1.14 installed and paths correctly set (**$GOPATH**,**$GOROOT**)
 
 ```bash
-git clone https://github.com/six2dez/reconftw
-cd reconftw
-chmod +x *.sh
-./install.sh
-./reconftw.sh -d target.com -a
+▶ git clone https://github.com/six2dez/reconftw
+▶ cd reconftw
+▶ chmod +x *.sh
+▶ ./install.sh
+▶ ./reconftw.sh -d target.com -a
 ```
 
-- It is highly recommended, and in some cases essential, to set your api keys or env variables:
-  - amass config file(```~/.config/amass/config.ini```)
-  - subfinder config file(```~/.config/subfinder/config.yaml```)
-  - GitHub tokens file(```~/Tools/.github_tokens```) Recommended > 5, see how to create [here](https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token)
-  - favup API(```shodan init <SHODANPAIDAPIKEY>```)
-  - SSRF Server var(```COLLAB_SERVER``` env var) 
-  - Blind XSS Server var(```XSS_SERVER``` env var) 
+- It is highly recommended, and in some cases essential, to set your API keys or env variables:
+  - amass config file (```~/.config/amass/config.ini```)
+  - subfinder config file (```~/.config/subfinder/config.yaml```)
+  - GitHub tokens file (```~/Tools/.github_tokens```) Recommended > 5, see how to create [here](https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token)
+  - favup API (```shodan init <SHODAN-API-KEY>```)
+  - SSRF Server var (```COLLAB_SERVER``` env var) 
+  - Blind XSS Server var (```XSS_SERVER``` env var) 
+  - Notify config file (```~/.config/notify/notify.conf```)
 
-## Usage
+## Usage:
 
 <b>TARGET OPTIONS</b>  
 
-| Flag | Description | Example |
-|------|-------------|---------|
-| -d	| Target domain 	|  ./reconftw.sh -d abc.com	|
-| -l  	| Targets list, one per line | ./reconftw.sh -l sites.txt |
-| -x 	| Exclude subdomains list (Out Of Scope) | ./reconftw.sh -x oos.txt |
-
+| Flag | Description |
+|------|-------------|
+| -d	| Target domain *(example.com)* 	|  
+| -l  	| Target list *(one per line)* | 
+| -x 	| Exclude subdomains list *(Out Of Scope)* | 
 
 <b>MODE OPTIONS</b>  
 
-| Flag | Description | Example |
-|------|-------------|---------|
-| -a	| Perform all checks	|./reconftw.sh -d abc.com -a	|
-| -s 	| Full subdomains scan (Subs, tko and probe) | ./reconftw.sh -d abc.com -s |
-| -w| Perform web checks only without subs (-l required) | ./reconftw.sh -d abc.com -w |
-| -i  	| Check all needed tools | ./reconftw.sh -i |
-| -v 	| Debug/verbose mode, no file descriptor redir | ./reconftw.sh -d abc.com -v |
-| -h	| Show this help | ./reconftw.sh -h |
+| Flag | Description | 
+|------|-------------|
+| -a	| Perform full recon |
+| -s 	| Full subdomain scan (Subs, tko and probe) | 
+| -w  | Perform web checks only without subs (-l required) | 
+| -i  | Check whether tools required are present or not | 
+| -v 	| Verbose/Debug Mode | 
+| -h	| Show help section |
 
 
 <b>GENERAL OPTIONS</b>  
 
-| Flag | Description | Example |
-|------|-------------|---------|
-| --deep |  Deep scan (Enable some slow options for deeper scan)	|./reconftw -d abc.com -a --deep	|
-| --fs |  Full scope (Enable widest scope *domain* options) | ./reconftw -d abc.com -a --fs |
-| -o |  Subdomain permutations and resolution (-l required) |./reconftw -d abc.com -a -o /output/here/ |
+| Flag | Description |
+|------|-------------|
+| --deep |  Deep scan (Enable some slow options for deeper scan)	|
+| --fs   |  Full scope (Enable the widest scope * *.domain.* * options) | 
+| -o |  Output directory |
+
+## Running ReconFTW: 
+
+**To perform a full recon on single target** *(may take a significant time)*
+```
+▶ ./reconftw.sh -d example.com -a 
+```
+
+**To perfrom a full recon on a list of targets**  
+```
+▶ ./reconftw.sh -l sites.txt -a -o /output/directory/
+```
+**Perform full recon with more intense tasks** *(VPS intended)*  
+```
+▶ ./reconftw.sh -d example.com -a --deep -o /output/directory/
+```
+**Perform a wide scope recon on a target**   *(may include false positives)*  
+```
+▶ ./reconftw.sh -d example.com -a --fs -o /output/directory/
+```
+**Check whether all required tools are present or not**  
+```
+▶ ./reconftw.sh -i
+```
+
+**Show help section**  
+```
+▶ ./reconftw.sh -h
+```
+
 
 ## :fire: Features :fire:
 
