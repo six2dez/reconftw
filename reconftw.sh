@@ -496,7 +496,7 @@ portscan(){
 			eval cat ${domain}_portscan.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${bred}\n Port scan Finished in ${runtime}${reset}\n"
+			printf "${bblue}\n Port scan Finished in ${runtime}${reset}\n"
 			printf "${bblue} Results are saved in ${domain}_portscan.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -556,7 +556,7 @@ urlchecks(){
 			else
 				gospider -S ${domain}_probed.txt -t 100 -c 10 -d 1 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt > gospider_tmp.txt
 			fi
-			eval cat gospider_tmp.txt $DEBUG_ERROR | grep -e "code-200" | awk '{print $5}' | anew -q ${domain}_url_extract_tmp.txt
+			cat gospider_tmp.txt | grep -e "code-200" | awk '{print $5}' | anew -q ${domain}_url_extract_tmp.txt
 			if [ -s "$tools/.github_tokens" ]
 			then
 				eval github-endpoints -q -k -d $domain -t $tools/.github_tokens -raw $DEBUG_ERROR | anew -q ${domain}_url_extract_tmp.txt
