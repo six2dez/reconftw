@@ -16,6 +16,11 @@ DEEP=false
 FULLSCOPE=false
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 COOKIE=""
+# Automate path discovery of Chromium. Rinse and repeat for other paths having problems.
+WHICH='/usr/bin/which'
+WHICHCHROMIUM=$(${WHICH} \
+	chromium)"
+CHROMIUMPATH="${WHICHCHROMIUM}"
 
 # Uncomment this only if it is not already in your env .bashrc or .zshrc
 #COLLAB_SERVER=XXXXXXXXXXXXXXXXX
@@ -475,7 +480,7 @@ screenshot(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} ${bgreen} Web Screenshot ${reset}\n\n"
 			start=`date +%s`
-			python3 $tools/webscreenshot/webscreenshot.py -i ${domain}_probed.txt -w 8 -a "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -o screenshots &>/dev/null && touch $called_fn_dir/.${FUNCNAME[0]}
+			python3 $tools/webscreenshot/webscreenshot.py -i ${domain}_probed.txt -r chromium --renderer-binary ${CHROMIUMPATH} -w 8 -a "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -o screenshots &>/dev/null && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Web Screenshot Finished in ${runtime}\n"
