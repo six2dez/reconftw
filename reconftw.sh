@@ -492,7 +492,7 @@ portscan(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Port Scan ${reset}\n\n"
 			start=`date +%s`
-			naabu -top-ports 1000 -silent -exclude-cdn -nmap-cli 'nmap -sV --min-rate 40000 -T4 --open --max-retries 2 -oN -' -iL ${domain}_subdomains.txt > ${domain}_portscan.txt;
+			naabu -top-ports 1000 -silent -exclude-cdn -nmap-cli 'nmap -sV -n --max-retries 2 -oN -' -iL ${domain}_subdomains.txt > ${domain}_portscan.txt;
 			eval cat ${domain}_portscan.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
@@ -510,33 +510,34 @@ nuclei_check(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Template Scanning with Nuclei ${reset}\n\n"
 			start=`date +%s`
+			mkdir -p nuclei_output
 			printf "${yellow} Running : Nuclei Technologies${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/technologies/ -o ${domain}_nuclei_technologies.txt;
+			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/technologies/ -o nuclei_output/${domain}_technologies.txt;
 			printf "${yellow}\n\n Running : Nuclei Tokens${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o ${domain}_nuclei_tokens.txt;
+			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o nuclei_output/${domain}_tokens.txt;
 			printf "${yellow}\n\n Running : Nuclei Exposures${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/exposures/ -o ${domain}_nuclei_exposures.txt;
+			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/exposures/ -o nuclei_output/${domain}_exposures.txt;
 			printf "${yellow}\n\n Running : Nuclei CVEs ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/cves/ -o ${domain}_nuclei_cves.txt;
+			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/cves/ -o nuclei_output/${domain}_cves.txt;
 			printf "${yellow}\n\n Running : Nuclei Default Creds ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/default-logins/ -o ${domain}_nuclei_default_creds.txt;
+			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/default-logins/ -o nuclei_output/${domain}_default_creds.txt;
 			printf "${yellow}\n\n Running : Nuclei SubTko ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/takeovers/ -o ${domain}_nuclei_subtko.txt;
+			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/takeovers/ -o nuclei_output/${domain}_subtko.txt;
 			printf "${yellow}\n\n Running : Nuclei DNS ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/dns/ -o ${domain}_nuclei_dns.txt;
+			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/dns/ -o nuclei_output/${domain}_dns.txt;
 			printf "${yellow}\n\n Running : Nuclei Miscellaneous ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/miscellaneous/ -o ${domain}_nuclei_miscellaneous.txt;
+			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/miscellaneous/ -o nuclei_output/${domain}_miscellaneous.txt;
 			printf "${yellow}\n\n Running : Nuclei Panels ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/exposed-panels/ -o ${domain}_nuclei_panels.txt;
+			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/exposed-panels/ -o nuclei_output/${domain}_panels.txt;
 			printf "${yellow}\n\n Running : Nuclei Security Misconfiguration ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/misconfiguration/ -o ${domain}_nuclei_misconfigurations.txt;
+			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/misconfiguration/ -o nuclei_output/${domain}_misconfigurations.txt;
 			printf "${yellow}\n\n Running : Nuclei Vulnerabilites ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/vulnerabilities/ -o ${domain}_nuclei_vulnerabilities.txt && touch $called_fn_dir/.${FUNCNAME[0]};
+			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/vulnerabilities/ -o nuclei_output/${domain}_vulnerabilities.txt && touch $called_fn_dir/.${FUNCNAME[0]};
 			printf "\n\n"
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Nuclei Scan Finished in ${runtime}\n" | tee /dev/tty | notify -silent
-			printf "${bblue} Results are saved in ${domain}_nuclei_*.txt files${reset}\n"
+			printf "${bblue} Results are saved in nuclei_output folder ${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -561,7 +562,7 @@ urlchecks(){
 			then
 				eval github-endpoints -q -k -d $domain -t $tools/.github_tokens -raw $DEBUG_ERROR | anew -q ${domain}_url_extract_tmp.txt
 			fi
-			cat ${domain}_url_extract_tmp.txt | grep "=" | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | qsreplace | qsreplace -a | anew -q ${domain}_url_extract.txt && touch $called_fn_dir/.${FUNCNAME[0]};
+			cat ${domain}_url_extract_tmp.txt | grep "=" | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | qsreplace FUZZ | qsreplace -a | anew -q ${domain}_url_extract.txt && touch $called_fn_dir/.${FUNCNAME[0]};
 			cat ${domain}_url_extract_tmp.txt | egrep -i ".(js)" | anew -q ${domain}_url_extract_js.txt
 			eval rm ${domain}_url_extract_tmp.txt gospider_tmp.txt $DEBUG_ERROR
 			end=`date +%s`
@@ -582,19 +583,20 @@ url_gf(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Vulnerable Pattern Search ${reset}\n\n"
 			start=`date +%s`
-			gf xss ${domain}_url_extract.txt | anew -q ${domain}_xss.txt;
-			gf ssti ${domain}_url_extract.txt | anew -q ${domain}_ssti.txt;
-			gf ssrf ${domain}_url_extract.txt | anew -q ${domain}_ssrf.txt;
-			gf sqli ${domain}_url_extract.txt | anew -q ${domain}_sqli.txt;
-			gf redirect ${domain}_url_extract.txt | anew -q ${domain}_redirect.txt;
-			gf rce ${domain}_url_extract.txt | anew -q ${domain}_rce.txt;
-			gf potential ${domain}_url_extract.txt | anew -q ${domain}_potential.txt;
-			gf lfi ${domain}_url_extract.txt | anew -q ${domain}_lfi.txt && touch $called_fn_dir/.${FUNCNAME[0]};
+			mkdir -p gf
+			gf xss ${domain}_url_extract.txt | anew -q gf/${domain}_xss.txt;
+			gf ssti ${domain}_url_extract.txt | anew -q gf/${domain}_ssti.txt;
+			gf ssrf ${domain}_url_extract.txt | anew -q gf/${domain}_ssrf.txt;
+			gf sqli ${domain}_url_extract.txt | anew -q gf/${domain}_sqli.txt;
+			gf redirect ${domain}_url_extract.txt | anew -q gf/${domain}_redirect.txt;
+			gf rce ${domain}_url_extract.txt | anew -q gf/${domain}_rce.txt;
+			gf potential ${domain}_url_extract.txt | anew -q gf/${domain}_potential.txt;
+			cat ${domain}_url_extract.txt | unfurl -u format %s://%d%p | anew -q gf/${domain}_endpoints.txt;
+			gf lfi ${domain}_url_extract.txt | anew -q gf/${domain}_lfi.txt && touch $called_fn_dir/.${FUNCNAME[0]};
 			end=`date +%s`
 			getElapsedTime $start $end
-			cat ${domain}_url_extract.txt | unfurl -u format %s://%d%p | anew -q ${domain}_url_endpoints.txt
 			printf "${bblue}\n Vulnerable Pattern Search Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in ${domain}_*gfpattern*.txt files${reset}\n"
+			printf "${bblue} Results are saved in gf folder${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -662,27 +664,27 @@ xss(){
 		printf "${bgreen}#######################################################################\n"
 		printf "${bblue} XSS Analysis ${reset}\n\n"
 		start=`date +%s`
-		cat ${domain}_xss.txt | Gxss -c 100 -p Xss | anew -q ${domain}_xss_reflected.txt
+		cat gf/${domain}_xss.txt | Gxss -c 100 -p Xss | anew -q ${domain}_xss_reflected.txt
 		if [ "$DEEP" = true ] ; then
 			if [ -n "$XSS_SERVER" ]; then
 				sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
-				eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss_reflected.txt -t 30 --crawl --blind --skip > ${domain}_xsstrike_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-				printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
+				eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss_reflected.txt -t 30 --crawl --blind --skip > ${domain}_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				printf "${bblue} Results are saved in ${domain}_xss.txt${reset}\n"
 			else
-				printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n"
-				eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss_reflected.txt -t 30 --crawl --skip > ${domain}_xsstrike_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-				printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
+				printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n\n"
+				eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss_reflected.txt -t 30 --crawl --skip > ${domain}_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				printf "${bblue} Results are saved in ${domain}_xss.txt${reset}\n"
 			fi
 		else
 			if [[ $(cat ${domain}_xss_reflected.txt | wc -l) -le 500 ]]
 			then
 				if [ -n "$XSS_SERVER" ]; then
 					sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
-					eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss_reflected.txt -t 30 --crawl --blind --skip > ${domain}_xsstrike_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss_reflected.txt -t 30 --crawl --blind --skip > ${domain}_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 					printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 				else
-					printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n"
-					eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss_reflected.txt -t 30 --crawl --skip > ${domain}_xsstrike_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+					printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n\n"
+					eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss_reflected.txt -t 30 --crawl --skip > ${domain}_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 					printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 				fi
 			else
@@ -832,7 +834,9 @@ test_ssl(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} SSL Test ${reset}\n"
 			start=`date +%s`
-			$tools/testssl.sh/testssl.sh --quiet --color 0 -U -iL ${domain}_probed.txt > ${domain}_testssl.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			eval cat ${domain}_probed.txt $DEBUG_ERROR | grep "^https" | anew -q ${domain}_probed_https.txt
+			$tools/testssl.sh/testssl.sh --quiet --color 0 -U -iL ${domain}_probed_https.txt > ${domain}_testssl.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			eval rm ${domain}_probed_https.txt $DEBUG_ERROR
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n SSL Test Finished in ${runtime}\n"
@@ -850,8 +854,8 @@ open_redirect(){
 				printf "${bgreen}#######################################################################\n"
 				printf "${bblue} Open redirects checks ${reset}\n"
 				start=`date +%s`
-				cat ${domain}_redirect.txt | qsreplace FUZZ | anew -q test_redirect.txt
-				eval python3 $tools/OpenRedireX/openredirex.py -l test_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt > ${domain}_openredirex.txt $DEBUG_STD
+				cat gf/${domain}_redirect.txt | qsreplace FUZZ | anew -q test_redirect.txt
+				eval python3 $tools/OpenRedireX/openredirex.py -l test_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt > ${domain}_openredirect.txt $DEBUG_STD
 				eval rm test_redirect.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
 				getElapsedTime $start $end
@@ -859,18 +863,18 @@ open_redirect(){
 				printf "${bblue} Results are saved in ${domain}_openredirex.txt ${reset}\n"
 				printf "${bgreen}#######################################################################\n"
 			else
-				if [[ $(cat ${domain}_redirect.txt | wc -l) -le 1000 ]]
+				if [[ $(cat gf/${domain}_redirect.txt | wc -l) -le 1000 ]]
 				then
 					printf "${bgreen}#######################################################################\n"
 					printf "${bblue} Open redirects checks ${reset}\n"
 					start=`date +%s`
-					cat ${domain}_redirect.txt | qsreplace FUZZ | anew -q test_redirect.txt
-					eval python3 $tools/OpenRedireX/openredirex.py -l test_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt > ${domain}_openredirex.txt $DEBUG_STD
+					cat gf/${domain}_redirect.txt | qsreplace FUZZ | anew -q test_redirect.txt
+					eval python3 $tools/OpenRedireX/openredirex.py -l test_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt > ${domain}_redirect.txt $DEBUG_STD
 					eval rm test_redirect.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 					end=`date +%s`
 					getElapsedTime $start $end
 					printf "${bblue}\n Open Redirects Finished in ${runtime}\n"
-					printf "${bblue} Results are saved in ${domain}_openredirex.txt ${reset}\n"
+					printf "${bblue} Results are saved in ${domain}_redirect.txt ${reset}\n"
 				else
 					printf "${bred} Skipping Open redirects: Too Much URLs to test, try with --deep flag${reset}\n"
 				fi
@@ -890,21 +894,21 @@ ssrf_checks(){
 			if [ "$DEEP" = true ] ; then
 				start=`date +%s`
 				COLLAB_SERVER_FIX=$(echo $COLLAB_SERVER | sed -r "s/https?:\/\///")
-				eval cat ${domain}_ssrf.txt $DEBUG_ERROR | eval python3 $tools/ssrf.py $COLLAB_SERVER_FIX > ${domain}_ssrf_confirmed.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval cat gf/${domain}_ssrf.txt $DEBUG_ERROR | eval python3 $tools/ssrf.py $COLLAB_SERVER_FIX > ${domain}_ssrf.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
 				getElapsedTime $start $end
 				printf "${bblue}\n SSRF Finished in ${runtime}\n"
 				printf "${bblue} Results are saved in ${domain}_ssrf_confirmed.txt ${reset}\n"
 			else
-				if [[ $(cat ${domain}_ssrf.txt | wc -l) -le 1000 ]]
+				if [[ $(cat gf/${domain}_ssrf.txt | wc -l) -le 1000 ]]
 				then
 					start=`date +%s`
 					COLLAB_SERVER_FIX=$(echo $COLLAB_SERVER | sed -r "s/https?:\/\///")
-					eval cat ${domain}_ssrf.txt $DEBUG_ERROR | eval python3 $tools/ssrf.py $COLLAB_SERVER_FIX > ${domain}_ssrf_confirmed.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval cat gf/${domain}_ssrf.txt $DEBUG_ERROR | eval python3 $tools/ssrf.py $COLLAB_SERVER_FIX > ${domain}_ssrf.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 					end=`date +%s`
 					getElapsedTime $start $end
 					printf "${bblue}\n SSRF Finished in ${runtime}\n"
-					printf "${bblue} Results are saved in ${domain}_ssrf_confirmed.txt ${reset}\n"
+					printf "${bblue} Results are saved in ${domain}_ssrf.txt ${reset}\n"
 				else
 					printf "${bred} Skipping SSRF: Too Much URLs to test, try with --deep flag${reset}\n"
 				fi
@@ -941,11 +945,11 @@ lfi(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} LFI checks ${reset}\n"
 			start=`date +%s`
-			cat ${domain}_lfi.txt | qsreplace "/etc/passwd" | xargs -I% -P 25 sh -c 'curl -s "%" 2>&1 | grep -q "root:x" && echo "VULN! %"' | anew -q ${domain}_lfi_confirmed.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			cat gf/${domain}_lfi.txt | qsreplace "/etc/passwd" | xargs -I% -P 25 sh -c 'curl -s "%" 2>&1 | grep -q "root:x" && echo "VULN! %"' | anew -q ${domain}_lfi.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n LFI Finished in ${runtime}${reset}\n"
-			printf "${bblue} Results are saved in ${domain}_lfi_confirmed.txt ${reset}\n"
+			printf "${bblue} Results are saved in ${domain}_lfi.txt ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
