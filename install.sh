@@ -201,6 +201,7 @@ eval wget -O resolvers.txt https://raw.githubusercontent.com/BBerastegui/fresh-d
 eval wget -O permutations_list.txt https://gist.githubusercontent.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw/137bb6b60c616552c705e93a345c06cec3a2cb1f/permutations_list.txt $DEBUG_STD
 eval wget -O ssrf.py https://gist.githubusercontent.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw/ea0774de5e27f9bc855207b175249edae2e9ccef/asyncio_ssrf.py $DEBUG_STD
 eval wget -O fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD
+eval wget -O lfi_wordlist.txt https://gist.githubusercontent.com/detonxx/a885ce7dd64a7139cb6f5b6860499ba8/raw/f91e76e3f8b1649f389d4fea9c44f360a5b76890/LFI-payloads.txt $DEBUG_STD
 eval wget -nc -O ~/.config/notify/notify.conf https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw/a66c4d8cf47a3bc95f5e9ba84773428662ea760c/notify_sample.conf
 
 sed -i 's/^miscellaneous/#miscellaneous/' ~/nuclei-templates/.nuclei-ignore
