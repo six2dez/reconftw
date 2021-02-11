@@ -67,6 +67,7 @@ start(){
 	fi
 
 	fuzz_wordlist=$tools/fuzz_wordlist.txt
+	lfi_wordlist=$tools/lfi_wordlist.txt
 	cd $dir
 	printf "\n"
 	printf "${bred} Target: ${domain}\n\n"
@@ -764,7 +765,7 @@ fuzz(){
 			for sub in $(cat ${domain}_probed.txt); do
 				printf "${yellow}\n\n Running: Fuzzing in ${sub}${reset}\n"
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-				ffuf -mc all -fc 404 -ac -sf -s -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -w $fuzz_wordlist -maxtime 900 -u $sub/FUZZ -or -o $dir/fuzzing/${sub_out}.tmp $DEBUG_STD
+				eval ffuf -mc all -fc 404 -ac -sf -s -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -w $fuzz_wordlist -maxtime 900 -u $sub/FUZZ -or -o $dir/fuzzing/${sub_out}.tmp $DEBUG_STD
 				cat $dir/fuzzing/${sub_out}.tmp | jq '[.results[]|{status: .status, length: .length, url: .url}]' | grep -oP "status\":\s(\d{3})|length\":\s(\d{1,7})|url\":\s\"(http[s]?:\/\/.*?)\"" | paste -d' ' - - - | awk '{print $2" "$4" "$6}' | sed 's/\"//g' | anew -q $dir/fuzzing/${sub_out}.txt
 				eval rm $dir/fuzzing/${sub_out}.tmp $DEBUG_ERROR
 			done
@@ -945,7 +946,10 @@ lfi(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} LFI checks ${reset}\n"
 			start=`date +%s`
-			cat gf/${domain}_lfi.txt | qsreplace "/etc/passwd" | xargs -I% -P 25 sh -c 'curl -s "%" 2>&1 | grep -q "root:x" && echo "VULN! %"' | anew -q ${domain}_lfi.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			for url in $(cat gf/${domain}_lfi.txt); do
+				eval ffuf -v -mc 200 -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -w $lfi_wordlist -u $url -mr "root:" $DEBUG_STD | grep "URL" | sed 's/| URL | //' | anew -q ${domain}_lfi.txt
+			done
+			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n LFI Finished in ${runtime}${reset}\n"
