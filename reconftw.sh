@@ -10,6 +10,8 @@ green='\033[0;32m'
 reset='\033[0m'
 
 tools=~/Tools
+fuzz_wordlist=$tools/fuzz_wordlist.txt
+lfi_wordlist=$tools/lfi_wordlist.txt
 DEBUG_STD="&>/dev/null"
 DEBUG_ERROR="2>/dev/null"
 DEEP=false
@@ -42,17 +44,25 @@ start(){
 	global_start=`date +%s`
 	tools_installed
 
-	dir=$SCRIPTPATH/Recon/$domain
-	called_fn_dir=$dir/.called_fn
-
-	if [ -n "$list" ]
+	if [ -z "$domain" ]
 	then
-		if [ -z "$domain" ]
+		if [ -n "$list" ]
 		then
-			domain="Multi"
-			dir=$SCRIPTPATH/Recon/$domain
+			if [ -z "$domain" ]
+			then
+				domain="Multi"
+				dir=$SCRIPTPATH/Recon/$domain
+				called_fn_dir=$dir/.called
+			fi
+			if [[ "$list" = /* ]]; then
+				install -D $list $dir/${domain}_probed.txt
+			else
+				install -D $SCRIPTPATH/$list $dir/${domain}_probed.txt
+			fi
 		fi
-		cp $list $dir/${domain}_probed.txt
+	else
+		dir=$SCRIPTPATH/Recon/$domain
+		called_fn_dir=$dir/.called_fn
 	fi
 
 	if [ -z "$domain" ]
@@ -66,8 +76,6 @@ start(){
 		mkdir -p $called_fn_dir
 	fi
 
-	fuzz_wordlist=$tools/fuzz_wordlist.txt
-	lfi_wordlist=$tools/lfi_wordlist.txt
 	cd $dir
 	printf "\n"
 	printf "${bred} Target: ${domain}\n\n"
@@ -201,15 +209,20 @@ function tools_full(){
 }
 
 dorks(){
-	start=`date +%s`
-	printf "${bgreen}#######################################################################\n"
-	printf "${bblue} Performing Google Dorks ${reset}\n\n"
-	$tools/degoogle_hunter/degoogle_hunter.sh $domain | tee ${domain}_dorks.txt
-	sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" ${domain}_dorks.txt
-	end=`date +%s`
-	getElapsedTime $start $end
-	printf "$\n${bblue} Finished in ${runtime} Happy hunting! ${reset}\n"
-	printf "${bgreen}#######################################################################\n"
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+	then
+		start=`date +%s`
+		printf "${bgreen}#######################################################################\n"
+		printf "${bblue} Performing Google Dorks ${reset}\n\n"
+		$tools/degoogle_hunter/degoogle_hunter.sh $domain | tee ${domain}_dorks.txt
+		sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" ${domain}_dorks.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+		end=`date +%s`
+		getElapsedTime $start $end
+		printf "$\n${bblue} Finished in ${runtime} Happy hunting! ${reset}\n"
+		printf "${bgreen}#######################################################################\n"
+	else
+		printf "${yellow} ${FUNCNAME[0]} are already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
 }
 
 subdomains_full(){
@@ -1179,7 +1192,11 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 		w ) start
 			if [ -n "$list" ]
 			then
-				cp $list $dir/${domain}_probed.txt
+				if [[ "$list" = /* ]]; then
+					cp $list $dir/${domain}_probed.txt
+				else
+					cp $SCRIPTPATH/$list $dir/${domain}_probed.txt
+				fi
 			fi
 			nuclei_check
 			cms_scanner
