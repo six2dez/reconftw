@@ -23,7 +23,7 @@ else
 fi
 
 printf "\n\n${bgreen}#######################################################################\n"
-printf "${bgreen} reconftw installer script (apt/rpm/pacman compatible)${reset}\n\n"
+printf "${bgreen} reconftw installer script ${reset}\n\n"
 
 install_apt(){
     eval $SUDO apt install chromium-browser -y $DEBUG_STD

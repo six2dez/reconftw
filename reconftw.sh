@@ -908,7 +908,7 @@ ssrf_checks(){
 			if [ "$DEEP" = true ] ; then
 				start=`date +%s`
 				COLLAB_SERVER_FIX=$(echo $COLLAB_SERVER | sed -r "s/https?:\/\///")
-				eval cat gf/${domain}_ssrf.txt $DEBUG_ERROR | eval python3 $tools/ssrf.py $COLLAB_SERVER_FIX > ${domain}_ssrf.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval cat gf/${domain}_ssrf.txt $DEBUG_ERROR | eval python3 $tools/ssrf.py $COLLAB_SERVER_FIX > ${domain}_ssrf.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
 				getElapsedTime $start $end
 				printf "${bblue}\n SSRF Finished in ${runtime}\n"
@@ -918,7 +918,7 @@ ssrf_checks(){
 				then
 					start=`date +%s`
 					COLLAB_SERVER_FIX=$(echo $COLLAB_SERVER | sed -r "s/https?:\/\///")
-					eval cat gf/${domain}_ssrf.txt $DEBUG_ERROR | eval python3 $tools/ssrf.py $COLLAB_SERVER_FIX > ${domain}_ssrf.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval cat gf/${domain}_ssrf.txt $DEBUG_ERROR | eval python3 $tools/ssrf.py $COLLAB_SERVER_FIX > ${domain}_ssrf.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 					end=`date +%s`
 					getElapsedTime $start $end
 					printf "${bblue}\n SSRF Finished in ${runtime}\n"
