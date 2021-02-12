@@ -960,7 +960,7 @@ lfi(){
 			printf "${bblue} LFI checks ${reset}\n"
 			start=`date +%s`
 			for url in $(cat gf/${domain}_lfi.txt); do
-				eval ffuf -v -mc 200 -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -w $lfi_wordlist -u $url -mr "root:" $DEBUG_STD | grep "URL" | sed 's/| URL | //' | anew -q ${domain}_lfi.txt
+				ffuf -v -mc 200 -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -w $lfi_wordlist -u $url -mr "root:" &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q ${domain}_lfi.txt
 			done
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
