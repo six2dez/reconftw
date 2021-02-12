@@ -42,6 +42,7 @@ banner(){
 
 start(){
 	global_start=`date +%s`
+	echo "****** 🙏 Thank you for making this world safer ******" | notify -silent
 	tools_installed
 
 	if [ -z "$domain" ]
@@ -1025,6 +1026,8 @@ end(){
 	printf "${bgreen}#######################################################################\n"
 	printf "${bred} Finished Recon on: ${domain} under ${finaldir} in: ${runtime} ${reset}\n" | tee /dev/tty | notify -silent
 	printf "${bgreen}#######################################################################\n"
+	#Seperator for more clear messges in telegram_Bot
+	echo "******  Stay safe 🦠 and secure 🔐  ******" | notify -silent
 }
 
 all(){
