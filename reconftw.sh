@@ -749,7 +749,6 @@ favicon(){
 			if [ ! -f "favicontest.json" ]
 			then
 				eval cat favicontest.json | jq > ${domain}_favicontest.txt $DEBUG_STD
-				rm favicontest.json
 				eval cat ${domain}_favicontest.txt $DEBUG_ERROR | grep found_ips
 				mv favicontest.json $dir/favicontest.json
 			fi
