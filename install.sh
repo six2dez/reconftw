@@ -136,6 +136,7 @@ eval go get -v github.com/haccer/subjack $DEBUG_STD
 eval git clone https://github.com/haccer/subjack $dir/subjack $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/projectdiscovery/httpx/cmd/httpx $DEBUG_STD
 printf "${bgreen} 30%% done${reset}\n\n"
+eval go get -u github.com/lukasikic/subzy $DEBUG_STD
 eval go get -u github.com/gwen001/github-endpoints $DEBUG_STD
 eval git clone https://github.com/s0md3v/XSStrike $dir/XSStrike $DEBUG_STD
 eval git clone https://github.com/1ndianl33t/Gf-Patterns $dir/Gf-Patterns $DEBUG_STD
