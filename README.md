@@ -129,7 +129,7 @@ ReconFTW is a tool designed to perform automated recon on a target domain by run
   - Bruteforce ([shuffledns](https://github.com/projectdiscovery/shuffledns))  
   - Permutations ([dnsgen](https://github.com/ProjectAnte/dnsgen))  
   - Subdomain JS Scraping ([JSFinder](https://github.com/Threezh1/JSFinder))  
-- Sub TKO ([subjack](https://github.com/haccer/subjack) and [nuclei](https://github.com/projectdiscovery/nuclei))  
+- Sub TKO ([subzy](https://github.com/LukaSikic/subzy) and [nuclei](https://github.com/projectdiscovery/nuclei))  
 - Web Prober ([httpx](https://github.com/projectdiscovery/httpx))  
 - Web screenshot ([webscreenshot](https://github.com/maaaaz/webscreenshot))  
 - Template scanner ([nuclei](https://github.com/projectdiscovery/nuclei))  
