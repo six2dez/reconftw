@@ -745,7 +745,7 @@ favicon(){
 			printf "${bblue} FavIcon Hash Extraction ${reset}\n\n"
 			start=`date +%s`
 			cd $tools/fav-up
-			eval python3 favUp.py -w $domain -sc -o favicontest.json $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+			eval python3 favUp.py -w $domain -sc -o favicontest.json $DEBUG_STD
 			if [ ! -f "favicontest.json" ]
 			then
 				eval cat favicontest.json | jq > ${domain}_favicontest.txt $DEBUG_STD
@@ -753,7 +753,7 @@ favicon(){
 				eval cat ${domain}_favicontest.txt $DEBUG_ERROR | grep found_ips
 				mv favicontest.json $dir/favicontest.json
 			fi
-			cd $dir
+			cd $dir && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n FavIcon Hash Extraction Finished in ${runtime}\n"
