@@ -132,8 +132,6 @@ eval go get -v github.com/tomnomnom/unfurl $DEBUG_STD
 eval git clone https://github.com/projectdiscovery/nuclei-templates ~/nuclei-templates $DEBUG_STD
 eval git clone https://github.com/eslam3kl/crtfinder $dir/crtfinder $DEBUG_STD
 eval nuclei -update-templates $DEBUG_STD
-eval go get -v github.com/haccer/subjack $DEBUG_STD
-eval git clone https://github.com/haccer/subjack $dir/subjack $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/projectdiscovery/httpx/cmd/httpx $DEBUG_STD
 printf "${bgreen} 30%% done${reset}\n\n"
 eval go get -u github.com/lukasikic/subzy $DEBUG_STD
