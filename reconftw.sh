@@ -1057,7 +1057,9 @@ all(){
 			fi
 			params
 			xss
-			test_ssl
+			if [ "$DEEP" = true ] ; then
+				test_ssl
+			fi
 			end
 		done
 	else
@@ -1085,7 +1087,9 @@ all(){
 		fi
 		params
 		xss
-		test_ssl
+		if [ "$DEEP" = true ] ; then
+			test_ssl
+		fi
 		end
 	fi
 }
@@ -1215,7 +1219,9 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 			fi
 			params
 			xss
-			test_ssl
+			if [ "$DEEP" = true ] ; then
+				test_ssl
+			fi
 			end
 			exit
 			;;
