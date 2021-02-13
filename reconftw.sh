@@ -753,9 +753,8 @@ favicon(){
 				eval cat favicontest.json | jq > ${domain}_favicontest.txt $DEBUG_STD
 				rm favicontest.json
 				eval cat ${domain}_favicontest.txt $DEBUG_ERROR | grep found_ips
-			else
-				cd $dir
 			fi
+			cd $dir
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n FavIcon Hash Extraction Finished in ${runtime}\n"
