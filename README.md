@@ -19,6 +19,9 @@
   <a href="https://twitter.com/Six2dez1">
     <img src="https://img.shields.io/badge/twitter-%40Six2dez1-blue">
   </a>
+    <a href="https://github.com/six2dez/reconftw/issues?q=is%3Aissue+is%3Aclosed">
+    <img src="https://img.shields.io/github/issues-closed-raw/six2dez/reconftw.svg">
+  </a>
 </p>
 
 :construction:	 ***Warning*** :construction:	
