@@ -118,8 +118,7 @@ function tools_installed(){
 	eval type -P waybackurls $DEBUG_STD || { printf "${bred} [*] Waybackurls		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P gau $DEBUG_STD || { printf "${bred} [*] Gau		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P shuffledns $DEBUG_STD || { printf "${bred} [*] ShuffleDns		[NO]${reset}\n"; allinstalled=false;}
-	eval type -P subjack $DEBUG_STD || { printf "${bred} [*] Subjack		[NO]${reset}\n"; allinstalled=false;}
-	[ -f $tools/subjack/fingerprints.json ] || { printf "${bred} [*] Subjack fingers 	[NO]${reset}\n"; allinstalled=false;}
+	eval type -P subzy $DEBUG_STD || { printf "${bred} [*] Subzy		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P nuclei $DEBUG_STD || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; allinstalled=false;}
 	[ -d ~/nuclei-templates ] || { printf "${bred} [*] Nuclei templates    [NO]${reset}\n"; allinstalled=false;}
 	eval type -P naabu $DEBUG_STD || { printf "${bred} [*] Naabu		[NO]${reset}\n"; allinstalled=false;}
@@ -184,8 +183,7 @@ function tools_full(){
 	eval type -P waybackurls $DEBUG_STD && printf "${bgreen}[*] Waybackurls		[YES]${reset}\n" || { printf "${bred} [*] Waybackurls	[NO]${reset}\n"; }
 	eval type -P gau $DEBUG_STD && printf "${bgreen}[*] Gau		        [YES]${reset}\n" || { printf "${bred} [*] Gau		[NO]${reset}\n"; }
 	eval type -P shuffledns $DEBUG_STD && printf "${bgreen}[*] ShuffleDns		[YES]${reset}\n" || { printf "${bred} [*] ShuffleDns		[NO]${reset}\n"; }
-	eval type -P subjack $DEBUG_STD && printf "${bgreen}[*] Subjack		[YES]${reset}\n" || { printf "${bred} [*] Subjack		[NO]${reset}\n"; }
-	[ -f $tools/subjack/fingerprints.json ] && printf "${bgreen}[*] Subjack fings	[YES]${reset}\n" || printf "${bred} [*] Subjack fings	[NO]${reset}\n"
+	eval type -P subzy $DEBUG_STD && printf "${bgreen}[*] Subzy		[YES]${reset}\n" || { printf "${bred} [*] Subzy		[NO]${reset}\n"; }
 	eval type -P nuclei $DEBUG_STD && printf "${bgreen}[*] Nuclei		[YES]${reset}\n" || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; }
 	[ -d ~/nuclei-templates ] && printf "${bgreen}[*] Nuclei templates  	[YES]${reset}\n" || printf "${bred} [*] Nuclei templates  	[NO]${reset}\n"
 	eval type -P naabu $DEBUG_STD && printf "${bgreen}[*] Naabu		[YES]${reset}\n" || { printf "${bred} [*] Naabu		[NO]${reset}\n"; }
@@ -442,8 +440,8 @@ subtakeover(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Subdomain Takeover ${reset}\n\n"
 			start=`date +%s`
-			eval subjack -w ${domain}_subdomains.txt -a -ssl -t 50 -v -c $tools/subjack/fingerprints.json -ssl -o ${domain}_all-takeover-checks.txt $DEBUG_STD;
-			grep -v "Not Vulnerable" <${domain}_all-takeover-checks.txt > ${domain}_takeover.txt
+			subzy --targets ${domain}_subdomains.txt  --https --concurrency 4 --hide_fails --timeout 5 > ${domain}_all-takeover-checks.txt
+			grep  "VULNERABLE" <${domain}_all-takeover-checks.txt > ${domain}_takeover.txt
 			eval rm ${domain}_all-takeover-checks.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
