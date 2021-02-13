@@ -102,7 +102,7 @@ printf "${bgreen}###############################################################
 #Updating Nuclei templates
 printf "${bgreen}#######################################################################\n"
 printf "${bblue} Updating Nuclei templates \n"
-nuclei -update-templates $DEBUG_STD
+eval nuclei -update-templates $DEBUG_STD
 sed -i 's/^miscellaneous/#miscellaneous/' ~/nuclei-templates/.nuclei-ignore
 printf "${bblue}\n Updating Nuclei templates is finished ${reset}\n"
 printf "${bgreen}#######################################################################\n"
