@@ -746,9 +746,9 @@ favicon(){
 			start=`date +%s`
 			cd $tools/fav-up
 			eval python3 favUp.py -w $domain -sc -o favicontest.json $DEBUG_STD
-			if [ ! -f "favicontest.json" ]
+			if [ -f "favicontest.json" ]
 			then
-				eval cat favicontest.json | jq > ${domain}_favicontest.txt $DEBUG_STD
+				cat favicontest.json | jq > ${domain}_favicontest.txt
 				eval cat ${domain}_favicontest.txt $DEBUG_ERROR | grep found_ips
 				mv favicontest.json $dir/favicontest.json
 			fi
