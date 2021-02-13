@@ -22,6 +22,9 @@
     <a href="https://github.com/six2dez/reconftw/issues?q=is%3Aissue+is%3Aclosed">
     <img src="https://img.shields.io/github/issues-closed-raw/six2dez/reconftw.svg">
   </a>
+  <a href="https://github.com/six2dez/reconftw/wiki">
+    <img src="https://img.shields.io/badge/doc-wiki-blue.svg">
+  </a>
 </p>
 
 :construction:	 ***Warning*** :construction:	
