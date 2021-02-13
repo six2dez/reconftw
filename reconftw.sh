@@ -23,7 +23,8 @@ COOKIE=""
 #COLLAB_SERVER=XXXXXXXXXXXXXXXXX
 #XSS_SERVER=XXXXXXXXXXXXXXXXX
 
-
+#Get number of processors
+NPROC=$(nproc)
 
 banner(){
 	printf "\n${bgreen}"
@@ -507,7 +508,7 @@ portscan(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Port Scan ${reset}\n\n"
 			start=`date +%s`
-			naabu -top-ports 1000 -silent -exclude-cdn -nmap-cli 'nmap -sV -n --max-retries 2 -oN -' -iL ${domain}_subdomains.txt > ${domain}_portscan.txt;
+			cf-check -c $NPROC -d ${domain}_subdomains.txt | naabu -top-ports 1000 -silent -exclude-cdn -nmap-cli 'nmap -sV -n --max-retries 2 -oN -' > ${domain}_portscan.txt;
 			eval cat ${domain}_portscan.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
