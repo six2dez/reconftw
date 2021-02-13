@@ -98,7 +98,7 @@ if ! command -v phantomjs &> /dev/null
 then
     cd /opt
     if [ "True" = "$IS_ARM" ]; then
-        eval $SUDO mkdir -p phantomjs-armv6-rpi-v2.1.1 && cd phantomjs-armv6-rpi-v2.1.1 $DEBUG_STD
+        mkdir -p phantomjs-armv6-rpi-v2.1.1 && cd phantomjs-armv6-rpi-v2.1.1
         eval $SUDO wget https://github.com/piksel/phantomjs-raspberrypi/releases/download/v2.1.1-r/phantomjs-armv6-rpi-v2.1.1.tar.xz $DEBUG_STD
         eval $SUDO tar xvf phantomjs-armv6-rpi-v2.1.1.tar.xz $DEBUG_STD
         eval $SUDO ln -s /opt/phantomjs-armv6-rpi-v2.1.1/bin/phantomjs /usr/local/bin/phantomjs $DEBUG_STD
