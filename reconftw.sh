@@ -845,17 +845,19 @@ cors(){
 test_ssl(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
 		then
-			printf "${bgreen}#######################################################################\n"
-			printf "${bblue} SSL Test ${reset}\n"
-			start=`date +%s`
-			eval cat ${domain}_probed.txt $DEBUG_ERROR | grep "^https" | anew -q ${domain}_probed_https.txt
-			$tools/testssl.sh/testssl.sh --quiet --color 0 -U -iL ${domain}_probed_https.txt > ${domain}_testssl.txt && touch $called_fn_dir/.${FUNCNAME[0]}
-			eval rm ${domain}_probed_https.txt $DEBUG_ERROR
-			end=`date +%s`
-			getElapsedTime $start $end
-			printf "${bblue}\n SSL Test Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in ${domain}_testssl.txt ${reset}\n"
-			printf "${bgreen}#######################################################################\n"
+			if [ "$DEEP" = true ] ; then
+				printf "${bgreen}#######################################################################\n"
+				printf "${bblue} SSL Test ${reset}\n"
+				start=`date +%s`
+				eval cat ${domain}_probed.txt $DEBUG_ERROR | grep "^https" | anew -q ${domain}_probed_https.txt
+				$tools/testssl.sh/testssl.sh --quiet --color 0 -U -iL ${domain}_probed_https.txt > ${domain}_testssl.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval rm ${domain}_probed_https.txt $DEBUG_ERROR
+				end=`date +%s`
+				getElapsedTime $start $end
+				printf "${bblue}\n SSL Test Finished in ${runtime}\n"
+				printf "${bblue} Results are saved in ${domain}_testssl.txt ${reset}\n"
+				printf "${bgreen}#######################################################################\n"
+			fi
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
