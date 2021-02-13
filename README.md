@@ -31,17 +31,14 @@
 
 This is a live development project, until the first stable release (1.0) it will be constantly updated in master branch, so if you have detected any bug, you can open an issue or ping me over [Telegram](https://t.me/six2dez) or [Twitter](https://twitter.com/Six2dez1) and I will try to do my best :)
 
-# Table of Contents
-
-- [Table of Contents](#table-of-contents)
-  - [Summary](#summary)
-  - [Installation Instructions](#installation-instructions)
-  - [Usage](#usage)
-  - [Running ReconFTW](#running-reconftw)
-  - [:fire: Features :fire:](#fire-features-fire)
-  - [Mindmap/Workflow](#mindmapworkflow)
-  - [:hourglass: Improvement plan :hourglass:](#hourglass-improvement-plan-hourglass)
-  - [Thanks](#thanks)
+- [Summary](#summary)
+- [Installation Instructions](#installation-instructions)
+- [Usage](#usage)
+- [Running ReconFTW](#running-reconftw)
+- [:fire: Features :fire:](#fire-features-fire)
+- [Mindmap/Workflow](#mindmapworkflow)
+- [:hourglass: Improvement plan :hourglass:](#hourglass-improvement-plan-hourglass)
+- [Thanks](#thanks)
 
 ## Summary
 
@@ -71,7 +68,7 @@ ReconFTW is a tool designed to perform automated recon on a target domain by run
 
 ## Usage
 
-<b>TARGET OPTIONS</b>
+**TARGET OPTIONS**
 
 | Flag | Description |
 |------|-------------|
@@ -79,7 +76,7 @@ ReconFTW is a tool designed to perform automated recon on a target domain by run
 | -l | Target list *(one per line)* |
 | -x | Exclude subdomains list *(Out Of Scope)* |
 
-<b>MODE OPTIONS</b>
+**MODE OPTIONS**
 
 | Flag | Description |
 |------|-------------|
@@ -90,7 +87,7 @@ ReconFTW is a tool designed to perform automated recon on a target domain by run
 | -v | Verbose/Debug Mode |
 | -h | Show help section |
 
-<b>GENERAL OPTIONS</b>
+**GENERAL OPTIONS**
 
 | Flag | Description |
 |------|-------------|
