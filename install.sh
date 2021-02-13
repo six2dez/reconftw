@@ -115,7 +115,7 @@ fi
 dir=~/Tools
 
 eval pip3 install -r requirements.txt $DEBUG_STD
-printf "${bgreen} Requirements installed\n\nInstallation begins!\n\n${reset}"
+printf "${bgreen} Requirements installed\n\n Installation begins!\n\n${reset}"
 eval go get -v github.com/tomnomnom/gf $DEBUG_STD
 eval go get -v github.com/tomnomnom/qsreplace $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/OWASP/Amass/v3/... $DEBUG_STD
@@ -181,7 +181,7 @@ fi
 
 $SUDO chmod 755 /usr/local/bin/findomain
 cd $dir/massdns; eval make $DEBUG_STD
-$SUDO cp $dir/massdns/bin/massdns /usr/bin/
+$SUDO cp $dir/massdns/bin/massdns /usr/local/bin/
 
 cd $dir/Interlace && eval $SUDO python3 setup.py install $DEBUG_STD
 cd $dir/LinkFinder && eval $SUDO python3 setup.py install $DEBUG_STD
@@ -202,14 +202,14 @@ eval wget -O permutations_list.txt https://gist.githubusercontent.com/six2dez/ff
 eval wget -O ssrf.py https://gist.githubusercontent.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw/ea0774de5e27f9bc855207b175249edae2e9ccef/asyncio_ssrf.py $DEBUG_STD
 eval wget -O fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD
 eval wget -O lfi_wordlist.txt https://gist.githubusercontent.com/detonxx/a885ce7dd64a7139cb6f5b6860499ba8/raw/f91e76e3f8b1649f389d4fea9c44f360a5b76890/LFI-payloads.txt $DEBUG_STD
-eval wget -nc -O ~/.config/notify/notify.conf https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw/a66c4d8cf47a3bc95f5e9ba84773428662ea760c/notify_sample.conf $DEBUG_STD
+eval wget -nc -O ~/.config/notify/notify.conf https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw/a66c4d8cf47a3bc95f5e9ba84773428662ea760c/notify_sample.conf $DEBUG_ERROR
 
 sed -i 's/^miscellaneous/#miscellaneous/' ~/nuclei-templates/.nuclei-ignore
 
 #stripping all Go binaries
 eval strip -s $HOME/go/bin/* $DEBUG_STD
 
-printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - GitHub (${dir}/.github_tokens)\n - favup (shodan init SHODANPAIDAPIKEY)\n - SSRF Server (COLLAB_SERVER env var) \n - Blind XSS Server (XSS_SERVER env var)\n\n${reset}"
+printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - GitHub (~/Tools/.github_tokens)\n - favup (shodan init SHODANPAIDAPIKEY)\n - SSRF Server (COLLAB_SERVER env var) \n - Blind XSS Server (XSS_SERVER env var)\n\n${reset}"
 
 printf "${bgreen} Finished!${reset}\n\n"
 printf "\n\n${bgreen}#######################################################################\n"
