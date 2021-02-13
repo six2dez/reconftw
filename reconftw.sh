@@ -526,6 +526,7 @@ nuclei_check(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Template Scanning with Nuclei ${reset}\n\n"
 			start=`date +%s`
+			eval nuclei -update-templates $DEBUG_STD
 			mkdir -p nuclei_output
 			printf "${yellow} Running : Nuclei Technologies${reset}\n\n"
 			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/technologies/ -o nuclei_output/${domain}_technologies.txt;
