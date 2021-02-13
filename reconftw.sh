@@ -623,26 +623,28 @@ url_gf(){
 jschecks(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
 		then
-			printf "${bgreen}#######################################################################\n"
-			printf "${bblue} Javascript Scan ${reset}\n\n"
-			start=`date +%s`
-			printf "${yellow} Running : Fetching Urls 1/5${reset}\n"
-			cat ${domain}_url_extract_js.txt | grep -iE "\.js$" | anew -q ${domain}_jsfile_links.txt;
-			cat ${domain}_url_extract_js.txt | subjs | anew -q ${domain}_jsfile_links.txt;
-			printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
-			cat ${domain}_jsfile_links.txt | httpx -follow-redirects -silent -threads 100 -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt
-			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
-			interlace -tL ${domain}_js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> ${domain}_js_endpoints.txt" &>/dev/null
-			eval sed -i '/^Running against/d; /^Invalid input/d; /^$/d' ${domain}_js_endpoints.txt $DEBUG_ERROR
-			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
-			cat ${domain}_js_livelinks.txt | nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o ${domain}_js_secrets.txt
-			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
-			cat ${domain}_js_livelinks.txt | python3 $tools/getjswords.py | anew -q ${domain}_js_Wordlist.txt && touch $called_fn_dir/.${FUNCNAME[0]}
-			end=`date +%s`
-			getElapsedTime $start $end
-			printf "${bblue}\n Javascript Scan Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in ${domain}_js_*.txt files${reset}\n"
-			printf "${bgreen}#######################################################################\n\n"
+			if [ "$DEEP" = true ] ; then
+				printf "${bgreen}#######################################################################\n"
+				printf "${bblue} Javascript Scan ${reset}\n\n"
+				start=`date +%s`
+				printf "${yellow} Running : Fetching Urls 1/5${reset}\n"
+				cat ${domain}_url_extract_js.txt | grep -iE "\.js$" | anew -q ${domain}_jsfile_links.txt;
+				cat ${domain}_url_extract_js.txt | subjs | anew -q ${domain}_jsfile_links.txt;
+				printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
+				cat ${domain}_jsfile_links.txt | httpx -follow-redirects -silent -threads 100 -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt
+				printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
+				interlace -tL ${domain}_js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> ${domain}_js_endpoints.txt" &>/dev/null
+				eval sed -i '/^Running against/d; /^Invalid input/d; /^$/d' ${domain}_js_endpoints.txt $DEBUG_ERROR
+				printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
+				cat ${domain}_js_livelinks.txt | nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o ${domain}_js_secrets.txt
+				printf "${yellow} Running : Building wordlist 5/5${reset}\n"
+				cat ${domain}_js_livelinks.txt | python3 $tools/getjswords.py | anew -q ${domain}_js_Wordlist.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+				end=`date +%s`
+				getElapsedTime $start $end
+				printf "${bblue}\n Javascript Scan Finished in ${runtime}\n"
+				printf "${bblue} Results are saved in ${domain}_js_*.txt files${reset}\n"
+				printf "${bgreen}#######################################################################\n\n"
+			fi
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
@@ -1054,14 +1056,10 @@ all(){
 			ssrf_checks
 			crlf_checks
 			lfi
-			if [ "$DEEP" = true ] ; then
-				jschecks
-			fi
+			jschecks
 			params
 			xss
-			if [ "$DEEP" = true ] ; then
-				test_ssl
-			fi
+			test_ssl
 			end
 		done
 	else
@@ -1084,14 +1082,10 @@ all(){
 		ssrf_checks
 		crlf_checks
 		lfi
-		if [ "$DEEP" = true ] ; then
-			jschecks
-		fi
+		jschecks
 		params
 		xss
-		if [ "$DEEP" = true ] ; then
-			test_ssl
-		fi
+		test_ssl
 		end
 	fi
 }
@@ -1216,14 +1210,10 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 			ssrf_checks
 			crlf_checks
 			lfi
-			if [ "$DEEP" = true ] ; then
-				jschecks
-			fi
+			jschecks
 			params
 			xss
-			if [ "$DEEP" = true ] ; then
-				test_ssl
-			fi
+			test_ssl
 			end
 			exit
 			;;
