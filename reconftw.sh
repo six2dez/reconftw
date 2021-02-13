@@ -440,8 +440,8 @@ subtakeover(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Subdomain Takeover ${reset}\n\n"
 			start=`date +%s`
-			eval subjack -w ${domain}_subdomains.txt -a -ssl -t 50 -v -c $tools/subjack/fingerprints.json -ssl -o ${domain}_all-takeover-checks.txt $DEBUG_STD;
-			grep -v "Not Vulnerable" <${domain}_all-takeover-checks.txt > ${domain}_takeover.txt
+			subzy --targets ${domain}_subdomains.txt  --https --concurrency 4 --hide_fails --timeout 5 > ${domain}_all-takeover-checks.txt
+			grep  "VULNERABLE" <${domain}_all-takeover-checks.txt > ${domain}_takeover.txt
 			eval rm ${domain}_all-takeover-checks.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
