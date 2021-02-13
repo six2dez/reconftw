@@ -118,8 +118,7 @@ function tools_installed(){
 	eval type -P waybackurls $DEBUG_STD || { printf "${bred} [*] Waybackurls		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P gau $DEBUG_STD || { printf "${bred} [*] Gau		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P shuffledns $DEBUG_STD || { printf "${bred} [*] ShuffleDns		[NO]${reset}\n"; allinstalled=false;}
-	eval type -P subjack $DEBUG_STD || { printf "${bred} [*] Subjack		[NO]${reset}\n"; allinstalled=false;}
-	[ -f $tools/subjack/fingerprints.json ] || { printf "${bred} [*] Subjack fingers 	[NO]${reset}\n"; allinstalled=false;}
+	eval type -P subzy $DEBUG_STD || { printf "${bred} [*] Subzy		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P nuclei $DEBUG_STD || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; allinstalled=false;}
 	[ -d ~/nuclei-templates ] || { printf "${bred} [*] Nuclei templates    [NO]${reset}\n"; allinstalled=false;}
 	eval type -P naabu $DEBUG_STD || { printf "${bred} [*] Naabu		[NO]${reset}\n"; allinstalled=false;}
@@ -184,8 +183,7 @@ function tools_full(){
 	eval type -P waybackurls $DEBUG_STD && printf "${bgreen}[*] Waybackurls		[YES]${reset}\n" || { printf "${bred} [*] Waybackurls	[NO]${reset}\n"; }
 	eval type -P gau $DEBUG_STD && printf "${bgreen}[*] Gau		        [YES]${reset}\n" || { printf "${bred} [*] Gau		[NO]${reset}\n"; }
 	eval type -P shuffledns $DEBUG_STD && printf "${bgreen}[*] ShuffleDns		[YES]${reset}\n" || { printf "${bred} [*] ShuffleDns		[NO]${reset}\n"; }
-	eval type -P subjack $DEBUG_STD && printf "${bgreen}[*] Subjack		[YES]${reset}\n" || { printf "${bred} [*] Subjack		[NO]${reset}\n"; }
-	[ -f $tools/subjack/fingerprints.json ] && printf "${bgreen}[*] Subjack fings	[YES]${reset}\n" || printf "${bred} [*] Subjack fings	[NO]${reset}\n"
+	eval type -P subzy $DEBUG_STD && printf "${bgreen}[*] Subzy		[YES]${reset}\n" || { printf "${bred} [*] Subzy		[NO]${reset}\n"; }
 	eval type -P nuclei $DEBUG_STD && printf "${bgreen}[*] Nuclei		[YES]${reset}\n" || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; }
 	[ -d ~/nuclei-templates ] && printf "${bgreen}[*] Nuclei templates  	[YES]${reset}\n" || printf "${bred} [*] Nuclei templates  	[NO]${reset}\n"
 	eval type -P naabu $DEBUG_STD && printf "${bgreen}[*] Naabu		[YES]${reset}\n" || { printf "${bred} [*] Naabu		[NO]${reset}\n"; }
