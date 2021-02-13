@@ -42,6 +42,7 @@ banner(){
 
 start(){
 	global_start=`date +%s`
+	echo "****** 🙏 Thank you for making this world safer ******" | notify -silent
 	tools_installed
 
 	if [ -z "$domain" ]
@@ -117,8 +118,7 @@ function tools_installed(){
 	eval type -P waybackurls $DEBUG_STD || { printf "${bred} [*] Waybackurls		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P gau $DEBUG_STD || { printf "${bred} [*] Gau		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P shuffledns $DEBUG_STD || { printf "${bred} [*] ShuffleDns		[NO]${reset}\n"; allinstalled=false;}
-	eval type -P subjack $DEBUG_STD || { printf "${bred} [*] Subjack		[NO]${reset}\n"; allinstalled=false;}
-	[ -f $tools/subjack/fingerprints.json ] || { printf "${bred} [*] Subjack fingers 	[NO]${reset}\n"; allinstalled=false;}
+	eval type -P subzy $DEBUG_STD || { printf "${bred} [*] Subzy		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P nuclei $DEBUG_STD || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; allinstalled=false;}
 	[ -d ~/nuclei-templates ] || { printf "${bred} [*] Nuclei templates    [NO]${reset}\n"; allinstalled=false;}
 	eval type -P naabu $DEBUG_STD || { printf "${bred} [*] Naabu		[NO]${reset}\n"; allinstalled=false;}
@@ -183,8 +183,7 @@ function tools_full(){
 	eval type -P waybackurls $DEBUG_STD && printf "${bgreen}[*] Waybackurls		[YES]${reset}\n" || { printf "${bred} [*] Waybackurls	[NO]${reset}\n"; }
 	eval type -P gau $DEBUG_STD && printf "${bgreen}[*] Gau		        [YES]${reset}\n" || { printf "${bred} [*] Gau		[NO]${reset}\n"; }
 	eval type -P shuffledns $DEBUG_STD && printf "${bgreen}[*] ShuffleDns		[YES]${reset}\n" || { printf "${bred} [*] ShuffleDns		[NO]${reset}\n"; }
-	eval type -P subjack $DEBUG_STD && printf "${bgreen}[*] Subjack		[YES]${reset}\n" || { printf "${bred} [*] Subjack		[NO]${reset}\n"; }
-	[ -f $tools/subjack/fingerprints.json ] && printf "${bgreen}[*] Subjack fings	[YES]${reset}\n" || printf "${bred} [*] Subjack fings	[NO]${reset}\n"
+	eval type -P subzy $DEBUG_STD && printf "${bgreen}[*] Subzy		[YES]${reset}\n" || { printf "${bred} [*] Subzy		[NO]${reset}\n"; }
 	eval type -P nuclei $DEBUG_STD && printf "${bgreen}[*] Nuclei		[YES]${reset}\n" || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; }
 	[ -d ~/nuclei-templates ] && printf "${bgreen}[*] Nuclei templates  	[YES]${reset}\n" || printf "${bred} [*] Nuclei templates  	[NO]${reset}\n"
 	eval type -P naabu $DEBUG_STD && printf "${bgreen}[*] Naabu		[YES]${reset}\n" || { printf "${bred} [*] Naabu		[NO]${reset}\n"; }
@@ -441,8 +440,8 @@ subtakeover(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Subdomain Takeover ${reset}\n\n"
 			start=`date +%s`
-			eval subjack -w ${domain}_subdomains.txt -a -ssl -t 50 -v -c $tools/subjack/fingerprints.json -ssl -o ${domain}_all-takeover-checks.txt $DEBUG_STD;
-			grep -v "Not Vulnerable" <${domain}_all-takeover-checks.txt > ${domain}_takeover.txt
+			subzy --targets ${domain}_subdomains.txt  --https --concurrency 4 --hide_fails --timeout 5 > ${domain}_all-takeover-checks.txt
+			grep  "VULNERABLE" <${domain}_all-takeover-checks.txt > ${domain}_takeover.txt
 			eval rm ${domain}_all-takeover-checks.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
@@ -489,7 +488,7 @@ screenshot(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} ${bgreen} Web Screenshot ${reset}\n\n"
 			start=`date +%s`
-			python3 $tools/webscreenshot/webscreenshot.py -i ${domain}_probed.txt -r chromium -w 8 -a "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -o screenshots &>/dev/null && touch $called_fn_dir/.${FUNCNAME[0]}
+			python3 $tools/webscreenshot/webscreenshot.py -i ${domain}_probed.txt -r chromium -w 4 -a "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -o screenshots &>/dev/null && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Web Screenshot Finished in ${runtime}\n"
@@ -750,13 +749,11 @@ favicon(){
 			if [ ! -f "favicontest.json" ]
 			then
 				mv favicontest.json $dir/favicontest.json
-				cd $dir
 				eval cat favicontest.json | jq > ${domain}_favicontest.txt $DEBUG_STD
 				rm favicontest.json
 				eval cat ${domain}_favicontest.txt $DEBUG_ERROR | grep found_ips
-			else
-				cd $dir
 			fi
+			cd $dir
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n FavIcon Hash Extraction Finished in ${runtime}\n"
@@ -830,7 +827,7 @@ cors(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} CORS Scan ${reset}\n\n"
 			start=`date +%s`
-			eval python3 $tools/Corsy/corsy.py -i ${domain}_probed.txt -t 200 > ${domain}_cors.txt $DEBUG_STD
+			eval python3 $tools/Corsy/corsy.py -i ${domain}_probed.txt > ${domain}_cors.txt $DEBUG_STD
 			eval cat ${domain}_cors.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
@@ -908,7 +905,7 @@ ssrf_checks(){
 			if [ "$DEEP" = true ] ; then
 				start=`date +%s`
 				COLLAB_SERVER_FIX=$(echo $COLLAB_SERVER | sed -r "s/https?:\/\///")
-				eval cat gf/${domain}_ssrf.txt $DEBUG_ERROR | eval python3 $tools/ssrf.py $COLLAB_SERVER_FIX > ${domain}_ssrf.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval cat gf/${domain}_ssrf.txt $DEBUG_ERROR | eval python3 $tools/ssrf.py $COLLAB_SERVER_FIX > ${domain}_ssrf.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
 				getElapsedTime $start $end
 				printf "${bblue}\n SSRF Finished in ${runtime}\n"
@@ -918,7 +915,7 @@ ssrf_checks(){
 				then
 					start=`date +%s`
 					COLLAB_SERVER_FIX=$(echo $COLLAB_SERVER | sed -r "s/https?:\/\///")
-					eval cat gf/${domain}_ssrf.txt $DEBUG_ERROR | eval python3 $tools/ssrf.py $COLLAB_SERVER_FIX > ${domain}_ssrf.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval cat gf/${domain}_ssrf.txt $DEBUG_ERROR | eval python3 $tools/ssrf.py $COLLAB_SERVER_FIX > ${domain}_ssrf.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 					end=`date +%s`
 					getElapsedTime $start $end
 					printf "${bblue}\n SSRF Finished in ${runtime}\n"
@@ -1025,6 +1022,8 @@ end(){
 	printf "${bgreen}#######################################################################\n"
 	printf "${bred} Finished Recon on: ${domain} under ${finaldir} in: ${runtime} ${reset}\n" | tee /dev/tty | notify -silent
 	printf "${bgreen}#######################################################################\n"
+	#Seperator for more clear messges in telegram_Bot
+	echo "******  Stay safe 🦠 and secure 🔐  ******" | notify -silent
 }
 
 all(){

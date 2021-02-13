@@ -23,7 +23,7 @@ else
 fi
 
 printf "\n\n${bgreen}#######################################################################\n"
-printf "${bgreen} reconftw installer script (apt/rpm/pacman compatible)${reset}\n\n"
+printf "${bgreen} reconftw installer script ${reset}\n\n"
 
 install_apt(){
     eval $SUDO apt install chromium-browser -y $DEBUG_STD
@@ -115,7 +115,7 @@ fi
 dir=~/Tools
 
 eval pip3 install -r requirements.txt $DEBUG_STD
-printf "${bgreen} Requirements installed\n\nInstallation begins!\n\n${reset}"
+printf "${bgreen} Requirements installed\n\n Installation begins!\n\n${reset}"
 eval go get -v github.com/tomnomnom/gf $DEBUG_STD
 eval go get -v github.com/tomnomnom/qsreplace $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/OWASP/Amass/v3/... $DEBUG_STD
@@ -132,10 +132,9 @@ eval go get -v github.com/tomnomnom/unfurl $DEBUG_STD
 eval git clone https://github.com/projectdiscovery/nuclei-templates ~/nuclei-templates $DEBUG_STD
 eval git clone https://github.com/eslam3kl/crtfinder $dir/crtfinder $DEBUG_STD
 eval nuclei -update-templates $DEBUG_STD
-eval go get -v github.com/haccer/subjack $DEBUG_STD
-eval git clone https://github.com/haccer/subjack $dir/subjack $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/projectdiscovery/httpx/cmd/httpx $DEBUG_STD
 printf "${bgreen} 30%% done${reset}\n\n"
+eval go get -u github.com/lukasikic/subzy $DEBUG_STD
 eval go get -u github.com/gwen001/github-endpoints $DEBUG_STD
 eval git clone https://github.com/s0md3v/XSStrike $dir/XSStrike $DEBUG_STD
 eval git clone https://github.com/1ndianl33t/Gf-Patterns $dir/Gf-Patterns $DEBUG_STD
@@ -181,7 +180,7 @@ fi
 
 $SUDO chmod 755 /usr/local/bin/findomain
 cd $dir/massdns; eval make $DEBUG_STD
-$SUDO cp $dir/massdns/bin/massdns /usr/bin/
+$SUDO cp $dir/massdns/bin/massdns /usr/local/bin/
 
 cd $dir/Interlace && eval $SUDO python3 setup.py install $DEBUG_STD
 cd $dir/LinkFinder && eval $SUDO python3 setup.py install $DEBUG_STD
@@ -190,6 +189,7 @@ cd $dir
 eval git clone https://github.com/devanshbatham/OpenRedireX $dir/OpenRedireX $DEBUG_STD
 printf "${bgreen} 90%% done${reset}\n\n"
 eval subfinder $DEBUG_STD
+eval notify -version $DEBUG_STD
 mkdir -p ~/.config/amass/
 eval wget -nc -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini $DEBUG_STD
 cd ~/.gf; eval wget -O potential.json https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json $DEBUG_STD; cd $dir
@@ -201,14 +201,14 @@ eval wget -O permutations_list.txt https://gist.githubusercontent.com/six2dez/ff
 eval wget -O ssrf.py https://gist.githubusercontent.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw/ea0774de5e27f9bc855207b175249edae2e9ccef/asyncio_ssrf.py $DEBUG_STD
 eval wget -O fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD
 eval wget -O lfi_wordlist.txt https://gist.githubusercontent.com/detonxx/a885ce7dd64a7139cb6f5b6860499ba8/raw/f91e76e3f8b1649f389d4fea9c44f360a5b76890/LFI-payloads.txt $DEBUG_STD
-eval wget -nc -O ~/.config/notify/notify.conf https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw/a66c4d8cf47a3bc95f5e9ba84773428662ea760c/notify_sample.conf
+eval wget -nc -O ~/.config/notify/notify.conf https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw/a66c4d8cf47a3bc95f5e9ba84773428662ea760c/notify_sample.conf $DEBUG_ERROR
 
 sed -i 's/^miscellaneous/#miscellaneous/' ~/nuclei-templates/.nuclei-ignore
 
 #stripping all Go binaries
 eval strip -s $HOME/go/bin/* $DEBUG_STD
 
-printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - GitHub (${dir}/.github_tokens)\n - favup (shodan init SHODANPAIDAPIKEY)\n - SSRF Server (COLLAB_SERVER env var) \n - Blind XSS Server (XSS_SERVER env var)\n\n${reset}"
+printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - GitHub (~/Tools/.github_tokens)\n - favup (shodan init SHODANPAIDAPIKEY)\n - SSRF Server (COLLAB_SERVER env var) \n - Blind XSS Server (XSS_SERVER env var)\n\n${reset}"
 
 printf "${bgreen} Finished!${reset}\n\n"
 printf "\n\n${bgreen}#######################################################################\n"
