@@ -139,35 +139,35 @@ ReconFTW is a tool designed to perform automated recon on a target domain by run
 - Multiple subdomain enumeration techniques (passive, bruteforce, permutations and scraping)
   - Passive ([subfinder](https://github.com/projectdiscovery/subfinder), [assetfinder](https://github.com/tomnomnom/assetfinder), [amass](https://github.com/OWASP/Amass), [findomain](https://github.com/Findomain/Findomain), [crobat](https://github.com/cgboal/sonarsearch), [waybackurls](https://github.com/tomnomnom/waybackurls))
   - Certificate transparency ([crtfinder](https://github.com/eslam3kl/crtfinder) and [bufferover](tls.bufferover.run))
-  - Bruteforce ([shuffledns](https://github.com/projectdiscovery/shuffledns))
-  - Permutations ([dnsgen](https://github.com/ProjectAnte/dnsgen))
-  - Subdomain JS Scraping ([JSFinder](https://github.com/Threezh1/JSFinder))
-- Sub TKO ([subjack](https://github.com/haccer/subjack) and [nuclei](https://github.com/projectdiscovery/nuclei))
-- Web Prober ([httpx](https://github.com/projectdiscovery/httpx))
-- Web screenshot ([webscreenshot](https://github.com/maaaaz/webscreenshot))
-- Template scanner ([nuclei](https://github.com/projectdiscovery/nuclei))
-- Port Scanner ([naabu](https://github.com/projectdiscovery/naabu))
-- Url extraction ([waybackurls](https://github.com/tomnomnom/waybackurls), [gau](https://github.com/lc/gau), [gospider](https://github.com/jaeles-project/gospider), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3))
-- Pattern Search ([gf](https://github.com/tomnomnom/waybackurls) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns))
-- Param discovery ([paramspider](https://github.com/devanshbatham/ParamSpider) and [arjun](https://github.com/s0md3v/Arjun))
-- XSS ([XSStrike](https://github.com/s0md3v/XSStrike))
-- Open redirect ([Openredirex](https://github.com/devanshbatham/OpenRedireX))
-- SSRF ([asyncio_ssrf.py](https://gist.github.com/h4ms1k/adcc340495d418fcd72ec727a116fea2))
-- CRLF ([crlfuzz](https://github.com/dwisiswant0/crlfuzz))
-- Github ([GitDorker](https://github.com/obheda12/GitDorker))
-- Favicon Real IP ([fav-up](https://github.com/pielco11/fav-up))
-- Javascript analysis ([LinkFinder](https://github.com/GerbenJavado/LinkFinder), scripts from [JSFScan](https://github.com/KathanP19/JSFScan.sh))
-- Fuzzing ([ffuf](https://github.com/ffuf/ffuf))
-- Cors ([Corsy](https://github.com/s0md3v/Corsy))
-- SSL tests ([testssl](https://github.com/drwetter/testssl.sh))
-- Multithread in some steps ([Interlace](https://github.com/codingo/Interlace))
-- Custom output folder (default under Recon/target.tld/)
-- Run standalone steps (subdomains, subtko, web, gdorks...)
-- Polished installer compatible with most distros
-- Verbose mode
-- Update tools script
-- Raspberry Pi support
-- Docker support
+  - Bruteforce ([shuffledns](https://github.com/projectdiscovery/shuffledns))  
+  - Permutations ([dnsgen](https://github.com/ProjectAnte/dnsgen))  
+  - Subdomain JS Scraping ([JSFinder](https://github.com/Threezh1/JSFinder))  
+- Sub TKO ([subzy](https://github.com/LukaSikic/subzy) and [nuclei](https://github.com/projectdiscovery/nuclei))  
+- Web Prober ([httpx](https://github.com/projectdiscovery/httpx))  
+- Web screenshot ([webscreenshot](https://github.com/maaaaz/webscreenshot))  
+- Template scanner ([nuclei](https://github.com/projectdiscovery/nuclei))  
+- Port Scanner ([naabu](https://github.com/projectdiscovery/naabu))  
+- Url extraction ([waybackurls](https://github.com/tomnomnom/waybackurls), [gau](https://github.com/lc/gau), [gospider](https://github.com/jaeles-project/gospider), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3))  
+- Pattern Search ([gf](https://github.com/tomnomnom/waybackurls) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns))  
+- Param discovery ([paramspider](https://github.com/devanshbatham/ParamSpider) and [arjun](https://github.com/s0md3v/Arjun))  
+- XSS ([XSStrike](https://github.com/s0md3v/XSStrike))  
+- Open redirect ([Openredirex](https://github.com/devanshbatham/OpenRedireX))  
+- SSRF ([asyncio_ssrf.py](https://gist.github.com/h4ms1k/adcc340495d418fcd72ec727a116fea2))  
+- CRLF ([crlfuzz](https://github.com/dwisiswant0/crlfuzz))  
+- Github ([GitDorker](https://github.com/obheda12/GitDorker))  
+- Favicon Real IP ([fav-up](https://github.com/pielco11/fav-up))  
+- Javascript analysis ([LinkFinder](https://github.com/GerbenJavado/LinkFinder), scripts from [JSFScan](https://github.com/KathanP19/JSFScan.sh))  
+- Fuzzing ([ffuf](https://github.com/ffuf/ffuf))  
+- Cors ([Corsy](https://github.com/s0md3v/Corsy))  
+- SSL tests ([testssl](https://github.com/drwetter/testssl.sh))  
+- Multithread in some steps ([Interlace](https://github.com/codingo/Interlace))  
+- Custom output folder (default under Recon/target.tld/)  
+- Run standalone steps (subdomains, subtko, web, gdorks...)  
+- Polished installer compatible with most distros  
+- Verbose mode  
+- Update tools script  
+- Raspberry Pi support  
+- Docker support  
 - CMS Scanner ([CMSeeK](https://github.com/Tuhinshubhra/CMSeeK))
 - Out of Scope Support
 - LFI Checks
