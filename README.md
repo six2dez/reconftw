@@ -1,6 +1,6 @@
 <h1 align="center">
   <br>
-  <a href="https://github.com/six2dez/reconftw"><img src="images/banner.png" alt="reconftw"></a>
+  <a href="https://github.com/six2dez/reconftw"><img src="https://github.com/six2dez/reconftw/blob/main/images/banner.png" alt="reconftw"></a>
   <br>
   ReconFTW
   <br>
