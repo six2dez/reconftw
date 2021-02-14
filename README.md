@@ -35,6 +35,7 @@ This is a live development project, until the first stable release (1.0) it will
 - [Installation Instructions](#installation-instructions)
 - [Usage](#usage)
 - [Running ReconFTW](#running-reconftw)
+- [Sample Video](#sample-video)
 - [:fire: Features :fire:](#fire-features-fire)
 - [Mindmap/Workflow](#mindmapworkflow)
 - [:hourglass: Improvement plan :hourglass:](#hourglass-improvement-plan-hourglass)
@@ -132,6 +133,10 @@ ReconFTW is a tool designed to perform automated recon on a target domain by run
 ```bash
 ▶ ./reconftw.sh -h
 ```
+
+## Sample video
+
+![Video](images/Video.gif)
 
 ## :fire: Features :fire:
 
