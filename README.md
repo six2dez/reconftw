@@ -9,8 +9,8 @@
 <h4 align="center">A simple bash script for full recon</h4>
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/0.9-beta1">
-    <img src="https://img.shields.io/badge/release-0.9--beta1-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/1.0-stable">
+    <img src="https://img.shields.io/badge/release-1.0--stable-green">
   </a>
    </a>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
