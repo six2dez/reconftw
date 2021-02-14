@@ -27,10 +27,6 @@
   </a>
 </p>
 
-:construction:  ***Warning*** :construction:
-
-This is a live development project, until the first stable release (1.0) it will be constantly updated in master branch, so if you have detected any bug, you can open an issue or ping me over [Telegram](https://t.me/six2dez) or [Twitter](https://twitter.com/Six2dez1) and I will try to do my best :)
-
 - [Summary](#summary)
 - [Installation Instructions](#installation-instructions)
 - [Usage](#usage)
