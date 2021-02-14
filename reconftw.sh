@@ -23,7 +23,8 @@ COOKIE=""
 #COLLAB_SERVER=XXXXXXXXXXXXXXXXX
 #XSS_SERVER=XXXXXXXXXXXXXXXXX
 
-
+#Get number of processors
+NPROC=$(nproc)
 
 banner(){
 	printf "\n${bgreen}"
@@ -119,6 +120,7 @@ function tools_installed(){
 	eval type -P gau $DEBUG_STD || { printf "${bred} [*] Gau		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P shuffledns $DEBUG_STD || { printf "${bred} [*] ShuffleDns		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P subzy $DEBUG_STD || { printf "${bred} [*] Subzy		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P cf-check $DEBUG_STD || { printf "${bred} [*] Cf-check		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P nuclei $DEBUG_STD || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; allinstalled=false;}
 	[ -d ~/nuclei-templates ] || { printf "${bred} [*] Nuclei templates    [NO]${reset}\n"; allinstalled=false;}
 	eval type -P naabu $DEBUG_STD || { printf "${bred} [*] Naabu		[NO]${reset}\n"; allinstalled=false;}
@@ -184,6 +186,7 @@ function tools_full(){
 	eval type -P gau $DEBUG_STD && printf "${bgreen}[*] Gau		        [YES]${reset}\n" || { printf "${bred} [*] Gau		[NO]${reset}\n"; }
 	eval type -P shuffledns $DEBUG_STD && printf "${bgreen}[*] ShuffleDns		[YES]${reset}\n" || { printf "${bred} [*] ShuffleDns		[NO]${reset}\n"; }
 	eval type -P subzy $DEBUG_STD && printf "${bgreen}[*] Subzy		[YES]${reset}\n" || { printf "${bred} [*] Subzy		[NO]${reset}\n"; }
+	eval type -P cf-check $DEBUG_STD && printf "${bgreen}[*] Cf-check		[YES]${reset}\n" || { printf "${bred} [*] Cf-check		[NO]${reset}\n"; }
 	eval type -P nuclei $DEBUG_STD && printf "${bgreen}[*] Nuclei		[YES]${reset}\n" || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; }
 	[ -d ~/nuclei-templates ] && printf "${bgreen}[*] Nuclei templates  	[YES]${reset}\n" || printf "${bred} [*] Nuclei templates  	[NO]${reset}\n"
 	eval type -P naabu $DEBUG_STD && printf "${bgreen}[*] Naabu		[YES]${reset}\n" || { printf "${bred} [*] Naabu		[NO]${reset}\n"; }
@@ -505,7 +508,7 @@ portscan(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Port Scan ${reset}\n\n"
 			start=`date +%s`
-			naabu -top-ports 1000 -silent -exclude-cdn -nmap-cli 'nmap -sV -n --max-retries 2 -oN -' -iL ${domain}_subdomains.txt > ${domain}_portscan.txt;
+			cf-check -c $NPROC -d ${domain}_subdomains.txt | naabu -top-ports 1000 -silent -exclude-cdn -nmap-cli 'nmap -sV -n --max-retries 2 -oN -' > ${domain}_portscan.txt;
 			eval cat ${domain}_portscan.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
@@ -523,6 +526,7 @@ nuclei_check(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Template Scanning with Nuclei ${reset}\n\n"
 			start=`date +%s`
+			eval nuclei -update-templates $DEBUG_STD
 			mkdir -p nuclei_output
 			printf "${yellow} Running : Nuclei Technologies${reset}\n\n"
 			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/technologies/ -o nuclei_output/${domain}_technologies.txt;
@@ -619,26 +623,28 @@ url_gf(){
 jschecks(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
 		then
-			printf "${bgreen}#######################################################################\n"
-			printf "${bblue} Javascript Scan ${reset}\n\n"
-			start=`date +%s`
-			printf "${yellow} Running : Fetching Urls 1/5${reset}\n"
-			cat ${domain}_url_extract_js.txt | grep -iE "\.js$" | anew -q ${domain}_jsfile_links.txt;
-			cat ${domain}_url_extract_js.txt | subjs | anew -q ${domain}_jsfile_links.txt;
-			printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
-			cat ${domain}_jsfile_links.txt | httpx -follow-redirects -silent -threads 100 -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt
-			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
-			interlace -tL ${domain}_js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> ${domain}_js_endpoints.txt" &>/dev/null
-			eval sed -i '/^Running against/d; /^Invalid input/d; /^$/d' ${domain}_js_endpoints.txt $DEBUG_ERROR
-			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
-			cat ${domain}_js_livelinks.txt | nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o ${domain}_js_secrets.txt
-			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
-			cat ${domain}_js_livelinks.txt | python3 $tools/getjswords.py | anew -q ${domain}_js_Wordlist.txt && touch $called_fn_dir/.${FUNCNAME[0]}
-			end=`date +%s`
-			getElapsedTime $start $end
-			printf "${bblue}\n Javascript Scan Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in ${domain}_js_*.txt files${reset}\n"
-			printf "${bgreen}#######################################################################\n\n"
+			if [ "$DEEP" = true ] ; then
+				printf "${bgreen}#######################################################################\n"
+				printf "${bblue} Javascript Scan ${reset}\n\n"
+				start=`date +%s`
+				printf "${yellow} Running : Fetching Urls 1/5${reset}\n"
+				cat ${domain}_url_extract_js.txt | grep -iE "\.js$" | anew -q ${domain}_jsfile_links.txt;
+				cat ${domain}_url_extract_js.txt | subjs | anew -q ${domain}_jsfile_links.txt;
+				printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
+				cat ${domain}_jsfile_links.txt | httpx -follow-redirects -silent -threads 100 -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt
+				printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
+				interlace -tL ${domain}_js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> ${domain}_js_endpoints.txt" &>/dev/null
+				eval sed -i '/^Running against/d; /^Invalid input/d; /^$/d' ${domain}_js_endpoints.txt $DEBUG_ERROR
+				printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
+				cat ${domain}_js_livelinks.txt | nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o ${domain}_js_secrets.txt
+				printf "${yellow} Running : Building wordlist 5/5${reset}\n"
+				cat ${domain}_js_livelinks.txt | python3 $tools/getjswords.py | anew -q ${domain}_js_Wordlist.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+				end=`date +%s`
+				getElapsedTime $start $end
+				printf "${bblue}\n Javascript Scan Finished in ${runtime}\n"
+				printf "${bblue} Results are saved in ${domain}_js_*.txt files${reset}\n"
+				printf "${bgreen}#######################################################################\n\n"
+			fi
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
@@ -745,15 +751,14 @@ favicon(){
 			printf "${bblue} FavIcon Hash Extraction ${reset}\n\n"
 			start=`date +%s`
 			cd $tools/fav-up
-			eval python3 favUp.py -w $domain -sc -o favicontest.json $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-			if [ ! -f "favicontest.json" ]
+			eval python3 favUp.py -w $domain -sc -o favicontest.json $DEBUG_STD
+			if [ -f "favicontest.json" ]
 			then
-				mv favicontest.json $dir/favicontest.json
-				eval cat favicontest.json | jq > ${domain}_favicontest.txt $DEBUG_STD
-				rm favicontest.json
+				cat favicontest.json | jq > ${domain}_favicontest.txt
 				eval cat ${domain}_favicontest.txt $DEBUG_ERROR | grep found_ips
+				mv favicontest.json $dir/favicontest.json
 			fi
-			cd $dir
+			cd $dir && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n FavIcon Hash Extraction Finished in ${runtime}\n"
@@ -842,17 +847,19 @@ cors(){
 test_ssl(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
 		then
-			printf "${bgreen}#######################################################################\n"
-			printf "${bblue} SSL Test ${reset}\n"
-			start=`date +%s`
-			eval cat ${domain}_probed.txt $DEBUG_ERROR | grep "^https" | anew -q ${domain}_probed_https.txt
-			$tools/testssl.sh/testssl.sh --quiet --color 0 -U -iL ${domain}_probed_https.txt > ${domain}_testssl.txt && touch $called_fn_dir/.${FUNCNAME[0]}
-			eval rm ${domain}_probed_https.txt $DEBUG_ERROR
-			end=`date +%s`
-			getElapsedTime $start $end
-			printf "${bblue}\n SSL Test Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in ${domain}_testssl.txt ${reset}\n"
-			printf "${bgreen}#######################################################################\n"
+			if [ "$DEEP" = true ] ; then
+				printf "${bgreen}#######################################################################\n"
+				printf "${bblue} SSL Test ${reset}\n"
+				start=`date +%s`
+				eval cat ${domain}_probed.txt $DEBUG_ERROR | grep "^https" | anew -q ${domain}_probed_https.txt
+				$tools/testssl.sh/testssl.sh --quiet --color 0 -U -iL ${domain}_probed_https.txt > ${domain}_testssl.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval rm ${domain}_probed_https.txt $DEBUG_ERROR
+				end=`date +%s`
+				getElapsedTime $start $end
+				printf "${bblue}\n SSL Test Finished in ${runtime}\n"
+				printf "${bblue} Results are saved in ${domain}_testssl.txt ${reset}\n"
+				printf "${bgreen}#######################################################################\n"
+			fi
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
@@ -1049,9 +1056,7 @@ all(){
 			ssrf_checks
 			crlf_checks
 			lfi
-			if [ "$DEEP" = true ] ; then
-				jschecks
-			fi
+			jschecks
 			params
 			xss
 			test_ssl
@@ -1077,9 +1082,7 @@ all(){
 		ssrf_checks
 		crlf_checks
 		lfi
-		if [ "$DEEP" = true ] ; then
-			jschecks
-		fi
+		jschecks
 		params
 		xss
 		test_ssl
@@ -1207,9 +1210,7 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 			ssrf_checks
 			crlf_checks
 			lfi
-			if [ "$DEEP" = true ] ; then
-				jschecks
-			fi
+			jschecks
 			params
 			xss
 			test_ssl

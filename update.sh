@@ -44,7 +44,7 @@ printf "${bblue}\n Updating installed python packages is finished ${reset}\n"
 printf "${bgreen}#######################################################################\n"
 
 #Tools to be updated
-repos="six2dez/degoogle_hunter 1ndianl33t/Gf-Patterns s0md3v/XSStrike gwen001/github-search eslam3kl/crtfinder dark-warlord14/LinkFinder maaaaz/webscreenshot ProjectAnte/dnsgen devanshbatham/ParamSpider Threezh1/JSFinder haccer/subjack s0md3v/Corsy Tuhinshubhra/CMSeeK pielco11/fav-up tomnomnom/gf codingo/Interlace blechschmidt/massdns devanshbatham/OpenRedireX obheda12/GitDorker"
+repos="six2dez/degoogle_hunter 1ndianl33t/Gf-Patterns s0md3v/XSStrike gwen001/github-search eslam3kl/crtfinder dark-warlord14/LinkFinder maaaaz/webscreenshot ProjectAnte/dnsgen devanshbatham/ParamSpider Threezh1/JSFinder s0md3v/Corsy Tuhinshubhra/CMSeeK pielco11/fav-up tomnomnom/gf codingo/Interlace blechschmidt/massdns devanshbatham/OpenRedireX obheda12/GitDorker"
 printf "\n${bgreen}--==[ ************************************************************************************ ]==--\n"
 printf "${bred}                reconftw updater script (apt/rpm/pacman compatible)${reset}\n"
 printf "\n${bgreen}--==[ ************************************************************************************ ]==--\n"
@@ -102,7 +102,7 @@ printf "${bgreen}###############################################################
 #Updating Nuclei templates
 printf "${bgreen}#######################################################################\n"
 printf "${bblue} Updating Nuclei templates \n"
-nuclei -update-templates $DEBUG_STD
+eval nuclei -update-templates $DEBUG_STD
 sed -i 's/^miscellaneous/#miscellaneous/' ~/nuclei-templates/.nuclei-ignore
 printf "${bblue}\n Updating Nuclei templates is finished ${reset}\n"
 printf "${bgreen}#######################################################################\n"

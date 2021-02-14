@@ -7,6 +7,8 @@ ENV XSS_SERVER='XXXXXXXXXXX'
 # Change this
 ENV SHODAN_API_KEY='XXXXXXXXXXXXXX'
 
+
+
 # DON'T CHANGE THIS
 ENV GOROOT=/usr/local/go
 ENV GOPATH=$HOME/go
@@ -29,20 +31,23 @@ RUN set -x \
         && apt-get -yqq dist-upgrade \
         && apt-get clean
 
-RUN apt-get --yes install git wget \
-    && mkdir -p /root/Tools \
+RUN apt-get --yes install git wget
+
+RUN LATEST_GO=$(wget -qO- https://golang.org/dl/ | grep -oP 'go([0-9\.]+)\.linux-amd64\.tar\.gz' | head -n 1 | grep -oP 'go[0-9\.]+' | grep -oP '[0-9\.]+' | head -c -2) &&\
+    wget --quiet https://dl.google.com/go/go$LATEST_GO.linux-amd64.tar.gz &&\
+    tar -C /usr/local -xzf go$LATEST_GO.linux-amd64.tar.gz &&\
+    cp /usr/local/go/bin/go /usr/bin
+
+RUN mkdir -p /root/Tools \
     && cd /root/Tools \
     && git clone https://github.com/six2dez/reconftw.git \
     && cd reconftw \
-    && ./install.sh \
     && ./install.sh
 
 ADD github_tokens.txt /root/Tools/.github_tokens
 ADD subfinder_config.yaml /root/.config/subfinder/config.yaml
 ADD amass_config.ini /root/.config/amass/config.ini
 ADD notify.conf /root/.config/notify/notify.conf
-
-#RUN shodan init $SHODAN_API_KEY
 
 CMD ["bash"]
 WORKDIR /root/Tools/reconftw
