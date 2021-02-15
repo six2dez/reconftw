@@ -28,11 +28,11 @@ printf "${bgreen} reconftw installer script ${reset}\n\n"
 install_apt(){
     eval $SUDO apt install chromium-browser -y $DEBUG_STD
     eval $SUDO apt install chromium -y $DEBUG_STD
-    eval $SUDO apt install python3 python3-pip ruby git curl libpcap-dev wget python-dev python3-dev dnsutils build-essential xvfb libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq -y $DEBUG_STD
+    eval $SUDO apt install python3 python3-pip ruby git curl libpcap-dev wget python-dev python3-dev dnsutils build-essential xvfb libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq python3-shodan -y $DEBUG_STD
 }
 
 install_yum(){
-    eval $SUDO yum install python3 python3-pip ruby git curl libpcap-devel chromium wget openssl-devel bind-utils python3-devel libxslt-devel libffi-devel xorg-x11-server-Xvfb libxml2-devel nmap zlib-devel jq -y $DEBUG_STD
+    eval $SUDO yum install python3 python3-pip ruby git curl libpcap-devel chromium wget openssl-devel bind-utils python3-devel libxslt-devel libffi-devel xorg-x11-server-Xvfb libxml2-devel nmap zlib-devel jq python-shodan -y $DEBUG_STD
 }
 
 install_pacman(){
@@ -57,6 +57,9 @@ if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]]
             $SUDO cp /usr/local/go/bin/go /usr/bin
         fi
         rm -rf go$LATEST_GO*
+        export GOROOT=/usr/local/go
+        export GOPATH=$HOME/go
+        export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
 if [ -f ~/.bashrc ]
 then
 cat << EOF >> ~/.bashrc
@@ -78,8 +81,8 @@ export GOPATH=\$HOME/go
 export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH
 EOF
 fi
-printf "${yellow} Golang installed! Open a new terminal and run again this script ${reset}\n"
-exit
+# printf "${yellow} Golang installed! Open a new terminal and run again this script ${reset}\n"
+# exit
 fi
 
 [ -n "$GOPATH" ] || { printf "${bred} GOPATH env var not detected, add Golang env vars to your \$HOME/.bashrc or \$HOME/.zshrc:\n\n export GOROOT=/usr/local/go\n export GOPATH=\$HOME/go\n export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH\n\n"; exit 1; }
