@@ -66,6 +66,7 @@ export GOROOT=/usr/local/go
 export GOPATH=\$HOME/go
 export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH
 EOF
+source ~/.bashrc
 fi
 
 if [ -f ~/.zshrc ]
@@ -77,8 +78,9 @@ export GOROOT=/usr/local/go
 export GOPATH=\$HOME/go
 export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH
 EOF
+source ~/.zshrc
 fi
-printf "${yellow} Golang installed! Open a new terminal and run again this script ${reset}\n"
+# printf "${yellow} Golang installed! Open a new terminal and run again this script ${reset}\n"
 exit
 fi
 
