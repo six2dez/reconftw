@@ -580,9 +580,10 @@ urlchecks(){
 			then
 				eval github-endpoints -q -k -d $domain -t $tools/.github_tokens -raw $DEBUG_ERROR | anew -q ${domain}_url_extract_tmp.txt
 			fi
-			cat ${domain}_url_extract_tmp.txt | grep "=" | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | qsreplace FUZZ | qsreplace -a | anew -q ${domain}_url_extract.txt && touch $called_fn_dir/.${FUNCNAME[0]};
+			cat ${domain}_url_extract_tmp.txt | grep "=" | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | qsreplace FUZZ | qsreplace -a | anew -q ${domain}_url_extract_tmp2.txt
 			cat ${domain}_url_extract_tmp.txt | egrep -i ".(js)" | anew -q ${domain}_url_extract_js.txt
-			eval rm ${domain}_url_extract_tmp.txt gospider_tmp.txt $DEBUG_ERROR
+			uddup -u ${domain}_url_extract_tmp2.txt -o ${domain}_url_extract.txt && touch $called_fn_dir/.${FUNCNAME[0]};
+			eval rm ${domain}_url_extract_tmp.txt ${domain}_url_extract_tmp2.txt gospider_tmp.txt $DEBUG_ERROR
 			end=`date +%s`
 			getElapsedTime $start $end
 			NUMOFLINES=$(wc -l < ${domain}_url_extract.txt)
