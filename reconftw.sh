@@ -730,9 +730,11 @@ github(){
 			start=`date +%s`
 			if [ -s "$tools/.github_tokens" ]
 			then
-				eval python3 $tools/GitDorker/GitDorker.py -tf $tools/.github_tokens -q $domain -e 10 -d $tools/GitDorker/Dorks/medium_dorks.txt -o ${domain}_gitrecon.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-				cat ${domain}_gitrecon.txt_gh_dorks.csv | sort -n --field-separator=',' --key=3 | grep -v ",0" | awk -F "\"*,\"*" '{print $1,$2}' | sed 's/"""//' > ${domain}_gitrecon.txt
-				eval rm ${domain}_gitrecon.txt_gh_dorks.csv $DEBUG_ERROR
+				if [ "$DEEP" = true ] ; then
+					eval python3 $tools/GitDorker/GitDorker.py -tf $tools/.github_tokens -q $domain -e 10 -d $tools/GitDorker/Dorks/alldorksv3 | grep "\[+\]" | anew -q ${domain}_gitrecon.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				else
+					eval python3 $tools/GitDorker/GitDorker.py -tf $tools/.github_tokens -q $domain -e 10 -d $tools/GitDorker/Dorks/medium_dorks.txt | grep "\[+\]" | anew -q ${domain}_gitrecon.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				fi
 			else
 				printf "\n${bred} Required file ${tools}/.github_tokens not exists or empty${reset}\n"
 			fi
