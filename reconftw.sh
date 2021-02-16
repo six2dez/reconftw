@@ -580,7 +580,7 @@ urlchecks(){
 			then
 				eval github-endpoints -q -k -d $domain -t $tools/.github_tokens -raw $DEBUG_ERROR | anew -q ${domain}_url_extract_tmp.txt
 			fi
-			cat ${domain}_url_extract_tmp.txt | grep "=" | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | qsreplace FUZZ | qsreplace -a | anew -q ${domain}_url_extract_tmp2.txt
+			cat ${domain}_url_extract_tmp.txt ${domain}_param.txt | grep "=" | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | qsreplace FUZZ | qsreplace -a | anew -q ${domain}_url_extract_tmp2.txt
 			cat ${domain}_url_extract_tmp.txt | egrep -i ".(js)" | anew -q ${domain}_url_extract_js.txt
 			uddup -u ${domain}_url_extract_tmp2.txt -o ${domain}_url_extract.txt && touch $called_fn_dir/.${FUNCNAME[0]};
 			eval rm ${domain}_url_extract_tmp.txt ${domain}_url_extract_tmp2.txt gospider_tmp.txt $DEBUG_ERROR
@@ -660,19 +660,27 @@ params(){
 			start=`date +%s`
 			printf "${yellow}\n\n Running : Finding params with paramspider${reset}\n"
 			cat ${domain}_probed.txt | sed -r "s/https?:\/\///" | anew -q ${domain}_probed_nohttp.txt
-			interlace -tL ${domain}_probed_nohttp.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,js" &>/dev/null && touch $called_fn_dir/.${FUNCNAME[0]}
-			find output/ -name '*.txt' -exec cat {} \; | anew -q ${domain}_param.txt
-			sed '/^FUZZ/d' -i ${domain}_param.txt
+			interlace -tL ${domain}_probed_nohttp.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt,js" &>/dev/null && touch $called_fn_dir/.${FUNCNAME[0]}
+			find output/ -name '*.txt' -exec cat {} \; | anew -q ${domain}_param_tmp.txt
+			sed '/^FUZZ/d' -i ${domain}_param_tmp.txt
 			eval rm -rf output/ $DEBUG_ERROR
 			eval rm ${domain}_probed_nohttp.txt $DEBUG_ERROR
 			if [ "$DEEP" = true ] ; then
 				printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
-				eval arjun -i ${domain}_param.txt -t 20 -o ${domain}_arjun.json $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval arjun -i ${domain}_param_tmp.txt -t 20 -oT ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+			else
+				if [[ $(cat ${domain}_param_tmp.txt | wc -l) -le 200 ]]
+				then
+					eval arjun -i ${domain}_param_tmp.txt -t 20 -oT ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				else
+					cp ${domain}_param_tmp.txt ${domain}_param.txt
+				fi
 			fi
+			eval rm ${domain}_param_tmp.txt $DEBUG_ERROR
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Parameter Discovery Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in ${domain}_param.txt and ${domain}_arjun.json${reset}\n"
+			printf "${bblue} Results are saved in ${domain}_param.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -1054,6 +1062,7 @@ all(){
 			cms_scanner
 			fuzz
 			cors
+			params
 			urlchecks
 			url_gf
 			open_redirect
@@ -1061,7 +1070,6 @@ all(){
 			crlf_checks
 			lfi
 			jschecks
-			params
 			xss
 			test_ssl
 			end
@@ -1080,6 +1088,7 @@ all(){
 		cms_scanner
 		fuzz
 		cors
+		params
 		urlchecks
 		url_gf
 		open_redirect
@@ -1087,7 +1096,6 @@ all(){
 		crlf_checks
 		lfi
 		jschecks
-		params
 		xss
 		test_ssl
 		end
@@ -1208,6 +1216,7 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 			cms_scanner
 			fuzz
 			cors
+			params
 			urlchecks
 			url_gf
 			open_redirect
@@ -1215,7 +1224,6 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 			crlf_checks
 			lfi
 			jschecks
-			params
 			xss
 			test_ssl
 			end
