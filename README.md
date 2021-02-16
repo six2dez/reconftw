@@ -25,6 +25,9 @@
   <a href="https://github.com/six2dez/reconftw/wiki">
     <img src="https://img.shields.io/badge/doc-wiki-blue.svg">
   </a>
+  <a href="https://t.me/joinchat/H5bAaw3YbzzmI5co">
+    <img src="https://img.shields.io/badge/telegram-@ReconFTW-blue.svg">
+  </a>
 </p>
 
 - [Summary](#summary)
