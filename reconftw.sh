@@ -308,11 +308,11 @@ sub_crt(){
 			eval rm ${outputfile}.txt $DEBUG_ERROR
 			cd $dir
 			if [ "$FULLSCOPE" = true ] ; then
-				eval curl "https://tls.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r .Results[] $DEBUG_ERROR | cut -d ',' -f3 | sort -u | anew -q crtsh_subs.txt
-				eval curl "https://dns.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r '.FDNS_A'[],'.RDNS'[] $DEBUG_ERROR | cut -d ',' -f2 | sort -u | anew -q crtsh_subs.txt
+				eval curl "https://tls.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r .Results[] $DEBUG_ERROR | cut -d ',' -f3 | anew -q crtsh_subs.txt
+				eval curl "https://dns.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r '.FDNS_A'[],'.RDNS'[] $DEBUG_ERROR | cut -d ',' -f2 | anew -q crtsh_subs.txt
 			else
-				eval curl "https://tls.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r .Results[] $DEBUG_ERROR | cut -d ',' -f3 | sort -u | grep -F ".$domain" | anew -q crtsh_subs.txt
-				eval curl "https://dns.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r '.FDNS_A'[],'.RDNS'[] $DEBUG_ERROR | cut -d ',' -f2 | sort -u | grep -F ".$domain" | anew -q crtsh_subs.txt
+				eval curl "https://tls.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r .Results[] $DEBUG_ERROR | cut -d ',' -f3 | grep -F ".$domain" | anew -q crtsh_subs.txt
+				eval curl "https://dns.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r '.FDNS_A'[],'.RDNS'[] $DEBUG_ERROR | cut -d ',' -f2 | grep -F ".$domain" | anew -q crtsh_subs.txt
 			fi
 			NUMOFLINES=$(wc -l < crtsh_subs.txt)
 			end=`date +%s`
@@ -363,7 +363,7 @@ sub_scraping(){
 			start=`date +%s`
 			printf "${yellow} Running : JS scraping subdomain search${reset}\n"
 			touch JS_subs.txt
-			cat ${domain}_subdomains.txt | httpx -follow-redirects -H $HEADER -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed_tmp.txt
+			cat ${domain}_subdomains.txt | httpx -follow-redirects -H $HEADER -status-code -vhost -threads 100 -silent | grep "[200]" | cut -d [ -f1 | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed_tmp.txt
 			eval python3 $tools/JSFinder/JSFinder.py -f ${domain}_probed_tmp.txt -os JS_subs.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			if [[ $(cat JS_subs.txt | wc -l) -gt 0 ]]
 			then
@@ -424,7 +424,7 @@ webprobe_simple(){
 		then
 			start=`date +%s`
 			printf "${yellow} Running : Http probing${reset}\n\n"
-			cat ${domain}_subdomains.txt | httpx -follow-redirects -H $HEADER -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			cat ${domain}_subdomains.txt | httpx -follow-redirects -H $HEADER -status-code -vhost -threads 100 -silent | grep "[200]" | cut -d [ -f1 | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			if [ -f "${domain}_probed.txt" ]
 			then
 				deleteOutScoped $outOfScope_file ${domain}_probed.txt
@@ -474,7 +474,7 @@ webprobe_full(){
 			printf "${bblue} ${bgreen} Web Probe ${reset}\n\n"
 			printf "${yellow} Running : Http probing non standard ports${reset}\n\n"
 			start=`date +%s`
-			cat ${domain}_subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55672 -follow-redirects -H $HEADER -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed_uncommon_ports.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			cat ${domain}_subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55672 -follow-redirects -H $HEADER -status-code -vhost -threads 100 -silent | grep "[200]" | cut -d [ -f1 | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed_uncommon_ports.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			NUMOFLINES=$(wc -l < ${domain}_probed_uncommon_ports.txt)
