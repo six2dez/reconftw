@@ -18,7 +18,7 @@ DEEP=false
 FULLSCOPE=false
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 COOKIE=""
-HEADER="User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0"
+HEADER='"User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0"'
 
 # Uncomment this only if it is not already in your env .bashrc or .zshrc
 #COLLAB_SERVER=XXXXXXXXXXXXXXXXX
@@ -43,8 +43,17 @@ banner(){
 }
 
 start(){
+
 	global_start=`date +%s`
-	echo "****** 🙏 Thank you for making this world safer ******" | notify -silent
+
+	if grep -q '^[[:blank:]]*[^[:blank:]#;]' ~/.config/notify/notify.conf; then
+		NOTIFY="notify -silent"
+	else
+	    NOTIFY=""
+	fi
+
+	echo "****** 🙏 Thank you for making this world safer ******" | $NOTIFY
+	exit
 	tools_installed
 
 	if [ -z "$domain" ]
@@ -252,11 +261,11 @@ subdomains_full(){
 			NUMOFLINES_probed=$(wc -l < ${domain}_probed.txt)
 	fi
 	printf "${bblue}\n Final results: ${reset}\n"
-	printf "${bred}\n - ${NUMOFLINES_subs} alive subdomains${reset}\n\n" | tee /dev/tty | notify -silent
+	printf "${bred}\n - ${NUMOFLINES_subs} alive subdomains${reset}\n\n" | tee /dev/tty | $NOTIFY
 	eval cat ${domain}_subdomains.txt $DEBUG_ERROR | sort
-	printf "${bred}\n - ${NUMOFLINES_probed} web probed${reset}\n\n" | tee /dev/tty | notify -silent
+	printf "${bred}\n - ${NUMOFLINES_probed} web probed${reset}\n\n" | tee /dev/tty | $NOTIFY
 	eval cat ${domain}_probed.txt $DEBUG_ERROR | sort
-	printf "${bblue}\n Subdomain Enumeration Finished\n" | tee /dev/tty | notify -silent
+	printf "${bblue}\n Subdomain Enumeration Finished\n" | tee /dev/tty | $NOTIFY
 	printf "${bblue} Results are saved in ${domain}_subdomains.txt and ${domain}_probed.txt${reset}\n"
 	printf "${bgreen}#######################################################################\n\n"
 }
@@ -363,7 +372,7 @@ sub_scraping(){
 			start=`date +%s`
 			printf "${yellow} Running : JS scraping subdomain search${reset}\n"
 			touch JS_subs.txt
-			cat ${domain}_subdomains.txt | httpx -follow-redirects -H $HEADER -status-code -vhost -threads 100 -silent | grep "[200]" | cut -d [ -f1 | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed_tmp.txt
+			cat ${domain}_subdomains.txt | httpx -follow-redirects -H "${HEADER}" -status-code -vhost -threads 100 -silent | grep "[200]" | cut -d [ -f1 | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed_tmp.txt
 			eval python3 $tools/JSFinder/JSFinder.py -f ${domain}_probed_tmp.txt -os JS_subs.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			if [[ $(cat JS_subs.txt | wc -l) -gt 0 ]]
 			then
@@ -424,7 +433,7 @@ webprobe_simple(){
 		then
 			start=`date +%s`
 			printf "${yellow} Running : Http probing${reset}\n\n"
-			cat ${domain}_subdomains.txt | httpx -follow-redirects -H $HEADER -status-code -vhost -threads 100 -silent | grep "[200]" | cut -d [ -f1 | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			cat ${domain}_subdomains.txt | httpx -follow-redirects -H "${HEADER}" -status-code -vhost -threads 100 -silent | grep "[200]" | cut -d [ -f1 | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			if [ -f "${domain}_probed.txt" ]
 			then
 				deleteOutScoped $outOfScope_file ${domain}_probed.txt
@@ -457,7 +466,7 @@ subtakeover(){
 			else
 				NUMOFLINES=0
 			fi
-			printf "${bred}\n Subtko: ${NUMOFLINES} subdomains in ${runtime}${reset}\n\n" | tee /dev/tty | notify -silent
+			printf "${bred}\n Subtko: ${NUMOFLINES} subdomains in ${runtime}${reset}\n\n" | tee /dev/tty | $NOTIFY
 			eval cat ${domain}_takeover.txt $DEBUG_ERROR
 			printf "${bblue}\n Subdomain Takeover Finished\n"
 			printf "${bblue} Results are saved in ${domain}_takeover.txt${reset}\n"
@@ -474,7 +483,7 @@ webprobe_full(){
 			printf "${bblue} ${bgreen} Web Probe ${reset}\n\n"
 			printf "${yellow} Running : Http probing non standard ports${reset}\n\n"
 			start=`date +%s`
-			cat ${domain}_subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55672 -follow-redirects -H $HEADER -status-code -vhost -threads 100 -silent | grep "[200]" | cut -d [ -f1 | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed_uncommon_ports.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			cat ${domain}_subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55672 -follow-redirects -H "${HEADER}" -status-code -vhost -threads 100 -silent | grep "[200]" | cut -d [ -f1 | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed_uncommon_ports.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			NUMOFLINES=$(wc -l < ${domain}_probed_uncommon_ports.txt)
@@ -532,31 +541,31 @@ nuclei_check(){
 			eval nuclei -update-templates $DEBUG_STD
 			mkdir -p nuclei_output
 			printf "${yellow} Running : Nuclei Technologies${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -H $HEADER -t ~/nuclei-templates/technologies/ -o nuclei_output/${domain}_technologies.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/technologies/ -o nuclei_output/${domain}_technologies.txt;
 			printf "${yellow}\n\n Running : Nuclei Tokens${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -H $HEADER -t ~/nuclei-templates/exposed-tokens/ -o nuclei_output/${domain}_tokens.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/exposed-tokens/ -o nuclei_output/${domain}_tokens.txt;
 			printf "${yellow}\n\n Running : Nuclei Exposures${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -H $HEADER -t ~/nuclei-templates/exposures/ -o nuclei_output/${domain}_exposures.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/exposures/ -o nuclei_output/${domain}_exposures.txt;
 			printf "${yellow}\n\n Running : Nuclei CVEs ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -H $HEADER -t ~/nuclei-templates/cves/ -o nuclei_output/${domain}_cves.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/cves/ -o nuclei_output/${domain}_cves.txt;
 			printf "${yellow}\n\n Running : Nuclei Default Creds ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -H $HEADER -t ~/nuclei-templates/default-logins/ -o nuclei_output/${domain}_default_creds.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/default-logins/ -o nuclei_output/${domain}_default_creds.txt;
 			printf "${yellow}\n\n Running : Nuclei SubTko ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -H $HEADER -t ~/nuclei-templates/takeovers/ -o nuclei_output/${domain}_subtko.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/takeovers/ -o nuclei_output/${domain}_subtko.txt;
 			printf "${yellow}\n\n Running : Nuclei DNS ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -H $HEADER -t ~/nuclei-templates/dns/ -o nuclei_output/${domain}_dns.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/dns/ -o nuclei_output/${domain}_dns.txt;
 			printf "${yellow}\n\n Running : Nuclei Miscellaneous ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -H $HEADER -t ~/nuclei-templates/miscellaneous/ -o nuclei_output/${domain}_miscellaneous.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/miscellaneous/ -o nuclei_output/${domain}_miscellaneous.txt;
 			printf "${yellow}\n\n Running : Nuclei Panels ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -H $HEADER -t ~/nuclei-templates/exposed-panels/ -o nuclei_output/${domain}_panels.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/exposed-panels/ -o nuclei_output/${domain}_panels.txt;
 			printf "${yellow}\n\n Running : Nuclei Security Misconfiguration ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -H $HEADER -t ~/nuclei-templates/misconfiguration/ -o nuclei_output/${domain}_misconfigurations.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/misconfiguration/ -o nuclei_output/${domain}_misconfigurations.txt;
 			printf "${yellow}\n\n Running : Nuclei Vulnerabilites ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -H $HEADER -t ~/nuclei-templates/vulnerabilities/ -o nuclei_output/${domain}_vulnerabilities.txt && touch $called_fn_dir/.${FUNCNAME[0]};
+			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/vulnerabilities/ -o nuclei_output/${domain}_vulnerabilities.txt && touch $called_fn_dir/.${FUNCNAME[0]};
 			printf "\n\n"
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${bblue}\n Nuclei Scan Finished in ${runtime}\n" | tee /dev/tty | notify -silent
+			printf "${bblue}\n Nuclei Scan Finished in ${runtime}\n" | tee /dev/tty | $NOTIFY
 			printf "${bblue} Results are saved in nuclei_output folder ${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -573,9 +582,9 @@ urlchecks(){
 			cat ${domain}_probed.txt | waybackurls | anew -q ${domain}_url_extract_tmp.txt
 			cat ${domain}_probed.txt | gau | anew -q ${domain}_url_extract_tmp.txt
 			if [ "$DEEP" = true ] ; then
-				gospider -S ${domain}_probed.txt -t 100 -H $HEADER -c 10 -d 2 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt > gospider_tmp.txt
+				gospider -S ${domain}_probed.txt -t 100 -H "${HEADER}" -c 10 -d 2 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt > gospider_tmp.txt
 			else
-				gospider -S ${domain}_probed.txt -t 100 -H $HEADER -c 10 -d 1 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt > gospider_tmp.txt
+				gospider -S ${domain}_probed.txt -t 100 -H "${HEADER}" -c 10 -d 1 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt > gospider_tmp.txt
 			fi
 			cat gospider_tmp.txt | sed "s/^.*http/http/p" | anew -q ${domain}_url_extract_tmp.txt
 			if [ -s "$tools/.github_tokens" ]
@@ -589,8 +598,8 @@ urlchecks(){
 			end=`date +%s`
 			getElapsedTime $start $end
 			NUMOFLINES=$(wc -l < ${domain}_url_extract.txt)
-			printf "${bblue}\n URL Extraction Finished\n" | tee /dev/tty | notify -silent
-			printf "${bblue}\n ${NUMOFLINES} in ${runtime}\n" | tee /dev/tty | notify -silent
+			printf "${bblue}\n URL Extraction Finished\n" | tee /dev/tty | $NOTIFY
+			printf "${bblue}\n ${NUMOFLINES} in ${runtime}\n" | tee /dev/tty | $NOTIFY
 			printf "${bblue} Results are saved in ${domain}_url_extract.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -635,7 +644,7 @@ jschecks(){
 				cat ${domain}_url_extract_js.txt | grep -iE "\.js$" | anew -q ${domain}_jsfile_links.txt;
 				cat ${domain}_url_extract_js.txt | subjs | anew -q ${domain}_jsfile_links.txt;
 				printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
-				cat ${domain}_jsfile_links.txt | httpx -follow-redirects -H $HEADER -silent -threads 100 -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt
+				cat ${domain}_jsfile_links.txt | httpx -follow-redirects -H "${HEADER}" -silent -threads 100 -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt
 				printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
 				interlace -tL ${domain}_js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> ${domain}_js_endpoints.txt" &>/dev/null
 				eval sed -i '/^Running against/d; /^Invalid input/d; /^$/d' ${domain}_js_endpoints.txt $DEBUG_ERROR
@@ -794,7 +803,7 @@ fuzz(){
 			for sub in $(cat ${domain}_probed.txt); do
 				printf "${yellow}\n\n Running: Fuzzing in ${sub}${reset}\n"
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-				ffuf -mc all -fc 404 -ac -sf -s -H $HEADER -w $fuzz_wordlist -maxtime 900 -u $sub/FUZZ -or -o $dir/fuzzing/${sub_out}.tmp &>/dev/null
+				ffuf -mc all -fc 404 -ac -sf -s -H "${HEADER}" -w $fuzz_wordlist -maxtime 900 -u $sub/FUZZ -or -o $dir/fuzzing/${sub_out}.tmp &>/dev/null
 				cat $dir/fuzzing/${sub_out}.tmp | jq '[.results[]|{status: .status, length: .length, url: .url}]' | grep -oP "status\":\s(\d{3})|length\":\s(\d{1,7})|url\":\s\"(http[s]?:\/\/.*?)\"" | paste -d' ' - - - | awk '{print $2" "$4" "$6}' | sed 's/\"//g' | anew -q $dir/fuzzing/${sub_out}.txt
 				eval rm $dir/fuzzing/${sub_out}.tmp $DEBUG_ERROR
 			done
@@ -978,7 +987,7 @@ lfi(){
 			printf "${bblue} LFI checks ${reset}\n"
 			start=`date +%s`
 			for url in $(cat gf/${domain}_lfi.txt); do
-				ffuf -v -mc 200 -H $HEADER -w $lfi_wordlist -u $url -mr "root:" &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q ${domain}_lfi.txt
+				ffuf -v -mc 200 -H "${HEADER}" -w $lfi_wordlist -u $url -mr "root:" &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q ${domain}_lfi.txt
 			done
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
@@ -1041,10 +1050,10 @@ end(){
 	global_end=`date +%s`
 	getElapsedTime $global_start $global_end
 	printf "${bgreen}#######################################################################\n"
-	printf "${bred} Finished Recon on: ${domain} under ${finaldir} in: ${runtime} ${reset}\n" | tee /dev/tty | notify -silent
+	printf "${bred} Finished Recon on: ${domain} under ${finaldir} in: ${runtime} ${reset}\n" | tee /dev/tty | $NOTIFY
 	printf "${bgreen}#######################################################################\n"
 	#Seperator for more clear messges in telegram_Bot
-	echo "******  Stay safe 🦠 and secure 🔐  ******" | notify -silent
+	echo "******  Stay safe 🦠 and secure 🔐  ******" | $NOTIFY
 }
 
 all(){
