@@ -53,7 +53,6 @@ start(){
 	fi
 
 	echo "****** 🙏 Thank you for making this world safer ******" | $NOTIFY
-	exit
 	tools_installed
 
 	if [ -z "$domain" ]
