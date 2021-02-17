@@ -24,5 +24,4 @@ aiohttp
 termcolors==0.1.0
 future
 fuzzywuzzy
-arjun
 uddup

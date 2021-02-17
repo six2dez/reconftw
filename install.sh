@@ -152,6 +152,7 @@ eval go get -v github.com/lc/gau $DEBUG_STD
 eval GO111MODULE=on go get -u -v github.com/lc/subjs $DEBUG_STD
 eval go get -v github.com/KathanP19/Gxss $DEBUG_STD
 eval git clone https://github.com/blechschmidt/massdns $dir/massdns $DEBUG_STD
+eval git clone https://github.com/s0md3v/Arjun $dir/Arjun $DEBUG_STD
 printf "${bgreen} 50%% done${reset}\n\n"
 eval git clone https://github.com/devanshbatham/ParamSpider $dir/ParamSpider $DEBUG_STD
 eval git clone https://github.com/dark-warlord14/LinkFinder $dir/LinkFinder $DEBUG_STD
@@ -190,6 +191,7 @@ $SUDO cp $dir/massdns/bin/massdns /usr/local/bin/
 cd $dir/Interlace && eval $SUDO python3 setup.py install $DEBUG_STD
 cd $dir/LinkFinder && eval $SUDO python3 setup.py install $DEBUG_STD
 cd $dir/dnsgen && eval $SUDO python3 setup.py install $DEBUG_STD
+cd $dir/Arjun && eval $SUDO python3 setup.py install $DEBUG_STD
 cd $dir
 eval git clone https://github.com/devanshbatham/OpenRedireX $dir/OpenRedireX $DEBUG_STD
 printf "${bgreen} 90%% done${reset}\n\n"

@@ -117,8 +117,8 @@ function tools_installed(){
 	[ -f $tools/getjswords.py ] || { printf "${bred} [*] getjswords   	[NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/subdomains.txt ] || { printf "${bred} [*] subdomains   	[NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/resolvers.txt ] || { printf "${bred} [*] resolvers   	[NO]${reset}\n"; allinstalled=false;}
+	[ -f $tools/Arjun/arjun.py ] || { printf "${bred} [*] Arjun		[NO]\n"; allinstalled=false;}
 	eval type -P github-endpoints $DEBUG_STD || { printf "${bred} [*] github-endpoints		[NO]${reset}\n"; allinstalled=false;}
-	eval type -P arjun $DEBUG_STD || { printf "${bred} [*] arjun		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P gospider $DEBUG_STD || { printf "${bred} [*] gospider		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P subfinder $DEBUG_STD || { printf "${bred} [*] Subfinder		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P assetfinder $DEBUG_STD || { printf "${bred} [*] Assetfinder		[NO]${reset}\n"; allinstalled=false;}
@@ -183,8 +183,8 @@ function tools_full(){
 	[ -f $tools/getjswords.py ] && printf "${bgreen}[*] getjswords.py	[YES]${reset}\n" || printf "${bred} [*] getjswords.py	[NO]${reset}\n"
 	[ -f $tools/subdomains.txt ] && printf "${bgreen}[*] subdomains.txt	[YES]${reset}\n" || printf "${bred} [*] subdomains.txt	[NO]${reset}\n"
 	[ -f $tools/resolvers.txt ] && printf "${bgreen}[*] resolvers.txt	[YES]${reset}\n" || printf "${bred} [*] resolvers.txt	[NO]${reset}\n"
+	[ -f $tools/Arjun/arjun.py ] && printf "${bgreen}[*] Arjun		[YES]\n" || printf "${bred} [*] Arjun		[NO]\n"
 	eval type -P github-endpoints $DEBUG_STD && printf "${bgreen}[*] github-endpoints	[YES]${reset}\n" || { printf "${bred} [*] github-endpoints	[NO]${reset}\n"; }
-	eval type -P arjun $DEBUG_STD && printf "${bgreen}[*] arjun		[YES]${reset}\n" || { printf "${bred} [*] arjun		[NO]${reset}\n"; }
 	eval type -P gospider $DEBUG_STD && printf "${bgreen}[*] gospider		[YES]${reset}\n" || { printf "${bred} [*] gospider		[NO]${reset}\n"; }
 	eval type -P subfinder $DEBUG_STD && printf "${bgreen}[*] Subfinder		[YES]${reset}\n" || { printf "${bred} [*] Subfinder		[NO]${reset}\n"; }
 	eval type -P assetfinder $DEBUG_STD && printf "${bgreen}[*] Assetfinder		[YES]${reset}\n" || { printf "${bred} [*] Assetfinder	[NO]${reset}\n"; }
@@ -502,7 +502,7 @@ screenshot(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} ${bgreen} Web Screenshot ${reset}\n\n"
 			start=`date +%s`
-			python3 $tools/webscreenshot/webscreenshot.py -i ${domain}_probed.txt -r chromium -w 4 -a $HEADER -o screenshots &>/dev/null && touch $called_fn_dir/.${FUNCNAME[0]}
+			python3 $tools/webscreenshot/webscreenshot.py -i ${domain}_probed.txt -r chromium -w 4 -a "${HEADER}" -o screenshots &>/dev/null && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Web Screenshot Finished in ${runtime}\n"
@@ -677,11 +677,11 @@ params(){
 			eval rm ${domain}_probed_nohttp.txt $DEBUG_ERROR
 			if [ "$DEEP" = true ] ; then
 				printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
-				eval arjun -i ${domain}_param_tmp.txt -t 20 -oT ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval python3 $tools/Arjun/arjun.py -i ${domain}_param_tmp.txt -t 20 -oT ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			else
 				if [[ $(cat ${domain}_param_tmp.txt | wc -l) -le 200 ]]
 				then
-					eval arjun -i ${domain}_param_tmp.txt -t 20 -oT ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval python3 $tools/Arjun/arjun.py -i ${domain}_param_tmp.txt -t 20 -oT ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				else
 					cp ${domain}_param_tmp.txt ${domain}_param.txt
 				fi
