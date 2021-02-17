@@ -371,7 +371,7 @@ sub_scraping(){
 			start=`date +%s`
 			printf "${yellow} Running : JS scraping subdomain search${reset}\n"
 			touch JS_subs.txt
-			cat ${domain}_subdomains.txt | httpx -follow-redirects -H "${HEADER}"" -status-code -timeout 15 -vhost -silent | grep "[200]" | cut -d [ -f1 | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed_tmp.txt
+			cat ${domain}_subdomains.txt | httpx -follow-redirects -H "${HEADER}" -status-code -timeout 15 -vhost -silent | grep "[200]" | cut -d [ -f1 | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed_tmp.txt
 			eval python3 $tools/JSFinder/JSFinder.py -f ${domain}_probed_tmp.txt -os JS_subs.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			if [[ $(cat JS_subs.txt | wc -l) -gt 0 ]]
 			then
