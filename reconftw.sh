@@ -540,27 +540,27 @@ nuclei_check(){
 			eval nuclei -update-templates $DEBUG_STD
 			mkdir -p nuclei_output
 			printf "${yellow} Running : Nuclei Technologies${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/technologies/ -o nuclei_output/${domain}_technologies.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "User-Agent: Mozilla" -t ~/nuclei-templates/technologies/ -o nuclei_output/${domain}_technologies.txt;
 			printf "${yellow}\n\n Running : Nuclei Tokens${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/exposed-tokens/ -o nuclei_output/${domain}_tokens.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "User-Agent: Mozilla" -t ~/nuclei-templates/exposed-tokens/ -o nuclei_output/${domain}_tokens.txt;
 			printf "${yellow}\n\n Running : Nuclei Exposures${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/exposures/ -o nuclei_output/${domain}_exposures.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "User-Agent: Mozilla" -t ~/nuclei-templates/exposures/ -o nuclei_output/${domain}_exposures.txt;
 			printf "${yellow}\n\n Running : Nuclei CVEs ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/cves/ -o nuclei_output/${domain}_cves.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "User-Agent: Mozilla" -t ~/nuclei-templates/cves/ -o nuclei_output/${domain}_cves.txt;
 			printf "${yellow}\n\n Running : Nuclei Default Creds ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/default-logins/ -o nuclei_output/${domain}_default_creds.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "User-Agent: Mozilla" -t ~/nuclei-templates/default-logins/ -o nuclei_output/${domain}_default_creds.txt;
 			printf "${yellow}\n\n Running : Nuclei SubTko ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/takeovers/ -o nuclei_output/${domain}_subtko.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "User-Agent: Mozilla" -t ~/nuclei-templates/takeovers/ -o nuclei_output/${domain}_subtko.txt;
 			printf "${yellow}\n\n Running : Nuclei DNS ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/dns/ -o nuclei_output/${domain}_dns.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "User-Agent: Mozilla" -t ~/nuclei-templates/dns/ -o nuclei_output/${domain}_dns.txt;
 			printf "${yellow}\n\n Running : Nuclei Miscellaneous ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/miscellaneous/ -o nuclei_output/${domain}_miscellaneous.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "User-Agent: Mozilla" -t ~/nuclei-templates/miscellaneous/ -o nuclei_output/${domain}_miscellaneous.txt;
 			printf "${yellow}\n\n Running : Nuclei Panels ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/exposed-panels/ -o nuclei_output/${domain}_panels.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "User-Agent: Mozilla" -t ~/nuclei-templates/exposed-panels/ -o nuclei_output/${domain}_panels.txt;
 			printf "${yellow}\n\n Running : Nuclei Security Misconfiguration ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/misconfiguration/ -o nuclei_output/${domain}_misconfigurations.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "User-Agent: Mozilla" -t ~/nuclei-templates/misconfiguration/ -o nuclei_output/${domain}_misconfigurations.txt;
 			printf "${yellow}\n\n Running : Nuclei Vulnerabilites ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/vulnerabilities/ -o nuclei_output/${domain}_vulnerabilities.txt && touch $called_fn_dir/.${FUNCNAME[0]};
+			cat ${domain}_probed.txt | nuclei -silent -H "User-Agent: Mozilla" -t ~/nuclei-templates/vulnerabilities/ -o nuclei_output/${domain}_vulnerabilities.txt && touch $called_fn_dir/.${FUNCNAME[0]};
 			printf "\n\n"
 			end=`date +%s`
 			getElapsedTime $start $end
