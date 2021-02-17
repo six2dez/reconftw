@@ -1039,8 +1039,8 @@ function isAsciiText {
 }
 
 end(){
-	find $dir -path ./.called_fn -prune -o -print -size 0 -exec rm -rf {} \; &>/dev/null
-	find $dir -type d -empty -delete &>/dev/null
+	find $dir -type f -empty | grep -v "called_fn" | xargs rm -f &>/dev/null
+	find $dir -type d -empty | grep -v "called_fn" | xargs rm -rf &>/dev/null
 	if [ -n "$dir_output" ]
 	then
 		output
