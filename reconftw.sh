@@ -18,7 +18,7 @@ DEEP=false
 FULLSCOPE=false
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 COOKIE=""
-HEADER='"User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0"'
+HEADER="User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0"
 
 # Uncomment this only if it is not already in your env .bashrc or .zshrc
 #COLLAB_SERVER=XXXXXXXXXXXXXXXXX
@@ -49,7 +49,7 @@ start(){
 	if grep -q '^[[:blank:]]*[^[:blank:]#;]' ~/.config/notify/notify.conf; then
 		NOTIFY="notify -silent"
 	else
-	    NOTIFY="&>/dev/null"
+	    NOTIFY=""
 	fi
 
 	echo "****** 🙏 Thank you for making this world safer ******" | $NOTIFY
