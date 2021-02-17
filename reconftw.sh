@@ -49,7 +49,7 @@ start(){
 	if grep -q '^[[:blank:]]*[^[:blank:]#;]' ~/.config/notify/notify.conf; then
 		NOTIFY="notify -silent"
 	else
-	    NOTIFY=""
+	    NOTIFY="&>/dev/null"
 	fi
 
 	echo "****** 🙏 Thank you for making this world safer ******" | $NOTIFY
