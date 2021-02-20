@@ -28,11 +28,11 @@ printf "${bgreen} reconftw installer script ${reset}\n\n"
 install_apt(){
     eval $SUDO apt install chromium-browser -y $DEBUG_STD
     eval $SUDO apt install chromium -y $DEBUG_STD
-    eval $SUDO apt install python3 python3-pip ruby git curl libpcap-dev wget python-dev python3-dev dnsutils build-essential xvfb libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq -y $DEBUG_STD
+    eval $SUDO apt install python3 python3-pip ruby git curl libpcap-dev wget python-dev python3-dev dnsutils build-essential xvfb libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq python3-shodan -y $DEBUG_STD
 }
 
 install_yum(){
-    eval $SUDO yum install python3 python3-pip ruby git curl libpcap-devel chromium wget openssl-devel bind-utils python3-devel libxslt-devel libffi-devel xorg-x11-server-Xvfb libxml2-devel nmap zlib-devel jq -y $DEBUG_STD
+    eval $SUDO yum install python3 python3-pip ruby git curl libpcap-devel chromium wget openssl-devel bind-utils python3-devel libxslt-devel libffi-devel xorg-x11-server-Xvfb libxml2-devel nmap zlib-devel jq python-shodan -y $DEBUG_STD
 }
 
 install_pacman(){
@@ -57,6 +57,9 @@ if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]]
             $SUDO cp /usr/local/go/bin/go /usr/bin
         fi
         rm -rf go$LATEST_GO*
+        export GOROOT=/usr/local/go
+        export GOPATH=$HOME/go
+        export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
 if [ -f ~/.bashrc ]
 then
 cat << EOF >> ~/.bashrc
@@ -78,8 +81,8 @@ export GOPATH=\$HOME/go
 export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH
 EOF
 fi
-printf "${yellow} Golang installed! Open a new terminal and run again this script ${reset}\n"
-exit
+# printf "${yellow} Golang installed! Open a new terminal and run again this script ${reset}\n"
+# exit
 fi
 
 [ -n "$GOPATH" ] || { printf "${bred} GOPATH env var not detected, add Golang env vars to your \$HOME/.bashrc or \$HOME/.zshrc:\n\n export GOROOT=/usr/local/go\n export GOPATH=\$HOME/go\n export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH\n\n"; exit 1; }
@@ -122,7 +125,6 @@ eval go get -v github.com/tomnomnom/qsreplace $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/OWASP/Amass/v3/... $DEBUG_STD
 eval go get -v github.com/ffuf/ffuf $DEBUG_STD
 eval go get -v github.com/tomnomnom/assetfinder $DEBUG_STD
-eval GO111MODULE=on go get -v github.com/projectdiscovery/naabu/v2/cmd/naabu $DEBUG_STD
 printf "${bgreen} 10%% done${reset}\n\n"
 eval go get -v github.com/dwisiswant0/cf-check $DEBUG_STD
 eval go get -v github.com/tomnomnom/hacks/waybackurls $DEBUG_STD
@@ -149,6 +151,7 @@ eval go get -v github.com/lc/gau $DEBUG_STD
 eval GO111MODULE=on go get -u -v github.com/lc/subjs $DEBUG_STD
 eval go get -v github.com/KathanP19/Gxss $DEBUG_STD
 eval git clone https://github.com/blechschmidt/massdns $dir/massdns $DEBUG_STD
+eval git clone https://github.com/s0md3v/Arjun $dir/Arjun $DEBUG_STD
 printf "${bgreen} 50%% done${reset}\n\n"
 eval git clone https://github.com/devanshbatham/ParamSpider $dir/ParamSpider $DEBUG_STD
 eval git clone https://github.com/dark-warlord14/LinkFinder $dir/LinkFinder $DEBUG_STD
@@ -187,11 +190,12 @@ $SUDO cp $dir/massdns/bin/massdns /usr/local/bin/
 cd $dir/Interlace && eval $SUDO python3 setup.py install $DEBUG_STD
 cd $dir/LinkFinder && eval $SUDO python3 setup.py install $DEBUG_STD
 cd $dir/dnsgen && eval $SUDO python3 setup.py install $DEBUG_STD
+cd $dir/Arjun && eval $SUDO python3 setup.py install $DEBUG_STD
 cd $dir
 eval git clone https://github.com/devanshbatham/OpenRedireX $dir/OpenRedireX $DEBUG_STD
 printf "${bgreen} 90%% done${reset}\n\n"
 eval subfinder $DEBUG_STD
-eval notify -version $DEBUG_STD
+mkdir -p ~/.config/notify/
 mkdir -p ~/.config/amass/
 eval wget -nc -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini $DEBUG_STD
 cd ~/.gf; eval wget -O potential.json https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json $DEBUG_STD; cd $dir

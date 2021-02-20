@@ -18,6 +18,7 @@ DEEP=false
 FULLSCOPE=false
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 COOKIE=""
+HEADER="User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0"
 
 # Uncomment this only if it is not already in your env .bashrc or .zshrc
 #COLLAB_SERVER=XXXXXXXXXXXXXXXXX
@@ -42,8 +43,16 @@ banner(){
 }
 
 start(){
+
 	global_start=`date +%s`
-	echo "****** 🙏 Thank you for making this world safer ******" | notify -silent
+
+	if grep -q '^[[:blank:]]*[^[:blank:]#;]' ~/.config/notify/notify.conf; then
+		NOTIFY="notify -silent"
+	else
+	    NOTIFY=""
+	fi
+
+	echo "****** 🙏 Thank you for making this world safer ******" | $NOTIFY
 	tools_installed
 
 	if [ -z "$domain" ]
@@ -108,8 +117,8 @@ function tools_installed(){
 	[ -f $tools/getjswords.py ] || { printf "${bred} [*] getjswords   	[NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/subdomains.txt ] || { printf "${bred} [*] subdomains   	[NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/resolvers.txt ] || { printf "${bred} [*] resolvers   	[NO]${reset}\n"; allinstalled=false;}
+	[ -f $tools/Arjun/arjun.py ] || { printf "${bred} [*] Arjun		[NO]\n"; allinstalled=false;}
 	eval type -P github-endpoints $DEBUG_STD || { printf "${bred} [*] github-endpoints		[NO]${reset}\n"; allinstalled=false;}
-	eval type -P arjun $DEBUG_STD || { printf "${bred} [*] arjun		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P gospider $DEBUG_STD || { printf "${bred} [*] gospider		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P subfinder $DEBUG_STD || { printf "${bred} [*] Subfinder		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P assetfinder $DEBUG_STD || { printf "${bred} [*] Assetfinder		[NO]${reset}\n"; allinstalled=false;}
@@ -123,7 +132,6 @@ function tools_installed(){
 	eval type -P cf-check $DEBUG_STD || { printf "${bred} [*] Cf-check		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P nuclei $DEBUG_STD || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; allinstalled=false;}
 	[ -d ~/nuclei-templates ] || { printf "${bred} [*] Nuclei templates    [NO]${reset}\n"; allinstalled=false;}
-	eval type -P naabu $DEBUG_STD || { printf "${bred} [*] Naabu		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P gf $DEBUG_STD || { printf "${bred} [*] Gf		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P Gxss $DEBUG_STD || { printf "${bred} [*] Gxss		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P subjs $DEBUG_STD || { printf "${bred} [*] subjs		[NO]${reset}\n"; allinstalled=false;}
@@ -174,8 +182,8 @@ function tools_full(){
 	[ -f $tools/getjswords.py ] && printf "${bgreen}[*] getjswords.py	[YES]${reset}\n" || printf "${bred} [*] getjswords.py	[NO]${reset}\n"
 	[ -f $tools/subdomains.txt ] && printf "${bgreen}[*] subdomains.txt	[YES]${reset}\n" || printf "${bred} [*] subdomains.txt	[NO]${reset}\n"
 	[ -f $tools/resolvers.txt ] && printf "${bgreen}[*] resolvers.txt	[YES]${reset}\n" || printf "${bred} [*] resolvers.txt	[NO]${reset}\n"
+	[ -f $tools/Arjun/arjun.py ] && printf "${bgreen}[*] Arjun		[YES]\n" || printf "${bred} [*] Arjun		[NO]\n"
 	eval type -P github-endpoints $DEBUG_STD && printf "${bgreen}[*] github-endpoints	[YES]${reset}\n" || { printf "${bred} [*] github-endpoints	[NO]${reset}\n"; }
-	eval type -P arjun $DEBUG_STD && printf "${bgreen}[*] arjun		[YES]${reset}\n" || { printf "${bred} [*] arjun		[NO]${reset}\n"; }
 	eval type -P gospider $DEBUG_STD && printf "${bgreen}[*] gospider		[YES]${reset}\n" || { printf "${bred} [*] gospider		[NO]${reset}\n"; }
 	eval type -P subfinder $DEBUG_STD && printf "${bgreen}[*] Subfinder		[YES]${reset}\n" || { printf "${bred} [*] Subfinder		[NO]${reset}\n"; }
 	eval type -P assetfinder $DEBUG_STD && printf "${bgreen}[*] Assetfinder		[YES]${reset}\n" || { printf "${bred} [*] Assetfinder	[NO]${reset}\n"; }
@@ -189,7 +197,6 @@ function tools_full(){
 	eval type -P cf-check $DEBUG_STD && printf "${bgreen}[*] Cf-check		[YES]${reset}\n" || { printf "${bred} [*] Cf-check		[NO]${reset}\n"; }
 	eval type -P nuclei $DEBUG_STD && printf "${bgreen}[*] Nuclei		[YES]${reset}\n" || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; }
 	[ -d ~/nuclei-templates ] && printf "${bgreen}[*] Nuclei templates  	[YES]${reset}\n" || printf "${bred} [*] Nuclei templates  	[NO]${reset}\n"
-	eval type -P naabu $DEBUG_STD && printf "${bgreen}[*] Naabu		[YES]${reset}\n" || { printf "${bred} [*] Naabu		[NO]${reset}\n"; }
 	eval type -P gf $DEBUG_STD && printf "${bgreen}[*] Gf		        [YES]${reset}\n" || { printf "${bred} [*] Gf			[NO]${reset}\n"; }
 	eval type -P Gxss $DEBUG_STD && printf "${bgreen}[*] Gxss		[YES]${reset}\n" || { printf "${bred} [*] Gxss		[NO]${reset}\n"; }
 	eval type -P subjs $DEBUG_STD && printf "${bgreen}[*] subjs		[YES]${reset}\n" || { printf "${bred} [*] subjs		[NO]${reset}\n"; }
@@ -251,11 +258,11 @@ subdomains_full(){
 			NUMOFLINES_probed=$(wc -l < ${domain}_probed.txt)
 	fi
 	printf "${bblue}\n Final results: ${reset}\n"
-	printf "${bred}\n - ${NUMOFLINES_subs} alive subdomains${reset}\n\n" | tee /dev/tty | notify -silent
+	printf "${bred}\n - ${NUMOFLINES_subs} alive subdomains${reset}\n\n" | tee /dev/tty | $NOTIFY
 	eval cat ${domain}_subdomains.txt $DEBUG_ERROR | sort
-	printf "${bred}\n - ${NUMOFLINES_probed} web probed${reset}\n\n" | tee /dev/tty | notify -silent
+	printf "${bred}\n - ${NUMOFLINES_probed} web probed${reset}\n\n" | tee /dev/tty | $NOTIFY
 	eval cat ${domain}_probed.txt $DEBUG_ERROR | sort
-	printf "${bblue}\n Subdomain Enumeration Finished\n" | tee /dev/tty | notify -silent
+	printf "${bblue}\n Subdomain Enumeration Finished\n" | tee /dev/tty | $NOTIFY
 	printf "${bblue} Results are saved in ${domain}_subdomains.txt and ${domain}_probed.txt${reset}\n"
 	printf "${bgreen}#######################################################################\n\n"
 }
@@ -307,9 +314,11 @@ sub_crt(){
 			eval rm ${outputfile}.txt $DEBUG_ERROR
 			cd $dir
 			if [ "$FULLSCOPE" = true ] ; then
-				eval curl "https://tls.bufferover.run/dns?q=${domain}" $DEBUG_ERROR | eval jq -r .Results[] $DEBUG_ERROR | cut -d ',' -f3 | sort -u | anew -q crtsh_subs.txt
+				eval curl "https://tls.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r .Results[] $DEBUG_ERROR | cut -d ',' -f3 | anew -q crtsh_subs.txt
+				eval curl "https://dns.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r '.FDNS_A'[],'.RDNS'[] $DEBUG_ERROR | cut -d ',' -f2 | anew -q crtsh_subs.txt
 			else
-				eval curl "https://tls.bufferover.run/dns?q=${domain}" $DEBUG_ERROR | eval jq -r .Results[] $DEBUG_ERROR | cut -d ',' -f3 | sort -u | grep -F ".$domain" | anew -q crtsh_subs.txt
+				eval curl "https://tls.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r .Results[] $DEBUG_ERROR | cut -d ',' -f3 | grep -F ".$domain" | anew -q crtsh_subs.txt
+				eval curl "https://dns.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r '.FDNS_A'[],'.RDNS'[] $DEBUG_ERROR | cut -d ',' -f2 | grep -F ".$domain" | anew -q crtsh_subs.txt
 			fi
 			NUMOFLINES=$(wc -l < crtsh_subs.txt)
 			end=`date +%s`
@@ -360,7 +369,7 @@ sub_scraping(){
 			start=`date +%s`
 			printf "${yellow} Running : JS scraping subdomain search${reset}\n"
 			touch JS_subs.txt
-			cat ${domain}_subdomains.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed_tmp.txt
+			cat ${domain}_subdomains.txt | httpx -follow-redirects -H "${HEADER}" -status-code -timeout 15 -vhost -silent | grep "[200]" | cut -d [ -f1 | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed_tmp.txt
 			eval python3 $tools/JSFinder/JSFinder.py -f ${domain}_probed_tmp.txt -os JS_subs.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			if [[ $(cat JS_subs.txt | wc -l) -gt 0 ]]
 			then
@@ -421,7 +430,7 @@ webprobe_simple(){
 		then
 			start=`date +%s`
 			printf "${yellow} Running : Http probing${reset}\n\n"
-			cat ${domain}_subdomains.txt | httpx -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			cat ${domain}_subdomains.txt | httpx -follow-redirects -H "${HEADER}" -status-code -vhost -timeout 15 -silent | grep "[200]" | cut -d [ -f1 | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			if [ -f "${domain}_probed.txt" ]
 			then
 				deleteOutScoped $outOfScope_file ${domain}_probed.txt
@@ -431,7 +440,7 @@ webprobe_simple(){
 			fi
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${green} ${NUMOFLINES} subdomains resolved in ${runtime}${reset}\n\n"
+			printf "${green} ${NUMOFLINES} websites resolved in ${runtime}${reset}\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
@@ -443,7 +452,7 @@ subtakeover(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Subdomain Takeover ${reset}\n\n"
 			start=`date +%s`
-			subzy --targets ${domain}_subdomains.txt  --https --concurrency 4 --hide_fails --timeout 5 > ${domain}_all-takeover-checks.txt
+			subzy --targets ${domain}_subdomains.txt  --https --concurrency 4 --hide_fails --timeout 10 > ${domain}_all-takeover-checks.txt
 			grep  "VULNERABLE" <${domain}_all-takeover-checks.txt > ${domain}_takeover.txt
 			eval rm ${domain}_all-takeover-checks.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
@@ -454,7 +463,7 @@ subtakeover(){
 			else
 				NUMOFLINES=0
 			fi
-			printf "${bred}\n Subtko: ${NUMOFLINES} subdomains in ${runtime}${reset}\n\n" | tee /dev/tty | notify -silent
+			printf "${bred}\n Subtko: ${NUMOFLINES} subdomains in ${runtime}${reset}\n\n" | tee /dev/tty | $NOTIFY
 			eval cat ${domain}_takeover.txt $DEBUG_ERROR
 			printf "${bblue}\n Subdomain Takeover Finished\n"
 			printf "${bblue} Results are saved in ${domain}_takeover.txt${reset}\n"
@@ -471,11 +480,11 @@ webprobe_full(){
 			printf "${bblue} ${bgreen} Web Probe ${reset}\n\n"
 			printf "${yellow} Running : Http probing non standard ports${reset}\n\n"
 			start=`date +%s`
-			cat ${domain}_subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55672 -follow-redirects -status-code -vhost -threads 100 -silent | sort -u | grep "[200]" | cut -d [ -f1 | sort -u | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed_uncommon_ports.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			cat ${domain}_subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55672 -follow-redirects -H "${HEADER}" -status-code -timeout 15 -vhost -silent | grep "[200]" | cut -d [ -f1 | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed_uncommon_ports.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			NUMOFLINES=$(wc -l < ${domain}_probed_uncommon_ports.txt)
-			printf "${bred}\n Uncommon web ports: ${NUMOFLINES} subdomains in ${runtime}${reset}\n\n"
+			printf "${bred}\n Uncommon web ports: ${NUMOFLINES} websites in ${runtime}${reset}\n\n"
 			eval cat ${domain}_probed_uncommon_ports.txt $DEBUG_ERROR
 			printf "${bblue}\n Web Probe Finished\n"
 			printf "${bblue} Results are saved in ${domain}_probed_uncommon_ports.txt${reset}\n"
@@ -491,7 +500,7 @@ screenshot(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} ${bgreen} Web Screenshot ${reset}\n\n"
 			start=`date +%s`
-			python3 $tools/webscreenshot/webscreenshot.py -i ${domain}_probed.txt -r chromium -w 4 -a "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -o screenshots &>/dev/null && touch $called_fn_dir/.${FUNCNAME[0]}
+			python3 $tools/webscreenshot/webscreenshot.py -i ${domain}_probed.txt -r chromium -w 4 -a "${HEADER}" -o screenshots &>/dev/null && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Web Screenshot Finished in ${runtime}\n"
@@ -508,7 +517,8 @@ portscan(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Port Scan ${reset}\n\n"
 			start=`date +%s`
-			cf-check -c $NPROC -d ${domain}_subdomains.txt | naabu -top-ports 1000 -silent -exclude-cdn -nmap-cli 'nmap -sV -n --max-retries 2 -oN -' > ${domain}_portscan.txt;
+			cf-check -c $NPROC -d ${domain}_subdomains_nocdn.txt
+			eval nmap --top-ports 1000 -sV -n --max-retries 2 -iL ${domain}_subdomains_nocdn.txt -oN ${domain}_portscan.txt $DEBUG_STD
 			eval cat ${domain}_portscan.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
@@ -529,31 +539,31 @@ nuclei_check(){
 			eval nuclei -update-templates $DEBUG_STD
 			mkdir -p nuclei_output
 			printf "${yellow} Running : Nuclei Technologies${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/technologies/ -o nuclei_output/${domain}_technologies.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/technologies/ -o nuclei_output/${domain}_technologies.txt;
 			printf "${yellow}\n\n Running : Nuclei Tokens${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o nuclei_output/${domain}_tokens.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/exposed-tokens/ -o nuclei_output/${domain}_tokens.txt;
 			printf "${yellow}\n\n Running : Nuclei Exposures${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/exposures/ -o nuclei_output/${domain}_exposures.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/exposures/ -o nuclei_output/${domain}_exposures.txt;
 			printf "${yellow}\n\n Running : Nuclei CVEs ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/cves/ -o nuclei_output/${domain}_cves.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/cves/ -o nuclei_output/${domain}_cves.txt;
 			printf "${yellow}\n\n Running : Nuclei Default Creds ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/default-logins/ -o nuclei_output/${domain}_default_creds.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/default-logins/ -o nuclei_output/${domain}_default_creds.txt;
 			printf "${yellow}\n\n Running : Nuclei SubTko ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/takeovers/ -o nuclei_output/${domain}_subtko.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/takeovers/ -o nuclei_output/${domain}_subtko.txt;
 			printf "${yellow}\n\n Running : Nuclei DNS ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/dns/ -o nuclei_output/${domain}_dns.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/dns/ -o nuclei_output/${domain}_dns.txt;
 			printf "${yellow}\n\n Running : Nuclei Miscellaneous ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/miscellaneous/ -o nuclei_output/${domain}_miscellaneous.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/miscellaneous/ -o nuclei_output/${domain}_miscellaneous.txt;
 			printf "${yellow}\n\n Running : Nuclei Panels ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/exposed-panels/ -o nuclei_output/${domain}_panels.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/exposed-panels/ -o nuclei_output/${domain}_panels.txt;
 			printf "${yellow}\n\n Running : Nuclei Security Misconfiguration ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/misconfiguration/ -o nuclei_output/${domain}_misconfigurations.txt;
+			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/misconfiguration/ -o nuclei_output/${domain}_misconfigurations.txt;
 			printf "${yellow}\n\n Running : Nuclei Vulnerabilites ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -t ~/nuclei-templates/vulnerabilities/ -o nuclei_output/${domain}_vulnerabilities.txt && touch $called_fn_dir/.${FUNCNAME[0]};
+			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/vulnerabilities/ -o nuclei_output/${domain}_vulnerabilities.txt && touch $called_fn_dir/.${FUNCNAME[0]};
 			printf "\n\n"
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${bblue}\n Nuclei Scan Finished in ${runtime}\n" | tee /dev/tty | notify -silent
+			printf "${bblue}\n Nuclei Scan Finished in ${runtime}\n" | tee /dev/tty | $NOTIFY
 			printf "${bblue} Results are saved in nuclei_output folder ${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -570,23 +580,24 @@ urlchecks(){
 			cat ${domain}_probed.txt | waybackurls | anew -q ${domain}_url_extract_tmp.txt
 			cat ${domain}_probed.txt | gau | anew -q ${domain}_url_extract_tmp.txt
 			if [ "$DEEP" = true ] ; then
-				gospider -S ${domain}_probed.txt -t 100 -c 10 -d 2 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt > gospider_tmp.txt
+				gospider -S ${domain}_probed.txt -t 100 -H "${HEADER}" -c 10 -d 2 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt > gospider_tmp.txt
 			else
-				gospider -S ${domain}_probed.txt -t 100 -c 10 -d 1 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt > gospider_tmp.txt
+				gospider -S ${domain}_probed.txt -t 100 -H "${HEADER}" -c 10 -d 1 -a -w --js --sitemap --robots --cookie $COOKIE --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt > gospider_tmp.txt
 			fi
 			cat gospider_tmp.txt | sed "s/^.*http/http/p" | anew -q ${domain}_url_extract_tmp.txt
 			if [ -s "$tools/.github_tokens" ]
 			then
 				eval github-endpoints -q -k -d $domain -t $tools/.github_tokens -raw $DEBUG_ERROR | anew -q ${domain}_url_extract_tmp.txt
 			fi
-			cat ${domain}_url_extract_tmp.txt | grep "=" | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | qsreplace FUZZ | qsreplace -a | anew -q ${domain}_url_extract.txt && touch $called_fn_dir/.${FUNCNAME[0]};
-			cat ${domain}_url_extract_tmp.txt | egrep -i ".(js)" | anew -q ${domain}_url_extract_js.txt
-			eval rm ${domain}_url_extract_tmp.txt gospider_tmp.txt $DEBUG_ERROR
+			cat ${domain}_url_extract_tmp.txt ${domain}_param.txt | grep "${domain}" | grep "=" | qsreplace FUZZ | qsreplace -a | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | anew -q ${domain}_url_extract_tmp2.txt
+			cat ${domain}_url_extract_tmp.txt | grep "${domain}" | egrep -i ".(js)" | anew -q ${domain}_url_extract_js.txt
+			uddup -u ${domain}_url_extract_tmp2.txt -o ${domain}_url_extract.txt && touch $called_fn_dir/.${FUNCNAME[0]};
+			eval rm ${domain}_url_extract_tmp.txt ${domain}_url_extract_tmp2.txt gospider_tmp.txt $DEBUG_ERROR
 			end=`date +%s`
 			getElapsedTime $start $end
 			NUMOFLINES=$(wc -l < ${domain}_url_extract.txt)
-			printf "${bblue}\n URL Extraction Finished\n" | tee /dev/tty | notify -silent
-			printf "${bblue}\n ${NUMOFLINES} in ${runtime}\n" | tee /dev/tty | notify -silent
+			printf "${bblue}\n URL Extraction Finished\n" | tee /dev/tty | $NOTIFY
+			printf "${bblue}\n ${NUMOFLINES} in ${runtime}\n" | tee /dev/tty | $NOTIFY
 			printf "${bblue} Results are saved in ${domain}_url_extract.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -631,7 +642,7 @@ jschecks(){
 				cat ${domain}_url_extract_js.txt | grep -iE "\.js$" | anew -q ${domain}_jsfile_links.txt;
 				cat ${domain}_url_extract_js.txt | subjs | anew -q ${domain}_jsfile_links.txt;
 				printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
-				cat ${domain}_jsfile_links.txt | httpx -follow-redirects -silent -threads 100 -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt
+				cat ${domain}_jsfile_links.txt | httpx -follow-redirects -H "${HEADER}" -silent -timeout 15 -status-code | grep "[200]" | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt
 				printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
 				interlace -tL ${domain}_js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> ${domain}_js_endpoints.txt" &>/dev/null
 				eval sed -i '/^Running against/d; /^Invalid input/d; /^$/d' ${domain}_js_endpoints.txt $DEBUG_ERROR
@@ -658,19 +669,27 @@ params(){
 			start=`date +%s`
 			printf "${yellow}\n\n Running : Finding params with paramspider${reset}\n"
 			cat ${domain}_probed.txt | sed -r "s/https?:\/\///" | anew -q ${domain}_probed_nohttp.txt
-			interlace -tL ${domain}_probed_nohttp.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude jpg,jpeg,gif,css,tif,tiff,png,ttf,woff,woff2,ico,js" &>/dev/null && touch $called_fn_dir/.${FUNCNAME[0]}
-			find output/ -name '*.txt' -exec cat {} \; | anew -q ${domain}_param.txt
-			sed '/^FUZZ/d' -i ${domain}_param.txt
+			interlace -tL ${domain}_probed_nohttp.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt,js" &>/dev/null && touch $called_fn_dir/.${FUNCNAME[0]}
+			find output/ -name '*.txt' -exec cat {} \; | anew -q ${domain}_param_tmp.txt
+			sed '/^FUZZ/d' -i ${domain}_param_tmp.txt
 			eval rm -rf output/ $DEBUG_ERROR
 			eval rm ${domain}_probed_nohttp.txt $DEBUG_ERROR
 			if [ "$DEEP" = true ] ; then
 				printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
-				eval arjun -i ${domain}_param.txt -t 20 -o ${domain}_arjun.json $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval python3 $tools/Arjun/arjun.py -i ${domain}_param_tmp.txt -t 20 -oT ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+			else
+				if [[ $(cat ${domain}_param_tmp.txt | wc -l) -le 200 ]]
+				then
+					eval python3 $tools/Arjun/arjun.py -i ${domain}_param_tmp.txt -t 20 -oT ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				else
+					cp ${domain}_param_tmp.txt ${domain}_param.txt
+				fi
 			fi
+			eval rm ${domain}_param_tmp.txt $DEBUG_ERROR
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Parameter Discovery Finished in ${runtime}\n"
-			printf "${bblue} Results are saved in ${domain}_param.txt and ${domain}_arjun.json${reset}\n"
+			printf "${bblue} Results are saved in ${domain}_param.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -728,9 +747,11 @@ github(){
 			start=`date +%s`
 			if [ -s "$tools/.github_tokens" ]
 			then
-				eval python3 $tools/GitDorker/GitDorker.py -tf $tools/.github_tokens -q $domain -e 10 -d $tools/GitDorker/Dorks/medium_dorks.txt -o ${domain}_gitrecon.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-				cat ${domain}_gitrecon.txt_gh_dorks.csv | sort -n --field-separator=',' --key=3 | grep -v ",0" | awk -F "\"*,\"*" '{print $1,$2}' | sed 's/"""//' > ${domain}_gitrecon.txt
-				eval rm ${domain}_gitrecon.txt_gh_dorks.csv $DEBUG_ERROR
+				if [ "$DEEP" = true ] ; then
+					eval python3 $tools/GitDorker/GitDorker.py -tf $tools/.github_tokens -q $domain -e 10 -d $tools/GitDorker/Dorks/alldorksv3 | grep "\[+\]" | anew -q ${domain}_gitrecon.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				else
+					eval python3 $tools/GitDorker/GitDorker.py -tf $tools/.github_tokens -q $domain -e 10 -d $tools/GitDorker/Dorks/medium_dorks.txt | grep "\[+\]" | anew -q ${domain}_gitrecon.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				fi
 			else
 				printf "\n${bred} Required file ${tools}/.github_tokens not exists or empty${reset}\n"
 			fi
@@ -780,7 +801,7 @@ fuzz(){
 			for sub in $(cat ${domain}_probed.txt); do
 				printf "${yellow}\n\n Running: Fuzzing in ${sub}${reset}\n"
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-				ffuf -mc all -fc 404 -ac -sf -s -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -w $fuzz_wordlist -maxtime 900 -u $sub/FUZZ -or -o $dir/fuzzing/${sub_out}.tmp &>/dev/null
+				ffuf -mc all -fc 404 -ac -sf -s -H "${HEADER}" -w $fuzz_wordlist -maxtime 900 -u $sub/FUZZ -or -o $dir/fuzzing/${sub_out}.tmp &>/dev/null
 				cat $dir/fuzzing/${sub_out}.tmp | jq '[.results[]|{status: .status, length: .length, url: .url}]' | grep -oP "status\":\s(\d{3})|length\":\s(\d{1,7})|url\":\s\"(http[s]?:\/\/.*?)\"" | paste -d' ' - - - | awk '{print $2" "$4" "$6}' | sed 's/\"//g' | anew -q $dir/fuzzing/${sub_out}.txt
 				eval rm $dir/fuzzing/${sub_out}.tmp $DEBUG_ERROR
 			done
@@ -873,7 +894,8 @@ open_redirect(){
 				printf "${bblue} Open redirects checks ${reset}\n"
 				start=`date +%s`
 				cat gf/${domain}_redirect.txt | qsreplace FUZZ | anew -q test_redirect.txt
-				eval python3 $tools/OpenRedireX/openredirex.py -l test_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt > ${domain}_openredirect.txt $DEBUG_STD
+				eval python3 $tools/OpenRedireX/openredirex.py -l test_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt $DEBUG_ERROR | grep "^http" > ${domain}_redirect.txt
+				sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" ${domain}_redirect.txt
 				eval rm test_redirect.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
 				getElapsedTime $start $end
@@ -887,7 +909,8 @@ open_redirect(){
 					printf "${bblue} Open redirects checks ${reset}\n"
 					start=`date +%s`
 					cat gf/${domain}_redirect.txt | qsreplace FUZZ | anew -q test_redirect.txt
-					eval python3 $tools/OpenRedireX/openredirex.py -l test_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt > ${domain}_redirect.txt $DEBUG_STD
+					eval python3 $tools/OpenRedireX/openredirex.py -l test_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt $DEBUG_ERROR | grep "^http" > ${domain}_redirect.txt
+					sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" ${domain}_redirect.txt
 					eval rm test_redirect.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 					end=`date +%s`
 					getElapsedTime $start $end
@@ -964,7 +987,7 @@ lfi(){
 			printf "${bblue} LFI checks ${reset}\n"
 			start=`date +%s`
 			for url in $(cat gf/${domain}_lfi.txt); do
-				ffuf -v -mc 200 -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -w $lfi_wordlist -u $url -mr "root:" &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q ${domain}_lfi.txt
+				ffuf -v -mc 200 -H "${HEADER}" -w $lfi_wordlist -u $url -mr "root:" &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q ${domain}_lfi.txt
 			done
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
@@ -1017,6 +1040,8 @@ function isAsciiText {
 }
 
 end(){
+	find $dir -type f -empty | grep -v "called_fn" | xargs rm -f &>/dev/null
+	find $dir -type d -empty | grep -v "called_fn" | xargs rm -rf &>/dev/null
 	if [ -n "$dir_output" ]
 	then
 		output
@@ -1027,10 +1052,10 @@ end(){
 	global_end=`date +%s`
 	getElapsedTime $global_start $global_end
 	printf "${bgreen}#######################################################################\n"
-	printf "${bred} Finished Recon on: ${domain} under ${finaldir} in: ${runtime} ${reset}\n" | tee /dev/tty | notify -silent
+	printf "${bred} Finished Recon on: ${domain} under ${finaldir} in: ${runtime} ${reset}\n" | tee /dev/tty | $NOTIFY
 	printf "${bgreen}#######################################################################\n"
 	#Seperator for more clear messges in telegram_Bot
-	echo "******  Stay safe 🦠 and secure 🔐  ******" | notify -silent
+	echo "******  Stay safe 🦠 and secure 🔐  ******" | $NOTIFY
 }
 
 all(){
@@ -1050,6 +1075,7 @@ all(){
 			cms_scanner
 			fuzz
 			cors
+			params
 			urlchecks
 			url_gf
 			open_redirect
@@ -1057,7 +1083,6 @@ all(){
 			crlf_checks
 			lfi
 			jschecks
-			params
 			xss
 			test_ssl
 			end
@@ -1076,6 +1101,7 @@ all(){
 		cms_scanner
 		fuzz
 		cors
+		params
 		urlchecks
 		url_gf
 		open_redirect
@@ -1083,7 +1109,6 @@ all(){
 		crlf_checks
 		lfi
 		jschecks
-		params
 		xss
 		test_ssl
 		end
@@ -1204,6 +1229,7 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 			cms_scanner
 			fuzz
 			cors
+			params
 			urlchecks
 			url_gf
 			open_redirect
@@ -1211,7 +1237,6 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 			crlf_checks
 			lfi
 			jschecks
-			params
 			xss
 			test_ssl
 			end
