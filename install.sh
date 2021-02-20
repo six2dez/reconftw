@@ -125,7 +125,6 @@ eval go get -v github.com/tomnomnom/qsreplace $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/OWASP/Amass/v3/... $DEBUG_STD
 eval go get -v github.com/ffuf/ffuf $DEBUG_STD
 eval go get -v github.com/tomnomnom/assetfinder $DEBUG_STD
-eval GO111MODULE=on go get -v github.com/projectdiscovery/naabu/v2/cmd/naabu $DEBUG_STD
 printf "${bgreen} 10%% done${reset}\n\n"
 eval go get -v github.com/dwisiswant0/cf-check $DEBUG_STD
 eval go get -v github.com/tomnomnom/hacks/waybackurls $DEBUG_STD
