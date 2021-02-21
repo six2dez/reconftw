@@ -118,7 +118,6 @@ fi
 dir=~/Tools
 
 eval pip3 install -r requirements.txt $DEBUG_STD
-eval shodan init $SHODAN_API_KEY $DEBUG_STD
 printf "${bgreen} Requirements installed\n\n Installation begins!\n\n${reset}"
 eval go get -v github.com/tomnomnom/gf $DEBUG_STD
 eval go get -v github.com/tomnomnom/qsreplace $DEBUG_STD
