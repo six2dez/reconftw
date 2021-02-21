@@ -4,8 +4,6 @@
 
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
-# Uncomment this only if it is not already in your env .bashrc or .zshrc
-
 banner(){
 	printf "\n${bgreen}"
 	printf "  ██▀███  ▓█████  ▄████▄   ▒█████   ███▄    █   █████▒▄▄▄█████▓ █     █░\n"
@@ -222,7 +220,7 @@ subdomains_full(){
 	sub_scraping
 	sub_permut
 	webprobe_simple
-	eval rm -f *_subs.txt $DEBUG_ERROR
+	#eval rm -f *_subs.txt $DEBUG_ERROR
 	if [ -f "${domain}_subdomains.txt" ]
 		then
 			deleteOutScoped $outOfScope_file ${domain}_subdomains.txt
@@ -251,15 +249,15 @@ sub_passive(){
 		then
 			start=`date +%s`
 			printf "${yellow} Running : Passive Subdomain Enumeration${reset}\n"
-			eval subfinder -d $domain -o subfinder.txt $DEBUG_STD
-			assetfinder --subs-only $domain | anew -q assetfinder.txt
-			eval amass enum -passive -d $domain -c $AMASS_CONFIG -o amass.txt $DEBUG_STD
-			eval findomain --quiet -t $domain -u findomain.txt $DEBUG_STD
-			crobat -s $domain | anew -q crobat.txt
-			timeout 5m waybackurls $domain | unfurl -u domains | anew -q waybackurls.txt
-			eval cat subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt waybackurls.txt $DEBUG_ERROR | sed "s/*.//" | anew -q passive_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
-			eval rm subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt waybackurls.txt $DEBUG_ERROR
-			NUMOFLINES=$(wc -l < passive_subs.txt)
+			eval subfinder -d $domain -o .tmp/subfinder.txt $DEBUG_STD
+			assetfinder --subs-only $domain | anew -q .tmp/assetfinder.txt
+			eval amass enum -passive -d $domain -config $AMASS_CONFIG -o .tmp/amass.txt $DEBUG_STD
+			eval findomain --quiet -t $domain -u .tmp/findomain.txt $DEBUG_STD
+			crobat -s $domain | anew -q .tmp/crobat.txt
+			timeout 5m waybackurls $domain | unfurl -u domains | anew -q .tmp/waybackurls.txt
+			eval cat .tmp/subfinder.txt .tmp/assetfinder.txt .tmp/amass.txt .tmp/findomain.txt .tmp/crobat.txt .tmp/waybackurls.txt $DEBUG_ERROR | sed "s/*.//" | anew -q .tmp/passive_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			#eval rm subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt waybackurls.txt $DEBUG_ERROR
+			NUMOFLINES=$(wc -l < .tmp/passive_subs.txt)
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${green} ${NUMOFLINES} subdomains found in ${runtime}${reset}\n\n"
@@ -277,29 +275,29 @@ sub_crt(){
 			eval python3 crtfinder.py -u $domain $DEBUG_STD
 			outputfile=${domain%%.*}
 			if [ "$FULLSCOPE" = true ] ; then
-				eval cat ${outputfile}.txt $DEBUG_ERROR | anew -q $dir/crtsh_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval cat ${outputfile}.txt $DEBUG_ERROR | anew -q $dir/.tmp/crtsh_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			else
-				eval cat ${outputfile}.txt $DEBUG_ERROR | grep ".$domain$" | anew -q $dir/crtsh_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval cat ${outputfile}.txt $DEBUG_ERROR | grep ".$domain$" | anew -q $dir/.tmp/crtsh_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			fi
 			if [ "$DEEP" = true ] ; then
 				eval python3 dig.py ${outputfile}.txt > ${domain}_more.txt $DEBUG_STD
 				if [ "$FULLSCOPE" = true ] ; then
-					eval cat ${domain}_more.txt $DEBUG_ERROR | anew -q $dir/crtsh_subs.txt
+					eval cat ${domain}_more.txt $DEBUG_ERROR | anew -q $dir/.tmp/crtsh_subs.txt
 				else
-					eval cat ${domain}_more.txt $DEBUG_ERROR | grep ".$domain$" | anew -q $dir/crtsh_subs.txt
+					eval cat ${domain}_more.txt $DEBUG_ERROR | grep ".$domain$" | anew -q $dir/.tmp/crtsh_subs.txt
 				fi
 				eval rm ${domain}_more.txt $DEBUG_ERROR
 			fi
 			eval rm ${outputfile}.txt $DEBUG_ERROR
 			cd $dir
 			if [ "$FULLSCOPE" = true ] ; then
-				eval curl "https://tls.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r .Results[] $DEBUG_ERROR | cut -d ',' -f3 | anew -q crtsh_subs.txt
-				eval curl "https://dns.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r '.FDNS_A'[],'.RDNS'[] $DEBUG_ERROR | cut -d ',' -f2 | anew -q crtsh_subs.txt
+				eval curl "https://tls.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r .Results[] $DEBUG_ERROR | cut -d ',' -f3 | anew -q .tmp/crtsh_subs.txt
+				eval curl "https://dns.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r '.FDNS_A'[],'.RDNS'[] $DEBUG_ERROR | cut -d ',' -f2 | anew -q .tmp/crtsh_subs.txt
 			else
-				eval curl "https://tls.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r .Results[] $DEBUG_ERROR | cut -d ',' -f3 | grep -F ".$domain" | anew -q crtsh_subs.txt
-				eval curl "https://dns.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r '.FDNS_A'[],'.RDNS'[] $DEBUG_ERROR | cut -d ',' -f2 | grep -F ".$domain" | anew -q crtsh_subs.txt
+				eval curl "https://tls.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r .Results[] $DEBUG_ERROR | cut -d ',' -f3 | grep -F ".$domain" | anew -q .tmp/crtsh_subs.txt
+				eval curl "https://dns.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r '.FDNS_A'[],'.RDNS'[] $DEBUG_ERROR | cut -d ',' -f2 | grep -F ".$domain" | anew -q .tmp/crtsh_subs.txt
 			fi
-			NUMOFLINES=$(wc -l < crtsh_subs.txt)
+			NUMOFLINES=$(wc -l < .tmp/crtsh_subs.txt)
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${green} ${NUMOFLINES} crtsh subdomains found in ${runtime}${reset}\n\n"
@@ -313,10 +311,10 @@ sub_brute(){
 		then
 			start=`date +%s`
 			printf "${yellow} Running : Bruteforce Subdomain Enumeration${reset}\n"
-			eval shuffledns -d $domain -w $subs_wordlist -r $resolvers -t 5000 -o active_tmp.txt $DEBUG_STD
-			cat active_tmp.txt | sed "s/*.//" | anew -q brute_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
-			eval rm active_tmp.txt $DEBUG_ERROR
-			NUMOFLINES=$(wc -l < brute_subs.txt)
+			eval shuffledns -d $domain -w $subs_wordlist -r $resolvers -t 5000 -o .tmp/active_tmp.txt $DEBUG_STD
+			cat .tmp/active_tmp.txt | sed "s/*.//" | anew -q .tmp/brute_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			#eval rm active_tmp.txt $DEBUG_ERROR
+			NUMOFLINES=$(wc -l < .tmp/brute_subs.txt)
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${green} ${NUMOFLINES} subdomains found in ${runtime}${reset}\n\n"
@@ -330,7 +328,7 @@ sub_dns(){
 		then
 			start=`date +%s`
 			printf "${yellow} Running : Active Subdomain Enumeration${reset}\n"
-			cat *_subs.txt | anew -q subs_no_resolved.txt
+			cat .tmp/*_subs.txt | anew -q subs_no_resolved.txt
 			deleteOutScoped $outOfScope_file subs_no_resolved.txt
 			eval shuffledns -d $domain -list subs_no_resolved.txt -r $resolvers -t 5000 -o ${domain}_subdomains.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			NUMOFLINES=$(wc -l < ${domain}_subdomains.txt)
@@ -347,15 +345,15 @@ sub_scraping(){
 		then
 			start=`date +%s`
 			printf "${yellow} Running : JS scraping subdomain search${reset}\n"
-			touch JS_subs.txt
-			cat ${domain}_subdomains.txt | httpx -follow-redirects -H "${HEADER}" -status-code -timeout 15 -vhost -silent | grep "[200]" | cut -d [ -f1 | sed 's/[[:blank:]]*$//' | anew -q ${domain}_probed_tmp.txt
-			eval python3 $tools/JSFinder/JSFinder.py -f ${domain}_probed_tmp.txt -os JS_subs.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-			if [[ $(cat JS_subs.txt | wc -l) -gt 0 ]]
+			touch .tmp/JS_subs.txt
+			cat ${domain}_subdomains.txt | httpx -follow-redirects -H "${HEADER}" -status-code -timeout 15 -vhost -silent | grep "[200]" | cut -d [ -f1 | sed 's/[[:blank:]]*$//' | anew -q .tmp/${domain}_probed_tmp.txt
+			eval python3 $tools/JSFinder/JSFinder.py -f .tmp/${domain}_probed_tmp.txt -os .tmp/JS_subs.txt $DEBUG_STD
+			if [[ $(cat .tmp/JS_subs.txt | wc -l) -gt 0 ]]
 			then
-				NUMOFLINES=$(wc -l < JS_subs.txt)
-				cat JS_subs.txt | eval shuffledns -d $domain -r $resolvers -t 5000 -o JS_subs_temp.txt $DEBUG_STD
-				cat JS_subs_temp.txt | anew -q ${domain}_subdomains.txt
-				eval rm JS_subs_temp.txt ${domain}_probed_tmp.txt $DEBUG_ERROR
+				NUMOFLINES=$(wc -l < .tmp/JS_subs.txt)
+				cat .tmp/JS_subs.txt | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/JS_subs_temp.txt $DEBUG_STD
+				eval cat .tmp/JS_subs_temp.txt $DEBUG_ERROR | anew -q ${domain}_subdomains.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+				#eval rm JS_subs_temp.txt ${domain}_probed_tmp.txt $DEBUG_ERROR
 			else
 				NUMOFLINES=0
 			fi
@@ -374,25 +372,25 @@ sub_permut(){
 			printf "${yellow} Running : Permutations Subdomain Enumeration${reset}\n"
 			if [[ $(cat subs_no_resolved.txt | wc -l) -le 50 ]]
 				then
-					eval dnsgen subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o permute1_tmp.txt $DEBUG_STD
-					cat permute1_tmp.txt | anew -q permute1.txt
-					eval dnsgen permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o permute2_tmp.txt $DEBUG_STD
-					cat permute2_tmp.txt | anew -q permute2.txt
-					cat permute1.txt permute2.txt | anew -q permute_subs.txt
-					eval rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval dnsgen subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/permute1_tmp.txt $DEBUG_STD
+					cat .tmp/permute1_tmp.txt | anew -q .tmp/permute1.txt
+					eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/permute2_tmp.txt $DEBUG_STD
+					cat .tmp/permute2_tmp.txt | anew -q .tmp/permute2.txt
+					eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+					#eval rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt $DEBUG_ERROR
 				elif [[ $(cat subs_no_resolved.txt | wc -l) -le 100 ]]
 		  		then
-					eval dnsgen subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o permute_tmp.txt $DEBUG_STD
-					cat permute_tmp.txt | anew -q permute_subs.txt
-					eval rm permute_tmp.txt $DEBUG_ERROR  && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval dnsgen subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/permute_tmp.txt $DEBUG_STD
+					eval cat .tmp/permute_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+					#eval rm permute_tmp.txt $DEBUG_ERROR
 				else
 					printf "\n${bred} Skipping Permutations: Too Much Subdomains${reset}\n\n"
 			fi
-			if [ -f "permute_subs.txt" ]
+			if [ -f ".tmp/permute_subs.txt" ]
 			then
-				deleteOutScoped $outOfScope_file permute_subs.txt
-				NUMOFLINES=$(wc -l < permute_subs.txt)
-				cat permute_subs.txt | anew -q ${domain}_subdomains.txt
+				deleteOutScoped $outOfScope_file .tmp/permute_subs.txt
+				NUMOFLINES=$(wc -l < .tmp/permute_subs.txt)
+				eval cat .tmp/permute_subs.txt $DEBUG_ERROR | anew -q ${domain}_subdomains.txt
 			else
 				NUMOFLINES=0
 			fi
@@ -431,9 +429,9 @@ subtakeover(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Subdomain Takeover ${reset}\n\n"
 			start=`date +%s`
-			subzy --targets ${domain}_subdomains.txt  --https --concurrency 4 --hide_fails --timeout 10 > ${domain}_all-takeover-checks.txt
-			grep  "VULNERABLE" <${domain}_all-takeover-checks.txt > ${domain}_takeover.txt
-			eval rm ${domain}_all-takeover-checks.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
+			subzy --targets ${domain}_subdomains.txt  --https --concurrency 4 --hide_fails --timeout 10 > .tmp/${domain}_all-takeover-checks.txt
+			grep  "VULNERABLE" <.tmp/${domain}_all-takeover-checks.txt > ${domain}_takeover.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			#eval rm ${domain}_all-takeover-checks.txt $DEBUG_ERROR
 			end=`date +%s`
 			getElapsedTime $start $end
 			if [ -f "${domain}_takeover.txt" ]
@@ -479,11 +477,8 @@ brokenLinks(){
 		printf "${bgreen}#######################################################################\n"
 		printf "${bblue} Broken links checks ${reset}\n\n"
 		start=`date +%s`
-		mkdir -p .broken_tmp
-		interlace -tL ${domain}_probed.txt -threads 10 -c "wget --spider -r -nd -nv -H -l 1 -w 1 --no-check-certificate -U 'Mozilla' -o _output_/_cleantarget__brokenLinks.tmp _target_" -o .broken_tmp &>/dev/null
-		cd .broken_tmp && cat *.tmp | grep "^http" | grep -v ':$' | anew -q ${dir}/${domain}_brokenLinks.txt
-		rm -rf .broken_tmp
-		touch $called_fn_dir/.${FUNCNAME[0]}
+		interlace -tL ${domain}_probed.txt -threads 10 -c "wget --spider -r -nd -nv -H -l 1 -w 1 --no-check-certificate -U 'Mozilla' -o _output_/_cleantarget__brokenLinks.tmp _target_" -o .tmp &>/dev/null
+		cat .tmp/*_brokenLinks.tmp | grep "^http" | grep -v ':$' | anew -q ${domain}_brokenLinks.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 		end=`date +%s`
 		getElapsedTime $start $end
 		printf "${bblue}\n Broken links checks Finished in ${runtime}\n"
@@ -552,8 +547,8 @@ nuclei_check(){
 			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/takeovers/ -o nuclei_output/${domain}_subtko.txt;
 			printf "${yellow}\n\n Running : Nuclei DNS ${reset}\n\n"
 			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/dns/ -o nuclei_output/${domain}_dns.txt;
-			printf "${yellow}\n\n Running : Nuclei Miscellaneous ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/miscellaneous/ -o nuclei_output/${domain}_miscellaneous.txt;
+#			printf "${yellow}\n\n Running : Nuclei Miscellaneous ${reset}\n\n"
+#			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/miscellaneous/ -o nuclei_output/${domain}_miscellaneous.txt;
 			printf "${yellow}\n\n Running : Nuclei Panels ${reset}\n\n"
 			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/exposed-panels/ -o nuclei_output/${domain}_panels.txt;
 			printf "${yellow}\n\n Running : Nuclei Security Misconfiguration ${reset}\n\n"
@@ -578,22 +573,22 @@ urlchecks(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} URL Extraction ${reset}\n\n"
 			start=`date +%s`
-			cat ${domain}_probed.txt | waybackurls | anew -q ${domain}_url_extract_tmp.txt
-			cat ${domain}_probed.txt | gau | anew -q ${domain}_url_extract_tmp.txt
+			cat ${domain}_probed.txt | waybackurls | anew -q .tmp/${domain}_url_extract_tmp.txt
+			cat ${domain}_probed.txt | gau | anew -q .tmp/${domain}_url_extract_tmp.txt
 			if [ "$DEEP" = true ] ; then
-				gospider -S ${domain}_probed.txt -t 100 -H "${HEADER}" -c 10 -d 2 -a -w --js --sitemap --robots --cookie "${COOKIE}" --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt > gospider_tmp.txt
+				gospider -S ${domain}_probed.txt -t 100 -H "${HEADER}" -c 10 -d 2 -a -w --js --sitemap --robots --cookie "${COOKIE}" --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt > .tmp/gospider_tmp.txt
 			else
-				gospider -S ${domain}_probed.txt -t 100 -H "${HEADER}" -c 10 -d 1 -a -w --js --sitemap --robots --cookie "${COOKIE}" --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt > gospider_tmp.txt
+				gospider -S ${domain}_probed.txt -t 100 -H "${HEADER}" -c 10 -d 1 -a -w --js --sitemap --robots --cookie "${COOKIE}" --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt > .tmp/gospider_tmp.txt
 			fi
-			cat gospider_tmp.txt | sed "s/^.*http/http/p" | anew -q ${domain}_url_extract_tmp.txt
+			cat .tmp/gospider_tmp.txt | sed "s/^.*http/http/p" | anew -q .tmp/${domain}_url_extract_tmp.txt
 			if [ -s "${GITHUB_TOKENS}" ]
 			then
-				eval github-endpoints -q -k -d $domain -t ${GITHUB_TOKENS} -raw $DEBUG_ERROR | anew -q ${domain}_url_extract_tmp.txt
+				eval github-endpoints -q -k -d $domain -t ${GITHUB_TOKENS} -raw $DEBUG_ERROR | anew -q .tmp/${domain}_url_extract_tmp.txt
 			fi
-			cat ${domain}_url_extract_tmp.txt ${domain}_param.txt | grep "${domain}" | grep "=" | qsreplace FUZZ | qsreplace -a | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | anew -q ${domain}_url_extract_tmp2.txt
-			cat ${domain}_url_extract_tmp.txt | grep "${domain}" | egrep -i ".(js)" | anew -q ${domain}_url_extract_js.txt
-			uddup -u ${domain}_url_extract_tmp2.txt -o ${domain}_url_extract.txt && touch $called_fn_dir/.${FUNCNAME[0]};
-			eval rm ${domain}_url_extract_tmp.txt ${domain}_url_extract_tmp2.txt gospider_tmp.txt $DEBUG_ERROR
+			cat .tmp/${domain}_url_extract_tmp.txt ${domain}_param.txt | grep "${domain}" | grep "=" | qsreplace FUZZ | qsreplace -a | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | anew -q .tmp/${domain}_url_extract_tmp2.txt
+			cat .tmp/${domain}_url_extract_tmp.txt | grep "${domain}" | egrep -i ".(js)" | anew -q ${domain}_url_extract_js.txt
+			uddup -u .tmp/${domain}_url_extract_tmp2.txt -o ${domain}_url_extract.txt && touch $called_fn_dir/.${FUNCNAME[0]};
+			#eval rm ${domain}_url_extract_tmp.txt ${domain}_url_extract_tmp2.txt gospider_tmp.txt $DEBUG_ERROR
 			end=`date +%s`
 			getElapsedTime $start $end
 			NUMOFLINES=$(wc -l < ${domain}_url_extract.txt)
@@ -623,7 +618,8 @@ url_gf(){
 			gf rce ${domain}_url_extract.txt | anew -q gf/${domain}_rce.txt;
 			gf potential ${domain}_url_extract.txt | anew -q gf/${domain}_potential.txt;
 			cat ${domain}_url_extract.txt | unfurl -u format %s://%d%p | anew -q gf/${domain}_endpoints.txt;
-			gf lfi ${domain}_url_extract.txt | anew -q gf/${domain}_lfi.txt && touch $called_fn_dir/.${FUNCNAME[0]};
+			gf lfi ${domain}_url_extract.txt | anew -q gf/${domain}_lfi.txt
+			touch $called_fn_dir/.${FUNCNAME[0]};
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Vulnerable Pattern Search Finished in ${runtime}\n"
@@ -671,24 +667,25 @@ params(){
 			printf "${bblue} Parameter Discovery ${reset}\n"
 			start=`date +%s`
 			printf "${yellow}\n\n Running : Finding params with paramspider${reset}\n"
-			cat ${domain}_probed.txt | sed -r "s/https?:\/\///" | anew -q ${domain}_probed_nohttp.txt
-			interlace -tL ${domain}_probed_nohttp.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt,js" &>/dev/null && touch $called_fn_dir/.${FUNCNAME[0]}
-			find output/ -name '*.txt' -exec cat {} \; | anew -q ${domain}_param_tmp.txt
-			sed '/^FUZZ/d' -i ${domain}_param_tmp.txt
+			cat ${domain}_probed.txt | sed -r "s/https?:\/\///" | anew -q .tmp/${domain}_probed_nohttp.txt
+			interlace -tL .tmp/${domain}_probed_nohttp.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt,js" &>/dev/null && touch $called_fn_dir/.${FUNCNAME[0]}
+			#find output/ -name '*.txt' -exec cat {} \; | anew -q ${domain}_param_tmp.txt
+			cat output/*.txt | anew -q .tmp/${domain}_param_tmp.txt
+			sed '/^FUZZ/d' -i .tmp/${domain}_param_tmp.txt
 			eval rm -rf output/ $DEBUG_ERROR
-			eval rm ${domain}_probed_nohttp.txt $DEBUG_ERROR
+			#eval rm ${domain}_probed_nohttp.txt $DEBUG_ERROR
 			if [ "$DEEP" = true ] ; then
 				printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
-				eval python3 $tools/Arjun/arjun.py -i ${domain}_param_tmp.txt -t 20 -oT ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval python3 $tools/Arjun/arjun.py -i .tmp/${domain}_param_tmp.txt -t 20 -oT ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			else
-				if [[ $(cat ${domain}_param_tmp.txt | wc -l) -le 200 ]]
+				if [[ $(cat .tmp/${domain}_param_tmp.txt | wc -l) -le 200 ]]
 				then
-					eval python3 $tools/Arjun/arjun.py -i ${domain}_param_tmp.txt -t 20 -oT ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval python3 $tools/Arjun/arjun.py -i .tmp/${domain}_param_tmp.txt -t 20 -oT ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				else
-					cp ${domain}_param_tmp.txt ${domain}_param.txt
+					cp .tmp/${domain}_param_tmp.txt ${domain}_param.txt
 				fi
 			fi
-			eval rm ${domain}_param_tmp.txt $DEBUG_ERROR
+			#eval rm ${domain}_param_tmp.txt $DEBUG_ERROR
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Parameter Discovery Finished in ${runtime}\n"
@@ -705,27 +702,27 @@ xss(){
 		printf "${bgreen}#######################################################################\n"
 		printf "${bblue} XSS Analysis ${reset}\n\n"
 		start=`date +%s`
-		cat gf/${domain}_xss.txt | Gxss -c 100 -p Xss | anew -q ${domain}_xss_reflected.txt
+		cat gf/${domain}_xss.txt | Gxss -c 100 -p Xss | anew -q .tmp/${domain}_xss_reflected.txt
 		if [ "$DEEP" = true ] ; then
 			if [ -n "$XSS_SERVER" ]; then
 				sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
-				eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss_reflected.txt -t 30 --crawl --blind --skip > ${domain}_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval python3 $tools/XSStrike/xsstrike.py --seeds .tmp/${domain}_xss_reflected.txt -t 30 --crawl --blind --skip > ${domain}_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				printf "${bblue} Results are saved in ${domain}_xss.txt${reset}\n"
 			else
 				printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n\n"
-				eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss_reflected.txt -t 30 --crawl --skip > ${domain}_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval python3 $tools/XSStrike/xsstrike.py --seeds .tmp/${domain}_xss_reflected.txt -t 30 --crawl --skip > ${domain}_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				printf "${bblue} Results are saved in ${domain}_xss.txt${reset}\n"
 			fi
 		else
-			if [[ $(cat ${domain}_xss_reflected.txt | wc -l) -le 500 ]]
+			if [[ $(cat .tmp/${domain}_xss_reflected.txt | wc -l) -le 500 ]]
 			then
 				if [ -n "$XSS_SERVER" ]; then
 					sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
-					eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss_reflected.txt -t 30 --crawl --blind --skip > ${domain}_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval python3 $tools/XSStrike/xsstrike.py --seeds .tmp/${domain}_xss_reflected.txt -t 30 --crawl --blind --skip > ${domain}_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 					printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 				else
 					printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n\n"
-					eval python3 $tools/XSStrike/xsstrike.py --seeds ${domain}_xss_reflected.txt -t 30 --crawl --skip > ${domain}_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval python3 $tools/XSStrike/xsstrike.py --seeds .tmp/${domain}_xss_reflected.txt -t 30 --crawl --skip > ${domain}_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 					printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 				fi
 			else
@@ -827,8 +824,8 @@ cms_scanner(){
 			printf "${bblue} CMS Scanner ${reset}\n"
 			start=`date +%s`
 			mkdir -p $dir/cms && rm -rf $dir/cms/*
-			tr '\n' ',' < ${domain}_probed.txt > ${domain}_cms.txt
-			eval python3 $tools/CMSeeK/cmseek.py -l ${domain}_cms.txt --batch -r $DEBUG_STD
+			tr '\n' ',' < ${domain}_probed.txt > .tmp/${domain}_cms.txt
+			eval python3 $tools/CMSeeK/cmseek.py -l .tmp/${domain}_cms.txt --batch -r $DEBUG_STD
 			for sub in $(cat ${domain}_probed.txt); do
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
 				cms_id=$(cat $tools/CMSeeK/Result/${sub_out}/cms.json | jq -r '.cms_id')
@@ -839,7 +836,7 @@ cms_scanner(){
 					mv -f $tools/CMSeeK/Result/${sub_out} $dir/cms/
 				fi
 			done
-			eval rm ${domain}_cms.txt $DEBUG_ERROR
+			#eval rm ${domain}_cms.txt $DEBUG_ERROR
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
@@ -876,9 +873,9 @@ test_ssl(){
 				printf "${bgreen}#######################################################################\n"
 				printf "${bblue} SSL Test ${reset}\n"
 				start=`date +%s`
-				eval cat ${domain}_probed.txt $DEBUG_ERROR | grep "^https" | anew -q ${domain}_probed_https.txt
-				$tools/testssl.sh/testssl.sh --quiet --color 0 -U -iL ${domain}_probed_https.txt > ${domain}_testssl.txt && touch $called_fn_dir/.${FUNCNAME[0]}
-				eval rm ${domain}_probed_https.txt $DEBUG_ERROR
+				eval cat ${domain}_probed.txt $DEBUG_ERROR | grep "^https" | anew -q .tmp/${domain}_probed_https.txt
+				$tools/testssl.sh/testssl.sh --quiet --color 0 -U -iL .tmp/${domain}_probed_https.txt > ${domain}_testssl.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+				#eval rm ${domain}_probed_https.txt $DEBUG_ERROR
 				end=`date +%s`
 				getElapsedTime $start $end
 				printf "${bblue}\n SSL Test Finished in ${runtime}\n"
@@ -897,10 +894,9 @@ open_redirect(){
 				printf "${bgreen}#######################################################################\n"
 				printf "${bblue} Open redirects checks ${reset}\n"
 				start=`date +%s`
-				cat gf/${domain}_redirect.txt | qsreplace FUZZ | anew -q test_redirect.txt
-				eval python3 $tools/OpenRedireX/openredirex.py -l test_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt $DEBUG_ERROR | grep "^http" > ${domain}_redirect.txt
+				eval python3 $tools/OpenRedireX/openredirex.py -l gf/${domain}_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt $DEBUG_ERROR | grep "^http" > ${domain}_redirect.txt
 				sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" ${domain}_redirect.txt
-				eval rm test_redirect.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
+				touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
 				getElapsedTime $start $end
 				printf "${bblue}\n Open Redirects Finished in ${runtime}\n"
@@ -912,10 +908,9 @@ open_redirect(){
 					printf "${bgreen}#######################################################################\n"
 					printf "${bblue} Open redirects checks ${reset}\n"
 					start=`date +%s`
-					cat gf/${domain}_redirect.txt | qsreplace FUZZ | anew -q test_redirect.txt
-					eval python3 $tools/OpenRedireX/openredirex.py -l test_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt $DEBUG_ERROR | grep "^http" > ${domain}_redirect.txt
+					eval python3 $tools/OpenRedireX/openredirex.py -l gf/${domain}_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt $DEBUG_ERROR | grep "^http" > ${domain}_redirect.txt
 					sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" ${domain}_redirect.txt
-					eval rm test_redirect.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
+					touch $called_fn_dir/.${FUNCNAME[0]}
 					end=`date +%s`
 					getElapsedTime $start $end
 					printf "${bblue}\n Open Redirects Finished in ${runtime}\n"
@@ -1046,6 +1041,12 @@ function isAsciiText {
 end(){
 	find $dir -type f -empty | grep -v "called_fn" | xargs rm -f &>/dev/null
 	find $dir -type d -empty | grep -v "called_fn" | xargs rm -rf &>/dev/null
+
+	if [ "$REMOVETMP" = true ]
+	then
+		rm -rf $dir/.tmp
+	fi
+
 	if [ -n "$dir_output" ]
 	then
 		output
@@ -1133,18 +1134,10 @@ help(){
 	printf " ${bblue}MODE OPTIONS${reset}\n"
 	printf "   -a               Perform all checks\n"
 	printf "   -s               Full subdomains scan (Subs, tko and probe)\n"
-#	printf "   -g               Google dorks searchs\n"
 	printf "   -w               Perform web checks only without subs ${yellow}(-l required)${reset}\n"
-#	printf "   -t               Check subdomain takeover ${yellow}(-l required)${reset}\n"
 	printf "   -i               Check all needed tools\n"
 	printf "   -v               Debug/verbose mode, no file descriptor redir\n"
 	printf "   -h               Show this help\n"
-#	printf " \n"
-#	printf " ${bblue}SUBDOMAIN OPTIONS${reset}\n"
-#	printf "   --sp             Passive subdomain scans\n"
-#	printf "   --sb             Bruteforce subdomain resolution \n"
-#	printf "   --sr             Subdomain permutations and resolution ${yellow}(-l required)${reset}\n"
-#	printf "   --ss             Subdomain scan by scraping ${yellow}(-l required)${reset}\n"
 	printf " \n"
 	printf " ${bblue}GENERAL OPTIONS${reset}\n"
 	printf "   --deep           Deep scan (Enable some slow options for deeper scan)\n"
