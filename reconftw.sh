@@ -474,23 +474,14 @@ webprobe_full(){
 }
 
 brokenLinks(){
-	#check if this function is already  processed
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] ; then
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$BROKENLINKS" = true ] ; then
 		printf "${bgreen}#######################################################################\n"
 		printf "${bblue} Broken links checks ${reset}\n\n"
 		start=`date +%s`
-		for sub in $(cat ${domain}_probed.txt); do
-			sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-			#check if subdomain is already processed
-			if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}_$sub_out" ] ; then
-				wget --spider -r -nd -nv -H -l 1 -w 1 --no-check-certificate -U 'Mozilla' -o ${sub_out}_brokenLinks.tmp $sub_out
-				cat ${sub_out}_brokenLinks.tmp | grep "^http" | grep -v ':$' | anew -q ${domain}_brokenLinks.txt
-				touch $called_fn_dir/.${FUNCNAME[0]}_$sub_out
-			else
-				printf "${yellow} ${FUNCNAME[0]}_$sub_out is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]}_$sub_out ${reset}\n\n"
-			fi
-		done
-		rm *_brokenLinks.tmp
+		mkdir -p .broken_tmp
+		interlace -tL ${domain}_probed.txt -threads 10 -c "wget --spider -r -nd -nv -H -l 1 -w 1 --no-check-certificate -U 'Mozilla' -o _output_/_cleantarget__brokenLinks.tmp _target_" -o .broken_tmp &>/dev/null
+		cd .broken_tmp && cat *.tmp | grep "^http" | grep -v ':$' | anew -q ${dir}/${domain}_brokenLinks.txt
+		rm -rf .broken_tmp
 		touch $called_fn_dir/.${FUNCNAME[0]}
 		end=`date +%s`
 		getElapsedTime $start $end
@@ -1080,13 +1071,13 @@ all(){
 			subdomains_full
 			subtakeover
 			webprobe_full
-			brokenLinks
 			screenshot
 			portscan
 			nuclei_check
 			github
 			favicon
 			cms_scanner
+			brokenLinks
 			fuzz
 			cors
 			params
@@ -1107,13 +1098,13 @@ all(){
 		subdomains_full
 		subtakeover
 		webprobe_full
-		brokenLinks
 		screenshot
 		portscan
 		nuclei_check
 		github
 		favicon
 		cms_scanner
+		brokenLinks
 		fuzz
 		cors
 		params
@@ -1242,6 +1233,7 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 			fi
 			nuclei_check
 			cms_scanner
+			brokenLinks
 			fuzz
 			cors
 			params
