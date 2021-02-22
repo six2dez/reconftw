@@ -215,6 +215,8 @@ subdomains_full(){
 	NUMOFLINES_probed="0"
 	printf "${bgreen}#######################################################################\n\n"
 	printf "${bblue} Subdomain Enumeration\n\n"
+	eval cp ${domain}_subdomains.txt .tmp/${domain}_subdomains_old.txt $DEBUG_ERROR
+	eval cp ${domain}_probed.txt .tmp/${domain}_probed_old.txt $DEBUG_ERROR
 	sub_passive
 	sub_crt
 	sub_brute
@@ -222,22 +224,21 @@ subdomains_full(){
 	sub_scraping
 	sub_permut
 	webprobe_simple
-	#eval rm -f *_subs.txt $DEBUG_ERROR
 	if [ -f "${domain}_subdomains.txt" ]
 		then
 			deleteOutScoped $outOfScope_file ${domain}_subdomains.txt
-			NUMOFLINES_subs=$(wc -l < ${domain}_subdomains.txt)
+			NUMOFLINES_subs=$(eval cat ${domain}_subdomains.txt $DEBUG_ERROR | anew .tmp/${domain}_subdomains_old.txt | wc -l)
 	fi
 	if [ -f "${domain}_probed.txt" ]
 		then
 			deleteOutScoped $outOfScope_file ${domain}_probed.txt
-			NUMOFLINES_probed=$(wc -l < ${domain}_probed.txt)
+			NUMOFLINES_probed=$(eval cat ${domain}_probed.txt $DEBUG_ERROR | anew .tmp/${domain}_probed_old.txt | wc -l)
 	fi
-	printf "${bblue}\n Total subdomains found: ${reset}\n\n"
-	text="${bred}\n - ${NUMOFLINES_subs} alive subdomains${reset}\n\n"
+	printf "${bblue}\n Total subdomains: ${reset}\n\n"
+	text="${bred}\n - ${NUMOFLINES_subs} new alive subdomains${reset}\n\n"
 	printf "${text}" && printf "${text}" | $NOTIFY
 	eval cat ${domain}_subdomains.txt $DEBUG_ERROR | sort
-	text="${bred}\n - ${NUMOFLINES_probed} web probed${reset}\n\n"
+	text="${bred}\n - ${NUMOFLINES_probed} new web probed${reset}\n\n"
 	printf "${text}" && printf "${text}" | $NOTIFY
 	eval cat ${domain}_probed.txt $DEBUG_ERROR | sort
 	text="${bblue}\n Subdomain Enumeration Finished\n"
@@ -247,7 +248,7 @@ subdomains_full(){
 }
 
 sub_passive(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]
 		then
 			start=`date +%s`
 			printf "${yellow} Running : Passive Subdomain Enumeration${reset}\n"
@@ -256,21 +257,22 @@ sub_passive(){
 			eval amass enum -passive -d $domain -config $AMASS_CONFIG -o .tmp/amass.txt $DEBUG_STD
 			eval findomain --quiet -t $domain -u .tmp/findomain.txt $DEBUG_STD
 			crobat -s $domain | anew -q .tmp/crobat.txt
-			timeout 5m waybackurls $domain | unfurl -u domains | anew -q .tmp/waybackurls.txt
 			echo $domain | anew -q .tmp/passive_subs.txt
-			eval cat .tmp/subfinder.txt .tmp/assetfinder.txt .tmp/amass.txt .tmp/findomain.txt .tmp/crobat.txt .tmp/waybackurls.txt $DEBUG_ERROR | sed "s/*.//" | anew -q .tmp/passive_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
-			#eval rm subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt waybackurls.txt $DEBUG_ERROR
-			NUMOFLINES=$(wc -l < .tmp/passive_subs.txt)
+			timeout 5m waybackurls $domain | unfurl -u domains | anew -q .tmp/waybackurls.txt
+			NUMOFLINES=$(eval cat .tmp/subfinder.txt .tmp/assetfinder.txt .tmp/amass.txt .tmp/findomain.txt .tmp/crobat.txt .tmp/waybackurls.txt $DEBUG_ERROR | sed "s/*.//" | anew .tmp/passive_subs.txt | wc -l)
+			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${green} ${NUMOFLINES} subdomains found in ${runtime}${reset}\n\n"
+			if [ "$NUMOFLINES" -gt 0 ]; then
+				printf "${green} ${NUMOFLINES} new subdomains by passive found in ${runtime}${reset}\n\n"
+			fi
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
 sub_crt(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$SUBCRT" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SUBCRT" = true ]
 		then
 			start=`date +%s`
 			printf "${yellow} Running : Crtsh Subdomain Enumeration${reset}\n"
@@ -278,73 +280,80 @@ sub_crt(){
 			eval python3 crtfinder.py -u $domain $DEBUG_STD
 			outputfile=${domain%%.*}
 			if [ "$FULLSCOPE" = true ] ; then
-				eval cat ${outputfile}.txt $DEBUG_ERROR | anew -q $dir/.tmp/crtsh_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval cat ${outputfile}.txt $DEBUG_ERROR | anew -q $dir/.tmp/crtsh_subs_tmp.txt
 			else
-				eval cat ${outputfile}.txt $DEBUG_ERROR | grep ".$domain$" | anew -q $dir/.tmp/crtsh_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval cat ${outputfile}.txt $DEBUG_ERROR | grep ".$domain$" | anew -q $dir/.tmp/crtsh_subs_tmp.txt
 			fi
 			if [ "$DEEP" = true ] ; then
 				eval python3 dig.py ${outputfile}.txt > ${domain}_more.txt $DEBUG_STD
 				if [ "$FULLSCOPE" = true ] ; then
-					eval cat ${domain}_more.txt $DEBUG_ERROR | anew -q $dir/.tmp/crtsh_subs.txt
+					eval cat ${domain}_more.txt $DEBUG_ERROR | anew -q $dir/.tmp/crtsh_subs_tmp.txt
 				else
-					eval cat ${domain}_more.txt $DEBUG_ERROR | grep ".$domain$" | anew -q $dir/.tmp/crtsh_subs.txt
+					eval cat ${domain}_more.txt $DEBUG_ERROR | grep ".$domain$" | anew -q $dir/.tmp/crtsh_subs_tmp.txt
 				fi
 				eval rm ${domain}_more.txt $DEBUG_ERROR
 			fi
 			eval rm ${outputfile}.txt $DEBUG_ERROR
 			cd $dir
 			if [ "$FULLSCOPE" = true ] ; then
-				eval curl "https://tls.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r .Results[] $DEBUG_ERROR | cut -d ',' -f3 | anew -q .tmp/crtsh_subs.txt
-				eval curl "https://dns.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r '.FDNS_A'[],'.RDNS'[] $DEBUG_ERROR | cut -d ',' -f2 | anew -q .tmp/crtsh_subs.txt
+				eval curl "https://tls.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r .Results[] $DEBUG_ERROR | cut -d ',' -f3 | anew -q .tmp/crtsh_subs_tmp.txt
+				eval curl "https://dns.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r '.FDNS_A'[],'.RDNS'[] $DEBUG_ERROR | cut -d ',' -f2 | anew -q .tmp/crtsh_subs_tmp.txt
 			else
 				eval curl "https://tls.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r .Results[] $DEBUG_ERROR | cut -d ',' -f3 | grep -F ".$domain" | anew -q .tmp/crtsh_subs.txt
-				eval curl "https://dns.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r '.FDNS_A'[],'.RDNS'[] $DEBUG_ERROR | cut -d ',' -f2 | grep -F ".$domain" | anew -q .tmp/crtsh_subs.txt
+				eval curl "https://dns.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r '.FDNS_A'[],'.RDNS'[] $DEBUG_ERROR | cut -d ',' -f2 | grep -F ".$domain" | anew -q .tmp/crtsh_subs_tmp.txt
 			fi
-			NUMOFLINES=$(wc -l < .tmp/crtsh_subs.txt)
+			touch $called_fn_dir/.${FUNCNAME[0]}
+			NUMOFLINES=$(eval cat .tmp/crtsh_subs_tmp.txt $DEBUG_ERROR | anew .tmp/crtsh_subs.txt | wc -l)
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${green} ${NUMOFLINES} crtsh subdomains found in ${runtime}${reset}\n\n"
+			if [ "$NUMOFLINES" -gt 0 ]; then
+				printf "${green} ${NUMOFLINES} new subdomains by certificate transparency found in ${runtime}${reset}\n\n"
+			fi
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
 sub_brute(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$SUBBRUTE" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SUBBRUTE" = true ]
 		then
 			start=`date +%s`
 			printf "${yellow} Running : Bruteforce Subdomain Enumeration${reset}\n"
 			eval shuffledns -d $domain -w $subs_wordlist -r $resolvers -t 5000 -o .tmp/active_tmp.txt $DEBUG_STD
-			cat .tmp/active_tmp.txt | sed "s/*.//" | anew -q .tmp/brute_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
-			#eval rm active_tmp.txt $DEBUG_ERROR
-			NUMOFLINES=$(wc -l < .tmp/brute_subs.txt)
+			NUMOFLINES=$(eval cat .tmp/active_tmp.txt $DEBUG_ERROR | sed "s/*.//" | anew .tmp/brute_subs.txt | wc -l)
+			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${green} ${NUMOFLINES} subdomains found in ${runtime}${reset}\n\n"
+			if [ "$NUMOFLINES" -gt 0 ]; then
+				printf "${green} ${NUMOFLINES} new subdomains by bruteforce found in ${runtime}${reset}\n\n"
+			fi
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
 sub_dns(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]
 		then
 			start=`date +%s`
 			printf "${yellow} Running : Active Subdomain Enumeration${reset}\n"
 			cat .tmp/*_subs.txt | anew -q .tmp/subs_no_resolved.txt
 			deleteOutScoped $outOfScope_file .tmp/subs_no_resolved.txt
-			eval shuffledns -d $domain -list .tmp/subs_no_resolved.txt -r $resolvers -t 5000 -o ${domain}_subdomains.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-			NUMOFLINES=$(wc -l < ${domain}_subdomains.txt)
+			eval shuffledns -d $domain -list .tmp/subs_no_resolved.txt -r $resolvers -t 5000 -o .tmp/${domain}_subdomains_tmp.txt $DEBUG_STD
+			NUMOFLINES=$(cat .tmp/${domain}_subdomains_tmp.txt | anew ${domain}_subdomains.txt | wc -l)
+			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${green} ${NUMOFLINES} subdomains found in ${runtime}${reset}\n\n"
+			if [ "$NUMOFLINES" -gt 0 ]; then
+				printf "${green} ${NUMOFLINES} new subdomains by dns resolution found in ${runtime}${reset}\n\n"
+			fi
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
 sub_scraping(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$SUBSCRAPING" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SUBSCRAPING" = true ]
 		then
 			start=`date +%s`
 			printf "${yellow} Running : JS scraping subdomain search${reset}\n"
@@ -352,26 +361,21 @@ sub_scraping(){
 			cat ${domain}_subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -timeout 15 -silent -no-color | grep '\[200\]' | cut -d ' ' -f1 | anew -q .tmp/${domain}_probed_tmp.txt
 			eval python3 $tools/JSFinder/JSFinder.py -f .tmp/${domain}_probed_tmp.txt -os .tmp/scrap_subs.txt $DEBUG_STD
 			galer -u .tmp/${domain}_probed_tmp.txt -s | grep ".$domain" | unfurl --unique domains | anew -q .tmp/scrap_subs.txt
-			if [[ $(cat .tmp/scrap_subs.txt | wc -l) -gt 0 ]]
-			then
-				NUMOFLINES=$(wc -l < .tmp/scrap_subs.txt)
-				cat .tmp/scrap_subs.txt | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/scrap_subs_resolved.txt $DEBUG_STD
-				eval cat .tmp/scrap_subs_resolved.txt $DEBUG_ERROR | anew -q ${domain}_subdomains.txt
-				#eval rm scrap_subs_temp.txt ${domain}_probed_tmp.txt $DEBUG_ERROR
-			else
-				NUMOFLINES=0
-			fi
+			cat .tmp/scrap_subs.txt | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/scrap_subs_resolved.txt $DEBUG_STD
+			NUMOFLINES=$(eval cat .tmp/scrap_subs_resolved.txt $DEBUG_ERROR | anew ${domain}_subdomains.txt | wc -l)
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${green} ${NUMOFLINES} subdomains found in ${runtime}${reset}\n\n"
+			if [ "$NUMOFLINES" -gt 0 ]; then
+				printf "${green} ${NUMOFLINES} new subdomains by scraping found in ${runtime}${reset}\n\n"
+			fi
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
 sub_permut(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$SUBPERMUTE" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SUBPERMUTE" = true ]
 		then
 			start=`date +%s`
 			printf "${yellow} Running : Permutations Subdomain Enumeration${reset}\n"
@@ -381,74 +385,69 @@ sub_permut(){
 					cat .tmp/permute1_tmp.txt | anew -q .tmp/permute1.txt
 					eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/permute2_tmp.txt $DEBUG_STD
 					cat .tmp/permute2_tmp.txt | anew -q .tmp/permute2.txt
-					eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 					#eval rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt $DEBUG_ERROR
 				elif [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 100 ]]
 		  		then
 					eval dnsgen .tmp/subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/permute_tmp.txt $DEBUG_STD
-					eval cat .tmp/permute_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval cat .tmp/permute_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 					#eval rm permute_tmp.txt $DEBUG_ERROR
 				else
-					printf "\n${bred} Skipping Permutations: Too Much Subdomains${reset}\n\n" && touch $called_fn_dir/.${FUNCNAME[0]}
+					printf "\n${bred} Skipping Permutations: Too Much Subdomains${reset}\n\n"
 			fi
 			if [ -f ".tmp/permute_subs.txt" ]
 			then
 				deleteOutScoped $outOfScope_file .tmp/permute_subs.txt
-				NUMOFLINES=$(wc -l < .tmp/permute_subs.txt)
-				eval cat .tmp/permute_subs.txt $DEBUG_ERROR | anew -q ${domain}_subdomains.txt
+				NUMOFLINES=$(eval cat .tmp/permute_subs.txt $DEBUG_ERROR | anew ${domain}_subdomains.txt | wc -l)
 			else
 				NUMOFLINES=0
 			fi
+			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${green} ${NUMOFLINES} subdomains found in ${runtime}${reset}\n\n"
+			if [ "$NUMOFLINES" -gt 0 ]; then
+				printf "${green} ${NUMOFLINES} new subdomains by permutations found in ${runtime}${reset}\n\n"
+			fi
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
 webprobe_simple(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]
 		then
 			start=`date +%s`
 			printf "${yellow} Running : Http probing${reset}\n\n"
-			cat ${domain}_subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -timeout 15 -silent -no-color | grep '\[200\]' | cut -d ' ' -f1 | anew -q ${domain}_probed.txt && touch $called_fn_dir/.${FUNCNAME[0]}
-			if [ -f "${domain}_probed.txt" ]
-			then
-				deleteOutScoped $outOfScope_file ${domain}_probed.txt
-				NUMOFLINES=$(wc -l < ${domain}_probed.txt)
-			else
-				NUMOFLINES=0
-			fi
+			cat ${domain}_subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -timeout 15 -silent -no-color | grep '\[200\]' | cut -d ' ' -f1 | anew -q .tmp/${domain}_probed_tmp.txt
+			deleteOutScoped $outOfScope_file .tmp/${domain}_probed_tmp.txt
+			NUMOFLINES=$(eval cat .tmp/${domain}_probed_tmp.txt $DEBUG_ERROR | anew ${domain}_probed.txt | wc -l)
+			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${green} ${NUMOFLINES} websites resolved in ${runtime}${reset}\n\n"
+			if [ "$NUMOFLINES" -gt 0 ]; then
+				printf "${green} ${NUMOFLINES} new websites resolved in ${runtime}${reset}\n\n"
+			fi
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
 
 subtakeover(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$SUBTAKEOVER" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SUBTAKEOVER" = true ]
 		then
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Subdomain Takeover ${reset}\n\n"
 			start=`date +%s`
-			subzy --targets ${domain}_subdomains.txt  --https --concurrency 4 --hide_fails --timeout 10 > .tmp/${domain}_all-takeover-checks.txt
-			grep "VULNERABLE" <.tmp/${domain}_all-takeover-checks.txt > ${domain}_takeover.txt
+			subzy --targets ${domain}_subdomains.txt --concurrency 4 --hide_fails --timeout 10 | grep "VULNERABLE" | cut -d ' ' -f9 > .tmp/${domain}_all-takeover-checks.txt
+			NUMOFLINES=$(eval cat .tmp/${domain}_all-takeover-checks.txt $DEBUG_ERROR | anew ${domain}_takeover.txt | wc -l)
 			#eval rm ${domain}_all-takeover-checks.txt $DEBUG_ERROR
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			if [ -f "${domain}_takeover.txt" ]
-			then
-				NUMOFLINES=$(wc -l < ${domain}_takeover.txt)
-			else
-				NUMOFLINES=0
+			if [ "$NUMOFLINES" -gt 0 ]; then
+				text="${bred}\n ${NUMOFLINES} new possible takeovers found in ${runtime}${reset}\n\n"
 			fi
-			text="${bred}\n Subtko: ${NUMOFLINES} subdomains in ${runtime}${reset}\n\n"
 			printf "${text}" && printf "${text}" | $NOTIFY
-			eval cat ${domain}_takeover.txt $DEBUG_ERROR
 			printf "${bblue}\n Subdomain Takeover Finished\n"
 			printf "${bblue} Results are saved in ${domain}_takeover.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
@@ -458,18 +457,21 @@ subtakeover(){
 }
 
 webprobe_full(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$WEBPROBEFULL" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$WEBPROBEFULL" = true ]
 		then
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} ${bgreen} Web Probe ${reset}\n\n"
 			printf "${yellow} Running : Http probing non standard ports${reset}\n\n"
 			start=`date +%s`
-			cat ${domain}_subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55672 -follow-host-redirects -H "${HEADER}" -status-code -timeout 15 -silent -no-color | grep '\[200\]' | cut -d ' ' -f1 | anew -q ${domain}_probed_uncommon_ports.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			cat ${domain}_subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55672 -follow-host-redirects -H "${HEADER}" -status-code -timeout 15 -silent -no-color | grep '\[200\]' | cut -d ' ' -f1 | anew -q .tmp/${domain}_probed_uncommon_ports.txt
+			NUMOFLINES=$(eval cat .tmp/${domain}_probed_uncommon_ports.txt $DEBUG_ERROR | anew ${domain}_probed_uncommon_ports.txt | wc -l)
+			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			NUMOFLINES=$(wc -l < ${domain}_probed_uncommon_ports.txt)
-			printf "${bred}\n Uncommon web ports: ${NUMOFLINES} websites in ${runtime}${reset}\n\n"
-			eval cat ${domain}_probed_uncommon_ports.txt $DEBUG_ERROR
+			if [ "$NUMOFLINES" -gt 0 ]; then
+				printf "${bred}\n Uncommon web ports: ${NUMOFLINES} new websites in ${runtime}${reset}\n\n"
+				eval cat ${domain}_probed_uncommon_ports.txt $DEBUG_ERROR
+			fi
 			printf "${bblue}\n Web Probe Finished\n"
 			printf "${bblue} Results are saved in ${domain}_probed_uncommon_ports.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
@@ -479,7 +481,7 @@ webprobe_full(){
 }
 
 brokenLinks(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$BROKENLINKS" = true ] ; then
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$BROKENLINKS" = true ] ; then
 		printf "${bgreen}#######################################################################\n"
 		printf "${bblue} Broken links checks ${reset}\n\n"
 		start=`date +%s`
@@ -490,9 +492,13 @@ brokenLinks(){
 				blc --requests 100 $sub | grep BROKEN | anew -q .tmp/brokenLinks.txt
 			fi
 		done
-		cat .tmp/brokenLinks.txt | cut -d ' ' -f2 | anew -q ${domain}_brokenLinks.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+		NUMOFLINES=$(eval cat .tmp/brokenLinks.txt $DEBUG_ERROR | cut -d ' ' -f2 | anew ${domain}_brokenLinks.txt | wc -l)
+		touch $called_fn_dir/.${FUNCNAME[0]}
 		end=`date +%s`
 		getElapsedTime $start $end
+		if [ "$NUMOFLINES" -gt 0 ]; then
+			text="${bred}\n ${NUMOFLINES} new broken links found in ${runtime}${reset}\n\n"
+		fi
 		printf "${bblue}\n Broken links checks Finished in ${runtime}\n"
 		printf "${bblue} Results are saved in ${domain}_brokenLinks.txt ${reset}\n"
 		printf "${bgreen}#######################################################################\n\n"
@@ -502,12 +508,13 @@ brokenLinks(){
 }
 
 screenshot(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$WEBSCREENSHOT" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$WEBSCREENSHOT" = true ]
 		then
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} ${bgreen} Web Screenshot ${reset}\n\n"
 			start=`date +%s`
-			python3 $tools/webscreenshot/webscreenshot.py -i ${domain}_probed.txt -r chromium -w 4 -a "${HEADER}" -o screenshots &>/dev/null && touch $called_fn_dir/.${FUNCNAME[0]}
+			python3 $tools/webscreenshot/webscreenshot.py -i ${domain}_probed.txt -r chromium -w 4 -a "${HEADER}" -o screenshots &>/dev/null
+			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Web Screenshot Finished in ${runtime}\n"
@@ -519,7 +526,7 @@ screenshot(){
 }
 
 portscan(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$PORTSCANNER" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$PORTSCANNER" = true ]
 		then
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Port Scan ${reset}\n\n"
@@ -541,7 +548,7 @@ portscan(){
 }
 
 nuclei_check(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$NUCLEICHECK" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$NUCLEICHECK" = true ]
 		then
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Template Scanning with Nuclei ${reset}\n\n"
@@ -581,7 +588,7 @@ nuclei_check(){
 }
 
 urlchecks(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]
 		then
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} URL Extraction ${reset}\n\n"
@@ -600,15 +607,18 @@ urlchecks(){
 			fi
 			cat .tmp/${domain}_url_extract_tmp.txt ${domain}_param.txt | grep "${domain}" | grep "=" | qsreplace FUZZ | qsreplace -a | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | anew -q .tmp/${domain}_url_extract_tmp2.txt
 			cat .tmp/${domain}_url_extract_tmp.txt | grep "${domain}" | egrep -i ".(js)" | anew -q ${domain}_url_extract_js.txt
-			uddup -u .tmp/${domain}_url_extract_tmp2.txt -o ${domain}_url_extract.txt && touch $called_fn_dir/.${FUNCNAME[0]};
+			uddup -u .tmp/${domain}_url_extract_tmp2.txt -o .tmp/${domain}_url_extract_uddup.txt
+			NUMOFLINES=$(eval cat .tmp/${domain}_url_extract_uddup.txt $DEBUG_ERROR | anew ${domain}_url_extract.txt | wc -l)
+			touch $called_fn_dir/.${FUNCNAME[0]};
 			#eval rm ${domain}_url_extract_tmp.txt ${domain}_url_extract_tmp2.txt gospider_tmp.txt $DEBUG_ERROR
 			end=`date +%s`
 			getElapsedTime $start $end
-			NUMOFLINES=$(wc -l < ${domain}_url_extract.txt)
 			text="${bblue}\n URL Extraction Finished\n"
 			printf "${text}" && printf "${text}" | $NOTIFY
-			text="${bblue}\n ${NUMOFLINES} in ${runtime}\n"
-			printf "${text}" && printf "${text}" | $NOTIFY
+			if [ "$NUMOFLINES" -gt 0 ]; then
+				text="${bblue}\n ${NUMOFLINES} new urls in ${runtime}\n"
+				printf "${text}" && printf "${text}" | $NOTIFY
+			fi
 			printf "${bblue} Results are saved in ${domain}_url_extract.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -617,7 +627,7 @@ urlchecks(){
 }
 
 url_gf(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$URL_GF" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$URL_GF" = true ]
 		then
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Vulnerable Pattern Search ${reset}\n\n"
@@ -644,7 +654,7 @@ url_gf(){
 }
 
 jschecks(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$JSCHECKS" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$JSCHECKS" = true ]
 		then
 			if [ "$DEEP" = true ] ; then
 				printf "${bgreen}#######################################################################\n"
@@ -674,7 +684,7 @@ jschecks(){
 }
 
 params(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$PARAMS" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$PARAMS" = true ]
 		then
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Parameter Discovery ${reset}\n"
@@ -710,7 +720,7 @@ params(){
 }
 
 xss(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$XSS" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$XSS" = true ]
 	then
 		printf "${bgreen}#######################################################################\n"
 		printf "${bblue} XSS Analysis ${reset}\n\n"
@@ -753,7 +763,7 @@ xss(){
 }
 
 github(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$GITHUB" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$GITHUB" = true ]
 		then
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} GitHub Scanning ${reset}\n\n"
@@ -779,7 +789,7 @@ github(){
 }
 
 favicon(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$FAVICON" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$FAVICON" = true ]
 		then
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} FavIcon Hash Extraction ${reset}\n\n"
@@ -805,7 +815,7 @@ favicon(){
 }
 
 fuzz(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$FUZZ" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$FUZZ" = true ]
 		then
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Directory Fuzzing ${reset}\n"
@@ -831,7 +841,7 @@ fuzz(){
 }
 
 cms_scanner(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$CMS_SCANNER" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$CMS_SCANNER" = true ]
 		then
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} CMS Scanner ${reset}\n"
@@ -862,7 +872,7 @@ cms_scanner(){
 }
 
 cors(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$CORS" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$CORS" = true ]
 		then
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} CORS Scan ${reset}\n\n"
@@ -880,7 +890,7 @@ cors(){
 }
 
 test_ssl(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$TEST_SSL" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$TEST_SSL" = true ]
 		then
 			if [ "$DEEP" = true ] ; then
 				printf "${bgreen}#######################################################################\n"
@@ -901,7 +911,7 @@ test_ssl(){
 }
 
 open_redirect(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$OPEN_REDIRECT" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$OPEN_REDIRECT" = true ]
 		then
 			if [ "$DEEP" = true ] ; then
 				printf "${bgreen}#######################################################################\n"
@@ -939,7 +949,7 @@ open_redirect(){
 }
 
 ssrf_checks(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$SSRF_CHECKS" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SSRF_CHECKS" = true ]
 	then
 		printf "${bgreen}#######################################################################\n"
 		printf "${bblue} SSRF checks ${reset}\n"
@@ -976,7 +986,7 @@ ssrf_checks(){
 }
 
 crlf_checks(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$CRLF_CHECKS" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$CRLF_CHECKS" = true ]
 		then
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} CRLF checks ${reset}\n"
@@ -993,7 +1003,7 @@ crlf_checks(){
 }
 
 lfi(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$LFI" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$LFI" = true ]
 		then
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} LFI checks ${reset}\n"
