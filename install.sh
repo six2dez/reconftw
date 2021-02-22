@@ -28,15 +28,16 @@ printf "${bgreen} reconftw installer script ${reset}\n\n"
 install_apt(){
     eval $SUDO apt install chromium-browser -y $DEBUG_STD
     eval $SUDO apt install chromium -y $DEBUG_STD
-    eval $SUDO apt install python3 python3-pip ruby git curl libpcap-dev wget python-dev python3-dev dnsutils build-essential xvfb libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq python3-shodan -y $DEBUG_STD
+    eval $SUDO apt install python3 python3-pip ruby npm git curl libpcap-dev wget python-dev python3-dev dnsutils build-essential xvfb libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq python3-shodan -y $DEBUG_STD
 }
 
 install_yum(){
     eval $SUDO yum install python3 python3-pip ruby git curl libpcap-devel chromium wget openssl-devel bind-utils python3-devel libxslt-devel libffi-devel xorg-x11-server-Xvfb libxml2-devel nmap zlib-devel jq python-shodan -y $DEBUG_STD
+    curl -fsSL https://rpm.nodesource.com/setup_lts.x | eval $SUDO bash - $DEBUG_STD
 }
 
 install_pacman(){
-    eval $SUDO pacman -Sy install python python-pip dnsutils ruby curl git libpcap nmap chromium wget jq xorg-server-xvfb -y $DEBUG_STD
+    eval $SUDO pacman -Sy install python python-pip dnsutils npm ruby curl git libpcap nmap chromium wget jq xorg-server-xvfb -y $DEBUG_STD
 }
 
 #installing latest Golang version
@@ -172,7 +173,7 @@ printf "${bgreen} 70%% done${reset}\n\n"
 eval git clone https://github.com/ProjectAnte/dnsgen $dir/dnsgen $DEBUG_STD
 eval git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh $DEBUG_STD
 eval git clone https://github.com/maaaaz/webscreenshot $dir/webscreenshot $DEBUG_STD
-
+eval $SUDO npm install broken-link-checker -g $DEBUG_STD
 printf "${bgreen} 80%% done${reset}\n\n"
 if [ "True" = "$IS_ARM" ]
     then
