@@ -93,7 +93,7 @@ function tools_installed(){
 	[ -f $tools/webscreenshot/webscreenshot.py ] || { printf "${bred} [*] webscreenshot	[NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/degoogle_hunter/degoogle_hunter.sh ] || { printf "${bred} [*] degoogle_hunter	[NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/getjswords.py ] || { printf "${bred} [*] getjswords   	[NO]${reset}\n"; allinstalled=false;}
-	[ -f $tools/Arjun/arjun.py ] || { printf "${bred} [*] Arjun		[NO]\n"; allinstalled=false;}
+	eval type -P arjun $DEBUG_STD || { printf "${bred} [*] Arjun		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P github-endpoints $DEBUG_STD || { printf "${bred} [*] github-endpoints		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P gospider $DEBUG_STD || { printf "${bred} [*] gospider		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P subfinder $DEBUG_STD || { printf "${bred} [*] Subfinder		[NO]${reset}\n"; allinstalled=false;}
@@ -157,7 +157,7 @@ function tools_full(){
 	[ -f $tools/GitDorker/GitDorker.py ] && printf "${bgreen}[*] GitDorker		[YES]${reset}\n" || printf "${bred} [*] GitDorker		[NO]${reset}\n"
 	[ -f $tools/webscreenshot/webscreenshot.py ] && printf "${bgreen}[*] webscreenshot	[YES]${reset}\n" || printf "${bred} [*] webscreenshot	[NO]${reset}\n"
 	[ -f $tools/getjswords.py ] && printf "${bgreen}[*] getjswords.py	[YES]${reset}\n" || printf "${bred} [*] getjswords.py	[NO]${reset}\n"
-	[ -f $tools/Arjun/arjun.py ] && printf "${bgreen}[*] Arjun		[YES]\n" || printf "${bred} [*] Arjun		[NO]\n"
+	eval type -P arjun $DEBUG_STD && printf "${bgreen}[*] Arjun		[YES]${reset}\n" || { printf "${bred} [*] Arjun		[NO]${reset}\n"; }
 	eval type -P github-endpoints $DEBUG_STD && printf "${bgreen}[*] github-endpoints	[YES]${reset}\n" || { printf "${bred} [*] github-endpoints	[NO]${reset}\n"; }
 	eval type -P gospider $DEBUG_STD && printf "${bgreen}[*] gospider		[YES]${reset}\n" || { printf "${bred} [*] gospider		[NO]${reset}\n"; }
 	eval type -P subfinder $DEBUG_STD && printf "${bgreen}[*] Subfinder		[YES]${reset}\n" || { printf "${bred} [*] Subfinder		[NO]${reset}\n"; }
@@ -699,11 +699,11 @@ params(){
 			#eval rm ${domain}_probed_nohttp.txt $DEBUG_ERROR
 			if [ "$DEEP" = true ] ; then
 				printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
-				eval python3 $tools/Arjun/arjun.py -i .tmp/${domain}_param_tmp.txt -t 20 -o ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval arjun -i .tmp/${domain}_param_tmp.txt -t 20 -o ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			else
 				if [[ $(cat .tmp/${domain}_param_tmp.txt | wc -l) -le 200 ]]
 				then
-					eval python3 $tools/Arjun/arjun.py -i .tmp/${domain}_param_tmp.txt -t 20 -o ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval arjun -i .tmp/${domain}_param_tmp.txt -t 20 -o ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				else
 					cp .tmp/${domain}_param_tmp.txt ${domain}_param.txt
 				fi
