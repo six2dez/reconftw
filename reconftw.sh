@@ -352,11 +352,12 @@ sub_scraping(){
 			then
 				NUMOFLINES=$(wc -l < .tmp/JS_subs.txt)
 				cat .tmp/JS_subs.txt | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/JS_subs_temp.txt $DEBUG_STD
-				eval cat .tmp/JS_subs_temp.txt $DEBUG_ERROR | anew -q ${domain}_subdomains.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval cat .tmp/JS_subs_temp.txt $DEBUG_ERROR | anew -q ${domain}_subdomains.txt
 				#eval rm JS_subs_temp.txt ${domain}_probed_tmp.txt $DEBUG_ERROR
 			else
 				NUMOFLINES=0
 			fi
+			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${green} ${NUMOFLINES} subdomains found in ${runtime}${reset}\n\n"
@@ -384,7 +385,7 @@ sub_permut(){
 					eval cat .tmp/permute_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 					#eval rm permute_tmp.txt $DEBUG_ERROR
 				else
-					printf "\n${bred} Skipping Permutations: Too Much Subdomains${reset}\n\n"
+					printf "\n${bred} Skipping Permutations: Too Much Subdomains${reset}\n\n" && touch $called_fn_dir/.${FUNCNAME[0]}
 			fi
 			if [ -f ".tmp/permute_subs.txt" ]
 			then
@@ -430,8 +431,9 @@ subtakeover(){
 			printf "${bblue} Subdomain Takeover ${reset}\n\n"
 			start=`date +%s`
 			subzy --targets ${domain}_subdomains.txt  --https --concurrency 4 --hide_fails --timeout 10 > .tmp/${domain}_all-takeover-checks.txt
-			grep  "VULNERABLE" <.tmp/${domain}_all-takeover-checks.txt > ${domain}_takeover.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			grep  "VULNERABLE" <.tmp/${domain}_all-takeover-checks.txt > ${domain}_takeover.txt
 			#eval rm ${domain}_all-takeover-checks.txt $DEBUG_ERROR
+			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			if [ -f "${domain}_takeover.txt" ]
@@ -512,8 +514,11 @@ portscan(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Port Scan ${reset}\n\n"
 			start=`date +%s`
-			cf-check -c $NPROC -d ${domain}_subdomains_nocdn.txt
-			eval nmap --top-ports 1000 -sV -n --max-retries 2 -iL ${domain}_subdomains_nocdn.txt -oN ${domain}_portscan.txt $DEBUG_STD
+			for sub in $(cat ${domain}_subdomains.txt); do
+				echo "$sub $(dig +short a $sub | tail -n1)" | anew -q ${domain}_subdomains_ips.txt
+			done
+			cat ${domain}_subdomains_ips.txt | cut -d ' ' -f2 | cf-check -c $NPROC | anew -q .tmp/${domain}_ips_nowaf.txt
+			eval nmap --top-ports 1000 -sV -n --max-retries 2 -iL .tmp/${domain}_ips_nowaf.txt -oN ${domain}_portscan.txt $DEBUG_STD
 			eval cat ${domain}_portscan.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
@@ -676,11 +681,11 @@ params(){
 			#eval rm ${domain}_probed_nohttp.txt $DEBUG_ERROR
 			if [ "$DEEP" = true ] ; then
 				printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
-				eval python3 $tools/Arjun/arjun.py -i .tmp/${domain}_param_tmp.txt -t 20 -oT ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval python3 $tools/Arjun/arjun.py -i .tmp/${domain}_param_tmp.txt -t 20 -o ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			else
 				if [[ $(cat .tmp/${domain}_param_tmp.txt | wc -l) -le 200 ]]
 				then
-					eval python3 $tools/Arjun/arjun.py -i .tmp/${domain}_param_tmp.txt -t 20 -oT ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval python3 $tools/Arjun/arjun.py -i .tmp/${domain}_param_tmp.txt -t 20 -o ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				else
 					cp .tmp/${domain}_param_tmp.txt ${domain}_param.txt
 				fi
