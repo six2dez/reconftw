@@ -108,6 +108,7 @@ function tools_installed(){
 	eval type -P cf-check $DEBUG_STD || { printf "${bred} [*] Cf-check		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P nuclei $DEBUG_STD || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; allinstalled=false;}
 	[ -d ~/nuclei-templates ] || { printf "${bred} [*] Nuclei templates    [NO]${reset}\n"; allinstalled=false;}
+	eval type -P galer $DEBUG_STD || { printf "${bred} [*] galer		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P gf $DEBUG_STD || { printf "${bred} [*] Gf		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P Gxss $DEBUG_STD || { printf "${bred} [*] Gxss		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P subjs $DEBUG_STD || { printf "${bred} [*] subjs		[NO]${reset}\n"; allinstalled=false;}
@@ -171,6 +172,7 @@ function tools_full(){
 	eval type -P cf-check $DEBUG_STD && printf "${bgreen}[*] Cf-check		[YES]${reset}\n" || { printf "${bred} [*] Cf-check		[NO]${reset}\n"; }
 	eval type -P nuclei $DEBUG_STD && printf "${bgreen}[*] Nuclei		[YES]${reset}\n" || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; }
 	[ -d ~/nuclei-templates ] && printf "${bgreen}[*] Nuclei templates  	[YES]${reset}\n" || printf "${bred} [*] Nuclei templates  	[NO]${reset}\n"
+	eval type -P galer $DEBUG_STD && printf "${bgreen}[*] galer		[YES]${reset}\n" || { printf "${bred} [*] galer		[NO]${reset}\n"; }
 	eval type -P gf $DEBUG_STD && printf "${bgreen}[*] Gf		        [YES]${reset}\n" || { printf "${bred} [*] Gf			[NO]${reset}\n"; }
 	eval type -P Gxss $DEBUG_STD && printf "${bgreen}[*] Gxss		[YES]${reset}\n" || { printf "${bred} [*] Gxss		[NO]${reset}\n"; }
 	eval type -P subjs $DEBUG_STD && printf "${bgreen}[*] subjs		[YES]${reset}\n" || { printf "${bred} [*] subjs		[NO]${reset}\n"; }
@@ -255,6 +257,7 @@ sub_passive(){
 			eval findomain --quiet -t $domain -u .tmp/findomain.txt $DEBUG_STD
 			crobat -s $domain | anew -q .tmp/crobat.txt
 			timeout 5m waybackurls $domain | unfurl -u domains | anew -q .tmp/waybackurls.txt
+			echo $domain | anew -q .tmp/passive_subs.txt
 			eval cat .tmp/subfinder.txt .tmp/assetfinder.txt .tmp/amass.txt .tmp/findomain.txt .tmp/crobat.txt .tmp/waybackurls.txt $DEBUG_ERROR | sed "s/*.//" | anew -q .tmp/passive_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			#eval rm subfinder.txt assetfinder.txt amass.txt findomain.txt crobat.txt waybackurls.txt $DEBUG_ERROR
 			NUMOFLINES=$(wc -l < .tmp/passive_subs.txt)
@@ -328,9 +331,9 @@ sub_dns(){
 		then
 			start=`date +%s`
 			printf "${yellow} Running : Active Subdomain Enumeration${reset}\n"
-			cat .tmp/*_subs.txt | anew -q subs_no_resolved.txt
-			deleteOutScoped $outOfScope_file subs_no_resolved.txt
-			eval shuffledns -d $domain -list subs_no_resolved.txt -r $resolvers -t 5000 -o ${domain}_subdomains.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+			cat .tmp/*_subs.txt | anew -q .tmp/subs_no_resolved.txt
+			deleteOutScoped $outOfScope_file .tmp/subs_no_resolved.txt
+			eval shuffledns -d $domain -list .tmp/subs_no_resolved.txt -r $resolvers -t 5000 -o ${domain}_subdomains.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			NUMOFLINES=$(wc -l < ${domain}_subdomains.txt)
 			end=`date +%s`
 			getElapsedTime $start $end
@@ -345,15 +348,16 @@ sub_scraping(){
 		then
 			start=`date +%s`
 			printf "${yellow} Running : JS scraping subdomain search${reset}\n"
-			touch .tmp/JS_subs.txt
+			touch .tmp/scrap_subs.txt
 			cat ${domain}_subdomains.txt | httpx -follow-redirects -H "${HEADER}" -status-code -timeout 15 -vhost -silent | grep "[200]" | cut -d [ -f1 | sed 's/[[:blank:]]*$//' | anew -q .tmp/${domain}_probed_tmp.txt
-			eval python3 $tools/JSFinder/JSFinder.py -f .tmp/${domain}_probed_tmp.txt -os .tmp/JS_subs.txt $DEBUG_STD
-			if [[ $(cat .tmp/JS_subs.txt | wc -l) -gt 0 ]]
+			eval python3 $tools/JSFinder/JSFinder.py -f .tmp/${domain}_probed_tmp.txt -os .tmp/scrap_subs.txt $DEBUG_STD
+			galer -u .tmp/${domain}_probed_tmp.txt -s | grep ".$domain" | unfurl --unique domains | anew -q .tmp/scrap_subs.txt
+			if [[ $(cat .tmp/scrap_subs.txt | wc -l) -gt 0 ]]
 			then
-				NUMOFLINES=$(wc -l < .tmp/JS_subs.txt)
-				cat .tmp/JS_subs.txt | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/JS_subs_temp.txt $DEBUG_STD
-				eval cat .tmp/JS_subs_temp.txt $DEBUG_ERROR | anew -q ${domain}_subdomains.txt
-				#eval rm JS_subs_temp.txt ${domain}_probed_tmp.txt $DEBUG_ERROR
+				NUMOFLINES=$(wc -l < .tmp/scrap_subs.txt)
+				cat .tmp/scrap_subs.txt | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/scrap_subs_resolved.txt $DEBUG_STD
+				eval cat .tmp/scrap_subs_resolved.txt $DEBUG_ERROR | anew -q ${domain}_subdomains.txt
+				#eval rm scrap_subs_temp.txt ${domain}_probed_tmp.txt $DEBUG_ERROR
 			else
 				NUMOFLINES=0
 			fi
@@ -371,17 +375,17 @@ sub_permut(){
 		then
 			start=`date +%s`
 			printf "${yellow} Running : Permutations Subdomain Enumeration${reset}\n"
-			if [[ $(cat subs_no_resolved.txt | wc -l) -le 50 ]]
+			if [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 50 ]]
 				then
-					eval dnsgen subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/permute1_tmp.txt $DEBUG_STD
+					eval dnsgen .tmp/subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/permute1_tmp.txt $DEBUG_STD
 					cat .tmp/permute1_tmp.txt | anew -q .tmp/permute1.txt
 					eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/permute2_tmp.txt $DEBUG_STD
 					cat .tmp/permute2_tmp.txt | anew -q .tmp/permute2.txt
 					eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 					#eval rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt $DEBUG_ERROR
-				elif [[ $(cat subs_no_resolved.txt | wc -l) -le 100 ]]
+				elif [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 100 ]]
 		  		then
-					eval dnsgen subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/permute_tmp.txt $DEBUG_STD
+					eval dnsgen .tmp/subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/permute_tmp.txt $DEBUG_STD
 					eval cat .tmp/permute_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 					#eval rm permute_tmp.txt $DEBUG_ERROR
 				else
@@ -552,8 +556,6 @@ nuclei_check(){
 			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/takeovers/ -o nuclei_output/${domain}_subtko.txt;
 			printf "${yellow}\n\n Running : Nuclei DNS ${reset}\n\n"
 			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/dns/ -o nuclei_output/${domain}_dns.txt;
-#			printf "${yellow}\n\n Running : Nuclei Miscellaneous ${reset}\n\n"
-#			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/miscellaneous/ -o nuclei_output/${domain}_miscellaneous.txt;
 			printf "${yellow}\n\n Running : Nuclei Panels ${reset}\n\n"
 			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/exposed-panels/ -o nuclei_output/${domain}_panels.txt;
 			printf "${yellow}\n\n Running : Nuclei Security Misconfiguration ${reset}\n\n"
