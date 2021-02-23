@@ -356,7 +356,7 @@ sub_scraping(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SUBSCRAPING" = true ]
 		then
 			start=`date +%s`
-			printf "${yellow} Running : JS scraping subdomain search${reset}\n"
+			printf "${yellow} Running : Web scraping subdomain search${reset}\n"
 			touch .tmp/scrap_subs.txt
 			cat ${domain}_subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -timeout 15 -silent -no-color | grep '\[200\]' | cut -d ' ' -f1 | anew -q .tmp/${domain}_probed_tmp.txt
 			eval python3 $tools/JSFinder/JSFinder.py -f .tmp/${domain}_probed_tmp.txt -os .tmp/scrap_subs.txt $DEBUG_STD
@@ -535,12 +535,25 @@ portscan(){
 				echo "$sub $(dig +short a $sub | tail -n1)" | anew -q ${domain}_subdomains_ips.txt
 			done
 			cat ${domain}_subdomains_ips.txt | cut -d ' ' -f2 | cf-check -c $NPROC | anew -q .tmp/${domain}_ips_nowaf.txt
-			eval nmap --top-ports 1000 -sV -n --max-retries 2 -iL .tmp/${domain}_ips_nowaf.txt -oN ${domain}_portscan.txt $DEBUG_STD
-			eval cat ${domain}_portscan.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
+
+			if [ "$PORTSCAN_PASSIVE" = true ]
+			then
+				for sub in $(cat .tmp/${domain}_ips_nowaf.txt); do
+					shodan host $sub 2>/dev/null >> ${domain}_portscan_passive.txt && echo echo "\n##########################\n" >> ${domain}_portscan_passive.txt
+				done
+			fi
+
+			if [ "$PORTSCAN_ACTIVE" = true ]
+			then
+				eval nmap --top-ports 1000 -sV -n --max-retries 2 -iL .tmp/${domain}_ips_nowaf.txt -oN ${domain}_portscan_active.txt $DEBUG_STD
+			fi
+
+			#eval cat ${domain}_portscan.txt $DEBUG_ERROR
+			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Port scan Finished in ${runtime}${reset}\n"
-			printf "${bblue} Results are saved in ${domain}_portscan.txt${reset}\n"
+			printf "${bblue} Results are saved in ${domain}_portscan_[passive|active].txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
