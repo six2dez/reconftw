@@ -647,7 +647,7 @@ url_gf(){
 			gf sqli ${domain}_url_extract.txt | anew -q gf/${domain}_sqli.txt
 			gf redirect ${domain}_url_extract.txt | anew -q gf/${domain}_redirect.txt && cat gf/${domain}_ssrf.txt | anew -q gf/${domain}_redirect.txt
 			gf rce ${domain}_url_extract.txt | anew -q gf/${domain}_rce.txt
-			gf potential ${domain}_url_extract.txt | anew -q gf/${domain}_potential.txt
+			gf potential ${domain}_url_extract.txt | cut -d ':' -f3-5 |anew -q gf/${domain}_potential.txt
 			cat ${domain}_url_extract.txt | unfurl -u format %s://%d%p | anew -q gf/${domain}_endpoints.txt
 			gf lfi ${domain}_url_extract.txt | anew -q gf/${domain}_lfi.txt
 			touch $called_fn_dir/.${FUNCNAME[0]}
