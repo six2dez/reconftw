@@ -65,13 +65,10 @@ for repo in ${repos}; do
             cp -r examples ~/.gf
         elif [ "Interlace" = "$(basename $repo)" ] || [ "LinkFinder" = "$(basename $repo)" ]; then
             eval $SUDO python3 setup.py install $DEBUG_STD
-        fi
         elif [ "LinkFinder" = "$(basename $repo)" ] || [ "LinkFinder" = "$(basename $repo)" ]; then
             eval $SUDO python3 setup.py install $DEBUG_STD
-        fi
         elif [ "dnsgen" = "$(basename $repo)" ] || [ "LinkFinder" = "$(basename $repo)" ]; then
             eval $SUDO python3 setup.py install $DEBUG_STD
-        fi
         elif [ "Arjun" = "$(basename $repo)" ] || [ "LinkFinder" = "$(basename $repo)" ]; then
             eval $SUDO python3 setup.py install $DEBUG_STD
         fi
