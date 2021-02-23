@@ -614,7 +614,7 @@ urlchecks(){
 				eval github-endpoints -q -k -d $domain -t ${GITHUB_TOKENS} -raw $DEBUG_ERROR | anew -q .tmp/${domain}_url_extract_tmp.txt
 			fi
 			# cat .tmp/${domain}_url_extract_tmp.txt ${domain}_param.txt | grep "${domain}" | grep "=" | qsreplace FUZZ | qsreplace -a | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | anew -q .tmp/${domain}_url_extract_tmp2.txt
-			cat .tmp/${domain}_url_extract_tmp.txt ${domain}_param.txt | grep "${domain}" | grep "=" | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | anew -q .tmp/${domain}_url_extract_tmp2.txt
+			cat .tmp/${domain}_url_extract_tmp.txt ${domain}_param.txt | grep "${domain}" | grep "=" | qsreplace -a | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | anew -q .tmp/${domain}_url_extract_tmp2.txt
 			cat .tmp/${domain}_url_extract_tmp.txt | grep "${domain}" | egrep -i ".(js)" | anew -q ${domain}_url_extract_js.txt
 			uddup -u .tmp/${domain}_url_extract_tmp2.txt -o .tmp/${domain}_url_extract_uddup.txt
 			NUMOFLINES=$(eval cat .tmp/${domain}_url_extract_uddup.txt $DEBUG_ERROR | anew ${domain}_url_extract.txt | wc -l)
@@ -733,7 +733,7 @@ xss(){
 		printf "${bgreen}#######################################################################\n"
 		printf "${bblue} XSS Analysis ${reset}\n\n"
 		start=`date +%s`
-		cat gf/${domain}_xss.txt | Gxss -c 100 -p Xss | anew -q .tmp/${domain}_xss_reflected.txt
+		cat gf/${domain}_xss.txt | qsreplace FUZZ | Gxss -c 100 -p Xss | anew -q .tmp/${domain}_xss_reflected.txt
 		if [ "$DEEP" = true ] ; then
 			if [ -n "$XSS_SERVER" ]; then
 				sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
@@ -927,7 +927,7 @@ open_redirect(){
 				printf "${bgreen}#######################################################################\n"
 				printf "${bblue} Open redirects checks ${reset}\n"
 				start=`date +%s`
-				cat gf/${domain}_redirect.txt | qsreplace FUZZ | qsreplace -a | anew -q .tmp/tmp_redirect.txt
+				cat gf/${domain}_redirect.txt | qsreplace FUZZ | anew -q .tmp/tmp_redirect.txt
 				eval python3 $tools/OpenRedireX/openredirex.py -l .tmp/tmp_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt $DEBUG_ERROR | grep "^http" > ${domain}_redirect.txt
 				sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" ${domain}_redirect.txt
 				touch $called_fn_dir/.${FUNCNAME[0]}
@@ -942,7 +942,7 @@ open_redirect(){
 					printf "${bgreen}#######################################################################\n"
 					printf "${bblue} Open redirects checks ${reset}\n"
 					start=`date +%s`
-					cat gf/${domain}_redirect.txt | qsreplace FUZZ | qsreplace -a | anew -q .tmp/tmp_redirect.txt
+					cat gf/${domain}_redirect.txt | qsreplace FUZZ | anew -q .tmp/tmp_redirect.txt
 					eval python3 $tools/OpenRedireX/openredirex.py -l .tmp/tmp_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt $DEBUG_ERROR | grep "^http" > ${domain}_redirect.txt
 					sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" ${domain}_redirect.txt
 					touch $called_fn_dir/.${FUNCNAME[0]}
@@ -1022,7 +1022,8 @@ lfi(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} LFI checks ${reset}\n"
 			start=`date +%s`
-			for url in $(cat gf/${domain}_lfi.txt); do
+			cat gf/${domain}_lfi.txt | qsreplace FUZZ | anew -q .tmp/tmp_lfi.txt
+			for url in $(cat .tmp/tmp_lfi.txt); do
 				ffuf -v -mc 200 -H "${HEADER}" -w $lfi_wordlist -u $url -mr "root:" &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q ${domain}_lfi.txt
 			done
 			touch $called_fn_dir/.${FUNCNAME[0]}
@@ -1066,7 +1067,8 @@ sqli(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} SQLi checks ${reset}\n"
 			start=`date +%s`
-			interlace -tL gf/${domain}_sqli.txt -threads 10 -c "python3 $tools/sqlmap/sqlmap.py -u _target_ -b --batch --disable-coloring --output-dir=sqlmap" &>/dev/null
+			cat gf/${domain}_sqli.txt | qsreplace FUZZ | anew -q .tmp/tmp_sqli.txt
+			interlace -tL .tmp/tmp_sqli.txt -threads 10 -c "python3 $tools/sqlmap/sqlmap.py -u _target_ -b --batch --disable-coloring --output-dir=sqlmap" &>/dev/null
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
