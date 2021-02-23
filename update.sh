@@ -121,28 +121,20 @@ printf "${bgreen}###############################################################
 #Updating Golang
 printf "${bgreen}#######################################################################\n"
 printf "${bblue} Updating Golang \n"
-if [ "True" = "$IS_ARM" ]; then
-    LATEST_GO=$(wget -qO- https://golang.org/dl/ | grep -oP 'go([0-9\.]+)\.linux-armv6l\.tar\.gz' | head -n 1 | grep -oP 'go[0-9\.]+' | grep -oP '[0-9\.]+' | head -c -2)
-    if [ "go$LATEST_GO" =  $(go version | cut -d " " -f3) ]
-        then
-            printf "${bblue}\n Golang is up to date ${reset}\n"
-        else
-            wget https://dl.google.com/go/go$LATEST_GO.linux-armv6l.tar.gz
-            $SUDO tar -C /usr/local -xzf go$LATEST_GO.linux-armv6l.tar.gz
-            $SUDO cp /usr/local/go/bin/go /usr/bin
-    fi
+LATEST_GO=$(curl https://golang.org/VERSION?m=text)
+if [ "$LATEST_GO" =  $(go version | cut -d " " -f3) ]; then
+    printf "${bblue}\n Golang is up to date ${reset}\n"
 else
-    LATEST_GO=$(wget -qO- https://golang.org/dl/ | grep -oP 'go([0-9\.]+)\.linux-amd64\.tar\.gz' | head -n 1 | grep -oP 'go[0-9\.]+' | grep -oP '[0-9\.]+' | head -c -2)
-    if [ "go$LATEST_GO" =  $(go version | cut -d " " -f3) ]
-        then
-            printf "${bblue}\n Golang is up to date ${reset}\n"
-        else
-            wget https://dl.google.com/go/go$LATEST_GO.linux-amd64.tar.gz
-            $SUDO tar -C /usr/local -xzf go$LATEST_GO.linux-amd64.tar.gz
-            $SUDO cp /usr/local/go/bin/go /usr/bin
+    if [ "True" = "$IS_ARM" ]; then
+        wget https://dl.google.com/go/$LATEST_GO.linux-armv6l.tar.gz
+        $SUDO tar -C /usr/local -xzf $LATEST_GO.linux-armv6l.tar.gz
+    else
+        wget https://dl.google.com/go/$LATEST_GO.linux-amd64.tar.gz
+        $SUDO tar -C /usr/local -xzf $LATEST_GO.linux-amd64.tar.gz
     fi
+    $SUDO cp /usr/local/go/bin/go /usr/bin
+    eval rm -rf $LATEST_GO* $DEBUG_STD
 fi
-eval rm -rf go$LATEST_GO* $DEBUG_STD
 printf "${bblue}\n Updating Golang is finished ${reset}\n"
 printf "${bgreen}#######################################################################\n"
 
