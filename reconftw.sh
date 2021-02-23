@@ -485,14 +485,9 @@ brokenLinks(){
 		printf "${bgreen}#######################################################################\n"
 		printf "${bblue} Broken links checks ${reset}\n\n"
 		start=`date +%s`
-		for sub in $(cat ${domain}_probed.txt); do
-			if [ "$DEEP" = true ] ; then
-				blc --requests 100 -r $sub | grep BROKEN | anew -q .tmp/brokenLinks.txt
-			else
-				blc --requests 100 $sub | grep BROKEN | anew -q .tmp/brokenLinks.txt
-			fi
-		done
-		NUMOFLINES=$(eval cat .tmp/brokenLinks.txt $DEBUG_ERROR | cut -d ' ' -f2 | anew ${domain}_brokenLinks.txt | wc -l)
+		interlace -tL ${domain}_probed.txt -threads 10 -c "wget --spider -r -nd -nv -H -l 1 -w 1 --no-check-certificate -U 'Mozilla' -o _output_/_cleantarget__brokenLinks.tmp _target_" -o .tmp &>/dev/null
+		cat .tmp/*_brokenLinks.tmp | grep "^http" | grep -v ':$' | anew -q .tmp/brokenLinks_total.txt
+		NUMOFLINES=$(eval cat .tmp/brokenLinks_total.txt $DEBUG_ERROR | cut -d ' ' -f2 | anew ${domain}_brokenLinks.txt | wc -l)
 		touch $called_fn_dir/.${FUNCNAME[0]}
 		end=`date +%s`
 		getElapsedTime $start $end
