@@ -47,13 +47,11 @@ if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]]
     else
         printf "${bgreen} Installing Golang ${reset}\n"
         if [ "True" = "$IS_ARM" ]; then
-            LATEST_GO=$(wget -qO- https://golang.org/dl/ | grep -oP 'go([0-9\.]+)\.linux-armv6l\.tar\.gz' | head -n 1 | grep -oP 'go[0-9\.]+' | grep -oP '[0-9\.]+' | head -c -2)
-            eval wget https://dl.google.com/go/go$LATEST_GO.linux-armv6l.tar.gz $DEBUG_STD
+            eval wget https://dl.google.com/go/$(curl https://golang.org/VERSION?m=text).linux-armv6l.tar.gz $DEBUG_STD
             eval $SUDO tar -C /usr/local -xzf go$LATEST_GO.linux-armv6l.tar.gz $DEBUG_STD
             $SUDO cp /usr/local/go/bin/go /usr/bin
         else
-            LATEST_GO=$(wget -qO- https://golang.org/dl/ | grep -oP 'go([0-9\.]+)\.linux-amd64\.tar\.gz' | head -n 1 | grep -oP 'go[0-9\.]+' | grep -oP '[0-9\.]+' | head -c -2)
-            eval wget https://dl.google.com/go/go$LATEST_GO.linux-amd64.tar.gz $DEBUG_STD
+            eval wget wget https://dl.google.com/go/$(curl https://golang.org/VERSION?m=text).linux-amd64.tar.gz $DEBUG_STD
             eval $SUDO tar -C /usr/local -xzf go$LATEST_GO.linux-amd64.tar.gz $DEBUG_STD
             $SUDO cp /usr/local/go/bin/go /usr/bin
         fi
