@@ -613,12 +613,12 @@ urlchecks(){
 			then
 				eval github-endpoints -q -k -d $domain -t ${GITHUB_TOKENS} -raw $DEBUG_ERROR | anew -q .tmp/${domain}_url_extract_tmp.txt
 			fi
-			cat .tmp/${domain}_url_extract_tmp.txt ${domain}_param.txt | grep "${domain}" | grep "=" | qsreplace FUZZ | qsreplace -a | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | anew -q .tmp/${domain}_url_extract_tmp2.txt
+			# cat .tmp/${domain}_url_extract_tmp.txt ${domain}_param.txt | grep "${domain}" | grep "=" | qsreplace FUZZ | qsreplace -a | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | anew -q .tmp/${domain}_url_extract_tmp2.txt
+			cat .tmp/${domain}_url_extract_tmp.txt ${domain}_param.txt | grep "${domain}" | grep "=" | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | anew -q .tmp/${domain}_url_extract_tmp2.txt
 			cat .tmp/${domain}_url_extract_tmp.txt | grep "${domain}" | egrep -i ".(js)" | anew -q ${domain}_url_extract_js.txt
 			uddup -u .tmp/${domain}_url_extract_tmp2.txt -o .tmp/${domain}_url_extract_uddup.txt
 			NUMOFLINES=$(eval cat .tmp/${domain}_url_extract_uddup.txt $DEBUG_ERROR | anew ${domain}_url_extract.txt | wc -l)
 			touch $called_fn_dir/.${FUNCNAME[0]};
-			#eval rm ${domain}_url_extract_tmp.txt ${domain}_url_extract_tmp2.txt gospider_tmp.txt $DEBUG_ERROR
 			end=`date +%s`
 			getElapsedTime $start $end
 			text="${bblue}\n URL Extraction Finished\n"
@@ -927,7 +927,8 @@ open_redirect(){
 				printf "${bgreen}#######################################################################\n"
 				printf "${bblue} Open redirects checks ${reset}\n"
 				start=`date +%s`
-				eval python3 $tools/OpenRedireX/openredirex.py -l gf/${domain}_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt $DEBUG_ERROR | grep "^http" > ${domain}_redirect.txt
+				cat gf/${domain}_redirect.txt | qsreplace FUZZ | qsreplace -a | anew -q .tmp/tmp_redirect.txt
+				eval python3 $tools/OpenRedireX/openredirex.py -l .tmp/tmp_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt $DEBUG_ERROR | grep "^http" > ${domain}_redirect.txt
 				sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" ${domain}_redirect.txt
 				touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
@@ -941,7 +942,8 @@ open_redirect(){
 					printf "${bgreen}#######################################################################\n"
 					printf "${bblue} Open redirects checks ${reset}\n"
 					start=`date +%s`
-					eval python3 $tools/OpenRedireX/openredirex.py -l gf/${domain}_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt $DEBUG_ERROR | grep "^http" > ${domain}_redirect.txt
+					cat gf/${domain}_redirect.txt | qsreplace FUZZ | qsreplace -a | anew -q .tmp/tmp_redirect.txt
+					eval python3 $tools/OpenRedireX/openredirex.py -l .tmp/tmp_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt $DEBUG_ERROR | grep "^http" > ${domain}_redirect.txt
 					sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" ${domain}_redirect.txt
 					touch $called_fn_dir/.${FUNCNAME[0]}
 					end=`date +%s`
