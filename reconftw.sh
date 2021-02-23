@@ -382,9 +382,9 @@ sub_permut(){
 			if [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 50 ]]
 				then
 					eval dnsgen .tmp/subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/permute1_tmp.txt $DEBUG_STD
-					cat .tmp/permute1_tmp.txt | anew -q .tmp/permute1.txt
+					eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
 					eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/permute2_tmp.txt $DEBUG_STD
-					cat .tmp/permute2_tmp.txt | anew -q .tmp/permute2.txt
+					eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
 					eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 					#eval rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt $DEBUG_ERROR
 				elif [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 100 ]]
@@ -463,7 +463,7 @@ webprobe_full(){
 			printf "${bblue} ${bgreen} Web Probe ${reset}\n\n"
 			printf "${yellow} Running : Http probing non standard ports${reset}\n\n"
 			start=`date +%s`
-			cat ${domain}_subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55672 -follow-host-redirects -H "${HEADER}" -status-code -timeout 15 -silent -no-color | grep '\[200\]' | cut -d ' ' -f1 | anew -q .tmp/${domain}_probed_uncommon_ports.txt
+			cat ${domain}_subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55672 -follow-host-redirects -H "${HEADER}" -status-code -threads 100 -timeout 15 -silent -no-color | grep '\[200\]' | cut -d ' ' -f1 | anew -q .tmp/${domain}_probed_uncommon_ports.txt
 			NUMOFLINES=$(eval cat .tmp/${domain}_probed_uncommon_ports.txt $DEBUG_ERROR | anew ${domain}_probed_uncommon_ports.txt | wc -l)
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
@@ -539,7 +539,7 @@ portscan(){
 			if [ "$PORTSCAN_PASSIVE" = true ]
 			then
 				for sub in $(cat .tmp/${domain}_ips_nowaf.txt); do
-					shodan host $sub 2>/dev/null >> ${domain}_portscan_passive.txt && echo echo "\n##########################\n" >> ${domain}_portscan_passive.txt
+					shodan host $sub 2>/dev/null >> ${domain}_portscan_passive.txt && echo "\n##########################\n" >> ${domain}_portscan_passive.txt
 				done
 			fi
 
@@ -1181,17 +1181,17 @@ help(){
 	printf "   -o output/path   Define output folder\n"
 	printf " \n"
 	printf " ${bblue}USAGE EXAMPLES${reset}\n"
-	printf " Full recon with custom output and excluded subdomains list:\n"
-	printf " ./reconftw.sh -d example.com -x out.txt -a -o custom/path\n"
+	printf " Full recon:\n"
+	printf " ./reconftw.sh -d example.com -a\n"
 	printf " \n"
-	printf " Full Subdomain scanning with multiple targets:\n"
+	printf " Subdomain scanning with multiple targets:\n"
 	printf " ./reconftw.sh -l targets.txt -s\n"
-	printf " \n"
-	printf " Permutations subdomain scan:\n"
-	printf " ./reconftw.sh -d example.com -l targets.txt --sr\n"
 	printf " \n"
 	printf " Web scanning for subdomain list:\n"
 	printf " ./reconftw.sh -d example.com -l targets.txt -w\n"
+	printf " \n"
+	printf " Full recon with custom output and excluded subdomains list:\n"
+	printf " ./reconftw.sh -d example.com -x out.txt -a -o custom/path\n"
 }
 
 output(){
