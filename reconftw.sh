@@ -1063,6 +1063,24 @@ ssti(){
 	fi
 }
 
+sqli(){
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SQLI" = true ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} SQLi checks ${reset}\n"
+			start=`date +%s`
+			interlace -tL gf/${domain}_sqli.txt -threads 10 -c "sqlmap -u _target_ -b --batch --disable-coloring --output-dir=sqlmap" &>/dev/null
+			touch $called_fn_dir/.${FUNCNAME[0]}
+			end=`date +%s`
+			getElapsedTime $start $end
+			printf "${bblue}\n SQLi Finished in ${runtime}${reset}\n"
+			printf "${bblue} Results are saved in sqlmap folder ${reset}\n"
+			printf "${bgreen}#######################################################################\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
+}
+
 deleteOutScoped(){
 	if [ -z "$1" ]
 	then
@@ -1154,6 +1172,7 @@ all(){
 			crlf_checks
 			lfi
 			ssti
+			sqli
 			jschecks
 			xss
 			test_ssl
@@ -1182,6 +1201,7 @@ all(){
 		crlf_checks
 		lfi
 		ssti
+		sqli
 		jschecks
 		xss
 		test_ssl
@@ -1305,6 +1325,7 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 			crlf_checks
 			lfi
 			ssti
+			sqli
 			jschecks
 			xss
 			test_ssl
