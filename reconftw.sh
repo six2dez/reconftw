@@ -366,7 +366,7 @@ sub_scraping(){
 			start=`date +%s`
 			printf "${yellow} Running : Web scraping subdomain search${reset}\n"
 			touch .tmp/scrap_subs.txt
-			cat ${domain}_subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -timeout 15 -silent -no-color | grep '\[200\]' | cut -d ' ' -f1 | anew -q .tmp/${domain}_probed_tmp.txt
+			cat ${domain}_subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -timeout 15 -silent -no-color | cut -d ' ' -f1 | anew -q .tmp/${domain}_probed_tmp.txt
 			eval python3 $tools/JSFinder/JSFinder.py -f .tmp/${domain}_probed_tmp.txt -os .tmp/scrap_subs.txt $DEBUG_STD
 			eval galer -u .tmp/${domain}_probed_tmp.txt -s  $DEBUG_ERROR | grep ".$domain" | unfurl --unique domains | anew -q .tmp/scrap_subs.txt
 			cat .tmp/scrap_subs.txt | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/scrap_subs_resolved.txt $DEBUG_STD
@@ -426,7 +426,7 @@ webprobe_simple(){
 		then
 			start=`date +%s`
 			printf "${yellow} Running : Http probing${reset}\n\n"
-			cat ${domain}_subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -timeout 15 -silent -no-color | grep '\[200\]' | cut -d ' ' -f1 | anew -q .tmp/${domain}_probed_tmp.txt
+			cat ${domain}_subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -timeout 15 -silent -no-color | cut -d ' ' -f1 | anew -q .tmp/${domain}_probed_tmp.txt
 			deleteOutScoped $outOfScope_file .tmp/${domain}_probed_tmp.txt
 			NUMOFLINES=$(eval cat .tmp/${domain}_probed_tmp.txt $DEBUG_ERROR | anew ${domain}_probed.txt | wc -l)
 			touch $called_fn_dir/.${FUNCNAME[0]}
@@ -471,7 +471,7 @@ webprobe_full(){
 			printf "${bblue} ${bgreen} Web Probe ${reset}\n\n"
 			printf "${yellow} Running : Http probing non standard ports${reset}\n\n"
 			start=`date +%s`
-			cat ${domain}_subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55672 -follow-host-redirects -H "${HEADER}" -status-code -threads 100 -timeout 15 -silent -no-color | grep '\[200\]' | cut -d ' ' -f1 | anew -q .tmp/${domain}_probed_uncommon_ports.txt
+			cat ${domain}_subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55672 -follow-host-redirects -H "${HEADER}" -status-code -threads 100 -timeout 15 -silent -no-color | cut -d ' ' -f1 | anew -q .tmp/${domain}_probed_uncommon_ports.txt
 			NUMOFLINES=$(eval cat .tmp/${domain}_probed_uncommon_ports.txt $DEBUG_ERROR | anew ${domain}_probed_uncommon_ports.txt | wc -l)
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
@@ -537,7 +537,11 @@ portscan(){
 			for sub in $(cat ${domain}_subdomains.txt); do
 				echo "$sub $(dig +short a $sub | tail -n1)" | anew -q ${domain}_subdomains_ips.txt
 			done
-			cat ${domain}_subdomains_ips.txt | cut -d ' ' -f2 | cf-check -c $NPROC | anew -q .tmp/${domain}_ips_nowaf.txt
+
+			cat ${domain}_subdomains_ips.txt | cut -d ' ' -f2 | cf-check -c $NPROC | egrep -iv "^(127|10|169|172|192)." | anew -q .tmp/${domain}_ips_nowaf.txt
+
+			printf "${bblue}\n Resolved IP addresses (No WAF) ${reset}\n\n";
+			eval cat .tmp/${domain}_ips_nowaf.txt $DEBUG_ERROR | sort
 
 			if [ "$PORTSCAN_PASSIVE" = true ]
 			then
@@ -581,8 +585,6 @@ nuclei_check(){
 			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/cves/ -o nuclei_output/${domain}_cves.txt;
 			printf "${yellow}\n\n Running : Nuclei Default Creds ${reset}\n\n"
 			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/default-logins/ -o nuclei_output/${domain}_default_creds.txt;
-			printf "${yellow}\n\n Running : Nuclei SubTko ${reset}\n\n"
-			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/takeovers/ -o nuclei_output/${domain}_subtko.txt;
 			printf "${yellow}\n\n Running : Nuclei DNS ${reset}\n\n"
 			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/dns/ -o nuclei_output/${domain}_dns.txt;
 			printf "${yellow}\n\n Running : Nuclei Panels ${reset}\n\n"
@@ -680,7 +682,7 @@ jschecks(){
 				cat ${domain}_url_extract_js.txt | grep -iE "\.js$" | anew -q ${domain}_jsfile_links.txt;
 				cat ${domain}_url_extract_js.txt | subjs | anew -q ${domain}_jsfile_links.txt;
 				printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
-				cat ${domain}_jsfile_links.txt | httpx -follow-host-redirects -H "${HEADER}" -silent -timeout 15 -status-code -no-color | grep '\[200\]' | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt
+				cat ${domain}_jsfile_links.txt | httpx -follow-host-redirects -H "${HEADER}" -silent -timeout 15 -status-code -no-color | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt
 				printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
 				interlace -tL ${domain}_js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> ${domain}_js_endpoints.txt" &>/dev/null
 				eval sed -i '/^Running against/d; /^Invalid input/d; /^$/d' ${domain}_js_endpoints.txt $DEBUG_ERROR
@@ -903,19 +905,17 @@ cors(){
 test_ssl(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$TEST_SSL" = true ]
 		then
-			if [ "$DEEP" = true ] ; then
-				printf "${bgreen}#######################################################################\n"
-				printf "${bblue} SSL Test ${reset}\n"
-				start=`date +%s`
-				eval cat ${domain}_probed.txt $DEBUG_ERROR | grep "^https" | anew -q .tmp/${domain}_probed_https.txt
-				$tools/testssl.sh/testssl.sh --quiet --color 0 -U -iL .tmp/${domain}_probed_https.txt > ${domain}_testssl.txt && touch $called_fn_dir/.${FUNCNAME[0]}
-				#eval rm ${domain}_probed_https.txt $DEBUG_ERROR
-				end=`date +%s`
-				getElapsedTime $start $end
-				printf "${bblue}\n SSL Test Finished in ${runtime}\n"
-				printf "${bblue} Results are saved in ${domain}_testssl.txt ${reset}\n"
-				printf "${bgreen}#######################################################################\n"
-			fi
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} SSL Test ${reset}\n"
+			start=`date +%s`
+			eval cat ${domain}_probed.txt $DEBUG_ERROR | grep "^https" | anew -q .tmp/${domain}_probed_https.txt
+			$tools/testssl.sh/testssl.sh --quiet --color 0 -U -iL .tmp/${domain}_probed_https.txt > ${domain}_testssl.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			#eval rm ${domain}_probed_https.txt $DEBUG_ERROR
+			end=`date +%s`
+			getElapsedTime $start $end
+			printf "${bblue}\n SSL Test Finished in ${runtime}\n"
+			printf "${bblue} Results are saved in ${domain}_testssl.txt ${reset}\n"
+			printf "${bgreen}#######################################################################\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
