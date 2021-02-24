@@ -471,7 +471,7 @@ webprobe_full(){
 			printf "${bblue} ${bgreen} Web Probe ${reset}\n\n"
 			printf "${yellow} Running : Http probing non standard ports${reset}\n\n"
 			start=`date +%s`
-			cat ${domain}_subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55672 -follow-host-redirects -H "${HEADER}" -status-code -threads 100 -timeout 15 -silent -no-color | cut -d ' ' -f1 | anew -q .tmp/${domain}_probed_uncommon_ports.txt
+			cat ${domain}_subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55672 -follow-host-redirects -H "${HEADER}" -status-code -threads 150 -timeout 10 -silent -no-color | cut -d ' ' -f1 | anew -q .tmp/${domain}_probed_uncommon_ports.txt
 			NUMOFLINES=$(eval cat .tmp/${domain}_probed_uncommon_ports.txt $DEBUG_ERROR | anew ${domain}_probed_uncommon_ports.txt | wc -l)
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
@@ -538,7 +538,7 @@ portscan(){
 				echo "$sub $(dig +short a $sub | tail -n1)" | anew -q ${domain}_subdomains_ips.txt
 			done
 
-			cat ${domain}_subdomains_ips.txt | cut -d ' ' -f2 | cf-check -c $NPROC | egrep -iv "^(127|10|169|172|192)." | anew -q .tmp/${domain}_ips_nowaf.txt
+			cat ${domain}_subdomains_ips.txt | cut -d ' ' -f2 | cf-check -c $NPROC | egrep -iv "^(127|10|169|172|192)\." | anew -q .tmp/${domain}_ips_nowaf.txt
 
 			printf "${bblue}\n Resolved IP addresses (No WAF) ${reset}\n\n";
 			eval cat .tmp/${domain}_ips_nowaf.txt $DEBUG_ERROR | sort
@@ -546,7 +546,7 @@ portscan(){
 			if [ "$PORTSCAN_PASSIVE" = true ]
 			then
 				for sub in $(cat .tmp/${domain}_ips_nowaf.txt); do
-					shodan host $sub 2>/dev/null >> ${domain}_portscan_passive.txt && echo "\n##########################\n" >> ${domain}_portscan_passive.txt
+					shodan host $sub 2>/dev/null >> ${domain}_portscan_passive.txt && echo -e "\n\n#######################################################################\n\n" >> ${domain}_portscan_passive.txt
 				done
 			fi
 
@@ -624,8 +624,8 @@ urlchecks(){
 			then
 				eval github-endpoints -q -k -d $domain -t ${GITHUB_TOKENS} -raw $DEBUG_ERROR | anew -q .tmp/${domain}_url_extract_tmp.txt
 			fi
-			cat .tmp/${domain}_url_extract_tmp.txt ${domain}_param.txt | grep "${domain}" | grep "=" | eval qsreplace -a $DEBUG_ERROR | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | anew -q .tmp/${domain}_url_extract_tmp2.txt
-			cat .tmp/${domain}_url_extract_tmp.txt | grep "${domain}" | egrep -i ".(js)" | anew -q ${domain}_url_extract_js.txt
+			cat .tmp/${domain}_url_extract_tmp.txt ${domain}_param.txt | grep "${domain}" | grep "=" | eval qsreplace -a $DEBUG_ERROR | egrep -iv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | anew -q .tmp/${domain}_url_extract_tmp2.txt
+			cat .tmp/${domain}_url_extract_tmp.txt | grep "${domain}" | egrep -i "\.(js)" | anew -q ${domain}_url_extract_js.txt
 			eval uddup -u .tmp/${domain}_url_extract_tmp2.txt -o .tmp/${domain}_url_extract_uddup.txt $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/${domain}_url_extract_uddup.txt $DEBUG_ERROR | anew ${domain}_url_extract.txt | wc -l)
 			touch $called_fn_dir/.${FUNCNAME[0]};
@@ -1336,20 +1336,17 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 			exit
 			;;
 		g ) start
+			PORTSCAN_ACTIVE=false
 			dorks
 			subdomains_full
 			subtakeover
 			webprobe_full
 			screenshot
 			portscan
-			nuclei_check
 			github
 			favicon
 			cms_scanner
-			fuzz
 			cors
-			brokenLinks
-			test_ssl
 			end
 			exit
 			;;
