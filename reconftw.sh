@@ -738,11 +738,9 @@ xss(){
 			if [ -n "$XSS_SERVER" ]; then
 				sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
 				eval python3 $tools/XSStrike/xsstrike.py --seeds .tmp/${domain}_xss_reflected.txt -t 30 --crawl --blind --skip > ${domain}_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-				printf "${bblue} Results are saved in ${domain}_xss.txt${reset}\n"
 			else
 				printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n\n"
 				eval python3 $tools/XSStrike/xsstrike.py --seeds .tmp/${domain}_xss_reflected.txt -t 30 --crawl --skip > ${domain}_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-				printf "${bblue} Results are saved in ${domain}_xss.txt${reset}\n"
 			fi
 		else
 			if [[ $(cat .tmp/${domain}_xss_reflected.txt | wc -l) -le 500 ]]
@@ -750,11 +748,9 @@ xss(){
 				if [ -n "$XSS_SERVER" ]; then
 					sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
 					eval python3 $tools/XSStrike/xsstrike.py --seeds .tmp/${domain}_xss_reflected.txt -t 30 --crawl --blind --skip > ${domain}_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-					printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 				else
 					printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n\n"
 					eval python3 $tools/XSStrike/xsstrike.py --seeds .tmp/${domain}_xss_reflected.txt -t 30 --crawl --skip > ${domain}_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
-					printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
 				fi
 			else
 				printf "${bred} Skipping XSS: Too Much URLs to test, try with --deep flag${reset}\n"
@@ -763,7 +759,7 @@ xss(){
 		end=`date +%s`
 		getElapsedTime $start $end
 		printf "${bblue}\n XSS Analysis Finished in ${runtime}\n"
-		printf "${bblue} Results are saved in ${domain}_xsstrike_xss.txt${reset}\n"
+		printf "${bblue} Results are saved in ${domain}_xss.txt${reset}\n"
 		printf "${bgreen}#######################################################################\n\n"
 	else
 		printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
