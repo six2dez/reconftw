@@ -1068,7 +1068,7 @@ sqli(){
 			printf "${bblue} SQLi checks ${reset}\n"
 			start=`date +%s`
 			cat gf/${domain}_sqli.txt | qsreplace FUZZ | anew -q .tmp/tmp_sqli.txt
-			interlace -tL .tmp/tmp_sqli.txt -threads 10 -c "python3 $tools/sqlmap/sqlmap.py -u _target_ -b --batch --disable-coloring --output-dir=sqlmap" &>/dev/null
+			interlace -tL .tmp/tmp_sqli.txt -threads 10 -c "python3 $tools/sqlmap/sqlmap.py -u _target_ -b --batch --disable-coloring --random-agent --output-dir=sqlmap" &>/dev/null
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
