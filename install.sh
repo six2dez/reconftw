@@ -141,6 +141,7 @@ eval go get -u github.com/gwen001/github-endpoints $DEBUG_STD
 eval git clone https://github.com/s0md3v/XSStrike $dir/XSStrike $DEBUG_STD
 eval git clone https://github.com/1ndianl33t/Gf-Patterns $dir/Gf-Patterns $DEBUG_STD
 eval git clone https://github.com/tomnomnom/gf $dir/gf $DEBUG_STD
+eval GO111MODULE=on go get -v github.com/projectdiscovery/dnsx/cmd/dnsx $DEBUG_STD
 cp -r $dir/gf/examples ~/.gf
 cp $dir/Gf-Patterns/*.json ~/.gf
 printf "${bgreen} 40%% done${reset}\n\n"
