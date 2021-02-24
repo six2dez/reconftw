@@ -104,7 +104,6 @@ function tools_installed(){
 	eval type -P waybackurls $DEBUG_STD || { printf "${bred} [*] Waybackurls		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P gau $DEBUG_STD || { printf "${bred} [*] Gau		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P shuffledns $DEBUG_STD || { printf "${bred} [*] ShuffleDns		[NO]${reset}\n"; allinstalled=false;}
-	eval type -P subzy $DEBUG_STD || { printf "${bred} [*] Subzy		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P cf-check $DEBUG_STD || { printf "${bred} [*] Cf-check		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P nuclei $DEBUG_STD || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; allinstalled=false;}
 	[ -d ~/nuclei-templates ] || { printf "${bred} [*] Nuclei templates    [NO]${reset}\n"; allinstalled=false;}
@@ -168,7 +167,6 @@ function tools_full(){
 	eval type -P waybackurls $DEBUG_STD && printf "${bgreen}[*] Waybackurls		[YES]${reset}\n" || { printf "${bred} [*] Waybackurls	[NO]${reset}\n"; }
 	eval type -P gau $DEBUG_STD && printf "${bgreen}[*] Gau		        [YES]${reset}\n" || { printf "${bred} [*] Gau		[NO]${reset}\n"; }
 	eval type -P shuffledns $DEBUG_STD && printf "${bgreen}[*] ShuffleDns		[YES]${reset}\n" || { printf "${bred} [*] ShuffleDns		[NO]${reset}\n"; }
-	eval type -P subzy $DEBUG_STD && printf "${bgreen}[*] Subzy		[YES]${reset}\n" || { printf "${bred} [*] Subzy		[NO]${reset}\n"; }
 	eval type -P cf-check $DEBUG_STD && printf "${bgreen}[*] Cf-check		[YES]${reset}\n" || { printf "${bred} [*] Cf-check		[NO]${reset}\n"; }
 	eval type -P nuclei $DEBUG_STD && printf "${bgreen}[*] Nuclei		[YES]${reset}\n" || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; }
 	[ -d ~/nuclei-templates ] && printf "${bgreen}[*] Nuclei templates  	[YES]${reset}\n" || printf "${bred} [*] Nuclei templates  	[NO]${reset}\n"
@@ -215,8 +213,14 @@ subdomains_full(){
 	NUMOFLINES_probed="0"
 	printf "${bgreen}#######################################################################\n\n"
 	printf "${bblue} Subdomain Enumeration\n\n"
-	eval cp ${domain}_subdomains.txt .tmp/${domain}_subdomains_old.txt $DEBUG_ERROR
-	eval cp ${domain}_probed.txt .tmp/${domain}_probed_old.txt $DEBUG_ERROR
+	if [ -f "${domain}_subdomains.txt" ]
+	then
+		eval cp ${domain}_subdomains.txt .tmp/${domain}_subdomains_old.txt $DEBUG_ERROR
+	fi
+	if [ -f "${domain}_probed.txt" ]
+	then
+		eval cp ${domain}_probed.txt .tmp/${domain}_probed_old.txt $DEBUG_ERROR
+	fi
 	sub_passive
 	sub_crt
 	sub_brute
@@ -253,12 +257,12 @@ sub_passive(){
 			start=`date +%s`
 			printf "${yellow} Running : Passive Subdomain Enumeration${reset}\n"
 			eval subfinder -d $domain -o .tmp/subfinder.txt $DEBUG_STD
-			assetfinder --subs-only $domain | anew -q .tmp/assetfinder.txt
+			eval assetfinder --subs-only $domain $DEBUG_ERROR | anew -q .tmp/assetfinder.txt
 			eval amass enum -passive -d $domain -config $AMASS_CONFIG -o .tmp/amass.txt $DEBUG_STD
 			eval findomain --quiet -t $domain -u .tmp/findomain.txt $DEBUG_STD
-			crobat -s $domain | anew -q .tmp/crobat.txt
+			eval crobat -s $domain $DEBUG_ERROR | anew -q .tmp/crobat.txt
 			echo $domain | anew -q .tmp/passive_subs.txt
-			timeout 5m waybackurls $domain | unfurl -u domains | anew -q .tmp/waybackurls.txt
+			timeout 5m waybackurls $domain | unfurl --unique domains | anew -q .tmp/waybackurls.txt
 			NUMOFLINES=$(eval cat .tmp/subfinder.txt .tmp/assetfinder.txt .tmp/amass.txt .tmp/findomain.txt .tmp/crobat.txt .tmp/waybackurls.txt $DEBUG_ERROR | sed "s/*.//" | anew .tmp/passive_subs.txt | wc -l)
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
@@ -438,9 +442,9 @@ subtakeover(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Subdomain Takeover ${reset}\n\n"
 			start=`date +%s`
-			subzy --targets ${domain}_subdomains.txt --concurrency 4 --hide_fails --timeout 10 | grep "VULNERABLE" | cut -d ' ' -f9 > .tmp/${domain}_all-takeover-checks.txt
-			NUMOFLINES=$(eval cat .tmp/${domain}_all-takeover-checks.txt $DEBUG_ERROR | anew ${domain}_takeover.txt | wc -l)
-			#eval rm ${domain}_all-takeover-checks.txt $DEBUG_ERROR
+			touch .tmp/tko.txt
+			cat ${domain}_probed.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/takeovers/ -o .tmp/tko.txt
+			NUMOFLINES=$(eval cat .tmp/tko.txt $DEBUG_ERROR | anew ${domain}_takeover.txt | wc -l)
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
@@ -609,14 +613,14 @@ urlchecks(){
 				gospider -S ${domain}_probed.txt -t 100 -H "${HEADER}" -c 10 -d 1 -a -w --js --sitemap --robots --cookie "${COOKIE}" --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt > .tmp/gospider_tmp.txt
 			fi
 			cat .tmp/gospider_tmp.txt | sed "s/^.*http/http/p" | anew -q .tmp/${domain}_url_extract_tmp.txt
+			cat .tmp/gospider_tmp.txt | cut -d ' ' -f3 | sed "s/^.*http/http/p" | anew -q .tmp/${domain}_url_extract_tmp.txt
 			if [ -s "${GITHUB_TOKENS}" ]
 			then
 				eval github-endpoints -q -k -d $domain -t ${GITHUB_TOKENS} -raw $DEBUG_ERROR | anew -q .tmp/${domain}_url_extract_tmp.txt
 			fi
-			# cat .tmp/${domain}_url_extract_tmp.txt ${domain}_param.txt | grep "${domain}" | grep "=" | qsreplace FUZZ | qsreplace -a | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | anew -q .tmp/${domain}_url_extract_tmp2.txt
-			cat .tmp/${domain}_url_extract_tmp.txt ${domain}_param.txt | grep "${domain}" | grep "=" | qsreplace -a | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | anew -q .tmp/${domain}_url_extract_tmp2.txt
+			cat .tmp/${domain}_url_extract_tmp.txt ${domain}_param.txt | grep "${domain}" | grep "=" | eval qsreplace -a $DEBUG_ERROR | egrep -iv ".(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | anew -q .tmp/${domain}_url_extract_tmp2.txt
 			cat .tmp/${domain}_url_extract_tmp.txt | grep "${domain}" | egrep -i ".(js)" | anew -q ${domain}_url_extract_js.txt
-			uddup -u .tmp/${domain}_url_extract_tmp2.txt -o .tmp/${domain}_url_extract_uddup.txt
+			eval uddup -u .tmp/${domain}_url_extract_tmp2.txt -o .tmp/${domain}_url_extract_uddup.txt $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/${domain}_url_extract_uddup.txt $DEBUG_ERROR | anew ${domain}_url_extract.txt | wc -l)
 			touch $called_fn_dir/.${FUNCNAME[0]};
 			end=`date +%s`
@@ -700,23 +704,20 @@ params(){
 			printf "${yellow}\n\n Running : Finding params with paramspider${reset}\n"
 			cat ${domain}_probed.txt | sed -r "s/https?:\/\///" | anew -q .tmp/${domain}_probed_nohttp.txt
 			interlace -tL .tmp/${domain}_probed_nohttp.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt,js" &>/dev/null && touch $called_fn_dir/.${FUNCNAME[0]}
-			#find output/ -name '*.txt' -exec cat {} \; | anew -q ${domain}_param_tmp.txt
 			cat output/*.txt | anew -q .tmp/${domain}_param_tmp.txt
 			sed '/^FUZZ/d' -i .tmp/${domain}_param_tmp.txt
 			eval rm -rf output/ $DEBUG_ERROR
-			#eval rm ${domain}_probed_nohttp.txt $DEBUG_ERROR
 			if [ "$DEEP" = true ] ; then
 				printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
-				eval arjun -i .tmp/${domain}_param_tmp.txt -t 20 -o ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval arjun -i .tmp/${domain}_param_tmp.txt -t 20 -oT ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			else
 				if [[ $(cat .tmp/${domain}_param_tmp.txt | wc -l) -le 200 ]]
 				then
-					eval arjun -i .tmp/${domain}_param_tmp.txt -t 20 -o ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval arjun -i .tmp/${domain}_param_tmp.txt -t 20 -oT ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				else
 					cp .tmp/${domain}_param_tmp.txt ${domain}_param.txt
 				fi
 			fi
-			#eval rm ${domain}_param_tmp.txt $DEBUG_ERROR
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n Parameter Discovery Finished in ${runtime}\n"
@@ -1156,7 +1157,6 @@ all(){
 			github
 			favicon
 			cms_scanner
-			brokenLinks
 			fuzz
 			cors
 			params
@@ -1170,6 +1170,7 @@ all(){
 			sqli
 			jschecks
 			xss
+			brokenLinks
 			test_ssl
 			end
 		done
@@ -1185,7 +1186,6 @@ all(){
 		github
 		favicon
 		cms_scanner
-		brokenLinks
 		fuzz
 		cors
 		params
@@ -1199,6 +1199,7 @@ all(){
 		sqli
 		jschecks
 		xss
+		brokenLinks
 		test_ssl
 		end
 	fi
@@ -1309,7 +1310,6 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 			fi
 			nuclei_check
 			cms_scanner
-			brokenLinks
 			fuzz
 			cors
 			params
@@ -1323,6 +1323,7 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 			sqli
 			jschecks
 			xss
+			brokenLinks
 			test_ssl
 			end
 			exit
@@ -1341,9 +1342,9 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 			github
 			favicon
 			cms_scanner
-			brokenLinks
 			fuzz
 			cors
+			brokenLinks
 			test_ssl
 			end
 			exit
