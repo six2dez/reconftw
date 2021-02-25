@@ -85,7 +85,6 @@ function tools_installed(){
 	[ -f $tools/fav-up/favUp.py ] || { printf "${bred} [*] fav-up		[NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/Corsy/corsy.py ] || { printf "${bred} [*] Corsy		[NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/testssl.sh/testssl.sh ] || { printf "${bred} [*] testssl		[NO]${reset}\n"; allinstalled=false;}
-	[ -f $tools/JSFinder/JSFinder.py ] || { printf "${bred} [*] JSFinder		[NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/CMSeeK/cmseek.py ] || { printf "${bred} [*] CMSeeK		[NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/fuzz_wordlist.txt ] || { printf "${bred} [*] OneListForAll	[NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/LinkFinder/linkfinder.py ] || { printf "${bred} [*] LinkFinder	        [NO]${reset}\n"; allinstalled=false;}
@@ -115,6 +114,7 @@ function tools_installed(){
 	eval type -P massdns $DEBUG_STD || { printf "${bred} [*] Massdns		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P qsreplace $DEBUG_STD || { printf "${bred} [*] qsreplace		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P interlace $DEBUG_STD || { printf "${bred} [*] interlace		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P hakrawler $DEBUG_STD || { printf "${bred} [*] hakrawler		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P dnsgen $DEBUG_STD || { printf "${bred} [*] DnsGen		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P anew $DEBUG_STD || { printf "${bred} [*] Anew		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P unfurl $DEBUG_STD || { printf "${bred} [*] unfurl		[NO]${reset}\n"; allinstalled=false;}
@@ -148,7 +148,6 @@ function tools_full(){
 	[ -f $tools/fav-up/favUp.py ] && printf "${bgreen}[*] fav-up		[YES]${reset}\n" || printf "${bred} [*] fav-up		[NO]${reset}\n"
 	[ -f $tools/Corsy/corsy.py ] && printf "${bgreen}[*] Corsy		[YES]${reset}\n" || printf "${bred} [*] Corsy		[NO]${reset}\n"
 	[ -f $tools/testssl.sh/testssl.sh ] && printf "${bgreen}[*] testssl		[YES]${reset}\n" || printf "${bred} [*] testssl		[NO]${reset}\n"
-	[ -f $tools/JSFinder/JSFinder.py ] && printf "${bgreen}[*] JSFinder		[YES]${reset}\n" || printf "${bred} [*] JSFinder		[NO]${reset}\n"
 	[ -f $tools/CMSeeK/cmseek.py ] && printf "${bgreen}[*] CMSeeK		[YES]${reset}\n" || printf "${bred} [*] CMSeeK		[NO]${reset}\n"
 	[ -f $tools/fuzz_wordlist.txt ] && printf "${bgreen}[*] OneListForAll	[YES]${reset}\n" || printf "${bred} [*] OneListForAll	[NO]${reset}\n"
 	[ -f $tools/LinkFinder/linkfinder.py ] && printf "${bgreen}[*] LinkFinder	        [YES]${reset}\n" || printf "${bred} [*] LinkFinder	        [NO]${reset}\n"
@@ -178,6 +177,7 @@ function tools_full(){
 	eval type -P massdns $DEBUG_STD && printf "${bgreen}[*] Massdns		[YES]${reset}\n" || { printf "${bred} [*] Massdns		[NO]${reset}\n"; }
 	eval type -P qsreplace $DEBUG_STD && printf "${bgreen}[*] qsreplace		[YES]${reset}\n" || { printf "${bred} [*] qsreplace		[NO]${reset}\n"; }
 	eval type -P interlace $DEBUG_STD && printf "${bgreen}[*] interlace		[YES]${reset}\n" || { printf "${bred} [*] interlace		[NO]${reset}\n"; }
+	eval type -P hakrawler $DEBUG_STD && printf "${bgreen}[*] hakrawler		[YES]${reset}\n" || { printf "${bred} [*] hakrawler		[NO]${reset}\n"; }
 	eval type -P dnsgen $DEBUG_STD && printf "${bgreen}[*] DnsGen		[YES]${reset}\n" || { printf "${bred} [*] DnsGen		[NO]${reset}\n"; }
 	eval type -P anew $DEBUG_STD && printf "${bgreen}[*] Anew		[YES]${reset}\n" || { printf "${bred} [*] Anew		[NO]${reset}\n"; }
 	eval type -P unfurl $DEBUG_STD && printf "${bgreen}[*] unfurl		[YES]${reset}\n" || { printf "${bred} [*] unfurl		[NO]${reset}\n"; }
@@ -261,7 +261,6 @@ sub_passive(){
 			eval amass enum -passive -d $domain -config $AMASS_CONFIG -o .tmp/amass.txt $DEBUG_STD
 			eval findomain --quiet -t $domain -u .tmp/findomain.txt $DEBUG_STD
 			eval crobat -s $domain $DEBUG_ERROR | anew -q .tmp/crobat.txt
-			echo $domain | anew -q .tmp/passive_subs.txt
 			timeout 5m waybackurls $domain | unfurl --unique domains | anew -q .tmp/waybackurls.txt
 			NUMOFLINES=$(eval cat .tmp/subfinder.txt .tmp/assetfinder.txt .tmp/amass.txt .tmp/findomain.txt .tmp/crobat.txt .tmp/waybackurls.txt $DEBUG_ERROR | sed "s/*.//" | anew .tmp/passive_subs.txt | wc -l)
 			touch $called_fn_dir/.${FUNCNAME[0]}
@@ -344,6 +343,7 @@ sub_dns(){
 			cat .tmp/*_subs.txt | anew -q .tmp/subs_no_resolved.txt
 			deleteOutScoped $outOfScope_file .tmp/subs_no_resolved.txt
 			eval shuffledns -d $domain -list .tmp/subs_no_resolved.txt -r $resolvers -t 5000 -o .tmp/${domain}_subdomains_tmp.txt $DEBUG_STD
+			echo $domain | dnsx -silent | anew -q .tmp/${domain}_subdomains_tmp.txt
 			dnsx -retry 3 -silent -cname -resp-only -l .tmp/${domain}_subdomains_tmp.txt | grep ".$domain$" | anew -q .tmp/${domain}_subdomains_tmp.txt
 			eval dnsx -retry 3 -silent -cname -resp -l ${domain}_subdomains.txt -o ${domain}_subdomains_cname.txt $DEBUG_STD
 			NUMOFLINES=$(cat .tmp/${domain}_subdomains_tmp.txt | anew ${domain}_subdomains.txt | wc -l)
@@ -362,11 +362,10 @@ sub_scraping(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SUBSCRAPING" = true ]
 		then
 			start=`date +%s`
-			printf "${yellow} Running : Web scraping subdomain search${reset}\n"
+			printf "${yellow} Running : Source code scraping subdomain search${reset}\n"
 			touch .tmp/scrap_subs.txt
 			cat ${domain}_subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -timeout 15 -silent -no-color | cut -d ' ' -f1 | anew -q .tmp/${domain}_probed_tmp.txt
-			eval python3 $tools/JSFinder/JSFinder.py -f .tmp/${domain}_probed_tmp.txt -os .tmp/scrap_subs.txt $DEBUG_STD
-			gospider -S .tmp/${domain}_probed_tmp.txt -t 10 -H "${HEADER}" -d 1 --js --sitemap --robots --cookie "${COOKIE}" -q | grep ".$domain" | unfurl --unique domains | anew -q .tmp/scrap_subs.txt
+			cat .tmp/${domain}_probed_tmp.txt | hakrawler -subs -plain -linkfinder -insecure | anew -q .tmp/scrap_subs.txt
 			cat .tmp/scrap_subs.txt | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/scrap_subs_resolved.txt $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/scrap_subs_resolved.txt $DEBUG_ERROR | anew ${domain}_subdomains.txt | wc -l)
 			touch $called_fn_dir/.${FUNCNAME[0]}
@@ -612,11 +611,10 @@ urlchecks(){
 			cat ${domain}_probed.txt | waybackurls | anew -q .tmp/${domain}_url_extract_tmp.txt
 			cat ${domain}_probed.txt | gau | anew -q .tmp/${domain}_url_extract_tmp.txt
 			if [ "$DEEP" = true ] ; then
-				gospider -S ${domain}_probed.txt -t 100 -H "${HEADER}" -c 10 -d 2 -a -w --js --sitemap --robots --cookie "${COOKIE}" --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt -q > .tmp/gospider_tmp.txt
+				cat ${domain}_probed.txt | hakrawler -urls -plain -linkfinder -insecure -depth 2 | anew -q .tmp/${domain}_url_extract_tmp.txt
 			else
-				gospider -S ${domain}_probed.txt -t 100 -H "${HEADER}" -c 10 -d 1 -a -w --js --sitemap --robots --cookie "${COOKIE}" --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt -q > .tmp/gospider_tmp.txt
+				cat ${domain}_probed.txt | hakrawler -urls -plain -linkfinder -insecure | anew -q .tmp/${domain}_url_extract_tmp.txt
 			fi
-			cat .tmp/gospider_tmp.txt | grep ".$domain" | anew -q .tmp/${domain}_url_extract_tmp.txt
 			if [ -s "${GITHUB_TOKENS}" ]
 			then
 				eval github-endpoints -q -k -d $domain -t ${GITHUB_TOKENS} -raw $DEBUG_ERROR | anew -q .tmp/${domain}_url_extract_tmp.txt
@@ -635,6 +633,25 @@ urlchecks(){
 				printf "${text}" && printf "${text}" | $NOTIFY
 			fi
 			printf "${bblue} Results are saved in ${domain}_url_extract.txt${reset}\n"
+			printf "${bgreen}#######################################################################\n\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
+}
+
+wordlist_gen(){
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$WORDLIST" = true ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} Wordlist generation ${reset}\n\n"
+			start=`date +%s`
+
+			cat .tmp/${domain}_url_extract_tmp.txt | unfurl -u keys | sed 's/[][]//g' | sed 's/[#]//g' | sed 's/[}{]//g' | anew -q ${domain}_dict_words.txt
+			cat .tmp/${domain}_url_extract_tmp.txt | unfurl -u path | anew -q ${domain}_dict_paths.txt
+
+			text="${bblue}\n Wordlists Generated\n"
+			printf "${text}" && printf "${text}" | $NOTIFY
+			printf "${bblue} Results are saved in ${domain}_dict_[words|paths].txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -1176,6 +1193,7 @@ all(){
 			cors
 			params
 			urlchecks
+			wordlist_gen
 			url_gf
 			open_redirect
 			ssrf_checks
@@ -1205,6 +1223,7 @@ all(){
 		cors
 		params
 		urlchecks
+		wordlist_gen
 		url_gf
 		open_redirect
 		ssrf_checks
@@ -1329,6 +1348,7 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 			cors
 			params
 			urlchecks
+			wordlist_gen
 			url_gf
 			open_redirect
 			ssrf_checks

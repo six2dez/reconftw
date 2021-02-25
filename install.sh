@@ -140,6 +140,7 @@ eval go get -u github.com/gwen001/github-endpoints $DEBUG_STD
 eval git clone https://github.com/s0md3v/XSStrike $dir/XSStrike $DEBUG_STD
 eval git clone https://github.com/1ndianl33t/Gf-Patterns $dir/Gf-Patterns $DEBUG_STD
 eval git clone https://github.com/tomnomnom/gf $dir/gf $DEBUG_STD
+eval go get github.com/hakluke/hakrawler $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/projectdiscovery/dnsx/cmd/dnsx $DEBUG_STD
 cp -r $dir/gf/examples ~/.gf
 cp $dir/Gf-Patterns/*.json ~/.gf
@@ -162,7 +163,6 @@ printf "${bgreen} 60%% done${reset}\n\n"
 eval git clone https://github.com/Tuhinshubhra/CMSeeK $dir/CMSeeK $DEBUG_STD
 eval git clone https://github.com/pielco11/fav-up $dir/fav-up $DEBUG_STD
 eval git clone https://github.com/s0md3v/Corsy $dir/Corsy $DEBUG_STD
-eval git clone https://github.com/Threezh1/JSFinder $dir/JSFinder $DEBUG_STD
 eval git clone https://github.com/codingo/Interlace $dir/Interlace $DEBUG_STD
 eval git clone https://github.com/gwen001/github-search $dir/github-search $DEBUG_STD
 eval git clone https://github.com/obheda12/GitDorker $dir/GitDorker $DEBUG_STD
