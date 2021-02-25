@@ -40,11 +40,11 @@
 - [:hourglass: Improvement plan :hourglass:](#hourglass-improvement-plan-hourglass)
 - [Thanks](#thanks)
 
-## Summary
+# Summary
 
-ReconFTW is a tool designed to perform automated recon on a target domain by running the best set of tools to perform scanning and finding out vulnerabilities.
+ReconFTW is a tool designed to perform automated recon on a target domain by running the best set of tools to perform enumeration and finding out vulnerabilities.
 
-## Installation Instructions
+# Installation Instructions
 
 - [Installation Guide](https://github.com/six2dez/reconftw/wiki) :book:
 - Requires [Golang](https://golang.org/dl/) > 1.14 installed and paths correctly set (**$GOPATH**, **$GOROOT**)
@@ -56,15 +56,114 @@ ReconFTW is a tool designed to perform automated recon on a target domain by run
 ▶ ./install.sh
 ▶ ./reconftw.sh -d target.com -a
 ```
+# Config file
+- Through ```reconftw.config``` file the whole execution of the tool can be controlled.
+- Hunters can set various scanning modes, execution preferences, tools config files, APIs/TOKENS, personalized wordlists
 
-- It is highly recommended, and in some cases essential, to set your API keys or env variables:
-  - amass config file (```~/.config/amass/config.ini```)
-  - subfinder config file (```~/.config/subfinder/config.yaml```)
-  - GitHub tokens file (```~/Tools/.github_tokens```) Recommended > 5, see how to create [here](https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token)
-  - favup API (```shodan init <SHODAN-API-KEY>```)
-  - SSRF Server var (```COLLAB_SERVER``` env var)
-  - Blind XSS Server var (```XSS_SERVER``` env var)
-  - Notify config file (```~/.config/notify/notify.conf```)
+<details>
+ <br><br>
+ <summary>Click here to view default config file</summary>   
+ 
+```yaml
+#################################################################
+#			reconFTW config file			#
+#################################################################
+
+# TERM COLOURS
+bred='\033[1;31m'
+bblue='\033[1;34m'
+bgreen='\033[1;32m'
+yellow='\033[0;33m'
+red='\033[0;31m'
+blue='\033[0;34m'
+green='\033[0;32m'
+reset='\033[0m'
+
+# General values
+tools=~/Tools
+NPROC=$(nproc || echo -n 1)
+output=${dir}/Recon/${domain}
+
+# Tools config files
+#NOTIFY_CONFIG=~/.config/notify/notify.conf # No need to define
+#SUBFINDER_CONFIG=~/.config/subfinder/config.yaml # No need to define
+AMASS_CONFIG=~/.config/amass/config.ini
+GITHUB_TOKENS=${tools}/.github_tokens
+
+# APIs/TOKENS
+SHODAN_API_KEY=XXXXXXXXXXXXX
+XSS_SERVER=reconftw.xss.ht
+COLLAB_SERVER=webhook.site/e3d6156b
+findomain_virustotal_token=XXXXXXXXXXXXXXXXX
+findomain_spyse_token=XXXXXXXXXXXXXXXXX
+findomain_securitytrails_token=XXXXXXXXXXXXXXXXX
+findomain_fb_token=XXXXXXXXXXXXXXXXX
+
+# File descriptors
+DEBUG_STD="&>/dev/null"
+DEBUG_ERROR="2>/dev/null"
+
+# Steps
+DORKS=true
+SUBCRT=true
+SUBBRUTE=true
+SUBSCRAPING=true
+SUBPERMUTE=true
+SUBTAKEOVER=true
+WEBPROBEFULL=true
+WEBSCREENSHOT=true
+PORTSCANNER=true
+PORTSCAN_PASSIVE=true
+PORTSCAN_ACTIVE=true
+NUCLEICHECK=true
+URL_GF=true
+JSCHECKS=true
+PARAMS=true
+XSS=true
+GITHUB=true
+FAVICON=true
+FUZZ=true
+CMS_SCANNER=true
+CORS=true
+TEST_SSL=true
+OPEN_REDIRECT=true
+SSRF_CHECKS=true
+CRLF_CHECKS=true
+LFI=true
+SSTI=true
+SQLI=true
+BROKENLINKS=true
+WORDLIST=true
+
+# Extra features
+NOTIFICATION=false
+DEEP=false
+FULLSCOPE=false
+DIFF=false
+REMOVETMP=false
+
+## HTTP options
+COOKIE=""
+HEADER="User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0"
+
+# lists
+fuzz_wordlist=${tools}/fuzz_wordlist.txt
+lfi_wordlist=${tools}/lfi_wordlist.txt
+subs_wordlist=${tools}/subdomains.txt
+resolvers=${tools}/resolvers.txt
+``` 
+</details>
+
+
+
+
+
+
+
+
+
+
+
 
 ## Usage
 
@@ -82,6 +181,7 @@ ReconFTW is a tool designed to perform automated recon on a target domain by run
 |------|-------------|
 | -a | Perform full recon |
 | -s | Full subdomain scan (Subs, tko and probe) |
+| -g | Gentle mode (Dorks, Subs, webprobe, screenshots, ports passive, favicon, cms and cors ) |
 | -w | Perform web checks only without subs (-l required) |
 | -i | Check whether tools required are present or not |
 | -v | Verbose/Debug Mode |
@@ -145,52 +245,53 @@ ReconFTW is a tool designed to perform automated recon on a target domain by run
   - Certificate transparency ([crtfinder](https://github.com/eslam3kl/crtfinder), [tls.bufferover](tls.bufferover.run) and [dns.bufferover](dns.bufferover.run)))
   - Bruteforce ([shuffledns](https://github.com/projectdiscovery/shuffledns))  
   - Permutations ([dnsgen](https://github.com/ProjectAnte/dnsgen))  
-  - Subdomain JS Scraping ([JSFinder](https://github.com/Threezh1/JSFinder))  
-- Sub TKO ([subzy](https://github.com/LukaSikic/subzy) and [nuclei](https://github.com/projectdiscovery/nuclei))  
+  - Source Code Scraping ([hakrawler](https://github.com/hakluke/hakrawler))  
+  - CNAME Records ([dnsx](https://github.com/projectdiscovery/dnsx))
+- Nuclei Sub TKO templates ([nuclei](https://github.com/projectdiscovery/nuclei))  
 - Web Prober ([httpx](https://github.com/projectdiscovery/httpx))  
 - Web screenshot ([webscreenshot](https://github.com/maaaaz/webscreenshot))  
 - Template scanner ([nuclei](https://github.com/projectdiscovery/nuclei))  
-- Port Scanner ([nmap](https://github.com/nmap/nmap))  
-- Url extraction ([waybackurls](https://github.com/tomnomnom/waybackurls), [gau](https://github.com/lc/gau), [gospider](https://github.com/jaeles-project/gospider), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3))  
+- Port Scanner (Active with [nmap](https://github.com/nmap/nmap) and passive with [shodan-cli](https://cli.shodan.io/))  
+- Url extraction ([waybackurls](https://github.com/tomnomnom/waybackurls), [gau](https://github.com/lc/gau), [hakrawler](https://github.com/hakluke/hakrawler), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3))  
 - Pattern Search ([gf](https://github.com/tomnomnom/gf) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns))  
 - Param discovery ([paramspider](https://github.com/devanshbatham/ParamSpider) and [arjun](https://github.com/s0md3v/Arjun))  
 - XSS ([XSStrike](https://github.com/s0md3v/XSStrike))  
 - Open redirect ([Openredirex](https://github.com/devanshbatham/OpenRedireX))  
-- SSRF ([asyncio_ssrf.py](https://gist.github.com/h4ms1k/adcc340495d418fcd72ec727a116fea2))  
+- SSRF (headers [asyncio_ssrf.py](https://gist.github.com/h4ms1k/adcc340495d418fcd72ec727a116fea2) and param values with [ffuf](https://github.com/ffuf/ffuf))  
 - CRLF ([crlfuzz](https://github.com/dwisiswant0/crlfuzz))  
 - Github ([GitDorker](https://github.com/obheda12/GitDorker))  
 - Favicon Real IP ([fav-up](https://github.com/pielco11/fav-up))  
 - Javascript analysis ([LinkFinder](https://github.com/GerbenJavado/LinkFinder), scripts from [JSFScan](https://github.com/KathanP19/JSFScan.sh))  
 - Fuzzing ([ffuf](https://github.com/ffuf/ffuf))  
-- Cors ([Corsy](https://github.com/s0md3v/Corsy))  
+- Cors ([Corsy](https://github.com/s0md3v/Corsy)) 
+- LFI Checks (manual/[ffuf](https://github.com/ffuf/ffuf)) 
+- SQLi Check ([SQLMap](https://github.com/sqlmapproject/sqlmap)) 
+- SSTI (manual/[ffuf](https://github.com/ffuf/ffuf)) 
+- CMS Scanner ([CMSeeK](https://github.com/Tuhinshubhra/CMSeeK))
 - SSL tests ([testssl](https://github.com/drwetter/testssl.sh))  
 - Multithread in some steps ([Interlace](https://github.com/codingo/Interlace))  
-- Custom output folder (default under Recon/target.tld/)  
-- Run standalone steps (subdomains, subtko, web, gdorks...)  
+- Broken Links Checker (manual/wget spider)
+- Gentle mode (only passive and low noise steps)
+- Docker support  
+- Custom output folder  
 - Polished installer compatible with most distros  
 - Verbose mode  
+- Diff support for continuous running (cron mode) 
 - Update tools script  
 - Raspberry Pi support  
-- Docker support  
-- CMS Scanner ([CMSeeK](https://github.com/Tuhinshubhra/CMSeeK))
+
+
 - Out of Scope Support
-- LFI Checks
+
 - Notification support for Slack, Discord and Telegram ([notify](https://github.com/projectdiscovery/notify))
 
 ## Mindmap/Workflow
 
 ![Mindmap](images/mindmap.png)
 
-## :hourglass: Improvement plan :hourglass:
 
-These are the next features that would come soon, take a look at all our pending [features](https://github.com/six2dez/reconftw/labels/feature) and feel free to contribute:
 
-- [X] Notification support
-- [ ] HTML Report
-- [ ] In Scope file support
-- [ ] ASN/CIDR/Name allowed as target
-
-You can support this work buying me a coffee:
+## You can support this work buying me a coffee:  
 
 [<img src="https://cdn.buymeacoffee.com/buttons/v2/default-green.png">](https://www.buymeacoffee.com/six2dez)
 
@@ -202,4 +303,3 @@ For their great feedback, support, help or for nothing special but well deserved
 - [@Bileltechno](https://twitter.com/BilelEljaamii)
 - [@cyph3r_asr](https://twitter.com/cyph3r_asr)
 - [@h4ms1k](https://twitter.com/h4ms1k)
-
