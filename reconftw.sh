@@ -108,7 +108,6 @@ function tools_installed(){
 	eval type -P cf-check $DEBUG_STD || { printf "${bred} [*] Cf-check		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P nuclei $DEBUG_STD || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; allinstalled=false;}
 	[ -d ~/nuclei-templates ] || { printf "${bred} [*] Nuclei templates    [NO]${reset}\n"; allinstalled=false;}
-	eval type -P galer $DEBUG_STD || { printf "${bred} [*] galer		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P gf $DEBUG_STD || { printf "${bred} [*] Gf		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P Gxss $DEBUG_STD || { printf "${bred} [*] Gxss		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P subjs $DEBUG_STD || { printf "${bred} [*] subjs		[NO]${reset}\n"; allinstalled=false;}
@@ -172,7 +171,6 @@ function tools_full(){
 	eval type -P cf-check $DEBUG_STD && printf "${bgreen}[*] Cf-check		[YES]${reset}\n" || { printf "${bred} [*] Cf-check		[NO]${reset}\n"; }
 	eval type -P nuclei $DEBUG_STD && printf "${bgreen}[*] Nuclei		[YES]${reset}\n" || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; }
 	[ -d ~/nuclei-templates ] && printf "${bgreen}[*] Nuclei templates  	[YES]${reset}\n" || printf "${bred} [*] Nuclei templates  	[NO]${reset}\n"
-	eval type -P galer $DEBUG_STD && printf "${bgreen}[*] galer		[YES]${reset}\n" || { printf "${bred} [*] galer		[NO]${reset}\n"; }
 	eval type -P gf $DEBUG_STD && printf "${bgreen}[*] Gf		        [YES]${reset}\n" || { printf "${bred} [*] Gf			[NO]${reset}\n"; }
 	eval type -P Gxss $DEBUG_STD && printf "${bgreen}[*] Gxss		[YES]${reset}\n" || { printf "${bred} [*] Gxss		[NO]${reset}\n"; }
 	eval type -P subjs $DEBUG_STD && printf "${bgreen}[*] subjs		[YES]${reset}\n" || { printf "${bred} [*] subjs		[NO]${reset}\n"; }
@@ -368,7 +366,7 @@ sub_scraping(){
 			touch .tmp/scrap_subs.txt
 			cat ${domain}_subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -timeout 15 -silent -no-color | cut -d ' ' -f1 | anew -q .tmp/${domain}_probed_tmp.txt
 			eval python3 $tools/JSFinder/JSFinder.py -f .tmp/${domain}_probed_tmp.txt -os .tmp/scrap_subs.txt $DEBUG_STD
-			eval galer -u .tmp/${domain}_probed_tmp.txt -s  $DEBUG_ERROR | grep ".$domain" | unfurl --unique domains | anew -q .tmp/scrap_subs.txt
+			gospider -S .tmp/${domain}_probed_tmp.txt -t 10 -H "${HEADER}" -d 1 --js --sitemap --robots --cookie "${COOKIE}" -q | grep ".$domain" | unfurl --unique domains | anew -q .tmp/scrap_subs.txt
 			cat .tmp/scrap_subs.txt | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/scrap_subs_resolved.txt $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/scrap_subs_resolved.txt $DEBUG_ERROR | anew ${domain}_subdomains.txt | wc -l)
 			touch $called_fn_dir/.${FUNCNAME[0]}
@@ -614,12 +612,11 @@ urlchecks(){
 			cat ${domain}_probed.txt | waybackurls | anew -q .tmp/${domain}_url_extract_tmp.txt
 			cat ${domain}_probed.txt | gau | anew -q .tmp/${domain}_url_extract_tmp.txt
 			if [ "$DEEP" = true ] ; then
-				gospider -S ${domain}_probed.txt -t 100 -H "${HEADER}" -c 10 -d 2 -a -w --js --sitemap --robots --cookie "${COOKIE}" --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt > .tmp/gospider_tmp.txt
+				gospider -S ${domain}_probed.txt -t 100 -H "${HEADER}" -c 10 -d 2 -a -w --js --sitemap --robots --cookie "${COOKIE}" --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt -q > .tmp/gospider_tmp.txt
 			else
-				gospider -S ${domain}_probed.txt -t 100 -H "${HEADER}" -c 10 -d 1 -a -w --js --sitemap --robots --cookie "${COOKIE}" --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt > .tmp/gospider_tmp.txt
+				gospider -S ${domain}_probed.txt -t 100 -H "${HEADER}" -c 10 -d 1 -a -w --js --sitemap --robots --cookie "${COOKIE}" --blacklist eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt -q > .tmp/gospider_tmp.txt
 			fi
-			cat .tmp/gospider_tmp.txt | sed "s/^.*http/http/p" | anew -q .tmp/${domain}_url_extract_tmp.txt
-			cat .tmp/gospider_tmp.txt | cut -d ' ' -f3 | sed "s/^.*http/http/p" | anew -q .tmp/${domain}_url_extract_tmp.txt
+			cat .tmp/gospider_tmp.txt | grep ".$domain" | anew -q .tmp/${domain}_url_extract_tmp.txt
 			if [ -s "${GITHUB_TOKENS}" ]
 			then
 				eval github-endpoints -q -k -d $domain -t ${GITHUB_TOKENS} -raw $DEBUG_ERROR | anew -q .tmp/${domain}_url_extract_tmp.txt
@@ -707,7 +704,7 @@ params(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Parameter Discovery ${reset}\n"
 			start=`date +%s`
-			printf "${yellow}\n\n Running : Finding params with paramspider${reset}\n"
+			printf "${yellow}\n\n Running : Searching params with paramspider${reset}\n"
 			cat ${domain}_probed.txt | sed -r "s/https?:\/\///" | anew -q .tmp/${domain}_probed_nohttp.txt
 			interlace -tL .tmp/${domain}_probed_nohttp.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt,js" &>/dev/null && touch $called_fn_dir/.${FUNCNAME[0]}
 			cat output/*.txt | anew -q .tmp/${domain}_param_tmp.txt
@@ -717,7 +714,7 @@ params(){
 				printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
 				eval arjun -i .tmp/${domain}_param_tmp.txt -t 20 -oT ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			else
-				if [[ $(cat .tmp/${domain}_param_tmp.txt | wc -l) -le 200 ]]
+				if [[ $(cat .tmp/${domain}_param_tmp.txt | wc -l) -le 300 ]]
 				then
 					eval arjun -i .tmp/${domain}_param_tmp.txt -t 20 -oT ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				else
@@ -969,8 +966,16 @@ ssrf_checks(){
 		if [ -n "$COLLAB_SERVER" ]; then
 			if [ "$DEEP" = true ] ; then
 				start=`date +%s`
+				cat gf/${domain}_ssrf.txt | qsreplace FUZZ | anew -q .tmp/tmp_ssrf.txt
 				COLLAB_SERVER_FIX=$(echo $COLLAB_SERVER | sed -r "s/https?:\/\///")
-				eval python3 $tools/ssrf.py gf/${domain}_ssrf.txt $COLLAB_SERVER_FIX > ${domain}_ssrf.txt $DEBUG_ERROR
+				echo $COLLAB_SERVER_FIX | anew -q .tmp/ssrf_server.txt
+				echo $COLLAB_SERVER | anew -q .tmp/ssrf_server.txt
+				for url in $(cat .tmp/tmp_ssrf.txt); do
+					ffuf -v -H "${HEADER}" -w .tmp/ssrf_server.txt -u $url &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q ${domain}_ssrf.txt
+				done
+
+				eval python3 $tools/ssrf.py gf/${domain}_ssrf.txt $COLLAB_SERVER_FIX $DEBUG_ERROR | anew -q ${domain}_ssrf.txt
+
 				touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
 				getElapsedTime $start $end
@@ -980,12 +985,18 @@ ssrf_checks(){
 				if [[ $(cat gf/${domain}_ssrf.txt | wc -l) -le 1000 ]]
 				then
 					start=`date +%s`
+					cat gf/${domain}_ssrf.txt | qsreplace FUZZ | anew -q .tmp/tmp_ssrf.txt
 					COLLAB_SERVER_FIX=$(echo $COLLAB_SERVER | sed -r "s/https?:\/\///")
-					eval python3 $tools/ssrf.py gf/${domain}_ssrf.txt $COLLAB_SERVER_FIX > ${domain}_ssrf.txt $DEBUG_ERROR
+					echo $COLLAB_SERVER_FIX | anew -q .tmp/ssrf_server.txt
+					echo $COLLAB_SERVER | anew -q .tmp/ssrf_server.txt
+					for url in $(cat .tmp/tmp_ssrf.txt); do
+						ffuf -v -H "${HEADER}" -w .tmp/ssrf_server.txt -u $url &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q ${domain}_ssrf.txt
+					done
+					eval python3 $tools/ssrf.py gf/${domain}_ssrf.txt $COLLAB_SERVER_FIX $DEBUG_ERROR | anew -q ${domain}_ssrf.txt
 					touch $called_fn_dir/.${FUNCNAME[0]}
 					end=`date +%s`
 					getElapsedTime $start $end
-					printf "${bblue}\n SSRF Finished in ${runtime}\n"
+					printf "${bblue}\n SSRF Finished in ${runtime}, check your callback server\n"
 					printf "${bblue} Results are saved in ${domain}_ssrf.txt ${reset}\n"
 				else
 					printf "${bred} Skipping SSRF: Too Much URLs to test, try with --deep flag${reset}\n"
