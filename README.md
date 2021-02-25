@@ -235,7 +235,7 @@ resolvers=${tools}/resolvers.txt
 
 ## Sample video
 
-![Video](images/Video.gif)
+![Video](images/reconftw_timelapse.gif)
 
 ## :fire: Features :fire:
 
