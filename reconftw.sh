@@ -364,7 +364,7 @@ sub_scraping(){
 			start=`date +%s`
 			printf "${yellow} Running : Source code scraping subdomain search${reset}\n"
 			touch .tmp/scrap_subs.txt
-			cat ${domain}_subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -timeout 15 -silent -no-color | cut -d ' ' -f1 | anew -q .tmp/${domain}_probed_tmp.txt
+			cat ${domain}_subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -timeout 15 -silent -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/${domain}_probed_tmp.txt
 			cat .tmp/${domain}_probed_tmp.txt | hakrawler -subs -plain -linkfinder -insecure | anew -q .tmp/scrap_subs.txt
 			cat .tmp/scrap_subs.txt | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/scrap_subs_resolved.txt $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/scrap_subs_resolved.txt $DEBUG_ERROR | anew ${domain}_subdomains.txt | wc -l)
@@ -391,14 +391,25 @@ sub_permut(){
 					eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/permute2_tmp.txt $DEBUG_STD
 					eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
 					eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
-					#eval rm permute1.txt permute1_tmp.txt permute2.txt permute2_tmp.txt $DEBUG_ERROR
 				elif [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 100 ]]
 		  		then
 					eval dnsgen .tmp/subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/permute_tmp.txt $DEBUG_STD
 					eval cat .tmp/permute_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
-					#eval rm permute_tmp.txt $DEBUG_ERROR
 				else
-					printf "\n${bred} Skipping Permutations: Too Much Subdomains${reset}\n\n"
+					if [[ $(cat ${domain}_subdomains.txt | wc -l) -le 50 ]]
+						then
+							eval dnsgen ${domain}_subdomains.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/permute1_tmp.txt $DEBUG_STD
+							eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
+							eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/permute2_tmp.txt $DEBUG_STD
+							eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
+							eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
+						elif [[ $(cat ${domain}_subdomains.txt | wc -l) -le 100 ]]
+						then
+							eval dnsgen ${domain}_subdomains.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/permute_tmp.txt $DEBUG_STD
+							eval cat .tmp/permute_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
+						else
+							printf "\n${bred} Skipping Permutations: Too Much Subdomains${reset}\n\n"
+					fi
 			fi
 			if [ -f ".tmp/permute_subs.txt" ]
 			then
@@ -423,7 +434,7 @@ webprobe_simple(){
 		then
 			start=`date +%s`
 			printf "${yellow} Running : Http probing${reset}\n\n"
-			cat ${domain}_subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -timeout 15 -silent -no-color | cut -d ' ' -f1 | anew -q .tmp/${domain}_probed_tmp.txt
+			cat ${domain}_subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -timeout 15 -silent -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/${domain}_probed_tmp.txt
 			deleteOutScoped $outOfScope_file .tmp/${domain}_probed_tmp.txt
 			NUMOFLINES=$(eval cat .tmp/${domain}_probed_tmp.txt $DEBUG_ERROR | anew ${domain}_probed.txt | wc -l)
 			touch $called_fn_dir/.${FUNCNAME[0]}
@@ -468,7 +479,7 @@ webprobe_full(){
 			printf "${bblue} ${bgreen} Web Probe ${reset}\n\n"
 			printf "${yellow} Running : Http probing non standard ports${reset}\n\n"
 			start=`date +%s`
-			cat ${domain}_subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55672 -follow-host-redirects -H "${HEADER}" -status-code -threads 150 -timeout 10 -silent -no-color | cut -d ' ' -f1 | anew -q .tmp/${domain}_probed_uncommon_ports.txt
+			cat ${domain}_subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55672 -follow-host-redirects -H "${HEADER}" -status-code -threads 150 -timeout 10 -silent -no-color | cut -d ' ' -f1 | grep ".$domain" | anew -q .tmp/${domain}_probed_uncommon_ports.txt
 			NUMOFLINES=$(eval cat .tmp/${domain}_probed_uncommon_ports.txt $DEBUG_ERROR | anew ${domain}_probed_uncommon_ports.txt | wc -l)
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
@@ -619,7 +630,7 @@ urlchecks(){
 			then
 				eval github-endpoints -q -k -d $domain -t ${GITHUB_TOKENS} -raw $DEBUG_ERROR | anew -q .tmp/${domain}_url_extract_tmp.txt
 			fi
-			cat .tmp/${domain}_url_extract_tmp.txt ${domain}_param.txt | grep "${domain}" | grep "=" | eval qsreplace -a $DEBUG_ERROR | egrep -iv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | anew -q .tmp/${domain}_url_extract_tmp2.txt
+			eval cat .tmp/${domain}_url_extract_tmp.txt ${domain}_param.txt $DEBUG_ERROR | grep "${domain}" | grep "=" | eval qsreplace -a $DEBUG_ERROR | egrep -iv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | anew -q .tmp/${domain}_url_extract_tmp2.txt
 			cat .tmp/${domain}_url_extract_tmp.txt | grep "${domain}" | egrep -i "\.(js)" | anew -q ${domain}_url_extract_js.txt
 			eval uddup -u .tmp/${domain}_url_extract_tmp2.txt -o .tmp/${domain}_url_extract_uddup.txt $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/${domain}_url_extract_uddup.txt $DEBUG_ERROR | anew ${domain}_url_extract.txt | wc -l)
@@ -731,8 +742,9 @@ params(){
 				printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
 				eval arjun -i .tmp/${domain}_param_tmp.txt -t 20 -oT ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			else
-				if [[ $(cat .tmp/${domain}_param_tmp.txt | wc -l) -le 300 ]]
+				if [[ $(cat .tmp/${domain}_param_tmp.txt | wc -l) -le 50 ]]
 				then
+					printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
 					eval arjun -i .tmp/${domain}_param_tmp.txt -t 20 -oT ${domain}_param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				else
 					cp .tmp/${domain}_param_tmp.txt ${domain}_param.txt
@@ -764,7 +776,7 @@ xss(){
 				eval python3 $tools/XSStrike/xsstrike.py --seeds .tmp/${domain}_xss_reflected.txt -t 30 --crawl --skip > ${domain}_xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			fi
 		else
-			if [[ $(cat .tmp/${domain}_xss_reflected.txt | wc -l) -le 500 ]]
+			if [[ $(cat .tmp/${domain}_xss_reflected.txt | wc -l) -le 200 ]]
 			then
 				if [ -n "$XSS_SERVER" ]; then
 					sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
@@ -796,9 +808,9 @@ github(){
 			if [ -s "${GITHUB_TOKENS}" ]
 			then
 				if [ "$DEEP" = true ] ; then
-					eval python3 $tools/GitDorker/GitDorker.py -tf ${GITHUB_TOKENS} -q $domain -p -d $tools/GitDorker/Dorks/alldorksv3 | grep "\[+\]" | anew -q ${domain}_gitrecon.txt $DEBUG_STD
+					eval python3 $tools/GitDorker/GitDorker.py -tf ${GITHUB_TOKENS} -e 5 -q $domain -p -d $tools/GitDorker/Dorks/alldorksv3 | grep "\[+\]" | anew -q ${domain}_gitrecon.txt $DEBUG_STD
 				else
-					eval python3 $tools/GitDorker/GitDorker.py -tf ${GITHUB_TOKENS} -q $domain -p -d $tools/GitDorker/Dorks/medium_dorks.txt | grep "\[+\]" | anew -q ${domain}_gitrecon.txt $DEBUG_STD
+					eval python3 $tools/GitDorker/GitDorker.py -tf ${GITHUB_TOKENS} -e 5 -q $domain -p -d $tools/GitDorker/Dorks/medium_dorks.txt | grep "\[+\]" | anew -q ${domain}_gitrecon.txt $DEBUG_STD
 				fi
 				sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" ${domain}_gitrecon.txt
 			else
@@ -991,7 +1003,7 @@ ssrf_checks(){
 					ffuf -v -H "${HEADER}" -w .tmp/ssrf_server.txt -u $url &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q ${domain}_ssrf.txt
 				done
 
-				eval python3 $tools/ssrf.py gf/${domain}_ssrf.txt $COLLAB_SERVER_FIX $DEBUG_ERROR | anew -q ${domain}_ssrf.txt
+				eval python3 $tools/ssrf.py $dir/gf/${domain}_ssrf.txt $COLLAB_SERVER_FIX $DEBUG_ERROR | anew -q ${domain}_ssrf.txt
 
 				touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
@@ -1009,7 +1021,7 @@ ssrf_checks(){
 					for url in $(cat .tmp/tmp_ssrf.txt); do
 						ffuf -v -H "${HEADER}" -w .tmp/ssrf_server.txt -u $url &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q ${domain}_ssrf.txt
 					done
-					eval python3 $tools/ssrf.py gf/${domain}_ssrf.txt $COLLAB_SERVER_FIX $DEBUG_ERROR | anew -q ${domain}_ssrf.txt
+					eval python3 $tools/ssrf.py $dir/gf/${domain}_ssrf.txt $COLLAB_SERVER_FIX $DEBUG_ERROR | anew -q ${domain}_ssrf.txt
 					touch $called_fn_dir/.${FUNCNAME[0]}
 					end=`date +%s`
 					getElapsedTime $start $end
