@@ -166,7 +166,7 @@ function tools_full(){
 	eval type -P crobat $DEBUG_STD && printf "${bgreen}[*] Crobat		[YES]${reset}\n" || { printf "${bred} [*] Crobat		[NO]${reset}\n"; }
 	eval type -P waybackurls $DEBUG_STD && printf "${bgreen}[*] Waybackurls		[YES]${reset}\n" || { printf "${bred} [*] Waybackurls	[NO]${reset}\n"; }
 	eval type -P gau $DEBUG_STD && printf "${bgreen}[*] Gau		        [YES]${reset}\n" || { printf "${bred} [*] Gau		[NO]${reset}\n"; }
-	eval type -P dnsx $DEBUG_STD && printf "${bgreen}[*] dnsx		        [YES]${reset}\n" || { printf "${bred} [*] dnsx		[NO]${reset}\n"; }
+	eval type -P dnsx $DEBUG_STD && printf "${bgreen}[*] dnsx		[YES]${reset}\n" || { printf "${bred} [*] dnsx		[NO]${reset}\n"; }
 	eval type -P shuffledns $DEBUG_STD && printf "${bgreen}[*] ShuffleDns		[YES]${reset}\n" || { printf "${bred} [*] ShuffleDns		[NO]${reset}\n"; }
 	eval type -P cf-check $DEBUG_STD && printf "${bgreen}[*] Cf-check		[YES]${reset}\n" || { printf "${bred} [*] Cf-check		[NO]${reset}\n"; }
 	eval type -P nuclei $DEBUG_STD && printf "${bgreen}[*] Nuclei		[YES]${reset}\n" || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; }
