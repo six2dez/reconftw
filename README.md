@@ -9,8 +9,8 @@
 <h4 align="center">A simple bash script for full recon</h4>
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v1.0.0">
-    <img src="https://img.shields.io/badge/release-v1.0.0-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v1.1.0">
+    <img src="https://img.shields.io/badge/release-v1.1.0-green">
   </a>
    </a>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
@@ -287,7 +287,7 @@ resolvers=${tools}/resolvers.txt
 
 ## Mindmap/Workflow
 
-![Mindmap](images/mindmap.png)
+![Mindmap](images/mindmap_updated.png)
 
 
 
