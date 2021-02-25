@@ -46,13 +46,11 @@ if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]]
     else
         printf "${bgreen} Installing Golang ${reset}\n"
         if [ "True" = "$IS_ARM" ]; then
-            LATEST_GO=$(wget -qO- https://golang.org/dl/ | grep -oP 'go([0-9\.]+)\.linux-armv6l\.tar\.gz' | head -n 1 | grep -oP 'go[0-9\.]+' | grep -oP '[0-9\.]+' | head -c -2)
-            eval wget https://dl.google.com/go/go$LATEST_GO.linux-armv6l.tar.gz $DEBUG_STD
+            eval wget https://dl.google.com/go/$(curl https://golang.org/VERSION?m=text).linux-armv6l.tar.gz $DEBUG_STD
             eval $SUDO tar -C /usr/local -xzf go$LATEST_GO.linux-armv6l.tar.gz $DEBUG_STD
             $SUDO cp /usr/local/go/bin/go /usr/bin
         else
-            LATEST_GO=$(wget -qO- https://golang.org/dl/ | grep -oP 'go([0-9\.]+)\.linux-amd64\.tar\.gz' | head -n 1 | grep -oP 'go[0-9\.]+' | grep -oP '[0-9\.]+' | head -c -2)
-            eval wget https://dl.google.com/go/go$LATEST_GO.linux-amd64.tar.gz $DEBUG_STD
+            eval wget wget https://dl.google.com/go/$(curl https://golang.org/VERSION?m=text).linux-amd64.tar.gz $DEBUG_STD
             eval $SUDO tar -C /usr/local -xzf go$LATEST_GO.linux-amd64.tar.gz $DEBUG_STD
             $SUDO cp /usr/local/go/bin/go /usr/bin
         fi
@@ -118,7 +116,6 @@ fi
 dir=~/Tools
 
 eval pip3 install -r requirements.txt $DEBUG_STD
-eval shodan init $SHODAN_API_KEY $DEBUG_STD
 printf "${bgreen} Requirements installed\n\n Installation begins!\n\n${reset}"
 eval go get -v github.com/tomnomnom/gf $DEBUG_STD
 eval go get -v github.com/tomnomnom/qsreplace $DEBUG_STD
@@ -136,13 +133,15 @@ eval go get -v github.com/tomnomnom/unfurl $DEBUG_STD
 eval git clone https://github.com/projectdiscovery/nuclei-templates ~/nuclei-templates $DEBUG_STD
 eval git clone https://github.com/eslam3kl/crtfinder $dir/crtfinder $DEBUG_STD
 eval nuclei -update-templates $DEBUG_STD
+eval git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git $dir/sqlmap $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/projectdiscovery/httpx/cmd/httpx $DEBUG_STD
 printf "${bgreen} 30%% done${reset}\n\n"
-eval go get -u github.com/lukasikic/subzy $DEBUG_STD
 eval go get -u github.com/gwen001/github-endpoints $DEBUG_STD
 eval git clone https://github.com/s0md3v/XSStrike $dir/XSStrike $DEBUG_STD
 eval git clone https://github.com/1ndianl33t/Gf-Patterns $dir/Gf-Patterns $DEBUG_STD
 eval git clone https://github.com/tomnomnom/gf $dir/gf $DEBUG_STD
+eval go get github.com/hakluke/hakrawler $DEBUG_STD
+eval GO111MODULE=on go get -v github.com/projectdiscovery/dnsx/cmd/dnsx $DEBUG_STD
 cp -r $dir/gf/examples ~/.gf
 cp $dir/Gf-Patterns/*.json ~/.gf
 printf "${bgreen} 40%% done${reset}\n\n"
@@ -164,7 +163,6 @@ printf "${bgreen} 60%% done${reset}\n\n"
 eval git clone https://github.com/Tuhinshubhra/CMSeeK $dir/CMSeeK $DEBUG_STD
 eval git clone https://github.com/pielco11/fav-up $dir/fav-up $DEBUG_STD
 eval git clone https://github.com/s0md3v/Corsy $dir/Corsy $DEBUG_STD
-eval git clone https://github.com/Threezh1/JSFinder $dir/JSFinder $DEBUG_STD
 eval git clone https://github.com/codingo/Interlace $dir/Interlace $DEBUG_STD
 eval git clone https://github.com/gwen001/github-search $dir/github-search $DEBUG_STD
 eval git clone https://github.com/obheda12/GitDorker $dir/GitDorker $DEBUG_STD
@@ -172,7 +170,6 @@ printf "${bgreen} 70%% done${reset}\n\n"
 eval git clone https://github.com/ProjectAnte/dnsgen $dir/dnsgen $DEBUG_STD
 eval git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh $DEBUG_STD
 eval git clone https://github.com/maaaaz/webscreenshot $dir/webscreenshot $DEBUG_STD
-
 printf "${bgreen} 80%% done${reset}\n\n"
 if [ "True" = "$IS_ARM" ]
     then
@@ -201,12 +198,13 @@ eval wget -nc -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OW
 cd ~/.gf; eval wget -O potential.json https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json $DEBUG_STD; cd $dir
 touch $dir/.github_tokens
 eval wget -O getjswords.py https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py $DEBUG_STD
-eval wget -O subdomains.txt https://gist.githubusercontent.com/jhaddix/86a06c5dc309d08580a018c66354a056/raw/96f4e51d96b2203f19f6381c8c545b278eaa0837/all.txt $DEBUG_STD
+eval wget -O subdomains_big.txt https://gist.githubusercontent.com/jhaddix/86a06c5dc309d08580a018c66354a056/raw/96f4e51d96b2203f19f6381c8c545b278eaa0837/all.txt $DEBUG_STD
+eval wget -O subdomains.txt https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/DNS/sortedcombined-knock-dnsrecon-fierce-reconng.txt $DEBUG_STD
 eval wget -O resolvers.txt https://raw.githubusercontent.com/BBerastegui/fresh-dns-servers/master/resolvers.txt $DEBUG_STD
 eval wget -O permutations_list.txt https://gist.githubusercontent.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw/137bb6b60c616552c705e93a345c06cec3a2cb1f/permutations_list.txt $DEBUG_STD
 eval wget -O ssrf.py https://gist.githubusercontent.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw/ea0774de5e27f9bc855207b175249edae2e9ccef/asyncio_ssrf.py $DEBUG_STD
 eval wget -O fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD
-eval wget -O lfi_wordlist.txt https://gist.githubusercontent.com/detonxx/a885ce7dd64a7139cb6f5b6860499ba8/raw/f91e76e3f8b1649f389d4fea9c44f360a5b76890/LFI-payloads.txt $DEBUG_STD
+eval wget -O lfi_wordlist.txt https://raw.githubusercontent.com/xmendez/wfuzz/master/wordlist/vulns/dirTraversal-nix.txt $DEBUG_STD
 eval wget -nc -O ~/.config/notify/notify.conf https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw/a66c4d8cf47a3bc95f5e9ba84773428662ea760c/notify_sample.conf $DEBUG_ERROR
 
 sed -i 's/^miscellaneous/#miscellaneous/' ~/nuclei-templates/.nuclei-ignore
