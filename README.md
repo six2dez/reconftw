@@ -2,7 +2,7 @@
   <br>
   <a href="https://github.com/six2dez/reconftw"><img src="https://github.com/six2dez/reconftw/blob/main/images/banner.png" alt="reconftw"></a>
   <br>
-  ReconFTW
+  reconFTW
   <br>
 </h1>
 
@@ -33,7 +33,7 @@
 - [Summary](#summary)
 - [Installation Instructions](#installation-instructions)
 - [Usage](#usage)
-- [Running ReconFTW](#running-reconftw)
+- [Running reconFTW](#running-reconftw)
 - [Sample Video](#sample-video)
 - [:fire: Features :fire:](#fire-features-fire)
 - [Mindmap/Workflow](#mindmapworkflow)
@@ -42,7 +42,7 @@
 
 # Summary
 
-ReconFTW is a tool designed to perform automated recon on a target domain by running the best set of tools to perform enumeration and finding out vulnerabilities.
+reconFTW is a tool designed to perform automated recon on a target domain by running the best set of tools to perform enumeration and finding out vulnerabilities.
 
 # Installation Instructions
 
