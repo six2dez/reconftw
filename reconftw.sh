@@ -707,7 +707,7 @@ jschecks(){
 				cat ${domain}_url_extract_js.txt | grep -iE "\.js$" | anew -q ${domain}_jsfile_links.txt;
 				cat ${domain}_url_extract_js.txt | subjs | anew -q ${domain}_jsfile_links.txt;
 				printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
-				cat ${domain}_jsfile_links.txt | httpx -follow-host-redirects -H "${HEADER}" -silent -timeout 15 -status-code -no-color | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt
+				cat ${domain}_jsfile_links.txt | httpx -status-code -follow-redirects | grep "200" | anew -q ${domain}_js_livelinks.txt
 				printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
 				interlace -tL ${domain}_js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> ${domain}_js_endpoints.txt" &>/dev/null
 				eval sed -i '/^Running against/d; /^Invalid input/d; /^$/d' ${domain}_js_endpoints.txt $DEBUG_ERROR
