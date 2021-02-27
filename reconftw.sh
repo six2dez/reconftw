@@ -547,7 +547,7 @@ portscan(){
 				echo "$sub $(dig +short a $sub | tail -n1)" | anew -q ${domain}_subdomains_ips.txt
 			done
 
-			cat ${domain}_subdomains_ips.txt | cut -d ' ' -f2 | cf-check -c $NPROC | egrep -iv "^(127|10|169|172|192)\." | anew -q .tmp/${domain}_ips_nowaf.txt
+			eval cat ${domain}_subdomains_ips.txt $dir/${domain}_favicontest.txt $DEBUG_ERROR | cut -d ' ' -f2 | cf-check -c $NPROC | egrep -iv "^(127|10|169|172|192)\." | anew -q .tmp/${domain}_ips_nowaf.txt
 
 			printf "${bblue}\n Resolved IP addresses (No WAF) ${reset}\n\n";
 			eval cat .tmp/${domain}_ips_nowaf.txt $DEBUG_ERROR | sort
@@ -839,9 +839,10 @@ favicon(){
 			eval python3 favUp.py -w $domain -sc -o favicontest.json $DEBUG_STD
 			if [ -f "favicontest.json" ]
 			then
-				cat favicontest.json | jq > ${domain}_favicontest.txt
-				eval cat ${domain}_favicontest.txt $DEBUG_ERROR | grep found_ips
-				mv favicontest.json $dir/favicontest.json
+				cat favicontest.json | eval jq -r '.found_ips' $DEBUG_ERROR | grep -v "not-found" > ${domain}_favicontest.txt
+				eval cat ${domain}_favicontest.txt $DEBUG_ERROR
+				mv ${domain}_favicontest.txt $dir/${domain}_favicontest.txt
+				rm favicontest.json
 			fi
 			cd $dir && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
@@ -1197,10 +1198,10 @@ all(){
 			subtakeover
 			webprobe_full
 			screenshot
+			favicon
 			portscan
 			nuclei_check
 			github
-			favicon
 			cms_scanner
 			fuzz
 			cors
@@ -1227,10 +1228,10 @@ all(){
 		subtakeover
 		webprobe_full
 		screenshot
+		favicon
 		portscan
 		nuclei_check
 		github
-		favicon
 		cms_scanner
 		fuzz
 		cors
@@ -1386,9 +1387,9 @@ while getopts ":hd:-:l:x:vaisxwgto:" opt; do
 			subtakeover
 			webprobe_full
 			screenshot
+			favicon
 			portscan
 			github
-			favicon
 			cms_scanner
 			cors
 			end
