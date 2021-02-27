@@ -501,8 +501,9 @@ brokenLinks(){
 		printf "${bgreen}#######################################################################\n"
 		printf "${bblue} Broken links checks ${reset}\n\n"
 		start=`date +%s`
-		interlace -tL ${domain}_probed.txt -threads 10 -c "wget --spider -r -nd -nv -H -l 1 -w 1 --no-check-certificate -U 'Mozilla' -o _output_/_cleantarget__brokenLinks.tmp _target_" -o .tmp &>/dev/null
-		cat .tmp/*_brokenLinks.tmp | grep "^http" | grep -v ':$' | anew -q .tmp/brokenLinks_total.txt
+		cat ${domain}_probed.txt | hakrawler -urls -plain -linkfinder -insecure -scope yolo | grep -v ".$domain" | httpx -status-code -follow-redirects -timeout 15 -silent -no-color | grep '\[404\]' | cut -d ' ' -f1 | anew -q .tmp/brokenLinks_total.txt
+		#interlace -tL ${domain}_probed.txt -threads 10 -c "wget --spider -r -nd -nv -H -l 1 -w 1 --no-check-certificate -U 'Mozilla' -o _output_/_cleantarget__brokenLinks.tmp _target_" -o .tmp &>/dev/null
+		#cat .tmp/*_brokenLinks.tmp | grep "^http" | grep -v ':$' | anew -q .tmp/brokenLinks_total.txt
 		NUMOFLINES=$(eval cat .tmp/brokenLinks_total.txt $DEBUG_ERROR | cut -d ' ' -f2 | anew ${domain}_brokenLinks.txt | wc -l)
 		touch $called_fn_dir/.${FUNCNAME[0]}
 		end=`date +%s`
