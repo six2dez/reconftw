@@ -704,7 +704,7 @@ jschecks(){
 				printf "${bblue} Javascript Scan ${reset}\n\n"
 				start=`date +%s`
 				printf "${yellow} Running : Fetching Urls 1/5${reset}\n"
-				cat ${domain}_url_extract_js.txt | grep -iE "\.js$" | anew -q ${domain}_jsfile_links.txt;
+				cat ${domain}_url_extract_js.txt | cut -d '?' -f 1 | grep -iE "\.js$" |anew -q ${domain}_jsfile_links.txt;
 				cat ${domain}_url_extract_js.txt | subjs | anew -q ${domain}_jsfile_links.txt;
 				printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
 				cat ${domain}_jsfile_links.txt | httpx -follow-host-redirects -H "${HEADER}" -silent -timeout 15 -status-code -no-color | cut -d ' ' -f1 | anew -q ${domain}_js_livelinks.txt
