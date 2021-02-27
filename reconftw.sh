@@ -552,7 +552,7 @@ portscan(){
 			printf "${bblue}\n Resolved IP addresses (No WAF) ${reset}\n\n";
 			eval cat .tmp/${domain}_ips_nowaf.txt $DEBUG_ERROR | sort
 
-			if [ "$PORTSCAN_PASSIVE" = true ]
+			if [ "$PORTSCAN_PASSIVE" = true ] && [ ! -f "${domain}_portscan_passive.txt" ]
 			then
 				for sub in $(cat .tmp/${domain}_ips_nowaf.txt); do
 					shodan host $sub 2>/dev/null >> ${domain}_portscan_passive.txt && echo -e "\n\n#######################################################################\n\n" >> ${domain}_portscan_passive.txt
