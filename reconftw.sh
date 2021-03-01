@@ -225,10 +225,8 @@ function emails(){
 			cat .tmp/harvester.txt | awk '/Emails/,/Hosts/' | sed -e '1,2d' | head -n -2 | anew -q osint/emails.txt
 			cat .tmp/harvester.txt | awk '/Users/,/IPs/' | sed -e '1,2d' | head -n -2 | anew -q osint/users.txt
 			cat .tmp/harvester.txt | awk '/Links/,/Users/' | sed -e '1,2d' | head -n -2 | anew -q osint/linkedin.txt
-			eval sudo systemctl start tor $DEBUG_ERROR && sleep 5
 			cd $tools/pwndb && python3 pwndb.py --target "@${domain}" | anew -q $dir/osint/pwndb.txt
 			cd $dir
-			eval sudo systemctl stop tor $DEBUG_ERROR
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
@@ -399,7 +397,7 @@ function sub_scraping(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SUBSCRAPING" = true ]
 		then
 			start=`date +%s`
-			printf "${yellow} Running : Source code scraping subdomain search${reset}\n"
+			printf "${yellow} Running : Source code scraping subdomain search${reset}\n\n"
 			touch .tmp/scrap_subs.txt
 			cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -timeout 15 -silent -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp.txt
 			cat .tmp/probed_tmp.txt | hakrawler -subs -plain -linkfinder -insecure | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
@@ -574,6 +572,7 @@ function favicon(){
 			if [ -f "favicontest.json" ]
 			then
 				cat favicontest.json | eval jq -r '.found_ips' $DEBUG_ERROR | grep -v "not-found" > favicontest.txt
+				eval sed -i "s/|/\n/g" favicontest.txt $DEBUG_ERROR
 				eval cat favicontest.txt $DEBUG_ERROR
 				eval mv favicontest.txt $dir/hosts/favicontest.txt $DEBUG_ERROR
 				eval rm favicontest.json $DEBUG_ERROR
@@ -713,7 +712,7 @@ function cms_scanner(){
 			eval python3 $tools/CMSeeK/cmseek.py -l .tmp/cms.txt --batch -r $DEBUG_STD
 			for sub in $(cat webs/webs.txt); do
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-				cms_id=$(cat $tools/CMSeeK/Result/${sub_out}/cms.json | jq -r '.cms_id')
+				cms_id=$(eval cat $tools/CMSeeK/Result/${sub_out}/cms.json $DEBUG_ERROR | jq -r '.cms_id')
 				if [ -z "$cms_id" ]
 				then
 					rm -rf $tools/CMSeeK/Result/${sub_out}
@@ -845,9 +844,9 @@ function jschecks(){
 			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
 			interlace -tL js/js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> js/js_endpoints.txt" &>/dev/null
 			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
-			cat js/js_livelinks.txt | nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o js/js_secrets.txt
+			cat js/js_livelinks.txt | eval nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o js/js_secrets.txt $DEBUG_STD
 			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
-			cat js/js_livelinks.txt | python3 $tools/getjswords.py | anew -q webs/dict_words.txt
+			cat js/js_livelinks.txt | eval python3 $tools/getjswords.py $DEBUG_ERROR | anew -q webs/dict_words.txt
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
@@ -1139,7 +1138,7 @@ function test_ssl(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} SSL Test ${reset}\n"
 			start=`date +%s`
-			$tools/testssl.sh/testssl.sh --quiet --color 0 -U -iL hosts/ips.txt > hosts/testssl.txt && touch $called_fn_dir/.${FUNCNAME[0]}
+			eval $tools/testssl.sh/testssl.sh --quiet --color 0 -U -iL hosts/ips.txt $DEBUG_ERROR > hosts/testssl.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n SSL Test Finished in ${runtime}\n"

@@ -29,6 +29,7 @@ install_apt(){
     eval $SUDO apt install chromium-browser -y $DEBUG_STD
     eval $SUDO apt install chromium -y $DEBUG_STD
     eval $SUDO apt install python3 python3-pip ruby git curl libpcap-dev wget python-dev python3-dev dnsutils build-essential xvfb libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq python3-shodan apt-transport-https tor -y $DEBUG_STD
+    eval $SUDO systemctl enable tor $DEBUG_STD
 }
 
 install_yum(){
@@ -37,6 +38,7 @@ install_yum(){
 
 install_pacman(){
     eval $SUDO pacman -Sy install python python-pip dnsutils ruby curl git libpcap nmap chromium wget jq xorg-server-xvfb tor -y $DEBUG_STD
+    eval $SUDO systemctl enable --now tor.service $DEBUG_STD
 }
 
 #installing latest Golang version
