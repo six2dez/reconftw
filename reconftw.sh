@@ -740,7 +740,7 @@ function params(){
 			start=`date +%s`
 			printf "${yellow}\n\n Running : Searching params with paramspider${reset}\n"
 			cat webs/webs.txt | sed -r "s/https?:\/\///" | anew -q .tmp/probed_nohttp.txt
-			interlace -tL .tmp/probed_nohttp.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt,js" &>/dev/null && touch $called_fn_dir/.${FUNCNAME[0]}
+			interlace -tL .tmp/probed_nohttp.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt,js" &>/dev/null
 			cat output/*.txt | anew -q .tmp/param_tmp.txt
 			sed '/^FUZZ/d' -i .tmp/param_tmp.txt
 			eval rm -rf output/ $DEBUG_ERROR
@@ -847,7 +847,7 @@ function jschecks(){
 			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
 			cat js/js_livelinks.txt | nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o js/js_secrets.txt
 			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
-			cat js/js_livelinks.txt | python3 $tools/getjswords.py | anew -q webs/dict_words.txt.txt
+			cat js/js_livelinks.txt | python3 $tools/getjswords.py | anew -q webs/dict_words.txt
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
@@ -948,7 +948,7 @@ function cors(){
 			printf "${bblue} CORS Scan ${reset}\n\n"
 			start=`date +%s`
 			eval python3 $tools/Corsy/corsy.py -i webs/webs.txt > webs/cors.txt $DEBUG_STD
-			eval cat cors.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
+			eval cat webs/cors.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
 			printf "${bblue}\n CORS Scan Finished in ${runtime}\n"
