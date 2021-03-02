@@ -240,6 +240,10 @@ function emails(){
 	fi
 }
 
+function domain_info(){
+	lynx -dump https://domainbigdata.com/${domain} | tail -n +19 > osint/domain_info.txt
+}
+
 
 ###############################################################################################################
 ############################################### SUBDOMAINS ####################################################
@@ -740,7 +744,7 @@ function params(){
 			printf "${yellow}\n\n Running : Searching params with paramspider${reset}\n"
 			cat webs/webs.txt | sed -r "s/https?:\/\///" | anew -q .tmp/probed_nohttp.txt
 			interlace -tL .tmp/probed_nohttp.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt,js" &>/dev/null
-			cat output/*.txt | anew -q .tmp/param_tmp.txt
+			eval cat output/*.txt $DEBUG_ERROR | anew -q .tmp/param_tmp.txt
 			sed '/^FUZZ/d' -i .tmp/param_tmp.txt
 			eval rm -rf output/ $DEBUG_ERROR
 			if [ "$DEEP" = true ] ; then
