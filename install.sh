@@ -28,7 +28,7 @@ printf "${bgreen} reconftw installer script ${reset}\n\n"
 install_apt(){
     eval $SUDO apt install chromium-browser -y $DEBUG_STD
     eval $SUDO apt install chromium -y $DEBUG_STD
-    eval $SUDO apt install python3 python3-pip ruby git curl libpcap-dev wget python-dev python3-dev dnsutils build-essential xvfb libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq python3-shodan apt-transport-https tor -y $DEBUG_STD
+    eval $SUDO apt install python3 python3-pip ruby git curl libpcap-dev wget python-dev python3-dev dnsutils build-essential xvfb libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq python3-shodan apt-transport-https lynx tor -y $DEBUG_STD
     eval $SUDO systemctl enable tor $DEBUG_STD
 }
 
