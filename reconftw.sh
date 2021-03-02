@@ -221,7 +221,9 @@ function emails(){
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Emails search ${reset}\n"
 			start=`date +%s`
-			eval python3 $tools/theHarvester/theHarvester.py -d $domain -b all $DEBUG_ERROR > .tmp/harvester.txt
+			cd $tools/theHarvester
+			eval python3 theHarvester.py -d $domain -b all $DEBUG_ERROR > $dir/.tmp/harvester.txt
+			cd $dir
 			cat .tmp/harvester.txt | awk '/Emails/,/Hosts/' | sed -e '1,2d' | head -n -2 | anew -q osint/emails.txt
 			cat .tmp/harvester.txt | awk '/Users/,/IPs/' | sed -e '1,2d' | head -n -2 | anew -q osint/users.txt
 			cat .tmp/harvester.txt | awk '/Links/,/Users/' | sed -e '1,2d' | head -n -2 | anew -q osint/linkedin.txt
@@ -527,7 +529,7 @@ function webprobe_full(){
 			if [ "$NUMOFLINES" -gt 0 ]; then
 				text="${bred}\n Uncommon web ports: ${NUMOFLINES} new websites in ${runtime}${reset}\n\n"
 				printf "${text}" && printf "${text}" | $NOTIFY
-				eval cat webs/probed_uncommon_ports.txt $DEBUG_ERROR
+				eval cat webs/webs_uncommon_ports.txt $DEBUG_ERROR
 			fi
 			printf "${bblue}\n Web Probe Finished\n"
 			printf "${bblue} Results are saved in webs/webs_uncommon_ports.txt${reset}\n"
@@ -567,12 +569,11 @@ function favicon(){
 			printf "${bblue} FavIcon Hash Extraction ${reset}\n\n"
 			start=`date +%s`
 			cd $tools/fav-up
-			eval shodan init $SHODAN_API_KEY $DEBUG_STD
 			eval python3 favUp.py -w $domain -sc -o favicontest.json $DEBUG_STD
 			if [ -f "favicontest.json" ]
 			then
 				cat favicontest.json | eval jq -r '.found_ips' $DEBUG_ERROR | grep -v "not-found" > favicontest.txt
-				eval sed -i "s/|/\n/g" favicontest.txt $DEBUG_ERROR
+				sed -i "s/|/\n/g" favicontest.txt
 				eval cat favicontest.txt $DEBUG_ERROR
 				eval mv favicontest.txt $dir/hosts/favicontest.txt $DEBUG_ERROR
 				eval rm favicontest.json $DEBUG_ERROR
@@ -624,7 +625,6 @@ function portscan(){
 			getElapsedTime $start $end
 			text="${bblue}\n Port scan Finished in ${runtime}${reset}\n"
 			printf "${text}" && printf "${text}" | $NOTIFY
-			eval cat webs/probed_uncommon_ports.txt $DEBUG_ERROR
 			printf "${bblue} Results are saved in portscan_[passive|active].txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -752,7 +752,7 @@ function params(){
 					printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
 					eval arjun -i .tmp/param_tmp.txt -t 20 -oT webs/param.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				else
-					cp .tmp/param_tmp.txt webs/param.txt
+					cp .tmp/param_tmp.txt webs/param.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 				fi
 			fi
 			end=`date +%s`
@@ -1037,7 +1037,7 @@ function ssrf_checks(){
 					end=`date +%s`
 					getElapsedTime $start $end
 					printf "${bblue}\n SSRF Finished in ${runtime}, check your callback server\n"
-					printf "${bblue} Results are saved in ssrf.txt ${reset}\n"
+					printf "${bblue} Results are saved in vulns/ssrf.txt ${reset}\n"
 				else
 					printf "${bred} Skipping SSRF: Too Much URLs to test, try with --deep flag${reset}\n"
 				fi
