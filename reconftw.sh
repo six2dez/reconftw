@@ -734,6 +734,43 @@ function portscan(){
 ############################################# WEB SCAN ########################################################
 ###############################################################################################################
 
+function waf_checks(){
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$WAF_DETECTION" = true ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} ${bgreen} Detecting WAF in websites ${reset}\n\n"
+			start=`date +%s`
+			wafw00f -i webs/webs.txt -o .tmp/wafs.txt &>/dev/null
+			cat .tmp/wafs.txt | sed -e 's/^[ \t]*//' -e 's/ \+ /\t/g' -e '/(None)/d' | tr -s "\t" ";" > webs/webs_wafs.txt
+			NUMOFLINES=$(eval cat webs/webs_wafs.txt $DEBUG_ERROR | wc -l)
+			text="${bblue}\n ${NUMOFLINES} websites with waf detected ${reset}\n"
+			printf "${text}" && printf "${text}" | $NOTIFY
+			if [ -s "webs/webs_wafs.txt" ] && [ "$WAF_DNS_BYPASS" = true ]
+			then
+				printf "${bblue} ${bgreen} Looking for WAF DNS History Bypasses ${reset}\n\n"
+				cat webs/webs_wafs.txt | cut -d ";" -f1 > .tmp/waf_subdomains.txt
+				bash $dir/bypass-firewalls-by-DNS-history/bypass-firewalls-by-DNS-history.sh -l .tmp/waf_subdomains.txt -o webs/webs_wafs_dns_bypass.txt
+				if [ -s "webs/webs_wafs_dns_bypass.txt" ]
+				then
+					text="${bblue}\n Found WAF DNS history bypasses, check webs/webs_wafs_dns_bypass.txt ${reset}\n"
+					printf "${text}" && printf "${text}" | $NOTIFY
+				fi
+			fi
+			touch $called_fn_dir/.${FUNCNAME[0]}
+			end=`date +%s`
+			getElapsedTime $start $end
+			printf "${bblue}\n WAF Detecion Finished in ${runtime}\n"
+			printf "${bblue} Results are saved in screenshots folder${reset}\n"
+			printf "${bgreen}#######################################################################\n\n"
+		else
+			if [ "$WAF" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
+	fi
+}
+
 function nuclei_check(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$NUCLEICHECK" = true ]
 		then
@@ -1496,6 +1533,7 @@ function all(){
 			screenshot
 			favicon
 			portscan
+			waf_checks
 			nuclei_check
 			github_dorks
 			cms_scanner
@@ -1527,6 +1565,7 @@ function all(){
 		screenshot
 		favicon
 		portscan
+		waf_checks
 		nuclei_check
 		github_dorks
 		cms_scanner
@@ -1566,6 +1605,7 @@ function recon(){
 			screenshot
 			favicon
 			portscan
+			waf_checks
 			nuclei_check
 			cms_scanner
 			fuzz
@@ -1590,6 +1630,7 @@ function recon(){
 		screenshot
 		favicon
 		portscan
+		waf_checks
 		nuclei_check
 		cms_scanner
 		fuzz
@@ -1707,6 +1748,7 @@ while getopts ":hd:-:l:x:vairsxwgto:" opt; do
 					cp $SCRIPTPATH/$list $dir/webs/webs.txt
 				fi
 			fi
+			waf_checks
 			nuclei_check
 			cms_scanner
 			fuzz

@@ -23,7 +23,7 @@ else
 fi
 
 printf "\n\n${bgreen}#######################################################################\n"
-printf "${bgreen} reconftw installer script ${reset}\n\n"
+printf "${bgreen} reconFTW installer script ${reset}\n\n"
 
 install_apt(){
     eval $SUDO apt install chromium-browser -y $DEBUG_STD
@@ -129,6 +129,7 @@ eval go get -v github.com/dwisiswant0/cf-check $DEBUG_STD
 eval go get -v github.com/tomnomnom/hacks/waybackurls $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei $DEBUG_STD
 eval go get -v github.com/tomnomnom/anew $DEBUG_STD
+eval git clone https://github.com/vincentcox/bypass-firewalls-by-DNS-history $dir/bypass-firewalls-by-DNS-history $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/projectdiscovery/notify/cmd/notify $DEBUG_STD
 printf "${bgreen} 20%% done${reset}\n\n"
 eval go get -v github.com/tomnomnom/unfurl $DEBUG_STD
@@ -143,6 +144,7 @@ eval go get -u github.com/gwen001/github-endpoints $DEBUG_STD
 eval git clone https://github.com/s0md3v/XSStrike $dir/XSStrike $DEBUG_STD
 eval git clone https://github.com/1ndianl33t/Gf-Patterns $dir/Gf-Patterns $DEBUG_STD
 eval git clone https://github.com/tomnomnom/gf $dir/gf $DEBUG_STD
+eval git clone https://github.com/EnableSecurity/wafw00f $dir/wafw00f $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/projectdiscovery/dnsx/cmd/dnsx $DEBUG_STD
 cp -r $dir/gf/examples ~/.gf
 cp $dir/Gf-Patterns/*.json ~/.gf
@@ -191,6 +193,7 @@ cd $dir/Interlace && eval $SUDO python3 setup.py install $DEBUG_STD
 cd $dir/LinkFinder && eval $SUDO python3 setup.py install $DEBUG_STD
 cd $dir/dnsgen && eval $SUDO python3 setup.py install $DEBUG_STD
 cd $dir/Arjun && eval $SUDO python3 setup.py install $DEBUG_STD
+cd $dir/wafw00f && eval $SUDO python setup.py install $DEBUG_STD
 cd $dir
 eval git clone https://github.com/devanshbatham/OpenRedireX $dir/OpenRedireX $DEBUG_STD
 printf "${bgreen} 90%% done${reset}\n\n"

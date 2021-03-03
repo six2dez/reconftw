@@ -44,10 +44,9 @@ printf "${bblue}\n Updating installed python packages is finished ${reset}\n"
 printf "${bgreen}#######################################################################\n"
 
 #Tools to be updated
-repos="six2dez/degoogle_hunter davidtavarez/pwndb laramies/theHarvester s0md3v/Arjun sqlmapproject/sqlmap 1ndianl33t/Gf-Patterns s0md3v/XSStrike gwen001/github-search eslam3kl/crtfinder dark-warlord14/LinkFinder maaaaz/webscreenshot ProjectAnte/dnsgen devanshbatham/ParamSpider s0md3v/Corsy Tuhinshubhra/CMSeeK pielco11/fav-up tomnomnom/gf codingo/Interlace blechschmidt/massdns devanshbatham/OpenRedireX obheda12/GitDorker"
-printf "\n${bgreen}--==[ ************************************************************************************ ]==--\n"
-printf "${bred}                reconftw updater script (apt/rpm/pacman compatible)${reset}\n"
-printf "\n${bgreen}--==[ ************************************************************************************ ]==--\n"
+repos="six2dez/degoogle_hunter davidtavarez/pwndb laramies/theHarvester EnableSecurity/wafw00f s0md3v/Arjun sqlmapproject/sqlmap 1ndianl33t/Gf-Patterns s0md3v/XSStrike gwen001/github-search eslam3kl/crtfinder dark-warlord14/LinkFinder maaaaz/webscreenshot ProjectAnte/dnsgen devanshbatham/ParamSpider s0md3v/Corsy Tuhinshubhra/CMSeeK pielco11/fav-up tomnomnom/gf codingo/Interlace blechschmidt/massdns devanshbatham/OpenRedireX vincentcox/bypass-firewalls-by-DNS-history obheda12/GitDorker"
+printf "\n\n${bgreen}#######################################################################\n"
+printf "${bgreen} reconFTW updater script ${reset}\n\n"
 
 for repo in ${repos}; do
     printf "${bgreen}#######################################################################\n"
