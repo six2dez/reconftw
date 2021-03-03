@@ -241,7 +241,49 @@ function emails(){
 }
 
 function domain_info(){
-	lynx -dump https://domainbigdata.com/${domain} | tail -n +19 > osint/domain_info.txt
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$DOMAIN_INFO" = true ]
+		then
+			printf "${bgreen}#######################################################################\n"
+			printf "${bblue} Domain info search ${reset}\n"
+			start=`date +%s`
+
+			lynx -dump https://domainbigdata.com/${domain} | tail -n +19 > osint/domain_info_general.txt
+
+			cat osint/domain_info_general.txt | grep '/nj/' | tr -s ' ' ',' | cut -d ',' -f3 > .tmp/domain_registrant_name.txt
+			cat osint/domain_info_general.txt | grep '/mj/' | tr -s ' ' ',' | cut -d ',' -f3 > .tmp/domain_registrant_email.txt
+			cat osint/domain_info_general.txt | grep -E "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | grep "https://domainbigdata.com" | tr -s ' ' ',' | cut -d ',' -f3 > .tmp/domain_registrant_ip.txt
+
+			sed -i -n '/Copyright/q;p' osint/domain_info_general.txt
+
+			if [ -s ".tmp/domain_registrant_name.txt" ]
+			then
+				for line in $(cat .tmp/domain_registrant_name.txt); do
+					lynx -dump $line | tail -n +18 | sed -n '/]domainbigdata.com/q;p' >> osint/domain_info_name.txt && echo -e "\n\n#######################################################################\n\n" >> osint/domain_info_name.txt
+				done
+			fi
+
+			if [ -s ".tmp/domain_registrant_email.txt" ]
+			then
+				for sub in $(cat .tmp/domain_registrant_email.txt); do
+					lynx -dump $line | tail -n +18 | sed -n '/]domainbigdata.com/q;p'  >> osint/domain_info_email.txt && echo -e "\n\n#######################################################################\n\n" >> osint/domain_info_email.txt
+				done
+			fi
+
+			if [ -s ".tmp/domain_registrant_ip.txt" ]
+			then
+				for sub in $(cat .tmp/domain_registrant_ip.txt); do
+					lynx -dump $line | tail -n +18 | sed -n '/]domainbigdata.com/q;p'  >> osint/domain_info_ip.txt && echo -e "\n\n#######################################################################\n\n" >> osint/domain_info_ip.txt
+				done
+			fi
+			touch $called_fn_dir/.${FUNCNAME[0]}
+			end=`date +%s`
+			getElapsedTime $start $end
+			printf "${bblue}\n Domain Info Search Finished in ${runtime}${reset}\n"
+			printf "${bblue} Results are saved in osint folder ${reset}\n"
+			printf "${bgreen}#######################################################################\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
 }
 
 
@@ -1287,6 +1329,7 @@ function osint(){
 	then
 		for domain in $(cat $list); do
 			start
+			domain_info
 			google_dorks
 			github_dorks
 			metadata
@@ -1295,6 +1338,7 @@ function osint(){
 		done
 	else
 		start
+		domain_info
 		google_dorks
 		github_dorks
 		metadata
@@ -1308,6 +1352,7 @@ function all(){
 	then
 		for domain in $(cat $list); do
 			start
+			domain_info
 			google_dorks
 			subdomains_full
 			subtakeover
@@ -1338,6 +1383,7 @@ function all(){
 		done
 	else
 		start
+		domain_info
 		google_dorks
 		subdomains_full
 		subtakeover
@@ -1373,6 +1419,7 @@ function recon(){
 	then
 		for domain in $(cat $list); do
 			start
+			domain_info
 			google_dorks
 			github_dorks
 			metadata
@@ -1396,6 +1443,7 @@ function recon(){
 		done
 	else
 		start
+		domain_info
 		google_dorks
 		github_dorks
 		metadata
@@ -1555,6 +1603,7 @@ while getopts ":hd:-:l:x:vairsxwgto:" opt; do
 			;;
 		g ) start
 			PORTSCAN_ACTIVE=false
+			domain_info
 			google_dorks
 			subdomains_full
 			subtakeover
