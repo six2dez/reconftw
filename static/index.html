@@ -151,12 +151,12 @@
 
         <body id="page">
             <div class="w3-container report" id="page1" style="display: none; padding-top:22px">
-                <h4><b><i class="fa fa-dashboard"></i> All JavaScript Links</b></h4> ' >> report.html
+                <h4><b><i class="fa fa-dashboard"></i> All JavaScript Links</b></h4>
 
-                echo -e " <input class='myInput' type='text' id='myInput1' onkeyup=\"myFunction('myInput1', 'myUL1' )\"
+               <input class='myInput' type='text' id='myInput1' onkeyup=\"myFunction('myInput1', 'myUL1' )\"
                     placeholder="Search.." title="Search">
                 <div class="w3-responsive w3-card-4">
-                    <ul id=\"myUL1\" class=\"myUL\">" >> report.html
+                    <ul id=\"myUL1\" class=\"myUL\">
 
                         jslinks=./jsfile_links.txt
                         if [ -f "$jslinks" ]; then
@@ -166,19 +166,18 @@
                         echo -e "<li><a href="#">No Jslinks Links Found For Target</a></li>" >> report.html
                         fi
 
-                        echo -e '
                     </ul>
                 </div>
-            </div>' >> report.html
+            </div>l
 
-            echo -e '
+           
             <div class="w3-container report" id="page2" style="display: none; padding-top:22px">
-                <h4><b><i class="fa fa-dashboard"></i> Live JavaScript Links</b></h4> ' >> report.html
+                <h4><b><i class="fa fa-dashboard"></i> Live JavaScript Links</b></h4> 
 
-                echo -e " <input class='myInput' type='text' id='myInput2' onkeyup=\"myFunction('myInput2', 'myUL2' )\"
+                 <input class='myInput' type='text' id='myInput2' onkeyup=\"myFunction('myInput2', 'myUL2' )\"
                     placeholder="Search.." title="Search">
                 <div class="w3-responsive w3-card-4">
-                    <ul id=\"myUL2\" class=\"myUL\">" >> report.html
+                    <ul id=\"myUL2\" class=\"myUL\">
 
                         live_jslinks=./live_jsfile_links.txt
                         if [ -f "$live_jslinks" ]; then
@@ -188,10 +187,10 @@
                         echo -e "<li><a href="#">No Jslinks Links Found For Target</a></li>" >> report.html
                         fi
 
-                        echo -e '
+                      
                     </ul>
                 </div>
-            </div>' >> report.html
+            </div>
 
             echo -e '
             <div class="w3-container report" id="page3" style="display: none; padding-top:22px">
