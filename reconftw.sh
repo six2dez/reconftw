@@ -1413,6 +1413,23 @@ function start(){
 	printf "${bred} Target: ${domain}\n\n"
 }
 
+#Don't call me, I am not finished yet
+function html_report(){
+	eval cp "static/index.html" $dir $DEBUG_ERROR
+	#changing title to target.com
+	sed -i "s/CHANGE_ME_TITLE/$domain/g" "$dir/index.html"
+	#subdomains
+	lineToAppend=""
+	if [ -f "$dir/subdomains/subdomains.txt" ]; then
+		cat $dir/subdomains/subdomains.txt | while read sub; do lineToAppend="$lineToAppend <li><a href='$sub'>$sub</a></li><br>" ; done
+	else
+		lineToAppend="<li><a href='\#'>No Jslinks Links Found For Target</a></li><br>"
+	fi
+	sed -i "s/CHANGE_ME_SUB_DOMAINS/$lineToAppend/g" "$dir/index.html"
+	#Screenshots
+	lineToAppend=""
+}
+
 function end(){
 	find $dir -type f -empty | grep -v "called_fn" | xargs rm -f &>/dev/null
 	find $dir -type d -empty | grep -v "called_fn" | xargs rm -rf &>/dev/null
