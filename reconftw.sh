@@ -67,7 +67,6 @@ function tools_installed(){
 	eval type -P massdns $DEBUG_STD || { printf "${bred} [*] Massdns		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P qsreplace $DEBUG_STD || { printf "${bred} [*] qsreplace		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P interlace $DEBUG_STD || { printf "${bred} [*] interlace		[NO]${reset}\n"; allinstalled=false;}
-	eval type -P hakrawler $DEBUG_STD || { printf "${bred} [*] hakrawler		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P dnsgen $DEBUG_STD || { printf "${bred} [*] DnsGen		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P anew $DEBUG_STD || { printf "${bred} [*] Anew		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P unfurl $DEBUG_STD || { printf "${bred} [*] unfurl		[NO]${reset}\n"; allinstalled=false;}
@@ -130,7 +129,6 @@ function tools_full(){
 	eval type -P massdns $DEBUG_STD && printf "${bgreen}[*] Massdns		[YES]${reset}\n" || { printf "${bred} [*] Massdns		[NO]${reset}\n"; }
 	eval type -P qsreplace $DEBUG_STD && printf "${bgreen}[*] qsreplace		[YES]${reset}\n" || { printf "${bred} [*] qsreplace		[NO]${reset}\n"; }
 	eval type -P interlace $DEBUG_STD && printf "${bgreen}[*] interlace		[YES]${reset}\n" || { printf "${bred} [*] interlace		[NO]${reset}\n"; }
-	eval type -P hakrawler $DEBUG_STD && printf "${bgreen}[*] hakrawler		[YES]${reset}\n" || { printf "${bred} [*] hakrawler		[NO]${reset}\n"; }
 	eval type -P dnsgen $DEBUG_STD && printf "${bgreen}[*] DnsGen		[YES]${reset}\n" || { printf "${bred} [*] DnsGen		[NO]${reset}\n"; }
 	eval type -P anew $DEBUG_STD && printf "${bgreen}[*] Anew		[YES]${reset}\n" || { printf "${bred} [*] Anew		[NO]${reset}\n"; }
 	eval type -P unfurl $DEBUG_STD && printf "${bgreen}[*] unfurl		[YES]${reset}\n" || { printf "${bred} [*] unfurl		[NO]${reset}\n"; }
@@ -191,7 +189,11 @@ function github_dorks(){
 			printf "${bblue} Results are saved in osint/gitdorks.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$DORKS" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -211,7 +213,11 @@ function metadata(){
 			printf "${bblue} Results are saved in osint folder ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$METADATA" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -236,7 +242,12 @@ function emails(){
 			printf "${bblue} Results are saved in osint folder ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$EMAILS" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
+
 	fi
 }
 
@@ -282,7 +293,11 @@ function domain_info(){
 			printf "${bblue} Results are saved in osint folder ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$DOMAIN_INFO" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -396,7 +411,11 @@ function sub_crt(){
 				printf "${green} ${NUMOFLINES} new subdomains by certificate transparency found in ${runtime}${reset}\n\n"
 			fi
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$SUBCRT" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -414,7 +433,11 @@ function sub_brute(){
 				printf "${green} ${NUMOFLINES} new subdomains by bruteforce found in ${runtime}${reset}\n\n"
 			fi
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$SUBBRUTE" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -448,7 +471,7 @@ function sub_scraping(){
 			printf "${yellow} Running : Source code scraping subdomain search${reset}\n\n"
 			touch .tmp/scrap_subs.txt
 			cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -timeout 15 -silent -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp.txt
-			cat .tmp/probed_tmp.txt | hakrawler -subs -plain -linkfinder -insecure | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
+			gospider -S .tmp/probed_tmp.txt --js -t 10 -H "${HEADER}" --sitemap --robots -w -r | egrep -o 'https?://[^ ]+' | sed 's/]$//' | unfurl --unique domains | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
 			cat .tmp/scrap_subs.txt | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/scrap_subs_resolved.txt $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/scrap_subs_resolved.txt $DEBUG_ERROR | anew subdomains/subdomains.txt | wc -l)
 			touch $called_fn_dir/.${FUNCNAME[0]}
@@ -458,7 +481,11 @@ function sub_scraping(){
 				printf "${green} ${NUMOFLINES} new subdomains by scraping found in ${runtime}${reset}\n\n"
 			fi
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$SUBSCRAPING" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -508,7 +535,11 @@ function sub_permut(){
 				printf "${green} ${NUMOFLINES} new subdomains by permutations found in ${runtime}${reset}\n\n"
 			fi
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$SUBPERMUTE" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -532,7 +563,11 @@ function subtakeover(){
 			printf "${bblue} Results are saved in webs/takeover.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$SUBTAKEOVER" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -581,7 +616,11 @@ function webprobe_full(){
 			printf "${bblue} Results are saved in webs/webs_uncommon_ports.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$WEBPROBEFULL" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -600,7 +639,11 @@ function screenshot(){
 			printf "${bblue} Results are saved in screenshots folder${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$WEBSCREENSHOT" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -631,7 +674,11 @@ function favicon(){
 			printf "${bblue} Results are saved in hosts/favicontest.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$FAVICON" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -674,7 +721,11 @@ function portscan(){
 			printf "${bblue} Results are saved in portscan_[passive|active].txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$PORTSCANNER" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -717,7 +768,11 @@ function nuclei_check(){
 			printf "${bblue} Results are saved in nuclei_output folder ${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$NUCLEICHECK" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -743,7 +798,11 @@ function fuzz(){
 			printf "${bblue} Results are saved in fuzzing/*subdomain*.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$FUZZ" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -773,7 +832,11 @@ function cms_scanner(){
 			printf "${bblue} Results are saved in cms/*subdomain* folder${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$CMS_SCANNER" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -807,7 +870,11 @@ function params(){
 			printf "${bblue} Results are saved in webs/param.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$PARAMS" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -821,9 +888,9 @@ function urlchecks(){
 			cat webs/webs.txt | waybackurls | anew -q .tmp/url_extract_tmp.txt
 			cat webs/webs.txt | gau | anew -q .tmp/url_extract_tmp.txt
 			if [ "$DEEP" = true ] ; then
-				cat webs/webs.txt | hakrawler -urls -plain -linkfinder -insecure -depth 2 | anew -q .tmp/url_extract_tmp.txt
+				gospider -S webs/webs.txt --js -t 10 -d 3 -H "${HEADER}" --sitemap --robots -w -r | egrep -o 'https?://[^ ]+' | sed 's/]$//' | grep ".$domain$" | anew -q .tmp/url_extract_tmp.txt
 			else
-				cat webs/webs.txt | hakrawler -urls -plain -linkfinder -insecure | anew -q .tmp/url_extract_tmp.txt
+				gospider -S webs/webs.txt --js -t 10 -H "${HEADER}" --sitemap --robots -w -r | egrep -o 'https?://[^ ]+' | sed 's/]$//' | grep ".$domain$" | anew -q .tmp/url_extract_tmp.txt
 			fi
 			if [ -s "${GITHUB_TOKENS}" ]
 			then
@@ -872,7 +939,11 @@ function url_gf(){
 			printf "${bblue} Results are saved in gf folder${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$URL_GF" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -900,7 +971,11 @@ function jschecks(){
 			printf "${bblue} Results are saved in js folder${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$JSCHECKS" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -918,7 +993,11 @@ function wordlist_gen(){
 			printf "${bblue} Results are saved in webs/dict_[words|paths].txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$WORDLIST" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -931,7 +1010,7 @@ function brokenLinks(){
 		printf "${bgreen}#######################################################################\n"
 		printf "${bblue} Broken links checks ${reset}\n\n"
 		start=`date +%s`
-		cat webs/webs.txt | hakrawler -urls -plain -linkfinder -insecure -scope yolo | grep -v ".$domain" | httpx -status-code -follow-redirects -timeout 15 -silent -no-color | grep '\[404\]' | cut -d ' ' -f1 | anew -q .tmp/brokenLinks_total.txt
+		gospider -S webs/webs.txt --js -t 10 -H "${HEADER}" --sitemap --robots -w -r | egrep -o 'https?://[^ ]+' | sed 's/]$//' | grep -v ".$domain" | httpx -status-code -follow-redirects -timeout 15 -silent -no-color | grep '\[404\]' | cut -d ' ' -f1 | anew -q .tmp/brokenLinks_total.txt
 		NUMOFLINES=$(eval cat .tmp/brokenLinks_total.txt $DEBUG_ERROR | cut -d ' ' -f2 | anew webs/brokenLinks.txt | wc -l)
 		touch $called_fn_dir/.${FUNCNAME[0]}
 		end=`date +%s`
@@ -943,7 +1022,11 @@ function brokenLinks(){
 		printf "${bblue} Results are saved in webs/brokenLinks.txt ${reset}\n"
 		printf "${bgreen}#######################################################################\n\n"
 	else
-		printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		if [ "$BROKENLINKS" = false ]; then
+			printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
 	fi
 }
 
@@ -982,7 +1065,11 @@ function xss(){
 		printf "${bblue} Results are saved in vulns/xss.txt${reset}\n"
 		printf "${bgreen}#######################################################################\n\n"
 	else
-		printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		if [ "$XSS" = false ]; then
+			printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
 	fi
 }
 
@@ -1000,7 +1087,11 @@ function cors(){
 			printf "${bblue} Results are saved in webs/cors.txt ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$CORS" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -1040,7 +1131,11 @@ function open_redirect(){
 			fi
 			printf "${bgreen}#######################################################################\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$OPEN_REDIRECT" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -1093,7 +1188,11 @@ function ssrf_checks(){
 		fi
 		printf "${bgreen}#######################################################################\n"
 	else
-		printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		if [ "$SSRF_CHECKS" = false ]; then
+			printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
 	fi
 }
 
@@ -1110,7 +1209,11 @@ function crlf_checks(){
 			printf "${bblue} Results are saved in crlf.txt ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$CRLF_CHECKS" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -1131,7 +1234,11 @@ function lfi(){
 			printf "${bblue} Results are saved in lfi.txt ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$LFI" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -1155,7 +1262,11 @@ function ssti(){
 			printf "${bblue} Results are saved in ssti.txt ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$SSTI" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -1174,7 +1285,11 @@ function sqli(){
 			printf "${bblue} Results are saved in sqlmap folder ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$SQLI" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -1191,7 +1306,11 @@ function test_ssl(){
 			printf "${bblue} Results are saved in hosts/testssl.txt ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$TEST_SSL" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 

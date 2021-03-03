@@ -33,11 +33,11 @@ install_apt(){
 }
 
 install_yum(){
-    eval $SUDO yum install python3 python3-pip ruby git curl libpcap-devel chromium wget openssl-devel bind-utils python3-devel libxslt-devel libffi-devel xorg-x11-server-Xvfb libxml2-devel nmap zlib-devel jq python-shodan -y $DEBUG_STD
+    eval $SUDO yum install python3 python3-pip ruby git curl libpcap-devel chromium wget openssl-devel bind-utils python3-devel lynx libxslt-devel libffi-devel xorg-x11-server-Xvfb libxml2-devel nmap zlib-devel jq python-shodan -y $DEBUG_STD
 }
 
 install_pacman(){
-    eval $SUDO pacman -Sy install python python-pip dnsutils ruby curl git libpcap nmap chromium wget jq xorg-server-xvfb tor -y $DEBUG_STD
+    eval $SUDO pacman -Sy install python python-pip dnsutils ruby curl git libpcap nmap chromium wget jq xorg-server-xvfb tor lynx -y $DEBUG_STD
     eval $SUDO systemctl enable --now tor.service $DEBUG_STD
 }
 
@@ -143,7 +143,6 @@ eval go get -u github.com/gwen001/github-endpoints $DEBUG_STD
 eval git clone https://github.com/s0md3v/XSStrike $dir/XSStrike $DEBUG_STD
 eval git clone https://github.com/1ndianl33t/Gf-Patterns $dir/Gf-Patterns $DEBUG_STD
 eval git clone https://github.com/tomnomnom/gf $dir/gf $DEBUG_STD
-eval go get github.com/hakluke/hakrawler $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/projectdiscovery/dnsx/cmd/dnsx $DEBUG_STD
 cp -r $dir/gf/examples ~/.gf
 cp $dir/Gf-Patterns/*.json ~/.gf
