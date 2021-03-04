@@ -57,7 +57,7 @@ for repo in ${repos}; do
         cd "$dir/$(basename $repo)"
         eval git pull origin master $DEBUG_STD
         if [ "massdns" = "$(basename $repo)" ]; then
-            make && $SUDO cp bin/massdns /usr/bin/
+            make && strip -s bin/massdns && $SUDO cp bin/massdns /usr/bin/
         elif [ "Gf-Patterns" = "$(basename $repo)" ]; then
             cp *.json ~/.gf
         elif [ "gf" = "$(basename $repo)" ]; then
