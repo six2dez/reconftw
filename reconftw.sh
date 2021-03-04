@@ -48,6 +48,7 @@ function tools_installed(){
 	eval type -P arjun $DEBUG_STD || { printf "${bred} [*] Arjun		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P github-endpoints $DEBUG_STD || { printf "${bred} [*] github-endpoints		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P gospider $DEBUG_STD || { printf "${bred} [*] gospider		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P wafw00f $DEBUG_STD || { printf "${bred} [*] wafw00f		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P subfinder $DEBUG_STD || { printf "${bred} [*] Subfinder		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P assetfinder $DEBUG_STD || { printf "${bred} [*] Assetfinder		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P findomain $DEBUG_STD || { printf "${bred} [*] Findomain		[NO]${reset}\n"; allinstalled=false;}
@@ -110,6 +111,7 @@ function tools_full(){
 	eval type -P arjun $DEBUG_STD && printf "${bgreen}[*] Arjun		[YES]${reset}\n" || { printf "${bred} [*] Arjun		[NO]${reset}\n"; }
 	eval type -P github-endpoints $DEBUG_STD && printf "${bgreen}[*] github-endpoints	[YES]${reset}\n" || { printf "${bred} [*] github-endpoints	[NO]${reset}\n"; }
 	eval type -P gospider $DEBUG_STD && printf "${bgreen}[*] gospider		[YES]${reset}\n" || { printf "${bred} [*] gospider		[NO]${reset}\n"; }
+	eval type -P wafw00f $DEBUG_STD && printf "${bgreen}[*] wafw00f		[YES]${reset}\n" || { printf "${bred} [*] wafw00f		[NO]${reset}\n"; }
 	eval type -P subfinder $DEBUG_STD && printf "${bgreen}[*] Subfinder		[YES]${reset}\n" || { printf "${bred} [*] Subfinder		[NO]${reset}\n"; }
 	eval type -P assetfinder $DEBUG_STD && printf "${bgreen}[*] Assetfinder		[YES]${reset}\n" || { printf "${bred} [*] Assetfinder	[NO]${reset}\n"; }
 	eval type -P findomain $DEBUG_STD && printf "${bgreen}[*] Findomain		[YES]${reset}\n" || { printf "${bred} [*] Findomain		[NO]${reset}\n"; }
@@ -749,7 +751,7 @@ function waf_checks(){
 			then
 				printf "${bblue} ${bgreen} Looking for WAF DNS History Bypasses ${reset}\n\n"
 				cat webs/webs_wafs.txt | cut -d ";" -f1 > .tmp/waf_subdomains.txt
-				bash $dir/bypass-firewalls-by-DNS-history/bypass-firewalls-by-DNS-history.sh -l .tmp/waf_subdomains.txt -o webs/webs_wafs_dns_bypass.txt
+				bash $dir/bypass-firewalls-by-DNS-history/bypass-firewalls-by-DNS-history.sh -d $domain -l .tmp/waf_subdomains.txt -o webs/webs_wafs_dns_bypass.txt
 				if [ -s "webs/webs_wafs_dns_bypass.txt" ]
 				then
 					text="${bblue}\n Found WAF DNS history bypasses, check webs/webs_wafs_dns_bypass.txt ${reset}\n"
