@@ -751,7 +751,7 @@ function waf_checks(){
 			then
 				printf "${bblue} ${bgreen} Looking for WAF DNS History Bypasses ${reset}\n\n"
 				cat webs/webs_wafs.txt | cut -d ";" -f1 > .tmp/waf_subdomains.txt
-				bash $dir/bypass-firewalls-by-DNS-history/bypass-firewalls-by-DNS-history.sh -d $domain -l .tmp/waf_subdomains.txt -o webs/webs_wafs_dns_bypass.txt
+				bash $tools/bypass-firewalls-by-DNS-history/bypass-firewalls-by-DNS-history.sh -d $domain -l .tmp/waf_subdomains.txt -o webs/webs_wafs_dns_bypass.txt -a
 				if [ -s "webs/webs_wafs_dns_bypass.txt" ]
 				then
 					text="${bblue}\n Found WAF DNS history bypasses, check webs/webs_wafs_dns_bypass.txt ${reset}\n"
