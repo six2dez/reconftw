@@ -89,63 +89,6 @@ function tools_installed(){
 	printf "${bgreen}#######################################################################\n"
 }
 
-function tools_full(){
-
-	printf "\n\n${bgreen}#######################################################################\n"
-	printf "${bblue} Checking installed tools ${reset}\n\n"
-	[ -n "$GOPATH" ] && printf "${bgreen}[*] GOPATH var		[YES]${reset}\n" || { printf "${bred} [*] GOPATH var		[NO]${reset}\n"; }
-	[ -n "$GOROOT" ] && printf "${bgreen}[*] GOROOT var		[YES]${reset}\n" || { printf "${bred} [*] GOROOT var		[NO]${reset}\n"; }
-	[ -n "$PATH" ] && printf "${bgreen}[*] PATH var		[YES]${reset}\n" || { printf "${bred} [*] PATH var		[NO]${reset}\n"; }
-	[ -f $tools/degoogle_hunter/degoogle.py ] && printf "${bgreen}[*] degoogle		[YES]${reset}\n" || printf "${bred} [*] degoogle		[NO]${reset}\n"
-	[ -f $tools/ParamSpider/paramspider.py ] && printf "${bgreen}[*] Paramspider		[YES]${reset}\n" || printf "${bred} [*] Paramspider	[NO]${reset}\n"
-	[ -f $tools/fav-up/favUp.py ] && printf "${bgreen}[*] fav-up		[YES]${reset}\n" || printf "${bred} [*] fav-up		[NO]${reset}\n"
-	[ -f $tools/Corsy/corsy.py ] && printf "${bgreen}[*] Corsy		[YES]${reset}\n" || printf "${bred} [*] Corsy		[NO]${reset}\n"
-	[ -f $tools/testssl.sh/testssl.sh ] && printf "${bgreen}[*] testssl		[YES]${reset}\n" || printf "${bred} [*] testssl		[NO]${reset}\n"
-	[ -f $tools/CMSeeK/cmseek.py ] && printf "${bgreen}[*] CMSeeK		[YES]${reset}\n" || printf "${bred} [*] CMSeeK		[NO]${reset}\n"
-	[ -f $tools/fuzz_wordlist.txt ] && printf "${bgreen}[*] OneListForAll	[YES]${reset}\n" || printf "${bred} [*] OneListForAll	[NO]${reset}\n"
-	[ -f $tools/LinkFinder/linkfinder.py ] && printf "${bgreen}[*] LinkFinder	        [YES]${reset}\n" || printf "${bred} [*] LinkFinder	        [NO]${reset}\n"
-	[ -f $tools/degoogle_hunter/degoogle_hunter.sh ] && printf "${bgreen}[*] degoogle_hunter	[YES]${reset}\n" || printf "${bred} [*] degoogle_hunter	[NO]${reset}\n"
-	[ -f $tools/GitDorker/GitDorker.py ] && printf "${bgreen}[*] GitDorker		[YES]${reset}\n" || printf "${bred} [*] GitDorker		[NO]${reset}\n"
-	[ -f $tools/webscreenshot/webscreenshot.py ] && printf "${bgreen}[*] webscreenshot	[YES]${reset}\n" || printf "${bred} [*] webscreenshot	[NO]${reset}\n"
-	[ -f $tools/getjswords.py ] && printf "${bgreen}[*] getjswords.py	[YES]${reset}\n" || printf "${bred} [*] getjswords.py	[NO]${reset}\n"
-	eval type -P arjun $DEBUG_STD && printf "${bgreen}[*] Arjun		[YES]${reset}\n" || { printf "${bred} [*] Arjun		[NO]${reset}\n"; }
-	eval type -P github-endpoints $DEBUG_STD && printf "${bgreen}[*] github-endpoints	[YES]${reset}\n" || { printf "${bred} [*] github-endpoints	[NO]${reset}\n"; }
-	eval type -P gospider $DEBUG_STD && printf "${bgreen}[*] gospider		[YES]${reset}\n" || { printf "${bred} [*] gospider		[NO]${reset}\n"; }
-	eval type -P wafw00f $DEBUG_STD && printf "${bgreen}[*] wafw00f		[YES]${reset}\n" || { printf "${bred} [*] wafw00f		[NO]${reset}\n"; }
-	eval type -P subfinder $DEBUG_STD && printf "${bgreen}[*] Subfinder		[YES]${reset}\n" || { printf "${bred} [*] Subfinder		[NO]${reset}\n"; }
-	eval type -P assetfinder $DEBUG_STD && printf "${bgreen}[*] Assetfinder		[YES]${reset}\n" || { printf "${bred} [*] Assetfinder	[NO]${reset}\n"; }
-	eval type -P findomain $DEBUG_STD && printf "${bgreen}[*] Findomain		[YES]${reset}\n" || { printf "${bred} [*] Findomain		[NO]${reset}\n"; }
-	eval type -P amass $DEBUG_STD && printf "${bgreen}[*] Amass		[YES]${reset}\n" || { printf "${bred} [*] Amass		[NO]${reset}\n"; }
-	eval type -P crobat $DEBUG_STD && printf "${bgreen}[*] Crobat		[YES]${reset}\n" || { printf "${bred} [*] Crobat		[NO]${reset}\n"; }
-	eval type -P waybackurls $DEBUG_STD && printf "${bgreen}[*] Waybackurls		[YES]${reset}\n" || { printf "${bred} [*] Waybackurls	[NO]${reset}\n"; }
-	eval type -P gau $DEBUG_STD && printf "${bgreen}[*] Gau		        [YES]${reset}\n" || { printf "${bred} [*] Gau		[NO]${reset}\n"; }
-	eval type -P dnsx $DEBUG_STD && printf "${bgreen}[*] dnsx		[YES]${reset}\n" || { printf "${bred} [*] dnsx		[NO]${reset}\n"; }
-	eval type -P shuffledns $DEBUG_STD && printf "${bgreen}[*] ShuffleDns		[YES]${reset}\n" || { printf "${bred} [*] ShuffleDns		[NO]${reset}\n"; }
-	eval type -P cf-check $DEBUG_STD && printf "${bgreen}[*] Cf-check		[YES]${reset}\n" || { printf "${bred} [*] Cf-check		[NO]${reset}\n"; }
-	eval type -P nuclei $DEBUG_STD && printf "${bgreen}[*] Nuclei		[YES]${reset}\n" || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; }
-	[ -d ~/nuclei-templates ] && printf "${bgreen}[*] Nuclei templates  	[YES]${reset}\n" || printf "${bred} [*] Nuclei templates  	[NO]${reset}\n"
-	eval type -P gf $DEBUG_STD && printf "${bgreen}[*] Gf		        [YES]${reset}\n" || { printf "${bred} [*] Gf			[NO]${reset}\n"; }
-	eval type -P Gxss $DEBUG_STD && printf "${bgreen}[*] Gxss		[YES]${reset}\n" || { printf "${bred} [*] Gxss		[NO]${reset}\n"; }
-	eval type -P subjs $DEBUG_STD && printf "${bgreen}[*] subjs		[YES]${reset}\n" || { printf "${bred} [*] subjs		[NO]${reset}\n"; }
-	eval type -P ffuf $DEBUG_STD && printf "${bgreen}[*] ffuf		[YES]${reset}\n" || { printf "${bred} [*] ffuf		[NO]${reset}\n"; }
-	eval type -P massdns $DEBUG_STD && printf "${bgreen}[*] Massdns		[YES]${reset}\n" || { printf "${bred} [*] Massdns		[NO]${reset}\n"; }
-	eval type -P qsreplace $DEBUG_STD && printf "${bgreen}[*] qsreplace		[YES]${reset}\n" || { printf "${bred} [*] qsreplace		[NO]${reset}\n"; }
-	eval type -P interlace $DEBUG_STD && printf "${bgreen}[*] interlace		[YES]${reset}\n" || { printf "${bred} [*] interlace		[NO]${reset}\n"; }
-	eval type -P dnsgen $DEBUG_STD && printf "${bgreen}[*] DnsGen		[YES]${reset}\n" || { printf "${bred} [*] DnsGen		[NO]${reset}\n"; }
-	eval type -P anew $DEBUG_STD && printf "${bgreen}[*] Anew		[YES]${reset}\n" || { printf "${bred} [*] Anew		[NO]${reset}\n"; }
-	eval type -P unfurl $DEBUG_STD && printf "${bgreen}[*] unfurl		[YES]${reset}\n" || { printf "${bred} [*] unfurl		[NO]${reset}\n"; }
-	eval type -P crlfuzz $DEBUG_STD && printf "${bgreen}[*] crlfuzz		[YES]${reset}\n" || { printf "${bred} [*] crlfuzz		[NO]${reset}\n"; }
-	eval type -P httpx $DEBUG_STD && printf "${bgreen}[*] Httpx		[YES]${reset}\n${reset}" || { printf "${bred} [*] Httpx		[NO]${reset}\n${reset}"; }
-	eval type -P jq $DEBUG_STD && printf "${bgreen}[*] jq			[YES]${reset}\n${reset}" || { printf "${bred} [*] jq			[NO]${reset}\n${reset}"; }
-	eval type -P notify $DEBUG_STD && printf "${bgreen}[*] notify		[YES]${reset}\n${reset}" || { printf "${bred} [*] notify		[NO]${reset}\n${reset}"; }
-
-	printf "\n${yellow} If any tool is not installed under $tools, I trust in your ability to install it :D\n Also remember to set the ${bred}\$tools${yellow} variable at the start of this script.\n If you have any problem you can always ping me ;) ${reset}\n\n"
-	printf "${bblue} Tools check finished\n"
-	printf "${bgreen}#######################################################################\n"
-}
-
-
-
 ###############################################################################################################
 ################################################### OSINT #####################################################
 ###############################################################################################################
@@ -192,7 +135,7 @@ function github_dorks(){
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			if [ "$DORKS" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -216,7 +159,7 @@ function metadata(){
 			printf "${bgreen}#######################################################################\n"
 		else
 			if [ "$METADATA" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -245,7 +188,7 @@ function emails(){
 			printf "${bgreen}#######################################################################\n"
 		else
 			if [ "$EMAILS" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -296,7 +239,7 @@ function domain_info(){
 			printf "${bgreen}#######################################################################\n"
 		else
 			if [ "$DOMAIN_INFO" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -414,7 +357,7 @@ function sub_crt(){
 			fi
 		else
 			if [ "$SUBCRT" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -436,7 +379,7 @@ function sub_brute(){
 			fi
 		else
 			if [ "$SUBBRUTE" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -484,7 +427,7 @@ function sub_scraping(){
 			fi
 		else
 			if [ "$SUBSCRAPING" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -538,7 +481,7 @@ function sub_permut(){
 			fi
 		else
 			if [ "$SUBPERMUTE" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -566,7 +509,7 @@ function subtakeover(){
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			if [ "$SUBTAKEOVER" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -578,7 +521,7 @@ function subtakeover(){
 ###############################################################################################################
 
 function webprobe_simple(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$WEBPROBESIMPLE" = true ]
 		then
 			start=`date +%s`
 			printf "${yellow} Running : Http probing${reset}\n\n"
@@ -593,7 +536,11 @@ function webprobe_simple(){
 				printf "${text}" && printf "${text}" | $NOTIFY
 			fi
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			if [ "$WEBPROBESIMPLE" = false ]; then
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -619,7 +566,7 @@ function webprobe_full(){
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			if [ "$WEBPROBEFULL" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -642,7 +589,7 @@ function screenshot(){
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			if [ "$WEBSCREENSHOT" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -677,7 +624,7 @@ function favicon(){
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			if [ "$FAVICON" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -724,7 +671,7 @@ function portscan(){
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			if [ "$PORTSCANNER" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -745,19 +692,8 @@ function waf_checks(){
 			wafw00f -i webs/webs.txt -o .tmp/wafs.txt &>/dev/null
 			cat .tmp/wafs.txt | sed -e 's/^[ \t]*//' -e 's/ \+ /\t/g' -e '/(None)/d' | tr -s "\t" ";" > webs/webs_wafs.txt
 			NUMOFLINES=$(eval cat webs/webs_wafs.txt $DEBUG_ERROR | wc -l)
-			text="${bblue}\n ${NUMOFLINES} websites with waf detected ${reset}\n"
+			text="${bblue}\n ${NUMOFLINES} websites protected by waf ${reset}\n"
 			printf "${text}" && printf "${text}" | $NOTIFY
-			if [ -s "webs/webs_wafs.txt" ] && [ "$WAF_DNS_BYPASS" = true ]
-			then
-				printf "${bblue} ${bgreen} Looking for WAF DNS History Bypasses ${reset}\n\n"
-				cat webs/webs_wafs.txt | cut -d ";" -f1 > .tmp/waf_subdomains.txt
-				bash $tools/bypass-firewalls-by-DNS-history/bypass-firewalls-by-DNS-history.sh -d $domain -l .tmp/waf_subdomains.txt -o webs/webs_wafs_dns_bypass.txt -a
-				if [ -s "webs/webs_wafs_dns_bypass.txt" ]
-				then
-					text="${bblue}\n Found WAF DNS history bypasses, check webs/webs_wafs_dns_bypass.txt ${reset}\n"
-					printf "${text}" && printf "${text}" | $NOTIFY
-				fi
-			fi
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
@@ -766,7 +702,7 @@ function waf_checks(){
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			if [ "$WAF" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -808,7 +744,7 @@ function nuclei_check(){
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			if [ "$NUCLEICHECK" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -838,7 +774,7 @@ function fuzz(){
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			if [ "$FUZZ" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -872,7 +808,7 @@ function cms_scanner(){
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			if [ "$CMS_SCANNER" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -910,7 +846,7 @@ function params(){
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			if [ "$PARAMS" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -979,7 +915,7 @@ function url_gf(){
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			if [ "$URL_GF" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -1011,7 +947,7 @@ function jschecks(){
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			if [ "$JSCHECKS" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -1033,7 +969,7 @@ function wordlist_gen(){
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			if [ "$WORDLIST" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -1062,7 +998,7 @@ function brokenLinks(){
 		printf "${bgreen}#######################################################################\n\n"
 	else
 		if [ "$BROKENLINKS" = false ]; then
-			printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
@@ -1105,7 +1041,7 @@ function xss(){
 		printf "${bgreen}#######################################################################\n\n"
 	else
 		if [ "$XSS" = false ]; then
-			printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
@@ -1127,7 +1063,7 @@ function cors(){
 			printf "${bgreen}#######################################################################\n"
 		else
 			if [ "$CORS" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -1171,7 +1107,7 @@ function open_redirect(){
 			printf "${bgreen}#######################################################################\n"
 		else
 			if [ "$OPEN_REDIRECT" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -1228,7 +1164,7 @@ function ssrf_checks(){
 		printf "${bgreen}#######################################################################\n"
 	else
 		if [ "$SSRF_CHECKS" = false ]; then
-			printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+			printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
@@ -1249,7 +1185,7 @@ function crlf_checks(){
 			printf "${bgreen}#######################################################################\n"
 		else
 			if [ "$CRLF_CHECKS" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -1274,7 +1210,7 @@ function lfi(){
 			printf "${bgreen}#######################################################################\n"
 		else
 			if [ "$LFI" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -1302,7 +1238,7 @@ function ssti(){
 			printf "${bgreen}#######################################################################\n"
 		else
 			if [ "$SSTI" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -1325,7 +1261,7 @@ function sqli(){
 			printf "${bgreen}#######################################################################\n"
 		else
 			if [ "$SQLI" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -1346,7 +1282,7 @@ function test_ssl(){
 			printf "${bgreen}#######################################################################\n"
 		else
 			if [ "$TEST_SSL" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped because is set to false in reconftw.cfg ${reset}\n\n"
+				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -1499,171 +1435,105 @@ function end(){
 ########################################### MODES & MENUS #####################################################
 ###############################################################################################################
 
-function osint(){
-	if [ -n "$list" ]
-	then
-		for domain in $(cat $list); do
-			start
-			domain_info
-			google_dorks
-			github_dorks
-			metadata
-			emails
-			end
-		done
-	else
-		start
-		domain_info
-		google_dorks
-		github_dorks
-		metadata
-		emails
-		end
-	fi
+function passive(){
+	start
+	domain_info
+	google_dorks
+	github_dorks
+	metadata
+	emails
+	SUBSCRAPING=false
+	WEBPROBESIMPLE=false
+	subdomains_full
+	favicon
+	PORTSCAN_ACTIVE=false
+	portscan
+	end
 }
 
 function all(){
-	if [ -n "$list" ]
-	then
-		for domain in $(cat $list); do
-			start
-			domain_info
-			google_dorks
-			subdomains_full
-			subtakeover
-			webprobe_full
-			screenshot
-			favicon
-			portscan
-			waf_checks
-			nuclei_check
-			github_dorks
-			cms_scanner
-			fuzz
-			cors
-			params
-			urlchecks
-			wordlist_gen
-			url_gf
-			open_redirect
-			ssrf_checks
-			crlf_checks
-			lfi
-			ssti
-			sqli
-			jschecks
-			xss
-			brokenLinks
-			test_ssl
-			end
-		done
-	else
-		start
-		domain_info
-		google_dorks
-		subdomains_full
-		subtakeover
-		webprobe_full
-		screenshot
-		favicon
-		portscan
-		waf_checks
-		nuclei_check
-		github_dorks
-		cms_scanner
-		fuzz
-		cors
-		params
-		urlchecks
-		wordlist_gen
-		url_gf
-		open_redirect
-		ssrf_checks
-		crlf_checks
-		lfi
-		ssti
-		sqli
-		jschecks
-		xss
-		brokenLinks
-		test_ssl
-		end
-	fi
+	start
+	domain_info
+	google_dorks
+	github_dorks
+	metadata
+	emails
+	subdomains_full
+	subtakeover
+	webprobe_full
+	screenshot
+	favicon
+	portscan
+	waf_checks
+	nuclei_check
+	cms_scanner
+	fuzz
+	cors
+	params
+	urlchecks
+	wordlist_gen
+	url_gf
+	open_redirect
+	ssrf_checks
+	crlf_checks
+	lfi
+	ssti
+	sqli
+	jschecks
+	xss
+	brokenLinks
+	test_ssl
+	end
 }
 
 function recon(){
-	if [ -n "$list" ]
-	then
-		for domain in $(cat $list); do
-			start
-			domain_info
-			google_dorks
-			github_dorks
-			metadata
-			emails
-			subdomains_full
-			subtakeover
-			webprobe_full
-			screenshot
-			favicon
-			portscan
-			waf_checks
-			nuclei_check
-			cms_scanner
-			fuzz
-			params
-			urlchecks
-			wordlist_gen
-			url_gf
-			jschecks
-			test_ssl
-			end
-		done
-	else
-		start
-		domain_info
-		google_dorks
-		github_dorks
-		metadata
-		emails
-		subdomains_full
-		subtakeover
-		webprobe_full
-		screenshot
-		favicon
-		portscan
-		waf_checks
-		nuclei_check
-		cms_scanner
-		fuzz
-		params
-		urlchecks
-		wordlist_gen
-		url_gf
-		jschecks
-		test_ssl
-		end
-	fi
+	start
+	domain_info
+	google_dorks
+	github_dorks
+	metadata
+	emails
+	subdomains_full
+	subtakeover
+	webprobe_full
+	screenshot
+	favicon
+	portscan
+	waf_checks
+	nuclei_check
+	cms_scanner
+	fuzz
+	params
+	urlchecks
+	wordlist_gen
+	url_gf
+	jschecks
+	end
+}
+
+function subs_menu(){
+	start
+	subdomains_full
+	subtakeover
+	end
 }
 
 function help(){
-	printf "\n Usage: $0 [-d DOMAIN] [-l list.txt] [-x oos.txt] [-r] [-a] [-s] [-g]"
-	printf "\n           	      [-t] [-w] [-i] [-v] [-h] [--deep] [--fs] [-o OUTPUT]\n\n"
+	printf "\n Usage: $0 [-d DOMAIN] [-l list.txt] [-x oos.txt] [-r] [-s] [-p] "
+	printf "\n           	      [-a] [-w] [-i] [-v] [-h] [--deep] [--fs] [-o OUTPUT]\n\n"
 	printf " ${bblue}TARGET OPTIONS${reset}\n"
 	printf "   -d DOMAIN        Target domain\n"
 	printf "   -l list.txt      Targets list, one per line\n"
 	printf "   -x oos.txt       Exclude subdomains list (Out Of Scope)\n"
 	printf " \n"
 	printf " ${bblue}MODE OPTIONS${reset}\n"
-	printf "   -r               Perform complete recon\n"
-	printf "   -a               Perform all checks and exploits\n"
-	printf "   -s               Full subdomains scan (Subs, tko and probe)\n"
-	printf "   -g               Gentle mode (Dorks, Subs, ports, nuclei, fuzz, cors and ssl)\n"
-	printf "   -w               Perform web checks only without subs ${yellow}(-l required)${reset}\n"
-	printf "   -t               Osint mode, completely passive \n"
-	printf "   -i               Check all needed tools\n"
-	printf "   -v               Debug/verbose mode, no file descriptor redir\n"
-	printf "   -h               Show this help\n"
+	printf "   -r               Recon - Full recon process (only recon without attacks)\n"
+	printf "   -s               Subdomains - Search subdomains, check tko and web probe\n"
+	printf "   -p               Passive - Performs only passive steps \n"
+	printf "   -a               All - Perform all checks and exploitations\n"
+	printf "   -w               Web - Just web checks from list provided${reset}\n"
+	printf "   -v               Verbose - Prints everything including errors, for debug purposes\n"
+	printf "   -h               Help - Show this help\n"
 	printf " \n"
 	printf " ${bblue}GENERAL OPTIONS${reset}\n"
 	printf "   --deep           Deep scan (Enable some slow options for deeper scan)\n"
@@ -1671,8 +1541,8 @@ function help(){
 	printf "   -o output/path   Define output folder\n"
 	printf " \n"
 	printf " ${bblue}USAGE EXAMPLES${reset}\n"
-	printf " Full recon:\n"
-	printf " ./reconftw.sh -d example.com -a\n"
+	printf " Recon:\n"
+	printf " ./reconftw.sh -d example.com -r\n"
 	printf " \n"
 	printf " Subdomain scanning with multiple targets:\n"
 	printf " ./reconftw.sh -l targets.txt -s\n"
@@ -1697,7 +1567,7 @@ then
    exit
 fi
 
-while getopts ":hd:-:l:x:vairsxwgto:" opt; do
+while getopts ":hd:-:l:x:varspxwo:" opt; do
 	general=$@
 	if [[ $general == *"-v"* ]]; then
   		unset DEBUG_STD
@@ -1722,23 +1592,34 @@ while getopts ":hd:-:l:x:vairsxwgto:" opt; do
 				exit
 			fi
 			;;
-		s ) if [ -n "$list" ]
+		r ) if [ -n "$list" ]
 			then
 				for domain in $(cat $list); do
-					start
-					subdomains_full
-					subtakeover
-					end
+					recon
 				done
 			else
-				start
-				subdomains_full
-				subtakeover
-				end
+				recon
 			fi
 			exit
 			;;
-		a ) all
+		s ) if [ -n "$list" ]
+			then
+				for domain in $(cat $list); do
+					subs_menu
+				done
+			else
+				subs_menu
+			fi
+			exit
+			;;
+		a ) if [ -n "$list" ]
+			then
+				for domain in $(cat $list); do
+					all
+				done
+			else
+				all
+			fi
 			exit
 			;;
 		w ) start
@@ -1772,29 +1653,14 @@ while getopts ":hd:-:l:x:vairsxwgto:" opt; do
 			end
 			exit
 			;;
-		t ) osint
-			exit
-			;;
-		r ) recon
-			exit
-			;;
-		i ) tools_full
-			exit
-			;;
-		g ) start
-			PORTSCAN_ACTIVE=false
-			domain_info
-			google_dorks
-			subdomains_full
-			subtakeover
-			webprobe_full
-			screenshot
-			favicon
-			portscan
-			github_dorks
-			cms_scanner
-			cors
-			end
+		p ) if [ -n "$list" ]
+			then
+				for domain in $(cat $list); do
+					passive
+				done
+			else
+				passive
+			fi
 			exit
 			;;
 		o ) dir_output=$OPTARG
