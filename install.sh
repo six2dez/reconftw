@@ -172,7 +172,6 @@ eval git clone https://github.com/obheda12/GitDorker $dir/GitDorker $DEBUG_STD
 printf "${bgreen} 70%% done${reset}\n\n"
 eval git clone https://github.com/ProjectAnte/dnsgen $dir/dnsgen $DEBUG_STD
 eval git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh $DEBUG_STD
-eval git clone https://github.com/maaaaz/webscreenshot $dir/webscreenshot $DEBUG_STD
 eval git clone https://github.com/laramies/theHarvester $dir/theHarvester $DEBUG_STD
 printf "${bgreen} 80%% done${reset}\n\n"
 if [ "True" = "$IS_ARM" ]
@@ -211,7 +210,8 @@ eval wget -O ssrf.py https://gist.githubusercontent.com/h4ms1k/adcc340495d418fcd
 eval wget -O fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD
 eval wget -O lfi_wordlist.txt https://raw.githubusercontent.com/xmendez/wfuzz/master/wordlist/vulns/dirTraversal-nix.txt $DEBUG_STD
 eval wget -nc -O ~/.config/notify/notify.conf https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw/a66c4d8cf47a3bc95f5e9ba84773428662ea760c/notify_sample.conf $DEBUG_ERROR
-
+eval wget -O ${GOPATH}/bin/gowitness https://github.com/sensepost/gowitness/releases/download/2.3.3/gowitness-2.3.3-linux-amd64 $DEBUG_STD
+eval chmod 755 ${GOPATH}/bin/gowitness $DEBUG_STD
 sed -i 's/^miscellaneous/#miscellaneous/' ~/nuclei-templates/.nuclei-ignore
 
 #stripping all Go binaries
