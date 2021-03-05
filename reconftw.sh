@@ -540,7 +540,7 @@ portscan(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$PORTSCANNER" = true ]
 		then
 			printf "${bgreen}#######################################################################\n"
-			printf "${bblue} Running : Port Scan ${reset}\n\n"
+			printf "${bblue} Running : Port Scan ${reset}\n\n" | $NOTIFY
 			start=`date +%s`
 			for sub in $(cat ${domain}_subdomains.txt); do
 				echo "$sub $(dig +short a $sub | tail -n1)" | anew -q ${domain}_subdomains_ips.txt
