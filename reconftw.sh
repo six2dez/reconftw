@@ -831,7 +831,7 @@ favicon(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$FAVICON" = true ]
 		then
 			printf "${bgreen}#######################################################################\n"
-			printf "${bblue} Running : FavIcon Hash Extraction ${reset}\n\n"
+			printf "${bblue} Running : FavIcon Hash Extraction ${reset}\n\n" | $NOTIFY
 			start=`date +%s`
 			cd $tools/fav-up
 			eval shodan init $SHODAN_API_KEY $DEBUG_STD
