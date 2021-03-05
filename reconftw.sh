@@ -103,7 +103,8 @@ function google_dorks(){
 		sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" osint/dorks.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 		end=`date +%s`
 		getElapsedTime $start $end
-		printf "$\n${bblue} Finished in ${runtime} Happy hunting! ${reset}\n"
+		text="$\n${bblue} Google Dorks finished in ${runtime} Happy hunting! ${reset}\n"
+		printf "${text}" && printf "${text}" | $NOTIFY
 		printf "${bgreen}#######################################################################\n"
 	else
 		printf "${yellow} ${FUNCNAME[0]} are already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -130,7 +131,8 @@ function github_dorks(){
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${bblue}\n GitHub Dorks Finished in ${runtime}\n"
+			text="${bblue}\n GitHub Dorks Finished in ${runtime}\n"
+			printf "${text}" && printf "${text}" | $NOTIFY
 			printf "${bblue} Results are saved in osint/gitdorks.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -154,7 +156,8 @@ function metadata(){
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${bblue}\n Metadata scan in ${runtime}${reset}\n"
+			text="${bblue}\n Metadata scan finished in ${runtime}${reset}\n"
+			printf "${text}" && printf "${text}" | $NOTIFY
 			printf "${bblue} Results are saved in osint folder ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
@@ -183,7 +186,8 @@ function emails(){
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${bblue}\n Emails Search Finished in ${runtime}${reset}\n"
+			text="${bblue}\n Emails Search Finished in ${runtime}${reset}\n"
+			printf "${text}" && printf "${text}" | $NOTIFY
 			printf "${bblue} Results are saved in osint folder ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
@@ -234,7 +238,8 @@ function domain_info(){
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${bblue}\n Domain Info Search Finished in ${runtime}${reset}\n"
+			text="${bblue}\n Domain Info Search Finished in ${runtime}${reset}\n"
+			printf "${text}" && printf "${text}" | $NOTIFY
 			printf "${bblue} Results are saved in osint folder ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
@@ -310,7 +315,8 @@ function sub_passive(){
 			end=`date +%s`
 			getElapsedTime $start $end
 			if [ "$NUMOFLINES" -gt 0 ]; then
-				printf "${green} ${NUMOFLINES} new subdomains by passive found in ${runtime}${reset}\n\n"
+				text="${green} ${NUMOFLINES} new subdomains by passive found in ${runtime}${reset}\n\n"
+				printf "${text}" && printf "${text}" | $NOTIFY
 			fi
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -353,7 +359,8 @@ function sub_crt(){
 			end=`date +%s`
 			getElapsedTime $start $end
 			if [ "$NUMOFLINES" -gt 0 ]; then
-				printf "${green} ${NUMOFLINES} new subdomains by certificate transparency found in ${runtime}${reset}\n\n"
+				text="${green} ${NUMOFLINES} new subdomains by certificate transparency found in ${runtime}${reset}\n\n"
+				printf "${text}" && printf "${text}" | $NOTIFY
 			fi
 		else
 			if [ "$SUBCRT" = false ]; then
@@ -375,7 +382,8 @@ function sub_brute(){
 			end=`date +%s`
 			getElapsedTime $start $end
 			if [ "$NUMOFLINES" -gt 0 ]; then
-				printf "${green} ${NUMOFLINES} new subdomains by bruteforce found in ${runtime}${reset}\n\n"
+				text="${green} ${NUMOFLINES} new subdomains by bruteforce found in ${runtime}${reset}\n\n"
+				printf "${text}" && printf "${text}" | $NOTIFY
 			fi
 		else
 			if [ "$SUBBRUTE" = false ]; then
@@ -402,7 +410,8 @@ function sub_dns(){
 			end=`date +%s`
 			getElapsedTime $start $end
 			if [ "$NUMOFLINES" -gt 0 ]; then
-				printf "${green} ${NUMOFLINES} new subdomains by dns resolution found in ${runtime}${reset}\n\n"
+				text="${green} ${NUMOFLINES} new subdomains by dns resolution found in ${runtime}${reset}\n\n"
+				printf "${text}" && printf "${text}" | $NOTIFY
 			fi
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -423,7 +432,8 @@ function sub_scraping(){
 			end=`date +%s`
 			getElapsedTime $start $end
 			if [ "$NUMOFLINES" -gt 0 ]; then
-				printf "${green} ${NUMOFLINES} new subdomains by scraping found in ${runtime}${reset}\n\n"
+				text="${green} ${NUMOFLINES} new subdomains by scraping found in ${runtime}${reset}\n\n"
+				printf "${text}" && printf "${text}" | $NOTIFY
 			fi
 		else
 			if [ "$SUBSCRAPING" = false ]; then
@@ -477,7 +487,8 @@ function sub_permut(){
 			end=`date +%s`
 			getElapsedTime $start $end
 			if [ "$NUMOFLINES" -gt 0 ]; then
-				printf "${green} ${NUMOFLINES} new subdomains by permutations found in ${runtime}${reset}\n\n"
+				text="${green} ${NUMOFLINES} new subdomains by permutations found in ${runtime}${reset}\n\n"
+				printf "${text}" && printf "${text}" | $NOTIFY
 			fi
 		else
 			if [ "$SUBPERMUTE" = false ]; then
@@ -502,9 +513,10 @@ function subtakeover(){
 			getElapsedTime $start $end
 			if [ "$NUMOFLINES" -gt 0 ]; then
 				text="${bred}\n ${NUMOFLINES} new possible takeovers found in ${runtime}${reset}\n\n"
+				printf "${text}" && printf "${text}" | $NOTIFY
 			fi
+			text="${bblue}\n Subdomain Takeover Finished\n"
 			printf "${text}" && printf "${text}" | $NOTIFY
-			printf "${bblue}\n Subdomain Takeover Finished\n"
 			printf "${bblue} Results are saved in webs/takeover.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -584,7 +596,8 @@ function screenshot(){
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${bblue}\n Web Screenshot Finished in ${runtime}\n"
+			text="${bblue}\n Web Screenshot Finished in ${runtime}\n"
+			printf "${text}" && printf "${text}" | $NOTIFY
 			printf "${bblue} Results are saved in screenshots folder${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -619,7 +632,8 @@ function favicon(){
 			cd $dir && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${bblue}\n FavIcon Hash Extraction Finished in ${runtime}\n"
+			text="${bblue}\n FavIcon Hash Extraction Finished in ${runtime}\n"
+			printf "${text}" && printf "${text}" | $NOTIFY
 			printf "${bblue} Results are saved in hosts/favicontest.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -769,7 +783,8 @@ function fuzz(){
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${bblue}\n Directory Fuzzing Finished in ${runtime}\n"
+			text="${bblue}\n Directory Fuzzing Finished in ${runtime}\n"
+			printf "${text}" && printf "${text}" | $NOTIFY
 			printf "${bblue} Results are saved in fuzzing/*subdomain*.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -803,7 +818,8 @@ function cms_scanner(){
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${bblue}\n CMS Scanner finished in ${runtime}\n"
+			text="${bblue}\n CMS Scanner finished in ${runtime}\n"
+			printf "${text}" && printf "${text}" | $NOTIFY
 			printf "${bblue} Results are saved in cms/*subdomain* folder${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -841,7 +857,8 @@ function params(){
 			fi
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${bblue}\n Parameter Discovery Finished in ${runtime}\n"
+			text="${bblue}\n Parameter Discovery Finished in ${runtime}\n"
+			printf "${text}" && printf "${text}" | $NOTIFY
 			printf "${bblue} Results are saved in webs/param.txt${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -910,7 +927,8 @@ function url_gf(){
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${bblue}\n Vulnerable Pattern Search Finished in ${runtime}\n"
+			text="${bblue}\n Vulnerable Pattern Search Finished in ${runtime}\n"
+			printf "${text}" && printf "${text}" | $NOTIFY
 			printf "${bblue} Results are saved in gf folder${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -942,7 +960,8 @@ function jschecks(){
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${bblue}\n Javascript Scan Finished in ${runtime}\n"
+			text="${bblue}\n Javascript Scan Finished in ${runtime}\n"
+			printf "${text}" && printf "${text}" | $NOTIFY
 			printf "${bblue} Results are saved in js folder${reset}\n"
 			printf "${bgreen}#######################################################################\n\n"
 		else
@@ -992,6 +1011,7 @@ function brokenLinks(){
 		getElapsedTime $start $end
 		if [ "$NUMOFLINES" -gt 0 ]; then
 			text="${bred}\n ${NUMOFLINES} new broken links found in ${runtime}${reset}\n\n"
+			printf "${text}" && printf "${text}" | $NOTIFY
 		fi
 		printf "${bblue}\n Broken links checks Finished in ${runtime}\n"
 		printf "${bblue} Results are saved in webs/brokenLinks.txt ${reset}\n"
@@ -1036,7 +1056,8 @@ function xss(){
 		fi
 		end=`date +%s`
 		getElapsedTime $start $end
-		printf "${bblue}\n XSS Analysis Finished in ${runtime}\n"
+		text="${bblue}\n XSS Analysis Finished in ${runtime}\n"
+		printf "${text}" && printf "${text}" | $NOTIFY
 		printf "${bblue} Results are saved in vulns/xss.txt${reset}\n"
 		printf "${bgreen}#######################################################################\n\n"
 	else
@@ -1058,7 +1079,8 @@ function cors(){
 			eval cat webs/cors.txt $DEBUG_ERROR && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${bblue}\n CORS Scan Finished in ${runtime}\n"
+			text="${bblue}\n CORS Scan Finished in ${runtime}\n"
+			printf "${text}" && printf "${text}" | $NOTIFY
 			printf "${bblue} Results are saved in webs/cors.txt ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
@@ -1083,7 +1105,8 @@ function open_redirect(){
 				touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
 				getElapsedTime $start $end
-				printf "${bblue}\n Open Redirects Finished in ${runtime}\n"
+				text="${bblue}\n Open Redirects Finished in ${runtime}\n"
+				printf "${text}" && printf "${text}" | $NOTIFY
 				printf "${bblue} Results are saved in vulns/openredirex.txt ${reset}\n"
 				printf "${bgreen}#######################################################################\n"
 			else
@@ -1098,7 +1121,8 @@ function open_redirect(){
 					touch $called_fn_dir/.${FUNCNAME[0]}
 					end=`date +%s`
 					getElapsedTime $start $end
-					printf "${bblue}\n Open Redirects Finished in ${runtime}\n"
+					text="${bblue}\n Open Redirects Finished in ${runtime}\n"
+					printf "${text}" && printf "${text}" | $NOTIFY
 					printf "${bblue} Results are saved in vulns/redirect.txt ${reset}\n"
 				else
 					printf "${bred} Skipping Open redirects: Too Much URLs to test, try with --deep flag${reset}\n"
@@ -1135,7 +1159,8 @@ function ssrf_checks(){
 				touch $called_fn_dir/.${FUNCNAME[0]}
 				end=`date +%s`
 				getElapsedTime $start $end
-				printf "${bblue}\n SSRF Finished in ${runtime}\n"
+				text="${bblue}\n SSRF Finished in ${runtime}, check your callback server\n"
+				printf "${text}" && printf "${text}" | $NOTIFY
 				printf "${bblue} Results are saved in ssrf_confirmed.txt ${reset}\n"
 			else
 				if [[ $(cat gf/ssrf.txt | wc -l) -le 1000 ]]
@@ -1152,7 +1177,8 @@ function ssrf_checks(){
 					touch $called_fn_dir/.${FUNCNAME[0]}
 					end=`date +%s`
 					getElapsedTime $start $end
-					printf "${bblue}\n SSRF Finished in ${runtime}, check your callback server\n"
+					text="${bblue}\n SSRF Finished in ${runtime}, check your callback server\n"
+					printf "${text}" && printf "${text}" | $NOTIFY
 					printf "${bblue} Results are saved in vulns/ssrf.txt ${reset}\n"
 				else
 					printf "${bred} Skipping SSRF: Too Much URLs to test, try with --deep flag${reset}\n"
@@ -1180,7 +1206,8 @@ function crlf_checks(){
 			eval crlfuzz -l webs/webs.txt -o vulns/crlf.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${bblue}\n CRLF Finished in ${runtime}${reset}\n"
+			text="${bblue}\n CRLF Finished in ${runtime}${reset}\n"
+			printf "${text}" && printf "${text}" | $NOTIFY
 			printf "${bblue} Results are saved in crlf.txt ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
@@ -1205,7 +1232,8 @@ function lfi(){
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${bblue}\n LFI Finished in ${runtime}${reset}\n"
+			text="${bblue}\n LFI Finished in ${runtime}${reset}\n"
+			printf "${text}" && printf "${text}" | $NOTIFY
 			printf "${bblue} Results are saved in lfi.txt ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
@@ -1233,7 +1261,8 @@ function ssti(){
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${bblue}\n SSTI Finished in ${runtime}${reset}\n"
+			text="${bblue}\n SSTI Finished in ${runtime}${reset}\n"
+			printf "${text}" && printf "${text}" | $NOTIFY
 			printf "${bblue} Results are saved in ssti.txt ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
@@ -1256,7 +1285,8 @@ function sqli(){
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${bblue}\n SQLi Finished in ${runtime}${reset}\n"
+			text="${bblue}\n SQLi Finished in ${runtime}${reset}\n"
+			printf "${text}" && printf "${text}" | $NOTIFY
 			printf "${bblue} Results are saved in sqlmap folder ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
@@ -1277,7 +1307,8 @@ function test_ssl(){
 			eval $tools/testssl.sh/testssl.sh --quiet --color 0 -U -iL hosts/ips.txt $DEBUG_ERROR > hosts/testssl.txt && touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
-			printf "${bblue}\n SSL Test Finished in ${runtime}\n"
+			text="${bblue}\n SSL Test Finished in ${runtime}\n"
+			printf "${text}" && printf "${text}" | $NOTIFY
 			printf "${bblue} Results are saved in hosts/testssl.txt ${reset}\n"
 			printf "${bgreen}#######################################################################\n"
 		else
