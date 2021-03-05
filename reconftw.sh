@@ -858,7 +858,7 @@ fuzz(){
 		then
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} Running : Directory Fuzzing ${reset}\n" | $NOTIFY
-			printf "${yellow}\n\n Fuzzing subdomains with ${fuz z_wordlist}${reset}\n\n" | $NOTIFY
+			printf "${yellow}\n\n Fuzzing subdomains with ${fuzz_wordlist}${reset}\n\n" | $NOTIFY
 			start=`date +%s`
 			mkdir -p $dir/fuzzing
 			for sub in $(cat ${domain}_probed.txt); do
