@@ -548,7 +548,7 @@ portscan(){
 
 			cat ${domain}_subdomains_ips.txt | cut -d ' ' -f2 | cf-check -c $NPROC | egrep -iv "^(127|10|169|172|192)\." | anew -q .tmp/${domain}_ips_nowaf.txt
 
-			printf "${bblue}\n Resolved IP addresses (No WAF) ${reset}\n\n"; | $NOTIFY
+			printf "${bblue}\n Resolved IP addresses (No WAF) ${reset}\n\n" | $NOTIFY
 			eval cat .tmp/${domain}_ips_nowaf.txt $DEBUG_ERROR | sort
 
 			if [ "$PORTSCAN_PASSIVE" = true ]
