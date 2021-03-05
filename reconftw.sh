@@ -617,7 +617,7 @@ urlchecks(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]
 		then
 			printf "${bgreen}#######################################################################\n"
-			printf "${bblue} Running : URL Extraction ${reset}\n\n"
+			printf "${bblue} Running : URL Extraction ${reset}\n\n" | $NOTIFY
 			start=`date +%s`
 			cat ${domain}_probed.txt | waybackurls | anew -q .tmp/${domain}_url_extract_tmp.txt
 			cat ${domain}_probed.txt | gau | anew -q .tmp/${domain}_url_extract_tmp.txt
