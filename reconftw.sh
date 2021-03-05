@@ -803,7 +803,7 @@ github(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$GITHUB" = true ]
 		then
 			printf "${bgreen}#######################################################################\n"
-			printf "${bblue} Running : GitHub Scanning ${reset}\n\n"
+			printf "${bblue} Running : GitHub Scanning ${reset}\n\n" | $NOTIFY
 			start=`date +%s`
 			if [ -s "${GITHUB_TOKENS}" ]
 			then
