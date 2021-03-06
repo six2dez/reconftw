@@ -37,7 +37,6 @@
 - [Sample Video](#sample-video)
 - [:fire: Features :fire:](#fire-features-fire)
 - [Mindmap/Workflow](#mindmapworkflow)
-- [:hourglass: Improvement plan :hourglass:](#hourglass-improvement-plan-hourglass)
 - [Thanks](#thanks)
 
 # Summary
