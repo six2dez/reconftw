@@ -35,8 +35,9 @@
 - [Usage](#usage)
 - [Running reconFTW](#running-reconftw)
 - [Sample Video](#sample-video)
-- [:fire: Features :fire:](#fire-features-fire)
+- [Features](#fire-features-fire)
 - [Mindmap/Workflow](#mindmapworkflow)
+- [Contribute](#how-to-contribute)
 - [Thanks](#thanks)
 
 # Summary
