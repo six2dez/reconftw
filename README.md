@@ -179,13 +179,13 @@ resolvers=${tools}/resolvers.txt
 
 | Flag | Description |
 |------|-------------|
-| -a | Perform full recon |
-| -s | Full subdomain scan (Subs, tko and probe) |
-| -g | Gentle mode (Dorks, Subs, webprobe, screenshots, ports passive, favicon, cms and cors ) |
-| -w | Perform web checks only without subs (-l required) |
-| -i | Check whether tools required are present or not |
-| -v | Verbose/Debug Mode |
-| -h | Show help section |
+| -r | Recon - Full recon process (only recon without attacks) |
+| -s | Subdomains - Search subdomains, check tko and web probe |
+| -p | Passive - Performs only passive steps |
+| -a | All - Perform all checks and exploitations |
+| -w | Web - Just web checks from list provided |
+| -v | Verbose - Prints everything including errors, for debug purposes |
+| -h | Help - Show this help |
 
 **GENERAL OPTIONS**
 
@@ -200,31 +200,25 @@ resolvers=${tools}/resolvers.txt
 **To perform a full recon on single target** *(may take a significant time)*
 
 ```bash
-▶ ./reconftw.sh -d example.com -a
+▶ ./reconftw.sh -d example.com -r
 ```
 
 **To perfrom a full recon on a list of targets**
 
 ```bash
-▶ ./reconftw.sh -l sites.txt -a -o /output/directory/
+▶ ./reconftw.sh -l sites.txt -r -o /output/directory/
 ```
 
 **Perform full recon with more intense tasks** *(VPS intended)*
 
 ```bash
-▶ ./reconftw.sh -d example.com -a --deep -o /output/directory/
+▶ ./reconftw.sh -d example.com -r --deep -o /output/directory/
 ```
 
 **Perform a wide scope recon on a target**   *(may include false positives)*
 
 ```bash
-▶ ./reconftw.sh -d example.com -a --fs -o /output/directory/
-```
-
-**Check whether all required tools are present or not**
-
-```bash
-▶ ./reconftw.sh -i
+▶ ./reconftw.sh -d example.com -r --fs -o /output/directory/
 ```
 
 **Show help section**
@@ -239,27 +233,32 @@ resolvers=${tools}/resolvers.txt
 
 ## :fire: Features :fire:
 
+- Domain information parser ([domainbigdata](https://domainbigdata.com/))
+- Emails addresses and users ([theHarvester](https://github.com/laramies/theHarvester))
+- Password leaks ([pwndb](https://github.com/davidtavarez/pwndb))
+- Metadata finder ([MetaFinder](https://github.com/Josue87/MetaFinder))
 - Google Dorks ([degoogle_hunter](https://github.com/six2dez/degoogle_hunter))
+- Github Dorks ([GitDorker](https://github.com/obheda12/GitDorker))  
 - Multiple subdomain enumeration techniques (passive, bruteforce, permutations and scraping)
   - Passive ([subfinder](https://github.com/projectdiscovery/subfinder), [assetfinder](https://github.com/tomnomnom/assetfinder), [amass](https://github.com/OWASP/Amass), [findomain](https://github.com/Findomain/Findomain), [crobat](https://github.com/cgboal/sonarsearch), [waybackurls](https://github.com/tomnomnom/waybackurls))
   - Certificate transparency ([crtfinder](https://github.com/eslam3kl/crtfinder), [tls.bufferover](tls.bufferover.run) and [dns.bufferover](dns.bufferover.run)))
   - Bruteforce ([shuffledns](https://github.com/projectdiscovery/shuffledns))  
   - Permutations ([dnsgen](https://github.com/ProjectAnte/dnsgen))  
-  - Source Code Scraping ([hakrawler](https://github.com/hakluke/hakrawler))  
+  - Source Code Scraping ([gospider](https://github.com/jaeles-project/gospider))  
   - CNAME Records ([dnsx](https://github.com/projectdiscovery/dnsx))
 - Nuclei Sub TKO templates ([nuclei](https://github.com/projectdiscovery/nuclei))  
 - Web Prober ([httpx](https://github.com/projectdiscovery/httpx))  
 - Web screenshot ([webscreenshot](https://github.com/maaaaz/webscreenshot))  
 - Template scanner ([nuclei](https://github.com/projectdiscovery/nuclei))  
+- IP and subdomains WAF checker ([cf-check](https://github.com/dwisiswant0/cf-check) and [wafw00f](https://github.com/EnableSecurity/wafw00f))
 - Port Scanner (Active with [nmap](https://github.com/nmap/nmap) and passive with [shodan-cli](https://cli.shodan.io/))  
-- Url extraction ([waybackurls](https://github.com/tomnomnom/waybackurls), [gau](https://github.com/lc/gau), [hakrawler](https://github.com/hakluke/hakrawler), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3))  
+- Url extraction ([waybackurls](https://github.com/tomnomnom/waybackurls), [gau](https://github.com/lc/gau), [gospider](https://github.com/jaeles-project/gospider), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3))  
 - Pattern Search ([gf](https://github.com/tomnomnom/gf) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns))  
 - Param discovery ([paramspider](https://github.com/devanshbatham/ParamSpider) and [arjun](https://github.com/s0md3v/Arjun))  
 - XSS ([XSStrike](https://github.com/s0md3v/XSStrike))  
 - Open redirect ([Openredirex](https://github.com/devanshbatham/OpenRedireX))  
 - SSRF (headers [asyncio_ssrf.py](https://gist.github.com/h4ms1k/adcc340495d418fcd72ec727a116fea2) and param values with [ffuf](https://github.com/ffuf/ffuf))  
 - CRLF ([crlfuzz](https://github.com/dwisiswant0/crlfuzz))  
-- Github ([GitDorker](https://github.com/obheda12/GitDorker))  
 - Favicon Real IP ([fav-up](https://github.com/pielco11/fav-up))  
 - Javascript analysis ([LinkFinder](https://github.com/GerbenJavado/LinkFinder), scripts from [JSFScan](https://github.com/KathanP19/JSFScan.sh))  
 - Fuzzing ([ffuf](https://github.com/ffuf/ffuf))  
@@ -271,23 +270,19 @@ resolvers=${tools}/resolvers.txt
 - SSL tests ([testssl](https://github.com/drwetter/testssl.sh))  
 - Multithread in some steps ([Interlace](https://github.com/codingo/Interlace))  
 - Broken Links Checker (manual/wget spider)
-- Gentle mode (only passive and low noise steps)
 - Docker support  
 - Custom output folder  
 - Polished installer compatible with most distros  
-- Verbose mode  
 - Diff support for continuous running (cron mode) 
 - Update tools script  
 - Raspberry Pi support  
-
-
+- 5 modes (recon, passive, subdomains, web and all)
 - Out of Scope Support
-
 - Notification support for Slack, Discord and Telegram ([notify](https://github.com/projectdiscovery/notify))
 
 ## Mindmap/Workflow
 
-![Mindmap](images/mindmap_updated.png)
+![Mindmap](images/mindmap.png)
 
 
 
