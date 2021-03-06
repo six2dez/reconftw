@@ -23,20 +23,22 @@ else
 fi
 
 printf "\n\n${bgreen}#######################################################################\n"
-printf "${bgreen} reconftw installer script ${reset}\n\n"
+printf "${bgreen} reconFTW installer script ${reset}\n\n"
 
 install_apt(){
     eval $SUDO apt install chromium-browser -y $DEBUG_STD
     eval $SUDO apt install chromium -y $DEBUG_STD
-    eval $SUDO apt install python3 python3-pip ruby git curl libpcap-dev wget python-dev python3-dev dnsutils build-essential xvfb libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq python3-shodan -y $DEBUG_STD
+    eval $SUDO apt install python3 python3-pip ruby git curl libpcap-dev wget python-dev python3-dev dnsutils build-essential xvfb libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq python3-shodan apt-transport-https lynx tor -y $DEBUG_STD
+    eval $SUDO systemctl enable tor $DEBUG_STD
 }
 
 install_yum(){
-    eval $SUDO yum install python3 python3-pip ruby git curl libpcap-devel chromium wget openssl-devel bind-utils python3-devel libxslt-devel libffi-devel xorg-x11-server-Xvfb libxml2-devel nmap zlib-devel jq python-shodan -y $DEBUG_STD
+    eval $SUDO yum install python3 python3-pip ruby git curl libpcap-devel chromium wget openssl-devel bind-utils python3-devel lynx libxslt-devel libffi-devel xorg-x11-server-Xvfb libxml2-devel nmap zlib-devel jq python-shodan -y $DEBUG_STD
 }
 
 install_pacman(){
-    eval $SUDO pacman -Sy install python python-pip dnsutils ruby curl git libpcap nmap chromium wget jq xorg-server-xvfb -y $DEBUG_STD
+    eval $SUDO pacman -Sy install python python-pip dnsutils ruby curl git libpcap nmap chromium wget jq xorg-server-xvfb tor lynx -y $DEBUG_STD
+    eval $SUDO systemctl enable --now tor.service $DEBUG_STD
 }
 
 #installing latest Golang version
@@ -132,6 +134,7 @@ printf "${bgreen} 20%% done${reset}\n\n"
 eval go get -v github.com/tomnomnom/unfurl $DEBUG_STD
 eval git clone https://github.com/projectdiscovery/nuclei-templates ~/nuclei-templates $DEBUG_STD
 eval git clone https://github.com/eslam3kl/crtfinder $dir/crtfinder $DEBUG_STD
+eval git clone https://github.com/davidtavarez/pwndb $dir/pwndb $DEBUG_STD
 eval nuclei -update-templates $DEBUG_STD
 eval git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git $dir/sqlmap $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/projectdiscovery/httpx/cmd/httpx $DEBUG_STD
@@ -140,7 +143,7 @@ eval go get -u github.com/gwen001/github-endpoints $DEBUG_STD
 eval git clone https://github.com/s0md3v/XSStrike $dir/XSStrike $DEBUG_STD
 eval git clone https://github.com/1ndianl33t/Gf-Patterns $dir/Gf-Patterns $DEBUG_STD
 eval git clone https://github.com/tomnomnom/gf $dir/gf $DEBUG_STD
-eval go get github.com/hakluke/hakrawler $DEBUG_STD
+eval git clone https://github.com/EnableSecurity/wafw00f $dir/wafw00f $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/projectdiscovery/dnsx/cmd/dnsx $DEBUG_STD
 cp -r $dir/gf/examples ~/.gf
 cp $dir/Gf-Patterns/*.json ~/.gf
@@ -169,7 +172,7 @@ eval git clone https://github.com/obheda12/GitDorker $dir/GitDorker $DEBUG_STD
 printf "${bgreen} 70%% done${reset}\n\n"
 eval git clone https://github.com/ProjectAnte/dnsgen $dir/dnsgen $DEBUG_STD
 eval git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh $DEBUG_STD
-eval git clone https://github.com/maaaaz/webscreenshot $dir/webscreenshot $DEBUG_STD
+eval git clone https://github.com/laramies/theHarvester $dir/theHarvester $DEBUG_STD
 printf "${bgreen} 80%% done${reset}\n\n"
 if [ "True" = "$IS_ARM" ]
     then
@@ -188,6 +191,7 @@ cd $dir/Interlace && eval $SUDO python3 setup.py install $DEBUG_STD
 cd $dir/LinkFinder && eval $SUDO python3 setup.py install $DEBUG_STD
 cd $dir/dnsgen && eval $SUDO python3 setup.py install $DEBUG_STD
 cd $dir/Arjun && eval $SUDO python3 setup.py install $DEBUG_STD
+cd $dir/wafw00f && eval $SUDO python3 setup.py install $DEBUG_STD
 cd $dir
 eval git clone https://github.com/devanshbatham/OpenRedireX $dir/OpenRedireX $DEBUG_STD
 printf "${bgreen} 90%% done${reset}\n\n"
@@ -206,7 +210,8 @@ eval wget -O ssrf.py https://gist.githubusercontent.com/h4ms1k/adcc340495d418fcd
 eval wget -O fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD
 eval wget -O lfi_wordlist.txt https://raw.githubusercontent.com/xmendez/wfuzz/master/wordlist/vulns/dirTraversal-nix.txt $DEBUG_STD
 eval wget -nc -O ~/.config/notify/notify.conf https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw/a66c4d8cf47a3bc95f5e9ba84773428662ea760c/notify_sample.conf $DEBUG_ERROR
-
+eval wget -O ${GOPATH}/bin/gowitness https://github.com/sensepost/gowitness/releases/download/2.3.3/gowitness-2.3.3-linux-amd64 $DEBUG_STD
+eval chmod 755 ${GOPATH}/bin/gowitness $DEBUG_STD
 sed -i 's/^miscellaneous/#miscellaneous/' ~/nuclei-templates/.nuclei-ignore
 
 #stripping all Go binaries
