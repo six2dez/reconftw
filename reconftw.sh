@@ -1429,11 +1429,17 @@ function html_report(){
 	if [ -f "$dir/subdomains/subdomains.txt" ]; then
 		cat $dir/subdomains/subdomains.txt | while read sub; do lineToAppend="$lineToAppend <li><a href='$sub'>$sub</a></li><br>" ; done
 	else
-		lineToAppend="<li><a href='\#'>No Jslinks Links Found For Target</a></li><br>"
+		lineToAppend="<li><a href='\#'>No Subdomains Found For Target</a></li><br>"
 	fi
 	sed -i "s/CHANGE_ME_SUB_DOMAINS/$lineToAppend/g" "$dir/index.html"
 	#Screenshots
 	lineToAppend=""
+
+	#OSINT
+	lineToAppend=""
+	# @TODO concatinate dorks and links and create a table cia HTML
+	tmpDorks=$(cat $dir/osint/gitdorks.txt | grep git | cut -d'|'  -f 1 | cut -d'='  -f 2)
+	tmpLinks=$(cat $dir/osint/gitdorks.txt | grep git | cut -d'|'  -f 2)
 }
 
 function end(){
