@@ -283,7 +283,11 @@ resolvers=${tools}/resolvers.txt
 
 ![Mindmap](images/mindmap.png)
 
+## How to contribute
 
+If you want to contribute to this project you can do it in multiple ways:
+- Submitting an [issue](https://github.com/six2dez/reconftw/issues/new/choose) because you have found a bug or you have any suggestion or request.
+- Making a Pull Request from [dev](https://github.com/six2dez/reconftw/tree/dev) branch because you want to improve the code or add something to the script.
 
 ## You can support this work buying me a coffee:  
 
