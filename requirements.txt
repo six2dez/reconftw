@@ -38,3 +38,4 @@ texttable==1.6.3
 lxml==4.6.2
 uvloop==0.15.2
 PySocks==1.6.8
+h8mail

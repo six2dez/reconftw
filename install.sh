@@ -213,11 +213,12 @@ eval wget -nc -O ~/.config/notify/notify.conf https://gist.githubusercontent.com
 eval wget -O ${GOPATH}/bin/gowitness https://github.com/sensepost/gowitness/releases/download/2.3.3/gowitness-2.3.3-linux-amd64 $DEBUG_STD
 eval chmod 755 ${GOPATH}/bin/gowitness $DEBUG_STD
 sed -i 's/^miscellaneous/#miscellaneous/' ~/nuclei-templates/.nuclei-ignore
+eval h8mail -g $DEBUG_STD
 
 #stripping all Go binaries
 eval strip -s $HOME/go/bin/* $DEBUG_STD
 
-printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - GitHub (~/Tools/.github_tokens)\n - favup (shodan init SHODANPAIDAPIKEY)\n - SSRF Server (COLLAB_SERVER env var) \n - Blind XSS Server (XSS_SERVER env var)\n\n${reset}"
+printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - GitHub (~/Tools/.github_tokens)\n - SHODAN (SHODAN_API_KEY in reconftw.cfg)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg) \n - theHarvester (~/Tools/theHarvester/api-keys.yml)\n - H8mail (~/Tools/h8mail_config.ini)\n\n${reset}"
 
 printf "${bgreen} Finished!${reset}\n\n"
 printf "\n\n${bgreen}#######################################################################\n"
