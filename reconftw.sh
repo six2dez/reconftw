@@ -94,7 +94,7 @@ function tools_installed(){
 ###############################################################################################################
 
 function google_dorks(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$DORKS" = true ]
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$GOOGLE_DORKS" = true ]
 	then
 		start=`date +%s`
 		printf "${bgreen}#######################################################################\n"
@@ -112,7 +112,7 @@ function google_dorks(){
 }
 
 function github_dorks(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$DORKS" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$GITHUB_DORKS" = true ]
 		then
 			printf "${bgreen}#######################################################################\n"
 			printf "${bblue} GitHub Dorks Scanning ${reset}\n\n"
@@ -181,8 +181,24 @@ function emails(){
 			cat .tmp/harvester.txt | awk '/Emails/,/Hosts/' | sed -e '1,2d' | head -n -2 | anew -q osint/emails.txt
 			cat .tmp/harvester.txt | awk '/Users/,/IPs/' | sed -e '1,2d' | head -n -2 | anew -q osint/users.txt
 			cat .tmp/harvester.txt | awk '/Links/,/Users/' | sed -e '1,2d' | head -n -2 | anew -q osint/linkedin.txt
-			cd $tools/pwndb && python3 pwndb.py --target "@${domain}" | anew -q $dir/osint/pwndb.txt
-			cd $dir
+
+			eval h8mail -t $domain -q domain --loose -c $tools/h8mail_config.ini -j .tmp/h8_results.json $DEBUG_STD
+			if [ -s ".tmp/h8_results.json" ]
+			then
+				cat .tmp/h8_results.json | jq -r '.targets[0] | .data[] | .[]' | cut -d '-' -f2 | anew -q osint/h8mail.txt
+			fi
+
+			PWNDB_STATUS=$(timeout 15s curl -Is --socks5-hostname localhost:9050 http://pwndb2am4tzkvold.onion | grep HTTP | cut -d ' ' -f2)
+
+			if [ "$PWNDB_STATUS" = 200 ]
+			then
+				cd $tools/pwndb
+				python3 pwndb.py --target "@${domain}" | anew -q $dir/osint/pwndb.txt
+				cd $dir
+			else
+				text="${yellow}\n pwndb is currently down :(\n\n Check xjypo5vzgmo7jca6b322dnqbsdnp3amd24ybx26x5nxbusccjkm4pwid.onion${reset}\n"
+				printf "${text}" && printf "${text}" | $NOTIFY
+			fi
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
 			getElapsedTime $start $end
@@ -425,7 +441,7 @@ function sub_scraping(){
 			printf "${yellow} Running : Source code scraping subdomain search${reset}\n\n"
 			touch .tmp/scrap_subs.txt
 			cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -timeout 15 -silent -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp.txt
-			gospider -S .tmp/probed_tmp.txt --js -t 10 -H "${HEADER}" --sitemap --robots -w -r | egrep -o 'https?://[^ ]+' | sed 's/]$//' | unfurl --unique domains | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
+			gospider -S .tmp/probed_tmp.txt --js -t 50 -H "${HEADER}" --sitemap --robots -w -r | egrep -o 'https?://[^ ]+' | sed 's/]$//' | unfurl --unique domains | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
 			cat .tmp/scrap_subs.txt | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/scrap_subs_resolved.txt $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/scrap_subs_resolved.txt $DEBUG_ERROR | anew subdomains/subdomains.txt | wc -l)
 			touch $called_fn_dir/.${FUNCNAME[0]}
@@ -880,9 +896,9 @@ function urlchecks(){
 			cat webs/webs.txt | waybackurls | anew -q .tmp/url_extract_tmp.txt
 			cat webs/webs.txt | gau | anew -q .tmp/url_extract_tmp.txt
 			if [ "$DEEP" = true ] ; then
-				gospider -S webs/webs.txt --js -t 10 -d 3 -H "${HEADER}" --sitemap --robots -w -r | egrep -o 'https?://[^ ]+' | sed 's/]$//' | grep ".$domain$" | anew -q .tmp/url_extract_tmp.txt
+				gospider -S webs/webs.txt --js -t 50 -d 3 -H "${HEADER}" --sitemap --robots -w -r | egrep -o 'https?://[^ ]+' | sed 's/]$//' | grep ".$domain$" | anew -q .tmp/url_extract_tmp.txt
 			else
-				gospider -S webs/webs.txt --js -t 10 -H "${HEADER}" --sitemap --robots -w -r | egrep -o 'https?://[^ ]+' | sed 's/]$//' | grep ".$domain$" | anew -q .tmp/url_extract_tmp.txt
+				gospider -S webs/webs.txt --js -t 50 -H "${HEADER}" --sitemap --robots -w -r | egrep -o 'https?://[^ ]+' | sed 's/]$//' | grep ".$domain$" | anew -q .tmp/url_extract_tmp.txt
 			fi
 			if [ -s "${GITHUB_TOKENS}" ]
 			then
@@ -1004,7 +1020,7 @@ function brokenLinks(){
 		printf "${bgreen}#######################################################################\n"
 		printf "${bblue} Broken links checks ${reset}\n\n"
 		start=`date +%s`
-		gospider -S webs/webs.txt --js -t 10 -H "${HEADER}" --sitemap --robots -w -r | egrep -o 'https?://[^ ]+' | sed 's/]$//' | grep -v ".$domain" | httpx -status-code -follow-redirects -timeout 15 -silent -no-color | grep '\[404\]' | cut -d ' ' -f1 | anew -q .tmp/brokenLinks_total.txt
+		gospider -S webs/webs.txt --js -t 50 -H "${HEADER}" --sitemap --robots -w -r | egrep -o 'https?://[^ ]+' | sed 's/]$//' | grep -v ".$domain" | httpx -status-code -follow-redirects -timeout 15 -silent -no-color | grep '\[404\]' | cut -d ' ' -f1 | anew -q .tmp/brokenLinks_total.txt
 		NUMOFLINES=$(eval cat .tmp/brokenLinks_total.txt $DEBUG_ERROR | cut -d ' ' -f2 | anew webs/brokenLinks.txt | wc -l)
 		touch $called_fn_dir/.${FUNCNAME[0]}
 		end=`date +%s`
@@ -1429,11 +1445,17 @@ function html_report(){
 	if [ -f "$dir/subdomains/subdomains.txt" ]; then
 		cat $dir/subdomains/subdomains.txt | while read sub; do lineToAppend="$lineToAppend <li><a href='$sub'>$sub</a></li><br>" ; done
 	else
-		lineToAppend="<li><a href='\#'>No Jslinks Links Found For Target</a></li><br>"
+		lineToAppend="<li><a href='\#'>No Subdomains Found For Target</a></li><br>"
 	fi
 	sed -i "s/CHANGE_ME_SUB_DOMAINS/$lineToAppend/g" "$dir/index.html"
 	#Screenshots
 	lineToAppend=""
+
+	#OSINT
+	lineToAppend=""
+	# @TODO concatinate dorks and links and create a table cia HTML
+	tmpDorks=$(cat $dir/osint/gitdorks.txt | grep git | cut -d'|'  -f 1 | cut -d'='  -f 2)
+	tmpLinks=$(cat $dir/osint/gitdorks.txt | grep git | cut -d'|'  -f 2)
 }
 
 function end(){
