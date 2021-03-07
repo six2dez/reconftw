@@ -235,7 +235,7 @@ resolvers=${tools}/resolvers.txt
 
 - Domain information parser ([domainbigdata](https://domainbigdata.com/))
 - Emails addresses and users ([theHarvester](https://github.com/laramies/theHarvester))
-- Password leaks ([pwndb](https://github.com/davidtavarez/pwndb))
+- Password leaks ([pwndb](https://github.com/davidtavarez/pwndb) and [H8mail](https://github.com/khast3x/h8mail))
 - Metadata finder ([MetaFinder](https://github.com/Josue87/MetaFinder))
 - Google Dorks ([degoogle_hunter](https://github.com/six2dez/degoogle_hunter))
 - Github Dorks ([GitDorker](https://github.com/obheda12/GitDorker))  
