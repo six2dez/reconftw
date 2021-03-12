@@ -1187,32 +1187,15 @@ function end_subfunc(){
 }
 
 function _spinner() {
-    # $1 start/stop
-    #
-    # on start: $2 display message
-    # on stop : $2 process exit status
-    #           $3 spinner function pid (supplied from stop_spinner)
-
-    local on_success="DONE"
-    local on_fail="FAIL"
-    local white="\e[1;37m"
-    local green="\e[1;32m"
-    local red="\e[1;31m"
-    local nc="\e[0m"
 
     case $1 in
         start)
-
 			let column=$(tput cols)-${#2}+2
             echo -ne ${2}
-
             printf "%${column}s"
-            # start spinner
             i=1
             sp='⣾⣽⣻⢿⡿⣟⣯⣷'
-            charwidth=3
             delay=${SPINNER_DELAY:-0.15}
-
             while :
             do
                 printf "\b${sp:i++%${#sp}:1}"
@@ -1224,7 +1207,8 @@ function _spinner() {
                 echo "spinner is not running.."
                 exit 1
             fi
-            kill -9 $1 > /dev/null 2>&1
+            kill $2 > /dev/null 2>&1
+            echo -en "\b "
             ;;
         *)
             echo "invalid argument, try {start/stop}"
@@ -1234,19 +1218,15 @@ function _spinner() {
 }
 
 function start_spinner {
-    # $1 : msg to display
-    _spinner "start" &
-    # set global spinner pid
+	_spinner "start" "${1}" | lolcat &
     _sp_pid=$!
     disown
 }
 
 function stop_spinner {
-    # $1 : command exit status
-    _spinner "stop" $_sp_pid
+    _spinner "stop" $1 $_sp_pid
     unset _sp_pid
 }
-
 
 function start(){
 
