@@ -1400,10 +1400,11 @@ function subs_menu(){
 }
 
 function help(){
-	printf "\n Usage: $0 [-d DOMAIN] [-l list.txt] [-x oos.txt] [-r] [-s] [-p] "
-	printf "\n           	      [-a] [-w] [-i] [-v] [-h] [--deep] [--fs] [-o OUTPUT]\n\n"
+	printf "\n Usage: $0 [-d domain.tld] [-m name] [-l list.txt] [-x oos.txt] [-r] [-s] "
+	printf "\n           	      [-p] [-a] [-w] [-i] [-v] [-h] [--deep] [--fs] [-o OUTPUT]\n\n"
 	printf " ${bblue}TARGET OPTIONS${reset}\n"
-	printf "   -d DOMAIN        Target domain\n"
+	printf "   -d domain.tld    Target domain\n"
+	printf "   -m company       Target company name\n"
 	printf "   -l list.txt      Targets list, one per line\n"
 	printf "   -x oos.txt       Exclude subdomains list (Out Of Scope)\n"
 	printf " \n"
@@ -1430,6 +1431,9 @@ function help(){
 	printf " \n"
 	printf " Web scanning for subdomain list:\n"
 	printf " ./reconftw.sh -d example.com -l targets.txt -w\n"
+	printf " \n"
+	printf " Multidomain recon:\n"
+	printf " ./reconftw.sh -m company -l domainlist.txt -r\n"
 	printf " \n"
 	printf " Full recon with custom output and excluded subdomains list:\n"
 	printf " ./reconftw.sh -d example.com -x out.txt -a -o custom/path\n"
