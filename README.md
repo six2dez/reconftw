@@ -9,8 +9,8 @@
 <h4 align="center">A simple bash script for full recon</h4>
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v1.2.1">
-    <img src="https://img.shields.io/badge/release-v1.2.1-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v1.2.2">
+    <img src="https://img.shields.io/badge/release-v1.2.2-green">
   </a>
    </a>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
@@ -172,6 +172,7 @@ resolvers=${tools}/resolvers.txt
 | Flag | Description |
 |------|-------------|
 | -d | Target domain *(example.com)*  |
+| -m | Multiple domain target *(companyName)*  |
 | -l | Target list *(one per line)* |
 | -x | Exclude subdomains list *(Out Of Scope)* |
 
@@ -209,6 +210,12 @@ resolvers=${tools}/resolvers.txt
 ▶ ./reconftw.sh -l sites.txt -r -o /output/directory/
 ```
 
+**Perform all steps (recon + attacks)** 
+
+```bash
+▶ ./reconftw.sh -d example.com -a
+```
+
 **Perform full recon with more intense tasks** *(VPS intended)*
 
 ```bash
@@ -219,6 +226,12 @@ resolvers=${tools}/resolvers.txt
 
 ```bash
 ▶ ./reconftw.sh -d example.com -r --fs -o /output/directory/
+```
+
+**Perform recon in a multi domain target**
+
+```bash
+▶ ./reconftw.sh -m company -l domainsList.txt
 ```
 
 **Show help section**
@@ -274,8 +287,9 @@ resolvers=${tools}/resolvers.txt
 - Custom output folder  
 - Polished installer compatible with most distros  
 - Diff support for continuous running (cron mode) 
+- Support for targets with multiple domains
 - Update tools script  
-- Raspberry Pi support  
+- RaspberryPi/ARM support  
 - 5 modes (recon, passive, subdomains, web and all)
 - Out of Scope Support
 - Notification support for Slack, Discord and Telegram ([notify](https://github.com/projectdiscovery/notify))
