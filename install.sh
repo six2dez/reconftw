@@ -28,16 +28,16 @@ printf "${bgreen} reconFTW installer script ${reset}\n\n"
 install_apt(){
     eval $SUDO apt install chromium-browser -y $DEBUG_STD
     eval $SUDO apt install chromium -y $DEBUG_STD
-    eval $SUDO apt install python3 python3-pip ruby git curl libpcap-dev wget python-dev python3-dev dnsutils build-essential xvfb libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq python3-shodan apt-transport-https lynx tor lolcat -y $DEBUG_STD
+    eval $SUDO apt install python3 python3-pip ruby git curl libpcap-dev wget python-dev python3-dev dnsutils build-essential xvfb libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq python3-shodan apt-transport-https lynx tor -y $DEBUG_STD
     eval $SUDO systemctl enable tor $DEBUG_STD
 }
 
 install_yum(){
-    eval $SUDO yum install python3 python3-pip ruby git curl libpcap-devel chromium wget openssl-devel bind-utils python3-devel lynx libxslt-devel libffi-devel xorg-x11-server-Xvfb libxml2-devel nmap zlib-devel jq python-shodan lolcat -y $DEBUG_STD
+    eval $SUDO yum install python3 python3-pip ruby git curl libpcap-devel chromium wget openssl-devel bind-utils python3-devel lynx libxslt-devel libffi-devel xorg-x11-server-Xvfb libxml2-devel nmap zlib-devel jq python-shodan -y $DEBUG_STD
 }
 
 install_pacman(){
-    eval $SUDO pacman -Sy install python python-pip dnsutils ruby curl git libpcap nmap chromium wget jq xorg-server-xvfb tor lynx lolcat -y $DEBUG_STD
+    eval $SUDO pacman -Sy install python python-pip dnsutils ruby curl git libpcap nmap chromium wget jq xorg-server-xvfb tor lynx -y $DEBUG_STD
     eval $SUDO systemctl enable --now tor.service $DEBUG_STD
 }
 

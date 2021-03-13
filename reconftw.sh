@@ -102,7 +102,7 @@ function google_dorks(){
 		end_func "Results are saved in osint/dorks.txt" ${FUNCNAME[0]}
 	else
 		if [ "$GOOGLE_DORKS" = false ]; then
-			printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} are already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
@@ -116,9 +116,9 @@ function github_dorks(){
 			if [ -s "${GITHUB_TOKENS}" ]
 			then
 				if [ "$DEEP" = true ] ; then
-					eval python3 $tools/GitDorker/GitDorker.py -tf ${GITHUB_TOKENS} -e 5 -q $domain -p -d $tools/GitDorker/Dorks/alldorksv3 | grep "\[+\]" | grep "git" | anew -q osint/gitdorks.txt $DEBUG_STD
+					eval python3 $tools/GitDorker/GitDorker.py -tf ${GITHUB_TOKENS} -e $GITDORKER_THREADS -q $domain -p -d $tools/GitDorker/Dorks/alldorksv3 | grep "\[+\]" | grep "git" | anew -q osint/gitdorks.txt $DEBUG_STD
 				else
-					eval python3 $tools/GitDorker/GitDorker.py -tf ${GITHUB_TOKENS} -e 5 -q $domain -p -d $tools/GitDorker/Dorks/medium_dorks.txt | grep "\[+\]" | grep "git" | anew -q osint/gitdorks.txt $DEBUG_STD
+					eval python3 $tools/GitDorker/GitDorker.py -tf ${GITHUB_TOKENS} -e $GITDORKER_THREADS -q $domain -p -d $tools/GitDorker/Dorks/medium_dorks.txt | grep "\[+\]" | grep "git" | anew -q osint/gitdorks.txt $DEBUG_STD
 				fi
 				sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" osint/gitdorks.txt
 			else
@@ -127,7 +127,7 @@ function github_dorks(){
 			end_func "Results are saved in osint/gitdorks.txt" ${FUNCNAME[0]}
 		else
 			if [ "$GITHUB_DORKS" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -145,7 +145,7 @@ function metadata(){
 			end_func "Results are saved in osint/[software/authors/metadata_results].txt" ${FUNCNAME[0]}
 		else
 			if [ "$METADATA" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -183,7 +183,7 @@ function emails(){
 			end_func "Results are saved in osint/[emails/users/h8mail/passwords].txt" ${FUNCNAME[0]}
 		else
 			if [ "$EMAILS" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -212,21 +212,21 @@ function domain_info(){
 
 			if [ -s ".tmp/domain_registrant_email.txt" ]
 			then
-				for sub in $(cat .tmp/domain_registrant_email.txt); do
+				for line in $(cat .tmp/domain_registrant_email.txt); do
 					lynx -dump $line | tail -n +18 | sed -n '/]domainbigdata.com/q;p'  >> osint/domain_info_email.txt && echo -e "\n\n#######################################################################\n\n" >> osint/domain_info_email.txt
 				done
 			fi
 
 			if [ -s ".tmp/domain_registrant_ip.txt" ]
 			then
-				for sub in $(cat .tmp/domain_registrant_ip.txt); do
+				for line in $(cat .tmp/domain_registrant_ip.txt); do
 					lynx -dump $line | tail -n +18 | sed -n '/]domainbigdata.com/q;p'  >> osint/domain_info_ip.txt && echo -e "\n\n#######################################################################\n\n" >> osint/domain_info_ip.txt
 				done
 			fi
 			end_func "Results are saved in osint/domain_info_[general/name/email/ip].txt" ${FUNCNAME[0]}
 		else
 			if [ "$DOMAIN_INFO" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -282,8 +282,6 @@ function sub_passive(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]
 		then
 			start_subfunc "Running : Passive Subdomain Enumeration"
-			#start=`date +%s`
-			#printf "${yellow} Running : Passive Subdomain Enumeration${reset}\n\n"
 			eval subfinder -d $domain -o .tmp/subfinder.txt $DEBUG_STD
 			eval assetfinder --subs-only $domain $DEBUG_ERROR | anew -q .tmp/assetfinder.txt
 			eval amass enum -passive -d $domain -config $AMASS_CONFIG -o .tmp/amass.txt $DEBUG_STD
@@ -292,10 +290,6 @@ function sub_passive(){
 			timeout 5m waybackurls $domain | unfurl --unique domains | anew -q .tmp/waybackurls.txt
 			NUMOFLINES=$(eval cat .tmp/subfinder.txt .tmp/assetfinder.txt .tmp/amass.txt .tmp/findomain.txt .tmp/crobat.txt .tmp/waybackurls.txt $DEBUG_ERROR | sed "s/*.//" | anew .tmp/passive_subs.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (passive)" ${FUNCNAME[0]}
-			#touch $called_fn_dir/.${FUNCNAME[0]}
-			#end=`date +%s`
-			#getElapsedTime $start $end
-			#notification "${NUMOFLINES} new subdomains found with passive techniques in ${runtime}" good
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
@@ -305,8 +299,6 @@ function sub_crt(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SUBCRT" = true ]
 		then
 			start_subfunc "Running : Crtsh Subdomain Enumeration"
-			#start=`date +%s`
-			#printf "${yellow} Running : Crtsh Subdomain Enumeration${reset}\n\n"
 			cd $tools/crtfinder
 			eval python3 crtfinder.py -u $domain $DEBUG_STD
 			outputfile=${domain%%.*}
@@ -336,12 +328,9 @@ function sub_crt(){
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			NUMOFLINES=$(eval cat .tmp/crtsh_subs_tmp.txt $DEBUG_ERROR | anew .tmp/crtsh_subs.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (cert transparency)" ${FUNCNAME[0]}
-			#end=`date +%s`
-			#getElapsedTime $start $end
-			#notification "${NUMOFLINES} new subdomains by certificate transparency found in ${runtime}" good
 		else
 			if [ "$SUBCRT" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -352,18 +341,12 @@ function sub_brute(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SUBBRUTE" = true ]
 		then
 			start_subfunc "Running : Bruteforce Subdomain Enumeration"
-			#start=`date +%s`
-			#printf "${yellow} Running : Bruteforce Subdomain Enumeration${reset}\n\n"
-			eval shuffledns -d $domain -w $subs_wordlist -r $resolvers -t 5000 -o .tmp/active_tmp.txt $DEBUG_STD
+			eval shuffledns -d $domain -w $subs_wordlist -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/active_tmp.txt $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/active_tmp.txt $DEBUG_ERROR | sed "s/*.//" | anew .tmp/brute_subs.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (bruteforce)" ${FUNCNAME[0]}
-			#touch $called_fn_dir/.${FUNCNAME[0]}
-			#end=`date +%s`
-			#getElapsedTime $start $end
-			#notification "${NUMOFLINES} new subdomains by bruteforce found in ${runtime}" good
 		else
 			if [ "$SUBBRUTE" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -374,20 +357,14 @@ function sub_dns(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]
 		then
 			start_subfunc "Running : Active Subdomain Enumeration"
-			#start=`date +%s`
-			#printf "${yellow} Running : Active Subdomain Enumeration${reset}\n\n"
 			cat .tmp/*_subs.txt | anew -q .tmp/subs_no_resolved.txt
 			deleteOutScoped $outOfScope_file .tmp/subs_no_resolved.txt
-			eval shuffledns -d $domain -list .tmp/subs_no_resolved.txt -r $resolvers -t 5000 -o .tmp/subdomains_tmp.txt $DEBUG_STD
+			eval shuffledns -d $domain -list .tmp/subs_no_resolved.txt -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/subdomains_tmp.txt $DEBUG_STD
 			echo $domain | dnsx -silent | anew -q .tmp/subdomains_tmp.txt
 			dnsx -retry 3 -silent -cname -resp-only -l .tmp/subdomains_tmp.txt | grep ".$domain$" | anew -q .tmp/subdomains_tmp.txt
 			eval dnsx -retry 3 -silent -cname -resp -l subdomains/subdomains.txt -o subdomains/subdomains_cname.txt $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/subdomains_tmp.txt $DEBUG_ERROR | anew subdomains/subdomains.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (dns resolution)" ${FUNCNAME[0]}
-			#touch $called_fn_dir/.${FUNCNAME[0]}
-			#end=`date +%s`
-			#getElapsedTime $start $end
-			#notification "${NUMOFLINES} new subdomains by dns resolution found in ${runtime}" good
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
@@ -397,21 +374,15 @@ function sub_scraping(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SUBSCRAPING" = true ]
 		then
 			start_subfunc "Running : Source code scraping subdomain search"
-			#start=`date +%s`
-			#printf "${yellow} Running : Source code scraping subdomain search${reset}\n\n"
 			touch .tmp/scrap_subs.txt
-			cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -timeout 15 -silent -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp.txt
-			gospider -S .tmp/probed_tmp.txt --js -t 50 -H "${HEADER}" --sitemap --robots -w -r | egrep -o 'https?://[^ ]+' | sed 's/]$//' | unfurl --unique domains | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
-			cat .tmp/scrap_subs.txt | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/scrap_subs_resolved.txt $DEBUG_STD
+			cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout 15 -silent -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp.txt
+			gospider -S .tmp/probed_tmp.txt --js -t $GOSPIDER_THREADS -H "${HEADER}" --sitemap --robots -w -r | egrep -o 'https?://[^ ]+' | sed 's/]$//' | unfurl --unique domains | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
+			cat .tmp/scrap_subs.txt | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/scrap_subs_resolved.txt $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/scrap_subs_resolved.txt $DEBUG_ERROR | anew subdomains/subdomains.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (code scraping)" ${FUNCNAME[0]}
-			#touch $called_fn_dir/.${FUNCNAME[0]}
-			#end=`date +%s`
-			#getElapsedTime $start $end
-			#notification "${NUMOFLINES} new subdomains by scraping found in ${runtime}" good
 		else
 			if [ "$SUBSCRAPING" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -422,30 +393,28 @@ function sub_permut(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SUBPERMUTE" = true ]
 		then
 			start_subfunc "Running : Permutations Subdomain Enumeration"
-			#start=`date +%s`
-			#printf "${yellow} Running : Permutations Subdomain Enumeration${reset}\n\n"
 			if [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 50 ]]
 				then
-					eval dnsgen .tmp/subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/permute1_tmp.txt $DEBUG_STD
+					eval dnsgen .tmp/subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute1_tmp.txt $DEBUG_STD
 					eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
-					eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/permute2_tmp.txt $DEBUG_STD
+					eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute2_tmp.txt $DEBUG_STD
 					eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
 					eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 				elif [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 100 ]]
 		  		then
-					eval dnsgen .tmp/subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/permute_tmp.txt $DEBUG_STD
+					eval dnsgen .tmp/subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute_tmp.txt $DEBUG_STD
 					eval cat .tmp/permute_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 				else
 					if [[ $(cat subdomains/subdomains.txt | wc -l) -le 50 ]]
 						then
-							eval dnsgen subdomains/subdomains.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/permute1_tmp.txt $DEBUG_STD
+							eval dnsgen subdomains/subdomains.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute1_tmp.txt $DEBUG_STD
 							eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
-							eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/permute2_tmp.txt $DEBUG_STD
+							eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute2_tmp.txt $DEBUG_STD
 							eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
 							eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 						elif [[ $(cat subdomains/subdomains.txt | wc -l) -le 100 ]]
 						then
-							eval dnsgen subdomains/subdomains.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t 5000 -o .tmp/permute_tmp.txt $DEBUG_STD
+							eval dnsgen subdomains/subdomains.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute_tmp.txt $DEBUG_STD
 							eval cat .tmp/permute_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 						else
 							printf "\n${bred} Skipping Permutations: Too Much Subdomains${reset}\n\n"
@@ -459,13 +428,9 @@ function sub_permut(){
 				NUMOFLINES=0
 			fi
 			end_subfunc "${NUMOFLINES} new subs (permutations)" ${FUNCNAME[0]}
-			#touch $called_fn_dir/.${FUNCNAME[0]}
-			#end=`date +%s`
-			#getElapsedTime $start $end
-			#notification "${NUMOFLINES} new subdomains by permutations found in ${runtime}" good
 		else
 			if [ "$SUBPERMUTE" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -485,7 +450,7 @@ function subtakeover(){
 			end_func "Results are saved in webs/takeover.txt" ${FUNCNAME[0]}
 		else
 			if [ "$SUBTAKEOVER" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -500,17 +465,13 @@ function webprobe_simple(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$WEBPROBESIMPLE" = true ]
 		then
 			start_subfunc "Running : Http probing"
-			cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -timeout 15 -silent -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp.txt
+			cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout 15 -silent -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp.txt
 			deleteOutScoped $outOfScope_file .tmp/probed_tmp.txt
 			NUMOFLINES=$(eval cat .tmp/probed_tmp.txt $DEBUG_ERROR | anew webs/webs.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new websites resolved" ${FUNCNAME[0]}
-			#touch $called_fn_dir/.${FUNCNAME[0]}
-			#end=`date +%s`
-			#getElapsedTime $start $end
-			#notification "${NUMOFLINES} new websites resolved in ${runtime}" good
 		else
 			if [ "$WEBPROBESIMPLE" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -521,14 +482,14 @@ function webprobe_full(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$WEBPROBEFULL" = true ]
 		then
 			start_func "Http probing non standard ports"
-			cat subdomains/subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55672 -follow-host-redirects -H "${HEADER}" -status-code -threads 150 -timeout 10 -silent -no-color | cut -d ' ' -f1 | grep ".$domain" | anew -q .tmp/probed_uncommon_ports_tmp.txt
+			cat subdomains/subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55672 -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout 10 -silent -no-color | cut -d ' ' -f1 | grep ".$domain" | anew -q .tmp/probed_uncommon_ports_tmp.txt
 			NUMOFLINES=$(eval cat .tmp/probed_uncommon_ports_tmp.txt $DEBUG_ERROR | anew webs/webs_uncommon_ports.txt | wc -l)
 			notification "Uncommon web ports: ${NUMOFLINES} new websites in ${runtime}" good
 			eval cat webs/webs_uncommon_ports.txt $DEBUG_ERROR
 			end_func "Results are saved in webs/webs_uncommon_ports.txt" ${FUNCNAME[0]}
 		else
 			if [ "$WEBPROBEFULL" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -544,7 +505,7 @@ function screenshot(){
 			end_func "Results are saved in screenshots folder" ${FUNCNAME[0]}
 		else
 			if [ "$WEBSCREENSHOT" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -569,10 +530,11 @@ function favicon(){
 				eval mv favicontest.txt $dir/hosts/favicontest.txt $DEBUG_ERROR
 				eval rm favicontest.json $DEBUG_ERROR
 			fi
+			cd $dir
 			end_func "Results are saved in hosts/favicontest.txt" ${FUNCNAME[0]}
 		else
 			if [ "$FAVICON" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -595,9 +557,9 @@ function portscan(){
 			eval cat .tmp/ips_nowaf.txt $DEBUG_ERROR | sort
 
 			printf "${bblue}\n Scanning ports... ${reset}\n\n";
-			if [ "$PORTSCAN_PASSIVE" = true ] && [ ! -f "${domain}_portscan_passive.txt" ]
+			if [ "$PORTSCAN_PASSIVE" = true ] && [ ! -f "hosts/portscan_passive.txt" ]
 			then
-				for sub in $(cat .tmp/ips_nowaf.txt); do
+				for sub in $(cat hosts/ips.txt); do
 					shodan host $sub 2>/dev/null >> hosts/portscan_passive.txt && echo -e "\n\n#######################################################################\n\n" >> hosts/portscan_passive.txt
 				done
 			fi
@@ -610,7 +572,7 @@ function portscan(){
 			end_func "Results are saved in hosts/portscan_[passive|active].txt" ${FUNCNAME[0]}
 		else
 			if [ "$PORTSCANNER" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -633,7 +595,7 @@ function waf_checks(){
 			end_func "Results are saved in webs/webs_wafs.txt" ${FUNCNAME[0]}
 		else
 			if [ "$WAF" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -646,7 +608,7 @@ function nuclei_check(){
 			start_func "Templates based web scanner"
 			eval nuclei -update-templates $DEBUG_STD
 			mkdir -p nuclei_output
-			printf "${yellow} Running : Nuclei Technologies${reset}\n\n"
+			printf "${yellow}\n Running : Nuclei Technologies${reset}\n\n"
 			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/technologies/ -o nuclei_output/technologies.txt
 			printf "${yellow}\n\n Running : Nuclei Tokens${reset}\n\n"
 			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/exposed-tokens/ -o nuclei_output/tokens.txt
@@ -668,7 +630,7 @@ function nuclei_check(){
 			end_func "Results are saved in nuclei_output folder" ${FUNCNAME[0]}
 		else
 			if [ "$NUCLEICHECK" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -683,14 +645,14 @@ function fuzz(){
 			for sub in $(cat webs/webs.txt); do
 				printf "${yellow}\n\n Running: Fuzzing in ${sub}${reset}\n"
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-				ffuf -mc all -fc 404 -ac -sf -s -H "${HEADER}" -w $fuzz_wordlist -maxtime 900 -u $sub/FUZZ -or -o $dir/fuzzing/${sub_out}.tmp &>/dev/null
+				ffuf -mc all -fc 404 -ac -t $FFUF_THREADS -sf -s -H "${HEADER}" -w $fuzz_wordlist -maxtime 900 -u $sub/FUZZ -or -o $dir/fuzzing/${sub_out}.tmp &>/dev/null
 				eval cat $dir/fuzzing/${sub_out}.tmp $DEBUG_ERROR | jq '[.results[]|{status: .status, length: .length, url: .url}]' | grep -oP "status\":\s(\d{3})|length\":\s(\d{1,7})|url\":\s\"(http[s]?:\/\/.*?)\"" | paste -d' ' - - - | awk '{print $2" "$4" "$6}' | sed 's/\"//g' | sort |anew -q $dir/fuzzing/${sub_out}.txt
 				eval rm $dir/fuzzing/${sub_out}.tmp $DEBUG_ERROR
 			done
 			end_func "Results are saved in fuzzing/*subdomain*.txt" ${FUNCNAME[0]}
 		else
 			if [ "$FUZZ" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -714,10 +676,10 @@ function cms_scanner(){
 					mv -f $tools/CMSeeK/Result/${sub_out} $dir/cms/
 				fi
 			done
-			end_func "Results are saved in cms/*subdomain* folder"
+			end_func "Results are saved in cms/*subdomain* folder" ${FUNCNAME[0]}
 		else
 			if [ "$CMS_SCANNER" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -749,7 +711,7 @@ function params(){
 			end_func "Results are saved in webs/param.txt" ${FUNCNAME[0]}
 		else
 			if [ "$PARAMS" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -764,19 +726,20 @@ function urlchecks(){
 			cat webs/webs.txt | waybackurls | anew -q .tmp/url_extract_tmp.txt
 			cat webs/webs.txt | gau | anew -q .tmp/url_extract_tmp.txt
 			if [ "$DEEP" = true ] ; then
-				gospider -S webs/webs.txt --js -t 50 -d 3 -H "${HEADER}" --sitemap --robots -w -r | egrep -o 'https?://[^ ]+' | sed 's/]$//' | grep ".$domain$" | anew -q .tmp/url_extract_tmp.txt
+				gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -d 3 -H "${HEADER}" --sitemap --robots -w -r | egrep -o 'https?://[^ ]+' | sed 's/]$//' | grep ".$domain$" | anew -q .tmp/url_extract_tmp.txt
 			else
-				gospider -S webs/webs.txt --js -t 50 -H "${HEADER}" --sitemap --robots -w -r | egrep -o 'https?://[^ ]+' | sed 's/]$//' | grep ".$domain$" | anew -q .tmp/url_extract_tmp.txt
+				gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -H "${HEADER}" --sitemap --robots -w -r | egrep -o 'https?://[^ ]+' | sed 's/]$//' | grep ".$domain$" | anew -q .tmp/url_extract_tmp.txt
 			fi
 			if [ -s "${GITHUB_TOKENS}" ]
 			then
-				eval github-endpoints -q -k -d $domain -t ${GITHUB_TOKENS} -raw $DEBUG_ERROR | anew -q .tmp/url_extract_tmp.txt
+				eval github-endpoints -q -k -d $domain -t ${GITHUB_TOKENS} -o .tmp/github-endpoints.txt $DEBUG_STD
+				eval cat .tmp/github-endpoints.txt $DEBUG_ERROR | anew -q .tmp/url_extract_tmp.txt
 			fi
 			eval cat .tmp/url_extract_tmp.txt webs/param.txt $DEBUG_ERROR | grep "${domain}" | grep "=" | eval qsreplace -a $DEBUG_ERROR | egrep -iv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | anew -q .tmp/url_extract_tmp2.txt
 			cat .tmp/url_extract_tmp.txt | grep "${domain}" | egrep -i "\.(js)" | anew -q js/url_extract_js.txt
 			eval uddup -u .tmp/url_extract_tmp2.txt -o .tmp/url_extract_uddup.txt $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/url_extract_uddup.txt $DEBUG_ERROR | anew webs/url_extract.txt | wc -l)
-			notification "${NUMOFLINES} new urls in ${runtime}" good
+			notification "${NUMOFLINES} new urls with params" good
 			end_func "Results are saved in webs/url_extract.txt" ${FUNCNAME[0]}
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -800,7 +763,7 @@ function url_gf(){
 			end_func "Results are saved in gf folder" ${FUNCNAME[0]}
 		else
 			if [ "$URL_GF" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -815,9 +778,10 @@ function jschecks(){
 			cat js/url_extract_js.txt | cut -d '?' -f 1 | grep -iE "\.js$" | anew -q js/jsfile_links.txt
 			cat js/url_extract_js.txt | subjs | anew -q js/jsfile_links.txt
 			printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
-			cat js/jsfile_links.txt | httpx -follow-redirects -H "${HEADER}" -silent -timeout 15 -status-code -no-color | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
+			cat js/jsfile_links.txt | httpx -follow-redirects -H "${HEADER}" -silent -timeout 15 -threads $HTTPX_THREADS -status-code -no-color | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
 			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
 			interlace -tL js/js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> js/js_endpoints.txt" &>/dev/null
+			sed -i '/^\//!d' js/js_endpoints.txt
 			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
 			cat js/js_livelinks.txt | eval nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o js/js_secrets.txt $DEBUG_STD
 			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
@@ -825,7 +789,7 @@ function jschecks(){
 			end_func "Results are saved in js folder" ${FUNCNAME[0]}
 		else
 			if [ "$JSCHECKS" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -846,7 +810,7 @@ function wordlist_gen(){
 			printf "${bgreen}#######################################################################\n\n"
 		else
 			if [ "$WORDLIST" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -867,7 +831,7 @@ function brokenLinks(){
 		end_func "Results are saved in webs/brokenLinks.txt" ${FUNCNAME[0]}
 	else
 		if [ "$BROKENLINKS" = false ]; then
-			printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
@@ -882,20 +846,20 @@ function xss(){
 		if [ "$DEEP" = true ] ; then
 			if [ -n "$XSS_SERVER" ]; then
 				sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
-				eval python3 $tools/XSStrike/xsstrike.py --seeds .tmp/xss_reflected.txt -t 30 --crawl --blind --skip > vulns/xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval python3 $tools/XSStrike/xsstrike.py --seeds .tmp/xss_reflected.txt -t $XSSTRIKE_THREADS --crawl --blind --skip > vulns/xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			else
 				printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n\n"
-				eval python3 $tools/XSStrike/xsstrike.py --seeds .tmp/xss_reflected.txt -t 30 --crawl --skip > vulns/xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+				eval python3 $tools/XSStrike/xsstrike.py --seeds .tmp/xss_reflected.txt -t $XSSTRIKE_THREADS --crawl --skip > vulns/xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 			fi
 		else
 			if [[ $(cat .tmp/xss_reflected.txt | wc -l) -le 200 ]]
 			then
 				if [ -n "$XSS_SERVER" ]; then
 					sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
-					eval python3 $tools/XSStrike/xsstrike.py --seeds .tmp/xss_reflected.txt -t 30 --crawl --blind --skip > vulns/xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval python3 $tools/XSStrike/xsstrike.py --seeds .tmp/xss_reflected.txt -t $XSSTRIKE_THREADS --crawl --blind --skip > vulns/xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				else
 					printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n\n"
-					eval python3 $tools/XSStrike/xsstrike.py --seeds .tmp/xss_reflected.txt -t 30 --crawl --skip > vulns/xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
+					eval python3 $tools/XSStrike/xsstrike.py --seeds .tmp/xss_reflected.txt -t $XSSTRIKE_THREADS --crawl --skip > vulns/xss.txt $DEBUG_STD && touch $called_fn_dir/.${FUNCNAME[0]}
 				fi
 			else
 				printf "${bred} Skipping XSS: Too Much URLs to test, try with --deep flag${reset}\n"
@@ -904,7 +868,7 @@ function xss(){
 		end_func "Results are saved in vulns/xss.txt" ${FUNCNAME[0]}
 	else
 		if [ "$XSS" = false ]; then
-			printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
@@ -920,7 +884,7 @@ function cors(){
 			end_func "Results are saved in webs/cors.txt"
 		else
 			if [ "$CORS" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -950,7 +914,7 @@ function open_redirect(){
 			fi
 		else
 			if [ "$OPEN_REDIRECT" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -968,7 +932,7 @@ function ssrf_checks(){
 				echo $COLLAB_SERVER_FIX | anew -q .tmp/ssrf_server.txt
 				echo $COLLAB_SERVER | anew -q .tmp/ssrf_server.txt
 				for url in $(cat .tmp/tmp_ssrf.txt); do
-					ffuf -v -H "${HEADER}" -w .tmp/ssrf_server.txt -u $url &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf.txt
+					ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/ssrf_server.txt -u $url &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf.txt
 				done
 				eval python3 $tools/ssrf.py $dir/gf/ssrf.txt $COLLAB_SERVER_FIX $DEBUG_ERROR | anew -q vulns/ssrf.txt
 				end_func "Results are saved in vulns/ssrf.txt" ${FUNCNAME[0]}
@@ -980,7 +944,7 @@ function ssrf_checks(){
 					echo $COLLAB_SERVER_FIX | anew -q .tmp/ssrf_server.txt
 					echo $COLLAB_SERVER | anew -q .tmp/ssrf_server.txt
 					for url in $(cat .tmp/tmp_ssrf.txt); do
-						ffuf -v -H "${HEADER}" -w .tmp/ssrf_server.txt -u $url &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf.txt
+						ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/ssrf_server.txt -u $url &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf.txt
 					done
 					eval python3 $tools/ssrf.py $dir/gf/ssrf.txt $COLLAB_SERVER_FIX $DEBUG_ERROR | anew -q vulns/ssrf.txt
 					end_func "Results are saved in vulns/ssrf.txt" ${FUNCNAME[0]}
@@ -994,7 +958,7 @@ function ssrf_checks(){
 		fi
 	else
 		if [ "$SSRF_CHECKS" = false ]; then
-			printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
@@ -1009,7 +973,7 @@ function crlf_checks(){
 			end_func "Results are saved in vulns/crlf.txt" ${FUNCNAME[0]}
 		else
 			if [ "$CRLF_CHECKS" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -1022,12 +986,12 @@ function lfi(){
 			start_func "LFI checks"
 			cat gf/lfi.txt | qsreplace FUZZ | anew -q .tmp/tmp_lfi.txt
 			for url in $(cat .tmp/tmp_lfi.txt); do
-				ffuf -v -mc 200 -H "${HEADER}" -w $lfi_wordlist -u $url -mr "root:" &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/lfi.txt
+				ffuf -v -mc 200 -t $FFUF_THREADS -H "${HEADER}" -w $lfi_wordlist -u $url -mr "root:" &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/lfi.txt
 			done
 			end_func "Results are saved in vulns/lfi.txt" ${FUNCNAME[0]}
 		else
 			if [ "$LFI" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -1039,13 +1003,13 @@ function ssti(){
 		then
 			start_func "SSTI checks"
 			cat gf/ssti.txt | qsreplace "ssti{{7*7}}" | anew -q .tmp/ssti_fuzz.txt
-			ffuf -v -mc 200 -H "${HEADER}" -w .tmp/ssti_fuzz.txt -u FUZZ -mr "ssti49" &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssti.txt
+			ffuf -v -mc 200 -t $FFUF_THREADS -H "${HEADER}" -w .tmp/ssti_fuzz.txt -u FUZZ -mr "ssti49" &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssti.txt
 			cat gf/ssti.txt | qsreplace "{{''.class.mro[2].subclasses()[40]('/etc/passwd').read()}}" | anew -q .tmp/ssti_fuzz2.txt
-			ffuf -v -mc 200 -H "${HEADER}" -w .tmp/ssti_fuzz.txt -u FUZZ -mr "root:" &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssti.txt
+			ffuf -v -mc 200 -t $FFUF_THREADS -H "${HEADER}" -w .tmp/ssti_fuzz.txt -u FUZZ -mr "root:" &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssti.txt
 			end_func "Results are saved in vulns/ssti.txt" ${FUNCNAME[0]}
 		else
 			if [ "$SSTI" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -1061,7 +1025,7 @@ function sqli(){
 			end_func "Results are saved in sqlmap folder" ${FUNCNAME[0]}
 		else
 			if [ "$SQLI" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -1076,7 +1040,7 @@ function test_ssl(){
 			end_func "Results are saved in hosts/testssl.txt" ${FUNCNAME[0]}
 		else
 			if [ "$TEST_SSL" = false ]; then
-				printf "${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -1156,17 +1120,15 @@ function notification(){
 }
 
 function start_func(){
-	printf "${bgreen}#######################################################################\n"
+	printf "${bgreen}#######################################################################"
 	notification "${1}" info
 	start=`date +%s`
-	start_spinner
 }
 
 function end_func(){
 	touch $called_fn_dir/.${2}
 	end=`date +%s`
 	getElapsedTime $start $end
-	stop_spinner
 	notification "${2} Finished in ${runtime}" info
 	printf "${bblue} ${1} ${reset}\n"
 	printf "${bgreen}#######################################################################\n"
@@ -1175,57 +1137,13 @@ function end_func(){
 function start_subfunc(){
 	notification "${1}" warn
 	start_sub=`date +%s`
-	start_spinner
 }
 
 function end_subfunc(){
 	touch $called_fn_dir/.${2}
 	end_sub=`date +%s`
 	getElapsedTime $start_sub $end_sub
-	stop_spinner
 	notification "${1} in ${runtime}" good
-}
-
-function _spinner() {
-
-    case $1 in
-        start)
-			let column=$(tput cols)-${#2}+2
-            echo -ne ${2}
-            printf "%${column}s"
-            i=1
-            sp='⣾⣽⣻⢿⡿⣟⣯⣷'
-            delay=${SPINNER_DELAY:-0.15}
-            while :
-            do
-                printf "\b${sp:i++%${#sp}:1}"
-                sleep $delay
-            done
-            ;;
-        stop)
-            if [[ -z ${1} ]]; then
-                echo "spinner is not running.."
-                exit 1
-            fi
-            kill $2 > /dev/null 2>&1
-            echo -en "\b "
-            ;;
-        *)
-            echo "invalid argument, try {start/stop}"
-            exit 1
-            ;;
-    esac
-}
-
-function start_spinner {
-	_spinner "start" "${1}" | lolcat &
-    _sp_pid=$!
-    disown
-}
-
-function stop_spinner {
-    _spinner "stop" $1 $_sp_pid
-    unset _sp_pid
 }
 
 function start(){
