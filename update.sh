@@ -2,7 +2,6 @@
 
 #@TODO:
     # - Update testssl.sh
-    # - Update Go packages
 
 bred='\033[1;31m'
 bblue='\033[1;34m'
@@ -135,6 +134,22 @@ else
     eval rm -rf $LATEST_GO* $DEBUG_STD
 fi
 printf "${bblue}\n Updating Golang is finished ${reset}\n"
+printf "${bgreen}#######################################################################\n"
+
+#Updating Golang Tools
+printf "${bgreen}#######################################################################\n"
+printf "${bblue} Updating Golang Tools \n"
+eval gobin -u $DEBUG_STD
+eval GO111MODULE=on go get -v github.com/OWASP/Amass/v3/... $DEBUG_STD
+eval GO111MODULE=on go get -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei $DEBUG_STD
+eval GO111MODULE=on go get -v github.com/projectdiscovery/notify/cmd/notify $DEBUG_STD
+eval GO111MODULE=on go get -v github.com/projectdiscovery/httpx/cmd/httpx $DEBUG_STD
+eval GO111MODULE=on go get -v github.com/projectdiscovery/dnsx/cmd/dnsx $DEBUG_STD
+eval GO111MODULE=on go get -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder $DEBUG_STD
+eval GO111MODULE=on go get -u -v github.com/lc/subjs $DEBUG_STD
+eval GO111MODULE=on go get -v github.com/projectdiscovery/shuffledns/cmd/shuffledns $DEBUG_STD
+eval GO111MODULE=on go get -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz $DEBUG_STD
+printf "${bblue}\n Updating Golang Tools finished ${reset}\n"
 printf "${bgreen}#######################################################################\n"
 
 #stripping all Go binaries

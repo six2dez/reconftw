@@ -154,6 +154,7 @@ eval GO111MODULE=on go get -u -v github.com/lc/subjs $DEBUG_STD
 eval go get -v github.com/KathanP19/Gxss $DEBUG_STD
 eval git clone https://github.com/blechschmidt/massdns $dir/massdns $DEBUG_STD
 eval git clone https://github.com/s0md3v/Arjun $dir/Arjun $DEBUG_STD
+eval go get -u github.com/rjeczalik/bin/cmd/gobin $DEBUG_STD
 printf "${bgreen} 50%% done${reset}\n\n"
 eval git clone https://github.com/devanshbatham/ParamSpider $dir/ParamSpider $DEBUG_STD
 eval git clone https://github.com/dark-warlord14/LinkFinder $dir/LinkFinder $DEBUG_STD

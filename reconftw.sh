@@ -45,23 +45,23 @@ function tools_installed(){
 	[ -f $tools/degoogle_hunter/degoogle_hunter.sh ] || { printf "${bred} [*] degoogle_hunter	[NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/getjswords.py ] || { printf "${bred} [*] getjswords   	[NO]${reset}\n"; allinstalled=false;}
 	eval type -P arjun $DEBUG_STD || { printf "${bred} [*] Arjun		[NO]${reset}\n"; allinstalled=false;}
-	eval type -P github-endpoints $DEBUG_STD || { printf "${bred} [*] github-endpoints		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P github-endpoints $DEBUG_STD || { printf "${bred} [*] github-endpoints	[NO]${reset}\n"; allinstalled=false;}
 	eval type -P gospider $DEBUG_STD || { printf "${bred} [*] gospider		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P wafw00f $DEBUG_STD || { printf "${bred} [*] wafw00f		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P subfinder $DEBUG_STD || { printf "${bred} [*] Subfinder		[NO]${reset}\n"; allinstalled=false;}
-	eval type -P assetfinder $DEBUG_STD || { printf "${bred} [*] Assetfinder		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P assetfinder $DEBUG_STD || { printf "${bred} [*] Assetfinder	[NO]${reset}\n"; allinstalled=false;}
 	eval type -P gowitness $DEBUG_STD || { printf "${bred} [*] gowitness		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P findomain $DEBUG_STD || { printf "${bred} [*] Findomain		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P amass $DEBUG_STD || { printf "${bred} [*] Amass		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P crobat $DEBUG_STD || { printf "${bred} [*] Crobat		[NO]${reset}\n"; allinstalled=false;}
-	eval type -P waybackurls $DEBUG_STD || { printf "${bred} [*] Waybackurls		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P waybackurls $DEBUG_STD || { printf "${bred} [*] Waybackurls	[NO]${reset}\n"; allinstalled=false;}
 	eval type -P gau $DEBUG_STD || { printf "${bred} [*] Gau		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P dnsx $DEBUG_STD || { printf "${bred} [*] dnsx		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P shuffledns $DEBUG_STD || { printf "${bred} [*] ShuffleDns		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P cf-check $DEBUG_STD || { printf "${bred} [*] Cf-check		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P nuclei $DEBUG_STD || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; allinstalled=false;}
 	[ -d ~/nuclei-templates ] || { printf "${bred} [*] Nuclei templates    [NO]${reset}\n"; allinstalled=false;}
-	eval type -P gf $DEBUG_STD || { printf "${bred} [*] Gf		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P gf $DEBUG_STD || { printf "${bred} [*] Gf			[NO]${reset}\n"; allinstalled=false;}
 	eval type -P Gxss $DEBUG_STD || { printf "${bred} [*] Gxss		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P subjs $DEBUG_STD || { printf "${bred} [*] subjs		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P ffuf $DEBUG_STD || { printf "${bred} [*] ffuf		[NO]${reset}\n"; allinstalled=false;}
@@ -357,6 +357,10 @@ function sub_dns(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]
 		then
 			start_subfunc "Running : Active Subdomain Enumeration"
+			if [ -s "${inScope_file}" ]
+			then
+				cat ${inScope_file} .tmp/inscope_subs.txt
+			fi
 			cat .tmp/*_subs.txt | anew -q .tmp/subs_no_resolved.txt
 			deleteOutScoped $outOfScope_file .tmp/subs_no_resolved.txt
 			eval shuffledns -d $domain -list .tmp/subs_no_resolved.txt -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/subdomains_tmp.txt $DEBUG_STD
@@ -1400,13 +1404,14 @@ function subs_menu(){
 }
 
 function help(){
-	printf "\n Usage: $0 [-d domain.tld] [-m name] [-l list.txt] [-x oos.txt] [-r] [-s] "
-	printf "\n           	      [-p] [-a] [-w] [-i] [-v] [-h] [--deep] [--fs] [-o OUTPUT]\n\n"
+	printf "\n Usage: $0 [-d domain.tld] [-m name] [-l list.txt] [-x oos.txt] [-i in.txt] "
+	printf "\n           	      [-r] [-s] [-p] [-a] [-w] [-i] [-v] [-h] [--deep] [--fs] [-o OUTPUT]\n\n"
 	printf " ${bblue}TARGET OPTIONS${reset}\n"
 	printf "   -d domain.tld    Target domain\n"
 	printf "   -m company       Target company name\n"
 	printf "   -l list.txt      Targets list, one per line\n"
 	printf "   -x oos.txt       Exclude subdomains list (Out Of Scope)\n"
+	printf "   -i in.txt        Include subdomains list\n"
 	printf " \n"
 	printf " ${bblue}MODE OPTIONS${reset}\n"
 	printf "   -r               Recon - Full recon process (only recon without attacks)\n"
@@ -1452,7 +1457,7 @@ then
 	exit
 fi
 
-while getopts ":hd:-:l:m:x:varspxwo:" opt; do
+while getopts ":hd:-:l:m:x:i:varspxwo:" opt; do
 	general=$@
 	if [[ $general == *"-v"* ]]; then
   		unset DEBUG_STD
@@ -1476,6 +1481,14 @@ while getopts ":hd:-:l:m:x:varspxwo:" opt; do
 			;;
 		x ) outOfScope_file=$OPTARG
 			isAsciiText $outOfScope_file
+			if [ "False" = "$IS_ASCII" ]
+			then
+				printf "\n\n${bred} Out of Scope file is not a text file${reset}\n\n"
+				exit
+			fi
+			;;
+		i ) inScope_file=$OPTARG
+			isAsciiText $inScope_file
 			if [ "False" = "$IS_ASCII" ]
 			then
 				printf "\n\n${bred} Out of Scope file is not a text file${reset}\n\n"
