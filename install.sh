@@ -46,7 +46,7 @@ if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]]
     then
         printf "${bgreen} Golang is already installed ${reset}\n\n"
     else
-        printf "${bgreen} Installing Golang ${reset}\n"
+        printf "${yellow} Running: Installing Golang ${reset}\n\n"
         if [ "True" = "$IS_ARM" ]; then
             eval wget https://dl.google.com/go/$(curl https://golang.org/VERSION?m=text).linux-armv6l.tar.gz $DEBUG_STD
             eval $SUDO tar -C /usr/local -xzf go$LATEST_GO.linux-armv6l.tar.gz $DEBUG_STD
@@ -81,14 +81,14 @@ export GOPATH=\$HOME/go
 export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH
 EOF
 fi
-# printf "${yellow} Golang installed! Open a new terminal and run again this script ${reset}\n"
+printf "${bgreen} Golang installed${reset}\n"
 # exit
 fi
 
 [ -n "$GOPATH" ] || { printf "${bred} GOPATH env var not detected, add Golang env vars to your \$HOME/.bashrc or \$HOME/.zshrc:\n\n export GOROOT=/usr/local/go\n export GOPATH=\$HOME/go\n export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH\n\n"; exit 1; }
 [ -n "$GOROOT" ] || { printf "${bred} GOROOT env var not detected, add Golang env vars to your \$HOME/.bashrc or \$HOME/.zshrc:\n\n export GOROOT=/usr/local/go\n export GOPATH=\$HOME/go\n export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH\n\n"; exit 1; }
 
-
+printf "${yellow} Running: Installing system packages ${reset}\n\n"
 if [ -f /etc/debian_version ]; then install_apt;
 elif [ -f /etc/redhat-release ]; then install_yum;
 elif [ -f /etc/arch-release ]; then install_pacman;
@@ -96,7 +96,7 @@ elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for
 fi
 
 printf "${bgreen} System packages installed${reset}\n\n"
-
+printf "${yellow} Running: Installing requirements ${reset}\n\n"
 if ! command -v phantomjs &> /dev/null
 then
     cd /opt
