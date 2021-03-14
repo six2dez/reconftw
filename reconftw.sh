@@ -379,7 +379,7 @@ function sub_scraping(){
 		then
 			start_subfunc "Running : Source code scraping subdomain search"
 			touch .tmp/scrap_subs.txt
-			cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout 15 -silent -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp.txt
+			cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp.txt
 			gospider -S .tmp/probed_tmp.txt --js -t $GOSPIDER_THREADS -H "${HEADER}" --sitemap --robots -w -r | egrep -o 'https?://[^ ]+' | sed 's/]$//' | unfurl --unique domains | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
 			cat .tmp/scrap_subs.txt | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/scrap_subs_resolved.txt $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/scrap_subs_resolved.txt $DEBUG_ERROR | anew subdomains/subdomains.txt | wc -l)
@@ -469,7 +469,7 @@ function webprobe_simple(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$WEBPROBESIMPLE" = true ]
 		then
 			start_subfunc "Running : Http probing"
-			cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout 15 -silent -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp.txt
+			cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp.txt
 			deleteOutScoped $outOfScope_file .tmp/probed_tmp.txt
 			NUMOFLINES=$(eval cat .tmp/probed_tmp.txt $DEBUG_ERROR | anew webs/webs.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new websites resolved" ${FUNCNAME[0]}
@@ -486,7 +486,7 @@ function webprobe_full(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$WEBPROBEFULL" = true ]
 		then
 			start_func "Http probing non standard ports"
-			cat subdomains/subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55440,55672 -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout 10 -silent -no-color | cut -d ' ' -f1 | grep ".$domain" | anew -q .tmp/probed_uncommon_ports_tmp.txt
+			cat subdomains/subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55440,55672 -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout 10 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain" | anew -q .tmp/probed_uncommon_ports_tmp.txt
 			NUMOFLINES=$(eval cat .tmp/probed_uncommon_ports_tmp.txt $DEBUG_ERROR | anew webs/webs_uncommon_ports.txt | wc -l)
 			notification "Uncommon web ports: ${NUMOFLINES} new websites in ${runtime}" good
 			eval cat webs/webs_uncommon_ports.txt $DEBUG_ERROR
@@ -762,7 +762,7 @@ function url_gf(){
 			gf redirect webs/url_extract.txt | anew -q gf/redirect.txt && cat gf/ssrf.txt | anew -q gf/redirect.txt
 			gf rce webs/url_extract.txt | anew -q gf/rce.txt
 			gf potential webs/url_extract.txt | cut -d ':' -f3-5 |anew -q gf/potential.txt
-			cat webs/url_extract.txt | unfurl -u format %s://%d%p | anew -q gf/endpoints.txt
+			cat .tmp/url_extract_tmp.txt | egrep -iv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | unfurl -u format %s://%d%p | anew -q gf/endpoints.txt
 			gf lfi webs/url_extract.txt | anew -q gf/lfi.txt
 			end_func "Results are saved in gf folder" ${FUNCNAME[0]}
 		else
@@ -782,14 +782,18 @@ function jschecks(){
 			cat js/url_extract_js.txt | cut -d '?' -f 1 | grep -iE "\.js$" | anew -q js/jsfile_links.txt
 			cat js/url_extract_js.txt | subjs | anew -q js/jsfile_links.txt
 			printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
-			cat js/jsfile_links.txt | httpx -follow-redirects -H "${HEADER}" -silent -timeout 15 -threads $HTTPX_THREADS -status-code -no-color | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
+			cat js/jsfile_links.txt | httpx -follow-redirects -H "${HEADER}" -silent -timeout 15 -threads $HTTPX_THREADS -status-code -retries 2 -no-color | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
 			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
-			interlace -tL js/js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> js/js_endpoints.txt" &>/dev/null
-			sed -i '/^\//!d' js/js_endpoints.txt
+			interlace -tL js/js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> .tmp/js_endpoints.txt" &>/dev/null
+			eval sed -i '/^\//!d' .tmp/js_endpoints.txt $DEBUG_ERROR
+			cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt.txt
 			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
 			cat js/js_livelinks.txt | eval nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o js/js_secrets.txt $DEBUG_STD
 			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
-			cat js/js_livelinks.txt | eval python3 $tools/getjswords.py $DEBUG_ERROR | anew -q webs/dict_words.txt
+			if [ -s "js/js_livelinks.txt" ]
+			then
+				cat js/js_livelinks.txt | eval python3 $tools/getjswords.py $DEBUG_ERROR | anew -q webs/dict_words.txt
+			fi
 			end_func "Results are saved in js folder" ${FUNCNAME[0]}
 		else
 			if [ "$JSCHECKS" = false ]; then
@@ -805,6 +809,8 @@ function wordlist_gen(){
 		then
 			start_func "Wordlist generation"
 			cat .tmp/url_extract_tmp.txt | unfurl -u keys | sed 's/[][]//g' | sed 's/[#]//g' | sed 's/[}{]//g' | anew -q webs/dict_words.txt
+			cat .tmp/url_extract_tmp.txt | unfurl -u values | sed 's/[][]//g' | sed 's/[#]//g' | sed 's/[}{]//g' | anew -q webs/dict_words.txt
+			cat .tmp/js_endpoints.txt | unfurl -u path | anew -q webs/dict_paths.txt
 			cat .tmp/url_extract_tmp.txt | unfurl -u path | anew -q webs/dict_paths.txt
 			touch $called_fn_dir/.${FUNCNAME[0]}
 			end=`date +%s`
@@ -843,7 +849,7 @@ function brokenLinks(){
 }
 
 function xss(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$XSS" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$XSS" = true ] && [ -s "gf/xss.txt" ]
 	then
 		start_func "XSS Analysis"
 		cat gf/xss.txt | qsreplace FUZZ | Gxss -c 100 -p Xss | anew -q .tmp/xss_reflected.txt
@@ -873,6 +879,8 @@ function xss(){
 	else
 		if [ "$XSS" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+		elif [ ! -s "gf/xss.txt" ]; then
+				printf "\n${yellow} ${FUNCNAME[0]} No URLs potentially vulnerables to XSS ${reset}\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
@@ -896,7 +904,7 @@ function cors(){
 }
 
 function open_redirect(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$OPEN_REDIRECT" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$OPEN_REDIRECT" = true ] && [ -s "gf/redirect.txt" ]
 		then
 			start_func "Open redirects checks"
 			if [ "$DEEP" = true ] ; then
@@ -919,6 +927,8 @@ function open_redirect(){
 		else
 			if [ "$OPEN_REDIRECT" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+			elif [ ! -s "gf/redirect.txt" ]; then
+				printf "\n${yellow} ${FUNCNAME[0]} No URLs potentially vulnerables to Open Redirect ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -926,7 +936,7 @@ function open_redirect(){
 }
 
 function ssrf_checks(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SSRF_CHECKS" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SSRF_CHECKS" = true ] && [ -s "gf/ssrf.txt" ]
 	then
 		if [ -n "$COLLAB_SERVER" ]; then
 			start_func "SSRF checks"
@@ -963,6 +973,8 @@ function ssrf_checks(){
 	else
 		if [ "$SSRF_CHECKS" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+		elif [ ! -s "gf/ssrf.txt" ]; then
+				printf "\n${yellow} ${FUNCNAME[0]} No URLs potentially vulnerables to SSRF ${reset}\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
@@ -985,7 +997,7 @@ function crlf_checks(){
 }
 
 function lfi(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$LFI" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$LFI" = true ] && [ -s "gf/lfi.txt" ]
 		then
 			start_func "LFI checks"
 			cat gf/lfi.txt | qsreplace FUZZ | anew -q .tmp/tmp_lfi.txt
@@ -996,6 +1008,8 @@ function lfi(){
 		else
 			if [ "$LFI" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+			elif [ ! -s "gf/lfi.txt" ]; then
+				printf "\n${yellow} ${FUNCNAME[0]} No URLs potentially vulnerables to LFI ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -1003,7 +1017,7 @@ function lfi(){
 }
 
 function ssti(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SSTI" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SSTI" = true ] && [ -s "gf/ssti.txt" ]
 		then
 			start_func "SSTI checks"
 			cat gf/ssti.txt | qsreplace "ssti{{7*7}}" | anew -q .tmp/ssti_fuzz.txt
@@ -1014,6 +1028,8 @@ function ssti(){
 		else
 			if [ "$SSTI" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+			elif [ ! -s "gf/ssti.txt" ]; then
+				printf "\n${yellow} ${FUNCNAME[0]} No URLs potentially vulnerables to SSTI ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
@@ -1021,7 +1037,7 @@ function ssti(){
 }
 
 function sqli(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SQLI" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SQLI" = true ] && [ -s "gf/sqli.txt" ]
 		then
 			start_func "SQLi checks"
 			cat gf/sqli.txt | qsreplace FUZZ | anew -q .tmp/tmp_sqli.txt
@@ -1030,6 +1046,8 @@ function sqli(){
 		else
 			if [ "$SQLI" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+			elif [ ! -s "gf/sqli.txt" ]; then
+				printf "\n${yellow} ${FUNCNAME[0]} No URLs potentially vulnerables to SQLi ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
