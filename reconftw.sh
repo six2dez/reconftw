@@ -46,6 +46,7 @@ function tools_installed(){
 	[ -f $tools/getjswords.py ] || { printf "${bred} [*] getjswords   	[NO]${reset}\n"; allinstalled=false;}
 	eval type -P arjun $DEBUG_STD || { printf "${bred} [*] Arjun		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P github-endpoints $DEBUG_STD || { printf "${bred} [*] github-endpoints	[NO]${reset}\n"; allinstalled=false;}
+	eval type -P github-subdomains $DEBUG_STD || { printf "${bred} [*] github-subdomains	[NO]${reset}\n"; allinstalled=false;}
 	eval type -P gospider $DEBUG_STD || { printf "${bred} [*] gospider		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P wafw00f $DEBUG_STD || { printf "${bred} [*] wafw00f		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P subfinder $DEBUG_STD || { printf "${bred} [*] Subfinder		[NO]${reset}\n"; allinstalled=false;}
@@ -54,6 +55,7 @@ function tools_installed(){
 	eval type -P findomain $DEBUG_STD || { printf "${bred} [*] Findomain		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P amass $DEBUG_STD || { printf "${bred} [*] Amass		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P crobat $DEBUG_STD || { printf "${bred} [*] Crobat		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P mildew $DEBUG_STD || { printf "${bred} [*] mildew		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P waybackurls $DEBUG_STD || { printf "${bred} [*] Waybackurls	[NO]${reset}\n"; allinstalled=false;}
 	eval type -P gau $DEBUG_STD || { printf "${bred} [*] Gau		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P dnsx $DEBUG_STD || { printf "${bred} [*] dnsx		[NO]${reset}\n"; allinstalled=false;}
@@ -282,13 +284,27 @@ function sub_passive(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]
 		then
 			start_subfunc "Running : Passive Subdomain Enumeration"
-			eval subfinder -d $domain -o .tmp/subfinder.txt $DEBUG_STD
-			eval assetfinder --subs-only $domain $DEBUG_ERROR | anew -q .tmp/assetfinder.txt
-			eval amass enum -passive -d $domain -config $AMASS_CONFIG -o .tmp/amass.txt $DEBUG_STD
-			eval findomain --quiet -t $domain -u .tmp/findomain.txt $DEBUG_STD
-			eval crobat -s $domain $DEBUG_ERROR | anew -q .tmp/crobat.txt
-			timeout 5m waybackurls $domain | unfurl --unique domains | anew -q .tmp/waybackurls.txt
-			NUMOFLINES=$(eval cat .tmp/subfinder.txt .tmp/assetfinder.txt .tmp/amass.txt .tmp/findomain.txt .tmp/crobat.txt .tmp/waybackurls.txt $DEBUG_ERROR | sed "s/*.//" | anew .tmp/passive_subs.txt | wc -l)
+			eval subfinder -d $domain -o .tmp/subfinder_psub.txt $DEBUG_STD
+			eval assetfinder --subs-only $domain $DEBUG_ERROR | anew -q .tmp/assetfinder_psub.txt
+			eval amass enum -passive -d $domain -config $AMASS_CONFIG -o .tmp/amass_psub.txt $DEBUG_STD
+			eval findomain --quiet -t $domain -u .tmp/findomain_psub.txt $DEBUG_STD
+			eval crobat -s $domain $DEBUG_ERROR | anew -q .tmp/crobat_psub.txt
+			if [ -s "${GITHUB_TOKENS}" ];then
+				if [ "$DEEP" = true ] ; then
+					eval github-subdomains -d $domain -k -raw -t $GITHUB_TOKENS | anew -q .tmp/github_subdomains_psub.txt
+				else
+					eval github-subdomains -d $domain -k -q -raw -t $GITHUB_TOKENS | anew -q .tmp/github_subdomains_psub.txt
+				fi
+			fi
+			eval curl -s "https://jldc.me/anubis/subdomains/tiktok.com" $DEBUG_ERROR | grep -Po "((http|https):\/\/)?(([\w.-]*)\.([\w]*)\.([A-z]))\w+" | sed '/^\./d' | anew -q .tmp/jldc_psub.txt
+			timeout 10m waybackurls $domain | unfurl --unique domains | anew -q .tmp/waybackurls_psub.txt
+			timeout 10m gau $domain | unfurl --unique domains | anew -q .tmp/gau_psub.txt
+			if echo $domain | grep -q ".mil$"; then
+				mildew
+				mv mildew.out .tmp/mildew.out
+				cat .tmp/mildew.out | grep ".$domain$" | anew -q .tmp/mil_psub.txt
+			fi
+			NUMOFLINES=$(eval cat .tmp/*_psub.txt $DEBUG_ERROR | sed "s/*.//" | anew .tmp/passive_subs.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (passive)" ${FUNCNAME[0]}
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"

@@ -124,12 +124,14 @@ eval go get -v github.com/tomnomnom/qsreplace $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/OWASP/Amass/v3/... $DEBUG_STD
 eval go get -v github.com/ffuf/ffuf $DEBUG_STD
 eval go get -v github.com/tomnomnom/assetfinder $DEBUG_STD
+eval go get -u github.com/gwen001/github-subdomains $DEBUG_STD
 printf "${bgreen} 10%% done${reset}\n\n"
 eval go get -v github.com/dwisiswant0/cf-check $DEBUG_STD
 eval go get -v github.com/tomnomnom/hacks/waybackurls $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei $DEBUG_STD
 eval go get -v github.com/tomnomnom/anew $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/projectdiscovery/notify/cmd/notify $DEBUG_STD
+eval go get -u github.com/daehee/mildew/cmd/mildew $DEBUG_STD
 printf "${bgreen} 20%% done${reset}\n\n"
 eval go get -v github.com/tomnomnom/unfurl $DEBUG_STD
 eval git clone https://github.com/projectdiscovery/nuclei-templates ~/nuclei-templates $DEBUG_STD
