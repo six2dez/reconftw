@@ -298,7 +298,7 @@ function sub_passive(){
 			fi
 			eval curl -s "https://jldc.me/anubis/subdomains/tiktok.com" $DEBUG_ERROR | grep -Po "((http|https):\/\/)?(([\w.-]*)\.([\w]*)\.([A-z]))\w+" | sed '/^\./d' | anew -q .tmp/jldc_psub.txt
 			timeout 10m waybackurls $domain | unfurl --unique domains | anew -q .tmp/waybackurls_psub.txt
-			timeout 10m gau $domain | unfurl --unique domains | anew -q .tmp/gau_psub.txt
+			timeout 10m gau -subs $domain | unfurl --unique domains | anew -q .tmp/gau_psub.txt
 			if echo $domain | grep -q ".mil$"; then
 				mildew
 				mv mildew.out .tmp/mildew.out
@@ -396,7 +396,12 @@ function sub_scraping(){
 			start_subfunc "Running : Source code scraping subdomain search"
 			touch .tmp/scrap_subs.txt
 			cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp.txt
-			gospider -S .tmp/probed_tmp.txt --js -t $GOSPIDER_THREADS -H "${HEADER}" --sitemap --robots -w -r | egrep -o 'https?://[^ ]+' | sed 's/]$//' | unfurl --unique domains | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
+			if [ "$DEEP" = true ] ; then
+				gospider -S .tmp/probed_tmp.txt --js -t $GOSPIDER_THREADS -d 3 -H "${HEADER}" --sitemap --robots -w -r > .tmp/gospider.txt
+			else
+				gospider -S .tmp/probed_tmp.txt --js -t $GOSPIDER_THREADS -H "${HEADER}" --sitemap --robots -w -r > .tmp/gospider.txt
+			fi
+			cat .tmp/gospider.txt | egrep -o 'https?://[^ ]+' | sed 's/]$//' | unfurl --unique domains | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
 			cat .tmp/scrap_subs.txt | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/scrap_subs_resolved.txt $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/scrap_subs_resolved.txt $DEBUG_ERROR | anew subdomains/subdomains.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (code scraping)" ${FUNCNAME[0]}
@@ -744,12 +749,17 @@ function urlchecks(){
 			start_func "URL Extraction"
 			mkdir -p js
 			cat webs/webs.txt | waybackurls | anew -q .tmp/url_extract_tmp.txt
-			cat webs/webs.txt | gau | anew -q .tmp/url_extract_tmp.txt
-			if [ "$DEEP" = true ] ; then
-				gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -d 3 -H "${HEADER}" --sitemap --robots -w -r | egrep -o 'https?://[^ ]+' | sed 's/]$//' | grep ".$domain$" | anew -q .tmp/url_extract_tmp.txt
-			else
-				gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -H "${HEADER}" --sitemap --robots -w -r | egrep -o 'https?://[^ ]+' | sed 's/]$//' | grep ".$domain$" | anew -q .tmp/url_extract_tmp.txt
+			cat webs/webs.txt | gau -subs | anew -q .tmp/url_extract_tmp.txt
+			diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt) <(sort -u webs/webs.txt) | wc -l)
+			if [ $diff_webs != "0" ];
+			then
+				if [ "$DEEP" = true ] ; then
+					gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -d 3 -H "${HEADER}" --sitemap --robots -w -r > .tmp/gospider.txt
+				else
+					gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -H "${HEADER}" --sitemap --robots -w -r > .tmp/gospider.txt
+				fi
 			fi
+			cat .tmp/gospider.txt | egrep -o 'https?://[^ ]+' | sed 's/]$//' | grep ".$domain$" | anew -q .tmp/url_extract_tmp.txt
 			if [ -s "${GITHUB_TOKENS}" ]
 			then
 				eval github-endpoints -q -k -d $domain -t ${GITHUB_TOKENS} -o .tmp/github-endpoints.txt $DEBUG_STD
@@ -826,6 +836,7 @@ function wordlist_gen(){
 			start_func "Wordlist generation"
 			cat .tmp/url_extract_tmp.txt | unfurl -u keys | sed 's/[][]//g' | sed 's/[#]//g' | sed 's/[}{]//g' | anew -q webs/dict_words.txt
 			cat .tmp/url_extract_tmp.txt | unfurl -u values | sed 's/[][]//g' | sed 's/[#]//g' | sed 's/[}{]//g' | anew -q webs/dict_words.txt
+			cat .tmp/url_extract_tmp.txt | tr "[:punct:]" "\n" | anew -q webs/dict_words.txt
 			cat .tmp/js_endpoints.txt | unfurl -u path | anew -q webs/dict_paths.txt
 			cat .tmp/url_extract_tmp.txt | unfurl -u path | anew -q webs/dict_paths.txt
 			touch $called_fn_dir/.${FUNCNAME[0]}
@@ -850,9 +861,15 @@ function wordlist_gen(){
 function brokenLinks(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$BROKENLINKS" = true ] ; then
 		start_func "Broken links checks"
-		interlace -tL webs/webs.txt -threads 10 -c "wget --spider -r -nd -nv -H -l 1 -w 1 --no-check-certificate -U 'Mozilla' -o _output_/_cleantarget__brokenLinks.tmp _target_" -o .tmp &>/dev/null
-		cat .tmp/*_brokenLinks.tmp | grep "^http" | grep -v ':$' | anew -q .tmp/brokenLinks_total.txt
-		NUMOFLINES=$(eval cat .tmp/brokenLinks_total.txt $DEBUG_ERROR | cut -d ' ' -f2 | anew webs/brokenLinks.txt | wc -l)
+		if [ ! -s ".tmp/gospider.txt" ]; then
+			if [ "$DEEP" = true ] ; then
+				gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -d 3 -H "${HEADER}" --sitemap --robots -w -r > .tmp/gospider.txt
+			else
+				gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -H "${HEADER}" --sitemap --robots -w -r > .tmp/gospider.txt
+			fi
+		fi
+		cat .tmp/gospider.txt | egrep -o 'https?://[^ ]+' | sed 's/]$//' | sort -u | httpx -follow-redirects -status-code -timeout 15 -silent -retries 2 -no-color | grep "\[4" | cut -d ' ' -f1 | anew -q .tmp/brokenLinks_total.txt
+		NUMOFLINES=$(eval cat .tmp/brokenLinks_total.txt $DEBUG_ERROR | anew webs/brokenLinks.txt | wc -l)
 		notification "${NUMOFLINES} new broken links found in ${runtime}" good
 		end_func "Results are saved in webs/brokenLinks.txt" ${FUNCNAME[0]}
 	else
