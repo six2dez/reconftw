@@ -28,6 +28,9 @@
   <a href="https://t.me/joinchat/H5bAaw3YbzzmI5co">
     <img src="https://img.shields.io/badge/telegram-@ReconFTW-blue.svg">
   </a>
+  <a href="https://hub.docker.com/r/six2dez/reconftw">
+    <img alt="Docker Cloud Build Status" src="https://img.shields.io/docker/cloud/build/six2dez/reconftw">
+  </a>
 </p>
 
 - [Summary](#summary)
@@ -37,6 +40,7 @@
 - [Sample Video](#sample-video)
 - [Features](#fire-features-fire)
 - [Mindmap/Workflow](#mindmapworkflow)
+- [Need help?](#need-help)
 - [Contribute](#how-to-contribute)
 - [Thanks](#thanks)
 
@@ -303,6 +307,11 @@ resolvers=${tools}/resolvers.txt
 If you want to contribute to this project you can do it in multiple ways:
 - Submitting an [issue](https://github.com/six2dez/reconftw/issues/new/choose) because you have found a bug or you have any suggestion or request.
 - Making a Pull Request from [dev](https://github.com/six2dez/reconftw/tree/dev) branch because you want to improve the code or add something to the script.
+
+## Need help?
+
+- Take a look in the [wiki](https://github.com/six2dez/reconftw/wiki) 
+- Ask for help in the [Telegram group](https://t.me/joinchat/TO_R8NYFhhbmI5co)
 
 ## You can support this work buying me a coffee:  
 
