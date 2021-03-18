@@ -296,7 +296,7 @@ function sub_passive(){
 					eval github-subdomains -d $domain -k -q -raw -t $GITHUB_TOKENS | anew -q .tmp/github_subdomains_psub.txt
 				fi
 			fi
-			eval curl -s "https://jldc.me/anubis/subdomains/tiktok.com" $DEBUG_ERROR | grep -Po "((http|https):\/\/)?(([\w.-]*)\.([\w]*)\.([A-z]))\w+" | sed '/^\./d' | anew -q .tmp/jldc_psub.txt
+			eval curl -s "https://jldc.me/anubis/subdomains/${domain}" $DEBUG_ERROR | grep -Po "((http|https):\/\/)?(([\w.-]*)\.([\w]*)\.([A-z]))\w+" | sed '/^\./d' | anew -q .tmp/jldc_psub.txt
 			timeout 10m waybackurls $domain | unfurl --unique domains | anew -q .tmp/waybackurls_psub.txt
 			timeout 10m gau -subs $domain | unfurl --unique domains | anew -q .tmp/gau_psub.txt
 			if echo $domain | grep -q ".mil$"; then

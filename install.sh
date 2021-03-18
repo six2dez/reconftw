@@ -47,13 +47,14 @@ if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]]
         printf "${bgreen} Golang is already installed ${reset}\n\n"
     else
         printf "${yellow} Running: Installing Golang ${reset}\n\n"
+        version=$(curl https://golang.org/VERSION?m=text)
         if [ "True" = "$IS_ARM" ]; then
-            eval wget https://dl.google.com/go/$(curl https://golang.org/VERSION?m=text).linux-armv6l.tar.gz $DEBUG_STD
-            eval $SUDO tar -C /usr/local -xzf go$LATEST_GO.linux-armv6l.tar.gz $DEBUG_STD
+            eval wget https://dl.google.com/go/${version}.linux-armv6l.tar.gz $DEBUG_STD
+            eval $SUDO tar -C /usr/local -xzf ${version}.linux-armv6l.tar.gz $DEBUG_STD
             $SUDO cp /usr/local/go/bin/go /usr/bin
         else
-            eval wget wget https://dl.google.com/go/$(curl https://golang.org/VERSION?m=text).linux-amd64.tar.gz $DEBUG_STD
-            eval $SUDO tar -C /usr/local -xzf go$LATEST_GO.linux-amd64.tar.gz $DEBUG_STD
+            eval wget https://dl.google.com/go/${version}.linux-amd64.tar.gz $DEBUG_STD
+            eval $SUDO tar -C /usr/local -xzf ${version}.linux-amd64.tar.gz $DEBUG_STD
             $SUDO cp /usr/local/go/bin/go /usr/bin
         fi
         rm -rf go$LATEST_GO*
