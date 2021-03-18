@@ -34,7 +34,7 @@
 </p>
 
 - [Summary](#summary)
-- [Installation Instructions](#installation-instructions)
+- [Install](#install)
 - [Usage](#usage)
 - [Running reconFTW](#running-reconftw)
 - [Sample Video](#sample-video)
@@ -48,7 +48,9 @@
 
 reconFTW is a tool designed to perform automated recon on a target domain by running the best set of tools to perform enumeration and finding out vulnerabilities.
 
-# Installation Instructions
+# Install
+
+## a) In your PC/VPS/VM
 
 - [Installation Guide](https://github.com/six2dez/reconftw/wiki) :book:
 - Requires [Golang](https://golang.org/dl/) > 1.14 installed and paths correctly set (**$GOPATH**, **$GOROOT**)
@@ -60,6 +62,26 @@ reconFTW is a tool designed to perform automated recon on a target domain by run
 ▶ ./install.sh
 ▶ ./reconftw.sh -d target.com -a
 ```
+
+## b) Docker container (2 options)
+
+### From [DockerHub](https://hub.docker.com/r/six2dez/reconftw)
+
+```bash
+▶ docker pull six2dez/reconftw:main
+▶ docker run -it six2dez/reconftw:main /bin/bash
+```
+
+### From repository
+
+```bash
+▶ git clone https://github.com/six2dez/reconftw
+▶ cd reconftw/Docker
+▶ docker build -t reconftw .
+▶ docker run -it reconftw /bin/bash
+```
+
+
 # Config file
 - Through ```reconftw.config``` file the whole execution of the tool can be controlled.
 - Hunters can set various scanning modes, execution preferences, tools config files, APIs/TOKENS, personalized wordlists
@@ -287,7 +309,7 @@ resolvers=${tools}/resolvers.txt
 - SSL tests ([testssl](https://github.com/drwetter/testssl.sh))  
 - Multithread in some steps ([Interlace](https://github.com/codingo/Interlace))  
 - Broken Links Checker (manual/wget spider)
-- Docker support  
+- Docker support with [DockerHub](https://hub.docker.com/r/six2dez/reconftw) integration  
 - Custom output folder  
 - Polished installer compatible with most distros  
 - Diff support for continuous running (cron mode) 
