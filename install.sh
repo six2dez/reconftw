@@ -46,14 +46,15 @@ if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]]
     then
         printf "${bgreen} Golang is already installed ${reset}\n\n"
     else
-        printf "${bgreen} Installing Golang ${reset}\n"
+        printf "${yellow} Running: Installing Golang ${reset}\n\n"
+        version=$(curl https://golang.org/VERSION?m=text)
         if [ "True" = "$IS_ARM" ]; then
-            eval wget https://dl.google.com/go/$(curl https://golang.org/VERSION?m=text).linux-armv6l.tar.gz $DEBUG_STD
-            eval $SUDO tar -C /usr/local -xzf go$LATEST_GO.linux-armv6l.tar.gz $DEBUG_STD
+            eval wget https://dl.google.com/go/${version}.linux-armv6l.tar.gz $DEBUG_STD
+            eval $SUDO tar -C /usr/local -xzf ${version}.linux-armv6l.tar.gz $DEBUG_STD
             $SUDO cp /usr/local/go/bin/go /usr/bin
         else
-            eval wget wget https://dl.google.com/go/$(curl https://golang.org/VERSION?m=text).linux-amd64.tar.gz $DEBUG_STD
-            eval $SUDO tar -C /usr/local -xzf go$LATEST_GO.linux-amd64.tar.gz $DEBUG_STD
+            eval wget https://dl.google.com/go/${version}.linux-amd64.tar.gz $DEBUG_STD
+            eval $SUDO tar -C /usr/local -xzf ${version}.linux-amd64.tar.gz $DEBUG_STD
             $SUDO cp /usr/local/go/bin/go /usr/bin
         fi
         rm -rf go$LATEST_GO*
@@ -81,14 +82,14 @@ export GOPATH=\$HOME/go
 export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH
 EOF
 fi
-# printf "${yellow} Golang installed! Open a new terminal and run again this script ${reset}\n"
+printf "${bgreen} Golang installed${reset}\n"
 # exit
 fi
 
 [ -n "$GOPATH" ] || { printf "${bred} GOPATH env var not detected, add Golang env vars to your \$HOME/.bashrc or \$HOME/.zshrc:\n\n export GOROOT=/usr/local/go\n export GOPATH=\$HOME/go\n export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH\n\n"; exit 1; }
 [ -n "$GOROOT" ] || { printf "${bred} GOROOT env var not detected, add Golang env vars to your \$HOME/.bashrc or \$HOME/.zshrc:\n\n export GOROOT=/usr/local/go\n export GOPATH=\$HOME/go\n export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH\n\n"; exit 1; }
 
-
+printf "${yellow} Running: Installing system packages ${reset}\n\n"
 if [ -f /etc/debian_version ]; then install_apt;
 elif [ -f /etc/redhat-release ]; then install_yum;
 elif [ -f /etc/arch-release ]; then install_pacman;
@@ -96,7 +97,7 @@ elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for
 fi
 
 printf "${bgreen} System packages installed${reset}\n\n"
-
+printf "${yellow} Running: Installing requirements ${reset}\n\n"
 if ! command -v phantomjs &> /dev/null
 then
     cd /opt
@@ -124,12 +125,14 @@ eval go get -v github.com/tomnomnom/qsreplace $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/OWASP/Amass/v3/... $DEBUG_STD
 eval go get -v github.com/ffuf/ffuf $DEBUG_STD
 eval go get -v github.com/tomnomnom/assetfinder $DEBUG_STD
+eval go get -u github.com/gwen001/github-subdomains $DEBUG_STD
 printf "${bgreen} 10%% done${reset}\n\n"
 eval go get -v github.com/dwisiswant0/cf-check $DEBUG_STD
 eval go get -v github.com/tomnomnom/hacks/waybackurls $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei $DEBUG_STD
 eval go get -v github.com/tomnomnom/anew $DEBUG_STD
 eval GO111MODULE=on go get -v github.com/projectdiscovery/notify/cmd/notify $DEBUG_STD
+eval go get -u github.com/daehee/mildew/cmd/mildew $DEBUG_STD
 printf "${bgreen} 20%% done${reset}\n\n"
 eval go get -v github.com/tomnomnom/unfurl $DEBUG_STD
 eval git clone https://github.com/projectdiscovery/nuclei-templates ~/nuclei-templates $DEBUG_STD
@@ -154,6 +157,7 @@ eval GO111MODULE=on go get -u -v github.com/lc/subjs $DEBUG_STD
 eval go get -v github.com/KathanP19/Gxss $DEBUG_STD
 eval git clone https://github.com/blechschmidt/massdns $dir/massdns $DEBUG_STD
 eval git clone https://github.com/s0md3v/Arjun $dir/Arjun $DEBUG_STD
+eval go get -u github.com/rjeczalik/bin/cmd/gobin $DEBUG_STD
 printf "${bgreen} 50%% done${reset}\n\n"
 eval git clone https://github.com/devanshbatham/ParamSpider $dir/ParamSpider $DEBUG_STD
 eval git clone https://github.com/dark-warlord14/LinkFinder $dir/LinkFinder $DEBUG_STD
@@ -203,7 +207,7 @@ cd ~/.gf; eval wget -O potential.json https://raw.githubusercontent.com/devanshb
 touch $dir/.github_tokens
 eval wget -O getjswords.py https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py $DEBUG_STD
 eval wget -O subdomains_big.txt https://gist.githubusercontent.com/jhaddix/86a06c5dc309d08580a018c66354a056/raw/96f4e51d96b2203f19f6381c8c545b278eaa0837/all.txt $DEBUG_STD
-eval wget -O subdomains.txt https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/DNS/sortedcombined-knock-dnsrecon-fierce-reconng.txt $DEBUG_STD
+eval wget -O subdomains.txt https://gist.githubusercontent.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw/1bcdf2d61df08e66fd2d63b6a840f02c3a2ae24c/subdomains.txt $DEBUG_STD
 eval wget -O resolvers.txt https://raw.githubusercontent.com/BBerastegui/fresh-dns-servers/master/resolvers.txt $DEBUG_STD
 eval wget -O permutations_list.txt https://gist.githubusercontent.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw/137bb6b60c616552c705e93a345c06cec3a2cb1f/permutations_list.txt $DEBUG_STD
 eval wget -O ssrf.py https://gist.githubusercontent.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw/ea0774de5e27f9bc855207b175249edae2e9ccef/asyncio_ssrf.py $DEBUG_STD

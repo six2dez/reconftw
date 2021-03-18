@@ -2,7 +2,6 @@
 
 #@TODO:
     # - Update testssl.sh
-    # - Update Go packages
 
 bred='\033[1;31m'
 bblue='\033[1;34m'
@@ -97,7 +96,7 @@ eval wget -N -c -O ~/.gf/potential.json https://raw.githubusercontent.com/devans
 eval wget -N -c -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini $DEBUG_STD
 eval wget -N -C -O ~/.config/notify/notify.conf https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw/a66c4d8cf47a3bc95f5e9ba84773428662ea760c/notify_sample.conf $DEBUG_ERROR
 eval wget -N -c -O $dir/getjswords.py https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py $DEBUG_STD
-eval wget -N -c -O $dir/subdomains.txt https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/DNS/sortedcombined-knock-dnsrecon-fierce-reconng.txt $DEBUG_STD
+eval wget -N -c -O $dir/subdomains.txt subdomains.txt https://gist.githubusercontent.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw/1bcdf2d61df08e66fd2d63b6a840f02c3a2ae24c/subdomains.txt $DEBUG_STD $DEBUG_STD
 eval wget -N -c -O $dir/subdomains_big.txt https://gist.githubusercontent.com/jhaddix/86a06c5dc309d08580a018c66354a056/raw/96f4e51d96b2203f19f6381c8c545b278eaa0837/all.txt $DEBUG_STD
 eval wget -N -c -O $dir/resolvers.txt https://raw.githubusercontent.com/BBerastegui/fresh-dns-servers/master/resolvers.txt $DEBUG_STD
 eval wget -N -c -O $dir/permutations_list.txt https://gist.githubusercontent.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw/137bb6b60c616552c705e93a345c06cec3a2cb1f/permutations_list.txt $DEBUG_STD
@@ -135,6 +134,22 @@ else
     eval rm -rf $LATEST_GO* $DEBUG_STD
 fi
 printf "${bblue}\n Updating Golang is finished ${reset}\n"
+printf "${bgreen}#######################################################################\n"
+
+#Updating Golang Tools
+printf "${bgreen}#######################################################################\n"
+printf "${bblue} Updating Golang Tools \n"
+eval gobin -u $DEBUG_STD
+eval GO111MODULE=on go get -v github.com/OWASP/Amass/v3/... $DEBUG_STD
+eval GO111MODULE=on go get -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei $DEBUG_STD
+eval GO111MODULE=on go get -v github.com/projectdiscovery/notify/cmd/notify $DEBUG_STD
+eval GO111MODULE=on go get -v github.com/projectdiscovery/httpx/cmd/httpx $DEBUG_STD
+eval GO111MODULE=on go get -v github.com/projectdiscovery/dnsx/cmd/dnsx $DEBUG_STD
+eval GO111MODULE=on go get -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder $DEBUG_STD
+eval GO111MODULE=on go get -u -v github.com/lc/subjs $DEBUG_STD
+eval GO111MODULE=on go get -v github.com/projectdiscovery/shuffledns/cmd/shuffledns $DEBUG_STD
+eval GO111MODULE=on go get -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz $DEBUG_STD
+printf "${bblue}\n Updating Golang Tools finished ${reset}\n"
 printf "${bgreen}#######################################################################\n"
 
 #stripping all Go binaries
