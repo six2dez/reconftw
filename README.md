@@ -279,7 +279,7 @@ resolvers=${tools}/resolvers.txt
 - Google Dorks ([degoogle_hunter](https://github.com/six2dez/degoogle_hunter))
 - Github Dorks ([GitDorker](https://github.com/obheda12/GitDorker))  
 - Multiple subdomain enumeration techniques (passive, bruteforce, permutations and scraping)
-  - Passive ([subfinder](https://github.com/projectdiscovery/subfinder), [assetfinder](https://github.com/tomnomnom/assetfinder), [amass](https://github.com/OWASP/Amass), [findomain](https://github.com/Findomain/Findomain), [crobat](https://github.com/cgboal/sonarsearch), [waybackurls](https://github.com/tomnomnom/waybackurls))
+  - Passive ([subfinder](https://github.com/projectdiscovery/subfinder), [assetfinder](https://github.com/tomnomnom/assetfinder), [amass](https://github.com/OWASP/Amass), [findomain](https://github.com/Findomain/Findomain), [crobat](https://github.com/cgboal/sonarsearch), [waybackurls](https://github.com/tomnomnom/waybackurls), [github-subdomains](https://github.com/gwen001/github-subdomains), [Anubis](https://jldc.me) and [mildew](https://github.com/daehee/mildew))
   - Certificate transparency ([crtfinder](https://github.com/eslam3kl/crtfinder), [tls.bufferover](tls.bufferover.run) and [dns.bufferover](dns.bufferover.run)))
   - Bruteforce ([shuffledns](https://github.com/projectdiscovery/shuffledns))  
   - Permutations ([dnsgen](https://github.com/ProjectAnte/dnsgen))  
@@ -287,8 +287,8 @@ resolvers=${tools}/resolvers.txt
   - CNAME Records ([dnsx](https://github.com/projectdiscovery/dnsx))
 - Nuclei Sub TKO templates ([nuclei](https://github.com/projectdiscovery/nuclei))  
 - Web Prober ([httpx](https://github.com/projectdiscovery/httpx))  
-- Web screenshot ([webscreenshot](https://github.com/maaaaz/webscreenshot))  
-- Template scanner ([nuclei](https://github.com/projectdiscovery/nuclei))  
+- Web screenshot ([gowitness](https://github.com/sensepost/gowitness))  
+- Web templates scanner ([nuclei](https://github.com/projectdiscovery/nuclei))  
 - IP and subdomains WAF checker ([cf-check](https://github.com/dwisiswant0/cf-check) and [wafw00f](https://github.com/EnableSecurity/wafw00f))
 - Port Scanner (Active with [nmap](https://github.com/nmap/nmap) and passive with [shodan-cli](https://cli.shodan.io/))  
 - Url extraction ([waybackurls](https://github.com/tomnomnom/waybackurls), [gau](https://github.com/lc/gau), [gospider](https://github.com/jaeles-project/gospider), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3))  
@@ -308,8 +308,8 @@ resolvers=${tools}/resolvers.txt
 - CMS Scanner ([CMSeeK](https://github.com/Tuhinshubhra/CMSeeK))
 - SSL tests ([testssl](https://github.com/drwetter/testssl.sh))  
 - Multithread in some steps ([Interlace](https://github.com/codingo/Interlace))  
-- Broken Links Checker (manual/wget spider)
-- Docker support with [DockerHub](https://hub.docker.com/r/six2dez/reconftw) integration  
+- Broken Links Checker ([gospider](https://github.com/jaeles-project/gospider))
+- Docker container included and [DockerHub](https://hub.docker.com/r/six2dez/reconftw) integration  
 - Custom output folder  
 - Polished installer compatible with most distros  
 - Diff support for continuous running (cron mode) 
