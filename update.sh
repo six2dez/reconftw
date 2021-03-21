@@ -43,7 +43,7 @@ printf "${bblue}\n Updating installed python packages is finished ${reset}\n"
 printf "${bgreen}#######################################################################\n"
 
 #Tools to be updated
-repos="six2dez/degoogle_hunter davidtavarez/pwndb laramies/theHarvester EnableSecurity/wafw00f s0md3v/Arjun sqlmapproject/sqlmap 1ndianl33t/Gf-Patterns s0md3v/XSStrike gwen001/github-search eslam3kl/crtfinder dark-warlord14/LinkFinder ProjectAnte/dnsgen devanshbatham/ParamSpider s0md3v/Corsy Tuhinshubhra/CMSeeK pielco11/fav-up tomnomnom/gf codingo/Interlace blechschmidt/massdns devanshbatham/OpenRedireX obheda12/GitDorker"
+repos="six2dez/degoogle_hunter davidtavarez/pwndb vortexau/dnsvalidator laramies/theHarvester x90skysn3k/brutespray EnableSecurity/wafw00f s0md3v/Arjun sqlmapproject/sqlmap 1ndianl33t/Gf-Patterns s0md3v/XSStrike gwen001/github-search eslam3kl/crtfinder dark-warlord14/LinkFinder ProjectAnte/dnsgen devanshbatham/ParamSpider s0md3v/Corsy Tuhinshubhra/CMSeeK pielco11/fav-up tomnomnom/gf codingo/Interlace blechschmidt/massdns devanshbatham/OpenRedireX obheda12/GitDorker"
 printf "\n\n${bgreen}#######################################################################\n"
 printf "${bgreen} reconFTW updater script ${reset}\n\n"
 
@@ -61,19 +61,9 @@ for repo in ${repos}; do
             cp *.json ~/.gf
         elif [ "gf" = "$(basename $repo)" ]; then
             cp -r examples ~/.gf
-        elif [ "Interlace" = "$(basename $repo)" ] || [ "LinkFinder" = "$(basename $repo)" ]; then
-            eval $SUDO python3 setup.py install $DEBUG_STD
-        elif [ "LinkFinder" = "$(basename $repo)" ] || [ "LinkFinder" = "$(basename $repo)" ]; then
-            eval $SUDO python3 setup.py install $DEBUG_STD
-        elif [ "dnsgen" = "$(basename $repo)" ] || [ "LinkFinder" = "$(basename $repo)" ]; then
-            eval $SUDO python3 setup.py install $DEBUG_STD
-        elif [ "Arjun" = "$(basename $repo)" ] || [ "LinkFinder" = "$(basename $repo)" ]; then
+        elif [ "Interlace" = "$(basename $repo)" ] || [ "LinkFinder" = "$(basename $repo)" ] || [ "dnsgen" = "$(basename $repo)" ] || [ "Arjun" = "$(basename $repo)" ] || [ "wafw00f" = "$(basename $repo)" ] || [ "dnsvalidator" = "$(basename $repo)" ]; then
             eval $SUDO python3 setup.py install $DEBUG_STD
         fi
-#        if [ "True" = "$IS_ARM" ] && [ "git-hound" = "$(basename $repo)" ]
-#            then
-#                go build && chmod 754 git-hound && $SUDO mv git-hound /usr/local/bin/
-#        fi
     fi
     printf "${bblue}\n Updating ${repo} is finished ${reset}\n"
     printf "${bgreen}#######################################################################\n"
@@ -96,9 +86,11 @@ eval wget -N -c -O ~/.gf/potential.json https://raw.githubusercontent.com/devans
 eval wget -N -c -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini $DEBUG_STD
 eval wget -N -C -O ~/.config/notify/notify.conf https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw/a66c4d8cf47a3bc95f5e9ba84773428662ea760c/notify_sample.conf $DEBUG_ERROR
 eval wget -N -c -O $dir/getjswords.py https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py $DEBUG_STD
-eval wget -N -c -O $dir/subdomains.txt subdomains.txt https://gist.githubusercontent.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw/1bcdf2d61df08e66fd2d63b6a840f02c3a2ae24c/subdomains.txt $DEBUG_STD $DEBUG_STD
-eval wget -N -c -O $dir/subdomains_big.txt https://gist.githubusercontent.com/jhaddix/86a06c5dc309d08580a018c66354a056/raw/96f4e51d96b2203f19f6381c8c545b278eaa0837/all.txt $DEBUG_STD
-eval wget -N -c -O $dir/resolvers.txt https://raw.githubusercontent.com/BBerastegui/fresh-dns-servers/master/resolvers.txt $DEBUG_STD
+eval wget -N -c -O $dir/subdomains_big.txt https://s3.amazonaws.com/assetnote-wordlists/data/manual/best-dns-wordlist.txt
+eval wget -N -c -O $dir/subdomains_big2.txt https://gist.githubusercontent.com/jhaddix/86a06c5dc309d08580a018c66354a056/raw/96f4e51d96b2203f19f6381c8c545b278eaa0837/all.txt $DEBUG_STD
+eval cat $dir/subdomains_big2.txt $DEBUG_ERROR | anew -q $dir/subdomains_big.txt
+eval rm $dir/subdomains_big2.txt $DEBUG_ERROR
+eval dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 100 -o $dir/resolvers.txt $DEBUG_STD
 eval wget -N -c -O $dir/permutations_list.txt https://gist.githubusercontent.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw/137bb6b60c616552c705e93a345c06cec3a2cb1f/permutations_list.txt $DEBUG_STD
 eval wget -N -c -O $dir/ssrf.py https://gist.githubusercontent.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw/ea0774de5e27f9bc855207b175249edae2e9ccef/asyncio_ssrf.py $DEBUG_STD
 eval wget -N -c -O $dir/fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD
