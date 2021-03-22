@@ -2,8 +2,6 @@
 
 . ./reconftw.cfg
 
-SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
-
 function banner(){
 	printf "\n${bgreen}"
 	printf "  ██▀███  ▓█████  ▄████▄   ▒█████   ███▄    █   █████▒▄▄▄█████▓ █     █░\n"
@@ -35,6 +33,8 @@ function tools_installed(){
 	[ -n "$PATH" ] || { printf "${bred} [*] PATH var		[NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/degoogle_hunter/degoogle.py ] || { printf "${bred} [*] degoogle		[NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/ParamSpider/paramspider.py ] || { printf "${bred} [*] Paramspider	[NO]${reset}\n"; allinstalled=false;}
+	[ -f $tools/brutespray/brutespray.py ] || { printf "${bred} [*] brutespray	[NO]${reset}\n"; allinstalled=false;}
+	[ -f $tools/dnsrecon/dnsrecon.py ] || { printf "${bred} [*] dnsrecon	[NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/fav-up/favUp.py ] || { printf "${bred} [*] fav-up		[NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/Corsy/corsy.py ] || { printf "${bred} [*] Corsy		[NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/testssl.sh/testssl.sh ] || { printf "${bred} [*] testssl		[NO]${reset}\n"; allinstalled=false;}
@@ -45,12 +45,14 @@ function tools_installed(){
 	[ -f $tools/degoogle_hunter/degoogle_hunter.sh ] || { printf "${bred} [*] degoogle_hunter	[NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/getjswords.py ] || { printf "${bred} [*] getjswords   	[NO]${reset}\n"; allinstalled=false;}
 	eval type -P arjun $DEBUG_STD || { printf "${bred} [*] Arjun		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P dirdar $DEBUG_STD || { printf "${bred} [*] dirdar		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P github-endpoints $DEBUG_STD || { printf "${bred} [*] github-endpoints	[NO]${reset}\n"; allinstalled=false;}
 	eval type -P github-subdomains $DEBUG_STD || { printf "${bred} [*] github-subdomains	[NO]${reset}\n"; allinstalled=false;}
 	eval type -P gospider $DEBUG_STD || { printf "${bred} [*] gospider		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P wafw00f $DEBUG_STD || { printf "${bred} [*] wafw00f		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P subfinder $DEBUG_STD || { printf "${bred} [*] Subfinder		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P assetfinder $DEBUG_STD || { printf "${bred} [*] Assetfinder	[NO]${reset}\n"; allinstalled=false;}
+	eval type -P dnsvalidator $DEBUG_STD || { printf "${bred} [*] dnsvalidator	[NO]${reset}\n"; allinstalled=false;}
 	eval type -P gowitness $DEBUG_STD || { printf "${bred} [*] gowitness		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P findomain $DEBUG_STD || { printf "${bred} [*] Findomain		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P amass $DEBUG_STD || { printf "${bred} [*] Amass		[NO]${reset}\n"; allinstalled=false;}
@@ -477,6 +479,21 @@ function subtakeover(){
 			end_func "Results are saved in webs/takeover.txt" ${FUNCNAME[0]}
 		else
 			if [ "$SUBTAKEOVER" = false ]; then
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
+	fi
+}
+
+function zonetransfer(){
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$ZONETRANSFER" = true ]
+		then
+			start_func "Zone transfer check"
+			python3 $tools/dnsrecon/dnsrecon.py -d $domain -a > webs/zonetransfer.txt
+			end_func "Results are saved in webs/zonetransfer.txt" ${FUNCNAME[0]}
+		else
+			if [ "$SPRAY" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -1117,6 +1134,22 @@ function spraying(){
 	fi
 }
 
+function 4xxbypass(){
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$BYPASSER4XX" = true ]
+		then
+			start_func "403 bypass"
+			cat fuzzing/*.txt | egrep '^4' | egrep -v '^404' | cut -d ' ' -f3 | dirdar -only-ok > .tmp/dirdar.txt
+			cat .tmp/dirdar.txt | sed -e '1,12d' | sed '/^$/d' | anew -q vulns/4xxbypass.txt
+			end_func "Results are saved in vulns/4xxbypass.txt" ${FUNCNAME[0]}
+		else
+			if [ "$SPRAY" = false ]; then
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
+	fi
+}
+
 ###############################################################################################################
 ########################################## OPTIONS & MGMT #####################################################
 ###############################################################################################################
@@ -1345,6 +1378,7 @@ function all(){
 	metadata
 	subdomains_full
 	subtakeover
+	zonetransfer
 	webprobe_full
 	screenshot
 	favicon
@@ -1353,6 +1387,7 @@ function all(){
 	nuclei_check
 	cms_scanner
 	fuzz
+	4xxbypass
 	cors
 	params
 	urlchecks
@@ -1381,6 +1416,7 @@ function recon(){
 	metadata
 	subdomains_full
 	subtakeover
+	zonetransfer
 	webprobe_full
 	screenshot
 	favicon
@@ -1389,6 +1425,7 @@ function recon(){
 	nuclei_check
 	cms_scanner
 	fuzz
+	4xxbypass
 	params
 	urlchecks
 	wordlist_gen
@@ -1420,6 +1457,7 @@ function multi_recon(){
 		metadata
 		subdomains_full
 		subtakeover
+		zonetransfer
 		webprobe_full
 		screenshot
 		favicon
@@ -1452,6 +1490,7 @@ function multi_recon(){
 		cd $dir
 		cms_scanner
 		fuzz
+		4xxbypass
 		params
 		urlchecks
 		wordlist_gen
@@ -1467,6 +1506,7 @@ function subs_menu(){
 	start
 	subdomains_full
 	subtakeover
+	zonetransfer
 	end
 }
 
@@ -1613,6 +1653,7 @@ while getopts ":hd:-:l:m:x:i:varspxwo:" opt; do
 			nuclei_check
 			cms_scanner
 			fuzz
+			4xxbypass
 			cors
 			params
 			urlchecks
