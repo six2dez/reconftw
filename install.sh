@@ -185,7 +185,7 @@ if [ "True" = "$IS_ARM" ]
         eval wget https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-rpi $DEBUG_STD
         $SUDO mv findomain-rpi /usr/local/bin/findomain
     else
-        eval wget https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-linux-amd64 $DEBUG_STD
+        eval wget https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-linux $DEBUG_STD
         $SUDO mv findomain-linux /usr/local/bin/findomain
 fi
 
