@@ -59,7 +59,7 @@ reconFTW is a tool designed to perform automated recon on a target domain by run
 ▶ git clone https://github.com/six2dez/reconftw
 ▶ cd reconftw
 ▶ chmod +x *.sh
-▶ ./install.sh
+▶ . ./install.sh
 ▶ ./reconftw.sh -d target.com -a
 ```
 
