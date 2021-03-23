@@ -41,6 +41,13 @@ install_pacman(){
     eval $SUDO systemctl enable --now tor.service $DEBUG_STD
 }
 
+printf "${yellow} Running: Installing system packages ${reset}\n\n"
+if [ -f /etc/debian_version ]; then install_apt;
+elif [ -f /etc/redhat-release ]; then install_yum;
+elif [ -f /etc/arch-release ]; then install_pacman;
+elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for some RedHat and Amazon Linux instances
+fi
+
 #installing latest Golang version
 if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]]
     then
@@ -88,13 +95,6 @@ fi
 
 [ -n "$GOPATH" ] || { printf "${bred} GOPATH env var not detected, add Golang env vars to your \$HOME/.bashrc or \$HOME/.zshrc:\n\n export GOROOT=/usr/local/go\n export GOPATH=\$HOME/go\n export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH\n\n"; exit 1; }
 [ -n "$GOROOT" ] || { printf "${bred} GOROOT env var not detected, add Golang env vars to your \$HOME/.bashrc or \$HOME/.zshrc:\n\n export GOROOT=/usr/local/go\n export GOPATH=\$HOME/go\n export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH\n\n"; exit 1; }
-
-printf "${yellow} Running: Installing system packages ${reset}\n\n"
-if [ -f /etc/debian_version ]; then install_apt;
-elif [ -f /etc/redhat-release ]; then install_yum;
-elif [ -f /etc/arch-release ]; then install_pacman;
-elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for some RedHat and Amazon Linux instances
-fi
 
 printf "${bgreen} System packages installed${reset}\n\n"
 printf "${yellow} Running: Installing requirements ${reset}\n\n"
