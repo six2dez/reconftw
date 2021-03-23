@@ -28,6 +28,7 @@ gotools["shuffledns"]="GO111MODULE=on go get -v github.com/projectdiscovery/shuf
 gotools["gospider"]="go get -u github.com/jaeles-project/gospider"
 gotools["crobat"]="go get -v github.com/cgboal/sonarsearch/crobat"
 gotools["crlfuzz"]="GO111MODULE=on go get -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz"
+gotools["gowitness"]="go get -u github.com/sensepost/gowitness"
 
 declare -A repos
 repos["degoogle_hunter"]="six2dez/degoogle_hunter"
@@ -194,25 +195,23 @@ eval subfinder $DEBUG_STD
 
 printf "${yellow} Running: Downloading required files ${reset}\n\n"
 ## Downloads
-eval wget -N -c -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini $DEBUG_STD
-eval wget -N -c -O ~/.gf/potential.json https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json $DEBUG_STD
-eval wget -N -c -O getjswords.py https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py $DEBUG_STD
-eval wget -N -c -O subdomains_big.txt https://s3.amazonaws.com/assetnote-wordlists/data/manual/best-dns-wordlist.txt
-eval wget -N -c -O subdomains_big2.txt https://gist.githubusercontent.com/jhaddix/86a06c5dc309d08580a018c66354a056/raw/96f4e51d96b2203f19f6381c8c545b278eaa0837/all.txt $DEBUG_STD
-eval wget -N -c -O subdomains.txt https://gist.githubusercontent.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw/1bcdf2d61df08e66fd2d63b6a840f02c3a2ae24c/subdomains.txt $DEBUG_STD
-eval wget -N -c -O permutations_list.txt https://gist.githubusercontent.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw/137bb6b60c616552c705e93a345c06cec3a2cb1f/permutations_list.txt $DEBUG_STD
-eval wget -N -c -O ssrf.py https://gist.githubusercontent.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw/ea0774de5e27f9bc855207b175249edae2e9ccef/asyncio_ssrf.py $DEBUG_STD
-eval wget -N -c -O fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD
-eval wget -N -c -O lfi_wordlist.txt https://raw.githubusercontent.com/xmendez/wfuzz/master/wordlist/vulns/dirTraversal-nix.txt $DEBUG_STD
-eval wget -N -c -O ~/.config/notify/notify.conf https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw/a66c4d8cf47a3bc95f5e9ba84773428662ea760c/notify_sample.conf $DEBUG_ERROR
-eval wget -N -c -O ${GOPATH}/bin/gowitness https://github.com/sensepost/gowitness/releases/download/2.3.3/gowitness-2.3.3-linux-amd64 $DEBUG_STD
+eval wget -nc -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini $DEBUG_STD
+eval wget -nc -O ~/.gf/potential.json https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json $DEBUG_STD
+eval wget -nc -O ~/.config/notify/notify.conf https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw/a66c4d8cf47a3bc95f5e9ba84773428662ea760c/notify_sample.conf $DEBUG_ERROR
+eval wget -N -c https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py $DEBUG_STD
+eval wget -N -c https://s3.amazonaws.com/assetnote-wordlists/data/manual/best-dns-wordlist.txt $DEBUG_STD && mv best-dns-wordlist.txt subdomains_big.txt
+eval wget -N -c https://gist.githubusercontent.com/jhaddix/86a06c5dc309d08580a018c66354a056/raw/96f4e51d96b2203f19f6381c8c545b278eaa0837/all.txt $DEBUG_STD && mv all.txt subdomains_big2.txt
+eval wget -N -c https://gist.githubusercontent.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw/1bcdf2d61df08e66fd2d63b6a840f02c3a2ae24c/subdomains.txt $DEBUG_STD
+eval wget -N -c https://gist.githubusercontent.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw/137bb6b60c616552c705e93a345c06cec3a2cb1f/permutations_list.txt $DEBUG_STD
+eval wget -N -c https://gist.githubusercontent.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw/ea0774de5e27f9bc855207b175249edae2e9ccef/asyncio_ssrf.py $DEBUG_STD && mv asyncio_ssrf.py ssrf.py
+eval wget -N -c https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD && mv onelistforallmicro.txt fuzz_wordlist.txt
+eval wget -N -c https://raw.githubusercontent.com/xmendez/wfuzz/master/wordlist/vulns/dirTraversal-nix.txt $DEBUG_STD && mv dirTraversal-nix.txt lfi_wordlist.txt
 
 printf "${yellow} Running: Performing last configurations ${reset}\n\n"
 ## Last steps
 eval cat subdomains_big2.txt $DEBUG_ERROR | anew -q subdomains_big.txt
 eval rm subdomains_big2.txt $DEBUG_ERROR
 eval dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 100 -o resolvers.txt $DEBUG_STD
-eval chmod 755 ${GOPATH}/bin/gowitness $DEBUG_STD
 eval h8mail -g $DEBUG_STD
 
 ## Stripping all Go binaries
