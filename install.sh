@@ -115,7 +115,7 @@ if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$versio
         rm -rf go$LATEST_GO*
         export GOROOT=/usr/local/go
         export GOPATH=$HOME/go
-        export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
+        export PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH
 if [ -f ~/.bashrc ] && [ "$golang_installed" = false ]
 then
 cat << EOF >> ~/.bashrc
@@ -123,7 +123,7 @@ cat << EOF >> ~/.bashrc
 # Golang vars
 export GOROOT=/usr/local/go
 export GOPATH=\$HOME/go
-export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH
+export PATH=\$GOPATH/bin:\$GOROOT/bin:\$HOME/.local/bin:\$PATH
 EOF
 fi
 
@@ -134,7 +134,7 @@ cat << EOF >> ~/.zshrc
 # Golang vars
 export GOROOT=/usr/local/go
 export GOPATH=\$HOME/go
-export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH
+export PATH=\$GOPATH/bin:\$GOROOT/bin:\$HOME/.local/bin:\$PATH
 EOF
 fi
 printf "${bgreen} Golang installed${reset}\n"
