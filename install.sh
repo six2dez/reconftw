@@ -118,28 +118,14 @@ if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$versio
         export GOROOT=/usr/local/go
         export GOPATH=$HOME/go
         export PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH
-if [ -f ~/.bashrc ] && [ "$golang_installed" = false ]
-then
-cat << EOF >> ~/.bashrc
+cat << EOF >> ~/${profile_shell}
 
 # Golang vars
 export GOROOT=/usr/local/go
 export GOPATH=\$HOME/go
 export PATH=\$GOPATH/bin:\$GOROOT/bin:\$HOME/.local/bin:\$PATH
 EOF
-fi
 
-if [ -f ~/.zshrc ] && [ $golang_installed = false ]
-then
-cat << EOF >> ~/.zshrc
-
-# Golang vars
-export GOROOT=/usr/local/go
-export GOPATH=\$HOME/go
-export PATH=\$GOPATH/bin:\$GOROOT/bin:\$HOME/.local/bin:\$PATH
-EOF
-fi
-printf "${bgreen} Golang installed${reset}\n"
 fi
 
 [ -n "$GOPATH" ] || { printf "${bred} GOPATH env var not detected, add Golang env vars to your \$HOME/.bashrc or \$HOME/.zshrc:\n\n export GOROOT=/usr/local/go\n export GOPATH=\$HOME/go\n export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH\n\n"; exit 1; }
