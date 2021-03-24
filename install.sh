@@ -90,17 +90,32 @@ install_pacman(){
     eval $SUDO systemctl enable --now tor.service $DEBUG_STD
 }
 
-printf "${yellow} Running: Installing system packages ${reset}\n\n"
+printf "${bblue} Running: Installing system packages ${reset}\n\n"
 if [ -f /etc/debian_version ]; then install_apt;
 elif [ -f /etc/redhat-release ]; then install_yum;
 elif [ -f /etc/arch-release ]; then install_pacman;
 elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for some RedHat and Amazon Linux instances
 fi
 
+printf "${bblue} Running: Looking for new reconFTW version${reset}\n\n"
+git fetch
+if [ -n "$(git status --porcelain | egrep -v '^\?\?')" ]; then
+    printf "${yellow} There is a new version, updating...${reset}\n\n"
+    if [ -n "$(git status --porcelain | egrep 'reconftw.cfg$')" ]; then
+        mv reconftw.cfg reconftw.cfg_bck
+        printf "${yellow} reconftw.cfg has been backed up in reconftw.cfg_bck${reset}\n\n"
+    fi
+    eval git reset --hard $DEBUG_STD
+    eval git pull $DEBUG_STD
+    printf "${bgreen} Updated! Running new installer version...${reset}\n\n"
+    exec "$0"
+    exit 1
+fi
+
 # Installing latest Golang version
 version=$(curl -s https://golang.org/VERSION?m=text)
 eval type -P go $DEBUG_STD || { golang_installed=false; }
-printf "${yellow} Running: Installing/Updating Golang ${reset}\n\n"
+printf "${bblue} Running: Installing/Updating Golang ${reset}\n\n"
 if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$version" = $(go version | cut -d " " -f3) ]
     then
         printf "${bgreen} Golang is already installed and updated ${reset}\n\n"
@@ -131,7 +146,7 @@ fi
 [ -n "$GOPATH" ] || { printf "${bred} GOPATH env var not detected, add Golang env vars to your \$HOME/.bashrc or \$HOME/.zshrc:\n\n export GOROOT=/usr/local/go\n export GOPATH=\$HOME/go\n export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH\n\n"; exit 1; }
 [ -n "$GOROOT" ] || { printf "${bred} GOROOT env var not detected, add Golang env vars to your \$HOME/.bashrc or \$HOME/.zshrc:\n\n export GOROOT=/usr/local/go\n export GOPATH=\$HOME/go\n export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH\n\n"; exit 1; }
 
-printf "${yellow} Running: Installing requirements ${reset}\n\n"
+printf "${bblue} Running: Installing requirements ${reset}\n\n"
 
 mkdir -p ~/.gf
 mkdir -p $tools
@@ -141,12 +156,12 @@ touch $dir/.github_tokens
 
 eval pip3 install -U -r requirements.txt $DEBUG_STD
 
-printf "${yellow} Running: Installing Golang tools ${reset}\n\n"
+printf "${bblue} Running: Installing Golang tools ${reset}\n\n"
 for gotool in "${!gotools[@]}"; do
     eval ${gotools[$gotool]} $DEBUG_STD
 done
 
-printf "${yellow} Running: Installing repositories ${reset}\n\n"
+printf "${bblue} Running: Installing repositories ${reset}\n\n"
 
 # Repos with special configs
 eval git clone https://github.com/projectdiscovery/nuclei-templates ~/nuclei-templates $DEBUG_STD
@@ -184,7 +199,7 @@ fi
 eval $SUDO chmod 755 /usr/local/bin/findomain
 eval subfinder $DEBUG_STD
 
-printf "${yellow} Running: Downloading required files ${reset}\n\n"
+printf "${bblue} Running: Downloading required files ${reset}\n\n"
 ## Downloads
 eval wget -nc -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini $DEBUG_STD
 eval wget -nc -O ~/.gf/potential.json https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json $DEBUG_STD
@@ -198,7 +213,7 @@ eval wget -N -c https://gist.githubusercontent.com/h4ms1k/adcc340495d418fcd72ec7
 eval wget -N -c https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD && cp onelistforallmicro.txt fuzz_wordlist.txt
 eval wget -N -c https://raw.githubusercontent.com/xmendez/wfuzz/master/wordlist/vulns/dirTraversal-nix.txt $DEBUG_STD && cp dirTraversal-nix.txt lfi_wordlist.txt
 
-printf "${yellow} Running: Performing last configurations ${reset}\n\n"
+printf "${bblue} Running: Performing last configurations ${reset}\n\n"
 ## Last steps
 eval cat subdomains_big2.txt $DEBUG_ERROR | anew -q subdomains_big.txt
 eval rm subdomains_big2.txt $DEBUG_ERROR
