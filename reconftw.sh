@@ -491,9 +491,28 @@ function zonetransfer(){
 		then
 			start_func "Zone transfer check"
 			python3 $tools/dnsrecon/dnsrecon.py -d $domain -a > webs/zonetransfer.txt
-			end_func "Results are saved in webs/zonetransfer.txt" ${FUNCNAME[0]}
+			end_func "Results are saved in subdomains/zonetransfer.txt" ${FUNCNAME[0]}
 		else
-			if [ "$SPRAY" = false ]; then
+			if [ "$ZONETRANSFER" = false ]; then
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
+	fi
+}
+
+function s3buckets(){
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$S3BUCKETS" = true ]
+		then
+			start_func "AWS S3 buckets search"
+			eval python3 $tools/S3Scanner/s3scanner.py subdomains/subdomains.txt -o .tmp/s3buckets.txt $DEBUG_STD
+			NUMOFLINES=$(eval cat .tmp/s3buckets.txt $DEBUG_ERROR | anew subdomains/s3buckets.txt | wc -l)
+			if [ "$NUMOFLINES" -gt 0 ]; then
+				notification "${NUMOFLINES} new S3 buckets found in ${runtime}" good
+			fi
+			end_func "Results are saved in subdomains/s3buckets.txt" ${FUNCNAME[0]}
+		else
+			if [ "$S3BUCKETS" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -1142,7 +1161,7 @@ function 4xxbypass(){
 			cat .tmp/dirdar.txt | sed -e '1,12d' | sed '/^$/d' | anew -q vulns/4xxbypass.txt
 			end_func "Results are saved in vulns/4xxbypass.txt" ${FUNCNAME[0]}
 		else
-			if [ "$SPRAY" = false ]; then
+			if [ "$BYPASSER4XX" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"

@@ -40,3 +40,7 @@ uvloop==0.15.2
 PySocks==1.6.8
 h8mail
 argcomplete==1.10.0
+awscli
+pytest-xdist
+coloredlogs
+boto3

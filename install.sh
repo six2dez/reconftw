@@ -55,6 +55,7 @@ repos["massdns"]="blechschmidt/massdns"
 repos["OpenRedireX"]="devanshbatham/OpenRedireX"
 repos["GitDorker"]="obheda12/GitDorker"
 repos["testssl"]="drwetter/testssl.sh"
+repos["S3Scanner"]="sa7mon/S3Scanner"
 
 dir=${tools}
 
