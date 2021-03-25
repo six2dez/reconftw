@@ -292,7 +292,7 @@ function sub_passive(){
 			eval crobat -s $domain $DEBUG_ERROR | anew -q .tmp/crobat_psub.txt
 			if [ -s "${GITHUB_TOKENS}" ];then
 				if [ "$DEEP" = true ] ; then
-					eval github-subdomains -d $domain -k -raw -t $GITHUB_TOKENS | anew -q .tmp/github_subdomains_psub.txt
+					eval github-subdomains -d $domain -raw -t $GITHUB_TOKENS | anew -q .tmp/github_subdomains_psub.txt
 				else
 					eval github-subdomains -d $domain -k -q -raw -t $GITHUB_TOKENS | anew -q .tmp/github_subdomains_psub.txt
 				fi
@@ -1371,29 +1371,9 @@ function passive(){
 
 function all(){
 	start
-	domain_info
-	emails
-	google_dorks
-	github_dorks
-	metadata
-	subdomains_full
-	subtakeover
-	zonetransfer
-	webprobe_full
-	screenshot
-	favicon
-	portscan
-	waf_checks
-	nuclei_check
-	cms_scanner
-	fuzz
+	recon
 	4xxbypass
 	cors
-	params
-	urlchecks
-	wordlist_gen
-	url_gf
-	jschecks
 	open_redirect
 	ssrf_checks
 	crlf_checks
@@ -1408,7 +1388,6 @@ function all(){
 }
 
 function recon(){
-	start
 	domain_info
 	emails
 	google_dorks
@@ -1425,13 +1404,11 @@ function recon(){
 	nuclei_check
 	cms_scanner
 	fuzz
-	4xxbypass
 	params
 	urlchecks
 	wordlist_gen
 	url_gf
 	jschecks
-	end
 }
 
 function multi_recon(){
@@ -1490,7 +1467,6 @@ function multi_recon(){
 		cd $dir
 		cms_scanner
 		fuzz
-		4xxbypass
 		params
 		urlchecks
 		wordlist_gen
@@ -1613,10 +1589,14 @@ while getopts ":hd:-:l:m:x:i:varspxwo:" opt; do
 			if [ -n "$list" ]
 			then
 				for domain in $(cat $list); do
+					start
 					recon
+					end
 				done
 			else
+				start
 				recon
+				end
 			fi
 			exit
 			;;
