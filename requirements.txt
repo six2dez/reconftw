@@ -4,7 +4,7 @@ mmh3
 ipwhois
 fake-useragent
 colorclass==2.2.0
-tqdm==4.36.1
+tqdm
 tld
 chardet==3.0.4
 idna==2.9
@@ -26,7 +26,7 @@ aiosqlite==0.17.0
 beautifulsoup4==4.9.3
 censys==1.1.1
 certifi==2020.12.5
-dnspython==2.1.0
+dnspython
 netaddr==0.8.0
 plotly==4.14.3
 pyppeteer==0.2.5
@@ -39,3 +39,8 @@ lxml==4.6.2
 uvloop==0.15.2
 PySocks==1.6.8
 h8mail
+argcomplete==1.10.0
+awscli
+pytest-xdist
+coloredlogs
+boto3

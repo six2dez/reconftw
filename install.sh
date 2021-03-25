@@ -1,13 +1,63 @@
 #!/bin/bash
 
-bgreen='\033[1;32m'
-yellow='\033[0;33m'
-reset='\033[0m'
-bred='\033[1;31m'
+. ./reconftw.cfg
 
-DEBUG_STD="&>/dev/null"
-DEBUG_ERROR="2>/dev/null"
-SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+declare -A gotools
+gotools["gf"]="go get -v github.com/tomnomnom/gf"
+gotools["qsreplace"]="go get -v github.com/tomnomnom/qsreplace"
+gotools["Amass"]="GO111MODULE=on go get -v github.com/OWASP/Amass/v3/..."
+gotools["ffuf"]="go get -u github.com/ffuf/ffuf"
+gotools["assetfinder"]="go get -v github.com/tomnomnom/assetfinder"
+gotools["github-subdomains"]="go get -u github.com/gwen001/github-subdomains"
+gotools["cf-check"]="go get -v github.com/dwisiswant0/cf-check"
+gotools["waybackurls"]="go get -v github.com/tomnomnom/hacks/waybackurls"
+gotools["nuclei"]="GO111MODULE=on go get -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei"
+gotools["anew"]="go get -v github.com/tomnomnom/anew"
+gotools["notify"]="GO111MODULE=on go get -v github.com/projectdiscovery/notify/cmd/notify"
+gotools["mildew"]="go get -u github.com/daehee/mildew/cmd/mildew"
+gotools["dirdar"]="go get -u github.com/m4dm0e/dirdar"
+gotools["unfurl"]="go get -v github.com/tomnomnom/unfurl"
+gotools["httpx"]="GO111MODULE=on go get -v github.com/projectdiscovery/httpx/cmd/httpx"
+gotools["github-endpoints"]="go get -u github.com/gwen001/github-endpoints"
+gotools["dnsx"]="GO111MODULE=on go get -v github.com/projectdiscovery/dnsx/cmd/dnsx"
+gotools["subfinder"]="GO111MODULE=on go get -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder"
+gotools["gau"]="go get -v github.com/lc/gau"
+gotools["subjs"]="GO111MODULE=on go get -u -v github.com/lc/subjs"
+gotools["Gxss"]="go get -v github.com/KathanP19/Gxss"
+gotools["shuffledns"]="GO111MODULE=on go get -v github.com/projectdiscovery/shuffledns/cmd/shuffledns"
+gotools["gospider"]="go get -u github.com/jaeles-project/gospider"
+gotools["crobat"]="go get -v github.com/cgboal/sonarsearch/crobat"
+gotools["crlfuzz"]="GO111MODULE=on go get -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz"
+gotools["gowitness"]="go get -u github.com/sensepost/gowitness"
+
+declare -A repos
+repos["degoogle_hunter"]="six2dez/degoogle_hunter"
+repos["pwndb"]="davidtavarez/pwndb"
+repos["dnsvalidator"]="vortexau/dnsvalidator"
+repos["dnsrecon"]="darkoperator/dnsrecon"
+repos["theHarvester"]="laramies/theHarvester"
+repos["brutespray"]="x90skysn3k/brutespray"
+repos["wafw00f"]="EnableSecurity/wafw00f"
+repos["Arjun"]="s0md3v/Arjun"
+repos["gf"]="tomnomnom/gf"
+repos["Gf-Patterns"]="1ndianl33t/Gf-Patterns"
+repos["XSStrike"]="s0md3v/XSStrike"
+repos["github-search"]="gwen001/github-search"
+repos["crtfinder"]="eslam3kl/crtfinder"
+repos["LinkFinder"]="dark-warlord14/LinkFinder"
+repos["dnsgen"]="ProjectAnte/dnsgen"
+repos["ParamSpider"]="devanshbatham/ParamSpider"
+repos["Corsy"]="s0md3v/Corsy"
+repos["CMSeeK"]="Tuhinshubhra/CMSeeK"
+repos["fav-up"]="pielco11/fav-up"
+repos["Interlace"]="codingo/Interlace"
+repos["massdns"]="blechschmidt/massdns"
+repos["OpenRedireX"]="devanshbatham/OpenRedireX"
+repos["GitDorker"]="obheda12/GitDorker"
+repos["testssl"]="drwetter/testssl.sh"
+repos["S3Scanner"]="sa7mon/S3Scanner"
+
+dir=${tools}
 
 if grep -q "ARMv"  /proc/cpuinfo
 then
@@ -23,7 +73,7 @@ else
 fi
 
 printf "\n\n${bgreen}#######################################################################\n"
-printf "${bgreen} reconFTW installer script ${reset}\n\n"
+printf "${bgreen} reconFTW installer/updater script ${reset}\n\n"
 
 install_apt(){
     eval $SUDO apt install chromium-browser -y $DEBUG_STD
@@ -41,188 +91,142 @@ install_pacman(){
     eval $SUDO systemctl enable --now tor.service $DEBUG_STD
 }
 
-printf "${yellow} Running: Installing system packages ${reset}\n\n"
+printf "${bblue} Running: Installing system packages ${reset}\n\n"
 if [ -f /etc/debian_version ]; then install_apt;
 elif [ -f /etc/redhat-release ]; then install_yum;
 elif [ -f /etc/arch-release ]; then install_pacman;
 elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for some RedHat and Amazon Linux instances
 fi
 
-#installing latest Golang version
-if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]]
+printf "${bblue} Running: Looking for new reconFTW version${reset}\n\n"
+git fetch
+if [ -n "$(git status --porcelain | egrep -v '^\?\?')" ]; then
+    printf "${yellow} There is a new version, updating...${reset}\n\n"
+    if [ -n "$(git status --porcelain | egrep 'reconftw.cfg$')" ]; then
+        mv reconftw.cfg reconftw.cfg_bck
+        printf "${yellow} reconftw.cfg has been backed up in reconftw.cfg_bck${reset}\n\n"
+    fi
+    eval git reset --hard $DEBUG_STD
+    eval git pull $DEBUG_STD
+    printf "${bgreen} Updated! Running new installer version...${reset}\n\n"
+    exec "$0"
+    exit 1
+fi
+
+# Installing latest Golang version
+version=$(curl -s https://golang.org/VERSION?m=text)
+eval type -P go $DEBUG_STD || { golang_installed=false; }
+printf "${bblue} Running: Installing/Updating Golang ${reset}\n\n"
+if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$version" = $(go version | cut -d " " -f3) ]
     then
-        printf "${bgreen} Golang is already installed ${reset}\n\n"
+        printf "${bgreen} Golang is already installed and updated ${reset}\n\n"
     else
-        printf "${yellow} Running: Installing Golang ${reset}\n\n"
-        version=$(curl https://golang.org/VERSION?m=text)
+        eval $SUDO rm -rf /usr/local/go $DEBUG_STD
         if [ "True" = "$IS_ARM" ]; then
             eval wget https://dl.google.com/go/${version}.linux-armv6l.tar.gz $DEBUG_STD
             eval $SUDO tar -C /usr/local -xzf ${version}.linux-armv6l.tar.gz $DEBUG_STD
-            $SUDO cp /usr/local/go/bin/go /usr/bin
         else
             eval wget https://dl.google.com/go/${version}.linux-amd64.tar.gz $DEBUG_STD
             eval $SUDO tar -C /usr/local -xzf ${version}.linux-amd64.tar.gz $DEBUG_STD
-            $SUDO cp /usr/local/go/bin/go /usr/bin
         fi
+        eval $SUDO cp /usr/local/go/bin/go /usr/bin
         rm -rf go$LATEST_GO*
         export GOROOT=/usr/local/go
         export GOPATH=$HOME/go
-        export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
-if [ -f ~/.bashrc ]
-then
-cat << EOF >> ~/.bashrc
+        export PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH
+cat << EOF >> ~/${profile_shell}
 
 # Golang vars
 export GOROOT=/usr/local/go
 export GOPATH=\$HOME/go
-export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH
+export PATH=\$GOPATH/bin:\$GOROOT/bin:\$HOME/.local/bin:\$PATH
 EOF
-fi
 
-if [ -f ~/.zshrc ]
-then
-cat << EOF >> ~/.zshrc
-
-# Golang vars
-export GOROOT=/usr/local/go
-export GOPATH=\$HOME/go
-export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH
-EOF
-fi
-printf "${bgreen} Golang installed${reset}\n"
-# exit
 fi
 
 [ -n "$GOPATH" ] || { printf "${bred} GOPATH env var not detected, add Golang env vars to your \$HOME/.bashrc or \$HOME/.zshrc:\n\n export GOROOT=/usr/local/go\n export GOPATH=\$HOME/go\n export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH\n\n"; exit 1; }
 [ -n "$GOROOT" ] || { printf "${bred} GOROOT env var not detected, add Golang env vars to your \$HOME/.bashrc or \$HOME/.zshrc:\n\n export GOROOT=/usr/local/go\n export GOPATH=\$HOME/go\n export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH\n\n"; exit 1; }
 
-printf "${bgreen} System packages installed${reset}\n\n"
-printf "${yellow} Running: Installing requirements ${reset}\n\n"
-if ! command -v phantomjs &> /dev/null
-then
-    cd /opt
-    if [ "True" = "$IS_ARM" ]; then
-        mkdir -p phantomjs-armv6-rpi-v2.1.1 && cd phantomjs-armv6-rpi-v2.1.1
-        eval $SUDO wget https://github.com/piksel/phantomjs-raspberrypi/releases/download/v2.1.1-r/phantomjs-armv6-rpi-v2.1.1.tar.xz $DEBUG_STD
-        eval $SUDO tar xvf phantomjs-armv6-rpi-v2.1.1.tar.xz $DEBUG_STD
-        eval $SUDO ln -s /opt/phantomjs-armv6-rpi-v2.1.1/bin/phantomjs /usr/local/bin/phantomjs $DEBUG_STD
-    else
-        eval $SUDO wget https://bitbucket.org/ariya/phantomjs/downloads/phantomjs-2.1.1-linux-x86_64.tar.bz2 $DEBUG_STD
-        eval $SUDO tar xvf phantomjs-2.1.1-linux-x86_64.tar.bz2 $DEBUG_STD
-        eval $SUDO ln -s /opt/phantomjs-2.1.1-linux-x86_64/bin/phantomjs /usr/local/bin/phantomjs $DEBUG_STD
-    fi
-    cd $SCRIPTPATH
-fi
+printf "${bblue} Running: Installing requirements ${reset}\n\n"
 
-[ ! -d "~/.gf" ] && mkdir -p ~/.gf
-[ ! -d "~/Tools" ] && mkdir -p ~/Tools
-dir=~/Tools
-
-eval pip3 install -r requirements.txt $DEBUG_STD
-printf "${bgreen} Requirements installed\n\n Installation begins!\n\n${reset}"
-eval go get -v github.com/tomnomnom/gf $DEBUG_STD
-eval go get -v github.com/tomnomnom/qsreplace $DEBUG_STD
-eval GO111MODULE=on go get -v github.com/OWASP/Amass/v3/... $DEBUG_STD
-eval go get -v github.com/ffuf/ffuf $DEBUG_STD
-eval go get -v github.com/tomnomnom/assetfinder $DEBUG_STD
-eval go get -u github.com/gwen001/github-subdomains $DEBUG_STD
-printf "${bgreen} 10%% done${reset}\n\n"
-eval go get -v github.com/dwisiswant0/cf-check $DEBUG_STD
-eval go get -v github.com/tomnomnom/hacks/waybackurls $DEBUG_STD
-eval GO111MODULE=on go get -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei $DEBUG_STD
-eval go get -v github.com/tomnomnom/anew $DEBUG_STD
-eval GO111MODULE=on go get -v github.com/projectdiscovery/notify/cmd/notify $DEBUG_STD
-eval go get -u github.com/daehee/mildew/cmd/mildew $DEBUG_STD
-printf "${bgreen} 20%% done${reset}\n\n"
-eval go get -v github.com/tomnomnom/unfurl $DEBUG_STD
-eval git clone https://github.com/projectdiscovery/nuclei-templates ~/nuclei-templates $DEBUG_STD
-eval git clone https://github.com/eslam3kl/crtfinder $dir/crtfinder $DEBUG_STD
-eval git clone https://github.com/davidtavarez/pwndb $dir/pwndb $DEBUG_STD
-eval nuclei -update-templates $DEBUG_STD
-eval git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git $dir/sqlmap $DEBUG_STD
-eval GO111MODULE=on go get -v github.com/projectdiscovery/httpx/cmd/httpx $DEBUG_STD
-printf "${bgreen} 30%% done${reset}\n\n"
-eval go get -u github.com/gwen001/github-endpoints $DEBUG_STD
-eval git clone https://github.com/s0md3v/XSStrike $dir/XSStrike $DEBUG_STD
-eval git clone https://github.com/1ndianl33t/Gf-Patterns $dir/Gf-Patterns $DEBUG_STD
-eval git clone https://github.com/tomnomnom/gf $dir/gf $DEBUG_STD
-eval git clone https://github.com/EnableSecurity/wafw00f $dir/wafw00f $DEBUG_STD
-eval GO111MODULE=on go get -v github.com/projectdiscovery/dnsx/cmd/dnsx $DEBUG_STD
-cp -r $dir/gf/examples ~/.gf
-cp $dir/Gf-Patterns/*.json ~/.gf
-printf "${bgreen} 40%% done${reset}\n\n"
-eval GO111MODULE=on go get -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder $DEBUG_STD
-eval go get -v github.com/lc/gau $DEBUG_STD
-eval GO111MODULE=on go get -u -v github.com/lc/subjs $DEBUG_STD
-eval go get -v github.com/KathanP19/Gxss $DEBUG_STD
-eval git clone https://github.com/blechschmidt/massdns $dir/massdns $DEBUG_STD
-eval git clone https://github.com/s0md3v/Arjun $dir/Arjun $DEBUG_STD
-eval go get -u github.com/rjeczalik/bin/cmd/gobin $DEBUG_STD
-printf "${bgreen} 50%% done${reset}\n\n"
-eval git clone https://github.com/devanshbatham/ParamSpider $dir/ParamSpider $DEBUG_STD
-eval git clone https://github.com/dark-warlord14/LinkFinder $dir/LinkFinder $DEBUG_STD
-eval git clone https://github.com/six2dez/degoogle_hunter $dir/degoogle_hunter $DEBUG_STD
-eval GO111MODULE=on go get -v github.com/projectdiscovery/shuffledns/cmd/shuffledns $DEBUG_STD
-eval go get -u github.com/jaeles-project/gospider $DEBUG_STD
-eval go get -v github.com/cgboal/sonarsearch/crobat $DEBUG_STD
-eval GO111MODULE=on go get -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz $DEBUG_STD
-printf "${bgreen} 60%% done${reset}\n\n"
-eval git clone https://github.com/Tuhinshubhra/CMSeeK $dir/CMSeeK $DEBUG_STD
-eval git clone https://github.com/pielco11/fav-up $dir/fav-up $DEBUG_STD
-eval git clone https://github.com/s0md3v/Corsy $dir/Corsy $DEBUG_STD
-eval git clone https://github.com/codingo/Interlace $dir/Interlace $DEBUG_STD
-eval git clone https://github.com/gwen001/github-search $dir/github-search $DEBUG_STD
-eval git clone https://github.com/obheda12/GitDorker $dir/GitDorker $DEBUG_STD
-printf "${bgreen} 70%% done${reset}\n\n"
-eval git clone https://github.com/ProjectAnte/dnsgen $dir/dnsgen $DEBUG_STD
-eval git clone https://github.com/drwetter/testssl.sh $dir/testssl.sh $DEBUG_STD
-eval git clone https://github.com/laramies/theHarvester $dir/theHarvester $DEBUG_STD
-printf "${bgreen} 80%% done${reset}\n\n"
-if [ "True" = "$IS_ARM" ]
-    then
-        eval wget https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-rpi $DEBUG_STD
-        $SUDO mv findomain-rpi /usr/local/bin/findomain
-    else
-        eval wget https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-linux $DEBUG_STD
-        $SUDO mv findomain-linux /usr/local/bin/findomain
-fi
-
-$SUDO chmod 755 /usr/local/bin/findomain
-cd $dir/massdns; eval make $DEBUG_STD
-$SUDO cp $dir/massdns/bin/massdns /usr/local/bin/
-
-cd $dir/Interlace && eval $SUDO python3 setup.py install $DEBUG_STD
-cd $dir/LinkFinder && eval $SUDO python3 setup.py install $DEBUG_STD
-cd $dir/dnsgen && eval $SUDO python3 setup.py install $DEBUG_STD
-cd $dir/Arjun && eval $SUDO python3 setup.py install $DEBUG_STD
-cd $dir/wafw00f && eval $SUDO python3 setup.py install $DEBUG_STD
-cd $dir
-eval git clone https://github.com/devanshbatham/OpenRedireX $dir/OpenRedireX $DEBUG_STD
-printf "${bgreen} 90%% done${reset}\n\n"
-eval subfinder $DEBUG_STD
+mkdir -p ~/.gf
+mkdir -p $tools
 mkdir -p ~/.config/notify/
 mkdir -p ~/.config/amass/
-eval wget -nc -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini $DEBUG_STD
-cd ~/.gf; eval wget -O potential.json https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json $DEBUG_STD; cd $dir
 touch $dir/.github_tokens
-eval wget -O getjswords.py https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py $DEBUG_STD
-eval wget -O subdomains_big.txt https://gist.githubusercontent.com/jhaddix/86a06c5dc309d08580a018c66354a056/raw/96f4e51d96b2203f19f6381c8c545b278eaa0837/all.txt $DEBUG_STD
-eval wget -O subdomains.txt https://gist.githubusercontent.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw/1bcdf2d61df08e66fd2d63b6a840f02c3a2ae24c/subdomains.txt $DEBUG_STD
-eval wget -O resolvers.txt https://raw.githubusercontent.com/BBerastegui/fresh-dns-servers/master/resolvers.txt $DEBUG_STD
-eval wget -O permutations_list.txt https://gist.githubusercontent.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw/137bb6b60c616552c705e93a345c06cec3a2cb1f/permutations_list.txt $DEBUG_STD
-eval wget -O ssrf.py https://gist.githubusercontent.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw/ea0774de5e27f9bc855207b175249edae2e9ccef/asyncio_ssrf.py $DEBUG_STD
-eval wget -O fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD
-eval wget -O lfi_wordlist.txt https://raw.githubusercontent.com/xmendez/wfuzz/master/wordlist/vulns/dirTraversal-nix.txt $DEBUG_STD
-eval wget -nc -O ~/.config/notify/notify.conf https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw/a66c4d8cf47a3bc95f5e9ba84773428662ea760c/notify_sample.conf $DEBUG_ERROR
-eval wget -O ${GOPATH}/bin/gowitness https://github.com/sensepost/gowitness/releases/download/2.3.3/gowitness-2.3.3-linux-amd64 $DEBUG_STD
-eval chmod 755 ${GOPATH}/bin/gowitness $DEBUG_STD
+
+eval pip3 install -U -r requirements.txt $DEBUG_STD
+
+printf "${bblue} Running: Installing Golang tools ${reset}\n\n"
+for gotool in "${!gotools[@]}"; do
+    eval ${gotools[$gotool]} $DEBUG_STD
+done
+
+printf "${bblue} Running: Installing repositories ${reset}\n\n"
+
+# Repos with special configs
+eval git clone https://github.com/projectdiscovery/nuclei-templates ~/nuclei-templates $DEBUG_STD
+eval nuclei -update-templates $DEBUG_STD
 sed -i 's/^miscellaneous/#miscellaneous/' ~/nuclei-templates/.nuclei-ignore
+eval git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git $dir/sqlmap $DEBUG_STD
+eval git clone --depth 1 https://github.com/drwetter/testssl.sh.git $dir/testssl.sh $DEBUG_STD
+
+# Standard repos installation
+for repo in "${!repos[@]}"; do
+    eval git clone https://github.com/${repos[$repo]} $dir/$repo $DEBUG_STD
+    cd $dir/$repo
+    if [ -n "$(git status --porcelain | egrep -v '^\?\?')" ]; then
+        install_again=true
+    fi
+    eval git pull $DEBUG_STD
+    if [ -s "setup.py" ] && [ "${install_again}" = true ]; then
+        eval $SUDO python3 setup.py install $DEBUG_STD
+    fi
+    if [ "massdns" = "$repo" ] && [ "${install_again}" = true ]; then
+            eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/bin/ $DEBUG_ERROR
+    elif [ "gf" = "$repo" ] && [ "${install_again}" = true ]; then
+            eval cp -r examples ~/.gf $DEBUG_ERROR
+    elif [ "Gf-Patterns" = "$repo" ] && [ "${install_again}" = true ]; then
+            eval mv *.json ~/.gf $DEBUG_ERROR
+    fi
+    cd $dir
+done
+
+if [ "True" = "$IS_ARM" ]
+    then
+        eval wget -N -c https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-rpi  $DEBUG_STD
+        eval $SUDO mv findomain-rpi /usr/local/bin/findomain
+    else
+        eval wget -N -c https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-linux  $DEBUG_STD
+        eval $SUDO mv findomain-linux /usr/local/bin/findomain
+fi
+eval $SUDO chmod 755 /usr/local/bin/findomain
+eval subfinder $DEBUG_STD
+
+printf "${bblue} Running: Downloading required files ${reset}\n\n"
+## Downloads
+eval wget -nc -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini $DEBUG_STD
+eval wget -nc -O ~/.gf/potential.json https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json $DEBUG_STD
+eval wget -nc -O ~/.config/notify/notify.conf https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw/a66c4d8cf47a3bc95f5e9ba84773428662ea760c/notify_sample.conf $DEBUG_ERROR
+eval wget -N -c https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py $DEBUG_STD
+eval wget -N -c https://s3.amazonaws.com/assetnote-wordlists/data/manual/best-dns-wordlist.txt $DEBUG_STD && cp best-dns-wordlist.txt subdomains_big.txt
+eval wget -N -c https://gist.githubusercontent.com/jhaddix/86a06c5dc309d08580a018c66354a056/raw/96f4e51d96b2203f19f6381c8c545b278eaa0837/all.txt $DEBUG_STD && cp all.txt subdomains_big2.txt
+eval wget -N -c https://gist.githubusercontent.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw/1bcdf2d61df08e66fd2d63b6a840f02c3a2ae24c/subdomains.txt $DEBUG_STD
+eval wget -N -c https://gist.githubusercontent.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw/137bb6b60c616552c705e93a345c06cec3a2cb1f/permutations_list.txt $DEBUG_STD
+eval wget -N -c https://gist.githubusercontent.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw/ea0774de5e27f9bc855207b175249edae2e9ccef/asyncio_ssrf.py $DEBUG_STD && cp asyncio_ssrf.py ssrf.py
+eval wget -N -c https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD && cp onelistforallmicro.txt fuzz_wordlist.txt
+eval wget -N -c https://raw.githubusercontent.com/xmendez/wfuzz/master/wordlist/vulns/dirTraversal-nix.txt $DEBUG_STD && cp dirTraversal-nix.txt lfi_wordlist.txt
+
+printf "${bblue} Running: Performing last configurations ${reset}\n\n"
+## Last steps
+eval cat subdomains_big2.txt $DEBUG_ERROR | anew -q subdomains_big.txt
+eval rm subdomains_big2.txt $DEBUG_ERROR
+eval dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 100 -o resolvers.txt $DEBUG_STD
 eval h8mail -g $DEBUG_STD
 
-#stripping all Go binaries
+## Stripping all Go binaries
 eval strip -s $HOME/go/bin/* $DEBUG_STD
 
 printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - GitHub (~/Tools/.github_tokens)\n - SHODAN (SHODAN_API_KEY in reconftw.cfg)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg) \n - theHarvester (~/Tools/theHarvester/api-keys.yml)\n - H8mail (~/Tools/h8mail_config.ini)\n\n${reset}"
-
 printf "${bgreen} Finished!${reset}\n\n"
 printf "\n\n${bgreen}#######################################################################\n"
