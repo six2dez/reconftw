@@ -475,7 +475,7 @@ function subtakeover(){
 			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/takeovers/ -o .tmp/tko.txt
 			NUMOFLINES=$(eval cat .tmp/tko.txt $DEBUG_ERROR | anew webs/takeover.txt | wc -l)
 			if [ "$NUMOFLINES" -gt 0 ]; then
-				notification "${NUMOFLINES} new possible takeovers found in ${runtime}" good
+				notification "${NUMOFLINES} new possible takeovers found" info
 			fi
 			end_func "Results are saved in webs/takeover.txt" ${FUNCNAME[0]}
 		else
@@ -509,7 +509,7 @@ function s3buckets(){
 			eval python3 $tools/S3Scanner/s3scanner.py subdomains/subdomains.txt -o .tmp/s3buckets.txt $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/s3buckets.txt $DEBUG_ERROR | anew subdomains/s3buckets.txt | wc -l)
 			if [ "$NUMOFLINES" -gt 0 ]; then
-				notification "${NUMOFLINES} new S3 buckets found in ${runtime}" good
+				notification "${NUMOFLINES} new S3 buckets found" info
 			fi
 			end_func "Results are saved in subdomains/s3buckets.txt" ${FUNCNAME[0]}
 		else
@@ -810,7 +810,7 @@ function urlchecks(){
 			cat .tmp/url_extract_tmp.txt | grep "${domain}" | egrep -i "\.(js)" | anew -q js/url_extract_js.txt
 			eval uddup -u .tmp/url_extract_tmp2.txt -o .tmp/url_extract_uddup.txt $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/url_extract_uddup.txt $DEBUG_ERROR | anew webs/url_extract.txt | wc -l)
-			notification "${NUMOFLINES} new urls with params" good
+			notification "${NUMOFLINES} new urls with params" info
 			end_func "Results are saved in webs/url_extract.txt" ${FUNCNAME[0]}
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -907,7 +907,7 @@ function brokenLinks(){
 		sed -i '/^.\{2048\}./d' .tmp/gospider.txt
 		cat .tmp/gospider.txt | egrep -o 'https?://[^ ]+' | sed 's/]$//' | sort -u | httpx -follow-redirects -status-code -timeout 15 -silent -retries 2 -no-color | grep "\[4" | cut -d ' ' -f1 | anew -q .tmp/brokenLinks_total.txt
 		NUMOFLINES=$(eval cat .tmp/brokenLinks_total.txt $DEBUG_ERROR | anew webs/brokenLinks.txt | wc -l)
-		notification "${NUMOFLINES} new broken links found in ${runtime}" good
+		notification "${NUMOFLINES} new broken links found" info
 		end_func "Results are saved in webs/brokenLinks.txt" ${FUNCNAME[0]}
 	else
 		if [ "$BROKENLINKS" = false ]; then
@@ -1226,7 +1226,7 @@ function notification(){
 		case $2 in
 			info)
 				text="\n${bblue} ${1} ${reset}\n"
-				printf "${text}" && printf "${text}" | $NOTIFY
+				printf "${text}" && printf "\`${text}\`" | $NOTIFY
 			;;
 			warn)
 				text="\n${yellow} ${1} ${reset}\n"
