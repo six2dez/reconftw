@@ -9,8 +9,8 @@
 <h4 align="center">A simple bash script for full recon</h4>
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v1.2.3">
-    <img src="https://img.shields.io/badge/release-v1.2.3-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v1.3.0">
+    <img src="https://img.shields.io/badge/release-v1.3.0-green">
   </a>
    </a>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
@@ -108,7 +108,14 @@ reset='\033[0m'
 # General values
 tools=~/Tools
 NPROC=$(nproc || echo -n 1)
-output=${dir}/Recon/${domain}
+SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+profile_shell=".$(basename $(echo $SHELL))rc"
+#dir_output=/custom/output/path
+
+# Golang Vars (Comment or change on your own)
+export GOROOT=/usr/local/go
+export GOPATH=$HOME/go
+export PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH
 
 # Tools config files
 #NOTIFY_CONFIG=~/.config/notify/notify.conf # No need to define
@@ -116,10 +123,10 @@ output=${dir}/Recon/${domain}
 AMASS_CONFIG=~/.config/amass/config.ini
 GITHUB_TOKENS=${tools}/.github_tokens
 
-# APIs/TOKENS
+# APIs/TOKENS - Uncomment the lines you set removing the '#' at the beginning of the line
 SHODAN_API_KEY=XXXXXXXXXXXXX
-XSS_SERVER=reconftw.xss.ht
-COLLAB_SERVER=webhook.site/e3d6156b
+XSS_SERVER=six2dez.xss.ht
+COLLAB_SERVER=i0m1y4j3fu.canarytokens.com
 findomain_virustotal_token=XXXXXXXXXXXXXXXXX
 findomain_spyse_token=XXXXXXXXXXXXXXXXX
 findomain_securitytrails_token=XXXXXXXXXXXXXXXXX
@@ -129,27 +136,46 @@ findomain_fb_token=XXXXXXXXXXXXXXXXX
 DEBUG_STD="&>/dev/null"
 DEBUG_ERROR="2>/dev/null"
 
-# Steps
-DORKS=true
+# Osint
+GOOGLE_DORKS=true
+GITHUB_DORKS=false
+METADATA=true
+EMAILS=true
+DOMAIN_INFO=true
+
+# Subdomains
 SUBCRT=true
 SUBBRUTE=true
 SUBSCRAPING=true
 SUBPERMUTE=true
 SUBTAKEOVER=true
+ZONETRANSFER=true
+S3BUCKETS=true
+
+# Web detection
+WEBPROBESIMPLE=true
 WEBPROBEFULL=true
 WEBSCREENSHOT=true
+
+# Host
+FAVICON=true
 PORTSCANNER=true
 PORTSCAN_PASSIVE=true
 PORTSCAN_ACTIVE=true
+
+# Web analysis
+WAF_DETECTION=true
 NUCLEICHECK=true
+URL_CHECK=true
 URL_GF=true
 JSCHECKS=true
 PARAMS=true
-XSS=true
-GITHUB=true
-FAVICON=true
 FUZZ=true
 CMS_SCANNER=true
+WORDLIST=true
+
+# Vulns
+XSS=true
 CORS=true
 TEST_SSL=true
 OPEN_REDIRECT=true
@@ -159,37 +185,39 @@ LFI=true
 SSTI=true
 SQLI=true
 BROKENLINKS=true
-WORDLIST=true
+SPRAY=true
+BYPASSER4XX=true
 
 # Extra features
-NOTIFICATION=false
+NOTIFICATION=true
 DEEP=false
 FULLSCOPE=false
 DIFF=false
 REMOVETMP=false
 
-## HTTP options
+# HTTP options
 COOKIE=""
 HEADER="User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0"
+
+# Threads
+FFUF_THREADS=40
+HTTPX_THREADS=50
+HTTPX_UNCOMMONPORTS_THREADS=150
+SHUFFLEDNS_THREADS=5000
+GOSPIDER_THREADS=50
+GITDORKER_THREADS=5
+XSSTRIKE_THREADS=30
+BRUTESPRAY_THREADS=20
+BRUTESPRAY_CONCURRENCE=10
 
 # lists
 fuzz_wordlist=${tools}/fuzz_wordlist.txt
 lfi_wordlist=${tools}/lfi_wordlist.txt
 subs_wordlist=${tools}/subdomains.txt
+subs_wordlist_big=${tools}/subdomains_big.txt
 resolvers=${tools}/resolvers.txt
 ``` 
 </details>
-
-
-
-
-
-
-
-
-
-
-
 
 ## Usage
 
@@ -309,9 +337,14 @@ resolvers=${tools}/resolvers.txt
 - SSL tests ([testssl](https://github.com/drwetter/testssl.sh))  
 - Multithread in some steps ([Interlace](https://github.com/codingo/Interlace))  
 - Broken Links Checker ([gospider](https://github.com/jaeles-project/gospider))
+- S3 bucket finder ([S3Scanner](https://github.com/sa7mon/S3Scanner))
+- Password spraying ([brutespray](https://github.com/x90skysn3k/brutespray))
+- 4xx bypasser ([DirDar](https://github.com/M4DM0e/DirDar))
+- Custom resolvers generated list ([dnsvalidator](https://github.com/vortexau/dnsvalidator))
+- DNS Zone Transfer ([dnsrecon](https://github.com/darkoperator/dnsrecon))
 - Docker container included and [DockerHub](https://hub.docker.com/r/six2dez/reconftw) integration  
 - Custom output folder  
-- Polished installer compatible with most distros  
+- Auto installer/updater compatible with most distros  
 - Diff support for continuous running (cron mode) 
 - Support for targets with multiple domains
 - Update tools script  
@@ -322,7 +355,7 @@ resolvers=${tools}/resolvers.txt
 
 ## Mindmap/Workflow
 
-![Mindmap](images/mindmap.png)
+![Mindmap](images/mindmap_0321.png)
 
 ## How to contribute
 
