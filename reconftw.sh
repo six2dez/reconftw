@@ -1428,9 +1428,9 @@ function recon(){
 	fuzz
 	params
 	urlchecks
-	wordlist_gen
 	url_gf
 	jschecks
+	wordlist_gen
 }
 
 function multi_recon(){
@@ -1491,9 +1491,9 @@ function multi_recon(){
 		fuzz
 		params
 		urlchecks
-		wordlist_gen
 		url_gf
 		jschecks
+		wordlist_gen
 	done
 	cd $workdir
 	dir=$workdir
@@ -1659,9 +1659,9 @@ while getopts ":hd:-:l:m:x:i:varspxwo:" opt; do
 			cors
 			params
 			urlchecks
-			wordlist_gen
 			url_gf
 			jschecks
+			wordlist_gen
 			open_redirect
 			ssrf_checks
 			crlf_checks
