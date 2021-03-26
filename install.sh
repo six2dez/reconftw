@@ -74,7 +74,7 @@ fi
 
 printf "\n\n${bgreen}#######################################################################\n"
 printf "${bgreen} reconFTW installer/updater script ${reset}\n\n"
-
+printf "${yellow} This may take time.So, go grab a coffee ! ${reset}\n\n"
 install_apt(){
     eval $SUDO apt install chromium-browser -y $DEBUG_STD
     eval $SUDO apt install chromium -y $DEBUG_STD
@@ -99,7 +99,7 @@ elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for
 fi
 
 printf "${bblue} Running: Looking for new reconFTW version${reset}\n\n"
-git fetch
+eval git fetch $DEBUG_STD
 if [ -n "$(git status --porcelain | egrep -v '^\?\?')" ]; then
     printf "${yellow} There is a new version, updating...${reset}\n\n"
     if [ -n "$(git status --porcelain | egrep 'reconftw.cfg$')" ]; then
@@ -114,7 +114,8 @@ if [ -n "$(git status --porcelain | egrep -v '^\?\?')" ]; then
 fi
 
 # Installing latest Golang version
-version=$(curl -s https://golang.org/VERSION?m=text)
+#version=$(curl -s https://golang.org/VERSION?m=text)
+version=go1.15.10
 eval type -P go $DEBUG_STD || { golang_installed=false; }
 printf "${bblue} Running: Installing/Updating Golang ${reset}\n\n"
 if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$version" = $(go version | cut -d " " -f3) ]
@@ -160,6 +161,7 @@ eval pip3 install -U -r requirements.txt $DEBUG_STD
 printf "${bblue} Running: Installing Golang tools ${reset}\n\n"
 for gotool in "${!gotools[@]}"; do
     eval ${gotools[$gotool]} $DEBUG_STD
+    sleep 2
 done
 
 printf "${bblue} Running: Installing repositories ${reset}\n\n"
@@ -175,21 +177,19 @@ eval git clone --depth 1 https://github.com/drwetter/testssl.sh.git $dir/testssl
 for repo in "${!repos[@]}"; do
     eval git clone https://github.com/${repos[$repo]} $dir/$repo $DEBUG_STD
     cd $dir/$repo
-    if [ -n "$(git status --porcelain | egrep -v '^\?\?')" ]; then
-        install_again=true
-    fi
     eval git pull $DEBUG_STD
-    if [ -s "setup.py" ] && [ "${install_again}" = true ]; then
+    if [ -s "setup.py" ]; then
         eval $SUDO python3 setup.py install $DEBUG_STD
     fi
-    if [ "massdns" = "$repo" ] && [ "${install_again}" = true ]; then
+    if [ "massdns" = "$repo" ]; then
             eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/bin/ $DEBUG_ERROR
-    elif [ "gf" = "$repo" ] && [ "${install_again}" = true ]; then
+    elif [ "gf" = "$repo" ]; then
             eval cp -r examples ~/.gf $DEBUG_ERROR
-    elif [ "Gf-Patterns" = "$repo" ] && [ "${install_again}" = true ]; then
+    elif [ "Gf-Patterns" = "$repo" ]; then
             eval mv *.json ~/.gf $DEBUG_ERROR
     fi
     cd $dir
+    sleep 2
 done
 
 if [ "True" = "$IS_ARM" ]
@@ -221,7 +221,10 @@ printf "${bblue} Running: Performing last configurations ${reset}\n\n"
 ## Last steps
 eval cat subdomains_big2.txt $DEBUG_ERROR | anew -q subdomains_big.txt
 eval rm subdomains_big2.txt $DEBUG_ERROR
-eval dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 100 -o resolvers.txt $DEBUG_STD
+if [ ! -s "resolvers.txt" ]; then
+    printf "${yellow} Generating personlized resolvers ${reset}\n\n"
+    eval dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 100 -o resolvers.txt $DEBUG_STD
+fi
 eval h8mail -g $DEBUG_STD
 
 ## Stripping all Go binaries
