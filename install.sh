@@ -114,7 +114,8 @@ if [ -n "$(git status --porcelain | egrep -v '^\?\?')" ]; then
 fi
 
 # Installing latest Golang version
-version=$(curl -s https://golang.org/VERSION?m=text)
+#version=$(curl -s https://golang.org/VERSION?m=text)
+version=go1.15.10
 eval type -P go $DEBUG_STD || { golang_installed=false; }
 printf "${bblue} Running: Installing/Updating Golang ${reset}\n\n"
 if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$version" = $(go version | cut -d " " -f3) ]
