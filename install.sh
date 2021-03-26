@@ -74,7 +74,7 @@ fi
 
 printf "\n\n${bgreen}#######################################################################\n"
 printf "${bgreen} reconFTW installer/updater script ${reset}\n\n"
-
+printf "${yellow} This may take time.So, go grab a coffee ! ${reset}\n\n"
 install_apt(){
     eval $SUDO apt install chromium-browser -y $DEBUG_STD
     eval $SUDO apt install chromium -y $DEBUG_STD
@@ -219,6 +219,7 @@ printf "${bblue} Running: Performing last configurations ${reset}\n\n"
 ## Last steps
 eval cat subdomains_big2.txt $DEBUG_ERROR | anew -q subdomains_big.txt
 eval rm subdomains_big2.txt $DEBUG_ERROR
+printf "${yellow} Generating personlized resolvers ${reset}\n\n"
 eval dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 100 -o resolvers.txt $DEBUG_STD
 eval h8mail -g $DEBUG_STD
 
