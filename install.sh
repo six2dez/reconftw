@@ -176,18 +176,15 @@ eval git clone --depth 1 https://github.com/drwetter/testssl.sh.git $dir/testssl
 for repo in "${!repos[@]}"; do
     eval git clone https://github.com/${repos[$repo]} $dir/$repo $DEBUG_STD
     cd $dir/$repo
-    if [ -n "$(git status --porcelain | egrep -v '^\?\?')" ]; then
-        install_again=true
-    fi
     eval git pull $DEBUG_STD
-    if [ -s "setup.py" ] && [ "${install_again}" = true ]; then
+    if [ -s "setup.py" ]; then
         eval $SUDO python3 setup.py install $DEBUG_STD
     fi
-    if [ "massdns" = "$repo" ] && [ "${install_again}" = true ]; then
+    if [ "massdns" = "$repo" ]; then
             eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/bin/ $DEBUG_ERROR
-    elif [ "gf" = "$repo" ] && [ "${install_again}" = true ]; then
+    elif [ "gf" = "$repo" ]; then
             eval cp -r examples ~/.gf $DEBUG_ERROR
-    elif [ "Gf-Patterns" = "$repo" ] && [ "${install_again}" = true ]; then
+    elif [ "Gf-Patterns" = "$repo" ]; then
             eval mv *.json ~/.gf $DEBUG_ERROR
     fi
     cd $dir
