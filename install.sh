@@ -99,7 +99,7 @@ elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for
 fi
 
 printf "${bblue} Running: Looking for new reconFTW version${reset}\n\n"
-git fetch
+eval git fetch $DEBUG_STD
 if [ -n "$(git status --porcelain | egrep -v '^\?\?')" ]; then
     printf "${yellow} There is a new version, updating...${reset}\n\n"
     if [ -n "$(git status --porcelain | egrep 'reconftw.cfg$')" ]; then
@@ -161,6 +161,7 @@ eval pip3 install -U -r requirements.txt $DEBUG_STD
 printf "${bblue} Running: Installing Golang tools ${reset}\n\n"
 for gotool in "${!gotools[@]}"; do
     eval ${gotools[$gotool]} $DEBUG_STD
+    sleep 2
 done
 
 printf "${bblue} Running: Installing repositories ${reset}\n\n"
@@ -188,6 +189,7 @@ for repo in "${!repos[@]}"; do
             eval mv *.json ~/.gf $DEBUG_ERROR
     fi
     cd $dir
+    sleep 2
 done
 
 if [ "True" = "$IS_ARM" ]
@@ -219,8 +221,10 @@ printf "${bblue} Running: Performing last configurations ${reset}\n\n"
 ## Last steps
 eval cat subdomains_big2.txt $DEBUG_ERROR | anew -q subdomains_big.txt
 eval rm subdomains_big2.txt $DEBUG_ERROR
-printf "${yellow} Generating personlized resolvers ${reset}\n\n"
-eval dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 100 -o resolvers.txt $DEBUG_STD
+if [ ! -s "resolvers.txt" ]; then
+    printf "${yellow} Generating personlized resolvers ${reset}\n\n"
+    eval dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 100 -o resolvers.txt $DEBUG_STD
+fi
 eval h8mail -g $DEBUG_STD
 
 ## Stripping all Go binaries
