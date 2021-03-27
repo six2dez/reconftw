@@ -763,12 +763,12 @@ function params(){
 			eval rm -rf output/ $DEBUG_ERROR
 			if [ "$DEEP" = true ] ; then
 				printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
-				eval arjun -i .tmp/param_tmp.txt -t 20 -oT webs/param.txt $DEBUG_STD
+				eval arjun -i .tmp/param_tmp.txt -t $ARJUN_THREADS -oT webs/param.txt $DEBUG_STD
 			else
 				if [[ $(cat .tmp/param_tmp.txt | wc -l) -le 50 ]]
 				then
 					printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
-					eval arjun -i .tmp/param_tmp.txt -t 20 -oT webs/param.txt $DEBUG_STD
+					eval arjun -i .tmp/param_tmp.txt -t $ARJUN_THREADS -oT webs/param.txt $DEBUG_STD
 				else
 					cp .tmp/param_tmp.txt webs/param.txt
 				fi
