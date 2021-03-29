@@ -70,6 +70,13 @@ reconFTW is a tool designed to perform automated recon on a target domain by run
 ```bash
 ▶ docker pull six2dez/reconftw:main
 ▶ docker run -it six2dez/reconftw:main /bin/bash
+
+# Exit the container and run this commands additionally if you want to gain persistence:
+▶ docker start $(docker ps -a|grep six2dez/reconftw:main|cut -d' ' -f1)
+▶ docker exec -it $(docker ps -a|grep six2dez/reconftw:main|cut -d' ' -f1) /bin/bash
+
+# Now you can exit the container and run again this command without files loss:
+▶ docker exec -it $(docker ps -a|grep six2dez/reconftw:main|cut -d' ' -f1) /bin/bash
 ```
 
 ### From repository
@@ -191,7 +198,6 @@ BYPASSER4XX=true
 # Extra features
 NOTIFICATION=true
 DEEP=false
-FULLSCOPE=false
 DIFF=false
 REMOVETMP=false
 
@@ -247,7 +253,6 @@ resolvers=${tools}/resolvers.txt
 | Flag | Description |
 |------|-------------|
 | --deep | Deep scan (Enable some slow options for deeper scan) |
-| --fs   | Full scope (Enable the widest scope * *.domain.* * options) |
 | -o |  Output directory |
 
 ## Running ReconFTW
@@ -274,12 +279,6 @@ resolvers=${tools}/resolvers.txt
 
 ```bash
 ▶ ./reconftw.sh -d example.com -r --deep -o /output/directory/
-```
-
-**Perform a wide scope recon on a target**   *(may include false positives)*
-
-```bash
-▶ ./reconftw.sh -d example.com -r --fs -o /output/directory/
 ```
 
 **Perform recon in a multi domain target**
