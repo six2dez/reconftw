@@ -24,11 +24,12 @@ gotools["subfinder"]="GO111MODULE=on go get -v github.com/projectdiscovery/subfi
 gotools["gau"]="go get -v github.com/lc/gau"
 gotools["subjs"]="GO111MODULE=on go get -u -v github.com/lc/subjs"
 gotools["Gxss"]="go get -v github.com/KathanP19/Gxss"
-gotools["shuffledns"]="GO111MODULE=on go get -v github.com/projectdiscovery/shuffledns/cmd/shuffledns"
+#gotools["shuffledns"]="GO111MODULE=on go get -v github.com/projectdiscovery/shuffledns/cmd/shuffledns"
+gotools["httprobe"]="go get -u github.com/tomnomnom/httprobe"
 gotools["gospider"]="go get -u github.com/jaeles-project/gospider"
 gotools["crobat"]="go get -v github.com/cgboal/sonarsearch/crobat"
 gotools["crlfuzz"]="GO111MODULE=on go get -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz"
-gotools["gowitness"]="go get -u github.com/sensepost/gowitness"
+#gotools["gowitness"]="go get -u github.com/sensepost/gowitness"
 
 declare -A repos
 repos["degoogle_hunter"]="six2dez/degoogle_hunter"
@@ -56,6 +57,7 @@ repos["OpenRedireX"]="devanshbatham/OpenRedireX"
 repos["GitDorker"]="obheda12/GitDorker"
 repos["testssl"]="drwetter/testssl.sh"
 repos["S3Scanner"]="sa7mon/S3Scanner"
+repos["puredns"]="d3mondev/puredns"
 
 dir=${tools}
 
@@ -74,16 +76,16 @@ fi
 
 printf "\n\n${bgreen}#######################################################################\n"
 printf "${bgreen} reconFTW installer/updater script ${reset}\n\n"
-printf "${yellow} This may take time.So, go grab a coffee ! ${reset}\n\n"
+printf "${yellow} This may take time. So, go to grab a coffee! ${reset}\n\n"
 install_apt(){
     eval $SUDO apt install chromium-browser -y $DEBUG_STD
     eval $SUDO apt install chromium -y $DEBUG_STD
-    eval $SUDO apt install python3 python3-pip ruby git curl libpcap-dev wget python-dev python3-dev dnsutils build-essential xvfb libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq python3-shodan apt-transport-https lynx tor -y $DEBUG_STD
+    eval $SUDO apt install python3 python3-pip ruby git curl libpcap-dev wget python-dev python3-dev python3-dnspython pv dnsutils build-essential libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq python3-shodan apt-transport-https lynx tor -y $DEBUG_STD
     eval $SUDO systemctl enable tor $DEBUG_STD
 }
 
 install_yum(){
-    eval $SUDO yum install python3 python3-pip ruby git curl libpcap-devel chromium wget openssl-devel bind-utils python3-devel lynx libxslt-devel libffi-devel xorg-x11-server-Xvfb libxml2-devel nmap zlib-devel jq python-shodan -y $DEBUG_STD
+    eval $SUDO yum install python3 python3-pip ruby git curl libpcap-devel chromium wget openssl-devel bind-utils python3-devel lynx libxslt-devel libffi-devel libxml2-devel nmap python3-dnspython pv zlib-devel jq python-shodan -y $DEBUG_STD
 }
 
 install_pacman(){
@@ -97,6 +99,9 @@ elif [ -f /etc/redhat-release ]; then install_yum;
 elif [ -f /etc/arch-release ]; then install_pacman;
 elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for some RedHat and Amazon Linux instances
 fi
+
+eval git config --global --unset http.proxy $DEBUG_STD
+eval git config --global --unset https.proxy $DEBUG_STD
 
 printf "${bblue} Running: Looking for new reconFTW version${reset}\n\n"
 eval git fetch $DEBUG_STD
@@ -160,8 +165,7 @@ eval pip3 install -U -r requirements.txt $DEBUG_STD
 
 printf "${bblue} Running: Installing Golang tools ${reset}\n\n"
 for gotool in "${!gotools[@]}"; do
-    eval ${gotools[$gotool]} $DEBUG_STD
-    sleep 2
+    eval type -P $gotool $DEBUG_STD || { eval ${gotools[$gotool]} $DEBUG_STD; }
 done
 
 printf "${bblue} Running: Installing repositories ${reset}\n\n"
@@ -175,8 +179,7 @@ eval git clone --depth 1 https://github.com/drwetter/testssl.sh.git $dir/testssl
 
 # Standard repos installation
 for repo in "${!repos[@]}"; do
-    eval git clone https://github.com/${repos[$repo]} $dir/$repo $DEBUG_STD
-    cd $dir/$repo
+    cd $dir/$repo || { eval git clone https://github.com/${repos[$repo]} $dir/$repo $DEBUG_STD && cd $dir/$repo; }
     eval git pull $DEBUG_STD
     if [ -s "setup.py" ]; then
         eval $SUDO python3 setup.py install $DEBUG_STD
@@ -189,7 +192,6 @@ for repo in "${!repos[@]}"; do
             eval mv *.json ~/.gf $DEBUG_ERROR
     fi
     cd $dir
-    sleep 2
 done
 
 if [ "True" = "$IS_ARM" ]
@@ -197,7 +199,9 @@ if [ "True" = "$IS_ARM" ]
         eval wget -N -c https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-rpi  $DEBUG_STD
         eval $SUDO mv findomain-rpi /usr/local/bin/findomain
     else
-        eval wget -N -c https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-linux  $DEBUG_STD
+        eval wget -N -c https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-linux $DEBUG_STD
+        eval wget -N -c https://github.com/sensepost/gowitness/releases/download/2.3.4/gowitness-2.3.4-linux-amd64 $DEBUG_STD
+        eval $SUDO mv gowitness-2.3.4-linux-amd64 /usr/local/bin/gowitness
         eval $SUDO mv findomain-linux /usr/local/bin/findomain
 fi
 eval $SUDO chmod 755 /usr/local/bin/findomain
