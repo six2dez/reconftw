@@ -1614,7 +1614,7 @@ while getopts ":hd:-:l:m:x:i:varspxwo:" opt; do
 			isAsciiText $inScope_file
 			if [ "False" = "$IS_ASCII" ]
 			then
-				printf "\n\n${bred} Out of Scope file is not a text file${reset}\n\n"
+				printf "\n\n${bred} In Scope file is not a text file${reset}\n\n"
 				exit
 			fi
 			;;
