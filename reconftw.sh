@@ -77,7 +77,7 @@ function tools_installed(){
 	eval type -P anew $DEBUG_STD || { printf "${bred} [*] Anew		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P unfurl $DEBUG_STD || { printf "${bred} [*] unfurl		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P crlfuzz $DEBUG_STD || { printf "${bred} [*] crlfuzz		[NO]${reset}\n"; allinstalled=false;}
-	eval type -P httprobe $DEBUG_STD || { printf "${bred} [*] httprobe		[NO]${reset}\n"; allinstalled=false;}
+	#eval type -P httprobe $DEBUG_STD || { printf "${bred} [*] httprobe		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P httpx $DEBUG_STD || { printf "${bred} [*] Httpx		[NO]${reset}\n${reset}"; allinstalled=false;}
 	eval type -P jq $DEBUG_STD || { printf "${bred} [*] jq			[NO]${reset}\n${reset}"; allinstalled=false;}
 	eval type -P notify $DEBUG_STD || { printf "${bred} [*] notify		[NO]${reset}\n${reset}"; allinstalled=false;}
@@ -262,6 +262,9 @@ function subdomains_full(){
 	sub_dns
 	sub_scraping
 	sub_permut
+	if [ "$DEEP" = true ] ; then
+		sub_recursive
+	fi
 	webprobe_simple
 	if [ -f "subdomains/subdomains.txt" ]
 		then
@@ -355,28 +358,6 @@ function sub_crt(){
 	fi
 }
 
-function sub_brute(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SUBBRUTE" = true ]
-		then
-			start_subfunc "Running : Bruteforce Subdomain Enumeration"
-			if [ "$DEEP" = true ] ; then
-				eval $tools/puredns/puredns bruteforce -w $subs_wordlist_big $domain -w .tmp/active_tmp.txt $DEBUG_STD
-				#eval shuffledns -d $domain -w $subs_wordlist_big -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/active_tmp.txt $DEBUG_STD
-			else
-				eval $tools/puredns/puredns bruteforce -w $subs_wordlist $domain -w .tmp/active_tmp.txt $DEBUG_STD
-				#eval shuffledns -d $domain -w $subs_wordlist -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/active_tmp.txt $DEBUG_STD
-			fi
-			NUMOFLINES=$(eval cat .tmp/active_tmp.txt $DEBUG_ERROR | sed "s/*.//" | anew .tmp/brute_subs.txt | wc -l)
-			end_subfunc "${NUMOFLINES} new subs (bruteforce)" ${FUNCNAME[0]}
-		else
-			if [ "$SUBBRUTE" = false ]; then
-				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
-			else
-				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
-			fi
-	fi
-}
-
 function sub_dns(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]
 		then
@@ -388,7 +369,7 @@ function sub_dns(){
 			cat .tmp/*_subs.txt | anew -q .tmp/subs_no_resolved.txt
 			deleteOutScoped $outOfScope_file .tmp/subs_no_resolved.txt
 			#eval shuffledns -d $domain -list .tmp/subs_no_resolved.txt -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/subdomains_tmp.txt $DEBUG_STD
-			eval $tools/puredns/puredns resolve .tmp/subs_no_resolved.txt -w .tmp/subdomains_tmp.txt $DEBUG_STD
+			eval $tools/puredns/puredns resolve .tmp/subs_no_resolved.txt -w .tmp/subdomains_tmp.txt -r $resolvers $DEBUG_STD
 			echo $domain | dnsx -silent | anew -q .tmp/subdomains_tmp.txt
 			dnsx -retry 3 -silent -cname -resp-only -l .tmp/subdomains_tmp.txt | grep ".$domain$" | anew -q .tmp/subdomains_tmp.txt
 			eval dnsx -retry 3 -silent -cname -resp -l subdomains/subdomains.txt -o subdomains/subdomains_cname.txt $DEBUG_STD
@@ -396,6 +377,28 @@ function sub_dns(){
 			end_subfunc "${NUMOFLINES} new subs (dns resolution)" ${FUNCNAME[0]}
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
+}
+
+function sub_brute(){
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SUBBRUTE" = true ]
+		then
+			start_subfunc "Running : Bruteforce Subdomain Enumeration"
+			if [ "$DEEP" = true ] ; then
+				eval $tools/puredns/puredns bruteforce $subs_wordlist_big $domain -w .tmp/subs_brute.txt -r $resolvers $DEBUG_STD
+				#eval shuffledns -d $domain -w $subs_wordlist_big -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/active_tmp.txt $DEBUG_STD
+			else
+				eval $tools/puredns/puredns bruteforce $subs_wordlist $domain -w .tmp/subs_brute.txt -r $resolvers $DEBUG_STD
+				#eval shuffledns -d $domain -w $subs_wordlist -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/active_tmp.txt $DEBUG_STD
+			fi
+			NUMOFLINES=$(eval cat .tmp/subs_brute.txt $DEBUG_ERROR | sed "s/*.//" | anew subdomains/subdomains.txt | wc -l)
+			end_subfunc "${NUMOFLINES} new subs (bruteforce)" ${FUNCNAME[0]}
+		else
+			if [ "$SUBBRUTE" = false ]; then
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
 }
 
@@ -413,7 +416,7 @@ function sub_scraping(){
 			sed -i '/^.\{2048\}./d' .tmp/gospider.txt
 			cat .tmp/gospider.txt | egrep -o 'https?://[^ ]+' | sed 's/]$//' | unfurl --unique domains | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
 			#cat .tmp/scrap_subs.txt | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/scrap_subs_resolved.txt $DEBUG_STD
-			eval $tools/puredns/puredns resolve .tmp/scrap_subs.txt -w .tmp/scrap_subs_resolved.txt $DEBUG_STD
+			eval $tools/puredns/puredns resolve .tmp/scrap_subs.txt -w .tmp/scrap_subs_resolved.txt -r $resolvers $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/scrap_subs_resolved.txt $DEBUG_ERROR | anew subdomains/subdomains.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (code scraping)" ${FUNCNAME[0]}
 		else
@@ -429,44 +432,56 @@ function sub_permut(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SUBPERMUTE" = true ]
 		then
 			start_subfunc "Running : Permutations Subdomain Enumeration"
-			if [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 50 ]]
+			if [ "$DEEP" = true ] ; then
+				#eval dnsgen .tmp/subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute1_tmp.txt $DEBUG_STD
+				eval dnsgen .tmp/subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR > .tmp/dnsgen1.txt
+				eval $tools/puredns/puredns resolve .tmp/dnsgen1.txt -w .tmp/permute1_tmp.txt -r $resolvers $DEBUG_STD
+				eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
+				#eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute2_tmp.txt $DEBUG_STD
+				eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR  > .tmp/dnsgen2.txt
+				eval $tools/puredns/puredns resolve .tmp/dnsgen2.txt -w .tmp/permute2_tmp.txt -r $resolvers $DEBUG_STD
+				eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
+				eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
+			else
+				if [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 50 ]]
 				then
 					#eval dnsgen .tmp/subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute1_tmp.txt $DEBUG_STD
 					eval dnsgen .tmp/subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR > .tmp/dnsgen1.txt
-					eval $tools/puredns/puredns resolve .tmp/dnsgen1.txt -w .tmp/permute1_tmp.txt $DEBUG_STD
+					eval $tools/puredns/puredns resolve .tmp/dnsgen1.txt -w .tmp/permute1_tmp.txt -r $resolvers $DEBUG_STD
 					eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
 					#eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute2_tmp.txt $DEBUG_STD
 					eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR  > .tmp/dnsgen2.txt
-					eval $tools/puredns/puredns resolve .tmp/dnsgen2.txt -w .tmp/permute2_tmp.txt $DEBUG_STD
+					eval $tools/puredns/puredns resolve .tmp/dnsgen2.txt -w .tmp/permute2_tmp.txt -r $resolvers $DEBUG_STD
 					eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
 					eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 				elif [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 100 ]]
 		  		then
 					#eval dnsgen .tmp/subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute_tmp.txt $DEBUG_STD
 					eval dnsgen .tmp/subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR > .tmp/dnsgen1.txt
-					eval $tools/puredns/puredns resolve .tmp/dnsgen1.txt -w .tmp/permute_tmp.txt $DEBUG_STD
+					eval $tools/puredns/puredns resolve .tmp/dnsgen1.txt -w .tmp/permute_tmp.txt -r $resolvers $DEBUG_STD
 					eval cat .tmp/permute_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 				else
 					if [[ $(cat subdomains/subdomains.txt | wc -l) -le 50 ]]
-						then
-							#eval dnsgen subdomains/subdomains.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute1_tmp.txt $DEBUG_STD
-							eval dnsgen subdomains/subdomains.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR > .tmp/dnsgen1.txt
-							eval $tools/puredns/puredns resolve .tmp/dnsgen1.txt -w .tmp/permute1_tmp.txt $DEBUG_STD
-							eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
-							#eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute2_tmp.txt $DEBUG_STD
-							eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR  > .tmp/dnsgen2.txt
-							eval $tools/puredns/puredns resolve .tmp/dnsgen2.txt -w .tmp/permute2_tmp.txt $DEBUG_STD
-							eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
-							eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
-						elif [[ $(cat subdomains/subdomains.txt | wc -l) -le 100 ]]
-						then
-							#eval dnsgen subdomains/subdomains.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute_tmp.txt $DEBUG_STD
-							eval dnsgen subdomains/subdomains.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR > .tmp/dnsgen1.txt
-							eval $tools/puredns/puredns resolve .tmp/dnsgen1.txt -w .tmp/permute_tmp.txt $DEBUG_STD
-							eval cat .tmp/permute_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
-						else
-							printf "\n${bred} Skipping Permutations: Too Much Subdomains${reset}\n\n"
+					then
+						#eval dnsgen subdomains/subdomains.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute1_tmp.txt $DEBUG_STD
+						eval dnsgen subdomains/subdomains.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR > .tmp/dnsgen1.txt
+						eval $tools/puredns/puredns resolve .tmp/dnsgen1.txt -w .tmp/permute1_tmp.txt -r $resolvers $DEBUG_STD
+						eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
+						#eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute2_tmp.txt $DEBUG_STD
+						eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR  > .tmp/dnsgen2.txt
+						eval $tools/puredns/puredns resolve .tmp/dnsgen2.txt -w .tmp/permute2_tmp.txt -r $resolvers $DEBUG_STD
+						eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
+						eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
+					elif [[ $(cat subdomains/subdomains.txt | wc -l) -le 100 ]]
+					then
+						#eval dnsgen subdomains/subdomains.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute_tmp.txt $DEBUG_STD
+						eval dnsgen subdomains/subdomains.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR > .tmp/dnsgen1.txt
+						eval $tools/puredns/puredns resolve .tmp/dnsgen1.txt -w .tmp/permute_tmp.txt -r $resolvers $DEBUG_STD
+						eval cat .tmp/permute_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
+					else
+						printf "\n${bred} Skipping Permutations: Too Much Subdomains${reset}\n\n"
 					fi
+				fi
 			fi
 			if [ -f ".tmp/permute_subs.txt" ]
 			then
@@ -509,7 +524,8 @@ function zonetransfer(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$ZONETRANSFER" = true ]
 		then
 			start_func "Zone transfer check"
-			python3 $tools/dnsrecon/dnsrecon.py -d $domain -a > webs/zonetransfer.txt
+			eval python3 $tools/dnsrecon/dnsrecon.py -d $domain -a -j subdomains/zonetransfer.json $DEBUG_STD
+			if grep -q "\"zone_transfer\"\: \"success\"" subdomains/zonetransfer.json ; then notification "Zone transfer found on ${domain}!" info; fi
 			end_func "Results are saved in subdomains/zonetransfer.txt" ${FUNCNAME[0]}
 		else
 			if [ "$ZONETRANSFER" = false ]; then
@@ -532,6 +548,42 @@ function s3buckets(){
 			end_func "Results are saved in subdomains/s3buckets.txt" ${FUNCNAME[0]}
 		else
 			if [ "$S3BUCKETS" = false ]; then
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
+	fi
+}
+
+function sub_recursive(){
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SUBRECURSIVE" = true ]
+		then
+			start_func "Subdomains recursive search"
+
+			save_domain=$domain
+			for sub in $(cat subdomains/subdomains.txt); do
+				domain=$sub
+				eval $tools/puredns/puredns bruteforce $subs_wordlist_big $domain -w .tmp/${sub}_brute_recursive.txt -r $resolvers $DEBUG_STD
+			done
+			cat .tmp/*_brute_recursive.txt | anew -q .tmp/brute_recursive.txt
+
+			domain=$save_domain
+
+			eval dnsgen .tmp/brute_recursive.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR > .tmp/dnsgen1_recursive.txt
+			eval $tools/puredns/puredns resolve .tmp/dnsgen1_recursive.txt -w .tmp/permute1_recursive_tmp.txt -r $resolvers $DEBUG_STD
+			eval cat .tmp/permute1_recursive_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1_recursive.txt
+			eval dnsgen .tmp/permute1_recursive.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR  > .tmp/dnsgen2_recursive.txt
+			eval $tools/puredns/puredns resolve .tmp/dnsgen2_recursive.txt -w .tmp/permute2_recursive_tmp.txt -r $resolvers $DEBUG_STD
+			eval cat .tmp/permute1_recursive.txt .tmp/permute2_recursive_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_recursive.txt
+
+			NUMOFLINES=$(eval cat .tmp/permute_recursive.txt .tmp/brute_recursive.txt $DEBUG_ERROR | anew subdomains/subdomain.txt | wc -l)
+
+			if [ "$NUMOFLINES" -gt 0 ]; then
+				notification "${NUMOFLINES} new subdomains found with recursive search" info
+			fi
+			end_func "Results are saved in subdomains/subdomain.txt" ${FUNCNAME[0]}
+		else
+			if [ "$SUBRECURSIVE" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -1297,6 +1349,12 @@ function start(){
 		NOTIFY="notify -silent"
 	else
 	    NOTIFY=""
+	fi
+
+	if [ "$CUSTOM_RESOLVER" = true ] ; then
+		resolvers=$resolvers_custom
+	else
+		resolvers=resolvers.txt
 	fi
 
 	echo "****** 🙏 Thank you for making this world safer ******" | $NOTIFY
