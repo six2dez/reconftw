@@ -258,8 +258,8 @@ function subdomains_full(){
 	fi
 	sub_passive
 	sub_crt
-	sub_brute
 	sub_dns
+	sub_brute
 	sub_scraping
 	sub_permut
 	if [ "$DEEP" = true ] ; then
@@ -433,11 +433,9 @@ function sub_permut(){
 		then
 			start_subfunc "Running : Permutations Subdomain Enumeration"
 			if [ "$DEEP" = true ] ; then
-				#eval dnsgen .tmp/subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute1_tmp.txt $DEBUG_STD
-				eval dnsgen .tmp/subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR > .tmp/dnsgen1.txt
+				eval dnsgen subdomains/subdomains.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR > .tmp/dnsgen1.txt
 				eval $tools/puredns/puredns resolve .tmp/dnsgen1.txt -w .tmp/permute1_tmp.txt -r $resolvers $DEBUG_STD
 				eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
-				#eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute2_tmp.txt $DEBUG_STD
 				eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR  > .tmp/dnsgen2.txt
 				eval $tools/puredns/puredns resolve .tmp/dnsgen2.txt -w .tmp/permute2_tmp.txt -r $resolvers $DEBUG_STD
 				eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
@@ -1349,12 +1347,6 @@ function start(){
 		NOTIFY="notify -silent"
 	else
 	    NOTIFY=""
-	fi
-
-	if [ "$CUSTOM_RESOLVER" = true ] ; then
-		resolvers=$resolvers_custom
-	else
-		resolvers=resolvers.txt
 	fi
 
 	echo "****** 🙏 Thank you for making this world safer ******" | $NOTIFY
