@@ -78,6 +78,7 @@ printf "\n\n${bgreen}###########################################################
 printf "${bgreen} reconFTW installer/updater script ${reset}\n\n"
 printf "${yellow} This may take time. So, go to grab a coffee! ${reset}\n\n"
 install_apt(){
+    eval $SUDO apt update -y $DEBUG_STD
     eval $SUDO apt install chromium-browser -y $DEBUG_STD
     eval $SUDO apt install chromium -y $DEBUG_STD
     eval $SUDO apt install python3 python3-pip ruby git curl libpcap-dev wget python-dev python3-dev python3-dnspython pv dnsutils build-essential libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq python3-shodan apt-transport-https lynx tor -y $DEBUG_STD
@@ -179,7 +180,7 @@ eval git clone --depth 1 https://github.com/drwetter/testssl.sh.git $dir/testssl
 
 # Standard repos installation
 for repo in "${!repos[@]}"; do
-    cd $dir/$repo || { eval git clone https://github.com/${repos[$repo]} $dir/$repo $DEBUG_STD && cd $dir/$repo; }
+    eval cd $dir/$repo $DEBUG_STD || { eval git clone https://github.com/${repos[$repo]} $dir/$repo $DEBUG_STD && cd $dir/$repo; }
     eval git pull $DEBUG_STD
     if [ -s "setup.py" ]; then
         eval $SUDO python3 setup.py install $DEBUG_STD
