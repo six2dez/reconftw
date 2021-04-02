@@ -24,12 +24,9 @@ gotools["subfinder"]="GO111MODULE=on go get -v github.com/projectdiscovery/subfi
 gotools["gau"]="go get -v github.com/lc/gau"
 gotools["subjs"]="GO111MODULE=on go get -u -v github.com/lc/subjs"
 gotools["Gxss"]="go get -v github.com/KathanP19/Gxss"
-#gotools["shuffledns"]="GO111MODULE=on go get -v github.com/projectdiscovery/shuffledns/cmd/shuffledns"
-#gotools["httprobe"]="go get -u github.com/tomnomnom/httprobe"
 gotools["gospider"]="go get -u github.com/jaeles-project/gospider"
 gotools["crobat"]="go get -v github.com/cgboal/sonarsearch/crobat"
 gotools["crlfuzz"]="GO111MODULE=on go get -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz"
-#gotools["gowitness"]="go get -u github.com/sensepost/gowitness"
 
 declare -A repos
 repos["degoogle_hunter"]="six2dez/degoogle_hunter"
@@ -202,10 +199,14 @@ if [ "True" = "$IS_ARM" ]
     else
         eval wget -N -c https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-linux $DEBUG_STD
         eval wget -N -c https://github.com/sensepost/gowitness/releases/download/2.3.4/gowitness-2.3.4-linux-amd64 $DEBUG_STD
+        eval wget -N -c https://github.com/codingo/DNSCewl/raw/master/DNScewl $DEBUG_STD
+        eval $SUDO mv DNScewl /usr/local/bin/DNScewl
         eval $SUDO mv gowitness-2.3.4-linux-amd64 /usr/local/bin/gowitness
         eval $SUDO mv findomain-linux /usr/local/bin/findomain
 fi
 eval $SUDO chmod 755 /usr/local/bin/findomain
+eval $SUDO chmod 755 /usr/local/bin/gowitness
+eval $SUDO chmod 755 /usr/local/bin/DNScewl
 eval subfinder $DEBUG_STD
 
 printf "${bblue} Running: Downloading required files ${reset}\n\n"

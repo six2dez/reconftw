@@ -62,7 +62,7 @@ function tools_installed(){
 	eval type -P waybackurls $DEBUG_STD || { printf "${bred} [*] Waybackurls	[NO]${reset}\n"; allinstalled=false;}
 	eval type -P gau $DEBUG_STD || { printf "${bred} [*] Gau		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P dnsx $DEBUG_STD || { printf "${bred} [*] dnsx		[NO]${reset}\n"; allinstalled=false;}
-#	eval type -P shuffledns $DEBUG_STD || { printf "${bred} [*] ShuffleDns		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P DNScewl $DEBUG_STD || { printf "${bred} [*] DNScewl		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P cf-check $DEBUG_STD || { printf "${bred} [*] Cf-check		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P nuclei $DEBUG_STD || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; allinstalled=false;}
 	[ -d ~/nuclei-templates ] || { printf "${bred} [*] Nuclei templates    [NO]${reset}\n"; allinstalled=false;}
@@ -73,11 +73,9 @@ function tools_installed(){
 	eval type -P massdns $DEBUG_STD || { printf "${bred} [*] Massdns		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P qsreplace $DEBUG_STD || { printf "${bred} [*] qsreplace		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P interlace $DEBUG_STD || { printf "${bred} [*] interlace		[NO]${reset}\n"; allinstalled=false;}
-	eval type -P dnsgen $DEBUG_STD || { printf "${bred} [*] DnsGen		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P anew $DEBUG_STD || { printf "${bred} [*] Anew		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P unfurl $DEBUG_STD || { printf "${bred} [*] unfurl		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P crlfuzz $DEBUG_STD || { printf "${bred} [*] crlfuzz		[NO]${reset}\n"; allinstalled=false;}
-	#eval type -P httprobe $DEBUG_STD || { printf "${bred} [*] httprobe		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P httpx $DEBUG_STD || { printf "${bred} [*] Httpx		[NO]${reset}\n${reset}"; allinstalled=false;}
 	eval type -P jq $DEBUG_STD || { printf "${bred} [*] jq			[NO]${reset}\n${reset}"; allinstalled=false;}
 	eval type -P notify $DEBUG_STD || { printf "${bred} [*] notify		[NO]${reset}\n${reset}"; allinstalled=false;}
@@ -409,7 +407,7 @@ function sub_scraping(){
 			touch .tmp/scrap_subs.txt
 			cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp.txt
 			if [ "$DEEP" = true ] ; then
-				gospider -S .tmp/probed_tmp.txt --js -t $GOSPIDER_THREADS -d 3 -H "${HEADER}" --sitemap --robots -w -r > .tmp/gospider.txt
+				gospider -S .tmp/probed_tmp.txt --js -t $GOSPIDER_THREADS -d 2 -H "${HEADER}" --sitemap --robots -w -r > .tmp/gospider.txt
 			else
 				gospider -S .tmp/probed_tmp.txt --js -t $GOSPIDER_THREADS -H "${HEADER}" --sitemap --robots -w -r > .tmp/gospider.txt
 			fi
@@ -433,48 +431,48 @@ function sub_permut(){
 		then
 			start_subfunc "Running : Permutations Subdomain Enumeration"
 			if [ "$DEEP" = true ] ; then
-				eval dnsgen subdomains/subdomains.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR > .tmp/dnsgen1.txt
-				eval $tools/puredns/puredns resolve .tmp/dnsgen1.txt -w .tmp/permute1_tmp.txt -r $resolvers $DEBUG_STD
+				eval DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=2 --subs --range=20 --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl1.txt
+				eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute1_tmp.txt -r $resolvers $DEBUG_STD
 				eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
-				eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR  > .tmp/dnsgen2.txt
-				eval $tools/puredns/puredns resolve .tmp/dnsgen2.txt -w .tmp/permute2_tmp.txt -r $resolvers $DEBUG_STD
+				eval DNScewl --tL .tmp/permute1.txt -p $tools/permutations_list.txt --level=2 --subs --range=20 --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl2.txt
+				eval $tools/puredns/puredns resolve .tmp/DNScewl2.txt -w .tmp/permute2_tmp.txt -r $resolvers $DEBUG_STD
 				eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
 				eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 			else
-				if [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 50 ]]
+				if [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 100 ]]
 				then
 					#eval dnsgen .tmp/subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute1_tmp.txt $DEBUG_STD
-					eval dnsgen .tmp/subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR > .tmp/dnsgen1.txt
-					eval $tools/puredns/puredns resolve .tmp/dnsgen1.txt -w .tmp/permute1_tmp.txt -r $resolvers $DEBUG_STD
+					eval DNScewl --tL .tmp/subs_no_resolved.txt -p $tools/permutations_list.txt --level=2 --subs --range=20 --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl1.txt
+					eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute1_tmp.txt -r $resolvers $DEBUG_STD
 					eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
 					#eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute2_tmp.txt $DEBUG_STD
-					eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR  > .tmp/dnsgen2.txt
-					eval $tools/puredns/puredns resolve .tmp/dnsgen2.txt -w .tmp/permute2_tmp.txt -r $resolvers $DEBUG_STD
+					eval DNScewl --tL .tmp/permute1.txt -p $tools/permutations_list.txt --level=2 --subs --range=20 --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl2.txt
+					eval $tools/puredns/puredns resolve .tmp/DNScewl2.txt -w .tmp/permute2_tmp.txt -r $resolvers $DEBUG_STD
 					eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
 					eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
-				elif [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 100 ]]
+				elif [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 200 ]]
 		  		then
 					#eval dnsgen .tmp/subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute_tmp.txt $DEBUG_STD
-					eval dnsgen .tmp/subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR > .tmp/dnsgen1.txt
-					eval $tools/puredns/puredns resolve .tmp/dnsgen1.txt -w .tmp/permute_tmp.txt -r $resolvers $DEBUG_STD
+					eval DNScewl --tL .tmp/subs_no_resolved.txt -p $tools/permutations_list.txt --level=2 --subs --range=20 --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl1.txt
+					eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute_tmp.txt -r $resolvers $DEBUG_STD
 					eval cat .tmp/permute_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 				else
-					if [[ $(cat subdomains/subdomains.txt | wc -l) -le 50 ]]
+					if [[ $(cat subdomains/subdomains.txt | wc -l) -le 100 ]]
 					then
 						#eval dnsgen subdomains/subdomains.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute1_tmp.txt $DEBUG_STD
-						eval dnsgen subdomains/subdomains.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR > .tmp/dnsgen1.txt
-						eval $tools/puredns/puredns resolve .tmp/dnsgen1.txt -w .tmp/permute1_tmp.txt -r $resolvers $DEBUG_STD
+						eval DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=2 --subs --range=20 --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl1.txt
+						eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute1_tmp.txt -r $resolvers $DEBUG_STD
 						eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
 						#eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute2_tmp.txt $DEBUG_STD
-						eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR  > .tmp/dnsgen2.txt
-						eval $tools/puredns/puredns resolve .tmp/dnsgen2.txt -w .tmp/permute2_tmp.txt -r $resolvers $DEBUG_STD
+						eval DNScewl --tL .tmp/permute1.txt -p $tools/permutations_list.txt --level=2 --subs --range=20 --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl2.txt
+						eval $tools/puredns/puredns resolve .tmp/DNScewl2.txt -w .tmp/permute2_tmp.txt -r $resolvers $DEBUG_STD
 						eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
 						eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
-					elif [[ $(cat subdomains/subdomains.txt | wc -l) -le 100 ]]
+					elif [[ $(cat subdomains/subdomains.txt | wc -l) -le 200 ]]
 					then
 						#eval dnsgen subdomains/subdomains.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute_tmp.txt $DEBUG_STD
-						eval dnsgen subdomains/subdomains.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR > .tmp/dnsgen1.txt
-						eval $tools/puredns/puredns resolve .tmp/dnsgen1.txt -w .tmp/permute_tmp.txt -r $resolvers $DEBUG_STD
+						eval DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=2 --subs --range=20 --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl1.txt
+						eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute_tmp.txt -r $resolvers $DEBUG_STD
 						eval cat .tmp/permute_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 					else
 						printf "\n${bred} Skipping Permutations: Too Much Subdomains${reset}\n\n"
@@ -567,11 +565,11 @@ function sub_recursive(){
 
 			domain=$save_domain
 
-			eval dnsgen .tmp/brute_recursive.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR > .tmp/dnsgen1_recursive.txt
-			eval $tools/puredns/puredns resolve .tmp/dnsgen1_recursive.txt -w .tmp/permute1_recursive_tmp.txt -r $resolvers $DEBUG_STD
+			eval DNScewl --tL .tmp/brute_recursive.txt -p $tools/permutations_list.txt --level=2 --subs --range=20 --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl1_recursive.txt
+			eval $tools/puredns/puredns resolve .tmp/DNScewl1_recursive.txt -w .tmp/permute1_recursive_tmp.txt -r $resolvers $DEBUG_STD
 			eval cat .tmp/permute1_recursive_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1_recursive.txt
-			eval dnsgen .tmp/permute1_recursive.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR  > .tmp/dnsgen2_recursive.txt
-			eval $tools/puredns/puredns resolve .tmp/dnsgen2_recursive.txt -w .tmp/permute2_recursive_tmp.txt -r $resolvers $DEBUG_STD
+			eval DNScewl --tL .tmp/permute1_recursive.txt -p $tools/permutations_list.txt --level=2 --subs --range=20 --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl2_recursive.txt
+			eval $tools/puredns/puredns resolve .tmp/DNScewl2_recursive.txt -w .tmp/permute2_recursive_tmp.txt -r $resolvers $DEBUG_STD
 			eval cat .tmp/permute1_recursive.txt .tmp/permute2_recursive_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_recursive.txt
 
 			NUMOFLINES=$(eval cat .tmp/permute_recursive.txt .tmp/brute_recursive.txt $DEBUG_ERROR | anew subdomains/subdomain.txt | wc -l)
@@ -862,7 +860,7 @@ function urlchecks(){
 			if [ $diff_webs != "0" ];
 			then
 				if [ "$DEEP" = true ] ; then
-					gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -d 3 -H "${HEADER}" --sitemap --robots -w -r > .tmp/gospider.txt
+					gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -d 2 -H "${HEADER}" --sitemap --robots -w -r > .tmp/gospider.txt
 				else
 					gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -H "${HEADER}" --sitemap --robots -w -r > .tmp/gospider.txt
 				fi
@@ -967,7 +965,7 @@ function brokenLinks(){
 		start_func "Broken links checks"
 		if [ ! -s ".tmp/gospider.txt" ]; then
 			if [ "$DEEP" = true ] ; then
-				gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -d 3 -H "${HEADER}" --sitemap --robots -w -r > .tmp/gospider.txt
+				gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -d 2 -H "${HEADER}" --sitemap --robots -w -r > .tmp/gospider.txt
 			else
 				gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -H "${HEADER}" --sitemap --robots -w -r > .tmp/gospider.txt
 			fi
