@@ -431,10 +431,10 @@ function sub_permut(){
 		then
 			start_subfunc "Running : Permutations Subdomain Enumeration"
 			if [ "$DEEP" = true ] ; then
-				eval DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=2 --subs --range=20 --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl1.txt
+				eval DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl1.txt
 				eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute1_tmp.txt -r $resolvers $DEBUG_STD
 				eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
-				eval DNScewl --tL .tmp/permute1.txt -p $tools/permutations_list.txt --level=2 --subs --range=20 --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl2.txt
+				eval DNScewl --tL .tmp/permute1.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl2.txt
 				eval $tools/puredns/puredns resolve .tmp/DNScewl2.txt -w .tmp/permute2_tmp.txt -r $resolvers $DEBUG_STD
 				eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
 				eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
@@ -442,36 +442,36 @@ function sub_permut(){
 				if [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 100 ]]
 				then
 					#eval dnsgen .tmp/subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute1_tmp.txt $DEBUG_STD
-					eval DNScewl --tL .tmp/subs_no_resolved.txt -p $tools/permutations_list.txt --level=2 --subs --range=20 --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl1.txt
+					eval DNScewl --tL .tmp/subs_no_resolved.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl1.txt
 					eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute1_tmp.txt -r $resolvers $DEBUG_STD
 					eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
 					#eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute2_tmp.txt $DEBUG_STD
-					eval DNScewl --tL .tmp/permute1.txt -p $tools/permutations_list.txt --level=2 --subs --range=20 --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl2.txt
+					eval DNScewl --tL .tmp/permute1.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl2.txt
 					eval $tools/puredns/puredns resolve .tmp/DNScewl2.txt -w .tmp/permute2_tmp.txt -r $resolvers $DEBUG_STD
 					eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
 					eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 				elif [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 200 ]]
 		  		then
 					#eval dnsgen .tmp/subs_no_resolved.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute_tmp.txt $DEBUG_STD
-					eval DNScewl --tL .tmp/subs_no_resolved.txt -p $tools/permutations_list.txt --level=2 --subs --range=20 --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl1.txt
+					eval DNScewl --tL .tmp/subs_no_resolved.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl1.txt
 					eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute_tmp.txt -r $resolvers $DEBUG_STD
 					eval cat .tmp/permute_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 				else
 					if [[ $(cat subdomains/subdomains.txt | wc -l) -le 100 ]]
 					then
 						#eval dnsgen subdomains/subdomains.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute1_tmp.txt $DEBUG_STD
-						eval DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=2 --subs --range=20 --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl1.txt
+						eval DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl1.txt
 						eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute1_tmp.txt -r $resolvers $DEBUG_STD
 						eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
 						#eval dnsgen .tmp/permute1.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute2_tmp.txt $DEBUG_STD
-						eval DNScewl --tL .tmp/permute1.txt -p $tools/permutations_list.txt --level=2 --subs --range=20 --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl2.txt
+						eval DNScewl --tL .tmp/permute1.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl2.txt
 						eval $tools/puredns/puredns resolve .tmp/DNScewl2.txt -w .tmp/permute2_tmp.txt -r $resolvers $DEBUG_STD
 						eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
 						eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 					elif [[ $(cat subdomains/subdomains.txt | wc -l) -le 200 ]]
 					then
 						#eval dnsgen subdomains/subdomains.txt --wordlist $tools/permutations_list.txt $DEBUG_ERROR | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/permute_tmp.txt $DEBUG_STD
-						eval DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=2 --subs --range=20 --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl1.txt
+						eval DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl1.txt
 						eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute_tmp.txt -r $resolvers $DEBUG_STD
 						eval cat .tmp/permute_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 					else
@@ -565,10 +565,10 @@ function sub_recursive(){
 
 			domain=$save_domain
 
-			eval DNScewl --tL .tmp/brute_recursive.txt -p $tools/permutations_list.txt --level=2 --subs --range=20 --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl1_recursive.txt
+			eval DNScewl --tL .tmp/brute_recursive.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl1_recursive.txt
 			eval $tools/puredns/puredns resolve .tmp/DNScewl1_recursive.txt -w .tmp/permute1_recursive_tmp.txt -r $resolvers $DEBUG_STD
 			eval cat .tmp/permute1_recursive_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1_recursive.txt
-			eval DNScewl --tL .tmp/permute1_recursive.txt -p $tools/permutations_list.txt --level=2 --subs --range=20 --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl2_recursive.txt
+			eval DNScewl --tL .tmp/permute1_recursive.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +15 > .tmp/DNScewl2_recursive.txt
 			eval $tools/puredns/puredns resolve .tmp/DNScewl2_recursive.txt -w .tmp/permute2_recursive_tmp.txt -r $resolvers $DEBUG_STD
 			eval cat .tmp/permute1_recursive.txt .tmp/permute2_recursive_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_recursive.txt
 
