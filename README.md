@@ -284,7 +284,7 @@ resolvers=${tools}/resolvers.txt
 **Perform recon in a multi domain target**
 
 ```bash
-▶ ./reconftw.sh -m company -l domainsList.txt
+▶ ./reconftw.sh -m company -l domainsList.txt -r
 ```
 
 **Show help section**
