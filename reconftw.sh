@@ -177,8 +177,9 @@ function emails(){
 			if [ "$PWNDB_STATUS" = 200 ]
 			then
 				cd $tools/pwndb
-				python3 pwndb.py --target "@${domain}" | anew -q $dir/osint/passwords.txt
+				python3 pwndb.py --target "@${domain}" | sed '/^[-]/d' | anew -q $dir/osint/passwords.txt
 				cd $dir
+				sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" osint/passwords.txt
 			else
 				text="${yellow}\n pwndb is currently down :(\n\n Check xjypo5vzgmo7jca6b322dnqbsdnp3amd24ybx26x5nxbusccjkm4pwid.onion${reset}\n"
 				printf "${text}" && printf "${text}" | $NOTIFY
@@ -575,7 +576,7 @@ function sub_recursive(){
 				for sub in $(cat subdomains/subdomains.txt); do
 					sed "s/$/.$sub/" $subs_wordlist | anew -q .tmp/brute_recursive_wordlist.txt
 				done
-				eval $tools/puredns/puredns resolve .tmp/brute_recursive_wordlist.txt $domain -r $resolvers -w .tmp/brute_recursive_result.txt $DEBUG_STD
+				eval $tools/puredns/puredns resolve .tmp/brute_recursive_wordlist.txt -r $resolvers -w .tmp/brute_recursive_result.txt $DEBUG_STD
 				cat .tmp/brute_recursive_result.txt | anew -q .tmp/brute_recursive.txt
 
 				eval DNScewl --tL .tmp/brute_recursive.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 > .tmp/DNScewl1_recursive.txt
@@ -881,7 +882,7 @@ function urlchecks(){
 			cat webs/webs.txt | waybackurls | anew -q .tmp/url_extract_tmp.txt
 			cat webs/webs.txt | gau -subs | anew -q .tmp/url_extract_tmp.txt
 			diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt) <(sort -u webs/webs.txt) | wc -l)
-			if [ $diff_webs != "0" ];
+			if [ $diff_webs != "0" ] || [ ! -s ".tmp/gospider.txt" ] ;
 			then
 				if [ "$DEEP" = true ] ; then
 					gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -d 2 -H "${HEADER}" --sitemap --robots -w -r > .tmp/gospider.txt
@@ -935,23 +936,28 @@ function jschecks(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$JSCHECKS" = true ]
 		then
 			start_func "Javascript Scan"
-			printf "${yellow} Running : Fetching Urls 1/5${reset}\n"
-			cat js/url_extract_js.txt | cut -d '?' -f 1 | grep -iE "\.js$" | anew -q js/jsfile_links.txt
-			cat js/url_extract_js.txt | subjs | anew -q js/jsfile_links.txt
-			printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
-			cat js/jsfile_links.txt | httpx -follow-redirects -H "${HEADER}" -silent -timeout 15 -threads $HTTPX_THREADS -status-code -retries 2 -no-color | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
-			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
-			interlace -tL js/js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> .tmp/js_endpoints.txt" &>/dev/null
-			eval sed -i '/^\//!d' .tmp/js_endpoints.txt $DEBUG_ERROR
-			cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt.txt
-			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
-			cat js/js_livelinks.txt | eval nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o js/js_secrets.txt $DEBUG_STD
-			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
-			if [ -s "js/js_livelinks.txt" ]
+			if [ -s "js/url_extract_js.txt" ]
 			then
-				cat js/js_livelinks.txt | eval python3 $tools/getjswords.py $DEBUG_ERROR | anew -q webs/dict_words.txt
+				printf "${yellow} Running : Fetching Urls 1/5${reset}\n"
+				cat js/url_extract_js.txt | cut -d '?' -f 1 | grep -iE "\.js$" | anew -q js/jsfile_links.txt
+				cat js/url_extract_js.txt | subjs | anew -q js/jsfile_links.txt
+				printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
+				cat js/jsfile_links.txt | httpx -follow-redirects -H "${HEADER}" -silent -timeout 15 -threads $HTTPX_THREADS -status-code -retries 2 -no-color | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
+				printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
+				interlace -tL js/js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> .tmp/js_endpoints.txt" &>/dev/null
+				eval sed -i '/^\//!d' .tmp/js_endpoints.txt $DEBUG_STD
+				cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt.txt
+				printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
+				cat js/js_livelinks.txt | eval nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o js/js_secrets.txt $DEBUG_STD
+				printf "${yellow} Running : Building wordlist 5/5${reset}\n"
+				if [ -s "js/js_livelinks.txt" ]
+				then
+					cat js/js_livelinks.txt | eval python3 $tools/getjswords.py $DEBUG_ERROR | anew -q webs/dict_words.txt
+				fi
+				end_func "Results are saved in js folder" ${FUNCNAME[0]}
+			else
+				end_func "No JS urls found, function skipped" ${FUNCNAME[0]}
 			fi
-			end_func "Results are saved in js folder" ${FUNCNAME[0]}
 		else
 			if [ "$JSCHECKS" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
@@ -968,7 +974,10 @@ function wordlist_gen(){
 			cat .tmp/url_extract_tmp.txt | unfurl -u keys | sed 's/[][]//g' | sed 's/[#]//g' | sed 's/[}{]//g' | anew -q webs/dict_words.txt
 			cat .tmp/url_extract_tmp.txt | unfurl -u values | sed 's/[][]//g' | sed 's/[#]//g' | sed 's/[}{]//g' | anew -q webs/dict_words.txt
 			cat .tmp/url_extract_tmp.txt | tr "[:punct:]" "\n" | anew -q webs/dict_words.txt
-			cat .tmp/js_endpoints.txt | unfurl -u path | anew -q webs/dict_paths.txt
+			if [ -s ".tmp/js_endpoints.txt" ]
+			then
+				cat .tmp/js_endpoints.txt | unfurl -u path | anew -q webs/dict_paths.txt
+			fi
 			cat .tmp/url_extract_tmp.txt | unfurl -u path | anew -q webs/dict_paths.txt
 			end_func "Results are saved in webs/dict_[words|paths].txt" ${FUNCNAME[0]}
 		else
