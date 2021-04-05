@@ -256,13 +256,14 @@ function subdomains_full(){
 	fi
 	sub_passive
 	sub_crt
-	sub_dns
+	sub_active
 	sub_brute
-	sub_scraping
 	sub_permut
 	if [ "$DEEP" = true ] ; then
 		sub_recursive
 	fi
+	sub_dns
+	sub_scraping
 	webprobe_simple
 	if [ -f "subdomains/subdomains.txt" ]
 		then
@@ -356,7 +357,7 @@ function sub_crt(){
 	fi
 }
 
-function sub_dns(){
+function sub_active(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]
 		then
 			start_subfunc "Running : Active Subdomain Enumeration"
@@ -369,9 +370,21 @@ function sub_dns(){
 			#eval shuffledns -d $domain -list .tmp/subs_no_resolved.txt -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/subdomains_tmp.txt $DEBUG_STD
 			eval $tools/puredns/puredns resolve .tmp/subs_no_resolved.txt -w .tmp/subdomains_tmp.txt -r $resolvers $DEBUG_STD
 			echo $domain | dnsx -silent | anew -q .tmp/subdomains_tmp.txt
-			dnsx -retry 3 -silent -cname -resp-only -l .tmp/subdomains_tmp.txt | grep ".$domain$" | anew -q .tmp/subdomains_tmp.txt
-			eval dnsx -retry 3 -silent -cname -resp -l subdomains/subdomains.txt -o subdomains/subdomains_cname.txt $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/subdomains_tmp.txt $DEBUG_ERROR | anew subdomains/subdomains.txt | wc -l)
+			end_subfunc "${NUMOFLINES} new subs (active resolution)" ${FUNCNAME[0]}
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
+}
+
+function sub_dns(){
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]
+		then
+			start_subfunc "Running : DNS Subdomain Enumeration"
+			eval dnsx -retry 3 -silent -cname -resp -l subdomains/subdomains.txt -o subdomains/subdomains_cname.txt $DEBUG_STD
+			cat subdomains/subdomains_cname.txt | cut -d '[' -f2 | sed 's/.$//' | grep ".$domain$" | anew -q .tmp/subdomains_dns.txt
+			eval $tools/puredns/puredns resolve .tmp/subdomains_dns.txt -w .tmp/subdomains_dns_resolved.txt -r $resolvers $DEBUG_STD
+			NUMOFLINES=$(eval cat .tmp/subdomains_dns_resolved.txt $DEBUG_ERROR | anew subdomains/subdomains.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (dns resolution)" ${FUNCNAME[0]}
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -405,7 +418,7 @@ function sub_scraping(){
 		then
 			start_subfunc "Running : Source code scraping subdomain search"
 			touch .tmp/scrap_subs.txt
-			cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp.txt
+			cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
 			if [ "$DEEP" = true ] ; then
 				gospider -S .tmp/probed_tmp.txt --js -t $GOSPIDER_THREADS -d 2 -H "${HEADER}" --sitemap --robots -w -r > .tmp/gospider.txt
 			else
@@ -415,7 +428,8 @@ function sub_scraping(){
 			cat .tmp/gospider.txt | egrep -o 'https?://[^ ]+' | sed 's/]$//' | unfurl --unique domains | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
 			#cat .tmp/scrap_subs.txt | eval shuffledns -d $domain -r $resolvers -t $SHUFFLEDNS_THREADS -o .tmp/scrap_subs_resolved.txt $DEBUG_STD
 			eval $tools/puredns/puredns resolve .tmp/scrap_subs.txt -w .tmp/scrap_subs_resolved.txt -r $resolvers $DEBUG_STD
-			NUMOFLINES=$(eval cat .tmp/scrap_subs_resolved.txt $DEBUG_ERROR | anew subdomains/subdomains.txt | wc -l)
+			NUMOFLINES=$(eval cat .tmp/scrap_subs_resolved.txt $DEBUG_ERROR | anew subdomains/subdomains.txt | tee .tmp/diff_scrap.txt | wc -l)
+			cat .tmp/diff_scrap.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
 			end_subfunc "${NUMOFLINES} new subs (code scraping)" ${FUNCNAME[0]}
 		else
 			if [ "$SUBSCRAPING" = false ]; then
@@ -556,28 +570,31 @@ function sub_recursive(){
 		then
 			start_func "Subdomains recursive search"
 
-			save_domain=$domain
-			for sub in $(cat subdomains/subdomains.txt); do
-				domain=$sub
-				eval $tools/puredns/puredns bruteforce $subs_wordlist_big $domain -w .tmp/${sub}_brute_recursive.txt -r $resolvers $DEBUG_STD
-			done
-			cat .tmp/*_brute_recursive.txt | anew -q .tmp/brute_recursive.txt
+			if [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 1000 ]]
+			then
+				for sub in $(cat subdomains/subdomains.txt); do
+					sed "s/$/.$sub/" $subs_wordlist | anew -q .tmp/brute_recursive_wordlist.txt
+				done
+				eval $tools/puredns/puredns resolve .tmp/brute_recursive_wordlist.txt $domain -r $resolvers -w .tmp/brute_recursive_result.txt $DEBUG_STD
+				cat .tmp/brute_recursive_result.txt | anew -q .tmp/brute_recursive.txt
 
-			domain=$save_domain
+				eval DNScewl --tL .tmp/brute_recursive.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 > .tmp/DNScewl1_recursive.txt
+				eval $tools/puredns/puredns resolve .tmp/DNScewl1_recursive.txt -w .tmp/permute1_recursive_tmp.txt -r $resolvers $DEBUG_STD
+				eval cat .tmp/permute1_recursive_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1_recursive.txt
+				eval DNScewl --tL .tmp/permute1_recursive.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 > .tmp/DNScewl2_recursive.txt
+				eval $tools/puredns/puredns resolve .tmp/DNScewl2_recursive.txt -w .tmp/permute2_recursive_tmp.txt -r $resolvers $DEBUG_STD
+				eval cat .tmp/permute1_recursive.txt .tmp/permute2_recursive_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_recursive.txt
 
-			eval DNScewl --tL .tmp/brute_recursive.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 > .tmp/DNScewl1_recursive.txt
-			eval $tools/puredns/puredns resolve .tmp/DNScewl1_recursive.txt -w .tmp/permute1_recursive_tmp.txt -r $resolvers $DEBUG_STD
-			eval cat .tmp/permute1_recursive_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1_recursive.txt
-			eval DNScewl --tL .tmp/permute1_recursive.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 > .tmp/DNScewl2_recursive.txt
-			eval $tools/puredns/puredns resolve .tmp/DNScewl2_recursive.txt -w .tmp/permute2_recursive_tmp.txt -r $resolvers $DEBUG_STD
-			eval cat .tmp/permute1_recursive.txt .tmp/permute2_recursive_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_recursive.txt
+				NUMOFLINES=$(eval cat .tmp/permute_recursive.txt .tmp/brute_recursive.txt $DEBUG_ERROR | anew subdomains/subdomains.txt | wc -l)
 
-			NUMOFLINES=$(eval cat .tmp/permute_recursive.txt .tmp/brute_recursive.txt $DEBUG_ERROR | anew subdomains/subdomain.txt | wc -l)
-
-			if [ "$NUMOFLINES" -gt 0 ]; then
-				notification "${NUMOFLINES} new subdomains found with recursive search" info
+				if [ "$NUMOFLINES" -gt 0 ]; then
+					notification "${NUMOFLINES} new subdomains found with recursive search" info
+				fi
+			else
+				notification "Skipping Permutations: Too Much Subdomains" warn
 			fi
-			end_func "Results are saved in subdomains/subdomain.txt" ${FUNCNAME[0]}
+
+			end_func "Results are saved in subdomains/subdomains.txt" ${FUNCNAME[0]}
 		else
 			if [ "$SUBRECURSIVE" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
@@ -595,7 +612,14 @@ function webprobe_simple(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$WEBPROBESIMPLE" = true ]
 		then
 			start_subfunc "Running : Http probing"
-			cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp.txt
+
+			if [ -s ".tmp/probed_tmp_scrap.txt" ]
+			then
+				mv .tmp/probed_tmp_scrap.txt .tmp/probed_tmp.txt
+			else
+				cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp.txt
+			fi
+
 			deleteOutScoped $outOfScope_file .tmp/probed_tmp.txt
 			NUMOFLINES=$(eval cat .tmp/probed_tmp.txt $DEBUG_ERROR | anew webs/webs.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new websites resolved" ${FUNCNAME[0]}
@@ -1047,14 +1071,14 @@ function open_redirect(){
 				cat gf/redirect.txt | qsreplace FUZZ | anew -q .tmp/tmp_redirect.txt
 				eval python3 $tools/OpenRedireX/openredirex.py -l .tmp/tmp_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt $DEBUG_ERROR | grep "^http" > vulns/redirect.txt
 				sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" vulns/redirect.txt
-				end_func "Results are saved in vulns/openredirex.txt" ${FUNCNAME[0]}
+				end_func "Results are saved in vulns/redirect.txt" ${FUNCNAME[0]}
 			else
 				if [[ $(cat gf/redirect.txt | wc -l) -le 1000 ]]
 				then
 					cat gf/redirect.txt | qsreplace FUZZ | anew -q .tmp/tmp_redirect.txt
 					eval python3 $tools/OpenRedireX/openredirex.py -l .tmp/tmp_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt $DEBUG_ERROR | grep "^http" > vulns/redirect.txt
 					sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" vulns/redirect.txt
-					end_func "Results are saved in vulns/openredirex.txt" ${FUNCNAME[0]}
+					end_func "Results are saved in vulns/redirect.txt" ${FUNCNAME[0]}
 				else
 					printf "${bred} Skipping Open redirects: Too Much URLs to test, try with --deep flag${reset}\n"
 					printf "${bgreen}#######################################################################\n"
