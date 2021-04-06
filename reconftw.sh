@@ -30,7 +30,7 @@ UPSTREAMHASH=$(git rev-parse ${BRANCH}@{upstream})
 
 if [ "$HEADHASH" != "$UPSTREAMHASH" ]
 then
-    printf "${yellow} There is a new version, run ./install.sh to get latest version${reset}\n\n"
+    printf "\n${yellow} There is a new version, run ./install.sh to get latest version${reset}\n\n"
 fi
 
 }
