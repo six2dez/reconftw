@@ -338,29 +338,17 @@ function sub_crt(){
 			cd $tools/crtfinder
 			eval python3 crtfinder.py -u $domain $DEBUG_STD
 			outputfile=${domain%%.*}
-			if [ "$FULLSCOPE" = true ] ; then
-				eval cat ${outputfile}.txt $DEBUG_ERROR | anew -q $dir/.tmp/crtsh_subs_tmp.txt
-			else
-				eval cat ${outputfile}.txt $DEBUG_ERROR | grep ".$domain$" | anew -q $dir/.tmp/crtsh_subs_tmp.txt
-			fi
+			eval cat ${outputfile}.txt $DEBUG_ERROR | grep ".$domain$" | anew -q $dir/.tmp/crtsh_subs_tmp.txt
+
 			if [ "$DEEP" = true ] ; then
 				eval python3 dig.py ${outputfile}.txt > more.txt $DEBUG_STD
-				if [ "$FULLSCOPE" = true ] ; then
-					eval cat more.txt $DEBUG_ERROR | anew -q $dir/.tmp/crtsh_subs_tmp.txt
-				else
-					eval cat more.txt $DEBUG_ERROR | grep ".$domain$" | anew -q $dir/.tmp/crtsh_subs_tmp.txt
-				fi
+				eval cat more.txt $DEBUG_ERROR | grep ".$domain$" | anew -q $dir/.tmp/crtsh_subs_tmp.txt
 				eval rm more.txt $DEBUG_ERROR
 			fi
 			eval rm ${outputfile}.txt $DEBUG_ERROR
 			cd $dir
-			if [ "$FULLSCOPE" = true ] ; then
-				eval curl "https://tls.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r .Results[] $DEBUG_ERROR | cut -d ',' -f3 | anew -q .tmp/crtsh_subs_tmp.txt
-				eval curl "https://dns.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r '.FDNS_A'[],'.RDNS'[] $DEBUG_ERROR | cut -d ',' -f2 | anew -q .tmp/crtsh_subs_tmp.txt
-			else
-				eval curl "https://tls.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r .Results[] $DEBUG_ERROR | cut -d ',' -f3 | grep -F ".$domain" | anew -q .tmp/crtsh_subs.txt
-				eval curl "https://dns.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r '.FDNS_A'[],'.RDNS'[] $DEBUG_ERROR | cut -d ',' -f2 | grep -F ".$domain" | anew -q .tmp/crtsh_subs_tmp.txt
-			fi
+			eval curl "https://tls.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r .Results[] $DEBUG_ERROR | cut -d ',' -f3 | grep -F ".$domain" | anew -q .tmp/crtsh_subs.txt
+			eval curl "https://dns.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r '.FDNS_A'[],'.RDNS'[] $DEBUG_ERROR | cut -d ',' -f2 | grep -F ".$domain" | anew -q .tmp/crtsh_subs_tmp.txt
 			NUMOFLINES=$(eval cat .tmp/crtsh_subs_tmp.txt $DEBUG_ERROR | anew .tmp/crtsh_subs.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (cert transparency)" ${FUNCNAME[0]}
 		else
@@ -1686,9 +1674,6 @@ while getopts ":hd:-:l:m:x:i:varspxwo:" opt; do
 	fi
 	if [[ $general == *"--deep"* ]]; then
   		DEEP=true
-	fi
-	if [[ $general == *"--fs"* ]]; then
-  		FULLSCOPE=true
 	fi
 	case ${opt} in
 
