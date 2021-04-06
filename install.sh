@@ -102,6 +102,26 @@ eval git config --global --unset http.proxy $DEBUG_STD
 eval git config --global --unset https.proxy $DEBUG_STD
 
 printf "${bblue} Running: Looking for new reconFTW version${reset}\n\n"
+
+eval git fetch $DEBUG_STD
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+HEADHASH=$(git rev-parse HEAD)
+UPSTREAMHASH=$(git rev-parse ${BRANCH}@{upstream})
+
+if [ "$HEADHASH" != "$UPSTREAMHASH" ]
+then
+    printf "${yellow} There is a new version, updating...${reset}\n\n"
+    if [ -n "$(git status --porcelain | egrep 'reconftw.cfg$')" ]; then
+        mv reconftw.cfg reconftw.cfg_bck
+        printf "${yellow} reconftw.cfg has been backed up in reconftw.cfg_bck${reset}\n\n"
+    fi
+    eval git reset --hard $DEBUG_STD
+    eval git pull $DEBUG_STD
+    printf "${bgreen} Updated! Running new installer version...${reset}\n\n"
+else
+    printf "${bgreen} reconFTW latest version installed ${reset}\n\n"
+fi
+
 eval git fetch $DEBUG_STD
 if [ -n "$(git status --porcelain | egrep -v '^\?\?')" ]; then
     printf "${yellow} There is a new version, updating...${reset}\n\n"
@@ -236,3 +256,4 @@ eval strip -s $HOME/go/bin/* $DEBUG_STD
 printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - GitHub (~/Tools/.github_tokens)\n - SHODAN (SHODAN_API_KEY in reconftw.cfg)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg) \n - theHarvester (~/Tools/theHarvester/api-keys.yml)\n - H8mail (~/Tools/h8mail_config.ini)\n\n${reset}"
 printf "${bgreen} Finished!${reset}\n\n"
 printf "\n\n${bgreen}#######################################################################${reset}\n"
+#test

@@ -14,12 +14,26 @@ function banner(){
 	printf "   ░░   ░    ░   ░        ░ ░ ░ ▒     ░   ░ ░  ░ ░      ░        ░   ░  \n"
 	printf "    ░        ░  ░░ ░          ░ ░           ░                      ░    \n"
 	printf "                 ░                                                      \n"
-	printf "			                                     by @six2dez${reset}\n"
+	printf " ${reconftw_version}                                 by @six2dez${reset}\n"
 }
 
 ###############################################################################################################
 ################################################### TOOLS #####################################################
 ###############################################################################################################
+
+function check_version(){
+
+eval git fetch $DEBUG_STD
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+HEADHASH=$(git rev-parse HEAD)
+UPSTREAMHASH=$(git rev-parse ${BRANCH}@{upstream})
+
+if [ "$HEADHASH" != "$UPSTREAMHASH" ]
+then
+    printf "${yellow} There is a new version, run ./install.sh to get latest version${reset}\n\n"
+fi
+
+}
 
 function tools_installed(){
 
@@ -1654,6 +1668,8 @@ function help(){
 ###############################################################################################################
 
 banner
+
+check_version
 
 if [ -z "$1" ]
 then
