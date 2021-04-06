@@ -191,7 +191,6 @@ BYPASSER4XX=true
 # Extra features
 NOTIFICATION=true
 DEEP=false
-FULLSCOPE=false
 DIFF=false
 REMOVETMP=false
 

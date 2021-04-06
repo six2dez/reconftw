@@ -23,10 +23,11 @@ gotools["dnsx"]="GO111MODULE=on go get -v github.com/projectdiscovery/dnsx/cmd/d
 gotools["subfinder"]="GO111MODULE=on go get -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder"
 gotools["gau"]="go get -v github.com/lc/gau"
 gotools["subjs"]="GO111MODULE=on go get -u -v github.com/lc/subjs"
-gotools["Gxss"]="go get -v github.com/KathanP19/Gxss"
+gotools["kxss"]="go get -u github.com/tomnomnom/hacks/kxss"
 gotools["gospider"]="go get -u github.com/jaeles-project/gospider"
 gotools["crobat"]="go get -v github.com/cgboal/sonarsearch/crobat"
 gotools["crlfuzz"]="GO111MODULE=on go get -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz"
+gotools["dalfox"]="GO111MODULE=on go get -v github.com/hahwul/dalfox/v2"
 
 declare -A repos
 repos["degoogle_hunter"]="six2dez/degoogle_hunter"
@@ -39,7 +40,6 @@ repos["wafw00f"]="EnableSecurity/wafw00f"
 repos["Arjun"]="s0md3v/Arjun"
 repos["gf"]="tomnomnom/gf"
 repos["Gf-Patterns"]="1ndianl33t/Gf-Patterns"
-repos["XSStrike"]="s0md3v/XSStrike"
 repos["github-search"]="gwen001/github-search"
 repos["crtfinder"]="eslam3kl/crtfinder"
 repos["LinkFinder"]="dark-warlord14/LinkFinder"
@@ -119,7 +119,7 @@ then
     eval git pull $DEBUG_STD
     printf "${bgreen} Updated! Running new installer version...${reset}\n\n"
 else
-    printf "${bgreen} reconFTW latest version installed ${reset}\n\n"
+    printf "${bgreen} reconFTW is already up to date!${reset}\n\n"
 fi
 
 eval git fetch $DEBUG_STD

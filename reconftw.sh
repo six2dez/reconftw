@@ -81,7 +81,7 @@ function tools_installed(){
 	eval type -P nuclei $DEBUG_STD || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; allinstalled=false;}
 	[ -d ~/nuclei-templates ] || { printf "${bred} [*] Nuclei templates    [NO]${reset}\n"; allinstalled=false;}
 	eval type -P gf $DEBUG_STD || { printf "${bred} [*] Gf			[NO]${reset}\n"; allinstalled=false;}
-	eval type -P Gxss $DEBUG_STD || { printf "${bred} [*] Gxss		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P kxss $DEBUG_STD || { printf "${bred} [*] kxss		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P subjs $DEBUG_STD || { printf "${bred} [*] subjs		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P ffuf $DEBUG_STD || { printf "${bred} [*] ffuf		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P massdns $DEBUG_STD || { printf "${bred} [*] Massdns		[NO]${reset}\n"; allinstalled=false;}
@@ -93,6 +93,7 @@ function tools_installed(){
 	eval type -P httpx $DEBUG_STD || { printf "${bred} [*] Httpx		[NO]${reset}\n${reset}"; allinstalled=false;}
 	eval type -P jq $DEBUG_STD || { printf "${bred} [*] jq			[NO]${reset}\n${reset}"; allinstalled=false;}
 	eval type -P notify $DEBUG_STD || { printf "${bred} [*] notify		[NO]${reset}\n${reset}"; allinstalled=false;}
+	eval type -P dalfox $DEBUG_STD || { printf "${bred} [*] dalfox		[NO]${reset}\n${reset}"; allinstalled=false;}
 
 	if [ "${allinstalled}" = true ] ; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
@@ -423,9 +424,9 @@ function sub_scraping(){
 			touch .tmp/scrap_subs.txt
 			cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
 			if [ "$DEEP" = true ] ; then
-				gospider -S .tmp/probed_tmp.txt --js -t $GOSPIDER_THREADS -d 2 -H "${HEADER}" --sitemap --robots -w -r > .tmp/gospider.txt
+				gospider -S .tmp/probed_tmp_scrap.txt --js -t $GOSPIDER_THREADS -d 3 -H "${HEADER}" --sitemap --robots -w -r > .tmp/gospider.txt
 			else
-				gospider -S .tmp/probed_tmp.txt --js -t $GOSPIDER_THREADS -H "${HEADER}" --sitemap --robots -w -r > .tmp/gospider.txt
+				gospider -S .tmp/probed_tmp_scrap.txt --js -t $GOSPIDER_THREADS -d 2 -H "${HEADER}" --sitemap --robots -w -r > .tmp/gospider.txt
 			fi
 			sed -i '/^.\{2048\}./d' .tmp/gospider.txt
 			cat .tmp/gospider.txt | egrep -o 'https?://[^ ]+' | sed 's/]$//' | unfurl --unique domains | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
@@ -1023,24 +1024,22 @@ function xss(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$XSS" = true ] && [ -s "gf/xss.txt" ]
 	then
 		start_func "XSS Analysis"
-		cat gf/xss.txt | qsreplace FUZZ | Gxss -c 100 -p Xss | anew -q .tmp/xss_reflected.txt
+		cat gf/xss.txt | qsreplace FUZZ | kxss | sed 's/^.*on //' | anew -q .tmp/xss_reflected.txt
 		if [ "$DEEP" = true ] ; then
 			if [ -n "$XSS_SERVER" ]; then
-				sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
-				eval python3 $tools/XSStrike/xsstrike.py --seeds .tmp/xss_reflected.txt -t $XSSTRIKE_THREADS --crawl --blind --skip > vulns/xss.txt $DEBUG_STD
+				eval cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav -b ${XSS_SERVER} $DEBUG_ERROR | anew -q vulns/xss.txt
 			else
 				printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n\n"
-				eval python3 $tools/XSStrike/xsstrike.py --seeds .tmp/xss_reflected.txt -t $XSSTRIKE_THREADS --crawl --skip > vulns/xss.txt $DEBUG_STD
+				eval cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav $DEBUG_ERROR | anew -q vulns/xss.txt
 			fi
 		else
-			if [[ $(cat .tmp/xss_reflected.txt | wc -l) -le 200 ]]
+			if [[ $(cat .tmp/xss_reflected.txt | wc -l) -le 500 ]]
 			then
 				if [ -n "$XSS_SERVER" ]; then
-					sed -i "s/^blindPayload = \x27\x27/blindPayload = \x27${XSS_SERVER}\x27/" $tools/XSStrike/core/config.py
-					eval python3 $tools/XSStrike/xsstrike.py --seeds .tmp/xss_reflected.txt -t $XSSTRIKE_THREADS --crawl --blind --skip > vulns/xss.txt $DEBUG_STD
+					eval cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav --skip-grepping --skip-mining-all --skip-mining-dict -b ${XSS_SERVER} $DEBUG_ERROR | anew -q vulns/xss.txt
 				else
 					printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n\n"
-					eval python3 $tools/XSStrike/xsstrike.py --seeds .tmp/xss_reflected.txt -t $XSSTRIKE_THREADS --crawl --skip > vulns/xss.txt $DEBUG_STD
+					eval cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav --skip-grepping --skip-mining-all --skip-mining-dict $DEBUG_ERROR | anew -q vulns/xss.txt
 				fi
 			else
 				printf "${bred} Skipping XSS: Too Much URLs to test, try with --deep flag${reset}\n"
