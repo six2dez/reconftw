@@ -23,7 +23,7 @@ function banner(){
 
 function tools_installed(){
 
-	printf "\n\n${bgreen}#######################################################################\n"
+	printf "\n\n${bgreen}#######################################################################${reset}\n"
 	printf "${bblue} Checking installed tools ${reset}\n\n"
 
 	allinstalled=true
@@ -1062,7 +1062,7 @@ function cors(){
 			start_func "CORS Scan"
 			eval python3 $tools/Corsy/corsy.py -i webs/webs.txt > webs/cors.txt $DEBUG_STD
 			eval cat webs/cors.txt $DEBUG_ERROR
-			end_func "Results are saved in webs/cors.txt"
+			end_func "Results are saved in webs/cors.txt" ${FUNCNAME[0]}
 		else
 			if [ "$CORS" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
@@ -1090,7 +1090,7 @@ function open_redirect(){
 					end_func "Results are saved in vulns/redirect.txt" ${FUNCNAME[0]}
 				else
 					printf "${bred} Skipping Open redirects: Too Much URLs to test, try with --deep flag${reset}\n"
-					printf "${bgreen}#######################################################################\n"
+					printf "${bgreen}#######################################################################${reset}\n"
 				fi
 			fi
 		else
@@ -1136,8 +1136,9 @@ function ssrf_checks(){
 				fi
 			fi
 		else
-			printf "${bred}\n No COLLAB_SERVER defined\n"
-			printf "${bgreen}#######################################################################\n"
+			notification "No COLLAB_SERVER defined" error
+			end_func "Skipping function" ${FUNCNAME[0]}
+			printf "${bgreen}#######################################################################${reset}\n"
 		fi
 	else
 		if [ "$SSRF_CHECKS" = false ]; then
@@ -1355,7 +1356,7 @@ function end_func(){
 	getElapsedTime $start $end
 	notification "${2} Finished in ${runtime}" info
 	printf "${bblue} ${1} ${reset}\n"
-	printf "${bgreen}#######################################################################\n"
+	printf "${bgreen}#######################################################################${reset}\n"
 }
 
 function start_subfunc(){
@@ -1462,10 +1463,10 @@ function end(){
 	fi
 	global_end=`date +%s`
 	getElapsedTime $global_start $global_end
-	printf "${bgreen}#######################################################################\n"
+	printf "${bgreen}#######################################################################${reset}\n"
 	text="${bred} Finished Recon on: ${domain} under ${finaldir} in: ${runtime} ${reset}\n"
 	printf "${text}" && printf "${text}" | $NOTIFY
-	printf "${bgreen}#######################################################################\n"
+	printf "${bgreen}#######################################################################${reset}\n"
 	#Seperator for more clear messges in telegram_Bot
 	echo "******  Stay safe 🦠 and secure 🔐  ******" | $NOTIFY
 }

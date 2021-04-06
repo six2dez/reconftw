@@ -71,14 +71,14 @@ else
     SUDO="sudo"
 fi
 
-printf "\n\n${bgreen}#######################################################################\n"
+printf "\n\n${bgreen}#######################################################################${reset}\n"
 printf "${bgreen} reconFTW installer/updater script ${reset}\n\n"
 printf "${yellow} This may take time. So, go to grab a coffee! ${reset}\n\n"
 install_apt(){
     eval $SUDO apt update -y $DEBUG_STD
     eval $SUDO apt install chromium-browser -y $DEBUG_STD
     eval $SUDO apt install chromium -y $DEBUG_STD
-    eval $SUDO apt install python3 python3-pip ruby git curl libpcap-dev wget python-dev python3-dev python3-dnspython pv dnsutils build-essential libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq python3-shodan apt-transport-https lynx tor -y $DEBUG_STD
+    eval $SUDO apt install python3 python3-pip ruby git curl libpcap-dev wget python3-dev python3-dnspython pv dnsutils build-essential libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq python3-shodan apt-transport-https lynx tor medusa -y $DEBUG_STD
     eval $SUDO systemctl enable tor $DEBUG_STD
 }
 
@@ -87,7 +87,7 @@ install_yum(){
 }
 
 install_pacman(){
-    eval $SUDO pacman -Sy install python python-pip dnsutils ruby curl git libpcap nmap chromium wget jq xorg-server-xvfb tor lynx -y $DEBUG_STD
+    eval $SUDO pacman -Sy install python python-pip dnsutils ruby curl git libpcap nmap chromium wget jq medusa tor lynx -y $DEBUG_STD
     eval $SUDO systemctl enable --now tor.service $DEBUG_STD
 }
 
@@ -235,4 +235,4 @@ eval strip -s $HOME/go/bin/* $DEBUG_STD
 
 printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - GitHub (~/Tools/.github_tokens)\n - SHODAN (SHODAN_API_KEY in reconftw.cfg)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg) \n - theHarvester (~/Tools/theHarvester/api-keys.yml)\n - H8mail (~/Tools/h8mail_config.ini)\n\n${reset}"
 printf "${bgreen} Finished!${reset}\n\n"
-printf "\n\n${bgreen}#######################################################################\n"
+printf "\n\n${bgreen}#######################################################################${reset}\n"
