@@ -59,7 +59,7 @@ reconFTW is a tool designed to perform automated recon on a target domain by run
 ▶ git clone https://github.com/six2dez/reconftw
 ▶ cd reconftw/
 ▶ ./install.sh
-▶ ./reconftw.sh -d target.com -a
+▶ ./reconftw.sh -d target.com -r
 ```
 
 ## b) Docker container (2 options)
@@ -308,8 +308,8 @@ resolvers=${tools}/resolvers.txt
 - Multiple subdomain enumeration techniques (passive, bruteforce, permutations and scraping)
   - Passive ([subfinder](https://github.com/projectdiscovery/subfinder), [assetfinder](https://github.com/tomnomnom/assetfinder), [amass](https://github.com/OWASP/Amass), [findomain](https://github.com/Findomain/Findomain), [crobat](https://github.com/cgboal/sonarsearch), [waybackurls](https://github.com/tomnomnom/waybackurls), [github-subdomains](https://github.com/gwen001/github-subdomains), [Anubis](https://jldc.me) and [mildew](https://github.com/daehee/mildew))
   - Certificate transparency ([crtfinder](https://github.com/eslam3kl/crtfinder), [tls.bufferover](tls.bufferover.run) and [dns.bufferover](dns.bufferover.run)))
-  - Bruteforce ([shuffledns](https://github.com/projectdiscovery/shuffledns))  
-  - Permutations ([dnsgen](https://github.com/ProjectAnte/dnsgen))  
+  - Bruteforce ([puredns](https://github.com/d3mondev/puredns))  
+  - Permutations ([DNScewl](https://github.com/codingo/DNSCewl))  
   - Source Code Scraping ([gospider](https://github.com/jaeles-project/gospider))  
   - CNAME Records ([dnsx](https://github.com/projectdiscovery/dnsx))
 - Nuclei Sub TKO templates ([nuclei](https://github.com/projectdiscovery/nuclei))  
