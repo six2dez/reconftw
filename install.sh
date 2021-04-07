@@ -23,7 +23,7 @@ gotools["dnsx"]="GO111MODULE=on go get -v github.com/projectdiscovery/dnsx/cmd/d
 gotools["subfinder"]="GO111MODULE=on go get -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder"
 gotools["gau"]="go get -v github.com/lc/gau"
 gotools["subjs"]="GO111MODULE=on go get -u -v github.com/lc/subjs"
-gotools["kxss"]="go get -u github.com/tomnomnom/hacks/kxss"
+gotools["Gxss"]="go get -v github.com/KathanP19/Gxss"
 gotools["gospider"]="go get -u github.com/jaeles-project/gospider"
 gotools["crobat"]="go get -v github.com/cgboal/sonarsearch/crobat"
 gotools["crlfuzz"]="GO111MODULE=on go get -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz"
@@ -73,7 +73,7 @@ fi
 
 printf "\n\n${bgreen}#######################################################################${reset}\n"
 printf "${bgreen} reconFTW installer/updater script ${reset}\n\n"
-printf "${yellow} This may take time. So, go to grab a coffee! ${reset}\n\n"
+printf "${yellow} This may take time. So, go grab a coffee! ${reset}\n\n"
 install_apt(){
     eval $SUDO apt update -y $DEBUG_STD
     eval $SUDO apt install chromium-browser -y $DEBUG_STD
