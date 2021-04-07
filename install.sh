@@ -91,13 +91,6 @@ install_pacman(){
     eval $SUDO systemctl enable --now tor.service $DEBUG_STD
 }
 
-printf "${bblue} Running: Installing system packages ${reset}\n\n"
-if [ -f /etc/debian_version ]; then install_apt;
-elif [ -f /etc/redhat-release ]; then install_yum;
-elif [ -f /etc/arch-release ]; then install_pacman;
-elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for some RedHat and Amazon Linux instances
-fi
-
 eval git config --global --unset http.proxy $DEBUG_STD
 eval git config --global --unset https.proxy $DEBUG_STD
 
@@ -134,6 +127,13 @@ if [ -n "$(git status --porcelain | egrep -v '^\?\?')" ]; then
     printf "${bgreen} Updated! Running new installer version...${reset}\n\n"
     exec "$0"
     exit 1
+fi
+
+printf "${bblue} Running: Installing system packages ${reset}\n\n"
+if [ -f /etc/debian_version ]; then install_apt;
+elif [ -f /etc/redhat-release ]; then install_yum;
+elif [ -f /etc/arch-release ]; then install_pacman;
+elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for some RedHat and Amazon Linux instances
 fi
 
 # Installing latest Golang version
