@@ -21,7 +21,7 @@ gotools["httpx"]="GO111MODULE=on go get -v github.com/projectdiscovery/httpx/cmd
 gotools["github-endpoints"]="go get -u github.com/gwen001/github-endpoints"
 gotools["dnsx"]="GO111MODULE=on go get -v github.com/projectdiscovery/dnsx/cmd/dnsx"
 gotools["subfinder"]="GO111MODULE=on go get -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder"
-gotools["gau"]="go get -v github.com/lc/gau"
+gotools["gauplus"]="GO111MODULE=on go get -u -v github.com/bp0lr/gauplus"
 gotools["subjs"]="GO111MODULE=on go get -u -v github.com/lc/subjs"
 gotools["Gxss"]="go get -v github.com/KathanP19/Gxss"
 gotools["gospider"]="go get -u github.com/jaeles-project/gospider"
@@ -41,7 +41,7 @@ repos["Arjun"]="s0md3v/Arjun"
 repos["gf"]="tomnomnom/gf"
 repos["Gf-Patterns"]="1ndianl33t/Gf-Patterns"
 repos["github-search"]="gwen001/github-search"
-repos["crtfinder"]="eslam3kl/crtfinder"
+repos["ctfr"]="UnaPibaGeek/ctfr"
 repos["LinkFinder"]="dark-warlord14/LinkFinder"
 repos["dnsgen"]="ProjectAnte/dnsgen"
 repos["ParamSpider"]="devanshbatham/ParamSpider"
@@ -236,9 +236,9 @@ eval wget -nc -O ~/.gf/potential.json https://raw.githubusercontent.com/devanshb
 eval wget -nc -O ~/.config/notify/notify.conf https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw/a66c4d8cf47a3bc95f5e9ba84773428662ea760c/notify_sample.conf $DEBUG_ERROR
 eval wget -N -c https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py $DEBUG_STD
 eval wget -N -c https://wordlists-cdn.assetnote.io/data/manual/best-dns-wordlist.txt $DEBUG_STD && mv best-dns-wordlist.txt subdomains_big.txt
-eval wget -N -c https://gist.githubusercontent.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw/1bcdf2d61df08e66fd2d63b6a840f02c3a2ae24c/subdomains.txt $DEBUG_STD
-eval wget -N -c https://gist.githubusercontent.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw/137bb6b60c616552c705e93a345c06cec3a2cb1f/permutations_list.txt $DEBUG_STD
-eval wget -N -c https://gist.githubusercontent.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw/ea0774de5e27f9bc855207b175249edae2e9ccef/asyncio_ssrf.py $DEBUG_STD && cp asyncio_ssrf.py ssrf.py
+eval wget -N -c -O subdomains.txt https://gist.github.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw $DEBUG_STD
+eval wget -N -c -O permutations_list.txt https://gist.github.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw $DEBUG_STD
+eval wget -N -c -O asyncio_ssrf.py https://gist.github.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw $DEBUG_STD && cp asyncio_ssrf.py ssrf.py
 eval wget -N -c https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD && cp onelistforallmicro.txt fuzz_wordlist.txt
 eval wget -N -c https://raw.githubusercontent.com/xmendez/wfuzz/master/wordlist/vulns/dirTraversal-nix.txt $DEBUG_STD && cp dirTraversal-nix.txt lfi_wordlist.txt
 
