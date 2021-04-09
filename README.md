@@ -40,6 +40,7 @@
 - [Sample Video](#sample-video)
 - [Features](#fire-features-fire)
 - [Mindmap/Workflow](#mindmapworkflow)
+- [Data Keep](#data-keep)
 - [Need help?](#need-help)
 - [Contribute](#how-to-contribute)
 - [Thanks](#thanks)
@@ -355,6 +356,23 @@ resolvers=${tools}/resolvers.txt
 ## Mindmap/Workflow
 
 ![Mindmap](images/mindmap_0321.png)
+
+## Data Keep
+
+Follow these simple steps to end up having a private repository with your `API Keys` and `/Recon` data.
+
+* Create a private __blank__ repository on `Git(Hub|Lab)` (Take into account size limits regarding Recon data upload)
+* Clone your project: `git clone https://gitlab.com/example/reconftw-data`
+* Get inside the cloned repository: `cd reconftw-data`
+* Create branch with an empty commit: `git commit --allow-empty -m "Empty commit"`
+* Add official repo as a new remote: `git remote add upstream https://github.com/six2dez/reconftw` (`upstream` is an example)
+* Update upstream's repo: `git fetch upstream`
+* Rebase current branch with the official one: `git rebase upstream/main master`
+
+### Main commands
+
+* Upload changes to your personal repo: `git add . && git commit -m "Data upload" && git push origin master`
+* Update tool anytime: `git fetch upstream && git rebase upstream/main master`
 
 ## How to contribute
 
