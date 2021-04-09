@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 . ./reconftw.cfg
 
@@ -55,6 +55,7 @@ repos["GitDorker"]="obheda12/GitDorker"
 repos["testssl"]="drwetter/testssl.sh"
 repos["S3Scanner"]="sa7mon/S3Scanner"
 repos["puredns"]="d3mondev/puredns"
+repos["ip2provider"]="oldrho/ip2provider"
 
 dir=${tools}
 

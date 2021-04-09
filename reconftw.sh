@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 . ./reconftw.cfg
 
@@ -690,7 +690,7 @@ function portscan(){
 
 			eval cat hosts/subs_ips_vhosts.txt $DEBUG_ERROR | cut -d ' ' -f1 | egrep -iv "^(127|10|169|172|192)\." | anew -q hosts/ips.txt
 
-			eval cat hosts/ips.txt $DEBUG_ERROR | cf-check -c $NPROC | egrep -iv "^(127|10|169|172|192)\." | anew -q .tmp/ips_nowaf.txt
+			eval cat hosts/ips.txt $DEBUG_ERROR | cf-check | egrep -iv "^(127|10|169|172|192)\." | anew -q .tmp/ips_nowaf.txt
 
 			printf "${bblue}\n Resolved IP addresses (No WAF) ${reset}\n\n";
 			eval cat .tmp/ips_nowaf.txt $DEBUG_ERROR | sort
@@ -718,6 +718,22 @@ function portscan(){
 	fi
 }
 
+function cloudprovider(){
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$CLOUD_IP" = true ]
+		then
+			start_func "Cloud provider check"
+			cd $tools/ip2provider
+			eval cat $dir/hosts/ips.txt | ./ip2provider.py | anew -q $dir/hosts/cloud_providers.txt $DEBUG_STD
+			cd $dir
+			end_func "Results are saved in hosts/cloud_providers.txt" ${FUNCNAME[0]}
+		else
+			if [ "$CLOUD_IP" = false ]; then
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
+	fi
+}
 
 ###############################################################################################################
 ############################################# WEB SCAN ########################################################
@@ -1491,6 +1507,7 @@ function passive(){
 	favicon
 	PORTSCAN_ACTIVE=false
 	portscan
+	cloudprovider
 	end
 }
 
@@ -1525,6 +1542,7 @@ function recon(){
 	screenshot
 	favicon
 	portscan
+	cloudprovider
 	waf_checks
 	nuclei_check
 	cms_scanner
@@ -1585,6 +1603,7 @@ function multi_recon(){
 	notification "- ${NUMOFLINES_webs_total} total websites" good
 
 	portscan
+	cloudprovider
 	waf_checks
 	nuclei_check
 	for domain in $targets; do
