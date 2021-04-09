@@ -343,6 +343,7 @@ resolvers=${tools}/resolvers.txt
 - Custom resolvers generated list ([dnsvalidator](https://github.com/vortexau/dnsvalidator))
 - DNS Zone Transfer ([dnsrecon](https://github.com/darkoperator/dnsrecon))
 - Docker container included and [DockerHub](https://hub.docker.com/r/six2dez/reconftw) integration  
+- Cloud providers check [ip2provider](https://github.com/oldrho/ip2provider)
 - Custom output folder  
 - Auto installer/updater compatible with most distros  
 - Diff support for continuous running (cron mode) 
