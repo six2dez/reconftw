@@ -320,7 +320,7 @@ function sub_passive(){
 			fi
 			eval curl -s "https://jldc.me/anubis/subdomains/${domain}" $DEBUG_ERROR | grep -Po "((http|https):\/\/)?(([\w.-]*)\.([\w]*)\.([A-z]))\w+" | sed '/^\./d' | anew -q .tmp/jldc_psub.txt
 			timeout 10m waybackurls $domain | unfurl --unique domains | anew -q .tmp/waybackurls_psub.txt
-			timeout 10m gauplus -t 50 -subs $domain | unfurl --unique domains | anew -q .tmp/gau_psub.txt
+			timeout 10m gauplus -t $GAUPLUS_THREADS -subs $domain | unfurl --unique domains | anew -q .tmp/gau_psub.txt
 			if echo $domain | grep -q ".mil$"; then
 				mildew
 				mv mildew.out .tmp/mildew.out
@@ -879,7 +879,7 @@ function urlchecks(){
 			start_func "URL Extraction"
 			mkdir -p js
 			cat webs/webs.txt | waybackurls | anew -q .tmp/url_extract_tmp.txt
-			cat webs/webs.txt | gauplus -t 50 -subs | anew -q .tmp/url_extract_tmp.txt
+			cat webs/webs.txt | gauplus -t $GAUPLUS_THREADS -subs | anew -q .tmp/url_extract_tmp.txt
 			diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt) <(sort -u webs/webs.txt) | wc -l)
 			if [ $diff_webs != "0" ] || [ ! -s ".tmp/gospider.txt" ] ;
 			then
