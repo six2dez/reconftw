@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 . ./reconftw.cfg
 
@@ -53,6 +53,7 @@ function tools_installed(){
 	[ -f $tools/Corsy/corsy.py ] || { printf "${bred} [*] Corsy		[NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/testssl.sh/testssl.sh ] || { printf "${bred} [*] testssl		[NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/CMSeeK/cmseek.py ] || { printf "${bred} [*] CMSeeK		[NO]${reset}\n"; allinstalled=false;}
+	[ -f $tools/ctfr/ctfr.py ] || { printf "${bred} [*] ctfr		[NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/fuzz_wordlist.txt ] || { printf "${bred} [*] OneListForAll	[NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/LinkFinder/linkfinder.py ] || { printf "${bred} [*] LinkFinder	        [NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/GitDorker/GitDorker.py ] || { printf "${bred} [*] GitDorker	        [NO]${reset}\n"; allinstalled=false;}
@@ -74,7 +75,7 @@ function tools_installed(){
 	eval type -P crobat $DEBUG_STD || { printf "${bred} [*] Crobat		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P mildew $DEBUG_STD || { printf "${bred} [*] mildew		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P waybackurls $DEBUG_STD || { printf "${bred} [*] Waybackurls	[NO]${reset}\n"; allinstalled=false;}
-	eval type -P gau $DEBUG_STD || { printf "${bred} [*] Gau		[NO]${reset}\n"; allinstalled=false;}
+	eval type -P gauplus $DEBUG_STD || { printf "${bred} [*] gauplus		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P dnsx $DEBUG_STD || { printf "${bred} [*] dnsx		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P DNScewl $DEBUG_STD || { printf "${bred} [*] DNScewl		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P cf-check $DEBUG_STD || { printf "${bred} [*] Cf-check		[NO]${reset}\n"; allinstalled=false;}
@@ -319,7 +320,7 @@ function sub_passive(){
 			fi
 			eval curl -s "https://jldc.me/anubis/subdomains/${domain}" $DEBUG_ERROR | grep -Po "((http|https):\/\/)?(([\w.-]*)\.([\w]*)\.([A-z]))\w+" | sed '/^\./d' | anew -q .tmp/jldc_psub.txt
 			timeout 10m waybackurls $domain | unfurl --unique domains | anew -q .tmp/waybackurls_psub.txt
-			timeout 10m gau -subs $domain | unfurl --unique domains | anew -q .tmp/gau_psub.txt
+			timeout 10m gauplus -t $GAUPLUS_THREADS -subs $domain | unfurl --unique domains | anew -q .tmp/gau_psub.txt
 			if echo $domain | grep -q ".mil$"; then
 				mildew
 				mv mildew.out .tmp/mildew.out
@@ -336,18 +337,7 @@ function sub_crt(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SUBCRT" = true ]
 		then
 			start_subfunc "Running : Crtsh Subdomain Enumeration"
-			cd $tools/crtfinder
-			eval python3 crtfinder.py -u $domain $DEBUG_STD
-			outputfile=${domain%%.*}
-			eval cat ${outputfile}.txt $DEBUG_ERROR | grep ".$domain$" | anew -q $dir/.tmp/crtsh_subs_tmp.txt
-
-			if [ "$DEEP" = true ] ; then
-				eval python3 dig.py ${outputfile}.txt > more.txt $DEBUG_STD
-				eval cat more.txt $DEBUG_ERROR | grep ".$domain$" | anew -q $dir/.tmp/crtsh_subs_tmp.txt
-				eval rm more.txt $DEBUG_ERROR
-			fi
-			eval rm ${outputfile}.txt $DEBUG_ERROR
-			cd $dir
+			eval python3 $tools/ctfr/ctfr.py -d $domain -o .tmp/crtsh_subs_tmp.txt $DEBUG_STD
 			eval curl "https://tls.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r .Results[] $DEBUG_ERROR | cut -d ',' -f3 | grep -F ".$domain" | anew -q .tmp/crtsh_subs.txt
 			eval curl "https://dns.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r '.FDNS_A'[],'.RDNS'[] $DEBUG_ERROR | cut -d ',' -f2 | grep -F ".$domain" | anew -q .tmp/crtsh_subs_tmp.txt
 			NUMOFLINES=$(eval cat .tmp/crtsh_subs_tmp.txt $DEBUG_ERROR | anew .tmp/crtsh_subs.txt | wc -l)
@@ -564,10 +554,9 @@ function s3buckets(){
 function sub_recursive(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SUBRECURSIVE" = true ]
 		then
-			start_func "Subdomains recursive search"
-
 			if [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 1000 ]]
 			then
+				start_subfunc "Running : Subdomains recursive search"
 				for sub in $(cat subdomains/subdomains.txt); do
 					sed "s/$/.$sub/" $subs_wordlist | anew -q .tmp/brute_recursive_wordlist.txt
 				done
@@ -586,11 +575,10 @@ function sub_recursive(){
 				if [ "$NUMOFLINES" -gt 0 ]; then
 					notification "${NUMOFLINES} new subdomains found with recursive search" info
 				fi
+				end_subfunc "${NUMOFLINES} new subs (recursive)" ${FUNCNAME[0]}
 			else
-				notification "Skipping Permutations: Too Much Subdomains" warn
+				notification "Skipping Recursive: Too Much Subdomains" warn
 			fi
-
-			end_func "Results are saved in subdomains/subdomains.txt" ${FUNCNAME[0]}
 		else
 			if [ "$SUBRECURSIVE" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
@@ -702,7 +690,7 @@ function portscan(){
 
 			eval cat hosts/subs_ips_vhosts.txt $DEBUG_ERROR | cut -d ' ' -f1 | egrep -iv "^(127|10|169|172|192)\." | anew -q hosts/ips.txt
 
-			eval cat hosts/ips.txt $DEBUG_ERROR | cf-check -c $NPROC | egrep -iv "^(127|10|169|172|192)\." | anew -q .tmp/ips_nowaf.txt
+			eval cat hosts/ips.txt $DEBUG_ERROR | cf-check | egrep -iv "^(127|10|169|172|192)\." | anew -q .tmp/ips_nowaf.txt
 
 			printf "${bblue}\n Resolved IP addresses (No WAF) ${reset}\n\n";
 			eval cat .tmp/ips_nowaf.txt $DEBUG_ERROR | sort
@@ -730,6 +718,22 @@ function portscan(){
 	fi
 }
 
+function cloudprovider(){
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$CLOUD_IP" = true ]
+		then
+			start_func "Cloud provider check"
+			cd $tools/ip2provider
+			eval cat $dir/hosts/ips.txt | ./ip2provider.py | anew -q $dir/hosts/cloud_providers.txt $DEBUG_STD
+			cd $dir
+			end_func "Results are saved in hosts/cloud_providers.txt" ${FUNCNAME[0]}
+		else
+			if [ "$CLOUD_IP" = false ]; then
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
+	fi
+}
 
 ###############################################################################################################
 ############################################# WEB SCAN ########################################################
@@ -875,7 +879,7 @@ function urlchecks(){
 			start_func "URL Extraction"
 			mkdir -p js
 			cat webs/webs.txt | waybackurls | anew -q .tmp/url_extract_tmp.txt
-			cat webs/webs.txt | gau -subs | anew -q .tmp/url_extract_tmp.txt
+			cat webs/webs.txt | gauplus -t $GAUPLUS_THREADS -subs | anew -q .tmp/url_extract_tmp.txt
 			diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt) <(sort -u webs/webs.txt) | wc -l)
 			if [ $diff_webs != "0" ] || [ ! -s ".tmp/gospider.txt" ] ;
 			then
@@ -1341,7 +1345,7 @@ function notification(){
 		case $2 in
 			info)
 				text="\n${bblue} ${1} ${reset}\n"
-				printf "${text}" && printf "\`${text}\`" | $NOTIFY
+				printf "${text}" && printf "${text}" | $NOTIFY
 			;;
 			warn)
 				text="\n${yellow} ${1} ${reset}\n"
@@ -1503,6 +1507,7 @@ function passive(){
 	favicon
 	PORTSCAN_ACTIVE=false
 	portscan
+	cloudprovider
 	end
 }
 
@@ -1537,6 +1542,7 @@ function recon(){
 	screenshot
 	favicon
 	portscan
+	cloudprovider
 	waf_checks
 	nuclei_check
 	cms_scanner
@@ -1597,6 +1603,7 @@ function multi_recon(){
 	notification "- ${NUMOFLINES_webs_total} total websites" good
 
 	portscan
+	cloudprovider
 	waf_checks
 	nuclei_check
 	for domain in $targets; do
