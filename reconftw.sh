@@ -554,10 +554,9 @@ function s3buckets(){
 function sub_recursive(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SUBRECURSIVE" = true ]
 		then
-			start_func "Subdomains recursive search"
-
 			if [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 1000 ]]
 			then
+				start_subfunc "Running : Subdomains recursive search"
 				for sub in $(cat subdomains/subdomains.txt); do
 					sed "s/$/.$sub/" $subs_wordlist | anew -q .tmp/brute_recursive_wordlist.txt
 				done
@@ -576,11 +575,10 @@ function sub_recursive(){
 				if [ "$NUMOFLINES" -gt 0 ]; then
 					notification "${NUMOFLINES} new subdomains found with recursive search" info
 				fi
+				end_subfunc "${NUMOFLINES} new subs (recursive)" ${FUNCNAME[0]}
 			else
-				notification "Skipping Permutations: Too Much Subdomains" warn
+				notification "Skipping Recursive: Too Much Subdomains" warn
 			fi
-
-			end_func "Results are saved in subdomains/subdomains.txt" ${FUNCNAME[0]}
 		else
 			if [ "$SUBRECURSIVE" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
@@ -1331,7 +1329,7 @@ function notification(){
 		case $2 in
 			info)
 				text="\n${bblue} ${1} ${reset}\n"
-				printf "${text}" && printf "\`${text}\`" | $NOTIFY
+				printf "${text}" && printf "${text}" | $NOTIFY
 			;;
 			warn)
 				text="\n${yellow} ${1} ${reset}\n"

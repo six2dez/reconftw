@@ -245,7 +245,7 @@ eval wget -N -c https://raw.githubusercontent.com/xmendez/wfuzz/master/wordlist/
 printf "${bblue} Running: Performing last configurations ${reset}\n\n"
 ## Last steps
 if [ ! -s "resolvers.txt" ]; then
-    printf "${yellow} Generating personlized resolvers ${reset}\n\n"
+    printf "${yellow} Generating custom resolvers ${reset}\n\n"
     eval dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 100 -o resolvers.txt $DEBUG_STD
 fi
 eval h8mail -g $DEBUG_STD
