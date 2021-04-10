@@ -1400,7 +1400,7 @@ function start(){
 	    NOTIFY=""
 	fi
 
-	echo "****** 🙏 Thank you for making this world safer ******" | $NOTIFY
+	echo "Recon succesfully started on $domain" | $NOTIFY
 	tools_installed
 
 	if [ -z "$domain" ]
