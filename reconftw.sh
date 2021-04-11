@@ -126,7 +126,7 @@ function google_dorks(){
 		sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" osint/dorks.txt
 		end_func "Results are saved in osint/dorks.txt" ${FUNCNAME[0]}
 	else
-		if [ "$GOOGLE_DORKS" = false ] || [ "$OSINT" = true ]; then
+		if [ "$GOOGLE_DORKS" = false ] || [ "$OSINT" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} are already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -151,7 +151,7 @@ function github_dorks(){
 			fi
 			end_func "Results are saved in osint/gitdorks.txt" ${FUNCNAME[0]}
 		else
-			if [ "$GITHUB_DORKS" = false ] || [ "$OSINT" = true ]; then
+			if [ "$GITHUB_DORKS" = false ] || [ "$OSINT" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -168,7 +168,7 @@ function metadata(){
 			eval rmdir osint/${domain} $DEBUG_ERROR
 			end_func "Results are saved in osint/[software/authors/metadata_results].txt" ${FUNCNAME[0]}
 		else
-			if [ "$METADATA" = false ] || [ "$OSINT" = true ]; then
+			if [ "$METADATA" = false ] || [ "$OSINT" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -207,7 +207,7 @@ function emails(){
 			fi
 			end_func "Results are saved in osint/[emails/users/h8mail/passwords].txt" ${FUNCNAME[0]}
 		else
-			if [ "$EMAILS" = false ] || [ "$OSINT" = true ]; then
+			if [ "$EMAILS" = false ] || [ "$OSINT" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -250,7 +250,7 @@ function domain_info(){
 			fi
 			end_func "Results are saved in osint/domain_info_[general/name/email/ip].txt" ${FUNCNAME[0]}
 		else
-			if [ "$DOMAIN_INFO" = false ] || [ "$OSINT" = true ]; then
+			if [ "$DOMAIN_INFO" = false ] || [ "$OSINT" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
