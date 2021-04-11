@@ -176,13 +176,13 @@ for gotool in "${!gotools[@]}"; do
     exit_status=$?
     if [ $exit_status -eq 0 ]
     then
-        printf "${yellow} $gotool installed (${go_step}/${#gotools[@]})${reset}\n\n"
+        printf "${yellow} $gotool installed (${go_step}/${#gotools[@]})${reset}\n"
     else
-        printf "${red} Unable to install $gotool, try manually (${go_step}/${#gotools[@]})${reset}\n\n"
+        printf "${red} Unable to install $gotool, try manually (${go_step}/${#gotools[@]})${reset}\n"
     fi
 done
 
-printf "${bblue} Running: Installing repositories (${#repos[@]})${reset}\n\n"
+printf "${bblue}\n Running: Installing repositories (${#repos[@]})${reset}\n\n"
 
 # Repos with special configs
 eval git clone https://github.com/projectdiscovery/nuclei-templates ~/nuclei-templates $DEBUG_STD
@@ -200,9 +200,9 @@ for repo in "${!repos[@]}"; do
     exit_status=$?
     if [ $exit_status -eq 0 ]
     then
-        printf "${yellow} $repo installed (${repos_step}/${#repos[@]})${reset}\n\n"
+        printf "${yellow} $repo installed (${repos_step}/${#repos[@]})${reset}\n"
     else
-        printf "${red} Unable to install $repo, try manually (${repos_step}/${#repos[@]})${reset}\n\n"
+        printf "${red} Unable to install $repo, try manually (${repos_step}/${#repos[@]})${reset}\n"
     fi
     if [ -s "setup.py" ]; then
         eval $SUDO python3 setup.py install $DEBUG_STD
@@ -234,7 +234,7 @@ eval $SUDO chmod 755 /usr/local/bin/gowitness
 eval $SUDO chmod 755 /usr/local/bin/DNScewl
 eval subfinder $DEBUG_STD
 
-printf "${bblue} Running: Downloading required files ${reset}\n\n"
+printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 ## Downloads
 eval wget -nc -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini $DEBUG_STD
 eval wget -nc -O ~/.gf/potential.json https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json $DEBUG_STD
