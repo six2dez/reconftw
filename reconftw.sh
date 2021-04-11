@@ -279,7 +279,7 @@ function subdomains_full(){
 
 	if [ "$update_resolvers" = true ]
 	then
-		if [[ $(find "$resolvers" -mtime +100 -print) ]]; then
+		if [[ $(find "$resolvers" -mtime +1 -print) ]]; then
   			notification "Updating resolvers lists..." warning
   			eval dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 100 -o $resolvers $DEBUG_STD
   		fi
@@ -980,8 +980,11 @@ function jschecks(){
 				cat js/jsfile_links.txt | httpx -follow-redirects -H "${HEADER}" -silent -timeout 15 -threads $HTTPX_THREADS -status-code -retries 2 -no-color | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
 				printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
 				interlace -tL js/js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> .tmp/js_endpoints.txt" &>/dev/null
-				eval sed -i '/^\//!d' .tmp/js_endpoints.txt $DEBUG_STD
-				cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt.txt
+				if [ -s ".tmp/js_endpoints.txt" ]
+				then
+					eval sed -i '/^\//!d' .tmp/js_endpoints.txt $DEBUG_STD
+					cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt.txt
+				fi
 				printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
 				cat js/js_livelinks.txt | eval nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o js/js_secrets.txt $DEBUG_STD
 				printf "${yellow} Running : Building wordlist 5/5${reset}\n"
