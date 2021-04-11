@@ -116,20 +116,6 @@ else
     printf "${bgreen} reconFTW is already up to date!${reset}\n\n"
 fi
 
-eval git fetch $DEBUG_STD
-if [ -n "$(git status --porcelain | egrep -v '^\?\?')" ]; then
-    printf "${yellow} There is a new version, updating...${reset}\n\n"
-    if [ -n "$(git status --porcelain | egrep 'reconftw.cfg$')" ]; then
-        mv reconftw.cfg reconftw.cfg_bck
-        printf "${yellow} reconftw.cfg has been backed up in reconftw.cfg_bck${reset}\n\n"
-    fi
-    eval git reset --hard $DEBUG_STD
-    eval git pull $DEBUG_STD
-    printf "${bgreen} Updated! Running new installer version...${reset}\n\n"
-    exec "$0"
-    exit 1
-fi
-
 printf "${bblue} Running: Installing system packages ${reset}\n\n"
 if [ -f /etc/debian_version ]; then install_apt;
 elif [ -f /etc/redhat-release ]; then install_yum;
@@ -182,12 +168,21 @@ touch $dir/.github_tokens
 
 eval pip3 install -U -r requirements.txt $DEBUG_STD
 
-printf "${bblue} Running: Installing Golang tools ${reset}\n\n"
+printf "${bblue} Running: Installing Golang tools (${#gotools[@]})${reset}\n\n"
+go_step=0
 for gotool in "${!gotools[@]}"; do
+    go_step=$((go_step + 1))
     eval type -P $gotool $DEBUG_STD || { eval ${gotools[$gotool]} $DEBUG_STD; }
+    exit_status=$?
+    if [ $exit_status -eq 0 ]
+    then
+        printf "${yellow} $gotool installed (${go_step}/${#gotools[@]})${reset}\n"
+    else
+        printf "${red} Unable to install $gotool, try manually (${go_step}/${#gotools[@]})${reset}\n"
+    fi
 done
 
-printf "${bblue} Running: Installing repositories ${reset}\n\n"
+printf "${bblue}\n Running: Installing repositories (${#repos[@]})${reset}\n\n"
 
 # Repos with special configs
 eval git clone https://github.com/projectdiscovery/nuclei-templates ~/nuclei-templates $DEBUG_STD
@@ -197,9 +192,18 @@ eval git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git $dir/sqlmap
 eval git clone --depth 1 https://github.com/drwetter/testssl.sh.git $dir/testssl.sh $DEBUG_STD
 
 # Standard repos installation
+repos_step=0
 for repo in "${!repos[@]}"; do
+    repos_step=$((repos_step + 1))
     eval cd $dir/$repo $DEBUG_STD || { eval git clone https://github.com/${repos[$repo]} $dir/$repo $DEBUG_STD && cd $dir/$repo; }
     eval git pull $DEBUG_STD
+    exit_status=$?
+    if [ $exit_status -eq 0 ]
+    then
+        printf "${yellow} $repo installed (${repos_step}/${#repos[@]})${reset}\n"
+    else
+        printf "${red} Unable to install $repo, try manually (${repos_step}/${#repos[@]})${reset}\n"
+    fi
     if [ -s "setup.py" ]; then
         eval $SUDO python3 setup.py install $DEBUG_STD
     fi
@@ -230,7 +234,7 @@ eval $SUDO chmod 755 /usr/local/bin/gowitness
 eval $SUDO chmod 755 /usr/local/bin/DNScewl
 eval subfinder $DEBUG_STD
 
-printf "${bblue} Running: Downloading required files ${reset}\n\n"
+printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 ## Downloads
 eval wget -nc -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini $DEBUG_STD
 eval wget -nc -O ~/.gf/potential.json https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json $DEBUG_STD
@@ -245,7 +249,7 @@ eval wget -N -c https://raw.githubusercontent.com/xmendez/wfuzz/master/wordlist/
 
 printf "${bblue} Running: Performing last configurations ${reset}\n\n"
 ## Last steps
-if [ ! -s "resolvers.txt" ]; then
+if [ ! -s "resolvers.txt" ] || [ $(find "resolvers.txt" -mtime +1 -print) ]; then
     printf "${yellow} Generating custom resolvers ${reset}\n\n"
     eval dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 100 -o resolvers.txt $DEBUG_STD
 fi

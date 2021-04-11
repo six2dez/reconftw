@@ -23,14 +23,19 @@ function banner(){
 
 function check_version(){
 
-eval git fetch $DEBUG_STD
-BRANCH=$(git rev-parse --abbrev-ref HEAD)
-HEADHASH=$(git rev-parse HEAD)
-UPSTREAMHASH=$(git rev-parse ${BRANCH}@{upstream})
-
-if [ "$HEADHASH" != "$UPSTREAMHASH" ]
+eval timeout 10 git fetch $DEBUG_STD
+exit_status=$?
+if [ $exit_status -eq 0 ]
 then
-    printf "\n${yellow} There is a new version, run ./install.sh to get latest version${reset}\n\n"
+	BRANCH=$(git rev-parse --abbrev-ref HEAD)
+	HEADHASH=$(git rev-parse HEAD)
+	UPSTREAMHASH=$(git rev-parse ${BRANCH}@{upstream})
+	if [ "$HEADHASH" != "$UPSTREAMHASH" ]
+	then
+    	printf "\n${yellow} There is a new version, run ./install.sh to get latest version${reset}\n\n"
+	fi
+else
+	printf "\n${bred} Unable to check updates ${reset}\n\n"
 fi
 
 }
@@ -114,14 +119,14 @@ function tools_installed(){
 ###############################################################################################################
 
 function google_dorks(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$GOOGLE_DORKS" = true ]
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$GOOGLE_DORKS" = true ] && [ "$OSINT" = true ]
 	then
 		start_func "Google Dorks in process"
 		$tools/degoogle_hunter/degoogle_hunter.sh $domain | tee osint/dorks.txt
 		sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" osint/dorks.txt
 		end_func "Results are saved in osint/dorks.txt" ${FUNCNAME[0]}
 	else
-		if [ "$GOOGLE_DORKS" = false ]; then
+		if [ "$GOOGLE_DORKS" = false ] || [ "$OSINT" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} are already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -130,7 +135,7 @@ function google_dorks(){
 }
 
 function github_dorks(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$GITHUB_DORKS" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$GITHUB_DORKS" = true ] && [ "$OSINT" = true ]
 		then
 			start_func "Github Dorks in process"
 			if [ -s "${GITHUB_TOKENS}" ]
@@ -146,7 +151,7 @@ function github_dorks(){
 			fi
 			end_func "Results are saved in osint/gitdorks.txt" ${FUNCNAME[0]}
 		else
-			if [ "$GITHUB_DORKS" = false ]; then
+			if [ "$GITHUB_DORKS" = false ] || [ "$OSINT" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -155,7 +160,7 @@ function github_dorks(){
 }
 
 function metadata(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$METADATA" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$METADATA" = true ] && [ "$OSINT" = true ]
 		then
 			start_func "Scanning metadata in public files"
 			eval metafinder -d $domain -l 20 -o osint -go -bi -ba $DEBUG_STD
@@ -163,7 +168,7 @@ function metadata(){
 			eval rmdir osint/${domain} $DEBUG_ERROR
 			end_func "Results are saved in osint/[software/authors/metadata_results].txt" ${FUNCNAME[0]}
 		else
-			if [ "$METADATA" = false ]; then
+			if [ "$METADATA" = false ] || [ "$OSINT" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -172,7 +177,7 @@ function metadata(){
 }
 
 function emails(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$EMAILS" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$EMAILS" = true ] && [ "$OSINT" = true ]
 		then
 			start_func "Searching emails/users/passwords leaks"
 			cd $tools/theHarvester
@@ -202,7 +207,7 @@ function emails(){
 			fi
 			end_func "Results are saved in osint/[emails/users/h8mail/passwords].txt" ${FUNCNAME[0]}
 		else
-			if [ "$EMAILS" = false ]; then
+			if [ "$EMAILS" = false ] || [ "$OSINT" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -212,7 +217,7 @@ function emails(){
 }
 
 function domain_info(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$DOMAIN_INFO" = true ]
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$DOMAIN_INFO" = true ] && [ "$OSINT" = true ]
 		then
 			start_func "Searching domain info (whois, registrant name/email domains)"
 			lynx -dump https://domainbigdata.com/${domain} | tail -n +19 > osint/domain_info_general.txt
@@ -245,7 +250,7 @@ function domain_info(){
 			fi
 			end_func "Results are saved in osint/domain_info_[general/name/email/ip].txt" ${FUNCNAME[0]}
 		else
-			if [ "$DOMAIN_INFO" = false ]; then
+			if [ "$DOMAIN_INFO" = false ] || [ "$OSINT" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -271,6 +276,15 @@ function subdomains_full(){
 	then
 		eval cp webs/webs.txt .tmp/probed_old.txt $DEBUG_ERROR
 	fi
+
+	if [ "$update_resolvers" = true ]
+	then
+		if [[ $(find "$resolvers" -mtime +1 -print) ]]; then
+  			notification "Updating resolvers lists..." warning
+  			eval dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 100 -o $resolvers $DEBUG_STD
+  		fi
+	fi
+
 	sub_passive
 	sub_crt
 	sub_active
@@ -313,9 +327,9 @@ function sub_passive(){
 			eval crobat -s $domain $DEBUG_ERROR | anew -q .tmp/crobat_psub.txt
 			if [ -s "${GITHUB_TOKENS}" ];then
 				if [ "$DEEP" = true ] ; then
-					eval github-subdomains -d $domain -raw -t $GITHUB_TOKENS | anew -q .tmp/github_subdomains_psub.txt
+					eval github-subdomains -d $domain -t $GITHUB_TOKENS -o .tmp/github_subdomains_psub.txt $DEBUG_STD
 				else
-					eval github-subdomains -d $domain -k -q -raw -t $GITHUB_TOKENS | anew -q .tmp/github_subdomains_psub.txt
+					eval github-subdomains -d $domain -k -q -t $GITHUB_TOKENS -o .tmp/github_subdomains_psub.txt $DEBUG_STD
 				fi
 			fi
 			eval curl -s "https://jldc.me/anubis/subdomains/${domain}" $DEBUG_ERROR | grep -Po "((http|https):\/\/)?(([\w.-]*)\.([\w]*)\.([A-z]))\w+" | sed '/^\./d' | anew -q .tmp/jldc_psub.txt
@@ -437,41 +451,41 @@ function sub_permut(){
 		then
 			start_subfunc "Running : Permutations Subdomain Enumeration"
 			if [ "$DEEP" = true ] ; then
-				eval DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 > .tmp/DNScewl1.txt
+				eval DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
 				eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute1_tmp.txt -r $resolvers $DEBUG_STD
 				eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
-				eval DNScewl --tL .tmp/permute1.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 > .tmp/DNScewl2.txt
+				eval DNScewl --tL .tmp/permute1.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 | grep ".$domain$" > .tmp/DNScewl2.txt
 				eval $tools/puredns/puredns resolve .tmp/DNScewl2.txt -w .tmp/permute2_tmp.txt -r $resolvers $DEBUG_STD
 				eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
 				eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 			else
 				if [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 100 ]]
 				then
-					eval DNScewl --tL .tmp/subs_no_resolved.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 > .tmp/DNScewl1.txt
+					eval DNScewl --tL .tmp/subs_no_resolved.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
 					eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute1_tmp.txt -r $resolvers $DEBUG_STD
 					eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
-					eval DNScewl --tL .tmp/permute1.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 > .tmp/DNScewl2.txt
+					eval DNScewl --tL .tmp/permute1.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 | grep ".$domain$" > .tmp/DNScewl2.txt
 					eval $tools/puredns/puredns resolve .tmp/DNScewl2.txt -w .tmp/permute2_tmp.txt -r $resolvers $DEBUG_STD
 					eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
 					eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 				elif [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 200 ]]
 		  		then
-					eval DNScewl --tL .tmp/subs_no_resolved.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 > .tmp/DNScewl1.txt
+					eval DNScewl --tL .tmp/subs_no_resolved.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
 					eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute_tmp.txt -r $resolvers $DEBUG_STD
 					eval cat .tmp/permute_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 				else
 					if [[ $(cat subdomains/subdomains.txt | wc -l) -le 100 ]]
 					then
-						eval DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 > .tmp/DNScewl1.txt
+						eval DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
 						eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute1_tmp.txt -r $resolvers $DEBUG_STD
 						eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
-						eval DNScewl --tL .tmp/permute1.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 > .tmp/DNScewl2.txt
+						eval DNScewl --tL .tmp/permute1.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 | grep ".$domain$" > .tmp/DNScewl2.txt
 						eval $tools/puredns/puredns resolve .tmp/DNScewl2.txt -w .tmp/permute2_tmp.txt -r $resolvers $DEBUG_STD
 						eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
 						eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 					elif [[ $(cat subdomains/subdomains.txt | wc -l) -le 200 ]]
 					then
-						eval DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 > .tmp/DNScewl1.txt
+						eval DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
 						eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute_tmp.txt -r $resolvers $DEBUG_STD
 						eval cat .tmp/permute_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 					else
@@ -563,10 +577,10 @@ function sub_recursive(){
 				eval $tools/puredns/puredns resolve .tmp/brute_recursive_wordlist.txt -r $resolvers -w .tmp/brute_recursive_result.txt $DEBUG_STD
 				cat .tmp/brute_recursive_result.txt | anew -q .tmp/brute_recursive.txt
 
-				eval DNScewl --tL .tmp/brute_recursive.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 > .tmp/DNScewl1_recursive.txt
+				eval DNScewl --tL .tmp/brute_recursive.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1_recursive.txt
 				eval $tools/puredns/puredns resolve .tmp/DNScewl1_recursive.txt -w .tmp/permute1_recursive_tmp.txt -r $resolvers $DEBUG_STD
 				eval cat .tmp/permute1_recursive_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1_recursive.txt
-				eval DNScewl --tL .tmp/permute1_recursive.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 > .tmp/DNScewl2_recursive.txt
+				eval DNScewl --tL .tmp/permute1_recursive.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 | grep ".$domain$" > .tmp/DNScewl2_recursive.txt
 				eval $tools/puredns/puredns resolve .tmp/DNScewl2_recursive.txt -w .tmp/permute2_recursive_tmp.txt -r $resolvers $DEBUG_STD
 				eval cat .tmp/permute1_recursive.txt .tmp/permute2_recursive_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_recursive.txt
 
@@ -622,7 +636,7 @@ function webprobe_full(){
 			start_func "Http probing non standard ports"
 			cat subdomains/subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55440,55672 -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout 10 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain" | anew -q .tmp/probed_uncommon_ports_tmp.txt
 			NUMOFLINES=$(eval cat .tmp/probed_uncommon_ports_tmp.txt $DEBUG_ERROR | anew webs/webs_uncommon_ports.txt | wc -l)
-			notification "Uncommon web ports: ${NUMOFLINES} new websites in ${runtime}" good
+			notification "Uncommon web ports: ${NUMOFLINES} new websites" good
 			eval cat webs/webs_uncommon_ports.txt $DEBUG_ERROR
 			end_func "Results are saved in webs/webs_uncommon_ports.txt" ${FUNCNAME[0]}
 		else
@@ -966,8 +980,11 @@ function jschecks(){
 				cat js/jsfile_links.txt | httpx -follow-redirects -H "${HEADER}" -silent -timeout 15 -threads $HTTPX_THREADS -status-code -retries 2 -no-color | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
 				printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
 				interlace -tL js/js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> .tmp/js_endpoints.txt" &>/dev/null
-				eval sed -i '/^\//!d' .tmp/js_endpoints.txt $DEBUG_STD
-				cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt.txt
+				if [ -s ".tmp/js_endpoints.txt" ]
+				then
+					eval sed -i '/^\//!d' .tmp/js_endpoints.txt $DEBUG_STD
+					cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt.txt
+				fi
 				printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
 				cat js/js_livelinks.txt | eval nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o js/js_secrets.txt $DEBUG_STD
 				printf "${yellow} Running : Building wordlist 5/5${reset}\n"
@@ -1045,19 +1062,19 @@ function xss(){
 		cat gf/xss.txt | qsreplace FUZZ | Gxss -c 100 -p Xss | anew -q .tmp/xss_reflected.txt
 		if [ "$DEEP" = true ] ; then
 			if [ -n "$XSS_SERVER" ]; then
-				eval cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav -b ${XSS_SERVER} $DEBUG_ERROR | anew -q vulns/xss.txt
+				eval cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav -b ${XSS_SERVER} -w $DALFOX_THREADS $DEBUG_ERROR | anew -q vulns/xss.txt
 			else
 				printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n\n"
-				eval cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav $DEBUG_ERROR | anew -q vulns/xss.txt
+				eval cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav -w $DALFOX_THREADS $DEBUG_ERROR | anew -q vulns/xss.txt
 			fi
 		else
 			if [[ $(cat .tmp/xss_reflected.txt | wc -l) -le 500 ]]
 			then
 				if [ -n "$XSS_SERVER" ]; then
-					eval cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav --skip-grepping --skip-mining-all --skip-mining-dict -b ${XSS_SERVER} $DEBUG_ERROR | anew -q vulns/xss.txt
+					eval cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav --skip-grepping --skip-mining-all --skip-mining-dict -b ${XSS_SERVER} -w $DALFOX_THREADS $DEBUG_ERROR | anew -q vulns/xss.txt
 				else
 					printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n\n"
-					eval cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav --skip-grepping --skip-mining-all --skip-mining-dict $DEBUG_ERROR | anew -q vulns/xss.txt
+					eval cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav --skip-grepping --skip-mining-all --skip-mining-dict -w $DALFOX_THREADS $DEBUG_ERROR | anew -q vulns/xss.txt
 				fi
 			else
 				printf "${bred} Skipping XSS: Too Much URLs to test, try with --deep flag${reset}\n"
@@ -1263,7 +1280,7 @@ function spraying(){
 		then
 			start_func "Password spraying"
 			cd $tools/brutespray
-			eval python3 $tools/brutespray/brutespray.py --file .tmp/nmap_grep.gnmap --threads $BRUTESPRAY_THREADS --hosts $BRUTESPRAY_CONCURRENCE -o $dir/hosts/brutespray.txt $DEBUG_STD
+			eval python3 $tools/brutespray/brutespray.py --file $dir/.tmp/nmap_grep.gnmap --threads $BRUTESPRAY_THREADS --hosts $BRUTESPRAY_CONCURRENCE -o $dir/hosts/brutespray.txt $DEBUG_STD
 			cd $dir
 			end_func "Results are saved in hosts/brutespray.txt" ${FUNCNAME[0]}
 		else
@@ -1279,8 +1296,8 @@ function 4xxbypass(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$BYPASSER4XX" = true ]
 		then
 			start_func "403 bypass"
-			cat fuzzing/*.txt | egrep '^4' | egrep -v '^404' | cut -d ' ' -f3 | dirdar -only-ok > .tmp/dirdar.txt
-			cat .tmp/dirdar.txt | sed -e '1,12d' | sed '/^$/d' | anew -q vulns/4xxbypass.txt
+			eval cat fuzzing/*.txt $DEBUG_ERROR | egrep '^4' | egrep -v '^404' | cut -d ' ' -f3 | dirdar -only-ok > .tmp/dirdar.txt
+			eval cat .tmp/dirdar.txt  $DEBUG_ERROR | sed -e '1,12d' | sed '/^$/d' | anew -q vulns/4xxbypass.txt
 			end_func "Results are saved in vulns/4xxbypass.txt" ${FUNCNAME[0]}
 		else
 			if [ "$BYPASSER4XX" = false ]; then
@@ -1400,7 +1417,7 @@ function start(){
 	    NOTIFY=""
 	fi
 
-	echo "****** 🙏 Thank you for making this world safer ******" | $NOTIFY
+	echo "Recon succesfully started on $domain" | $NOTIFY
 	tools_installed
 
 	if [ -z "$domain" ]
@@ -1437,6 +1454,12 @@ function start(){
 
 	cd $dir
 	mkdir -p .tmp osint subdomains webs hosts vulns
+
+	if [ ! -z "$findomain_virustotal_token" ]
+	then
+		VT_API_KEY=$findomain_virustotal_token
+	fi
+
 	printf "\n"
 	printf "${bred} Target: ${domain}\n\n"
 }
