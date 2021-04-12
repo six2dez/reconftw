@@ -255,6 +255,8 @@ if [ ! -s "resolvers.txt" ] || [ $(find "resolvers.txt" -mtime +1 -print) ]; the
 fi
 eval h8mail -g $DEBUG_STD
 
+echo -e "8.8.8.8\n8.8.4.4" > $dir/puredns/trusted.txt
+
 ## Stripping all Go binaries
 eval strip -s $HOME/go/bin/* $DEBUG_STD
 
