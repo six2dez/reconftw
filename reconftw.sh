@@ -1362,20 +1362,20 @@ function notification(){
 	then
 		case $2 in
 			info)
-				text="\n${bblue} ${1} ${reset}\n"
-				printf "${text}" && printf "${text}" | $NOTIFY
+				text="\n${bblue} ${1} ${reset}"
+				printf "${text}\n" && printf "${text} - ${domain}\n" | $NOTIFY
 			;;
 			warn)
-				text="\n${yellow} ${1} ${reset}\n"
-				printf "${text}" && printf "${text}" | $NOTIFY
+				text="\n${yellow} ${1} ${reset}"
+				printf "${text}\n" && printf "${text} - ${domain}\n" | $NOTIFY
 			;;
 			error)
-				text="\n${bred} ${1} ${reset}\n"
-				printf "${text}" && printf "${text}" | $NOTIFY
+				text="\n${bred} ${1} ${reset}"
+				printf "${text}\n" && printf "${text} - ${domain}\n" | $NOTIFY
 			;;
 			good)
-				text="\n${bgreen} ${1} ${reset}\n"
-				printf "${text}" && printf "${text}" | $NOTIFY
+				text="\n${bgreen} ${1} ${reset}"
+				printf "${text}\n" && printf "${text} - ${domain}\n" | $NOTIFY
 			;;
 		esac
 	fi
