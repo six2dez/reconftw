@@ -90,7 +90,7 @@ reconFTW is a tool designed to perform automated recon on a target domain by run
 
 
 # Config file
-- Through ```reconftw.config``` file the whole execution of the tool can be controlled.
+- Through ```reconftw.cfg``` file the whole execution of the tool can be controlled.
 - Hunters can set various scanning modes, execution preferences, tools config files, APIs/TOKENS, personalized wordlists
 
 <details>
