@@ -375,8 +375,8 @@ function sub_active(){
 			fi
 			cat .tmp/*_subs.txt | anew -q .tmp/subs_no_resolved.txt
 			deleteOutScoped $outOfScope_file .tmp/subs_no_resolved.txt
-			eval $tools/puredns/puredns resolve .tmp/subs_no_resolved.txt -w .tmp/subdomains_tmp.txt -r $resolvers -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
-			echo $domain | dnsx -silent | anew -q .tmp/subdomains_tmp.txt
+			eval $tools/puredns/puredns resolve .tmp/subs_no_resolved.txt -w .tmp/subdomains_tmp.txt -r $resolvers -rt $resolvers_trusted -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
+			echo $domain | eval dnsx -silent -r $resolvers_trusted $DEBUG_ERROR | anew -q .tmp/subdomains_tmp.txt
 			NUMOFLINES=$(eval cat .tmp/subdomains_tmp.txt $DEBUG_ERROR | anew subdomains/subdomains.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (active resolution)" ${FUNCNAME[0]}
 		else
@@ -388,9 +388,9 @@ function sub_dns(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]
 		then
 			start_subfunc "Running : DNS Subdomain Enumeration"
-			eval dnsx -retry 3 -silent -cname -resp -l subdomains/subdomains.txt -o subdomains/subdomains_cname.txt $DEBUG_STD
+			eval dnsx -retry 3 -silent -cname -resp -l subdomains/subdomains.txt -o subdomains/subdomains_cname.txt -r $resolvers_trusted $DEBUG_STD
 			cat subdomains/subdomains_cname.txt | cut -d '[' -f2 | sed 's/.$//' | grep ".$domain$" | anew -q .tmp/subdomains_dns.txt
-			eval $tools/puredns/puredns resolve .tmp/subdomains_dns.txt -w .tmp/subdomains_dns_resolved.txt -r $resolvers -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
+			eval $tools/puredns/puredns resolve .tmp/subdomains_dns.txt -w .tmp/subdomains_dns_resolved.txt -r $resolvers -rt $resolvers_trusted -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/subdomains_dns_resolved.txt $DEBUG_ERROR | anew subdomains/subdomains.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (dns resolution)" ${FUNCNAME[0]}
 		else
@@ -403,9 +403,9 @@ function sub_brute(){
 		then
 			start_subfunc "Running : Bruteforce Subdomain Enumeration"
 			if [ "$DEEP" = true ] ; then
-				eval $tools/puredns/puredns bruteforce $subs_wordlist_big $domain -w .tmp/subs_brute.txt -r $resolvers -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
+				eval $tools/puredns/puredns bruteforce $subs_wordlist_big $domain -w .tmp/subs_brute.txt -r $resolvers -rt $resolvers_trusted -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
 			else
-				eval $tools/puredns/puredns bruteforce $subs_wordlist $domain -w .tmp/subs_brute.txt -r $resolvers -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
+				eval $tools/puredns/puredns bruteforce $subs_wordlist $domain -w .tmp/subs_brute.txt -r $resolvers -rt $resolvers_trusted -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
 			fi
 			NUMOFLINES=$(eval cat .tmp/subs_brute.txt $DEBUG_ERROR | sed "s/*.//" | anew subdomains/subdomains.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (bruteforce)" ${FUNCNAME[0]}
@@ -433,7 +433,7 @@ function sub_scraping(){
 			fi
 			sed -i '/^.\{2048\}./d' .tmp/gospider.txt
 			cat .tmp/gospider.txt | egrep -o 'https?://[^ ]+' | sed 's/]$//' | unfurl --unique domains | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
-			eval $tools/puredns/puredns resolve .tmp/scrap_subs.txt -w .tmp/scrap_subs_resolved.txt -r $resolvers -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
+			eval $tools/puredns/puredns resolve .tmp/scrap_subs.txt -w .tmp/scrap_subs_resolved.txt -r $resolvers -rt $resolvers_trusted -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/scrap_subs_resolved.txt $DEBUG_ERROR | anew subdomains/subdomains.txt | tee .tmp/diff_scrap.txt | wc -l)
 			cat .tmp/diff_scrap.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
 			end_subfunc "${NUMOFLINES} new subs (code scraping)" ${FUNCNAME[0]}
@@ -452,41 +452,41 @@ function sub_permut(){
 			start_subfunc "Running : Permutations Subdomain Enumeration"
 			if [ "$DEEP" = true ] ; then
 				eval DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
-				eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute1_tmp.txt -r $resolvers -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
+				eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute1_tmp.txt -r $resolvers -rt $resolvers_trusted -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
 				eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
 				eval DNScewl --tL .tmp/permute1.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 | grep ".$domain$" > .tmp/DNScewl2.txt
-				eval $tools/puredns/puredns resolve .tmp/DNScewl2.txt -w .tmp/permute2_tmp.txt -r $resolvers -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
+				eval $tools/puredns/puredns resolve .tmp/DNScewl2.txt -w .tmp/permute2_tmp.txt -r $resolvers -rt $resolvers_trusted -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
 				eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
 				eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 			else
 				if [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 100 ]]
 				then
 					eval DNScewl --tL .tmp/subs_no_resolved.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
-					eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute1_tmp.txt -r $resolvers -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
+					eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute1_tmp.txt -r $resolvers -rt $resolvers_trusted -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
 					eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
 					eval DNScewl --tL .tmp/permute1.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 | grep ".$domain$" > .tmp/DNScewl2.txt
-					eval $tools/puredns/puredns resolve .tmp/DNScewl2.txt -w .tmp/permute2_tmp.txt -r $resolvers -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
+					eval $tools/puredns/puredns resolve .tmp/DNScewl2.txt -w .tmp/permute2_tmp.txt -r $resolvers -rt $resolvers_trusted -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
 					eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
 					eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 				elif [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 200 ]]
 		  		then
 					eval DNScewl --tL .tmp/subs_no_resolved.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
-					eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute_tmp.txt -r $resolvers -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
+					eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute_tmp.txt -r $resolvers -rt $resolvers_trusted -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
 					eval cat .tmp/permute_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 				else
 					if [[ $(cat subdomains/subdomains.txt | wc -l) -le 100 ]]
 					then
 						eval DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
-						eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute1_tmp.txt -r $resolvers -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
+						eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute1_tmp.txt -r $resolvers -rt $resolvers_trusted -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
 						eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
 						eval DNScewl --tL .tmp/permute1.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 | grep ".$domain$" > .tmp/DNScewl2.txt
-						eval $tools/puredns/puredns resolve .tmp/DNScewl2.txt -w .tmp/permute2_tmp.txt -r $resolvers -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
+						eval $tools/puredns/puredns resolve .tmp/DNScewl2.txt -w .tmp/permute2_tmp.txt -r $resolvers -rt $resolvers_trusted -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
 						eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
 						eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 					elif [[ $(cat subdomains/subdomains.txt | wc -l) -le 200 ]]
 					then
 						eval DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
-						eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute_tmp.txt -r $resolvers -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
+						eval $tools/puredns/puredns resolve .tmp/DNScewl1.txt -w .tmp/permute_tmp.txt -r $resolvers -rt $resolvers_trusted -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
 						eval cat .tmp/permute_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 					else
 						printf "\n${bred} Skipping Permutations: Too Much Subdomains${reset}\n\n"
@@ -510,12 +510,50 @@ function sub_permut(){
 	fi
 }
 
+function sub_recursive(){
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SUBRECURSIVE" = true ]
+		then
+			if [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 1000 ]]
+			then
+				start_subfunc "Running : Subdomains recursive search"
+				echo "" > .tmp/brute_recursive_wordlist.txt
+				for sub in $(cat subdomains/subdomains.txt); do
+					sed "s/$/.$sub/" $subs_wordlist >> .tmp/brute_recursive_wordlist.txt
+				done
+				eval $tools/puredns/puredns resolve .tmp/brute_recursive_wordlist.txt -r $resolvers -rt $resolvers_trusted -lt $PUREDNS_TRUSTED_LIMIT -w .tmp/brute_recursive_result.txt $DEBUG_STD
+				cat .tmp/brute_recursive_result.txt | anew -q .tmp/brute_recursive.txt
+
+				eval DNScewl --tL .tmp/brute_recursive.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1_recursive.txt
+				eval $tools/puredns/puredns resolve .tmp/DNScewl1_recursive.txt -w .tmp/permute1_recursive_tmp.txt -r $resolvers -rt $resolvers_trusted -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
+				eval cat .tmp/permute1_recursive_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1_recursive.txt
+				eval DNScewl --tL .tmp/permute1_recursive.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 | grep ".$domain$" > .tmp/DNScewl2_recursive.txt
+				eval $tools/puredns/puredns resolve .tmp/DNScewl2_recursive.txt -w .tmp/permute2_recursive_tmp.txt -r $resolvers -rt $resolvers_trusted -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
+				eval cat .tmp/permute1_recursive.txt .tmp/permute2_recursive_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_recursive.txt
+
+				NUMOFLINES=$(eval cat .tmp/permute_recursive.txt .tmp/brute_recursive.txt $DEBUG_ERROR | anew subdomains/subdomains.txt | wc -l)
+
+				if [ "$NUMOFLINES" -gt 0 ]; then
+					notification "${NUMOFLINES} new subdomains found with recursive search" info
+				fi
+				end_subfunc "${NUMOFLINES} new subs (recursive)" ${FUNCNAME[0]}
+			else
+				notification "Skipping Recursive: Too Much Subdomains" warn
+			fi
+		else
+			if [ "$SUBRECURSIVE" = false ]; then
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
+	fi
+}
+
 function subtakeover(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SUBTAKEOVER" = true ]
 		then
 			start_func "Looking for possible subdomain takeover"
 			touch .tmp/tko.txt
-			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/takeovers/ -o .tmp/tko.txt
+			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/takeovers/ -r $resolvers_trusted -o .tmp/tko.txt
 			NUMOFLINES=$(eval cat .tmp/tko.txt $DEBUG_ERROR | anew webs/takeover.txt | wc -l)
 			if [ "$NUMOFLINES" -gt 0 ]; then
 				notification "${NUMOFLINES} new possible takeovers found" info
@@ -558,44 +596,6 @@ function s3buckets(){
 			end_func "Results are saved in subdomains/s3buckets.txt" ${FUNCNAME[0]}
 		else
 			if [ "$S3BUCKETS" = false ]; then
-				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
-			else
-				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
-			fi
-	fi
-}
-
-function sub_recursive(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SUBRECURSIVE" = true ]
-		then
-			if [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 1000 ]]
-			then
-				start_subfunc "Running : Subdomains recursive search"
-				echo "" > .tmp/brute_recursive_wordlist.txt
-				for sub in $(cat subdomains/subdomains.txt); do
-					sed "s/$/.$sub/" $subs_wordlist >> .tmp/brute_recursive_wordlist.txt
-				done
-				eval $tools/puredns/puredns resolve .tmp/brute_recursive_wordlist.txt -r $resolvers -lt $PUREDNS_TRUSTED_LIMIT -w .tmp/brute_recursive_result.txt $DEBUG_STD
-				cat .tmp/brute_recursive_result.txt | anew -q .tmp/brute_recursive.txt
-
-				eval DNScewl --tL .tmp/brute_recursive.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1_recursive.txt
-				eval $tools/puredns/puredns resolve .tmp/DNScewl1_recursive.txt -w .tmp/permute1_recursive_tmp.txt -r $resolvers -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
-				eval cat .tmp/permute1_recursive_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1_recursive.txt
-				eval DNScewl --tL .tmp/permute1_recursive.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 | grep ".$domain$" > .tmp/DNScewl2_recursive.txt
-				eval $tools/puredns/puredns resolve .tmp/DNScewl2_recursive.txt -w .tmp/permute2_recursive_tmp.txt -r $resolvers -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
-				eval cat .tmp/permute1_recursive.txt .tmp/permute2_recursive_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_recursive.txt
-
-				NUMOFLINES=$(eval cat .tmp/permute_recursive.txt .tmp/brute_recursive.txt $DEBUG_ERROR | anew subdomains/subdomains.txt | wc -l)
-
-				if [ "$NUMOFLINES" -gt 0 ]; then
-					notification "${NUMOFLINES} new subdomains found with recursive search" info
-				fi
-				end_subfunc "${NUMOFLINES} new subs (recursive)" ${FUNCNAME[0]}
-			else
-				notification "Skipping Recursive: Too Much Subdomains" warn
-			fi
-		else
-			if [ "$SUBRECURSIVE" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -779,23 +779,23 @@ function nuclei_check(){
 			eval nuclei -update-templates $DEBUG_STD
 			mkdir -p nuclei_output
 			printf "${yellow}\n Running : Nuclei Technologies${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/technologies/ -o nuclei_output/technologies.txt
+			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/technologies/ -r $resolvers_trusted -o nuclei_output/technologies.txt
 			printf "${yellow}\n\n Running : Nuclei Tokens${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/exposed-tokens/ -o nuclei_output/tokens.txt
+			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/exposed-tokens/ -r $resolvers_trusted -o nuclei_output/tokens.txt
 			printf "${yellow}\n\n Running : Nuclei Exposures${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/exposures/ -o nuclei_output/exposures.txt
+			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/exposures/ -r $resolvers_trusted -o nuclei_output/exposures.txt
 			printf "${yellow}\n\n Running : Nuclei CVEs ${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/cves/ -o nuclei_output/cves.txt
+			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/cves/ -r $resolvers_trusted -o nuclei_output/cves.txt
 			printf "${yellow}\n\n Running : Nuclei Default Creds ${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/default-logins/ -o nuclei_output/default_creds.txt
+			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/default-logins/ -r $resolvers_trusted -o nuclei_output/default_creds.txt
 			printf "${yellow}\n\n Running : Nuclei DNS ${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/dns/ -o nuclei_output/dns.txt
+			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/dns/ -r $resolvers_trusted -o nuclei_output/dns.txt
 			printf "${yellow}\n\n Running : Nuclei Panels ${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/exposed-panels/ -o nuclei_output/panels.txt
+			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/exposed-panels/ -r $resolvers_trusted -o nuclei_output/panels.txt
 			printf "${yellow}\n\n Running : Nuclei Security Misconfiguration ${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/misconfiguration/ -o nuclei_output/misconfigurations.txt
+			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/misconfiguration/ -r $resolvers_trusted -o nuclei_output/misconfigurations.txt
 			printf "${yellow}\n\n Running : Nuclei Vulnerabilites ${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/vulnerabilities/ -o nuclei_output/vulnerabilities.txt
+			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/vulnerabilities/ -r $resolvers_trusted -o nuclei_output/vulnerabilities.txt
 			printf "\n\n"
 			end_func "Results are saved in nuclei_output folder" ${FUNCNAME[0]}
 		else
@@ -987,7 +987,7 @@ function jschecks(){
 					cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt.txt
 				fi
 				printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
-				cat js/js_livelinks.txt | eval nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -o js/js_secrets.txt $DEBUG_STD
+				cat js/js_livelinks.txt | eval nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -r $resolvers_trusted -o js/js_secrets.txt $DEBUG_STD
 				printf "${yellow} Running : Building wordlist 5/5${reset}\n"
 				if [ -s "js/js_livelinks.txt" ]
 				then
