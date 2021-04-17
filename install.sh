@@ -163,6 +163,7 @@ mkdir -p ~/.gf
 mkdir -p $tools
 mkdir -p ~/.config/notify/
 mkdir -p ~/.config/amass/
+mkdir -p ~/.config/nuclei/
 touch $dir/.github_tokens
 
 eval pip3 install -U -r requirements.txt $DEBUG_STD
@@ -187,6 +188,7 @@ printf "${bblue}\n Running: Installing repositories (${#repos[@]})${reset}\n\n"
 eval git clone https://github.com/projectdiscovery/nuclei-templates ~/nuclei-templates $DEBUG_STD
 eval nuclei -update-templates $DEBUG_STD
 sed -i 's/^miscellaneous/#miscellaneous/' ~/nuclei-templates/.nuclei-ignore
+sed -i 's/^#random-agent: false/random-agent: true/' ~/.config/nuclei/config.yaml
 eval git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git $dir/sqlmap $DEBUG_STD
 eval git clone --depth 1 https://github.com/drwetter/testssl.sh.git $dir/testssl.sh $DEBUG_STD
 
