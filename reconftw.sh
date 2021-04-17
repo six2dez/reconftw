@@ -334,7 +334,7 @@ function sub_passive(){
 			fi
 			eval curl -s "https://jldc.me/anubis/subdomains/${domain}" $DEBUG_ERROR | grep -Po "((http|https):\/\/)?(([\w.-]*)\.([\w]*)\.([A-z]))\w+" | sed '/^\./d' | anew -q .tmp/jldc_psub.txt
 			timeout 10m waybackurls $domain | unfurl --unique domains | anew -q .tmp/waybackurls_psub.txt
-			timeout 10m gauplus -t $GAUPLUS_THREADS -subs $domain | unfurl --unique domains | anew -q .tmp/gau_psub.txt
+			timeout 10m gauplus -t $GAUPLUS_THREADS -random-agent -subs $domain | unfurl --unique domains | anew -q .tmp/gau_psub.txt
 			if echo $domain | grep -q ".mil$"; then
 				mildew
 				mv mildew.out .tmp/mildew.out
