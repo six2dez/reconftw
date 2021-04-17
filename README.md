@@ -9,8 +9,8 @@
 <h4 align="center">A simple bash script for full recon</h4>
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v1.3.0">
-    <img src="https://img.shields.io/badge/release-v1.3.0-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v1.4.2">
+    <img src="https://img.shields.io/badge/release-v1.4.2-green">
   </a>
    </a>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
@@ -40,6 +40,7 @@
 - [Sample Video](#sample-video)
 - [Features](#fire-features-fire)
 - [Mindmap/Workflow](#mindmapworkflow)
+- [Data Keep](#data-keep)
 - [Need help?](#need-help)
 - [Contribute](#how-to-contribute)
 - [Thanks](#thanks)
@@ -57,10 +58,9 @@ reconFTW is a tool designed to perform automated recon on a target domain by run
 
 ```bash
 ▶ git clone https://github.com/six2dez/reconftw
-▶ cd reconftw
-▶ chmod +x *.sh
-▶ . ./install.sh
-▶ ./reconftw.sh -d target.com -a
+▶ cd reconftw/
+▶ ./install.sh
+▶ ./reconftw.sh -d target.com -r
 ```
 
 ## b) Docker container (2 options)
@@ -70,6 +70,13 @@ reconFTW is a tool designed to perform automated recon on a target domain by run
 ```bash
 ▶ docker pull six2dez/reconftw:main
 ▶ docker run -it six2dez/reconftw:main /bin/bash
+
+# Exit the container and run this commands additionally if you want to gain persistence:
+▶ docker start $(docker ps -a|grep six2dez/reconftw:main|cut -d' ' -f1)
+▶ docker exec -it $(docker ps -a|grep six2dez/reconftw:main|cut -d' ' -f1) /bin/bash
+
+# Now you can exit the container and run again this command without files loss:
+▶ docker exec -it $(docker ps -a|grep six2dez/reconftw:main|cut -d' ' -f1) /bin/bash
 ```
 
 ### From repository
@@ -83,7 +90,7 @@ reconFTW is a tool designed to perform automated recon on a target domain by run
 
 
 # Config file
-- Through ```reconftw.config``` file the whole execution of the tool can be controlled.
+- Through ```reconftw.cfg``` file the whole execution of the tool can be controlled.
 - Hunters can set various scanning modes, execution preferences, tools config files, APIs/TOKENS, personalized wordlists
 
 <details>
@@ -247,7 +254,6 @@ resolvers=${tools}/resolvers.txt
 | Flag | Description |
 |------|-------------|
 | --deep | Deep scan (Enable some slow options for deeper scan) |
-| --fs   | Full scope (Enable the widest scope * *.domain.* * options) |
 | -o |  Output directory |
 
 ## Running ReconFTW
@@ -276,16 +282,10 @@ resolvers=${tools}/resolvers.txt
 ▶ ./reconftw.sh -d example.com -r --deep -o /output/directory/
 ```
 
-**Perform a wide scope recon on a target**   *(may include false positives)*
-
-```bash
-▶ ./reconftw.sh -d example.com -r --fs -o /output/directory/
-```
-
 **Perform recon in a multi domain target**
 
 ```bash
-▶ ./reconftw.sh -m company -l domainsList.txt
+▶ ./reconftw.sh -m company -l domainsList.txt -r
 ```
 
 **Show help section**
@@ -308,9 +308,9 @@ resolvers=${tools}/resolvers.txt
 - Github Dorks ([GitDorker](https://github.com/obheda12/GitDorker))  
 - Multiple subdomain enumeration techniques (passive, bruteforce, permutations and scraping)
   - Passive ([subfinder](https://github.com/projectdiscovery/subfinder), [assetfinder](https://github.com/tomnomnom/assetfinder), [amass](https://github.com/OWASP/Amass), [findomain](https://github.com/Findomain/Findomain), [crobat](https://github.com/cgboal/sonarsearch), [waybackurls](https://github.com/tomnomnom/waybackurls), [github-subdomains](https://github.com/gwen001/github-subdomains), [Anubis](https://jldc.me) and [mildew](https://github.com/daehee/mildew))
-  - Certificate transparency ([crtfinder](https://github.com/eslam3kl/crtfinder), [tls.bufferover](tls.bufferover.run) and [dns.bufferover](dns.bufferover.run)))
-  - Bruteforce ([shuffledns](https://github.com/projectdiscovery/shuffledns))  
-  - Permutations ([dnsgen](https://github.com/ProjectAnte/dnsgen))  
+  - Certificate transparency ([ctfr](https://github.com/UnaPibaGeek/ctfr), [tls.bufferover](tls.bufferover.run) and [dns.bufferover](dns.bufferover.run)))
+  - Bruteforce ([puredns](https://github.com/d3mondev/puredns))  
+  - Permutations ([DNScewl](https://github.com/codingo/DNSCewl))  
   - Source Code Scraping ([gospider](https://github.com/jaeles-project/gospider))  
   - CNAME Records ([dnsx](https://github.com/projectdiscovery/dnsx))
 - Nuclei Sub TKO templates ([nuclei](https://github.com/projectdiscovery/nuclei))  
@@ -319,7 +319,7 @@ resolvers=${tools}/resolvers.txt
 - Web templates scanner ([nuclei](https://github.com/projectdiscovery/nuclei))  
 - IP and subdomains WAF checker ([cf-check](https://github.com/dwisiswant0/cf-check) and [wafw00f](https://github.com/EnableSecurity/wafw00f))
 - Port Scanner (Active with [nmap](https://github.com/nmap/nmap) and passive with [shodan-cli](https://cli.shodan.io/))  
-- Url extraction ([waybackurls](https://github.com/tomnomnom/waybackurls), [gau](https://github.com/lc/gau), [gospider](https://github.com/jaeles-project/gospider), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3))  
+- Url extraction ([waybackurls](https://github.com/tomnomnom/waybackurls), [gauplus](https://github.com/bp0lr/gauplus), [gospider](https://github.com/jaeles-project/gospider), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3))  
 - Pattern Search ([gf](https://github.com/tomnomnom/gf) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns))  
 - Param discovery ([paramspider](https://github.com/devanshbatham/ParamSpider) and [arjun](https://github.com/s0md3v/Arjun))  
 - XSS ([XSStrike](https://github.com/s0md3v/XSStrike))  
@@ -343,6 +343,7 @@ resolvers=${tools}/resolvers.txt
 - Custom resolvers generated list ([dnsvalidator](https://github.com/vortexau/dnsvalidator))
 - DNS Zone Transfer ([dnsrecon](https://github.com/darkoperator/dnsrecon))
 - Docker container included and [DockerHub](https://hub.docker.com/r/six2dez/reconftw) integration  
+- Cloud providers check [ip2provider](https://github.com/oldrho/ip2provider)
 - Custom output folder  
 - Auto installer/updater compatible with most distros  
 - Diff support for continuous running (cron mode) 
@@ -356,6 +357,23 @@ resolvers=${tools}/resolvers.txt
 ## Mindmap/Workflow
 
 ![Mindmap](images/mindmap_0321.png)
+
+## Data Keep
+
+Follow these simple steps to end up having a private repository with your `API Keys` and `/Recon` data.
+
+* Create a private __blank__ repository on `Git(Hub|Lab)` (Take into account size limits regarding Recon data upload)
+* Clone your project: `git clone https://gitlab.com/example/reconftw-data`
+* Get inside the cloned repository: `cd reconftw-data`
+* Create branch with an empty commit: `git commit --allow-empty -m "Empty commit"`
+* Add official repo as a new remote: `git remote add upstream https://github.com/six2dez/reconftw` (`upstream` is an example)
+* Update upstream's repo: `git fetch upstream`
+* Rebase current branch with the official one: `git rebase upstream/main master`
+
+### Main commands
+
+* Upload changes to your personal repo: `git add . && git commit -m "Data upload" && git push origin master`
+* Update tool anytime: `git fetch upstream && git rebase upstream/main master`
 
 ## How to contribute
 
