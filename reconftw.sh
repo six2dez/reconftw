@@ -1659,7 +1659,7 @@ function help(){
 	printf "\n           	      [-r] [-s] [-p] [-a] [-w] [-i] [-v] [-h] [--deep] [--fs] [-o OUTPUT]\n\n"
 	printf " ${bblue}TARGET OPTIONS${reset}\n"
 	printf "   -d domain.tld    Target domain\n"
-	printf "   -m company       Target company name\n"
+#	printf "   -m company       Target company name\n"
 	printf "   -l list.txt      Targets list, one per line\n"
 	printf "   -x oos.txt       Exclude subdomains list (Out Of Scope)\n"
 	printf "   -i in.txt        Include subdomains list\n"
@@ -1675,7 +1675,6 @@ function help(){
 	printf " \n"
 	printf " ${bblue}GENERAL OPTIONS${reset}\n"
 	printf "   --deep           Deep scan (Enable some slow options for deeper scan)\n"
-	printf "   --fs             Full scope (Enable widest scope *domain* options)\n"
 	printf "   -o output/path   Define output folder\n"
 	printf " \n"
 	printf " ${bblue}USAGE EXAMPLES${reset}\n"
@@ -1688,9 +1687,9 @@ function help(){
 	printf " Web scanning for subdomain list:\n"
 	printf " ./reconftw.sh -d example.com -l targets.txt -w\n"
 	printf " \n"
-	printf " Multidomain recon:\n"
-	printf " ./reconftw.sh -m company -l domainlist.txt -r\n"
-	printf " \n"
+#	printf " Multidomain recon:\n"
+#	printf " ./reconftw.sh -m company -l domainlist.txt -r\n"
+#	printf " \n"
 	printf " Full recon with custom output and excluded subdomains list:\n"
 	printf " ./reconftw.sh -d example.com -x out.txt -a -o custom/path\n"
 }
@@ -1723,8 +1722,8 @@ while getopts ":hd:-:l:m:x:i:varspxwo:" opt; do
 
 		## TARGETS
 
-		m ) multi=$OPTARG
-			;;
+#		m ) multi=$OPTARG
+#			;;
 		d ) domain=$OPTARG
 			;;
 		l ) list=$OPTARG
