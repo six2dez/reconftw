@@ -625,7 +625,7 @@ function webprobe_simple(){
 
 			end_subfunc "${NUMOFLINES} new websites resolved" ${FUNCNAME[0]}
 
-			if [ "$PROXY" = true ] && [ ! -z "$proxy_url" ]
+			if [ "$PROXY" = true ] && [ ! -z "$proxy_url" ] && [[ $(cat webs/webs.txt| wc -l) -le 1500 ]]
 			then
 				notification "Sending websites to proxy" info
 				eval ffuf -mc all -w webs/webs.txt -u FUZZ -replay-proxy $proxy_url $DEBUG_STD
@@ -649,7 +649,7 @@ function webprobe_full(){
 			notification "Uncommon web ports: ${NUMOFLINES} new websites" good
 			eval cat webs/webs_uncommon_ports.txt $DEBUG_ERROR
 			end_func "Results are saved in webs/webs_uncommon_ports.txt" ${FUNCNAME[0]}
-			if [ "$PROXY" = true ] && [ ! -z "$proxy_url" ]
+			if [ "$PROXY" = true ] && [ ! -z "$proxy_url" ] && [[ $(cat webs/webs_uncommon_ports.txt| wc -l) -le 1500 ]]
 			then
 				notification "Sending websites uncommon ports to proxy" info
 				eval ffuf -mc all -w webs/webs_uncommon_ports.txt -u FUZZ -replay-proxy $proxy_url $DEBUG_STD
@@ -792,24 +792,16 @@ function nuclei_check(){
 			start_func "Templates based web scanner"
 			eval nuclei -update-templates $DEBUG_STD
 			mkdir -p nuclei_output
-			printf "${yellow}\n Running : Nuclei Technologies${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/technologies/ -r $resolvers_trusted -o nuclei_output/technologies.txt
-			printf "${yellow}\n\n Running : Nuclei Tokens${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -r $resolvers_trusted -o nuclei_output/tokens.txt
-			printf "${yellow}\n\n Running : Nuclei Exposures${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/exposures/ -r $resolvers_trusted -o nuclei_output/exposures.txt
-			printf "${yellow}\n\n Running : Nuclei CVEs ${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/cves/ -r $resolvers_trusted -o nuclei_output/cves.txt
-			printf "${yellow}\n\n Running : Nuclei Default Creds ${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/default-logins/ -r $resolvers_trusted -o nuclei_output/default_creds.txt
-			printf "${yellow}\n\n Running : Nuclei DNS ${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/dns/ -r $resolvers_trusted -o nuclei_output/dns.txt
-			printf "${yellow}\n\n Running : Nuclei Panels ${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/exposed-panels/ -r $resolvers_trusted -o nuclei_output/panels.txt
-			printf "${yellow}\n\n Running : Nuclei Security Misconfiguration ${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/misconfiguration/ -r $resolvers_trusted -o nuclei_output/misconfigurations.txt
-			printf "${yellow}\n\n Running : Nuclei Vulnerabilites ${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/vulnerabilities/ -r $resolvers_trusted -o nuclei_output/vulnerabilities.txt
+			printf "${yellow}\n Running : Nuclei Info${reset}\n\n"
+			cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/ -severity info -r $resolvers_trusted -o nuclei_output/info.txt
+			printf "${yellow}\n\n Running : Nuclei Low${reset}\n\n"
+			cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/ -severity low -r $resolvers_trusted -o nuclei_output/low.txt
+			printf "${yellow}\n\n Running : Nuclei Medium${reset}\n\n"
+			cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/ -severity medium -r $resolvers_trusted -o nuclei_output/medium.txt
+			printf "${yellow}\n\n Running : Nuclei High${reset}\n\n"
+			cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/ -severity high -r $resolvers_trusted -o nuclei_output/high.txt
+			printf "${yellow}\n\n Running : Nuclei Critical${reset}\n\n"
+			cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/ -severity critical -r $resolvers_trusted -o nuclei_output/critical.txt
 			printf "\n\n"
 			end_func "Results are saved in nuclei_output folder" ${FUNCNAME[0]}
 		else
@@ -931,7 +923,7 @@ function urlchecks(){
 			NUMOFLINES=$(eval cat .tmp/url_extract_uddup.txt $DEBUG_ERROR | anew webs/url_extract.txt | wc -l)
 			notification "${NUMOFLINES} new urls with params" info
 			end_func "Results are saved in webs/url_extract.txt" ${FUNCNAME[0]}
-			if [ "$PROXY" = true ] && [ ! -z "$proxy_url" ] && [[ $(cat webs/url_extract.txt | wc -l) -le 1000 ]]
+			if [ "$PROXY" = true ] && [ ! -z "$proxy_url" ] && [[ $(cat webs/url_extract.txt | wc -l) -le 1500 ]]
 			then
 				notification "Sending urls to proxy" info
 				eval ffuf -mc all -w webs/url_extract.txt -u FUZZ -replay-proxy $proxy_url $DEBUG_STD
@@ -1598,6 +1590,16 @@ function recon(){
 }
 
 function multi_recon(){
+
+
+	global_start=`date +%s`
+
+	if [ "$NOTIFICATION" = true ] ; then
+		NOTIFY="notify -silent"
+	else
+	    NOTIFY=""
+	fi
+
 	if [ -s "$list" ]
 	then
 		targets=$(cat $list)
@@ -1605,14 +1607,16 @@ function multi_recon(){
 		notification "Target list not provided" error
 		exit
 	fi
+
 	workdir=$SCRIPTPATH/Recon/$multi
 	mkdir -p $workdir && cd $workdir
-	mkdir -p .tmp .called_fn_dir osint subdomains webs hosts vulns
+	mkdir -p .tmp .called_fn osint subdomains webs hosts vulns
 	for domain in $targets; do
 		dir=$workdir/targets/$domain
+		called_fn_dir=$dir/.called_fn
 		mkdir -p $dir
 		cd $dir
-		mkdir -p .tmp .called_fn_dir osint subdomains webs hosts vulns
+		mkdir -p .tmp .called_fn osint subdomains webs hosts vulns
 		domain_info
 		emails
 		google_dorks
@@ -1741,8 +1745,8 @@ while getopts ":hd:-:l:m:x:i:varspxwo:" opt; do
 
 		## TARGETS
 
-#		m ) multi=$OPTARG
-#			;;
+		m ) multi=$OPTARG
+			;;
 		d ) domain=$OPTARG
 			;;
 		l ) list=$OPTARG
