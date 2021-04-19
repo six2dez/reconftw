@@ -667,8 +667,8 @@ function screenshot(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$WEBSCREENSHOT" = true ]
 		then
 			start_func "Web Screenshots"
-			eval gowitness file -f webs/webs.txt --disable-db --disable-logging $DEBUG_ERROR
-			eval gowitness file -f webs/webs_uncommon_ports.txt --disable-db --disable-logging $DEBUG_ERROR
+			eval gowitness file -f webs/webs.txt --disable-logging $DEBUG_ERROR
+			eval gowitness file -f webs/webs_uncommon_ports.txt --disable-logging $DEBUG_ERROR
 			end_func "Results are saved in screenshots folder" ${FUNCNAME[0]}
 		else
 			if [ "$WEBSCREENSHOT" = false ]; then
