@@ -320,26 +320,27 @@ function sub_passive(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]
 		then
 			start_subfunc "Running : Passive Subdomain Enumeration"
-			eval subfinder -d $domain -o .tmp/subfinder_psub.txt $DEBUG_STD
-			eval assetfinder --subs-only $domain $DEBUG_ERROR | anew -q .tmp/assetfinder_psub.txt
-			eval amass enum -passive -d $domain -config $AMASS_CONFIG -o .tmp/amass_psub.txt $DEBUG_STD
-			eval findomain --quiet -t $domain -u .tmp/findomain_psub.txt $DEBUG_STD
-			eval crobat -s $domain $DEBUG_ERROR | anew -q .tmp/crobat_psub.txt
+			eval subfinder -d $domain -o .tmp/subfinder_psub.txt $DEBUG_STD &
+			eval assetfinder --subs-only $domain $DEBUG_ERROR | anew -q .tmp/assetfinder_psub.txt &
+			eval amass enum -passive -d $domain -config $AMASS_CONFIG -o .tmp/amass_psub.txt $DEBUG_STD &
+			eval findomain --quiet -t $domain -u .tmp/findomain_psub.txt $DEBUG_STD &
+			eval crobat -s $domain $DEBUG_ERROR | anew -q .tmp/crobat_psub.txt &
 			if [ -s "${GITHUB_TOKENS}" ];then
 				if [ "$DEEP" = true ] ; then
-					eval github-subdomains -d $domain -t $GITHUB_TOKENS -o .tmp/github_subdomains_psub.txt $DEBUG_STD
+					eval github-subdomains -d $domain -t $GITHUB_TOKENS -o .tmp/github_subdomains_psub.txt $DEBUG_STD &
 				else
-					eval github-subdomains -d $domain -k -q -t $GITHUB_TOKENS -o .tmp/github_subdomains_psub.txt $DEBUG_STD
+					eval github-subdomains -d $domain -k -q -t $GITHUB_TOKENS -o .tmp/github_subdomains_psub.txt $DEBUG_STD &
 				fi
 			fi
-			eval curl -s "https://jldc.me/anubis/subdomains/${domain}" $DEBUG_ERROR | grep -Po "((http|https):\/\/)?(([\w.-]*)\.([\w]*)\.([A-z]))\w+" | sed '/^\./d' | anew -q .tmp/jldc_psub.txt
-			timeout 10m waybackurls $domain | unfurl --unique domains | anew -q .tmp/waybackurls_psub.txt
-			timeout 10m gauplus -t $GAUPLUS_THREADS -random-agent -subs $domain | unfurl --unique domains | anew -q .tmp/gau_psub.txt
+			eval curl -s "https://jldc.me/anubis/subdomains/${domain}" $DEBUG_ERROR | grep -Po "((http|https):\/\/)?(([\w.-]*)\.([\w]*)\.([A-z]))\w+" | sed '/^\./d' | anew -q .tmp/jldc_psub.txt &
+			timeout 10m waybackurls $domain | unfurl --unique domains | anew -q .tmp/waybackurls_psub.txt &
+			timeout 10m gauplus -t $GAUPLUS_THREADS -random-agent -subs $domain | unfurl --unique domains | anew -q .tmp/gau_psub.txt &
 			if echo $domain | grep -q ".mil$"; then
 				mildew
 				mv mildew.out .tmp/mildew.out
 				cat .tmp/mildew.out | grep ".$domain$" | anew -q .tmp/mil_psub.txt
 			fi
+			wait $(jobs -rp)
 			NUMOFLINES=$(eval cat .tmp/*_psub.txt $DEBUG_ERROR | sed "s/*.//" | anew .tmp/passive_subs.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (passive)" ${FUNCNAME[0]}
 		else
@@ -553,7 +554,7 @@ function subtakeover(){
 		then
 			start_func "Looking for possible subdomain takeover"
 			touch .tmp/tko.txt
-			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/takeovers/ -r $resolvers_trusted -o .tmp/tko.txt
+			cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/takeovers/ -r $resolvers_trusted -o .tmp/tko.txt
 			NUMOFLINES=$(eval cat .tmp/tko.txt $DEBUG_ERROR | anew webs/takeover.txt | wc -l)
 			if [ "$NUMOFLINES" -gt 0 ]; then
 				notification "${NUMOFLINES} new possible takeovers found" info
@@ -621,7 +622,15 @@ function webprobe_simple(){
 
 			deleteOutScoped $outOfScope_file .tmp/probed_tmp.txt
 			NUMOFLINES=$(eval cat .tmp/probed_tmp.txt $DEBUG_ERROR | anew webs/webs.txt | wc -l)
+
 			end_subfunc "${NUMOFLINES} new websites resolved" ${FUNCNAME[0]}
+
+			if [ "$PROXY" = true ] && [ ! -z "$proxy_url" ]
+			then
+				notification "Sending websites to proxy" info
+				eval ffuf -mc all -w webs/webs.txt -u FUZZ -replay-proxy $proxy_url $DEBUG_STD
+			fi
+
 		else
 			if [ "$WEBPROBESIMPLE" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -640,6 +649,11 @@ function webprobe_full(){
 			notification "Uncommon web ports: ${NUMOFLINES} new websites" good
 			eval cat webs/webs_uncommon_ports.txt $DEBUG_ERROR
 			end_func "Results are saved in webs/webs_uncommon_ports.txt" ${FUNCNAME[0]}
+			if [ "$PROXY" = true ] && [ ! -z "$proxy_url" ]
+			then
+				notification "Sending websites uncommon ports to proxy" info
+				eval ffuf -mc all -w webs/webs_uncommon_ports.txt -u FUZZ -replay-proxy $proxy_url $DEBUG_STD
+			fi
 		else
 			if [ "$WEBPROBEFULL" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -779,23 +793,23 @@ function nuclei_check(){
 			eval nuclei -update-templates $DEBUG_STD
 			mkdir -p nuclei_output
 			printf "${yellow}\n Running : Nuclei Technologies${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/technologies/ -r $resolvers_trusted -o nuclei_output/technologies.txt
+			cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/technologies/ -r $resolvers_trusted -o nuclei_output/technologies.txt
 			printf "${yellow}\n\n Running : Nuclei Tokens${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/exposed-tokens/ -r $resolvers_trusted -o nuclei_output/tokens.txt
+			cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/exposed-tokens/ -r $resolvers_trusted -o nuclei_output/tokens.txt
 			printf "${yellow}\n\n Running : Nuclei Exposures${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/exposures/ -r $resolvers_trusted -o nuclei_output/exposures.txt
+			cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/exposures/ -r $resolvers_trusted -o nuclei_output/exposures.txt
 			printf "${yellow}\n\n Running : Nuclei CVEs ${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/cves/ -r $resolvers_trusted -o nuclei_output/cves.txt
+			cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/cves/ -r $resolvers_trusted -o nuclei_output/cves.txt
 			printf "${yellow}\n\n Running : Nuclei Default Creds ${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/default-logins/ -r $resolvers_trusted -o nuclei_output/default_creds.txt
+			cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/default-logins/ -r $resolvers_trusted -o nuclei_output/default_creds.txt
 			printf "${yellow}\n\n Running : Nuclei DNS ${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/dns/ -r $resolvers_trusted -o nuclei_output/dns.txt
+			cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/dns/ -r $resolvers_trusted -o nuclei_output/dns.txt
 			printf "${yellow}\n\n Running : Nuclei Panels ${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/exposed-panels/ -r $resolvers_trusted -o nuclei_output/panels.txt
+			cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/exposed-panels/ -r $resolvers_trusted -o nuclei_output/panels.txt
 			printf "${yellow}\n\n Running : Nuclei Security Misconfiguration ${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/misconfiguration/ -r $resolvers_trusted -o nuclei_output/misconfigurations.txt
+			cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/misconfiguration/ -r $resolvers_trusted -o nuclei_output/misconfigurations.txt
 			printf "${yellow}\n\n Running : Nuclei Vulnerabilites ${reset}\n\n"
-			cat webs/webs.txt | nuclei -silent -H "${HEADER}" -t ~/nuclei-templates/vulnerabilities/ -r $resolvers_trusted -o nuclei_output/vulnerabilities.txt
+			cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/vulnerabilities/ -r $resolvers_trusted -o nuclei_output/vulnerabilities.txt
 			printf "\n\n"
 			end_func "Results are saved in nuclei_output folder" ${FUNCNAME[0]}
 		else
@@ -917,6 +931,11 @@ function urlchecks(){
 			NUMOFLINES=$(eval cat .tmp/url_extract_uddup.txt $DEBUG_ERROR | anew webs/url_extract.txt | wc -l)
 			notification "${NUMOFLINES} new urls with params" info
 			end_func "Results are saved in webs/url_extract.txt" ${FUNCNAME[0]}
+			if [ "$PROXY" = true ] && [ ! -z "$proxy_url" ] && [[ $(cat webs/url_extract.txt | wc -l) -le 1000 ]]
+			then
+				notification "Sending urls to proxy" info
+				eval ffuf -mc all -w webs/url_extract.txt -u FUZZ -replay-proxy $proxy_url $DEBUG_STD
+			fi
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
