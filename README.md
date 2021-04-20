@@ -37,7 +37,7 @@
 -----------------
 - [Summary](#summary)
 - [Installation](#-installation)
-- [Config file](#-config-file)
+- [Config file](#%EF%B8%8F-config-file)
 - [Usage](#usage)
 - [Running reconFTW](#running-reconftw)
 - [Sample Video](#sample-video)
