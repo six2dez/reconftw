@@ -533,9 +533,6 @@ function sub_recursive(){
 
 				NUMOFLINES=$(eval cat .tmp/permute_recursive.txt .tmp/brute_recursive.txt $DEBUG_ERROR | anew subdomains/subdomains.txt | wc -l)
 
-				if [ "$NUMOFLINES" -gt 0 ]; then
-					notification "${NUMOFLINES} new subdomains found with recursive search" info
-				fi
 				end_subfunc "${NUMOFLINES} new subs (recursive)" ${FUNCNAME[0]}
 			else
 				notification "Skipping Recursive: Too Much Subdomains" warn
@@ -1573,6 +1570,7 @@ function recon(){
 	subdomains_full
 	subtakeover
 	zonetransfer
+	s3buckets
 	webprobe_full
 	screenshot
 	favicon
@@ -1651,6 +1649,7 @@ function multi_recon(){
 
 	portscan
 	cloudprovider
+	s3buckets
 	waf_checks
 	nuclei_check
 	for domain in $targets; do
@@ -1673,8 +1672,10 @@ function multi_recon(){
 function subs_menu(){
 	start
 	subdomains_full
+	webprobe_full
 	subtakeover
 	zonetransfer
+	s3buckets
 	end
 }
 
@@ -1819,6 +1820,8 @@ while getopts ":hd:-:l:m:x:i:varspxwo:" opt; do
 					cp $SCRIPTPATH/$list $dir/webs/webs.txt
 				fi
 			fi
+			subtakeover
+			s3buckets
 			waf_checks
 			nuclei_check
 			cms_scanner
