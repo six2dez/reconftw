@@ -320,13 +320,13 @@ function sub_passive(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]
 		then
 			start_subfunc "Running : Passive Subdomain Enumeration"
-			echo "/home/op/go/bin/subfinder -d ${domain}" > .tmp/sub_passive_commands.txt
-			echo "/home/op/go/bin/assetfinder --subs-only ${domain}" >> .tmp/sub_passive_commands.txt
-			echo "amass enum -passive -d ${domain}" >> .tmp/sub_passive_commands.txt
-			echo "/usr/bin/findomain --quiet -t ${domain}" >> .tmp/sub_passive_commands.txt
-			echo "timeout 10m /home/op/go/bin/waybackurls ${domain} | /home/op/go/bin/unfurl --unique domains" >> .tmp/sub_passive_commands.txt
-			echo "timeout 10m /home/op/go/bin/gau ${domain} | /home/op/go/bin/unfurl --unique domains" >> .tmp/sub_passive_commands.txt
-			eval axiom-scan .tmp/sub_passive_commands.txt -m exec -o .tmp/axiom_psub.txt $DEBUG_STD
+
+			eval axiom-scan $list -m subfinder -o .tmp/subfinder_psub.txt $DEBUG_STD
+			eval axiom-scan $list -m assetfinder -o .tmp/assetfinder_psub.txt $DEBUG_STD
+			eval axiom-scan $list -m amass -o .tmp/amass_psub.txt $DEBUG_STD
+			eval axiom-scan $list -m findomain -o .tmp/findomain_psub.txt $DEBUG_STD
+			eval axiom-scan $list -m waybackurls -o .tmp/waybackurls_psub_tmp.txt $DEBUG_STD && eval cat .tmp/waybackurls_psub_tmp.txt $DEBUG_ERROR | unfurl --unique domains | anew -q .tmp/waybackurls_psub.txt
+			eval axiom-scan $list -m gau -o .tmp/gau_psub_tmp.txt $DEBUG_STD && eval cat .tmp/gau_psub_tmp.txt $DEBUG_ERROR | unfurl --unique domains | anew -q .tmp/gau_psub.txt
 			eval crobat -s $domain $DEBUG_ERROR | anew -q .tmp/crobat_psub.txt
 			if [ -s "${GITHUB_TOKENS}" ];then
 				if [ "$DEEP" = true ] ; then
@@ -572,7 +572,10 @@ function zonetransfer(){
 		then
 			start_func "Zone transfer check"
 			eval python3 $tools/dnsrecon/dnsrecon.py -d $domain -a -j subdomains/zonetransfer.json $DEBUG_STD
-			if grep -q "\"zone_transfer\"\: \"success\"" subdomains/zonetransfer.json ; then notification "Zone transfer found on ${domain}!" info; fi
+			if [ -s "subdomains/zonetransfer.json" ]
+			then
+				if grep -q "\"zone_transfer\"\: \"success\"" subdomains/zonetransfer.json ; then notification "Zone transfer found on ${domain}!" info; fi
+			fi
 			end_func "Results are saved in subdomains/zonetransfer.txt" ${FUNCNAME[0]}
 		else
 			if [ "$ZONETRANSFER" = false ]; then
@@ -969,14 +972,20 @@ function jschecks(){
 				printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
 				eval axiom-scan js/jsfile_links.txt -m httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color -o .tmp/js_livelinks.txt $DEBUG_STD && cat .tmp/js_livelinks.txt | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
 				printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
-				interlace -tL js/js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> .tmp/js_endpoints.txt" &>/dev/null
+				if [ -s "js/js_livelinks.txt" ]
+				then
+					interlace -tL js/js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> .tmp/js_endpoints.txt" &>/dev/null
+				fi
 				if [ -s ".tmp/js_endpoints.txt" ]
 				then
 					eval sed -i '/^\//!d' .tmp/js_endpoints.txt $DEBUG_STD
 					cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt.txt
 				fi
 				printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
-				eval axiom-scan js/js_livelinks.txt -m nuclei -wL /home/op/recon/nuclei/nuclei-templates/exposed-tokens/ -r $resolvers_trusted -o nuclei_js/js_secrets.txt $DEBUG_STD
+				if [ -s "js/js_livelinks.txt" ]
+				then
+					eval axiom-scan js/js_livelinks.txt -m nuclei -wL /home/op/recon/nuclei/nuclei-templates/exposed-tokens/ -r $resolvers_trusted -o nuclei_js/js_secrets.txt $DEBUG_STD
+				fi
 				printf "${yellow} Running : Building wordlist 5/5${reset}\n"
 				if [ -s "js/js_livelinks.txt" ]
 				then

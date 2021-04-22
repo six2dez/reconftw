@@ -320,27 +320,26 @@ function sub_passive(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]
 		then
 			start_subfunc "Running : Passive Subdomain Enumeration"
-			eval subfinder -d $domain -o .tmp/subfinder_psub.txt $DEBUG_STD &
-			eval assetfinder --subs-only $domain $DEBUG_ERROR | anew -q .tmp/assetfinder_psub.txt &
-			eval amass enum -passive -d $domain -config $AMASS_CONFIG -o .tmp/amass_psub.txt $DEBUG_STD &
-			eval findomain --quiet -t $domain -u .tmp/findomain_psub.txt $DEBUG_STD &
-			eval crobat -s $domain $DEBUG_ERROR | anew -q .tmp/crobat_psub.txt &
+			eval subfinder -d $domain -o .tmp/subfinder_psub.txt $DEBUG_STD
+			eval assetfinder --subs-only $domain $DEBUG_ERROR | anew -q .tmp/assetfinder_psub.txt
+			eval amass enum -passive -d $domain -config $AMASS_CONFIG -o .tmp/amass_psub.txt $DEBUG_STD
+			eval findomain --quiet -t $domain -u .tmp/findomain_psub.txt $DEBUG_STD
+			eval crobat -s $domain $DEBUG_ERROR | anew -q .tmp/crobat_psub.txt
 			if [ -s "${GITHUB_TOKENS}" ];then
 				if [ "$DEEP" = true ] ; then
-					eval github-subdomains -d $domain -t $GITHUB_TOKENS -o .tmp/github_subdomains_psub.txt $DEBUG_STD &
+					eval github-subdomains -d $domain -t $GITHUB_TOKENS -o .tmp/github_subdomains_psub.txt $DEBUG_STD
 				else
-					eval github-subdomains -d $domain -k -q -t $GITHUB_TOKENS -o .tmp/github_subdomains_psub.txt $DEBUG_STD &
+					eval github-subdomains -d $domain -k -q -t $GITHUB_TOKENS -o .tmp/github_subdomains_psub.txt $DEBUG_STD
 				fi
 			fi
-			eval curl -s "https://jldc.me/anubis/subdomains/${domain}" $DEBUG_ERROR | grep -Po "((http|https):\/\/)?(([\w.-]*)\.([\w]*)\.([A-z]))\w+" | sed '/^\./d' | anew -q .tmp/jldc_psub.txt &
-			timeout 10m waybackurls $domain | unfurl --unique domains | anew -q .tmp/waybackurls_psub.txt &
-			timeout 10m gauplus -t $GAUPLUS_THREADS -random-agent -subs $domain | unfurl --unique domains | anew -q .tmp/gau_psub.txt &
+			eval curl -s "https://jldc.me/anubis/subdomains/${domain}" $DEBUG_ERROR | grep -Po "((http|https):\/\/)?(([\w.-]*)\.([\w]*)\.([A-z]))\w+" | sed '/^\./d' | anew -q .tmp/jldc_psub.txt
+			timeout 10m waybackurls $domain | unfurl --unique domains | anew -q .tmp/waybackurls_psub.txt
+			timeout 10m gauplus -t $GAUPLUS_THREADS -random-agent -subs $domain | unfurl --unique domains | anew -q .tmp/gau_psub.txt
 			if echo $domain | grep -q ".mil$"; then
 				mildew
 				mv mildew.out .tmp/mildew.out
 				cat .tmp/mildew.out | grep ".$domain$" | anew -q .tmp/mil_psub.txt
 			fi
-			wait $(jobs -rp)
 			NUMOFLINES=$(eval cat .tmp/*_psub.txt $DEBUG_ERROR | sed "s/*.//" | anew .tmp/passive_subs.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (passive)" ${FUNCNAME[0]}
 		else
@@ -571,7 +570,10 @@ function zonetransfer(){
 		then
 			start_func "Zone transfer check"
 			eval python3 $tools/dnsrecon/dnsrecon.py -d $domain -a -j subdomains/zonetransfer.json $DEBUG_STD
-			if grep -q "\"zone_transfer\"\: \"success\"" subdomains/zonetransfer.json ; then notification "Zone transfer found on ${domain}!" info; fi
+			if [ -s "subdomains/zonetransfer.json" ]
+			then
+				if grep -q "\"zone_transfer\"\: \"success\"" subdomains/zonetransfer.json ; then notification "Zone transfer found on ${domain}!" info; fi
+			fi
 			end_func "Results are saved in subdomains/zonetransfer.txt" ${FUNCNAME[0]}
 		else
 			if [ "$ZONETRANSFER" = false ]; then
@@ -988,14 +990,20 @@ function jschecks(){
 				printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
 				cat js/jsfile_links.txt | httpx -follow-redirects -random-agent -silent -timeout 15 -threads $HTTPX_THREADS -status-code -retries 2 -no-color | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
 				printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
-				interlace -tL js/js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> .tmp/js_endpoints.txt" &>/dev/null
+				if [ -s "js/js_livelinks.txt" ]
+				then
+					interlace -tL js/js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> .tmp/js_endpoints.txt" &>/dev/null
+				fi
 				if [ -s ".tmp/js_endpoints.txt" ]
 				then
 					eval sed -i '/^\//!d' .tmp/js_endpoints.txt $DEBUG_STD
 					cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt.txt
 				fi
 				printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
-				cat js/js_livelinks.txt | eval nuclei -silent -t ~/nuclei-templates/exposures/ -r $resolvers_trusted -o js/js_secrets.txt $DEBUG_STD
+				if [ -s "js/js_livelinks.txt" ]
+				then
+					cat js/js_livelinks.txt | eval nuclei -silent -t ~/nuclei-templates/exposures/ -r $resolvers_trusted -o js/js_secrets.txt $DEBUG_STD
+				fi
 				printf "${yellow} Running : Building wordlist 5/5${reset}\n"
 				if [ -s "js/js_livelinks.txt" ]
 				then
