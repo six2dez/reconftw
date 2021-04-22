@@ -234,6 +234,7 @@ eval $SUDO chmod 755 /usr/local/bin/findomain
 eval $SUDO chmod 755 /usr/local/bin/gowitness
 eval $SUDO chmod 755 /usr/local/bin/DNScewl
 eval subfinder $DEBUG_STD
+eval subfinder $DEBUG_STD
 
 printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 ## Downloads

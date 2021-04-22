@@ -323,7 +323,7 @@ function sub_passive(){
 
 			eval axiom-scan $list -m subfinder -o .tmp/subfinder_psub.txt $DEBUG_STD
 			eval axiom-scan $list -m assetfinder -o .tmp/assetfinder_psub.txt $DEBUG_STD
-			eval axiom-scan $list -m amass -o .tmp/amass_psub.txt $DEBUG_STD
+			eval axiom-scan $list -m amass -passive -o .tmp/amass_psub.txt $DEBUG_STD
 			eval axiom-scan $list -m findomain -o .tmp/findomain_psub.txt $DEBUG_STD
 			eval axiom-scan $list -m waybackurls -o .tmp/waybackurls_psub_tmp.txt $DEBUG_STD && eval cat .tmp/waybackurls_psub_tmp.txt $DEBUG_ERROR | unfurl --unique domains | anew -q .tmp/waybackurls_psub.txt
 			eval axiom-scan $list -m gau -o .tmp/gau_psub_tmp.txt $DEBUG_STD && eval cat .tmp/gau_psub_tmp.txt $DEBUG_ERROR | unfurl --unique domains | anew -q .tmp/gau_psub.txt
