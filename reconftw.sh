@@ -496,7 +496,7 @@ function sub_permut(){
 			if [ -f ".tmp/permute_subs.txt" ]
 			then
 				deleteOutScoped $outOfScope_file .tmp/permute_subs.txt
-				NUMOFLINES=$(eval cat .tmp/permute_subs.txt $DEBUG_ERROR | grep "$domain$" | anew subdomains/subdomains.txt | wc -l)
+				NUMOFLINES=$(eval cat .tmp/permute_subs.txt $DEBUG_ERROR | grep ".$domain$" | anew subdomains/subdomains.txt | wc -l)
 			else
 				NUMOFLINES=0
 			fi
@@ -618,18 +618,14 @@ function webprobe_simple(){
 			else
 				cat subdomains/subdomains.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp.txt
 			fi
-
 			deleteOutScoped $outOfScope_file .tmp/probed_tmp.txt
 			NUMOFLINES=$(eval cat .tmp/probed_tmp.txt $DEBUG_ERROR | anew webs/webs.txt | wc -l)
-
 			end_subfunc "${NUMOFLINES} new websites resolved" ${FUNCNAME[0]}
-
 			if [ "$PROXY" = true ] && [ ! -z "$proxy_url" ] && [[ $(cat webs/webs.txt| wc -l) -le 1500 ]]
 			then
 				notification "Sending websites to proxy" info
 				eval ffuf -mc all -w webs/webs.txt -u FUZZ -replay-proxy $proxy_url $DEBUG_STD
 			fi
-
 		else
 			if [ "$WEBPROBESIMPLE" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -643,7 +639,8 @@ function webprobe_full(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$WEBPROBEFULL" = true ]
 		then
 			start_func "Http probing non standard ports"
-			cat subdomains/subdomains.txt | httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55440,55672 -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout 10 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain" | anew -q .tmp/probed_uncommon_ports_tmp.txt
+			eval nmap -p $UNCOMMON_PORTS_WEB --max-retries 2 -Pn -iL subdomains/subdomains.txt -oG .tmp/nmap_uncommonweb.txt $DEBUG_STD && uncommon_ports_checked=$(cat .tmp/nmap_uncommonweb.txt | egrep -v "^#|Status: Up" | cut -d' ' -f4- | sed -n -e 's/Ignored.*//p' | tr ',' '\n' | sed -e 's/^[ \t]*//' | sort -u | cut -d '/' -f1 | sed -e 'H;${x;s/\n/,/g;s/^,//;p;};d')
+			cat subdomains/subdomains.txt | httpx -ports $uncommon_ports_checked -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout 10 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain" | anew -q .tmp/probed_uncommon_ports_tmp.txt
 			NUMOFLINES=$(eval cat .tmp/probed_uncommon_ports_tmp.txt $DEBUG_ERROR | anew webs/webs_uncommon_ports.txt | wc -l)
 			notification "Uncommon web ports: ${NUMOFLINES} new websites" good
 			eval cat webs/webs_uncommon_ports.txt $DEBUG_ERROR
@@ -666,8 +663,8 @@ function screenshot(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$WEBSCREENSHOT" = true ]
 		then
 			start_func "Web Screenshots"
-			eval gowitness file -f webs/webs.txt --disable-logging $DEBUG_ERROR
-			eval gowitness file -f webs/webs_uncommon_ports.txt --disable-logging $DEBUG_ERROR
+			eval cat webs/webs.txt webs/webs_uncommon_ports.txt $DEBUG_ERROR | anew -q .tmp/webs_screenshots.txt
+			eval gowitness file -f .tmp/webs_screenshots.txt --disable-logging $DEBUG_ERROR
 			end_func "Results are saved in screenshots folder" ${FUNCNAME[0]}
 		else
 			if [ "$WEBSCREENSHOT" = false ]; then
@@ -715,11 +712,8 @@ function portscan(){
 				echo "$sub $(dig +short a $sub | tail -n1)" | anew -q .tmp/subs_ips.txt
 			done
 			awk '{ print $2 " " $1}' .tmp/subs_ips.txt | sort -k2 -n | anew -q hosts/subs_ips_vhosts.txt
-
 			eval cat hosts/subs_ips_vhosts.txt $DEBUG_ERROR | cut -d ' ' -f1 | egrep -iv "^(127|10|169|172|192)\." | anew -q hosts/ips.txt
-
 			eval cat hosts/ips.txt $DEBUG_ERROR | cf-check | egrep -iv "^(127|10|169|172|192)\." | anew -q .tmp/ips_nowaf.txt
-
 			printf "${bblue}\n Resolved IP addresses (No WAF) ${reset}\n\n";
 			eval cat .tmp/ips_nowaf.txt $DEBUG_ERROR | sort
 
@@ -733,7 +727,7 @@ function portscan(){
 
 			if [ "$PORTSCAN_ACTIVE" = true ]
 			then
-				eval nmap --top-ports 1000 -sV -n --max-retries 2 -iL .tmp/ips_nowaf.txt -oN hosts/portscan_active.txt -oG .tmp/nmap_grep.gnmap $DEBUG_STD
+				eval nmap --top-ports 1000 -sV -n --max-retries 2 -Pn -iL .tmp/ips_nowaf.txt -oN hosts/portscan_active.txt -oG .tmp/nmap_grep.gnmap $DEBUG_STD
 			fi
 
 			end_func "Results are saved in hosts/portscan_[passive|active].txt" ${FUNCNAME[0]}
@@ -1059,7 +1053,7 @@ function brokenLinks(){
 			fi
 		fi
 		sed -i '/^.\{2048\}./d' .tmp/gospider.txt
-		cat .tmp/gospider.txt | egrep -o 'https?://[^ ]+' | sed 's/]$//' | sort -u | httpx -follow-redirects -random-agent -status-code -timeout 15 -silent -retries 2 -no-color | grep "\[4" | cut -d ' ' -f1 | anew -q .tmp/brokenLinks_total.txt
+		cat .tmp/gospider.txt | egrep -o 'https?://[^ ]+' | sed 's/]$//' | sort -u | httpx -follow-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color | grep "\[4" | cut -d ' ' -f1 | anew -q .tmp/brokenLinks_total.txt
 		NUMOFLINES=$(eval cat .tmp/brokenLinks_total.txt $DEBUG_ERROR | anew webs/brokenLinks.txt | wc -l)
 		notification "${NUMOFLINES} new broken links found" info
 		end_func "Results are saved in webs/brokenLinks.txt" ${FUNCNAME[0]}
@@ -1460,7 +1454,7 @@ function start(){
 
 	if [ -z "$domain" ]
 	then
-		printf "\n\n${bred} No domain or list provided ${reset}\n\n"
+		notification "\n\n${bred} No domain or list provided ${reset}\n\n" error
 		exit
 	fi
 
@@ -1680,6 +1674,8 @@ function multi_recon(){
 function subs_menu(){
 	start
 	subdomains_full
+	webprobe_full
+	screenshot
 	subtakeover
 	zonetransfer
 	s3buckets

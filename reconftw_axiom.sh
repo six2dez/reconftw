@@ -357,7 +357,7 @@ function sub_crt(){
 			eval axiom-scan .tmp/sub_ctrf_commands.txt -m exec -o .tmp/crtsh_subs_tmp.txt $DEBUG_STD
 			eval curl "https://tls.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r .Results[] $DEBUG_ERROR | cut -d ',' -f3 | grep -F ".$domain" | anew -q .tmp/crtsh_subs.txt
 			eval curl "https://dns.bufferover.run/dns?q=.${domain}" $DEBUG_ERROR | eval jq -r '.FDNS_A'[],'.RDNS'[] $DEBUG_ERROR | cut -d ',' -f2 | grep -F ".$domain" | anew -q .tmp/crtsh_subs_tmp.txt
-			NUMOFLINES=$(eval cat .tmp/crtsh_subs_tmp.txt $DEBUG_ERROR | sed "s/*.//" | anew .tmp/crtsh_subs.txt | wc -l)
+			NUMOFLINES=$(eval cat .tmp/crtsh_subs_tmp.txt $DEBUG_ERROR | anew .tmp/crtsh_subs.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (cert transparency)" ${FUNCNAME[0]}
 		else
 			if [ "$SUBCRT" = false ]; then
@@ -499,7 +499,7 @@ function sub_permut(){
 			if [ -f ".tmp/permute_subs.txt" ]
 			then
 				deleteOutScoped $outOfScope_file .tmp/permute_subs.txt
-				NUMOFLINES=$(eval cat .tmp/permute_subs.txt $DEBUG_ERROR | grep ".$domain$" |anew subdomains/subdomains.txt | wc -l)
+				NUMOFLINES=$(eval cat .tmp/permute_subs.txt $DEBUG_ERROR | grep ".$domain$" | anew subdomains/subdomains.txt | wc -l)
 			else
 				NUMOFLINES=0
 			fi
@@ -623,6 +623,11 @@ function webprobe_simple(){
 			deleteOutScoped $outOfScope_file .tmp/probed_tmp.txt
 			NUMOFLINES=$(eval cat .tmp/probed_tmp.txt $DEBUG_ERROR | anew webs/webs.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new websites resolved" ${FUNCNAME[0]}
+			if [ "$PROXY" = true ] && [ ! -z "$proxy_url" ] && [[ $(cat webs/webs.txt| wc -l) -le 1500 ]]
+			then
+				notification "Sending websites to proxy" info
+				eval ffuf -mc all -w webs/webs.txt -u FUZZ -replay-proxy $proxy_url $DEBUG_STD
+			fi
 		else
 			if [ "$WEBPROBESIMPLE" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -636,11 +641,17 @@ function webprobe_full(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$WEBPROBEFULL" = true ]
 		then
 			start_func "Http probing non standard ports"
-			eval axiom-scan subdomains/subdomains.txt -m httpx -ports 81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55440,55672 -follow-host-redirects -random-agent -status-code -timeout 10 -threads $HTTPX_UNCOMMONPORTS_THREADS -silent -retries 2 -no-color -o .tmp/probed_uncommon_ports_tmp_.txt $DEBUG_STD && cat .tmp/probed_uncommon_ports_tmp_.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_uncommon_ports_tmp.txt
+			eval axiom-scan subdomains/subdomains.txt -m nmapx -p $UNCOMMON_PORTS_WEB --max-retries 2 -Pn -o .tmp/nmap_uncommonweb.txt $DEBUG_STD && uncommon_ports_checked=$(cat .tmp/nmap_uncommonweb.txt | egrep -v "^#|Status: Up" | cut -d' ' -f4- | sed -n -e 's/Ignored.*//p' | tr ',' '\n' | sed -e 's/^[ \t]*//' | sort -u | cut -d '/' -f1 | sed -e 'H;${x;s/\n/,/g;s/^,//;p;};d')
+			eval axiom-scan subdomains/subdomains.txt -m httpx -ports $uncommon_ports_checked -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout 10 -silent -retries 2 -no-color -o .tmp/probed_uncommon_ports_tmp_.txt $DEBUG_STD && cat .tmp/probed_uncommon_ports_tmp_.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_uncommon_ports_tmp.txt
 			NUMOFLINES=$(eval cat .tmp/probed_uncommon_ports_tmp.txt $DEBUG_ERROR | anew webs/webs_uncommon_ports.txt | wc -l)
 			notification "Uncommon web ports: ${NUMOFLINES} new websites" good
 			eval cat webs/webs_uncommon_ports.txt $DEBUG_ERROR
 			end_func "Results are saved in webs/webs_uncommon_ports.txt" ${FUNCNAME[0]}
+			if [ "$PROXY" = true ] && [ ! -z "$proxy_url" ] && [[ $(cat webs/webs_uncommon_ports.txt| wc -l) -le 1500 ]]
+			then
+				notification "Sending websites uncommon ports to proxy" info
+				eval ffuf -mc all -w webs/webs_uncommon_ports.txt -u FUZZ -replay-proxy $proxy_url $DEBUG_STD
+			fi
 		else
 			if [ "$WEBPROBEFULL" = false ]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -654,8 +665,8 @@ function screenshot(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$WEBSCREENSHOT" = true ]
 		then
 			start_func "Web Screenshots"
-			eval axiom-scan webs/webs.txt -m gowitness --disable-logging -o screenshots $DEBUG_STD
-			eval axiom-scan webs/webs_uncommon_ports.txt -m gowitness --disable-logging -o screenshots $DEBUG_STD
+			eval cat webs/webs.txt webs/webs_uncommon_ports.txt $DEBUG_ERROR | anew -q .tmp/webs_screenshots.txt
+			eval axiom-scan .tmp/webs_screenshots.txt -m gowitness -o screenshots $DEBUG_STD
 			end_func "Results are saved in screenshots folder" ${FUNCNAME[0]}
 		else
 			if [ "$WEBSCREENSHOT" = false ]; then
@@ -718,7 +729,7 @@ function portscan(){
 
 			if [ "$PORTSCAN_ACTIVE" = true ]
 			then
-				eval axiom-scan .tmp/ips_nowaf.txt -m nmap --top-ports 1000 -sV -n --max-retries 2 -oN hosts/portscan_active.txt -oG .tmp/nmap_grep.gnmap $DEBUG_STD
+				eval axiom-scan .tmp/ips_nowaf.txt -m nmapx --top-ports 1000 -sV -n -Pn --max-retries 2 -o hosts/portscan_active.txt $DEBUG_STD
 			fi
 
 			end_func "Results are saved in hosts/portscan_[passive|active].txt" ${FUNCNAME[0]}
@@ -883,10 +894,8 @@ function urlchecks(){
 		then
 			start_func "URL Extraction"
 			mkdir -p js
-
 			eval axiom-scan webs/webs.txt -m waybackurls -o .tmp/url_extract_way_tmp.txt $DEBUG_STD && eval cat .tmp/url_extract_way_tmp.txt $DEBUG_ERROR | anew -q .tmp/url_extract_tmp.txt
 			eval axiom-scan webs/webs.txt -m gau -o .tmp/url_extract_gau_tmp.txt $DEBUG_STD && eval cat .tmp/url_extract_gau_tmp.txt $DEBUG_ERROR | anew -q .tmp/url_extract_tmp.txt
-
 			diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt) <(sort -u webs/webs.txt) | wc -l)
 			if [ $diff_webs != "0" ] || [ ! -s ".tmp/gospider.txt" ] ;
 			then
@@ -909,6 +918,11 @@ function urlchecks(){
 			NUMOFLINES=$(eval cat .tmp/url_extract_uddup.txt $DEBUG_ERROR | anew webs/url_extract.txt | wc -l)
 			notification "${NUMOFLINES} new urls with params" info
 			end_func "Results are saved in webs/url_extract.txt" ${FUNCNAME[0]}
+			if [ "$PROXY" = true ] && [ ! -z "$proxy_url" ] && [[ $(cat webs/url_extract.txt | wc -l) -le 1500 ]]
+			then
+				notification "Sending urls to proxy" info
+				eval ffuf -mc all -w webs/url_extract.txt -u FUZZ -replay-proxy $proxy_url $DEBUG_STD
+			fi
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
@@ -970,7 +984,7 @@ function jschecks(){
 				cat js/url_extract_js.txt | cut -d '?' -f 1 | grep -iE "\.js$" | anew -q js/jsfile_links.txt
 				cat js/url_extract_js.txt | subjs | anew -q js/jsfile_links.txt
 				printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
-				eval axiom-scan js/jsfile_links.txt -m httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color -o .tmp/js_livelinks.txt $DEBUG_STD && cat .tmp/js_livelinks.txt | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
+				eval axiom-scan js/jsfile_links.txt -m httpx -follow-redirects -random-agent -silent -timeout 15 -threads $HTTPX_THREADS -status-code -retries 2 -no-color -o .tmp/js_livelinks.txt $DEBUG_STD && cat .tmp/js_livelinks.txt | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
 				printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
 				if [ -s "js/js_livelinks.txt" ]
 				then
@@ -984,7 +998,7 @@ function jschecks(){
 				printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
 				if [ -s "js/js_livelinks.txt" ]
 				then
-					eval axiom-scan js/js_livelinks.txt -m nuclei -wL /home/op/recon/nuclei/nuclei-templates/exposed-tokens/ -r $resolvers_trusted -o nuclei_js/js_secrets.txt $DEBUG_STD
+					eval axiom-scan js/js_livelinks.txt -m nuclei -wL /home/op/recon/nuclei/nuclei-templates/exposures/ -r $resolvers_trusted -o js/js_secrets.txt $DEBUG_STD
 				fi
 				printf "${yellow} Running : Building wordlist 5/5${reset}\n"
 				if [ -s "js/js_livelinks.txt" ]
@@ -1033,8 +1047,7 @@ function wordlist_gen(){
 function brokenLinks(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$BROKENLINKS" = true ] ; then
 		start_func "Broken links checks"
-		if [ ! -s ".tmp/gospider.txt" ] ;
-		then
+		if [ ! -s ".tmp/gospider.txt" ]; then
 			if [ "$DEEP" = true ] ; then
 				eval axiom-scan .tmp/probed_tmp_scrap.txt -m gospider --js -d 3 --sitemap --robots -w -r -o .tmp/gospider $DEBUG_STD
 			else
@@ -1042,7 +1055,7 @@ function brokenLinks(){
 			fi
 			cat .tmp/gospider/* | sed '/^.\{2048\}./d' | anew -q .tmp/gospider.txt
 		fi
-		cat .tmp/gospider.txt | egrep -o 'https?://[^ ]+' | sed 's/]$//' | sort -u | httpx -follow-redirects -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color | grep "\[4" | cut -d ' ' -f1 | anew -q .tmp/brokenLinks_total.txt
+		cat .tmp/gospider.txt | egrep -o 'https?://[^ ]+' | sed 's/]$//' | sort -u | httpx -follow-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color | grep "\[4" | cut -d ' ' -f1 | anew -q .tmp/brokenLinks_total.txt
 		NUMOFLINES=$(eval cat .tmp/brokenLinks_total.txt $DEBUG_ERROR | anew webs/brokenLinks.txt | wc -l)
 		notification "${NUMOFLINES} new broken links found" info
 		end_func "Results are saved in webs/brokenLinks.txt" ${FUNCNAME[0]}
@@ -1280,7 +1293,7 @@ function spraying(){
 		then
 			start_func "Password spraying"
 			cd $tools/brutespray
-			eval python3 $tools/brutespray/brutespray.py --file $dir/.tmp/nmap_grep.gnmap --threads $BRUTESPRAY_THREADS --hosts $BRUTESPRAY_CONCURRENCE -o $dir/hosts/brutespray.txt $DEBUG_STD
+			eval python3 $tools/brutespray/brutespray.py --file $dir/hosts/portscan_active.txt --threads $BRUTESPRAY_THREADS --hosts $BRUTESPRAY_CONCURRENCE -o $dir/hosts/brutespray.txt $DEBUG_STD
 			cd $dir
 			end_func "Results are saved in hosts/brutespray.txt" ${FUNCNAME[0]}
 		else
@@ -1674,6 +1687,8 @@ function multi_recon(){
 function subs_menu(){
 	start
 	subdomains_full
+	webprobe_full
+	screenshot
 	subtakeover
 	zonetransfer
 	s3buckets
