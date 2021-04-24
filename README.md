@@ -89,7 +89,6 @@
 ▶ docker run -it reconftw /bin/bash
 ```
  
- 
 # ⚙️ Config file:
 > A detailed explaintion of config file can be found here [Configuration file](https://github.com/six2dez/reconftw/wiki/3.-Configuration-file) :book:
 - Through ```reconftw.cfg``` file the whole execution of the tool can be controlled.
