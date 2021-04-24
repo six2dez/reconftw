@@ -376,7 +376,7 @@ function sub_active(){
 			cat .tmp/*_subs.txt | anew -q .tmp/subs_no_resolved.txt
 			deleteOutScoped $outOfScope_file .tmp/subs_no_resolved.txt
 			eval $tools/puredns/puredns resolve .tmp/subs_no_resolved.txt -w .tmp/subdomains_tmp.txt -r $resolvers -rt $resolvers_trusted -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
-			echo $domain | eval dnsx -silent -r $resolvers_trusted $DEBUG_ERROR | anew -q .tmp/subdomains_tmp.txt
+			echo $domain | eval dnsx -retry 3 -silent -r $resolvers_trusted $DEBUG_ERROR | anew -q .tmp/subdomains_tmp.txt
 			NUMOFLINES=$(eval cat .tmp/subdomains_tmp.txt $DEBUG_ERROR | grep "$domain$" | anew subdomains/subdomains.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (active resolution)" ${FUNCNAME[0]}
 		else
@@ -388,7 +388,7 @@ function sub_dns(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]
 		then
 			start_subfunc "Running : DNS Subdomain Enumeration"
-			eval dnsx -retry 3 -silent -cname -resp -l subdomains/subdomains.txt -o subdomains/subdomains_cname.txt -r $resolvers_trusted $DEBUG_STD
+			eval dnsx -retry 3 -a -aaaa -cname -ns -ptr -mx -soa -resp -silent -l subdomains/subdomains.txt -o subdomains/subdomains_cname.txt -r $resolvers_trusted $DEBUG_STD
 			cat subdomains/subdomains_cname.txt | cut -d '[' -f2 | sed 's/.$//' | grep ".$domain$" | anew -q .tmp/subdomains_dns.txt
 			eval $tools/puredns/puredns resolve .tmp/subdomains_dns.txt -w .tmp/subdomains_dns_resolved.txt -r $resolvers -rt $resolvers_trusted -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/subdomains_dns_resolved.txt $DEBUG_ERROR | grep "$domain$" | anew subdomains/subdomains.txt | wc -l)
