@@ -35,11 +35,11 @@
  
 📔 Table of Contents
 -----------------
-- [Summary](#summary)
 - [Installation](#-installation)
 - [Config file](#%EF%B8%8F-config-file)
 - [Usage](#usage)
-- [Running reconFTW](#running-reconftw)
+- [Example Usage](#Example-Usage)
+- [Axiom Support](#axiom-support-cloud)
 - [Sample Video](#sample-video)
 - [Features](#fire-features-fire)
 - [Mindmap/Workflow](#mindmapworkflow)
@@ -48,13 +48,9 @@
 - [Contribute](#how-to-contribute)
 - [Thanks](#thanks)
  
-# Summary
- 
-reconFTW is a tool designed to perform automated recon on a target domain by running the best set of tools to perform enumeration and finding out vulnerabilities.
- 
 ---
  
-# 💿 Installation
+# 💿 Installation:
  
 ## a) In your PC/VPS/VM
  
@@ -94,7 +90,7 @@ reconFTW is a tool designed to perform automated recon on a target domain by run
 ```
  
  
-# ⚙️ Config file
+# ⚙️ Config file:
 > A detailed explaintion of config file can be found here [Configuration file](https://github.com/six2dez/reconftw/wiki/3.-Configuration-file) :book:
 - Through ```reconftw.cfg``` file the whole execution of the tool can be controlled.
 - Hunters can set various scanning modes, execution preferences, tools, config files, APIs/TOKENS, personalized wordlists and much more.
@@ -105,9 +101,9 @@ reconFTW is a tool designed to perform automated recon on a target domain by run
  
 ```yaml
 #################################################################
-#           reconFTW config file            #
+#			reconFTW config file			#
 #################################################################
- 
+
 # TERM COLORS
 bred='\033[1;31m'
 bblue='\033[1;34m'
@@ -117,7 +113,7 @@ red='\033[0;31m'
 blue='\033[0;34m'
 green='\033[0;32m'
 reset='\033[0m'
- 
+
 # General values
 tools=~/Tools
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
@@ -126,31 +122,31 @@ reconftw_version=$(git branch --show-current)-$(git describe --tags)
 update_resolvers=true
 proxy_url="http://127.0.0.1:8080/"
 #dir_output=/custom/output/path
- 
+
 # Golang Vars (Comment or change on your own)
 export GOROOT=/usr/local/go
 export GOPATH=$HOME/go
 export PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH
- 
+
 # Tools config files
 #NOTIFY_CONFIG=~/.config/notify/notify.conf # No need to define
 #SUBFINDER_CONFIG=~/.config/subfinder/config.yaml # No need to define
 AMASS_CONFIG=~/.config/amass/config.ini
 GITHUB_TOKENS=${tools}/.github_tokens
- 
+
 # APIs/TOKENS - Uncomment the lines you set removing the '#' at the beginning of the line
 #SHODAN_API_KEY=XXXXXXXXXXXXX
-#XSS_SERVER=XXXXXXXXXXXXXXXXX
+#XSS_SERVER=six2dez.xss.ht
 #COLLAB_SERVER=XXXXXXXXXXXXXXXXX
 #findomain_virustotal_token=XXXXXXXXXXXXXXXXX
 #findomain_spyse_token=XXXXXXXXXXXXXXXXX
 #findomain_securitytrails_token=XXXXXXXXXXXXXXXXX
 #findomain_fb_token=XXXXXXXXXXXXXXXXX
- 
+
 # File descriptors
 DEBUG_STD="&>/dev/null"
 DEBUG_ERROR="2>/dev/null"
- 
+
 # Osint
 OSINT=true
 GOOGLE_DORKS=true
@@ -158,7 +154,7 @@ GITHUB_DORKS=true
 METADATA=true
 EMAILS=true
 DOMAIN_INFO=true
- 
+
 # Subdomains
 SUBCRT=true
 SUBBRUTE=true
@@ -168,19 +164,20 @@ SUBTAKEOVER=true
 SUBRECURSIVE=true
 ZONETRANSFER=true
 S3BUCKETS=true
- 
+
 # Web detection
 WEBPROBESIMPLE=true
 WEBPROBEFULL=true
 WEBSCREENSHOT=true
- 
+UNCOMMON_PORTS_WEB="81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55440,55672"
+
 # Host
 FAVICON=true
 PORTSCANNER=true
 PORTSCAN_PASSIVE=true
 PORTSCAN_ACTIVE=true
 CLOUD_IP=true
- 
+
 # Web analysis
 WAF_DETECTION=true
 NUCLEICHECK=true
@@ -192,7 +189,7 @@ PARAMS=true
 FUZZ=true
 CMS_SCANNER=true
 WORDLIST=true
- 
+
 # Vulns
 XSS=true
 CORS=true
@@ -206,17 +203,17 @@ SQLI=true
 BROKENLINKS=true
 SPRAY=true
 BYPASSER4XX=true
- 
+
 # Extra features
 NOTIFICATION=false
 DEEP=false
 DIFF=false
 REMOVETMP=false
 PROXY=false
- 
+
 # HTTP options
 HEADER="User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0"
- 
+
 # Threads
 FFUF_THREADS=40
 HTTPX_THREADS=50
@@ -229,7 +226,7 @@ ARJUN_THREADS=20
 GAUPLUS_THREADS=10
 DALFOX_THREADS=200
 PUREDNS_TRUSTED_LIMIT=400
- 
+
 # lists
 fuzz_wordlist=${tools}/fuzz_wordlist.txt
 lfi_wordlist=${tools}/lfi_wordlist.txt
@@ -240,7 +237,7 @@ resolvers_trusted=${tools}/resolvers_trusted.txt
 ``` 
 </details>
  
-## Usage
+# Usage:
 > Check out the wiki section to know which flag performs what all steps/attacks [Usage Guide](https://github.com/six2dez/reconftw/wiki/2.-Usage-Guide) :book:
  
 **TARGET OPTIONS**
@@ -268,18 +265,18 @@ resolvers_trusted=${tools}/resolvers_trusted.txt
  
 | Flag | Description |
 |------|-------------|
-| --deep | Deep scan (Enable some slow options for deeper scan, _vps intented mode_) |
+| --deep | Deep scan (Enable some slow options for deeper scan, _vps intended mode_) |
 | -o |  Output directory |
  
-## Running ReconFTW
+# Example Usage:
  
 **To perform a full recon on single target** 
  
 ```bash
-▶ ./reconftw.sh -d example.com -r
+▶ ./reconftw.sh -d target.com -r
 ```
  
-**To perfrom a full recon on a list of targets**
+**To perform a full recon on a list of targets**
  
 ```bash
 ▶ ./reconftw.sh -l sites.txt -r -o /output/directory/
@@ -288,19 +285,19 @@ resolvers_trusted=${tools}/resolvers_trusted.txt
 **Perform all steps (whole recon + all attacks)** 
  
 ```bash
-▶ ./reconftw.sh -d example.com -a
+▶ ./reconftw.sh -d target.com -a
 ```
  
 **Perform full recon with more time intense tasks** *(VPS intended only)*
  
 ```bash
-▶ ./reconftw.sh -d example.com -r --deep -o /output/directory/
+▶ ./reconftw.sh -d target.com -r --deep -o /output/directory/
 ```
  
 **Perform recon in a multi domain target**
  
 ```bash
-▶ ./reconftw.sh -m company -l domainsList.txt -r
+▶ ./reconftw.sh -m company -l domains_list.txt -r
 ```
  
 **Show help section**
@@ -308,12 +305,22 @@ resolvers_trusted=${tools}/resolvers_trusted.txt
 ```bash
 ▶ ./reconftw.sh -h
 ```
+
+# Axiom Support: :cloud:
+![](https://i.ibb.co/Jzrgkqt/axiom-readme.png)
+> Check out the wiki section for more info [Axiom Support](https://github.com/six2dez/reconftw/wiki/5.-Axiom-version)
+* Using ```reconftw_axiom.sh``` script you can take advantage of running **reconFTW** with [Axiom](https://github.com/pry0cc/axiom).
+* As reconFTW actively hits the target with a lot of web traffic, hence there was a need to move to Axiom distributing the work load among various instances leading to reduction of execution time.
+* Currently except the ```-a``` flag, all flags are supported when running with Axiom.
+```bash
+▶ ./reconftw_axiom.sh -d target.com -r
+```
  
-## Sample video
+# Sample video:
  
 ![Video](images/reconFTW.gif)
  
-## :fire: Features :fire:
+# :fire: Features :fire:
  
 - Domain information parser ([domainbigdata](https://domainbigdata.com/))
 - Emails addresses and users ([theHarvester](https://github.com/laramies/theHarvester))
@@ -369,7 +376,7 @@ resolvers_trusted=${tools}/resolvers_trusted.txt
 - Out of Scope Support
 - Notification support for Slack, Discord and Telegram ([notify](https://github.com/projectdiscovery/notify))
  
-## Mindmap/Workflow
+# Mindmap/Workflow
  
 ![Mindmap](images/mindmap_0321.png)
  
@@ -385,12 +392,12 @@ Follow these simple steps to end up having a private repository with your `API K
 * Update upstream's repo: `git fetch upstream`
 * Rebase current branch with the official one: `git rebase upstream/main master`
  
-### Main commands
+### Main commands:
  
 * Upload changes to your personal repo: `git add . && git commit -m "Data upload" && git push origin master`
 * Update tool anytime: `git fetch upstream && git rebase upstream/main master`
  
-## How to contribute
+## How to contribute:
  
 If you want to contribute to this project you can do it in multiple ways:
 - Submitting an [issue](https://github.com/six2dez/reconftw/issues/new/choose) because you have found a bug or you have any suggestion or request.
@@ -405,11 +412,13 @@ If you want to contribute to this project you can do it in multiple ways:
  
 [<img src="https://cdn.buymeacoffee.com/buttons/v2/default-green.png">](https://www.buymeacoffee.com/six2dez)
  
-## Thanks
+# Thanks :pray:
+* Thank you for lending a helping hand towards the development of the project!
  
-For their great feedback, support, help or for nothing special but well deserved:
- 
-- [@detonXX](https://twitter.com/detonXX)
-- [@Bileltechno](https://twitter.com/BilelEljaamii)
-- [@cyph3r_asr](https://twitter.com/cyph3r_asr)
-- [@h4ms1k](https://twitter.com/h4ms1k)
+- [Spyse](https://spyse.com/)
+- [Networksdb](https://networksdb.io/)
+- [Intelx](https://intelx.io/)
+- [BinaryEdge](https://www.binaryedge.io/)
+- [Censys](https://censys.io/)
+- [CIRCL](https://www.circl.lu/)
+- [Whoxy](https://www.whoxy.com/)
