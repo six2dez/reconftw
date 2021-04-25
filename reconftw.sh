@@ -640,7 +640,10 @@ function webprobe_full(){
 		then
 			start_func "Http probing non standard ports"
 			eval nmap -p $UNCOMMON_PORTS_WEB --max-retries 2 -Pn -iL subdomains/subdomains.txt -oG .tmp/nmap_uncommonweb.txt $DEBUG_STD && uncommon_ports_checked=$(cat .tmp/nmap_uncommonweb.txt | egrep -v "^#|Status: Up" | cut -d' ' -f4- | sed -n -e 's/Ignored.*//p' | tr ',' '\n' | sed -e 's/^[ \t]*//' | sort -u | cut -d '/' -f1 | sed -e 'H;${x;s/\n/,/g;s/^,//;p;};d')
-			cat subdomains/subdomains.txt | httpx -ports $uncommon_ports_checked -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout 10 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain" | anew -q .tmp/probed_uncommon_ports_tmp.txt
+			if [ ! -z "$uncommon_ports_checked" ]
+			then
+				cat subdomains/subdomains.txt | httpx -ports $uncommon_ports_checked -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout 10 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain" | anew -q .tmp/probed_uncommon_ports_tmp.txt
+			fi
 			NUMOFLINES=$(eval cat .tmp/probed_uncommon_ports_tmp.txt $DEBUG_ERROR | anew webs/webs_uncommon_ports.txt | wc -l)
 			notification "Uncommon web ports: ${NUMOFLINES} new websites" good
 			eval cat webs/webs_uncommon_ports.txt $DEBUG_ERROR
