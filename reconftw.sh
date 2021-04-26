@@ -621,7 +621,7 @@ function webprobe_simple(){
 			deleteOutScoped $outOfScope_file .tmp/probed_tmp.txt
 			NUMOFLINES=$(eval cat .tmp/probed_tmp.txt $DEBUG_ERROR | anew webs/webs.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new websites resolved" ${FUNCNAME[0]}
-			if [ "$PROXY" = true ] && [ ! -z "$proxy_url" ] && [[ $(cat webs/webs.txt| wc -l) -le 1500 ]]
+			if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/webs.txt| wc -l) -le 1500 ]]
 			then
 				notification "Sending websites to proxy" info
 				eval ffuf -mc all -w webs/webs.txt -u FUZZ -replay-proxy $proxy_url $DEBUG_STD
@@ -640,7 +640,7 @@ function webprobe_full(){
 		then
 			start_func "Http probing non standard ports"
 			eval nmap -p $UNCOMMON_PORTS_WEB --max-retries 2 -Pn -iL subdomains/subdomains.txt -oG .tmp/nmap_uncommonweb.txt $DEBUG_STD && uncommon_ports_checked=$(cat .tmp/nmap_uncommonweb.txt | egrep -v "^#|Status: Up" | cut -d' ' -f4- | sed -n -e 's/Ignored.*//p' | tr ',' '\n' | sed -e 's/^[ \t]*//' | sort -u | cut -d '/' -f1 | sed -e 'H;${x;s/\n/,/g;s/^,//;p;};d')
-			if [ ! -z "$uncommon_ports_checked" ]
+			if [ -n "$uncommon_ports_checked" ]
 			then
 				cat subdomains/subdomains.txt | httpx -ports $uncommon_ports_checked -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout 10 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain" | anew -q .tmp/probed_uncommon_ports_tmp.txt
 			fi
@@ -648,7 +648,7 @@ function webprobe_full(){
 			notification "Uncommon web ports: ${NUMOFLINES} new websites" good
 			eval cat webs/webs_uncommon_ports.txt $DEBUG_ERROR
 			end_func "Results are saved in webs/webs_uncommon_ports.txt" ${FUNCNAME[0]}
-			if [ "$PROXY" = true ] && [ ! -z "$proxy_url" ] && [[ $(cat webs/webs_uncommon_ports.txt| wc -l) -le 1500 ]]
+			if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/webs_uncommon_ports.txt| wc -l) -le 1500 ]]
 			then
 				notification "Sending websites uncommon ports to proxy" info
 				eval ffuf -mc all -w webs/webs_uncommon_ports.txt -u FUZZ -replay-proxy $proxy_url $DEBUG_STD
@@ -919,7 +919,7 @@ function urlchecks(){
 			NUMOFLINES=$(eval cat .tmp/url_extract_uddup.txt $DEBUG_ERROR | anew webs/url_extract.txt | wc -l)
 			notification "${NUMOFLINES} new urls with params" info
 			end_func "Results are saved in webs/url_extract.txt" ${FUNCNAME[0]}
-			if [ "$PROXY" = true ] && [ ! -z "$proxy_url" ] && [[ $(cat webs/url_extract.txt | wc -l) -le 1500 ]]
+			if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/url_extract.txt | wc -l) -le 1500 ]]
 			then
 				notification "Sending urls to proxy" info
 				eval ffuf -mc all -w webs/url_extract.txt -u FUZZ -replay-proxy $proxy_url $DEBUG_STD
@@ -958,7 +958,7 @@ function url_ext(){
 		then
 			ext=("7z" "achee" "action" "adr" "apk" "arj" "ascx" "asmx" "asp" "aspx" "axd" "backup" "bak" "bat" "bin" "bkf" "bkp" "bok" "cab" "cer" "cfg" "cfm" "cfml" "cgi" "cnf" "conf" "config" "cpl" "crt" "csr" "csv" "dat" "db" "dbf" "deb" "dmg" "dmp" "doc" "docx" "drv" "email" "eml" "emlx" "env" "exe" "gadget" "gz" "html" "ica" "inf" "ini" "iso" "jar" "java" "jhtml" "json" "jsp" "key" "log" "lst" "mai" "mbox" "mbx" "md" "mdb" "msg" "msi" "nsf" "ods" "oft" "old" "ora" "ost" "pac" "passwd" "pcf" "pdf" "pem" "pgp" "php" "php3" "php4" "php5" "phtm" "phtml" "pkg" "pl" "plist" "pst" "pwd" "py" "rar" "rb" "rdp" "reg" "rpm" "rtf" "sav" "sh" "shtm" "shtml" "skr" "sql" "swf" "sys" "tar" "tar.gz" "tmp" "toast" "tpl" "txt" "url" "vcd" "vcf" "wml" "wpd" "wsdl" "wsf" "xls" "xlsm" "xlsx" "xml" "xsd" "yaml" "yml" "z" "zip")
 			echo "" > webs/url_extract.txt
-			for t in ${ext[@]}; do
+			for t in "${ext[@]}"; do
 				NUMOFLINES=$(cat .tmp/url_extract_tmp.txt | egrep -i "\.(${t})($|\/|\?)" | sort -u | wc -l)
 				if [[ ${NUMOFLINES} -gt 0 ]]; then
 					echo -e "\n############################\n + ${t} + \n############################\n" >> webs/urls_by_ext.txt
@@ -1294,7 +1294,7 @@ function spraying(){
 		then
 			start_func "Password spraying"
 			cd $tools/brutespray
-			eval python3 $tools/brutespray/brutespray.py --file $dir/.tmp/nmap_grep.gnmap --threads $BRUTESPRAY_THREADS --hosts $BRUTESPRAY_CONCURRENCE -o $dir/hosts/brutespray.txt $DEBUG_STD
+			eval python3 brutespray.py --file $dir/.tmp/nmap_grep.gnmap --threads $BRUTESPRAY_THREADS --hosts $BRUTESPRAY_CONCURRENCE -o $dir/hosts/brutespray.txt $DEBUG_STD
 			cd $dir
 			end_func "Results are saved in hosts/brutespray.txt" ${FUNCNAME[0]}
 		else
@@ -1371,7 +1371,7 @@ function output(){
 }
 
 function notification(){
-	if [ ! -z "$1" ] && [ ! -z "$2" ]
+	if [ -n "$1" ] && [ -n "$2" ]
 	then
 		case $2 in
 			info)
@@ -1469,36 +1469,13 @@ function start(){
 	cd $dir
 	mkdir -p .tmp osint subdomains webs hosts vulns
 
-	if [ ! -z "$findomain_virustotal_token" ]
+	if [ -n "$findomain_virustotal_token" ]
 	then
 		VT_API_KEY=$findomain_virustotal_token
 	fi
 
 	printf "\n"
 	printf "${bred} Target: ${domain}\n\n"
-}
-
-#Don't call me, I am not finished yet
-function html_report(){
-	eval cp "static/index.html" $dir $DEBUG_ERROR
-	#changing title to target.com
-	sed -i "s/CHANGE_ME_TITLE/$domain/g" "$dir/index.html"
-	#subdomains
-	lineToAppend=""
-	if [ -f "$dir/subdomains/subdomains.txt" ]; then
-		cat $dir/subdomains/subdomains.txt | while read sub; do lineToAppend="$lineToAppend <li><a href='$sub'>$sub</a></li><br>" ; done
-	else
-		lineToAppend="<li><a href='\#'>No Subdomains Found For Target</a></li><br>"
-	fi
-	sed -i "s/CHANGE_ME_SUB_DOMAINS/$lineToAppend/g" "$dir/index.html"
-	#Screenshots
-	lineToAppend=""
-
-	#OSINT
-	lineToAppend=""
-	# @TODO concatinate dorks and links and create a table cia HTML
-	tmpDorks=$(cat $dir/osint/gitdorks.txt | grep git | cut -d'|'  -f 1 | cut -d'='  -f 2)
-	tmpLinks=$(cat $dir/osint/gitdorks.txt | grep git | cut -d'|'  -f 2)
 }
 
 function end(){
@@ -1778,7 +1755,7 @@ while getopts ":hd:-:l:m:x:i:varspxwo:" opt; do
 
 		## MODES
 
-		r ) if [ ! -z "$multi" ]
+		r ) if [ -n "$multi" ]
 			then
 				multi_recon
 				exit
