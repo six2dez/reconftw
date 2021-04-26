@@ -255,6 +255,7 @@ printf "${bblue} Running: Performing last configurations ${reset}\n\n"
 if [ ! -s "resolvers.txt" ] || [ $(find "resolvers.txt" -mtime +1 -print) ]; then
     printf "${yellow} Generating custom resolvers ${reset}\n\n"
     eval dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 100 -o resolvers.txt $DEBUG_STD
+    eval $SUDO mv $tools/trusted_resolvers.txt $tools/resolvers_trusted.txt
 fi
 eval h8mail -g $DEBUG_STD
 
