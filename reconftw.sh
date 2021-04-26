@@ -715,8 +715,8 @@ function portscan(){
 				echo "$sub $(dig +short a $sub | tail -n1)" | anew -q .tmp/subs_ips.txt
 			done
 			awk '{ print $2 " " $1}' .tmp/subs_ips.txt | sort -k2 -n | anew -q hosts/subs_ips_vhosts.txt
-			eval cat hosts/subs_ips_vhosts.txt $DEBUG_ERROR | cut -d ' ' -f1 | egrep -iv "^(127|10|169|172|192)\." | anew -q hosts/ips.txt
-			eval cat hosts/ips.txt $DEBUG_ERROR | cf-check | egrep -iv "^(127|10|169|172|192)\." | anew -q .tmp/ips_nowaf.txt
+			eval cat hosts/subs_ips_vhosts.txt $DEBUG_ERROR | cut -d ' ' -f1 | egrep -iv "^(127|10|169|172|192)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
+			eval cat hosts/ips.txt $DEBUG_ERROR | cf-check | egrep -iv "^(127|10|169|172|192)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q .tmp/ips_nowaf.txt
 			printf "${bblue}\n Resolved IP addresses (No WAF) ${reset}\n\n";
 			eval cat .tmp/ips_nowaf.txt $DEBUG_ERROR | sort
 

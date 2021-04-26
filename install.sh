@@ -243,12 +243,12 @@ eval wget -nc -O ~/.gf/potential.json https://raw.githubusercontent.com/devanshb
 eval wget -nc -O ~/.config/notify/notify.conf https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw/a66c4d8cf47a3bc95f5e9ba84773428662ea760c/notify_sample.conf $$DEBUG_STD
 eval wget -N -c https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py $DEBUG_STD
 eval wget -N -c https://wordlists-cdn.assetnote.io/data/manual/best-dns-wordlist.txt $DEBUG_STD && mv best-dns-wordlist.txt subdomains_big.txt
-eval wget -N -c -O trusted_resolvers.txt https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw $DEBUG_STD
+eval wget -N -c -O resolvers_trusted.txt https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw $DEBUG_STD
 eval wget -N -c -O subdomains.txt https://gist.github.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw $DEBUG_STD
 eval wget -N -c -O permutations_list.txt https://gist.github.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw $DEBUG_STD
 eval wget -N -c -O asyncio_ssrf.py https://gist.github.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw $DEBUG_STD && cp asyncio_ssrf.py ssrf.py
 eval wget -N -c https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD && cp onelistforallmicro.txt fuzz_wordlist.txt
-eval wget -N -c https://gist.githubusercontent.com/detonxx/a885ce7dd64a7139cb6f5b6860499ba8/raw $DEBUG_STD && cp dirTraversal-nix.txt lfi_wordlist.txt
+eval wget -N -c -O lfi_wordlist.txt https://gist.githubusercontent.com/detonxx/a885ce7dd64a7139cb6f5b6860499ba8/raw $DEBUG_STD
 
 printf "${bblue} Running: Performing last configurations ${reset}\n\n"
 ## Last steps
