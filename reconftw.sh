@@ -280,8 +280,9 @@ function subdomains_full(){
 	if [ "$update_resolvers" = true ]
 	then
 		if [[ $(find "$resolvers" -mtime +1 -print) ]]; then
-			notification "Updating resolvers lists..." warn
+			notification " Resolvers seem older than 1 day\n Generating custom resolvers..." warn
   			eval dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 100 -o $resolvers $DEBUG_STD
+			notification "Updated\n" good
   		fi
 	fi
 
@@ -320,10 +321,12 @@ function sub_passive(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]
 		then
 			start_subfunc "Running : Passive Subdomain Enumeration"
-			eval subfinder -d $domain -o .tmp/subfinder_psub.txt $DEBUG_STD
+			eval subfinder -d $domain -all -o .tmp/subfinder_psub.txt $DEBUG_STD
 			eval assetfinder --subs-only $domain $DEBUG_ERROR | anew -q .tmp/assetfinder_psub.txt
 			eval amass enum -passive -d $domain -config $AMASS_CONFIG -o .tmp/amass_psub.txt $DEBUG_STD
 			eval findomain --quiet -t $domain -u .tmp/findomain_psub.txt $DEBUG_STD
+			timeout 10m waybackurls $domain | unfurl --unique domains | anew -q .tmp/waybackurls_psub.txt
+			timeout 10m gauplus -t $GAUPLUS_THREADS -random-agent -subs $domain | unfurl --unique domains | anew -q .tmp/gau_psub.txt
 			eval crobat -s $domain $DEBUG_ERROR | anew -q .tmp/crobat_psub.txt
 			if [ -s "${GITHUB_TOKENS}" ];then
 				if [ "$DEEP" = true ] ; then
@@ -333,8 +336,6 @@ function sub_passive(){
 				fi
 			fi
 			eval curl -s "https://jldc.me/anubis/subdomains/${domain}" $DEBUG_ERROR | grep -Po "((http|https):\/\/)?(([\w.-]*)\.([\w]*)\.([A-z]))\w+" | sed '/^\./d' | anew -q .tmp/jldc_psub.txt
-			timeout 10m waybackurls $domain | unfurl --unique domains | anew -q .tmp/waybackurls_psub.txt
-			timeout 10m gauplus -t $GAUPLUS_THREADS -random-agent -subs $domain | unfurl --unique domains | anew -q .tmp/gau_psub.txt
 			if echo $domain | grep -q ".mil$"; then
 				mildew
 				mv mildew.out .tmp/mildew.out
@@ -407,7 +408,7 @@ function sub_brute(){
 			else
 				eval $tools/puredns/puredns bruteforce $subs_wordlist $domain -w .tmp/subs_brute.txt -r $resolvers -rt $resolvers_trusted -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
 			fi
-			NUMOFLINES=$(eval cat .tmp/subs_brute.txt $DEBUG_ERROR | sed "s/*.//" | grep "$domain$" | anew subdomains/subdomains.txt | wc -l)
+			NUMOFLINES=$(eval cat .tmp/subs_brute.txt $DEBUG_ERROR | sed "s/*.//" | grep ".$domain$" | anew subdomains/subdomains.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (bruteforce)" ${FUNCNAME[0]}
 		else
 			if [ "$SUBBRUTE" = false ]; then
@@ -425,7 +426,7 @@ function sub_scraping(){
 			touch .tmp/scrap_subs.txt
 			cat subdomains/subdomains.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
 			cat .tmp/probed_tmp_scrap.txt | httpx -csp-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
-			cat .tmp/probed_tmp_scrap.txt | httpx -tls-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
+			cat .tmp/probed_tmp_scrap.txt | httpx -tls-grab -tls-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
 			if [ "$DEEP" = true ] ; then
 				gospider -S .tmp/probed_tmp_scrap.txt --js -t $GOSPIDER_THREADS -d 3 --sitemap --robots -w -r > .tmp/gospider.txt
 			else
@@ -522,7 +523,6 @@ function sub_recursive(){
 				done
 				eval $tools/puredns/puredns resolve .tmp/brute_recursive_wordlist.txt -r $resolvers -rt $resolvers_trusted -lt $PUREDNS_TRUSTED_LIMIT -w .tmp/brute_recursive_result.txt $DEBUG_STD
 				cat .tmp/brute_recursive_result.txt | anew -q .tmp/brute_recursive.txt
-
 				eval DNScewl --tL .tmp/brute_recursive.txt -p $tools/permutations_list.txt --level=0 --subs --no-color $DEBUG_ERROR | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1_recursive.txt
 				eval $tools/puredns/puredns resolve .tmp/DNScewl1_recursive.txt -w .tmp/permute1_recursive_tmp.txt -r $resolvers -rt $resolvers_trusted -lt $PUREDNS_TRUSTED_LIMIT $DEBUG_STD
 				eval cat .tmp/permute1_recursive_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1_recursive.txt
@@ -588,7 +588,7 @@ function s3buckets(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$S3BUCKETS" = true ]
 		then
 			start_func "AWS S3 buckets search"
-			eval python3 $tools/S3Scanner/s3scanner.py subdomains/subdomains.txt -o .tmp/s3buckets.txt $DEBUG_STD
+			eval s3scanner subdomains/subdomains.txt -o .tmp/s3buckets.txt $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/s3buckets.txt $DEBUG_ERROR | anew subdomains/s3buckets.txt | wc -l)
 			if [ "$NUMOFLINES" -gt 0 ]; then
 				notification "${NUMOFLINES} new S3 buckets found" info
@@ -715,8 +715,8 @@ function portscan(){
 				echo "$sub $(dig +short a $sub | tail -n1)" | anew -q .tmp/subs_ips.txt
 			done
 			awk '{ print $2 " " $1}' .tmp/subs_ips.txt | sort -k2 -n | anew -q hosts/subs_ips_vhosts.txt
-			eval cat hosts/subs_ips_vhosts.txt $DEBUG_ERROR | cut -d ' ' -f1 | egrep -iv "^(127|10|169|172|192)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
-			eval cat hosts/ips.txt $DEBUG_ERROR | cf-check | egrep -iv "^(127|10|169|172|192)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q .tmp/ips_nowaf.txt
+			eval cat hosts/subs_ips_vhosts.txt $DEBUG_ERROR | cut -d ' ' -f1 | egrep -iv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
+			eval cat hosts/ips.txt $DEBUG_ERROR | cf-check | egrep -iv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q .tmp/ips_nowaf.txt
 			printf "${bblue}\n Resolved IP addresses (No WAF) ${reset}\n\n";
 			eval cat .tmp/ips_nowaf.txt $DEBUG_ERROR | sort
 
@@ -982,8 +982,8 @@ function jschecks(){
 			if [ -s "js/url_extract_js.txt" ]
 			then
 				printf "${yellow} Running : Fetching Urls 1/5${reset}\n"
-				cat js/url_extract_js.txt | cut -d '?' -f 1 | grep -iE "\.js$" | anew -q js/jsfile_links.txt
-				cat js/url_extract_js.txt | subjs | anew -q js/jsfile_links.txt
+				cat js/url_extract_js.txt | cut -d '?' -f 1 | grep -iE "\.js$" | grep "$domain$" | anew -q js/jsfile_links.txt
+				cat js/url_extract_js.txt | subjs | grep "$domain$" | anew -q js/jsfile_links.txt
 				printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
 				cat js/jsfile_links.txt | httpx -follow-redirects -random-agent -silent -timeout 15 -threads $HTTPX_THREADS -status-code -retries 2 -no-color | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
 				printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
@@ -993,7 +993,7 @@ function jschecks(){
 				fi
 				if [ -s ".tmp/js_endpoints.txt" ]
 				then
-					eval sed -i '/^\//!d' .tmp/js_endpoints.txt $DEBUG_STD
+					sed -i '/^\//!d' .tmp/js_endpoints.txt
 					cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt.txt
 				fi
 				printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
