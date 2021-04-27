@@ -44,3 +44,4 @@ awscli
 pytest-xdist
 coloredlogs
 boto3
+s3scanner
