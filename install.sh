@@ -52,7 +52,6 @@ repos["massdns"]="blechschmidt/massdns"
 repos["OpenRedireX"]="devanshbatham/OpenRedireX"
 repos["GitDorker"]="obheda12/GitDorker"
 repos["testssl"]="drwetter/testssl.sh"
-repos["S3Scanner"]="sa7mon/S3Scanner"
 repos["puredns"]="d3mondev/puredns"
 repos["ip2provider"]="oldrho/ip2provider"
 
@@ -253,7 +252,7 @@ eval wget -O lfi_wordlist.txt https://gist.githubusercontent.com/detonxx/a885ce7
 printf "${bblue} Running: Performing last configurations ${reset}\n\n"
 ## Last steps
 if [ ! -s "resolvers.txt" ] || [ $(find "resolvers.txt" -mtime +1 -print) ]; then
-    printf "${yellow} Resolvers seem older than 1 day.... Generating custom resolvers ${reset}\n\n"
+    printf "${yellow} Resolvers seem older than 1 day\n Generating custom resolvers... ${reset}\n\n"
     eval dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 100 -o resolvers.txt $DEBUG_STD
 fi
 eval h8mail -g $DEBUG_STD
