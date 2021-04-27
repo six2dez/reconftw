@@ -588,7 +588,7 @@ function s3buckets(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$S3BUCKETS" = true ]
 		then
 			start_func "AWS S3 buckets search"
-			eval s3scanner subdomains/subdomains.txt -o .tmp/s3buckets.txt $DEBUG_STD
+			eval s3scanner scan --buckets-file subdomains/subdomains.txt $DEBUG_ERROR | grep -iv "not_exist" | anew -q .tmp/s3buckets.txt
 			NUMOFLINES=$(eval cat .tmp/s3buckets.txt $DEBUG_ERROR | anew subdomains/s3buckets.txt | wc -l)
 			if [ "$NUMOFLINES" -gt 0 ]; then
 				notification "${NUMOFLINES} new S3 buckets found" info
