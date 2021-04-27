@@ -457,7 +457,7 @@ function sub_permut(){
 				eval axiom-scan subdomains/subdomains.txt -m dnscewl -o .tmp/DNScewl1_.txt $DEBUG_STD && cat .tmp/DNScewl1_.txt | grep ".$domain$" > .tmp/DNScewl1.txt
 				eval axiom-scan .tmp/DNScewl1.txt -m puredns-resolve -o .tmp/permute1_tmp.txt $DEBUG_STD
 				eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
-				eval axiom-scan .tmp/permute1.txt -m dnscewl -o .tmp/DNScewl2_.txt $DEBUG_STD && cat .tmp/DNScewl2_.txt | grep ".$domain$" > .tmp/DNScewl2.txt
+				eval axiom-scan .tmp/permute1.txt -m dnscewl -o .tmp/DNScewl2_.txt $DEBUG_STD && eval cat .tmp/DNScewl2_.txt $DEBUG_ERROR | grep ".$domain$" > .tmp/DNScewl2.txt
 				eval axiom-scan .tmp/DNScewl2.txt -m puredns-resolve -o .tmp/permute2_tmp.txt $DEBUG_STD
 				eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
 				eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
@@ -467,7 +467,7 @@ function sub_permut(){
 					eval axiom-scan .tmp/subs_no_resolved.txt -m dnscewl -o .tmp/DNScewl1_.txt $DEBUG_STD && cat .tmp/DNScewl1_.txt | grep ".$domain$" > .tmp/DNScewl1.txt
 					eval axiom-scan .tmp/DNScewl1.txt -m puredns-resolve -o .tmp/permute1_tmp.txt $DEBUG_STD
 					eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
-					eval axiom-scan .tmp/permute1.txt -m dnscewl -o .tmp/DNScewl2_.txt $DEBUG_STD && cat .tmp/DNScewl2_.txt | grep ".$domain$" > .tmp/DNScewl2.txt
+					eval axiom-scan .tmp/permute1.txt -m dnscewl -o .tmp/DNScewl2_.txt $DEBUG_STD && eval cat .tmp/DNScewl2_.txt $DEBUG_ERROR | grep ".$domain$" > .tmp/DNScewl2.txt
 					eval axiom-scan .tmp/DNScewl2.txt -m puredns-resolve -o .tmp/permute2_tmp.txt $DEBUG_STD
 					eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
 					eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
@@ -482,7 +482,7 @@ function sub_permut(){
 						eval axiom-scan subdomains/subdomains.txt -m dnscewl -o .tmp/DNScewl1_.txt $DEBUG_STD && cat .tmp/DNScewl1_.txt | grep ".$domain$" > .tmp/DNScewl1.txt
 						eval axiom-scan .tmp/DNScewl1.txt -m puredns-resolve -o .tmp/permute1_tmp.txt $DEBUG_STD
 						eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
-						eval axiom-scan .tmp/permute1.txt -m dnscewl -o .tmp/DNScewl2_.txt $DEBUG_STD && cat .tmp/DNScewl2_.txt | grep ".$domain$" > .tmp/DNScewl2.txt
+						eval axiom-scan .tmp/permute1.txt -m dnscewl -o .tmp/DNScewl2_.txt $DEBUG_STD && eval cat .tmp/DNScewl2_.txt $DEBUG_ERROR | grep ".$domain$" > .tmp/DNScewl2.txt
 						eval axiom-scan .tmp/DNScewl2.txt -m puredns-resolve -o .tmp/permute2_tmp.txt $DEBUG_STD
 						eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
 						eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
