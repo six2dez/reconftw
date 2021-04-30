@@ -376,9 +376,9 @@ function sub_active(){
 			fi
 			cat .tmp/*_subs.txt | anew -q .tmp/subs_no_resolved.txt
 			deleteOutScoped $outOfScope_file .tmp/subs_no_resolved.txt
-			eval axiom-scan .tmp/subs_no_resolved.txt -m puredns-resolve -o .tmp/subdomains_tmp.txt $DEBUG_STD
+			eval axiom-scan .tmp/subs_no_resolved.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/subdomains_tmp.txt $DEBUG_STD
 			echo $domain | eval dnsx -retry 3 -silent -r /home/op/recon/puredns/trusted.txt $DEBUG_ERROR | anew -q .tmp/subdomains_tmp.txt
-			NUMOFLINES=$(eval cat .tmp/subdomains_tmp.txt $DEBUG_ERROR | grep "$domain$" | anew subdomains/subdomains.txt | wc -l)
+			NUMOFLINES=$(eval cat .tmp/subdomains_tmp.txt $DEBUG_ERROR | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (active resolution)" ${FUNCNAME[0]}
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -391,8 +391,8 @@ function sub_dns(){
 			start_subfunc "Running : DNS Subdomain Enumeration"
 			eval axiom-scan subdomains/subdomains.txt -m dnsx -retry 3 -a -aaaa -cname -ns -ptr -mx -soa -resp -o subdomains/subdomains_cname.txt $DEBUG_STD
 			cat subdomains/subdomains_cname.txt | cut -d '[' -f2 | sed 's/.$//' | grep ".$domain$" | anew -q .tmp/subdomains_dns.txt
-			eval axiom-scan .tmp/subdomains_dns.txt -m puredns-resolve -o .tmp/subdomains_dns_resolved.txt $DEBUG_STD
-			NUMOFLINES=$(eval cat .tmp/subdomains_dns_resolved.txt $DEBUG_ERROR | grep "$domain$" | anew subdomains/subdomains.txt | wc -l)
+			eval axiom-scan .tmp/subdomains_dns.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/subdomains_dns_resolved.txt $DEBUG_STD
+			NUMOFLINES=$(eval cat .tmp/subdomains_dns_resolved.txt $DEBUG_ERROR | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (dns resolution)" ${FUNCNAME[0]}
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -404,11 +404,15 @@ function sub_brute(){
 		then
 			start_subfunc "Running : Bruteforce Subdomain Enumeration"
 			if [ "$DEEP" = true ] ; then
-				eval axiom-scan $subs_wordlist_big -m puredns-single $domain -o .tmp/subs_brute.txt $DEBUG_STD
+				eval axiom-scan $subs_wordlist_big -m puredns-single $domain -r /home/op/lists/resolvers.txt -o .tmp/subs_brute.txt $DEBUG_STD
 			else
-				eval axiom-scan $subs_wordlist -m puredns-single $domain -o .tmp/subs_brute.txt $DEBUG_STD
+				eval axiom-scan $subs_wordlist -m puredns-single $domain -r /home/op/lists/resolvers.txt -o .tmp/subs_brute.txt $DEBUG_STD
 			fi
-			NUMOFLINES=$(eval cat .tmp/subs_brute.txt $DEBUG_ERROR | sed "s/*.//" | grep ".$domain$" | anew subdomains/subdomains.txt | wc -l)
+			if [[ -s ".tmp/subs_brute.txt" ]]
+			then
+				eval axiom-scan .tmp/subs_brute.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/subs_brute_valid.txt $DEBUG_STD
+			fi
+			NUMOFLINES=$(eval cat .tmp/subs_brute_valid.txt $DEBUG_ERROR | sed "s/*.//" | grep ".$domain$" | anew subdomains/subdomains.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (bruteforce)" ${FUNCNAME[0]}
 		else
 			if [ "$SUBBRUTE" = false ]; then
@@ -434,8 +438,8 @@ function sub_scraping(){
 			fi
 			cat .tmp/gospider/* | sed '/^.\{2048\}./d' | anew -q .tmp/gospider.txt
 			cat .tmp/gospider.txt | egrep -o 'https?://[^ ]+' | sed 's/]$//' | unfurl --unique domains | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
-			eval axiom-scan .tmp/scrap_subs.txt -m puredns-resolve -o .tmp/scrap_subs_resolved.txt $DEBUG_STD
-			NUMOFLINES=$(eval cat .tmp/scrap_subs_resolved.txt $DEBUG_ERROR | grep "$domain$" | anew subdomains/subdomains.txt | tee .tmp/diff_scrap.txt | wc -l)
+			eval axiom-scan .tmp/scrap_subs.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/scrap_subs_resolved.txt $DEBUG_STD
+			NUMOFLINES=$(eval cat .tmp/scrap_subs_resolved.txt $DEBUG_ERROR | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | tee .tmp/diff_scrap.txt | wc -l)
 			eval axiom-scan .tmp/diff_scrap.txt -m httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap4.txt $DEBUG_STD && eval cat .tmp/probed_tmp_scrap4.txt $DEBUG_ERROR | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
 			end_subfunc "${NUMOFLINES} new subs (code scraping)" ${FUNCNAME[0]}
 		else
@@ -453,41 +457,41 @@ function sub_permut(){
 			start_subfunc "Running : Permutations Subdomain Enumeration"
 			if [ "$DEEP" = true ] ; then
 				eval axiom-scan subdomains/subdomains.txt -m dnscewl -o .tmp/DNScewl1_.txt $DEBUG_STD && cat .tmp/DNScewl1_.txt | grep ".$domain$" > .tmp/DNScewl1.txt
-				eval axiom-scan .tmp/DNScewl1.txt -m puredns-resolve -o .tmp/permute1_tmp.txt $DEBUG_STD
+				eval axiom-scan .tmp/DNScewl1.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute1_tmp.txt $DEBUG_STD
 				eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
 				eval axiom-scan .tmp/permute1.txt -m dnscewl -o .tmp/DNScewl2_.txt $DEBUG_STD && eval cat .tmp/DNScewl2_.txt $DEBUG_ERROR | grep ".$domain$" > .tmp/DNScewl2.txt
-				eval axiom-scan .tmp/DNScewl2.txt -m puredns-resolve -o .tmp/permute2_tmp.txt $DEBUG_STD
+				eval axiom-scan .tmp/DNScewl2.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute2_tmp.txt $DEBUG_STD
 				eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
 				eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 			else
 				if [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 100 ]]
 				then
 					eval axiom-scan .tmp/subs_no_resolved.txt -m dnscewl -o .tmp/DNScewl1_.txt $DEBUG_STD && cat .tmp/DNScewl1_.txt | grep ".$domain$" > .tmp/DNScewl1.txt
-					eval axiom-scan .tmp/DNScewl1.txt -m puredns-resolve -o .tmp/permute1_tmp.txt $DEBUG_STD
+					eval axiom-scan .tmp/DNScewl1.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute1_tmp.txt $DEBUG_STD
 					eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
 					eval axiom-scan .tmp/permute1.txt -m dnscewl -o .tmp/DNScewl2_.txt $DEBUG_STD && eval cat .tmp/DNScewl2_.txt $DEBUG_ERROR | grep ".$domain$" > .tmp/DNScewl2.txt
-					eval axiom-scan .tmp/DNScewl2.txt -m puredns-resolve -o .tmp/permute2_tmp.txt $DEBUG_STD
+					eval axiom-scan .tmp/DNScewl2.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute2_tmp.txt $DEBUG_STD
 					eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
 					eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 				elif [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 200 ]]
 		  		then
 		  			eval axiom-scan .tmp/subs_no_resolved.txt -m dnscewl -o .tmp/DNScewl1_.txt $DEBUG_STD && cat .tmp/DNScewl1_.txt | grep ".$domain$" > .tmp/DNScewl1.txt
-					eval axiom-scan .tmp/DNScewl1.txt -m puredns-resolve -o .tmp/permute_tmp.txt $DEBUG_STD
+					eval axiom-scan .tmp/DNScewl1.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute_tmp.txt $DEBUG_STD
 					eval cat .tmp/permute_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 				else
 					if [[ $(cat subdomains/subdomains.txt | wc -l) -le 100 ]]
 					then
 						eval axiom-scan subdomains/subdomains.txt -m dnscewl -o .tmp/DNScewl1_.txt $DEBUG_STD && cat .tmp/DNScewl1_.txt | grep ".$domain$" > .tmp/DNScewl1.txt
-						eval axiom-scan .tmp/DNScewl1.txt -m puredns-resolve -o .tmp/permute1_tmp.txt $DEBUG_STD
+						eval axiom-scan .tmp/DNScewl1.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute1_tmp.txt $DEBUG_STD
 						eval cat .tmp/permute1_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1.txt
 						eval axiom-scan .tmp/permute1.txt -m dnscewl -o .tmp/DNScewl2_.txt $DEBUG_STD && eval cat .tmp/DNScewl2_.txt $DEBUG_ERROR | grep ".$domain$" > .tmp/DNScewl2.txt
-						eval axiom-scan .tmp/DNScewl2.txt -m puredns-resolve -o .tmp/permute2_tmp.txt $DEBUG_STD
+						eval axiom-scan .tmp/DNScewl2.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute2_tmp.txt $DEBUG_STD
 						eval cat .tmp/permute2_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute2.txt
 						eval cat .tmp/permute1.txt .tmp/permute2.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 					elif [[ $(cat subdomains/subdomains.txt | wc -l) -le 200 ]]
 					then
 						eval axiom-scan subdomains/subdomains.txt -m dnscewl -o .tmp/DNScewl1_.txt $DEBUG_STD && cat .tmp/DNScewl1_.txt | grep ".$domain$" > .tmp/DNScewl1.txt
-						eval axiom-scan .tmp/DNScewl1.txt -m puredns-resolve -o .tmp/permute_tmp.txt $DEBUG_STD
+						eval axiom-scan .tmp/DNScewl1.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute_tmp.txt $DEBUG_STD
 						eval cat .tmp/permute_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_subs.txt
 					else
 						printf "\n${bred} Skipping Permutations: Too Much Subdomains${reset}\n\n"
@@ -521,16 +525,16 @@ function sub_recursive(){
 				for sub in $(cat subdomains/subdomains.txt); do
 					sed "s/$/.$sub/" $subs_wordlist >> .tmp/brute_recursive_wordlist.txt
 				done
-				eval axiom-scan .tmp/brute_recursive_wordlist.txt -m puredns-resolve -o .tmp/brute_recursive_result.txt $DEBUG_STD
+				eval axiom-scan .tmp/brute_recursive_wordlist.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/brute_recursive_result.txt $DEBUG_STD
 				cat .tmp/brute_recursive_result.txt | anew -q .tmp/brute_recursive.txt
 				eval axiom-scan .tmp/brute_recursive.txt -m dnscewl -o .tmp/DNScewl1_recursive_.txt $DEBUG_STD && eval cat .tmp/DNScewl1_recursive_.txt $DEBUG_ERROR | grep ".$domain$" > .tmp/DNScewl1_recursive.txt
-				eval axiom-scan .tmp/DNScewl1_recursive.txt -m puredns-resolve -o .tmp/permute1_recursive_tmp.txt $DEBUG_STD
+				eval axiom-scan .tmp/DNScewl1_recursive.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute1_recursive_tmp.txt $DEBUG_STD
 				eval cat .tmp/permute1_recursive_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute1_recursive.txt
 				eval axiom-scan .tmp/permute1_recursive.txt -m dnscewl -o .tmp/DNScewl2_recursive_.txt $DEBUG_STD && eval cat .tmp/DNScewl2_recursive_.txt $DEBUG_ERROR | grep ".$domain$" > .tmp/DNScewl2_recursive.txt
-				eval axiom-scan .tmp/DNScewl2_recursive.txt -m puredns-resolve -o .tmp/permute2_recursive_tmp.txt $DEBUG_STD
+				eval axiom-scan .tmp/DNScewl2_recursive.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute2_recursive_tmp.txt $DEBUG_STD
 				eval cat .tmp/permute1_recursive.txt .tmp/permute2_recursive_tmp.txt $DEBUG_ERROR | anew -q .tmp/permute_recursive.txt
 
-				NUMOFLINES=$(eval cat .tmp/permute_recursive.txt .tmp/brute_recursive.txt $DEBUG_ERROR | grep "$domain$" | anew subdomains/subdomains.txt | wc -l)
+				NUMOFLINES=$(eval cat .tmp/permute_recursive.txt .tmp/brute_recursive.txt $DEBUG_ERROR | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | wc -l)
 
 				end_subfunc "${NUMOFLINES} new subs (recursive)" ${FUNCNAME[0]}
 			else
@@ -640,7 +644,7 @@ function webprobe_full(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$WEBPROBEFULL" = true ]
 		then
 			start_func "Http probing non standard ports"
-			eval axiom-scan subdomains/subdomains.txt -m nmapx -p $UNCOMMON_PORTS_WEB --max-retries 2 -Pn -o .tmp/nmap_uncommonweb.txt $DEBUG_STD && uncommon_ports_checked=$(cat .tmp/nmap_uncommonweb.txt | egrep -v "^#|Status: Up" | cut -d' ' -f4- | sed -n -e 's/Ignored.*//p' | tr ',' '\n' | sed -e 's/^[ \t]*//' | sort -u | cut -d '/' -f1 | sed -e 'H;${x;s/\n/,/g;s/^,//;p;};d')
+			eval axiom-scan subdomains/subdomains.txt -m nmapx -p $UNCOMMON_PORTS_WEB --max-retries 2 -Pn -o .tmp/nmap_uncommonweb.txt $DEBUG_STD && uncommon_ports_checked=$(cat .tmp/nmap_uncommonweb.txt | egrep -v "^#|Status: Up" | cut -d' ' -f4- | sed -n -e 's/Ignored.*//p' | tr ',' '\n' | sed -e 's/^[ \t]*//' | sort -u | grep "open" | cut -d '/' -f1 | sed -e 'H;${x;s/\n/,/g;s/^,//;p;};d')
 			if [ -n "$uncommon_ports_checked" ]
 			then
 				eval axiom-scan subdomains/subdomains.txt -m httpx -ports $uncommon_ports_checked -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout 10 -silent -retries 2 -no-color -o .tmp/probed_uncommon_ports_tmp_.txt $DEBUG_STD && cat .tmp/probed_uncommon_ports_tmp_.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_uncommon_ports_tmp.txt
