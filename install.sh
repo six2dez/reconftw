@@ -28,6 +28,7 @@ gotools["gospider"]="go get -u github.com/jaeles-project/gospider"
 gotools["crobat"]="go get -v github.com/cgboal/sonarsearch/crobat"
 gotools["crlfuzz"]="GO111MODULE=on go get -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz"
 gotools["dalfox"]="GO111MODULE=on go get -v github.com/hahwul/dalfox/v2"
+gotools["puredns"]="GO111MODULE=on go get github.com/d3mondev/puredns/v2"
 
 declare -A repos
 repos["degoogle_hunter"]="six2dez/degoogle_hunter"
@@ -52,7 +53,6 @@ repos["massdns"]="blechschmidt/massdns"
 repos["OpenRedireX"]="devanshbatham/OpenRedireX"
 repos["GitDorker"]="obheda12/GitDorker"
 repos["testssl"]="drwetter/testssl.sh"
-repos["puredns"]="d3mondev/puredns"
 repos["ip2provider"]="oldrho/ip2provider"
 
 dir=${tools}

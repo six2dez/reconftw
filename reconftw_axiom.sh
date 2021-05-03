@@ -63,7 +63,6 @@ function tools_installed(){
 	[ -f $tools/LinkFinder/linkfinder.py ] || { printf "${bred} [*] LinkFinder	        [NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/GitDorker/GitDorker.py ] || { printf "${bred} [*] GitDorker	        [NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/degoogle_hunter/degoogle_hunter.sh ] || { printf "${bred} [*] degoogle_hunter	[NO]${reset}\n"; allinstalled=false;}
-	[ -f $tools/puredns/puredns ] || { printf "${bred} [*] puredns		[NO]${reset}\n"; allinstalled=false;}
 	[ -f $tools/getjswords.py ] || { printf "${bred} [*] getjswords   	[NO]${reset}\n"; allinstalled=false;}
 	eval type -P arjun $DEBUG_STD || { printf "${bred} [*] Arjun		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P dirdar $DEBUG_STD || { printf "${bred} [*] dirdar		[NO]${reset}\n"; allinstalled=false;}
@@ -100,6 +99,7 @@ function tools_installed(){
 	eval type -P jq $DEBUG_STD || { printf "${bred} [*] jq			[NO]${reset}\n${reset}"; allinstalled=false;}
 	eval type -P notify $DEBUG_STD || { printf "${bred} [*] notify		[NO]${reset}\n${reset}"; allinstalled=false;}
 	eval type -P dalfox $DEBUG_STD || { printf "${bred} [*] dalfox		[NO]${reset}\n${reset}"; allinstalled=false;}
+	eval type -P puredns $DEBUG_STD || { printf "${bred} [*] puredns		[NO]${reset}\n${reset}"; allinstalled=false;}
 	eval type -P axiom-ls $DEBUG_STD || { printf "${bred} [*] axiom		[NO]${reset}\n${reset}"; allinstalled=false;}
 
 	if [ "${allinstalled}" = true ] ; then
@@ -644,7 +644,7 @@ function webprobe_full(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$WEBPROBEFULL" = true ]
 		then
 			start_func "Http probing non standard ports"
-			eval axiom-scan subdomains/subdomains.txt -m nmapx -p $UNCOMMON_PORTS_WEB --max-retries 2 -Pn -o .tmp/nmap_uncommonweb.txt $DEBUG_STD && uncommon_ports_checked=$(cat .tmp/nmap_uncommonweb.txt | egrep -v "^#|Status: Up" | cut -d' ' -f4- | sed -n -e 's/Ignored.*//p' | tr ',' '\n' | sed -e 's/^[ \t]*//' | sort -u | grep "open" | cut -d '/' -f1 | sed -e 'H;${x;s/\n/,/g;s/^,//;p;};d')
+			eval axiom-scan subdomains/subdomains.txt -m naabu -p $UNCOMMON_PORTS_WEB -o .tmp/nmap_uncommonweb.txt $DEBUG_STD && uncommon_ports_checked=$(cat .tmp/nmap_uncommonweb.txt | cut -d ':' -f2 | sort -u | sed -e 'H;${x;s/\n/,/g;s/^,//;p;};d')
 			if [ -n "$uncommon_ports_checked" ]
 			then
 				eval axiom-scan subdomains/subdomains.txt -m httpx -ports $uncommon_ports_checked -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout 10 -silent -retries 2 -no-color -o .tmp/probed_uncommon_ports_tmp_.txt $DEBUG_STD && cat .tmp/probed_uncommon_ports_tmp_.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_uncommon_ports_tmp.txt
@@ -824,6 +824,7 @@ function fuzz(){
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
 				ffuf -mc all -fc 404 -ac -t $FFUF_THREADS -sf -s -H "${HEADER}" -w $fuzz_wordlist -maxtime 900 -u $sub/FUZZ -or -o $dir/fuzzing/${sub_out}.tmp &>/dev/null
 				eval cat $dir/fuzzing/${sub_out}.tmp $DEBUG_ERROR | jq '[.results[]|{status: .status, length: .length, url: .url}]' | grep -oP "status\":\s(\d{3})|length\":\s(\d{1,7})|url\":\s\"(http[s]?:\/\/.*?)\"" | paste -d' ' - - - | awk '{print $2" "$4" "$6}' | sed 's/\"//g' | sort |anew -q $dir/fuzzing/${sub_out}.txt
+				## FFuf csv parsing ---- file.csv | cut -d ',' -f2,5,6 | tr ',' ' ' | awk '{ print $2 " " $3 " " $1}' | tail -n +2 | sort -k1
 				eval rm $dir/fuzzing/${sub_out}.tmp $DEBUG_ERROR
 			done
 			end_func "Results are saved in fuzzing/*subdomain*.txt" ${FUNCNAME[0]}
