@@ -424,30 +424,34 @@ function sub_brute(){
 }
 
 function sub_scraping(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SUBSCRAPING" = true ]
-		then
-			start_subfunc "Running : Source code scraping subdomain search"
-			touch .tmp/scrap_subs.txt
-			eval axiom-scan subdomains/subdomains.txt -m httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap1.txt $DEBUG_STD && cat .tmp/probed_tmp_scrap1.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
-			eval axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -csp-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap2.txt $DEBUG_STD && cat .tmp/probed_tmp_scrap2.txt | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
-			eval axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -tls-grab -tls-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap3.txt $DEBUG_STD && cat .tmp/probed_tmp_scrap3.txt | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBSCRAPING" = true ]; then
+		start_subfunc "Running : Source code scraping subdomain search"
+		touch .tmp/scrap_subs.txt
+		if [ -s "$dir/subdomains/subdomains.txt" ]; then 
+			eval axiom-scan subdomains/subdomains.txt -m httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap1.txt $DEBUG_STD && cat .tmp/probed_tmp_scrap1.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
+			eval axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -csp-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap2.txt $DEBUG_STD && cat .tmp/probed_tmp_scrap2.txt | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
+			eval axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -tls-grab -tls-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap3.txt $DEBUG_STD && cat .tmp/probed_tmp_scrap3.txt | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
 			if [ "$DEEP" = true ] ; then
 				eval axiom-scan .tmp/probed_tmp_scrap.txt -m gospider --js -d 3 --sitemap --robots -w -r -o .tmp/gospider $DEBUG_STD
 			else
 				eval axiom-scan .tmp/probed_tmp_scrap.txt -m gospider --js -d 2 --sitemap --robots -w -r -o .tmp/gospider $DEBUG_STD
 			fi
-			cat .tmp/gospider/* | sed '/^.\{2048\}./d' | anew -q .tmp/gospider.txt
-			cat .tmp/gospider.txt | egrep -o 'https?://[^ ]+' | sed 's/]$//' | unfurl --unique domains | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
+			NUMFILES=$(find .tmp/gospider/ -type f | wc -l)
+			[[ $NUMFILES -gt 0 ]] && cat .tmp/gospider/* | sed '/^.\{2048\}./d' | anew -q .tmp/gospider.txt
+			grep -E -o 'https?://[^ ]+' .tmp/gospider.txt | sed 's/]$//' | unfurl --unique domains | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
 			eval axiom-scan .tmp/scrap_subs.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/scrap_subs_resolved.txt $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/scrap_subs_resolved.txt $DEBUG_ERROR | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | tee .tmp/diff_scrap.txt | wc -l)
-			eval axiom-scan .tmp/diff_scrap.txt -m httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap4.txt $DEBUG_STD && eval cat .tmp/probed_tmp_scrap4.txt $DEBUG_ERROR | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
+			eval axiom-scan .tmp/diff_scrap.txt -m httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap4.txt $DEBUG_STD && eval cat .tmp/probed_tmp_scrap4.txt $DEBUG_ERROR | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
 			end_subfunc "${NUMOFLINES} new subs (code scraping)" ${FUNCNAME[0]}
 		else
-			if [ "$SUBSCRAPING" = false ]; then
-				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
-			else
-				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
-			fi
+			end_subfunc "No subdomains to search (code scraping)" ${FUNCNAME[0]}
+		fi
+	else
+		if [ "$SUBSCRAPING" = false ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
 	fi
 }
 
@@ -838,29 +842,42 @@ function fuzz(){
 }
 
 function cms_scanner(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$CMS_SCANNER" = true ]
-		then
-			start_func "CMS Scanner"
-			mkdir -p $dir/cms && rm -rf $dir/cms/*
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$CMS_SCANNER" = true ]; then
+		start_func "CMS Scanner"
+		mkdir -p $dir/cms && rm -rf $dir/cms/*
+		if [ -s "./webs/webs.txt" ]; then
 			tr '\n' ',' < webs/webs.txt > .tmp/cms.txt
-			eval python3 $tools/CMSeeK/cmseek.py -l .tmp/cms.txt --batch -r $DEBUG_STD
+			eval timeout -k 30 $CMSSCAN_TIMEOUT python3 $tools/CMSeeK/cmseek.py -l .tmp/cms.txt --batch -r $DEBUG_STD
+			exit_status=$?
+			if [[ $exit_status -eq 125 ]]; then
+				echo "TIMEOUT cmseek.py - investigate manually for $dir" $DEBUG_STD
+				end_func "TIMEOUT cmseek.py - investigate manually for $dir" ${FUNCNAME[0]}
+				return
+			elif [[ $exit_status -ne 0 ]]; then
+				echo "ERROR cmseek.py - investigate manually for $dir" $DEBUG_STD
+				end_func "ERROR cmseek.py - investigate manually for $dir" ${FUNCNAME[0]}
+				return
+			fi	# otherwise Assume we have a successfully exited cmseek
+			
 			for sub in $(cat webs/webs.txt); do
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
 				cms_id=$(eval cat $tools/CMSeeK/Result/${sub_out}/cms.json $DEBUG_ERROR | jq -r '.cms_id')
-				if [ -z "$cms_id" ]
-				then
+				if [ -z "$cms_id" ]; then
 					rm -rf $tools/CMSeeK/Result/${sub_out}
 				else
 					mv -f $tools/CMSeeK/Result/${sub_out} $dir/cms/
 				fi
 			done
-			end_func "Results are saved in cms/*subdomain* folder" ${FUNCNAME[0]}
+			end_func "Results are saved in $domain/cms/*subdomain* folder" ${FUNCNAME[0]}
 		else
-			if [ "$CMS_SCANNER" = false ]; then
-				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
-			else
-				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
-			fi
+			end_func "No $domain/web/webs.txts file found, cms scanner skipped" ${FUNCNAME[0]}
+		fi
+	else
+		if [ "$CMS_SCANNER" = false ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
 	fi
 }
 
