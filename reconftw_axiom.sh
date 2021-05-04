@@ -807,25 +807,27 @@ function nuclei_check(){
 }
 
 function fuzz(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$FUZZ" = true ]
-		then
-			start_func "Web directory fuzzing"
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$FUZZ" = true ]; then
+		start_func "Web directory fuzzing"
+		if [ -s "./webs/webs.txt" ]; then
 			mkdir -p $dir/fuzzing
+			eval axiom-scan webs/webs.txt -m ffuf -H \'\"${HEADER}\"\' -wL $fuzz_wordlist -mc all -fc 404 -sf -s -maxtime $FFUF_MAXTIME -o $dir/fuzzing/ffuf-content.csv $DEBUG_STD
+			grep -v "FUZZ,url,redirectlocation" $dir/fuzzing/ffuf-content.csv | awk -F "," '{print $2" "$5" "$6}' | sort > $dir/fuzzing/ffuf-content.tmp
 			for sub in $(cat webs/webs.txt); do
-				printf "${yellow}\n\n Running: Fuzzing in ${sub}${reset}\n"
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-				ffuf -mc all -fc 404 -ac -t $FFUF_THREADS -sf -s -H "${HEADER}" -w $fuzz_wordlist -maxtime 900 -u $sub/FUZZ -or -o $dir/fuzzing/${sub_out}.tmp &>/dev/null
-				eval cat $dir/fuzzing/${sub_out}.tmp $DEBUG_ERROR | jq '[.results[]|{status: .status, length: .length, url: .url}]' | grep -oP "status\":\s(\d{3})|length\":\s(\d{1,7})|url\":\s\"(http[s]?:\/\/.*?)\"" | paste -d' ' - - - | awk '{print $2" "$4" "$6}' | sed 's/\"//g' | sort |anew -q $dir/fuzzing/${sub_out}.txt
-				## FFuf csv parsing ---- file.csv | cut -d ',' -f2,5,6 | tr ',' ' ' | awk '{ print $2 " " $3 " " $1}' | tail -n +2 | sort -k1
-				eval rm $dir/fuzzing/${sub_out}.tmp $DEBUG_ERROR
+				grep "$sub" $dir/fuzzing/ffuf-content.tmp | awk '{print $2" "$3" "$1}' > $dir/fuzzing/${sub_out}.txt
 			done
-			end_func "Results are saved in fuzzing/*subdomain*.txt" ${FUNCNAME[0]}
+			rm -f $dir/fuzzing/ffuf-content.tmp
+			end_func "Results are saved in $domain/fuzzing/*subdomain*.txt" ${FUNCNAME[0]}
 		else
-			if [ "$FUZZ" = false ]; then
-				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
-			else
-				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
-			fi
+			end_func "No $domain/web/webs.txts file found, fuzzing skipped " ${FUNCNAME[0]}
+		fi
+	else
+		if [ "$FUZZ" = false ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
 	fi
 }
 
