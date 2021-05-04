@@ -50,20 +50,20 @@ function tools_installed(){
 	[ -n "$GOPATH" ] || { printf "${bred} [*] GOPATH var		[NO]${reset}\n"; allinstalled=false;}
 	[ -n "$GOROOT" ] || { printf "${bred} [*] GOROOT var		[NO]${reset}\n"; allinstalled=false;}
 	[ -n "$PATH" ] || { printf "${bred} [*] PATH var		[NO]${reset}\n"; allinstalled=false;}
-	[ -f $tools/degoogle_hunter/degoogle.py ] || { printf "${bred} [*] degoogle		[NO]${reset}\n"; allinstalled=false;}
-	[ -f $tools/ParamSpider/paramspider.py ] || { printf "${bred} [*] Paramspider	[NO]${reset}\n"; allinstalled=false;}
-	[ -f $tools/brutespray/brutespray.py ] || { printf "${bred} [*] brutespray	[NO]${reset}\n"; allinstalled=false;}
-	[ -f $tools/dnsrecon/dnsrecon.py ] || { printf "${bred} [*] dnsrecon	[NO]${reset}\n"; allinstalled=false;}
-	[ -f $tools/fav-up/favUp.py ] || { printf "${bred} [*] fav-up		[NO]${reset}\n"; allinstalled=false;}
-	[ -f $tools/Corsy/corsy.py ] || { printf "${bred} [*] Corsy		[NO]${reset}\n"; allinstalled=false;}
-	[ -f $tools/testssl.sh/testssl.sh ] || { printf "${bred} [*] testssl		[NO]${reset}\n"; allinstalled=false;}
-	[ -f $tools/CMSeeK/cmseek.py ] || { printf "${bred} [*] CMSeeK		[NO]${reset}\n"; allinstalled=false;}
-	[ -f $tools/ctfr/ctfr.py ] || { printf "${bred} [*] ctfr		[NO]${reset}\n"; allinstalled=false;}
-	[ -f $tools/fuzz_wordlist.txt ] || { printf "${bred} [*] OneListForAll	[NO]${reset}\n"; allinstalled=false;}
-	[ -f $tools/LinkFinder/linkfinder.py ] || { printf "${bred} [*] LinkFinder	        [NO]${reset}\n"; allinstalled=false;}
-	[ -f $tools/GitDorker/GitDorker.py ] || { printf "${bred} [*] GitDorker	        [NO]${reset}\n"; allinstalled=false;}
-	[ -f $tools/degoogle_hunter/degoogle_hunter.sh ] || { printf "${bred} [*] degoogle_hunter	[NO]${reset}\n"; allinstalled=false;}
-	[ -f $tools/getjswords.py ] || { printf "${bred} [*] getjswords   	[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/degoogle_hunter/degoogle.py" ] || { printf "${bred} [*] degoogle		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/ParamSpider/paramspider.py" ] || { printf "${bred} [*] Paramspider	[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/brutespray/brutespray.py" ] || { printf "${bred} [*] brutespray	[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/dnsrecon/dnsrecon.py" ] || { printf "${bred} [*] dnsrecon	[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/fav-up/favUp.py" ] || { printf "${bred} [*] fav-up		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/Corsy/corsy.py" ] || { printf "${bred} [*] Corsy		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/testssl.sh/testssl.sh" ] || { printf "${bred} [*] testssl		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/CMSeeK/cmseek.py" ] || { printf "${bred} [*] CMSeeK		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/ctfr/ctfr.py" ] || { printf "${bred} [*] ctfr		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/fuzz_wordlist.txt" ] || { printf "${bred} [*] OneListForAll	[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/LinkFinder/linkfinder.py" ] || { printf "${bred} [*] LinkFinder	        [NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/GitDorker/GitDorker.py" ] || { printf "${bred} [*] GitDorker	        [NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/degoogle_hunter/degoogle_hunter.sh" ] || { printf "${bred} [*] degoogle_hunter	[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/getjswords.py" ] || { printf "${bred} [*] getjswords   	[NO]${reset}\n"; allinstalled=false;}
 	eval type -P arjun $DEBUG_STD || { printf "${bred} [*] Arjun		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P dirdar $DEBUG_STD || { printf "${bred} [*] dirdar		[NO]${reset}\n"; allinstalled=false;}
 	eval type -P github-endpoints $DEBUG_STD || { printf "${bred} [*] github-endpoints	[NO]${reset}\n"; allinstalled=false;}
@@ -120,12 +120,11 @@ function tools_installed(){
 ###############################################################################################################
 
 function google_dorks(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$GOOGLE_DORKS" = true ] && [ "$OSINT" = true ]
-	then
+	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$GOOGLE_DORKS" = true ] && [ "$OSINT" = true ]; then
 		start_func "Google Dorks in process"
 		$tools/degoogle_hunter/degoogle_hunter.sh $domain | tee osint/dorks.txt
 		sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" osint/dorks.txt
-		end_func "Results are saved in osint/dorks.txt" ${FUNCNAME[0]}
+		end_func "Results are saved in $domain/osint/dorks.txt" ${FUNCNAME[0]}
 	else
 		if [ "$GOOGLE_DORKS" = false ] || [ "$OSINT" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -136,126 +135,122 @@ function google_dorks(){
 }
 
 function github_dorks(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$GITHUB_DORKS" = true ] && [ "$OSINT" = true ]
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$GITHUB_DORKS" = true ] && [ "$OSINT" = true ]; then
+		start_func "Github Dorks in process"
+		if [ -s "${GITHUB_TOKENS}" ]
 		then
-			start_func "Github Dorks in process"
-			if [ -s "${GITHUB_TOKENS}" ]
-			then
-				if [ "$DEEP" = true ] ; then
-					eval python3 $tools/GitDorker/GitDorker.py -tf ${GITHUB_TOKENS} -e $GITDORKER_THREADS -q $domain -p -d $tools/GitDorker/Dorks/alldorksv3 | grep "\[+\]" | grep "git" | anew -q osint/gitdorks.txt $DEBUG_STD
-				else
-					eval python3 $tools/GitDorker/GitDorker.py -tf ${GITHUB_TOKENS} -e $GITDORKER_THREADS -q $domain -p -d $tools/GitDorker/Dorks/medium_dorks.txt | grep "\[+\]" | grep "git" | anew -q osint/gitdorks.txt $DEBUG_STD
-				fi
-				sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" osint/gitdorks.txt
+			if [ "$DEEP" = true ] ; then
+				eval python3 "$tools/GitDorker/GitDorker.py" -tf "${GITHUB_TOKENS}" -e "$GITDORKER_THREADS" -q "$domain" -p -d "$tools/GitDorker/Dorks/alldorksv3" | grep "\[+\]" | grep "git" | anew -q osint/gitdorks.txt $DEBUG_STD
 			else
-				printf "\n${bred} Required file ${GITHUB_TOKENS} not exists or empty${reset}\n"
+				eval python3 "$tools/GitDorker/GitDorker.py" -tf "${GITHUB_TOKENS}" -e "$GITDORKER_THREADS" -q "$domain" -p -d "$tools/GitDorker/Dorks/medium_dorks.txt" | grep "\[+\]" | grep "git" | anew -q osint/gitdorks.txt $DEBUG_STD
 			fi
-			end_func "Results are saved in osint/gitdorks.txt" ${FUNCNAME[0]}
+			sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" osint/gitdorks.txt
 		else
-			if [ "$GITHUB_DORKS" = false ] || [ "$OSINT" = false ]; then
-				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
-			else
-				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
-			fi
+			printf "\n${bred} Required file ${GITHUB_TOKENS} not exists or empty${reset}\n"
+		fi
+		end_func "Results are saved in $domain/osint/gitdorks.txt" ${FUNCNAME[0]}
+	else
+		if [ "$GITHUB_DORKS" = false ] || [ "$OSINT" = false ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
 	fi
 }
 
 function metadata(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$METADATA" = true ] && [ "$OSINT" = true ]
-		then
-			start_func "Scanning metadata in public files"
-			eval metafinder -d $domain -l 20 -o osint -go -bi -ba $DEBUG_STD
-			eval mv osint/${domain}/* osint/ $DEBUG_ERROR
-			eval rmdir osint/${domain} $DEBUG_ERROR
-			end_func "Results are saved in osint/[software/authors/metadata_results].txt" ${FUNCNAME[0]}
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$METADATA" = true ] && [ "$OSINT" = true ]; then
+		start_func "Scanning metadata in public files"
+		eval metafinder -d "$domain" -l 20 -o osint -go -bi -ba $DEBUG_STD
+		eval mv "osint/${domain}/*" "osint/" $DEBUG_ERROR
+		eval rmdir "osint/${domain}" $DEBUG_ERROR
+		end_func "Results are saved in $domain/osint/[software/authors/metadata_results].txt" ${FUNCNAME[0]}
+	else
+		if [ "$METADATA" = false ] || [ "$OSINT" = false ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			if [ "$METADATA" = false ] || [ "$OSINT" = false ]; then
-				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
-			else
-				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
-			fi
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
 	fi
 }
 
 function emails(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$EMAILS" = true ] && [ "$OSINT" = true ]
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$EMAILS" = true ] && [ "$OSINT" = true ]; then
+		start_func "Searching emails/users/passwords leaks"
+		cd "$tools/theHarvester" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+		eval python3 theHarvester.py -d $domain -b all $DEBUG_ERROR > $dir/.tmp/harvester.txt
+		cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+		cat .tmp/harvester.txt | awk '/Emails/,/Hosts/' | sed -e '1,2d' | head -n -2 | sed -e '/Searching /d' -e '/exception has occurred/d' -e '/found:/Q' | anew -q osint/emails.txt
+		cat .tmp/harvester.txt | awk '/Users/,/IPs/' | sed -e '1,2d' | head -n -2 | sed -e '/Searching /d' -e '/exception has occurred/d' -e '/found:/Q' | anew -q osint/users.txt
+		cat .tmp/harvester.txt | awk '/Links/,/Users/' | sed -e '1,2d' | head -n -2 | sed -e '/Searching /d' -e '/exception has occurred/d' -e '/found:/Q' | anew -q osint/linkedin.txt
+
+		eval h8mail -t $domain -q domain --loose -c $tools/h8mail_config.ini -j .tmp/h8_results.json $DEBUG_STD
+		if [ -s ".tmp/h8_results.json" ]
 		then
-			start_func "Searching emails/users/passwords leaks"
-			cd $tools/theHarvester
-			eval python3 theHarvester.py -d $domain -b all $DEBUG_ERROR > $dir/.tmp/harvester.txt
-			cd $dir
-			cat .tmp/harvester.txt | awk '/Emails/,/Hosts/' | sed -e '1,2d' | head -n -2 | sed -e '/Searching /d' -e '/exception has occurred/d' -e '/found:/Q' | anew -q osint/emails.txt
-			cat .tmp/harvester.txt | awk '/Users/,/IPs/' | sed -e '1,2d' | head -n -2 | sed -e '/Searching /d' -e '/exception has occurred/d' -e '/found:/Q' | anew -q osint/users.txt
-			cat .tmp/harvester.txt | awk '/Links/,/Users/' | sed -e '1,2d' | head -n -2 | sed -e '/Searching /d' -e '/exception has occurred/d' -e '/found:/Q' | anew -q osint/linkedin.txt
+			cat .tmp/h8_results.json | jq -r '.targets[0] | .data[] | .[]' | cut -d '-' -f2 | anew -q osint/h8mail.txt
+		fi
 
-			eval h8mail -t $domain -q domain --loose -c $tools/h8mail_config.ini -j .tmp/h8_results.json $DEBUG_STD
-			if [ -s ".tmp/h8_results.json" ]
-			then
-				cat .tmp/h8_results.json | jq -r '.targets[0] | .data[] | .[]' | cut -d '-' -f2 | anew -q osint/h8mail.txt
-			fi
+		PWNDB_STATUS=$(timeout 15s curl -Is --socks5-hostname localhost:9050 http://pwndb2am4tzkvold.onion | grep HTTP | cut -d ' ' -f2)
 
-			PWNDB_STATUS=$(timeout 15s curl -Is --socks5-hostname localhost:9050 http://pwndb2am4tzkvold.onion | grep HTTP | cut -d ' ' -f2)
-
-			if [ "$PWNDB_STATUS" = 200 ]
-			then
-				cd $tools/pwndb
-				python3 pwndb.py --target "@${domain}" | sed '/^[-]/d' | anew -q $dir/osint/passwords.txt
-				cd $dir
-				sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" osint/passwords.txt
-			else
-				text="${yellow}\n pwndb is currently down :(\n\n Check xjypo5vzgmo7jca6b322dnqbsdnp3amd24ybx26x5nxbusccjkm4pwid.onion${reset}\n"
-				printf "${text}" && printf "${text}" | $NOTIFY
-			fi
-			end_func "Results are saved in osint/[emails/users/h8mail/passwords].txt" ${FUNCNAME[0]}
+		if [ "$PWNDB_STATUS" = 200 ]
+		then
+			cd "$tools/pwndb" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+			python3 pwndb.py --target "@${domain}" | sed '/^[-]/d' | anew -q $dir/osint/passwords.txt
+			cd "$dir" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+			sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" osint/passwords.txt
 		else
-			if [ "$EMAILS" = false ] || [ "$OSINT" = false ]; then
-				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
-			else
-				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
-			fi
+			text="${yellow}\n pwndb is currently down :(\n\n Check xjypo5vzgmo7jca6b322dnqbsdnp3amd24ybx26x5nxbusccjkm4pwid.onion${reset}\n"
+			printf "${text}" && printf "${text}" | $NOTIFY
+		fi
+		end_func "Results are saved in $domain/osint/[emails/users/h8mail/passwords].txt" ${FUNCNAME[0]}
+	else
+		if [ "$EMAILS" = false ] || [ "$OSINT" = false ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
 
 	fi
 }
 
 function domain_info(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$DOMAIN_INFO" = true ] && [ "$OSINT" = true ]
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$DOMAIN_INFO" = true ] && [ "$OSINT" = true ]; then
+		start_func "Searching domain info (whois, registrant name/email domains)"
+		lynx -dump "https://domainbigdata.com/${domain}" | tail -n +19 > osint/domain_info_general.txt
+
+		cat osint/domain_info_general.txt | grep '/nj/' | tr -s ' ' ',' | cut -d ',' -f3 > .tmp/domain_registrant_name.txt
+		cat osint/domain_info_general.txt | grep '/mj/' | tr -s ' ' ',' | cut -d ',' -f3 > .tmp/domain_registrant_email.txt
+		cat osint/domain_info_general.txt | grep -E "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | grep "https://domainbigdata.com" | tr -s ' ' ',' | cut -d ',' -f3 > .tmp/domain_registrant_ip.txt
+
+		sed -i -n '/Copyright/q;p' osint/domain_info_general.txt
+
+		if [ -s ".tmp/domain_registrant_name.txt" ]
 		then
-			start_func "Searching domain info (whois, registrant name/email domains)"
-			lynx -dump https://domainbigdata.com/${domain} | tail -n +19 > osint/domain_info_general.txt
+			for line in $(cat .tmp/domain_registrant_name.txt); do
+				lynx -dump $line | tail -n +18 | sed -n '/]domainbigdata.com/q;p' >> osint/domain_info_name.txt && echo -e "\n\n#######################################################################\n\n" >> osint/domain_info_name.txt
+			done
+		fi
 
-			cat osint/domain_info_general.txt | grep '/nj/' | tr -s ' ' ',' | cut -d ',' -f3 > .tmp/domain_registrant_name.txt
-			cat osint/domain_info_general.txt | grep '/mj/' | tr -s ' ' ',' | cut -d ',' -f3 > .tmp/domain_registrant_email.txt
-			cat osint/domain_info_general.txt | grep -E "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | grep "https://domainbigdata.com" | tr -s ' ' ',' | cut -d ',' -f3 > .tmp/domain_registrant_ip.txt
+		if [ -s ".tmp/domain_registrant_email.txt" ]
+		then
+			for line in $(cat .tmp/domain_registrant_email.txt); do
+				lynx -dump $line | tail -n +18 | sed -n '/]domainbigdata.com/q;p'  >> osint/domain_info_email.txt && echo -e "\n\n#######################################################################\n\n" >> osint/domain_info_email.txt
+			done
+		fi
 
-			sed -i -n '/Copyright/q;p' osint/domain_info_general.txt
-
-			if [ -s ".tmp/domain_registrant_name.txt" ]
-			then
-				for line in $(cat .tmp/domain_registrant_name.txt); do
-					lynx -dump $line | tail -n +18 | sed -n '/]domainbigdata.com/q;p' >> osint/domain_info_name.txt && echo -e "\n\n#######################################################################\n\n" >> osint/domain_info_name.txt
-				done
-			fi
-
-			if [ -s ".tmp/domain_registrant_email.txt" ]
-			then
-				for line in $(cat .tmp/domain_registrant_email.txt); do
-					lynx -dump $line | tail -n +18 | sed -n '/]domainbigdata.com/q;p'  >> osint/domain_info_email.txt && echo -e "\n\n#######################################################################\n\n" >> osint/domain_info_email.txt
-				done
-			fi
-
-			if [ -s ".tmp/domain_registrant_ip.txt" ]
-			then
-				for line in $(cat .tmp/domain_registrant_ip.txt); do
-					lynx -dump $line | tail -n +18 | sed -n '/]domainbigdata.com/q;p'  >> osint/domain_info_ip.txt && echo -e "\n\n#######################################################################\n\n" >> osint/domain_info_ip.txt
-				done
-			fi
-			end_func "Results are saved in osint/domain_info_[general/name/email/ip].txt" ${FUNCNAME[0]}
+		if [ -s ".tmp/domain_registrant_ip.txt" ]
+		then
+			for line in $(cat .tmp/domain_registrant_ip.txt); do
+				lynx -dump $line | tail -n +18 | sed -n '/]domainbigdata.com/q;p'  >> osint/domain_info_ip.txt && echo -e "\n\n#######################################################################\n\n" >> osint/domain_info_ip.txt
+			done
+		fi
+		end_func "Results are saved in $domain/osint/domain_info_[general/name/email/ip].txt" ${FUNCNAME[0]}
+	else
+		if [ "$DOMAIN_INFO" = false ] || [ "$OSINT" = false ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			if [ "$DOMAIN_INFO" = false ] || [ "$OSINT" = false ]; then
-				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
-			else
-				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
-			fi
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
 	fi
 }
 
@@ -268,22 +263,15 @@ function subdomains_full(){
 	NUMOFLINES_subs="0"
 	NUMOFLINES_probed="0"
 	printf "${bgreen}#######################################################################\n\n"
-	printf "${bblue} Subdomain Enumeration\n\n"
-	if [ -f "subdomains/subdomains.txt" ]
-	then
+	printf "${bblue} Subdomain Enumeration $domain\n\n"
+	if [ -f "subdomains/subdomains.txt" ]; then
 		eval cp subdomains/subdomains.txt .tmp/subdomains_old.txt $DEBUG_ERROR
 	fi
-	if [ -f "webs/webs.txt" ]
-	then
+	if [ -f "webs/webs.txt" ]; then
 		eval cp webs/webs.txt .tmp/probed_old.txt $DEBUG_ERROR
 	fi
 
-	if [ "$update_resolvers" = true ]
-	then
-		notification "Checking resolvers lists...\n Accurate resolvers are the key to great results\n This may take around 10 minutes if it's not updated" warn
-		axiom-exec 'if [ \$(find "/home/op/lists/resolvers.txt" -mtime +1 -print) ] || [ \$(cat /home/op/lists/resolvers.txt | wc -l) -le 40 ] ; then dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 200 -o /home/op/lists/resolvers.txt ; cp /home/op/lists/resolvers.txt /home/op/recon/puredns/resolvers.txt; fi' &>/dev/null
-		notification "Updated\n" good
-	fi
+	resolvers_update
 
 	sub_passive
 	sub_crt
@@ -308,9 +296,9 @@ function subdomains_full(){
 	fi
 	printf "${bblue}\n Total subdomains: ${reset}\n\n"
 	notification "- ${NUMOFLINES_subs} new alive subdomains" good
-	eval cat subdomains/subdomains.txt $DEBUG_ERROR | sort
+	[ -f "subdomains/subdomains.txt" ] && eval cat subdomains/subdomains.txt $DEBUG_ERROR | sort
 	notification "- ${NUMOFLINES_probed} new web probed" good
-	eval cat webs/webs.txt $DEBUG_ERROR | sort
+	[ -f "webs/webs.txt" ] && eval cat webs/webs.txt $DEBUG_ERROR | sort
 	notification "Subdomain Enumeration Finished" good
 	printf "${bblue} Results are saved in subdomains/subdomains.txt and webs/webs.txt${reset}\n"
 	printf "${bgreen}#######################################################################\n\n"
@@ -424,30 +412,34 @@ function sub_brute(){
 }
 
 function sub_scraping(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SUBSCRAPING" = true ]
-		then
-			start_subfunc "Running : Source code scraping subdomain search"
-			touch .tmp/scrap_subs.txt
-			eval axiom-scan subdomains/subdomains.txt -m httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap1.txt $DEBUG_STD && cat .tmp/probed_tmp_scrap1.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
-			eval axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -csp-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap2.txt $DEBUG_STD && cat .tmp/probed_tmp_scrap2.txt | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
-			eval axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -tls-grab -tls-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap3.txt $DEBUG_STD && cat .tmp/probed_tmp_scrap3.txt | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBSCRAPING" = true ]; then
+		start_subfunc "Running : Source code scraping subdomain search"
+		touch .tmp/scrap_subs.txt
+		if [ -s "$dir/subdomains/subdomains.txt" ]; then 
+			eval axiom-scan subdomains/subdomains.txt -m httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap1.txt $DEBUG_STD && cat .tmp/probed_tmp_scrap1.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
+			eval axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -csp-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap2.txt $DEBUG_STD && cat .tmp/probed_tmp_scrap2.txt | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
+			eval axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -tls-grab -tls-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap3.txt $DEBUG_STD && cat .tmp/probed_tmp_scrap3.txt | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
 			if [ "$DEEP" = true ] ; then
 				eval axiom-scan .tmp/probed_tmp_scrap.txt -m gospider --js -d 3 --sitemap --robots -w -r -o .tmp/gospider $DEBUG_STD
 			else
 				eval axiom-scan .tmp/probed_tmp_scrap.txt -m gospider --js -d 2 --sitemap --robots -w -r -o .tmp/gospider $DEBUG_STD
 			fi
-			cat .tmp/gospider/* | sed '/^.\{2048\}./d' | anew -q .tmp/gospider.txt
-			cat .tmp/gospider.txt | egrep -o 'https?://[^ ]+' | sed 's/]$//' | unfurl --unique domains | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
+			NUMFILES=$(find .tmp/gospider/ -type f | wc -l)
+			[[ $NUMFILES -gt 0 ]] && cat .tmp/gospider/* | sed '/^.\{2048\}./d' | anew -q .tmp/gospider.txt
+			grep -E -o 'https?://[^ ]+' .tmp/gospider.txt | sed 's/]$//' | unfurl --unique domains | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
 			eval axiom-scan .tmp/scrap_subs.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/scrap_subs_resolved.txt $DEBUG_STD
 			NUMOFLINES=$(eval cat .tmp/scrap_subs_resolved.txt $DEBUG_ERROR | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | tee .tmp/diff_scrap.txt | wc -l)
-			eval axiom-scan .tmp/diff_scrap.txt -m httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap4.txt $DEBUG_STD && eval cat .tmp/probed_tmp_scrap4.txt $DEBUG_ERROR | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
+			eval axiom-scan .tmp/diff_scrap.txt -m httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap4.txt $DEBUG_STD && eval cat .tmp/probed_tmp_scrap4.txt $DEBUG_ERROR | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
 			end_subfunc "${NUMOFLINES} new subs (code scraping)" ${FUNCNAME[0]}
 		else
-			if [ "$SUBSCRAPING" = false ]; then
-				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
-			else
-				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
-			fi
+			end_subfunc "No subdomains to search (code scraping)" ${FUNCNAME[0]}
+		fi
+	else
+		if [ "$SUBSCRAPING" = false ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
 	fi
 }
 
@@ -815,52 +807,67 @@ function nuclei_check(){
 }
 
 function fuzz(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$FUZZ" = true ]
-		then
-			start_func "Web directory fuzzing"
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$FUZZ" = true ]; then
+		start_func "Web directory fuzzing"
+		if [ -s "./webs/webs.txt" ]; then
 			mkdir -p $dir/fuzzing
+			eval axiom-scan webs/webs.txt -m ffuf -H \'\"${HEADER}\"\' -wL $fuzz_wordlist -mc all -fc 404 -sf -s -maxtime $FFUF_MAXTIME -o $dir/fuzzing/ffuf-content.csv $DEBUG_STD
+			grep -v "FUZZ,url,redirectlocation" $dir/fuzzing/ffuf-content.csv | awk -F "," '{print $2" "$5" "$6}' | sort > $dir/fuzzing/ffuf-content.tmp
 			for sub in $(cat webs/webs.txt); do
-				printf "${yellow}\n\n Running: Fuzzing in ${sub}${reset}\n"
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-				ffuf -mc all -fc 404 -ac -t $FFUF_THREADS -sf -s -H "${HEADER}" -w $fuzz_wordlist -maxtime 900 -u $sub/FUZZ -or -o $dir/fuzzing/${sub_out}.tmp &>/dev/null
-				eval cat $dir/fuzzing/${sub_out}.tmp $DEBUG_ERROR | jq '[.results[]|{status: .status, length: .length, url: .url}]' | grep -oP "status\":\s(\d{3})|length\":\s(\d{1,7})|url\":\s\"(http[s]?:\/\/.*?)\"" | paste -d' ' - - - | awk '{print $2" "$4" "$6}' | sed 's/\"//g' | sort |anew -q $dir/fuzzing/${sub_out}.txt
-				## FFuf csv parsing ---- file.csv | cut -d ',' -f2,5,6 | tr ',' ' ' | awk '{ print $2 " " $3 " " $1}' | tail -n +2 | sort -k1
-				eval rm $dir/fuzzing/${sub_out}.tmp $DEBUG_ERROR
+				grep "$sub" $dir/fuzzing/ffuf-content.tmp | awk '{print $2" "$3" "$1}' > $dir/fuzzing/${sub_out}.txt
 			done
-			end_func "Results are saved in fuzzing/*subdomain*.txt" ${FUNCNAME[0]}
+			rm -f $dir/fuzzing/ffuf-content.tmp
+			end_func "Results are saved in $domain/fuzzing/*subdomain*.txt" ${FUNCNAME[0]}
 		else
-			if [ "$FUZZ" = false ]; then
-				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
-			else
-				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
-			fi
+			end_func "No $domain/web/webs.txts file found, fuzzing skipped " ${FUNCNAME[0]}
+		fi
+	else
+		if [ "$FUZZ" = false ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
 	fi
 }
 
 function cms_scanner(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$CMS_SCANNER" = true ]
-		then
-			start_func "CMS Scanner"
-			mkdir -p $dir/cms && rm -rf $dir/cms/*
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$CMS_SCANNER" = true ]; then
+		start_func "CMS Scanner"
+		mkdir -p $dir/cms && rm -rf $dir/cms/*
+		if [ -s "./webs/webs.txt" ]; then
 			tr '\n' ',' < webs/webs.txt > .tmp/cms.txt
-			eval python3 $tools/CMSeeK/cmseek.py -l .tmp/cms.txt --batch -r $DEBUG_STD
+			eval timeout -k 30 $CMSSCAN_TIMEOUT python3 $tools/CMSeeK/cmseek.py -l .tmp/cms.txt --batch -r $DEBUG_STD
+			exit_status=$?
+			if [[ $exit_status -eq 125 ]]; then
+				echo "TIMEOUT cmseek.py - investigate manually for $dir" $DEBUG_STD
+				end_func "TIMEOUT cmseek.py - investigate manually for $dir" ${FUNCNAME[0]}
+				return
+			elif [[ $exit_status -ne 0 ]]; then
+				echo "ERROR cmseek.py - investigate manually for $dir" $DEBUG_STD
+				end_func "ERROR cmseek.py - investigate manually for $dir" ${FUNCNAME[0]}
+				return
+			fi	# otherwise Assume we have a successfully exited cmseek
+			
 			for sub in $(cat webs/webs.txt); do
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
 				cms_id=$(eval cat $tools/CMSeeK/Result/${sub_out}/cms.json $DEBUG_ERROR | jq -r '.cms_id')
-				if [ -z "$cms_id" ]
-				then
+				if [ -z "$cms_id" ]; then
 					rm -rf $tools/CMSeeK/Result/${sub_out}
 				else
 					mv -f $tools/CMSeeK/Result/${sub_out} $dir/cms/
 				fi
 			done
-			end_func "Results are saved in cms/*subdomain* folder" ${FUNCNAME[0]}
+			end_func "Results are saved in $domain/cms/*subdomain* folder" ${FUNCNAME[0]}
 		else
-			if [ "$CMS_SCANNER" = false ]; then
-				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
-			else
-				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
-			fi
+			end_func "No $domain/web/webs.txts file found, cms scanner skipped" ${FUNCNAME[0]}
+		fi
+	else
+		if [ "$CMS_SCANNER" = false ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
 	fi
 }
 
@@ -1403,12 +1410,12 @@ function notification(){
 function start_func(){
 	printf "${bgreen}#######################################################################"
 	notification "${1}" info
-	start=`date +%s`
+	start=$(date +%s)
 }
 
 function end_func(){
 	touch $called_fn_dir/.${2}
-	end=`date +%s`
+	end=$(date +%s)
 	getElapsedTime $start $end
 	notification "${2} Finished in ${runtime}" info
 	printf "${bblue} ${1} ${reset}\n"
@@ -1417,21 +1424,30 @@ function end_func(){
 
 function start_subfunc(){
 	notification "${1}" warn
-	start_sub=`date +%s`
+	start_sub=$(date +%s)
 }
 
 function end_subfunc(){
 	touch $called_fn_dir/.${2}
-	end_sub=`date +%s`
+	end_sub=$(date +%s)
 	getElapsedTime $start_sub $end_sub
 	notification "${1} in ${runtime}" good
 }
 
+function resolvers_update(){
+	if [ "$update_resolvers" = true ]; then
+		notification "Checking resolvers lists...\n Accurate resolvers are the key to great results\n This may take around 10 minutes if it's not updated" warn
+		# shellcheck disable=SC2016
+		axiom-exec 'if [ \$(find "/home/op/lists/resolvers.txt" -mtime +1 -print) ] || [ \$(cat /home/op/lists/resolvers.txt | wc -l) -le 40 ] ; then dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 200 -o /home/op/lists/resolvers.txt ; cp /home/op/lists/resolvers.txt /home/op/recon/puredns/resolvers.txt; fi' &>/dev/null
+		notification "Updated\n" good
+	fi
+}
+
 function start(){
 
-	global_start=`date +%s`
+	global_start=$(date +%s)
 
-	if [ "$NOTIFICATION" = true ] ; then
+	if [ "$NOTIFICATION" = true ]; then
 		NOTIFY="notify -silent"
 	else
 	    NOTIFY=""
@@ -1583,16 +1599,15 @@ function recon(){
 function multi_recon(){
 
 
-	global_start=`date +%s`
+	global_start=$(date +%s)
 
-	if [ "$NOTIFICATION" = true ] ; then
+	if [ "$NOTIFICATION" = true ]; then
 		NOTIFY="notify -silent"
 	else
 	    NOTIFY=""
 	fi
 
-	if [ -s "$list" ]
-	then
+	if [ -s "$list" ]; then
 		targets=$(cat $list)
 	else
 		notification "Target list not provided" error
@@ -1600,7 +1615,8 @@ function multi_recon(){
 	fi
 
 	workdir=$SCRIPTPATH/Recon/$multi
-	mkdir -p $workdir && cd $workdir
+	mkdir -p $workdir  || { echo "Failed to create directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 	mkdir -p .tmp .called_fn osint subdomains webs hosts vulns
 
 	if [[ ! $(cat ~/.axiom/selected.conf | sed '/^\s*$/d' | wc -l) -gt 0 ]]
@@ -1613,31 +1629,31 @@ function multi_recon(){
 		dir=$workdir/targets/$domain
 		called_fn_dir=$dir/.called_fn
 		mkdir -p $dir
-		cd $dir
+		cd "$dir"  || { echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		mkdir -p .tmp .called_fn osint subdomains webs hosts vulns
 		domain_info
 		emails
 		google_dorks
 		github_dorks
 		metadata
+		zonetransfer
+		favicon
 		subdomains_full
 		subtakeover
-		zonetransfer
 		webprobe_full
 		screenshot
-		favicon
 	done
-	cd $workdir
+	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 
 	notification "############################# Total data ############################" info
-	NUMOFLINES_users_total=$(find . -type f -name 'users.txt' -exec cat {} + | anew -q osint/users.txt | wc -l)
-	NUMOFLINES_pwndb_total=$(find . -type f -name 'passwords.txt' -exec cat {} + | anew -q osint/passwords.txt | wc -l)
-	NUMOFLINES_software_total=$(find . -type f -name 'software.txt' -exec cat {} + | anew -q osint/software.txt | wc -l)
-	NUMOFLINES_authors_total=$(find . -type f -name 'authors.txt' -exec cat {} + | anew -q osint/authors.txt | wc -l)
-	NUMOFLINES_subs_total=$(find . -type f -name 'subdomains.txt' -exec cat {} + | anew -q subdomains/subdomains.txt | wc -l)
-	NUMOFLINES_subtko_total=$(find . -type f -name 'takeover.txt' -exec cat {} + | anew -q webs/takeover.txt | wc -l)
-	NUMOFLINES_webs_total=$(find . -type f -name 'webs.txt' -exec cat {} + | anew -q webs/webs.txt | wc -l)
-	NUMOFLINES_webs_total=$(find . -type f -name 'webs_uncommon_ports.txt' -exec cat {} + | anew -q webs/webs_uncommon_ports.txt | wc -l)
+	NUMOFLINES_users_total=$(find . -type f -name 'users.txt' -exec cat {} + | anew osint/users.txt | wc -l)
+	NUMOFLINES_pwndb_total=$(find . -type f -name 'passwords.txt' -exec cat {} + | anew osint/passwords.txt | wc -l)
+	NUMOFLINES_software_total=$(find . -type f -name 'software.txt' -exec cat {} + | anew osint/software.txt | wc -l)
+	NUMOFLINES_authors_total=$(find . -type f -name 'authors.txt' -exec cat {} + | anew osint/authors.txt | wc -l)
+	NUMOFLINES_subs_total=$(find . -type f -name 'subdomains.txt' -exec cat {} + | anew subdomains/subdomains.txt | wc -l)
+	NUMOFLINES_subtko_total=$(find . -type f -name 'takeover.txt' -exec cat {} + | anew webs/takeover.txt | wc -l)
+	NUMOFLINES_webs_total=$(find . -type f -name 'webs.txt' -exec cat {} + | anew webs/webs.txt | wc -l)
+	NUMOFLINES_webs_total=$(find . -type f -name 'webs_uncommon_ports.txt' -exec cat {} + | anew webs/webs_uncommon_ports.txt | wc -l)
 
 	notification "- ${NUMOFLINES_users_total} total users found" good
 	notification "- ${NUMOFLINES_pwndb_total} total creds leaked" good
@@ -1654,7 +1670,8 @@ function multi_recon(){
 	nuclei_check
 	for domain in $targets; do
 		dir=$workdir/targets/$domain
-		cd $dir
+        called_fn_dir=$dir/.called_fn 
+		cd "$dir" || { echo "Failed to cd directory '$kdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		cms_scanner
 		fuzz
 		params
@@ -1663,7 +1680,9 @@ function multi_recon(){
 		jschecks
 		wordlist_gen
 	done
-	cd $workdir
+
+
+	cd "$workdir" || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 	dir=$workdir
 	domain=$multi
 	end
