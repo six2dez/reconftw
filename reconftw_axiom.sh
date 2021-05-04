@@ -1600,16 +1600,15 @@ function recon(){
 function multi_recon(){
 
 
-	global_start=`date +%s`
+	global_start=$(date +%s)
 
-	if [ "$NOTIFICATION" = true ] ; then
+	if [ "$NOTIFICATION" = true ]; then
 		NOTIFY="notify -silent"
 	else
 	    NOTIFY=""
 	fi
 
-	if [ -s "$list" ]
-	then
+	if [ -s "$list" ]; then
 		targets=$(cat $list)
 	else
 		notification "Target list not provided" error
@@ -1617,7 +1616,8 @@ function multi_recon(){
 	fi
 
 	workdir=$SCRIPTPATH/Recon/$multi
-	mkdir -p $workdir && cd $workdir
+	mkdir -p $workdir  || { echo "Failed to create directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 	mkdir -p .tmp .called_fn osint subdomains webs hosts vulns
 
 	if [[ ! $(cat ~/.axiom/selected.conf | sed '/^\s*$/d' | wc -l) -gt 0 ]]
@@ -1630,31 +1630,31 @@ function multi_recon(){
 		dir=$workdir/targets/$domain
 		called_fn_dir=$dir/.called_fn
 		mkdir -p $dir
-		cd $dir
+		cd "$dir"  || { echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		mkdir -p .tmp .called_fn osint subdomains webs hosts vulns
 		domain_info
 		emails
 		google_dorks
 		github_dorks
 		metadata
+		zonetransfer
+		favicon
 		subdomains_full
 		subtakeover
-		zonetransfer
 		webprobe_full
 		screenshot
-		favicon
 	done
-	cd $workdir
+	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 
 	notification "############################# Total data ############################" info
-	NUMOFLINES_users_total=$(find . -type f -name 'users.txt' -exec cat {} + | anew -q osint/users.txt | wc -l)
-	NUMOFLINES_pwndb_total=$(find . -type f -name 'passwords.txt' -exec cat {} + | anew -q osint/passwords.txt | wc -l)
-	NUMOFLINES_software_total=$(find . -type f -name 'software.txt' -exec cat {} + | anew -q osint/software.txt | wc -l)
-	NUMOFLINES_authors_total=$(find . -type f -name 'authors.txt' -exec cat {} + | anew -q osint/authors.txt | wc -l)
-	NUMOFLINES_subs_total=$(find . -type f -name 'subdomains.txt' -exec cat {} + | anew -q subdomains/subdomains.txt | wc -l)
-	NUMOFLINES_subtko_total=$(find . -type f -name 'takeover.txt' -exec cat {} + | anew -q webs/takeover.txt | wc -l)
-	NUMOFLINES_webs_total=$(find . -type f -name 'webs.txt' -exec cat {} + | anew -q webs/webs.txt | wc -l)
-	NUMOFLINES_webs_total=$(find . -type f -name 'webs_uncommon_ports.txt' -exec cat {} + | anew -q webs/webs_uncommon_ports.txt | wc -l)
+	NUMOFLINES_users_total=$(find . -type f -name 'users.txt' -exec cat {} + | anew osint/users.txt | wc -l)
+	NUMOFLINES_pwndb_total=$(find . -type f -name 'passwords.txt' -exec cat {} + | anew osint/passwords.txt | wc -l)
+	NUMOFLINES_software_total=$(find . -type f -name 'software.txt' -exec cat {} + | anew osint/software.txt | wc -l)
+	NUMOFLINES_authors_total=$(find . -type f -name 'authors.txt' -exec cat {} + | anew osint/authors.txt | wc -l)
+	NUMOFLINES_subs_total=$(find . -type f -name 'subdomains.txt' -exec cat {} + | anew subdomains/subdomains.txt | wc -l)
+	NUMOFLINES_subtko_total=$(find . -type f -name 'takeover.txt' -exec cat {} + | anew webs/takeover.txt | wc -l)
+	NUMOFLINES_webs_total=$(find . -type f -name 'webs.txt' -exec cat {} + | anew webs/webs.txt | wc -l)
+	NUMOFLINES_webs_total=$(find . -type f -name 'webs_uncommon_ports.txt' -exec cat {} + | anew webs/webs_uncommon_ports.txt | wc -l)
 
 	notification "- ${NUMOFLINES_users_total} total users found" good
 	notification "- ${NUMOFLINES_pwndb_total} total creds leaked" good
@@ -1671,7 +1671,8 @@ function multi_recon(){
 	nuclei_check
 	for domain in $targets; do
 		dir=$workdir/targets/$domain
-		cd $dir
+        called_fn_dir=$dir/.called_fn 
+		cd "$dir" || { echo "Failed to cd directory '$kdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		cms_scanner
 		fuzz
 		params
@@ -1680,7 +1681,9 @@ function multi_recon(){
 		jschecks
 		wordlist_gen
 	done
-	cd $workdir
+
+
+	cd "$workdir" || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 	dir=$workdir
 	domain=$multi
 	end
