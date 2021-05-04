@@ -1408,7 +1408,7 @@ function notification(){
 function start_func(){
 	printf "${bgreen}#######################################################################"
 	notification "${1}" info
-	start=`date +%s`
+	start=$(date +%s)
 }
 
 function end_func(){
@@ -1443,9 +1443,9 @@ function resolvers_update(){
 
 function start(){
 
-	global_start=`date +%s`
+	global_start=$(date +%s)
 
-	if [ "$NOTIFICATION" = true ] ; then
+	if [ "$NOTIFICATION" = true ]; then
 		NOTIFY="notify -silent"
 	else
 	    NOTIFY=""
