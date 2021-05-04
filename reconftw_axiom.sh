@@ -263,22 +263,15 @@ function subdomains_full(){
 	NUMOFLINES_subs="0"
 	NUMOFLINES_probed="0"
 	printf "${bgreen}#######################################################################\n\n"
-	printf "${bblue} Subdomain Enumeration\n\n"
-	if [ -f "subdomains/subdomains.txt" ]
-	then
+	printf "${bblue} Subdomain Enumeration $domain\n\n"
+	if [ -f "subdomains/subdomains.txt" ]; then
 		eval cp subdomains/subdomains.txt .tmp/subdomains_old.txt $DEBUG_ERROR
 	fi
-	if [ -f "webs/webs.txt" ]
-	then
+	if [ -f "webs/webs.txt" ]; then
 		eval cp webs/webs.txt .tmp/probed_old.txt $DEBUG_ERROR
 	fi
 
-	if [ "$update_resolvers" = true ]
-	then
-		notification "Checking resolvers lists...\n Accurate resolvers are the key to great results\n This may take around 10 minutes if it's not updated" warn
-		axiom-exec 'if [ \$(find "/home/op/lists/resolvers.txt" -mtime +1 -print) ] || [ \$(cat /home/op/lists/resolvers.txt | wc -l) -le 40 ] ; then dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 200 -o /home/op/lists/resolvers.txt ; cp /home/op/lists/resolvers.txt /home/op/recon/puredns/resolvers.txt; fi' &>/dev/null
-		notification "Updated\n" good
-	fi
+	resolvers_update
 
 	sub_passive
 	sub_crt
@@ -303,9 +296,9 @@ function subdomains_full(){
 	fi
 	printf "${bblue}\n Total subdomains: ${reset}\n\n"
 	notification "- ${NUMOFLINES_subs} new alive subdomains" good
-	eval cat subdomains/subdomains.txt $DEBUG_ERROR | sort
+	[ -f "subdomains/subdomains.txt" ] && eval cat subdomains/subdomains.txt $DEBUG_ERROR | sort
 	notification "- ${NUMOFLINES_probed} new web probed" good
-	eval cat webs/webs.txt $DEBUG_ERROR | sort
+	[ -f "webs/webs.txt" ] && eval cat webs/webs.txt $DEBUG_ERROR | sort
 	notification "Subdomain Enumeration Finished" good
 	printf "${bblue} Results are saved in subdomains/subdomains.txt and webs/webs.txt${reset}\n"
 	printf "${bgreen}#######################################################################\n\n"
@@ -1420,7 +1413,7 @@ function start_func(){
 
 function end_func(){
 	touch $called_fn_dir/.${2}
-	end=`date +%s`
+	end=$(date +%s)
 	getElapsedTime $start $end
 	notification "${2} Finished in ${runtime}" info
 	printf "${bblue} ${1} ${reset}\n"
@@ -1429,14 +1422,23 @@ function end_func(){
 
 function start_subfunc(){
 	notification "${1}" warn
-	start_sub=`date +%s`
+	start_sub=$(date +%s)
 }
 
 function end_subfunc(){
 	touch $called_fn_dir/.${2}
-	end_sub=`date +%s`
+	end_sub=$(date +%s)
 	getElapsedTime $start_sub $end_sub
 	notification "${1} in ${runtime}" good
+}
+
+function resolvers_update(){
+	if [ "$update_resolvers" = true ]; then
+		notification "Checking resolvers lists...\n Accurate resolvers are the key to great results\n This may take around 10 minutes if it's not updated" warn
+		# shellcheck disable=SC2016
+		axiom-exec 'if [ \$(find "/home/op/lists/resolvers.txt" -mtime +1 -print) ] || [ \$(cat /home/op/lists/resolvers.txt | wc -l) -le 40 ] ; then dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 200 -o /home/op/lists/resolvers.txt ; cp /home/op/lists/resolvers.txt /home/op/recon/puredns/resolvers.txt; fi' &>/dev/null
+		notification "Updated\n" good
+	fi
 }
 
 function start(){
