@@ -667,7 +667,7 @@ function favicon(){
 }
 
 function portscan(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$PORTSCANNER" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$PORTSCANNER" = true ]; then
 		start_func "Port scan"
 		for sub in $(cat subdomains/subdomains.txt); do
 			echo "$sub $(dig +short a $sub | tail -n1)" | anew -q .tmp/subs_ips.txt
@@ -697,11 +697,11 @@ function portscan(){
 }
 
 function cloudprovider(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$CLOUD_IP" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$CLOUD_IP" = true ]; then
 		start_func "Cloud provider check"
-		cd $tools/ip2provider
+		cd "$tools/ip2provider" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		eval cat $dir/hosts/ips.txt | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | ./ip2provider.py | anew -q $dir/hosts/cloud_providers.txt $DEBUG_STD
-		cd $dir
+		cd "$dir" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		end_func "Results are saved in hosts/cloud_providers.txt" ${FUNCNAME[0]}
 	else
 		if [ "$CLOUD_IP" = false ]; then
@@ -717,7 +717,7 @@ function cloudprovider(){
 ###############################################################################################################
 
 function waf_checks(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$WAF_DETECTION" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$WAF_DETECTION" = true ]; then
 		start_func "Website's WAF detection"
 		eval axiom-scan webs/webs.txt -m wafw00f -o .tmp/wafs.txt $DEBUG_STD
 		cat .tmp/wafs.txt | sed -e 's/^[ \t]*//' -e 's/ \+ /\t/g' -e '/(None)/d' | tr -s "\t" ";" > webs/webs_wafs.txt
@@ -734,7 +734,7 @@ function waf_checks(){
 }
 
 function nuclei_check(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$NUCLEICHECK" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$NUCLEICHECK" = true ]; then
 		start_func "Templates based web scanner"
 		eval nuclei -update-templates $DEBUG_STD
 		mkdir -p nuclei_output
@@ -749,7 +749,7 @@ function nuclei_check(){
 		printf "${yellow}\n\n Running : Nuclei Critical${reset}\n\n"
 		eval axiom-scan webs/webs.txt -m nuclei -severity critical -r /home/op/recon/puredns/trusted.txt -o nuclei_output/critical.txt $DEBUG_STD
 		printf "\n\n"
-		end_func "Results are saved in nuclei_output folder" ${FUNCNAME[0]}
+		end_func "Results are saved in $domain/nuclei_output folder" ${FUNCNAME[0]}
 	else
 		if [ "$NUCLEICHECK" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -995,7 +995,7 @@ function wordlist_gen(){
 ###############################################################################################################
 
 function brokenLinks(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$BROKENLINKS" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$BROKENLINKS" = true ] ; then
 		start_func "Broken links checks"
 		if [ ! -s ".tmp/gospider.txt" ]; then
 			if [ "$DEEP" = true ]; then
@@ -1019,7 +1019,7 @@ function brokenLinks(){
 }
 
 function xss(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$XSS" = true ] && [ -s "gf/xss.txt" ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$XSS" = true ] && [ -s "gf/xss.txt" ]; then
 		start_func "XSS Analysis"
 		cat gf/xss.txt | qsreplace FUZZ | Gxss -c 100 -p Xss | anew -q .tmp/xss_reflected.txt
 		if [ "$DEEP" = true ]; then
@@ -1054,7 +1054,7 @@ function xss(){
 }
 
 function cors(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$CORS" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$CORS" = true ]; then
 		start_func "CORS Scan"
 		eval python3 $tools/Corsy/corsy.py -i webs/webs.txt > webs/cors.txt $DEBUG_STD
 		eval cat webs/cors.txt $DEBUG_ERROR
@@ -1069,7 +1069,7 @@ function cors(){
 }
 
 function open_redirect(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$OPEN_REDIRECT" = true ] && [ -s "gf/redirect.txt" ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$OPEN_REDIRECT" = true ] && [ -s "gf/redirect.txt" ]; then
 		start_func "Open redirects checks"
 		if [ "$DEEP" = true ]; then
 			cat gf/redirect.txt | qsreplace FUZZ | anew -q .tmp/tmp_redirect.txt
@@ -1099,7 +1099,7 @@ function open_redirect(){
 }
 
 function ssrf_checks(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SSRF_CHECKS" = true ] && [ -s "gf/ssrf.txt" ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SSRF_CHECKS" = true ] && [ -s "gf/ssrf.txt" ]; then
 		if [ -n "$COLLAB_SERVER" ]; then
 			start_func "SSRF checks"
 			if [ "$DEEP" = true ]; then
@@ -1144,7 +1144,7 @@ function ssrf_checks(){
 }
 
 function crlf_checks(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$CRLF_CHECKS" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$CRLF_CHECKS" = true ]; then
 		start_func "CRLF checks"
 		eval crlfuzz -l webs/webs.txt -o vulns/crlf.txt $DEBUG_STD
 		end_func "Results are saved in vulns/crlf.txt" ${FUNCNAME[0]}
@@ -1158,7 +1158,7 @@ function crlf_checks(){
 }
 
 function lfi(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$LFI" = true ] && [ -s "gf/lfi.txt" ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$LFI" = true ] && [ -s "gf/lfi.txt" ]; then
 		start_func "LFI checks"
 		cat gf/lfi.txt | qsreplace FUZZ | anew -q .tmp/tmp_lfi.txt
 		for url in $(cat .tmp/tmp_lfi.txt); do
@@ -1177,7 +1177,7 @@ function lfi(){
 }
 
 function ssti(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SSTI" = true ] && [ -s "gf/ssti.txt" ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SSTI" = true ] && [ -s "gf/ssti.txt" ]; then
 		start_func "SSTI checks"
 		cat gf/ssti.txt | qsreplace "ssti{{7*7}}" | anew -q .tmp/ssti_fuzz.txt
 		ffuf -v -mc 200 -t $FFUF_THREADS -H "${HEADER}" -w .tmp/ssti_fuzz.txt -u FUZZ -mr "ssti49" &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssti.txt
@@ -1196,7 +1196,7 @@ function ssti(){
 }
 
 function sqli(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SQLI" = true ] && [ -s "gf/sqli.txt" ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SQLI" = true ] && [ -s "gf/sqli.txt" ]; then
 		start_func "SQLi checks"
 		cat gf/sqli.txt | qsreplace FUZZ | anew -q .tmp/tmp_sqli.txt
 		interlace -tL .tmp/tmp_sqli.txt -threads 10 -c "python3 $tools/sqlmap/sqlmap.py -u _target_ -b --batch --disable-coloring --random-agent --output-dir=sqlmap" &>/dev/null
@@ -1213,7 +1213,7 @@ function sqli(){
 }
 
 function test_ssl(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$TEST_SSL" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$TEST_SSL" = true ]; then
 		start_func "SSL Test"
 		eval $tools/testssl.sh/testssl.sh --quiet --color 0 -U -iL hosts/ips.txt $DEBUG_ERROR > hosts/testssl.txt
 		end_func "Results are saved in hosts/testssl.txt" ${FUNCNAME[0]}
@@ -1227,11 +1227,11 @@ function test_ssl(){
 }
 
 function spraying(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$SPRAY" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SPRAY" = true ]; then
 		start_func "Password spraying"
-		cd $tools/brutespray
+		cd "$tools/brutespray" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		eval python3 brutespray.py --file $dir/hosts/portscan_active.txt --threads $BRUTESPRAY_THREADS --hosts $BRUTESPRAY_CONCURRENCE -o $dir/hosts/brutespray.txt $DEBUG_STD
-		cd $dir
+		cd "$dir" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		end_func "Results are saved in hosts/brutespray.txt" ${FUNCNAME[0]}
 	else
 		if [ "$SPRAY" = false ]; then
@@ -1243,7 +1243,7 @@ function spraying(){
 }
 
 function 4xxbypass(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$BYPASSER4XX" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$BYPASSER4XX" = true ]; then
 		start_func "403 bypass"
 		eval cat fuzzing/*.txt $DEBUG_ERROR | egrep '^4' | egrep -v '^404' | cut -d ' ' -f3 | dirdar -only-ok > .tmp/dirdar.txt
 		eval cat .tmp/dirdar.txt  $DEBUG_ERROR | sed -e '1,12d' | sed '/^$/d' | anew -q vulns/4xxbypass.txt
@@ -1379,7 +1379,7 @@ function start(){
 		if [ -n "$list" ]; then
 			if [ -z "$domain" ]; then
 				domain="Multi"
-				dir=$SCRIPTPATH/Recon/$domain
+				dir="$SCRIPTPATH/Recon/$domain"
 				called_fn_dir=$dir/.called_fn
 			fi
 			if [[ "$list" = /* ]]; then
@@ -1389,7 +1389,7 @@ function start(){
 			fi
 		fi
 	else
-		dir=$SCRIPTPATH/Recon/$domain
+		dir="$SCRIPTPATH/Recon/$domain"
 		called_fn_dir=$dir/.called_fn
 	fi
 
