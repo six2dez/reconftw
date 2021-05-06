@@ -394,7 +394,7 @@ function sub_scraping(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBSCRAPING" = true ]; then
 		start_subfunc "Running : Source code scraping subdomain search"
 		touch .tmp/scrap_subs.txt
-		if [ -s "$dir/subdomains/subdomains.txt" ]; then 
+		if [ -s "$dir/subdomains/subdomains.txt" ]; then
 			cat subdomains/subdomains.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
 			cat .tmp/probed_tmp_scrap.txt | httpx -csp-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
 			cat .tmp/probed_tmp_scrap.txt | httpx -tls-grab -tls-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
@@ -1282,6 +1282,17 @@ function getElapsedTime {
 	runtime="$runtime$S seconds."
 }
 
+function zipSnedOutputFolder {
+	zip_name=`date +"%Y_%m_%d-%H.%M.%S"`
+	zip_name="$zip_name"_"$domain.zip"
+	cd $SCRIPTPATH && zip -r $zip_name $dir 1>>"$LOGFILE"
+	if [ -f "$SCRIPTPATH/$zip_name" ]; then
+		printf "\n${yellow}  @TODO send it ${reset}\n"
+	else
+		printf "\n${yellow} no Zip file to send ${reset}\n"
+	fi
+}
+
 function isAsciiText {
 	IS_ASCII="False";
 	if [[ $(file $1 | grep -o 'ASCII text$') == "ASCII text" ]]; then
@@ -1426,6 +1437,8 @@ function end(){
 	else
 		finaldir=$dir
 	fi
+	#Zip the output folder and send it via tg/discord/slack
+	zipSnedOutputFolder
 	global_end=$(date +%s)
 	getElapsedTime $global_start $global_end
 	printf "${bgreen}#######################################################################${reset}\n"
