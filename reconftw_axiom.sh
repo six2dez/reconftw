@@ -627,7 +627,7 @@ function screenshot(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$WEBSCREENSHOT" = true ]; then
 		start_func "Web Screenshots"
 		cat webs/webs.txt webs/webs_uncommon_ports.txt 2>>"$LOGFILE" | anew -q .tmp/webs_screenshots.txt
-		axiom-scan .tmp/webs_screenshots.txt -m gowitness -o screenshots &>>"$LOGFILE"
+		axiom-scan .tmp/webs_screenshots.txt -m "$AXIOM_SCREENSHOT_MODULE" -o screenshots &>>"$LOGFILE"
 		end_func "Results are saved in $domain/screenshots folder" ${FUNCNAME[0]}
 	else
 		if [ "$WEBSCREENSHOT" = false ]; then
