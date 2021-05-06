@@ -600,7 +600,7 @@ function webprobe_simple(){
 }
 
 function webprobe_full(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$WEBPROBEFULL" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$WEBPROBEFULL" = true ]; then
 		start_func "Http probing non standard ports"
 		axiom-scan subdomains/subdomains.txt -m naabu -p $UNCOMMON_PORTS_WEB -o .tmp/nmap_uncommonweb.txt &>>"$LOGFILE" && uncommon_ports_checked=$(cat .tmp/nmap_uncommonweb.txt | cut -d ':' -f2 | sort -u | sed -e 'H;${x;s/\n/,/g;s/^,//;p;};d')
 		if [ -n "$uncommon_ports_checked" ]; then
@@ -1409,6 +1409,55 @@ function resolvers_update(){
 	axiom-exec 'wget -O /home/op/lists/resolvers_trusted.txt https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw' &>/dev/null
 }
 
+function axiom_lauch(){
+	# let's fire up a FLEET!
+	if [ "$AXIOM_FLEET_LAUNCH" = true ] && [ -n "$AXIOM_FLEET_NAME" ] && [ -n "$AXIOM_FLEET_COUNT" ]; then
+		start_func "Launching our Axiom fleet"
+		# Check to see if we have a fleet already, if so, SKIP THIS!
+		NUMOFNODES=$(timeout 30 axiom-ls | grep -c "$AXIOM_FLEET_NAME")
+		if [[ $NUMOFNODES -ge $AXIOM_FLEET_COUNT ]]; then
+			axiom-select "$AXIOM_FLEET_NAME*"
+			# if [ -n "$AXIOM_POST_START" ]; then
+			# 	eval "$AXIOM_POST_START"
+			# fi
+			end_func "Axiom fleet $AXIOM_FLEET_NAME already has $NUMOFNODES instances"			
+		elif [[ $NUMOFNODES -eq 0 ]]; then
+			axiom_args=" -i=$AXIOM_FLEET_COUNT "
+			[ -n "$AXIOM_FLEET_REGIONS" ] && axiom_args="$axiom_args --regions=\"$AXIOM_FLEET_REGIONS\" " 
+			
+			echo "axiom-fleet $AXIOM_FLEET_NAME $axiom_args"
+			axiom-fleet "$AXIOM_FLEET_NAME $axiom_args"
+			axiom-select "$AXIOM_FLEET_NAME*"
+			if [ -n "$AXIOM_POST_START" ]; then
+				eval "$AXIOM_POST_START"
+			fi
+
+			NUMOFNODES=$(timeout 30 axiom-ls | grep -c "$AXIOM_FLEET_NAME" )
+			echo "Axiom fleet $AXIOM_FLEET_NAME launched w/ $NUMOFNODES instances" | $NOTIFY
+			end_func "Axiom fleet $AXIOM_FLEET_NAME launched w/ $NUMOFNODES instances"
+		fi
+	fi
+}
+
+function axiom_shutdown(){
+	if [ "$AXIOM_FLEET_LAUNCH" = true ] && [ "$AXIOM_FLEET_SHUTDOWN" = true ] && [ -n "$AXIOM_FLEET_NAME" ]; then
+		if [ "$mode" == "subs_menu" ] || [ "$mode" == "list_recon" ] || [ "$mode" == "passive" ] || [ "$mode" == "all" ]; then
+			notification "Automatic Axiom fleet shutdown is not enabled in this mode" info
+			return
+		fi
+		eval axiom-rm -f "$AXIOM_FLEET_NAME*"
+		echo "Axiom fleet $AXIOM_FLEET_NAME shutdown" | $NOTIFY
+		notification "Axiom fleet $AXIOM_FLEET_NAME shutdown" info
+	fi
+}
+
+function axiom_selected(){
+	if [[ ! $(cat ~/.axiom/selected.conf | sed '/^\s*$/d' | wc -l) -gt 0 ]]; then
+		notification "\n\n${bred} No axiom instances selected ${reset}\n\n" error
+		exit
+	fi
+}
+
 function start(){
 
 	global_start=$(date +%s)
@@ -1508,12 +1557,17 @@ function passive(){
 	metadata
 	SUBSCRAPING=false
 	WEBPROBESIMPLE=false
-	# axiom_lauch is coming
+
+	axiom_lauch
+	axiom_selected
+	
 	subdomains_full
 	favicon
 	PORTSCAN_ACTIVE=false
 	portscan
-	# axiom_shutdown is coming
+
+	axiom_shutdown
+
 	cloudprovider
 	end
 }
@@ -1546,7 +1600,10 @@ function recon(){
 	metadata
 	zonetransfer
 	favicon
-	# axiom_lauch is coming
+
+	axiom_lauch
+	axiom_selected
+
 	subdomains_full
 	subtakeover
 	s3buckets
@@ -1559,7 +1616,9 @@ function recon(){
 	params
 	urlchecks
 	jschecks
-	# axiom_shutdown is coming
+
+	axiom_shutdown
+	
 	cloudprovider
 	cms_scanner
 	url_gf
@@ -1595,11 +1654,6 @@ function multi_recon(){
 	LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
 	touch .log/${NOW}_${NOWT}.txt
 
-	if [[ ! $(cat ~/.axiom/selected.conf | sed '/^\s*$/d' | wc -l) -gt 0 ]]
-	then
-		notification "\n\n${bred} No axiom instances selected ${reset}\n\n" error
-		exit
-	fi
 
 	for domain in $targets; do
 		dir=$workdir/targets/$domain
@@ -1612,6 +1666,7 @@ function multi_recon(){
 		NOWT=$(date +"%T")
 		LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
 		touch .log/${NOW}_${NOWT}.txt
+		loopstart=$(date +%s)
 
 		domain_info
 		emails
@@ -1620,12 +1675,18 @@ function multi_recon(){
 		metadata
 		zonetransfer
 		favicon
+		NOW=$(date +"%H:%I:%S")
+		loopend=$(date +%s)
+		getElapsedTime $loopstart $loopend
+		printf "${bgreen} $domain finished 1st loop in ${runtime} - ${NOW} ${reset}\n"
 	done
 	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 
-	# Axiom launch automation coming....
+	axiom_lauch
+	axiom_selected
 
 	for domain in $targets; do
+		loopstart=$(date +%s)
 		dir=$workdir/targets/$domain
 		called_fn_dir=$dir/.called_fn
 		cd "$dir"  || { echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
@@ -1633,6 +1694,10 @@ function multi_recon(){
 		subtakeover
 		webprobe_full
 		screenshot
+		NOW=$(date +"%H:%I:%S")
+		loopend=$(date +%s)
+		getElapsedTime $loopstart $loopend
+		printf "${bgreen} $domain finished 2nd loop in ${runtime} - ${NOW} ${reset}\n"
 	done
 	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 
@@ -1662,20 +1727,30 @@ function multi_recon(){
 		dir=$workdir/targets/$domain
 		called_fn_dir=$dir/.called_fn
 		cd "$dir" || { echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+		loopstart=$(date +%s)
 		fuzz
 		params
 		urlchecks
 		jschecks
+		NOW=$(date +"%H:%I:%S")
+		loopend=$(date +%s)
+		getElapsedTime $loopstart $loopend
+		printf "${bgreen} $domain finished 3rd loop in ${runtime} - ${NOW} ${reset}\n"
 	done
 
-	# axiom_shutdown coming...
+	axiom_shutdown
 
 	cloudprovider
 
 	for domain in $targets; do
+		loopstart=$(date +%s)
 		cms_scanner
 		url_gf
 		wordlist_gen
+		NOW=$(date +"%H:%I:%S")
+		loopend=$(date +%s)
+		getElapsedTime $loopstart $loopend
+		printf "${bgreen} $domain finished final loop in ${runtime} - ${NOW} ${reset}\n"		
 	done
 
 	cd "$workdir" || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
