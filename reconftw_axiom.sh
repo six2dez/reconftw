@@ -1866,6 +1866,7 @@ function help(){
 	printf "   -p               Passive - Performs only passive steps \n"
 	printf "   -a               All - Perform all checks and exploitations\n"
 	printf "   -w               Web - Just web checks from list provided\n"
+	printf "   -n               OSINT - Just checks public intel info\n"
 	printf "   -h               Help - Show this help\n"
 	printf " \n"
 	printf " ${bblue}GENERAL OPTIONS${reset}\n"
@@ -1903,7 +1904,7 @@ if [ -z "$1" ]; then
 	exit
 fi
 
-while getopts ":hd:-:l:m:x:i:varspxwo:" opt; do
+while getopts ":hd:-:l:m:x:i:varnspxwo:" opt; do
 	general=$@
 	if [[ $general == *"--deep"* ]]; then
   		DEEP=true
@@ -1948,6 +1949,23 @@ while getopts ":hd:-:l:m:x:i:varspxwo:" opt; do
 			else
 				start
 				recon
+				end
+			fi
+			exit
+			;;
+		n ) if [ -n "$multi" ];	then
+				multi_osint 
+				exit
+			fi
+			if [ -n "$list" ]; then
+				for domain in $(cat $list); do
+					start
+					osint
+					end
+				done
+			else
+				start
+				osint
 				end
 			fi
 			exit
