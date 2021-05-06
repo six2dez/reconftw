@@ -54,7 +54,7 @@
  
 ## a) In your PC/VPS/VM
  
-> You can check out our wiki for installtion guide [Installation Guide](https://github.com/six2dez/reconftw/wiki/0.-Installation-Guide) :book:  
+> You can check out our wiki for the installation guide [Installation Guide](https://github.com/six2dez/reconftw/wiki/0.-Installation-Guide) :book:  
 - Requires [Golang](https://golang.org/dl/) > **1.15.0+** installed and paths correctly set (**$GOPATH**, **$GOROOT**)
  
 ```bash
@@ -72,7 +72,7 @@
 ▶ docker pull six2dez/reconftw:main
 ▶ docker run -it six2dez/reconftw:main /bin/bash
  
-# Exit the container and run this commands additionally if you want to gain persistence:
+# Exit the container and run these commands additionally if you want to gain persistence:
 ▶ docker start $(docker ps -a|grep six2dez/reconftw:main|cut -d' ' -f1)
 ▶ docker exec -it $(docker ps -a|grep six2dez/reconftw:main|cut -d' ' -f1) /bin/bash
  
