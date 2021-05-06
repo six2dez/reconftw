@@ -349,7 +349,7 @@ function sub_active(){
 		cat .tmp/*_subs.txt | anew -q .tmp/subs_no_resolved.txt
 		deleteOutScoped $outOfScope_file .tmp/subs_no_resolved.txt
 		axiom-scan .tmp/subs_no_resolved.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/subdomains_tmp.txt &>>"$LOGFILE"
-		echo $domain | dnsx -retry 3 -silent -r /home/op/recon/puredns/trusted.txt 2>>"$LOGFILE" | anew -q .tmp/subdomains_tmp.txt
+		echo $domain | dnsx -retry 3 -silent -r /home/op/lists/resolvers_trusted.txt 2>>"$LOGFILE" | anew -q .tmp/subdomains_tmp.txt
 		NUMOFLINES=$(cat .tmp/subdomains_tmp.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (active resolution)" ${FUNCNAME[0]}
 	else
@@ -396,18 +396,18 @@ function sub_scraping(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBSCRAPING" = true ]; then
 		start_subfunc "Running : Source code scraping subdomain search"
 		touch .tmp/scrap_subs.txt
-		if [ -s "$dir/subdomains/subdomains.txt" ]; then 
+		if [ -s "$dir/subdomains/subdomains.txt" ]; then
 			axiom-scan subdomains/subdomains.txt -m httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap1.txt &>>"$LOGFILE" && cat .tmp/probed_tmp_scrap1.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
 			axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -csp-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap2.txt &>>"$LOGFILE" && cat .tmp/probed_tmp_scrap2.txt | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
 			axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -tls-grab -tls-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap3.txt &>>"$LOGFILE" && cat .tmp/probed_tmp_scrap3.txt | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
-			if [ "$DEEP" = true ] ; then
+			if [ "$DEEP" = true ]; then
 				axiom-scan .tmp/probed_tmp_scrap.txt -m gospider --js -d 3 --sitemap --robots -w -r -o .tmp/gospider &>>"$LOGFILE"
 			else
 				axiom-scan .tmp/probed_tmp_scrap.txt -m gospider --js -d 2 --sitemap --robots -w -r -o .tmp/gospider &>>"$LOGFILE"
 			fi
 			NUMFILES=$(find .tmp/gospider/ -type f | wc -l)
 			[[ $NUMFILES -gt 0 ]] && cat .tmp/gospider/* | sed '/^.\{2048\}./d' | anew -q .tmp/gospider.txt
-			grep -E -o 'https?://[^ ]+' .tmp/gospider.txt | sed 's/]$//' | unfurl --unique domains | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
+			grep -Eo 'https?://[^ ]+' .tmp/gospider.txt | sed 's/]$//' | unfurl --unique domains | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
 			axiom-scan .tmp/scrap_subs.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/scrap_subs_resolved.txt &>>"$LOGFILE"
 			NUMOFLINES=$(cat .tmp/scrap_subs_resolved.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | tee .tmp/diff_scrap.txt | wc -l)
 			axiom-scan .tmp/diff_scrap.txt -m httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap4.txt &>>"$LOGFILE" && cat .tmp/probed_tmp_scrap4.txt 2>>"$LOGFILE" | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
@@ -588,7 +588,7 @@ function webprobe_simple(){
 				ffuf -mc all -w webs/webs.txt -u FUZZ -replay-proxy $proxy_url &>>"$LOGFILE"
 			fi
 		else
-			end_subfunc "No new websites to probe" ${FUNCNAME[0]}	
+			end_subfunc "No new websites to probe" ${FUNCNAME[0]}
 		fi
 	else
 		if [ "$WEBPROBESIMPLE" = false ]; then
@@ -600,7 +600,7 @@ function webprobe_simple(){
 }
 
 function webprobe_full(){
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$WEBPROBEFULL" = true ];	then
+	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$WEBPROBEFULL" = true ]; then
 		start_func "Http probing non standard ports"
 		axiom-scan subdomains/subdomains.txt -m naabu -p $UNCOMMON_PORTS_WEB -o .tmp/nmap_uncommonweb.txt &>>"$LOGFILE" && uncommon_ports_checked=$(cat .tmp/nmap_uncommonweb.txt | cut -d ':' -f2 | sort -u | sed -e 'H;${x;s/\n/,/g;s/^,//;p;};d')
 		if [ -n "$uncommon_ports_checked" ]; then
@@ -729,7 +729,7 @@ function waf_checks(){
 				end_func "No results found" ${FUNCNAME[0]}
 			fi
 		else
-			end_func "No websites to scan" ${FUNCNAME[0]}	
+			end_func "No websites to scan" ${FUNCNAME[0]}
 		fi
 	else
 		if [ "$WAF" = false ]; then
@@ -746,15 +746,15 @@ function nuclei_check(){
 		nuclei -update-templates &>>"$LOGFILE"
 		mkdir -p nuclei_output
 		printf "${yellow}\n Running : Nuclei Info${reset}\n\n"
-		axiom-scan webs/webs.txt -m nuclei -severity info -r /home/op/recon/puredns/trusted.txt -o nuclei_output/info.txt &>>"$LOGFILE"
+		axiom-scan webs/webs.txt -m nuclei -severity info -r /home/op/lists/resolvers_trusted.txt -o nuclei_output/info.txt &>>"$LOGFILE"
 		printf "${yellow}\n\n Running : Nuclei Low${reset}\n\n"
-		axiom-scan webs/webs.txt -m nuclei -severity low -r /home/op/recon/puredns/trusted.txt -o nuclei_output/low.txt &>>"$LOGFILE"
+		axiom-scan webs/webs.txt -m nuclei -severity low -r /home/op/lists/resolvers_trusted.txt -o nuclei_output/low.txt &>>"$LOGFILE"
 		printf "${yellow}\n\n Running : Nuclei Medium${reset}\n\n"
-		axiom-scan webs/webs.txt -m nuclei -severity medium -r /home/op/recon/puredns/trusted.txt -o nuclei_output/medium.txt &>>"$LOGFILE"
+		axiom-scan webs/webs.txt -m nuclei -severity medium -r /home/op/lists/resolvers_trusted.txt -o nuclei_output/medium.txt &>>"$LOGFILE"
 		printf "${yellow}\n\n Running : Nuclei High${reset}\n\n"
-		axiom-scan webs/webs.txt -m nuclei -severity high -r /home/op/recon/puredns/trusted.txt -o nuclei_output/high.txt &>>"$LOGFILE"
+		axiom-scan webs/webs.txt -m nuclei -severity high -r /home/op/lists/resolvers_trusted.txt -o nuclei_output/high.txt &>>"$LOGFILE"
 		printf "${yellow}\n\n Running : Nuclei Critical${reset}\n\n"
-		axiom-scan webs/webs.txt -m nuclei -severity critical -r /home/op/recon/puredns/trusted.txt -o nuclei_output/critical.txt &>>"$LOGFILE"
+		axiom-scan webs/webs.txt -m nuclei -severity critical -r /home/op/lists/resolvers_trusted.txt -o nuclei_output/critical.txt &>>"$LOGFILE"
 		printf "\n\n"
 		end_func "Results are saved in $domain/nuclei_output folder" ${FUNCNAME[0]}
 	else
@@ -875,13 +875,13 @@ function urlchecks(){
 			fi
 			cat .tmp/gospider/* | sed '/^.\{2048\}./d' | anew -q .tmp/gospider.txt
 		fi
-		cat .tmp/gospider.txt | grep -oE 'https?://[^ ]+' | sed 's/]$//' | grep ".$domain$" | anew -q .tmp/url_extract_tmp.txt
+		cat .tmp/gospider.txt | grep -Eo 'https?://[^ ]+' | sed 's/]$//' | grep ".$domain$" | anew -q .tmp/url_extract_tmp.txt
 		if [ -s "${GITHUB_TOKENS}" ]; then
 			github-endpoints -q -k -d $domain -t ${GITHUB_TOKENS} -o .tmp/github-endpoints.txt &>>"$LOGFILE"
 			cat .tmp/github-endpoints.txt 2>>"$LOGFILE" | anew -q .tmp/url_extract_tmp.txt
 		fi
-		cat .tmp/url_extract_tmp.txt webs/param.txt 2>>"$LOGFILE" | grep "${domain}" | grep "=" | qsreplace -a 2>>"$LOGFILE" | egrep -iv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | anew -q .tmp/url_extract_tmp2.txt
-		cat .tmp/url_extract_tmp.txt | grep "${domain}" | egrep -i "\.(js)" | anew -q js/url_extract_js.txt
+		cat .tmp/url_extract_tmp.txt webs/param.txt 2>>"$LOGFILE" | grep "${domain}" | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -Eiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | anew -q .tmp/url_extract_tmp2.txt
+		cat .tmp/url_extract_tmp.txt | grep "${domain}" | grep -Ei "\.(js)" | anew -q js/url_extract_js.txt
 		uddup -u .tmp/url_extract_tmp2.txt -o .tmp/url_extract_uddup.txt &>>"$LOGFILE"
 		NUMOFLINES=$(cat .tmp/url_extract_uddup.txt 2>>"$LOGFILE" | anew webs/url_extract.txt | wc -l)
 		notification "${NUMOFLINES} new urls with params" info
@@ -958,7 +958,7 @@ function jschecks(){
 			fi
 			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
 			if [ -s "js/js_livelinks.txt" ]; then
-				axiom-scan js/js_livelinks.txt -m nuclei -w /home/op/recon/nuclei/exposures/ -r /home/op/recon/puredns/trusted.txt -o js/js_secrets.txt &>>"$LOGFILE"
+				axiom-scan js/js_livelinks.txt -m nuclei -w /home/op/recon/nuclei/exposures/ -r /home/op/lists/resolvers_trusted.txt -o js/js_secrets.txt &>>"$LOGFILE"
 			fi
 			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
 			if [ -s "js/js_livelinks.txt" ]; then
@@ -1296,6 +1296,17 @@ function getElapsedTime {
 	runtime="$runtime$S seconds."
 }
 
+function zipSnedOutputFolder {
+	zip_name=`date +"%Y_%m_%d-%H.%M.%S"`
+	zip_name="$zip_name"_"$domain.zip"
+	cd $SCRIPTPATH && zip -r $zip_name $dir 1>>"$LOGFILE"
+	if [ -f "$SCRIPTPATH/$zip_name" ]; then
+		printf "\n${yellow}  @TODO send it ${reset}\n"
+	else
+		printf "\n${yellow} no Zip file to send ${reset}\n"
+	fi
+}
+
 function isAsciiText {
 	IS_ASCII="False";
 	if [[ $(file $1 | grep -o 'ASCII text$') == "ASCII text" ]]; then
@@ -1364,10 +1375,11 @@ function resolvers_update(){
 	if [ "$update_resolvers" = true ]; then
 		notification "Checking resolvers lists...\n Accurate resolvers are the key to great results\n This may take around 10 minutes if it's not updated" warn
 		# shellcheck disable=SC2016
-		axiom-exec 'if [ \$(find "/home/op/lists/resolvers.txt" -mtime +1 -print) ] || [ \$(cat /home/op/lists/resolvers.txt | wc -l) -le 40 ] ; then dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 200 -o /home/op/lists/resolvers.txt ; cp /home/op/lists/resolvers.txt /home/op/recon/puredns/resolvers.txt; fi' &>/dev/null
+		axiom-exec 'if [ \$(find "/home/op/lists/resolvers.txt" -mtime +1 -print) ] || [ \$(cat /home/op/lists/resolvers.txt | wc -l) -le 40 ] ; then dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 200 -o /home/op/lists/resolvers.txt ; fi' &>/dev/null
 		notification "Updated\n" good
 		update_resolvers=false
 	fi
+	axiom-exec 'wget -O /home/op/lists/resolvers_trusted.txt https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw' &>/dev/null
 }
 
 function start(){
@@ -1444,6 +1456,8 @@ function end(){
 	else
 		finaldir=$dir
 	fi
+	#Zip the output folder and send it via tg/discord/slack
+	zipSnedOutputFolder
 	global_end=$(date +%s)
 	getElapsedTime $global_start $global_end
 	printf "${bgreen}#######################################################################${reset}\n"
@@ -1619,7 +1633,7 @@ function multi_recon(){
 	nuclei_check
 	for domain in $targets; do
 		dir=$workdir/targets/$domain
-        called_fn_dir=$dir/.called_fn 
+		called_fn_dir=$dir/.called_fn
 		cd "$dir" || { echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		fuzz
 		params
@@ -1811,7 +1825,7 @@ while getopts ":hd:-:l:m:x:i:varspxwo:" opt; do
 			fi
 			webs_menu
 			exit
-            ;;
+			;;
 		p ) if [ -n "$list" ]; then
 				for domain in $(cat $list); do
 					passive
