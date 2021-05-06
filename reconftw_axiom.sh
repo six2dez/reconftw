@@ -288,7 +288,7 @@ function subdomains_full(){
 	notification "- ${NUMOFLINES_probed} new web probed" good
 	[ -f "webs/webs.txt" ] && cat webs/webs.txt 2>>"$LOGFILE" | sort
 	notification "Subdomain Enumeration Finished" good
-	printf "${bblue} Results are saved in subdomains/subdomains.txt and webs/webs.txt${reset}\n"
+	printf "${bblue} Results are saved in $domain/subdomains/subdomains.txt and webs/webs.txt${reset}\n"
 	printf "${bgreen}#######################################################################\n\n"
 }
 
@@ -501,7 +501,7 @@ function sub_recursive(){
 			NUMOFLINES=$(cat .tmp/permute_recursive.txt .tmp/brute_recursive.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (recursive)" ${FUNCNAME[0]}
 		else
-			notification "Skipping Recursive: Too Much Subdomains" warn
+			notification "Skipping Recursive: Too Many Subdomains" warn
 		fi
 	else
 		if [ "$SUBRECURSIVE" = false ]; then
@@ -573,13 +573,13 @@ function s3buckets(){
 
 function webprobe_simple(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$WEBPROBESIMPLE" = true ]; then
-		start_subfunc "Running : Http probing"
+		start_subfunc "Running : Http probing $domain"
 		if [ -s ".tmp/probed_tmp_scrap.txt" ]; then
 			mv .tmp/probed_tmp_scrap.txt .tmp/probed_tmp.txt
 		else
 			axiom-scan subdomains/subdomains.txt -m httpx -follow-host-redirects -random-agent -threads $HTTPX_THREADS -status-code -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -o .tmp/probed_tmp_.txt &>>"$LOGFILE" && cat .tmp/probed_tmp_.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp.txt
 		fi
-		if [ -s ".tmp/probed_tmp_.txt" ]; then
+		if [ -s ".tmp/probed_tmp.txt" ]; then
 			deleteOutScoped $outOfScope_file .tmp/probed_tmp.txt
 			NUMOFLINES=$(cat .tmp/probed_tmp.txt 2>>"$LOGFILE" | anew webs/webs.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new websites resolved" ${FUNCNAME[0]}
@@ -587,6 +587,8 @@ function webprobe_simple(){
 				notification "Sending websites to proxy" info
 				ffuf -mc all -w webs/webs.txt -u FUZZ -replay-proxy $proxy_url &>>"$LOGFILE"
 			fi
+		else
+			end_subfunc "No new websites to probe" ${FUNCNAME[0]}	
 		fi
 	else
 		if [ "$WEBPROBESIMPLE" = false ]; then
@@ -598,7 +600,7 @@ function webprobe_simple(){
 }
 
 function webprobe_full(){
-	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$WEBPROBEFULL" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$WEBPROBEFULL" = true ];	then
 		start_func "Http probing non standard ports"
 		axiom-scan subdomains/subdomains.txt -m naabu -p $UNCOMMON_PORTS_WEB -o .tmp/nmap_uncommonweb.txt &>>"$LOGFILE" && uncommon_ports_checked=$(cat .tmp/nmap_uncommonweb.txt | cut -d ':' -f2 | sort -u | sed -e 'H;${x;s/\n/,/g;s/^,//;p;};d')
 		if [ -n "$uncommon_ports_checked" ]; then
@@ -607,7 +609,7 @@ function webprobe_full(){
 		NUMOFLINES=$(cat .tmp/probed_uncommon_ports_tmp.txt 2>>"$LOGFILE" | anew webs/webs_uncommon_ports.txt | wc -l)
 		notification "Uncommon web ports: ${NUMOFLINES} new websites" good
 		cat webs/webs_uncommon_ports.txt 2>>"$LOGFILE"
-		end_func "Results are saved in webs/webs_uncommon_ports.txt" ${FUNCNAME[0]}
+		end_func "Results are saved in $domain/webs/webs_uncommon_ports.txt" ${FUNCNAME[0]}
 		if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/webs_uncommon_ports.txt| wc -l) -le 1500 ]]; then
 			notification "Sending websites uncommon ports to proxy" info
 			ffuf -mc all -w webs/webs_uncommon_ports.txt -u FUZZ -replay-proxy $proxy_url &>>"$LOGFILE"
@@ -670,8 +672,8 @@ function portscan(){
 			echo "$sub $(dig +short a $sub | tail -n1)" | anew -q .tmp/subs_ips.txt
 		done
 		awk '{ print $2 " " $1}' .tmp/subs_ips.txt | sort -k2 -n | anew -q hosts/subs_ips_vhosts.txt
-		cat hosts/subs_ips_vhosts.txt 2>>"$LOGFILE" | cut -d ' ' -f1 | egrep -iv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
-		axiom-scan webs/webs.txt -m cf-check -o .tmp/ips_nowaf_.txt &>>"$LOGFILE" && cat .tmp/ips_nowaf_.txt | egrep -iv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q .tmp/ips_nowaf.txt
+		cat hosts/subs_ips_vhosts.txt 2>>"$LOGFILE" | cut -d ' ' -f1 | grep -Eiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
+		axiom-scan webs/webs.txt -m cf-check -o .tmp/ips_nowaf_.txt &>>"$LOGFILE" && cat .tmp/ips_nowaf_.txt | grep -Eiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q .tmp/ips_nowaf.txt
 		printf "${bblue}\n Resolved IP addresses (No WAF) ${reset}\n\n";
 		cat .tmp/ips_nowaf.txt 2>>"$LOGFILE" | sort
 		printf "${bblue}\n Scanning ports... ${reset}\n\n";
@@ -716,11 +718,19 @@ function cloudprovider(){
 function waf_checks(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$WAF_DETECTION" = true ]; then
 		start_func "Website's WAF detection"
-		axiom-scan webs/webs.txt -m wafw00f -o .tmp/wafs.txt &>>"$LOGFILE"
-		cat .tmp/wafs.txt | sed -e 's/^[ \t]*//' -e 's/ \+ /\t/g' -e '/(None)/d' | tr -s "\t" ";" > webs/webs_wafs.txt
-		NUMOFLINES=$(cat webs/webs_wafs.txt 2>>"$LOGFILE" | wc -l)
-		notification "${NUMOFLINES} websites protected by waf" info
-		end_func "Results are saved in webs/webs_wafs.txt" ${FUNCNAME[0]}
+		if [ -s "./webs/webs.txt" ]; then
+			axiom-scan webs/webs.txt -m wafw00f -o .tmp/wafs.txt &>>"$LOGFILE"
+			if [ -f ".tmp/wafs.txt" ]; then
+				cat .tmp/wafs.txt | sed -e 's/^[ \t]*//' -e 's/ \+ /\t/g' -e '/(None)/d' | tr -s "\t" ";" > webs/webs_wafs.txt
+				NUMOFLINES=$(cat webs/webs_wafs.txt 2>>"$LOGFILE" | wc -l)
+				notification "${NUMOFLINES} websites protected by waf" info
+				end_func "Results are saved in $domain/webs/webs_wafs.txt" ${FUNCNAME[0]}
+			else
+				end_func "No results found" ${FUNCNAME[0]}
+			fi
+		else
+			end_func "No websites to scan" ${FUNCNAME[0]}	
+		fi
 	else
 		if [ "$WAF" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -865,7 +875,7 @@ function urlchecks(){
 			fi
 			cat .tmp/gospider/* | sed '/^.\{2048\}./d' | anew -q .tmp/gospider.txt
 		fi
-		cat .tmp/gospider.txt | egrep -o 'https?://[^ ]+' | sed 's/]$//' | grep ".$domain$" | anew -q .tmp/url_extract_tmp.txt
+		cat .tmp/gospider.txt | grep -oE 'https?://[^ ]+' | sed 's/]$//' | grep ".$domain$" | anew -q .tmp/url_extract_tmp.txt
 		if [ -s "${GITHUB_TOKENS}" ]; then
 			github-endpoints -q -k -d $domain -t ${GITHUB_TOKENS} -o .tmp/github-endpoints.txt &>>"$LOGFILE"
 			cat .tmp/github-endpoints.txt 2>>"$LOGFILE" | anew -q .tmp/url_extract_tmp.txt
@@ -875,7 +885,7 @@ function urlchecks(){
 		uddup -u .tmp/url_extract_tmp2.txt -o .tmp/url_extract_uddup.txt &>>"$LOGFILE"
 		NUMOFLINES=$(cat .tmp/url_extract_uddup.txt 2>>"$LOGFILE" | anew webs/url_extract.txt | wc -l)
 		notification "${NUMOFLINES} new urls with params" info
-		end_func "Results are saved in webs/url_extract.txt" ${FUNCNAME[0]}
+		end_func "Results are saved in $domain/webs/url_extract.txt" ${FUNCNAME[0]}
 		if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/url_extract.txt | wc -l) -le 1500 ]]; then
 			notification "Sending urls to proxy" info
 			ffuf -mc all -w webs/url_extract.txt -u FUZZ -replay-proxy $proxy_url &>>"$LOGFILE"
@@ -896,7 +906,7 @@ function url_gf(){
 		gf redirect webs/url_extract.txt | anew -q gf/redirect.txt && cat gf/ssrf.txt | anew -q gf/redirect.txt
 		gf rce webs/url_extract.txt | anew -q gf/rce.txt
 		gf potential webs/url_extract.txt | cut -d ':' -f3-5 |anew -q gf/potential.txt
-		cat .tmp/url_extract_tmp.txt | egrep -iv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | unfurl -u format %s://%d%p | anew -q gf/endpoints.txt
+		cat .tmp/url_extract_tmp.txt | grep -Eiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | unfurl -u format %s://%d%p | anew -q gf/endpoints.txt
 		gf lfi webs/url_extract.txt | anew -q gf/lfi.txt
 		end_func "Results are saved in $domain/gf folder" ${FUNCNAME[0]}
 	else
@@ -913,10 +923,10 @@ function url_ext(){
 		ext=("7z" "achee" "action" "adr" "apk" "arj" "ascx" "asmx" "asp" "aspx" "axd" "backup" "bak" "bat" "bin" "bkf" "bkp" "bok" "cab" "cer" "cfg" "cfm" "cfml" "cgi" "cnf" "conf" "config" "cpl" "crt" "csr" "csv" "dat" "db" "dbf" "deb" "dmg" "dmp" "doc" "docx" "drv" "email" "eml" "emlx" "env" "exe" "gadget" "gz" "html" "ica" "inf" "ini" "iso" "jar" "java" "jhtml" "json" "jsp" "key" "log" "lst" "mai" "mbox" "mbx" "md" "mdb" "msg" "msi" "nsf" "ods" "oft" "old" "ora" "ost" "pac" "passwd" "pcf" "pdf" "pem" "pgp" "php" "php3" "php4" "php5" "phtm" "phtml" "pkg" "pl" "plist" "pst" "pwd" "py" "rar" "rb" "rdp" "reg" "rpm" "rtf" "sav" "sh" "shtm" "shtml" "skr" "sql" "swf" "sys" "tar" "tar.gz" "tmp" "toast" "tpl" "txt" "url" "vcd" "vcf" "wml" "wpd" "wsdl" "wsf" "xls" "xlsm" "xlsx" "xml" "xsd" "yaml" "yml" "z" "zip")
 		echo "" > webs/url_extract.txt
 		for t in "${ext[@]}"; do
-			NUMOFLINES=$(cat .tmp/url_extract_tmp.txt | egrep -i "\.(${t})($|\/|\?)" | sort -u | wc -l)
+			NUMOFLINES=$(cat .tmp/url_extract_tmp.txt | grep -Ei "\.(${t})($|\/|\?)" | sort -u | wc -l)
 			if [[ ${NUMOFLINES} -gt 0 ]]; then
 				echo -e "\n############################\n + ${t} + \n############################\n" >> webs/urls_by_ext.txt
-				cat .tmp/url_extract_tmp.txt | egrep -i "\.(${t})($|\/|\?)" | sort -u >> webs/urls_by_ext.txt
+				cat .tmp/url_extract_tmp.txt | grep -Ei "\.(${t})($|\/|\?)" | sort -u >> webs/urls_by_ext.txt
 			fi
 		done
 		end_func "Results are saved in $domain/webs/urls_by_ext.txt" ${FUNCNAME[0]}
@@ -1002,7 +1012,7 @@ function brokenLinks(){
 			fi
 			cat .tmp/gospider/* | sed '/^.\{2048\}./d' | anew -q .tmp/gospider.txt
 		fi
-		cat .tmp/gospider.txt | egrep -o 'https?://[^ ]+' | sed 's/]$//' | sort -u | httpx -follow-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout 15 -silent -retries 2 -no-color | grep "\[4" | cut -d ' ' -f1 | anew -q .tmp/brokenLinks_total.txt
+		cat .tmp/gospider.txt | grep -Eo 'https?://[^ ]+' | sed 's/]$//' | sort -u | httpx -follow-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color | grep "\[4" | cut -d ' ' -f1 | anew -q .tmp/brokenLinks_total.txt
 		NUMOFLINES=$(cat .tmp/brokenLinks_total.txt 2>>"$LOGFILE" | anew webs/brokenLinks.txt | wc -l)
 		notification "${NUMOFLINES} new broken links found" info
 		end_func "Results are saved in webs/brokenLinks.txt" ${FUNCNAME[0]}
@@ -1242,7 +1252,7 @@ function spraying(){
 function 4xxbypass(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$BYPASSER4XX" = true ]; then
 		start_func "403 bypass"
-		cat fuzzing/*.txt 2>>"$LOGFILE" | egrep '^4' | egrep -v '^404' | cut -d ' ' -f3 | dirdar -only-ok > .tmp/dirdar.txt
+		cat fuzzing/*.txt 2>>"$LOGFILE" | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 | dirdar -only-ok > .tmp/dirdar.txt
 		cat .tmp/dirdar.txt  2>>"$LOGFILE" | sed -e '1,12d' | sed '/^$/d' | anew -q vulns/4xxbypass.txt
 		end_func "Results are saved in vulns/4xxbypass.txt" ${FUNCNAME[0]}
 	else
@@ -1356,6 +1366,7 @@ function resolvers_update(){
 		# shellcheck disable=SC2016
 		axiom-exec 'if [ \$(find "/home/op/lists/resolvers.txt" -mtime +1 -print) ] || [ \$(cat /home/op/lists/resolvers.txt | wc -l) -le 40 ] ; then dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 200 -o /home/op/lists/resolvers.txt ; cp /home/op/lists/resolvers.txt /home/op/recon/puredns/resolvers.txt; fi' &>/dev/null
 		notification "Updated\n" good
+		update_resolvers=false
 	fi
 }
 
@@ -1456,10 +1467,12 @@ function passive(){
 	metadata
 	SUBSCRAPING=false
 	WEBPROBESIMPLE=false
+	# axiom_lauch is coming
 	subdomains_full
 	favicon
 	PORTSCAN_ACTIVE=false
 	portscan
+	# axiom_shutdown is coming
 	cloudprovider
 	end
 }
@@ -1482,29 +1495,33 @@ function all(){
 	end
 }
 
+
+
 function recon(){
 	domain_info
 	emails
 	google_dorks
 	github_dorks
 	metadata
+	zonetransfer
+	favicon
+	# axiom_lauch is coming
 	subdomains_full
 	subtakeover
-	zonetransfer
 	s3buckets
 	webprobe_full
 	screenshot
-	favicon
 	portscan
-	cloudprovider
 	waf_checks
 	nuclei_check
-	cms_scanner
 	fuzz
 	params
 	urlchecks
-	url_gf
 	jschecks
+	# axiom_shutdown is coming
+	cloudprovider
+	cms_scanner
+	url_gf
 	wordlist_gen
 }
 
@@ -1562,6 +1579,15 @@ function multi_recon(){
 		metadata
 		zonetransfer
 		favicon
+	done
+	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+
+	# Axiom launch automation coming....
+
+	for domain in $targets; do
+		dir=$workdir/targets/$domain
+		called_fn_dir=$dir/.called_fn
+		cd "$dir"  || { echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		subdomains_full
 		subtakeover
 		webprobe_full
@@ -1588,20 +1614,26 @@ function multi_recon(){
 	notification "- ${NUMOFLINES_webs_total} total websites" good
 
 	portscan
-	cloudprovider
 	s3buckets
 	waf_checks
 	nuclei_check
 	for domain in $targets; do
 		dir=$workdir/targets/$domain
-        	called_fn_dir=$dir/.called_fn
+        called_fn_dir=$dir/.called_fn 
 		cd "$dir" || { echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
-		cms_scanner
 		fuzz
 		params
 		urlchecks
-		url_gf
 		jschecks
+	done
+
+	# axiom_shutdown coming...
+
+	cloudprovider
+
+	for domain in $targets; do
+		cms_scanner
+		url_gf
 		wordlist_gen
 	done
 
@@ -1622,6 +1654,33 @@ function subs_menu(){
 	end
 }
 
+function webs_menu(){
+			subtakeover
+			s3buckets
+			waf_checks
+			nuclei_check
+			cms_scanner
+			fuzz
+			4xxbypass
+			cors
+			params
+			urlchecks
+			url_gf
+			jschecks
+			wordlist_gen
+			open_redirect
+			ssrf_checks
+			crlf_checks
+			lfi
+			ssti
+			sqli
+			xss
+			spraying
+			brokenLinks
+			test_ssl
+			end
+}
+
 function help(){
 	printf "\n Usage: $0 [-d domain.tld] [-m name] [-l list.txt] [-x oos.txt] [-i in.txt] "
 	printf "\n           	      [-r] [-s] [-p] [-a] [-w] [-i] [-h] [--deep] [--fs] [-o OUTPUT]\n\n"
@@ -1637,7 +1696,7 @@ function help(){
 	printf "   -s               Subdomains - Search subdomains, check tko and web probe\n"
 	printf "   -p               Passive - Performs only passive steps \n"
 	printf "   -a               All - Perform all checks and exploitations\n"
-	printf "   -w               Web - Just web checks from list provided${reset}\n"
+	printf "   -w               Web - Just web checks from list provided\n"
 	printf "   -h               Help - Show this help\n"
 	printf " \n"
 	printf " ${bblue}GENERAL OPTIONS${reset}\n"
@@ -1750,32 +1809,9 @@ while getopts ":hd:-:l:m:x:i:varspxwo:" opt; do
 					cp $SCRIPTPATH/$list $dir/webs/webs.txt
 				fi
 			fi
-			subtakeover
-			s3buckets
-			waf_checks
-			nuclei_check
-			cms_scanner
-			fuzz
-			4xxbypass
-			cors
-			params
-			urlchecks
-			url_gf
-			jschecks
-			wordlist_gen
-			open_redirect
-			ssrf_checks
-			crlf_checks
-			lfi
-			ssti
-			sqli
-			xss
-			spraying
-			brokenLinks
-			test_ssl
-			end
+			webs_menu
 			exit
-			;;
+            ;;
 		p ) if [ -n "$list" ]; then
 				for domain in $(cat $list); do
 					passive
