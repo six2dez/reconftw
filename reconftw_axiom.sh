@@ -1676,10 +1676,10 @@ function multi_recon(){
 		metadata
 		zonetransfer
 		favicon
-		NOW=$(date +"%H:%I:%S")
+		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
-		printf "${bgreen} $domain finished 1st loop in ${runtime} - ${NOW} ${reset}\n"
+		printf "${bgreen} $domain finished 1st loop in ${runtime}  $currently ${reset}\n"
 	done
 	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 
@@ -1695,10 +1695,10 @@ function multi_recon(){
 		subtakeover
 		webprobe_full
 		screenshot
-		NOW=$(date +"%H:%I:%S")
+		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
-		printf "${bgreen} $domain finished 2nd loop in ${runtime} - ${NOW} ${reset}\n"
+		printf "${bgreen} $domain finished 2nd loop in ${runtime}  $currently ${reset}\n"
 	done
 	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 
@@ -1733,10 +1733,10 @@ function multi_recon(){
 		params
 		urlchecks
 		jschecks
-		NOW=$(date +"%H:%I:%S")
+		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
-		printf "${bgreen} $domain finished 3rd loop in ${runtime} - ${NOW} ${reset}\n"
+		printf "${bgreen} $domain finished 3rd loop in ${runtime}  $currently ${reset}\n"
 	done
 
 	axiom_shutdown
@@ -1748,10 +1748,10 @@ function multi_recon(){
 		cms_scanner
 		url_gf
 		wordlist_gen
-		NOW=$(date +"%H:%I:%S")
+		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
-		printf "${bgreen} $domain finished final loop in ${runtime} - ${NOW} ${reset}\n"		
+		printf "${bgreen} $domain finished final loop in ${runtime}  $currently ${reset}\n"				
 	done
 
 	cd "$workdir" || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
