@@ -1591,6 +1591,58 @@ function all(){
 	end
 }
 
+function osint(){
+	domain_info
+	emails
+	google_dorks
+	github_dorks
+	metadata
+	zonetransfer
+	favicon
+}
+
+function multi_osint(){
+
+	global_start=$(date +%s)
+
+	if [ "$NOTIFICATION" = true ]; then
+		NOTIFY="notify -silent"
+	else
+	    NOTIFY=""
+	fi
+
+	if [ -s "$list" ]; then
+		targets=$(cat $list)
+	else
+		notification "Target list not provided" error
+		exit
+	fi
+
+	workdir=$SCRIPTPATH/Recon/$multi
+	mkdir -p $workdir  || { echo "Failed to create directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+	mkdir -p .tmp .called_fn osint subdomains webs hosts vulns
+
+	# All of the following are LOCAL machine, so AXIOM isn't needed
+	for domain in $targets; do
+		dir=$workdir/targets/$domain
+		called_fn_dir=$dir/.called_fn
+		mkdir -p $dir
+		cd "$dir"  || { echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+		mkdir -p .tmp .called_fn osint subdomains webs hosts vulns
+		domain_info
+		emails
+		google_dorks
+		github_dorks
+		metadata
+		zonetransfer
+		favicon
+	done
+	cd "$workdir" || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+	dir=$workdir
+	domain=$multi
+	end
+}
 
 
 function recon(){
