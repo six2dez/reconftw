@@ -29,6 +29,7 @@ gotools["crobat"]="go get -v github.com/cgboal/sonarsearch/crobat"
 gotools["crlfuzz"]="GO111MODULE=on go get -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz"
 gotools["dalfox"]="GO111MODULE=on go get -v github.com/hahwul/dalfox/v2"
 gotools["puredns"]="GO111MODULE=on go get github.com/d3mondev/puredns/v2"
+gotools["naabu"]="GO111MODULE=on go get -v github.com/projectdiscovery/naabu/v2/cmd/naabu"
 
 declare -A repos
 repos["degoogle_hunter"]="six2dez/degoogle_hunter"
@@ -77,16 +78,16 @@ install_apt(){
     eval $SUDO apt update -y $DEBUG_STD
     eval $SUDO apt install chromium-browser -y $DEBUG_STD
     eval $SUDO apt install chromium -y $DEBUG_STD
-    eval $SUDO apt install python3 python3-pip ruby git curl libpcap-dev wget python3-dev python3-dnspython pv dnsutils build-essential libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq python3-shodan apt-transport-https lynx tor medusa -y $DEBUG_STD
+    eval $SUDO apt install python3 python3-pip ruby git curl libpcap-dev wget zip python3-dev python3-dnspython pv dnsutils build-essential libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq python3-shodan apt-transport-https lynx tor medusa -y $DEBUG_STD
     eval $SUDO systemctl enable tor $DEBUG_STD
 }
 
 install_yum(){
-    eval $SUDO yum install python3 python3-pip ruby git curl libpcap-devel chromium wget openssl-devel bind-utils python3-devel lynx libxslt-devel libffi-devel libxml2-devel nmap python3-dnspython pv zlib-devel jq python-shodan -y $DEBUG_STD
+    eval $SUDO yum install python3 python3-pip ruby git curl libpcap-devel chromium wget zip openssl-devel bind-utils python3-devel lynx libxslt-devel libffi-devel libxml2-devel nmap python3-dnspython pv zlib-devel jq python-shodan -y $DEBUG_STD
 }
 
 install_pacman(){
-    eval $SUDO pacman -Sy install python python-pip dnsutils ruby curl git libpcap nmap chromium wget jq medusa tor lynx -y $DEBUG_STD
+    eval $SUDO pacman -Sy install python python-pip dnsutils ruby curl zip git libpcap nmap chromium wget jq medusa tor lynx -y $DEBUG_STD
     eval $SUDO systemctl enable --now tor.service $DEBUG_STD
 }
 
