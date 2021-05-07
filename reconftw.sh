@@ -96,6 +96,7 @@ function tools_installed(){
 	type -P notify &>/dev/null || { printf "${bred} [*] notify		[NO]${reset}\n${reset}"; allinstalled=false;}
 	type -P dalfox &>/dev/null || { printf "${bred} [*] dalfox		[NO]${reset}\n${reset}"; allinstalled=false;}
 	type -P puredns &>/dev/null || { printf "${bred} [*] puredns		[NO]${reset}\n${reset}"; allinstalled=false;}
+	type -P naabu &>/dev/null || { printf "${bred} [*] naabu		[NO]${reset}\n${reset}"; allinstalled=false;}
 
 	if [ "${allinstalled}" = true ]; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
@@ -134,9 +135,9 @@ function github_dorks(){
 		start_func "Github Dorks in process"
 		if [ -s "${GITHUB_TOKENS}" ]; then
 			if [ "$DEEP" = true ]; then
-				python3 "$tools/GitDorker/GitDorker.py" -tf "${GITHUB_TOKENS}" -e "$GITDORKER_THREADS" -q "$domain" -p -d "$tools/GitDorker/Dorks/alldorksv3" | grep "\[+\]" | grep "git" | anew -q osint/gitdorks.txt &>>"$LOGFILE"
+				python3 "$tools/GitDorker/GitDorker.py" -tf "${GITHUB_TOKENS}" -e "$GITDORKER_THREADS" -q "$domain" -p -ri -d "$tools/GitDorker/Dorks/alldorksv3" | grep "\[+\]" | grep "git" | anew -q osint/gitdorks.txt &>>"$LOGFILE"
 			else
-				python3 "$tools/GitDorker/GitDorker.py" -tf "${GITHUB_TOKENS}" -e "$GITDORKER_THREADS" -q "$domain" -p -d "$tools/GitDorker/Dorks/medium_dorks.txt" | grep "\[+\]" | grep "git" | anew -q osint/gitdorks.txt &>>"$LOGFILE"
+				python3 "$tools/GitDorker/GitDorker.py" -tf "${GITHUB_TOKENS}" -e "$GITDORKER_THREADS" -q "$domain" -p -ri -d "$tools/GitDorker/Dorks/medium_dorks.txt" | grep "\[+\]" | grep "git" | anew -q osint/gitdorks.txt &>>"$LOGFILE"
 			fi
 			sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" osint/gitdorks.txt
 		else
@@ -459,7 +460,7 @@ function sub_permut(){
 					puredns resolve .tmp/DNScewl1.txt -w .tmp/permute_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
 					cat .tmp/permute_tmp.txt 2>>"$LOGFILE" | anew -q .tmp/permute_subs.txt
 				else
-					printf "\n${bred} Skipping Permutations: Too Much Subdomains${reset}\n\n"
+					printf "\n${bred} Skipping Permutations: Too Many Subdomains${reset}\n\n"
 				fi
 			fi
 		fi
@@ -548,7 +549,7 @@ function zonetransfer(){
 function s3buckets(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$S3BUCKETS" = true ]; then
 		start_func "AWS S3 buckets search"
-		s3scanner scan --buckets-file subdomains/subdomains.txt 2>>"$LOGFILE" | grep -iv "not_exist" | anew -q .tmp/s3buckets.txt
+		s3scanner scan -f subdomains/subdomains.txt 2>>"$LOGFILE" | grep -iv "not_exist" | anew -q .tmp/s3buckets.txt
 		NUMOFLINES=$(cat .tmp/s3buckets.txt 2>>"$LOGFILE" | anew subdomains/s3buckets.txt | wc -l)
 		if [ "$NUMOFLINES" -gt 0 ]; then
 			notification "${NUMOFLINES} new S3 buckets found" info
@@ -598,7 +599,7 @@ function webprobe_simple(){
 function webprobe_full(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$WEBPROBEFULL" = true ]; then
 		start_func "Http probing non standard ports"
-		nmap -p $UNCOMMON_PORTS_WEB --max-retries 2 -Pn -iL subdomains/subdomains.txt -oG .tmp/nmap_uncommonweb.txt &>>"$LOGFILE" && uncommon_ports_checked=$(cat .tmp/nmap_uncommonweb.txt | grep -Ev "^#|Status: Up" | cut -d' ' -f4- | sed -n -e 's/Ignored.*//p' | tr ',' '\n' | sed -e 's/^[ \t]*//' | sort -u | grep "open" | cut -d '/' -f1 | sed -e 'H;${x;s/\n/,/g;s/^,//;p;};d')
+		cat subdomains/subdomains.txt | naabu -p $UNCOMMON_PORTS_WEB -o .tmp/nmap_uncommonweb.txt &>>"$LOGFILE" && uncommon_ports_checked=$(cat .tmp/nmap_uncommonweb.txt | cut -d ':' -f2 | sort -u | sed -e 'H;${x;s/\n/,/g;s/^,//;p;};d')
 		if [ -n "$uncommon_ports_checked" ]; then
 			cat subdomains/subdomains.txt | httpx -ports $uncommon_ports_checked -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout 10 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain" | anew -q .tmp/probed_uncommon_ports_tmp.txt
 		fi
@@ -1041,7 +1042,7 @@ function xss(){
 					cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav --skip-grepping --skip-mining-all --skip-mining-dict -w $DALFOX_THREADS 2>>"$LOGFILE" | anew -q vulns/xss.txt
 				fi
 			else
-				printf "${bred} Skipping XSS: Too Much URLs to test, try with --deep flag${reset}\n"
+				printf "${bred} Skipping XSS: Too many URLs to test, try with --deep flag${reset}\n"
 			fi
 		fi
 		end_func "Results are saved in vulns/xss.txt" ${FUNCNAME[0]}
@@ -1086,7 +1087,7 @@ function open_redirect(){
 				sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" vulns/redirect.txt
 				end_func "Results are saved in vulns/redirect.txt" ${FUNCNAME[0]}
 			else
-				printf "${bred} Skipping Open redirects: Too Much URLs to test, try with --deep flag${reset}\n"
+				printf "${bred} Skipping Open redirects: Too many URLs to test, try with --deep flag${reset}\n"
 				printf "${bgreen}#######################################################################${reset}\n"
 			fi
 		fi
@@ -1127,7 +1128,7 @@ function ssrf_checks(){
 					python3 $tools/ssrf.py $dir/gf/ssrf.txt $COLLAB_SERVER_FIX 2>>"$LOGFILE" | anew -q vulns/ssrf.txt
 					end_func "Results are saved in vulns/ssrf.txt" ${FUNCNAME[0]}
 				else
-					printf "${bred} Skipping SSRF: Too Much URLs to test, try with --deep flag${reset}\n"
+					printf "${bred} Skipping SSRF: Too many URLs to test, try with --deep flag${reset}\n"
 				fi
 			fi
 		else
@@ -1247,10 +1248,14 @@ function spraying(){
 
 function 4xxbypass(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$BYPASSER4XX" = true ]; then
-		start_func "403 bypass"
-		cat fuzzing/*.txt 2>>"$LOGFILE" | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 | dirdar -only-ok > .tmp/dirdar.txt
-		cat .tmp/dirdar.txt  2>>"$LOGFILE" | sed -e '1,12d' | sed '/^$/d' | anew -q vulns/4xxbypass.txt
-		end_func "Results are saved in vulns/4xxbypass.txt" ${FUNCNAME[0]}
+		if [[ $(cat fuzzing/*.txt 2>/dev/null | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 | wc -l) -le 1000 ]] || [ "$DEEP" = true ]; then
+			start_func "403 bypass"
+			cat fuzzing/*.txt 2>>"$LOGFILE" | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 | dirdar -threads $DIRDAR_THREADS -only-ok > .tmp/dirdar.txt
+			cat .tmp/dirdar.txt  2>>"$LOGFILE" | sed -e '1,12d' | sed '/^$/d' | anew -q vulns/4xxbypass.txt
+			end_func "Results are saved in vulns/4xxbypass.txt" ${FUNCNAME[0]}
+		else
+			notification "Too many urls to bypass, skipping" warn
+		fi
 	else
 		if [ "$BYPASSER4XX" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -1528,29 +1533,82 @@ function all(){
 	end
 }
 
+function osint(){
+	domain_info
+	emails
+	google_dorks
+	github_dorks
+	metadata
+	zonetransfer
+	favicon
+}
+
+function multi_osint(){
+
+	global_start=$(date +%s)
+
+	if [ "$NOTIFICATION" = true ]; then
+		NOTIFY="notify -silent"
+	else
+	    NOTIFY=""
+	fi
+
+	if [ -s "$list" ]; then
+		targets=$(cat $list)
+	else
+		notification "Target list not provided" error
+		exit
+	fi
+
+	workdir=$SCRIPTPATH/Recon/$multi
+	mkdir -p $workdir  || { echo "Failed to create directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+	mkdir -p .tmp .called_fn osint subdomains webs hosts vulns
+
+	for domain in $targets; do
+		dir=$workdir/targets/$domain
+		called_fn_dir=$dir/.called_fn
+		mkdir -p $dir
+		cd "$dir"  || { echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+		mkdir -p .tmp .called_fn osint subdomains webs hosts vulns
+		domain_info
+		emails
+		google_dorks
+		github_dorks
+		metadata
+		zonetransfer
+		favicon
+	done
+	cd "$workdir" || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+	dir=$workdir
+	domain=$multi
+	end
+}
+
+
 function recon(){
 	domain_info
 	emails
 	google_dorks
 	github_dorks
 	metadata
+	zonetransfer
+	favicon
 	subdomains_full
 	subtakeover
-	zonetransfer
 	s3buckets
 	webprobe_full
 	screenshot
-	favicon
 	portscan
-	cloudprovider
 	waf_checks
 	nuclei_check
-	cms_scanner
 	fuzz
 	params
 	urlchecks
-	url_gf
 	jschecks
+	cloudprovider
+	cms_scanner
+	url_gf
 	wordlist_gen
 }
 
@@ -1594,6 +1652,7 @@ function multi_recon(){
 		NOWT=$(date +"%T")
 		LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
 		touch .log/${NOW}_${NOWT}.txt
+		loopstart=$(date +%s)
 
 		domain_info
 		emails
@@ -1602,10 +1661,26 @@ function multi_recon(){
 		metadata
 		zonetransfer
 		favicon
+		currently=$(date +"%H:%M:%S")
+		loopend=$(date +%s)
+		getElapsedTime $loopstart $loopend
+		printf "${bgreen} $domain finished 1st loop in ${runtime}  $currently ${reset}\n"
+	done
+	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+
+	for domain in $targets; do
+		loopstart=$(date +%s)
+		dir=$workdir/targets/$domain
+		called_fn_dir=$dir/.called_fn
+		cd "$dir"  || { echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		subdomains_full
 		subtakeover
 		webprobe_full
 		screenshot
+		currently=$(date +"%H:%M:%S")
+		loopend=$(date +%s)
+		getElapsedTime $loopstart $loopend
+		printf "${bgreen} $domain finished 2nd loop in ${runtime}  $currently ${reset}\n"
 	done
 	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 
@@ -1628,23 +1703,34 @@ function multi_recon(){
 	notification "- ${NUMOFLINES_webs_total} total websites" good
 
 	portscan
-	cloudprovider
 	s3buckets
 	waf_checks
 	nuclei_check
 	for domain in $targets; do
 		dir=$workdir/targets/$domain
-        	called_fn_dir=$dir/.called_fn
+		called_fn_dir=$dir/.called_fn
 		cd "$dir" || { echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
-		cms_scanner
+		loopstart=$(date +%s)
 		fuzz
 		params
 		urlchecks
-		url_gf
 		jschecks
-		wordlist_gen
+		currently=$(date +"%H:%M:%S")
+		loopend=$(date +%s)
+		getElapsedTime $loopstart $loopend
+		printf "${bgreen} $domain finished 3rd loop in ${runtime}  $currently ${reset}\n"
 	done
-
+	cloudprovider
+	for domain in $targets; do
+		loopstart=$(date +%s)
+		cms_scanner
+		url_gf
+		wordlist_gen
+		currently=$(date +"%H:%M:%S")
+		loopend=$(date +%s)
+		getElapsedTime $loopstart $loopend
+		printf "${bgreen} $domain finished final loop in ${runtime}  $currently ${reset}\n"
+	done
 	cd "$workdir" || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 	dir=$workdir
 	domain=$multi
@@ -1705,6 +1791,7 @@ function help(){
 	printf "   -p               Passive - Performs only passive steps \n"
 	printf "   -a               All - Perform all checks and exploitations\n"
 	printf "   -w               Web - Just web checks from list provided\n"
+	printf "   -n               OSINT - Just checks public intel info\n"
 	printf "   -h               Help - Show this help\n"
 	printf " \n"
 	printf " ${bblue}GENERAL OPTIONS${reset}\n"
@@ -1742,7 +1829,7 @@ if [ -z "$1" ]; then
 	exit
 fi
 
-while getopts ":hd:-:l:m:x:i:varspxwo:" opt; do
+while getopts ":hd:-:l:m:x:i:varnspxwo:" opt; do
 	general=$@
 	if [[ $general == *"--deep"* ]]; then
   		DEEP=true
@@ -1787,6 +1874,23 @@ while getopts ":hd:-:l:m:x:i:varspxwo:" opt; do
 			else
 				start
 				recon
+				end
+			fi
+			exit
+			;;
+		n ) if [ -n "$multi" ];	then
+				multi_osint
+				exit
+			fi
+			if [ -n "$list" ]; then
+				for domain in $(cat $list); do
+					start
+					osint
+					end
+				done
+			else
+				start
+				osint
 				end
 			fi
 			exit

@@ -29,6 +29,7 @@ gotools["crobat"]="go get -v github.com/cgboal/sonarsearch/crobat"
 gotools["crlfuzz"]="GO111MODULE=on go get -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz"
 gotools["dalfox"]="GO111MODULE=on go get -v github.com/hahwul/dalfox/v2"
 gotools["puredns"]="GO111MODULE=on go get github.com/d3mondev/puredns/v2"
+gotools["naabu"]="GO111MODULE=on go get -v github.com/projectdiscovery/naabu/v2/cmd/naabu"
 
 declare -A repos
 repos["degoogle_hunter"]="six2dez/degoogle_hunter"

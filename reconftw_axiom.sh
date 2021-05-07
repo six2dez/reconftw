@@ -96,6 +96,7 @@ function tools_installed(){
 	type -P notify &>/dev/null || { printf "${bred} [*] notify		[NO]${reset}\n${reset}"; allinstalled=false;}
 	type -P dalfox &>/dev/null || { printf "${bred} [*] dalfox		[NO]${reset}\n${reset}"; allinstalled=false;}
 	type -P puredns &>/dev/null || { printf "${bred} [*] puredns		[NO]${reset}\n${reset}"; allinstalled=false;}
+	type -P naabu &>/dev/null || { printf "${bred} [*] naabu		[NO]${reset}\n${reset}"; allinstalled=false;}
 	type -P axiom-ls &>/dev/null || { printf "${bred} [*] axiom		[NO]${reset}\n${reset}"; allinstalled=false;}
 
 	if [ "${allinstalled}" = true ]; then
@@ -462,7 +463,7 @@ function sub_permut(){
 					axiom-scan .tmp/DNScewl1.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute_tmp.txt &>>"$LOGFILE"
 					cat .tmp/permute_tmp.txt 2>>"$LOGFILE" | anew -q .tmp/permute_subs.txt
 				else
-					printf "\n${bred} Skipping Permutations: Too Much Subdomains${reset}\n\n"
+					printf "\n${bred} Skipping Permutations: Too Many Subdomains${reset}\n\n"
 				fi
 			fi
 		fi
@@ -551,7 +552,7 @@ function zonetransfer(){
 function s3buckets(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$S3BUCKETS" = true ]; then
 		start_func "AWS S3 buckets search"
-		s3scanner scan --buckets-file subdomains/subdomains.txt 2>>"$LOGFILE" | grep -iv "not_exist" | anew -q .tmp/s3buckets.txt
+		s3scanner scan -f subdomains/subdomains.txt 2>>"$LOGFILE" | grep -iv "not_exist" | anew -q .tmp/s3buckets.txt
 		#axiom-scan subdomains/subdomains.txt -m s3scanner -o .tmp/s3buckets.txt &>>"$LOGFILE"
 		NUMOFLINES=$(cat .tmp/s3buckets.txt 2>>"$LOGFILE" | anew subdomains/s3buckets.txt | wc -l)
 		if [ "$NUMOFLINES" -gt 0 ]; then
@@ -1045,7 +1046,7 @@ function xss(){
 					axiom-scan .tmp/xss_reflected.txt -m dalfox --mass --mass-worker 100 --multicast --skip-bav --skip-grepping --skip-mining-all --skip-mining-dict -w $DALFOX_THREADS -o vulns/xss.txt &>>"$LOGFILE"
 				fi
 			else
-				printf "${bred} Skipping XSS: Too Much URLs to test, try with --deep flag${reset}\n"
+				printf "${bred} Skipping XSS: Too many URLs to test, try with --deep flag${reset}\n"
 			fi
 		fi
 		end_func "Results are saved in vulns/xss.txt" ${FUNCNAME[0]}
@@ -1090,7 +1091,7 @@ function open_redirect(){
 				sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" vulns/redirect.txt
 				end_func "Results are saved in vulns/redirect.txt" ${FUNCNAME[0]}
 			else
-				printf "${bred} Skipping Open redirects: Too Much URLs to test, try with --deep flag${reset}\n"
+				printf "${bred} Skipping Open redirects: Too many URLs to test, try with --deep flag${reset}\n"
 				printf "${bgreen}#######################################################################${reset}\n"
 			fi
 		fi
@@ -1131,7 +1132,7 @@ function ssrf_checks(){
 					python3 $tools/ssrf.py $dir/gf/ssrf.txt $COLLAB_SERVER_FIX 2>>"$LOGFILE" | anew -q vulns/ssrf.txt
 					end_func "Results are saved in vulns/ssrf.txt" ${FUNCNAME[0]}
 				else
-					printf "${bred} Skipping SSRF: Too Much URLs to test, try with --deep flag${reset}\n"
+					printf "${bred} Skipping SSRF: Too many URLs to test, try with --deep flag${reset}\n"
 				fi
 			fi
 		else
@@ -1251,10 +1252,14 @@ function spraying(){
 
 function 4xxbypass(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$BYPASSER4XX" = true ]; then
-		start_func "403 bypass"
-		cat fuzzing/*.txt 2>>"$LOGFILE" | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 | dirdar -only-ok > .tmp/dirdar.txt
-		cat .tmp/dirdar.txt  2>>"$LOGFILE" | sed -e '1,12d' | sed '/^$/d' | anew -q vulns/4xxbypass.txt
-		end_func "Results are saved in vulns/4xxbypass.txt" ${FUNCNAME[0]}
+		if [[ $(cat fuzzing/*.txt 2>/dev/null | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 | wc -l) -le 1000 ]] || [ "$DEEP" = true ]; then
+			start_func "403 bypass"
+			cat fuzzing/*.txt 2>>"$LOGFILE" | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 | dirdar -threads $DIRDAR_THREADS -only-ok > .tmp/dirdar.txt
+			cat .tmp/dirdar.txt  2>>"$LOGFILE" | sed -e '1,12d' | sed '/^$/d' | anew -q vulns/4xxbypass.txt
+			end_func "Results are saved in vulns/4xxbypass.txt" ${FUNCNAME[0]}
+		else
+			notification "Too many urls to bypass, skipping" warn
+		fi
 	else
 		if [ "$BYPASSER4XX" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -1407,7 +1412,7 @@ function resolvers_update(){
 		axiom-exec 'wget -O /home/op/lists/resolvers_trusted.txt https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw' &>/dev/null
 		update_resolvers=false
 	fi
-	
+
 }
 
 function axiom_lauch(){
@@ -1421,11 +1426,11 @@ function axiom_lauch(){
 			# if [ -n "$AXIOM_POST_START" ]; then
 			# 	eval "$AXIOM_POST_START"
 			# fi
-			end_func "Axiom fleet $AXIOM_FLEET_NAME already has $NUMOFNODES instances"			
+			end_func "Axiom fleet $AXIOM_FLEET_NAME already has $NUMOFNODES instances"
 		elif [[ $NUMOFNODES -eq 0 ]]; then
 			axiom_args=" -i=$AXIOM_FLEET_COUNT "
-			[ -n "$AXIOM_FLEET_REGIONS" ] && axiom_args="$axiom_args --regions=\"$AXIOM_FLEET_REGIONS\" " 
-			
+			[ -n "$AXIOM_FLEET_REGIONS" ] && axiom_args="$axiom_args --regions=\"$AXIOM_FLEET_REGIONS\" "
+
 			echo "axiom-fleet $AXIOM_FLEET_NAME $axiom_args"
 			axiom-fleet "$AXIOM_FLEET_NAME $axiom_args"
 			axiom-select "$AXIOM_FLEET_NAME*"
@@ -1534,7 +1539,9 @@ function end(){
 		finaldir=$dir
 	fi
 	#Zip the output folder and send it via tg/discord/slack
-	zipSnedOutputFolder
+	if [ "$SENDZIPNOTIFY" = true ]; then
+		zipSnedOutputFolder
+	fi
 	global_end=$(date +%s)
 	getElapsedTime $global_start $global_end
 	printf "${bgreen}#######################################################################${reset}\n"
@@ -1561,7 +1568,7 @@ function passive(){
 
 	axiom_lauch
 	axiom_selected
-	
+
 	subdomains_full
 	favicon
 	PORTSCAN_ACTIVE=false
@@ -1671,7 +1678,7 @@ function recon(){
 	jschecks
 
 	axiom_shutdown
-	
+
 	cloudprovider
 	cms_scanner
 	url_gf
@@ -1706,7 +1713,6 @@ function multi_recon(){
 	NOWT=$(date +"%T")
 	LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
 	touch .log/${NOW}_${NOWT}.txt
-
 
 	for domain in $targets; do
 		dir=$workdir/targets/$domain
@@ -1790,11 +1796,8 @@ function multi_recon(){
 		getElapsedTime $loopstart $loopend
 		printf "${bgreen} $domain finished 3rd loop in ${runtime}  $currently ${reset}\n"
 	done
-
 	axiom_shutdown
-
 	cloudprovider
-
 	for domain in $targets; do
 		loopstart=$(date +%s)
 		cms_scanner
@@ -1803,9 +1806,8 @@ function multi_recon(){
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
-		printf "${bgreen} $domain finished final loop in ${runtime}  $currently ${reset}\n"				
+		printf "${bgreen} $domain finished final loop in ${runtime}  $currently ${reset}\n"
 	done
-
 	cd "$workdir" || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 	dir=$workdir
 	domain=$multi
@@ -1954,7 +1956,7 @@ while getopts ":hd:-:l:m:x:i:varnspxwo:" opt; do
 			exit
 			;;
 		n ) if [ -n "$multi" ];	then
-				multi_osint 
+				multi_osint
 				exit
 			fi
 			if [ -n "$list" ]; then
