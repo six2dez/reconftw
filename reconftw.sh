@@ -398,7 +398,7 @@ function sub_scraping(){
 		if [ -s "$dir/subdomains/subdomains.txt" ]; then
 			cat subdomains/subdomains.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
 			cat .tmp/probed_tmp_scrap.txt | httpx -csp-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
-			cat .tmp/probed_tmp_scrap.txt | httpx -tls-grab -tls-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
+			cat .tmp/probed_tmp_scrap.txt | httpx -tls-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
 			if [ "$DEEP" = true ]; then
 				gospider -S .tmp/probed_tmp_scrap.txt --js -t $GOSPIDER_THREADS -d 3 --sitemap --robots -w -r > .tmp/gospider.txt
 			else
