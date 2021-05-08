@@ -400,7 +400,7 @@ function sub_scraping(){
 		if [ -s "$dir/subdomains/subdomains.txt" ]; then
 			axiom-scan subdomains/subdomains.txt -m httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap1.txt &>>"$LOGFILE" && cat .tmp/probed_tmp_scrap1.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
 			axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -csp-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap2.txt &>>"$LOGFILE" && cat .tmp/probed_tmp_scrap2.txt | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
-			axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -tls-grab -tls-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap3.txt &>>"$LOGFILE" && cat .tmp/probed_tmp_scrap3.txt | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
+			axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -tls-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -o .tmp/probed_tmp_scrap3.txt &>>"$LOGFILE" && cat .tmp/probed_tmp_scrap3.txt | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
 			if [ "$DEEP" = true ]; then
 				axiom-scan .tmp/probed_tmp_scrap.txt -m gospider --js -d 3 --sitemap --robots -w -r -o .tmp/gospider &>>"$LOGFILE"
 			else
