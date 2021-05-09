@@ -398,7 +398,7 @@ function sub_scraping(){
 		if [ -s "$dir/subdomains/subdomains.txt" ]; then
 			cat subdomains/subdomains.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
 			cat .tmp/probed_tmp_scrap.txt | httpx -csp-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
-			cat .tmp/probed_tmp_scrap.txt | httpx -tls-grab -tls-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
+			cat .tmp/probed_tmp_scrap.txt | httpx -tls-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
 			if [ "$DEEP" = true ]; then
 				gospider -S .tmp/probed_tmp_scrap.txt --js -t $GOSPIDER_THREADS -d 3 --sitemap --robots -w -r > .tmp/gospider.txt
 			else
@@ -599,7 +599,10 @@ function webprobe_simple(){
 function webprobe_full(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$WEBPROBEFULL" = true ]; then
 		start_func "Http probing non standard ports"
-		cat subdomains/subdomains.txt | naabu -p $UNCOMMON_PORTS_WEB -o .tmp/nmap_uncommonweb.txt &>>"$LOGFILE" && uncommon_ports_checked=$(cat .tmp/nmap_uncommonweb.txt | cut -d ':' -f2 | sort -u | sed -e 'H;${x;s/\n/,/g;s/^,//;p;};d')
+
+		timeout_secs=$(($(cat subdomains/subdomains.txt | wc -l)*5+10))
+
+		cat subdomains/subdomains.txt | timeout $timeout_secs naabu -p $UNCOMMON_PORTS_WEB -o .tmp/nmap_uncommonweb.txt &>>"$LOGFILE" && uncommon_ports_checked=$(cat .tmp/nmap_uncommonweb.txt | cut -d ':' -f2 | sort -u | sed -e 'H;${x;s/\n/,/g;s/^,//;p;};d')
 		if [ -n "$uncommon_ports_checked" ]; then
 			cat subdomains/subdomains.txt | httpx -ports $uncommon_ports_checked -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout 10 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain" | anew -q .tmp/probed_uncommon_ports_tmp.txt
 		fi
@@ -1410,6 +1413,20 @@ function resolvers_update(){
 	fi
 }
 
+function ipcidr_detection(){
+	if [[ $1 =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+		if [[ $1 =~ /[0-9]+$ ]]; then
+			prips $1 | hakrevdns
+			prips $1 | gdn
+			# ./test.sh 199.120.48.0/24 | cut -d' ' -f3 | unfurl -u domains | sed 's/\.$//' | awk -F\. '{print $(NF-1) FS $NF}' | sort -u
+		else
+			echo $1 | hakrevdns
+			echo $1 | gdn
+			# ./test.sh 199.120.48.0/24 | cut -d' ' -f3 | unfurl -u domains | sed 's/\.$//' | awk -F\. '{print $(NF-1) FS $NF}' | sort -u
+		fi
+	fi
+}
+
 function start(){
 
 	global_start=$(date +%s)
@@ -1422,6 +1439,8 @@ function start(){
 
 	echo "Recon succesfully started on $domain" | $NOTIFY
 	tools_installed
+
+#	ipcidr_detection $domain
 
 	if [ -z "$domain" ]; then
 		if [ -n "$list" ]; then
