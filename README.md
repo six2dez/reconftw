@@ -35,23 +35,23 @@
 
 📔 Table of Contents
 -----------------
-- [💿 Installation:](#-installation)
+- [💿 Installation](#-installation)
   - [a) In your PC/VPS/VM](#a-in-your-pcvpsvm)
   - [b) Docker container 🐳 (2 options)](#b-docker-container--2-options)
     - [1) From DockerHub](#1-from-dockerhub)
     - [2) From repository](#2-from-repository)
-- [⚙️ Config file:](#️-config-file)
-- [Usage:](#usage)
-- [Example Usage:](#example-usage)
-- [Axiom Support: :cloud:](#axiom-support-cloud)
-- [Sample video:](#sample-video)
+- [⚙️ Config file](#️-config-file)
+- [Usage](#usage)
+  - [Example Usage](#example-usage)
+- [Axiom Support :cloud:](#axiom-support-cloud)
+- [Sample video](#sample-video)
 - [:fire: Features :fire:](#fire-features-fire)
 - [Mindmap/Workflow](#mindmapworkflow)
   - [Data Keep](#data-keep)
-    - [Main commands:](#main-commands)
-  - [How to contribute:](#how-to-contribute)
-  - [Need help?](#need-help)
-  - [You can support this work buying me a coffee:](#you-can-support-this-work-buying-me-a-coffee)
+  - [Main commands](#main-commands)
+  - [How to contribute](#how-to-contribute)
+- [Need help?](#need-help)
+- [Support this project](#you-can-support-this-work-buying-me-a-coffee)
 - [Thanks :pray:](#thanks-pray)
 
 ---
@@ -143,13 +143,15 @@ AMASS_CONFIG=~/.config/amass/config.ini
 GITHUB_TOKENS=${tools}/.github_tokens
 
 # APIs/TOKENS - Uncomment the lines you set removing the '#' at the beginning of the line
-#SHODAN_API_KEY=XXXXXXXXXXXXX
-#XSS_SERVER=six2dez.xss.ht
-#COLLAB_SERVER=XXXXXXXXXXXXXXXXX
-#findomain_virustotal_token=XXXXXXXXXXXXXXXXX
-#findomain_spyse_token=XXXXXXXXXXXXXXXXX
-#findomain_securitytrails_token=XXXXXXXXXXXXXXXXX
-#findomain_fb_token=XXXXXXXXXXXXXXXXX
+#SHODAN_API_KEY="XXXXXXXXXXXXX"
+#XSS_SERVER="XXXXXXXXXXXXXXXXX"
+#COLLAB_SERVER="XXXXXXXXXXXXXXXXX"
+#findomain_virustotal_token="XXXXXXXXXXXXXXXXX"
+#findomain_spyse_token="XXXXXXXXXXXXXXXXX"
+#findomain_securitytrails_token="XXXXXXXXXXXXXXXXX"
+#findomain_fb_token="XXXXXXXXXXXXXXXXX"
+slack_channel="XXXXXXXX"
+slack_auth="xoXX-XXX-XXX-XXX"
 
 # File descriptors
 DEBUG_STD="&>/dev/null"
@@ -178,6 +180,9 @@ WEBPROBESIMPLE=true
 WEBPROBEFULL=true
 WEBSCREENSHOT=true
 UNCOMMON_PORTS_WEB="81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55440,55672"
+# You can change to aquatone if gowitness fails, comment the one you don't want
+AXIOM_SCREENSHOT_MODULE=gowitness
+#AXIOM_SCREENSHOT_MODULE=aquatone
 
 # Host
 FAVICON=true
@@ -218,6 +223,7 @@ DEEP=false
 DIFF=false
 REMOVETMP=false
 PROXY=false
+SENDZIPNOTIFY=false
 
 # HTTP options
 HEADER="User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0"
@@ -233,7 +239,15 @@ BRUTESPRAY_CONCURRENCE=10
 ARJUN_THREADS=20
 GAUPLUS_THREADS=10
 DALFOX_THREADS=200
+PUREDNS_PUBLIC_LIMIT=0 # Set between 2000 - 10000 if your router blows up, 0 is unlimited
 PUREDNS_TRUSTED_LIMIT=400
+DIRDAR_THREADS=200
+
+# Timeouts
+CMSSCAN_TIMEOUT=3600
+FFUF_MAXTIME=900                # Seconds
+HTTPX_TIMEOUT=15                # Seconds
+HTTPX_UNCOMMONPORTS_TIMEOUT=10  # Seconds
 
 # lists
 fuzz_wordlist=${tools}/fuzz_wordlist.txt
@@ -242,6 +256,17 @@ subs_wordlist=${tools}/subdomains.txt
 subs_wordlist_big=${tools}/subdomains_big.txt
 resolvers=${tools}/resolvers.txt
 resolvers_trusted=${tools}/resolvers_trusted.txt
+
+# Axiom Fleet
+# Will not start a new fleet if one exist w/ same name and size (or larger)
+AXIOM_FLEET_LAUNCH=true
+AXIOM_FLEET_NAME="reconFTW"
+AXIOM_FLEET_COUNT=5
+AXIOM_FLEET_REGIONS=""
+AXIOM_FLEET_SHUTDOWN=true
+# This is a script on your reconftw host that might prep things your way...
+#AXIOM_POST_START="$HOME/bin/yourScript"
+
 ```
 </details>
 
@@ -267,7 +292,7 @@ resolvers_trusted=${tools}/resolvers_trusted.txt
 | -p | Passive - Perform only passive steps |
 | -a | All - Perform whole recon and all active attacks |
 | -w | Web - Just web checks on the list provided |
-| -v | Verbose - Prints everything including errors, for debug purposes |
+| -n | OSINT - Performs and OSINT scan, without subdomains |
 | -h | Help - Show this help menu |
 
 **GENERAL OPTIONS**
@@ -345,7 +370,7 @@ resolvers_trusted=${tools}/resolvers_trusted.txt
   - JS files & Source Code Scraping ([gospider](https://github.com/jaeles-project/gospider))
   - CNAME Records ([dnsx](https://github.com/projectdiscovery/dnsx))
 - Nuclei Sub TKO templates ([nuclei](https://github.com/projectdiscovery/nuclei))
-- Web Prober ([httpx](https://github.com/projectdiscovery/httpx))
+- Web Prober ([httpx](https://github.com/projectdiscovery/httpx) and [naabu](https://github.com/projectdiscovery/naabu))
 - Web screenshot ([gowitness](https://github.com/sensepost/gowitness))
 - Web templates scanner ([nuclei](https://github.com/projectdiscovery/nuclei))
 - IP and subdomains WAF checker ([cf-check](https://github.com/dwisiswant0/cf-check) and [wafw00f](https://github.com/EnableSecurity/wafw00f))
@@ -353,7 +378,7 @@ resolvers_trusted=${tools}/resolvers_trusted.txt
 - Url extraction ([waybackurls](https://github.com/tomnomnom/waybackurls), [gauplus](https://github.com/bp0lr/gauplus), [gospider](https://github.com/jaeles-project/gospider), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3))
 - Pattern Search ([gf](https://github.com/tomnomnom/gf) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns))
 - Param discovery ([paramspider](https://github.com/devanshbatham/ParamSpider) and [arjun](https://github.com/s0md3v/Arjun))
-- XSS ([XSStrike](https://github.com/s0md3v/XSStrike))
+- XSS ([dalfox](https://github.com/hahwul/dalfox))
 - Open redirect ([Openredirex](https://github.com/devanshbatham/OpenRedireX))
 - SSRF (headers [asyncio_ssrf.py](https://gist.github.com/h4ms1k/adcc340495d418fcd72ec727a116fea2) and param values with [ffuf](https://github.com/ffuf/ffuf))
 - CRLF ([crlfuzz](https://github.com/dwisiswant0/crlfuzz))
@@ -376,12 +401,13 @@ resolvers_trusted=${tools}/resolvers_trusted.txt
 - Docker container included and [DockerHub](https://hub.docker.com/r/six2dez/reconftw) integration
 - Cloud providers check ([ip2provider](https://github.com/oldrho/ip2provider))
 - Resume the scan from last performed step
-- Custom output folder
+- Custom output folder option
 - All in one installer/updater script compatible with most distros
 - Diff support for continuous running (cron mode)
 - Support for targets with multiple domains
 - RaspberryPi/ARM support
-- 5 modes (recon, passive, subdomains, web and all)
+- Send scan results zipped over Slack, Discord and Telegram
+- 6 modes (recon, passive, subdomains, web, osint and all)
 - Out of Scope Support
 - Notification support for Slack, Discord and Telegram ([notify](https://github.com/projectdiscovery/notify))
 
@@ -420,6 +446,12 @@ If you want to contribute to this project you can do it in multiple ways:
 ## You can support this work buying me a coffee:
 
 [<img src="https://cdn.buymeacoffee.com/buttons/v2/default-green.png">](https://www.buymeacoffee.com/six2dez)
+
+# Sponsors
+**This section shows the current financial sponsors of this project**  
+
+
+[<img src="https://pbs.twimg.com/profile_images/1360304248534282240/MomOFi40_400x400.jpg" width="100" height=auto>](https://github.com/0xtavian)
 
 # Thanks :pray:
 * Thank you for lending a helping hand towards the development of the project!
