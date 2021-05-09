@@ -1426,11 +1426,18 @@ function axiom_lauch(){
 			# if [ -n "$AXIOM_POST_START" ]; then
 			# 	eval "$AXIOM_POST_START"
 			# fi
-			end_func "Axiom fleet $AXIOM_FLEET_NAME already has $NUMOFNODES instances"
-		elif [[ $NUMOFNODES -eq 0 ]]; then
-			axiom_args=" -i=$AXIOM_FLEET_COUNT "
-			[ -n "$AXIOM_FLEET_REGIONS" ] && axiom_args="$axiom_args --regions=\"$AXIOM_FLEET_REGIONS\" "
-
+			end_func "Axiom fleet $AXIOM_FLEET_NAME already has $NUMOFNODES instances"		
+		# elif [[ $NUMOFNODES -eq 0 ]]; then
+		else
+			if [[ $NUMOFNODES -eq 0 ]]; then
+				startcount=$AXIOM_FLEET_COUNT
+			else
+				startcount=$((AXIOM_FLEET_COUNT-NUMOFNODES))
+			fi
+			axiom_args=" -i=$startcount "
+			# Temporarily disabled multiple axiom regions
+			# [ -n "$AXIOM_FLEET_REGIONS" ] && axiom_args="$axiom_args --regions=\"$AXIOM_FLEET_REGIONS\" " 
+			
 			echo "axiom-fleet $AXIOM_FLEET_NAME $axiom_args"
 			axiom-fleet $AXIOM_FLEET_NAME "$axiom_args"
 			axiom-select "$AXIOM_FLEET_NAME*"
@@ -1716,6 +1723,8 @@ function multi_recon(){
 	LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
 	touch .log/${NOW}_${NOWT}.txt
 
+	[ -n "$flist" ] && LISTTOTAL=$(cat "$flist" | wc -l )
+
 	for domain in $targets; do
 		dir=$workdir/targets/$domain
 		called_fn_dir=$dir/.called_fn
@@ -1742,7 +1751,6 @@ function multi_recon(){
 		printf "${bgreen} $domain finished 1st loop in ${runtime}  $currently ${reset}\n"
 		if [ -n "$flist" ]; then
 			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
-			LISTTOTAL=$(cat "$flist" | wc -l )
 			printf "\n${yellow}  $domain is $POSINLIST of $LISTTOTAL${reset}\n"
 		fi
 		printf "${reset}#######################################################################\n"
@@ -1768,7 +1776,6 @@ function multi_recon(){
 		printf "${bgreen} $domain finished 2nd loop in ${runtime}  $currently ${reset}\n"
 		if [ -n "$flist" ]; then
 			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
-			LISTTOTAL=$(cat "$flist" | wc -l )
 			printf "\n${yellow}  $domain is $POSINLIST of $LISTTOTAL${reset}\n"
 		fi
 		printf "${reset}#######################################################################\n\n"
@@ -1813,7 +1820,6 @@ function multi_recon(){
 		printf "${bgreen} $domain finished 3rd loop in ${runtime}  $currently ${reset}\n"
 		if [ -n "$flist" ]; then
 			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
-			LISTTOTAL=$(cat "$flist" | wc -l )
 			printf "\n${yellow}  $domain is $POSINLIST of $LISTTOTAL${reset}\n"
 		fi
 		printf "${reset}#######################################################################\n\n"
@@ -1835,7 +1841,6 @@ function multi_recon(){
 		printf "${bgreen} $domain finished final loop in ${runtime}  $currently ${reset}\n"
 		if [ -n "$flist" ]; then
 			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
-			LISTTOTAL=$(cat "$flist" | wc -l )
 			printf "\n${yellow}  $domain is $POSINLIST of $LISTTOTAL${reset}\n"
 		fi
 		printf "${reset}#######################################################################\n\n"
