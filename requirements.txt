@@ -45,3 +45,4 @@ boto3
 s3scanner
 shodan
 dnspython
+pytest-runner
