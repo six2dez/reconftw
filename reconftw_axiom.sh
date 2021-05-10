@@ -1426,13 +1426,20 @@ function axiom_lauch(){
 			# if [ -n "$AXIOM_POST_START" ]; then
 			# 	eval "$AXIOM_POST_START"
 			# fi
-			end_func "Axiom fleet $AXIOM_FLEET_NAME already has $NUMOFNODES instances"
-		elif [[ $NUMOFNODES -eq 0 ]]; then
-			axiom_args=" -i=$AXIOM_FLEET_COUNT "
-			[ -n "$AXIOM_FLEET_REGIONS" ] && axiom_args="$axiom_args --regions=\"$AXIOM_FLEET_REGIONS\" "
-
+			end_func "Axiom fleet $AXIOM_FLEET_NAME already has $NUMOFNODES instances"		
+		# elif [[ $NUMOFNODES -eq 0 ]]; then
+		else
+			if [[ $NUMOFNODES -eq 0 ]]; then
+				startcount=$AXIOM_FLEET_COUNT
+			else
+				startcount=$((AXIOM_FLEET_COUNT-NUMOFNODES))
+			fi
+			axiom_args=" -i=$startcount "
+			# Temporarily disabled multiple axiom regions
+			# [ -n "$AXIOM_FLEET_REGIONS" ] && axiom_args="$axiom_args --regions=\"$AXIOM_FLEET_REGIONS\" " 
+			
 			echo "axiom-fleet $AXIOM_FLEET_NAME $axiom_args"
-			axiom-fleet "$AXIOM_FLEET_NAME $axiom_args"
+			axiom-fleet $AXIOM_FLEET_NAME "$axiom_args"
 			axiom-select "$AXIOM_FLEET_NAME*"
 			if [ -n "$AXIOM_POST_START" ]; then
 				eval "$AXIOM_POST_START"
@@ -1525,8 +1532,10 @@ function start(){
 }
 
 function end(){
-	find $dir -type f -empty | grep -v "called_fn" | xargs rm -f &>/dev/null
-	find $dir -type d -empty | grep -v "called_fn" | xargs rm -rf &>/dev/null
+	if [ ! "$PRESERVE" = true ]; then
+		find $dir -type f -empty | grep -v "called_fn" | xargs rm -f &>/dev/null
+		find $dir -type d -empty | grep -v "called_fn" | xargs rm -rf &>/dev/null
+	fi
 
 	if [ "$REMOVETMP" = true ]; then
 		rm -rf $dir/.tmp
@@ -1714,6 +1723,8 @@ function multi_recon(){
 	LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
 	touch .log/${NOW}_${NOWT}.txt
 
+	[ -n "$flist" ] && LISTTOTAL=$(cat "$flist" | wc -l )
+
 	for domain in $targets; do
 		dir=$workdir/targets/$domain
 		called_fn_dir=$dir/.called_fn
@@ -1736,8 +1747,13 @@ function multi_recon(){
 		favicon
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
-		getElapsedTime $loopstart $loopend
+		printf "\n\n${reset}#######################################################################\n"
 		printf "${bgreen} $domain finished 1st loop in ${runtime}  $currently ${reset}\n"
+		if [ -n "$flist" ]; then
+			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
+			printf "\n${yellow}  $domain is $POSINLIST of $LISTTOTAL${reset}\n"
+		fi
+		printf "${reset}#######################################################################\n"
 	done
 	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 
@@ -1756,7 +1772,13 @@ function multi_recon(){
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
+		printf "\n\n${reset}#######################################################################\n"
 		printf "${bgreen} $domain finished 2nd loop in ${runtime}  $currently ${reset}\n"
+		if [ -n "$flist" ]; then
+			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
+			printf "\n${yellow}  $domain is $POSINLIST of $LISTTOTAL${reset}\n"
+		fi
+		printf "${reset}#######################################################################\n\n"
 	done
 	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 
@@ -1783,10 +1805,10 @@ function multi_recon(){
 	waf_checks
 	nuclei_check
 	for domain in $targets; do
-		dir=$workdir/targets/$domain
-		called_fn_dir=$dir/.called_fn
-		cd "$dir" || { echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		loopstart=$(date +%s)
+		dir=$workdir/targets/$domain
+        called_fn_dir=$dir/.called_fn 
+		cd "$dir" || { echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		fuzz
 		params
 		urlchecks
@@ -1794,19 +1816,34 @@ function multi_recon(){
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
+		printf "\n\n${reset}#######################################################################\n"
 		printf "${bgreen} $domain finished 3rd loop in ${runtime}  $currently ${reset}\n"
+		if [ -n "$flist" ]; then
+			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
+			printf "\n${yellow}  $domain is $POSINLIST of $LISTTOTAL${reset}\n"
+		fi
+		printf "${reset}#######################################################################\n\n"
 	done
 	axiom_shutdown
 	cloudprovider
 	for domain in $targets; do
 		loopstart=$(date +%s)
+		dir=$workdir/targets/$domain
+        called_fn_dir=$dir/.called_fn 
+		cd "$dir" || { echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		cms_scanner
 		url_gf
 		wordlist_gen
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
+		printf "\n\n${reset}#######################################################################\n"
 		printf "${bgreen} $domain finished final loop in ${runtime}  $currently ${reset}\n"
+		if [ -n "$flist" ]; then
+			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
+			printf "\n${yellow}  $domain is $POSINLIST of $LISTTOTAL${reset}\n"
+		fi
+		printf "${reset}#######################################################################\n\n"
 	done
 	cd "$workdir" || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 	dir=$workdir
@@ -1900,6 +1937,8 @@ banner
 
 check_version
 
+startdir=${PWD}
+
 if [ -z "$1" ]; then
 	help
 	tools_installed
@@ -1920,6 +1959,19 @@ while getopts ":hd:-:l:m:x:i:varnspxwo:" opt; do
 		d ) domain=$OPTARG
 			;;
 		l ) list=$OPTARG
+			if [ -n "$list" ]; then
+				if [[ "$list" = ./* ]]; then
+					flist="${startdir}/${list:2}"
+				elif [[ "$list" = ~* ]]; then
+					flist="${HOME}/${list:2}"
+				elif [[ "$list" = /* ]]; then
+					flist=$list
+				else
+					flist="$startdir/$list"
+				fi
+			else
+				flist=''
+			fi
 			;;
 		x ) outOfScope_file=$OPTARG
 			isAsciiText $outOfScope_file
@@ -1955,7 +2007,8 @@ while getopts ":hd:-:l:m:x:i:varnspxwo:" opt; do
 			fi
 			exit
 			;;
-		n ) if [ -n "$multi" ];	then
+		n ) PRESERVE=true
+			if [ -n "$multi" ];	then
 				multi_osint
 				exit
 			fi
