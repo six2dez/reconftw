@@ -78,12 +78,12 @@ install_apt(){
     eval $SUDO apt update -y $DEBUG_STD
     eval $SUDO apt install chromium-browser -y $DEBUG_STD
     eval $SUDO apt install chromium -y $DEBUG_STD
-    eval $SUDO apt install python3 python3-pip gcc build-essential ruby git curl libpcap-dev wget zip python3-dev python3-dnspython pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq python3-shodan apt-transport-https lynx tor medusa -y $DEBUG_STD
+    eval $SUDO apt install python3 python3-pip gcc build-essential ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa -y $DEBUG_STD
     eval $SUDO systemctl enable tor $DEBUG_STD
 }
 
 install_yum(){
-    eval $SUDO yum install python3 python3-pip ruby git curl libpcap-devel chromium wget zip openssl-devel bind-utils python3-devel lynx libxslt-devel libffi-devel libxml2-devel nmap python3-dnspython pv zlib-devel jq python-shodan -y $DEBUG_STD
+    eval $SUDO yum install python3 python3-pip ruby git curl libpcap-devel chromium wget zip openssl-devel bind-utils python3-devel lynx libxslt-devel libffi-devel libxml2-devel nmap pv zlib-devel jq -y $DEBUG_STD
 }
 
 install_pacman(){
@@ -250,7 +250,34 @@ eval wget -O asyncio_ssrf.py https://gist.github.com/h4ms1k/adcc340495d418fcd72e
 eval wget https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD && cp onelistforallmicro.txt fuzz_wordlist.txt
 eval wget -O lfi_wordlist.txt https://gist.githubusercontent.com/detonxx/a885ce7dd64a7139cb6f5b6860499ba8/raw $DEBUG_STD
 
-printf "${bblue} Running: Performing last configurations ${reset}\n\n"
+## Last check
+printf "${bblue} Running: Double check for installed tools ${reset}\n\n"
+go_step=0
+for gotool in "${!gotools[@]}"; do
+    go_step=$((go_step + 1))
+    eval type -P $gotool $DEBUG_STD || { eval ${gotools[$gotool]} $DEBUG_STD; }
+    exit_status=$?
+done
+repos_step=0
+for repo in "${!repos[@]}"; do
+    repos_step=$((repos_step + 1))
+    eval cd $dir/$repo $DEBUG_STD || { eval git clone https://github.com/${repos[$repo]} $dir/$repo $DEBUG_STD && cd $dir/$repo; }
+    eval git pull $DEBUG_STD
+    exit_status=$?
+    if [ -s "setup.py" ]; then
+        eval $SUDO python3 setup.py install $DEBUG_STD
+    fi
+    if [ "massdns" = "$repo" ]; then
+            eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/bin/ $DEBUG_ERROR
+    elif [ "gf" = "$repo" ]; then
+            eval cp -r examples ~/.gf $DEBUG_ERROR
+    elif [ "Gf-Patterns" = "$repo" ]; then
+            eval mv *.json ~/.gf $DEBUG_ERROR
+    fi
+    cd $dir
+done
+
+printf "${bblue}\n Running: Performing last configurations ${reset}\n\n"
 ## Last steps
 if [ ! -s "resolvers.txt" ] || [ $(find "resolvers.txt" -mtime +1 -print) ]; then
     printf "${yellow} Resolvers seem older than 1 day\n Generating custom resolvers... ${reset}\n\n"
