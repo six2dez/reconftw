@@ -8,7 +8,7 @@ tqdm
 tld
 chardet==3.0.4
 idna==2.9
-termcolor==1.1.0
+termcolor
 argparse==1.4.0
 htmlmin==0.1.12
 tldextract==2.2.0
@@ -30,7 +30,7 @@ netaddr==0.8.0
 plotly==4.14.3
 pyppeteer==0.2.5
 PyYAML==5.4.1
-requests==2.25.1
+requests
 retrying==1.3.3
 texttable==1.6.3
 lxml
