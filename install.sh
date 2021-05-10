@@ -78,12 +78,12 @@ install_apt(){
     eval $SUDO apt update -y $DEBUG_STD
     eval $SUDO apt install chromium-browser -y $DEBUG_STD
     eval $SUDO apt install chromium -y $DEBUG_STD
-    eval $SUDO apt install python3 python3-pip gcc build-essential ruby git curl libpcap-dev wget zip python3-dev python3-dnspython pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq python3-shodan apt-transport-https lynx tor medusa -y $DEBUG_STD
+    eval $SUDO apt install python3 python3-pip gcc build-essential ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa -y $DEBUG_STD
     eval $SUDO systemctl enable tor $DEBUG_STD
 }
 
 install_yum(){
-    eval $SUDO yum install python3 python3-pip ruby git curl libpcap-devel chromium wget zip openssl-devel bind-utils python3-devel lynx libxslt-devel libffi-devel libxml2-devel nmap python3-dnspython pv zlib-devel jq python-shodan -y $DEBUG_STD
+    eval $SUDO yum install python3 python3-pip ruby git curl libpcap-devel chromium wget zip openssl-devel bind-utils python3-devel lynx libxslt-devel libffi-devel libxml2-devel nmap pv zlib-devel jq -y $DEBUG_STD
 }
 
 install_pacman(){
@@ -172,7 +172,7 @@ printf "${bblue} Running: Installing Golang tools (${#gotools[@]})${reset}\n\n"
 go_step=0
 for gotool in "${!gotools[@]}"; do
     go_step=$((go_step + 1))
-    eval type -P $gotool $DEBUG_STD || { eval ${gotools[$gotool]} $DEBUG_STD; }
+    eval ${gotools[$gotool]} $DEBUG_STD
     exit_status=$?
     if [ $exit_status -eq 0 ]
     then
@@ -196,7 +196,8 @@ eval git clone --depth 1 https://github.com/drwetter/testssl.sh.git $dir/testssl
 repos_step=0
 for repo in "${!repos[@]}"; do
     repos_step=$((repos_step + 1))
-    eval cd $dir/$repo $DEBUG_STD || { eval git clone https://github.com/${repos[$repo]} $dir/$repo $DEBUG_STD && cd $dir/$repo; }
+    eval git clone https://github.com/${repos[$repo]} $dir/$repo $DEBUG_STD
+    eval cd $dir/$repo $DEBUG_STD
     eval git pull $DEBUG_STD
     exit_status=$?
     if [ $exit_status -eq 0 ]
@@ -241,14 +242,41 @@ printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 eval wget -nc -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini $DEBUG_STD
 eval wget -nc -O ~/.gf/potential.json https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json $DEBUG_STD
 eval wget -nc -O ~/.config/notify/notify.conf https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw/a66c4d8cf47a3bc95f5e9ba84773428662ea760c/notify_sample.conf $DEBUG_STD
-eval wget https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py $DEBUG_STD
-eval wget https://wordlists-cdn.assetnote.io/data/manual/best-dns-wordlist.txt $DEBUG_STD && mv best-dns-wordlist.txt subdomains_big.txt
+eval wget -nc -O getjswords.py https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py $DEBUG_STD
+eval wget -nc -O subdomains_big.txt https://wordlists-cdn.assetnote.io/data/manual/best-dns-wordlist.txt $DEBUG_STD
 eval wget -O resolvers_trusted.txt https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw $DEBUG_STD
 eval wget -O subdomains.txt https://gist.github.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw $DEBUG_STD
 eval wget -O permutations_list.txt https://gist.github.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw $DEBUG_STD
-eval wget -O asyncio_ssrf.py https://gist.github.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw $DEBUG_STD && cp asyncio_ssrf.py ssrf.py
-eval wget https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD && cp onelistforallmicro.txt fuzz_wordlist.txt
+eval wget -nc -O ssrf.py https://gist.github.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw $DEBUG_STD
+eval wget -nc -O fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD
 eval wget -O lfi_wordlist.txt https://gist.githubusercontent.com/detonxx/a885ce7dd64a7139cb6f5b6860499ba8/raw $DEBUG_STD
+
+## Last check
+printf "${bblue} Running: Double check for installed tools ${reset}\n\n"
+go_step=0
+for gotool in "${!gotools[@]}"; do
+    go_step=$((go_step + 1))
+    eval type -P $gotool $DEBUG_STD || { eval ${gotools[$gotool]} $DEBUG_STD; }
+    exit_status=$?
+done
+repos_step=0
+for repo in "${!repos[@]}"; do
+    repos_step=$((repos_step + 1))
+    eval cd $dir/$repo $DEBUG_STD || { eval git clone https://github.com/${repos[$repo]} $dir/$repo $DEBUG_STD && cd $dir/$repo; }
+    eval git pull $DEBUG_STD
+    exit_status=$?
+    if [ -s "setup.py" ]; then
+        eval $SUDO python3 setup.py install $DEBUG_STD
+    fi
+    if [ "massdns" = "$repo" ]; then
+            eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/bin/ $DEBUG_ERROR
+    elif [ "gf" = "$repo" ]; then
+            eval cp -r examples ~/.gf $DEBUG_ERROR
+    elif [ "Gf-Patterns" = "$repo" ]; then
+            eval mv *.json ~/.gf $DEBUG_ERROR
+    fi
+    cd $dir
+done
 
 printf "${bblue} Running: Performing last configurations ${reset}\n\n"
 ## Last steps
