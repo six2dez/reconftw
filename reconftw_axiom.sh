@@ -1426,7 +1426,7 @@ function axiom_lauch(){
 			# if [ -n "$AXIOM_POST_START" ]; then
 			# 	eval "$AXIOM_POST_START"
 			# fi
-			end_func "Axiom fleet $AXIOM_FLEET_NAME already has $NUMOFNODES instances"		
+			end_func "Axiom fleet $AXIOM_FLEET_NAME already has $NUMOFNODES instances"
 		# elif [[ $NUMOFNODES -eq 0 ]]; then
 		else
 			if [[ $NUMOFNODES -eq 0 ]]; then
@@ -1436,8 +1436,8 @@ function axiom_lauch(){
 			fi
 			axiom_args=" -i=$startcount "
 			# Temporarily disabled multiple axiom regions
-			# [ -n "$AXIOM_FLEET_REGIONS" ] && axiom_args="$axiom_args --regions=\"$AXIOM_FLEET_REGIONS\" " 
-			
+			# [ -n "$AXIOM_FLEET_REGIONS" ] && axiom_args="$axiom_args --regions=\"$AXIOM_FLEET_REGIONS\" "
+
 			echo "axiom-fleet $AXIOM_FLEET_NAME $axiom_args"
 			axiom-fleet $AXIOM_FLEET_NAME "$axiom_args"
 			axiom-select "$AXIOM_FLEET_NAME*"
@@ -1465,6 +1465,12 @@ function axiom_shutdown(){
 }
 
 function axiom_selected(){
+
+	if [[ ! $(axiom-ls | tail -n +2 | sed '$ d' | wc -l) -gt 0 ]]; then
+		notification "\n\n${bred} No axiom instances running ${reset}\n\n" error
+		exit
+	fi
+
 	if [[ ! $(cat ~/.axiom/selected.conf | sed '/^\s*$/d' | wc -l) -gt 0 ]]; then
 		notification "\n\n${bred} No axiom instances selected ${reset}\n\n" error
 		exit
@@ -1853,12 +1859,19 @@ function multi_recon(){
 
 function subs_menu(){
 	start
+
+	axiom_lauch
+	axiom_selected
+
 	subdomains_full
 	webprobe_full
 	screenshot
 	subtakeover
 	zonetransfer
 	s3buckets
+
+	axiom_shutdown
+
 	end
 }
 
