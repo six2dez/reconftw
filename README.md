@@ -6,8 +6,6 @@
   <br>
 </h1>
 
-<h4 align="center">A simple bash script for full recon</h4>
-
 <p align="center">
   <a href="https://github.com/six2dez/reconftw/releases/tag/v1.6.0.2">
     <img src="https://img.shields.io/badge/release-v1.6.0.2-green">
@@ -32,6 +30,17 @@
     <img alt="Docker Cloud Build Status" src="https://img.shields.io/docker/cloud/build/six2dez/reconftw">
   </a>
 </p>
+
+<h3 align="center">Summary</h3>
+
+**ReconFTW** automates the entire process of reconnaisance for you. It outperforms the work of subdomain enumeration along with various vulnerability checks and obtaining maximum information about your target.       
+
+ReconFTW uses around 5 techniques(passive,bruteforce,permutations,certificate transparency,JS scraping) for subdomain enumeration which helps you getting the maximum and the most interesting subdomains so that you be ahead of the competition.   
+
+
+It also performs various vulnerability checks like XSS, Open Redirects, SSRF, CRLF, LFI, SQLi, SSL tests, SSTI, DNS zone transfers, and much more. Along with these, it performs OSINT techniques, directory fuzzing, dorking, ports scanning, screenshots, nuclei scan on your target.
+
+So, what are you waiting for Go! Go! Go! :boom:
 
 📔 Table of Contents
 -----------------
@@ -291,7 +300,7 @@ AXIOM_FLEET_SHUTDOWN=true
 | -s | Subdomains - Perform only subdomain enumeration, web probing, subdomain takeovers |
 | -p | Passive - Perform only passive steps |
 | -a | All - Perform whole recon and all active attacks |
-| -w | Web - Just web checks on the list provided |
+| -w | Web - Perform only vulnerability checks/attacks on particular domain |
 | -n | OSINT - Performs and OSINT scan, without subdomains |
 | -h | Help - Show this help menu |
 
@@ -343,9 +352,10 @@ AXIOM_FLEET_SHUTDOWN=true
 # Axiom Support: :cloud:
 ![](https://i.ibb.co/Jzrgkqt/axiom-readme.png)
 > Check out the wiki section for more info [Axiom Support](https://github.com/six2dez/reconftw/wiki/5.-Axiom-version)
-* Using ```reconftw_axiom.sh``` script you can take advantage of running **reconFTW** with [Axiom](https://github.com/pry0cc/axiom).
 * As reconFTW actively hits the target with a lot of web traffic, hence there was a need to move to Axiom distributing the work load among various instances leading to reduction of execution time.
-* Currently except the ```-a``` flag, all flags are supported when running with Axiom.
+* During the configuartion of axiom you need to select `reconftw` as provisoner.
+* Using ```reconftw_axiom.sh``` script you can take advantage of running **reconFTW** with [Axiom](https://github.com/pry0cc/axiom).
+
 ```bash
 ▶ ./reconftw_axiom.sh -d target.com -r
 ```
@@ -447,7 +457,7 @@ If you want to contribute to this project you can do it in multiple ways:
 
 [<img src="https://cdn.buymeacoffee.com/buttons/v2/default-green.png">](https://www.buymeacoffee.com/six2dez)
 
-# Sponsors
+# Sponsors ❤️
 **This section shows the current financial sponsors of this project**  
 
 
