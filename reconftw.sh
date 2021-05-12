@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-. ./reconftw.cfg
 
 function banner(){
 	printf "\n${bgreen}"
@@ -1660,6 +1659,7 @@ function multi_recon(){
 	LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
 	touch .log/${NOW}_${NOWT}.txt
 
+	[ -n "$flist" ] && LISTTOTAL=$(cat "$flist" | wc -l )
 	for domain in $targets; do
 		dir=$workdir/targets/$domain
 		called_fn_dir=$dir/.called_fn
@@ -1683,7 +1683,13 @@ function multi_recon(){
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
+		printf "\n\n${reset}#######################################################################\n"
 		printf "${bgreen} $domain finished 1st loop in ${runtime}  $currently ${reset}\n"
+		if [ -n "$flist" ]; then
+			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
+			printf "\n${yellow}  $domain is $POSINLIST of $LISTTOTAL${reset}\n"
+		fi
+		printf "${reset}#######################################################################\n"
 	done
 	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 
@@ -1699,7 +1705,13 @@ function multi_recon(){
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
+		printf "\n\n${reset}#######################################################################\n"
 		printf "${bgreen} $domain finished 2nd loop in ${runtime}  $currently ${reset}\n"
+		if [ -n "$flist" ]; then
+			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
+			printf "\n${yellow}  $domain is $POSINLIST of $LISTTOTAL${reset}\n"
+		fi
+		printf "${reset}#######################################################################\n\n"
 	done
 	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 
@@ -1737,18 +1749,33 @@ function multi_recon(){
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
+		printf "\n\n${reset}#######################################################################\n"
 		printf "${bgreen} $domain finished 3rd loop in ${runtime}  $currently ${reset}\n"
+		if [ -n "$flist" ]; then
+			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
+			printf "\n${yellow}  $domain is $POSINLIST of $LISTTOTAL${reset}\n"
+		fi
+		printf "${reset}#######################################################################\n\n"
 	done
 	cloudprovider
 	for domain in $targets; do
 		loopstart=$(date +%s)
+		dir=$workdir/targets/$domain
+        called_fn_dir=$dir/.called_fn 
+		cd "$dir" || { echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		cms_scanner
 		url_gf
 		wordlist_gen
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
+		printf "\n\n${reset}#######################################################################\n"
 		printf "${bgreen} $domain finished final loop in ${runtime}  $currently ${reset}\n"
+		if [ -n "$flist" ]; then
+			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
+			printf "\n${yellow}  $domain is $POSINLIST of $LISTTOTAL${reset}\n"
+		fi
+		printf "${reset}#######################################################################\n\n"
 	done
 	cd "$workdir" || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 	dir=$workdir
@@ -1768,54 +1795,55 @@ function subs_menu(){
 }
 
 function webs_menu(){
-			subtakeover
-			s3buckets
-			waf_checks
-			nuclei_check
-			cms_scanner
-			fuzz
-			4xxbypass
-			cors
-			params
-			urlchecks
-			url_gf
-			jschecks
-			wordlist_gen
-			open_redirect
-			ssrf_checks
-			crlf_checks
-			lfi
-			ssti
-			sqli
-			xss
-			spraying
-			brokenLinks
-			test_ssl
-			end
+	subtakeover
+	s3buckets
+	waf_checks
+	nuclei_check
+	cms_scanner
+	fuzz
+	4xxbypass
+	cors
+	params
+	urlchecks
+	url_gf
+	jschecks
+	wordlist_gen
+	open_redirect
+	ssrf_checks
+	crlf_checks
+	lfi
+	ssti
+	sqli
+	xss
+	spraying
+	brokenLinks
+	test_ssl
+	end
 }
 
 function help(){
 	printf "\n Usage: $0 [-d domain.tld] [-m name] [-l list.txt] [-x oos.txt] [-i in.txt] "
-	printf "\n           	      [-r] [-s] [-p] [-a] [-w] [-i] [-h] [--deep] [--fs] [-o OUTPUT]\n\n"
+	printf "\n           	      [-r] [-s] [-p] [-a] [-w] [-n] [-i] [-h] [--deep] [--fs] [-o OUTPUT]\n\n"
 	printf " ${bblue}TARGET OPTIONS${reset}\n"
-	printf "   -d domain.tld    Target domain\n"
-	printf "   -m company       Target company name\n"
-	printf "   -l list.txt      Targets list, one per line\n"
-	printf "   -x oos.txt       Exclude subdomains list (Out Of Scope)\n"
-	printf "   -i in.txt        Include subdomains list\n"
+	printf "   -d domain.tld     Target domain\n"
+	printf "   -m company        Target company name\n"
+	printf "   -l list.txt       Targets list, one per line\n"
+	printf "   -x oos.txt        Exclude subdomains list (Out Of Scope)\n"
+	printf "   -i in.txt         Include subdomains list\n"
 	printf " \n"
 	printf " ${bblue}MODE OPTIONS${reset}\n"
-	printf "   -r               Recon - Full recon process (only recon without attacks)\n"
-	printf "   -s               Subdomains - Search subdomains, check tko and web probe\n"
-	printf "   -p               Passive - Performs only passive steps \n"
-	printf "   -a               All - Perform all checks and exploitations\n"
-	printf "   -w               Web - Just web checks from list provided\n"
-	printf "   -n               OSINT - Just checks public intel info\n"
-	printf "   -h               Help - Show this help\n"
+	printf "   -r, --recon       Recon - Full recon process (only recon without attacks)\n"
+	printf "   -s, --subdomains  Subdomains - Search subdomains, check tko and web probe\n"
+	printf "   -p, --passive     Passive - Performs only passive steps \n"
+	printf "   -a, --all         All - Perform all checks and exploitations\n"
+	printf "   -w, --web         Web - Just web checks from list provided\n"
+	printf "   -n, --osint       OSINT - Just checks public intel info\n"
+	printf "   -h                Help - Show this help\n"
 	printf " \n"
 	printf " ${bblue}GENERAL OPTIONS${reset}\n"
-	printf "   --deep           Deep scan (Enable some slow options for deeper scan)\n"
-	printf "   -o output/path   Define output folder\n"
+	printf "   -f confile_file   Alternate reconftw.cfg file\n"	
+	printf "   --deep            Deep scan (Enable some slow options for deeper scan)\n"
+	printf "   -o output/path    Define output folder\n"
 	printf " \n"
 	printf " ${bblue}USAGE EXAMPLES${reset}\n"
 	printf " Recon:\n"
@@ -1834,71 +1862,230 @@ function help(){
 	printf " ./reconftw.sh -d example.com -x out.txt -a -o custom/path\n"
 }
 
+
 ###############################################################################################################
 ########################################### START SCRIPT  #####################################################
 ###############################################################################################################
+
+PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:rspawvh::' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,deep,help' -n 'reconFTW' -- "$@")
+
+
+# Note the quotes around "$PROGARGS": they are essential!
+eval set -- "$PROGARGS"
+unset PROGARGS
+
+while true; do
+    case "$1" in
+        '-d'|'--domain')
+            domain=$2
+            shift 2
+            continue
+            ;;
+        '-m')
+            multi=$2
+            shift 2
+            continue
+            ;;
+        '-l'|'--list')
+            list=$2
+            shift 2
+            continue
+            ;;
+        '-x')
+            outOfScope_file=$2
+            shift 2
+            continue
+            ;;            
+        '-i')
+            inScope_file=$2
+            shift 2
+            continue
+            ;;
+
+        # modes
+        '-r'|'--recon')
+            opt_mode='r'
+            shift
+            continue
+            ;;
+        '-s'|'--subdomains')
+            opt_mode='s'
+            shift
+            continue
+            ;;
+        '-p'|'--passive')
+            opt_mode='p'
+            shift
+            continue
+            ;;
+        '-a'|'--all')
+            opt_mode='a'
+            shift
+            continue
+            ;;
+        '-w'|'--web')
+            opt_mode='w'
+            shift
+            continue
+            ;;
+        '-n'|'--osint')
+            opt_mode='i'
+            shift
+            continue
+            ;;			
+
+        # extra stuff
+        '-o')
+            dir_output=$2
+            output
+
+            shift 2
+            continue
+            ;;            
+        '-f')
+            config_file=$2
+            shift 2
+            continue
+            ;;    
+        '--deep')
+            opt_deep=true
+            shift
+            continue
+            ;;
+
+        '--')
+			shift
+			break
+		    ;;
+        '--help'| '-h'| *)
+            # echo "Unknown argument: $1"
+			banner
+            help
+			exit 1
+		    ;;
+
+    esac
+done
+
+
+# This is the first thing to do to read in alternate config 
+if [ -s "$config_file" ]; then
+    . "${config_file}"
+else
+    . ./reconftw.cfg
+fi
+
+if [ $opt_deep ]; then
+    DEEP=true
+fi
+
+if [ -n "$outOfScope_file" ]; then
+    isAsciiText $outOfScope_file
+    if [ "False" = "$IS_ASCII" ]
+    then
+        printf "\n\n${bred} Out of Scope file is not a text file${reset}\n\n"
+        exit
+    fi
+fi
+
+if [ -n "$inScope_file" ]; then
+    isAsciiText $inScope_file
+    if [ "False" = "$IS_ASCII" ]
+    then
+        printf "\n\n${bred} In Scope file is not a text file${reset}\n\n"
+        exit
+    fi
+fi
+
+startdir=${PWD}
 
 banner
 
 check_version
 
-if [ -z "$1" ]; then
-	help
-	tools_installed
-	exit
+startdir=${PWD}
+if [ -n "$list" ]; then
+	if [[ "$list" = ./* ]]; then
+		flist="${startdir}/${list:2}"
+	elif [[ "$list" = ~* ]]; then
+		flist="${HOME}/${list:2}"
+	elif [[ "$list" = /* ]]; then
+		flist=$list
+	else
+		flist="$startdir/$list"
+	fi
+else
+	flist=''
 fi
 
-while getopts ":hd:-:l:m:x:i:varnspxwo:" opt; do
-	general=$@
-	if [[ $general == *"--deep"* ]]; then
-  		DEEP=true
-	fi
-	case ${opt} in
-
-		## TARGETS
-
-		m ) multi=$OPTARG
-			;;
-		d ) domain=$OPTARG
-			;;
-		l ) list=$OPTARG
-			;;
-		x ) outOfScope_file=$OPTARG
-			isAsciiText $outOfScope_file
-			if [ "False" = "$IS_ASCII" ]; then
-				printf "\n\n${bred} Out of Scope file is not a text file${reset}\n\n"
-				exit
-			fi
-			;;
-		i ) inScope_file=$OPTARG
-			isAsciiText $inScope_file
-			if [ "False" = "$IS_ASCII" ]; then
-				printf "\n\n${bred} In Scope file is not a text file${reset}\n\n"
-				exit
-			fi
-			;;
-
-		## MODES
-
-		r ) if [ -n "$multi" ]; then
+case $opt_mode in
+        'r')
+            if [ -n "$multi" ];	then
+				#mode="multi_recon"
 				multi_recon
 				exit
 			fi
 			if [ -n "$list" ]; then
+
+				#mode="list_recon"
 				for domain in $(cat $list); do
 					start
 					recon
 					end
 				done
 			else
+				#mode="recon"
 				start
 				recon
 				end
 			fi
+            ;;
+        's')
+            if [ -n "$list" ]; then
+				#mode="subs_menu"
+				for domain in $(cat $list); do
+					subs_menu
+				done
+			else
+				subs_menu
+			fi
+            ;;
+        'p')
+            if [ -n "$list" ]; then
+				#mode="passive"
+				for domain in $(cat $list); do
+					passive
+				done
+			else
+				passive
+			fi
+            ;;
+        'a')
+            if [ -n "$list" ]; then
+				#mode="all"
+				for domain in $(cat $list); do
+					all
+				done
+			else
+				all
+			fi
+            ;;
+        'w')
+            start
+			if [ -n "$list" ]; then
+				if [[ "$list" = /* ]]; then
+					cp $list $dir/webs/webs.txt
+				else
+					cp $SCRIPTPATH/$list $dir/webs/webs.txt
+				fi
+			fi
+			webs_menu
 			exit
-			;;
-		n ) if [ -n "$multi" ];	then
-				multi_osint
+            ;;
+        'i')
+			PRESERVE=true
+			if [ -n "$multi" ];	then
+				multi_osint 
 				exit
 			fi
 			if [ -n "$list" ]; then
@@ -1912,52 +2099,11 @@ while getopts ":hd:-:l:m:x:i:varnspxwo:" opt; do
 				osint
 				end
 			fi
-			exit
-			;;
-		s ) if [ -n "$list" ]; then
-				for domain in $(cat $list); do
-					subs_menu
-				done
-			else
-				subs_menu
-			fi
-			exit
-			;;
-		a ) if [ -n "$list" ]; then
-				for domain in $(cat $list); do
-					all
-				done
-			else
-				all
-			fi
-			exit
-			;;
-		w ) start
-			if [ -n "$list" ]; then
-				if [[ "$list" = /* ]]; then
-					cp $list $dir/webs/webs.txt
-				else
-					cp $SCRIPTPATH/$list $dir/webs/webs.txt
-				fi
-			fi
-			webs_menu
-			exit
-			;;
-		p ) if [ -n "$list" ]; then
-				for domain in $(cat $list); do
-					passive
-				done
-			else
-				passive
-			fi
-			exit
-			;;
-		o ) dir_output=$OPTARG
-			output
-			;;
-		\? | h | : | - | * )
-			help
-			;;
-	esac
-done
-shift $((OPTIND -1))
+
+			;;    
+        # No mode selected.  EXIT!
+        *)
+            help
+            exit 1
+            ;;
+esac
