@@ -1967,6 +1967,7 @@ while true; do
 		    ;;
         '--help'| '-h'| *)
             # echo "Unknown argument: $1"
+            . ./reconftw.cfg
 			banner
             help
 			exit 1
