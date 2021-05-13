@@ -65,15 +65,22 @@ else
    IS_ARM="False";
 fi
 
-if [[ $(id -u | grep -o '^0$') == "0" ]]; then
-    SUDO=" "
-else
-    SUDO="sudo"
-fi
-
 printf "\n\n${bgreen}#######################################################################${reset}\n"
 printf "${bgreen} reconFTW installer/updater script ${reset}\n\n"
 printf "${yellow} This may take time. So, go grab a coffee! ${reset}\n\n"
+
+if [[ $(id -u | grep -o '^0$') == "0" ]]; then
+    SUDO=" "
+else
+    if sudo -n false 2>/dev/null; then
+        printf "${bred} Is strongly recommended to add your user to sudoers${reset}\n"
+        printf "${bred} This will avoid prompts for sudo password in the middle of the installation${reset}\n"
+        printf "${bred} And more important, in the middle of the scan (needed for nmap SYN scan)${reset}\n\n"
+        printf "${bred} echo \"${USERNAME}  ALL=(ALL:ALL) NOPASSWD: ALL\" > /etc/sudoers.d/reconFTW${reset}\n\n"
+    fi
+    SUDO="sudo"
+fi
+
 install_apt(){
     eval $SUDO apt update -y $DEBUG_STD
     eval $SUDO apt install chromium-browser -y $DEBUG_STD
@@ -222,18 +229,21 @@ done
 if [ "True" = "$IS_ARM" ]
     then
         eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-rpi  $DEBUG_STD
-        eval $SUDO mv findomain-rpi /usr/local/bin/findomain
+        eval $SUDO mv findomain-rpi /usr/bin/findomain
     else
         eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux $DEBUG_STD
         eval wget -N -c https://github.com/sensepost/gowitness/releases/download/2.3.4/gowitness-2.3.4-linux-amd64 $DEBUG_STD
         eval wget -N -c https://github.com/codingo/DNSCewl/raw/master/DNScewl $DEBUG_STD
-        eval $SUDO mv DNScewl /usr/local/bin/DNScewl
-        eval $SUDO mv gowitness-2.3.4-linux-amd64 /usr/local/bin/gowitness
-        eval $SUDO mv findomain-linux /usr/local/bin/findomain
+        eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/download/0.4.0/unimap-linux $DEBUG_STD
+        eval $SUDO mv DNScewl /usr/bin/DNScewl
+        eval $SUDO mv gowitness-2.3.4-linux-amd64 /usr/bin/gowitness
+        eval $SUDO mv findomain-linux /usr/bin/findomain
+        eval $SUDO mv unimap-linux /usr/bin/unimap
 fi
-eval $SUDO chmod 755 /usr/local/bin/findomain
-eval $SUDO chmod 755 /usr/local/bin/gowitness
-eval $SUDO chmod 755 /usr/local/bin/DNScewl
+eval $SUDO chmod 755 /usr/bin/findomain
+eval $SUDO chmod 755 /usr/bin/gowitness
+eval $SUDO chmod 755 /usr/bin/DNScewl
+eval $SUDO chmod 755 /usr/bin/unimap
 eval subfinder $DEBUG_STD
 eval subfinder $DEBUG_STD
 
@@ -288,6 +298,8 @@ eval h8mail -g $DEBUG_STD
 
 ## Stripping all Go binaries
 eval strip -s $HOME/go/bin/* $DEBUG_STD
+
+eval $SUDO cp $HOME/go/bin/* /usr/bin $DEBUG_STD
 
 printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - GitHub (~/Tools/.github_tokens)\n - SHODAN (SHODAN_API_KEY in reconftw.cfg)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg) \n - notify (~/.config/notify/notify.conf) \n - theHarvester (~/Tools/theHarvester/api-keys.yml)\n - H8mail (~/Tools/h8mail_config.ini)\n\n${reset}"
 printf "${bgreen} Finished!${reset}\n\n"

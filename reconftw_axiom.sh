@@ -954,7 +954,7 @@ function jschecks(){
 			fi
 			if [ -s ".tmp/js_endpoints.txt" ]; then
 				sed -i '/^\//!d' .tmp/js_endpoints.txt
-				cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt.txt
+				cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt
 			fi
 			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
 			if [ -s "js/js_livelinks.txt" ]; then

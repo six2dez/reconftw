@@ -325,7 +325,7 @@ function sub_crt(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBCRT" = true ]; then
 		start_subfunc "Running : Crtsh Subdomain Enumeration"
 		python3 $tools/ctfr/ctfr.py -d $domain -o .tmp/crtsh_subs_tmp.txt &>>"$LOGFILE"
-		curl "https://tls.bufferover.run/dns?q=.${domain}" 2>>"$LOGFILE" | jq -r .Results[] 2>>"$LOGFILE" | cut -d ',' -f3 | grep -F ".$domain" | anew -q .tmp/crtsh_subs.txt
+		curl "https://tls.bufferover.run/dns?q=.${domain}" 2>>"$LOGFILE" | jq -r .Results[] 2>>"$LOGFILE" | cut -d ',' -f3 | grep -F ".$domain" | anew -q .tmp/crtsh_subs_tmp.txt
 		curl "https://dns.bufferover.run/dns?q=.${domain}" 2>>"$LOGFILE" | jq -r '.FDNS_A'[],'.RDNS'[] 2>>"$LOGFILE" | cut -d ',' -f2 | grep -F ".$domain" | anew -q .tmp/crtsh_subs_tmp.txt
 		NUMOFLINES=$(cat .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" | anew .tmp/crtsh_subs.txt | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (cert transparency)" ${FUNCNAME[0]}
@@ -599,12 +599,14 @@ function webprobe_full(){
 	if ([ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]) && [ "$WEBPROBEFULL" = true ]; then
 		start_func "Http probing non standard ports"
 
-		timeout_secs=$(($(cat subdomains/subdomains.txt | wc -l)*5+10))
+		sudo unimap --fast-scan -f subdomains/subdomains.txt --ports $UNCOMMON_PORTS_WEB -q -k --url-output | anew -q .tmp/nmap_uncommonweb.txt
+		cat .tmp/nmap_uncommonweb.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout 10 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain" | anew -q .tmp/probed_uncommon_ports_tmp.txt
 
-		cat subdomains/subdomains.txt | timeout $timeout_secs naabu -p $UNCOMMON_PORTS_WEB -o .tmp/nmap_uncommonweb.txt &>>"$LOGFILE" && uncommon_ports_checked=$(cat .tmp/nmap_uncommonweb.txt | cut -d ':' -f2 | sort -u | sed -e 'H;${x;s/\n/,/g;s/^,//;p;};d')
-		if [ -n "$uncommon_ports_checked" ]; then
-			cat subdomains/subdomains.txt | httpx -ports $uncommon_ports_checked -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout 10 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain" | anew -q .tmp/probed_uncommon_ports_tmp.txt
-		fi
+		#timeout_secs=$(($(cat subdomains/subdomains.txt | wc -l)*5+10))
+		#cat subdomains/subdomains.txt | timeout $timeout_secs naabu -p $UNCOMMON_PORTS_WEB -o .tmp/nmap_uncommonweb.txt &>>"$LOGFILE" && uncommon_ports_checked=$(cat .tmp/nmap_uncommonweb.txt | cut -d ':' -f2 | sort -u | sed -e 'H;${x;s/\n/,/g;s/^,//;p;};d')
+		#if [ -n "$uncommon_ports_checked" ]; then
+			#cat subdomains/subdomains.txt | httpx -ports $uncommon_ports_checked -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout 10 -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain" | anew -q .tmp/probed_uncommon_ports_tmp.txt
+		#fi
 		NUMOFLINES=$(cat .tmp/probed_uncommon_ports_tmp.txt 2>>"$LOGFILE" | anew webs/webs_uncommon_ports.txt | wc -l)
 		notification "Uncommon web ports: ${NUMOFLINES} new websites" good
 		cat webs/webs_uncommon_ports.txt 2>>"$LOGFILE"
@@ -682,7 +684,7 @@ function portscan(){
 			done
 		fi
 		if [ "$PORTSCAN_ACTIVE" = true ]; then
-			nmap --top-ports 1000 -sV -n --max-retries 2 -Pn -iL .tmp/ips_nowaf.txt -oN hosts/portscan_active.txt -oG .tmp/nmap_grep.gnmap &>>"$LOGFILE"
+			sudo nmap --top-ports 1000 -sV -n --max-retries 2 -Pn -iL .tmp/ips_nowaf.txt -oN hosts/portscan_active.txt -oG .tmp/nmap_grep.gnmap &>>"$LOGFILE"
 		fi
 		end_func "Results are saved in hosts/portscan_[passive|active].txt" ${FUNCNAME[0]}
 	else
@@ -953,7 +955,7 @@ function jschecks(){
 			fi
 			if [ -s ".tmp/js_endpoints.txt" ]; then
 				sed -i '/^\//!d' .tmp/js_endpoints.txt
-				cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt.txt
+				cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt
 			fi
 			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
 			if [ -s "js/js_livelinks.txt" ]; then
@@ -1572,6 +1574,7 @@ function multi_osint(){
 	fi
 
 	if [ -s "$list" ]; then
+		sed -i 's/\r$//' $list
 		targets=$(cat $list)
 	else
 		notification "Target list not provided" error
@@ -1642,6 +1645,7 @@ function multi_recon(){
 	fi
 
 	if [ -s "$list" ]; then
+		 sed -i 's/\r$//' $list
 		targets=$(cat $list)
 	else
 		notification "Target list not provided" error
@@ -1823,7 +1827,7 @@ function webs_menu(){
 
 function help(){
 	printf "\n Usage: $0 [-d domain.tld] [-m name] [-l list.txt] [-x oos.txt] [-i in.txt] "
-	printf "\n           	      [-r] [-s] [-p] [-a] [-w] [-n] [-i] [-h] [--deep] [--fs] [-o OUTPUT]\n\n"
+	printf "\n           	      [-r] [-s] [-p] [-a] [-w] [-n] [-i] [-h] [-f] [--deep] [-o OUTPUT]\n\n"
 	printf " ${bblue}TARGET OPTIONS${reset}\n"
 	printf "   -d domain.tld     Target domain\n"
 	printf "   -m company        Target company name\n"
@@ -1841,7 +1845,7 @@ function help(){
 	printf "   -h                Help - Show this help\n"
 	printf " \n"
 	printf " ${bblue}GENERAL OPTIONS${reset}\n"
-	printf "   -f confile_file   Alternate reconftw.cfg file\n"	
+	printf "   -f confile_file   Alternate reconftw.cfg file\n"
 	printf "   --deep            Deep scan (Enable some slow options for deeper scan)\n"
 	printf "   -o output/path    Define output folder\n"
 	printf " \n"
@@ -1895,7 +1899,7 @@ while true; do
             outOfScope_file=$2
             shift 2
             continue
-            ;;            
+            ;;
         '-i')
             inScope_file=$2
             shift 2
@@ -1929,10 +1933,10 @@ while true; do
             continue
             ;;
         '-n'|'--osint')
-            opt_mode='i'
+            opt_mode='n'
             shift
             continue
-            ;;			
+            ;;
 
         # extra stuff
         '-o')
@@ -1941,18 +1945,17 @@ while true; do
 
             shift 2
             continue
-            ;;            
+            ;;
         '-f')
             config_file=$2
             shift 2
             continue
-            ;;    
+            ;;
         '--deep')
             opt_deep=true
             shift
             continue
             ;;
-
         '--')
 			shift
 			break
@@ -1963,12 +1966,10 @@ while true; do
             help
 			exit 1
 		    ;;
-
     esac
 done
 
-
-# This is the first thing to do to read in alternate config 
+# This is the first thing to do to read in alternate config
 if [ -s "$config_file" ]; then
     . "${config_file}"
 else
@@ -2026,8 +2027,8 @@ case $opt_mode in
 				exit
 			fi
 			if [ -n "$list" ]; then
-
 				#mode="list_recon"
+				sed -i 's/\r$//' $list
 				for domain in $(cat $list); do
 					start
 					recon
@@ -2043,6 +2044,7 @@ case $opt_mode in
         's')
             if [ -n "$list" ]; then
 				#mode="subs_menu"
+				sed -i 's/\r$//' $list
 				for domain in $(cat $list); do
 					subs_menu
 				done
@@ -2053,6 +2055,7 @@ case $opt_mode in
         'p')
             if [ -n "$list" ]; then
 				#mode="passive"
+				sed -i 's/\r$//' $list
 				for domain in $(cat $list); do
 					passive
 				done
@@ -2063,6 +2066,7 @@ case $opt_mode in
         'a')
             if [ -n "$list" ]; then
 				#mode="all"
+				sed -i 's/\r$//' $list
 				for domain in $(cat $list); do
 					all
 				done
@@ -2085,10 +2089,11 @@ case $opt_mode in
         'i')
 			PRESERVE=true
 			if [ -n "$multi" ];	then
-				multi_osint 
+				multi_osint
 				exit
 			fi
 			if [ -n "$list" ]; then
+				sed -i 's/\r$//' $list
 				for domain in $(cat $list); do
 					start
 					osint
@@ -2099,8 +2104,7 @@ case $opt_mode in
 				osint
 				end
 			fi
-
-			;;    
+			;;
         # No mode selected.  EXIT!
         *)
             help
