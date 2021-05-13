@@ -95,7 +95,7 @@ function tools_installed(){
 	type -P notify &>/dev/null || { printf "${bred} [*] notify		[NO]${reset}\n${reset}"; allinstalled=false;}
 	type -P dalfox &>/dev/null || { printf "${bred} [*] dalfox		[NO]${reset}\n${reset}"; allinstalled=false;}
 	type -P puredns &>/dev/null || { printf "${bred} [*] puredns		[NO]${reset}\n${reset}"; allinstalled=false;}
-	type -P naabu &>/dev/null || { printf "${bred} [*] naabu		[NO]${reset}\n${reset}"; allinstalled=false;}
+	type -P unimap &>/dev/null || { printf "${bred} [*] unimap		[NO]${reset}\n${reset}"; allinstalled=false;}
 	type -P axiom-ls &>/dev/null || { printf "${bred} [*] axiom		[NO]${reset}\n${reset}"; allinstalled=false;}
 
 	if [ "${allinstalled}" = true ]; then
@@ -135,9 +135,9 @@ function github_dorks(){
 		start_func "Github Dorks in process"
 		if [ -s "${GITHUB_TOKENS}" ]; then
 			if [ "$DEEP" = true ]; then
-				python3 "$tools/GitDorker/GitDorker.py" -tf "${GITHUB_TOKENS}" -e "$GITDORKER_THREADS" -q "$domain" -p -d "$tools/GitDorker/Dorks/alldorksv3" | grep "\[+\]" | grep "git" | anew -q osint/gitdorks.txt &>>"$LOGFILE"
+				python3 "$tools/GitDorker/GitDorker.py" -tf "${GITHUB_TOKENS}" -e "$GITDORKER_THREADS" -q "$domain" -p -ri -d "$tools/GitDorker/Dorks/alldorksv3" | grep "\[+\]" | grep "git" | anew -q osint/gitdorks.txt &>>"$LOGFILE"
 			else
-				python3 "$tools/GitDorker/GitDorker.py" -tf "${GITHUB_TOKENS}" -e "$GITDORKER_THREADS" -q "$domain" -p -d "$tools/GitDorker/Dorks/medium_dorks.txt" | grep "\[+\]" | grep "git" | anew -q osint/gitdorks.txt &>>"$LOGFILE"
+				python3 "$tools/GitDorker/GitDorker.py" -tf "${GITHUB_TOKENS}" -e "$GITDORKER_THREADS" -q "$domain" -p -ri -d "$tools/GitDorker/Dorks/medium_dorks.txt" | grep "\[+\]" | grep "git" | anew -q osint/gitdorks.txt &>>"$LOGFILE"
 			fi
 			sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" osint/gitdorks.txt
 		else
@@ -327,7 +327,7 @@ function sub_crt(){
 		start_subfunc "Running : Crtsh Subdomain Enumeration"
 		echo "python3 -u /home/op/recon/ctfr/ctfr.py -d ${domain} -o ${domain}_ctfr.txt; cat ${domain}_ctfr.txt" > .tmp/sub_ctrf_commands.txt
 		axiom-scan .tmp/sub_ctrf_commands.txt -m exec -o .tmp/crtsh_subs_tmp.txt &>>"$LOGFILE"
-		curl "https://tls.bufferover.run/dns?q=.${domain}" 2>>"$LOGFILE" | jq -r .Results[] 2>>"$LOGFILE" | cut -d ',' -f3 | grep -F ".$domain" | anew -q .tmp/crtsh_subs.txt
+		curl "https://tls.bufferover.run/dns?q=.${domain}" 2>>"$LOGFILE" | jq -r .Results[] 2>>"$LOGFILE" | cut -d ',' -f3 | grep -F ".$domain" | anew -q .tmp/crtsh_subs_tmp.txt
 		curl "https://dns.bufferover.run/dns?q=.${domain}" 2>>"$LOGFILE" | jq -r '.FDNS_A'[],'.RDNS'[] 2>>"$LOGFILE" | cut -d ',' -f2 | grep -F ".$domain" | anew -q .tmp/crtsh_subs_tmp.txt
 		NUMOFLINES=$(cat .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" | anew .tmp/crtsh_subs.txt | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (cert transparency)" ${FUNCNAME[0]}
@@ -551,8 +551,8 @@ function zonetransfer(){
 function s3buckets(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$S3BUCKETS" = true ]; then
 		start_func "AWS S3 buckets search"
-		s3scanner scan -f subdomains/subdomains.txt 2>>"$LOGFILE" | grep -iv "not_exist" | anew -q .tmp/s3buckets.txt
-		#axiom-scan subdomains/subdomains.txt -m s3scanner -o .tmp/s3buckets.txt &>>"$LOGFILE"
+		axiom-scan subdomains/subdomains.txt -m s3scanner -o .tmp/s3buckets_tmp.txt &>>"$LOGFILE"
+		cat .tmp/s3buckets_tmp.txt | grep -iv "not_exist" | grep -iv "Warning:" | anew -q .tmp/s3buckets.txt
 		NUMOFLINES=$(cat .tmp/s3buckets.txt 2>>"$LOGFILE" | anew subdomains/s3buckets.txt | wc -l)
 		if [ "$NUMOFLINES" -gt 0 ]; then
 			notification "${NUMOFLINES} new S3 buckets found" info
@@ -602,10 +602,14 @@ function webprobe_simple(){
 function webprobe_full(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$WEBPROBEFULL" = true ]; then
 		start_func "Http probing non standard ports"
-		axiom-scan subdomains/subdomains.txt -m naabu -p $UNCOMMON_PORTS_WEB -o .tmp/nmap_uncommonweb.txt &>>"$LOGFILE" && uncommon_ports_checked=$(cat .tmp/nmap_uncommonweb.txt | cut -d ':' -f2 | sort -u | sed -e 'H;${x;s/\n/,/g;s/^,//;p;};d')
-		if [ -n "$uncommon_ports_checked" ]; then
-			axiom-scan subdomains/subdomains.txt -m httpx -ports $uncommon_ports_checked -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout 10 -silent -retries 2 -no-color -o .tmp/probed_uncommon_ports_tmp_.txt &>>"$LOGFILE" && cat .tmp/probed_uncommon_ports_tmp_.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_uncommon_ports_tmp.txt
-		fi
+
+		axiom-scan subdomains/subdomains.txt -m unimap --fast-scan --ports $UNCOMMON_PORTS_WEB -q -k --url-output -o .tmp/nmap_uncommonweb.txt
+		axiom-scan .tmp/nmap_uncommonweb.txt -m httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout $HTTPX_UNCOMMONPORTS_TIMEOUT -silent -retries 2 -no-color -o .tmp/probed_uncommon_ports_tmp_.txt &>>"$LOGFILE" && cat .tmp/probed_uncommon_ports_tmp_.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_uncommon_ports_tmp.txt
+
+		#axiom-scan subdomains/subdomains.txt -m naabu -p $UNCOMMON_PORTS_WEB -o .tmp/nmap_uncommonweb.txt &>>"$LOGFILE" && uncommon_ports_checked=$(cat .tmp/nmap_uncommonweb.txt | cut -d ':' -f2 | sort -u | sed -e 'H;${x;s/\n/,/g;s/^,//;p;};d')
+		#if [ -n "$uncommon_ports_checked" ]; then
+			#axiom-scan subdomains/subdomains.txt -m httpx -ports $uncommon_ports_checked -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout 10 -silent -retries 2 -no-color -o .tmp/probed_uncommon_ports_tmp_.txt &>>"$LOGFILE" && cat .tmp/probed_uncommon_ports_tmp_.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_uncommon_ports_tmp.txt
+		#fi
 		NUMOFLINES=$(cat .tmp/probed_uncommon_ports_tmp.txt 2>>"$LOGFILE" | anew webs/webs_uncommon_ports.txt | wc -l)
 		notification "Uncommon web ports: ${NUMOFLINES} new websites" good
 		cat webs/webs_uncommon_ports.txt 2>>"$LOGFILE"
@@ -958,7 +962,7 @@ function jschecks(){
 			fi
 			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
 			if [ -s "js/js_livelinks.txt" ]; then
-				axiom-scan js/js_livelinks.txt -m nuclei -w /home/op/recon/nuclei/exposures/ -r /home/op/lists/resolvers_trusted.txt -o js/js_secrets.txt &>>"$LOGFILE"
+				axiom-scan js/js_livelinks.txt -m nuclei -w /home/op/recon/nuclei/exposures/tokens/ -r /home/op/lists/resolvers_trusted.txt -o js/js_secrets.txt &>>"$LOGFILE"
 			fi
 			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
 			if [ -s "js/js_livelinks.txt" ]; then
@@ -1411,7 +1415,6 @@ function resolvers_update(){
 		axiom-exec 'wget -O /home/op/lists/resolvers_trusted.txt https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw' &>/dev/null
 		update_resolvers=false
 	fi
-
 }
 
 function axiom_lauch(){
@@ -1633,6 +1636,7 @@ function multi_osint(){
 	fi
 
 	if [ -s "$list" ]; then
+		sed -i 's/\r$//' $list
 		targets=$(cat $list)
 	else
 		notification "Target list not provided" error
@@ -1711,6 +1715,7 @@ function multi_recon(){
 	fi
 
 	if [ -s "$list" ]; then
+		 sed -i 's/\r$//' $list
 		targets=$(cat $list)
 	else
 		notification "Target list not provided" error
@@ -1752,6 +1757,7 @@ function multi_recon(){
 		favicon
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
+		getElapsedTime $loopstart $loopend
 		printf "\n\n${reset}#######################################################################\n"
 		printf "${bgreen} $domain finished 1st loop in ${runtime}  $currently ${reset}\n"
 		if [ -n "$flist" ]; then
@@ -1812,8 +1818,9 @@ function multi_recon(){
 	for domain in $targets; do
 		loopstart=$(date +%s)
 		dir=$workdir/targets/$domain
-        called_fn_dir=$dir/.called_fn 
+		called_fn_dir=$dir/.called_fn
 		cd "$dir" || { echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+		loopstart=$(date +%s)
 		fuzz
 		params
 		urlchecks
@@ -1875,35 +1882,35 @@ function subs_menu(){
 }
 
 function webs_menu(){
-			subtakeover
-			s3buckets
-			waf_checks
-			nuclei_check
-			cms_scanner
-			fuzz
-			4xxbypass
-			cors
-			params
-			urlchecks
-			url_gf
-			jschecks
-			wordlist_gen
-			open_redirect
-			ssrf_checks
-			crlf_checks
-			lfi
-			ssti
-			sqli
-			xss
-			spraying
-			brokenLinks
-			test_ssl
-			end
+	subtakeover
+	s3buckets
+	waf_checks
+	nuclei_check
+	cms_scanner
+	fuzz
+	4xxbypass
+	cors
+	params
+	urlchecks
+	url_gf
+	jschecks
+	wordlist_gen
+	open_redirect
+	ssrf_checks
+	crlf_checks
+	lfi
+	ssti
+	sqli
+	xss
+	spraying
+	brokenLinks
+	test_ssl
+	end
 }
 
 function help(){
 	printf "\n Usage: $0 [-d domain.tld] [-m name] [-l list.txt] [-x oos.txt] [-i in.txt] "
-	printf "\n           	      [-r] [-s] [-p] [-a] [-w] [-n] [-i] [-h] [--deep] [--fs] [-o OUTPUT]\n\n"
+	printf "\n           	      [-r] [-s] [-p] [-a] [-w] [-n] [-i] [-h] [-f] [--deep] [-o OUTPUT]\n\n"
 	printf " ${bblue}TARGET OPTIONS${reset}\n"
 	printf "   -d domain.tld     Target domain\n"
 	printf "   -m company        Target company name\n"
@@ -1921,7 +1928,7 @@ function help(){
 	printf "   -h                Help - Show this help\n"
 	printf " \n"
 	printf " ${bblue}GENERAL OPTIONS${reset}\n"
-	printf "   -f confile_file   Alternate reconftw.cfg file\n"	
+	printf "   -f confile_file   Alternate reconftw.cfg file\n"
 	printf "   --deep            Deep scan (Enable some slow options for deeper scan)\n"
 	printf "   -o output/path    Define output folder\n"
 	printf " \n"
@@ -1975,7 +1982,7 @@ while true; do
             outOfScope_file=$2
             shift 2
             continue
-            ;;            
+            ;;
         '-i')
             inScope_file=$2
             shift 2
@@ -2009,10 +2016,10 @@ while true; do
             continue
             ;;
         '-n'|'--osint')
-            opt_mode='i'
+            opt_mode='n'
             shift
             continue
-            ;;			
+            ;;
 
         # extra stuff
         '-o')
@@ -2021,12 +2028,12 @@ while true; do
 
             shift 2
             continue
-            ;;            
+            ;;
         '-f')
             config_file=$2
             shift 2
             continue
-            ;;    
+            ;;
         '--deep')
             opt_deep=true
             shift
@@ -2043,12 +2050,10 @@ while true; do
             help
 			exit 1
 		    ;;
-
     esac
 done
 
-
-# This is the first thing to do to read in alternate config 
+# This is the first thing to do to read in alternate config
 if [ -s "$config_file" ]; then
     . "${config_file}"
 else
@@ -2106,8 +2111,8 @@ case $opt_mode in
 				exit
 			fi
 			if [ -n "$list" ]; then
-
 				mode="list_recon"
+				sed -i 's/\r$//' $list
 				for domain in $(cat $list); do
 					start
 					recon
@@ -2123,6 +2128,7 @@ case $opt_mode in
         's')
             if [ -n "$list" ]; then
 				mode="subs_menu"
+				sed -i 's/\r$//' $list
 				for domain in $(cat $list); do
 					subs_menu
 				done
@@ -2133,6 +2139,7 @@ case $opt_mode in
         'p')
             if [ -n "$list" ]; then
 				mode="passive"
+				sed -i 's/\r$//' $list
 				for domain in $(cat $list); do
 					passive
 				done
@@ -2143,6 +2150,7 @@ case $opt_mode in
         'a')
             if [ -n "$list" ]; then
 				mode="all"
+				sed -i 's/\r$//' $list
 				for domain in $(cat $list); do
 					all
 				done
@@ -2162,13 +2170,14 @@ case $opt_mode in
 			webs_menu
 			exit
             ;;
-        'i')
+        'n')
 			PRESERVE=true
 			if [ -n "$multi" ];	then
-				multi_osint 
+				multi_osint
 				exit
 			fi
 			if [ -n "$list" ]; then
+				sed -i 's/\r$//' $list
 				for domain in $(cat $list); do
 					start
 					osint
@@ -2179,8 +2188,7 @@ case $opt_mode in
 				osint
 				end
 			fi
-
-			;;    
+			;;
         # No mode selected.  EXIT!
         *)
             help
