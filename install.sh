@@ -57,6 +57,7 @@ repos["GitDorker"]="obheda12/GitDorker"
 repos["testssl"]="drwetter/testssl.sh"
 repos["ip2provider"]="oldrho/ip2provider"
 repos["commix"]="commixproject/commix"
+repos["JSA"]="w9w/JSA"
 
 dir=${tools}
 
@@ -261,7 +262,7 @@ eval wget -O subdomains.txt https://gist.github.com/six2dez/a307a04a222fab5a5746
 eval wget -O permutations_list.txt https://gist.github.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw $DEBUG_STD
 eval wget -nc -O ssrf.py https://gist.github.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw $DEBUG_STD
 eval wget -nc -O fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD
-eval wget -O lfi_wordlist.txt https://gist.githubusercontent.com/detonxx/a885ce7dd64a7139cb6f5b6860499ba8/raw $DEBUG_STD
+eval wget -O lfi_wordlist.txt https://gist.githubusercontent.com/six2dez/a89a0c7861d49bb61a09822d272d5395/raw $DEBUG_STD
 
 ## Last check
 printf "${bblue} Running: Double check for installed tools ${reset}\n\n"
