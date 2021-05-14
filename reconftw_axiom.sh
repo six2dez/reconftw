@@ -1277,6 +1277,24 @@ function 4xxbypass(){
 	fi
 }
 
+function command_injection(){
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$COMM_INJ" = true ] && [ -s "gf/rce.txt" ]; then
+		start_func "Command Injection checks"
+		cat gf/rce.txt | qsreplace FUZZ | anew -q .tmp/tmp_rce.txt
+		python3 $tools/commix/commix.py --batch -m .tmp/tmp_rce.txt --output-dir vulns/command_injection
+		#axiom_scan .tmp/tmp_rce.txt -m commix -o vulns/command_injection
+		end_func "Results are saved in vulns/command_injection folder" ${FUNCNAME[0]}
+	else
+		if [ "$COMM_INJ" = false ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+		elif [ ! -s "gf/rce.txt" ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} No URLs potentially vulnerables to Command Injection ${reset}\n\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
+	fi
+}
+
 ###############################################################################################################
 ########################################## OPTIONS & MGMT #####################################################
 ###############################################################################################################
@@ -1637,6 +1655,7 @@ function all(){
 	ssti
 	sqli
 	xss
+	command_injection
 	spraying
 	brokenLinks
 	test_ssl
@@ -1934,6 +1953,7 @@ function webs_menu(){
 	ssti
 	sqli
 	xss
+	command_injection
 	spraying
 	brokenLinks
 	test_ssl

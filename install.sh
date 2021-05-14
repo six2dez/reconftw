@@ -56,6 +56,7 @@ repos["OpenRedireX"]="devanshbatham/OpenRedireX"
 repos["GitDorker"]="obheda12/GitDorker"
 repos["testssl"]="drwetter/testssl.sh"
 repos["ip2provider"]="oldrho/ip2provider"
+repos["commix"]="commixproject/commix"
 
 dir=${tools}
 
