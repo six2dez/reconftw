@@ -55,6 +55,7 @@ repos["OpenRedireX"]="devanshbatham/OpenRedireX"
 repos["GitDorker"]="obheda12/GitDorker"
 repos["testssl"]="drwetter/testssl.sh"
 repos["ip2provider"]="oldrho/ip2provider"
+repos["uddup"]="rotemreiss/uddup"
 
 dir=${tools}
 
@@ -83,9 +84,9 @@ fi
 
 install_apt(){
     eval $SUDO apt update -y $DEBUG_STD
-    eval $SUDO apt install chromium-browser -y $DEBUG_STD
-    eval $SUDO apt install chromium -y $DEBUG_STD
-    eval $SUDO apt install python3 python3-pip gcc build-essential ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa -y $DEBUG_STD
+    eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium-browser -y $DEBUG_STD
+    eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium -y $DEBUG_STD
+    eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip gcc build-essential ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa -y $DEBUG_STD
     eval $SUDO systemctl enable tor $DEBUG_STD
 }
 
@@ -215,6 +216,8 @@ for repo in "${!repos[@]}"; do
     fi
     if [ -s "setup.py" ]; then
         eval $SUDO python3 setup.py install $DEBUG_STD
+    elif [ -s "requirements.txt" ]; then
+        eval pip3 install -U -r requirements.txt $DEBUG_STD
     fi
     if [ "massdns" = "$repo" ]; then
             eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/bin/ $DEBUG_ERROR
