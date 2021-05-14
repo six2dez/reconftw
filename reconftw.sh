@@ -1419,12 +1419,19 @@ function ipcidr_detection(){
 		if [[ $1 =~ /[0-9]+$ ]]; then
 			prips $1 | hakrevdns
 			prips $1 | gdn
-			# ./test.sh 199.120.48.0/24 | cut -d' ' -f3 | unfurl -u domains | sed 's/\.$//' | awk -F\. '{print $(NF-1) FS $NF}' | sort -u
 		else
 			echo $1 | hakrevdns
 			echo $1 | gdn
-			# ./test.sh 199.120.48.0/24 | cut -d' ' -f3 | unfurl -u domains | sed 's/\.$//' | awk -F\. '{print $(NF-1) FS $NF}' | sort -u
 		fi
+	fi
+}
+
+function ipcidr_target(){
+	ipcidr_detection $1 | cut -d' ' -f3 | unfurl -u domains | sed 's/\.$//' | sort -u > ./target_reconftw_ipcidr.txt
+	if [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -eq 1 ]]; then
+		domain=$(cat ./target_reconftw_ipcidr.txt)
+	elif [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -gt 1 ]]; then
+		list=${PWD}/target_reconftw_ipcidr.txt
 	fi
 }
 
@@ -1441,7 +1448,7 @@ function start(){
 	echo "Recon succesfully started on $domain" | $NOTIFY
 	tools_installed
 
-#	ipcidr_detection $domain
+	[[ -n "$domain" ]] && ipcidr_target $domain
 
 	if [ -z "$domain" ]; then
 		if [ -n "$list" ]; then
@@ -1575,6 +1582,8 @@ function multi_osint(){
 	    NOTIFY=""
 	fi
 
+	[[ -n "$domain" ]] && ipcidr_target $domain
+
 	if [ -s "$list" ]; then
 		sed -i 's/\r$//' $list
 		targets=$(cat $list)
@@ -1645,6 +1654,8 @@ function multi_recon(){
 	else
 	    NOTIFY=""
 	fi
+
+	[[ -n "$domain" ]] && ipcidr_target $domain
 
 	if [ -s "$list" ]; then
 		 sed -i 's/\r$//' $list

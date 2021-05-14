@@ -1420,6 +1420,27 @@ function resolvers_update(){
 	fi
 }
 
+function ipcidr_detection(){
+	if [[ $1 =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+		if [[ $1 =~ /[0-9]+$ ]]; then
+			prips $1 | hakrevdns
+			prips $1 | gdn
+		else
+			echo $1 | hakrevdns
+			echo $1 | gdn
+		fi
+	fi
+}
+
+function ipcidr_target(){
+	ipcidr_detection $1 | cut -d' ' -f3 | unfurl -u domains | sed 's/\.$//' | sort -u > ./target_reconftw_ipcidr.txt
+	if [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -eq 1 ]]; then
+		domain=$(cat ./target_reconftw_ipcidr.txt)
+	elif [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -gt 1 ]]; then
+		list=${PWD}/target_reconftw_ipcidr.txt
+	fi
+}
+
 function axiom_lauch(){
 	# let's fire up a FLEET!
 	if [ "$AXIOM_FLEET_LAUNCH" = true ] && [ -n "$AXIOM_FLEET_NAME" ] && [ -n "$AXIOM_FLEET_COUNT" ]; then
@@ -1494,6 +1515,8 @@ function start(){
 
 	echo "Recon succesfully started on $domain" | $NOTIFY
 	tools_installed
+
+	[[ -n "$domain" ]] && ipcidr_target $domain
 
 	if [ -z "$domain" ]; then
 		if [ -n "$list" ]; then
@@ -1638,6 +1661,8 @@ function multi_osint(){
 	    NOTIFY=""
 	fi
 
+	[[ -n "$domain" ]] && ipcidr_target $domain
+
 	if [ -s "$list" ]; then
 		sed -i 's/\r$//' $list
 		targets=$(cat $list)
@@ -1716,6 +1741,8 @@ function multi_recon(){
 	else
 	    NOTIFY=""
 	fi
+
+	[[ -n "$domain" ]] && ipcidr_target $domain
 
 	if [ -s "$list" ]; then
 		 sed -i 's/\r$//' $list
