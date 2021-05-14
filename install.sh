@@ -55,6 +55,7 @@ repos["OpenRedireX"]="devanshbatham/OpenRedireX"
 repos["GitDorker"]="obheda12/GitDorker"
 repos["testssl"]="drwetter/testssl.sh"
 repos["ip2provider"]="oldrho/ip2provider"
+repos["uddup"]="rotemreiss/uddup"
 
 dir=${tools}
 
@@ -215,6 +216,8 @@ for repo in "${!repos[@]}"; do
     fi
     if [ -s "setup.py" ]; then
         eval $SUDO python3 setup.py install $DEBUG_STD
+    elif [ -s "requirements.txt" ]; then
+        eval pip3 install -U -r requirements.txt $DEBUG_STD
     fi
     if [ "massdns" = "$repo" ]; then
             eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/bin/ $DEBUG_ERROR
