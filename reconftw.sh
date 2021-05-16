@@ -487,8 +487,8 @@ function sub_recursive(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBRECURSIVE" = true ]; then
 
 		# Passive recursive
-		for sub in $(cat subdomains/subdomains.txt | rev | cut -d '.' -f 3 | rev | sort | uniq -c | sort -nr | grep -v '1 ' | sed -e 's/^[[:space:]]*//' | cut -d ' ' -f 2); do
-			subfinder -d $sub.$domain -all -silent &>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
+		for sub in $(cat subdomains/subdomains.txt | rev | cut -d '.' -f 3,2,1 | rev | sort | uniq -c | sort -nr | grep -v '1 ' | sed -e 's/^[[:space:]]*//' | cut -d ' ' -f 2); do
+			subfinder -d $sub -all -silent &>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
 			assetfinder --subs-only $sub.$domain 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
 			amass enum -passive -d $sub.$domain -config $AMASS_CONFIG &>>"$LOGFILE"
 			findomain --quiet -t $sub.$domain &>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt

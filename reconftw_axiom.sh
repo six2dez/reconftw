@@ -491,8 +491,8 @@ function sub_recursive(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBRECURSIVE" = true ]; then
 
 		# Passive recursive
-		for sub in $(cat subdomains/subdomains.txt | rev | cut -d '.' -f 3 | rev | sort | uniq -c | sort -nr | grep -v '1 ' | sed -e 's/^[[:space:]]*//' | cut -d ' ' -f 2); do
-			echo $sub.$domain | anew -q .tmp/sub_pass_recur_target.com
+		for sub in $(cat subdomains/subdomains.txt | rev | cut -d '.' -f 3,2,1 | rev | sort | uniq -c | sort -nr | grep -v '1 ' | sed -e 's/^[[:space:]]*//' | cut -d ' ' -f 2); do
+			echo $sub | anew -q .tmp/sub_pass_recur_target.com
 		done
 		axiom-scan .tmp/sub_pass_recur_target.com -m subfinder -all -o .tmp/subfinder_prec.txt &>>"$LOGFILE"
 		axiom-scan .tmp/sub_pass_recur_target.com -m assetfinder -o .tmp/assetfinder_prec.txt &>>"$LOGFILE"
