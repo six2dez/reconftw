@@ -772,7 +772,7 @@ function fuzz(){
 		start_func "Web directory fuzzing"
 		if [ -s "./webs/webs.txt" ]; then
 			mkdir -p $dir/fuzzing
-			axiom-scan webs/webs.txt -m ffuf -H \'\"${HEADER}\"\' -wL $fuzz_wordlist -mc all -fc 404 -sf -s -maxtime $FFUF_MAXTIME -o $dir/fuzzing/ffuf-content.csv &>>"$LOGFILE"
+			axiom-scan webs/webs.txt -m ffuf -w /home/op/lists/onelistforallmicro.txt -H \"${HEADER}\" -mc all -fc 404 -sf -s -maxtime $FFUF_MAXTIME -o $dir/fuzzing/ffuf-content.csv &>>"$LOGFILE"
 			grep -v "FUZZ,url,redirectlocation" $dir/fuzzing/ffuf-content.csv | awk -F "," '{print $2" "$5" "$6}' | sort > $dir/fuzzing/ffuf-content.tmp
 			for sub in $(cat webs/webs.txt); do
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
@@ -1410,6 +1410,7 @@ function resolvers_update(){
 		axiom-exec 'if [ \$(find "/home/op/lists/resolvers.txt" -mtime +1 -print) ] || [ \$(cat /home/op/lists/resolvers.txt | wc -l) -le 40 ] ; then dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 200 -o /home/op/lists/resolvers.txt ; fi' &>/dev/null
 		notification "Updated\n" good
 		axiom-exec 'wget -O /home/op/lists/resolvers_trusted.txt https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw' &>/dev/null
+		axiom-exec 'wget -O /home/op/lists/onelistforallmicro.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt' &>/dev/null
 		update_resolvers=false
 	fi
 
