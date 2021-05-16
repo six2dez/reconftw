@@ -46,3 +46,4 @@ s3scanner
 shodan
 dnspython
 pytest-runner
+webscreenshot

@@ -485,7 +485,19 @@ function sub_permut(){
 
 function sub_recursive(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBRECURSIVE" = true ]; then
-		if [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 1000 ]]; then
+
+		# Passive recursive
+		for sub in $(cat subdomains/subdomains.txt | rev | cut -d '.' -f 3 | rev | sort | uniq -c | sort -nr | grep -v '1 ' | sed -e 's/^[[:space:]]*//' | cut -d ' ' -f 2); do
+			subfinder -d $sub.$domain -all -silent &>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
+			assetfinder --subs-only $sub.$domain 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
+			amass enum -passive -d $sub.$domain -config $AMASS_CONFIG &>>"$LOGFILE"
+			findomain --quiet -t $sub.$domain &>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
+		done
+		puredns resolve .tmp/passive_recursive.txt -w .tmp/passive_recurs_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
+		[ -f ".tmp/passive_recurs_tmp.txt" ] && cat .tmp/passive_recurs_tmp.txt | anew -q subdomains/subdomains.txt
+
+		# Bruteforce recursive
+		if [[ $(cat subdomains/subdomains.txt | wc -l) -le 1000 ]]; then
 			start_subfunc "Running : Subdomains recursive search"
 			echo "" > .tmp/brute_recursive_wordlist.txt
 			for sub in $(cat subdomains/subdomains.txt); do
@@ -632,7 +644,8 @@ function screenshot(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$WEBSCREENSHOT" = true ]; then
 		start_func "Web Screenshots"
 		cat webs/webs.txt webs/webs_uncommon_ports.txt 2>>"$LOGFILE" | anew -q .tmp/webs_screenshots.txt
-		gowitness file -f .tmp/webs_screenshots.txt --disable-logging 2>>"$LOGFILE"
+		webscreenshot --no-xserver -r chrome -i .tmp/webs_screenshots.txt -w $WEBSCREENSHOT_THREADS -o screenshots
+		#gowitness file -f .tmp/webs_screenshots.txt --disable-logging 2>>"$LOGFILE"
 		end_func "Results are saved in $domain/screenshots folder" ${FUNCNAME[0]}
 	else
 		if [ "$WEBSCREENSHOT" = false ]; then

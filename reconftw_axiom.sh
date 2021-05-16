@@ -489,7 +489,21 @@ function sub_permut(){
 
 function sub_recursive(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBRECURSIVE" = true ]; then
-		if [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 1000 ]]; then
+
+		# Passive recursive
+		for sub in $(cat subdomains/subdomains.txt | rev | cut -d '.' -f 3 | rev | sort | uniq -c | sort -nr | grep -v '1 ' | sed -e 's/^[[:space:]]*//' | cut -d ' ' -f 2); do
+			echo $sub.$domain | anew -q .tmp/sub_pass_recur_target.com
+		done
+		axiom-scan .tmp/sub_pass_recur_target.com -m subfinder -all -o .tmp/subfinder_prec.txt &>>"$LOGFILE"
+		axiom-scan .tmp/sub_pass_recur_target.com -m assetfinder -o .tmp/assetfinder_prec.txt &>>"$LOGFILE"
+		axiom-scan .tmp/sub_pass_recur_target.com -m amass -passive -o .tmp/amass_prec.txt &>>"$LOGFILE"
+		axiom-scan .tmp/sub_pass_recur_target.com -m findomain -o .tmp/findomain_prec.txt &>>"$LOGFILE"
+		cat .tmp/*_prec.txt | anew -q .tmp/passive_recursive.txt
+		axiom-scan .tmp/passive_recursive.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/passive_recurs_tmp.txt &>>"$LOGFILE"
+		[ -f ".tmp/passive_recurs_tmp.txt" ] && cat .tmp/passive_recurs_tmp.txt | anew -q subdomains/subdomains.txt
+
+		#Bruteforce recursive
+		if [[ $(cat subdomains/subdomains.txt | wc -l) -le 1000 ]]; then
 			start_subfunc "Running : Subdomains recursive search"
 			echo "" > .tmp/brute_recursive_wordlist.txt
 			for sub in $(cat subdomains/subdomains.txt); do
@@ -636,7 +650,8 @@ function screenshot(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$WEBSCREENSHOT" = true ]; then
 		start_func "Web Screenshots"
 		cat webs/webs.txt webs/webs_uncommon_ports.txt 2>>"$LOGFILE" | anew -q .tmp/webs_screenshots.txt
-		axiom-scan .tmp/webs_screenshots.txt -m "$AXIOM_SCREENSHOT_MODULE" -o screenshots &>>"$LOGFILE"
+		axiom-scan .tmp/webs_screenshots.txt -m webscreenshot -w $WEBSCREENSHOT_THREADS -o screenshots &>>"$LOGFILE"
+#		axiom-scan .tmp/webs_screenshots.txt -m "$AXIOM_SCREENSHOT_MODULE" -o screenshots &>>"$LOGFILE"
 		end_func "Results are saved in $domain/screenshots folder" ${FUNCNAME[0]}
 	else
 		if [ "$WEBSCREENSHOT" = false ]; then
@@ -780,7 +795,7 @@ function fuzz(){
 		start_func "Web directory fuzzing"
 		if [ -s "./webs/webs.txt" ]; then
 			mkdir -p $dir/fuzzing
-			axiom-scan webs/webs.txt -m ffuf -H \'\"${HEADER}\"\' -wL $fuzz_wordlist -mc all -fc 404 -sf -s -maxtime $FFUF_MAXTIME -o $dir/fuzzing/ffuf-content.csv &>>"$LOGFILE"
+			axiom-scan webs/webs.txt -m ffuf -w /home/op/lists/onelistforallmicro.txt -H \"${HEADER}\" -mc all -fc 404 -sf -s -maxtime $FFUF_MAXTIME -o $dir/fuzzing/ffuf-content.csv &>>"$LOGFILE"
 			grep -v "FUZZ,url,redirectlocation" $dir/fuzzing/ffuf-content.csv | awk -F "," '{print $2" "$5" "$6}' | sort > $dir/fuzzing/ffuf-content.tmp
 			for sub in $(cat webs/webs.txt); do
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
@@ -1441,6 +1456,7 @@ function resolvers_update(){
 		axiom-exec 'if [ \$(find "/home/op/lists/resolvers.txt" -mtime +1 -print) ] || [ \$(cat /home/op/lists/resolvers.txt | wc -l) -le 40 ] ; then dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 200 -o /home/op/lists/resolvers.txt ; fi' &>/dev/null
 		notification "Updated\n" good
 		axiom-exec 'wget -O /home/op/lists/resolvers_trusted.txt https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw' &>/dev/null
+		axiom-exec 'wget -O /home/op/lists/onelistforallmicro.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt' &>/dev/null
 		update_resolvers=false
 	fi
 }
