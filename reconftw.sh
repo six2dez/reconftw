@@ -529,7 +529,7 @@ function subtakeover(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBTAKEOVER" = true ]; then
 		start_func "Looking for possible subdomain takeover"
 		touch .tmp/tko.txt
-		cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/takeovers/ -r $resolvers_trusted -o .tmp/tko.txt
+		[ -f "webs/webs.txt" ] && cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/takeovers/ -r $resolvers_trusted -o .tmp/tko.txt
 		NUMOFLINES=$(cat .tmp/tko.txt 2>>"$LOGFILE" | anew webs/takeover.txt | wc -l)
 		if [ "$NUMOFLINES" -gt 0 ]; then
 			notification "${NUMOFLINES} new possible takeovers found" info

@@ -328,6 +328,7 @@ function sub_crt(){
 		start_subfunc "Running : Crtsh Subdomain Enumeration"
 		echo "python3 -u /home/op/recon/ctfr/ctfr.py -d ${domain} -o ${domain}_ctfr.txt; cat ${domain}_ctfr.txt" > .tmp/sub_ctrf_commands.txt
 		axiom-scan .tmp/sub_ctrf_commands.txt -m exec -o .tmp/crtsh_subs_tmp.txt &>>"$LOGFILE"
+		sed -i '1,11d' .tmp/crtsh_subs_tmp.txt
 		curl "https://tls.bufferover.run/dns?q=.${domain}" 2>>"$LOGFILE" | jq -r .Results[] 2>>"$LOGFILE" | cut -d ',' -f3 | grep -F ".$domain" | anew -q .tmp/crtsh_subs_tmp.txt
 		curl "https://dns.bufferover.run/dns?q=.${domain}" 2>>"$LOGFILE" | jq -r '.FDNS_A'[],'.RDNS'[] 2>>"$LOGFILE" | cut -d ',' -f2 | grep -F ".$domain" | anew -q .tmp/crtsh_subs_tmp.txt
 		NUMOFLINES=$(cat .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" | anew .tmp/crtsh_subs.txt | wc -l)
@@ -533,7 +534,7 @@ function subtakeover(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBTAKEOVER" = true ]; then
 		start_func "Looking for possible subdomain takeover"
 		touch .tmp/tko.txt
-		axiom-scan webs/webs.txt -m nuclei -w /home/op/recon/nuclei/takeovers/ -o .tmp/tko.txt &>>"$LOGFILE"
+		[ -f "webs/webs.txt" ] && axiom-scan webs/webs.txt -m nuclei -w /home/op/recon/nuclei/takeovers/ -o .tmp/tko.txt &>>"$LOGFILE"
 		NUMOFLINES=$(cat .tmp/tko.txt 2>>"$LOGFILE" | anew webs/takeover.txt | wc -l)
 		if [ "$NUMOFLINES" -gt 0 ]; then
 			notification "${NUMOFLINES} new possible takeovers found" info
