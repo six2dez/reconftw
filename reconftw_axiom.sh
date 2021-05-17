@@ -1614,6 +1614,10 @@ function end(){
 	if [ "$REMOVETMP" = true ]; then
 		rm -rf $dir/.tmp
 	fi
+   
+        if [ "$REMOVELOG" = true ]; then
+                rm -rf $dir/.log
+        fi 
 
 	if [ -n "$dir_output" ]; then
 		output
