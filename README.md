@@ -231,6 +231,7 @@ NOTIFICATION=false
 DEEP=false
 DIFF=false
 REMOVETMP=false
+REMOVELOG=false
 PROXY=false
 SENDZIPNOTIFY=false
  
