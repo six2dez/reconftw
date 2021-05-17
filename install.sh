@@ -60,6 +60,7 @@ repos["commix"]="commixproject/commix"
 repos["JSA"]="w9w/JSA"
 
 dir=${tools}
+double_check=false
 
 if grep -q "ARMv"  /proc/cpuinfo
 then
@@ -189,6 +190,7 @@ for gotool in "${!gotools[@]}"; do
         printf "${yellow} $gotool installed (${go_step}/${#gotools[@]})${reset}\n"
     else
         printf "${red} Unable to install $gotool, try manually (${go_step}/${#gotools[@]})${reset}\n"
+        double_check=true
     fi
 done
 
@@ -215,6 +217,7 @@ for repo in "${!repos[@]}"; do
         printf "${yellow} $repo installed (${repos_step}/${#repos[@]})${reset}\n"
     else
         printf "${red} Unable to install $repo, try manually (${repos_step}/${#repos[@]})${reset}\n"
+        double_check=true
     fi
     if [ -s "setup.py" ]; then
         eval $SUDO python3 setup.py install $DEBUG_STD
@@ -263,33 +266,36 @@ eval wget -O permutations_list.txt https://gist.github.com/six2dez/ffc2b14d283e8
 eval wget -nc -O ssrf.py https://gist.github.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw $DEBUG_STD
 eval wget -nc -O fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD
 eval wget -O lfi_wordlist.txt https://gist.githubusercontent.com/six2dez/a89a0c7861d49bb61a09822d272d5395/raw $DEBUG_STD
+eval wget -O ssti_wordlist.txt https://gist.githubusercontent.com/six2dez/ab5277b11da7369bf4e9db72b49ad3c1/raw $DEBUG_STD
 
 ## Last check
-printf "${bblue} Running: Double check for installed tools ${reset}\n\n"
-go_step=0
-for gotool in "${!gotools[@]}"; do
-    go_step=$((go_step + 1))
-    eval type -P $gotool $DEBUG_STD || { eval ${gotools[$gotool]} $DEBUG_STD; }
-    exit_status=$?
-done
-repos_step=0
-for repo in "${!repos[@]}"; do
-    repos_step=$((repos_step + 1))
-    eval cd $dir/$repo $DEBUG_STD || { eval git clone https://github.com/${repos[$repo]} $dir/$repo $DEBUG_STD && cd $dir/$repo; }
-    eval git pull $DEBUG_STD
-    exit_status=$?
-    if [ -s "setup.py" ]; then
-        eval $SUDO python3 setup.py install $DEBUG_STD
-    fi
-    if [ "massdns" = "$repo" ]; then
-            eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/bin/ $DEBUG_ERROR
-    elif [ "gf" = "$repo" ]; then
-            eval cp -r examples ~/.gf $DEBUG_ERROR
-    elif [ "Gf-Patterns" = "$repo" ]; then
-            eval mv *.json ~/.gf $DEBUG_ERROR
-    fi
-    cd $dir
-done
+if [ "$double_check" = "true" ]; then
+    printf "${bblue} Running: Double check for installed tools ${reset}\n\n"
+    go_step=0
+    for gotool in "${!gotools[@]}"; do
+        go_step=$((go_step + 1))
+        eval type -P $gotool $DEBUG_STD || { eval ${gotools[$gotool]} $DEBUG_STD; }
+        exit_status=$?
+    done
+    repos_step=0
+    for repo in "${!repos[@]}"; do
+        repos_step=$((repos_step + 1))
+        eval cd $dir/$repo $DEBUG_STD || { eval git clone https://github.com/${repos[$repo]} $dir/$repo $DEBUG_STD && cd $dir/$repo; }
+        eval git pull $DEBUG_STD
+        exit_status=$?
+        if [ -s "setup.py" ]; then
+            eval $SUDO python3 setup.py install $DEBUG_STD
+        fi
+        if [ "massdns" = "$repo" ]; then
+                eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/bin/ $DEBUG_ERROR
+        elif [ "gf" = "$repo" ]; then
+                eval cp -r examples ~/.gf $DEBUG_ERROR
+        elif [ "Gf-Patterns" = "$repo" ]; then
+                eval mv *.json ~/.gf $DEBUG_ERROR
+        fi
+        cd $dir
+    done
+fi
 
 printf "${bblue} Running: Performing last configurations ${reset}\n\n"
 ## Last steps

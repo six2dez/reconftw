@@ -271,9 +271,7 @@ function subdomains_full(){
 	sub_active
 	sub_brute
 	sub_permut
-	if [ "$DEEP" = true ]; then
-		sub_recursive
-	fi
+	sub_recursive
 	sub_dns
 	sub_scraping
 	webprobe_simple
@@ -488,8 +486,9 @@ function sub_permut(){
 }
 
 function sub_recursive(){
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBRECURSIVE" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && { [ "$SUBRECURSIVE" = true ] || [ "$DEEP" = true ]; } ; then
 
+		start_subfunc "Running : Subdomains recursive search"
 		# Passive recursive
 		for sub in $(cat subdomains/subdomains.txt | rev | cut -d '.' -f 3,2,1 | rev | sort | uniq -c | sort -nr | grep -v '1 ' | sed -e 's/^[[:space:]]*//' | cut -d ' ' -f 2); do
 			echo $sub | anew -q .tmp/sub_pass_recur_target.com
@@ -498,13 +497,12 @@ function sub_recursive(){
 		axiom-scan .tmp/sub_pass_recur_target.com -m assetfinder -o .tmp/assetfinder_prec.txt &>>"$LOGFILE"
 		axiom-scan .tmp/sub_pass_recur_target.com -m amass -passive -o .tmp/amass_prec.txt &>>"$LOGFILE"
 		axiom-scan .tmp/sub_pass_recur_target.com -m findomain -o .tmp/findomain_prec.txt &>>"$LOGFILE"
-		cat .tmp/*_prec.txt | anew -q .tmp/passive_recursive.txt
+		eval cat .tmp/*_prec.txt 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
 		axiom-scan .tmp/passive_recursive.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/passive_recurs_tmp.txt &>>"$LOGFILE"
 		[ -f ".tmp/passive_recurs_tmp.txt" ] && cat .tmp/passive_recurs_tmp.txt | anew -q subdomains/subdomains.txt
 
 		#Bruteforce recursive
 		if [[ $(cat subdomains/subdomains.txt | wc -l) -le 1000 ]]; then
-			start_subfunc "Running : Subdomains recursive search"
 			echo "" > .tmp/brute_recursive_wordlist.txt
 			for sub in $(cat subdomains/subdomains.txt); do
 				sed "s/$/.$sub/" $subs_wordlist >> .tmp/brute_recursive_wordlist.txt
@@ -520,7 +518,7 @@ function sub_recursive(){
 			NUMOFLINES=$(cat .tmp/permute_recursive.txt .tmp/brute_recursive.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (recursive)" ${FUNCNAME[0]}
 		else
-			notification "Skipping Recursive: Too Many Subdomains" warn
+			notification "Skipping Recursive BF: Too Many Subdomains" warn
 		fi
 	else
 		if [ "$SUBRECURSIVE" = false ]; then
@@ -1197,7 +1195,7 @@ function lfi(){
 		start_func "LFI checks"
 		cat gf/lfi.txt | qsreplace FUZZ | anew -q .tmp/tmp_lfi.txt
 		for url in $(cat .tmp/tmp_lfi.txt); do
-			ffuf -v -mc 200 -t $FFUF_THREADS -H "${HEADER}" -w $lfi_wordlist -u $url -mr "root:" &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/lfi.txt
+			ffuf -v -t $FFUF_THREADS -H "${HEADER}" -w $lfi_wordlist -u $url -mr "root:" &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/lfi.txt
 		done
 		end_func "Results are saved in vulns/lfi.txt" ${FUNCNAME[0]}
 	else
@@ -1214,10 +1212,10 @@ function lfi(){
 function ssti(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SSTI" = true ] && [ -s "gf/ssti.txt" ]; then
 		start_func "SSTI checks"
-		cat gf/ssti.txt | qsreplace "ssti{{7*7}}" | anew -q .tmp/ssti_fuzz.txt
-		ffuf -v -mc 200 -t $FFUF_THREADS -H "${HEADER}" -w .tmp/ssti_fuzz.txt -u FUZZ -mr "ssti49" &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssti.txt
-		cat gf/ssti.txt | qsreplace "{{''.class.mro[2].subclasses()[40]('/etc/passwd').read()}}" | anew -q .tmp/ssti_fuzz2.txt
-		ffuf -v -mc 200 -t $FFUF_THREADS -H "${HEADER}" -w .tmp/ssti_fuzz.txt -u FUZZ -mr "root:" &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssti.txt
+		cat gf/ssti.txt | qsreplace FUZZ | anew -q .tmp/tmp_ssti.txt
+		for url in $(cat .tmp/tmp_ssti.txt); do
+    		ffuf -v -t $FFUF_THREADS -H "${HEADER}" -w $ssti_wordlist -u $url -mr "ssti49" &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssti.txt
+    	done
 		end_func "Results are saved in vulns/ssti.txt" ${FUNCNAME[0]}
 	else
 		if [ "$SSTI" = false ]; then
@@ -2027,7 +2025,7 @@ function help(){
 ########################################### START SCRIPT  #####################################################
 ###############################################################################################################
 
-PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:rspawvh::' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,deep,help' -n 'reconFTW' -- "$@")
+PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:rspanwvh::' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,deep,help' -n 'reconFTW' -- "$@")
 
 
 # Note the quotes around "$PROGARGS": they are essential!
