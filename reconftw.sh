@@ -192,7 +192,8 @@ function emails(){
 			cd "$tools/pwndb" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 			python3 pwndb.py --target "@${domain}" | sed '/^[-]/d' | anew -q $dir/osint/passwords.txt
 			cd "$dir" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
-			sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" osint/passwords.txt
+			[ -f "osint/passwords.txt" ] && sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" osint/passwords.txt
+			[ -f "osint/passwords.txt" ] && sed -i '1,2d' osint/passwords.txt
 		else
 			text="${yellow}\n pwndb is currently down :(\n\n Check xjypo5vzgmo7jca6b322dnqbsdnp3amd24ybx26x5nxbusccjkm4pwid.onion${reset}\n"
 			printf "${text}" && printf "${text}" | $NOTIFY
@@ -256,12 +257,8 @@ function subdomains_full(){
 	NUMOFLINES_probed="0"
 	printf "${bgreen}#######################################################################\n\n"
 	printf "${bblue} Subdomain Enumeration $domain\n\n"
-	if [ -f "subdomains/subdomains.txt" ]; then
-		cp subdomains/subdomains.txt .tmp/subdomains_old.txt 2>>"$LOGFILE"
-	fi
-	if [ -f "webs/webs.txt" ]; then
-		cp webs/webs.txt .tmp/probed_old.txt 2>>"$LOGFILE"
-	fi
+	[ -s "subdomains/subdomains.txt" ] && cp subdomains/subdomains.txt .tmp/subdomains_old.txt
+	[ -s "webs/webs.txt" ] && cp webs/webs.txt .tmp/probed_old.txt
 
 	resolvers_update
 
@@ -284,9 +281,9 @@ function subdomains_full(){
 	fi
 	printf "${bblue}\n Total subdomains: ${reset}\n\n"
 	notification "- ${NUMOFLINES_subs} new alive subdomains" good
-	[ -f "subdomains/subdomains.txt" ] && cat subdomains/subdomains.txt 2>>"$LOGFILE" | sort
+	[ -s "subdomains/subdomains.txt" ] && cat subdomains/subdomains.txt | sort
 	notification "- ${NUMOFLINES_probed} new web probed" good
-	[ -f "webs/webs.txt" ] && cat webs/webs.txt 2>>"$LOGFILE" | sort
+	[ -s "webs/webs.txt" ] && cat webs/webs.txt | sort
 	notification "Subdomain Enumeration Finished" good
 	printf "${bblue} Results are saved in $domain/subdomains/subdomains.txt and webs/webs.txt${reset}\n"
 	printf "${bgreen}#######################################################################\n\n"
@@ -345,7 +342,7 @@ function sub_active(){
 		[ -s "${inScope_file}" ] && cat ${inScope_file} .tmp/inscope_subs.txt
 		cat .tmp/*_subs.txt | anew -q .tmp/subs_no_resolved.txt
 		deleteOutScoped $outOfScope_file .tmp/subs_no_resolved.txt
-		puredns resolve .tmp/subs_no_resolved.txt -w .tmp/subdomains_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
+		[ -s ".tmp/subs_no_resolved.txt" ] && puredns resolve .tmp/subs_no_resolved.txt -w .tmp/subdomains_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
 		echo $domain | dnsx -retry 3 -silent -r $resolvers_trusted 2>>"$LOGFILE" | anew -q .tmp/subdomains_tmp.txt
 		NUMOFLINES=$(cat .tmp/subdomains_tmp.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (active resolution)" ${FUNCNAME[0]}
@@ -357,9 +354,9 @@ function sub_active(){
 function sub_dns(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; then
 		start_subfunc "Running : DNS Subdomain Enumeration"
-		dnsx -retry 3 -a -aaaa -cname -ns -ptr -mx -soa -resp -silent -l subdomains/subdomains.txt -o subdomains/subdomains_cname.txt -r $resolvers_trusted &>>"$LOGFILE"
+		[ -s "subdomains/subdomains.txt" ] && dnsx -retry 3 -a -aaaa -cname -ns -ptr -mx -soa -resp -silent -l subdomains/subdomains.txt -o subdomains/subdomains_cname.txt -r $resolvers_trusted &>>"$LOGFILE"
 		[ -s "subdomains/subdomains_cname.txt" ] && cat subdomains/subdomains_cname.txt | cut -d '[' -f2 | sed 's/.$//' | grep ".$domain$" | anew -q .tmp/subdomains_dns.txt
-		puredns resolve .tmp/subdomains_dns.txt -w .tmp/subdomains_dns_resolved.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
+		[ -s ".tmp/subdomains_dns.txt" ] && puredns resolve .tmp/subdomains_dns.txt -w .tmp/subdomains_dns_resolved.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
 		NUMOFLINES=$(cat .tmp/subdomains_dns_resolved.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (dns resolution)" ${FUNCNAME[0]}
 	else
@@ -375,9 +372,7 @@ function sub_brute(){
 		else
 			puredns bruteforce $subs_wordlist $domain -w .tmp/subs_brute.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
 		fi
-		if [[ -s ".tmp/subs_brute.txt" ]]; then
-			puredns resolve .tmp/subs_brute.txt -w .tmp/subs_brute_valid.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
-		fi
+		[ -s ".tmp/subs_brute.txt" ] && puredns resolve .tmp/subs_brute.txt -w .tmp/subs_brute_valid.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
 		NUMOFLINES=$(cat .tmp/subs_brute_valid.txt 2>>"$LOGFILE" | sed "s/*.//" | grep ".$domain$" | anew subdomains/subdomains.txt | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (bruteforce)" ${FUNCNAME[0]}
 	else
@@ -398,13 +393,13 @@ function sub_scraping(){
 			[ -s ".tmp/probed_tmp_scrap.txt" ] && cat .tmp/probed_tmp_scrap.txt | httpx -csp-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
 			[ -s ".tmp/probed_tmp_scrap.txt" ] && cat .tmp/probed_tmp_scrap.txt | httpx -tls-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains | anew -q .tmp/scrap_subs.txt
 			if [ "$DEEP" = true ]; then
-				[ -f ".tmp/probed_tmp_scrap.txt" ] && gospider -S .tmp/probed_tmp_scrap.txt --js -t $GOSPIDER_THREADS -d 3 --sitemap --robots -w -r > .tmp/gospider.txt
+				[ -s ".tmp/probed_tmp_scrap.txt" ] && gospider -S .tmp/probed_tmp_scrap.txt --js -t $GOSPIDER_THREADS -d 3 --sitemap --robots -w -r > .tmp/gospider.txt
 			else
-				[ -f ".tmp/probed_tmp_scrap.txt" ] && gospider -S .tmp/probed_tmp_scrap.txt --js -t $GOSPIDER_THREADS -d 2 --sitemap --robots -w -r > .tmp/gospider.txt
+				[ -s ".tmp/probed_tmp_scrap.txt" ] && gospider -S .tmp/probed_tmp_scrap.txt --js -t $GOSPIDER_THREADS -d 2 --sitemap --robots -w -r > .tmp/gospider.txt
 			fi
 			sed -i '/^.\{2048\}./d' .tmp/gospider.txt
 			[ -s ".tmp/gospider.txt" ] && cat .tmp/gospider.txt | grep -Eo 'https?://[^ ]+' | sed 's/]$//' | unfurl --unique domains | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
-			puredns resolve .tmp/scrap_subs.txt -w .tmp/scrap_subs_resolved.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
+			[ -s ".tmp/scrap_subs.txt" ] && puredns resolve .tmp/scrap_subs.txt -w .tmp/scrap_subs_resolved.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
 			NUMOFLINES=$(cat .tmp/scrap_subs_resolved.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | tee .tmp/diff_scrap.txt | wc -l)
 			[ -s ".tmp/diff_scrap.txt" ] && cat .tmp/diff_scrap.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
 			end_subfunc "${NUMOFLINES} new subs (code scraping)" ${FUNCNAME[0]}
@@ -423,45 +418,19 @@ function sub_scraping(){
 function sub_permut(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBPERMUTE" = true ]; then
 		start_subfunc "Running : Permutations Subdomain Enumeration"
-		if [ "$DEEP" = true ]; then
-			DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
-			puredns resolve .tmp/DNScewl1.txt -w .tmp/permute1_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
-			cat .tmp/permute1_tmp.txt 2>>"$LOGFILE" | anew -q .tmp/permute1.txt
-			DNScewl --tL .tmp/permute1.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl2.txt
-			puredns resolve .tmp/DNScewl2.txt -w .tmp/permute2_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
-			cat .tmp/permute2_tmp.txt 2>>"$LOGFILE" | anew -q .tmp/permute2.txt
-			cat .tmp/permute1.txt .tmp/permute2.txt 2>>"$LOGFILE" | anew -q .tmp/permute_subs.txt
-		else
-			if [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 100 ]]; then
-				DNScewl --tL .tmp/subs_no_resolved.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
-				puredns resolve .tmp/DNScewl1.txt -w .tmp/permute1_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
-				cat .tmp/permute1_tmp.txt 2>>"$LOGFILE" | anew -q .tmp/permute1.txt
-				DNScewl --tL .tmp/permute1.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl2.txt
-				puredns resolve .tmp/DNScewl2.txt -w .tmp/permute2_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
-				cat .tmp/permute2_tmp.txt 2>>"$LOGFILE" | anew -q .tmp/permute2.txt
-				cat .tmp/permute1.txt .tmp/permute2.txt 2>>"$LOGFILE" | anew -q .tmp/permute_subs.txt
-			elif [[ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 200 ]]; then
-				DNScewl --tL .tmp/subs_no_resolved.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
-				puredns resolve .tmp/DNScewl1.txt -w .tmp/permute_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
-				cat .tmp/permute_tmp.txt 2>>"$LOGFILE" | anew -q .tmp/permute_subs.txt
-			else
-				if [[ $(cat subdomains/subdomains.txt | wc -l) -le 100 ]]; then
-					DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
-					puredns resolve .tmp/DNScewl1.txt -w .tmp/permute1_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
-					cat .tmp/permute1_tmp.txt 2>>"$LOGFILE" | anew -q .tmp/permute1.txt
-					DNScewl --tL .tmp/permute1.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl2.txt
-					puredns resolve .tmp/DNScewl2.txt -w .tmp/permute2_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
-					cat .tmp/permute2_tmp.txt 2>>"$LOGFILE" | anew -q .tmp/permute2.txt
-					cat .tmp/permute1.txt .tmp/permute2.txt 2>>"$LOGFILE" | anew -q .tmp/permute_subs.txt
-				elif [[ $(cat subdomains/subdomains.txt | wc -l) -le 200 ]]; then
-					DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
-					puredns resolve .tmp/DNScewl1.txt -w .tmp/permute_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
-					cat .tmp/permute_tmp.txt 2>>"$LOGFILE" | anew -q .tmp/permute_subs.txt
-				else
-					printf "\n${bred} Skipping Permutations: Too Many Subdomains${reset}\n\n"
-				fi
-			fi
-		fi
+
+		[ "$DEEP" = true ] && [ -s "subdomains/subdomains.txt" ] && DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
+		[ "$DEEP" = false ] && [ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 100 ] && DNScewl --tL .tmp/subs_no_resolved.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
+		[ "$DEEP" = false ] && [ $(cat .tmp/subs_no_resolved.txt | wc -l) -gt 100 ] && [ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 200 ] && DNScewl --tL .tmp/subs_no_resolved.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
+		[ "$DEEP" = false ] && [ $(cat .tmp/subs_no_resolved.txt | wc -l) -gt 200 ] && [ $(cat subdomains/subdomains.txt | wc -l) -le 100 ] && DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
+		[ -s ".tmp/DNScewl1.txt" ] && puredns resolve .tmp/DNScewl1.txt -w .tmp/permute1_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
+		[ -s ".tmp/permute1_tmp.txt" ] && cat .tmp/permute1_tmp.txt | anew -q .tmp/permute1.txt
+		[ -s ".tmp/permute1.txt" ] && DNScewl --tL .tmp/permute1.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl2.txt
+		[ -s ".tmp/DNScewl2.txt" ] && puredns resolve .tmp/DNScewl2.txt -w .tmp/permute2_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
+		[ -s ".tmp/permute2_tmp.txt" ] && cat .tmp/permute2_tmp.txt | anew -q .tmp/permute2.txt
+
+		cat .tmp/permute1.txt .tmp/permute2.txt 2>>"$LOGFILE" | anew -q .tmp/permute_subs.txt
+
 		if [ -f ".tmp/permute_subs.txt" ]; then
 			deleteOutScoped $outOfScope_file .tmp/permute_subs.txt
 			NUMOFLINES=$(cat .tmp/permute_subs.txt 2>>"$LOGFILE" | grep ".$domain$" | anew subdomains/subdomains.txt | wc -l)
@@ -489,8 +458,8 @@ function sub_recursive(){
 			amass enum -passive -d $sub.$domain -config $AMASS_CONFIG &>>"$LOGFILE"
 			findomain --quiet -t $sub.$domain &>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
 		done
-		puredns resolve .tmp/passive_recursive.txt -w .tmp/passive_recurs_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
-		[ -f ".tmp/passive_recurs_tmp.txt" ] && cat .tmp/passive_recurs_tmp.txt | anew -q subdomains/subdomains.txt
+		[ -s ".tmp/passive_recursive.txt" ] && puredns resolve .tmp/passive_recursive.txt -w .tmp/passive_recurs_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
+		[ -s ".tmp/passive_recurs_tmp.txt" ] && cat .tmp/passive_recurs_tmp.txt | anew -q subdomains/subdomains.txt
 
 		# Bruteforce recursive
 		if [[ $(cat subdomains/subdomains.txt | wc -l) -le 1000 ]]; then
@@ -498,13 +467,13 @@ function sub_recursive(){
 			for sub in $(cat subdomains/subdomains.txt); do
 				sed "s/$/.$sub/" $subs_wordlist >> .tmp/brute_recursive_wordlist.txt
 			done
-			puredns resolve .tmp/brute_recursive_wordlist.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT -w .tmp/brute_recursive_result.txt &>>"$LOGFILE"
-			cat .tmp/brute_recursive_result.txt | anew -q .tmp/brute_recursive.txt
-			DNScewl --tL .tmp/brute_recursive.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1_recursive.txt
-			puredns resolve .tmp/DNScewl1_recursive.txt -w .tmp/permute1_recursive_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
-			cat .tmp/permute1_recursive_tmp.txt 2>>"$LOGFILE" | anew -q .tmp/permute1_recursive.txt
-			DNScewl --tL .tmp/permute1_recursive.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl2_recursive.txt
-			puredns resolve .tmp/DNScewl2_recursive.txt -w .tmp/permute2_recursive_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
+			[ -s ".tmp/brute_recursive_wordlist.txt" ] && puredns resolve .tmp/brute_recursive_wordlist.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT -w .tmp/brute_recursive_result.txt &>>"$LOGFILE"
+			[ -s ".tmp/brute_recursive_result.txt" ] && cat .tmp/brute_recursive_result.txt | anew -q .tmp/brute_recursive.txt
+			[ -s ".tmp/brute_recursive.txt" ] && DNScewl --tL .tmp/brute_recursive.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1_recursive.txt
+			[ -s ".tmp/DNScewl1_recursive.txt" ] && puredns resolve .tmp/DNScewl1_recursive.txt -w .tmp/permute1_recursive_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
+			[ -s ".tmp/permute1_recursive_tmp.txt" ] && cat .tmp/permute1_recursive_tmp.txt 2>>"$LOGFILE" | anew -q .tmp/permute1_recursive.txt
+			[ -s ".tmp/permute1_recursive.txt" ] && DNScewl --tL .tmp/permute1_recursive.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl2_recursive.txt
+			[ -s ".tmp/DNScewl2_recursive.txt" ] && puredns resolve .tmp/DNScewl2_recursive.txt -w .tmp/permute2_recursive_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT &>>"$LOGFILE"
 			cat .tmp/permute1_recursive.txt .tmp/permute2_recursive_tmp.txt 2>>"$LOGFILE" | anew -q .tmp/permute_recursive.txt
 			NUMOFLINES=$(cat .tmp/permute_recursive.txt .tmp/brute_recursive.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (recursive)" ${FUNCNAME[0]}
@@ -559,7 +528,7 @@ function zonetransfer(){
 function s3buckets(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$S3BUCKETS" = true ]; then
 		start_func "AWS S3 buckets search"
-		s3scanner scan -f subdomains/subdomains.txt 2>>"$LOGFILE" | grep -iv "not_exist" | grep -iv "Warning:" | anew -q .tmp/s3buckets.txt
+		[ -s "subdomains/subdomains.txt" ] && s3scanner scan -f subdomains/subdomains.txt 2>>"$LOGFILE" | grep -iv "not_exist" | grep -iv "Warning:" | anew -q .tmp/s3buckets.txt
 		NUMOFLINES=$(cat .tmp/s3buckets.txt 2>>"$LOGFILE" | anew subdomains/s3buckets.txt | wc -l)
 		if [ "$NUMOFLINES" -gt 0 ]; then
 			notification "${NUMOFLINES} new S3 buckets found" info
@@ -610,7 +579,7 @@ function webprobe_full(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$WEBPROBEFULL" = true ]; then
 		start_func "Http probing non standard ports"
 
-		sudo unimap --fast-scan -f subdomains/subdomains.txt --ports $UNCOMMON_PORTS_WEB -q -k --url-output | anew -q .tmp/nmap_uncommonweb.txt
+		[ -s "subdomains/subdomains.txt" ] && sudo unimap --fast-scan -f subdomains/subdomains.txt --ports $UNCOMMON_PORTS_WEB -q -k --url-output | anew -q .tmp/nmap_uncommonweb.txt
 		[ -s ".tmp/nmap_uncommonweb.txt" ] && cat .tmp/nmap_uncommonweb.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout $HTTPX_UNCOMMONPORTS_TIMEOUT -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain" | anew -q .tmp/probed_uncommon_ports_tmp.txt
 
 		#timeout_secs=$(($(cat subdomains/subdomains.txt | wc -l)*5+10))
@@ -639,7 +608,7 @@ function screenshot(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$WEBSCREENSHOT" = true ]; then
 		start_func "Web Screenshots"
 		cat webs/webs.txt webs/webs_uncommon_ports.txt 2>>"$LOGFILE" | anew -q .tmp/webs_screenshots.txt
-		webscreenshot --no-xserver -r chrome -i .tmp/webs_screenshots.txt -w $WEBSCREENSHOT_THREADS -o screenshots
+		[ -s ".tmp/webs_screenshots.txt" ] && webscreenshot --no-xserver -r chrome -i .tmp/webs_screenshots.txt -w $WEBSCREENSHOT_THREADS -o screenshots
 		#gowitness file -f .tmp/webs_screenshots.txt --disable-logging 2>>"$LOGFILE"
 		end_func "Results are saved in $domain/screenshots folder" ${FUNCNAME[0]}
 	else
@@ -665,7 +634,7 @@ function favicon(){
 			sed -i "s/|/\n/g" favicontest.txt
 			cat favicontest.txt 2>>"$LOGFILE"
 			mv favicontest.txt $dir/hosts/favicontest.txt 2>>"$LOGFILE"
-			rm favicontest.json 2>>"$LOGFILE"
+			rm -f favicontest.json 2>>"$LOGFILE"
 		fi
 		cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		end_func "Results are saved in hosts/favicontest.txt" ${FUNCNAME[0]}
@@ -696,7 +665,7 @@ function portscan(){
 			done
 		fi
 		if [ "$PORTSCAN_ACTIVE" = true ]; then
-			sudo nmap --top-ports 1000 -sV -n --max-retries 2 -Pn -iL .tmp/ips_nowaf.txt -oN hosts/portscan_active.txt -oG .tmp/nmap_grep.gnmap &>>"$LOGFILE"
+			[ -s ".tmp/ips_nowaf.txt" ] && sudo nmap --top-ports 1000 -sV -n --max-retries 2 -Pn -iL .tmp/ips_nowaf.txt -oN hosts/portscan_active.txt -oG .tmp/nmap_grep.gnmap &>>"$LOGFILE"
 		fi
 		end_func "Results are saved in hosts/portscan_[passive|active].txt" ${FUNCNAME[0]}
 	else
@@ -786,13 +755,14 @@ function fuzz(){
 		start_func "Web directory fuzzing"
 		if [ -s "./webs/webs.txt" ]; then
 			mkdir -p $dir/fuzzing
+			interlace -tL webs/webs.txt -threads 10 -c "ffuf -mc all -fc 404 -ac -t ${FFUF_THREADS} -sf -s -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u  _target_/FUZZ -of csv -o _output_/_cleantarget_.csv -ac" -o fuzzing
+
 			for sub in $(cat webs/webs.txt); do
-				printf "${yellow}\n\n Running: Fuzzing in ${sub}${reset}\n"
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-				ffuf -mc all -fc 404 -ac -t $FFUF_THREADS -sf -s -H "${HEADER}" -w $fuzz_wordlist -maxtime $FFUF_MAXTIME -u $sub/FUZZ -or -of csv -o $dir/fuzzing/${sub_out}.csv &>/dev/null
 				[ -s "$dir/fuzzing/${sub_out}.csv" ] && cat $dir/fuzzing/${sub_out}.csv | cut -d ',' -f2,5,6 | tr ',' ' ' | awk '{ print $2 " " $3 " " $1}' | tail -n +2 | sort -k1 | anew -q $dir/fuzzing/${sub_out}.txt
-				rm $dir/fuzzing/${sub_out}.csv 2>>"$LOGFILE"
+				rm -f $dir/fuzzing/${sub_out}.csv 2>>"$LOGFILE"
 			done
+
 			end_func "Results are saved in $domain/fuzzing/*subdomain*.txt" ${FUNCNAME[0]}
 		else
 			end_func "No $domain/web/webs.txts file found, fuzzing skipped " ${FUNCNAME[0]}
@@ -851,19 +821,19 @@ function params(){
 		printf "${yellow}\n\n Running : Searching params with paramspider${reset}\n"
 		if [ -s "webs/webs.txt" ]; then
 			cat webs/webs.txt | sed -r "s/https?:\/\///" | anew -q .tmp/probed_nohttp.txt
-			interlace -tL .tmp/probed_nohttp.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt,js" &>/dev/null
+			[ -s ".tmp/probed_nohttp.txt" ] && interlace -tL .tmp/probed_nohttp.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt,js" &>/dev/null
 			cat output/*.txt 2>>"$LOGFILE" | anew -q .tmp/param_tmp.txt
 			sed '/^FUZZ/d' -i .tmp/param_tmp.txt
 			rm -rf output/ 2>>"$LOGFILE"
 			if [ "$DEEP" = true ]; then
 				printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
-				arjun -i .tmp/param_tmp.txt -t $ARJUN_THREADS -oT webs/param.txt &>>"$LOGFILE"
+				[ -s ".tmp/param_tmp.txt" ] && arjun -i .tmp/param_tmp.txt -t $ARJUN_THREADS -oT webs/param.txt &>>"$LOGFILE"
 			else
 				if [[ $(cat .tmp/param_tmp.txt | wc -l) -le 50 ]]; then
 					printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
-					arjun -i .tmp/param_tmp.txt -t $ARJUN_THREADS -oT webs/param.txt &>>"$LOGFILE"
+					[ -s ".tmp/param_tmp.txt" ] && arjun -i .tmp/param_tmp.txt -t $ARJUN_THREADS -oT webs/param.txt &>>"$LOGFILE"
 				else
-					cp .tmp/param_tmp.txt webs/param.txt
+					[ -s ".tmp/param_tmp.txt" ] && cp .tmp/param_tmp.txt webs/param.txt
 				fi
 			fi
 		fi
@@ -903,7 +873,7 @@ function urlchecks(){
 				[ -s "js/url_extract_js.txt" ] && cat js/url_extract_js.txt | python3 $tools/JSA/jsa.py | anew -q .tmp/url_extract_tmp.txt
 			fi
 			cat .tmp/url_extract_tmp.txt webs/param.txt 2>>"$LOGFILE" | grep "${domain}" | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -Eiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | anew -q .tmp/url_extract_tmp2.txt
-			uddup -u .tmp/url_extract_tmp2.txt -o .tmp/url_extract_uddup.txt &>>"$LOGFILE"
+			[ -s ".tmp/url_extract_tmp2.txt" ] && uddup -u .tmp/url_extract_tmp2.txt -o .tmp/url_extract_uddup.txt &>>"$LOGFILE"
 			NUMOFLINES=$(cat .tmp/url_extract_uddup.txt 2>>"$LOGFILE" | anew webs/url_extract.txt | wc -l)
 			notification "${NUMOFLINES} new urls with params" info
 			end_func "Results are saved in $domain/webs/url_extract.txt" ${FUNCNAME[0]}
@@ -921,16 +891,18 @@ function url_gf(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$URL_GF" = true ]; then
 		start_func "Vulnerable Pattern Search"
 		mkdir -p gf
-		gf xss webs/url_extract.txt | anew -q gf/xss.txt
-		gf ssti webs/url_extract.txt | anew -q gf/ssti.txt
-		gf ssrf webs/url_extract.txt | anew -q gf/ssrf.txt
-		gf sqli webs/url_extract.txt | anew -q gf/sqli.txt
-		gf redirect webs/url_extract.txt | anew -q gf/redirect.txt
-		[ -f "gf/ssrf.txt" ] && cat gf/ssrf.txt | anew -q gf/redirect.txt
-		gf rce webs/url_extract.txt | anew -q gf/rce.txt
-		gf potential webs/url_extract.txt | cut -d ':' -f3-5 |anew -q gf/potential.txt
-		[ -s ".tmp/url_extract_tmp.txt" ] && cat .tmp/url_extract_tmp.txt | grep -Eiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | unfurl -u format %s://%d%p | anew -q gf/endpoints.txt
-		gf lfi webs/url_extract.txt | anew -q gf/lfi.txt
+		if [ -s "webs/url_extract.txt" ]; then
+			gf xss webs/url_extract.txt | anew -q gf/xss.txt
+			gf ssti webs/url_extract.txt | anew -q gf/ssti.txt
+			gf ssrf webs/url_extract.txt | anew -q gf/ssrf.txt
+			gf sqli webs/url_extract.txt | anew -q gf/sqli.txt
+			gf redirect webs/url_extract.txt | anew -q gf/redirect.txt
+			[ -f "gf/ssrf.txt" ] && cat gf/ssrf.txt | anew -q gf/redirect.txt
+			gf rce webs/url_extract.txt | anew -q gf/rce.txt
+			gf potential webs/url_extract.txt | cut -d ':' -f3-5 |anew -q gf/potential.txt
+			[ -s ".tmp/url_extract_tmp.txt" ] && cat .tmp/url_extract_tmp.txt | grep -Eiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | unfurl -u format %s://%d%p | anew -q gf/endpoints.txt
+			gf lfi webs/url_extract.txt | anew -q gf/lfi.txt
+		fi
 		end_func "Results are saved in $domain/gf folder" ${FUNCNAME[0]}
 	else
 		if [ "$URL_GF" = false ]; then
