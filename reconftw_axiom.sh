@@ -844,7 +844,7 @@ function params(){
 		if [ -s "webs/webs.txt" ]; then
 			cat webs/webs.txt | sed -r "s/https?:\/\///" | anew -q .tmp/probed_nohttp.txt
 			axiom-scan .tmp/probed_nohttp.txt -m paramspider -l high -q --exclude eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt,js -o output_paramspider &>>"$LOGFILE"
-			cat output_paramspider/*.txt 2>>"$LOGFILE" | anew -q .tmp/param_tmp.txt
+			find output_paramspider/ -name '*.txt' -exec cat {} \; | anew -q .tmp/param_tmp.txt
 			sed '/^FUZZ/d' -i .tmp/param_tmp.txt
 			rm -rf output_paramspider/ 2>>"$LOGFILE"
 			if [ "$DEEP" = true ]; then
@@ -1189,7 +1189,7 @@ function lfi(){
 		if [ -s "gf/lfi.txt" ]; then
 			cat gf/lfi.txt | qsreplace FUZZ | anew -q .tmp/tmp_lfi.txt
 			for url in $(cat .tmp/tmp_lfi.txt); do
-				ffuf -v -t $FFUF_THREADS -H "${HEADER}" -w $lfi_wordlist -u $url -mr "root:" &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/lfi.txt
+				ffuf -v -t $FFUF_THREADS -H "${HEADER}" -w $lfi_wordlist -u $url -mr "root:" 2>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/lfi.txt
 			done
 		fi
 		end_func "Results are saved in vulns/lfi.txt" ${FUNCNAME[0]}

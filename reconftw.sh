@@ -1165,7 +1165,7 @@ function lfi(){
 		if [ -s "gf/lfi.txt" ]; then
 			cat gf/lfi.txt | qsreplace FUZZ | anew -q .tmp/tmp_lfi.txt
 			for url in $(cat .tmp/tmp_lfi.txt); do
-				ffuf -v -t $FFUF_THREADS -H "${HEADER}" -w $lfi_wordlist -u $url -mr "root:" &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/lfi.txt
+				ffuf -v -t $FFUF_THREADS -H "${HEADER}" -w $lfi_wordlist -u $url -mr "root:" 2>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/lfi.txt
 			done
 		fi
 		end_func "Results are saved in vulns/lfi.txt" ${FUNCNAME[0]}
