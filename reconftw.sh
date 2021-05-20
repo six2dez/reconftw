@@ -160,7 +160,7 @@ function metadata(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$METADATA" = true ] && [ "$OSINT" = true ]; then
 		start_func "Scanning metadata in public files"
 		metafinder -d "$domain" -l 20 -o osint -go -bi -ba &>>"$LOGFILE"
-		mv "osint/${domain}/*" "osint/" 2>>"$LOGFILE"
+		mv "osint/${domain}/"*".txt" "osint/" 2>>"$LOGFILE"
 		rmdir "osint/${domain}" 2>>"$LOGFILE"
 		end_func "Results are saved in $domain/osint/[software/authors/metadata_results].txt" ${FUNCNAME[0]}
 	else
