@@ -672,9 +672,7 @@ function favicon(){
 function portscan(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$PORTSCANNER" = true ]; then
 		start_func "Port scan"
-		for sub in $(cat subdomains/subdomains.txt); do
-			echo "$sub $(dig +short a $sub | tail -n1)" | anew -q .tmp/subs_ips.txt
-		done
+		interlace -tL subdomains/subdomains.txt -threads 50 -c 'echo "_target_ $(dig +retry=5 +short a _target_ | tail -n1)" | anew -q _output_' -o .tmp/subs_ips.txt
 		awk '{ print $2 " " $1}' .tmp/subs_ips.txt | sort -k2 -n | anew -q hosts/subs_ips_vhosts.txt
 		[ -s "hosts/subs_ips_vhosts.txt" ] && cat hosts/subs_ips_vhosts.txt | cut -d ' ' -f1 | grep -Eiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
 		[ -s "hosts/ips.txt" ] && axiom-scan hosts/ips.txt -m cf-check -o .tmp/ips_nowaf_.txt 2>>"$LOGFILE" &>/dev/null
