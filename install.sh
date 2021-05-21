@@ -31,6 +31,7 @@ gotools["dalfox"]="GO111MODULE=on go get -v github.com/hahwul/dalfox/v2"
 gotools["puredns"]="GO111MODULE=on go get github.com/d3mondev/puredns/v2"
 gotools["hakrevdns"]="go get github.com/hakluke/hakrevdns"
 gotools["gdn"]="GO111MODULE=on go get -v github.com/kmskrishna/gdn"
+gotools["resolveDomains"]="go get -v github.com/Josue87/resolveDomains"
 
 declare -A repos
 repos["degoogle_hunter"]="six2dez/degoogle_hunter"

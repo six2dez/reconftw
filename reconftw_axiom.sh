@@ -100,6 +100,7 @@ function tools_installed(){
 	type -P unimap &>/dev/null || { printf "${bred} [*] unimap		[NO]${reset}\n${reset}"; allinstalled=false;}
 	type -P hakrevdns &>/dev/null || { printf "${bred} [*] hakrevdns	[NO]${reset}\n${reset}"; allinstalled=false;}
 	type -P gdn &>/dev/null || { printf "${bred} [*] gdn			[NO]${reset}\n"; allinstalled=false;}
+	type -P resolveDomains &>/dev/null || { printf "${bred} [*] resolveDomains	[NO]${reset}\n"; allinstalled=false;}
 	type -P axiom-ls &>/dev/null || { printf "${bred} [*] axiom		[NO]${reset}\n${reset}"; allinstalled=false;}
 
 	if [ "${allinstalled}" = true ]; then
@@ -656,7 +657,7 @@ function favicon(){
 			sed -i "s/|/\n/g" favicontest.txt
 			cat favicontest.txt 2>>"$LOGFILE"
 			mv favicontest.txt $dir/hosts/favicontest.txt 2>>"$LOGFILE"
-			rm favicontest.json 2>>"$LOGFILE"
+			rm -f favicontest.json 2>>"$LOGFILE"
 		fi
 		cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		end_func "Results are saved in hosts/favicontest.txt" ${FUNCNAME[0]}
@@ -672,8 +673,9 @@ function favicon(){
 function portscan(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$PORTSCANNER" = true ]; then
 		start_func "Port scan"
-		interlace -tL subdomains/subdomains.txt -threads 50 -c 'echo "_target_ $(dig +retry=5 +short a _target_ | tail -n1)" | anew -q _output_' -o .tmp/subs_ips.txt
-		awk '{ print $2 " " $1}' .tmp/subs_ips.txt | sort -k2 -n | anew -q hosts/subs_ips_vhosts.txt
+		#interlace -tL subdomains/subdomains.txt -threads 50 -c 'echo "_target_ $(dig +short a _target_ | tail -n1)" | anew -q _output_' -o .tmp/subs_ips.txt
+		[ -s "subdomains/subdomains.txt" ] && resolveDomains -d subdomains/subdomains.txt -t $RESOLVE_DOMAINS_THREADS 2>>"$LOGFILE" | anew -q .tmp/subs_ips.txt
+		[ -s ".tmp/subs_ips.txt" ] && awk '{ print $2 " " $1}' .tmp/subs_ips.txt | sort -k2 -n | anew -q hosts/subs_ips_vhosts.txt
 		[ -s "hosts/subs_ips_vhosts.txt" ] && cat hosts/subs_ips_vhosts.txt | cut -d ' ' -f1 | grep -Eiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
 		[ -s "hosts/ips.txt" ] && axiom-scan hosts/ips.txt -m cf-check -o .tmp/ips_nowaf_.txt 2>>"$LOGFILE" &>/dev/null
 		[ -s ".tmp/ips_nowaf_.txt" ] && cat .tmp/ips_nowaf_.txt | grep -Eiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q .tmp/ips_nowaf.txt
