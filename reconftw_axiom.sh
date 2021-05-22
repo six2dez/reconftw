@@ -1471,7 +1471,7 @@ function ipcidr_detection(){
 }
 
 function ipcidr_target(){
-	ipcidr_detection $1 | cut -d' ' -f3 | unfurl -u domains 2>>"$LOGFILE" | sed 's/\.$//' | sort -u > ./target_reconftw_ipcidr.txt
+	ipcidr_detection $1 | cut -d' ' -f3 | unfurl -u domains 2>/dev/null | sed 's/\.$//' | sort -u > ./target_reconftw_ipcidr.txt
 	if [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -eq 1 ]]; then
 		domain=$(cat ./target_reconftw_ipcidr.txt)
 	elif [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -gt 1 ]]; then
