@@ -47,3 +47,4 @@ shodan
 dnspython
 pytest-runner
 webscreenshot
+emailfinder

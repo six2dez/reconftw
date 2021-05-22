@@ -59,6 +59,7 @@ repos["testssl"]="drwetter/testssl.sh"
 repos["ip2provider"]="oldrho/ip2provider"
 repos["commix"]="commixproject/commix"
 repos["JSA"]="w9w/JSA"
+repos["AnalyticsRelationships"]="Josue87/AnalyticsRelationships"
 
 dir=${tools}
 double_check=false
