@@ -37,7 +37,7 @@
  
 **ReconFTW** automates the entire process of reconnaisance for you. It outperforms the work of subdomain enumeration along with various vulnerability checks and obtaining maximum information about your target.       
  
-ReconFTW uses around 5 techniques(passive,bruteforce,permutations,certificate transparency,JS scraping) for subdomain enumeration which helps you getting the maximum and the most interesting subdomains so that you be ahead of the competition.   
+ReconFTW uses around 5 techniques (passive, bruteforce, permutations, certificate transparency, source code scraping) for subdomain enumeration which helps you getting the maximum and the most interesting subdomains so that you be ahead of the competition.   
  
  
 It also performs various vulnerability checks like XSS, Open Redirects, SSRF, CRLF, LFI, SQLi, SSL tests, SSTI, DNS zone transfers, and much more. Along with these, it performs OSINT techniques, directory fuzzing, dorking, ports scanning, screenshots, nuclei scan on your target.
@@ -373,7 +373,7 @@ AXIOM_FLEET_SHUTDOWN=true
 # :fire: Features :fire:
  
 - Domain information parser ([domainbigdata](https://domainbigdata.com/))
-- Emails addresses and users ([theHarvester](https://github.com/laramies/theHarvester))
+- Emails addresses and users ([theHarvester](https://github.com/laramies/theHarvester), [emailfinder](https://github.com/Josue87/EmailFinder))
 - Password leaks ([pwndb](https://github.com/davidtavarez/pwndb) and [H8mail](https://github.com/khast3x/h8mail))
 - Metadata finder ([MetaFinder](https://github.com/Josue87/MetaFinder))
 - Google Dorks ([degoogle_hunter](https://github.com/six2dez/degoogle_hunter))
@@ -383,7 +383,7 @@ AXIOM_FLEET_SHUTDOWN=true
   - Certificate transparency ([ctfr](https://github.com/UnaPibaGeek/ctfr), [tls.bufferover](tls.bufferover.run) and [dns.bufferover](dns.bufferover.run)))
   - Bruteforce ([puredns](https://github.com/d3mondev/puredns))
   - Permutations ([DNScewl](https://github.com/codingo/DNSCewl))
-  - JS files & Source Code Scraping ([gospider](https://github.com/jaeles-project/gospider))
+  - JS files & Source Code Scraping ([gospider](https://github.com/jaeles-project/gospider), [analyticsRelationship](https://github.com/Josue87/analyticsRelationship))
   - CNAME Records ([dnsx](https://github.com/projectdiscovery/dnsx))
 - Nuclei Sub TKO templates ([nuclei](https://github.com/projectdiscovery/nuclei))
 - Web Prober ([httpx](https://github.com/projectdiscovery/httpx) and [naabu](https://github.com/projectdiscovery/naabu))
