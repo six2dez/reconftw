@@ -236,8 +236,8 @@ done
 
 if [ "True" = "$IS_ARM" ]
     then
-        eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-rpi  $DEBUG_STD
-        eval $SUDO mv findomain-rpi /usr/bin/findomain
+        eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-armv7  $DEBUG_STD
+        eval $SUDO mv findomain-armv7 /usr/local/bin/findomain
     else
         eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux $DEBUG_STD
         eval wget -N -c https://github.com/sensepost/gowitness/releases/download/2.3.4/gowitness-2.3.4-linux-amd64 $DEBUG_STD

@@ -5,7 +5,8 @@
   reconFTW
   <br>
 </h1>
- 
+
+
 <p align="center">
   <a href="https://github.com/six2dez/reconftw/releases/tag/v1.6.0.2">
     <img src="https://img.shields.io/badge/release-v1.6.0.2-green">
@@ -30,6 +31,7 @@
     <img alt="Docker Cloud Build Status" src="https://img.shields.io/docker/cloud/build/six2dez/reconftw">
   </a>
 </p>
+
  
 <h3 align="center">Summary</h3>
  
@@ -42,6 +44,7 @@ It also performs various vulnerability checks like XSS, Open Redirects, SSRF, CR
  
 So, what are you waiting for Go! Go! Go! :boom:
  
+
 📔 Table of Contents
 -----------------
 - [💿 Installation](#-installation)
@@ -161,7 +164,7 @@ GITHUB_TOKENS=${tools}/.github_tokens
 #findomain_fb_token="XXXXXXXXXXXXXXXXX"
 slack_channel="XXXXXXXX"
 slack_auth="xoXX-XXX-XXX-XXX"
- 
+
 # File descriptors
 DEBUG_STD="&>/dev/null"
 DEBUG_ERROR="2>/dev/null"
@@ -192,7 +195,7 @@ UNCOMMON_PORTS_WEB="81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,30
 # You can change to aquatone if gowitness fails, comment the one you don't want
 AXIOM_SCREENSHOT_MODULE=gowitness
 #AXIOM_SCREENSHOT_MODULE=aquatone
- 
+
 # Host
 FAVICON=true
 PORTSCANNER=true
@@ -234,7 +237,7 @@ REMOVETMP=false
 REMOVELOG=false
 PROXY=false
 SENDZIPNOTIFY=false
- 
+
 # HTTP options
 HEADER="User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0"
  
@@ -252,13 +255,13 @@ DALFOX_THREADS=200
 PUREDNS_PUBLIC_LIMIT=0 # Set between 2000 - 10000 if your router blows up, 0 is unlimited
 PUREDNS_TRUSTED_LIMIT=400
 DIRDAR_THREADS=200
- 
+
 # Timeouts
 CMSSCAN_TIMEOUT=3600
 FFUF_MAXTIME=900                # Seconds
 HTTPX_TIMEOUT=15                # Seconds
 HTTPX_UNCOMMONPORTS_TIMEOUT=10  # Seconds
- 
+
 # lists
 fuzz_wordlist=${tools}/fuzz_wordlist.txt
 lfi_wordlist=${tools}/lfi_wordlist.txt
@@ -266,7 +269,7 @@ subs_wordlist=${tools}/subdomains.txt
 subs_wordlist_big=${tools}/subdomains_big.txt
 resolvers=${tools}/resolvers.txt
 resolvers_trusted=${tools}/resolvers_trusted.txt
- 
+
 # Axiom Fleet
 # Will not start a new fleet if one exist w/ same name and size (or larger)
 AXIOM_FLEET_LAUNCH=true
@@ -276,7 +279,7 @@ AXIOM_FLEET_REGIONS=""
 AXIOM_FLEET_SHUTDOWN=true
 # This is a script on your reconftw host that might prep things your way...
 #AXIOM_POST_START="$HOME/bin/yourScript"
- 
+
 ```
 </details>
  
@@ -460,13 +463,14 @@ If you want to contribute to this project you can do it in multiple ways:
 ## You can support this work buying me a coffee:
  
 [<img src="https://cdn.buymeacoffee.com/buttons/v2/default-green.png">](https://www.buymeacoffee.com/six2dez)
+
  
 # Sponsors ❤️
 **This section shows the current financial sponsors of this project**  
  
  
 [<img src="https://pbs.twimg.com/profile_images/1360304248534282240/MomOFi40_400x400.jpg" width="100" height=auto>](https://github.com/0xtavian)
- 
+
 # Thanks :pray:
 * Thank you for lending a helping hand towards the development of the project!
  

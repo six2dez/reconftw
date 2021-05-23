@@ -803,7 +803,9 @@ function fuzz(){
 		start_func "Web directory fuzzing"
 		if [ -s "webs/webs.txt" ]; then
 			mkdir -p $dir/fuzzing
+
 			axiom-scan webs/webs.txt -m ffuf -w /home/op/lists/onelistforallmicro.txt -H \"${HEADER}\" -mc all -fc 404 -sf -s -maxtime $FFUF_MAXTIME -o $dir/fuzzing/ffuf-content.csv 2>>"$LOGFILE" &>/dev/null
+
 			grep -v "FUZZ,url,redirectlocation" $dir/fuzzing/ffuf-content.csv | awk -F "," '{print $2" "$5" "$6}' | sort > $dir/fuzzing/ffuf-content.tmp
 			for sub in $(cat webs/webs.txt); do
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
