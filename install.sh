@@ -29,7 +29,9 @@ gotools["crobat"]="go get -v github.com/cgboal/sonarsearch/crobat"
 gotools["crlfuzz"]="GO111MODULE=on go get -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz"
 gotools["dalfox"]="GO111MODULE=on go get -v github.com/hahwul/dalfox/v2"
 gotools["puredns"]="GO111MODULE=on go get github.com/d3mondev/puredns/v2"
-gotools["naabu"]="GO111MODULE=on go get -v github.com/projectdiscovery/naabu/v2/cmd/naabu"
+gotools["hakrevdns"]="go get github.com/hakluke/hakrevdns"
+gotools["gdn"]="GO111MODULE=on go get -v github.com/kmskrishna/gdn"
+gotools["resolveDomains"]="go get -v github.com/Josue87/resolveDomains"
 
 declare -A repos
 repos["degoogle_hunter"]="six2dez/degoogle_hunter"
@@ -55,8 +57,12 @@ repos["OpenRedireX"]="devanshbatham/OpenRedireX"
 repos["GitDorker"]="obheda12/GitDorker"
 repos["testssl"]="drwetter/testssl.sh"
 repos["ip2provider"]="oldrho/ip2provider"
+repos["commix"]="commixproject/commix"
+repos["JSA"]="w9w/JSA"
+repos["AnalyticsRelationships"]="Josue87/AnalyticsRelationships"
 
 dir=${tools}
+double_check=false
 
 if grep -q "ARMv"  /proc/cpuinfo
 then
@@ -65,20 +71,27 @@ else
    IS_ARM="False";
 fi
 
-if [[ $(id -u | grep -o '^0$') == "0" ]]; then
-    SUDO=" "
-else
-    SUDO="sudo"
-fi
-
 printf "\n\n${bgreen}#######################################################################${reset}\n"
 printf "${bgreen} reconFTW installer/updater script ${reset}\n\n"
 printf "${yellow} This may take time. So, go grab a coffee! ${reset}\n\n"
+
+if [[ $(id -u | grep -o '^0$') == "0" ]]; then
+    SUDO=" "
+else
+    if sudo -n false 2>/dev/null; then
+        printf "${bred} Is strongly recommended to add your user to sudoers${reset}\n"
+        printf "${bred} This will avoid prompts for sudo password in the middle of the installation${reset}\n"
+        printf "${bred} And more important, in the middle of the scan (needed for nmap SYN scan)${reset}\n\n"
+        printf "${bred} echo \"${USERNAME}  ALL=(ALL:ALL) NOPASSWD: ALL\" > /etc/sudoers.d/reconFTW${reset}\n\n"
+    fi
+    SUDO="sudo"
+fi
+
 install_apt(){
     eval $SUDO apt update -y $DEBUG_STD
-    eval $SUDO apt install chromium-browser -y $DEBUG_STD
-    eval $SUDO apt install chromium -y $DEBUG_STD
-    eval $SUDO apt install python3 python3-pip gcc build-essential ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa -y $DEBUG_STD
+    eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium-browser -y $DEBUG_STD
+    eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium -y $DEBUG_STD
+    eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip gcc build-essential ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb -y $DEBUG_STD
     eval $SUDO systemctl enable tor $DEBUG_STD
 }
 
@@ -179,6 +192,7 @@ for gotool in "${!gotools[@]}"; do
         printf "${yellow} $gotool installed (${go_step}/${#gotools[@]})${reset}\n"
     else
         printf "${red} Unable to install $gotool, try manually (${go_step}/${#gotools[@]})${reset}\n"
+        double_check=true
     fi
 done
 
@@ -205,6 +219,7 @@ for repo in "${!repos[@]}"; do
         printf "${yellow} $repo installed (${repos_step}/${#repos[@]})${reset}\n"
     else
         printf "${red} Unable to install $repo, try manually (${repos_step}/${#repos[@]})${reset}\n"
+        double_check=true
     fi
     if [ -s "setup.py" ]; then
         eval $SUDO python3 setup.py install $DEBUG_STD
@@ -227,13 +242,16 @@ if [ "True" = "$IS_ARM" ]
         eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux $DEBUG_STD
         eval wget -N -c https://github.com/sensepost/gowitness/releases/download/2.3.4/gowitness-2.3.4-linux-amd64 $DEBUG_STD
         eval wget -N -c https://github.com/codingo/DNSCewl/raw/master/DNScewl $DEBUG_STD
-        eval $SUDO mv DNScewl /usr/local/bin/DNScewl
-        eval $SUDO mv gowitness-2.3.4-linux-amd64 /usr/local/bin/gowitness
-        eval $SUDO mv findomain-linux /usr/local/bin/findomain
+        eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/download/0.4.0/unimap-linux $DEBUG_STD
+        eval $SUDO mv DNScewl /usr/bin/DNScewl
+        eval $SUDO mv gowitness-2.3.4-linux-amd64 /usr/bin/gowitness
+        eval $SUDO mv findomain-linux /usr/bin/findomain
+        eval $SUDO mv unimap-linux /usr/bin/unimap
 fi
-eval $SUDO chmod 755 /usr/local/bin/findomain
-eval $SUDO chmod 755 /usr/local/bin/gowitness
-eval $SUDO chmod 755 /usr/local/bin/DNScewl
+eval $SUDO chmod 755 /usr/bin/findomain
+eval $SUDO chmod 755 /usr/bin/gowitness
+eval $SUDO chmod 755 /usr/bin/DNScewl
+eval $SUDO chmod 755 /usr/bin/unimap
 eval subfinder $DEBUG_STD
 eval subfinder $DEBUG_STD
 
@@ -249,34 +267,37 @@ eval wget -O subdomains.txt https://gist.github.com/six2dez/a307a04a222fab5a5746
 eval wget -O permutations_list.txt https://gist.github.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw $DEBUG_STD
 eval wget -nc -O ssrf.py https://gist.github.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw $DEBUG_STD
 eval wget -nc -O fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD
-eval wget -O lfi_wordlist.txt https://gist.githubusercontent.com/detonxx/a885ce7dd64a7139cb6f5b6860499ba8/raw $DEBUG_STD
+eval wget -O lfi_wordlist.txt https://gist.githubusercontent.com/six2dez/a89a0c7861d49bb61a09822d272d5395/raw $DEBUG_STD
+eval wget -O ssti_wordlist.txt https://gist.githubusercontent.com/six2dez/ab5277b11da7369bf4e9db72b49ad3c1/raw $DEBUG_STD
 
 ## Last check
-printf "${bblue} Running: Double check for installed tools ${reset}\n\n"
-go_step=0
-for gotool in "${!gotools[@]}"; do
-    go_step=$((go_step + 1))
-    eval type -P $gotool $DEBUG_STD || { eval ${gotools[$gotool]} $DEBUG_STD; }
-    exit_status=$?
-done
-repos_step=0
-for repo in "${!repos[@]}"; do
-    repos_step=$((repos_step + 1))
-    eval cd $dir/$repo $DEBUG_STD || { eval git clone https://github.com/${repos[$repo]} $dir/$repo $DEBUG_STD && cd $dir/$repo; }
-    eval git pull $DEBUG_STD
-    exit_status=$?
-    if [ -s "setup.py" ]; then
-        eval $SUDO python3 setup.py install $DEBUG_STD
-    fi
-    if [ "massdns" = "$repo" ]; then
-            eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/bin/ $DEBUG_ERROR
-    elif [ "gf" = "$repo" ]; then
-            eval cp -r examples ~/.gf $DEBUG_ERROR
-    elif [ "Gf-Patterns" = "$repo" ]; then
-            eval mv *.json ~/.gf $DEBUG_ERROR
-    fi
-    cd $dir
-done
+if [ "$double_check" = "true" ]; then
+    printf "${bblue} Running: Double check for installed tools ${reset}\n\n"
+    go_step=0
+    for gotool in "${!gotools[@]}"; do
+        go_step=$((go_step + 1))
+        eval type -P $gotool $DEBUG_STD || { eval ${gotools[$gotool]} $DEBUG_STD; }
+        exit_status=$?
+    done
+    repos_step=0
+    for repo in "${!repos[@]}"; do
+        repos_step=$((repos_step + 1))
+        eval cd $dir/$repo $DEBUG_STD || { eval git clone https://github.com/${repos[$repo]} $dir/$repo $DEBUG_STD && cd $dir/$repo; }
+        eval git pull $DEBUG_STD
+        exit_status=$?
+        if [ -s "setup.py" ]; then
+            eval $SUDO python3 setup.py install $DEBUG_STD
+        fi
+        if [ "massdns" = "$repo" ]; then
+                eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/bin/ $DEBUG_ERROR
+        elif [ "gf" = "$repo" ]; then
+                eval cp -r examples ~/.gf $DEBUG_ERROR
+        elif [ "Gf-Patterns" = "$repo" ]; then
+                eval mv *.json ~/.gf $DEBUG_ERROR
+        fi
+        cd $dir
+    done
+fi
 
 printf "${bblue} Running: Performing last configurations ${reset}\n\n"
 ## Last steps
@@ -289,6 +310,8 @@ eval h8mail -g $DEBUG_STD
 ## Stripping all Go binaries
 eval strip -s $HOME/go/bin/* $DEBUG_STD
 
-printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - GitHub (~/Tools/.github_tokens)\n - SHODAN (SHODAN_API_KEY in reconftw.cfg)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg) \n - theHarvester (~/Tools/theHarvester/api-keys.yml)\n - H8mail (~/Tools/h8mail_config.ini)\n\n${reset}"
+eval $SUDO cp $HOME/go/bin/* /usr/bin $DEBUG_STD
+
+printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - GitHub (~/Tools/.github_tokens)\n - SHODAN (SHODAN_API_KEY in reconftw.cfg)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg) \n - notify (~/.config/notify/notify.conf) \n - theHarvester (~/Tools/theHarvester/api-keys.yml)\n - H8mail (~/Tools/h8mail_config.ini)\n\n${reset}"
 printf "${bgreen} Finished!${reset}\n\n"
 printf "\n\n${bgreen}#######################################################################${reset}\n"
