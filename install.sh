@@ -179,6 +179,8 @@ mkdir -p ~/.config/amass/
 mkdir -p ~/.config/nuclei/
 touch $dir/.github_tokens
 
+eval wget https://bootstrap.pypa.io/get-pip.py $DEBUG_STD && eval python3 get-pip.py $DEBUG_STD
+eval ln -s /usr/local/bin/pip3 /usr/bin/pip3 $DEBUG_STD
 eval pip3 install -U -r requirements.txt $DEBUG_STD
 
 printf "${bblue} Running: Installing Golang tools (${#gotools[@]})${reset}\n\n"

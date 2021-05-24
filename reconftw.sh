@@ -474,19 +474,20 @@ function sub_permut(){
 }
 
 function sub_recursive(){
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && { [ "$SUBRECURSIVE" = true ] || [ "$DEEP" = true ]; } ; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBRECURSIVE" = true ] ; then
 
 		start_subfunc "Running : Subdomains recursive search"
 		# Passive recursive
-		for sub in $(cat subdomains/subdomains.txt | rev | cut -d '.' -f 3,2,1 | rev | sort | uniq -c | sort -nr | grep -v '1 ' | sed -e 's/^[[:space:]]*//' | cut -d ' ' -f 2); do
-			subfinder -d $sub -all -silent 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
-			assetfinder --subs-only $sub.$domain 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
-			amass enum -passive -d $sub.$domain -config $AMASS_CONFIG 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
-			findomain --quiet -t $sub.$domain 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
-		done
-		[ -s ".tmp/passive_recursive.txt" ] && puredns resolve .tmp/passive_recursive.txt -w .tmp/passive_recurs_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
-		[ -s ".tmp/passive_recurs_tmp.txt" ] && cat .tmp/passive_recurs_tmp.txt | anew -q subdomains/subdomains.txt
-
+		if [ "$SUB_RECURSIVE_PASSIVE" = true ]; then
+			for sub in $(cat subdomains/subdomains.txt | rev | cut -d '.' -f 3,2,1 | rev | sort | uniq -c | sort -nr | grep -v '1 ' | sed -e 's/^[[:space:]]*//' | cut -d ' ' -f 2); do
+				subfinder -d $sub -all -silent 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
+				assetfinder --subs-only $sub.$domain 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
+				amass enum -passive -d $sub.$domain -config $AMASS_CONFIG 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
+				findomain --quiet -t $sub.$domain 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
+			done
+			[ -s ".tmp/passive_recursive.txt" ] && puredns resolve .tmp/passive_recursive.txt -w .tmp/passive_recurs_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
+			[ -s ".tmp/passive_recurs_tmp.txt" ] && cat .tmp/passive_recurs_tmp.txt | anew -q subdomains/subdomains.txt
+		fi
 		# Bruteforce recursive
 		if [[ $(cat subdomains/subdomains.txt | wc -l) -le 1000 ]]; then
 			echo "" > .tmp/brute_recursive_wordlist.txt
@@ -1151,7 +1152,7 @@ function ssrf_checks(){
 					python3 $tools/ssrf.py $dir/gf/ssrf.txt $COLLAB_SERVER_FIX 2>>"$LOGFILE" | anew -q vulns/ssrf.txt
 					end_func "Results are saved in vulns/ssrf.txt" ${FUNCNAME[0]}
 				else
-					printf "${bred} Skipping SSRF: Too many URLs to test, try with --deep flag${reset}\n"
+					end_func "Skipping SSRF: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
 				fi
 			fi
 		else
@@ -1298,8 +1299,15 @@ function command_injection(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$COMM_INJ" = true ] && [ -s "gf/rce.txt" ]; then
 		start_func "Command Injection checks"
 		[ -s "gf/rce.txt" ] && cat gf/rce.txt | qsreplace FUZZ | anew -q .tmp/tmp_rce.txt
-		[ -s ".tmp/tmp_rce.txt" ] && python3 $tools/commix/commix.py --batch -m .tmp/tmp_rce.txt --output-dir vulns/command_injection
-		end_func "Results are saved in vulns/command_injection folder" ${FUNCNAME[0]}
+		if [ "$DEEP" = true ]; then
+			[ -s ".tmp/tmp_rce.txt" ] && python3 $tools/commix/commix.py --batch -m .tmp/tmp_rce.txt --output-dir vulns/command_injection
+			end_func "Results are saved in vulns/command_injection folder" ${FUNCNAME[0]}
+		elif [[ $(cat .tmp/tmp_rce.txt | wc -l) -le 200 ]]; then
+			[ -s ".tmp/tmp_rce.txt" ] && python3 $tools/commix/commix.py --batch -m .tmp/tmp_rce.txt --output-dir vulns/command_injection
+			end_func "Results are saved in vulns/command_injection folder" ${FUNCNAME[0]}
+		else
+			end_func "Skipping Command injection: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
+		fi
 	else
 		if [ "$COMM_INJ" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
