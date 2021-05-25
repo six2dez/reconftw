@@ -446,9 +446,9 @@ function sub_permut(){
 		start_subfunc "Running : Permutations Subdomain Enumeration"
 
 		[ "$DEEP" = true ] && [ -s "subdomains/subdomains.txt" ] && DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
-		[ "$DEEP" = false ] && [ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 100 ] && DNScewl --tL .tmp/subs_no_resolved.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
-		[ "$DEEP" = false ] && [ $(cat .tmp/subs_no_resolved.txt | wc -l) -gt 100 ] && [ $(cat .tmp/subs_no_resolved.txt | wc -l) -le 200 ] && DNScewl --tL .tmp/subs_no_resolved.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
-		[ "$DEEP" = false ] && [ $(cat .tmp/subs_no_resolved.txt | wc -l) -gt 200 ] && [ $(cat subdomains/subdomains.txt | wc -l) -le 100 ] && DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
+		[ "$DEEP" = false ] && [ "$(cat .tmp/subs_no_resolved.txt | wc -l)" -le 100 ] && DNScewl --tL .tmp/subs_no_resolved.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
+		[ "$DEEP" = false ] && [ "$(cat .tmp/subs_no_resolved.txt | wc -l)" -gt 100 ] && [ "$(cat .tmp/subs_no_resolved.txt | wc -l)" -le 200 ] && DNScewl --tL .tmp/subs_no_resolved.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
+		[ "$DEEP" = false ] && [ "$(cat .tmp/subs_no_resolved.txt | wc -l)" -gt 200 ] && [ "$(cat subdomains/subdomains.txt | wc -l)" -le 100 ] && DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
 		[ -s ".tmp/DNScewl1.txt" ] && puredns resolve .tmp/DNScewl1.txt -w .tmp/permute1_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
 		[ -s ".tmp/permute1_tmp.txt" ] && cat .tmp/permute1_tmp.txt | anew -q .tmp/permute1.txt
 		[ -s ".tmp/permute1.txt" ] && DNScewl --tL .tmp/permute1.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl2.txt
@@ -1135,7 +1135,7 @@ function ssrf_checks(){
 					echo $COLLAB_SERVER_FIX | anew -q .tmp/ssrf_server.txt
 					echo $COLLAB_SERVER | anew -q .tmp/ssrf_server.txt
 					for url in $(cat .tmp/tmp_ssrf.txt); do
-						ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/ssrf_server.txt -u $url &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf.txt
+						ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/ssrf_server.txt -u $url 2>>"$LOGFILE" | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf.txt
 					done
 					python3 $tools/ssrf.py $dir/gf/ssrf.txt $COLLAB_SERVER_FIX 2>>"$LOGFILE" | anew -q vulns/ssrf.txt
 				fi
@@ -1147,7 +1147,7 @@ function ssrf_checks(){
 					echo $COLLAB_SERVER_FIX | anew -q .tmp/ssrf_server.txt
 					echo $COLLAB_SERVER | anew -q .tmp/ssrf_server.txt
 					for url in $(cat .tmp/tmp_ssrf.txt); do
-						ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/ssrf_server.txt -u $url &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf.txt
+						ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/ssrf_server.txt -u $url 2>>"$LOGFILE" | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf.txt
 					done
 					python3 $tools/ssrf.py $dir/gf/ssrf.txt $COLLAB_SERVER_FIX 2>>"$LOGFILE" | anew -q vulns/ssrf.txt
 					end_func "Results are saved in vulns/ssrf.txt" ${FUNCNAME[0]}
@@ -1212,7 +1212,7 @@ function ssti(){
 		if [ -s "gf/ssti.txt" ]; then
 			cat gf/ssti.txt | qsreplace FUZZ | anew -q .tmp/tmp_ssti.txt
 			for url in $(cat .tmp/tmp_ssti.txt); do
-    				ffuf -v -t $FFUF_THREADS -H "${HEADER}" -w $ssti_wordlist -u $url -mr "ssti49" &>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssti.txt
+    				ffuf -v -t $FFUF_THREADS -H "${HEADER}" -w $ssti_wordlist -u $url -mr "ssti49" 2>>"$LOGFILE" | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssti.txt
     			done
 		fi
 		end_func "Results are saved in vulns/ssti.txt" ${FUNCNAME[0]}
@@ -2148,13 +2148,16 @@ case $opt_mode in
 			fi
             ;;
         'w')
-            start
 			if [ -n "$list" ]; then
+				start
 				if [[ "$list" = /* ]]; then
 					cp $list $dir/webs/webs.txt
 				else
 					cp $SCRIPTPATH/$list $dir/webs/webs.txt
 				fi
+			else
+				printf "\n\n${bred} Web mode needs a website list file as target (./reconftw.sh -l target.txt -w) ${reset}\n\n"
+				exit
 			fi
 			webs_menu
 			exit
