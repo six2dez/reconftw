@@ -138,7 +138,6 @@ fi
 # Installing latest Golang version
 #version=$(curl -s https://golang.org/VERSION?m=text)
 version=go1.15.10
-eval type -P go $DEBUG_STD || { golang_installed=false; }
 printf "${bblue} Running: Installing/Updating Golang ${reset}\n\n"
 if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$version" = $(go version | cut -d " " -f3) ]
     then
@@ -179,7 +178,7 @@ mkdir -p ~/.config/amass/
 mkdir -p ~/.config/nuclei/
 touch $dir/.github_tokens
 
-eval wget https://bootstrap.pypa.io/get-pip.py $DEBUG_STD && eval python3 get-pip.py $DEBUG_STD
+eval wget -N -c https://bootstrap.pypa.io/get-pip.py $DEBUG_STD && eval python3 get-pip.py $DEBUG_STD
 eval ln -s /usr/local/bin/pip3 /usr/bin/pip3 $DEBUG_STD
 eval pip3 install -U -r requirements.txt $DEBUG_STD
 
@@ -233,7 +232,7 @@ for repo in "${!repos[@]}"; do
     elif [ "Gf-Patterns" = "$repo" ]; then
             eval mv *.json ~/.gf $DEBUG_ERROR
     fi
-    cd $dir
+    cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 done
 
 if [ "True" = "$IS_ARM" ]
@@ -297,7 +296,7 @@ if [ "$double_check" = "true" ]; then
         elif [ "Gf-Patterns" = "$repo" ]; then
                 eval mv *.json ~/.gf $DEBUG_ERROR
         fi
-        cd $dir
+        cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
     done
 fi
 
