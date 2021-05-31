@@ -1463,7 +1463,6 @@ function resolvers_update(){
 }
 
 function ipcidr_detection(){
-	if [[ $1 =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		if [[ $1 =~ /[0-9]+$ ]]; then
 			prips $1 | hakrevdns
 			prips $1 | gdn
@@ -1471,15 +1470,16 @@ function ipcidr_detection(){
 			echo $1 | hakrevdns
 			echo $1 | gdn
 		fi
-	fi
 }
 
 function ipcidr_target(){
-	ipcidr_detection $1 | cut -d' ' -f3 | unfurl -u domains 2>/dev/null | sed 's/\.$//' | sort -u > ./target_reconftw_ipcidr.txt
-	if [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -eq 1 ]]; then
-		domain=$(cat ./target_reconftw_ipcidr.txt)
-	elif [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -gt 1 ]]; then
-		list=${PWD}/target_reconftw_ipcidr.txt
+	if [[ $1 =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+		ipcidr_detection $1 | cut -d' ' -f3 | unfurl -u domains 2>/dev/null | sed 's/\.$//' | sort -u > ./target_reconftw_ipcidr.txt
+		if [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -eq 1 ]]; then
+			domain=$(cat ./target_reconftw_ipcidr.txt)
+		elif [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -gt 1 ]]; then
+			list=${PWD}/target_reconftw_ipcidr.txt
+		fi
 	fi
 }
 
