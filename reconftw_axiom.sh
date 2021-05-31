@@ -179,7 +179,7 @@ function metadata(){
 function emails(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$EMAILS" = true ] && [ "$OSINT" = true ]; then
 		start_func "Searching emails/users/passwords leaks"
-		emailfinder -d $domain | anew -q .tmp/emailfinder.txt
+		emailfinder -d $domain 2>>"$LOGFILE" | anew -q .tmp/emailfinder.txt
 		[ -s ".tmp/emailfinder.txt" ] && cat .tmp/emailfinder.txt | awk 'matched; /^-----------------$/ { matched = 1 }' | anew -q osint/emails.txt
 		cd "$tools/theHarvester" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		python3 theHarvester.py -d $domain -b all 2>>"$LOGFILE" > $dir/.tmp/harvester.txt
