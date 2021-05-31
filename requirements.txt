@@ -18,7 +18,6 @@ aiohttp
 termcolors==0.1.0
 future
 fuzzywuzzy
-uddup
 metafinder
 aiodns==2.0.0
 aiomultiprocess==0.8.0

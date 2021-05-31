@@ -60,6 +60,7 @@ repos["ip2provider"]="oldrho/ip2provider"
 repos["commix"]="commixproject/commix"
 repos["JSA"]="w9w/JSA"
 repos["AnalyticsRelationships"]="Josue87/AnalyticsRelationships"
+repos["urldedupe"]="ameenmaali/urldedupe"
 
 dir=${tools}
 double_check=false
@@ -233,6 +234,10 @@ for repo in "${!repos[@]}"; do
             eval cp -r examples ~/.gf $DEBUG_ERROR
     elif [ "Gf-Patterns" = "$repo" ]; then
             eval mv *.json ~/.gf $DEBUG_ERROR
+    elif [ "urldedupe" = "$repo" ]; then
+            eval cmake CMakeLists.txt $DEBUG_STD
+            eval make $DEBUG_STD
+            eval cp ./urldedupe /usr/bin/ $DEBUG_STD
     fi
     cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 done
@@ -313,7 +318,7 @@ eval h8mail -g $DEBUG_STD
 ## Stripping all Go binaries
 eval strip -s $HOME/go/bin/* $DEBUG_STD
 
-eval $SUDO cp $HOME/go/bin/* /usr/bin $DEBUG_STD
+eval $SUDO cp $HOME/go/bin/* /usr/bin/ $DEBUG_STD
 
 printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - GitHub (~/Tools/.github_tokens)\n - SHODAN (SHODAN_API_KEY in reconftw.cfg)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg) \n - notify (~/.config/notify/notify.conf) \n - theHarvester (~/Tools/theHarvester/api-keys.yml)\n - H8mail (~/Tools/h8mail_config.ini)\n\n${reset}"
 printf "${bgreen} Finished!${reset}\n\n"
