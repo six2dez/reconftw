@@ -92,7 +92,7 @@ install_apt(){
     eval $SUDO apt update -y $DEBUG_STD
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium-browser -y $DEBUG_STD
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium -y $DEBUG_STD
-    eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip gcc build-essential ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb -y $DEBUG_STD
+    eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip gcc build-essential cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb -y $DEBUG_STD
     eval $SUDO systemctl enable tor $DEBUG_STD
 }
 
@@ -204,7 +204,7 @@ printf "${bblue}\n Running: Installing repositories (${#repos[@]})${reset}\n\n"
 eval git clone https://github.com/projectdiscovery/nuclei-templates ~/nuclei-templates $DEBUG_STD
 eval git clone https://github.com/geeknik/the-nuclei-templates.git ~/nuclei-templates/extra_templates $DEBUG_STD
 eval nuclei -update-templates $DEBUG_STD
-eval cd ~/nuclei-templates/extra_templates && git pull $DEBUG_STD
+cd ~/nuclei-templates/extra_templates && eval git pull $DEBUG_STD
 cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 eval sed -i 's/^#random-agent: false/random-agent: true/' ~/.config/nuclei/config.yaml $DEBUG_ERROR
 eval git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git $dir/sqlmap $DEBUG_STD
@@ -237,7 +237,7 @@ for repo in "${!repos[@]}"; do
     elif [ "urldedupe" = "$repo" ]; then
             eval cmake CMakeLists.txt $DEBUG_STD
             eval make $DEBUG_STD
-            eval cp ./urldedupe /usr/bin/ $DEBUG_STD
+            eval $SUDO cp ./urldedupe /usr/bin/ $DEBUG_STD
     fi
     cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 done
@@ -245,7 +245,7 @@ done
 if [ "True" = "$IS_ARM" ]
     then
         eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-armv7  $DEBUG_STD
-        eval $SUDO mv findomain-armv7 /usr/local/bin/findomain
+        eval $SUDO mv findomain-armv7 /usr/bin/findomain
     else
         eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux $DEBUG_STD
         eval wget -N -c https://github.com/sensepost/gowitness/releases/download/2.3.4/gowitness-2.3.4-linux-amd64 $DEBUG_STD
