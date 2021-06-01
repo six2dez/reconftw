@@ -103,6 +103,7 @@ function tools_installed(){
 	type -P resolveDomains &>/dev/null || { printf "${bred} [*] resolveDomains	[NO]${reset}\n"; allinstalled=false;}
 	type -P emailfinder &>/dev/null || { printf "${bred} [*] emailfinder	[NO]${reset}\n"; allinstalled=false;}
 	type -P urldedupe &>/dev/null || { printf "${bred} [*] urldedupe	[NO]${reset}\n"; allinstalled=false;}
+	type -P interactsh-client &>/dev/null || { printf "${bred} [*] interactsh-client	[NO]${reset}\n"; allinstalled=false;}
 
 	if [ "${allinstalled}" = true ]; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
@@ -1124,39 +1125,41 @@ function open_redirect(){
 
 function ssrf_checks(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SSRF_CHECKS" = true ] && [ -s "gf/ssrf.txt" ]; then
+		start_func "SSRF checks"
 		if [ -n "$COLLAB_SERVER" ]; then
-			start_func "SSRF checks"
-			if [ "$DEEP" = true ]; then
-				if [ -s "gf/ssrf.txt" ]; then
-					cat gf/ssrf.txt | qsreplace FUZZ | anew -q .tmp/tmp_ssrf.txt
-					COLLAB_SERVER_FIX=$(echo $COLLAB_SERVER | sed -r "s/https?:\/\///")
-					echo $COLLAB_SERVER_FIX | anew -q .tmp/ssrf_server.txt
-					echo $COLLAB_SERVER | anew -q .tmp/ssrf_server.txt
-					for url in $(cat .tmp/tmp_ssrf.txt); do
-						ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/ssrf_server.txt -u $url 2>>"$LOGFILE" | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf.txt
-					done
-					python3 $tools/ssrf.py $dir/gf/ssrf.txt $COLLAB_SERVER_FIX 2>>"$LOGFILE" | anew -q vulns/ssrf.txt
-				fi
-				end_func "Results are saved in vulns/ssrf.txt" ${FUNCNAME[0]}
-			else
-				if [[ $(cat gf/ssrf.txt | wc -l) -le 1000 ]]; then
-					cat gf/ssrf.txt | qsreplace FUZZ | anew -q .tmp/tmp_ssrf.txt
-					COLLAB_SERVER_FIX=$(echo $COLLAB_SERVER | sed -r "s/https?:\/\///")
-					echo $COLLAB_SERVER_FIX | anew -q .tmp/ssrf_server.txt
-					echo $COLLAB_SERVER | anew -q .tmp/ssrf_server.txt
-					for url in $(cat .tmp/tmp_ssrf.txt); do
-						ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/ssrf_server.txt -u $url 2>>"$LOGFILE" | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf.txt
-					done
-					python3 $tools/ssrf.py $dir/gf/ssrf.txt $COLLAB_SERVER_FIX 2>>"$LOGFILE" | anew -q vulns/ssrf.txt
-					end_func "Results are saved in vulns/ssrf.txt" ${FUNCNAME[0]}
-				else
-					end_func "Skipping SSRF: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
-				fi
-			fi
+			interactsh-client 2>.tmp/server.txt &>.tmp/ssrf_callback.txt &
+			INTERACT_PID=$!
+			COLLAB_SERVER_FIX=$(cat server.txt | tail -n1 | cut -c 16-)
 		else
-			notification "No COLLAB_SERVER defined" error
-			end_func "Skipping function" ${FUNCNAME[0]}
-			printf "${bgreen}#######################################################################${reset}\n"
+			COLLAB_SERVER_FIX=$(echo ${COLLAB_SERVER} | sed -r "s/https?:\/\///")
+		fi
+		[ -s "$tools/headers_inject.txt" ] && cp $tools/headers_inject.txt .tmp/headers_inject.txt
+		sed -e "s/$/${COLLAB_SERVER_FIX}/" -i .tmp/headers_inject.txt
+		if [ "$DEEP" = true ]; then
+			if [ -s "gf/ssrf.txt" ]; then
+				cat gf/ssrf.txt | qsreplace ${COLLAB_SERVER_FIX} | anew -q .tmp/tmp_ssrf.txt
+				ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/tmp_ssrf.txt -u FUZZ 2>>"$LOGFILE" | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf_requests_url.txt
+				ffuf -v -w .tmp/tmp_ssrf.txt:W1,.tmp/headers_inject.txt:W2 -H "${HEADER}" -H "W2" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
+				[ -s ".tmp/ssrf_callback.txt" ] && cat .tmp/ssrf_callback.txt | tail -n+12 | anew -q vulns/ssrf_callback.txt
+			fi
+			[ -z "$INTERACT_PID" ] && kill $INTERACT_PID
+			[ -z "$INTERACT_PID" ] && unset $INTERACT_PID
+			end_func "Results are saved in vulns/ssrf_*" ${FUNCNAME[0]}
+		else
+			if [[ $(cat gf/ssrf.txt | wc -l) -le 1000 ]]; then
+				COLLAB_SERVER_FIX=$(echo $COLLAB_SERVER | sed -r "s/https?:\/\///")
+				cat gf/ssrf.txt | qsreplace ${COLLAB_SERVER_FIX} | anew -q .tmp/tmp_ssrf.txt
+				ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/tmp_ssrf.txt -u FUZZ 2>>"$LOGFILE" | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf_requests_url.txt
+				ffuf -v -w .tmp/tmp_ssrf.txt:W1,.tmp/headers_inject.txt:W2 -H "${HEADER}" -H "W2" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
+				[ -s ".tmp/ssrf_callback.txt" ] && cat .tmp/ssrf_callback.txt | tail -n+12 | anew -q vulns/ssrf_callback.txt
+				[ -z "$INTERACT_PID" ] && kill $INTERACT_PID
+				[ -z "$INTERACT_PID" ] && unset $INTERACT_PID
+				end_func "Results are saved in vulns/ssrf_*" ${FUNCNAME[0]}
+			else
+				[ -z "$INTERACT_PID" ] && kill $INTERACT_PID
+				[ -z "$INTERACT_PID" ] && unset $INTERACT_PID
+				end_func "Skipping SSRF: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
+			fi
 		fi
 	else
 		if [ "$SSRF_CHECKS" = false ]; then
