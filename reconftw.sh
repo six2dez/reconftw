@@ -1129,7 +1129,7 @@ function ssrf_checks(){
 		if [ -n "$COLLAB_SERVER" ]; then
 			interactsh-client 2>.tmp/server.txt &>.tmp/ssrf_callback.txt &
 			INTERACT_PID=$!
-			COLLAB_SERVER_FIX=$(cat server.txt | tail -n1 | cut -c 16-)
+			COLLAB_SERVER_FIX=$(cat .tmp/server.txt | tail -n1 | cut -c 16-)
 		else
 			COLLAB_SERVER_FIX=$(echo ${COLLAB_SERVER} | sed -r "s/https?:\/\///")
 		fi
