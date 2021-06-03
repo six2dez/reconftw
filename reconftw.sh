@@ -1156,8 +1156,8 @@ function ssrf_checks(){
 				end_func "Skipping SSRF: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
 			fi
 		fi
-		[ -z "$INTERACT_PID" ] && kill $INTERACT_PID
-		[ -z "$INTERACT_PID" ] && unset $INTERACT_PID
+		[ -n "$INTERACT_PID" ] && kill $INTERACT_PID
+		[ -n "$INTERACT_PID" ] && unset $INTERACT_PID
 	else
 		if [ "$SSRF_CHECKS" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
