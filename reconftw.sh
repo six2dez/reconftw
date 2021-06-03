@@ -1128,8 +1128,7 @@ function ssrf_checks(){
 		start_func "SSRF checks"
 		if [ -z "$COLLAB_SERVER" ]; then
 			interactsh-client &>.tmp/ssrf_callback.txt &
-			sleep 1
-			INTERACT_PID=$!
+			sleep 2
 			COLLAB_SERVER_FIX=$(cat .tmp/ssrf_callback.txt | tail -n1 | cut -c 16-)
 			COLLAB_SERVER_URL="http://$COLLAB_SERVER_FIX"
 		else
@@ -1141,7 +1140,9 @@ function ssrf_checks(){
 			ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/tmp_ssrf.txt -u FUZZ 2>>"$LOGFILE" | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf_requests_url.txt
 			ffuf -v -w .tmp/tmp_ssrf.txt:W1,.tmp/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_FIX}" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
 			ffuf -v -w .tmp/tmp_ssrf.txt:W1,.tmp/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_URL}" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
-			[ -s ".tmp/ssrf_callback.txt" ] && cat .tmp/ssrf_callback.txt | tail -n+11 | anew -q vulns/ssrf_callback.txt
+			sleep 5
+			[ -s ".tmp/ssrf_callback.txt" ] && cat .tmp/ssrf_callback.txt | tail -n+11 | anew -q vulns/ssrf_callback.txt && NUMOFLINES=$(cat .tmp/ssrf_callback.txt | tail -n+12 | wc -l)
+			notification "SSRF: ${NUMOFLINES} callbacks received" info
 			end_func "Results are saved in vulns/ssrf_*" ${FUNCNAME[0]}
 		else
 			if [[ $(cat gf/ssrf.txt | wc -l) -le 1000 ]]; then
@@ -1150,14 +1151,15 @@ function ssrf_checks(){
 				ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/tmp_ssrf.txt -u FUZZ 2>>"$LOGFILE" | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf_requests_url.txt
 				ffuf -v -w .tmp/tmp_ssrf.txt:W1,.tmp/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_FIX}" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
 				ffuf -v -w .tmp/tmp_ssrf.txt:W1,.tmp/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_URL}" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
-				[ -s ".tmp/ssrf_callback.txt" ] && cat .tmp/ssrf_callback.txt | tail -n+11 | anew -q vulns/ssrf_callback.txt
+				sleep 5
+				[ -s ".tmp/ssrf_callback.txt" ] && cat .tmp/ssrf_callback.txt | tail -n+11 | anew -q vulns/ssrf_callback.txt && NUMOFLINES=$(cat .tmp/ssrf_callback.txt | tail -n+12 | wc -l)
+				notification "SSRF: ${NUMOFLINES} callbacks received" info
 				end_func "Results are saved in vulns/ssrf_*" ${FUNCNAME[0]}
 			else
 				end_func "Skipping SSRF: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
 			fi
 		fi
-		[ -n "$INTERACT_PID" ] && kill $INTERACT_PID
-		[ -n "$INTERACT_PID" ] && unset INTERACT_PID
+		pkill -f interactsh-client
 	else
 		if [ "$SSRF_CHECKS" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
