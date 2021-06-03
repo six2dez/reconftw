@@ -32,6 +32,7 @@ gotools["puredns"]="GO111MODULE=on go get github.com/d3mondev/puredns/v2"
 gotools["hakrevdns"]="go get github.com/hakluke/hakrevdns"
 gotools["gdn"]="GO111MODULE=on go get -v github.com/kmskrishna/gdn"
 gotools["resolveDomains"]="go get -v github.com/Josue87/resolveDomains"
+gotools["interactsh-client"]="GO111MODULE=on go get -v github.com/projectdiscovery/interactsh/cmd/interactsh-client"
 
 declare -A repos
 repos["degoogle_hunter"]="six2dez/degoogle_hunter"
@@ -60,6 +61,7 @@ repos["ip2provider"]="oldrho/ip2provider"
 repos["commix"]="commixproject/commix"
 repos["JSA"]="w9w/JSA"
 repos["AnalyticsRelationships"]="Josue87/AnalyticsRelationships"
+repos["urldedupe"]="ameenmaali/urldedupe"
 
 dir=${tools}
 double_check=false
@@ -91,7 +93,7 @@ install_apt(){
     eval $SUDO apt update -y $DEBUG_STD
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium-browser -y $DEBUG_STD
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium -y $DEBUG_STD
-    eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip gcc build-essential ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb -y $DEBUG_STD
+    eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip gcc build-essential cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb -y $DEBUG_STD
     eval $SUDO systemctl enable tor $DEBUG_STD
 }
 
@@ -138,7 +140,6 @@ fi
 # Installing latest Golang version
 #version=$(curl -s https://golang.org/VERSION?m=text)
 version=go1.15.10
-eval type -P go $DEBUG_STD || { golang_installed=false; }
 printf "${bblue} Running: Installing/Updating Golang ${reset}\n\n"
 if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$version" = $(go version | cut -d " " -f3) ]
     then
@@ -179,9 +180,9 @@ mkdir -p ~/.config/amass/
 mkdir -p ~/.config/nuclei/
 touch $dir/.github_tokens
 
-eval wget https://bootstrap.pypa.io/get-pip.py $DEBUG_STD && eval python3 get-pip.py $DEBUG_STD
+eval wget -N -c https://bootstrap.pypa.io/get-pip.py $DEBUG_STD && eval python3 get-pip.py $DEBUG_STD
 eval ln -s /usr/local/bin/pip3 /usr/bin/pip3 $DEBUG_STD
-eval pip3 install -U -r requirements.txt $DEBUG_STD
+eval pip3 install -I -r requirements.txt $DEBUG_STD
 
 printf "${bblue} Running: Installing Golang tools (${#gotools[@]})${reset}\n\n"
 go_step=0
@@ -202,8 +203,10 @@ printf "${bblue}\n Running: Installing repositories (${#repos[@]})${reset}\n\n"
 
 # Repos with special configs
 eval git clone https://github.com/projectdiscovery/nuclei-templates ~/nuclei-templates $DEBUG_STD
+eval git clone https://github.com/geeknik/the-nuclei-templates.git ~/nuclei-templates/extra_templates $DEBUG_STD
 eval nuclei -update-templates $DEBUG_STD
-eval sed -i 's/^miscellaneous/#miscellaneous/' ~/nuclei-templates/.nuclei-ignore $DEBUG_ERROR
+cd ~/nuclei-templates/extra_templates && eval git pull $DEBUG_STD
+cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 eval sed -i 's/^#random-agent: false/random-agent: true/' ~/.config/nuclei/config.yaml $DEBUG_ERROR
 eval git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git $dir/sqlmap $DEBUG_STD
 eval git clone --depth 1 https://github.com/drwetter/testssl.sh.git $dir/testssl.sh $DEBUG_STD
@@ -232,14 +235,18 @@ for repo in "${!repos[@]}"; do
             eval cp -r examples ~/.gf $DEBUG_ERROR
     elif [ "Gf-Patterns" = "$repo" ]; then
             eval mv *.json ~/.gf $DEBUG_ERROR
+    elif [ "urldedupe" = "$repo" ]; then
+            eval cmake CMakeLists.txt $DEBUG_STD
+            eval make $DEBUG_STD
+            eval $SUDO cp ./urldedupe /usr/bin/ $DEBUG_STD
     fi
-    cd $dir
+    cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 done
 
 if [ "True" = "$IS_ARM" ]
     then
         eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-armv7  $DEBUG_STD
-        eval $SUDO mv findomain-armv7 /usr/local/bin/findomain
+        eval $SUDO mv findomain-armv7 /usr/bin/findomain
     else
         eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux $DEBUG_STD
         eval wget -N -c https://github.com/sensepost/gowitness/releases/download/2.3.4/gowitness-2.3.4-linux-amd64 $DEBUG_STD
@@ -267,10 +274,10 @@ eval wget -nc -O subdomains_big.txt https://wordlists-cdn.assetnote.io/data/manu
 eval wget -O resolvers_trusted.txt https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw $DEBUG_STD
 eval wget -O subdomains.txt https://gist.github.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw $DEBUG_STD
 eval wget -O permutations_list.txt https://gist.github.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw $DEBUG_STD
-eval wget -nc -O ssrf.py https://gist.github.com/h4ms1k/adcc340495d418fcd72ec727a116fea2/raw $DEBUG_STD
 eval wget -nc -O fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD
 eval wget -O lfi_wordlist.txt https://gist.githubusercontent.com/six2dez/a89a0c7861d49bb61a09822d272d5395/raw $DEBUG_STD
 eval wget -O ssti_wordlist.txt https://gist.githubusercontent.com/six2dez/ab5277b11da7369bf4e9db72b49ad3c1/raw $DEBUG_STD
+eval wget -O headers_inject.txt https://gist.github.com/six2dez/d62ab8f8ffd28e1c206d401081d977ae/raw $DEBUG_STD
 
 ## Last check
 if [ "$double_check" = "true" ]; then
@@ -297,7 +304,7 @@ if [ "$double_check" = "true" ]; then
         elif [ "Gf-Patterns" = "$repo" ]; then
                 eval mv *.json ~/.gf $DEBUG_ERROR
         fi
-        cd $dir
+        cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
     done
 fi
 
@@ -312,7 +319,7 @@ eval h8mail -g $DEBUG_STD
 ## Stripping all Go binaries
 eval strip -s $HOME/go/bin/* $DEBUG_STD
 
-eval $SUDO cp $HOME/go/bin/* /usr/bin $DEBUG_STD
+eval $SUDO cp $HOME/go/bin/* /usr/bin/ $DEBUG_STD
 
 printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - GitHub (~/Tools/.github_tokens)\n - SHODAN (SHODAN_API_KEY in reconftw.cfg)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg) \n - notify (~/.config/notify/notify.conf) \n - theHarvester (~/Tools/theHarvester/api-keys.yml)\n - H8mail (~/Tools/h8mail_config.ini)\n\n${reset}"
 printf "${bgreen} Finished!${reset}\n\n"
