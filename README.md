@@ -8,8 +8,8 @@
 
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v1.7.0">
-    <img src="https://img.shields.io/badge/release-v1.7.0-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v1.7.1">
+    <img src="https://img.shields.io/badge/release-v1.7.1-green">
   </a>
    </a>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
