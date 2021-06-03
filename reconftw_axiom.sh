@@ -1160,25 +1160,25 @@ function ssrf_checks(){
 			sleep 1
 			INTERACT_PID=$!
 			COLLAB_SERVER_FIX=$(cat .tmp/ssrf_callback.txt | tail -n1 | cut -c 16-)
+			COLLAB_SERVER_URL="http://$COLLAB_SERVER_FIX"
 		else
 			COLLAB_SERVER_FIX=$(echo ${COLLAB_SERVER} | sed -r "s/https?:\/\///")
 		fi
-		[ -s "$tools/headers_inject.txt" ] && cp $tools/headers_inject.txt .tmp/headers_inject.txt
-		sed -e "s/$/${COLLAB_SERVER_FIX}/" -i .tmp/headers_inject.txt
 		if [ "$DEEP" = true ]; then
-			if [ -s "gf/ssrf.txt" ]; then
-				cat gf/ssrf.txt | qsreplace ${COLLAB_SERVER_FIX} | anew -q .tmp/tmp_ssrf.txt
-				ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/tmp_ssrf.txt -u FUZZ 2>>"$LOGFILE" | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf_requests_url.txt
-				ffuf -v -w .tmp/tmp_ssrf.txt:W1,.tmp/headers_inject.txt:W2 -H "${HEADER}" -H "W2" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
-				[ -s ".tmp/ssrf_callback.txt" ] && cat .tmp/ssrf_callback.txt | tail -n+11 | anew -q vulns/ssrf_callback.txt
-			fi
+			cat gf/ssrf.txt | qsreplace ${COLLAB_SERVER_FIX} | anew -q .tmp/tmp_ssrf.txt
+			cat gf/ssrf.txt | qsreplace ${COLLAB_SERVER_URL} | anew -q .tmp/tmp_ssrf.txt
+			ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/tmp_ssrf.txt -u FUZZ 2>>"$LOGFILE" | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf_requests_url.txt
+			ffuf -v -w .tmp/tmp_ssrf.txt:W1,.tmp/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_FIX}" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
+			ffuf -v -w .tmp/tmp_ssrf.txt:W1,.tmp/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_URL}" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
+			[ -s ".tmp/ssrf_callback.txt" ] && cat .tmp/ssrf_callback.txt | tail -n+11 | anew -q vulns/ssrf_callback.txt
 			end_func "Results are saved in vulns/ssrf_*" ${FUNCNAME[0]}
 		else
 			if [[ $(cat gf/ssrf.txt | wc -l) -le 1000 ]]; then
-				COLLAB_SERVER_FIX=$(echo $COLLAB_SERVER | sed -r "s/https?:\/\///")
 				cat gf/ssrf.txt | qsreplace ${COLLAB_SERVER_FIX} | anew -q .tmp/tmp_ssrf.txt
+				cat gf/ssrf.txt | qsreplace ${COLLAB_SERVER_URL} | anew -q .tmp/tmp_ssrf.txt
 				ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/tmp_ssrf.txt -u FUZZ 2>>"$LOGFILE" | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf_requests_url.txt
-				ffuf -v -w .tmp/tmp_ssrf.txt:W1,.tmp/headers_inject.txt:W2 -H "${HEADER}" -H "W2" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
+				ffuf -v -w .tmp/tmp_ssrf.txt:W1,.tmp/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_FIX}" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
+				ffuf -v -w .tmp/tmp_ssrf.txt:W1,.tmp/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_URL}" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
 				[ -s ".tmp/ssrf_callback.txt" ] && cat .tmp/ssrf_callback.txt | tail -n+11 | anew -q vulns/ssrf_callback.txt
 				end_func "Results are saved in vulns/ssrf_*" ${FUNCNAME[0]}
 			else
@@ -1186,7 +1186,7 @@ function ssrf_checks(){
 			fi
 		fi
 		[ -n "$INTERACT_PID" ] && kill $INTERACT_PID
-		[ -n "$INTERACT_PID" ] && unset $INTERACT_PID
+		[ -n "$INTERACT_PID" ] && unset INTERACT_PID
 	else
 		if [ "$SSRF_CHECKS" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
