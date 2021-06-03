@@ -1126,10 +1126,11 @@ function open_redirect(){
 function ssrf_checks(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SSRF_CHECKS" = true ] && [ -s "gf/ssrf.txt" ]; then
 		start_func "SSRF checks"
-		if [ -n "$COLLAB_SERVER" ]; then
-			interactsh-client 2>.tmp/server.txt &>.tmp/ssrf_callback.txt &
+		if [ -z "$COLLAB_SERVER" ]; then
+			interactsh-client &>.tmp/ssrf_callback.txt &
+			sleep 1
 			INTERACT_PID=$!
-			COLLAB_SERVER_FIX=$(cat .tmp/server.txt | tail -n1 | cut -c 16-)
+			COLLAB_SERVER_FIX=$(cat .tmp/ssrf_callback.txt | tail -n1 | cut -c 16-)
 		else
 			COLLAB_SERVER_FIX=$(echo ${COLLAB_SERVER} | sed -r "s/https?:\/\///")
 		fi
@@ -1140,10 +1141,8 @@ function ssrf_checks(){
 				cat gf/ssrf.txt | qsreplace ${COLLAB_SERVER_FIX} | anew -q .tmp/tmp_ssrf.txt
 				ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/tmp_ssrf.txt -u FUZZ 2>>"$LOGFILE" | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf_requests_url.txt
 				ffuf -v -w .tmp/tmp_ssrf.txt:W1,.tmp/headers_inject.txt:W2 -H "${HEADER}" -H "W2" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
-				[ -s ".tmp/ssrf_callback.txt" ] && cat .tmp/ssrf_callback.txt | tail -n+12 | anew -q vulns/ssrf_callback.txt
+				[ -s ".tmp/ssrf_callback.txt" ] && cat .tmp/ssrf_callback.txt | tail -n+11 | anew -q vulns/ssrf_callback.txt
 			fi
-			[ -z "$INTERACT_PID" ] && kill $INTERACT_PID
-			[ -z "$INTERACT_PID" ] && unset $INTERACT_PID
 			end_func "Results are saved in vulns/ssrf_*" ${FUNCNAME[0]}
 		else
 			if [[ $(cat gf/ssrf.txt | wc -l) -le 1000 ]]; then
@@ -1151,16 +1150,14 @@ function ssrf_checks(){
 				cat gf/ssrf.txt | qsreplace ${COLLAB_SERVER_FIX} | anew -q .tmp/tmp_ssrf.txt
 				ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/tmp_ssrf.txt -u FUZZ 2>>"$LOGFILE" | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf_requests_url.txt
 				ffuf -v -w .tmp/tmp_ssrf.txt:W1,.tmp/headers_inject.txt:W2 -H "${HEADER}" -H "W2" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
-				[ -s ".tmp/ssrf_callback.txt" ] && cat .tmp/ssrf_callback.txt | tail -n+12 | anew -q vulns/ssrf_callback.txt
-				[ -z "$INTERACT_PID" ] && kill $INTERACT_PID
-				[ -z "$INTERACT_PID" ] && unset $INTERACT_PID
+				[ -s ".tmp/ssrf_callback.txt" ] && cat .tmp/ssrf_callback.txt | tail -n+11 | anew -q vulns/ssrf_callback.txt
 				end_func "Results are saved in vulns/ssrf_*" ${FUNCNAME[0]}
 			else
-				[ -z "$INTERACT_PID" ] && kill $INTERACT_PID
-				[ -z "$INTERACT_PID" ] && unset $INTERACT_PID
 				end_func "Skipping SSRF: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
 			fi
 		fi
+		[ -z "$INTERACT_PID" ] && kill $INTERACT_PID
+		[ -z "$INTERACT_PID" ] && unset $INTERACT_PID
 	else
 		if [ "$SSRF_CHECKS" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
