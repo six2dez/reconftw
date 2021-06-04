@@ -845,9 +845,9 @@ function params(){
 		start_func "Parameter Discovery"
 		if [ -s ".tmp/url_extract_uddup.txt" ]; then
 			if [ "$DEEP" = true ]; then
-				arjun -i .tmp/param_tmp.txt -t $ARJUN_THREADS -oT webs/param.txt 2>>"$LOGFILE" &>/dev/null
-			elif [[ $(cat .tmp/param_tmp.txt | wc -l) -le 50 ]]; then
-					arjun -i .tmp/param_tmp.txt -t $ARJUN_THREADS -oT webs/param.txt 2>>"$LOGFILE" &>/dev/null
+				arjun -i .tmp/url_extract_uddup.txt -t $ARJUN_THREADS -oT webs/param.txt 2>>"$LOGFILE" &>/dev/null
+			elif [[ $(cat .tmp/url_extract_uddup.txt | wc -l) -le 50 ]]; then
+					arjun -i .tmp/url_extract_uddup.txt -t $ARJUN_THREADS -oT webs/param.txt 2>>"$LOGFILE" &>/dev/null
 			else
 				end_func "Skipping Param discovery: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
 			fi
