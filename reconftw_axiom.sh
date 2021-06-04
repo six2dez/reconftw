@@ -870,24 +870,15 @@ function cms_scanner(){
 function params(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$PARAMS" = true ]; then
 		start_func "Parameter Discovery"
-		printf "${yellow}\n\n Running : Searching params with paramspider${reset}\n"
-		if [ -s "webs/webs.txt" ]; then
-			cat webs/webs.txt | sed -r "s/https?:\/\///" | anew -q .tmp/probed_nohttp.txt
-			axiom-scan .tmp/probed_nohttp.txt -m paramspider -l high -q --exclude eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt,js -o output_paramspider 2>>"$LOGFILE" &>/dev/null
-			find output_paramspider/ -name '*.txt' -exec cat {} \; | anew -q .tmp/param_tmp.txt
-			sed '/^FUZZ/d' -i .tmp/param_tmp.txt
-			rm -rf output_paramspider/ 2>>"$LOGFILE"
+		if [ -s ".tmp/url_extract_uddup.txt" ]; then
 			if [ "$DEEP" = true ]; then
-				printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
-				axiom-scan .tmp/param_tmp.txt -m arjun -t $ARJUN_THREADS -o webs/param.txt 2>>"$LOGFILE" &>/dev/null
+				axiom-scan .tmp/url_extract_uddup.txt -m arjun -t $ARJUN_THREADS -o webs/param.txt 2>>"$LOGFILE" &>/dev/null
+			elif [[ $(cat .tmp/url_extract_uddup.txt | wc -l) -le 50 ]]; then
+					axiom-scan .tmp/url_extract_uddup.txt -m arjun -t $ARJUN_THREADS -o webs/param.txt 2>>"$LOGFILE" &>/dev/null
 			else
-				if [[ $(cat .tmp/param_tmp.txt | wc -l) -le 50 ]]; then
-					printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
-					axiom-scan .tmp/param_tmp.txt -m arjun -t $ARJUN_THREADS -o webs/param.txt 2>>"$LOGFILE" &>/dev/null
-				else
-					cp .tmp/param_tmp.txt webs/param.txt
-				fi
+				end_func "Skipping Param discovery: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
 			fi
+			[ -s "webs/param.txt" ] && cat webs/param.txt | anew -q webs/url_extract.txt
 		fi
 		end_func "Results are saved in $domain/webs/param.txt" ${FUNCNAME[0]}
 	else
@@ -919,6 +910,10 @@ function urlchecks(){
 			fi
 			[[ -d .tmp/gospider/ ]] && NUMFILES=$(find .tmp/gospider/ -type f | wc -l)
 			[[ $NUMFILES -gt 0 ]] && cat .tmp/gospider.txt | grep -Eo 'https?://[^ ]+' | sed 's/]$//' | grep ".$domain" | anew -q .tmp/url_extract_tmp.txt
+			axiom-scan webs/webs.txt -m paramspider -l high -q -o output_paramspider 2>>"$LOGFILE" &>/dev/null
+			find output_paramspider/ -type f -exec cat {} \; | sed '/^FUZZ/d' | anew -q .tmp/param_tmp.txt
+			rm -rf output_paramspider/ 2>>"$LOGFILE"
+			[ -s ".tmp/param_tmp.txt" ] && cat .tmp/param_tmp.txt | anew -q .tmp/gospider.txt
 			if [ -s "${GITHUB_TOKENS}" ]; then
 				github-endpoints -q -k -d $domain -t ${GITHUB_TOKENS} -o .tmp/github-endpoints.txt 2>>"$LOGFILE" &>/dev/null
 				[ -s ".tmp/github-endpoints.txt" ] && cat .tmp/github-endpoints.txt | anew -q .tmp/url_extract_tmp.txt
@@ -927,7 +922,7 @@ function urlchecks(){
 			if [ "$DEEP" = true ]; then
 				[ -s "js/url_extract_js.txt" ] && cat js/url_extract_js.txt | python3 $tools/JSA/jsa.py | anew -q .tmp/url_extract_tmp.txt
 			fi
-			cat .tmp/url_extract_tmp.txt webs/param.txt 2>>"$LOGFILE" | grep "${domain}" | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -Eiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | anew -q .tmp/url_extract_tmp2.txt
+			[ -s ".tmp/url_extract_tmp.txt" ] &&  cat .tmp/url_extract_tmp.txt | grep "${domain}" | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -Eiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | anew -q .tmp/url_extract_tmp2.txt
 			[ -s ".tmp/url_extract_tmp2.txt" ] && cat .tmp/url_extract_tmp2.txt | urldedupe -s -qs | anew -q .tmp/url_extract_uddup.txt 2>>"$LOGFILE" &>/dev/null
 			NUMOFLINES=$(cat .tmp/url_extract_uddup.txt 2>>"$LOGFILE" | anew webs/url_extract.txt | wc -l)
 			notification "${NUMOFLINES} new urls with params" info
@@ -1167,8 +1162,8 @@ function ssrf_checks(){
 			cat gf/ssrf.txt | qsreplace ${COLLAB_SERVER_FIX} | anew -q .tmp/tmp_ssrf.txt
 			cat gf/ssrf.txt | qsreplace ${COLLAB_SERVER_URL} | anew -q .tmp/tmp_ssrf.txt
 			ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/tmp_ssrf.txt -u FUZZ 2>>"$LOGFILE" | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf_requests_url.txt
-			ffuf -v -w .tmp/tmp_ssrf.txt:W1,.tmp/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_FIX}" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
-			ffuf -v -w .tmp/tmp_ssrf.txt:W1,.tmp/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_URL}" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
+			ffuf -v -w .tmp/tmp_ssrf.txt:W1,$tools/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_FIX}" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
+			ffuf -v -w .tmp/tmp_ssrf.txt:W1,$tools/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_URL}" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
 			sleep 5
 			[ -s ".tmp/ssrf_callback.txt" ] && cat .tmp/ssrf_callback.txt | tail -n+11 | anew -q vulns/ssrf_callback.txt && NUMOFLINES=$(cat .tmp/ssrf_callback.txt | tail -n+12 | wc -l)
 			notification "SSRF: ${NUMOFLINES} callbacks received" info
@@ -1178,8 +1173,8 @@ function ssrf_checks(){
 				cat gf/ssrf.txt | qsreplace ${COLLAB_SERVER_FIX} | anew -q .tmp/tmp_ssrf.txt
 				cat gf/ssrf.txt | qsreplace ${COLLAB_SERVER_URL} | anew -q .tmp/tmp_ssrf.txt
 				ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/tmp_ssrf.txt -u FUZZ 2>>"$LOGFILE" | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf_requests_url.txt
-				ffuf -v -w .tmp/tmp_ssrf.txt:W1,.tmp/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_FIX}" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
-				ffuf -v -w .tmp/tmp_ssrf.txt:W1,.tmp/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_URL}" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
+				ffuf -v -w .tmp/tmp_ssrf.txt:W1,$tools/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_FIX}" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
+				ffuf -v -w .tmp/tmp_ssrf.txt:W1,$tools/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_URL}" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
 				sleep 5
 				[ -s ".tmp/ssrf_callback.txt" ] && cat .tmp/ssrf_callback.txt | tail -n+11 | anew -q vulns/ssrf_callback.txt && NUMOFLINES=$(cat .tmp/ssrf_callback.txt | tail -n+12 | wc -l)
 				notification "SSRF: ${NUMOFLINES} callbacks received" info
@@ -1261,7 +1256,7 @@ function sqli(){
 		start_func "SQLi checks"
 		if [ -s "gf/sqli.txt" ]; then
 			cat gf/sqli.txt | qsreplace FUZZ | anew -q .tmp/tmp_sqli.txt
-			interlace -tL .tmp/tmp_sqli.txt -threads 10 -c "python3 $tools/sqlmap/sqlmap.py -u _target_ -b --batch --disable-coloring --random-agent --output-dir=vulns/sqlmap" &>/dev/null
+			interlace -tL .tmp/tmp_sqli.txt -threads 10 -c "python3 $tools/sqlmap/sqlmap.py -u _target_ -b --batch --disable-coloring --random-agent --output-dir=_output_" -o vulns/sqlmap &>/dev/null
 		fi
 		end_func "Results are saved in vulns/sqlmap folder" ${FUNCNAME[0]}
 	else
@@ -1802,8 +1797,8 @@ function recon(){
 	waf_checks
 	nuclei_check
 	fuzz
-	params
 	urlchecks
+	params
 	jschecks
 
 	axiom_shutdown
@@ -1935,8 +1930,8 @@ function multi_recon(){
 		cd "$dir" || { echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		loopstart=$(date +%s)
 		fuzz
-		params
 		urlchecks
+		params
 		jschecks
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
@@ -2003,8 +1998,8 @@ function webs_menu(){
 	fuzz
 	4xxbypass
 	cors
-	params
 	urlchecks
+	params
 	url_gf
 	jschecks
 	wordlist_gen
