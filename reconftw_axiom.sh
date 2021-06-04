@@ -911,7 +911,7 @@ function urlchecks(){
 			[[ -d .tmp/gospider/ ]] && NUMFILES=$(find .tmp/gospider/ -type f | wc -l)
 			[[ $NUMFILES -gt 0 ]] && cat .tmp/gospider.txt | grep -Eo 'https?://[^ ]+' | sed 's/]$//' | grep ".$domain" | anew -q .tmp/url_extract_tmp.txt
 			axiom-scan webs/webs.txt -m paramspider -l high -q -o output_paramspider 2>>"$LOGFILE" &>/dev/null
-			find output_paramspider/ -exec cat {} \; | sed '/^FUZZ/d' | anew -q .tmp/param_tmp.txt
+			find output_paramspider/ -type f -exec cat {} \; | sed '/^FUZZ/d' | anew -q .tmp/param_tmp.txt
 			rm -rf output_paramspider/ 2>>"$LOGFILE"
 			[ -s ".tmp/param_tmp.txt" ] && cat .tmp/param_tmp.txt | anew -q .tmp/gospider.txt
 			if [ -s "${GITHUB_TOKENS}" ]; then
@@ -922,7 +922,7 @@ function urlchecks(){
 			if [ "$DEEP" = true ]; then
 				[ -s "js/url_extract_js.txt" ] && cat js/url_extract_js.txt | python3 $tools/JSA/jsa.py | anew -q .tmp/url_extract_tmp.txt
 			fi
-			cat .tmp/url_extract_tmp.txt webs/param.txt 2>>"$LOGFILE" | grep "${domain}" | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -Eiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | anew -q .tmp/url_extract_tmp2.txt
+			[ -s ".tmp/url_extract_tmp.txt" ] &&  cat .tmp/url_extract_tmp.txt | grep "${domain}" | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -Eiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | anew -q .tmp/url_extract_tmp2.txt
 			[ -s ".tmp/url_extract_tmp2.txt" ] && cat .tmp/url_extract_tmp2.txt | urldedupe -s -qs | anew -q .tmp/url_extract_uddup.txt 2>>"$LOGFILE" &>/dev/null
 			NUMOFLINES=$(cat .tmp/url_extract_uddup.txt 2>>"$LOGFILE" | anew webs/url_extract.txt | wc -l)
 			notification "${NUMOFLINES} new urls with params" info

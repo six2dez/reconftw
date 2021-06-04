@@ -879,7 +879,7 @@ function urlchecks(){
 				fi
 			fi
 			interlace -tL webs/webs.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q -o _output_/_cleantarget_" -o output &>/dev/null
-			find output/ -exec cat {} \; | sed '/^FUZZ/d' | anew -q .tmp/param_tmp.txt
+			find output/ -type f -exec cat {} \; | sed '/^FUZZ/d' | anew -q .tmp/param_tmp.txt
 			rm -rf output/ 2>>"$LOGFILE"
 			[ -s ".tmp/param_tmp.txt" ] && cat .tmp/param_tmp.txt | anew -q .tmp/gospider.txt
 			sed -i '/^.\{2048\}./d' .tmp/gospider.txt
@@ -892,7 +892,7 @@ function urlchecks(){
 			if [ "$DEEP" = true ]; then
 				[ -s "js/url_extract_js.txt" ] && cat js/url_extract_js.txt | python3 $tools/JSA/jsa.py | anew -q .tmp/url_extract_tmp.txt
 			fi
-			cat .tmp/url_extract_tmp.txt webs/param.txt 2>>"$LOGFILE" | grep "${domain}" | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -Eiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | anew -q .tmp/url_extract_tmp2.txt
+			[ -s ".tmp/url_extract_tmp.txt" ] &&  cat .tmp/url_extract_tmp.txt | grep "${domain}" | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -Eiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | anew -q .tmp/url_extract_tmp2.txt
 			[ -s ".tmp/url_extract_tmp2.txt" ] && cat .tmp/url_extract_tmp2.txt | urldedupe -s -qs | anew -q .tmp/url_extract_uddup.txt 2>>"$LOGFILE" &>/dev/null
 			NUMOFLINES=$(cat .tmp/url_extract_uddup.txt 2>>"$LOGFILE" | anew webs/url_extract.txt | wc -l)
 			notification "${NUMOFLINES} new urls with params" info
