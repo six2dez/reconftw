@@ -844,23 +844,15 @@ function params(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$PARAMS" = true ]; then
 		start_func "Parameter Discovery"
 		printf "${yellow}\n\n Running : Searching params with paramspider${reset}\n"
-		if [ -s "webs/webs.txt" ]; then
-			cat webs/webs.txt | sed -r "s/https?:\/\///" | anew -q .tmp/probed_nohttp.txt
-			[ -s ".tmp/probed_nohttp.txt" ] && interlace -tL .tmp/probed_nohttp.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q --exclude eot,jpg,jpeg,gif,css,tif,tiff,png,ttf,otf,woff,woff2,ico,pdf,svg,txt,js" &>/dev/null
-			cat output/*.txt 2>>"$LOGFILE" | anew -q .tmp/param_tmp.txt
-			sed '/^FUZZ/d' -i .tmp/param_tmp.txt
-			rm -rf output/ 2>>"$LOGFILE"
+		if [ -s ".tmp/url_extract_uddup.txt" ]; then
 			if [ "$DEEP" = true ]; then
-				printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
-				[ -s ".tmp/param_tmp.txt" ] && arjun -i .tmp/param_tmp.txt -t $ARJUN_THREADS -oT webs/param.txt 2>>"$LOGFILE" &>/dev/null
+				arjun -i .tmp/param_tmp.txt -t $ARJUN_THREADS -oT webs/param.txt 2>>"$LOGFILE" &>/dev/null
+			elif [[ $(cat .tmp/param_tmp.txt | wc -l) -le 50 ]]; then
+					arjun -i .tmp/param_tmp.txt -t $ARJUN_THREADS -oT webs/param.txt 2>>"$LOGFILE" &>/dev/null
 			else
-				if [[ $(cat .tmp/param_tmp.txt | wc -l) -le 50 ]]; then
-					printf "${yellow}\n\n Running : Checking ${domain} with Arjun${reset}\n"
-					[ -s ".tmp/param_tmp.txt" ] && arjun -i .tmp/param_tmp.txt -t $ARJUN_THREADS -oT webs/param.txt 2>>"$LOGFILE" &>/dev/null
-				else
-					[ -s ".tmp/param_tmp.txt" ] && cp .tmp/param_tmp.txt webs/param.txt
-				fi
+				end_func "Skipping Param discovery: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
 			fi
+			[ -s "webs/param.txt" ] && cat webs/param.txt | anew -q webs/url_extract.txt
 		fi
 		end_func "Results are saved in $domain/webs/param.txt" ${FUNCNAME[0]}
 	else
@@ -887,6 +879,10 @@ function urlchecks(){
 					gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -d 2 --sitemap --robots -w -r > .tmp/gospider.txt
 				fi
 			fi
+			interlace -tL webs/webs.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q -o _output_/_cleantarget_" -o output &>/dev/null
+			cat output/*.txt 2>>"$LOGFILE" | sed '/^FUZZ/d' | anew -q .tmp/param_tmp.txt
+			rm -rf output/ 2>>"$LOGFILE"
+			[ -s ".tmp/param_tmp.txt" ] && cat .tmp/param_tmp.txt | anew -q .tmp/gospider.txt
 			sed -i '/^.\{2048\}./d' .tmp/gospider.txt
 			[ -s ".tmp/gospider.txt" ] && cat .tmp/gospider.txt | grep -Eo 'https?://[^ ]+' | sed 's/]$//' | grep ".$domain" | anew -q .tmp/url_extract_tmp.txt
 			if [ -s "${GITHUB_TOKENS}" ]; then
@@ -1232,7 +1228,7 @@ function sqli(){
 		start_func "SQLi checks"
 		if [ -s "gf/sqli.txt" ]; then
 			cat gf/sqli.txt | qsreplace FUZZ | anew -q .tmp/tmp_sqli.txt
-			interlace -tL .tmp/tmp_sqli.txt -threads 10 -c "python3 $tools/sqlmap/sqlmap.py -u _target_ -b --batch --disable-coloring --random-agent --output-dir=vulns/sqlmap" &>/dev/null
+			interlace -tL .tmp/tmp_sqli.txt -threads 10 -c "python3 $tools/sqlmap/sqlmap.py -u _target_ -b --batch --disable-coloring --random-agent --output-dir=_output_" -o vulns/sqlmap &>/dev/null
 		fi
 		end_func "Results are saved in vulns/sqlmap folder" ${FUNCNAME[0]}
 	else
@@ -1690,8 +1686,8 @@ function recon(){
 	waf_checks
 	nuclei_check
 	fuzz
-	params
 	urlchecks
+	params
 	jschecks
 	cloudprovider
 	cms_scanner
@@ -1817,8 +1813,8 @@ function multi_recon(){
 		cd "$dir" || { echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		loopstart=$(date +%s)
 		fuzz
-		params
 		urlchecks
+		params
 		jschecks
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
@@ -1877,8 +1873,8 @@ function webs_menu(){
 	fuzz
 	4xxbypass
 	cors
-	params
 	urlchecks
+	params
 	url_gf
 	jschecks
 	wordlist_gen
