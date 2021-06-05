@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-
 function banner(){
 	printf "\n${bgreen}"
 	printf "  ██▀███  ▓█████  ▄████▄   ▒█████   ███▄    █   █████▒▄▄▄█████▓ █     █░\n"
@@ -446,11 +445,14 @@ function sub_analytics(){
 function sub_permut(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBPERMUTE" = true ]; then
 		start_subfunc "Running : Permutations Subdomain Enumeration"
-
-		[ "$DEEP" = true ] && [ -s "subdomains/subdomains.txt" ] && DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
-		[ "$DEEP" = false ] && [ "$(cat .tmp/subs_no_resolved.txt | wc -l)" -le 100 ] && DNScewl --tL .tmp/subs_no_resolved.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
-		[ "$DEEP" = false ] && [ "$(cat .tmp/subs_no_resolved.txt | wc -l)" -gt 100 ] && [ "$(cat .tmp/subs_no_resolved.txt | wc -l)" -le 200 ] && DNScewl --tL .tmp/subs_no_resolved.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
-		[ "$DEEP" = false ] && [ "$(cat .tmp/subs_no_resolved.txt | wc -l)" -gt 200 ] && [ "$(cat subdomains/subdomains.txt | wc -l)" -le 100 ] && DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
+		if [ "$DEEP" = true ] || [ "$(cat subdomains/subdomains.txt | wc -l)" -le 200 ] ; then
+			[ -s "subdomains/subdomains.txt" ] && DNScewl --tL subdomains/subdomains.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
+		elif [ "$(cat .tmp/subs_no_resolved.txt | wc -l)" -le 200 ]; then
+			DNScewl --tL .tmp/subs_no_resolved.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl1.txt
+		else
+			end_subfunc "Skipping Permutations: Too Many Subdomains" ${FUNCNAME[0]}
+			return 1
+		fi
 		[ -s ".tmp/DNScewl1.txt" ] && puredns resolve .tmp/DNScewl1.txt -w .tmp/permute1_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
 		[ -s ".tmp/permute1_tmp.txt" ] && cat .tmp/permute1_tmp.txt | anew -q .tmp/permute1.txt
 		[ -s ".tmp/permute1.txt" ] && DNScewl --tL .tmp/permute1.txt -p $tools/permutations_list.txt --level=0 --subs --no-color 2>>"$LOGFILE" | tail -n +14 | grep ".$domain$" > .tmp/DNScewl2.txt
@@ -476,8 +478,7 @@ function sub_permut(){
 }
 
 function sub_recursive(){
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBRECURSIVE" = true ] ; then
-
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBRECURSIVE" = true ] && [ -s "subdomains/subdomains.txt" ]; then
 		start_subfunc "Running : Subdomains recursive search"
 		# Passive recursive
 		if [ "$SUB_RECURSIVE_PASSIVE" = true ]; then
@@ -507,7 +508,7 @@ function sub_recursive(){
 			NUMOFLINES=$(cat .tmp/permute_recursive.txt .tmp/brute_recursive.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (recursive)" ${FUNCNAME[0]}
 		else
-			notification "Skipping Recursive BF: Too Many Subdomains" warn
+			end_subfunc "Skipping Recursive BF: Too Many Subdomains" ${FUNCNAME[0]}
 		fi
 	else
 		if [ "$SUBRECURSIVE" = false ]; then
@@ -610,8 +611,6 @@ function webprobe_full(){
 
 		[ -s "subdomains/subdomains.txt" ] && sudo unimap --fast-scan -f subdomains/subdomains.txt --ports $UNCOMMON_PORTS_WEB -q -k --url-output 2>>"$LOGFILE" | anew -q .tmp/nmap_uncommonweb.txt
 		[ -s ".tmp/nmap_uncommonweb.txt" ] && cat .tmp/nmap_uncommonweb.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout $HTTPX_UNCOMMONPORTS_TIMEOUT -silent -retries 2 -no-color 2>>"$LOGFILE" | cut -d ' ' -f1 | grep ".$domain" | anew -q .tmp/probed_uncommon_ports_tmp.txt
-
-		#cat subdomains/subdomains.txt | httpx -ports $UNCOMMON_PORTS_WEB -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout $HTTPX_UNCOMMONPORTS_TIMEOUT -silent -retries 2 -no-color 2>>"$LOGFILE" | cut -d ' ' -f1 | grep ".$domain" | anew -q .tmp/probed_uncommon_ports_tmp.txt
 
 		NUMOFLINES=$(cat .tmp/probed_uncommon_ports_tmp.txt 2>>"$LOGFILE" | anew webs/webs_uncommon_ports.txt | wc -l)
 		notification "Uncommon web ports: ${NUMOFLINES} new websites" good
@@ -778,7 +777,7 @@ function nuclei_check(){
 function fuzz(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$FUZZ" = true ]; then
 		start_func "Web directory fuzzing"
-		if [ -s "./webs/webs.txt" ]; then
+		if [ -s "webs/webs.txt" ]; then
 			mkdir -p $dir/fuzzing
 			interlace -tL webs/webs.txt -threads 10 -c "ffuf -mc all -fc 404 -ac -t ${FFUF_THREADS} -sf -s -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u  _target_/FUZZ -of csv -o _output_/_cleantarget_.csv -ac" -o fuzzing 2>>"$LOGFILE" &>/dev/null
 
@@ -844,10 +843,8 @@ function params(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$PARAMS" = true ]; then
 		start_func "Parameter Discovery"
 		if [ -s ".tmp/url_extract_uddup.txt" ]; then
-			if [ "$DEEP" = true ]; then
+			if [ "$DEEP" = true ] || [[ $(cat .tmp/url_extract_uddup.txt | wc -l) -le 50 ]]; then
 				arjun -i .tmp/url_extract_uddup.txt -t $ARJUN_THREADS -oT webs/param.txt 2>>"$LOGFILE" &>/dev/null
-			elif [[ $(cat .tmp/url_extract_uddup.txt | wc -l) -le 50 ]]; then
-					arjun -i .tmp/url_extract_uddup.txt -t $ARJUN_THREADS -oT webs/param.txt 2>>"$LOGFILE" &>/dev/null
 			else
 				end_func "Skipping Param discovery: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
 			fi
@@ -870,7 +867,7 @@ function urlchecks(){
 		if [ -s "webs/webs.txt" ]; then
 			cat webs/webs.txt | waybackurls | anew -q .tmp/url_extract_tmp.txt
 			cat webs/webs.txt | gauplus -t $GAUPLUS_THREADS -subs | anew -q .tmp/url_extract_tmp.txt
-			diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt) <(sort -u webs/webs.txt) | wc -l)
+			diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt 2>>"$LOGFILE") <(sort -u webs/webs.txt 2>>"$LOGFILE") | wc -l)
 			if [ $diff_webs != "0" ] || [ ! -s ".tmp/gospider.txt" ]; then
 				if [ "$DEEP" = true ]; then
 					gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -d 3 --sitemap --robots -w -r > .tmp/gospider.txt
@@ -1048,7 +1045,7 @@ function xss(){
 				[ -s ".tmp/xss_reflected.txt" ] && cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav -w $DALFOX_THREADS 2>>"$LOGFILE" | anew -q vulns/xss.txt
 			fi
 		else
-			if [[ $(cat .tmp/xss_reflected.txt | wc -l) -le 500 ]]; then
+			if [[ $(cat .tmp/xss_reflected.txt | wc -l) -le $DEEP_LIMIT ]]; then
 				if [ -n "$XSS_SERVER" ]; then
 					cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav --skip-grepping --skip-mining-all --skip-mining-dict -b ${XSS_SERVER} -w $DALFOX_THREADS 2>>"$LOGFILE" | anew -q vulns/xss.txt
 				else
@@ -1089,23 +1086,14 @@ function cors(){
 function open_redirect(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$OPEN_REDIRECT" = true ] && [ -s "gf/redirect.txt" ]; then
 		start_func "Open redirects checks"
-		if [ "$DEEP" = true ]; then
-			if [ -s "webs/cors.txt" ]; then
-				cat gf/redirect.txt | qsreplace FUZZ | anew -q .tmp/tmp_redirect.txt
-				python3 $tools/OpenRedireX/openredirex.py -l .tmp/tmp_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt 2>>"$LOGFILE" | grep "^http" > vulns/redirect.txt
-				sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" vulns/redirect.txt
-			fi
+		if [ "$DEEP" = true ] || [[ $(cat gf/redirect.txt | wc -l) -le $DEEP_LIMIT ]]; then
+			cat gf/redirect.txt | qsreplace FUZZ | anew -q .tmp/tmp_redirect.txt
+			python3 $tools/OpenRedireX/openredirex.py -l .tmp/tmp_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt 2>>"$LOGFILE" | grep "^http" > vulns/redirect.txt
+			sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" vulns/redirect.txt
 			end_func "Results are saved in vulns/redirect.txt" ${FUNCNAME[0]}
 		else
-			if [[ $(cat gf/redirect.txt | wc -l) -le 1000 ]]; then
-				cat gf/redirect.txt | qsreplace FUZZ | anew -q .tmp/tmp_redirect.txt
-				python3 $tools/OpenRedireX/openredirex.py -l .tmp/tmp_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt 2>>"$LOGFILE" | grep "^http" > vulns/redirect.txt
-				sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" vulns/redirect.txt
-				end_func "Results are saved in vulns/redirect.txt" ${FUNCNAME[0]}
-			else
-				printf "${bred} Skipping Open redirects: Too many URLs to test, try with --deep flag${reset}\n"
-				printf "${bgreen}#######################################################################${reset}\n"
-			fi
+			end_func "Skipping Open redirects: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
+			printf "${bgreen}#######################################################################${reset}\n"
 		fi
 	else
 		if [ "$OPEN_REDIRECT" = false ]; then
@@ -1129,7 +1117,7 @@ function ssrf_checks(){
 		else
 			COLLAB_SERVER_FIX=$(echo ${COLLAB_SERVER} | sed -r "s/https?:\/\///")
 		fi
-		if [ "$DEEP" = true ]; then
+		if [ "$DEEP" = true ] || [[ $(cat gf/ssrf.txt | wc -l) -le $DEEP_LIMIT ]]; then
 			cat gf/ssrf.txt | qsreplace ${COLLAB_SERVER_FIX} | anew -q .tmp/tmp_ssrf.txt
 			cat gf/ssrf.txt | qsreplace ${COLLAB_SERVER_URL} | anew -q .tmp/tmp_ssrf.txt
 			ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/tmp_ssrf.txt -u FUZZ 2>>"$LOGFILE" | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf_requests_url.txt
@@ -1140,19 +1128,7 @@ function ssrf_checks(){
 			notification "SSRF: ${NUMOFLINES} callbacks received" info
 			end_func "Results are saved in vulns/ssrf_*" ${FUNCNAME[0]}
 		else
-			if [[ $(cat gf/ssrf.txt | wc -l) -le 1000 ]]; then
-				cat gf/ssrf.txt | qsreplace ${COLLAB_SERVER_FIX} | anew -q .tmp/tmp_ssrf.txt
-				cat gf/ssrf.txt | qsreplace ${COLLAB_SERVER_URL} | anew -q .tmp/tmp_ssrf.txt
-				ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/tmp_ssrf.txt -u FUZZ 2>>"$LOGFILE" | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf_requests_url.txt
-				ffuf -v -w .tmp/tmp_ssrf.txt:W1,$tools/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_FIX}" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
-				ffuf -v -w .tmp/tmp_ssrf.txt:W1,$tools/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_URL}" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
-				sleep 5
-				[ -s ".tmp/ssrf_callback.txt" ] && cat .tmp/ssrf_callback.txt | tail -n+11 | anew -q vulns/ssrf_callback.txt && NUMOFLINES=$(cat .tmp/ssrf_callback.txt | tail -n+12 | wc -l)
-				notification "SSRF: ${NUMOFLINES} callbacks received" info
-				end_func "Results are saved in vulns/ssrf_*" ${FUNCNAME[0]}
-			else
-				end_func "Skipping SSRF: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
-			fi
+			end_func "Skipping SSRF: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
 		fi
 		pkill -f interactsh-client
 	else
@@ -1169,8 +1145,12 @@ function ssrf_checks(){
 function crlf_checks(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$CRLF_CHECKS" = true ]; then
 		start_func "CRLF checks"
-		crlfuzz -l webs/webs.txt -o vulns/crlf.txt 2>>"$LOGFILE" &>/dev/null
-		end_func "Results are saved in vulns/crlf.txt" ${FUNCNAME[0]}
+		if [ "$DEEP" = true ] || [[ $(cat webs/webs.txt | wc -l) -le $DEEP_LIMIT ]]; then
+			crlfuzz -l webs/webs.txt -o vulns/crlf.txt 2>>"$LOGFILE" &>/dev/null
+			end_func "Results are saved in vulns/crlf.txt" ${FUNCNAME[0]}
+		else
+			end_func "Skipping SSRF: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
+		fi
 	else
 		if [ "$CRLF_CHECKS" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -1185,11 +1165,15 @@ function lfi(){
 		start_func "LFI checks"
 		if [ -s "gf/lfi.txt" ]; then
 			cat gf/lfi.txt | qsreplace FUZZ | anew -q .tmp/tmp_lfi.txt
-			for url in $(cat .tmp/tmp_lfi.txt); do
-				ffuf -v -t $FFUF_THREADS -H "${HEADER}" -w $lfi_wordlist -u $url -mr "root:" 2>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/lfi.txt
-			done
+			if [ "$DEEP" = true ] || [[ $(cat .tmp/tmp_lfi.txt | wc -l) -le $DEEP_LIMIT ]]; then
+				for url in $(cat .tmp/tmp_lfi.txt); do
+					ffuf -v -t $FFUF_THREADS -H "${HEADER}" -w $lfi_wordlist -u $url -mr "root:" 2>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/lfi.txt
+				done
+				end_func "Results are saved in vulns/lfi.txt" ${FUNCNAME[0]}
+			else
+				end_func "Skipping SSRF: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
+			fi
 		fi
-		end_func "Results are saved in vulns/lfi.txt" ${FUNCNAME[0]}
 	else
 		if [ "$LFI" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -1206,11 +1190,15 @@ function ssti(){
 		start_func "SSTI checks"
 		if [ -s "gf/ssti.txt" ]; then
 			cat gf/ssti.txt | qsreplace FUZZ | anew -q .tmp/tmp_ssti.txt
-			for url in $(cat .tmp/tmp_ssti.txt); do
-    			ffuf -v -t $FFUF_THREADS -H "${HEADER}" -w $ssti_wordlist -u $url -mr "ssti49" 2>>"$LOGFILE" | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssti.txt
-    		done
+			if [ "$DEEP" = true ] || [[ $(cat .tmp/tmp_ssti.txt | wc -l) -le $DEEP_LIMIT ]]; then
+				for url in $(cat .tmp/tmp_ssti.txt); do
+    				ffuf -v -t $FFUF_THREADS -H "${HEADER}" -w $ssti_wordlist -u $url -mr "ssti49" 2>>"$LOGFILE" | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssti.txt
+    			done
+				end_func "Results are saved in vulns/ssti.txt" ${FUNCNAME[0]}
+			else
+				end_func "Skipping SSTI: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
+			fi
 		fi
-		end_func "Results are saved in vulns/ssti.txt" ${FUNCNAME[0]}
 	else
 		if [ "$SSTI" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -1225,11 +1213,14 @@ function ssti(){
 function sqli(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SQLI" = true ] && [ -s "gf/sqli.txt" ]; then
 		start_func "SQLi checks"
-		if [ -s "gf/sqli.txt" ]; then
-			cat gf/sqli.txt | qsreplace FUZZ | anew -q .tmp/tmp_sqli.txt
+
+		cat gf/sqli.txt | qsreplace FUZZ | anew -q .tmp/tmp_sqli.txt
+		if [ "$DEEP" = true ] || [[ $(cat .tmp/tmp_sqli.txt | wc -l) -le $DEEP_LIMIT ]]; then
 			interlace -tL .tmp/tmp_sqli.txt -threads 10 -c "python3 $tools/sqlmap/sqlmap.py -u _target_ -b --batch --disable-coloring --random-agent --output-dir=_output_" -o vulns/sqlmap &>/dev/null
+			end_func "Results are saved in vulns/sqlmap folder" ${FUNCNAME[0]}
+		else
+			end_func "Skipping SQLi: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
 		fi
-		end_func "Results are saved in vulns/sqlmap folder" ${FUNCNAME[0]}
 	else
 		if [ "$SQLI" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -1273,7 +1264,7 @@ function spraying(){
 
 function 4xxbypass(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$BYPASSER4XX" = true ]; then
-		if [[ $(cat fuzzing/*.txt 2>/dev/null | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 | wc -l) -le 1000 ]] || [ "$DEEP" = true ]; then
+		if [[ $(cat fuzzing/*.txt 2>/dev/null | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 | wc -l) -le $DEEP_LIMIT ]] || [ "$DEEP" = true ]; then
 			start_func "403 bypass"
 			cat fuzzing/*.txt 2>>"$LOGFILE" | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 | dirdar -threads $DIRDAR_THREADS -only-ok > .tmp/dirdar.txt
 			[ -s ".tmp/dirdar.txt" ] && cat .tmp/dirdar.txt | sed -e '1,12d' | sed '/^$/d' | anew -q vulns/4xxbypass.txt
@@ -1294,10 +1285,7 @@ function command_injection(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$COMM_INJ" = true ] && [ -s "gf/rce.txt" ]; then
 		start_func "Command Injection checks"
 		[ -s "gf/rce.txt" ] && cat gf/rce.txt | qsreplace FUZZ | anew -q .tmp/tmp_rce.txt
-		if [ "$DEEP" = true ]; then
-			[ -s ".tmp/tmp_rce.txt" ] && python3 $tools/commix/commix.py --batch -m .tmp/tmp_rce.txt --output-dir vulns/command_injection
-			end_func "Results are saved in vulns/command_injection folder" ${FUNCNAME[0]}
-		elif [[ $(cat .tmp/tmp_rce.txt | wc -l) -le 200 ]]; then
+		if [ "$DEEP" = true ] || [[ $(cat .tmp/tmp_rce.txt | wc -l) -le $DEEP_LIMIT ]]; then
 			[ -s ".tmp/tmp_rce.txt" ] && python3 $tools/commix/commix.py --batch -m .tmp/tmp_rce.txt --output-dir vulns/command_injection
 			end_func "Results are saved in vulns/command_injection folder" ${FUNCNAME[0]}
 		else
