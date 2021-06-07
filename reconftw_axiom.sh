@@ -102,6 +102,7 @@ function tools_installed(){
 	type -P resolveDomains &>/dev/null || { printf "${bred} [*] resolveDomains	[NO]${reset}\n"; allinstalled=false;}
 	type -P emailfinder &>/dev/null || { printf "${bred} [*] emailfinder	[NO]${reset}\n"; allinstalled=false;}
 	type -P urldedupe &>/dev/null || { printf "${bred} [*] urldedupe	[NO]${reset}\n"; allinstalled=false;}
+	type -P analyticsrelationships &>/dev/null || { printf "${bred} [*] analyticsrelationships	[NO]${reset}\n"; allinstalled=false;}
 	type -P interactsh-client &>/dev/null || { printf "${bred} [*] interactsh-client	[NO]${reset}\n"; allinstalled=false;}
 	type -P axiom-ls &>/dev/null || { printf "${bred} [*] axiom		[NO]${reset}\n${reset}"; allinstalled=false;}
 
@@ -437,9 +438,10 @@ function sub_analytics(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBANALYTICS" = true ]; then
 		start_subfunc "Running : Analytics Subdomain Enumeration"
 		if [ -s ".tmp/probed_tmp_scrap.txt" ]; then
-			for sub in $(cat .tmp/probed_tmp_scrap.txt); do
-				python3 $tools/AnalyticsRelationships/Python/analyticsrelationships.py -u $sub 2>>"$LOGFILE" | anew -q .tmp/analytics_subs_tmp.txt
-			done
+			mkdir -p .tmp/output_analytics/
+			interlace -tL .tmp/probed_tmp_scrap.txt -threads 20 -c "analyticsrelationships --url _target_ > _output_/_target_.txt" -o .tmp/output_analytics/
+			find output_analytics/ -type f -exec cat {} \; | anew -q .tmp/analytics_subs_tmp.txt
+			rm -rf .tmp/output_analytics/
 			[ -s ".tmp/analytics_subs_tmp.txt" ] && cat .tmp/analytics_subs_tmp.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | sed "s/|__ //" | anew -q .tmp/analytics_subs_clean.txt
 			[ -s ".tmp/analytics_subs_clean.txt" ] && axiom-scan .tmp/analytics_subs_clean.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/analytics_subs_resolved.txt 2>>"$LOGFILE" &>/dev/null
 		fi

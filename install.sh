@@ -240,6 +240,10 @@ for repo in "${!repos[@]}"; do
             eval cmake CMakeLists.txt $DEBUG_STD
             eval make $DEBUG_STD
             eval $SUDO cp ./urldedupe /usr/bin/ $DEBUG_STD
+    elif [ "AnalyticsRelationships" = "$repo" ]; then
+            eval cd GO $DEBUG_STD
+            eval go build -ldflags "-s -w" $DEBUG_STD
+            eval $SUDO cp ./analyticsrelationships /usr/bin/ $DEBUG_STD
     fi
     cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 done
