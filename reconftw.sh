@@ -45,7 +45,6 @@ function tools_installed(){
 	[ -n "$GOROOT" ] || { printf "${bred} [*] GOROOT var		[NO]${reset}\n"; allinstalled=false;}
 	[ -n "$PATH" ] || { printf "${bred} [*] PATH var		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/degoogle_hunter/degoogle.py" ] || { printf "${bred} [*] degoogle		[NO]${reset}\n"; allinstalled=false;}
-	[ -f "$tools/ParamSpider/paramspider.py" ] || { printf "${bred} [*] Paramspider	[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/brutespray/brutespray.py" ] || { printf "${bred} [*] brutespray	[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/dnsrecon/dnsrecon.py" ] || { printf "${bred} [*] dnsrecon	[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/fav-up/favUp.py" ] || { printf "${bred} [*] fav-up		[NO]${reset}\n"; allinstalled=false;}
@@ -60,7 +59,6 @@ function tools_installed(){
 	[ -f "$tools/degoogle_hunter/degoogle_hunter.sh" ] || { printf "${bred} [*] degoogle_hunter	[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/getjswords.py" ] || { printf "${bred} [*] getjswords   	[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/JSA/jsa.py" ] || { printf "${bred} [*] JSA		[NO]${reset}\n"; allinstalled=false;}
-	type -P arjun &>/dev/null || { printf "${bred} [*] Arjun		[NO]${reset}\n"; allinstalled=false;}
 	type -P dirdar &>/dev/null || { printf "${bred} [*] dirdar		[NO]${reset}\n"; allinstalled=false;}
 	type -P github-endpoints &>/dev/null || { printf "${bred} [*] github-endpoints	[NO]${reset}\n"; allinstalled=false;}
 	type -P github-subdomains &>/dev/null || { printf "${bred} [*] github-subdomains	[NO]${reset}\n"; allinstalled=false;}
@@ -313,7 +311,9 @@ function sub_passive(){
 				github-subdomains -d $domain -k -q -t $GITHUB_TOKENS -o .tmp/github_subdomains_psub.txt 2>>"$LOGFILE" &>/dev/null
 			fi
 		fi
-		curl -s "https://jldc.me/anubis/subdomains/${domain}" 2>>"$LOGFILE" | grep -Po "((http|https):\/\/)?(([\w.-]*)\.([\w]*)\.([A-z]))\w+" | sed '/^\./d' | anew -q .tmp/jldc_psub.txt
+		curl -s -k "https://jldc.me/anubis/subdomains/${domain}" 2>>"$LOGFILE" | grep -Po "((http|https):\/\/)?(([\w.-]*)\.([\w]*)\.([A-z]))\w+" | sed '/^\./d' | anew -q .tmp/curl_psub.txt
+		curl -s -k "https://dns.bufferover.run/dns?q=.${domain}" 2>>"$LOGFILE" | jq -r '.FDNS_A'[],'.RDNS'[] 2>>"$LOGFILE" | cut -d ',' -f2 | grep -F ".$domain" | anew -q .tmp/curl_psub.txt
+		curl -s -k "https://tls.bufferover.run/dns?q=.${domain}" 2>>"$LOGFILE" | jq -r .Results[] 2>>"$LOGFILE" | cut -d ',' -f3 | grep -F ".$domain" | anew -q .tmp/curl_psub.txt
 		if echo $domain | grep -q ".mil$"; then
 			mildew
 			mv mildew.out .tmp/mildew.out
@@ -330,8 +330,6 @@ function sub_crt(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBCRT" = true ]; then
 		start_subfunc "Running : Crtsh Subdomain Enumeration"
 		python3 $tools/ctfr/ctfr.py -d $domain -o .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" &>/dev/null
-		curl "https://tls.bufferover.run/dns?q=.${domain}" 2>>"$LOGFILE" | jq -r .Results[] 2>>"$LOGFILE" | cut -d ',' -f3 | grep -F ".$domain" | anew -q .tmp/crtsh_subs_tmp.txt
-		curl "https://dns.bufferover.run/dns?q=.${domain}" 2>>"$LOGFILE" | jq -r '.FDNS_A'[],'.RDNS'[] 2>>"$LOGFILE" | cut -d ',' -f2 | grep -F ".$domain" | anew -q .tmp/crtsh_subs_tmp.txt
 		NUMOFLINES=$(cat .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" | anew .tmp/crtsh_subs.txt | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (cert transparency)" ${FUNCNAME[0]}
 	else
@@ -841,27 +839,6 @@ function cms_scanner(){
 	fi
 }
 
-function params(){
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$PARAMS" = true ]; then
-		start_func "Parameter Discovery"
-		if [ -s ".tmp/url_extract_uddup.txt" ]; then
-			if [ "$DEEP" = true ] || [[ $(cat .tmp/url_extract_uddup.txt | wc -l) -le 50 ]]; then
-				arjun -i .tmp/url_extract_uddup.txt -t $ARJUN_THREADS -oT webs/param.txt 2>>"$LOGFILE" &>/dev/null
-			else
-				end_func "Skipping Param discovery: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
-			fi
-			[ -s "webs/param.txt" ] && cat webs/param.txt | anew -q webs/url_extract.txt
-		fi
-		end_func "Results are saved in $domain/webs/param.txt" ${FUNCNAME[0]}
-	else
-		if [ "$PARAMS" = false ]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
-		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
-		fi
-	fi
-}
-
 function urlchecks(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$URL_CHECK" = true ]; then
 		start_func "URL Extraction"
@@ -877,10 +854,6 @@ function urlchecks(){
 					gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -d 2 --sitemap --robots -w -r > .tmp/gospider.txt
 				fi
 			fi
-			interlace -tL webs/webs.txt -threads 10 -c "python3 $tools/ParamSpider/paramspider.py -d _target_ -l high -q -o _output_/_cleantarget_" -o output &>/dev/null
-			find output/ -type f -exec cat {} \; | sed '/^FUZZ/d' | anew -q .tmp/param_tmp.txt
-			rm -rf output/ 2>>"$LOGFILE"
-			[ -s ".tmp/param_tmp.txt" ] && cat .tmp/param_tmp.txt | anew -q .tmp/gospider.txt
 			sed -i '/^.\{2048\}./d' .tmp/gospider.txt
 			[ -s ".tmp/gospider.txt" ] && cat .tmp/gospider.txt | grep -Eo 'https?://[^ ]+' | sed 's/]$//' | grep ".$domain" | anew -q .tmp/url_extract_tmp.txt
 			if [ -s "${GITHUB_TOKENS}" ]; then
@@ -1676,7 +1649,6 @@ function recon(){
 	nuclei_check
 	fuzz
 	urlchecks
-	params
 	jschecks
 	cloudprovider
 	cms_scanner
@@ -1803,7 +1775,6 @@ function multi_recon(){
 		loopstart=$(date +%s)
 		fuzz
 		urlchecks
-		params
 		jschecks
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
@@ -1863,7 +1834,6 @@ function webs_menu(){
 	4xxbypass
 	cors
 	urlchecks
-	params
 	url_gf
 	jschecks
 	wordlist_gen
