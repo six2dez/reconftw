@@ -254,7 +254,7 @@ if [ "True" = "$IS_ARM" ]
     else
         eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux $DEBUG_STD
         eval wget -N -c https://github.com/sensepost/gowitness/releases/download/2.3.4/gowitness-2.3.4-linux-amd64 $DEBUG_STD
-        eval wget -N -c https://github.com/codingo/DNSCewl/raw/master/DNScewl $DEBUG_STD
+        eval wget -N -c https://github.com/six2dez/DNSCewl/raw/master/DNScewl $DEBUG_STD
         eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/download/0.4.0/unimap-linux $DEBUG_STD
         eval $SUDO mv DNScewl /usr/bin/DNScewl
         eval $SUDO mv gowitness-2.3.4-linux-amd64 /usr/bin/gowitness
