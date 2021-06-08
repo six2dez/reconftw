@@ -60,6 +60,7 @@ repos["commix"]="commixproject/commix"
 repos["JSA"]="w9w/JSA"
 repos["AnalyticsRelationships"]="Josue87/AnalyticsRelationships"
 repos["urldedupe"]="ameenmaali/urldedupe"
+repos["cloud_enum"]="initstring/cloud_enum"
 
 dir=${tools}
 double_check=false

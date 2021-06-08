@@ -20,3 +20,4 @@ shodan
 dnspython
 webscreenshot
 emailfinder
+requests_futures
