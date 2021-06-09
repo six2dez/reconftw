@@ -1463,8 +1463,10 @@ function start(){
 	else
 	    NOTIFY=""
 	fi
-
-	echo "Recon succesfully started on $domain" | $NOTIFY
+	printf "\n${bgreen}#######################################################################${reset}"
+	notification "Recon succesfully started on ${domain}" good
+	[ "$SOFT_NOTIFICATION" = true ] && echo "Recon succesfully started on ${domain}" | notify -silent
+	printf "${bgreen}#######################################################################${reset}\n"
 	tools_installed
 
 	[[ -n "$domain" ]] && ipcidr_target $domain
@@ -1539,8 +1541,8 @@ function end(){
 	global_end=$(date +%s)
 	getElapsedTime $global_start $global_end
 	printf "${bgreen}#######################################################################${reset}\n"
-	text="${bred} Finished Recon on: ${domain} under ${finaldir} in: ${runtime} ${reset}\n"
-	printf "${text}" && printf "${text}" | $NOTIFY
+	notification "Finished Recon on: ${domain} under ${finaldir} in: ${runtime}" good
+	[ "$SOFT_NOTIFICATION" = true ] && echo "Finished Recon on: ${domain} under ${finaldir} in: ${runtime}" | notify -silent
 	printf "${bgreen}#######################################################################${reset}\n"
 	#Seperator for more clear messges in telegram_Bot
 	echo "******  Stay safe 🦠 and secure 🔐  ******" | $NOTIFY
