@@ -57,7 +57,7 @@ repos["GitDorker"]="obheda12/GitDorker"
 repos["testssl"]="drwetter/testssl.sh"
 repos["ip2provider"]="oldrho/ip2provider"
 repos["commix"]="commixproject/commix"
-repos["JSA"]="w9w/JSA"
+repos["JSA"]="six2dez/JSA"
 repos["AnalyticsRelationships"]="Josue87/AnalyticsRelationships"
 repos["urldedupe"]="ameenmaali/urldedupe"
 repos["cloud_enum"]="initstring/cloud_enum"
@@ -181,6 +181,7 @@ mkdir -p ~/.config/nuclei/
 touch $dir/.github_tokens
 
 eval wget -N -c https://bootstrap.pypa.io/get-pip.py $DEBUG_STD && eval python3 get-pip.py $DEBUG_STD
+eval rm -f get-pip.py $DEBUG_STD
 eval ln -s /usr/local/bin/pip3 /usr/bin/pip3 $DEBUG_STD
 eval pip3 install -I -r requirements.txt $DEBUG_STD
 
