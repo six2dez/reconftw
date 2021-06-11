@@ -96,8 +96,6 @@ function tools_installed(){
 	type -P dalfox &>/dev/null || { printf "${bred} [*] dalfox		[NO]${reset}\n${reset}"; allinstalled=false;}
 	type -P puredns &>/dev/null || { printf "${bred} [*] puredns		[NO]${reset}\n${reset}"; allinstalled=false;}
 	type -P unimap &>/dev/null || { printf "${bred} [*] unimap		[NO]${reset}\n${reset}"; allinstalled=false;}
-	type -P hakrevdns &>/dev/null || { printf "${bred} [*] hakrevdns	[NO]${reset}\n${reset}"; allinstalled=false;}
-	type -P gdn &>/dev/null || { printf "${bred} [*] gdn			[NO]${reset}\n"; allinstalled=false;}
 	type -P resolveDomains &>/dev/null || { printf "${bred} [*] resolveDomains	[NO]${reset}\n"; allinstalled=false;}
 	type -P emailfinder &>/dev/null || { printf "${bred} [*] emailfinder	[NO]${reset}\n"; allinstalled=false;}
 	type -P urldedupe &>/dev/null || { printf "${bred} [*] urldedupe	[NO]${reset}\n"; allinstalled=false;}
@@ -1435,17 +1433,15 @@ function resolvers_update(){
 
 function ipcidr_detection(){
 		if [[ $1 =~ /[0-9]+$ ]]; then
-			prips $1 | hakrevdns
-			prips $1 | gdn
+			prips $1 | dnsx -ptr -resp-only -silent
 		else
-			echo $1 | hakrevdns
-			echo $1 | gdn
+			echo $1 | dnsx -ptr -resp-only -silent
 		fi
 }
 
 function ipcidr_target(){
 	if [[ $1 =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
-		ipcidr_detection $1 | cut -d' ' -f3 | unfurl -u domains 2>/dev/null | sed 's/\.$//' | sort -u > ./target_reconftw_ipcidr.txt
+		ipcidr_detection $1 | unfurl -u domains 2>/dev/null | sed 's/\.$//' | sort -u > ./target_reconftw_ipcidr.txt
 		if [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -eq 1 ]]; then
 			domain=$(cat ./target_reconftw_ipcidr.txt)
 		elif [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -gt 1 ]]; then
