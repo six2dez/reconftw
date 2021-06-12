@@ -29,8 +29,6 @@ gotools["crobat"]="go get -v github.com/cgboal/sonarsearch/crobat"
 gotools["crlfuzz"]="GO111MODULE=on go get -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz"
 gotools["dalfox"]="GO111MODULE=on go get -v github.com/hahwul/dalfox/v2"
 gotools["puredns"]="GO111MODULE=on go get github.com/d3mondev/puredns/v2"
-gotools["hakrevdns"]="go get github.com/hakluke/hakrevdns"
-gotools["gdn"]="GO111MODULE=on go get -v github.com/kmskrishna/gdn"
 gotools["resolveDomains"]="go get -v github.com/Josue87/resolveDomains"
 gotools["interactsh-client"]="GO111MODULE=on go get -v github.com/projectdiscovery/interactsh/cmd/interactsh-client"
 
@@ -42,13 +40,11 @@ repos["dnsrecon"]="darkoperator/dnsrecon"
 repos["theHarvester"]="laramies/theHarvester"
 repos["brutespray"]="x90skysn3k/brutespray"
 repos["wafw00f"]="EnableSecurity/wafw00f"
-repos["Arjun"]="s0md3v/Arjun"
 repos["gf"]="tomnomnom/gf"
 repos["Gf-Patterns"]="1ndianl33t/Gf-Patterns"
 repos["github-search"]="gwen001/github-search"
 repos["ctfr"]="UnaPibaGeek/ctfr"
 repos["LinkFinder"]="dark-warlord14/LinkFinder"
-repos["ParamSpider"]="devanshbatham/ParamSpider"
 repos["Corsy"]="s0md3v/Corsy"
 repos["CMSeeK"]="Tuhinshubhra/CMSeeK"
 repos["fav-up"]="pielco11/fav-up"
@@ -59,9 +55,10 @@ repos["GitDorker"]="obheda12/GitDorker"
 repos["testssl"]="drwetter/testssl.sh"
 repos["ip2provider"]="oldrho/ip2provider"
 repos["commix"]="commixproject/commix"
-repos["JSA"]="w9w/JSA"
+repos["JSA"]="six2dez/JSA"
 repos["AnalyticsRelationships"]="Josue87/AnalyticsRelationships"
 repos["urldedupe"]="ameenmaali/urldedupe"
+repos["cloud_enum"]="initstring/cloud_enum"
 
 dir=${tools}
 double_check=false
@@ -93,17 +90,17 @@ install_apt(){
     eval $SUDO apt update -y $DEBUG_STD
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium-browser -y $DEBUG_STD
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium -y $DEBUG_STD
-    eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip build-essential gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb -y $DEBUG_STD
+    eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip build-essential gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb prips -y $DEBUG_STD
     eval $SUDO systemctl enable tor $DEBUG_STD
 }
 
 install_yum(){
     eval $SUDO yum groupinstall "Development Tools" -y $DEBUG_STD
-    eval $SUDO yum install python3 python3-pip gcc cmake ruby git curl libpcap-dev wget zip python3-devel pv bind-utils libopenssl-devel libffi-devel libxml2-devel libxslt-devel zlib-devel nmap jq lynx tor medusa xorg-x11-server-xvfb -y $DEBUG_STD
+    eval $SUDO yum install python3 python3-pip gcc cmake ruby git curl libpcap-dev wget zip python3-devel pv bind-utils libopenssl-devel libffi-devel libxml2-devel libxslt-devel zlib-devel nmap jq lynx tor medusa xorg-x11-server-xvfb prips -y $DEBUG_STD
 }
 
 install_pacman(){
-    eval $SUDO pacman -Sy install python python-pip base-devel gcc cmake ruby git curl libpcap wget zip pv bind openssl libffi libxml2 libxslt zlib nmap jq lynx tor medusa xorg-server-xvfb -y $DEBUG_STD
+    eval $SUDO pacman -Sy install python python-pip base-devel gcc cmake ruby git curl libpcap wget zip pv bind openssl libffi libxml2 libxslt zlib nmap jq lynx tor medusa xorg-server-xvfb prips -y $DEBUG_STD
     eval $SUDO systemctl enable --now tor.service $DEBUG_STD
 }
 
@@ -182,6 +179,7 @@ mkdir -p ~/.config/nuclei/
 touch $dir/.github_tokens
 
 eval wget -N -c https://bootstrap.pypa.io/get-pip.py $DEBUG_STD && eval python3 get-pip.py $DEBUG_STD
+eval rm -f get-pip.py $DEBUG_STD
 eval ln -s /usr/local/bin/pip3 /usr/bin/pip3 $DEBUG_STD
 eval pip3 install -I -r requirements.txt $DEBUG_STD
 
@@ -240,6 +238,10 @@ for repo in "${!repos[@]}"; do
             eval cmake CMakeLists.txt $DEBUG_STD
             eval make $DEBUG_STD
             eval $SUDO cp ./urldedupe /usr/bin/ $DEBUG_STD
+    elif [ "AnalyticsRelationships" = "$repo" ]; then
+            eval cd GO $DEBUG_STD
+            eval go build -ldflags "-s -w" $DEBUG_STD
+            eval $SUDO cp ./analyticsrelationships /usr/bin/ $DEBUG_STD
     fi
     cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 done
@@ -251,7 +253,7 @@ if [ "True" = "$IS_ARM" ]
     else
         eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux $DEBUG_STD
         eval wget -N -c https://github.com/sensepost/gowitness/releases/download/2.3.4/gowitness-2.3.4-linux-amd64 $DEBUG_STD
-        eval wget -N -c https://github.com/codingo/DNSCewl/raw/master/DNScewl $DEBUG_STD
+        eval wget -N -c https://github.com/six2dez/DNSCewl/raw/master/DNScewl $DEBUG_STD
         eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/download/0.4.0/unimap-linux $DEBUG_STD
         eval $SUDO mv DNScewl /usr/bin/DNScewl
         eval $SUDO mv gowitness-2.3.4-linux-amd64 /usr/bin/gowitness
