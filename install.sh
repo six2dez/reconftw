@@ -238,6 +238,7 @@ for repo in "${!repos[@]}"; do
             eval cmake CMakeLists.txt $DEBUG_STD
             eval make $DEBUG_STD
             eval $SUDO cp ./urldedupe /usr/bin/ $DEBUG_STD
+    fi
     cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 done
 
