@@ -31,6 +31,7 @@ gotools["dalfox"]="GO111MODULE=on go get -v github.com/hahwul/dalfox/v2"
 gotools["puredns"]="GO111MODULE=on go get github.com/d3mondev/puredns/v2"
 gotools["resolveDomains"]="go get -v github.com/Josue87/resolveDomains"
 gotools["interactsh-client"]="GO111MODULE=on go get -v github.com/projectdiscovery/interactsh/cmd/interactsh-client"
+gotools["analyticsrelationships"]="six2dez/analyticsrelationships"
 
 declare -A repos
 repos["degoogle_hunter"]="six2dez/degoogle_hunter"
@@ -56,7 +57,6 @@ repos["testssl"]="drwetter/testssl.sh"
 repos["ip2provider"]="oldrho/ip2provider"
 repos["commix"]="commixproject/commix"
 repos["JSA"]="six2dez/JSA"
-repos["AnalyticsRelationships"]="Josue87/AnalyticsRelationships"
 repos["urldedupe"]="ameenmaali/urldedupe"
 repos["cloud_enum"]="initstring/cloud_enum"
 
@@ -238,11 +238,6 @@ for repo in "${!repos[@]}"; do
             eval cmake CMakeLists.txt $DEBUG_STD
             eval make $DEBUG_STD
             eval $SUDO cp ./urldedupe /usr/bin/ $DEBUG_STD
-    elif [ "AnalyticsRelationships" = "$repo" ]; then
-            eval cd GO $DEBUG_STD
-            eval go build -ldflags "-s -w" $DEBUG_STD
-            eval $SUDO cp ./analyticsrelationships /usr/bin/ $DEBUG_STD
-    fi
     cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 done
 
