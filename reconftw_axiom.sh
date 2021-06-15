@@ -1281,7 +1281,7 @@ function 4xxbypass(){
 		if [[ $(cat fuzzing/*.txt 2>/dev/null | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 | wc -l) -le $DEEP_LIMIT ]] || [ "$DEEP" = true ]; then
 			start_func "403 bypass"
 			cat fuzzing/*.txt 2>>"$LOGFILE" | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 > .tmp/dirdar_test.txt
-			axiom-scan .tmp/dirdar_test.txt -m dirdar -o .tmp/dirdar.txt
+			axiom-scan .tmp/dirdar_test.txt -m dirdar -o .tmp/dirdar.txt 2>>"$LOGFILE" &>/dev/null
 			[ -s ".tmp/dirdar.txt" ] && cat .tmp/dirdar.txt | sed -e '1,12d' | sed '/^$/d' | anew -q vulns/4xxbypass.txt
 			end_func "Results are saved in vulns/4xxbypass.txt" ${FUNCNAME[0]}
 		else
@@ -1301,7 +1301,7 @@ function command_injection(){
 		start_func "Command Injection checks"
 		[ -s "gf/rce.txt" ] && cat gf/rce.txt | qsreplace FUZZ | anew -q .tmp/tmp_rce.txt
 		if [ "$DEEP" = true ] || [[ $(cat .tmp/tmp_rce.txt | wc -l) -le $DEEP_LIMIT ]]; then
-			[ -s ".tmp/tmp_rce.txt" ] && python3 $tools/commix/commix.py --batch -m .tmp/tmp_rce.txt --output-dir vulns/command_injection
+			[ -s ".tmp/tmp_rce.txt" ] && python3 $tools/commix/commix.py --batch -m .tmp/tmp_rce.txt --output-dir vulns/command_injection 2>>"$LOGFILE" &>/dev/null
 			end_func "Results are saved in vulns/command_injection folder" ${FUNCNAME[0]}
 		else
 			end_func "Skipping Command injection: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
