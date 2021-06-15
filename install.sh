@@ -31,8 +31,8 @@ gotools["dalfox"]="GO111MODULE=on go get -v github.com/hahwul/dalfox/v2"
 gotools["puredns"]="GO111MODULE=on go get github.com/d3mondev/puredns/v2"
 gotools["resolveDomains"]="go get -v github.com/Josue87/resolveDomains"
 gotools["interactsh-client"]="GO111MODULE=on go get -v github.com/projectdiscovery/interactsh/cmd/interactsh-client"
-gotools["analyticsrelationships"]="Josue87/analyticsrelationships"
-gotools["gotator"]="Josue87/gotator"
+gotools["analyticsrelationships"]="go get -v github.com/Josue87/analyticsrelationships"
+gotools["gotator"]="go get -v github.com/Josue87/gotator"
 
 declare -A repos
 repos["degoogle_hunter"]="six2dez/degoogle_hunter"
