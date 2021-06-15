@@ -424,8 +424,8 @@ function sub_analytics(){
 		start_subfunc "Running : Analytics Subdomain Enumeration"
 		if [ -s ".tmp/probed_tmp_scrap.txt" ]; then
 			mkdir -p .tmp/output_analytics/
-			interlace -tL .tmp/probed_tmp_scrap.txt -threads 20 -c "analyticsrelationships --url _target_ > _output_/_target_.txt" -o .tmp/output_analytics/
-			find output_analytics/ -type f -exec cat {} \; | anew -q .tmp/analytics_subs_tmp.txt
+			interlace -tL .tmp/probed_tmp_scrap.txt -threads 20 -c "analyticsrelationships --url _target_ > _output_/_cleantarget_.txt" -o .tmp/output_analytics/
+			find .tmp/output_analytics/ -type f -exec cat {} \; | anew -q .tmp/analytics_subs_tmp.txt
 			rm -rf .tmp/output_analytics/
 			[ -s ".tmp/analytics_subs_tmp.txt" ] && cat .tmp/analytics_subs_tmp.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | sed "s/|__ //" | anew -q .tmp/analytics_subs_clean.txt
 			[ -s ".tmp/analytics_subs_clean.txt" ] && puredns resolve .tmp/analytics_subs_clean.txt -w .tmp/analytics_subs_resolved.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
