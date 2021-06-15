@@ -76,7 +76,7 @@ function tools_installed(){
 	type -P waybackurls &>/dev/null || { printf "${bred} [*] Waybackurls	[NO]${reset}\n"; allinstalled=false;}
 	type -P gauplus &>/dev/null || { printf "${bred} [*] gauplus		[NO]${reset}\n"; allinstalled=false;}
 	type -P dnsx &>/dev/null || { printf "${bred} [*] dnsx		[NO]${reset}\n"; allinstalled=false;}
-	type -P DNScewl &>/dev/null || { printf "${bred} [*] DNScewl		[NO]${reset}\n"; allinstalled=false;}
+	type -P gotator &>/dev/null || { printf "${bred} [*] gotator		[NO]${reset}\n"; allinstalled=false;}
 	type -P cf-check &>/dev/null || { printf "${bred} [*] Cf-check		[NO]${reset}\n"; allinstalled=false;}
 	type -P nuclei &>/dev/null || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; allinstalled=false;}
 	[ -d ~/nuclei-templates ] || { printf "${bred} [*] Nuclei templates	[NO]${reset}\n"; allinstalled=false;}
@@ -457,19 +457,17 @@ function sub_permut(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBPERMUTE" = true ]; then
 		start_subfunc "Running : Permutations Subdomain Enumeration"
 		if [ "$DEEP" = true ] || [ "$(cat subdomains/subdomains.txt | wc -l)" -le 200 ] ; then
-			[ -s "subdomains/subdomains.txt" ] && axiom-scan subdomains/subdomains.txt -m dnscewl -o .tmp/DNScewl1_.txt 2>>"$LOGFILE" &>/dev/null
+			[ -s "subdomains/subdomains.txt" ] && gotator -sub subdomains/subdomains.txt -perm $tools/permutations_list.txt -depth 1 -numbers 10 -md | sort -u > .tmp/gotator1.txt
 		elif [ "$(cat .tmp/subs_no_resolved.txt | wc -l)" -le 200 ]; then
-			axiom-scan .tmp/subs_no_resolved.txt -m dnscewl -o .tmp/DNScewl1_.txt 2>>"$LOGFILE" &>/dev/null
+			gotator -sub .tmp/subs_no_resolved.txt -perm $tools/permutations_list.txt -depth 1 -numbers 10 -md | sort -u > .tmp/gotator1.txt
 		else
 			end_subfunc "Skipping Permutations: Too Many Subdomains" ${FUNCNAME[0]}
 			return 1
 		fi
-		[ -s ".tmp/DNScewl1_.txt" ] && cat .tmp/DNScewl1_.txt | grep ".$domain$" > .tmp/DNScewl1.txt
-		[ -s ".tmp/DNScewl1.txt" ] && axiom-scan .tmp/DNScewl1.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute1_tmp.txt 2>>"$LOGFILE" &>/dev/null
+		[ -s ".tmp/gotator1.txt" ] && axiom-scan .tmp/gotator1.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute1_tmp.txt 2>>"$LOGFILE" &>/dev/null
 		[ -s ".tmp/permute1_tmp.txt" ] && cat .tmp/permute1_tmp.txt | anew -q .tmp/permute1.txt
-		[ -s ".tmp/permute1.txt" ] && axiom-scan .tmp/permute1.txt -m dnscewl -o .tmp/DNScewl2_.txt 2>>"$LOGFILE" &>/dev/null
-		[ -s ".tmp/DNScewl2_.txt" ] && cat .tmp/DNScewl2_.txt | grep ".$domain$" > .tmp/DNScewl2.txt
-		[ -s ".tmp/DNScewl2.txt" ] && axiom-scan .tmp/DNScewl2.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute2_tmp.txt 2>>"$LOGFILE" &>/dev/null
+		[ -s ".tmp/permute1.txt" ] && gotator -sub .tmp/permute1.txt -perm $tools/permutations_list.txt -depth 1 -numbers 10 -md | sort -u > .tmp/gotator2.txt
+		[ -s ".tmp/gotator2.txt" ] && axiom-scan .tmp/gotator2.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute2_tmp.txt 2>>"$LOGFILE" &>/dev/null
 		[ -s ".tmp/permute2_tmp.txt" ] && cat .tmp/permute2_tmp.txt | anew -q .tmp/permute2.txt
 
 		cat .tmp/permute1.txt .tmp/permute2.txt 2>>"$LOGFILE" | anew -q .tmp/permute_subs.txt
@@ -516,13 +514,11 @@ function sub_recursive(){
 			done
 			[ -s ".tmp/brute_recursive_wordlist.txt" ] && axiom-scan .tmp/brute_recursive_wordlist.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/brute_recursive_result.txt 2>>"$LOGFILE" &>/dev/null
 			[ -s ".tmp/brute_recursive_result.txt" ] && cat .tmp/brute_recursive_result.txt | anew -q .tmp/brute_recursive.txt
-			[ -s ".tmp/brute_recursive.txt" ] && axiom-scan .tmp/brute_recursive.txt -m dnscewl -o .tmp/DNScewl1_recursive_.txt 2>>"$LOGFILE" &>/dev/null
-			[ -s ".tmp/DNScewl1_recursive_.txt" ] && cat .tmp/DNScewl1_recursive_.txt | grep ".$domain$" > .tmp/DNScewl1_recursive.txt
-			[ -s ".tmp/DNScewl1_recursive.txt" ] && axiom-scan .tmp/DNScewl1_recursive.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute1_recursive_tmp.txt 2>>"$LOGFILE" &>/dev/null
+			[ -s ".tmp/brute_recursive.txt" ] && gotator -sub .tmp/brute_recursive.txt -perm $tools/permutations_list.txt -depth 1 -numbers 10 -md | sort -u > .tmp/gotator1_recursive.txt
+			[ -s ".tmp/gotator1_recursive.txt" ] && axiom-scan .tmp/gotator1_recursive.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute1_recursive_tmp.txt 2>>"$LOGFILE" &>/dev/null
 			[ -s ".tmp/permute1_recursive_tmp.txt" ] && cat .tmp/permute1_recursive_tmp.txt | anew -q .tmp/permute1_recursive.txt
-			[ -s ".tmp/permute1_recursive.txt" ] && axiom-scan .tmp/permute1_recursive.txt -m dnscewl -o .tmp/DNScewl2_recursive_.txt 2>>"$LOGFILE" &>/dev/null
-			[ -s ".tmp/DNScewl2_recursive_.txt" ] && cat .tmp/DNScewl2_recursive_.txt | grep ".$domain$" > .tmp/DNScewl2_recursive.txt
-			[ -s ".tmp/DNScewl2_recursive.txt" ] && axiom-scan .tmp/DNScewl2_recursive.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute2_recursive_tmp.txt 2>>"$LOGFILE" &>/dev/null
+			[ -s ".tmp/permute1_recursive.txt" ] && gotator -sub .tmp/permute1_recursive.txt -perm $tools/permutations_list.txt -depth 1 -numbers 10 -md | sort -u > .tmp/gotator2_recursive.txt
+			[ -s ".tmp/gotator2_recursive.txt" ] && axiom-scan .tmp/gotator2_recursive.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute2_recursive_tmp.txt 2>>"$LOGFILE" &>/dev/null
 			cat .tmp/permute1_recursive.txt .tmp/permute2_recursive_tmp.txt 2>>"$LOGFILE" | anew -q .tmp/permute_recursive.txt
 			NUMOFLINES=$(cat .tmp/permute_recursive.txt .tmp/brute_recursive.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (recursive)" ${FUNCNAME[0]}
