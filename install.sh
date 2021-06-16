@@ -137,8 +137,7 @@ elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for
 fi
 
 # Installing latest Golang version
-#version=$(curl -s https://golang.org/VERSION?m=text)
-version=go1.15.10
+version=$(curl -s https://golang.org/VERSION?m=text)
 printf "${bblue} Running: Installing/Updating Golang ${reset}\n\n"
 if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$version" = $(go version | cut -d " " -f3) ]
     then
@@ -185,6 +184,7 @@ eval ln -s /usr/local/bin/pip3 /usr/bin/pip3 $DEBUG_STD
 eval pip3 install -I -r requirements.txt $DEBUG_STD
 
 printf "${bblue} Running: Installing Golang tools (${#gotools[@]})${reset}\n\n"
+go env -w GO111MODULE=auto
 go_step=0
 for gotool in "${!gotools[@]}"; do
     go_step=$((go_step + 1))
