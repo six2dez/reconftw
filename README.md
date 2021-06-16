@@ -391,7 +391,7 @@ reset='\033[0m'
   - Passive ([subfinder](https://github.com/projectdiscovery/subfinder), [assetfinder](https://github.com/tomnomnom/assetfinder), [amass](https://github.com/OWASP/Amass), [findomain](https://github.com/Findomain/Findomain), [crobat](https://github.com/cgboal/sonarsearch), [waybackurls](https://github.com/tomnomnom/waybackurls), [github-subdomains](https://github.com/gwen001/github-subdomains), [Anubis](https://jldc.me), [gauplus](https://github.com/bp0lr/gauplus) and [mildew](https://github.com/daehee/mildew))
   - Certificate transparency ([ctfr](https://github.com/UnaPibaGeek/ctfr), [tls.bufferover](tls.bufferover.run) and [dns.bufferover](dns.bufferover.run)))
   - Bruteforce ([puredns](https://github.com/d3mondev/puredns))
-  - Permutations ([DNScewl](https://github.com/codingo/DNSCewl))
+  - Permutations ([gotator](https://github.com/Josue87/gotator))
   - JS files & Source Code Scraping ([gospider](https://github.com/jaeles-project/gospider), [analyticsRelationship](https://github.com/Josue87/analyticsRelationship))
   - DNS Records ([dnsx](https://github.com/projectdiscovery/dnsx))
 - Nuclei Sub TKO templates ([nuclei](https://github.com/projectdiscovery/nuclei))
