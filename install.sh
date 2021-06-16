@@ -31,7 +31,8 @@ gotools["dalfox"]="GO111MODULE=on go get -v github.com/hahwul/dalfox/v2"
 gotools["puredns"]="GO111MODULE=on go get github.com/d3mondev/puredns/v2"
 gotools["resolveDomains"]="go get -v github.com/Josue87/resolveDomains"
 gotools["interactsh-client"]="GO111MODULE=on go get -v github.com/projectdiscovery/interactsh/cmd/interactsh-client"
-gotools["analyticsrelationships"]="Josue87/analyticsrelationships"
+gotools["analyticsrelationships"]="go get -v github.com/Josue87/analyticsrelationships"
+gotools["gotator"]="go get -v github.com/Josue87/gotator"
 
 declare -A repos
 repos["degoogle_hunter"]="six2dez/degoogle_hunter"
@@ -136,8 +137,7 @@ elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for
 fi
 
 # Installing latest Golang version
-#version=$(curl -s https://golang.org/VERSION?m=text)
-version=go1.15.10
+version=$(curl -s https://golang.org/VERSION?m=text)
 printf "${bblue} Running: Installing/Updating Golang ${reset}\n\n"
 if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$version" = $(go version | cut -d " " -f3) ]
     then
@@ -184,6 +184,7 @@ eval ln -s /usr/local/bin/pip3 /usr/bin/pip3 $DEBUG_STD
 eval pip3 install -I -r requirements.txt $DEBUG_STD
 
 printf "${bblue} Running: Installing Golang tools (${#gotools[@]})${reset}\n\n"
+go env -w GO111MODULE=auto
 go_step=0
 for gotool in "${!gotools[@]}"; do
     go_step=$((go_step + 1))
@@ -249,16 +250,13 @@ if [ "True" = "$IS_ARM" ]
     else
         eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux $DEBUG_STD
         eval wget -N -c https://github.com/sensepost/gowitness/releases/download/2.3.4/gowitness-2.3.4-linux-amd64 $DEBUG_STD
-        eval wget -N -c https://github.com/six2dez/DNSCewl/raw/master/DNScewl $DEBUG_STD
         eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/download/0.4.0/unimap-linux $DEBUG_STD
-        eval $SUDO mv DNScewl /usr/bin/DNScewl
         eval $SUDO mv gowitness-2.3.4-linux-amd64 /usr/bin/gowitness
         eval $SUDO mv findomain-linux /usr/bin/findomain
         eval $SUDO mv unimap-linux /usr/bin/unimap
 fi
 eval $SUDO chmod 755 /usr/bin/findomain
 eval $SUDO chmod 755 /usr/bin/gowitness
-eval $SUDO chmod 755 /usr/bin/DNScewl
 eval $SUDO chmod 755 /usr/bin/unimap
 eval subfinder $DEBUG_STD
 eval subfinder $DEBUG_STD
@@ -311,6 +309,7 @@ printf "${bblue} Running: Performing last configurations ${reset}\n\n"
 ## Last steps
 if [ ! -s "resolvers.txt" ] || [ $(find "resolvers.txt" -mtime +1 -print) ]; then
     printf "${yellow} Resolvers seem older than 1 day\n Generating custom resolvers... ${reset}\n\n"
+    eval rm -f resolvers.txt &>/dev/null
     eval dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 100 -o resolvers.txt $DEBUG_STD
 fi
 eval h8mail -g $DEBUG_STD
