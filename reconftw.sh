@@ -424,7 +424,7 @@ function sub_analytics(){
 		start_subfunc "Running : Analytics Subdomain Enumeration"
 		if [ -s ".tmp/probed_tmp_scrap.txt" ]; then
 			mkdir -p .tmp/output_analytics/
-			interlace -tL .tmp/probed_tmp_scrap.txt -threads 20 -c "analyticsrelationships --url _target_ > _output_/_cleantarget_.txt" -o .tmp/output_analytics/
+			interlace -tL .tmp/probed_tmp_scrap.txt -threads 20 -c "analyticsrelationships --url _target_ > _output_/_cleantarget_.txt" -o .tmp/output_analytics/ 2>>"$LOGFILE" &>/dev/null
 			find .tmp/output_analytics/ -type f -exec cat {} \; | anew -q .tmp/analytics_subs_tmp.txt
 			rm -rf .tmp/output_analytics/
 			[ -s ".tmp/analytics_subs_tmp.txt" ] && cat .tmp/analytics_subs_tmp.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | sed "s/|__ //" | anew -q .tmp/analytics_subs_clean.txt
@@ -481,7 +481,7 @@ function sub_recursive(){
 		start_subfunc "Running : Subdomains recursive search"
 		# Passive recursive
 		if [ "$SUB_RECURSIVE_PASSIVE" = true ]; then
-			for sub in $( ( cat subdomains/subdomains.txt | rev | cut -d '.' -f 4,3,2,1 | rev | sort | uniq -c | sort -nr | grep -v '1 ' && cat subdomains/subdomains.txt | rev | cut -d '.' -f 3,2,1 | rev | sort | uniq -c | sort -nr | grep -v '1 ' ) | sed -e 's/^[[:space:]]*//' | cut -d ' ' -f 2);do 
+			for sub in $( ( cat subdomains/subdomains.txt | rev | cut -d '.' -f 3,2,1 | rev | sort | uniq -c | sort -nr | grep -v '1 ' && cat subdomains/subdomains.txt | rev | cut -d '.' -f 4,3,2,1 | rev | sort | uniq -c | sort -nr | grep -v '1 ' ) | sed -e 's/^[[:space:]]*//' | cut -d ' ' -f 2);do 
 				subfinder -d $sub -all -silent 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
 				assetfinder --subs-only $sub 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
 				amass enum -passive -d $sub -config $AMASS_CONFIG 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
@@ -562,7 +562,7 @@ function s3buckets(){
 		[ -s "subdomains/subdomains.txt" ] && s3scanner scan -f subdomains/subdomains.txt 2>>"$LOGFILE" | grep -iv "not_exist" | grep -iv "Warning:" | anew -q .tmp/s3buckets.txt
 		# Cloudenum
 		keyword=${domain%%.*}
-		python3 ~/Tools/cloud_enum/cloud_enum.py -k $keyword -qs -l .tmp/output_cloud.txt
+		python3 ~/Tools/cloud_enum/cloud_enum.py -k $keyword -qs -l .tmp/output_cloud.txt 2>>"$LOGFILE" &>/dev/null
 
 		NUMOFLINES1=$(cat .tmp/output_cloud.txt 2>>"$LOGFILE" | sed '/^#/d' | sed '/^$/d' | anew subdomains/cloud_assets.txt | wc -l)
 		if [ "$NUMOFLINES1" -gt 0 ]; then
@@ -1723,13 +1723,13 @@ function multi_recon(){
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
-		printf "\n\n${reset}#######################################################################\n"
+		printf "${bgreen}#######################################################################${reset}\n"
 		printf "${bgreen} $domain finished 1st loop in ${runtime}  $currently ${reset}\n"
 		if [ -n "$flist" ]; then
 			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
 			printf "\n${yellow}  $domain is $POSINLIST of $LISTTOTAL${reset}\n"
 		fi
-		printf "${reset}#######################################################################\n"
+		printf "${bgreen}#######################################################################${reset}\n"
 	done
 	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 
@@ -1745,7 +1745,7 @@ function multi_recon(){
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
-		printf "\n\n${reset}#######################################################################\n"
+		printf "${bgreen}#######################################################################${reset}\n"
 		printf "${bgreen} $domain finished 2nd loop in ${runtime}  $currently ${reset}\n"
 		if [ -n "$flist" ]; then
 			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
@@ -1789,7 +1789,7 @@ function multi_recon(){
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
-		printf "\n\n${reset}#######################################################################\n"
+		printf "${bgreen}#######################################################################${reset}\n"
 		printf "${bgreen} $domain finished 3rd loop in ${runtime}  $currently ${reset}\n"
 		if [ -n "$flist" ]; then
 			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
@@ -1809,7 +1809,7 @@ function multi_recon(){
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
-		printf "\n\n${reset}#######################################################################\n"
+		printf "${bgreen}#######################################################################${reset}\n"
 		printf "${bgreen} $domain finished final loop in ${runtime}  $currently ${reset}\n"
 		if [ -n "$flist" ]; then
 			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
