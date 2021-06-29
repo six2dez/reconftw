@@ -713,7 +713,7 @@ function portscan(){
 		printf "${bblue}\n Resolved IP addresses (No WAF) ${reset}\n\n";
 		[ -s ".tmp/ips_nowaf.txt" ] && cat .tmp/ips_nowaf.txt | sort
 		printf "${bblue}\n Scanning ports... ${reset}\n\n";
-		if [ "$PORTSCAN_PASSIVE" = true ] && [ ! -f "hosts/portscan_passive.txt" ]; then
+		if [ "$PORTSCAN_PASSIVE" = true ] && [ ! -f "hosts/portscan_passive.txt" ]  && [ -s "hosts/ips.txt" ] ; then
 			for sub in $(cat hosts/ips.txt); do
 				shodan host $sub 2>/dev/null >> hosts/portscan_passive.txt && echo -e "\n\n#######################################################################\n\n" >> hosts/portscan_passive.txt
 			done
@@ -811,7 +811,7 @@ function fuzz(){
 		if [ -s "webs/webs.txt" ]; then
 			mkdir -p $dir/fuzzing
 
-			axiom-scan webs/webs.txt -m ffuf -w /home/op/lists/onelistforallmicro.txt -H \"${HEADER}\" -mc all -fc 404 -sf -s -maxtime $FFUF_MAXTIME -o $dir/fuzzing/ffuf-content.csv 2>>"$LOGFILE" &>/dev/null
+			axiom-scan webs/webs.txt -m ffuf -w /home/op/lists/onelistforallmicro.txt -H \"${HEADER}\" -mc all -fc 404 -sf -ac -s -maxtime $FFUF_MAXTIME -o $dir/fuzzing/ffuf-content.csv 2>>"$LOGFILE" &>/dev/null
 
 			grep -v "FUZZ,url,redirectlocation" $dir/fuzzing/ffuf-content.csv | awk -F "," '{print $2" "$5" "$6}' | sort > $dir/fuzzing/ffuf-content.tmp
 			for sub in $(cat webs/webs.txt); do

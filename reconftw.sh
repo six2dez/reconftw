@@ -693,7 +693,7 @@ function portscan(){
 		printf "${bblue}\n Resolved IP addresses (No WAF) ${reset}\n\n";
 		[ -s ".tmp/ips_nowaf.txt" ] && cat .tmp/ips_nowaf.txt | sort
 		printf "${bblue}\n Scanning ports... ${reset}\n\n";
-		if [ "$PORTSCAN_PASSIVE" = true ] && [ ! -f "hosts/portscan_passive.txt" ]; then
+		if [ "$PORTSCAN_PASSIVE" = true ] && [ ! -f "hosts/portscan_passive.txt" ] && [ -s "hosts/ips.txt" ] ; then
 			for sub in $(cat hosts/ips.txt); do
 				shodan host $sub 2>/dev/null >> hosts/portscan_passive.txt && echo -e "\n\n#######################################################################\n\n" >> hosts/portscan_passive.txt
 			done
@@ -789,7 +789,7 @@ function fuzz(){
 		start_func "Web directory fuzzing"
 		if [ -s "webs/webs.txt" ]; then
 			mkdir -p $dir/fuzzing
-			interlace -tL webs/webs.txt -threads 10 -c "ffuf -mc all -fc 404 -ac -t ${FFUF_THREADS} -sf -s -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u  _target_/FUZZ -of csv -o _output_/_cleantarget_.csv -ac" -o fuzzing 2>>"$LOGFILE" &>/dev/null
+			interlace -tL webs/webs.txt -threads 10 -c "ffuf -mc all -fc 404 -ac -t ${FFUF_THREADS} -sf -s -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u  _target_/FUZZ -of csv -o _output_/_cleantarget_.csv" -o fuzzing 2>>"$LOGFILE" &>/dev/null
 
 			for sub in $(cat webs/webs.txt); do
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
