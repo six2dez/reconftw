@@ -436,10 +436,8 @@ function sub_analytics(){
 		start_subfunc "Running : Analytics Subdomain Enumeration"
 		if [ -s ".tmp/probed_tmp_scrap.txt" ]; then
 			mkdir -p .tmp/output_analytics/
-			interlace -tL .tmp/probed_tmp_scrap.txt -threads 20 -c "analyticsrelationships --url _target_ > _output_/_cleantarget_.txt" -o .tmp/output_analytics/ 2>>"$LOGFILE" &>/dev/null
-			find .tmp/output_analytics/ -type f -exec cat {} \; | anew -q .tmp/analytics_subs_tmp.txt
-			rm -rf .tmp/output_analytics/
-			[ -s ".tmp/analytics_subs_tmp.txt" ] && cat .tmp/analytics_subs_tmp.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | sed "s/|__ //" | anew -q .tmp/analytics_subs_clean.txt
+			cat .tmp/probed_tmp_scrap.txt | analyticsrelationships >> .tmp/analytics_subs_tmp.txt 2>>"$LOGFILE" &>/dev/null
+			[ -s ".tmp/analytics_subs_tmp.txt" ] && cat .tmp/analytics_subs_tmp.txt | grep "\.$domain$\|^$domain$" | sed "s/|__ //" | anew -q .tmp/analytics_subs_clean.txt
 			[ -s ".tmp/analytics_subs_clean.txt" ] && axiom-scan .tmp/analytics_subs_clean.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/analytics_subs_resolved.txt 2>>"$LOGFILE" &>/dev/null
 		fi
 		NUMOFLINES=$(cat .tmp/analytics_subs_resolved.txt 2>>"$LOGFILE" | anew subdomains/subdomains.txt |  wc -l)
@@ -521,6 +519,7 @@ function sub_recursive(){
 			[ -s ".tmp/gotator2_recursive.txt" ] && axiom-scan .tmp/gotator2_recursive.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute2_recursive_tmp.txt 2>>"$LOGFILE" &>/dev/null
 			cat .tmp/permute1_recursive.txt .tmp/permute2_recursive_tmp.txt 2>>"$LOGFILE" | anew -q .tmp/permute_recursive.txt
 			eval rm -rf .tmp/gotator*.txt 2>>"$LOGFILE"
+			eval rm -rf .tmp/brute_recursive_wordlist.txt.txt 2>>"$LOGFILE"
 			NUMOFLINES=$(cat .tmp/permute_recursive.txt .tmp/brute_recursive.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (recursive)" ${FUNCNAME[0]}
 		else
@@ -782,17 +781,18 @@ function nuclei_check(){
 		start_func "Templates based web scanner"
 		nuclei -update-templates 2>>"$LOGFILE" &>/dev/null
 		mkdir -p nuclei_output
-		if [ -s "webs/webs.txt" ]; then
+		[ -s "webs/webs.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q .tmp/webs_nuclei.txt
+		if [ -s ".tmp/webs_nuclei.txt" ]; then
 			printf "${yellow}\n Running : Nuclei Info${reset}\n\n"
-			axiom-scan webs/webs.txt -m nuclei -severity info -r /home/op/lists/resolvers_trusted.txt -o nuclei_output/info.txt 2>>"$LOGFILE" &>/dev/null
+			axiom-scan .tmp/webs_nuclei.txt -m nuclei -severity info -r /home/op/lists/resolvers_trusted.txt -o nuclei_output/info.txt 2>>"$LOGFILE" &>/dev/null
 			printf "${yellow}\n\n Running : Nuclei Low${reset}\n\n"
-			axiom-scan webs/webs.txt -m nuclei -severity low -r /home/op/lists/resolvers_trusted.txt -o nuclei_output/low.txt 2>>"$LOGFILE" &>/dev/null
+			axiom-scan .tmp/webs_nuclei.txt -m nuclei -severity low -r /home/op/lists/resolvers_trusted.txt -o nuclei_output/low.txt 2>>"$LOGFILE" &>/dev/null
 			printf "${yellow}\n\n Running : Nuclei Medium${reset}\n\n"
-			axiom-scan webs/webs.txt -m nuclei -severity medium -r /home/op/lists/resolvers_trusted.txt -o nuclei_output/medium.txt 2>>"$LOGFILE" &>/dev/null
+			axiom-scan .tmp/webs_nuclei.txt -m nuclei -severity medium -r /home/op/lists/resolvers_trusted.txt -o nuclei_output/medium.txt 2>>"$LOGFILE" &>/dev/null
 			printf "${yellow}\n\n Running : Nuclei High${reset}\n\n"
-			axiom-scan webs/webs.txt -m nuclei -severity high -r /home/op/lists/resolvers_trusted.txt -o nuclei_output/high.txt 2>>"$LOGFILE" &>/dev/null
+			axiom-scan .tmp/webs_nuclei.txt -m nuclei -severity high -r /home/op/lists/resolvers_trusted.txt -o nuclei_output/high.txt 2>>"$LOGFILE" &>/dev/null
 			printf "${yellow}\n\n Running : Nuclei Critical${reset}\n\n"
-			axiom-scan webs/webs.txt -m nuclei -severity critical -r /home/op/lists/resolvers_trusted.txt -o nuclei_output/critical.txt 2>>"$LOGFILE" &>/dev/null
+			axiom-scan .tmp/webs_nuclei.txt -m nuclei -severity critical -r /home/op/lists/resolvers_trusted.txt -o nuclei_output/critical.txt 2>>"$LOGFILE" &>/dev/null
 			printf "\n\n"
 		fi
 		end_func "Results are saved in $domain/nuclei_output folder" ${FUNCNAME[0]}
@@ -811,7 +811,7 @@ function fuzz(){
 		if [ -s "webs/webs.txt" ]; then
 			mkdir -p $dir/fuzzing
 
-			axiom-scan webs/webs.txt -m ffuf -w /home/op/lists/onelistforallmicro.txt -H \"${HEADER}\" -mc all -mc 200 -sf -ac -s -maxtime $FFUF_MAXTIME -o $dir/fuzzing/ffuf-content.csv 2>>"$LOGFILE" &>/dev/null
+			axiom-scan webs/webs.txt -m ffuf -w /home/op/lists/onelistforallmicro.txt -H \"${HEADER}\" -mc all -fc 404 -sf -ac -s -maxtime $FFUF_MAXTIME -o $dir/fuzzing/ffuf-content.csv 2>>"$LOGFILE" &>/dev/null
 
 			grep -v "FUZZ,url,redirectlocation" $dir/fuzzing/ffuf-content.csv | awk -F "," '{print $2" "$5" "$6}' | sort > $dir/fuzzing/ffuf-content.tmp
 			for sub in $(cat webs/webs.txt); do

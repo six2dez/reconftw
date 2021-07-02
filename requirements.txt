@@ -6,7 +6,6 @@ colorclass==2.2.0
 tqdm
 termcolor
 argparse
-testresources
 future
 metafinder
 beautifulsoup4==4.9.3
