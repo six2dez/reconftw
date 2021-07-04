@@ -1133,7 +1133,7 @@ function crlf_checks(){
 			crlfuzz -l webs/webs.txt -o vulns/crlf.txt 2>>"$LOGFILE" &>/dev/null
 			end_func "Results are saved in vulns/crlf.txt" ${FUNCNAME[0]}
 		else
-			end_func "Skipping SSRF: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
+			end_func "Skipping CRLF: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
 		fi
 	else
 		if [ "$CRLF_CHECKS" = false ]; then
@@ -1155,7 +1155,7 @@ function lfi(){
 				done
 				end_func "Results are saved in vulns/lfi.txt" ${FUNCNAME[0]}
 			else
-				end_func "Skipping SSRF: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
+				end_func "Skipping LFI: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
 			fi
 		fi
 	else
