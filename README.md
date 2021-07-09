@@ -8,8 +8,8 @@
 
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v1.7.2">
-    <img src="https://img.shields.io/badge/release-v1.7.2-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v1.7.1.1">
+    <img src="https://img.shields.io/badge/release-v1.7.1.1-green">
   </a>
    </a>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
@@ -391,7 +391,7 @@ reset='\033[0m'
   - Passive ([subfinder](https://github.com/projectdiscovery/subfinder), [assetfinder](https://github.com/tomnomnom/assetfinder), [amass](https://github.com/OWASP/Amass), [findomain](https://github.com/Findomain/Findomain), [crobat](https://github.com/cgboal/sonarsearch), [waybackurls](https://github.com/tomnomnom/waybackurls), [github-subdomains](https://github.com/gwen001/github-subdomains), [Anubis](https://jldc.me), [gauplus](https://github.com/bp0lr/gauplus) and [mildew](https://github.com/daehee/mildew))
   - Certificate transparency ([ctfr](https://github.com/UnaPibaGeek/ctfr), [tls.bufferover](tls.bufferover.run) and [dns.bufferover](dns.bufferover.run)))
   - Bruteforce ([puredns](https://github.com/d3mondev/puredns))
-  - Permutations ([gotator](https://github.com/Josue87/gotator))
+  - Permutations ([DNScewl](https://github.com/codingo/DNSCewl))
   - JS files & Source Code Scraping ([gospider](https://github.com/jaeles-project/gospider), [analyticsRelationship](https://github.com/Josue87/analyticsRelationship))
   - DNS Records ([dnsx](https://github.com/projectdiscovery/dnsx))
 - Nuclei Sub TKO templates ([nuclei](https://github.com/projectdiscovery/nuclei))
@@ -402,6 +402,7 @@ reset='\033[0m'
 - Port Scanner (Active with [nmap](https://github.com/nmap/nmap) and passive with [shodan-cli](https://cli.shodan.io/), Subdomains IP resolution with[resolveDomains](https://github.com/Josue87/resolveDomains))
 - Url extraction ([waybackurls](https://github.com/tomnomnom/waybackurls), [gauplus](https://github.com/bp0lr/gauplus), [gospider](https://github.com/jaeles-project/gospider), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3) and [JSA](https://github.com/w9w/JSA))
 - Pattern Search ([gf](https://github.com/tomnomnom/gf) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns))
+- Param discovery ([paramspider](https://github.com/devanshbatham/ParamSpider) and [arjun](https://github.com/s0md3v/Arjun))
 - XSS ([dalfox](https://github.com/hahwul/dalfox))
 - Open redirect ([Openredirex](https://github.com/devanshbatham/OpenRedireX))
 - SSRF (headers [interactsh](https://github.com/projectdiscovery/interactsh) and param values with [ffuf](https://github.com/ffuf/ffuf))
@@ -418,7 +419,6 @@ reset='\033[0m'
 - Multithread in some steps ([Interlace](https://github.com/codingo/Interlace))
 - Broken Links Checker ([gospider](https://github.com/jaeles-project/gospider))
 - S3 bucket finder ([S3Scanner](https://github.com/sa7mon/S3Scanner))
-- Cloud assets finder ([cloud_enum](https://github.com/initstring/cloud_enum))
 - Password spraying ([brutespray](https://github.com/x90skysn3k/brutespray))
 - 4xx bypasser ([DirDar](https://github.com/M4DM0e/DirDar))
 - Custom resolvers generated list ([dnsvalidator](https://github.com/vortexau/dnsvalidator))
