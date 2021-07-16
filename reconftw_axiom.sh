@@ -643,6 +643,7 @@ function webprobe_full(){
 		NUMOFLINES=$(cat .tmp/probed_uncommon_ports_tmp.txt 2>>"$LOGFILE" | anew webs/webs_uncommon_ports.txt | wc -l)
 		notification "Uncommon web ports: ${NUMOFLINES} new websites" good
 		[ -s "webs/webs_uncommon_ports.txt" ] && cat webs/webs_uncommon_ports.txt
+		rm -rf "unimap_logs" 2>>"$LOGFILE"
 		end_func "Results are saved in $domain/webs/webs_uncommon_ports.txt" ${FUNCNAME[0]}
 		if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/webs_uncommon_ports.txt| wc -l) -le 1500 ]]; then
 			notification "Sending websites uncommon ports to proxy" info
@@ -1168,7 +1169,7 @@ function crlf_checks(){
 			crlfuzz -l webs/webs.txt -o vulns/crlf.txt 2>>"$LOGFILE" &>/dev/null
 			end_func "Results are saved in vulns/crlf.txt" ${FUNCNAME[0]}
 		else
-			end_func "Skipping SSRF: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
+			end_func "Skipping CRLF: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
 		fi
 	else
 		if [ "$CRLF_CHECKS" = false ]; then
@@ -1190,7 +1191,7 @@ function lfi(){
 				done
 				end_func "Results are saved in vulns/lfi.txt" ${FUNCNAME[0]}
 			else
-				end_func "Skipping SSRF: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
+				end_func "Skipping LFI: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
 			fi
 		fi
 	else
@@ -1571,17 +1572,17 @@ function start(){
 			if [ -z "$domain" ]; then
 				domain="Multi"
 				dir="$SCRIPTPATH/Recon/$domain"
-				called_fn_dir=$dir/.called_fn
+				called_fn_dir="$dir"/.called_fn
 			fi
 			if [[ "$list" = /* ]]; then
-				install -D $list $dir/webs/webs.txt
+				install -D $list "$dir"/webs/webs.txt
 			else
-				install -D $SCRIPTPATH/$list $dir/webs/webs.txt
+				install -D "$SCRIPTPATH"/"$list" "$dir"/webs/webs.txt
 			fi
 		fi
 	else
 		dir="$SCRIPTPATH/Recon/$domain"
-		called_fn_dir=$dir/.called_fn
+		called_fn_dir="$dir"/.called_fn
 	fi
 
 	if [ -z "$domain" ]; then
@@ -1590,9 +1591,9 @@ function start(){
 	fi
 
 	if [ ! -d "$called_fn_dir" ]; then
-		mkdir -p $called_fn_dir
+		mkdir -p "$called_fn_dir"
 	fi
-
+	mkdir -p "$dir"
 	cd "$dir"  || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 	if [ -n "$domain" ]; then
 		echo "$domain" | anew -q target.txt
