@@ -8,8 +8,8 @@
 
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v1.7.2">
-    <img src="https://img.shields.io/badge/release-v1.7.2-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v1.7.1.1">
+    <img src="https://img.shields.io/badge/release-v1.7.1.1-green">
   </a>
    </a>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
@@ -77,36 +77,43 @@ So, what are you waiting for Go! Go! Go! :boom:
 - Requires [Golang](https://golang.org/dl/) > **1.15.0+** installed and paths correctly set (**$GOPATH**, **$GOROOT**)
  
 ```bash
-▶ git clone https://github.com/six2dez/reconftw
-▶ cd reconftw/
-▶ ./install.sh
-▶ ./reconftw.sh -d target.com -r
+git clone https://github.com/six2dez/reconftw
+cd reconftw/
+./install.sh
+./reconftw.sh -d target.com -r
 ```
  
 ## b) Docker container 🐳 (2 options)
- 
+
+- Docker parameters usage
+
+``` bash
+-d -> Detached 
+-v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -> Share CFG with the Docker
+-v $PWD/Recon/:/root/Tools/reconftw/Recon/ -> Share output folder with the Host
+--name reconftwSCAN -> Docker name
+--rm -> Automatically remove the container when it exits
+'-d target.com -r' -> reconftw parameters
+```
+
 ### 1) From [DockerHub](https://hub.docker.com/r/six2dez/reconftw)
  
 ```bash
-▶ docker pull six2dez/reconftw:main
-▶ docker run -it six2dez/reconftw:main /bin/bash
- 
-# Exit the container and run these commands additionally if you want to gain persistence:
- 
-▶ docker start $(docker ps -a|grep six2dez/reconftw:main|cut -d' ' -f1)
-▶ docker exec -it $(docker ps -a|grep six2dez/reconftw:main|cut -d' ' -f1) /bin/bash
- 
-# Now you can exit the container and run again this command without files loss:
-▶ docker exec -it $(docker ps -a|grep six2dez/reconftw:main|cut -d' ' -f1) /bin/bash
+docker pull six2dez/reconftw:main
+# Download and configure CFG file
+wget https://raw.githubusercontent.com/six2dez/reconftw/main/reconftw.cfg
+mkdir Recon
+docker run -d -v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -v $PWD/Recon/:/root/Tools/reconftw/Recon/ --name reconftwSCAN --rm six2dez/reconftw -d target.com -r
 ```
  
 ### 2) From repository
  
 ```bash
-▶ git clone https://github.com/six2dez/reconftw
-▶ cd reconftw/Docker
-▶ docker build -t reconftw .
-▶ docker run -it reconftw /bin/bash
+git clone https://github.com/six2dez/reconftw
+cd reconftw/Docker
+docker build -t reconftw .
+docker run -v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -v $PWD/Recon/:/root/Tools/reconftw/Recon/ --name reconftwSCAN --rm reconftw -d target.com -r
+
 ```
  
 # ⚙️ Config file:
@@ -329,37 +336,37 @@ reset='\033[0m'
 **To perform a full recon on single target**
  
 ```bash
-▶ ./reconftw.sh -d target.com -r
+./reconftw.sh -d target.com -r
 ```
  
 **To perform a full recon on a list of targets**
  
 ```bash
-▶ ./reconftw.sh -l sites.txt -r -o /output/directory/
+./reconftw.sh -l sites.txt -r -o /output/directory/
 ```
  
 **Perform all steps (whole recon + all attacks)**
  
 ```bash
-▶ ./reconftw.sh -d target.com -a
+./reconftw.sh -d target.com -a
 ```
  
 **Perform full recon with more time intense tasks** *(VPS intended only)*
  
 ```bash
-▶ ./reconftw.sh -d target.com -r --deep -o /output/directory/
+./reconftw.sh -d target.com -r --deep -o /output/directory/
 ```
  
 **Perform recon in a multi domain target**
  
 ```bash
-▶ ./reconftw.sh -m company -l domains_list.txt -r
+./reconftw.sh -m company -l domains_list.txt -r
 ```
  
 **Show help section**
  
 ```bash
-▶ ./reconftw.sh -h
+./reconftw.sh -h
 ```
  
 # Axiom Support: :cloud:
@@ -371,8 +378,8 @@ reset='\033[0m'
 * Its also necessary that you need to create your fleet prior.
  
 ```bash
-▶ axiom-fleet testy -i=10   # Initialize a fleet named 'testy'
-▶ ./reconftw_axiom.sh -d target.com -r
+axiom-fleet testy -i=10   # Initialize a fleet named 'testy'
+./reconftw_axiom.sh -d target.com -r
 ```
  
 # Sample video:
@@ -391,7 +398,7 @@ reset='\033[0m'
   - Passive ([subfinder](https://github.com/projectdiscovery/subfinder), [assetfinder](https://github.com/tomnomnom/assetfinder), [amass](https://github.com/OWASP/Amass), [findomain](https://github.com/Findomain/Findomain), [crobat](https://github.com/cgboal/sonarsearch), [waybackurls](https://github.com/tomnomnom/waybackurls), [github-subdomains](https://github.com/gwen001/github-subdomains), [Anubis](https://jldc.me), [gauplus](https://github.com/bp0lr/gauplus) and [mildew](https://github.com/daehee/mildew))
   - Certificate transparency ([ctfr](https://github.com/UnaPibaGeek/ctfr), [tls.bufferover](tls.bufferover.run) and [dns.bufferover](dns.bufferover.run)))
   - Bruteforce ([puredns](https://github.com/d3mondev/puredns))
-  - Permutations ([gotator](https://github.com/Josue87/gotator))
+  - Permutations ([DNScewl](https://github.com/codingo/DNSCewl))
   - JS files & Source Code Scraping ([gospider](https://github.com/jaeles-project/gospider), [analyticsRelationship](https://github.com/Josue87/analyticsRelationship))
   - DNS Records ([dnsx](https://github.com/projectdiscovery/dnsx))
 - Nuclei Sub TKO templates ([nuclei](https://github.com/projectdiscovery/nuclei))
@@ -402,6 +409,7 @@ reset='\033[0m'
 - Port Scanner (Active with [nmap](https://github.com/nmap/nmap) and passive with [shodan-cli](https://cli.shodan.io/), Subdomains IP resolution with[resolveDomains](https://github.com/Josue87/resolveDomains))
 - Url extraction ([waybackurls](https://github.com/tomnomnom/waybackurls), [gauplus](https://github.com/bp0lr/gauplus), [gospider](https://github.com/jaeles-project/gospider), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3) and [JSA](https://github.com/w9w/JSA))
 - Pattern Search ([gf](https://github.com/tomnomnom/gf) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns))
+- Param discovery ([paramspider](https://github.com/devanshbatham/ParamSpider) and [arjun](https://github.com/s0md3v/Arjun))
 - XSS ([dalfox](https://github.com/hahwul/dalfox))
 - Open redirect ([Openredirex](https://github.com/devanshbatham/OpenRedireX))
 - SSRF (headers [interactsh](https://github.com/projectdiscovery/interactsh) and param values with [ffuf](https://github.com/ffuf/ffuf))
@@ -418,7 +426,6 @@ reset='\033[0m'
 - Multithread in some steps ([Interlace](https://github.com/codingo/Interlace))
 - Broken Links Checker ([gospider](https://github.com/jaeles-project/gospider))
 - S3 bucket finder ([S3Scanner](https://github.com/sa7mon/S3Scanner))
-- Cloud assets finder ([cloud_enum](https://github.com/initstring/cloud_enum))
 - Password spraying ([brutespray](https://github.com/x90skysn3k/brutespray))
 - 4xx bypasser ([DirDar](https://github.com/M4DM0e/DirDar))
 - Custom resolvers generated list ([dnsvalidator](https://github.com/vortexau/dnsvalidator))
