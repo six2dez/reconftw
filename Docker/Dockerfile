@@ -51,3 +51,4 @@ ADD notify.conf /root/.config/notify/notify.conf
 
 CMD ["bash"]
 WORKDIR /root/Tools/reconftw
+ENTRYPOINT ["bash", "reconftw.sh"]

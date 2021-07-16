@@ -77,10 +77,10 @@ So, what are you waiting for Go! Go! Go! :boom:
 - Requires [Golang](https://golang.org/dl/) > **1.15.0+** installed and paths correctly set (**$GOPATH**, **$GOROOT**)
  
 ```bash
-▶ git clone https://github.com/six2dez/reconftw
-▶ cd reconftw/
-▶ ./install.sh
-▶ ./reconftw.sh -d target.com -r
+git clone https://github.com/six2dez/reconftw
+cd reconftw/
+./install.sh
+./reconftw.sh -d target.com -r
 ```
  
 ## b) Docker container 🐳 (2 options)
@@ -88,25 +88,36 @@ So, what are you waiting for Go! Go! Go! :boom:
 ### 1) From [DockerHub](https://hub.docker.com/r/six2dez/reconftw)
  
 ```bash
-▶ docker pull six2dez/reconftw:main
-▶ docker run -it six2dez/reconftw:main /bin/bash
- 
-# Exit the container and run these commands additionally if you want to gain persistence:
- 
-▶ docker start $(docker ps -a|grep six2dez/reconftw:main|cut -d' ' -f1)
-▶ docker exec -it $(docker ps -a|grep six2dez/reconftw:main|cut -d' ' -f1) /bin/bash
- 
-# Now you can exit the container and run again this command without files loss:
-▶ docker exec -it $(docker ps -a|grep six2dez/reconftw:main|cut -d' ' -f1) /bin/bash
+docker pull six2dez/reconftw:main
+
+# Download and configure CFG file
+wget https://raw.githubusercontent.com/six2dez/reconftw/main/reconftw.cfg
+
+mkdir Recon
+
+## -d -> Detached 
+## -v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -> Share CFG with the Docker
+## -v $PWD/Recon/:/root/Tools/reconftw/Recon/ -> Share output folder with the Host
+## --name reconftwSCAN -> Docker name
+## --rm -> Automatically remove the container when it exits
+## '-d target.com -r' -> reconftw parameters
+docker run -d -v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -v $PWD/Recon/:/root/Tools/reconftw/Recon/ --name reconftwSCAN --rm six2dez/reconftw -d target.com -r
 ```
  
 ### 2) From repository
  
 ```bash
-▶ git clone https://github.com/six2dez/reconftw
-▶ cd reconftw/Docker
-▶ docker build -t reconftw .
-▶ docker run -it reconftw /bin/bash
+git clone https://github.com/six2dez/reconftw
+cd reconftw/Docker
+docker build -t reconftw .
+## -d -> Detached 
+## -v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -> Share CFG with the Docker
+## -v $PWD/Recon/:/root/Tools/reconftw/Recon/ -> Share output folder with the Host
+## --name reconftwSCAN -> Docker name
+## --rm -> Automatically remove the container when it exits
+## '-d target.com -r' -> reconftw parameters
+docker run -v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -v $PWD/Recon/:/root/Tools/reconftw/Recon/ --name reconftwSCAN --rm reconftw -d target.com -r
+
 ```
  
 # ⚙️ Config file:
@@ -329,37 +340,37 @@ reset='\033[0m'
 **To perform a full recon on single target**
  
 ```bash
-▶ ./reconftw.sh -d target.com -r
+./reconftw.sh -d target.com -r
 ```
  
 **To perform a full recon on a list of targets**
  
 ```bash
-▶ ./reconftw.sh -l sites.txt -r -o /output/directory/
+./reconftw.sh -l sites.txt -r -o /output/directory/
 ```
  
 **Perform all steps (whole recon + all attacks)**
  
 ```bash
-▶ ./reconftw.sh -d target.com -a
+./reconftw.sh -d target.com -a
 ```
  
 **Perform full recon with more time intense tasks** *(VPS intended only)*
  
 ```bash
-▶ ./reconftw.sh -d target.com -r --deep -o /output/directory/
+./reconftw.sh -d target.com -r --deep -o /output/directory/
 ```
  
 **Perform recon in a multi domain target**
  
 ```bash
-▶ ./reconftw.sh -m company -l domains_list.txt -r
+./reconftw.sh -m company -l domains_list.txt -r
 ```
  
 **Show help section**
  
 ```bash
-▶ ./reconftw.sh -h
+./reconftw.sh -h
 ```
  
 # Axiom Support: :cloud:
@@ -371,8 +382,8 @@ reset='\033[0m'
 * Its also necessary that you need to create your fleet prior.
  
 ```bash
-▶ axiom-fleet testy -i=10   # Initialize a fleet named 'testy'
-▶ ./reconftw_axiom.sh -d target.com -r
+axiom-fleet testy -i=10   # Initialize a fleet named 'testy'
+./reconftw_axiom.sh -d target.com -r
 ```
  
 # Sample video:
