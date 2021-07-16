@@ -88,12 +88,12 @@ cd reconftw/
 - Docker parameters usage
 
 ``` bash
-## -d -> Detached 
-## -v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -> Share CFG with the Docker
-## -v $PWD/Recon/:/root/Tools/reconftw/Recon/ -> Share output folder with the Host
-## --name reconftwSCAN -> Docker name
-## --rm -> Automatically remove the container when it exits
-## '-d target.com -r' -> reconftw parameters
+-d -> Detached 
+-v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -> Share CFG with the Docker
+-v $PWD/Recon/:/root/Tools/reconftw/Recon/ -> Share output folder with the Host
+--name reconftwSCAN -> Docker name
+--rm -> Automatically remove the container when it exits
+'-d target.com -r' -> reconftw parameters
 ```
 
 ### 1) From [DockerHub](https://hub.docker.com/r/six2dez/reconftw)
