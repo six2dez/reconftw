@@ -84,23 +84,25 @@ cd reconftw/
 ```
  
 ## b) Docker container 🐳 (2 options)
- 
-### 1) From [DockerHub](https://hub.docker.com/r/six2dez/reconftw)
- 
-```bash
-docker pull six2dez/reconftw:main
 
-# Download and configure CFG file
-wget https://raw.githubusercontent.com/six2dez/reconftw/main/reconftw.cfg
+- Docker parameters usage
 
-mkdir Recon
-
+``` bash
 ## -d -> Detached 
 ## -v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -> Share CFG with the Docker
 ## -v $PWD/Recon/:/root/Tools/reconftw/Recon/ -> Share output folder with the Host
 ## --name reconftwSCAN -> Docker name
 ## --rm -> Automatically remove the container when it exits
 ## '-d target.com -r' -> reconftw parameters
+```
+
+### 1) From [DockerHub](https://hub.docker.com/r/six2dez/reconftw)
+ 
+```bash
+docker pull six2dez/reconftw:main
+# Download and configure CFG file
+wget https://raw.githubusercontent.com/six2dez/reconftw/main/reconftw.cfg
+mkdir Recon
 docker run -d -v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -v $PWD/Recon/:/root/Tools/reconftw/Recon/ --name reconftwSCAN --rm six2dez/reconftw -d target.com -r
 ```
  
@@ -110,12 +112,6 @@ docker run -d -v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -v $PWD/Rec
 git clone https://github.com/six2dez/reconftw
 cd reconftw/Docker
 docker build -t reconftw .
-## -d -> Detached 
-## -v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -> Share CFG with the Docker
-## -v $PWD/Recon/:/root/Tools/reconftw/Recon/ -> Share output folder with the Host
-## --name reconftwSCAN -> Docker name
-## --rm -> Automatically remove the container when it exits
-## '-d target.com -r' -> reconftw parameters
 docker run -v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -v $PWD/Recon/:/root/Tools/reconftw/Recon/ --name reconftwSCAN --rm reconftw -d target.com -r
 
 ```
