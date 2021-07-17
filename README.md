@@ -103,7 +103,7 @@ docker pull six2dez/reconftw:main
 # Download and configure CFG file
 wget https://raw.githubusercontent.com/six2dez/reconftw/main/reconftw.cfg
 mkdir Recon
-docker run -d -v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -v $PWD/Recon/:/root/Tools/reconftw/Recon/ --name reconftwSCAN --rm six2dez/reconftw -d target.com -r
+docker run -d -v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -v $PWD/Recon/:/root/Tools/reconftw/Recon/ --name reconftwSCAN --rm six2dez/reconftw:main -d target.com -r
 ```
  
 ### 2) From repository
