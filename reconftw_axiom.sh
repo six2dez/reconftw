@@ -455,16 +455,16 @@ function sub_permut(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBPERMUTE" = true ]; then
 		start_subfunc "Running : Permutations Subdomain Enumeration"
 		if [ "$DEEP" = true ] || [ "$(cat subdomains/subdomains.txt | wc -l)" -le 500 ] ; then
-			[ -s "subdomains/subdomains.txt" ] && gotator -sub subdomains/subdomains.txt -perm $tools/permutations_list.txt -depth 1 -numbers 10 -md 2>>"$LOGFILE" > .tmp/gotator1.txt
+			[ -s "subdomains/subdomains.txt" ] && gotator -sub subdomains/subdomains.txt -perm $tools/permutations_list.txt -depth 1 -numbers 10 -mindup -md 2>>"$LOGFILE" > .tmp/gotator1.txt
 		elif [ "$(cat subdomains/subdomains.txt | wc -l)" -le 100 ] && [ "$(cat .tmp/subs_no_resolved.txt | wc -l)" -le 500 ]; then
-			gotator -sub .tmp/subs_no_resolved.txt -perm $tools/permutations_list.txt -depth 1 -numbers 10 -md 2>>"$LOGFILE" > .tmp/gotator1.txt
+			gotator -sub .tmp/subs_no_resolved.txt -perm $tools/permutations_list.txt -depth 1 -numbers 10 -mindup -md 2>>"$LOGFILE" > .tmp/gotator1.txt
 		else
 			end_subfunc "Skipping Permutations: Too Many Subdomains" ${FUNCNAME[0]}
 			return 1
 		fi
 		[ -s ".tmp/gotator1.txt" ] && axiom-scan .tmp/gotator1.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute1_tmp.txt 2>>"$LOGFILE" &>/dev/null
 		[ -s ".tmp/permute1_tmp.txt" ] && cat .tmp/permute1_tmp.txt | anew -q .tmp/permute1.txt
-		[ -s ".tmp/permute1.txt" ] && gotator -sub .tmp/permute1.txt -perm $tools/permutations_list.txt -depth 1 -numbers 10 -md 2>>"$LOGFILE" > .tmp/gotator2.txt
+		[ -s ".tmp/permute1.txt" ] && gotator -sub .tmp/permute1.txt -perm $tools/permutations_list.txt -depth 1 -numbers 10 -mindup -md 2>>"$LOGFILE" > .tmp/gotator2.txt
 		[ -s ".tmp/gotator2.txt" ] && axiom-scan .tmp/gotator2.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute2_tmp.txt 2>>"$LOGFILE" &>/dev/null
 		[ -s ".tmp/permute2_tmp.txt" ] && cat .tmp/permute2_tmp.txt | anew -q .tmp/permute2.txt
 		eval rm -rf .tmp/gotator*.txt 2>>"$LOGFILE"
@@ -1022,6 +1022,15 @@ function wordlist_gen(){
 		fi
 	fi
 }
+
+function wordlist_gen_roboxtractor(){
+	if  { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$ROBOTSWORDLIST" = true ];
+		cat webs/webs.txt | roboxtractor  -m 1 -wb | anew -q webs/robots_wordlist.txt
+	else
+		printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
+}
+
 
 ###############################################################################################################
 ######################################### VULNERABILITIES #####################################################
@@ -1788,6 +1797,7 @@ function recon(){
 	cms_scanner
 	url_gf
 	wordlist_gen
+	wordlist_gen_roboxtractor
 }
 
 function multi_recon(){
@@ -1934,6 +1944,7 @@ function multi_recon(){
 		cms_scanner
 		url_gf
 		wordlist_gen
+		wordlist_gen_roboxtractor
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
@@ -1980,6 +1991,7 @@ function webs_menu(){
 	jschecks
 	url_gf
 	wordlist_gen
+	wordlist_gen_roboxtractor
 	vulns
 	end
 }
