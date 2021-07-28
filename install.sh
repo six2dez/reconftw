@@ -33,6 +33,7 @@ gotools["resolveDomains"]="go get -u -v github.com/Josue87/resolveDomains"
 gotools["interactsh-client"]="GO111MODULE=on go get -v github.com/projectdiscovery/interactsh/cmd/interactsh-client"
 gotools["analyticsrelationships"]="go get -u -v github.com/Josue87/analyticsrelationships"
 gotools["gotator"]="go get -u -v github.com/Josue87/gotator"
+gotools["roboxtractor"]="go get -u -v github.com/Josue87/roboxtractor"
 gotools["mapcidr"]="GO111MODULE=on go get -v github.com/projectdiscovery/mapcidr/cmd/mapcidr"
 
 declare -A repos
