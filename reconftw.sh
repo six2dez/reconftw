@@ -1032,8 +1032,12 @@ function wordlist_gen(){
 }
 
 function wordlist_gen_roboxtractor(){
-	if  { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$ROBOTSWORDLIST" = true ];
-		cat webs/webs.txt | roboxtractor  -m 1 -wb | anew -q webs/robots_wordlist.txt
+	if  { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$ROBOTSWORDLIST" = true ]; then
+		start_func "Robots wordlist generation"
+		if [ -s "webs/webs.txt" ]; then
+			cat webs/webs.txt | roboxtractor  -m 1 -wb | anew -q webs/robots_wordlist.txt
+		fi
+		end_func "Results are saved in $domain/webs/robots_wordlist.txt" ${FUNCNAME[0]}
 	else
 		printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
