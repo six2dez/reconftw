@@ -943,8 +943,15 @@ function jschecks(){
 		start_func "Javascript Scan"
 		if [ -s "js/url_extract_js.txt" ]; then
 			printf "${yellow} Running : Fetching Urls 1/5${reset}\n"
-			cat js/url_extract_js.txt | cut -d '?' -f 1 | grep -iE "\.js$" | grep "$domain$" | anew -q js/jsfile_links.txt
-			cat js/url_extract_js.txt | subjs | grep "$domain$" | anew -q js/jsfile_links.txt
+			#No need to use delimator, makes more links dead
+			#cat js/url_extract_js.txt | cut -d '?' -f 1 | grep -iE "\.js$" | grep "$domain$" | anew -q js/jsfile_links.txt
+			cp js/url_extract_js.txt js/jsfile_links.txt
+			# Added threads to subjs, works like charm
+			cat js/jsfile_links.txt | subjs -c 40 |grep "$domain" | anew -q .tmp/subjslinks.txt
+			#Filtering js and other links into different files
+			if [ -s .tmp/subjslinks.txt ] && cat .tmp/subjslinks.txt|egrep -iv ".(js|jpg|jpeg|woff|woff2|ttf|eot)"|anew -q js/nojs_links.txt
+			#Adding js files found inside of jsfiles_links.txt by subjs into jsfile_links.txt
+			if [ -s .tmp/subjslinks.txt ] && cat .tmp/subjslinks.txt|grep -iE "\.js"|anew -q js/jsfile_links.txt
 			printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
 			[ -s "js/jsfile_links.txt" ] && cat js/jsfile_links.txt | httpx -follow-redirects -random-agent -silent -timeout $HTTPX_TIMEOUT -threads $HTTPX_THREADS -status-code -retries 2 -no-color | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
 			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
