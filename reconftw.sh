@@ -44,7 +44,7 @@ function tools_installed(){
 	[ -n "$GOPATH" ] || { printf "${bred} [*] GOPATH var		[NO]${reset}\n"; allinstalled=false;}
 	[ -n "$GOROOT" ] || { printf "${bred} [*] GOROOT var		[NO]${reset}\n"; allinstalled=false;}
 	[ -n "$PATH" ] || { printf "${bred} [*] PATH var		[NO]${reset}\n"; allinstalled=false;}
-	[ -f "$tools/degoogle_hunter/degoogle.py" ] || { printf "${bred} [*] degoogle		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/uDork/uDork.sh" ] || { printf "${bred} [*] uDork		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/brutespray/brutespray.py" ] || { printf "${bred} [*] brutespray	[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/dnsrecon/dnsrecon.py" ] || { printf "${bred} [*] dnsrecon	[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/fav-up/favUp.py" ] || { printf "${bred} [*] fav-up		[NO]${reset}\n"; allinstalled=false;}
@@ -100,6 +100,7 @@ function tools_installed(){
 	type -P emailfinder &>/dev/null || { printf "${bred} [*] emailfinder	[NO]${reset}\n"; allinstalled=false;}
 	type -P urldedupe &>/dev/null || { printf "${bred} [*] urldedupe	[NO]${reset}\n"; allinstalled=false;}
 	type -P analyticsrelationships &>/dev/null || { printf "${bred} [*] analyticsrelationships	[NO]${reset}\n"; allinstalled=false;}
+	type -P mapcidr &>/dev/null || { printf "${bred} [*] mapcidr		[NO]${reset}\n"; allinstalled=false;}
 	type -P interactsh-client &>/dev/null || { printf "${bred} [*] interactsh-client	[NO]${reset}\n"; allinstalled=false;}
 
 	if [ "${allinstalled}" = true ]; then
@@ -122,8 +123,11 @@ function tools_installed(){
 function google_dorks(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$GOOGLE_DORKS" = true ] && [ "$OSINT" = true ]; then
 		start_func "Google Dorks in process"
-		$tools/degoogle_hunter/degoogle_hunter.sh $domain | tee osint/dorks.txt
-		sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" osint/dorks.txt
+		eval sed -i "s/^cookies=\"c_user=HEREYOUCOOKIE; xs=HEREYOUCOOKIE;\"/cookies=\"${UDORK_COOKIE}\"/" $tools/uDork/uDork.sh 2>>"$LOGFILE" &>/dev/null
+		cd "$tools/uDork" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+		./uDork.sh $domain -f $tools/custom_udork.txt -o $dir/osint/dorks.txt &> /dev/null
+		[ -s "$dir/osint/dorks.txt" ] && sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" $dir/osint/dorks.txt 2>>"$LOGFILE" &>/dev/null
+		cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		end_func "Results are saved in $domain/osint/dorks.txt" ${FUNCNAME[0]}
 	else
 		if [ "$GOOGLE_DORKS" = false ] || [ "$OSINT" = false ]; then
@@ -158,7 +162,7 @@ function github_dorks(){
 }
 
 function metadata(){
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$METADATA" = true ] && [ "$OSINT" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$METADATA" = true ] && [ "$OSINT" = true ] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func "Scanning metadata in public files"
 		metafinder -d "$domain" -l $METAFINDER_LIMIT -o osint -go -bi -ba 2>>"$LOGFILE" &>/dev/null
 		mv "osint/${domain}/"*".txt" "osint/" 2>>"$LOGFILE"
@@ -174,7 +178,7 @@ function metadata(){
 }
 
 function emails(){
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$EMAILS" = true ] && [ "$OSINT" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$EMAILS" = true ] && [ "$OSINT" = true ] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func "Searching emails/users/passwords leaks"
 		emailfinder -d $domain 2>>"$LOGFILE" | anew -q .tmp/emailfinder.txt
 		[ -s ".tmp/emailfinder.txt" ] && cat .tmp/emailfinder.txt | awk 'matched; /^-----------------$/ { matched = 1 }' | anew -q osint/emails.txt
@@ -250,7 +254,6 @@ function domain_info(){
 	fi
 }
 
-
 ###############################################################################################################
 ############################################### SUBDOMAINS ####################################################
 ###############################################################################################################
@@ -265,15 +268,20 @@ function subdomains_full(){
 
 	resolvers_update
 
-	sub_passive
-	sub_crt
-	sub_active
-	sub_brute
-	sub_permut
-	sub_recursive
-	sub_dns
-	sub_scraping
-	sub_analytics
+	if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then 
+		sub_passive
+		sub_crt
+		sub_active
+		sub_brute
+		sub_permut
+		sub_recursive
+		sub_dns
+		sub_scraping
+		sub_analytics
+	else 
+		notification "IP/CIDR detected, subdomains search skipped" info
+		echo $domain | anew -q subdomains/subdomains.txt
+	fi
 	webprobe_simple
 	if [ -s "subdomains/subdomains.txt" ]; then
 		deleteOutScoped $outOfScope_file subdomains/subdomains.txt
@@ -538,7 +546,7 @@ function subtakeover(){
 }
 
 function zonetransfer(){
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$ZONETRANSFER" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$ZONETRANSFER" = true ] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func "Zone transfer check"
 		python3 $tools/dnsrecon/dnsrecon.py -d $domain -a -j subdomains/zonetransfer.json 2>>"$LOGFILE" &>/dev/null
 		if [ -s "subdomains/zonetransfer.json" ]; then
@@ -555,7 +563,7 @@ function zonetransfer(){
 }
 
 function s3buckets(){
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$S3BUCKETS" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$S3BUCKETS" = true ] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func "AWS S3 buckets search"
 
 		# S3Scanner
@@ -592,7 +600,11 @@ function webprobe_simple(){
 		if [ -s ".tmp/probed_tmp_scrap.txt" ]; then
 			mv .tmp/probed_tmp_scrap.txt .tmp/probed_tmp.txt
 		else
-			cat subdomains/subdomains.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp.txt
+			if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then 
+				cat subdomains/subdomains.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color | cut -d ' ' -f1 | anew -q .tmp/probed_tmp.txt
+			else
+				cat subdomains/subdomains.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color | cut -d ' ' -f1 | grep "$domain$" | anew -q .tmp/probed_tmp.txt
+			fi
 		fi
 		if [ -s ".tmp/probed_tmp.txt" ]; then
 			deleteOutScoped $outOfScope_file .tmp/probed_tmp.txt
@@ -617,10 +629,21 @@ function webprobe_simple(){
 function webprobe_full(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$WEBPROBEFULL" = true ]; then
 		start_func "Http probing non standard ports"
-
-		[ -s "subdomains/subdomains.txt" ] && sudo unimap --fast-scan -f subdomains/subdomains.txt --ports $UNCOMMON_PORTS_WEB -q -k --url-output 2>>"$LOGFILE" | anew -q .tmp/nmap_uncommonweb.txt
-		[ -s ".tmp/nmap_uncommonweb.txt" ] && cat .tmp/nmap_uncommonweb.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout $HTTPX_UNCOMMONPORTS_TIMEOUT -silent -retries 2 -no-color 2>>"$LOGFILE" | cut -d ' ' -f1 | grep ".$domain" | anew -q .tmp/probed_uncommon_ports_tmp.txt
-
+		if [ -s "subdomains/subdomains.txt" ]; then
+			if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+				sudo nmap -iL subdomains/subdomains.txt -p $UNCOMMON_PORTS_WEB -oG .tmp/uncommon_nmap.gnmap 2>>"$LOGFILE" &>/dev/null
+				cat .tmp/uncommon_nmap.gnmap | egrep -v "^#|Status: Up" | cut -d' ' -f2,4- | grep "open" | sed -e 's/\/.*$//g' | sed -e "s/ /:/g" | sort -u | anew -q .tmp/nmap_uncommonweb.txt
+			else
+				sudo unimap --fast-scan -f subdomains/subdomains.txt --ports $UNCOMMON_PORTS_WEB -q -k --url-output 2>>"$LOGFILE" | anew -q .tmp/nmap_uncommonweb.txt
+			fi
+		fi
+		if [ -s ".tmp/nmap_uncommonweb.txt" ]; then
+			if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then 
+				cat .tmp/nmap_uncommonweb.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout $HTTPX_UNCOMMONPORTS_TIMEOUT -silent -retries 2 -no-color 2>>"$LOGFILE" | cut -d ' ' -f1 | anew -q .tmp/probed_uncommon_ports_tmp.txt
+			else
+				cat .tmp/nmap_uncommonweb.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout $HTTPX_UNCOMMONPORTS_TIMEOUT -silent -retries 2 -no-color 2>>"$LOGFILE" | cut -d ' ' -f1 | grep "$domain" | anew -q .tmp/probed_uncommon_ports_tmp.txt
+			fi
+		fi
 		NUMOFLINES=$(cat .tmp/probed_uncommon_ports_tmp.txt 2>>"$LOGFILE" | anew webs/webs_uncommon_ports.txt | wc -l)
 		notification "Uncommon web ports: ${NUMOFLINES} new websites" good
 		[ -s "webs/webs_uncommon_ports.txt" ] && cat webs/webs_uncommon_ports.txt
@@ -660,7 +683,7 @@ function screenshot(){
 ###############################################################################################################
 
 function favicon(){
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$FAVICON" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$FAVICON" = true ] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func "Favicon Ip Lookup"
 		cd "$tools/fav-up" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		python3 favUp.py -w "$domain" -sc -o favicontest.json 2>>"$LOGFILE" &>/dev/null
@@ -686,9 +709,12 @@ function portscan(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$PORTSCANNER" = true ]; then
 		start_func "Port scan"
 		#interlace -tL subdomains/subdomains.txt -threads 50 -c 'echo "_target_ $(dig +short a _target_ | tail -n1)" | anew -q _output_' -o .tmp/subs_ips.txt
-		[ -s "subdomains/subdomains.txt" ] && resolveDomains -d subdomains/subdomains.txt -t $RESOLVE_DOMAINS_THREADS 2>>"$LOGFILE" | anew -q .tmp/subs_ips.txt
-		[ -s ".tmp/subs_ips.txt" ] && awk '{ print $2 " " $1}' .tmp/subs_ips.txt | sort -k2 -n | anew -q hosts/subs_ips_vhosts.txt
-		[ -s "hosts/subs_ips_vhosts.txt" ] && cat hosts/subs_ips_vhosts.txt | cut -d ' ' -f1 | grep -Eiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
+		if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+			[ -s "subdomains/subdomains.txt" ] && resolveDomains -d subdomains/subdomains.txt -t $RESOLVE_DOMAINS_THREADS 2>>"$LOGFILE" | anew -q .tmp/subs_ips.txt
+			[ -s ".tmp/subs_ips.txt" ] && awk '{ print $2 " " $1}' .tmp/subs_ips.txt | sort -k2 -n | anew -q hosts/subs_ips_vhosts.txt
+			[ -s "hosts/subs_ips_vhosts.txt" ] && cat hosts/subs_ips_vhosts.txt | cut -d ' ' -f1 | grep -Eiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
+		else echo $domain | anew -q hosts/ips.txt
+		fi
 		[ -s "hosts/ips.txt" ] && cat hosts/ips.txt | cf-check | grep -Eiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q .tmp/ips_nowaf.txt
 		printf "${bblue}\n Resolved IP addresses (No WAF) ${reset}\n\n";
 		[ -s ".tmp/ips_nowaf.txt" ] && cat .tmp/ips_nowaf.txt | sort
@@ -855,9 +881,11 @@ function urlchecks(){
 		start_func "URL Extraction"
 		mkdir -p js
 		if [ -s "webs/webs.txt" ]; then
-			cat webs/webs.txt | waybackurls | anew -q .tmp/url_extract_tmp.txt
-			cat webs/webs.txt | gauplus -t $GAUPLUS_THREADS -subs | anew -q .tmp/url_extract_tmp.txt
+			if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+				cat webs/webs.txt | waybackurls | anew -q .tmp/url_extract_tmp.txt
+				cat webs/webs.txt | gauplus -t $GAUPLUS_THREADS -subs | anew -q .tmp/url_extract_tmp.txt
 			#cat webs/webs.txt | nuclei -t ~/nuclei-templates/headless/extract-urls.yaml -headless -silent -no-color | grep "^http" | anew -q .tmp/url_extract_tmp.txt
+			fi
 			diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt 2>>"$LOGFILE") <(sort -u webs/webs.txt 2>>"$LOGFILE") | wc -l)
 			if [ $diff_webs != "0" ] || [ ! -s ".tmp/gospider.txt" ]; then
 				if [ "$DEEP" = true ]; then
@@ -867,7 +895,11 @@ function urlchecks(){
 				fi
 			fi
 			sed -i '/^.\{2048\}./d' .tmp/gospider.txt
-			[ -s ".tmp/gospider.txt" ] && cat .tmp/gospider.txt | grep -Eo 'https?://[^ ]+' | sed 's/]$//' | grep ".$domain" | anew -q .tmp/url_extract_tmp.txt
+			if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+				[ -s ".tmp/gospider.txt" ] && cat .tmp/gospider.txt | grep -Eo 'https?://[^ ]+' | sed 's/]$//' | anew -q .tmp/url_extract_tmp.txt
+			else
+				[ -s ".tmp/gospider.txt" ] && cat .tmp/gospider.txt | grep -Eo 'https?://[^ ]+' | sed 's/]$//' | grep "$domain" | anew -q .tmp/url_extract_tmp.txt
+			fi
 			if [ -s "${GITHUB_TOKENS}" ]; then
 				github-endpoints -q -k -d $domain -t ${GITHUB_TOKENS} -o .tmp/github-endpoints.txt 2>>"$LOGFILE" &>/dev/null
 				[ -s ".tmp/github-endpoints.txt" ] && cat .tmp/github-endpoints.txt | anew -q .tmp/url_extract_tmp.txt
@@ -919,13 +951,14 @@ function url_gf(){
 
 function url_ext(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$URL_EXT" = true ]; then
+		start_func "Urls by extension"
 		ext=("7z" "achee" "action" "adr" "apk" "arj" "ascx" "asmx" "asp" "aspx" "axd" "backup" "bak" "bat" "bin" "bkf" "bkp" "bok" "cab" "cer" "cfg" "cfm" "cfml" "cgi" "cnf" "conf" "config" "cpl" "crt" "csr" "csv" "dat" "db" "dbf" "deb" "dmg" "dmp" "doc" "docx" "drv" "email" "eml" "emlx" "env" "exe" "gadget" "gz" "html" "ica" "inf" "ini" "iso" "jar" "java" "jhtml" "json" "jsp" "key" "log" "lst" "mai" "mbox" "mbx" "md" "mdb" "msg" "msi" "nsf" "ods" "oft" "old" "ora" "ost" "pac" "passwd" "pcf" "pdf" "pem" "pgp" "php" "php3" "php4" "php5" "phtm" "phtml" "pkg" "pl" "plist" "pst" "pwd" "py" "rar" "rb" "rdp" "reg" "rpm" "rtf" "sav" "sh" "shtm" "shtml" "skr" "sql" "swf" "sys" "tar" "tar.gz" "tmp" "toast" "tpl" "txt" "url" "vcd" "vcf" "wml" "wpd" "wsdl" "wsf" "xls" "xlsm" "xlsx" "xml" "xsd" "yaml" "yml" "z" "zip")
-		echo "" > webs/url_extract.txt
+		#echo "" > webs/url_extract.txt
 		for t in "${ext[@]}"; do
 			NUMOFLINES=$(cat .tmp/url_extract_tmp.txt | grep -Ei "\.(${t})($|\/|\?)" | sort -u | wc -l)
 			if [[ ${NUMOFLINES} -gt 0 ]]; then
 				echo -e "\n############################\n + ${t} + \n############################\n" >> webs/urls_by_ext.txt
-				[ -s ".tmp/url_extract_tmp.txt" ] && cat .tmp/url_extract_tmp.txt | grep -Ei "\.(${t})($|\/|\?)" | anew -q > webs/urls_by_ext.txt
+				[ -s ".tmp/url_extract_tmp.txt" ] && cat .tmp/url_extract_tmp.txt | grep -Ei "\.(${t})($|\/|\?)" >> webs/urls_by_ext.txt
 			fi
 		done
 		end_func "Results are saved in $domain/webs/urls_by_ext.txt" ${FUNCNAME[0]}
@@ -1036,7 +1069,7 @@ function brokenLinks(){
 function xss(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$XSS" = true ] && [ -s "gf/xss.txt" ]; then
 		start_func "XSS Analysis"
-		[ -s "gf/xss.txt" ] && cat gf/xss.txt | qsreplace FUZZ | Gxss -c 100 -p Xss | anew -q .tmp/xss_reflected.txt
+		[ -s "gf/xss.txt" ] && cat gf/xss.txt | qsreplace FUZZ | Gxss -c 100 -p test_reflection | anew -q .tmp/xss_reflected.txt
 		if [ "$DEEP" = true ]; then
 			if [ -n "$XSS_SERVER" ]; then
 				[ -s ".tmp/xss_reflected.txt" ] && cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav -b ${XSS_SERVER} -w $DALFOX_THREADS 2>>"$LOGFILE" | anew -q vulns/xss.txt
@@ -1386,7 +1419,6 @@ function notification(){
 }
 
 function sendToNotify {
-
 	if [[ -z "$1" ]]; then
 		printf "\n${yellow} no file provided to send ${reset}\n"
 	else
@@ -1450,21 +1482,21 @@ function resolvers_update(){
 	fi
 }
 
-function ipcidr_detection(){
-		if [[ $1 =~ /[0-9]+$ ]]; then
-			prips $1 | dnsx -ptr -resp-only -silent
-		else
-			echo $1 | dnsx -ptr -resp-only -silent
-		fi
-}
-
 function ipcidr_target(){
 	if [[ $1 =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
-		ipcidr_detection $1 | unfurl -u domains 2>/dev/null | sed 's/\.$//' | anew -q ./target_reconftw_ipcidr.txt
-		if [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -eq 1 ]]; then
-			domain=$(cat ./target_reconftw_ipcidr.txt)
-		elif [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -gt 1 ]]; then
-			list=${PWD}/target_reconftw_ipcidr.txt
+		echo $1 | mapcidr -silent > target_reconftw_ipcidr.txt
+		if [ -s "./target_reconftw_ipcidr.txt" ]; then 
+			[ "$REVERSE_IP" = true ] && cat ./target_reconftw_ipcidr.txt | dnsx -ptr -resp-only -silent | unfurl -u domains 2>/dev/null | sed 's/\.$//' | anew -q ./target_reconftw_ipcidr.txt
+			if [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -eq 1 ]]; then
+				domain=$(cat ./target_reconftw_ipcidr.txt)
+			elif [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -gt 1 ]]; then
+				unset domain
+				list=${PWD}/target_reconftw_ipcidr.txt
+			fi
+		fi
+		if [ -n "$2" ]; then
+			cat $list | anew -q $2
+			sed -i '/\/[0-9]*$/d' $2
 		fi
 	fi
 }
@@ -1484,7 +1516,8 @@ function start(){
 	printf "${bgreen}#######################################################################${reset}\n"
 	tools_installed
 
-	[[ -n "$domain" ]] && ipcidr_target $domain
+	#[[ -n "$domain" ]] && ipcidr_target $domain
+
 
 	if [ -z "$domain" ]; then
 		if [ -n "$list" ]; then
@@ -1629,7 +1662,7 @@ function multi_osint(){
 	    NOTIFY=""
 	fi
 
-	[[ -n "$domain" ]] && ipcidr_target $domain
+	#[[ -n "$domain" ]] && ipcidr_target $domain
 
 	if [ -s "$list" ]; then
 		sed -i 's/\r$//' $list
@@ -1689,6 +1722,7 @@ function recon(){
 	url_gf
 	wordlist_gen
 	wordlist_gen_roboxtractor
+	url_ext
 }
 
 function multi_recon(){
@@ -1702,7 +1736,7 @@ function multi_recon(){
 	    NOTIFY=""
 	fi
 
-	[[ -n "$domain" ]] && ipcidr_target $domain
+	#[[ -n "$domain" ]] && ipcidr_target $domain
 
 	if [ -s "$list" ]; then
 		 sed -i 's/\r$//' $list
@@ -1776,7 +1810,7 @@ function multi_recon(){
 			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
 			printf "\n${yellow}  $domain is $POSINLIST of $LISTTOTAL${reset}\n"
 		fi
-		printf "${reset}#######################################################################\n\n"
+		printf "${bgreen}#######################################################################${reset}\n"
 	done
 	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 
@@ -1820,7 +1854,7 @@ function multi_recon(){
 			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
 			printf "\n${yellow}  $domain is $POSINLIST of $LISTTOTAL${reset}\n"
 		fi
-		printf "${reset}#######################################################################\n\n"
+		printf "${bgreen}#######################################################################${reset}\n"
 	done
 	cloudprovider
 	for domain in $targets; do
@@ -1832,6 +1866,7 @@ function multi_recon(){
 		url_gf
 		wordlist_gen
 		wordlist_gen_roboxtractor
+		url_ext
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
@@ -1841,7 +1876,7 @@ function multi_recon(){
 			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
 			printf "\n${yellow}  $domain is $POSINLIST of $LISTTOTAL${reset}\n"
 		fi
-		printf "${reset}#######################################################################\n\n"
+		printf "${bgreen}#######################################################################${reset}\n"
 	done
 	cd "$workdir" || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 	dir=$workdir
@@ -1872,6 +1907,7 @@ function webs_menu(){
 	url_gf
 	wordlist_gen
 	wordlist_gen_roboxtractor
+	url_ext
 	vulns
 	end
 }
@@ -1933,6 +1969,7 @@ while true; do
     case "$1" in
         '-d'|'--domain')
             domain=$2
+			ipcidr_target $2
             shift 2
             continue
             ;;
@@ -1942,7 +1979,10 @@ while true; do
             continue
             ;;
         '-l'|'--list')
-            list=$2
+			list=$2
+			for domain in $(cat $list); do
+				ipcidr_target $domain $list
+			done
             shift 2
             continue
             ;;
