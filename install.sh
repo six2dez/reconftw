@@ -212,6 +212,9 @@ eval sed -i 's/^#random-agent: false/random-agent: true/' ~/.config/nuclei/confi
 eval git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git $dir/sqlmap $DEBUG_STD
 eval git clone --depth 1 https://github.com/drwetter/testssl.sh.git $dir/testssl.sh $DEBUG_STD
 
+sudo git clone https://github.com/offensive-security/exploitdb.git /opt/exploitdb
+sudo ln -sf /opt/exploitdb/searchsploit /usr/local/bin/searchsploit
+
 # Standard repos installation
 repos_step=0
 for repo in "${!repos[@]}"; do
@@ -252,9 +255,9 @@ if [ "True" = "$IS_ARM" ]
         eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux $DEBUG_STD
         eval wget -N -c https://github.com/sensepost/gowitness/releases/download/2.3.4/gowitness-2.3.4-linux-amd64 $DEBUG_STD
         eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/download/0.4.0/unimap-linux $DEBUG_STD
-        eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz
-        $SUDO tar -C /usr/bin/ -xzf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz
-        $SUDO rm -rf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz
+        eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz $DEBUG_STD
+        eval $SUDO tar -C /usr/bin/ -xzf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
+        eval $SUDO rm -rf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
         eval $SUDO mv gowitness-2.3.4-linux-amd64 /usr/bin/gowitness
         eval $SUDO mv findomain-linux /usr/bin/findomain
         eval $SUDO mv unimap-linux /usr/bin/unimap
