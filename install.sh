@@ -260,7 +260,7 @@ fi
 eval $SUDO chmod 755 /usr/bin/findomain
 eval $SUDO chmod 755 /usr/bin/gowitness
 eval $SUDO chmod 755 /usr/bin/unimap
-eval $SUDO chmod +x $tools/uDork/uDork.sh
+eval $SUDO chmod +x $tools/udork/uDork.sh
 eval subfinder $DEBUG_STD
 eval subfinder $DEBUG_STD
 
