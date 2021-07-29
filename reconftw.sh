@@ -498,7 +498,7 @@ function sub_recursive(){
 			[ -s ".tmp/passive_recurs_tmp.txt" ] && cat .tmp/passive_recurs_tmp.txt | anew -q subdomains/subdomains.txt
 		fi
 		# Bruteforce recursive
-		if [[ $(cat subdomains/subdomains.txt | wc -l) -le 1000 ]]; then
+		if [[ $(cat subdomains/subdomains.txt | wc -l) -le $DEEP_LIMIT ]]; then
 			echo "" > .tmp/brute_recursive_wordlist.txt
 			for sub in $(cat subdomains/subdomains.txt); do
 				sed "s/$/.$sub/" $subs_wordlist >> .tmp/brute_recursive_wordlist.txt
@@ -982,7 +982,7 @@ function jschecks(){
 			printf "${yellow} Running : Fetching Urls 1/5${reset}\n"
 			cp js/url_extract_js.txt js/jsfile_links.txt
 			cat js/jsfile_links.txt | subjs -c 40 | grep "$domain" | anew -q .tmp/subjslinks.txt
-			[ -s .tmp/subjslinks.txt ] && cat .tmp/subjslinks.txt | egrep -iv ".(js|jpg|jpeg|woff|woff2|ttf|eot)" | anew -q js/nojs_links.txt
+			[ -s .tmp/subjslinks.txt ] && cat .tmp/subjslinks.txt | egrep -iv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | anew -q js/nojs_links.txt
 			[ -s .tmp/subjslinks.txt ] && cat .tmp/subjslinks.txt | grep -iE "\.js" | anew -q js/jsfile_links.txt
 			printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
 			[ -s "js/jsfile_links.txt" ] && cat js/jsfile_links.txt | httpx -follow-redirects -random-agent -silent -timeout $HTTPX_TIMEOUT -threads $HTTPX_THREADS -status-code -retries 2 -no-color | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
