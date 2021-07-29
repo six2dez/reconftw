@@ -1079,7 +1079,7 @@ function brokenLinks(){
 function xss(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$XSS" = true ] && [ -s "gf/xss.txt" ]; then
 		start_func "XSS Analysis"
-		[ -s "gf/xss.txt" ] && cat gf/xss.txt | qsreplace FUZZ | Gxss -c 100 -p test_reflection | anew -q .tmp/xss_reflected.txt
+		[ -s "gf/xss.txt" ] && cat gf/xss.txt | qsreplace FUZZ | Gxss -c 100 -p Xss | qsreplace FUZZ | anew -q .tmp/xss_reflected.txt
 		if [ "$DEEP" = true ]; then
 			if [ -n "$XSS_SERVER" ]; then
 				[ -s ".tmp/xss_reflected.txt" ] && cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav -b ${XSS_SERVER} -w $DALFOX_THREADS 2>>"$LOGFILE" | anew -q vulns/xss.txt
