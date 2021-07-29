@@ -60,7 +60,6 @@ function tools_installed(){
 	[ -f "$tools/getjswords.py" ] || { printf "${bred} [*] getjswords   	[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/JSA/jsa.py" ] || { printf "${bred} [*] JSA		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/cloud_enum/cloud_enum.py" ] || { printf "${bred} [*] cloud_enum		[NO]${reset}\n"; allinstalled=false;}
-	type -P dirdar &>/dev/null || { printf "${bred} [*] dirdar		[NO]${reset}\n"; allinstalled=false;}
 	type -P github-endpoints &>/dev/null || { printf "${bred} [*] github-endpoints	[NO]${reset}\n"; allinstalled=false;}
 	type -P github-subdomains &>/dev/null || { printf "${bred} [*] github-subdomains	[NO]${reset}\n"; allinstalled=false;}
 	type -P gospider &>/dev/null || { printf "${bred} [*] gospider		[NO]${reset}\n"; allinstalled=false;}
@@ -101,6 +100,7 @@ function tools_installed(){
 	type -P urldedupe &>/dev/null || { printf "${bred} [*] urldedupe	[NO]${reset}\n"; allinstalled=false;}
 	type -P analyticsrelationships &>/dev/null || { printf "${bred} [*] analyticsrelationships	[NO]${reset}\n"; allinstalled=false;}
 	type -P mapcidr &>/dev/null || { printf "${bred} [*] mapcidr		[NO]${reset}\n"; allinstalled=false;}
+	type -P ppfuzz &>/dev/null || { printf "${bred} [*] ppfuzz		[NO]${reset}\n"; allinstalled=false;}
 	type -P interactsh-client &>/dev/null || { printf "${bred} [*] interactsh-client	[NO]${reset}\n"; allinstalled=false;}
 
 	if [ "${allinstalled}" = true ]; then
@@ -1305,25 +1305,6 @@ function spraying(){
 	fi
 }
 
-function 4xxbypass(){
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$BYPASSER4XX" = true ]; then
-		if [[ $(cat fuzzing/*.txt 2>/dev/null | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 | wc -l) -le $DEEP_LIMIT ]] || [ "$DEEP" = true ]; then
-			start_func "403 bypass"
-			cat fuzzing/*.txt 2>>"$LOGFILE" | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 | dirdar -threads $DIRDAR_THREADS -only-ok > .tmp/dirdar.txt
-			[ -s ".tmp/dirdar.txt" ] && cat .tmp/dirdar.txt | sed -e '1,12d' | sed '/^$/d' | anew -q vulns/4xxbypass.txt
-			end_func "Results are saved in vulns/4xxbypass.txt" ${FUNCNAME[0]}
-		else
-			notification "Too many urls to bypass, skipping" warn
-		fi
-	else
-		if [ "$BYPASSER4XX" = false ]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
-		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
-		fi
-	fi
-}
-
 function command_injection(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$COMM_INJ" = true ] && [ -s "gf/rce.txt" ]; then
 		start_func "Command Injection checks"
@@ -1339,6 +1320,21 @@ function command_injection(){
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		elif [ ! -s "gf/rce.txt" ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} No URLs potentially vulnerables to Command Injection ${reset}\n\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
+	fi
+}
+
+function prototype_pollution(){
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$PROTO_POLLUTION" = true ] ; then
+		start_func "Prototype Pollution checks"
+		[ -s "webs/url_extract.txt" ] && ppfuzz -l webs/url_extract.txt -c $PPFUZZ_THREADS > anew -q .tmp/prototype_pollution.txt
+		[ -s ".tmp/prototype_pollution.txt" ] && cat .tmp/prototype_pollution.txt | sed -e '1,8d' | sed '/^\[ERR/d' | anew -q vulns/prototype_pollution.txt
+		end_func "Results are saved in vulns/prototype_pollution.txt" ${FUNCNAME[0]}
+	else
+		if [ "$PROTO_POLLUTION" = false ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
@@ -1644,7 +1640,6 @@ function osint(){
 
 function vulns(){
 	if [ "$VULNS_GENERAL" = true ]; then
-		4xxbypass
 		cors
 		open_redirect
 		ssrf_checks
@@ -1654,6 +1649,7 @@ function vulns(){
 		sqli
 		xss
 		command_injection
+		prototype_pollution
 		spraying
 		brokenLinks
 		test_ssl

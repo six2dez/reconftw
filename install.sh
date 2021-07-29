@@ -15,7 +15,6 @@ gotools["nuclei"]="GO111MODULE=on go get -v github.com/projectdiscovery/nuclei/v
 gotools["anew"]="go get -u -v github.com/tomnomnom/anew"
 gotools["notify"]="GO111MODULE=on go get -v github.com/projectdiscovery/notify/cmd/notify"
 gotools["mildew"]="go get -u github.com/daehee/mildew/cmd/mildew"
-gotools["dirdar"]="go get -u github.com/m4dm0e/dirdar"
 gotools["unfurl"]="go get -u -v github.com/tomnomnom/unfurl"
 gotools["httpx"]="GO111MODULE=on go get -v github.com/projectdiscovery/httpx/cmd/httpx"
 gotools["github-endpoints"]="go get -u github.com/gwen001/github-endpoints"
@@ -253,6 +252,9 @@ if [ "True" = "$IS_ARM" ]
         eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux $DEBUG_STD
         eval wget -N -c https://github.com/sensepost/gowitness/releases/download/2.3.4/gowitness-2.3.4-linux-amd64 $DEBUG_STD
         eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/download/0.4.0/unimap-linux $DEBUG_STD
+        eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz
+        $SUDO tar -C /usr/bin/ -xzf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz
+        $SUDO rm -rf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz
         eval $SUDO mv gowitness-2.3.4-linux-amd64 /usr/bin/gowitness
         eval $SUDO mv findomain-linux /usr/bin/findomain
         eval $SUDO mv unimap-linux /usr/bin/unimap
@@ -260,6 +262,7 @@ fi
 eval $SUDO chmod 755 /usr/bin/findomain
 eval $SUDO chmod 755 /usr/bin/gowitness
 eval $SUDO chmod 755 /usr/bin/unimap
+eval $SUDO chmod 755 /usr/bin/ppfuzz
 eval $SUDO chmod +x $tools/udork/uDork.sh
 eval subfinder $DEBUG_STD
 eval subfinder $DEBUG_STD
