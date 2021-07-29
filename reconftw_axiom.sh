@@ -997,11 +997,12 @@ function jschecks(){
 		start_func "Javascript Scan"
 		if [ -s "js/url_extract_js.txt" ]; then
 			printf "${yellow} Running : Fetching Urls 1/5${reset}\n"
-			cat js/url_extract_js.txt | cut -d '?' -f 1 | grep -iE "\.js$" | grep "$domain$" | anew -q js/jsfile_links.txt
-			cat js/url_extract_js.txt | subjs | grep "$domain$" | anew -q js/jsfile_links.txt
+			cp js/url_extract_js.txt js/jsfile_links.txt
+			cat js/jsfile_links.txt | subjs -c 40 | grep "$domain" | anew -q .tmp/subjslinks.txt
+			[ -s .tmp/subjslinks.txt ] && cat .tmp/subjslinks.txt | egrep -iv ".(js|jpg|jpeg|woff|woff2|ttf|eot)" | anew -q js/nojs_links.txt
+			[ -s .tmp/subjslinks.txt ] && cat .tmp/subjslinks.txt | grep -iE "\.js" | anew -q js/jsfile_links.txt
 			printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
-			axiom-scan js/jsfile_links.txt -m httpx -follow-redirects -random-agent -silent -timeout $HTTPX_TIMEOUT -threads $HTTPX_THREADS -status-code -retries 2 -no-color -o .tmp/js_livelinks.txt 2>>"$LOGFILE" &>/dev/null
-			[ -s ".tmp/js_livelinks.txt" ] && cat .tmp/js_livelinks.txt | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
+			[ -s "js/jsfile_links.txt" ] && cat js/jsfile_links.txt | httpx -follow-redirects -random-agent -silent -timeout $HTTPX_TIMEOUT -threads $HTTPX_THREADS -status-code -retries 2 -no-color | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
 			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
 			if [ -s "js/js_livelinks.txt" ]; then
 				interlace -tL js/js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> .tmp/js_endpoints.txt" &>/dev/null
@@ -1011,7 +1012,7 @@ function jschecks(){
 				cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt
 			fi
 			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
-			[ -s "js/js_livelinks.txt" ] && axiom-scan js/js_livelinks.txt -m nuclei -w /home/op/recon/nuclei/exposures/tokens/ -r /home/op/lists/resolvers_trusted.txt -o js/js_secrets.txt 2>>"$LOGFILE" &>/dev/null
+			[ -s "js/js_livelinks.txt" ] && cat js/js_livelinks.txt | nuclei -silent -t ~/nuclei-templates/exposures/tokens/ -r $resolvers_trusted -o js/js_secrets.txt 2>>"$LOGFILE" &>/dev/null
 			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
 			[ -s "js/js_livelinks.txt" ] && cat js/js_livelinks.txt | python3 $tools/getjswords.py 2>>"$LOGFILE" | anew -q webs/dict_words.txt
 			end_func "Results are saved in $domain/js folder" ${FUNCNAME[0]}
