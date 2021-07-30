@@ -1000,22 +1000,22 @@ function jschecks(){
 		start_func "Javascript Scan"
 		if [ -s "js/url_extract_js.txt" ]; then
 			printf "${yellow} Running : Fetching Urls 1/5${reset}\n"
-			cp js/url_extract_js.txt js/jsfile_links.txt
-			cat js/jsfile_links.txt | subjs -c 40 | grep "$domain" | anew -q .tmp/subjslinks.txt
+			axiom-scan js/url_extract_js.txt -m subjs -o .tmp/subjslinks.txt 2>>"$LOGFILE" &>/dev/null			
 			[ -s .tmp/subjslinks.txt ] && cat .tmp/subjslinks.txt | egrep -iv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | anew -q js/nojs_links.txt
-			[ -s .tmp/subjslinks.txt ] && cat .tmp/subjslinks.txt | grep -iE "\.js" | anew -q js/jsfile_links.txt
+			[ -s .tmp/subjslinks.txt ] && cat .tmp/subjslinks.txt | grep -iE "\.js" | anew -q js/url_extract_js.txt
 			printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
-			[ -s "js/jsfile_links.txt" ] && cat js/jsfile_links.txt | httpx -follow-redirects -random-agent -silent -timeout $HTTPX_TIMEOUT -threads $HTTPX_THREADS -status-code -retries 2 -no-color | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
+			[ -s "js/url_extract_js.txt" ] && axiom-scan js/url_extract_js.txt -m httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -o .tmp/js_livelinks.txt 2>>"$LOGFILE" &>/dev/null
+			[ -s ".tmp/js_livelinks.txt" ] && cat .tmp/js_livelinks.txt | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
 			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
 			if [ -s "js/js_livelinks.txt" ]; then
-				interlace -tL js/js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> .tmp/js_endpoints.txt" &>/dev/null
+				axiom-scan js/js_livelinks.txt -m linkfinder -o .tmp/js_endpoints.txt 2>>"$LOGFILE" &>/dev/null			
 			fi
 			if [ -s ".tmp/js_endpoints.txt" ]; then
 				sed -i '/^\//!d' .tmp/js_endpoints.txt
 				cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt
 			fi
 			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
-			[ -s "js/js_livelinks.txt" ] && cat js/js_livelinks.txt | nuclei -silent -t ~/nuclei-templates/exposures/tokens/ -r $resolvers_trusted -o js/js_secrets.txt 2>>"$LOGFILE" &>/dev/null
+			[ -s "js/js_livelinks.txt" ] && axiom-scan js/js_livelinks.txt -m nuclei -w /home/op/recon/nuclei/exposures/tokens/ -o js/js_secrets.txt 2>>"$LOGFILE" &>/dev/null
 			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
 			[ -s "js/js_livelinks.txt" ] && cat js/js_livelinks.txt | python3 $tools/getjswords.py 2>>"$LOGFILE" | anew -q webs/dict_words.txt
 			end_func "Results are saved in $domain/js folder" ${FUNCNAME[0]}
@@ -1059,7 +1059,7 @@ function wordlist_gen_roboxtractor(){
 	if  { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$ROBOTSWORDLIST" = true ]; then
 		start_func "Robots wordlist generation"
 		if [ -s "webs/webs.txt" ]; then
-			cat webs/webs.txt | roboxtractor  -m 1 -wb | anew -q webs/robots_wordlist.txt
+			cat webs/webs.txt | roboxtractor -m 1 -wb 2>>"$LOGFILE" | anew -q webs/robots_wordlist.txt
 		fi
 		end_func "Results are saved in $domain/webs/robots_wordlist.txt" ${FUNCNAME[0]}
 	else
@@ -1536,11 +1536,7 @@ function axiom_lauch(){
 		NUMOFNODES=$(timeout 30 axiom-ls | grep -c "$AXIOM_FLEET_NAME")
 		if [[ $NUMOFNODES -ge $AXIOM_FLEET_COUNT ]]; then
 			axiom-select "$AXIOM_FLEET_NAME*"
-			# if [ -n "$AXIOM_POST_START" ]; then
-			# 	eval "$AXIOM_POST_START"
-			# fi
 			end_func "Axiom fleet $AXIOM_FLEET_NAME already has $NUMOFNODES instances"
-		# elif [[ $NUMOFNODES -eq 0 ]]; then
 		else
 			if [[ $NUMOFNODES -eq 0 ]]; then
 				startcount=$AXIOM_FLEET_COUNT
@@ -1555,7 +1551,7 @@ function axiom_lauch(){
 			axiom-fleet $AXIOM_FLEET_NAME "$axiom_args"
 			axiom-select "$AXIOM_FLEET_NAME*"
 			if [ -n "$AXIOM_POST_START" ]; then
-				eval "$AXIOM_POST_START"
+				eval "$AXIOM_POST_START" 2>>"$LOGFILE" &>/dev/null
 			fi
 
 			NUMOFNODES=$(timeout 30 axiom-ls | grep -c "$AXIOM_FLEET_NAME" )
