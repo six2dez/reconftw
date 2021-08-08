@@ -61,6 +61,7 @@ repos["commix"]="commixproject/commix"
 repos["JSA"]="six2dez/JSA"
 repos["urldedupe"]="ameenmaali/urldedupe"
 repos["cloud_enum"]="initstring/cloud_enum"
+repos["nmap-parse-output"]="ernw/nmap-parse-output"
 
 dir=${tools}
 double_check=false
@@ -313,6 +314,20 @@ if [ "$double_check" = "true" ]; then
         fi
         cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
     done
+fi
+
+# BBRF Setup
+if  [ -d "$HOME/.bbrf/" ] && [ ! -s "$HOME/.bbrf/config.json" ]; then
+    cat > $HOME/.bbrf/config.json << EOF
+{
+    "username": "bbrf",
+    "password": "<your secure password>",
+    "couchdb": "https://<your-bbrf-server>/bbrf",
+    "slack_token": "<a slack token to receive notifications>",
+    "discord_webhook": "<your discord webhook if you want one>",
+    "ignore_ssl_errors": false
+}
+EOF
 fi
 
 printf "${bblue} Running: Performing last configurations ${reset}\n\n"
