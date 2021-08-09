@@ -1464,7 +1464,8 @@ function isAsciiText {
 
 function output(){
 	mkdir -p $dir_output
-	mv $dir/* $dir_output/*
+	cp -r $dir $dir_output
+	rm -rf $dir
 }
 
 function notification(){
