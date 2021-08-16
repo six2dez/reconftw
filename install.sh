@@ -36,7 +36,7 @@ gotools["roboxtractor"]="go get -u -v github.com/Josue87/roboxtractor"
 gotools["mapcidr"]="GO111MODULE=on go get -v github.com/projectdiscovery/mapcidr/cmd/mapcidr"
 
 declare -A repos
-repos["udork"]="m3n0sd0n4ld/uDork"
+repos["uDork"]="m3n0sd0n4ld/uDork"
 repos["pwndb"]="davidtavarez/pwndb"
 repos["dnsvalidator"]="vortexau/dnsvalidator"
 repos["dnsrecon"]="darkoperator/dnsrecon"
@@ -267,7 +267,7 @@ eval $SUDO chmod 755 /usr/bin/findomain
 eval $SUDO chmod 755 /usr/bin/gowitness
 eval $SUDO chmod 755 /usr/bin/unimap
 eval $SUDO chmod 755 /usr/bin/ppfuzz
-eval $SUDO chmod +x $tools/udork/uDork.sh
+eval $SUDO chmod +x $tools/uDork/uDork.sh
 eval subfinder $DEBUG_STD
 eval subfinder $DEBUG_STD
 
