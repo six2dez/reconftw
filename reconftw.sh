@@ -102,6 +102,7 @@ function tools_installed(){
 	type -P mapcidr &>/dev/null || { printf "${bred} [*] mapcidr		[NO]${reset}\n"; allinstalled=false;}
 	type -P ppfuzz &>/dev/null || { printf "${bred} [*] ppfuzz		[NO]${reset}\n"; allinstalled=false;}
 	type -P searchsploit &>/dev/null || { printf "${bred} [*] searchsploit	[NO]${reset}\n"; allinstalled=false;}
+	type -P clouddetect &>/dev/null || { printf "${bred} [*] clouddetect	[NO]${reset}\n"; allinstalled=false;}
 	type -P interactsh-client &>/dev/null || { printf "${bred} [*] interactsh-client	[NO]${reset}\n"; allinstalled=false;}
 	type -P axiom-ls &>/dev/null || { printf "${bred} [*] axiom		[NO]${reset}\n${reset}"; allinstalled=false;}
 
@@ -922,9 +923,11 @@ function portscan(){
 function cloudprovider(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$CLOUD_IP" = true ]; then
 		start_func "Cloud provider check"
-		cd "$tools/ip2provider" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
-		[ -s "$dir/hosts/ips.txt" ] && cat $dir/hosts/ips.txt | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | ./ip2provider.py 2>>"$LOGFILE" | anew -q $dir/hosts/cloud_providers.txt
-		cd "$dir" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+		if [ -s "$dir/hosts/ips.txt" ]; then
+			for ip in $( cat "$dir/hosts/ips.txt" ); do 
+				echo "$( echo -n ${ip} && echo -n " " && clouddetect -ip=${ip} )" | grep -iv "Error" | anew -q $dir/hosts/cloud_providers.txt
+			done
+		fi
 		end_func "Results are saved in hosts/cloud_providers.txt" ${FUNCNAME[0]}
 	else
 		if [ "$CLOUD_IP" = false ]; then

@@ -34,6 +34,7 @@ gotools["analyticsrelationships"]="go get -u -v github.com/Josue87/analyticsrela
 gotools["gotator"]="go get -u -v github.com/Josue87/gotator"
 gotools["roboxtractor"]="go get -u -v github.com/Josue87/roboxtractor"
 gotools["mapcidr"]="GO111MODULE=on go get -v github.com/projectdiscovery/mapcidr/cmd/mapcidr"
+gotools["clouddetect"]="go get github.com/99designs/clouddetect/cli/clouddetect"
 
 declare -A repos
 repos["uDork"]="m3n0sd0n4ld/uDork"
@@ -56,7 +57,6 @@ repos["massdns"]="blechschmidt/massdns"
 repos["OpenRedireX"]="devanshbatham/OpenRedireX"
 repos["GitDorker"]="obheda12/GitDorker"
 repos["testssl"]="drwetter/testssl.sh"
-repos["ip2provider"]="oldrho/ip2provider"
 repos["commix"]="commixproject/commix"
 repos["JSA"]="six2dez/JSA"
 repos["urldedupe"]="ameenmaali/urldedupe"
