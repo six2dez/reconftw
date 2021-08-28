@@ -272,7 +272,9 @@ function subdomains_full(){
 
 	resolvers_update
 
-	if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then 
+	[ -s "${inScope_file}" ] && cat ${inScope_file} | anew -q subdomains/subdomains.txt
+
+	if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]] && [ "$SUBDOMAINS" = true ]; then
 		sub_passive
 		sub_crt
 		sub_active
@@ -311,7 +313,7 @@ function subdomains_full(){
 }
 
 function sub_passive(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBPASSIVE" = true ]; then
 		start_subfunc "Running : Passive Subdomain Enumeration"
 		if [ ! "$AXIOM" = true ]; then
 			subfinder -d $domain -all -o .tmp/subfinder_psub.txt 2>>"$LOGFILE" &>/dev/null
@@ -349,7 +351,11 @@ function sub_passive(){
 		NUMOFLINES=$(cat .tmp/*_psub.txt 2>>"$LOGFILE" | sed "s/*.//" | anew .tmp/passive_subs.txt | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (passive)" ${FUNCNAME[0]}
 	else
-		printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		if [ "$SUBPASSIVE" = false ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
 	fi
 }
 
@@ -377,7 +383,6 @@ function sub_crt(){
 function sub_active(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; then
 		start_subfunc "Running : Active Subdomain Enumeration"
-		[ -s "${inScope_file}" ] && cat ${inScope_file} .tmp/inscope_subs.txt
 		cat .tmp/*_subs.txt | anew -q .tmp/subs_no_resolved.txt
 		deleteOutScoped $outOfScope_file .tmp/subs_no_resolved.txt
 		if [ ! "$AXIOM" = true ]; then
