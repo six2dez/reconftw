@@ -274,7 +274,7 @@ function subdomains_full(){
 
 	[ -s "${inScope_file}" ] && cat ${inScope_file} | anew -q subdomains/subdomains.txt
 
-	if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]] && [ "$SUBDOMAINS" = true ]; then
+	if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]] && [ "$SUBDOMAINS_GENERAL" = true ]; then
 		sub_passive
 		sub_crt
 		sub_active
