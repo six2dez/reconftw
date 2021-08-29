@@ -5,7 +5,7 @@
 declare -A gotools
 gotools["gf"]="go get -u -v github.com/tomnomnom/gf"
 gotools["qsreplace"]="go get -u -v github.com/tomnomnom/qsreplace"
-gotools["Amass"]="GO111MODULE=on go get -u -v github.com/OWASP/Amass/v3/..."
+gotools["Amass"]="GO111MODULE=on go get -v github.com/OWASP/Amass/v3/..."
 gotools["ffuf"]="go get -u github.com/ffuf/ffuf"
 gotools["assetfinder"]="go get -u -v github.com/tomnomnom/assetfinder"
 gotools["github-subdomains"]="go get -u github.com/gwen001/github-subdomains"
@@ -213,9 +213,8 @@ cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; e
 eval sed -i 's/^#random-agent: false/random-agent: true/' ~/.config/nuclei/config.yaml $DEBUG_ERROR
 eval git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git $dir/sqlmap $DEBUG_STD
 eval git clone --depth 1 https://github.com/drwetter/testssl.sh.git $dir/testssl.sh $DEBUG_STD
-
-sudo git clone https://github.com/offensive-security/exploitdb.git /opt/exploitdb
-sudo ln -sf /opt/exploitdb/searchsploit /usr/local/bin/searchsploit
+eval $SUDO git clone https://github.com/offensive-security/exploitdb.git /opt/exploitdb $DEBUG_STD
+eval $SUDO ln -sf /opt/exploitdb/searchsploit /usr/local/bin/searchsploit $DEBUG_STD
 
 # Standard repos installation
 repos_step=0
