@@ -415,7 +415,7 @@ reset='\033[0m'
 - Emails addresses and users ([theHarvester](https://github.com/laramies/theHarvester), [emailfinder](https://github.com/Josue87/EmailFinder))
 - Password leaks ([pwndb](https://github.com/davidtavarez/pwndb) and [H8mail](https://github.com/khast3x/h8mail))
 - Metadata finder ([MetaFinder](https://github.com/Josue87/MetaFinder))
-- Google Dorks ([degoogle_hunter](https://github.com/six2dez/degoogle_hunter))
+- Google Dorks ([uDork](https://github.com/m3n0sd0n4ld/uDork))
 - Github Dorks ([GitDorker](https://github.com/obheda12/GitDorker))
 ## Subdomains
   - Passive ([subfinder](https://github.com/projectdiscovery/subfinder), [assetfinder](https://github.com/tomnomnom/assetfinder), [amass](https://github.com/OWASP/Amass), [findomain](https://github.com/Findomain/Findomain), [crobat](https://github.com/cgboal/sonarsearch), [waybackurls](https://github.com/tomnomnom/waybackurls), [github-subdomains](https://github.com/gwen001/github-subdomains), [Anubis](https://jldc.me), [gauplus](https://github.com/bp0lr/gauplus) and [mildew](https://github.com/daehee/mildew))
