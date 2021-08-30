@@ -5,7 +5,7 @@
 declare -A gotools
 gotools["gf"]="go get -u -v github.com/tomnomnom/gf"
 gotools["qsreplace"]="go get -u -v github.com/tomnomnom/qsreplace"
-gotools["Amass"]="GO111MODULE=on go get -u -v github.com/OWASP/Amass/v3/..."
+gotools["Amass"]="GO111MODULE=on go get -v github.com/OWASP/Amass/v3/..."
 gotools["ffuf"]="go get -u github.com/ffuf/ffuf"
 gotools["assetfinder"]="go get -u -v github.com/tomnomnom/assetfinder"
 gotools["github-subdomains"]="go get -u github.com/gwen001/github-subdomains"
@@ -15,7 +15,6 @@ gotools["nuclei"]="GO111MODULE=on go get -v github.com/projectdiscovery/nuclei/v
 gotools["anew"]="go get -u -v github.com/tomnomnom/anew"
 gotools["notify"]="GO111MODULE=on go get -v github.com/projectdiscovery/notify/cmd/notify"
 gotools["mildew"]="go get -u github.com/daehee/mildew/cmd/mildew"
-gotools["dirdar"]="go get -u github.com/m4dm0e/dirdar"
 gotools["unfurl"]="go get -u -v github.com/tomnomnom/unfurl"
 gotools["httpx"]="GO111MODULE=on go get -v github.com/projectdiscovery/httpx/cmd/httpx"
 gotools["github-endpoints"]="go get -u github.com/gwen001/github-endpoints"
@@ -33,9 +32,12 @@ gotools["resolveDomains"]="go get -u -v github.com/Josue87/resolveDomains"
 gotools["interactsh-client"]="GO111MODULE=on go get -v github.com/projectdiscovery/interactsh/cmd/interactsh-client"
 gotools["analyticsrelationships"]="go get -u -v github.com/Josue87/analyticsrelationships"
 gotools["gotator"]="go get -u -v github.com/Josue87/gotator"
+gotools["roboxtractor"]="go get -u -v github.com/Josue87/roboxtractor"
+gotools["mapcidr"]="GO111MODULE=on go get -v github.com/projectdiscovery/mapcidr/cmd/mapcidr"
+gotools["clouddetect"]="go get github.com/99designs/clouddetect/cli/clouddetect"
 
 declare -A repos
-repos["degoogle_hunter"]="six2dez/degoogle_hunter"
+repos["uDork"]="m3n0sd0n4ld/uDork"
 repos["pwndb"]="davidtavarez/pwndb"
 repos["dnsvalidator"]="vortexau/dnsvalidator"
 repos["dnsrecon"]="darkoperator/dnsrecon"
@@ -44,7 +46,6 @@ repos["brutespray"]="x90skysn3k/brutespray"
 repos["wafw00f"]="EnableSecurity/wafw00f"
 repos["gf"]="tomnomnom/gf"
 repos["Gf-Patterns"]="1ndianl33t/Gf-Patterns"
-repos["github-search"]="gwen001/github-search"
 repos["ctfr"]="UnaPibaGeek/ctfr"
 repos["LinkFinder"]="dark-warlord14/LinkFinder"
 repos["Corsy"]="s0md3v/Corsy"
@@ -55,11 +56,11 @@ repos["massdns"]="blechschmidt/massdns"
 repos["OpenRedireX"]="devanshbatham/OpenRedireX"
 repos["GitDorker"]="obheda12/GitDorker"
 repos["testssl"]="drwetter/testssl.sh"
-repos["ip2provider"]="oldrho/ip2provider"
 repos["commix"]="commixproject/commix"
-repos["JSA"]="six2dez/JSA"
+repos["JSA"]="w9w/JSA"
 repos["urldedupe"]="ameenmaali/urldedupe"
 repos["cloud_enum"]="initstring/cloud_enum"
+repos["nmap-parse-output"]="ernw/nmap-parse-output"
 
 dir=${tools}
 double_check=false
@@ -91,17 +92,17 @@ install_apt(){
     eval $SUDO apt update -y $DEBUG_STD
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium-browser -y $DEBUG_STD
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium -y $DEBUG_STD
-    eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip build-essential gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb prips -y $DEBUG_STD
+    eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip build-essential gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb -y $DEBUG_STD
     eval $SUDO systemctl enable tor $DEBUG_STD
 }
 
 install_yum(){
     eval $SUDO yum groupinstall "Development Tools" -y $DEBUG_STD
-    eval $SUDO yum install python3 python3-pip gcc cmake ruby git curl libpcap-dev wget zip python3-devel pv bind-utils libopenssl-devel libffi-devel libxml2-devel libxslt-devel zlib-devel nmap jq lynx tor medusa xorg-x11-server-xvfb prips -y $DEBUG_STD
+    eval $SUDO yum install python3 python3-pip gcc cmake ruby git curl libpcap-dev wget zip python3-devel pv bind-utils libopenssl-devel libffi-devel libxml2-devel libxslt-devel zlib-devel nmap jq lynx tor medusa xorg-x11-server-xvfb -y $DEBUG_STD
 }
 
 install_pacman(){
-    eval $SUDO pacman -Sy install python python-pip base-devel gcc cmake ruby git curl libpcap wget zip pv bind openssl libffi libxml2 libxslt zlib nmap jq lynx tor medusa xorg-server-xvfb prips -y $DEBUG_STD
+    eval $SUDO pacman -Sy install python python-pip base-devel gcc cmake ruby git curl libpcap wget zip pv bind openssl libffi libxml2 libxslt zlib nmap jq lynx tor medusa xorg-server-xvfb -y $DEBUG_STD
     eval $SUDO systemctl enable --now tor.service $DEBUG_STD
 }
 
@@ -137,7 +138,8 @@ elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for
 fi
 
 # Installing latest Golang version
-version=$(curl -s https://golang.org/VERSION?m=text)
+#version=$(curl -s https://golang.org/VERSION?m=text)
+version="go1.16.7"
 printf "${bblue} Running: Installing/Updating Golang ${reset}\n\n"
 if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$version" = $(go version | cut -d " " -f3) ]
     then
@@ -210,6 +212,8 @@ cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; e
 eval sed -i 's/^#random-agent: false/random-agent: true/' ~/.config/nuclei/config.yaml $DEBUG_ERROR
 eval git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git $dir/sqlmap $DEBUG_STD
 eval git clone --depth 1 https://github.com/drwetter/testssl.sh.git $dir/testssl.sh $DEBUG_STD
+eval $SUDO git clone https://github.com/offensive-security/exploitdb.git /opt/exploitdb $DEBUG_STD
+eval $SUDO ln -sf /opt/exploitdb/searchsploit /usr/local/bin/searchsploit $DEBUG_STD
 
 # Standard repos installation
 repos_step=0
@@ -251,6 +255,9 @@ if [ "True" = "$IS_ARM" ]
         eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux $DEBUG_STD
         eval wget -N -c https://github.com/sensepost/gowitness/releases/download/2.3.4/gowitness-2.3.4-linux-amd64 $DEBUG_STD
         eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/download/0.4.0/unimap-linux $DEBUG_STD
+        eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz $DEBUG_STD
+        eval $SUDO tar -C /usr/bin/ -xzf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
+        eval $SUDO rm -rf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
         eval $SUDO mv gowitness-2.3.4-linux-amd64 /usr/bin/gowitness
         eval $SUDO mv findomain-linux /usr/bin/findomain
         eval $SUDO mv unimap-linux /usr/bin/unimap
@@ -258,6 +265,8 @@ fi
 eval $SUDO chmod 755 /usr/bin/findomain
 eval $SUDO chmod 755 /usr/bin/gowitness
 eval $SUDO chmod 755 /usr/bin/unimap
+eval $SUDO chmod 755 /usr/bin/ppfuzz
+eval $SUDO chmod +x $tools/uDork/uDork.sh
 eval subfinder $DEBUG_STD
 eval subfinder $DEBUG_STD
 
@@ -265,7 +274,7 @@ printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 ## Downloads
 eval wget -nc -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini $DEBUG_STD
 eval wget -nc -O ~/.gf/potential.json https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json $DEBUG_STD
-eval wget -nc -O ~/.config/notify/notify.conf https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw/a66c4d8cf47a3bc95f5e9ba84773428662ea760c/notify_sample.conf $DEBUG_STD
+eval wget -nc -O ~/.config/notify/provider-config.yaml https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw/a66c4d8cf47a3bc95f5e9ba84773428662ea760c/notify_sample.conf $DEBUG_STD
 eval wget -nc -O getjswords.py https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py $DEBUG_STD
 eval wget -nc -O subdomains_big.txt https://wordlists-cdn.assetnote.io/data/manual/best-dns-wordlist.txt $DEBUG_STD
 eval wget -O resolvers_trusted.txt https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw $DEBUG_STD
@@ -275,6 +284,8 @@ eval wget -nc -O fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/One
 eval wget -O lfi_wordlist.txt https://gist.githubusercontent.com/six2dez/a89a0c7861d49bb61a09822d272d5395/raw $DEBUG_STD
 eval wget -O ssti_wordlist.txt https://gist.githubusercontent.com/six2dez/ab5277b11da7369bf4e9db72b49ad3c1/raw $DEBUG_STD
 eval wget -O headers_inject.txt https://gist.github.com/six2dez/d62ab8f8ffd28e1c206d401081d977ae/raw $DEBUG_STD
+eval wget -O custom_udork.txt https://gist.githubusercontent.com/six2dez/7245cad74f2da5824080e0cb6bdaac22/raw $DEBUG_STD
+eval wget -O axiom_config.sh https://gist.githubusercontent.com/six2dez/6e2d9f4932fd38d84610eb851014b26e/raw $DEBUG_STD
 
 ## Last check
 if [ "$double_check" = "true" ]; then
@@ -305,6 +316,20 @@ if [ "$double_check" = "true" ]; then
     done
 fi
 
+# BBRF Setup
+if  [ -d "$HOME/.bbrf/" ] && [ ! -s "$HOME/.bbrf/config.json" ]; then
+    cat > $HOME/.bbrf/config.json << EOF
+{
+    "username": "bbrf",
+    "password": "<your secure password>",
+    "couchdb": "https://<your-bbrf-server>/bbrf",
+    "slack_token": "<a slack token to receive notifications>",
+    "discord_webhook": "<your discord webhook if you want one>",
+    "ignore_ssl_errors": false
+}
+EOF
+fi
+
 printf "${bblue} Running: Performing last configurations ${reset}\n\n"
 ## Last steps
 if [ ! -s "resolvers.txt" ] || [ $(find "resolvers.txt" -mtime +1 -print) ]; then
@@ -319,6 +344,6 @@ eval strip -s $HOME/go/bin/* $DEBUG_STD
 
 eval $SUDO cp $HOME/go/bin/* /usr/bin/ $DEBUG_STD
 
-printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - GitHub (~/Tools/.github_tokens)\n - SHODAN (SHODAN_API_KEY in reconftw.cfg)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg) \n - notify (~/.config/notify/notify.conf) \n - theHarvester (~/Tools/theHarvester/api-keys.yml)\n - H8mail (~/Tools/h8mail_config.ini)\n\n${reset}"
+printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - GitHub (~/Tools/.github_tokens)\n - SHODAN (SHODAN_API_KEY in reconftw.cfg)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg) \n - notify (~/.config/notify/provider-config.yaml) \n - theHarvester (~/Tools/theHarvester/api-keys.yml)\n - H8mail (~/Tools/h8mail_config.ini)\n - uDork FB cookie (UDORK_COOKIE in reconftw.cfg)\n\n${reset}"
 printf "${bgreen} Finished!${reset}\n\n"
 printf "\n\n${bgreen}#######################################################################${reset}\n"

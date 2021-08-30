@@ -44,7 +44,7 @@ function tools_installed(){
 	[ -n "$GOPATH" ] || { printf "${bred} [*] GOPATH var		[NO]${reset}\n"; allinstalled=false;}
 	[ -n "$GOROOT" ] || { printf "${bred} [*] GOROOT var		[NO]${reset}\n"; allinstalled=false;}
 	[ -n "$PATH" ] || { printf "${bred} [*] PATH var		[NO]${reset}\n"; allinstalled=false;}
-	[ -f "$tools/degoogle_hunter/degoogle.py" ] || { printf "${bred} [*] degoogle		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/uDork/uDork.sh" ] || { printf "${bred} [*] uDork		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/brutespray/brutespray.py" ] || { printf "${bred} [*] brutespray	[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/dnsrecon/dnsrecon.py" ] || { printf "${bred} [*] dnsrecon	[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/fav-up/favUp.py" ] || { printf "${bred} [*] fav-up		[NO]${reset}\n"; allinstalled=false;}
@@ -56,11 +56,10 @@ function tools_installed(){
 	[ -f "$tools/LinkFinder/linkfinder.py" ] || { printf "${bred} [*] LinkFinder		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/GitDorker/GitDorker.py" ] || { printf "${bred} [*] GitDorker		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/commix/commix.py" ] || { printf "${bred} [*] commix		[NO]${reset}\n"; allinstalled=false;}
-	[ -f "$tools/degoogle_hunter/degoogle_hunter.sh" ] || { printf "${bred} [*] degoogle_hunter	[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/getjswords.py" ] || { printf "${bred} [*] getjswords   	[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/JSA/jsa.py" ] || { printf "${bred} [*] JSA		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/cloud_enum/cloud_enum.py" ] || { printf "${bred} [*] cloud_enum		[NO]${reset}\n"; allinstalled=false;}
-	type -P dirdar &>/dev/null || { printf "${bred} [*] dirdar		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/nmap-parse-output/nmap-parse-output" ] || { printf "${bred} [*] nmap-parse-output		[NO]${reset}\n"; allinstalled=false;}
 	type -P github-endpoints &>/dev/null || { printf "${bred} [*] github-endpoints	[NO]${reset}\n"; allinstalled=false;}
 	type -P github-subdomains &>/dev/null || { printf "${bred} [*] github-subdomains	[NO]${reset}\n"; allinstalled=false;}
 	type -P gospider &>/dev/null || { printf "${bred} [*] gospider		[NO]${reset}\n"; allinstalled=false;}
@@ -100,7 +99,14 @@ function tools_installed(){
 	type -P emailfinder &>/dev/null || { printf "${bred} [*] emailfinder	[NO]${reset}\n"; allinstalled=false;}
 	type -P urldedupe &>/dev/null || { printf "${bred} [*] urldedupe	[NO]${reset}\n"; allinstalled=false;}
 	type -P analyticsrelationships &>/dev/null || { printf "${bred} [*] analyticsrelationships	[NO]${reset}\n"; allinstalled=false;}
+	type -P mapcidr &>/dev/null || { printf "${bred} [*] mapcidr		[NO]${reset}\n"; allinstalled=false;}
+	type -P ppfuzz &>/dev/null || { printf "${bred} [*] ppfuzz		[NO]${reset}\n"; allinstalled=false;}
+	type -P searchsploit &>/dev/null || { printf "${bred} [*] searchsploit	[NO]${reset}\n"; allinstalled=false;}
+	type -P clouddetect &>/dev/null || { printf "${bred} [*] clouddetect	[NO]${reset}\n"; allinstalled=false;}
 	type -P interactsh-client &>/dev/null || { printf "${bred} [*] interactsh-client	[NO]${reset}\n"; allinstalled=false;}
+	type -P uro &>/dev/null || { printf "${bred} [*] uro		[NO]${reset}\n"; allinstalled=false;}
+	type -P bbrf &>/dev/null || { printf "${bred} [*] bbrf		[NO]${reset}\n"; allinstalled=false;}
+	type -P axiom-ls &>/dev/null || { printf "${bred} [*] axiom		[NO]${reset}\n${reset}"; allinstalled=false;}
 
 	if [ "${allinstalled}" = true ]; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
@@ -122,8 +128,11 @@ function tools_installed(){
 function google_dorks(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$GOOGLE_DORKS" = true ] && [ "$OSINT" = true ]; then
 		start_func "Google Dorks in process"
-		$tools/degoogle_hunter/degoogle_hunter.sh $domain | tee osint/dorks.txt
-		sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" osint/dorks.txt
+		eval sed -i "s/^cookies=\"c_user=HEREYOUCOOKIE; xs=HEREYOUCOOKIE;\"/cookies=\"${UDORK_COOKIE}\"/" $tools/uDork/uDork.sh 2>>"$LOGFILE" &>/dev/null
+		cd "$tools/uDork" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+		./uDork.sh $domain -f $tools/custom_udork.txt -o $dir/osint/dorks.txt &> /dev/null
+		[ -s "$dir/osint/dorks.txt" ] && sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" $dir/osint/dorks.txt 2>>"$LOGFILE" &>/dev/null
+		cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		end_func "Results are saved in $domain/osint/dorks.txt" ${FUNCNAME[0]}
 	else
 		if [ "$GOOGLE_DORKS" = false ] || [ "$OSINT" = false ]; then
@@ -158,7 +167,7 @@ function github_dorks(){
 }
 
 function metadata(){
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$METADATA" = true ] && [ "$OSINT" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$METADATA" = true ] && [ "$OSINT" = true ] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func "Scanning metadata in public files"
 		metafinder -d "$domain" -l $METAFINDER_LIMIT -o osint -go -bi -ba 2>>"$LOGFILE" &>/dev/null
 		mv "osint/${domain}/"*".txt" "osint/" 2>>"$LOGFILE"
@@ -174,7 +183,7 @@ function metadata(){
 }
 
 function emails(){
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$EMAILS" = true ] && [ "$OSINT" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$EMAILS" = true ] && [ "$OSINT" = true ] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func "Searching emails/users/passwords leaks"
 		emailfinder -d $domain 2>>"$LOGFILE" | anew -q .tmp/emailfinder.txt
 		[ -s ".tmp/emailfinder.txt" ] && cat .tmp/emailfinder.txt | awk 'matched; /^-----------------$/ { matched = 1 }' | anew -q osint/emails.txt
@@ -250,7 +259,6 @@ function domain_info(){
 	fi
 }
 
-
 ###############################################################################################################
 ############################################### SUBDOMAINS ####################################################
 ###############################################################################################################
@@ -259,21 +267,34 @@ function subdomains_full(){
 	NUMOFLINES_subs="0"
 	NUMOFLINES_probed="0"
 	printf "${bgreen}#######################################################################\n\n"
-	printf "${bblue} Subdomain Enumeration $domain\n\n"
+	! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]] && printf "${bblue} Subdomain Enumeration $domain\n\n"
+	[[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]] && printf "${bblue} Scanning IP $domain\n\n"
 	[ -s "subdomains/subdomains.txt" ] && cp subdomains/subdomains.txt .tmp/subdomains_old.txt
 	[ -s "webs/webs.txt" ] && cp webs/webs.txt .tmp/probed_old.txt
 
 	resolvers_update
 
-	sub_passive
-	sub_crt
-	sub_active
-	sub_brute
-	sub_permut
-	sub_recursive
-	sub_dns
-	sub_scraping
-	sub_analytics
+	[ -s "${inScope_file}" ] && cat ${inScope_file} | anew -q subdomains/subdomains.txt
+
+	if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]] && [ "$SUBDOMAINS_GENERAL" = true ]; then
+		sub_passive
+		sub_crt
+		sub_active
+		sub_brute
+		sub_permut
+		sub_recursive
+		sub_dns
+		sub_scraping
+		sub_analytics
+	else 
+		notification "IP/CIDR detected, subdomains search skipped" info
+		echo $domain | anew -q subdomains/subdomains.txt
+	fi
+
+	if [ "$BBRF_CONNECTION" = true ]; then
+		[ -s "subdomains/subdomains.txt" ] && cat subdomains/subdomains.txt | bbrf domain add - 2>>"$LOGFILE" &>/dev/null
+	fi
+
 	webprobe_simple
 	if [ -s "subdomains/subdomains.txt" ]; then
 		deleteOutScoped $outOfScope_file subdomains/subdomains.txt
@@ -284,7 +305,7 @@ function subdomains_full(){
 		NUMOFLINES_probed=$(cat webs/webs.txt 2>>"$LOGFILE" | anew .tmp/probed_old.txt | wc -l)
 	fi
 	printf "${bblue}\n Total subdomains: ${reset}\n\n"
-	notification "- ${NUMOFLINES_subs} new alive subdomains" good
+	notification "- ${NUMOFLINES_subs} alive" good
 	[ -s "subdomains/subdomains.txt" ] && cat subdomains/subdomains.txt | sort
 	notification "- ${NUMOFLINES_probed} new web probed" good
 	[ -s "webs/webs.txt" ] && cat webs/webs.txt | sort
@@ -294,14 +315,25 @@ function subdomains_full(){
 }
 
 function sub_passive(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBPASSIVE" = true ]; then
 		start_subfunc "Running : Passive Subdomain Enumeration"
-		subfinder -d $domain -all -o .tmp/subfinder_psub.txt 2>>"$LOGFILE" &>/dev/null
-		assetfinder --subs-only $domain 2>>"$LOGFILE" | anew -q .tmp/assetfinder_psub.txt
-		amass enum -passive -d $domain -config $AMASS_CONFIG -o .tmp/amass_psub.txt 2>>"$LOGFILE" &>/dev/null
-		findomain --quiet -t $domain -u .tmp/findomain_psub.txt 2>>"$LOGFILE" &>/dev/null
-		timeout 10m waybackurls $domain | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/waybackurls_psub.txt
-		timeout 10m gauplus -t $GAUPLUS_THREADS -random-agent -subs $domain | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/gau_psub.txt
+		if [ ! "$AXIOM" = true ]; then
+			subfinder -d $domain -all -o .tmp/subfinder_psub.txt 2>>"$LOGFILE" &>/dev/null
+			assetfinder --subs-only $domain 2>>"$LOGFILE" | anew -q .tmp/assetfinder_psub.txt
+			amass enum -passive -d $domain -config $AMASS_CONFIG -o .tmp/amass_psub.txt 2>>"$LOGFILE" &>/dev/null
+			findomain --quiet -t $domain -u .tmp/findomain_psub.txt 2>>"$LOGFILE" &>/dev/null
+			timeout 10m waybackurls $domain | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/waybackurls_psub.txt
+			timeout 10m gauplus -t $GAUPLUS_THREADS -random-agent -subs $domain | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/gau_psub.txt
+		else
+			axiom-scan $list -m subfinder -all -o .tmp/subfinder_psub.txt 2>>"$LOGFILE" &>/dev/null
+			axiom-scan $list -m assetfinder -o .tmp/assetfinder_psub.txt 2>>"$LOGFILE" &>/dev/null
+			axiom-scan $list -m amass -passive -o .tmp/amass_psub.txt 2>>"$LOGFILE" &>/dev/null
+			axiom-scan $list -m findomain -o .tmp/findomain_psub.txt 2>>"$LOGFILE" &>/dev/null
+			axiom-scan $list -m waybackurls -o .tmp/waybackurls_psub_tmp.txt 2>>"$LOGFILE" &>/dev/null
+			[ -s ".tmp/waybackurls_psub_tmp.txt" ] && cat .tmp/waybackurls_psub_tmp.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/waybackurls_psub.txt
+			axiom-scan $list -m gau -o .tmp/gau_psub_tmp.txt 2>>"$LOGFILE" &>/dev/null
+			[ -s ".tmp/gau_psub_tmp.txt" ] && cat .tmp/gau_psub_tmp.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/gau_psub.txt
+		fi
 		crobat -s $domain 2>>"$LOGFILE" | anew -q .tmp/crobat_psub.txt
 		if [ -s "${GITHUB_TOKENS}" ]; then
 			if [ "$DEEP" = true ]; then
@@ -321,14 +353,24 @@ function sub_passive(){
 		NUMOFLINES=$(cat .tmp/*_psub.txt 2>>"$LOGFILE" | sed "s/*.//" | anew .tmp/passive_subs.txt | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (passive)" ${FUNCNAME[0]}
 	else
-		printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		if [ "$SUBPASSIVE" = false ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
 	fi
 }
 
 function sub_crt(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBCRT" = true ]; then
 		start_subfunc "Running : Crtsh Subdomain Enumeration"
-		python3 $tools/ctfr/ctfr.py -d $domain -o .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" &>/dev/null
+		if [ ! "$AXIOM" = true ]; then
+			python3 $tools/ctfr/ctfr.py -d $domain -o .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" &>/dev/null
+		else
+			echo "python3 -u /home/op/recon/ctfr/ctfr.py -d ${domain} -o ${domain}_ctfr.txt; cat ${domain}_ctfr.txt" > .tmp/sub_ctrf_commands.txt
+			axiom-scan .tmp/sub_ctrf_commands.txt -m exec -o .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" &>/dev/null
+			sed -i '1,11d' .tmp/crtsh_subs_tmp.txt
+		fi
 		NUMOFLINES=$(cat .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" | anew .tmp/crtsh_subs.txt | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (cert transparency)" ${FUNCNAME[0]}
 	else
@@ -343,10 +385,14 @@ function sub_crt(){
 function sub_active(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; then
 		start_subfunc "Running : Active Subdomain Enumeration"
-		[ -s "${inScope_file}" ] && cat ${inScope_file} .tmp/inscope_subs.txt
 		cat .tmp/*_subs.txt | anew -q .tmp/subs_no_resolved.txt
 		deleteOutScoped $outOfScope_file .tmp/subs_no_resolved.txt
-		[ -s ".tmp/subs_no_resolved.txt" ] && puredns resolve .tmp/subs_no_resolved.txt -w .tmp/subdomains_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
+		if [ ! "$AXIOM" = true ]; then
+			[ -s ".tmp/subs_no_resolved.txt" ] && puredns resolve .tmp/subs_no_resolved.txt -w .tmp/subdomains_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
+		else
+			[ -s ".tmp/subs_no_resolved.txt" ] && axiom-scan .tmp/subs_no_resolved.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/subdomains_tmp.txt 2>>"$LOGFILE" &>/dev/null
+			echo $domain | dnsx -retry 3 -silent 2>>"$LOGFILE" | anew -q .tmp/subdomains_tmp.txt
+		fi
 		echo $domain | dnsx -retry 3 -silent -r $resolvers_trusted 2>>"$LOGFILE" | anew -q .tmp/subdomains_tmp.txt
 		NUMOFLINES=$(cat .tmp/subdomains_tmp.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (active resolution)" ${FUNCNAME[0]}
@@ -358,9 +404,16 @@ function sub_active(){
 function sub_dns(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; then
 		start_subfunc "Running : DNS Subdomain Enumeration"
-		[ -s "subdomains/subdomains.txt" ] && dnsx -retry 3 -a -aaaa -cname -ns -ptr -mx -soa -resp -silent -l subdomains/subdomains.txt -o subdomains/subdomains_cname.txt -r $resolvers_trusted 2>>"$LOGFILE" &>/dev/null
-		[ -s "subdomains/subdomains_cname.txt" ] && cat subdomains/subdomains_cname.txt | cut -d '[' -f2 | sed 's/.$//' | grep ".$domain$" | anew -q .tmp/subdomains_dns.txt
-		[ -s ".tmp/subdomains_dns.txt" ] && puredns resolve .tmp/subdomains_dns.txt -w .tmp/subdomains_dns_resolved.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
+		if [ ! "$AXIOM" = true ]; then
+			[ -s "subdomains/subdomains.txt" ] && dnsx -retry 3 -a -aaaa -cname -ns -ptr -mx -soa -resp -silent -l subdomains/subdomains.txt -o subdomains/subdomains_dnsregs.txt -r $resolvers_trusted 2>>"$LOGFILE" &>/dev/null
+			[ -s "subdomains/subdomains_dnsregs.txt" ] && cat subdomains/subdomains_dnsregs.txt | cut -d '[' -f2 | sed 's/.$//' | grep ".$domain$" | anew -q .tmp/subdomains_dns.txt
+			[ -s ".tmp/subdomains_dns.txt" ] && puredns resolve .tmp/subdomains_dns.txt -w .tmp/subdomains_dns_resolved.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
+		else
+			[ -s "subdomains/subdomains.txt" ] && axiom-scan subdomains/subdomains.txt -m dnsx -retry 3 -a -aaaa -cname -ns -ptr -mx -soa -resp -o subdomains/subdomains_dnsregs.txt 2>>"$LOGFILE" &>/dev/null
+			[ -s "subdomains/subdomains_dnsregs.txt" ] && cat subdomains/subdomains_dnsregs.txt | cut -d '[' -f2 | sed 's/.$//' | grep ".$domain$" | anew -q .tmp/subdomains_dns.txt
+			[ -s ".tmp/subdomains_dns.txt" ] && axiom-scan .tmp/subdomains_dns.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/subdomains_dns_resolved.txt 2>>"$LOGFILE" &>/dev/null
+		fi
+
 		NUMOFLINES=$(cat .tmp/subdomains_dns_resolved.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (dns resolution)" ${FUNCNAME[0]}
 	else
@@ -371,12 +424,21 @@ function sub_dns(){
 function sub_brute(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBBRUTE" = true ]; then
 		start_subfunc "Running : Bruteforce Subdomain Enumeration"
-		if [ "$DEEP" = true ]; then
-			puredns bruteforce $subs_wordlist_big $domain -w .tmp/subs_brute.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
+		if [ ! "$AXIOM" = true ]; then
+			if [ "$DEEP" = true ]; then
+				puredns bruteforce $subs_wordlist_big $domain -w .tmp/subs_brute.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
+			else
+				puredns bruteforce $subs_wordlist $domain -w .tmp/subs_brute.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
+			fi
+			[ -s ".tmp/subs_brute.txt" ] && puredns resolve .tmp/subs_brute.txt -w .tmp/subs_brute_valid.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
 		else
-			puredns bruteforce $subs_wordlist $domain -w .tmp/subs_brute.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
+			if [ "$DEEP" = true ]; then
+				axiom-scan $subs_wordlist_big -m puredns-single $domain -r /home/op/lists/resolvers.txt -o .tmp/subs_brute.txt 2>>"$LOGFILE" &>/dev/null
+			else
+				axiom-scan $subs_wordlist -m puredns-single $domain -r /home/op/lists/resolvers.txt -o .tmp/subs_brute.txt 2>>"$LOGFILE" &>/dev/null
+			fi
+			[ -s ".tmp/subs_brute.txt" ] && axiom-scan .tmp/subs_brute.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/subs_brute_valid.txt 2>>"$LOGFILE" &>/dev/null
 		fi
-		[ -s ".tmp/subs_brute.txt" ] && puredns resolve .tmp/subs_brute.txt -w .tmp/subs_brute_valid.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
 		NUMOFLINES=$(cat .tmp/subs_brute_valid.txt 2>>"$LOGFILE" | sed "s/*.//" | grep ".$domain$" | anew subdomains/subdomains.txt | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (bruteforce)" ${FUNCNAME[0]}
 	else
@@ -393,19 +455,42 @@ function sub_scraping(){
 		start_subfunc "Running : Source code scraping subdomain search"
 		touch .tmp/scrap_subs.txt
 		if [ -s "$dir/subdomains/subdomains.txt" ]; then
-			cat subdomains/subdomains.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
-			[ -s ".tmp/probed_tmp_scrap.txt" ] && cat .tmp/probed_tmp_scrap.txt | httpx -csp-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
-			[ -s ".tmp/probed_tmp_scrap.txt" ] && cat .tmp/probed_tmp_scrap.txt | httpx -tls-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
-			if [ "$DEEP" = true ]; then
-				[ -s ".tmp/probed_tmp_scrap.txt" ] && gospider -S .tmp/probed_tmp_scrap.txt --js -t $GOSPIDER_THREADS -d 3 --sitemap --robots -w -r > .tmp/gospider.txt
+			if [ ! "$AXIOM" = true ]; then
+				cat subdomains/subdomains.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
+				[ -s ".tmp/probed_tmp_scrap.txt" ] && cat .tmp/probed_tmp_scrap.txt | httpx -csp-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
+				[ -s ".tmp/probed_tmp_scrap.txt" ] && cat .tmp/probed_tmp_scrap.txt | httpx -tls-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
+				if [ "$DEEP" = true ]; then
+					[ -s ".tmp/probed_tmp_scrap.txt" ] && gospider -S .tmp/probed_tmp_scrap.txt --js -t $GOSPIDER_THREADS -d 3 --sitemap --robots -w -r > .tmp/gospider.txt
+				else
+					[ -s ".tmp/probed_tmp_scrap.txt" ] && gospider -S .tmp/probed_tmp_scrap.txt --js -t $GOSPIDER_THREADS -d 2 --sitemap --robots -w -r > .tmp/gospider.txt
+				fi
+				sed -i '/^.\{2048\}./d' .tmp/gospider.txt
+				[ -s ".tmp/gospider.txt" ] && cat .tmp/gospider.txt | grep -Eo 'https?://[^ ]+' | sed 's/]$//' | unfurl -u domains 2>>"$LOGFILE" | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
+				[ -s ".tmp/scrap_subs.txt" ] && puredns resolve .tmp/scrap_subs.txt -w .tmp/scrap_subs_resolved.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
+				NUMOFLINES=$(cat .tmp/scrap_subs_resolved.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | tee .tmp/diff_scrap.txt | wc -l)
+				[ -s ".tmp/diff_scrap.txt" ] && cat .tmp/diff_scrap.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
 			else
-				[ -s ".tmp/probed_tmp_scrap.txt" ] && gospider -S .tmp/probed_tmp_scrap.txt --js -t $GOSPIDER_THREADS -d 2 --sitemap --robots -w -r > .tmp/gospider.txt
+				axiom-scan subdomains/subdomains.txt -m httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -o .tmp/probed_tmp_scrap1.txt 2>>"$LOGFILE" &>/dev/null
+				[ -s ".tmp/probed_tmp_scrap1.txt" ] && cat .tmp/probed_tmp_scrap1.txt | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
+				axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -csp-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -o .tmp/probed_tmp_scrap2.txt 2>>"$LOGFILE" &>/dev/null
+				[ -s ".tmp/probed_tmp_scrap2.txt" ] && cat .tmp/probed_tmp_scrap2.txt | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
+				axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -tls-probe -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -o .tmp/probed_tmp_scrap3.txt 2>>"$LOGFILE" &>/dev/null
+				[ -s ".tmp/probed_tmp_scrap3.txt" ] && cat .tmp/probed_tmp_scrap3.txt | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
+				if [ "$DEEP" = true ]; then
+					[ -s ".tmp/probed_tmp_scrap.txt" ] && axiom-scan .tmp/probed_tmp_scrap.txt -m gospider --js -d 3 --sitemap --robots -w -r -o .tmp/gospider 2>>"$LOGFILE" &>/dev/null
+				else
+					[ -s ".tmp/probed_tmp_scrap.txt" ] && axiom-scan .tmp/probed_tmp_scrap.txt -m gospider --js -d 2 --sitemap --robots -w -r -o .tmp/gospider 2>>"$LOGFILE" &>/dev/null
+				fi
+				NUMFILES=0
+				touch .tmp/gospider.txt
+				[[ -d .tmp/gospider/ ]] && NUMFILES=$(find .tmp/gospider/ -type f | wc -l)
+				[[ $NUMFILES -gt 0 ]] && cat .tmp/gospider/* | sed '/^.\{2048\}./d' | anew -q .tmp/gospider.txt
+				grep -Eo 'https?://[^ ]+' .tmp/gospider.txt | sed 's/]$//' | unfurl -u domains 2>>"$LOGFILE" | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
+				[ -s ".tmp/scrap_subs.txt" ] && axiom-scan .tmp/scrap_subs.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/scrap_subs_resolved.txt 2>>"$LOGFILE" &>/dev/null
+				NUMOFLINES=$(cat .tmp/scrap_subs_resolved.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | tee .tmp/diff_scrap.txt | wc -l)
+				axiom-scan .tmp/diff_scrap.txt -m httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -o .tmp/probed_tmp_scrap4.txt 2>>"$LOGFILE" &>/dev/null
+				[ -s ".tmp/probed_tmp_scrap4.txt" ] && cat .tmp/probed_tmp_scrap4.txt | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
 			fi
-			sed -i '/^.\{2048\}./d' .tmp/gospider.txt
-			[ -s ".tmp/gospider.txt" ] && cat .tmp/gospider.txt | grep -Eo 'https?://[^ ]+' | sed 's/]$//' | unfurl -u domains 2>>"$LOGFILE" | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
-			[ -s ".tmp/scrap_subs.txt" ] && puredns resolve .tmp/scrap_subs.txt -w .tmp/scrap_subs_resolved.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
-			NUMOFLINES=$(cat .tmp/scrap_subs_resolved.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | tee .tmp/diff_scrap.txt | wc -l)
-			[ -s ".tmp/diff_scrap.txt" ] && cat .tmp/diff_scrap.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
 			end_subfunc "${NUMOFLINES} new subs (code scraping)" ${FUNCNAME[0]}
 		else
 			end_subfunc "No subdomains to search (code scraping)" ${FUNCNAME[0]}
@@ -426,7 +511,11 @@ function sub_analytics(){
 			mkdir -p .tmp/output_analytics/
 			cat .tmp/probed_tmp_scrap.txt | analyticsrelationships >> .tmp/analytics_subs_tmp.txt 2>>"$LOGFILE" &>/dev/null
 			[ -s ".tmp/analytics_subs_tmp.txt" ] && cat .tmp/analytics_subs_tmp.txt | grep "\.$domain$\|^$domain$" | sed "s/|__ //" | anew -q .tmp/analytics_subs_clean.txt
-			[ -s ".tmp/analytics_subs_clean.txt" ] && puredns resolve .tmp/analytics_subs_clean.txt -w .tmp/analytics_subs_resolved.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
+			if [ ! "$AXIOM" = true ]; then
+				[ -s ".tmp/analytics_subs_clean.txt" ] && puredns resolve .tmp/analytics_subs_clean.txt -w .tmp/analytics_subs_resolved.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
+			else
+				[ -s ".tmp/analytics_subs_clean.txt" ] && axiom-scan .tmp/analytics_subs_clean.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/analytics_subs_resolved.txt 2>>"$LOGFILE" &>/dev/null
+			fi
 		fi
 		NUMOFLINES=$(cat .tmp/analytics_subs_resolved.txt 2>>"$LOGFILE" | anew subdomains/subdomains.txt |  wc -l)
 		end_subfunc "${NUMOFLINES} new subs (analytics relationship)" ${FUNCNAME[0]}
@@ -443,19 +532,28 @@ function sub_permut(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBPERMUTE" = true ]; then
 		start_subfunc "Running : Permutations Subdomain Enumeration"
 		if [ "$DEEP" = true ] || [ "$(cat subdomains/subdomains.txt | wc -l)" -le 500 ] ; then
-			[ -s "subdomains/subdomains.txt" ] && gotator -sub subdomains/subdomains.txt -perm $tools/permutations_list.txt -depth 1 -numbers 10 -md 2>>"$LOGFILE" > .tmp/gotator1.txt
+			[ -s "subdomains/subdomains.txt" ] && gotator -sub subdomains/subdomains.txt -perm $tools/permutations_list.txt -depth 1 -numbers 10 -mindup -adv -md 2>>"$LOGFILE" > .tmp/gotator1.txt
 		elif [ "$(cat subdomains/subdomains.txt | wc -l)" -le 100 ] && [ "$(cat .tmp/subs_no_resolved.txt | wc -l)" -le 500 ]; then
-			gotator -sub .tmp/subs_no_resolved.txt -perm $tools/permutations_list.txt -depth 1 -numbers 10 -md 2>>"$LOGFILE" > .tmp/gotator1.txt
+			gotator -sub .tmp/subs_no_resolved.txt -perm $tools/permutations_list.txt -depth 1 -numbers 10 -mindup -adv -md 2>>"$LOGFILE" > .tmp/gotator1.txt
 		else
 			end_subfunc "Skipping Permutations: Too Many Subdomains" ${FUNCNAME[0]}
 			return 1
 		fi
-		[ -s ".tmp/gotator1.txt" ] && puredns resolve .tmp/gotator1.txt -w .tmp/permute1_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
+		if [ ! "$AXIOM" = true ]; then
+			[ -s ".tmp/gotator1.txt" ] && puredns resolve .tmp/gotator1.txt -w .tmp/permute1_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
+		else
+			[ -s ".tmp/gotator1.txt" ] && axiom-scan .tmp/gotator1.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute1_tmp.txt 2>>"$LOGFILE" &>/dev/null
+		fi
 		[ -s ".tmp/permute1_tmp.txt" ] && cat .tmp/permute1_tmp.txt | anew -q .tmp/permute1.txt
-		[ -s ".tmp/permute1.txt" ] && gotator -sub .tmp/permute1.txt -perm $tools/permutations_list.txt -depth 1 -numbers 10 -md 2>>"$LOGFILE" > .tmp/gotator2.txt
-		[ -s ".tmp/gotator2.txt" ] && puredns resolve .tmp/gotator2.txt -w .tmp/permute2_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
+		[ -s ".tmp/permute1.txt" ] && gotator -sub .tmp/permute1.txt -perm $tools/permutations_list.txt -depth 1 -numbers 10 -mindup -adv -md 2>>"$LOGFILE" > .tmp/gotator2.txt
+		if [ ! "$AXIOM" = true ]; then
+			[ -s ".tmp/gotator2.txt" ] && puredns resolve .tmp/gotator2.txt -w .tmp/permute2_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
+		else
+			[ -s ".tmp/gotator2.txt" ] && axiom-scan .tmp/gotator2.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute2_tmp.txt 2>>"$LOGFILE" &>/dev/null
+		fi
 		[ -s ".tmp/permute2_tmp.txt" ] && cat .tmp/permute2_tmp.txt | anew -q .tmp/permute2.txt
 		eval rm -rf .tmp/gotator*.txt 2>>"$LOGFILE"
+		eval rm -rf .tmp/permute*.txt 2>>"$LOGFILE"
 		cat .tmp/permute1.txt .tmp/permute2.txt 2>>"$LOGFILE" | anew -q .tmp/permute_subs.txt
 
 		if [ -s ".tmp/permute_subs.txt" ]; then
@@ -479,31 +577,59 @@ function sub_recursive(){
 		start_subfunc "Running : Subdomains recursive search"
 		# Passive recursive
 		if [ "$SUB_RECURSIVE_PASSIVE" = true ]; then
-			for sub in $( ( cat subdomains/subdomains.txt | rev | cut -d '.' -f 3,2,1 | rev | sort | uniq -c | sort -nr | grep -v '1 ' | head -n 10 && cat subdomains/subdomains.txt | rev | cut -d '.' -f 4,3,2,1 | rev | sort | uniq -c | sort -nr | grep -v '1 ' | head -n 10 ) | sed -e 's/^[[:space:]]*//' | cut -d ' ' -f 2);do 
-				subfinder -d $sub -all -silent 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
-				assetfinder --subs-only $sub 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
-				amass enum -passive -d $sub -config $AMASS_CONFIG 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
-				findomain --quiet -t $sub 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
-			done
-			[ -s ".tmp/passive_recursive.txt" ] && puredns resolve .tmp/passive_recursive.txt -w .tmp/passive_recurs_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
-			[ -s ".tmp/passive_recurs_tmp.txt" ] && cat .tmp/passive_recurs_tmp.txt | anew -q subdomains/subdomains.txt
+			if [ ! "$AXIOM" = true ]; then
+				for sub in $( ( cat subdomains/subdomains.txt | rev | cut -d '.' -f 3,2,1 | rev | sort | uniq -c | sort -nr | grep -v '1 ' | head -n 10 && cat subdomains/subdomains.txt | rev | cut -d '.' -f 4,3,2,1 | rev | sort | uniq -c | sort -nr | grep -v '1 ' | head -n 10 ) | sed -e 's/^[[:space:]]*//' | cut -d ' ' -f 2);do 
+					subfinder -d $sub -all -silent 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
+					assetfinder --subs-only $sub 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
+					amass enum -passive -d $sub -config $AMASS_CONFIG 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
+					findomain --quiet -t $sub 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
+				done
+				[ -s ".tmp/passive_recursive.txt" ] && puredns resolve .tmp/passive_recursive.txt -w .tmp/passive_recurs_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
+				[ -s ".tmp/passive_recurs_tmp.txt" ] && cat .tmp/passive_recurs_tmp.txt | anew -q subdomains/subdomains.txt
+			else
+				for sub in $( ( cat subdomains/subdomains.txt | rev | cut -d '.' -f 3,2,1 | rev | sort | uniq -c | sort -nr | grep -v '1 ' | head -n 10 && cat subdomains/subdomains.txt | rev | cut -d '.' -f 4,3,2,1 | rev | sort | uniq -c | sort -nr | grep -v '1 ' | head -n 10 ) | sed -e 's/^[[:space:]]*//' | cut -d ' ' -f 2);do 
+					echo $sub | anew -q .tmp/sub_pass_recur_target.com
+				done
+				if [ -s ".tmp/sub_pass_recur_target.com" ]; then
+					axiom-scan .tmp/sub_pass_recur_target.com -m subfinder -all -o .tmp/subfinder_prec.txt 2>>"$LOGFILE" &>/dev/null
+					axiom-scan .tmp/sub_pass_recur_target.com -m assetfinder -o .tmp/assetfinder_prec.txt 2>>"$LOGFILE" &>/dev/null
+					axiom-scan .tmp/sub_pass_recur_target.com -m amass -passive -o .tmp/amass_prec.txt 2>>"$LOGFILE" &>/dev/null
+					axiom-scan .tmp/sub_pass_recur_target.com -m findomain -o .tmp/findomain_prec.txt 2>>"$LOGFILE" &>/dev/null
+				fi
+				cat .tmp/*_prec.txt 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
+				[ -s ".tmp/passive_recursive.txt" ] && axiom-scan .tmp/passive_recursive.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/passive_recurs_tmp.txt 2>>"$LOGFILE" &>/dev/null
+				[ -s ".tmp/passive_recurs_tmp.txt" ] && cat .tmp/passive_recurs_tmp.txt | anew -q subdomains/subdomains.txt
+			fi
 		fi
 		# Bruteforce recursive
-		if [[ $(cat subdomains/subdomains.txt | wc -l) -le 1000 ]]; then
+		if [[ $(cat subdomains/subdomains.txt | wc -l) -le $DEEP_LIMIT ]]; then
 			echo "" > .tmp/brute_recursive_wordlist.txt
 			for sub in $(cat subdomains/subdomains.txt); do
 				sed "s/$/.$sub/" $subs_wordlist >> .tmp/brute_recursive_wordlist.txt
 			done
-			[ -s ".tmp/brute_recursive_wordlist.txt" ] && puredns resolve .tmp/brute_recursive_wordlist.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT -w .tmp/brute_recursive_result.txt 2>>"$LOGFILE" &>/dev/null
+			if [ ! "$AXIOM" = true ]; then
+				[ -s ".tmp/brute_recursive_wordlist.txt" ] && puredns resolve .tmp/brute_recursive_wordlist.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT -w .tmp/brute_recursive_result.txt 2>>"$LOGFILE" &>/dev/null
+			else
+				[ -s ".tmp/brute_recursive_wordlist.txt" ] && axiom-scan .tmp/brute_recursive_wordlist.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/brute_recursive_result.txt 2>>"$LOGFILE" &>/dev/null
+			fi
 			[ -s ".tmp/brute_recursive_result.txt" ] && cat .tmp/brute_recursive_result.txt | anew -q .tmp/brute_recursive.txt
-			[ -s ".tmp/brute_recursive.txt" ] && gotator -sub .tmp/brute_recursive.txt -perm $tools/permutations_list.txt -depth 1 -numbers 10 -md 2>>"$LOGFILE" > .tmp/gotator1_recursive.txt
+			[ -s ".tmp/brute_recursive.txt" ] && gotator -sub .tmp/brute_recursive.txt -perm $tools/permutations_list.txt -depth 1 -numbers 10 -mindup -adv -md 2>>"$LOGFILE" > .tmp/gotator1_recursive.txt
+			if [ ! "$AXIOM" = true ]; then
 			[ -s ".tmp/gotator1_recursive.txt" ] && puredns resolve .tmp/gotator1_recursive.txt -w .tmp/permute1_recursive_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
+			else
+				[ -s ".tmp/gotator1_recursive.txt" ] && axiom-scan .tmp/gotator1_recursive.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute1_recursive_tmp.txt 2>>"$LOGFILE" &>/dev/null
+			fi
 			[ -s ".tmp/permute1_recursive_tmp.txt" ] && cat .tmp/permute1_recursive_tmp.txt 2>>"$LOGFILE" | anew -q .tmp/permute1_recursive.txt
-			[ -s ".tmp/permute1_recursive.txt" ] && gotator -sub .tmp/permute1_recursive.txt -perm $tools/permutations_list.txt -depth 1 -numbers 10 -md 2>>"$LOGFILE" > .tmp/gotator2_recursive.txt
+			[ -s ".tmp/permute1_recursive.txt" ] && gotator -sub .tmp/permute1_recursive.txt -perm $tools/permutations_list.txt -depth 1 -numbers 10 -mindup -adv -md 2>>"$LOGFILE" > .tmp/gotator2_recursive.txt
+			if [ ! "$AXIOM" = true ]; then
 			[ -s ".tmp/gotator2_recursive.txt" ] && puredns resolve .tmp/gotator2_recursive.txt -w .tmp/permute2_recursive_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT 2>>"$LOGFILE" &>/dev/null
+			else
+				[ -s ".tmp/gotator2_recursive.txt" ] && axiom-scan .tmp/gotator2_recursive.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute2_recursive_tmp.txt 2>>"$LOGFILE" &>/dev/null
+			fi
 			cat .tmp/permute1_recursive.txt .tmp/permute2_recursive_tmp.txt 2>>"$LOGFILE" | anew -q .tmp/permute_recursive.txt
 			eval rm -rf .tmp/gotator*.txt 2>>"$LOGFILE"
 			eval rm -rf .tmp/brute_recursive_wordlist.txt.txt 2>>"$LOGFILE"
+			eval rm -rf .tmp/permute*.txt 2>>"$LOGFILE"
 			NUMOFLINES=$(cat .tmp/permute_recursive.txt .tmp/brute_recursive.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (recursive)" ${FUNCNAME[0]}
 		else
@@ -522,10 +648,18 @@ function subtakeover(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBTAKEOVER" = true ]; then
 		start_func "Looking for possible subdomain takeover"
 		touch .tmp/tko.txt
-		[ -s "webs/webs.txt" ] && cat webs/webs.txt | nuclei -silent -t ~/nuclei-templates/takeovers/ -r $resolvers_trusted -o .tmp/tko.txt
+		if [ ! "$AXIOM" = true ]; then
+			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -tags takeover -r $resolvers_trusted -o .tmp/tko.txt
+		else
+			cat webs/webs.txt subdomains/subdomains.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
+			[ -s ".tmp/webs_subs.txt" ] && axiom-scan .tmp/webs_subs.txt -m nuclei -w /home/op/recon/nuclei/takeovers/ -o .tmp/tko.txt 2>>"$LOGFILE" &>/dev/null
+		fi
 		NUMOFLINES=$(cat .tmp/tko.txt 2>>"$LOGFILE" | anew webs/takeover.txt | wc -l)
 		if [ "$NUMOFLINES" -gt 0 ]; then
 			notification "${NUMOFLINES} new possible takeovers found" info
+		fi
+		if [ "$BBRF_CONNECTION" = true ]; then
+			[ -s "webs/takeover.txt" ] && cat webs/takeover.txt | grep -Eo 'https?://[^ ]+' | bbrf url add - -t subtko:true 2>>"$LOGFILE" &>/dev/null
 		fi
 		end_func "Results are saved in $domain/webs/takeover.txt" ${FUNCNAME[0]}
 	else
@@ -538,7 +672,7 @@ function subtakeover(){
 }
 
 function zonetransfer(){
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$ZONETRANSFER" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$ZONETRANSFER" = true ] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func "Zone transfer check"
 		python3 $tools/dnsrecon/dnsrecon.py -d $domain -a -j subdomains/zonetransfer.json 2>>"$LOGFILE" &>/dev/null
 		if [ -s "subdomains/zonetransfer.json" ]; then
@@ -555,11 +689,16 @@ function zonetransfer(){
 }
 
 function s3buckets(){
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$S3BUCKETS" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$S3BUCKETS" = true ] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func "AWS S3 buckets search"
 
 		# S3Scanner
-		[ -s "subdomains/subdomains.txt" ] && s3scanner scan -f subdomains/subdomains.txt 2>>"$LOGFILE" | grep -iv "not_exist" | grep -iv "Warning:" | anew -q .tmp/s3buckets.txt
+		if [ ! "$AXIOM" = true ]; then
+			[ -s "subdomains/subdomains.txt" ] && s3scanner scan -f subdomains/subdomains.txt | grep -iv "not_exist" | grep -iv "Warning:" | grep -iv "invalid_name" | anew -q .tmp/s3buckets.txt
+		else
+			axiom-scan webs/webs.txt -m s3scanner -o .tmp/s3buckets_tmp.txt 2>>"$LOGFILE" &>/dev/null
+			cat .tmp/s3buckets_tmp.txt | grep -iv "not_exist" | grep -iv "Warning:" | anew -q .tmp/s3buckets.txt
+		fi
 		# Cloudenum
 		keyword=${domain%%.*}
 		python3 ~/Tools/cloud_enum/cloud_enum.py -k $keyword -qs -l .tmp/output_cloud.txt 2>>"$LOGFILE" &>/dev/null
@@ -572,6 +711,12 @@ function s3buckets(){
 		if [ "$NUMOFLINES2" -gt 0 ]; then
 			notification "${NUMOFLINES} new S3 buckets found" info
 		fi
+
+		if [ "$BBRF_CONNECTION" = true ]; then
+			[ -s "subdomains/cloud_assets.txt" ] && cat subdomains/cloud_assets.txt | grep -Eo 'https?://[^ ]+' | sed 's/[ \t]*$//' | bbrf url add - -t cloud_assets:true 2>>"$LOGFILE" &>/dev/null
+			[ -s "subdomains/s3buckets.txt" ] && cat subdomains/s3buckets.txt | cut -d'|' -f1 | sed 's/[ \t]*$//' | bbrf domain update - -t s3bucket:true 2>>"$LOGFILE" &>/dev/null
+		fi
+
 		end_func "Results are saved in subdomains/s3buckets.txt and subdomains/cloud_assets.txt" ${FUNCNAME[0]}
 	else
 		if [ "$S3BUCKETS" = false ]; then
@@ -592,15 +737,32 @@ function webprobe_simple(){
 		if [ -s ".tmp/probed_tmp_scrap.txt" ]; then
 			mv .tmp/probed_tmp_scrap.txt .tmp/probed_tmp.txt
 		else
-			cat subdomains/subdomains.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp.txt
+			if [ ! "$AXIOM" = true ]; then
+				if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then 
+					cat subdomains/subdomains.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | anew -q .tmp/probed_tmp.txt
+				else
+					cat subdomains/subdomains.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | grep "$domain$" | anew -q .tmp/probed_tmp.txt
+				fi
+			else
+				axiom-scan subdomains/subdomains.txt -m httpx -follow-host-redirects -random-agent -threads $HTTPX_THREADS -status-code -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -o .tmp/probed_tmp_.txt 2>>"$LOGFILE" &>/dev/null
+				if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then 
+					[ -s ".tmp/probed_tmp_.txt" ] && cat .tmp/probed_tmp_.txt | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp.txt
+				else
+					[ -s ".tmp/probed_tmp_.txt" ] && cat .tmp/probed_tmp_.txt | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | anew -q .tmp/probed_tmp.txt
+				fi
+			fi
 		fi
 		if [ -s ".tmp/probed_tmp.txt" ]; then
+			cat .tmp/web_full_info.txt | anew -q webs/web_full_info.txt
 			deleteOutScoped $outOfScope_file .tmp/probed_tmp.txt
 			NUMOFLINES=$(cat .tmp/probed_tmp.txt 2>>"$LOGFILE" | anew webs/webs.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new websites resolved" ${FUNCNAME[0]}
 			if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/webs.txt| wc -l) -le 1500 ]]; then
 				notification "Sending websites to proxy" info
 				ffuf -mc all -fc 404 -w webs/webs.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" &>/dev/null
+			fi
+			if [ "$BBRF_CONNECTION" = true ]; then
+				[ -s "webs/webs.txt" ] && cat webs/webs.txt | bbrf url add - 2>>"$LOGFILE" &>/dev/null
 			fi
 		else
 			end_subfunc "No new websites to probe" ${FUNCNAME[0]}
@@ -617,10 +779,38 @@ function webprobe_simple(){
 function webprobe_full(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$WEBPROBEFULL" = true ]; then
 		start_func "Http probing non standard ports"
-
-		[ -s "subdomains/subdomains.txt" ] && sudo unimap --fast-scan -f subdomains/subdomains.txt --ports $UNCOMMON_PORTS_WEB -q -k --url-output 2>>"$LOGFILE" | anew -q .tmp/nmap_uncommonweb.txt
-		[ -s ".tmp/nmap_uncommonweb.txt" ] && cat .tmp/nmap_uncommonweb.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout $HTTPX_UNCOMMONPORTS_TIMEOUT -silent -retries 2 -no-color 2>>"$LOGFILE" | cut -d ' ' -f1 | grep ".$domain" | anew -q .tmp/probed_uncommon_ports_tmp.txt
-
+		if [ -s "subdomains/subdomains.txt" ]; then
+			if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+				sudo nmap -iL subdomains/subdomains.txt -p $UNCOMMON_PORTS_WEB -oG .tmp/uncommon_nmap.gnmap 2>>"$LOGFILE" &>/dev/null
+				cat .tmp/uncommon_nmap.gnmap | egrep -v "^#|Status: Up" | cut -d' ' -f2,4- | grep "open" | sed -e 's/\/.*$//g' | sed -e "s/ /:/g" | sort -u | anew -q .tmp/nmap_uncommonweb.txt
+			else
+				if [ ! "$AXIOM" = true ]; then
+					sudo unimap --fast-scan -f subdomains/subdomains.txt --ports $UNCOMMON_PORTS_WEB -q -k --url-output 2>>"$LOGFILE" | anew -q .tmp/nmap_uncommonweb.txt
+				else
+					axiom-scan subdomains/subdomains.txt -m unimap --fast-scan --ports $UNCOMMON_PORTS_WEB -q -k --url-output -o .tmp/nmap_uncommonweb.txt 2>>"$LOGFILE" &>/dev/null
+				fi
+			fi
+		fi
+		if [ ! "$AXIOM" = true ]; then
+			if [ -s ".tmp/nmap_uncommonweb.txt" ]; then
+				if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then 
+					cat .tmp/nmap_uncommonweb.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout $HTTPX_UNCOMMONPORTS_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color | anew .tmp/web_full_info_uncommon.txt | cut -d ' ' -f1 | anew -q .tmp/probed_uncommon_ports_tmp.txt
+				else
+					cat .tmp/nmap_uncommonweb.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout $HTTPX_UNCOMMONPORTS_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color | anew .tmp/web_full_info_uncommon.txt | cut -d ' ' -f1 | grep "$domain" | anew -q .tmp/probed_uncommon_ports_tmp.txt
+				fi
+			fi
+			[ -s ".tmp/web_full_info_uncommon.txt" ] && cat .tmp/web_full_info_uncommon.txt | anew -q webs/web_full_info_uncommon.txt
+		else
+			if [ -s ".tmp/nmap_uncommonweb.txt" ]; then
+				axiom-scan .tmp/nmap_uncommonweb.txt -m httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout $HTTPX_UNCOMMONPORTS_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -o .tmp/probed_uncommon_ports_tmp_.txt 2>>"$LOGFILE" &>/dev/null
+				if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then 
+					[ -s ".tmp/probed_uncommon_ports_tmp_.txt" ] && cat .tmp/probed_uncommon_ports_tmp_.txt | anew .tmp/web_full_info_uncommon.txt | cut -d ' ' -f1 | anew -q .tmp/probed_uncommon_ports_tmp.txt
+				else
+					[ -s ".tmp/probed_uncommon_ports_tmp_.txt" ] && cat .tmp/probed_uncommon_ports_tmp_.txt | anew .tmp/web_full_info_uncommon.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_uncommon_ports_tmp.txt
+				fi
+			fi
+			[ -s ".tmp/web_full_info_uncommon.txt" ] && cat .tmp/web_full_info_uncommon.txt 2>>"$LOGFILE" | anew -q webs/web_full_info_uncommon.txt
+		fi
 		NUMOFLINES=$(cat .tmp/probed_uncommon_ports_tmp.txt 2>>"$LOGFILE" | anew webs/webs_uncommon_ports.txt | wc -l)
 		notification "Uncommon web ports: ${NUMOFLINES} new websites" good
 		[ -s "webs/webs_uncommon_ports.txt" ] && cat webs/webs_uncommon_ports.txt
@@ -629,6 +819,9 @@ function webprobe_full(){
 		if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/webs_uncommon_ports.txt| wc -l) -le 1500 ]]; then
 			notification "Sending websites uncommon ports to proxy" info
 			ffuf -mc all -fc 404 -w webs/webs_uncommon_ports.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" &>/dev/null
+		fi
+		if [ "$BBRF_CONNECTION" = true ]; then
+			[ -s "webs/webs_uncommon_ports.txt" ] && cat webs/webs_uncommon_ports.txt | bbrf url add - 2>>"$LOGFILE" &>/dev/null
 		fi
 	else
 		if [ "$WEBPROBEFULL" = false ]; then
@@ -643,8 +836,13 @@ function screenshot(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$WEBSCREENSHOT" = true ]; then
 		start_func "Web Screenshots"
 		cat webs/webs.txt webs/webs_uncommon_ports.txt 2>>"$LOGFILE" | anew -q .tmp/webs_screenshots.txt
-		[ -s ".tmp/webs_screenshots.txt" ] && webscreenshot -r chromium -i .tmp/webs_screenshots.txt -w $WEBSCREENSHOT_THREADS -o screenshots 2>>"$LOGFILE" &>/dev/null
-		#gowitness file -f .tmp/webs_screenshots.txt --disable-logging 2>>"$LOGFILE"
+		if [ ! "$AXIOM" = true ]; then
+			[ -s ".tmp/webs_screenshots.txt" ] && webscreenshot -r chromium -i .tmp/webs_screenshots.txt -w $WEBSCREENSHOT_THREADS -o screenshots 2>>"$LOGFILE" &>/dev/null
+			#gowitness file -f .tmp/webs_screenshots.txt --disable-logging 2>>"$LOGFILE"
+		else
+			[ "$AXIOM_SCREENSHOT_MODULE" = "webscreenshot" ] && axiom-scan .tmp/webs_screenshots.txt -m $AXIOM_SCREENSHOT_MODULE -w $WEBSCREENSHOT_THREADS -o screenshots 2>>"$LOGFILE" &>/dev/null
+			[ "$AXIOM_SCREENSHOT_MODULE" != "webscreenshot" ] && axiom-scan .tmp/webs_screenshots.txt -m $AXIOM_SCREENSHOT_MODULE -o screenshots 2>>"$LOGFILE" &>/dev/null
+		fi
 		end_func "Results are saved in $domain/screenshots folder" ${FUNCNAME[0]}
 	else
 		if [ "$WEBSCREENSHOT" = false ]; then
@@ -660,7 +858,7 @@ function screenshot(){
 ###############################################################################################################
 
 function favicon(){
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$FAVICON" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$FAVICON" = true ] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func "Favicon Ip Lookup"
 		cd "$tools/fav-up" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		python3 favUp.py -w "$domain" -sc -o favicontest.json 2>>"$LOGFILE" &>/dev/null
@@ -686,10 +884,19 @@ function portscan(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$PORTSCANNER" = true ]; then
 		start_func "Port scan"
 		#interlace -tL subdomains/subdomains.txt -threads 50 -c 'echo "_target_ $(dig +short a _target_ | tail -n1)" | anew -q _output_' -o .tmp/subs_ips.txt
-		[ -s "subdomains/subdomains.txt" ] && resolveDomains -d subdomains/subdomains.txt -t $RESOLVE_DOMAINS_THREADS 2>>"$LOGFILE" | anew -q .tmp/subs_ips.txt
-		[ -s ".tmp/subs_ips.txt" ] && awk '{ print $2 " " $1}' .tmp/subs_ips.txt | sort -k2 -n | anew -q hosts/subs_ips_vhosts.txt
-		[ -s "hosts/subs_ips_vhosts.txt" ] && cat hosts/subs_ips_vhosts.txt | cut -d ' ' -f1 | grep -Eiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
-		[ -s "hosts/ips.txt" ] && cat hosts/ips.txt | cf-check | grep -Eiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q .tmp/ips_nowaf.txt
+		if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+			[ -s "subdomains/subdomains.txt" ] && resolveDomains -d subdomains/subdomains.txt -t $RESOLVE_DOMAINS_THREADS 2>>"$LOGFILE" | anew -q .tmp/subs_ips.txt
+			[ -s ".tmp/subs_ips.txt" ] && awk '{ print $2 " " $1}' .tmp/subs_ips.txt | sort -k2 -n | anew -q hosts/subs_ips_vhosts.txt
+			[ -s "hosts/subs_ips_vhosts.txt" ] && cat hosts/subs_ips_vhosts.txt | cut -d ' ' -f1 | grep -Eiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
+		else echo $domain | grep -Eiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
+		fi
+		if [ ! "$AXIOM" = true ]; then
+			[ -s "hosts/ips.txt" ] && cat hosts/ips.txt | cf-check | grep -Eiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q .tmp/ips_nowaf.txt	
+		else
+			[ -s "hosts/subs_ips_vhosts.txt" ] && cat hosts/subs_ips_vhosts.txt | cut -d ' ' -f1 | grep -Eiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
+			[ -s "hosts/ips.txt" ] && axiom-scan hosts/ips.txt -m cf-check -o .tmp/ips_nowaf_.txt 2>>"$LOGFILE" &>/dev/null
+			[ -s ".tmp/ips_nowaf_.txt" ] && cat .tmp/ips_nowaf_.txt | grep -Eiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q .tmp/ips_nowaf.txt
+		fi
 		printf "${bblue}\n Resolved IP addresses (No WAF) ${reset}\n\n";
 		[ -s ".tmp/ips_nowaf.txt" ] && cat .tmp/ips_nowaf.txt | sort
 		printf "${bblue}\n Scanning ports... ${reset}\n\n";
@@ -699,8 +906,17 @@ function portscan(){
 			done
 		fi
 		if [ "$PORTSCAN_ACTIVE" = true ]; then
-			[ -s ".tmp/ips_nowaf.txt" ] && sudo nmap --top-ports 200 -sV -n --max-retries 2 -Pn --open -iL .tmp/ips_nowaf.txt -oN hosts/portscan_active.txt -oG .tmp/portscan_active.gnmap 2>>"$LOGFILE" &>/dev/null
+			if [ ! "$AXIOM" = true ]; then
+				[ -s ".tmp/ips_nowaf.txt" ] && sudo nmap --top-ports 200 -sV -n --max-retries 2 -Pn --open -iL .tmp/ips_nowaf.txt -oA hosts/portscan_active 2>>"$LOGFILE" &>/dev/null
+			else
+				[ -s ".tmp/ips_nowaf.txt" ] && axiom-scan .tmp/ips_nowaf.txt -m nmapx --top-ports 200 -sV -n -Pn --open --max-retries 2 -o hosts/portscan_active.gnmap 2>>"$LOGFILE" &>/dev/null
+				[ -s "hosts/portscan_active.gnmap" ] && cat hosts/portscan_active.gnmap | egrep -v "^#|Status: Up" | cut -d' ' -f2,4- | sed -n -e 's/Ignored.*//p' | awk '{print "Host: " $1 " Ports: " NF-1; $1=""; for(i=2; i<=NF; i++) { a=a" "$i; }; split(a,s,","); for(e in s) { split(s[e],v,"/"); printf "%-8s %s/%-7s %s\n" , v[2], v[3], v[1], v[5]}; a="" }' > hosts/portscan_active.txt 2>>"$LOGFILE" &>/dev/null
+			fi
 		fi
+		if [ "$BBRF_CONNECTION" = true ]; then
+			[ -s "hosts/portscan_active.xml" ] && $tools/nmap-parse-output/nmap-parse-output hosts/portscan_active.xml host-ports | bbrf service add - 2>>"$LOGFILE" &>/dev/null
+		fi
+		[ -s "hosts/portscan_active.xml" ] && searchsploit --nmap hosts/portscan_active.xml 2>>"$LOGFILE" > hosts/searchsploit.txt
 		end_func "Results are saved in hosts/portscan_[passive|active].txt" ${FUNCNAME[0]}
 	else
 		if [ "$PORTSCANNER" = false ]; then
@@ -714,9 +930,11 @@ function portscan(){
 function cloudprovider(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$CLOUD_IP" = true ]; then
 		start_func "Cloud provider check"
-		cd "$tools/ip2provider" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
-		[ -s "$dir/hosts/ips.txt" ] && cat $dir/hosts/ips.txt | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | ./ip2provider.py 2>>"$LOGFILE" | anew -q $dir/hosts/cloud_providers.txt
-		cd "$dir" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+		if [ -s "$dir/hosts/ips.txt" ]; then
+			for ip in $( cat "$dir/hosts/ips.txt" ); do 
+				echo "$( echo -n ${ip} && echo -n " " && clouddetect -ip=${ip} )" | grep -iv "Error" | anew -q $dir/hosts/cloud_providers.txt
+			done
+		fi
 		end_func "Results are saved in hosts/cloud_providers.txt" ${FUNCNAME[0]}
 	else
 		if [ "$CLOUD_IP" = false ]; then
@@ -735,11 +953,18 @@ function waf_checks(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$WAF_DETECTION" = true ]; then
 		start_func "Website's WAF detection"
 		if [ -s "./webs/webs.txt" ]; then
-			wafw00f -i webs/webs.txt -o .tmp/wafs.txt 2>>"$LOGFILE" &>/dev/null
+			if [ ! "$AXIOM" = true ]; then
+				wafw00f -i webs/webs.txt -o .tmp/wafs.txt 2>>"$LOGFILE" &>/dev/null
+			else
+				axiom-scan webs/webs.txt -m wafw00f -o .tmp/wafs.txt 2>>"$LOGFILE" &>/dev/null
+			fi
 			if [ -s ".tmp/wafs.txt" ]; then
 				cat .tmp/wafs.txt | sed -e 's/^[ \t]*//' -e 's/ \+ /\t/g' -e '/(None)/d' | tr -s "\t" ";" > webs/webs_wafs.txt
 				NUMOFLINES=$(cat webs/webs_wafs.txt 2>>"$LOGFILE" | wc -l)
 				notification "${NUMOFLINES} websites protected by waf" info
+				if [ "$BBRF_CONNECTION" = true ]; then
+					[ -s "webs/webs_wafs.txt" ] && cat webs/webs_wafs.txt | bbrf url add - -t waf:true 2>>"$LOGFILE" &>/dev/null
+				fi
 				end_func "Results are saved in $domain/webs/webs_wafs.txt" ${FUNCNAME[0]}
 			else
 				end_func "No results found" ${FUNCNAME[0]}
@@ -761,19 +986,47 @@ function nuclei_check(){
 		start_func "Templates based web scanner"
 		nuclei -update-templates 2>>"$LOGFILE" &>/dev/null
 		mkdir -p nuclei_output
-		[ -s "webs/webs.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q .tmp/webs_nuclei.txt
-		if [ -s ".tmp/webs_nuclei.txt" ]; then
+		if [ ! "$AXIOM" = true ]; then
 			printf "${yellow}\n Running : Nuclei Info${reset}\n\n"
-			cat .tmp/webs_nuclei.txt | nuclei -silent -t ~/nuclei-templates/ -severity info -r $resolvers_trusted -o nuclei_output/info.txt
+			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity info -r $resolvers_trusted -o nuclei_output/info.txt
 			printf "${yellow}\n\n Running : Nuclei Low${reset}\n\n"
-			cat .tmp/webs_nuclei.txt | nuclei -silent -t ~/nuclei-templates/ -severity low -r $resolvers_trusted -o nuclei_output/low.txt
+			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity low -r $resolvers_trusted -o nuclei_output/low.txt
 			printf "${yellow}\n\n Running : Nuclei Medium${reset}\n\n"
-			cat .tmp/webs_nuclei.txt | nuclei -silent -t ~/nuclei-templates/ -severity medium -r $resolvers_trusted -o nuclei_output/medium.txt
+			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity medium -r $resolvers_trusted -o nuclei_output/medium.txt
 			printf "${yellow}\n\n Running : Nuclei High${reset}\n\n"
-			cat .tmp/webs_nuclei.txt | nuclei -silent -t ~/nuclei-templates/ -severity high -r $resolvers_trusted -o nuclei_output/high.txt
+			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity high -r $resolvers_trusted -o nuclei_output/high.txt
 			printf "${yellow}\n\n Running : Nuclei Critical${reset}\n\n"
-			cat .tmp/webs_nuclei.txt | nuclei -silent -t ~/nuclei-templates/ -severity critical -r $resolvers_trusted -o nuclei_output/critical.txt
+			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity critical -r $resolvers_trusted -o nuclei_output/critical.txt
+			if [ "$BBRF_CONNECTION" = true ]; then
+				[ -s "nuclei_output/info.txt" ] && cat nuclei_output/info.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:info 2>>"$LOGFILE" &>/dev/null
+				[ -s "nuclei_output/low.txt" ] && cat nuclei_output/low.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:low 2>>"$LOGFILE" &>/dev/null
+				[ -s "nuclei_output/medium.txt" ] && cat nuclei_output/medium.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:medium 2>>"$LOGFILE" &>/dev/null
+				[ -s "nuclei_output/high.txt" ] && cat nuclei_output/high.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:high 2>>"$LOGFILE" &>/dev/null
+				[ -s "nuclei_output/critical.txt" ] && cat nuclei_output/critical.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:critical 2>>"$LOGFILE" &>/dev/null
+			fi
 			printf "\n\n"
+		else
+			[ ! -s ".tmp/webs_subs.txt" ] && cat webs/webs.txt subdomains/subdomains.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
+			if [ -s ".tmp/webs_subs.txt" ]; then
+				printf "${yellow}\n Running : Nuclei Info${reset}\n\n"
+				axiom-scan .tmp/webs_subs.txt -m nuclei -severity info -o nuclei_output/info.txt 2>>"$LOGFILE" &>/dev/null
+				printf "${yellow}\n\n Running : Nuclei Low${reset}\n\n"
+				axiom-scan .tmp/webs_subs.txt -m nuclei -severity low -o nuclei_output/low.txt 2>>"$LOGFILE" &>/dev/null
+				printf "${yellow}\n\n Running : Nuclei Medium${reset}\n\n"
+				axiom-scan .tmp/webs_subs.txt -m nuclei -severity medium -o nuclei_output/medium.txt 2>>"$LOGFILE" &>/dev/null
+				printf "${yellow}\n\n Running : Nuclei High${reset}\n\n"
+				axiom-scan .tmp/webs_subs.txt -m nuclei -severity high -o nuclei_output/high.txt 2>>"$LOGFILE" &>/dev/null
+				printf "${yellow}\n\n Running : Nuclei Critical${reset}\n\n"
+				axiom-scan .tmp/webs_subs.txt -m nuclei -severity critical -o nuclei_output/critical.txt 2>>"$LOGFILE" &>/dev/null
+				if [ "$BBRF_CONNECTION" = true ]; then
+					[ -s "nuclei_output/info.txt" ] && cat nuclei_output/info.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:info 2>>"$LOGFILE" &>/dev/null
+					[ -s "nuclei_output/low.txt" ] && cat nuclei_output/low.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:low 2>>"$LOGFILE" &>/dev/null
+					[ -s "nuclei_output/medium.txt" ] && cat nuclei_output/medium.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:medium 2>>"$LOGFILE" &>/dev/null
+					[ -s "nuclei_output/high.txt" ] && cat nuclei_output/high.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:high 2>>"$LOGFILE" &>/dev/null
+					[ -s "nuclei_output/critical.txt" ] && cat nuclei_output/critical.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:critical 2>>"$LOGFILE" &>/dev/null
+				fi
+				printf "\n\n"
+			fi
 		fi
 		end_func "Results are saved in $domain/nuclei_output folder" ${FUNCNAME[0]}
 	else
@@ -790,14 +1043,24 @@ function fuzz(){
 		start_func "Web directory fuzzing"
 		if [ -s "webs/webs.txt" ]; then
 			mkdir -p $dir/fuzzing
-			interlace -tL webs/webs.txt -threads 10 -c "ffuf -mc all -mc 200 -ac -t ${FFUF_THREADS} -sf -s -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u  _target_/FUZZ -of csv -o _output_/_cleantarget_.csv" -o fuzzing 2>>"$LOGFILE" &>/dev/null
-
-			for sub in $(cat webs/webs.txt); do
-				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-				[ -s "$dir/fuzzing/${sub_out}.csv" ] && cat $dir/fuzzing/${sub_out}.csv | cut -d ',' -f2,5,6 | tr ',' ' ' | awk '{ print $2 " " $3 " " $1}' | tail -n +2 | sort -k1 | anew -q $dir/fuzzing/${sub_out}.txt
-				rm -f $dir/fuzzing/${sub_out}.csv 2>>"$LOGFILE"
-			done
-
+			if [ ! "$AXIOM" = true ]; then
+				interlace -tL webs/webs.txt -threads 10 -c "ffuf -mc all -fc 404 -ac -t ${FFUF_THREADS} -sf -s -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u  _target_/FUZZ -of csv -o _output_/_cleantarget_.csv" -o fuzzing 2>>"$LOGFILE" &>/dev/null
+				for sub in $(cat webs/webs.txt); do
+					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
+					[ -s "$dir/fuzzing/${sub_out}.csv" ] && cat $dir/fuzzing/${sub_out}.csv | cut -d ',' -f2,5,6 | tr ',' ' ' | awk '{ print $2 " " $3 " " $1}' | tail -n +2 | sort -k1 | anew -q $dir/fuzzing/${sub_out}.txt
+					rm -f $dir/fuzzing/${sub_out}.csv 2>>"$LOGFILE"
+				done
+				find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | anew -q $dir/fuzzing/fuzzing_full.txt
+			else
+				axiom-scan webs/webs.txt -m ffuf -w /home/op/lists/onelistforallmicro.txt -H \"${HEADER}\" -mc all -fc 404 -sf -ac -s -maxtime $FFUF_MAXTIME -o $dir/fuzzing/ffuf-content.csv 2>>"$LOGFILE" &>/dev/null
+				grep -v "FUZZ,url,redirectlocation" $dir/fuzzing/ffuf-content.csv | awk -F "," '{print $2" "$5" "$6}' | sort > $dir/fuzzing/ffuf-content.tmp
+				for sub in $(cat webs/webs.txt); do
+					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
+					grep "$sub" $dir/fuzzing/ffuf-content.tmp | awk '{print $2" "$3" "$1}' | sort -k1 | anew -q $dir/fuzzing/${sub_out}.txt
+				done
+				find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | anew -q $dir/fuzzing/fuzzing_full.txt
+				rm -f $dir/fuzzing/ffuf-content.tmp $dir/fuzzing/ffuf-content.csv
+			fi
 			end_func "Results are saved in $domain/fuzzing/*subdomain*.txt" ${FUNCNAME[0]}
 		else
 			end_func "No $domain/web/webs.txts file found, fuzzing skipped " ${FUNCNAME[0]}
@@ -855,19 +1118,47 @@ function urlchecks(){
 		start_func "URL Extraction"
 		mkdir -p js
 		if [ -s "webs/webs.txt" ]; then
-			cat webs/webs.txt | waybackurls | anew -q .tmp/url_extract_tmp.txt
-			cat webs/webs.txt | gauplus -t $GAUPLUS_THREADS -subs | anew -q .tmp/url_extract_tmp.txt
-			#cat webs/webs.txt | nuclei -t ~/nuclei-templates/headless/extract-urls.yaml -headless -silent -no-color | grep "^http" | anew -q .tmp/url_extract_tmp.txt
-			diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt 2>>"$LOGFILE") <(sort -u webs/webs.txt 2>>"$LOGFILE") | wc -l)
-			if [ $diff_webs != "0" ] || [ ! -s ".tmp/gospider.txt" ]; then
-				if [ "$DEEP" = true ]; then
-					gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -d 3 --sitemap --robots -w -r > .tmp/gospider.txt
-				else
-					gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -d 2 --sitemap --robots -w -r > .tmp/gospider.txt
+			if [ ! "$AXIOM" = true ]; then
+				if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+					cat webs/webs.txt | waybackurls | anew -q .tmp/url_extract_tmp.txt
+					cat webs/webs.txt | gauplus -t $GAUPLUS_THREADS -subs | anew -q .tmp/url_extract_tmp.txt
+				#cat webs/webs.txt | nuclei -t ~/nuclei-templates/headless/extract-urls.yaml -headless -silent -no-color | grep "^http" | anew -q .tmp/url_extract_tmp.txt
 				fi
+				diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt 2>>"$LOGFILE") <(sort -u webs/webs.txt 2>>"$LOGFILE") | wc -l)
+				if [ $diff_webs != "0" ] || [ ! -s ".tmp/gospider.txt" ]; then
+					if [ "$DEEP" = true ]; then
+						gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -d 3 --sitemap --robots -w -r > .tmp/gospider.txt
+					else
+						gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -d 2 --sitemap --robots -w -r > .tmp/gospider.txt
+					fi
+				fi
+				sed -i '/^.\{2048\}./d' .tmp/gospider.txt
+				if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+					[ -s ".tmp/gospider.txt" ] && cat .tmp/gospider.txt | grep -Eo 'https?://[^ ]+' | sed 's/]$//' | anew -q .tmp/url_extract_tmp.txt
+				else
+					[ -s ".tmp/gospider.txt" ] && cat .tmp/gospider.txt | grep -Eo 'https?://[^ ]+' | sed 's/]$//' | grep "$domain" | anew -q .tmp/url_extract_tmp.txt
+				fi
+			else
+				if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+					axiom-scan webs/webs.txt -m waybackurls -o .tmp/url_extract_way_tmp.txt 2>>"$LOGFILE" &>/dev/null
+					[ -s ".tmp/url_extract_way_tmp.txt" ] && cat .tmp/url_extract_way_tmp.txt | anew -q .tmp/url_extract_tmp.txt
+					axiom-scan webs/webs.txt -m gau -o .tmp/url_extract_gau_tmp.txt 2>>"$LOGFILE" &>/dev/null
+					[ -s ".tmp/url_extract_gau_tmp.txt" ] && cat .tmp/url_extract_gau_tmp.txt | anew -q .tmp/url_extract_tmp.txt
+					#axiom-scan webs/webs.txt -m nuclei -w /home/op/recon/nuclei/headless/extract-urls.yaml -o .tmp/url_extract_nuclei_tmp.txt 2>>"$LOGFILE" &>/dev/null
+					#[ -s ".tmp/url_extract_nuclei_tmp.txt" ] && cat .tmp/url_extract_nuclei_tmp.txt | grep "^http" | anew -q .tmp/url_extract_tmp.txt
+				fi
+				diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt) <(sort -u webs/webs.txt) | wc -l)
+				if [ $diff_webs != "0" ] || [ ! -s ".tmp/gospider.txt" ]; then
+					if [ "$DEEP" = true ]; then
+						axiom-scan webs/webs.txt -m gospider --js -d 3 --sitemap --robots -w -r -o .tmp/gospider 2>>"$LOGFILE" &>/dev/null
+					else
+						axiom-scan webs/webs.txt -m gospider --js -d 2 --sitemap --robots -w -r -o .tmp/gospider 2>>"$LOGFILE" &>/dev/null
+					fi
+					[[ -d .tmp/gospider/ ]] && cat .tmp/gospider/* 2>>"$LOGFILE" | sed '/^.\{2048\}./d' | anew -q .tmp/gospider.txt
+				fi
+				[[ -d .tmp/gospider/ ]] && NUMFILES=$(find .tmp/gospider/ -type f | wc -l)
+				[[ $NUMFILES -gt 0 ]] && cat .tmp/gospider.txt | grep -Eo 'https?://[^ ]+' | sed 's/]$//' | grep ".$domain" | anew -q .tmp/url_extract_tmp.txt
 			fi
-			sed -i '/^.\{2048\}./d' .tmp/gospider.txt
-			[ -s ".tmp/gospider.txt" ] && cat .tmp/gospider.txt | grep -Eo 'https?://[^ ]+' | sed 's/]$//' | grep ".$domain" | anew -q .tmp/url_extract_tmp.txt
 			if [ -s "${GITHUB_TOKENS}" ]; then
 				github-endpoints -q -k -d $domain -t ${GITHUB_TOKENS} -o .tmp/github-endpoints.txt 2>>"$LOGFILE" &>/dev/null
 				[ -s ".tmp/github-endpoints.txt" ] && cat .tmp/github-endpoints.txt | anew -q .tmp/url_extract_tmp.txt
@@ -877,7 +1168,7 @@ function urlchecks(){
 				[ -s "js/url_extract_js.txt" ] && cat js/url_extract_js.txt | python3 $tools/JSA/jsa.py | anew -q .tmp/url_extract_tmp.txt
 			fi
 			[ -s ".tmp/url_extract_tmp.txt" ] &&  cat .tmp/url_extract_tmp.txt | grep "${domain}" | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -Eiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | anew -q .tmp/url_extract_tmp2.txt
-			[ -s ".tmp/url_extract_tmp2.txt" ] && cat .tmp/url_extract_tmp2.txt | urldedupe -s -qs | anew -q .tmp/url_extract_uddup.txt 2>>"$LOGFILE" &>/dev/null
+			[ -s ".tmp/url_extract_tmp2.txt" ] && cat .tmp/url_extract_tmp2.txt | urldedupe -s -qs | uro | anew -q .tmp/url_extract_uddup.txt 2>>"$LOGFILE" &>/dev/null
 			NUMOFLINES=$(cat .tmp/url_extract_uddup.txt 2>>"$LOGFILE" | anew webs/url_extract.txt | wc -l)
 			notification "${NUMOFLINES} new urls with params" info
 			end_func "Results are saved in $domain/webs/url_extract.txt" ${FUNCNAME[0]}
@@ -919,16 +1210,19 @@ function url_gf(){
 
 function url_ext(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$URL_EXT" = true ]; then
-		ext=("7z" "achee" "action" "adr" "apk" "arj" "ascx" "asmx" "asp" "aspx" "axd" "backup" "bak" "bat" "bin" "bkf" "bkp" "bok" "cab" "cer" "cfg" "cfm" "cfml" "cgi" "cnf" "conf" "config" "cpl" "crt" "csr" "csv" "dat" "db" "dbf" "deb" "dmg" "dmp" "doc" "docx" "drv" "email" "eml" "emlx" "env" "exe" "gadget" "gz" "html" "ica" "inf" "ini" "iso" "jar" "java" "jhtml" "json" "jsp" "key" "log" "lst" "mai" "mbox" "mbx" "md" "mdb" "msg" "msi" "nsf" "ods" "oft" "old" "ora" "ost" "pac" "passwd" "pcf" "pdf" "pem" "pgp" "php" "php3" "php4" "php5" "phtm" "phtml" "pkg" "pl" "plist" "pst" "pwd" "py" "rar" "rb" "rdp" "reg" "rpm" "rtf" "sav" "sh" "shtm" "shtml" "skr" "sql" "swf" "sys" "tar" "tar.gz" "tmp" "toast" "tpl" "txt" "url" "vcd" "vcf" "wml" "wpd" "wsdl" "wsf" "xls" "xlsm" "xlsx" "xml" "xsd" "yaml" "yml" "z" "zip")
-		echo "" > webs/url_extract.txt
-		for t in "${ext[@]}"; do
-			NUMOFLINES=$(cat .tmp/url_extract_tmp.txt | grep -Ei "\.(${t})($|\/|\?)" | sort -u | wc -l)
-			if [[ ${NUMOFLINES} -gt 0 ]]; then
-				echo -e "\n############################\n + ${t} + \n############################\n" >> webs/urls_by_ext.txt
-				[ -s ".tmp/url_extract_tmp.txt" ] && cat .tmp/url_extract_tmp.txt | grep -Ei "\.(${t})($|\/|\?)" | anew -q > webs/urls_by_ext.txt
-			fi
-		done
-		end_func "Results are saved in $domain/webs/urls_by_ext.txt" ${FUNCNAME[0]}
+		if [ -s ".tmp/url_extract_tmp.txt" ]; then
+			start_func "Urls by extension"
+			ext=("7z" "achee" "action" "adr" "apk" "arj" "ascx" "asmx" "asp" "aspx" "axd" "backup" "bak" "bat" "bin" "bkf" "bkp" "bok" "cab" "cer" "cfg" "cfm" "cfml" "cgi" "cnf" "conf" "config" "cpl" "crt" "csr" "csv" "dat" "db" "dbf" "deb" "dmg" "dmp" "doc" "docx" "drv" "email" "eml" "emlx" "env" "exe" "gadget" "gz" "html" "ica" "inf" "ini" "iso" "jar" "java" "jhtml" "json" "jsp" "key" "log" "lst" "mai" "mbox" "mbx" "md" "mdb" "msg" "msi" "nsf" "ods" "oft" "old" "ora" "ost" "pac" "passwd" "pcf" "pdf" "pem" "pgp" "php" "php3" "php4" "php5" "phtm" "phtml" "pkg" "pl" "plist" "pst" "pwd" "py" "rar" "rb" "rdp" "reg" "rpm" "rtf" "sav" "sh" "shtm" "shtml" "skr" "sql" "swf" "sys" "tar" "tar.gz" "tmp" "toast" "tpl" "txt" "url" "vcd" "vcf" "wml" "wpd" "wsdl" "wsf" "xls" "xlsm" "xlsx" "xml" "xsd" "yaml" "yml" "z" "zip")
+			#echo "" > webs/url_extract.txt
+			for t in "${ext[@]}"; do
+				NUMOFLINES=$(cat .tmp/url_extract_tmp.txt | grep -Ei "\.(${t})($|\/|\?)" | sort -u | wc -l)
+				if [[ ${NUMOFLINES} -gt 0 ]]; then
+					echo -e "\n############################\n + ${t} + \n############################\n" >> webs/urls_by_ext.txt
+					cat .tmp/url_extract_tmp.txt | grep -Ei "\.(${t})($|\/|\?)" >> webs/urls_by_ext.txt
+				fi
+			done
+			end_func "Results are saved in $domain/webs/urls_by_ext.txt" ${FUNCNAME[0]}
+		fi
 	else
 		if [ "$URL_EXT" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -943,20 +1237,38 @@ function jschecks(){
 		start_func "Javascript Scan"
 		if [ -s "js/url_extract_js.txt" ]; then
 			printf "${yellow} Running : Fetching Urls 1/5${reset}\n"
-			cat js/url_extract_js.txt | cut -d '?' -f 1 | grep -iE "\.js$" | grep "$domain$" | anew -q js/jsfile_links.txt
-			cat js/url_extract_js.txt | subjs | grep "$domain$" | anew -q js/jsfile_links.txt
+			if [ ! "$AXIOM" = true ]; then
+				cat js/url_extract_js.txt | subjs -c 40 | grep "$domain" | anew -q .tmp/subjslinks.txt
+			else
+				axiom-scan js/url_extract_js.txt -m subjs -o .tmp/subjslinks.txt 2>>"$LOGFILE" &>/dev/null							
+			fi
+			[ -s .tmp/subjslinks.txt ] && cat .tmp/subjslinks.txt | egrep -iv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | anew -q js/nojs_links.txt
+			[ -s .tmp/subjslinks.txt ] && cat .tmp/subjslinks.txt | grep -iE "\.js" | anew -q js/url_extract_js.txt
 			printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
-			[ -s "js/jsfile_links.txt" ] && cat js/jsfile_links.txt | httpx -follow-redirects -random-agent -silent -timeout $HTTPX_TIMEOUT -threads $HTTPX_THREADS -status-code -retries 2 -no-color | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
+			if [ ! "$AXIOM" = true ]; then
+				[ -s "js/url_extract_js.txt" ] && cat js/url_extract_js.txt | httpx -follow-redirects -random-agent -silent -timeout $HTTPX_TIMEOUT -threads $HTTPX_THREADS -status-code -retries 2 -no-color | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
+			else
+				[ -s "js/url_extract_js.txt" ] && axiom-scan js/url_extract_js.txt -m httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -o .tmp/js_livelinks.txt 2>>"$LOGFILE" &>/dev/null
+				[ -s ".tmp/js_livelinks.txt" ] && cat .tmp/js_livelinks.txt | anew .tmp/web_full_info.txt | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
+			fi
 			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
 			if [ -s "js/js_livelinks.txt" ]; then
-				interlace -tL js/js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> .tmp/js_endpoints.txt" &>/dev/null
+				if [ ! "$AXIOM" = true ]; then
+					interlace -tL js/js_livelinks.txt -threads 10 -c "python3 $tools/LinkFinder/linkfinder.py -d -i _target_ -o cli >> .tmp/js_endpoints.txt" &>/dev/null
+				else
+					axiom-scan js/js_livelinks.txt -m linkfinder -o .tmp/js_endpoints.txt 2>>"$LOGFILE" &>/dev/null			
+				fi
 			fi
 			if [ -s ".tmp/js_endpoints.txt" ]; then
 				sed -i '/^\//!d' .tmp/js_endpoints.txt
 				cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt
 			fi
 			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
-			[ -s "js/js_livelinks.txt" ] && cat js/js_livelinks.txt | nuclei -silent -t ~/nuclei-templates/exposures/tokens/ -r $resolvers_trusted -o js/js_secrets.txt 2>>"$LOGFILE" &>/dev/null
+			if [ ! "$AXIOM" = true ]; then
+				[ -s "js/js_livelinks.txt" ] && cat js/js_livelinks.txt | nuclei -silent -t ~/nuclei-templates/ -tags exposure,token -r $resolvers_trusted -o js/js_secrets.txt 2>>"$LOGFILE" &>/dev/null
+			else
+				[ -s "js/js_livelinks.txt" ] && axiom-scan js/js_livelinks.txt -m nuclei -w /home/op/recon/nuclei/exposures/tokens/ -o js/js_secrets.txt 2>>"$LOGFILE" &>/dev/null
+			fi
 			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
 			[ -s "js/js_livelinks.txt" ] && cat js/js_livelinks.txt | python3 $tools/getjswords.py 2>>"$LOGFILE" | anew -q webs/dict_words.txt
 			end_func "Results are saved in $domain/js folder" ${FUNCNAME[0]}
@@ -996,6 +1308,18 @@ function wordlist_gen(){
 	fi
 }
 
+function wordlist_gen_roboxtractor(){
+	if  { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$ROBOTSWORDLIST" = true ]; then
+		start_func "Robots wordlist generation"
+		if [ -s "webs/webs.txt" ]; then
+			cat webs/webs.txt | roboxtractor -m 1 -wb 2>>"$LOGFILE" | anew -q webs/robots_wordlist.txt
+		fi
+		end_func "Results are saved in $domain/webs/robots_wordlist.txt" ${FUNCNAME[0]}
+	else
+		printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
+}
+
 ###############################################################################################################
 ######################################### VULNERABILITIES #####################################################
 ###############################################################################################################
@@ -1003,14 +1327,25 @@ function wordlist_gen(){
 function brokenLinks(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$BROKENLINKS" = true ] ; then
 		start_func "Broken links checks"
-		if [ ! -s ".tmp/gospider.txt" ]; then
-			if [ "$DEEP" = true ]; then
-				[ -s "webs/webs.txt" ] && gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -d 3 --sitemap --robots -w -r > .tmp/gospider.txt
-			else
-				[ -s "webs/webs.txt" ] && gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -d 2 --sitemap --robots -w -r > .tmp/gospider.txt
+		if [ ! "$AXIOM" = true ]; then
+			if [ ! -s ".tmp/gospider.txt" ]; then
+				if [ "$DEEP" = true ]; then
+					[ -s "webs/webs.txt" ] && gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -d 3 --sitemap --robots -w -r > .tmp/gospider.txt
+				else
+					[ -s "webs/webs.txt" ] && gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -d 2 --sitemap --robots -w -r > .tmp/gospider.txt
+				fi
+			fi
+			[ -s ".tmp/gospider.txt" ] && sed -i '/^.\{2048\}./d' .tmp/gospider.txt
+		else
+			if [ ! -s ".tmp/gospider.txt" ]; then
+				if [ "$DEEP" = true ]; then
+					[ -s "webs/webs.txt" ] && axiom-scan webs/webs.txt -m gospider --js -d 3 --sitemap --robots -w -r -o .tmp/gospider 2>>"$LOGFILE" &>/dev/null
+				else
+					[ -s "webs/webs.txt" ] && axiom-scan webs/webs.txt -m gospider --js -d 2 --sitemap --robots -w -r -o .tmp/gospider 2>>"$LOGFILE" &>/dev/null
+				fi
+				cat .tmp/gospider/* | sed '/^.\{2048\}./d' | anew -q .tmp/gospider.txt
 			fi
 		fi
-		[ -s ".tmp/gospider.txt" ] && sed -i '/^.\{2048\}./d' .tmp/gospider.txt
 		[ -s ".tmp/gospider.txt" ] && cat .tmp/gospider.txt | grep -Eo 'https?://[^ ]+' | sed 's/]$//' | sort -u | httpx -follow-redirects -random-agent -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color | grep "\[4" | cut -d ' ' -f1 | anew -q .tmp/brokenLinks_total.txt
 		NUMOFLINES=$(cat .tmp/brokenLinks_total.txt 2>>"$LOGFILE" | anew webs/brokenLinks.txt | wc -l)
 		notification "${NUMOFLINES} new broken links found" info
@@ -1027,24 +1362,46 @@ function brokenLinks(){
 function xss(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$XSS" = true ] && [ -s "gf/xss.txt" ]; then
 		start_func "XSS Analysis"
-		[ -s "gf/xss.txt" ] && cat gf/xss.txt | qsreplace FUZZ | Gxss -c 100 -p Xss | anew -q .tmp/xss_reflected.txt
-		if [ "$DEEP" = true ]; then
-			if [ -n "$XSS_SERVER" ]; then
-				[ -s ".tmp/xss_reflected.txt" ] && cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav -b ${XSS_SERVER} -w $DALFOX_THREADS 2>>"$LOGFILE" | anew -q vulns/xss.txt
-			else
-				printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n\n"
-				[ -s ".tmp/xss_reflected.txt" ] && cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav -w $DALFOX_THREADS 2>>"$LOGFILE" | anew -q vulns/xss.txt
-			fi
-		else
-			if [[ $(cat .tmp/xss_reflected.txt | wc -l) -le $DEEP_LIMIT ]]; then
+		[ -s "gf/xss.txt" ] && cat gf/xss.txt | qsreplace FUZZ | Gxss -c 100 -p Xss | qsreplace FUZZ | anew -q .tmp/xss_reflected.txt
+		if [ ! "$AXIOM" = true ]; then		
+			if [ "$DEEP" = true ]; then
 				if [ -n "$XSS_SERVER" ]; then
-					cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav --skip-grepping --skip-mining-all --skip-mining-dict -b ${XSS_SERVER} -w $DALFOX_THREADS 2>>"$LOGFILE" | anew -q vulns/xss.txt
+					[ -s ".tmp/xss_reflected.txt" ] && cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav -b ${XSS_SERVER} -w $DALFOX_THREADS 2>>"$LOGFILE" | anew -q vulns/xss.txt
 				else
 					printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n\n"
-					cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav --skip-grepping --skip-mining-all --skip-mining-dict -w $DALFOX_THREADS 2>>"$LOGFILE" | anew -q vulns/xss.txt
+					[ -s ".tmp/xss_reflected.txt" ] && cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav -w $DALFOX_THREADS 2>>"$LOGFILE" | anew -q vulns/xss.txt
 				fi
 			else
-				printf "${bred} Skipping XSS: Too many URLs to test, try with --deep flag${reset}\n"
+				if [[ $(cat .tmp/xss_reflected.txt | wc -l) -le $DEEP_LIMIT ]]; then
+					if [ -n "$XSS_SERVER" ]; then
+						cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav --skip-grepping --skip-mining-all --skip-mining-dict -b ${XSS_SERVER} -w $DALFOX_THREADS 2>>"$LOGFILE" | anew -q vulns/xss.txt
+					else
+						printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n\n"
+						cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --mass --mass-worker 100 --multicast --skip-bav --skip-grepping --skip-mining-all --skip-mining-dict -w $DALFOX_THREADS 2>>"$LOGFILE" | anew -q vulns/xss.txt
+					fi
+				else
+					printf "${bred} Skipping XSS: Too many URLs to test, try with --deep flag${reset}\n"
+				fi
+			fi
+		else
+			if [ "$DEEP" = true ]; then
+				if [ -n "$XSS_SERVER" ]; then
+					[ -s ".tmp/xss_reflected.txt" ] && axiom-scan .tmp/xss_reflected.txt -m dalfox --mass --mass-worker 100 --multicast --skip-bav -b ${XSS_SERVER} -w $DALFOX_THREADS -o vulns/xss.txt 2>>"$LOGFILE" &>/dev/null
+				else
+					printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n\n"
+					[ -s ".tmp/xss_reflected.txt" ] && axiom-scan .tmp/xss_reflected.txt -m dalfox --mass --mass-worker 100 --multicast --skip-bav -w $DALFOX_THREADS -o vulns/xss.txt 2>>"$LOGFILE" &>/dev/null
+				fi
+			else
+				if [[ $(cat .tmp/xss_reflected.txt | wc -l) -le 500 ]]; then
+					if [ -n "$XSS_SERVER" ]; then
+						axiom-scan .tmp/xss_reflected.txt -m dalfox --mass --mass-worker 100 --multicast --skip-bav --skip-grepping --skip-mining-all --skip-mining-dict -b ${XSS_SERVER} -w $DALFOX_THREADS -o vulns/xss.txt 2>>"$LOGFILE" &>/dev/null
+					else
+						printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n\n"
+						axiom-scan .tmp/xss_reflected.txt -m dalfox --mass --mass-worker 100 --multicast --skip-bav --skip-grepping --skip-mining-all --skip-mining-dict -w $DALFOX_THREADS -o vulns/xss.txt 2>>"$LOGFILE" &>/dev/null
+					fi
+				else
+					printf "${bred} Skipping XSS: Too many URLs to test, try with --deep flag${reset}\n"
+				fi
 			fi
 		fi
 		end_func "Results are saved in vulns/xss.txt" ${FUNCNAME[0]}
@@ -1159,9 +1516,7 @@ function lfi(){
 		if [ -s "gf/lfi.txt" ]; then
 			cat gf/lfi.txt | qsreplace FUZZ | anew -q .tmp/tmp_lfi.txt
 			if [ "$DEEP" = true ] || [[ $(cat .tmp/tmp_lfi.txt | wc -l) -le $DEEP_LIMIT ]]; then
-				for url in $(cat .tmp/tmp_lfi.txt); do
-					ffuf -v -t $FFUF_THREADS -H "${HEADER}" -w $lfi_wordlist -u $url -mr "root:" 2>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/lfi.txt
-				done
+				interlace -tL .tmp/tmp_lfi.txt -threads 10 -c "ffuf -v -r -t ${FFUF_THREADS} -H \"${HEADER}\" -w ${lfi_wordlist} -u \"_target_\" -mr \"root:\" " 2>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/lfi.txt
 				end_func "Results are saved in vulns/lfi.txt" ${FUNCNAME[0]}
 			else
 				end_func "Skipping LFI: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
@@ -1184,9 +1539,7 @@ function ssti(){
 		if [ -s "gf/ssti.txt" ]; then
 			cat gf/ssti.txt | qsreplace FUZZ | anew -q .tmp/tmp_ssti.txt
 			if [ "$DEEP" = true ] || [[ $(cat .tmp/tmp_ssti.txt | wc -l) -le $DEEP_LIMIT ]]; then
-				for url in $(cat .tmp/tmp_ssti.txt); do
-    				ffuf -v -t $FFUF_THREADS -H "${HEADER}" -w $ssti_wordlist -u $url -mr "ssti49" 2>>"$LOGFILE" | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssti.txt
-    			done
+				interlace -tL .tmp/tmp_ssti.txt -threads 10 -c "ffuf -v -r -t ${FFUF_THREADS} -H \"${HEADER}\" -w ${ssti_wordlist} -u \"_target_\" -mr \"ssti49\" " 2>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssti.txt
 				end_func "Results are saved in vulns/ssti.txt" ${FUNCNAME[0]}
 			else
 				end_func "Skipping SSTI: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
@@ -1243,30 +1596,11 @@ function spraying(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SPRAY" = true ]; then
 		start_func "Password spraying"
 		cd "$tools/brutespray" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
-		python3 brutespray.py --file $dir/.tmp/portscan_active.gnmap --threads $BRUTESPRAY_THREADS --hosts $BRUTESPRAY_CONCURRENCE -o $dir/hosts/brutespray 2>>"$LOGFILE" &>/dev/null
+		python3 brutespray.py --file $dir/hosts/portscan_active.gnmap --threads $BRUTESPRAY_THREADS --hosts $BRUTESPRAY_CONCURRENCE -o $dir/hosts/brutespray 2>>"$LOGFILE" &>/dev/null
 		cd "$dir" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		end_func "Results are saved in hosts/brutespray folder" ${FUNCNAME[0]}
 	else
 		if [ "$SPRAY" = false ]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
-		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
-		fi
-	fi
-}
-
-function 4xxbypass(){
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$BYPASSER4XX" = true ]; then
-		if [[ $(cat fuzzing/*.txt 2>/dev/null | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 | wc -l) -le $DEEP_LIMIT ]] || [ "$DEEP" = true ]; then
-			start_func "403 bypass"
-			cat fuzzing/*.txt 2>>"$LOGFILE" | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 | dirdar -threads $DIRDAR_THREADS -only-ok > .tmp/dirdar.txt
-			[ -s ".tmp/dirdar.txt" ] && cat .tmp/dirdar.txt | sed -e '1,12d' | sed '/^$/d' | anew -q vulns/4xxbypass.txt
-			end_func "Results are saved in vulns/4xxbypass.txt" ${FUNCNAME[0]}
-		else
-			notification "Too many urls to bypass, skipping" warn
-		fi
-	else
-		if [ "$BYPASSER4XX" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -1279,7 +1613,7 @@ function command_injection(){
 		start_func "Command Injection checks"
 		[ -s "gf/rce.txt" ] && cat gf/rce.txt | qsreplace FUZZ | anew -q .tmp/tmp_rce.txt
 		if [ "$DEEP" = true ] || [[ $(cat .tmp/tmp_rce.txt | wc -l) -le $DEEP_LIMIT ]]; then
-			[ -s ".tmp/tmp_rce.txt" ] && python3 $tools/commix/commix.py --batch -m .tmp/tmp_rce.txt --output-dir vulns/command_injection txt 2>>"$LOGFILE" &>/dev/null
+			[ -s ".tmp/tmp_rce.txt" ] && python3 $tools/commix/commix.py --batch -m .tmp/tmp_rce.txt --output-dir vulns/command_injection.txt 2>>"$LOGFILE" &>/dev/null
 			end_func "Results are saved in vulns/command_injection folder" ${FUNCNAME[0]}
 		else
 			end_func "Skipping Command injection: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
@@ -1289,6 +1623,25 @@ function command_injection(){
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		elif [ ! -s "gf/rce.txt" ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} No URLs potentially vulnerables to Command Injection ${reset}\n\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
+	fi
+}
+
+function prototype_pollution(){
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$PROTO_POLLUTION" = true ] ; then
+		start_func "Prototype Pollution checks"
+		if [ "$DEEP" = true ] || [[ $(cat webs/url_extract.txt | wc -l) -le $DEEP_LIMIT ]]; then
+			[ -s "webs/url_extract.txt" ] && ppfuzz -l webs/url_extract.txt -c $PPFUZZ_THREADS > anew -q .tmp/prototype_pollution.txt
+			[ -s ".tmp/prototype_pollution.txt" ] && cat .tmp/prototype_pollution.txt | sed -e '1,8d' | sed '/^\[ERR/d' | anew -q vulns/prototype_pollution.txt
+			end_func "Results are saved in vulns/prototype_pollution.txt" ${FUNCNAME[0]}
+		else
+			end_func "Skipping Prototype Pollution: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
+		fi
+	else
+		if [ "$PROTO_POLLUTION" = false ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
@@ -1350,7 +1703,8 @@ function isAsciiText {
 
 function output(){
 	mkdir -p $dir_output
-	mv $dir $dir_output
+	cp -r $dir $dir_output
+	rm -rf $dir
 }
 
 function notification(){
@@ -1377,7 +1731,6 @@ function notification(){
 }
 
 function sendToNotify {
-
 	if [[ -z "$1" ]]; then
 		printf "\n${yellow} no file provided to send ${reset}\n"
 	else
@@ -1431,32 +1784,102 @@ function end_subfunc(){
 
 function resolvers_update(){
 	if [ "$update_resolvers" = true ]; then
-		if [[ $(find "$resolvers" -mtime +1 -print) ]]; then
-			notification "Resolvers seem older than 1 day\n Generating custom resolvers..." warn
-			eval rm -f $resolvers 2>>"$LOGFILE"
-			dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 100 -o $resolvers &>/dev/null
-			notification "Updated\n" good
-			update_resolvers=false
-  		fi
-	fi
-}
-
-function ipcidr_detection(){
-		if [[ $1 =~ /[0-9]+$ ]]; then
-			prips $1 | dnsx -ptr -resp-only -silent
+		if [ ! "$AXIOM" = true ]; then	
+			if [[ $(find "$resolvers" -mtime +1 -print) ]]; then
+				notification "Resolvers seem older than 1 day\n Generating custom resolvers..." warn
+				eval rm -f $resolvers 2>>"$LOGFILE"
+				dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 100 -o $resolvers &>/dev/null
+				notification "Updated\n" good
+	  		fi
 		else
-			echo $1 | dnsx -ptr -resp-only -silent
+			notification "Checking resolvers lists...\n Accurate resolvers are the key to great results\n This may take around 10 minutes if it's not updated" warn
+			# shellcheck disable=SC2016
+			axiom-exec 'if [ \$(find "/home/op/lists/resolvers.txt" -mtime +1 -print) ] || [ \$(cat /home/op/lists/resolvers.txt | wc -l) -le 40 ] ; then dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 200 -o /home/op/lists/resolvers.txt ; fi' &>/dev/null
+			notification "Updated\n" good
+			axiom-exec 'wget -O /home/op/lists/resolvers_trusted.txt https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw' &>/dev/null
+			axiom-exec 'wget -O /home/op/lists/onelistforallmicro.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt' &>/dev/null
+
 		fi
+		update_resolvers=false
+	fi
 }
 
 function ipcidr_target(){
 	if [[ $1 =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
-		ipcidr_detection $1 | unfurl -u domains 2>/dev/null | sed 's/\.$//' | anew -q ./target_reconftw_ipcidr.txt
-		if [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -eq 1 ]]; then
-			domain=$(cat ./target_reconftw_ipcidr.txt)
-		elif [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -gt 1 ]]; then
-			list=${PWD}/target_reconftw_ipcidr.txt
+		echo $1 | mapcidr -silent | anew -q target_reconftw_ipcidr.txt
+		if [ -s "./target_reconftw_ipcidr.txt" ]; then 
+			[ "$REVERSE_IP" = true ] && cat ./target_reconftw_ipcidr.txt | dnsx -ptr -resp-only -silent | unfurl -u domains 2>/dev/null | sed 's/\.$//' | anew -q ./target_reconftw_ipcidr.txt
+			if [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -eq 1 ]]; then
+				domain=$(cat ./target_reconftw_ipcidr.txt)
+			elif [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -gt 1 ]]; then
+				unset domain
+				list=${PWD}/target_reconftw_ipcidr.txt
+			fi
 		fi
+		if [ -n "$2" ]; then
+			cat $list | anew -q $2
+			sed -i '/\/[0-9]*$/d' $2
+		fi
+	fi
+}
+
+function axiom_lauch(){
+	# let's fire up a FLEET!
+	if [ "$AXIOM_FLEET_LAUNCH" = true ] && [ -n "$AXIOM_FLEET_NAME" ] && [ -n "$AXIOM_FLEET_COUNT" ]; then
+		start_func "Launching our Axiom fleet"
+		python3 -m pip install --upgrade linode-cli 2>>"$LOGFILE" &>/dev/null
+		# Check to see if we have a fleet already, if so, SKIP THIS!
+		NUMOFNODES=$(timeout 30 axiom-ls | grep -c "$AXIOM_FLEET_NAME")
+		if [[ $NUMOFNODES -ge $AXIOM_FLEET_COUNT ]]; then
+			axiom-select "$AXIOM_FLEET_NAME*"
+			end_func "Axiom fleet $AXIOM_FLEET_NAME already has $NUMOFNODES instances"
+		else
+			if [[ $NUMOFNODES -eq 0 ]]; then
+				startcount=$AXIOM_FLEET_COUNT
+			else
+				startcount=$((AXIOM_FLEET_COUNT-NUMOFNODES))
+			fi
+			axiom_args=" -i=$startcount "
+			# Temporarily disabled multiple axiom regions
+			# [ -n "$AXIOM_FLEET_REGIONS" ] && axiom_args="$axiom_args --regions=\"$AXIOM_FLEET_REGIONS\" "
+
+			echo "axiom-fleet $AXIOM_FLEET_NAME $axiom_args"
+			axiom-fleet $AXIOM_FLEET_NAME "$axiom_args"
+			axiom-select "$AXIOM_FLEET_NAME*"
+			if [ -n "$AXIOM_POST_START" ]; then
+				eval "$AXIOM_POST_START" 2>>"$LOGFILE" &>/dev/null
+			fi
+
+			NUMOFNODES=$(timeout 30 axiom-ls | grep -c "$AXIOM_FLEET_NAME" )
+			echo "Axiom fleet $AXIOM_FLEET_NAME launched w/ $NUMOFNODES instances" | $NOTIFY
+			end_func "Axiom fleet $AXIOM_FLEET_NAME launched w/ $NUMOFNODES instances"
+		fi
+	fi
+}
+
+function axiom_shutdown(){
+	if [ "$AXIOM_FLEET_LAUNCH" = true ] && [ "$AXIOM_FLEET_SHUTDOWN" = true ] && [ -n "$AXIOM_FLEET_NAME" ]; then
+		#if [ "$mode" == "subs_menu" ] || [ "$mode" == "list_recon" ] || [ "$mode" == "passive" ] || [ "$mode" == "all" ]; then
+		if [ "$mode" == "subs_menu" ] || [ "$mode" == "passive" ] || [ "$mode" == "all" ]; then
+			notification "Automatic Axiom fleet shutdown is not enabled in this mode" info
+			return
+		fi
+		eval axiom-rm -f "$AXIOM_FLEET_NAME*"
+		echo "Axiom fleet $AXIOM_FLEET_NAME shutdown" | $NOTIFY
+		notification "Axiom fleet $AXIOM_FLEET_NAME shutdown" info
+	fi
+}
+
+function axiom_selected(){
+
+	if [[ ! $(axiom-ls | tail -n +2 | sed '$ d' | wc -l) -gt 0 ]]; then
+		notification "\n\n${bred} No axiom instances running ${reset}\n\n" error
+		exit
+	fi
+
+	if [[ ! $(cat ~/.axiom/selected.conf | sed '/^\s*$/d' | wc -l) -gt 0 ]]; then
+		notification "\n\n${bred} No axiom instances selected ${reset}\n\n" error
+		exit
 	fi
 }
 
@@ -1475,7 +1898,8 @@ function start(){
 	printf "${bgreen}#######################################################################${reset}\n"
 	tools_installed
 
-	[[ -n "$domain" ]] && ipcidr_target $domain
+	#[[ -n "$domain" ]] && ipcidr_target $domain
+
 
 	if [ -z "$domain" ]; then
 		if [ -n "$list" ]; then
@@ -1505,6 +1929,12 @@ function start(){
 	fi
 	mkdir -p "$dir"
 	cd "$dir"  || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+	if [ "$AXIOM" = true ]; then
+		if [ -n "$domain" ]; then
+			echo "$domain" | anew -q target.txt
+			list="${dir}/target.txt"
+		fi
+	fi
 	mkdir -p .tmp .log osint subdomains webs hosts vulns
 
 	NOW=$(date +"%F")
@@ -1514,6 +1944,13 @@ function start(){
 
 	if [ -n "$findomain_virustotal_token" ]; then
 		VT_API_KEY=$findomain_virustotal_token
+	fi
+
+	if [ "$BBRF_CONNECTION" = true ]; then
+		program_bbrf=${echo $domain | awk -F. '{print $1"_"$2}'} 2>>"$LOGFILE" &>/dev/null
+		bbrf new ${program_bbrf} 2>>"$LOGFILE" &>/dev/null
+		bbrf use ${program_bbrf} 2>>"$LOGFILE" &>/dev/null
+		bbrf inscope add "*.${domain}" 2>>"$LOGFILE" &>/dev/null
 	fi
 
 	printf "\n"
@@ -1567,10 +2004,21 @@ function passive(){
 	metadata
 	SUBSCRAPING=false
 	WEBPROBESIMPLE=false
+
+	if [ "$AXIOM" = true ]; then
+		axiom_lauch
+		axiom_selected
+	fi
+
 	subdomains_full
 	favicon
 	PORTSCAN_ACTIVE=false
 	portscan
+	
+	if [ "$AXIOM" = true ]; then
+		axiom_shutdown
+	fi
+
 	cloudprovider
 	end
 }
@@ -1594,7 +2042,6 @@ function osint(){
 
 function vulns(){
 	if [ "$VULNS_GENERAL" = true ]; then
-		4xxbypass
 		cors
 		open_redirect
 		ssrf_checks
@@ -1604,6 +2051,7 @@ function vulns(){
 		sqli
 		xss
 		command_injection
+		prototype_pollution
 		spraying
 		brokenLinks
 		test_ssl
@@ -1620,7 +2068,7 @@ function multi_osint(){
 	    NOTIFY=""
 	fi
 
-	[[ -n "$domain" ]] && ipcidr_target $domain
+	#[[ -n "$domain" ]] && ipcidr_target $domain
 
 	if [ -s "$list" ]; then
 		sed -i 's/\r$//' $list
@@ -1664,10 +2112,16 @@ function recon(){
 	metadata
 	zonetransfer
 	favicon
+
+	if [ "$AXIOM" = true ]; then
+		axiom_lauch
+		axiom_selected
+	fi
+
 	subdomains_full
-	subtakeover
-	s3buckets
 	webprobe_full
+	s3buckets
+	subtakeover
 	screenshot
 	portscan
 	waf_checks
@@ -1675,10 +2129,17 @@ function recon(){
 	fuzz
 	urlchecks
 	jschecks
+
+	if [ "$AXIOM" = true ]; then
+		axiom_shutdown
+	fi
+
 	cloudprovider
 	cms_scanner
 	url_gf
 	wordlist_gen
+	wordlist_gen_roboxtractor
+	url_ext
 }
 
 function multi_recon(){
@@ -1692,7 +2153,7 @@ function multi_recon(){
 	    NOTIFY=""
 	fi
 
-	[[ -n "$domain" ]] && ipcidr_target $domain
+	#[[ -n "$domain" ]] && ipcidr_target $domain
 
 	if [ -s "$list" ]; then
 		 sed -i 's/\r$//' $list
@@ -1748,15 +2209,22 @@ function multi_recon(){
 	done
 	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 
+	if [ "$AXIOM" = true ]; then
+		axiom_lauch
+		axiom_selected
+	fi
+
 	for domain in $targets; do
 		loopstart=$(date +%s)
 		dir=$workdir/targets/$domain
 		called_fn_dir=$dir/.called_fn
 		cd "$dir"  || { echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		subdomains_full
-		subtakeover
 		webprobe_full
+		subtakeover
 		screenshot
+		portscan
+		cloudprovider
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
@@ -1766,7 +2234,7 @@ function multi_recon(){
 			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
 			printf "\n${yellow}  $domain is $POSINLIST of $LISTTOTAL${reset}\n"
 		fi
-		printf "${reset}#######################################################################\n\n"
+		printf "${bgreen}#######################################################################${reset}\n"
 	done
 	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 
@@ -1779,6 +2247,11 @@ function multi_recon(){
 	NUMOFLINES_subtko_total=$(find . -type f -name 'takeover.txt' -exec cat {} + | anew webs/takeover.txt | wc -l)
 	NUMOFLINES_webs_total=$(find . -type f -name 'webs.txt' -exec cat {} + | anew webs/webs.txt | wc -l)
 	NUMOFLINES_webs_total=$(find . -type f -name 'webs_uncommon_ports.txt' -exec cat {} + | anew webs/webs_uncommon_ports.txt | wc -l)
+	NUMOFLINES_ips_total=$(find . -type f -name 'ips.txt' -exec cat {} + | anew hosts/ips.txt | wc -l)
+	NUMOFLINES_cloudsprov_total=$(find . -type f -name 'cloud_providers.txt' -exec cat {} + | anew hosts/cloud_providers.txt | wc -l)
+	find . -type f -name 'portscan_active.txt' -exec cat {} + > hosts/portscan_active.txt 2>>"$LOGFILE" &>/dev/null
+	find . -type f -name 'portscan_active.gnmap' -exec cat {} + > hosts/portscan_active.gnmap 2>>"$LOGFILE" &>/dev/null
+	find . -type f -name 'portscan_passive.txt' -exec cat {} + > hosts/portscan_passive.txt 2>>"$LOGFILE" &>/dev/null
 
 	notification "- ${NUMOFLINES_users_total} total users found" good
 	notification "- ${NUMOFLINES_pwndb_total} total creds leaked" good
@@ -1787,8 +2260,8 @@ function multi_recon(){
 	notification "- ${NUMOFLINES_subs_total} total subdomains" good
 	notification "- ${NUMOFLINES_subtko_total} total probably subdomain takeovers" good
 	notification "- ${NUMOFLINES_webs_total} total websites" good
-
-	portscan
+	notification "- ${NUMOFLINES_ips_total} total ips" good
+	notification "- ${NUMOFLINES_cloudsprov_total} total IPs belongs to cloud" good
 	s3buckets
 	waf_checks
 	nuclei_check
@@ -1810,9 +2283,13 @@ function multi_recon(){
 			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
 			printf "\n${yellow}  $domain is $POSINLIST of $LISTTOTAL${reset}\n"
 		fi
-		printf "${reset}#######################################################################\n\n"
+		printf "${bgreen}#######################################################################${reset}\n"
 	done
-	cloudprovider
+
+	if [ "$AXIOM" = true ]; then
+		axiom_shutdown
+	fi
+
 	for domain in $targets; do
 		loopstart=$(date +%s)
 		dir=$workdir/targets/$domain
@@ -1821,6 +2298,8 @@ function multi_recon(){
 		cms_scanner
 		url_gf
 		wordlist_gen
+		wordlist_gen_roboxtractor
+		url_ext
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
@@ -1830,7 +2309,7 @@ function multi_recon(){
 			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
 			printf "\n${yellow}  $domain is $POSINLIST of $LISTTOTAL${reset}\n"
 		fi
-		printf "${reset}#######################################################################\n\n"
+		printf "${bgreen}#######################################################################${reset}\n"
 	done
 	cd "$workdir" || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 	dir=$workdir
@@ -1840,12 +2319,23 @@ function multi_recon(){
 
 function subs_menu(){
 	start
+
+	if [ "$AXIOM" = true ]; then
+		axiom_lauch
+		axiom_selected
+	fi
+
 	subdomains_full
 	webprobe_full
-	screenshot
 	subtakeover
+	screenshot
 	zonetransfer
 	s3buckets
+
+	if [ "$AXIOM" = true ]; then
+		axiom_shutdown
+	fi
+
 	end
 }
 
@@ -1860,6 +2350,8 @@ function webs_menu(){
 	jschecks
 	url_gf
 	wordlist_gen
+	wordlist_gen_roboxtractor
+	url_ext
 	vulns
 	end
 }
@@ -1884,9 +2376,10 @@ function help(){
 	printf "   -h                Help - Show this help\n"
 	printf " \n"
 	printf " ${bblue}GENERAL OPTIONS${reset}\n"
-	printf "   -f confile_file   Alternate reconftw.cfg file\n"
 	printf "   --deep            Deep scan (Enable some slow options for deeper scan)\n"
+	printf "   -f confile_file   Alternate reconftw.cfg file\n"
 	printf "   -o output/path    Define output folder\n"
+	printf "   -v, --vps         Axiom distributed VPS \n"
 	printf " \n"
 	printf " ${bblue}USAGE EXAMPLES${reset}\n"
 	printf " Recon:\n"
@@ -1910,7 +2403,7 @@ function help(){
 ########################################### START SCRIPT  #####################################################
 ###############################################################################################################
 
-PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:rspanwvh::' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,deep,help' -n 'reconFTW' -- "$@")
+PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:rspanwvh::' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,deep,help,vps' -n 'reconFTW' -- "$@")
 
 
 # Note the quotes around "$PROGARGS": they are essential!
@@ -1921,6 +2414,7 @@ while true; do
     case "$1" in
         '-d'|'--domain')
             domain=$2
+			ipcidr_target $2
             shift 2
             continue
             ;;
@@ -1930,7 +2424,10 @@ while true; do
             continue
             ;;
         '-l'|'--list')
-            list=$2
+			list=$2
+			for domain in $(cat $list); do
+				ipcidr_target $domain $list
+			done
             shift 2
             continue
             ;;
@@ -1987,6 +2484,11 @@ while true; do
             shift 2
             continue
             ;;
+		'-v'|'--vps')
+			AXIOM=true
+            shift
+            continue
+            ;;
         '-f')
 			config_file=$2
             shift 2
@@ -2007,6 +2509,7 @@ while true; do
             . ./reconftw.cfg
 			banner
             help
+			tools_installed
 			exit 1
 		    ;;
     esac
@@ -2066,12 +2569,16 @@ fi
 case $opt_mode in
         'r')
             if [ -n "$multi" ];	then
-				#mode="multi_recon"
+				if [ "$AXIOM" = true ]; then
+					mode="multi_recon"
+				fi
 				multi_recon
 				exit
 			fi
 			if [ -n "$list" ]; then
-				#mode="list_recon"
+				if [ "$AXIOM" = true ]; then
+					mode="list_recon"
+				fi
 				sed -i 's/\r$//' $list
 				for domain in $(cat $list); do
 					start
@@ -2079,7 +2586,9 @@ case $opt_mode in
 					end
 				done
 			else
-				#mode="recon"
+				if [ "$AXIOM" = true ]; then
+					mode="recon"
+				fi
 				start
 				recon
 				end
@@ -2087,7 +2596,9 @@ case $opt_mode in
             ;;
         's')
             if [ -n "$list" ]; then
-				#mode="subs_menu"
+				if [ "$AXIOM" = true ]; then
+					mode="subs_menu"
+				fi
 				sed -i 's/\r$//' $list
 				for domain in $(cat $list); do
 					subs_menu
@@ -2098,7 +2609,9 @@ case $opt_mode in
             ;;
         'p')
             if [ -n "$list" ]; then
-				#mode="passive"
+				if [ "$AXIOM" = true ]; then
+					mode="passive"
+				fi
 				sed -i 's/\r$//' $list
 				for domain in $(cat $list); do
 					passive
@@ -2110,7 +2623,9 @@ case $opt_mode in
         'a')
 			export VULNS_GENERAL=true
             if [ -n "$list" ]; then
-				#mode="all"
+				if [ "$AXIOM" = true ]; then
+					mode="all"
+				fi
 				sed -i 's/\r$//' $list
 				for domain in $(cat $list); do
 					all

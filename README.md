@@ -8,8 +8,8 @@
 
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v1.7.4">
-    <img src="https://img.shields.io/badge/release-v1.7.4-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.0.0">
+    <img src="https://img.shields.io/badge/release-v2.0.0-green">
   </a>
    </a>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
@@ -135,7 +135,7 @@ docker run -v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -v $PWD/Recon/
 tools=~/Tools
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 profile_shell=".$(basename $(echo $SHELL))rc"
-reconftw_version=$(git branch --show-current)-$(git describe --tags)
+reconftw_version=$(git rev-parse --abbrev-ref HEAD)-$(git describe --tags)
 update_resolvers=true
 proxy_url="http://127.0.0.1:8080/"
 #dir_output=/custom/output/path
@@ -151,7 +151,8 @@ export PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH
 AMASS_CONFIG=~/.config/amass/config.ini
 GITHUB_TOKENS=${tools}/.github_tokens
 
-# APIs/TOKENS - Uncomment the lines you set removing the '#' at the beginning of the line
+# APIs/TOKENS - Uncomment the lines you want removing the '#' at the beginning of the line
+#UDORK_COOKIE="c_user=XXXXXXXXXX; xs=XXXXXXXXXXXXXX"
 #SHODAN_API_KEY="XXXXXXXXXXXXX"
 #XSS_SERVER="XXXXXXXXXXXXXXXXX"
 #COLLAB_SERVER="XXXXXXXXXXXXXXXXX"
@@ -176,6 +177,8 @@ DOMAIN_INFO=true
 METAFINDER_LIMIT=20 # Max 250
 
 # Subdomains
+SUBDOMAINS_GENERAL=true
+SUBPASSIVE=true
 SUBCRT=true
 SUBANALYTICS=true
 SUBBRUTE=true
@@ -186,12 +189,13 @@ SUBRECURSIVE=true
 SUB_RECURSIVE_PASSIVE=false # Uses a lot of API keys queries
 ZONETRANSFER=true
 S3BUCKETS=true
+REVERSE_IP=false
 
 # Web detection
 WEBPROBESIMPLE=true
 WEBPROBEFULL=true
 WEBSCREENSHOT=true
-UNCOMMON_PORTS_WEB="81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55440,55672"
+UNCOMMON_PORTS_WEB="81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9092,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55440,55672"
 # You can change to aquatone if gowitness fails, comment the one you don't want
 AXIOM_SCREENSHOT_MODULE=webscreenshot # Choose between aquatone,gowitness,webscreenshot
 
@@ -209,12 +213,13 @@ URL_CHECK=true
 URL_GF=true
 URL_EXT=true
 JSCHECKS=true
-PARAMS=true
 FUZZ=true
 CMS_SCANNER=true
 WORDLIST=true
+ROBOTSWORDLIST=true
 
 # Vulns
+VULNS_GENERAL=false
 XSS=true
 CORS=true
 TEST_SSL=true
@@ -226,18 +231,20 @@ SSTI=true
 SQLI=true
 BROKENLINKS=true
 SPRAY=true
-BYPASSER4XX=true
 COMM_INJ=true
+PROTO_POLLUTION=true
 
 # Extra features
-NOTIFICATION=false
+NOTIFICATION=false # Notification for every function
+SOFT_NOTIFICATION=false # Only for start/end
 DEEP=false
+DEEP_LIMIT=500
 DIFF=false
 REMOVETMP=false
 REMOVELOG=false
 PROXY=false
 SENDZIPNOTIFY=false
-PRESERVE=false      # set to true to avoid deleting the .called_fn files on really large scans
+PRESERVE=true      # set to true to avoid deleting the .called_fn files on really large scans
 
 # HTTP options
 HEADER="User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0"
@@ -255,9 +262,9 @@ GAUPLUS_THREADS=10
 DALFOX_THREADS=200
 PUREDNS_PUBLIC_LIMIT=0 # Set between 2000 - 10000 if your router blows up, 0 is unlimited
 PUREDNS_TRUSTED_LIMIT=400
-DIRDAR_THREADS=200
 WEBSCREENSHOT_THREADS=200
 RESOLVE_DOMAINS_THREADS=150
+PPFUZZ_THREADS=30
 
 # Timeouts
 CMSSCAN_TIMEOUT=3600
@@ -276,13 +283,20 @@ resolvers_trusted=${tools}/resolvers_trusted.txt
 
 # Axiom Fleet
 # Will not start a new fleet if one exist w/ same name and size (or larger)
+AXIOM=false
 AXIOM_FLEET_LAUNCH=false
 AXIOM_FLEET_NAME="reconFTW"
-AXIOM_FLEET_COUNT=5
-AXIOM_FLEET_REGIONS=""
+AXIOM_FLEET_COUNT=10
+AXIOM_FLEET_REGIONS="eu-central"
 AXIOM_FLEET_SHUTDOWN=true
 # This is a script on your reconftw host that might prep things your way...
-#AXIOM_POST_START="$HOME/bin/yourScript"
+#AXIOM_POST_START="~/Tools/axiom_config.sh"
+
+# BBRF
+BBRF_CONNECTION=false
+BBRF_SERVER=https://demo.bbrf.me/bbrf
+BBRF_USERNAME=user
+BBRF_PASSWORD=password
 
 # TERM COLORS
 bred='\033[1;31m'
@@ -294,6 +308,7 @@ blue='\033[0;34m'
 green='\033[0;32m'
 reset='\033[0m'
 
+	
 ```
 </details>
  
@@ -329,7 +344,8 @@ reset='\033[0m'
 |------|-------------|
 | --deep | Deep scan (Enable some slow options for deeper scan, _vps intended mode_) |
 | -f | Custom config file path |
-| -o |  Output directory |
+| -o | Output directory |
+| -v | Axiom distributed VPS |
  
 # Example Usage:
  
@@ -345,12 +361,7 @@ reset='\033[0m'
 ./reconftw.sh -l sites.txt -r -o /output/directory/
 ```
  
-**Perform all steps (whole recon + all attacks)**
- 
-```bash
-./reconftw.sh -d target.com -a
-```
- 
+
 **Perform full recon with more time intense tasks** *(VPS intended only)*
  
 ```bash
@@ -362,7 +373,19 @@ reset='\033[0m'
 ```bash
 ./reconftw.sh -m company -l domains_list.txt -r
 ```
+
+**Perform recon with axiom integration**
  
+```bash
+./reconftw.sh -d target.com -r -v
+```
+ 
+ **Perform all steps (whole recon + all attacks) a.k.a. YOLO mode**
+ 
+```bash
+./reconftw.sh -d target.com -a
+```
+
 **Show help section**
  
 ```bash
@@ -373,14 +396,13 @@ reset='\033[0m'
 ![](https://i.ibb.co/Jzrgkqt/axiom-readme.png)
 > Check out the wiki section for more info [Axiom Support](https://github.com/six2dez/reconftw/wiki/5.-Axiom-version)
 * As reconFTW actively hits the target with a lot of web traffic, hence there was a need to move to Axiom distributing the work load among various instances leading to reduction of execution time.
-* During the configuartion of axiom you need to select `reconftw` as provisoner.  
-* Using ```reconftw_axiom.sh``` script you can take advantage of running **reconFTW** with [Axiom](https://github.com/pry0cc/axiom).
-* Its also necessary that you need to create your fleet prior.
- 
-```bash
-axiom-fleet testy -i=10   # Initialize a fleet named 'testy'
-./reconftw_axiom.sh -d target.com -r
-```
+* During the configuration of axiom you need to select `reconftw` as provisoner.  
+* You can create your own axiom's fleet before running reconFTW or let reconFTW to create and destroy it automatically just modifying reconftw.cfg file.
+
+# BBRF Support: :computer:
+* To add reconFTW results to your [BBRF instance](https://github.com/honoki/bbrf-server) just add IP and credentials on reconftw.cfg file section dedicated to bbrf.
+* During the execution of the scans the results will be added dinamically when each step ends.
+* Even you can set up locally your BBRF instance to be able to visualize your results in a fancy web UI.
  
 # Sample video:
  
@@ -388,34 +410,44 @@ axiom-fleet testy -i=10   # Initialize a fleet named 'testy'
  
 # :fire: Features :fire:
  
+ ## Osint
 - Domain information parser ([domainbigdata](https://domainbigdata.com/))
 - Emails addresses and users ([theHarvester](https://github.com/laramies/theHarvester), [emailfinder](https://github.com/Josue87/EmailFinder))
 - Password leaks ([pwndb](https://github.com/davidtavarez/pwndb) and [H8mail](https://github.com/khast3x/h8mail))
 - Metadata finder ([MetaFinder](https://github.com/Josue87/MetaFinder))
 - Google Dorks ([degoogle_hunter](https://github.com/six2dez/degoogle_hunter))
 - Github Dorks ([GitDorker](https://github.com/obheda12/GitDorker))
-- Multiple subdomain enumeration techniques (passive, bruteforce, permutations, DNS records, scraping)
+## Subdomains
   - Passive ([subfinder](https://github.com/projectdiscovery/subfinder), [assetfinder](https://github.com/tomnomnom/assetfinder), [amass](https://github.com/OWASP/Amass), [findomain](https://github.com/Findomain/Findomain), [crobat](https://github.com/cgboal/sonarsearch), [waybackurls](https://github.com/tomnomnom/waybackurls), [github-subdomains](https://github.com/gwen001/github-subdomains), [Anubis](https://jldc.me), [gauplus](https://github.com/bp0lr/gauplus) and [mildew](https://github.com/daehee/mildew))
   - Certificate transparency ([ctfr](https://github.com/UnaPibaGeek/ctfr), [tls.bufferover](tls.bufferover.run) and [dns.bufferover](dns.bufferover.run)))
   - Bruteforce ([puredns](https://github.com/d3mondev/puredns))
-  - Permutations ([DNScewl](https://github.com/codingo/DNSCewl))
-  - JS files & Source Code Scraping ([gospider](https://github.com/jaeles-project/gospider), [analyticsRelationship](https://github.com/Josue87/analyticsRelationship))
+  - Permutations ([Gotator](https://github.com/Josue87/gotator))
+  - JS files & Source Code Scraping ([gospider](https://github.com/jaeles-project/gospider))
   - DNS Records ([dnsx](https://github.com/projectdiscovery/dnsx))
-- Nuclei Sub TKO templates ([nuclei](https://github.com/projectdiscovery/nuclei))
-- Web Prober ([httpx](https://github.com/projectdiscovery/httpx) and [unimap](https://github.com/Edu4rdSHL/unimap))
-- Web screenshot ([webscreenshot](https://github.com/maaaaz/webscreenshot))
-- Web templates scanner ([nuclei](https://github.com/projectdiscovery/nuclei) and [nuclei geeknik](https://github.com/geeknik/the-nuclei-templates.git))
+  - Google Analytics ID ([AnalyticsRelationships](https://github.com/Josue87/AnalyticsRelationships))
+  - Recursive search.
+  - DNS Zone Transfer ([dnsrecon](https://github.com/darkoperator/dnsrecon))
+
+## Hosts
 - IP and subdomains WAF checker ([cf-check](https://github.com/dwisiswant0/cf-check) and [wafw00f](https://github.com/EnableSecurity/wafw00f))
 - Port Scanner (Active with [nmap](https://github.com/nmap/nmap) and passive with [shodan-cli](https://cli.shodan.io/), Subdomains IP resolution with[resolveDomains](https://github.com/Josue87/resolveDomains))
+- Port services vulnerability checks ([searchsploit](https://github.com/offensive-security/exploitdb))
+- Password spraying ([brutespray](https://github.com/x90skysn3k/brutespray))
+- Cloud providers check ([clouddetect](https://github.com/99designs/clouddetect))
+
+## Webs
+- Nuclei Sub TKO templates ([nuclei](https://github.com/projectdiscovery/nuclei))
+- Web Prober ([httpx](https://github.com/projectdiscovery/httpx) and [unimap](https://github.com/Edu4rdSHL/unimap))
+- Web screenshot ([webscreenshot](https://github.com/maaaaz/webscreenshot) or [gowitness](https://github.com/sensepost/gowitness))
+- Web templates scanner ([nuclei](https://github.com/projectdiscovery/nuclei) and [nuclei geeknik](https://github.com/geeknik/the-nuclei-templates.git))
 - Url extraction ([waybackurls](https://github.com/tomnomnom/waybackurls), [gauplus](https://github.com/bp0lr/gauplus), [gospider](https://github.com/jaeles-project/gospider), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3) and [JSA](https://github.com/w9w/JSA))
-- Pattern Search ([gf](https://github.com/tomnomnom/gf) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns))
-- Param discovery ([paramspider](https://github.com/devanshbatham/ParamSpider) and [arjun](https://github.com/s0md3v/Arjun))
+- URLPatterns Search ([gf](https://github.com/tomnomnom/gf) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns))
 - XSS ([dalfox](https://github.com/hahwul/dalfox))
 - Open redirect ([Openredirex](https://github.com/devanshbatham/OpenRedireX))
 - SSRF (headers [interactsh](https://github.com/projectdiscovery/interactsh) and param values with [ffuf](https://github.com/ffuf/ffuf))
 - CRLF ([crlfuzz](https://github.com/dwisiswant0/crlfuzz))
 - Favicon Real IP ([fav-up](https://github.com/pielco11/fav-up))
-- Javascript analysis ([LinkFinder](https://github.com/GerbenJavado/LinkFinder), scripts from [JSFScan](https://github.com/KathanP19/JSFScan.sh))
+- Javascript analysis ([subjs](https://github.com/lc/subjs), [JSA](https://github.com/w9w/JSA), [LinkFinder](https://github.com/GerbenJavado/LinkFinder), [getjswords](https://github.com/m4ll0k/BBTz))
 - Fuzzing ([ffuf](https://github.com/ffuf/ffuf))
 - Cors ([Corsy](https://github.com/s0md3v/Corsy))
 - LFI Checks ([ffuf](https://github.com/ffuf/ffuf))
@@ -423,17 +455,16 @@ axiom-fleet testy -i=10   # Initialize a fleet named 'testy'
 - SSTI ([ffuf](https://github.com/ffuf/ffuf))
 - CMS Scanner ([CMSeeK](https://github.com/Tuhinshubhra/CMSeeK))
 - SSL tests ([testssl](https://github.com/drwetter/testssl.sh))
-- Multithread in some steps ([Interlace](https://github.com/codingo/Interlace))
 - Broken Links Checker ([gospider](https://github.com/jaeles-project/gospider))
 - S3 bucket finder ([S3Scanner](https://github.com/sa7mon/S3Scanner))
-- Password spraying ([brutespray](https://github.com/x90skysn3k/brutespray))
-- 4xx bypasser ([DirDar](https://github.com/M4DM0e/DirDar))
-- Custom resolvers generated list ([dnsvalidator](https://github.com/vortexau/dnsvalidator))
-- DNS Zone Transfer ([dnsrecon](https://github.com/darkoperator/dnsrecon))
-- Docker container included and [DockerHub](https://hub.docker.com/r/six2dez/reconftw) integration
-- Cloud providers check ([ip2provider](https://github.com/oldrho/ip2provider))
+- Prototype Pollution ([ppfuzz](https://github.com/dwisiswant0/ppfuzz))
 - URL sorting by extension
 - Wordlist generation
+
+## Extras
+- Multithread ([Interlace](https://github.com/codingo/Interlace))
+- Custom resolvers generated list ([dnsvalidator](https://github.com/vortexau/dnsvalidator))
+- Docker container included and [DockerHub](https://hub.docker.com/r/six2dez/reconftw) integration
 - Allows IP/CIDR as target
 - Resume the scan from last performed step
 - Custom output folder option
@@ -441,14 +472,13 @@ axiom-fleet testy -i=10   # Initialize a fleet named 'testy'
 - Diff support for continuous running (cron mode)
 - Support for targets with multiple domains
 - Raspberry Pi/ARM support
-- Send scan results zipped over Slack, Discord and Telegram
 - 6 modes (recon, passive, subdomains, web, osint and all)
 - Out of Scope Support
-- Notification support for Slack, Discord and Telegram ([notify](https://github.com/projectdiscovery/notify))
+- Notification system with Slack, Discord and Telegram ([notify](https://github.com/projectdiscovery/notify)) and sending zipped results support
  
 # Mindmap/Workflow
  
-![Mindmap](images/mindmap.png)
+![Mindmap](images/mindmapv2.png)
  
 ## Data Keep
  
