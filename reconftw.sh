@@ -290,7 +290,7 @@ function subdomains_full(){
 	fi
 
 	if [ "$BBRF_CONNECTION" = true ]; then
-		cat subdomains/subdomains.txt | bbrf domain add -
+		[ -s "subdomains/subdomains.txt" ] && cat subdomains/subdomains.txt | bbrf domain add - 2>>"$LOGFILE" &>/dev/null
 	fi
 
 	webprobe_simple
@@ -657,7 +657,7 @@ function subtakeover(){
 			notification "${NUMOFLINES} new possible takeovers found" info
 		fi
 		if [ "$BBRF_CONNECTION" = true ]; then
-			cat webs/takeover.txt | grep -Eo 'https?://[^ ]+' | bbrf url add - -t subtko:true
+			[ -s "webs/takeover.txt" ] && cat webs/takeover.txt | grep -Eo 'https?://[^ ]+' | bbrf url add - -t subtko:true 2>>"$LOGFILE" &>/dev/null
 		fi
 		end_func "Results are saved in $domain/webs/takeover.txt" ${FUNCNAME[0]}
 	else
@@ -711,8 +711,8 @@ function s3buckets(){
 		fi
 
 		if [ "$BBRF_CONNECTION" = true ]; then
-			cat subdomains/cloud_assets.txt | grep -Eo 'https?://[^ ]+' | sed 's/[ \t]*$//' | bbrf url add - -t cloud_assets:true
-			cat subdomains/s3buckets.txt | cut -d'|' -f1 | sed 's/[ \t]*$//' | bbrf domain update - -t s3bucket:true
+			[ -s "subdomains/cloud_assets.txt" ] && cat subdomains/cloud_assets.txt | grep -Eo 'https?://[^ ]+' | sed 's/[ \t]*$//' | bbrf url add - -t cloud_assets:true 2>>"$LOGFILE" &>/dev/null
+			[ -s "subdomains/s3buckets.txt" ] && cat subdomains/s3buckets.txt | cut -d'|' -f1 | sed 's/[ \t]*$//' | bbrf domain update - -t s3bucket:true 2>>"$LOGFILE" &>/dev/null
 		fi
 
 		end_func "Results are saved in subdomains/s3buckets.txt and subdomains/cloud_assets.txt" ${FUNCNAME[0]}
@@ -760,7 +760,7 @@ function webprobe_simple(){
 				ffuf -mc all -fc 404 -w webs/webs.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" &>/dev/null
 			fi
 			if [ "$BBRF_CONNECTION" = true ]; then
-				cat webs/webs.txt | bbrf url add -
+				[ -s "webs/webs.txt" ] && cat webs/webs.txt | bbrf url add - 2>>"$LOGFILE" &>/dev/null
 			fi
 		else
 			end_subfunc "No new websites to probe" ${FUNCNAME[0]}
@@ -797,7 +797,7 @@ function webprobe_full(){
 					cat .tmp/nmap_uncommonweb.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout $HTTPX_UNCOMMONPORTS_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color | anew .tmp/web_full_info_uncommon.txt | cut -d ' ' -f1 | grep "$domain" | anew -q .tmp/probed_uncommon_ports_tmp.txt
 				fi
 			fi
-			cat .tmp/web_full_info_uncommon.txt | anew -q webs/web_full_info_uncommon.txt
+			[ -s ".tmp/web_full_info_uncommon.txt" ] && cat .tmp/web_full_info_uncommon.txt | anew -q webs/web_full_info_uncommon.txt
 		else
 			if [ -s ".tmp/nmap_uncommonweb.txt" ]; then
 				axiom-scan .tmp/nmap_uncommonweb.txt -m httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout $HTTPX_UNCOMMONPORTS_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -o .tmp/probed_uncommon_ports_tmp_.txt 2>>"$LOGFILE" &>/dev/null
@@ -807,7 +807,7 @@ function webprobe_full(){
 					[ -s ".tmp/probed_uncommon_ports_tmp_.txt" ] && cat .tmp/probed_uncommon_ports_tmp_.txt | anew .tmp/web_full_info_uncommon.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_uncommon_ports_tmp.txt
 				fi
 			fi
-			cat .tmp/web_full_info_uncommon.txt 2>>"$LOGFILE" | anew -q webs/web_full_info_uncommon.txt
+			[ -s ".tmp/web_full_info_uncommon.txt" ] && cat .tmp/web_full_info_uncommon.txt 2>>"$LOGFILE" | anew -q webs/web_full_info_uncommon.txt
 		fi
 		NUMOFLINES=$(cat .tmp/probed_uncommon_ports_tmp.txt 2>>"$LOGFILE" | anew webs/webs_uncommon_ports.txt | wc -l)
 		notification "Uncommon web ports: ${NUMOFLINES} new websites" good
@@ -819,7 +819,7 @@ function webprobe_full(){
 			ffuf -mc all -fc 404 -w webs/webs_uncommon_ports.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" &>/dev/null
 		fi
 		if [ "$BBRF_CONNECTION" = true ]; then
-			cat webs/webs_uncommon_ports.txt | bbrf url add -
+			[ -s "webs/webs_uncommon_ports.txt" ] && cat webs/webs_uncommon_ports.txt | bbrf url add - 2>>"$LOGFILE" &>/dev/null
 		fi
 	else
 		if [ "$WEBPROBEFULL" = false ]; then
@@ -912,9 +912,9 @@ function portscan(){
 			fi
 		fi
 		if [ "$BBRF_CONNECTION" = true ]; then
-			[ -s "hosts/portscan_active.xml" ] && $tools/nmap-parse-output/nmap-parse-output hosts/portscan_active.xml host-ports | bbrf service add -
+			[ -s "hosts/portscan_active.xml" ] && $tools/nmap-parse-output/nmap-parse-output hosts/portscan_active.xml host-ports | bbrf service add - 2>>"$LOGFILE" &>/dev/null
 		fi
-		[ -s "hosts/portscan_active.xml" ] && searchsploit --nmap hosts/portscan_active.xml > hosts/searchsploit.txt
+		[ -s "hosts/portscan_active.xml" ] && searchsploit --nmap hosts/portscan_active.xml 2>>"$LOGFILE" > hosts/searchsploit.txt
 		end_func "Results are saved in hosts/portscan_[passive|active].txt" ${FUNCNAME[0]}
 	else
 		if [ "$PORTSCANNER" = false ]; then
@@ -961,7 +961,7 @@ function waf_checks(){
 				NUMOFLINES=$(cat webs/webs_wafs.txt 2>>"$LOGFILE" | wc -l)
 				notification "${NUMOFLINES} websites protected by waf" info
 				if [ "$BBRF_CONNECTION" = true ]; then
-					[ -s "webs/webs_wafs.txt" ] && cat webs/webs_wafs.txt | bbrf url add - -t waf:true
+					[ -s "webs/webs_wafs.txt" ] && cat webs/webs_wafs.txt | bbrf url add - -t waf:true 2>>"$LOGFILE" &>/dev/null
 				fi
 				end_func "Results are saved in $domain/webs/webs_wafs.txt" ${FUNCNAME[0]}
 			else
@@ -996,11 +996,11 @@ function nuclei_check(){
 			printf "${yellow}\n\n Running : Nuclei Critical${reset}\n\n"
 			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity critical -r $resolvers_trusted -o nuclei_output/critical.txt
 			if [ "$BBRF_CONNECTION" = true ]; then
-				[ -s "nuclei_output/info.txt" ] && cat nuclei_output/info.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:info
-				[ -s "nuclei_output/low.txt" ] && cat nuclei_output/low.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:low
-				[ -s "nuclei_output/medium.txt" ] && cat nuclei_output/medium.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:medium
-				[ -s "nuclei_output/high.txt" ] && cat nuclei_output/high.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:high
-				[ -s "nuclei_output/critical.txt" ] && cat nuclei_output/critical.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:critical
+				[ -s "nuclei_output/info.txt" ] && cat nuclei_output/info.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:info 2>>"$LOGFILE" &>/dev/null
+				[ -s "nuclei_output/low.txt" ] && cat nuclei_output/low.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:low 2>>"$LOGFILE" &>/dev/null
+				[ -s "nuclei_output/medium.txt" ] && cat nuclei_output/medium.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:medium 2>>"$LOGFILE" &>/dev/null
+				[ -s "nuclei_output/high.txt" ] && cat nuclei_output/high.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:high 2>>"$LOGFILE" &>/dev/null
+				[ -s "nuclei_output/critical.txt" ] && cat nuclei_output/critical.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:critical 2>>"$LOGFILE" &>/dev/null
 			fi
 			printf "\n\n"
 		else
@@ -1017,11 +1017,11 @@ function nuclei_check(){
 				printf "${yellow}\n\n Running : Nuclei Critical${reset}\n\n"
 				axiom-scan .tmp/webs_subs.txt -m nuclei -severity critical -o nuclei_output/critical.txt 2>>"$LOGFILE" &>/dev/null
 				if [ "$BBRF_CONNECTION" = true ]; then
-					[ -s "nuclei_output/info.txt" ] && cat nuclei_output/info.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:info
-					[ -s "nuclei_output/low.txt" ] && cat nuclei_output/low.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:low
-					[ -s "nuclei_output/medium.txt" ] && cat nuclei_output/medium.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:medium
-					[ -s "nuclei_output/high.txt" ] && cat nuclei_output/high.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:high
-					[ -s "nuclei_output/critical.txt" ] && cat nuclei_output/critical.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:critical
+					[ -s "nuclei_output/info.txt" ] && cat nuclei_output/info.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:info 2>>"$LOGFILE" &>/dev/null
+					[ -s "nuclei_output/low.txt" ] && cat nuclei_output/low.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:low 2>>"$LOGFILE" &>/dev/null
+					[ -s "nuclei_output/medium.txt" ] && cat nuclei_output/medium.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:medium 2>>"$LOGFILE" &>/dev/null
+					[ -s "nuclei_output/high.txt" ] && cat nuclei_output/high.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:high 2>>"$LOGFILE" &>/dev/null
+					[ -s "nuclei_output/critical.txt" ] && cat nuclei_output/critical.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:critical 2>>"$LOGFILE" &>/dev/null
 				fi
 				printf "\n\n"
 			fi
@@ -1945,10 +1945,10 @@ function start(){
 	fi
 
 	if [ "$BBRF_CONNECTION" = true ]; then
-		program_bbrf=${echo $domain | awk -F. '{print $1"_"$2}'}
-		bbrf new ${program_bbrf}
-		bbrf use ${program_bbrf}
-		bbrf inscope add '*.${domain}'
+		program_bbrf=${echo $domain | awk -F. '{print $1"_"$2}'} 2>>"$LOGFILE" &>/dev/null
+		bbrf new ${program_bbrf} 2>>"$LOGFILE" &>/dev/null
+		bbrf use ${program_bbrf} 2>>"$LOGFILE" &>/dev/null
+		bbrf inscope add "*.${domain}" 2>>"$LOGFILE" &>/dev/null
 	fi
 
 	printf "\n"
@@ -2374,9 +2374,10 @@ function help(){
 	printf "   -h                Help - Show this help\n"
 	printf " \n"
 	printf " ${bblue}GENERAL OPTIONS${reset}\n"
-	printf "   -f confile_file   Alternate reconftw.cfg file\n"
 	printf "   --deep            Deep scan (Enable some slow options for deeper scan)\n"
+	printf "   -f confile_file   Alternate reconftw.cfg file\n"
 	printf "   -o output/path    Define output folder\n"
+	printf "   -v, --vps         Axiom distributed VPS \n"
 	printf " \n"
 	printf " ${bblue}USAGE EXAMPLES${reset}\n"
 	printf " Recon:\n"
@@ -2483,7 +2484,7 @@ while true; do
             ;;
 		'-v'|'--vps')
 			AXIOM=true
-            shift 2
+            shift
             continue
             ;;
         '-f')
@@ -2506,6 +2507,7 @@ while true; do
             . ./reconftw.cfg
 			banner
             help
+			tools_installed
 			exit 1
 		    ;;
     esac

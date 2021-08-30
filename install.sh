@@ -46,7 +46,6 @@ repos["brutespray"]="x90skysn3k/brutespray"
 repos["wafw00f"]="EnableSecurity/wafw00f"
 repos["gf"]="tomnomnom/gf"
 repos["Gf-Patterns"]="1ndianl33t/Gf-Patterns"
-repos["github-search"]="gwen001/github-search"
 repos["ctfr"]="UnaPibaGeek/ctfr"
 repos["LinkFinder"]="dark-warlord14/LinkFinder"
 repos["Corsy"]="s0md3v/Corsy"
@@ -58,7 +57,7 @@ repos["OpenRedireX"]="devanshbatham/OpenRedireX"
 repos["GitDorker"]="obheda12/GitDorker"
 repos["testssl"]="drwetter/testssl.sh"
 repos["commix"]="commixproject/commix"
-repos["JSA"]="six2dez/JSA"
+repos["JSA"]="w9w/JSA"
 repos["urldedupe"]="ameenmaali/urldedupe"
 repos["cloud_enum"]="initstring/cloud_enum"
 repos["nmap-parse-output"]="ernw/nmap-parse-output"
@@ -286,6 +285,7 @@ eval wget -O lfi_wordlist.txt https://gist.githubusercontent.com/six2dez/a89a0c7
 eval wget -O ssti_wordlist.txt https://gist.githubusercontent.com/six2dez/ab5277b11da7369bf4e9db72b49ad3c1/raw $DEBUG_STD
 eval wget -O headers_inject.txt https://gist.github.com/six2dez/d62ab8f8ffd28e1c206d401081d977ae/raw $DEBUG_STD
 eval wget -O custom_udork.txt https://gist.githubusercontent.com/six2dez/7245cad74f2da5824080e0cb6bdaac22/raw $DEBUG_STD
+eval wget -O axiom_config.sh https://gist.githubusercontent.com/six2dez/6e2d9f4932fd38d84610eb851014b26e/raw $DEBUG_STD
 
 ## Last check
 if [ "$double_check" = "true" ]; then
