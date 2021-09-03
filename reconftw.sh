@@ -1947,7 +1947,7 @@ function start(){
 	fi
 
 	if [ "$BBRF_CONNECTION" = true ]; then
-		program_bbrf=${echo $domain | awk -F. '{print $1"_"$2}'} 2>>"$LOGFILE" &>/dev/null
+		program_bbrf=$(echo $domain | awk -F. '{print $1"_"$2}') 2>>"$LOGFILE" &>/dev/null
 		bbrf new ${program_bbrf} 2>>"$LOGFILE" &>/dev/null
 		bbrf use ${program_bbrf} 2>>"$LOGFILE" &>/dev/null
 		bbrf inscope add "*.${domain}" 2>>"$LOGFILE" &>/dev/null
