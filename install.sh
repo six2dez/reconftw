@@ -317,12 +317,15 @@ if [ "$double_check" = "true" ]; then
 fi
 
 # BBRF Setup
+if [ ! -d "$HOME/.bbrf/" ] ; then
+    mkdir $HOME/.bbrf/
+fi
 if  [ -d "$HOME/.bbrf/" ] && [ ! -s "$HOME/.bbrf/config.json" ]; then
     cat > $HOME/.bbrf/config.json << EOF
 {
-    "username": "bbrf",
-    "password": "<your secure password>",
-    "couchdb": "https://<your-bbrf-server>/bbrf",
+    "username": "$BBRF_USERNAME",
+    "password": "$BBRF_PASSWORD",
+    "couchdb": "https://$BBRF_SERVER/bbrf",
     "slack_token": "<a slack token to receive notifications>",
     "discord_webhook": "<your discord webhook if you want one>",
     "ignore_ssl_errors": false
