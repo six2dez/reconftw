@@ -35,6 +35,7 @@ gotools["gotator"]="go get -u -v github.com/Josue87/gotator"
 gotools["roboxtractor"]="go get -u -v github.com/Josue87/roboxtractor"
 gotools["mapcidr"]="GO111MODULE=on go get -v github.com/projectdiscovery/mapcidr/cmd/mapcidr"
 gotools["clouddetect"]="go get github.com/99designs/clouddetect/cli/clouddetect"
+gotools["dnstake"]="go install github.com/pwnesia/dnstake/cmd/dnstake@latest"
 
 declare -A repos
 repos["uDork"]="m3n0sd0n4ld/uDork"

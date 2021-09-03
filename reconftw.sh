@@ -646,7 +646,7 @@ function sub_recursive(){
 
 function subtakeover(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBTAKEOVER" = true ]; then
-		start_func "Looking for possible subdomain takeover"
+		start_func "Looking for possible subdomain and DNS takeover"
 		touch .tmp/tko.txt
 		if [ ! "$AXIOM" = true ]; then
 			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/takeovers/ -r $resolvers_trusted -o .tmp/tko.txt
@@ -654,6 +654,9 @@ function subtakeover(){
 			cat webs/webs.txt subdomains/subdomains.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
 			[ -s ".tmp/webs_subs.txt" ] && axiom-scan .tmp/webs_subs.txt -m nuclei -w /home/op/recon/nuclei/takeovers/ -o .tmp/tko.txt 2>>"$LOGFILE" &>/dev/null
 		fi
+
+		cat subdomains/subdomains.txt | dnstake -c 50 -s 2>>"$LOGFILE" | anew -q .tmp/tko.txt
+		
 		NUMOFLINES=$(cat .tmp/tko.txt 2>>"$LOGFILE" | anew webs/takeover.txt | wc -l)
 		if [ "$NUMOFLINES" -gt 0 ]; then
 			notification "${NUMOFLINES} new possible takeovers found" info
