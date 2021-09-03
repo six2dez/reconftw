@@ -35,6 +35,7 @@ gotools["gotator"]="go get -u -v github.com/Josue87/gotator"
 gotools["roboxtractor"]="go get -u -v github.com/Josue87/roboxtractor"
 gotools["mapcidr"]="GO111MODULE=on go get -v github.com/projectdiscovery/mapcidr/cmd/mapcidr"
 gotools["clouddetect"]="go get github.com/99designs/clouddetect/cli/clouddetect"
+gotools["dnstake"]="go install github.com/pwnesia/dnstake/cmd/dnstake@latest"
 
 declare -A repos
 repos["uDork"]="m3n0sd0n4ld/uDork"
@@ -53,7 +54,7 @@ repos["CMSeeK"]="Tuhinshubhra/CMSeeK"
 repos["fav-up"]="pielco11/fav-up"
 repos["Interlace"]="codingo/Interlace"
 repos["massdns"]="blechschmidt/massdns"
-repos["OpenRedireX"]="devanshbatham/OpenRedireX"
+repos["Oralyzer"]="r0075h3ll/Oralyzer"
 repos["GitDorker"]="obheda12/GitDorker"
 repos["testssl"]="drwetter/testssl.sh"
 repos["commix"]="commixproject/commix"
@@ -317,12 +318,15 @@ if [ "$double_check" = "true" ]; then
 fi
 
 # BBRF Setup
+if [ ! -d "$HOME/.bbrf/" ] ; then
+    mkdir $HOME/.bbrf/
+fi
 if  [ -d "$HOME/.bbrf/" ] && [ ! -s "$HOME/.bbrf/config.json" ]; then
     cat > $HOME/.bbrf/config.json << EOF
 {
-    "username": "bbrf",
-    "password": "<your secure password>",
-    "couchdb": "https://<your-bbrf-server>/bbrf",
+    "username": "$BBRF_USERNAME",
+    "password": "$BBRF_PASSWORD",
+    "couchdb": "https://$BBRF_SERVER/bbrf",
     "slack_token": "<a slack token to receive notifications>",
     "discord_webhook": "<your discord webhook if you want one>",
     "ignore_ssl_errors": false

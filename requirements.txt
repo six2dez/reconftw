@@ -23,3 +23,5 @@ emailfinder
 requests_futures
 bbrf
 uro
+bs4
+urllib3

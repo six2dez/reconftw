@@ -646,7 +646,7 @@ function sub_recursive(){
 
 function subtakeover(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBTAKEOVER" = true ]; then
-		start_func "Looking for possible subdomain takeover"
+		start_func "Looking for possible subdomain and DNS takeover"
 		touch .tmp/tko.txt
 		if [ ! "$AXIOM" = true ]; then
 			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/takeovers/ -r $resolvers_trusted -o .tmp/tko.txt
@@ -654,6 +654,9 @@ function subtakeover(){
 			cat webs/webs.txt subdomains/subdomains.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
 			[ -s ".tmp/webs_subs.txt" ] && axiom-scan .tmp/webs_subs.txt -m nuclei -w /home/op/recon/nuclei/takeovers/ -o .tmp/tko.txt 2>>"$LOGFILE" &>/dev/null
 		fi
+
+		cat subdomains/subdomains.txt | dnstake -c 50 -s 2>>"$LOGFILE" | anew -q .tmp/tko.txt
+		
 		NUMOFLINES=$(cat .tmp/tko.txt 2>>"$LOGFILE" | anew webs/takeover.txt | wc -l)
 		if [ "$NUMOFLINES" -gt 0 ]; then
 			notification "${NUMOFLINES} new possible takeovers found" info
@@ -1436,7 +1439,7 @@ function open_redirect(){
 		start_func "Open redirects checks"
 		if [ "$DEEP" = true ] || [[ $(cat gf/redirect.txt | wc -l) -le $DEEP_LIMIT ]]; then
 			cat gf/redirect.txt | qsreplace FUZZ | anew -q .tmp/tmp_redirect.txt
-			python3 $tools/OpenRedireX/openredirex.py -l .tmp/tmp_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt 2>>"$LOGFILE" | grep "^http" > vulns/redirect.txt
+			python3 $tools/Oralyzer/oralyzer.py -l .tmp/tmp_redirect.txt -p $tools/Oralyzer/payloads.txt > vulns/redirect.txt
 			sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" vulns/redirect.txt
 			end_func "Results are saved in vulns/redirect.txt" ${FUNCNAME[0]}
 		else
@@ -1892,6 +1895,13 @@ function start(){
 	else
 	    NOTIFY=""
 	fi
+
+	if [[ $(id -u | grep -o '^0$') == "0" ]]; then
+    	SUDO=" "
+	else
+    	SUDO="sudo"
+	fi
+	
 	printf "\n${bgreen}#######################################################################${reset}"
 	notification "Recon succesfully started on ${domain}" good
 	[ "$SOFT_NOTIFICATION" = true ] && echo "Recon succesfully started on ${domain}" | notify -silent
@@ -1947,7 +1957,7 @@ function start(){
 	fi
 
 	if [ "$BBRF_CONNECTION" = true ]; then
-		program_bbrf=${echo $domain | awk -F. '{print $1"_"$2}'} 2>>"$LOGFILE" &>/dev/null
+		program_bbrf=$(echo $domain | awk -F. '{print $1"_"$2}') 2>>"$LOGFILE" &>/dev/null
 		bbrf new ${program_bbrf} 2>>"$LOGFILE" &>/dev/null
 		bbrf use ${program_bbrf} 2>>"$LOGFILE" &>/dev/null
 		bbrf inscope add "*.${domain}" 2>>"$LOGFILE" &>/dev/null
@@ -2068,6 +2078,12 @@ function multi_osint(){
 	    NOTIFY=""
 	fi
 
+	if [[ $(id -u | grep -o '^0$') == "0" ]]; then
+    	SUDO=" "
+	else
+    	SUDO="sudo"
+	fi
+
 	#[[ -n "$domain" ]] && ipcidr_target $domain
 
 	if [ -s "$list" ]; then
@@ -2151,6 +2167,12 @@ function multi_recon(){
 		NOTIFY="notify -silent"
 	else
 	    NOTIFY=""
+	fi
+
+	if [[ $(id -u | grep -o '^0$') == "0" ]]; then
+    	SUDO=" "
+	else
+    	SUDO="sudo"
 	fi
 
 	#[[ -n "$domain" ]] && ipcidr_target $domain
