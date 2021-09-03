@@ -1892,6 +1892,13 @@ function start(){
 	else
 	    NOTIFY=""
 	fi
+
+	if [[ $(id -u | grep -o '^0$') == "0" ]]; then
+    	SUDO=" "
+	else
+    	SUDO="sudo"
+	fi
+	
 	printf "\n${bgreen}#######################################################################${reset}"
 	notification "Recon succesfully started on ${domain}" good
 	[ "$SOFT_NOTIFICATION" = true ] && echo "Recon succesfully started on ${domain}" | notify -silent
@@ -2068,6 +2075,12 @@ function multi_osint(){
 	    NOTIFY=""
 	fi
 
+	if [[ $(id -u | grep -o '^0$') == "0" ]]; then
+    	SUDO=" "
+	else
+    	SUDO="sudo"
+	fi
+
 	#[[ -n "$domain" ]] && ipcidr_target $domain
 
 	if [ -s "$list" ]; then
@@ -2151,6 +2164,12 @@ function multi_recon(){
 		NOTIFY="notify -silent"
 	else
 	    NOTIFY=""
+	fi
+
+	if [[ $(id -u | grep -o '^0$') == "0" ]]; then
+    	SUDO=" "
+	else
+    	SUDO="sudo"
 	fi
 
 	#[[ -n "$domain" ]] && ipcidr_target $domain
