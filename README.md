@@ -8,8 +8,8 @@
 
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.0.0">
-    <img src="https://img.shields.io/badge/release-v2.0.0-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.0.1">
+    <img src="https://img.shields.io/badge/release-v2.0.1-green">
   </a>
    </a>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
@@ -432,6 +432,8 @@ reset='\033[0m'
   - DNS Records ([dnsx](https://github.com/projectdiscovery/dnsx))
   - Google Analytics ID ([AnalyticsRelationships](https://github.com/Josue87/AnalyticsRelationships))
   - Recursive search.
+  - Subdomains takeover ([nuclei](https://github.com/projectdiscovery/nuclei))
+  - DNS takeover ([dnstake](https://github.com/pwnesia/dnstake))
   - DNS Zone Transfer ([dnsrecon](https://github.com/darkoperator/dnsrecon))
 
 ## Hosts
@@ -442,7 +444,6 @@ reset='\033[0m'
 - Cloud providers check ([clouddetect](https://github.com/99designs/clouddetect))
 
 ## Webs
-- Nuclei Sub TKO templates ([nuclei](https://github.com/projectdiscovery/nuclei))
 - Web Prober ([httpx](https://github.com/projectdiscovery/httpx) and [unimap](https://github.com/Edu4rdSHL/unimap))
 - Web screenshot ([webscreenshot](https://github.com/maaaaz/webscreenshot) or [gowitness](https://github.com/sensepost/gowitness))
 - Web templates scanner ([nuclei](https://github.com/projectdiscovery/nuclei) and [nuclei geeknik](https://github.com/geeknik/the-nuclei-templates.git))
