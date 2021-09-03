@@ -1436,7 +1436,7 @@ function open_redirect(){
 		start_func "Open redirects checks"
 		if [ "$DEEP" = true ] || [[ $(cat gf/redirect.txt | wc -l) -le $DEEP_LIMIT ]]; then
 			cat gf/redirect.txt | qsreplace FUZZ | anew -q .tmp/tmp_redirect.txt
-			python3 $tools/OpenRedireX/openredirex.py -l .tmp/tmp_redirect.txt --keyword FUZZ -p $tools/OpenRedireX/payloads.txt 2>>"$LOGFILE" | grep "^http" > vulns/redirect.txt
+			python3 $tools/Oralyzer/oralyzer.py -l .tmp/tmp_redirect.txt -p $tools/Oralyzer/payloads.txt > vulns/redirect.txt
 			sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" vulns/redirect.txt
 			end_func "Results are saved in vulns/redirect.txt" ${FUNCNAME[0]}
 		else
