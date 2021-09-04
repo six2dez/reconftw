@@ -3,7 +3,7 @@ name: ci
 on:
   release:
   	types:
-		- 'published'
+      - 'published'
   # push:
     # branches:
       # - 'master'
