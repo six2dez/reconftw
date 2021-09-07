@@ -993,13 +993,13 @@ function nuclei_check(){
 			printf "${yellow}\n Running : Nuclei Info${reset}\n\n"
 			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity info -r $resolvers_trusted -o nuclei_output/info.txt
 			printf "${yellow}\n\n Running : Nuclei Low${reset}\n\n"
-			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity low -r $resolvers_trusted -o nuclei_output/low.txt
+			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity low -r $resolvers_trusted -o nuclei_output/low.txt | notify
 			printf "${yellow}\n\n Running : Nuclei Medium${reset}\n\n"
-			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity medium -r $resolvers_trusted -o nuclei_output/medium.txt
+			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity medium -r $resolvers_trusted -o nuclei_output/medium.txt | notify
 			printf "${yellow}\n\n Running : Nuclei High${reset}\n\n"
-			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity high -r $resolvers_trusted -o nuclei_output/high.txt
+			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity high -r $resolvers_trusted -o nuclei_output/high.txt | notify
 			printf "${yellow}\n\n Running : Nuclei Critical${reset}\n\n"
-			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity critical -r $resolvers_trusted -o nuclei_output/critical.txt
+			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity critical -r $resolvers_trusted -o nuclei_output/critical.txt | notify
 			if [ "$BBRF_CONNECTION" = true ]; then
 				[ -s "nuclei_output/info.txt" ] && cat nuclei_output/info.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:info 2>>"$LOGFILE" &>/dev/null
 				[ -s "nuclei_output/low.txt" ] && cat nuclei_output/low.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:low 2>>"$LOGFILE" &>/dev/null
