@@ -1792,6 +1792,10 @@ function resolvers_update(){
 				notification "Resolvers seem older than 1 day\n Generating custom resolvers..." warn
 				eval rm -f $resolvers 2>>"$LOGFILE"
 				dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 100 -o $resolvers &>/dev/null
+				dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads 100 -o tmp_resolvers &>/dev/null
+				cat tmp_resolvers | anew -q $resolvers
+				rm -f tmp_resolvers &>/dev/null
+				[ ! -s "$resolvers" ] && wget -O $resolvers https://raw.githubusercontent.com/proabiral/Fresh-Resolvers/master/resolvers.txt &>/dev/null
 				notification "Updated\n" good
 	  		fi
 		else
