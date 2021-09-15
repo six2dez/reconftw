@@ -60,6 +60,7 @@ function tools_installed(){
 	[ -f "$tools/JSA/jsa.py" ] || { printf "${bred} [*] JSA		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/cloud_enum/cloud_enum.py" ] || { printf "${bred} [*] cloud_enum		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/nmap-parse-output/nmap-parse-output" ] || { printf "${bred} [*] nmap-parse-output		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/pydictor/pydictor.py" ] || { printf "${bred} [*] pydictor   	[NO]${reset}\n"; allinstalled=false;}
 	type -P github-endpoints &>/dev/null || { printf "${bred} [*] github-endpoints	[NO]${reset}\n"; allinstalled=false;}
 	type -P github-subdomains &>/dev/null || { printf "${bred} [*] github-subdomains	[NO]${reset}\n"; allinstalled=false;}
 	type -P gospider &>/dev/null || { printf "${bred} [*] gospider		[NO]${reset}\n"; allinstalled=false;}
@@ -106,8 +107,7 @@ function tools_installed(){
 	type -P interactsh-client &>/dev/null || { printf "${bred} [*] interactsh-client	[NO]${reset}\n"; allinstalled=false;}
 	type -P uro &>/dev/null || { printf "${bred} [*] uro		[NO]${reset}\n"; allinstalled=false;}
 	type -P bbrf &>/dev/null || { printf "${bred} [*] bbrf		[NO]${reset}\n"; allinstalled=false;}
-	type -P axiom-ls &>/dev/null || { printf "${bred} [*] axiom		[NO]${reset}\n${reset}"; allinstalled=false;}
-
+	
 	if [ "${allinstalled}" = true ]; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
 	else
@@ -840,7 +840,7 @@ function screenshot(){
 		start_func "Web Screenshots"
 		cat webs/webs.txt webs/webs_uncommon_ports.txt 2>>"$LOGFILE" | anew -q .tmp/webs_screenshots.txt
 		if [ ! "$AXIOM" = true ]; then
-			[ -s ".tmp/webs_screenshots.txt" ] && webscreenshot -r chromium -i .tmp/webs_screenshots.txt -w $WEBSCREENSHOT_THREADS -o screenshots 2>>"$LOGFILE" &>/dev/null
+			[ -s ".tmp/webs_screenshots.txt" ] && webscreenshot -i .tmp/webs_screenshots.txt -w $WEBSCREENSHOT_THREADS -o screenshots 2>>"$LOGFILE" &>/dev/null
 			#gowitness file -f .tmp/webs_screenshots.txt --disable-logging 2>>"$LOGFILE"
 		else
 			[ "$AXIOM_SCREENSHOT_MODULE" = "webscreenshot" ] && axiom-scan .tmp/webs_screenshots.txt -m $AXIOM_SCREENSHOT_MODULE -w $WEBSCREENSHOT_THREADS -o screenshots 2>>"$LOGFILE" &>/dev/null
@@ -1320,6 +1320,21 @@ function wordlist_gen_roboxtractor(){
 		end_func "Results are saved in $domain/webs/robots_wordlist.txt" ${FUNCNAME[0]}
 	else
 		printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
+}
+
+function password_dict(){
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$PASSWORD_DICT" = true ];	then
+		start_func "Password dictionary generation"
+		word=${domain%%.*}
+		python3 $tools/pydictor/pydictor.py -extend $word --leet 0 1 2 11 21 --len ${PASSWORD_MIN_LENGTH} ${PASSWORD_MAX_LENGTH} -o webs/password_dict.txt
+		end_func "Results are saved in $domain/webs/password_dict.txt" ${FUNCNAME[0]}
+	else
+		if [ "$PASSWORD_DICT" = false ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
 	fi
 }
 
@@ -1972,6 +1987,10 @@ function start(){
 }
 
 function end(){
+
+	find $dir -type f -empty -print | grep -v '.called_fn' | grep -v '.log' | grep -v '.tmp' | xargs rm -f
+	find $dir -type d -empty -print -delete
+
 	if [ ! "$PRESERVE" = true ]; then
 		find $dir -type f -empty | grep -v "called_fn" | xargs rm -f &>/dev/null
 		find $dir -type d -empty | grep -v "called_fn" | xargs rm -rf &>/dev/null
@@ -1981,9 +2000,9 @@ function end(){
 		rm -rf $dir/.tmp
 	fi
 
-        if [ "$REMOVELOG" = true ]; then
-                rm -rf $dir/.log
-        fi 
+    if [ "$REMOVELOG" = true ]; then
+            rm -rf $dir/.log
+    fi 
 
 	if [ -n "$dir_output" ]; then
 		output
@@ -2159,6 +2178,7 @@ function recon(){
 	url_gf
 	wordlist_gen
 	wordlist_gen_roboxtractor
+	password_dict
 	url_ext
 }
 
@@ -2325,6 +2345,7 @@ function multi_recon(){
 		url_gf
 		wordlist_gen
 		wordlist_gen_roboxtractor
+		password_dict
 		url_ext
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
@@ -2377,6 +2398,7 @@ function webs_menu(){
 	url_gf
 	wordlist_gen
 	wordlist_gen_roboxtractor
+	password_dict
 	url_ext
 	vulns
 	end
@@ -2429,7 +2451,7 @@ function help(){
 ########################################### START SCRIPT  #####################################################
 ###############################################################################################################
 
-PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:rspanwvh::' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,deep,help,vps' -n 'reconFTW' -- "$@")
+PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:c:rspanwvh::' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,deep,help,vps' -n 'reconFTW' -- "$@")
 
 
 # Note the quotes around "$PROGARGS": they are essential!
@@ -2499,7 +2521,12 @@ while true; do
             shift
             continue
             ;;
-
+		'-c')
+			custom_function=$2
+			opt_mode='c'
+            shift 2
+            continue
+            ;;
         # extra stuff
         '-o')
 			if [[ "$2" != /* ]]; then
@@ -2511,6 +2538,7 @@ while true; do
             continue
             ;;
 		'-v'|'--vps')
+			type -P axiom-ls &>/dev/null || { printf "\n Axiom is needed for this mode and is not installed \n You have to install it manually \n" && exit; allinstalled=false;}
 			AXIOM=true
             shift
             continue
@@ -2694,6 +2722,11 @@ case $opt_mode in
 				end
 			fi
 			;;
+		'c')
+			export DIFF=true
+			$custom_function
+			exit
+            ;;
         # No mode selected.  EXIT!
         *)
             help
