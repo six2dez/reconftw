@@ -990,46 +990,33 @@ function nuclei_check(){
 		nuclei -update-templates 2>>"$LOGFILE" &>/dev/null
 		mkdir -p nuclei_output
 		if [ ! "$AXIOM" = true ]; then
-			printf "${yellow}\n Running : Nuclei Info${reset}\n\n"
-			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity info -r $resolvers_trusted -o nuclei_output/info.txt
-			printf "${yellow}\n\n Running : Nuclei Low${reset}\n\n"
-			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity low -r $resolvers_trusted -o nuclei_output/low.txt
-			printf "${yellow}\n\n Running : Nuclei Medium${reset}\n\n"
-			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity medium -r $resolvers_trusted -o nuclei_output/medium.txt
-			printf "${yellow}\n\n Running : Nuclei High${reset}\n\n"
-			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity high -r $resolvers_trusted -o nuclei_output/high.txt
-			printf "${yellow}\n\n Running : Nuclei Critical${reset}\n\n"
-			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity critical -r $resolvers_trusted -o nuclei_output/critical.txt
-			if [ "$BBRF_CONNECTION" = true ]; then
-				[ -s "nuclei_output/info.txt" ] && cat nuclei_output/info.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:info 2>>"$LOGFILE" &>/dev/null
-				[ -s "nuclei_output/low.txt" ] && cat nuclei_output/low.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:low 2>>"$LOGFILE" &>/dev/null
-				[ -s "nuclei_output/medium.txt" ] && cat nuclei_output/medium.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:medium 2>>"$LOGFILE" &>/dev/null
-				[ -s "nuclei_output/high.txt" ] && cat nuclei_output/high.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:high 2>>"$LOGFILE" &>/dev/null
-				[ -s "nuclei_output/critical.txt" ] && cat nuclei_output/critical.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:critical 2>>"$LOGFILE" &>/dev/null
-			fi
+			set -f                      # avoid globbing (expansion of *).
+			array=(${NUCLEI_SEVERITY//,/ })
+			for i in "${!array[@]}"
+			do
+				crit=${array[i]}
+				printf "${yellow}\n Running : Nuclei $crit ${reset}\n\n"
+				cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity $crit -r $resolvers_trusted -o nuclei_output/${crit}.txt
+			done
 			printf "\n\n"
 		else
 			[ ! -s ".tmp/webs_subs.txt" ] && cat webs/webs.txt subdomains/subdomains.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
 			if [ -s ".tmp/webs_subs.txt" ]; then
-				printf "${yellow}\n Running : Nuclei Info${reset}\n\n"
-				axiom-scan .tmp/webs_subs.txt -m nuclei -severity info -o nuclei_output/info.txt 2>>"$LOGFILE" &>/dev/null
-				printf "${yellow}\n\n Running : Nuclei Low${reset}\n\n"
-				axiom-scan .tmp/webs_subs.txt -m nuclei -severity low -o nuclei_output/low.txt 2>>"$LOGFILE" &>/dev/null
-				printf "${yellow}\n\n Running : Nuclei Medium${reset}\n\n"
-				axiom-scan .tmp/webs_subs.txt -m nuclei -severity medium -o nuclei_output/medium.txt 2>>"$LOGFILE" &>/dev/null
-				printf "${yellow}\n\n Running : Nuclei High${reset}\n\n"
-				axiom-scan .tmp/webs_subs.txt -m nuclei -severity high -o nuclei_output/high.txt 2>>"$LOGFILE" &>/dev/null
-				printf "${yellow}\n\n Running : Nuclei Critical${reset}\n\n"
-				axiom-scan .tmp/webs_subs.txt -m nuclei -severity critical -o nuclei_output/critical.txt 2>>"$LOGFILE" &>/dev/null
-				if [ "$BBRF_CONNECTION" = true ]; then
-					[ -s "nuclei_output/info.txt" ] && cat nuclei_output/info.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:info 2>>"$LOGFILE" &>/dev/null
-					[ -s "nuclei_output/low.txt" ] && cat nuclei_output/low.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:low 2>>"$LOGFILE" &>/dev/null
-					[ -s "nuclei_output/medium.txt" ] && cat nuclei_output/medium.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:medium 2>>"$LOGFILE" &>/dev/null
-					[ -s "nuclei_output/high.txt" ] && cat nuclei_output/high.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:high 2>>"$LOGFILE" &>/dev/null
-					[ -s "nuclei_output/critical.txt" ] && cat nuclei_output/critical.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:critical 2>>"$LOGFILE" &>/dev/null
-				fi
+				for i in "${!array[@]}"
+				do
+					crit=${array[i]}
+					printf "${yellow}\n Running : Nuclei $crit ${reset}\n\n"
+					axiom-scan .tmp/webs_subs.txt -m nuclei -severity ${crit} -o nuclei_output/${crit}.txt 2>>"$LOGFILE" &>/dev/null
+				done
 				printf "\n\n"
 			fi
+		fi
+		if [ "$BBRF_CONNECTION" = true ]; then
+			[ -s "nuclei_output/info.txt" ] && cat nuclei_output/info.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:${crit} 2>>"$LOGFILE" &>/dev/null
+			[ -s "nuclei_output/low.txt" ] && cat nuclei_output/low.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:${crit} 2>>"$LOGFILE" &>/dev/null
+			[ -s "nuclei_output/medium.txt" ] && cat nuclei_output/medium.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:${crit} 2>>"$LOGFILE" &>/dev/null
+			[ -s "nuclei_output/high.txt" ] && cat nuclei_output/high.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:${crit} 2>>"$LOGFILE" &>/dev/null
+			[ -s "nuclei_output/critical.txt" ] && cat nuclei_output/critical.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:${crit} 2>>"$LOGFILE" &>/dev/null
 		fi
 		end_func "Results are saved in $domain/nuclei_output folder" ${FUNCNAME[0]}
 	else
