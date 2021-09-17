@@ -2711,7 +2711,10 @@ case $opt_mode in
 			;;
 		'c')
 			export DIFF=true
+			dir="$SCRIPTPATH/Recon/$domain"
+			cd $dir || { echo "Failed to cd directory '$dir'"; exit 1; }
 			$custom_function
+			cd $SCRIPTPATH || { echo "Failed to cd directory '$dir'"; exit 1; }
 			exit
             ;;
         # No mode selected.  EXIT!
