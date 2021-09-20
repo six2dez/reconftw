@@ -1975,8 +1975,8 @@ function start(){
 
 function end(){
 
-	find $dir -type f -empty -print | grep -v '.called_fn' | grep -v '.log' | grep -v '.tmp' | xargs rm -f
-	find $dir -type d -empty -print -delete
+	find $dir -type f -empty -print | grep -v '.called_fn' | grep -v '.log' | grep -v '.tmp' | xargs rm -f &>/dev/null
+	find $dir -type d -empty -print -delete &>/dev/null
 
 	if [ ! "$PRESERVE" = true ]; then
 		find $dir -type f -empty | grep -v "called_fn" | xargs rm -f &>/dev/null
