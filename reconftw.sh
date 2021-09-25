@@ -60,6 +60,7 @@ function tools_installed(){
 	[ -f "$tools/JSA/jsa.py" ] || { printf "${bred} [*] JSA		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/cloud_enum/cloud_enum.py" ] || { printf "${bred} [*] cloud_enum		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/nmap-parse-output/nmap-parse-output" ] || { printf "${bred} [*] nmap-parse-output		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/pydictor/pydictor.py" ] || { printf "${bred} [*] pydictor   	[NO]${reset}\n"; allinstalled=false;}
 	type -P github-endpoints &>/dev/null || { printf "${bred} [*] github-endpoints	[NO]${reset}\n"; allinstalled=false;}
 	type -P github-subdomains &>/dev/null || { printf "${bred} [*] github-subdomains	[NO]${reset}\n"; allinstalled=false;}
 	type -P gospider &>/dev/null || { printf "${bred} [*] gospider		[NO]${reset}\n"; allinstalled=false;}
@@ -71,7 +72,6 @@ function tools_installed(){
 	type -P findomain &>/dev/null || { printf "${bred} [*] Findomain		[NO]${reset}\n"; allinstalled=false;}
 	type -P amass &>/dev/null || { printf "${bred} [*] Amass		[NO]${reset}\n"; allinstalled=false;}
 	type -P crobat &>/dev/null || { printf "${bred} [*] Crobat		[NO]${reset}\n"; allinstalled=false;}
-	type -P mildew &>/dev/null || { printf "${bred} [*] mildew		[NO]${reset}\n"; allinstalled=false;}
 	type -P waybackurls &>/dev/null || { printf "${bred} [*] Waybackurls	[NO]${reset}\n"; allinstalled=false;}
 	type -P gauplus &>/dev/null || { printf "${bred} [*] gauplus		[NO]${reset}\n"; allinstalled=false;}
 	type -P dnsx &>/dev/null || { printf "${bred} [*] dnsx		[NO]${reset}\n"; allinstalled=false;}
@@ -97,7 +97,6 @@ function tools_installed(){
 	type -P unimap &>/dev/null || { printf "${bred} [*] unimap		[NO]${reset}\n${reset}"; allinstalled=false;}
 	type -P resolveDomains &>/dev/null || { printf "${bred} [*] resolveDomains	[NO]${reset}\n"; allinstalled=false;}
 	type -P emailfinder &>/dev/null || { printf "${bred} [*] emailfinder	[NO]${reset}\n"; allinstalled=false;}
-	type -P urldedupe &>/dev/null || { printf "${bred} [*] urldedupe	[NO]${reset}\n"; allinstalled=false;}
 	type -P analyticsrelationships &>/dev/null || { printf "${bred} [*] analyticsrelationships	[NO]${reset}\n"; allinstalled=false;}
 	type -P mapcidr &>/dev/null || { printf "${bred} [*] mapcidr		[NO]${reset}\n"; allinstalled=false;}
 	type -P ppfuzz &>/dev/null || { printf "${bred} [*] ppfuzz		[NO]${reset}\n"; allinstalled=false;}
@@ -106,8 +105,7 @@ function tools_installed(){
 	type -P interactsh-client &>/dev/null || { printf "${bred} [*] interactsh-client	[NO]${reset}\n"; allinstalled=false;}
 	type -P uro &>/dev/null || { printf "${bred} [*] uro		[NO]${reset}\n"; allinstalled=false;}
 	type -P bbrf &>/dev/null || { printf "${bred} [*] bbrf		[NO]${reset}\n"; allinstalled=false;}
-	type -P axiom-ls &>/dev/null || { printf "${bred} [*] axiom		[NO]${reset}\n${reset}"; allinstalled=false;}
-
+	
 	if [ "${allinstalled}" = true ]; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
 	else
@@ -188,7 +186,7 @@ function emails(){
 		emailfinder -d $domain 2>>"$LOGFILE" | anew -q .tmp/emailfinder.txt
 		[ -s ".tmp/emailfinder.txt" ] && cat .tmp/emailfinder.txt | awk 'matched; /^-----------------$/ { matched = 1 }' | anew -q osint/emails.txt
 		cd "$tools/theHarvester" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
-		python3 theHarvester.py -d $domain -b all 2>>"$LOGFILE" > $dir/.tmp/harvester.txt
+		python3 theHarvester.py -d $domain -b "anubis, baidu, bing, binaryedge, bingapi, bufferoverun, censys, certspotter, crtsh, dnsdumpster, duckduckgo, github-code, google, hackertarget, hunter, intelx, linkedin, linkedin_links, netcraft, omnisint, otx, pentesttools, projectdiscovery, qwant, rapiddns, rocketreach, securityTrails, sublist3r, threatcrowd, threatminer, trello, twitter, urlscan, virustotal, yahoo, zoomeye" 2>>"$LOGFILE" > $dir/.tmp/harvester.txt
 		cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		if [ -s ".tmp/harvester.txt" ]; then
 			cat .tmp/harvester.txt | awk '/Emails/,/Hosts/' | sed -e '1,2d' | head -n -2 | sed -e '/Searching /d' -e '/exception has occurred/d' -e '/found:/Q' | anew -q osint/emails.txt
@@ -345,11 +343,6 @@ function sub_passive(){
 		curl -s -k "https://jldc.me/anubis/subdomains/${domain}" 2>>"$LOGFILE" | grep -Po "((http|https):\/\/)?(([\w.-]*)\.([\w]*)\.([A-z]))\w+" | sed '/^\./d' | anew -q .tmp/curl_psub.txt
 		curl -s -k "https://dns.bufferover.run/dns?q=.${domain}" 2>>"$LOGFILE" | jq -r '.FDNS_A'[],'.RDNS'[] 2>>"$LOGFILE" | cut -d ',' -f2 | grep -F ".$domain" | anew -q .tmp/curl_psub.txt
 		curl -s -k "https://tls.bufferover.run/dns?q=.${domain}" 2>>"$LOGFILE" | jq -r .Results[] 2>>"$LOGFILE" | cut -d ',' -f3 | grep -F ".$domain" | anew -q .tmp/curl_psub.txt
-		if echo $domain | grep -q ".mil$"; then
-			mildew
-			mv mildew.out .tmp/mildew.out
-			[ -s ".tmp/mildew.out" ] && cat .tmp/mildew.out | grep ".$domain$" | anew -q .tmp/mil_psub.txt
-		fi
 		NUMOFLINES=$(cat .tmp/*_psub.txt 2>>"$LOGFILE" | sed "s/*.//" | anew .tmp/passive_subs.txt | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (passive)" ${FUNCNAME[0]}
 	else
@@ -840,7 +833,7 @@ function screenshot(){
 		start_func "Web Screenshots"
 		cat webs/webs.txt webs/webs_uncommon_ports.txt 2>>"$LOGFILE" | anew -q .tmp/webs_screenshots.txt
 		if [ ! "$AXIOM" = true ]; then
-			[ -s ".tmp/webs_screenshots.txt" ] && webscreenshot -r chromium -i .tmp/webs_screenshots.txt -w $WEBSCREENSHOT_THREADS -o screenshots 2>>"$LOGFILE" &>/dev/null
+			[ -s ".tmp/webs_screenshots.txt" ] && webscreenshot -i .tmp/webs_screenshots.txt -w $WEBSCREENSHOT_THREADS -o screenshots 2>>"$LOGFILE" &>/dev/null
 			#gowitness file -f .tmp/webs_screenshots.txt --disable-logging 2>>"$LOGFILE"
 		else
 			[ "$AXIOM_SCREENSHOT_MODULE" = "webscreenshot" ] && axiom-scan .tmp/webs_screenshots.txt -m $AXIOM_SCREENSHOT_MODULE -w $WEBSCREENSHOT_THREADS -o screenshots 2>>"$LOGFILE" &>/dev/null
@@ -990,46 +983,33 @@ function nuclei_check(){
 		nuclei -update-templates 2>>"$LOGFILE" &>/dev/null
 		mkdir -p nuclei_output
 		if [ ! "$AXIOM" = true ]; then
-			printf "${yellow}\n Running : Nuclei Info${reset}\n\n"
-			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity info -r $resolvers_trusted -o nuclei_output/info.txt
-			printf "${yellow}\n\n Running : Nuclei Low${reset}\n\n"
-			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity low -r $resolvers_trusted -o nuclei_output/low.txt
-			printf "${yellow}\n\n Running : Nuclei Medium${reset}\n\n"
-			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity medium -r $resolvers_trusted -o nuclei_output/medium.txt
-			printf "${yellow}\n\n Running : Nuclei High${reset}\n\n"
-			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity high -r $resolvers_trusted -o nuclei_output/high.txt
-			printf "${yellow}\n\n Running : Nuclei Critical${reset}\n\n"
-			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity critical -r $resolvers_trusted -o nuclei_output/critical.txt
-			if [ "$BBRF_CONNECTION" = true ]; then
-				[ -s "nuclei_output/info.txt" ] && cat nuclei_output/info.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:info 2>>"$LOGFILE" &>/dev/null
-				[ -s "nuclei_output/low.txt" ] && cat nuclei_output/low.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:low 2>>"$LOGFILE" &>/dev/null
-				[ -s "nuclei_output/medium.txt" ] && cat nuclei_output/medium.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:medium 2>>"$LOGFILE" &>/dev/null
-				[ -s "nuclei_output/high.txt" ] && cat nuclei_output/high.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:high 2>>"$LOGFILE" &>/dev/null
-				[ -s "nuclei_output/critical.txt" ] && cat nuclei_output/critical.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:critical 2>>"$LOGFILE" &>/dev/null
-			fi
+			set -f                      # avoid globbing (expansion of *).
+			array=(${NUCLEI_SEVERITY//,/ })
+			for i in "${!array[@]}"
+			do
+				crit=${array[i]}
+				printf "${yellow}\n Running : Nuclei $crit ${reset}\n\n"
+				cat subdomains/subdomains.txt webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/ -severity $crit -r $resolvers_trusted -o nuclei_output/${crit}.txt
+			done
 			printf "\n\n"
 		else
 			[ ! -s ".tmp/webs_subs.txt" ] && cat webs/webs.txt subdomains/subdomains.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
 			if [ -s ".tmp/webs_subs.txt" ]; then
-				printf "${yellow}\n Running : Nuclei Info${reset}\n\n"
-				axiom-scan .tmp/webs_subs.txt -m nuclei -severity info -o nuclei_output/info.txt 2>>"$LOGFILE" &>/dev/null
-				printf "${yellow}\n\n Running : Nuclei Low${reset}\n\n"
-				axiom-scan .tmp/webs_subs.txt -m nuclei -severity low -o nuclei_output/low.txt 2>>"$LOGFILE" &>/dev/null
-				printf "${yellow}\n\n Running : Nuclei Medium${reset}\n\n"
-				axiom-scan .tmp/webs_subs.txt -m nuclei -severity medium -o nuclei_output/medium.txt 2>>"$LOGFILE" &>/dev/null
-				printf "${yellow}\n\n Running : Nuclei High${reset}\n\n"
-				axiom-scan .tmp/webs_subs.txt -m nuclei -severity high -o nuclei_output/high.txt 2>>"$LOGFILE" &>/dev/null
-				printf "${yellow}\n\n Running : Nuclei Critical${reset}\n\n"
-				axiom-scan .tmp/webs_subs.txt -m nuclei -severity critical -o nuclei_output/critical.txt 2>>"$LOGFILE" &>/dev/null
-				if [ "$BBRF_CONNECTION" = true ]; then
-					[ -s "nuclei_output/info.txt" ] && cat nuclei_output/info.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:info 2>>"$LOGFILE" &>/dev/null
-					[ -s "nuclei_output/low.txt" ] && cat nuclei_output/low.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:low 2>>"$LOGFILE" &>/dev/null
-					[ -s "nuclei_output/medium.txt" ] && cat nuclei_output/medium.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:medium 2>>"$LOGFILE" &>/dev/null
-					[ -s "nuclei_output/high.txt" ] && cat nuclei_output/high.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:high 2>>"$LOGFILE" &>/dev/null
-					[ -s "nuclei_output/critical.txt" ] && cat nuclei_output/critical.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:critical 2>>"$LOGFILE" &>/dev/null
-				fi
+				for i in "${!array[@]}"
+				do
+					crit=${array[i]}
+					printf "${yellow}\n Running : Nuclei $crit ${reset}\n\n"
+					axiom-scan .tmp/webs_subs.txt -m nuclei -severity ${crit} -o nuclei_output/${crit}.txt 2>>"$LOGFILE" &>/dev/null
+				done
 				printf "\n\n"
 			fi
+		fi
+		if [ "$BBRF_CONNECTION" = true ]; then
+			[ -s "nuclei_output/info.txt" ] && cat nuclei_output/info.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:${crit} 2>>"$LOGFILE" &>/dev/null
+			[ -s "nuclei_output/low.txt" ] && cat nuclei_output/low.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:${crit} 2>>"$LOGFILE" &>/dev/null
+			[ -s "nuclei_output/medium.txt" ] && cat nuclei_output/medium.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:${crit} 2>>"$LOGFILE" &>/dev/null
+			[ -s "nuclei_output/high.txt" ] && cat nuclei_output/high.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:${crit} 2>>"$LOGFILE" &>/dev/null
+			[ -s "nuclei_output/critical.txt" ] && cat nuclei_output/critical.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:${crit} 2>>"$LOGFILE" &>/dev/null
 		fi
 		end_func "Results are saved in $domain/nuclei_output folder" ${FUNCNAME[0]}
 	else
@@ -1171,7 +1151,7 @@ function urlchecks(){
 				[ -s "js/url_extract_js.txt" ] && cat js/url_extract_js.txt | python3 $tools/JSA/jsa.py | anew -q .tmp/url_extract_tmp.txt
 			fi
 			[ -s ".tmp/url_extract_tmp.txt" ] &&  cat .tmp/url_extract_tmp.txt | grep "${domain}" | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -Eiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | anew -q .tmp/url_extract_tmp2.txt
-			[ -s ".tmp/url_extract_tmp2.txt" ] && cat .tmp/url_extract_tmp2.txt | urldedupe -s -qs | uro | anew -q .tmp/url_extract_uddup.txt 2>>"$LOGFILE" &>/dev/null
+			[ -s ".tmp/url_extract_tmp2.txt" ] && cat .tmp/url_extract_tmp2.txt | uro | anew -q .tmp/url_extract_uddup.txt 2>>"$LOGFILE" &>/dev/null
 			NUMOFLINES=$(cat .tmp/url_extract_uddup.txt 2>>"$LOGFILE" | anew webs/url_extract.txt | wc -l)
 			notification "${NUMOFLINES} new urls with params" info
 			end_func "Results are saved in $domain/webs/url_extract.txt" ${FUNCNAME[0]}
@@ -1320,6 +1300,21 @@ function wordlist_gen_roboxtractor(){
 		end_func "Results are saved in $domain/webs/robots_wordlist.txt" ${FUNCNAME[0]}
 	else
 		printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
+}
+
+function password_dict(){
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$PASSWORD_DICT" = true ];	then
+		start_func "Password dictionary generation"
+		word=${domain%%.*}
+		python3 $tools/pydictor/pydictor.py -extend $word --leet 0 1 2 11 21 --len ${PASSWORD_MIN_LENGTH} ${PASSWORD_MAX_LENGTH} -o webs/password_dict.txt 2>>"$LOGFILE" &>/dev/null
+		end_func "Results are saved in $domain/webs/password_dict.txt" ${FUNCNAME[0]}
+	else
+		if [ "$PASSWORD_DICT" = false ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
 	fi
 }
 
@@ -1483,7 +1478,7 @@ function ssrf_checks(){
 		else
 			end_func "Skipping SSRF: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
 		fi
-		pkill -f interactsh-client
+		pkill -f interactsh-client &
 	else
 		if [ "$SSRF_CHECKS" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -1636,7 +1631,7 @@ function prototype_pollution(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$PROTO_POLLUTION" = true ] ; then
 		start_func "Prototype Pollution checks"
 		if [ "$DEEP" = true ] || [[ $(cat webs/url_extract.txt | wc -l) -le $DEEP_LIMIT ]]; then
-			[ -s "webs/url_extract.txt" ] && ppfuzz -l webs/url_extract.txt -c $PPFUZZ_THREADS > anew -q .tmp/prototype_pollution.txt
+			[ -s "webs/url_extract.txt" ] && ppfuzz -l webs/url_extract.txt -c $PPFUZZ_THREADS 2>/dev/null | anew -q .tmp/prototype_pollution.txt
 			[ -s ".tmp/prototype_pollution.txt" ] && cat .tmp/prototype_pollution.txt | sed -e '1,8d' | sed '/^\[ERR/d' | anew -q vulns/prototype_pollution.txt
 			end_func "Results are saved in vulns/prototype_pollution.txt" ${FUNCNAME[0]}
 		else
@@ -1972,6 +1967,10 @@ function start(){
 }
 
 function end(){
+
+	find $dir -type f -empty -print | grep -v '.called_fn' | grep -v '.log' | grep -v '.tmp' | xargs rm -f &>/dev/null
+	find $dir -type d -empty -print -delete &>/dev/null
+
 	if [ ! "$PRESERVE" = true ]; then
 		find $dir -type f -empty | grep -v "called_fn" | xargs rm -f &>/dev/null
 		find $dir -type d -empty | grep -v "called_fn" | xargs rm -rf &>/dev/null
@@ -1981,9 +1980,9 @@ function end(){
 		rm -rf $dir/.tmp
 	fi
 
-        if [ "$REMOVELOG" = true ]; then
-                rm -rf $dir/.log
-        fi 
+    if [ "$REMOVELOG" = true ]; then
+            rm -rf $dir/.log
+    fi 
 
 	if [ -n "$dir_output" ]; then
 		output
@@ -2159,6 +2158,7 @@ function recon(){
 	url_gf
 	wordlist_gen
 	wordlist_gen_roboxtractor
+	password_dict
 	url_ext
 }
 
@@ -2325,6 +2325,7 @@ function multi_recon(){
 		url_gf
 		wordlist_gen
 		wordlist_gen_roboxtractor
+		password_dict
 		url_ext
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
@@ -2377,6 +2378,7 @@ function webs_menu(){
 	url_gf
 	wordlist_gen
 	wordlist_gen_roboxtractor
+	password_dict
 	url_ext
 	vulns
 	end
@@ -2429,7 +2431,7 @@ function help(){
 ########################################### START SCRIPT  #####################################################
 ###############################################################################################################
 
-PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:rspanwvh::' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,deep,help,vps' -n 'reconFTW' -- "$@")
+PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:c:rspanwvh::' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,deep,help,vps' -n 'reconFTW' -- "$@")
 
 
 # Note the quotes around "$PROGARGS": they are essential!
@@ -2499,7 +2501,12 @@ while true; do
             shift
             continue
             ;;
-
+		'-c')
+			custom_function=$2
+			opt_mode='c'
+            shift 2
+            continue
+            ;;
         # extra stuff
         '-o')
 			if [[ "$2" != /* ]]; then
@@ -2511,6 +2518,7 @@ while true; do
             continue
             ;;
 		'-v'|'--vps')
+			type -P axiom-ls &>/dev/null || { printf "\n Axiom is needed for this mode and is not installed \n You have to install it manually \n" && exit; allinstalled=false;}
 			AXIOM=true
             shift
             continue
@@ -2694,6 +2702,14 @@ case $opt_mode in
 				end
 			fi
 			;;
+		'c')
+			export DIFF=true
+			dir="$SCRIPTPATH/Recon/$domain"
+			cd $dir || { echo "Failed to cd directory '$dir'"; exit 1; }
+			$custom_function
+			cd $SCRIPTPATH || { echo "Failed to cd directory '$dir'"; exit 1; }
+			exit
+            ;;
         # No mode selected.  EXIT!
         *)
             help

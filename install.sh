@@ -14,7 +14,6 @@ gotools["waybackurls"]="go get -u -v github.com/tomnomnom/hacks/waybackurls"
 gotools["nuclei"]="GO111MODULE=on go get -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei"
 gotools["anew"]="go get -u -v github.com/tomnomnom/anew"
 gotools["notify"]="GO111MODULE=on go get -v github.com/projectdiscovery/notify/cmd/notify"
-gotools["mildew"]="go get -u github.com/daehee/mildew/cmd/mildew"
 gotools["unfurl"]="go get -u -v github.com/tomnomnom/unfurl"
 gotools["httpx"]="GO111MODULE=on go get -v github.com/projectdiscovery/httpx/cmd/httpx"
 gotools["github-endpoints"]="go get -u github.com/gwen001/github-endpoints"
@@ -62,6 +61,7 @@ repos["JSA"]="w9w/JSA"
 repos["urldedupe"]="ameenmaali/urldedupe"
 repos["cloud_enum"]="initstring/cloud_enum"
 repos["nmap-parse-output"]="ernw/nmap-parse-output"
+repos["pydictor"]="LandGrey/pydictor"
 
 dir=${tools}
 double_check=false
@@ -154,7 +154,7 @@ if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$versio
             eval wget https://dl.google.com/go/${version}.linux-amd64.tar.gz $DEBUG_STD
             eval $SUDO tar -C /usr/local -xzf ${version}.linux-amd64.tar.gz $DEBUG_STD
         fi
-        eval $SUDO cp /usr/local/go/bin/go /usr/bin
+        eval $SUDO cp /usr/local/go/bin/go /usr/local/bin
         rm -rf go$LATEST_GO*
         export GOROOT=/usr/local/go
         export GOPATH=$HOME/go
@@ -183,7 +183,7 @@ touch $dir/.github_tokens
 
 eval wget -N -c https://bootstrap.pypa.io/get-pip.py $DEBUG_STD && eval python3 get-pip.py $DEBUG_STD
 eval rm -f get-pip.py $DEBUG_STD
-eval ln -s /usr/local/bin/pip3 /usr/bin/pip3 $DEBUG_STD
+eval ln -s /usr/local/bin/pip3 /usr/local/bin/pip3 $DEBUG_STD
 eval pip3 install -I -r requirements.txt $DEBUG_STD
 
 printf "${bblue} Running: Installing Golang tools (${#gotools[@]})${reset}\n\n"
@@ -235,15 +235,11 @@ for repo in "${!repos[@]}"; do
         eval $SUDO python3 setup.py install $DEBUG_STD
     fi
     if [ "massdns" = "$repo" ]; then
-            eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/bin/ $DEBUG_ERROR
+            eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/local/bin/ $DEBUG_ERROR
     elif [ "gf" = "$repo" ]; then
             eval cp -r examples ~/.gf $DEBUG_ERROR
     elif [ "Gf-Patterns" = "$repo" ]; then
             eval mv *.json ~/.gf $DEBUG_ERROR
-    elif [ "urldedupe" = "$repo" ]; then
-            eval cmake CMakeLists.txt $DEBUG_STD
-            eval make $DEBUG_STD
-            eval $SUDO cp ./urldedupe /usr/bin/ $DEBUG_STD
     fi
     cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 done
@@ -251,22 +247,22 @@ done
 if [ "True" = "$IS_ARM" ]
     then
         eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-armv7  $DEBUG_STD
-        eval $SUDO mv findomain-armv7 /usr/bin/findomain
+        eval $SUDO mv findomain-armv7 /usr/local/bin/findomain
     else
         eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux $DEBUG_STD
         eval wget -N -c https://github.com/sensepost/gowitness/releases/download/2.3.4/gowitness-2.3.4-linux-amd64 $DEBUG_STD
         eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/download/0.4.0/unimap-linux $DEBUG_STD
         eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz $DEBUG_STD
-        eval $SUDO tar -C /usr/bin/ -xzf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
+        eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
         eval $SUDO rm -rf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
-        eval $SUDO mv gowitness-2.3.4-linux-amd64 /usr/bin/gowitness
-        eval $SUDO mv findomain-linux /usr/bin/findomain
-        eval $SUDO mv unimap-linux /usr/bin/unimap
+        eval $SUDO mv gowitness-2.3.4-linux-amd64 /usr/local/bin/gowitness
+        eval $SUDO mv findomain-linux /usr/local/bin/findomain
+        eval $SUDO mv unimap-linux /usr/local/bin/unimap
 fi
-eval $SUDO chmod 755 /usr/bin/findomain
-eval $SUDO chmod 755 /usr/bin/gowitness
-eval $SUDO chmod 755 /usr/bin/unimap
-eval $SUDO chmod 755 /usr/bin/ppfuzz
+eval $SUDO chmod 755 /usr/local/bin/findomain
+eval $SUDO chmod 755 /usr/local/bin/gowitness
+eval $SUDO chmod 755 /usr/local/bin/unimap
+eval $SUDO chmod 755 /usr/local/bin/ppfuzz
 eval $SUDO chmod +x $tools/uDork/uDork.sh
 eval subfinder $DEBUG_STD
 eval subfinder $DEBUG_STD
@@ -287,6 +283,8 @@ eval wget -O ssti_wordlist.txt https://gist.githubusercontent.com/six2dez/ab5277
 eval wget -O headers_inject.txt https://gist.github.com/six2dez/d62ab8f8ffd28e1c206d401081d977ae/raw $DEBUG_STD
 eval wget -O custom_udork.txt https://gist.githubusercontent.com/six2dez/7245cad74f2da5824080e0cb6bdaac22/raw $DEBUG_STD
 eval wget -O axiom_config.sh https://gist.githubusercontent.com/six2dez/6e2d9f4932fd38d84610eb851014b26e/raw $DEBUG_STD
+eval wget -O ~/nuclei-templates/extra_templates/ssrf.yaml https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/ssrf.yaml $DEBUG_STD
+eval wget -O ~/nuclei-templates/extra_templates/sap-redirect.yaml https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/sap-redirect.yaml $DEBUG_STD
 
 ## Last check
 if [ "$double_check" = "true" ]; then
@@ -307,7 +305,7 @@ if [ "$double_check" = "true" ]; then
             eval $SUDO python3 setup.py install $DEBUG_STD
         fi
         if [ "massdns" = "$repo" ]; then
-                eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/bin/ $DEBUG_ERROR
+                eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/local/bin/ $DEBUG_ERROR
         elif [ "gf" = "$repo" ]; then
                 eval cp -r examples ~/.gf $DEBUG_ERROR
         elif [ "Gf-Patterns" = "$repo" ]; then
@@ -340,13 +338,16 @@ if [ ! -s "resolvers.txt" ] || [ $(find "resolvers.txt" -mtime +1 -print) ]; the
     printf "${yellow} Resolvers seem older than 1 day\n Generating custom resolvers... ${reset}\n\n"
     eval rm -f resolvers.txt &>/dev/null
     eval dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 100 -o resolvers.txt $DEBUG_STD
+	eval dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads 100 -o tmp_resolvers $DEBUG_STD
+	eval cat tmp_resolvers $DEBUG_ERROR | anew -q resolvers.txt
+	eval rm -f tmp_resolvers $DEBUG_STD
 fi
 eval h8mail -g $DEBUG_STD
 
 ## Stripping all Go binaries
 eval strip -s $HOME/go/bin/* $DEBUG_STD
 
-eval $SUDO cp $HOME/go/bin/* /usr/bin/ $DEBUG_STD
+eval $SUDO cp $HOME/go/bin/* /usr/local/bin/ $DEBUG_STD
 
 printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - GitHub (~/Tools/.github_tokens)\n - SHODAN (SHODAN_API_KEY in reconftw.cfg)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg) \n - notify (~/.config/notify/provider-config.yaml) \n - theHarvester (~/Tools/theHarvester/api-keys.yml)\n - H8mail (~/Tools/h8mail_config.ini)\n - uDork FB cookie (UDORK_COOKIE in reconftw.cfg)\n\n${reset}"
 printf "${bgreen} Finished!${reset}\n\n"
