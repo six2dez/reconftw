@@ -35,6 +35,7 @@ gotools["roboxtractor"]="go get -u -v github.com/Josue87/roboxtractor"
 gotools["mapcidr"]="GO111MODULE=on go get -v github.com/projectdiscovery/mapcidr/cmd/mapcidr"
 gotools["clouddetect"]="go get github.com/99designs/clouddetect/cli/clouddetect"
 gotools["dnstake"]="go install github.com/pwnesia/dnstake/cmd/dnstake@latest"
+gotools["gowitness"]="go get -u github.com/sensepost/gowitness"
 
 declare -A repos
 repos["uDork"]="m3n0sd0n4ld/uDork"
@@ -255,7 +256,6 @@ if [ "True" = "$IS_ARM" ]
         eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz $DEBUG_STD
         eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
         eval $SUDO rm -rf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
-        eval $SUDO mv gowitness-2.3.4-linux-amd64 /usr/local/bin/gowitness
         eval $SUDO mv findomain-linux /usr/local/bin/findomain
         eval $SUDO mv unimap-linux /usr/local/bin/unimap
 fi
@@ -271,7 +271,7 @@ printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 ## Downloads
 eval wget -nc -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini $DEBUG_STD
 eval wget -nc -O ~/.gf/potential.json https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json $DEBUG_STD
-eval wget -nc -O ~/.config/notify/provider-config.yaml https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw/a66c4d8cf47a3bc95f5e9ba84773428662ea760c/notify_sample.conf $DEBUG_STD
+eval wget -nc -O ~/.config/notify/provider-config.yaml https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw $DEBUG_STD
 eval wget -nc -O getjswords.py https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py $DEBUG_STD
 eval wget -nc -O subdomains_big.txt https://wordlists-cdn.assetnote.io/data/manual/best-dns-wordlist.txt $DEBUG_STD
 eval wget -O resolvers_trusted.txt https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw $DEBUG_STD
@@ -285,6 +285,7 @@ eval wget -O custom_udork.txt https://gist.githubusercontent.com/six2dez/7245cad
 eval wget -O axiom_config.sh https://gist.githubusercontent.com/six2dez/6e2d9f4932fd38d84610eb851014b26e/raw $DEBUG_STD
 eval wget -O ~/nuclei-templates/extra_templates/ssrf.yaml https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/ssrf.yaml $DEBUG_STD
 eval wget -O ~/nuclei-templates/extra_templates/sap-redirect.yaml https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/sap-redirect.yaml $DEBUG_STD
+eval $SUDO chmod +x $tools/axiom_config.sh
 
 ## Last check
 if [ "$double_check" = "true" ]; then
