@@ -1205,6 +1205,9 @@ function url_ext(){
 				if [[ ${NUMOFLINES} -gt 0 ]]; then
 					echo -e "\n############################\n + ${t} + \n############################\n" >> webs/urls_by_ext.txt
 					cat .tmp/url_extract_tmp.txt | grep -Ei "\.(${t})($|\/|\?)" >> webs/urls_by_ext.txt
+					if [ "$BBRF_CONNECTION" = true ]; then
+						cat .tmp/url_extract_tmp.txt | grep -Ei "\.(${t})($|\/|\?)" | bbrf url add - 2>>"$LOGFILE" &>/dev/null
+					fi
 				fi
 			done
 			end_func "Results are saved in $domain/webs/urls_by_ext.txt" ${FUNCNAME[0]}
