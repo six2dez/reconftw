@@ -17,7 +17,6 @@ argcomplete==1.10.0
 s3scanner
 shodan
 dnspython
-webscreenshot
 emailfinder
 requests_futures
 bbrf
