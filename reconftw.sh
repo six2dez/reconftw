@@ -524,10 +524,10 @@ function sub_analytics(){
 function sub_permut(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBPERMUTE" = true ]; then
 		start_subfunc "Running : Permutations Subdomain Enumeration"
-		if [ "$DEEP" = true ] || [ "$(cat subdomains/subdomains.txt | wc -l)" -le 500 ] ; then
+		if [ "$DEEP" = true ] || [ "$(cat subdomains/subdomains.txt | wc -l)" -le $DEEP_LIMIT ] ; then
 			[ -s "subdomains/subdomains.txt" ] && gotator -sub subdomains/subdomains.txt -perm $tools/permutations_list.txt -depth 1 -numbers 10 -mindup -adv -md 2>>"$LOGFILE" > .tmp/gotator1.txt
-		elif [ "$(cat subdomains/subdomains.txt | wc -l)" -le 100 ] && [ "$(cat .tmp/subs_no_resolved.txt | wc -l)" -le 500 ]; then
-			gotator -sub .tmp/subs_no_resolved.txt -perm $tools/permutations_list.txt -depth 1 -numbers 10 -mindup -adv -md 2>>"$LOGFILE" > .tmp/gotator1.txt
+		elif [ "$(cat .tmp/subs_no_resolved.txt | wc -l)" -le $DEEP_LIMIT2 ]; then
+			[ -s ".tmp/subs_no_resolved.txt" ] && gotator -sub .tmp/subs_no_resolved.txt -perm $tools/permutations_list.txt -depth 1 -numbers 10 -mindup -adv -md 2>>"$LOGFILE" > .tmp/gotator1.txt
 		else
 			end_subfunc "Skipping Permutations: Too Many Subdomains" ${FUNCNAME[0]}
 			return 1
@@ -545,8 +545,6 @@ function sub_permut(){
 			[ -s ".tmp/gotator2.txt" ] && axiom-scan .tmp/gotator2.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute2_tmp.txt 2>>"$LOGFILE" &>/dev/null
 		fi
 		[ -s ".tmp/permute2_tmp.txt" ] && cat .tmp/permute2_tmp.txt | anew -q .tmp/permute2.txt
-		#eval rm -rf .tmp/gotator*.txt 2>>"$LOGFILE"
-		#eval rm -rf .tmp/permute*.txt 2>>"$LOGFILE"
 		cat .tmp/permute1.txt .tmp/permute2.txt 2>>"$LOGFILE" | anew -q .tmp/permute_subs.txt
 
 		if [ -s ".tmp/permute_subs.txt" ]; then
@@ -578,7 +576,6 @@ function sub_recursive(){
 					findomain --quiet -t $sub 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
 				done
 				[ -s ".tmp/passive_recursive.txt" ] && puredns resolve .tmp/passive_recursive.txt -w .tmp/passive_recurs_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT  --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" &>/dev/null
-				[ -s ".tmp/passive_recurs_tmp.txt" ] && cat .tmp/passive_recurs_tmp.txt | anew -q subdomains/subdomains.txt
 			else
 				for sub in $( ( cat subdomains/subdomains.txt | rev | cut -d '.' -f 3,2,1 | rev | sort | uniq -c | sort -nr | grep -v '1 ' | head -n 10 && cat subdomains/subdomains.txt | rev | cut -d '.' -f 4,3,2,1 | rev | sort | uniq -c | sort -nr | grep -v '1 ' | head -n 10 ) | sed -e 's/^[[:space:]]*//' | cut -d ' ' -f 2);do 
 					echo $sub | anew -q .tmp/sub_pass_recur_target.com
@@ -591,7 +588,6 @@ function sub_recursive(){
 				fi
 				cat .tmp/*_prec.txt 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
 				[ -s ".tmp/passive_recursive.txt" ] && axiom-scan .tmp/passive_recursive.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/passive_recurs_tmp.txt 2>>"$LOGFILE" &>/dev/null
-				[ -s ".tmp/passive_recurs_tmp.txt" ] && cat .tmp/passive_recurs_tmp.txt | anew -q subdomains/subdomains.txt
 			fi
 		fi
 		# Bruteforce recursive
@@ -623,11 +619,11 @@ function sub_recursive(){
 			#eval rm -rf .tmp/gotator*.txt 2>>"$LOGFILE"
 			#eval rm -rf .tmp/brute_recursive_wordlist.txt 2>>"$LOGFILE"
 			#eval rm -rf .tmp/permute*.txt 2>>"$LOGFILE"
-			NUMOFLINES=$(cat .tmp/permute_recursive.txt .tmp/brute_recursive.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | wc -l)
-			end_subfunc "${NUMOFLINES} new subs (recursive)" ${FUNCNAME[0]}
 		else
 			end_subfunc "Skipping Recursive BF: Too Many Subdomains" ${FUNCNAME[0]}
 		fi
+		NUMOFLINES=$(cat .tmp/passive_recurs_tmp.txt .tmp/permute_recursive.txt .tmp/brute_recursive.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | wc -l)
+		end_subfunc "${NUMOFLINES} new subs (recursive)" ${FUNCNAME[0]}
 	else
 		if [ "$SUBRECURSIVE" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -649,8 +645,7 @@ function subtakeover(){
 		fi
 
 		# DNS_TAKEOVER
-		sed "s/$/.$domain/" $subs_wordlist > .tmp/brute_dns_tko.txt
-		cat .tmp/subs_no_resolved.txt .tmp/subdomains_dns.txt .tmp/brute_dns_tko.txt .tmp/scrap_subs.txt .tmp/analytics_subs_clean.txt .tmp/gotator1.txt .tmp/gotator2.txt .tmp/passive_recursive.txt .tmp/brute_recursive_wordlist.txt .tmp/gotator1_recursive.txt .tmp/gotator2_recursive.txt 2>/dev/null | anew -q .tmp/subs_dns_tko.txt
+		cat .tmp/subs_no_resolved.txt .tmp/subdomains_dns.txt .tmp/scrap_subs.txt .tmp/analytics_subs_clean.txt .tmp/passive_recursive.txt 2>/dev/null | anew -q .tmp/subs_dns_tko.txt
 		cat .tmp/subs_dns_tko.txt 2>/dev/null | dnstake -c $DNSTAKE_THREADS -s 2>>"$LOGFILE" | anew -q .tmp/tko.txt
 		
 		NUMOFLINES=$(cat .tmp/tko.txt 2>>"$LOGFILE" | anew webs/takeover.txt | wc -l)
@@ -756,7 +751,7 @@ function webprobe_simple(){
 			deleteOutScoped $outOfScope_file .tmp/probed_tmp.txt
 			NUMOFLINES=$(cat .tmp/probed_tmp.txt 2>>"$LOGFILE" | anew webs/webs.txt | wc -l)
 			end_subfunc "${NUMOFLINES} new websites resolved" ${FUNCNAME[0]}
-			if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/webs.txt| wc -l) -le 1500 ]]; then
+			if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/webs.txt| wc -l) -le $DEEP_LIMIT2 ]]; then
 				notification "Sending websites to proxy" info
 				ffuf -mc all -fc 404 -w webs/webs.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" &>/dev/null
 			fi
@@ -815,7 +810,7 @@ function webprobe_full(){
 		[ -s "webs/webs_uncommon_ports.txt" ] && cat webs/webs_uncommon_ports.txt
 		rm -rf "unimap_logs" 2>>"$LOGFILE"
 		end_func "Results are saved in $domain/webs/webs_uncommon_ports.txt" ${FUNCNAME[0]}
-		if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/webs_uncommon_ports.txt| wc -l) -le 1500 ]]; then
+		if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/webs_uncommon_ports.txt| wc -l) -le $DEEP_LIMIT2 ]]; then
 			notification "Sending websites uncommon ports to proxy" info
 			ffuf -mc all -fc 404 -w webs/webs_uncommon_ports.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" &>/dev/null
 		fi
@@ -1158,7 +1153,7 @@ function urlchecks(){
 			NUMOFLINES=$(cat .tmp/url_extract_uddup.txt 2>>"$LOGFILE" | anew webs/url_extract.txt | wc -l)
 			notification "${NUMOFLINES} new urls with params" info
 			end_func "Results are saved in $domain/webs/url_extract.txt" ${FUNCNAME[0]}
-			if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/url_extract.txt | wc -l) -le 1500 ]]; then
+			if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/url_extract.txt | wc -l) -le $DEEP_LIMIT2 ]]; then
 				notification "Sending urls to proxy" info
 				ffuf -mc all -fc 404 -w webs/url_extract.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" &>/dev/null
 			fi
@@ -1284,7 +1279,7 @@ function wordlist_gen(){
 		[ -s ".tmp/js_endpoints.txt" ] && cat .tmp/js_endpoints.txt | unfurl -u format %s://%d%p 2>>"$LOGFILE" | anew -q webs/all_paths.txt
 		[ -s ".tmp/url_extract_tmp.txt" ] && cat .tmp/url_extract_tmp.txt | unfurl -u format %s://%d%p 2>>"$LOGFILE" | anew -q webs/all_paths.txt
 		end_func "Results are saved in $domain/webs/dict_[words|paths].txt" ${FUNCNAME[0]}
-		if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/all_paths.txt | wc -l) -le 1500 ]]; then
+		if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/all_paths.txt | wc -l) -le $DEEP_LIMIT2 ]]; then
 			notification "Sending urls to proxy" info
 			ffuf -mc all -fc 404 -w webs/all_paths.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" &>/dev/null
 		fi
@@ -1396,7 +1391,7 @@ function xss(){
 					[ -s ".tmp/xss_reflected.txt" ] && axiom-scan .tmp/xss_reflected.txt -m dalfox --mass --mass-worker 100 --multicast --skip-bav -w $DALFOX_THREADS -o vulns/xss.txt 2>>"$LOGFILE" &>/dev/null
 				fi
 			else
-				if [[ $(cat .tmp/xss_reflected.txt | wc -l) -le 500 ]]; then
+				if [[ $(cat .tmp/xss_reflected.txt | wc -l) -le $DEEP_LIMIT ]]; then
 					if [ -n "$XSS_SERVER" ]; then
 						axiom-scan .tmp/xss_reflected.txt -m dalfox --mass --mass-worker 100 --multicast --skip-bav --skip-grepping --skip-mining-all --skip-mining-dict -b ${XSS_SERVER} -w $DALFOX_THREADS -o vulns/xss.txt 2>>"$LOGFILE" &>/dev/null
 					else

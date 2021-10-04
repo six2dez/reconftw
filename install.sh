@@ -28,7 +28,7 @@ gotools["crlfuzz"]="GO111MODULE=on go get -v github.com/dwisiswant0/crlfuzz/cmd/
 gotools["dalfox"]="GO111MODULE=on go get -v github.com/hahwul/dalfox/v2"
 gotools["puredns"]="GO111MODULE=on go get -v github.com/d3mondev/puredns/v2"
 gotools["resolveDomains"]="go get -u -v github.com/Josue87/resolveDomains"
-gotools["interactsh-client"]="GO111MODULE=on go get -v github.com/projectdiscovery/interactsh/cmd/interactsh-client"
+gotools["interactsh-client"]="go install -v github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest"
 gotools["analyticsrelationships"]="go get -u -v github.com/Josue87/analyticsrelationships"
 gotools["gotator"]="go get -u -v github.com/Josue87/gotator"
 gotools["roboxtractor"]="go get -u -v github.com/Josue87/roboxtractor"
