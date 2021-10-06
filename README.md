@@ -71,6 +71,7 @@ So, what are you waiting for Go! Go! Go! :boom:
   - [You can support this work buying me a coffee:](#you-can-support-this-work-buying-me-a-coffee)
 - [Sponsors ❤️](#sponsors-️)
 - [Thanks :pray:](#thanks-pray)
+- [Disclaimer](#disclaimer)
  
 ---
  
@@ -116,10 +117,10 @@ docker run -d -v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -v $PWD/Rec
  
 ```bash
 git clone https://github.com/six2dez/reconftw
-cd reconftw/Docker
-docker build -t reconftw .
+cd reconftw
+docker build -t reconftw Docker/.
+# Running from reconftw root folder, configure values properly for your needs
 docker run -v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -v $PWD/Recon/:/root/Tools/reconftw/Recon/ --name reconftwSCAN --rm reconftw -d target.com -r
-
 ```
  
 # ⚙️ Config file:
@@ -540,3 +541,8 @@ If you want to contribute to this project you can do it in multiple ways:
 - [Censys](https://censys.io/)
 - [CIRCL](https://www.circl.lu/)
 - [Whoxy](https://www.whoxy.com/)
+
+# Disclaimer
+Usage of this program for attacking targets without consent is illegal. It is the user's responsibility to obey all applicable laws. The developer assumes no liability and is not responsible for any misuse or damage caused by this program. Please use responsibly.
+
+The material contained in this repository is licensed under GNU GPLv3.
