@@ -8,8 +8,8 @@
 
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.1.0">
-    <img src="https://img.shields.io/badge/release-v2.1.0-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.1.1">
+    <img src="https://img.shields.io/badge/release-v2.1.1-green">
   </a>
    </a>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
@@ -73,3 +73,4 @@ Então, o que está esperando? Bora! Bora! Bora! :boom:
   - [Dê suporte ao projeto me comprando um café:](#you-can-support-this-work-buying-me-a-coffee)
 - [Patrocinadores ❤️](#sponsors-️)
 - [Agradecimentos :pray:](#thanks-pray)
+- [Isenção de responsabilidade](#disclaimer)
