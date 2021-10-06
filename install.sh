@@ -336,8 +336,8 @@ printf "${bblue} Running: Performing last configurations ${reset}\n\n"
 if [ ! -s "resolvers.txt" ] || [ $(find "resolvers.txt" -mtime +1 -print) ]; then
     printf "${yellow} Resolvers seem older than 1 day\n Generating custom resolvers... ${reset}\n\n"
     eval rm -f resolvers.txt &>/dev/null
-    eval dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 100 -o resolvers.txt $DEBUG_STD
-	eval dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads 100 -o tmp_resolvers $DEBUG_STD
+    eval dnsvalidator -tL https://public-dns.info/nameservers.txt -threads $DNSVALIDATOR_THREADS -o resolvers.txt $DEBUG_STD
+	eval dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads $DNSVALIDATOR_THREADS -o tmp_resolvers $DEBUG_STD
 	eval cat tmp_resolvers $DEBUG_ERROR | anew -q resolvers.txt
 	eval rm -f tmp_resolvers $DEBUG_STD
 fi
