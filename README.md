@@ -37,7 +37,7 @@
  
 **ReconFTW** automates the entire process of reconnaisance for you. It outperforms the work of subdomain enumeration along with various vulnerability checks and obtaining maximum information about your target.       
  
-ReconFTW uses lot of techniques (passive, bruteforce, permutations, certificate transparency, source code scraping, analytics, DNS records...) for subdomain enumeration which helps you getting the maximum and the most interesting subdomains so that you be ahead of the competition.   
+ReconFTW uses a lot of techniques (passive, bruteforce, permutations, certificate transparency, source code scraping, analytics, DNS records...) for subdomain enumeration which helps you getting the maximum and the most interesting subdomains so that you be ahead of the competition.   
   
 It also performs various vulnerability checks like XSS, Open Redirects, SSRF, CRLF, LFI, SQLi, SSL tests, SSTI, DNS zone transfers, and much more. Along with these, it performs OSINT techniques, directory fuzzing, dorking, ports scanning, screenshots, nuclei scan on your target.
  
@@ -127,7 +127,7 @@ docker run -v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -v $PWD/Recon/
 > A detailed explaintion of config file can be found here [Configuration file](https://github.com/six2dez/reconftw/wiki/3.-Configuration-file) :book:
  
 - Through ```reconftw.cfg``` file the whole execution of the tool can be controlled.
-- Hunters can set various scanning modes, execution preferences, tools, config files, APIs/TOKENS, personalized wordlists and much more.
+- Hunters can set various scanning modes, execution preferences, tools, config files, APIs/TOKENS, personalized wordlists, and much more.
  
 <details>
  <br><br>
@@ -404,13 +404,13 @@ reset='\033[0m'
 # Axiom Support: :cloud:
 ![](https://i.ibb.co/Jzrgkqt/axiom-readme.png)
 > Check out the wiki section for more info [Axiom Support](https://github.com/six2dez/reconftw/wiki/5.-Axiom-version)
-* As reconFTW actively hits the target with a lot of web traffic, hence there was a need to move to Axiom distributing the work load among various instances leading to reduction of execution time.
-* During the configuration of axiom you need to select `reconftw` as provisoner.  
-* You can create your own axiom's fleet before running reconFTW or let reconFTW to create and destroy it automatically just modifying reconftw.cfg file.
+* As reconFTW actively hits the target with a lot of web traffic, hence there was a need to move to Axiom distributing the workload among various instances leading to a reduction of execution time.
+* During the configuration of axiom, you need to select `reconftw` as provisioner.  
+* You can create your own axiom's fleet before running reconFTW or let reconFTW create and destroy it automatically just modifying reconftw.cfg file.
 
 # BBRF Support: :computer:
 * To add reconFTW results to your [BBRF instance](https://github.com/honoki/bbrf-server) just add IP and credentials on reconftw.cfg file section dedicated to bbrf.
-* During the execution of the scans the results will be added dinamically when each step ends.
+* During the execution of the scans, the results will be added dynamically when each step ends.
 * Even you can set up locally your BBRF instance to be able to visualize your results in a fancy web UI.
  
 # Sample video:
@@ -512,7 +512,7 @@ Follow these simple steps to end up having a private repository with your `API K
  
 If you want to contribute to this project you can do it in multiple ways:
 - Submitting an [issue](https://github.com/six2dez/reconftw/issues/new/choose) because you have found a bug or you have any suggestion or request.
-- Making a Pull Request from [dev](https://github.com/six2dez/reconftw/tree/dev) branch because you want to improve the code or add something to the script.
+- Making a Pull Request from the [dev](https://github.com/six2dez/reconftw/tree/dev) branch because you want to improve the code or add something to the script.
  
 ## Need help? :information_source:
  
