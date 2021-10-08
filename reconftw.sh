@@ -59,7 +59,7 @@ function tools_installed(){
 	[ -f "$tools/getjswords.py" ] || { printf "${bred} [*] getjswords   	[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/JSA/jsa.py" ] || { printf "${bred} [*] JSA		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/cloud_enum/cloud_enum.py" ] || { printf "${bred} [*] cloud_enum		[NO]${reset}\n"; allinstalled=false;}
-	[ -f "$tools/nmap-parse-output/nmap-parse-output" ] || { printf "${bred} [*] nmap-parse-output		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/ultimate-nmap-parser/ultimate-nmap-parser.sh" ] || { printf "${bred} [*] nmap-parse-output		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/pydictor/pydictor.py" ] || { printf "${bred} [*] pydictor   	[NO]${reset}\n"; allinstalled=false;}
 	type -P github-endpoints &>/dev/null || { printf "${bred} [*] github-endpoints	[NO]${reset}\n"; allinstalled=false;}
 	type -P github-subdomains &>/dev/null || { printf "${bred} [*] github-subdomains	[NO]${reset}\n"; allinstalled=false;}
@@ -942,7 +942,10 @@ function portscan(){
 			fi
 		fi
 		if [ "$BBRF_CONNECTION" = true ]; then
-			[ -s "hosts/portscan_active.xml" ] && $tools/nmap-parse-output/nmap-parse-output hosts/portscan_active.xml host-ports | bbrf service add - 2>>"$LOGFILE" &>/dev/null
+			[ -s "hosts/subs_ips_vhosts.txt" ] && cat subs_ips_vhosts.txt | awk '{print $2,$1}' | sed -e 's/\s\+/:/g' | bbrf domain add -
+			[ -s "hosts/subs_ips_vhosts.txt" ] && cat subs_ips_vhosts.txt | sed -e 's/\s\+/:/g' | bbrf ip add -
+			[ -s "hosts/portscan_active.xml" ] && $tools/ultimate-nmap-parser/ultimate-nmap-parser.sh hosts/portscan_active.gnmap --csv 2>>"$LOGFILE" &>/dev/null
+			[ -s "parsed_nmap.csv" ] && mv parsed_nmap.csv .tmp/parsed_nmap.csv && cat .tmp/parsed_nmap.csv | tail -n +2 | cut -d',' -f1,2,5,6 | sed -e 's/,/:/g' | sed 's/\:$//' | bbrf service add - && rm -f parsed_nmap.csv
 		fi
 		[ -s "hosts/portscan_active.xml" ] && searchsploit --nmap hosts/portscan_active.xml 2>>"$LOGFILE" > hosts/searchsploit.txt
 		end_func "Results are saved in hosts/portscan_[passive|active].txt" ${FUNCNAME[0]}

@@ -61,7 +61,7 @@ repos["commix"]="commixproject/commix"
 repos["JSA"]="w9w/JSA"
 repos["urldedupe"]="ameenmaali/urldedupe"
 repos["cloud_enum"]="initstring/cloud_enum"
-repos["nmap-parse-output"]="ernw/nmap-parse-output"
+repos["ultimate-nmap-parser"]="shifty0g/ultimate-nmap-parser"
 repos["pydictor"]="LandGrey/pydictor"
 
 dir=${tools}
