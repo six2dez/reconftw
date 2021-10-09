@@ -257,12 +257,11 @@ for repo in "${!repos[@]}"; do
 done
 
 if [ "True" = "$IS_ARM" ]; then
-            if [ "True" = "$RPI_3" ]; then
-
-if [ "True" = "$IS_ARM" ]; then
     if [ "True" = "$RPI_3" ]; then
         eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-armv7  $DEBUG_STD
+        eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/latest/download/unimap-armv7 $DEBUG_STD
         eval $SUDO mv findomain-armv7 /usr/local/bin/findomain
+        eval $SUDO mv unimap-armv7 /usr/local/bin/unimap
     elif [ "True" = "$RPI_4" ]; then
         printf "${bred}\n To be check if there is a compiled version of findomain for armv8 ${reset}\n\n"
         #eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-armv7  $DEBUG_STD
@@ -278,8 +277,11 @@ else
     eval $SUDO mv unimap-linux /usr/local/bin/unimap
 fi
 eval $SUDO chmod 755 /usr/local/bin/findomain
+eval strip -s /usr/local/bin/findomain $DEBUG_STD
 eval $SUDO chmod 755 /usr/local/bin/unimap
+eval strip -s /usr/local/bin/unimap $DEBUG_STD
 eval $SUDO chmod 755 /usr/local/bin/ppfuzz
+eval strip -s /usr/local/bin/ppfuzz $DEBUG_STD
 eval $SUDO chmod +x $tools/uDork/uDork.sh
 eval subfinder $DEBUG_STD
 eval subfinder $DEBUG_STD
