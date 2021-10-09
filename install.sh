@@ -67,11 +67,17 @@ repos["pydictor"]="LandGrey/pydictor"
 dir=${tools}
 double_check=false
 
-if grep -q "ARMv"  /proc/cpuinfo
-then
-   IS_ARM="True";
+
+if [ grep -q "Raspberry Pi 3"  /proc/cpuinfo ]; then
+    IS_ARM="True"
+    RPI_3="True"
+    RPI_4="False"
+elif [ grep -q "Raspberry Pi 4"  /proc/cpuinfo ]; then
+    IS_ARM="True"
+    RPI_4="True"
+    RPI_3="False"
 else
-   IS_ARM="False";
+    IS_ARM="False"
 fi
 
 printf "\n\n${bgreen}#######################################################################${reset}\n"
@@ -149,8 +155,13 @@ if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$versio
     else
         eval $SUDO rm -rf /usr/local/go $DEBUG_STD
         if [ "True" = "$IS_ARM" ]; then
-            eval wget https://dl.google.com/go/${version}.linux-armv6l.tar.gz $DEBUG_STD
-            eval $SUDO tar -C /usr/local -xzf ${version}.linux-armv6l.tar.gz $DEBUG_STD
+            if [ "True" = "$RPI_3" ]; then
+                eval wget https://dl.google.com/go/${version}.linux-armv6l.tar.gz $DEBUG_STD
+                eval $SUDO tar -C /usr/local -xzf ${version}.linux-armv6l.tar.gz $DEBUG_STD
+            elif [ "True" = "$RPI_4" ]; then
+                eval wget https://dl.google.com/go/${version}.linux-arm64.tar.gz $DEBUG_STD
+                eval $SUDO tar -C /usr/local -xzf ${version}.linux-arm64.tar.gz $DEBUG_STD
+            fi
         else
             eval wget https://dl.google.com/go/${version}.linux-amd64.tar.gz $DEBUG_STD
             eval $SUDO tar -C /usr/local -xzf ${version}.linux-amd64.tar.gz $DEBUG_STD
@@ -245,18 +256,26 @@ for repo in "${!repos[@]}"; do
     cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 done
 
-if [ "True" = "$IS_ARM" ]
-    then
+if [ "True" = "$IS_ARM" ]; then
+            if [ "True" = "$RPI_3" ]; then
+
+if [ "True" = "$IS_ARM" ]; then
+    if [ "True" = "$RPI_3" ]; then
         eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-armv7  $DEBUG_STD
         eval $SUDO mv findomain-armv7 /usr/local/bin/findomain
-    else
-        eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux $DEBUG_STD
-        eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/download/0.4.0/unimap-linux $DEBUG_STD
-        eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz $DEBUG_STD
-        eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
-        eval $SUDO rm -rf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
-        eval $SUDO mv findomain-linux /usr/local/bin/findomain
-        eval $SUDO mv unimap-linux /usr/local/bin/unimap
+    elif [ "True" = "$RPI_4" ]; then
+        printf "${bred}\n To be check if there is a compiled version of findomain for armv8 ${reset}\n\n"
+        #eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-armv7  $DEBUG_STD
+        #eval $SUDO mv findomain-armv7 /usr/local/bin/findomain
+    fi
+else
+    eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux $DEBUG_STD
+    eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/download/0.4.0/unimap-linux $DEBUG_STD
+    eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz $DEBUG_STD
+    eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
+    eval $SUDO rm -rf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
+    eval $SUDO mv findomain-linux /usr/local/bin/findomain
+    eval $SUDO mv unimap-linux /usr/local/bin/unimap
 fi
 eval $SUDO chmod 755 /usr/local/bin/findomain
 eval $SUDO chmod 755 /usr/local/bin/unimap
