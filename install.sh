@@ -68,11 +68,11 @@ dir=${tools}
 double_check=false
 
 
-if [ grep -q "Raspberry Pi 3"  /proc/cpuinfo ]; then
+if grep -q "Raspberry Pi 3"  /proc/cpuinfo; then
     IS_ARM="True"
     RPI_3="True"
     RPI_4="False"
-elif [ grep -q "Raspberry Pi 4"  /proc/cpuinfo ]; then
+elif grep -q "Raspberry Pi 4"  /proc/cpuinfo; then
     IS_ARM="True"
     RPI_4="True"
     RPI_3="False"
