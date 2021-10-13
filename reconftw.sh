@@ -251,6 +251,7 @@ function domain_info(){
 				lynx -dump $line | tail -n +18 | sed -n '/]domainbigdata.com/q;p'  >> osint/domain_info_ip.txt && echo -e "\n\n#######################################################################\n\n" >> osint/domain_info_ip.txt
 			done
 		fi
+		amass intel -d ${domain} -whois -o osint/domain_info_reverse_whois.txt 2>>"$LOGFILE" &>/dev/null
 		end_func "Results are saved in $domain/osint/domain_info_[general/name/email/ip].txt" ${FUNCNAME[0]}
 	else
 		if [ "$DOMAIN_INFO" = false ] || [ "$OSINT" = false ]; then
