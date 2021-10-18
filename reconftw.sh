@@ -2155,12 +2155,23 @@ function multi_osint(){
 	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 	mkdir -p .tmp .called_fn osint subdomains webs hosts vulns
 
+	NOW=$(date +"%F")
+	NOWT=$(date +"%T")
+	LOGFILE="${workdir}/.log/${NOW}_${NOWT}.txt"
+	touch .log/${NOW}_${NOWT}.txt
+	echo "Start ${NOW} ${NOWT}" > ${LOGFILE}
+
 	for domain in $targets; do
 		dir=$workdir/targets/$domain
 		called_fn_dir=$dir/.called_fn
 		mkdir -p $dir
 		cd "$dir"  || { echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		mkdir -p .tmp .called_fn osint subdomains webs hosts vulns
+		NOW=$(date +"%F")
+		NOWT=$(date +"%T")
+		LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
+		touch .log/${NOW}_${NOWT}.txt
+		echo "Start ${NOW} ${NOWT}" > ${LOGFILE}
 		domain_info
 		ip_info
 		emails
@@ -2250,10 +2261,9 @@ function multi_recon(){
 	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 
 	mkdir -p .tmp .log .called_fn osint subdomains webs hosts vulns
-
 	NOW=$(date +"%F")
 	NOWT=$(date +"%T")
-	LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
+	LOGFILE="${workdir}/.log/${NOW}_${NOWT}.txt"
 	touch .log/${NOW}_${NOWT}.txt
 	echo "Start ${NOW} ${NOWT}" > ${LOGFILE}
 
