@@ -368,6 +368,7 @@ if [ ! -s "resolvers.txt" ] || [ $(find "resolvers.txt" -mtime +1 -print) ]; the
 	eval dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads $DNSVALIDATOR_THREADS -o tmp_resolvers $DEBUG_STD
 	eval cat tmp_resolvers $DEBUG_ERROR | anew -q resolvers.txt
 	eval rm -f tmp_resolvers $DEBUG_STD
+    [ ! -s "$resolvers" ] && wget -O $resolvers https://raw.githubusercontent.com/proabiral/Fresh-Resolvers/master/resolvers.txt &>/dev/null
 fi
 eval h8mail -g $DEBUG_STD
 
