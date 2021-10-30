@@ -59,7 +59,7 @@ function tools_installed(){
 	[ -f "$tools/getjswords.py" ] || { printf "${bred} [*] getjswords   	[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/JSA/jsa.py" ] || { printf "${bred} [*] JSA		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/cloud_enum/cloud_enum.py" ] || { printf "${bred} [*] cloud_enum		[NO]${reset}\n"; allinstalled=false;}
-	[ -f "$tools/nmap-parse-output/nmap-parse-output" ] || { printf "${bred} [*] nmap-parse-output		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/ultimate-nmap-parser/ultimate-nmap-parser.sh" ] || { printf "${bred} [*] nmap-parse-output		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/pydictor/pydictor.py" ] || { printf "${bred} [*] pydictor   	[NO]${reset}\n"; allinstalled=false;}
 	type -P github-endpoints &>/dev/null || { printf "${bred} [*] github-endpoints	[NO]${reset}\n"; allinstalled=false;}
 	type -P github-subdomains &>/dev/null || { printf "${bred} [*] github-subdomains	[NO]${reset}\n"; allinstalled=false;}
@@ -251,6 +251,7 @@ function domain_info(){
 				lynx -dump $line | tail -n +18 | sed -n '/]domainbigdata.com/q;p'  >> osint/domain_info_ip.txt && echo -e "\n\n#######################################################################\n\n" >> osint/domain_info_ip.txt
 			done
 		fi
+		amass intel -d ${domain} -whois -o osint/domain_info_reverse_whois.txt 2>>"$LOGFILE" &>/dev/null
 		end_func "Results are saved in $domain/osint/domain_info_[general/name/email/ip].txt" ${FUNCNAME[0]}
 	else
 		if [ "$DOMAIN_INFO" = false ] || [ "$OSINT" = false ]; then
@@ -666,9 +667,9 @@ function subtakeover(){
 		start_func ${FUNCNAME[0]} "Looking for possible subdomain and DNS takeover"
 		touch .tmp/tko.txt
 		if [ ! "$AXIOM" = true ]; then
-			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/takeovers/ -r $resolvers_trusted -retries 3 -o .tmp/tko.txt
+			cat subdomains/subdomains.txt webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/takeovers/ -r $resolvers_trusted -retries 3 -o .tmp/tko.txt
 		else
-			cat webs/webs.txt subdomains/subdomains.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
+			cat webs/webs.txt subdomains/subdomains.txt webs/webs_uncommon_ports.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
 			[ -s ".tmp/webs_subs.txt" ] && axiom-scan .tmp/webs_subs.txt -m nuclei -w /home/op/recon/nuclei/takeovers/ -retries 3 -o .tmp/tko.txt 2>>"$LOGFILE" &>/dev/null
 		fi
 
@@ -942,7 +943,10 @@ function portscan(){
 			fi
 		fi
 		if [ "$BBRF_CONNECTION" = true ]; then
-			[ -s "hosts/portscan_active.xml" ] && $tools/nmap-parse-output/nmap-parse-output hosts/portscan_active.xml host-ports | bbrf service add - 2>>"$LOGFILE" &>/dev/null
+			[ -s "hosts/subs_ips_vhosts.txt" ] && cat subs_ips_vhosts.txt | awk '{print $2,$1}' | sed -e 's/\s\+/:/g' | bbrf domain add -
+			[ -s "hosts/subs_ips_vhosts.txt" ] && cat subs_ips_vhosts.txt | sed -e 's/\s\+/:/g' | bbrf ip add -
+			[ -s "hosts/portscan_active.xml" ] && $tools/ultimate-nmap-parser/ultimate-nmap-parser.sh hosts/portscan_active.gnmap --csv 2>>"$LOGFILE" &>/dev/null
+			[ -s "parsed_nmap.csv" ] && mv parsed_nmap.csv .tmp/parsed_nmap.csv && cat .tmp/parsed_nmap.csv | tail -n +2 | cut -d',' -f1,2,5,6 | sed -e 's/,/:/g' | sed 's/\:$//' | bbrf service add - && rm -f parsed_nmap.csv
 		fi
 		[ -s "hosts/portscan_active.xml" ] && searchsploit --nmap hosts/portscan_active.xml 2>>"$LOGFILE" > hosts/searchsploit.txt
 		end_func "Results are saved in hosts/portscan_[passive|active].txt" ${FUNCNAME[0]}
@@ -1025,8 +1029,10 @@ function nuclei_check(){
 			done
 			printf "\n\n"
 		else
-			[ ! -s ".tmp/webs_subs.txt" ] && cat webs/webs.txt subdomains/subdomains.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
+			[ ! -s ".tmp/webs_subs.txt" ] && cat subdomains/subdomains.txt webs/webs.txt webs/webs_uncommon_ports.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
 			if [ -s ".tmp/webs_subs.txt" ]; then
+				set -f                      # avoid globbing (expansion of *).
+				array=(${NUCLEI_SEVERITY//,/ })
 				for i in "${!array[@]}"
 				do
 					crit=${array[i]}
@@ -2151,12 +2157,23 @@ function multi_osint(){
 	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 	mkdir -p .tmp .called_fn osint subdomains webs hosts vulns
 
+	NOW=$(date +"%F")
+	NOWT=$(date +"%T")
+	LOGFILE="${workdir}/.log/${NOW}_${NOWT}.txt"
+	touch .log/${NOW}_${NOWT}.txt
+	echo "Start ${NOW} ${NOWT}" > ${LOGFILE}
+
 	for domain in $targets; do
 		dir=$workdir/targets/$domain
 		called_fn_dir=$dir/.called_fn
 		mkdir -p $dir
 		cd "$dir"  || { echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		mkdir -p .tmp .called_fn osint subdomains webs hosts vulns
+		NOW=$(date +"%F")
+		NOWT=$(date +"%T")
+		LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
+		touch .log/${NOW}_${NOWT}.txt
+		echo "Start ${NOW} ${NOWT}" > ${LOGFILE}
 		domain_info
 		ip_info
 		emails
@@ -2246,10 +2263,9 @@ function multi_recon(){
 	cd "$workdir"  || { echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 
 	mkdir -p .tmp .log .called_fn osint subdomains webs hosts vulns
-
 	NOW=$(date +"%F")
 	NOWT=$(date +"%T")
-	LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
+	LOGFILE="${workdir}/.log/${NOW}_${NOWT}.txt"
 	touch .log/${NOW}_${NOWT}.txt
 	echo "Start ${NOW} ${NOWT}" > ${LOGFILE}
 
