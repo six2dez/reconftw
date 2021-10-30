@@ -667,9 +667,9 @@ function subtakeover(){
 		start_func ${FUNCNAME[0]} "Looking for possible subdomain and DNS takeover"
 		touch .tmp/tko.txt
 		if [ ! "$AXIOM" = true ]; then
-			cat subdomains/subdomains.txt webs/webs.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/takeovers/ -r $resolvers_trusted -retries 3 -o .tmp/tko.txt
+			cat subdomains/subdomains.txt webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | nuclei -silent -t ~/nuclei-templates/takeovers/ -r $resolvers_trusted -retries 3 -o .tmp/tko.txt
 		else
-			cat webs/webs.txt subdomains/subdomains.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
+			cat webs/webs.txt subdomains/subdomains.txt webs/webs_uncommon_ports.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
 			[ -s ".tmp/webs_subs.txt" ] && axiom-scan .tmp/webs_subs.txt -m nuclei -w /home/op/recon/nuclei/takeovers/ -retries 3 -o .tmp/tko.txt 2>>"$LOGFILE" &>/dev/null
 		fi
 
@@ -1029,8 +1029,10 @@ function nuclei_check(){
 			done
 			printf "\n\n"
 		else
-			[ ! -s ".tmp/webs_subs.txt" ] && cat webs/webs.txt subdomains/subdomains.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
+			[ ! -s ".tmp/webs_subs.txt" ] && cat subdomains/subdomains.txt webs/webs.txt webs/webs_uncommon_ports.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
 			if [ -s ".tmp/webs_subs.txt" ]; then
+				set -f                      # avoid globbing (expansion of *).
+				array=(${NUCLEI_SEVERITY//,/ })
 				for i in "${!array[@]}"
 				do
 					crit=${array[i]}
