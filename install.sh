@@ -19,7 +19,7 @@ gotools["httpx"]="GO111MODULE=on go get -v github.com/projectdiscovery/httpx/cmd
 gotools["github-endpoints"]="go get -u github.com/gwen001/github-endpoints"
 gotools["dnsx"]="GO111MODULE=on go get -v github.com/projectdiscovery/dnsx/cmd/dnsx"
 gotools["subfinder"]="GO111MODULE=on go get -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder"
-gotools["gauplus"]="GO111MODULE=on go get -v github.com/bp0lr/gauplus"
+gotools["gau"]="go install github.com/lc/gau/v2/cmd/gau@latest"
 gotools["subjs"]="GO111MODULE=on go get -v github.com/lc/subjs"
 gotools["Gxss"]="go get -u -v github.com/KathanP19/Gxss"
 gotools["gospider"]="go get -u github.com/jaeles-project/gospider"
@@ -59,7 +59,6 @@ repos["GitDorker"]="obheda12/GitDorker"
 repos["testssl"]="drwetter/testssl.sh"
 repos["commix"]="commixproject/commix"
 repos["JSA"]="w9w/JSA"
-repos["urldedupe"]="ameenmaali/urldedupe"
 repos["cloud_enum"]="initstring/cloud_enum"
 repos["ultimate-nmap-parser"]="shifty0g/ultimate-nmap-parser"
 repos["pydictor"]="LandGrey/pydictor"
@@ -219,6 +218,8 @@ printf "${bblue}\n Running: Installing repositories (${#repos[@]})${reset}\n\n"
 # Repos with special configs
 eval git clone https://github.com/projectdiscovery/nuclei-templates ~/nuclei-templates $DEBUG_STD
 eval git clone https://github.com/geeknik/the-nuclei-templates.git ~/nuclei-templates/extra_templates $DEBUG_STD
+eval wget -nc -O ~/nuclei-templates/ssrf_nagli.yaml https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/ssrf.yaml $DEBUG_STD
+eval wget -nc -O ~/nuclei-templates/sap-redirect_nagli.yaml https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/sap-redirect.yaml $DEBUG_STD
 eval nuclei -update-templates $DEBUG_STD
 cd ~/nuclei-templates/extra_templates && eval git pull $DEBUG_STD
 cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
