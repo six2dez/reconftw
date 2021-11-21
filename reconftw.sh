@@ -1065,7 +1065,7 @@ function fuzz(){
 		if [ -s "webs/webs.txt" ]; then
 			mkdir -p $dir/fuzzing
 			if [ ! "$AXIOM" = true ]; then
-				interlace -tL webs/webs.txt -threads 10 -c "ffuf -mc all -fc 404 -ac -t ${FFUF_THREADS} -sf -s -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u  _target_/FUZZ -of csv -o _output_/_cleantarget_.csv" -o fuzzing 2>>"$LOGFILE" &>/dev/null
+				interlace -tL webs/webs.txt -threads 10 -c "ffuf ${FFUF_FLAGS} -t ${FFUF_THREADS}  -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u  _target_/FUZZ -of csv -o _output_/_cleantarget_.csv" -o fuzzing 2>>"$LOGFILE" &>/dev/null
 				for sub in $(cat webs/webs.txt); do
 					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
 					[ -s "$dir/fuzzing/${sub_out}.csv" ] && cat $dir/fuzzing/${sub_out}.csv | cut -d ',' -f2,5,6 | tr ',' ' ' | awk '{ print $2 " " $3 " " $1}' | tail -n +2 | sort -k1 | anew -q $dir/fuzzing/${sub_out}.txt
@@ -1073,7 +1073,7 @@ function fuzz(){
 				done
 				find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | anew -q $dir/fuzzing/fuzzing_full.txt
 			else
-				axiom-scan webs/webs.txt -m ffuf -w /home/op/lists/onelistforallmicro.txt -H \"${HEADER}\" -mc all -fc 404 -sf -ac -s -maxtime $FFUF_MAXTIME -o $dir/fuzzing/ffuf-content.csv 2>>"$LOGFILE" &>/dev/null
+				axiom-scan webs/webs.txt -m ffuf -w /home/op/lists/onelistforallmicro.txt -H \"${HEADER}\" $FFUF_FLAGS -maxtime $FFUF_MAXTIME -o $dir/fuzzing/ffuf-content.csv 2>>"$LOGFILE" &>/dev/null
 				grep -v "FUZZ,url,redirectlocation" $dir/fuzzing/ffuf-content.csv | awk -F "," '{print $2" "$5" "$6}' | sort > $dir/fuzzing/ffuf-content.tmp
 				for sub in $(cat webs/webs.txt); do
 					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
