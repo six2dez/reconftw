@@ -1891,7 +1891,7 @@ function axiom_lauch(){
 			else
 				startcount=$((AXIOM_FLEET_COUNT-NUMOFNODES))
 			fi
-			axiom_args=" -i=$startcount "
+			axiom_args=" -i $startcount "
 			# Temporarily disabled multiple axiom regions
 			# [ -n "$AXIOM_FLEET_REGIONS" ] && axiom_args="$axiom_args --regions=\"$AXIOM_FLEET_REGIONS\" "
 
