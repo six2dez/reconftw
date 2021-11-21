@@ -620,7 +620,7 @@ function sub_recursive(){
 			fi
 		fi
 		# Bruteforce recursive
-		if [[ $(cat subdomains/subdomains.txt | wc -l) -le $DEEP_LIMIT ]]; then
+		if [[ $(cat subdomains/subdomains.txt | wc -l) -le $DEEP_LIMIT ]] && [ "$SUB_RECURSIVE_BRUTE" = true ] ; then
 			echo "" > .tmp/brute_recursive_wordlist.txt
 			for sub in $(cat subdomains/subdomains.txt); do
 				sed "s/$/.$sub/" $subs_wordlist >> .tmp/brute_recursive_wordlist.txt
