@@ -1891,12 +1891,12 @@ function axiom_lauch(){
 			else
 				startcount=$((AXIOM_FLEET_COUNT-NUMOFNODES))
 			fi
-			axiom_args=" -i $startcount "
+			AXIOM_ARGS=" -i $startcount"
 			# Temporarily disabled multiple axiom regions
 			# [ -n "$AXIOM_FLEET_REGIONS" ] && axiom_args="$axiom_args --regions=\"$AXIOM_FLEET_REGIONS\" "
 
-			echo "axiom-fleet $AXIOM_FLEET_NAME $axiom_args"
-			axiom-fleet $AXIOM_FLEET_NAME "$axiom_args"
+			echo "axiom-fleet ${AXIOM_FLEET_NAME} ${AXIOM_ARGS}"
+			axiom-fleet ${AXIOM_FLEET_NAME} ${AXIOM_ARGS}
 			axiom-select "$AXIOM_FLEET_NAME*"
 			if [ -n "$AXIOM_POST_START" ]; then
 				eval "$AXIOM_POST_START" 2>>"$LOGFILE" &>/dev/null
