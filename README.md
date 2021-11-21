@@ -8,8 +8,8 @@
 
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.1.1">
-    <img src="https://img.shields.io/badge/release-v2.1.1-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.1.3">
+    <img src="https://img.shields.io/badge/release-v2.1.3-green">
   </a>
    </a>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
@@ -427,7 +427,7 @@ reset='\033[0m'
 - Google Dorks ([uDork](https://github.com/m3n0sd0n4ld/uDork))
 - Github Dorks ([GitDorker](https://github.com/obheda12/GitDorker))
 ## Subdomains
-  - Passive ([subfinder](https://github.com/projectdiscovery/subfinder), [assetfinder](https://github.com/tomnomnom/assetfinder), [amass](https://github.com/OWASP/Amass), [findomain](https://github.com/Findomain/Findomain), [crobat](https://github.com/cgboal/sonarsearch), [waybackurls](https://github.com/tomnomnom/waybackurls), [github-subdomains](https://github.com/gwen001/github-subdomains), [Anubis](https://jldc.me), [gauplus](https://github.com/bp0lr/gauplus))
+  - Passive ([subfinder](https://github.com/projectdiscovery/subfinder), [assetfinder](https://github.com/tomnomnom/assetfinder), [amass](https://github.com/OWASP/Amass), [findomain](https://github.com/Findomain/Findomain), [crobat](https://github.com/cgboal/sonarsearch), [waybackurls](https://github.com/tomnomnom/waybackurls), [github-subdomains](https://github.com/gwen001/github-subdomains), [Anubis](https://jldc.me), [gau](https://github.com/lc/gau))
   - Certificate transparency ([ctfr](https://github.com/UnaPibaGeek/ctfr), [tls.bufferover](tls.bufferover.run) and [dns.bufferover](dns.bufferover.run)))
   - Bruteforce ([puredns](https://github.com/d3mondev/puredns))
   - Permutations ([Gotator](https://github.com/Josue87/gotator))
