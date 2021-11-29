@@ -419,9 +419,9 @@ function sub_active(){
 		echo $domain | dnsx -retry 3 -silent -r $resolvers_trusted 2>>"$LOGFILE" | anew -q .tmp/subdomains_tmp.txt
 
 		if [ "$DEEP" = true ]; then
-			cat .tmp/subdomains_tmp.txt | cero -p $TLS_PORTS 2>>"$LOGFILE" | sed 's/^*.//' | grep -iv "." | anew -q .tmp/subdomains_tmp.txt
+			cat .tmp/subdomains_tmp.txt | cero -p $TLS_PORTS 2>>"$LOGFILE" | sed 's/^*.//' | grep -e "\." | anew -q .tmp/subdomains_tmp.txt
 		else
-			cat .tmp/subdomains_tmp.txt | cero 2>>"$LOGFILE" | sed 's/^*.//' | grep -iv "." | anew -q .tmp/subdomains_tmp.txt
+			cat .tmp/subdomains_tmp.txt | cero 2>>"$LOGFILE" | sed 's/^*.//' | grep -e "\." | anew -q .tmp/subdomains_tmp.txt
 		fi
 		NUMOFLINES=$(cat .tmp/subdomains_tmp.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (active resolution)" ${FUNCNAME[0]}
