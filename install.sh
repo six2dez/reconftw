@@ -22,7 +22,7 @@ gotools["subfinder"]="GO111MODULE=on go get -v github.com/projectdiscovery/subfi
 gotools["gau"]="go install github.com/lc/gau/v2/cmd/gau@latest"
 gotools["subjs"]="GO111MODULE=on go get -v github.com/lc/subjs"
 gotools["Gxss"]="go get -u -v github.com/KathanP19/Gxss"
-gotools["gospider"]="go get -u github.com/jaeles-project/gospider"
+gotools["gospider"]="GO111MODULE=on go get -u github.com/jaeles-project/gospider"
 gotools["crobat"]="go get -u -v github.com/cgboal/sonarsearch/cmd/crobat"
 gotools["crlfuzz"]="GO111MODULE=on go get -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz"
 gotools["dalfox"]="GO111MODULE=on go get -v github.com/hahwul/dalfox/v2"
@@ -36,6 +36,7 @@ gotools["mapcidr"]="GO111MODULE=on go get -v github.com/projectdiscovery/mapcidr
 gotools["clouddetect"]="go get github.com/99designs/clouddetect/cli/clouddetect"
 gotools["dnstake"]="go install github.com/pwnesia/dnstake/cmd/dnstake@latest"
 gotools["gowitness"]="go get -u github.com/sensepost/gowitness"
+gotools["cero"]="go get -u github.com/glebarez/cero"
 
 declare -A repos
 repos["uDork"]="m3n0sd0n4ld/uDork"
