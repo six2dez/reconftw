@@ -2623,11 +2623,10 @@ while true; do
 done
 
 # This is the first thing to do to read in alternate config
+SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+. "$SCRIPTPATH"/reconftw.cfg
 if [ -s "$config_file" ]; then
     . "${config_file}"
-else
-	SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
-    . "$SCRIPTPATH"/reconftw.cfg
 fi
 
 if [ $opt_deep ]; then
