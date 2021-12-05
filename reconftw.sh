@@ -2597,7 +2597,7 @@ while true; do
             continue
             ;;
         '-f')
-			config_file=$2
+			CUSTOM_CONFIG=$2
             shift 2
             continue
             ;;
@@ -2625,8 +2625,8 @@ done
 # This is the first thing to do to read in alternate config
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 . "$SCRIPTPATH"/reconftw.cfg
-if [ -s "$config_file" ]; then
-    . "${config_file}"
+if [ -s "$CUSTOM_CONFIG" ]; then
+    . "${CUSTOM_CONFIG}"
 fi
 
 if [ $opt_deep ]; then
