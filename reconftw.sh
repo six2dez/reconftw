@@ -498,9 +498,9 @@ function sub_scraping(){
 				NUMOFLINES=$(cat .tmp/scrap_subs_resolved.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | tee .tmp/diff_scrap.txt | wc -l)
 				[ -s ".tmp/diff_scrap.txt" ] && cat .tmp/diff_scrap.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
 			else
-				axiom-scan subdomains/subdomains.txt -m httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -o .tmp/probed_tmp_scrap1.txt 2>>"$LOGFILE" &>/dev/null
+				axiom-scan subdomains/subdomains.txt -m httpx -follow-host-redirects -H \"${HEADER}\" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -o .tmp/probed_tmp_scrap1.txt 2>>"$LOGFILE" &>/dev/null
 				[ -s ".tmp/probed_tmp_scrap1.txt" ] && cat .tmp/probed_tmp_scrap1.txt | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
-				axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -tls-grab -tls-probe -csp-probe -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -o .tmp/probed_tmp_scrap2.txt 2>>"$LOGFILE" &>/dev/null
+				axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -tls-grab -tls-probe -csp-probe -H \"${HEADER}\" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -o .tmp/probed_tmp_scrap2.txt 2>>"$LOGFILE" &>/dev/null
 				[ -s ".tmp/probed_tmp_scrap2.txt" ] && cat .tmp/probed_tmp_scrap2.txt | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
 				if [ "$DEEP" = true ]; then
 					[ -s ".tmp/probed_tmp_scrap.txt" ] && axiom-scan .tmp/probed_tmp_scrap.txt -m gospider --js -d 3 --sitemap --robots -w -r -o .tmp/gospider 2>>"$LOGFILE" &>/dev/null
@@ -514,7 +514,7 @@ function sub_scraping(){
 				grep -Eo 'https?://[^ ]+' .tmp/gospider.txt | sed 's/]$//' | unfurl -u domains 2>>"$LOGFILE" | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
 				[ -s ".tmp/scrap_subs.txt" ] && axiom-scan .tmp/scrap_subs.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/scrap_subs_resolved.txt 2>>"$LOGFILE" &>/dev/null
 				NUMOFLINES=$(cat .tmp/scrap_subs_resolved.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | tee .tmp/diff_scrap.txt | wc -l)
-				axiom-scan .tmp/diff_scrap.txt -m httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -o .tmp/probed_tmp_scrap4.txt 2>>"$LOGFILE" &>/dev/null
+				axiom-scan .tmp/diff_scrap.txt -m httpx -follow-host-redirects -H \"${HEADER}\" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -o .tmp/probed_tmp_scrap4.txt 2>>"$LOGFILE" &>/dev/null
 				[ -s ".tmp/probed_tmp_scrap4.txt" ] && cat .tmp/probed_tmp_scrap4.txt | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
 			fi
 			end_subfunc "${NUMOFLINES} new subs (code scraping)" ${FUNCNAME[0]}
@@ -775,7 +775,7 @@ function webprobe_simple(){
 					cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | grep "$domain$" | anew -q .tmp/probed_tmp.txt
 				fi
 			else
-				axiom-scan subdomains/subdomains.txt -m httpx -follow-host-redirects -random-agent -threads $HTTPX_THREADS -status-code -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -o .tmp/probed_tmp_.txt 2>>"$LOGFILE" &>/dev/null
+				axiom-scan subdomains/subdomains.txt -m httpx -H \"${HEADER}\" -follow-host-redirects -random-agent -threads $HTTPX_THREADS -status-code -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -o .tmp/probed_tmp_.txt 2>>"$LOGFILE" &>/dev/null
 				if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then 
 					[ -s ".tmp/probed_tmp_.txt" ] && cat .tmp/probed_tmp_.txt | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp.txt
 				else
@@ -833,7 +833,7 @@ function webprobe_full(){
 			[ -s ".tmp/web_full_info_uncommon.txt" ] && cat .tmp/web_full_info_uncommon.txt | anew -q webs/web_full_info_uncommon.txt
 		else
 			if [ -s ".tmp/nmap_uncommonweb.txt" ]; then
-				axiom-scan .tmp/nmap_uncommonweb.txt -m httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout $HTTPX_UNCOMMONPORTS_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -o .tmp/probed_uncommon_ports_tmp_.txt 2>>"$LOGFILE" &>/dev/null
+				axiom-scan .tmp/nmap_uncommonweb.txt -m httpx -follow-host-redirects -H \"${HEADER}\" -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout $HTTPX_UNCOMMONPORTS_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -o .tmp/probed_uncommon_ports_tmp_.txt 2>>"$LOGFILE" &>/dev/null
 				if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then 
 					[ -s ".tmp/probed_uncommon_ports_tmp_.txt" ] && cat .tmp/probed_uncommon_ports_tmp_.txt | anew .tmp/web_full_info_uncommon.txt | cut -d ' ' -f1 | anew -q .tmp/probed_uncommon_ports_tmp.txt
 				else
@@ -1272,7 +1272,7 @@ function jschecks(){
 			if [ ! "$AXIOM" = true ]; then
 				[ -s "js/url_extract_js.txt" ] && cat js/url_extract_js.txt | httpx -follow-redirects -random-agent -silent -timeout $HTTPX_TIMEOUT -threads $HTTPX_THREADS -status-code -retries 2 -no-color | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
 			else
-				[ -s "js/url_extract_js.txt" ] && axiom-scan js/url_extract_js.txt -m httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -o .tmp/js_livelinks.txt 2>>"$LOGFILE" &>/dev/null
+				[ -s "js/url_extract_js.txt" ] && axiom-scan js/url_extract_js.txt -m httpx -follow-host-redirects -H \"${HEADER}\" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -o .tmp/js_livelinks.txt 2>>"$LOGFILE" &>/dev/null
 				[ -s ".tmp/js_livelinks.txt" ] && cat .tmp/js_livelinks.txt | anew .tmp/web_full_info.txt | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
 			fi
 			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
