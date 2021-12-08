@@ -156,14 +156,14 @@ if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$versio
         eval $SUDO rm -rf /usr/local/go $DEBUG_STD
         if [ "True" = "$IS_ARM" ]; then
             if [ "True" = "$RPI_3" ]; then
-                eval wget https://dl.google.com/go/${version}.linux-armv6l.tar.gz $DEBUG_STD
+                eval wget https://go.dev/dl/${version}.linux-armv6l.tar.gz $DEBUG_STD
                 eval $SUDO tar -C /usr/local -xzf ${version}.linux-armv6l.tar.gz $DEBUG_STD
             elif [ "True" = "$RPI_4" ]; then
-                eval wget https://dl.google.com/go/${version}.linux-arm64.tar.gz $DEBUG_STD
+                eval wget https://go.dev/dl/${version}.linux-arm64.tar.gz $DEBUG_STD
                 eval $SUDO tar -C /usr/local -xzf ${version}.linux-arm64.tar.gz $DEBUG_STD
             fi
         else
-            eval wget https://dl.google.com/go/${version}.linux-amd64.tar.gz $DEBUG_STD
+            eval wget https://go.dev/dl/${version}.linux-amd64.tar.gz $DEBUG_STD
             eval $SUDO tar -C /usr/local -xzf ${version}.linux-amd64.tar.gz $DEBUG_STD
         fi
         eval $SUDO cp /usr/local/go/bin/go /usr/local/bin
