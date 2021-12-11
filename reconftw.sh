@@ -300,7 +300,9 @@ function subdomains_full(){
 	[ -s "subdomains/subdomains.txt" ] && cp subdomains/subdomains.txt .tmp/subdomains_old.txt
 	[ -s "webs/webs.txt" ] && cp webs/webs.txt .tmp/probed_old.txt
 
-	resolvers_update
+	if ( [ ! -f "$called_fn_dir/.sub_active" ] || [ ! -f "$called_fn_dir/.sub_brute" ] || [ ! -f "$called_fn_dir/.sub_permut" ] || [ ! -f "$called_fn_dir/.sub_recursive" ] )  || [ "$DIFF" = true ] ; then
+		resolvers_update
+	fi
 
 	[ -s "${inScope_file}" ] && cat ${inScope_file} | anew -q subdomains/subdomains.txt
 
@@ -1076,7 +1078,8 @@ function fuzz(){
 				done
 				find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | anew -q $dir/fuzzing/fuzzing_full.txt
 			else
-				axiom-scan webs/webs.txt -m ffuf -w /home/op/lists/onelistforallmicro.txt -H \"${HEADER}\" $FFUF_FLAGS -maxtime $FFUF_MAXTIME -o $dir/fuzzing/ffuf-content.csv $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+				axiom-exec 'wget -O /home/op/lists/fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt' &>/dev/null
+				axiom-scan webs/webs.txt -m ffuf -w /home/op/lists/fuzz_wordlist.txt -H \"${HEADER}\" $FFUF_FLAGS -maxtime $FFUF_MAXTIME -o $dir/fuzzing/ffuf-content.csv $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 				grep -v "FUZZ,url,redirectlocation" $dir/fuzzing/ffuf-content.csv | awk -F "," '{print $2" "$5" "$6}' | sort > $dir/fuzzing/ffuf-content.tmp
 				for sub in $(cat webs/webs.txt); do
 					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
@@ -1848,8 +1851,6 @@ function resolvers_update(){
 			axiom-exec 'if [ \$(find "/home/op/lists/resolvers.txt" -mtime +1 -print) ] || [ \$(cat /home/op/lists/resolvers.txt | wc -l) -le 40 ] ; then dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 200 -o /home/op/lists/resolvers.txt ; fi' &>/dev/null
 			notification "Updated\n" good
 			axiom-exec 'wget -O /home/op/lists/resolvers_trusted.txt https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw' &>/dev/null
-			axiom-exec 'wget -O /home/op/lists/onelistforallmicro.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt' &>/dev/null
-
 		fi
 		update_resolvers=false
 	fi
