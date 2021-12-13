@@ -67,7 +67,7 @@ repos["pydictor"]="LandGrey/pydictor"
 dir=${tools}
 double_check=false
 
-
+# Raspberry Pi Detecting 
 if grep -q "Raspberry Pi 3"  /proc/cpuinfo; then
     IS_ARM="True"
     RPI_3="True"
@@ -78,6 +78,12 @@ elif grep -q "Raspberry Pi 4"  /proc/cpuinfo; then
     RPI_3="False"
 else
     IS_ARM="False"
+fi
+#Mac Osx Detecting
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    IS_MAC="True"
+else
+    IS_MAC="False"
 fi
 
 printf "\n\n${bgreen}#######################################################################${reset}\n"
@@ -102,6 +108,15 @@ install_apt(){
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium -y $DEBUG_STD
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip build-essential gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb -y $DEBUG_STD
     eval $SUDO systemctl enable tor $DEBUG_STD
+}
+
+install_brew(){
+    eval $SUDO brew update -$DEBUG_STD
+    eval $SUDO brew install chromium-browser $DEBUG_STD
+    eval $SUDO brew install chromium $DEBUG_STD
+    eval $SUDO brew install python3 python3-pip build-essential gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb $DEBUG_STD
+    #TO_DO enable TOr
+    #eval $SUDO systemctl enable tor $DEBUG_STD
 }
 
 install_yum(){
@@ -142,6 +157,7 @@ printf "${bblue} Running: Installing system packages ${reset}\n\n"
 if [ -f /etc/debian_version ]; then install_apt;
 elif [ -f /etc/redhat-release ]; then install_yum;
 elif [ -f /etc/arch-release ]; then install_pacman;
+elif [ "True" = "$IS_MAC" ]; then install_brew;
 elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for some RedHat and Amazon Linux instances
 fi
 
