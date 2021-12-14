@@ -111,6 +111,11 @@ install_apt(){
 }
 
 install_brew(){
+    if brew --version &>/dev/null; then
+	printf "${bgreen} brew is already installed ${reset}\n\n"
+    else
+	/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    fi
     eval $SUDO brew update -$DEBUG_STD
     eval $SUDO brew install chromium-browser $DEBUG_STD
     eval $SUDO brew install chromium $DEBUG_STD
@@ -178,6 +183,9 @@ if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$versio
                 eval wget https://dl.google.com/go/${version}.linux-arm64.tar.gz $DEBUG_STD
                 eval $SUDO tar -C /usr/local -xzf ${version}.linux-arm64.tar.gz $DEBUG_STD
             fi
+	elif [ "True" = "$IS_MAC" ]; then
+	    eval wget https://dl.google.com/go/${version}.darwin-amd64.tar.gz $DEBUG_STD
+            eval $SUDO tar -C /usr/local -xzf ${version}.darwin-amd64.tar.gz $DEBU
         else
             eval wget https://dl.google.com/go/${version}.linux-amd64.tar.gz $DEBUG_STD
             eval $SUDO tar -C /usr/local -xzf ${version}.linux-amd64.tar.gz $DEBUG_STD
