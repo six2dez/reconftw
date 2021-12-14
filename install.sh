@@ -299,6 +299,15 @@ if [ "True" = "$IS_ARM" ]; then
         eval $SUDO mv findomain-aarch64 /usr/local/bin/findomain
         eval $SUDO mv unimap-aarch64 /usr/local/bin/unimap
     fi
+elif [ "True" = "$IS_MAC" ]; then
+    eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-osx  $DEBUG_STD
+    eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/latest/download/unimap-osx $DEBUG_STD
+    eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz $DEBUG_STD
+    eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz  $DEBUG_STD
+    eval $SUDO rm -rf ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz  $DEBUG_STD
+    eval $SUDO mv findomain-osx  /usr/local/bin/findomain
+    eval $SUDO mv unimap-osx /usr/local/bin/unimap
+    
 else
     eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux $DEBUG_STD
     eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/download/0.4.0/unimap-linux $DEBUG_STD
