@@ -120,8 +120,7 @@ install_brew(){
     eval $SUDO brew install chromium-browser $DEBUG_STD
     eval $SUDO brew install chromium $DEBUG_STD
     eval $SUDO brew install python3 python3-pip build-essential gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb $DEBUG_STD
-    #TO_DO enable TOr
-    #eval $SUDO systemctl enable tor $DEBUG_STD
+    eval $SUDO brew services start tor $DEBUG_STD
 }
 
 install_yum(){
