@@ -62,6 +62,7 @@ repos["JSA"]="w9w/JSA"
 repos["cloud_enum"]="initstring/cloud_enum"
 repos["ultimate-nmap-parser"]="shifty0g/ultimate-nmap-parser"
 repos["pydictor"]="LandGrey/pydictor"
+repos["lgtm-cli"]="$LGTM_CLI_REPO"
 
 dir=${tools}
 double_check=false
@@ -253,6 +254,8 @@ for repo in "${!repos[@]}"; do
             eval cp -r examples ~/.gf $DEBUG_ERROR
     elif [ "Gf-Patterns" = "$repo" ]; then
             eval mv *.json ~/.gf $DEBUG_ERROR
+    elif [ "lgtm-cli" = "$repo" ]; then
+            eval make install $DEBUG_STD
     fi
     cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 done

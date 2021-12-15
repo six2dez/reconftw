@@ -105,6 +105,7 @@ function tools_installed(){
 	type -P interactsh-client &>/dev/null || { printf "${bred} [*] interactsh-client	[NO]${reset}\n"; allinstalled=false;}
 	type -P uro &>/dev/null || { printf "${bred} [*] uro		[NO]${reset}\n"; allinstalled=false;}
 	type -P bbrf &>/dev/null || { printf "${bred} [*] bbrf		[NO]${reset}\n"; allinstalled=false;}
+	type -P lgtm &>/dev/null || { printf "${bred} [*] lgtm		[NO]${reset}\n"; allinstalled=false;}
 	
 	if [ "${allinstalled}" = true ]; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
@@ -1677,6 +1678,25 @@ function prototype_pollution(){
 		fi
 	else
 		if [ "$PROTO_POLLUTION" = false ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
+	fi
+}
+
+###############################################################################################################
+######################################### VULNERABILITIES #####################################################
+###############################################################################################################
+
+function lgtm(){
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$LGTM_CLI" = true ] ; then
+		start_func ${FUNCNAME[0]} "CodeQL scan"
+		# TODO
+		# lgtm --ignore-followed-errors --nocache --wait 30s follow -f REPO_LIST
+		# by code search?
+	else
+		if [ "$LGTM_CLI" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
