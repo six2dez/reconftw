@@ -22,7 +22,7 @@ gotools["subfinder"]="GO111MODULE=on go get -v github.com/projectdiscovery/subfi
 gotools["gau"]="go install github.com/lc/gau/v2/cmd/gau@latest"
 gotools["subjs"]="GO111MODULE=on go get -v github.com/lc/subjs"
 gotools["Gxss"]="go get -u -v github.com/KathanP19/Gxss"
-gotools["gospider"]="go get -u github.com/jaeles-project/gospider"
+gotools["gospider"]="GO111MODULE=on go get -u github.com/jaeles-project/gospider"
 gotools["crobat"]="go get -u -v github.com/cgboal/sonarsearch/cmd/crobat"
 gotools["crlfuzz"]="GO111MODULE=on go get -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz"
 gotools["dalfox"]="GO111MODULE=on go get -v github.com/hahwul/dalfox/v2"
@@ -36,6 +36,7 @@ gotools["mapcidr"]="GO111MODULE=on go get -v github.com/projectdiscovery/mapcidr
 gotools["clouddetect"]="go get github.com/99designs/clouddetect/cli/clouddetect"
 gotools["dnstake"]="go install github.com/pwnesia/dnstake/cmd/dnstake@latest"
 gotools["gowitness"]="go get -u github.com/sensepost/gowitness"
+gotools["cero"]="go get -u github.com/glebarez/cero"
 
 declare -A repos
 repos["uDork"]="m3n0sd0n4ld/uDork"
@@ -66,7 +67,7 @@ repos["pydictor"]="LandGrey/pydictor"
 dir=${tools}
 double_check=false
 
-
+# Raspberry Pi Detecting
 if grep -q "Raspberry Pi 3"  /proc/cpuinfo; then
     IS_ARM="True"
     RPI_3="True"
@@ -77,6 +78,12 @@ elif grep -q "Raspberry Pi 4"  /proc/cpuinfo; then
     RPI_3="False"
 else
     IS_ARM="False"
+fi
+#Mac Osx Detecting
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    IS_MAC="True"
+else
+    IS_MAC="False"
 fi
 
 printf "\n\n${bgreen}#######################################################################${reset}\n"
@@ -101,6 +108,19 @@ install_apt(){
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium -y $DEBUG_STD
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip build-essential gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb -y $DEBUG_STD
     eval $SUDO systemctl enable tor $DEBUG_STD
+}
+
+install_brew(){
+    if brew --version &>/dev/null; then
+	printf "${bgreen} brew is already installed ${reset}\n\n"
+    else
+	/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    fi
+    eval $SUDO brew update -$DEBUG_STD
+    eval $SUDO brew install chromium-browser $DEBUG_STD
+    eval $SUDO brew install chromium $DEBUG_STD
+    eval $SUDO brew install python3 python3-pip build-essential gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb $DEBUG_STD
+    eval $SUDO brew services start tor $DEBUG_STD
 }
 
 install_yum(){
@@ -141,12 +161,13 @@ printf "${bblue} Running: Installing system packages ${reset}\n\n"
 if [ -f /etc/debian_version ]; then install_apt;
 elif [ -f /etc/redhat-release ]; then install_yum;
 elif [ -f /etc/arch-release ]; then install_pacman;
+elif [ "True" = "$IS_MAC" ]; then install_brew;
 elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for some RedHat and Amazon Linux instances
 fi
 
 # Installing latest Golang version
-#version=$(curl -s https://golang.org/VERSION?m=text)
-version="go1.16.7"
+version=$(curl -L -s https://golang.org/VERSION?m=text)
+#version="go1.17.5"
 printf "${bblue} Running: Installing/Updating Golang ${reset}\n\n"
 if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$version" = $(go version | cut -d " " -f3) ]
     then
@@ -161,12 +182,15 @@ if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$versio
                 eval wget https://dl.google.com/go/${version}.linux-arm64.tar.gz $DEBUG_STD
                 eval $SUDO tar -C /usr/local -xzf ${version}.linux-arm64.tar.gz $DEBUG_STD
             fi
+	elif [ "True" = "$IS_MAC" ]; then
+	    eval wget https://dl.google.com/go/${version}.darwin-amd64.tar.gz $DEBUG_STD
+            eval $SUDO tar -C /usr/local -xzf ${version}.darwin-amd64.tar.gz $DEBU
         else
             eval wget https://dl.google.com/go/${version}.linux-amd64.tar.gz $DEBUG_STD
             eval $SUDO tar -C /usr/local -xzf ${version}.linux-amd64.tar.gz $DEBUG_STD
         fi
         eval $SUDO cp /usr/local/go/bin/go /usr/local/bin
-        rm -rf go$LATEST_GO*
+        rm -rf $version*
         export GOROOT=/usr/local/go
         export GOPATH=$HOME/go
         export PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH
@@ -223,7 +247,6 @@ eval wget -nc -O ~/nuclei-templates/sap-redirect_nagli.yaml https://raw.githubus
 eval nuclei -update-templates $DEBUG_STD
 cd ~/nuclei-templates/extra_templates && eval git pull $DEBUG_STD
 cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
-eval sed -i 's/^#random-agent: false/random-agent: true/' ~/.config/nuclei/config.yaml $DEBUG_ERROR
 eval git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git $dir/sqlmap $DEBUG_STD
 eval git clone --depth 1 https://github.com/drwetter/testssl.sh.git $dir/testssl.sh $DEBUG_STD
 eval $SUDO git clone https://github.com/offensive-security/exploitdb.git /opt/exploitdb $DEBUG_STD
@@ -275,6 +298,15 @@ if [ "True" = "$IS_ARM" ]; then
         eval $SUDO mv findomain-aarch64 /usr/local/bin/findomain
         eval $SUDO mv unimap-aarch64 /usr/local/bin/unimap
     fi
+elif [ "True" = "$IS_MAC" ]; then
+    eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-osx  $DEBUG_STD
+    eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/latest/download/unimap-osx $DEBUG_STD
+    eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz $DEBUG_STD
+    eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz  $DEBUG_STD
+    eval $SUDO rm -rf ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz  $DEBUG_STD
+    eval $SUDO mv findomain-osx  /usr/local/bin/findomain
+    eval $SUDO mv unimap-osx /usr/local/bin/unimap
+    
 else
     eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux $DEBUG_STD
     eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/download/0.4.0/unimap-linux $DEBUG_STD
@@ -292,7 +324,7 @@ eval $SUDO chmod 755 /usr/local/bin/ppfuzz
 eval $SUDO strip -s /usr/local/bin/ppfuzz $DEBUG_STD
 eval $SUDO chmod +x $tools/uDork/uDork.sh
 eval subfinder $DEBUG_STD
-eval subfinder $DEBUG_STD
+eval notify $DEBUG_STD
 
 printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 ## Downloads
