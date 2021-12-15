@@ -67,7 +67,7 @@ repos["pydictor"]="LandGrey/pydictor"
 dir=${tools}
 double_check=false
 
-# Raspberry Pi Detecting 
+# Raspberry Pi Detecting
 if grep -q "Raspberry Pi 3"  /proc/cpuinfo; then
     IS_ARM="True"
     RPI_3="True"
@@ -167,8 +167,8 @@ elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for
 fi
 
 # Installing latest Golang version
-#version=$(curl -s https://golang.org/VERSION?m=text)
-version="go1.16.7"
+version=$(curl -L -s https://golang.org/VERSION?m=text)
+#version="go1.17.5"
 printf "${bblue} Running: Installing/Updating Golang ${reset}\n\n"
 if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$version" = $(go version | cut -d " " -f3) ]
     then
@@ -191,7 +191,7 @@ if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$versio
             eval $SUDO tar -C /usr/local -xzf ${version}.linux-amd64.tar.gz $DEBUG_STD
         fi
         eval $SUDO cp /usr/local/go/bin/go /usr/local/bin
-        rm -rf go$LATEST_GO*
+        rm -rf $version*
         export GOROOT=/usr/local/go
         export GOPATH=$HOME/go
         export PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH
