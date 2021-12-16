@@ -656,7 +656,7 @@ function sub_recursive(){
 			#eval rm -rf .tmp/brute_recursive_wordlist.txt 2>>"$LOGFILE"
 			#eval rm -rf .tmp/permute*.txt 2>>"$LOGFILE"
 		else
-			end_subfunc "Skipping Recursive BF: Too Many Subdomains" ${FUNCNAME[0]}
+			end_subfunc "Skipping Recursive BF: Too Many Subdomains or skipped in config file" ${FUNCNAME[0]}
 		fi
 		NUMOFLINES=$(cat .tmp/passive_recurs_tmp.txt .tmp/permute_recursive.txt .tmp/brute_recursive.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (recursive)" ${FUNCNAME[0]}
