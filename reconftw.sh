@@ -130,7 +130,7 @@ function google_dorks(){
 		eval sed -i "s/^cookies=\"c_user=HEREYOUCOOKIE; xs=HEREYOUCOOKIE;\"/cookies=\"${UDORK_COOKIE}\"/" $tools/uDork/uDork.sh 2>>"$LOGFILE" &>/dev/null
 		cd "$tools/uDork" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		#./uDork.sh $domain -f $tools/custom_udork.txt -o $dir/osint/dorks.txt &> /dev/null
-		./uDork.sh $domain -u all.txt -o $dir/osint/dorks.txt &> /dev/null
+		./uDork.sh $domain -u all -o $dir/osint/dorks.txt &> /dev/null
 		[ -s "$dir/osint/dorks.txt" ] && sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" $dir/osint/dorks.txt 2>>"$LOGFILE" &>/dev/null
 		cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		end_func "Results are saved in $domain/osint/dorks.txt" ${FUNCNAME[0]}
