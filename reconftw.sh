@@ -1114,11 +1114,11 @@ function cms_scanner(){
 			timeout -k 30 $CMSSCAN_TIMEOUT python3 $tools/CMSeeK/cmseek.py -l .tmp/cms.txt --batch -r 2>>"$LOGFILE" &>/dev/null
 			exit_status=$?
 			if [[ $exit_status -eq 125 ]]; then
-				echo "TIMEOUT cmseek.py - investigate manually for $dir" & >> "$LOGFILE"
+				echo "TIMEOUT cmseek.py - investigate manually for $dir" >> "$LOGFILE"
 				end_func "TIMEOUT cmseek.py - investigate manually for $dir" ${FUNCNAME[0]}
 				return
 			elif [[ $exit_status -ne 0 ]]; then
-				echo "ERROR cmseek.py - investigate manually for $dir" & >> "$LOGFILE"
+				echo "ERROR cmseek.py - investigate manually for $dir" >> "$LOGFILE"
 				end_func "ERROR cmseek.py - investigate manually for $dir" ${FUNCNAME[0]}
 				return
 			fi	# otherwise Assume we have a successfully exited cmseek
