@@ -106,7 +106,7 @@ function tools_installed(){
 	type -P uro &>/dev/null || { printf "${bred} [*] uro		[NO]${reset}\n"; allinstalled=false;}
 	type -P cero &>/dev/null || { printf "${bred} [*] cero		[NO]${reset}\n"; allinstalled=false;}
 	type -P bbrf &>/dev/null || { printf "${bred} [*] bbrf		[NO]${reset}\n"; allinstalled=false;}
-	
+
 	if [ "${allinstalled}" = true ]; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
 	else
@@ -686,7 +686,7 @@ function subtakeover(){
 		# DNS_TAKEOVER
 		cat .tmp/subs_no_resolved.txt .tmp/subdomains_dns.txt .tmp/scrap_subs.txt .tmp/analytics_subs_clean.txt .tmp/passive_recursive.txt 2>/dev/null | anew -q .tmp/subs_dns_tko.txt
 		cat .tmp/subs_dns_tko.txt 2>/dev/null | dnstake -c $DNSTAKE_THREADS -s 2>>"$LOGFILE" | anew -q .tmp/tko.txt
-		
+
 		NUMOFLINES=$(cat .tmp/tko.txt 2>>"$LOGFILE" | anew webs/takeover.txt | wc -l)
 		if [ "$NUMOFLINES" -gt 0 ]; then
 			notification "${NUMOFLINES} new possible takeovers found" info
@@ -1150,10 +1150,8 @@ function urlchecks(){
 		mkdir -p js
 		if [ -s "webs/webs.txt" ]; then
 			if [ ! "$AXIOM" = true ]; then
-				if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
-					cat webs/webs.txt | waybackurls | anew -q .tmp/url_extract_tmp.txt
-					cat webs/webs.txt | gau --subs --threads $GAUPLUS_THREADS | anew -q .tmp/url_extract_tmp.txt
-				fi
+				cat webs/webs.txt | waybackurls | anew -q .tmp/url_extract_tmp.txt
+				cat webs/webs.txt | gau --subs --threads $GAUPLUS_THREADS | anew -q .tmp/url_extract_tmp.txt
 				diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt 2>>"$LOGFILE") <(sort -u webs/webs.txt 2>>"$LOGFILE") | wc -l)
 				if [ $diff_webs != "0" ] || [ ! -s ".tmp/gospider.txt" ]; then
 					if [ "$DEEP" = true ]; then
@@ -1163,18 +1161,12 @@ function urlchecks(){
 					fi
 				fi
 				sed -i '/^.\{2048\}./d' .tmp/gospider.txt
-				if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
-					[ -s ".tmp/gospider.txt" ] && cat .tmp/gospider.txt | grep -Eo 'https?://[^ ]+' | sed 's/]$//' | anew -q .tmp/url_extract_tmp.txt
-				else
-					[ -s ".tmp/gospider.txt" ] && cat .tmp/gospider.txt | grep -Eo 'https?://[^ ]+' | sed 's/]$//' | grep "$domain" | anew -q .tmp/url_extract_tmp.txt
-				fi
+				[ -s ".tmp/gospider.txt" ] && cat .tmp/gospider.txt | grep -Eo 'https?://[^ ]+' | sed 's/]$//' | grep "$domain" | anew -q .tmp/url_extract_tmp.txt
 			else
-				if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
-					axiom-scan webs/webs.txt -m waybackurls -o .tmp/url_extract_way_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-					[ -s ".tmp/url_extract_way_tmp.txt" ] && cat .tmp/url_extract_way_tmp.txt | anew -q .tmp/url_extract_tmp.txt
-					axiom-scan webs/webs.txt -m gau -o .tmp/url_extract_gau_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-					[ -s ".tmp/url_extract_gau_tmp.txt" ] && cat .tmp/url_extract_gau_tmp.txt | anew -q .tmp/url_extract_tmp.txt
-				fi
+				axiom-scan webs/webs.txt -m waybackurls -o .tmp/url_extract_way_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+				[ -s ".tmp/url_extract_way_tmp.txt" ] && cat .tmp/url_extract_way_tmp.txt | anew -q .tmp/url_extract_tmp.txt
+				axiom-scan webs/webs.txt -m gau -o .tmp/url_extract_gau_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+				[ -s ".tmp/url_extract_gau_tmp.txt" ] && cat .tmp/url_extract_gau_tmp.txt | anew -q .tmp/url_extract_tmp.txt
 				diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt) <(sort -u webs/webs.txt) | wc -l)
 				if [ $diff_webs != "0" ] || [ ! -s ".tmp/gospider.txt" ]; then
 					if [ "$DEEP" = true ]; then
