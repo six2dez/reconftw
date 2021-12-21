@@ -118,7 +118,7 @@ docker run -d -v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -v $PWD/Rec
 ```bash
 git clone https://github.com/six2dez/reconftw
 cd reconftw
-docker build -t reconftw Docker/.
+docker buildx build -t reconftw Docker/.
 # Running from reconftw root folder, configure values properly for your needs
 docker run -v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -v $PWD/Recon/:/root/Tools/reconftw/Recon/ --name reconftwSCAN --rm reconftw -d target.com -r
 ```
