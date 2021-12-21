@@ -737,11 +737,11 @@ function s3buckets(){
 
 		NUMOFLINES1=$(cat .tmp/output_cloud.txt 2>>"$LOGFILE" | sed '/^#/d' | sed '/^$/d' | anew subdomains/cloud_assets.txt | wc -l)
 		if [ "$NUMOFLINES1" -gt 0 ]; then
-			notification "${NUMOFLINES} new cloud assets found" info
+			notification "${NUMOFLINES1} new cloud assets found" info
 		fi
-		NUMOFLINES2=$(cat .tmp/s3buckets.txt 2>>"$LOGFILE" | anew subdomains/s3buckets.txt | wc -l)
+		NUMOFLINES2=$(cat .tmp/s3buckets.txt 2>>"$LOGFILE" | awk 'NF' | anew subdomains/s3buckets.txt | wc -l)
 		if [ "$NUMOFLINES2" -gt 0 ]; then
-			notification "${NUMOFLINES} new S3 buckets found" info
+			notification "${NUMOFLINES2} new S3 buckets found" info
 		fi
 
 		if [ "$BBRF_CONNECTION" = true ]; then
