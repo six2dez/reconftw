@@ -1,54 +1,64 @@
-FROM kalilinux/kali-rolling
+# syntax=docker/dockerfile:1.3-labs
 
-# Change this
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
+
+FROM kalilinux/kali-rolling:latest
+
+## You can change this
 ENV COLLAB_SERVER='XXXXXXXXXX'
-# Change this
 ENV XSS_SERVER='XXXXXXXXXXX'
-# Change this
 ENV SHODAN_API_KEY='XXXXXXXXXXXXXX'
 
-
-
-# DON'T CHANGE THIS
-ENV GOROOT=/usr/local/go
+## Do NOT change this
+ENV DEBIAN_FRONTEND=noninteractive
+ENV DEBCONF_NONINTERACTIVE_SEEN=true
 ENV GOPATH=$HOME/go
+ENV GOROOT=/usr/local/go
 ENV PATH=$GOPATH/bin:$GOROOT/bin:$PATH
 
-LABEL org.label-schema.name='reconftw' \
-    org.label-schema.description='A simple script for full recon' \
-    org.label-schema.usage='https://github.com/six2dez/reconftw' \
-    org.label-schema.url='https://github.com/six2dez/reconftw' \
-    org.label-schema.docker.cmd.devel='docker run --rm -ti six2dez/reconftw' \
-    MAINTAINER="six2dez"
+LABEL org.label-schema.name='reconftw'
+LABEL org.label-schema.description='A simple script for full recon'
+LABEL org.label-schema.usage='https://github.com/six2dez/reconftw'
+LABEL org.label-schema.url='https://github.com/six2dez/reconftw'
+LABEL org.label-schema.docker.cmd.devel='docker run --rm -ti six2dez/reconftw'
+LABEL MAINTAINER="six2dez"
 
-RUN echo "deb http://http.kali.org/kali kali-rolling main contrib non-free" > /etc/apt/sources.list && \
-    echo "deb-src http://http.kali.org/kali kali-rolling main contrib non-free" >> /etc/apt/sources.list
+RUN <<eot
+#!/bin/bash
+set -x
+############> Update Sources <############
+echo "deb http://kali.download/kali kali-rolling main contrib non-free" > /etc/apt/sources.list
+echo "deb-src http://kali.download/kali kali-rolling main contrib non-free" >> /etc/apt/sources.list
+############> System Update <############
+apt update
+apt full-upgrade -f -y --allow-downgrades
+apt install -y git wget
+############> Install Golang <############
+GO_BIN=$(wget -qO- https://golang.org/dl/ | grep -oP 'go([0-9\.]+)\.linux-amd64\.tar\.gz' | head -n 1)
+wget https://dl.google.com/go/${GO_BIN}
+tar -xzf ${GO_BIN} -C /usr/local
+ln -sf /usr/local/go/bin/go /usr/bin
+############> Install reconFTW <############
+mkdir -p /root/Tools
+cd /root/Tools
+git clone https://github.com/six2dez/reconftw.git
+cd reconftw
+./install.sh
+############> Clean up <############
+rm -f "/${GO_BIN}"
+rm -rf "/root/go" "/root/.cache/go"
+apt autoremove -y
+apt clean all
+find /var/cache -type f -delete
+find /var/lib/apt/lists -type f -delete
+find /var/log -type f -delete
+eot
 
-ENV DEBIAN_FRONTEND noninteractive
+COPY amass_config.ini /root/.config/amass/config.ini
+COPY github_tokens.txt /root/Tools/.github_tokens
+COPY notify.conf /root/.config/notify/notify.conf
+COPY subfinder_config.yaml /root/.config/subfinder/config.yaml
 
-RUN set -x \
-        && apt-get -yqq update \
-        && apt-get -yqq dist-upgrade \
-        && apt-get clean
-
-RUN apt-get --yes install git wget
-
-RUN LATEST_GO=$(wget -qO- https://golang.org/dl/ | grep -oP 'go([0-9\.]+)\.linux-amd64\.tar\.gz' | head -n 1 | grep -oP 'go[0-9\.]+' | grep -oP '[0-9\.]+' | head -c -2) &&\
-    wget --quiet https://dl.google.com/go/go$LATEST_GO.linux-amd64.tar.gz &&\
-    tar -C /usr/local -xzf go$LATEST_GO.linux-amd64.tar.gz &&\
-    cp /usr/local/go/bin/go /usr/bin
-
-RUN mkdir -p /root/Tools \
-    && cd /root/Tools \
-    && git clone https://github.com/six2dez/reconftw.git \
-    && cd reconftw \
-    && ./install.sh
-
-ADD github_tokens.txt /root/Tools/.github_tokens
-ADD subfinder_config.yaml /root/.config/subfinder/config.yaml
-ADD amass_config.ini /root/.config/amass/config.ini
-ADD notify.conf /root/.config/notify/notify.conf
-
-CMD ["bash"]
 WORKDIR /root/Tools/reconftw
 ENTRYPOINT ["bash", "reconftw.sh"]
+CMD [ "--help" ]
