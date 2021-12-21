@@ -735,7 +735,7 @@ function s3buckets(){
 		keyword=${domain%%.*}
 		python3 ~/Tools/cloud_enum/cloud_enum.py -k $keyword -qs -l .tmp/output_cloud.txt 2>>"$LOGFILE" &>/dev/null
 
-		NUMOFLINES1=$(cat .tmp/output_cloud.txt 2>>"$LOGFILE" | awk 'NF' | anew subdomains/cloud_assets.txt | wc -l)
+		NUMOFLINES1=$(cat .tmp/output_cloud.txt 2>>"$LOGFILE" | sed '/^#/d' | sed '/^$/d' | anew subdomains/cloud_assets.txt | wc -l)
 		if [ "$NUMOFLINES1" -gt 0 ]; then
 			notification "${NUMOFLINES1} new cloud assets found" info
 		fi
