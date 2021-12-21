@@ -659,7 +659,7 @@ function sub_recursive(){
 			#eval rm -rf .tmp/brute_recursive_wordlist.txt 2>>"$LOGFILE"
 			#eval rm -rf .tmp/permute*.txt 2>>"$LOGFILE"
 		else
-			end_subfunc "Skipping Recursive BF: Too Many Subdomains or skipped in config file" ${FUNCNAME[0]}
+			end_subfunc "skipped in this mode or defined in reconftw.cfg" ${FUNCNAME[0]}
 		fi
 		NUMOFLINES=$(cat .tmp/passive_recurs_tmp.txt .tmp/permute_recursive.txt .tmp/brute_recursive.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (recursive)" ${FUNCNAME[0]}
@@ -740,11 +740,11 @@ function s3buckets(){
 
 		NUMOFLINES1=$(cat .tmp/output_cloud.txt 2>>"$LOGFILE" | sed '/^#/d' | sed '/^$/d' | anew subdomains/cloud_assets.txt | wc -l)
 		if [ "$NUMOFLINES1" -gt 0 ]; then
-			notification "${NUMOFLINES} new cloud assets found" info
+			notification "${NUMOFLINES1} new cloud assets found" info
 		fi
-		NUMOFLINES2=$(cat .tmp/s3buckets.txt 2>>"$LOGFILE" | anew subdomains/s3buckets.txt | wc -l)
+		NUMOFLINES2=$(cat .tmp/s3buckets.txt 2>>"$LOGFILE" | awk 'NF' | anew subdomains/s3buckets.txt | wc -l)
 		if [ "$NUMOFLINES2" -gt 0 ]; then
-			notification "${NUMOFLINES} new S3 buckets found" info
+			notification "${NUMOFLINES2} new S3 buckets found" info
 		fi
 
 		if [ "$BBRF_CONNECTION" = true ]; then
