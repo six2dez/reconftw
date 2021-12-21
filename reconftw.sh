@@ -818,11 +818,11 @@ function webprobe_full(){
 		start_func ${FUNCNAME[0]} "Http probing non standard ports"
 		if [ -s "subdomains/subdomains.txt" ]; then
 			if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
-				sudo nmap -iL subdomains/subdomains.txt -p $UNCOMMON_PORTS_WEB -oG .tmp/uncommon_nmap.gnmap 2>>"$LOGFILE" &>/dev/null
+				$SUDO nmap -iL subdomains/subdomains.txt -p $UNCOMMON_PORTS_WEB -oG .tmp/uncommon_nmap.gnmap 2>>"$LOGFILE" &>/dev/null
 				cat .tmp/uncommon_nmap.gnmap | egrep -v "^#|Status: Up" | cut -d' ' -f2,4- | grep "open" | sed -e 's/\/.*$//g' | sed -e "s/ /:/g" | sort -u | anew -q .tmp/nmap_uncommonweb.txt
 			else
 				if [ ! "$AXIOM" = true ]; then
-					sudo unimap --fast-scan -f subdomains/subdomains.txt --ports $UNCOMMON_PORTS_WEB -q -k --url-output 2>>"$LOGFILE" | anew -q .tmp/nmap_uncommonweb.txt
+					$SUDO unimap --fast-scan -f subdomains/subdomains.txt --ports $UNCOMMON_PORTS_WEB -q -k --url-output 2>>"$LOGFILE" | anew -q .tmp/nmap_uncommonweb.txt
 				else
 					axiom-scan subdomains/subdomains.txt -m unimap --fast-scan --ports $UNCOMMON_PORTS_WEB -q -k --url-output -o .tmp/nmap_uncommonweb.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 				fi
@@ -945,7 +945,7 @@ function portscan(){
 		fi
 		if [ "$PORTSCAN_ACTIVE" = true ]; then
 			if [ ! "$AXIOM" = true ]; then
-				[ -s ".tmp/ips_nowaf.txt" ] && sudo nmap --top-ports 200 -sV -n --max-retries 2 -Pn --open -iL .tmp/ips_nowaf.txt -oA hosts/portscan_active 2>>"$LOGFILE" &>/dev/null
+				[ -s ".tmp/ips_nowaf.txt" ] && $SUDO nmap --top-ports 200 -sV -n --max-retries 2 -Pn --open -iL .tmp/ips_nowaf.txt -oA hosts/portscan_active 2>>"$LOGFILE" &>/dev/null
 			else
 				[ -s ".tmp/ips_nowaf.txt" ] && axiom-scan .tmp/ips_nowaf.txt -m nmapx --top-ports 200 -sV -n -Pn --open --max-retries 2 -o hosts/portscan_active.gnmap $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 				[ -s "hosts/portscan_active.gnmap" ] && cat hosts/portscan_active.gnmap | egrep -v "^#|Status: Up" | cut -d' ' -f2,4- | sed -n -e 's/Ignored.*//p' | awk '{print "Host: " $1 " Ports: " NF-1; $1=""; for(i=2; i<=NF; i++) { a=a" "$i; }; split(a,s,","); for(e in s) { split(s[e],v,"/"); printf "%-8s %s/%-7s %s\n" , v[2], v[3], v[1], v[5]}; a="" }' > hosts/portscan_active.txt 2>>"$LOGFILE" &>/dev/null
@@ -1940,12 +1940,6 @@ function start(){
 	else
 	    NOTIFY=""
 	fi
-
-	if [[ $(id -u | grep -o '^0$') == "0" ]]; then
-    	SUDO=" "
-	else
-    	SUDO="sudo"
-	fi
 	
 	printf "\n${bgreen}#######################################################################${reset}"
 	notification "Recon succesfully started on ${domain}" good
@@ -2132,12 +2126,6 @@ function multi_osint(){
 	    NOTIFY=""
 	fi
 
-	if [[ $(id -u | grep -o '^0$') == "0" ]]; then
-    	SUDO=" "
-	else
-    	SUDO="sudo"
-	fi
-
 	#[[ -n "$domain" ]] && ipcidr_target $domain
 
 	if [ -s "$list" ]; then
@@ -2236,12 +2224,6 @@ function multi_recon(){
 		NOTIFY="notify -silent"
 	else
 	    NOTIFY=""
-	fi
-
-	if [[ $(id -u | grep -o '^0$') == "0" ]]; then
-    	SUDO=" "
-	else
-    	SUDO="sudo"
 	fi
 
 	#[[ -n "$domain" ]] && ipcidr_target $domain
@@ -2646,6 +2628,12 @@ if [ -n "$inScope_file" ]; then
         printf "\n\n${bred} In Scope file is not a text file${reset}\n\n"
         exit
     fi
+fi
+
+if [[ $(id -u | grep -o '^0$') == "0" ]]; then
+    SUDO=" "
+else
+    SUDO="sudo"
 fi
 
 startdir=${PWD}
