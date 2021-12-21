@@ -46,7 +46,7 @@ cd reconftw
 ./install.sh
 ############> Clean up <############
 rm -f "/${GO_BIN}"
-go clean -cache -modcache
+rm -rf "/root/go" "/root/.cache/go"
 apt autoremove -y
 apt clean all
 find /var/cache -type f -delete
