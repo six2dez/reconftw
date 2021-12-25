@@ -1897,6 +1897,14 @@ function axiom_lauch(){
 
 			echo "axiom-fleet ${AXIOM_FLEET_NAME} ${AXIOM_ARGS}"
 			axiom-fleet ${AXIOM_FLEET_NAME} ${AXIOM_ARGS}
+
+			# Keep checking into they are all there
+			while [[ "$NUMOFNODES" -lt  "$AXIOM_FLEET_COUNT" ]]; do
+				echo "Current: $NUMOFNODES | Target: $AXIOM_FLEET_COUNT"
+				sleep 30s
+				NUMOFNODES=$(timeout 30 axiom-ls | grep -c "$AXIOM_FLEET_NAME" )
+			done
+			
 			axiom-select "$AXIOM_FLEET_NAME*"
 			if [ -n "$AXIOM_POST_START" ]; then
 				eval "$AXIOM_POST_START" 2>>"$LOGFILE" &>/dev/null
