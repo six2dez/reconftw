@@ -43,7 +43,7 @@ repos["uDork"]="m3n0sd0n4ld/uDork"
 repos["pwndb"]="davidtavarez/pwndb"
 repos["dnsvalidator"]="vortexau/dnsvalidator"
 repos["dnsrecon"]="darkoperator/dnsrecon"
-repos["theHarvester"]="laramies/theHarvester"
+#repos["theHarvester"]="laramies/theHarvester"
 repos["brutespray"]="x90skysn3k/brutespray"
 repos["wafw00f"]="EnableSecurity/wafw00f"
 repos["gf"]="tomnomnom/gf"
@@ -91,7 +91,7 @@ printf "${bgreen} reconFTW installer/updater script ${reset}\n\n"
 printf "${yellow} This may take time. So, go grab a coffee! ${reset}\n\n"
 
 if [[ $(id -u | grep -o '^0$') == "0" ]]; then
-    SUDO=" "
+    SUDO=""
 else
     if sudo -n false 2>/dev/null; then
         printf "${bred} Is strongly recommended to add your user to sudoers${reset}\n"
@@ -106,7 +106,7 @@ install_apt(){
     eval $SUDO apt update -y $DEBUG_STD
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium-browser -y $DEBUG_STD
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium -y $DEBUG_STD
-    eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip build-essential gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb -y $DEBUG_STD
+    eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip build-essential gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb libxml2-utils hexdump -y $DEBUG_STD
     eval $SUDO systemctl enable tor $DEBUG_STD
 }
 
@@ -166,8 +166,8 @@ elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for
 fi
 
 # Installing latest Golang version
-version=$(curl -L -s https://golang.org/VERSION?m=text)
-#version="go1.17.5"
+#version=$(curl -L -s https://golang.org/VERSION?m=text)
+version="go1.17.5"
 printf "${bblue} Running: Installing/Updating Golang ${reset}\n\n"
 if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$version" = $(go version | cut -d " " -f3) ]
     then
@@ -268,7 +268,13 @@ for repo in "${!repos[@]}"; do
         double_check=true
     fi
     if [ -s "setup.py" ]; then
-        eval $SUDO python3 setup.py install $DEBUG_STD
+        eval $SUDO pip3 install . $DEBUG_STD
+    fi
+    if [ -s "requirements.txt" ]; then
+        eval $SUDO pip3 install -r requirements.txt $DEBUG_STD
+        eval $SUDO python3 setup.py install --record files.txt $DEBUG_STD
+        eval xargs rm -rf < files.txt $DEBUG_STD
+        eval pip3 install . $DEBUG_STD
     fi
     if [ "massdns" = "$repo" ]; then
             eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/local/bin/ $DEBUG_ERROR
@@ -306,7 +312,7 @@ elif [ "True" = "$IS_MAC" ]; then
     eval $SUDO rm -rf ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz  $DEBUG_STD
     eval $SUDO mv findomain-osx  /usr/local/bin/findomain
     eval $SUDO mv unimap-osx /usr/local/bin/unimap
-    
+
 else
     eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux $DEBUG_STD
     eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/download/0.4.0/unimap-linux $DEBUG_STD
