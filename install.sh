@@ -91,7 +91,7 @@ printf "${bgreen} reconFTW installer/updater script ${reset}\n\n"
 printf "${yellow} This may take time. So, go grab a coffee! ${reset}\n\n"
 
 if [[ $(id -u | grep -o '^0$') == "0" ]]; then
-    SUDO=" "
+    SUDO=""
 else
     if sudo -n false 2>/dev/null; then
         printf "${bred} Is strongly recommended to add your user to sudoers${reset}\n"
@@ -268,7 +268,10 @@ for repo in "${!repos[@]}"; do
         double_check=true
     fi
     if [ -s "setup.py" ]; then
-        eval $SUDO python3 setup.py install $DEBUG_STD
+        eval $SUDO pip3 install . $DEBUG_STD
+    fi
+    if [ -s "requirements.txt" ]; then
+        eval $SUDO pip3 install -r requirements.txt $DEBUG_STD
     fi
     if [ "massdns" = "$repo" ]; then
             eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/local/bin/ $DEBUG_ERROR
@@ -306,7 +309,7 @@ elif [ "True" = "$IS_MAC" ]; then
     eval $SUDO rm -rf ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz  $DEBUG_STD
     eval $SUDO mv findomain-osx  /usr/local/bin/findomain
     eval $SUDO mv unimap-osx /usr/local/bin/unimap
-    
+
 else
     eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux $DEBUG_STD
     eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/download/0.4.0/unimap-linux $DEBUG_STD
