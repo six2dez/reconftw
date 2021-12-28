@@ -957,7 +957,7 @@ function portscan(){
 			[ -s "hosts/portscan_active.xml" ] && $tools/ultimate-nmap-parser/ultimate-nmap-parser.sh hosts/portscan_active.gnmap --csv 2>>"$LOGFILE" &>/dev/null
 			[ -s "parsed_nmap.csv" ] && mv parsed_nmap.csv .tmp/parsed_nmap.csv && cat .tmp/parsed_nmap.csv | tail -n +2 | cut -d',' -f1,2,5,6 | sed -e 's/,/:/g' | sed 's/\:$//' | bbrf service add - && rm -f parsed_nmap.csv
 		fi
-		[ -s "hosts/portscan_active.xml" ] && searchsploit --nmap hosts/portscan_active.xml 2>>"$LOGFILE" > hosts/searchsploit.txt
+		[ -s "hosts/portscan_active.xml" ] && searchsploit --nmap hosts/portscan_active.xml 2>/dev/null > hosts/searchsploit.txt
 		end_func "Results are saved in hosts/portscan_[passive|active].txt" ${FUNCNAME[0]}
 	else
 		if [ "$PORTSCANNER" = false ]; then
@@ -1331,7 +1331,7 @@ function wordlist_gen_roboxtractor(){
 	if  { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$ROBOTSWORDLIST" = true ]; then
 		start_func ${FUNCNAME[0]} "Robots wordlist generation"
 		if [ -s "webs/webs.txt" ]; then
-			cat webs/webs.txt | roboxtractor -m 1 -wb 2>>"$LOGFILE" | anew -q webs/robots_wordlist.txt
+			cat webs/webs.txt | roboxtractor -m 1 -wb 2>/dev/null | anew -q webs/robots_wordlist.txt
 		fi
 		end_func "Results are saved in $domain/webs/robots_wordlist.txt" ${FUNCNAME[0]}
 	else
@@ -1453,8 +1453,8 @@ function xss(){
 function cors(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$CORS" = true ]; then
 		start_func ${FUNCNAME[0]} "CORS Scan"
-		python3 $tools/Corsy/corsy.py -i webs/webs.txt > webs/cors.txt 2>>"$LOGFILE" &>/dev/null
-		[ -s "webs/cors.txt" ] && cat webs/cors.txt
+		python3 $tools/Corsy/corsy.py -i webs/webs.txt -o webs/cors.txt 2>>"$LOGFILE" &>/dev/null
+		#[ -s "webs/cors.txt" ] && cat webs/cors.txt | jq 
 		end_func "Results are saved in webs/cors.txt" ${FUNCNAME[0]}
 	else
 		if [ "$CORS" = false ]; then
@@ -1504,9 +1504,9 @@ function ssrf_checks(){
 		if [ "$DEEP" = true ] || [[ $(cat gf/ssrf.txt | wc -l) -le $DEEP_LIMIT ]]; then
 			cat gf/ssrf.txt | qsreplace ${COLLAB_SERVER_FIX} | anew -q .tmp/tmp_ssrf.txt
 			cat gf/ssrf.txt | qsreplace ${COLLAB_SERVER_URL} | anew -q .tmp/tmp_ssrf.txt
-			ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/tmp_ssrf.txt -u FUZZ 2>>"$LOGFILE" | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf_requests_url.txt
-			ffuf -v -w .tmp/tmp_ssrf.txt:W1,$tools/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_FIX}" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
-			ffuf -v -w .tmp/tmp_ssrf.txt:W1,$tools/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_URL}" -t $FFUF_THREADS -u W1 2>>"$LOGFILE" | anew -q vulns/ssrf_requests_headers.txt
+			ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/tmp_ssrf.txt -u FUZZ 2>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf_requests_url.txt
+			ffuf -v -w .tmp/tmp_ssrf.txt:W1,$tools/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_FIX}" -t $FFUF_THREADS -u W1 2>/dev/null | anew -q vulns/ssrf_requests_headers.txt
+			ffuf -v -w .tmp/tmp_ssrf.txt:W1,$tools/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_URL}" -t $FFUF_THREADS -u W1 2>/dev/null | anew -q vulns/ssrf_requests_headers.txt
 			sleep 5
 			[ -s ".tmp/ssrf_callback.txt" ] && cat .tmp/ssrf_callback.txt | tail -n+11 | anew -q vulns/ssrf_callback.txt && NUMOFLINES=$(cat .tmp/ssrf_callback.txt | tail -n+12 | wc -l)
 			[ "$INTERACT" = true ] && notification "SSRF: ${NUMOFLINES} callbacks received" info
@@ -1831,13 +1831,13 @@ function end_subfunc(){
 function resolvers_update(){
 	if [ "$update_resolvers" = true ]; then
 		if [ ! "$AXIOM" = true ]; then	
-			if [[ $(find "$resolvers" -mtime +1 -print) ]]; then
+			if [[ $(find "$resolvers" -mtime +1 -print) ]] || [ ! -s "$resolvers" ] ; then
 				notification "Resolvers seem older than 1 day\n Generating custom resolvers..." warn
 				eval rm -f $resolvers 2>>"$LOGFILE"
 				dnsvalidator -tL https://public-dns.info/nameservers.txt -threads $DNSVALIDATOR_THREADS -o $resolvers &>/dev/null
 				dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads $DNSVALIDATOR_THREADS -o tmp_resolvers &>/dev/null
-				cat tmp_resolvers | anew -q $resolvers
-				rm -f tmp_resolvers &>/dev/null
+				[ -s "tmp_resolvers" ] && cat tmp_resolvers | anew -q $resolvers
+				[ -s "tmp_resolvers" ] && rm -f tmp_resolvers &>/dev/null
 				[ ! -s "$resolvers" ] && wget -O $resolvers https://raw.githubusercontent.com/proabiral/Fresh-Resolvers/master/resolvers.txt &>/dev/null
 				notification "Updated\n" good
 	  		fi

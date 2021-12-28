@@ -106,7 +106,7 @@ install_apt(){
     eval $SUDO apt update -y $DEBUG_STD
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium-browser -y $DEBUG_STD
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium -y $DEBUG_STD
-    eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip build-essential gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb libxml2-utils -y $DEBUG_STD
+    eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip build-essential gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb libxml2-utils hexdump -y $DEBUG_STD
     eval $SUDO systemctl enable tor $DEBUG_STD
 }
 
@@ -272,6 +272,9 @@ for repo in "${!repos[@]}"; do
     fi
     if [ -s "requirements.txt" ]; then
         eval $SUDO pip3 install -r requirements.txt $DEBUG_STD
+        eval $SUDO python3 setup.py install --record files.txt $DEBUG_STD
+        eval xargs rm -rf < files.txt $DEBUG_STD
+        eval pip3 install . $DEBUG_STD
     fi
     if [ "massdns" = "$repo" ]; then
             eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/local/bin/ $DEBUG_ERROR
