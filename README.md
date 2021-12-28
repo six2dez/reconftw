@@ -8,8 +8,8 @@
 
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.1.3">
-    <img src="https://img.shields.io/badge/release-v2.1.3-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.1.4">
+    <img src="https://img.shields.io/badge/release-v2.1.4-green">
   </a>
    </a>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
@@ -153,14 +153,16 @@ export GOPATH=$HOME/go
 export PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH
 
 # Tools config files
-#NOTIFY_CONFIG=~/.config/notify/notify.conf # No need to define
+#NOTIFY_CONFIG=~/.config/notify/provider-config.yaml # No need to define
 #SUBFINDER_CONFIG=~/.config/subfinder/config.yaml # No need to define
 AMASS_CONFIG=~/.config/amass/config.ini
 GITHUB_TOKENS=${tools}/.github_tokens
+#CUSTOM_CONFIG=custom_config_path.txt # In case you use a custom config file, uncomment this line and set your files path
 
 # APIs/TOKENS - Uncomment the lines you want removing the '#' at the beginning of the line
 #UDORK_COOKIE="c_user=XXXXXXXXXX; xs=XXXXXXXXXXXXXX"
 #SHODAN_API_KEY="XXXXXXXXXXXXX"
+#WHOISXML_API="XXXXXXXXXX"
 #XSS_SERVER="XXXXXXXXXXXXXXXXX"
 #COLLAB_SERVER="XXXXXXXXXXXXXXXXX"
 #findomain_virustotal_token="XXXXXXXXXXXXXXXXX"
@@ -181,6 +183,7 @@ GITHUB_DORKS=true
 METADATA=true
 EMAILS=true
 DOMAIN_INFO=true
+IP_INFO=true
 METAFINDER_LIMIT=20 # Max 250
 
 # Subdomains
@@ -194,9 +197,11 @@ SUBPERMUTE=true
 SUBTAKEOVER=true
 SUBRECURSIVE=true
 SUB_RECURSIVE_PASSIVE=false # Uses a lot of API keys queries
+SUB_RECURSIVE_BRUTE=false # Needs big disk space and time to resolve
 ZONETRANSFER=true
 S3BUCKETS=true
 REVERSE_IP=false
+TLS_PORTS="21,22,25,80,110,135,143,261,271,324,443,448,465,563,614,631,636,664,684,695,832,853,854,990,993,989,990,992,993,994,995,1129,1131,1184,2083,2087,2089,2096,2221,2252,2376,2381,2478,2479,2482,2484,2679,2762,3077,3078,3183,3191,3220,3269,3306,3410,3424,3471,3496,3509,3529,3539,3535,3660,36611,3713,3747,3766,3864,3885,3995,3896,4031,4036,4062,4064,4081,4083,4116,4335,4336,4536,4590,4740,4843,4843,4849,5443,5007,5061,5321,5349,5671,5783,5868,5986,5989,5990,6209,6251,6443,6513,6514,6619,6697,6771,6697,7202,7443,7673,7674,7677,7775,8243,8443,8991,8989,9089,9295,9318,9443,9444,9614,9802,10161,10162,11751,12013,12109,14143,15002,16995,41230,16993,20003"
 
 # Web detection
 WEBPROBESIMPLE=true
@@ -225,6 +230,9 @@ FUZZ=true
 CMS_SCANNER=true
 WORDLIST=true
 ROBOTSWORDLIST=true
+PASSWORD_DICT=true
+PASSWORD_MIN_LENGTH=5
+PASSWORD_MAX_LENGTH=14
 
 # Vulns
 VULNS_GENERAL=false
@@ -247,12 +255,14 @@ NOTIFICATION=false # Notification for every function
 SOFT_NOTIFICATION=false # Only for start/end
 DEEP=false
 DEEP_LIMIT=500
+DEEP_LIMIT2=1500
 DIFF=false
 REMOVETMP=false
 REMOVELOG=false
 PROXY=false
 SENDZIPNOTIFY=false
 PRESERVE=true      # set to true to avoid deleting the .called_fn files on really large scans
+FFUF_FLAGS="-mc all -fc 404 -ac -sf -s"
 
 # HTTP options
 HEADER="User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0"
@@ -265,14 +275,19 @@ GOSPIDER_THREADS=50
 GITDORKER_THREADS=5
 BRUTESPRAY_THREADS=20
 BRUTESPRAY_CONCURRENCE=10
-ARJUN_THREADS=20
 GAUPLUS_THREADS=10
+DNSTAKE_THREADS=100
 DALFOX_THREADS=200
 PUREDNS_PUBLIC_LIMIT=0 # Set between 2000 - 10000 if your router blows up, 0 is unlimited
 PUREDNS_TRUSTED_LIMIT=400
+PUREDNS_WILDCARDTEST_LIMIT=30
+PUREDNS_WILDCARDBATCH_LIMIT=1500000
 WEBSCREENSHOT_THREADS=200
+GOWITNESS_THREADS=8
 RESOLVE_DOMAINS_THREADS=150
 PPFUZZ_THREADS=30
+DNSVALIDATOR_THREADS=200
+INTERLACE_THREADS=10
 
 # Timeouts
 CMSSCAN_TIMEOUT=3600
@@ -291,31 +306,33 @@ resolvers_trusted=${tools}/resolvers_trusted.txt
 
 # Axiom Fleet
 # Will not start a new fleet if one exist w/ same name and size (or larger)
-AXIOM=false
+# AXIOM=false Uncomment only to overwrite command line flags
 AXIOM_FLEET_LAUNCH=false
 AXIOM_FLEET_NAME="reconFTW"
-AXIOM_FLEET_COUNT=10
+AXIOM_FLEET_COUNT=5
 AXIOM_FLEET_REGIONS="eu-central"
 AXIOM_FLEET_SHUTDOWN=true
 # This is a script on your reconftw host that might prep things your way...
 #AXIOM_POST_START="~/Tools/axiom_config.sh"
+AXIOM_EXTRA_ARGS="" # Leave empty if you don't want to add extra arguments
+#AXIOM_EXTRA_ARGS="--rm-logs" # Example
 
 # BBRF
 BBRF_CONNECTION=false
 BBRF_SERVER=https://demo.bbrf.me/bbrf
-BBRF_USERNAME=user
-BBRF_PASSWORD=password
+BBRF_USERNAME="user"
+BBRF_PASSWORD="password"
 
 # TERM COLORS
 bred='\033[1;31m'
 bblue='\033[1;34m'
 bgreen='\033[1;32m'
-yellow='\033[0;33m'
+byellow='\033[1;33m'
 red='\033[0;31m'
 blue='\033[0;34m'
 green='\033[0;32m'
+yellow='\033[0;33m'
 reset='\033[0m'
-
 	
 ```
 </details>
