@@ -218,7 +218,7 @@ touch $dir/.github_tokens
 
 eval wget -N -c https://bootstrap.pypa.io/get-pip.py $DEBUG_STD && eval python3 get-pip.py $DEBUG_STD
 eval rm -f get-pip.py $DEBUG_STD
-eval ln -s /usr/local/bin/pip3 /usr/local/bin/pip3 $DEBUG_STD
+#eval ln -s /usr/local/bin/pip3 /usr/local/bin/pip3 $DEBUG_STD
 eval pip3 install -I -r requirements.txt $DEBUG_STD
 
 printf "${bblue} Running: Installing Golang tools (${#gotools[@]})${reset}\n\n"
