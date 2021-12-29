@@ -273,7 +273,7 @@ for repo in "${!repos[@]}"; do
     if [ -s "requirements.txt" ]; then
         eval $SUDO pip3 install -r requirements.txt $DEBUG_STD
         eval $SUDO python3 setup.py install --record files.txt $DEBUG_STD
-        eval xargs rm -rf < files.txt $DEBUG_STD
+        [ -s "files.txt" ] && eval xargs rm -rf < files.txt $DEBUG_STD
         eval pip3 install . $DEBUG_STD
     fi
     if [ "massdns" = "$repo" ]; then
