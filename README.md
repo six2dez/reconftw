@@ -122,6 +122,12 @@ docker buildx build -t reconftw Docker/.
 # Running from reconftw root folder, configure values properly for your needs
 docker run -v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -v $PWD/Recon/:/root/Tools/reconftw/Recon/ --name reconftwSCAN --rm reconftw -d target.com -r
 ```
+
+#### You can also choose to configure a locale at build time
+
+```
+docker buildx build --build-arg LANG=es_ES.UTF-8 --build-arg LANGUAGE=es_ES -t reconftw Docker/.
+```
  
 # ⚙️ Config file:
 > A detailed explaintion of config file can be found here [Configuration file](https://github.com/six2dez/reconftw/wiki/3.-Configuration-file) :book:
