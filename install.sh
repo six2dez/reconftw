@@ -2,83 +2,95 @@
 
 . ./reconftw.cfg
 
-declare_arrays(){
+# Check Bash version
+BASH_VERSION=$(bash --version | awk 'NR==1{print $4}' | cut -d'.' -f1)
+if [ ${BASH_VERSION} -lt 4 ]; then
+     printf "${bred} Your Bash version is lower than 4, please update${reset}\n"
+    if [ "True" = "$IS_MAC" ]; then
+        printf "${yellow} For MacOS run 'brew install bash' and rerun installer in a new terminal${reset}\n\n" 
+        exit 1;
+    fi
+fi
 
-    declare -A gotools
-    gotools["gf"]="go get -u -v github.com/tomnomnom/gf"
-    gotools["qsreplace"]="go get -u -v github.com/tomnomnom/qsreplace"
-    gotools["Amass"]="GO111MODULE=on go get -v github.com/OWASP/Amass/v3/..."
-    gotools["ffuf"]="go get -u github.com/ffuf/ffuf"
-    gotools["assetfinder"]="go get -u -v github.com/tomnomnom/assetfinder"
-    gotools["github-subdomains"]="go get -u github.com/gwen001/github-subdomains"
-    gotools["cf-check"]="go get -u -v github.com/dwisiswant0/cf-check"
-    gotools["waybackurls"]="go get -u -v github.com/tomnomnom/hacks/waybackurls"
-    gotools["nuclei"]="GO111MODULE=on go get -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei"
-    gotools["anew"]="go get -u -v github.com/tomnomnom/anew"
-    gotools["notify"]="GO111MODULE=on go get -v github.com/projectdiscovery/notify/cmd/notify"
-    gotools["unfurl"]="go get -u -v github.com/tomnomnom/unfurl"
-    gotools["httpx"]="GO111MODULE=on go get -v github.com/projectdiscovery/httpx/cmd/httpx"
-    gotools["github-endpoints"]="go get -u github.com/gwen001/github-endpoints"
-    gotools["dnsx"]="GO111MODULE=on go get -v github.com/projectdiscovery/dnsx/cmd/dnsx"
-    gotools["subfinder"]="GO111MODULE=on go get -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder"
-    gotools["gau"]="go install github.com/lc/gau/v2/cmd/gau@latest"
-    gotools["subjs"]="GO111MODULE=on go get -v github.com/lc/subjs"
-    gotools["Gxss"]="go get -u -v github.com/KathanP19/Gxss"
-    gotools["gospider"]="GO111MODULE=on go get -u github.com/jaeles-project/gospider"
-    gotools["crobat"]="go get -u -v github.com/cgboal/sonarsearch/cmd/crobat"
-    gotools["crlfuzz"]="GO111MODULE=on go get -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz"
-    gotools["dalfox"]="GO111MODULE=on go get -v github.com/hahwul/dalfox/v2"
-    gotools["puredns"]="GO111MODULE=on go get -v github.com/d3mondev/puredns/v2"
-    gotools["resolveDomains"]="go get -u -v github.com/Josue87/resolveDomains"
-    gotools["interactsh-client"]="go install -v github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest"
-    gotools["analyticsrelationships"]="go get -u -v github.com/Josue87/analyticsrelationships"
-    gotools["gotator"]="go get -u -v github.com/Josue87/gotator"
-    gotools["roboxtractor"]="go get -u -v github.com/Josue87/roboxtractor"
-    gotools["mapcidr"]="GO111MODULE=on go get -v github.com/projectdiscovery/mapcidr/cmd/mapcidr"
-    gotools["clouddetect"]="go get github.com/99designs/clouddetect/cli/clouddetect"
-    gotools["dnstake"]="go install github.com/pwnesia/dnstake/cmd/dnstake@latest"
-    gotools["gowitness"]="go get -u github.com/sensepost/gowitness"
-    gotools["cero"]="go get -u github.com/glebarez/cero"
+declare -A gotools
+gotools["gf"]="go get -u -v github.com/tomnomnom/gf"
+gotools["qsreplace"]="go get -u -v github.com/tomnomnom/qsreplace"
+gotools["Amass"]="GO111MODULE=on go get -v github.com/OWASP/Amass/v3/..."
+gotools["ffuf"]="go get -u github.com/ffuf/ffuf"
+gotools["assetfinder"]="go get -u -v github.com/tomnomnom/assetfinder"
+gotools["github-subdomains"]="go get -u github.com/gwen001/github-subdomains"
+gotools["cf-check"]="go get -u -v github.com/dwisiswant0/cf-check"
+gotools["waybackurls"]="go get -u -v github.com/tomnomnom/hacks/waybackurls"
+gotools["nuclei"]="GO111MODULE=on go get -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei"
+gotools["anew"]="go get -u -v github.com/tomnomnom/anew"
+gotools["notify"]="GO111MODULE=on go get -v github.com/projectdiscovery/notify/cmd/notify"
+gotools["unfurl"]="go get -u -v github.com/tomnomnom/unfurl"
+gotools["httpx"]="GO111MODULE=on go get -v github.com/projectdiscovery/httpx/cmd/httpx"
+gotools["github-endpoints"]="go get -u github.com/gwen001/github-endpoints"
+gotools["dnsx"]="GO111MODULE=on go get -v github.com/projectdiscovery/dnsx/cmd/dnsx"
+gotools["subfinder"]="GO111MODULE=on go get -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder"
+gotools["gau"]="go install github.com/lc/gau/v2/cmd/gau@latest"
+gotools["subjs"]="GO111MODULE=on go get -v github.com/lc/subjs"
+gotools["Gxss"]="go get -u -v github.com/KathanP19/Gxss"
+gotools["gospider"]="GO111MODULE=on go get -u github.com/jaeles-project/gospider"
+gotools["crobat"]="go get -u -v github.com/cgboal/sonarsearch/cmd/crobat"
+gotools["crlfuzz"]="GO111MODULE=on go get -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz"
+gotools["dalfox"]="GO111MODULE=on go get -v github.com/hahwul/dalfox/v2"
+gotools["puredns"]="GO111MODULE=on go get -v github.com/d3mondev/puredns/v2"
+gotools["resolveDomains"]="go get -u -v github.com/Josue87/resolveDomains"
+gotools["interactsh-client"]="go install -v github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest"
+gotools["analyticsrelationships"]="go get -u -v github.com/Josue87/analyticsrelationships"
+gotools["gotator"]="go get -u -v github.com/Josue87/gotator"
+gotools["roboxtractor"]="go get -u -v github.com/Josue87/roboxtractor"
+gotools["mapcidr"]="GO111MODULE=on go get -v github.com/projectdiscovery/mapcidr/cmd/mapcidr"
+gotools["clouddetect"]="go get github.com/99designs/clouddetect/cli/clouddetect"
+gotools["dnstake"]="go install github.com/pwnesia/dnstake/cmd/dnstake@latest"
+gotools["gowitness"]="go get -u github.com/sensepost/gowitness"
+gotools["cero"]="go get -u github.com/glebarez/cero"
 
-    declare -A repos
-    repos["uDork"]="m3n0sd0n4ld/uDork"
-    repos["pwndb"]="davidtavarez/pwndb"
-    repos["dnsvalidator"]="vortexau/dnsvalidator"
-    repos["dnsrecon"]="darkoperator/dnsrecon"
-    #repos["theHarvester"]="laramies/theHarvester"
-    repos["brutespray"]="x90skysn3k/brutespray"
-    repos["wafw00f"]="EnableSecurity/wafw00f"
-    repos["gf"]="tomnomnom/gf"
-    repos["Gf-Patterns"]="1ndianl33t/Gf-Patterns"
-    repos["ctfr"]="UnaPibaGeek/ctfr"
-    repos["LinkFinder"]="dark-warlord14/LinkFinder"
-    repos["Corsy"]="s0md3v/Corsy"
-    repos["CMSeeK"]="Tuhinshubhra/CMSeeK"
-    repos["fav-up"]="pielco11/fav-up"
-    repos["Interlace"]="codingo/Interlace"
-    repos["massdns"]="blechschmidt/massdns"
-    repos["Oralyzer"]="r0075h3ll/Oralyzer"
-    repos["GitDorker"]="obheda12/GitDorker"
-    repos["testssl"]="drwetter/testssl.sh"
-    repos["commix"]="commixproject/commix"
-    repos["JSA"]="w9w/JSA"
-    repos["cloud_enum"]="initstring/cloud_enum"
-    repos["ultimate-nmap-parser"]="shifty0g/ultimate-nmap-parser"
-    repos["pydictor"]="LandGrey/pydictor"
-}
+declare -A repos
+repos["uDork"]="m3n0sd0n4ld/uDork"
+repos["pwndb"]="davidtavarez/pwndb"
+repos["dnsvalidator"]="vortexau/dnsvalidator"
+repos["dnsrecon"]="darkoperator/dnsrecon"
+#repos["theHarvester"]="laramies/theHarvester"
+repos["brutespray"]="x90skysn3k/brutespray"
+repos["wafw00f"]="EnableSecurity/wafw00f"
+repos["gf"]="tomnomnom/gf"
+repos["Gf-Patterns"]="1ndianl33t/Gf-Patterns"
+repos["ctfr"]="UnaPibaGeek/ctfr"
+repos["LinkFinder"]="dark-warlord14/LinkFinder"
+repos["Corsy"]="s0md3v/Corsy"
+repos["CMSeeK"]="Tuhinshubhra/CMSeeK"
+repos["fav-up"]="pielco11/fav-up"
+repos["Interlace"]="codingo/Interlace"
+repos["massdns"]="blechschmidt/massdns"
+repos["Oralyzer"]="r0075h3ll/Oralyzer"
+repos["GitDorker"]="obheda12/GitDorker"
+repos["testssl"]="drwetter/testssl.sh"
+repos["commix"]="commixproject/commix"
+repos["JSA"]="w9w/JSA"
+repos["cloud_enum"]="initstring/cloud_enum"
+repos["ultimate-nmap-parser"]="shifty0g/ultimate-nmap-parser"
+repos["pydictor"]="LandGrey/pydictor"
+
 
 dir=${tools}
 double_check=false
 
 # Raspberry Pi Detecting
-if grep -q "Raspberry Pi 3"  /proc/cpuinfo; then
-    IS_ARM="True"
-    RPI_3="True"
-    RPI_4="False"
-elif grep -q "Raspberry Pi 4"  /proc/cpuinfo; then
-    IS_ARM="True"
-    RPI_4="True"
-    RPI_3="False"
+if [ -s "/proc/cpuinfo" ]; then
+    if grep -q "Raspberry Pi 3"  /proc/cpuinfo; then
+        IS_ARM="True"
+        RPI_3="True"
+        RPI_4="False"
+    elif grep -q "Raspberry Pi 4"  /proc/cpuinfo; then
+        IS_ARM="True"
+        RPI_4="True"
+        RPI_3="False"
+    else
+        IS_ARM="False"
+    fi
 else
     IS_ARM="False"
 fi
@@ -121,7 +133,7 @@ install_brew(){
     fi
     eval brew update -$DEBUG_STD
     eval brew install --cask chromium $DEBUG_STD
-    eval brew install bash python3 python3-pip build-essential gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb libxml2-utils libdata-hexdump-perl $DEBUG_STD
+    eval brew install bash python build-essential gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb libxml2-utils libdata-hexdump-perl $DEBUG_STD
     eval brew services start tor $DEBUG_STD
 }
 
@@ -165,17 +177,6 @@ elif [ -f /etc/redhat-release ]; then install_yum;
 elif [ -f /etc/arch-release ]; then install_pacman;
 elif [ "True" = "$IS_MAC" ]; then install_brew;
 elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for some RedHat and Amazon Linux instances
-fi
-
-
-# Check Bash version
-BASH_VERSION=$(bash --version | awk 'NR==1{print $4}' | cut -d'.' -f1)
-if [ ${BASH_VERSION} -lt 4 ]; then
-     printf "${bred} Your bash version is lower than 4, please update${reset}\n"
-    if [ "True" = "$IS_MAC" ]; then
-        printf "${yellow} For MacOS run `brew install bash` and rerun installer in a new terminal${reset}\n\n" 
-        exit 1;
-    fi
 fi
 
 declare_arrays
