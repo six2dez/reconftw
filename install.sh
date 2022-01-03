@@ -181,14 +181,14 @@ if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$versio
                 eval wget https://dl.google.com/go/${version}.linux-arm64.tar.gz $DEBUG_STD
                 eval $SUDO tar -C /usr/local -xzf ${version}.linux-arm64.tar.gz $DEBUG_STD
             fi
-	elif [ "True" = "$IS_MAC" ]; then
-	    eval wget https://dl.google.com/go/${version}.darwin-amd64.tar.gz $DEBUG_STD
+        elif [ "True" = "$IS_MAC" ]; then
+            eval wget https://dl.google.com/go/${version}.darwin-amd64.tar.gz $DEBUG_STD
             eval $SUDO tar -C /usr/local -xzf ${version}.darwin-amd64.tar.gz $DEBU
         else
             eval wget https://dl.google.com/go/${version}.linux-amd64.tar.gz $DEBUG_STD
             eval $SUDO tar -C /usr/local -xzf ${version}.linux-amd64.tar.gz $DEBUG_STD
         fi
-        eval $SUDO cp /usr/local/go/bin/go /usr/local/bin
+        eval $SUDO ln -sf /usr/local/go/bin/go /usr/local/bin/
         rm -rf $version*
         export GOROOT=/usr/local/go
         export GOPATH=$HOME/go
