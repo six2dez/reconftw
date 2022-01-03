@@ -2,6 +2,32 @@
 
 . ./reconftw.cfg
 
+dir=${tools}
+double_check=false
+
+# Raspberry Pi Detecting
+if [ -s "/proc/cpuinfo" ]; then
+    if grep -q "Raspberry Pi 3"  /proc/cpuinfo; then
+        IS_ARM="True"
+        RPI_3="True"
+        RPI_4="False"
+    elif grep -q "Raspberry Pi 4"  /proc/cpuinfo; then
+        IS_ARM="True"
+        RPI_4="True"
+        RPI_3="False"
+    else
+        IS_ARM="False"
+    fi
+else
+    IS_ARM="False"
+fi
+#Mac Osx Detecting
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    IS_MAC="True"
+else
+    IS_MAC="False"
+fi
+
 # Check Bash version
 BASH_VERSION=$(bash --version | awk 'NR==1{print $4}' | cut -d'.' -f1)
 if [ ${BASH_VERSION} -lt 4 ]; then
@@ -74,33 +100,6 @@ repos["cloud_enum"]="initstring/cloud_enum"
 repos["ultimate-nmap-parser"]="shifty0g/ultimate-nmap-parser"
 repos["pydictor"]="LandGrey/pydictor"
 
-
-dir=${tools}
-double_check=false
-
-# Raspberry Pi Detecting
-if [ -s "/proc/cpuinfo" ]; then
-    if grep -q "Raspberry Pi 3"  /proc/cpuinfo; then
-        IS_ARM="True"
-        RPI_3="True"
-        RPI_4="False"
-    elif grep -q "Raspberry Pi 4"  /proc/cpuinfo; then
-        IS_ARM="True"
-        RPI_4="True"
-        RPI_3="False"
-    else
-        IS_ARM="False"
-    fi
-else
-    IS_ARM="False"
-fi
-#Mac Osx Detecting
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    IS_MAC="True"
-else
-    IS_MAC="False"
-fi
-
 printf "\n\n${bgreen}#######################################################################${reset}\n"
 printf "${bgreen} reconFTW installer/updater script ${reset}\n\n"
 printf "${yellow} This may take time. So, go grab a coffee! ${reset}\n\n"
@@ -133,7 +132,7 @@ install_brew(){
     fi
     eval brew update -$DEBUG_STD
     eval brew install --cask chromium $DEBUG_STD
-    eval brew install bash python build-essential gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb libxml2-utils libdata-hexdump-perl $DEBUG_STD
+    eval brew install bash python massdns jq gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb libxml2-utils libdata-hexdump-perl $DEBUG_STD
     eval brew services start tor $DEBUG_STD
 }
 
@@ -178,8 +177,6 @@ elif [ -f /etc/arch-release ]; then install_pacman;
 elif [ "True" = "$IS_MAC" ]; then install_brew;
 elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for some RedHat and Amazon Linux instances
 fi
-
-declare_arrays
 
 # Installing latest Golang version
 #version=$(curl -L -s https://golang.org/VERSION?m=text)
@@ -290,7 +287,7 @@ for repo in "${!repos[@]}"; do
         eval $SUDO pip3 install -r requirements.txt $DEBUG_STD
         eval $SUDO python3 setup.py install --record files.txt $DEBUG_STD
         [ -s "files.txt" ] && eval xargs rm -rf < files.txt $DEBUG_STD
-        eval pip3 install . $DEBUG_STD
+        eval $SUDO pip3 install . $DEBUG_STD
     fi
     if [ "massdns" = "$repo" ]; then
             eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/local/bin/ $DEBUG_ERROR
