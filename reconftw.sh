@@ -1853,7 +1853,8 @@ function resolvers_update(){
 }
 
 function ipcidr_target(){
-	if [[ $1 =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+	IP_CIDR_REGEX='(((25[0-5]|2[0-4][0-9]|1?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9][0-9]?))(\/([8-9]|[1-2][0-9]|3[0-2]))([^0-9.]|$)|(((25[0-5]|2[0-4][0-9]|1?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9][0-9]?)$)'
+	if [[ $1 =~ ^$IP_CIDR_REGEX ]]; then
 		echo $1 | mapcidr -silent | anew -q target_reconftw_ipcidr.txt
 		if [ -s "./target_reconftw_ipcidr.txt" ]; then 
 			[ "$REVERSE_IP" = true ] && cat ./target_reconftw_ipcidr.txt | dnsx -ptr -resp-only -silent -retry 3 | unfurl -u domains 2>/dev/null | sed 's/\.$//' | anew -q ./target_reconftw_ipcidr.txt
@@ -2482,6 +2483,12 @@ function help(){
 ###############################################################################################################
 ########################################### START SCRIPT  #####################################################
 ###############################################################################################################
+
+# macOS PATH initialization, thanks @0xtavian <3
+if [[ "$OSTYPE" == "darwin"* ]]; then
+	PATH="/usr/local/opt/gnu-getopt/bin:$PATH"
+	PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
+fi
 
 PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:c:rspanwvh::' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,deep,help,vps' -n 'reconFTW' -- "$@")
 
