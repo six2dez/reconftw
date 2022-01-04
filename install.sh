@@ -2,6 +2,42 @@
 
 . ./reconftw.cfg
 
+dir=${tools}
+double_check=false
+
+# Raspberry Pi Detecting
+if [ -s "/proc/cpuinfo" ]; then
+    if grep -q "Raspberry Pi 3"  /proc/cpuinfo; then
+        IS_ARM="True"
+        RPI_3="True"
+        RPI_4="False"
+    elif grep -q "Raspberry Pi 4"  /proc/cpuinfo; then
+        IS_ARM="True"
+        RPI_4="True"
+        RPI_3="False"
+    else
+        IS_ARM="False"
+    fi
+else
+    IS_ARM="False"
+fi
+#Mac Osx Detecting
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    IS_MAC="True"
+else
+    IS_MAC="False"
+fi
+
+# Check Bash version
+BASH_VERSION=$(bash --version | awk 'NR==1{print $4}' | cut -d'.' -f1)
+if [ ${BASH_VERSION} -lt 4 ]; then
+     printf "${bred} Your Bash version is lower than 4, please update${reset}\n"
+    if [ "True" = "$IS_MAC" ]; then
+        printf "${yellow} For MacOS run 'brew install bash' and rerun installer in a new terminal${reset}\n\n" 
+        exit 1;
+    fi
+fi
+
 declare -A gotools
 gotools["gf"]="go get -u -v github.com/tomnomnom/gf"
 gotools["qsreplace"]="go get -u -v github.com/tomnomnom/qsreplace"
@@ -64,28 +100,6 @@ repos["cloud_enum"]="initstring/cloud_enum"
 repos["ultimate-nmap-parser"]="shifty0g/ultimate-nmap-parser"
 repos["pydictor"]="LandGrey/pydictor"
 
-dir=${tools}
-double_check=false
-
-# Raspberry Pi Detecting
-if grep -q "Raspberry Pi 3"  /proc/cpuinfo; then
-    IS_ARM="True"
-    RPI_3="True"
-    RPI_4="False"
-elif grep -q "Raspberry Pi 4"  /proc/cpuinfo; then
-    IS_ARM="True"
-    RPI_4="True"
-    RPI_3="False"
-else
-    IS_ARM="False"
-fi
-#Mac Osx Detecting
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    IS_MAC="True"
-else
-    IS_MAC="False"
-fi
-
 printf "\n\n${bgreen}#######################################################################${reset}\n"
 printf "${bgreen} reconFTW installer/updater script ${reset}\n\n"
 printf "${yellow} This may take time. So, go grab a coffee! ${reset}\n\n"
@@ -116,11 +130,10 @@ install_brew(){
     else
 	/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     fi
-    eval $SUDO brew update -$DEBUG_STD
-    eval $SUDO brew install chromium-browser $DEBUG_STD
-    eval $SUDO brew install chromium $DEBUG_STD
-    eval $SUDO brew install python3 python3-pip build-essential gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb $DEBUG_STD
-    eval $SUDO brew services start tor $DEBUG_STD
+    eval brew update -$DEBUG_STD
+    eval brew install --cask chromium $DEBUG_STD
+    eval brew install bash python massdns jq gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb libxml2-utils libdata-hexdump-perl $DEBUG_STD
+    eval brew services start tor $DEBUG_STD
 }
 
 install_yum(){
@@ -182,14 +195,14 @@ if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$versio
                 eval wget https://dl.google.com/go/${version}.linux-arm64.tar.gz $DEBUG_STD
                 eval $SUDO tar -C /usr/local -xzf ${version}.linux-arm64.tar.gz $DEBUG_STD
             fi
-	elif [ "True" = "$IS_MAC" ]; then
-	    eval wget https://dl.google.com/go/${version}.darwin-amd64.tar.gz $DEBUG_STD
+        elif [ "True" = "$IS_MAC" ]; then
+            eval wget https://dl.google.com/go/${version}.darwin-amd64.tar.gz $DEBUG_STD
             eval $SUDO tar -C /usr/local -xzf ${version}.darwin-amd64.tar.gz $DEBU
         else
             eval wget https://dl.google.com/go/${version}.linux-amd64.tar.gz $DEBUG_STD
             eval $SUDO tar -C /usr/local -xzf ${version}.linux-amd64.tar.gz $DEBUG_STD
         fi
-        eval $SUDO cp /usr/local/go/bin/go /usr/local/bin
+        eval $SUDO ln -sf /usr/local/go/bin/go /usr/local/bin/
         rm -rf $version*
         export GOROOT=/usr/local/go
         export GOPATH=$HOME/go
@@ -274,7 +287,7 @@ for repo in "${!repos[@]}"; do
         eval $SUDO pip3 install -r requirements.txt $DEBUG_STD
         eval $SUDO python3 setup.py install --record files.txt $DEBUG_STD
         [ -s "files.txt" ] && eval xargs rm -rf < files.txt $DEBUG_STD
-        eval pip3 install . $DEBUG_STD
+        eval $SUDO pip3 install . $DEBUG_STD
     fi
     if [ "massdns" = "$repo" ]; then
             eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/local/bin/ $DEBUG_ERROR
