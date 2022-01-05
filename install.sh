@@ -5,7 +5,7 @@
 dir=${tools}
 double_check=false
 
-# Raspberry Pi Detecting
+# ARM Detection
 if [ -s "/proc/cpuinfo" ]; then
     if grep -q "Raspberry Pi 3"  /proc/cpuinfo; then
         IS_ARM="True"
@@ -18,9 +18,12 @@ if [ -s "/proc/cpuinfo" ]; then
     else
         IS_ARM="False"
     fi
+elif grep -iq "arm" <<< "$(/usr/bin/arch)";then
+    IS_ARM="True"
 else
     IS_ARM="False"
 fi
+
 #Mac Osx Detecting
 if [[ "$OSTYPE" == "darwin"* ]]; then
     IS_MAC="True"
@@ -196,8 +199,13 @@ if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$versio
                 eval $SUDO tar -C /usr/local -xzf ${version}.linux-arm64.tar.gz $DEBUG_STD
             fi
         elif [ "True" = "$IS_MAC" ]; then
-            eval wget https://dl.google.com/go/${version}.darwin-amd64.tar.gz $DEBUG_STD
-            eval $SUDO tar -C /usr/local -xzf ${version}.darwin-amd64.tar.gz $DEBU
+            if [ "True" = "$IS_ARM" ]; then
+                eval wget https://dl.google.com/go/${version}.darwin-arm64.tar.gz $DEBUG_STD
+                eval $SUDO tar -C /usr/local -xzf ${version}.darwin-arm64.tar.gz $DEBUG_STD
+            else
+                eval wget https://dl.google.com/go/${version}.darwin-amd64.tar.gz $DEBUG_STD
+                eval $SUDO tar -C /usr/local -xzf ${version}.darwin-amd64.tar.gz $DEBUG_STD
+            fi
         else
             eval wget https://dl.google.com/go/${version}.linux-amd64.tar.gz $DEBUG_STD
             eval $SUDO tar -C /usr/local -xzf ${version}.linux-amd64.tar.gz $DEBUG_STD
@@ -308,7 +316,7 @@ if [ "True" = "$IS_ARM" ]; then
         eval $SUDO rm -rf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
         eval $SUDO mv findomain-armv7 /usr/local/bin/findomain
         eval $SUDO mv unimap-armv7 /usr/local/bin/unimap
-    elif [ "True" = "$RPI_4" ]; then
+    elif [ "True" = "$RPI_4" ] || [ "True" = "$IS_MAC" ]; then
         eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-aarch64  $DEBUG_STD
         eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/latest/download/unimap-aarch64 $DEBUG_STD
         eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz $DEBUG_STD
@@ -325,7 +333,6 @@ elif [ "True" = "$IS_MAC" ]; then
     eval $SUDO rm -rf ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz  $DEBUG_STD
     eval $SUDO mv findomain-osx  /usr/local/bin/findomain
     eval $SUDO mv unimap-osx /usr/local/bin/unimap
-
 else
     eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux $DEBUG_STD
     eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/download/0.4.0/unimap-linux $DEBUG_STD
