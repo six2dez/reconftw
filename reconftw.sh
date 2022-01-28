@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
 
+trap printout SIGINT
+trap printout ERR
+
+printout() {
+	printf "\n\n${bred}#######################################################################\n"
+	printf "Ctrl+C Detected , Skipping This Function"
+	printf "\n#######################################################################${reset}\n"
+}
+
 function banner(){
 	printf "\n${bgreen}"
 	printf "  ██▀███  ▓█████  ▄████▄   ▒█████   ███▄    █   █████▒▄▄▄█████▓ █     █░\n"
