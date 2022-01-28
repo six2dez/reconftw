@@ -74,13 +74,9 @@ function tools_installed(){
 	type -P github-subdomains &>/dev/null || { printf "${bred} [*] github-subdomains	[NO]${reset}\n"; allinstalled=false;}
 	type -P gospider &>/dev/null || { printf "${bred} [*] gospider		[NO]${reset}\n"; allinstalled=false;}
 	type -P wafw00f &>/dev/null || { printf "${bred} [*] wafw00f		[NO]${reset}\n"; allinstalled=false;}
-	type -P subfinder &>/dev/null || { printf "${bred} [*] Subfinder		[NO]${reset}\n"; allinstalled=false;}
-	type -P assetfinder &>/dev/null || { printf "${bred} [*] Assetfinder	[NO]${reset}\n"; allinstalled=false;}
 	type -P dnsvalidator &>/dev/null || { printf "${bred} [*] dnsvalidator	[NO]${reset}\n"; allinstalled=false;}
 	type -P gowitness &>/dev/null || { printf "${bred} [*] gowitness		[NO]${reset}\n"; allinstalled=false;}
-	type -P findomain &>/dev/null || { printf "${bred} [*] Findomain		[NO]${reset}\n"; allinstalled=false;}
 	type -P amass &>/dev/null || { printf "${bred} [*] Amass		[NO]${reset}\n"; allinstalled=false;}
-	type -P crobat &>/dev/null || { printf "${bred} [*] Crobat		[NO]${reset}\n"; allinstalled=false;}
 	type -P waybackurls &>/dev/null || { printf "${bred} [*] Waybackurls	[NO]${reset}\n"; allinstalled=false;}
 	type -P gau &>/dev/null || { printf "${bred} [*] gau		[NO]${reset}\n"; allinstalled=false;}
 	type -P dnsx &>/dev/null || { printf "${bred} [*] dnsx		[NO]${reset}\n"; allinstalled=false;}
@@ -361,23 +357,10 @@ function sub_passive(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBPASSIVE" = true ]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Passive Subdomain Enumeration"
 		if [ ! "$AXIOM" = true ]; then
-			subfinder -d $domain -all -o .tmp/subfinder_psub.txt 2>>"$LOGFILE" &>/dev/null
-			assetfinder --subs-only $domain 2>>"$LOGFILE" | anew -q .tmp/assetfinder_psub.txt
 			amass enum -passive -d $domain -config $AMASS_CONFIG -o .tmp/amass_psub.txt 2>>"$LOGFILE" &>/dev/null
-			findomain --quiet -t $domain -u .tmp/findomain_psub.txt 2>>"$LOGFILE" &>/dev/null
-			timeout 10m waybackurls $domain | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/waybackurls_psub.txt
-			timeout 10m gau --subs --threads $GAUPLUS_THREADS $domain | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/gau_psub.txt
 		else
-			axiom-scan $list -m subfinder -all -o .tmp/subfinder_psub.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-			axiom-scan $list -m assetfinder -o .tmp/assetfinder_psub.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			axiom-scan $list -m amass -passive -o .tmp/amass_psub.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-			axiom-scan $list -m findomain -o .tmp/findomain_psub.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-			axiom-scan $list -m waybackurls -o .tmp/waybackurls_psub_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-			[ -s ".tmp/waybackurls_psub_tmp.txt" ] && cat .tmp/waybackurls_psub_tmp.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/waybackurls_psub.txt
-			axiom-scan $list -m gau -o .tmp/gau_psub_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-			[ -s ".tmp/gau_psub_tmp.txt" ] && cat .tmp/gau_psub_tmp.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/gau_psub.txt
 		fi
-		crobat -s $domain 2>>"$LOGFILE" | anew -q .tmp/crobat_psub.txt
 		if [ -s "${GITHUB_TOKENS}" ]; then
 			if [ "$DEEP" = true ]; then
 				github-subdomains -d $domain -t $GITHUB_TOKENS -o .tmp/github_subdomains_psub.txt 2>>"$LOGFILE" &>/dev/null
@@ -385,9 +368,6 @@ function sub_passive(){
 				github-subdomains -d $domain -k -q -t $GITHUB_TOKENS -o .tmp/github_subdomains_psub.txt 2>>"$LOGFILE" &>/dev/null
 			fi
 		fi
-		curl -s -k "https://jldc.me/anubis/subdomains/${domain}" 2>>"$LOGFILE" | grep -Po "((http|https):\/\/)?(([\w.-]*)\.([\w]*)\.([A-z]))\w+" | sed '/^\./d' | anew -q .tmp/curl_psub.txt
-		curl -s -k "https://dns.bufferover.run/dns?q=.${domain}" 2>>"$LOGFILE" | jq -r '.FDNS_A'[],'.RDNS'[] 2>>"$LOGFILE" | cut -d ',' -f2 | grep -F ".$domain" | anew -q .tmp/curl_psub.txt
-		#curl -s -k "https://tls.bufferover.run/dns?q=.${domain}" 2>>"$LOGFILE" | jq -r .Results[] 2>>"$LOGFILE" | cut -d ',' -f4 | grep -F ".$domain" | anew -q .tmp/curl_psub.txt
 		NUMOFLINES=$(cat .tmp/*_psub.txt 2>>"$LOGFILE" | sed "s/*.//" | anew .tmp/passive_subs.txt | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (passive)" ${FUNCNAME[0]}
 	else
