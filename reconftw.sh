@@ -1809,7 +1809,7 @@ function sendToNotify {
 function start_func(){
 	printf "${bgreen}#######################################################################"
 	notification "${2}" info
-	echo "Start function ${1} $(date +"%F") $(date +"%T")" >> ${LOGFILE}
+	echo "[ $(date +"%F %T") ] Start function : ${1} " >> ${LOGFILE}
 	start=$(date +%s)
 }
 
@@ -1818,14 +1818,14 @@ function end_func(){
 	end=$(date +%s)
 	getElapsedTime $start $end
 	notification "${2} Finished in ${runtime}" info
-	echo "End function ${2} $(date +"%F") $(date +"%T")" >> ${LOGFILE}
+	echo "[ $(date +"%F %T") ] End function : ${2} " >> ${LOGFILE}
 	printf "${bblue} ${1} ${reset}\n"
 	printf "${bgreen}#######################################################################${reset}\n"
 }
 
 function start_subfunc(){
 	notification "${2}" warn
-	echo "Start subfunction ${1} $(date +"%F") $(date +"%T")" >> ${LOGFILE}
+	echo "[ $(date +"%F %T") ] Start subfunction : ${1} " >> ${LOGFILE}
 	start_sub=$(date +%s)
 }
 
@@ -1834,7 +1834,7 @@ function end_subfunc(){
 	end_sub=$(date +%s)
 	getElapsedTime $start_sub $end_sub
 	notification "${1} in ${runtime}" good
-	echo "End subfunction ${1} $(date +"%F") $(date +"%T")" >> ${LOGFILE}
+	echo "[ $(date +"%F %T") ] End subfunction : ${1} " >> ${LOGFILE}
 }
 
 function resolvers_update(){
