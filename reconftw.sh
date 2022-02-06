@@ -2204,7 +2204,7 @@ function recon(){
 	webprobe_full
 	s3buckets
 	screenshot
-	#virtualhosts
+	virtualhosts
 	portscan
 	waf_checks
 	nuclei_check
@@ -2309,7 +2309,7 @@ function multi_recon(){
 		remove_big_files
 		webprobe_full
 		screenshot
-		#virtualhosts
+		virtualhosts
 		portscan
 		cloudprovider
 		currently=$(date +"%H:%M:%S")
@@ -2418,7 +2418,7 @@ function subs_menu(){
 	remove_big_files
 	webprobe_full
 	screenshot
-	#virtualhosts
+	virtualhosts
 	zonetransfer
 	s3buckets
 
@@ -2433,7 +2433,7 @@ function webs_menu(){
 	subtakeover
 	remove_big_files
 	screenshot
-	#virtualhosts
+	virtualhosts
 	waf_checks
 	nuclei_check
 	cms_scanner
