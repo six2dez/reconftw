@@ -24,22 +24,15 @@ else
     IS_ARM="False"
 fi
 
-#Mac Osx Detecting
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    IS_MAC="True"
-else
-    IS_MAC="False"
-fi
+# Mac Osx Detection
+[[ "$OSTYPE" == "darwin"* ]] && IS_MAC="True" || IS_MAC="False"
 
-# Check Bash version
+# Check Bash Version
 BASH_VERSION=$(bash --version | awk 'NR==1{print $4}' | cut -d'.' -f1)
-if [ ${BASH_VERSION} -lt 4 ]; then
-     printf "${bred} Your Bash version is lower than 4, please update${reset}\n"
-    if [ "True" = "$IS_MAC" ]; then
-        printf "${yellow} For MacOS run 'brew install bash' and rerun installer in a new terminal${reset}\n\n" 
-        exit 1;
-    fi
-fi
+[ ${BASH_VERSION} -lt 4 ] && \
+printf "${bred} Your Bash version is lower than 4, please update${reset}\n" && \
+[ "True" = "$IS_MAC" ] && \
+printf "${yellow} For MacOS run 'brew install bash' and rerun installer in a new terminal${reset}\n\n" ; exit 1;
 
 declare -A gotools
 gotools["gf"]="go get -u -v github.com/tomnomnom/gf"
