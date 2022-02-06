@@ -8,8 +8,8 @@
 
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.1.4">
-    <img src="https://img.shields.io/badge/release-v2.1.4-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.2">
+    <img src="https://img.shields.io/badge/release-v2.2-green">
   </a>
    </a>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
@@ -51,6 +51,7 @@ So, what are you waiting for Go! Go! Go! :boom:
   - [b) Docker container 🐳 (2 options)](#b-docker-container--2-options)
     - [1) From DockerHub](#1-from-dockerhub)
     - [2) From repository](#2-from-repository)
+      - [You can also choose to configure a locale at build time](#you-can-also-choose-to-configure-a-locale-at-build-time)
 - [⚙️ Config file:](#️-config-file)
 - [Usage:](#usage)
 - [Example Usage:](#example-usage)
@@ -450,8 +451,8 @@ reset='\033[0m'
 - Google Dorks ([uDork](https://github.com/m3n0sd0n4ld/uDork))
 - Github Dorks ([GitDorker](https://github.com/obheda12/GitDorker))
 ## Subdomains
-  - Passive ([subfinder](https://github.com/projectdiscovery/subfinder), [assetfinder](https://github.com/tomnomnom/assetfinder), [amass](https://github.com/OWASP/Amass), [findomain](https://github.com/Findomain/Findomain), [crobat](https://github.com/cgboal/sonarsearch), [waybackurls](https://github.com/tomnomnom/waybackurls), [github-subdomains](https://github.com/gwen001/github-subdomains), [Anubis](https://jldc.me), [gau](https://github.com/lc/gau))
-  - Certificate transparency ([ctfr](https://github.com/UnaPibaGeek/ctfr), [tls.bufferover](tls.bufferover.run) and [dns.bufferover](dns.bufferover.run)))
+  - Passive ([amass](https://github.com/OWASP/Amass), [waybackurls](https://github.com/tomnomnom/waybackurls), [github-subdomains](https://github.com/gwen001/github-subdomains), [gau](https://github.com/lc/gau))
+  - Certificate transparency ([ctfr](https://github.com/UnaPibaGeek/ctfr))
   - Bruteforce ([puredns](https://github.com/d3mondev/puredns))
   - Permutations ([Gotator](https://github.com/Josue87/gotator))
   - JS files & Source Code Scraping ([gospider](https://github.com/jaeles-project/gospider))

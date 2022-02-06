@@ -5,7 +5,7 @@
 dir=${tools}
 double_check=false
 
-# Raspberry Pi Detecting
+# ARM Detection
 if [ -s "/proc/cpuinfo" ]; then
     if grep -q "Raspberry Pi 3"  /proc/cpuinfo; then
         IS_ARM="True"
@@ -18,9 +18,12 @@ if [ -s "/proc/cpuinfo" ]; then
     else
         IS_ARM="False"
     fi
+elif grep -iq "arm" <<< "$(/usr/bin/arch)";then
+    IS_ARM="True"
 else
     IS_ARM="False"
 fi
+
 #Mac Osx Detecting
 if [[ "$OSTYPE" == "darwin"* ]]; then
     IS_MAC="True"
@@ -43,7 +46,6 @@ gotools["gf"]="go get -u -v github.com/tomnomnom/gf"
 gotools["qsreplace"]="go get -u -v github.com/tomnomnom/qsreplace"
 gotools["Amass"]="GO111MODULE=on go get -v github.com/OWASP/Amass/v3/..."
 gotools["ffuf"]="go get -u github.com/ffuf/ffuf"
-gotools["assetfinder"]="go get -u -v github.com/tomnomnom/assetfinder"
 gotools["github-subdomains"]="go get -u github.com/gwen001/github-subdomains"
 gotools["cf-check"]="go get -u -v github.com/dwisiswant0/cf-check"
 gotools["waybackurls"]="go get -u -v github.com/tomnomnom/hacks/waybackurls"
@@ -54,12 +56,10 @@ gotools["unfurl"]="go get -u -v github.com/tomnomnom/unfurl"
 gotools["httpx"]="GO111MODULE=on go get -v github.com/projectdiscovery/httpx/cmd/httpx"
 gotools["github-endpoints"]="go get -u github.com/gwen001/github-endpoints"
 gotools["dnsx"]="GO111MODULE=on go get -v github.com/projectdiscovery/dnsx/cmd/dnsx"
-gotools["subfinder"]="GO111MODULE=on go get -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder"
 gotools["gau"]="go install github.com/lc/gau/v2/cmd/gau@latest"
 gotools["subjs"]="GO111MODULE=on go get -v github.com/lc/subjs"
 gotools["Gxss"]="go get -u -v github.com/KathanP19/Gxss"
 gotools["gospider"]="GO111MODULE=on go get -u github.com/jaeles-project/gospider"
-gotools["crobat"]="go get -u -v github.com/cgboal/sonarsearch/cmd/crobat"
 gotools["crlfuzz"]="GO111MODULE=on go get -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz"
 gotools["dalfox"]="GO111MODULE=on go get -v github.com/hahwul/dalfox/v2"
 gotools["puredns"]="GO111MODULE=on go get -v github.com/d3mondev/puredns/v2"
@@ -132,7 +132,7 @@ install_brew(){
     fi
     eval brew update -$DEBUG_STD
     eval brew install --cask chromium $DEBUG_STD
-    eval brew install bash python massdns jq gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb libxml2-utils libdata-hexdump-perl $DEBUG_STD
+    eval brew install bash coreutils python massdns jq gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb libxml2-utils libdata-hexdump-perl $DEBUG_STD
     eval brew services start tor $DEBUG_STD
 }
 
@@ -180,7 +180,7 @@ fi
 
 # Installing latest Golang version
 #version=$(curl -L -s https://golang.org/VERSION?m=text)
-version="go1.17.5"
+version="go1.17.6"
 printf "${bblue} Running: Installing/Updating Golang ${reset}\n\n"
 if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$version" = $(go version | cut -d " " -f3) ]
     then
@@ -196,8 +196,13 @@ if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$versio
                 eval $SUDO tar -C /usr/local -xzf ${version}.linux-arm64.tar.gz $DEBUG_STD
             fi
         elif [ "True" = "$IS_MAC" ]; then
-            eval wget https://dl.google.com/go/${version}.darwin-amd64.tar.gz $DEBUG_STD
-            eval $SUDO tar -C /usr/local -xzf ${version}.darwin-amd64.tar.gz $DEBU
+            if [ "True" = "$IS_ARM" ]; then
+                eval wget https://dl.google.com/go/${version}.darwin-arm64.tar.gz $DEBUG_STD
+                eval $SUDO tar -C /usr/local -xzf ${version}.darwin-arm64.tar.gz $DEBUG_STD
+            else
+                eval wget https://dl.google.com/go/${version}.darwin-amd64.tar.gz $DEBUG_STD
+                eval $SUDO tar -C /usr/local -xzf ${version}.darwin-amd64.tar.gz $DEBUG_STD
+            fi
         else
             eval wget https://dl.google.com/go/${version}.linux-amd64.tar.gz $DEBUG_STD
             eval $SUDO tar -C /usr/local -xzf ${version}.linux-amd64.tar.gz $DEBUG_STD
@@ -301,48 +306,36 @@ done
 
 if [ "True" = "$IS_ARM" ]; then
     if [ "True" = "$RPI_3" ]; then
-        eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-armv7  $DEBUG_STD
         eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/latest/download/unimap-armv7 $DEBUG_STD
         eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz $DEBUG_STD
         eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
         eval $SUDO rm -rf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
-        eval $SUDO mv findomain-armv7 /usr/local/bin/findomain
         eval $SUDO mv unimap-armv7 /usr/local/bin/unimap
-    elif [ "True" = "$RPI_4" ]; then
-        eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-aarch64  $DEBUG_STD
+    elif [ "True" = "$RPI_4" ] || [ "True" = "$IS_MAC" ]; then
         eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/latest/download/unimap-aarch64 $DEBUG_STD
         eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz $DEBUG_STD
         eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
         eval $SUDO rm -rf ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
-        eval $SUDO mv findomain-aarch64 /usr/local/bin/findomain
         eval $SUDO mv unimap-aarch64 /usr/local/bin/unimap
     fi
 elif [ "True" = "$IS_MAC" ]; then
-    eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-osx  $DEBUG_STD
     eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/latest/download/unimap-osx $DEBUG_STD
     eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz $DEBUG_STD
     eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz  $DEBUG_STD
     eval $SUDO rm -rf ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz  $DEBUG_STD
-    eval $SUDO mv findomain-osx  /usr/local/bin/findomain
     eval $SUDO mv unimap-osx /usr/local/bin/unimap
-
 else
-    eval wget -N -c https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux $DEBUG_STD
     eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/download/0.4.0/unimap-linux $DEBUG_STD
     eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz $DEBUG_STD
     eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
     eval $SUDO rm -rf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
-    eval $SUDO mv findomain-linux /usr/local/bin/findomain
     eval $SUDO mv unimap-linux /usr/local/bin/unimap
 fi
-eval $SUDO chmod 755 /usr/local/bin/findomain
-eval $SUDO strip -s /usr/local/bin/findomain $DEBUG_STD
 eval $SUDO chmod 755 /usr/local/bin/unimap
 eval $SUDO strip -s /usr/local/bin/unimap $DEBUG_STD
 eval $SUDO chmod 755 /usr/local/bin/ppfuzz
 eval $SUDO strip -s /usr/local/bin/ppfuzz $DEBUG_STD
 eval $SUDO chmod +x $tools/uDork/uDork.sh
-eval subfinder $DEBUG_STD
 eval notify $DEBUG_STD
 
 printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
