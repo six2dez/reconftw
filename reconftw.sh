@@ -1745,7 +1745,7 @@ function isAsciiText {
 function output(){
 	mkdir -p $dir_output
 	cp -r $dir $dir_output
-	[[ "$dir" != "$dir_output" ]] && rm -rf "$dir"
+	[[ "$(dirname $dir)" != "$dir_output" ]] && rm -rf "$dir"
 }
 
 function remove_big_files(){
