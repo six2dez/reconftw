@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
-trap printout SIGINT
-trap printout ERR
-
-printout() {
-	printf "\n\n${bred}#######################################################################\n"
-	printf "Ctrl+C Detected , Skipping This Function"
-	printf "\n#######################################################################${reset}\n"
-}
+#trap printout SIGINT
+#trap printout ERR
+#
+#printout() {
+#	printf "\n\n${bred}#######################################################################\n"
+#	printf "Ctrl+C Detected , Skipping This Function"
+#	printf "\n#######################################################################${reset}\n"
+#}
 
 function banner(){
 	printf "\n${bgreen}"
@@ -355,7 +355,7 @@ function sub_passive(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBPASSIVE" = true ]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Passive Subdomain Enumeration"
 		if [ ! "$AXIOM" = true ]; then
-			amass enum -passive -d $domain -config $AMASS_CONFIG -json -o .tmp/amass_json.json 2>>"$LOGFILE" &>/dev/null
+			amass enum -passive -d $domain -config $AMASS_CONFIG -json .tmp/amass_json.json 2>>"$LOGFILE" &>/dev/null
 		else
 			axiom-scan $list -m amass -passive -json -o .tmp/amass_json.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 		fi
