@@ -55,7 +55,6 @@ function tools_installed(){
 	[ -n "$PATH" ] || { printf "${bred} [*] PATH var		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/uDork/uDork.sh" ] || { printf "${bred} [*] uDork		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/brutespray/brutespray.py" ] || { printf "${bred} [*] brutespray	[NO]${reset}\n"; allinstalled=false;}
-	[ -f "$tools/dnsrecon/dnsrecon.py" ] || { printf "${bred} [*] dnsrecon	[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/fav-up/favUp.py" ] || { printf "${bred} [*] fav-up		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/Corsy/corsy.py" ] || { printf "${bred} [*] Corsy		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/testssl.sh/testssl.sh" ] || { printf "${bred} [*] testssl		[NO]${reset}\n"; allinstalled=false;}
@@ -193,8 +192,6 @@ function emails(){
 		start_func ${FUNCNAME[0]} "Searching emails/users/passwords leaks"
 		emailfinder -d $domain 2>>"$LOGFILE" | anew -q .tmp/emailfinder.txt
 		[ -s ".tmp/emailfinder.txt" ] && cat .tmp/emailfinder.txt | awk 'matched; /^-----------------$/ { matched = 1 }' | anew -q osint/emails.txt
-		
-		theHarvester commented until they resolves multiple bugs
 		cd "$tools/theHarvester" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		python3 theHarvester.py -d $domain -b all -f $dir/.tmp/harvester.json >/dev/null
 		cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
@@ -227,7 +224,6 @@ function emails(){
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
-
 	fi
 }
 
@@ -479,8 +475,12 @@ function sub_scraping(){
 		touch .tmp/scrap_subs.txt
 		if [ -s "$dir/subdomains/subdomains.txt" ]; then
 			if [ ! "$AXIOM" = true ]; then
-				cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
-				[ -s ".tmp/probed_tmp_scrap.txt" ] && cat .tmp/probed_tmp_scrap.txt | httpx -tls-grab -tls-probe -csp-probe -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
+
+				cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info1.txt 2>>"$LOGFILE" &>/dev/null
+				[ -s ".tmp/web_full_info1.txt" ] && cat .tmp/web_full_info1.txt | jq -r '.url' 2>/dev/null | grep "$domain" | sed "s/*.//" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
+				[ -s ".tmp/probed_tmp_scrap.txt" ] && cat .tmp/probed_tmp_scrap.txt | httpx -tls-grab -tls-probe -csp-probe -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info2.txt 2>>"$LOGFILE" &>/dev/null
+				[ -s ".tmp/web_full_info2.txt" ] && cat .tmp/web_full_info2.txt | jq -r '."tls-grab"."dns_names"[],.csp.domains[],.url' 2>/dev/null | grep "$domain" | sed "s/*.//" | sort -u | httpx -silent | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
+
 				if [ "$DEEP" = true ]; then
 					[ -s ".tmp/probed_tmp_scrap.txt" ] && gospider -S .tmp/probed_tmp_scrap.txt --js -t $GOSPIDER_THREADS -d 3 --sitemap --robots -w -r > .tmp/gospider.txt
 				else
@@ -490,12 +490,14 @@ function sub_scraping(){
 				[ -s ".tmp/gospider.txt" ] && cat .tmp/gospider.txt | grep -aEo 'https?://[^ ]+' | sed 's/]$//' | unfurl -u domains 2>>"$LOGFILE" | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
 				[ -s ".tmp/scrap_subs.txt" ] && puredns resolve .tmp/scrap_subs.txt -w .tmp/scrap_subs_resolved.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT  --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" &>/dev/null
 				NUMOFLINES=$(cat .tmp/scrap_subs_resolved.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | tee .tmp/diff_scrap.txt | wc -l)
-				[ -s ".tmp/diff_scrap.txt" ] && cat .tmp/diff_scrap.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
+				[ -s ".tmp/diff_scrap.txt" ] && cat .tmp/diff_scrap.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info3.txt 2>>"$LOGFILE" &>/dev/null
+				[ -s ".tmp/web_full_info3.txt" ] && cat .tmp/web_full_info3.txt | jq -r '.url' 2>/dev/null | grep "$domain" | sed "s/*.//" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
+				cat .tmp/web_full_info1.txt .tmp/web_full_info2.txt .tmp/web_full_info3.txt 2>>"$LOGFILE" | jq -s '.' | jq 'unique_by(.input)' | jq '.[]' 2>>"$LOGFILE" > .tmp/web_full_info.txt
 			else
-				axiom-scan subdomains/subdomains.txt -m httpx -follow-host-redirects -H \"${HEADER}\" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -o .tmp/probed_tmp_scrap1.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-				[ -s ".tmp/probed_tmp_scrap1.txt" ] && cat .tmp/probed_tmp_scrap1.txt | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
-				axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -tls-grab -tls-probe -csp-probe -H \"${HEADER}\" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -o .tmp/probed_tmp_scrap2.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-				[ -s ".tmp/probed_tmp_scrap2.txt" ] && cat .tmp/probed_tmp_scrap2.txt | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | grep ".$domain$" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
+				axiom-scan subdomains/subdomains.txt -m httpx -follow-host-redirects -H \"${HEADER}\" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info1.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+				[ -s ".tmp/web_full_info1.txt" ] && cat .tmp/web_full_info1.txt | jq -r '.url' 2>/dev/null | grep "$domain" | sed "s/*.//" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
+				[ -s ".tmp/probed_tmp_scrap.txt" ] && axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -tls-grab -tls-probe -csp-probe -H \"${HEADER}\" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info2.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+				[ -s ".tmp/web_full_info2.txt" ] && cat .tmp/web_full_info2.txt | jq -r '."tls-grab"."dns_names"[],.csp.domains[],.url' 2>/dev/null | grep "$domain" | sed "s/*.//" | sort -u | httpx -silent | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
 				if [ "$DEEP" = true ]; then
 					[ -s ".tmp/probed_tmp_scrap.txt" ] && axiom-scan .tmp/probed_tmp_scrap.txt -m gospider --js -d 3 --sitemap --robots -w -r -o .tmp/gospider $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 				else
@@ -505,11 +507,12 @@ function sub_scraping(){
 				touch .tmp/gospider.txt
 				[[ -d .tmp/gospider/ ]] && NUMFILES=$(find .tmp/gospider/ -type f | wc -l)
 				[[ $NUMFILES -gt 0 ]] && find .tmp/gospider/ -type f -exec cat {} + | sed '/^.\{2048\}./d' | anew -q .tmp/gospider.txt
-				grep -aEo 'https?://[^ ]+' .tmp/gospider.txt | sed 's/]$//' | unfurl -u domains 2>>"$LOGFILE" | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
+				[ -s ".tmp/gospider.txt" ] && cat .tmp/gospider.txt | grep -aEo 'https?://[^ ]+' | sed 's/]$//' | unfurl -u domains 2>>"$LOGFILE" | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
 				[ -s ".tmp/scrap_subs.txt" ] && axiom-scan .tmp/scrap_subs.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/scrap_subs_resolved.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 				NUMOFLINES=$(cat .tmp/scrap_subs_resolved.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | tee .tmp/diff_scrap.txt | wc -l)
-				axiom-scan .tmp/diff_scrap.txt -m httpx -follow-host-redirects -H \"${HEADER}\" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -o .tmp/probed_tmp_scrap4.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-				[ -s ".tmp/probed_tmp_scrap4.txt" ] && cat .tmp/probed_tmp_scrap4.txt | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp_scrap.txt
+				[ -s ".tmp/diff_scrap.txt" ] && axiom-scan .tmp/diff_scrap.txt -m httpx -follow-host-redirects -H \"${HEADER}\" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info3.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+				[ -s ".tmp/web_full_info3.txt" ] && cat .tmp/web_full_info3.txt | jq -r '.url' 2>/dev/null | grep "$domain" | sed "s/*.//" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
+				cat .tmp/web_full_info1.txt .tmp/web_full_info2.txt .tmp/web_full_info3.txt 2>>"$LOGFILE" | jq -s '.' | jq 'unique_by(.input)' | jq '.[]' 2>>"$LOGFILE" > .tmp/web_full_info.txt
 			fi
 			end_subfunc "${NUMOFLINES} new subs (code scraping)" ${FUNCNAME[0]}
 		else
@@ -752,42 +755,22 @@ function s3buckets(){
 function webprobe_simple(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$WEBPROBESIMPLE" = true ]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Http probing $domain"
-		if [ -s ".tmp/probed_tmp_scrap.txt" ]; then
-			mv .tmp/probed_tmp_scrap.txt .tmp/probed_tmp.txt
+		if [ ! "$AXIOM" = true ]; then
+			cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info_probe.txt 2>>"$LOGFILE" &>/dev/null
 		else
-			if [ ! "$AXIOM" = true ]; then
-				if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then 
-					cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | anew -q .tmp/probed_tmp.txt
-				else
-					cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | grep "$domain$" | anew -q .tmp/probed_tmp.txt
-				fi
-			else
-				axiom-scan subdomains/subdomains.txt -m httpx -H \"${HEADER}\" -follow-host-redirects -random-agent -threads $HTTPX_THREADS -status-code -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -o .tmp/probed_tmp_.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-				if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then 
-					[ -s ".tmp/probed_tmp_.txt" ] && cat .tmp/probed_tmp_.txt | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_tmp.txt
-				else
-					[ -s ".tmp/probed_tmp_.txt" ] && cat .tmp/probed_tmp_.txt | anew .tmp/web_full_info.txt | cut -d ' ' -f1 | anew -q .tmp/probed_tmp.txt
-				fi
-			fi
+			axiom-scan subdomains/subdomains.txt -m httpx -H \"${HEADER}\" -follow-host-redirects -random-agent -threads $HTTPX_THREADS -status-code -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info_probe.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 		fi
-		if [ -s ".tmp/probed_tmp.txt" ]; then
-			if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then 
-				cat .tmp/web_full_info.txt | anew -q webs/web_full_info.txt
-			else
-				cat .tmp/web_full_info.txt | grep "$domain" | anew -q webs/web_full_info.txt
-			fi
-			deleteOutScoped $outOfScope_file .tmp/probed_tmp.txt
-			NUMOFLINES=$(cat .tmp/probed_tmp.txt 2>>"$LOGFILE" | anew webs/webs.txt | wc -l)
-			end_subfunc "${NUMOFLINES} new websites resolved" ${FUNCNAME[0]}
-			if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/webs.txt| wc -l) -le $DEEP_LIMIT2 ]]; then
-				notification "Sending websites to proxy" info
-				ffuf -mc all -fc 404 -w webs/webs.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" &>/dev/null
-			fi
-			if [ "$BBRF_CONNECTION" = true ]; then
-				[ -s "webs/webs.txt" ] && cat webs/webs.txt | bbrf url add - 2>>"$LOGFILE" &>/dev/null
-			fi
-		else
-			end_subfunc "No new websites to probe" ${FUNCNAME[0]}
+		cat .tmp/web_full_info.txt .tmp/web_full_info_probe.txt webs/web_full_info.txt 2>>"$LOGFILE" | jq -s '.' | jq 'unique_by(.input)' | jq '.[]' 2>>"$LOGFILE" > webs/web_full_info.txt
+		cat webs/web_full_info.txt | jq -r '.url' 2>/dev/null | grep "$domain" | sed "s/*.//" | anew -q .tmp/probed_tmp.txt
+		deleteOutScoped $outOfScope_file .tmp/probed_tmp.txt
+		NUMOFLINES=$(cat .tmp/probed_tmp.txt 2>>"$LOGFILE" | anew webs/webs.txt | wc -l)
+		end_subfunc "${NUMOFLINES} new websites resolved" ${FUNCNAME[0]}
+		if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/webs.txt| wc -l) -le $DEEP_LIMIT2 ]]; then
+			notification "Sending websites to proxy" info
+			ffuf -mc all -fc 404 -w webs/webs.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" &>/dev/null
+		fi
+		if [ "$BBRF_CONNECTION" = true ]; then
+			[ -s "webs/webs.txt" ] && cat webs/webs.txt | bbrf url add - 2>>"$LOGFILE" &>/dev/null
 		fi
 	else
 		if [ "$WEBPROBESIMPLE" = false ]; then
@@ -815,20 +798,13 @@ function webprobe_full(){
 		fi
 		if [ ! "$AXIOM" = true ]; then
 			if [ -s ".tmp/nmap_uncommonweb.txt" ]; then
-				if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then 
-					cat .tmp/nmap_uncommonweb.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout $HTTPX_UNCOMMONPORTS_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color | anew .tmp/web_full_info_uncommon.txt | cut -d ' ' -f1 | anew -q .tmp/probed_uncommon_ports_tmp.txt
-				else
-					cat .tmp/nmap_uncommonweb.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout $HTTPX_UNCOMMONPORTS_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color | anew .tmp/web_full_info_uncommon.txt | cut -d ' ' -f1 | grep "$domain" | anew -q .tmp/probed_uncommon_ports_tmp.txt
-				fi
+				cat .tmp/nmap_uncommonweb.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout $HTTPX_UNCOMMONPORTS_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info_uncommon.txt 2>>"$LOGFILE" &>/dev/null
+				[ -s ".tmp/web_full_info_uncommon.txt" ] && cat .tmp/web_full_info_uncommon.txt | jq -r '.url' 2>/dev/null | grep "$domain" | sed "s/*.//" | anew -q .tmp/probed_uncommon_ports_tmp.txt
 			fi
 		else
 			if [ -s ".tmp/nmap_uncommonweb.txt" ]; then
-				axiom-scan .tmp/nmap_uncommonweb.txt -m httpx -follow-host-redirects -H \"${HEADER}\" -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout $HTTPX_UNCOMMONPORTS_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -o .tmp/probed_uncommon_ports_tmp_.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-				if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then 
-					[ -s ".tmp/probed_uncommon_ports_tmp_.txt" ] && cat .tmp/probed_uncommon_ports_tmp_.txt | anew .tmp/web_full_info_uncommon.txt | cut -d ' ' -f1 | anew -q .tmp/probed_uncommon_ports_tmp.txt
-				else
-					[ -s ".tmp/probed_uncommon_ports_tmp_.txt" ] && cat .tmp/probed_uncommon_ports_tmp_.txt | anew .tmp/web_full_info_uncommon.txt | cut -d ' ' -f1 | grep ".$domain$" | anew -q .tmp/probed_uncommon_ports_tmp.txt
-				fi
+				axiom-scan .tmp/nmap_uncommonweb.txt -m httpx -follow-host-redirects -H \"${HEADER}\" -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout $HTTPX_UNCOMMONPORTS_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info_uncommon.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+				[ -s ".tmp/web_full_info_uncommon.txt" ] && cat .tmp/web_full_info_uncommon.txt | jq -r '.url' 2>/dev/null | grep "$domain" | sed "s/*.//" | anew -q .tmp/probed_uncommon_ports_tmp.txt
 			fi
 		fi
 		if [ -s ".tmp/web_full_info_uncommon.txt" ]; then
@@ -885,12 +861,11 @@ function virtualhosts(){
 		start_func ${FUNCNAME[0]} "Virtual Hosts dicovery"
 		cat webs/webs.txt webs/webs_uncommon_ports.txt 2>>"$LOGFILE" | anew -q .tmp/websites.txt
 		if [ -s ".tmp/websites.txt" ]; then
-			mkdir -p $dir/virtualhosts
-			interlace -tL .tmp/websites.txt -threads ${INTERLACE_THREADS} -c "ffuf -ac -t ${FFUF_THREADS}  -H \"${HEADER}\" -H \"Host: FUZZ._cleantarget_\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u  _target_ -of csv -o _output_/_cleantarget_.csv" -o virtualhosts 2>>"$LOGFILE" &>/dev/null
+			mkdir -p $dir/virtualhosts $dir/.tmp/virtualhosts
+			interlace -tL .tmp/websites.txt -threads ${INTERLACE_THREADS} -c "ffuf -ac -t ${FFUF_THREADS}  -H \"${HEADER}\" -H \"Host: FUZZ._cleantarget_\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u  _target_ -of json -o _output_/_cleantarget_.json" -o $dir/.tmp/virtualhosts 2>>"$LOGFILE" &>/dev/null
 			for sub in $(cat .tmp/websites.txt); do
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-				[ -s "$dir/virtualhosts/${sub_out}.csv" ] && cat $dir/virtualhosts/${sub_out}.csv | cut -d ',' -f2,5,6 | tr ',' ' ' | awk '{ print $2 " " $3 " " $1}' | tail -n +2 | sort -k1 | anew -q $dir/virtualhosts/${sub_out}.txt
-				rm -f $dir/virtualhosts/${sub_out}.csv 2>>"$LOGFILE"
+				[ -s "$dir/.tmp/virtualhosts/${sub_out}.json" ] && cat $dir/.tmp/virtualhosts/${sub_out}.json | jq -r '.results[] | "\(.status) \(.length) \(.url)"' | sort | anew -q $dir/virtualhosts/${sub_out}.txt
 			done
 			find $dir/virtualhosts/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | anew -q $dir/virtualhosts/virtualhosts_full.txt
 			end_func "Results are saved in $domain/virtualhosts/*subdomain*.txt" ${FUNCNAME[0]}
@@ -939,7 +914,7 @@ function portscan(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$PORTSCANNER" = true ]; then
 		start_func ${FUNCNAME[0]} "Port scan"
 		if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
-			[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json jq -r '. | "\(.host) \(.a[0])"' | anew -q .tmp/subs_ips.txt
+			[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r '. | "\(.host) \(.a[0])"' | anew -q .tmp/subs_ips.txt
 			[ -s ".tmp/subs_ips.txt" ] && awk '{ print $2 " " $1}' .tmp/subs_ips.txt | sort -k2 -n | anew -q hosts/subs_ips_vhosts.txt
 			[ -s "hosts/subs_ips_vhosts.txt" ] && cat hosts/subs_ips_vhosts.txt | cut -d ' ' -f1 | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
 		else echo $domain | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
@@ -1089,25 +1064,23 @@ function fuzz(){
 		start_func ${FUNCNAME[0]} "Web directory fuzzing"
 		cat webs/webs.txt webs/webs_uncommon_ports.txt 2>>"$LOGFILE" | anew -q .tmp/websites.txt
 		if [ -s ".tmp/websites.txt" ]; then
-			mkdir -p $dir/fuzzing
+			mkdir -p $dir/fuzzing $dir/.tmp/fuzzing
 			if [ ! "$AXIOM" = true ]; then
-				interlace -tL .tmp/websites.txt -threads ${INTERLACE_THREADS} -c "ffuf ${FFUF_FLAGS} -t ${FFUF_THREADS}  -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u  _target_/FUZZ -of csv -o _output_/_cleantarget_.csv" -o fuzzing 2>>"$LOGFILE" &>/dev/null
+				interlace -tL .tmp/websites.txt -threads ${INTERLACE_THREADS} -c "ffuf ${FFUF_FLAGS} -t ${FFUF_THREADS}  -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u  _target_/FUZZ -of json -o _output_/_cleantarget_.json" -o $dir/.tmp/fuzzing 2>>"$LOGFILE" &>/dev/null
 				for sub in $(cat .tmp/websites.txt); do
 					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-					[ -s "$dir/fuzzing/${sub_out}.csv" ] && cat $dir/fuzzing/${sub_out}.csv | cut -d ',' -f2,5,6 | tr ',' ' ' | awk '{ print $2 " " $3 " " $1}' | tail -n +2 | sort -k1 | anew -q $dir/fuzzing/${sub_out}.txt
-					rm -f $dir/fuzzing/${sub_out}.csv 2>>"$LOGFILE"
+					[ -s "$dir/.tmp/fuzzing/${sub_out}.json" ] && cat $dir/.tmp/fuzzing/${sub_out}.json | jq -r '.results[] | "\(.status) \(.length) \(.url)"' | sort | anew -q $dir/fuzzing/${sub_out}.txt
 				done
 				find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | anew -q $dir/fuzzing/fuzzing_full.txt
 			else
 				axiom-exec 'wget -O /home/op/lists/fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt' &>/dev/null
-				axiom-scan webs/webs.txt -m ffuf -w /home/op/lists/fuzz_wordlist.txt -H \"${HEADER}\" $FFUF_FLAGS -maxtime $FFUF_MAXTIME -o $dir/fuzzing/ffuf-content.csv $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-				grep -v "FUZZ,url,redirectlocation" $dir/fuzzing/ffuf-content.csv | awk -F "," '{print $2" "$5" "$6}' | sort > $dir/fuzzing/ffuf-content.tmp
+				axiom-scan webs/webs.txt -m ffuf -w /home/op/lists/fuzz_wordlist.txt -H \"${HEADER}\" $FFUF_FLAGS -maxtime $FFUF_MAXTIME -of json -o $dir/.tmp/fuzzing/ffuf-content.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+				[ -s "$dir/.tmp/fuzzing/ffuf-content.json" ] && $dir/.tmp/fuzzing/ffuf-content.json | jq -r '.results[] | "\(.status) \(.length) \(.url)"' | sort | $dir/.tmp/fuzzing/ffuf-content.tmp
 				for sub in $(cat webs/webs.txt); do
 					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-					grep "$sub" $dir/fuzzing/ffuf-content.tmp | awk '{print $2" "$3" "$1}' | sort -k1 | anew -q $dir/fuzzing/${sub_out}.txt
+					grep "$sub" $dir/.tmp/fuzzing/ffuf-content.tmp | anew -q $dir/fuzzing/${sub_out}.txt
 				done
 				find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | anew -q $dir/fuzzing/fuzzing_full.txt
-				rm -f $dir/fuzzing/ffuf-content.tmp $dir/fuzzing/ffuf-content.csv
 			fi
 			end_func "Results are saved in $domain/fuzzing/*subdomain*.txt" ${FUNCNAME[0]}
 		else
@@ -1177,7 +1150,7 @@ function urlchecks(){
 						gospider -S webs/webs.txt --js -t $GOSPIDER_THREADS -d 2 --sitemap --robots -w -r > .tmp/gospider.txt
 					fi
 				fi
-				sed -i '/^.\{2048\}./d' .tmp/gospider.txt
+				[ -s ".tmp/gospider.txt" ] && sed -i '/^.\{2048\}./d' .tmp/gospider.txt
 				[ -s ".tmp/gospider.txt" ] && cat .tmp/gospider.txt | grep -aEo 'https?://[^ ]+' | sed 's/]$//' | grep "$domain" | anew -q .tmp/url_extract_tmp.txt
 			else
 				axiom-scan webs/webs.txt -m waybackurls -o .tmp/url_extract_way_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
