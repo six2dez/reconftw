@@ -46,6 +46,7 @@ function tools_installed(){
 	[ -n "$PATH" ] || { printf "${bred} [*] PATH var		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/degoogle_hunter/degoogle.py" ] || { printf "${bred} [*] degoogle [NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/brutespray/brutespray.py" ] || { printf "${bred} [*] brutespray	[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/theHarvester/theHarvester.py" ] || { printf "${bred} [*] theHarvester	[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/fav-up/favUp.py" ] || { printf "${bred} [*] fav-up		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/Corsy/corsy.py" ] || { printf "${bred} [*] Corsy		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/testssl.sh/testssl.sh" ] || { printf "${bred} [*] testssl		[NO]${reset}\n"; allinstalled=false;}

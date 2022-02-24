@@ -36,6 +36,7 @@ slowapi                 # theHarvester
 starlette               # theHarvester
 termcolor               # gitDorker
 tqdm                    # multiple
+ujson                   # theHarvester
 urllib3                 # multiple
 uro                     # Tool
 uvicorn                 # theHarvester
