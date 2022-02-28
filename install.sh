@@ -71,7 +71,7 @@ gotools["roboxtractor"]="go get -u -v github.com/Josue87/roboxtractor"
 gotools["mapcidr"]="GO111MODULE=on go get -v github.com/projectdiscovery/mapcidr/cmd/mapcidr"
 gotools["clouddetect"]="go get github.com/99designs/clouddetect/cli/clouddetect"
 gotools["dnstake"]="go install github.com/pwnesia/dnstake/cmd/dnstake@latest"
-gotools["gowitness"]="go get -u github.com/sensepost/gowitness"
+gotools["gowitness"]="GO111MODULE=on go get -u github.com/sensepost/gowitness"
 gotools["cero"]="go get -u github.com/glebarez/cero"
 
 declare -A repos
