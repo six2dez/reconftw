@@ -122,6 +122,7 @@ install_apt(){
     eval $SUDO systemctl enable tor $DEBUG_STD
     eval wget https://gitlab.com/api/v4/projects/33695681/packages/generic/nrich/latest/nrich_latest_amd64.deb $DEBUG_STD
     eval $SUDO dpkg -i nrich_latest_amd64.deb $DEBUG_STD
+    eval $SUDO rm -rf nrich_latest_amd64.deb  $DEBUG_STD
 }
 
 install_brew(){
@@ -409,15 +410,26 @@ fi
 
 printf "${bblue} Running: Performing last configurations ${reset}\n\n"
 ## Last steps
-if [ ! -s "resolvers.txt" ] || [ $(find "resolvers.txt" -mtime +1 -print) ]; then
-    printf "${yellow} Resolvers seem older than 1 day\n Generating custom resolvers... ${reset}\n\n"
-    eval rm -f resolvers.txt &>/dev/null
-    eval dnsvalidator -tL https://public-dns.info/nameservers.txt -threads $DNSVALIDATOR_THREADS -o resolvers.txt $DEBUG_STD
-	eval dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads $DNSVALIDATOR_THREADS -o tmp_resolvers $DEBUG_STD
-	eval cat tmp_resolvers $DEBUG_ERROR | anew -q resolvers.txt
-	eval rm -f tmp_resolvers $DEBUG_STD
-    [ ! -s "$resolvers" ] && wget -O $resolvers https://raw.githubusercontent.com/proabiral/Fresh-Resolvers/master/resolvers.txt &>/dev/null
+if [ "$generate_resolvers" = true ]; then
+	if [[ $(find "$resolvers" -mtime +1 -print) ]] || [ ! -s "$resolvers" ] ; then
+		 ${reset}\n\n"Checking resolvers lists...\n Accurate resolvers are the key to great results\n This may take around 10 minutes if it's not updated ${reset}\n\n"
+		eval rm -f $resolvers 2>>"$LOGFILE"
+		dnsvalidator -tL https://public-dns.info/nameservers.txt -threads $DNSVALIDATOR_THREADS -o $resolvers &>/dev/null
+		dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads $DNSVALIDATOR_THREADS -o tmp_resolvers &>/dev/null
+		[ -s "tmp_resolvers" ] && cat tmp_resolvers | anew -q $resolvers
+		[ -s "tmp_resolvers" ] && rm -f tmp_resolvers &>/dev/null
+		[ ! -s "$resolvers" ] && wget -q https://raw.githubusercontent.com/BonJarber/fresh-resolvers/main/resolvers.txt -O $resolvers &>/dev/null
+		printf "${yellow} Resolvers updated\n ${reset}\n\n"
+	fi
+	generate_resolvers=false
+else
+	[ ! -s "resolvers.txt" ] || if [[ $(find "$resolvers" -mtime +1 -print) ]] || [ ! -s "$resolvers" ] ; then
+		 ${reset}\n\n"Checking resolvers lists...\n Accurate resolvers are the key to great results\n Downloading new resolvers ${reset}\n\n"
+		wget -q https://raw.githubusercontent.com/BonJarber/fresh-resolvers/main/resolvers.txt -O $resolvers &>/dev/null
+		printf "${yellow} Resolvers updated\n ${reset}\n\n"
+	fi
 fi
+
 eval h8mail -g $DEBUG_STD
 
 ## Stripping all Go binaries
