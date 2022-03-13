@@ -411,7 +411,7 @@ fi
 printf "${bblue} Running: Performing last configurations ${reset}\n\n"
 ## Last steps
 if [ "$generate_resolvers" = true ]; then
-	if [[ $(find "$resolvers" -mtime +1 -print) ]] || [ ! -s "$resolvers" ] ; then
+	if [ ! -s "$resolvers" ] || [[ $(find "$resolvers" -mtime +1 -print) ]] ; then
 		 ${reset}\n\n"Checking resolvers lists...\n Accurate resolvers are the key to great results\n This may take around 10 minutes if it's not updated ${reset}\n\n"
 		eval rm -f $resolvers 2>>"$LOGFILE"
 		dnsvalidator -tL https://public-dns.info/nameservers.txt -threads $DNSVALIDATOR_THREADS -o $resolvers &>/dev/null
@@ -423,7 +423,7 @@ if [ "$generate_resolvers" = true ]; then
 	fi
 	generate_resolvers=false
 else
-	[ ! -s "resolvers.txt" ] || if [[ $(find "$resolvers" -mtime +1 -print) ]] || [ ! -s "$resolvers" ] ; then
+	[ ! -s "$resolvers" ] || if [[ $(find "$resolvers" -mtime +1 -print) ]] ; then
 		 ${reset}\n\n"Checking resolvers lists...\n Accurate resolvers are the key to great results\n Downloading new resolvers ${reset}\n\n"
 		wget -q https://raw.githubusercontent.com/BonJarber/fresh-resolvers/main/resolvers.txt -O $resolvers &>/dev/null
 		printf "${yellow} Resolvers updated\n ${reset}\n\n"

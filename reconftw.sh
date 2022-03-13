@@ -1815,7 +1815,7 @@ function end_subfunc(){
 function resolvers_update(){
 	if [ "$generate_resolvers" = true ]; then
 		if [ ! "$AXIOM" = true ]; then	
-			if [[ $(find "$resolvers" -mtime +1 -print) ]] || [ ! -s "$resolvers" ] ; then
+			if [ ! -s "$resolvers" ] || [[ $(find "$resolvers" -mtime +1 -print) ]] ; then
 				notification "Resolvers seem older than 1 day\n Generating custom resolvers..." warn
 				eval rm -f $resolvers 2>>"$LOGFILE"
 				dnsvalidator -tL https://public-dns.info/nameservers.txt -threads $DNSVALIDATOR_THREADS -o $resolvers &>/dev/null
@@ -1835,13 +1835,12 @@ function resolvers_update(){
 		fi
 		generate_resolvers=false
 	else
-		if [[ $(find "$resolvers" -mtime +1 -print) ]] || [ ! -s "$resolvers" ] ; then
+		if  [ ! -s "$resolvers" ] || [[ $(find "$resolvers" -mtime +1 -print) ]] ; then
 			notification "Resolvers seem older than 1 day\n Downloading new resolvers..." warn
 			wget -q https://raw.githubusercontent.com/BonJarber/fresh-resolvers/main/resolvers.txt -O $resolvers &>/dev/null
 			notification "Resolvers updated\n" good
 		fi
 	fi
-
 }
 
 function ipcidr_target(){
