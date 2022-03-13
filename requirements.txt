@@ -31,7 +31,6 @@ requests_futures        # cloud_enums
 retrying                # theHarvester
 s3scanner               # Tool
 setuptools              # theHarvester
-shodan                  # Tool
 slowapi                 # theHarvester
 starlette               # theHarvester
 termcolor               # gitDorker
