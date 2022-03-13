@@ -1,42 +1,41 @@
-jsbeautifier
-mmh3
-ipwhois
-fake-useragent
-colorclass==2.2.0
-tqdm
-termcolor
-argparse
-future
-metafinder
-netaddr
-requests
-lxml
-PySocks==1.6.8
-h8mail
-argcomplete==1.10.0
-s3scanner
-shodan
-dnspython
-emailfinder
-requests_futures
-bbrf
-uro
-bs4
-urllib3
-aiodns
-aiofiles
-aiohttp
-aiomultiprocess
-aiosqlite
-beautifulsoup4
-censys
-certifi
-fastapi
-orjson
-pyppeteer
-PyYAML
-retrying
-setuptools
-slowapi
-starlette
-uvicorn
+aiodns                  # theHarvester
+aiofiles                # theHarvester
+aiohttp                 # theHarvester
+aiomultiprocess         # theHarvester
+aiosqlite               # theHarvester
+argcomplete             # brutespray
+argparse                # multiple
+bbrf                    # multiple
+beautifulsoup4          # multiple
+bs4                     # multiple
+censys                  # theHarvester
+certifi                 # theHarvester
+colorclass              # interlace
+dnspython               # ip2provider
+emailfinder             # Tool
+fake-useragent          # fav-up
+fastapi                 # theHarvester
+future                  # multiple
+h8mail                  # Tool
+ipwhois                 # fav-up
+jsbeautifier            # Linkfinder
+metafinder              # Tool
+mmh3                    # fav-up
+netaddr                 # dnsvalidator
+orjson                  # theHarvester
+pyppeteer               # theHarvester
+PySocks                 # pwndb
+PyYAML                  # theHarvester
+requests                # multiple
+requests_futures        # cloud_enums
+retrying                # theHarvester
+s3scanner               # Tool
+setuptools              # theHarvester
+slowapi                 # theHarvester
+starlette               # theHarvester
+termcolor               # gitDorker
+tqdm                    # multiple
+ujson                   # theHarvester
+urllib3                 # multiple
+uro                     # Tool
+uvicorn                 # theHarvester

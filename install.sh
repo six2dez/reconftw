@@ -42,44 +42,42 @@ if [ ${BASH_VERSION} -lt 4 ]; then
 fi
 
 declare -A gotools
-gotools["gf"]="go get -u -v github.com/tomnomnom/gf"
-gotools["qsreplace"]="go get -u -v github.com/tomnomnom/qsreplace"
-gotools["Amass"]="GO111MODULE=on go get -v github.com/OWASP/Amass/v3/..."
-gotools["ffuf"]="go get -u github.com/ffuf/ffuf"
-gotools["github-subdomains"]="go get -u github.com/gwen001/github-subdomains"
-gotools["cf-check"]="go get -u -v github.com/dwisiswant0/cf-check"
-gotools["waybackurls"]="go get -u -v github.com/tomnomnom/hacks/waybackurls"
-gotools["nuclei"]="GO111MODULE=on go get -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei"
-gotools["anew"]="go get -u -v github.com/tomnomnom/anew"
-gotools["notify"]="GO111MODULE=on go get -v github.com/projectdiscovery/notify/cmd/notify"
-gotools["unfurl"]="go get -u -v github.com/tomnomnom/unfurl"
-gotools["httpx"]="GO111MODULE=on go get -v github.com/projectdiscovery/httpx/cmd/httpx"
-gotools["github-endpoints"]="go get -u github.com/gwen001/github-endpoints"
-gotools["dnsx"]="GO111MODULE=on go get -v github.com/projectdiscovery/dnsx/cmd/dnsx"
-gotools["gau"]="go install github.com/lc/gau/v2/cmd/gau@latest"
-gotools["subjs"]="GO111MODULE=on go get -v github.com/lc/subjs"
-gotools["Gxss"]="go get -u -v github.com/KathanP19/Gxss"
-gotools["gospider"]="GO111MODULE=on go get -u github.com/jaeles-project/gospider"
-gotools["crlfuzz"]="GO111MODULE=on go get -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz"
-gotools["dalfox"]="GO111MODULE=on go get -v github.com/hahwul/dalfox/v2"
-gotools["puredns"]="GO111MODULE=on go get -v github.com/d3mondev/puredns/v2"
-gotools["resolveDomains"]="go get -u -v github.com/Josue87/resolveDomains"
+gotools["gf"]="go install -v github.com/tomnomnom/gf@latest"
+gotools["qsreplace"]="go install -v github.com/tomnomnom/qsreplace@latest"
+gotools["Amass"]="go install -v github.com/OWASP/Amass/v3/...@master"
+gotools["ffuf"]="go install -v github.com/ffuf/ffuf@latest"
+gotools["github-subdomains"]="go install -v github.com/gwen001/github-subdomains@latest"
+gotools["cf-check"]="go install -v github.com/dwisiswant0/cf-check@latest"
+gotools["waybackurls"]="go install -v github.com/tomnomnom/waybackurls@latest"
+gotools["nuclei"]="go install -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest"
+gotools["anew"]="go install -v github.com/tomnomnom/anew@latest"
+gotools["notify"]="go install -v github.com/projectdiscovery/notify/cmd/notify@latest"
+gotools["unfurl"]="go install -v github.com/tomnomnom/unfurl@latest"
+gotools["httpx"]="go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest"
+gotools["github-endpoints"]="go install -v github.com/gwen001/github-endpoints@latest"
+gotools["dnsx"]="go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest"
+gotools["gau"]="go install -v github.com/lc/gau/v2/cmd/gau@latest"
+gotools["subjs"]="go install -v github.com/lc/subjs@latest"
+gotools["Gxss"]="go install -v github.com/KathanP19/Gxss@latest"
+gotools["gospider"]="go install -v github.com/jaeles-project/gospider@latest"
+gotools["crlfuzz"]="go install -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest"
+gotools["dalfox"]="go install -v github.com/hahwul/dalfox/v2@latest"
+gotools["puredns"]="go install -v github.com/d3mondev/puredns/v2@latest"
 gotools["interactsh-client"]="go install -v github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest"
-gotools["analyticsrelationships"]="go get -u -v github.com/Josue87/analyticsrelationships"
-gotools["gotator"]="go get -u -v github.com/Josue87/gotator"
-gotools["roboxtractor"]="go get -u -v github.com/Josue87/roboxtractor"
-gotools["mapcidr"]="GO111MODULE=on go get -v github.com/projectdiscovery/mapcidr/cmd/mapcidr"
-gotools["clouddetect"]="go get github.com/99designs/clouddetect/cli/clouddetect"
-gotools["dnstake"]="go install github.com/pwnesia/dnstake/cmd/dnstake@latest"
-gotools["gowitness"]="go get -u github.com/sensepost/gowitness"
-gotools["cero"]="go get -u github.com/glebarez/cero"
+gotools["analyticsrelationships"]="go install -v github.com/Josue87/analyticsrelationships@latest"
+gotools["gotator"]="go install -v github.com/Josue87/gotator@latest"
+gotools["roboxtractor"]="go install -v github.com/Josue87/roboxtractor@latest"
+gotools["mapcidr"]="go install -v github.com/projectdiscovery/mapcidr/cmd/mapcidr@latest"
+gotools["clouddetect"]="go install -v github.com/99designs/clouddetect/cli/clouddetect@latest"
+gotools["dnstake"]="go install -v github.com/pwnesia/dnstake/cmd/dnstake@latest"
+gotools["gowitness"]="go install -v github.com/sensepost/gowitness@latest"
+gotools["cero"]="go install -v github.com/glebarez/cero@latest"
 
 declare -A repos
-repos["uDork"]="m3n0sd0n4ld/uDork"
+repos["degoogle_hunter"]="six2dez/degoogle_hunter"
 repos["pwndb"]="davidtavarez/pwndb"
 repos["dnsvalidator"]="vortexau/dnsvalidator"
-repos["dnsrecon"]="darkoperator/dnsrecon"
-#repos["theHarvester"]="laramies/theHarvester"
+repos["theHarvester"]="laramies/theHarvester"
 repos["brutespray"]="x90skysn3k/brutespray"
 repos["wafw00f"]="EnableSecurity/wafw00f"
 repos["gf"]="tomnomnom/gf"
@@ -120,8 +118,11 @@ install_apt(){
     eval $SUDO apt update -y $DEBUG_STD
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium-browser -y $DEBUG_STD
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium -y $DEBUG_STD
-    eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip build-essential gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb libxml2-utils libdata-hexdump-perl -y $DEBUG_STD
+    eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip build-essential gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb libxml2-utils procps bsdmainutils libdata-hexdump-perl -y $DEBUG_STD
     eval $SUDO systemctl enable tor $DEBUG_STD
+    eval wget https://gitlab.com/api/v4/projects/33695681/packages/generic/nrich/latest/nrich_latest_amd64.deb $DEBUG_STD
+    eval $SUDO dpkg -i nrich_latest_amd64.deb $DEBUG_STD
+    eval $SUDO rm -rf nrich_latest_amd64.deb  $DEBUG_STD
 }
 
 install_brew(){
@@ -134,11 +135,15 @@ install_brew(){
     eval brew install --cask chromium $DEBUG_STD
     eval brew install bash coreutils python massdns jq gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb libxml2-utils libdata-hexdump-perl $DEBUG_STD
     eval brew services start tor $DEBUG_STD
+    eval wget  https://gitlab.com/api/v4/projects/33695681/packages/generic/nrich/latest/nrich_latest_darwin $DEBUG_STD
+    eval $SUDO sudo installer -pkg nrich_latest_darwin -target / $DEBUG_STD
 }
 
 install_yum(){
     eval $SUDO yum groupinstall "Development Tools" -y $DEBUG_STD
     eval $SUDO yum install python3 python3-pip gcc cmake ruby git curl libpcap-dev wget zip python3-devel pv bind-utils libopenssl-devel libffi-devel libxml2-devel libxslt-devel zlib-devel nmap jq lynx tor medusa xorg-x11-server-xvfb -y $DEBUG_STD
+    eval wget https://gitlab.com/api/v4/projects/33695681/packages/generic/nrich/latest/nrich_latest_amd64.rpm $DEBUG_STD
+    eval $SUDO yum localinstall nrich_latest_amd64.rpm -y $DEBUG_STD
 }
 
 install_pacman(){
@@ -289,7 +294,7 @@ for repo in "${!repos[@]}"; do
         eval $SUDO pip3 install . $DEBUG_STD
     fi
     if [ -s "requirements.txt" ]; then
-        eval $SUDO pip3 install -r requirements.txt $DEBUG_STD
+        #eval $SUDO pip3 install -r requirements.txt $DEBUG_STD
         eval $SUDO python3 setup.py install --record files.txt $DEBUG_STD
         [ -s "files.txt" ] && eval xargs rm -rf < files.txt $DEBUG_STD
         eval $SUDO pip3 install . $DEBUG_STD
@@ -335,7 +340,7 @@ eval $SUDO chmod 755 /usr/local/bin/unimap
 eval $SUDO strip -s /usr/local/bin/unimap $DEBUG_STD
 eval $SUDO chmod 755 /usr/local/bin/ppfuzz
 eval $SUDO strip -s /usr/local/bin/ppfuzz $DEBUG_STD
-eval $SUDO chmod +x $tools/uDork/uDork.sh
+eval $SUDO chmod +x $tools/degoogle_hunter/degoogle_hunter.sh
 eval notify $DEBUG_STD
 
 printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
@@ -352,7 +357,6 @@ eval wget -nc -O fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/One
 eval wget -O lfi_wordlist.txt https://gist.githubusercontent.com/six2dez/a89a0c7861d49bb61a09822d272d5395/raw $DEBUG_STD
 eval wget -O ssti_wordlist.txt https://gist.githubusercontent.com/six2dez/ab5277b11da7369bf4e9db72b49ad3c1/raw $DEBUG_STD
 eval wget -O headers_inject.txt https://gist.github.com/six2dez/d62ab8f8ffd28e1c206d401081d977ae/raw $DEBUG_STD
-eval wget -O custom_udork.txt https://gist.githubusercontent.com/six2dez/7245cad74f2da5824080e0cb6bdaac22/raw $DEBUG_STD
 eval wget -O axiom_config.sh https://gist.githubusercontent.com/six2dez/6e2d9f4932fd38d84610eb851014b26e/raw $DEBUG_STD
 eval wget -O ~/nuclei-templates/extra_templates/ssrf.yaml https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/ssrf.yaml $DEBUG_STD
 eval wget -O ~/nuclei-templates/extra_templates/sap-redirect.yaml https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/sap-redirect.yaml $DEBUG_STD
@@ -406,15 +410,26 @@ fi
 
 printf "${bblue} Running: Performing last configurations ${reset}\n\n"
 ## Last steps
-if [ ! -s "resolvers.txt" ] || [ $(find "resolvers.txt" -mtime +1 -print) ]; then
-    printf "${yellow} Resolvers seem older than 1 day\n Generating custom resolvers... ${reset}\n\n"
-    eval rm -f resolvers.txt &>/dev/null
-    eval dnsvalidator -tL https://public-dns.info/nameservers.txt -threads $DNSVALIDATOR_THREADS -o resolvers.txt $DEBUG_STD
-	eval dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads $DNSVALIDATOR_THREADS -o tmp_resolvers $DEBUG_STD
-	eval cat tmp_resolvers $DEBUG_ERROR | anew -q resolvers.txt
-	eval rm -f tmp_resolvers $DEBUG_STD
-    [ ! -s "$resolvers" ] && wget -O $resolvers https://raw.githubusercontent.com/proabiral/Fresh-Resolvers/master/resolvers.txt &>/dev/null
+if [ "$generate_resolvers" = true ]; then
+	if [ ! -s "$resolvers" ] || [[ $(find "$resolvers" -mtime +1 -print) ]] ; then
+		 ${reset}\n\n"Checking resolvers lists...\n Accurate resolvers are the key to great results\n This may take around 10 minutes if it's not updated ${reset}\n\n"
+		eval rm -f $resolvers 2>>"$LOGFILE"
+		dnsvalidator -tL https://public-dns.info/nameservers.txt -threads $DNSVALIDATOR_THREADS -o $resolvers &>/dev/null
+		dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads $DNSVALIDATOR_THREADS -o tmp_resolvers &>/dev/null
+		[ -s "tmp_resolvers" ] && cat tmp_resolvers | anew -q $resolvers
+		[ -s "tmp_resolvers" ] && rm -f tmp_resolvers &>/dev/null
+		[ ! -s "$resolvers" ] && wget -q https://raw.githubusercontent.com/BonJarber/fresh-resolvers/main/resolvers.txt -O $resolvers &>/dev/null
+		printf "${yellow} Resolvers updated\n ${reset}\n\n"
+	fi
+	generate_resolvers=false
+else
+	[ ! -s "$resolvers" ] || if [[ $(find "$resolvers" -mtime +1 -print) ]] ; then
+		 ${reset}\n\n"Checking resolvers lists...\n Accurate resolvers are the key to great results\n Downloading new resolvers ${reset}\n\n"
+		wget -q https://raw.githubusercontent.com/BonJarber/fresh-resolvers/main/resolvers.txt -O $resolvers &>/dev/null
+		printf "${yellow} Resolvers updated\n ${reset}\n\n"
+	fi
 fi
+
 eval h8mail -g $DEBUG_STD
 
 ## Stripping all Go binaries
@@ -422,6 +437,6 @@ eval strip -s $HOME/go/bin/* $DEBUG_STD
 
 eval $SUDO cp $HOME/go/bin/* /usr/local/bin/ $DEBUG_STD
 
-printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/config.yaml)\n - GitHub (~/Tools/.github_tokens)\n - SHODAN (SHODAN_API_KEY in reconftw.cfg or env var)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg or env var) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg or env var) \n - notify (~/.config/notify/provider-config.yaml) \n - theHarvester (~/Tools/theHarvester/api-keys.yml)\n - H8mail (~/Tools/h8mail_config.ini)\n - uDork FB cookie (UDORK_COOKIE in reconftw.cfg or env var)\n - WHOISXML API (WHOISXML_API in reconftw.cfg or env var)\n\n\n${reset}"
+printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - GitHub (~/Tools/.github_tokens)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg or env var) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg or env var) \n - notify (~/.config/notify/provider-config.yaml) \n - theHarvester (~/Tools/theHarvester/api-keys.yaml or /etc/theHarvester/api-keys.yaml)\n - H8mail (~/Tools/h8mail_config.ini)\n - WHOISXML API (WHOISXML_API in reconftw.cfg or env var)\n\n\n${reset}"
 printf "${bgreen} Finished!${reset}\n\n"
 printf "\n\n${bgreen}#######################################################################${reset}\n"

@@ -8,8 +8,8 @@
 
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.2">
-    <img src="https://img.shields.io/badge/release-v2.2-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.2.1">
+    <img src="https://img.shields.io/badge/release-v2.2.1-green">
   </a>
    </a>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
@@ -150,7 +150,7 @@ tools=~/Tools
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 profile_shell=".$(basename $(echo $SHELL))rc"
 reconftw_version=$(git rev-parse --abbrev-ref HEAD)-$(git describe --tags)
-update_resolvers=true
+generate_resolvers=false
 proxy_url="http://127.0.0.1:8080/"
 #dir_output=/custom/output/path
 
@@ -167,7 +167,6 @@ GITHUB_TOKENS=${tools}/.github_tokens
 #CUSTOM_CONFIG=custom_config_path.txt # In case you use a custom config file, uncomment this line and set your files path
 
 # APIs/TOKENS - Uncomment the lines you want removing the '#' at the beginning of the line
-#UDORK_COOKIE="c_user=XXXXXXXXXX; xs=XXXXXXXXXXXXXX"
 #SHODAN_API_KEY="XXXXXXXXXXXXX"
 #WHOISXML_API="XXXXXXXXXX"
 #XSS_SERVER="XXXXXXXXXXXXXXXXX"
@@ -214,6 +213,7 @@ TLS_PORTS="21,22,25,80,110,135,143,261,271,324,443,448,465,563,614,631,636,664,6
 WEBPROBESIMPLE=true
 WEBPROBEFULL=true
 WEBSCREENSHOT=true
+VIRTUALHOSTS=true
 UNCOMMON_PORTS_WEB="81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9092,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55440,55672"
 # You can change to aquatone if gowitness fails, comment the one you don't want
 AXIOM_SCREENSHOT_MODULE=webscreenshot # Choose between aquatone,gowitness,webscreenshot
@@ -278,7 +278,7 @@ HEADER="User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Fire
 FFUF_THREADS=40
 HTTPX_THREADS=50
 HTTPX_UNCOMMONPORTS_THREADS=100
-GOSPIDER_THREADS=50
+GOSPIDER_THREADS=20
 GITDORKER_THREADS=5
 BRUTESPRAY_THREADS=20
 BRUTESPRAY_CONCURRENCE=10
@@ -295,6 +295,7 @@ RESOLVE_DOMAINS_THREADS=150
 PPFUZZ_THREADS=30
 DNSVALIDATOR_THREADS=200
 INTERLACE_THREADS=10
+CERO_THREADS=1000
 
 # Timeouts
 CMSSCAN_TIMEOUT=3600
@@ -394,7 +395,6 @@ reset='\033[0m'
 ./reconftw.sh -l sites.txt -r -o /output/directory/
 ```
  
-
 **Perform full recon with more time intense tasks** *(VPS intended only)*
  
 ```bash
@@ -448,7 +448,7 @@ reset='\033[0m'
 - Emails addresses and users ([theHarvester](https://github.com/laramies/theHarvester), [emailfinder](https://github.com/Josue87/EmailFinder))
 - Password leaks ([pwndb](https://github.com/davidtavarez/pwndb) and [H8mail](https://github.com/khast3x/h8mail))
 - Metadata finder ([MetaFinder](https://github.com/Josue87/MetaFinder))
-- Google Dorks ([uDork](https://github.com/m3n0sd0n4ld/uDork))
+- Google Dorks ([degoogle_hunter](https://github.com/six2dez/degoogle_hunter))
 - Github Dorks ([GitDorker](https://github.com/obheda12/GitDorker))
 ## Subdomains
   - Passive ([amass](https://github.com/OWASP/Amass), [waybackurls](https://github.com/tomnomnom/waybackurls), [github-subdomains](https://github.com/gwen001/github-subdomains), [gau](https://github.com/lc/gau))
@@ -461,11 +461,11 @@ reset='\033[0m'
   - Recursive search.
   - Subdomains takeover ([nuclei](https://github.com/projectdiscovery/nuclei))
   - DNS takeover ([dnstake](https://github.com/pwnesia/dnstake))
-  - DNS Zone Transfer ([dnsrecon](https://github.com/darkoperator/dnsrecon))
+  - DNS Zone Transfer ([dig](https://linux.die.net/man/1/dig))
 
 ## Hosts
 - IP and subdomains WAF checker ([cf-check](https://github.com/dwisiswant0/cf-check) and [wafw00f](https://github.com/EnableSecurity/wafw00f))
-- Port Scanner (Active with [nmap](https://github.com/nmap/nmap) and passive with [shodan-cli](https://cli.shodan.io/), Subdomains IP resolution with[resolveDomains](https://github.com/Josue87/resolveDomains))
+- Port Scanner (Active with [nmap](https://github.com/nmap/nmap) and passive with [nrich](https://gitlab.com/shodan-public/nrich))
 - Port services vulnerability checks ([searchsploit](https://github.com/offensive-security/exploitdb))
 - Password spraying ([brutespray](https://github.com/x90skysn3k/brutespray))
 - Cloud providers check ([clouddetect](https://github.com/99designs/clouddetect))
