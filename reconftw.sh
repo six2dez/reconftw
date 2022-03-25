@@ -678,8 +678,8 @@ function subtakeover(){
 function zonetransfer(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$ZONETRANSFER" = true ] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Zone transfer check"
-		dig axfr $domain @8.8.8.8 > subdomains/zonetransfer.txt
-		if [ -s ".tmp/zone_transfer.txt" ]; then
+		for ns in $(dig +short ns "$domain"); do dig axfr "$domain" @"$ns" >> subdomains/zonetransfer.txt; done
+		if [ -s "subdomains/zonetransfer.txt" ]; then
 			if ! grep -q "Transfer failed" subdomains/zonetransfer.txt ; then notification "Zone transfer found on ${domain}!" info; fi
 		fi
 		end_func "Results are saved in $domain/subdomains/zonetransfer.txt" ${FUNCNAME[0]}
