@@ -1819,9 +1819,9 @@ function resolvers_update(){
 			notification "Checking resolvers lists...\n Accurate resolvers are the key to great results\n This may take around 10 minutes if it's not updated" warn
 			# shellcheck disable=SC2016
 			axiom-exec 'if [ $(find "/home/op/lists/resolvers.txt" -mtime +1 -print) ] || [ $(cat /home/op/lists/resolvers.txt | wc -l) -le 40 ] ; then dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 200 -o /home/op/lists/resolvers.txt ; fi' &>/dev/null
-			axiom-exec '[ ! -s "/home/op/lists/resolvers.txt" ] && wget -O /home/op/lists/resolvers.txt https://raw.githubusercontent.com/BonJarber/fresh-resolvers/main/resolvers.txt' &>/dev/null
-			notification "Updated\n" good
+			axiom-exec 'wget -O /home/op/lists/resolvers.txt https://raw.githubusercontent.com/BonJarber/fresh-resolvers/main/resolvers.txt' &>/dev/null
 			axiom-exec 'wget -O /home/op/lists/resolvers_trusted.txt https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw' &>/dev/null
+			notification "Updated\n" good
 		fi
 		generate_resolvers=false
 	else
