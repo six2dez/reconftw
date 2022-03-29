@@ -8,8 +8,8 @@
 
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.2.1">
-    <img src="https://img.shields.io/badge/release-v2.2.1-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.2.1.1">
+    <img src="https://img.shields.io/badge/release-v2.2.1.1-green">
   </a>
    </a>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
@@ -69,7 +69,10 @@ So, what are you waiting for Go! Go! Go! :boom:
     - [Main commands:](#main-commands)
   - [How to contribute:](#how-to-contribute)
   - [Need help? :information_source:](#need-help-information_source)
-  - [You can support this work buying me a coffee:](#you-can-support-this-work-buying-me-a-coffee)
+  - [Support this project](#support-this-project)
+    - [Buymeacoffee](#buymeacoffee)
+    - [DigitalOcean referral link](#digitalocean-referral-link)
+    - [GitHub sponsorship](#github-sponsorship)
 - [Sponsors ❤️](#sponsors-️)
 - [Thanks :pray:](#thanks-pray)
 - [Disclaimer](#disclaimer)
@@ -450,6 +453,7 @@ reset='\033[0m'
 - Metadata finder ([MetaFinder](https://github.com/Josue87/MetaFinder))
 - Google Dorks ([degoogle_hunter](https://github.com/six2dez/degoogle_hunter))
 - Github Dorks ([GitDorker](https://github.com/obheda12/GitDorker))
+
 ## Subdomains
   - Passive ([amass](https://github.com/OWASP/Amass), [waybackurls](https://github.com/tomnomnom/waybackurls), [github-subdomains](https://github.com/gwen001/github-subdomains), [gau](https://github.com/lc/gau))
   - Certificate transparency ([ctfr](https://github.com/UnaPibaGeek/ctfr))
@@ -544,16 +548,23 @@ If you want to contribute to this project you can do it in multiple ways:
 - Check [FAQ](https://github.com/six2dez/reconftw/wiki/7.-FAQs) for commonly asked questions.  
 - Ask for help in the [Telegram group](https://t.me/joinchat/TO_R8NYFhhbmI5co)
  
-## You can support this work buying me a coffee:
- 
+## Support this project
+
+### Buymeacoffee 
 [<img src="https://cdn.buymeacoffee.com/buttons/v2/default-green.png">](https://www.buymeacoffee.com/six2dez)
 
+### DigitalOcean referral link
+<a href="https://www.digitalocean.com/?refcode=f362a6e193a1&utm_campaign=Referral_Invite&utm_medium=Referral_Program&utm_source=badge"><img src="https://web-platforms.sfo2.cdn.digitaloceanspaces.com/WWW/Badge%201.svg" alt="DigitalOcean Referral Badge" /></a>
+
+### GitHub sponsorship
+[Sponsor](https://github.com/sponsors/six2dez)
  
 # Sponsors ❤️
 **This section shows the current financial sponsors of this project**  
- 
- 
+  
 [<img src="https://pbs.twimg.com/profile_images/1360304248534282240/MomOFi40_400x400.jpg" width="100" height=auto>](https://github.com/0xtavian)
+[<img src="https://pbs.twimg.com/profile_images/1296513249702285312/fpHFDhyc_400x400.jpg" width="100" height=auto>](https://github.com/reconmap)
+[<img src="https://pbs.twimg.com/profile_images/1221701173864017922/Wg_Q7HoD_400x400.jpg" width="100" height=auto>](https://github.com/r1p)
 
 # Thanks :pray:
 * Thank you for lending a helping hand towards the development of the project!
