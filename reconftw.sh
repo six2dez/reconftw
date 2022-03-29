@@ -342,7 +342,8 @@ function sub_passive(){
 			amass enum -passive -d $domain -config $AMASS_CONFIG -json .tmp/amass_json.json 2>>"$LOGFILE" &>/dev/null
 			[ -s ".tmp/amass_json.json" ] && cat .tmp/amass_json.json | jq -r '.name' | anew -q .tmp/amass_psub.txt
 		else
-			axiom-scan $list -m amass -passive -o .tmp/amass_axiom.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+			echo $domain > .tmp/amass_temp_axiom.txt
+			[ -s ".tmp/amass_temp_axiom.txt" ] && axiom-scan .tmp/amass_temp_axiom.txt -m amass -passive -o .tmp/amass_axiom.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			[ -s ".tmp/amass_axiom.txt" ] && cat .tmp/amass_axiom.txt | anew -q .tmp/amass_psub.txt
 		fi
 		if [ -s "${GITHUB_TOKENS}" ]; then
