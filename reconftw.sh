@@ -691,13 +691,10 @@ function s3buckets(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$S3BUCKETS" = true ] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "AWS S3 buckets search"
 		# S3Scanner
-		[ ! -s ".tmp/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q .tmp/webs_all.txt
 		if [ ! "$AXIOM" = true ]; then
 			[ -s "subdomains/subdomains.txt" ] && s3scanner scan -f subdomains/subdomains.txt | anew -q .tmp/s3buckets.txt
-			[ -s ".tmp/webs_all.txt" ] && s3scanner scan -f .tmp/webs_all.txt | anew -q .tmp/s3buckets.txt
 		else
 			axiom-scan subdomains/subdomains.txt -m s3scanner -o .tmp/s3buckets_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-			axiom-scan .tmp/webs_all.txt -m s3scanner -o .tmp/s3buckets_tmp2.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			[ -s ".tmp/s3buckets_tmp.txt" ] && cat .tmp/s3buckets_tmp.txt .tmp/s3buckets_tmp2.txt 2>>"$LOGFILE" | anew -q .tmp/s3buckets.txt && sed -i '/^$/d' .tmp/s3buckets.txt
 		fi
 		# Cloudenum
@@ -708,7 +705,7 @@ function s3buckets(){
 		if [ "$NUMOFLINES1" -gt 0 ]; then
 			notification "${NUMOFLINES1} new cloud assets found" info
 		fi
-		NUMOFLINES2=$(cat .tmp/s3buckets.txt 2>>"$LOGFILE" | grep -iv "not_exist" | grep -iv "Warning:" | grep -iv "invalid_name" | grep -iv "^http" | awk 'NF' | anew subdomains/s3buckets.txt | sed '/^$/d' | wc -l)
+		NUMOFLINES2=$(cat .tmp/s3buckets.txt 2>>"$LOGFILE" | grep -aiv "not_exist" | grep -aiv "Warning:" | grep -aiv "invalid_name" | grep -aiv "^http" | awk 'NF' | anew subdomains/s3buckets.txt | sed '/^$/d' | wc -l)
 		if [ "$NUMOFLINES2" -gt 0 ]; then
 			notification "${NUMOFLINES2} new S3 buckets found" info
 		fi
