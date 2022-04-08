@@ -39,3 +39,4 @@ ujson                   # theHarvester
 urllib3                 # multiple
 uro                     # Tool
 uvicorn                 # theHarvester
+uvloop;platform_system != "Windows" # theHarvester
