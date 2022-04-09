@@ -409,10 +409,12 @@ function sub_dns(){
 		if [ ! "$AXIOM" = true ]; then
 			[ -s "subdomains/subdomains.txt" ] && cat subdomains/subdomains.txt | dnsx -r $resolvers_trusted -a -aaaa -cname -ns -ptr -mx -soa -silent -retry 3 -json -o subdomains/subdomains_dnsregs.json 2>>"$LOGFILE" &>/dev/null
 			[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r 'try .a[], try .aaaa[], try .cname[], try .ns[], try .ptr[], try .mx[], try .soa[]' 2>/dev/null | grep ".$domain$" | anew -q .tmp/subdomains_dns.txt
+			[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r 'try "\(.host) - \(.a[])"' 2>/dev/null | sort -u -k2 | anew -q subdomains/subdomains_ips.txt
 			[ -s ".tmp/subdomains_dns.txt" ] && puredns resolve .tmp/subdomains_dns.txt -w .tmp/subdomains_dns_resolved.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT  --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" &>/dev/null
 		else
 			[ -s "subdomains/subdomains.txt" ] && axiom-scan subdomains/subdomains.txt -m dnsx -retry 3 -a -aaaa -cname -ns -ptr -mx -soa -json -o subdomains/subdomains_dnsregs.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r 'try .a[], try .aaaa[], try .cname[], try .ns[], try .ptr[], try .mx[], try .soa[]' 2>/dev/null | grep ".$domain$" | anew -q .tmp/subdomains_dns.txt
+			[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r 'try "\(.host) - \(.a[])"' 2>/dev/null | sort -u -k2 | anew -q subdomains/subdomains_ips.txt
 			axiom-exec 'wget -O /home/op/lists/resolvers.txt https://raw.githubusercontent.com/BonJarber/fresh-resolvers/main/resolvers.txt' &>/dev/null
 			[ -s ".tmp/subdomains_dns.txt" ] && axiom-scan .tmp/subdomains_dns.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/subdomains_dns_resolved.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 		fi
@@ -906,7 +908,7 @@ function portscan(){
 			[ -s "hosts/subs_ips_vhosts.txt" ] && cat hosts/subs_ips_vhosts.txt | cut -d ' ' -f1 | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
 		else echo $domain | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
 		fi
-		[ -s "hosts/ips.txt" ] && cat hosts/ips.txt | ipcdn -m not | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q .tmp/ips_nocdn.txt	
+		[ -s "hosts/ips.txt" ] && cat hosts/ips.txt | ipcdn -m not | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q .tmp/ips_nocdn.txt
 		printf "${bblue}\n Resolved IP addresses (No CDN) ${reset}\n\n";
 		[ -s ".tmp/ips_nocdn.txt" ] && cat .tmp/ips_nocdn.txt | sort
 		printf "${bblue}\n Scanning ports... ${reset}\n\n";
@@ -1052,7 +1054,7 @@ function fuzz(){
 			else
 				axiom-exec 'wget -O /home/op/lists/fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt' &>/dev/null
 				axiom-scan .tmp/webs_all.txt -m ffuf -w /home/op/lists/fuzz_wordlist.txt -H \"${HEADER}\" $FFUF_FLAGS -maxtime $FFUF_MAXTIME -of json -o $dir/.tmp/fuzzing/ffuf-content.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-				[ -s "$dir/.tmp/fuzzing/ffuf-content.json" ] && cat $dir/.tmp/fuzzing/ffuf-content.json | jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' | sort | $dir/.tmp/fuzzing/ffuf-content.tmp
+				[ -s "$dir/.tmp/fuzzing/ffuf-content.json" ] && cat $dir/.tmp/fuzzing/ffuf-content.json | jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' | sort > $dir/.tmp/fuzzing/ffuf-content.tmp
 				for sub in $(cat .tmp/webs_all.txt); do
 					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
 					grep "$sub" $dir/.tmp/fuzzing/ffuf-content.tmp | anew -q $dir/fuzzing/${sub_out}.txt
@@ -1092,7 +1094,7 @@ function cms_scanner(){
 			fi	# otherwise Assume we have a successfully exited cmseek
 			for sub in $(cat .tmp/webs_all.txt); do
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-				cms_id=$(cat $tools/CMSeeK/Result/${sub_out}/cms.json 2>>"$LOGFILE" | jq -r 'try .cms_id')
+				cms_id=$(cat $tools/CMSeeK/Result/${sub_out}/cms.json 2>/dev/null | jq -r 'try .cms_id')
 				if [ -z "$cms_id" ]; then
 					rm -rf $tools/CMSeeK/Result/${sub_out}
 				else
@@ -1350,9 +1352,9 @@ function brokenLinks(){
 			fi
 		fi
 		[ -s ".tmp/gospider.txt" ] && cat .tmp/gospider.txt | grep -aEo 'https?://[^ ]+' | sed 's/]$//' | sort -u | httpx -follow-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color | grep "\[4" | cut -d ' ' -f1 | anew -q .tmp/brokenLinks_total.txt
-		NUMOFLINES=$(cat .tmp/brokenLinks_total.txt 2>>"$LOGFILE" | anew webs/brokenLinks.txt | sed '/^$/d' | wc -l)
+		NUMOFLINES=$(cat .tmp/brokenLinks_total.txt 2>>"$LOGFILE" | anew vulns/brokenLinks.txt | sed '/^$/d' | wc -l)
 		notification "${NUMOFLINES} new broken links found" info
-		end_func "Results are saved in webs/brokenLinks.txt" ${FUNCNAME[0]}
+		end_func "Results are saved in vulns/brokenLinks.txt" ${FUNCNAME[0]}
 	else
 		if [ "$BROKENLINKS" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -1423,8 +1425,8 @@ function cors(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$CORS" = true ]; then
 		start_func ${FUNCNAME[0]} "CORS Scan"
 		[ ! -s ".tmp/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q .tmp/webs_all.txt
-		[ -s ".tmp/webs_all.txt" ] && python3 $tools/Corsy/corsy.py -i .tmp/webs_all.txt -o webs/cors.txt 2>>"$LOGFILE" &>/dev/null
-		end_func "Results are saved in webs/cors.txt" ${FUNCNAME[0]}
+		[ -s ".tmp/webs_all.txt" ] && python3 $tools/Corsy/corsy.py -i .tmp/webs_all.txt -o vulns/cors.txt 2>>"$LOGFILE" &>/dev/null
+		end_func "Results are saved in vulns/cors.txt" ${FUNCNAME[0]}
 	else
 		if [ "$CORS" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -1473,9 +1475,9 @@ function ssrf_checks(){
 		if [ "$DEEP" = true ] || [[ $(cat gf/ssrf.txt | wc -l) -le $DEEP_LIMIT ]]; then
 			cat gf/ssrf.txt | qsreplace ${COLLAB_SERVER_FIX} | anew -q .tmp/tmp_ssrf.txt
 			cat gf/ssrf.txt | qsreplace ${COLLAB_SERVER_URL} | anew -q .tmp/tmp_ssrf.txt
-			ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/tmp_ssrf.txt -u FUZZ 2>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf_requests_url.txt
-			ffuf -v -w .tmp/tmp_ssrf.txt:W1,$tools/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_FIX}" -t $FFUF_THREADS -u W1 2>/dev/null | anew -q vulns/ssrf_requests_headers.txt
-			ffuf -v -w .tmp/tmp_ssrf.txt:W1,$tools/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_URL}" -t $FFUF_THREADS -u W1 2>/dev/null | anew -q vulns/ssrf_requests_headers.txt
+			ffuf -v -H "${HEADER}" -t $FFUF_THREADS -w .tmp/tmp_ssrf.txt -u FUZZ 2>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf_requested_url.txt
+			ffuf -v -w .tmp/tmp_ssrf.txt:W1,$tools/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_FIX}" -t $FFUF_THREADS -u W1 2>/dev/null | anew -q vulns/ssrf_requested_headers.txt
+			ffuf -v -w .tmp/tmp_ssrf.txt:W1,$tools/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_URL}" -t $FFUF_THREADS -u W1 2>/dev/null | anew -q vulns/ssrf_requested_headers.txt
 			sleep 5
 			[ -s ".tmp/ssrf_callback.txt" ] && cat .tmp/ssrf_callback.txt | tail -n+11 | anew -q vulns/ssrf_callback.txt && NUMOFLINES=$(cat .tmp/ssrf_callback.txt | tail -n+12 | sed '/^$/d' | wc -l)
 			[ "$INTERACT" = true ] && notification "SSRF: ${NUMOFLINES} callbacks received" info
@@ -1566,7 +1568,7 @@ function sqli(){
 
 		cat gf/sqli.txt | qsreplace FUZZ | sed '/FUZZ/!d' | anew -q .tmp/tmp_sqli.txt
 		if [ "$DEEP" = true ] || [[ $(cat .tmp/tmp_sqli.txt | wc -l) -le $DEEP_LIMIT ]]; then
-			interlace -tL .tmp/tmp_sqli.txt -threads ${INTERLACE_THREADS} -c "python3 $tools/sqlmap/sqlmap.py -u _target_ -b --batch --disable-coloring --random-agent --output-dir=_output_" -o vulns/sqlmap &>/dev/null
+			python3 /root/Tools/sqlmap/sqlmap.py -m .tmp/tmp_sqli.txt -b -o --smart --batch --disable-coloring --random-agent --output-dir=vulns/sqlmap &>/dev/null
 			end_func "Results are saved in vulns/sqlmap folder" ${FUNCNAME[0]}
 		else
 			end_func "Skipping SQLi: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
@@ -1585,8 +1587,8 @@ function sqli(){
 function test_ssl(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$TEST_SSL" = true ]; then
 		start_func ${FUNCNAME[0]} "SSL Test"
-		$tools/testssl.sh/testssl.sh --quiet --color 0 -U -iL hosts/ips.txt 2>>"$LOGFILE" > hosts/testssl.txt
-		end_func "Results are saved in hosts/testssl.txt" ${FUNCNAME[0]}
+		$tools/testssl.sh/testssl.sh --quiet --color 0 -U -iL hosts/ips.txt 2>>"$LOGFILE" > vulns/testssl.txt
+		end_func "Results are saved in vulns/testssl.txt" ${FUNCNAME[0]}
 	else
 		if [ "$TEST_SSL" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -1600,9 +1602,9 @@ function spraying(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SPRAY" = true ]; then
 		start_func ${FUNCNAME[0]} "Password spraying"
 		cd "$tools/brutespray" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
-		python3 brutespray.py --file $dir/hosts/portscan_active.gnmap --threads $BRUTESPRAY_THREADS --hosts $BRUTESPRAY_CONCURRENCE -o $dir/hosts/brutespray 2>>"$LOGFILE" &>/dev/null
+		python3 brutespray.py --file $dir/hosts/portscan_active.gnmap --threads $BRUTESPRAY_THREADS --hosts $BRUTESPRAY_CONCURRENCE -o $dir/vulns/brutespray 2>>"$LOGFILE" &>/dev/null
 		cd "$dir" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
-		end_func "Results are saved in hosts/brutespray folder" ${FUNCNAME[0]}
+		end_func "Results are saved in vulns/brutespray folder" ${FUNCNAME[0]}
 	else
 		if [ "$SPRAY" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
