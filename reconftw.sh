@@ -54,7 +54,6 @@ function tools_installed(){
 	[ -f "$tools/ctfr/ctfr.py" ] || { printf "${bred} [*] ctfr		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/fuzz_wordlist.txt" ] || { printf "${bred} [*] OneListForAll	[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/LinkFinder/linkfinder.py" ] || { printf "${bred} [*] LinkFinder		[NO]${reset}\n"; allinstalled=false;}
-	[ -f "$tools/GitDorker/GitDorker.py" ] || { printf "${bred} [*] GitDorker		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/commix/commix.py" ] || { printf "${bred} [*] commix		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/getjswords.py" ] || { printf "${bred} [*] getjswords   	[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/JSA/jsa.py" ] || { printf "${bred} [*] JSA		[NO]${reset}\n"; allinstalled=false;}
@@ -72,7 +71,6 @@ function tools_installed(){
 	type -P gau &>/dev/null || { printf "${bred} [*] gau		[NO]${reset}\n"; allinstalled=false;}
 	type -P dnsx &>/dev/null || { printf "${bred} [*] dnsx		[NO]${reset}\n"; allinstalled=false;}
 	type -P gotator &>/dev/null || { printf "${bred} [*] gotator		[NO]${reset}\n"; allinstalled=false;}
-	type -P cf-check &>/dev/null || { printf "${bred} [*] Cf-check		[NO]${reset}\n"; allinstalled=false;}
 	type -P nuclei &>/dev/null || { printf "${bred} [*] Nuclei		[NO]${reset}\n"; allinstalled=false;}
 	[ -d ~/nuclei-templates ] || { printf "${bred} [*] Nuclei templates	[NO]${reset}\n"; allinstalled=false;}
 	type -P gf &>/dev/null || { printf "${bred} [*] Gf			[NO]${reset}\n"; allinstalled=false;}
@@ -96,12 +94,13 @@ function tools_installed(){
 	type -P mapcidr &>/dev/null || { printf "${bred} [*] mapcidr		[NO]${reset}\n"; allinstalled=false;}
 	type -P ppfuzz &>/dev/null || { printf "${bred} [*] ppfuzz		[NO]${reset}\n"; allinstalled=false;}
 	type -P searchsploit &>/dev/null || { printf "${bred} [*] searchsploit	[NO]${reset}\n"; allinstalled=false;}
-	type -P clouddetect &>/dev/null || { printf "${bred} [*] clouddetect	[NO]${reset}\n"; allinstalled=false;}
+	type -P ipcdn &>/dev/null || { printf "${bred} [*] ipcdn		[NO]${reset}\n"; allinstalled=false;}
 	type -P interactsh-client &>/dev/null || { printf "${bred} [*] interactsh-client	[NO]${reset}\n"; allinstalled=false;}
 	type -P uro &>/dev/null || { printf "${bred} [*] uro		[NO]${reset}\n"; allinstalled=false;}
 	type -P cero &>/dev/null || { printf "${bred} [*] cero		[NO]${reset}\n"; allinstalled=false;}
 	type -P bbrf &>/dev/null || { printf "${bred} [*] bbrf		[NO]${reset}\n"; allinstalled=false;}
 	type -P nrich &>/dev/null || { printf "${bred} [*] nrich		[NO]${reset}\n"; allinstalled=false;}
+	type -P gitdorks_go &>/dev/null || { printf "${bred} [*] gitdorks_go	[NO]${reset}\n"; allinstalled=false;}
 
 	if [ "${allinstalled}" = true ]; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
@@ -139,11 +138,10 @@ function github_dorks(){
 		start_func ${FUNCNAME[0]} "Github Dorks in process"
 		if [ -s "${GITHUB_TOKENS}" ]; then
 			if [ "$DEEP" = true ]; then
-				python3 "$tools/GitDorker/GitDorker.py" -tf "${GITHUB_TOKENS}" -e "$GITDORKER_THREADS" -q "$domain" -p -ri -d "$tools/GitDorker/Dorks/alldorksv3" 2>>"$LOGFILE" | grep "\[+\]" | grep "git" | anew -q osint/gitdorks.txt
+				gitdorks_go -gd $tools/gitdorks_go/Dorks/medium_dorks.txt -nws 20 -target $domain -tf "${GITHUB_TOKENS}" -ew 3 | anew -q osint/gitdorks.txt
 			else
-				python3 "$tools/GitDorker/GitDorker.py" -tf "${GITHUB_TOKENS}" -e "$GITDORKER_THREADS" -q "$domain" -p -ri -d "$tools/GitDorker/Dorks/medium_dorks.txt" 2>>"$LOGFILE" | grep "\[+\]" | grep "git" | anew -q osint/gitdorks.txt
+				gitdorks_go -gd $tools/gitdorks_go/Dorks/smalldorks.txt -nws 20 -target $domain -tf "${GITHUB_TOKENS}" -ew 3 | anew -q osint/gitdorks.txt
 			fi
-			sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" osint/gitdorks.txt
 		else
 			printf "\n${bred} Required file ${GITHUB_TOKENS} not exists or empty${reset}\n"
 		fi
@@ -387,6 +385,7 @@ function sub_active(){
 		if [ ! "$AXIOM" = true ]; then
 			[ -s ".tmp/subs_no_resolved.txt" ] && puredns resolve .tmp/subs_no_resolved.txt -w .tmp/subdomains_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT  --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT &>/dev/null
 		else
+			axiom-exec 'wget -O /home/op/lists/resolvers.txt https://raw.githubusercontent.com/BonJarber/fresh-resolvers/main/resolvers.txt' &>/dev/null
 			[ -s ".tmp/subs_no_resolved.txt" ] && axiom-scan .tmp/subs_no_resolved.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/subdomains_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			echo $domain | dnsx -retry 3 -silent 2>>"$LOGFILE" | anew -q .tmp/subdomains_tmp.txt
 		fi
@@ -414,6 +413,7 @@ function sub_dns(){
 		else
 			[ -s "subdomains/subdomains.txt" ] && axiom-scan subdomains/subdomains.txt -m dnsx -retry 3 -a -aaaa -cname -ns -ptr -mx -soa -json -o subdomains/subdomains_dnsregs.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r 'try .a[], try .aaaa[], try .cname[], try .ns[], try .ptr[], try .mx[], try .soa[]' 2>/dev/null | grep ".$domain$" | anew -q .tmp/subdomains_dns.txt
+			axiom-exec 'wget -O /home/op/lists/resolvers.txt https://raw.githubusercontent.com/BonJarber/fresh-resolvers/main/resolvers.txt' &>/dev/null
 			[ -s ".tmp/subdomains_dns.txt" ] && axiom-scan .tmp/subdomains_dns.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/subdomains_dns_resolved.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 		fi
 
@@ -435,6 +435,7 @@ function sub_brute(){
 			fi
 			[ -s ".tmp/subs_brute.txt" ] && puredns resolve .tmp/subs_brute.txt -w .tmp/subs_brute_valid.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT  --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" &>/dev/null
 		else
+			axiom-exec 'wget -O /home/op/lists/resolvers.txt https://raw.githubusercontent.com/BonJarber/fresh-resolvers/main/resolvers.txt' &>/dev/null
 			if [ "$DEEP" = true ]; then
 				axiom-scan $subs_wordlist_big -m puredns-single $domain -r /home/op/lists/resolvers.txt -o .tmp/subs_brute.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			else
@@ -476,6 +477,7 @@ function sub_scraping(){
 					NUMOFLINES=$(cat .tmp/scrap_subs_resolved.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | tee .tmp/diff_scrap.txt | sed '/^$/d' | wc -l)
 					[ -s ".tmp/diff_scrap.txt" ] && cat .tmp/diff_scrap.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info3.txt 2>>"$LOGFILE" &>/dev/null
 				else
+					axiom-exec 'wget -O /home/op/lists/resolvers.txt https://raw.githubusercontent.com/BonJarber/fresh-resolvers/main/resolvers.txt' &>/dev/null
 					axiom-scan subdomains/subdomains.txt -m httpx -follow-host-redirects -H \"${HEADER}\" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info1.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 					[ -s ".tmp/web_full_info1.txt" ] && cat .tmp/web_full_info1.txt | jq -r 'try .url' 2>/dev/null | grep "$domain" | sed "s/*.//" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
 					[ -s ".tmp/probed_tmp_scrap.txt" ] && axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -tls-grab -tls-probe -csp-probe -H \"${HEADER}\" -status-code -threads $HTTPX_THREADS -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info2.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
@@ -522,6 +524,7 @@ function sub_analytics(){
 			if [ ! "$AXIOM" = true ]; then
 				[ -s ".tmp/analytics_subs_clean.txt" ] && puredns resolve .tmp/analytics_subs_clean.txt -w .tmp/analytics_subs_resolved.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT  --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" &>/dev/null
 			else
+				axiom-exec 'wget -O /home/op/lists/resolvers.txt https://raw.githubusercontent.com/BonJarber/fresh-resolvers/main/resolvers.txt' &>/dev/null
 				[ -s ".tmp/analytics_subs_clean.txt" ] && axiom-scan .tmp/analytics_subs_clean.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/analytics_subs_resolved.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			fi
 		fi
@@ -550,6 +553,7 @@ function sub_permut(){
 		if [ ! "$AXIOM" = true ]; then
 			[ -s ".tmp/gotator1.txt" ] && puredns resolve .tmp/gotator1.txt -w .tmp/permute1_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT  --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" &>/dev/null
 		else
+			axiom-exec 'wget -O /home/op/lists/resolvers.txt https://raw.githubusercontent.com/BonJarber/fresh-resolvers/main/resolvers.txt' &>/dev/null
 			[ -s ".tmp/gotator1.txt" ] && axiom-scan .tmp/gotator1.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/permute1_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 		fi
 		[ -s ".tmp/permute1_tmp.txt" ] && cat .tmp/permute1_tmp.txt | anew -q .tmp/permute1.txt
@@ -588,6 +592,7 @@ function sub_recursive(){
 				[ -s ".tmp/subdomains_recurs_amass.txt" ] && amass enum -passive -df .tmp/subdomains_recurs_amass.txt -config $AMASS_CONFIG 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
 				[ -s ".tmp/passive_recursive.txt" ] && puredns resolve .tmp/passive_recursive.txt -w .tmp/passive_recurs_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT  --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" &>/dev/null
 			else
+				axiom-exec 'wget -O /home/op/lists/resolvers.txt https://raw.githubusercontent.com/BonJarber/fresh-resolvers/main/resolvers.txt' &>/dev/null
 				[ -s ".tmp/subdomains_recurs_amass.txt" ] && axiom-scan .tmp/subdomains_recurs_amass.txt -m amass -passive -o .tmp/amass_prec.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 				[ -s ".tmp/amass_prec.txt" ] &&  cat .tmp/amass_prec.txt | anew -q .tmp/passive_recursive.txt
 				[ -s ".tmp/passive_recursive.txt" ] && axiom-scan .tmp/passive_recursive.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/passive_recurs_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
@@ -602,6 +607,7 @@ function sub_recursive(){
 			if [ ! "$AXIOM" = true ]; then
 				[ -s ".tmp/brute_recursive_wordlist.txt" ] && puredns resolve .tmp/brute_recursive_wordlist.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT  --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -w .tmp/brute_recursive_result.txt 2>>"$LOGFILE" &>/dev/null
 			else
+				axiom-exec 'wget -O /home/op/lists/resolvers.txt https://raw.githubusercontent.com/BonJarber/fresh-resolvers/main/resolvers.txt' &>/dev/null
 				[ -s ".tmp/brute_recursive_wordlist.txt" ] && axiom-scan .tmp/brute_recursive_wordlist.txt -m puredns-resolve -r /home/op/lists/resolvers.txt -o .tmp/brute_recursive_result.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			fi
 			[ -s ".tmp/brute_recursive_result.txt" ] && cat .tmp/brute_recursive_result.txt | anew -q .tmp/brute_recursive.txt
@@ -747,7 +753,7 @@ function webprobe_simple(){
 		end_subfunc "${NUMOFLINES} new websites resolved" ${FUNCNAME[0]}
 		if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/webs.txt| wc -l) -le $DEEP_LIMIT2 ]]; then
 			notification "Sending websites to proxy" info
-			ffuf -mc all -fc 404 -w webs/webs.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" &>/dev/null
+			ffuf -mc all -w webs/webs.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" &>/dev/null
 		fi
 		if [ "$BBRF_CONNECTION" = true ]; then
 			[ -s "webs/webs.txt" ] && cat webs/webs.txt | bbrf url add - 2>>"$LOGFILE" &>/dev/null
@@ -801,8 +807,8 @@ function webprobe_full(){
 		rm -rf "unimap_logs" 2>>"$LOGFILE"
 		end_func "Results are saved in $domain/webs/webs_uncommon_ports.txt" ${FUNCNAME[0]}
 		if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/webs_uncommon_ports.txt| wc -l) -le $DEEP_LIMIT2 ]]; then
-			notification "Sending websites uncommon ports to proxy" info
-			ffuf -mc all -fc 404 -w webs/webs_uncommon_ports.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" &>/dev/null
+			notification "Sending websites with uncommon ports to proxy" info
+			ffuf -mc all -w webs/webs_uncommon_ports.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" &>/dev/null
 		fi
 		if [ "$BBRF_CONNECTION" = true ]; then
 			[ -s "webs/webs_uncommon_ports.txt" ] && cat webs/webs_uncommon_ports.txt | bbrf url add - 2>>"$LOGFILE" &>/dev/null
@@ -900,24 +906,18 @@ function portscan(){
 			[ -s "hosts/subs_ips_vhosts.txt" ] && cat hosts/subs_ips_vhosts.txt | cut -d ' ' -f1 | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
 		else echo $domain | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
 		fi
-		if [ ! "$AXIOM" = true ]; then
-			[ -s "hosts/ips.txt" ] && cat hosts/ips.txt | cf-check | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q .tmp/ips_nowaf.txt	
-		else
-			[ -s "hosts/subs_ips_vhosts.txt" ] && cat hosts/subs_ips_vhosts.txt | cut -d ' ' -f1 | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
-			[ -s "hosts/ips.txt" ] && axiom-scan hosts/ips.txt -m cf-check -o .tmp/ips_nowaf_.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-			[ -s ".tmp/ips_nowaf_.txt" ] && cat .tmp/ips_nowaf_.txt | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q .tmp/ips_nowaf.txt
-		fi
-		printf "${bblue}\n Resolved IP addresses (No WAF) ${reset}\n\n";
-		[ -s ".tmp/ips_nowaf.txt" ] && cat .tmp/ips_nowaf.txt | sort
+		[ -s "hosts/ips.txt" ] && cat hosts/ips.txt | ipcdn -m not | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q .tmp/ips_nocdn.txt	
+		printf "${bblue}\n Resolved IP addresses (No CDN) ${reset}\n\n";
+		[ -s ".tmp/ips_nocdn.txt" ] && cat .tmp/ips_nocdn.txt | sort
 		printf "${bblue}\n Scanning ports... ${reset}\n\n";
-		if [ "$PORTSCAN_PASSIVE" = true ] && [ ! -f "hosts/portscan_passive.txt" ] && [ -s "hosts/ips.txt" ] ; then
-			nrich hosts/ips.txt > hosts/portscan_passive.txt
+		if [ "$PORTSCAN_PASSIVE" = true ] && [ ! -f "hosts/portscan_passive.txt" ] && [ -s ".tmp/ips_nocdn.txt" ] ; then
+			nrich .tmp/ips_nocdn.txt > hosts/portscan_passive.txt
 		fi
 		if [ "$PORTSCAN_ACTIVE" = true ]; then
 			if [ ! "$AXIOM" = true ]; then
-				[ -s ".tmp/ips_nowaf.txt" ] && $SUDO nmap --top-ports 200 -sV -n --max-retries 2 -Pn --open -iL .tmp/ips_nowaf.txt -oA hosts/portscan_active 2>>"$LOGFILE" &>/dev/null
+				[ -s ".tmp/ips_nocdn.txt" ] && $SUDO nmap --top-ports 200 -sV -n --max-retries 2 -Pn --open -iL .tmp/ips_nocdn.txt -oA hosts/portscan_active 2>>"$LOGFILE" &>/dev/null
 			else
-				[ -s ".tmp/ips_nowaf.txt" ] && axiom-scan .tmp/ips_nowaf.txt -m nmapx --top-ports 200 -sV -n -Pn --open --max-retries 2 -o hosts/portscan_active.gnmap $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+				[ -s ".tmp/ips_nocdn.txt" ] && axiom-scan .tmp/ips_nocdn.txt -m nmapx --top-ports 200 -sV -n -Pn --open --max-retries 2 -o hosts/portscan_active.gnmap $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 				[ -s "hosts/portscan_active.gnmap" ] && cat hosts/portscan_active.gnmap | egrep -v "^#|Status: Up" | cut -d' ' -f2,4- | sed -n -e 's/Ignored.*//p' | awk '{print "Host: " $1 " Ports: " NF-1; $1=""; for(i=2; i<=NF; i++) { a=a" "$i; }; split(a,s,","); for(e in s) { split(s[e],v,"/"); printf "%-8s %s/%-7s %s\n" , v[2], v[3], v[1], v[5]}; a="" }' > hosts/portscan_active.txt 2>>"$LOGFILE" &>/dev/null
 			fi
 		fi
@@ -938,17 +938,13 @@ function portscan(){
 	fi
 }
 
-function cloudprovider(){
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$CLOUD_IP" = true ]; then
-		start_func ${FUNCNAME[0]} "Cloud provider check"
-		if [ -s "$dir/hosts/ips.txt" ]; then
-			for ip in $( cat "$dir/hosts/ips.txt" ); do 
-				echo "$( echo -n ${ip} && echo -n " " && clouddetect -ip=${ip} )" | grep -iv "Error" | anew -q $dir/hosts/cloud_providers.txt
-			done
-		fi
-		end_func "Results are saved in hosts/cloud_providers.txt" ${FUNCNAME[0]}
+function cdnprovider(){
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$CDN_IP" = true ]; then
+		start_func ${FUNCNAME[0]} "CDN provider check"
+		[ -s "$dir/hosts/ips.txt" ] && cat $dir/hosts/ips.txt | ipcdn -m all | anew -q $dir/hosts/cdn_providers.txt
+		end_func "Results are saved in hosts/cdn_providers.txt" ${FUNCNAME[0]}
 	else
-		if [ "$CLOUD_IP" = false ]; then
+		if [ "$CDN_IP" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -1167,7 +1163,7 @@ function urlchecks(){
 			end_func "Results are saved in $domain/webs/url_extract.txt" ${FUNCNAME[0]}
 			if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/url_extract.txt | wc -l) -le $DEEP_LIMIT2 ]]; then
 				notification "Sending urls to proxy" info
-				ffuf -mc all -fc 404 -w webs/url_extract.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" &>/dev/null
+				ffuf -mc all -w webs/url_extract.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" &>/dev/null
 			fi
 		fi
 	else
@@ -1287,7 +1283,7 @@ function wordlist_gen(){
 		end_func "Results are saved in $domain/webs/dict_[words|paths].txt" ${FUNCNAME[0]}
 		if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/all_paths.txt | wc -l) -le $DEEP_LIMIT2 ]]; then
 			notification "Sending urls to proxy" info
-			ffuf -mc all -fc 404 -w webs/all_paths.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" &>/dev/null
+			ffuf -mc all -w webs/all_paths.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" &>/dev/null
 		fi
 	else
 		if [ "$WORDLIST" = false ]; then
@@ -1973,9 +1969,6 @@ function start(){
 	LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
 	touch .log/${NOW}_${NOWT}.txt
 	echo "Start ${NOW} ${NOWT}" > ${LOGFILE}
-	if [ -n "$findomain_virustotal_token" ]; then
-		VT_API_KEY=$findomain_virustotal_token
-	fi
 
 	if [ "$BBRF_CONNECTION" = true ]; then
 		program_bbrf=$(echo $domain | awk -F. '{print $1"_"$2}') 2>>"$LOGFILE" &>/dev/null
@@ -2051,6 +2044,7 @@ function passive(){
 	subdomains_full
 	remove_big_files
 	favicon
+	cdnprovider
 	PORTSCAN_ACTIVE=false
 	portscan
 	
@@ -2058,7 +2052,6 @@ function passive(){
 		axiom_shutdown
 	fi
 
-	cloudprovider
 	end
 }
 
@@ -2178,6 +2171,7 @@ function recon(){
 	s3buckets
 	screenshot
 	virtualhosts
+	cdnprovider
 	portscan
 	waf_checks
 	nuclei_check
@@ -2189,7 +2183,6 @@ function recon(){
 		axiom_shutdown
 	fi
 
-	cloudprovider
 	cms_scanner
 	url_gf
 	wordlist_gen
@@ -2283,8 +2276,8 @@ function multi_recon(){
 		remove_big_files
 		screenshot
 		virtualhosts
+		cdnprovider
 		portscan
-		cloudprovider
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
@@ -2308,7 +2301,7 @@ function multi_recon(){
 	NUMOFLINES_webs_total=$(find . -type f -name 'webs.txt' -exec cat {} + | anew webs/webs.txt | sed '/^$/d' | wc -l)
 	NUMOFLINES_webs_total=$(find . -type f -name 'webs_uncommon_ports.txt' -exec cat {} + | anew webs/webs_uncommon_ports.txt | sed '/^$/d' | wc -l)
 	NUMOFLINES_ips_total=$(find . -type f -name 'ips.txt' -exec cat {} + | anew hosts/ips.txt | sed '/^$/d' | wc -l)
-	NUMOFLINES_cloudsprov_total=$(find . -type f -name 'cloud_providers.txt' -exec cat {} + | anew hosts/cloud_providers.txt | sed '/^$/d' | wc -l)
+	NUMOFLINES_cloudsprov_total=$(find . -type f -name 'cdn_providers.txt' -exec cat {} + | anew hosts/cdn_providers.txt | sed '/^$/d' | wc -l)
 	find . -type f -name 'portscan_active.txt' -exec cat {} + > hosts/portscan_active.txt 2>>"$LOGFILE" &>/dev/null
 	find . -type f -name 'portscan_active.gnmap' -exec cat {} + > hosts/portscan_active.gnmap 2>>"$LOGFILE" &>/dev/null
 	find . -type f -name 'portscan_passive.txt' -exec cat {} + > hosts/portscan_passive.txt 2>>"$LOGFILE" &>/dev/null

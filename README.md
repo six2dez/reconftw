@@ -8,8 +8,8 @@
 
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.2.1.1">
-    <img src="https://img.shields.io/badge/release-v2.2.1.1-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.2.2">
+    <img src="https://img.shields.io/badge/release-v2.2.2-green">
   </a>
    </a>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
@@ -164,7 +164,6 @@ export PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH
 
 # Tools config files
 #NOTIFY_CONFIG=~/.config/notify/provider-config.yaml # No need to define
-#SUBFINDER_CONFIG=~/.config/subfinder/config.yaml # No need to define
 AMASS_CONFIG=~/.config/amass/config.ini
 GITHUB_TOKENS=${tools}/.github_tokens
 #CUSTOM_CONFIG=custom_config_path.txt # In case you use a custom config file, uncomment this line and set your files path
@@ -174,10 +173,6 @@ GITHUB_TOKENS=${tools}/.github_tokens
 #WHOISXML_API="XXXXXXXXXX"
 #XSS_SERVER="XXXXXXXXXXXXXXXXX"
 #COLLAB_SERVER="XXXXXXXXXXXXXXXXX"
-#findomain_virustotal_token="XXXXXXXXXXXXXXXXX"
-#findomain_spyse_token="XXXXXXXXXXXXXXXXX"
-#findomain_securitytrails_token="XXXXXXXXXXXXXXXXX"
-#findomain_fb_token="XXXXXXXXXXXXXXXXX"
 #slack_channel="XXXXXXXX"
 #slack_auth="xoXX-XXX-XXX-XXX"
 
@@ -282,7 +277,6 @@ FFUF_THREADS=40
 HTTPX_THREADS=50
 HTTPX_UNCOMMONPORTS_THREADS=100
 GOSPIDER_THREADS=20
-GITDORKER_THREADS=5
 BRUTESPRAY_THREADS=20
 BRUTESPRAY_CONCURRENCE=10
 GAUPLUS_THREADS=10
@@ -452,7 +446,7 @@ reset='\033[0m'
 - Password leaks ([pwndb](https://github.com/davidtavarez/pwndb) and [H8mail](https://github.com/khast3x/h8mail))
 - Metadata finder ([MetaFinder](https://github.com/Josue87/MetaFinder))
 - Google Dorks ([degoogle_hunter](https://github.com/six2dez/degoogle_hunter))
-- Github Dorks ([GitDorker](https://github.com/obheda12/GitDorker))
+- Github Dorks ([gitdorks_go](https://github.com/damit5/gitdorks_go))
 
 ## Subdomains
   - Passive ([amass](https://github.com/OWASP/Amass), [waybackurls](https://github.com/tomnomnom/waybackurls), [github-subdomains](https://github.com/gwen001/github-subdomains), [gau](https://github.com/lc/gau))

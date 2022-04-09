@@ -88,7 +88,6 @@ eot
 COPY amass_config.ini /root/.config/amass/config.ini
 COPY github_tokens.txt /root/Tools/.github_tokens
 COPY notify.conf /root/.config/notify/notify.conf
-COPY subfinder_config.yaml /root/.config/subfinder/config.yaml
 
 WORKDIR /root/Tools/reconftw
 ENTRYPOINT [ "bash", "reconftw.sh" ]
