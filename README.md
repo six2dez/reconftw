@@ -32,26 +32,23 @@
   </a>
 </p>
 
- 
+
 <h3 align="center">Summary</h3>
- 
-**ReconFTW** automates the entire process of reconnaisance for you. It outperforms the work of subdomain enumeration along with various vulnerability checks and obtaining maximum information about your target.       
- 
-ReconFTW uses lot of techniques (passive, bruteforce, permutations, certificate transparency, source code scraping, analytics, DNS records...) for subdomain enumeration which helps you getting the maximum and the most interesting subdomains so that you be ahead of the competition.   
-  
+
+**ReconFTW** automates the entire process of reconnaisance for you. It outperforms the work of subdomain enumeration along with various vulnerability checks and obtaining maximum information about your target.
+
+ReconFTW uses lot of techniques (passive, bruteforce, permutations, certificate transparency, source code scraping, analytics, DNS records...) for subdomain enumeration which helps you getting the maximum and the most interesting subdomains so that you be ahead of the competition.
+
 It also performs various vulnerability checks like XSS, Open Redirects, SSRF, CRLF, LFI, SQLi, SSL tests, SSTI, DNS zone transfers, and much more. Along with these, it performs OSINT techniques, directory fuzzing, dorking, ports scanning, screenshots, nuclei scan on your target.
- 
+
 So, what are you waiting for Go! Go! Go! :boom:
- 
+
 
 📔 Table of Contents
 -----------------
 - [💿 Installation:](#-installation)
   - [a) In your PC/VPS/VM](#a-in-your-pcvpsvm)
-  - [b) Docker container 🐳 (2 options)](#b-docker-container--2-options)
-    - [1) From DockerHub](#1-from-dockerhub)
-    - [2) From repository](#2-from-repository)
-      - [You can also choose to configure a locale at build time](#you-can-also-choose-to-configure-a-locale-at-build-time)
+  - [b) Docker Image 🐳 (3 options)](#b-docker-image--3-options)
 - [⚙️ Config file:](#️-config-file)
 - [Usage:](#usage)
 - [Example Usage:](#example-usage)
@@ -76,73 +73,54 @@ So, what are you waiting for Go! Go! Go! :boom:
 - [Sponsors ❤️](#sponsors-️)
 - [Thanks :pray:](#thanks-pray)
 - [Disclaimer](#disclaimer)
- 
+
 ---
- 
+
 # 💿 Installation:
- 
+
 ## a) In your PC/VPS/VM
- 
-> You can check out our wiki for the installation guide [Installation Guide](https://github.com/six2dez/reconftw/wiki/0.-Installation-Guide) :book:  
- 
+
+> You can check out our wiki for the installation guide [Installation Guide](https://github.com/six2dez/reconftw/wiki/0.-Installation-Guide) :book:
+
 - Requires [Golang](https://golang.org/dl/) > **1.15.0+** installed and paths correctly set (**$GOPATH**, **$GOROOT**)
- 
+
 ```bash
 git clone https://github.com/six2dez/reconftw
 cd reconftw/
 ./install.sh
 ./reconftw.sh -d target.com -r
 ```
- 
-## b) Docker container 🐳 (2 options)
 
-- Docker parameters usage
+## b) Docker Image 🐳 (3 options)
 
-``` bash
--d -> Detached 
--v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -> Share CFG with the Docker
--v $PWD/Recon/:/root/Tools/reconftw/Recon/ -> Share output folder with the Host
---name reconftwSCAN -> Docker name
---rm -> Automatically remove the container when it exits
-'-d target.com -r' -> reconftw parameters
-```
-
-### 1) From [DockerHub](https://hub.docker.com/r/six2dez/reconftw)
- 
+- Pull the image
 ```bash
-docker pull six2dez/reconftw:main
-# Download and configure CFG file
-wget https://raw.githubusercontent.com/six2dez/reconftw/main/reconftw.cfg
-mkdir Recon
-docker run -d -v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -v $PWD/Recon/:/root/Tools/reconftw/Recon/ --name reconftwSCAN --rm six2dez/reconftw:main -d target.com -r
+$ docker pull six2dez/reconftw:main
 ```
- 
-### 2) From repository
- 
-```bash
-git clone https://github.com/six2dez/reconftw
-cd reconftw
-docker buildx build -t reconftw Docker/.
-# Running from reconftw root folder, configure values properly for your needs
-docker run -v $PWD/reconftw.cfg:/root/Tools/reconftw/reconftw.cfg -v $PWD/Recon/:/root/Tools/reconftw/Recon/ --name reconftwSCAN --rm reconftw -d target.com -r
+- Run the container
+```
+$ docker run -it --rm \
+  -v "${PWD}/OutputFolder/":'/reconftw/Recon/' \
+  six2dez/reconftw:main -d example.com -r
 ```
 
-#### You can also choose to configure a locale at build time
+However, if you wish to:
+1. Dynamically modify the behaviour & function of the image
+2. Build your own container
+3. Build an Axiom Controller on top of the official image
 
-```
-docker buildx build --build-arg LANG=es_ES.UTF-8 --build-arg LANGUAGE=es_ES -t reconftw Docker/.
-```
- 
+Please refer to the [Docker](https://github.com/six2dez/reconftw/wiki/4.-Docker) documentation.
+
 # ⚙️ Config file:
 > A detailed explaintion of config file can be found here [Configuration file](https://github.com/six2dez/reconftw/wiki/3.-Configuration-file) :book:
- 
+
 - Through ```reconftw.cfg``` file the whole execution of the tool can be controlled.
 - Hunters can set various scanning modes, execution preferences, tools, config files, APIs/TOKENS, personalized wordlists and much more.
- 
+
 <details>
  <br><br>
  <summary> :point_right: Click here to view default config file :point_left: </summary>
- 
+
 ```yaml
 #################################################################
 #			reconFTW config file			#
@@ -338,16 +316,16 @@ blue='\033[0;34m'
 green='\033[0;32m'
 yellow='\033[0;33m'
 reset='\033[0m'
-	
+
 ```
 </details>
- 
+
 # Usage:
- 
+
 > Check out the wiki section to know which flag performs what all steps/attacks [Usage Guide](https://github.com/six2dez/reconftw/wiki/2.-Usage-Guide) :book:
- 
+
 **TARGET OPTIONS**
- 
+
 | Flag | Description |
 |------|-------------|
 | -d | Single Target domain *(example.com)*  |
@@ -355,9 +333,9 @@ reset='\033[0m'
 | -m | Multiple domain target *(companyName)*  |
 | -x | Exclude subdomains list *(Out Of Scope)* |
 | -i | Include subdomains list *(In Scope)* |
- 
+
 **MODE OPTIONS**
- 
+
 | Flag | Description |
 |------|-------------|
 | -r | Recon - Full recon process (without attacks like sqli,ssrf,xss,ssti,lfi etc.) |
@@ -368,78 +346,78 @@ reset='\033[0m'
 | -n | OSINT - Performs an OSINT scan (no subdomain enumeration and attacks) |
 | -c | Custom - Launches specific function against target |
 | -h | Help - Show this help menu |
- 
+
 **GENERAL OPTIONS**
- 
+
 | Flag | Description |
 |------|-------------|
 | --deep | Deep scan (Enable some slow options for deeper scan, _vps intended mode_) |
 | -f | Custom config file path |
 | -o | Output directory |
 | -v | Axiom distributed VPS |
- 
+
 # Example Usage:
- 
+
 **To perform a full recon on single target**
- 
+
 ```bash
 ./reconftw.sh -d target.com -r
 ```
- 
+
 **To perform a full recon on a list of targets**
- 
+
 ```bash
 ./reconftw.sh -l sites.txt -r -o /output/directory/
 ```
- 
+
 **Perform full recon with more time intense tasks** *(VPS intended only)*
- 
+
 ```bash
 ./reconftw.sh -d target.com -r --deep -o /output/directory/
 ```
- 
+
 **Perform recon in a multi domain target**
- 
+
 ```bash
 ./reconftw.sh -m company -l domains_list.txt -r
 ```
 
 **Perform recon with axiom integration**
- 
+
 ```bash
 ./reconftw.sh -d target.com -r -v
 ```
- 
+
  **Perform all steps (whole recon + all attacks) a.k.a. YOLO mode**
- 
+
 ```bash
 ./reconftw.sh -d target.com -a
 ```
 
 **Show help section**
- 
+
 ```bash
 ./reconftw.sh -h
 ```
- 
+
 # Axiom Support: :cloud:
 ![](https://i.ibb.co/Jzrgkqt/axiom-readme.png)
 > Check out the wiki section for more info [Axiom Support](https://github.com/six2dez/reconftw/wiki/5.-Axiom-version)
 * As reconFTW actively hits the target with a lot of web traffic, hence there was a need to move to Axiom distributing the work load among various instances leading to reduction of execution time.
-* During the configuration of axiom you need to select `reconftw` as provisoner.  
+* During the configuration of axiom you need to select `reconftw` as provisoner.
 * You can create your own axiom's fleet before running reconFTW or let reconFTW to create and destroy it automatically just modifying reconftw.cfg file.
 
 # BBRF Support: :computer:
 * To add reconFTW results to your [BBRF instance](https://github.com/honoki/bbrf-server) just add IP and credentials on reconftw.cfg file section dedicated to bbrf.
 * During the execution of the scans the results will be added dinamically when each step ends.
 * Even you can set up locally your BBRF instance to be able to visualize your results in a fancy web UI.
- 
+
 # Sample video:
- 
+
 ![Video](images/reconFTW.gif)
- 
+
 # :fire: Features :fire:
- 
+
  ## Osint
 - Domain information parser ([domainbigdata](https://domainbigdata.com/))
 - Emails addresses and users ([theHarvester](https://github.com/laramies/theHarvester), [emailfinder](https://github.com/Josue87/EmailFinder))
@@ -508,15 +486,15 @@ reset='\033[0m'
 - 6 modes (recon, passive, subdomains, web, osint and all)
 - Out of Scope Support
 - Notification system with Slack, Discord and Telegram ([notify](https://github.com/projectdiscovery/notify)) and sending zipped results support
- 
+
 # Mindmap/Workflow
- 
+
 ![Mindmap](images/mindmapv2.png)
- 
+
 ## Data Keep
- 
+
 Follow these simple steps to end up having a private repository with your `API Keys` and `/Recon` data.
- 
+
 * Create a private __blank__ repository on `Git(Hub|Lab)` (Take into account size limits regarding Recon data upload)
 * Clone your project: `git clone https://gitlab.com/example/reconftw-data`
 * Get inside the cloned repository: `cd reconftw-data`
@@ -524,27 +502,27 @@ Follow these simple steps to end up having a private repository with your `API K
 * Add official repo as a new remote: `git remote add upstream https://github.com/six2dez/reconftw` (`upstream` is an example)
 * Update upstream's repo: `git fetch upstream`
 * Rebase current branch with the official one: `git rebase upstream/main master`
- 
+
 ### Main commands:
- 
+
 * Upload changes to your personal repo: `git add . && git commit -m "Data upload" && git push origin master`
 * Update tool anytime: `git fetch upstream && git rebase upstream/main master`
- 
+
 ## How to contribute:
- 
+
 If you want to contribute to this project you can do it in multiple ways:
 - Submitting an [issue](https://github.com/six2dez/reconftw/issues/new/choose) because you have found a bug or you have any suggestion or request.
 - Making a Pull Request from [dev](https://github.com/six2dez/reconftw/tree/dev) branch because you want to improve the code or add something to the script.
- 
+
 ## Need help? :information_source:
- 
-- Take a look at the [wiki](https://github.com/six2dez/reconftw/wiki) section.  
-- Check [FAQ](https://github.com/six2dez/reconftw/wiki/7.-FAQs) for commonly asked questions.  
+
+- Take a look at the [wiki](https://github.com/six2dez/reconftw/wiki) section.
+- Check [FAQ](https://github.com/six2dez/reconftw/wiki/7.-FAQs) for commonly asked questions.
 - Ask for help in the [Telegram group](https://t.me/joinchat/TO_R8NYFhhbmI5co)
- 
+
 ## Support this project
 
-### Buymeacoffee 
+### Buymeacoffee
 [<img src="https://cdn.buymeacoffee.com/buttons/v2/default-green.png">](https://www.buymeacoffee.com/six2dez)
 
 ### DigitalOcean referral link
@@ -552,17 +530,17 @@ If you want to contribute to this project you can do it in multiple ways:
 
 ### GitHub sponsorship
 [Sponsor](https://github.com/sponsors/six2dez)
- 
+
 # Sponsors ❤️
-**This section shows the current financial sponsors of this project**  
-  
+**This section shows the current financial sponsors of this project**
+
 [<img src="https://pbs.twimg.com/profile_images/1360304248534282240/MomOFi40_400x400.jpg" width="100" height=auto>](https://github.com/0xtavian)
 [<img src="https://pbs.twimg.com/profile_images/1296513249702285312/fpHFDhyc_400x400.jpg" width="100" height=auto>](https://github.com/reconmap)
 [<img src="https://pbs.twimg.com/profile_images/1221701173864017922/Wg_Q7HoD_400x400.jpg" width="100" height=auto>](https://github.com/r1p)
 
 # Thanks :pray:
 * Thank you for lending a helping hand towards the development of the project!
- 
+
 - [Spyse](https://spyse.com/)
 - [Networksdb](https://networksdb.io/)
 - [Intelx](https://intelx.io/)
