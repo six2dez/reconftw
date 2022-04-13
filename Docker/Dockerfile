@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.3-labs
+# syntax=docker/dockerfile:1.4
 
 #-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
 
@@ -41,46 +41,71 @@ ENV LC_ALL=$LANG
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DEBCONF_NONINTERACTIVE_SEEN=true
 
-ENV GOPATH=$HOME/go
-ENV GOROOT=/usr/local/go
-ENV PATH=$GOPATH/bin:$GOROOT/bin:$PATH
+ENV GOROOT='/usr/local/go'
+ENV GOPATH='/root/go'
+ENV AXIOMPATH='/root/.axiom/interact'
+ENV PATH="${GOROOT}:${PATH}:${GOPATH}:${AXIOMPATH}"
 
 COPY 01_nodoc /etc/dpkg/dpkg.cfg.d/
 
 RUN <<eot
 #!/bin/bash
 set -x
-############> Update Sources <############
+
+###>> Backup .bashrc <<###
+cp /root/.bashrc /root/original.bashrc
+
+###>> Update Sources <<###
 echo "deb http://kali.download/kali kali-rolling main contrib non-free" > /etc/apt/sources.list
 echo "deb-src http://kali.download/kali kali-rolling main contrib non-free" >> /etc/apt/sources.list
-############> System Configuration <############
+
+###>> System Configuration <<###
 apt clean all
 apt update
 apt full-upgrade -f -y --allow-downgrades
-apt install -y --no-install-recommends apt-utils ca-certificates git nano wget
-############> Congifure Locales <############
+apt install -y --no-install-recommends apt-utils ca-certificates curl git lsb-release nano wget
+
+###>> Congifure Locales <<###
 apt install -y --no-install-recommends locales
 sed -i -- "/${LANG}/s/^# //g" /etc/locale.gen
 dpkg-reconfigure locales
 update-locale LANG=${LANG}
-############> Install reconFTW <############
-mkdir -p /root/Tools
-cd /root/Tools
-git clone https://github.com/six2dez/reconftw.git
-cd reconftw
-./install.sh
-############> Clean up <############
-apt update
-apt remove --purge -y build-essential
-apt autoremove -y
+
+###>> Congifure localepurge <<###
 apt install -y --no-install-recommends localepurge
 sed -i -- '/^USE_DPKG/s/^/#/' /etc/locale.nopurge
 dpkg-reconfigure localepurge
 localepurge
+
+###>> Configure Axiom <<###
+mkdir -p /root/.axiom/
+git clone https://github.com/pry0cc/axiom /root/.axiom/
+cd /root/.axiom/interact
+./axiom-configure --unattended --shell Bash
+## This avoids useless error messages later.
+touch /root/.axiom/axiom.json
+touch /root/.axiom/interact/includes/functions.sh
+
+###>> Install reconFTW <<###
+mkdir -p /root/Tools
+mkdir -p /reconftw
+git clone https://github.com/six2dez/reconftw.git /reconftw
+cd /reconftw
+./install.sh
+
+###>> Restore .bashrc <<###
+mv /root/original.bashrc /root/.bashrc
+find /root -type f \( -name '.bashrc*' -not -name '.bashrc' \) -delete
+
+###>> Clean up <<###
+apt update
+apt remove --purge -y build-essential
+apt autoremove -y
 apt clean all
-find /var/cache -type f -delete
 find /var/lib/apt/lists -type f -delete
+find /var/cache -type f -delete
 find /var/log -type f -delete
+find /tmp -type f -delete
 rm -rf /root/.cache
 rm -rf /root/go
 eot
@@ -89,6 +114,11 @@ COPY amass_config.ini /root/.config/amass/config.ini
 COPY github_tokens.txt /root/Tools/.github_tokens
 COPY notify.conf /root/.config/notify/notify.conf
 
-WORKDIR /root/Tools/reconftw
-ENTRYPOINT [ "bash", "reconftw.sh" ]
+## Issue 271
+EXPOSE 85-90
+
+WORKDIR /reconftw
+
+SHELL [ "/bin/bash", "-c" ]
+ENTRYPOINT [ "./reconftw.sh" ]
 CMD [ "--help" ]
