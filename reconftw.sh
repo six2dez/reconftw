@@ -179,7 +179,7 @@ function emails(){
 		emailfinder -d $domain 2>>"$LOGFILE" | anew -q .tmp/emailfinder.txt
 		[ -s ".tmp/emailfinder.txt" ] && cat .tmp/emailfinder.txt | awk 'matched; /^-----------------$/ { matched = 1 }' | anew -q osint/emails.txt
 		cd "$tools/theHarvester" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
-		python3 theHarvester.py -d $domain -b all -f $dir/.tmp/harvester.json >/dev/null
+		python3 theHarvester.py -d $domain -b all -f $dir/.tmp/harvester.json 2>>"$LOGFILE" &>/dev/null
 		cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		if [ -s ".tmp/harvester.json" ]; then
 			cat .tmp/harvester.json | jq -r 'try .emails[]' 2>/dev/null | anew -q osint/emails.txt
@@ -1126,7 +1126,7 @@ function urlchecks(){
 		if [ -s ".tmp/webs_all.txt" ]; then
 			if [ ! "$AXIOM" = true ]; then
 				cat .tmp/webs_all.txt | waybackurls | anew -q .tmp/url_extract_tmp.txt
-				cat .tmp/webs_all.txt | gau --subs --threads $GAUPLUS_THREADS | anew -q .tmp/url_extract_tmp.txt
+				cat .tmp/webs_all.txt | gau --subs --threads $GAU_THREADS | anew -q .tmp/url_extract_tmp.txt
 				diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt 2>>"$LOGFILE") <(sort -u .tmp/webs_all.txt 2>>"$LOGFILE") | wc -l)
 				if [ $diff_webs != "0" ] || [ ! -s ".tmp/gospider.txt" ]; then
 					if [ "$DEEP" = true ]; then
