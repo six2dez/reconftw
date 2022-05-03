@@ -2445,6 +2445,7 @@ function help(){
 	printf "   -f confile_file   Alternate reconftw.cfg file\n"
 	printf "   -o output/path    Define output folder\n"
 	printf "   -v, --vps         Axiom distributed VPS \n"
+	printf "   -q                Rate limit in requests per second \n"
 	printf " \n"
 	printf " ${bblue}USAGE EXAMPLES${reset}\n"
 	printf " Recon:\n"
@@ -2474,7 +2475,7 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
 	PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
 fi
 
-PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:c:rspanwvh::' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,deep,help,vps' -n 'reconFTW' -- "$@")
+PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:rspanwvh::' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,deep,help,vps' -n 'reconFTW' -- "$@")
 
 
 # Note the quotes around "$PROGARGS": they are essential!
@@ -2571,6 +2572,11 @@ while true; do
             shift 2
             continue
             ;;
+		'-q')
+			rate_limit=$2
+            shift 2
+            continue
+            ;;
         '--deep')
             opt_deep=true
             shift
@@ -2601,6 +2607,12 @@ fi
 
 if [ $opt_deep ]; then
     DEEP=true
+fi
+
+if [ $rate_limit ]; then
+    NUCLEI_RATELIMIT=$rate_limit
+	FFUF_RATELIMIT=$rate_limit
+	HTTPX_RATELIMIT=$rate_limit
 fi
 
 if [ -n "$outOfScope_file" ]; then
