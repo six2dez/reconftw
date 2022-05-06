@@ -355,6 +355,7 @@ reset='\033[0m'
 | -f | Custom config file path |
 | -o | Output directory |
 | -v | Axiom distributed VPS |
+| -q | Rate limit in requests per second |
 
 # Example Usage:
 
