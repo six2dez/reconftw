@@ -424,7 +424,7 @@ if [ "$generate_resolvers" = true ]; then
 	generate_resolvers=false
 else
 	[ ! -s "$resolvers" ] || if [[ $(find "$resolvers" -mtime +1 -print) ]] ; then
-		 ${reset}\n\n"Checking resolvers lists...\n Accurate resolvers are the key to great results\n Downloading new resolvers ${reset}\n\n"
+		 ${reset}"\n\nChecking resolvers lists...\n Accurate resolvers are the key to great results\n Downloading new resolvers ${reset}\n\n"
 		wget -q https://raw.githubusercontent.com/BonJarber/fresh-resolvers/main/resolvers.txt -O $resolvers &>/dev/null
 		printf "${yellow} Resolvers updated\n ${reset}\n\n"
 	fi
