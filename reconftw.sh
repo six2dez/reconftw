@@ -1776,7 +1776,7 @@ function sendToNotify {
 function start_func(){
 	printf "${bgreen}#######################################################################"
 	notification "${2}" info
-	echo "[ $(date +"%F %T") ] Start function : ${1} " >> ${LOGFILE}
+	echo "[ $(date +"%F %T") ] Start function : ${1} " >> "${LOGFILE}"
 	start=$(date +%s)
 }
 
@@ -1785,14 +1785,14 @@ function end_func(){
 	end=$(date +%s)
 	getElapsedTime $start $end
 	notification "${2} Finished in ${runtime}" info
-	echo "[ $(date +"%F %T") ] End function : ${2} " >> ${LOGFILE}
+	echo "[ $(date +"%F %T") ] End function : ${2} " >> "${LOGFILE}"
 	printf "${bblue} ${1} ${reset}\n"
 	printf "${bgreen}#######################################################################${reset}\n"
 }
 
 function start_subfunc(){
 	notification "${2}" warn
-	echo "[ $(date +"%F %T") ] Start subfunction : ${1} " >> ${LOGFILE}
+	echo "[ $(date +"%F %T") ] Start subfunction : ${1} " >> "${LOGFILE}"
 	start_sub=$(date +%s)
 }
 
@@ -1801,7 +1801,7 @@ function end_subfunc(){
 	end_sub=$(date +%s)
 	getElapsedTime $start_sub $end_sub
 	notification "${1} in ${runtime}" good
-	echo "[ $(date +"%F %T") ] End subfunction : ${1} " >> ${LOGFILE}
+	echo "[ $(date +"%F %T") ] End subfunction : ${1} " >> "${LOGFILE}"
 }
 
 function resolvers_update(){
@@ -1974,7 +1974,7 @@ function start(){
 	NOWT=$(date +"%T")
 	LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
 	touch .log/${NOW}_${NOWT}.txt
-	echo "Start ${NOW} ${NOWT}" > ${LOGFILE}
+	echo "Start ${NOW} ${NOWT}" > "${LOGFILE}"
 
 	if [ "$BBRF_CONNECTION" = true ]; then
 		program_bbrf=$(echo $domain | awk -F. '{print $1"_"$2}') 2>>"$LOGFILE" &>/dev/null
@@ -1992,7 +1992,7 @@ function end(){
 	find $dir -type f -empty -print | grep -v '.called_fn' | grep -v '.log' | grep -v '.tmp' | xargs rm -f &>/dev/null
 	find $dir -type d -empty -print -delete &>/dev/null
 
-	echo "End $(date +"%F") $(date +"%T")" >> ${LOGFILE}
+	echo "End $(date +"%F") $(date +"%T")" >> "${LOGFILE}"
 
 	if [ ! "$PRESERVE" = true ]; then
 		find $dir -type f -empty | grep -v "called_fn" | xargs rm -f &>/dev/null
@@ -2126,7 +2126,7 @@ function multi_osint(){
 	NOWT=$(date +"%T")
 	LOGFILE="${workdir}/.log/${NOW}_${NOWT}.txt"
 	touch .log/${NOW}_${NOWT}.txt
-	echo "Start ${NOW} ${NOWT}" > ${LOGFILE}
+	echo "Start ${NOW} ${NOWT}" > "${LOGFILE}"
 
 	for domain in $targets; do
 		dir=$workdir/targets/$domain
@@ -2138,7 +2138,7 @@ function multi_osint(){
 		NOWT=$(date +"%T")
 		LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
 		touch .log/${NOW}_${NOWT}.txt
-		echo "Start ${NOW} ${NOWT}" > ${LOGFILE}
+		echo "Start ${NOW} ${NOWT}" > "${LOGFILE}"
 		domain_info
 		ip_info
 		emails
@@ -2227,7 +2227,7 @@ function multi_recon(){
 	NOWT=$(date +"%T")
 	LOGFILE="${workdir}/.log/${NOW}_${NOWT}.txt"
 	touch .log/${NOW}_${NOWT}.txt
-	echo "Start ${NOW} ${NOWT}" > ${LOGFILE}
+	echo "Start ${NOW} ${NOWT}" > "${LOGFILE}"
 
 	[ -n "$flist" ] && LISTTOTAL=$(cat "$flist" | wc -l )
 
@@ -2242,7 +2242,7 @@ function multi_recon(){
 		NOWT=$(date +"%T")
 		LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
 		touch .log/${NOW}_${NOWT}.txt
-		echo "Start ${NOW} ${NOWT}" > ${LOGFILE}
+		echo "Start ${NOW} ${NOWT}" > "${LOGFILE}"
 		loopstart=$(date +%s)
 
 		domain_info
