@@ -260,6 +260,20 @@ for gotool in "${!gotools[@]}"; do
     fi
 done
 
+# Install URO outside "gotools" to fix GO111MODULE issue
+
+printf "${bblue}\n Running: Installing URO ${reset}\n\n"
+
+GO111MODULE=on go get github.com/evilsocket/uroboros/cmd/uro
+
+
+# Install emailfinder with pip3
+
+printf "${bblue}\n Running: Installing emailfinder ${reset}\n\n"
+
+pip3 install emailfinder
+
+
 printf "${bblue}\n Running: Installing repositories (${#repos[@]})${reset}\n\n"
 
 # Repos with special configs
