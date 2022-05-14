@@ -1,0 +1,43 @@
+---
+- hosts: all
+  become: true
+  tasks:
+    - name: Update and upgrade apt packages
+      become: true
+      apt:
+       upgrade: no
+       update_cache: yes
+       cache_valid_time: 86400 #One day
+
+    - name: Install GoLang
+      apt:
+        name: golang
+        state: present
+    - name: Install rsync
+      apt:
+        name: rsync
+        state: present
+    - name: Add Go into the PATH variable
+      shell: echo "export PATH=$PATH:/usr/local/go/bin" > /etc/profile.d/go.sh 
+    - name: Install Git
+      apt:
+        name: git
+        state: present
+    - name: Clone ReconFTW
+      git:
+        repo: https://github.com/six2dez/reconftw.git
+        dest: /opt/reconftw/
+        clone: yes
+        update: yes  
+    - name: Install ReconFTW
+      command: chdir=/opt/reconftw/ ./install.sh
+    - name: Create amass folder
+      shell: mkdir -p /home/admin/.config/amass/
+    - name: Copy Config File
+      synchronize:
+        src: files/config.ini
+        dest: /home/admin/.config/amass/config.ini
+    - name: Copy reconftw.cfg File
+      synchronize:
+        src: files/reconftw.cfg
+        dest: /opt/reconftw/reconftw.cfg
