@@ -8,8 +8,8 @@
 
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.2.2">
-    <img src="https://img.shields.io/badge/release-v2.2.2-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.3">
+    <img src="https://img.shields.io/badge/release-v2.3-green">
   </a>
    </a>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
@@ -49,6 +49,7 @@ So, what are you waiting for Go! Go! Go! :boom:
 - [💿 Installation:](#-installation)
   - [a) In your PC/VPS/VM](#a-in-your-pcvpsvm)
   - [b) Docker Image 🐳 (3 options)](#b-docker-image--3-options)
+  - [c) Terraform + Ansible](#c-terraform--ansible)
 - [⚙️ Config file:](#️-config-file)
 - [Usage:](#usage)
 - [Example Usage:](#example-usage)
@@ -110,6 +111,10 @@ However, if you wish to:
 3. Build an Axiom Controller on top of the official image
 
 Please refer to the [Docker](https://github.com/six2dez/reconftw/wiki/4.-Docker) documentation.
+
+## c) Terraform + Ansible
+
+Yes! reconFTW can also be easily deployed with Terraform and Ansible to AWS, if you want to know how to do it, you can check the guide [here](Terraform/README.md)
 
 # ⚙️ Config file:
 > A detailed explaintion of config file can be found here [Configuration file](https://github.com/six2dez/reconftw/wiki/3.-Configuration-file) :book:
@@ -199,7 +204,7 @@ FAVICON=true
 PORTSCANNER=true
 PORTSCAN_PASSIVE=true
 PORTSCAN_ACTIVE=true
-CLOUD_IP=true
+CDN_IP=true
 
 # Web analysis
 WAF_DETECTION=true
@@ -257,7 +262,7 @@ HTTPX_UNCOMMONPORTS_THREADS=100
 GOSPIDER_THREADS=20
 BRUTESPRAY_THREADS=20
 BRUTESPRAY_CONCURRENCE=10
-GAUPLUS_THREADS=10
+GAU_THREADS=10
 DNSTAKE_THREADS=100
 DALFOX_THREADS=200
 PUREDNS_PUBLIC_LIMIT=0 # Set between 2000 - 10000 if your router blows up, 0 is unlimited
@@ -271,6 +276,11 @@ PPFUZZ_THREADS=30
 DNSVALIDATOR_THREADS=200
 INTERLACE_THREADS=10
 CERO_THREADS=1000
+
+# Rate limits
+HTTPX_RATELIMIT=150
+NUCLEI_RATELIMIT=150
+FFUF_RATELIMIT=0
 
 # Timeouts
 CMSSCAN_TIMEOUT=3600
@@ -420,38 +430,41 @@ reset='\033[0m'
 # :fire: Features :fire:
 
  ## Osint
-- Domain information parser ([domainbigdata](https://domainbigdata.com/))
-- Emails addresses and users ([theHarvester](https://github.com/laramies/theHarvester), [emailfinder](https://github.com/Josue87/EmailFinder))
+- Domain information ([domainbigdata](https://domainbigdata.com/) and [amass](https://github.com/OWASP/Amass))
+- Emails addresses and users ([theHarvester](https://github.com/laramies/theHarvester) and [emailfinder](https://github.com/Josue87/EmailFinder))
 - Password leaks ([pwndb](https://github.com/davidtavarez/pwndb) and [H8mail](https://github.com/khast3x/h8mail))
 - Metadata finder ([MetaFinder](https://github.com/Josue87/MetaFinder))
 - Google Dorks ([degoogle_hunter](https://github.com/six2dez/degoogle_hunter))
 - Github Dorks ([gitdorks_go](https://github.com/damit5/gitdorks_go))
 
 ## Subdomains
-  - Passive ([amass](https://github.com/OWASP/Amass), [waybackurls](https://github.com/tomnomnom/waybackurls), [github-subdomains](https://github.com/gwen001/github-subdomains), [gau](https://github.com/lc/gau))
+  - Passive ([amass](https://github.com/OWASP/Amass) and [github-subdomains](https://github.com/gwen001/github-subdomains))
   - Certificate transparency ([ctfr](https://github.com/UnaPibaGeek/ctfr))
   - Bruteforce ([puredns](https://github.com/d3mondev/puredns))
   - Permutations ([Gotator](https://github.com/Josue87/gotator))
   - JS files & Source Code Scraping ([gospider](https://github.com/jaeles-project/gospider))
   - DNS Records ([dnsx](https://github.com/projectdiscovery/dnsx))
   - Google Analytics ID ([AnalyticsRelationships](https://github.com/Josue87/AnalyticsRelationships))
+  - TLS handshake ([cero](https://github.com/glebarez/cero))
   - Recursive search.
   - Subdomains takeover ([nuclei](https://github.com/projectdiscovery/nuclei))
   - DNS takeover ([dnstake](https://github.com/pwnesia/dnstake))
   - DNS Zone Transfer ([dig](https://linux.die.net/man/1/dig))
+  - Cloud checkers ([S3Scanner](https://github.com/sa7mon/S3Scanner) and [cloud_enum](https://github.com/initstring/cloud_enum))
 
 ## Hosts
-- IP and subdomains WAF checker ([cf-check](https://github.com/dwisiswant0/cf-check) and [wafw00f](https://github.com/EnableSecurity/wafw00f))
+- IP info ([whoisxmlapi API](https://www.whoisxmlapi.com/)
+- CDN checker ([ipcdn](https://github.com/six2dez/ipcdn))
+- WAF checker ([wafw00f](https://github.com/EnableSecurity/wafw00f))
 - Port Scanner (Active with [nmap](https://github.com/nmap/nmap) and passive with [nrich](https://gitlab.com/shodan-public/nrich))
 - Port services vulnerability checks ([searchsploit](https://github.com/offensive-security/exploitdb))
 - Password spraying ([brutespray](https://github.com/x90skysn3k/brutespray))
-- Cloud providers check ([clouddetect](https://github.com/99designs/clouddetect))
 
 ## Webs
 - Web Prober ([httpx](https://github.com/projectdiscovery/httpx) and [unimap](https://github.com/Edu4rdSHL/unimap))
 - Web screenshot ([webscreenshot](https://github.com/maaaaz/webscreenshot) or [gowitness](https://github.com/sensepost/gowitness))
 - Web templates scanner ([nuclei](https://github.com/projectdiscovery/nuclei) and [nuclei geeknik](https://github.com/geeknik/the-nuclei-templates.git))
-- Url extraction ([waybackurls](https://github.com/tomnomnom/waybackurls), [gauplus](https://github.com/bp0lr/gauplus), [gospider](https://github.com/jaeles-project/gospider), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3) and [JSA](https://github.com/w9w/JSA))
+- Url extraction ([waybackurls](https://github.com/tomnomnom/waybackurls), [gau](https://github.com/lc/gau), [gospider](https://github.com/jaeles-project/gospider), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3) and [JSA](https://github.com/w9w/JSA))
 - URLPatterns Search ([gf](https://github.com/tomnomnom/gf) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns))
 - XSS ([dalfox](https://github.com/hahwul/dalfox))
 - Open redirect ([Oralyzer](https://github.com/r0075h3ll/Oralyzer))
@@ -467,7 +480,6 @@ reset='\033[0m'
 - CMS Scanner ([CMSeeK](https://github.com/Tuhinshubhra/CMSeeK))
 - SSL tests ([testssl](https://github.com/drwetter/testssl.sh))
 - Broken Links Checker ([gospider](https://github.com/jaeles-project/gospider))
-- S3 bucket finder ([S3Scanner](https://github.com/sa7mon/S3Scanner))
 - Prototype Pollution ([ppfuzz](https://github.com/dwisiswant0/ppfuzz))
 - URL sorting by extension
 - Wordlist generation
@@ -477,6 +489,7 @@ reset='\033[0m'
 - Multithread ([Interlace](https://github.com/codingo/Interlace))
 - Custom resolvers generated list ([dnsvalidator](https://github.com/vortexau/dnsvalidator))
 - Docker container included and [DockerHub](https://hub.docker.com/r/six2dez/reconftw) integration
+- Ansible + Terraform deployment over AWS
 - Allows IP/CIDR as target
 - Resume the scan from last performed step
 - Custom output folder option
@@ -536,8 +549,7 @@ If you want to contribute to this project you can do it in multiple ways:
 **This section shows the current financial sponsors of this project**
 
 [<img src="https://pbs.twimg.com/profile_images/1360304248534282240/MomOFi40_400x400.jpg" width="100" height=auto>](https://github.com/0xtavian)
-[<img src="https://pbs.twimg.com/profile_images/1296513249702285312/fpHFDhyc_400x400.jpg" width="100" height=auto>](https://github.com/reconmap)
-[<img src="https://pbs.twimg.com/profile_images/1221701173864017922/Wg_Q7HoD_400x400.jpg" width="100" height=auto>](https://github.com/r1p)
+[<img src="https://pbs.twimg.com/profile_images/1509304017993752578/qqcKUKZb_400x400.jpg" width="100" height=auto>](https://github.com/geeknik)
 
 # Thanks :pray:
 * Thank you for lending a helping hand towards the development of the project!
