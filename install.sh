@@ -36,7 +36,7 @@ BASH_VERSION=$(bash --version | awk 'NR==1{print $4}' | cut -d'.' -f1)
 if [ ${BASH_VERSION} -lt 4 ]; then
      printf "${bred} Your Bash version is lower than 4, please update${reset}\n"
     if [ "True" = "$IS_MAC" ]; then
-        printf "${yellow} For MacOS run 'brew install bash' and rerun installer in a new terminal${reset}\n\n" 
+        printf "${yellow} For MacOS run 'brew install bash' and rerun installer in a new terminal${reset}\n\n"
         exit 1;
     fi
 fi
@@ -290,13 +290,13 @@ for repo in "${!repos[@]}"; do
         printf "${red} Unable to install $repo, try manually (${repos_step}/${#repos[@]})${reset}\n"
         double_check=true
     fi
-    if [ -s "setup.py" ]; then
-        eval $SUDO pip3 install . $DEBUG_STD
-    fi
     if [ -s "requirements.txt" ]; then
-        #eval $SUDO pip3 install -r requirements.txt $DEBUG_STD
-        eval $SUDO python3 setup.py install --record files.txt $DEBUG_STD
-        [ -s "files.txt" ] && eval xargs rm -rf < files.txt $DEBUG_STD
+        eval $SUDO pip3 install -r requirements.txt $DEBUG_STD
+        #eval $SUDO python3 setup.py install --record files.txt $DEBUG_STD
+        #[ -s "files.txt" ] && eval xargs rm -rf < files.txt $DEBUG_STD
+        #eval $SUDO pip3 install . $DEBUG_STD
+    fi
+    if [ -s "setup.py" ]; then
         eval $SUDO pip3 install . $DEBUG_STD
     fi
     if [ "massdns" = "$repo" ]; then
