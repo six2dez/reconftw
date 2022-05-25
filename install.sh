@@ -122,7 +122,10 @@ install_apt(){
     eval $SUDO systemctl enable tor $DEBUG_STD
     eval wget https://gitlab.com/api/v4/projects/33695681/packages/generic/nrich/latest/nrich_latest_amd64.deb $DEBUG_STD
     eval $SUDO dpkg -i nrich_latest_amd64.deb $DEBUG_STD
-    eval $SUDO rm -rf nrich_latest_amd64.deb  $DEBUG_STD
+    eval $SUDO rm -rf nrich_latest_amd64.deb $DEBUG_STD
+    eval curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh $DEBUG_STD
+    eval source $HOME/.cargo/env $DEBUG_STD
+    eval cargo install ripgen $DEBUG_STD
 }
 
 install_brew(){
@@ -137,6 +140,9 @@ install_brew(){
     eval brew services start tor $DEBUG_STD
     eval wget  https://gitlab.com/api/v4/projects/33695681/packages/generic/nrich/latest/nrich_latest_darwin $DEBUG_STD
     eval $SUDO sudo installer -pkg nrich_latest_darwin -target / $DEBUG_STD
+    eval brew install rustup $DEBUG_STD
+    eval rustup-init $DEBUG_STD
+    eval cargo install ripgen $DEBUG_STD
 }
 
 install_yum(){
@@ -144,11 +150,17 @@ install_yum(){
     eval $SUDO yum install python3 python3-pip gcc cmake ruby git curl libpcap-dev wget zip python3-devel pv bind-utils libopenssl-devel libffi-devel libxml2-devel libxslt-devel zlib-devel nmap jq lynx tor medusa xorg-x11-server-xvfb -y $DEBUG_STD
     eval wget https://gitlab.com/api/v4/projects/33695681/packages/generic/nrich/latest/nrich_latest_amd64.rpm $DEBUG_STD
     eval $SUDO yum localinstall nrich_latest_amd64.rpm -y $DEBUG_STD
+    eval curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh $DEBUG_STD
+    eval source $HOME/.cargo/env $DEBUG_STD
+    eval cargo install ripgen $DEBUG_STD
 }
 
 install_pacman(){
     eval $SUDO pacman -Sy install python python-pip base-devel gcc cmake ruby git curl libpcap wget zip pv bind openssl libffi libxml2 libxslt zlib nmap jq lynx tor medusa xorg-server-xvfb -y $DEBUG_STD
     eval $SUDO systemctl enable --now tor.service $DEBUG_STD
+    eval curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh $DEBUG_STD
+    eval source $HOME/.cargo/env $DEBUG_STD
+    eval cargo install ripgen $DEBUG_STD
 }
 
 eval git config --global --unset http.proxy $DEBUG_STD
