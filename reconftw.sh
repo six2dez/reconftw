@@ -2809,6 +2809,8 @@ case $opt_mode in
 			export DIFF=true
 			dir="$SCRIPTPATH/Recon/$domain"
 			cd $dir || { echo "Failed to cd directory '$dir'"; exit 1; }
+			LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
+			called_fn_dir=$dir/.called_fn 
 			$custom_function
 			cd $SCRIPTPATH || { echo "Failed to cd directory '$dir'"; exit 1; }
 			exit
