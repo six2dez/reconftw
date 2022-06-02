@@ -456,7 +456,7 @@ reset='\033[0m'
 - IP info ([whoisxmlapi API](https://www.whoisxmlapi.com/)
 - CDN checker ([ipcdn](https://github.com/six2dez/ipcdn))
 - WAF checker ([wafw00f](https://github.com/EnableSecurity/wafw00f))
-- Port Scanner (Active with [nmap](https://github.com/nmap/nmap) and passive with [nrich](https://gitlab.com/shodan-public/nrich))
+- Port Scanner (Active with [nmap](https://github.com/nmap/nmap) and passive with [smap](https://github.com/s0md3v/Smap))
 - Port services vulnerability checks ([searchsploit](https://github.com/offensive-security/exploitdb))
 - Password spraying ([brutespray](https://github.com/x90skysn3k/brutespray))
 

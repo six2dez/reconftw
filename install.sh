@@ -72,6 +72,7 @@ gotools["dnstake"]="go install -v github.com/pwnesia/dnstake/cmd/dnstake@latest"
 gotools["gowitness"]="go install -v github.com/sensepost/gowitness@latest"
 gotools["cero"]="go install -v github.com/glebarez/cero@latest"
 gotools["gitdorks_go"]="go install -v github.com/damit5/gitdorks_go@latest"
+gotools["smap"]="go install -v github.com/s0md3v/smap/cmd/smap@latest"
 
 declare -A repos
 repos["degoogle_hunter"]="six2dez/degoogle_hunter"
@@ -120,9 +121,6 @@ install_apt(){
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium -y $DEBUG_STD
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip build-essential gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb libxml2-utils procps bsdmainutils libdata-hexdump-perl -y $DEBUG_STD
     eval $SUDO systemctl enable tor $DEBUG_STD
-    eval wget https://gitlab.com/api/v4/projects/33695681/packages/generic/nrich/latest/nrich_latest_amd64.deb $DEBUG_STD
-    eval $SUDO dpkg -i nrich_latest_amd64.deb $DEBUG_STD
-    eval $SUDO rm -rf nrich_latest_amd64.deb $DEBUG_STD
     eval curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh $DEBUG_STD
     eval source $HOME/.cargo/env $DEBUG_STD
     eval cargo install ripgen $DEBUG_STD
@@ -138,8 +136,6 @@ install_brew(){
     eval brew install --cask chromium $DEBUG_STD
     eval brew install bash coreutils python massdns jq gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb libxml2-utils libdata-hexdump-perl $DEBUG_STD
     eval brew services start tor $DEBUG_STD
-    eval wget  https://gitlab.com/api/v4/projects/33695681/packages/generic/nrich/latest/nrich_latest_darwin $DEBUG_STD
-    eval $SUDO sudo installer -pkg nrich_latest_darwin -target / $DEBUG_STD
     eval brew install rustup $DEBUG_STD
     eval rustup-init $DEBUG_STD
     eval cargo install ripgen $DEBUG_STD
@@ -148,8 +144,6 @@ install_brew(){
 install_yum(){
     eval $SUDO yum groupinstall "Development Tools" -y $DEBUG_STD
     eval $SUDO yum install python3 python3-pip gcc cmake ruby git curl libpcap-dev wget zip python3-devel pv bind-utils libopenssl-devel libffi-devel libxml2-devel libxslt-devel zlib-devel nmap jq lynx tor medusa xorg-x11-server-xvfb -y $DEBUG_STD
-    eval wget https://gitlab.com/api/v4/projects/33695681/packages/generic/nrich/latest/nrich_latest_amd64.rpm $DEBUG_STD
-    eval $SUDO yum localinstall nrich_latest_amd64.rpm -y $DEBUG_STD
     eval curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh $DEBUG_STD
     eval source $HOME/.cargo/env $DEBUG_STD
     eval cargo install ripgen $DEBUG_STD
