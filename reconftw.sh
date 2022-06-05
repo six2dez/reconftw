@@ -1851,7 +1851,7 @@ function resolvers_update(){
 				[ -s "tmp_resolvers" ] && cat tmp_resolvers | anew -q $resolvers
 				[ -s "tmp_resolvers" ] && rm -f tmp_resolvers &>/dev/null
 				[ ! -s "$resolvers" ] && wget -q https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt -O $resolvers &>/dev/null
-				[ ! -s "$resolvers_trusted" ] && wget -q https://raw.githubusercontent.com/trickest/resolvers/main/resolvers_trusted.txt -O $resolvers_trusted &>/dev/null
+				[ ! -s "$resolvers_trusted" ] && wget -q https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt -O $resolvers_trusted &>/dev/null
 				notification "Updated\n" good
 	  		fi
 		else
@@ -1867,7 +1867,7 @@ function resolvers_update(){
 		if  [ ! -s "$resolvers" ] || [[ $(find "$resolvers" -mtime +1 -print) ]] ; then
 			notification "Resolvers seem older than 1 day\n Downloading new resolvers..." warn
 			wget -q https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt -O $resolvers &>/dev/null
-			wget -q https://raw.githubusercontent.com/trickest/resolvers/main/resolvers_trusted.txt -O $resolvers_trusted &>/dev/null
+			wget -q https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt -O $resolvers_trusted &>/dev/null
 			notification "Resolvers updated\n" good
 		fi
 	fi
@@ -1875,7 +1875,7 @@ function resolvers_update(){
 
 function resolvers_update_quick(){
 	axiom-exec 'wget -O /home/op/lists/resolvers.txt https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt' &>/dev/null
-	axiom-exec 'wget -O /home/op/lists/resolvers_trusted.txt https://raw.githubusercontent.com/trickest/resolvers/main/resolvers_trusted.txt' &>/dev/null
+	axiom-exec 'wget -O /home/op/lists/resolvers_trusted.txt https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt' &>/dev/null
 }
 
 function ipcidr_target(){

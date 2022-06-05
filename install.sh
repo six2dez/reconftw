@@ -433,7 +433,7 @@ if [ "$generate_resolvers" = true ]; then
 		[ -s "tmp_resolvers" ] && cat tmp_resolvers | anew -q $resolvers
 		[ -s "tmp_resolvers" ] && rm -f tmp_resolvers &>/dev/null
 		[ ! -s "$resolvers" ] && wget -q https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt -O $resolvers &>/dev/null
-        [ ! -s "$resolvers_trusted" ] && wget -q https://raw.githubusercontent.com/trickest/resolvers/main/resolvers_trusted.txt -O $resolvers_trusted &>/dev/null
+        [ ! -s "$resolvers_trusted" ] && wget -q https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt -O $resolvers_trusted &>/dev/null
 		printf "${yellow} Resolvers updated\n ${reset}\n\n"
 	fi
 	generate_resolvers=false
@@ -441,7 +441,7 @@ else
 	[ ! -s "$resolvers" ] || if [[ $(find "$resolvers" -mtime +1 -print) ]] ; then
 		 ${reset}"\n\nChecking resolvers lists...\n Accurate resolvers are the key to great results\n Downloading new resolvers ${reset}\n\n"
 		wget -q https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt -O $resolvers &>/dev/null
-        wget -q https://raw.githubusercontent.com/trickest/resolvers/main/resolvers_trusted.txt -O $resolvers_trusted &>/dev/null
+        wget -q https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt -O $resolvers_trusted &>/dev/null
 		printf "${yellow} Resolvers updated\n ${reset}\n\n"
 	fi
 fi
