@@ -102,6 +102,7 @@ function tools_installed(){
 	type -P smap &>/dev/null || { printf "${bred} [*] smap		[NO]${reset}\n"; allinstalled=false;}
 	type -P gitdorks_go &>/dev/null || { printf "${bred} [*] gitdorks_go	[NO]${reset}\n"; allinstalled=false;}
 	type -P ripgen &>/dev/null || { printf "${bred} [*] ripgen		[NO]${reset}\n${reset}"; allinstalled=false;}
+	type -P dsieve &>/dev/null || { printf "${bred} [*] dsieve		[NO]${reset}\n${reset}"; allinstalled=false;}
 
 	if [ "${allinstalled}" = true ]; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
@@ -385,9 +386,10 @@ function sub_active(){
 		find .tmp -type f -iname "*_subs.txt" -exec cat {} + | anew -q .tmp/subs_no_resolved.txt
 		deleteOutScoped $outOfScope_file .tmp/subs_no_resolved.txt
 		if [ ! "$AXIOM" = true ]; then
+			resolvers_update_quick_local
 			[ -s ".tmp/subs_no_resolved.txt" ] && puredns resolve .tmp/subs_no_resolved.txt -w .tmp/subdomains_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT  --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT &>/dev/null
 		else
-			resolvers_update_quick
+			resolvers_update_quick_axiom
 			[ -s ".tmp/subs_no_resolved.txt" ] && axiom-scan .tmp/subs_no_resolved.txt -m puredns-resolve -r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -o .tmp/subdomains_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			echo $domain | dnsx -retry 3 -silent 2>>"$LOGFILE" | anew -q .tmp/subdomains_tmp.txt
 		fi
@@ -413,6 +415,7 @@ function sub_dns(){
 			[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r 'try .a[], try .aaaa[], try .cname[], try .ns[], try .ptr[], try .mx[], try .soa[]' 2>/dev/null | grep ".$domain$" | anew -q .tmp/subdomains_dns.txt
 			[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r 'try .a[]' | sort -u | dnsx -retry 3 -silent -ptr -resp-only 2>/dev/null | grep ".$domain$" | anew -q .tmp/subdomains_dns.txt
 			[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r 'try "\(.host) - \(.a[])"' 2>/dev/null | sort -u -k2 | anew -q subdomains/subdomains_ips.txt
+			resolvers_update_quick_local
 			[ -s ".tmp/subdomains_dns.txt" ] && puredns resolve .tmp/subdomains_dns.txt -w .tmp/subdomains_dns_resolved.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT  --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" &>/dev/null
 		else
 			[ -s "subdomains/subdomains.txt" ] && axiom-scan subdomains/subdomains.txt -m dnsx -retry 3 -a -aaaa -cname -ns -ptr -mx -soa -json -o subdomains/subdomains_dnsregs.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
@@ -421,7 +424,7 @@ function sub_dns(){
 			[ -s ".tmp/subdomains_dns_ptr_reverse.txt" ] && cat .tmp/subdomains_dns_ptr_reverse.txt | grep ".$domain$" | anew -q .tmp/subdomains_dns.txt
 			[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r 'try .a[], try .aaaa[], try .cname[], try .ns[], try .ptr[], try .mx[], try .soa[]' 2>/dev/null | grep ".$domain$" | anew -q .tmp/subdomains_dns.txt
 			[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r 'try "\(.host) - \(.a[])"' 2>/dev/null | sort -u -k2 | anew -q subdomains/subdomains_ips.txt
-			resolvers_update_quick
+			resolvers_update_quick_axiom
 			[ -s ".tmp/subdomains_dns.txt" ] && axiom-scan .tmp/subdomains_dns.txt -m puredns-resolve -r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -o .tmp/subdomains_dns_resolved.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 		fi
 
@@ -436,6 +439,7 @@ function sub_brute(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBBRUTE" = true ]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Bruteforce Subdomain Enumeration"
 		if [ ! "$AXIOM" = true ]; then
+			resolvers_update_quick_local
 			if [ "$DEEP" = true ]; then
 				puredns bruteforce $subs_wordlist_big $domain -w .tmp/subs_brute.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT  --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" &>/dev/null
 			else
@@ -443,7 +447,7 @@ function sub_brute(){
 			fi
 			[ -s ".tmp/subs_brute.txt" ] && puredns resolve .tmp/subs_brute.txt -w .tmp/subs_brute_valid.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT  --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" &>/dev/null
 		else
-			resolvers_update_quick
+			resolvers_update_quick_axiom
 			if [ "$DEEP" = true ]; then
 				axiom-scan $subs_wordlist_big -m puredns-single $domain -r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -o .tmp/subs_brute.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			else
@@ -469,6 +473,7 @@ function sub_scraping(){
 		if [ -s "$dir/subdomains/subdomains.txt" ]; then
 			if [[ $(cat subdomains/subdomains.txt | wc -l) -le $DEEP_LIMIT ]] || [ "$DEEP" = true ] ; then
 				if [ ! "$AXIOM" = true ]; then
+					resolvers_update_quick_local
 					cat subdomains/subdomains.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info1.txt 2>>"$LOGFILE" &>/dev/null
 					[ -s ".tmp/web_full_info1.txt" ] && cat .tmp/web_full_info1.txt | jq -r 'try .url' 2>/dev/null | grep "$domain" | sed "s/*.//" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
 					[ -s ".tmp/probed_tmp_scrap.txt" ] && cat .tmp/probed_tmp_scrap.txt | httpx -tls-grab -tls-probe -csp-probe -H "${HEADER}" -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info2.txt 2>>"$LOGFILE" &>/dev/null
@@ -485,7 +490,7 @@ function sub_scraping(){
 					NUMOFLINES=$(cat .tmp/scrap_subs_resolved.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | tee .tmp/diff_scrap.txt | sed '/^$/d' | wc -l)
 					[ -s ".tmp/diff_scrap.txt" ] && cat .tmp/diff_scrap.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info3.txt 2>>"$LOGFILE" &>/dev/null
 				else
-					resolvers_update_quick
+					resolvers_update_quick_axiom
 					axiom-scan subdomains/subdomains.txt -m httpx -follow-host-redirects -H \"${HEADER}\" -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info1.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 					[ -s ".tmp/web_full_info1.txt" ] && cat .tmp/web_full_info1.txt | jq -r 'try .url' 2>/dev/null | grep "$domain" | sed "s/*.//" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
 					[ -s ".tmp/probed_tmp_scrap.txt" ] && axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -tls-grab -tls-probe -csp-probe -H \"${HEADER}\" -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info2.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
@@ -530,9 +535,10 @@ function sub_analytics(){
 			cat .tmp/probed_tmp_scrap.txt | analyticsrelationships -ch >> .tmp/analytics_subs_tmp.txt 2>>"$LOGFILE" &>/dev/null
 			[ -s ".tmp/analytics_subs_tmp.txt" ] && cat .tmp/analytics_subs_tmp.txt | grep "\.$domain$\|^$domain$" | sed "s/|__ //" | anew -q .tmp/analytics_subs_clean.txt
 			if [ ! "$AXIOM" = true ]; then
+				resolvers_update_quick_local
 				[ -s ".tmp/analytics_subs_clean.txt" ] && puredns resolve .tmp/analytics_subs_clean.txt -w .tmp/analytics_subs_resolved.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT  --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" &>/dev/null
 			else
-				resolvers_update_quick
+				resolvers_update_quick_axiom
 				[ -s ".tmp/analytics_subs_clean.txt" ] && axiom-scan .tmp/analytics_subs_clean.txt -m puredns-resolve -r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -o .tmp/analytics_subs_resolved.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			fi
 		fi
@@ -567,9 +573,10 @@ function sub_permut(){
 			return 1
 		fi
 		if [ ! "$AXIOM" = true ]; then
+			resolvers_update_quick_local
 			[ -s ".tmp/gotator1.txt" ] && puredns resolve .tmp/gotator1.txt -w .tmp/permute1.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT  --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" &>/dev/null
 		else
-			resolvers_update_quick
+			resolvers_update_quick_axiom
 			[ -s ".tmp/gotator1.txt" ] && axiom-scan .tmp/gotator1.txt -m puredns-resolve -r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -o .tmp/permute1.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 		fi
 		
@@ -606,12 +613,13 @@ function sub_recursive_passive(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUB_RECURSIVE_PASSIVE" = true ] && [ -s "subdomains/subdomains.txt" ]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Subdomains recursive search"
 		# Passive recursive
-		[ -s "subdomains/subdomains.txt" ] && ( cat subdomains/subdomains.txt | rev | cut -d '.' -f 3,2,1 | rev | sort | uniq -c | sort -nr | grep -v '1 ' | head -n 10 && cat subdomains/subdomains.txt | rev | cut -d '.' -f 4,3,2,1 | rev | sort | uniq -c | sort -nr | grep -v '1 ' | head -n 10 ) | sed -e 's/^[[:space:]]*//' | cut -d ' ' -f 2 > .tmp/subdomains_recurs_amass.txt
+		[ -s "subdomains/subdomains.txt" ] && dsieve -if subdomains/subdomains.txt -f 2:$DEEP_RECURSIVE_PASSIVE | sed 1d > .tmp/subdomains_recurs_amass.txt
 		if [ ! "$AXIOM" = true ]; then
+			resolvers_update_quick_local
 			[ -s ".tmp/subdomains_recurs_amass.txt" ] && amass enum -passive -df .tmp/subdomains_recurs_amass.txt -nf subdomains/subdomains.txt -config $AMASS_CONFIG 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
 			[ -s ".tmp/passive_recursive.txt" ] && puredns resolve .tmp/passive_recursive.txt -w .tmp/passive_recurs_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT  --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" &>/dev/null
 		else
-			resolvers_update_quick
+			resolvers_update_quick_axiom
 			[ -s ".tmp/subdomains_recurs_amass.txt" ] && axiom-scan .tmp/subdomains_recurs_amass.txt -m amass -passive -o .tmp/amass_prec.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			[ -s ".tmp/amass_prec.txt" ] &&  cat .tmp/amass_prec.txt | anew -q .tmp/passive_recursive.txt
 			[ -s ".tmp/passive_recursive.txt" ] && axiom-scan .tmp/passive_recursive.txt -m puredns-resolve -r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -o .tmp/passive_recurs_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
@@ -631,14 +639,12 @@ function sub_recursive_brute(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUB_RECURSIVE_BRUTE" = true ] && [ -s "subdomains/subdomains.txt" ]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Subdomains recursive search"
 		if [[ $(cat subdomains/subdomains.txt | wc -l) -le $DEEP_LIMIT ]] ; then
-			echo "" > .tmp/brute_recursive_wordlist.txt
-			for sub in $(cat subdomains/subdomains.txt); do
-				sed "s/$/.$sub/" $subs_wordlist >> .tmp/brute_recursive_wordlist.txt
-			done
+			ripgen -d subdomains/subdomains.txt -w $subs_wordlist > .tmp/brute_recursive_wordlist.txt
 			if [ ! "$AXIOM" = true ]; then
+				resolvers_update_quick_local
 				[ -s ".tmp/brute_recursive_wordlist.txt" ] && puredns resolve .tmp/brute_recursive_wordlist.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT  --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -w .tmp/brute_recursive_result.txt 2>>"$LOGFILE" &>/dev/null
 			else
-				resolvers_update_quick
+				resolvers_update_quick_axiom
 				[ -s ".tmp/brute_recursive_wordlist.txt" ] && axiom-scan .tmp/brute_recursive_wordlist.txt -m puredns-resolve -r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -o .tmp/brute_recursive_result.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			fi
 			[ -s ".tmp/brute_recursive_result.txt" ] && cat .tmp/brute_recursive_result.txt | anew -q .tmp/brute_recursive.txt
@@ -1092,7 +1098,7 @@ function fuzz(){
 				done
 				find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | anew -q $dir/fuzzing/fuzzing_full.txt
 			else
-				axiom-exec 'wget -O /home/op/lists/fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt' &>/dev/null
+				axiom-exec 'wget -q -O - https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt > /home/op/lists/fuzz_wordlist.txt' &>/dev/null
 				axiom-scan .tmp/webs_all.txt -m ffuf -w /home/op/lists/fuzz_wordlist.txt -H \"${HEADER}\" $FFUF_FLAGS -maxtime $FFUF_MAXTIME -of json -o $dir/.tmp/fuzzing/ffuf-content.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 				[ -s "$dir/.tmp/fuzzing/ffuf-content.json" ] && cat $dir/.tmp/fuzzing/ffuf-content.json | jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' | sort > $dir/.tmp/fuzzing/ffuf-content.tmp
 				for sub in $(cat .tmp/webs_all.txt); do
@@ -1850,32 +1856,39 @@ function resolvers_update(){
 				dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads $DNSVALIDATOR_THREADS -o tmp_resolvers &>/dev/null
 				[ -s "tmp_resolvers" ] && cat tmp_resolvers | anew -q $resolvers
 				[ -s "tmp_resolvers" ] && rm -f tmp_resolvers &>/dev/null
-				[ ! -s "$resolvers" ] && wget -q https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt -O $resolvers &>/dev/null
-				[ ! -s "$resolvers_trusted" ] && wget -q https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt -O $resolvers_trusted &>/dev/null
+				[ ! -s "$resolvers" ] && wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > $resolvers &>/dev/null
+				[ ! -s "$resolvers_trusted" ] && wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt > $resolvers_trusted &>/dev/null
 				notification "Updated\n" good
 	  		fi
 		else
 			notification "Checking resolvers lists...\n Accurate resolvers are the key to great results\n This may take around 10 minutes if it's not updated" warn
 			# shellcheck disable=SC2016
 			axiom-exec 'if [ $(find "/home/op/lists/resolvers.txt" -mtime +1 -print) ] || [ $(cat /home/op/lists/resolvers.txt | wc -l) -le 40 ] ; then dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 200 -o /home/op/lists/resolvers.txt ; fi' &>/dev/null
-			axiom-exec 'wget -O /home/op/lists/resolvers.txt https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt' &>/dev/null
-			axiom-exec 'wget -O /home/op/lists/resolvers_trusted.txt https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt' &>/dev/null
+			axiom-exec 'wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > /home/op/lists/resolvers.txt' &>/dev/null
+			axiom-exec 'wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt > /home/op/lists/resolvers_trusted.txt' &>/dev/null
 			notification "Updated\n" good
 		fi
 		generate_resolvers=false
 	else
 		if  [ ! -s "$resolvers" ] || [[ $(find "$resolvers" -mtime +1 -print) ]] ; then
 			notification "Resolvers seem older than 1 day\n Downloading new resolvers..." warn
-			wget -q https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt -O $resolvers &>/dev/null
-			wget -q https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt -O $resolvers_trusted &>/dev/null
+			wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > $resolvers &>/dev/null
+			wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt > $resolvers_trusted &>/dev/null
 			notification "Resolvers updated\n" good
 		fi
 	fi
 }
 
-function resolvers_update_quick(){
-	axiom-exec 'wget -O /home/op/lists/resolvers.txt https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt' &>/dev/null
-	axiom-exec 'wget -O /home/op/lists/resolvers_trusted.txt https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt' &>/dev/null
+function resolvers_update_quick_local(){
+	if [ "$update_resolvers" = true ]; then
+		wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > $resolvers &>/dev/null
+		wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt > $resolvers_trusted &>/dev/null
+	fi
+}
+
+function resolvers_update_quick_axiom(){
+	axiom-exec 'wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > /home/op/lists/resolvers.txt' &>/dev/null
+	axiom-exec 'wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt > /home/op/lists/resolvers_trusted.txt' &>/dev/null
 }
 
 function ipcidr_target(){

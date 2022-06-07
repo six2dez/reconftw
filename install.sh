@@ -73,6 +73,7 @@ gotools["gowitness"]="go install -v github.com/sensepost/gowitness@latest"
 gotools["cero"]="go install -v github.com/glebarez/cero@latest"
 gotools["gitdorks_go"]="go install -v github.com/damit5/gitdorks_go@latest"
 gotools["smap"]="go install -v github.com/s0md3v/smap/cmd/smap@latest"
+gotools["dsieve"]="go install -v github.com/trickest/dsieve@latest"
 
 declare -A repos
 repos["degoogle_hunter"]="six2dez/degoogle_hunter"
@@ -271,8 +272,8 @@ printf "${bblue}\n Running: Installing repositories (${#repos[@]})${reset}\n\n"
 # Repos with special configs
 eval git clone https://github.com/projectdiscovery/nuclei-templates ~/nuclei-templates $DEBUG_STD
 eval git clone https://github.com/geeknik/the-nuclei-templates.git ~/nuclei-templates/extra_templates $DEBUG_STD
-eval wget -nc -O ~/nuclei-templates/ssrf_nagli.yaml https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/ssrf.yaml $DEBUG_STD
-eval wget -nc -O ~/nuclei-templates/sap-redirect_nagli.yaml https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/sap-redirect.yaml $DEBUG_STD
+eval wget -q -O - https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/ssrf.yaml > ~/nuclei-templates/ssrf_nagli.yaml $DEBUG_STD
+eval wget -q -O - https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/sap-redirect.yaml > ~/nuclei-templates/sap-redirect_nagli.yaml $DEBUG_STD
 eval nuclei -update-templates $DEBUG_STD
 cd ~/nuclei-templates/extra_templates && eval git pull $DEBUG_STD
 cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
@@ -359,21 +360,21 @@ eval notify $DEBUG_STD
 
 printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 ## Downloads
-eval wget -nc -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini $DEBUG_STD
-eval wget -nc -O ~/.gf/potential.json https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json $DEBUG_STD
-eval wget -nc -O ~/.config/notify/provider-config.yaml https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw $DEBUG_STD
-eval wget -nc -O getjswords.py https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py $DEBUG_STD
-eval wget -nc -O subdomains_big.txt https://wordlists-cdn.assetnote.io/data/manual/best-dns-wordlist.txt $DEBUG_STD
-eval wget -O resolvers_trusted.txt https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt $DEBUG_STD
-eval wget -O subdomains.txt https://gist.github.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw $DEBUG_STD
-eval wget -O permutations_list.txt https://gist.github.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw $DEBUG_STD
-eval wget -nc -O fuzz_wordlist.txt https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt $DEBUG_STD
-eval wget -O lfi_wordlist.txt https://gist.githubusercontent.com/six2dez/a89a0c7861d49bb61a09822d272d5395/raw $DEBUG_STD
-eval wget -O ssti_wordlist.txt https://gist.githubusercontent.com/six2dez/ab5277b11da7369bf4e9db72b49ad3c1/raw $DEBUG_STD
-eval wget -O headers_inject.txt https://gist.github.com/six2dez/d62ab8f8ffd28e1c206d401081d977ae/raw $DEBUG_STD
-eval wget -O axiom_config.sh https://gist.githubusercontent.com/six2dez/6e2d9f4932fd38d84610eb851014b26e/raw $DEBUG_STD
-eval wget -O ~/nuclei-templates/extra_templates/ssrf.yaml https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/ssrf.yaml $DEBUG_STD
-eval wget -O ~/nuclei-templates/extra_templates/sap-redirect.yaml https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/sap-redirect.yaml $DEBUG_STD
+eval wget -q -O - https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini > ~/.config/amass/config.ini $DEBUG_STD
+eval wget -q -O - https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json > ~/.gf/potential.json $DEBUG_STD
+eval wget -q -O - https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw ~/.config/notify/provider-config.yaml $DEBUG_STD
+eval wget -q -O - https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py > getjswords.py $DEBUG_STD
+eval wget -q -O - https://wordlists-cdn.assetnote.io/data/manual/best-dns-wordlist.txt > subdomains_big.txt $DEBUG_STD
+eval wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt > resolvers_trusted.txt $DEBUG_STD
+eval wget -q -O - https://gist.github.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw > subdomains.txt $DEBUG_STD
+eval wget -q -O - https://gist.github.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw > permutations_list.txt $DEBUG_STD
+eval wget -q -O - https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt > fuzz_wordlist.txt $DEBUG_STD
+eval wget -q -O - https://gist.githubusercontent.com/six2dez/a89a0c7861d49bb61a09822d272d5395/raw > lfi_wordlist.txt $DEBUG_STD
+eval wget -q -O - https://gist.githubusercontent.com/six2dez/ab5277b11da7369bf4e9db72b49ad3c1/raw > ssti_wordlist.txt $DEBUG_STD
+eval wget -q -O - https://gist.github.com/six2dez/d62ab8f8ffd28e1c206d401081d977ae/raw > headers_inject.txt $DEBUG_STD
+eval wget -q -O - https://gist.githubusercontent.com/six2dez/6e2d9f4932fd38d84610eb851014b26e/raw > axiom_config.sh $DEBUG_STD
+eval wget -q -O - https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/ssrf.yaml > ~/nuclei-templates/extra_templates/ssrf.yaml $DEBUG_STD
+eval wget -q -O - https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/sap-redirect.yaml > ~/nuclei-templates/extra_templates/sap-redirect.yaml $DEBUG_STD
 eval $SUDO chmod +x $tools/axiom_config.sh
 
 ## Last check
@@ -432,16 +433,16 @@ if [ "$generate_resolvers" = true ]; then
 		dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads $DNSVALIDATOR_THREADS -o tmp_resolvers &>/dev/null
 		[ -s "tmp_resolvers" ] && cat tmp_resolvers | anew -q $resolvers
 		[ -s "tmp_resolvers" ] && rm -f tmp_resolvers &>/dev/null
-		[ ! -s "$resolvers" ] && wget -q https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt -O $resolvers &>/dev/null
-        [ ! -s "$resolvers_trusted" ] && wget -q https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt -O $resolvers_trusted &>/dev/null
+		[ ! -s "$resolvers" ] && wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > $resolvers &>/dev/null
+        [ ! -s "$resolvers_trusted" ] && wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt > $resolvers_trusted &>/dev/null
 		printf "${yellow} Resolvers updated\n ${reset}\n\n"
 	fi
 	generate_resolvers=false
 else
 	[ ! -s "$resolvers" ] || if [[ $(find "$resolvers" -mtime +1 -print) ]] ; then
 		 ${reset}"\n\nChecking resolvers lists...\n Accurate resolvers are the key to great results\n Downloading new resolvers ${reset}\n\n"
-		wget -q https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt -O $resolvers &>/dev/null
-        wget -q https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt -O $resolvers_trusted &>/dev/null
+		wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > $resolvers &>/dev/null
+        wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt > $resolvers_trusted &>/dev/null
 		printf "${yellow} Resolvers updated\n ${reset}\n\n"
 	fi
 fi
