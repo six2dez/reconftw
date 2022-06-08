@@ -613,7 +613,7 @@ function sub_recursive_passive(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUB_RECURSIVE_PASSIVE" = true ] && [ -s "subdomains/subdomains.txt" ]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Subdomains recursive search"
 		# Passive recursive
-		[ -s "subdomains/subdomains.txt" ] && dsieve -if subdomains/subdomains.txt -f 2:$DEEP_RECURSIVE_PASSIVE | sed 1d > .tmp/subdomains_recurs_amass.txt
+		[ -s "subdomains/subdomains.txt" ] && dsieve -if subdomains/subdomains.txt -f 3:$DEEP_RECURSIVE_PASSIVE | sed 1d > .tmp/subdomains_recurs_amass.txt
 		if [ ! "$AXIOM" = true ]; then
 			resolvers_update_quick_local
 			[ -s ".tmp/subdomains_recurs_amass.txt" ] && amass enum -passive -df .tmp/subdomains_recurs_amass.txt -nf subdomains/subdomains.txt -config $AMASS_CONFIG 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
