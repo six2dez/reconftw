@@ -360,7 +360,7 @@ eval notify $DEBUG_STD
 
 printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 ## Downloads
-eval wget -q -O - https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini > ~/.config/amass/config.ini $DEBUG_STD
+eval wget -q -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini $DEBUG_STD
 eval wget -q -O - https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json > ~/.gf/potential.json $DEBUG_STD
 eval wget -q -O - https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw ~/.config/notify/provider-config.yaml $DEBUG_STD
 eval wget -q -O - https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py > getjswords.py $DEBUG_STD
