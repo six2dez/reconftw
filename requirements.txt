@@ -39,3 +39,4 @@ urllib3                 # multiple
 uro                     # Tool
 uvicorn                 # theHarvester
 uvloop;platform_system != "Windows" # theHarvester
+degoogle                # degoogle_hunter
