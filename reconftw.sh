@@ -367,10 +367,8 @@ function sub_active(){
 		else
 			resolvers_update_quick_axiom
 			[ -s ".tmp/subs_no_resolved.txt" ] && axiom-scan .tmp/subs_no_resolved.txt -m puredns-resolve -r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -o .tmp/subdomains_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-			echo $domain | dnsx -retry 3 -silent 2>>"$LOGFILE" | anew -q .tmp/subdomains_tmp.txt
 		fi
 		echo $domain | dnsx -retry 3 -silent -r $resolvers_trusted 2>>"$LOGFILE" | anew -q .tmp/subdomains_tmp.txt
-
 		if [ "$DEEP" = true ]; then
 			cat .tmp/subdomains_tmp.txt | cero -c $CERO_THREADS -p $TLS_PORTS 2>>"$LOGFILE" | sed 's/^*.//' | grep -aE "\." | anew -q .tmp/subdomains_tmp.txt
 		else
@@ -389,7 +387,7 @@ function sub_dns(){
 		if [ ! "$AXIOM" = true ]; then
 			[ -s "subdomains/subdomains.txt" ] && cat subdomains/subdomains.txt | dnsx -r $resolvers_trusted -a -aaaa -cname -ns -ptr -mx -soa -silent -retry 3 -json -o subdomains/subdomains_dnsregs.json 2>>"$LOGFILE" &>/dev/null
 			[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r 'try .a[], try .aaaa[], try .cname[], try .ns[], try .ptr[], try .mx[], try .soa[]' 2>/dev/null | grep ".$domain$" | anew -q .tmp/subdomains_dns.txt
-			[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r 'try .a[]' | sort -u | dnsx -retry 3 -silent -ptr -resp-only 2>/dev/null | grep ".$domain$" | anew -q .tmp/subdomains_dns.txt
+			[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r 'try .a[]' | sort -u | dnsx -retry 3 -silent -ptr -r $resolvers_trusted -resp-only 2>/dev/null | grep ".$domain$" | anew -q .tmp/subdomains_dns.txt
 			[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r 'try "\(.host) - \(.a[])"' 2>/dev/null | sort -u -k2 | anew -q subdomains/subdomains_ips.txt
 			resolvers_update_quick_local
 			[ -s ".tmp/subdomains_dns.txt" ] && puredns resolve .tmp/subdomains_dns.txt -w .tmp/subdomains_dns_resolved.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT  --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" &>/dev/null
@@ -1872,7 +1870,7 @@ function ipcidr_target(){
 	if [[ $1 =~ ^$IP_CIDR_REGEX ]]; then
 		echo $1 | mapcidr -silent | anew -q target_reconftw_ipcidr.txt
 		if [ -s "./target_reconftw_ipcidr.txt" ]; then 
-			[ "$REVERSE_IP" = true ] && cat ./target_reconftw_ipcidr.txt | dnsx -ptr -resp-only -silent -retry 3 | unfurl -u domains 2>/dev/null | sed 's/\.$//' | anew -q ./target_reconftw_ipcidr.txt
+			[ "$REVERSE_IP" = true ] && cat ./target_reconftw_ipcidr.txt | dnsx -ptr -resp-only -silent -retry 3 -r $resolvers_trusted | unfurl -u domains 2>/dev/null | sed 's/\.$//' | anew -q ./target_reconftw_ipcidr.txt
 			if [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -eq 1 ]]; then
 				domain=$(cat ./target_reconftw_ipcidr.txt)
 			elif [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -gt 1 ]]; then
