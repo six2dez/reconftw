@@ -360,21 +360,22 @@ eval notify $DEBUG_STD
 
 printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 ## Downloads
-eval wget -q -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini $DEBUG_STD
-eval wget -q -O - https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json > ~/.gf/potential.json $DEBUG_STD
-eval wget -q -O - https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw ~/.config/notify/provider-config.yaml $DEBUG_STD
-eval wget -q -O - https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py > getjswords.py $DEBUG_STD
-eval wget -q -O - https://wordlists-cdn.assetnote.io/data/manual/best-dns-wordlist.txt > subdomains_big.txt $DEBUG_STD
-eval wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt > resolvers_trusted.txt $DEBUG_STD
-eval wget -q -O - https://gist.github.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw > subdomains.txt $DEBUG_STD
-eval wget -q -O - https://gist.github.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw > permutations_list.txt $DEBUG_STD
-eval wget -q -O - https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt > fuzz_wordlist.txt $DEBUG_STD
-eval wget -q -O - https://gist.githubusercontent.com/six2dez/a89a0c7861d49bb61a09822d272d5395/raw > lfi_wordlist.txt $DEBUG_STD
-eval wget -q -O - https://gist.githubusercontent.com/six2dez/ab5277b11da7369bf4e9db72b49ad3c1/raw > ssti_wordlist.txt $DEBUG_STD
-eval wget -q -O - https://gist.github.com/six2dez/d62ab8f8ffd28e1c206d401081d977ae/raw > headers_inject.txt $DEBUG_STD
-eval wget -q -O - https://gist.githubusercontent.com/six2dez/6e2d9f4932fd38d84610eb851014b26e/raw > axiom_config.sh $DEBUG_STD
-eval wget -q -O - https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/ssrf.yaml > ~/nuclei-templates/extra_templates/ssrf.yaml $DEBUG_STD
-eval wget -q -O - https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/sap-redirect.yaml > ~/nuclei-templates/extra_templates/sap-redirect.yaml $DEBUG_STD
+wget -q -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini
+wget -q -O ~/.config/notify/provider-config.yaml https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw
+wget -q -O - https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json > ~/.gf/potential.json
+wget -q -O - https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py > ${tools}/getjswords.py
+wget -q -O - https://wordlists-cdn.assetnote.io/data/manual/best-dns-wordlist.txt > ${subs_wordlist_big}
+wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt > ${resolvers_trusted}
+wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > ${resolvers} 
+wget -q -O - https://gist.github.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw > ${subs_wordlist}
+wget -q -O - https://gist.github.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw > ${tools}/permutations_list.txt
+wget -q -O - https://media.githubusercontent.com/media/six2dez/OneListForAll/main/onelistforallmicro.txt > ${fuzz_wordlist}
+wget -q -O - https://gist.githubusercontent.com/six2dez/a89a0c7861d49bb61a09822d272d5395/raw > ${lfi_wordlist}
+wget -q -O - https://gist.githubusercontent.com/six2dez/ab5277b11da7369bf4e9db72b49ad3c1/raw > ${ssti_wordlist}
+wget -q -O - https://gist.github.com/six2dez/d62ab8f8ffd28e1c206d401081d977ae/raw > ${tools}/headers_inject.txt
+wget -q -O - https://gist.githubusercontent.com/six2dez/6e2d9f4932fd38d84610eb851014b26e/raw > ${tools}/axiom_config.sh
+wget -q -O - https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/ssrf.yaml > ~/nuclei-templates/extra_templates/ssrf.yaml
+wget -q -O - https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/sap-redirect.yaml > ~/nuclei-templates/extra_templates/sap-redirect.yaml
 eval $SUDO chmod +x $tools/axiom_config.sh
 
 ## Last check
