@@ -1869,8 +1869,8 @@ function resolvers_update(){
 
 function resolvers_update_quick_local(){
 	if [ "$update_resolvers" = true ]; then
-		wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > $resolvers &>/dev/null
-		wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt > $resolvers_trusted &>/dev/null
+		wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > $resolvers
+		wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt > $resolvers_trusted
 	fi
 }
 
