@@ -97,7 +97,7 @@ function tools_installed(){
 	type -P ipcdn &>/dev/null || { printf "${bred} [*] ipcdn		[NO]${reset}\n"; allinstalled=false;}
 	type -P interactsh-client &>/dev/null || { printf "${bred} [*] interactsh-client	[NO]${reset}\n"; allinstalled=false;}
 	type -P uro &>/dev/null || { printf "${bred} [*] uro		[NO]${reset}\n"; allinstalled=false;}
-	type -P cero &>/dev/null || { printf "${bred} [*] cero		[NO]${reset}\n"; allinstalled=false;}
+	type -P tlsx &>/dev/null || { printf "${bred} [*] tlsx		[NO]${reset}\n"; allinstalled=false;}
 	type -P bbrf &>/dev/null || { printf "${bred} [*] bbrf		[NO]${reset}\n"; allinstalled=false;}
 	type -P smap &>/dev/null || { printf "${bred} [*] smap		[NO]${reset}\n"; allinstalled=false;}
 	type -P gitdorks_go &>/dev/null || { printf "${bred} [*] gitdorks_go	[NO]${reset}\n"; allinstalled=false;}
@@ -372,9 +372,9 @@ function sub_active(){
 		fi
 		echo $domain | dnsx -retry 3 -silent -r $resolvers_trusted 2>>"$LOGFILE" | anew -q .tmp/subdomains_tmp.txt
 		if [ "$DEEP" = true ]; then
-			cat .tmp/subdomains_tmp.txt | cero -c $CERO_THREADS -p $TLS_PORTS 2>>"$LOGFILE" | sed 's/^*.//' | grep -aE "\." | anew -q .tmp/subdomains_tmp.txt
+			cat .tmp/subdomains_tmp.txt | tlsx -san -cn -silent -ro -c $TLSX_THREADS -p $TLS_PORTS | anew -q .tmp/subdomains_tmp.txt
 		else
-			cat .tmp/subdomains_tmp.txt | cero -c $CERO_THREADS 2>>"$LOGFILE" | sed 's/^*.//' | grep -aE "\." | anew -q .tmp/subdomains_tmp.txt
+			cat .tmp/subdomains_tmp.txt | tlsx -san -cn -silent -ro -c $TLSX_THREADS | anew -q .tmp/subdomains_tmp.txt
 		fi
 		NUMOFLINES=$(cat .tmp/subdomains_tmp.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (active resolution)" ${FUNCNAME[0]}
