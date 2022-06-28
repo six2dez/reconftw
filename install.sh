@@ -32,6 +32,8 @@ else
 fi
 
 # Check Bash version
+(bash --version | awk 'NR==1{print $4}' | cut -d'.' -f1) &>/dev/null || echo "Unable to get bash version, for MacOS run 'brew install bash' and rerun installer in a new terminal" && exit 1
+
 BASH_VERSION=$(bash --version | awk 'NR==1{print $4}' | cut -d'.' -f1)
 if [ ${BASH_VERSION} -lt 4 ]; then
      printf "${bred} Your Bash version is lower than 4, please update${reset}\n"
