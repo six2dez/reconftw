@@ -18,11 +18,11 @@ fastapi                 # theHarvester
 future                  # multiple
 h8mail                  # Tool
 ipwhois                 # fav-up
-jsbeautifier            # Linkfinder
 metafinder              # Tool
 mmh3                    # fav-up
 netaddr                 # dnsvalidator
 orjson                  # theHarvester
+psutil                  # xnLinkFinder
 pyppeteer               # theHarvester
 PySocks                 # pwndb
 PyYAML                  # theHarvester
@@ -33,6 +33,7 @@ s3scanner               # Tool
 setuptools              # theHarvester
 slowapi                 # theHarvester
 starlette               # theHarvester
+termcolor               # xnLinkFinder
 tqdm                    # multiple
 ujson                   # theHarvester
 urllib3                 # multiple

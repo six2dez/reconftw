@@ -471,7 +471,7 @@ reset='\033[0m'
 - SSRF (headers [interactsh](https://github.com/projectdiscovery/interactsh) and param values with [ffuf](https://github.com/ffuf/ffuf))
 - CRLF ([crlfuzz](https://github.com/dwisiswant0/crlfuzz))
 - Favicon Real IP ([fav-up](https://github.com/pielco11/fav-up))
-- Javascript analysis ([subjs](https://github.com/lc/subjs), [JSA](https://github.com/w9w/JSA), [LinkFinder](https://github.com/GerbenJavado/LinkFinder), [getjswords](https://github.com/m4ll0k/BBTz))
+- Javascript analysis ([subjs](https://github.com/lc/subjs), [JSA](https://github.com/w9w/JSA), [xnLinkFinder](https://github.com/xnl-h4ck3r/xnLinkFinder), [getjswords](https://github.com/m4ll0k/BBTz))
 - Fuzzing ([ffuf](https://github.com/ffuf/ffuf))
 - Cors ([Corsy](https://github.com/s0md3v/Corsy))
 - LFI Checks ([ffuf](https://github.com/ffuf/ffuf))
