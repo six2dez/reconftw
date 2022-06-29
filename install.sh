@@ -222,7 +222,7 @@ if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$versio
             eval $SUDO tar -C /usr/local -xzf ${version}.linux-amd64.tar.gz $DEBUG_STD
         fi
         eval $SUDO ln -sf /usr/local/go/bin/go /usr/local/bin/
-        rm -rf $version*
+        #rm -rf $version*
         export GOROOT=/usr/local/go
         export GOPATH=$HOME/go
         export PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH
