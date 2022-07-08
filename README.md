@@ -275,7 +275,7 @@ RESOLVE_DOMAINS_THREADS=150
 PPFUZZ_THREADS=30
 DNSVALIDATOR_THREADS=200
 INTERLACE_THREADS=10
-CERO_THREADS=1000
+TLSX_THREADS=1000
 
 # Rate limits
 HTTPX_RATELIMIT=150
@@ -445,7 +445,7 @@ reset='\033[0m'
   - JS files & Source Code Scraping ([gospider](https://github.com/jaeles-project/gospider))
   - DNS Records ([dnsx](https://github.com/projectdiscovery/dnsx))
   - Google Analytics ID ([AnalyticsRelationships](https://github.com/Josue87/AnalyticsRelationships))
-  - TLS handshake ([cero](https://github.com/glebarez/cero))
+  - TLS handshake ([tlsx](https://github.com/projectdiscovery/tlsx))
   - Recursive search.
   - Subdomains takeover ([nuclei](https://github.com/projectdiscovery/nuclei))
   - DNS takeover ([dnstake](https://github.com/pwnesia/dnstake))
@@ -471,7 +471,7 @@ reset='\033[0m'
 - SSRF (headers [interactsh](https://github.com/projectdiscovery/interactsh) and param values with [ffuf](https://github.com/ffuf/ffuf))
 - CRLF ([crlfuzz](https://github.com/dwisiswant0/crlfuzz))
 - Favicon Real IP ([fav-up](https://github.com/pielco11/fav-up))
-- Javascript analysis ([subjs](https://github.com/lc/subjs), [JSA](https://github.com/w9w/JSA), [LinkFinder](https://github.com/GerbenJavado/LinkFinder), [getjswords](https://github.com/m4ll0k/BBTz))
+- Javascript analysis ([subjs](https://github.com/lc/subjs), [JSA](https://github.com/w9w/JSA), [xnLinkFinder](https://github.com/xnl-h4ck3r/xnLinkFinder), [getjswords](https://github.com/m4ll0k/BBTz))
 - Fuzzing ([ffuf](https://github.com/ffuf/ffuf))
 - Cors ([Corsy](https://github.com/s0md3v/Corsy))
 - LFI Checks ([ffuf](https://github.com/ffuf/ffuf))

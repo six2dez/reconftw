@@ -32,6 +32,8 @@ else
 fi
 
 # Check Bash version
+#(bash --version | awk 'NR==1{print $4}' | cut -d'.' -f1) 2&>/dev/null || echo "Unable to get bash version, for MacOS run 'brew install bash' and rerun installer in a new terminal" && exit 1
+
 BASH_VERSION=$(bash --version | awk 'NR==1{print $4}' | cut -d'.' -f1)
 if [ ${BASH_VERSION} -lt 4 ]; then
      printf "${bred} Your Bash version is lower than 4, please update${reset}\n"
@@ -70,7 +72,7 @@ gotools["mapcidr"]="go install -v github.com/projectdiscovery/mapcidr/cmd/mapcid
 gotools["ipcdn"]="go install -v github.com/six2dez/ipcdn@latest"
 gotools["dnstake"]="go install -v github.com/pwnesia/dnstake/cmd/dnstake@latest"
 gotools["gowitness"]="go install -v github.com/sensepost/gowitness@latest"
-gotools["cero"]="go install -v github.com/glebarez/cero@latest"
+gotools["tlsx"]="go install github.com/projectdiscovery/tlsx/cmd/tlsx@latest"
 gotools["gitdorks_go"]="go install -v github.com/damit5/gitdorks_go@latest"
 gotools["smap"]="go install -v github.com/s0md3v/smap/cmd/smap@latest"
 gotools["dsieve"]="go install -v github.com/trickest/dsieve@latest"
@@ -85,7 +87,7 @@ repos["wafw00f"]="EnableSecurity/wafw00f"
 repos["gf"]="tomnomnom/gf"
 repos["Gf-Patterns"]="1ndianl33t/Gf-Patterns"
 repos["ctfr"]="UnaPibaGeek/ctfr"
-repos["LinkFinder"]="dark-warlord14/LinkFinder"
+repos["xnLinkFinder"]="xnl-h4ck3r/xnLinkFinder"
 repos["Corsy"]="s0md3v/Corsy"
 repos["CMSeeK"]="Tuhinshubhra/CMSeeK"
 repos["fav-up"]="pielco11/fav-up"
@@ -220,7 +222,7 @@ if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$versio
             eval $SUDO tar -C /usr/local -xzf ${version}.linux-amd64.tar.gz $DEBUG_STD
         fi
         eval $SUDO ln -sf /usr/local/go/bin/go /usr/local/bin/
-        rm -rf $version*
+        #rm -rf $version*
         export GOROOT=/usr/local/go
         export GOPATH=$HOME/go
         export PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH
@@ -369,7 +371,7 @@ wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers
 wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > ${resolvers} 
 wget -q -O - https://gist.github.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw > ${subs_wordlist}
 wget -q -O - https://gist.github.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw > ${tools}/permutations_list.txt
-wget -q -O - https://media.githubusercontent.com/media/six2dez/OneListForAll/main/onelistforallmicro.txt > ${fuzz_wordlist}
+wget -q -O - https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt > ${fuzz_wordlist}
 wget -q -O - https://gist.githubusercontent.com/six2dez/a89a0c7861d49bb61a09822d272d5395/raw > ${lfi_wordlist}
 wget -q -O - https://gist.githubusercontent.com/six2dez/ab5277b11da7369bf4e9db72b49ad3c1/raw > ${ssti_wordlist}
 wget -q -O - https://gist.github.com/six2dez/d62ab8f8ffd28e1c206d401081d977ae/raw > ${tools}/headers_inject.txt
