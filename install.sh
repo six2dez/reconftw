@@ -75,7 +75,7 @@ gotools["gowitness"]="go install -v github.com/sensepost/gowitness@latest"
 gotools["tlsx"]="go install github.com/projectdiscovery/tlsx/cmd/tlsx@latest"
 gotools["gitdorks_go"]="go install -v github.com/damit5/gitdorks_go@latest"
 gotools["smap"]="go install -v github.com/s0md3v/smap/cmd/smap@latest"
-gotools["dsieve"]="go install -v github.com/trickest/dsieve@latest"
+gotools["dsieve"]="go install -v github.com/six2dez/dsieve@master"
 
 declare -A repos
 repos["degoogle_hunter"]="six2dez/degoogle_hunter"
@@ -362,8 +362,8 @@ eval notify $DEBUG_STD
 
 printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 ## Downloads
-wget -q -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini
-wget -q -O ~/.config/notify/provider-config.yaml https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw
+[ ! -f ~/.config/amass/config.ini ] && wget -q -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini
+[ ! -f ~/.config/notify/provider-config.yaml ] && wget -q -O ~/.config/notify/provider-config.yaml https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw
 wget -q -O - https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json > ~/.gf/potential.json
 wget -q -O - https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py > ${tools}/getjswords.py
 wget -q -O - https://wordlists-cdn.assetnote.io/data/manual/best-dns-wordlist.txt > ${subs_wordlist_big}
