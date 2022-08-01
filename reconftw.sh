@@ -1280,7 +1280,7 @@ function jschecks(){
 				[ -s ".tmp/js_livelinks.txt" ] && cat .tmp/js_livelinks.txt | anew .tmp/web_full_info.txt | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
 			fi
 			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
-			[ -s "js/js_livelinks.txt" ] && python3 xnLinkFinder.py -i ~/Tools/reconftw/Recon/bugcrowd.com_/js/js_livelinks.txt -o .tmp/js_endpoints.txt &>/dev/null
+			[ -s "js/js_livelinks.txt" ] && python3 xnLinkFinder.py -i js/js_livelinks.txt -o .tmp/js_endpoints.txt &>/dev/null
 			if [ -s ".tmp/js_endpoints.txt" ]; then
 				sed -i '/^\//!d' .tmp/js_endpoints.txt
 				cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt
