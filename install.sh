@@ -75,7 +75,7 @@ gotools["gowitness"]="go install -v github.com/sensepost/gowitness@latest"
 gotools["tlsx"]="go install github.com/projectdiscovery/tlsx/cmd/tlsx@latest"
 gotools["gitdorks_go"]="go install -v github.com/damit5/gitdorks_go@latest"
 gotools["smap"]="go install -v github.com/s0md3v/smap/cmd/smap@latest"
-gotools["dsieve"]="go install -v github.com/six2dez/dsieve@master"
+gotools["dsieve"]="go install -v github.com/trickest/dsieve@master"
 
 declare -A repos
 repos["degoogle_hunter"]="six2dez/degoogle_hunter"
