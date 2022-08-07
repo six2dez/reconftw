@@ -78,7 +78,7 @@ gotools["smap"]="go install -v github.com/s0md3v/smap/cmd/smap@latest"
 gotools["dsieve"]="go install -v github.com/trickest/dsieve@master"
 
 declare -A repos
-repos["degoogle_hunter"]="six2dez/degoogle_hunter"
+repos["dorks_hunter"]="six2dez/dorks_hunter"
 repos["pwndb"]="davidtavarez/pwndb"
 repos["dnsvalidator"]="vortexau/dnsvalidator"
 repos["theHarvester"]="laramies/theHarvester"
@@ -357,7 +357,6 @@ eval $SUDO chmod 755 /usr/local/bin/unimap
 eval $SUDO strip -s /usr/local/bin/unimap $DEBUG_STD
 eval $SUDO chmod 755 /usr/local/bin/ppfuzz
 eval $SUDO strip -s /usr/local/bin/ppfuzz $DEBUG_STD
-eval $SUDO chmod +x $tools/degoogle_hunter/degoogle_hunter.sh
 eval notify $DEBUG_STD
 
 printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
