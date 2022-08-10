@@ -1295,6 +1295,7 @@ function url_ext(){
 function jschecks(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$JSCHECKS" = true ]; then
 		start_func ${FUNCNAME[0]} "Javascript Scan"
+		[ ! -s ".tmp/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q .tmp/webs_all.txt
 		if [ -s "js/url_extract_js.txt" ]; then
 			printf "${yellow} Running : Fetching Urls 1/5${reset}\n"
 			if [ ! "$AXIOM" = true ]; then
@@ -1312,7 +1313,7 @@ function jschecks(){
 				[ -s ".tmp/js_livelinks.txt" ] && cat .tmp/js_livelinks.txt | anew .tmp/web_full_info.txt | grep "[200]" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
 			fi
 			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
-			[ -s "js/js_livelinks.txt" ] && python3 xnLinkFinder.py -i js/js_livelinks.txt -sf subdomains/subdomains.txt -d $XNLINKFINDER_DEPTH -o .tmp/js_endpoints.txt &>/dev/null
+			[ -s "js/js_livelinks.txt" ] && python3 xnLinkFinder.py -i js/js_livelinks.txt -sf .tmp/webs_all.txt -d $XNLINKFINDER_DEPTH -o .tmp/js_endpoints.txt &>/dev/null
 			if [ -s ".tmp/js_endpoints.txt" ]; then
 				sed -i '/^\//!d' .tmp/js_endpoints.txt
 				cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt
