@@ -6,7 +6,7 @@ dir=${tools}
 double_check=false
 
 # ARM Detection
-if [ -s "/proc/cpuinfo" ]; then
+if [ -f "/proc/cpuinfo" ]; then
     if grep -q "Raspberry Pi 3"  /proc/cpuinfo; then
         IS_ARM="True"
         RPI_3="True"
@@ -197,7 +197,7 @@ version=$(curl -L -s https://golang.org/VERSION?m=text)
 #version="go1.17.6"
 printf "${bblue} Running: Installing/Updating Golang ${reset}\n\n"
 if [ "$install_golang" = "true" ]; then
-    if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$version" = $(go version | cut -d " " -f3) ]
+    if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [[ "$version" = $(go version | cut -d " " -f3) ]]
         then
             printf "${bgreen} Golang is already installed and updated ${reset}\n\n"
         else

@@ -122,7 +122,7 @@ function tools_installed(){
 ###############################################################################################################
 
 function google_dorks(){
-	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] && [ "$GOOGLE_DORKS" = true ] && [ "$OSINT" = true ]; then
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$GOOGLE_DORKS" = true ] && [ "$OSINT" = true ]; then
 		python3 $tools/dorks_hunter/dorks_hunter.py -d $domain -o osint/dorks.txt
 		end_func "Results are saved in $domain/osint/dorks.txt" ${FUNCNAME[0]}
 	else
