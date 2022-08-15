@@ -6,7 +6,7 @@ dir=${tools}
 double_check=false
 
 # ARM Detection
-if [ -s "/proc/cpuinfo" ]; then
+if [ -f "/proc/cpuinfo" ]; then
     if grep -q "Raspberry Pi 3"  /proc/cpuinfo; then
         IS_ARM="True"
         RPI_3="True"
@@ -196,36 +196,37 @@ fi
 version=$(curl -L -s https://golang.org/VERSION?m=text)
 #version="go1.17.6"
 printf "${bblue} Running: Installing/Updating Golang ${reset}\n\n"
-if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [ "$version" = $(go version | cut -d " " -f3) ]
-    then
-        printf "${bgreen} Golang is already installed and updated ${reset}\n\n"
-    else
-        eval $SUDO rm -rf /usr/local/go $DEBUG_STD
-        if [ "True" = "$IS_ARM" ]; then
-            if [ "True" = "$RPI_3" ]; then
-                eval wget https://dl.google.com/go/${version}.linux-armv6l.tar.gz $DEBUG_STD
-                eval $SUDO tar -C /usr/local -xzf ${version}.linux-armv6l.tar.gz $DEBUG_STD
-            elif [ "True" = "$RPI_4" ]; then
-                eval wget https://dl.google.com/go/${version}.linux-arm64.tar.gz $DEBUG_STD
-                eval $SUDO tar -C /usr/local -xzf ${version}.linux-arm64.tar.gz $DEBUG_STD
-            fi
-        elif [ "True" = "$IS_MAC" ]; then
-            if [ "True" = "$IS_ARM" ]; then
-                eval wget https://dl.google.com/go/${version}.darwin-arm64.tar.gz $DEBUG_STD
-                eval $SUDO tar -C /usr/local -xzf ${version}.darwin-arm64.tar.gz $DEBUG_STD
-            else
-                eval wget https://dl.google.com/go/${version}.darwin-amd64.tar.gz $DEBUG_STD
-                eval $SUDO tar -C /usr/local -xzf ${version}.darwin-amd64.tar.gz $DEBUG_STD
-            fi
+if [ "$install_golang" = "true" ]; then
+    if [[ $(eval type go $DEBUG_ERROR | grep -o 'go is') == "go is" ]] && [[ "$version" = $(go version | cut -d " " -f3) ]]
+        then
+            printf "${bgreen} Golang is already installed and updated ${reset}\n\n"
         else
-            eval wget https://dl.google.com/go/${version}.linux-amd64.tar.gz $DEBUG_STD
-            eval $SUDO tar -C /usr/local -xzf ${version}.linux-amd64.tar.gz $DEBUG_STD
-        fi
-        eval $SUDO ln -sf /usr/local/go/bin/go /usr/local/bin/
-        #rm -rf $version*
-        export GOROOT=/usr/local/go
-        export GOPATH=$HOME/go
-        export PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH
+            eval $SUDO rm -rf /usr/local/go $DEBUG_STD
+            if [ "True" = "$IS_ARM" ]; then
+                if [ "True" = "$RPI_3" ]; then
+                    eval wget https://dl.google.com/go/${version}.linux-armv6l.tar.gz $DEBUG_STD
+                    eval $SUDO tar -C /usr/local -xzf ${version}.linux-armv6l.tar.gz $DEBUG_STD
+                elif [ "True" = "$RPI_4" ]; then
+                    eval wget https://dl.google.com/go/${version}.linux-arm64.tar.gz $DEBUG_STD
+                    eval $SUDO tar -C /usr/local -xzf ${version}.linux-arm64.tar.gz $DEBUG_STD
+                fi
+            elif [ "True" = "$IS_MAC" ]; then
+                if [ "True" = "$IS_ARM" ]; then
+                    eval wget https://dl.google.com/go/${version}.darwin-arm64.tar.gz $DEBUG_STD
+                    eval $SUDO tar -C /usr/local -xzf ${version}.darwin-arm64.tar.gz $DEBUG_STD
+                else
+                    eval wget https://dl.google.com/go/${version}.darwin-amd64.tar.gz $DEBUG_STD
+                    eval $SUDO tar -C /usr/local -xzf ${version}.darwin-amd64.tar.gz $DEBUG_STD
+                fi
+            else
+                eval wget https://dl.google.com/go/${version}.linux-amd64.tar.gz $DEBUG_STD
+                eval $SUDO tar -C /usr/local -xzf ${version}.linux-amd64.tar.gz $DEBUG_STD
+            fi
+            eval $SUDO ln -sf /usr/local/go/bin/go /usr/local/bin/
+            #rm -rf $version*
+            export GOROOT=/usr/local/go
+            export GOPATH=$HOME/go
+            export PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH
 cat << EOF >> ~/${profile_shell}
 
 # Golang vars
@@ -233,7 +234,9 @@ export GOROOT=/usr/local/go
 export GOPATH=\$HOME/go
 export PATH=\$GOPATH/bin:\$GOROOT/bin:\$HOME/.local/bin:\$PATH
 EOF
-
+fi
+else
+    printf "${byellow} Golang will not be configured according to the user's prefereneces (reconftw.cfg install_golang var)${reset}\n";
 fi
 
 [ -n "$GOPATH" ] || { printf "${bred} GOPATH env var not detected, add Golang env vars to your \$HOME/.bashrc or \$HOME/.zshrc:\n\n export GOROOT=/usr/local/go\n export GOPATH=\$HOME/go\n export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH\n\n"; exit 1; }
