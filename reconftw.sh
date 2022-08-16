@@ -103,6 +103,7 @@ function tools_installed(){
 	which gitdorks_go &>/dev/null || { printf "${bred} [*] gitdorks_go	[NO]${reset}\n"; allinstalled=false;}
 	which ripgen &>/dev/null || { printf "${bred} [*] ripgen		[NO]${reset}\n${reset}"; allinstalled=false;}
 	which dsieve &>/dev/null || { printf "${bred} [*] dsieve		[NO]${reset}\n${reset}"; allinstalled=false;}
+	which inscope &>/dev/null || { printf "${bred} [*] inscope		[NO]${reset}\n${reset}"; allinstalled=false;}
 
 	if [ "${allinstalled}" = true ]; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
@@ -347,6 +348,10 @@ function sub_passive(){
 				github-subdomains -d $domain -k -q -t $GITHUB_TOKENS -o .tmp/github_subdomains_psub.txt 2>>"$LOGFILE" &>/dev/null
 			fi
 		fi
+		if [ "$INSCOPE" = true ]; then
+			check_inscope .tmp/amass_psub.txt
+			check_inscope .tmp/github_subdomains_psub.txt
+		fi
 		NUMOFLINES=$(find .tmp -type f -iname "*_psub.txt" -exec cat {} + | sed "s/*.//" | anew .tmp/passive_subs.txt | sed '/^$/d' | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (passive)" ${FUNCNAME[0]}
 	else
@@ -362,6 +367,9 @@ function sub_crt(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBCRT" = true ]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Crtsh Subdomain Enumeration"
 		python3 $tools/ctfr/ctfr.py -d $domain -o .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" &>/dev/null
+		if [ "$INSCOPE" = true ]; then
+			check_inscope .tmp/crtsh_subs_tmp.txt
+		fi
 		NUMOFLINES=$(cat .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" | sed 's/\*.//g' | anew .tmp/crtsh_subs.txt | sed '/^$/d' | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (cert transparency)" ${FUNCNAME[0]}
 	else
@@ -391,6 +399,9 @@ function sub_active(){
 		else
 			cat .tmp/subdomains_tmp.txt | tlsx -san -cn -silent -ro -c $TLSX_THREADS | anew -q .tmp/subdomains_tmp.txt
 		fi
+		if [ "$INSCOPE" = true ]; then
+			check_inscope .tmp/subdomains_tmp.txt
+		fi
 		NUMOFLINES=$(cat .tmp/subdomains_tmp.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
 		end_subfunc "${NUMOFLINES} subs DNS resolved from passive" ${FUNCNAME[0]}
 	else
@@ -418,7 +429,9 @@ function sub_dns(){
 			resolvers_update_quick_axiom
 			[ -s ".tmp/subdomains_dns.txt" ] && axiom-scan .tmp/subdomains_dns.txt -m puredns-resolve -r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -o .tmp/subdomains_dns_resolved.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 		fi
-
+		if [ "$INSCOPE" = true ]; then
+			check_inscope .tmp/subdomains_dns_resolved.txt
+		fi
 		NUMOFLINES=$(cat .tmp/subdomains_dns_resolved.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (dns resolution)" ${FUNCNAME[0]}
 	else
@@ -445,6 +458,9 @@ function sub_brute(){
 				axiom-scan $subs_wordlist -m puredns-single $domain -r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -o .tmp/subs_brute.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			fi
 			[ -s ".tmp/subs_brute.txt" ] && axiom-scan .tmp/subs_brute.txt -m puredns-resolve -r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -o .tmp/subs_brute_valid.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+		fi
+		if [ "$INSCOPE" = true ]; then
+			check_inscope .tmp/subs_brute_valid.txt
 		fi
 		NUMOFLINES=$(cat .tmp/subs_brute_valid.txt 2>>"$LOGFILE" | sed "s/*.//" | grep ".$domain$" | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (bruteforce)" ${FUNCNAME[0]}
@@ -478,6 +494,9 @@ function sub_scraping(){
 					sed -i '/^.\{2048\}./d' .tmp/gospider.txt
 					[ -s ".tmp/gospider.txt" ] && cat .tmp/gospider.txt | grep -aEo 'https?://[^ ]+' | sed 's/]$//' | unfurl -u domains 2>>"$LOGFILE" | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
 					[ -s ".tmp/scrap_subs.txt" ] && puredns resolve .tmp/scrap_subs.txt -w .tmp/scrap_subs_resolved.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT  --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" &>/dev/null
+					if [ "$INSCOPE" = true ]; then
+						check_inscope .tmp/scrap_subs_resolved.txt
+					fi
 					NUMOFLINES=$(cat .tmp/scrap_subs_resolved.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | tee .tmp/diff_scrap.txt | sed '/^$/d' | wc -l)
 					[ -s ".tmp/diff_scrap.txt" ] && cat .tmp/diff_scrap.txt | httpx -follow-host-redirects -H "${HEADER}" -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info3.txt 2>>"$LOGFILE" &>/dev/null
 				else
@@ -497,6 +516,9 @@ function sub_scraping(){
 					[[ $NUMFILES -gt 0 ]] && find .tmp/gospider/ -type f -exec cat {} + | sed '/^.\{2048\}./d' | anew -q .tmp/gospider.txt
 					[ -s ".tmp/gospider.txt" ] && cat .tmp/gospider.txt | grep -aEo 'https?://[^ ]+' | sed 's/]$//' | unfurl -u domains 2>>"$LOGFILE" | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
 					[ -s ".tmp/scrap_subs.txt" ] && axiom-scan .tmp/scrap_subs.txt -m puredns-resolve -r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -o .tmp/scrap_subs_resolved.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+					if [ "$INSCOPE" = true ]; then
+						check_inscope .tmp/scrap_subs_resolved.txt
+					fi
 					NUMOFLINES=$(cat .tmp/scrap_subs_resolved.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | tee .tmp/diff_scrap.txt | sed '/^$/d' | wc -l)
 					[ -s ".tmp/diff_scrap.txt" ] && axiom-scan .tmp/diff_scrap.txt -m httpx -follow-host-redirects -H \"${HEADER}\" -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info3.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 				fi
@@ -532,6 +554,9 @@ function sub_analytics(){
 				resolvers_update_quick_axiom
 				[ -s ".tmp/analytics_subs_clean.txt" ] && axiom-scan .tmp/analytics_subs_clean.txt -m puredns-resolve -r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -o .tmp/analytics_subs_resolved.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			fi
+		fi
+		if [ "$INSCOPE" = true ]; then
+			check_inscope .tmp/analytics_subs_resolved.txt
 		fi
 		NUMOFLINES=$(cat .tmp/analytics_subs_resolved.txt 2>>"$LOGFILE" | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (analytics relationship)" ${FUNCNAME[0]}
@@ -586,6 +611,9 @@ function sub_permut(){
 
 		if [ -s ".tmp/permute_subs.txt" ]; then
 			deleteOutScoped $outOfScope_file .tmp/permute_subs.txt
+			if [ "$INSCOPE" = true ]; then
+				check_inscope .tmp/permute_subs.txt
+			fi
 			NUMOFLINES=$(cat .tmp/permute_subs.txt 2>>"$LOGFILE" | grep ".$domain$" | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
 		else
 			NUMOFLINES=0
@@ -614,6 +642,9 @@ function sub_recursive_passive(){
 			[ -s ".tmp/subdomains_recurs_top.txt" ] && axiom-scan .tmp/subdomains_recurs_top.txt -m amass -passive -o .tmp/amass_prec.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			[ -s ".tmp/amass_prec.txt" ] &&  cat .tmp/amass_prec.txt | anew -q .tmp/passive_recursive.txt
 			[ -s ".tmp/passive_recursive.txt" ] && axiom-scan .tmp/passive_recursive.txt -m puredns-resolve -r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -o .tmp/passive_recurs_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+		fi
+		if [ "$INSCOPE" = true ]; then
+			check_inscope .tmp/passive_recurs_tmp.txt
 		fi
 		NUMOFLINES=$(cat .tmp/passive_recurs_tmp.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | sed '/^$/d' | anew subdomains/subdomains.txt | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (recursive)" ${FUNCNAME[0]}
@@ -667,6 +698,10 @@ function sub_recursive_brute(){
 			cat .tmp/permute1_recursive.txt .tmp/permute2_recursive.txt 2>>"$LOGFILE" | anew -q .tmp/permute_recursive.txt
 		else
 			end_subfunc "skipped in this mode or defined in reconftw.cfg" ${FUNCNAME[0]}
+		fi
+		if [ "$INSCOPE" = true ]; then
+			check_inscope .tmp/permute_recursive.txt
+			check_inscope .tmp/brute_recursive.txt
 		fi
 		NUMOFLINES=$(cat .tmp/permute_recursive.txt .tmp/brute_recursive.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | sed '/^$/d' | anew subdomains/subdomains.txt | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (recursive)" ${FUNCNAME[0]}
@@ -1868,6 +1903,12 @@ function end_subfunc(){
 	getElapsedTime $start_sub $end_sub
 	notification "${1} in ${runtime}" good
 	echo "[ $(date +"%F %T") ] End subfunction : ${1} " >> "${LOGFILE}"
+}
+
+function check_inscope(){
+	if ! timeout 1 inscope &>/dev/null; then
+		cat $1 | inscope > $1_tmp && cp $1_tmp $1 && rm -f $1_tmp
+	fi
 }
 
 function resolvers_update(){

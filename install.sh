@@ -76,6 +76,7 @@ gotools["tlsx"]="go install github.com/projectdiscovery/tlsx/cmd/tlsx@latest"
 gotools["gitdorks_go"]="go install -v github.com/damit5/gitdorks_go@latest"
 gotools["smap"]="go install -v github.com/s0md3v/smap/cmd/smap@latest"
 gotools["dsieve"]="go install -v github.com/trickest/dsieve@master"
+gotools["inscope"]="go install github.com/tomnomnom/hacks/inscope@latest"
 
 declare -A repos
 repos["dorks_hunter"]="six2dez/dorks_hunter"
