@@ -549,7 +549,6 @@ If you want to contribute to this project you can do it in multiple ways:
 **This section shows the current financial sponsors of this project**
 
 [<img src="https://pbs.twimg.com/profile_images/1360304248534282240/MomOFi40_400x400.jpg" width="100" height=auto>](https://github.com/0xtavian)
-[<img src="https://pbs.twimg.com/profile_images/1509304017993752578/qqcKUKZb_400x400.jpg" width="100" height=auto>](https://github.com/geeknik)
 
 # Thanks :pray:
 * Thank you for lending a helping hand towards the development of the project!
