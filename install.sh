@@ -102,6 +102,7 @@ repos["cloud_enum"]="initstring/cloud_enum"
 repos["ultimate-nmap-parser"]="shifty0g/ultimate-nmap-parser"
 repos["pydictor"]="LandGrey/pydictor"
 repos["gitdorks_go"]="damit5/gitdorks_go"
+repos["urless"]="xnl-h4ck3r/urless"
 
 printf "\n\n${bgreen}#######################################################################${reset}\n"
 printf "${bgreen} reconFTW installer/updater script ${reset}\n\n"

@@ -60,6 +60,7 @@ function tools_installed(){
 	[ -f "$tools/cloud_enum/cloud_enum.py" ] || { printf "${bred} [*] cloud_enum		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/ultimate-nmap-parser/ultimate-nmap-parser.sh" ] || { printf "${bred} [*] nmap-parse-output	[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/pydictor/pydictor.py" ] || { printf "${bred} [*] pydictor   	[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/urless/urless.py" ] || { printf "${bred} [*] urless		[NO]${reset}\n"; allinstalled=false;}
 	which github-endpoints &>/dev/null || { printf "${bred} [*] github-endpoints	[NO]${reset}\n"; allinstalled=false;}
 	which github-subdomains &>/dev/null || { printf "${bred} [*] github-subdomains	[NO]${reset}\n"; allinstalled=false;}
 	which gospider &>/dev/null || { printf "${bred} [*] gospider		[NO]${reset}\n"; allinstalled=false;}
@@ -96,7 +97,6 @@ function tools_installed(){
 	which searchsploit &>/dev/null || { printf "${bred} [*] searchsploit	[NO]${reset}\n"; allinstalled=false;}
 	which ipcdn &>/dev/null || { printf "${bred} [*] ipcdn		[NO]${reset}\n"; allinstalled=false;}
 	which interactsh-client &>/dev/null || { printf "${bred} [*] interactsh-client	[NO]${reset}\n"; allinstalled=false;}
-	which uro &>/dev/null || { printf "${bred} [*] uro		[NO]${reset}\n"; allinstalled=false;}
 	which tlsx &>/dev/null || { printf "${bred} [*] tlsx		[NO]${reset}\n"; allinstalled=false;}
 	which bbrf &>/dev/null || { printf "${bred} [*] bbrf		[NO]${reset}\n"; allinstalled=false;}
 	which smap &>/dev/null || { printf "${bred} [*] smap		[NO]${reset}\n"; allinstalled=false;}
@@ -1256,7 +1256,7 @@ function urlchecks(){
 				[ -s "js/url_extract_js.txt" ] && cat js/url_extract_js.txt | python3 $tools/JSA/jsa.py | anew -q .tmp/url_extract_tmp.txt
 			fi
 			[ -s ".tmp/url_extract_tmp.txt" ] &&  cat .tmp/url_extract_tmp.txt | grep "${domain}" | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | anew -q .tmp/url_extract_tmp2.txt
-			[ -s ".tmp/url_extract_tmp2.txt" ] && cat .tmp/url_extract_tmp2.txt | uro | anew -q .tmp/url_extract_uddup.txt 2>>"$LOGFILE" &>/dev/null
+			[ -s ".tmp/url_extract_tmp2.txt" ] && cat .tmp/url_extract_tmp2.txt | $tools/urless/urless.py | anew -q .tmp/url_extract_uddup.txt 2>>"$LOGFILE" &>/dev/null
 			NUMOFLINES=$(cat .tmp/url_extract_uddup.txt 2>>"$LOGFILE" | anew webs/url_extract.txt | sed '/^$/d' | wc -l)
 			notification "${NUMOFLINES} new urls with params" info
 			end_func "Results are saved in $domain/webs/url_extract.txt" ${FUNCNAME[0]}
