@@ -1207,8 +1207,8 @@ function urlchecks(){
 		if [ -s ".tmp/webs_all.txt" ]; then
 			if [ ! "$AXIOM" = true ]; then
 				if [ "$URL_CHECK_PASSIVE" = true ]; then
-					cat .tmp/webs_all.txt | waybackurls | anew -q .tmp/url_extract_tmp.txt
-					cat .tmp/webs_all.txt | gau --subs --threads $GAU_THREADS | anew -q .tmp/url_extract_tmp.txt
+					cat .tmp/webs_all.txt | waybackurls -no-subs | anew -q .tmp/url_extract_tmp.txt
+					cat .tmp/webs_all.txt | gau --threads $GAU_THREADS | anew -q .tmp/url_extract_tmp.txt
 					if [ -s "${GITHUB_TOKENS}" ]; then
 						github-endpoints -q -k -d $domain -t ${GITHUB_TOKENS} -o .tmp/github-endpoints.txt 2>>"$LOGFILE" &>/dev/null
 						[ -s ".tmp/github-endpoints.txt" ] && cat .tmp/github-endpoints.txt | anew -q .tmp/url_extract_tmp.txt
