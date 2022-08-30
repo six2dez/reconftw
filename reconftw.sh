@@ -2646,8 +2646,8 @@ while true; do
             ;;
         '-l'|'--list')
 			list=$2
-			for domain in $(cat $list); do
-				ipcidr_target $domain $list
+			for t in $(cat $list); do
+				ipcidr_target $t $list
 			done
             shift 2
             continue
