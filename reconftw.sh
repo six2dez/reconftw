@@ -413,7 +413,7 @@ function sub_active(){
 function sub_noerror(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBNOERROR" = true ]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Checking NOERROR DNS response"
-		if [[ $(echo "${RANDOM}thistotallynotexist${RANDOM}.$domain" | dnsx -r ~/Tools/resolvers.txt -rcode noerror,nxdomain -retry 3 -silent | cut -d' ' -f2) == "[NOERROR]" ]]; then 
+		if [[ $(echo "${RANDOM}thistotallynotexist${RANDOM}.$domain" | dnsx -r ~/Tools/resolvers.txt -rcode noerror,nxdomain -retry 3 -silent | cut -d' ' -f2) == "NXDOMAIN]" ]]; then 
 			resolvers_update_quick_local
 			if [ "$DEEP" = true ]; then
 				dnsx -d $domain -r $resolvers -silent -rcode noerror -w $subs_wordlist_big | cut -d' ' -f1 | anew -q .tmp/subs_noerror.txt 2>>"$LOGFILE" &>/dev/null
