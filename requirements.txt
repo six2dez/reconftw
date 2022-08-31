@@ -10,7 +10,6 @@ beautifulsoup4          # multiple
 bs4                     # multiple
 censys                  # theHarvester
 certifi                 # theHarvester
-colorclass              # interlace
 dnspython               # ip2provider
 emailfinder             # Tool
 fake-useragent          # fav-up
