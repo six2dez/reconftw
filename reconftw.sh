@@ -1957,9 +1957,7 @@ function end_subfunc(){
 }
 
 function check_inscope(){
-	if ! timeout 1 inscope &>/dev/null; then
-		cat $1 | inscope > $1_tmp && cp $1_tmp $1 && rm -f $1_tmp
-	fi
+	cat $1 | inscope > $1_tmp && cp $1_tmp $1 && rm -f $1_tmp
 }
 
 function resolvers_update(){
