@@ -553,13 +553,12 @@ If you want to contribute to this project you can do it in multiple ways:
 # Thanks :pray:
 * Thank you for lending a helping hand towards the development of the project!
 
-- [Spyse](https://spyse.com/)
-- [Networksdb](https://networksdb.io/)
-- [Intelx](https://intelx.io/)
-- [BinaryEdge](https://www.binaryedge.io/)
-- [Censys](https://censys.io/)
+- [C99](https://api.c99.nl/)
 - [CIRCL](https://www.circl.lu/)
-- [Whoxy](https://www.whoxy.com/)
+- [NetworksDB](networksdb.io)
+- [ipinfo](ipinfo.io)
+- [hackertarget](hackertarget.com)
+- [Censys](censys.io)
 
 # Disclaimer
 Usage of this program for attacking targets without consent is illegal. It is the user's responsibility to obey all applicable laws. The developer assumes no liability and is not responsible for any misuse or damage caused by this program. Please use responsibly.
