@@ -78,6 +78,7 @@ gotools["smap"]="go install -v github.com/s0md3v/smap/cmd/smap@latest"
 gotools["dsieve"]="go install -v github.com/trickest/dsieve@master"
 gotools["inscope"]="go install github.com/tomnomnom/hacks/inscope@latest"
 gotools["rush"]="go install github.com/shenwei356/rush@latest"
+gotools["enumerepo"]="go install github.com/trickest/enumerepo@latest"
 
 declare -A repos
 repos["dorks_hunter"]="six2dez/dorks_hunter"
@@ -103,6 +104,7 @@ repos["ultimate-nmap-parser"]="shifty0g/ultimate-nmap-parser"
 repos["pydictor"]="LandGrey/pydictor"
 repos["gitdorks_go"]="damit5/gitdorks_go"
 repos["urless"]="xnl-h4ck3r/urless"
+repos["trufflehog"]="trufflesecurity/trufflehog"
 
 printf "\n\n${bgreen}#######################################################################${reset}\n"
 printf "${bgreen} reconFTW installer/updater script ${reset}\n\n"
@@ -314,11 +316,13 @@ for repo in "${!repos[@]}"; do
         eval $SUDO pip3 install . $DEBUG_STD
     fi
     if [ "massdns" = "$repo" ]; then
-            eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/local/bin/ $DEBUG_ERROR
+        eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/local/bin/ $DEBUG_ERROR
     elif [ "gf" = "$repo" ]; then
-            eval cp -r examples ~/.gf $DEBUG_ERROR
+        eval cp -r examples ~/.gf $DEBUG_ERROR
     elif [ "Gf-Patterns" = "$repo" ]; then
-            eval mv *.json ~/.gf $DEBUG_ERROR
+        eval mv *.json ~/.gf $DEBUG_ERROR
+    elif [ "trufflehog" = "$repo" ]; then
+        go install
     fi
     cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 done
