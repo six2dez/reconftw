@@ -369,7 +369,7 @@ function sub_crt(){
 		start_subfunc ${FUNCNAME[0]} "Running : Crtsh Subdomain Enumeration"
 		python3 $tools/ctfr/ctfr.py -d $domain -o .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" &>/dev/null
 		if [ "$INSCOPE" = true ]; then
-			check_inscope .tmp/crtsh_subs_tmp.txt
+			check_inscope .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" &>/dev/null
 		fi
 		NUMOFLINES=$(cat .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" | sed 's/\*.//g' | anew .tmp/crtsh_subs.txt | sed '/^$/d' | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (cert transparency)" ${FUNCNAME[0]}
