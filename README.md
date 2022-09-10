@@ -8,8 +8,8 @@
 
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.3.2">
-    <img src="https://img.shields.io/badge/release-v2.3.2-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.4">
+    <img src="https://img.shields.io/badge/release-v2.4-green">
   </a>
    </a>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
@@ -440,6 +440,7 @@ reset='\033[0m'
 ## Subdomains
   - Passive ([amass](https://github.com/OWASP/Amass) and [github-subdomains](https://github.com/gwen001/github-subdomains))
   - Certificate transparency ([ctfr](https://github.com/UnaPibaGeek/ctfr))
+  - NOERROR subdomain discovery ([dnsx](https://github.com/projectdiscovery/dnsx), more info [here](https://www.securesystems.de/blog/enhancing-subdomain-enumeration-ents-and-noerror/))
   - Bruteforce ([puredns](https://github.com/d3mondev/puredns))
   - Permutations ([Gotator](https://github.com/Josue87/gotator))
   - JS files & Source Code Scraping ([gospider](https://github.com/jaeles-project/gospider))
@@ -465,7 +466,7 @@ reset='\033[0m'
 - Web screenshot ([webscreenshot](https://github.com/maaaaz/webscreenshot) or [gowitness](https://github.com/sensepost/gowitness))
 - Web templates scanner ([nuclei](https://github.com/projectdiscovery/nuclei) and [nuclei geeknik](https://github.com/geeknik/the-nuclei-templates.git))
 - Url extraction ([waybackurls](https://github.com/tomnomnom/waybackurls), [gau](https://github.com/lc/gau), [gospider](https://github.com/jaeles-project/gospider), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3) and [JSA](https://github.com/w9w/JSA))
-- URLPatterns Search ([gf](https://github.com/tomnomnom/gf) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns))
+- URLPatterns Search and filtering ([urless](https://github.com/xnl-h4ck3r/urless), [gf](https://github.com/tomnomnom/gf) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns))
 - XSS ([dalfox](https://github.com/hahwul/dalfox))
 - Open redirect ([Oralyzer](https://github.com/r0075h3ll/Oralyzer))
 - SSRF (headers [interactsh](https://github.com/projectdiscovery/interactsh) and param values with [ffuf](https://github.com/ffuf/ffuf))
@@ -486,7 +487,7 @@ reset='\033[0m'
 - Passwords dictionary creation ([pydictor](https://github.com/LandGrey/pydictor))
 
 ## Extras
-- Multithread ([Interlace](https://github.com/codingo/Interlace))
+- Multithread ([Rush](https://github.com/shenwei356/rush))
 - Custom resolvers generated list ([dnsvalidator](https://github.com/vortexau/dnsvalidator))
 - Docker container included and [DockerHub](https://hub.docker.com/r/six2dez/reconftw) integration
 - Ansible + Terraform deployment over AWS
@@ -498,7 +499,7 @@ reset='\033[0m'
 - Support for targets with multiple domains
 - Raspberry Pi/ARM support
 - 6 modes (recon, passive, subdomains, web, osint and all)
-- Out of Scope Support
+- Out of Scope Support + optional [inscope](https://github.com/tomnomnom/hacks/tree/master/inscope) support
 - Notification system with Slack, Discord and Telegram ([notify](https://github.com/projectdiscovery/notify)) and sending zipped results support
 
 # Mindmap/Workflow
@@ -549,18 +550,16 @@ If you want to contribute to this project you can do it in multiple ways:
 **This section shows the current financial sponsors of this project**
 
 [<img src="https://pbs.twimg.com/profile_images/1360304248534282240/MomOFi40_400x400.jpg" width="100" height=auto>](https://github.com/0xtavian)
-[<img src="https://pbs.twimg.com/profile_images/1509304017993752578/qqcKUKZb_400x400.jpg" width="100" height=auto>](https://github.com/geeknik)
 
 # Thanks :pray:
 * Thank you for lending a helping hand towards the development of the project!
 
-- [Spyse](https://spyse.com/)
-- [Networksdb](https://networksdb.io/)
-- [Intelx](https://intelx.io/)
-- [BinaryEdge](https://www.binaryedge.io/)
-- [Censys](https://censys.io/)
+- [C99](https://api.c99.nl/)
 - [CIRCL](https://www.circl.lu/)
-- [Whoxy](https://www.whoxy.com/)
+- [NetworksDB](networksdb.io)
+- [ipinfo](ipinfo.io)
+- [hackertarget](hackertarget.com)
+- [Censys](censys.io)
 
 # Disclaimer
 Usage of this program for attacking targets without consent is illegal. It is the user's responsibility to obey all applicable laws. The developer assumes no liability and is not responsible for any misuse or damage caused by this program. Please use responsibly.
