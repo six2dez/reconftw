@@ -561,6 +561,7 @@ If you want to contribute to this project you can do it in multiple ways:
 - [hackertarget](hackertarget.com)
 - [Censys](censys.io)
 - [Fofa](fofa.info)
+- [intelx](intelx.io)
 
 # Disclaimer
 Usage of this program for attacking targets without consent is illegal. It is the user's responsibility to obey all applicable laws. The developer assumes no liability and is not responsible for any misuse or damage caused by this program. Please use responsibly.
