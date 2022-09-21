@@ -1871,7 +1871,6 @@ function zipSnedOutputFolder {
 	zip_name=`date +"%Y_%m_%d-%H.%M.%S"`
 	zip_name="$zip_name"_"$domain.zip"
 	(cd $dir && zip -r "../$zip_name" .)
-	file "$SCRIPTPATH/$zip_name" # wip, just checking if the file is created
 
 	if [ -s "$SCRIPTPATH/$zip_name" ]; then
 		sendToNotify "$SCRIPTPATH/$zip_name"
