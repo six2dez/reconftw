@@ -556,12 +556,12 @@ If you want to contribute to this project you can do it in multiple ways:
 
 - [C99](https://api.c99.nl/)
 - [CIRCL](https://www.circl.lu/)
-- [NetworksDB](networksdb.io)
-- [ipinfo](ipinfo.io)
-- [hackertarget](hackertarget.com)
-- [Censys](censys.io)
-- [Fofa](fofa.info)
-- [intelx](intelx.io)
+- [NetworksDB](https://networksdb.io/)
+- [ipinfo](https://ipinfo.io/)
+- [hackertarget](https://hackertarget.com/)
+- [Censys](https://censys.io/)
+- [Fofa](https://fofa.info/)
+- [intelx](https://intelx.io/)
 
 # Disclaimer
 Usage of this program for attacking targets without consent is illegal. It is the user's responsibility to obey all applicable laws. The developer assumes no liability and is not responsible for any misuse or damage caused by this program. Please use responsibly.
