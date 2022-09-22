@@ -165,10 +165,10 @@ function github_repos(){
 
 		if [ -s "${GITHUB_TOKENS}" ]; then
 			GH_TOKEN=$(cat ${GITHUB_TOKENS} | head -1)
-			cat $domain | unfurl format %r > .tmp/company_name.txt
-			enumerepo -token-string ${GH_TOKEN} -usernames .tmp/company_name.txt -o .tmp/company_repos.txt
-			[ -s .tmp/company_repos.txt ] && cat .tmp/company_repos.txt | jq -r '.[].repos[]|.url' > .tmp/company_repos_url.txt
-			rush -i .tmp/company_repos_url.txt -j ${INTERLACE_THREADS} "trufflehog git {} -j | jq -c >> osint/github_company_secrets.json"
+			echo $domain | unfurl format %r > .tmp/company_name.txt
+			enumerepo -token-string ${GH_TOKEN} -usernames .tmp/company_name.txt -o .tmp/company_repos.txt 2>>"$LOGFILE" &>/dev/null
+			[ -s .tmp/company_repos.txt ] && cat .tmp/company_repos.txt | jq -r '.[].repos[]|.url' > .tmp/company_repos_url.txt 2>>"$LOGFILE" &>/dev/null
+			rush -i .tmp/company_repos_url.txt -j ${INTERLACE_THREADS} "trufflehog git {} -j | jq -c >> osint/github_company_secrets.json" 2>>"$LOGFILE" &>/dev/null
 		else
 			printf "\n${bred} Required file ${GITHUB_TOKENS} not exists or empty${reset}\n"
 		fi
@@ -438,7 +438,10 @@ function sub_active(){
 function sub_noerror(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBNOERROR" = true ]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Checking NOERROR DNS response"
-		if [[ $(echo "${RANDOM}thistotallynotexist${RANDOM}.$domain" | dnsx -r ~/Tools/resolvers.txt -rcode noerror,nxdomain -retry 3 -silent | cut -d' ' -f2) == "[NXDOMAIN]" ]]; then 
+		echo "${RANDOM}thistotallynotexist${RANDOM}.$domain"
+		echo "${RANDOM}thistotallynotexist${RANDOM}.$domain" | dnsx -r $resolvers -rcode noerror,nxdomain -retry 3 -silent | cut -d' ' -f2
+		exit
+		if [[ $(echo "${RANDOM}thistotallynotexist${RANDOM}.$domain" | dnsx -r $resolvers -rcode noerror,nxdomain -retry 3 -silent | cut -d' ' -f2) == "[NXDOMAIN]" ]]; then 
 			resolvers_update_quick_local
 			if [ "$DEEP" = true ]; then
 				dnsx -d $domain -r $resolvers -silent -rcode noerror -w $subs_wordlist_big | cut -d' ' -f1 | anew -q .tmp/subs_noerror.txt 2>>"$LOGFILE" &>/dev/null
@@ -1995,8 +1998,8 @@ function resolvers_update(){
 				dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads $DNSVALIDATOR_THREADS -o tmp_resolvers &>/dev/null
 				[ -s "tmp_resolvers" ] && cat tmp_resolvers | anew -q $resolvers
 				[ -s "tmp_resolvers" ] && rm -f tmp_resolvers &>/dev/null
-				[ ! -s "$resolvers" ] && wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > $resolvers &>/dev/null
-				[ ! -s "$resolvers_trusted" ] && wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt > $resolvers_trusted &>/dev/null
+				[ ! -s "$resolvers" ] && wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > $resolvers
+				[ ! -s "$resolvers_trusted" ] && wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt > $resolvers_trusted
 				notification "Updated\n" good
 	  		fi
 		else
@@ -2009,10 +2012,13 @@ function resolvers_update(){
 		fi
 		generate_resolvers=false
 	else
+	
 		if  [ ! -s "$resolvers" ] || [[ $(find "$resolvers" -mtime +1 -print) ]] ; then
 			notification "Resolvers seem older than 1 day\n Downloading new resolvers..." warn
-			wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > $resolvers &>/dev/null
-			wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt > $resolvers_trusted &>/dev/null
+			wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > $resolvers
+			wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt > $resolvers_trusted
+			echo "here"
+			exit
 			notification "Resolvers updated\n" good
 		fi
 	fi
