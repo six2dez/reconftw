@@ -2233,6 +2233,7 @@ function passive(){
 	emails
 	google_dorks
 	github_dorks
+	github_repos
 	metadata
 	SUBSCRAPING=false
 	WEBPROBESIMPLE=false
@@ -2269,6 +2270,7 @@ function osint(){
 	emails
 	google_dorks
 	github_dorks
+	github_repos
 	metadata
 	zonetransfer
 	favicon
@@ -2339,6 +2341,7 @@ function multi_osint(){
 		emails
 		google_dorks
 		github_dorks
+		github_repos
 		metadata
 		zonetransfer
 		favicon
@@ -2356,6 +2359,7 @@ function recon(){
 	emails
 	google_dorks
 	github_dorks
+	github_repos
 	metadata
 	zonetransfer
 	favicon
@@ -2445,6 +2449,7 @@ function multi_recon(){
 		emails
 		google_dorks
 		github_dorks
+		github_repos
 		metadata
 		zonetransfer
 		favicon
