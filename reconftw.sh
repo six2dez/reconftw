@@ -1201,17 +1201,17 @@ function fuzz(){
 		if [ -s ".tmp/webs_all.txt" ]; then
 			mkdir -p $dir/fuzzing $dir/.tmp/fuzzing
 			if [ ! "$AXIOM" = true ]; then
-				rush -i .tmp/webs_all.txt -j ${INTERLACE_THREADS} "ffuf ${FFUF_FLAGS} -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u \"{}/FUZZ\" -of json | anew -q $dir/.tmp/fuzzing_full.json" 2>>"$LOGFILE" &>/dev/null
+				rush -i .tmp/webs_all.txt -j ${INTERLACE_THREADS} "ffuf ${FFUF_FLAGS} -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H '${HEADER}' -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u '{}/FUZZ' -json 2>/dev/null | anew -q .tmp/fuzzing_full.json"
 				#interlace -tL .tmp/webs_all.txt -threads ${INTERLACE_THREADS} -c "ffuf ${FFUF_FLAGS} -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u  _target_/FUZZ -of json -o _output_/_cleantarget_.json" -o $dir/.tmp/fuzzing 2>>"$LOGFILE" &>/dev/null
 				#for sub in $(cat .tmp/webs_all.txt); do
 					#sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
 					#[ -s "$dir/.tmp/fuzzing/${sub_out}.json" ] && cat $dir/.tmp/fuzzing/${sub_out}.json | jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' | sort | anew -q $dir/fuzzing/${sub_out}.txt
 				#done
-				[ -s "$dir/.tmp/fuzzing_full.json" ] && cat $dir/.tmp/fuzzing_full.json | jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' | sort | anew -q $dir/fuzzing/fuzzing_full.txt
+				[ -s "$dir/.tmp/fuzzing_full.json" ] && cat $dir/.tmp/fuzzing_full.json | jq -r '. | "\(.status) \(.length) \(.url)"' | sort | anew -q $dir/fuzzing/fuzzing_full.txt
 				#find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | anew -q $dir/fuzzing/fuzzing_full.txt
 			else
 				axiom-exec 'wget -q -O - https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt > /home/op/lists/fuzz_wordlist.txt' &>/dev/null
-				axiom-scan .tmp/webs_all.txt -m ffuf -w /home/op/lists/fuzz_wordlist.txt -H \"${HEADER}\" $FFUF_FLAGS -maxtime $FFUF_MAXTIME -of json -o $dir/.tmp/fuzzing/ffuf-content.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+				axiom-scan .tmp/webs_all.txt -m ffuf -w /home/op/lists/fuzz_wordlist.txt -H \"${HEADER}\" $FFUF_FLAGS -s -maxtime $FFUF_MAXTIME -of json -o $dir/.tmp/fuzzing/ffuf-content.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 				[ -s "$dir/.tmp/fuzzing/ffuf-content.json" ] && cat $dir/.tmp/fuzzing/ffuf-content.json | jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' | sort > $dir/.tmp/fuzzing/ffuf-content.tmp
 				for sub in $(cat .tmp/webs_all.txt); do
 					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
