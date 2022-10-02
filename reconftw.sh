@@ -2346,6 +2346,7 @@ function vulns(){
 		command_injection
 		prototype_pollution
 		smuggling
+		webcache
 		spraying
 		brokenLinks
 		test_ssl
