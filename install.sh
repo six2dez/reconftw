@@ -105,6 +105,7 @@ repos["pydictor"]="LandGrey/pydictor"
 repos["gitdorks_go"]="damit5/gitdorks_go"
 repos["urless"]="xnl-h4ck3r/urless"
 repos["trufflehog"]="trufflesecurity/trufflehog"
+repos["smuggler"]="defparam/smuggler"
 
 printf "\n\n${bgreen}#######################################################################${reset}\n"
 printf "${bgreen} reconFTW installer/updater script ${reset}\n\n"
