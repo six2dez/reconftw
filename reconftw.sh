@@ -1427,9 +1427,9 @@ function jschecks(){
 			fi
 			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
 			if [ ! "$AXIOM" = true ]; then
-				[ -s "js/js_livelinks.txt" ] && cat js/js_livelinks.txt | nuclei -silent -t ~/nuclei-templates/ -tags exposure,token -r $resolvers_trusted -retries 3 -rl $NUCLEI_RATELIMIT -o js/js_secrets.txt 2>>"$LOGFILE" &>/dev/null
+				[ -s "js/js_livelinks.txt" ] && cat js/js_livelinks.txt | nuclei -silent -t ~/nuclei-templates/ $NUCLEI_FLAGS_JS -r $resolvers_trusted -retries 3 -rl $NUCLEI_RATELIMIT -o js/js_secrets.txt 2>>"$LOGFILE" &>/dev/null
 			else
-				[ -s "js/js_livelinks.txt" ] && axiom-scan js/js_livelinks.txt -m nuclei -w /home/op/recon/nuclei/exposures/tokens/ -retries 3 -rl $NUCLEI_RATELIMIT -o js/js_secrets.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+				[ -s "js/js_livelinks.txt" ] && axiom-scan js/js_livelinks.txt -m nuclei $NUCLEI_FLAGS_JS -retries 3 -rl $NUCLEI_RATELIMIT -o js/js_secrets.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			fi
 			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
 			[ -s "js/js_livelinks.txt" ] && rush -j ${INTERLACE_THREADS} -i js/js_livelinks.txt "python3 $tools/getjswords.py '{}' | anew -q webs/dict_words.txt" &>/dev/null
