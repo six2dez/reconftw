@@ -1870,7 +1870,8 @@ function getElapsedTime {
 function zipSnedOutputFolder {
 	zip_name=`date +"%Y_%m_%d-%H.%M.%S"`
 	zip_name="$zip_name"_"$domain.zip"
-	cd $SCRIPTPATH && zip -r $zip_name $dir &>/dev/null
+	(cd $dir && zip -r "../$zip_name" .)
+
 	if [ -s "$SCRIPTPATH/$zip_name" ]; then
 		sendToNotify "$SCRIPTPATH/$zip_name"
 		rm -f "$SCRIPTPATH/$zip_name"
@@ -1925,12 +1926,19 @@ function notification(){
 	fi
 }
 
+transfer(){ if [ $# -eq 0 ];then echo "No arguments specified.\nUsage:\n transfer <file|directory>\n ... | transfer <file_name>">&2;return 1;fi;if tty -s;then file="$1";file_name=$(basename "$file");if [ ! -e "$file" ];then echo "$file: No such file or directory">&2;return 1;fi;if [ -d "$file" ];then file_name="$file_name.zip" ,;(cd "$file"&&zip -r -q - .)|curl --progress-bar --upload-file "-" "https://transfer.sh/$file_name"|tee /dev/null,;else cat "$file"|curl --progress-bar --upload-file "-" "https://transfer.sh/$file_name"|tee /dev/null;fi;else file_name=$1;curl --progress-bar --upload-file "-" "https://transfer.sh/$file_name"|tee /dev/null;fi;}
+
 function sendToNotify {
 	if [[ -z "$1" ]]; then
 		printf "\n${yellow} no file provided to send ${reset}\n"
 	else
 		if [[ -z "$NOTIFY_CONFIG" ]]; then
 			NOTIFY_CONFIG=~/.config/notify/provider-config.yaml
+		fi
+		if [ -n "$(find "${1}" -prune -size +8000000c)" ]; then
+    		printf '%s is larger than 8MB, sending over transfer.sh\n' "${1}"
+			transfer "${1}" | notify
+			return 0
 		fi
 		if grep -q '^ telegram\|^telegram\|^    telegram' $NOTIFY_CONFIG ; then
 			notification "Sending ${domain} data over Telegram" info
@@ -2982,3 +2990,4 @@ case $opt_mode in
             exit 1
             ;;
 esac
+
