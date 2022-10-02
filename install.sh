@@ -79,6 +79,7 @@ gotools["dsieve"]="go install -v github.com/trickest/dsieve@master"
 gotools["inscope"]="go install github.com/tomnomnom/hacks/inscope@latest"
 gotools["rush"]="go install github.com/shenwei356/rush@latest"
 gotools["enumerepo"]="go install github.com/trickest/enumerepo@latest"
+gotools["Web-Cache-Vulnerability-Scanner"]="go install -v github.com/Hackmanit/Web-Cache-Vulnerability-Scanner@latest"
 
 declare -A repos
 repos["dorks_hunter"]="six2dez/dorks_hunter"
@@ -106,6 +107,7 @@ repos["gitdorks_go"]="damit5/gitdorks_go"
 repos["urless"]="xnl-h4ck3r/urless"
 repos["trufflehog"]="trufflesecurity/trufflehog"
 repos["smuggler"]="defparam/smuggler"
+repos["Web-Cache-Vulnerability-Scanner"]="Hackmanit/Web-Cache-Vulnerability-Scanner"
 
 printf "\n\n${bgreen}#######################################################################${reset}\n"
 printf "${bgreen} reconFTW installer/updater script ${reset}\n\n"
