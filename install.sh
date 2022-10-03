@@ -35,8 +35,9 @@ fi
 #(bash --version | awk 'NR==1{print $4}' | cut -d'.' -f1) 2&>/dev/null || echo "Unable to get bash version, for MacOS run 'brew install bash' and rerun installer in a new terminal" && exit 1
 
 BASH_VERSION=$(bash --version | awk 'NR==1{print $4}' | cut -d'.' -f1)
-if [ ${BASH_VERSION} -lt 4 ]; then
+if [ "${BASH_VERSION}" -lt 4 ]; then
      printf "${bred} Your Bash version is lower than 4, please update${reset}\n"
+     printf "%s Your Bash version is lower than 4, please update%s\n" "${bred}" "${reset}"
     if [ "True" = "$IS_MAC" ]; then
         printf "${yellow} For MacOS run 'brew install bash' and rerun installer in a new terminal${reset}\n\n"
         exit 1;
@@ -131,8 +132,8 @@ install_apt(){
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium -y $DEBUG_STD
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip build-essential gcc cmake ruby whois git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb libxml2-utils procps bsdmainutils libdata-hexdump-perl -y $DEBUG_STD
     eval $SUDO systemctl enable tor $DEBUG_STD
-    rust=$(curl https://sh.rustup.rs -sSf | sh -s -- -y) &>/dev/null
-    eval source $HOME/.cargo/env $DEBUG_STD
+    curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
+    eval source "$HOME/.cargo/env $DEBUG_STD"
     eval cargo install ripgen $DEBUG_STD
 }
 
@@ -154,16 +155,16 @@ install_brew(){
 install_yum(){
     eval $SUDO yum groupinstall "Development Tools" -y $DEBUG_STD
     eval $SUDO yum install python3 python3-pip gcc cmake ruby git curl libpcap-dev wget whois zip python3-devel pv bind-utils libopenssl-devel libffi-devel libxml2-devel libxslt-devel zlib-devel nmap jq lynx tor medusa xorg-x11-server-xvfb -y $DEBUG_STD
-    rust=$(curl https://sh.rustup.rs -sSf | sh -s -- -y) &>/dev/null
-    eval source $HOME/.cargo/env $DEBUG_STD
+    curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
+    eval source "$HOME/.cargo/env $DEBUG_STD"
     eval cargo install ripgen $DEBUG_STD
 }
 
 install_pacman(){
     eval $SUDO pacman -Sy install python python-pip base-devel gcc cmake ruby git curl libpcap whois wget zip pv bind openssl libffi libxml2 libxslt zlib nmap jq lynx tor medusa xorg-server-xvfb -y $DEBUG_STD
     eval $SUDO systemctl enable --now tor.service $DEBUG_STD
-    rust=$(curl https://sh.rustup.rs -sSf | sh -s -- -y) &>/dev/null
-    eval source $HOME/.cargo/env $DEBUG_STD
+    curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
+    eval source "$HOME/.cargo/env $DEBUG_STD"
     eval cargo install ripgen $DEBUG_STD
 }
 
@@ -175,12 +176,12 @@ printf "${bblue} Running: Looking for new reconFTW version${reset}\n\n"
 eval git fetch $DEBUG_STD
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 HEADHASH=$(git rev-parse HEAD)
-UPSTREAMHASH=$(git rev-parse ${BRANCH}@{upstream})
+UPSTREAMHASH=$(git rev-parse "${BRANCH}@{upstream}")
 
 if [ "$HEADHASH" != "$UPSTREAMHASH" ]
 then
     printf "${yellow} There is a new version, updating...${reset}\n\n"
-    if [ -n "$(git status --porcelain | egrep 'reconftw.cfg$')" ]; then
+    if git status --porcelain | grep -q 'reconftw.cfg$'; then
         mv reconftw.cfg reconftw.cfg_bck
         printf "${yellow} reconftw.cfg has been backed up in reconftw.cfg_bck${reset}\n\n"
     fi
@@ -211,30 +212,30 @@ if [ "$install_golang" = "true" ]; then
             eval $SUDO rm -rf /usr/local/go $DEBUG_STD
             if [ "True" = "$IS_ARM" ]; then
                 if [ "True" = "$RPI_3" ]; then
-                    eval wget https://dl.google.com/go/${version}.linux-armv6l.tar.gz $DEBUG_STD
-                    eval $SUDO tar -C /usr/local -xzf ${version}.linux-armv6l.tar.gz $DEBUG_STD
+                    eval wget "https://dl.google.com/go/${version}.linux-armv6l.tar.gz" $DEBUG_STD
+                    eval $SUDO tar -C /usr/local -xzf "${version}.linux-armv6l.tar.gz" $DEBUG_STD
                 elif [ "True" = "$RPI_4" ]; then
-                    eval wget https://dl.google.com/go/${version}.linux-arm64.tar.gz $DEBUG_STD
-                    eval $SUDO tar -C /usr/local -xzf ${version}.linux-arm64.tar.gz $DEBUG_STD
+                    eval wget "https://dl.google.com/go/${version}.linux-arm64.tar.gz" $DEBUG_STD
+                    eval $SUDO tar -C /usr/local -xzf "${version}.linux-arm64.tar.gz" $DEBUG_STD
                 fi
             elif [ "True" = "$IS_MAC" ]; then
                 if [ "True" = "$IS_ARM" ]; then
-                    eval wget https://dl.google.com/go/${version}.darwin-arm64.tar.gz $DEBUG_STD
-                    eval $SUDO tar -C /usr/local -xzf ${version}.darwin-arm64.tar.gz $DEBUG_STD
+                    eval wget "https://dl.google.com/go/${version}.darwin-arm64.tar.gz" $DEBUG_STD
+                    eval $SUDO tar -C /usr/local -xzf "${version}.darwin-arm64.tar.gz" $DEBUG_STD
                 else
-                    eval wget https://dl.google.com/go/${version}.darwin-amd64.tar.gz $DEBUG_STD
-                    eval $SUDO tar -C /usr/local -xzf ${version}.darwin-amd64.tar.gz $DEBUG_STD
+                    eval wget "https://dl.google.com/go/${version}.darwin-amd64.tar.gz" $DEBUG_STD
+                    eval $SUDO tar -C /usr/local -xzf "${version}.darwin-amd64.tar.gz" $DEBUG_STD
                 fi
             else
-                eval wget https://dl.google.com/go/${version}.linux-amd64.tar.gz $DEBUG_STD
-                eval $SUDO tar -C /usr/local -xzf ${version}.linux-amd64.tar.gz $DEBUG_STD
+                eval wget "https://dl.google.com/go/${version}.linux-amd64.tar.gz" $DEBUG_STD
+                eval $SUDO tar -C /usr/local -xzf "${version}.linux-amd64.tar.gz" $DEBUG_STD
             fi
             eval $SUDO ln -sf /usr/local/go/bin/go /usr/local/bin/
             #rm -rf $version*
             export GOROOT=/usr/local/go
             export GOPATH=$HOME/go
             export PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH
-cat << EOF >> ~/${profile_shell}
+cat << EOF >> ~/"${profile_shell}"
 
 # Golang vars
 export GOROOT=/usr/local/go
@@ -323,7 +324,7 @@ for repo in "${!repos[@]}"; do
     elif [ "gf" = "$repo" ]; then
         eval cp -r examples ~/.gf $DEBUG_ERROR
     elif [ "Gf-Patterns" = "$repo" ]; then
-        eval mv *.json ~/.gf $DEBUG_ERROR
+        eval mv ./*.json ~/.gf $DEBUG_ERROR
     elif [ "trufflehog" = "$repo" ]; then
         go install
     fi
@@ -414,7 +415,7 @@ if [ "$double_check" = "true" ]; then
         elif [ "gf" = "$repo" ]; then
                 eval cp -r examples ~/.gf $DEBUG_ERROR
         elif [ "Gf-Patterns" = "$repo" ]; then
-                eval mv *.json ~/.gf $DEBUG_ERROR
+                eval mv ./*.json ~/.gf $DEBUG_ERROR
         fi
         cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
     done
@@ -422,10 +423,10 @@ fi
 
 # BBRF Setup
 if [ ! -d "$HOME/.bbrf/" ] ; then
-    mkdir $HOME/.bbrf/
+    mkdir "$HOME/.bbrf/"
 fi
 if  [ -d "$HOME/.bbrf/" ] && [ ! -s "$HOME/.bbrf/config.json" ]; then
-    cat > $HOME/.bbrf/config.json << EOF
+    cat > "$HOME/.bbrf/config.json" << EOF
 {
     "username": "$BBRF_USERNAME",
     "password": "$BBRF_PASSWORD",
@@ -464,9 +465,9 @@ fi
 eval h8mail -g $DEBUG_STD
 
 ## Stripping all Go binaries
-eval strip -s $HOME/go/bin/* $DEBUG_STD
+eval strip -s "$HOME"/go/bin/* $DEBUG_STD
 
-eval $SUDO cp $HOME/go/bin/* /usr/local/bin/ $DEBUG_STD
+eval $SUDO cp "$HOME"/go/bin/* /usr/local/bin/ $DEBUG_STD
 
 printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - GitHub (~/Tools/.github_tokens)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg or env var) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg or env var) \n - notify (~/.config/notify/provider-config.yaml) \n - theHarvester (~/Tools/theHarvester/api-keys.yaml or /etc/theHarvester/api-keys.yaml)\n - H8mail (~/Tools/h8mail_config.ini)\n - WHOISXML API (WHOISXML_API in reconftw.cfg or env var)\n\n\n${reset}"
 printf "${bgreen} Finished!${reset}\n\n"
