@@ -44,7 +44,8 @@ ENV DEBCONF_NONINTERACTIVE_SEEN=true
 ENV GOROOT='/usr/local/go'
 ENV GOPATH='/root/go'
 ENV AXIOMPATH='/root/.axiom/interact'
-ENV PATH="${GOROOT}:${PATH}:${GOPATH}:${AXIOMPATH}"
+ENV CARGOPATH='/root/.cargo/bin'
+ENV PATH="${GOROOT}:${PATH}:${GOPATH}:${AXIOMPATH}:${CARGOPATH}"
 
 COPY 01_nodoc /etc/dpkg/dpkg.cfg.d/
 
