@@ -2068,8 +2068,6 @@ function resolvers_update(){
 			notification "Resolvers seem older than 1 day\n Downloading new resolvers..." warn
 			wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > $resolvers
 			wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt > $resolvers_trusted
-			echo "here"
-			exit
 			notification "Resolvers updated\n" good
 		fi
 	fi
