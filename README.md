@@ -35,13 +35,13 @@
 
 <h3 align="center">Summary</h3>
 
-**ReconFTW** automates the entire process of reconnaisance for you. It outperforms the work of subdomain enumeration along with various vulnerability checks and obtaining maximum information about your target.
+**ReconFTW** automates the entire process of reconnaissance for you. It outperforms the work of subdomain enumeration along with various vulnerability checks and obtaining maximum information about your target.
 
-ReconFTW uses lot of techniques (passive, bruteforce, permutations, certificate transparency, source code scraping, analytics, DNS records...) for subdomain enumeration which helps you getting the maximum and the most interesting subdomains so that you be ahead of the competition.
+ReconFTW uses a lot of techniques (passive, bruteforce, permutations, certificate transparency, source code scraping, analytics, DNS records...) for subdomain enumeration which helps you to get the maximum and the most interesting subdomains so that you be ahead of the competition.
 
 It also performs various vulnerability checks like XSS, Open Redirects, SSRF, CRLF, LFI, SQLi, SSL tests, SSTI, DNS zone transfers, and much more. Along with these, it performs OSINT techniques, directory fuzzing, dorking, ports scanning, screenshots, nuclei scan on your target.
 
-So, what are you waiting for Go! Go! Go! :boom:
+So, what are you waiting for? Go! Go! Go! :boom:
 
 
 📔 Table of Contents
@@ -61,6 +61,7 @@ So, what are you waiting for Go! Go! Go! :boom:
   - [Subdomains](#subdomains)
   - [Hosts](#hosts)
   - [Webs](#webs)
+  - [Vulnerability checks](#vulnerability-checks)
   - [Extras](#extras)
 - [Mindmap/Workflow](#mindmapworkflow)
   - [Data Keep](#data-keep)
@@ -117,7 +118,7 @@ Please refer to the [Docker](https://github.com/six2dez/reconftw/wiki/4.-Docker)
 Yes! reconFTW can also be easily deployed with Terraform and Ansible to AWS, if you want to know how to do it, you can check the guide [here](Terraform/README.md)
 
 # ⚙️ Config file:
-> A detailed explaintion of config file can be found here [Configuration file](https://github.com/six2dez/reconftw/wiki/3.-Configuration-file) :book:
+> You can find a detailed explanation of the configuration file [here](https://github.com/six2dez/reconftw/wiki/3.-Configuration-file) :book:
 
 - Through ```reconftw.cfg``` file the whole execution of the tool can be controlled.
 - Hunters can set various scanning modes, execution preferences, tools, config files, APIs/TOKENS, personalized wordlists and much more.
@@ -132,12 +133,14 @@ Yes! reconFTW can also be easily deployed with Terraform and Ansible to AWS, if 
 #################################################################
 
 # General values
-tools=~/Tools
-SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
-profile_shell=".$(basename $(echo $SHELL))rc"
-reconftw_version=$(git rev-parse --abbrev-ref HEAD)-$(git describe --tags)
-generate_resolvers=false
-proxy_url="http://127.0.0.1:8080/"
+tools=~/Tools   # Path installed tools
+SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )" # Get current script's path
+profile_shell=".$(basename $(echo $SHELL))rc" # Get current shell profile
+reconftw_version=$(git rev-parse --abbrev-ref HEAD)-$(git describe --tags) # Fetch current reconftw version
+generate_resolvers=false # Generate custom resolvers with dnsvalidator
+update_resolvers=true # Fetch and rewrite resolvers from trickest/resolvers before DNS resolution
+proxy_url="http://127.0.0.1:8080/" # Proxy url
+install_golang=true # Set it to false if you already have Golang configured and ready
 #dir_output=/custom/output/path
 
 # Golang Vars (Comment or change on your own)
@@ -160,100 +163,116 @@ GITHUB_TOKENS=${tools}/.github_tokens
 #slack_auth="xoXX-XXX-XXX-XXX"
 
 # File descriptors
-DEBUG_STD="&>/dev/null"
-DEBUG_ERROR="2>/dev/null"
+DEBUG_STD="&>/dev/null" # Skips STD output on installer
+DEBUG_ERROR="2>/dev/null" # Skips ERR output on installer
 
 # Osint
-OSINT=true
+OSINT=true # Enable or disable the whole OSINT module
 GOOGLE_DORKS=true
 GITHUB_DORKS=true
-METADATA=true
-EMAILS=true
-DOMAIN_INFO=true
-IP_INFO=true
+GITHUB_REPOS=true
+METADATA=true # Fetch metadata from indexed office documents
+EMAILS=true # Fetch emails from differents sites 
+DOMAIN_INFO=true # whois info
+REVERSE_WHOIS=true # amass intel reverse whois info, takes some time
+IP_INFO=true    # Reverse IP search, geolocation and whois
 METAFINDER_LIMIT=20 # Max 250
 
 # Subdomains
-SUBDOMAINS_GENERAL=true
-SUBPASSIVE=true
-SUBCRT=true
-SUBANALYTICS=true
-SUBBRUTE=true
-SUBSCRAPING=true
-SUBPERMUTE=true
-SUBTAKEOVER=true
-SUBRECURSIVE=true
+RUNAMASS=true
+RUNSUBFINDER=true
+SUBDOMAINS_GENERAL=true # Enable or disable the whole Subdomains module
+SUBPASSIVE=true # Passive subdomains search
+SUBCRT=true # crtsh search
+SUBNOERROR=true # Check DNS NOERROR response and BF on them
+SUBANALYTICS=true # Google Analytics search
+SUBBRUTE=true # DNS bruteforcing
+SUBSCRAPING=true # Subdomains extraction from web crawling
+SUBPERMUTE=true # DNS permutations
+PERMUTATIONS_OPTION=gotator # The alternative is "ripgen" (faster, not deeper)
+GOTATOR_FLAGS="-depth 1 -numbers 3 -mindup -adv -md" # Flags for gotator
+SUBTAKEOVER=false # Check subdomain takeovers, false by default cuz nuclei already check this
 SUB_RECURSIVE_PASSIVE=false # Uses a lot of API keys queries
+DEEP_RECURSIVE_PASSIVE=10 # Number of top subdomains for recursion
 SUB_RECURSIVE_BRUTE=false # Needs big disk space and time to resolve
-ZONETRANSFER=true
-S3BUCKETS=true
-REVERSE_IP=false
-TLS_PORTS="21,22,25,80,110,135,143,261,271,324,443,448,465,563,614,631,636,664,684,695,832,853,854,990,993,989,990,992,993,994,995,1129,1131,1184,2083,2087,2089,2096,2221,2252,2376,2381,2478,2479,2482,2484,2679,2762,3077,3078,3183,3191,3220,3269,3306,3410,3424,3471,3496,3509,3529,3539,3535,3660,36611,3713,3747,3766,3864,3885,3995,3896,4031,4036,4062,4064,4081,4083,4116,4335,4336,4536,4590,4740,4843,4843,4849,5443,5007,5061,5321,5349,5671,5783,5868,5986,5989,5990,6209,6251,6443,6513,6514,6619,6697,6771,6697,7202,7443,7673,7674,7677,7775,8243,8443,8991,8989,9089,9295,9318,9443,9444,9614,9802,10161,10162,11751,12013,12109,14143,15002,16995,41230,16993,20003"
+ZONETRANSFER=true # Check zone transfer
+S3BUCKETS=true # Check S3 buckets misconfigs
+REVERSE_IP=false # Check reverse IP subdomain search (set True if your target is CIDR/IP)
+TLS_PORTS="21,22,25,80,110,135,143,261,271,324,443,448,465,563,614,631,636,664,684,695,832,853,854,990,993,989,992,994,995,1129,1131,1184,2083,2087,2089,2096,2221,2252,2376,2381,2478,2479,2482,2484,2679,2762,3077,3078,3183,3191,3220,3269,3306,3410,3424,3471,3496,3509,3529,3539,3535,3660,36611,3713,3747,3766,3864,3885,3995,3896,4031,4036,4062,4064,4081,4083,4116,4335,4336,4536,4590,4740,4843,4849,5443,5007,5061,5321,5349,5671,5783,5868,5986,5989,5990,6209,6251,6443,6513,6514,6619,6697,6771,7202,7443,7673,7674,7677,7775,8243,8443,8991,8989,9089,9295,9318,9443,9444,9614,9802,10161,10162,11751,12013,12109,14143,15002,16995,41230,16993,20003"
+INSCOPE=false # Uses inscope tool to filter the scope, requires .scope file in reconftw folder 
 
 # Web detection
-WEBPROBESIMPLE=true
-WEBPROBEFULL=true
-WEBSCREENSHOT=true
-VIRTUALHOSTS=true
-UNCOMMON_PORTS_WEB="81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9092,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55440,55672"
+WEBPROBESIMPLE=true # Web probing on 80/443
+WEBPROBEFULL=true # Web probing in a large port list
+WEBSCREENSHOT=true # Webs screenshooting
+VIRTUALHOSTS=false # Check virtualhosts by fuzzing HOST header
+NMAP_WEBPROBE=true # If disabled it will run httpx directly over subdomains list, nmap before web probing is used to increase the speed and avoid repeated requests
+UNCOMMON_PORTS_WEB="81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3001,3002,3003,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9092,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55440,55672"
 # You can change to aquatone if gowitness fails, comment the one you don't want
 AXIOM_SCREENSHOT_MODULE=webscreenshot # Choose between aquatone,gowitness,webscreenshot
 
 # Host
-FAVICON=true
-PORTSCANNER=true
-PORTSCAN_PASSIVE=true
-PORTSCAN_ACTIVE=true
-CDN_IP=true
+FAVICON=true # Check Favicon domain discovery
+PORTSCANNER=true # Enable or disable the whole Port scanner module 
+PORTSCAN_PASSIVE=true # Port scanner with Shodan
+PORTSCAN_ACTIVE=true # Port scanner with nmap
+CDN_IP=true # Check which IPs belongs to CDN
 
 # Web analysis
-WAF_DETECTION=true
-NUCLEICHECK=true
-NUCLEI_SEVERITY="info,low,medium,high,critical"
-URL_CHECK=true
-URL_GF=true
-URL_EXT=true
-JSCHECKS=true
-FUZZ=true
-CMS_SCANNER=true
-WORDLIST=true
-ROBOTSWORDLIST=true
-PASSWORD_DICT=true
-PASSWORD_MIN_LENGTH=5
-PASSWORD_MAX_LENGTH=14
+WAF_DETECTION=true # Detect WAFs
+NUCLEICHECK=true # Enable or disable nuclei
+NUCLEI_SEVERITY="info,low,medium,high,critical" # Set templates criticity
+NUCLEI_FLAGS="-silent -t ~/nuclei-templates/ -retries 2" # Additional nuclei extra flags, don't set the severity here but the exclusions like "-etags openssh"
+NUCLEI_FLAGS_JS="-silent -tags exposure,token -severity info,low,medium,high,critical" # Additional nuclei extra flags for js secrets
+URL_CHECK=true # Enable or disable URL collection
+URL_CHECK_PASSIVE=true # Search for urls, passive methods from Archive, OTX, CommonCrawl, etc
+URL_CHECK_ACTIVE=true # Search for urls by crawling the websites
+URL_GF=true # Url patterns classification
+URL_EXT=true # Returns a list of files divided by extension
+JSCHECKS=true # JS analysis
+FUZZ=true # Web fuzzing
+CMS_SCANNER=true # CMS scanner
+WORDLIST=true # Wordlist generation
+ROBOTSWORDLIST=true # Check historic disallow entries on waybackMachine
+PASSWORD_DICT=true # Generate password dictionary
+PASSWORD_MIN_LENGTH=5 # Min password lenght
+PASSWORD_MAX_LENGTH=14 # Max password lenght
 
 # Vulns
-VULNS_GENERAL=false
-XSS=true
-CORS=true
-TEST_SSL=true
-OPEN_REDIRECT=true
-SSRF_CHECKS=true
-CRLF_CHECKS=true
-LFI=true
-SSTI=true
-SQLI=true
-BROKENLINKS=true
-SPRAY=true
-COMM_INJ=true
-PROTO_POLLUTION=true
+VULNS_GENERAL=false # Enable or disable the vulnerability module (very intrusive and slow)
+XSS=true # Check for xss with dalfox
+CORS=true # CORS misconfigs
+TEST_SSL=true # SSL misconfigs
+OPEN_REDIRECT=true # Check open redirects
+SSRF_CHECKS=true # SSRF checks
+CRLF_CHECKS=true # CRLF checks
+LFI=true # LFI by fuzzing
+SSTI=true # SSTI by fuzzing
+SQLI=true # Check SQLI with sqlmap
+BROKENLINKS=true # Check for brokenlinks
+SPRAY=true # Performs password spraying
+COMM_INJ=true # Check for command injections with commix
+PROTO_POLLUTION=true # Check for prototype pollution flaws
+SMUGGLING=true # Check for HTTP request smuggling flaws
+WEBCACHE=true # Check for HTTP request smuggling flaws
 
 # Extra features
 NOTIFICATION=false # Notification for every function
 SOFT_NOTIFICATION=false # Only for start/end
-DEEP=false
-DEEP_LIMIT=500
-DEEP_LIMIT2=1500
-DIFF=false
-REMOVETMP=false
-REMOVELOG=false
-PROXY=false
-SENDZIPNOTIFY=false
+DEEP=false # DEEP mode, really slow and don't care about the number of results
+DEEP_LIMIT=500 # First limit to not run unless you run DEEP
+DEEP_LIMIT2=1500 # Second limit to not run unless you run DEEP
+DIFF=false # Diff function, run every module over an already scanned target, printing only new findings (but save everything)
+REMOVETMP=false # Delete temporary files after execution (to free up space)
+REMOVELOG=false # Delete logs after execution
+PROXY=false # Send to proxy the websites found
+SENDZIPNOTIFY=false # Send to zip the results (over notify)
 PRESERVE=true      # set to true to avoid deleting the .called_fn files on really large scans
-FFUF_FLAGS="-mc all -fc 404 -ac -sf -s"
+FFUF_FLAGS="-mc all -fc 404 -ac -sf" # Ffuf flags
+HTTPX_FLAGS="-follow-redirects -random-agent -status-code -silent -title -web-server -tech-detect -location" # Httpx flags for simple web probing
 
 # HTTP options
-HEADER="User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0"
+HEADER="User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" # Default header
 
 # Threads
 FFUF_THREADS=40
@@ -265,7 +284,7 @@ BRUTESPRAY_CONCURRENCE=10
 GAU_THREADS=10
 DNSTAKE_THREADS=100
 DALFOX_THREADS=200
-PUREDNS_PUBLIC_LIMIT=0 # Set between 2000 - 10000 if your router blows up, 0 is unlimited
+PUREDNS_PUBLIC_LIMIT=0 # Set between 2000 - 10000 if your router blows up, 0 means unlimited
 PUREDNS_TRUSTED_LIMIT=400
 PUREDNS_WILDCARDTEST_LIMIT=30
 PUREDNS_WILDCARDBATCH_LIMIT=1500000
@@ -276,6 +295,7 @@ PPFUZZ_THREADS=30
 DNSVALIDATOR_THREADS=200
 INTERLACE_THREADS=10
 TLSX_THREADS=1000
+XNLINKFINDER_DEPTH=3
 
 # Rate limits
 HTTPX_RATELIMIT=150
@@ -283,10 +303,13 @@ NUCLEI_RATELIMIT=150
 FFUF_RATELIMIT=0
 
 # Timeouts
-CMSSCAN_TIMEOUT=3600
+AMASS_INTEL_TIMEOUT=15          # Minutes
+AMASS_ENUM_TIMEOUT=180          # Minutes
+CMSSCAN_TIMEOUT=3600            # Seconds
 FFUF_MAXTIME=900                # Seconds
 HTTPX_TIMEOUT=10                # Seconds
 HTTPX_UNCOMMONPORTS_TIMEOUT=10  # Seconds
+PERMUTATIONS_LIMIT=21474836480  # Bytes, default is 20 GB
 
 # lists
 fuzz_wordlist=${tools}/fuzz_wordlist.txt
@@ -300,13 +323,13 @@ resolvers_trusted=${tools}/resolvers_trusted.txt
 # Axiom Fleet
 # Will not start a new fleet if one exist w/ same name and size (or larger)
 # AXIOM=false Uncomment only to overwrite command line flags
-AXIOM_FLEET_LAUNCH=false
-AXIOM_FLEET_NAME="reconFTW"
-AXIOM_FLEET_COUNT=5
-AXIOM_FLEET_REGIONS="eu-central"
-AXIOM_FLEET_SHUTDOWN=true
+AXIOM_FLEET_LAUNCH=true # Enable or disable spin up a new fleet, if false it will use the current fleet with the AXIOM_FLEET_NAME prefix
+AXIOM_FLEET_NAME="reconFTW" # Fleet's prefix name
+AXIOM_FLEET_COUNT=5 # Fleet's number
+AXIOM_FLEET_REGIONS="eu-central" # Fleet's region
+AXIOM_FLEET_SHUTDOWN=true # # Enable or disable delete the fleet after the execution
 # This is a script on your reconftw host that might prep things your way...
-#AXIOM_POST_START="~/Tools/axiom_config.sh"
+#AXIOM_POST_START="~/Tools/axiom_config.sh" # Useful  to send your config files to the fleet
 AXIOM_EXTRA_ARGS="" # Leave empty if you don't want to add extra arguments
 #AXIOM_EXTRA_ARGS="--rm-logs" # Example
 
@@ -419,8 +442,8 @@ reset='\033[0m'
 * You can create your own axiom's fleet before running reconFTW or let reconFTW to create and destroy it automatically just modifying reconftw.cfg file.
 
 # BBRF Support: :computer:
-* To add reconFTW results to your [BBRF instance](https://github.com/honoki/bbrf-server) just add IP and credentials on reconftw.cfg file section dedicated to bbrf.
-* During the execution of the scans the results will be added dinamically when each step ends.
+* To add reconFTW results to your [BBRF instance](https://github.com/honoki/bbrf-server) just add IP and credentials to reconftw.cfg file section dedicated to bbrf.
+* During the execution of the scans the results will be added dynamically when each step ends.
 * Even you can set up locally your BBRF instance to be able to visualize your results in a fancy web UI.
 
 # Sample video:
@@ -436,18 +459,19 @@ reset='\033[0m'
 - Metadata finder ([MetaFinder](https://github.com/Josue87/MetaFinder))
 - Google Dorks ([dorks_hunter](https://github.com/six2dez/dorks_hunter))
 - Github Dorks ([gitdorks_go](https://github.com/damit5/gitdorks_go))
+- GitHub org analysis ([enumerepo](https://github.com/trickest/enumerepo) and [trufflehog](https://github.com/trufflesecurity/trufflehog))
 
 ## Subdomains
-  - Passive ([amass](https://github.com/OWASP/Amass) and [github-subdomains](https://github.com/gwen001/github-subdomains))
+  - Passive ([amass](https://github.com/OWASP/Amass), [subfinder](https://github.com/projectdiscovery/subfinder) and [github-subdomains](https://github.com/gwen001/github-subdomains))
   - Certificate transparency ([ctfr](https://github.com/UnaPibaGeek/ctfr))
   - NOERROR subdomain discovery ([dnsx](https://github.com/projectdiscovery/dnsx), more info [here](https://www.securesystems.de/blog/enhancing-subdomain-enumeration-ents-and-noerror/))
   - Bruteforce ([puredns](https://github.com/d3mondev/puredns))
-  - Permutations ([Gotator](https://github.com/Josue87/gotator))
+  - Permutations ([Gotator](https://github.com/Josue87/gotator) and [ripgen](https://github.com/resyncgg/ripgen))
   - JS files & Source Code Scraping ([gospider](https://github.com/jaeles-project/gospider))
   - DNS Records ([dnsx](https://github.com/projectdiscovery/dnsx))
   - Google Analytics ID ([AnalyticsRelationships](https://github.com/Josue87/AnalyticsRelationships))
   - TLS handshake ([tlsx](https://github.com/projectdiscovery/tlsx))
-  - Recursive search.
+  - Recursive search ([dsieve](https://github.com/trickest/dsieve)).
   - Subdomains takeover ([nuclei](https://github.com/projectdiscovery/nuclei))
   - DNS takeover ([dnstake](https://github.com/pwnesia/dnstake))
   - DNS Zone Transfer ([dig](https://linux.die.net/man/1/dig))
@@ -463,31 +487,34 @@ reset='\033[0m'
 
 ## Webs
 - Web Prober ([httpx](https://github.com/projectdiscovery/httpx) and [unimap](https://github.com/Edu4rdSHL/unimap))
-- Web screenshot ([webscreenshot](https://github.com/maaaaz/webscreenshot) or [gowitness](https://github.com/sensepost/gowitness))
+- Web screenshoting ([webscreenshot](https://github.com/maaaaz/webscreenshot) or [gowitness](https://github.com/sensepost/gowitness))
 - Web templates scanner ([nuclei](https://github.com/projectdiscovery/nuclei) and [nuclei geeknik](https://github.com/geeknik/the-nuclei-templates.git))
+- CMS Scanner ([CMSeeK](https://github.com/Tuhinshubhra/CMSeeK))
 - Url extraction ([waybackurls](https://github.com/tomnomnom/waybackurls), [gau](https://github.com/lc/gau), [gospider](https://github.com/jaeles-project/gospider), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3) and [JSA](https://github.com/w9w/JSA))
-- URLPatterns Search and filtering ([urless](https://github.com/xnl-h4ck3r/urless), [gf](https://github.com/tomnomnom/gf) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns))
-- XSS ([dalfox](https://github.com/hahwul/dalfox))
-- Open redirect ([Oralyzer](https://github.com/r0075h3ll/Oralyzer))
-- SSRF (headers [interactsh](https://github.com/projectdiscovery/interactsh) and param values with [ffuf](https://github.com/ffuf/ffuf))
-- CRLF ([crlfuzz](https://github.com/dwisiswant0/crlfuzz))
+- URL patterns Search and filtering ([urless](https://github.com/xnl-h4ck3r/urless), [gf](https://github.com/tomnomnom/gf) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns))
 - Favicon Real IP ([fav-up](https://github.com/pielco11/fav-up))
 - Javascript analysis ([subjs](https://github.com/lc/subjs), [JSA](https://github.com/w9w/JSA), [xnLinkFinder](https://github.com/xnl-h4ck3r/xnLinkFinder), [getjswords](https://github.com/m4ll0k/BBTz))
 - Fuzzing ([ffuf](https://github.com/ffuf/ffuf))
-- Cors ([Corsy](https://github.com/s0md3v/Corsy))
-- LFI Checks ([ffuf](https://github.com/ffuf/ffuf))
-- SQLi Check ([SQLMap](https://github.com/sqlmapproject/sqlmap))
-- SSTI ([ffuf](https://github.com/ffuf/ffuf))
-- CMS Scanner ([CMSeeK](https://github.com/Tuhinshubhra/CMSeeK))
-- SSL tests ([testssl](https://github.com/drwetter/testssl.sh))
-- Broken Links Checker ([gospider](https://github.com/jaeles-project/gospider))
-- Prototype Pollution ([ppfuzz](https://github.com/dwisiswant0/ppfuzz))
 - URL sorting by extension
 - Wordlist generation
 - Passwords dictionary creation ([pydictor](https://github.com/LandGrey/pydictor))
 
+## Vulnerability checks
+- XSS ([dalfox](https://github.com/hahwul/dalfox))
+- Open redirect ([Oralyzer](https://github.com/r0075h3ll/Oralyzer))
+- SSRF (headers [interactsh](https://github.com/projectdiscovery/interactsh) and param values with [ffuf](https://github.com/ffuf/ffuf))
+- CRLF ([crlfuzz](https://github.com/dwisiswant0/crlfuzz))
+- Cors ([Corsy](https://github.com/s0md3v/Corsy))
+- LFI Checks ([ffuf](https://github.com/ffuf/ffuf))
+- SQLi Check ([SQLMap](https://github.com/sqlmapproject/sqlmap))
+- SSTI ([ffuf](https://github.com/ffuf/ffuf))
+- SSL tests ([testssl](https://github.com/drwetter/testssl.sh))
+- Broken Links Checker ([gospider](https://github.com/jaeles-project/gospider))
+- Prototype Pollution ([ppfuzz](https://github.com/dwisiswant0/ppfuzz))
+- Web Cache Vulnerabilities ([Web-Cache-Vulnerability-Scanner](https://github.com/Hackmanit/Web-Cache-Vulnerability-Scanner))
+
 ## Extras
-- Multithread ([Rush](https://github.com/shenwei356/rush))
+- Multithreading ([Rush](https://github.com/shenwei356/rush))
 - Custom resolvers generated list ([dnsvalidator](https://github.com/vortexau/dnsvalidator))
 - Docker container included and [DockerHub](https://hub.docker.com/r/six2dez/reconftw) integration
 - Ansible + Terraform deployment over AWS
@@ -508,13 +535,13 @@ reset='\033[0m'
 
 ## Data Keep
 
-Follow these simple steps to end up having a private repository with your `API Keys` and `/Recon` data.
+Follow these simple steps to end up with a private repository with your `API Keys` and `/Recon` data.
 
 * Create a private __blank__ repository on `Git(Hub|Lab)` (Take into account size limits regarding Recon data upload)
 * Clone your project: `git clone https://gitlab.com/example/reconftw-data`
 * Get inside the cloned repository: `cd reconftw-data`
-* Create branch with an empty commit: `git commit --allow-empty -m "Empty commit"`
-* Add official repo as a new remote: `git remote add upstream https://github.com/six2dez/reconftw` (`upstream` is an example)
+* Create a new branch with an empty commit: `git commit --allow-empty -m "Empty commit"`
+* Add the official repo as a new remote: `git remote add upstream https://github.com/six2dez/reconftw` (`upstream` is an example)
 * Update upstream's repo: `git fetch upstream`
 * Rebase current branch with the official one: `git rebase upstream/main master`
 
@@ -525,7 +552,7 @@ Follow these simple steps to end up having a private repository with your `API K
 
 ## How to contribute:
 
-If you want to contribute to this project you can do it in multiple ways:
+If you want to contribute to this project, you can do it in multiple ways:
 - Submitting an [issue](https://github.com/six2dez/reconftw/issues/new/choose) because you have found a bug or you have any suggestion or request.
 - Making a Pull Request from [dev](https://github.com/six2dez/reconftw/tree/dev) branch because you want to improve the code or add something to the script.
 
@@ -562,6 +589,7 @@ If you want to contribute to this project you can do it in multiple ways:
 - [Censys](https://censys.io/)
 - [Fofa](https://fofa.info/)
 - [intelx](https://intelx.io/)
+- [Whoxy](https://www.whoxy.com/)
 
 # Disclaimer
 Usage of this program for attacking targets without consent is illegal. It is the user's responsibility to obey all applicable laws. The developer assumes no liability and is not responsible for any misuse or damage caused by this program. Please use responsibly.
