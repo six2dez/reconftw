@@ -108,6 +108,7 @@ function tools_installed(){
 	which enumerepo &>/dev/null || { printf "${bred} [*] enumerepo			[NO]${reset}\n${reset}"; allinstalled=false;}
 	which trufflehog &>/dev/null || { printf "${bred} [*] trufflehog			[NO]${reset}\n${reset}"; allinstalled=false;}
 	which Web-Cache-Vulnerability-Scanner &>/dev/null || { printf "${bred} [*] Web-Cache-Vulnerability-Scanner [NO]${reset}\n"; allinstalled=false;}
+	which subfinder &>/dev/null || { printf "${bred} [*] subfinder			[NO]${reset}\n${reset}"; allinstalled=false;}
 
 	if [ "${allinstalled}" = true ]; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
@@ -362,12 +363,14 @@ function sub_passive(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBPASSIVE" = true ]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Passive Subdomain Enumeration"
 		if [ ! "$AXIOM" = true ]; then
-			amass enum -passive -d $domain -config $AMASS_CONFIG -timeout $AMASS_ENUM_TIMEOUT -json .tmp/amass_json.json 2>>"$LOGFILE" &>/dev/null
+			[[ $RUNAMASS == true ]] && amass enum -passive -d $domain -config $AMASS_CONFIG -timeout $AMASS_ENUM_TIMEOUT -json .tmp/amass_json.json 2>>"$LOGFILE" &>/dev/null
 			[ -s ".tmp/amass_json.json" ] && cat .tmp/amass_json.json | jq -r '.name' | anew -q .tmp/amass_psub.txt
+			[[ $RUNSUBFINDER == true ]] && subfinder -all -d $domain -silent | anew -q .tmp/amass_psub.txt
 		else
 			echo $domain > .tmp/amass_temp_axiom.txt
-			[ -s ".tmp/amass_temp_axiom.txt" ] && axiom-scan .tmp/amass_temp_axiom.txt -m amass -passive -o .tmp/amass_axiom.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-			[ -s ".tmp/amass_axiom.txt" ] && cat .tmp/amass_axiom.txt | anew -q .tmp/amass_psub.txt
+			[[ $RUNAMASS == true ]] && axiom-scan .tmp/amass_temp_axiom.txt -m amass -passive -o .tmp/amass_axiom.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+			[[ $RUNSUBFINDER == true ]] && axiom-scan .tmp/amass_temp_axiom.txt -m subfinder -all -silent -o .tmp/subfinder_axiom.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+			cat .tmp/amass_axiom.txt .tmp/subfinder_axiom.txt 2>>"$LOGFILE" | anew -q .tmp/amass_psub.txt
 		fi
 		if [ -s "${GITHUB_TOKENS}" ]; then
 			if [ "$DEEP" = true ]; then
@@ -395,9 +398,7 @@ function sub_crt(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBCRT" = true ]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Crtsh Subdomain Enumeration"
 		python3 $tools/ctfr/ctfr.py -d $domain -o .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" &>/dev/null
-		if [ "$INSCOPE" = true ]; then
-			check_inscope .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" &>/dev/null
-		fi
+		[[ "$INSCOPE" = true ]] && check_inscope .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" &>/dev/null
 		NUMOFLINES=$(cat .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" | sed 's/\*.//g' | anew .tmp/crtsh_subs.txt | sed '/^$/d' | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (cert transparency)" ${FUNCNAME[0]}
 	else
@@ -427,9 +428,7 @@ function sub_active(){
 		else
 			cat .tmp/subdomains_tmp.txt | tlsx -san -cn -silent -ro -c $TLSX_THREADS | anew -q .tmp/subdomains_tmp.txt
 		fi
-		if [ "$INSCOPE" = true ]; then
-			check_inscope .tmp/subdomains_tmp.txt 2>>"$LOGFILE" &>/dev/null
-		fi
+		[[ "$INSCOPE" = true ]] && check_inscope .tmp/subdomains_tmp.txt 2>>"$LOGFILE" &>/dev/null
 		NUMOFLINES=$(cat .tmp/subdomains_tmp.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
 		end_subfunc "${NUMOFLINES} subs DNS resolved from passive" ${FUNCNAME[0]}
 	else
@@ -447,9 +446,7 @@ function sub_noerror(){
 			else
 				dnsx -d $domain -r $resolvers -silent -rcode noerror -w $subs_wordlist | cut -d' ' -f1 | anew -q .tmp/subs_noerror.txt 2>>"$LOGFILE" &>/dev/null
 			fi
-			if [ "$INSCOPE" = true ]; then
-				check_inscope .tmp/subs_noerror.txt 2>>"$LOGFILE" &>/dev/null
-			fi
+			[[ "$INSCOPE" = true ]] && check_inscope .tmp/subs_noerror.txt 2>>"$LOGFILE" &>/dev/null
 			NUMOFLINES=$(cat .tmp/subs_noerror.txt 2>>"$LOGFILE" | sed "s/*.//" | grep ".$domain$" | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (DNS noerror)" ${FUNCNAME[0]}
 		else 
@@ -484,9 +481,7 @@ function sub_dns(){
 			resolvers_update_quick_axiom
 			[ -s ".tmp/subdomains_dns.txt" ] && axiom-scan .tmp/subdomains_dns.txt -m puredns-resolve -r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -o .tmp/subdomains_dns_resolved.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 		fi
-		if [ "$INSCOPE" = true ]; then
-			check_inscope .tmp/subdomains_dns_resolved.txt 2>>"$LOGFILE" &>/dev/null
-		fi
+		[[ "$INSCOPE" = true ]] && check_inscope .tmp/subdomains_dns_resolved.txt 2>>"$LOGFILE" &>/dev/null
 		NUMOFLINES=$(cat .tmp/subdomains_dns_resolved.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (dns resolution)" ${FUNCNAME[0]}
 	else
@@ -514,9 +509,7 @@ function sub_brute(){
 			fi
 			[ -s ".tmp/subs_brute.txt" ] && axiom-scan .tmp/subs_brute.txt -m puredns-resolve -r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -o .tmp/subs_brute_valid.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 		fi
-		if [ "$INSCOPE" = true ]; then
-			check_inscope .tmp/subs_brute_valid.txt 2>>"$LOGFILE" &>/dev/null
-		fi
+		[[ "$INSCOPE" = true ]] && check_inscope .tmp/subs_brute_valid.txt 2>>"$LOGFILE" &>/dev/null
 		NUMOFLINES=$(cat .tmp/subs_brute_valid.txt 2>>"$LOGFILE" | sed "s/*.//" | grep ".$domain$" | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (bruteforce)" ${FUNCNAME[0]}
 	else
@@ -571,9 +564,7 @@ function sub_scraping(){
 					[[ $NUMFILES -gt 0 ]] && find .tmp/gospider/ -type f -exec cat {} + | sed '/^.\{2048\}./d' | anew -q .tmp/gospider.txt
 					[ -s ".tmp/gospider.txt" ] && cat .tmp/gospider.txt | grep -aEo 'https?://[^ ]+' | sed 's/]$//' | unfurl -u domains 2>>"$LOGFILE" | grep ".$domain$" | anew -q .tmp/scrap_subs.txt
 					[ -s ".tmp/scrap_subs.txt" ] && axiom-scan .tmp/scrap_subs.txt -m puredns-resolve -r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -o .tmp/scrap_subs_resolved.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-					if [ "$INSCOPE" = true ]; then
-						check_inscope .tmp/scrap_subs_resolved.txt 2>>"$LOGFILE" &>/dev/null
-					fi
+					[[ "$INSCOPE" = true ]] && check_inscope .tmp/scrap_subs_resolved.txt 2>>"$LOGFILE" &>/dev/null
 					NUMOFLINES=$(cat .tmp/scrap_subs_resolved.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | tee .tmp/diff_scrap.txt | sed '/^$/d' | wc -l)
 					[ -s ".tmp/diff_scrap.txt" ] && axiom-scan .tmp/diff_scrap.txt -m httpx -follow-host-redirects -H \"${HEADER}\" -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info3.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 				fi
@@ -610,9 +601,7 @@ function sub_analytics(){
 				[ -s ".tmp/analytics_subs_clean.txt" ] && axiom-scan .tmp/analytics_subs_clean.txt -m puredns-resolve -r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -o .tmp/analytics_subs_resolved.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			fi
 		fi
-		if [ "$INSCOPE" = true ]; then
-			check_inscope .tmp/analytics_subs_resolved.txt 2>>"$LOGFILE" &>/dev/null
-		fi
+		[[ "$INSCOPE" = true ]] && check_inscope .tmp/analytics_subs_resolved.txt 2>>"$LOGFILE" &>/dev/null
 		NUMOFLINES=$(cat .tmp/analytics_subs_resolved.txt 2>>"$LOGFILE" | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (analytics relationship)" ${FUNCNAME[0]}
 	else
@@ -666,9 +655,7 @@ function sub_permut(){
 
 		if [ -s ".tmp/permute_subs.txt" ]; then
 			deleteOutScoped $outOfScope_file .tmp/permute_subs.txt
-			if [ "$INSCOPE" = true ]; then
-				check_inscope .tmp/permute_subs.txt 2>>"$LOGFILE" &>/dev/null
-			fi
+			[[ "$INSCOPE" = true ]] && check_inscope .tmp/permute_subs.txt 2>>"$LOGFILE" &>/dev/null
 			NUMOFLINES=$(cat .tmp/permute_subs.txt 2>>"$LOGFILE" | grep ".$domain$" | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
 		else
 			NUMOFLINES=0
@@ -698,9 +685,7 @@ function sub_recursive_passive(){
 			[ -s ".tmp/amass_prec.txt" ] &&  cat .tmp/amass_prec.txt | anew -q .tmp/passive_recursive.txt
 			[ -s ".tmp/passive_recursive.txt" ] && axiom-scan .tmp/passive_recursive.txt -m puredns-resolve -r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -o .tmp/passive_recurs_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 		fi
-		if [ "$INSCOPE" = true ]; then
-			check_inscope .tmp/passive_recurs_tmp.txt 2>>"$LOGFILE" &>/dev/null
-		fi
+		[[ "$INSCOPE" = true ]] && check_inscope .tmp/passive_recurs_tmp.txt 2>>"$LOGFILE" &>/dev/null
 		NUMOFLINES=$(cat .tmp/passive_recurs_tmp.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | sed '/^$/d' | anew subdomains/subdomains.txt | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (recursive)" ${FUNCNAME[0]}
 	else
@@ -981,7 +966,6 @@ function screenshot(){
 		start_func ${FUNCNAME[0]} "Web Screenshots"
 		[ ! -s ".tmp/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q .tmp/webs_all.txt
 		if [ ! "$AXIOM" = true ]; then
-			#[ -s ".tmp/webs_screenshots.txt" ] && webscreenshot -i .tmp/webs_screenshots.txt -w $WEBSCREENSHOT_THREADS -o screenshots 2>>"$LOGFILE" &>/dev/null
 			[ -s ".tmp/webs_all.txt" ] && gowitness file -f .tmp/webs_all.txt -t $GOWITNESS_THREADS --disable-logging 2>>"$LOGFILE"
 		else
 			[ "$AXIOM_SCREENSHOT_MODULE" = "webscreenshot" ] && axiom-scan .tmp/webs_all.txt -m $AXIOM_SCREENSHOT_MODULE -w $WEBSCREENSHOT_THREADS -o screenshots $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
