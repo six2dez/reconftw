@@ -8,8 +8,8 @@
 
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.4">
-    <img src="https://img.shields.io/badge/release-v2.4-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.5">
+    <img src="https://img.shields.io/badge/release-v2.5-green">
   </a>
    </a>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
@@ -138,7 +138,7 @@ SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )" # Get current sc
 profile_shell=".$(basename $(echo $SHELL))rc" # Get current shell profile
 reconftw_version=$(git rev-parse --abbrev-ref HEAD)-$(git describe --tags) # Fetch current reconftw version
 generate_resolvers=false # Generate custom resolvers with dnsvalidator
-update_resolvers=true # Fetch and rewrite resolvers from trickest/resolvers before DNS resolution
+update_resolvers=true # Fetch and rewrite resolvers before DNS resolution
 proxy_url="http://127.0.0.1:8080/" # Proxy url
 install_golang=true # Set it to false if you already have Golang configured and ready
 #dir_output=/custom/output/path
