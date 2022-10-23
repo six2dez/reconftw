@@ -81,6 +81,7 @@ gotools["inscope"]="go install github.com/tomnomnom/hacks/inscope@latest"
 gotools["rush"]="go install github.com/shenwei356/rush@latest"
 gotools["enumerepo"]="go install github.com/trickest/enumerepo@latest"
 gotools["Web-Cache-Vulnerability-Scanner"]="go install -v github.com/Hackmanit/Web-Cache-Vulnerability-Scanner@latest"
+gotools["subfinder"]="go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest"
 
 declare -A repos
 repos["dorks_hunter"]="six2dez/dorks_hunter"
@@ -145,7 +146,9 @@ install_brew(){
     fi
     eval brew update -$DEBUG_STD
     eval brew install --cask chromium $DEBUG_STD
-    eval brew install bash coreutils python massdns jq gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils whois libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb libxml2-utils libdata-hexdump-perl $DEBUG_STD
+    eval brew install bash coreutils python massdns jq gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils whois libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb libxml2-utils libdata-hexdump-perl gnu-getopt $DEBUG_STD
+    export PATH="/opt/homebrew/opt/gnu-getopt/bin:$PATH"
+    echo 'export PATH="/opt/homebrew/opt/gnu-getopt/bin:$PATH"' >> ~/.zshrc
     eval brew services start tor $DEBUG_STD
     eval brew install rustup $DEBUG_STD
     eval rustup-init $DEBUG_STD
@@ -371,6 +374,7 @@ eval $SUDO strip -s /usr/local/bin/unimap $DEBUG_STD
 eval $SUDO chmod 755 /usr/local/bin/ppfuzz
 eval $SUDO strip -s /usr/local/bin/ppfuzz $DEBUG_STD
 eval notify $DEBUG_STD
+eval subfinder -h $DEBUG_STD
 
 printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 ## Downloads
@@ -379,8 +383,8 @@ printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 wget -q -O - https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json > ~/.gf/potential.json
 wget -q -O - https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py > ${tools}/getjswords.py
 wget -q -O - https://wordlists-cdn.assetnote.io/data/manual/best-dns-wordlist.txt > ${subs_wordlist_big}
-wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt > ${resolvers_trusted}
-wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > ${resolvers} 
+wget -q -O - https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw > ${resolvers_trusted}
+wget -q -O - https://raw.githubusercontent.com/proabiral/Fresh-Resolvers/master/resolvers.txt > ${resolvers} 
 wget -q -O - https://gist.github.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw > ${subs_wordlist}
 wget -q -O - https://gist.github.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw > ${tools}/permutations_list.txt
 wget -q -O - https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt > ${fuzz_wordlist}
@@ -448,16 +452,16 @@ if [ "$generate_resolvers" = true ]; then
 		dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads $DNSVALIDATOR_THREADS -o tmp_resolvers &>/dev/null
 		[ -s "tmp_resolvers" ] && cat tmp_resolvers | anew -q $resolvers
 		[ -s "tmp_resolvers" ] && rm -f tmp_resolvers &>/dev/null
-		[ ! -s "$resolvers" ] && wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > $resolvers
-        [ ! -s "$resolvers_trusted" ] && wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt > $resolvers_trusted
+		[ ! -s "$resolvers" ] && wget -q -O - https://raw.githubusercontent.com/proabiral/Fresh-Resolvers/master/resolvers.txt > ${resolvers}
+        [ ! -s "$resolvers_trusted" ] && wget -q -O - https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw > ${resolvers_trusted}
 		printf "${yellow} Resolvers updated\n ${reset}\n\n"
 	fi
 	generate_resolvers=false
 else
 	[ ! -s "$resolvers" ] || if [[ $(find "$resolvers" -mtime +1 -print) ]] ; then
 		 ${reset}"\n\nChecking resolvers lists...\n Accurate resolvers are the key to great results\n Downloading new resolvers ${reset}\n\n"
-		wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > $resolvers
-        wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt > $resolvers_trusted
+		wget -q -O - https://raw.githubusercontent.com/proabiral/Fresh-Resolvers/master/resolvers.txt > ${resolvers}
+        wget -q -O - https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw > ${resolvers_trusted}
 		printf "${yellow} Resolvers updated\n ${reset}\n\n"
 	fi
 fi
@@ -469,6 +473,6 @@ eval strip -s "$HOME"/go/bin/* $DEBUG_STD
 
 eval $SUDO cp "$HOME"/go/bin/* /usr/local/bin/ $DEBUG_STD
 
-printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - GitHub (~/Tools/.github_tokens)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg or env var) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg or env var) \n - notify (~/.config/notify/provider-config.yaml) \n - theHarvester (~/Tools/theHarvester/api-keys.yaml or /etc/theHarvester/api-keys.yaml)\n - H8mail (~/Tools/h8mail_config.ini)\n - WHOISXML API (WHOISXML_API in reconftw.cfg or env var)\n\n\n${reset}"
+printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/provider-config.yaml)\n - GitHub (~/Tools/.github_tokens)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg or env var) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg or env var) \n - notify (~/.config/notify/provider-config.yaml) \n - theHarvester (~/Tools/theHarvester/api-keys.yaml or /etc/theHarvester/api-keys.yaml)\n - H8mail (~/Tools/h8mail_config.ini)\n - WHOISXML API (WHOISXML_API in reconftw.cfg or env var)\n\n\n${reset}"
 printf "${bgreen} Finished!${reset}\n\n"
 printf "\n\n${bgreen}#######################################################################${reset}\n"
