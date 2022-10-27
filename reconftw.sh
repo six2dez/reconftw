@@ -2075,8 +2075,8 @@ function resolvers_update_quick_local(){
 }
 
 function resolvers_update_quick_axiom(){
-	axiom-exec 'wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > /home/op/lists/resolvers.txt' &>/dev/null
-	axiom-exec 'wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt > /home/op/lists/resolvers_trusted.txt' &>/dev/null
+	axiom-exec "wget -q -O - ${resolvers_url} > /home/op/lists/resolvers.txt" &>/dev/null
+	axiom-exec "wget -q -O - ${resolvers_trusted_url} > /home/op/lists/resolvers_trusted.txt" &>/dev/null
 }
 
 function ipcidr_target(){
