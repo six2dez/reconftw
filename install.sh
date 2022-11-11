@@ -329,7 +329,7 @@ for repo in "${!repos[@]}"; do
     elif [ "Gf-Patterns" = "$repo" ]; then
         eval mv ./*.json ~/.gf $DEBUG_ERROR
     elif [ "trufflehog" = "$repo" ]; then
-        go install
+        eval go install $DEBUG_STD
     fi
     cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 done
@@ -374,7 +374,7 @@ eval $SUDO strip -s /usr/local/bin/unimap $DEBUG_STD
 eval $SUDO chmod 755 /usr/local/bin/ppfuzz
 eval $SUDO strip -s /usr/local/bin/ppfuzz $DEBUG_STD
 eval notify $DEBUG_STD
-eval subfinder -h $DEBUG_STD
+eval subfinder $DEBUG_STD
 
 printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 ## Downloads
