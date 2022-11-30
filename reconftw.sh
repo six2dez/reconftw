@@ -62,6 +62,7 @@ function tools_installed(){
 	[ -f "$tools/pydictor/pydictor.py" ] || { printf "${bred} [*] pydictor   		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/urless/urless.py" ] || { printf "${bred} [*] urless			[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/smuggler/smuggler.py" ] || { printf "${bred} [*] smuggler			[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/regulator/regulator.py" ] || { printf "${bred} [*] regulator			[NO]${reset}\n"; allinstalled=false;}
 	which github-endpoints &>/dev/null || { printf "${bred} [*] github-endpoints		[NO]${reset}\n"; allinstalled=false;}
 	which github-subdomains &>/dev/null || { printf "${bred} [*] github-subdomains		[NO]${reset}\n"; allinstalled=false;}
 	which gospider &>/dev/null || { printf "${bred} [*] gospider			[NO]${reset}\n"; allinstalled=false;}
@@ -326,6 +327,7 @@ function subdomains_full(){
 		sub_noerror
 		sub_brute
 		sub_permut
+		sub_regex_permut
 		sub_recursive_passive
 		sub_recursive_brute
 		sub_dns
@@ -663,6 +665,39 @@ function sub_permut(){
 		end_subfunc "${NUMOFLINES} new subs (permutations)" ${FUNCNAME[0]}
 	else
 		if [ "$SUBPERMUTE" = false ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
+	fi
+}
+
+function sub_regex_permut(){
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBREGEXPERMUTE" = true ]; then
+		start_subfunc ${FUNCNAME[0]} "Running : Permutations BY REGEX ANALYSIS"
+		cd "$tools/regulator" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+		python3 main.py $domain subdomains/subdomains.txt $dir/.tmp/${domain}.rules
+		./make_brute_list.sh ${dir}/.tmp/${domain}.rules ${dir}/.tmp/${domain}.brute
+		cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+
+		if [ ! "$AXIOM" = true ]; then
+			resolvers_update_quick_local
+			[ -s ".tmp/${domain}.brute" ] && puredns resolve .tmp/${domain}.brute -w .tmp/regulator.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" &>/dev/null
+		else
+			resolvers_update_quick_axiom
+			[ -s ".tmp/${domain}.brute" ] && axiom-scan .tmp/${domain}.brute -m puredns-resolve -r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -o .tmp/regulator.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+		fi
+		
+		if [ -s ".tmp/regulator.txt" ]; then
+			deleteOutScoped $outOfScope_file .tmp/regulator.txt
+			[[ "$INSCOPE" = true ]] && check_inscope .tmp/regulator.txt 2>>"$LOGFILE" &>/dev/null
+			NUMOFLINES=$(cat .tmp/regulator.txt 2>>"$LOGFILE" | grep ".$domain$" | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
+		else
+			NUMOFLINES=0
+		fi
+		end_subfunc "${NUMOFLINES} new subs (permutations)" ${FUNCNAME[0]}
+	else
+		if [ "$SUBREGEXPERMUTE" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
