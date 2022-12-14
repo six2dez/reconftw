@@ -62,7 +62,7 @@ function tools_installed(){
 	[ -f "$tools/pydictor/pydictor.py" ] || { printf "${bred} [*] pydictor   		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/urless/urless.py" ] || { printf "${bred} [*] urless			[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/smuggler/smuggler.py" ] || { printf "${bred} [*] smuggler			[NO]${reset}\n"; allinstalled=false;}
-	[ -f "$tools/regulator/regulator.py" ] || { printf "${bred} [*] regulator			[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/regulator/main.py" ] || { printf "${bred} [*] regulator			[NO]${reset}\n"; allinstalled=false;}
 	which github-endpoints &>/dev/null || { printf "${bred} [*] github-endpoints		[NO]${reset}\n"; allinstalled=false;}
 	which github-subdomains &>/dev/null || { printf "${bred} [*] github-subdomains		[NO]${reset}\n"; allinstalled=false;}
 	which gospider &>/dev/null || { printf "${bred} [*] gospider			[NO]${reset}\n"; allinstalled=false;}
@@ -674,7 +674,7 @@ function sub_permut(){
 
 function sub_regex_permut(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBREGEXPERMUTE" = true ]; then
-		start_subfunc ${FUNCNAME[0]} "Running : Permutations BY REGEX ANALYSIS"
+		start_subfunc ${FUNCNAME[0]} "Running : Permutations by regex analysis"
 		cd "$tools/regulator" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		python3 main.py $domain ${dir}/subdomains/subdomains.txt $dir/.tmp/${domain}.rules
 		./make_brute_list.sh ${dir}/.tmp/${domain}.rules ${dir}/.tmp/${domain}.brute
