@@ -676,7 +676,7 @@ function sub_regex_permut(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBREGEXPERMUTE" = true ]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Permutations BY REGEX ANALYSIS"
 		cd "$tools/regulator" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
-		python3 main.py $domain subdomains/subdomains.txt $dir/.tmp/${domain}.rules
+		python3 main.py $domain ${dir}/subdomains/subdomains.txt $dir/.tmp/${domain}.rules
 		./make_brute_list.sh ${dir}/.tmp/${domain}.rules ${dir}/.tmp/${domain}.brute
 		cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 
