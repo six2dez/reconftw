@@ -296,7 +296,7 @@ cd ~/nuclei-templates/extra_templates && eval git pull $DEBUG_STD
 cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 eval git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git $dir/sqlmap $DEBUG_STD
 eval git clone --depth 1 https://github.com/drwetter/testssl.sh.git $dir/testssl.sh $DEBUG_STD
-eval $SUDO git clone https://github.com/offensive-security/exploitdb.git /opt/exploitdb $DEBUG_STD
+eval $SUDO git clone https://gitlab.com/exploit-database/exploitdb /opt/exploitdb $DEBUG_STD
 eval $SUDO ln -sf /opt/exploitdb/searchsploit /usr/local/bin/searchsploit $DEBUG_STD
 
 # Standard repos installation
