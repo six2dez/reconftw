@@ -8,8 +8,8 @@
 
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.5">
-    <img src="https://img.shields.io/badge/release-v2.5-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.5.1">
+    <img src="https://img.shields.io/badge/release-v2.5.1-green">
   </a>
    </a>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
@@ -67,7 +67,7 @@ So, what are you waiting for? Go! Go! Go! :boom:
   - [Data Keep](#data-keep)
     - [Main commands:](#main-commands)
   - [How to contribute:](#how-to-contribute)
-  - [Need help? :information_source:](#need-help-information_source)
+  - [Need help? :information\_source:](#need-help-information_source)
   - [Support this project](#support-this-project)
     - [Buymeacoffee](#buymeacoffee)
     - [DigitalOcean referral link](#digitalocean-referral-link)
@@ -466,7 +466,7 @@ reset='\033[0m'
   - Certificate transparency ([ctfr](https://github.com/UnaPibaGeek/ctfr))
   - NOERROR subdomain discovery ([dnsx](https://github.com/projectdiscovery/dnsx), more info [here](https://www.securesystems.de/blog/enhancing-subdomain-enumeration-ents-and-noerror/))
   - Bruteforce ([puredns](https://github.com/d3mondev/puredns))
-  - Permutations ([Gotator](https://github.com/Josue87/gotator) and [ripgen](https://github.com/resyncgg/ripgen))
+  - Permutations ([Gotator](https://github.com/Josue87/gotator), [ripgen](https://github.com/resyncgg/ripgen) and [regulator](https://github.com/cramppet/regulator))
   - JS files & Source Code Scraping ([gospider](https://github.com/jaeles-project/gospider))
   - DNS Records ([dnsx](https://github.com/projectdiscovery/dnsx))
   - Google Analytics ID ([AnalyticsRelationships](https://github.com/Josue87/AnalyticsRelationships))
