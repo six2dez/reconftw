@@ -151,8 +151,8 @@ install_brew(){
     export PATH="/opt/homebrew/opt/gnu-getopt/bin:$PATH"
     echo 'export PATH="/opt/homebrew/opt/gnu-getopt/bin:$PATH"' >> ~/.zshrc
     eval brew services start tor $DEBUG_STD
-    eval brew install rustup $DEBUG_STD
-    eval rustup-init $DEBUG_STD
+    brew install rustup
+    rustup-init
     eval cargo install ripgen $DEBUG_STD
 }
 
