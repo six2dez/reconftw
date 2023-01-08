@@ -47,7 +47,7 @@ fi
 declare -A gotools
 gotools["gf"]="go install -v github.com/tomnomnom/gf@latest"
 gotools["qsreplace"]="go install -v github.com/tomnomnom/qsreplace@latest"
-gotools["Amass"]="go install -v github.com/OWASP/Amass/v3/...@master"
+gotools["Amass"]="go install -v github.com/OWASP/Amass/v3/...@3.20.0"
 gotools["ffuf"]="go install -v github.com/ffuf/ffuf@latest"
 gotools["github-subdomains"]="go install -v github.com/gwen001/github-subdomains@latest"
 gotools["waybackurls"]="go install -v github.com/tomnomnom/waybackurls@latest"
