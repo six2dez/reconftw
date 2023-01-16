@@ -1944,12 +1944,12 @@ function getElapsedTime {
 function zipSnedOutputFolder {
 	zip_name=`date +"%Y_%m_%d-%H.%M.%S"`
 	zip_name="$zip_name"_"$domain.zip"
-	(cd $dir && zip -r "../$zip_name" .)
+	(cd $dir && zip -r "$zip_name" .)
 
-	echo "Sending zip file "${dir_output}/${zip_name}""
-	if [ -s "$dir_output/$zip_name" ]; then
-		sendToNotify "$dir_output/$zip_name"
-		rm -f "$dir_output/$zip_name"
+	echo "Sending zip file "${dir}/${zip_name}""
+	if [ -s "${dir}/$zip_name" ]; then
+		sendToNotify "$dir/$zip_name"
+		rm -f "${dir}/$zip_name"
 	else
 		notification "No Zip file to send" warn
 	fi
@@ -2078,8 +2078,8 @@ function resolvers_update(){
 				dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads $DNSVALIDATOR_THREADS -o tmp_resolvers &>/dev/null
 				[ -s "tmp_resolvers" ] && cat tmp_resolvers | anew -q $resolvers
 				[ -s "tmp_resolvers" ] && rm -f tmp_resolvers &>/dev/null
-				[ ! -s "$resolvers" ] && wget -q -O - $resolvers_url > $resolvers
-				[ ! -s "$resolvers_trusted" ] && wget -q -O - $resolvers_trusted_url > $resolvers_trusted
+				[ ! -s "$resolvers" ] && wget -q -O - ${resolvers_url} > $resolvers
+				[ ! -s "$resolvers_trusted" ] && wget -q -O - ${resolvers_trusted_url} > $resolvers_trusted
 				notification "Updated\n" good
 	  		fi
 		else
@@ -2095,8 +2095,8 @@ function resolvers_update(){
 	
 		if  [ ! -s "$resolvers" ] || [[ $(find "$resolvers" -mtime +1 -print) ]] ; then
 			notification "Resolvers seem older than 1 day\n Downloading new resolvers..." warn
-			wget -q -O - $resolvers_url > $resolvers
-			wget -q -O - $resolvers_trusted_url > $resolvers_trusted
+			wget -q -O - ${resolvers_url} > $resolvers
+			wget -q -O - ${resolvers_trusted_url} > $resolvers_trusted
 			notification "Resolvers updated\n" good
 		fi
 	fi
@@ -2104,8 +2104,8 @@ function resolvers_update(){
 
 function resolvers_update_quick_local(){
 	if [ "$update_resolvers" = true ]; then
-		wget -q -O - $resolvers_url > $resolvers
-		wget -q -O - $resolvers_trusted_url > $resolvers_trusted
+		wget -q -O - ${resolvers_url} > $resolvers
+		wget -q -O - ${resolvers_trusted_url} > $resolvers_trusted
 	fi
 }
 
