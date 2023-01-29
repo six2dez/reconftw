@@ -110,6 +110,7 @@ function tools_installed(){
 	which trufflehog &>/dev/null || { printf "${bred} [*] trufflehog			[NO]${reset}\n${reset}"; allinstalled=false;}
 	which Web-Cache-Vulnerability-Scanner &>/dev/null || { printf "${bred} [*] Web-Cache-Vulnerability-Scanner [NO]${reset}\n"; allinstalled=false;}
 	which subfinder &>/dev/null || { printf "${bred} [*] subfinder			[NO]${reset}\n${reset}"; allinstalled=false;}
+	which byp4xx &>/dev/null || { printf "${bred} [*] byp4xx			[NO]${reset}\n${reset}"; allinstalled=false;}
 
 	if [ "${allinstalled}" = true ]; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
@@ -1840,6 +1841,28 @@ function command_injection(){
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		elif [ ! -s "gf/rce.txt" ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} No URLs potentially vulnerables to Command Injection ${reset}\n\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
+	fi
+}
+
+function 4xxbypass(){
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$BYPASSER4XX" = true ]; then
+		if [[ $(cat fuzzing/fuzzing_full.txt 2>/dev/null | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 | wc -l) -le 1000 ]] || [ "$DEEP" = true ]; then
+			start_func "403 bypass"
+			cat $dir/fuzzing/fuzzing_full.txt 2>/dev/null | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 > $dir/.tmp/403test.txt
+			cd "$tools/byp4xx" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+			byp4xx -threads $BYP4XX_THREADS $dir/.tmp/403test.txt > $dir/.tmp/byp4xx.txt
+			cd "$dir" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+			[ -s ".tmp/byp4xx.txt" ] && cat .tmp/dirdar.txt | anew -q vulns/byp4xx.txt
+			end_func "Results are saved in vulns/byp4xx.txt" ${FUNCNAME[0]}
+		else
+			notification "Too many urls to bypass, skipping" warn
+		fi
+	else
+		if [ "$BYPASSER4XX" = false ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi

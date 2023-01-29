@@ -27,8 +27,8 @@
   <a href="https://t.me/joinchat/H5bAaw3YbzzmI5co">
     <img src="https://img.shields.io/badge/telegram-@ReconFTW-blue.svg">
   </a>
-  <a href="https://hub.docker.com/r/six2dez/reconftw">
-    <img alt="Docker Cloud Build Status" src="https://img.shields.io/docker/cloud/build/six2dez/reconftw">
+  <a href="https://discord.gg/R5DdXVEdTy">
+    <img src="https://img.shields.io/discord/1048623782912340038.svg?logo=discord">
   </a>
 </p>
 
@@ -560,6 +560,7 @@ If you want to contribute to this project, you can do it in multiple ways:
 
 - Take a look at the [wiki](https://github.com/six2dez/reconftw/wiki) section.
 - Check [FAQ](https://github.com/six2dez/reconftw/wiki/7.-FAQs) for commonly asked questions.
+- Join our [Discord server](https://discord.gg/R5DdXVEdTy)
 - Ask for help in the [Telegram group](https://t.me/joinchat/TO_R8NYFhhbmI5co)
 
 ## Support this project

@@ -82,6 +82,7 @@ gotools["rush"]="go install github.com/shenwei356/rush@latest"
 gotools["enumerepo"]="go install github.com/trickest/enumerepo@latest"
 gotools["Web-Cache-Vulnerability-Scanner"]="go install -v github.com/Hackmanit/Web-Cache-Vulnerability-Scanner@latest"
 gotools["subfinder"]="go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest"
+gotools["byp4xx"]="go install -v github.com/lobuhi/byp4xx@latest"
 
 declare -A repos
 repos["dorks_hunter"]="six2dez/dorks_hunter"
@@ -111,6 +112,7 @@ repos["trufflehog"]="trufflesecurity/trufflehog"
 repos["smuggler"]="defparam/smuggler"
 repos["Web-Cache-Vulnerability-Scanner"]="Hackmanit/Web-Cache-Vulnerability-Scanner"
 repos["regulator"]="cramppet/regulator"
+repos["regulator"]="lobuhi/byp4xx"
 
 printf "\n\n${bgreen}#######################################################################${reset}\n"
 printf "${bgreen} reconFTW installer/updater script ${reset}\n\n"
