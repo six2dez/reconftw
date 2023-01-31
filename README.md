@@ -86,6 +86,8 @@ So, what are you waiting for? Go! Go! Go! :boom:
 
 - Requires [Golang](https://golang.org/dl/) > **1.15.0+** installed and paths correctly set (**$GOPATH**, **$GOROOT**)
 
+Important : Run `sudo echo "${USERNAME}  ALL=(ALL:ALL) NOPASSWD: ALL" > /etc/sudoers.d/reconFTW` , to make sure no sudo prompts are required to run the tool and to avoid any permission issues.
+
 ```bash
 git clone https://github.com/six2dez/reconftw
 cd reconftw/
