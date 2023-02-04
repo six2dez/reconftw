@@ -112,7 +112,7 @@ repos["trufflehog"]="trufflesecurity/trufflehog"
 repos["smuggler"]="defparam/smuggler"
 repos["Web-Cache-Vulnerability-Scanner"]="Hackmanit/Web-Cache-Vulnerability-Scanner"
 repos["regulator"]="cramppet/regulator"
-repos["regulator"]="lobuhi/byp4xx"
+repos["byp4xx"]="lobuhi/byp4xx"
 
 printf "\n\n${bgreen}#######################################################################${reset}\n"
 printf "${bgreen} reconFTW installer/updater script ${reset}\n\n"
