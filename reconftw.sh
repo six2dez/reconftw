@@ -1682,11 +1682,11 @@ function ssrf_checks(){
 		if [ -z "$COLLAB_SERVER" ]; then
 			interactsh-client &>.tmp/ssrf_callback.txt &
 			sleep 2
-			COLLAB_SERVER_FIX=$(cat .tmp/ssrf_callback.txt | tail -n1 | cut -c 16-)
+			COLLAB_SERVER_FIX="FFUFHASH.$(cat .tmp/ssrf_callback.txt | tail -n1 | cut -c 16-)"
 			COLLAB_SERVER_URL="http://$COLLAB_SERVER_FIX"
 			INTERACT=true
 		else
-			COLLAB_SERVER_FIX=$(echo ${COLLAB_SERVER} | sed -r "s/https?:\/\///")
+			COLLAB_SERVER_FIX="FFUFHASH.$(echo ${COLLAB_SERVER} | sed -r "s/https?:\/\///")"
 			INTERACT=false
 		fi
 		if [ "$DEEP" = true ] || [[ $(cat gf/ssrf.txt | wc -l) -le $DEEP_LIMIT ]]; then
