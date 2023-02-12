@@ -1251,6 +1251,7 @@ function fuzz(){
 				done
 				find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | anew -q $dir/fuzzing/fuzzing_full.txt
 			fi
+			sort --numeric-sort --reverse -t ' ' -k1 -k2 -o $dir/fuzzing/fuzzing_full.txt{,}
 			end_func "Results are saved in $domain/fuzzing/*subdomain*.txt" ${FUNCNAME[0]}
 		else
 			end_func "No $domain/web/webs.txts file found, fuzzing skipped " ${FUNCNAME[0]}
