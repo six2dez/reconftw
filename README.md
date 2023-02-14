@@ -8,8 +8,8 @@
 
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.5.1">
-    <img src="https://img.shields.io/badge/release-v2.5.1-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.5.2">
+    <img src="https://img.shields.io/badge/release-v2.5.2-green">
   </a>
    </a>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
@@ -27,8 +27,8 @@
   <a href="https://t.me/joinchat/H5bAaw3YbzzmI5co">
     <img src="https://img.shields.io/badge/telegram-@ReconFTW-blue.svg">
   </a>
-  <a href="https://hub.docker.com/r/six2dez/reconftw">
-    <img alt="Docker Cloud Build Status" src="https://img.shields.io/docker/cloud/build/six2dez/reconftw">
+  <a href="https://discord.gg/R5DdXVEdTy">
+    <img src="https://img.shields.io/discord/1048623782912340038.svg?logo=discord">
   </a>
 </p>
 
@@ -85,6 +85,8 @@ So, what are you waiting for? Go! Go! Go! :boom:
 > You can check out our wiki for the installation guide [Installation Guide](https://github.com/six2dez/reconftw/wiki/0.-Installation-Guide) :book:
 
 - Requires [Golang](https://golang.org/dl/) > **1.15.0+** installed and paths correctly set (**$GOPATH**, **$GOROOT**)
+
+Important : If you are not running reconftw as root, run `sudo echo "${USERNAME}  ALL=(ALL:ALL) NOPASSWD: ALL" > /etc/sudoers.d/reconFTW` , to make sure no sudo prompts are required to run the tool and to avoid any permission issues.
 
 ```bash
 git clone https://github.com/six2dez/reconftw
@@ -478,7 +480,7 @@ reset='\033[0m'
   - Cloud checkers ([S3Scanner](https://github.com/sa7mon/S3Scanner) and [cloud_enum](https://github.com/initstring/cloud_enum))
 
 ## Hosts
-- IP info ([whoisxmlapi API](https://www.whoisxmlapi.com/)
+- IP info ([whoisxmlapi API](https://www.whoisxmlapi.com/))
 - CDN checker ([ipcdn](https://github.com/six2dez/ipcdn))
 - WAF checker ([wafw00f](https://github.com/EnableSecurity/wafw00f))
 - Port Scanner (Active with [nmap](https://github.com/nmap/nmap) and passive with [smap](https://github.com/s0md3v/Smap))
@@ -490,7 +492,7 @@ reset='\033[0m'
 - Web screenshoting ([webscreenshot](https://github.com/maaaaz/webscreenshot) or [gowitness](https://github.com/sensepost/gowitness))
 - Web templates scanner ([nuclei](https://github.com/projectdiscovery/nuclei) and [nuclei geeknik](https://github.com/geeknik/the-nuclei-templates.git))
 - CMS Scanner ([CMSeeK](https://github.com/Tuhinshubhra/CMSeeK))
-- Url extraction ([waybackurls](https://github.com/tomnomnom/waybackurls), [gau](https://github.com/lc/gau), [gospider](https://github.com/jaeles-project/gospider), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3) and [JSA](https://github.com/w9w/JSA))
+- Url extraction ([waymore](https://github.com/xnl-h4ck3r/waymore), [gospider](https://github.com/jaeles-project/gospider), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3) and [JSA](https://github.com/w9w/JSA))
 - URL patterns Search and filtering ([urless](https://github.com/xnl-h4ck3r/urless), [gf](https://github.com/tomnomnom/gf) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns))
 - Favicon Real IP ([fav-up](https://github.com/pielco11/fav-up))
 - Javascript analysis ([subjs](https://github.com/lc/subjs), [JSA](https://github.com/w9w/JSA), [xnLinkFinder](https://github.com/xnl-h4ck3r/xnLinkFinder), [getjswords](https://github.com/m4ll0k/BBTz))
@@ -512,6 +514,7 @@ reset='\033[0m'
 - Broken Links Checker ([gospider](https://github.com/jaeles-project/gospider))
 - Prototype Pollution ([ppfuzz](https://github.com/dwisiswant0/ppfuzz))
 - Web Cache Vulnerabilities ([Web-Cache-Vulnerability-Scanner](https://github.com/Hackmanit/Web-Cache-Vulnerability-Scanner))
+- 4XX Bypasser ([byp4xx](https://github.com/lobuhi/byp4xx))
 
 ## Extras
 - Multithreading ([Rush](https://github.com/shenwei356/rush))
@@ -560,6 +563,7 @@ If you want to contribute to this project, you can do it in multiple ways:
 
 - Take a look at the [wiki](https://github.com/six2dez/reconftw/wiki) section.
 - Check [FAQ](https://github.com/six2dez/reconftw/wiki/7.-FAQs) for commonly asked questions.
+- Join our [Discord server](https://discord.gg/R5DdXVEdTy)
 - Ask for help in the [Telegram group](https://t.me/joinchat/TO_R8NYFhhbmI5co)
 
 ## Support this project
