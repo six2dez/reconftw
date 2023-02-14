@@ -8,8 +8,8 @@
 
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.5.1">
-    <img src="https://img.shields.io/badge/release-v2.5.1-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.5.2">
+    <img src="https://img.shields.io/badge/release-v2.5.2-green">
   </a>
    </a>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
@@ -480,7 +480,7 @@ reset='\033[0m'
   - Cloud checkers ([S3Scanner](https://github.com/sa7mon/S3Scanner) and [cloud_enum](https://github.com/initstring/cloud_enum))
 
 ## Hosts
-- IP info ([whoisxmlapi API](https://www.whoisxmlapi.com/)
+- IP info ([whoisxmlapi API](https://www.whoisxmlapi.com/))
 - CDN checker ([ipcdn](https://github.com/six2dez/ipcdn))
 - WAF checker ([wafw00f](https://github.com/EnableSecurity/wafw00f))
 - Port Scanner (Active with [nmap](https://github.com/nmap/nmap) and passive with [smap](https://github.com/s0md3v/Smap))
@@ -514,6 +514,7 @@ reset='\033[0m'
 - Broken Links Checker ([gospider](https://github.com/jaeles-project/gospider))
 - Prototype Pollution ([ppfuzz](https://github.com/dwisiswant0/ppfuzz))
 - Web Cache Vulnerabilities ([Web-Cache-Vulnerability-Scanner](https://github.com/Hackmanit/Web-Cache-Vulnerability-Scanner))
+- 4XX Bypasser ([byp4xx](https://github.com/lobuhi/byp4xx))
 
 ## Extras
 - Multithreading ([Rush](https://github.com/shenwei356/rush))
