@@ -22,7 +22,7 @@ rm:
 	rm -rf ~/$(PRIVATE_REPO)
 
 sync:
-	cd ~/$(PRIVATE_REPO) && git fetch upstream && git rebase upstream/main master
+	cd ~/$(PRIVATE_REPO) && git fetch upstream && git rebase upstream/main $(shell git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
 
 upload:
 	cd ~/$(PRIVATE_REPO) && \
