@@ -1,6 +1,5 @@
-
 GH_CLI := $(shell command -v gh 2> /dev/null)
-PRIVATE_REPO := $(shell echo $${ENV_VAR-reconftw-data})
+PRIVATE_REPO := $(shell echo $${PRIV_REPO-reconftw-data})
 
 .PHONY: sync upload bootstrap rm
 

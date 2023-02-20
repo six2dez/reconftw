@@ -546,6 +546,8 @@ A `Makefile` is provided to quickly bootstrap a private repo. To use it, you'll 
 
 Once done, just run:
 ```bash
+# below line is optional, the default is ~/reconftw-data
+export PRIV_REPO="$HOME/reconftw-data"
 make bootstrap
 ```
 
