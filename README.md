@@ -65,6 +65,8 @@ So, what are you waiting for? Go! Go! Go! :boom:
   - [Extras](#extras)
 - [Mindmap/Workflow](#mindmapworkflow)
   - [Data Keep](#data-keep)
+    - [Makefile](#makefile)
+    - [Manual](#manual)
     - [Main commands:](#main-commands)
   - [How to contribute:](#how-to-contribute)
   - [Need help? :information\_source:](#need-help-information_source)
@@ -174,7 +176,7 @@ GOOGLE_DORKS=true
 GITHUB_DORKS=true
 GITHUB_REPOS=true
 METADATA=true # Fetch metadata from indexed office documents
-EMAILS=true # Fetch emails from differents sites 
+EMAILS=true # Fetch emails from differents sites
 DOMAIN_INFO=true # whois info
 REVERSE_WHOIS=true # amass intel reverse whois info, takes some time
 IP_INFO=true    # Reverse IP search, geolocation and whois
@@ -201,7 +203,7 @@ ZONETRANSFER=true # Check zone transfer
 S3BUCKETS=true # Check S3 buckets misconfigs
 REVERSE_IP=false # Check reverse IP subdomain search (set True if your target is CIDR/IP)
 TLS_PORTS="21,22,25,80,110,135,143,261,271,324,443,448,465,563,614,631,636,664,684,695,832,853,854,990,993,989,992,994,995,1129,1131,1184,2083,2087,2089,2096,2221,2252,2376,2381,2478,2479,2482,2484,2679,2762,3077,3078,3183,3191,3220,3269,3306,3410,3424,3471,3496,3509,3529,3539,3535,3660,36611,3713,3747,3766,3864,3885,3995,3896,4031,4036,4062,4064,4081,4083,4116,4335,4336,4536,4590,4740,4843,4849,5443,5007,5061,5321,5349,5671,5783,5868,5986,5989,5990,6209,6251,6443,6513,6514,6619,6697,6771,7202,7443,7673,7674,7677,7775,8243,8443,8991,8989,9089,9295,9318,9443,9444,9614,9802,10161,10162,11751,12013,12109,14143,15002,16995,41230,16993,20003"
-INSCOPE=false # Uses inscope tool to filter the scope, requires .scope file in reconftw folder 
+INSCOPE=false # Uses inscope tool to filter the scope, requires .scope file in reconftw folder
 
 # Web detection
 WEBPROBESIMPLE=true # Web probing on 80/443
@@ -215,7 +217,7 @@ AXIOM_SCREENSHOT_MODULE=webscreenshot # Choose between aquatone,gowitness,webscr
 
 # Host
 FAVICON=true # Check Favicon domain discovery
-PORTSCANNER=true # Enable or disable the whole Port scanner module 
+PORTSCANNER=true # Enable or disable the whole Port scanner module
 PORTSCAN_PASSIVE=true # Port scanner with Shodan
 PORTSCAN_ACTIVE=true # Port scanner with nmap
 CDN_IP=true # Check which IPs belongs to CDN
@@ -539,7 +541,25 @@ reset='\033[0m'
 ## Data Keep
 
 Follow these simple steps to end up with a private repository with your `API Keys` and `/Recon` data.
+### Makefile
+A `Makefile` is provided to quickly bootstrap a private repo. To use it, you'll need the [Github CLI](https://cli.github.com/) installed.
 
+Once done, just run:
+```bash
+make bootstrap
+```
+
+To sync your private repo with upstream:
+```bash
+make sync
+```
+
+To upload juicy recon data:
+```bash
+make upload
+```
+
+### Manual
 * Create a private __blank__ repository on `Git(Hub|Lab)` (Take into account size limits regarding Recon data upload)
 * Clone your project: `git clone https://gitlab.com/example/reconftw-data`
 * Get inside the cloned repository: `cd reconftw-data`
