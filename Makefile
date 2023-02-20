@@ -1,8 +1,8 @@
 
 GH_CLI := $(shell command -v gh 2> /dev/null)
-PRIVATE_REPO := $(shell echo $${ENV_VAR-reconftw-data1234567})
+PRIVATE_REPO := $(shell echo $${ENV_VAR-reconftw-data})
 
-.PHONY: sync update bootstrap
+.PHONY: sync update bootstrap rm
 
 # bootstrap a private repo to store data
 bootstrap:
@@ -16,13 +16,17 @@ bootstrap:
 		mkdir Recon && \
 		git push origin $(shell git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
 	@echo "Done!"
+	@echo "Initialized private repo: $(PRIVATE_REPO)"
 
 rm:
 	gh repo delete $(PRIVATE_REPO) --yes
 	rm -rf ~/$(PRIVATE_REPO)
 
 sync:
-	git fetch upstream && git rebase upstream/main master
+	cd ~/$(PRIVATE_REPO) && git fetch upstream && git rebase upstream/main master
 
 update:
-	git add . && git commit -m "Data upload" && git push origin master
+	cd ~/$(PRIVATE_REPO) && \
+		git add . && \
+		git commit -m "Data upload" && \
+		git push origin $(shell git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
