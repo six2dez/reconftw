@@ -2,7 +2,7 @@
 GH_CLI := $(shell command -v gh 2> /dev/null)
 PRIVATE_REPO := $(shell echo $${ENV_VAR-reconftw-data})
 
-.PHONY: sync update bootstrap rm
+.PHONY: sync upload bootstrap rm
 
 # bootstrap a private repo to store data
 bootstrap:
@@ -25,7 +25,7 @@ rm:
 sync:
 	cd ~/$(PRIVATE_REPO) && git fetch upstream && git rebase upstream/main master
 
-update:
+upload:
 	cd ~/$(PRIVATE_REPO) && \
 		git add . && \
 		git commit -m "Data upload" && \
