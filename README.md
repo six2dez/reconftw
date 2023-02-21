@@ -8,7 +8,7 @@
 
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.5.2">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.5.2">  
     <img src="https://img.shields.io/badge/release-v2.5.2-green">
   </a>
    </a>
