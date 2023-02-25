@@ -1930,9 +1930,7 @@ function webcache(){
 ###############################################################################################################
 
 function deleteOutScoped(){
-	echo "$1"
-	echo "$2"
-	if [ -f "$1" ]; then
+	if [ -s "$1" ]; then
 		cat $1 | while read outscoped
 		do
 			if grep -q "^[*]" <<< $outscoped
