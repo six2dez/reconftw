@@ -345,11 +345,11 @@ function subdomains_full(){
 
 	webprobe_simple
 	if [ -s "subdomains/subdomains.txt" ]; then
-		deleteOutScoped $outOfScope_file subdomains/subdomains.txt
+		[ -s "$outOfScope_file" ] && deleteOutScoped $outOfScope_file subdomains/subdomains.txt
 		NUMOFLINES_subs=$(cat subdomains/subdomains.txt 2>>"$LOGFILE" | anew .tmp/subdomains_old.txt | sed '/^$/d' | wc -l)
 	fi
 	if [ -s "webs/webs.txt" ]; then
-		deleteOutScoped $outOfScope_file webs/webs.txt
+		[ -s "$outOfScope_file" ] && deleteOutScoped $outOfScope_file webs/webs.txt
 		NUMOFLINES_probed=$(cat webs/webs.txt 2>>"$LOGFILE" | anew .tmp/probed_old.txt | sed '/^$/d' | wc -l)
 	fi
 	printf "${bblue}\n Total subdomains: ${reset}\n\n"
@@ -421,7 +421,7 @@ function sub_active(){
 	if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Active Subdomain Enumeration"
 		find .tmp -type f -iname "*_subs.txt" -exec cat {} + | anew -q .tmp/subs_no_resolved.txt
-		deleteOutScoped $outOfScope_file .tmp/subs_no_resolved.txt
+		[ -s "$outOfScope_file" ] && deleteOutScoped $outOfScope_file .tmp/subs_no_resolved.txt
 		if [ ! "$AXIOM" = true ]; then
 			resolvers_update_quick_local
 			[ -s ".tmp/subs_no_resolved.txt" ] && puredns resolve .tmp/subs_no_resolved.txt -w .tmp/subdomains_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT  --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT &>/dev/null
@@ -652,7 +652,7 @@ function sub_permut(){
 		cat .tmp/permute1.txt .tmp/permute2.txt 2>>"$LOGFILE" | anew -q .tmp/permute_subs.txt
 
 		if [ -s ".tmp/permute_subs.txt" ]; then
-			deleteOutScoped $outOfScope_file .tmp/permute_subs.txt
+			[ -s "$outOfScope_file" ] && deleteOutScoped $outOfScope_file .tmp/permute_subs.txt
 			[[ "$INSCOPE" = true ]] && check_inscope .tmp/permute_subs.txt 2>>"$LOGFILE" &>/dev/null
 			NUMOFLINES=$(cat .tmp/permute_subs.txt 2>>"$LOGFILE" | grep ".$domain$" | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
 		else
@@ -684,7 +684,7 @@ function sub_regex_permut(){
 		fi
 		
 		if [ -s ".tmp/regulator.txt" ]; then
-			deleteOutScoped $outOfScope_file .tmp/regulator.txt
+			[ -s "$outOfScope_file" ] && deleteOutScoped $outOfScope_file .tmp/regulator.txt
 			[[ "$INSCOPE" = true ]] && check_inscope .tmp/regulator.txt 2>>"$LOGFILE" &>/dev/null
 			NUMOFLINES=$(cat .tmp/regulator.txt 2>>"$LOGFILE" | grep ".$domain$" | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
 		else
@@ -909,7 +909,7 @@ function webprobe_simple(){
 		fi
 		cat .tmp/web_full_info.txt .tmp/web_full_info_probe.txt webs/web_full_info.txt 2>>"$LOGFILE" | jq -s 'try .' | jq 'try unique_by(.input)' | jq 'try .[]' 2>>"$LOGFILE" > webs/web_full_info.txt
 		cat webs/web_full_info.txt | jq -r 'try .url' 2>/dev/null | grep "$domain" | sed "s/*.//" | anew -q .tmp/probed_tmp.txt
-		deleteOutScoped $outOfScope_file .tmp/probed_tmp.txt
+		[ -s "$outOfScope_file" ] && deleteOutScoped $outOfScope_file .tmp/probed_tmp.txt
 		NUMOFLINES=$(cat .tmp/probed_tmp.txt 2>>"$LOGFILE" | anew webs/webs.txt | sed '/^$/d' | wc -l)
 		cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q .tmp/webs_all.txt
 		end_subfunc "${NUMOFLINES} new websites resolved" ${FUNCNAME[0]}
@@ -1930,6 +1930,8 @@ function webcache(){
 ###############################################################################################################
 
 function deleteOutScoped(){
+	echo "$1"
+	echo "$2"
 	if [ -f "$1" ]; then
 		cat $1 | while read outscoped
 		do
