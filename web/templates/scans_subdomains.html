@@ -1,0 +1,390 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}reconFTW - Results{% endblock %}
+{% block content %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/subdomains.css' %}">
+{% endblock %}
+
+{% include 'modal.html' %}
+
+
+<body>
+
+  <div class="contentDiv" id="content">
+    <button class="back-to-top" type="button"></button>
+  </div>
+
+  <div class="sidebar close">
+    <div class="logo-details">
+      <img class="rftw-logo" src="/static/img/favicon.ico" alt="" />
+      <span class="logo_name"> reconFTW</span>
+    </div>
+
+    <hr class="nav-hr" />
+
+    <ul class="nav-links">
+      <li>
+        <a href="#section-1">
+          <i class="bx bx-globe"></i>
+          <span class="link_name">Subdomains</span>
+        </a>
+        <ul class="sub-menu blank">
+          <li><a class="link_name" href="#section-1">Subdomains</a></li>
+        </ul>
+      </li>
+
+      <li>
+        <a href="#section-2">
+          <i class="bx bx-cloud"></i>
+          <span class="link_name">Cloud Assets</span>
+        </a>
+        <ul class="sub-menu blank">
+          <li><a class="link_name" href="#section-2">Cloud Assets</a></li>
+        </ul>
+      </li>
+
+      <li>
+        <a href="#section-3">
+          <i class="bx bx-image"></i>
+          <span class="link_name">Screenshots</span>
+        </a>
+        <ul class="sub-menu blank">
+          <li><a class="link_name" href="#section-3">Screenshots</a></li>
+        </ul>
+      </li>
+
+      <li class="disabled_background">
+        <a href="#" class="disabled">
+          <i class="bx bx-search-alt disabled"></i>
+          <span class="link_name_disabled">OSINT Output</span>
+        </a>
+        <ul class="sub-menu blank">
+          <li><a class="disabled" href="#">OSINT Output</a></li>
+        </ul>
+      </li>
+
+      <li class="disabled_background">
+        <!-- <div class="disabled_background"> -->
+          <a href="#" class="disabled">
+            <i class="bx bx-ghost disabled"></i>
+            <span class="link_name_disabled">Nuclei Output</span>
+          </a>
+          <i class="bx bxs-chevron-down arrow"></i>
+        <!-- </div> -->
+        <ul class="sub-menu">
+          <li><a class="disabled" href="#">Nuclei Output</a></li>
+          <li><a href="#" class="disabled">Info</a></li>
+          <li><a href="#" class="disabled">Low</a></li>
+          <li><a href="#" class="disabled">Medium</a></li>
+          <li><a href="#" class="disabled">High</a></li>
+          <li><a href="#" class="disabled">Critical</a></li>
+        </ul>
+      </li>
+
+      <li class="disabled_background">
+        <!-- <div class="disabled_background"> -->
+          <a href="#" class="disabled">
+            <i class="bx bx-bug disabled"></i>
+            <span class="link_name_disabled">Vulnerabilities</span>
+          </a>
+          <i class="bx bxs-chevron-down arrow"></i>
+        <!-- </div> -->
+        <ul class="sub-menu">
+          <li><a class="disabled" href="#">Vulnerabilities</a></li>
+          <li><a href="#" class="disabled">Cors</a></li>
+          <li><a href="#" class="disabled">Broken Links</a></li>
+          <li><a href="#" class="disabled">smuggling</a></li>
+          <li><a href="#" class="disabled">Command Injection</a></li>
+          <li><a href="#" class="disabled">Open Redirect</a></li>
+          <li><a href="#" class="disabled">SSRF</a></li>
+          <li><a href="#" class="disabled">CRLF</a></li>
+          <li><a href="#" class="disabled">XSS</a></li>
+          <li><a href="#" class="disabled">LFI</a></li>
+          <li><a href="#" class="disabled">SQLI</a></li>
+          <li><a href="#" class="disabled">SSTI</a></li>
+          <li><a href="#" class="disabled">GF Output</a></li>
+        </ul>
+      </li>
+
+      <li class="disabled_background">
+        <a href="#" class="disabled">
+          <i class="bx bxs-folder-open disabled"></i>
+          <span class="link_name_disabled">Fuzzing Paths</span>
+        </a>
+        <ul class="sub-menu blank">
+          <li><a class="disabled" href="#">Fuzzing Paths</a></li>
+        </ul>
+      </li>
+
+      <li class="disabled_background">
+        <!-- <div class="disabled_background"> -->
+          <a href="#" class="disabled">
+            <i class="bx bxl-javascript disabled"></i>
+            <span class="link_name_disabled">Javascript</span>
+          </a>
+          <i class="bx bxs-chevron-down arrow"></i>
+        <!-- </div> -->
+        <ul class="sub-menu">
+          <li><a class="disabled" href="#">JavaScript</a></li>
+          <li><a href="#" class="disabled">Endpoints</a></li>
+          <li><a href="#" class="disabled">Links</a></li>
+          <li><a href="#" class="disabled">Secrets</a></li>
+        </ul>
+      </li>
+
+      <li class="disabled_background">
+        <!-- <div class="disabled_background"> -->
+          <a href="#" class="disabled">
+            <i class="bx bxs-file disabled"></i>
+            <span class="link_name_disabled">Dictionaries</span>
+          </a>
+          <i class="bx bxs-chevron-down arrow"></i>
+        <!-- </div> -->
+        <ul class="sub-menu">
+          <li><a class="disabled" href="#">Dictionaries</a></li>
+          <li><a href="#" class="disabled">Params</a></li>
+          <li><a href="#" class="disabled">Values</a></li>
+          <li><a href="#" class="disabled">Words</a></li>
+          <li><a href="#" class="disabled">Paths</a></li>
+        </ul>
+      </li>
+
+      <hr class="nav-hr" />
+
+      <li>
+        <div class="logout-section-sidenav">
+          <a href="{% url 'projects:index' %}">
+            <i class="bx bx-exit bx-rotate-180 nav_icon"></i>
+            <span class="link_name">Back to Projects</span>
+          </a>
+          <ul class="sub-menu blank comeback-submenu">
+            <li>
+              <a class="link_name" href="{% url 'projects:index' %}">Back to Projects</a>
+            </li>
+          </ul>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <section class="home-section">
+    <div class="home-content fixed-top">
+      <i class="bx bx-menu"></i>
+
+      <div class="home-content-right">
+        {% if status == 'FINISHED' %}
+        <i class='bx bx-check iconsmr'></i>
+        <h5 class="h4 fntsmr_scanning">FINISHED</h5>
+        {% endif %}
+        {% if status == 'SCANNING' %}
+        <i class='bx bx-loader-circle loader'></i>
+        <h5 class="h4 fntsmr_scanning">SCANNING</h5>
+        {% endif %}
+        {% if status == 'WAITING' %}
+        <i class='bx bxs-hand iconsmr blink_me'></i>
+        <h5 class="h4 fntsmr_scanning">WAITING</h5>
+        {% endif %}
+        <i class="bx bx-globe iconsmr"></i>
+        <h5 class="h4 fntsmr_scan_mode">SCAN MODE: <span class="scan_mode">SUBDOMAINS</span></h5>
+
+        <i class="bx bx-target-lock iconsmr"></i>
+        <h5 class="h4 fntsmr">{{ title_domain_target }}</h5>
+
+        <!-- <hr class="rftw-vertical-line"> -->
+
+        <div class="action" onmouseover="menuToggle();" onmouseout="menuToggle();">
+          <div class="profile">
+            <img src="{{ imagePath }}" />
+          </div>
+          <div class="menu">
+            <h3>{{ request.user }}<br /><span>Reconnaissance Ninja</span></h3>
+            <ul>
+              <li>
+                <a href="{% url 'edit_profile:index' %}"><i class="bx bx-sm bx-user-circle"></i>Edit profile</a>
+              </li>
+              <li>
+                <a href="{% url 'apikeys_settings:index' %}"><i class="bx bx-sm bx-cog"></i> API Keys</a>
+              </li>
+              <li>
+                <a href="{% url 'logout' %}"><i class="bx bx-sm bx-log-out-circle"></i> Logout</a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BODY -->
+    <div class="container-fluid">
+      <div class="card-body" id="section-1">
+        <div class="row">
+          <div class="d-sm-flex align-items-center align-to-cards">
+            <i class="bx bx-sm bx-globe"></i>
+            <p>
+              <strong> SUBDOMAINS </strong>
+            </p>
+          </div>
+
+          <div class="col-xs-6">
+            <div class="table-responsive">
+              <table id="subdomains" class="table table-striped table-content" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>SUBDOMAIN</th>
+                    <th>IP ADDRESS</th>
+                    <th>PORT</th>
+                    <th>SUBDOMAIN TAKEOVER</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for subdomains in subdomains_table %}
+
+                  <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ subdomains.subdomain }}</td>
+                    <td>{{ subdomains.ip_address }}</td>
+                    <td>{{ subdomains.ports }}</td>
+                    <td>{{ subdomains.subtakeover }}</td>
+                  </tr>
+
+                  {% endfor %}
+                </tbody>
+              </table>
+
+              <div class="mb-2 mt-3">
+                <button class="btn-reconftw" data-target="#modal-dns-zonetransfer" data-toggle="modal">
+                  <i class="bx bxs-chevron-up"></i>
+                  <span>DNS ZONE TRANSFER</span>
+                </button>
+
+                <i class="bx bx-wifi-0"></i>
+
+                <button class="btn-reconftw" data-target="#modal-dns-registry" data-toggle="modal">
+                  <i class="bx bxs-chevron-up"></i>
+                  <span>DNS REGISTRY</span>
+                </button>
+
+                <i class="bx bx-wifi-0"></i>
+
+                <button class="btn-reconftw" data-target="#modal-cms" data-toggle="modal">
+                  <i class="bx bxs-chevron-up"></i>
+                  <span>CMS</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr />
+
+      <div class="card-body" id="section-2">
+        <div class="row">
+          <div class="d-sm-flex align-items-center align-to-cards" id="#cloud_assets">
+            <i class="bx bx-sm bx-cloud"></i>
+            <p>
+              <strong> CLOUD ASSETS </strong>
+            </p>
+          </div>
+
+          <div class="col-xs-6">
+            <div class="table-content table-responsive">
+              <table id="cloud_assets" class="table table-striped" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th>S3 BUCKETS</th>
+                    <th>APP FOUND</th>
+                    <th>STORAGE ACCOUNT</th>
+                    <th>AZURE DNS NAME</th>
+                    <th>GOOGLE BUCKET</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for cloud_asset in cloud_assets %}
+                  <tr>
+                    <td>{{ cloud_asset.protected_s3bucket }}</td>
+                    <td>{{ cloud_asset.appfound }}</td>
+                    <td>{{ cloud_asset.storage_account }}</td>
+                    <td>{{ cloud_asset.azure }}</td>
+                    <td>{{ cloud_asset.google }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <hr />
+
+    <div class="card-body" id="section-3">
+      <div class="row">
+        <div class="d-sm-flex align-items-center align-to-cards">
+          <i class="bx bx-sm bx-image"></i>
+          <p>
+            <strong> SCREENSHOTS </strong>
+          </p>
+        </div>
+
+        <div class="col-xs-5">
+          <div class="table-responsive">
+
+            <div id="reconftw-gallery" data-nanogallery2='{
+                
+                "thumbnailWidth": "auto",
+                "thumbnailHeight": "400",
+                "thumbnailBorderVertical": 0,
+                "thumbnailBorderHorizontal": 0,
+                "thumbnailDisplayTransitionDuration": 5000,
+                "thumbnailLabel": {
+                  "position": "overImageOnBottom",
+                  "displayDescription": true
+                },
+                "galleryFilterTags": true,
+                "displayBreadcrumb": true,
+                "breadcrumbOnlyCurrentLevel": true,
+                "thumbnailOpenImage": true,
+                "galleryDisplayMode": "pagination",
+                "galleryMaxRows": 5,
+                "galleryPaginationMode": "numbers",
+                "thumbnailAlignment": "center",
+                "navPagination": false,
+                "galleryFilterTags": "description",
+                "thumbnailLevelUp": true
+              }'>
+              {% for i in screenshots %}
+              <a href="data:image/jpeg;base64,{{ i.2 }}" data-ngthumb="data:image/jpeg;base64,{{ i.2 }}"
+                data-ngdesc="{{ i.3 }}">{{ i.0 }}</a>
+              {% endfor %}
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    </div>
+    </div>
+
+    <hr />
+
+    <!-- FOOTER -->
+    <footer class="sticky-footer bg-footer">
+      <div class="container my-auto">
+        <div class="copyright text-center my-auto">
+          <span>reconFTW ©</span>
+        </div>
+      </div>
+    </footer>
+  </section>
+
+</body>
+
+<!-- </html> N ESQUECER -->
+{% endblock %}
