@@ -47,10 +47,10 @@ fi
 declare -A gotools
 gotools["gf"]="go install -v github.com/tomnomnom/gf@latest"
 gotools["qsreplace"]="go install -v github.com/tomnomnom/qsreplace@latest"
-gotools["Amass"]="go install -v github.com/OWASP/Amass/v3/...@master"
+gotools["Amass"]="go install -v github.com/OWASP/Amass/v3/...@v3.20.0"
 gotools["ffuf"]="go install -v github.com/ffuf/ffuf@latest"
 gotools["github-subdomains"]="go install -v github.com/gwen001/github-subdomains@latest"
-gotools["waybackurls"]="go install -v github.com/tomnomnom/waybackurls@latest"
+gotools["gitlab-subdomains"]="go install github.com/gwen001/gitlab-subdomains@latest"
 gotools["nuclei"]="go install -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest"
 gotools["anew"]="go install -v github.com/tomnomnom/anew@latest"
 gotools["notify"]="go install -v github.com/projectdiscovery/notify/cmd/notify@latest"
@@ -58,10 +58,9 @@ gotools["unfurl"]="go install -v github.com/tomnomnom/unfurl@latest"
 gotools["httpx"]="go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest"
 gotools["github-endpoints"]="go install -v github.com/gwen001/github-endpoints@latest"
 gotools["dnsx"]="go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest"
-gotools["gau"]="go install -v github.com/lc/gau/v2/cmd/gau@latest"
 gotools["subjs"]="go install -v github.com/lc/subjs@latest"
 gotools["Gxss"]="go install -v github.com/KathanP19/Gxss@latest"
-gotools["gospider"]="go install -v github.com/jaeles-project/gospider@latest"
+gotools["katana"]="go install github.com/projectdiscovery/katana/cmd/katana@latest"
 gotools["crlfuzz"]="go install -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest"
 gotools["dalfox"]="go install -v github.com/hahwul/dalfox/v2@latest"
 gotools["puredns"]="go install -v github.com/d3mondev/puredns/v2@latest"
@@ -82,6 +81,7 @@ gotools["rush"]="go install github.com/shenwei356/rush@latest"
 gotools["enumerepo"]="go install github.com/trickest/enumerepo@latest"
 gotools["Web-Cache-Vulnerability-Scanner"]="go install -v github.com/Hackmanit/Web-Cache-Vulnerability-Scanner@latest"
 gotools["subfinder"]="go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest"
+gotools["byp4xx"]="go install -v github.com/lobuhi/byp4xx@latest"
 
 declare -A repos
 repos["dorks_hunter"]="six2dez/dorks_hunter"
@@ -94,6 +94,7 @@ repos["gf"]="tomnomnom/gf"
 repos["Gf-Patterns"]="1ndianl33t/Gf-Patterns"
 repos["ctfr"]="UnaPibaGeek/ctfr"
 repos["xnLinkFinder"]="xnl-h4ck3r/xnLinkFinder"
+repos["waymore"]="xnl-h4ck3r/waymore"
 repos["Corsy"]="s0md3v/Corsy"
 repos["CMSeeK"]="Tuhinshubhra/CMSeeK"
 repos["fav-up"]="pielco11/fav-up"
@@ -451,7 +452,7 @@ cd ~/nuclei-templates/extra_templates && eval git pull $DEBUG_STD
 cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 eval git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git $dir/sqlmap $DEBUG_STD
 eval git clone --depth 1 https://github.com/drwetter/testssl.sh.git $dir/testssl.sh $DEBUG_STD
-eval $SUDO git clone https://github.com/offensive-security/exploitdb.git /opt/exploitdb $DEBUG_STD
+eval $SUDO git clone https://gitlab.com/exploit-database/exploitdb /opt/exploitdb $DEBUG_STD
 eval $SUDO ln -sf /opt/exploitdb/searchsploit /usr/local/bin/searchsploit $DEBUG_STD
 
 # Standard repos installation
@@ -485,7 +486,7 @@ for repo in "${!repos[@]}"; do
     elif [ "Gf-Patterns" = "$repo" ]; then
         eval mv ./*.json ~/.gf $DEBUG_ERROR
     elif [ "trufflehog" = "$repo" ]; then
-        go install
+        eval go install $DEBUG_STD
     fi
     cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 done
@@ -530,7 +531,7 @@ eval $SUDO strip -s /usr/local/bin/unimap $DEBUG_STD
 eval $SUDO chmod 755 /usr/local/bin/ppfuzz
 eval $SUDO strip -s /usr/local/bin/ppfuzz $DEBUG_STD
 eval notify $DEBUG_STD
-eval subfinder -h $DEBUG_STD
+eval subfinder $DEBUG_STD
 
 printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 ## Downloads
@@ -539,8 +540,8 @@ printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 wget -q -O - https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json > ~/.gf/potential.json
 wget -q -O - https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py > ${tools}/getjswords.py
 wget -q -O - https://wordlists-cdn.assetnote.io/data/manual/best-dns-wordlist.txt > ${subs_wordlist_big}
-wget -q -O - https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw > ${resolvers_trusted}
-wget -q -O - https://raw.githubusercontent.com/proabiral/Fresh-Resolvers/master/resolvers.txt > ${resolvers} 
+wget -q -O - https://raw.githubusercontent.com/six2dez/resolvers_reconftw/main/resolvers_trusted.txt > ${resolvers_trusted}
+wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > ${resolvers} 
 wget -q -O - https://gist.github.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw > ${subs_wordlist}
 wget -q -O - https://gist.github.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw > ${tools}/permutations_list.txt
 wget -q -O - https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt > ${fuzz_wordlist}
@@ -608,16 +609,16 @@ if [ "$generate_resolvers" = true ]; then
 		dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads $DNSVALIDATOR_THREADS -o tmp_resolvers &>/dev/null
 		[ -s "tmp_resolvers" ] && cat tmp_resolvers | anew -q $resolvers
 		[ -s "tmp_resolvers" ] && rm -f tmp_resolvers &>/dev/null
-		[ ! -s "$resolvers" ] && wget -q -O - https://raw.githubusercontent.com/proabiral/Fresh-Resolvers/master/resolvers.txt > ${resolvers}
-        [ ! -s "$resolvers_trusted" ] && wget -q -O - https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw > ${resolvers_trusted}
+		[ ! -s "$resolvers" ] && wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > ${resolvers}
+        [ ! -s "$resolvers_trusted" ] && wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > ${resolvers_trusted}
 		printf "${yellow} Resolvers updated\n ${reset}\n\n"
 	fi
 	generate_resolvers=false
 else
 	[ ! -s "$resolvers" ] || if [[ $(find "$resolvers" -mtime +1 -print) ]] ; then
 		 ${reset}"\n\nChecking resolvers lists...\n Accurate resolvers are the key to great results\n Downloading new resolvers ${reset}\n\n"
-		wget -q -O - https://raw.githubusercontent.com/proabiral/Fresh-Resolvers/master/resolvers.txt > ${resolvers}
-        wget -q -O - https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw > ${resolvers_trusted}
+		wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > ${resolvers}
+        wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > ${resolvers_trusted}
 		printf "${yellow} Resolvers updated\n ${reset}\n\n"
 	fi
 fi
