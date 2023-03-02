@@ -1,0 +1,2211 @@
+{% extends 'base.html' %}
+{% load static %} 
+{% block title %}reconFTW - Projects{% endblock %} 
+{% block content %} 
+
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: "Quicksand", sans-serif;
+  }
+
+  body {
+    display: block;
+    font-size: 1.2rem;
+  }
+
+  a:hover {
+    color: #fff;
+  }
+
+  .home-content {
+    height: 60px;
+    display: flex;
+    align-items: center;
+    background-color: #161616;
+    /* box-shadow: 0px 0px 5px 0px #000f; */
+    z-index: 1000;
+    position: fixed;
+  }
+
+  .home-content .text {
+    font-size: 26px;
+    font-weight: 600;
+  }
+
+  .navbar-logo {
+    margin: 5px 0px 0px 20px;
+    width: 100px;
+  }
+
+  .home-content-right {
+    display: flex;
+    justify-content: flex-end;
+    width: 100%;
+    align-items: center;
+    margin-right: 58px;
+  }
+
+  /* .btn {
+    padding: 0px;
+  } */
+
+  .btn-newscan {
+    margin: 0px 15px 0px 0px;
+    font-weight: 700 !important;
+    color: #a5e22f;
+    border-right: 1px solid;
+    border-left: none;
+    padding: 7px 15px 5px 0px;
+    border-image: linear-gradient(to bottom,
+        transparent,
+        rgba(167, 218, 27, 0.11),
+        transparent) 1;
+    font-size: 13px;
+    text-decoration: none;
+    vertical-align: middle;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+    background-color: transparent;
+  }
+
+  .icon-newscan {
+    margin: 0px 4px 0px 0px;
+    font-size: 20px;
+    font-weight: 500 !important;
+    color: #a5e22f;
+  }
+
+  .btn-reconftw {
+    margin: 0px 10px 0px 0px;
+    font-weight: 700 !important;
+    border-right: 1px solid;
+    border-left: none;
+    border-image: linear-gradient(to bottom,
+        transparent,
+        rgba(167, 218, 27, 0.11),
+        transparent) 1;
+    font-size: 13px;
+    color: #a5e22f;
+    background-color: transparent;
+    border-top: none;
+    padding: 7px 10px 5px 0px;
+    border-bottom: none;
+    letter-spacing: 0.2em;
+  }
+
+  .btn-reconftw:hover {
+    color: #bdfa44;
+    text-shadow: 0px 0px 1px #bdfa44;
+    transition: 0.6s;
+  }
+
+  .btn-reconftw i {
+    color: #a5e22f;
+    transition: 0.5s;
+    position: relative;
+    top: 1.7px;
+    padding: 0;
+    width: 9px;
+  }
+
+  .btn-reconftw:hover i {
+    text-shadow: 0px 0px 1px #bdfa44;
+    color: #bdfa44;
+    transform: translateX(2px) translateY(-3px) rotate(90deg);
+    transition: 0.5s;
+  }
+
+  .btn-options {
+    margin: 0px 10px 0px 0px;
+    font-weight: 700 !important;
+    border-right: 1px solid;
+    border-left: none;
+    border-image: linear-gradient(to bottom,
+        transparent,
+        rgba(167, 218, 27, 0.11),
+        transparent) 1;
+    font-size: 13px;
+    color: #000;
+    background-color: transparent;
+    border-top: none;
+    padding: 7px 10px 5px 0px;
+    border-bottom: none;
+    letter-spacing: 0.2em;
+  }
+
+  .btn-options:hover {
+    color: #000;
+    text-shadow: 0px 0px 1px #000;
+    transition: 0.6s;
+  }
+
+  .btn-options i {
+    color: #000;
+    transition: 0.5s;
+    position: relative;
+    top: 1.7px;
+    padding: 0;
+    width: 9px;
+  }
+
+  .btn-options:hover i {
+    text-shadow: 0px 0px 1px #000;
+    color: #000;
+    transform: translateX(2px) translateY(-3px) rotate(90deg);
+    transition: 0.5s;
+  }
+
+  ol,
+  ul {
+    padding-left: 0;
+  }
+
+  .action {
+    margin: 0;
+  }
+
+  .action .profile {
+    position: relative;
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    overflow: hidden;
+    cursor: pointer;
+  }
+
+  .action .profile img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .action .menu {
+    position: absolute;
+    top: 120px;
+    right: 36px;
+    padding: 10px 20px 0px 20px;
+    background-color: #161616;
+    width: 200px;
+    box-sizing: 0 5px 25px rgba(0, 0, 0, 0.1);
+    border-radius: 15px;
+    transition: 0.5s;
+    visibility: hidden;
+    opacity: 0;
+  }
+
+  .action .menu.active {
+    top: 70px;
+    visibility: visible;
+    opacity: 1;
+  }
+
+  .action .menu::before {
+    content: "";
+    position: absolute;
+    top: -5px;
+    right: 28px;
+    width: 20px;
+    height: 20px;
+    background-color: #161616;
+    transform: rotate(45deg);
+  }
+
+  .action .menu h3 {
+    width: 100%;
+    text-align: center;
+    font-size: 18px;
+    color: #b8fa34;
+    font-weight: 500;
+    line-height: 1.5em;
+  }
+
+  .action .menu h3 span {
+    font-size: 14px;
+    color: #b8fa34;
+    font-weight: 300;
+  }
+
+  .action .menu ul li {
+    list-style: none;
+    padding: 16px 0;
+    border-top: 1px solid #1c1c1c;
+    display: flex;
+    align-items: center;
+  }
+
+  .action .menu ul li i {
+    max-width: 100%;
+    margin-right: 15px;
+    opacity: 0.5;
+  }
+
+  .action .menu ul li:hover i {
+    opacity: 1;
+  }
+
+  .action .menu ul li a {
+    display: inline-block;
+    text-decoration: none;
+    color: #b8fa34;
+    font-weight: 500;
+    transition: 0.5s;
+  }
+
+  .action .menu ul li:hover a {
+    color: #d6ff83;
+  }
+
+  .action .bx {
+    position: relative;
+    top: 5px;
+  }
+
+  .card-body {
+    margin: 60px 0px 10px 0px;
+    background-color: rgba(255, 255, 255, 0.123);
+    padding: 10px 15px 40px 15px;
+  }
+
+  .row>* {
+    padding-right: 7px;
+    padding-left: 7px;
+  }
+
+  .row {
+    --bs-gutter-x: None;
+  }
+
+  .align-title {
+    padding-right: 5px;
+  }
+
+  .table-content {
+    padding: 10px;
+    background-color: #ffffff;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    box-shadow: 0px 0px 5px 0px #0000009d;
+  }
+
+  .align-to-cards {
+    margin-top: 15px;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600 !important;
+    padding-bottom: 15px;
+  }
+
+  p {
+    margin-bottom: 0px;
+  }
+
+  .grid-container {
+    margin: 15px;
+    color: #000;
+    background-color: #ffffff;
+    border: 1px solid rgb(153, 153, 153);
+    border-radius: 3px;
+    box-shadow: 0px 0px 10px 0px rgb(99, 98, 98);
+    overflow-x: auto;
+  }
+
+  .grid-container-table {
+    margin: 15px;
+    padding: 0;
+    border-radius: 3px;
+    box-shadow: 0px 0px 10px 0px rgb(99, 98, 98);
+  }
+
+  thead {
+    background-color: #2f2f30;
+    color: #a5e22f;
+    text-align: center;
+  }
+
+  td {
+    text-align: center;
+  }
+
+  .blackcount {
+    font-weight: bold;
+  }
+
+  th {
+    text-align: center;
+  }
+
+  .table-striped>tbody>tr:nth-of-type(odd)>* {
+    background-color: #d3d3d3;
+  }
+
+  .table-striped>tbody>tr:nth-of-type(even)>* {
+    background-color: #e1e1e1;
+  }
+
+  .td:nth-child(even) {
+    background-color: #d3d3d3;
+  }
+
+  .table>tbody {
+    vertical-align: middle;
+  }
+
+  .rowbg:nth-child(odd) {
+    background-color: #e1e1e1;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  form {
+    display: contents;
+  }
+
+  .bx-sm:hover {
+    color: #2f2f30;
+    text-shadow: 0px 0px 5px #a5e22f;
+  }
+
+  .bg-footer {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    color: #b8f04993;
+    padding: 5px;
+    font-weight: bold;
+  }
+
+  .modal-header {
+    color: #777;
+    font-size: 12px;
+    font-weight: bold;
+    border-bottom: 2px solid #46494b;
+  }
+
+  .modal-content {
+    background-color: #27292c;
+    color: #fff;
+  }
+
+  .nav-pills .nav-link.active,
+  .nav-pills .show>.nav-link {
+    color: #fff;
+    background-color: #648b24;
+  }
+
+  .nav-pills .nav-link {
+    background: 0 0;
+    border: 0;
+    color: #fff;
+    border-radius: 10rem;
+    padding: 0.1rem 1rem;
+    font-size: 16px;
+  }
+
+  .nav-link:focus,
+  .nav-link:hover {
+    color: #fff;
+  }
+
+  .modal-footer {
+    border-top: 2px solid #46494b;
+  }
+
+  .form-check-input:checked {
+    background-color: #709722;
+    border-color: #709722;
+  }
+
+  .mb-4 {
+    color: #a5e22f;
+  }
+
+  .input-group-text {
+    display: flex;
+    align-items: center;
+    padding: 0.375rem 0.75rem;
+    font-size: 1rem;
+    font-weight: bold;
+    line-height: 1.5;
+    color: #a5e22f;
+    text-align: center;
+    white-space: nowrap;
+    background-color: #383a3b;
+    border: none;
+    border-radius: 0;
+    border-top-left-radius: 0.25rem;
+    border-bottom-left-radius: 0.25rem;
+  }
+
+  .form-control {
+    font-weight: bold;
+    display: block;
+    width: 100%;
+    padding: 0.375rem 0.75rem;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #e0e0e0;
+    background-color: #545657;
+    background-clip: padding-box;
+    -webkit-appearance: none;
+    border: none;
+    -moz-appearance: none;
+    appearance: none;
+    border-radius: 0.25rem;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  }
+
+  .form-control::placeholder {
+    color: #b3b3b3;
+    font-size: 14px;
+    font-weight: bold;
+  }
+
+  .form-control:disabled,
+  .form-control[readonly] {
+    background-color: #383a3b;
+    opacity: 1;
+  }
+
+  .form-control:focus {
+    color: #e0e0e0;
+    background-color: #545657;
+    border-color: none;
+    border: none;
+    outline: none;
+    box-shadow: 0 0 0 0.25rem #b5fd0d40;
+  }
+
+  .input-group> :not(:first-child):not(.dropdown-menu):not(.valid-tooltip):not(.valid-feedback):not(.invalid-tooltip):not(.invalid-feedback) {
+    margin-left: -12px;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+
+  @media (min-width: 768px) {
+    .form-horizontal .control-label {
+      text-align: right;
+      margin-bottom: 0;
+      padding-top: 7px;
+    }
+  }
+
+  .panel {
+    margin-bottom: 20px;
+    background-color: #d8d8d8;
+    border: 10px solid #fff;
+    box-shadow: 0px 0px 5px 0px #0000009d;
+    border-radius: 5px;
+    -webkit-box-shadow: 0 1px 1px rgb(0 0 0 / 5%);
+  }
+
+  .panel-heading {
+    border-bottom: 0;
+  }
+
+  .panel-title {
+    font-size: 17px;
+    padding: 14px 10px 10px 10px;
+    background-color: #2f2f30;
+    color: #a5e22f;
+    font-weight: bold;
+  }
+
+  .panel-title>small {
+    font-size: 0.75em;
+    color: #999999;
+  }
+
+  .panel-body *:first-child {
+    margin-top: 0;
+  }
+
+  .panel-footer {
+    border-top: 0;
+  }
+
+  .panel-default>.panel-heading {
+    color: #333333;
+    border-color: #ddd;
+    border-color: rgba(0, 0, 0, 0.07);
+  }
+
+  form label {
+    color: #fff;
+    font-weight: 400;
+  }
+
+  .fieldset {
+    position: relative;
+    border: 2px solid #444446;
+    background-color: #2f2f30;
+    padding: 20px 0px 5px 5px;
+    margin: 30px 0px 10px 12px;
+    border-radius: 10px;
+    width: 98%;
+  }
+
+  .fieldset h1 {
+    /* position: absolute; */
+    position: relative;
+
+    border-top: 2px solid #444446;
+
+    height: 30px;
+    bottom: 20px;
+    font-size: 18px;
+    line-height: 1;
+    margin: -20px 0 0 0rem;
+    /* half of font-size up top */
+    background-color: #2f2f30;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+    padding: 2px 10px 0px 10px;
+    font-weight: bold;
+    color: #a5e22f;
+  }
+
+  .col-form-label {
+    font-weight: bold;
+    font-size: 15.5px;
+    letter-spacing: -1px;
+    margin-left: 24px;
+  }
+
+  .icon-info-apikey {
+    margin-right: 9px;
+    position: relative;
+    color: #000000;
+    border-radius: 5px;
+    text-shadow: 0px 0px 5px #a5e22f;
+    cursor: pointer;
+  }
+
+  .icon-info-apikey:hover {
+    color: #000;
+    text-shadow: 0px 0px 5px #d5ff82;
+  }
+
+  .api-align-input {
+    position: relative;
+    bottom: 6px;
+  }
+
+  .btn-edit-reconftw {
+    margin-top: 10px;
+    padding: 5px 30px 5px 30px;
+    margin-bottom: 10px;
+    color: #a5e22f;
+    font-size: 14px;
+    font-weight: bold;
+    background-color: #161616;
+    border: 0;
+  }
+
+  .btn-edit-reconftw:hover {
+    color: #bdfa44;
+    transition: 0.6s;
+    background-color: #000000;
+    box-shadow: 0 0 1px #000000;
+  }
+
+  .reconftw-fileupload {
+    display: inline;
+    width: 55%;
+    box-shadow: 0 0 5px #333333;
+  }
+
+  #formFile::before {
+    content: "UPLOAD";
+    position: absolute;
+    color: #a5e22f;
+    z-index: 2;
+    display: block;
+    background-color: #161616;
+    font-weight: bold;
+    text-align: center;
+    border-radius: 5px;
+    margin: -7px 0px 0px -13px;
+    padding: 7px 23px 7px 23px;
+    line-height: 1;
+  }
+
+  #formFile:hover::before {
+    color: #bdfa44;
+    transition: 0.6s;
+    background-color: #000000;
+    box-shadow: 0 0 1px #000000;
+  }
+
+  .col-sm-4 {
+    flex: 0 0 auto;
+    width: 36.33333333%;
+  }
+</style>
+
+{% if messages %} {% for message in messages %}
+<div class="position-fixed bottom-0 end-0 p-2" style="z-index: 11">
+  <div class="toast {{message.tags}} fade show align-items-center" role="alert" aria-live="assertive" aria-atomic="true"
+    data-bs-autohide="true">
+    <div class="d-flex">
+      <div class="toast-body">{{message}}</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
+        aria-label="Close"></button>
+    </div>
+  </div>
+</div>
+{% endfor %} {% endif %}
+
+<!-- TOP BAR -->
+<div class="container-fluid">
+  <div class="home-content fixed-top">
+    <a href="{% url 'projects:index' %}">
+      <img class="navbar-logo" src="{% static 'img/reconftw_logo.png' %}" alt="Logo" />
+    </a>
+
+    <div class="home-content-right">
+      <button class="btn-reconftw" type="button" data-bs-toggle="modal" data-bs-target="#modal-newscan">
+        <i class="bx bxs-chevron-up"></i>
+        <span>NEW SCAN</span>
+      </button>
+
+      <i class="bx bx-sitemap icon-newscan"></i>
+      <div class="btn-newscan">RECON LIST</div>
+
+      <div class="action" onmouseover="menuToggle();" onmouseout="menuToggle();">
+        <div class="profile">
+          <img src="{{ imagePath }}" />
+        </div>
+        <div class="menu">
+          <h3>{{ request.user }}<br /><span>Reconnaissance Ninja</span></h3>
+          <ul>
+            <li>
+              <a href="{% url 'edit_profile:index' %}"><i class="bx bx-sm bx-user-circle"></i>Edit profile</a>
+            </li>
+            <li>
+              <a href="{% url 'apikeys_settings:index' %}"><i class="bx bx-sm bx-cog"></i> API Keys</a>
+            </li>
+            <li>
+              <a href="{% url 'logout' %}"><i class="bx bx-sm bx-log-out-circle"></i> Logout</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- TOP BAR -->
+
+<div class="card-body">
+  <div class="row">
+    <div class="d-sm-flex align-items-center align-to-cards">
+      <i class="align-title bx bx-sm bx-cog"></i>
+      <p>
+        <strong>SETTINGS</strong>
+      </p>
+    </div>
+
+    <div class="col-sm"></div>
+    <div class="col-sm-8">
+      <div class="panel panel-default">
+        <div class="panel-heading mb-2">
+          <div class="panel-title">
+            <div class="d-sm-flex">
+              <i class="align-title bx bx-sm bxs-key"></i>
+              <p>
+                <strong>API KEYS</strong>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="container">
+          <div class="row">
+            <section class="fieldset">
+              <div class="container">
+                <div class="row">
+                  <div class="col-sm"></div>
+                  <div class="col-sm-3 text-center">
+                    <h1>RECONFTW CONFIG</h1>
+                  </div>
+                  <div class="col-sm"></div>
+                </div>
+              </div>
+
+              <form class="form-horizontal" action="" method="post">
+                <input type="hidden" name="type" value="reconftw" />
+                <div class="container">
+                  <div class="row">
+                    <div class="col-sm">
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">SHODAN</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ shodan_value }}"
+                            name="shodan" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">WHOISXML</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ whoisxml_value }}"
+                            name="whoisxml" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">XSS
+                            SERVER</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ xss_server_value }}"
+                            name="xss_server" />
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-sm">
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">COLLAB
+                            SERVER</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ collab_server_value }}" name="collab_server" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">SLACK
+                            CHANNEL</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ slack_channel_value }}" name="slackchanel" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">SLACK
+                            AUTH</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ slack_auth_value }}"
+                            name="slack_auth" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="container text-center">
+                      <div class="row">
+                        <div class="col-sm-3"></div>
+                        <div class="col-sm">
+                          <!-- <input class="reconftw-fileupload form-control" type="file" accept="images/*" id="formFile" name="UserPicture">
+                          <button type="reset" class="btn btn-default btn-edit-reconftw">SUBMIT</button> -->
+                          <button type="submit" class="btn btn-success btn-edit-reconftw">
+                            SUBMIT
+                          </button>
+                        </div>
+                        <div class="col-sm-3"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {% csrf_token %}
+              </form>
+            </section>
+          </div>
+        </div>
+
+        <div class="container">
+          <div class="row">
+            <section class="fieldset">
+              <div class="container">
+                <div class="row">
+                  <div class="col-sm"></div>
+                  <div class="col-sm-3 text-center">
+                    <h1>AMASS TOOL</h1>
+                  </div>
+                  <div class="col-sm"></div>
+                </div>
+              </div>
+
+              <form class="form-horizontal" action="" method="post">
+                <input type="hidden" name="type" value="amass" />
+                <div class="container">
+                  <div class="row">
+                    <div class="col-sm">
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">PASSIVEDNS</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ passivedns_value }}"
+                            name="passivedns" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">ASNLOOKUP</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ asnlookup_value }}"
+                            name="asnlookup" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">AHREFS</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ ahrefs_value }}"
+                            name="ahrefs" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">ALIENVAULT</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ alienvault_value }}"
+                            name="alienvault" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">BEVIGIL</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ bevigil_value }}"
+                            name="bevigil" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">BIGDATACLOUD</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ bigdatacloud_value }}" name="bigdatacloud" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">BUFFEROVER</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ bufferover_value }}"
+                            name="bufferover" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">BUILTWITH</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ builtwith_value }}"
+                            name="builtwith" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">C99</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ c99_value }}"
+                            name="c99" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">CENSYS
+                            APIKEY</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ censys_value }}"
+                            name="censys" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">CENSYS
+                            SECRET</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ censysSecret_value }}" name="censysSecret" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">CHAOS</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ chaos_value }}"
+                            name="chaos" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">CIRCL
+                            USERNAME</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ circlUsername_value }}" name="circlUsername" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">CIRCL
+                            PASSWORD</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ circlPassword_value }}" name="circlPassword" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">CLOUDFLARE</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ cloudflare_value }}"
+                            name="cloudflare" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">DIGICERT
+                            APIKEY</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ digicert_value }}"
+                            name="digicert" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">DIGICERT
+                            USERNAME</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ digicertUsername_value }}" name="digicertUsername" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">DNSDB</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ dnsdb_value }}"
+                            name="dnsdb" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">DNSLYTICS</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ dnslytics_value }}"
+                            name="dnslytics" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">DNSREPO</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ dnsrepo_value }}"
+                            name="dnsrepo" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">DEEPINFO</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ deepinfo_value }}"
+                            name="deepinfo" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">DETECTIFY</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ detectify_value }}"
+                            name="detectify" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">FACEBOOK
+                            APIKEY</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ facebook_value }}"
+                            name="facebook" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">FACEBOOK
+                            SECRET</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ facebookSecret_value }}" name="facebookSecret" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">FOFA
+                            APIKEY</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ fofa_value }}"
+                            name="fofa" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">FOFA
+                            USERNAME</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ fofaUsername_value }}" name="fofaUsername" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">FULLHUNT</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ fullhunt_value }}"
+                            name="fullhunt" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">GITHUB</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ github_value }}"
+                            name="github" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">HACKERTARGET</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ hackertarget_value }}" name="hackertarget" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">HUNTER</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ hunter_value }}"
+                            name="hunter" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="col-sm">
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">INTELX</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ intelx_value }}"
+                            name="intelx" />
+                        </div>
+                      </div>
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">IPDATA</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ ipdata_value }}"
+                            name="ipdata" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">IPINFO</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ ipinfo_value }}"
+                            name="ipinfo" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">LEAKIX</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ leakix_value }}"
+                            name="leakix" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">NETLAS</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ netlas_value }}"
+                            name="netlas" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">NETWORKSDB</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ networksdb_value }}"
+                            name="networksdb" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">ONYPHE</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ onyphe_value }}"
+                            name="onyphe" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">PSBDMP</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ psbdmp_value }}"
+                            name="psbdmp" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">RIKIQ
+                            APIKEY</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ rikiq_value }}"
+                            name="rikiq" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">RIKIQ
+                            USERNAME</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ rikiqUsername_value }}" name="rikiqUsername" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">PENTEST-TOOLS</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ pentesttools_value }}" name="pentesttools" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">QUAKE360</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ quake360_value }}"
+                            name="quake360" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">SOCRADAR</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ socradar_value }}"
+                            name="socradar" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">SECURITYTRAILS</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ securitytrails_value }}" name="securitytrails" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">SHODAN</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ shodan2_value }}"
+                            name="shodan" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">SPAMHAUS
+                            USERNAME</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ spamhausUsername_value }}" name="spamhausUsername" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">SPAMHAUS
+                            PASSWORD</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ spamhausPassword_value }}" name="spamhausPassword" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">SPYSE</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ spyse_value }}"
+                            name="spyse" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">THREATBOOK</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ threatbook_value }}"
+                            name="threatbook" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">TWITTER
+                            APIKEY</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ twitter_value }}"
+                            name="twitter" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">TWITTER
+                            SECRET</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ twitterSecret_value }}" name="twitterSecret" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">CISCO</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ cisco_value }}"
+                            name="cisco" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">URLSCAN</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ urlscan_value }}"
+                            name="urlscan" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">VIRUSTOTAL</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ virustotal_value }}"
+                            name="virustotal" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">WHOISXMLAPI</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ whoisxmlapi_value }}" name="whoisxmlapi" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">ZETALYTICS</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ zetalytics_value }}"
+                            name="zetalytics" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">ZOOMEYE
+                            USERNAME</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ zoomeyeUsername_value }}" name="zoomeyeUsername" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">ZOOMEYE
+                            PASSWORD</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ zoomeyePassword_value }}" name="zoomeyePassword" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">YANDEX
+                            APIKEY</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ yandex_value }}"
+                            name="yandex" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">YANDEX
+                            USERNAME</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ yandexUsername_value }}" name="yandexUsername" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="container text-center">
+                      <div class="row">
+                        <div class="col-sm-3"></div>
+                        <div class="col-sm">
+                          <!-- <input class="reconftw-fileupload form-control" type="file" accept="images/*" id="formFile" name="UserPicture">
+                          <button type="reset" class="btn btn-default btn-edit-reconftw">SUBMIT</button> -->
+                          <button type="submit" class="btn btn-success btn-edit-reconftw">
+                            SUBMIT
+                          </button>
+                        </div>
+                        <div class="col-sm-3"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {% csrf_token %}
+              </form>
+            </section>
+          </div>
+        </div>
+
+        <div class="container">
+          <div class="row">
+            <section class="fieldset">
+              <div class="container">
+                <div class="row">
+                  <div class="col-sm"></div>
+                  <div class="col-sm-3 text-center">
+                    <h1>GITHUB TOKENS</h1>
+                  </div>
+                  <div class="col-sm"></div>
+                </div>
+              </div>
+
+              <form class="form-horizontal" action="" method="post">
+                <input type="hidden" name="type" value="github" />
+                <div class="container">
+                  <div class="row">
+                    <div class="col-sm">
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">TOKEN
+                            1</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ token_1_value }}"
+                            name="token_1" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">TOKEN
+                            2</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ token_2_value }}"
+                            name="token_2" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">TOKEN
+                            3</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ token_3_value }}"
+                            name="token_3" />
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-sm">
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">TOKEN
+                            4</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ token_4_value }}"
+                            name="token_4" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">TOKEN
+                            5</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ token_5_value }}"
+                            name="token_5" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">TOKEN
+                            6</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ token_6_value }}"
+                            name="token_6" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="container text-center">
+                      <div class="row">
+                        <div class="col-sm-3"></div>
+                        <div class="col-sm">
+                          <!-- <input class="reconftw-fileupload form-control" type="file" accept="images/*" id="formFile" name="UserPicture">
+                          <button type="reset" class="btn btn-default btn-edit-reconftw">SUBMIT</button> -->
+                          <button type="submit" class="btn btn-success btn-edit-reconftw">
+                            SUBMIT
+                          </button>
+                        </div>
+                        <div class="col-sm-3"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {% csrf_token %}
+              </form>
+            </section>
+          </div>
+        </div>
+
+        <div class="container">
+          <div class="row">
+            <section class="fieldset">
+              <div class="container">
+                <div class="row">
+                  <div class="col-sm"></div>
+                  <div class="col-sm-3 text-center">
+                    <h1>THE HARVESTER</h1>
+                  </div>
+                  <div class="col-sm"></div>
+                </div>
+              </div>
+
+              <form class="form-horizontal" action="" method="post">
+                <input type="hidden" name="type" value="TheHarvester" />
+                <div class="container">
+                  <div class="row">
+                    <div class="col-sm">
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">BINARYEDGE</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ binaryedge_value }}"
+                            name="binaryedge" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">BING</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ bing_value }}"
+                            name="bing" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">CENSYS</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ censys2_value }}"
+                            name="censys" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">FULLHUNT</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ fullhunt2_value }}"
+                            name="fullhunt" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">GITHUB</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ github2_value }}"
+                            name="github" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">HUNTER</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ hunter2_value }}"
+                            name="hunter" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">INTELX</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ intelx2_value }}"
+                            name="intelx" />
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-sm">
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">PENTEST-TOOLS</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ pentesttools2_value }}" name="pentestTools" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">CHAOS</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ chaos2_value }}"
+                            name="chaos" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">ROCKETREACH</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ rocketreach_value }}" name="rocketreach" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">SECURITYTRAILS</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ securitytrails2_value }}" name="securityTrails" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">SHODAN</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ shodan3_value }}"
+                            name="shodan" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">ZOOMEYE</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ zoomeye2_value }}"
+                            name="zoomeye" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="container text-center">
+                      <div class="row">
+                        <div class="col-sm-3"></div>
+                        <div class="col-sm">
+                          <!-- <input class="reconftw-fileupload form-control" type="file" accept="images/*" id="formFile" name="UserPicture">
+                          <button type="reset" class="btn btn-default btn-edit-reconftw">SUBMIT</button> -->
+                          <button type="submit" class="btn btn-success btn-edit-reconftw">
+                            SUBMIT
+                          </button>
+                        </div>
+                        <div class="col-sm-3"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {% csrf_token %}
+              </form>
+            </section>
+          </div>
+        </div>
+
+        <div class="container">
+          <div class="row">
+            <section class="fieldset">
+              <div class="container">
+                <div class="row">
+                  <div class="col-sm"></div>
+                  <div class="col-sm-3 text-center">
+                    <h1>H8MAIL TOOL</h1>
+                  </div>
+                  <div class="col-sm"></div>
+                </div>
+              </div>
+
+              <form class="form-horizontal" action="" method="post">
+                <input type="hidden" name="type" value="h8mail" />
+                <div class="container">
+                  <div class="row">
+                    <div class="col-sm">
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">HUNTER</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ hunter3_value }}"
+                            name="hunter" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">SNUSBASE</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ snusbase_value }}"
+                            name="snusbase" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">EMAILREP</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ emailrep_value }}"
+                            name="emailrep" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">INTELX</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ intelx3_value }}"
+                            name="intelx" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">HIBP</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX" value="{{ hibp_value }}"
+                            name="hibp" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">LEAK-LOOKUP PUB</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ leaklookup_pub_value }}" name="leaklookup_pub" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">LEAK-LOOKUP PRIV</span></label>
+                        <div class="col-sm-6 mx-4">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ leaklookup_priv_value }}" name="leaklookup_priv" />
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-sm">
+                      <div class="form-group row">
+                        <label class="col-sm-5 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">WELEAKINFO PRIV</span></label>
+                        <div class="col-sm-6">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ weleakinfo_priv_value }}" name="weleakinfo_priv" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-5 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">WELEAKINFO PUB</span></label>
+                        <div class="col-sm-6">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ weleakinfo_pub_value }}" name="weleakinfo_pub" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-5 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">DEHASHED
+                            EMAIL</span></label>
+                        <div class="col-sm-6">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ dehashed_email_value }}" name="dehashed_email" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-5 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span class="api-align-input">DEHASHED
+                            KEY</span></label>
+                        <div class="col-sm-6">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ dehashed_key_value }}" name="dehashed_key" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-5 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">BREACHDIRECTORY USER</span></label>
+                        <div class="col-sm-6">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ breachdirectory_user_value }}" name="breachdirectory_user" />
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label class="col-sm-5 col-form-label"><i
+                            class="icon-info-apikey bx-sm bx bxs-info-circle"></i><span
+                            class="api-align-input">BREACHDIRECTORY PASS</span></label>
+                        <div class="col-sm-6">
+                          <input type="XXXXXX" class="form-control" placeholder="XXXXXXX"
+                            value="{{ breachdirectory_pass_value }}" name="breachdirectory_pass" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="container text-center">
+                      <div class="row">
+                        <div class="col-sm-3"></div>
+                        <div class="col-sm">
+                          <!-- <input class="reconftw-fileupload form-control" type="file" accept="images/*" id="formFile" name="UserPicture">
+                          <button type="reset" class="btn btn-default btn-edit-reconftw">SUBMIT</button> -->
+                          <button type="submit" class="btn btn-success btn-edit-reconftw">
+                            SUBMIT
+                          </button>
+                        </div>
+                        <div class="col-sm-3"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {% csrf_token %}
+              </form>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm"></div>
+  </div>
+</div>
+
+<footer class="fixed-bottom bg-footer">
+  <div class="container my-auto">
+    <div class="text-center my-auto">
+      <span>reconFTW ©</span>
+    </div>
+  </div>
+</footer>
+
+<!-- The Modal New Project-->
+<div class="modal fade text-dark" id="modal-newscan" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        NEW SCAN
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+
+      <!-- Modal body -->
+      <div class="modal-body">
+        <form method="post" id="addDomain" action="{% url 'scans:new' %}">
+          {% csrf_token %}
+          <h6 class="mb-4"><b>TARGET OPTIONS</b></h6>
+
+          <ul class="nav nav-pills mb-3" id="pills-tab" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active" id="pills-single-nav" onclick="selectSingle()" data-bs-toggle="pill"
+                data-bs-target="#pills-single" type="button" role="tab">
+                Single
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="pills-list-nav" onclick="selectList()" data-bs-toggle="pill"
+                data-bs-target="#pills-list" type="button" role="tab">
+                List
+              </button>
+            </li>
+          </ul>
+
+          <div class="tab-content" id="pills-tabContent">
+            <input type="hidden" id="typeDomain" name="typeDomain" value="0" />
+            <div class="tab-pane fade show active" id="pills-single" role="tabpanel">
+              <input type="text" name="singleDomain" class="form-control" id="singleDomain" onkeyup="checkCommand()"
+                placeholder="example.com" />
+            </div>
+            <div class="tab-pane fade" id="pills-list" role="tabpanel">
+              <textarea class="form-control" name="listDomain" id="listDomain" onkeyup="checkCommand()"></textarea>
+            </div>
+          </div>
+
+          <h6 class="mt-4 mb-4"><b>MODE OPTIONS</b></h6>
+          <div class="row">
+            <div class="col-6">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="switch-recon" name="switch-recon"
+                  onclick="checkCommand()" />
+                <label class="form-check-label" for="flexSwitchCheckDefault">Recon</label>
+              </div>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="switch-subdomains"
+                  name="switch-subdomains" onclick="checkCommand()" />
+                <label class="form-check-label" for="flexSwitchCheckDefault">Subdomains</label>
+              </div>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="switch-passive" name="switch-passive"
+                  onclick="checkCommand()" />
+                <label class="form-check-label" for="flexSwitchCheckDefault">Passive</label>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="switch-all" name="switch-all"
+                  onclick="switchButtons()" />
+                <label class="form-check-label" for="flexSwitchCheckDefault">All</label>
+              </div>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="switch-web" name="switch-web"
+                  onclick="checkCommand()" />
+                <label class="form-check-label" for="flexSwitchCheckDefault">Web</label>
+              </div>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="switch-osint" name="switch-osint"
+                  onclick="checkCommand()" />
+                <label class="form-check-label" for="flexSwitchCheckDefault">OSINT</label>
+              </div>
+            </div>
+          </div>
+          <h6 class="mt-4 mb-4"><b>GENERAL OPTIONS</b></h6>
+          <div class="row">
+            <div class="col-6">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="switch-deep" name="switch-deep"
+                  onclick="checkCommand()" />
+                <label class="form-check-label" for="flexSwitchCheckDefault">Deep Scan</label>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="switch-vps" name="switch-vps"
+                  onclick="checkCommand()" />
+                <label class="form-check-label" for="flexSwitchCheckDefault">Axiom</label>
+              </div>
+            </div>
+          </div>
+
+          <!-- <h6 class="mt-4 mb-4"><b>COMMAND</b></h6> -->
+
+          <div class="input-group mt-4">
+            <div class="input-group-prepend">
+              <span class="input-group-text" id="basic-addon3">COMMAND:</span>
+            </div>
+            <input type="text" class="form-control" id="command" name="command" disabled />
+          </div>
+
+          <!-- <input type="text" class="form-control" id="command" name="command" disabled>  -->
+        </form>
+      </div>
+
+      <div class="modal-footer">
+        <a href="/projects" name="cancel"><button type="button" class="btn btn-danger">Cancel</button></a>
+        <button type="submit" form="addDomain" data-backdrop="static" onclick="showLoading()" class="btn btn-success">
+          Submit
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- The Modal Scheduling-->
+<div class="modal fade text-dark" id="modal-scheduling">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+
+      <!-- Modal body -->
+      <div class="modal-body">UNDER CONSTRUCTION</div>
+
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-bs-dismiss="modal">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- The Modal Scheduling-->
+
+<!-- The Modal Loading-->
+<div class="modal fade text-dark" id="modal-loading" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <!-- Modal body -->
+      <div class="modal-body">
+        <div class="text-center py-3">
+          Loading
+          <div class="spinner-border" role="status">
+            <span class="sr-only">Loading...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- The Modal Backup -->
+<div class="modal fade text-dark" id="modal-backup">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+
+      <!-- Modal body -->
+      <div class="modal-body">UNDER CONSTRUCTION</div>
+
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-bs-dismiss="modal">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- The Modal Backup -->
+
+<script>
+  function switchButtons() {
+    if (document.getElementById("switch-all").checked == true) {
+      document.getElementById("switch-recon").checked = true;
+      document.getElementById("switch-subdomains").checked = true;
+      document.getElementById("switch-passive").checked = true;
+      document.getElementById("switch-web").checked = true;
+      document.getElementById("switch-osint").checked = true;
+
+      document.getElementById("switch-recon").disabled = true;
+      document.getElementById("switch-subdomains").disabled = true;
+      document.getElementById("switch-passive").disabled = true;
+      document.getElementById("switch-web").disabled = true;
+      document.getElementById("switch-osint").disabled = true;
+      checkCommand();
+    } else {
+      document.getElementById("switch-recon").checked = false;
+      document.getElementById("switch-subdomains").checked = false;
+      document.getElementById("switch-passive").checked = false;
+      document.getElementById("switch-web").checked = false;
+      document.getElementById("switch-osint").checked = false;
+
+      document.getElementById("switch-recon").disabled = false;
+      document.getElementById("switch-subdomains").disabled = false;
+      document.getElementById("switch-passive").disabled = false;
+      document.getElementById("switch-web").disabled = false;
+      document.getElementById("switch-osint").disabled = false;
+      checkCommand();
+    }
+  }
+
+  function checkCommand() {
+    let command = "./reconftw.sh";
+
+    if (
+      document.getElementById("pills-single-nav").classList.contains("active")
+    ) {
+      command += " -d " + document.getElementById("singleDomain").value;
+    } else {
+      command += " -l targets.txt";
+    }
+
+    if (document.getElementById("switch-all").checked == true) {
+      command += " -a";
+    } else {
+      if (document.getElementById("switch-recon").checked) {
+        command += " -r";
+      }
+
+      if (document.getElementById("switch-subdomains").checked) {
+        command += " -s";
+      }
+
+      if (document.getElementById("switch-passive").checked) {
+        command += " -p";
+      }
+
+      if (document.getElementById("switch-web").checked) {
+        command += " -w";
+      }
+
+      if (document.getElementById("switch-osint").checked) {
+        command += " -n";
+      }
+    }
+
+    if (document.getElementById("switch-deep").checked == true) {
+      command += " --deep";
+    }
+
+    if (document.getElementById("switch-vps").checked == true) {
+      command += " -v";
+    }
+
+    document.getElementById("command").value = command;
+  }
+
+  function selectSingle() {
+    document.getElementById("typeDomain").value = 0;
+    checkCommand();
+  }
+
+  function selectList() {
+    document.getElementById("typeDomain").value = 1;
+    checkCommand();
+  }
+
+  function showLoading() {
+    $("#modal-loading").modal("show");
+    $("#modal-newscan").modal("hide");
+  }
+
+  function menuToggle() {
+    const toggleMenu = document.querySelector(".menu");
+    toggleMenu.classList.toggle("active");
+  }
+</script>
+
+{% endblock %}

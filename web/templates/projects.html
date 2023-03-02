@@ -1,0 +1,1589 @@
+{% extends 'base.html' %} 
+{% block title %}reconFTW - Projects{% endblock %} 
+{% block content %} 
+{% load static %}
+<style>
+  /* Chrome, Safari, Edge, Opera /
+  input::-webkit-outer-spin-button,
+  input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  / Firefox */
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: "Quicksand", sans-serif;
+  }
+
+  body {
+    display: block;
+    font-size: 1.2rem;
+  }
+
+  a:hover {
+    color: #fff;
+  }
+  .home-content {
+    height: 60px;
+    display: flex;
+    align-items: center;
+    background-color: #161616;
+    /* box-shadow: 0px 0px 5px 0px #000f; */
+    z-index: 1000;
+    position: fixed;
+  }
+
+  .home-content .text {
+    font-size: 26px;
+    font-weight: 600;
+  }
+
+  .navbar-logo {
+    margin: 5px 0px 0px 20px;
+    width: 100px;
+  }
+
+  .home-content-right {
+    display: flex;
+    justify-content: flex-end;
+    width: 100%;
+    align-items: center;
+    margin-right: 58px;
+  }
+
+  /* .btn {
+    padding: 0px;
+  } */
+
+  .btn-newscan {
+    margin: 0px 15px 0px 0px;
+    font-weight: 700 !important;
+    color: #a5e22f;
+    border-right: 1px solid;
+    border-left: none;
+    padding: 7px 15px 5px 0px;
+    border-image: linear-gradient(
+        to bottom,
+        transparent,
+        rgba(167, 218, 27, 0.11),
+        transparent
+      )
+      1;
+    font-size: 13px;
+    text-decoration: none;
+    vertical-align: middle;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+    background-color: transparent;
+  }
+
+  .icon-newscan {
+    margin: 0px 4px 0px 0px;
+    font-size: 20px;
+    font-weight: 500 !important;
+    color: #a5e22f;
+  }
+
+  .btn-reconftw {
+    margin: 0px 10px 0px 0px;
+    font-weight: 700 !important;
+    border-right: 1px solid;
+    border-left: none;
+    border-image: linear-gradient(
+        to bottom,
+        transparent,
+        rgba(167, 218, 27, 0.11),
+        transparent
+      )
+      1;
+    font-size: 13px;
+    color: #a5e22f;
+    background-color: transparent;
+    border-top: none;
+    padding: 7px 10px 5px 0px;
+    border-bottom: none;
+    letter-spacing: 0.2em;
+  }
+
+  .btn-reconftw:hover {
+    color: #bdfa44;
+    text-shadow: 0px 0px 1px #bdfa44;
+    transition: 0.6s;
+  }
+
+  .btn-reconftw i {
+    color: #a5e22f;
+    transition: 0.5s;
+    position: relative;
+    top: 1.7px;
+    padding: 0;
+    width: 9px;
+  }
+
+  .btn-reconftw:hover i {
+    text-shadow: 0px 0px 1px #bdfa44;
+    color: #bdfa44;
+    transform: translateX(2px) translateY(-3px) rotate(90deg);
+    transition: 0.5s;
+  }
+
+  .btn-options {
+    margin: 0px 10px 0px 0px;
+    font-weight: 700 !important;
+    border-right: 1px solid;
+    border-left: none;
+    border-image: linear-gradient(
+        to bottom,
+        transparent,
+        rgba(167, 218, 27, 0.11),
+        transparent
+      )
+      1;
+    font-size: 13px;
+    color: #000;
+    background-color: transparent;
+    border-top: none;
+    padding: 7px 10px 5px 0px;
+    border-bottom: none;
+    letter-spacing: 0.2em;
+  }
+
+  .btn-options:hover {
+    color: #000;
+    text-shadow: 0px 0px 1px #000;
+    transition: 0.6s;
+  }
+
+  .btn-options i {
+    color: #000;
+    transition: 0.5s;
+    position: relative;
+    top: 1.7px;
+    padding: 0;
+    width: 9px;
+  }
+
+  .btn-options:hover i {
+    text-shadow: 0px 0px 1px #000;
+    color: #000;
+    transform: translateX(2px) translateY(-3px) rotate(90deg);
+    transition: 0.5s;
+  }
+
+  ol,
+  ul {
+    padding-left: 0;
+  }
+
+  .action {
+    margin: 0;
+  }
+
+  .action .profile {
+    position: relative;
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    overflow: hidden;
+    cursor: pointer;
+  }
+
+  .action .profile img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .action .menu {
+    position: absolute;
+    top: 120px;
+    right: 36px;
+    padding: 10px 20px 0px 20px;
+    background-color: #161616;
+    width: 200px;
+    box-sizing: 0 5px 25px rgba(0, 0, 0, 0.1);
+    border-radius: 15px;
+    transition: 0.5s;
+    visibility: hidden;
+    opacity: 0;
+  }
+
+  .action .menu.active {
+    top: 70px;
+    visibility: visible;
+    opacity: 1;
+  }
+
+  .action .menu::before {
+    content: "";
+    position: absolute;
+    top: -5px;
+    right: 28px;
+    width: 20px;
+    height: 20px;
+    background-color: #161616;
+    transform: rotate(45deg);
+  }
+
+  .action .menu h3 {
+    width: 100%;
+    text-align: center;
+    font-size: 18px;
+    color: #b8fa34;
+    font-weight: 500;
+    line-height: 1.5em;
+  }
+
+  .action .menu h3 span {
+    font-size: 14px;
+    color: #b8fa34;
+    font-weight: 300;
+  }
+
+  .action .menu ul li {
+    list-style: none;
+    padding: 16px 0;
+    border-top: 1px solid #1c1c1c;
+    display: flex;
+    align-items: center;
+  }
+
+  .action .menu ul li i {
+    max-width: 100%;
+    margin-right: 15px;
+    opacity: 0.5;
+  }
+
+  .action .menu ul li:hover i {
+    opacity: 1;
+  }
+
+  .action .menu ul li a {
+    display: inline-block;
+    text-decoration: none;
+    color: #b8fa34;
+    font-weight: 500;
+    transition: 0.5s;
+  }
+
+  .action .menu ul li:hover a {
+    color: #d6ff83;
+  }
+
+  .action .bx {
+    position: relative;
+    top: 5px;
+  }
+
+  .card-body {
+    margin: 60px 0px 10px 0px;
+    background-color: rgba(255, 255, 255, 0.123);
+    padding: 10px 15px 40px 15px;
+  }
+
+  .row > * {
+    padding-right: 7px;
+    padding-left: 7px;
+  }
+
+  .row {
+    --bs-gutter-x: None;
+  }
+
+  .align-title {
+    padding-right: 5px;
+  }
+
+  .table-content {
+    padding: 10px;
+    background-color: #ffffff;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    box-shadow: 0px 0px 5px 0px #0000009d;
+  }
+
+  .align-to-cards {
+    margin-top: 15px;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600 !important;
+    padding-bottom: 15px;
+  }
+
+  p {
+    margin-bottom: 0px;
+  }
+
+  .grid-container {
+    margin: 15px;
+    color: #000;
+    background-color: #ffffff;
+    border: 1px solid rgb(153, 153, 153);
+    border-radius: 3px;
+    box-shadow: 0px 0px 10px 0px rgb(99, 98, 98);
+    overflow-x: auto;
+  }
+
+  .grid-container-table {
+    margin: 15px;
+    padding: 0;
+    border-radius: 3px;
+    box-shadow: 0px 0px 10px 0px rgb(99, 98, 98);
+  }
+
+  thead {
+    background-color: #2f2f30;
+    color: #a5e22f;
+    text-align: center;
+  }
+
+  td {
+    text-align: center;
+  }
+  .blackcount {
+    font-weight: bold;
+  }
+
+  th {
+    text-align: center;
+  }
+
+  .table-striped > tbody > tr:nth-of-type(odd) > * {
+    background-color: #d3d3d3;
+  }
+
+  .table-striped > tbody > tr:nth-of-type(even) > * {
+    background-color: #e1e1e1;
+  }
+
+  .td:nth-child(even) {
+    background-color: #d3d3d3;
+  }
+
+  .table > tbody {
+    vertical-align: middle;
+  }
+  .rowbg:nth-child(odd) {
+    background-color: #e1e1e1;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  form {
+    display: contents;
+  }
+
+  .bx-sm:hover {
+    color: #2f2f30;
+    text-shadow: 0px 0px 5px #a5e22f;
+  }
+
+  .bg-footer {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    color: #b8f04993;
+    padding: 5px;
+    font-weight: bold;
+  }
+
+  .modal-header {
+    color: #777;
+    font-size: 12px;
+    font-weight: bold;
+    border-bottom: 2px solid #46494b;
+  }
+
+  .modal-content {
+    background-color: #27292c;
+    color: #fff;
+  }
+
+  .nav-pills .nav-link.active,
+  .nav-pills .show > .nav-link {
+    color: #fff;
+    background-color: #648b24;
+  }
+
+  .nav-pills .nav-link {
+    background: 0 0;
+    border: 0;
+    color: #fff;
+    border-radius: 10rem;
+    padding: 0.1rem 1rem;
+    font-size: 16px;
+  }
+
+  .nav-link:focus,
+  .nav-link:hover {
+    color: #fff;
+  }
+
+  .modal-footer {
+    border-top: 2px solid #46494b;
+  }
+
+  .form-check-input:checked {
+    background-color: #709722;
+    border-color: #709722;
+  }
+
+  .mb-4 {
+    color: #a5e22f;
+  }
+
+  .input-group-text {
+    display: flex;
+    align-items: center;
+    padding: 0.375rem 0.75rem;
+    font-size: 1rem;
+    font-weight: bold;
+    line-height: 1.5;
+    color: #a5e22f;
+    text-align: center;
+    white-space: nowrap;
+    background-color: #383a3b;
+    border: none;
+    border-radius: 0;
+    border-top-left-radius: 0.25rem;
+    border-bottom-left-radius: 0.25rem;
+  }
+
+  .form-control {
+    font-weight: bold;
+    display: block;
+    width: 100%;
+    padding: 0.375rem 0.75rem;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #e0e0e0;
+    background-color: #545657;
+    background-clip: padding-box;
+    -webkit-appearance: none;
+    border: none;
+    -moz-appearance: none;
+    appearance: none;
+    border-radius: 0.25rem;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  }
+
+  .form-control::placeholder {
+    color: #b3b3b3;
+    font-size: 14px;
+    font-weight: bold;
+  }
+
+  .form-control:disabled,
+  .form-control[readonly] {
+    background-color: #383a3b;
+    opacity: 1;
+  }
+
+  .form-control:focus {
+    color: #e0e0e0;
+    background-color: #545657;
+    border-color: none;
+    border: none;
+    outline: none;
+    box-shadow: 0 0 0 0.25rem #b5fd0d40;
+  }
+
+  .input-group
+    > :not(:first-child):not(.dropdown-menu):not(.valid-tooltip):not(
+      .valid-feedback
+    ):not(.invalid-tooltip):not(.invalid-feedback) {
+    margin-left: -12px;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+
+  .select {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+  }
+  .select select {
+    display: inline-block;
+    width: 100%;
+    cursor: pointer;
+    outline: 0;
+    border: 0;
+    color: #fff;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    border-radius: 5px;
+    padding: 10px 35px 10px 15px;
+    background-color: #383a3b;
+    font-weight: bold;
+    font-size: 16px;
+  }
+  .select select::-ms-expand {
+    display: none;
+  }
+  .select select:hover,
+  .select select:focus {
+    background: #626566;
+  }
+  .select select:disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .select__arrow {
+    position: absolute;
+    top: 16px;
+    right: 15px;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+    border-style: solid;
+    border-width: 8px 5px 0 5px;
+    border-color: #808586 transparent transparent transparent;
+  }
+  .select select:hover ~ .select__arrow,
+  .select select:focus ~ .select__arrow {
+    border-top-color: #ccc;
+  }
+  .select select:disabled ~ .select__arrow {
+    border-top-color: #ccc;
+  }
+
+  select:active,
+  select:hover {
+    outline-color: red;
+  }
+
+  .schedule-clock-icon {
+    margin-top: 7px;
+  }
+
+  .current-time {
+    border-radius: 5px;
+    padding: 10px 10px 10px 15px;
+    background-color: #383a3b;
+    font-weight: bold;
+    font-size: 16px;
+  }
+
+  .schedule-title {
+    margin-bottom: 19px;
+    margin-top: 19px;
+    font-size: 18px;
+    font-weight: bold;
+    color: #a5e22f;
+  }
+
+  .schedule-title-current-time {
+    margin-bottom: 19px;
+    margin-top: 0;
+    font-size: 18px;
+    font-weight: bold;
+    color: #a5e22f;
+  }
+
+  .update-button {
+    margin-top: 10px;
+    margin-right: -10px;
+    position: relative;
+    float: right;
+    border-radius: 5px;
+    text-shadow: 0px 0px 5px #a5e22f;
+  }
+
+  .current-time-icon {
+    margin-top: 10px;
+    margin-left: -2px;
+    text-shadow: 0px 0px 3px #d5ff82;
+  }
+
+  .current-time-icon:hover {
+    color: #d5ff82;
+    text-shadow: 0px 0px 5px #d5ff82;
+  }
+
+  .update-button:hover {
+    color: #d5ff82;
+    text-shadow: 0px 0px 5px #d5ff82;
+  }
+
+  .schedule-clock-icon:hover {
+    color: #fff;
+    text-shadow: 0px 0px 0px #ffffff00;
+  }
+
+  .pause-icon {
+    border-radius: 50%;
+    background-color: #fff;
+  }
+</style>
+
+{% if messages %} {% for message in messages %}
+<div class="position-fixed bottom-0 end-0 p-2" style="z-index: 11">
+  <div
+    class="toast {{message.tags}} fade show align-items-center"
+    role="alert"
+    aria-live="assertive"
+    aria-atomic="true"
+    data-bs-autohide="true"
+  >
+    <div class="d-flex">
+      <div class="toast-body">{{message}}</div>
+      <button
+        type="button"
+        class="btn-close btn-close-white me-2 m-auto"
+        data-bs-dismiss="toast"
+        aria-label="Close"
+      ></button>
+    </div>
+  </div>
+</div>
+{% endfor %} {% endif %}
+
+<!-- TOP BAR -->
+<div class="container-fluid">
+  <div class="home-content fixed-top">
+    <a href="{% url 'projects:index' %}">
+      <img
+        class="navbar-logo"
+        src="{% static 'img/reconftw_logo.png' %}"
+        alt="Logo"
+      />
+    </a>
+
+    <div class="home-content-right">
+      <button
+        class="btn-reconftw"
+        type="button"
+        data-bs-toggle="modal"
+        data-bs-target="#modal-newscan"
+      >
+        <i class="bx bxs-chevron-up"></i>
+        <span>NEW SCAN</span>
+      </button>
+
+      <i class="bx bx-sitemap icon-newscan"></i>
+      <div class="btn-newscan">RECON LIST</div>
+
+      <div
+        class="action"
+        onmouseover="menuToggle();"
+        onmouseout="menuToggle();"
+      >
+        <div class="profile">
+          <img src="{{ imagePath }}" alt="" />
+        </div>
+        <div class="menu">
+          <h3>{{ request.user }}<br /><span>Reconnaissance Ninja</span></h3>
+          <ul>
+            <li>
+              <a href="{% url 'edit_profile:index' %}"
+                ><i class="bx bx-sm bx-user-circle"></i>Edit profile</a
+              >
+            </li>
+            <li>
+              <a href="{% url 'apikeys_settings:index' %}"
+                ><i class="bx bx-sm bx-cog"></i> API Keys</a
+              >
+            </li>
+            <li>
+              <a href="{% url 'logout' %}"
+                ><i class="bx bx-sm bx-log-out-circle"></i> Logout</a
+              >
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- TOP BAR -->
+
+<div class="card-body">
+  <div class="row">
+    <div class="d-sm-flex align-items-center align-to-cards">
+      <i class="align-title bx bx-sm bx-analyse"></i>
+      <p>
+        <strong>SCANS PERFORMED</strong>
+      </p>
+    </div>
+
+    <div class="col-xs-6">
+      <div class="table-responsive">
+        <table class="table table-striped table-content dataTable">
+          <thead>
+            <tr>
+              <th scope="col">
+                <i class="fas fa-sort-amount-down"></i> VERSION
+              </th>
+              <th scope="col"><i class="fas fa-crosshairs"></i> TARGET</th>
+              <th scope="col"><i class="fas fa-globe"></i> DOMAIN</th>
+              <th scope="col">
+                <i class="fas fa-sort-amount-down"></i> SCAN MODE
+              </th>
+              <th scope="col">
+                <i class="fas fa-calendar-alt"></i> LAST CHANGE
+              </th>
+              <th scope="col"><i class="fas fa-flag"></i> RESULT</th>
+              <th scope="col"><i class="fas fa-mouse"></i> ACTIONS</th>
+              <th scope="col"><i class="fas fa-heartbeat"></i> STATUS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for domains in projects_output %}
+            <tr>
+              <td class="blackcount" scope="row">{{ domains.number }}</td>
+              <td>
+                {% if domains.icon != "" %}
+                <img width="32px" height="32px" src="{{ domains.icon.url  }}" />
+                {% else %}
+                <img src="{% static 'img/unknown.ico' %}" />
+                {% endif %}
+              </td>
+              <td>{{ domains.domain }}</td>
+              <td>{{ domains.scan_mode }}</td>
+              <td>{{ domains.get_last_change }}</td>
+              <td>
+                <a data-bs-toggle="tooltip" data-bs-placement="bottom" title="REPORT" href="{% url 'scans:index' number=domains.id %}">
+                  <i class='bx bxs-file bx-sm'></i>
+                </a>
+              </td>
+              <td>
+                {% if domains.status == 'SCANNING' %}
+                  <button class="btn" data-bs-toggle="modal" data-bs-placement="bottom" title="CANCEL" type="button" data-bs-toggle="modal" data-bs-target="#modal-cancel-{{ domains.id }}"><i class='bx bxs-x-square bx-sm'></i></button>
+                {% elif domains.status == 'WAITING' %}
+                  <button class="btn" data-bs-toggle="modal" data-bs-placement="bottom" title="CANCEL" type="button" data-bs-toggle="modal" data-bs-target="#modal-cancel-{{ domains.id }}"><i class='bx bxs-x-square bx-sm'></i></button>
+                {% endif %}
+                  <button class="btn" type="button" data-bs-toggle="modal" data-bs-target="#modal-scheduling-{{ domains.id }}" onclick="timezone('{{ domains.id }}'); getSchedules('{{ domains.id }}');" ><i class='bx bxs-alarm-add bx-sm'></i></button>
+                  <button class="btn" type="button" data-bs-toggle="modal" data-bs-target="#modal-backup"><i class='bx bxs-hdd bx-sm'></i></button>
+                  <button class="btn" data-bs-toggle="modal" data-bs-placement="bottom" title="DELETE" type="button" data-bs-target="#modal-delete-{{ domains.id }}"><i class='bx bxs-trash-alt bx-sm' ></i></button>
+              </td>
+              <td>
+                {{ domains.status }}
+              </td>
+            </tr>
+
+            <!-- The Modal Scheduling-->
+            <div class="modal fade text-dark" id="modal-scheduling-{{ domains.id }}" data-bs-backdrop="static" data-bs-keyboard="false">
+              <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+
+                  <!-- Modal Header -->
+                  <div class="modal-header">
+                    SCHEDULE SCAN
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                  </div>
+
+                  <!-- Modal body -->
+                  <div class="modal-body ">
+                    
+                    <p class="schedule-title-current-time">CURRENT TIME</p>
+                    <div class="container mb-4">
+                      <div class="row">
+                        <div class="col-2">
+                          <i type="button" class='update-button bx bx-sm bx-repost' onclick="settimezone('{{ domains.id }}')"></i>  
+                        </div>
+                      
+                        <div class="col-4">
+                          <div class="tab-content" id="pills-tabContent">
+                            <input type="hidden" id="typeDomain" name="typeDomain" value="0">
+                            <div class="tab-pane fade show active" id="pills-single" role="tabpanel">
+                            
+                              <div class="select">
+
+                                <select name="timezone_offset-{{ domains.id }}" id="timezone-offset-{{ domains.id }}" class="span5" onchange="timezone('{{ domains.id }}')">
+                                  {% for timezone, text, selected in timezones %}
+                                  
+                                    {% if selected == 'true' %}
+                                      <option value="{{ timezone }}" selected>{{ text }}</option>
+                                    {% else %}
+                                      <option value="{{ timezone }}">{{ text }}</option>
+                                    {% endif %}
+
+                          
+                                  {% endfor %}
+
+                                </select>
+                                
+
+                                <div class="select__arrow"></div>
+                              </div>
+                            
+                            
+                            </div>
+                            <div class="tab-pane fade" id="pills-list" role="tabpanel">
+                              <textarea class="form-control" name="listDomain" id="listDomain" onkeyup="checkCommand()"></textarea>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="col-3 current-time text-center" id="time-{{ domains.id }}"></div>
+                        <div class="col-2">
+                          <i class='bx bx-sm bx-calendar current-time-icon'></i>
+                        </div>
+                      </div>
+                    </div>
+
+                    <form method="post" id="addScheduler-{{ domains.id }}" action="{% url 'schedules:new' %}">
+                      {% csrf_token %}
+
+                      <input hidden="" name="id" value="{{ domains.id }}">
+                      
+                      <p class="schedule-title">EXISTING SCHEDULES</p>
+                      <div class="select" style="width: 30%;">
+              
+                        <select id="schedules-existing-{{ domains.id }}" onchange="changeSchedule('{{ domains.id }}')" class="schedules span5">
+                          <option value="NewSchedule" selected>New Schedule</option>
+                        </select>
+                        
+                        <div class="select__arrow"></div>
+                      </div>
+                      <!-- <button hidden type="button" class="btn btn-danger" id="Delete-Schedule-button-{{ domains.id }}" data-bs-toggle="modal" data-bs-target="#modal-delete-{{ domains.id }}">Delete Schedule</button> -->
+                      <button hidden class="btn btn-danger" data-bs-toggle="modal" id="Delete-Schedule-button-{{ domains.id }}" type="button" data-bs-target="#modal-delete-schedule-{{ domains.id }}">Delete Schedule</button>
+                      
+                      <p class="schedule-title">SCAN AT</p>
+                      <div class="row">
+                        <div class="col-1">
+                          <input type="number" name="hours" class="form-control" id="hours-{{ domains.id }}" value="00" onkeyup="checkCommand()" placeholder="00" maxlength="2">
+                        </div>
+                        :
+                        <div class="col-1">
+                          <input type="number" name="minutes" class="form-control" id="minutes-{{ domains.id }}" value="00" onkeyup="checkCommand()" placeholder="00" maxlength="2">
+                        </div>
+                        <div class="col-1">
+                          <i class='bx bxs-timer bx-sm schedule-clock-icon'></i> 
+                        </div>
+                        
+                      </div>
+
+                      <p class="schedule-title">EVERY</p>
+
+                      <b><div class="row">
+                        <div class="col-4">
+                          <div class="form-check">
+                            <input class="form-check-input" type="checkbox" role="switch" id="Monday-{{ domains.id }}" name="Monday" onclick="checkCommand()">
+                            <label class="form-check-label" for="flexSwitchCheckDefault">Monday</label>
+                          </div>
+                        </div>
+                        <div class="col-4">
+                          <div class="form-check">
+                            <input class="form-check-input" type="checkbox" role="switch" id="Tuesday-{{ domains.id }}" name="Tuesday" onclick="switchButtons()">
+                            <label class="form-check-label" for="flexSwitchCheckDefault">Tuesday</label>
+                          </div>
+                        </div>
+                        <div class="col-4">
+                          <div class="form-check">
+                            <input class="form-check-input" type="checkbox" role="switch" id="Wednesday-{{ domains.id }}" name="Wednesday" onclick="switchButtons()">
+                            <label class="form-check-label" for="flexSwitchCheckDefault">Wednesday</label>
+                          </div>
+                        </div>
+                        <div class="col-4">
+                          <div class="form-check">
+                            <input class="form-check-input" type="checkbox" role="switch" id="Thursday-{{ domains.id }}" name="Thursday" onclick="checkCommand()">
+                            <label class="form-check-label" for="flexSwitchCheckDefault">Thursday</label>
+                          </div>
+                        </div>
+                        <div class="col-4">
+                          <div class="form-check">
+                            <input class="form-check-input" type="checkbox" role="switch" id="Friday-{{ domains.id }}" name="Friday" onclick="switchButtons()">
+                            <label class="form-check-label" for="flexSwitchCheckDefault">Friday</label>
+                          </div>
+                        </div>
+                        <div class="col-4">
+                          <div class="form-check">
+                            <input class="form-check-input" type="checkbox" role="switch" id="Saturday-{{ domains.id }}" name="Saturday" onclick="switchButtons()">
+                            <label class="form-check-label" for="flexSwitchCheckDefault">Saturday</label>
+                          </div>
+                        </div>
+                        <div class="col-4">
+                          <div class="form-check">
+                            <input class="form-check-input" type="checkbox" role="switch" id="Sunday-{{ domains.id }}" name="Sunday" onclick="switchButtons()">
+                            <label class="form-check-label" for="flexSwitchCheckDefault">Sunday</label>
+                          </div>
+                        </div>
+                      </div></b>
+
+                      <div class="input-group mt-4">
+                        <div class="input-group-prepend">
+                          <span class="input-group-text" id="basic-addon3">RESULT:</span>
+                        </div>
+                        <input type="text" class="form-control" id="command" name="command" value="SCAN AT 23:00 HOURS EVERY FRIDAY" disabled>
+                      </div>
+
+                      <!-- <input type="text" class="form-control" id="command" name="command" disabled>  -->
+                    </form>
+                  </div>
+
+                  <!-- Modal footer -->
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" form="addScheduler-{{ domains.id }}" id="addScheduler-{{ domains.id }}" data-backdrop="static" onclick="showLoading()" class="btn btn-success">Submit</button>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+            <!-- The Modal Scheduling-->
+
+            <!-- The Modal Delete -->
+            <div class="modal fade text-dark" id="modal-delete-{{ domains.id }}">
+              <div class="modal-dialog">
+                <div class="modal-content">
+
+                  <!-- Modal Header -->
+                  <div class="modal-header">
+                    <!-- <h4 class="modal-title">Modal Heading</h4> -->
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                  </div>
+
+                  <!-- Modal body -->
+                  <div class="modal-body ">
+                    Are you sure you want to delete this scan?
+                  </div>
+
+                  <!-- Modal footer -->
+                  <div class="modal-footer">  
+                    <form method="post" id="myForm-{{ domains.id }}" action="{% url 'projects:delete' id=domains.id %}">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-danger py-1 px-2">Yes, delete!</button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- The Modal Delete -->
+
+
+            <!-- The Modal Delete Schedule -->
+            <div class="modal fade text-dark" id="modal-delete-schedule-{{ domains.id }}">
+              <div class="modal-dialog">
+                <div class="modal-content">
+
+                  <!-- Modal Header -->
+                  <div class="modal-header">
+                    <!-- <h4 class="modal-title">Modal Heading</h4> -->
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                  </div>
+
+                  <!-- Modal body -->
+                  <div class="modal-body ">
+                    Are you sure you want to delete this schedule?
+                  </div>
+
+                  <!-- Modal footer -->
+                  <div class="modal-footer">  
+                    <form method="post" action="{% url 'schedules:delete' %}">
+                      <input hidden type="text" id="schedule-name-{{ domains.id }}" name="schedule-name" value="">
+                      <input hidden type="text" id="crontab-id-{{ domains.id }}" name="crontab-id" value="">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-danger py-1 px-2">Yes, delete!</button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- The Modal Delete Schedule -->
+
+
+            <!-- The Modal Cancel -->
+            <div class="modal fade text-dark" id="modal-cancel-{{ domains.id }}">
+              <div class="modal-dialog">
+                <div class="modal-content">
+
+                  <!-- Modal Header -->
+                  <div class="modal-header">
+                    <!-- <h4 class="modal-title">Modal Heading</h4> -->
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                  </div>
+
+                  <!-- Modal body -->
+                  <div class="modal-body ">
+                    Are you sure you want to cancel this scan?
+                  </div>
+                  <!-- <div class="modal-body">UNDER CONSTRUCTION</div> -->
+
+                  <!-- Modal footer -->
+                  <div class="modal-footer">  
+                    <form method="post" id="cancel_scan-{{ domains.id }}" action="{% url 'projects:cancel' id=domains.id %}">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-danger py-1 px-2">Yes, cancel!</button>
+                    </form>
+                    <!-- <button type="button" class="btn btn-danger" data-bs-dismiss="modal">
+                      Close
+                    </button> -->
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- The Modal Cancel -->
+
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer class="fixed-bottom bg-footer">
+  <div class="container my-auto">
+    <div class="text-center my-auto">
+      <span>reconFTW Â©</span>
+    </div>
+  </div>
+</footer>
+
+<!-- The Modal New Project-->
+<div
+  class="modal fade text-dark"
+  id="modal-newscan"
+  data-bs-backdrop="static"
+  data-bs-keyboard="false"
+>
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        NEW SCAN
+        <button
+          type="button"
+          class="btn-close btn-close-white"
+          data-bs-dismiss="modal"
+        ></button>
+      </div>
+
+      <!-- Modal body -->
+      <div class="modal-body">
+        <form method="post" id="addDomain" action="{% url 'scans:new' %}">
+          {% csrf_token %}
+          <h6 class="mb-4"><b>TARGET OPTIONS</b></h6>
+
+          <ul class="nav nav-pills mb-3" id="pills-tab" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button
+                class="nav-link active"
+                id="pills-single-nav"
+                onclick="selectSingle()"
+                data-bs-toggle="pill"
+                data-bs-target="#pills-single"
+                type="button"
+                role="tab"
+              >
+                Single
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button
+                class="nav-link"
+                id="pills-list-nav"
+                onclick="selectList()"
+                data-bs-toggle="pill"
+                data-bs-target="#pills-list"
+                type="button"
+                role="tab"
+              >
+                List
+              </button>
+            </li>
+          </ul>
+          <div class="tab-content" id="pills-tabContent">
+            <input type="hidden" id="typeDomain" name="typeDomain" value="0" />
+            <div
+              class="tab-pane fade show active"
+              id="pills-single"
+              role="tabpanel"
+            >
+              <input
+                type="text"
+                name="singleDomain"
+                class="form-control"
+                id="singleDomain"
+                onkeyup="checkCommand()"
+                placeholder="example.com"
+              />
+            </div>
+            <div class="tab-pane fade" id="pills-list" role="tabpanel">
+              <textarea
+                class="form-control"
+                name="listDomain"
+                id="listDomain"
+                onkeyup="checkCommand()"
+              ></textarea>
+            </div>
+          </div>
+
+          <h6 class="mt-4 mb-4"><b>MODE OPTIONS</b></h6>
+          <div class="row">
+            <div class="col-6">
+              <div class="form-check form-switch">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  id="switch-recon"
+                  name="switch-recon"
+                  onclick="checkCommand()"
+                />
+                <label class="form-check-label" for="flexSwitchCheckDefault"
+                  >Recon</label
+                >
+              </div>
+              <div class="form-check form-switch">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  id="switch-subdomains"
+                  name="switch-subdomains"
+                  onclick="checkCommand()"
+                />
+                <label class="form-check-label" for="flexSwitchCheckDefault"
+                  >Subdomains</label
+                >
+              </div>
+              <div class="form-check form-switch">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  id="switch-passive"
+                  name="switch-passive"
+                  onclick="checkCommand()"
+                />
+                <label class="form-check-label" for="flexSwitchCheckDefault"
+                  >Passive</label
+                >
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="form-check form-switch">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  id="switch-all"
+                  name="switch-all"
+                  onclick="switchButtons()"
+                />
+                <label class="form-check-label" for="flexSwitchCheckDefault"
+                  >All</label
+                >
+              </div>
+              <div class="form-check form-switch">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  id="switch-web"
+                  name="switch-web"
+                  onclick="checkCommand()"
+                />
+                <label class="form-check-label" for="flexSwitchCheckDefault"
+                  >Web</label
+                >
+              </div>
+              <div class="form-check form-switch">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  id="switch-osint"
+                  name="switch-osint"
+                  onclick="checkCommand()"
+                />
+                <label class="form-check-label" for="flexSwitchCheckDefault"
+                  >OSINT</label
+                >
+              </div>
+            </div>
+          </div>
+          <h6 class="mt-4 mb-4"><b>GENERAL OPTIONS</b></h6>
+          <div class="row">
+            <div class="col-6">
+              <div class="form-check form-switch">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  id="switch-deep"
+                  name="switch-deep"
+                  onclick="checkCommand()"
+                />
+                <label class="form-check-label" for="flexSwitchCheckDefault"
+                  >Deep Scan</label
+                >
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="form-check form-switch">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  id="switch-vps"
+                  name="switch-vps"
+                  onclick="checkCommand()"
+                />
+                <label class="form-check-label" for="flexSwitchCheckDefault"
+                  >Axiom</label
+                >
+              </div>
+            </div>
+          </div>
+
+          <!-- <h6 class="mt-4 mb-4"><b>COMMAND</b></h6> -->
+
+          <div class="input-group mt-4">
+            <div class="input-group-prepend">
+              <span class="input-group-text" id="basic-addon3">COMMAND:</span>
+            </div>
+            <input
+              type="text"
+              class="form-control"
+              id="command"
+              name="command"
+              disabled
+            />
+          </div>
+
+          <!-- <input type="text" class="form-control" id="command" name="command" disabled>  -->
+        </form>
+      </div>
+
+      <div class="modal-footer">
+        <a href="/projects" name="cancel"
+          ><button type="button" class="btn btn-danger">Cancel</button></a
+        >
+        <button
+          type="submit"
+          form="addDomain"
+          data-backdrop="static"
+          onclick="showLoading()"
+          class="btn btn-success"
+        >
+          Submit
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- The Modal Loading-->
+<div
+  class="modal fade text-dark"
+  id="modal-loading"
+  data-bs-backdrop="static"
+  data-bs-keyboard="false"
+>
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <!-- Modal body -->
+      <div class="modal-body">
+        <div class="text-center py-3">
+          Loading
+          <div class="spinner-border" role="status">
+            <span class="sr-only">Loading...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- The Modal Backup -->
+<div class="modal fade text-dark" id="modal-backup">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <button
+          type="button"
+          class="btn-close btn-close-white"
+          data-bs-dismiss="modal"
+        ></button>
+      </div>
+
+      <!-- Modal body -->
+      <div class="modal-body">UNDER CONSTRUCTION</div>
+
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-bs-dismiss="modal">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- The Modal Backup -->
+
+<script>
+  function timezone(id) {
+    tzone = decodeURIComponent(
+      document.getElementById("timezone-offset-" + id).value
+    );
+    nav = navigator.language;
+    date = new Date().toLocaleString(nav, { timeZone: tzone });
+
+    document.getElementById("time-" + id).textContent = date;
+  }
+
+  function settimezone(id) {
+    var xhttp = new XMLHttpRequest();
+    var value = document.getElementById("timezone-offset-" + id).value;
+    var csrf_token = document.getElementsByName("csrfmiddlewaretoken")[0].value;
+
+    xhttp.open("POST", "{% url 'schedules:timezone' %}");
+    xhttp.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+    xhttp.send(
+      "csrfmiddlewaretoken=" + csrf_token + "&timezone_offset=" + value
+    );
+  }
+
+  function getSchedules(id) {
+    var xhttp = new XMLHttpRequest();
+
+    xhttp.open("POST", "{% url 'schedules:get' %}", false);
+    xhttp.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+    xhttp.send("csrfmiddlewaretoken={{ csrf_token }}" + "&projectId=" + id);
+
+    var respons = JSON.parse(xhttp.responseText);
+
+    for (var respon in respons) {
+      var element = document.getElementById("schedules-existing-" + id);
+      var opt = document.createElement("option");
+
+      opt.value = respon;
+      opt.innerHTML = respons[respon].name;
+
+      element.appendChild(opt);
+      console.log(opt);
+    }
+  }
+
+  function changeSchedule(id) {
+    var value = document.getElementById("schedules-existing-" + id).value;
+
+    if (value == "NewSchedule") {
+      document.getElementById("Delete-Schedule-button-" + id).hidden = true;
+
+      document.getElementById("hours-" + id).disabled = false;
+      document.getElementById("minutes-" + id).disabled = false;
+      document.getElementById("Monday-" + id).disabled = false;
+      document.getElementById("Tuesday-" + id).disabled = false;
+      document.getElementById("Wednesday-" + id).disabled = false;
+      document.getElementById("Thursday-" + id).disabled = false;
+      document.getElementById("Friday-" + id).disabled = false;
+      document.getElementById("Saturday-" + id).disabled = false;
+      document.getElementById("Sunday-" + id).disabled = false;
+      document.getElementById("addScheduler-" + id).disabled = false;
+
+      document.getElementById("hours-" + id).checked = false;
+      document.getElementById("minutes-" + id).checked = false;
+      document.getElementById("Monday-" + id).checked = false;
+      document.getElementById("Tuesday-" + id).checked = false;
+      document.getElementById("Wednesday-" + id).checked = false;
+      document.getElementById("Thursday-" + id).checked = false;
+      document.getElementById("Friday-" + id).checked = false;
+      document.getElementById("Saturday-" + id).checked = false;
+      document.getElementById("Sunday-" + id).checked = false;
+      document.getElementById("addScheduler-" + id).checked = false;
+      document.getElementById("hours-" + id).value = 00;
+      document.getElementById("minutes-" + id).value = 00;
+
+      document.getElementById("schedule-name-" + id).value = "NoneValue";
+      document.getElementById("crontab-id-" + id).value = "NoneValue";
+    } else {
+      var xhttp = new XMLHttpRequest();
+
+      xhttp.open("POST", "{% url 'schedules:get' %}", false);
+      xhttp.setRequestHeader(
+        "Content-Type",
+        "application/x-www-form-urlencoded"
+      );
+      xhttp.send("csrfmiddlewaretoken={{ csrf_token }}" + "&projectId=" + id);
+
+      var respons = JSON.parse(xhttp.responseText);
+
+      console.log(respons[value].contrabId);
+      document.getElementById("schedule-name-" + id).value = respons[value].name;
+      document.getElementById("crontab-id-" + id).value = respons[value].contrabId;
+
+      document.getElementById("Delete-Schedule-button-" + id).hidden = false;
+
+      document.getElementById("hours-" + id).disabled = true;
+      document.getElementById("minutes-" + id).disabled = true;
+      document.getElementById("Monday-" + id).disabled = true;
+      document.getElementById("Tuesday-" + id).disabled = true;
+      document.getElementById("Wednesday-" + id).disabled = true;
+      document.getElementById("Thursday-" + id).disabled = true;
+      document.getElementById("Friday-" + id).disabled = true;
+      document.getElementById("Saturday-" + id).disabled = true;
+      document.getElementById("Sunday-" + id).disabled = true;
+      document.getElementById("addScheduler-" + id).disabled = true;
+
+      document.getElementById("hours-" + id).value = respons[value].hours;
+      document.getElementById("minutes-" + id).value = respons[value].minutes;
+
+      if (respons[value].days.includes("Monday")) {
+        document.getElementById("Monday-" + id).checked = true;
+      } else {
+        document.getElementById("Monday-" + id).checked = false;
+      }
+
+      if (respons[value].days.includes("Tuesday")) {
+        document.getElementById("Tuesday-" + id).checked = true;
+      } else {
+        document.getElementById("Tuesday-" + id).checked = false;
+      }
+
+      if (respons[value].days.includes("Wednesday")) {
+        document.getElementById("Wednesday-" + id).checked = true;
+      } else {
+        document.getElementById("Wednesday-" + id).checked = false;
+      }
+
+      if (respons[value].days.includes("Thursday")) {
+        document.getElementById("Thursday-" + id).checked = true;
+      } else {
+        document.getElementById("Thursday-" + id).checked = false;
+      }
+
+      if (respons[value].days.includes("Friday")) {
+        document.getElementById("Friday-" + id).checked = true;
+      } else {
+        document.getElementById("Friday-" + id).checked = false;
+      }
+
+      if (respons[value].days.includes("Saturday")) {
+        document.getElementById("Saturday-" + id).checked = true;
+      } else {
+        document.getElementById("Saturday-" + id).checked = false;
+      }
+
+      if (respons[value].days.includes("Sunday")) {
+        document.getElementById("Sunday-" + id).checked = true;
+      } else {
+        document.getElementById("Sunday-" + id).checked = false;
+      }
+    }
+  }
+
+  function switchButtons() {
+    if (document.getElementById("switch-all").checked == true) {
+      document.getElementById("switch-recon").checked = true;
+      document.getElementById("switch-subdomains").checked = true;
+      document.getElementById("switch-passive").checked = true;
+      document.getElementById("switch-web").checked = true;
+      document.getElementById("switch-osint").checked = true;
+
+      document.getElementById("switch-recon").disabled = true;
+      document.getElementById("switch-subdomains").disabled = true;
+      document.getElementById("switch-passive").disabled = true;
+      document.getElementById("switch-web").disabled = true;
+      document.getElementById("switch-osint").disabled = true;
+      checkCommand();
+    } else {
+      document.getElementById("switch-recon").checked = false;
+      document.getElementById("switch-subdomains").checked = false;
+      document.getElementById("switch-passive").checked = false;
+      document.getElementById("switch-web").checked = false;
+      document.getElementById("switch-osint").checked = false;
+
+      document.getElementById("switch-recon").disabled = false;
+      document.getElementById("switch-subdomains").disabled = false;
+      document.getElementById("switch-passive").disabled = false;
+      document.getElementById("switch-web").disabled = false;
+      document.getElementById("switch-osint").disabled = false;
+      checkCommand();
+    }
+  }
+
+  function checkCommand() {
+    let command = "./reconftw.sh";
+
+    if (
+      document.getElementById("pills-single-nav").classList.contains("active")
+    ) {
+      command += " -d " + document.getElementById("singleDomain").value;
+    } else {
+      command += " -l targets.txt";
+    }
+
+    if (document.getElementById("switch-all").checked == true) {
+      command += " -a";
+    } else {
+      if (document.getElementById("switch-recon").checked) {
+        command += " -r";
+      }
+
+      if (document.getElementById("switch-subdomains").checked) {
+        command += " -s";
+      }
+
+      if (document.getElementById("switch-passive").checked) {
+        command += " -p";
+      }
+
+      if (document.getElementById("switch-web").checked) {
+        command += " -w";
+      }
+
+      if (document.getElementById("switch-osint").checked) {
+        command += " -n";
+      }
+    }
+
+    if (document.getElementById("switch-deep").checked == true) {
+      command += " --deep";
+    }
+
+    if (document.getElementById("switch-vps").checked == true) {
+      command += " -v";
+    }
+
+    document.getElementById("command").value = command;
+  }
+
+  function selectSingle() {
+    document.getElementById("typeDomain").value = 0;
+    checkCommand();
+  }
+
+  function selectList() {
+    document.getElementById("typeDomain").value = 1;
+    checkCommand();
+  }
+
+  function showLoading() {
+    $("#modal-loading").modal("show");
+    $("#modal-newscan").modal("hide");
+  }
+
+  function menuToggle() {
+    const toggleMenu = document.querySelector(".menu");
+    toggleMenu.classList.toggle("active");
+  }
+
+  var tooltipTriggerList = [].slice.call(
+    document.querySelectorAll('[data-bs-toggle="tooltip"]')
+  );
+  var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+    return new bootstrap.Tooltip(tooltipTriggerEl);
+  });
+</script>
+
+{% endblock %}

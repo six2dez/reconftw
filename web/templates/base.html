@@ -1,0 +1,234 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="ReconFTW">
+  <meta name="author" content="ReconFTW">
+  <title>{% block title %}{% endblock %}</title>
+  <link rel="icon" type="image/png" href="{% static 'img/favicon.ico' %}" />
+  <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+  <link href='https://cdn.jsdelivr.net/npm/boxicons@latest/css/boxicons.min.css' rel='stylesheet'>
+  <link rel="stylesheet" href="{% static 'fa/css/all.min.css' %}">
+
+  <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+  <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js"></script>
+
+  <link href="https://cdn.jsdelivr.net/npm/nanogallery2@3/dist/css/nanogallery2.min.css" rel="stylesheet"
+    type="text/css">
+  <script type="text/javascript"
+    src="https://cdn.jsdelivr.net/npm/nanogallery2@3/dist/jquery.nanogallery2.min.js"></script>
+
+  <!-- BOOTSTRAP 5 -->
+  <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/bs5/dt-1.11.4/datatables.min.css" />
+  <script type="text/javascript" src="https://cdn.datatables.net/v/bs5/dt-1.11.4/datatables.min.js"></script>
+
+  <!-- DEFAULT
+  <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/dt/dt-1.11.4/datatables.min.css"/>
+ 
+  <script type="text/javascript" src="https://cdn.datatables.net/v/dt/dt-1.11.4/datatables.min.js"></script> -->
+
+
+  <!-- <script src="https://unpkg.com/@popperjs/core@2"></script> -->
+  <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+  <!-- <script scr="{% static 'js/scans_all.js' %}"></script> -->
+  <style>
+    html {
+      scroll-behavior: smooth;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: "Quicksand", sans-serif;
+    }
+
+    p {
+      margin-bottom: 0px;
+    }
+
+    .bx {
+      caret-color: transparent;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      background: url("{% static 'img/background.png' %}") no-repeat center center fixed;
+      -webkit-background-size: cover;
+      -moz-background-size: cover;
+      -o-background-size: cover;
+      background-size: cover;
+      height: 100%;
+      width: 100%;
+      color: #FFF;
+      font-size: 1rem;
+      overflow-x: hidden;
+      overflow-y: auto;
+      letter-spacing: 0.0312rem;
+      font-family: "Quicksand", sans-serif;
+      margin: 0 auto;
+    }
+
+
+    .bg-navbar {
+      background-color: #2f2f30;
+      box-shadow: 0px 0px 5px 0px #000f;
+    }
+
+    .navbar-color {
+      color: #F6F7E9;
+    }
+
+    .navbar {
+      width: 100%;
+      position: absolute;
+      left: 0px;
+      top: 0px;
+      height: 45px;
+      padding: 0px;
+      flex-wrap: nowrap;
+    }
+
+    .logout-icon {
+      color: #A5E22F;
+    }
+
+    .logout-icon-mov {
+      margin: 0px 10px 0px 20px;
+    }
+
+    .logout-icon:hover {
+      color: #6A921C;
+    }
+
+    footer {
+      margin-top: 15px;
+    }
+
+    .loader-wrapper {
+      width: 100%;
+      height: 100%;
+      position: fixed;
+      left: 0%;
+      right: 0%;
+      top: 0%;
+      background: url(/static/img/background.png) no-repeat center center fixed;
+      margin: 0 auto;
+      overflow-x: hidden;
+      overflow-y: hidden;
+      background-size: cover;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1001;
+      /* background-color: #242f3f; */
+    }
+
+    .loading {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      border: rgba(0, 131, 35, 0.556) solid;
+      border-left-color: rgb(0, 218, 0);
+      border-radius: 50%;
+      animation: loading 0.8s linear infinite;
+    }
+
+    .imgloader {
+      position: relative;
+      width: 214px;
+      top: 9px;
+      right: 2px;
+    }
+
+    @keyframes loading {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .blink_me {
+      position: relative;
+      font-weight: bold;
+      font-size: 8px;
+      top: 62px;
+      right: 126px;
+      animation: blinker 1s linear infinite;
+    }
+
+    @keyframes blinker {
+      50% {
+        opacity: 0;
+      }
+    }
+
+    ::-webkit-scrollbar-button {
+      width: 0px;
+      height: 0px;
+    }
+
+    ::-webkit-scrollbar-track {
+      -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+      background-color: #161616;
+      border: 1px solid #000000;
+      border-radius: 0px;
+    }
+
+    ::-webkit-scrollbar-track:hover {
+      background-color: #2f2f30;
+    }
+
+    ::-webkit-scrollbar-track:active {
+      background-color: #000000;
+    }
+
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    ::-webkit-scrollbar-corner {
+      background-color: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background-color: #709900;
+      background-image: -webkit-linear-gradient(45deg,
+          rgba(255, 255, 255, 0.2) 25%,
+          transparent 25%,
+          transparent 50%,
+          rgba(255, 255, 255, 0.2) 50%,
+          rgba(255, 255, 255, 0.2) 75%,
+          transparent 75%,
+          transparent);
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background-color: #6ba100;
+    }
+
+    ::-webkit-scrollbar-thumb:active {
+      background-color: #6ba100;
+    }
+  </style>
+
+  <div class="loader-wrapper">
+    <img class="imgloader" src="/static/img/reconftw_logo.png" alt="">
+    <span class="loading"></span>
+    <p class="blink_me">LOADING</p>
+  </div>
+
+  <script>
+    $(window).on("load", function () {
+      $(".loader-wrapper").fadeOut("slow")
+    })
+
+  </script>
+
+  {% block content %}{% endblock %}
+  {% include 'scans_all_js.html' %}
+</html>

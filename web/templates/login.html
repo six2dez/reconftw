@@ -1,0 +1,196 @@
+{% extends 'base.html' %} 
+{% block title %} reconFTW - Login {% endblock %} 
+{% block content %} 
+{% load static %} 
+{% if user.is_authenticated %}
+<meta http-equiv="REFRESH" content="0;url={% url 'projects:index' %}" />
+{% endif %}
+
+<style>
+  body {
+    display: flex;
+    align-items: center;
+    background-image: url("/static/img/background.png");
+    background-color: #212529;
+    height: 100%;
+    color: #f6f7e9;
+    font-size: 1rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+    letter-spacing: 0.0312rem;
+    font-family: "Quicksand", sans-serif;
+    margin: 0 auto;
+  }
+
+  .form-content {
+    display: block;
+    padding: 35px 45px 45px 45px;
+    background: #1f262b;
+    text-align: center;
+    border-radius: 15px;
+    box-sizing: border-box;
+    border: 1px solid #000;
+    /* -webkit-box-shadow: 0 0.1px 0px rgb(0 0 0 / 0%), 0 0.2px 0px rgb(0 0 0 / 0%), 0 0.4px 0px rgb(0 0 0 / 0%), 0 0.6px 0px rgb(0 0 0 / 0%), 0 0.9px 0px rgb(0 0 0 / 1%), 0 1.2px 0px rgb(0 0 0 / 1%), 0 1.8px 0px rgb(0 0 0 / 1%), 0 2.6px 0px rgb(0 0 0 / 1%), 0 3.9px 0px rgb(0 0 0 / 1%), 0 7px 0px rgb(0 0 0 / 1%);
+        -moz-box-shadow: 0 0.1px 0px rgba(0, 0, 0, 0.002), 0 0.2px 0px rgba(0, 0, 0, 0.003), 0 0.4px 0px rgba(0, 0, 0, 0.004), 0 0.6px 0px rgba(0, 0, 0, 0.004), 0 0.9px 0px rgba(0, 0, 0, 0.005), 0 1.2px 0px rgba(0, 0, 0, 0.006), 0 1.8px 0px rgba(0, 0, 0, 0.006), 0 2.6px 0px rgba(0, 0, 0, 0.007), 0 3.9px 0px rgba(0, 0, 0, 0.008), 0 7px 0px rgba(0, 0, 0, 0.01); 
+        box-shadow: 0 0.1px 0px rgb(0 0 0 / 0%), 0 0.2px 0px rgb(0 0 0 / 0%), 0 0.4px 0px rgb(0 0 0 / 0%), 0 0.6px 0px rgb(0 0 0 / 0%), 0 0.9px 0px rgb(0 0 0 / 1%), 0 1.2px 0px rgb(0 0 0 / 1%), 0 1.8px 0px rgb(0 0 0 / 1%), 0 2.6px 0px rgb(0 0 0 / 1%), 0 3.9px 0px rgb(0 0 0 / 1%), 0 7px 0px rgb(0 0 0 / 1%); */
+    box-shadow: 0px 0px 50px 0px #000f;
+    margin: 0;
+  }
+
+  .lgnfnt {
+    font-size: 20px;
+    font-weight: 700 !important;
+  }
+
+  .text-left {
+    text-align: left !important;
+  }
+
+  .center-verty {
+    min-height: 20%;
+    /* Fallback for browsers do NOT support vh unit */
+    min-height: 20vh;
+    /* These two lines are counted as one :-)       */
+    display: flex;
+  }
+
+  .textUP {
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 0px;
+    letter-spacing: 1px;
+    display: inline-block;
+  }
+
+  .w-100 {
+    height: 90% !important;
+  }
+
+  .btn-primary {
+    background-color: #6a921c;
+    border-color: #6a921c;
+    font-weight: bold;
+    width: 100%;
+  }
+
+  .btn-primary:hover {
+    background-color: #749e20;
+    border-color: #6b921cef;
+    font-weight: bold;
+  }
+
+  ::placeholder {
+    padding: 0px;
+    font-size: 13px;
+  }
+
+  .errormsg {
+    text-align: center;
+    font-size: 10px;
+    font-weight: bold;
+    color: rgb(255, 0, 0);
+  }
+
+  .form-control {
+    padding: 0px 0px 0px 10px;
+    font-size: 12px;
+  }
+
+  .form-control:focus {
+    color: #212529;
+    background-color: #fff;
+    border-color: #83b325;
+    outline: 0;
+    box-shadow: -10px 0px 10px 1px rgba(36, 131, 23, 0.25);
+  }
+
+  input[type="text"] {
+    background-color: #1f262b;
+    width: 80%;
+    border: none;
+    float: right;
+    margin: -4px 0px 00px 0px;
+    border-bottom: 1px solid #6a921c;
+    border-top: 0px;
+    border-radius: 0px;
+    font-weight: bold;
+    outline: 0;
+    margin-bottom: 20px;
+    padding-left: 0px;
+    color: #f6f7e9;
+    padding: 0px 0px 0px 5px;
+  }
+
+  input[type="password"] {
+    background-color: #1f262b;
+    width: 80%;
+    float: right;
+    margin: -4px 0px 0px 0px;
+    border: none;
+    border-bottom: 1px solid #6a921c;
+    border-top: 0px;
+    border-radius: 0px;
+    font-weight: bold;
+    outline: 0;
+    margin-bottom: 20px;
+    padding-left: 0px;
+    color: #f6f7e9;
+    padding: 0px 0px 0px 5px;
+  }
+
+  .form-signin input[type="text"] {
+    margin-bottom: -1px;
+    border-bottom-right-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+
+  .form-signin input[type="password"] {
+    margin-bottom: 10px;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+  }
+</style>
+
+<div class="container">
+  <div class="row">
+    <div class="col-sm"></div>
+    <div class="col-sm-3">
+      <div class="center-verty"></div>
+    </div>
+    <div class="col-sm"></div>
+  </div>
+  <div class="row">
+    <div class="col-sm"></div>
+    <div class="col-sm-3">
+      <main class="form-signin">
+        <div class="form-content">
+          <img class="img-fluid testecarai2" src="{% static 'img/reconftw_logo.png' %}" alt="Logo" />
+          <br /><br />
+          <h1 class="h4 mb-3 lgnfnt">WELCOME</h1>
+          <br />
+          <form class="text-left" action="" method="post">
+            {% csrf_token %} <i class="fas fa-user testecarai"></i>
+            <input name="username" type="text" class="is-invalid" placeholder="username" required="" />
+            <br /><br />
+            <i class="fas fa-lock"></i>
+            <input name="password" type="password" placeholder="password" required="" />
+            <br /><br />
+            {% if form.errors %}
+            <p class="alert alert-danger errormsg">
+              Username or password incorrect.
+            </p>
+            {% endif %}
+            <br />
+            <button class="btn btn-lg btn-primary lgnbtn" type="submit">
+              Login
+            </button>
+          </form>
+          <br />
+        </div>
+      </main>
+    </div>
+    <div class="col-sm"></div>
+  </div>
+</div>
+
+{% endblock %}

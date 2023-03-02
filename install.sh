@@ -47,10 +47,10 @@ fi
 declare -A gotools
 gotools["gf"]="go install -v github.com/tomnomnom/gf@latest"
 gotools["qsreplace"]="go install -v github.com/tomnomnom/qsreplace@latest"
-gotools["Amass"]="go install -v github.com/OWASP/Amass/v3/...@v3.20.0"
+gotools["Amass"]="go install -v github.com/OWASP/Amass/v3/...@master"
 gotools["ffuf"]="go install -v github.com/ffuf/ffuf@latest"
 gotools["github-subdomains"]="go install -v github.com/gwen001/github-subdomains@latest"
-gotools["gitlab-subdomains"]="go install github.com/gwen001/gitlab-subdomains@latest"
+gotools["waybackurls"]="go install -v github.com/tomnomnom/waybackurls@latest"
 gotools["nuclei"]="go install -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest"
 gotools["anew"]="go install -v github.com/tomnomnom/anew@latest"
 gotools["notify"]="go install -v github.com/projectdiscovery/notify/cmd/notify@latest"
@@ -58,9 +58,10 @@ gotools["unfurl"]="go install -v github.com/tomnomnom/unfurl@latest"
 gotools["httpx"]="go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest"
 gotools["github-endpoints"]="go install -v github.com/gwen001/github-endpoints@latest"
 gotools["dnsx"]="go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest"
+gotools["gau"]="go install -v github.com/lc/gau/v2/cmd/gau@latest"
 gotools["subjs"]="go install -v github.com/lc/subjs@latest"
 gotools["Gxss"]="go install -v github.com/KathanP19/Gxss@latest"
-gotools["katana"]="go install github.com/projectdiscovery/katana/cmd/katana@latest"
+gotools["gospider"]="go install -v github.com/jaeles-project/gospider@latest"
 gotools["crlfuzz"]="go install -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest"
 gotools["dalfox"]="go install -v github.com/hahwul/dalfox/v2@latest"
 gotools["puredns"]="go install -v github.com/d3mondev/puredns/v2@latest"
@@ -81,7 +82,6 @@ gotools["rush"]="go install github.com/shenwei356/rush@latest"
 gotools["enumerepo"]="go install github.com/trickest/enumerepo@latest"
 gotools["Web-Cache-Vulnerability-Scanner"]="go install -v github.com/Hackmanit/Web-Cache-Vulnerability-Scanner@latest"
 gotools["subfinder"]="go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest"
-gotools["byp4xx"]="go install -v github.com/lobuhi/byp4xx@latest"
 
 declare -A repos
 repos["dorks_hunter"]="six2dez/dorks_hunter"
@@ -94,7 +94,6 @@ repos["gf"]="tomnomnom/gf"
 repos["Gf-Patterns"]="1ndianl33t/Gf-Patterns"
 repos["ctfr"]="UnaPibaGeek/ctfr"
 repos["xnLinkFinder"]="xnl-h4ck3r/xnLinkFinder"
-repos["waymore"]="xnl-h4ck3r/waymore"
 repos["Corsy"]="s0md3v/Corsy"
 repos["CMSeeK"]="Tuhinshubhra/CMSeeK"
 repos["fav-up"]="pielco11/fav-up"
@@ -115,8 +114,164 @@ repos["regulator"]="cramppet/regulator"
 repos["byp4xx"]="lobuhi/byp4xx"
 repos["Infoga"]="m4ll0k/Infoga"
 
-printf "\n\n${bgreen}#######################################################################${reset}\n"
-printf "${bgreen} reconFTW installer/updater script ${reset}\n\n"
+
+function banner_web(){
+    echo -en "\033c"
+	printf "\n${bgreen}"
+	printf "  ██▀███  ▓█████  ▄████▄   ▒█████   ███▄    █   █████▒▄▄▄█████▓ █     █░\n"
+	printf " ▓██ ▒ ██▒▓█   ▀ ▒██▀ ▀█  ▒██▒  ██▒ ██ ▀█   █ ▓██   ▒ ▓  ██▒ ▓▒▓█░ █ ░█░\n"
+	printf " ▓██ ░▄█ ▒▒███   ▒▓█    ▄ ▒██░  ██▒▓██  ▀█ ██▒▒████ ░ ▒ ▓██░ ▒░▒█░ █ ░█ \n"
+	printf " ▒██▀▀█▄  ▒▓█  ▄ ▒▓▓▄ ▄██▒▒██   ██░▓██▒  ▐▌██▒░▓█▒  ░ ░ ▓██▓ ░ ░█░ █ ░█ \n"
+	printf " ░██▓ ▒██▒░▒████▒▒ ▓███▀ ░░ ████▓▒░▒██░   ▓██░░▒█░      ▒██▒ ░ ░░██▒██▓ \n"
+	printf " ░ ▒▓ ░▒▓░░░ ▒░ ░░ ░▒ ▒  ░░ ▒░▒░▒░ ░ ▒░   ▒ ▒  ▒ ░      ▒ ░░   ░ ▓░▒ ▒  \n"
+	printf "   ░▒ ░ ▒░ ░ ░  ░  ░  ▒     ░ ▒ ▒░ ░ ░░   ░ ▒░ ░          ░      ▒ ░ ░  \n"
+	printf "   ░░   ░    ░   ░        ░ ░ ░ ▒     ░   ░ ░  ░ ░      ░        ░   ░  \n"
+	printf "    ░        ░  ░░ ░          ░ ░           ░                      ░    \n"
+	printf "                 ░                                                      \n"
+    printf " ${reconftw_version}                                         by @six2dez\n"
+	printf " Web Interface by @lur1el, @d3vchac, @mx61tt and @dd4n1b0y${reset}\n"
+}
+
+
+install_webserver(){
+    printf "${bblue} Running: Installing web reconftw ${reset}\n\n"
+    printf "${yellow} Installing python libraries...${reset}\n\n"
+    
+    # Install venv
+    printf "${yellow} python virtualenv install...${reset}\n\n"
+    $SUDO rm -rf /web/.venv/
+    $SUDO pip3 install virtualenv &>/dev/null
+    $SUDO virtualenv $HOME/reconftw/web/.venv/ &>/dev/null
+    if [ $? -eq 0 ]; then
+        printf "${yellow} Activating virtualenv...${reset}\n\n" 
+        $SUDO source $HOME/reconftw/web/.venv/bin/activate
+        $SUDO pip3 install --upgrade pip &>/dev/null
+    else
+        printf '[ERROR] Failed to create virtualenv. Please install requirements mentioned in Documentation.'
+        exit 1
+    fi
+
+    printf "${yellow} Installing Requirements...${reset}\n\n"
+    $SUDO pip3 install -r $HOME/reconftw/web/requirements.txt &>/dev/null
+    
+    
+    
+    #$SUDO virtualenv web/env &>/dev/null
+    #$SUDO source web/env/bin/activate
+    #$SUDO pip3 install -r web/requirements.txt &>/dev/null
+
+    printf "${yellow} Installing tools...${reset}\n\n"
+    $SUDO apt install redis-server -y &>/dev/null
+    #$SUDO apt install postgresql -y &>/dev/null
+
+    # printf "${yellow} Database configuration...${reset}\n\n"
+    #$SUDO service postgresql restart &>/dev/null
+    #$SUDO su postgres -c 'psql -c "DROP DATABASE web;"' &>/dev/null
+    #$SUDO su postgres -c 'psql -c "CREATE DATABASE web;"' &>/dev/null
+    
+    #read -p ' What Username is used in db: ' DBUser
+    #read -s -p ' What Password is used in db: ' DBPass
+    
+    #$SUDO su postgres 'psql -c "DROP USER "'$DBUser &> /dev/null
+
+    #sed -i "s/'USER': '.*/'USER': '$DBUser',/" web/web/settings.py
+    #sed -i "s/'PASSWORD': '.*/'PASSWORD': '$DBPass',/" web/web/settings.py
+    #echo ""
+
+    #printf "${yellow} Creating DB User...${reset}\n\n"
+    #$SUDO su postgres -c "psql -c \"CREATE USER $DBUser with PASSWORD '$DBPass';\""
+
+    #$SUDO su postgres -c "psql -c \"ALTER ROLE $DBUser SET client_encoding TO 'utf8';\""
+    #$SUDO su postgres -c "psql -c \"ALTER ROLE $DBUser SET default_transaction_isolation TO 'read committed';\""
+    #$SUDO su postgres -c "psql -c \"ALTER ROLE $DBUser SET timezone TO 'UTC';\""
+    #$SUDO su postgres -c "psql -c \"GRANT ALL PRIVILEGES ON DATABASE web TO $DBUser;\""
+    
+    printf "${yellow} Creating WEB User...${reset}\n\n"
+    $SUDO rm $HOME/reconftw/web/db.sqlite3 &>/dev/null
+    $SUDO python3 $HOME/reconftw/web/manage.py makemigrations &>/dev/null
+    $SUDO python3 $HOME/reconftw/web/manage.py migrate &>/dev/null
+    $SUDO python3 $HOME/reconftw/web/manage.py createsuperuser
+}
+
+
+banner_web
+printf "\n${bgreen} reconFTW installer/updater script ${reset}\n\n"
+
+
+if [[ -d $dir && -d ~/.gf && -d ~/.config/notify/ && -d ~/.config/amass/ && -d ~/.config/nuclei/ && -f $dir/.github_tokens ]]; then
+    rftw_installed=true
+else 
+    rftw_installed=false
+fi
+
+
+# Display menu and wait for user input
+while true; do
+    printf "${bblue} Choose one of the following options: ${reset}\n\n"
+
+    if $rftw_installed; then
+        printf "${bblue} 1. Install/Update ReconFTW (without Web Interface)${reset}\n\n"
+        printf "${bblue} 2. Install/Update ReconFTW + Install Web Interface${reset}\n\n"
+        printf "${bblue} 3. Install only Web Interface${reset}\n\n"
+        printf "${bblue} 4. Exit${reset}\n\n"
+        printf "${bgreen}#######################################################################${reset}\n\n"
+        read -p "$(echo -e ${bblue} "Insert option: "${reset})" option
+        printf "\n\n${bgreen}#######################################################################${reset}\n\n"
+
+        case $option in
+            1)
+                web=false
+                break
+                ;;
+            2)
+                web=true
+                break
+                ;;
+            3)
+                install_webserver
+                exit 1
+                ;;
+            4)
+                printf "${bblue} Exiting...${reset}\n\n"
+                exit 1
+                ;;
+            *)
+                printf "${bblue} Invalid option. Exiting...${reset}\n\n"
+                exit 1
+                ;;
+        esac
+
+    else
+        printf "${bblue} 1. Install/Update ReconFTW${reset}\n\n"
+        printf "${bblue} 2. Install/Update ReconFTW + Install Web Interface${reset}\n\n"
+        printf "${bred} 3. Can't install Web Interface without ReconFTW${reset}\n\n"
+        printf "${bblue} 4. Exit${reset}\n\n"
+        printf "${bgreen}#######################################################################${reset}\n\n"
+        read -p "$(echo -e ${bblue} "Insert option: "${reset})" option
+        printf "\n${bgreen}#######################################################################${reset}\n\n"
+
+        case $option in
+            1)
+                web=false
+                break
+                ;;
+            2)
+                web=true
+                break
+                ;;
+            4)
+                printf "${bblue} Exiting...${reset}\n\n"
+                exit 1
+                ;;
+            *)
+                printf "${bblue} Invalid option. Exiting...${reset}\n\n"
+                exit 1
+                ;;
+        esac
+    fi    
+done
+
+
 printf "${yellow} This may take time. So, go grab a coffee! ${reset}\n\n"
 
 if [[ $(id -u | grep -o '^0$') == "0" ]]; then
@@ -296,7 +451,7 @@ cd ~/nuclei-templates/extra_templates && eval git pull $DEBUG_STD
 cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 eval git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git $dir/sqlmap $DEBUG_STD
 eval git clone --depth 1 https://github.com/drwetter/testssl.sh.git $dir/testssl.sh $DEBUG_STD
-eval $SUDO git clone https://gitlab.com/exploit-database/exploitdb /opt/exploitdb $DEBUG_STD
+eval $SUDO git clone https://github.com/offensive-security/exploitdb.git /opt/exploitdb $DEBUG_STD
 eval $SUDO ln -sf /opt/exploitdb/searchsploit /usr/local/bin/searchsploit $DEBUG_STD
 
 # Standard repos installation
@@ -330,7 +485,7 @@ for repo in "${!repos[@]}"; do
     elif [ "Gf-Patterns" = "$repo" ]; then
         eval mv ./*.json ~/.gf $DEBUG_ERROR
     elif [ "trufflehog" = "$repo" ]; then
-        eval go install $DEBUG_STD
+        go install
     fi
     cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 done
@@ -375,7 +530,7 @@ eval $SUDO strip -s /usr/local/bin/unimap $DEBUG_STD
 eval $SUDO chmod 755 /usr/local/bin/ppfuzz
 eval $SUDO strip -s /usr/local/bin/ppfuzz $DEBUG_STD
 eval notify $DEBUG_STD
-eval subfinder $DEBUG_STD
+eval subfinder -h $DEBUG_STD
 
 printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 ## Downloads
@@ -384,8 +539,8 @@ printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 wget -q -O - https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json > ~/.gf/potential.json
 wget -q -O - https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py > ${tools}/getjswords.py
 wget -q -O - https://wordlists-cdn.assetnote.io/data/manual/best-dns-wordlist.txt > ${subs_wordlist_big}
-wget -q -O - https://raw.githubusercontent.com/six2dez/resolvers_reconftw/main/resolvers_trusted.txt > ${resolvers_trusted}
-wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > ${resolvers} 
+wget -q -O - https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw > ${resolvers_trusted}
+wget -q -O - https://raw.githubusercontent.com/proabiral/Fresh-Resolvers/master/resolvers.txt > ${resolvers} 
 wget -q -O - https://gist.github.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw > ${subs_wordlist}
 wget -q -O - https://gist.github.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw > ${tools}/permutations_list.txt
 wget -q -O - https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt > ${fuzz_wordlist}
@@ -453,16 +608,16 @@ if [ "$generate_resolvers" = true ]; then
 		dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads $DNSVALIDATOR_THREADS -o tmp_resolvers &>/dev/null
 		[ -s "tmp_resolvers" ] && cat tmp_resolvers | anew -q $resolvers
 		[ -s "tmp_resolvers" ] && rm -f tmp_resolvers &>/dev/null
-		[ ! -s "$resolvers" ] && wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > ${resolvers}
-        [ ! -s "$resolvers_trusted" ] && wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > ${resolvers_trusted}
+		[ ! -s "$resolvers" ] && wget -q -O - https://raw.githubusercontent.com/proabiral/Fresh-Resolvers/master/resolvers.txt > ${resolvers}
+        [ ! -s "$resolvers_trusted" ] && wget -q -O - https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw > ${resolvers_trusted}
 		printf "${yellow} Resolvers updated\n ${reset}\n\n"
 	fi
 	generate_resolvers=false
 else
 	[ ! -s "$resolvers" ] || if [[ $(find "$resolvers" -mtime +1 -print) ]] ; then
 		 ${reset}"\n\nChecking resolvers lists...\n Accurate resolvers are the key to great results\n Downloading new resolvers ${reset}\n\n"
-		wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > ${resolvers}
-        wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > ${resolvers_trusted}
+		wget -q -O - https://raw.githubusercontent.com/proabiral/Fresh-Resolvers/master/resolvers.txt > ${resolvers}
+        wget -q -O - https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw > ${resolvers_trusted}
 		printf "${yellow} Resolvers updated\n ${reset}\n\n"
 	fi
 fi

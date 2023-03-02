@@ -1,0 +1,1710 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}reconFTW - Results{% endblock %}
+{% block content %}
+<style>
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: rgb(240, 239, 239);
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: "Poppins", sans-serif;
+  }
+
+  p {
+    margin-bottom: 0px;
+  }
+
+  /** *::-webkit-scrollbar {
+    width: 12px;
+  }
+
+
+  *::-webkit-scrollbar-track {
+    background: #161616;
+  }
+
+
+  *::-webkit-scrollbar-thumb {
+    background: #FFF;
+    box-shadow: inset 0 0 5px grey;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: #f1f1f1;
+  } **/
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 260px;
+    background-color: #18191a;
+    /* box-shadow: 0px 0px 5px 0px #000f; */
+    z-index: 1000;
+    transition: all 0.5s ease;
+  }
+
+  .sidebar.close {
+    width: 78px;
+  }
+
+
+
+  .sidebar .logo-details {
+    height: 60px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+  }
+
+  .sidebar .logo-details i {
+    font-size: 30px;
+    color: #a5e22f;
+    height: 50px;
+    min-width: 78px;
+    text-align: center;
+    line-height: 50px;
+  }
+
+  .sidebar .logo-details .logo_name {
+    font-size: 22px;
+    color: #a5e22f;
+    font-weight: 600;
+    transition: 0.3s ease;
+    transition-delay: 0.1s;
+    margin-left: 25px;
+  }
+
+  .sidebar.close .logo-details .logo_name {
+    transition-delay: 0s;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .sidebar .nav-links {
+    height: 100%;
+    padding: 0px 0 150px 0;
+    overflow: auto;
+    /* border-top: 1px dashed #1f1f1f; */
+  }
+
+  .sidebar.close .nav-links {
+    overflow: visible;
+  }
+
+  .sidebar .nav-links::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sidebar .nav-links li {
+    position: relative;
+    list-style: none;
+    transition: all 0.4s ease;
+  }
+
+  .sidebar .nav-links li:hover {
+    background-color: #1e1f20;
+    /*  background-color: #1e1f20; */
+  }
+
+  .disabled_background:hover {
+    background-color: #1e1f20;
+    position: relative;
+    list-style: none;
+    transition: all 0.4s ease;
+  }
+
+  .sidebar .nav-links li .icon-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .disabled_background {
+    background-color: #242424;
+    cursor: not-allowed;
+    border: 1px inset #2c2c2c;
+    /* solid */
+  }
+
+  .sidebar.close .nav-links li .icon-link {
+    display: block;
+  }
+
+  .sidebar .nav-links li i {
+    height: 50px;
+    /* min-width: 78px; */
+    padding-left: 23px;
+    padding-right: 26px;
+    text-align: center;
+    line-height: 50px;
+    color: #a5e22f;
+    font-size: 24px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .sidebar .nav-links li.showMenu i.arrow {
+    transform: rotate(-180deg);
+  }
+
+  .sidebar.close .nav-links i.arrow {
+    display: none;
+  }
+
+  .sidebar .nav-links li a {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+  }
+
+  .sidebar .nav-links li a .link_name {
+    font-size: 15px;
+    font-weight: 600;
+    color: #a5e22f;
+    transition: all 0.4s ease;
+  }
+
+  .sidebar.close .nav-links li a .link_name_disabled {
+    opacity: 0;
+    pointer-events: none;
+    cursor: not-allowed;
+  }
+
+  .sidebar .nav-links li a .link_name_disabled {
+    font-size: 15px;
+    font-weight: 600;
+    color: #646464;
+    transition: all 0.4s ease;
+    cursor: not-allowed;
+  }
+
+
+
+  .sidebar .nav-links li a .link_name:hover {
+    color: #cbfa6d;
+  }
+
+  .sidebar.close .nav-links li a .link_name {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .sidebar .nav-links li .sub-menu {
+    padding: 6px 6px 14px 75px;
+    margin-top: -10px;
+    background: #1e1f20;
+    display: none;
+    /* box-shadow: 0 -3px 3px -3px #000f, 
+              0 3px 3px -3px #000f, 
+              3px 0 3px -3px #000f; */
+  }
+
+  .sidebar .nav-links li.showMenu .sub-menu {
+    display: block;
+  }
+
+  .sidebar .nav-links li .sub-menu a {
+    color: #a5e22f;
+    font-size: 16px;
+    padding: 5px 0;
+    white-space: nowrap;
+    opacity: 0.6;
+    transition: all 0.3s ease;
+  }
+
+  .sidebar .nav-links li .sub-menu a:hover {
+    opacity: 1;
+  }
+
+  .sidebar.close .nav-links li .sub-menu {
+    position: absolute;
+    left: 100%;
+    top: -10px;
+    margin-top: 0;
+    padding: 10px 20px;
+    border-radius: 0 6px 6px 0;
+    opacity: 0;
+    display: block;
+    pointer-events: none;
+    transition: 0s;
+  }
+
+  .sidebar.close .nav-links li:hover .sub-menu {
+    top: 0;
+    opacity: 1;
+    pointer-events: auto;
+    transition: all 0.4s ease;
+  }
+
+  .sidebar .nav-links li .sub-menu .link_name {
+    display: none;
+  }
+
+  .sidebar.close .nav-links li .sub-menu .link_name {
+    font-size: 18px;
+    opacity: 1;
+    display: block;
+  }
+
+  .sidebar .nav-links li .sub-menu.blank {
+    opacity: 1;
+    pointer-events: auto;
+    padding: 7px 20px 6px 16px;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .sidebar .nav-links li:hover .sub-menu.blank {
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .sidebar .logout-section-sidenav {
+    position: fixed;
+    bottom: 0px;
+    width: 260px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0px 0px 0px 0px;
+    transition: all 0.5s ease;
+    background-color: #18191a;
+  }
+
+  .logout-section-sidenav:hover {
+    background-color: #1e1f20;
+  }
+
+  .sidebar.close .logout-section-sidenav {
+    width: 78px;
+  }
+
+  .sidebar .logout-section-sidenav {
+    display: flex;
+    align-items: center;
+  }
+
+  .home-section {
+    position: relative;
+    left: 260px;
+    width: calc(100% - 260px);
+    transition: all 0.5s ease;
+    height: auto;
+  }
+
+  .sidebar.close~.home-section {
+    left: 78px;
+    width: calc(100% - 78px);
+  }
+
+  .home-section .home-content {
+    height: 60px;
+    display: flex;
+    align-items: center;
+    background-color: #18191a;
+    /* box-shadow: 0px 0px 5px 0px #000f; */
+    z-index: 1000;
+    position: sticky;
+  }
+
+  .home-section .home-content .bx-menu,
+  .home-section .home-content .text {
+    color: #a5e22f;
+    font-size: 35px;
+    text-shadow: 0px 0px 5px #000;
+  }
+
+  .home-section:hover .home-content:hover .bx-menu:hover,
+  .home-section:hover .home-content:hover .text:hover {
+    color: #b8f049;
+  }
+
+  .home-section .home-content .bx-menu {
+    margin: 0 15px;
+    cursor: pointer;
+  }
+
+  .home-section .home-content .text {
+    font-size: 26px;
+    font-weight: 600;
+  }
+
+  .rftw-logo {
+    margin-left: 20px;
+  }
+
+  .home-content-right {
+    display: flex;
+    justify-content: flex-end;
+    width: 100%;
+    align-items: center;
+    margin-right: 43px;
+  }
+
+  .btn-reconftw-topbar {
+    margin: 0px 10px 0px 0px;
+    font-weight: 700 !important;
+    border-right: 1px solid;
+    border-left: none;
+    border-image: linear-gradient(to bottom, transparent, rgba(167, 218, 27, 0.11), transparent) 1;
+    font-size: 13px;
+    color: #a5e22f;
+    background-color: transparent;
+    border-top: none;
+    padding: 7px 10px 5px 0px;
+    border-bottom: none;
+    letter-spacing: 0.2em;
+  }
+
+  .btn-reconftw-topbar:hover {
+    color: #bdfa44;
+    text-shadow: 0px 0px 1px #bdfa44;
+    transition: 0.6s;
+  }
+
+  .btn-reconftw-topbar i {
+    color: #a5e22f;
+    transition: 0.5s;
+    position: relative;
+    top: 1.7px;
+    padding: 0;
+    width: 9px;
+  }
+
+  .btn-reconftw-topbar:hover i {
+    text-shadow: 0px 0px 1px #bdfa44;
+    color: #bdfa44;
+    transform: translateX(2px) translateY(-3px) rotate(90deg);
+    transition: 0.5s;
+  }
+
+  .fntsmr {
+    margin: 0px 15px 0px 0px;
+    font-size: 13px;
+    font-weight: 700 !important;
+    color: #fff;
+    border-right: 1px solid;
+    padding: 9px 15px 9px 5px;
+    border-image: linear-gradient(to bottom, transparent, rgba(167, 218, 27, 0.11), transparent) 1;
+  }
+
+  .fntsmr_scan_mode {
+    margin: 0px 15px 0px 0px;
+    font-size: 13px;
+    font-weight: 700 !important;
+    color: #a5e22f;
+    border-right: 1px solid;
+    padding: 9px 15px 9px 5px;
+    border-image: linear-gradient(to bottom, transparent, rgba(167, 218, 27, 0.11), transparent) 1;
+  }
+
+  .iconsmr {
+    margin: 0px 0px 3px 0px;
+    font-size: 20px;
+    font-weight: 500 !important;
+    color: #a5e22f;
+  }
+
+
+  .action {
+    margin: 0;
+  }
+
+  .action .profile {
+    position: relative;
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    overflow: hidden;
+    cursor: pointer;
+  }
+
+  .action .profile img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .action .menu {
+    position: absolute;
+    top: 120px;
+    right: 36px;
+    padding: 10px 20px 0px 20px;
+    background-color: #161616;
+    width: 200px;
+    box-sizing: 0 5px 25px rgba(0, 0, 0, 0.1);
+    border-radius: 15px;
+    transition: 0.5s;
+    visibility: hidden;
+    opacity: 0;
+  }
+
+  .action .menu.active {
+    top: 70px;
+    visibility: visible;
+    opacity: 1;
+  }
+
+  .action .menu::before {
+    content: "";
+    position: absolute;
+    top: -5px;
+    right: 28px;
+    width: 20px;
+    height: 20px;
+    background-color: #161616;
+    transform: rotate(45deg);
+  }
+
+  .action .menu h3 {
+    width: 100%;
+    text-align: center;
+    font-size: 18px;
+    color: #b8fa34;
+    font-weight: 500;
+    line-height: 1.5em;
+  }
+
+  .action .menu h3 span {
+    font-size: 14px;
+    color: #b8fa34;
+    font-weight: 300;
+  }
+
+  .action .menu ul li {
+    list-style: none;
+    padding: 16px 0;
+    border-top: 1px solid #1c1c1c;
+    display: flex;
+    align-items: center;
+  }
+
+  .action .menu ul li i {
+    max-width: 100%;
+    margin-right: 15px;
+    opacity: 0.5;
+  }
+
+  .action .menu ul li:hover i {
+    opacity: 1;
+  }
+
+  .action .menu ul li a {
+    display: inline-block;
+    text-decoration: none;
+    color: #b8fa34;
+    font-weight: 500;
+    transition: 0.5s;
+  }
+
+  .action .menu ul li:hover a {
+    color: #d6ff83;
+  }
+
+  .action .bx {
+    position: relative;
+    top: 5px;
+  }
+
+  ol,
+  ul {
+    padding-left: 0rem;
+  }
+
+  .header_img {
+    width: 35px;
+    height: 35px;
+    display: flex;
+    border-radius: 50%;
+    overflow: hidden;
+    box-shadow: 0px 0px 5px 0px #000f;
+    cursor: pointer;
+    margin-left: auto;
+    margin-right: 22px;
+  }
+
+  /* começa o card  */
+
+  .container-fluid {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  hr:not([size]) {
+    height: 1px;
+  }
+
+  hr {
+    background: linear-gradient(to right,
+        transparent,
+        rgba(255, 255, 255, 0.411),
+        transparent);
+    width: 60%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .nav-hr {
+    background: linear-gradient(to right,
+        transparent,
+        rgba(167, 218, 27, 0.637),
+        transparent);
+    width: 60%;
+    margin: 0;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* From cssbuttons.io by @adamgiebl */
+  .btn-reconftw {
+    align-items: center;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 0.4em 0.4em 0.2em 0.3em;
+    color: #fff;
+    background-color: transparent;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    border-bottom: 2px solid #18191a;
+    letter-spacing: 0.2em;
+  }
+
+  .btn-reconftw:hover {
+    border-bottom: 2px solid #a5e22f;
+    transition: 0.6s;
+  }
+
+  .btn-reconftw i {
+    color: #a5e22f;
+    position: relative;
+    top: 1.7px;
+    padding: 0;
+    width: 9px;
+    border-radius: 100%;
+
+    transition: transform 0.5s cubic-bezier(0.76, 0, 0.24, 1);
+  }
+
+  .btn-reconftw:hover i {
+    transform: translateX(2px) translateY(-3px) rotate(90deg);
+  }
+
+  .card-body {
+    /* box-shadow: 0px 0px 5px 0px rgba(255, 255, 255, 0.123); */
+    background-color: rgba(255, 255, 255, 0.123);
+    padding: 10px 15px 10px 15px;
+    margin-bottom: 20px;
+  }
+
+  .align-to-cards {
+    margin-top: 15px;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600 !important;
+    padding-bottom: 15px;
+  }
+
+  .row>* {
+    padding-right: 7px;
+    padding-left: 7px;
+  }
+
+  .row {
+    --bs-gutter-x: None;
+  }
+
+  .card-box {
+    position: relative;
+    font-weight: bold;
+    color: #fff;
+    padding: 20px 10px 40px;
+    box-shadow: 0px 0px 5px 0px #0000003b;
+    border: 1px solid rgb(33, 43, 51);
+  }
+
+  .card-box:hover {
+    text-decoration: none;
+    color: #f1f1f1;
+  }
+
+  .card-box:hover .icon i {
+    font-size: 100px;
+    transition: 1s;
+    -webkit-transition: 1s;
+  }
+
+  .card-box .inner {
+    padding: 5px 10px 0 10px;
+  }
+
+  .card-box h3 {
+    font-size: 27px;
+    font-weight: bold;
+    margin: 0 0 8px 0;
+    white-space: nowrap;
+    padding: 0;
+    text-align: left;
+  }
+
+  .card-box p {
+    font-size: 12px;
+  }
+
+  .card-box .icon {
+    position: absolute;
+    top: auto;
+    bottom: 5px;
+    right: 5px;
+    z-index: 0;
+    font-size: 72px;
+    color: rgba(255, 255, 255, 0.39);
+  }
+
+  .card-box .card-box-footer {
+    position: absolute;
+    left: 0px;
+    bottom: 0px;
+    text-align: center;
+    padding: 3px 0;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.158);
+    width: 100%;
+    text-decoration: none;
+  }
+
+  .card-box:hover .card-box-footer {
+    background: rgba(0, 0, 0, 0.3);
+    color: #a5e22f;
+  }
+
+  .card-box:hover .bxs-chevron-up {
+    transition: transform 0.5s cubic-bezier(0.76, 0, 0.24, 1);
+    transform: translateX(2px) translateY(1px) rotate(90deg);
+  }
+
+  .bg-card-one {
+    background-color: #2c3031 !important;
+  }
+
+  .bg-card-two {
+    background-color: #2c3031 !important;
+  }
+
+  .bg-card-three {
+    background-color: #2c3031 !important;
+  }
+
+  .bg-card-four {
+    background-color: #2c3031 !important;
+  }
+
+  .bg-card-five {
+    background-color: #2c3031 !important;
+  }
+
+  .bg-card-six {
+    background-color: #2c3031 !important;
+  }
+
+  /* SCREENSHOT GALERY */
+
+  #image-gallery .modal-footer {
+    display: block;
+  }
+
+  .lookbook-gallery img {
+    min-width: 400px;
+    max-width: 100%;
+    display: block;
+    border-radius: 5px;
+    margin-bottom: 10px;
+  }
+
+  .lookbook-gallery .model {
+    margin: 0;
+    position: relative;
+  }
+
+  .lookbook-gallery .model .model--caption {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin: 0;
+    background-color: #000000ab;
+    padding: 0.25em 1.2em 0.25em 0.9em;
+
+    text-align: center;
+    border-bottom-left-radius: 4.5px;
+  }
+
+  .lookbook-gallery .model .model--caption .model-hed {
+    font-size: 1.25em;
+    margin: 0.5em 0;
+  }
+
+  .lookbook-gallery .model .model--caption .model-hed a {
+    color: #fff;
+    text-decoration-color: rgba(255, 255, 255, 0.5);
+  }
+
+  .lookbook-gallery .model .model--caption p {
+    font-size: 13px;
+    font-weight: 600;
+    color: #a5e22f;
+  }
+
+  .icon-gallery {
+    position: relative;
+    top: 1px;
+  }
+
+  .fntsmr_scanning {
+    margin: 0px 15px 0px 0px;
+    font-size: 13px;
+    font-weight: 700 !important;
+    color: #fff;
+    border-right: 1px solid;
+    padding: 9px 15px 9px 5px;
+    border-image: linear-gradient(to bottom, transparent, rgba(167, 218, 27, 0.11), transparent) 1;
+  }
+
+  @media (min-width: 45em) {
+    .lookbook-gallery .lookbook-grid {
+      display: flex;
+      flex-wrap: wrap;
+    }
+
+    .lookbook-gallery .model {
+      flex: 47.5%;
+      margin: 0.5%;
+    }
+  }
+
+  @media (min-width: 65em) {
+    .lookbook-gallery .model {
+      flex: 24.25% 0;
+      margin: 0.25%;
+    }
+
+    @supports (display: grid) {
+      .lookbook-gallery .lookbook-grid {
+        display: grid;
+        grid-gap: 0.5em;
+        grid-template-columns: repeat(4, minmax(200px, 1fr));
+      }
+
+      .lookbook-gallery .model {
+        margin: 0;
+      }
+
+      .lookbook-gallery .model:nth-of-type(4n-1) {
+        grid-row-end: span 2;
+        grid-column-end: span 2;
+      }
+    }
+  }
+
+  .p-4 {
+    border-top: 1px solid rgb(165, 165, 165);
+  }
+
+  .bx-sm {
+    padding-right: 5px;
+  }
+
+  table.dataTable>thead>tr>th:not(.sorting_disabled),
+  table.dataTable>thead>tr>td:not(.sorting_disabled) {
+    padding-right: 55px;
+    padding-left: 55px;
+  }
+
+  table.dataTable>thead .sorting:before {
+    content: "▲";
+    top: 8px;
+    right: 5px;
+    font-size: 10px;
+  }
+
+  table.dataTable>thead .sorting:after {
+    content: "▼";
+    font-size: 10px;
+  }
+
+  table.dataTable>thead .sorting:after {
+    bottom: 8px;
+  }
+
+  .table-content {
+    padding: 10px;
+    background-color: #ffffff;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    box-shadow: 0px 0px 5px 0px #0000009d;
+  }
+
+  div.dataTables_wrapper div.dataTables_paginate ul.pagination {
+    margin: 2px 0;
+    white-space: nowrap;
+    justify-content: flex-end;
+  }
+
+  .table-align {
+    margin-top: 50px;
+  }
+
+  table.dataTable.no-footer {
+    border: 0;
+  }
+
+  table> :not(caption)>*>* {
+    border: 0;
+  }
+
+  thead {
+    background-color: #2f2f30;
+    color: #a5e22f;
+    text-align: center;
+    font-weight: 400 !important;
+    font-size: 16px;
+  }
+
+  td {
+    text-align: center;
+  }
+
+  th {
+    text-align: center;
+  }
+
+  .table-striped>tbody>tr:nth-of-type(odd)>* {
+    background-color: #d3d3d3;
+  }
+
+  .table-striped>tbody>tr:nth-of-type(even)>* {
+    background-color: #e1e1e1;
+  }
+
+  .td:nth-child(even) {
+    background-color: #d3d3d3;
+  }
+
+  .rowbg:nth-child(odd) {
+    background-color: #e1e1e1;
+  }
+
+  .page-item.active .page-link {
+    z-index: 3;
+    color: #fff;
+    background-color: #2f2f30;
+    border-color: #353538;
+  }
+
+  .bg-footer {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    color: #b8f04993;
+    padding: 5px;
+    font-weight: bold;
+  }
+
+  @media (max-width: 420px) {
+    .sidebar.close .nav-links li .sub-menu {
+      display: none;
+    }
+  }
+
+  .sidebar .nav-links li .disabled {
+    color: #646464;
+    cursor: not-allowed;
+  }
+
+  .disabled {
+    cursor: not-allowed;
+  }
+
+  .scan_mode {
+    color: #ffffff;
+  }
+
+  .loader {
+    color: #a5e22f;
+    -webkit-animation: spin 2s linear infinite;
+    /* Safari */
+    animation: spin 2s linear infinite;
+  }
+
+  /* Safari */
+  @-webkit-keyframes spin {
+    0% {
+      -webkit-transform: rotate(0deg);
+    }
+
+    100% {
+      -webkit-transform: rotate(360deg);
+    }
+  }
+
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  .modal-header {
+    color: #777;
+    font-size: 12px;
+    font-weight: bold;
+    border-bottom: 2px solid #46494b;
+  }
+
+  .modal-content {
+    background-color: #27292c;
+    color: #fff;
+  }
+
+  .modal-footer {
+    border-top: 2px solid #46494b;
+
+  }
+
+  .input-group-text {
+    display: flex;
+    align-items: center;
+    padding: 0.375rem 0.75rem;
+    font-size: 1rem;
+    font-weight: bold;
+    line-height: 1.5;
+    color: #a5e22f;
+    text-align: center;
+    white-space: normal;
+    background-color: #383a3b;
+    border: none;
+    border-radius: 0;
+    border-top-left-radius: 0.25rem;
+    border-bottom-left-radius: 0.25rem;
+  }
+
+  .input-group>:not(:first-child):not(.dropdown-menu):not(.valid-tooltip):not(.valid-feedback):not(.invalid-tooltip):not(.invalid-feedback) {
+    margin-left: -12px;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+</style>
+
+
+<!-- The Modal DNS Zone Transfer-->
+<div class="modal fade text-dark" id="modal-dns-zonetransfer" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+
+      <!-- Modal Header -->
+      <div class="modal-header">
+        DNS Zone Transfer
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+
+      <!-- Modal body -->
+      <div class="modal-body ">
+        <div class="input-group-prepend">
+          <p class="modal-results">TESTEEEE</p>
+        </div>
+      </div>
+
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- The Modal DNS Zone Transfer-->
+
+<!-- The Modal DNS Registry -->
+<div class="modal fade text-dark" id="modal-dns-registry" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+
+      <!-- Modal Header -->
+      <div class="modal-header">
+        DNS Registry
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+
+      <!-- Modal body -->
+      <div class="modal-body ">
+        <div class="input-group-prepend">
+          <p class="modal-results">TESTEEEE</p>
+        </div>
+      </div>
+
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- The Modal DNS Registry -->
+
+<!-- The Modal All Subdomains -->
+<div class="modal fade text-dark" id="modal-all-subdomains" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+
+      <!-- Modal Header -->
+      <div class="modal-header">
+        ALL SUBDOMAINS
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+
+      <!-- Modal body -->
+      <div class="modal-body ">
+        <div class="input-group-prepend">
+          <p class="modal-results">{{ subdomains.subdomains }}</p>{{ git_dorks.git_dorks }}
+        </div>
+      </div>
+
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- The Modal All Subdomains -->
+
+<!-- The Modal Gitghub Dorks-->
+<div class="modal fade text-dark" id="modal-github-dorks" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+
+      <!-- Modal Header -->
+      <div class="modal-header">
+        GITHUB DORKS
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+
+      <!-- Modal body -->
+      <div class="modal-body ">
+        <!-- <h6 class="mt-4 mb-4"><b>COMMAND</b></h6> -->
+
+        <div class="modal-body ">
+          <div class="input-group-prepend">
+            <p class="modal-results">{{ git_dorks.git_dorks }}</p>
+          </div>
+        </div>
+
+
+        <!-- <input type="text" class="form-control" id="command" name="command" disabled>  -->
+
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- The Modal Google Dorks-->
+<div class="modal fade text-dark" id="modal-google-dorks" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+
+      <!-- Modal Header -->
+      <div class="modal-header">
+        GOOGLE DORKS
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+
+      <!-- Modal body -->
+      <div class="modal-body ">
+        <div class="input-group-prepend">
+          <p class="modal-results">{{ google_dorks.dorks }}</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+
+<body>
+  <div class="sidebar close">
+    <div class="logo-details">
+      <img class="rftw-logo" src="/static/img/favicon.ico" alt="" />
+      <span class="logo_name"> reconFTW</span>
+    </div>
+
+    <hr class="nav-hr" />
+
+    <ul class="nav-links">
+      <li>
+        <a href="#">
+          <i class="bx bx-globe"></i>
+          <span class="link_name">Subdomains</span>
+        </a>
+        <ul class="sub-menu blank">
+          <li><a class="link_name" href="#">Subdomains</a></li>
+        </ul>
+      </li>
+
+      <li>
+        <a href="#">
+          <i class="bx bx-search-alt"></i>
+          <span class="link_name">OSINT Output</span>
+        </a>
+        <ul class="sub-menu blank">
+          <li><a class="link_name" href="#">OSINT Output</a></li>
+        </ul>
+      </li>
+
+      <li class="disabled_background">
+        <a href="#" class="disabled">
+          <i class="bx bx-cloud disabled"></i>
+          <span class="link_name_disabled">Cloud Assets</span>
+        </a>
+        <ul class="sub-menu blank">
+          <li><a class="link_name" href="#">Cloud Assets</a></li>
+        </ul>
+      </li>
+
+      <li class="disabled_background">
+        <a href="#" class="disabled">
+          <i class="bx bx-image disabled"></i>
+          <span class="link_name_disabled">Screenshots</span>
+        </a>
+        <ul class="sub-menu blank">
+          <li><a class="link_name" href="#">Screenshots</a></li>
+        </ul>
+      </li>
+
+      <li>
+        <div class="icon-link disabled_background">
+          <a href="#" class="disabled">
+            <i class="bx bx-ghost disabled"></i>
+            <span class="link_name_disabled">Nuclei Output</span>
+          </a>
+          <i class="bx bxs-chevron-down arrow disabled"></i>
+        </div>
+        <ul class="sub-menu blank">
+          <li><a class="link_name" href="#">Nuclei Output</a></li>
+        </ul>
+      </li>
+
+
+
+      <li>
+        <div class="icon-link disabled_background">
+          <a href="#" class="disabled">
+            <i class="bx bx-bug disabled"></i>
+            <span class="link_name_disabled">Vulnerabilities</span>
+          </a>
+          <i class="bx bxs-chevron-down arrow disabled"></i>
+        </div>
+        <ul class="sub-menu blank">
+          <li><a class="link_name" href="#">Vulnerabilities</a></li>
+        </ul>
+      </li>
+
+      <li class="disabled_background">
+        <a href="#" class="disabled">
+          <i class="bx bxs-analyse disabled"></i>
+          <span class="link_name_disabled">GF Output</span>
+        </a>
+        <ul class="sub-menu blank">
+          <li><a class="link_name" href="#">GF Output</a></li>
+        </ul>
+      </li>
+
+      <li class="disabled_background">
+        <a href="#" class="disabled">
+          <i class="bx bxs-folder-open disabled"></i>
+          <span class="link_name_disabled">Fuzzing Paths</span>
+        </a>
+        <ul class="sub-menu blank">
+          <li><a class="link_name" href="#">Fuzzing Paths</a></li>
+        </ul>
+      </li>
+
+      <li class="disabled_background">
+        <a href="#" class="disabled">
+          <i class="bx bxs-data disabled"></i>
+          <span class="link_name_disabled">Data Extracted</span>
+        </a>
+        <ul class="sub-menu blank">
+          <li><a class="link_name" href="#">Data Extracted</a></li>
+        </ul>
+      </li>
+
+      <li>
+        <div class="icon-link disabled_background">
+          <a href="#" class="disabled">
+            <i class="bx bxl-javascript disabled"></i>
+            <span class="link_name_disabled">Javascript</span>
+          </a>
+          <i class="bx bxs-chevron-down arrow disabled"></i>
+        </div>
+        <ul class="sub-menu">
+          <li><a class="link_name" href="#">JavaScript</a></li>
+        </ul>
+      </li>
+
+      <li class="disabled_background">
+        <a href="#" class="disabled">
+          <i class="bx bxs-file disabled"></i>
+          <span class="link_name_disabled">Dictionaries</span>
+        </a>
+        <ul class="sub-menu blank">
+          <li><a class="link_name" href="#">Dictionaries</a></li>
+        </ul>
+      </li>
+
+      <hr class="nav-hr" />
+
+      <li>
+        <div class="logout-section-sidenav">
+          <a href="{% url 'projects:index' %}">
+            <i class="bx bx-exit bx-rotate-180 nav_icon"></i>
+            <span class="link_name">Back to Projects</span>
+          </a>
+          <ul class="sub-menu blank comeback-submenu">
+            <li>
+              <a class="link_name" href="{% url 'projects:index' %}">Back to Projects</a>
+            </li>
+          </ul>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <section class="home-section">
+    <div class="home-content fixed-top">
+      <i class="bx bx-menu"></i>
+
+      <div class="home-content-right">
+
+        {% if status == 'FINISHED' %}
+        <i class='bx bx-check iconsmr'></i>
+        <h5 class="h4 fntsmr_scanning">FINISHED</h5>
+        {% endif %}
+        {% if status == 'SCANNING' %}
+        <i class='bx bx-loader-circle loader'></i>
+        <h5 class="h4 fntsmr_scanning">SCANNING</h5>
+        {% endif %}
+        {% if status == 'WAITING' %}
+        <i class='bx bxs-hand iconsmr blink_me'></i>
+        <h5 class="h4 fntsmr_scanning">WAITING</h5>
+        {% endif %}
+        <i class="bx bx-search-alt iconsmr"></i>
+        <h5 class="h4 fntsmr_scan_mode">SCAN MODE: <span class="scan_mode">OSINT</span></h5>
+
+        <i class="bx bx-target-lock iconsmr"></i>
+        <h5 class="h4 fntsmr">{{ title_domain_target }}</h5>
+
+        <!-- <hr class="rftw-vertical-line"> -->
+
+        <div class="action" onmouseover="menuToggle();" onmouseout="menuToggle();">
+          <div class="profile">
+            <img src="{{ imagePath }}" />
+          </div>
+          <div class="menu">
+            <h3>Admin<br /><span>Reconnaissance Ninja</span></h3>
+            <ul>
+              <li>
+                <a href="{% url 'edit_profile:index' %}"><i class="bx bx-sm bx-user-circle"></i>Edit profile</a>
+              </li>
+              <li>
+                <a href="#"><i class="bx bx-sm bx-cog"></i> API Keys</a>
+              </li>
+              <li>
+                <a href="{% url 'logout' %}"><i class="bx bx-sm bx-log-out-circle"></i> Logout</a>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+
+      </div>
+
+
+    </div>
+
+    <!-- BODY -->
+    <div class="container-fluid">
+      <div class="card-body">
+        <div class="row">
+          <div class="d-sm-flex align-items-center align-to-cards">
+            <i class="bx bx-sm bx-globe"></i>
+            <p>
+              <strong> SUBDOMAINS </strong>
+            </p>
+          </div>
+
+          <div class="col-xs-6">
+            <div class="table-responsive">
+              <table id="subdomains" class="table table-striped table-content" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>SUBDOMAIN</th>
+                    <th>IP ADDRESS</th>
+                    <th>PORT</th>
+                    <th>PROVIDER</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for subdomain in subdomains_dns %}
+                  <tr>
+                    <td>{{ subdomain.id }}</td>
+                    <td>{{ subdomain.host }}</td>
+                    <td>{{ subdomain.a_record }}</td>
+                    <td>port.webs_uncommon_ports</td>
+                    <td>AMAZON</td>
+                  </tr>
+                  {% endfor %}
+
+                </tbody>
+              </table>
+
+              <div class="mb-2 mt-3">
+                <button class="btn-reconftw" type="button" data-bs-toggle="modal"
+                  data-bs-target="#modal-dns-zonetransfer">
+                  <i class="bx bxs-chevron-up"></i>
+                  <span>DNS ZONE TRANSFER</span>
+                </button>
+
+                <i class="bx bx-wifi-0"></i>
+
+                <button class="btn-reconftw" type="button" data-bs-toggle="modal" data-bs-target="#modal-dns-registry">
+                  <i class="bx bxs-chevron-up"></i>
+                  <span>DNS REGISTRY</span>
+                </button>
+
+                <i class="bx bx-wifi-0"></i>
+
+                <button class="btn-reconftw" type="button" data-bs-toggle="modal"
+                  data-bs-target="#modal-all-subdomains">
+                  <i class="bx bxs-chevron-up"></i>
+                  <span>ALL SUBDOMAINS</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr />
+
+      <div class="card-body">
+        <div class="row">
+          <div class="d-sm-flex align-items-center align-to-cards">
+            <i class="bx bx-sm bx-search-alt"></i>
+            <p>
+              <strong> OSINT Resources </strong>
+            </p>
+          </div>
+
+          <div class="col-lg-3 mb-2">
+            <div class="card-box bg-card-one">
+              <div class="inner">
+                <h3>0</h3>
+                <p>GOOGLE DORKS</p>
+              </div>
+              <div class="icon">
+                <i class="bx bx-image" aria-hidden="true"></i>
+              </div>
+              <button class="card-box-footer" type="button" data-bs-toggle="modal" data-bs-target="#modal-google-dorks">
+                <i class="bx bxs-chevron-up"></i>
+                <span>DETAILS</span>
+              </button>
+              <!-- <a href="#" class="card-box-footer"
+                ><i class="bx bxs-chevron-up"></i> DETAILS</a
+              > -->
+            </div>
+          </div>
+
+          <div class="col-lg-3 mb-2">
+            <div class="card-box bg-card-two">
+              <div class="inner">
+                <h3>54</h3>
+                <p>GITHUB DORKS</p>
+              </div>
+              <div class="icon">
+                <i class="bx bx-globe" aria-hidden="true"></i>
+              </div>
+              <button class="card-box-footer" type="button" data-bs-toggle="modal" data-bs-target="#modal-github-dorks">
+                <i class="bx bxs-chevron-up"></i>
+                <span>DETAILS</span>
+              </button>
+              <!-- <a href="#modal-github-dorks" data-bs-target="#modal-github-dorks" class="card-box-footer"
+                ><i class="bx bxs-chevron-up"></i> DETAILS</a
+              > -->
+            </div>
+          </div>
+
+          <div class="col-lg-3 mb-2">
+            <div class="card-box bg-card-three">
+              <div class="inner">
+                <h3>185</h3>
+                <p>SOFTWARES USED</p>
+              </div>
+              <div class="icon">
+                <i class="bx bx-desktop" aria-hidden="true"></i>
+              </div>
+              <a href="#" class="card-box-footer"><i class="bx bxs-chevron-up"></i> DETAILS</a>
+            </div>
+          </div>
+
+          <div class="col-lg-3 mb-2">
+            <div class="card-box bg-card-four">
+              <div class="inner">
+                <h3>13</h3>
+                <p>USERS RELATED</p>
+              </div>
+              <div class="icon">
+                <i class="bx bx-search-alt" aria-hidden="true"></i>
+              </div>
+              <a href="#" class="card-box-footer"><i class="bx bxs-chevron-up"></i> DETAILS</a>
+            </div>
+          </div>
+
+          <div class="col-lg-3 mb-2">
+            <div class="card-box bg-card-five">
+              <div class="inner">
+                <h3>18</h3>
+                <p>METADATA RESULTS</p>
+              </div>
+              <div class="icon">
+                <i class="bx bx-globe" aria-hidden="true"></i>
+              </div>
+              <a href="#" class="card-box-footer"><i class="bx bxs-chevron-up"></i> DETAILS</a>
+            </div>
+          </div>
+
+          <div class="col-lg-3 mb-2">
+            <div class="card-box bg-card-six">
+              <div class="inner">
+                <h3>134</h3>
+                <p>EMAILS FOUND</p>
+              </div>
+              <div class="icon">
+                <i class="bx bx-bug" aria-hidden="true"></i>
+              </div>
+              <a href="#" class="card-box-footer"><i class="bx bxs-chevron-up"></i> DETAILS</a>
+            </div>
+          </div>
+
+          <div class="col-lg-3 mb-2">
+            <div class="card-box bg-card-six">
+              <div class="inner">
+                <h3>134</h3>
+                <p>PASSWORDS FOUND</p>
+              </div>
+              <div class="icon">
+                <i class="bx bx-bug" aria-hidden="true"></i>
+              </div>
+              <a href="#" class="card-box-footer"><i class="bx bxs-chevron-up"></i> DETAILS</a>
+            </div>
+          </div>
+
+          <div class="col-lg-3 mb-2">
+            <div class="card-box bg-card-six">
+              <div class="inner">
+                <h3>134</h3>
+                <p>DOMAIN INFO</p>
+              </div>
+              <div class="icon">
+                <i class="bx bx-bug" aria-hidden="true"></i>
+              </div>
+              <a href="#" class="card-box-footer"><i class="bx bxs-chevron-up"></i> DETAILS</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr>
+
+      <!-- FOOTER -->
+      <footer class="sticky-footer bg-footer">
+        <div class="container my-auto">
+          <div class="copyright text-center my-auto">
+            <span>reconFTW ©</span>
+          </div>
+        </div>
+      </footer>
+  </section>
+
+  <script>
+    // let arrow = document.querySelectorAll(".arrow");
+
+    // for (var i = 0; i < arrow.length; i++) {
+    //   arrow[i].addEventListener("click", (e) => {
+    //     let arrowParent = e.target.parentElement.parentElement; //selecting main parent of arrow
+    //     console.log(arrowParent);
+    //     //arrowParent.classList.toggle("showMenu");
+    //   });
+    // }
+
+    // let sidebar = document.querySelector(".sidebar");
+    // let sidebarBtn = document.querySelector(".bx-menu");
+    // sidebarBtn.addEventListener("click", () => {
+    //   sidebar.classList.toggle("close");
+    // });
+
+    // function menuToggle() {
+    //   const toggleMenu = document.querySelector(".menu");
+    //   toggleMenu.classList.toggle("active");
+    // }
+
+    // let modalId = $("#image-gallery");
+
+    // $(document).ready(function () {
+    //   loadGallery(true, "a.thumbnail");
+
+    //   //This function disables buttons when needed
+    //   function disableButtons(counter_max, counter_current) {
+    //     $("#show-previous-image, #show-next-image").show();
+    //     if (counter_max === counter_current) {
+    //       $("#show-next-image").hide();
+    //     } else if (counter_current === 1) {
+    //       $("#show-previous-image").hide();
+    //     }
+    //   }
+
+    //   /**
+    //    *
+    //    * @param setIDs        Sets IDs when DOM is loaded. If using a PHP counter, set to false.
+    //    * @param setClickAttr  Sets the attribute for the click handler.
+    //    */
+
+    //   function loadGallery(setIDs, setClickAttr) {
+    //     let current_image,
+    //       selector,
+    //       counter = 0;
+
+    //     $("#show-next-image, #show-previous-image").click(function () {
+    //       if ($(this).attr("id") === "show-previous-image") {
+    //         current_image--;
+    //       } else {
+    //         current_image++;
+    //       }
+
+    //       selector = $('[data-image-id="' + current_image + '"]');
+    //       updateGallery(selector);
+    //     });
+
+    //     function updateGallery(selector) {
+    //       let $sel = selector;
+    //       current_image = $sel.data("image-id");
+    //       $("#image-gallery-title").text($sel.data("title"));
+    //       $("#image-gallery-image").attr("src", $sel.data("image"));
+    //       disableButtons(counter, $sel.data("image-id"));
+    //     }
+
+    //     if (setIDs == true) {
+    //       $("[data-image-id]").each(function () {
+    //         counter++;
+    //         $(this).attr("data-image-id", counter);
+    //       });
+    //     }
+    //     $(setClickAttr).on("click", function () {
+    //       updateGallery($(this));
+    //     });
+    //   }
+    // });
+
+    // // build key actions
+    // $(document).keydown(function (e) {
+    //   switch (e.which) {
+    //     case 37: // left
+    //       if (
+    //         (modalId.data("bs.modal") || {})._isShown &&
+    //         $("#show-previous-image").is(":visible")
+    //       ) {
+    //         $("#show-previous-image").click();
+    //       }
+    //       break;
+
+    //     case 39: // right
+    //       if (
+    //         (modalId.data("bs.modal") || {})._isShown &&
+    //         $("#show-next-image").is(":visible")
+    //       ) {
+    //         $("#show-next-image").click();
+    //       }
+    //       break;
+
+    //     default:
+    //       return; // exit this handler for other keys
+    //   }
+    //   e.preventDefault(); // prevent the default action (scroll / move caret)
+    // });
+
+    // // Data Table
+    // $(document).ready(function () {
+    //   $("#subdomains").DataTable({
+    //     bPaginate: true,
+    //     bLengthChange: false,
+    //     bFilter: true,
+    //     bInfo: true,
+    //     bAutoWidth: true,
+    //   });
+    // });
+
+    // // Data Table
+    // $(document).ready(function () {
+    //   $("#cloud_assets").DataTable({
+    //     bPaginate: false,
+    //     bLengthChange: false,
+    //     bFilter: false,
+    //     bInfo: false,
+    //     bAutoWidth: false,
+    //   });
+    // });
+
+    // // Data Table
+    // $(document).ready(function () {
+    //   $("#nuclei_outputs").DataTable({
+    //     bPaginate: false,
+    //     bLengthChange: false,
+    //     bFilter: false,
+    //     bInfo: false,
+    //     bAutoWidth: false,
+    //   });
+    // });
+
+    // function showLoading() {
+
+    //   $('#modal-loading').modal('show');
+    //   $('#modal-github-dorks').modal('hide');
+    // }
+  </script>
+
+
+
+</body>
+
+<!-- </html> N ESQUECER -->
+{% endblock %}
