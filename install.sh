@@ -153,10 +153,8 @@ install_webserver(){
     fi
 
     printf "${yellow} Installing Requirements...${reset}\n\n"
-    $SUDO pip3 install -r web/requirements.txt &>/dev/null
-    
-    
-    
+    $SUDO pip3 install -r $SCRIPTPATH/web/requirements.txt &>/dev/null
+        
     #$SUDO virtualenv web/env &>/dev/null
     #$SUDO source web/env/bin/activate
     #$SUDO pip3 install -r web/requirements.txt &>/dev/null
@@ -188,10 +186,10 @@ install_webserver(){
     #$SUDO su postgres -c "psql -c \"GRANT ALL PRIVILEGES ON DATABASE web TO $DBUser;\""
     
     printf "${yellow} Creating WEB User...${reset}\n\n"
-    $SUDO rm web/db.sqlite3 &>/dev/null
-    $SUDO python3 web/manage.py makemigrations &>/dev/null
-    $SUDO python3 web/manage.py migrate &>/dev/null
-    $SUDO python3 web/manage.py createsuperuser
+    $SUDO rm $SCRIPTPATH/web/db.sqlite3
+    $SUDO python3 $SCRIPTPATH/web/manage.py makemigrations &>/dev/null
+    $SUDO python3 $SCRIPTPATH/web/manage.py migrate &>/dev/null
+    $SUDO python3 $SCRIPTPATH/web/manage.py createsuperuser
 }
 
 
