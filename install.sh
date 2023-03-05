@@ -142,10 +142,10 @@ install_webserver(){
     printf "${yellow} python virtualenv install...${reset}\n\n"
     $SUDO rm -rf /web/.venv/
     $SUDO pip3 install virtualenv &>/dev/null
-    $SUDO virtualenv $HOME/reconftw/web/.venv/ &>/dev/null
+    $SUDO virtualenv web/.venv/ &>/dev/null
     if [ $? -eq 0 ]; then
         printf "${yellow} Activating virtualenv...${reset}\n\n" 
-        $SUDO source $HOME/reconftw/web/.venv/bin/activate
+        $SUDO source web/.venv/bin/activate
         $SUDO pip3 install --upgrade pip &>/dev/null
     else
         printf '[ERROR] Failed to create virtualenv. Please install requirements mentioned in Documentation.'
@@ -153,7 +153,7 @@ install_webserver(){
     fi
 
     printf "${yellow} Installing Requirements...${reset}\n\n"
-    $SUDO pip3 install -r $HOME/reconftw/web/requirements.txt &>/dev/null
+    $SUDO pip3 install -r web/requirements.txt &>/dev/null
     
     
     
@@ -188,10 +188,10 @@ install_webserver(){
     #$SUDO su postgres -c "psql -c \"GRANT ALL PRIVILEGES ON DATABASE web TO $DBUser;\""
     
     printf "${yellow} Creating WEB User...${reset}\n\n"
-    $SUDO rm $HOME/reconftw/web/db.sqlite3 &>/dev/null
-    $SUDO python3 $HOME/reconftw/web/manage.py makemigrations &>/dev/null
-    $SUDO python3 $HOME/reconftw/web/manage.py migrate &>/dev/null
-    $SUDO python3 $HOME/reconftw/web/manage.py createsuperuser
+    $SUDO rm web/db.sqlite3 &>/dev/null
+    $SUDO python3 web/manage.py makemigrations &>/dev/null
+    $SUDO python3 web/manage.py migrate &>/dev/null
+    $SUDO python3 web/manage.py createsuperuser
 }
 
 
