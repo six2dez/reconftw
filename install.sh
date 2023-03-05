@@ -154,9 +154,7 @@ install_webserver(){
 
     printf "${yellow} Installing Requirements...${reset}\n\n"
     $SUDO pip3 install -r $SCRIPTPATH/web/requirements.txt &>/dev/null
-    
-    
-    
+        
     #$SUDO virtualenv web/env &>/dev/null
     #$SUDO source web/env/bin/activate
     #$SUDO pip3 install -r web/requirements.txt &>/dev/null
