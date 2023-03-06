@@ -47,7 +47,7 @@ fi
 declare -A gotools
 gotools["gf"]="go install -v github.com/tomnomnom/gf@latest"
 gotools["qsreplace"]="go install -v github.com/tomnomnom/qsreplace@latest"
-gotools["Amass"]="go install -v github.com/OWASP/Amass/v3/...@v3.20.0"
+gotools["amass"]="go install -v github.com/OWASP/Amass/v3/...@v3.20.0"
 gotools["ffuf"]="go install -v github.com/ffuf/ffuf@latest"
 gotools["github-subdomains"]="go install -v github.com/gwen001/github-subdomains@latest"
 gotools["gitlab-subdomains"]="go install github.com/gwen001/gitlab-subdomains@latest"
@@ -427,6 +427,12 @@ go env -w GO111MODULE=auto
 go_step=0
 for gotool in "${!gotools[@]}"; do
     go_step=$((go_step + 1))
+    if [ "$upgrade_tools" = "false" ]; then
+        res=$(command -v "$gotool") && {
+            echo -e "[${yellow}SKIPPING${reset}] $gotool already installed in...${blue}${res}${reset}"
+            continue
+        }
+    fi
     eval ${gotools[$gotool]} $DEBUG_STD
     exit_status=$?
     if [ $exit_status -eq 0 ]
@@ -457,6 +463,18 @@ eval $SUDO ln -sf /opt/exploitdb/searchsploit /usr/local/bin/searchsploit $DEBUG
 repos_step=0
 for repo in "${!repos[@]}"; do
     repos_step=$((repos_step + 1))
+    if [ "$upgrade_tools" = "false" ]; then
+        unset is_installed
+        unset is_need_dl
+        [[ $repo == "Gf-Patterns" ]] && is_need_dl=1
+        [[ $repo == "gf" ]] && is_need_dl=1
+        res=$(command -v "$repo") && is_installed=1
+        [[ -z $is_need_dl ]] && [[ -n $is_installed ]] && {
+            # HERE: not installed yet.
+            echo -e "[${yellow}SKIPPING${reset}] $repo already installed in...${blue}${res}${reset}"
+            continue
+        }
+    fi
     eval git clone https://github.com/${repos[$repo]} $dir/$repo $DEBUG_STD
     eval cd $dir/$repo $DEBUG_STD
     eval git pull $DEBUG_STD
@@ -468,18 +486,18 @@ for repo in "${!repos[@]}"; do
         printf "${red} Unable to install $repo, try manually (${repos_step}/${#repos[@]})${reset}\n"
         double_check=true
     fi
-    if [ -s "requirements.txt" ]; then
-        eval $SUDO pip3 install -r requirements.txt $DEBUG_STD
-        #eval $SUDO python3 setup.py install --record files.txt $DEBUG_STD
-        #[ -s "files.txt" ] && eval xargs rm -rf < files.txt $DEBUG_STD
-        #eval $SUDO pip3 install . $DEBUG_STD
+    if ( [ -z $is_installed ] && [ "$upgrade_tools" = "false" ] ) || [ "$upgrade_tools" = "true" ] ; then
+        if [ -s "requirements.txt" ]; then
+            eval $SUDO pip3 install -r requirements.txt $DEBUG_STD
+        fi
+        if [ -s "setup.py" ]; then
+            eval $SUDO pip3 install . $DEBUG_STD
+        fi
+        if [ "massdns" = "$repo" ]; then
+            eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/local/bin/ $DEBUG_ERROR
+        fi
     fi
-    if [ -s "setup.py" ]; then
-        eval $SUDO pip3 install . $DEBUG_STD
-    fi
-    if [ "massdns" = "$repo" ]; then
-        eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/local/bin/ $DEBUG_ERROR
-    elif [ "gf" = "$repo" ]; then
+    if [ "gf" = "$repo" ]; then
         eval cp -r examples ~/.gf $DEBUG_ERROR
     elif [ "Gf-Patterns" = "$repo" ]; then
         eval mv ./*.json ~/.gf $DEBUG_ERROR
