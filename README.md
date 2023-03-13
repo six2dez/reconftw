@@ -519,7 +519,7 @@ reset='\033[0m'
 - 4XX Bypasser ([byp4xx](https://github.com/lobuhi/byp4xx))
 
 ## Extras
-- Multithreading ([Rush](https://github.com/shenwei356/rush))
+- Multithreading ([Interlace](https://github.com/codingo/Interlace))
 - Custom resolvers generated list ([dnsvalidator](https://github.com/vortexau/dnsvalidator))
 - Docker container included and [DockerHub](https://hub.docker.com/r/six2dez/reconftw) integration
 - Ansible + Terraform deployment over AWS
