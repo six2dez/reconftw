@@ -46,7 +46,6 @@ function tools_installed(){
 	[ -n "$PATH" ] || { printf "${bred} [*] PATH var			[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/dorks_hunter/dorks_hunter.py" ] || { printf "${bred} [*] dorks_hunter		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/brutespray/brutespray.py" ] || { printf "${bred} [*] brutespray			[NO]${reset}\n"; allinstalled=false;}
-#	[ -f "$tools/theHarvester/theHarvester.py" ] || { printf "${bred} [*] theHarvester		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/fav-up/favUp.py" ] || { printf "${bred} [*] fav-up			[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/Corsy/corsy.py" ] || { printf "${bred} [*] Corsy			[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/testssl.sh/testssl.sh" ] || { printf "${bred} [*] testssl			[NO]${reset}\n"; allinstalled=false;}
@@ -222,7 +221,6 @@ function emails(){
 		python3 infoga.py --domain $domain --source all --report $dir/.tmp/infoga.txt 2>>"$LOGFILE" &>/dev/null
 		cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		[ -s ".tmp/infoga.txt" ] && cat .tmp/infoga.txt | cut -d " " -f3 | grep -v "-" | anew -q osint/emails.txt
-
 
 # COMMENTED THEHARVESTER, H8MAIL AND PWNDB AS THEY'RE NOT WORKING AS EXPECTED
 #		cd "$tools/theHarvester" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
@@ -1855,7 +1853,7 @@ function 4xxbypass(){
 			cd "$tools/byp4xx" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 			byp4xx -threads $BYP4XX_THREADS $dir/.tmp/403test.txt > $dir/.tmp/byp4xx.txt
 			cd "$dir" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
-			[ -s ".tmp/byp4xx.txt" ] && cat .tmp/dirdar.txt | anew -q vulns/byp4xx.txt
+			[ -s ".tmp/byp4xx.txt" ] && cat .tmp/byp4xx.txt | anew -q vulns/byp4xx.txt
 			end_func "Results are saved in vulns/byp4xx.txt" ${FUNCNAME[0]}
 		else
 			notification "Too many urls to bypass, skipping" warn

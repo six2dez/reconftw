@@ -25,6 +25,7 @@ requests_futures        # cloud_enums
 retrying                # multiple
 s3scanner               # Tool
 setuptools              # multiple
+shodan                  # favUp
 termcolor               # xnLinkFinder
 tldextract              # dorks_hunter
 tqdm                    # multiple
