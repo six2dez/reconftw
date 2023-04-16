@@ -113,6 +113,7 @@ repos["Web-Cache-Vulnerability-Scanner"]="Hackmanit/Web-Cache-Vulnerability-Scan
 repos["regulator"]="cramppet/regulator"
 repos["byp4xx"]="lobuhi/byp4xx"
 repos["Infoga"]="m4ll0k/Infoga"
+repos["ghauri"]="https://github.com/r0oth3x49/ghauri"
 
 
 function banner_web(){
