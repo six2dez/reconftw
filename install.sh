@@ -54,7 +54,7 @@ gotools["gitlab-subdomains"]="go install github.com/gwen001/gitlab-subdomains@la
 gotools["nuclei"]="go install -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest"
 gotools["anew"]="go install -v github.com/tomnomnom/anew@latest"
 gotools["notify"]="go install -v github.com/projectdiscovery/notify/cmd/notify@latest"
-gotools["unfurl"]="go install -v github.com/tomnomnom/unfurl@latest"
+gotools["unfurl"]="go install -v github.com/tomnomnom/unfurl@v0.3.0"
 gotools["httpx"]="go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest"
 gotools["github-endpoints"]="go install -v github.com/gwen001/github-endpoints@latest"
 gotools["dnsx"]="go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest"
@@ -81,6 +81,7 @@ gotools["enumerepo"]="go install github.com/trickest/enumerepo@latest"
 gotools["Web-Cache-Vulnerability-Scanner"]="go install -v github.com/Hackmanit/Web-Cache-Vulnerability-Scanner@latest"
 gotools["subfinder"]="go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest"
 gotools["byp4xx"]="go install -v github.com/lobuhi/byp4xx@latest"
+gotools["hakip2host"]="go install github.com/hakluke/hakip2host@latest"
 
 declare -A repos
 repos["dorks_hunter"]="six2dez/dorks_hunter"
