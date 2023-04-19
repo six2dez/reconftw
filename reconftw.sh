@@ -20,7 +20,7 @@ function banner(){
 ###############################################################################################################
 
 function check_version(){
-	timeout 10 git fetch 2>>"$LOGFILE" &>/dev/null
+	timeout 10 git fetch
 	exit_status=$?
 	if [ $exit_status -eq 0 ]; then
 		BRANCH=$(git rev-parse --abbrev-ref HEAD)
