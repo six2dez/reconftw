@@ -130,8 +130,7 @@ function banner_web(){
 	printf "   ░░   ░    ░   ░        ░ ░ ░ ▒     ░   ░ ░  ░ ░      ░        ░   ░  \n"
 	printf "    ░        ░  ░░ ░          ░ ░           ░                      ░    \n"
 	printf "                 ░                                                      \n"
-    printf " ${reconftw_version}                                         by @six2dez\n"
-	printf " Web Interface by @lur1el, @d3vchac, @mx61tt and @dd4n1b0y${reset}\n"
+        printf " ${reconftw_version}                                         by @six2dez\n"
 }
 
 
