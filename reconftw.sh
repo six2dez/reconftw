@@ -1310,7 +1310,6 @@ function cms_scanner(){
 
 function urlchecks(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$URL_CHECK" = true ]; then
-		set -x
 		start_func ${FUNCNAME[0]} "URL Extraction"
 		mkdir -p js
 		[ ! -s ".tmp/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q .tmp/webs_all.txt
@@ -1380,8 +1379,6 @@ function urlchecks(){
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
-	set -x
-	exit
 }
 
 function url_gf(){
