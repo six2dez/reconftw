@@ -35,7 +35,7 @@ So, without further ado, we invite you to explore the enhanced web interface of 
 ```bash
 ./install.sh
 ```
-
+![ReconFTW Install Web GUI](https://i.imgur.com/675L89x.png)
 ---
 
 # :robot: Usage:
@@ -44,7 +44,7 @@ So, without further ado, we invite you to explore the enhanced web interface of 
 ```bash
 ./reconftw.sh --web-server start
 ```
-![ReconFTW Start Web GUI](https://i.imgur.com/lzilnIz.png)
+![ReconFTW Start Web GUI](https://i.imgur.com/gHi7Bj5.png)
 
 ### To stop the Web Service:
 ```bash
