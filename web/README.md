@@ -8,44 +8,52 @@
 
 <h3 align="center">Summary</h3>
 
-**ReconFTW** is a powerful and versatile reconnaissance tool, and I'm thrilled to have the opportunity to contribute to its development with my friends Daniel **"d3vchac" Chactoura, Daniel "dd4n1b0y" Lima**, and **Matheus "mx61tt" Tucunduva**.
+Over the past year, our team has been dedicated to the meticulous development of the web interface for ReconFTW. Our unwavering efforts have been singularly focused on enhancing its intuitiveness, user-friendliness, and visual aesthetics, all while ensuring that it strikes the right balance between functionality and simplicity. This has been a challenging endeavor as we aimed to create an interface that caters to the diverse needs of both advanced users and beginners alike.
 
-Over the past year, we have dedicated ourselves to creating the web interface of **ReconFTW**. Working hard to make it more intuitive, user-friendly, and visually appealing. We also have implemented some features that make it easier for users to create their scans and get the results they need quickly and efficiently.
+One of the key hurdles we encountered was reconciling the intricate functionality required by advanced users with the need for a straightforward and accessible interface for those who are new to the platform. Through meticulous design and rigorous testing, we have successfully incorporated several features that streamline the process of creating scans and obtaining results in a prompt and efficient manner. The ultimate goal has been to elevate the overall user experience and provide a seamless and satisfying interaction with ReconFTW.
 
-One of the main challenges we faced during this project was striking a balance between functionality and simplicity because we wanted to make sure that the interface was powerful enough to meet the needs of advanced users and easy for beginners to navigate. 
+So, without further ado, we invite you to explore the enhanced web interface of ReconFTW and experience the fruits of our labor firsthand. Don't hesitate - seize the opportunity to leverage our powerful yet user-friendly tool now! 
 
-So, what are you waiting for? Go! Go! Go! :boom: :boom: :boom:
+**So, what are you waiting for? Go! Go! Go! :boom: :boom: :boom:**
+
+---
+
+# :video_camera: Demo:
+### WEB:
+![WEB](https://media1.giphy.com/media/7ikMiEv5bTUP943Gnp/giphy.gif)
+
+### Mobile:
+![MOBILE](https://media3.giphy.com/media/Ec5SOPpVRlh79Vy1uR/giphy.gif)
 
 ---
 
 # 💿 Installation:
 
-- We strictly recommend installing the web interface on a VPS such as DigitalOcean.
+**:bangbang: We strictly recommend installing the web interface on a VPS such as DigitalOcean.:bangbang:**
 
-Run the following command to install the WEB GUI Interface
+### Run the following command to install the WEB GUI Interface
 ```bash
 ./install.sh
 ```
 
+---
 
-# Usage:
+# :robot: Usage:
 
-**To start the Web Service:**
+### To start the Web Service:
 ```bash
 ./reconftw.sh --web-server start
 ```
-**To stop the Web Service:**
+![ReconFTW Start Web GUI](https://i.imgur.com/lzilnIz.png)
+
+### To stop the Web Service:
 ```bash
-./reconftw.sh --web-server start
+./reconftw.sh --web-server stop
 ```
+![ReconFTW Stop Web GUI](https://i.imgur.com/bWklRCY.pngg)
+---
 
-
-# Sample video:
-
-[![Alt text](https://img.youtube.com/vi/rsIj7bFx4dk/0.jpg)](https://www.youtube.com/watch?v=rsIj7bFx4dk)
-
-
-# :fire: Features :fire:
+# :fire: Features:
 
 - New Scan
 - Schedule Scan
@@ -53,9 +61,9 @@ Run the following command to install the WEB GUI Interface
 - Edit Profile
 - Delete Scan
 
+---
 
-
-## How to contribute:
+# :drop_of_blood: How to contribute:
 
 We tried to make the structure as simple as possible to be understood, with the intention of new collaborators being able to easily read the code and add their knowledge.
 
@@ -65,7 +73,8 @@ We need to finalize features such as: cancel scan, backup scan, api key config.
 
 We need help! if you have an idea or want to improve our code, please do not hesitate to contact us or contribute directly. We know that a lot can be improved and we have the humbleness to recognize this. 
 
-Let's make history!
+**Let's make history!**
 
-"The best way to find yourself is to lose yourself in the service of others." - Mahatma Gandhi
+>"The best way to find yourself is to lose yourself in the service of others." - Mahatma Gandhi
 
+---
