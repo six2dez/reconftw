@@ -1366,7 +1366,7 @@ function urlchecks(){
 			[ -s ".tmp/katana.txt" ] && cat .tmp/katana.txt | anew -q .tmp/url_extract_tmp.txt
 			[ -s ".tmp/url_extract_tmp.txt" ] && cat .tmp/url_extract_tmp.txt | grep "${domain}" | grep -aEi "\.(js)" | anew -q .tmp/url_extract_js.txt
 			if [ "$DEEP" = true ]; then
-				[ -s ".tmp/url_extract_js.txt" ] && cat .tmp/url_extract_js.txt | python3 $tools/JSA/jsa.py | anew -q .tmp/url_extract_tmp.txt
+				[ -s ".tmp/url_extract_js.txt" ] && interlace -tL .tmp/url_extract_js.txt -threads 10 -c "python3 $tools/JSA/jsa.py -f target | anew -q .tmp/url_extract_tmp.txt" &>/dev/null
 			fi
 			[ -s ".tmp/url_extract_tmp.txt" ] &&  cat .tmp/url_extract_tmp.txt | grep "${domain}" | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | anew -q .tmp/url_extract_tmp2.txt
 			[ -s ".tmp/url_extract_tmp2.txt" ] && cat .tmp/url_extract_tmp2.txt | python3 $tools/urless/urless.py | anew -q .tmp/url_extract_uddup.txt 2>>"$LOGFILE" &>/dev/null
