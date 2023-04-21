@@ -82,6 +82,8 @@ gotools["Web-Cache-Vulnerability-Scanner"]="go install -v github.com/Hackmanit/W
 gotools["subfinder"]="go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest"
 gotools["byp4xx"]="go install -v github.com/lobuhi/byp4xx@latest"
 gotools["hakip2host"]="go install github.com/hakluke/hakip2host@latest"
+gotools["waybackurls"]="go install -v github.com/tomnomnom/waybackurls@latest"
+gotools["gau"]="go install -v github.com/lc/gau/v2/cmd/gau@latest"
 
 declare -A repos
 repos["dorks_hunter"]="six2dez/dorks_hunter"
