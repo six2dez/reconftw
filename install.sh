@@ -47,14 +47,14 @@ fi
 declare -A gotools
 gotools["gf"]="go install -v github.com/tomnomnom/gf@latest"
 gotools["qsreplace"]="go install -v github.com/tomnomnom/qsreplace@latest"
-gotools["Amass"]="go install -v github.com/OWASP/Amass/v3/...@v3.20.0"
-gotools["ffuf"]="go install -v github.com/ffuf/ffuf@latest"
+gotools["amass"]="go install -v github.com/OWASP/Amass/v3/...@v3.20.0"
+gotools["ffuf"]="go install -v github.com/ffuf/ffuf/v2@latest"
 gotools["github-subdomains"]="go install -v github.com/gwen001/github-subdomains@latest"
 gotools["gitlab-subdomains"]="go install github.com/gwen001/gitlab-subdomains@latest"
 gotools["nuclei"]="go install -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest"
 gotools["anew"]="go install -v github.com/tomnomnom/anew@latest"
 gotools["notify"]="go install -v github.com/projectdiscovery/notify/cmd/notify@latest"
-gotools["unfurl"]="go install -v github.com/tomnomnom/unfurl@latest"
+gotools["unfurl"]="go install -v github.com/tomnomnom/unfurl@v0.3.0"
 gotools["httpx"]="go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest"
 gotools["github-endpoints"]="go install -v github.com/gwen001/github-endpoints@latest"
 gotools["dnsx"]="go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest"
@@ -77,17 +77,18 @@ gotools["gitdorks_go"]="go install -v github.com/damit5/gitdorks_go@latest"
 gotools["smap"]="go install -v github.com/s0md3v/smap/cmd/smap@latest"
 gotools["dsieve"]="go install -v github.com/trickest/dsieve@master"
 gotools["inscope"]="go install github.com/tomnomnom/hacks/inscope@latest"
-gotools["rush"]="go install github.com/shenwei356/rush@latest"
 gotools["enumerepo"]="go install github.com/trickest/enumerepo@latest"
 gotools["Web-Cache-Vulnerability-Scanner"]="go install -v github.com/Hackmanit/Web-Cache-Vulnerability-Scanner@latest"
 gotools["subfinder"]="go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest"
 gotools["byp4xx"]="go install -v github.com/lobuhi/byp4xx@latest"
+gotools["hakip2host"]="go install github.com/hakluke/hakip2host@latest"
+gotools["gau"]="go install -v github.com/lc/gau/v2/cmd/gau@latest"
 
 declare -A repos
 repos["dorks_hunter"]="six2dez/dorks_hunter"
 repos["pwndb"]="davidtavarez/pwndb"
 repos["dnsvalidator"]="vortexau/dnsvalidator"
-repos["theHarvester"]="laramies/theHarvester"
+repos["interlace"]="codingo/Interlace"
 repos["brutespray"]="x90skysn3k/brutespray"
 repos["wafw00f"]="EnableSecurity/wafw00f"
 repos["gf"]="tomnomnom/gf"
@@ -113,9 +114,164 @@ repos["smuggler"]="defparam/smuggler"
 repos["Web-Cache-Vulnerability-Scanner"]="Hackmanit/Web-Cache-Vulnerability-Scanner"
 repos["regulator"]="cramppet/regulator"
 repos["byp4xx"]="lobuhi/byp4xx"
+repos["Infoga"]="m4ll0k/Infoga"
+repos["ghauri"]="https://github.com/r0oth3x49/ghauri"
 
-printf "\n\n${bgreen}#######################################################################${reset}\n"
-printf "${bgreen} reconFTW installer/updater script ${reset}\n\n"
+
+function banner_web(){
+    echo -en "\033c"
+	printf "\n${bgreen}"
+	printf "  ██▀███  ▓█████  ▄████▄   ▒█████   ███▄    █   █████▒▄▄▄█████▓ █     █░\n"
+	printf " ▓██ ▒ ██▒▓█   ▀ ▒██▀ ▀█  ▒██▒  ██▒ ██ ▀█   █ ▓██   ▒ ▓  ██▒ ▓▒▓█░ █ ░█░\n"
+	printf " ▓██ ░▄█ ▒▒███   ▒▓█    ▄ ▒██░  ██▒▓██  ▀█ ██▒▒████ ░ ▒ ▓██░ ▒░▒█░ █ ░█ \n"
+	printf " ▒██▀▀█▄  ▒▓█  ▄ ▒▓▓▄ ▄██▒▒██   ██░▓██▒  ▐▌██▒░▓█▒  ░ ░ ▓██▓ ░ ░█░ █ ░█ \n"
+	printf " ░██▓ ▒██▒░▒████▒▒ ▓███▀ ░░ ████▓▒░▒██░   ▓██░░▒█░      ▒██▒ ░ ░░██▒██▓ \n"
+	printf " ░ ▒▓ ░▒▓░░░ ▒░ ░░ ░▒ ▒  ░░ ▒░▒░▒░ ░ ▒░   ▒ ▒  ▒ ░      ▒ ░░   ░ ▓░▒ ▒  \n"
+	printf "   ░▒ ░ ▒░ ░ ░  ░  ░  ▒     ░ ▒ ▒░ ░ ░░   ░ ▒░ ░          ░      ▒ ░ ░  \n"
+	printf "   ░░   ░    ░   ░        ░ ░ ░ ▒     ░   ░ ░  ░ ░      ░        ░   ░  \n"
+	printf "    ░        ░  ░░ ░          ░ ░           ░                      ░    \n"
+	printf "                 ░                                                      \n"
+        printf " ${reconftw_version}                                         by @six2dez\n"
+}
+
+
+install_webserver(){
+    printf "${bblue} Running: Installing web reconftw ${reset}\n\n"
+    printf "${yellow} Installing python libraries...${reset}\n\n"
+    
+    # Install venv
+    printf "${yellow} python virtualenv install...${reset}\n\n"
+    $SUDO rm -rf /web/.venv/
+    $SUDO pip3 install virtualenv &>/dev/null
+    $SUDO virtualenv web/.venv/ &>/dev/null
+    if [ $? -eq 0 ]; then
+        printf "${yellow} Activating virtualenv...${reset}\n\n" 
+        $SUDO source web/.venv/bin/activate
+        $SUDO pip3 install --upgrade pip &>/dev/null
+    else
+        printf '[ERROR] Failed to create virtualenv. Please install requirements mentioned in Documentation.'
+        exit 1
+    fi
+
+    printf "${yellow} Installing Requirements...${reset}\n\n"
+    $SUDO pip3 install -r $SCRIPTPATH/web/requirements.txt &>/dev/null
+        
+    #$SUDO virtualenv web/env &>/dev/null
+    #$SUDO source web/env/bin/activate
+    #$SUDO pip3 install -r web/requirements.txt &>/dev/null
+
+    printf "${yellow} Installing tools...${reset}\n\n"
+    $SUDO apt install redis-server -y &>/dev/null
+    #$SUDO apt install postgresql -y &>/dev/null
+
+    # printf "${yellow} Database configuration...${reset}\n\n"
+    #$SUDO service postgresql restart &>/dev/null
+    #$SUDO su postgres -c 'psql -c "DROP DATABASE web;"' &>/dev/null
+    #$SUDO su postgres -c 'psql -c "CREATE DATABASE web;"' &>/dev/null
+    
+    #read -p ' What Username is used in db: ' DBUser
+    #read -s -p ' What Password is used in db: ' DBPass
+    
+    #$SUDO su postgres 'psql -c "DROP USER "'$DBUser &> /dev/null
+
+    #sed -i "s/'USER': '.*/'USER': '$DBUser',/" web/web/settings.py
+    #sed -i "s/'PASSWORD': '.*/'PASSWORD': '$DBPass',/" web/web/settings.py
+    #echo ""
+
+    #printf "${yellow} Creating DB User...${reset}\n\n"
+    #$SUDO su postgres -c "psql -c \"CREATE USER $DBUser with PASSWORD '$DBPass';\""
+
+    #$SUDO su postgres -c "psql -c \"ALTER ROLE $DBUser SET client_encoding TO 'utf8';\""
+    #$SUDO su postgres -c "psql -c \"ALTER ROLE $DBUser SET default_transaction_isolation TO 'read committed';\""
+    #$SUDO su postgres -c "psql -c \"ALTER ROLE $DBUser SET timezone TO 'UTC';\""
+    #$SUDO su postgres -c "psql -c \"GRANT ALL PRIVILEGES ON DATABASE web TO $DBUser;\""
+    
+    printf "${yellow} Creating WEB User...${reset}\n\n"
+    $SUDO rm $SCRIPTPATH/web/db.sqlite3
+    $SUDO python3 $SCRIPTPATH/web/manage.py makemigrations &>/dev/null
+    $SUDO python3 $SCRIPTPATH/web/manage.py migrate &>/dev/null
+    $SUDO python3 $SCRIPTPATH/web/manage.py createsuperuser
+}
+
+
+banner_web
+printf "\n${bgreen} reconFTW installer/updater script ${reset}\n\n"
+
+
+if [[ -d $dir && -d ~/.gf && -d ~/.config/notify/ && -d ~/.config/amass/ && -d ~/.config/nuclei/ && -f $dir/.github_tokens ]]; then
+    rftw_installed=true
+else 
+    rftw_installed=false
+fi
+
+
+# Display menu and wait for user input
+while true; do
+    printf "${bblue} Choose one of the following options: ${reset}\n\n"
+
+    if $rftw_installed; then
+        printf "${bblue} 1. Install/Update ReconFTW (without Web Interface)${reset}\n\n"
+        printf "${bblue} 2. Install/Update ReconFTW + Install Web Interface${reset}\n\n"
+        printf "${bblue} 3. Install only Web Interface${reset}\n\n"
+        printf "${bblue} 4. Exit${reset}\n\n"
+        printf "${bgreen}#######################################################################${reset}\n\n"
+        read -p "$(echo -e ${bblue} "Insert option: "${reset})" option
+        printf "\n\n${bgreen}#######################################################################${reset}\n\n"
+
+        case $option in
+            1)
+                web=false
+                break
+                ;;
+            2)
+                web=true
+                break
+                ;;
+            3)
+                install_webserver
+                exit 1
+                ;;
+            4)
+                printf "${bblue} Exiting...${reset}\n\n"
+                exit 1
+                ;;
+            *)
+                printf "${bblue} Invalid option. Exiting...${reset}\n\n"
+                exit 1
+                ;;
+        esac
+
+    else
+        printf "${bblue} 1. Install/Update ReconFTW${reset}\n\n"
+        printf "${bblue} 2. Install/Update ReconFTW + Install Web Interface${reset}\n\n"
+        printf "${bred} 3. Can't install Web Interface without ReconFTW${reset}\n\n"
+        printf "${bblue} 4. Exit${reset}\n\n"
+        printf "${bgreen}#######################################################################${reset}\n\n"
+        read -p "$(echo -e ${bblue} "Insert option: "${reset})" option
+        printf "\n${bgreen}#######################################################################${reset}\n\n"
+
+        case $option in
+            1)
+                web=false
+                break
+                ;;
+            2)
+                web=true
+                break
+                ;;
+            4)
+                printf "${bblue} Exiting...${reset}\n\n"
+                exit 1
+                ;;
+            *)
+                printf "${bblue} Invalid option. Exiting...${reset}\n\n"
+                exit 1
+                ;;
+        esac
+    fi    
+done
+
+
 printf "${yellow} This may take time. So, go grab a coffee! ${reset}\n\n"
 
 if [[ $(id -u | grep -o '^0$') == "0" ]]; then
@@ -134,8 +290,7 @@ install_apt(){
     eval $SUDO apt update -y $DEBUG_STD
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium-browser -y $DEBUG_STD
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium -y $DEBUG_STD
-    eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip build-essential gcc cmake ruby whois git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb libxml2-utils procps bsdmainutils libdata-hexdump-perl -y $DEBUG_STD
-    eval $SUDO systemctl enable tor $DEBUG_STD
+    eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip build-essential gcc cmake ruby whois git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx medusa xvfb libxml2-utils procps bsdmainutils libdata-hexdump-perl -y $DEBUG_STD
     curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
     eval source "$HOME/.cargo/env $DEBUG_STD"
     eval cargo install ripgen $DEBUG_STD
@@ -149,10 +304,9 @@ install_brew(){
     fi
     eval brew update -$DEBUG_STD
     eval brew install --cask chromium $DEBUG_STD
-    eval brew install bash coreutils python massdns jq gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils whois libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx tor medusa xvfb libxml2-utils libdata-hexdump-perl gnu-getopt $DEBUG_STD
+    eval brew install bash coreutils python massdns jq gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils whois libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx medusa xvfb libxml2-utils libdata-hexdump-perl gnu-getopt $DEBUG_STD
     export PATH="/opt/homebrew/opt/gnu-getopt/bin:$PATH"
     echo 'export PATH="/opt/homebrew/opt/gnu-getopt/bin:$PATH"' >> ~/.zshrc
-    eval brew services start tor $DEBUG_STD
     brew install rustup
     rustup-init
     eval cargo install ripgen $DEBUG_STD
@@ -160,15 +314,14 @@ install_brew(){
 
 install_yum(){
     eval $SUDO yum groupinstall "Development Tools" -y $DEBUG_STD
-    eval $SUDO yum install python3 python3-pip gcc cmake ruby git curl libpcap-dev wget whois zip python3-devel pv bind-utils libopenssl-devel libffi-devel libxml2-devel libxslt-devel zlib-devel nmap jq lynx tor medusa xorg-x11-server-xvfb -y $DEBUG_STD
+    eval $SUDO yum install python3 python3-pip gcc cmake ruby git curl libpcap-dev wget whois zip python3-devel pv bind-utils libopenssl-devel libffi-devel libxml2-devel libxslt-devel zlib-devel nmap jq lynx medusa xorg-x11-server-xvfb -y $DEBUG_STD
     curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
     eval source "$HOME/.cargo/env $DEBUG_STD"
     eval cargo install ripgen $DEBUG_STD
 }
 
 install_pacman(){
-    eval $SUDO pacman -Sy install python python-pip base-devel gcc cmake ruby git curl libpcap whois wget zip pv bind openssl libffi libxml2 libxslt zlib nmap jq lynx tor medusa xorg-server-xvfb -y $DEBUG_STD
-    eval $SUDO systemctl enable --now tor.service $DEBUG_STD
+    eval $SUDO pacman -Sy install python python-pip base-devel gcc cmake ruby git curl libpcap whois wget zip pv bind openssl libffi libxml2 libxslt zlib nmap jq lynx medusa xorg-server-xvfb -y $DEBUG_STD
     curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
     eval source "$HOME/.cargo/env $DEBUG_STD"
     eval cargo install ripgen $DEBUG_STD
@@ -276,6 +429,12 @@ go env -w GO111MODULE=auto
 go_step=0
 for gotool in "${!gotools[@]}"; do
     go_step=$((go_step + 1))
+    if [ "$upgrade_tools" = "false" ]; then
+        res=$(command -v "$gotool") && {
+            echo -e "[${yellow}SKIPPING${reset}] $gotool already installed in...${blue}${res}${reset}"
+            continue
+        }
+    fi
     eval ${gotools[$gotool]} $DEBUG_STD
     exit_status=$?
     if [ $exit_status -eq 0 ]
@@ -306,6 +465,18 @@ eval $SUDO ln -sf /opt/exploitdb/searchsploit /usr/local/bin/searchsploit $DEBUG
 repos_step=0
 for repo in "${!repos[@]}"; do
     repos_step=$((repos_step + 1))
+    if [ "$upgrade_tools" = "false" ]; then
+        unset is_installed
+        unset is_need_dl
+        [[ $repo == "Gf-Patterns" ]] && is_need_dl=1
+        [[ $repo == "gf" ]] && is_need_dl=1
+        res=$(command -v "$repo") && is_installed=1
+        [[ -z $is_need_dl ]] && [[ -n $is_installed ]] && {
+            # HERE: not installed yet.
+            echo -e "[${yellow}SKIPPING${reset}] $repo already installed in...${blue}${res}${reset}"
+            continue
+        }
+    fi
     eval git clone https://github.com/${repos[$repo]} $dir/$repo $DEBUG_STD
     eval cd $dir/$repo $DEBUG_STD
     eval git pull $DEBUG_STD
@@ -317,18 +488,18 @@ for repo in "${!repos[@]}"; do
         printf "${red} Unable to install $repo, try manually (${repos_step}/${#repos[@]})${reset}\n"
         double_check=true
     fi
-    if [ -s "requirements.txt" ]; then
-        eval $SUDO pip3 install -r requirements.txt $DEBUG_STD
-        #eval $SUDO python3 setup.py install --record files.txt $DEBUG_STD
-        #[ -s "files.txt" ] && eval xargs rm -rf < files.txt $DEBUG_STD
-        #eval $SUDO pip3 install . $DEBUG_STD
+    if ( [ -z $is_installed ] && [ "$upgrade_tools" = "false" ] ) || [ "$upgrade_tools" = "true" ] ; then
+        if [ -s "requirements.txt" ]; then
+            eval $SUDO pip3 install -r requirements.txt $DEBUG_STD
+        fi
+        if [ -s "setup.py" ]; then
+            eval $SUDO pip3 install . $DEBUG_STD
+        fi
+        if [ "massdns" = "$repo" ]; then
+            eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/local/bin/ $DEBUG_ERROR
+        fi
     fi
-    if [ -s "setup.py" ]; then
-        eval $SUDO pip3 install . $DEBUG_STD
-    fi
-    if [ "massdns" = "$repo" ]; then
-        eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/local/bin/ $DEBUG_ERROR
-    elif [ "gf" = "$repo" ]; then
+    if [ "gf" = "$repo" ]; then
         eval cp -r examples ~/.gf $DEBUG_ERROR
     elif [ "Gf-Patterns" = "$repo" ]; then
         eval mv ./*.json ~/.gf $DEBUG_ERROR
@@ -386,7 +557,7 @@ printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 [ ! -f ~/.config/notify/provider-config.yaml ] && wget -q -O ~/.config/notify/provider-config.yaml https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw
 wget -q -O - https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json > ~/.gf/potential.json
 wget -q -O - https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py > ${tools}/getjswords.py
-wget -q -O - https://wordlists-cdn.assetnote.io/data/manual/best-dns-wordlist.txt > ${subs_wordlist_big}
+wget -q -O - https://raw.githubusercontent.com/n0kovo/n0kovo_subdomains/main/n0kovo_subdomains_huge.txt > ${subs_wordlist_big}
 wget -q -O - https://raw.githubusercontent.com/six2dez/resolvers_reconftw/main/resolvers_trusted.txt > ${resolvers_trusted}
 wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > ${resolvers} 
 wget -q -O - https://gist.github.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw > ${subs_wordlist}
@@ -470,13 +641,13 @@ else
 	fi
 fi
 
-eval h8mail -g $DEBUG_STD
+#eval h8mail -g $DEBUG_STD
 
 ## Stripping all Go binaries
 eval strip -s "$HOME"/go/bin/* $DEBUG_STD
 
 eval $SUDO cp "$HOME"/go/bin/* /usr/local/bin/ $DEBUG_STD
 
-printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/provider-config.yaml)\n - GitLab (~/Tools/.gitlab_tokens)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg or env var) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg or env var) \n - notify (~/.config/notify/provider-config.yaml) \n - theHarvester (~/Tools/theHarvester/api-keys.yaml or /etc/theHarvester/api-keys.yaml)\n - H8mail (~/Tools/h8mail_config.ini)\n - WHOISXML API (WHOISXML_API in reconftw.cfg or env var)\n\n\n${reset}"
+printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/provider-config.yaml)\n - GitLab (~/Tools/.gitlab_tokens)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg or env var) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg or env var) \n - notify (~/.config/notify/provider-config.yaml) \n - theHarvester (~/Tools/theHarvester/api-keys.yaml or /etc/theHarvester/api-keys.yaml)\n - WHOISXML API (WHOISXML_API in reconftw.cfg or env var)\n\n\n${reset}"
 printf "${bgreen} Finished!${reset}\n\n"
 printf "\n\n${bgreen}#######################################################################${reset}\n"

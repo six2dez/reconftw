@@ -1,0 +1,1239 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}reconFTW - Results{% endblock %}
+{% block content %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/scan_all.css' %}">
+{% endblock %}
+
+{% include 'modal.html' %}
+
+<body>
+
+  <div class="contentDiv" id="content">
+
+    <button class="back-to-top" type="button"></button>
+
+  </div>
+
+  <div class="sidebar close">
+    <div class="logo-details">
+      <img class="rftw-logo" src="/static/img/favicon.ico" alt="" />
+      <span class="logo_name"> reconFTW</span>
+    </div>
+
+    <hr class="nav-hr" />
+
+    <ul class="nav-links">
+      <li>
+        <a href="#section-1">
+          <i class="bx bx-globe"></i>
+          <span class="link_name">Subdomains</span>
+        </a>
+        <ul class="sub-menu blank">
+          <li><a class="link_name" href="#section-1">Subdomains</a></li>
+        </ul>
+      </li>
+
+      <li>
+        <a href="#section-2">
+          <i class="bx bx-cloud"></i>
+          <span class="link_name">Cloud Assets</span>
+        </a>
+        <ul class="sub-menu blank">
+          <li><a class="link_name" href="#section-2">Cloud Assets</a></li>
+        </ul>
+      </li>
+
+      <li>
+        <a href="#section-3">
+          <i class="bx bx-image"></i>
+          <span class="link_name">Screenshots</span>
+        </a>
+        <ul class="sub-menu blank">
+          <li><a class="link_name" href="#section-3">Screenshots</a></li>
+        </ul>
+      </li>
+
+      <li>
+        <a href="#section-4">
+          <i class="bx bx-search-alt"></i>
+          <span class="link_name">OSINT Output</span>
+        </a>
+        <ul class="sub-menu blank">
+          <li><a class="link_name" href="#section-4">OSINT Output</a></li>
+        </ul>
+      </li>
+
+      <li>
+        <div class="icon-link">
+          <a href="#section-5">
+            <i class="bx bx-ghost"></i>
+            <span class="link_name">Nuclei Output</span>
+          </a>
+          <i class="bx bxs-chevron-down arrow"></i>
+        </div>
+        <ul class="sub-menu">
+          <li><a class="link_name" href="#section-5">Nuclei Output</a></li>
+          <li><a href="#section-5">Info</a></li>
+          <li><a href="#section-5">Low</a></li>
+          <li><a href="#section-5">Medium</a></li>
+          <li><a href="#section-5">High</a></li>
+          <li><a href="#section-5">Critical</a></li>
+        </ul>
+      </li>
+
+      <li>
+        <div class="icon-link">
+          <a href="#section-6">
+            <i class="bx bx-bug"></i>
+            <span class="link_name">Vulnerabilities</span>
+          </a>
+          <i class="bx bxs-chevron-down arrow"></i>
+        </div>
+        <ul class="sub-menu">
+          <li><a class="link_name" href="#section-6">Vulnerabilities</a></li>
+          <li><a href="#section-6">Cors</a></li>
+          <li><a href="#section-6">Broken Links</a></li>
+          <li><a href="#section-6">smuggling</a></li>
+          <li><a href="#section-6">Command Injection</a></li>
+          <li><a href="#section-6">Open Redirect</a></li>
+          <li><a href="#section-6">SSRF</a></li>
+          <li><a href="#section-6">CRLF</a></li>
+          <li><a href="#section-6">XSS</a></li>
+          <li><a href="#section-6">LFI</a></li>
+          <li><a href="#section-6">SQLI</a></li>
+          <li><a href="#section-6">SSTI</a></li>
+          <li><a href="#section-6">GF Output</a></li>
+        </ul>
+      </li>
+
+      <li>
+        <a href="#section-8">
+          <i class="bx bxs-folder-open"></i>
+          <span class="link_name">Fuzzing Paths</span>
+        </a>
+        <ul class="sub-menu blank">
+          <li><a class="link_name" href="#section-8">Fuzzing Paths</a></li>
+        </ul>
+      </li>
+
+      <li>
+        <div class="icon-link">
+          <a href="#section-10">
+            <i class="bx bxl-javascript"></i>
+            <span class="link_name">Javascript</span>
+          </a>
+          <i class="bx bxs-chevron-down arrow"></i>
+        </div>
+        <ul class="sub-menu">
+          <li><a class="link_name" href="#section-10">JavaScript</a></li>
+          <li><a href="#section-10">Endpoints</a></li>
+          <li><a href="#section-10">Links</a></li>
+          <li><a href="#section-10">Secrets</a></li>
+        </ul>
+      </li>
+
+      <li>
+        <div class="icon-link">
+          <a href="#section-11">
+            <i class="bx bxs-file"></i>
+            <span class="link_name">Dictionaries</span>
+          </a>
+          <i class="bx bxs-chevron-down arrow"></i>
+        </div>
+        <ul class="sub-menu">
+          <li><a class="link_name" href="#section-11">Dictionaries</a></li>
+          <li><a href="#section-11">Params</a></li>
+          <li><a href="#section-11">Values</a></li>
+          <li><a href="#section-11">Words</a></li>
+          <li><a href="#section-11">Paths</a></li>
+        </ul>
+      </li>
+
+      <hr class="nav-hr" />
+
+      <li>
+        <div class="logout-section-sidenav">
+          <a href="{% url 'projects:index' %}">
+            <i class="bx bx-exit bx-rotate-180 nav_icon"></i>
+            <span class="link_name">Back to Projects</span>
+          </a>
+          <ul class="sub-menu blank comeback-submenu">
+            <li>
+              <a class="link_name" href="{% url 'projects:index' %}">Back to Projects</a>
+            </li>
+          </ul>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <section class="home-section">
+    <div class="home-content fixed-top">
+      <i class="bx bx-menu"></i>
+
+      <div class="home-content-right">
+        {% if status == 'FINISHED' %}
+        <i class='bx bx-check iconsmr'></i>
+        <h5 class="h4 fntsmr_scanning">FINISHED</h5>
+        {% endif %}
+        {% if status == 'SCANNING' %}
+        <i class='bx bx-loader-circle loader'></i>
+        <h5 class="h4 fntsmr_scanning">SCANNING</h5>
+        {% endif %}
+        {% if status == 'WAITING' %}
+        <i class='bx bxs-hand iconsmr blink_me'></i>
+        <h5 class="h4 fntsmr_scanning">WAITING</h5>
+        {% endif %}
+        <i class="bx bx-globe iconsmr"></i>
+        <h5 class="h4 fntsmr_scan_mode">SCAN MODE: <span class="scan_mode">RECON</span></h5>
+
+        <i class="bx bx-target-lock iconsmr"></i>
+        <h5 class="h4 fntsmr">{{ title_domain_target }}</h5>
+
+        <!-- <hr class="rftw-vertical-line"> -->
+
+        <div class="action" onmouseover="menuToggle();" onmouseout="menuToggle();">
+          <div class="profile">
+            <img src="{{ imagePath }}" />
+          </div>
+          <div class="menu">
+            <h3>{{ request.user }}<br /><span>Reconnaissance Ninja</span></h3>
+            <ul>
+              <li>
+                <a href="{% url 'edit_profile:index' %}"><i class="bx bx-sm bx-user-circle"></i>Edit profile</a>
+              </li>
+              <li>
+                <a href="{% url 'apikeys_settings:index' %}"><i class="bx bx-sm bx-cog"></i> API Keys</a>
+              </li>
+              <li>
+                <a href="{% url 'logout' %}"><i class="bx bx-sm bx-log-out-circle"></i> Logout</a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BODY -->
+    <div class="container-fluid">
+      <div class="card-body" id="section-1">
+        <div class="row">
+          <div class="d-sm-flex align-items-center align-to-cards">
+            <i class="bx bx-sm bx-globe"></i>
+            <p>
+              <strong> SUBDOMAINS </strong>
+            </p>
+          </div>
+
+          <div class="col-xs-6">
+            <div class="table-responsive">
+              <table id="subdomains" class="table table-striped table-content" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>SUBDOMAIN</th>
+                    <th>IP ADDRESS</th>
+                    <th>PORT</th>
+                    <th>SUBDOMAIN TAKEOVER</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for subdomains in subdomains_table %}
+
+                  <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ subdomains.subdomain }}</td>
+                    <td>{{ subdomains.ip_address }}</td>
+                    <td>{{ subdomains.ports }}</td>
+                    <td>{{ subdomains.subtakeover }}</td>
+                  </tr>
+
+                  {% endfor %}
+                </tbody>
+              </table>
+
+              <div class="mb-2 mt-3">
+                <button class="btn-reconftw" data-target="#modal-dns-zonetransfer" data-toggle="modal">
+                  <i class="bx bxs-chevron-up"></i>
+                  <span>DNS ZONE TRANSFER</span>
+                </button>
+
+                <i class="bx bx-wifi-0"></i>
+
+                <button class="btn-reconftw" data-target="#modal-dns-registry" data-toggle="modal">
+                  <i class="bx bxs-chevron-up"></i>
+                  <span>DNS REGISTRY</span>
+                </button>
+
+                <i class="bx bx-wifi-0"></i>
+
+                <button class="btn-reconftw" data-target="#modal-cms" data-toggle="modal">
+                  <i class="bx bxs-chevron-up"></i>
+                  <span>CMS</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr />
+
+      <div class="card-body" id="section-2">
+        <div class="row">
+          <div class="d-sm-flex align-items-center align-to-cards" id="#cloud_assets">
+            <i class="bx bx-sm bx-cloud"></i>
+            <p>
+              <strong> CLOUD ASSETS </strong>
+            </p>
+          </div>
+
+          <div class="col-xs-6">
+            <div class="table-content table-responsive">
+              <table id="cloud_assets" class="table table-striped" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th>S3 BUCKETS</th>
+                    <th>APP FOUND</th>
+                    <th>STORAGE ACCOUNT</th>
+                    <th>AZURE DNS NAME</th>
+                    <th>GOOGLE BUCKET</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for cloud_asset in cloud_assets %}
+                  <tr>
+                    <td>{{ cloud_asset.protected_s3bucket }}</td>
+                    <td>{{ cloud_asset.appfound }}</td>
+                    <td>{{ cloud_asset.storage_account }}</td>
+                    <td>{{ cloud_asset.azure }}</td>
+                    <td>{{ cloud_asset.google }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr />
+
+      <div class="card-body" id="section-3">
+        <div class="row">
+          <div class="d-sm-flex align-items-center align-to-cards">
+            <i class="bx bx-sm bx-image"></i>
+            <p>
+              <strong> SCREENSHOTS </strong>
+            </p>
+          </div>
+
+          <div class="col-xs-5">
+            <div class="table-responsive">
+
+              <div id="reconftw-gallery" data-nanogallery2='{
+                  
+                  "thumbnailWidth": "auto",
+                  "thumbnailHeight": "400",
+                  "thumbnailBorderVertical": 0,
+                  "thumbnailBorderHorizontal": 0,
+                  "thumbnailDisplayTransitionDuration": 5000,
+                  "thumbnailLabel": {
+                    "position": "overImageOnBottom",
+                    "displayDescription": true
+                  },
+                  "galleryFilterTags": true,
+                  "displayBreadcrumb": true,
+                  "breadcrumbOnlyCurrentLevel": true,
+                  "thumbnailOpenImage": true,
+                  "galleryDisplayMode": "pagination",
+                  "galleryMaxRows": 5,
+                  "galleryPaginationMode": "numbers",
+                  "thumbnailAlignment": "center",
+                  "navPagination": false,
+                  "galleryFilterTags": "description",
+                  "thumbnailLevelUp": true
+                }'>
+                {% for i in screenshots %}
+                <a href="data:image/jpeg;base64,{{ i.2 }}" data-ngthumb="data:image/jpeg;base64,{{ i.2 }}"
+                  data-ngdesc="{{ i.3 }}">{{ i.0 }}</a>
+                {% endfor %}
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr />
+
+      <div class="card-body" id="section-4">
+        <div class="row">
+          <div class="d-sm-flex align-items-center align-to-cards">
+            <i class="bx bx-sm bx-search-alt"></i>
+            <p>
+              <strong> OSINT Resources </strong>
+            </p>
+          </div>
+
+          <div class="col-lg-3 mb-2">
+            <div class="card-box bg-card-one">
+              <div class="inner">
+                <h3>{{ google_dorks_count }}</h3>
+                <p>GOOGLE DORKS</p>
+              </div>
+              <div class="icon">
+                <i class="bx bxl-google" aria-hidden="true"></i>
+              </div>
+              <a data-target="#modal-google-dorks" data-toggle="modal" class="card-box-footer"><i
+                  class="bx bxs-chevron-up"></i> DETAILS
+              </a>
+              <!-- The Modal Google Dorks-->
+              <div class="modal fade text-dark" id="modal-google-dorks" data-bs-backdrop="static"
+                data-bs-keyboard="false">
+                <div class="modal-dialog modal-lg">
+                  <div class="modal-content">
+
+                    <!-- Modal Header -->
+                    <div class="modal-header">
+                      GOOGLE DORKS
+                      <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+                    </div>
+
+                    <!-- Modal body -->
+                    <div class="modal-body ">
+                      <div class="input-group-prepend">
+                        <p class="modal-results">{{ google_dorks.dorks }}</p>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-3 mb-2">
+            <div class="card-box bg-card-two">
+              <div class="inner">
+                <h3>{{ git_dorks_count }}</h3>
+                <p>GITHUB DORKS</p>
+              </div>
+              <div class="icon">
+                <i class="bx bxl-github" aria-hidden="true"></i>
+              </div>
+              <a data-target="#modal-github-dorks" data-toggle="modal" class="card-box-footer">
+                <i class="bx bxs-chevron-up"></i> DETAILS
+              </a>
+              <!-- The Modal Github Dorks-->
+              <div class="modal fade text-dark" id="modal-github-dorks" data-bs-backdrop="static"
+                data-bs-keyboard="false">
+                <div class="modal-dialog modal-lg">
+                  <div class="modal-content">
+
+                    <!-- Modal Header -->
+                    <div class="modal-header">
+                      GITHUB DORKS
+                      <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+                    </div>
+
+                    <!-- Modal body -->
+                    <div class="modal-body ">
+                      <div class="input-group-prepend">
+                        {% for line in git_dorks %}
+                        {% if line != "" and title_domain_target|lower in line|lower %}
+                        <p class="modal-results">{{ line }}</p>
+                        {% endif %}
+                        {% endfor %}
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-3 mb-2">
+            <div class="card-box bg-card-three">
+              <div class="inner">
+                <h3>{{ software_infos_count }}</h3>
+                <p>SOFTWARES USED</p>
+              </div>
+              <div class="icon">
+                <i class="bx bx-desktop" aria-hidden="true"></i>
+              </div>
+              <a data-target="#modal-software" data-toggle="modal" class="card-box-footer">
+                <i class="bx bxs-chevron-up"></i> DETAILS
+              </a>
+              <!-- The Modal software-->
+              <div class="modal fade text-dark" id="modal-software" data-bs-backdrop="static" data-bs-keyboard="false">
+                <div class="modal-dialog modal-lg">
+                  <div class="modal-content">
+
+                    <!-- Modal Header -->
+                    <div class="modal-header">
+                      SOFTWARES USED
+                      <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+                    </div>
+
+                    <!-- Modal body -->
+                    <div class="modal-body ">
+                      <div class="input-group-prepend">
+                        <p class="modal-results">{{ software_infos }}</p>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-3 mb-2">
+            <div class="card-box bg-card-five">
+              <div class="inner">
+                <h3>{{ osintusersinfouser_count }}</h3>
+                <p>USERS RELATED</p>
+              </div>
+              <div class="icon">
+                <i class="bx bx-user" aria-hidden="true"></i>
+              </div>
+              <a data-target="#modal-user-related" data-toggle="modal" class="card-box-footer">
+                <i class="bx bxs-chevron-up"></i> DETAILS
+              </a>
+              <!-- The Modal USERS RELATED-->
+              <div class="modal fade text-dark" id="modal-user-related" data-bs-backdrop="static"
+                data-bs-keyboard="false">
+                <div class="modal-dialog modal-lg">
+                  <div class="modal-content">
+
+                    <!-- Modal Header -->
+                    <div class="modal-header">
+                      USERS RELATED
+                      <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+                    </div>
+
+                    <!-- Modal body -->
+                    <div class="modal-body ">
+                      <div class="input-group-prepend">
+                        {% for osint in osintusersinfo %}
+                        <p class="modal-results">{{ osint.users }}</p>
+                        {% endfor %}
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+
+          <div class="col-lg-3 mb-2">
+            <div class="card-box bg-card-five">
+              <div class="inner">
+                <h3>{{ metadata_results_count }}</h3>
+                <p>METADATA RESULTS</p>
+              </div>
+              <div class="icon">
+                <i class="bx bx-data" aria-hidden="true"></i>
+              </div>
+              <a data-target="#modal-metadata" data-toggle="modal" class="card-box-footer">
+                <i class="bx bxs-chevron-up"></i> DETAILS
+              </a>
+              <!-- The Modal METADATA RESULTS-->
+              <div class="modal fade text-dark" id="modal-metadata" data-bs-backdrop="static" data-bs-keyboard="false">
+                <div class="modal-dialog modal-lg">
+                  <div class="modal-content">
+
+                    <!-- Modal Header -->
+                    <div class="modal-header">
+                      METADATA RESULTS
+                      <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+                    </div>
+
+                    <!-- Modal body -->
+                    <div class="modal-body ">
+                      <div class="input-group-prepend">
+                        {% for line in metadata_results %}
+                        <p class="modal-results">{{ line }}</p>
+                        {% endfor %}
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-3 mb-2">
+            <div class="card-box bg-card-six">
+              <div class="inner">
+                <h3>{{ emails|length }}</h3>
+                <p>EMAILS FOUND</p>
+              </div>
+              <div class="icon">
+                <i class="bx bx-envelope" aria-hidden="true"></i>
+              </div>
+              <a data-target="#modal-emails" data-toggle="modal" class="card-box-footer">
+                <i class="bx bxs-chevron-up"></i> DETAILS
+              </a>
+              <!-- The Modal Emails-->
+              <div class="modal fade text-dark" id="modal-emails" data-bs-backdrop="static" data-bs-keyboard="false">
+                <div class="modal-dialog modal-lg">
+                  <div class="modal-content">
+
+                    <!-- Modal Header -->
+                    <div class="modal-header">
+                      EMAILS FOUND
+                      <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+                    </div>
+
+                    <!-- Modal body -->
+                    <div class="modal-body ">
+                      <div class="input-group-prepend">
+                        {% for email in emails %}
+                        {% if email != "" %}
+                        <p class="modal-results">{{ email }}</p>
+                        {% endif %}
+                        {% endfor %}
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-3 mb-2">
+            <div class="card-box bg-card-six">
+              <div class="inner">
+                <h3>{{ osintusersinfopassword_count }}</h3>
+                <p>PASSWORDS FOUND</p>
+              </div>
+              <div class="icon">
+                <i class="bx bx-lock-open" aria-hidden="true"></i>
+              </div>
+              <a data-target="#modal-passwords" data-toggle="modal" class="card-box-footer"><i
+                  class="bx bxs-chevron-up"></i> DETAILS
+              </a>
+              <div class="modal fade text-dark" id="modal-passwords" data-bs-backdrop="static" data-bs-keyboard="false">
+                <div class="modal-dialog modal-lg">
+                  <div class="modal-content">
+
+                    <!-- Modal Header -->
+                    <div class="modal-header">
+                      PASSWORDS FOUND
+                      <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+                    </div>
+
+                    <!-- Modal body -->
+                    <div class="modal-body ">
+                      <div class="input-group-prepend">
+                        {% for osint in osintusersinfo %}
+                        <p class="modal-results">{{ osint.passwords }}</p>
+                        {% endfor %}
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-3 mb-2">
+            <div class="card-box bg-card-six">
+              <div class="inner">
+                <h3>{{ domain_info_general_count }}</h3>
+                <p>DOMAIN INFO</p>
+              </div>
+              <div class="icon">
+                <i class="bx bx-info-circle" aria-hidden="true"></i>
+              </div>
+              <a data-target="#modal-domainInfo" data-toggle="modal" class="card-box-footer">
+                <i class="bx bxs-chevron-up"></i> DETAILS
+              </a>
+              <!-- The Modal Domain info-->
+              <div class="modal fade text-dark" id="modal-domainInfo" data-bs-backdrop="static"
+                data-bs-keyboard="false">
+                <div class="modal-dialog modal-lg">
+                  <div class="modal-content">
+
+                    <!-- Modal Header -->
+                    <div class="modal-header">
+                      DOMAIN INFO
+                      <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+                    </div>
+
+                    <!-- Modal body -->
+                    <div class="modal-body ">
+                      <div class="input-group-prepend">
+                        {% for line in domain_info_general %}
+                        <p class="modal-results">{{ line }}</p>
+                        {% endfor %}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr />
+
+      <div class="card-body" id="section-5">
+        <div class="row">
+          <div class="d-sm-flex align-items-center align-to-cards">
+            <i class="text-infov bx bx-sm bx-ghost"></i>
+            <p>
+              <strong> Nuclei - </strong><strong class="text-infov">Info</strong>
+            </p>
+          </div>
+
+          <div class="col-xs-6">
+            <div class="table-responsive">
+              <table id="nuclei_info" class="table table-striped table-content nuclei_class" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>TYPE</th>
+                    <th>PROTOCOL</th>
+                    <th>URL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for info in nuclei_outputs_info %}
+                  <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ info.0 }}</td>
+                    <td>{{ info.1 }}</td>
+                    <td>{{ info.3 }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+
+              <div class="mb-2 mt-3">
+
+              </div>
+            </div>
+
+
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="d-sm-flex align-items-center align-to-cards">
+            <i class="text-low bx bx-sm bx-ghost"></i>
+            <p>
+              <strong> Nuclei - </strong><strong class="text-low">Low</strong>
+            </p>
+          </div>
+
+          <div class="col-xs-6">
+            <div class="table-responsive">
+              <table id="nuclei_low" class="table table-striped table-content nuclei_class" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>TYPE</th>
+                    <th>PROTOCOL</th>
+                    <th>URL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for low in nuclei_outputs_low %}
+                  <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ low.0 }}</td>
+                    <td>{{ low.1 }}</td>
+                    <td>{{ low.3 }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+
+              <div class="mb-2 mt-3">
+
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="d-sm-flex align-items-center align-to-cards">
+            <i class="text-medium bx bx-sm bx-ghost"></i>
+            <p>
+              <strong> Nuclei - </strong><strong class="text-medium">Medium</strong>
+            </p>
+          </div>
+
+          <div class="col-xs-6">
+            <div class="table-responsive">
+              <table id="nuclei_medium" class="table table-striped table-content nuclei_class" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>TYPE</th>
+                    <th>PROTOCOL</th>
+                    <th>URL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for medium in nuclei_outputs_medium %}
+                  <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ medium.0 }}</td>
+                    <td>{{ medium.1 }}</td>
+                    <td>{{ medium.3 }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+
+              <div class="mb-2 mt-3">
+
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="d-sm-flex align-items-center align-to-cards">
+            <i class="text-high bx bx-sm bx-ghost"></i>
+            <p>
+              <strong> Nuclei - </strong><strong class="text-high">High</strong>
+            </p>
+          </div>
+
+          <div class="col-xs-6">
+            <div class="table-responsive">
+              <table id="nuclei_high" class="table table-striped table-content nuclei_class" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>TYPE</th>
+                    <th>PROTOCOL</th>
+                    <th>URL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for high in nuclei_outputs_high %}
+                  <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ high.0 }}</td>
+                    <td>{{ high.1 }}</td>
+                    <td>{{ high.3 }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+
+              <div class="mb-2 mt-3">
+
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="d-sm-flex align-items-center align-to-cards">
+            <i class="text-critical bx bx-sm bx-ghost"></i>
+            <p>
+              <strong> Nuclei - </strong><strong class="text-critical">Critical</strong>
+            </p>
+          </div>
+
+          <div class="col-xs-6">
+            <div class="table-responsive">
+              <table id="nuclei_critical" class="table table-striped table-content nuclei_class" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>TYPE</th>
+                    <th>PROTOCOL</th>
+                    <th>URL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for critical in nuclei_outputs_critical %}
+                  <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ critical.0 }}</td>
+                    <td>{{ critical.1 }}</td>
+                    <td>{{ critical.3 }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+
+              <div class="mb-2 mt-3">
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr />
+
+      <div class="card-body" id="section-6">
+        <div class="row">
+          <div class="d-sm-flex align-items-center align-to-cards">
+            <i class="bx bx-sm bx-bug"></i>
+            <p>
+              <strong> Vulnerabilities </strong>
+            </p>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-sm-12">
+
+            <div class="d-sm-flex align-items-center align-to-cards">
+              <i class="bx bx-sm bxs-analyse"></i>
+              <p>
+                <strong> GF Output </strong>
+              </p>
+            </div>
+            <div class="mb-2 mt-3">
+              <button class="btn-reconftw" data-target="#modal-gf-endpoints" data-toggle="modal">
+                <i class="bx bxs-chevron-up"></i>
+                <span>ENDPOINTS</span>
+              </button>
+
+              <i class="bx bx-wifi-0"></i>
+
+              <button class="btn-reconftw" data-target="#modal-gf-lfi" data-toggle="modal">
+                <i class="bx bxs-chevron-up"></i>
+                <span>LOCAL FILE INCLUSION</span>
+              </button>
+
+              <i class="bx bx-wifi-0"></i>
+
+              <button class="btn-reconftw" data-target="#modal-gf-rce" data-toggle="modal">
+                <i class="bx bxs-chevron-up"></i>
+                <span>CODE EXECUTION</span>
+              </button>
+
+              <i class="bx bx-wifi-0"></i>
+
+              <button class="btn-reconftw" data-target="#modal-gf-openredirect" data-toggle="modal">
+                <i class="bx bxs-chevron-up"></i>
+                <span>OPEN REDIRECT</span>
+              </button>
+
+              <i class="bx bx-wifi-0"></i>
+
+              <button class="btn-reconftw" data-target="#modal-gf-sqli" data-toggle="modal">
+                <i class="bx bxs-chevron-up"></i>
+                <span>SQL INJECTION</span>
+              </button>
+
+              <i class="bx bx-wifi-0"></i>
+
+              <button class="btn-reconftw" data-target="#modal-gf-ssrf" data-toggle="modal">
+                <i class="bx bxs-chevron-up"></i>
+                <span>SERVER-SIDE REQUEST FORGERY</span>
+              </button>
+
+              <i class="bx bx-wifi-0"></i>
+
+              <button class="btn-reconftw" data-target="#modal-gf-ssti" data-toggle="modal">
+                <i class="bx bxs-chevron-up"></i>
+                <span>SERVER-SIDE TEMPLATE INJECTION</span>
+              </button>
+
+              <i class="bx bx-wifi-0"></i>
+
+              <button class="btn-reconftw" data-target="#modal-gf-xss" data-toggle="modal">
+                <i class="bx bxs-chevron-up"></i>
+                <span>CROSS-SITE SCRIPTING</span>
+              </button>
+
+              <i class="bx bx-wifi-0"></i>
+
+              <button class="btn-reconftw" data-target="#modal-gf-potential" data-toggle="modal">
+                <i class="bx bxs-chevron-up"></i>
+                <span>POTENTIAL</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr />
+
+      <div class="card-body" id="section-8">
+        <div class="row">
+          <div class="d-sm-flex align-items-center align-to-cards">
+            <i class="bx bx-sm bxs-folder-open"></i>
+            <p>
+              <strong> Fuzzing Paths </strong>
+            </p>
+          </div>
+
+          <div class="col-xs-6">
+            <div class="table-responsive">
+              <table id="nuclei_outputs" class="table table-striped table-content web_dicts" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>CODE</th>
+                    <th>LENGTH</th>
+                    <th>URL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for paths in fuzzing_full %}
+                  <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ paths.0 }}</td>
+                    <td>{{ paths.1 }}</td>
+                    <td>{{ paths.2 }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr />
+
+      <div class="card-body" id="section-10">
+        <div class="row">
+          <div class="d-sm-flex align-items-center align-to-cards">
+            <i class="bx bx-sm bxl-javascript"></i>
+            <p>
+              <strong> Javascript </strong>
+            </p>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col-xs-6">
+            <div class="table-responsive">
+              <table id="js_livelinks" class="table table-striped table-content" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>LIVE LINKS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for livelinks in js_checks_livelinks %}
+                  <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ livelinks }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="col-xs-6">
+            <div class="table-responsive">
+              <table id="url_extract_js" class="table table-striped table-content" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>URL EXTRACT</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for url in js_checks_url_extract_js %}
+                  <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ url }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="col-xs-6">
+            <div class="table-responsive">
+              <table id="js_endpoints" class="table table-striped table-content" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>ENDPOINTS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for endpoints in js_checks_js_endpoints %}
+                  <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ endpoints }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="col-xs-6">
+            <div class="table-responsive">
+              <table id="js_secrets" class="table table-striped table-content" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>TYPE</th>
+                    <th>PROTOCOL</th>
+                    <th>SEVERITY</th>
+                    <th>URL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for secrets in js_checks_js_secrets %}
+                  <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ secrets.0 }}</td>
+                    <td>{{ secrets.1 }}</td>
+                    <td>{{ secrets.2 }}</td>
+                    <td>{{ secrets.3 }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <hr />
+
+    <div class="card-body" id="section-11">
+      <div class="row">
+        <div class="d-sm-flex align-items-center align-to-cards">
+          <i class="bx bx-sm bx bxs-file"></i>
+          <p>
+            <strong> Dictionaries </strong>
+          </p>
+        </div>
+
+        <div class="row">
+          <div class="col-xs-6">
+            <div class="table-responsive">
+              <table id="web_dicts_params" class="table table-striped table-content web_dicts" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>PARAMS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for param in web_dicts_params %}
+                  <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ param }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="col-xs-6">
+            <div class="table-responsive">
+              <table id="web_dicts_values" class="table table-striped table-content web_dicts" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>VALUES</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for value in web_dicts_values %}
+                  <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ value }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="col-xs-6">
+            <div class="table-responsive">
+              <table id="web_dicts_words" class="table table-striped table-content web_dicts" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>WORDS</th>
+                  </tr>
+                </thead>
+                <tbody>
+
+                  {% for word in web_dicts_words %}
+                  <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ word }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="col-xs-6">
+            <div class="table-responsive">
+              <table id="web_dicts_paths" class="table table-striped table-content web_dicts" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>PATHS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for path in web_dicts_paths %}
+                  <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ path }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="mb-2 mt-3">
+            <button class="btn-reconftw" data-target="#modal-dictionaries-password" data-toggle="modal">
+              <i class="bx bxs-chevron-up"></i>
+              <span>PASSWORDS FOR BRUTE-FORCE</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- </div> -->
+    <hr>
+
+    <!-- FOOTER -->
+    <footer class="sticky-footer bg-footer">
+      <div class="container my-auto">
+        <div class="copyright text-center my-auto">
+          <span>reconFTW ©</span>
+        </div>
+      </div>
+    </footer>
+  </section>
+
+</body>
+
+<!-- </html> N ESQUECER -->
+{% endblock %}

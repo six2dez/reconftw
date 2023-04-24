@@ -8,8 +8,8 @@
 
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.5.2">
-    <img src="https://img.shields.io/badge/release-v2.5.2-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.6">
+    <img src="https://img.shields.io/badge/release-v2.6-green">
   </a>
    </a>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
@@ -88,7 +88,7 @@ So, what are you waiting for? Go! Go! Go! :boom:
 
 - Requires [Golang](https://golang.org/dl/) > **1.15.0+** installed and paths correctly set (**$GOPATH**, **$GOROOT**)
 
-Important : If you are not running reconftw as root, run `sudo echo "${USERNAME}  ALL=(ALL:ALL) NOPASSWD: ALL" > /etc/sudoers.d/reconFTW` , to make sure no sudo prompts are required to run the tool and to avoid any permission issues.
+Important : If you are not running reconftw as root, run `sudo echo "${USERNAME}  ALL=(ALL:ALL) NOPASSWD: ALL" | sudo tee -a /etc/sudoers.d/reconFTW` , to make sure no sudo prompts are required to run the tool and to avoid any permission issues.
 
 ```bash
 git clone https://github.com/six2dez/reconftw
@@ -458,8 +458,7 @@ reset='\033[0m'
 
  ## Osint
 - Domain information ([whois](https://github.com/rfc1036/whois) and [amass](https://github.com/OWASP/Amass))
-- Emails addresses and users ([theHarvester](https://github.com/laramies/theHarvester) and [emailfinder](https://github.com/Josue87/EmailFinder))
-- Password leaks ([pwndb](https://github.com/davidtavarez/pwndb) and [H8mail](https://github.com/khast3x/h8mail))
+- Emails addresses and users ([emailfinder](https://github.com/Josue87/EmailFinder))
 - Metadata finder ([MetaFinder](https://github.com/Josue87/MetaFinder))
 - Google Dorks ([dorks_hunter](https://github.com/six2dez/dorks_hunter))
 - Github Dorks ([gitdorks_go](https://github.com/damit5/gitdorks_go))
@@ -494,7 +493,7 @@ reset='\033[0m'
 - Web screenshoting ([webscreenshot](https://github.com/maaaaz/webscreenshot) or [gowitness](https://github.com/sensepost/gowitness))
 - Web templates scanner ([nuclei](https://github.com/projectdiscovery/nuclei) and [nuclei geeknik](https://github.com/geeknik/the-nuclei-templates.git))
 - CMS Scanner ([CMSeeK](https://github.com/Tuhinshubhra/CMSeeK))
-- Url extraction ([waymore](https://github.com/xnl-h4ck3r/waymore), [katana](https://github.com/projectdiscovery/katana), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3) and [JSA](https://github.com/w9w/JSA))
+- Url extraction ([gau](https://github.com/lc/gau),[waymore](https://github.com/xnl-h4ck3r/waymore), [katana](https://github.com/projectdiscovery/katana), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3) and [JSA](https://github.com/w9w/JSA))
 - URL patterns Search and filtering ([urless](https://github.com/xnl-h4ck3r/urless), [gf](https://github.com/tomnomnom/gf) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns))
 - Favicon Real IP ([fav-up](https://github.com/pielco11/fav-up))
 - Javascript analysis ([subjs](https://github.com/lc/subjs), [JSA](https://github.com/w9w/JSA), [xnLinkFinder](https://github.com/xnl-h4ck3r/xnLinkFinder), [getjswords](https://github.com/m4ll0k/BBTz))
@@ -510,7 +509,7 @@ reset='\033[0m'
 - CRLF ([crlfuzz](https://github.com/dwisiswant0/crlfuzz))
 - Cors ([Corsy](https://github.com/s0md3v/Corsy))
 - LFI Checks ([ffuf](https://github.com/ffuf/ffuf))
-- SQLi Check ([SQLMap](https://github.com/sqlmapproject/sqlmap))
+- SQLi Check ([SQLMap](https://github.com/sqlmapproject/sqlmap) and [ghauri](https://github.com/r0oth3x49/ghauri))
 - SSTI ([ffuf](https://github.com/ffuf/ffuf))
 - SSL tests ([testssl](https://github.com/drwetter/testssl.sh))
 - Broken Links Checker ([katana](https://github.com/projectdiscovery/katana))
@@ -519,7 +518,7 @@ reset='\033[0m'
 - 4XX Bypasser ([byp4xx](https://github.com/lobuhi/byp4xx))
 
 ## Extras
-- Multithreading ([Rush](https://github.com/shenwei356/rush))
+- Multithreading ([Interlace](https://github.com/codingo/Interlace))
 - Custom resolvers generated list ([dnsvalidator](https://github.com/vortexau/dnsvalidator))
 - Docker container included and [DockerHub](https://hub.docker.com/r/six2dez/reconftw) integration
 - Ansible + Terraform deployment over AWS

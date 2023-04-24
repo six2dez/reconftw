@@ -1,0 +1,1163 @@
+{% extends 'base.html' %}
+{% block title %}reconFTW - Edits Profile{% endblock %}
+{% block content %}
+{% load static %}
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: "Quicksand", sans-serif;
+  }
+
+  body {
+    display: block;
+    font-size: 1.2rem;
+
+  }
+
+  a:hover {
+    color: #fff;
+  }
+
+  .home-content {
+    height: 60px;
+    display: flex;
+    align-items: center;
+    background-color: #161616;
+    /* box-shadow: 0px 0px 5px 0px #000f; */
+    z-index: 1000;
+    position: fixed;
+  }
+
+  .home-content .text {
+    font-size: 26px;
+    font-weight: 600;
+  }
+
+  .navbar-logo {
+    margin: 5px 0px 0px 20px;
+    width: 100px;
+  }
+
+  .home-content-right {
+    display: flex;
+    justify-content: flex-end;
+    width: 100%;
+    align-items: center;
+    margin-right: 58px;
+  }
+
+  /* .btn {
+    padding: 0px;
+  } */
+
+  .btn-newscan {
+    margin: 0px 15px 0px 0px;
+    font-weight: 700 !important;
+    color: #a5e22f;
+    border-right: 1px solid;
+    border-left: none;
+    padding: 7px 15px 5px 0px;
+    border-image: linear-gradient(to bottom, transparent, rgba(167, 218, 27, 0.11), transparent) 1;
+    font-size: 13px;
+    text-decoration: none;
+    vertical-align: middle;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+    background-color: transparent;
+  }
+
+  .icon {
+    margin: 0px 4px 0px 0px;
+    font-size: 20px;
+    font-weight: 500 !important;
+    color: #a5e22f;
+  }
+
+  .icon-back {
+    margin: 0px 4px 0px 0px;
+    font-size: 25px;
+    font-weight: 500 !important;
+    color: #a5e22f;
+  }
+
+  .btn-reconftw {
+    margin: 0px 10px 0px 0px;
+    font-weight: 700 !important;
+    border-right: 1px solid;
+    border-left: none;
+    border-image: linear-gradient(to bottom, transparent, rgba(167, 218, 27, 0.11), transparent) 1;
+    font-size: 13px;
+    color: #a5e22f;
+    background-color: transparent;
+    border-top: none;
+    padding: 7px 10px 5px 0px;
+    border-bottom: none;
+    letter-spacing: 0.2em;
+  }
+
+  .btn-reconftw:hover {
+    color: #bdfa44;
+    text-shadow: 0px 0px 1px #bdfa44;
+    transition: 0.6s;
+  }
+
+  .btn-reconftw i {
+    color: #a5e22f;
+    transition: 0.5s;
+    position: relative;
+    top: 1.7px;
+    padding: 0;
+    width: 9px;
+  }
+
+  .btn-reconftw:hover i {
+    text-shadow: 0px 0px 1px #bdfa44;
+    color: #bdfa44;
+    transform: translateX(2px) translateY(-3px) rotate(90deg);
+    transition: 0.5s;
+  }
+
+  .btn-options {
+    margin: 0px 10px 0px 0px;
+    font-weight: 700 !important;
+    border-right: 1px solid;
+    border-left: none;
+    border-image: linear-gradient(to bottom, transparent, rgba(167, 218, 27, 0.11), transparent) 1;
+    font-size: 13px;
+    color: #000;
+    background-color: transparent;
+    border-top: none;
+    padding: 7px 10px 5px 0px;
+    border-bottom: none;
+    letter-spacing: 0.2em;
+  }
+
+  .btn-options:hover {
+    color: #000;
+    text-shadow: 0px 0px 1px #000;
+    transition: 0.6s;
+  }
+
+  .btn-options i {
+    color: #000;
+    transition: 0.5s;
+    position: relative;
+    top: 1.7px;
+    padding: 0;
+    width: 9px;
+  }
+
+  .btn-options:hover i {
+    text-shadow: 0px 0px 1px #000;
+    color: #000;
+    transform: translateX(2px) translateY(-3px) rotate(90deg);
+    transition: 0.5s;
+  }
+
+  ol,
+  ul {
+    padding-left: 0;
+  }
+
+  .action {
+    margin: 0;
+  }
+
+  .action .profile {
+    position: relative;
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    overflow: hidden;
+    cursor: pointer;
+  }
+
+  .action .profile img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .action .menu {
+    position: absolute;
+    top: 120px;
+    right: 36px;
+    padding: 10px 20px 0px 20px;
+    background-color: #161616;
+    width: 200px;
+    box-sizing: 0 5px 25px rgba(0, 0, 0, 0.1);
+    border-radius: 15px;
+    transition: 0.5s;
+    visibility: hidden;
+    opacity: 0;
+  }
+
+  .action .menu.active {
+    top: 70px;
+    visibility: visible;
+    opacity: 1;
+  }
+
+  .action .menu::before {
+    content: "";
+    position: absolute;
+    top: -5px;
+    right: 28px;
+    width: 20px;
+    height: 20px;
+    background-color: #161616;
+    transform: rotate(45deg);
+  }
+
+  .action .menu h3 {
+    width: 100%;
+    text-align: center;
+    font-size: 18px;
+    color: #b8fa34;
+    font-weight: 500;
+    line-height: 1.5em;
+  }
+
+  .action .menu h3 span {
+    font-size: 14px;
+    color: #b8fa34;
+    font-weight: 300;
+  }
+
+  .action .menu ul li {
+    list-style: none;
+    padding: 16px 0;
+    border-top: 1px solid #1c1c1c;
+    display: flex;
+    align-items: center;
+  }
+
+  .action .menu ul li i {
+    max-width: 100%;
+    margin-right: 15px;
+    opacity: 0.5;
+  }
+
+  .action .menu ul li:hover i {
+    opacity: 1;
+  }
+
+  .action .menu ul li a {
+    display: inline-block;
+    text-decoration: none;
+    color: #b8fa34;
+    font-weight: 500;
+    transition: 0.5s;
+  }
+
+  .action .menu ul li:hover a {
+    color: #d6ff83;
+  }
+
+  .action .bx {
+    position: relative;
+    top: 5px;
+  }
+
+  .card-body {
+    margin: 60px 0px 10px 0px;
+    background-color: rgba(255, 255, 255, 0.123);
+    padding: 10px 15px 0px 15px;
+
+  }
+
+  .row>* {
+    padding-right: 7px;
+    padding-left: 7px;
+  }
+
+  .row {
+    --bs-gutter-x: None;
+  }
+
+  .align-title {
+    padding-right: 5px;
+  }
+
+  .table-content {
+    padding: 10px;
+    background-color: #ffffff;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    box-shadow: 0px 0px 5px 0px #0000009d;
+  }
+
+  .align-to-cards {
+    margin-top: 15px;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600 !important;
+    padding-bottom: 15px;
+  }
+
+  p {
+    margin-bottom: 0px;
+  }
+
+
+
+  .grid-container {
+    margin: 15px;
+    color: #000;
+    background-color: #ffffff;
+    border: 1px solid rgb(153, 153, 153);
+    border-radius: 3px;
+    box-shadow: 0px 0px 10px 0px rgb(99, 98, 98);
+    overflow-x: auto;
+  }
+
+  .grid-container-table {
+    margin: 15px;
+    padding: 0;
+    border-radius: 3px;
+    box-shadow: 0px 0px 10px 0px rgb(99, 98, 98);
+  }
+
+  thead {
+    background-color: #2f2f30;
+    color: #a5e22f;
+    text-align: center;
+  }
+
+  td {
+    text-align: center;
+  }
+
+  .blackcount {
+    font-weight: bold;
+  }
+
+  th {
+    text-align: center;
+  }
+
+  .table-striped>tbody>tr:nth-of-type(odd)>* {
+    background-color: #d3d3d3;
+  }
+
+  .table-striped>tbody>tr:nth-of-type(even)>* {
+    background-color: #e1e1e1;
+  }
+
+  .td:nth-child(even) {
+    background-color: #d3d3d3;
+  }
+
+  .table>tbody {
+    vertical-align: middle;
+  }
+
+  .rowbg:nth-child(odd) {
+    background-color: #e1e1e1;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  form {
+    display: contents;
+  }
+
+
+
+  .bx-sm:hover {
+    color: #2f2f30;
+    text-shadow: 0px 0px 5px #a5e22f;
+  }
+
+  .bg-footer {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    color: #b8f04993;
+    padding: 5px;
+    font-weight: bold;
+  }
+
+  .modal-header {
+    color: #777;
+    font-size: 12px;
+    font-weight: bold;
+    border-bottom: 2px solid #46494b;
+  }
+
+  .modal-content {
+    background-color: #27292c;
+    color: #fff;
+  }
+
+  .nav-pills .nav-link.active,
+  .nav-pills .show>.nav-link {
+    color: #fff;
+    background-color: #648b24;
+  }
+
+  .nav-pills .nav-link {
+    background: 0 0;
+    border: 0;
+    color: #fff;
+    border-radius: 10rem;
+    padding: 0.1rem 1rem;
+    font-size: 16px;
+  }
+
+  .nav-link:focus,
+  .nav-link:hover {
+    color: #fff;
+  }
+
+  .modal-footer {
+    border-top: 2px solid #46494b;
+
+  }
+
+
+
+  .form-check-input:checked {
+    background-color: #709722;
+    border-color: #709722;
+  }
+
+  .mb-4 {
+    color: #a5e22f;
+  }
+
+  .input-group-text {
+    display: flex;
+    align-items: center;
+    padding: 0.375rem 0.75rem;
+    font-size: 1rem;
+    font-weight: bold;
+    line-height: 1.5;
+    color: #a5e22f;
+    text-align: center;
+    white-space: nowrap;
+    background-color: #383a3b;
+    border: none;
+    border-radius: 0;
+    border-top-left-radius: 0.25rem;
+    border-bottom-left-radius: 0.25rem;
+  }
+
+
+  .input-group>:not(:first-child):not(.dropdown-menu):not(.valid-tooltip):not(.valid-feedback):not(.invalid-tooltip):not(.invalid-feedback) {
+    margin-left: -12px;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+
+  .input {
+    position: relative;
+    width: 30%;
+    left: 20%;
+
+  }
+
+  .text {
+    position: relative;
+    left: 20%;
+  }
+
+  .card {
+    position: absolute;
+    left: 60%;
+    top: 140px;
+  }
+
+  .alert-card {
+    width: 30%;
+    left: 20%;
+    text-align: center;
+  }
+
+  .alert {
+    position: relative;
+    padding: 1rem 1rem;
+    margin-bottom: 0;
+    border: 1px solid transparent;
+    border-radius: 0.25rem;
+  }
+
+
+  .checkBox {
+    color: #000;
+  }
+
+  .checkboxRm {
+    margin: 5px 0px 10px 0px;
+  }
+
+  .changeImg {
+    margin: 5px 0px 10px 0px;
+  }
+
+
+  /**
+  * Panels
+  */
+  /*** General styles ***/
+  .panel {
+    margin-bottom: 20px;
+    background-color: #e6e6e6;
+    border: 10px solid #fff;
+    box-shadow: 0px 0px 5px 0px #0000009d;
+    border-radius: 5px;
+    -webkit-box-shadow: 0 1px 1px rgb(0 0 0 / 5%);
+  }
+
+  .panel-heading {
+    border-bottom: 0;
+  }
+
+  .panel-title {
+    font-size: 17px;
+  }
+
+  .panel-title>small {
+    font-size: .75em;
+    color: #999999;
+  }
+
+  .panel-footer {
+    border-top: 0;
+  }
+
+  .fieldset {
+    position: relative;
+    border: 2px solid #444446;
+    background-color: #2f2f30;
+    padding: 20px 10px 10px 10px;
+    margin: 30px 0px 10px 12px;
+    border-radius: 10px;
+    width: 98%;
+  }
+
+  .fieldset h1 {
+    /* position: absolute; */
+    position: relative;
+
+    border-top: 2px solid #444446;
+
+    height: 30px;
+    bottom: 20px;
+    font-size: 18px;
+    line-height: 1;
+    margin: -20px 0 0 0rem;
+    /* half of font-size up top */
+    background-color: #2f2f30;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+    padding: 2px 10px 0px 10px;
+    font-weight: bold;
+    color: #a5e22f;
+  }
+
+
+  .panel-default>.panel-heading {
+    color: #333333;
+    border-color: #ddd;
+    border-color: rgba(0, 0, 0, 0.07);
+  }
+
+  form label {
+    color: #212529;
+
+    font-weight: bold;
+  }
+
+  /*.form-horizontal .form-group {
+    margin-left: -15px;
+    margin-right: -15px;
+  }*/
+  @media (min-width: 768px) {
+    .form-horizontal .control-label {
+      text-align: right;
+      margin-bottom: 0;
+      padding-top: 7px;
+    }
+  }
+
+  .profile__contact-info-icon {
+    float: left;
+    font-size: 18px;
+    color: #999999;
+  }
+
+  .profile__contact-info-body {
+    overflow: hidden;
+    padding-left: 20px;
+    color: #999999;
+  }
+
+  .profile-avatar {
+    width: 200px;
+    position: relative;
+    border: 4px solid #f3f3f3;
+    border-radius: 10px;
+  }
+
+  .row>* {
+    padding-right: 3px;
+    padding-left: 3px;
+  }
+
+  .panel-title {
+    font-size: 17px;
+    padding: 14px 10px 10px 10px;
+    background-color: #2f2f30;
+    color: #a5e22f;
+    font-weight: bold;
+  }
+
+  input[type="file"] {
+    background-color: rgb(209, 209, 209);
+  }
+
+  .btn-edit-reconftw {
+    margin-top: 10px;
+    padding: 5px 30px 5px 30px;
+    margin-bottom: 10px;
+    color: #a5e22f;
+    font-size: 14px;
+    font-weight: bold;
+    background-color: #161616;
+    border: 0;
+  }
+
+  .btn-edit-reconftw:hover {
+    color: #bdfa44;
+
+    transition: 0.6s;
+    background-color: #333333;
+
+  }
+
+  .form-control {
+    font-weight: bold;
+    display: block;
+    width: 100%;
+    padding: 0.375rem 0.75rem;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #e0e0e0;
+    background-color: #545657;
+    background-clip: padding-box;
+    -webkit-appearance: none;
+    border: none;
+    -moz-appearance: none;
+    appearance: none;
+    border-radius: 0.25rem;
+    transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+  }
+
+  .form-control:focus {
+    color: #e0e0e0;
+    background-color: #545657;
+    border-color: none;
+    border: none;
+    outline: none;
+    box-shadow: 0 0 0 0.25rem #b5fd0d40;
+  }
+</style>
+
+
+
+<!-- TOP BAR -->
+<div class="container-fluid">
+  <div class="home-content fixed-top">
+    <a href="{% url 'projects:index' %}">
+      <img class="navbar-logo" src="{% static 'img/reconftw_logo.png' %}" alt="Logo" />
+    </a>
+
+    <div class="home-content-right">
+      <button class="btn-reconftw" type="button" data-bs-toggle="modal" data-bs-target="#modal-newscan">
+        <i class="bx bxs-chevron-up"></i>
+        <span>NEW SCAN</span>
+      </button>
+
+      <i class='bx bx-user icon'></i>
+      <div class="btn-newscan">EDIT PROFILE</div>
+
+      <div class="action" onmouseover="menuToggle();" onmouseout="menuToggle();">
+        <div class="profile">
+          <img src="{{ imagePath }}" />
+        </div>
+        <div class="menu">
+          <h3>{{ request.user }}<br /><span>Reconnaissance Ninja</span></h3>
+          <ul>
+            <li>
+              <a href="{% url 'edit_profile:index' %}"><i class="bx bx-sm bx-user-circle"></i>Edit profile</a>
+            </li>
+            <li>
+              <a href="{% url 'apikeys_settings:index' %}"><i class="bx bx-sm bx-cog"></i> API Keys</a>
+            </li>
+            <li>
+              <a href="{% url 'logout' %}"><i class="bx bx-sm bx-log-out-circle"></i> Logout</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- TOP BAR -->
+
+<div class="container-fluid">
+  <div class="card-body">
+    <div class="row">
+      <div class="d-sm-flex align-items-center align-to-cards">
+        <i class='align-title bx bx-sm bx-user-circle'></i>
+        <p>
+          <strong>EDIT PROFILE</strong>
+        </p>
+      </div>
+      <div class="col-sm"></div>
+      <div class="col-sm-11">
+
+        <div class="panel panel-default">
+          <div class="panel-heading mb-2">
+            <div class="panel-title">
+              <div class="d-sm-flex ">
+                <i class='align-title bx bx-sm bxs-user-account'></i>
+                <p>
+                  <strong>ACCOUNT DETAILS</strong>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="container">
+            <div class="row">
+
+              <div class="col-sm-4">
+
+                <form class="form-horizontal" action="" method="post" enctype="multipart/form-data">
+                  <section class="fieldset">
+
+                    <div class="container">
+                      <div class="row">
+                        <div class="col-sm">
+                        </div>
+                        <div class="col-sm-6 text-center">
+                          <h1>PROFILE IMAGE</h1>
+                        </div>
+                        <div class="col-sm">
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="container">
+                      <div class="row">
+                        <div class="col-sm">
+                        </div>
+                        <div class="col-sm">
+                          <img src="{{ imagePath }}" class="img-circle profile-avatar" alt="User avatar">
+                          <div class="small font-italic text-muted mb-3 mt-3">JPG or PNG no larger than 5 MB</div>
+                        </div>
+                        <div class="col-sm">
+                        </div>
+                      </div>
+                    </div>
+
+
+
+
+                    <div class="container">
+                      <div class="row">
+                        <div class="col-sm">
+                        </div>
+                        <div class="col-sm-6">
+
+                          <div class="form-group row">
+                            <label for="uploadImage" class="col-sm-4 col-form-label">UPLOAD IMAGE</label>
+                            <div class="col-sm">
+                              <input class="form-control" type="file" accept="images/*" id="formFile"
+                                name="UserPicture">
+                            </div>
+                          </div>
+                        </div>
+                        <div class="col-sm">
+                        </div>
+                      </div>
+                    </div>
+
+                  </section>
+
+              </div>
+
+              <div class="col-sm">
+                <section class="fieldset">
+
+                  <div class="container">
+                    <div class="row">
+                      <div class="col-sm">
+                      </div>
+                      <div class="col-sm-6 text-center">
+                        <h1>CREDENTIAL INFORMATION</h1>
+                      </div>
+                      <div class="col-sm">
+                      </div>
+                    </div>
+                  </div>
+
+
+                  <div class="form-group row">
+                    <label for="staticEmail" class="col-sm-4 col-form-label">USERNAME</label>
+                    <div class="col-sm">
+                      <input type="Username" class="form-control" placeholder="Username" value="{{ UserName }}"
+                        name="username">
+                    </div>
+                  </div>
+                  <div class="form-group row">
+                    <label for="staticEmail" class="col-sm-4 col-form-label">EMAIL</label>
+                    <div class="col-sm">
+                      <input type="email" class="form-control" placeholder="name@example.com" value="{{ email }}"
+                        name="email">
+                    </div>
+                  </div>
+                  <div class="form-group row">
+                    <label for="inputPassword" class="col-sm-4 col-form-label">CURRENT PASSWORD</label>
+                    <div class="col-sm">
+                      <input type="password" class="form-control" name="CurrentPassword" placeholder="******">
+                    </div>
+                  </div>
+
+                  <div class="form-group row">
+                    <label for="inputPassword" class="col-sm-4 col-form-label">NEW PASSWORD</label>
+                    <div class="col-sm">
+                      <input type="password" class="form-control" name="NewPassword" placeholder="******">
+                    </div>
+                  </div>
+
+                  <div class="form-group row">
+                    <label for="inputPassword" class="col-sm-4 col-form-label">CONFIRM PASSWORD</label>
+                    <div class="col-sm">
+                      <input type="password" class="form-control" name="ConfirmPassword" placeholder="******">
+                    </div>
+                  </div>
+
+
+                </section>
+
+
+                <div class="container text-center">
+                  <div class="row">
+                    <div class="col-sm">
+                    </div>
+                    <div class="col-sm">
+                      <button type="submit" class="btn btn-success btn-edit-reconftw">SUBMIT</button>
+                      <button type="reset" class="btn btn-default btn-edit-reconftw text-danger">CANCEL</button>
+                    </div>
+                    <div class="col-sm">
+                    </div>
+                  </div>
+                </div>
+                {% csrf_token %}
+                </form>
+                {% if response != "" %}
+                <p class="alert alert-success errormsg alert-card">{{ response }}</p>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      <div class="col-sm"></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+      <!-- 
+        <form class="form-horizontal" action="" method="post" enctype="multipart/form-data">
+
+            <div class="panel panel-default text-center">
+                <div class="panel-heading">
+                  <div class="panel-title mb-4">
+                    <div class="d-sm-flex ">
+                      <i class='align-title bx bx-sm bx-image-add' ></i>
+                      <p>
+                        <strong>PROFILE IMAGE</strong>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+
+               <img src="{{ imagePath }}" class="img-circle profile-avatar" alt="User avatar">
+               <div class="small font-italic text-muted mb-3 mt-3">JPG or PNG no larger than 5 MB</div>
+
+               <div class="container">
+                <div class="row">
+                  <div class="col-sm">
+                  </div>
+                  <div class="col-sm-6">
+                    
+                    <div class="form-group row">
+                      <label for="uploadImage" class="col-sm-4 col-form-label">UPLOAD IMAGE</label>
+                      <div class="col-sm">
+                        <input class="form-control" type="file" accept="images/*" id="formFile" name="UserPicture">
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-sm">
+                  </div>
+                </div>
+              </div>   
+            </div>
+
+
+
+          <div class="panel panel-default ">
+            <div class="panel-heading">
+              <div class="panel-title mb-4">
+                <div class="d-sm-flex ">
+                  <i class='align-title bx bx-sm bxs-user-account' ></i>
+                  <p>
+                    <strong>ACCOUNT INFORMATION</strong>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="container">
+              <div class="row">
+                <div class="col-sm-1">
+                </div>
+                <div class="col-sm">
+                  
+                  <div class="form-group row">
+                    <label for="staticEmail" class="col-sm-2 col-form-label">USERNAME</label>
+                    <div class="col-sm-10">
+                      <input type="Username" class="form-control" placeholder="Username" value="{{ UserName }}" name="username">
+                    </div>
+                  </div>
+                  <div class="form-group row">
+                    <label for="staticEmail" class="col-sm-2 col-form-label">EMAIL</label>
+                    <div class="col-sm-10">
+                      <input type="email" class="form-control" placeholder="name@example.com" value="{{ email }}" name="email">
+                    </div>
+                  </div>
+
+                </div>
+                <div class="col-sm-1">
+                </div>
+              </div>
+            </div>
+            
+            
+
+          </div>
+    
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <div class="panel-title mb-4">
+                <div class="d-sm-flex ">
+                  <i class='align-title bx bx-sm bxs-lock-open' ></i>
+                  <p>
+                    <strong>CHANGE PASSWORD</strong>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel-body">
+              <div class="form-group row">
+
+                <div class="container">
+                  <div class="row">
+                    <div class="col-sm-1">
+                    </div>
+                    <div class="col-sm">
+                      <div class="form-group row">
+                        <label for="inputPassword" class="col-sm-4 col-form-label">CURRENT PASSWORD</label>
+                        <div class="col-sm">
+                          <input type="password" class="form-control" name="CurrentPassword" placeholder="******">
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label for="inputPassword" class="col-sm-4 col-form-label">NEW PASSWORD</label>
+                        <div class="col-sm">
+                          <input type="password" class="form-control" name="NewPassword" placeholder="******">
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                        <label for="inputPassword" class="col-sm-4 col-form-label">CONFIRM PASSWORD</label>
+                        <div class="col-sm">
+                          <input type="password" class="form-control" name="ConfirmPassword" placeholder="******">
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-sm-1">
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="container text-center">
+                <div class="row">
+                  <div class="col-sm">
+                  </div>
+                  <div class="col-sm">
+                    <button type="submit" class="btn btn-success btn-edit-reconftw">SUBMIT</button>
+                    <button type="reset" class="btn btn-default btn-edit-reconftw text-danger">CANCEL</button>
+                  </div>
+                  <div class="col-sm">
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+          {% csrf_token %}
+        </form>
+        {% if response != "" %}
+        <p class="alert alert-success errormsg alert-card">{{ response }}</p>
+        {% endif %}
+      </div>
+      <div class="col-sm"></div>
+    </div>
+    -->
+
+
+
+      <div class="sidebar close">
+        <footer class="fixed-bottom bg-footer">
+          <div class="container my-auto">
+            <div class="text-center my-auto">
+              <span>reconFTW ©</span>
+            </div>
+          </div>
+        </footer>
+
+
+
+
+        <script>
+
+
+
+
+
+          function switchButtons() {
+            if (document.getElementById("switch-all").checked == true) {
+              document.getElementById("switch-recon").checked = true;
+              document.getElementById("switch-subdomains").checked = true;
+              document.getElementById("switch-passive").checked = true;
+              document.getElementById("switch-web").checked = true;
+              document.getElementById("switch-osint").checked = true;
+
+              document.getElementById("switch-recon").disabled = true;
+              document.getElementById("switch-subdomains").disabled = true;
+              document.getElementById("switch-passive").disabled = true;
+              document.getElementById("switch-web").disabled = true;
+              document.getElementById("switch-osint").disabled = true;
+              checkCommand();
+            } else {
+              document.getElementById("switch-recon").checked = false;
+              document.getElementById("switch-subdomains").checked = false;
+              document.getElementById("switch-passive").checked = false;
+              document.getElementById("switch-web").checked = false;
+              document.getElementById("switch-osint").checked = false;
+
+              document.getElementById("switch-recon").disabled = false;
+              document.getElementById("switch-subdomains").disabled = false;
+              document.getElementById("switch-passive").disabled = false;
+              document.getElementById("switch-web").disabled = false;
+              document.getElementById("switch-osint").disabled = false;
+              checkCommand();
+            }
+          }
+
+          function checkCommand() {
+            let command = "./reconftw.sh";
+
+            if (document.getElementById("pills-single-nav").classList.contains("active")) {
+              command += " -d " + document.getElementById("singleDomain").value;
+            } else {
+              command += " -l targets.txt";
+            }
+
+            if (document.getElementById("switch-all").checked == true) {
+              command += " -a";
+            } else {
+              if (document.getElementById("switch-recon").checked) {
+                command += " -r";
+              }
+
+              if (document.getElementById("switch-subdomains").checked) {
+                command += " -s";
+              }
+
+              if (document.getElementById("switch-passive").checked) {
+                command += " -p";
+              }
+
+              if (document.getElementById("switch-web").checked) {
+                command += " -w";
+              }
+
+              if (document.getElementById("switch-osint").checked) {
+                command += " -n";
+              }
+            }
+
+            if (document.getElementById("switch-deep").checked == true) {
+              command += " --deep";
+            }
+
+            if (document.getElementById("switch-vps").checked == true) {
+              command += " -v";
+            }
+
+            document.getElementById("command").value = command;
+          }
+
+          function selectSingle() {
+            document.getElementById("typeDomain").value = 0;
+            checkCommand();
+          }
+
+          function selectList() {
+            document.getElementById("typeDomain").value = 1;
+            checkCommand();
+          }
+
+          function showLoading() {
+
+            $('#modal-loading').modal('show');
+            $('#modal-newscan').modal('hide');
+          }
+
+          function menuToggle() {
+            const toggleMenu = document.querySelector(".menu");
+            toggleMenu.classList.toggle("active");
+          }
+        </script>
+
+        {% endblock %}

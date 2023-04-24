@@ -1,0 +1,449 @@
+
+<!-- The Modal DNS Zone Transfer-->
+<div class="modal fade text-dark" id="modal-dns-zonetransfer">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+  
+        <!-- Modal Header -->
+        <div class="modal-header">
+          DNS Zone Transfer
+          <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+        </div>
+  
+        <!-- Modal body -->
+        <div class="modal-body ">
+          <div class="input-group-prepend">
+            <p class="modal-results">{{ zonetransfer.zonetransfer }}</p>
+          </div>
+        </div>
+  
+        <!-- Modal footer -->
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- The Modal DNS Zone Transfer-->
+  
+  <!-- The Modal DNS Registry -->
+  <div class="modal fade text-dark" id="modal-dns-registry">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+  
+        <!-- Modal Header -->
+        <div class="modal-header">
+          DNS Registry
+          <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+        </div>
+  
+        <!-- Modal body -->
+        <div class="modal-body ">
+          <div class="input-group-prepend">
+            {%for i in subdomains_dns %}
+            <p class="modal-results">
+              <b>------------------------------------------------------------------------------------------------------------------------------</b>
+              <b>HOST:</b> {{ i.host }}
+              <b>RESOLVER:</b> {{ i.resolver }}
+              <b>CNAME:</b> {{ i.cname }}
+              <b>A_RECORD:</b> {{ i.a_record }}
+              <b>AAAAA_RECORD:</b> {{ i.aaaa_record }}
+              <b>MX_RECORD:</b> {{ i.mx_record }}
+              <b>SOA_RECORD:</b> {{ i.soa_record }}
+              <b>NS_RECORD:</b> {{ i.ns_record }}
+              <b>INTERNAL_IPS:</b> {{ i.internal_ips_record }}
+            </p>
+            {% endfor %}
+          </div>
+        </div>
+  
+        <!-- Modal footer -->
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- The Modal DNS Registry -->
+  
+  
+  <!-- The Modal CMS -->
+  <div class="modal fade text-dark" id="modal-cms">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+  
+        <!-- Modal Header -->
+        <div class="modal-header">
+          CMS
+          <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+        </div>
+  
+        <!-- Modal body -->
+        <div class="modal-body ">
+          <div class="input-group-prepend">
+            {%for cms in cms_scanners %}
+            <p class="modal-results">
+              <b>------------------------------------------------------------------------------------------------------------------------------</b>
+              <b>SUBDOMAIN:</b> {{ cms.subdomain }}
+              <b>RESULT:</b> {{ cms.cms }}
+              {% endfor %}
+          </div>
+        </div>
+  
+        <!-- Modal footer -->
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- The Modal CMS -->
+  
+  
+  <!-- The Modal All Subdomains -->
+  <div class="modal fade text-dark" id="modal-all-subdomains">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+  
+        <!-- Modal Header -->
+        <div class="modal-header">
+          ALL SUBDOMAINS
+          <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+        </div>
+  
+        <!-- Modal body -->
+        <div class="modal-body ">
+          <div class="input-group-prepend">
+            <p class="modal-results">{{ subdomains.subdomains }}</p>
+          </div>
+        </div>
+  
+        <!-- Modal footer -->
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- The Modal All Subdomains -->
+
+
+  <!-- The Modal CDN Providers -->
+  <div class="modal fade text-dark" id="modal-cdn">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+  
+        <!-- Modal Header -->
+        <div class="modal-header">
+          CDN PROVIDERS
+          <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+        </div>
+  
+        <!-- Modal body -->
+        <div class="modal-body ">
+          <div class="input-group-prepend">
+            <p class="modal-results">{{ cdn_providers.cdn_providers }}</p>
+          </div>
+        </div>
+  
+        <!-- Modal footer -->
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- The Modal CDN Providers -->
+  
+  
+  <!-- The Modal Dictionaries Password -->
+  <div class="modal fade text-dark" id="modal-dictionaries-password">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+  
+        <!-- Modal Header -->
+        <div class="modal-header">
+          PASSWORDS GENERATED FOR BRUTE-FORCE
+          <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+        </div>
+  
+        <!-- Modal body -->
+        <div class="modal-body ">
+          <div class="input-group-prepend">
+            <p class="modal-results">
+              <td>{{ web_dicts_passwords }}</td>
+            </p>
+          </div>
+        </div>
+  
+        <!-- Modal footer -->
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- The Modal Dictionaries Password -->
+  
+  
+  <!-- The Modal GF xss -->
+  <div class="modal fade text-dark" id="modal-gf-xss">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+  
+        <!-- Modal Header -->
+        <div class="modal-header">
+          GF Cross-Site Scripting
+          <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+        </div>
+  
+        <!-- Modal body -->
+        <div class="modal-body ">
+          <div class="input-group-prepend">
+            <p class="modal-results">
+              <td>{{ url_gf.xss }}</td>
+            </p>
+          </div>
+        </div>
+  
+        <!-- Modal footer -->
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- The Modal GF xss -->
+  
+  <!-- The Modal GF Endpoints -->
+  <div class="modal fade text-dark" id="modal-gf-endpoints">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+  
+        <!-- Modal Header -->
+        <div class="modal-header">
+          GF ENDPOINTS
+          <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+        </div>
+  
+        <!-- Modal body -->
+        <div class="modal-body ">
+          <div class="input-group-prepend">
+            <p class="modal-results">
+              <td>{{ url_gf.endpoints }}</td>
+            </p>
+          </div>
+        </div>
+  
+        <!-- Modal footer -->
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- The Modal GF Endpoints -->
+  
+  <!-- The Modal GF ssti -->
+  <div class="modal fade text-dark" id="modal-gf-ssti">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+  
+        <!-- Modal Header -->
+        <div class="modal-header">
+          GF SERVER-SIDE TEMPLATE INJECTION
+          <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+        </div>
+  
+        <!-- Modal body -->
+        <div class="modal-body ">
+          <div class="input-group-prepend">
+            <p class="modal-results">
+              <td>{{ url_gf.ssti }}</td>
+            </p>
+          </div>
+        </div>
+  
+        <!-- Modal footer -->
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- The Modal GF ssti -->
+  
+  <!-- The Modal GF ssrf -->
+  <div class="modal fade text-dark" id="modal-gf-ssrf">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+  
+        <!-- Modal Header -->
+        <div class="modal-header">
+          GF SERVER-SIDE REQUEST FORGERY
+          <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+        </div>
+  
+        <!-- Modal body -->
+        <div class="modal-body ">
+          <div class="input-group-prepend">
+            <p class="modal-results">
+              <td>{{ url_gf.ssrf }}</td>
+            </p>
+          </div>
+        </div>
+  
+        <!-- Modal footer -->
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- The Modal GF ssrf -->
+  
+  <!-- The Modal GF sqli -->
+  <div class="modal fade text-dark" id="modal-gf-sqli">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+  
+        <!-- Modal Header -->
+        <div class="modal-header">
+          GF SQL INJECTION
+          <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+        </div>
+  
+        <!-- Modal body -->
+        <div class="modal-body ">
+          <div class="input-group-prepend">
+            <p class="modal-results">
+              <td>{{ url_gf.sqli }}</td>
+            </p>
+          </div>
+        </div>
+  
+        <!-- Modal footer -->
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- The Modal GF sqli -->
+  
+  <!-- The Modal GF openredirect -->
+  <div class="modal fade text-dark" id="modal-gf-openredirect">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+  
+        <!-- Modal Header -->
+        <div class="modal-header">
+          GF OPEN REDIRECT
+          <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+        </div>
+  
+        <!-- Modal body -->
+        <div class="modal-body ">
+          <div class="input-group-prepend">
+            <p class="modal-results">
+              <td>{{ url_gf.redirect }}</td>
+            </p>
+          </div>
+        </div>
+  
+        <!-- Modal footer -->
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- The Modal GF openredirect -->
+  
+  <!-- The Modal GF rce -->
+  <div class="modal fade text-dark" id="modal-gf-rce">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+  
+        <!-- Modal Header -->
+        <div class="modal-header">
+          GF REMOTE CODE EXECUTION
+          <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+        </div>
+  
+        <!-- Modal body -->
+        <div class="modal-body ">
+          <div class="input-group-prepend">
+            <p class="modal-results">
+              <td>{{ url_gf.rce }}</td>
+            </p>
+          </div>
+        </div>
+  
+        <!-- Modal footer -->
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- The Modal GF rce -->
+  
+  <!-- The Modal GF lfi -->
+  <div class="modal fade text-dark" id="modal-gf-lfi">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+  
+        <!-- Modal Header -->
+        <div class="modal-header">
+          GF LOCAL FILE INCLUSION
+          <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+        </div>
+  
+        <!-- Modal body -->
+        <div class="modal-body ">
+          <div class="input-group-prepend">
+            <p class="modal-results">
+              <td>{{ url_gf.lfi }}</td>
+            </p>
+          </div>
+        </div>
+  
+        <!-- Modal footer -->
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- The Modal GF lfi -->
+  
+  <!-- The Modal GF potential -->
+  <div class="modal fade text-dark" id="modal-gf-potential">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+  
+        <!-- Modal Header -->
+        <div class="modal-header">
+          GF POTENTIAL
+          <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+        </div>
+  
+        <!-- Modal body -->
+        <div class="modal-body ">
+          <div class="input-group-prepend">
+            <p class="modal-results">
+              <td>{{ url_gf.potential }}</td>
+            </p>
+          </div>
+        </div>
+  
+        <!-- Modal footer -->
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- The Modal GF potential -->
+  
