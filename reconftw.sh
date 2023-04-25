@@ -1342,7 +1342,7 @@ function urlchecks(){
 				if [ "$URL_CHECK_PASSIVE" = true ]; then
 					if [ "$DEEP" = true ]; then
 						cat .tmp/webs_all.txt | unfurl -u domains > .tmp/waymore_input.txt
-						axiom-scan .tmp/webs_all.txt -m waymore -o .tmp/url_extract_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+						axiom-scan .tmp/waymore_input.txt -m waymore -o .tmp/url_extract_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 					else
 						axiom-scan .tmp/webs_all.txt -m gau -o .tmp/url_extract_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 						fi
