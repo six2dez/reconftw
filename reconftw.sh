@@ -2827,13 +2827,12 @@ function webserver(){
 
 		if [ "$ipAddress" != "" ]; then
 			printf "\n ${bblue}Starting web server... ${reset}\n"
-			cd $SCRIPTPATH/web
+			cd $SCRIPTPATH/web || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 			$SUDO source $SCRIPTPATH/web/.venv/bin/activate
-			# $SUDO service postgresql start
-			$SUDO screen -S ReconftwWebserver -X kill #&>/dev/null
-			$SUDO screen -dmS ReconftwWebserver python3 manage.py runserver $ipAddress:8001 #&>/dev/null
-			$SUDO service redis-server start #&>/dev/null
-			$SUDO screen -S ReconftwCelery -X kill #&>/dev/null
+			$SUDO screen -S ReconftwWebserver -X kill &>/dev/null
+			$SUDO screen -dmS ReconftwWebserver python3 manage.py runserver $ipAddress:8001 &>/dev/null
+			$SUDO service redis-server start &>/dev/null
+			$SUDO screen -S ReconftwCelery -X kill &>/dev/null
 			$SUDO screen -dmS ReconftwCelery python3 -m celery -A web worker -l info -P prefork -Q run_scans,default &>/dev/null
 			printf " ${bblue}Web server started! ${reset}\n"
 			printf " ${bblue}Service Address: http://$ipAddress:8001${reset}\n"
