@@ -2827,9 +2827,8 @@ function webserver(){
 
 		if [ "$ipAddress" != "" ]; then
 			printf "\n ${bblue}Starting web server... ${reset}\n"
-			$SUDO source .venv/bin/activate
-			cd web
-			# $SUDO service postgresql start
+			cd $SCRIPTPATH/web || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+			$SUDO source $SCRIPTPATH/web/.venv/bin/activate
 			$SUDO screen -S ReconftwWebserver -X kill &>/dev/null
 			$SUDO screen -dmS ReconftwWebserver python3 manage.py runserver $ipAddress:8001 &>/dev/null
 			$SUDO service redis-server start &>/dev/null

@@ -372,23 +372,23 @@ if [ "$install_golang" = "true" ]; then
             eval $SUDO rm -rf /usr/local/go $DEBUG_STD
             if [ "True" = "$IS_ARM" ]; then
                 if [ "True" = "$RPI_3" ]; then
-                    eval wget "https://dl.google.com/go/${version}.linux-armv6l.tar.gz" $DEBUG_STD
-                    eval $SUDO tar -C /usr/local -xzf "${version}.linux-armv6l.tar.gz" $DEBUG_STD
+                    eval wget "https://dl.google.com/go/${version}.linux-armv6l.tar.gz" -O /tmp/${version}.linux-armv6l.tar.gz $DEBUG_STD
+                    eval $SUDO tar -C /usr/local -xzf /tmp/"${version}.linux-armv6l.tar.gz" $DEBUG_STD
                 elif [ "True" = "$RPI_4" ]; then
-                    eval wget "https://dl.google.com/go/${version}.linux-arm64.tar.gz" $DEBUG_STD
-                    eval $SUDO tar -C /usr/local -xzf "${version}.linux-arm64.tar.gz" $DEBUG_STD
+                    eval wget "https://dl.google.com/go/${version}.linux-arm64.tar.gz" -O /tmp/${version}.linux-arm64.tar.gz $DEBUG_STD
+                    eval $SUDO tar -C /usr/local -xzf /tmp/"${version}.linux-arm64.tar.gz" $DEBUG_STD
                 fi
             elif [ "True" = "$IS_MAC" ]; then
                 if [ "True" = "$IS_ARM" ]; then
-                    eval wget "https://dl.google.com/go/${version}.darwin-arm64.tar.gz" $DEBUG_STD
-                    eval $SUDO tar -C /usr/local -xzf "${version}.darwin-arm64.tar.gz" $DEBUG_STD
+                    eval wget "https://dl.google.com/go/${version}.darwin-arm64.tar.gz" -O /tmp/${version}.darwin-arm64.tar.gz $DEBUG_STD
+                    eval $SUDO tar -C /usr/local -xzf /tmp/"${version}.darwin-arm64.tar.gz" $DEBUG_STD
                 else
-                    eval wget "https://dl.google.com/go/${version}.darwin-amd64.tar.gz" $DEBUG_STD
-                    eval $SUDO tar -C /usr/local -xzf "${version}.darwin-amd64.tar.gz" $DEBUG_STD
+                    eval wget "https://dl.google.com/go/${version}.darwin-amd64.tar.gz" -O /tmp/${version}.darwin-amd64.tar.gz $DEBUG_STD
+                    eval $SUDO tar -C /usr/local -xzf /tmp/"${version}.darwin-amd64.tar.gz" $DEBUG_STD
                 fi
             else
-                eval wget "https://dl.google.com/go/${version}.linux-amd64.tar.gz" $DEBUG_STD
-                eval $SUDO tar -C /usr/local -xzf "${version}.linux-amd64.tar.gz" $DEBUG_STD
+                eval wget "https://dl.google.com/go/${version}.linux-amd64.tar.gz" -O /tmp/${version}.linux-amd64.tar.gz $DEBUG_STD
+                eval $SUDO tar -C /usr/local -xzf /tmp/"${version}.linux-amd64.tar.gz" $DEBUG_STD
             fi
             eval $SUDO ln -sf /usr/local/go/bin/go /usr/local/bin/
             #rm -rf $version*
