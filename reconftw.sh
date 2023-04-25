@@ -2827,8 +2827,8 @@ function webserver(){
 
 		if [ "$ipAddress" != "" ]; then
 			printf "\n ${bblue}Starting web server... ${reset}\n"
-			cd web
 			$SUDO source .venv/bin/activate
+			cd web
 			# $SUDO service postgresql start
 			$SUDO screen -S ReconftwWebserver -X kill &>/dev/null
 			$SUDO screen -dmS ReconftwWebserver python3 manage.py runserver $ipAddress:8001 &>/dev/null
