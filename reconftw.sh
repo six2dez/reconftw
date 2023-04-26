@@ -2822,6 +2822,13 @@ function help(){
 
 function webserver(){
 	printf "${bgreen} Web Interface    by @lur1el, @d3vchac, @mx61tt and @dd4n1b0y ${reset}\n"
+	ver=$(python3 -V 2>&1 | sed 's/.* \([0-9]\).\([0-9]\).*/\1\2/')
+	
+    if [ "$ver" -lt "31" ]; then
+        echo "The web interface requires python 3.10 or greater"
+        exit 1
+    fi
+
 	if [ "$1" == "start" ]; then
 		ipAddress=$(hostname -I | cut -d ' ' -f1 | sed -e 's/ //') 
 
