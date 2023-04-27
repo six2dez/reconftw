@@ -47,7 +47,7 @@ fi
 declare -A gotools
 gotools["gf"]="go install -v github.com/tomnomnom/gf@latest"
 gotools["qsreplace"]="go install -v github.com/tomnomnom/qsreplace@latest"
-gotools["amass"]="go install -v github.com/OWASP/Amass/v3/...@v3.20.0"
+gotools["amass"]="go install -v github.com/OWASP/Amass/v3/...@master"
 gotools["ffuf"]="go install -v github.com/ffuf/ffuf/v2@latest"
 gotools["github-subdomains"]="go install -v github.com/gwen001/github-subdomains@latest"
 gotools["gitlab-subdomains"]="go install github.com/gwen001/gitlab-subdomains@latest"
