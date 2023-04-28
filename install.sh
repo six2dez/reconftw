@@ -194,7 +194,7 @@ install_webserver(){
     #$SUDO su postgres -c "psql -c \"GRANT ALL PRIVILEGES ON DATABASE web TO $DBUser;\""
     
     printf "${yellow} Creating WEB User...${reset}\n\n"
-    $SUDO rm $SCRIPTPATH/web/db.sqlite3
+    $SUDO rm $SCRIPTPATH/web/db.sqlite3 &>/dev/null
     $SUDO python3 $SCRIPTPATH/web/manage.py makemigrations &>/dev/null
     $SUDO python3 $SCRIPTPATH/web/manage.py migrate &>/dev/null
     $SUDO python3 $SCRIPTPATH/web/manage.py createsuperuser
