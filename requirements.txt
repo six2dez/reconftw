@@ -6,6 +6,8 @@ beautifulsoup4          # multiple
 bs4                     # multiple
 censys                  # multiple
 certifi                 # multiple
+chardet                 # ghauri
+colorama                # ghauri
 dank                    # regulator
 datrie                  # regulator
 dnspython               # ip2provider
