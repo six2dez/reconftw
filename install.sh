@@ -198,6 +198,7 @@ install_webserver(){
     $SUDO python3 $SCRIPTPATH/web/manage.py makemigrations &>/dev/null
     $SUDO python3 $SCRIPTPATH/web/manage.py migrate &>/dev/null
     $SUDO python3 $SCRIPTPATH/web/manage.py createsuperuser
+    printf "\n\n"
 }
 
 
