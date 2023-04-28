@@ -218,7 +218,7 @@ while true; do
 
     if $rftw_installed; then
         printf "${bblue} 1. Install/Update ReconFTW (without Web Interface)${reset}\n\n"
-        printf "${bblue} 2. Install/Update ReconFTW + Install Web Interface${reset}\n\n"
+        printf "${bblue} 2. Install/Update ReconFTW + Install Web Interface${reset} ${yellow}(User Interaction needed!)${reset}\n\n"
         printf "${bblue} 3. Install only Web Interface${reset}\n\n"
         printf "${bblue} 4. Exit${reset}\n\n"
         printf "${bgreen}#######################################################################${reset}\n\n"
