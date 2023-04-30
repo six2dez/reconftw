@@ -114,6 +114,7 @@ function tools_installed(){
 	which ghauri &>/dev/null || { printf "${bred} [*] ghauri			[NO]${reset}\n${reset}"; allinstalled=false;}
 	which hakip2host &>/dev/null || { printf "${bred} [*] hakip2host			[NO]${reset}\n${reset}"; allinstalled=false;}
 	which gau &>/dev/null || { printf "${bred} [*] gau			[NO]${reset}\n${reset}"; allinstalled=false;}
+	which subgpt &>/dev/null || { printf "${bred} [*] subgpt			[NO]${reset}\n${reset}"; allinstalled=false;}
 	
 	if [ "${allinstalled}" = true ]; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
@@ -342,6 +343,7 @@ function subdomains_full(){
 		sub_brute
 		sub_permut
 		sub_regex_permut
+		sub_gpt
 		sub_recursive_passive
 		sub_recursive_brute
 		sub_dns
@@ -707,6 +709,37 @@ function sub_regex_permut(){
 	else
 		if [ "$SUBREGEXPERMUTE" = false ]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
+	fi
+}
+
+function sub_gpt(){
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBGPT" = true ] && [ -s "$SUBGPT_COOKIE" ]; then
+		start_subfunc ${FUNCNAME[0]} "Running : Permutations by BingGPT prediction"
+		subgpt -i ${dir}/subdomains/subdomains.txt -c $SUBGPT_COOKIE --dont-resolve -o ${dir}/.tmp/gpt_subs.txt
+		if [ ! "$AXIOM" = true ]; then
+			resolvers_update_quick_local
+			[ -s "${dir}/.tmp/gpt_subs.txt" ] && puredns resolve ${dir}/.tmp/gpt_subs.txt -w .tmp/gpt_resolved.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" &>/dev/null
+		else
+			resolvers_update_quick_axiom
+			[ -s "${dir}/.tmp/gpt_subs.txt" ] && axiom-scan ${dir}/.tmp/gpt_subs.txt -m puredns-resolve -r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -o .tmp/gpt_resolved.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+		fi
+		
+		if [ -s ".tmp/gpt_resolved.txt" ]; then
+			[ -s "$outOfScope_file" ] && deleteOutScoped $outOfScope_file .tmp/gpt_resolved.txt
+			[[ "$INSCOPE" = true ]] && check_inscope .tmp/gpt_resolved.txt 2>>"$LOGFILE" &>/dev/null
+			NUMOFLINES=$(cat .tmp/gpt_resolved.txt 2>>"$LOGFILE" | grep ".$domain$" | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
+		else
+			NUMOFLINES=0
+		fi
+		end_subfunc "${NUMOFLINES} new subs (permutations)" ${FUNCNAME[0]}
+	else
+		if [ "$SUBGPT" = false ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+		elif [ ! -s "$SUBGPT_COOKIE" ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} SUBGPT_COOKIE not defined on config file (reconftw.cfg by default) ${reset}\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi

@@ -661,6 +661,6 @@ if [ "$web" = true ]; then
     install_webserver
 fi
 
-printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/provider-config.yaml)\n - GitLab (~/Tools/.gitlab_tokens)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg or env var) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg or env var) \n - notify (~/.config/notify/provider-config.yaml) \n - theHarvester (~/Tools/theHarvester/api-keys.yaml or /etc/theHarvester/api-keys.yaml)\n - WHOISXML API (WHOISXML_API in reconftw.cfg or env var)\n\n\n${reset}"
+printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/provider-config.yaml)\n - GitLab (~/Tools/.gitlab_tokens)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg or env var) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg or env var) \n - notify (~/.config/notify/provider-config.yaml) \n - WHOISXML API (WHOISXML_API in reconftw.cfg or env var)\n - subgpt_cookies.json (subgpt_cookies.json file, follow instructions at https://github.com/s0md3v/SubGPT#getting-bing-cookie)\n\n\n${reset}"
 printf "${bgreen} Finished!${reset}\n\n"
 printf "\n\n${bgreen}#######################################################################${reset}\n"

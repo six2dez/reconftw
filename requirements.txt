@@ -33,4 +33,4 @@ tldextract              # dorks_hunter
 tqdm                    # multiple
 ujson                   # multiple
 urllib3                 # multiple
-uvloop;platform_system != "Windows" # theHarvester
+subgpt                  # subgpt
