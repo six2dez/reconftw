@@ -302,6 +302,7 @@ install_apt(){
     curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
     eval source "$HOME/.cargo/env $DEBUG_STD"
     eval cargo install ripgen $DEBUG_STD
+    eval source "$HOME/.cargo/env $DEBUG_STD"
 }
 
 install_brew(){
@@ -426,6 +427,7 @@ mkdir -p ~/.config/notify/
 mkdir -p ~/.config/amass/
 mkdir -p ~/.config/nuclei/
 touch $dir/.github_tokens
+touch $dir/.gitlab_tokens
 
 eval wget -N -c https://bootstrap.pypa.io/get-pip.py $DEBUG_STD && eval python3 get-pip.py $DEBUG_STD
 eval rm -f get-pip.py $DEBUG_STD
