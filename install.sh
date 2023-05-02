@@ -47,7 +47,7 @@ fi
 declare -A gotools
 gotools["gf"]="go install -v github.com/tomnomnom/gf@latest"
 gotools["qsreplace"]="go install -v github.com/tomnomnom/qsreplace@latest"
-gotools["amass"]="go install -v github.com/OWASP/Amass/v3/...@master"
+gotools["amass"]="go install -v github.com/owasp-amass/amass/v3/...@master"
 gotools["ffuf"]="go install -v github.com/ffuf/ffuf/v2@latest"
 gotools["github-subdomains"]="go install -v github.com/gwen001/github-subdomains@latest"
 gotools["gitlab-subdomains"]="go install github.com/gwen001/gitlab-subdomains@latest"
@@ -115,7 +115,7 @@ repos["Web-Cache-Vulnerability-Scanner"]="Hackmanit/Web-Cache-Vulnerability-Scan
 repos["regulator"]="cramppet/regulator"
 repos["byp4xx"]="lobuhi/byp4xx"
 repos["Infoga"]="m4ll0k/Infoga"
-repos["ghauri"]="https://github.com/r0oth3x49/ghauri"
+repos["ghauri"]="r0oth3x49/ghauri"
 
 
 function banner_web(){
@@ -560,7 +560,7 @@ eval subfinder $DEBUG_STD
 
 printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 ## Downloads
-[ ! -f ~/.config/amass/config.ini ] && wget -q -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini
+[ ! -f ~/.config/amass/config.ini ] && wget -q -O ~/.config/amass/config.ini https://raw.githubusercontent.com/owasp-amass/amass/master/examples/config.ini
 [ ! -f ~/.config/notify/provider-config.yaml ] && wget -q -O ~/.config/notify/provider-config.yaml https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw
 wget -q -O - https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json > ~/.gf/potential.json
 wget -q -O - https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py > ${tools}/getjswords.py
