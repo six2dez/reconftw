@@ -92,7 +92,7 @@ mkdir -p /root/Tools
 mkdir -p /reconftw
 git clone https://github.com/six2dez/reconftw.git /reconftw
 cd /reconftw
-./install.sh
+echo 1 | ./install.sh
 
 ###>> Restore .bashrc <<###
 mv /root/original.bashrc /root/.bashrc
