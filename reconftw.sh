@@ -902,7 +902,7 @@ function s3buckets(){
 		start_func ${FUNCNAME[0]} "AWS S3 buckets search"
 		# S3Scanner
 		if [ ! "$AXIOM" = true ]; then
-			[ -s "subdomains/subdomains.txt" ] && s3scanner scan -f subdomains/subdomains.txt | anew -q .tmp/s3buckets.txt
+			[ -s "subdomains/subdomains.txt" ] && s3scanner scan -f subdomains/subdomains.txt 2>>"$LOGFILE" | anew -q .tmp/s3buckets.txt
 		else
 			axiom-scan subdomains/subdomains.txt -m s3scanner -o .tmp/s3buckets_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			[ -s ".tmp/s3buckets_tmp.txt" ] && cat .tmp/s3buckets_tmp.txt .tmp/s3buckets_tmp2.txt 2>>"$LOGFILE" | anew -q .tmp/s3buckets.txt && sed -i '/^$/d' .tmp/s3buckets.txt
