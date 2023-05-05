@@ -1495,6 +1495,7 @@ function jschecks(){
 			fi
 			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
 			[ -s "js/js_livelinks.txt" ] && python3 $tools/xnLinkFinder/xnLinkFinder.py -i js/js_livelinks.txt -sf subdomains/subdomains.txt -d $XNLINKFINDER_DEPTH -o .tmp/js_endpoints.txt 2>>"$LOGFILE" &>/dev/null
+			[ -s "parameters.txt" ] && rm -f parameters.txt 2>>"$LOGFILE" &>/dev/null
 			if [ -s ".tmp/js_endpoints.txt" ]; then
 				sed -i '/^\//!d' .tmp/js_endpoints.txt
 				cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt
