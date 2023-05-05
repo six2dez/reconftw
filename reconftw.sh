@@ -718,7 +718,7 @@ function sub_regex_permut(){
 function sub_gpt(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBGPT" = true ] && [ -s "$SUBGPT_COOKIE" ]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Permutations by BingGPT prediction"
-		subgpt -i ${dir}/subdomains/subdomains.txt -c $SUBGPT_COOKIE --dont-resolve -o ${dir}/.tmp/gpt_subs.txt
+		subgpt -i ${dir}/subdomains/subdomains.txt -c $SUBGPT_COOKIE --dont-resolve -o ${dir}/.tmp/gpt_subs.txt 2>>"$LOGFILE"
 		if [ ! "$AXIOM" = true ]; then
 			resolvers_update_quick_local
 			[ -s "${dir}/.tmp/gpt_subs.txt" ] && puredns resolve ${dir}/.tmp/gpt_subs.txt -w .tmp/gpt_resolved.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" &>/dev/null
@@ -1280,7 +1280,7 @@ function fuzz(){
 			else
 				axiom-exec 'wget -q -O - https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt > /home/op/lists/fuzz_wordlist.txt' &>/dev/null
 				axiom-scan .tmp/webs_all.txt -m ffuf -w /home/op/lists/fuzz_wordlist.txt -H "${HEADER}" $FFUF_FLAGS -s -maxtime $FFUF_MAXTIME -o $dir/fuzzing/ffuf-content.csv $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-				grep -v "FUZZ,url,redirectlocation" $dir/fuzzing/ffuf-content.csv | awk -F "," '{print $2" "$5" "$6}' | sort > $dir/fuzzing/ffuf-content.tmp
+				grep -v "FUZZ,url,redirectlocation" $dir/fuzzing/ffuf-content.csv 2>>"$LOGFILE" | awk -F "," '{print $2" "$5" "$6}' | sort > $dir/fuzzing/ffuf-content.tmp
 				for sub in $(cat .tmp/webs_all.txt); do
 					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
 					grep "$sub" $dir/fuzzing/ffuf-content.tmp | awk '{print $2" "$3" "$1}' | sort -k1 | anew -q $dir/fuzzing/${sub_out}.txt
