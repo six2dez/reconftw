@@ -47,7 +47,7 @@ fi
 declare -A gotools
 gotools["gf"]="go install -v github.com/tomnomnom/gf@latest"
 gotools["qsreplace"]="go install -v github.com/tomnomnom/qsreplace@latest"
-gotools["amass"]="go install -v github.com/OWASP/Amass/v3/...@master"
+gotools["amass"]="go install -v github.com/owasp-amass/amass/v3/...@master"
 gotools["ffuf"]="go install -v github.com/ffuf/ffuf/v2@latest"
 gotools["github-subdomains"]="go install -v github.com/gwen001/github-subdomains@latest"
 gotools["gitlab-subdomains"]="go install github.com/gwen001/gitlab-subdomains@latest"
@@ -115,7 +115,7 @@ repos["Web-Cache-Vulnerability-Scanner"]="Hackmanit/Web-Cache-Vulnerability-Scan
 repos["regulator"]="cramppet/regulator"
 repos["byp4xx"]="lobuhi/byp4xx"
 repos["Infoga"]="m4ll0k/Infoga"
-repos["ghauri"]="https://github.com/r0oth3x49/ghauri"
+repos["ghauri"]="r0oth3x49/ghauri"
 
 
 function banner_web(){
@@ -194,10 +194,11 @@ install_webserver(){
     #$SUDO su postgres -c "psql -c \"GRANT ALL PRIVILEGES ON DATABASE web TO $DBUser;\""
     
     printf "${yellow} Creating WEB User...${reset}\n\n"
-    $SUDO rm $SCRIPTPATH/web/db.sqlite3
+    $SUDO rm $SCRIPTPATH/web/db.sqlite3 &>/dev/null
     $SUDO python3 $SCRIPTPATH/web/manage.py makemigrations &>/dev/null
     $SUDO python3 $SCRIPTPATH/web/manage.py migrate &>/dev/null
     $SUDO python3 $SCRIPTPATH/web/manage.py createsuperuser
+    printf "\n\n"
 }
 
 
@@ -218,8 +219,8 @@ while true; do
 
     if $rftw_installed; then
         printf "${bblue} 1. Install/Update ReconFTW (without Web Interface)${reset}\n\n"
-        printf "${bblue} 2. Install/Update ReconFTW + Install Web Interface${reset}\n\n"
-        printf "${bblue} 3. Install only Web Interface${reset}\n\n"
+        printf "${bblue} 2. Install/Update ReconFTW + Install Web Interface${reset} ${yellow}(User Interaction needed!)${reset}\n\n"
+        printf "${bblue} 3. Setup Web Interface${reset}\n\n"
         printf "${bblue} 4. Exit${reset}\n\n"
         printf "${bgreen}#######################################################################${reset}\n\n"
         read -p "$(echo -e ${bblue} "Insert option: "${reset})" option
@@ -250,7 +251,7 @@ while true; do
 
     else
         printf "${bblue} 1. Install/Update ReconFTW${reset}\n\n"
-        printf "${bblue} 2. Install/Update ReconFTW + Install Web Interface${reset}\n\n"
+        printf "${bblue} 2. Install/Update ReconFTW + Install Web Interface${reset} ${yellow}(User Interaction needed!)${reset}\n\n"
         printf "${bred} 3. Can't install Web Interface without ReconFTW${reset}\n\n"
         printf "${bblue} 4. Exit${reset}\n\n"
         printf "${bgreen}#######################################################################${reset}\n\n"
@@ -301,6 +302,7 @@ install_apt(){
     curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
     eval source "$HOME/.cargo/env $DEBUG_STD"
     eval cargo install ripgen $DEBUG_STD
+    eval source "$HOME/.cargo/env $DEBUG_STD"
 }
 
 install_brew(){
@@ -425,6 +427,7 @@ mkdir -p ~/.config/notify/
 mkdir -p ~/.config/amass/
 mkdir -p ~/.config/nuclei/
 touch $dir/.github_tokens
+touch $dir/.gitlab_tokens
 
 eval wget -N -c https://bootstrap.pypa.io/get-pip.py $DEBUG_STD && eval python3 get-pip.py $DEBUG_STD
 eval rm -f get-pip.py $DEBUG_STD
@@ -557,10 +560,11 @@ eval $SUDO chmod 755 /usr/local/bin/ppfuzz
 eval $SUDO strip -s /usr/local/bin/ppfuzz $DEBUG_STD
 eval notify $DEBUG_STD
 eval subfinder $DEBUG_STD
+eval subfinder $DEBUG_STD
 
 printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 ## Downloads
-[ ! -f ~/.config/amass/config.ini ] && wget -q -O ~/.config/amass/config.ini https://raw.githubusercontent.com/OWASP/Amass/master/examples/config.ini
+[ ! -f ~/.config/amass/config.ini ] && wget -q -O ~/.config/amass/config.ini https://raw.githubusercontent.com/owasp-amass/amass/master/examples/config.ini
 [ ! -f ~/.config/notify/provider-config.yaml ] && wget -q -O ~/.config/notify/provider-config.yaml https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw
 wget -q -O - https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json > ~/.gf/potential.json
 wget -q -O - https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py > ${tools}/getjswords.py
@@ -635,7 +639,7 @@ if [ "$generate_resolvers" = true ]; then
 		[ -s "tmp_resolvers" ] && cat tmp_resolvers | anew -q $resolvers
 		[ -s "tmp_resolvers" ] && rm -f tmp_resolvers &>/dev/null
 		[ ! -s "$resolvers" ] && wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > ${resolvers}
-        [ ! -s "$resolvers_trusted" ] && wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > ${resolvers_trusted}
+        [ ! -s "$resolvers_trusted" ] && wget -q -O - https://raw.githubusercontent.com/six2dez/resolvers_reconftw/main/resolvers_trusted.txt > ${resolvers_trusted}
 		printf "${yellow} Resolvers updated\n ${reset}\n\n"
 	fi
 	generate_resolvers=false
@@ -643,7 +647,7 @@ else
 	[ ! -s "$resolvers" ] || if [[ $(find "$resolvers" -mtime +1 -print) ]] ; then
 		 ${reset}"\n\nChecking resolvers lists...\n Accurate resolvers are the key to great results\n Downloading new resolvers ${reset}\n\n"
 		wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > ${resolvers}
-        wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt > ${resolvers_trusted}
+        wget -q -O - https://raw.githubusercontent.com/six2dez/resolvers_reconftw/main/resolvers_trusted.txt > ${resolvers_trusted}
 		printf "${yellow} Resolvers updated\n ${reset}\n\n"
 	fi
 fi
@@ -656,9 +660,9 @@ eval strip -s "$HOME"/go/bin/* $DEBUG_STD
 eval $SUDO cp "$HOME"/go/bin/* /usr/local/bin/ $DEBUG_STD
 
 if [ "$web" = true ]; then
-    install_webserver
+    sh -c 'echo 3 | ./install.sh'
 fi
 
-printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/provider-config.yaml)\n - GitLab (~/Tools/.gitlab_tokens)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg or env var) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg or env var) \n - notify (~/.config/notify/provider-config.yaml) \n - theHarvester (~/Tools/theHarvester/api-keys.yaml or /etc/theHarvester/api-keys.yaml)\n - WHOISXML API (WHOISXML_API in reconftw.cfg or env var)\n\n\n${reset}"
+printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/provider-config.yaml)\n - GitLab (~/Tools/.gitlab_tokens)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg or env var) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg or env var) \n - notify (~/.config/notify/provider-config.yaml) \n - WHOISXML API (WHOISXML_API in reconftw.cfg or env var)\n - subgpt_cookies.json (subgpt_cookies.json file, follow instructions at https://github.com/s0md3v/SubGPT#getting-bing-cookie)\n\n\n${reset}"
 printf "${bgreen} Finished!${reset}\n\n"
 printf "\n\n${bgreen}#######################################################################${reset}\n"

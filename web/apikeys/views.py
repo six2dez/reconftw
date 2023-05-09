@@ -1,7 +1,8 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from editprofile.imgUser import imgUser
-from apikeys.config import amassConfig, ReconConfig, theHarvesterConfig, GithubConfig, h8mailConfig
+from apikeys.config import amassConfig, ReconConfig, GithubConfig, h8mailConfig
+#from apikeys.config import amassConfig, ReconConfig, theHarvesterConfig, GithubConfig, h8mailConfig
 # Create your views here.
 
 otherNames = {'passivedns': '360PassiveDNS', 'digicert': 'CertCentral', 'psbdmp':'Pastebin', 'rikiq':'PassiveTotal', 'quake360':'quake', 'cisco':'Umbrella', 'leaklookup_priv':'leak-lookup_priv', 'leaklookup_pub':'leak-lookup_pub'}
@@ -43,14 +44,14 @@ def conf(request):
             GithubConfig(number, key=key)
 
 
-    elif keys["type"][0] == "TheHarvester":
-        del keys["type"]
-
-        for key in keys:
-            name = key
-            key = key=keys[key][0]  
-            if name != "spyse":
-                theHarvesterConfig(name, key=key)
+#    elif keys["type"][0] == "TheHarvester":
+#        del keys["type"]
+#
+#        for key in keys:
+#            name = key
+#            key = key=keys[key][0]  
+#            if name != "spyse":
+#                theHarvesterConfig(name, key=key)
 
     elif keys["type"][0] == "h8mail":
         del keys["type"]
@@ -147,19 +148,19 @@ def index(request):
         'token_5_value': GithubConfig('5', get=True),
         'token_6_value': GithubConfig('6', get=True),
 
-        'binaryedge_value': theHarvesterConfig("binaryedge", get=True),
-        'bing_value': theHarvesterConfig("bing", get=True),
-        'censys2_value': theHarvesterConfig("censys", get=True),
-        'fullhunt2_value': theHarvesterConfig("fullhunt", get=True),
-        'github2_value': theHarvesterConfig("github", get=True),
-        'hunter2_value': theHarvesterConfig("hunter", get=True),
-        'intelx2_value': theHarvesterConfig("intelx", get=True),
-        'pentesttools2_value': theHarvesterConfig("pentestTools", get=True),
-        'chaos2_value': theHarvesterConfig("chaos", get=True),
-        'rocketreach_value': theHarvesterConfig("rocketreach", get=True),
-        'securitytrails2_value': theHarvesterConfig("securityTrails", get=True),
-        'shodan3_value': theHarvesterConfig("shodan", get=True),
-        'zoomeye2_value': theHarvesterConfig("zoomeye", get=True),
+#        'binaryedge_value': theHarvesterConfig("binaryedge", get=True),
+#        'bing_value': theHarvesterConfig("bing", get=True),
+#        'censys2_value': theHarvesterConfig("censys", get=True),
+#        'fullhunt2_value': theHarvesterConfig("fullhunt", get=True),
+#        'github2_value': theHarvesterConfig("github", get=True),
+#        'hunter2_value': theHarvesterConfig("hunter", get=True),
+#        'intelx2_value': theHarvesterConfig("intelx", get=True),
+#        'pentesttools2_value': theHarvesterConfig("pentestTools", get=True),
+#        'chaos2_value': theHarvesterConfig("chaos", get=True),
+#        'rocketreach_value': theHarvesterConfig("rocketreach", get=True),
+#        'securitytrails2_value': theHarvesterConfig("securityTrails", get=True),
+#        'shodan3_value': theHarvesterConfig("shodan", get=True),
+#        'zoomeye2_value': theHarvesterConfig("zoomeye", get=True),
 
         'hunter3_value': h8mailConfig("hunter", get=True),
         'snusbase_value': h8mailConfig("snusbase", get=True),

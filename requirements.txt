@@ -6,7 +6,11 @@ beautifulsoup4          # multiple
 bs4                     # multiple
 censys                  # multiple
 certifi                 # multiple
+chardet                 # ghauri
+colorama                # ghauri
+colorclass              # dnsvalidator
 dank                    # regulator
+datetime                #JSA
 datrie                  # regulator
 dnspython               # ip2provider
 emailfinder             # Tool
@@ -15,6 +19,7 @@ fake-useragent          # fav-up
 future                  # multiple
 google                  # dorks_hunter
 ipwhois                 # fav-up
+ipaddress               # dnsvalidator
 metafinder              # Tool
 mmh3                    # fav-up
 netaddr                 # dnsvalidator
@@ -31,4 +36,4 @@ tldextract              # dorks_hunter
 tqdm                    # multiple
 ujson                   # multiple
 urllib3                 # multiple
-uvloop;platform_system != "Windows" # theHarvester
+subgpt                  # subgpt

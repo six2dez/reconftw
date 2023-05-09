@@ -114,6 +114,7 @@ function tools_installed(){
 	which ghauri &>/dev/null || { printf "${bred} [*] ghauri			[NO]${reset}\n${reset}"; allinstalled=false;}
 	which hakip2host &>/dev/null || { printf "${bred} [*] hakip2host			[NO]${reset}\n${reset}"; allinstalled=false;}
 	which gau &>/dev/null || { printf "${bred} [*] gau			[NO]${reset}\n${reset}"; allinstalled=false;}
+	which subgpt &>/dev/null || { printf "${bred} [*] subgpt			[NO]${reset}\n${reset}"; allinstalled=false;}
 	
 	if [ "${allinstalled}" = true ]; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
@@ -271,7 +272,7 @@ function domain_info(){
 		start_func ${FUNCNAME[0]} "Searching domain info (whois, registrant name/email domains)"
 		whois -H $domain > osint/domain_info_general.txt
 		if [ "$DEEP" = true ] || [ "$REVERSE_WHOIS" = true ]; then
-			amass intel -d ${domain} -whois -timeout $AMASS_INTEL_TIMEOUT -o osint/domain_info_reverse_whois.txt 2>>"$LOGFILE" &>/dev/null
+			timeout -k $AMASS_INTEL_TIMEOUT amass intel -d ${domain} -whois -timeout $AMASS_INTEL_TIMEOUT -o osint/domain_info_reverse_whois.txt 2>>"$LOGFILE" &>/dev/null
 		fi
 		end_func "Results are saved in $domain/osint/domain_info_[general/name/email/ip].txt" ${FUNCNAME[0]}
 	else
@@ -342,6 +343,7 @@ function subdomains_full(){
 		sub_brute
 		sub_permut
 		sub_regex_permut
+		sub_gpt
 		sub_recursive_passive
 		sub_recursive_brute
 		sub_dns
@@ -379,7 +381,7 @@ function sub_passive(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBPASSIVE" = true ]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Passive Subdomain Enumeration"
 		if [ ! "$AXIOM" = true ]; then
-			[[ $RUNAMASS == true ]] && amass enum -passive -d $domain -config $AMASS_CONFIG -timeout $AMASS_ENUM_TIMEOUT -json .tmp/amass_json.json 2>>"$LOGFILE" &>/dev/null
+			[[ $RUNAMASS == true ]] && timeout -k $AMASS_ENUM_TIMEOUT amass enum -passive -d $domain -config $AMASS_CONFIG -timeout $AMASS_ENUM_TIMEOUT -json .tmp/amass_json.json 2>>"$LOGFILE" &>/dev/null
 			[ -s ".tmp/amass_json.json" ] && cat .tmp/amass_json.json | jq -r '.name' | anew -q .tmp/amass_psub.txt
 			[[ $RUNSUBFINDER == true ]] && subfinder -all -d $domain -silent -o .tmp/subfinder_psub.txt 2>>"$LOGFILE" &>/dev/null
 		else
@@ -713,6 +715,37 @@ function sub_regex_permut(){
 	fi
 }
 
+function sub_gpt(){
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBGPT" = true ] && [ -s "$SUBGPT_COOKIE" ]; then
+		start_subfunc ${FUNCNAME[0]} "Running : Permutations by BingGPT prediction"
+		subgpt -i ${dir}/subdomains/subdomains.txt -c $SUBGPT_COOKIE --dont-resolve -o ${dir}/.tmp/gpt_subs.txt 2>>"$LOGFILE"
+		if [ ! "$AXIOM" = true ]; then
+			resolvers_update_quick_local
+			[ -s "${dir}/.tmp/gpt_subs.txt" ] && puredns resolve ${dir}/.tmp/gpt_subs.txt -w .tmp/gpt_resolved.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" &>/dev/null
+		else
+			resolvers_update_quick_axiom
+			[ -s "${dir}/.tmp/gpt_subs.txt" ] && axiom-scan ${dir}/.tmp/gpt_subs.txt -m puredns-resolve -r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -o .tmp/gpt_resolved.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+		fi
+		
+		if [ -s ".tmp/gpt_resolved.txt" ]; then
+			[ -s "$outOfScope_file" ] && deleteOutScoped $outOfScope_file .tmp/gpt_resolved.txt
+			[[ "$INSCOPE" = true ]] && check_inscope .tmp/gpt_resolved.txt 2>>"$LOGFILE" &>/dev/null
+			NUMOFLINES=$(cat .tmp/gpt_resolved.txt 2>>"$LOGFILE" | grep ".$domain$" | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
+		else
+			NUMOFLINES=0
+		fi
+		end_subfunc "${NUMOFLINES} new subs (permutations)" ${FUNCNAME[0]}
+	else
+		if [ "$SUBGPT" = false ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+		elif [ ! -s "$SUBGPT_COOKIE" ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} SUBGPT_COOKIE not defined on config file (reconftw.cfg by default) ${reset}\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
+	fi
+}
+
 function sub_recursive_passive(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUB_RECURSIVE_PASSIVE" = true ] && [ -s "subdomains/subdomains.txt" ]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Subdomains recursive search passive"
@@ -720,7 +753,7 @@ function sub_recursive_passive(){
 		[ -s "subdomains/subdomains.txt" ] && dsieve -if subdomains/subdomains.txt -f 3 -top $DEEP_RECURSIVE_PASSIVE > .tmp/subdomains_recurs_top.txt
 		if [ ! "$AXIOM" = true ]; then
 			resolvers_update_quick_local
-			[ -s ".tmp/subdomains_recurs_top.txt" ] && amass enum -passive -df .tmp/subdomains_recurs_top.txt -nf subdomains/subdomains.txt -config $AMASS_CONFIG -timeout $AMASS_ENUM_TIMEOUT 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
+			[ -s ".tmp/subdomains_recurs_top.txt" ] && timeout -k $AMASS_ENUM_TIMEOUT amass enum -passive -df .tmp/subdomains_recurs_top.txt -nf subdomains/subdomains.txt -config $AMASS_CONFIG -timeout $AMASS_ENUM_TIMEOUT 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
 			[ -s ".tmp/passive_recursive.txt" ] && puredns resolve .tmp/passive_recursive.txt -w .tmp/passive_recurs_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT  --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" &>/dev/null
 		else
 			resolvers_update_quick_axiom
@@ -869,7 +902,7 @@ function s3buckets(){
 		start_func ${FUNCNAME[0]} "AWS S3 buckets search"
 		# S3Scanner
 		if [ ! "$AXIOM" = true ]; then
-			[ -s "subdomains/subdomains.txt" ] && s3scanner scan -f subdomains/subdomains.txt | anew -q .tmp/s3buckets.txt
+			[ -s "subdomains/subdomains.txt" ] && s3scanner scan -f subdomains/subdomains.txt 2>>"$LOGFILE" | anew -q .tmp/s3buckets.txt
 		else
 			axiom-scan subdomains/subdomains.txt -m s3scanner -o .tmp/s3buckets_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			[ -s ".tmp/s3buckets_tmp.txt" ] && cat .tmp/s3buckets_tmp.txt .tmp/s3buckets_tmp2.txt 2>>"$LOGFILE" | anew -q .tmp/s3buckets.txt && sed -i '/^$/d' .tmp/s3buckets.txt
@@ -921,7 +954,8 @@ function webprobe_simple(){
 			axiom-scan subdomains/subdomains.txt -m httpx ${HTTPX_FLAGS} -no-color -json -random-agent -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -retries 2 -timeout $HTTPX_TIMEOUT -o .tmp/web_full_info_probe.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 		fi
 		cat .tmp/web_full_info.txt .tmp/web_full_info_probe.txt webs/web_full_info.txt 2>>"$LOGFILE" | jq -s 'try .' | jq 'try unique_by(.input)' | jq 'try .[]' 2>>"$LOGFILE" > webs/web_full_info.txt
-		cat webs/web_full_info.txt | jq -r 'try .url' 2>/dev/null | grep "$domain" | sed "s/*.//" | anew -q .tmp/probed_tmp.txt
+		[ -s "webs/web_full_info.txt" ] && cat webs/web_full_info.txt | jq -r 'try .url' 2>/dev/null | grep "$domain" | sed "s/*.//" | anew -q .tmp/probed_tmp.txt
+		[ -s "webs/web_full_info.txt" ] && cat webs/web_full_info.txt | jq -r 'try . |"\(.url) [\(.status_code)] [\(.title)] [\(.webserver)] \(.tech)"' | anew -q webs/web_full_info_plain.txt
 		[ -s "$outOfScope_file" ] && deleteOutScoped $outOfScope_file .tmp/probed_tmp.txt
 		NUMOFLINES=$(cat .tmp/probed_tmp.txt 2>>"$LOGFILE" | anew webs/webs.txt | sed '/^$/d' | wc -l)
 		cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q .tmp/webs_all.txt
@@ -963,27 +997,25 @@ function webprobe_full(){
 			if [ ! "$AXIOM" = true ]; then
 				if [ -s ".tmp/nmap_uncommonweb.txt" ]; then
 					cat .tmp/nmap_uncommonweb.txt | httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout $HTTPX_UNCOMMONPORTS_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info_uncommon.txt 2>>"$LOGFILE" &>/dev/null
-					[ -s ".tmp/web_full_info_uncommon.txt" ] && cat .tmp/web_full_info_uncommon.txt | jq -r 'try .url' 2>/dev/null | grep "$domain" | sed "s/*.//" | anew -q .tmp/probed_uncommon_ports_tmp.txt
 				fi
 			else
 				if [ -s ".tmp/nmap_uncommonweb.txt" ]; then
 					axiom-scan .tmp/nmap_uncommonweb.txt -m httpx -follow-host-redirects -H \"${HEADER}\" -status-code -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout $HTTPX_UNCOMMONPORTS_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info_uncommon.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-					[ -s ".tmp/web_full_info_uncommon.txt" ] && cat .tmp/web_full_info_uncommon.txt | jq -r 'try .url' 2>/dev/null | grep "$domain" | sed "s/*.//" | anew -q .tmp/probed_uncommon_ports_tmp.txt
 				fi
 			fi
 		else
 			if [ ! "$AXIOM" = true ]; then
 				if [ -s "subdomains/subdomains.txt" ]; then
 					cat subdomains/subdomains.txt | httpx -follow-host-redirects -random-agent -status-code -p $UNCOMMON_PORTS_WEB -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout $HTTPX_UNCOMMONPORTS_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info_uncommon.txt 2>>"$LOGFILE" &>/dev/null
-					[ -s ".tmp/web_full_info_uncommon.txt" ] && cat .tmp/web_full_info_uncommon.txt | jq -r 'try .url' 2>/dev/null | grep "$domain" | sed "s/*.//" | anew -q .tmp/probed_uncommon_ports_tmp.txt
 				fi
 			else
 				if [ -s "subdomains/subdomains.txt" ]; then
 					axiom-scan subdomains/subdomains.txt -m httpx -follow-host-redirects -H \"${HEADER}\" -status-code -p $UNCOMMON_PORTS_WEB -threads $HTTPX_UNCOMMONPORTS_THREADS -timeout $HTTPX_UNCOMMONPORTS_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info_uncommon.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-					[ -s ".tmp/web_full_info_uncommon.txt" ] && cat .tmp/web_full_info_uncommon.txt | jq -r 'try .url' 2>/dev/null | grep "$domain" | sed "s/*.//" | anew -q .tmp/probed_uncommon_ports_tmp.txt
 				fi
 			fi
 		fi
+		[ -s ".tmp/web_full_info_uncommon.txt" ] && cat .tmp/web_full_info_uncommon.txt | jq -r 'try .url' 2>/dev/null | grep "$domain" | sed "s/*.//" | anew -q .tmp/probed_uncommon_ports_tmp.txt
+		[ -s ".tmp/web_full_info_uncommon.txt" ] && cat webs/web_full_info_uncommon.txt | jq -r 'try . |"\(.url) [\(.status_code)] [\(.title)] [\(.webserver)] \(.tech)"' | anew -q webs/web_full_info_uncommon_plain.txt
 		if [ -s ".tmp/web_full_info_uncommon.txt" ]; then
 			if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then 
 				cat .tmp/web_full_info_uncommon.txt 2>>"$LOGFILE" | anew -q webs/web_full_info_uncommon.txt
@@ -1020,8 +1052,7 @@ function screenshot(){
 		if [ ! "$AXIOM" = true ]; then
 			[ -s ".tmp/webs_all.txt" ] && gowitness file -f .tmp/webs_all.txt -t $GOWITNESS_THREADS --disable-logging 2>>"$LOGFILE"
 		else
-			[ "$AXIOM_SCREENSHOT_MODULE" = "webscreenshot" ] && axiom-scan .tmp/webs_all.txt -m $AXIOM_SCREENSHOT_MODULE -w $WEBSCREENSHOT_THREADS -o screenshots $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-			[ "$AXIOM_SCREENSHOT_MODULE" != "webscreenshot" ] && axiom-scan .tmp/webs_all.txt -m $AXIOM_SCREENSHOT_MODULE -o screenshots $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+			axiom-scan .tmp/webs_all.txt -m gowitness -t $GOWITNESS_THREADS --disable-logging -o screenshots $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 		fi
 		end_func "Results are saved in $domain/screenshots folder" ${FUNCNAME[0]}
 	else
@@ -1247,7 +1278,7 @@ function fuzz(){
 			else
 				axiom-exec 'wget -q -O - https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt > /home/op/lists/fuzz_wordlist.txt' &>/dev/null
 				axiom-scan .tmp/webs_all.txt -m ffuf -w /home/op/lists/fuzz_wordlist.txt -H "${HEADER}" $FFUF_FLAGS -s -maxtime $FFUF_MAXTIME -o $dir/fuzzing/ffuf-content.csv $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-				grep -v "FUZZ,url,redirectlocation" $dir/fuzzing/ffuf-content.csv | awk -F "," '{print $2" "$5" "$6}' | sort > $dir/fuzzing/ffuf-content.tmp
+				grep -v "FUZZ,url,redirectlocation" $dir/fuzzing/ffuf-content.csv 2>>"$LOGFILE" | awk -F "," '{print $2" "$5" "$6}' | sort > $dir/fuzzing/ffuf-content.tmp
 				for sub in $(cat .tmp/webs_all.txt); do
 					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
 					grep "$sub" $dir/fuzzing/ffuf-content.tmp | awk '{print $2" "$3" "$1}' | sort -k1 | anew -q $dir/fuzzing/${sub_out}.txt
@@ -1276,7 +1307,7 @@ function cms_scanner(){
 		[ ! -s ".tmp/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q .tmp/webs_all.txt
 		if [ -s ".tmp/webs_all.txt" ]; then
 			tr '\n' ',' < .tmp/webs_all.txt > .tmp/cms.txt
-			timeout -k 30 $CMSSCAN_TIMEOUT python3 $tools/CMSeeK/cmseek.py -l .tmp/cms.txt --batch -r 2>>"$LOGFILE" &>/dev/null
+			timeout -k $CMSSCAN_TIMEOUT python3 $tools/CMSeeK/cmseek.py -l .tmp/cms.txt --batch -r 2>>"$LOGFILE" &>/dev/null
 			exit_status=$?
 			if [[ $exit_status -eq 125 ]]; then
 				echo "TIMEOUT cmseek.py - investigate manually for $dir" >> "$LOGFILE"
@@ -1462,6 +1493,7 @@ function jschecks(){
 			fi
 			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
 			[ -s "js/js_livelinks.txt" ] && python3 $tools/xnLinkFinder/xnLinkFinder.py -i js/js_livelinks.txt -sf subdomains/subdomains.txt -d $XNLINKFINDER_DEPTH -o .tmp/js_endpoints.txt 2>>"$LOGFILE" &>/dev/null
+			[ -s "parameters.txt" ] && rm -f parameters.txt 2>>"$LOGFILE" &>/dev/null
 			if [ -s ".tmp/js_endpoints.txt" ]; then
 				sed -i '/^\//!d' .tmp/js_endpoints.txt
 				cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt
@@ -2770,46 +2802,50 @@ function help(){
 	printf " ${bblue}TARGET OPTIONS${reset}\n"
 	printf "   -d domain.tld     Target domain\n"
 	printf "   -m company        Target company name\n"
-	printf "   -l list.txt       Targets list, one per line\n"
+	printf "   -l list.txt       Targets list (One on each line)\n"
 	printf "   -x oos.txt        Exclude subdomains list (Out Of Scope)\n"
 	printf "   -i in.txt         Include subdomains list\n"
 	printf " \n"
 	printf " ${bblue}MODE OPTIONS${reset}\n"
-	printf "   -r, --recon       Recon - Full recon process (only recon without attacks)\n"
-	printf "   -s, --subdomains  Subdomains - Search subdomains, check tko and web probe\n"
-	printf "   -p, --passive     Passive - Performs only passive steps \n"
-	printf "   -a, --all         All - Perform all checks and exploitations\n"
-	printf "   -w, --web         Web - Just web checks from list provided\n"
-	printf "   -n, --osint       OSINT - Just checks public intel info\n"
-	printf "   -h                Help - Show this help\n"
+	printf "   -r, --recon       Recon - Perform full recon process (without attacks)\n"
+	printf "   -s, --subdomains  Subdomains - Perform Subdomain Enumeration, Web probing and check for sub-tko\n"
+	printf "   -p, --passive     Passive - Perform only passive steps\n"
+	printf "   -a, --all         All - Perform all checks and active exploitations\n"
+	printf "   -w, --web         Web - Perform web checks from list of subdomains\n"
+	printf "   -n, --osint       OSINT - Check for public intel data\n"
+	printf "   -c                Launches specific function against target\n"
+	printf "   -h                Help - Show help section\n"
 	printf " \n"
 	printf " ${bblue}GENERAL OPTIONS${reset}\n"
 	printf "   --deep            Deep scan (Enable some slow options for deeper scan)\n"
-	printf "   -f confile_file   Alternate reconftw.cfg file\n"
+	printf "   -f config_file    Alternate reconftw.cfg file\n"
 	printf "   -o output/path    Define output folder\n"
 	printf "   -v, --vps         Axiom distributed VPS \n"
 	printf "   -q                Rate limit in requests per second \n"
 	printf " \n"
 	printf " ${bblue}USAGE EXAMPLES${reset}\n"
-	printf " Recon:\n"
+	printf " ${byellow}Perform full recon (without attacks):${reset}\n"
 	printf " ./reconftw.sh -d example.com -r\n"
 	printf " \n"
-	printf " Subdomain scanning with multiple targets:\n"
+	printf " ${byellow}Perform subdomain enumeration on multiple targets:${reset}\n"
 	printf " ./reconftw.sh -l targets.txt -s\n"
 	printf " \n"
-	printf " Web scanning for subdomain list:\n"
+	printf " ${byellow}Perform Web based scanning on a subdomains list:${reset}\n"
 	printf " ./reconftw.sh -d example.com -l targets.txt -w\n"
 	printf " \n"
-	printf " Multidomain recon:\n"
+	printf " ${byellow}Multidomain recon:${reset}\n"
 	printf " ./reconftw.sh -m company -l domainlist.txt -r\n"
 	printf " \n"
-	printf " Full recon with custom output and excluded subdomains list:\n"
-	printf " ./reconftw.sh -d example.com -x out.txt -a -o custom/path\n"
+	printf " ${byellow}Perform full recon (with active attacks) along Out-Of-Scope subdomains list:${reset}\n"
+	printf " ./reconftw.sh -d example.com -x out.txt -a\n"
 	printf " \n"
-	printf " start the web server:\n"
+	printf " ${byellow}Perform full recon and store output to specified directory:${reset}\n"
+	printf " ./reconftw.sh -d example.com -r -o custom/path\n"
+	printf " \n"
+	printf " ${byellow}Start the web server:${reset}\n"
 	printf " ./reconftw.sh --web-server start\n"
 	printf " \n"
-	printf " stop the web server:\n"
+	printf " ${byellow}Stop the web server:${reset}\n"
 	printf " ./reconftw.sh --web-server stop\n"
 }
 
