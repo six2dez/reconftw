@@ -69,7 +69,7 @@ gotools["analyticsrelationships"]="go install -v github.com/Josue87/analyticsrel
 gotools["gotator"]="go install -v github.com/Josue87/gotator@latest"
 gotools["roboxtractor"]="go install -v github.com/Josue87/roboxtractor@latest"
 gotools["mapcidr"]="go install -v github.com/projectdiscovery/mapcidr/cmd/mapcidr@latest"
-gotools["ipcdn"]="go install -v github.com/six2dez/ipcdn@latest"
+gotools["cdncheck"]="go install -v github.com/projectdiscovery/cdncheck/cmd/cdncheck@latest"
 gotools["dnstake"]="go install -v github.com/pwnesia/dnstake/cmd/dnstake@latest"
 gotools["gowitness"]="go install -v github.com/sensepost/gowitness@latest"
 gotools["tlsx"]="go install github.com/projectdiscovery/tlsx/cmd/tlsx@latest"
@@ -137,12 +137,6 @@ function banner_web(){
 
 install_webserver(){
     printf "${bblue} Running: Installing web reconftw ${reset}\n\n"
-
-    ver=$(python3 -V 2>&1 | sed 's/.* \([0-9]\).\([0-9]\).*/\1\2/')
-    if [ "$ver" -lt "31" ]; then
-        echo "The web interface requires python 3.10 or greater"
-        exit 1
-    fi
 
     printf "${yellow} Installing python libraries...${reset}\n\n"
     
@@ -660,7 +654,7 @@ eval strip -s "$HOME"/go/bin/* $DEBUG_STD
 eval $SUDO cp "$HOME"/go/bin/* /usr/local/bin/ $DEBUG_STD
 
 if [ "$web" = true ]; then
-    sh -c 'echo 3 | ./install.sh'
+    sh -c "echo 3 | $SCRIPTPATH/install.sh"
 fi
 
 printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/provider-config.yaml)\n - GitLab (~/Tools/.gitlab_tokens)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg or env var) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg or env var) \n - notify (~/.config/notify/provider-config.yaml) \n - WHOISXML API (WHOISXML_API in reconftw.cfg or env var)\n - subgpt_cookies.json (subgpt_cookies.json file, follow instructions at https://github.com/s0md3v/SubGPT#getting-bing-cookie)\n\n\n${reset}"
