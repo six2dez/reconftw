@@ -97,7 +97,7 @@ function tools_installed(){
 	which mapcidr &>/dev/null || { printf "${bred} [*] mapcidr			[NO]${reset}\n"; allinstalled=false;}
 	which ppfuzz &>/dev/null || { printf "${bred} [*] ppfuzz			[NO]${reset}\n"; allinstalled=false;}
 	which searchsploit &>/dev/null || { printf "${bred} [*] searchsploit		[NO]${reset}\n"; allinstalled=false;}
-	which ipcdn &>/dev/null || { printf "${bred} [*] ipcdn			[NO]${reset}\n"; allinstalled=false;}
+	which cdncheck &>/dev/null || { printf "${bred} [*] cdncheck			[NO]${reset}\n"; allinstalled=false;}
 	which interactsh-client &>/dev/null || { printf "${bred} [*] interactsh-client		[NO]${reset}\n"; allinstalled=false;}
 	which tlsx &>/dev/null || { printf "${bred} [*] tlsx			[NO]${reset}\n"; allinstalled=false;}
 	which bbrf &>/dev/null || { printf "${bred} [*] bbrf			[NO]${reset}\n"; allinstalled=false;}
@@ -1131,7 +1131,8 @@ function portscan(){
 			[ -s "hosts/subs_ips_vhosts.txt" ] && cat hosts/subs_ips_vhosts.txt | cut -d ' ' -f1 | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
 		else echo $domain | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
 		fi
-		[ -s "hosts/ips.txt" ] && cat hosts/ips.txt | ipcdn -m not | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q .tmp/ips_nocdn.txt
+		[ ! -s "hosts/cdn_providers.txt" ] && cat hosts/ips.txt 2>/dev/null | cdncheck -silent -resp -nc 2>/dev/null > hosts/cdn_providers.txt
+		[ -s "hosts/ips.txt" ] && comm -23 <(cat hosts/ips.txt | sort -u) <(cat hosts/cdn_providers.txt | cut -d'[' -f1 | sed 's/[[:space:]]*$//' | sort -u) | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | sort -u | anew -q .tmp/ips_nocdn.txt
 		printf "${bblue}\n Resolved IP addresses (No CDN) ${reset}\n\n";
 		[ -s ".tmp/ips_nocdn.txt" ] && cat .tmp/ips_nocdn.txt | sort
 		printf "${bblue}\n Scanning ports... ${reset}\n\n";
@@ -1167,7 +1168,7 @@ function cdnprovider(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$CDN_IP" = true ]; then
 		start_func ${FUNCNAME[0]} "CDN provider check"
 		[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r 'try . | .a[]' | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | sort -u > .tmp/ips_cdn.txt
-		[ -s ".tmp/ips_cdn.txt" ] && cat .tmp/ips_cdn.txt | ipcdn -m all | anew -q $dir/hosts/cdn_providers.txt
+		[ -s ".tmp/ips_cdn.txt" ] && cat .tmp/ips_cdn.txt | cdncheck -silent -resp -nc | anew -q $dir/hosts/cdn_providers.txt
 		end_func "Results are saved in hosts/cdn_providers.txt" ${FUNCNAME[0]}
 	else
 		if [ "$CDN_IP" = false ]; then
