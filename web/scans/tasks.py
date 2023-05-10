@@ -28,24 +28,33 @@ def new_scan_single_domain(*command):
     command.append(str(path))
     
 
-    match str(command[3]):
-        case '-r': # RECON
-            scan_mode = "[ -r ] - Recon"
-            
-        case '-s': # SUBDOMAINS
-            scan_mode = "[ -s ] - Subdomains"
+    mode = str(command[3])
 
-        case '-p': # PASSIVE
-            scan_mode = "[ -p ] - Passive"
+    if mode == '-r': # RECON
+        scan_mode = "[ -r ] - Recon"
+        
+    elif mode == '-s': # SUBDOMAINS
+        scan_mode = "[ -s ] - Subdomains"
 
-        case '-w': # WEB
-            scan_mode = "[ -w ] - Web"
-        
-        case '-n': # OSINT
-            scan_mode = "[ -n ] - Osint"
-        
-        case '-a': # ALL
-            scan_mode = "[ -a ] - All"
+    elif mode == '-p': # PASSIVE
+        scan_mode = "[ -p ] - Passive"
+
+    elif mode == '-w': # WEB
+        scan_mode = "[ -w ] - Web"
+    
+    elif mode == '-n': # OSINT
+        scan_mode = "[ -n ] - Osint"
+    
+    elif mode == '-a': # ALL
+        scan_mode = "[ -a ] - All"
+
+    # GENERAL OPTIONS
+    g_opt = str(command[-3])
+    if '--deep' in command:
+            scan_mode += ' / Deep Scan'
+    if '-v' in command:
+            scan_mode += ' / Axiom'
+    
         
 
     # ADDING DOMAIN

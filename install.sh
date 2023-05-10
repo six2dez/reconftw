@@ -138,12 +138,6 @@ function banner_web(){
 install_webserver(){
     printf "${bblue} Running: Installing web reconftw ${reset}\n\n"
 
-    ver=$(python3 -V 2>&1 | sed 's/.* \([0-9]\).\([0-9]\).*/\1\2/')
-    if [ "$ver" -lt "31" ]; then
-        echo "The web interface requires python 3.10 or greater"
-        exit 1
-    fi
-
     printf "${yellow} Installing python libraries...${reset}\n\n"
     
     # Install venv
