@@ -107,9 +107,9 @@ docker pull six2dez/reconftw:main
 - Run the container
 
 ```bash
-$ docker run -it --rm \
-  -v "${PWD}/OutputFolder/":'/reconftw/Recon/' \
-  six2dez/reconftw:main -d example.com -r
+docker run -it --rm \
+-v "${PWD}/OutputFolder/":'/reconftw/Recon/' \
+six2dez/reconftw:main -d example.com -r
 ```
 
 However, if you wish to:
@@ -401,6 +401,8 @@ reset='\033[0m'
 
 ## Example Usage
 
+**NOTE: this is applicable when you've installed reconFTW on the host (e.g. VM/VPS/cloud) and not in a Docker container.**
+
 ### To perform a full recon on single target
 
 ```bash
@@ -628,7 +630,7 @@ If you want to contribute to this project, you can do it in multiple ways:
 
 This section shows the current financial sponsors of this project
 
-[<img src="https://pbs.twimg.com/profile_images/1360304248534282240/MomOFi40_400x400.jpg" width="100" height=auto>](https://github.com/0xtavian)
+[<img src="https://pbs.twimg.com/profile_images/1578131929794314272/b79Rezd4_400x400.png" width="100" height=auto>](https://github.com/0xtavian)
 
 ## Thanks :pray:
 
