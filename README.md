@@ -112,7 +112,11 @@ docker run -it --rm \
 six2dez/reconftw:main -d example.com -r
 ```
 
-However, if you wish to:
+- View results (they're NOT in the Docker container)
+
+  - As the folder you cloned earlier (named `reconftw`) is being renamed to `OutputFolder`, you'll have to go to that folder to view results.
+
+If you wish to:
 
 1. Dynamically modify the behaviour & function of the image
 2. Build your own container
