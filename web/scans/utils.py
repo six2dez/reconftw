@@ -736,7 +736,13 @@ def screenshots_f2db(project_id):
             with open(f"{ss_path}/{s}", 'rb') as f:
                 img = f.read()
 
-            hn = f"{s.replace('.png','').split('-')[1]}:{s.replace('.png','').split('-')[2]}"
+            hn = sub(r'https?-', '',s.replace('.png',''))
+
+            i = hn.rfind('-')
+
+            if '-' in hn and i > 0 and hn[i+1::].isnumeric():
+                hn = f"{hn[:i:]}:{hn[i+1::]}"
+
             ScreenShots.objects.create(hostname=hn, screenshot=img, project_id=project_id)
 
 
