@@ -45,13 +45,19 @@ So, what are you waiting for? Go! Go! Go! :boom:
 
 -----------------
 
-- [💿 Installation](#💿-installation)
-  - [a) Using a PC/VPS/VM](#a-using-a-pcvpsvm)
-  - [b) Docker Image 🐳 (3 options)](#b-docker-image-🐳-3-options)
-  - [c) Terraform + Ansible](#c-terraform--ansible)
-- [⚙️ Config file](#⚙️-config-file)
+- [⚙️ Config file](#️-config-file)
 - [Usage](#usage)
-- [Example Usage](#example-usage)
+  - [TARGET OPTIONS](#target-options)
+  - [MODE OPTIONS](#mode-options)
+  - [GENERAL OPTIONS](#general-options)
+  - [Example Usage](#example-usage)
+    - [To perform a full recon on single target](#to-perform-a-full-recon-on-single-target)
+    - [To perform a full recon on a list of targets](#to-perform-a-full-recon-on-a-list-of-targets)
+    - [Perform full recon with more time intense tasks *(VPS intended only)*](#perform-full-recon-with-more-time-intense-tasks-vps-intended-only)
+    - [Perform recon in a multi domain target](#perform-recon-in-a-multi-domain-target)
+    - [Perform recon with axiom integration](#perform-recon-with-axiom-integration)
+    - [Perform all steps (whole recon + all attacks) a.k.a. YOLO mode](#perform-all-steps-whole-recon--all-attacks-aka-yolo-mode)
+    - [Show help section](#show-help-section)
 - [Axiom Support :cloud:](#axiom-support-cloud)
 - [BBRF Support :computer:](#bbrf-support-computer)
 - [Sample video](#sample-video)
@@ -62,7 +68,7 @@ So, what are you waiting for? Go! Go! Go! :boom:
   - [Webs](#webs)
   - [Vulnerability checks](#vulnerability-checks)
   - [Extras](#extras)
-- [Mindmap/Workflow](#mindmapworkflow)
+  - [Mindmap/Workflow](#mindmapworkflow)
   - [Data Keep](#data-keep)
     - [Makefile](#makefile)
     - [Manual](#manual)
@@ -73,9 +79,8 @@ So, what are you waiting for? Go! Go! Go! :boom:
     - [Buymeacoffee](#buymeacoffee)
     - [DigitalOcean referral link](#digitalocean-referral-link)
     - [GitHub sponsorship](#github-sponsorship)
-- [Sponsors ❤️](#sponsors-️)
-- [Thanks :pray:](#thanks-pray)
-- [Disclaimer](#disclaimer)
+  - [Thanks :pray:](#thanks-pray)
+  - [Disclaimer](#disclaimer)
 
 -----------------
 
@@ -629,12 +634,6 @@ If you want to contribute to this project, you can do it in multiple ways:
 ### GitHub sponsorship
 
 [Sponsor](https://github.com/sponsors/six2dez)
-
-## Sponsors ❤️
-
-This section shows the current financial sponsors of this project
-
-[<img src="https://pbs.twimg.com/profile_images/1578131929794314272/b79Rezd4_400x400.png" width="100" height=auto>](https://github.com/0xtavian)
 
 ## Thanks :pray:
 
