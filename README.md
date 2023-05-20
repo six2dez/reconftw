@@ -561,7 +561,7 @@ reset='\033[0m'
 
 ## Mindmap/Workflow
 
-![Mindmap](images/mindmapv2.png)
+![Mindmap](images/mindmap_obsidian.png)
 
 ## Data Keep
 
