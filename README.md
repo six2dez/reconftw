@@ -513,7 +513,7 @@ reset='\033[0m'
 
 ## Webs
 
-- Web Prober ([httpx](https://github.com/projectdiscovery/httpx) and [unimap](https://github.com/Edu4rdSHL/unimap))
+- Web Prober ([httpx](https://github.com/projectdiscovery/httpx))
 - Web screenshoting ([webscreenshot](https://github.com/maaaaz/webscreenshot) or [gowitness](https://github.com/sensepost/gowitness))
 - Web templates scanner ([nuclei](https://github.com/projectdiscovery/nuclei) and [nuclei geeknik](https://github.com/geeknik/the-nuclei-templates.git))
 - CMS Scanner ([CMSeeK](https://github.com/Tuhinshubhra/CMSeeK))

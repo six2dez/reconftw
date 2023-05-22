@@ -515,41 +515,29 @@ done
 
 if [ "True" = "$IS_ARM" ]; then
     if [ "True" = "$RPI_3" ]; then
-        eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/latest/download/unimap-armv7 $DEBUG_STD
         eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz $DEBUG_STD
         eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
         eval $SUDO rm -rf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
-        eval $SUDO mv unimap-armv7 /usr/local/bin/unimap
     elif [ "True" = "$RPI_4" ] || [ "True" = "$IS_MAC" ]; then
-        eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/latest/download/unimap-aarch64 $DEBUG_STD
         eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz $DEBUG_STD
         eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
         eval $SUDO rm -rf ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
-        eval $SUDO mv unimap-aarch64 /usr/local/bin/unimap
     fi
 elif [ "True" = "$IS_MAC" ]; then
     if [ "True" = "$IS_ARM" ]; then
-        eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/latest/download/unimap-armv7 $DEBUG_STD
         eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz $DEBUG_STD
         eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
         eval $SUDO rm -rf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
-        eval $SUDO mv unimap-armv7 /usr/local/bin/unimap
     else
-        eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/latest/download/unimap-osx $DEBUG_STD
         eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz $DEBUG_STD
         eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz  $DEBUG_STD
         eval $SUDO rm -rf ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz  $DEBUG_STD
-        eval $SUDO mv unimap-osx /usr/local/bin/unimap
     fi
 else
-    eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/download/0.4.0/unimap-linux $DEBUG_STD
     eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz $DEBUG_STD
     eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
     eval $SUDO rm -rf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
-    eval $SUDO mv unimap-linux /usr/local/bin/unimap
 fi
-eval $SUDO chmod 755 /usr/local/bin/unimap
-eval $SUDO strip -s /usr/local/bin/unimap $DEBUG_STD
 eval $SUDO chmod 755 /usr/local/bin/ppfuzz
 eval $SUDO strip -s /usr/local/bin/ppfuzz $DEBUG_STD
 eval notify $DEBUG_STD
