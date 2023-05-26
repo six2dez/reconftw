@@ -479,7 +479,7 @@ reset='\033[0m'
 - Metadata finder ([MetaFinder](https://github.com/Josue87/MetaFinder))
 - Google Dorks ([dorks_hunter](https://github.com/six2dez/dorks_hunter))
 - Github Dorks ([gitdorks_go](https://github.com/damit5/gitdorks_go))
-- GitHub org analysis ([enumerepo](https://github.com/trickest/enumerepo) and [gitleaks](https://github.com/gitleaks/gitleaks))
+- GitHub org analysis ([enumerepo](https://github.com/trickest/enumerepo), [trufflehog](https://github.com/trufflesecurity/trufflehog) and [gitleaks](https://github.com/gitleaks/gitleaks))
 
 ## Subdomains
 

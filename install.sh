@@ -117,6 +117,7 @@ repos["byp4xx"]="lobuhi/byp4xx"
 repos["Infoga"]="m4ll0k/Infoga"
 repos["ghauri"]="r0oth3x49/ghauri"
 repos["gitleaks"]="gitleaks/gitleaks"
+repos["trufflehog"]="trufflesecurity/trufflehog"
 
 
 function banner_web(){
@@ -558,11 +559,13 @@ if [ "$double_check" = "true" ]; then
             eval $SUDO python3 setup.py install $DEBUG_STD
         fi
         if [ "massdns" = "$repo" ]; then
-                eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/local/bin/ $DEBUG_ERROR
+            eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/local/bin/ $DEBUG_ERROR
         elif [ "gf" = "$repo" ]; then
-                eval cp -r examples ~/.gf $DEBUG_ERROR
+            eval cp -r examples ~/.gf $DEBUG_ERROR
         elif [ "Gf-Patterns" = "$repo" ]; then
-                eval mv ./*.json ~/.gf $DEBUG_ERROR
+            eval mv ./*.json ~/.gf $DEBUG_ERROR
+        elif [ "trufflehog" = "$repo" ]; then
+            eval go install $DEBUG_STD
         fi
         cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
     done

@@ -113,6 +113,7 @@ function tools_installed(){
 	which gau &>/dev/null || { printf "${bred} [*] gau			[NO]${reset}\n${reset}"; allinstalled=false;}
 	which subgpt &>/dev/null || { printf "${bred} [*] subgpt			[NO]${reset}\n${reset}"; allinstalled=false;}
 	which gitleaks &>/dev/null || { printf "${bred} [*] gitleaks			[NO]${reset}\n${reset}"; allinstalled=false;}
+	which trufflehog &>/dev/null || { printf "${bred} [*] trufflehog [NO]${reset}\n${reset}"; allinstalled=false;}
 	
 	if [ "${allinstalled}" = true ]; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
@@ -178,7 +179,8 @@ function github_repos(){
 			mkdir -p .tmp/github_repos 2>>"$LOGFILE" &>/dev/null
 			[ -s ".tmp/company_repos_url.txt" ] && interlace -tL .tmp/company_repos_url.txt -threads ${INTERLACE_THREADS} -c "git clone _target_  .tmp/github_repos/_cleantarget_" 2>>"$LOGFILE" &>/dev/null
 			[ -d ".tmp/github/" ] && ls .tmp/github_repos > .tmp/github_repos_folders.txt
-			[ -s ".tmp/company_repos_url.txt" ] && interlace -tL .tmp/github_repos_folders.txt -threads ${INTERLACE_THREADS} -c "gitleaks detect --source .tmp/github_repos/_target_ --no-banner --no-color -r ./tmp/github/gh_secret_cleantarget_.json" 2>>"$LOGFILE" &>/dev/null
+			[ -s ".tmp/github_repos_folders.txt" ] && interlace -tL .tmp/github_repos_folders.txt -threads ${INTERLACE_THREADS} -c "gitleaks detect --source .tmp/github_repos/_target_ --no-banner --no-color -r ./tmp/github/gh_secret_cleantarget_.json" 2>>"$LOGFILE" &>/dev/null
+			[ -s ".tmp/company_repos_url.txt" ] && interlace -tL .tmp/company_repos_url.txt -threads ${INTERLACE_THREADS} -c "trufflehog git _target_ -j | jq -c > _output_/_cleantarget_" -o .tmp/github/ 2>>"$LOGFILE" &>/dev/null
 			[ -d ".tmp/github/" ] && cat .tmp/github/* | jq -c | jq -r > osint/github_company_secrets.json 2>>"$LOGFILE" &>/dev/null
 		else
 			printf "\n${bred} Required file ${GITHUB_TOKENS} not exists or empty${reset}\n"
