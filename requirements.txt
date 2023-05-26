@@ -1,7 +1,6 @@
 aiohttp                 # sqlmap
 argcomplete             # brutespray
 argparse                # multiple
-bbrf                    # multiple
 beautifulsoup4          # multiple
 bs4                     # multiple
 censys                  # multiple

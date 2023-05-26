@@ -571,23 +571,6 @@ if [ "$double_check" = "true" ]; then
     done
 fi
 
-# BBRF Setup
-if [ ! -d "$HOME/.bbrf/" ] ; then
-    mkdir "$HOME/.bbrf/"
-fi
-if  [ -d "$HOME/.bbrf/" ] && [ ! -s "$HOME/.bbrf/config.json" ]; then
-    cat > "$HOME/.bbrf/config.json" << EOF
-{
-    "username": "$BBRF_USERNAME",
-    "password": "$BBRF_PASSWORD",
-    "couchdb": "https://$BBRF_SERVER/bbrf",
-    "slack_token": "<a slack token to receive notifications>",
-    "discord_webhook": "<your discord webhook if you want one>",
-    "ignore_ssl_errors": false
-}
-EOF
-fi
-
 printf "${bblue} Running: Performing last configurations ${reset}\n\n"
 ## Last steps
 if [ "$generate_resolvers" = true ]; then

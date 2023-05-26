@@ -99,7 +99,6 @@ function tools_installed(){
 	which cdncheck &>/dev/null || { printf "${bred} [*] cdncheck			[NO]${reset}\n"; allinstalled=false;}
 	which interactsh-client &>/dev/null || { printf "${bred} [*] interactsh-client		[NO]${reset}\n"; allinstalled=false;}
 	which tlsx &>/dev/null || { printf "${bred} [*] tlsx			[NO]${reset}\n"; allinstalled=false;}
-	which bbrf &>/dev/null || { printf "${bred} [*] bbrf			[NO]${reset}\n"; allinstalled=false;}
 	which smap &>/dev/null || { printf "${bred} [*] smap			[NO]${reset}\n"; allinstalled=false;}
 	which gitdorks_go &>/dev/null || { printf "${bred} [*] gitdorks_go		[NO]${reset}\n"; allinstalled=false;}
 	which ripgen &>/dev/null || { printf "${bred} [*] ripgen			[NO]${reset}\n${reset}"; allinstalled=false;}
@@ -355,10 +354,6 @@ function subdomains_full(){
 	else 
 		notification "IP/CIDR detected, subdomains search skipped" info
 		echo $domain | anew -q subdomains/subdomains.txt
-	fi
-
-	if [ "$BBRF_CONNECTION" = true ]; then
-		[ -s "subdomains/subdomains.txt" ] && cat subdomains/subdomains.txt | bbrf domain add - 2>>"$LOGFILE" &>/dev/null
 	fi
 
 	webprobe_simple
@@ -863,9 +858,6 @@ function subtakeover(){
 		if [ "$NUMOFLINES" -gt 0 ]; then
 			notification "${NUMOFLINES} new possible takeovers found" info
 		fi
-		if [ "$BBRF_CONNECTION" = true ]; then
-			[ -s "webs/takeover.txt" ] && cat webs/takeover.txt | grep -aEo 'https?://[^ ]+' | bbrf url add - -t subtko:true 2>>"$LOGFILE" &>/dev/null
-		fi
 		end_func "Results are saved in $domain/webs/takeover.txt" ${FUNCNAME[0]}
 	else
 		if [ "$SUBTAKEOVER" = false ]; then
@@ -922,11 +914,6 @@ function s3buckets(){
 			notification "${NUMOFLINES2} new S3 buckets found" info
 		fi
 
-		if [ "$BBRF_CONNECTION" = true ]; then
-			[ -s "subdomains/cloud_assets.txt" ] && cat subdomains/cloud_assets.txt | grep -aEo 'https?://[^ ]+' | sed 's/[ \t]*$//' | bbrf url add - -t cloud_assets:true 2>>"$LOGFILE" &>/dev/null
-			[ -s "subdomains/s3buckets.txt" ] && cat subdomains/s3buckets.txt | cut -d'|' -f1 | sed 's/[ \t]*$//' | bbrf domain update - -t s3bucket:true 2>>"$LOGFILE" &>/dev/null
-		fi
-
 		end_func "Results are saved in subdomains/s3buckets.txt and subdomains/cloud_assets.txt" ${FUNCNAME[0]}
 	else
 		if [ "$S3BUCKETS" = false ]; then
@@ -965,9 +952,6 @@ function webprobe_simple(){
 		if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/webs.txt| wc -l) -le $DEEP_LIMIT2 ]]; then
 			notification "Sending websites to proxy" info
 			ffuf -mc all -w webs/webs.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" &>/dev/null
-		fi
-		if [ "$BBRF_CONNECTION" = true ]; then
-			[ -s "webs/webs.txt" ] && cat webs/webs.txt | bbrf url add - 2>>"$LOGFILE" &>/dev/null
 		fi
 	else
 		if [ "$WEBPROBESIMPLE" = false ]; then
@@ -1009,9 +993,6 @@ function webprobe_full(){
 		if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/webs_uncommon_ports.txt| wc -l) -le $DEEP_LIMIT2 ]]; then
 			notification "Sending websites with uncommon ports to proxy" info
 			ffuf -mc all -w webs/webs_uncommon_ports.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" &>/dev/null
-		fi
-		if [ "$BBRF_CONNECTION" = true ]; then
-			[ -s "webs/webs_uncommon_ports.txt" ] && cat webs/webs_uncommon_ports.txt | bbrf url add - 2>>"$LOGFILE" &>/dev/null
 		fi
 	else
 		if [ "$WEBPROBEFULL" = false ]; then
@@ -1123,12 +1104,6 @@ function portscan(){
 				[ -s ".tmp/ips_nocdn.txt" ] && axiom-scan .tmp/ips_nocdn.txt -m nmapx --top-ports 200 -sV -n -Pn --open --max-retries 2 -oA hosts/portscan_active $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			fi
 		fi
-		if [ "$BBRF_CONNECTION" = true ]; then
-			[ -s "hosts/subs_ips_vhosts.txt" ] && cat hosts/subs_ips_vhosts.txt | awk '{print $2,$1}' | sed -e 's/\s\+/:/g' | bbrf domain add -
-			[ -s "hosts/subs_ips_vhosts.txt" ] && cat hosts/subs_ips_vhosts.txt | sed -e 's/\s\+/:/g' | bbrf ip add -
-			[ -s "hosts/portscan_active.xml" ] && $tools/ultimate-nmap-parser/ultimate-nmap-parser.sh hosts/portscan_active.gnmap --csv 2>>"$LOGFILE" &>/dev/null
-			[ -s "parsed_nmap.csv" ] && mv parsed_nmap.csv .tmp/parsed_nmap.csv && cat .tmp/parsed_nmap.csv | tail -n +2 | cut -d',' -f1,2,5,6 | sed -e 's/,/:/g' | sed 's/\:$//' | bbrf service add - && rm -f parsed_nmap.csv
-		fi
 		[ -s "hosts/portscan_active.xml" ] && searchsploit --nmap hosts/portscan_active.xml 2>/dev/null > hosts/searchsploit.txt
 		end_func "Results are saved in hosts/portscan_[passive|active].txt" ${FUNCNAME[0]}
 	else
@@ -1173,9 +1148,6 @@ function waf_checks(){
 				cat .tmp/wafs.txt | sed -e 's/^[ \t]*//' -e 's/ \+ /\t/g' -e '/(None)/d' | tr -s "\t" ";" > webs/webs_wafs.txt
 				NUMOFLINES=$(cat webs/webs_wafs.txt 2>>"$LOGFILE" | sed '/^$/d' | wc -l)
 				notification "${NUMOFLINES} websites protected by waf" info
-				if [ "$BBRF_CONNECTION" = true ]; then
-					[ -s "webs/webs_wafs.txt" ] && cat webs/webs_wafs.txt | bbrf url add - -t waf:true 2>>"$LOGFILE" &>/dev/null
-				fi
 				end_func "Results are saved in $domain/webs/webs_wafs.txt" ${FUNCNAME[0]}
 			else
 				end_func "No results found" ${FUNCNAME[0]}
@@ -1221,13 +1193,6 @@ function nuclei_check(){
 				done
 				printf "\n\n"
 			fi
-		fi
-		if [ "$BBRF_CONNECTION" = true ]; then
-			[ -s "nuclei_output/info.txt" ] && cat nuclei_output/info.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:${crit} 2>>"$LOGFILE" &>/dev/null
-			[ -s "nuclei_output/low.txt" ] && cat nuclei_output/low.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:${crit} 2>>"$LOGFILE" &>/dev/null
-			[ -s "nuclei_output/medium.txt" ] && cat nuclei_output/medium.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:${crit} 2>>"$LOGFILE" &>/dev/null
-			[ -s "nuclei_output/high.txt" ] && cat nuclei_output/high.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:${crit} 2>>"$LOGFILE" &>/dev/null
-			[ -s "nuclei_output/critical.txt" ] && cat nuclei_output/critical.txt | cut -d' ' -f6 | sort -u | bbrf url add - -t nuclei:${crit} 2>>"$LOGFILE" &>/dev/null
 		fi
 		end_func "Results are saved in $domain/nuclei_output folder" ${FUNCNAME[0]}
 	else
@@ -1432,9 +1397,6 @@ function url_ext(){
 				if [[ ${NUMOFLINES} -gt 0 ]]; then
 					echo -e "\n############################\n + ${t} + \n############################\n" >> webs/urls_by_ext.txt
 					cat .tmp/url_extract_tmp.txt | grep -aEi "\.(${t})($|\/|\?)" >> webs/urls_by_ext.txt
-					if [ "$BBRF_CONNECTION" = true ]; then
-						cat .tmp/url_extract_tmp.txt | grep -aEi "\.(${t})($|\/|\?)" | bbrf url add - 2>>"$LOGFILE" &>/dev/null
-					fi
 				fi
 			done
 			end_func "Results are saved in $domain/webs/urls_by_ext.txt" ${FUNCNAME[0]}
@@ -2320,13 +2282,6 @@ function start(){
 	LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
 	touch .log/${NOW}_${NOWT}.txt
 	echo "Start ${NOW} ${NOWT}" > "${LOGFILE}"
-
-	if [ "$BBRF_CONNECTION" = true ]; then
-		program_bbrf=$(echo $domain | awk -F. '{print $1"_"$2}') 2>>"$LOGFILE" &>/dev/null
-		bbrf new ${program_bbrf} 2>>"$LOGFILE" &>/dev/null
-		bbrf use ${program_bbrf} 2>>"$LOGFILE" &>/dev/null
-		bbrf inscope add "*.${domain}" 2>>"$LOGFILE" &>/dev/null
-	fi
 
 	printf "\n"
 	printf "${bred} Target: ${domain}\n\n"

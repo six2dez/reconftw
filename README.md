@@ -59,7 +59,6 @@ So, what are you waiting for? Go! Go! Go! :boom:
     - [Perform all steps (whole recon + all attacks) a.k.a. YOLO mode](#perform-all-steps-whole-recon--all-attacks-aka-yolo-mode)
     - [Show help section](#show-help-section)
 - [Axiom Support :cloud:](#axiom-support-cloud)
-- [BBRF Support :computer:](#bbrf-support-computer)
 - [Sample video](#sample-video)
 - [:fire: Features :fire:](#fire-features-fire)
   - [Osint](#osint)
@@ -350,12 +349,6 @@ AXIOM_FLEET_SHUTDOWN=true # # Enable or disable delete the fleet after the execu
 AXIOM_EXTRA_ARGS="" # Leave empty if you don't want to add extra arguments
 #AXIOM_EXTRA_ARGS="--rm-logs" # Example
 
-# BBRF
-BBRF_CONNECTION=false
-BBRF_SERVER=https://demo.bbrf.me/bbrf
-BBRF_USERNAME="user"
-BBRF_PASSWORD="password"
-
 # TERM COLORS
 bred='\033[1;31m'
 bblue='\033[1;34m'
@@ -462,13 +455,6 @@ reset='\033[0m'
 - As reconFTW actively hits the target with a lot of web traffic, hence there was a need to move to Axiom distributing the work load among various instances leading to reduction of execution time.
 - During the configuration of axiom you need to select `reconftw` as provisoner.
 - You can create your own axiom's fleet before running reconFTW or let reconFTW to create and destroy it automatically just modifying reconftw.cfg file.
-
-# BBRF Support :computer:
-
-- To add reconFTW results to your [BBRF instance](https://github.com/honoki/bbrf-server) just add IP and credentials to reconftw.cfg file section dedicated to bbrf.
-
-- During the execution of the scans the results will be added dynamically when each step ends.
-- Even you can set up locally your BBRF instance to be able to visualize your results in a fancy web UI.
 
 # Sample video
 
