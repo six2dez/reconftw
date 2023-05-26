@@ -116,6 +116,7 @@ repos["regulator"]="cramppet/regulator"
 repos["byp4xx"]="lobuhi/byp4xx"
 repos["Infoga"]="m4ll0k/Infoga"
 repos["ghauri"]="r0oth3x49/ghauri"
+repos["gitleaks"]="gitleaks/gitleaks"
 
 
 function banner_web(){
@@ -157,35 +158,8 @@ install_webserver(){
     printf "${yellow} Installing Requirements...${reset}\n\n"
     $SUDO pip3 install -r $SCRIPTPATH/web/requirements.txt &>/dev/null
         
-    #$SUDO virtualenv web/env &>/dev/null
-    #$SUDO source web/env/bin/activate
-    #$SUDO pip3 install -r web/requirements.txt &>/dev/null
-
     printf "${yellow} Installing tools...${reset}\n\n"
     $SUDO apt install redis-server -y &>/dev/null
-    #$SUDO apt install postgresql -y &>/dev/null
-
-    # printf "${yellow} Database configuration...${reset}\n\n"
-    #$SUDO service postgresql restart &>/dev/null
-    #$SUDO su postgres -c 'psql -c "DROP DATABASE web;"' &>/dev/null
-    #$SUDO su postgres -c 'psql -c "CREATE DATABASE web;"' &>/dev/null
-    
-    #read -p ' What Username is used in db: ' DBUser
-    #read -s -p ' What Password is used in db: ' DBPass
-    
-    #$SUDO su postgres 'psql -c "DROP USER "'$DBUser &> /dev/null
-
-    #sed -i "s/'USER': '.*/'USER': '$DBUser',/" web/web/settings.py
-    #sed -i "s/'PASSWORD': '.*/'PASSWORD': '$DBPass',/" web/web/settings.py
-    #echo ""
-
-    #printf "${yellow} Creating DB User...${reset}\n\n"
-    #$SUDO su postgres -c "psql -c \"CREATE USER $DBUser with PASSWORD '$DBPass';\""
-
-    #$SUDO su postgres -c "psql -c \"ALTER ROLE $DBUser SET client_encoding TO 'utf8';\""
-    #$SUDO su postgres -c "psql -c \"ALTER ROLE $DBUser SET default_transaction_isolation TO 'read committed';\""
-    #$SUDO su postgres -c "psql -c \"ALTER ROLE $DBUser SET timezone TO 'UTC';\""
-    #$SUDO su postgres -c "psql -c \"GRANT ALL PRIVILEGES ON DATABASE web TO $DBUser;\""
     
     printf "${yellow} Creating WEB User...${reset}\n\n"
     $SUDO rm $SCRIPTPATH/web/db.sqlite3 &>/dev/null
@@ -501,6 +475,9 @@ for repo in "${!repos[@]}"; do
         fi
         if [ "massdns" = "$repo" ]; then
             eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/local/bin/ $DEBUG_ERROR
+        fi
+        if [ "gitleaks" = "$repo" ]; then
+            eval make build $DEBUG_STD && eval $SUDO cp ./gitleaks /usr/local/bin/ $DEBUG_ERROR
         fi
     fi
     if [ "gf" = "$repo" ]; then
