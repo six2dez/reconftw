@@ -1,18 +1,16 @@
 #!/usr/bin/env bash
 
+function banner_graber(){
+	source $SCRIPTPATH/banners.txt
+	randx=$(shuf -i 1-23 -n 1)
+	tmp="banner${randx}" 
+	banner_code=${!tmp}
+	echo -e "${banner_code}"
+}
 function banner(){
-	printf "\n${bgreen}"
-	printf "  ██▀███  ▓█████  ▄████▄   ▒█████   ███▄    █   █████▒▄▄▄█████▓ █     █░\n"
-	printf " ▓██ ▒ ██▒▓█   ▀ ▒██▀ ▀█  ▒██▒  ██▒ ██ ▀█   █ ▓██   ▒ ▓  ██▒ ▓▒▓█░ █ ░█░\n"
-	printf " ▓██ ░▄█ ▒▒███   ▒▓█    ▄ ▒██░  ██▒▓██  ▀█ ██▒▒████ ░ ▒ ▓██░ ▒░▒█░ █ ░█ \n"
-	printf " ▒██▀▀█▄  ▒▓█  ▄ ▒▓▓▄ ▄██▒▒██   ██░▓██▒  ▐▌██▒░▓█▒  ░ ░ ▓██▓ ░ ░█░ █ ░█ \n"
-	printf " ░██▓ ▒██▒░▒████▒▒ ▓███▀ ░░ ████▓▒░▒██░   ▓██░░▒█░      ▒██▒ ░ ░░██▒██▓ \n"
-	printf " ░ ▒▓ ░▒▓░░░ ▒░ ░░ ░▒ ▒  ░░ ▒░▒░▒░ ░ ▒░   ▒ ▒  ▒ ░      ▒ ░░   ░ ▓░▒ ▒  \n"
-	printf "   ░▒ ░ ▒░ ░ ░  ░  ░  ▒     ░ ▒ ▒░ ░ ░░   ░ ▒░ ░          ░      ▒ ░ ░  \n"
-	printf "   ░░   ░    ░   ░        ░ ░ ░ ▒     ░   ░ ░  ░ ░      ░        ░   ░  \n"
-	printf "    ░        ░  ░░ ░          ░ ░           ░                      ░    \n"
-	printf "                 ░                                                      \n"
-	printf " ${reconftw_version}                                 by @six2dez${reset}\n"
+	banner_code=$(banner_graber)
+	printf "\n${bgreen}${banner_code}"
+	printf "\n ${reconftw_version}                                 by @six2dez${reset}\n"
 }
 
 ###############################################################################################################
