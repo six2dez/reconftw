@@ -1120,8 +1120,7 @@ function portscan(){
 			if [ ! "$AXIOM" = true ]; then
 				[ -s ".tmp/ips_nocdn.txt" ] && $SUDO nmap --top-ports 200 -sV -n --max-retries 2 -Pn --open -iL .tmp/ips_nocdn.txt -oA hosts/portscan_active 2>>"$LOGFILE" &>/dev/null
 			else
-				[ -s ".tmp/ips_nocdn.txt" ] && axiom-scan .tmp/ips_nocdn.txt -m nmapx --top-ports 200 -sV -n -Pn --open --max-retries 2 -o hosts/portscan_active.gnmap $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
-				[ -s "hosts/portscan_active.gnmap" ] && cat hosts/portscan_active.gnmap | egrep -v "^#|Status: Up" | cut -d' ' -f2,4- | sed -n -e 's/Ignored.*//p' | awk '{print "Host: " $1 " Ports: " NF-1; $1=""; for(i=2; i<=NF; i++) { a=a" "$i; }; split(a,s,","); for(e in s) { split(s[e],v,"/"); printf "%-8s %s/%-7s %s\n" , v[2], v[3], v[1], v[5]}; a="" }' > hosts/portscan_active.txt 2>>"$LOGFILE" &>/dev/null
+				[ -s ".tmp/ips_nocdn.txt" ] && axiom-scan .tmp/ips_nocdn.txt -m nmapx --top-ports 200 -sV -n -Pn --open --max-retries 2 -oA hosts/portscan_active $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			fi
 		fi
 		if [ "$BBRF_CONNECTION" = true ]; then
