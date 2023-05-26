@@ -1478,7 +1478,7 @@ function jschecks(){
 			fi
 			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
 			if [ ! "$AXIOM" = true ]; then
-				[ -s "js/js_livelinks.txt" ] && cat js/js_livelinks.txt | nuclei -silent -t ~/nuclei-templates/ $NUCLEI_FLAGS_JS -nh -retries 3 -rl $NUCLEI_RATELIMIT -o js/js_secrets.txt 2>>"$LOGFILE" &>/dev/null
+				[ -s "js/js_livelinks.txt" ] && cat js/js_livelinks.txt | Mantra -ua ${HEADER} | tail -n +11 | anew -q js/js_secrets.txt
 			else
 				[ -s "js/js_livelinks.txt" ] && axiom-scan js/js_livelinks.txt -m nuclei $NUCLEI_FLAGS_JS -retries 3 -nh -rl $NUCLEI_RATELIMIT -o js/js_secrets.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			fi
