@@ -1439,9 +1439,9 @@ function jschecks(){
 			fi
 			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
 			if [ ! "$AXIOM" = true ]; then
-				[ -s "js/js_livelinks.txt" ] && cat js/js_livelinks.txt | Mantra -ua ${HEADER} | tail -n +11 | anew -q js/js_secrets.txt
+				[ -s "js/js_livelinks.txt" ] && cat js/js_livelinks.txt | Mantra -ua ${HEADER} -s | anew -q js/js_secrets.txt
 			else
-				[ -s "js/js_livelinks.txt" ] && axiom-scan js/js_livelinks.txt -m nuclei $NUCLEI_FLAGS_JS -retries 3 -nh -rl $NUCLEI_RATELIMIT -o js/js_secrets.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+				[ -s "js/js_livelinks.txt" ] && axiom-scan js/js_livelinks.txt -m Mantra -ua ${HEADER} -o js/js_secrets.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			fi
 			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
 			[ -s "js/js_livelinks.txt" ] && interlace -tL js/js_livelinks.txt -threads ${INTERLACE_THREADS}  -c "python3 $tools/getjswords.py '_target_' | anew -q webs/dict_words.txt" 2>>"$LOGFILE" &>/dev/null
