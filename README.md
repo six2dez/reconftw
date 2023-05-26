@@ -239,7 +239,6 @@ WAF_DETECTION=true # Detect WAFs
 NUCLEICHECK=true # Enable or disable nuclei
 NUCLEI_SEVERITY="info,low,medium,high,critical" # Set templates criticity
 NUCLEI_FLAGS="-silent -t ~/nuclei-templates/ -retries 2" # Additional nuclei extra flags, don't set the severity here but the exclusions like "-etags openssh"
-NUCLEI_FLAGS_JS="-silent -tags exposure,token -severity info,low,medium,high,critical" # Additional nuclei extra flags for js secrets
 URL_CHECK=true # Enable or disable URL collection
 URL_CHECK_PASSIVE=true # Search for urls, passive methods from Archive, OTX, CommonCrawl, etc
 URL_CHECK_ACTIVE=true # Search for urls by crawling the websites
@@ -469,7 +468,7 @@ reset='\033[0m'
 - Metadata finder ([MetaFinder](https://github.com/Josue87/MetaFinder))
 - Google Dorks ([dorks_hunter](https://github.com/six2dez/dorks_hunter))
 - Github Dorks ([gitdorks_go](https://github.com/damit5/gitdorks_go))
-- GitHub org analysis ([enumerepo](https://github.com/trickest/enumerepo) and [trufflehog](https://github.com/trufflesecurity/trufflehog))
+- GitHub org analysis ([enumerepo](https://github.com/trickest/enumerepo) and [gitleaks](https://github.com/gitleaks/gitleaks))
 
 ## Subdomains
 
@@ -506,7 +505,7 @@ reset='\033[0m'
 - Url extraction ([gau](https://github.com/lc/gau),[waymore](https://github.com/xnl-h4ck3r/waymore), [katana](https://github.com/projectdiscovery/katana), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3) and [JSA](https://github.com/w9w/JSA))
 - URL patterns Search and filtering ([urless](https://github.com/xnl-h4ck3r/urless), [gf](https://github.com/tomnomnom/gf) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns))
 - Favicon Real IP ([fav-up](https://github.com/pielco11/fav-up))
-- Javascript analysis ([subjs](https://github.com/lc/subjs), [JSA](https://github.com/w9w/JSA), [xnLinkFinder](https://github.com/xnl-h4ck3r/xnLinkFinder), [getjswords](https://github.com/m4ll0k/BBTz))
+- Javascript analysis ([subjs](https://github.com/lc/subjs), [JSA](https://github.com/w9w/JSA), [xnLinkFinder](https://github.com/xnl-h4ck3r/xnLinkFinder), [getjswords](https://github.com/m4ll0k/BBTz), [Mantra](https://github.com/MrEmpy/Mantra))
 - Fuzzing ([ffuf](https://github.com/ffuf/ffuf))
 - URL sorting by extension
 - Wordlist generation
