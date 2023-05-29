@@ -841,6 +841,7 @@ function subtakeover(){
 		touch .tmp/tko.txt
 		[ ! -s ".tmp/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q .tmp/webs_all.txt
 		if [ ! "$AXIOM" = true ]; then
+			nuclei -update 2>>"$LOGFILE" &>/dev/null
 			cat subdomains/subdomains.txt .tmp/webs_all.txt 2>/dev/null | nuclei -silent -nh -tags takeover -severity low,medium,high,critical -retries 3 -rl $NUCLEI_RATELIMIT -o .tmp/tko.txt
 		else
 			cat subdomains/subdomains.txt .tmp/webs_all.txt 2>>"$LOGFILE" | sed '/^$/d' | anew -q .tmp/webs_subs.txt
@@ -1166,7 +1167,7 @@ function waf_checks(){
 function nuclei_check(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$NUCLEICHECK" = true ]; then
 		start_func ${FUNCNAME[0]} "Templates based web scanner"
-		nuclei -update-templates 2>>"$LOGFILE" &>/dev/null
+		nuclei -update 2>>"$LOGFILE" &>/dev/null
 		mkdir -p nuclei_output
 		[ ! -s ".tmp/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q .tmp/webs_all.txt
 		[ ! -s ".tmp/webs_subs.txt" ] && cat subdomains/subdomains.txt .tmp/webs_all.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
