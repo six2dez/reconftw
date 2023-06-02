@@ -1036,7 +1036,7 @@ function virtualhosts(){
 			find $dir/virtualhosts/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | anew -q $dir/virtualhosts/virtualhosts_full.txt
 			end_func "Results are saved in $domain/virtualhosts/*subdomain*.txt" ${FUNCNAME[0]}
 		else
-			end_func "No $domain/web/webs.txts file found, fuzzing skipped " ${FUNCNAME[0]}
+			end_func "No $domain/web/webs.txts file found, virtualhosts skipped " ${FUNCNAME[0]}
 		fi
 	else
 		if [ "$VIRTUALHOSTS" = false ]; then
@@ -1224,7 +1224,7 @@ function fuzz(){
 				axiom-scan .tmp/webs_all.txt -m ffuf_base -H "${HEADER}" $FFUF_FLAGS -s -maxtime $FFUF_MAXTIME -o $dir/.tmp/ffuf-content.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 				for sub in $(cat .tmp/webs_all.txt); do
 					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-					grep "$sub" $dir/.tmp/ffuf-content.json | awk '{print $2" "$3" "$1}' | sort -k1 | anew -q $dir/fuzzing/${sub_out}.txt
+					[ -s "$dir/.tmp/ffuf-content.json" ] && cat .tmp/ffuf-content.json | jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' | grep $sub | sort | sort -k1 | anew -q fuzzing/${sub_out}.txt
 				done
 				find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | sort -k3 | anew -q $dir/fuzzing/fuzzing_full.txt
 			fi
