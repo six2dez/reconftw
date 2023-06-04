@@ -484,7 +484,7 @@ reset='\033[0m'
 ## Subdomains
 
 - Passive ([amass](https://github.com/OWASP/Amass), [subfinder](https://github.com/projectdiscovery/subfinder) and [github-subdomains](https://github.com/gwen001/github-subdomains))
-- Certificate transparency ([ctfr](https://github.com/UnaPibaGeek/ctfr))
+- Certificate transparency ([crt](https://github.com/cemulus/crt))
 - NOERROR subdomain discovery ([dnsx](https://github.com/projectdiscovery/dnsx), more info [here](https://www.securesystems.de/blog/enhancing-subdomain-enumeration-ents-and-noerror/))
 - Bruteforce ([puredns](https://github.com/d3mondev/puredns))
 - Permutations ([Gotator](https://github.com/Josue87/gotator), [ripgen](https://github.com/resyncgg/ripgen) and [regulator](https://github.com/cramppet/regulator))

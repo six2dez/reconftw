@@ -48,7 +48,6 @@ function tools_installed(){
 	[ -f "$tools/Corsy/corsy.py" ] || { printf "${bred} [*] Corsy			[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/testssl.sh/testssl.sh" ] || { printf "${bred} [*] testssl			[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/CMSeeK/cmseek.py" ] || { printf "${bred} [*] CMSeeK			[NO]${reset}\n"; allinstalled=false;}
-	[ -f "$tools/ctfr/ctfr.py" ] || { printf "${bred} [*] ctfr			[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/fuzz_wordlist.txt" ] || { printf "${bred} [*] OneListForAll		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/xnLinkFinder/xnLinkFinder.py" ] || { printf "${bred} [*] xnLinkFinder		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/waymore/waymore.py" ] || { printf "${bred} [*] waymore		[NO]${reset}\n"; allinstalled=false;}
@@ -109,6 +108,7 @@ function tools_installed(){
 	which ghauri &>/dev/null || { printf "${bred} [*] ghauri			[NO]${reset}\n${reset}"; allinstalled=false;}
 	which hakip2host &>/dev/null || { printf "${bred} [*] hakip2host			[NO]${reset}\n${reset}"; allinstalled=false;}
 	which gau &>/dev/null || { printf "${bred} [*] gau			[NO]${reset}\n${reset}"; allinstalled=false;}
+	which crt &>/dev/null || { printf "${bred} [*] crt			[NO]${reset}\n${reset}"; allinstalled=false;}
 	which subgpt &>/dev/null || { printf "${bred} [*] subgpt			[NO]${reset}\n${reset}"; allinstalled=false;}
 	which gitleaks &>/dev/null || { printf "${bred} [*] gitleaks			[NO]${reset}\n${reset}"; allinstalled=false;}
 	which trufflehog &>/dev/null || { printf "${bred} [*] trufflehog [NO]${reset}\n${reset}"; allinstalled=false;}
@@ -416,7 +416,7 @@ function sub_passive(){
 function sub_crt(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBCRT" = true ]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Crtsh Subdomain Enumeration"
-		python3 $tools/ctfr/ctfr.py -d $domain -o .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" &>/dev/null
+		crt -s -json -l ${CTR_LIMIT} $domain 2>>"$LOGFILE" | jq -r '.[].subdomain' | sed -e "s/^\\*\\.//" | anew -q .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" &>/dev/null
 		[[ "$INSCOPE" = true ]] && check_inscope .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" &>/dev/null
 		NUMOFLINES=$(cat .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" | sed 's/\*.//g' | anew .tmp/crtsh_subs.txt | sed '/^$/d' | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (cert transparency)" ${FUNCNAME[0]}
