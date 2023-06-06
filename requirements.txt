@@ -9,7 +9,7 @@ chardet                 # ghauri
 colorama                # ghauri
 colorclass              # dnsvalidator
 dank                    # regulator
-datetime                #JSA
+datetime                # JSA
 datrie                  # regulator
 dnspython               # ip2provider
 emailfinder             # Tool
@@ -35,4 +35,4 @@ tldextract              # dorks_hunter
 tqdm                    # multiple
 ujson                   # multiple
 urllib3                 # multiple
-subgpt                  # subgpt
+subgpt                  # Tool

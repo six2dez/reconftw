@@ -188,8 +188,8 @@ while true; do
 
     if $rftw_installed; then
         printf "${bblue} 1. Install/Update ReconFTW (without Web Interface)${reset}\n\n"
-        printf "${bblue} 2. Install/Update ReconFTW + Install Web Interface${reset} ${yellow}(User Interaction needed!)${reset}\n\n"
-        printf "${bblue} 3. Setup Web Interface${reset}\n\n"
+        printf "${bblue} 2. Install/Update ReconFTW + Install Web Interface${reset}\n\n"
+        printf "${bblue} 3. Setup Web Interface${reset} ${yellow}(User Interaction needed!)${reset}\n\n"
         printf "${bblue} 4. Exit${reset}\n\n"
         printf "${bgreen}#######################################################################${reset}\n\n"
         read -p "$(echo -e ${bblue} "Insert option: "${reset})" option
@@ -494,7 +494,7 @@ if [ "True" = "$IS_ARM" ]; then
         eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz $DEBUG_STD
         eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
         eval $SUDO rm -rf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
-    elif [ "True" = "$RPI_4" ] || [ "True" = "$IS_MAC" ]; then
+    elif [ "True" = "$RPI_4" ]; then
         eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz $DEBUG_STD
         eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
         eval $SUDO rm -rf ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
@@ -603,7 +603,7 @@ eval strip -s "$HOME"/go/bin/* $DEBUG_STD
 eval $SUDO cp "$HOME"/go/bin/* /usr/local/bin/ $DEBUG_STD
 
 if [ "$web" = true ]; then
-    sh -c "echo 3 | $SCRIPTPATH/install.sh"
+    printf "\n${bgreen} Web server is installed, to set it up run ./install.sh and select option 3 ${reset}\n\n"
 fi
 
 printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/provider-config.yaml)\n - GitLab (~/Tools/.gitlab_tokens)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg or env var) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg or env var) \n - notify (~/.config/notify/provider-config.yaml) \n - WHOISXML API (WHOISXML_API in reconftw.cfg or env var)\n - subgpt_cookies.json (subgpt_cookies.json file, follow instructions at https://github.com/s0md3v/SubGPT#getting-bing-cookie)\n\n\n${reset}"
