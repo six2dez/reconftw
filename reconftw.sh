@@ -92,7 +92,6 @@ function tools_installed(){
 	which analyticsrelationships &>/dev/null || { printf "${bred} [*] analyticsrelationships	[NO]${reset}\n"; allinstalled=false;}
 	which mapcidr &>/dev/null || { printf "${bred} [*] mapcidr			[NO]${reset}\n"; allinstalled=false;}
 	which ppfuzz &>/dev/null || { printf "${bred} [*] ppfuzz			[NO]${reset}\n"; allinstalled=false;}
-	which searchsploit &>/dev/null || { printf "${bred} [*] searchsploit		[NO]${reset}\n"; allinstalled=false;}
 	which cdncheck &>/dev/null || { printf "${bred} [*] cdncheck			[NO]${reset}\n"; allinstalled=false;}
 	which interactsh-client &>/dev/null || { printf "${bred} [*] interactsh-client		[NO]${reset}\n"; allinstalled=false;}
 	which tlsx &>/dev/null || { printf "${bred} [*] tlsx			[NO]${reset}\n"; allinstalled=false;}
@@ -1099,12 +1098,11 @@ function portscan(){
 		fi
 		if [ "$PORTSCAN_ACTIVE" = true ]; then
 			if [ ! "$AXIOM" = true ]; then
-				[ -s ".tmp/ips_nocdn.txt" ] && $SUDO nmap --top-ports 200 -sV -n --max-retries 2 -Pn --open -iL .tmp/ips_nocdn.txt -oA hosts/portscan_active 2>>"$LOGFILE" &>/dev/null
+				[ -s ".tmp/ips_nocdn.txt" ] && $SUDO nmap --top-ports 200 -sV -n --max-retries 2 -Pn --open --script vulners -iL .tmp/ips_nocdn.txt -oA hosts/portscan_active 2>>"$LOGFILE" &>/dev/null
 			else
-				[ -s ".tmp/ips_nocdn.txt" ] && axiom-scan .tmp/ips_nocdn.txt -m nmapx --top-ports 200 -sV -n -Pn --open --max-retries 2 -oA hosts/portscan_active $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+				[ -s ".tmp/ips_nocdn.txt" ] && axiom-scan .tmp/ips_nocdn.txt -m nmapx --top-ports 200 -sV -n -Pn --open --max-retries 2 --script vulners -oA hosts/portscan_active $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 			fi
 		fi
-		[ -s "hosts/portscan_active.xml" ] && searchsploit --nmap hosts/portscan_active.xml 2>/dev/null > hosts/searchsploit.txt
 		end_func "Results are saved in hosts/portscan_[passive|active].txt" ${FUNCNAME[0]}
 	else
 		if [ "$PORTSCANNER" = false ]; then
