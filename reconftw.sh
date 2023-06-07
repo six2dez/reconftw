@@ -1186,7 +1186,7 @@ function nuclei_check(){
 				for i in "${!array[@]}"
 				do
 					crit=${array[i]}
-					printf "${yellow}\n Running : Nuclei $crit ${reset}\n\n"
+					printf "${yellow}\n Running : Nuclei $crit, check results on nuclei_output folder${reset}\n\n"
 					axiom-scan .tmp/webs_subs.txt -m nuclei -severity ${crit} -nh -rl $NUCLEI_RATELIMIT -o nuclei_output/${crit}.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
 				done
 				printf "\n\n"
@@ -1438,7 +1438,7 @@ function jschecks(){
 			if [ ! "$AXIOM" = true ]; then
 				[ -s "js/js_livelinks.txt" ] && cat js/js_livelinks.txt | Mantra -ua ${HEADER} -s | anew -q js/js_secrets.txt
 			else
-				[ -s "js/js_livelinks.txt" ] && axiom-scan js/js_livelinks.txt -m mantra -ua ${HEADER} -o js/js_secrets.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" &>/dev/null
+				[ -s "js/js_livelinks.txt" ] && axiom-scan js/js_livelinks.txt -m mantra -ua ${HEADER} -o js/js_secrets.txt $AXIOM_EXTRA_ARGS &>/dev/null
 			fi
 			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
 			[ -s "js/js_livelinks.txt" ] && interlace -tL js/js_livelinks.txt -threads ${INTERLACE_THREADS}  -c "python3 $tools/getjswords.py '_target_' | anew -q webs/dict_words.txt" 2>>"$LOGFILE" &>/dev/null
