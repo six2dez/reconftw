@@ -2339,9 +2339,15 @@ function passive(){
 	github_dorks
 	github_repos
 	metadata
+	SUBNOERROR=false
+	SUBANALYTICS=false
+	SUBBRUTE=false
 	SUBSCRAPING=false
+	SUBPERMUTE=false
+	SUBREGEXPERMUTE=false
+	SUBGPT=false
+	SUB_RECURSIVE_BRUTE=false
 	WEBPROBESIMPLE=false
-
 	if [ "$AXIOM" = true ]; then
 		axiom_lauch
 		axiom_selected
