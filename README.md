@@ -11,8 +11,8 @@
     <img src="https://img.shields.io/badge/release-v2.6-green">
   </a>
    </a>
-  <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">
-      <img src="https://img.shields.io/badge/license-GPL3-_red.svg">
+  <a href="https://opensource.org/licenses/MIT">
+      <img src="https://img.shields.io/badge/License-MIT-yellow.svg">
   </a>
   <a href="https://twitter.com/Six2dez1">
     <img src="https://img.shields.io/badge/twitter-%40Six2dez1-blue">
@@ -649,4 +649,4 @@ If you want to contribute to this project, you can do it in multiple ways:
 
 Usage of this program for attacking targets without consent is illegal. It is the user's responsibility to obey all applicable laws. The developer assumes no liability and is not responsible for any misuse or damage caused by this program. Please use responsibly.
 
-The material contained in this repository is licensed under GNU GPLv3.
+The material contained in this repository is licensed under MIT.
