@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 function banner_graber(){
-	source $SCRIPTPATH/banners.txt
+	source "${SCRIPTPATH}"/banners.txt
 	randx=$(shuf -i 1-23 -n 1)
 	tmp="banner${randx}" 
 	banner_code=${!tmp}
@@ -23,7 +23,7 @@ function check_version(){
 	if [ $exit_status -eq 0 ]; then
 		BRANCH=$(git rev-parse --abbrev-ref HEAD)
 		HEADHASH=$(git rev-parse HEAD)
-		UPSTREAMHASH=$(git rev-parse ${BRANCH}@{upstream})
+		UPSTREAMHASH=$(git rev-parse "${BRANCH}"@\{upstream\})
 		if [ "$HEADHASH" != "$UPSTREAMHASH" ]; then
 			printf "\n${yellow} There is a new version, run ./install.sh to get latest version${reset}\n\n"
 		fi
@@ -1171,7 +1171,7 @@ function nuclei_check(){
 		[ ! -s ".tmp/webs_subs.txt" ] && cat subdomains/subdomains.txt .tmp/webs_all.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
 		if [ ! "$AXIOM" = true ]; then
 			set -f                      # avoid globbing (expansion of *).
-			array=(${NUCLEI_SEVERITY//,/ })
+			array=("${NUCLEI_SEVERITY//,/ }")
 			for i in "${!array[@]}"
 			do
 				crit=${array[i]}
@@ -1182,7 +1182,7 @@ function nuclei_check(){
 		else
 			if [ -s ".tmp/webs_subs.txt" ]; then
 				set -f                      # avoid globbing (expansion of *).
-				array=(${NUCLEI_SEVERITY//,/ })
+				array=("${NUCLEI_SEVERITY//,/ }")
 				for i in "${!array[@]}"
 				do
 					crit=${array[i]}
@@ -1945,9 +1945,9 @@ function getElapsedTime {
 }
 
 function zipSnedOutputFolder {
-	zip_name=`date +"%Y_%m_%d-%H.%M.%S"`
-	zip_name="$zip_name"_"$domain.zip"
-	(cd $dir && zip -r "$zip_name" .)
+	zip_name1=$(date +"%Y_%m_%d-%H.%M.%S")
+	zip_name="${zip_name1}_${domain}.zip"
+	(cd "$dir" && zip -r "$zip_name" .)
 
 	echo "Sending zip file "${dir}/${zip_name}""
 	if [ -s "${dir}/$zip_name" ]; then
@@ -2975,10 +2975,11 @@ while true; do
 done
 
 # This is the first thing to do to read in alternate config
-SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 || exit ; pwd -P )"
 . "$SCRIPTPATH"/reconftw.cfg
 if [ -s "$CUSTOM_CONFIG" ]; then
-    . "${CUSTOM_CONFIG}"
+# shellcheck source=/home/six2dez/Tools/reconftw/custom_config.cfg
+. "${CUSTOM_CONFIG}"
 fi
 
 if [ $opt_deep ]; then
