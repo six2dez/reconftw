@@ -594,8 +594,6 @@ else
 	fi
 fi
 
-#eval h8mail -g $DEBUG_STD
-
 ## Stripping all Go binaries
 eval strip -s "$HOME"/go/bin/* $DEBUG_STD
 

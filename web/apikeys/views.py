@@ -1,8 +1,7 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from editprofile.imgUser import imgUser
-from apikeys.config import amassConfig, ReconConfig, GithubConfig, h8mailConfig
-#from apikeys.config import amassConfig, ReconConfig, theHarvesterConfig, GithubConfig, h8mailConfig
+from apikeys.config import amassConfig, ReconConfig, GithubConfig
 # Create your views here.
 
 otherNames = {'passivedns': '360PassiveDNS', 'digicert': 'CertCentral', 'psbdmp':'Pastebin', 'rikiq':'PassiveTotal', 'quake360':'quake', 'cisco':'Umbrella', 'leaklookup_priv':'leak-lookup_priv', 'leaklookup_pub':'leak-lookup_pub'}
@@ -52,17 +51,6 @@ def conf(request):
 #            key = key=keys[key][0]  
 #            if name != "spyse":
 #                theHarvesterConfig(name, key=key)
-
-    elif keys["type"][0] == "h8mail":
-        del keys["type"]
-
-        for key in keys:
-            name = key
-            key = key=keys[key][0]  
-            if name in otherNames:
-                name = otherNames[name]
-
-            h8mailConfig(name, key=key)
 
 @login_required(login_url='/login/')
 def index(request):
@@ -147,34 +135,6 @@ def index(request):
         'token_4_value': GithubConfig('4', get=True),
         'token_5_value': GithubConfig('5', get=True),
         'token_6_value': GithubConfig('6', get=True),
-
-#        'binaryedge_value': theHarvesterConfig("binaryedge", get=True),
-#        'bing_value': theHarvesterConfig("bing", get=True),
-#        'censys2_value': theHarvesterConfig("censys", get=True),
-#        'fullhunt2_value': theHarvesterConfig("fullhunt", get=True),
-#        'github2_value': theHarvesterConfig("github", get=True),
-#        'hunter2_value': theHarvesterConfig("hunter", get=True),
-#        'intelx2_value': theHarvesterConfig("intelx", get=True),
-#        'pentesttools2_value': theHarvesterConfig("pentestTools", get=True),
-#        'chaos2_value': theHarvesterConfig("chaos", get=True),
-#        'rocketreach_value': theHarvesterConfig("rocketreach", get=True),
-#        'securitytrails2_value': theHarvesterConfig("securityTrails", get=True),
-#        'shodan3_value': theHarvesterConfig("shodan", get=True),
-#        'zoomeye2_value': theHarvesterConfig("zoomeye", get=True),
-
-        'hunter3_value': h8mailConfig("hunter", get=True),
-        'snusbase_value': h8mailConfig("snusbase", get=True),
-        'emailrep_value': h8mailConfig("emailrep", get=True),
-        'intelx3_value': h8mailConfig("intelx", get=True),
-        'hibp_value': h8mailConfig("hibp", get=True),
-        'leaklookup_pub_value': h8mailConfig("leak-lookup_pub", get=True),
-        'leaklookup_priv_value': h8mailConfig("leak-lookup_priv", get=True),
-        'weleakinfo_priv_value': h8mailConfig("weleakinfo_priv", get=True),
-        'weleakinfo_pub_value': h8mailConfig("weleakinfo_pub", get=True),
-        'dehashed_email_value': h8mailConfig("dehashed_email", get=True),
-        'dehashed_key_value': h8mailConfig("dehashed_key", get=True),
-        'breachdirectory_user_value': h8mailConfig("breachdirectory_user", get=True),
-        'breachdirectory_pass_value': h8mailConfig("breachdirectory_pass", get=True),
 
         "imagePath": imagePath,
         "apikeys_settings": "API Keys Settings",

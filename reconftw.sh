@@ -228,31 +228,6 @@ function emails(){
 		cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		[ -s ".tmp/infoga.txt" ] && cat .tmp/infoga.txt | cut -d " " -f3 | grep -v "-" | anew -q osint/emails.txt
 
-# COMMENTED THEHARVESTER, H8MAIL AND PWNDB AS THEY'RE NOT WORKING AS EXPECTED
-#		cd "$tools/theHarvester" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
-#		python3 theHarvester.py -d $domain -b all -f $dir/.tmp/harvester.json 2>>"$LOGFILE" >/dev/null
-#		cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
-#		if [ -s ".tmp/harvester.json" ]; then
-#			cat .tmp/harvester.json | jq -r 'try .emails[]' 2>/dev/null | anew -q osint/emails.txt
-#			cat .tmp/harvester.json | jq -r 'try .linkedin_people[]' 2>/dev/null | anew -q osint/employees.txt
-#			cat .tmp/harvester.json | jq -r 'try .linkedin_links[]' 2>/dev/null | anew -q osint/linkedin.txt
-#		fi
-#		h8mail -t $domain -q domain --loose -c $tools/h8mail_config.ini -j .tmp/h8_results.json 2>>"$LOGFILE" >/dev/null
-#		[ -s ".tmp/h8_results.json" ] && cat .tmp/h8_results.json | jq -r '.targets[0] | .data[] | .[]' | awk '{print $12}' | anew -q osint/h8mail.txt
-#
-#		PWNDB_STATUS=$(timeout 30s curl -Is --socks5-hostname localhost:9050 http://pwndb2am4tzkvold.onion | grep HTTP | cut -d ' ' -f2)
-#
-#		if [ "$PWNDB_STATUS" = 200 ]; then
-#			cd "$tools/pwndb" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
-#			python3 pwndb.py --target "@${domain}" | sed '/^[-]/d' | anew -q $dir/osint/passwords.txt
-#			cd "$dir" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
-#			[ -s "osint/passwords.txt" ] && sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" osint/passwords.txt
-#			[ -s "osint/passwords.txt" ] && sed -i '1,2d' osint/passwords.txt
-#		else
-#			text="${yellow}\n pwndb is currently down :(\n\n Check xjypo5vzgmo7jca6b322dnqbsdnp3amd24ybx26x5nxbusccjkm4pwid.onion${reset}\n"
-#			printf "${text}" && printf "${text}" | $NOTIFY
-#		fi
-
 		end_func "Results are saved in $domain/osint/emails.txt" ${FUNCNAME[0]}
 	else
 		if [ "$EMAILS" = false ] || [ "$OSINT" = false ]; then

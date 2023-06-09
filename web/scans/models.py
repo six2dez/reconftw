@@ -363,7 +363,6 @@ class IPsInfos(models.Model):
 class OSINTUsersInfo(models.Model):
     emails = models.TextField()
     users = models.TextField()
-    h8mail = models.TextField()
     passwords = models.TextField()
     employees = models.TextField()
     linkedin = models.TextField()

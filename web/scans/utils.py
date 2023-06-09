@@ -1316,13 +1316,6 @@ def osintusersinfo_f2db(project_id):
         else:
             users = 'N/A'
         
-        if 'h8mail.txt' in ld:
-            with open(f"{osintusers_path}/h8mail.txt") as f:
-                h8mail = f.read()
-                f.close()
-        else:
-            h8mail = 'N/A'
-        
         if 'passwords.txt' in ld:
             with open(f"{osintusers_path}/passwords.txt") as f:
                 passwords = f.read()
@@ -1345,8 +1338,7 @@ def osintusersinfo_f2db(project_id):
             linkedin = 'N/A'
 
 
-        osintusers_save.create(emails=emails, users=users, h8mail=h8mail, 
-                            passwords=passwords, employees=employees, 
+        osintusers_save.create(emails=emails, users=users, passwords=passwords, employees=employees, 
                             linkedin=linkedin, project_id=project_id)
 
 
