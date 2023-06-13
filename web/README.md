@@ -33,7 +33,14 @@ So, without further ado, we invite you to explore the enhanced web interface of 
 
 ### Run the following command to install the WEB GUI Interface
 ```bash
-./install.sh
+./install.sh #(Option 2)
+```
+![ReconFTW Install Web GUI](https://i.imgur.com/675L89x.png)
+---
+
+### Run the following after install to setup the WEB GUI Interface
+```bash
+./install.sh #(Option 3)
 ```
 ![ReconFTW Install Web GUI](https://i.imgur.com/675L89x.png)
 ---

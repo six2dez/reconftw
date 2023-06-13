@@ -83,6 +83,8 @@ gotools["subfinder"]="go install -v github.com/projectdiscovery/subfinder/v2/cmd
 gotools["byp4xx"]="go install -v github.com/lobuhi/byp4xx@latest"
 gotools["hakip2host"]="go install github.com/hakluke/hakip2host@latest"
 gotools["gau"]="go install -v github.com/lc/gau/v2/cmd/gau@latest"
+gotools["Mantra"]="go install github.com/MrEmpy/Mantra@latest"
+gotools["crt"]="go install github.com/cemulus/crt@latest"
 
 declare -A repos
 repos["dorks_hunter"]="six2dez/dorks_hunter"
@@ -93,7 +95,6 @@ repos["brutespray"]="x90skysn3k/brutespray"
 repos["wafw00f"]="EnableSecurity/wafw00f"
 repos["gf"]="tomnomnom/gf"
 repos["Gf-Patterns"]="1ndianl33t/Gf-Patterns"
-repos["ctfr"]="UnaPibaGeek/ctfr"
 repos["xnLinkFinder"]="xnl-h4ck3r/xnLinkFinder"
 repos["waymore"]="xnl-h4ck3r/waymore"
 repos["Corsy"]="s0md3v/Corsy"
@@ -109,13 +110,14 @@ repos["ultimate-nmap-parser"]="shifty0g/ultimate-nmap-parser"
 repos["pydictor"]="LandGrey/pydictor"
 repos["gitdorks_go"]="damit5/gitdorks_go"
 repos["urless"]="xnl-h4ck3r/urless"
-repos["trufflehog"]="trufflesecurity/trufflehog"
 repos["smuggler"]="defparam/smuggler"
 repos["Web-Cache-Vulnerability-Scanner"]="Hackmanit/Web-Cache-Vulnerability-Scanner"
 repos["regulator"]="cramppet/regulator"
 repos["byp4xx"]="lobuhi/byp4xx"
 repos["Infoga"]="m4ll0k/Infoga"
 repos["ghauri"]="r0oth3x49/ghauri"
+repos["gitleaks"]="gitleaks/gitleaks"
+repos["trufflehog"]="trufflesecurity/trufflehog"
 
 
 function banner_web(){
@@ -157,35 +159,8 @@ install_webserver(){
     printf "${yellow} Installing Requirements...${reset}\n\n"
     $SUDO pip3 install -r $SCRIPTPATH/web/requirements.txt &>/dev/null
         
-    #$SUDO virtualenv web/env &>/dev/null
-    #$SUDO source web/env/bin/activate
-    #$SUDO pip3 install -r web/requirements.txt &>/dev/null
-
     printf "${yellow} Installing tools...${reset}\n\n"
     $SUDO apt install redis-server -y &>/dev/null
-    #$SUDO apt install postgresql -y &>/dev/null
-
-    # printf "${yellow} Database configuration...${reset}\n\n"
-    #$SUDO service postgresql restart &>/dev/null
-    #$SUDO su postgres -c 'psql -c "DROP DATABASE web;"' &>/dev/null
-    #$SUDO su postgres -c 'psql -c "CREATE DATABASE web;"' &>/dev/null
-    
-    #read -p ' What Username is used in db: ' DBUser
-    #read -s -p ' What Password is used in db: ' DBPass
-    
-    #$SUDO su postgres 'psql -c "DROP USER "'$DBUser &> /dev/null
-
-    #sed -i "s/'USER': '.*/'USER': '$DBUser',/" web/web/settings.py
-    #sed -i "s/'PASSWORD': '.*/'PASSWORD': '$DBPass',/" web/web/settings.py
-    #echo ""
-
-    #printf "${yellow} Creating DB User...${reset}\n\n"
-    #$SUDO su postgres -c "psql -c \"CREATE USER $DBUser with PASSWORD '$DBPass';\""
-
-    #$SUDO su postgres -c "psql -c \"ALTER ROLE $DBUser SET client_encoding TO 'utf8';\""
-    #$SUDO su postgres -c "psql -c \"ALTER ROLE $DBUser SET default_transaction_isolation TO 'read committed';\""
-    #$SUDO su postgres -c "psql -c \"ALTER ROLE $DBUser SET timezone TO 'UTC';\""
-    #$SUDO su postgres -c "psql -c \"GRANT ALL PRIVILEGES ON DATABASE web TO $DBUser;\""
     
     printf "${yellow} Creating WEB User...${reset}\n\n"
     $SUDO rm $SCRIPTPATH/web/db.sqlite3 &>/dev/null
@@ -213,8 +188,8 @@ while true; do
 
     if $rftw_installed; then
         printf "${bblue} 1. Install/Update ReconFTW (without Web Interface)${reset}\n\n"
-        printf "${bblue} 2. Install/Update ReconFTW + Install Web Interface${reset} ${yellow}(User Interaction needed!)${reset}\n\n"
-        printf "${bblue} 3. Setup Web Interface${reset}\n\n"
+        printf "${bblue} 2. Install/Update ReconFTW + Install Web Interface${reset}\n\n"
+        printf "${bblue} 3. Setup Web Interface${reset} ${yellow}(User Interaction needed!)${reset}\n\n"
         printf "${bblue} 4. Exit${reset}\n\n"
         printf "${bgreen}#######################################################################${reset}\n\n"
         read -p "$(echo -e ${bblue} "Insert option: "${reset})" option
@@ -463,7 +438,6 @@ cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; e
 eval git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git $dir/sqlmap $DEBUG_STD
 eval git clone --depth 1 https://github.com/drwetter/testssl.sh.git $dir/testssl.sh $DEBUG_STD
 eval $SUDO git clone https://gitlab.com/exploit-database/exploitdb /opt/exploitdb $DEBUG_STD
-eval $SUDO ln -sf /opt/exploitdb/searchsploit /usr/local/bin/searchsploit $DEBUG_STD
 
 # Standard repos installation
 repos_step=0
@@ -502,54 +476,43 @@ for repo in "${!repos[@]}"; do
         if [ "massdns" = "$repo" ]; then
             eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/local/bin/ $DEBUG_ERROR
         fi
+        if [ "gitleaks" = "$repo" ]; then
+            eval make build $DEBUG_STD && eval $SUDO cp ./gitleaks /usr/local/bin/ $DEBUG_ERROR
+        fi
     fi
     if [ "gf" = "$repo" ]; then
         eval cp -r examples ~/.gf $DEBUG_ERROR
     elif [ "Gf-Patterns" = "$repo" ]; then
         eval mv ./*.json ~/.gf $DEBUG_ERROR
-    elif [ "trufflehog" = "$repo" ]; then
-        eval go install $DEBUG_STD
     fi
     cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 done
 
 if [ "True" = "$IS_ARM" ]; then
     if [ "True" = "$RPI_3" ]; then
-        eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/latest/download/unimap-armv7 $DEBUG_STD
         eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz $DEBUG_STD
         eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
         eval $SUDO rm -rf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
-        eval $SUDO mv unimap-armv7 /usr/local/bin/unimap
-    elif [ "True" = "$RPI_4" ] || [ "True" = "$IS_MAC" ]; then
-        eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/latest/download/unimap-aarch64 $DEBUG_STD
+    elif [ "True" = "$RPI_4" ]; then
         eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz $DEBUG_STD
         eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
         eval $SUDO rm -rf ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
-        eval $SUDO mv unimap-aarch64 /usr/local/bin/unimap
     fi
 elif [ "True" = "$IS_MAC" ]; then
     if [ "True" = "$IS_ARM" ]; then
-        eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/latest/download/unimap-armv7 $DEBUG_STD
         eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz $DEBUG_STD
         eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
         eval $SUDO rm -rf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
-        eval $SUDO mv unimap-armv7 /usr/local/bin/unimap
     else
-        eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/latest/download/unimap-osx $DEBUG_STD
         eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz $DEBUG_STD
         eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz  $DEBUG_STD
         eval $SUDO rm -rf ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz  $DEBUG_STD
-        eval $SUDO mv unimap-osx /usr/local/bin/unimap
     fi
 else
-    eval wget -N -c https://github.com/Edu4rdSHL/unimap/releases/download/0.4.0/unimap-linux $DEBUG_STD
     eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz $DEBUG_STD
     eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
     eval $SUDO rm -rf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
-    eval $SUDO mv unimap-linux /usr/local/bin/unimap
 fi
-eval $SUDO chmod 755 /usr/local/bin/unimap
-eval $SUDO strip -s /usr/local/bin/unimap $DEBUG_STD
 eval $SUDO chmod 755 /usr/local/bin/ppfuzz
 eval $SUDO strip -s /usr/local/bin/ppfuzz $DEBUG_STD
 eval notify $DEBUG_STD
@@ -595,31 +558,16 @@ if [ "$double_check" = "true" ]; then
             eval $SUDO python3 setup.py install $DEBUG_STD
         fi
         if [ "massdns" = "$repo" ]; then
-                eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/local/bin/ $DEBUG_ERROR
+            eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/local/bin/ $DEBUG_ERROR
         elif [ "gf" = "$repo" ]; then
-                eval cp -r examples ~/.gf $DEBUG_ERROR
+            eval cp -r examples ~/.gf $DEBUG_ERROR
         elif [ "Gf-Patterns" = "$repo" ]; then
-                eval mv ./*.json ~/.gf $DEBUG_ERROR
+            eval mv ./*.json ~/.gf $DEBUG_ERROR
+        elif [ "trufflehog" = "$repo" ]; then
+            eval go install $DEBUG_STD
         fi
         cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
     done
-fi
-
-# BBRF Setup
-if [ ! -d "$HOME/.bbrf/" ] ; then
-    mkdir "$HOME/.bbrf/"
-fi
-if  [ -d "$HOME/.bbrf/" ] && [ ! -s "$HOME/.bbrf/config.json" ]; then
-    cat > "$HOME/.bbrf/config.json" << EOF
-{
-    "username": "$BBRF_USERNAME",
-    "password": "$BBRF_PASSWORD",
-    "couchdb": "https://$BBRF_SERVER/bbrf",
-    "slack_token": "<a slack token to receive notifications>",
-    "discord_webhook": "<your discord webhook if you want one>",
-    "ignore_ssl_errors": false
-}
-EOF
 fi
 
 printf "${bblue} Running: Performing last configurations ${reset}\n\n"
@@ -646,15 +594,13 @@ else
 	fi
 fi
 
-#eval h8mail -g $DEBUG_STD
-
 ## Stripping all Go binaries
 eval strip -s "$HOME"/go/bin/* $DEBUG_STD
 
 eval $SUDO cp "$HOME"/go/bin/* /usr/local/bin/ $DEBUG_STD
 
 if [ "$web" = true ]; then
-    sh -c "echo 3 | $SCRIPTPATH/install.sh"
+    printf "\n${bgreen} Web server is installed, to set it up run ./install.sh and select option 3 ${reset}\n\n"
 fi
 
 printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/provider-config.yaml)\n - GitLab (~/Tools/.gitlab_tokens)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg or env var) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg or env var) \n - notify (~/.config/notify/provider-config.yaml) \n - WHOISXML API (WHOISXML_API in reconftw.cfg or env var)\n - subgpt_cookies.json (subgpt_cookies.json file, follow instructions at https://github.com/s0md3v/SubGPT#getting-bing-cookie)\n\n\n${reset}"
