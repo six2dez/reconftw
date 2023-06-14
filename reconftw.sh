@@ -1160,7 +1160,7 @@ function nuclei_check(){
 		else
 			if [ -s ".tmp/webs_subs.txt" ]; then
 				set -f                      # avoid globbing (expansion of *).
-				array=("${NUCLEI_SEVERITY//,/ }")
+				array=(${NUCLEI_SEVERITY//,/ })
 				for i in "${!array[@]}"
 				do
 					crit=${array[i]}
