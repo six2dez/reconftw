@@ -551,7 +551,7 @@ if [ "$double_check" = "true" ]; then
     repos_step=0
     for repo in "${!repos[@]}"; do
         repos_step=$((repos_step + 1))
-        eval cd $dir/$repo $DEBUG_STD || { eval git clone https://github.com/${repos[$repo]} $dir/$repo $DEBUG_STD && cd $dir/$repo; }
+        eval cd $dir/$repo $DEBUG_STD || { eval git clone https://github.com/${repos[$repo]} $dir/$repo $DEBUG_STD && cd $dir/$repo || { echo "Failed to cd directory '$dir'"; exit 1; }; }
         eval git pull $DEBUG_STD
         exit_status=$?
         if [ -s "setup.py" ]; then
@@ -574,7 +574,7 @@ printf "${bblue} Running: Performing last configurations ${reset}\n\n"
 ## Last steps
 if [ "$generate_resolvers" = true ]; then
 	if [ ! -s "$resolvers" ] || [[ $(find "$resolvers" -mtime +1 -print) ]] ; then
-		 ${reset}\n\n"Checking resolvers lists...\n Accurate resolvers are the key to great results\n This may take around 10 minutes if it's not updated ${reset}\n\n"
+        printf "${reset}\n\nChecking resolvers lists...\n Accurate resolvers are the key to great results\n This may take around 10 minutes if it's not updated\n\n"
 		eval rm -f $resolvers 2>>"$LOGFILE"
 		dnsvalidator -tL https://public-dns.info/nameservers.txt -threads $DNSVALIDATOR_THREADS -o $resolvers &>/dev/null
 		dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads $DNSVALIDATOR_THREADS -o tmp_resolvers &>/dev/null
