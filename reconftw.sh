@@ -1890,6 +1890,32 @@ function webcache(){
 	fi
 }
 
+function fuzzparams(){
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$FUZZPARAMS" = true ] ; then
+		start_func ${FUNCNAME[0]} "Fuzzing params values checks"
+		if [ "$DEEP" = true ] || [[ $(cat webs/url_extract.txt | wc -l) -le $DEEP_LIMIT2 ]]; then
+			if [ ! "$AXIOM" = true ]; then
+				nuclei -update 2>>"$LOGFILE" >/dev/null
+				git -C $tools/fuzzing-templates pull
+				cat webs/url_extract.txt 2>/dev/null | nuclei -silent -retries 3 -rl $NUCLEI_RATELIMIT -t $tools/fuzzing-templates -o .tmp/fuzzparams.txt
+			else
+				axiom-exec "git clone https://github.com/projectdiscovery/fuzzing-templates /home/op/fuzzing-templates" &>/dev/null
+				axiom-scan webs/url_extract.txt -m nuclei -nh -retries 3 -w /home/op/fuzzing-templates -rl $NUCLEI_RATELIMIT -o .tmp/fuzzparams.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+			fi
+			[ -s ".tmp/fuzzparams.txt" ] && cat .tmp/fuzzparams.txt | anew -q vulns/fuzzparams.txt
+			end_func "Results are saved in vulns/fuzzparams.txt" ${FUNCNAME[0]}
+		else
+			end_func "Fuzzing params values: Too many entries to test, try with --deep flag" ${FUNCNAME[0]}
+		fi
+	else
+		if [ "$FUZZPARAMS" = false ]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
+	fi
+}
+
 ###############################################################################################################
 ########################################## OPTIONS & MGMT #####################################################
 ###############################################################################################################
@@ -2378,6 +2404,7 @@ function vulns(){
 		webcache
 		spraying
 		brokenLinks
+		fuzzparams
 		test_ssl
 	fi
 }

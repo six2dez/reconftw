@@ -430,10 +430,10 @@ printf "${bblue}\n Running: Installing repositories (${#repos[@]})${reset}\n\n"
 # Repos with special configs
 eval git clone https://github.com/projectdiscovery/nuclei-templates ~/nuclei-templates $DEBUG_STD
 eval git clone https://github.com/geeknik/the-nuclei-templates.git ~/nuclei-templates/extra_templates $DEBUG_STD
+eval git clone https://github.com/projectdiscovery/fuzzing-templates $tools/fuzzing-templates $DEBUG_STD
 eval wget -q -O - https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/ssrf.yaml > ~/nuclei-templates/ssrf_nagli.yaml $DEBUG_STD
 eval wget -q -O - https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/sap-redirect.yaml > ~/nuclei-templates/sap-redirect_nagli.yaml $DEBUG_STD
 eval nuclei -update-templates $DEBUG_STD
-cd ~/nuclei-templates/extra_templates && eval git pull $DEBUG_STD
 cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 eval git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git $dir/sqlmap $DEBUG_STD
 eval git clone --depth 1 https://github.com/drwetter/testssl.sh.git $dir/testssl.sh $DEBUG_STD
