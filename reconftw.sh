@@ -1149,7 +1149,7 @@ function nuclei_check(){
 		[ ! -s ".tmp/webs_subs.txt" ] && cat subdomains/subdomains.txt .tmp/webs_all.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
 		if [ ! "$AXIOM" = true ]; then
 			set -f                      # avoid globbing (expansion of *).
-			array=("${NUCLEI_SEVERITY//,/ }")
+			array=(${NUCLEI_SEVERITY//,/ })
 			for i in "${!array[@]}"
 			do
 				crit=${array[i]}
