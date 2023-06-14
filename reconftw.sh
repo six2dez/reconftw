@@ -1147,23 +1147,19 @@ function nuclei_check(){
 		mkdir -p nuclei_output
 		[ ! -s ".tmp/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q .tmp/webs_all.txt
 		[ ! -s ".tmp/webs_subs.txt" ] && cat subdomains/subdomains.txt .tmp/webs_all.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
-		if [ ! "$AXIOM" = true ]; then
-			set -f                      # avoid globbing (expansion of *).
-			array=(${NUCLEI_SEVERITY//,/ })
-			for i in "${!array[@]}"
+		if [ ! "$AXIOM" = true ]; then                 # avoid globbing (expansion of *).
+			IFS=',' read -ra severity_array <<< "$NUCLEI_SEVERITY"
+			for crit in "${severity_array[@]}"
 			do
-				crit=${array[i]}
 				printf "${yellow}\n Running : Nuclei $crit ${reset}\n\n"
 				cat .tmp/webs_subs.txt 2>/dev/null | nuclei $NUCLEI_FLAGS -severity $crit -nh -rl $NUCLEI_RATELIMIT -o nuclei_output/${crit}.txt
 			done
 			printf "\n\n"
 		else
 			if [ -s ".tmp/webs_subs.txt" ]; then
-				set -f                      # avoid globbing (expansion of *).
-				array=(${NUCLEI_SEVERITY//,/ })
-				for i in "${!array[@]}"
+				IFS=',' read -ra severity_array <<< "$NUCLEI_SEVERITY"
+				for crit in "${severity_array[@]}"
 				do
-					crit=${array[i]}
 					printf "${yellow}\n Running : Nuclei $crit, check results on nuclei_output folder${reset}\n\n"
 					axiom-scan .tmp/webs_subs.txt -m nuclei -severity ${crit} -nh -rl $NUCLEI_RATELIMIT -o nuclei_output/${crit}.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 				done
