@@ -988,10 +988,14 @@ function screenshot(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$WEBSCREENSHOT" = true ]; then
 		start_func ${FUNCNAME[0]} "Web Screenshots"
 		[ ! -s ".tmp/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q .tmp/webs_all.txt
+		
+		num_lines=$(wc -l < .tmp/webs_all.txt)
+		dynamic_gowitness_timeout=$(expr $num_lines \* $GOWITNESS_TIMEOUT_PER_SITE)
+
 		if [ ! "$AXIOM" = true ]; then
-			[ -s ".tmp/webs_all.txt" ] && gowitness file -f .tmp/webs_all.txt -t $GOWITNESS_THREADS $GOWITNESS_FLAGS 2>>"$LOGFILE"
+			[ -s ".tmp/webs_all.txt" ] && timeout -k 1m ${dynamic_gowitness_timeout}s gowitness file -f .tmp/webs_all.txt -t $GOWITNESS_THREADS $GOWITNESS_FLAGS -o screenshots 2>>"$LOGFILE"
 		else
-			axiom-scan .tmp/webs_all.txt -m gowitness -t $GOWITNESS_THREADS $GOWITNESS_FLAGS -o screenshots $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+			timeout -k 1m ${dynamic_gowitness_timeout}s axiom-scan .tmp/webs_all.txt -m gowitness -t $GOWITNESS_THREADS $GOWITNESS_FLAGS -o screenshots $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 		fi
 		end_func "Results are saved in $domain/screenshots folder" ${FUNCNAME[0]}
 	else
