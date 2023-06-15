@@ -252,6 +252,9 @@ function domain_info(){
 		if [ "$DEEP" = true ] || [ "$REVERSE_WHOIS" = true ]; then
 			timeout -k 1m ${AMASS_INTEL_TIMEOUT}m amass intel -d ${domain} -whois -timeout $AMASS_INTEL_TIMEOUT -o osint/domain_info_reverse_whois.txt 2>>"$LOGFILE" &>/dev/null
 		fi
+		
+		curl -s "https://aadinternals.azurewebsites.net/api/tenantinfo?domainName=${domain}" -H "Origin: https://aadinternals.com" | jq -r .domains[].name > osint/azure_tenant_domains.txt
+
 		end_func "Results are saved in $domain/osint/domain_info_[general/name/email/ip].txt" ${FUNCNAME[0]}
 	else
 		if [ "$DOMAIN_INFO" = false ] || [ "$OSINT" = false ]; then
