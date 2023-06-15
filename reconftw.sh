@@ -993,7 +993,7 @@ function screenshot(){
 		dynamic_gowitness_timeout=$(expr $num_lines \* $GOWITNESS_TIMEOUT_PER_SITE)
 
 		if [ ! "$AXIOM" = true ]; then
-			[ -s ".tmp/webs_all.txt" ] && timeout -k 1m ${dynamic_gowitness_timeout}s gowitness file -f .tmp/webs_all.txt -t $GOWITNESS_THREADS $GOWITNESS_FLAGS -o screenshots 2>>"$LOGFILE"
+			[ -s ".tmp/webs_all.txt" ] && timeout -k 1m ${dynamic_gowitness_timeout}s gowitness file -f .tmp/webs_all.txt -t $GOWITNESS_THREADS $GOWITNESS_FLAGS 2>>"$LOGFILE"
 		else
 			timeout -k 1m ${dynamic_gowitness_timeout}s axiom-scan .tmp/webs_all.txt -m gowitness -t $GOWITNESS_THREADS $GOWITNESS_FLAGS -o screenshots $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 		fi
