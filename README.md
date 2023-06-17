@@ -7,8 +7,8 @@
 </h1>
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.6">
-    <img src="https://img.shields.io/badge/release-v2.6-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.7">
+    <img src="https://img.shields.io/badge/release-v2.7-green">
   </a>
    </a>
   <a href="https://opensource.org/licenses/MIT">
