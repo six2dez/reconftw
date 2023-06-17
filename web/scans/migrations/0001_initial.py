@@ -227,7 +227,6 @@ class Migration(migrations.Migration):
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('emails', models.TextField()),
                 ('users', models.TextField()),
-                ('h8mail', models.TextField()),
                 ('passwords', models.TextField()),
                 ('employees', models.TextField()),
                 ('linkedin', models.TextField()),
