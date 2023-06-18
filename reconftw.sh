@@ -111,7 +111,7 @@ function tools_installed(){
 	which crt &>/dev/null || { printf "${bred} [*] crt			[NO]${reset}\n${reset}"; allinstalled=false;}
 	which subgpt &>/dev/null || { printf "${bred} [*] subgpt			[NO]${reset}\n${reset}"; allinstalled=false;}
 	which gitleaks &>/dev/null || { printf "${bred} [*] gitleaks			[NO]${reset}\n${reset}"; allinstalled=false;}
-	which trufflehog &>/dev/null || { printf "${bred} [*] trufflehog		[NO]${reset}\n${reset}"; allinstalled=false;}
+	which trufflehog &>/dev/null || { printf "${bred} [*] trufflehog			[NO]${reset}\n${reset}"; allinstalled=false;}
 	
 	if [ "${allinstalled}" = true ]; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
@@ -198,7 +198,7 @@ function github_repos(){
 function metadata(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$METADATA" = true ] && [ "$OSINT" = true ] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Scanning metadata in public files"
-		{ metafinder -d "$domain" -l $METAFINDER_LIMIT -o osint -go -bi -ba; } >>"$LOGFILE" 2>&1 &
+		metafinder -d "$domain" -l $METAFINDER_LIMIT -o osint -go -bi -ba &>> "$LOGFILE"
 		mv "osint/${domain}/"*".txt" "osint/" 2>>"$LOGFILE"
 		rm -rf "osint/${domain}" 2>>"$LOGFILE"
 		end_func "Results are saved in $domain/osint/[software/authors/metadata_results].txt" ${FUNCNAME[0]}
@@ -225,7 +225,7 @@ function emails(){
 
 		
 		cd "$tools/Infoga" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
-		python3 infoga.py --domain "$domain" --source all --report "$dir/.tmp/infoga.txt" 2>&1 | tee -a "$LOGFILE"
+		python3 infoga.py --domain "$domain" --source all --report "$dir/.tmp/infoga.txt" &>> "$LOGFILE"
 		cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 		[ -s ".tmp/infoga.txt" ] && cat .tmp/infoga.txt | cut -d " " -f3 | grep -v "-" | anew -q osint/emails.txt
 
@@ -396,7 +396,7 @@ function sub_passive(){
 function sub_crt(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$SUBCRT" = true ]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Crtsh Subdomain Enumeration"
-		crt -s -json -l ${CTR_LIMIT} $domain 2>>"$LOGFILE" | jq -r '.[].subdomain' | sed -e "s/^\\*\\.//" | anew -q .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" >/dev/null
+		crt -s -json -l ${CTR_LIMIT} $domain 2>>"$LOGFILE" | jq -r '.[].subdomain' 2>>"$LOGFILE" | sed -e "s/^\\*\\.//" | anew -q .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" >/dev/null
 		[[ "$INSCOPE" = true ]] && check_inscope .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" >/dev/null
 		NUMOFLINES=$(cat .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" | sed 's/\*.//g' | anew .tmp/crtsh_subs.txt | sed '/^$/d' | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (cert transparency)" ${FUNCNAME[0]}

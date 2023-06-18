@@ -221,7 +221,7 @@ while true; do
     else
         printf "${bblue} 1. Install/Update ReconFTW${reset}\n\n"
         printf "${bblue} 2. Install/Update ReconFTW + Install Web Interface${reset} ${yellow}(User Interaction needed!)${reset}\n\n"
-        printf "${bred} 3. Can't install Web Interface without ReconFTW${reset}\n\n"
+        printf "${bred} 3. Can't setup Web Interface without ReconFTW${reset}\n\n"
         printf "${bblue} 4. Exit${reset}\n\n"
         printf "${bgreen}#######################################################################${reset}\n\n"
         read -p "$(echo -e ${bblue} "Insert option: "${reset})" option
