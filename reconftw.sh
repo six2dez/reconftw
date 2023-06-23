@@ -175,9 +175,10 @@ function github_repos(){
 			enumerepo -token-string "${GH_TOKEN}" -usernames .tmp/company_name.txt -o .tmp/company_repos.txt 2>>"$LOGFILE" >/dev/null &
 			[ -s ".tmp/company_repos.txt" ] && jq -r '.[].repos[]|.url' < .tmp/company_repos.txt > .tmp/company_repos_url.txt 2>>"$LOGFILE"
 			mkdir -p .tmp/github_repos 2>>"$LOGFILE" >>"$LOGFILE"
+			mkdir -p .tmp/github 2>>"$LOGFILE" >>"$LOGFILE"
 			[ -s ".tmp/company_repos_url.txt" ] && interlace -tL .tmp/company_repos_url.txt -threads ${INTERLACE_THREADS} -c "git clone _target_  .tmp/github_repos/_cleantarget_" 2>>"$LOGFILE" >/dev/null 2>&1
 			[ -d ".tmp/github/" ] && ls .tmp/github_repos > .tmp/github_repos_folders.txt
-			[ -s ".tmp/github_repos_folders.txt" ] && interlace -tL .tmp/github_repos_folders.txt -threads ${INTERLACE_THREADS} -c "gitleaks detect --source .tmp/github_repos/_target_ --no-banner --no-color -r ./tmp/github/gh_secret_cleantarget_.json" 2>>"$LOGFILE" >/dev/null
+			[ -s ".tmp/github_repos_folders.txt" ] && interlace -tL .tmp/github_repos_folders.txt -threads ${INTERLACE_THREADS} -c "gitleaks detect --source .tmp/github_repos/_target_ --no-banner --no-color -r .tmp/github/gh_secret_cleantarget_.json" 2>>"$LOGFILE" >/dev/null
 			[ -s ".tmp/company_repos_url.txt" ] && interlace -tL .tmp/company_repos_url.txt -threads ${INTERLACE_THREADS} -c "trufflehog git _target_ -j 2>&1 | jq -c > _output_/_cleantarget_" -o .tmp/github/ >>"$LOGFILE" 2>&1
 			if [ -d ".tmp/github/" ]; then
 				cat .tmp/github/* | jq -c | jq -r > osint/github_company_secrets.json 2>>"$LOGFILE"
