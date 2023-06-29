@@ -9,4 +9,5 @@ urlpatterns=[
     path('', views.index, name='index'),
     path('<int:id>/delete/', views.delete_project,name='delete'),
     path('<int:id>/cancel/', views.cancel_scan,name='cancel'),
+    path('<int:id>/backup/', views.DownloadBackup, name='backup'),
 ]
