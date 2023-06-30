@@ -1,4 +1,5 @@
 from django.shortcuts import get_object_or_404, render
+from django.http import HttpResponse
 from projects.models import Project
 from django.core.files.base import ContentFile
 from django.shortcuts import redirect
@@ -11,6 +12,7 @@ from web.settings import BASE_DIR
 import shutil, os, time, requests, favicon
 from pathlib import Path
 from subprocess import Popen
+import zipfile
 
 # Main Projects Page
 @login_required(login_url='/login/')
@@ -67,7 +69,7 @@ def index(request):
                 print("final_date: "+str(final_date))
 
                 pjtfor = Project.objects.filter(domain=sgdomain)
-                print("pjt: "+str(pjtfor))
+                # print("pjt: "+str(pjtfor))
 
 
                 # Save Domain
@@ -194,6 +196,42 @@ def delete_project(request, id):
 
         return redirect('projects:index')
 
+@login_required(login_url='/login/')
+def DownloadBackup(requests, id):
+
+    project = Project.objects.get(id=id)
+    if project.status == "FINISHED":
+        command = str(project.command).split("'")
+        del command[0::2]
+
+        tempFolder = "/tmp"
+        folderPath = command[-1].rsplit("/",1)[0]
+        folderName = command[-1].rsplit("/",1)[1]
+
+        if "/" in folderName:
+            tmp = folderName.rsplit("/", 1)
+
+            folderPath = tmp[0]
+            folderName = tmp[1]
+
+        if os.path.exists(tempFolder+"/Backup-"+folderName+".zip"):
+            os.remove(tempFolder+"/Backup-"+folderName+".zip")
+
+        os.chdir(folderPath)
+        with zipfile.ZipFile(tempFolder+"/Backup-"+folderName+".zip", "w") as zf:
+            for item in Path(folderName).rglob("*"):
+                zf.write(item)
+            zf.close()
+
+        backupFileName = "Backup-"+folderName+".zip"
+
+        file = open(tempFolder+"/"+backupFileName, "rb")
+
+        response = HttpResponse(file, content_type='application/force-download')
+        response['Content-Disposition'] = 'attachment; filename='+backupFileName
+        return response
+    else:
+        return HttpResponse('Scanning is not completed, please wait.')
 
 # TODO: Cancel Scan Function 
 @login_required(login_url='/login/')
