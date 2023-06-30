@@ -769,7 +769,7 @@
                   <button class="btn" data-bs-toggle="modal" data-bs-placement="bottom" title="CANCEL" type="button" data-bs-toggle="modal" data-bs-target="#modal-cancel-{{ domains.id }}"><i class='bx bxs-x-square bx-sm'></i></button>
                 {% endif %}
                   <button class="btn" type="button" data-bs-toggle="modal" data-bs-target="#modal-scheduling-{{ domains.id }}" onclick="timezone('{{ domains.id }}'); getSchedules('{{ domains.id }}');" ><i class='bx bxs-alarm-add bx-sm'></i></button>
-                  <button class="btn" type="button" data-bs-toggle="modal" data-bs-target="#modal-backup"><i class='bx bxs-hdd bx-sm'></i></button>
+                  <button class="btn" type="button" data-bs-toggle="modal" onclick="backup('{{ domains.id }}')"><i class='bx bxs-hdd bx-sm'></i></button>
                   <button class="btn" data-bs-toggle="modal" data-bs-placement="bottom" title="DELETE" type="button" data-bs-target="#modal-delete-{{ domains.id }}"><i class='bx bxs-trash-alt bx-sm' ></i></button>
               </td>
               <td>
@@ -1113,14 +1113,22 @@
                 id="singleDomain"
                 onkeyup="checkCommand()"
                 placeholder="example.com"
+                style="display: block;"
               />
             </div>
-            <div class="tab-pane fade" id="pills-list" role="tabpanel">
+            <div
+              class="tab-pane fade show active"
+              id="pills-list"
+              role="tabpanel"
+            >
               <textarea
-                class="form-control"
+                type="text"
                 name="listDomain"
+                class="form-control"
                 id="listDomain"
                 onkeyup="checkCommand()"
+                placeholder="example.com"
+                style="display: none;"
               ></textarea>
             </div>
           </div>
@@ -1253,7 +1261,7 @@
             <input
               type="text"
               class="form-control"
-              id="command"
+              id="showCommand"
               name="command"
               disabled
             />
@@ -1373,6 +1381,9 @@
       console.log(opt);
     }
   }
+  function backup(id){
+    window.location.href = ("{% url 'projects:index' %}"+id+"/backup");
+  }
 
   function changeSchedule(id) {
     var value = document.getElementById("schedules-existing-" + id).value;
@@ -1401,8 +1412,8 @@
       document.getElementById("Saturday-" + id).checked = false;
       document.getElementById("Sunday-" + id).checked = false;
       document.getElementById("addScheduler-" + id).checked = false;
-      document.getElementById("hours-" + id).value = 00;
-      document.getElementById("minutes-" + id).value = 00;
+      document.getElementById("hours-" + id).value = "00";
+      document.getElementById("minutes-" + id).value = "00";
 
       document.getElementById("schedule-name-" + id).value = "NoneValue";
       document.getElementById("crontab-id-" + id).value = "NoneValue";
@@ -1495,7 +1506,7 @@
       document.getElementById("switch-passive").disabled = true;
       document.getElementById("switch-web").disabled = true;
       document.getElementById("switch-osint").disabled = true;
-      checkCommand();
+      // checkCommand();
     } else {
       document.getElementById("switch-recon").checked = false;
       document.getElementById("switch-subdomains").checked = false;
@@ -1508,65 +1519,75 @@
       document.getElementById("switch-passive").disabled = false;
       document.getElementById("switch-web").disabled = false;
       document.getElementById("switch-osint").disabled = false;
-      checkCommand();
+      // checkCommand();
     }
   }
-
   function checkCommand() {
-    let command = "./reconftw.sh";
+    // Retrieve the input value
+    var inputValue = document.getElementById("singleDomain").value;
 
-    if (
-      document.getElementById("pills-single-nav").classList.contains("active")
-    ) {
-      command += " -d " + document.getElementById("singleDomain").value;
-    } else {
-      command += " -l targets.txt";
-    }
-
-    if (document.getElementById("switch-all").checked == true) {
-      command += " -a";
-    } else {
-      if (document.getElementById("switch-recon").checked) {
-        command += " -r";
-      }
-
-      if (document.getElementById("switch-subdomains").checked) {
-        command += " -s";
-      }
-
-      if (document.getElementById("switch-passive").checked) {
-        command += " -p";
-      }
-
-      if (document.getElementById("switch-web").checked) {
-        command += " -w";
-      }
-
-      if (document.getElementById("switch-osint").checked) {
-        command += " -n";
-      }
-    }
-
-    if (document.getElementById("switch-deep").checked == true) {
-      command += " --deep";
-    }
-
-    if (document.getElementById("switch-vps").checked == true) {
-      command += " -v";
-    }
-
-    document.getElementById("command").value = command;
+    // Set the input value to the second input field
+    document.getElementById("showCommand").value = inputValue;
   }
+  // function checkCommand() {
+  //   let command = "./reconftw.sh";
 
-  function selectSingle() {
-    document.getElementById("typeDomain").value = 0;
-    checkCommand();
-  }
+  //   if (
+  //     document.getElementById("pills-single-nav").classList.contains("active")
+  //   ) {
+  //     command += " -d " + document.getElementById("singleDomain").value;
+  //   } else {
+  //     command += " -l targets.txt";
+  //   }
 
-  function selectList() {
-    document.getElementById("typeDomain").value = 1;
-    checkCommand();
-  }
+  //   if (document.getElementById("switch-all").checked == true) {
+  //     command += " -a";
+  //   } else {
+  //     if (document.getElementById("switch-recon").checked) {
+  //       command += " -r";
+  //     }
+
+  //     if (document.getElementById("switch-subdomains").checked) {
+  //       command += " -s";
+  //     }
+
+  //     if (document.getElementById("switch-passive").checked) {
+  //       command += " -p";
+  //     }
+
+  //     if (document.getElementById("switch-web").checked) {
+  //       command += " -w";
+  //     }
+
+  //     if (document.getElementById("switch-osint").checked) {
+  //       command += " -n";
+  //     }
+  //   }
+
+  //   if (document.getElementById("switch-deep").checked == true) {
+  //     command += " --deep";
+  //   }
+
+  //   if (document.getElementById("switch-vps").checked == true) {
+  //     command += " -v";
+  //   }
+
+  //   document.getElementById("command").value = command;
+  // }
+
+  // function selectSingle() {
+  //   document.getElementById("typeDomain").value = 0;
+  //   document.getElementById("singleDomain").style.display = 'block';
+  //   document.getElementById("listDomain").style.display = 'block';
+  //   checkCommand();
+  // }
+
+  // function selectList() {
+  //   document.getElementById("typeDomain").value = 1;
+  //   document.getElementById("singleDomain").style.display = 'none';
+  //   document.getElementById("listDomain").style.display = 'none';
+  //   checkCommand();
+  // }
 
   function showLoading() {
     $("#modal-loading").modal("show");
