@@ -630,6 +630,7 @@
     border-radius: 50%;
     background-color: #fff;
   }
+
 </style>
 
 {% if messages %} {% for message in messages %}
@@ -800,8 +801,7 @@
                       
                         <div class="col-4">
                           <div class="tab-content" id="pills-tabContent">
-                            <input type="hidden" id="typeDomain" name="typeDomain" value="0">
-                            <div class="tab-pane fade show active" id="pills-single" role="tabpanel">
+                            <div>
                             
                               <div class="select">
 
@@ -824,9 +824,6 @@
                               </div>
                             
                             
-                            </div>
-                            <div class="tab-pane fade" id="pills-list" role="tabpanel">
-                              <textarea class="form-control" name="listDomain" id="listDomain" onkeyup="checkCommand()"></textarea>
                             </div>
                           </div>
                         </div>
@@ -1100,12 +1097,8 @@
             </li>
           </ul>
           <div class="tab-content" id="pills-tabContent">
-            <input type="hidden" id="typeDomain" name="typeDomain" value="0" />
-            <div
-              class="tab-pane fade show active"
-              id="pills-single"
-              role="tabpanel"
-            >
+            <input type="hidden" id="typeDomain" name="typeDomain" value="1" />
+            <div class="tab-pane show active" id="pills-single" role="tabpanel">
               <input
                 type="text"
                 name="singleDomain"
@@ -1113,22 +1106,15 @@
                 id="singleDomain"
                 onkeyup="checkCommand()"
                 placeholder="example.com"
-                style="display: block;"
               />
             </div>
-            <div
-              class="tab-pane fade show active"
-              id="pills-list"
-              role="tabpanel"
-            >
+            <div class="tab-pane" id="pills-list" role="tabpanel">
               <textarea
-                type="text"
-                name="listDomain"
                 class="form-control"
+                name="listDomain"
                 id="listDomain"
                 onkeyup="checkCommand()"
-                placeholder="example.com"
-                style="display: none;"
+                placeholder="example.com&#10;example2.com"
               ></textarea>
             </div>
           </div>
@@ -1261,7 +1247,7 @@
             <input
               type="text"
               class="form-control"
-              id="showCommand"
+              id="command"
               name="command"
               disabled
             />
@@ -1380,9 +1366,6 @@
       element.appendChild(opt);
       console.log(opt);
     }
-  }
-  function backup(id){
-    window.location.href = ("{% url 'projects:index' %}"+id+"/backup");
   }
 
   function changeSchedule(id) {
@@ -1506,7 +1489,7 @@
       document.getElementById("switch-passive").disabled = true;
       document.getElementById("switch-web").disabled = true;
       document.getElementById("switch-osint").disabled = true;
-      // checkCommand();
+      checkCommand();
     } else {
       document.getElementById("switch-recon").checked = false;
       document.getElementById("switch-subdomains").checked = false;
@@ -1519,16 +1502,10 @@
       document.getElementById("switch-passive").disabled = false;
       document.getElementById("switch-web").disabled = false;
       document.getElementById("switch-osint").disabled = false;
-      // checkCommand();
+      checkCommand();
     }
   }
-  function checkCommand() {
-    // Retrieve the input value
-    var inputValue = document.getElementById("singleDomain").value;
 
-    // Set the input value to the second input field
-    document.getElementById("showCommand").value = inputValue;
-  }
   // function checkCommand() {
   //   let command = "./reconftw.sh";
 
@@ -1575,19 +1552,15 @@
   //   document.getElementById("command").value = command;
   // }
 
-  // function selectSingle() {
-  //   document.getElementById("typeDomain").value = 0;
-  //   document.getElementById("singleDomain").style.display = 'block';
-  //   document.getElementById("listDomain").style.display = 'block';
-  //   checkCommand();
-  // }
+  function selectSingle() {
+    document.getElementById("pills-single").classList.add("active");
+    checkCommand();
+  }
 
-  // function selectList() {
-  //   document.getElementById("typeDomain").value = 1;
-  //   document.getElementById("singleDomain").style.display = 'none';
-  //   document.getElementById("listDomain").style.display = 'none';
-  //   checkCommand();
-  // }
+  function selectList() {
+    document.getElementById("pills-list").classList.add("active");
+    checkCommand();
+  }
 
   function showLoading() {
     $("#modal-loading").modal("show");
