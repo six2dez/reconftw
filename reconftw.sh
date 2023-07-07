@@ -371,7 +371,7 @@ function sub_passive(){
 			fi
 		fi
 		if [ -s "${GITLAB_TOKENS}" ]; then
-			gitlab-subdomains -d $domain -t $GITLAB_TOKENS -o .tmp/gitlab_subdomains_psub.txt 2>>"$LOGFILE" >/dev/null
+			gitlab-subdomains -d $domain -t $GITLAB_TOKENS > .tmp/gitlab_subdomains_psub.txt 2>>"$LOGFILE" >/dev/null
 		fi
 		if [ "$INSCOPE" = true ]; then
 			check_inscope .tmp/amass_psub.txt 2>>"$LOGFILE" >/dev/null
