@@ -630,6 +630,7 @@
     border-radius: 50%;
     background-color: #fff;
   }
+
 </style>
 
 {% if messages %} {% for message in messages %}
@@ -769,7 +770,7 @@
                   <button class="btn" data-bs-toggle="modal" data-bs-placement="bottom" title="CANCEL" type="button" data-bs-toggle="modal" data-bs-target="#modal-cancel-{{ domains.id }}"><i class='bx bxs-x-square bx-sm'></i></button>
                 {% endif %}
                   <button class="btn" type="button" data-bs-toggle="modal" data-bs-target="#modal-scheduling-{{ domains.id }}" onclick="timezone('{{ domains.id }}'); getSchedules('{{ domains.id }}');" ><i class='bx bxs-alarm-add bx-sm'></i></button>
-                  <button class="btn" type="button" data-bs-toggle="modal" data-bs-target="#modal-backup"><i class='bx bxs-hdd bx-sm'></i></button>
+                  <button class="btn" type="button" data-bs-toggle="modal" onclick="backup('{{ domains.id }}')"><i class='bx bxs-hdd bx-sm'></i></button>
                   <button class="btn" data-bs-toggle="modal" data-bs-placement="bottom" title="DELETE" type="button" data-bs-target="#modal-delete-{{ domains.id }}"><i class='bx bxs-trash-alt bx-sm' ></i></button>
               </td>
               <td>
@@ -800,8 +801,7 @@
                       
                         <div class="col-4">
                           <div class="tab-content" id="pills-tabContent">
-                            <input type="hidden" id="typeDomain" name="typeDomain" value="0">
-                            <div class="tab-pane fade show active" id="pills-single" role="tabpanel">
+                            <div>
                             
                               <div class="select">
 
@@ -824,9 +824,6 @@
                               </div>
                             
                             
-                            </div>
-                            <div class="tab-pane fade" id="pills-list" role="tabpanel">
-                              <textarea class="form-control" name="listDomain" id="listDomain" onkeyup="checkCommand()"></textarea>
                             </div>
                           </div>
                         </div>
@@ -1100,12 +1097,8 @@
             </li>
           </ul>
           <div class="tab-content" id="pills-tabContent">
-            <input type="hidden" id="typeDomain" name="typeDomain" value="0" />
-            <div
-              class="tab-pane fade show active"
-              id="pills-single"
-              role="tabpanel"
-            >
+            <input type="hidden" id="typeDomain" name="typeDomain" value="1" />
+            <div class="tab-pane show active" id="pills-single" role="tabpanel">
               <input
                 type="text"
                 name="singleDomain"
@@ -1115,12 +1108,13 @@
                 placeholder="example.com"
               />
             </div>
-            <div class="tab-pane fade" id="pills-list" role="tabpanel">
+            <div class="tab-pane" id="pills-list" role="tabpanel">
               <textarea
                 class="form-control"
                 name="listDomain"
                 id="listDomain"
                 onkeyup="checkCommand()"
+                placeholder="example.com&#10;example2.com"
               ></textarea>
             </div>
           </div>
@@ -1401,8 +1395,8 @@
       document.getElementById("Saturday-" + id).checked = false;
       document.getElementById("Sunday-" + id).checked = false;
       document.getElementById("addScheduler-" + id).checked = false;
-      document.getElementById("hours-" + id).value = 00;
-      document.getElementById("minutes-" + id).value = 00;
+      document.getElementById("hours-" + id).value = "00";
+      document.getElementById("minutes-" + id).value = "00";
 
       document.getElementById("schedule-name-" + id).value = "NoneValue";
       document.getElementById("crontab-id-" + id).value = "NoneValue";
@@ -1512,59 +1506,59 @@
     }
   }
 
-  function checkCommand() {
-    let command = "./reconftw.sh";
+  // function checkCommand() {
+  //   let command = "./reconftw.sh";
 
-    if (
-      document.getElementById("pills-single-nav").classList.contains("active")
-    ) {
-      command += " -d " + document.getElementById("singleDomain").value;
-    } else {
-      command += " -l targets.txt";
-    }
+  //   if (
+  //     document.getElementById("pills-single-nav").classList.contains("active")
+  //   ) {
+  //     command += " -d " + document.getElementById("singleDomain").value;
+  //   } else {
+  //     command += " -l targets.txt";
+  //   }
 
-    if (document.getElementById("switch-all").checked == true) {
-      command += " -a";
-    } else {
-      if (document.getElementById("switch-recon").checked) {
-        command += " -r";
-      }
+  //   if (document.getElementById("switch-all").checked == true) {
+  //     command += " -a";
+  //   } else {
+  //     if (document.getElementById("switch-recon").checked) {
+  //       command += " -r";
+  //     }
 
-      if (document.getElementById("switch-subdomains").checked) {
-        command += " -s";
-      }
+  //     if (document.getElementById("switch-subdomains").checked) {
+  //       command += " -s";
+  //     }
 
-      if (document.getElementById("switch-passive").checked) {
-        command += " -p";
-      }
+  //     if (document.getElementById("switch-passive").checked) {
+  //       command += " -p";
+  //     }
 
-      if (document.getElementById("switch-web").checked) {
-        command += " -w";
-      }
+  //     if (document.getElementById("switch-web").checked) {
+  //       command += " -w";
+  //     }
 
-      if (document.getElementById("switch-osint").checked) {
-        command += " -n";
-      }
-    }
+  //     if (document.getElementById("switch-osint").checked) {
+  //       command += " -n";
+  //     }
+  //   }
 
-    if (document.getElementById("switch-deep").checked == true) {
-      command += " --deep";
-    }
+  //   if (document.getElementById("switch-deep").checked == true) {
+  //     command += " --deep";
+  //   }
 
-    if (document.getElementById("switch-vps").checked == true) {
-      command += " -v";
-    }
+  //   if (document.getElementById("switch-vps").checked == true) {
+  //     command += " -v";
+  //   }
 
-    document.getElementById("command").value = command;
-  }
+  //   document.getElementById("command").value = command;
+  // }
 
   function selectSingle() {
-    document.getElementById("typeDomain").value = 0;
+    document.getElementById("pills-single").classList.add("active");
     checkCommand();
   }
 
   function selectList() {
-    document.getElementById("typeDomain").value = 1;
+    document.getElementById("pills-list").classList.add("active");
     checkCommand();
   }
 

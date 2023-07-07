@@ -410,7 +410,39 @@ def new_scan(request):
         elif type_domain == "1":
             list_domain = request.POST.get('listDomain')
             print("List Domain")
-        else:
-            print("Wrong!!")
+            list_domain = list(map(str.strip, list_domain.split("\n")))
+
+            for single_domain in list_domain:
+                if validators.domain(single_domain):
+                    command = ['../reconftw.sh','-d',single_domain]
+
+                    req_params = list(request.POST)
+                    
+                    # MODE OPTIONS
+                    if req_params[4] == 'switch-recon':
+                        command.append('-r')
+                    elif req_params[4] == 'switch-subdomains':
+                        command.append('-s')
+                    elif req_params[4] == 'switch-passive':
+                        command.append('-p')
+                    elif req_params[4] == 'switch-all':
+                        command.append('-a')
+                    elif req_params[4] == 'switch-web':
+                        command.append('-w')
+                    elif req_params[4] == 'switch-osint':
+                        command.append('-n')
+
+                    # GENERAL OPTIONS
+                    if 'switch-deep' in req_params:
+                            command.append('--deep')
+                    if 'switch-vps' in req_params:
+                            command.append('-v')
+
+                    # RUN new_scan_single_domain TASK
+                    print("=====>>>> about to run new_scan_single_domain")
+                    celery_task = new_scan_single_domain.apply_async(command, queue="default")
+
+            else:
+                print("Wrong!!")
 
     return redirect('projects:index')
