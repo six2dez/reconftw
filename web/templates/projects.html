@@ -1097,7 +1097,7 @@
             </li>
           </ul>
           <div class="tab-content" id="pills-tabContent">
-            <input type="hidden" id="typeDomain" name="typeDomain" value="1" />
+            <input type="hidden" id="typeDomain" name="typeDomain" value="0" />
             <div class="tab-pane show active" id="pills-single" role="tabpanel">
               <input
                 type="text"
@@ -1554,11 +1554,13 @@
 
   function selectSingle() {
     document.getElementById("pills-single").classList.add("active");
+    document.getElementById("typeDomain").value = 0;
     checkCommand();
   }
 
   function selectList() {
     document.getElementById("pills-list").classList.add("active");
+    document.getElementById("typeDomain").value = 1;
     checkCommand();
   }
 
