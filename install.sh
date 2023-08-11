@@ -338,7 +338,7 @@ elif [ -f /etc/os-release ]; then install_yum;  #/etc/os-release fall in yum for
 fi
 
 # Installing latest Golang version
-version=$(curl -L -s https://golang.org/VERSION?m=text)
+version=$(curl -L -s https://golang.org/VERSION?m=text | head -1)
 [[ $version = g* ]] || version="go1.20.3"
 
 printf "${bblue} Running: Installing/Updating Golang ${reset}\n\n"
