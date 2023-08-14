@@ -2808,7 +2808,7 @@ function webserver(){
     fi
 
 	if [ "$1" == "start" ]; then
-		ipAddress=$(hostname -I | cut -d ' ' -f1 | sed -e 's/ //') 
+		ipAddress=$(curl -s ifconfig.me) 
 
 		if [ "$ipAddress" != "" ]; then
 			printf "\n ${bblue}Starting web server... ${reset}\n"
