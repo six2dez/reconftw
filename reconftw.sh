@@ -325,7 +325,7 @@ function subdomains_full(){
 		sub_brute
 		sub_permut
 		sub_regex_permut
-		sub_gpt
+		#sub_gpt
 		sub_recursive_passive
 		sub_recursive_brute
 		sub_dns
