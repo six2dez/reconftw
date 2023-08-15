@@ -345,7 +345,7 @@ fi
 
 # Installing latest Golang version
 version=$(curl -L -s https://golang.org/VERSION?m=text | head -1)
-[[ $version = g* ]] || version="go1.20.3"
+[[ $version = g* ]] || version="go1.20.7"
 
 printf "${bblue} Running: Installing/Updating Golang ${reset}\n\n"
 if [ "$install_golang" = "true" ]; then
