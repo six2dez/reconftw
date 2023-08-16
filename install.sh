@@ -183,71 +183,77 @@ fi
 
 
 # Display menu and wait for user input
-while true; do
-    printf "${bblue} Choose one of the following options: ${reset}\n\n"
+display_menu(){
+    while true; do
+        printf "${bblue} Choose one of the following options: ${reset}\n\n"
 
-    if $rftw_installed; then
-        printf "${bblue} 1. Install/Update ReconFTW (without Web Interface)${reset}\n\n"
-        printf "${bblue} 2. Install/Update ReconFTW + Install Web Interface${reset}\n\n"
-        printf "${bblue} 3. Setup Web Interface${reset} ${yellow}(User Interaction needed!)${reset}\n\n"
-        printf "${bblue} 4. Exit${reset}\n\n"
-        printf "${bgreen}#######################################################################${reset}\n\n"
-        read -p "$(echo -e ${bblue} "Insert option: "${reset})" option
-        printf "\n\n${bgreen}#######################################################################${reset}\n\n"
+        if $rftw_installed; then
+            printf "${bblue} 1. Install/Update ReconFTW (without Web Interface)${reset}\n\n"
+            printf "${bblue} 2. Install/Update ReconFTW + Install Web Interface${reset}\n\n"
+            printf "${bblue} 3. Setup Web Interface${reset} ${yellow}(User Interaction needed!)${reset}\n\n"
+            printf "${bblue} 4. Exit${reset}\n\n"
+            printf "${bgreen}#######################################################################${reset}\n\n"
+            read -p "$(echo -e ${bblue} "Insert option: "${reset})" option
+            printf "\n\n${bgreen}#######################################################################${reset}\n\n"
 
-        case $option in
-            1)
-                web=false
-                break
-                ;;
-            2)
-                web=true
-                break
-                ;;
-            3)
-                install_webserver
-                exit 1
-                ;;
-            4)
-                printf "${bblue} Exiting...${reset}\n\n"
-                exit 1
-                ;;
-            *)
-                printf "${bblue} Invalid option. Exiting...${reset}\n\n"
-                exit 1
-                ;;
-        esac
+            case $option in
+                1)
+                    web=false
+                    break
+                    ;;
+                2)
+                    web=true
+                    break
+                    ;;
+                3)
+                    install_webserver
+                    exit 1
+                    ;;
+                4)
+                    printf "${bblue} Exiting...${reset}\n\n"
+                    exit 1
+                    ;;
+                *)
+                    printf "${bblue} Invalid option. Exiting...${reset}\n\n"
+                    exit 1
+                    ;;
+            esac
 
-    else
-        printf "${bblue} 1. Install/Update ReconFTW${reset}\n\n"
-        printf "${bblue} 2. Install/Update ReconFTW + Install Web Interface${reset} ${yellow}(User Interaction needed!)${reset}\n\n"
-        printf "${bred} 3. Can't setup Web Interface without ReconFTW${reset}\n\n"
-        printf "${bblue} 4. Exit${reset}\n\n"
-        printf "${bgreen}#######################################################################${reset}\n\n"
-        read -p "$(echo -e ${bblue} "Insert option: "${reset})" option
-        printf "\n${bgreen}#######################################################################${reset}\n\n"
+        else
+            printf "${bblue} 1. Install/Update ReconFTW${reset}\n\n"
+            printf "${bblue} 2. Install/Update ReconFTW + Install Web Interface${reset} ${yellow}(User Interaction needed!)${reset}\n\n"
+            printf "${bred} 3. Can't setup Web Interface without ReconFTW${reset}\n\n"
+            printf "${bblue} 4. Exit${reset}\n\n"
+            printf "${bgreen}#######################################################################${reset}\n\n"
+            read -p "$(echo -e ${bblue} "Insert option: "${reset})" option
+            printf "\n${bgreen}#######################################################################${reset}\n\n"
 
-        case $option in
-            1)
-                web=false
-                break
-                ;;
-            2)
-                web=true
-                break
-                ;;
-            4)
-                printf "${bblue} Exiting...${reset}\n\n"
-                exit 1
-                ;;
-            *)
-                printf "${bblue} Invalid option. Exiting...${reset}\n\n"
-                exit 1
-                ;;
-        esac
-    fi    
-done
+            case $option in
+                1)
+                    web=false
+                    break
+                    ;;
+                2)
+                    web=true
+                    break
+                    ;;
+                4)
+                    printf "${bblue} Exiting...${reset}\n\n"
+                    exit 1
+                    ;;
+                *)
+                    printf "${bblue} Invalid option. Exiting...${reset}\n\n"
+                    exit 1
+                    ;;
+            esac
+        fi    
+    done
+}
 
+if [ "$1" != '--auto' ]; then
+    echo "$1"
+    display_menu
+fi
 
 printf "${yellow} This may take time. So, go grab a coffee! ${reset}\n\n"
 
@@ -339,7 +345,7 @@ fi
 
 # Installing latest Golang version
 version=$(curl -L -s https://golang.org/VERSION?m=text | head -1)
-[[ $version = g* ]] || version="go1.20.3"
+[[ $version = g* ]] || version="go1.20.7"
 
 printf "${bblue} Running: Installing/Updating Golang ${reset}\n\n"
 if [ "$install_golang" = "true" ]; then
@@ -523,7 +529,7 @@ printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 ## Downloads
 [ ! -f ~/.config/amass/config.ini ] && wget -q -O ~/.config/amass/config.ini https://raw.githubusercontent.com/owasp-amass/amass/master/examples/config.ini
 [ ! -f ~/.config/notify/provider-config.yaml ] && wget -q -O ~/.config/notify/provider-config.yaml https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw
-wget -q -O - https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json > ~/.gf/potential.json
+#wget -q -O - https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json > ~/.gf/potential.json - Removed 
 wget -q -O - https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py > ${tools}/getjswords.py
 wget -q -O - https://raw.githubusercontent.com/n0kovo/n0kovo_subdomains/main/n0kovo_subdomains_huge.txt > ${subs_wordlist_big}
 wget -q -O - https://raw.githubusercontent.com/six2dez/resolvers_reconftw/main/resolvers_trusted.txt > ${resolvers_trusted}
@@ -538,6 +544,7 @@ wget -q -O - https://gist.githubusercontent.com/six2dez/6e2d9f4932fd38d84610eb85
 wget -q -O - https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/ssrf.yaml > ~/nuclei-templates/extra_templates/ssrf.yaml
 wget -q -O - https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/sap-redirect.yaml > ~/nuclei-templates/extra_templates/sap-redirect.yaml
 eval $SUDO chmod +x $tools/axiom_config.sh
+eval $SUDO mv ./assets/potential.json ~/.gf/potential.json
 
 ## Last check
 if [ "$double_check" = "true" ]; then
