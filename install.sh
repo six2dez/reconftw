@@ -544,7 +544,7 @@ wget -q -O - https://gist.githubusercontent.com/six2dez/6e2d9f4932fd38d84610eb85
 wget -q -O - https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/ssrf.yaml > ~/nuclei-templates/extra_templates/ssrf.yaml
 wget -q -O - https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/sap-redirect.yaml > ~/nuclei-templates/extra_templates/sap-redirect.yaml
 eval $SUDO chmod +x $tools/axiom_config.sh
-eval $SUDO mv ./assets/potential.json ~/.gf/potential.json
+eval $SUDO mv $SCRIPTPATH/assets/potential.json ~/.gf/potential.json
 
 ## Last check
 if [ "$double_check" = "true" ]; then
