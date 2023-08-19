@@ -85,6 +85,7 @@ gotools["hakip2host"]="go install github.com/hakluke/hakip2host@latest"
 gotools["gau"]="go install -v github.com/lc/gau/v2/cmd/gau@latest"
 gotools["Mantra"]="go install github.com/MrEmpy/Mantra@latest"
 gotools["crt"]="go install github.com/cemulus/crt@latest"
+gotools["s3scanner"]="go install -v github.com/sa7mon/s3scanner@latest" 
 
 declare -A repos
 repos["dorks_hunter"]="six2dez/dorks_hunter"

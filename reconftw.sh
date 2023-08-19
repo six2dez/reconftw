@@ -112,6 +112,7 @@ function tools_installed(){
 	which subgpt &>/dev/null || { printf "${bred} [*] subgpt			[NO]${reset}\n${reset}"; allinstalled=false;}
 	which gitleaks &>/dev/null || { printf "${bred} [*] gitleaks			[NO]${reset}\n${reset}"; allinstalled=false;}
 	which trufflehog &>/dev/null || { printf "${bred} [*] trufflehog			[NO]${reset}\n${reset}"; allinstalled=false;}
+	which s3scanner &>/dev/null || { printf "${bred} [*] s3scanner			[NO]${reset}\n${reset}"; allinstalled=false;}
 	
 	if [ "${allinstalled}" = true ]; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
@@ -181,7 +182,7 @@ function github_repos(){
 			[ -s ".tmp/github_repos_folders.txt" ] && interlace -tL .tmp/github_repos_folders.txt -threads ${INTERLACE_THREADS} -c "gitleaks detect --source .tmp/github_repos/_target_ --no-banner --no-color -r .tmp/github/gh_secret_cleantarget_.json" 2>>"$LOGFILE" >/dev/null
 			[ -s ".tmp/company_repos_url.txt" ] && interlace -tL .tmp/company_repos_url.txt -threads ${INTERLACE_THREADS} -c "trufflehog git _target_ -j 2>&1 | jq -c > _output_/_cleantarget_" -o .tmp/github/ >>"$LOGFILE" 2>&1
 			if [ -d ".tmp/github/" ]; then
-				cat .tmp/github/* | jq -c | jq -r > osint/github_company_secrets.json 2>>"$LOGFILE"
+				cat .tmp/github/* 2>/dev/null | jq -c | jq -r > osint/github_company_secrets.json 2>>"$LOGFILE"
 			fi
 		else
 			printf "\n${bred} Required file ${GITHUB_TOKENS} not exists or empty${reset}\n"
