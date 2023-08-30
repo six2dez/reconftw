@@ -57,7 +57,7 @@ function tools_installed(){
 	[ -f "$tools/cloud_enum/cloud_enum.py" ] || { printf "${bred} [*] cloud_enum			[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/ultimate-nmap-parser/ultimate-nmap-parser.sh" ] || { printf "${bred} [*] nmap-parse-output		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/pydictor/pydictor.py" ] || { printf "${bred} [*] pydictor   		[NO]${reset}\n"; allinstalled=false;}
-	[ -f "$tools/urless/urless.py" ] || { printf "${bred} [*] urless			[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/urless/urless/urless.py" ] || { printf "${bred} [*] urless			[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/smuggler/smuggler.py" ] || { printf "${bred} [*] smuggler			[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/regulator/main.py" ] || { printf "${bred} [*] regulator			[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/Infoga/infoga.py" ] || { printf "${bred} [*] infoga			[NO]${reset}\n"; allinstalled=false;}
