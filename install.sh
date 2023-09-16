@@ -6,22 +6,16 @@ dir=${tools}
 double_check=false
 
 # ARM Detection
-if [ -f "/proc/cpuinfo" ]; then
-    if grep -q "Raspberry Pi 3"  /proc/cpuinfo; then
-        IS_ARM="True"
-        RPI_3="True"
-        RPI_4="False"
-    elif grep -q "Raspberry Pi 4"  /proc/cpuinfo; then
-        IS_ARM="True"
-        RPI_4="True"
-        RPI_3="False"
-    else
-        IS_ARM="False"
-    fi
-elif grep -iq "arm" <<< "$(/usr/bin/arch)";then
-    IS_ARM="True"
-else
+if [[ $(uname -m) == "amd64" ]] || [[ $(uname -m) == "x86_64" ]]; then
     IS_ARM="False"
+fi
+if [[ $(uname -m) == "arm64" ]] || [[ $(uname -m) == "armv6l" ]]; then
+    IS_ARM="True"
+    if [[ $(uname -m) == "arm64" ]]; then
+        RPI_4="False"
+    else
+        RPI_3="True"
+    fi
 fi
 
 #Mac Osx Detecting
