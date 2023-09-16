@@ -2246,6 +2246,9 @@ function start(){
 	notification "Recon succesfully started on ${domain}" good
 	[ "$SOFT_NOTIFICATION" = true ] && echo "Recon succesfully started on ${domain}" | notify -silent
 	printf "${bgreen}#######################################################################${reset}\n"
+	if [ "$upgrade_before_running" = true ]; then
+		${SCRIPTPATH}/install.sh --tools
+	fi
 	tools_installed
 
 	#[[ -n "$domain" ]] && ipcidr_target $domain
