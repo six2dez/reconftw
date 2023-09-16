@@ -48,7 +48,13 @@ function tools_installed(){
 	[ -f "$tools/Corsy/corsy.py" ] || { printf "${bred} [*] Corsy			[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/testssl.sh/testssl.sh" ] || { printf "${bred} [*] testssl			[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/CMSeeK/cmseek.py" ] || { printf "${bred} [*] CMSeeK			[NO]${reset}\n"; allinstalled=false;}
-	[ -f "$tools/fuzz_wordlist.txt" ] || { printf "${bred} [*] OneListForAll		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "${fuzz_wordlist}" ] || { printf "${bred} [*] OneListForAll		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "${lfi_wordlist}" ] || { printf "${bred} [*] lfi_wordlist		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "${ssti_wordlist}" ] || { printf "${bred} [*] ssti_wordlist		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "${subs_wordlist}" ] || { printf "${bred} [*] subs_wordlist		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "${subs_wordlist_big}" ] || { printf "${bred} [*] subs_wordlist_big		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "${resolvers}" ] || { printf "${bred} [*] resolvers		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "${resolvers_trusted}" ] || { printf "${bred} [*] resolvers_trusted		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/xnLinkFinder/xnLinkFinder.py" ] || { printf "${bred} [*] xnLinkFinder		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/waymore/waymore.py" ] || { printf "${bred} [*] waymore		[NO]${reset}\n"; allinstalled=false;}
 	[ -f "$tools/commix/commix.py" ] || { printf "${bred} [*] commix			[NO]${reset}\n"; allinstalled=false;}
@@ -72,8 +78,8 @@ function tools_installed(){
 	which dnsx &>/dev/null || { printf "${bred} [*] dnsx			[NO]${reset}\n"; allinstalled=false;}
 	which gotator &>/dev/null || { printf "${bred} [*] gotator			[NO]${reset}\n"; allinstalled=false;}
 	which nuclei &>/dev/null || { printf "${bred} [*] Nuclei			[NO]${reset}\n"; allinstalled=false;}
-	[ -d ~/nuclei-templates ] || { printf "${bred} [*] Nuclei templates	[NO]${reset}\n"; allinstalled=false;}
-	[ -d $tools/fuzzing-templates ] || { printf "${bred} [*] Fuzzing templates	[NO]${reset}\n"; allinstalled=false;}
+	[ -d ${NUCLEI_TEMPLATES_PATH} ] || { printf "${bred} [*] Nuclei templates	[NO]${reset}\n"; allinstalled=false;}
+	[ -d ${tools}/fuzzing-templates ] || { printf "${bred} [*] Fuzzing templates	[NO]${reset}\n"; allinstalled=false;}
 	which gf &>/dev/null || { printf "${bred} [*] Gf				[NO]${reset}\n"; allinstalled=false;}
 	which Gxss &>/dev/null || { printf "${bred} [*] Gxss			[NO]${reset}\n"; allinstalled=false;}
 	which subjs &>/dev/null || { printf "${bred} [*] subjs			[NO]${reset}\n"; allinstalled=false;}
@@ -821,10 +827,10 @@ function subtakeover(){
 		[ ! -s ".tmp/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q .tmp/webs_all.txt
 		if [ ! "$AXIOM" = true ]; then
 			nuclei -update 2>>"$LOGFILE" >/dev/null
-			cat subdomains/subdomains.txt .tmp/webs_all.txt 2>/dev/null | nuclei -silent -nh -tags takeover -severity info,low,medium,high,critical -retries 3 -rl $NUCLEI_RATELIMIT -o .tmp/tko.txt
+			cat subdomains/subdomains.txt .tmp/webs_all.txt 2>/dev/null | nuclei -silent -nh -tags takeover -severity info,low,medium,high,critical -retries 3 -rl $NUCLEI_RATELIMIT -t ${NUCLEI_TEMPLATES_PATH} -o .tmp/tko.txt
 		else
 			cat subdomains/subdomains.txt .tmp/webs_all.txt 2>>"$LOGFILE" | sed '/^$/d' | anew -q .tmp/webs_subs.txt
-			[ -s ".tmp/webs_subs.txt" ] && axiom-scan .tmp/webs_subs.txt -m nuclei -tags takeover -nh -severity info,low,medium,high,critical -retries 3 -rl $NUCLEI_RATELIMIT -o .tmp/tko.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+			[ -s ".tmp/webs_subs.txt" ] && axiom-scan .tmp/webs_subs.txt -m nuclei --nuclei-templates ${NUCLEI_TEMPLATES_PATH} -tags takeover -nh -severity info,low,medium,high,critical -retries 3 -rl $NUCLEI_RATELIMIT -t ${NUCLEI_TEMPLATES_PATH} -o .tmp/tko.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 		fi
 
 		# DNS_TAKEOVER
@@ -1167,7 +1173,7 @@ function nuclei_check(){
 				for crit in "${severity_array[@]}"
 				do
 					printf "${yellow}\n Running : Nuclei $crit, check results on nuclei_output folder${reset}\n\n"
-					axiom-scan .tmp/webs_subs.txt -m nuclei -severity ${crit} -nh -rl $NUCLEI_RATELIMIT -o nuclei_output/${crit}.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+					axiom-scan .tmp/webs_subs.txt -m nuclei --nuclei-templates ${NUCLEI_TEMPLATES_PATH} -severity ${crit} -nh -rl $NUCLEI_RATELIMIT -o nuclei_output/${crit}.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 				done
 				printf "\n\n"
 			fi
