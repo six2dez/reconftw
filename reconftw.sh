@@ -139,7 +139,7 @@ function tools_installed(){
 
 function google_dorks(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$GOOGLE_DORKS" = true ] && [ "$OSINT" = true ]; then
-		python3 $tools/dorks_hunter/dorks_hunter.py -d "$domain" -o osint/dorks.txt
+		python3 $tools/dorks_hunter/dorks_hunter.py -d "$domain" -o osint/dorks.txt || { echo "dorks_hunter command failed"; exit 1; }
 		end_func "Results are saved in $domain/osint/dorks.txt" "${FUNCNAME[0]}"
 	else
 		if [ "$GOOGLE_DORKS" = false ] || [ "$OSINT" = false ]; then
@@ -155,9 +155,9 @@ function github_dorks(){
 		start_func "${FUNCNAME[0]}" "Github Dorks in process"
 		if [ -s "${GITHUB_TOKENS}" ]; then
 			if [ "$DEEP" = true ]; then
-				gitdorks_go -gd $tools/gitdorks_go/Dorks/medium_dorks.txt -nws 20 -target "$domain" -tf "${GITHUB_TOKENS}" -ew 3 | anew -q osint/gitdorks.txt
+				gitdorks_go -gd $tools/gitdorks_go/Dorks/medium_dorks.txt -nws 20 -target "$domain" -tf "${GITHUB_TOKENS}" -ew 3 | anew -q osint/gitdorks.txt || { echo "gitdorks_go/anew command failed"; exit 1; }
 			else
-				gitdorks_go -gd $tools/gitdorks_go/Dorks/smalldorks.txt -nws 20 -target $domain -tf "${GITHUB_TOKENS}" -ew 3 | anew -q osint/gitdorks.txt
+				gitdorks_go -gd $tools/gitdorks_go/Dorks/smalldorks.txt -nws 20 -target $domain -tf "${GITHUB_TOKENS}" -ew 3 | anew -q osint/gitdorks.txt || { echo "gitdorks_go/anew command failed"; exit 1; }
 			fi
 		else
 			printf "\n${bred} Required file ${GITHUB_TOKENS} not exists or empty${reset}\n"
@@ -206,7 +206,7 @@ function github_repos(){
 function metadata(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$METADATA" = true ] && [ "$OSINT" = true ] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Scanning metadata in public files"
-		metafinder -d "$domain" -l $METAFINDER_LIMIT -o osint -go -bi -ba &>> "$LOGFILE"
+		metafinder -d "$domain" -l $METAFINDER_LIMIT -o osint -go -bi -ba &>> "$LOGFILE" || { echo "metafinder command failed"; exit 1; }
 		mv "osint/${domain}/"*".txt" "osint/" 2>>"$LOGFILE"
 		rm -rf "osint/${domain}" 2>>"$LOGFILE"
 		end_func "Results are saved in $domain/osint/[software/authors/metadata_results].txt" ${FUNCNAME[0]}
@@ -228,14 +228,16 @@ function metadata(){
 function emails(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$EMAILS" = true ] && [ "$OSINT" = true ] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Searching emails/users/passwords leaks"
-		emailfinder -d $domain 2>>"$LOGFILE" | anew -q .tmp/emailfinder.txt
+		emailfinder -d $domain 2>>"$LOGFILE" | anew -q .tmp/emailfinder.txt || { echo "emailfinder command failed"; exit 1; }
 		[ -s ".tmp/emailfinder.txt" ] && cat .tmp/emailfinder.txt | grep "@" | grep -iv "|_" | anew -q osint/emails.txt
+
 
 # INFOGA repo does not exists anymore		
 #		cd "$tools/Infoga" || { echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 #		python3 infoga.py --domain "$domain" --source all --report "$dir/.tmp/infoga.txt" &>> "$LOGFILE"
 #		cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
 #		[ -s ".tmp/infoga.txt" ] && cat .tmp/infoga.txt | cut -d " " -f3 | grep -v "-" | anew -q osint/emails.txt
+
 
 		end_func "Results are saved in $domain/osint/emails.txt" ${FUNCNAME[0]}
 	else
@@ -256,7 +258,7 @@ function emails(){
 function domain_info(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$DOMAIN_INFO" = true ] && [ "$OSINT" = true ] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Searching domain info (whois, registrant name/email domains)"
-		whois -H $domain > osint/domain_info_general.txt
+		whois -H $domain > osint/domain_info_general.txt || { echo "whois command failed"; exit 1; }
 		if [ "$DEEP" = true ] || [ "$REVERSE_WHOIS" = true ]; then
 			timeout -k 1m ${AMASS_INTEL_TIMEOUT}m amass intel -d ${domain} -whois -timeout $AMASS_INTEL_TIMEOUT -o osint/domain_info_reverse_whois.txt 2>>"$LOGFILE" &>/dev/null
 		fi
@@ -2993,10 +2995,10 @@ done
 
 # This is the first thing to do to read in alternate config
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 || exit ; pwd -P )"
-. "$SCRIPTPATH"/reconftw.cfg
+. "$SCRIPTPATH"/reconftw.cfg || { echo "Error importing reconftw.ctg"; exit 1; }
 if [ -s "$CUSTOM_CONFIG" ]; then
 # shellcheck source=/home/six2dez/Tools/reconftw/custom_config.cfg
-. "${CUSTOM_CONFIG}"
+. "${CUSTOM_CONFIG}" || { echo "Error importing reconftw.ctg"; exit 1; }
 fi
 
 if [ $opt_deep ]; then
