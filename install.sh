@@ -6,22 +6,16 @@ dir=${tools}
 double_check=false
 
 # ARM Detection
-if [ -f "/proc/cpuinfo" ]; then
-    if grep -q "Raspberry Pi 3"  /proc/cpuinfo; then
-        IS_ARM="True"
-        RPI_3="True"
-        RPI_4="False"
-    elif grep -q "Raspberry Pi 4"  /proc/cpuinfo; then
-        IS_ARM="True"
-        RPI_4="True"
-        RPI_3="False"
-    else
-        IS_ARM="False"
-    fi
-elif grep -iq "arm" <<< "$(/usr/bin/arch)";then
-    IS_ARM="True"
-else
+if [[ $(uname -m) == "amd64" ]] || [[ $(uname -m) == "x86_64" ]]; then
     IS_ARM="False"
+fi
+if [[ $(uname -m) == "arm64" ]] || [[ $(uname -m) == "armv6l" ]]; then
+    IS_ARM="True"
+    if [[ $(uname -m) == "arm64" ]]; then
+        RPI_4="False"
+    else
+        RPI_3="True"
+    fi
 fi
 
 #Mac Osx Detecting
@@ -85,6 +79,7 @@ gotools["hakip2host"]="go install github.com/hakluke/hakip2host@latest"
 gotools["gau"]="go install -v github.com/lc/gau/v2/cmd/gau@latest"
 gotools["Mantra"]="go install github.com/MrEmpy/Mantra@latest"
 gotools["crt"]="go install github.com/cemulus/crt@latest"
+gotools["s3scanner"]="go install -v github.com/sa7mon/s3scanner@latest" 
 
 declare -A repos
 repos["dorks_hunter"]="six2dez/dorks_hunter"
@@ -114,7 +109,7 @@ repos["smuggler"]="defparam/smuggler"
 repos["Web-Cache-Vulnerability-Scanner"]="Hackmanit/Web-Cache-Vulnerability-Scanner"
 repos["regulator"]="cramppet/regulator"
 repos["byp4xx"]="lobuhi/byp4xx"
-repos["Infoga"]="m4ll0k/Infoga"
+#repos["Infoga"]="m4ll0k/Infoga"
 repos["ghauri"]="r0oth3x49/ghauri"
 repos["gitleaks"]="gitleaks/gitleaks"
 repos["trufflehog"]="trufflesecurity/trufflehog"
@@ -136,6 +131,124 @@ function banner_web(){
         printf " ${reconftw_version}                                         by @six2dez\n"
 }
 
+function install_tools(){
+    #eval ln -s /usr/local/bin/pip3 /usr/local/bin/pip3 $DEBUG_STD
+    eval pip3 install -I -r requirements.txt $DEBUG_STD
+    
+    printf "${bblue} Running: Installing Golang tools (${#gotools[@]})${reset}\n\n"
+    go env -w GO111MODULE=auto
+    go_step=0
+    for gotool in "${!gotools[@]}"; do
+        go_step=$((go_step + 1))
+        if [ "$upgrade_tools" = "false" ]; then
+            res=$(command -v "$gotool") && {
+                echo -e "[${yellow}SKIPPING${reset}] $gotool already installed in...${blue}${res}${reset}"
+                continue
+            }
+        fi
+        eval ${gotools[$gotool]} $DEBUG_STD
+        exit_status=$?
+        if [ $exit_status -eq 0 ]
+        then
+            printf "${yellow} $gotool installed (${go_step}/${#gotools[@]})${reset}\n"
+        else
+            printf "${red} Unable to install $gotool, try manually (${go_step}/${#gotools[@]})${reset}\n"
+            double_check=true
+        fi
+    done
+    
+    printf "${bblue}\n Running: Installing repositories (${#repos[@]})${reset}\n\n"
+    
+    # Repos with special configs
+    eval git clone https://github.com/projectdiscovery/nuclei-templates ${NUCLEI_TEMPLATES_PATH} $DEBUG_STD
+    eval git clone https://github.com/geeknik/the-nuclei-templates.git ${NUCLEI_TEMPLATES_PATH}/extra_templates $DEBUG_STD
+    eval git clone https://github.com/projectdiscovery/fuzzing-templates $tools/fuzzing-templates $DEBUG_STD
+    eval nuclei -update-templates $DEBUG_STD
+    cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+    eval git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git $dir/sqlmap $DEBUG_STD
+    eval git clone --depth 1 https://github.com/drwetter/testssl.sh.git $dir/testssl.sh $DEBUG_STD
+    eval $SUDO git clone https://gitlab.com/exploit-database/exploitdb /opt/exploitdb $DEBUG_STD
+    
+    # Standard repos installation
+    repos_step=0
+    for repo in "${!repos[@]}"; do
+        repos_step=$((repos_step + 1))
+        if [ "$upgrade_tools" = "false" ]; then
+            unset is_installed
+            unset is_need_dl
+            [[ $repo == "Gf-Patterns" ]] && is_need_dl=1
+            [[ $repo == "gf" ]] && is_need_dl=1
+            res=$(command -v "$repo") && is_installed=1
+            [[ -z $is_need_dl ]] && [[ -n $is_installed ]] && {
+                # HERE: not installed yet.
+                echo -e "[${yellow}SKIPPING${reset}] $repo already installed in...${blue}${res}${reset}"
+                continue
+            }
+        fi
+        eval git clone https://github.com/${repos[$repo]} $dir/$repo $DEBUG_STD
+        eval cd $dir/$repo $DEBUG_STD
+        eval git pull $DEBUG_STD
+        exit_status=$?
+        if [ $exit_status -eq 0 ]
+        then
+            printf "${yellow} $repo installed (${repos_step}/${#repos[@]})${reset}\n"
+        else
+            printf "${red} Unable to install $repo, try manually (${repos_step}/${#repos[@]})${reset}\n"
+            double_check=true
+        fi
+        if ( [ -z $is_installed ] && [ "$upgrade_tools" = "false" ] ) || [ "$upgrade_tools" = "true" ] ; then
+            if [ -s "requirements.txt" ]; then
+                eval $SUDO pip3 install -r requirements.txt $DEBUG_STD
+            fi
+            if [ -s "setup.py" ]; then
+                eval $SUDO pip3 install . $DEBUG_STD
+            fi
+            if [ "massdns" = "$repo" ]; then
+                eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/local/bin/ $DEBUG_ERROR
+            fi
+            if [ "gitleaks" = "$repo" ]; then
+                eval make build $DEBUG_STD && eval $SUDO cp ./gitleaks /usr/local/bin/ $DEBUG_ERROR
+            fi
+        fi
+        if [ "gf" = "$repo" ]; then
+            eval cp -r examples ~/.gf $DEBUG_ERROR
+        elif [ "Gf-Patterns" = "$repo" ]; then
+            eval mv ./*.json ~/.gf $DEBUG_ERROR
+        fi
+        cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
+    done
+    
+    if [ "True" = "$IS_ARM" ]; then
+        if [ "True" = "$RPI_3" ]; then
+            eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz $DEBUG_STD
+            eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
+            eval $SUDO rm -rf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
+        elif [ "True" = "$RPI_4" ]; then
+            eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz $DEBUG_STD
+            eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
+            eval $SUDO rm -rf ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
+        fi
+    elif [ "True" = "$IS_MAC" ]; then
+        if [ "True" = "$IS_ARM" ]; then
+            eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz $DEBUG_STD
+            eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
+            eval $SUDO rm -rf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
+        else
+            eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz $DEBUG_STD
+            eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz  $DEBUG_STD
+            eval $SUDO rm -rf ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz  $DEBUG_STD
+        fi
+    else
+        eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz $DEBUG_STD
+        eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
+        eval $SUDO rm -rf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
+    fi
+    eval $SUDO chmod 755 /usr/local/bin/ppfuzz
+    eval $SUDO strip -s /usr/local/bin/ppfuzz $DEBUG_STD
+    eval notify $DEBUG_STD
+    eval subfinder $DEBUG_STD
+    eval subfinder $DEBUG_STD
+}
 
 install_webserver(){
     printf "${bblue} Running: Installing web reconftw ${reset}\n\n"
@@ -249,6 +362,10 @@ display_menu(){
         fi    
     done
 }
+
+if [ "$1" = '--tools' ]; then
+    install_tools
+fi
 
 if [ "$1" != '--auto' ]; then
     echo "$1"
@@ -406,124 +523,8 @@ touch $dir/.gitlab_tokens
 
 eval wget -N -c https://bootstrap.pypa.io/get-pip.py $DEBUG_STD && eval python3 get-pip.py $DEBUG_STD
 eval rm -f get-pip.py $DEBUG_STD
-#eval ln -s /usr/local/bin/pip3 /usr/local/bin/pip3 $DEBUG_STD
-eval pip3 install -I -r requirements.txt $DEBUG_STD
 
-printf "${bblue} Running: Installing Golang tools (${#gotools[@]})${reset}\n\n"
-go env -w GO111MODULE=auto
-go_step=0
-for gotool in "${!gotools[@]}"; do
-    go_step=$((go_step + 1))
-    if [ "$upgrade_tools" = "false" ]; then
-        res=$(command -v "$gotool") && {
-            echo -e "[${yellow}SKIPPING${reset}] $gotool already installed in...${blue}${res}${reset}"
-            continue
-        }
-    fi
-    eval ${gotools[$gotool]} $DEBUG_STD
-    exit_status=$?
-    if [ $exit_status -eq 0 ]
-    then
-        printf "${yellow} $gotool installed (${go_step}/${#gotools[@]})${reset}\n"
-    else
-        printf "${red} Unable to install $gotool, try manually (${go_step}/${#gotools[@]})${reset}\n"
-        double_check=true
-    fi
-done
-
-printf "${bblue}\n Running: Installing repositories (${#repos[@]})${reset}\n\n"
-
-# Repos with special configs
-eval git clone https://github.com/projectdiscovery/nuclei-templates ~/nuclei-templates $DEBUG_STD
-eval git clone https://github.com/geeknik/the-nuclei-templates.git ~/nuclei-templates/extra_templates $DEBUG_STD
-eval git clone https://github.com/projectdiscovery/fuzzing-templates $tools/fuzzing-templates $DEBUG_STD
-eval wget -q -O - https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/ssrf.yaml > ~/nuclei-templates/ssrf_nagli.yaml $DEBUG_STD
-eval wget -q -O - https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/sap-redirect.yaml > ~/nuclei-templates/sap-redirect_nagli.yaml $DEBUG_STD
-eval nuclei -update-templates $DEBUG_STD
-cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
-eval git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git $dir/sqlmap $DEBUG_STD
-eval git clone --depth 1 https://github.com/drwetter/testssl.sh.git $dir/testssl.sh $DEBUG_STD
-eval $SUDO git clone https://gitlab.com/exploit-database/exploitdb /opt/exploitdb $DEBUG_STD
-
-# Standard repos installation
-repos_step=0
-for repo in "${!repos[@]}"; do
-    repos_step=$((repos_step + 1))
-    if [ "$upgrade_tools" = "false" ]; then
-        unset is_installed
-        unset is_need_dl
-        [[ $repo == "Gf-Patterns" ]] && is_need_dl=1
-        [[ $repo == "gf" ]] && is_need_dl=1
-        res=$(command -v "$repo") && is_installed=1
-        [[ -z $is_need_dl ]] && [[ -n $is_installed ]] && {
-            # HERE: not installed yet.
-            echo -e "[${yellow}SKIPPING${reset}] $repo already installed in...${blue}${res}${reset}"
-            continue
-        }
-    fi
-    eval git clone https://github.com/${repos[$repo]} $dir/$repo $DEBUG_STD
-    eval cd $dir/$repo $DEBUG_STD
-    eval git pull $DEBUG_STD
-    exit_status=$?
-    if [ $exit_status -eq 0 ]
-    then
-        printf "${yellow} $repo installed (${repos_step}/${#repos[@]})${reset}\n"
-    else
-        printf "${red} Unable to install $repo, try manually (${repos_step}/${#repos[@]})${reset}\n"
-        double_check=true
-    fi
-    if ( [ -z $is_installed ] && [ "$upgrade_tools" = "false" ] ) || [ "$upgrade_tools" = "true" ] ; then
-        if [ -s "requirements.txt" ]; then
-            eval $SUDO pip3 install -r requirements.txt $DEBUG_STD
-        fi
-        if [ -s "setup.py" ]; then
-            eval $SUDO pip3 install . $DEBUG_STD
-        fi
-        if [ "massdns" = "$repo" ]; then
-            eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/local/bin/ $DEBUG_ERROR
-        fi
-        if [ "gitleaks" = "$repo" ]; then
-            eval make build $DEBUG_STD && eval $SUDO cp ./gitleaks /usr/local/bin/ $DEBUG_ERROR
-        fi
-    fi
-    if [ "gf" = "$repo" ]; then
-        eval cp -r examples ~/.gf $DEBUG_ERROR
-    elif [ "Gf-Patterns" = "$repo" ]; then
-        eval mv ./*.json ~/.gf $DEBUG_ERROR
-    fi
-    cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
-done
-
-if [ "True" = "$IS_ARM" ]; then
-    if [ "True" = "$RPI_3" ]; then
-        eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz $DEBUG_STD
-        eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
-        eval $SUDO rm -rf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
-    elif [ "True" = "$RPI_4" ]; then
-        eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz $DEBUG_STD
-        eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
-        eval $SUDO rm -rf ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
-    fi
-elif [ "True" = "$IS_MAC" ]; then
-    if [ "True" = "$IS_ARM" ]; then
-        eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz $DEBUG_STD
-        eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
-        eval $SUDO rm -rf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
-    else
-        eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz $DEBUG_STD
-        eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz  $DEBUG_STD
-        eval $SUDO rm -rf ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz  $DEBUG_STD
-    fi
-else
-    eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz $DEBUG_STD
-    eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
-    eval $SUDO rm -rf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
-fi
-eval $SUDO chmod 755 /usr/local/bin/ppfuzz
-eval $SUDO strip -s /usr/local/bin/ppfuzz $DEBUG_STD
-eval notify $DEBUG_STD
-eval subfinder $DEBUG_STD
-eval subfinder $DEBUG_STD
+install_tools
 
 printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 ## Downloads
@@ -541,8 +542,6 @@ wget -q -O - https://gist.githubusercontent.com/six2dez/a89a0c7861d49bb61a09822d
 wget -q -O - https://gist.githubusercontent.com/six2dez/ab5277b11da7369bf4e9db72b49ad3c1/raw > ${ssti_wordlist}
 wget -q -O - https://gist.github.com/six2dez/d62ab8f8ffd28e1c206d401081d977ae/raw > ${tools}/headers_inject.txt
 wget -q -O - https://gist.githubusercontent.com/six2dez/6e2d9f4932fd38d84610eb851014b26e/raw > ${tools}/axiom_config.sh
-wget -q -O - https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/ssrf.yaml > ~/nuclei-templates/extra_templates/ssrf.yaml
-wget -q -O - https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/sap-redirect.yaml > ~/nuclei-templates/extra_templates/sap-redirect.yaml
 eval $SUDO chmod +x $tools/axiom_config.sh
 eval $SUDO mv $SCRIPTPATH/assets/potential.json ~/.gf/potential.json
 
