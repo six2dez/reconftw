@@ -163,7 +163,7 @@ function install_tools(){
     eval git clone https://github.com/projectdiscovery/nuclei-templates ${NUCLEI_TEMPLATES_PATH} $DEBUG_STD
     eval git clone https://github.com/geeknik/the-nuclei-templates.git ${NUCLEI_TEMPLATES_PATH}/extra_templates $DEBUG_STD
     eval git clone https://github.com/projectdiscovery/fuzzing-templates $tools/fuzzing-templates $DEBUG_STD
-    eval nuclei -update-templates $DEBUG_STD
+    eval nuclei -update-templates update-template-dir ${NUCLEI_TEMPLATES_PATH} $DEBUG_STD
     cd "$dir" || { echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"; exit 1; }
     eval git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git $dir/sqlmap $DEBUG_STD
     eval git clone --depth 1 https://github.com/drwetter/testssl.sh.git $dir/testssl.sh $DEBUG_STD
@@ -390,7 +390,7 @@ install_apt(){
     eval $SUDO apt update -y $DEBUG_STD
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium-browser -y $DEBUG_STD
     eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium -y $DEBUG_STD
-    eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip build-essential gcc cmake ruby whois git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx medusa xvfb libxml2-utils procps bsdmainutils libdata-hexdump-perl -y $DEBUG_STD
+    eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip python3-virtualenv build-essential gcc cmake ruby whois git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx medusa xvfb libxml2-utils procps bsdmainutils libdata-hexdump-perl -y $DEBUG_STD
     curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
     eval source "$HOME/.cargo/env $DEBUG_STD"
     eval cargo install ripgen $DEBUG_STD
