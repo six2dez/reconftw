@@ -2758,7 +2758,7 @@ function help(){
 	printf "   -a, --all         All - Perform all checks and active exploitations\n"
 	printf "   -w, --web         Web - Perform web checks from list of subdomains\n"
 	printf "   -n, --osint       OSINT - Check for public intel data\n"
-	printf "   -c                Launches specific function against target\n"
+	printf "   -c, --custom      Custom - Launches specific function against target, u need to know the function name first\n"
 	printf "   -h                Help - Show help section\n"
 	printf " \n"
 	printf " ${bblue}GENERAL OPTIONS${reset}\n"
@@ -2786,6 +2786,9 @@ function help(){
 	printf " \n"
 	printf " ${byellow}Perform full recon and store output to specified directory:${reset}\n"
 	printf " ./reconftw.sh -d example.com -r -o custom/path\n"
+	printf " \n"
+	printf " ${byellow}Run custom function:${reset}\n"
+	printf " ./reconftw.sh -d example.com -c nuclei_check \n"
 	printf " \n"
 	printf " ${byellow}Start the web server:${reset}\n"
 	printf " ./reconftw.sh --web-server start\n"
@@ -2925,7 +2928,7 @@ while true; do
             shift
             continue
             ;;
-		'-c')
+		'-c'|'--custom')
 			custom_function=$2
 			opt_mode='c'
             shift 2
