@@ -7,7 +7,7 @@ SECRET_KEY = secrets.token_hex(32)
 
 DEBUG = 1
 
-ipAddress=os.popen('hostname -I | cut -d " " -f1').read().strip()
+ipAddress=os.popen('hostname -i | cut -d " " -f1').read().strip()
 ALLOWED_HOSTS = [ipAddress, 'localhost', '127.0.0.1', '*']
 
 # SESSION_COOKIE_SECURE = True
