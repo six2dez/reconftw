@@ -1167,6 +1167,7 @@ function nuclei_check(){
 				do
 					printf "${yellow}\n Running : Nuclei $crit, check results on nuclei_output folder${reset}\n\n"
 					axiom-scan .tmp/webs_subs.txt -m nuclei --nuclei-templates ${NUCLEI_TEMPLATES_PATH} -severity ${crit} -nh -rl $NUCLEI_RATELIMIT -o nuclei_output/${crit}.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+					[ -s "nuclei_output/${crit}.txt" ] && cat nuclei_output/${crit}.txt
 				done
 				printf "\n\n"
 			fi
