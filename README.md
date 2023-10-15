@@ -606,8 +606,8 @@ make upload
 
 If you want to contribute to this project, you can do it in multiple ways:
 
-- Submitting an [issue](https://github.com/six2dez/reconftw/issues/new/choose) because you have found a bug or you have any suggestion or request.
-- Making a Pull Request from [dev](https://github.com/six2dez/reconftw/tree/dev) branch because you want to improve the code or add something to the script.
+- Submitting an [issue](https://github.com/six2dez/reconftw/issues/new/choose) if you have found a bug or you have any suggestion or request.
+- Making a Pull Request from [dev](https://github.com/six2dez/reconftw/tree/dev) branch if you want to improve the code or add something to the script.
 
 ## Need help? :information_source:
 
@@ -632,7 +632,7 @@ If you want to contribute to this project, you can do it in multiple ways:
 
 ## Thanks :pray:
 
-- Thank you for lending a helping hand towards the development of the project!
+- Thank you for contributing to the project's development!
 
 - [C99](https://api.c99.nl/)
 - [CIRCL](https://www.circl.lu/)
