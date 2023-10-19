@@ -34,4 +34,4 @@ tldextract              # dorks_hunter
 tqdm                    # multiple
 ujson                   # multiple
 urllib3                 # multiple
-subgpt                  # Tool
+postleaksNeg            # Tool
