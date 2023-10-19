@@ -6,45 +6,37 @@ dir=${tools}
 double_check=false
 
 # ARM Detection
-if [[ $(uname -m) == "amd64" ]] || [[ $(uname -m) == "x86_64" ]]; then
-    IS_ARM="False"
-fi
-if [[ $(uname -m) == "arm64" ]] || [[ $(uname -m) == "armv6l" ]]; then
-    IS_ARM="True"
-    if [[ $(uname -m) == "arm64" ]]; then
-        RPI_4="False"
-    else
-        RPI_3="True"
-    fi
-fi
+ARCH=$(uname -m)
+case $ARCH in
+    amd64|x86_64) IS_ARM="False" ;;
+    arm64|armv6l) 
+        IS_ARM="True"
+        RPI_4=$([[ $ARCH == "arm64" ]] && echo "True" || echo "False")
+        RPI_3=$([[ $ARCH == "arm64" ]] && echo "False" || echo "True")
+        ;;
+esac
 
 #Mac Osx Detecting
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    IS_MAC="True"
-else
-    IS_MAC="False"
-fi
-
-# Check Bash version
-#(bash --version | awk 'NR==1{print $4}' | cut -d'.' -f1) 2&>/dev/null || echo "Unable to get bash version, for MacOS run 'brew install bash' and rerun installer in a new terminal" && exit 1
+IS_MAC=$([[ "$OSTYPE" == "darwin"* ]] && echo "True" || echo "False")
 
 BASH_VERSION=$(bash --version | awk 'NR==1{print $4}' | cut -d'.' -f1)
 if [ "${BASH_VERSION}" -lt 4 ]; then
      printf "${bred} Your Bash version is lower than 4, please update${reset}\n"
-     printf "%s Your Bash version is lower than 4, please update%s\n" "${bred}" "${reset}"
+     printf "%s Your Bash version is lower than 4, please update%s\n" "${bred}" "${reset}" >&2
     if [ "True" = "$IS_MAC" ]; then
         printf "${yellow} For MacOS run 'brew install bash' and rerun installer in a new terminal${reset}\n\n"
         exit 1;
     fi
 fi
 
+# Declaring Go tools and their installation commands
 declare -A gotools
 gotools["gf"]="go install -v github.com/tomnomnom/gf@latest"
 gotools["qsreplace"]="go install -v github.com/tomnomnom/qsreplace@latest"
 gotools["amass"]="go install -v github.com/owasp-amass/amass/v3/...@master"
 gotools["ffuf"]="go install -v github.com/ffuf/ffuf/v2@latest"
 gotools["github-subdomains"]="go install -v github.com/gwen001/github-subdomains@latest"
-gotools["gitlab-subdomains"]="go install github.com/gwen001/gitlab-subdomains@latest"
+gotools["gitlab-subdomains"]="go install -v github.com/gwen001/gitlab-subdomains@latest"
 gotools["nuclei"]="go install -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest"
 gotools["anew"]="go install -v github.com/tomnomnom/anew@latest"
 gotools["notify"]="go install -v github.com/projectdiscovery/notify/cmd/notify@latest"
@@ -54,7 +46,7 @@ gotools["github-endpoints"]="go install -v github.com/gwen001/github-endpoints@l
 gotools["dnsx"]="go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest"
 gotools["subjs"]="go install -v github.com/lc/subjs@latest"
 gotools["Gxss"]="go install -v github.com/KathanP19/Gxss@latest"
-gotools["katana"]="go install github.com/projectdiscovery/katana/cmd/katana@latest"
+gotools["katana"]="go install -v github.com/projectdiscovery/katana/cmd/katana@latest"
 gotools["crlfuzz"]="go install -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest"
 gotools["dalfox"]="go install -v github.com/hahwul/dalfox/v2@latest"
 gotools["puredns"]="go install -v github.com/d3mondev/puredns/v2@latest"
@@ -66,21 +58,22 @@ gotools["mapcidr"]="go install -v github.com/projectdiscovery/mapcidr/cmd/mapcid
 gotools["cdncheck"]="go install -v github.com/projectdiscovery/cdncheck/cmd/cdncheck@latest"
 gotools["dnstake"]="go install -v github.com/pwnesia/dnstake/cmd/dnstake@latest"
 gotools["gowitness"]="go install -v github.com/sensepost/gowitness@latest"
-gotools["tlsx"]="go install github.com/projectdiscovery/tlsx/cmd/tlsx@latest"
+gotools["tlsx"]="go install -v github.com/projectdiscovery/tlsx/cmd/tlsx@latest"
 gotools["gitdorks_go"]="go install -v github.com/damit5/gitdorks_go@latest"
 gotools["smap"]="go install -v github.com/s0md3v/smap/cmd/smap@latest"
 gotools["dsieve"]="go install -v github.com/trickest/dsieve@master"
-gotools["inscope"]="go install github.com/tomnomnom/hacks/inscope@latest"
-gotools["enumerepo"]="go install github.com/trickest/enumerepo@latest"
+gotools["inscope"]="go install -v github.com/tomnomnom/hacks/inscope@latest"
+gotools["enumerepo"]="go install -v github.com/trickest/enumerepo@latest"
 gotools["Web-Cache-Vulnerability-Scanner"]="go install -v github.com/Hackmanit/Web-Cache-Vulnerability-Scanner@latest"
 gotools["subfinder"]="go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest"
 gotools["byp4xx"]="go install -v github.com/lobuhi/byp4xx@latest"
-gotools["hakip2host"]="go install github.com/hakluke/hakip2host@latest"
+gotools["hakip2host"]="go install -v github.com/hakluke/hakip2host@latest"
 gotools["gau"]="go install -v github.com/lc/gau/v2/cmd/gau@latest"
-gotools["Mantra"]="go install github.com/MrEmpy/Mantra@latest"
-gotools["crt"]="go install github.com/cemulus/crt@latest"
+gotools["Mantra"]="go install -v github.com/MrEmpy/Mantra@latest"
+gotools["crt"]="go install -v github.com/cemulus/crt@latest"
 gotools["s3scanner"]="go install -v github.com/sa7mon/s3scanner@latest" 
 
+# Declaring repositories and their paths
 declare -A repos
 repos["dorks_hunter"]="six2dez/dorks_hunter"
 repos["pwndb"]="davidtavarez/pwndb"
@@ -115,7 +108,7 @@ repos["trufflehog"]="trufflesecurity/trufflehog"
 
 
 function banner_web(){
-    echo -en "\033c"
+    tput clear
 	printf "\n${bgreen}"
 	printf "  ██▀███  ▓█████  ▄████▄   ▒█████   ███▄    █   █████▒▄▄▄█████▓ █     █░\n"
 	printf " ▓██ ▒ ██▒▓█   ▀ ▒██▀ ▀█  ▒██▒  ██▒ ██ ▀█   █ ▓██   ▒ ▓  ██▒ ▓▒▓█░ █ ░█░\n"
@@ -130,8 +123,18 @@ function banner_web(){
         printf " ${reconftw_version}                                         by @six2dez\n"
 }
 
+function install_ppfuzz() {
+    local url=$1
+    local tar_file=$2
+    
+    wget -N -c "$url" $DEBUG_STD
+    eval $SUDO tar -C /usr/local/bin/ -xzf "$tar_file" $DEBUG_STD
+    eval $SUDO rm -rf "$tar_file" $DEBUG_STD
+}
+
+# This function installs various tools and repositories as per the configuration.
 function install_tools(){
-    #eval ln -s /usr/local/bin/pip3 /usr/local/bin/pip3 $DEBUG_STD
+
     eval pip3 install -I -r requirements.txt $DEBUG_STD
     
     printf "${bblue} Running: Installing Golang tools (${#gotools[@]})${reset}\n\n"
@@ -219,28 +222,18 @@ function install_tools(){
     
     if [ "True" = "$IS_ARM" ]; then
         if [ "True" = "$RPI_3" ]; then
-            eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz $DEBUG_STD
-            eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
-            eval $SUDO rm -rf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
+            install_ppfuzz "https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz" "ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz"
         elif [ "True" = "$RPI_4" ]; then
-            eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz $DEBUG_STD
-            eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
-            eval $SUDO rm -rf ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
+            install_ppfuzz "https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz" "ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz"
         fi
     elif [ "True" = "$IS_MAC" ]; then
         if [ "True" = "$IS_ARM" ]; then
-            eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz $DEBUG_STD
-            eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
-            eval $SUDO rm -rf ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz  $DEBUG_STD
+            install_ppfuzz "https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz" "ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz"
         else
-            eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz $DEBUG_STD
-            eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz  $DEBUG_STD
-            eval $SUDO rm -rf ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz  $DEBUG_STD
+            install_ppfuzz "https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz" "ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz"
         fi
     else
-        eval wget -N -c https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz $DEBUG_STD
-        eval $SUDO tar -C /usr/local/bin/ -xzf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
-        eval $SUDO rm -rf ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz  $DEBUG_STD
+        install_ppfuzz "https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz" "ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz"
     fi
     eval $SUDO chmod 755 /usr/local/bin/ppfuzz
     eval $SUDO strip -s /usr/local/bin/ppfuzz $DEBUG_STD
@@ -272,7 +265,14 @@ install_webserver(){
     $SUDO pip3 install -r $SCRIPTPATH/web/requirements.txt &>/dev/null
         
     printf "${yellow} Installing tools...${reset}\n\n"
+    if command -v apt > /dev/null; then
     $SUDO apt install redis-server -y &>/dev/null
+    elif command -v yum > /dev/null; then
+        $SUDO yum install redis -y &>/dev/null
+    else
+        printf '[ERROR] Unable to find a supported package manager. Please install redis manually.\n'
+        exit 1
+    fi
     
     printf "${yellow} Creating WEB User...${reset}\n\n"
     $SUDO rm $SCRIPTPATH/web/db.sqlite3 &>/dev/null
@@ -305,8 +305,14 @@ display_menu(){
             printf "${bblue} 3. Setup Web Interface${reset} ${yellow}(User Interaction needed!)${reset}\n\n"
             printf "${bblue} 4. Exit${reset}\n\n"
             printf "${bgreen}#######################################################################${reset}\n\n"
-            read -p "$(echo -e ${bblue} "Insert option: "${reset})" option
+            read -p "${bblue}Insert option: ${reset}" option
             printf "\n\n${bgreen}#######################################################################${reset}\n\n"
+
+            option=$(echo "$option" | tr -d '[:space:]')
+            if ! [[ "$option" =~ ^[1-4]$ ]]; then
+                printf "${bred} Invalid option. Please try again.${reset}\n\n"
+                continue
+            fi
 
             case $option in
                 1)
@@ -354,7 +360,7 @@ display_menu(){
                     exit 1
                     ;;
                 *)
-                    printf "${bblue} Invalid option. Exiting...${reset}\n\n"
+                    printf "${bred} Invalid option. Please try again.${reset}\n\n"
                     exit 1
                     ;;
             esac
@@ -362,14 +368,18 @@ display_menu(){
     done
 }
 
-if [ "$1" = '--tools' ]; then
-    install_tools
-fi
-
-if [ "$1" != '--auto' ]; then
-    echo "$1"
-    display_menu
-fi
+case "$1" in
+    --tools)
+        install_tools
+        ;;
+    --auto)
+        # possibly some other actions
+        ;;
+    *)
+        echo "$1"
+        display_menu
+        ;;
+esac
 
 printf "${yellow} This may take time. So, go grab a coffee! ${reset}\n\n"
 
@@ -432,7 +442,11 @@ eval git config --global --unset https.proxy $DEBUG_STD
 
 printf "${bblue} Running: Looking for new reconFTW version${reset}\n\n"
 
-eval git fetch $DEBUG_STD
+if ! eval git fetch $DEBUG_STD; then
+    echo "Failed to fetch updates."
+    exit 1
+fi
+
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 HEADHASH=$(git rev-parse HEAD)
 UPSTREAMHASH=$(git rev-parse "${BRANCH}@{upstream}")
@@ -608,6 +622,6 @@ if [ "$web" = true ]; then
     printf "\n${bgreen} Web server is installed, to set it up run ./install.sh and select option 3 ${reset}\n\n"
 fi
 
-printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/provider-config.yaml)\n - GitLab (~/Tools/.gitlab_tokens)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg or env var) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg or env var) \n - notify (~/.config/notify/provider-config.yaml) \n - WHOISXML API (WHOISXML_API in reconftw.cfg or env var)\n - subgpt_cookies.json (subgpt_cookies.json file, follow instructions at https://github.com/s0md3v/SubGPT#getting-bing-cookie)\n\n\n${reset}"
+printf "${yellow} Remember set your api keys:\n - amass (~/.config/amass/config.ini)\n - subfinder (~/.config/subfinder/provider-config.yaml)\n - GitLab (~/Tools/.gitlab_tokens)\n - SSRF Server (COLLAB_SERVER in reconftw.cfg or env var) \n - Blind XSS Server (XSS_SERVER in reconftw.cfg or env var) \n - notify (~/.config/notify/provider-config.yaml) \n - WHOISXML API (WHOISXML_API in reconftw.cfg or env var)\n\n${reset}"
 printf "${bgreen} Finished!${reset}\n\n"
 printf "\n\n${bgreen}#######################################################################${reset}\n"

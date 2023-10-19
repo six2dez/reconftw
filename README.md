@@ -7,8 +7,8 @@
 </h1>
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.7">
-    <img src="https://img.shields.io/badge/release-v2.7-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.7.1">
+    <img src="https://img.shields.io/badge/release-v2.7.1-green">
   </a>
    </a>
   <a href="https://opensource.org/licenses/MIT">
@@ -173,7 +173,6 @@ export PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH
 AMASS_CONFIG=~/.config/amass/config.ini
 GITHUB_TOKENS=${tools}/.github_tokens
 GITLAB_TOKENS=${tools}/.gitlab_tokens
-SUBGPT_COOKIE=${tools}/subgpt_cookies.json
 #CUSTOM_CONFIG=custom_config_path.txt # In case you use a custom config file, uncomment this line and set your files path
 
 # APIs/TOKENS - Uncomment the lines you want removing the '#' at the beginning of the line
@@ -212,7 +211,6 @@ SUBBRUTE=true # DNS bruteforcing
 SUBSCRAPING=true # Subdomains extraction from web crawling
 SUBPERMUTE=true # DNS permutations
 SUBREGEXPERMUTE=true # Permutations by regex analysis
-SUBGPT=true # Permutations by BingGPT prediction
 PERMUTATIONS_OPTION=gotator # The alternative is "ripgen" (faster, not deeper)
 GOTATOR_FLAGS=" -depth 1 -numbers 3 -mindup -adv -md" # Flags for gotator
 SUBTAKEOVER=false # Check subdomain takeovers, false by default cuz nuclei already check this
