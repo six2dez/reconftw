@@ -1,0 +1,84 @@
+#!/bin/bash
+
+# Load environment variables
+if [ -f "reconftw.cfg" ]; then
+    source reconftw.cfg
+else
+    echo "Error: reconftw.cfg not found!"
+    exit 1
+fi
+
+# Help menu function
+help_menu() {
+    echo "Usage: url_gf.sh [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  -u, --url-file <file>   Specify the URL file to scan."
+    echo "  -h, --help             Display this help menu."
+    echo ""
+    echo "Example:"
+    echo "  url_gf.sh -u webs/url_extract.txt"
+}
+
+# Input validation function
+validate_input() {
+    if [ -z "$url_file" ]; then
+        echo "Error: URL file not specified."
+        help_menu
+        exit 1
+    elif [ ! -f "$url_file" ]; then
+        echo "Error: Specified URL file does not exist."
+        exit 1
+    fi
+}
+
+# Vulnerable pattern search function
+url_gf() {
+    if { [ ! -f "$called_fn_dir/.url_gf" ] || [ "$DIFF" = true ]; } && [ "$URL_GF" = true ]; then
+        echo "[+] Starting Vulnerable Pattern Search"
+
+        mkdir -p gf
+        if [ -s "$url_file" ]; then
+            gf xss "$url_file" | anew -q gf/xss.txt
+            gf ssti "$url_file" | anew -q gf/ssti.txt
+            gf ssrf "$url_file" | anew -q gf/ssrf.txt
+            gf sqli "$url_file" | anew -q gf/sqli.txt
+            gf redirect "$url_file" | anew -q gf/redirect.txt
+            [ -s "gf/ssrf.txt" ] && cat gf/ssrf.txt | anew -q gf/redirect.txt
+            gf rce "$url_file" | anew -q gf/rce.txt
+            gf potential "$url_file" | cut -d ':' -f3-5 | anew -q gf/potential.txt
+            [ -s ".tmp/url_extract_tmp.txt" ] && cat .tmp/url_extract_tmp.txt | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | unfurl -u format %s://%d%p 2>>"$LOGFILE" | anew -q gf/endpoints.txt
+            gf lfi "$url_file" | anew -q gf/lfi.txt
+        fi
+        echo "[+] Results are saved in $domain/gf folder"
+    else
+        if [ "$URL_GF" = false ]; then
+            echo "[!] URL_Gf skipped in this mode or defined in reconftw.cfg"
+        else
+            echo "[!] URL_Gf is already processed, to force executing delete $called_fn_dir/.url_gf"
+        fi
+    fi
+}
+
+# Parse command-line arguments
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -u|--url-file)
+            url_file="$2"
+            shift 2
+            ;;
+        -h|--help)
+            help_menu
+            exit 0
+            ;;
+        *)
+            echo "Unknown parameter: $1"
+            help_menu
+            exit 1
+            ;;
+    esac
+done
+
+# Validate input and start main function
+validate_input
+url_gf

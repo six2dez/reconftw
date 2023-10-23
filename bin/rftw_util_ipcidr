@@ -1,0 +1,61 @@
+#!/bin/bash
+
+# Load environment variables from reconftw.cfg
+# Load environment variables
+if [ -f "reconftw.cfg" ]; then
+    source reconftw.cfg
+else
+    echo "Error: reconftw.cfg not found!"
+    exit 1
+fi
+
+# Help menu
+function display_help() {
+    echo "Usage: $0 [IP CIDR] [OPTIONAL FILE]"
+    echo
+    echo "Processes an IP CIDR, maps it, and optionally saves the output to a file."
+    echo
+    echo "Options:"
+    echo "  -h, --help    Display this help and exit"
+    echo
+}
+
+function process_ip_cidr() {
+    local IP_CIDR=$1
+    local OUTFILE=$2
+    local IP_CIDR_REGEX='(((25[0-5]|2[0-4][0-9]|1?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9][0-9]?))(\/([8-9]|[1-2][0-9]|3[0-2]))([^0-9.]|$)|(((25[0-5]|2[0-4][0-9]|1?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9][0-9]?)$)'
+
+    if [[ $IP_CIDR =~ ^$IP_CIDR_REGEX ]]; then
+        echo $IP_CIDR | mapcidr -silent | anew -q target_reconftw_ipcidr.txt
+
+        if [ -s "./target_reconftw_ipcidr.txt" ]; then
+            [ "$REVERSE_IP" = true ] && cat ./target_reconftw_ipcidr.txt | hakip2host | cut -d' ' -f 3 | unfurl -u domains 2>/dev/null | sed -e 's/*\.//' -e 's/\.$//' -e '/\./!d' | anew -q ./target_reconftw_ipcidr.txt
+
+            if [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -eq 1 ]]; then
+                domain=$(cat ./target_reconftw_ipcidr.txt)
+            elif [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -gt 1 ]]; then
+                unset domain
+                list=${PWD}/target_reconftw_ipcidr.txt
+            fi
+        fi
+
+        if [ -n "$OUTFILE" ]; then
+            cat $list | anew -q $OUTFILE
+            sed -i '/\/[0-9]*$/d' $OUTFILE
+        fi
+    else
+        echo "Invalid IP CIDR format provided. Please check the input."
+        exit 1
+    fi
+}
+
+# Main execution starts here
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    display_help
+    exit 0
+elif [[ -z "$1" ]]; then
+    echo "Error: No IP CIDR provided. Use -h or --help for more information."
+    exit 1
+else
+    process_ip_cidr "$1" "$2"
+fi

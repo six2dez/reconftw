@@ -1,0 +1,85 @@
+#!/bin/bash
+
+# Load environment variables from reconftw.cfg
+if [ -f "reconftw.cfg" ]; then
+    source reconftw.cfg
+else
+    echo "Error: reconftw.cfg not found!"
+    exit 1
+fi
+
+# Color definitions for output (optional, you can adjust or remove)
+yellow='\033[1;33m'
+reset='\033[0m'
+
+# Help menu
+display_help() {
+    echo "Usage: $0 [OPTIONS]"
+    echo "Options:"
+    echo "  -d, --domain          Set the target domain."
+    echo "  -h, --help            Display this help and exit."
+    echo "  -f, --input-file      Specify the input file with a list of domains."
+    echo "  -o, --output-file     Specify the output file for saving results."
+    echo
+    echo "Ensure all required environment variables are set in reconftw.cfg"
+}
+
+# Input validation
+if [ -z "$domain" ] || [ -z "$resolvers_trusted" ] || [ -z "$LOGFILE" ]; then
+    echo "Error: One or more required environment variables are missing in reconftw.cfg."
+    display_help
+    exit 1
+fi
+
+# Default values for input and output files
+INPUTFILE=""
+OUTPUTFILE="subdomains/subdomains.txt"
+
+# Parse input arguments
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -d|--domain) domain="$2"; shift;;
+        -f|--input-file) INPUTFILE="$2"; shift;;
+        -o|--output-file) OUTPUTFILE="$2"; shift;;
+        -h|--help) display_help; exit 0;;
+        *) echo "Unknown parameter passed: $1"; display_help; exit 1;;
+    esac
+    shift
+done
+
+# If an input file is provided, validate it
+if [ -n "$INPUTFILE" ] && [ ! -f "$INPUTFILE" ]; then
+    echo "Error: Input file $INPUTFILE not found!"
+    exit 1
+fi
+
+# Main logic (Original function content)
+sub_dns() {
+    if [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; then
+        start_subfunc ${FUNCNAME[0]} "Running : DNS Subdomain Enumeration and PTR search"
+		if [ ! "$AXIOM" = true ]; then
+			[ -s "subdomains/subdomains.txt" ] && cat subdomains/subdomains.txt | dnsx -r $resolvers_trusted -a -aaaa -cname -ns -ptr -mx -soa -silent -retry 3 -json -o subdomains/subdomains_dnsregs.json 2>>"$LOGFILE" >/dev/null
+			[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r 'try .a[], try .aaaa[], try .cname[], try .ns[], try .ptr[], try .mx[], try .soa[]' 2>/dev/null | grep ".$domain$" | anew -q .tmp/subdomains_dns.txt
+			[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r 'try .a[]' | sort -u | hakip2host | cut -d' ' -f 3 | unfurl -u domains | sed -e 's/*\.//' -e 's/\.$//' -e '/\./!d' | grep ".$domain$" | anew -q .tmp/subdomains_dns.txt
+			[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r 'try "\(.host) - \(.a[])"' 2>/dev/null | sort -u -k2 | anew -q subdomains/subdomains_ips.txt
+			resolvers_update_quick_local
+			[ -s ".tmp/subdomains_dns.txt" ] && puredns resolve .tmp/subdomains_dns.txt -w .tmp/subdomains_dns_resolved.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT  --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" >/dev/null
+		else
+			[ -s "subdomains/subdomains.txt" ] && axiom-scan subdomains/subdomains.txt -m dnsx -retry 3 -a -aaaa -cname -ns -ptr -mx -soa -json -o subdomains/subdomains_dnsregs.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+			[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r 'try .a[]' | sort -u | anew -q .tmp/subdomains_dns_a_records.txt
+			[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r 'try .a[]' | sort -u | hakip2host | cut -d' ' -f 3 | unfurl -u domains | sed -e 's/*\.//' -e 's/\.$//' -e '/\./!d' | grep ".$domain$" | anew -q .tmp/subdomains_dns.txt
+			[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r 'try .a[], try .aaaa[], try .cname[], try .ns[], try .ptr[], try .mx[], try .soa[]' 2>/dev/null | grep ".$domain$" | anew -q .tmp/subdomains_dns.txt
+			[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r 'try "\(.host) - \(.a[])"' 2>/dev/null | sort -u -k2 | anew -q subdomains/subdomains_ips.txt
+			resolvers_update_quick_axiom
+			[ -s ".tmp/subdomains_dns.txt" ] && axiom-scan .tmp/subdomains_dns.txt -m puredns-resolve -r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -o .tmp/subdomains_dns_resolved.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+		fi
+		[[ "$INSCOPE" = true ]] && check_inscope .tmp/subdomains_dns_resolved.txt 2>>"$LOGFILE" >/dev/null
+		NUMOFLINES=$(cat .tmp/subdomains_dns_resolved.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
+		end_subfunc "${NUMOFLINES} new subs (dns resolution)" ${FUNCNAME[0]}
+    else
+        printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+    fi
+}
+
+# Call the main logic function
+sub_dns

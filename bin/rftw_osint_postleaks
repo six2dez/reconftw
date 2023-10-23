@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# Load environment variables
+if [ -f "reconftw.cfg" ]; then
+    source reconftw.cfg
+else
+    echo "Error: reconftw.cfg not found!"
+    exit 1
+fi
+
+# Help menu function
+function help_menu() {
+    echo -e "Usage: $0 [-d DOMAIN] or $0 [DOMAIN]"
+    echo -e "Options:"
+    echo -e "  -d DOMAIN                  Specify the domain to scan for postman leaks."
+    echo -e "  -h, --help                 Display this help menu"
+    exit 1
+}
+
+function postleaks() {
+    if { [ ! -f "$called_fn_dir/.postleaks" ] || [ "$DIFF" = true ]; } && [ "$POSTMAN_LEAKS" = true ] && [ "$OSINT" = true ] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+        echo -e "${yellow}Scanning for leaks in postman public directory${reset}"
+        
+        postleaksNg -k "$domain" > .tmp/postleaks.txt  || { echo "postleaksNg command failed"; exit 1; }
+        echo "Results are saved in .tmp/postleaks.txt"
+    elif [ "$POSTMAN_LEAKS" = false ] || [ "$OSINT" = false ]; then
+        echo -e "${yellow}postleaks skipped as defined in reconftw.cfg${reset}"
+    else
+        echo -e "${yellow}postleaks is already processed or input is an IP. To force, delete\n    $called_fn_dir/.postleaks${reset}"
+    fi
+}
+
+# Main function to execute the postleaks function
+function main() {
+    if [[ -z "$domain" ]]; then
+        help_menu
+    fi
+    postleaks
+}
+
+# Parse command-line arguments
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -d) domain="$2"; shift ;;
+        -h|--help) help_menu ;;
+        *) domain="$1" ;;
+    esac
+    shift
+done
+
+main

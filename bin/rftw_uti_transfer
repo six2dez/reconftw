@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# Load environment variables from reconftw.cfg
+# Load environment variables
+if [ -f "reconftw.cfg" ]; then
+    source reconftw.cfg
+else
+    echo "Error: reconftw.cfg not found!"
+    exit 1
+fi
+
+# Display help information
+function display_help() {
+    echo "Usage: $0 <file|directory>"
+    echo "       ... | $0 <file_name>"
+    echo
+    echo "Uploads a specified file or directory to https://transfer.sh/"
+    echo
+    echo "Options:"
+    echo "  -h, --help    Display this help and exit"
+    echo
+}
+
+# Uploads a file or directory to transfer.sh
+function transfer() {
+    if [ $# -eq 0 ]; then 
+        echo "Error: No arguments specified."
+        display_help
+        exit 1
+    fi
+
+    if tty -s; then
+        local file="$1"
+        local file_name=$(basename "$file")
+
+        if [ ! -e "$file" ]; then 
+            echo "Error: $file: No such file or directory" >&2
+            exit 1
+        fi
+
+        if [ -d "$file" ]; then
+            # If the given input is a directory, zip and transfer it.
+            file_name="$file_name.zip"
+            (cd "$file" && zip -r -q - .) | curl --progress-bar --upload-file "-" "https://transfer.sh/$file_name" | tee /dev/null
+        else
+            # If the given input is a file, transfer it.
+            cat "$file" | curl --progress-bar --upload-file "-" "https://transfer.sh/$file_name" | tee /dev/null
+        fi
+    else
+        # Transfer data from standard input.
+        local file_name=$1
+        curl --progress-bar --upload-file "-" "https://transfer.sh/$file_name" | tee /dev/null
+    fi
+}
+
+# Main script execution
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    display_help
+    exit 0
+fi
+
+transfer "$@"

@@ -1,0 +1,67 @@
+#!/bin/bash
+
+# Load environment variables from reconftw.cfg
+# Load environment variables
+if [ -f "reconftw.cfg" ]; then
+    source reconftw.cfg
+else
+    echo "Error: reconftw.cfg not found!"
+    exit 1
+fi
+
+# Help menu
+help_menu() {
+    echo "Usage: $0 [OPTIONS]"
+    echo "Password Dictionary Generation using pydictor"
+    echo ""
+    echo "Options:"
+    echo "  -d, --domain DOMAIN     Set domain (required)"
+    echo "  -h, --help              Display this help message and exit"
+    exit 0
+}
+
+# Input validation
+if [ $# -eq 0 ]; then
+    help_menu
+fi
+
+DOMAIN=""
+while [ "$1" != "" ]; do
+    case $1 in
+        -d | --domain )           shift
+                                  DOMAIN=$1
+                                  ;;
+        -h | --help )             help_menu
+                                  exit
+                                  ;;
+        * )                       echo "Unknown option: $1"
+                                  exit 1
+    esac
+    shift
+done
+
+if [ -z "$DOMAIN" ]; then
+    echo "Error: Domain is required!"
+    exit 1
+fi
+
+password_dict() {
+    local domain=$1
+
+    if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$PASSWORD_DICT" = true ]; then
+        start_func ${FUNCNAME[0]} "Password dictionary generation"
+        
+        local word=${domain%%.*}
+        python3 $tools/pydictor/pydictor.py -extend $word --leet 0 1 2 11 21 --len ${PASSWORD_MIN_LENGTH} ${PASSWORD_MAX_LENGTH} -o webs/password_dict.txt 2>>"$LOGFILE" >/dev/null
+        
+        end_func "Results are saved in $domain/webs/password_dict.txt" ${FUNCNAME[0]}
+    else
+        if [ "$PASSWORD_DICT" = false ]; then
+            printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+        else
+            printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+        fi
+    fi
+}
+
+password_dict $DOMAIN

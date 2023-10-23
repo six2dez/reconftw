@@ -1,0 +1,65 @@
+#!/bin/bash
+# Check manually, the logic for extracting the ips from dnsx results should be on reconftw.sh script, this script should only scan the ips
+
+# Default config path
+CONFIG_PATH="$RECONFTW_CFG"
+
+# Check if the config file exists
+if [ -f "$CONFIG_PATH" ]; then
+    source "$CONFIG_PATH"
+else
+    echo "Error: reconftw.cfg not found at $CONFIG_PATH!"
+    exit 1
+fi
+
+# Help function
+help_menu() {
+    cat <<- EOF
+Usage: $0 [OPTIONS] <input_file>
+
+CDN Provider Check Tool
+
+Options:
+  -h, --help            Show this help menu
+  -i, --input           Specify the input IP lists file (required)
+  -f, --force           Force the execution even if already processed
+  -o, --output          Specify the output file (default is print to stdout)
+EOF
+}
+
+# Default values
+FORCE=false
+INPUT_FILE=""
+OUTPUT_FILE=""
+
+# Parse arguments
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -i|--input) INPUT_FILE="$2"; shift ;;
+        -h|--help) help_menu; exit 0 ;;
+        -f|--force) FORCE=true; shift ;;
+        -o|--output) OUTPUT_FILE="$2"; shift ;;
+        *)
+            if [ -z "$INPUT_FILE" ]; then
+                INPUT_FILE=$1
+            else
+                echo "Unknown parameter passed: $1"; exit 1;
+            fi
+            ;;
+    esac
+    shift
+done
+
+# Validate input file
+if [ ! -f "$INPUT_FILE" ] || [ ! -s "$INPUT_FILE" ]; then
+    echo "Invalid or empty input file!"
+    help_menu
+    exit 1
+fi
+
+# Handle the output of the cdncheck command based on the presence of the -o flag
+if [ -z "$OUTPUT_FILE" ]; then
+    cdncheck -silent -resp -nc < "$INPUT_FILE"
+else
+    cdncheck -silent -resp -nc < "$INPUT_FILE" | sort -u > "$OUTPUT_FILE"
+fi

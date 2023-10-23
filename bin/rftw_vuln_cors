@@ -1,0 +1,82 @@
+#!/bin/bash
+
+# Load environment variables from reconftw.cfg
+# Load environment variables
+if [ -f "reconftw.cfg" ]; then
+    source reconftw.cfg
+else
+    echo "Error: reconftw.cfg not found!"
+    exit 1
+fi
+
+# Help menu
+function display_help() {
+    echo "Usage: $0 [OPTIONS]"
+    echo
+    echo "Perform CORS scan on provided inputs."
+    echo "Options:"
+    echo "  -h, --help    Display this help and exit"
+    echo
+}
+
+# Validate the required tools and files
+function validate_requirements() {
+    if ! [ -x "$(command -v python3)" ]; then
+        echo "Error: python3 is not installed." >&2
+        exit 1
+    fi
+    if [ ! -f "$tools/Corsy/corsy.py" ]; then
+        echo "Error: Corsy tool is missing." >&2
+        exit 1
+    fi
+    if [ ! -f "webs/webs.txt" ] || [ ! -f "webs/webs_uncommon_ports.txt" ]; then
+        echo "Error: Required input files are missing." >&2
+        exit 1
+    fi
+}
+
+# Main CORS function
+function cors_scan() {
+    if { [ ! -f "$called_fn_dir/.cors_scan" ] || [ "$DIFF" = true ]; } && [ "$CORS" = true ]; then
+        echo "[*] Starting CORS Scan"
+        
+        # Check and consolidate input files
+        [ ! -s ".tmp/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q .tmp/webs_all.txt
+
+        # Perform CORS scan
+        [ -s ".tmp/webs_all.txt" ] && python3 $tools/Corsy/corsy.py -i .tmp/webs_all.txt -o vulns/cors.txt 2>>"$LOGFILE" >/dev/null
+
+        echo "[+] Results are saved in vulns/cors.txt"
+    else
+        if [ "$CORS" = false ]; then
+            echo -e "\n${yellow} cors_scan skipped in this mode or defined in reconftw.cfg ${reset}"
+        else
+            echo -e "${yellow} cors_scan is already processed, to force executing cors_scan delete\n    $called_fn_dir/.cors_scan ${reset}\n"
+        fi
+    fi
+}
+
+# Main script execution
+if [ "$#" -eq 0 ]; then
+    display_help
+    exit 0
+fi
+
+while (( "$#" )); do
+    case "$1" in
+        -h|--help)
+            display_help
+            exit 0
+            ;;
+        *) 
+            echo "Unknown parameter passed: $1"
+            display_help
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+validate_requirements
+cors_scan
+

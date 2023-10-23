@@ -1,0 +1,63 @@
+#!/bin/bash
+
+# Load environment variables from reconftw.cfg
+# Load environment variables
+if [ -f "reconftw.cfg" ]; then
+    source reconftw.cfg
+else
+    echo "Error: reconftw.cfg not found!"
+    exit 1
+fi
+
+# Display help information
+function display_help() {
+    echo "Usage: $0"
+    echo
+    echo "Update resolvers for reconftw."
+    echo
+    echo "Options:"
+    echo "  -h, --help    Display this help and exit"
+    echo
+}
+
+function update_resolvers() {
+    if [ "$generate_resolvers" = true ]; then
+        if [ ! "$AXIOM" = true ]; then
+            if [ ! -s "$resolvers" ] || [[ $(find "$resolvers" -mtime +1 -print) ]]; then
+                notification "Resolvers seem older than 1 day\n Generating custom resolvers..." warn
+                rm -f $resolvers 2>>"$LOGFILE"
+                dnsvalidator -tL https://public-dns.info/nameservers.txt -threads $DNSVALIDATOR_THREADS -o $resolvers 2>>"$LOGFILE" >/dev/null
+                dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads $DNSVALIDATOR_THREADS -o tmp_resolvers 2>>"$LOGFILE" >/dev/null
+                
+                [ -s "tmp_resolvers" ] && cat tmp_resolvers | anew -q $resolvers
+                [ -s "tmp_resolvers" ] && rm -f tmp_resolvers 2>>"$LOGFILE" >/dev/null
+
+                [ ! -s "$resolvers" ] && wget -q -O - ${resolvers_url} > $resolvers
+                [ ! -s "$resolvers_trusted" ] && wget -q -O - ${resolvers_trusted_url} > $resolvers_trusted
+                notification "Updated\n" good
+            fi
+        else
+            notification "Checking resolvers lists...\n Accurate resolvers are the key to great results\n This may take around 10 minutes if it's not updated" warn
+            axiom-exec 'if [ $(find "/home/op/lists/resolvers.txt" -mtime +1 -print) ] || [ $(cat /home/op/lists/resolvers.txt | wc -l) -le 40 ] ; then dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 200 -o /home/op/lists/resolvers.txt ; fi' &>/dev/null
+            axiom-exec "wget -q -O - ${resolvers_url} > /home/op/lists/resolvers.txt" 2>>"$LOGFILE" >/dev/null
+            axiom-exec "wget -q -O - ${resolvers_trusted_url} > /home/op/lists/resolvers_trusted.txt" 2>>"$LOGFILE" >/dev/null
+            notification "Updated\n" good
+        fi
+        generate_resolvers=false
+    else
+        if [ ! -s "$resolvers" ] || [[ $(find "$resolvers" -mtime +1 -print) ]]; then
+            notification "Resolvers seem older than 1 day\n Downloading new resolvers..." warn
+            wget -q -O - ${resolvers_url} > $resolvers
+            wget -q -O - ${resolvers_trusted_url} > $resolvers_trusted
+            notification "Resolvers updated\n" good
+        fi
+    fi
+}
+
+# Check arguments and call the main function
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    display_help
+    exit 0
+else
+    update_resolvers
+fi

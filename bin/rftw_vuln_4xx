@@ -1,0 +1,77 @@
+#!/bin/bash
+
+# Load environment variables from reconftw.cfg
+# Load environment variables
+if [ -f "reconftw.cfg" ]; then
+    source reconftw.cfg
+else
+    echo "Error: reconftw.cfg not found!"
+    exit 1
+fi
+
+# Colors
+yellow="\033[1;33m"
+reset="\033[0m"
+
+# Help menu function
+function display_help() {
+    echo "Usage: $0 [OPTIONS]"
+    echo
+    echo "Perform 4XX Bypass checks on provided inputs."
+    echo "Options:"
+    echo "  -h, --help    Display this help and exit"
+    echo
+}
+
+# Validate requirements function
+function validate_requirements() {
+    if ! [ -x "$(command -v byp4xx)" ]; then
+        echo "Error: byp4xx not found." >&2
+        exit 1
+    fi
+    if ! [ -f "fuzzing/fuzzing_full.txt" ]; then
+        echo "Error: fuzzing_full.txt not found." >&2
+        exit 1
+    fi
+}
+
+# 4XX Bypass test function
+function bypass_4xx_test() {
+    if { [ ! -f "$called_fn_dir/.4xxbypass" ] || [ "$DIFF" = true ]; } && [ "$BYPASSER4XX" = true ]; then
+        if [[ $(cat fuzzing/fuzzing_full.txt 2>/dev/null | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 | wc -l) -le 1000 ]] || [ "$DEEP" = true ]; then
+            echo "[*] Starting 403 bypass"
+            cat $dir/fuzzing/fuzzing_full.txt 2>/dev/null | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 > $dir/.tmp/403test.txt
+            cd "$tools/byp4xx" || { echo "Failed to cd directory in 4xxbypass @ line ${LINENO}"; exit 1; }
+            byp4xx -threads $BYP4XX_THREADS $dir/.tmp/403test.txt > $dir/.tmp/byp4xx.txt
+            cd "$dir" || { echo "Failed to cd directory in 4xxbypass @ line ${LINENO}"; exit 1; }
+            [ -s ".tmp/byp4xx.txt" ] && cat .tmp/byp4xx.txt | anew -q vulns/byp4xx.txt
+            echo "[+] Results are saved in vulns/byp4xx.txt"
+        else
+            echo "[!] Too many URLs to bypass, skipping"
+        fi
+    else
+        if [ "$BYPASSER4XX" = false ]; then
+            echo -e "\n${yellow} 4xxbypass skipped in this mode or defined in reconftw.cfg ${reset}"
+        else
+            echo -e "${yellow} 4xxbypass is already processed, to force executing 4xxbypass delete\n    $called_fn_dir/.4xxbypass ${reset}\n"
+        fi
+    fi
+}
+
+# Main script execution
+while (( "$#" )); do
+    case "$1" in
+        -h|--help)
+            display_help
+            exit 0
+            ;;
+        *) 
+            echo "Unknown parameter passed: $1"
+            display_help
+            exit 1
+            ;;
+    esac
+done
+
+validate_requirements
+bypass_4xx_test

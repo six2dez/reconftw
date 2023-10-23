@@ -1,0 +1,74 @@
+#!/bin/bash
+
+# Load environment variables from reconftw.cfg
+# Load environment variables
+if [ -f "reconftw.cfg" ]; then
+    source reconftw.cfg
+else
+    echo "Error: reconftw.cfg not found!"
+    exit 1
+fi
+
+# Colors for console output
+bblue="\033[1;34m"
+yellow="\033[1;33m"
+reset="\033[0m"
+bred="\033[1;31m"
+bgreen="\033[1;32m"
+
+# Help menu function
+function display_help() {
+    echo "Usage: $0 <message> <type>"
+    echo
+    echo "Sends notification based on the given message and type."
+    echo "Types:"
+    echo "  info   - Informational message (Blue)"
+    echo "  warn   - Warning message (Yellow)"
+    echo "  error  - Error message (Red)"
+    echo "  good   - Positive message (Green)"
+    echo 
+    echo "Options:"
+    echo "  -h, --help    Display this help and exit"
+    echo
+}
+
+# Send notification function
+function notification() {
+    local message=$1
+    local type=$2
+    local text=""
+    
+    if [[ -z "$message" || -z "$type" ]]; then
+        echo -e "${bred}Error: Both message and type are required.${reset}"
+        exit 2
+    fi
+
+    case $type in
+        info)
+            text="\n${bblue} ${message} ${reset}"
+            ;;
+        warn)
+            text="\n${yellow} ${message} ${reset}"
+            ;;
+        error)
+            text="\n${bred} ${message} ${reset}"
+            ;;
+        good)
+            text="\n${bgreen} ${message} ${reset}"
+            ;;
+        *)
+            echo -e "${bred}Error: Invalid type. Valid types are: info, warn, error, good.${reset}"
+            exit 2
+            ;;
+    esac
+
+    printf "${text}\n" && printf "${text} - ${domain}\n" | $NOTIFY
+}
+
+# Main script execution
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    display_help
+    exit 0
+fi
+
+notification "$1" "$2"

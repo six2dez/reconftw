@@ -1,0 +1,65 @@
+#!/bin/bash
+
+# Load environment variables from reconftw.cfg
+# Load environment variables
+if [ -f "reconftw.cfg" ]; then
+    source reconftw.cfg
+else
+    echo "Error: reconftw.cfg not found!"
+    exit 1
+fi
+
+help_menu() {
+    echo "Usage: $0 [DOMAIN] [OPTIONS]"
+    echo "Web Screenshots tool for the specified domain."
+    echo
+    echo "Options:"
+    echo "  -h, --help   Display this help menu and exit"
+    echo "  -f, --force  Force the execution even if it was already processed"
+}
+
+validate_inputs() {
+    if [[ -z "$domain" ]]; then
+        echo -e "${yellow} No domain provided! ${reset}"
+        exit 1
+    fi
+
+    if [ "$WEBSCREENSHOT" != true ] && [ "$FORCE_EXECUTION" != true ]; then
+        echo -e "${yellow} screenshot skipped in this mode or defined in reconftw.cfg ${reset}"
+        exit 0
+    fi
+}
+
+run_screenshot() {
+    start_func "screenshot" "Web Screenshots"
+    
+    [ ! -s ".tmp/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q .tmp/webs_all.txt
+
+    num_lines=$(wc -l < .tmp/webs_all.txt)
+    dynamic_gowitness_timeout=$(expr $num_lines \* $GOWITNESS_TIMEOUT_PER_SITE)
+
+    if [ ! "$AXIOM" = true ]; then
+        [ -s ".tmp/webs_all.txt" ] && timeout -k 1m ${dynamic_gowitness_timeout}s gowitness file -f .tmp/webs_all.txt -t $GOWITNESS_THREADS $GOWITNESS_FLAGS 2>>"$LOGFILE"
+    else
+        timeout -k 1m ${dynamic_gowitness_timeout}s axiom-scan .tmp/webs_all.txt -m gowitness -t $GOWITNESS_THREADS $GOWITNESS_FLAGS -o screenshots $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+    fi
+    
+    end_func "Results are saved in $domain/screenshots folder" "screenshot"
+}
+
+# Main
+FORCE_EXECUTION=false
+domain="$1"
+
+shift
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -h|--help) help_menu; exit 0 ;;
+        -f|--force) FORCE_EXECUTION=true; shift ;;
+        *) echo "Unknown parameter passed: $1"; exit 1 ;;
+    esac
+    shift
+done
+
+validate_inputs
+run_screenshot

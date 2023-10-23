@@ -1,0 +1,133 @@
+#!/bin/bash
+
+# Load environment variables
+if [ -f "reconftw.cfg" ]; then
+    source reconftw.cfg
+else
+    echo "Error: reconftw.cfg not found!"
+    exit 1
+fi
+
+# Help menu function
+help_menu() {
+    echo "Usage: urlchecks.sh [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  -d, --domain <domain>   Specify the domain to scan."
+    echo "  -h, --help             Display this help menu."
+    echo ""
+    echo "Example:"
+    echo "  urlchecks.sh -d example.com"
+}
+
+# Input validation function
+validate_input() {
+    if [ -z "$domain" ]; then
+        echo "Error: Domain not specified."
+        help_menu
+        exit 1
+    fi
+}
+
+# URL checks function
+urlchecks() {
+    if { [ ! -f "$called_fn_dir/.urlchecks" ] || [ "$DIFF" = true ]; } && [ "$URL_CHECK" = true ]; then
+        echo "[+] Starting URL Extraction"
+
+        mkdir -p js
+		[ ! -s ".tmp/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q .tmp/webs_all.txt
+		if [ -s ".tmp/webs_all.txt" ]; then
+			if [ ! "$AXIOM" = true ]; then
+				if [ "$URL_CHECK_PASSIVE" = true ]; then
+					if [ "$DEEP" = true ]; then
+						cat .tmp/webs_all.txt | unfurl -u domains > .tmp/waymore_input.txt
+						python3 ${tools}/waymore/waymore.py -i .tmp/waymore_input.txt -mode U -f -oU .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
+					else
+						cat .tmp/webs_all.txt | gau --threads $GAU_THREADS | anew -q .tmp/url_extract_tmp.txt
+					fi
+					if [ -s "${GITHUB_TOKENS}" ]; then
+						github-endpoints -q -k -d $domain -t ${GITHUB_TOKENS} -o .tmp/github-endpoints.txt 2>>"$LOGFILE" >/dev/null
+						[ -s ".tmp/github-endpoints.txt" ] && cat .tmp/github-endpoints.txt | anew -q .tmp/url_extract_tmp.txt
+					fi
+				fi
+				diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt 2>>"$LOGFILE") <(sort -u .tmp/webs_all.txt 2>>"$LOGFILE") | wc -l)
+				if [ $diff_webs != "0" ] || [ ! -s ".tmp/katana.txt" ]; then
+					if [ "$URL_CHECK_ACTIVE" = true ]; then
+						if [ "$DEEP" = true ]; then
+							katana -silent -list .tmp/webs_all.txt -jc -kf all -c $KATANA_THREADS -d 3 -fs rdn -o .tmp/katana.txt 2>>"$LOGFILE" >/dev/null
+						else
+							katana -silent -list .tmp/webs_all.txt -jc -kf all -c $KATANA_THREADS -d 2 -fs rdn -o .tmp/katana.txt 2>>"$LOGFILE" >/dev/null
+						fi
+					fi
+				fi
+			else
+				if [ "$URL_CHECK_PASSIVE" = true ]; then
+					if [ "$DEEP" = true ]; then
+						cat .tmp/webs_all.txt | unfurl -u domains > .tmp/waymore_input.txt
+						axiom-scan .tmp/waymore_input.txt -m waymore -o .tmp/url_extract_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+					else
+						axiom-scan .tmp/webs_all.txt -m gau -o .tmp/url_extract_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+						fi
+					if [ -s "${GITHUB_TOKENS}" ]; then
+						github-endpoints -q -k -d $domain -t ${GITHUB_TOKENS} -o .tmp/github-endpoints.txt 2>>"$LOGFILE" >/dev/null
+						[ -s ".tmp/github-endpoints.txt" ] && cat .tmp/github-endpoints.txt | anew -q .tmp/url_extract_tmp.txt
+					fi
+				fi
+				diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt) <(sort -u .tmp/webs_all.txt) | wc -l)
+				if [ $diff_webs != "0" ] || [ ! -s ".tmp/katana.txt" ]; then
+					if [ "$URL_CHECK_ACTIVE" = true ]; then
+						if [ "$DEEP" = true ]; then
+							axiom-scan .tmp/webs_all.txt -m katana -jc -kf all -d 3 -fs rdn -fs rdn -o .tmp/katana.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+						else
+							axiom-scan .tmp/webs_all.txt -m katana -jc -kf all -d 2 -fs rdn -fs rdn -o .tmp/katana.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+						fi	
+					fi
+				fi
+			fi
+			[ -s ".tmp/katana.txt" ] && sed -i '/^.\{2048\}./d' .tmp/katana.txt
+			[ -s ".tmp/katana.txt" ] && cat .tmp/katana.txt | anew -q .tmp/url_extract_tmp.txt
+			[ -s ".tmp/url_extract_tmp.txt" ] && cat .tmp/url_extract_tmp.txt | grep "${domain}" | grep -aEi "\.(js)" | anew -q .tmp/url_extract_js.txt
+			if [ "$DEEP" = true ]; then
+				[ -s ".tmp/url_extract_js.txt" ] && interlace -tL .tmp/url_extract_js.txt -threads 10 -c "python3 $tools/JSA/jsa.py -f target | anew -q .tmp/url_extract_tmp.txt" &>/dev/null
+			fi
+			[ -s ".tmp/url_extract_tmp.txt" ] &&  cat .tmp/url_extract_tmp.txt | grep "${domain}" | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | anew -q .tmp/url_extract_tmp2.txt
+			[ -s ".tmp/url_extract_tmp2.txt" ] && cat .tmp/url_extract_tmp2.txt | python3 $tools/urless/urless/urless.py | anew -q .tmp/url_extract_uddup.txt 2>>"$LOGFILE" >/dev/null
+			NUMOFLINES=$(cat .tmp/url_extract_uddup.txt 2>>"$LOGFILE" | anew webs/url_extract.txt | sed '/^$/d' | wc -l)
+			notification "${NUMOFLINES} new urls with params" info
+			end_func "Results are saved in $domain/webs/url_extract.txt" ${FUNCNAME[0]}
+			if [ "$PROXY" = true ] && [ -n "$proxy_url" ] && [[ $(cat webs/url_extract.txt | wc -l) -le $DEEP_LIMIT2 ]]; then
+				notification "Sending urls to proxy" info
+				ffuf -mc all -w webs/url_extract.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" >/dev/null
+			fi
+		fi
+    else
+        if [ "$URL_CHECK" = false ]; then
+            echo "[!] URL checks skipped in this mode or defined in reconftw.cfg"
+        else
+            echo "[!] URL checks are already processed, to force executing delete $called_fn_dir/.urlchecks"
+        fi
+    fi
+}
+
+# Parse command-line arguments
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -d|--domain)
+            domain="$2"
+            shift 2
+            ;;
+        -h|--help)
+            help_menu
+            exit 0
+            ;;
+        *)
+            echo "Unknown parameter: $1"
+            help_menu
+            exit 1
+            ;;
+    esac
+done
+
+# Validate input and start main function
+validate_input
+urlchecks

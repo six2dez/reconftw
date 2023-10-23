@@ -1,0 +1,81 @@
+#!/bin/bash
+
+# Load environment variables from reconftw.cfg
+# Load environment variables
+if [ -f "reconftw.cfg" ]; then
+    source reconftw.cfg
+else
+    echo "Error: reconftw.cfg not found!"
+    exit 1
+fi
+
+# Colors
+yellow="\033[1;33m"
+reset="\033[0m"
+
+# Help menu function
+function display_help() {
+    echo "Usage: $0 [OPTIONS]"
+    echo
+    echo "Perform Fuzzing params values checks on provided inputs."
+    echo "Options:"
+    echo "  -h, --help    Display this help and exit"
+    echo
+}
+
+# Validate requirements function
+function validate_requirements() {
+    if ! [ -x "$(command -v nuclei)" ]; then
+        echo "Error: nuclei not found." >&2
+        exit 1
+    fi
+    if ! [ -d "$tools/fuzzing-templates" ]; then
+        echo "Error: fuzzing-templates directory not found." >&2
+        exit 1
+    fi
+}
+
+# Fuzzing params values test function
+function fuzzparams_test() {
+    if { [ ! -f "$called_fn_dir/.fuzzparams" ] || [ "$DIFF" = true ]; } && [ "$FUZZPARAMS" = true ]; then
+        echo "[*] Starting Fuzzing params values checks"
+        if [ "$DEEP" = true ] || [[ $(cat webs/url_extract.txt | wc -l) -le $DEEP_LIMIT2 ]]; then
+            if [ ! "$AXIOM" = true ]; then
+                nuclei -update 2>>"$LOGFILE" >/dev/null
+                git -C $tools/fuzzing-templates pull
+                cat webs/url_extract.txt 2>/dev/null | nuclei -silent -retries 3 -rl $NUCLEI_RATELIMIT -t $tools/fuzzing-templates -o .tmp/fuzzparams.txt
+            else
+                axiom-exec "git clone https://github.com/projectdiscovery/fuzzing-templates /home/op/fuzzing-templates" &>/dev/null
+                axiom-scan webs/url_extract.txt -m nuclei -nh -retries 3 -w /home/op/fuzzing-templates -rl $NUCLEI_RATELIMIT -o .tmp/fuzzparams.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+            fi
+            [ -s ".tmp/fuzzparams.txt" ] && cat .tmp/fuzzparams.txt | anew -q vulns/fuzzparams.txt
+            echo "[+] Results are saved in vulns/fuzzparams.txt"
+        else
+            echo "[!] Fuzzing params values: Too many entries to test, try with --deep flag"
+        fi
+    else
+        if [ "$FUZZPARAMS" = false ]; then
+            echo -e "\n${yellow} fuzzparams skipped in this mode or defined in reconftw.cfg ${reset}"
+        else
+            echo -e "${yellow} fuzzparams is already processed, to force executing fuzzparams delete\n    $called_fn_dir/.fuzzparams ${reset}\n"
+        fi
+    fi
+}
+
+# Main script execution
+while (( "$#" )); do
+    case "$1" in
+        -h|--help)
+            display_help
+            exit 0
+            ;;
+        *) 
+            echo "Unknown parameter passed: $1"
+            display_help
+            exit 1
+            ;;
+    esac
+done
+
+validate_requirements
+fuzzparams_test

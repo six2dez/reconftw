@@ -1,0 +1,95 @@
+#!/bin/bash
+
+# Looks good, needs testing
+
+# Load environment variables
+if [ -f "reconftw.cfg" ]; then
+    source reconftw.cfg
+else
+    echo "Error: reconftw.cfg not found!"
+    exit 1
+fi
+
+
+
+function help_menu(){
+    echo "Usage: $0 [OPTIONS] [DOMAIN]"
+    echo ""
+    echo "Email Finder Tool"
+    echo ""
+    echo "Options:"
+    echo "  -h, --help            Show this help menu"
+    echo "  -d, --domain DOMAIN   Specify the domain target"
+    echo "  -o, --output DIR      Specify the output directory"
+    echo "  -f, --force           Force the execution even if already processed"
+}
+
+function validate_domain(){
+    if [[ ! "$1" =~ ^[a-zA-Z0-9.-]+$ ]]; then
+        echo "Error: Invalid domain format."
+        exit 1
+    fi
+}
+
+function emails(){
+    if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$EMAILS" = true ] && [ "$OSINT" = true ] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+        echo "Searching emails/users/passwords leaks"
+        emailfinder -d $domain 2>>"$LOGFILE" | anew -q .tmp/emailfinder.txt || { echo "emailfinder command failed"; exit 1; }
+        [ -s ".tmp/emailfinder.txt" ] && cat .tmp/emailfinder.txt | grep "@" | grep -iv "|_" | anew -q osint/emails.txt
+        echo "Results are saved in $domain/osint/emails.txt"
+    else
+        if [ "$EMAILS" = false ] || [ "$OSINT" = false ]; then
+            echo "${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg"
+        else
+            echo "${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete $called_fn_dir/.${FUNCNAME[0]}"
+        fi
+    fi
+}
+
+function main(){
+    local OUTPUT_DIR="./"
+    local FORCE=false
+    local DOMAIN=""
+
+    # Parse arguments
+    while [[ "$#" -gt 0 ]]; do
+        case $1 in
+            -h|--help) help_menu; exit 0 ;;
+            -d|--domain) DOMAIN="$2"; shift ;;
+            -o|--output) OUTPUT_DIR="$2"; shift ;;
+            -f|--force) FORCE=true ;;
+            *) 
+                # If a domain wasn't set using -d, then set it using the last argument
+                if [[ -z "$DOMAIN" ]]; then
+                    DOMAIN="$1"
+                else
+                    echo "Unknown parameter or multiple domains passed: $1"; exit 1;
+                fi
+                ;;
+        esac
+        shift
+    done
+
+    if [[ -z "$DOMAIN" ]]; then
+        echo "No domain provided."
+        help_menu
+        exit 1
+    fi
+
+    validate_domain "$DOMAIN"
+
+    # Define other variables
+    called_fn_dir="./called_functions"
+    DIFF=true
+    EMAILS=true
+    OSINT=true
+    LOGFILE="./log.txt"
+
+    echo "Processing domain: $DOMAIN"
+    
+    # Call the emails function
+    emails
+}
+
+# Execute the main function
+main "$@"

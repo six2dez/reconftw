@@ -1,0 +1,100 @@
+#!/bin/bash
+# Check manually, the logic for extracting the ips from dnsx results should be on reconftw.sh script, this script should only scan the ips
+
+# Load environment variables
+if [ -f "reconftw.cfg" ]; then
+    source reconftw.cfg
+else
+    echo "Error: reconftw.cfg not found!"
+    exit 1
+fi
+
+# Help function
+help_menu() {
+  echo "Usage: $0 [OPTIONS] DOMAIN"
+  echo ""
+  echo "Port Scan Tool"
+  echo ""
+  echo "Options:"
+  echo "  -h, --help            Show this help menu"
+  echo "  -d, --domain DOMAIN   Specify the domain to process"
+  echo "  -f, --force           Force the execution even if already processed"
+}
+
+# Start function
+start_func() {
+    echo "Starting $1..."
+}
+
+# End function
+end_func() {
+    echo "$1"
+    echo "End of $2..."
+}
+
+# Input validation
+if [ -z "$1" ]; then
+  help_menu
+  exit 1
+fi
+
+# Default values
+FORCE=false
+
+# Parse arguments
+while [[ "$#" -gt 0 ]]; do
+  case $1 in
+    -h|--help) help_menu; exit 0 ;;
+    -d|--domain) DOMAIN="$2"; shift ;;
+    -f|--force) FORCE=true ;;
+    *) echo "Unknown parameter passed: $1"; exit 1 ;;
+  esac
+  shift
+done
+
+# Validate domain format
+if [[ ! "$DOMAIN" =~ ^[a-zA-Z0-9.-]+$ ]] && ! [[ $DOMAIN =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "Invalid domain format."
+    exit 1
+fi
+
+if { [ ! -f "$called_fn_dir/.portscan" ] || [ "$FORCE" = true ]; } && [ "$PORTSCANNER" = true ]; then
+    start_func "portscan" "Port scan"
+    
+    if ! [[ $DOMAIN =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        # The following checks and actions are based on the original function logic
+        [ -s "subdomains/subdomains_dnsregs.json" ] && jq -r 'try . | "\(.host) \(.a[0])"' subdomains/subdomains_dnsregs.json | anew -q .tmp/subs_ips.txt
+        [ -s ".tmp/subs_ips.txt" ] && awk '{ print $2 " " $1}' .tmp/subs_ips.txt | sort -k2 -n | anew -q hosts/subs_ips_vhosts.txt
+        [ -s "hosts/subs_ips_vhosts.txt" ] && cut -d ' ' -f1 hosts/subs_ips_vhosts.txt | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
+    else 
+        echo $DOMAIN | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
+    fi
+
+    [ ! -s "hosts/cdn_providers.txt" ] && [ -s "hosts/ips.txt" ] && cdncheck -silent -resp -nc < hosts/ips.txt 2>/dev/null > hosts/cdn_providers.txt
+
+    [ -s "hosts/ips.txt" ] && comm -23 <(sort -u hosts/ips.txt) <(cut -d'[' -f1 hosts/cdn_providers.txt | sed 's/[[:space:]]*$//' | sort -u) | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | sort -u | anew -q .tmp/ips_nocdn.txt
+
+    printf "${bblue}\n Resolved IP addresses (No CDN) ${reset}\n\n"
+    [ -s ".tmp/ips_nocdn.txt" ] && sort .tmp/ips_nocdn.txt
+    printf "${bblue}\n Scanning ports... ${reset}\n\n"
+    
+    if [ "$PORTSCAN_PASSIVE" = true ] && [ ! -f "hosts/portscan_passive.txt" ] && [ -s ".tmp/ips_nocdn.txt" ]; then
+        smap -iL .tmp/ips_nocdn.txt > hosts/portscan_passive.txt
+    fi
+    
+    if [ "$PORTSCAN_ACTIVE" = true ]; then
+        if [ "$AXIOM" = true ]; then
+            [ -s ".tmp/ips_nocdn.txt" ] && axiom-scan .tmp/ips_nocdn.txt -m nmapx --top-ports 200 -sV -n -Pn --open --max-retries 2 --script vulners -oA hosts/portscan_active $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+        else
+            [ -s ".tmp/ips_nocdn.txt" ] && $SUDO nmap --top-ports 200 -sV -n --max-retries 2 -Pn --open --script vulners -iL .tmp/ips_nocdn.txt -oA hosts/portscan_active 2>>"$LOGFILE" >/dev/null
+        fi
+    fi
+    
+    end_func "Results are saved in hosts/portscan_[passive|active].txt" "portscan"
+else
+    if [ "$PORTSCANNER" = false ]; then
+        printf "\n${yellow} portscan skipped in this mode or defined in reconftw.cfg ${reset}\n"
+    else
+        printf "${yellow} portscan is already processed, to force executing portscan delete\n    $called_fn_dir/.portscan ${reset}\n\n"
+    fi
+fi

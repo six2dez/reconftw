@@ -1,0 +1,108 @@
+#!/bin/bash
+
+# Load environment variables from reconftw.cfg
+# Load environment variables
+if [ -f "reconftw.cfg" ]; then
+    source reconftw.cfg
+else
+    echo "Error: reconftw.cfg not found!"
+    exit 1
+fi
+
+# Colors
+yellow="\033[1;33m"
+bgreen="\033[1;32m"
+reset="\033[0m"
+
+# Help menu
+function display_help() {
+    echo "Usage: $0 [OPTIONS]"
+    echo
+    echo "Perform SSRF checks on provided inputs."
+    echo "Options:"
+    echo "  -d, --deep    Perform deep scanning"
+    echo "  -h, --help    Display this help and exit"
+    echo
+}
+
+# Validate the required tools and files
+function validate_requirements() {
+    if ! [ -x "$(command -v python3)" ]; then
+        echo "Error: python3 is not installed." >&2
+        exit 1
+    fi
+    if [ ! -f "$tools/Oralyzer/oralyzer.py" ]; then
+        echo "Error: Oralyzer tool is missing." >&2
+        exit 1
+    fi
+}
+
+# Main SSRF checks function
+function ssrf_checks() {
+    local deep_flag=$1
+
+    if { [ ! -f "$called_fn_dir/.ssrf_checks" ] || [ "$DIFF" = true ]; } && [ "$SSRF_CHECKS" = true ] && [ -s "gf/ssrf.txt" ]; then
+        echo "[*] Starting SSRF checks"
+        
+        if [ -z "$COLLAB_SERVER" ]; then
+            interactsh-client &>.tmp/ssrf_callback.txt &
+            sleep 2
+            COLLAB_SERVER_FIX="FFUFHASH.$(cat .tmp/ssrf_callback.txt | tail -n1 | cut -c 16-)"
+            COLLAB_SERVER_URL="http://$COLLAB_SERVER_FIX"
+            INTERACT=true
+        else
+            COLLAB_SERVER_FIX="FFUFHASH.$(echo ${COLLAB_SERVER} | sed -r "s/https?:\/\///")"
+            INTERACT=false
+        fi
+        if [ "$deep_flag" = true ] || [[ $(cat gf/ssrf.txt | wc -l) -le $DEEP_LIMIT ]]; then
+            cat gf/ssrf.txt | qsreplace ${COLLAB_SERVER_FIX} | anew -q .tmp/tmp_ssrf.txt
+            cat gf/ssrf.txt | qsreplace ${COLLAB_SERVER_URL} | anew -q .tmp/tmp_ssrf.txt
+            ffuf -v -H "${HEADER}" -t $FFUF_THREADS -rate $FFUF_RATELIMIT -w .tmp/tmp_ssrf.txt -u FUZZ 2>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssrf_requested_url.txt
+            ffuf -v -w .tmp/tmp_ssrf.txt:W1,$tools/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_FIX}" -t $FFUF_THREADS -rate $FFUF_RATELIMIT -u W1 2>/dev/null | anew -q vulns/ssrf_requested_headers.txt
+            ffuf -v -w .tmp/tmp_ssrf.txt:W1,$tools/headers_inject.txt:W2 -H "${HEADER}" -H "W2: ${COLLAB_SERVER_URL}" -t $FFUF_THREADS -rate $FFUF_RATELIMIT -u W1 2>/dev/null | anew -q vulns/ssrf_requested_headers.txt
+            sleep 5
+            if [ -s ".tmp/ssrf_callback.txt" ]; then 
+                cat .tmp/ssrf_callback.txt | tail -n+11 | anew -q vulns/ssrf_callback.txt 
+                NUMOFLINES=$(cat .tmp/ssrf_callback.txt | tail -n+12 | sed '/^$/d' | wc -l)
+                [ "$INTERACT" = true ] && echo "SSRF: ${NUMOFLINES} callbacks received"
+            fi
+            echo "[+] Results are saved in vulns/ssrf_*"
+        else
+            echo "[!] Skipping SSRF: Too many URLs to test, try with --deep flag"
+        fi
+        pkill -f interactsh-client &
+    else
+        if [ "$SSRF_CHECKS" = false ]; then
+            echo -e "\n${yellow} ssrf_checks skipped in this mode or defined in reconftw.cfg ${reset}"
+        elif [ ! -s "gf/ssrf.txt" ]; then
+            echo -e "\n${yellow} ssrf_checks No URLs potentially vulnerables to SSRF ${reset}\n"
+        else
+            echo -e "${yellow} ssrf_checks is already processed, to force executing ssrf_checks delete\n    $called_fn_dir/.ssrf_checks ${reset}\n"
+        fi
+    fi
+}
+
+# Main script execution
+deep_flag=false
+
+while (( "$#" )); do
+    case "$1" in
+        -d|--deep)
+            deep_flag=true
+            shift
+            ;;
+        -h|--help)
+            display_help
+            exit 0
+            ;;
+        *) 
+            echo "Unknown parameter passed: $1"
+            display_help
+            exit 1
+            ;;
+    esac
+done
+
+validate_requirements
+ssrf_checks $deep_flag
+

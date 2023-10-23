@@ -1,0 +1,97 @@
+#!/bin/bash
+
+# Load environment variables
+if [ -f "reconftw.cfg" ]; then
+    source reconftw.cfg
+else
+    echo "Error: reconftw.cfg not found!"
+    exit 1
+fi
+
+# Help menu function
+help_menu() {
+    echo "Usage: url_ext.sh [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  -i, --input-file <file>    Specify the input URL file for extraction."
+    echo "  -o, --output-file <file>   Specify the output file for URLs by extension."
+    echo "  -h, --help                 Display this help menu."
+    echo ""
+    echo "Example:"
+    echo "  url_ext.sh -i .tmp/url_extract_tmp.txt -o webs/urls_by_ext.txt"
+}
+
+# Input validation function
+validate_input() {
+    if [ -z "$input_file" ]; then
+        echo "Error: Input file not specified."
+        help_menu
+        exit 1
+    elif [ ! -f "$input_file" ]; then
+        echo "Error: Specified input file does not exist."
+        exit 1
+    fi
+
+    if [ -z "$output_file" ]; then
+        echo "Error: Output file not specified."
+        help_menu
+        exit 1
+    fi
+}
+
+# Extract URLs by extension function
+url_ext() {
+    if { [ ! -f "$called_fn_dir/.url_ext" ] || [ "$DIFF" = true ]; } && [ "$URL_EXT" = true ]; then
+        if [ -s "$input_file" ]; then
+            echo "[+] Extracting URLs by extension..."
+
+            ext=("7z" "achee" "action" "adr" "apk" "arj" "ascx" "asmx" "asp" "aspx" "axd" "backup" "bak" "bat" "bin" "bkf" "bkp" "bok" "cab" "cer" "cfg" "cfm" "cfml" "cgi" "cnf" "conf" "config" "cpl" "crt" "csr" "csv" "dat" "db" "dbf" "deb" "dmg" "dmp" "doc" "docx" "drv" "email" "eml" "emlx" "env" "exe" "gadget" "gz" "html" "ica" "inf" "ini" "iso" "jar" "java" "jhtml" "json" "jsp" "key" "log" "lst" "mai" "mbox" "mbx" "md" "mdb" "msg" "msi" "nsf" "ods" "oft" "old" "ora" "ost" "pac" "passwd" "pcf" "pdf" "pem" "pgp" "php" "php3" "php4" "php5" "phtm" "phtml" "pkg" "pl" "plist" "pst" "pwd" "py" "rar" "rb" "rdp" "reg" "rpm" "rtf" "sav" "sh" "shtm" "shtml" "skr" "sql" "swf" "sys" "tar" "tar.gz" "tmp" "toast" "tpl" "txt" "url" "vcd" "vcf" "wml" "wpd" "wsdl" "wsf" "xls" "xlsm" "xlsx" "xml" "xsd" "yaml" "yml" "z" "zip")
+
+            # Truncate or create the output file
+            echo "" > "$output_file"
+
+            for t in "${ext[@]}"; do
+                NUMOFLINES=$(grep -aEi "\.(${t})($|\/|\?)" "$input_file" | sort -u | sed '/^$/d' | wc -l)
+                if [[ $NUMOFLINES -gt 0 ]]; then
+                    echo -e "\n############################\n + ${t} + \n############################\n" >> "$output_file"
+                    grep -aEi "\.(${t})($|\/|\?)" "$input_file" >> "$output_file"
+                fi
+            done
+
+            echo "[+] Results are saved in $output_file"
+        fi
+    else
+        if [ "$URL_EXT" = false ]; then
+            echo "[!] URL_Ext skipped in this mode or defined in reconftw.cfg"
+        else
+            echo "[!] URL_Ext is already processed, to force executing delete $called_fn_dir/.url_ext"
+        fi
+    fi
+}
+
+# Parse command-line arguments
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -i|--input-file)
+            input_file="$2"
+            shift 2
+            ;;
+        -o|--output-file)
+            output_file="$2"
+            shift 2
+            ;;
+        -h|--help)
+            help_menu
+            exit 0
+            ;;
+        *)
+            echo "Unknown parameter: $1"
+            help_menu
+            exit 1
+            ;;
+    esac
+done
+
+# Validate input and start the main function
+validate_input
+url_ext

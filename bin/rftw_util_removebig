@@ -1,0 +1,53 @@
+#!/bin/bash
+
+# Load environment variables from reconftw.cfg
+# Load environment variables
+if [ -f "reconftw.cfg" ]; then
+    source reconftw.cfg
+else
+    echo "Error: reconftw.cfg not found!"
+    exit 1
+fi
+
+# Colors for console output
+green="\033[1;32m"
+red="\033[1;31m"
+reset="\033[0m"
+
+# Help menu function
+function display_help() {
+    echo "Usage: $0"
+    echo
+    echo "Removes specific files and any files larger than 200MB from .tmp directory."
+    echo "Logs errors to 'LOGFILE' specified in reconftw.cfg."
+    echo "Options:"
+    echo "  -h, --help    Display this help and exit"
+    echo
+}
+
+# Validate logfile existence function
+function validate_logfile() {
+    if [[ ! -w "$(dirname "$LOGFILE")" ]]; then
+        echo -e "${red}Error: Unable to write to LOGFILE directory: $(dirname "$LOGFILE").${reset}"
+        exit 2
+    fi
+}
+
+# Remove big files function
+function remove_big_files() {
+    rm -rf .tmp/gotator*.txt 2>>"$LOGFILE"
+    rm -rf .tmp/brute_recursive_wordlist.txt 2>>"$LOGFILE"
+    rm -rf .tmp/subs_dns_tko.txt  2>>"$LOGFILE"
+    rm -rf .tmp/subs_no_resolved.txt .tmp/subdomains_dns.txt .tmp/brute_dns_tko.txt .tmp/scrap_subs.txt .tmp/analytics_subs_clean.txt .tmp/gotator1.txt .tmp/gotator2.txt .tmp/passive_recursive.txt .tmp/brute_recursive_wordlist.txt .tmp/gotator1_recursive.txt .tmp/gotator2_recursive.txt 2>>"$LOGFILE"
+    find .tmp -type f -size +200M -exec rm -f {} + 2>>"$LOGFILE"
+    echo -e "${green}Specified files and large files in .tmp directory removed successfully.${reset}"
+}
+
+# Main script execution
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    display_help
+    exit 0
+fi
+
+validate_logfile
+remove_big_files

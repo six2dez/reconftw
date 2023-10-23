@@ -1,0 +1,82 @@
+#!/bin/bash
+
+# Load environment variables
+if [ -f "reconftw.cfg" ]; then
+    source reconftw.cfg
+else
+    echo "Error: reconftw.cfg not found!"
+    exit 1
+fi
+
+# Help function
+help_menu() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Website's WAF Detection Tool"
+    echo ""
+    echo "Options:"
+    echo "  -h, --help            Show this help menu"
+    echo "  -f, --force           Force the execution even if already processed"
+}
+
+# Start function
+start_func() {
+    echo "Starting $1: $2..."
+}
+
+# End function
+end_func() {
+    echo "$1"
+    echo "End of $2..."
+}
+
+# Notification function
+notification() {
+    echo "$1"
+}
+
+# Default values
+FORCE=false
+
+# Parse arguments
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -h|--help) help_menu; exit 0 ;;
+        -f|--force) FORCE=true ;;
+        *) echo "Unknown parameter passed: $1"; exit 1 ;;
+    esac
+    shift
+done
+
+if { [ ! -f "$called_fn_dir/.waf_checks" ] || [ "$FORCE" = true ]; } && [ "$WAF_DETECTION" = true ]; then
+    start_func "waf_checks" "Website's WAF detection"
+    
+    if [ ! -s ".tmp/webs_all.txt" ]; then
+        anew -q .tmp/webs_all.txt < <(cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null)
+    fi
+
+    if [ -s ".tmp/webs_all.txt" ]; then
+        if [ ! "$AXIOM" = true ]; then
+            wafw00f -i .tmp/webs_all.txt -o .tmp/wafs.txt 2>>"$LOGFILE" >/dev/null
+        else
+            axiom-scan .tmp/webs_all.txt -m wafw00f -o .tmp/wafs.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+        fi
+
+        if [ -s ".tmp/wafs.txt" ]; then
+            sed -e 's/^[ \t]*//' -e 's/ \+ /\t/g' -e '/(None)/d' .tmp/wafs.txt | tr -s "\t" ";" > webs/webs_wafs.txt
+            NUMOFLINES=$(sed '/^$/d' webs/webs_wafs.txt 2>>"$LOGFILE" | wc -l)
+            notification "${NUMOFLINES} websites protected by waf" info
+            end_func "Results are saved in $domain/webs/webs_wafs.txt" "waf_checks"
+        else
+            end_func "No results found" "waf_checks"
+        fi
+    else
+        end_func "No websites to scan" "waf_checks"
+    fi
+else
+    if [ "$WAF_DETECTION" = false ]; then
+        printf "\n${yellow} waf_checks skipped in this mode or defined in reconftw.cfg ${reset}\n"
+    else
+        printf "${yellow} waf_checks is already processed. To force executing waf_checks, delete\n    $called_fn_dir/.waf_checks ${reset}\n\n"
+    fi
+fi

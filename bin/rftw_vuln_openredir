@@ -1,0 +1,89 @@
+#!/bin/bash
+
+# Load environment variables from reconftw.cfg
+# Load environment variables
+if [ -f "reconftw.cfg" ]; then
+    source reconftw.cfg
+else
+    echo "Error: reconftw.cfg not found!"
+    exit 1
+fi
+
+# Colors
+yellow="\033[1;33m"
+bgreen="\033[1;32m"
+reset="\033[0m"
+
+# Help menu
+function display_help() {
+    echo "Usage: $0 [OPTIONS]"
+    echo
+    echo "Perform Open Redirects scan on provided inputs."
+    echo "Options:"
+    echo "  -d, --deep    Perform deep scanning"
+    echo "  -h, --help    Display this help and exit"
+    echo
+}
+
+# Validate the required tools and files
+function validate_requirements() {
+    if ! [ -x "$(command -v python3)" ]; then
+        echo "Error: python3 is not installed." >&2
+        exit 1
+    fi
+    if [ ! -f "$tools/Oralyzer/oralyzer.py" ] || [ ! -f "$tools/Oralyzer/payloads.txt" ]; then
+        echo "Error: Oralyzer tool or its payloads are missing." >&2
+        exit 1
+    fi
+}
+
+# Main Open Redirect function
+function open_redirect_scan() {
+    local deep_flag=$1
+
+    if { [ ! -f "$called_fn_dir/.open_redirect_scan" ] || [ "$DIFF" = true ]; } && [ "$OPEN_REDIRECT" = true ] && [ -s "gf/redirect.txt" ]; then
+        echo "[*] Starting Open Redirects checks"
+        
+        if [ "$deep_flag" = true ] || [[ $(cat gf/redirect.txt | wc -l) -le $DEEP_LIMIT ]]; then
+            cat gf/redirect.txt | qsreplace FUZZ | sed '/FUZZ/!d' | anew -q .tmp/tmp_redirect.txt
+            python3 $tools/Oralyzer/oralyzer.py -l .tmp/tmp_redirect.txt -p $tools/Oralyzer/payloads.txt > vulns/redirect.txt
+            sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" vulns/redirect.txt
+            echo "[+] Results are saved in vulns/redirect.txt"
+        else
+            echo "[!] Skipping Open redirects: Too many URLs to test, try with --deep flag"
+        fi
+    else
+        if [ "$OPEN_REDIRECT" = false ]; then
+            echo -e "\n${yellow} open_redirect_scan skipped in this mode or defined in reconftw.cfg ${reset}"
+        elif [ ! -s "gf/redirect.txt" ]; then
+            echo -e "\n${yellow} open_redirect_scan No URLs potentially vulnerables to Open Redirect ${reset}\n"
+        else
+            echo -e "${yellow} open_redirect_scan is already processed, to force executing open_redirect_scan delete\n    $called_fn_dir/.open_redirect_scan ${reset}\n"
+        fi
+    fi
+}
+
+# Main script execution
+deep_flag=false
+
+while (( "$#" )); do
+    case "$1" in
+        -d|--deep)
+            deep_flag=true
+            shift
+            ;;
+        -h|--help)
+            display_help
+            exit 0
+            ;;
+        *) 
+            echo "Unknown parameter passed: $1"
+            display_help
+            exit 1
+            ;;
+    esac
+done
+
+validate_requirements
+open_redirect_scan $deep_flag
+

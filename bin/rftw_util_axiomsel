@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# Load environment variables from reconftw.cfg
+# Load environment variables
+if [ -f "reconftw.cfg" ]; then
+    source reconftw.cfg
+else
+    echo "Error: reconftw.cfg not found!"
+    exit 1
+fi
+
+# Help menu function
+function display_help() {
+    echo "Usage: $0"
+    echo
+    echo "Check for running Axiom instances and whether any instances are selected."
+    echo
+    echo "Options:"
+    echo "  -h, --help    Display this help and exit"
+    echo
+}
+
+# Main Axiom check function
+function axiom_selected() {
+    # Check if there are any running axiom instances
+    if [[ ! $(axiom-ls | tail -n +2 | sed '$ d' | wc -l) -gt 0 ]]; then
+        # You might want to add a logging function here for "notification"
+        # notification "\n\n${bred} No axiom instances running ${reset}\n\n" error
+        echo -e "\n\n${bred} No axiom instances running ${reset}\n\n"
+        exit 1
+    fi
+
+    # Check if there are any selected axiom instances
+    if [[ ! $(cat ~/.axiom/selected.conf | sed '/^\s*$/d' | wc -l) -gt 0 ]]; then
+        # Again, consider adding a logging function here for "notification"
+        # notification "\n\n${bred} No axiom instances selected ${reset}\n\n" error
+        echo -e "\n\n${bred} No axiom instances selected ${reset}\n\n"
+        exit 1
+    fi
+
+    echo "Axiom instances are running and selected."
+}
+
+# Check arguments
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    display_help
+    exit 0
+else
+    axiom_selected
+fi

@@ -1,0 +1,64 @@
+#!/bin/bash
+
+# Load environment variables from reconftw.cfg
+# Load environment variables
+if [ -f "reconftw.cfg" ]; then
+    source reconftw.cfg
+else
+    echo "Error: reconftw.cfg not found!"
+    exit 1
+fi
+
+# Help menu
+function display_help() {
+    echo "Usage: $0"
+    echo
+    echo "Launch an Axiom fleet based on configurations in reconftw.cfg."
+    echo
+    echo "Options:"
+    echo "  -h, --help    Display this help and exit"
+    echo
+}
+
+# Main Axiom launch function
+function axiom_launch() {
+    if [ "$AXIOM_FLEET_LAUNCH" = true ] && [ -n "$AXIOM_FLEET_NAME" ] && [ -n "$AXIOM_FLEET_COUNT" ]; then
+        # Additional logging function can be used here, example:
+        # start_func ${FUNCNAME[0]} "Launching our Axiom fleet"
+
+        # Ensure the linode-cli tool is up-to-date
+        python3 -m pip install --upgrade linode-cli 2>>"$LOGFILE" >/dev/null
+        
+        # Check the current number of nodes
+        NUMOFNODES=$(timeout 30 axiom-ls | grep -c "$AXIOM_FLEET_NAME")
+
+        if [[ $NUMOFNODES -ge $AXIOM_FLEET_COUNT ]]; then
+            axiom-select "$AXIOM_FLEET_NAME*"
+            # Logging/notification example:
+            # end_func "Axiom fleet $AXIOM_FLEET_NAME already has $NUMOFNODES instances"
+        else
+            [ $NUMOFNODES -eq 0 ] && startcount=$AXIOM_FLEET_COUNT || startcount=$((AXIOM_FLEET_COUNT-NUMOFNODES))
+            
+            AXIOM_ARGS=" -i $startcount"
+            # Execute the axiom fleet command
+            axiom-fleet ${AXIOM_FLEET_NAME} ${AXIOM_ARGS}
+            
+            axiom-select "$AXIOM_FLEET_NAME*"
+            
+            [ -n "$AXIOM_POST_START" ] && eval "$AXIOM_POST_START" 2>>"$LOGFILE" >/dev/null
+
+            NUMOFNODES=$(timeout 30 axiom-ls | grep -c "$AXIOM_FLEET_NAME")
+            # Notification/logging example:
+            # echo "Axiom fleet $AXIOM_FLEET_NAME launched w/ $NUMOFNODES instances" | $NOTIFY
+            # end_func "Axiom fleet $AXIOM_FLEET_NAME launched w/ $NUMOFNODES instances"
+        fi
+    fi
+}
+
+# Main execution starts here
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    display_help
+    exit 0
+else
+    axiom_launch
+fi

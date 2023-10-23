@@ -1,0 +1,78 @@
+#!/bin/bash
+
+# Load environment variables from reconftw.cfg
+# Load environment variables
+if [ -f "reconftw.cfg" ]; then
+    source reconftw.cfg
+else
+    echo "Error: reconftw.cfg not found!"
+    exit 1
+fi
+
+# Display help information
+function display_help() {
+    echo "Usage: $0 <file>"
+    echo
+    echo "Send a specified file to notify providers based on configurations."
+    echo
+    echo "Options:"
+    echo "  -h, --help    Display this help and exit"
+    echo
+}
+
+# Main sendToNotify function
+function sendToNotify() {
+    local file="$1"
+
+    if [[ -z "$file" ]]; then
+        printf "\n${yellow}Error: No file provided to send${reset}\n"
+        display_help
+        exit 1
+    fi
+
+    if [[ -z "$NOTIFY_CONFIG" ]]; then
+        NOTIFY_CONFIG=~/.config/notify/provider-config.yaml
+    fi
+
+    if [ -n "$(find "$file" -prune -size +8000000c)" ]; then
+        printf '%s is larger than 8MB, sending over transfer.sh\n' "$file"
+        transfer "$file" | notify
+        return 0
+    fi
+
+    local config_value
+    for provider in telegram discord slack; do
+        if grep -q -E "^(    )?${provider}" "$NOTIFY_CONFIG"; then
+            case $provider in
+                telegram)
+                    notification "Sending ${domain} data over Telegram" info
+                    config_value=$(grep -E "^(    )?telegram_(chat_id|api_key)" "$NOTIFY_CONFIG" | xargs)
+                    telegram_chat_id=$(echo "$config_value" | cut -d' ' -f2)
+                    telegram_key=$(echo "$config_value" | cut -d' ' -f4)
+                    curl -F document=@"$file" "https://api.telegram.org/bot${telegram_key}/sendDocument?chat_id=${telegram_chat_id}" 2>>"$LOGFILE" >/dev/null
+                    ;;
+
+                discord)
+                    notification "Sending ${domain} data over Discord" info
+                    discord_url=$(grep -E "^(    )?discord_webhook_url" "$NOTIFY_CONFIG" | xargs | cut -d' ' -f2)
+                    curl -v -i -H "Accept: application/json" -H "Content-Type: multipart/form-data" -X POST -F file1=@"$file" "$discord_url" 2>>"$LOGFILE" >/dev/null
+                    ;;
+
+                slack)
+                    if [[ -n "$slack_channel" ]] && [[ -n "$slack_auth" ]]; then
+                        notification "Sending ${domain} data over Slack" info
+                        curl -F file=@"$file" -F "initial_comment=reconftw zip file" -F channels="$slack_channel" -H "Authorization: Bearer ${slack_auth}" https://slack.com/api/files.upload 2>>"$LOGFILE" >/dev/null
+                    fi
+                    ;;
+            esac
+        fi
+    done
+}
+
+# Check arguments and call the main function
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    display_help
+    exit 0
+else
+    sendToNotify "$1"
+fi
