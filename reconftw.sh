@@ -1,18 +1,5 @@
 #!/usr/bin/env bash
 
-# Welcome to reconFTW main script
-#	 ██▀███  ▓█████  ▄████▄   ▒█████   ███▄    █   █████▒▄▄▄█████▓ █     █░   
-#	▓██ ▒ ██▒▓█   ▀ ▒██▀ ▀█  ▒██▒  ██▒ ██ ▀█   █ ▓██   ▒ ▓  ██▒ ▓▒▓█░ █ ░█░   
-#	▓██ ░▄█ ▒▒███   ▒▓█    ▄ ▒██░  ██▒▓██  ▀█ ██▒▒████ ░ ▒ ▓██░ ▒░▒█░ █ ░█    
-#	▒██▀▀█▄  ▒▓█  ▄ ▒▓▓▄ ▄██▒▒██   ██░▓██▒  ▐▌██▒░▓█▒  ░ ░ ▓██▓ ░ ░█░ █ ░█    
-#	░██▓ ▒██▒░▒████▒▒ ▓███▀ ░░ ████▓▒░▒██░   ▓██░░▒█░      ▒██▒ ░ ░░██▒██▓    
-#	░ ▒▓ ░▒▓░░░ ▒░ ░░ ░▒ ▒  ░░ ▒░▒░▒░ ░ ▒░   ▒ ▒  ▒ ░      ▒ ░░   ░ ▓░▒ ▒     
-#	  ░▒ ░ ▒░ ░ ░  ░  ░  ▒     ░ ▒ ▒░ ░ ░░   ░ ▒░ ░          ░      ▒ ░ ░     
-#	  ░░   ░    ░   ░        ░ ░ ░ ▒     ░   ░ ░  ░ ░      ░        ░   ░     
-#	   ░        ░  ░░ ░          ░ ░           ░                      ░       
-#	
-# 																by @six2dez
-
 function banner_graber(){
 	source "${SCRIPTPATH}"/banners.txt
 	randx=$(shuf -i 1-23 -n 1)
@@ -30,9 +17,119 @@ function banner(){
 ################################################### TOOLS #####################################################
 ###############################################################################################################
 
-rftw_util_version
+function check_version(){
+	timeout 10 git fetch
+	exit_status=$?
+	if [ $exit_status -eq 0 ]; then
+		BRANCH=$(git rev-parse --abbrev-ref HEAD)
+		HEADHASH=$(git rev-parse HEAD)
+		UPSTREAMHASH=$(git rev-parse "${BRANCH}"@\{upstream\})
+		if [ "$HEADHASH" != "$UPSTREAMHASH" ]; then
+			printf "\n${yellow} There is a new version, run ./install.sh to get latest version${reset}\n\n"
+		fi
+	else
+		printf "\n${bred} Unable to check updates ${reset}\n\n"
+	fi
+}
 
-rftw_util_tools -t $tools
+function tools_installed(){
+
+	printf "\n\n${bgreen}#######################################################################${reset}\n"
+	printf "${bblue} Checking installed tools ${reset}\n\n"
+
+	allinstalled=true
+
+	[ -n "$GOPATH" ] || { printf "${bred} [*] GOPATH var			[NO]${reset}\n"; allinstalled=false;}
+	[ -n "$GOROOT" ] || { printf "${bred} [*] GOROOT var			[NO]${reset}\n"; allinstalled=false;}
+	[ -n "$PATH" ] || { printf "${bred} [*] PATH var			[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/dorks_hunter/dorks_hunter.py" ] || { printf "${bred} [*] dorks_hunter		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/brutespray/brutespray.py" ] || { printf "${bred} [*] brutespray			[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/fav-up/favUp.py" ] || { printf "${bred} [*] fav-up			[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/Corsy/corsy.py" ] || { printf "${bred} [*] Corsy			[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/testssl.sh/testssl.sh" ] || { printf "${bred} [*] testssl			[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/CMSeeK/cmseek.py" ] || { printf "${bred} [*] CMSeeK			[NO]${reset}\n"; allinstalled=false;}
+	[ -f "${fuzz_wordlist}" ] || { printf "${bred} [*] OneListForAll		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "${lfi_wordlist}" ] || { printf "${bred} [*] lfi_wordlist		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "${ssti_wordlist}" ] || { printf "${bred} [*] ssti_wordlist		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "${subs_wordlist}" ] || { printf "${bred} [*] subs_wordlist		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "${subs_wordlist_big}" ] || { printf "${bred} [*] subs_wordlist_big		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "${resolvers}" ] || { printf "${bred} [*] resolvers		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "${resolvers_trusted}" ] || { printf "${bred} [*] resolvers_trusted		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/xnLinkFinder/xnLinkFinder.py" ] || { printf "${bred} [*] xnLinkFinder		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/waymore/waymore.py" ] || { printf "${bred} [*] waymore		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/commix/commix.py" ] || { printf "${bred} [*] commix			[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/getjswords.py" ] || { printf "${bred} [*] getjswords   		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/JSA/jsa.py" ] || { printf "${bred} [*] JSA			[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/cloud_enum/cloud_enum.py" ] || { printf "${bred} [*] cloud_enum			[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/ultimate-nmap-parser/ultimate-nmap-parser.sh" ] || { printf "${bred} [*] nmap-parse-output		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/pydictor/pydictor.py" ] || { printf "${bred} [*] pydictor   		[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/urless/urless/urless.py" ] || { printf "${bred} [*] urless			[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/smuggler/smuggler.py" ] || { printf "${bred} [*] smuggler			[NO]${reset}\n"; allinstalled=false;}
+	[ -f "$tools/regulator/main.py" ] || { printf "${bred} [*] regulator			[NO]${reset}\n"; allinstalled=false;}
+	which github-endpoints &>/dev/null || { printf "${bred} [*] github-endpoints		[NO]${reset}\n"; allinstalled=false;}
+	which github-subdomains &>/dev/null || { printf "${bred} [*] github-subdomains		[NO]${reset}\n"; allinstalled=false;}
+	which gitlab-subdomains &>/dev/null || { printf "${bred} [*] gitlab-subdomains		[NO]${reset}\n"; allinstalled=false;}
+	which katana &>/dev/null || { printf "${bred} [*] katana			[NO]${reset}\n"; allinstalled=false;}
+	which wafw00f &>/dev/null || { printf "${bred} [*] wafw00f			[NO]${reset}\n"; allinstalled=false;}
+	which dnsvalidator &>/dev/null || { printf "${bred} [*] dnsvalidator		[NO]${reset}\n"; allinstalled=false;}
+	which gowitness &>/dev/null || { printf "${bred} [*] gowitness			[NO]${reset}\n"; allinstalled=false;}
+	which amass &>/dev/null || { printf "${bred} [*] Amass			[NO]${reset}\n"; allinstalled=false;}
+	which dnsx &>/dev/null || { printf "${bred} [*] dnsx			[NO]${reset}\n"; allinstalled=false;}
+	which gotator &>/dev/null || { printf "${bred} [*] gotator			[NO]${reset}\n"; allinstalled=false;}
+	which nuclei &>/dev/null || { printf "${bred} [*] Nuclei			[NO]${reset}\n"; allinstalled=false;}
+	[ -d ${NUCLEI_TEMPLATES_PATH} ] || { printf "${bred} [*] Nuclei templates	[NO]${reset}\n"; allinstalled=false;}
+	[ -d ${tools}/fuzzing-templates ] || { printf "${bred} [*] Fuzzing templates	[NO]${reset}\n"; allinstalled=false;}
+	which gf &>/dev/null || { printf "${bred} [*] Gf				[NO]${reset}\n"; allinstalled=false;}
+	which Gxss &>/dev/null || { printf "${bred} [*] Gxss			[NO]${reset}\n"; allinstalled=false;}
+	which subjs &>/dev/null || { printf "${bred} [*] subjs			[NO]${reset}\n"; allinstalled=false;}
+	which ffuf &>/dev/null || { printf "${bred} [*] ffuf			[NO]${reset}\n"; allinstalled=false;}
+	which massdns &>/dev/null || { printf "${bred} [*] Massdns			[NO]${reset}\n"; allinstalled=false;}
+	which qsreplace &>/dev/null || { printf "${bred} [*] qsreplace			[NO]${reset}\n"; allinstalled=false;}
+	which interlace &>/dev/null || { printf "${bred} [*] interlace			[NO]${reset}\n"; allinstalled=false;}
+	which anew &>/dev/null || { printf "${bred} [*] Anew			[NO]${reset}\n"; allinstalled=false;}
+	which unfurl &>/dev/null || { printf "${bred} [*] unfurl			[NO]${reset}\n"; allinstalled=false;}
+	which crlfuzz &>/dev/null || { printf "${bred} [*] crlfuzz			[NO]${reset}\n"; allinstalled=false;}
+	which httpx &>/dev/null || { printf "${bred} [*] Httpx			[NO]${reset}\n${reset}"; allinstalled=false;}
+	which jq &>/dev/null || { printf "${bred} [*] jq				[NO]${reset}\n${reset}"; allinstalled=false;}
+	which notify &>/dev/null || { printf "${bred} [*] notify			[NO]${reset}\n${reset}"; allinstalled=false;}
+	which dalfox &>/dev/null || { printf "${bred} [*] dalfox			[NO]${reset}\n${reset}"; allinstalled=false;}
+	which puredns &>/dev/null || { printf "${bred} [*] puredns			[NO]${reset}\n${reset}"; allinstalled=false;}
+	which emailfinder &>/dev/null || { printf "${bred} [*] emailfinder		[NO]${reset}\n"; allinstalled=false;}
+	which analyticsrelationships &>/dev/null || { printf "${bred} [*] analyticsrelationships	[NO]${reset}\n"; allinstalled=false;}
+	which mapcidr &>/dev/null || { printf "${bred} [*] mapcidr			[NO]${reset}\n"; allinstalled=false;}
+	which ppfuzz &>/dev/null || { printf "${bred} [*] ppfuzz			[NO]${reset}\n"; allinstalled=false;}
+	which cdncheck &>/dev/null || { printf "${bred} [*] cdncheck			[NO]${reset}\n"; allinstalled=false;}
+	which interactsh-client &>/dev/null || { printf "${bred} [*] interactsh-client		[NO]${reset}\n"; allinstalled=false;}
+	which tlsx &>/dev/null || { printf "${bred} [*] tlsx			[NO]${reset}\n"; allinstalled=false;}
+	which smap &>/dev/null || { printf "${bred} [*] smap			[NO]${reset}\n"; allinstalled=false;}
+	which gitdorks_go &>/dev/null || { printf "${bred} [*] gitdorks_go		[NO]${reset}\n"; allinstalled=false;}
+	which ripgen &>/dev/null || { printf "${bred} [*] ripgen			[NO]${reset}\n${reset}"; allinstalled=false;}
+	which dsieve &>/dev/null || { printf "${bred} [*] dsieve			[NO]${reset}\n${reset}"; allinstalled=false;}
+	which inscope &>/dev/null || { printf "${bred} [*] inscope			[NO]${reset}\n${reset}"; allinstalled=false;}
+	which enumerepo &>/dev/null || { printf "${bred} [*] enumerepo			[NO]${reset}\n${reset}"; allinstalled=false;}
+	which Web-Cache-Vulnerability-Scanner &>/dev/null || { printf "${bred} [*] Web-Cache-Vulnerability-Scanner [NO]${reset}\n"; allinstalled=false;}
+	which subfinder &>/dev/null || { printf "${bred} [*] subfinder			[NO]${reset}\n${reset}"; allinstalled=false;}
+	which byp4xx &>/dev/null || { printf "${bred} [*] byp4xx			[NO]${reset}\n${reset}"; allinstalled=false;}
+	which ghauri &>/dev/null || { printf "${bred} [*] ghauri			[NO]${reset}\n${reset}"; allinstalled=false;}
+	which hakip2host &>/dev/null || { printf "${bred} [*] hakip2host			[NO]${reset}\n${reset}"; allinstalled=false;}
+	which gau &>/dev/null || { printf "${bred} [*] gau			[NO]${reset}\n${reset}"; allinstalled=false;}
+	which crt &>/dev/null || { printf "${bred}  [*] crt			[NO]${reset}\n${reset}"; allinstalled=false;}
+	which gitleaks &>/dev/null || { printf "${bred} [*] gitleaks			[NO]${reset}\n${reset}"; allinstalled=false;}
+	which trufflehog &>/dev/null || { printf "${bred} [*] trufflehog			[NO]${reset}\n${reset}"; allinstalled=false;}
+	which s3scanner &>/dev/null || { printf "${bred} [*] s3scanner			[NO]${reset}\n${reset}"; allinstalled=false;}
+	
+	if [ "${allinstalled}" = true ]; then
+		printf "${bgreen} Good! All installed! ${reset}\n\n"
+	else
+		printf "\n${yellow} Try running the installer script again ./install.sh"
+		printf "\n${yellow} If it fails for any reason try to install manually the tools missed"
+		printf "\n${yellow} Finally remember to set the ${bred}\$tools${yellow} variable at the start of this script"
+		printf "\n${yellow} If nothing works and the world is gonna end you can always ping me :D ${reset}\n\n"
+	fi
+
+	printf "${bblue} Tools check finished\n"
+	printf "${bgreen}#######################################################################\n${reset}"
+}
 
 ###############################################################################################################
 ################################################### OSINT #####################################################
@@ -40,7 +137,7 @@ rftw_util_tools -t $tools
 
 function google_dorks(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$GOOGLE_DORKS" = true ] && [ "$OSINT" = true ]; then
-		rftw_osint_googledorks -d "$domain" -o osint/dorks.txt || { echo "dorks_hunter command failed"; exit 1; } 2>>"$LOGFILE" >/dev/null 2>&1
+		python3 $tools/dorks_hunter/dorks_hunter.py -d "$domain" -o osint/dorks.txt || { echo "dorks_hunter command failed"; exit 1; }
 		end_func "Results are saved in $domain/osint/dorks.txt" "${FUNCNAME[0]}"
 	else
 		if [ "$GOOGLE_DORKS" = false ] || [ "$OSINT" = false ]; then
@@ -54,7 +151,15 @@ function google_dorks(){
 function github_dorks(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$GITHUB_DORKS" = true ] && [ "$OSINT" = true ]; then
 		start_func "${FUNCNAME[0]}" "Github Dorks in process"
-		rftw_osint_gh_dorks -d "$domain" -t "${GITHUB_TOKENS}" -D "$DEEP" | anew -q osint/gitdorks.txt || { echo "gitdorks_go command failed"; exit 1; } 2>>"$LOGFILE" >/dev/null 2>&1
+		if [ -s "${GITHUB_TOKENS}" ]; then
+			if [ "$DEEP" = true ]; then
+				gitdorks_go -gd $tools/gitdorks_go/Dorks/medium_dorks.txt -nws 20 -target "$domain" -tf "${GITHUB_TOKENS}" -ew 3 | anew -q osint/gitdorks.txt || { echo "gitdorks_go/anew command failed"; exit 1; }
+			else
+				gitdorks_go -gd $tools/gitdorks_go/Dorks/smalldorks.txt -nws 20 -target $domain -tf "${GITHUB_TOKENS}" -ew 3 | anew -q osint/gitdorks.txt || { echo "gitdorks_go/anew command failed"; exit 1; }
+			fi
+		else
+			printf "\n${bred} Required file ${GITHUB_TOKENS} not exists or empty${reset}\n"
+		fi
 		end_func "Results are saved in $domain/osint/gitdorks.txt" "${FUNCNAME[0]}"
 	else
 		if [ "$GITHUB_DORKS" = false ] || [ "$OSINT" = false ]; then
@@ -985,7 +1090,7 @@ function cdnprovider(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$CDN_IP" = true ]; then
 		start_func ${FUNCNAME[0]} "CDN provider check"
 		[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r 'try . | .a[]' | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | sort -u > .tmp/ips_cdn.txt
-		[ -s ".tmp/ips_cdn.txt" ] && cat .tmp/ips_cdn.txt | rftw_ip_cdnprovider | anew -q $dir/hosts/cdn_providers.txt
+		[ -s ".tmp/ips_cdn.txt" ] && cat .tmp/ips_cdn.txt | cdncheck -silent -resp -nc | anew -q $dir/hosts/cdn_providers.txt
 		end_func "Results are saved in hosts/cdn_providers.txt" ${FUNCNAME[0]}
 	else
 		if [ "$CDN_IP" = false ]; then
