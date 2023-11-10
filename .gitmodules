@@ -1,0 +1,3 @@
+[submodule "assets/spinny"]
+	path = assets/spinny
+	url = https://github.com/hschne/spinny
