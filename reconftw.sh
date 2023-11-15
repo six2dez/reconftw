@@ -270,7 +270,7 @@ function emails(){
 function domain_info(){
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; } && [ "$DOMAIN_INFO" = true ] && [ "$OSINT" = true ] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Searching domain info (whois, registrant name/email domains)"
-		whois -H $domain > osint/domain_info_general.txt || { echo "whois command failed"; exit 1; }
+		whois -H $domain > osint/domain_info_general.txt || { echo "whois command failed"; }
 		if [ "$DEEP" = true ] || [ "$REVERSE_WHOIS" = true ]; then
 			timeout -k 1m ${AMASS_INTEL_TIMEOUT}m amass intel -d ${domain} -whois -timeout $AMASS_INTEL_TIMEOUT -o osint/domain_info_reverse_whois.txt 2>>"$LOGFILE" &>/dev/null
 		fi
