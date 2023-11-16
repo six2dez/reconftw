@@ -5,7 +5,6 @@ declare __spinny__spinner_pid
 declare -a __spinny__frames=()
 
 spinny::start() {
-  tput civis
   spinny::_spinner &
   __spinny__spinner_pid=$!
 }
@@ -16,6 +15,7 @@ spinny::stop() {
   kill -9 "$__spinny__spinner_pid" 
   # Use conditional to avoid exiting the program immediatly
   wait "$__spinny__spinner_pid" 2>/dev/null || true
+  printf "\r\033[K"
 }
 
 spinny::_spinner() {
@@ -26,12 +26,7 @@ spinny::_spinner() {
   do
     for frame in "${__spinny__frames[@]}"
     do
-      # After rendering each frame the cursor is reset to 
-      # the previous position so that the next frame can 
-      # overwrite it
-      tput sc
-      printf "%b" "$frame"
-      tput rc
+      printf "\r\033[K%s" "$frame"
       sleep "$delay"
     done
   done
@@ -45,7 +40,7 @@ spinny::_pad_frames() {
   local max_length
   max_length=$(spinny::_max_framelength)
   local array_length=${#__spinny__frames[@]}
-  for (( i=0; c<array_length; c++ )) do
+  for (( i=0; i<array_length; i++ )) do
     local frame=${__spinny__frames[i]}
     local frame_length=${#frame}
     diff=$((max_length - frame_length + 1))
