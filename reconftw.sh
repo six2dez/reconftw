@@ -360,12 +360,6 @@ function subdomains_full(){
 		sub_dns
 		sub_scraping
 		sub_analytics
-		sub_archive
-		sub_hackertarget
-		sub_certspotter
-		sub_anubisdb
-		sub_alienvault
-		sub_urlscan
 	else 
 		notification "IP/CIDR detected, subdomains search skipped" info
 		echo $domain | anew -q subdomains/subdomains.txt
@@ -908,102 +902,6 @@ function s3buckets(){
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
-		fi
-	fi
-}
-
-###############################################################################################################
-########################################### SUBDOMAIN FIND PROCEDURES #####################################################
-###############################################################################################################
-
-function sub_archive(){
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; }; then
-		start_subfunc "Running : archive.org Subdomain Enumeration"
-		curl -s "http://web.archive.org/cdx/search/cdx?url=*.${domain}/*&output=text&fl=original&collapse=urlkey" | sort |\
-		sed -e 's_https*://__' -e "s/\/.*//" -e 's/:.*//' -e 's/^www\.//' |sort -u >> .tmp/archive_psub.txt
-		NUMOFLINES=$(cat .tmp/archive_psub.txt 2>>"$LOGFILE" | anew .tmp/archive_pub.txt | wc -l)
-		end_subfunc "${NUMOFLINES} new subs by using archive.org" ${FUNCNAME[0]}
-	else
-		if [ "$SUBCRT" = false ]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
-		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
-		fi
-	fi
-}
-
-function sub_hackertarget(){
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; }; then
-		start_subfunc "Running : hackertarget.org  Subdomain Enumeration"
-		curl -s "https://api.hackertarget.com/hostsearch/?q=${domain}"|grep -o "\w.*$1">> .tmp/hackertarget_psub.txt
-		NUMOFLINES=$(cat .tmp/hackertarget_psub.txt 2>>"$LOGFILE" | anew .tmp/hackertarget_psub.txt | wc -l)
-		end_subfunc "${NUMOFLINES} new subs by using hackertarget.org" ${FUNCNAME[0]}
-	else
-		if [ "$SUBCRT" = false ]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
-		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
-		fi
-	fi
-}
-
-function sub_certspotter(){
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; }; then
-		start_subfunc "Running : certspotter.com  Subdomain Enumeration"
-		curl -s "https://api.certspotter.com/v1/issuances?domain=${domain}&expand=dns_names&expand=issuer&expand=issuer.caa_domains" | jq -r '.[].dns_names[]' 2>/dev/null | grep -o "\w.*$1" | sort -u >> .tmp/certspotter_psub.txt
-		NUMOFLINES=$(cat .tmp/certspotter_psub.txt 2>>"$LOGFILE" | anew .tmp/certspotter_psub.txt | wc -l)			
-		end_subfunc "${NUMOFLINES} new subs by using certspotter.com" ${FUNCNAME[0]}
-	else
-		if [ "$SUBCRT" = false ]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
-		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
-		fi
-	fi
-}
-
-function sub_anubisdb(){
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; }; then
-		start_subfunc "Running : anubisdb  Subdomain Enumeration"
-		curl -s "https://jldc.me/anubis/subdomains/${domain}" | jq -r '.' 2>/dev/null | grep -o "\w.*$1" | tr -d '",' >> .tmp/anubisdb_psub.txt
-		NUMOFLINES=$(cat .tmp/anubisdb_psub.txt 2>>"$LOGFILE" | anew .tmp/anubisdb_psub.txt | wc -l)
-		end_subfunc "${NUMOFLINES} new subs by using anubisdb" ${FUNCNAME[0]}
-	else
-		if [ "$SUBCRT" = false ]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
-		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
-		fi
-	fi
-}
-
-function sub_alienvault(){
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; }; then
-		start_subfunc "Running : alienvault  Subdomain Enumeration"
-		curl -s "https://otx.alienvault.com/api/v1/indicators/domain/${domain}/passive_dns"|		jq '.passive_dns[].hostname' 2>/dev/null |grep -o "\w.*${domain}"|sort -u > .tmp/alienvault_psub.txt
-		NUMOFLINES=$(cat .tmp/alienvault_psub.txt 2>>"$LOGFILE" | anew .tmp/alienvault_psub.txt | wc -l)
-		end_subfunc "${NUMOFLINES} new subs by using alienvault" ${FUNCNAME[0]}
-	else
-		if [ "$SUBCRT" = false ]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
-		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
-		fi
-	fi
-}
-
-function sub_urlscan(){
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; }; then
-		start_subfunc "Running : urlscan Subdomain Enumeration"
-		curl -s "https://urlscan.io/api/v1/search/?q=domain:${domain}"|jq '.results[].page.domain' >/dev/null |\
-		grep -o "\w.*$1"|sort -u > .tmp/urlscan_psub.txt
-		NUMOFLINES=$(cat .tmp/urlscan_psub.txt 2>>"$LOGFILE" | anew .tmp/urlscan_psub.txt | wc -l)
-		end_subfunc "${NUMOFLINES} new subs by using urlscan" ${FUNCNAME[0]}
-	else
-		if [ "$SUBCRT" = false ]; then
-				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
-		else
-				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 }
