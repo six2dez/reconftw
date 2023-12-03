@@ -13,6 +13,14 @@ function banner(){
 	printf "\n ${reconftw_version}                                 by @six2dez${reset}\n"
 }
 
+function test_connectivity(){
+	if nc -zw1 google.com 443 2>/dev/null; then
+		echo -e "${lgray}Connection: ${lgreen}OK${reset}"
+	else
+		echo -e "${lred}[!] Please check your internet connection and then try again...${reset}";exit 1
+	fi
+}
+
 ###############################################################################################################
 ################################################### TOOLS #####################################################
 ###############################################################################################################
@@ -1019,6 +1027,64 @@ function virtualhosts(){
 	fi
 }
 
+
+###############################################################################################################
+############################################# GEOLOCALIZATION INFO #######################################################
+###############################################################################################################
+
+
+function geo_info(){
+	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; }; then
+		start_func ${FUNCNAME[0]}  "Running: ipinfo via ipapi.co"
+		ips_file="${dir}/hosts/ips.txt"
+		if [ ! -f $ips_file ]; then
+			echo "File ${dir}/hosts/ips.txt does not exist."
+		else
+			for ip in $(cat "$ips_file"); do
+				json_output=$(curl -s https://ipapi.co/$ip/json)
+				echo $json_output >>  ${dir}/hosts/geoip.json	
+				ip=$(echo $json_output| jq '.ip' | tr -d '''"''')
+				network=$(echo $json_output| jq '.network' | tr -d '''"''')
+				city=$(echo $json_output| jq '.city' | tr -d '''"''')
+				region=$(echo $json_output| jq '.region' | tr -d '''"''')
+				country=$(echo $json_output| jq '.country' | tr -d '''"''')
+				country_name=$(echo $json_output| jq '.country_name' | tr -d '''"''')
+				country_code=$(echo $json_output| jq '.country_code' | tr -d '''"''')
+				country_code_iso3=$(echo $json_output| jq '.country_code_iso3' | tr -d '''"''')
+				country_tld=$(echo $json_output| jq '.country_tld' | tr -d '''"''')
+				continent_code=$(echo $json_output| jq '.continent_code' | tr -d '''"''')
+				latitude=$(echo $json_output| jq '.latitude' | tr -d '''"''')
+				longitude=$(echo $json_output| jq '.longitude' | tr -d '''"''')
+				timezone=$(echo $json_output| jq '.timezone' | tr -d '''"''')
+				utc_offset=$(echo $json_output| jq '.utc_offset' | tr -d '''"''')
+				asn=$(echo $json_output| jq '.asn' | tr -d '''"''')
+				org=$(echo $json_output| jq '.org' | tr -d '''"''')
+				
+				echo "IP: $ip" >> ${dir}/hosts/geoip.txt
+				echo "Network: $network" >> ${dir}/hosts/geoip.txt
+				echo "City: $city" >>  ${dir}/hosts/geoip.txt
+				echo "Region: $region" >>  ${dir}/hosts/geoip.txt
+				echo "Country: $country" >>  ${dir}/hosts/geoip.txt
+				echo "Country Name: $country_name" >>  ${dir}/hosts/geoip.txt
+				echo "Country Code: $country_code" >>  ${dir}/hosts/geoip.txt
+				echo "Country Code ISO3: $country_code_iso3" >>  ${dir}/hosts/geoip.txt
+				echo "Country tld: $country_tld" >>  ${dir}/hosts/geoip.txt
+				echo "Continent Code: $continent_code" >>  ${dir}/hosts/geoip.txt
+				echo "Latitude: $latitude" >>  ${dir}/hosts/geoip.txt
+				echo "Longitude: $longitude" >>  ${dir}/hosts/geoip.txt
+				echo "Timezone: $timezone" >>  ${dir}/hosts/geoip.txt
+				echo "UTC Offset: $utc_offset" >>  ${dir}/hosts/geoip.txt
+				echo "ASN: $asn" >>  ${dir}/hosts/geoip.txt
+				echo "ORG: $org" >>  ${dir}/hosts/geoip.txt
+				echo -e "------------------------------\n" >> ${dir}/hosts/geoip.txt
+			done
+		fi
+		end_func "Results are saved in hosts/geoip.txt and hosts/geoip.json" ${FUNCNAME[0]}
+	else
+		printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+	fi
+}
+
 ###############################################################################################################
 ############################################# HOST SCAN #######################################################
 ###############################################################################################################
@@ -1065,6 +1131,8 @@ function portscan(){
 		[ -s "hosts/ips.txt" ] && comm -23 <(cat hosts/ips.txt | sort -u) <(cat hosts/cdn_providers.txt | cut -d'[' -f1 | sed 's/[[:space:]]*$//' | sort -u) | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | sort -u | anew -q .tmp/ips_nocdn.txt
 		printf "${bblue}\n Resolved IP addresses (No CDN) ${reset}\n\n";
 		[ -s ".tmp/ips_nocdn.txt" ] && cat .tmp/ips_nocdn.txt | sort
+		geo_info
+
 		printf "${bblue}\n Scanning ports... ${reset}\n\n";
 		if [ "$PORTSCAN_PASSIVE" = true ] && [ ! -f "hosts/portscan_passive.txt" ] && [ -s ".tmp/ips_nocdn.txt" ] ; then
 			smap -iL .tmp/ips_nocdn.txt > hosts/portscan_passive.txt

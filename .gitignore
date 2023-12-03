@@ -2,6 +2,7 @@
 Recon/
 output/
 .obsidian/
+test/
 
 #Ignoring compressed files
 *.tar
