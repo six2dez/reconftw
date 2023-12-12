@@ -1461,6 +1461,30 @@ function portscan() {
 		[ -s ".tmp/ips_nocdn.txt" ] && cat .tmp/ips_nocdn.txt | sort
 		geo_info
 		printf "${bblue}\n Scanning ports... ${reset}\n\n"
+  		ips_file="${dir}/hosts/ips.txt"
+		if [ "$PORTSCAN_PASSIVE" = true ] ; then
+			if [ ! -f $ips_file ]; then
+				echo "File $ips_file does not exist."
+			else
+				start_subfunc "Running : Shodan to check for open ports "
+				for cip in $(cat "$ips_file"); do
+					json_result=$(curl -s https://internetdb.shodan.io/${cip})
+					json_array+=("$json_result")
+				done
+				formatted_json="["
+				for ((i=0; i<${#json_array[@]}; i++)); do
+					formatted_json+="$(echo ${json_array[i]} | tr -d '\n')"
+					if [ $i -lt $((${#json_array[@]}-1)) ]; then
+						formatted_json+=", "
+					fi
+				done
+				formatted_json+="]"
+				echo "$formatted_json" > "${dir}/hosts/shodan_results.json"	
+			fi
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
+		end_func "Results are saved in hosts/shodan_results.json" ${FUNCNAME[0]}
 		if [[ $PORTSCAN_PASSIVE == true ]] && [[ ! -f "hosts/portscan_passive.txt" ]] && [[ -s ".tmp/ips_nocdn.txt" ]]; then
 			smap -iL .tmp/ips_nocdn.txt >hosts/portscan_passive.txt
 		fi
