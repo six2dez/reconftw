@@ -117,6 +117,7 @@ function tools_installed(){
 	which gitleaks &>/dev/null || { printf "${bred} [*] gitleaks			[NO]${reset}\n${reset}"; allinstalled=false;}
 	which trufflehog &>/dev/null || { printf "${bred} [*] trufflehog			[NO]${reset}\n${reset}"; allinstalled=false;}
 	which s3scanner &>/dev/null || { printf "${bred} [*] s3scanner			[NO]${reset}\n${reset}"; allinstalled=false;}
+ 	which mantra &>/dev/null || { printf "${bred} [*] mantra			[NO]${reset}\n${reset}"; allinstalled=false;}
 	
 	if [ "${allinstalled}" = true ]; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
