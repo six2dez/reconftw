@@ -69,7 +69,7 @@ gotools["subfinder"]="go install -v github.com/projectdiscovery/subfinder/v2/cmd
 gotools["byp4xx"]="go install -v github.com/lobuhi/byp4xx@latest"
 gotools["hakip2host"]="go install -v github.com/hakluke/hakip2host@latest"
 gotools["gau"]="go install -v github.com/lc/gau/v2/cmd/gau@latest"
-gotools["Mantra"]="go install -v github.com/MrEmpy/Mantra@latest"
+gotools["mantra"]="go install -v github.com/MrEmpy/mantra@latest"
 gotools["crt"]="go install -v github.com/cemulus/crt@latest"
 gotools["s3scanner"]="go install -v github.com/sa7mon/s3scanner@latest" 
 
