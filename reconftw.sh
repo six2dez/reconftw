@@ -60,6 +60,7 @@ function tools_installed() {
 
 	allinstalled=true
 
+
 	[ -n "$GOPATH" ] || {
 		printf "${bred} [*] GOPATH var			[NO]${reset}\n"
 		allinstalled=false
@@ -372,7 +373,10 @@ function tools_installed() {
 		printf "${bred} [*] s3scanner			[NO]${reset}\n${reset}"
 		allinstalled=false
 	}
-
+  command -v mantra &>/dev/null || {
+		printf "${bred} [*] mantra			[NO]${reset}\n${reset}"
+		allinstalled=false
+	}
 	if [[ ${allinstalled} == true ]]; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
 	else
@@ -1848,6 +1852,7 @@ function jschecks() {
 				cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt
 			fi
 			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
+
 			if [[ $AXIOM != true ]]; then
 				[ -s "js/js_livelinks.txt" ] && cat js/js_livelinks.txt | Mantra -ua ${HEADER} -s | anew -q js/js_secrets.txt
 			else
