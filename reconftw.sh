@@ -1,5 +1,17 @@
 #!/usr/bin/env bash
 
+# Welcome to reconFTW main script
+#	 ██▀███  ▓█████  ▄████▄   ▒█████   ███▄    █   █████▒▄▄▄█████▓ █     █░
+#	▓██ ▒ ██▒▓█   ▀ ▒██▀ ▀█  ▒██▒  ██▒ ██ ▀█   █ ▓██   ▒ ▓  ██▒ ▓▒▓█░ █ ░█░
+#	▓██ ░▄█ ▒▒███   ▒▓█    ▄ ▒██░  ██▒▓██  ▀█ ██▒▒████ ░ ▒ ▓██░ ▒░▒█░ █ ░█
+#	▒██▀▀█▄  ▒▓█  ▄ ▒▓▓▄ ▄██▒▒██   ██░▓██▒  ▐▌██▒░▓█▒  ░ ░ ▓██▓ ░ ░█░ █ ░█
+#	░██▓ ▒██▒░▒████▒▒ ▓███▀ ░░ ████▓▒░▒██░   ▓██░░▒█░      ▒██▒ ░ ░░██▒██▓
+#	░ ▒▓ ░▒▓░░░ ▒░ ░░ ░▒ ▒  ░░ ▒░▒░▒░ ░ ▒░   ▒ ▒  ▒ ░      ▒ ░░   ░ ▓░▒ ▒
+#	  ░▒ ░ ▒░ ░ ░  ░  ░  ▒     ░ ▒ ▒░ ░ ░░   ░ ▒░ ░          ░      ▒ ░ ░
+#	  ░░   ░    ░   ░        ░ ░ ░ ▒     ░   ░ ░  ░ ░      ░        ░   ░
+#	   ░        ░  ░░ ░          ░ ░           ░                      ░
+#
+
 function banner_graber() {
 	source "${SCRIPTPATH}"/banners.txt
 	randx=$(shuf -i 1-23 -n 1)
@@ -13,11 +25,12 @@ function banner() {
 	printf "\n ${reconftw_version}                                 by @six2dez${reset}\n"
 }
 
-function test_connectivity(){
+function test_connectivity() {
 	if nc -zw1 google.com 443 2>/dev/null; then
-		echo -e "${lgray}Connection: ${lgreen}OK${reset}"
+		echo -e "Connection: ${bgreen}OK${reset}"
 	else
-		echo -e "${lred}[!] Please check your internet connection and then try again...${reset}";exit 1
+		echo -e "${bred}[!] Please check your internet connection and then try again...${reset}"
+		exit 1
 	fi
 }
 ###############################################################################################################
@@ -491,8 +504,8 @@ function postleaks() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $POSTMAN_LEAKS == true ]] && [[ $OSINT == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Scanning for leaks in postman public directory"
 
-		postleaksNg -k "$domain" >.tmp/postleaks.txt || {
-			echo "postleaksNg command failed"
+		porch-pirate -s "$domain" --dump >osint/postman_leaks.txt || {
+			echo "porch-pirate command failed"
 			exit 1
 		}
 
@@ -756,7 +769,7 @@ function sub_noerror() {
 			printf "\n${yellow} Detected DNSSEC black lies, skipping this technique ${reset}\n"
 		fi
 	else
-		if [[ $SUBBRUTE == false ]]; then
+		if [[ $SUBNOERROR == false ]]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -1213,56 +1226,54 @@ function s3buckets() {
 	spinny::stop
 }
 
-
 ###############################################################################################################
 ############################################# GEOLOCALIZATION INFO #######################################################
 ###############################################################################################################
 
-
-function geo_info(){
+function geo_info() {
 	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; }; then
-		start_func ${FUNCNAME[0]}  "Running: ipinfo via ipapi.co"
+		start_func ${FUNCNAME[0]} "Running: ipinfo via ipapi.co"
 		ips_file="${dir}/hosts/ips.txt"
 		if [ ! -f $ips_file ]; then
 			echo "File ${dir}/hosts/ips.txt does not exist."
 		else
 			for ip in $(cat "$ips_file"); do
 				json_output=$(curl -s https://ipapi.co/$ip/json)
-				echo $json_output >>  ${dir}/hosts/geoip.json	
-				ip=$(echo $json_output| jq '.ip' | tr -d '''"''')
-				network=$(echo $json_output| jq '.network' | tr -d '''"''')
-				city=$(echo $json_output| jq '.city' | tr -d '''"''')
-				region=$(echo $json_output| jq '.region' | tr -d '''"''')
-				country=$(echo $json_output| jq '.country' | tr -d '''"''')
-				country_name=$(echo $json_output| jq '.country_name' | tr -d '''"''')
-				country_code=$(echo $json_output| jq '.country_code' | tr -d '''"''')
-				country_code_iso3=$(echo $json_output| jq '.country_code_iso3' | tr -d '''"''')
-				country_tld=$(echo $json_output| jq '.country_tld' | tr -d '''"''')
-				continent_code=$(echo $json_output| jq '.continent_code' | tr -d '''"''')
-				latitude=$(echo $json_output| jq '.latitude' | tr -d '''"''')
-				longitude=$(echo $json_output| jq '.longitude' | tr -d '''"''')
-				timezone=$(echo $json_output| jq '.timezone' | tr -d '''"''')
-				utc_offset=$(echo $json_output| jq '.utc_offset' | tr -d '''"''')
-				asn=$(echo $json_output| jq '.asn' | tr -d '''"''')
-				org=$(echo $json_output| jq '.org' | tr -d '''"''')
-				
-				echo "IP: $ip" >> ${dir}/hosts/geoip.txt
-				echo "Network: $network" >> ${dir}/hosts/geoip.txt
-				echo "City: $city" >>  ${dir}/hosts/geoip.txt
-				echo "Region: $region" >>  ${dir}/hosts/geoip.txt
-				echo "Country: $country" >>  ${dir}/hosts/geoip.txt
-				echo "Country Name: $country_name" >>  ${dir}/hosts/geoip.txt
-				echo "Country Code: $country_code" >>  ${dir}/hosts/geoip.txt
-				echo "Country Code ISO3: $country_code_iso3" >>  ${dir}/hosts/geoip.txt
-				echo "Country tld: $country_tld" >>  ${dir}/hosts/geoip.txt
-				echo "Continent Code: $continent_code" >>  ${dir}/hosts/geoip.txt
-				echo "Latitude: $latitude" >>  ${dir}/hosts/geoip.txt
-				echo "Longitude: $longitude" >>  ${dir}/hosts/geoip.txt
-				echo "Timezone: $timezone" >>  ${dir}/hosts/geoip.txt
-				echo "UTC Offset: $utc_offset" >>  ${dir}/hosts/geoip.txt
-				echo "ASN: $asn" >>  ${dir}/hosts/geoip.txt
-				echo "ORG: $org" >>  ${dir}/hosts/geoip.txt
-				echo -e "------------------------------\n" >> ${dir}/hosts/geoip.txt
+				echo $json_output >>${dir}/hosts/geoip.json
+				ip=$(echo $json_output | jq '.ip' | tr -d '''"''')
+				network=$(echo $json_output | jq '.network' | tr -d '''"''')
+				city=$(echo $json_output | jq '.city' | tr -d '''"''')
+				region=$(echo $json_output | jq '.region' | tr -d '''"''')
+				country=$(echo $json_output | jq '.country' | tr -d '''"''')
+				country_name=$(echo $json_output | jq '.country_name' | tr -d '''"''')
+				country_code=$(echo $json_output | jq '.country_code' | tr -d '''"''')
+				country_code_iso3=$(echo $json_output | jq '.country_code_iso3' | tr -d '''"''')
+				country_tld=$(echo $json_output | jq '.country_tld' | tr -d '''"''')
+				continent_code=$(echo $json_output | jq '.continent_code' | tr -d '''"''')
+				latitude=$(echo $json_output | jq '.latitude' | tr -d '''"''')
+				longitude=$(echo $json_output | jq '.longitude' | tr -d '''"''')
+				timezone=$(echo $json_output | jq '.timezone' | tr -d '''"''')
+				utc_offset=$(echo $json_output | jq '.utc_offset' | tr -d '''"''')
+				asn=$(echo $json_output | jq '.asn' | tr -d '''"''')
+				org=$(echo $json_output | jq '.org' | tr -d '''"''')
+
+				echo "IP: $ip" >>${dir}/hosts/geoip.txt
+				echo "Network: $network" >>${dir}/hosts/geoip.txt
+				echo "City: $city" >>${dir}/hosts/geoip.txt
+				echo "Region: $region" >>${dir}/hosts/geoip.txt
+				echo "Country: $country" >>${dir}/hosts/geoip.txt
+				echo "Country Name: $country_name" >>${dir}/hosts/geoip.txt
+				echo "Country Code: $country_code" >>${dir}/hosts/geoip.txt
+				echo "Country Code ISO3: $country_code_iso3" >>${dir}/hosts/geoip.txt
+				echo "Country tld: $country_tld" >>${dir}/hosts/geoip.txt
+				echo "Continent Code: $continent_code" >>${dir}/hosts/geoip.txt
+				echo "Latitude: $latitude" >>${dir}/hosts/geoip.txt
+				echo "Longitude: $longitude" >>${dir}/hosts/geoip.txt
+				echo "Timezone: $timezone" >>${dir}/hosts/geoip.txt
+				echo "UTC Offset: $utc_offset" >>${dir}/hosts/geoip.txt
+				echo "ASN: $asn" >>${dir}/hosts/geoip.txt
+				echo "ORG: $org" >>${dir}/hosts/geoip.txt
+				echo -e "------------------------------\n" >>${dir}/hosts/geoip.txt
 			done
 		fi
 		end_func "Results are saved in hosts/geoip.txt and hosts/geoip.json" ${FUNCNAME[0]}
@@ -1270,9 +1281,6 @@ function geo_info(){
 		printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 }
-
-
-
 
 ###############################################################################################################
 ########################################### WEB DETECTION #####################################################
@@ -1455,14 +1463,14 @@ function portscan() {
 		else
 			echo $domain | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | anew -q hosts/ips.txt
 		fi
-		[ ! -s "hosts/cdn_providers.txt" ] && cat hosts/ips.txt 2>/dev/null | cdncheck -silent -resp -nc 2>/dev/null >hosts/cdn_providers.txt
+		[ ! -s "hosts/cdn_providers.txt" ] && cat hosts/ips.txt 2>/dev/null | cdncheck -silent -resp -cdn -waf -nc 2>/dev/null >hosts/cdn_providers.txt
 		[ -s "hosts/ips.txt" ] && comm -23 <(cat hosts/ips.txt | sort -u) <(cat hosts/cdn_providers.txt | cut -d'[' -f1 | sed 's/[[:space:]]*$//' | sort -u) | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | sort -u | anew -q .tmp/ips_nocdn.txt
 		printf "${bblue}\n Resolved IP addresses (No CDN) ${reset}\n\n"
 		[ -s ".tmp/ips_nocdn.txt" ] && cat .tmp/ips_nocdn.txt | sort
 		geo_info
 		printf "${bblue}\n Scanning ports... ${reset}\n\n"
-  		ips_file="${dir}/hosts/ips.txt"
-		if [ "$PORTSCAN_PASSIVE" = true ] ; then
+		ips_file="${dir}/hosts/ips.txt"
+		if [ "$PORTSCAN_PASSIVE" = true ]; then
 			if [ ! -f $ips_file ]; then
 				echo "File $ips_file does not exist."
 			else
@@ -1472,14 +1480,14 @@ function portscan() {
 					json_array+=("$json_result")
 				done
 				formatted_json="["
-				for ((i=0; i<${#json_array[@]}; i++)); do
+				for ((i = 0; i < ${#json_array[@]}; i++)); do
 					formatted_json+="$(echo ${json_array[i]} | tr -d '\n')"
-					if [ $i -lt $((${#json_array[@]}-1)) ]; then
+					if [ $i -lt $((${#json_array[@]} - 1)) ]; then
 						formatted_json+=", "
 					fi
 				done
 				formatted_json+="]"
-				echo "$formatted_json" > "${dir}/hosts/shodan_results.json"	
+				echo "$formatted_json" >"${dir}/hosts/shodan_results.json"
 			fi
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -2160,6 +2168,7 @@ function ssti() {
 		if [[ -s "gf/ssti.txt" ]]; then
 			cat gf/ssti.txt | qsreplace FUZZ | sed '/FUZZ/!d' | anew -q .tmp/tmp_ssti.txt
 			if [[ $DEEP == true ]] || [[ $(cat .tmp/tmp_ssti.txt | wc -l) -le $DEEP_LIMIT ]]; then
+				#TInjA url -u "file://.tmp/tmp_ssti.txt" --csti --reportpath "vulns/"
 				interlace -tL .tmp/tmp_ssti.txt -threads ${INTERLACE_THREADS} -c "ffuf -v -r -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w ${ssti_wordlist} -u \"_target_\" -mr \"ssti49\" " 2>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssti.txt
 				end_func "Results are saved in vulns/ssti.txt" ${FUNCNAME[0]}
 			else
