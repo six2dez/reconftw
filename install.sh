@@ -249,12 +249,6 @@ function install_tools() {
 banner
 printf "\n${bgreen} reconFTW installer/updater script ${reset}\n\n"
 
-if [[ -d $dir && -d ~/.gf && -d ~/.config/notify/ && -d ~/.config/amass/ && -d ~/.config/nuclei/ && -f "${dir}"/.github_tokens ]]; then
-	rftw_installed=true
-else
-	rftw_installed=false
-fi
-
 printf "${yellow} This may take time. So, go grab a coffee! ${reset}\n\n"
 
 if [[ $(id -u | grep -o '^0$') == "0" ]]; then
