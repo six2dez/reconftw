@@ -3,6 +3,7 @@ Recon/
 output/
 .obsidian/
 test/
+.trunk/
 
 #Ignoring compressed files
 *.tar
