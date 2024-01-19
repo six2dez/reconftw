@@ -433,7 +433,6 @@ wget -q -O - https://gist.githubusercontent.com/six2dez/ab5277b11da7369bf4e9db72
 wget -q -O - https://gist.github.com/six2dez/d62ab8f8ffd28e1c206d401081d977ae/raw >${tools}/headers_inject.txt
 wget -q -O - https://gist.githubusercontent.com/six2dez/6e2d9f4932fd38d84610eb851014b26e/raw >${tools}/axiom_config.sh
 eval $SUDO chmod +x ${tools}/axiom_config.sh
-eval $SUDO mv $SCRIPTPATH/assets/potential.json ~/.gf/potential.json
 
 ## Last check
 if [[ $double_check == "true" ]]; then
