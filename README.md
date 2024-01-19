@@ -7,8 +7,8 @@
 </h1>
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.7.1">
-    <img src="https://img.shields.io/badge/release-v2.7.1-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.8.1">
+    <img src="https://img.shields.io/badge/release-v2.8.1-green">
   </a>
    </a>
   <a href="https://opensource.org/licenses/MIT">
@@ -318,7 +318,6 @@ DNSVALIDATOR_THREADS=200
 INTERLACE_THREADS=10
 TLSX_THREADS=1000
 XNLINKFINDER_DEPTH=3
-BYP4XX_THREADS=20
 
 # Rate limits
 HTTPX_RATELIMIT=150
@@ -474,6 +473,7 @@ reset='\033[0m'
 - Domain information ([whois](https://github.com/rfc1036/whois) and [amass](https://github.com/OWASP/Amass))
 - Emails addresses and users ([emailfinder](https://github.com/Josue87/EmailFinder))
 - Metadata finder ([MetaFinder](https://github.com/Josue87/MetaFinder))
+- API leaks search ([porch-pirate](https://github.com/MandConsultingGroup/porch-pirate) and [SwaggerSpy](https://github.com/UndeadSec/SwaggerSpy))
 - Google Dorks ([dorks_hunter](https://github.com/six2dez/dorks_hunter))
 - Github Dorks ([gitdorks_go](https://github.com/damit5/gitdorks_go))
 - GitHub org analysis ([enumerepo](https://github.com/trickest/enumerepo), [trufflehog](https://github.com/trufflesecurity/trufflehog) and [gitleaks](https://github.com/gitleaks/gitleaks))
@@ -533,7 +533,7 @@ reset='\033[0m'
 - Broken Links Checker ([katana](https://github.com/projectdiscovery/katana))
 - Prototype Pollution ([ppfuzz](https://github.com/dwisiswant0/ppfuzz))
 - Web Cache Vulnerabilities ([Web-Cache-Vulnerability-Scanner](https://github.com/Hackmanit/Web-Cache-Vulnerability-Scanner))
-- 4XX Bypasser ([byp4xx](https://github.com/lobuhi/byp4xx))
+- 4XX Bypasser ([dontgo403](https://github.com/devploit/dontgo403))
 
 ## Extras
 
