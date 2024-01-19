@@ -2366,13 +2366,16 @@ function smuggling() {
 				exit 1
 			}
 			cat $dir/.tmp/webs_all.txt | python3 smuggler.py -q --no-color 2>/dev/null | anew -q $dir/.tmp/smuggling.txt
+			mkdir -p $dir/vulns/smuggling/
+			find payloads -type f ! -name "README*" -exec mv {} $dir/vulns/smuggling/ \;
 			popd >/dev/null || {
 				echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
 				exit 1
-			}			[ -s ".tmp/smuggling.txt" ] && cat .tmp/smuggling.txt | anew -q vulns/smuggling.txt
-			end_func "Results are saved in vulns/smuggling.txt" ${FUNCNAME[0]}
+			}			
+			[ -s ".tmp/smuggling.txt" ] && cat .tmp/smuggling.txt | anew -q vulns/smuggling_log.txt
+			end_func "Results are saved in vulns/smuggling_log.txt and findings in vulns/smuggling/" ${FUNCNAME[0]}
 		else
-			end_func "Skipping Prototype Pollution: Too many webs to test, try with --deep flag" ${FUNCNAME[0]}
+			end_func "Skipping Request Smuggling: Too many webs to test, try with --deep flag" ${FUNCNAME[0]}
 		fi
 	else
 		if [[ $SMUGGLING == false ]]; then
