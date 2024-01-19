@@ -517,7 +517,7 @@ function apileaks() {
 			echo "Failed to pushd to ${tools}/SwaggerSpy in ${FUNCNAME[0]} @ line ${LINENO}"
 			exit 1
 		}
-		python3 swaggerspy.py $domain > ../osint/swagger_leaks.txt 2>>"$LOGFILE" || {
+		python3 swaggerspy.py $domain > ${dir}/osint/swagger_leaks.txt 2>>"$LOGFILE" || {
 			echo "swaggerspy command failed"
 			exit 1
 		}
