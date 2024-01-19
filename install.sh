@@ -103,6 +103,7 @@ repos["ghauri"]="r0oth3x49/ghauri"
 repos["gitleaks"]="gitleaks/gitleaks"
 repos["trufflehog"]="trufflesecurity/trufflehog"
 repos["dontgo403"]="devploit/dontgo403"
+repos["SwaggerSpy"]="UndeadSec/SwaggerSpy"
 
 function banner() {
 	tput clear

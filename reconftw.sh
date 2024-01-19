@@ -169,6 +169,10 @@ function tools_installed() {
 		printf "${bred} [*] regulator			[NO]${reset}\n"
 		allinstalled=false
 	}
+	[ -f "${tools}/dontgo403/dontgo403" ] || {
+		printf "${bred} [*] dontgo403			[NO]${reset}\n"
+		allinstalled=false
+	}
 	command -v github-endpoints &>/dev/null || {
 		printf "${bred} [*] github-endpoints		[NO]${reset}\n"
 		allinstalled=false
@@ -341,10 +345,6 @@ function tools_installed() {
 		printf "${bred} [*] subfinder			[NO]${reset}\n${reset}"
 		allinstalled=false
 	}
-	command -v byp4xx &>/dev/null || {
-		printf "${bred} [*] byp4xx			[NO]${reset}\n${reset}"
-		allinstalled=false
-	}
 	command -v ghauri &>/dev/null || {
 		printf "${bred} [*] ghauri			[NO]${reset}\n${reset}"
 		allinstalled=false
@@ -503,24 +503,37 @@ function metadata() {
 	spinny::stop
 }
 
-function postleaks() {
+function apileaks() {
 	spinny::start
-	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $POSTMAN_LEAKS == true ]] && [[ $OSINT == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
-		start_func ${FUNCNAME[0]} "Scanning for leaks in postman public directory"
+	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $API_LEAKS == true ]] && [[ $OSINT == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+		start_func ${FUNCNAME[0]} "Scanning for leaks in APIs public directories"
 
 		porch-pirate -s "$domain" --dump >osint/postman_leaks.txt || {
 			echo "porch-pirate command failed"
 			exit 1
 		}
 
+		pushd "${tools}/SwaggerSpy" >/dev/null || {
+			echo "Failed to pushd to ${tools}/SwaggerSpy in ${FUNCNAME[0]} @ line ${LINENO}"
+			exit 1
+		}
+		python swaggerspy.py -d $domain -o ../osint/swagger_leaks.txt 2>>"$LOGFILE" || {
+			echo "swaggerspy command failed"
+			exit 1
+		}
+		popd >/dev/null || {
+			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
+			exit 1
+		}
+
 		end_func "Results are saved in $domain/osint/[software/authors/metadata_results].txt" ${FUNCNAME[0]}
 	else
-		if [[ $POSTMAN_LEAKS == false ]] || [[ $OSINT == false ]]; then
+		if [[ $API_LEAKS == false ]] || [[ $OSINT == false ]]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 			return
 		else
-			if [[ $POSTMAN_LEAKS == false ]] || [[ $OSINT == false ]]; then
+			if [[ $API_LEAKS == false ]] || [[ $OSINT == false ]]; then
 				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 			else
 				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -996,13 +1009,16 @@ function sub_regex_permut() {
 	spinny::start
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBREGEXPERMUTE == true ]]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Permutations by regex analysis"
-		cd "${tools}/regulator" || {
+		
+		pushd "${tools}/regulator" >/dev/null || {
 			echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
 			exit 1
 		}
+
 		python3 main.py -t $domain -f ${dir}/subdomains/subdomains.txt -o ${dir}/.tmp/${domain}.brute
-		cd "$dir" || {
-			echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"
+
+		popd >/dev/null || {
+			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
 			exit 1
 		}
 
@@ -1423,10 +1439,11 @@ function favicon() {
 	spinny::start
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $FAVICON == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Favicon Ip Lookup"
-		cd "${tools}/fav-up" || {
+		pushd "${tools}/fav-up" >/dev/null || {
 			echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"
 			exit 1
 		}
+		
 		python3 favUp.py -w "$domain" -sc -o favicontest.json 2>>"$LOGFILE" >/dev/null
 		if [[ -s "favicontest.json" ]]; then
 			cat favicontest.json | jq -r 'try .found_ips' 2>>"$LOGFILE" | grep -v "not-found" >favicontest.txt
@@ -1435,8 +1452,9 @@ function favicon() {
 			mv favicontest.txt $dir/hosts/favicontest.txt 2>>"$LOGFILE"
 			rm -f favicontest.json 2>>"$LOGFILE"
 		fi
-		cd "$dir" || {
-			echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"
+		
+		popd >/dev/null || {
+			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
 			exit 1
 		}
 		end_func "Results are saved in hosts/favicontest.txt" ${FUNCNAME[0]}
@@ -2239,13 +2257,15 @@ function spraying() {
 	spinny::start
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SPRAY == true ]]; then
 		start_func ${FUNCNAME[0]} "Password spraying"
-		cd "${tools}/brutespray" || {
+
+		pushd "${tools}/brutespray" >/dev/null || {
 			echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
 			exit 1
 		}
+
 		python3 brutespray.py --file $dir/hosts/portscan_active.gnmap --threads $BRUTESPRAY_THREADS --hosts $BRUTESPRAY_CONCURRENCE -o $dir/vulns/brutespray 2>>"$LOGFILE" >/dev/null
-		cd "$dir" || {
-			echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
+		popd >/dev/null || {
+			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
 			exit 1
 		}
 		end_func "Results are saved in vulns/brutespray folder" ${FUNCNAME[0]}
@@ -2288,17 +2308,19 @@ function 4xxbypass() {
 		if [[ $(cat fuzzing/fuzzing_full.txt 2>/dev/null | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 | wc -l) -le 1000 ]] || [[ $DEEP == true ]]; then
 			start_func "403 bypass"
 			cat $dir/fuzzing/fuzzing_full.txt 2>/dev/null | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 >$dir/.tmp/403test.txt
-			cd "${tools}/byp4xx" || {
+
+			pushd "${tools}/dontgo403" >/dev/null || {
 				echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
 				exit 1
 			}
-			byp4xx -threads $BYP4XX_THREADS $dir/.tmp/403test.txt >$dir/.tmp/byp4xx.txt
-			cd "$dir" || {
-				echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
+
+			cat $dir/.tmp/403test.txt | ./dontgo403 >$dir/.tmp/4xxbypass.txt
+			popd >/dev/null || {
+				echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
 				exit 1
 			}
-			[ -s ".tmp/byp4xx.txt" ] && cat .tmp/byp4xx.txt | anew -q vulns/byp4xx.txt
-			end_func "Results are saved in vulns/byp4xx.txt" ${FUNCNAME[0]}
+			[ -s ".tmp/4xxbypass.txt" ] && cat .tmp/4xxbypass.txt | anew -q vulns/4xxbypass.txt
+			end_func "Results are saved in vulns/4xxbypass.txt" ${FUNCNAME[0]}
 		else
 			notification "Too many urls to bypass, skipping" warn
 		fi
@@ -2339,16 +2361,15 @@ function smuggling() {
 		start_func ${FUNCNAME[0]} "HTTP Request Smuggling checks"
 		[ ! -s ".tmp/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q .tmp/webs_all.txt
 		if [[ $DEEP == true ]] || [[ $(cat .tmp/webs_all.txt | wc -l) -le $DEEP_LIMIT ]]; then
-			cd "${tools}/smuggler" || {
+			pushd "${tools}/smuggler" >/dev/null || {
 				echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
 				exit 1
 			}
 			cat $dir/.tmp/webs_all.txt | python3 smuggler.py -q --no-color 2>/dev/null | anew -q $dir/.tmp/smuggling.txt
-			cd "$dir" || {
-				echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"
+			popd >/dev/null || {
+				echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
 				exit 1
-			}
-			[ -s ".tmp/smuggling.txt" ] && cat .tmp/smuggling.txt | anew -q vulns/smuggling.txt
+			}			[ -s ".tmp/smuggling.txt" ] && cat .tmp/smuggling.txt | anew -q vulns/smuggling.txt
 			end_func "Results are saved in vulns/smuggling.txt" ${FUNCNAME[0]}
 		else
 			end_func "Skipping Prototype Pollution: Too many webs to test, try with --deep flag" ${FUNCNAME[0]}
@@ -2369,13 +2390,14 @@ function webcache() {
 		start_func ${FUNCNAME[0]} "Web Cache Poisoning checks"
 		[ ! -s ".tmp/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q .tmp/webs_all.txt
 		if [[ $DEEP == true ]] || [[ $(cat .tmp/webs_all.txt | wc -l) -le $DEEP_LIMIT ]]; then
-			cd "${tools}/Web-Cache-Vulnerability-Scanner" || {
+			pushd "${tools}/Web-Cache-Vulnerability-Scanner" >/dev/null || {
 				echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
 				exit 1
 			}
+
 			Web-Cache-Vulnerability-Scanner -u file:$dir/.tmp/webs_all.txt -v 0 2>/dev/null | anew -q $dir/.tmp/webcache.txt
-			cd "$dir" || {
-				echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"
+			popd >/dev/null || {
+				echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
 				exit 1
 			}
 			[ -s ".tmp/webcache.txt" ] && cat .tmp/webcache.txt | anew -q vulns/webcache.txt
@@ -2851,6 +2873,7 @@ function passive() {
 	github_dorks
 	github_repos
 	metadata
+	apileaks
 	SUBNOERROR=false
 	SUBANALYTICS=false
 	SUBBRUTE=false
@@ -2893,6 +2916,7 @@ function osint() {
 	github_dorks
 	github_repos
 	metadata
+	apileaks
 	zonetransfer
 	favicon
 }
@@ -2977,6 +3001,7 @@ function multi_osint() {
 		github_dorks
 		github_repos
 		metadata
+		apileaks
 		zonetransfer
 		favicon
 	done
@@ -2997,6 +3022,7 @@ function recon() {
 	github_dorks
 	github_repos
 	metadata
+	apileaks
 	zonetransfer
 	favicon
 
@@ -3095,6 +3121,7 @@ function multi_recon() {
 		github_dorks
 		github_repos
 		metadata
+		apileaks
 		zonetransfer
 		favicon
 		currently=$(date +"%H:%M:%S")

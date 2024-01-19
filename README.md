@@ -7,8 +7,8 @@
 </h1>
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.7.1">
-    <img src="https://img.shields.io/badge/release-v2.7.1-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.8.1">
+    <img src="https://img.shields.io/badge/release-v2.8.1-green">
   </a>
    </a>
   <a href="https://opensource.org/licenses/MIT">
@@ -318,7 +318,6 @@ DNSVALIDATOR_THREADS=200
 INTERLACE_THREADS=10
 TLSX_THREADS=1000
 XNLINKFINDER_DEPTH=3
-BYP4XX_THREADS=20
 
 # Rate limits
 HTTPX_RATELIMIT=150
@@ -533,7 +532,7 @@ reset='\033[0m'
 - Broken Links Checker ([katana](https://github.com/projectdiscovery/katana))
 - Prototype Pollution ([ppfuzz](https://github.com/dwisiswant0/ppfuzz))
 - Web Cache Vulnerabilities ([Web-Cache-Vulnerability-Scanner](https://github.com/Hackmanit/Web-Cache-Vulnerability-Scanner))
-- 4XX Bypasser ([byp4xx](https://github.com/lobuhi/byp4xx))
+- 4XX Bypasser ([dontgo403](https://github.com/devploit/dontgo403))
 
 ## Extras
 
