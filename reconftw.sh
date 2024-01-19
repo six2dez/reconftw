@@ -508,7 +508,7 @@ function apileaks() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $API_LEAKS == true ]] && [[ $OSINT == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Scanning for leaks in APIs public directories"
 
-		porch-pirate -s "$domain" --dump >osint/postman_leaks.txt || {
+		porch-pirate -s "$domain" --dump > osint/postman_leaks.txt 2>>"$LOGFILE" || {
 			echo "porch-pirate command failed"
 			exit 1
 		}
@@ -517,7 +517,7 @@ function apileaks() {
 			echo "Failed to pushd to ${tools}/SwaggerSpy in ${FUNCNAME[0]} @ line ${LINENO}"
 			exit 1
 		}
-		python swaggerspy.py -d $domain -o ../osint/swagger_leaks.txt 2>>"$LOGFILE" || {
+		python3 swaggerspy.py -d $domain -o ../osint/swagger_leaks.txt 2>>"$LOGFILE" || {
 			echo "swaggerspy command failed"
 			exit 1
 		}
