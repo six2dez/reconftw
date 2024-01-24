@@ -161,6 +161,9 @@ fuzzing_remote_list="https://raw.githubusercontent.com/six2dez/OneListForAll/mai
 proxy_url="http://127.0.0.1:8080/" # Proxy url
 install_golang=true # Set it to false if you already have Golang configured and ready
 upgrade_tools=true
+upgrade_before_running=false # Upgrade tools before running
+#SPINNY_FRAMES=(. .. ... .... ..... " ...." "  ..." "   .." "    ." "      " )
+SPINNY_DELAY=0.1
 #dir_output=/custom/output/path
 
 # Golang Vars (Comment or change on your own)
@@ -197,6 +200,7 @@ EMAILS=true # Fetch emails from differents sites
 DOMAIN_INFO=true # whois info
 REVERSE_WHOIS=true # amass intel reverse whois info, takes some time
 IP_INFO=true    # Reverse IP search, geolocation and whois
+API_LEAKS=true # Check for API leaks
 METAFINDER_LIMIT=20 # Max 250
 
 # Subdomains
@@ -205,7 +209,8 @@ RUNSUBFINDER=true
 SUBDOMAINS_GENERAL=true # Enable or disable the whole Subdomains module
 SUBPASSIVE=true # Passive subdomains search
 SUBCRT=true # crtsh search
-SUBNOERROR=true # Check DNS NOERROR response and BF on them
+CTR_LIMIT=999999 # Limit the number of results
+SUBNOERROR=false # Check DNS NOERROR response and BF on them
 SUBANALYTICS=true # Google Analytics search
 SUBBRUTE=true # DNS bruteforcing
 SUBSCRAPING=true # Subdomains extraction from web crawling
@@ -213,7 +218,7 @@ SUBPERMUTE=true # DNS permutations
 SUBREGEXPERMUTE=true # Permutations by regex analysis
 PERMUTATIONS_OPTION=gotator # The alternative is "ripgen" (faster, not deeper)
 GOTATOR_FLAGS=" -depth 1 -numbers 3 -mindup -adv -md" # Flags for gotator
-SUBTAKEOVER=false # Check subdomain takeovers, false by default cuz nuclei already check this
+SUBTAKEOVER=true # Check subdomain takeovers, false by default cuz nuclei already check this
 SUB_RECURSIVE_PASSIVE=false # Uses a lot of API keys queries
 DEEP_RECURSIVE_PASSIVE=10 # Number of top subdomains for recursion
 SUB_RECURSIVE_BRUTE=false # Needs big disk space and time to resolve
@@ -240,8 +245,9 @@ CDN_IP=true # Check which IPs belongs to CDN
 # Web analysis
 WAF_DETECTION=true # Detect WAFs
 NUCLEICHECK=true # Enable or disable nuclei
+NUCLEI_TEMPLATES_PATH="$HOME/nuclei-templates" # Set nuclei templates path
 NUCLEI_SEVERITY="info,low,medium,high,critical" # Set templates criticity
-NUCLEI_FLAGS=" -silent -t $HOME/nuclei-templates/ -retries 2" # Additional nuclei extra flags, don't set the severity here but the exclusions like " -etags openssh"
+NUCLEI_FLAGS=" -silent -t ${NUCLEI_TEMPLATES_PATH}/ -retries 2" # Additional nuclei extra flags, don't set the severity here but the exclusions like " -etags openssh"
 NUCLEI_FLAGS_JS=" -silent -tags exposure,token -severity info,low,medium,high,critical" # Additional nuclei extra flags for js secrets
 URL_CHECK=true # Enable or disable URL collection
 URL_CHECK_PASSIVE=true # Search for urls, passive methods from Archive, OTX, CommonCrawl, etc
@@ -277,6 +283,7 @@ PROTO_POLLUTION=true # Check for prototype pollution flaws
 SMUGGLING=true # Check for HTTP request smuggling flaws
 WEBCACHE=true # Check for Web Cache issues
 BYPASSER4XX=true # Check for 4XX bypasses
+FUZZPARAMS=true # Fuzz parameters values
 
 # Extra features
 NOTIFICATION=false # Notification for every function
@@ -292,7 +299,6 @@ SENDZIPNOTIFY=false # Send to zip the results (over notify)
 PRESERVE=true      # set to true to avoid deleting the .called_fn files on really large scans
 FFUF_FLAGS=" -mc all -fc 404 -ach -sf -of json" # Ffuf flags
 HTTPX_FLAGS=" -follow-redirects -random-agent -status-code -silent -title -web-server -tech-detect -location -content-length" # Httpx flags for simple web probing
-GOWITNESS_FLAGS=" --disable-logging --timeout 5"
 
 # HTTP options
 HEADER="User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" # Default header
@@ -311,7 +317,6 @@ PUREDNS_PUBLIC_LIMIT=0 # Set between 2000 - 10000 if your router blows up, 0 mea
 PUREDNS_TRUSTED_LIMIT=400
 PUREDNS_WILDCARDTEST_LIMIT=30
 PUREDNS_WILDCARDBATCH_LIMIT=1500000
-GOWITNESS_THREADS=20
 RESOLVE_DOMAINS_THREADS=150
 PPFUZZ_THREADS=30
 DNSVALIDATOR_THREADS=200
@@ -507,7 +512,7 @@ reset='\033[0m'
 ## Webs
 
 - Web Prober ([httpx](https://github.com/projectdiscovery/httpx))
-- Web screenshoting ([webscreenshot](https://github.com/maaaaz/webscreenshot) or [gowitness](https://github.com/sensepost/gowitness))
+- Web screenshoting ([nuclei](https://github.com/projectdiscovery/nuclei))
 - Web templates scanner ([nuclei](https://github.com/projectdiscovery/nuclei) and [nuclei geeknik](https://github.com/geeknik/the-nuclei-templates.git))
 - CMS Scanner ([CMSeeK](https://github.com/Tuhinshubhra/CMSeeK))
 - Url extraction ([gau](https://github.com/lc/gau),[waymore](https://github.com/xnl-h4ck3r/waymore), [katana](https://github.com/projectdiscovery/katana), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3) and [JSA](https://github.com/w9w/JSA))
