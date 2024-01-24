@@ -60,7 +60,6 @@ function tools_installed() {
 
 	allinstalled=true
 
-
 	[ -n "$GOPATH" ] || {
 		printf "${bred} [*] GOPATH var			[NO]${reset}\n"
 		allinstalled=false
@@ -369,8 +368,12 @@ function tools_installed() {
 		printf "${bred} [*] s3scanner			[NO]${reset}\n${reset}"
 		allinstalled=false
 	}
-  command -v mantra &>/dev/null || {
+	command -v mantra &>/dev/null || {
 		printf "${bred} [*] mantra			[NO]${reset}\n${reset}"
+		allinstalled=false
+	}
+	command -v nmapurls &>/dev/null || {
+		printf "${bred} [*] nmapurls			[NO]${reset}\n"
 		allinstalled=false
 	}
 	if [[ ${allinstalled} == true ]]; then
@@ -504,7 +507,7 @@ function apileaks() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $API_LEAKS == true ]] && [[ $OSINT == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Scanning for leaks in APIs public directories"
 
-		porch-pirate -s "$domain" --dump > osint/postman_leaks.txt 2>>"$LOGFILE" || {
+		porch-pirate -s "$domain" --dump 2>>"$LOGFILE" > ${dir}osint/postman_leaks.txt || {
 			echo "porch-pirate command failed"
 			exit 1
 		}
@@ -513,7 +516,7 @@ function apileaks() {
 			echo "Failed to pushd to ${tools}/SwaggerSpy in ${FUNCNAME[0]} @ line ${LINENO}"
 			exit 1
 		}
-		python3 swaggerspy.py $domain > ${dir}/osint/swagger_leaks.txt 2>>"$LOGFILE" || {
+		python3 swaggerspy.py $domain 2>>"$LOGFILE" > ${dir}/osint/swagger_leaks.txt || {
 			echo "swaggerspy command failed"
 			exit 1
 		}
@@ -1005,7 +1008,7 @@ function sub_regex_permut() {
 	spinny::start
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBREGEXPERMUTE == true ]]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Permutations by regex analysis"
-		
+
 		pushd "${tools}/regulator" >/dev/null || {
 			echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
 			exit 1
@@ -1436,7 +1439,7 @@ function favicon() {
 			echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"
 			exit 1
 		}
-		
+
 		python3 favUp.py -w "$domain" -sc -o favicontest.json 2>>"$LOGFILE" >/dev/null
 		if [[ -s "favicontest.json" ]]; then
 			cat favicontest.json | jq -r 'try .found_ips' 2>>"$LOGFILE" | grep -v "not-found" >favicontest.txt
@@ -1445,7 +1448,7 @@ function favicon() {
 			mv favicontest.txt $dir/hosts/favicontest.txt 2>>"$LOGFILE"
 			rm -f favicontest.json 2>>"$LOGFILE"
 		fi
-		
+
 		popd >/dev/null || {
 			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
 			exit 1
@@ -1518,6 +1521,15 @@ function portscan() {
 				[ -s ".tmp/ips_nocdn.txt" ] && axiom-scan .tmp/ips_nocdn.txt -m nmapx --top-ports 200 -sV -n -Pn --open --max-retries 2 --script vulners -oA hosts/portscan_active $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 			fi
 		fi
+
+		[ -s "hosts/portscan_active.xml" ] && cat hosts/portscan_active.xml | nmapurls 2>>"$LOGFILE" | anew -q hosts/webs.txt
+
+		if [ -s "hosts/webs.txt" ]; then
+			NUMOFLINES=$(cat hosts/webs.txt | wc -l)
+			notification "Webs detected from port scan: ${NUMOFLINES} new websites" good
+			cat hosts/webs.txt
+		fi
+
 		end_func "Results are saved in hosts/portscan_[passive|active].txt" ${FUNCNAME[0]}
 	else
 		if [[ $PORTSCANNER == false ]]; then
@@ -2364,7 +2376,7 @@ function smuggling() {
 			popd >/dev/null || {
 				echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
 				exit 1
-			}			
+			}
 			[ -s ".tmp/smuggling.txt" ] && cat .tmp/smuggling.txt | anew -q vulns/smuggling_log.txt
 			end_func "Results are saved in vulns/smuggling_log.txt and findings in vulns/smuggling/" ${FUNCNAME[0]}
 		else
