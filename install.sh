@@ -248,7 +248,38 @@ function install_tools() {
 }
 
 banner
+
+show_help() {
+    echo "Usage: $0 [OPTION]"
+    echo "Run the script with specified options."
+    echo ""
+    echo "  -h, --help       Display this help and exit."
+    echo "  --tools          Install the tools before running, useful for upgrading."
+	echo "                                                                          "
+    echo "  ****             Without any arguments, the script will update reconftw"
+    echo "                   and install all dependencies and requirements."
+    exit 0
+}
+
 printf "\n${bgreen} reconFTW installer/updater script ${reset}\n\n"
+
+# Parse command-line arguments
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            ;;
+        --tools)
+            install_tools
+            shift
+            ;;
+        *)
+            echo "Error: Invalid argument '$1'"
+            echo "Use -h or --help for usage information."
+            exit 1
+            ;;
+    esac
+done
 
 printf "${yellow} This may take time. So, go grab a coffee! ${reset}\n\n"
 

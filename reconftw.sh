@@ -508,10 +508,8 @@ function apileaks() {
 		start_func ${FUNCNAME[0]} "Scanning for leaks in APIs public directories"
 
 		porch-pirate -s "$domain" --dump 2>>"$LOGFILE" > ${dir}osint/postman_leaks.txt || {
-			echo "porch-pirate command failed"
-			exit 1
+			echo "porch-pirate command failed by rate limit"
 		}
-
 		pushd "${tools}/SwaggerSpy" >/dev/null || {
 			echo "Failed to pushd to ${tools}/SwaggerSpy in ${FUNCNAME[0]} @ line ${LINENO}"
 			exit 1
