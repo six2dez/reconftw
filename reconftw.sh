@@ -1514,9 +1514,9 @@ function portscan() {
 		fi
 		if [[ $PORTSCAN_ACTIVE == true ]]; then
 			if [[ $AXIOM != true ]]; then
-				[ -s ".tmp/ips_nocdn.txt" ] && $SUDO nmap --top-ports 200 -sV -n --max-retries 2 -Pn --open --script vulners -iL .tmp/ips_nocdn.txt -oA hosts/portscan_active 2>>"$LOGFILE" >/dev/null
+				[ -s ".tmp/ips_nocdn.txt" ] && $SUDO nmap ${PORTSCAN_ACTIVE_OPTIONS} -iL .tmp/ips_nocdn.txt -oA hosts/portscan_active 2>>"$LOGFILE" >/dev/null
 			else
-				[ -s ".tmp/ips_nocdn.txt" ] && axiom-scan .tmp/ips_nocdn.txt -m nmapx --top-ports 200 -sV -n -Pn --open --max-retries 2 --script vulners -oA hosts/portscan_active $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+				[ -s ".tmp/ips_nocdn.txt" ] && axiom-scan .tmp/ips_nocdn.txt -m nmapx ${PORTSCAN_ACTIVE_OPTIONS} -oA hosts/portscan_active $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 			fi
 		fi
 
