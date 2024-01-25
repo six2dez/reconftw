@@ -507,14 +507,14 @@ function apileaks() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $API_LEAKS == true ]] && [[ $OSINT == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Scanning for leaks in APIs public directories"
 
-		porch-pirate -s "$domain" --dump 2>>"$LOGFILE" > ${dir}osint/postman_leaks.txt || {
+		porch-pirate -s "$domain" --dump 2>>"$LOGFILE" >${dir}osint/postman_leaks.txt || {
 			echo "porch-pirate command failed by rate limit"
 		}
 		pushd "${tools}/SwaggerSpy" >/dev/null || {
 			echo "Failed to pushd to ${tools}/SwaggerSpy in ${FUNCNAME[0]} @ line ${LINENO}"
 			exit 1
 		}
-		python3 swaggerspy.py $domain 2>>"$LOGFILE" > ${dir}/osint/swagger_leaks.txt || {
+		python3 swaggerspy.py $domain 2>>"$LOGFILE" >${dir}/osint/swagger_leaks.txt || {
 			echo "swaggerspy command failed"
 			exit 1
 		}
@@ -522,6 +522,9 @@ function apileaks() {
 			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
 			exit 1
 		}
+
+		trufflehog filesystem ${dir}osint/postman_leaks.txt -j 2>>"$LOGFILE" | jq -r > ${dir}osint/postman_leaks_trufflehog.json &>/dev/null
+		trufflehog filesystem ${dir}osint/swagger_leaks.txt -j 2>>"$LOGFILE" | jq -r > ${dir}osint/swagger_leaks_trufflehog.json &>/dev/null
 
 		end_func "Results are saved in $domain/osint/[software/authors/metadata_results].txt" ${FUNCNAME[0]}
 	else
@@ -1226,6 +1229,8 @@ function s3buckets() {
 			notification "${NUMOFLINES2} new S3 buckets found" info
 		fi
 
+		[ -s "subdomains/s3buckets.txt" ] && for i in $(cat subdomains/s3buckets.txt); do trufflehog s3 --bucket="$i" -j 2>>"$LOGFILE" | jq -c >>subdomains/s3buckets_trufflehog.txt &>/dev/null; done
+
 		end_func "Results are saved in subdomains/s3buckets.txt and subdomains/cloud_assets.txt" ${FUNCNAME[0]}
 	else
 		if [[ $S3BUCKETS == false ]]; then
@@ -1878,6 +1883,7 @@ function jschecks() {
 				[ -s "js/js_livelinks.txt" ] && cat js/js_livelinks.txt | mantra -ua ${HEADER} -s | anew -q js/js_secrets.txt
 			else
 				[ -s "js/js_livelinks.txt" ] && axiom-scan js/js_livelinks.txt -m mantra -ua \"${HEADER}\" -s -o js/js_secrets.txt $AXIOM_EXTRA_ARGS &>/dev/null
+				[ -s "js/js_secrets.txt" ] && trufflehog filesystem js/js_secrets.txt -j 2>>"$LOGFILE" | jq -c > js/js_secrets_trufflehog.txt &>/dev/null
 			fi
 			[ -s "js/js_secrets.txt" ] && sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2};?)?)?[mGK]//g" -i js/js_secrets.txt
 			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
