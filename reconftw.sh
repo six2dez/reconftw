@@ -507,7 +507,7 @@ function apileaks() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $API_LEAKS == true ]] && [[ $OSINT == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Scanning for leaks in APIs public directories"
 
-		porch-pirate -s "$domain" --dump 2>>"$LOGFILE" >${dir}osint/postman_leaks.txt || {
+		porch-pirate -s "$domain" --dump 2>>"$LOGFILE" >${dir}/osint/postman_leaks.txt || {
 			echo "porch-pirate command failed by rate limit"
 		}
 		pushd "${tools}/SwaggerSpy" >/dev/null || {
@@ -523,8 +523,8 @@ function apileaks() {
 			exit 1
 		}
 
-		trufflehog filesystem ${dir}osint/postman_leaks.txt -j | jq -c | anew -q ${dir}osint/postman_leaks_trufflehog.json
-		trufflehog filesystem ${dir}osint/swagger_leaks.txt -j | jq -c | anew -q ${dir}osint/swagger_leaks_trufflehog.json
+		trufflehog filesystem ${dir}/osint/postman_leaks.txt -j | jq -c | anew -q ${dir}/osint/postman_leaks_trufflehog.json
+		trufflehog filesystem ${dir}/osint/swagger_leaks.txt -j | jq -c | anew -q ${dir}/osint/swagger_leaks_trufflehog.json
 
 		end_func "Results are saved in $domain/osint/[software/authors/metadata_results].txt" ${FUNCNAME[0]}
 	else
