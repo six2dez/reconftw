@@ -57,7 +57,6 @@ gotools["roboxtractor"]="go install -v github.com/Josue87/roboxtractor@latest"
 gotools["mapcidr"]="go install -v github.com/projectdiscovery/mapcidr/cmd/mapcidr@latest"
 gotools["cdncheck"]="go install -v github.com/projectdiscovery/cdncheck/cmd/cdncheck@latest"
 gotools["dnstake"]="go install -v github.com/pwnesia/dnstake/cmd/dnstake@latest"
-gotools["gowitness"]="go install -v github.com/sensepost/gowitness@latest"
 gotools["tlsx"]="go install -v github.com/projectdiscovery/tlsx/cmd/tlsx@latest"
 gotools["gitdorks_go"]="go install -v github.com/damit5/gitdorks_go@latest"
 gotools["smap"]="go install -v github.com/s0md3v/smap/cmd/smap@latest"
@@ -71,6 +70,7 @@ gotools["gau"]="go install -v github.com/lc/gau/v2/cmd/gau@latest"
 gotools["mantra"]="go install -v github.com/MrEmpy/mantra@latest"
 gotools["crt"]="go install -v github.com/cemulus/crt@latest"
 gotools["s3scanner"]="go install -v github.com/sa7mon/s3scanner@latest"
+gotools["nmapurls"]="go install -v github.com/sdcampbell/nmapurls@latest"
 
 # Declaring repositories and their paths
 declare -A repos
@@ -248,7 +248,38 @@ function install_tools() {
 }
 
 banner
+
+show_help() {
+    echo "Usage: $0 [OPTION]"
+    echo "Run the script with specified options."
+    echo ""
+    echo "  -h, --help       Display this help and exit."
+    echo "  --tools          Install the tools before running, useful for upgrading."
+	echo "                                                                          "
+    echo "  ****             Without any arguments, the script will update reconftw"
+    echo "                   and install all dependencies and requirements."
+    exit 0
+}
+
 printf "\n${bgreen} reconFTW installer/updater script ${reset}\n\n"
+
+# Parse command-line arguments
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            ;;
+        --tools)
+            install_tools
+            shift
+            ;;
+        *)
+            echo "Error: Invalid argument '$1'"
+            echo "Use -h or --help for usage information."
+            exit 1
+            ;;
+    esac
+done
 
 printf "${yellow} This may take time. So, go grab a coffee! ${reset}\n\n"
 
