@@ -525,8 +525,8 @@ function apileaks() {
 			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
 		}
 
-		[ -s "osint/postman_leaks.txt" ] && trufflehog filesystem --directory=${dir}/osint/postman_leaks.txt -j | jq -c | anew -q ${dir}/osint/postman_leaks_trufflehog.json
-		[ -s "osint/swagger_leaks.txt" ] && trufflehog filesystem --directory=${dir}/osint/swagger_leaks.txt -j | jq -c | anew -q ${dir}/osint/swagger_leaks_trufflehog.json
+		[ -s "osint/postman_leaks.txt" ] && trufflehog filesystem ${dir}/osint/postman_leaks.txt -j | jq -c | anew -q ${dir}/osint/postman_leaks_trufflehog.json
+		[ -s "osint/swagger_leaks.txt" ] && trufflehog filesystem ${dir}/osint/swagger_leaks.txt -j | jq -c | anew -q ${dir}/osint/swagger_leaks_trufflehog.json
 
 		end_func "Results are saved in $domain/osint/[software/authors/metadata_results].txt" ${FUNCNAME[0]}
 	else
@@ -1883,7 +1883,7 @@ function jschecks() {
 				[ -s "js/js_livelinks.txt" ] && cat js/js_livelinks.txt | mantra -ua ${HEADER} -s | anew -q js/js_secrets.txt
 			else
 				[ -s "js/js_livelinks.txt" ] && axiom-scan js/js_livelinks.txt -m mantra -ua \"${HEADER}\" -s -o js/js_secrets.txt $AXIOM_EXTRA_ARGS &>/dev/null
-				[ -s "js/js_secrets.txt" ] && trufflehog filesystem --directory=js/js_secrets.txt -j | jq -c | anew -q js/js_secrets_trufflehog.txt
+				[ -s "js/js_secrets.txt" ] && trufflehog filesystem js/js_secrets.txt -j | jq -c | anew -q js/js_secrets_trufflehog.txt
 			fi
 			[ -s "js/js_secrets.txt" ] && sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2};?)?)?[mGK]//g" -i js/js_secrets.txt
 			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
