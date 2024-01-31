@@ -521,9 +521,8 @@ function apileaks() {
 		pushd "${tools}/SwaggerSpy" >/dev/null || {
 			echo "Failed to pushd to ${tools}/SwaggerSpy in ${FUNCNAME[0]} @ line ${LINENO}"
 		}
-		python3 swaggerspy.py $domain 2>>"$LOGFILE" | grep -i "[*]\|URL" > ${dir}/osint/swagger_leaks.txt || {
-			echo "swaggerspy command failed"
-		}
+		python3 swaggerspy.py $domain 2>>"$LOGFILE" | grep -i "[*]\|URL" > ${dir}/osint/swagger_leaks.txt
+
 		popd >/dev/null || {
 			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
 		}
@@ -1256,7 +1255,8 @@ function s3buckets() {
 ###############################################################################################################
 
 function geo_info() {
-	if { [ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ] || [ "$DIFF" = true ]; }; then
+	spinny::start
+	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GEO_INFO == true ]]; then
 		start_func ${FUNCNAME[0]} "Running: ipinfo via ipapi.co"
 		ips_file="${dir}/hosts/ips.txt"
 		if [ ! -f $ips_file ]; then
@@ -1303,8 +1303,13 @@ function geo_info() {
 		fi
 		end_func "Results are saved in hosts/geoip.txt and hosts/geoip.json" ${FUNCNAME[0]}
 	else
-		printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		if [[ $GEO_INFO == false ]]; then
+				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			else
+				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
 	fi
+	spinny::stop
 }
 
 ###############################################################################################################
@@ -1489,14 +1494,12 @@ function portscan() {
 		[ -s "hosts/ips.txt" ] && comm -23 <(cat hosts/ips.txt | sort -u) <(cat hosts/cdn_providers.txt | cut -d'[' -f1 | sed 's/[[:space:]]*$//' | sort -u) | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | sort -u | anew -q .tmp/ips_nocdn.txt
 		printf "${bblue}\n Resolved IP addresses (No CDN) ${reset}\n\n"
 		[ -s ".tmp/ips_nocdn.txt" ] && cat .tmp/ips_nocdn.txt | sort
-		geo_info
 		printf "${bblue}\n Scanning ports... ${reset}\n\n"
 		ips_file="${dir}/hosts/ips.txt"
 		if [ "$PORTSCAN_PASSIVE" = true ]; then
 			if [ ! -f $ips_file ]; then
 				echo "File $ips_file does not exist."
 			else
-				start_subfunc "Running : Shodan to check for open ports "
 				for cip in $(cat "$ips_file"); do
 					json_result=$(curl -s https://internetdb.shodan.io/${cip})
 					json_array+=("$json_result")
@@ -1509,12 +1512,11 @@ function portscan() {
 					fi
 				done
 				formatted_json+="]"
-				echo "$formatted_json" >"${dir}/hosts/shodan_results.json"
+				echo "$formatted_json" >"${dir}/hosts/portscan_shodan.txt"
 			fi
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
-		end_func "Results are saved in hosts/shodan_results.json" ${FUNCNAME[0]}
 		if [[ $PORTSCAN_PASSIVE == true ]] && [[ ! -f "hosts/portscan_passive.txt" ]] && [[ -s ".tmp/ips_nocdn.txt" ]]; then
 			smap -iL .tmp/ips_nocdn.txt >hosts/portscan_passive.txt
 		fi
@@ -1533,8 +1535,7 @@ function portscan() {
 			notification "Webs detected from port scan: ${NUMOFLINES} new websites" good
 			cat hosts/webs.txt
 		fi
-
-		end_func "Results are saved in hosts/portscan_[passive|active].txt" ${FUNCNAME[0]}
+		end_func "Results are saved in hosts/portscan_[passive|active|shodan].txt" ${FUNCNAME[0]}
 	else
 		if [[ $PORTSCANNER == false ]]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -2250,6 +2251,7 @@ function sqli() {
 }
 
 function test_ssl() {
+	spinny::start
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $TEST_SSL == true ]]; then
 		start_func ${FUNCNAME[0]} "SSL Test"
 		${tools}/testssl.sh/testssl.sh --quiet --color 0 -U -iL hosts/ips.txt 2>>"$LOGFILE" >vulns/testssl.txt
@@ -2261,6 +2263,7 @@ function test_ssl() {
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
+	spinny::stop
 }
 
 function spraying() {
@@ -2896,6 +2899,7 @@ function passive() {
 	remove_big_files
 	favicon
 	cdnprovider
+	geo_info
 	PORTSCAN_ACTIVE=false
 	portscan
 
@@ -3044,6 +3048,7 @@ function recon() {
 	screenshot
 	#	virtualhosts
 	cdnprovider
+	geo_info
 	portscan
 	waf_checks
 	nuclei_check
@@ -3165,6 +3170,7 @@ function multi_recon() {
 		screenshot
 		#		virtualhosts
 		cdnprovider
+		geo_info
 		portscan
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
