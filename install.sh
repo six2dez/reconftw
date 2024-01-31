@@ -71,6 +71,7 @@ gotools["mantra"]="go install -v github.com/MrEmpy/mantra@latest"
 gotools["crt"]="go install -v github.com/cemulus/crt@latest"
 gotools["s3scanner"]="go install -v github.com/sa7mon/s3scanner@latest"
 gotools["nmapurls"]="go install -v github.com/sdcampbell/nmapurls@latest"
+gotools["shortscan"]="go install -v github.com/bitquark/shortscan/cmd/shortscan@latest"
 
 # Declaring repositories and their paths
 declare -A repos

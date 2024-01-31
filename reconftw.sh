@@ -383,6 +383,10 @@ function tools_installed() {
 		printf "${bred} [*] porch-pirate			[NO]${reset}\n"
 		allinstalled=false
 	}
+	command -v shortscan &>/dev/null || {
+		printf "${bred} [*] shortscan			[NO]${reset}\n"
+		allinstalled=false
+	}
 	if [[ ${allinstalled} == true ]]; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
 	else
@@ -1665,6 +1669,29 @@ function fuzz() {
 		fi
 	else
 		if [[ $FUZZ == false ]]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
+	fi
+
+}
+
+function iishortname() {
+
+	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $IIS_SHORTNAME == true ]]; then
+		start_func ${FUNCNAME[0]} "IIS Shortname Scanner"
+		[ -s "nuclei_output/info.txt" ] && cat nuclei_output/info.txt | grep "iis-version" | cut -d " " -f4 > .tmp/iis_sites.txt
+		if [[ -s ".tmp/iis_sites.txt" ]]; then
+			mkdir -p $dir/vulns/iis-shortname/
+			interlace -tL .tmp/iis_sites.txt -threads ${INTERLACE_THREADS} -c "shortscan _target_ -F -s -p 1 > _output_/_cleantarget_.txt" -o $dir/vulns/iis-shortname/ 2>>"$LOGFILE" >/dev/null
+			find $dir/vulns/iis-shortname/ -type f -print0 | xargs --null grep -Z -L 'Vulnerable: Yes' | xargs --null rm
+			end_func "Results are saved in vulns/iis-shortname/" ${FUNCNAME[0]}
+		else
+			end_func "No IIS sites detected, iishortname check skipped " ${FUNCNAME[0]}
+		fi
+	else
+		if [[ $IIS_SHORTNAME == false ]]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -3052,6 +3079,7 @@ function recon() {
 	waf_checks
 	nuclei_check
 	fuzz
+	iishortname
 	urlchecks
 	jschecks
 
@@ -3224,6 +3252,7 @@ function multi_recon() {
 		}
 		loopstart=$(date +%s)
 		fuzz
+		iishortname
 		urlchecks
 		jschecks
 		currently=$(date +"%H:%M:%S")
@@ -3309,6 +3338,7 @@ function webs_menu() {
 	nuclei_check
 	cms_scanner
 	fuzz
+	iishortname
 	urlchecks
 	jschecks
 	url_gf
