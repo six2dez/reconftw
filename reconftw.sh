@@ -1394,7 +1394,7 @@ function screenshot() {
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
 
 		if [[ $AXIOM != true ]]; then
-			[ -s "webs/webs_all.txt" ] && nuclei -headless -id screenshot -V dir='screenshots' file -f webs/webs_all.txt 2>>"$LOGFILE"
+			[ -s "webs/webs_all.txt" ] && cat webs/webs_all.txt | nuclei -headless -id screenshot -V dir='screenshots' 2>>"$LOGFILE"
 		else
 			[ -s "webs/webs_all.txt" ] && axiom-scan webs/webs_all.txt -m nuclei-screenshots -o screenshots $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 		fi
