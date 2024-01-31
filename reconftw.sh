@@ -172,6 +172,10 @@ function tools_installed() {
 		printf "${bred} [*] dontgo403			[NO]${reset}\n"
 		allinstalled=false
 	}
+	[ -f "${tools}/SwaggerSpy/swaggerspy.py" ] || {
+		printf "${bred} [*] swaggerspy			[NO]${reset}\n"
+		allinstalled=false
+	}
 	command -v github-endpoints &>/dev/null || {
 		printf "${bred} [*] github-endpoints		[NO]${reset}\n"
 		allinstalled=false
@@ -376,6 +380,10 @@ function tools_installed() {
 		printf "${bred} [*] nmapurls			[NO]${reset}\n"
 		allinstalled=false
 	}
+	command -v porch-pirate &>/dev/null || {
+		printf "${bred} [*] porch-pirate			[NO]${reset}\n"
+		allinstalled=false
+	}
 	if [[ ${allinstalled} == true ]]; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
 	else
@@ -512,15 +520,12 @@ function apileaks() {
 		}
 		pushd "${tools}/SwaggerSpy" >/dev/null || {
 			echo "Failed to pushd to ${tools}/SwaggerSpy in ${FUNCNAME[0]} @ line ${LINENO}"
-			exit 1
 		}
 		python3 swaggerspy.py $domain 2>>"$LOGFILE" >${dir}/osint/swagger_leaks.txt || {
 			echo "swaggerspy command failed"
-			exit 1
 		}
 		popd >/dev/null || {
 			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
-			exit 1
 		}
 
 		trufflehog filesystem ${dir}/osint/postman_leaks.txt -j | jq -c | anew -q ${dir}/osint/postman_leaks_trufflehog.json
@@ -1012,14 +1017,12 @@ function sub_regex_permut() {
 
 		pushd "${tools}/regulator" >/dev/null || {
 			echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
-			exit 1
 		}
 
 		python3 main.py -t $domain -f ${dir}/subdomains/subdomains.txt -o ${dir}/.tmp/${domain}.brute
 
 		popd >/dev/null || {
 			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
-			exit 1
 		}
 
 		if [[ $AXIOM != true ]]; then
@@ -1440,7 +1443,6 @@ function favicon() {
 		start_func ${FUNCNAME[0]} "Favicon Ip Lookup"
 		pushd "${tools}/fav-up" >/dev/null || {
 			echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"
-			exit 1
 		}
 
 		python3 favUp.py -w "$domain" -sc -o favicontest.json 2>>"$LOGFILE" >/dev/null
@@ -1454,7 +1456,6 @@ function favicon() {
 
 		popd >/dev/null || {
 			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
-			exit 1
 		}
 		end_func "Results are saved in hosts/favicontest.txt" ${FUNCNAME[0]}
 	else
@@ -2269,13 +2270,11 @@ function spraying() {
 
 		pushd "${tools}/brutespray" >/dev/null || {
 			echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
-			exit 1
 		}
 
 		python3 brutespray.py --file $dir/hosts/portscan_active.gnmap --threads $BRUTESPRAY_THREADS --hosts $BRUTESPRAY_CONCURRENCE -o $dir/vulns/brutespray 2>>"$LOGFILE" >/dev/null
 		popd >/dev/null || {
 			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
-			exit 1
 		}
 		end_func "Results are saved in vulns/brutespray folder" ${FUNCNAME[0]}
 	else
@@ -2320,13 +2319,11 @@ function 4xxbypass() {
 
 			pushd "${tools}/dontgo403" >/dev/null || {
 				echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
-				exit 1
 			}
 
 			cat $dir/.tmp/403test.txt | ./dontgo403 >$dir/.tmp/4xxbypass.txt
 			popd >/dev/null || {
 				echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
-				exit 1
 			}
 			[ -s ".tmp/4xxbypass.txt" ] && cat .tmp/4xxbypass.txt | anew -q vulns/4xxbypass.txt
 			end_func "Results are saved in vulns/4xxbypass.txt" ${FUNCNAME[0]}
@@ -2372,14 +2369,12 @@ function smuggling() {
 		if [[ $DEEP == true ]] || [[ $(cat webs/webs_all.txt | wc -l) -le $DEEP_LIMIT ]]; then
 			pushd "${tools}/smuggler" >/dev/null || {
 				echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
-				exit 1
 			}
 			cat $dir/webs/webs_all.txt | python3 smuggler.py -q --no-color 2>/dev/null | anew -q $dir/.tmp/smuggling.txt
 			mkdir -p $dir/vulns/smuggling/
 			find payloads -type f ! -name "README*" -exec mv {} $dir/vulns/smuggling/ \;
 			popd >/dev/null || {
 				echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
-				exit 1
 			}
 			[ -s ".tmp/smuggling.txt" ] && cat .tmp/smuggling.txt | anew -q vulns/smuggling_log.txt
 			end_func "Results are saved in vulns/smuggling_log.txt and findings in vulns/smuggling/" ${FUNCNAME[0]}
@@ -2404,13 +2399,11 @@ function webcache() {
 		if [[ $DEEP == true ]] || [[ $(cat webs/webs_all.txt | wc -l) -le $DEEP_LIMIT ]]; then
 			pushd "${tools}/Web-Cache-Vulnerability-Scanner" >/dev/null || {
 				echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
-				exit 1
 			}
 
 			Web-Cache-Vulnerability-Scanner -u file:$dir/webs/webs_all.txt -v 0 2>/dev/null | anew -q $dir/.tmp/webcache.txt
 			popd >/dev/null || {
 				echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
-				exit 1
 			}
 			[ -s ".tmp/webcache.txt" ] && cat .tmp/webcache.txt | anew -q vulns/webcache.txt
 			end_func "Results are saved in vulns/webcache.txt" ${FUNCNAME[0]}
