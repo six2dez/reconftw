@@ -516,7 +516,7 @@ function apileaks() {
 		start_func ${FUNCNAME[0]} "Scanning for leaks in APIs public directories"
 
 		porch-pirate -s "$domain" --dump 2>>"$LOGFILE" >${dir}/osint/postman_leaks.txt || {
-			echo "porch-pirate command failed by rate limit"
+			echo "porch-pirate command failed (probably by rate limit)"
 		}
 		pushd "${tools}/SwaggerSpy" >/dev/null || {
 			echo "Failed to pushd to ${tools}/SwaggerSpy in ${FUNCNAME[0]} @ line ${LINENO}"
@@ -528,8 +528,8 @@ function apileaks() {
 			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
 		}
 
-		trufflehog filesystem ${dir}/osint/postman_leaks.txt -j | jq -c | anew -q ${dir}/osint/postman_leaks_trufflehog.json
-		trufflehog filesystem ${dir}/osint/swagger_leaks.txt -j | jq -c | anew -q ${dir}/osint/swagger_leaks_trufflehog.json
+		[ -s  "osint/postman_leaks.txt" ] && trufflehog filesystem ${dir}/osint/postman_leaks.txt -j | jq -c | anew -q ${dir}/osint/postman_leaks_trufflehog.json
+		[ -s  "osint/swagger_leaks.txt" ] && trufflehog filesystem ${dir}/osint/swagger_leaks.txt -j | jq -c | anew -q ${dir}/osint/swagger_leaks_trufflehog.json
 
 		end_func "Results are saved in $domain/osint/[software/authors/metadata_results].txt" ${FUNCNAME[0]}
 	else
