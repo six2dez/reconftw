@@ -175,6 +175,10 @@ function tools_installed() {
 		printf "${bred} [*] swaggerspy			[NO]${reset}\n"
 		allinstalled=false
 	}
+	[ -f "${tools}/LeakSearch/LeakSearch.py" ] || {
+		printf "${bred} [*] LeakSearch			[NO]${reset}\n"
+		allinstalled=false
+	}
 	command -v github-endpoints &>/dev/null || {
 		printf "${bred} [*] github-endpoints		[NO]${reset}\n"
 		allinstalled=false
@@ -563,7 +567,21 @@ function emails() {
 		}
 		[ -s ".tmp/emailfinder.txt" ] && cat .tmp/emailfinder.txt | grep "@" | grep -iv "|_" | anew -q osint/emails.txt
 
-		end_func "Results are saved in $domain/osint/emails.txt" ${FUNCNAME[0]}
+		pushd "${tools}/LeakSearch" >/dev/null || {
+			echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
+		}
+
+		python3 LeakSearch.py -k $domain -o ${dir}/.tmp/passwords.txt 2>>"$LOGFILE" || {
+			echo "LeakSearch command failed"
+		}
+
+		popd >/dev/null || {
+			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
+		}
+
+		[ -s ".tmp/passwords.txt" ] && cat .tmp/passwords.txt | anew -q osint/passwords.txt
+
+		end_func "Results are saved in $domain/osint/emails|passwords.txt" ${FUNCNAME[0]}
 	else
 		if [[ $EMAILS == false ]] || [[ $OSINT == false ]]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"

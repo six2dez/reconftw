@@ -106,6 +106,7 @@ repos["gitleaks"]="gitleaks/gitleaks"
 repos["trufflehog"]="trufflesecurity/trufflehog"
 repos["dontgo403"]="devploit/dontgo403"
 repos["SwaggerSpy"]="UndeadSec/SwaggerSpy"
+repos["LeakSearch"]="JoelGMSec/LeakSearch"
 
 function banner() {
 	tput clear
