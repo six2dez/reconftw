@@ -402,6 +402,7 @@ function tools_installed() {
 
 function google_dorks() {
 
+	mkdir -p osint
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GOOGLE_DORKS == true ]] && [[ $OSINT == true ]]; then
 		python3 ${tools}/dorks_hunter/dorks_hunter.py -d "$domain" -o osint/dorks.txt || {
 			echo "dorks_hunter command failed"
@@ -420,6 +421,7 @@ function google_dorks() {
 
 function github_dorks() {
 
+	mkdir -p osint
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GITHUB_DORKS == true ]] && [[ $OSINT == true ]]; then
 		start_func "${FUNCNAME[0]}" "Github Dorks in process"
 		if [[ -s ${GITHUB_TOKENS} ]]; then
@@ -450,6 +452,7 @@ function github_dorks() {
 
 function github_repos() {
 
+	mkdir -p .tmp
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GITHUB_REPOS == true ]] && [[ $OSINT == true ]]; then
 		start_func "${FUNCNAME[0]}" "Github Repos analysis in process"
 
@@ -483,6 +486,7 @@ function github_repos() {
 
 function metadata() {
 
+	mkdir -p osint
 	if { [[ ! -f "${called_fn_dir}/.${FUNCNAME[0]}" ]] || [[ ${DIFF} == true ]]; } && [[ ${METADATA} == true ]] && [[ ${OSINT} == true ]] && ! [[ ${domain} =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Scanning metadata in public files"
 		metafinder -d "$domain" -l $METAFINDER_LIMIT -o osint -go -bi -ba &>>"$LOGFILE" || {
@@ -510,6 +514,7 @@ function metadata() {
 
 function apileaks() {
 
+	mkdir -p osint
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $API_LEAKS == true ]] && [[ $OSINT == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Scanning for leaks in APIs public directories"
 
@@ -547,6 +552,7 @@ function apileaks() {
 
 function emails() {
 
+	mkdir -p {.tmp,osint}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $EMAILS == true ]] && [[ $OSINT == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Searching emails/users/passwords leaks"
 		emailfinder -d $domain 2>>"$LOGFILE" | anew -q .tmp/emailfinder.txt || {
@@ -574,6 +580,7 @@ function emails() {
 
 function domain_info() {
 
+	mkdir -p osint
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $DOMAIN_INFO == true ]] && [[ $OSINT == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Searching domain info (whois, registrant name/email domains)"
 		whois -H $domain >osint/domain_info_general.txt || { echo "whois command failed"; }
@@ -602,6 +609,7 @@ function domain_info() {
 
 function ip_info() {
 
+	mkdir -p osint
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $IP_INFO == true ]] && [[ $OSINT == true ]] && [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Searching ip info"
 		if [[ -n $WHOISXML_API ]]; then
@@ -633,6 +641,8 @@ function ip_info() {
 ###############################################################################################################
 
 function subdomains_full() {
+
+	mkdir -p {.tmp,webs,subdomains}
 	NUMOFLINES_subs="0"
 	NUMOFLINES_probed="0"
 	printf "${bgreen}#######################################################################\n\n"
@@ -687,6 +697,7 @@ function subdomains_full() {
 
 function sub_passive() {
 
+	mkdir -p .tmp
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBPASSIVE == true ]]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Passive Subdomain Enumeration"
 
@@ -726,6 +737,7 @@ function sub_passive() {
 
 function sub_crt() {
 
+	
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBCRT == true ]]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Crtsh Subdomain Enumeration"
 		crt -s -json -l ${CTR_LIMIT} $domain 2>>"$LOGFILE" | jq -r '.[].subdomain' 2>>"$LOGFILE" | sed -e 's/^\*\.//' | anew -q .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" >/dev/null
@@ -744,6 +756,7 @@ function sub_crt() {
 
 function sub_active() {
 
+	mkdir -p {.tmp,subdomains}
 	if [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Active Subdomain Enumeration"
 		find .tmp -type f -iname "*_subs.txt" -exec cat {} + | anew -q .tmp/subs_no_resolved.txt
@@ -772,6 +785,7 @@ function sub_active() {
 
 function sub_noerror() {
 
+	mkdir -p {.tmp,subdomains}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBNOERROR == true ]]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Checking NOERROR DNS response"
 		if [[ $(echo "${RANDOM}thistotallynotexist${RANDOM}.$domain" | dnsx -r $resolvers -rcode noerror,nxdomain -retry 3 -silent | cut -d' ' -f2) == "[NXDOMAIN]" ]]; then
@@ -799,6 +813,7 @@ function sub_noerror() {
 
 function sub_dns() {
 
+	mkdir -p {.tmp,subdomains}
 	if [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; then
 		start_subfunc ${FUNCNAME[0]} "Running : DNS Subdomain Enumeration and PTR search"
 		if [[ $AXIOM != true ]]; then
@@ -828,6 +843,7 @@ function sub_dns() {
 
 function sub_brute() {
 
+	mkdir -p {.tmp,subdomains}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBBRUTE == true ]]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Bruteforce Subdomain Enumeration"
 		if [[ $AXIOM != true ]]; then
@@ -862,9 +878,11 @@ function sub_brute() {
 
 function sub_scraping() {
 
+	mkdir -p {.tmp,subdomains}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBSCRAPING == true ]]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Source code scraping subdomain search"
 		touch .tmp/scrap_subs.txt
+		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt"
 		if [[ -s "$dir/subdomains/subdomains.txt" ]]; then
 			if [[ $(cat subdomains/subdomains.txt | wc -l) -le $DEEP_LIMIT ]] || [[ $DEEP == true ]]; then
 				if [[ $AXIOM != true ]]; then
@@ -920,10 +938,10 @@ function sub_scraping() {
 
 function sub_analytics() {
 
+	mkdir -p {.tmp,subdomains}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBANALYTICS == true ]]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Analytics Subdomain Enumeration"
 		if [[ -s ".tmp/probed_tmp_scrap.txt" ]]; then
-			mkdir -p .tmp/output_analytics/
 			analyticsrelationships -ch <.tmp/probed_tmp_scrap.txt >>.tmp/analytics_subs_tmp.txt 2>>"$LOGFILE"
 
 			[ -s ".tmp/analytics_subs_tmp.txt" ] && cat .tmp/analytics_subs_tmp.txt | grep "\.$domain$\|^$domain$" | grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' | sed "s/|__ //" | anew -q .tmp/analytics_subs_clean.txt
@@ -950,8 +968,10 @@ function sub_analytics() {
 
 function sub_permut() {
 
+	mkdir -p {.tmp,subdomains}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBPERMUTE == true ]]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Permutations Subdomain Enumeration"
+		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt"
 		if [[ $DEEP == true ]] || [[ "$(cat subdomains/subdomains.txt | wc -l)" -le $DEEP_LIMIT ]]; then
 			if [[ $PERMUTATIONS_OPTION == "gotator" ]]; then
 				[ -s "subdomains/subdomains.txt" ] && gotator -sub subdomains/subdomains.txt -perm ${tools}/permutations_list.txt $GOTATOR_FLAGS -silent 2>>"$LOGFILE" | head -c $PERMUTATIONS_LIMIT >.tmp/gotator1.txt
@@ -1009,13 +1029,14 @@ function sub_permut() {
 
 function sub_regex_permut() {
 
+	mkdir -p {.tmp,subdomains}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBREGEXPERMUTE == true ]]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Permutations by regex analysis"
 
 		pushd "${tools}/regulator" >/dev/null || {
 			echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
 		}
-
+		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt"
 		python3 main.py -t $domain -f ${dir}/subdomains/subdomains.txt -o ${dir}/.tmp/${domain}.brute
 
 		popd >/dev/null || {
@@ -1052,6 +1073,7 @@ function sub_recursive_passive() {
 
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUB_RECURSIVE_PASSIVE == true ]] && [[ -s "subdomains/subdomains.txt" ]]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Subdomains recursive search passive"
+		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt"
 		# Passive recursive
 		[ -s "subdomains/subdomains.txt" ] && dsieve -if subdomains/subdomains.txt -f 3 -top $DEEP_RECURSIVE_PASSIVE >.tmp/subdomains_recurs_top.txt
 		if [[ $AXIOM != true ]]; then
@@ -1079,8 +1101,10 @@ function sub_recursive_passive() {
 
 function sub_recursive_brute() {
 
+	mkdir -p {.tmp,subdomains}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUB_RECURSIVE_BRUTE == true ]] && [[ -s "subdomains/subdomains.txt" ]]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Subdomains recursive search active"
+		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt"
 		if [[ $(cat subdomains/subdomains.txt | wc -l) -le $DEEP_LIMIT ]]; then
 			[ ! -s ".tmp/subdomains_recurs_top.txt" ] && dsieve -if subdomains/subdomains.txt -f 3 -top $DEEP_RECURSIVE_PASSIVE >.tmp/subdomains_recurs_top.txt
 			ripgen -d .tmp/subdomains_recurs_top.txt -w $subs_wordlist >.tmp/brute_recursive_wordlist.txt
@@ -1147,6 +1171,7 @@ function sub_recursive_brute() {
 
 function subtakeover() {
 
+	mkdir -p {.tmp,webs,subdomains}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBTAKEOVER == true ]]; then
 		start_func ${FUNCNAME[0]} "Looking for possible subdomain and DNS takeover"
 		touch .tmp/tko.txt
@@ -1182,6 +1207,7 @@ function subtakeover() {
 
 function zonetransfer() {
 
+	mkdir -p subdomains
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $ZONETRANSFER == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Zone transfer check"
 		for ns in $(dig +short ns "$domain"); do dig axfr "$domain" @"$ns" >>subdomains/zonetransfer.txt; done
@@ -1207,8 +1233,10 @@ function zonetransfer() {
 
 function s3buckets() {
 
+	mkdir -p {.tmp,subdomains}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $S3BUCKETS == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "AWS S3 buckets search"
+		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt"
 		# S3Scanner
 		if [[ $AXIOM != true ]]; then
 			[ -s "subdomains/subdomains.txt" ] && s3scanner scan -f subdomains/subdomains.txt 2>>"$LOGFILE" | anew -q .tmp/s3buckets.txt
@@ -1254,6 +1282,7 @@ function s3buckets() {
 
 function geo_info() {
 
+	mkdir -p hosts
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GEO_INFO == true ]]; then
 		start_func ${FUNCNAME[0]} "Running: ipinfo via ipapi.co"
 		ips_file="${dir}/hosts/ips.txt"
@@ -1316,8 +1345,10 @@ function geo_info() {
 
 function webprobe_simple() {
 
+	mkdir -p {.tmp,webs,subdomains}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $WEBPROBESIMPLE == true ]]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Http probing $domain"
+		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt"
 		if [[ $AXIOM != true ]]; then
 			cat subdomains/subdomains.txt | httpx ${HTTPX_FLAGS} -no-color -json -random-agent -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -retries 2 -timeout $HTTPX_TIMEOUT -o .tmp/web_full_info_probe.txt 2>>"$LOGFILE" >/dev/null
 		else
@@ -1346,8 +1377,10 @@ function webprobe_simple() {
 
 function webprobe_full() {
 
+	mkdir -p {.tmp,webs,subdomains}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $WEBPROBEFULL == true ]]; then
 		start_func ${FUNCNAME[0]} "Http probing non standard ports"
+		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt"
 		if [[ -s "subdomains/subdomains.txt" ]]; then
 			if [[ $AXIOM != true ]]; then
 				if [[ -s "subdomains/subdomains.txt" ]]; then
@@ -1389,6 +1422,7 @@ function webprobe_full() {
 
 function screenshot() {
 
+	mkdir -p {webs,screenshots}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $WEBSCREENSHOT == true ]]; then
 		start_func ${FUNCNAME[0]} "Web Screenshots"
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
@@ -1411,11 +1445,11 @@ function screenshot() {
 
 function virtualhosts() {
 
+	mkdir -p {.tmp/virtualhosts,virtualhosts,webs}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $VIRTUALHOSTS == true ]]; then
 		start_func ${FUNCNAME[0]} "Virtual Hosts dicovery"
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
 		if [[ -s "webs/webs_all.txt" ]]; then
-			mkdir -p $dir/virtualhosts $dir/.tmp/virtualhosts
 			interlace -tL webs/webs_all.txt -threads ${INTERLACE_THREADS} -c "ffuf -ac -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -H \"Host: FUZZ._cleantarget_\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u  _target_ -of json -o _output_/_cleantarget_.json" -o $dir/.tmp/virtualhosts 2>>"$LOGFILE" >/dev/null
 			for sub in $(cat webs/webs_all.txt); do
 				sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
@@ -1442,6 +1476,7 @@ function virtualhosts() {
 
 function favicon() {
 
+	mkdir -p hosts
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $FAVICON == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Favicon Ip Lookup"
 		pushd "${tools}/fav-up" >/dev/null || {
@@ -1479,6 +1514,7 @@ function favicon() {
 
 function portscan() {
 
+	mkdir -p {.tmp,subdomains,hosts}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $PORTSCANNER == true ]]; then
 		start_func ${FUNCNAME[0]} "Port scan"
 		if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
@@ -1546,6 +1582,7 @@ function portscan() {
 
 function cdnprovider() {
 
+	mkdir -p {.tmp,subdomains,hosts}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $CDN_IP == true ]]; then
 		start_func ${FUNCNAME[0]} "CDN provider check"
 		[ -s "subdomains/subdomains_dnsregs.json" ] && cat subdomains/subdomains_dnsregs.json | jq -r 'try . | .a[]' | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | sort -u >.tmp/ips_cdn.txt
@@ -1567,6 +1604,7 @@ function cdnprovider() {
 
 function waf_checks() {
 
+	mkdir -p {.tmp,webs}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $WAF_DETECTION == true ]]; then
 		start_func ${FUNCNAME[0]} "Website's WAF detection"
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
@@ -1599,10 +1637,11 @@ function waf_checks() {
 
 function nuclei_check() {
 
+	mkdir -p {.tmp,webs,subdomains,nuclei_output}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $NUCLEICHECK == true ]]; then
 		start_func ${FUNCNAME[0]} "Templates based web scanner"
 		nuclei -update 2>>"$LOGFILE" >/dev/null
-		mkdir -p nuclei_output
+		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt"
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
 		[ ! -s ".tmp/webs_subs.txt" ] && cat subdomains/subdomains.txt webs/webs_all.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
 		if [[ $AXIOM != true ]]; then # avoid globbing (expansion of *).
@@ -1636,11 +1675,12 @@ function nuclei_check() {
 
 function fuzz() {
 
+	mkdir -p {.tmp/fuzzing,webs,fuzzing}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $FUZZ == true ]]; then
 		start_func ${FUNCNAME[0]} "Web directory fuzzing"
+		[[ -n $multi ]] && [ ! -f "$dir/webs/webs.txt" ] && echo "$domain" > "$dir/webs/webs.txt"
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
 		if [[ -s "webs/webs_all.txt" ]]; then
-			mkdir -p $dir/fuzzing $dir/.tmp/fuzzing
 			if [[ $AXIOM != true ]]; then
 				interlace -tL webs/webs_all.txt -threads ${INTERLACE_THREADS} -c "ffuf ${FFUF_FLAGS} -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" -o $dir/.tmp/fuzzing 2>>"$LOGFILE" >/dev/null
 				for sub in $(cat webs/webs_all.txt); do
@@ -1675,9 +1715,11 @@ function fuzz() {
 
 function cms_scanner() {
 
+	mkdir -p {.tmp,webs,cms}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $CMS_SCANNER == true ]]; then
 		start_func ${FUNCNAME[0]} "CMS Scanner"
-		mkdir -p $dir/cms && rm -rf $dir/cms/*
+		rm -rf $dir/cms/*
+		[[ -n $multi ]] && [ ! -f "$dir/webs/webs.txt" ] && echo "$domain" > "$dir/webs/webs.txt"
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
 		if [[ -s "webs/webs_all.txt" ]]; then
 			tr '\n' ',' <webs/webs_all.txt >.tmp/cms.txt 2>>"$LOGFILE"
@@ -1717,9 +1759,9 @@ function cms_scanner() {
 
 function urlchecks() {
 
+	mkdir -p {.tmp,webs}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $URL_CHECK == true ]]; then
 		start_func ${FUNCNAME[0]} "URL Extraction"
-		mkdir -p js
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
 		if [[ -s "webs/webs_all.txt" ]]; then
 			if [[ $AXIOM != true ]]; then
@@ -1797,9 +1839,9 @@ function urlchecks() {
 
 function url_gf() {
 
+	mkdir -p {.tmp,webs,gf}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $URL_GF == true ]]; then
 		start_func ${FUNCNAME[0]} "Vulnerable Pattern Search"
-		mkdir -p gf
 		if [[ -s "webs/url_extract.txt" ]]; then
 			gf xss webs/url_extract.txt | anew -q gf/xss.txt
 			gf ssti webs/url_extract.txt | anew -q gf/ssti.txt
@@ -1825,6 +1867,7 @@ function url_gf() {
 
 function url_ext() {
 
+	mkdir -p {.tmp,webs}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $URL_EXT == true ]]; then
 		if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
 			start_func ${FUNCNAME[0]} "Urls by extension"
@@ -1851,6 +1894,7 @@ function url_ext() {
 
 function jschecks() {
 
+	mkdir -p {.tmp,webs,subdomains,js}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $JSCHECKS == true ]]; then
 		start_func ${FUNCNAME[0]} "Javascript Scan"
 		if [[ -s ".tmp/url_extract_js.txt" ]]; then
@@ -1904,6 +1948,7 @@ function jschecks() {
 
 function wordlist_gen() {
 
+	mkdir -p {.tmp,webs}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $WORDLIST == true ]]; then
 		start_func ${FUNCNAME[0]} "Wordlist generation"
 		if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
@@ -1930,6 +1975,7 @@ function wordlist_gen() {
 
 function wordlist_gen_roboxtractor() {
 
+	mkdir -p webs
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $ROBOTSWORDLIST == true ]]; then
 		start_func ${FUNCNAME[0]} "Robots wordlist generation"
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
@@ -1949,6 +1995,7 @@ function wordlist_gen_roboxtractor() {
 
 function password_dict() {
 
+	mkdir -p webs
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $PASSWORD_DICT == true ]]; then
 		start_func ${FUNCNAME[0]} "Password dictionary generation"
 		word=${domain%%.*}
@@ -1970,6 +2017,7 @@ function password_dict() {
 
 function brokenLinks() {
 
+	mkdir -p {.tmp,webs,vulns}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $BROKENLINKS == true ]]; then
 		start_func ${FUNCNAME[0]} "Broken links checks"
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
@@ -2008,6 +2056,7 @@ function brokenLinks() {
 
 function xss() {
 
+	mkdir -p {.tmp,webs,vulns}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $XSS == true ]] && [[ -s "gf/xss.txt" ]]; then
 		start_func ${FUNCNAME[0]} "XSS Analysis"
 		[ -s "gf/xss.txt" ] && cat gf/xss.txt | qsreplace FUZZ | sed '/FUZZ/!d' | Gxss -c 100 -p Xss | qsreplace FUZZ | sed '/FUZZ/!d' | anew -q .tmp/xss_reflected.txt
@@ -2067,6 +2116,7 @@ function xss() {
 
 function cors() {
 
+	mkdir -p {.tmp,webs,vulns}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $CORS == true ]]; then
 		start_func ${FUNCNAME[0]} "CORS Scan"
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
@@ -2084,6 +2134,7 @@ function cors() {
 
 function open_redirect() {
 
+	mkdir -p {.tmp,gf,vulns}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $OPEN_REDIRECT == true ]] && [[ -s "gf/redirect.txt" ]]; then
 		start_func ${FUNCNAME[0]} "Open redirects checks"
 		if [[ $DEEP == true ]] || [[ $(cat gf/redirect.txt | wc -l) -le $DEEP_LIMIT ]]; then
@@ -2109,6 +2160,7 @@ function open_redirect() {
 
 function ssrf_checks() {
 
+	mkdir -p {.tmp,gf,vulns}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SSRF_CHECKS == true ]] && [[ -s "gf/ssrf.txt" ]]; then
 		start_func ${FUNCNAME[0]} "SSRF checks"
 		if [[ -z $COLLAB_SERVER ]]; then
@@ -2149,6 +2201,7 @@ function ssrf_checks() {
 
 function crlf_checks() {
 
+	mkdir -p {webs,vulns}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $CRLF_CHECKS == true ]]; then
 		start_func ${FUNCNAME[0]} "CRLF checks"
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
@@ -2170,6 +2223,7 @@ function crlf_checks() {
 
 function lfi() {
 
+	mkdir -p {.tmp,gf,vulns}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $LFI == true ]] && [[ -s "gf/lfi.txt" ]]; then
 		start_func ${FUNCNAME[0]} "LFI checks"
 		if [[ -s "gf/lfi.txt" ]]; then
@@ -2195,6 +2249,7 @@ function lfi() {
 
 function ssti() {
 
+	mkdir -p {.tmp,gf,vulns}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SSTI == true ]] && [[ -s "gf/ssti.txt" ]]; then
 		start_func ${FUNCNAME[0]} "SSTI checks"
 		if [[ -s "gf/ssti.txt" ]]; then
@@ -2221,6 +2276,7 @@ function ssti() {
 
 function sqli() {
 
+	mkdir -p {.tmp,gf,vulns}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SQLI == true ]] && [[ -s "gf/sqli.txt" ]]; then
 		start_func ${FUNCNAME[0]} "SQLi checks"
 
@@ -2250,8 +2306,10 @@ function sqli() {
 
 function test_ssl() {
 
+	mkdir -p {hosts,vulns}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $TEST_SSL == true ]]; then
 		start_func ${FUNCNAME[0]} "SSL Test"
+		[[ -n $multi ]] && [ ! -f "$dir/hosts/ips.txt" ] && echo "$domain" > "$dir/hosts/ips.txt"
 		${tools}/testssl.sh/testssl.sh --quiet --color 0 -U -iL hosts/ips.txt 2>>"$LOGFILE" >vulns/testssl.txt
 		end_func "Results are saved in vulns/testssl.txt" ${FUNCNAME[0]}
 	else
@@ -2266,6 +2324,7 @@ function test_ssl() {
 
 function spraying() {
 
+	mkdir -p vulns
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SPRAY == true ]]; then
 		start_func ${FUNCNAME[0]} "Password spraying"
 
@@ -2290,6 +2349,7 @@ function spraying() {
 
 function command_injection() {
 
+	mkdir -p {.tmp,gf,vulns}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $COMM_INJ == true ]] && [[ -s "gf/rce.txt" ]]; then
 		start_func ${FUNCNAME[0]} "Command Injection checks"
 		[ -s "gf/rce.txt" ] && cat gf/rce.txt | qsreplace FUZZ | sed '/FUZZ/!d' | anew -q .tmp/tmp_rce.txt
@@ -2313,6 +2373,7 @@ function command_injection() {
 
 function 4xxbypass() {
 
+	mkdir -p {.tmp,fuzzing,vulns}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $BYPASSER4XX == true ]]; then
 		if [[ $(cat fuzzing/fuzzing_full.txt 2>/dev/null | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 | wc -l) -le 1000 ]] || [[ $DEEP == true ]]; then
 			start_func "403 bypass"
@@ -2343,6 +2404,7 @@ function 4xxbypass() {
 
 function prototype_pollution() {
 
+	mkdir -p {.tmp,webs,vulns}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $PROTO_POLLUTION == true ]]; then
 		start_func ${FUNCNAME[0]} "Prototype Pollution checks"
 		if [[ $DEEP == true ]] || [[ $(cat webs/url_extract.txt | wc -l) -le $DEEP_LIMIT ]]; then
@@ -2364,6 +2426,7 @@ function prototype_pollution() {
 
 function smuggling() {
 
+	mkdir -p {.tmp,webs,vulns/smuggling}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SMUGGLING == true ]]; then
 		start_func ${FUNCNAME[0]} "HTTP Request Smuggling checks"
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
@@ -2372,7 +2435,6 @@ function smuggling() {
 				echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
 			}
 			cat $dir/webs/webs_all.txt | python3 smuggler.py -q --no-color 2>/dev/null | anew -q $dir/.tmp/smuggling.txt
-			mkdir -p $dir/vulns/smuggling/
 			find payloads -type f ! -name "README*" -exec mv {} $dir/vulns/smuggling/ \;
 			popd >/dev/null || {
 				echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
@@ -2394,6 +2456,7 @@ function smuggling() {
 
 function webcache() {
 
+	mkdir -p {.tmp,webs,vulns}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $WEBCACHE == true ]]; then
 		start_func ${FUNCNAME[0]} "Web Cache Poisoning checks"
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
@@ -2423,6 +2486,7 @@ function webcache() {
 
 function fuzzparams() {
 
+	mkdir -p {.tmp,webs,vulns}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $FUZZPARAMS == true ]]; then
 		start_func ${FUNCNAME[0]} "Fuzzing params values checks"
 		if [[ $DEEP == true ]] || [[ $(cat webs/url_extract.txt | wc -l) -le $DEEP_LIMIT2 ]]; then
@@ -2814,7 +2878,7 @@ function start() {
 			list="${dir}/target.txt"
 		fi
 	fi
-	mkdir -p .tmp .log osint subdomains webs hosts vulns
+	mkdir -p .log
 
 	NOW=$(date +"%F")
 	NOWT=$(date +"%T")
@@ -2980,7 +3044,7 @@ function multi_osint() {
 		echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"
 		exit 1
 	}
-	mkdir -p .tmp .called_fn osint subdomains webs hosts vulns
+	mkdir -p {.called_fn,.log}
 
 	NOW=$(date +"%F")
 	NOWT=$(date +"%T")
@@ -2996,7 +3060,7 @@ function multi_osint() {
 			echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
 			exit 1
 		}
-		mkdir -p .tmp .called_fn osint subdomains webs hosts vulns
+		mkdir -p {.called_fn,.log}
 		NOW=$(date +"%F")
 		NOWT=$(date +"%T")
 		LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
@@ -3097,7 +3161,7 @@ function multi_recon() {
 		exit 1
 	}
 
-	mkdir -p .tmp .log .called_fn osint subdomains webs hosts vulns
+	mkdir -p {.called_fn,.log}
 	NOW=$(date +"%F")
 	NOWT=$(date +"%T")
 	LOGFILE="${workdir}/.log/${NOW}_${NOWT}.txt"
@@ -3114,7 +3178,7 @@ function multi_recon() {
 			echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
 			exit 1
 		}
-		mkdir -p .tmp .log .called_fn osint subdomains webs hosts vulns
+		mkdir -p {.called_fn,.log}
 
 		NOW=$(date +"%F")
 		NOWT=$(date +"%T")
@@ -3137,10 +3201,10 @@ function multi_recon() {
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
 		printf "${bgreen}#######################################################################${reset}\n"
-		printf "${bgreen} $domain finished 1st loop in ${runtime}  $currently ${reset}\n"
+		printf "${bgreen} $domain finished 1st loop in ${runtime} $currently ${reset}\n"
 		if [[ -n $flist ]]; then
 			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
-			printf "\n${yellow}  $domain is $POSINLIST of $LISTTOTAL${reset}\n"
+			printf "\n${yellow} $domain is $POSINLIST of $LISTTOTAL${reset}\n"
 		fi
 		printf "${bgreen}#######################################################################${reset}\n"
 	done
@@ -3175,10 +3239,10 @@ function multi_recon() {
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
 		printf "${bgreen}#######################################################################${reset}\n"
-		printf "${bgreen} $domain finished 2nd loop in ${runtime}  $currently ${reset}\n"
+		printf "${bgreen} $domain finished 2nd loop in ${runtime} $currently ${reset}\n"
 		if [[ -n $flist ]]; then
 			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
-			printf "\n${yellow}  $domain is $POSINLIST of $LISTTOTAL${reset}\n"
+			printf "\n${yellow} $domain is $POSINLIST of $LISTTOTAL${reset}\n"
 		fi
 		printf "${bgreen}#######################################################################${reset}\n"
 	done
@@ -3230,10 +3294,10 @@ function multi_recon() {
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
 		printf "${bgreen}#######################################################################${reset}\n"
-		printf "${bgreen} $domain finished 3rd loop in ${runtime}  $currently ${reset}\n"
+		printf "${bgreen} $domain finished 3rd loop in ${runtime} $currently ${reset}\n"
 		if [[ -n $flist ]]; then
 			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
-			printf "\n${yellow}  $domain is $POSINLIST of $LISTTOTAL${reset}\n"
+			printf "\n${yellow} $domain is $POSINLIST of $LISTTOTAL${reset}\n"
 		fi
 		printf "${bgreen}#######################################################################${reset}\n"
 	done
@@ -3260,10 +3324,10 @@ function multi_recon() {
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
 		printf "${bgreen}#######################################################################${reset}\n"
-		printf "${bgreen} $domain finished final loop in ${runtime}  $currently ${reset}\n"
+		printf "${bgreen} $domain finished final loop in ${runtime} $currently ${reset}\n"
 		if [[ -n $flist ]]; then
 			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
-			printf "\n${yellow}  $domain is $POSINLIST of $LISTTOTAL${reset}\n"
+			printf "\n${yellow} $domain is $POSINLIST of $LISTTOTAL${reset}\n"
 		fi
 		printf "${bgreen}#######################################################################${reset}\n"
 	done
@@ -3273,6 +3337,93 @@ function multi_recon() {
 	}
 	dir=$workdir
 	domain=$multi
+	end
+}
+
+function multi_custom() {
+
+	global_start=$(date +%s)
+
+	if [[ $NOTIFICATION == true ]]; then
+		NOTIFY="notify -silent"
+	else
+		NOTIFY=""
+	fi
+
+	if [[ -s $list ]]; then
+		sed -i 's/\r$//' $list
+		targets=$(cat $list)
+	else
+		notification "Target list not provided" error
+		exit
+	fi
+
+	workdir=${SCRIPTPATH}/Recon/$multi
+	mkdir -p $workdir || {
+		echo "Failed to create directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"
+		exit 1
+	}
+	cd "$workdir" || {
+		echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"
+		exit 1
+	}
+
+	mkdir -p {.log}
+	NOW=$(date +"%F")
+	NOWT=$(date +"%T")
+	LOGFILE="${workdir}/.log/${NOW}_${NOWT}.txt"
+	touch .log/${NOW}_${NOWT}.txt
+	echo "Start ${NOW} ${NOWT}" >"${LOGFILE}"
+
+	[ -n "$flist" ] && LISTTOTAL=$(cat "$flist" | wc -l)
+
+
+	if [[ $AXIOM == true ]]; then
+		axiom_lauch
+		axiom_selected
+	fi
+
+	custom_function_list=$(echo $custom_function|sed -i 's/,/\n/')
+
+	[ -n "$custom_function_list" ] && LISTFUNCTOTAL=$(echo "$flist" | wc -l)
+
+	for domain in $targets; do
+		loopstart=$(date +%s)
+		dir=$workdir/targets/$domain
+
+		cd "$dir" || {
+			echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
+			exit 1
+		}
+		mkdir -p {.called_fn,.log}
+		called_fn_dir=$dir/.called_fn
+
+		echo $domain > $dir/.tmp/webs_subs.txt
+		func_count=0
+		for custom_f in $custom_function_list; do
+			((func_count++))
+
+			loopstart=$(date +%s)
+			
+			$custom_f
+
+			currently=$(date +"%H:%M:%S")
+			loopend=$(date +%s)
+			getElapsedTime $loopstart $loopend
+			printf "${bgreen}#######################################################################${reset}\n"
+			printf "${bgreen} $domain finished $custom_function in ${runtime} $currently ${reset}\n"
+			if [[ -n $flist ]]; then
+				POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
+				printf "\n${yellow} $domain is $POSINLIST of $LISTTOTAL (${func_count}/${LISTFUNCTOTAL})${reset}\n"
+			fi
+			printf "${bgreen}#######################################################################${reset}\n"
+		done
+	done
+
+	if [[ $AXIOM == true ]]; then
+		axiom_shutdown
+	fi
+
 	end
 }
 
@@ -3380,7 +3531,7 @@ if [[ $OSTYPE == "darwin"* ]]; then
 	PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
 fi
 
-PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:rspanvh::' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,deep,help,vps' -n 'reconFTW' -- "$@")
+PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:rspanvh::' --long 'domain:,list:,custom:,recon,subdomains,passive,all,web,osint,deep,help,vps' -n 'reconFTW' -- "$@")
 
 # Note the quotes around "$PROGARGS": they are essential!
 eval set -- "$PROGARGS"
@@ -3679,19 +3830,26 @@ case $opt_mode in
 	fi
 	;;
 'c')
-	export DIFF=true
-	dir="${SCRIPTPATH}/Recon/$domain"
-	cd $dir || {
-		echo "Failed to cd directory '$dir'"
-		exit 1
-	}
-	LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
-	called_fn_dir=$dir/.called_fn
-	$custom_function
-	cd ${SCRIPTPATH} || {
-		echo "Failed to cd directory '$dir'"
-		exit 1
-	}
+	if [[ -n $multi ]]; then
+		if [[ $AXIOM == true ]]; then
+			mode="multi_custom"
+		fi
+		multi_custom
+	else
+		export DIFF=true
+		dir="${SCRIPTPATH}/Recon/$domain"
+		cd $dir || {
+			echo "Failed to cd directory '$dir'"
+			exit 1
+		}
+		LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
+		called_fn_dir=$dir/.called_fn
+		$custom_function
+		cd ${SCRIPTPATH} || {
+			echo "Failed to cd directory '$dir'"
+			exit 1
+		}
+	fi
 	exit
 	;;
 	# No mode selected.  EXIT!
