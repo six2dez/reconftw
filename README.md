@@ -476,7 +476,7 @@ reset='\033[0m'
 ## Osint
 
 - Domain information ([whois](https://github.com/rfc1036/whois) and [amass](https://github.com/OWASP/Amass))
-- Emails addresses and users ([emailfinder](https://github.com/Josue87/EmailFinder))
+- Emails addresses and passwords leaks ([emailfinder](https://github.com/Josue87/EmailFinder) and [LeakSearch](https://github.com/JoelGMSec/LeakSearch))
 - Metadata finder ([MetaFinder](https://github.com/Josue87/MetaFinder))
 - API leaks search ([porch-pirate](https://github.com/MandConsultingGroup/porch-pirate) and [SwaggerSpy](https://github.com/UndeadSec/SwaggerSpy))
 - Google Dorks ([dorks_hunter](https://github.com/six2dez/dorks_hunter))

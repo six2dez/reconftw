@@ -175,6 +175,10 @@ function tools_installed() {
 		printf "${bred} [*] swaggerspy			[NO]${reset}\n"
 		allinstalled=false
 	}
+	[ -f "${tools}/LeakSearch/LeakSearch.py" ] || {
+		printf "${bred} [*] LeakSearch			[NO]${reset}\n"
+		allinstalled=false
+	}
 	command -v github-endpoints &>/dev/null || {
 		printf "${bred} [*] github-endpoints		[NO]${reset}\n"
 		allinstalled=false
@@ -383,6 +387,14 @@ function tools_installed() {
 		printf "${bred} [*] porch-pirate			[NO]${reset}\n"
 		allinstalled=false
 	}
+	command -v shortscan &>/dev/null || {
+		printf "${bred} [*] shortscan			[NO]${reset}\n"
+		allinstalled=false
+	}
+	command -v sns &>/dev/null || {
+		printf "${bred} [*] sns			[NO]${reset}\n"
+		allinstalled=false
+	}
 	if [[ ${allinstalled} == true ]]; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
 	else
@@ -555,7 +567,21 @@ function emails() {
 		}
 		[ -s ".tmp/emailfinder.txt" ] && cat .tmp/emailfinder.txt | grep "@" | grep -iv "|_" | anew -q osint/emails.txt
 
-		end_func "Results are saved in $domain/osint/emails.txt" ${FUNCNAME[0]}
+		pushd "${tools}/LeakSearch" >/dev/null || {
+			echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
+		}
+
+		python3 LeakSearch.py -k $domain -o ${dir}/.tmp/passwords.txt 2>>"$LOGFILE" || {
+			echo "LeakSearch command failed"
+		}
+
+		popd >/dev/null || {
+			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
+		}
+
+		[ -s ".tmp/passwords.txt" ] && cat .tmp/passwords.txt | anew -q osint/passwords.txt
+
+		end_func "Results are saved in $domain/osint/emails|passwords.txt" ${FUNCNAME[0]}
 	else
 		if [[ $EMAILS == false ]] || [[ $OSINT == false ]]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -871,7 +897,7 @@ function sub_scraping() {
 					resolvers_update_quick_local
 					cat subdomains/subdomains.txt | httpx -follow-host-redirects -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info1.txt 2>>"$LOGFILE" >/dev/null
 					[ -s ".tmp/web_full_info1.txt" ] && cat .tmp/web_full_info1.txt | jq -r 'try .url' 2>/dev/null | grep "$domain" | grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' | sed "s/*.//" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
-					[ -s ".tmp/probed_tmp_scrap.txt" ] && cat .tmp/probed_tmp_scrap.txt | httpx -tls-grab -tls-probe -csp-probe -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info2.txt 2>>"$LOGFILE" >/dev/null
+					[ -s ".tmp/probed_tmp_scrap.txt" ] && timeout -k 1m 10m httpx -l .tmp/probed_tmp_scrap.txt -tls-grab -tls-probe -csp-probe -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -json -o .tmp/web_full_info2.txt 2>>"$LOGFILE" >/dev/null
 					[ -s ".tmp/web_full_info2.txt" ] && cat .tmp/web_full_info2.txt | jq -r 'try ."tls-grab"."dns_names"[],try .csp.domains[],try .url' 2>/dev/null | grep "$domain" | grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' | sed "s/*.//" | sort -u | httpx -silent | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
 
 					if [[ $DEEP == true ]]; then
@@ -883,7 +909,7 @@ function sub_scraping() {
 					resolvers_update_quick_axiom
 					axiom-scan subdomains/subdomains.txt -m httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info1.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 					[ -s ".tmp/web_full_info1.txt" ] && cat .tmp/web_full_info1.txt | jq -r 'try .url' 2>/dev/null | grep "$domain" | grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' | sed "s/*.//" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
-					[ -s ".tmp/probed_tmp_scrap.txt" ] && axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -tls-grab -tls-probe -csp-probe -random-agent -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info2.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+					[ -s ".tmp/probed_tmp_scrap.txt" ] && timeout -k 1m 10m axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -tls-grab -tls-probe -csp-probe -random-agent -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info2.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 					[ -s ".tmp/web_full_info2.txt" ] && cat .tmp/web_full_info2.txt | jq -r 'try ."tls-grab"."dns_names"[],try .csp.domains[],try .url' 2>/dev/null | grep "$domain" | grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' | sed "s/*.//" | sort -u | httpx -silent | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
 					if [[ $DEEP == true ]]; then
 						[ -s ".tmp/probed_tmp_scrap.txt" ] && axiom-scan .tmp/probed_tmp_scrap.txt -m katana -jc -kf all -d 3 -fs rdn -o .tmp/katana.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
@@ -1665,6 +1691,32 @@ function fuzz() {
 		fi
 	else
 		if [[ $FUZZ == false ]]; then
+			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+		else
+			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
+	fi
+
+}
+
+function iishortname() {
+
+	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $IIS_SHORTNAME == true ]]; then
+		start_func ${FUNCNAME[0]} "IIS Shortname Scanner"
+		[ -s "nuclei_output/info.txt" ] && cat nuclei_output/info.txt | grep "iis-version" | cut -d " " -f4 > .tmp/iis_sites.txt
+		if [[ -s ".tmp/iis_sites.txt" ]]; then
+			mkdir -p $$dir/vulns/iis-shortname-shortscan/
+			mkdir -p $$dir/vulns/iis-shortname-sns/
+			interlace -tL .tmp/iis_sites.txt -threads ${INTERLACE_THREADS} -c "shortscan _target_ -F -s -p 1 > _output_/_cleantarget_.txt" -o $dir/vulns/iis-shortname-shortscan/ 2>>"$LOGFILE" >/dev/null
+			find $dir/vulns/iis-shortname-shortscan/ -type f -print0 | xargs --null grep -Z -L 'Vulnerable: Yes' | xargs --null rm
+			interlace -tL .tmp/iis_sites.txt -threads ${INTERLACE_THREADS} -c "sns -u _target_ > _output_/_cleantarget_.txt" -o $dir/vulns/iis-shortname-sns/ 2>>"$LOGFILE" >/dev/null
+			find $dir/vulns/iis-shortname-sns/ -type f -print0 | xargs --null grep -Z 'Target is not vulnerable' | xargs --null rm
+			end_func "Results are saved in vulns/iis-shortname/" ${FUNCNAME[0]}
+		else
+			end_func "No IIS sites detected, iishortname check skipped " ${FUNCNAME[0]}
+		fi
+	else
+		if [[ $IIS_SHORTNAME == false ]]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
 			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -3052,6 +3104,7 @@ function recon() {
 	waf_checks
 	nuclei_check
 	fuzz
+	iishortname
 	urlchecks
 	jschecks
 
@@ -3224,6 +3277,7 @@ function multi_recon() {
 		}
 		loopstart=$(date +%s)
 		fuzz
+		iishortname
 		urlchecks
 		jschecks
 		currently=$(date +"%H:%M:%S")
@@ -3309,6 +3363,7 @@ function webs_menu() {
 	nuclei_check
 	cms_scanner
 	fuzz
+	iishortname
 	urlchecks
 	jschecks
 	url_gf
