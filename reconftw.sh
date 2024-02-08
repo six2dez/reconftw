@@ -2646,6 +2646,12 @@ function remove_big_files() {
 
 function notification() {
 	if [[ -n $1 ]] && [[ -n $2 ]]; then
+
+		if [[ $NOTIFICATION == true ]]; then
+			NOTIFY="notify -silent"
+		else
+			NOTIFY="true"
+		fi
 		if [[ -z $3 ]]; then
 			current_date=$(date +'%Y-%m-%dT%H:%M:%S%z')
 		else
@@ -2861,8 +2867,7 @@ function axiom_launch() {
 			fi
 
 			NUMOFNODES=$(timeout 30 axiom-ls | grep -c "$AXIOM_FLEET_NAME" || true)
-			echo "[$(date +"%Y-%m-%dT%H:%M:%S%z")] Axiom fleet $AXIOM_FLEET_NAME launched w/ $NUMOFNODES instances" | $NOTIFY
-			end_func "Axiom fleet $AXIOM_FLEET_NAME launched w/ $NUMOFNODES instances" info
+			end_func "Axiom fleet $AXIOM_FLEET_NAME launched $NUMOFNODES instances" info
 		fi
 	fi
 }
@@ -2876,7 +2881,6 @@ function axiom_shutdown() {
 		fi
 		eval axiom-rm -f "$AXIOM_FLEET_NAME*" || true
 		axiom-ls | grep "$AXIOM_FLEET_NAME" || true
-		echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] Axiom fleet $AXIOM_FLEET_NAME shutdown" | $NOTIFY
 		notification "Axiom fleet $AXIOM_FLEET_NAME shutdown" info
 	fi
 }
@@ -2897,12 +2901,6 @@ function axiom_selected() {
 function start() {
 
 	global_start=$(date +%s)
-
-	if [[ $NOTIFICATION == true ]]; then
-		NOTIFY="notify -silent"
-	else
-		NOTIFY=""
-	fi
 
 	printf "\n${bgreen}#######################################################################${reset}"
 	notification "Recon succesfully started on ${domain}" good $(date +'%Y-%m-%dT%H:%M:%S%z')
@@ -3001,7 +2999,7 @@ function end() {
 	[ "$SOFT_NOTIFICATION" = true ] && echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] Finished Recon on: ${domain} under ${finaldir} in: ${runtime}" | notify -silent
 	printf "${bgreen}#######################################################################${reset}\n"
 	#Separator for more clear messges in telegram_Bot
-	echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] ******  Stay safe 🦠 and secure 🔐  ******" | $NOTIFY
+	notification echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] ******  Stay safe 🦠 and secure 🔐  ******" info
 
 }
 
@@ -3092,12 +3090,6 @@ function vulns() {
 function multi_osint() {
 
 	global_start=$(date +%s)
-
-	if [[ $NOTIFICATION == true ]]; then
-		NOTIFY="notify -silent"
-	else
-		NOTIFY=""
-	fi
 
 	#[[ -n "$domain" ]] && ipcidr_target $domain
 
@@ -3209,12 +3201,6 @@ function recon() {
 function multi_recon() {
 
 	global_start=$(date +%s)
-
-	if [[ $NOTIFICATION == true ]]; then
-		NOTIFY="notify -silent"
-	else
-		NOTIFY=""
-	fi
 
 	#[[ -n "$domain" ]] && ipcidr_target $domain
 
@@ -3419,12 +3405,6 @@ function multi_recon() {
 function multi_custom() {
 
 	global_start=$(date +%s)
-
-	if [[ $NOTIFICATION == true ]]; then
-		NOTIFY="notify -silent"
-	else
-		NOTIFY=""
-	fi
 
 	if [[ -s $list ]]; then
 		sed -i 's/\r$//' $list
