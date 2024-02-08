@@ -3459,7 +3459,7 @@ function multi_custom() {
 	fi
 
 	custom_function_list=$(echo $custom_function|tr ',' '\n')
-	[ -n "$custom_function_list" ] && func_total=$(cat "$custom_function_list" | wc -l)
+	func_total=$(echo "$custom_function_list" | wc -l)
 
 	func_count=0
 	domain=$(cat $flist)
