@@ -3443,7 +3443,8 @@ function multi_custom() {
 		exit 1
 	}
 
-	mkdir -p .log
+	mkdir -p {.called_fn,.log}
+	called_fn_dir=$dir/.called_fn
 	NOW=$(date +"%F")
 	NOWT=$(date +"%T")
 	LOGFILE="${workdir}/.log/${NOW}_${NOWT}.txt"
