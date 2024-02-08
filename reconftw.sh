@@ -2874,7 +2874,8 @@ function axiom_shutdown() {
 			notification "Automatic Axiom fleet shutdown is not enabled in this mode" info
 			return
 		fi
-		eval axiom-rm -f "$AXIOM_FLEET_NAME*"
+		eval axiom-rm -f "$AXIOM_FLEET_NAME*" || true
+		axiom-ls | grep "$AXIOM_FLEET_NAME" || true
 		echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] Axiom fleet $AXIOM_FLEET_NAME shutdown" | $NOTIFY
 		notification "Axiom fleet $AXIOM_FLEET_NAME shutdown" info
 	fi
@@ -3434,6 +3435,7 @@ function multi_custom() {
 	fi
 
 	dir=${SCRIPTPATH}/Recon/$multi
+	rm -rf $dir
 	mkdir -p $dir || {
 		echo "Failed to create directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
 		exit 1
