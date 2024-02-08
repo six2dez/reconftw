@@ -10,8 +10,8 @@ ARG SHODAN_API_KEY="XXXXXXXXXXXXXX"
 ARG LANG=en_US.UTF-8
 ARG LANGUAGE=en_US
 
-ARG GIT_REPOSITORY_AXIOM
-ARG GIT_REPOSITORY_RECONFTW
+ARG GIT_REPOSITORY_AXIOM="https://github.com/pry0cc/axiom"
+ARG GIT_REPOSITORY_RECONFTW="https://github.com/six2dez/reconftw"
 
 ##################################################
 ###> Do NOT change anything beyond this point <###
@@ -33,6 +33,9 @@ ARG SHODAN_API_KEY
 ARG LANG
 ARG LANGUAGE
 
+ARG GIT_REPOSITORY_AXIOM
+ARG GIT_REPOSITORY_RECONFTW
+
 ENV COLLAB_SERVER=$COLLAB_SERVER
 ENV XSS_SERVER=$XSS_SERVER
 ENV SHODAN_API_KEY=$SHODAN_API_KEY
@@ -41,8 +44,8 @@ ENV LANG=$LANG
 ENV LANGUAGE=$LANGUAGE
 ENV LC_ALL=$LANG
 
-ENV GIT_REPOSITORY_AXIOM=${GIT_REPOSITORY_AXIOM:-"https://github.com/pry0cc/axiom"}
-ENV GIT_REPOSITORY_RECONFTW=${GIT_REPOSITORY_RECONFTW:-"https://github.com/six2dez/reconftw"}
+ENV GIT_REPOSITORY_AXIOM=$GIT_REPOSITORY_AXIOM
+ENV GIT_REPOSITORY_RECONFTW=$GIT_REPOSITORY_RECONFToW
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DEBCONF_NONINTERACTIVE_SEEN=true
@@ -86,7 +89,7 @@ localepurge
 
 ###>> Configure Axiom <<###
 mkdir -p /root/.axiom/
-git clone ${AXIOM_GIT_REPOSITORY} /root/.axiom/
+git clone ${GIT_REPOSITORY_AXIOM} /root/.axiom/
 cd /root/.axiom/interact
 ./axiom-configure --unattended --shell Bash
 ## This avoids useless error messages later.
