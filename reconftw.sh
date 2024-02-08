@@ -1678,7 +1678,7 @@ function nuclei_check() {
 	mkdir -p {.tmp,webs,subdomains,nuclei_output}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $NUCLEICHECK == true ]]; then
 		start_func ${FUNCNAME[0]} "Templates based web scanner"
-		nuclei -update 2>>"$LOGFILE" >/dev/null
+		nuclei -update 2>>"$LOGFILE" >/dev/null+
 		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt"  && touch webs/webs.txt webs/webs_uncommon_ports.txt 
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
 		[ ! -s ".tmp/webs_subs.txt" ] && cat subdomains/subdomains.txt webs/webs_all.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
@@ -3433,21 +3433,21 @@ function multi_custom() {
 		exit
 	fi
 
-	workdir=${SCRIPTPATH}/Recon/$multi
-	mkdir -p $workdir || {
-		echo "Failed to create directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"
+	dir=${SCRIPTPATH}/Recon/$multi
+	mkdir -p $dir || {
+		echo "Failed to create directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
 		exit 1
 	}
-	cd "$workdir" || {
-		echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"
+	cd "$dir" || {
+		echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
 		exit 1
 	}
 
 	mkdir -p {.called_fn,.log}
-	called_fn_dir=$workdir/.called_fn
+	called_fn_dir=$dir/.called_fn
 	NOW=$(date +"%F")
 	NOWT=$(date +"%T")
-	LOGFILE="${workdir}/.log/${NOW}_${NOWT}.txt"
+	LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
 	touch .log/${NOW}_${NOWT}.txt
 	echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
 
