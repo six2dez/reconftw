@@ -470,7 +470,7 @@ function github_dorks() {
 		if [[ $GITHUB_DORKS == false ]] || [[ $OSINT == false ]]; then
 			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
