@@ -2842,7 +2842,7 @@ function axiom_launch() {
 		NUMOFNODES=$(timeout 30 axiom-ls | grep -c "$AXIOM_FLEET_NAME" || true)
 		if [[ $NUMOFNODES -ge $AXIOM_FLEET_COUNT ]]; then
 			axiom-select "$AXIOM_FLEET_NAME*"
-			end_func "Axiom fleet $AXIOM_FLEET_NAME already has $NUMOFNODES instances"
+			end_func "Axiom fleet $AXIOM_FLEET_NAME already has $NUMOFNODES instances" info+
 		else
 			if [[ $NUMOFNODES -eq 0 ]]; then
 				startcount=$AXIOM_FLEET_COUNT
