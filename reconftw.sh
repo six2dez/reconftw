@@ -68,7 +68,7 @@ function check_version() {
 function tools_installed() {
 
 	printf "\n\n${bgreen}#######################################################################${reset}\n"
-	printf "${bblue} Checking installed tools ${reset}\n\n"
+	printf "${bblue}[$(date +'%Y-%m-%dT%H:%M:%S%z')] Checking installed tools ${reset}\n\n"
 
 	allinstalled=true
 
@@ -417,7 +417,7 @@ function tools_installed() {
 		printf "\n${yellow} If nothing works and the world is gonna end you can always ping me :D ${reset}\n\n"
 	fi
 
-	printf "${bblue} Tools check finished\n"
+	printf "${bblue}[$(date +'%Y-%m-%dT%H:%M:%S%z')] Tools check finished\n"
 	printf "${bgreen}#######################################################################\n${reset}"
 }
 
@@ -437,9 +437,9 @@ function google_dorks() {
 		end_func "Results are saved in $domain/osint/dorks.txt" "${FUNCNAME[0]}"
 	else
 		if [[ $GOOGLE_DORKS == false ]] || [[ $OSINT == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} are already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} are already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -463,14 +463,14 @@ function github_dorks() {
 				}
 			fi
 		else
-			printf "\n${bred} Required file ${GITHUB_TOKENS} not exists or empty${reset}\n"
+			printf "\n${bred}[$(date +'%Y-%m-%dT%H:%M:%S%z')] Required file ${GITHUB_TOKENS} not exists or empty${reset}\n"
 		fi
 		end_func "Results are saved in $domain/osint/gitdorks.txt" "${FUNCNAME[0]}"
 	else
 		if [[ $GITHUB_DORKS == false ]] || [[ $OSINT == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -497,14 +497,14 @@ function github_repos() {
 				cat .tmp/github/* 2>/dev/null | jq -c | jq -r >osint/github_company_secrets.json 2>>"$LOGFILE"
 			fi
 		else
-			printf "\n${bred} Required file ${GITHUB_TOKENS} not exists or empty${reset}\n"
+			printf "\n${bred}[$(date +'%Y-%m-%dT%H:%M:%S%z')] Required file ${GITHUB_TOKENS} not exists or empty${reset}\n"
 		fi
 		end_func "Results are saved in $domain/osint/github_company_secrets.json" ${FUNCNAME[0]}
 	else
 		if [[ $GITHUB_REPOS == false ]] || [[ $OSINT == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -524,14 +524,14 @@ function metadata() {
 		end_func "Results are saved in $domain/osint/[software/authors/metadata_results].txt" ${FUNCNAME[0]}
 	else
 		if [[ $METADATA == false ]] || [[ $OSINT == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 			return
 		else
 			if [[ $METADATA == false ]] || [[ $OSINT == false ]]; then
-				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+				printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 			else
-				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+				printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
 		fi
 	fi
@@ -562,14 +562,14 @@ function apileaks() {
 		end_func "Results are saved in $domain/osint/[software/authors/metadata_results].txt" ${FUNCNAME[0]}
 	else
 		if [[ $API_LEAKS == false ]] || [[ $OSINT == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 			return
 		else
 			if [[ $API_LEAKS == false ]] || [[ $OSINT == false ]]; then
-				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+				printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 			else
-				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+				printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
 		fi
 	fi
@@ -604,14 +604,14 @@ function emails() {
 		end_func "Results are saved in $domain/osint/emails|passwords.txt" ${FUNCNAME[0]}
 	else
 		if [[ $EMAILS == false ]] || [[ $OSINT == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 			return
 		else
 			if [[ $EMAILS == false ]] || [[ $OSINT == false ]]; then
-				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+				printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 			else
-				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+				printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
 		fi
 	fi
@@ -633,14 +633,14 @@ function domain_info() {
 		end_func "Results are saved in $domain/osint/domain_info_[general/name/email/ip].txt" ${FUNCNAME[0]}
 	else
 		if [[ $DOMAIN_INFO == false ]] || [[ $OSINT == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 			return
 		else
 			if [[ $DOMAIN_INFO == false ]] || [[ $OSINT == false ]]; then
-				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+				printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 			else
-				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+				printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
 		fi
 	fi
@@ -658,18 +658,18 @@ function ip_info() {
 			curl "https://ip-geolocation.whoisxmlapi.com/api/v1?apiKey=${WHOISXML_API}&ipAddress=${domain}" 2>/dev/null | jq -r '.ip,.location' 2>>"$LOGFILE" | anew -q osint/ip_${domain}_location.txt
 			end_func "Results are saved in $domain/osint/ip_[domain_relations|whois|location].txt" ${FUNCNAME[0]}
 		else
-			printf "\n${yellow} No WHOISXML_API var defined, skipping function ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] No WHOISXML_API var defined, skipping function ${reset}\n"
 		fi
 	else
 		if [[ $IP_INFO == false ]] || [[ $OSINT == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		elif [[ ! $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 			return
 		else
 			if [[ $IP_INFO == false ]] || [[ $OSINT == false ]]; then
-				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+				printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 			else
-				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+				printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
 		fi
 	fi
@@ -686,8 +686,8 @@ function subdomains_full() {
 	NUMOFLINES_subs="0"
 	NUMOFLINES_probed="0"
 	printf "${bgreen}#######################################################################\n\n"
-	! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]] && printf "${bblue} Subdomain Enumeration $domain\n\n"
-	[[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]] && printf "${bblue} Scanning IP $domain\n\n"
+	! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]] && printf "${bblue}[$(date +'%Y-%m-%dT%H:%M:%S%z')] Subdomain Enumeration $domain\n\n"
+	[[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]] && printf "${bblue}[$(date +'%Y-%m-%dT%H:%M:%S%z')] Scanning IP $domain\n\n"
 	[ -s "subdomains/subdomains.txt" ] && cp subdomains/subdomains.txt .tmp/subdomains_old.txt
 	[ -s "webs/webs.txt" ] && cp webs/webs.txt .tmp/probed_old.txt
 
@@ -725,13 +725,13 @@ function subdomains_full() {
 		[ -s "$outOfScope_file" ] && deleteOutScoped $outOfScope_file webs/webs.txt
 		NUMOFLINES_probed=$(cat webs/webs.txt 2>>"$LOGFILE" | anew .tmp/probed_old.txt | sed '/^$/d' | wc -l)
 	fi
-	printf "${bblue}\n Total subdomains: ${reset}\n\n"
+	printf "${bblue}\n[$(date +'%Y-%m-%dT%H:%M:%S%z')] Total subdomains: ${reset}\n\n"
 	notification "- ${NUMOFLINES_subs} alive" good
 	[ -s "subdomains/subdomains.txt" ] && cat subdomains/subdomains.txt | sort
 	notification "- ${NUMOFLINES_probed} new web probed" good
 	[ -s "webs/webs.txt" ] && cat webs/webs.txt | sort
 	notification "Subdomain Enumeration Finished" good
-	printf "${bblue} Results are saved in $domain/subdomains/subdomains.txt and webs/webs.txt${reset}\n"
+	printf "${bblue}[$(date +'%Y-%m-%dT%H:%M:%S%z')] Results are saved in $domain/subdomains/subdomains.txt and webs/webs.txt${reset}\n"
 	printf "${bgreen}#######################################################################\n\n"
 }
 
@@ -767,9 +767,9 @@ function sub_passive() {
 		end_subfunc "${NUMOFLINES} new subs (passive)" ${FUNCNAME[0]}
 	else
 		if [[ $SUBPASSIVE == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -786,9 +786,9 @@ function sub_crt() {
 		end_subfunc "${NUMOFLINES} new subs (cert transparency)" ${FUNCNAME[0]}
 	else
 		if [[ $SUBCRT == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -818,7 +818,7 @@ function sub_active() {
 		NUMOFLINES=$(cat .tmp/subdomains_tmp.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
 		end_subfunc "${NUMOFLINES} subs DNS resolved from passive" ${FUNCNAME[0]}
 	else
-		printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 
 }
@@ -839,13 +839,13 @@ function sub_noerror() {
 			NUMOFLINES=$(cat .tmp/subs_noerror.txt 2>>"$LOGFILE" | sed "s/*.//" | grep ".$domain$" | grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
 			end_subfunc "${NUMOFLINES} new subs (DNS noerror)" ${FUNCNAME[0]}
 		else
-			printf "\n${yellow} Detected DNSSEC black lies, skipping this technique ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] Detected DNSSEC black lies, skipping this technique ${reset}\n"
 		fi
 	else
 		if [[ $SUBNOERROR == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -876,7 +876,7 @@ function sub_dns() {
 		NUMOFLINES=$(cat .tmp/subdomains_dns_resolved.txt 2>>"$LOGFILE" | grep "\.$domain$\|^$domain$" | grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
 		end_subfunc "${NUMOFLINES} new subs (dns resolution)" ${FUNCNAME[0]}
 	else
-		printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 	fi
 
 }
@@ -908,9 +908,9 @@ function sub_brute() {
 		end_subfunc "${NUMOFLINES} new subs (bruteforce)" ${FUNCNAME[0]}
 	else
 		if [[ $SUBBRUTE == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -968,9 +968,9 @@ function sub_scraping() {
 		fi
 	else
 		if [[ $SUBSCRAPING == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -998,9 +998,9 @@ function sub_analytics() {
 		end_subfunc "${NUMOFLINES} new subs (analytics relationship)" ${FUNCNAME[0]}
 	else
 		if [[ $SUBANALYTICS == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -1059,9 +1059,9 @@ function sub_permut() {
 		end_subfunc "${NUMOFLINES} new subs (permutations)" ${FUNCNAME[0]}
 	else
 		if [[ $SUBPERMUTE == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -1101,9 +1101,9 @@ function sub_regex_permut() {
 		end_subfunc "${NUMOFLINES} new subs (permutations by regex)" ${FUNCNAME[0]}
 	else
 		if [[ $SUBREGEXPERMUTE == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -1131,9 +1131,9 @@ function sub_recursive_passive() {
 		end_subfunc "${NUMOFLINES} new subs (recursive)" ${FUNCNAME[0]}
 	else
 		if [[ $SUB_RECURSIVE_PASSIVE == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -1201,9 +1201,9 @@ function sub_recursive_brute() {
 		end_subfunc "${NUMOFLINES} new subs (recursive active)" ${FUNCNAME[0]}
 	else
 		if [[ $SUB_RECURSIVE_BRUTE == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -1237,9 +1237,9 @@ function subtakeover() {
 		end_func "Results are saved in $domain/webs/takeover.txt" ${FUNCNAME[0]}
 	else
 		if [[ $SUBTAKEOVER == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -1257,14 +1257,14 @@ function zonetransfer() {
 		end_func "Results are saved in $domain/subdomains/zonetransfer.txt" ${FUNCNAME[0]}
 	else
 		if [[ $ZONETRANSFER == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 			return
 		else
 			if [[ $ZONETRANSFER == false ]]; then
-				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+				printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 			else
-				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+				printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
 		fi
 	fi
@@ -1302,14 +1302,14 @@ function s3buckets() {
 		end_func "Results are saved in subdomains/s3buckets.txt and subdomains/cloud_assets.txt" ${FUNCNAME[0]}
 	else
 		if [[ $S3BUCKETS == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 			return
 		else
 			if [[ $S3BUCKETS == false ]]; then
-				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+				printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 			else
-				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+				printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
 		fi
 	fi
@@ -1371,9 +1371,9 @@ function geo_info() {
 		end_func "Results are saved in hosts/geoip.txt and hosts/geoip.json" ${FUNCNAME[0]}
 	else
 		if [[ $GEO_INFO == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -1407,9 +1407,9 @@ function webprobe_simple() {
 		fi
 	else
 		if [[ $WEBPROBESIMPLE == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -1452,9 +1452,9 @@ function webprobe_full() {
 		fi
 	else
 		if [[ $WEBPROBEFULL == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -1475,9 +1475,9 @@ function screenshot() {
 		end_func "Results are saved in $domain/screenshots folder" ${FUNCNAME[0]}
 	else
 		if [[ $WEBSCREENSHOT == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -1502,9 +1502,9 @@ function virtualhosts() {
 		fi
 	else
 		if [[ $VIRTUALHOSTS == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -1538,14 +1538,14 @@ function favicon() {
 		end_func "Results are saved in hosts/favicontest.txt" ${FUNCNAME[0]}
 	else
 		if [[ $FAVICON == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 			return
 		else
 			if [[ $FAVICON == false ]]; then
-				printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+				printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 			else
-				printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+				printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 			fi
 		fi
 	fi
@@ -1566,9 +1566,9 @@ function portscan() {
 		fi
 		[ ! -s "hosts/cdn_providers.txt" ] && cat hosts/ips.txt 2>/dev/null | cdncheck -silent -resp -cdn -waf -nc 2>/dev/null >hosts/cdn_providers.txt
 		[ -s "hosts/ips.txt" ] && comm -23 <(cat hosts/ips.txt | sort -u) <(cat hosts/cdn_providers.txt | cut -d'[' -f1 | sed 's/[[:space:]]*$//' | sort -u) | grep -aEiv "^(127|10|169\.154|172\.1[6789]|172\.2[0-9]|172\.3[01]|192\.168)\." | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | sort -u | anew -q .tmp/ips_nocdn.txt
-		printf "${bblue}\n Resolved IP addresses (No CDN) ${reset}\n\n"
+		printf "${bblue}\n[$(date +'%Y-%m-%dT%H:%M:%S%z')] Resolved IP addresses (No CDN) ${reset}\n\n"
 		[ -s ".tmp/ips_nocdn.txt" ] && cat .tmp/ips_nocdn.txt | sort
-		printf "${bblue}\n Scanning ports... ${reset}\n\n"
+		printf "${bblue}\n[$(date +'%Y-%m-%dT%H:%M:%S%z')] Scanning ports... ${reset}\n\n"
 		ips_file="${dir}/hosts/ips.txt"
 		if [ "$PORTSCAN_PASSIVE" = true ]; then
 			if [ ! -f $ips_file ]; then
@@ -1610,9 +1610,9 @@ function portscan() {
 		end_func "Results are saved in hosts/portscan_[passive|active|shodan].[txt|xml]" ${FUNCNAME[0]}
 	else
 		if [[ $PORTSCANNER == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -1628,9 +1628,9 @@ function cdnprovider() {
 		end_func "Results are saved in hosts/cdn_providers.txt" ${FUNCNAME[0]}
 	else
 		if [[ $CDN_IP == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -1665,9 +1665,9 @@ function waf_checks() {
 		fi
 	else
 		if [[ $WAF_DETECTION == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -1685,7 +1685,7 @@ function nuclei_check() {
 		if [[ $AXIOM != true ]]; then # avoid globbing (expansion of *).
 			IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
 			for crit in "${severity_array[@]}"; do
-				printf "${yellow}\n Running : Nuclei $crit ${reset}\n\n"
+				printf "${yellow}\n[$(date +'%Y-%m-%dT%H:%M:%S%z')] Running : Nuclei $crit ${reset}\n\n"
 				cat .tmp/webs_subs.txt 2>/dev/null | nuclei $NUCLEI_FLAGS -severity $crit -nh -rl $NUCLEI_RATELIMIT -j -o nuclei_output/${crit}.json
 			done
 			printf "\n\n"
@@ -1693,7 +1693,7 @@ function nuclei_check() {
 			if [[ -s ".tmp/webs_subs.txt" ]]; then
 				IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
 				for crit in "${severity_array[@]}"; do
-					printf "${yellow}\n Running : Nuclei $crit, check results on nuclei_output folder${reset}\n\n"
+					printf "${yellow}\n[$(date +'%Y-%m-%dT%H:%M:%S%z')] Running : Nuclei $crit, check results on nuclei_output folder${reset}\n\n"
 					axiom-scan .tmp/webs_subs.txt -m nuclei --nuclei-templates ${NUCLEI_TEMPLATES_PATH} -severity ${crit} -nh -rl $NUCLEI_RATELIMIT -j -o nuclei_output/${crit}.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 					[ -s "nuclei_output/${crit}.json" ] && jq -r '.|[.info.severity,.host,.info.nameo,.url]|@csv' |tr -d '"'  nuclei_output/${crit}.json
 				done
@@ -1703,9 +1703,9 @@ function nuclei_check() {
 		end_func "Results are saved in $domain/nuclei_output folder" ${FUNCNAME[0]}
 	else
 		if [[ $NUCLEICHECK == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -1743,9 +1743,9 @@ function fuzz() {
 		fi
 	else
 		if [[ $FUZZ == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -1769,9 +1769,9 @@ function iishortname() {
 		fi
 	else
 		if [[ $IIS_SHORTNAME == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -1813,9 +1813,9 @@ function cms_scanner() {
 		fi
 	else
 		if [[ $CMS_SCANNER == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -1893,9 +1893,9 @@ function urlchecks() {
 		fi
 	else
 		if [[ $URL_CHECK == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -1921,9 +1921,9 @@ function url_gf() {
 		end_func "Results are saved in $domain/gf folder" ${FUNCNAME[0]}
 	else
 		if [[ $URL_GF == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -1948,9 +1948,9 @@ function url_ext() {
 		fi
 	else
 		if [[ $URL_EXT == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -1971,21 +1971,21 @@ function jschecks() {
 			[ -s ".tmp/subjslinks.txt" ] && cat .tmp/subjslinks.txt | egrep -iv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | anew -q js/nojs_links.txt
 			[ -s ".tmp/subjslinks.txt" ] && cat .tmp/subjslinks.txt | grep -iE "\.js($|\?)" | anew -q .tmp/url_extract_js.txt
 			cat .tmp/url_extract_js.txt | python3 ${tools}/urless/urless/urless.py | anew -q js/url_extract_js.txt 2>>"$LOGFILE" >/dev/null
-			printf "${yellow} Running : Resolving JS Urls 2/5${reset}\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] Running : Resolving JS Urls 2/5${reset}\n"
 			if [[ $AXIOM != true ]]; then
 				[ -s "js/url_extract_js.txt" ] && cat js/url_extract_js.txt | httpx -follow-redirects -random-agent -silent -timeout $HTTPX_TIMEOUT -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -status-code -content-type -retries 2 -no-color | grep "[200]" | grep "javascript" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
 			else
 				[ -s "js/url_extract_js.txt" ] && axiom-scan js/url_extract_js.txt -m httpx -follow-host-redirects -H \"${HEADER}\" -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -content-type -retries 2 -no-color -o .tmp/js_livelinks.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 				[ -s ".tmp/js_livelinks.txt" ] && cat .tmp/js_livelinks.txt | anew .tmp/web_full_info.txt | grep "[200]" | grep "javascript" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
 			fi
-			printf "${yellow} Running : Gathering endpoints 3/5${reset}\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] Running : Gathering endpoints 3/5${reset}\n"
 			[ -s "js/js_livelinks.txt" ] && python3 ${tools}/xnLinkFinder/xnLinkFinder.py -i js/js_livelinks.txt -sf subdomains/subdomains.txt -d $XNLINKFINDER_DEPTH -o .tmp/js_endpoints.txt 2>>"$LOGFILE" >/dev/null
 			[ -s "parameters.txt" ] && rm -f parameters.txt 2>>"$LOGFILE" >/dev/null
 			if [[ -s ".tmp/js_endpoints.txt" ]]; then
 				sed -i '/^\//!d' .tmp/js_endpoints.txt
 				cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt
 			fi
-			printf "${yellow} Running : Gathering secrets 4/5${reset}\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] Running : Gathering secrets 4/5${reset}\n"
 
 			if [[ $AXIOM != true ]]; then
 				[ -s "js/js_livelinks.txt" ] && cat js/js_livelinks.txt | mantra -ua ${HEADER} -s | anew -q js/js_secrets.txt
@@ -1994,7 +1994,7 @@ function jschecks() {
 				[ -s "js/js_secrets.txt" ] && trufflehog filesystem js/js_secrets.txt -j | jq -c | anew -q js/js_secrets_trufflehog.txt
 			fi
 			[ -s "js/js_secrets.txt" ] && sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2};?)?)?[mGK]//g" -i js/js_secrets.txt
-			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] Running : Building wordlist 5/5${reset}\n"
 			[ -s "js/js_livelinks.txt" ] && interlace -tL js/js_livelinks.txt -threads ${INTERLACE_THREADS} -c "python3 ${tools}/getjswords.py '_target_' | anew -q webs/dict_words.txt" 2>>"$LOGFILE" >/dev/null
 			end_func "Results are saved in $domain/js folder" ${FUNCNAME[0]}
 		else
@@ -2002,9 +2002,9 @@ function jschecks() {
 		fi
 	else
 		if [[ $JSCHECKS == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -2029,9 +2029,9 @@ function wordlist_gen() {
 		fi
 	else
 		if [[ $WORDLIST == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -2049,9 +2049,9 @@ function wordlist_gen_roboxtractor() {
 		end_func "Results are saved in $domain/webs/robots_wordlist.txt" ${FUNCNAME[0]}
 	else
 		if [[ $ROBOTSWORDLIST == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -2067,9 +2067,9 @@ function password_dict() {
 		end_func "Results are saved in $domain/webs/password_dict.txt" ${FUNCNAME[0]}
 	else
 		if [[ $PASSWORD_DICT == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -2110,9 +2110,9 @@ function brokenLinks() {
 		end_func "Results are saved in vulns/brokenLinks.txt" ${FUNCNAME[0]}
 	else
 		if [[ $BROKENLINKS == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -2129,7 +2129,7 @@ function xss() {
 				if [[ -n $XSS_SERVER ]]; then
 					[ -s ".tmp/xss_reflected.txt" ] && cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --only-poc r --ignore-return 302,404,403 --skip-bav -b ${XSS_SERVER} -w $DALFOX_THREADS 2>>"$LOGFILE" | anew -q vulns/xss.txt
 				else
-					printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n\n"
+					printf "${yellow}\n[$(date +'%Y-%m-%dT%H:%M:%S%z')] No XSS_SERVER defined, blind xss skipped\n\n"
 					[ -s ".tmp/xss_reflected.txt" ] && cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --only-poc r --ignore-return 302,404,403 --skip-bav -w $DALFOX_THREADS 2>>"$LOGFILE" | anew -q vulns/xss.txt
 				fi
 			else
@@ -2137,11 +2137,11 @@ function xss() {
 					if [[ -n $XSS_SERVER ]]; then
 						cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --skip-bav --skip-mining-dom --skip-mining-dict --only-poc r --ignore-return 302,404,403 -b ${XSS_SERVER} -w $DALFOX_THREADS 2>>"$LOGFILE" | anew -q vulns/xss.txt
 					else
-						printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n\n"
+						printf "${yellow}\n[$(date +'%Y-%m-%dT%H:%M:%S%z')] No XSS_SERVER defined, blind xss skipped\n\n"
 						cat .tmp/xss_reflected.txt | dalfox pipe --silence --no-color --no-spinner --skip-bav --skip-mining-dom --skip-mining-dict --only-poc r --ignore-return 302,404,403 -w $DALFOX_THREADS 2>>"$LOGFILE" | anew -q vulns/xss.txt
 					fi
 				else
-					printf "${bred} Skipping XSS: Too many URLs to test, try with --deep flag${reset}\n"
+					printf "${bred}[$(date +'%Y-%m-%dT%H:%M:%S%z')] Skipping XSS: Too many URLs to test, try with --deep flag${reset}\n"
 				fi
 			fi
 		else
@@ -2149,7 +2149,7 @@ function xss() {
 				if [[ -n $XSS_SERVER ]]; then
 					[ -s ".tmp/xss_reflected.txt" ] && axiom-scan .tmp/xss_reflected.txt -m dalfox --skip-bav -b ${XSS_SERVER} -w $DALFOX_THREADS -o vulns/xss.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 				else
-					printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n\n"
+					printf "${yellow}\n[$(date +'%Y-%m-%dT%H:%M:%S%z')] No XSS_SERVER defined, blind xss skipped\n\n"
 					[ -s ".tmp/xss_reflected.txt" ] && axiom-scan .tmp/xss_reflected.txt -m dalfox --skip-bav -w $DALFOX_THREADS -o vulns/xss.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 				fi
 			else
@@ -2157,22 +2157,22 @@ function xss() {
 					if [[ -n $XSS_SERVER ]]; then
 						axiom-scan .tmp/xss_reflected.txt -m dalfox --skip-bav --skip-grepping --skip-mining-all --skip-mining-dict -b ${XSS_SERVER} -w $DALFOX_THREADS -o vulns/xss.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 					else
-						printf "${yellow}\n No XSS_SERVER defined, blind xss skipped\n\n"
+						printf "${yellow}\n[$(date +'%Y-%m-%dT%H:%M:%S%z')] No XSS_SERVER defined, blind xss skipped\n\n"
 						axiom-scan .tmp/xss_reflected.txt -m dalfox --skip-bav --skip-grepping --skip-mining-all --skip-mining-dict -w $DALFOX_THREADS -o vulns/xss.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 					fi
 				else
-					printf "${bred} Skipping XSS: Too many URLs to test, try with --deep flag${reset}\n"
+					printf "${bred}[$(date +'%Y-%m-%dT%H:%M:%S%z')] Skipping XSS: Too many URLs to test, try with --deep flag${reset}\n"
 				fi
 			fi
 		fi
 		end_func "Results are saved in vulns/xss.txt" ${FUNCNAME[0]}
 	else
 		if [[ $XSS == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		elif [[ ! -s "gf/xss.txt" ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} No URLs potentially vulnerables to XSS ${reset}\n\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} No URLs potentially vulnerables to XSS ${reset}\n\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -2188,9 +2188,9 @@ function cors() {
 		end_func "Results are saved in vulns/cors.txt" ${FUNCNAME[0]}
 	else
 		if [[ $CORS == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -2212,11 +2212,11 @@ function open_redirect() {
 		fi
 	else
 		if [[ $OPEN_REDIRECT == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		elif [[ ! -s "gf/redirect.txt" ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} No URLs potentially vulnerables to Open Redirect ${reset}\n\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} No URLs potentially vulnerables to Open Redirect ${reset}\n\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -2253,11 +2253,11 @@ function ssrf_checks() {
 		pkill -f interactsh-client &
 	else
 		if [[ $SSRF_CHECKS == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		elif [[ ! -s "gf/ssrf.txt" ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} No URLs potentially vulnerables to SSRF ${reset}\n\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} No URLs potentially vulnerables to SSRF ${reset}\n\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -2277,9 +2277,9 @@ function crlf_checks() {
 		fi
 	else
 		if [[ $CRLF_CHECKS == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -2301,11 +2301,11 @@ function lfi() {
 		fi
 	else
 		if [[ $LFI == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		elif [[ ! -s "gf/lfi.txt" ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} No URLs potentially vulnerables to LFI ${reset}\n\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} No URLs potentially vulnerables to LFI ${reset}\n\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -2328,11 +2328,11 @@ function ssti() {
 		fi
 	else
 		if [[ $SSTI == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		elif [[ ! -s "gf/ssti.txt" ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} No URLs potentially vulnerables to SSTI ${reset}\n\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} No URLs potentially vulnerables to SSTI ${reset}\n\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -2358,11 +2358,11 @@ function sqli() {
 		fi
 	else
 		if [[ $SQLI == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		elif [[ ! -s "gf/sqli.txt" ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} No URLs potentially vulnerables to SQLi ${reset}\n\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} No URLs potentially vulnerables to SQLi ${reset}\n\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -2378,9 +2378,9 @@ function test_ssl() {
 		end_func "Results are saved in vulns/testssl.txt" ${FUNCNAME[0]}
 	else
 		if [[ $TEST_SSL == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -2403,9 +2403,9 @@ function spraying() {
 		end_func "Results are saved in vulns/brutespray folder" ${FUNCNAME[0]}
 	else
 		if [[ $SPRAY == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -2425,11 +2425,11 @@ function command_injection() {
 		fi
 	else
 		if [[ $COMM_INJ == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		elif [[ ! -s "gf/rce.txt" ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} No URLs potentially vulnerables to Command Injection ${reset}\n\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} No URLs potentially vulnerables to Command Injection ${reset}\n\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -2458,9 +2458,9 @@ function 4xxbypass() {
 		fi
 	else
 		if [[ $BYPASSER4XX == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -2480,9 +2480,9 @@ function prototype_pollution() {
 		fi
 	else
 		if [[ $PROTO_POLLUTION == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -2510,9 +2510,9 @@ function smuggling() {
 		fi
 	else
 		if [[ $SMUGGLING == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -2540,9 +2540,9 @@ function webcache() {
 		fi
 	else
 		if [[ $WEBCACHE == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -2569,9 +2569,9 @@ function fuzzparams() {
 		fi
 	else
 		if [[ $FUZZPARAMS == false ]]; then
-			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
@@ -2646,21 +2646,26 @@ function remove_big_files() {
 
 function notification() {
 	if [[ -n $1 ]] && [[ -n $2 ]]; then
+		if [[ -z $3 ]]; then
+			current_date=$(date +'%Y-%m-%dT%H:%M:%S%z')
+		else
+			current_date="$3"
+		fi
 		case $2 in
 		info)
-			text="\n${bblue} ${1} ${reset}"
+			text="\n${bblue}[$current_date] ${1} ${reset}"
 			printf "${text}\n" && printf "${text} - ${domain}\n" | $NOTIFY
 			;;
 		warn)
-			text="\n${yellow} ${1} ${reset}"
+			text="\n${yellow}[$current_date] ${1} ${reset}"
 			printf "${text}\n" && printf "${text} - ${domain}\n" | $NOTIFY
 			;;
 		error)
-			text="\n${bred} ${1} ${reset}"
+			text="\n${bred}[$current_date] ${1} ${reset}"
 			printf "${text}\n" && printf "${text} - ${domain}\n" | $NOTIFY
 			;;
 		good)
-			text="\n${bgreen} ${1} ${reset}"
+			text="\n${bgreen}[$current_date] ${1} ${reset}"
 			printf "${text}\n" && printf "${text} - ${domain}\n" | $NOTIFY
 			;;
 		esac
@@ -2693,7 +2698,7 @@ function transfer {
 
 function sendToNotify {
 	if [[ -z $1 ]]; then
-		printf "\n${yellow} no file provided to send ${reset}\n"
+		printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] No file provided to send ${reset}\n"
 	else
 		if [[ -z $NOTIFY_CONFIG ]]; then
 			NOTIFY_CONFIG=~/.config/notify/provider-config.yaml
@@ -2704,27 +2709,28 @@ function sendToNotify {
 			return 0
 		fi
 		if grep -q '^ telegram\|^telegram\|^    telegram' $NOTIFY_CONFIG; then
-			notification "Sending ${domain} data over Telegram" info
+			notification "[$(date +'%Y-%m-%dT%H:%M:%S%z')] Sending ${domain} data over Telegram" info
 			telegram_chat_id=$(cat ${NOTIFY_CONFIG} | grep '^    telegram_chat_id\|^telegram_chat_id\|^    telegram_chat_id' | xargs | cut -d' ' -f2)
 			telegram_key=$(cat ${NOTIFY_CONFIG} | grep '^    telegram_api_key\|^telegram_api_key\|^    telegram_apikey' | xargs | cut -d' ' -f2)
 			curl -F document=@${1} "https://api.telegram.org/bot${telegram_key}/sendDocument?chat_id=${telegram_chat_id}" 2>>"$LOGFILE" >/dev/null
 		fi
 		if grep -q '^ discord\|^discord\|^    discord' $NOTIFY_CONFIG; then
-			notification "Sending ${domain} data over Discord" info
+			notification "[$(date +'%Y-%m-%dT%H:%M:%S%z')] Sending ${domain} data over Discord" info
 			discord_url=$(cat ${NOTIFY_CONFIG} | grep '^ discord_webhook_url\|^discord_webhook_url\|^    discord_webhook_url' | xargs | cut -d' ' -f2)
 			curl -v -i -H "Accept: application/json" -H "Content-Type: multipart/form-data" -X POST -F file1=@${1} $discord_url 2>>"$LOGFILE" >/dev/null
 		fi
 		if [[ -n $slack_channel ]] && [[ -n $slack_auth ]]; then
-			notification "Sending ${domain} data over Slack" info
+			notification "[$(date +'%Y-%m-%dT%H:%M:%S%z')] Sending ${domain} data over Slack" info
 			curl -F file=@${1} -F "initial_comment=reconftw zip file" -F channels=${slack_channel} -H "Authorization: Bearer ${slack_auth}" https://slack.com/api/files.upload 2>>"$LOGFILE" >/dev/null
 		fi
 	fi
 }
 
 function start_func() {
+	current_date=$(date +'%Y-%m-%dT%H:%M:%S%z')
 	printf "${bgreen}#######################################################################"
-	notification "${2}" info
-	echo "[ $(date +"%F %T") ] Start function : ${1} " >>"${LOGFILE}"
+	notification "${2}" info $current_date
+	echo "[$current_date] Start function: ${1} " >>"${LOGFILE}"
 	start=$(date +%s)
 }
 
@@ -2732,15 +2738,17 @@ function end_func() {
 	touch $called_fn_dir/.${2}
 	end=$(date +%s)
 	getElapsedTime $start $end
-	notification "${2} Finished in ${runtime}" info
-	echo "[ $(date +"%F %T") ] End function : ${2} " >>"${LOGFILE}"
-	printf "${bblue} ${1} ${reset}\n"
+	current_date=$(date +'%Y-%m-%dT%H:%M:%S%z')
+	notification "${2} Finished in ${runtime}" info $current_date
+	echo "[$current_date] End function: ${2} " >>"${LOGFILE}"
+	printf "${bblue}[$current_date] ${1} ${reset}\n"
 	printf "${bgreen}#######################################################################${reset}\n"
 }
 
 function start_subfunc() {
-	notification "${2}" warn
-	echo "[ $(date +"%F %T") ] Start subfunction : ${1} " >>"${LOGFILE}"
+	current_date=$(date +'%Y-%m-%dT%H:%M:%S%z')
+	notification "     ${2}" info $current_date
+	echo "[$current_date] Start subfunction: ${1} " >>"${LOGFILE}"
 	start_sub=$(date +%s)
 }
 
@@ -2748,8 +2756,9 @@ function end_subfunc() {
 	touch $called_fn_dir/.${2}
 	end_sub=$(date +%s)
 	getElapsedTime $start_sub $end_sub
-	notification "${1} in ${runtime}" good
-	echo "[ $(date +"%F %T") ] End subfunction : ${1} " >>"${LOGFILE}"
+	current_date=$(date +'%Y-%m-%dT%H:%M:%S%z')
+	notification "     ${1} in ${runtime}" good $current_date
+	echo "[$current_date] End subfunction: ${1} " >>"${LOGFILE}"
 }
 
 function check_inscope() {
@@ -2895,8 +2904,8 @@ function start() {
 	fi
 
 	printf "\n${bgreen}#######################################################################${reset}"
-	notification "Recon succesfully started on ${domain}" good
-	[ "$SOFT_NOTIFICATION" = true ] && echo "Recon succesfully started on ${domain}" | notify -silent
+	notification "Recon succesfully started on ${domain}" good $(date +'%Y-%m-%dT%H:%M:%S%z')
+	[ "$SOFT_NOTIFICATION" = true ] && echo "$(date +'%Y-%m-%dT%H:%M:%S%z') Recon succesfully started on ${domain}" | notify -silent
 	printf "${bgreen}#######################################################################${reset}\n"
 	if [[ $upgrade_before_running == true ]]; then
 		${SCRIPTPATH}/install.sh --tools
@@ -2951,7 +2960,7 @@ function start() {
 	echo "Start ${NOW} ${NOWT}" >"${LOGFILE}"
 
 	printf "\n"
-	printf "${bred} Target: ${domain}\n\n"
+	printf "${bred}[$(date +'%Y-%m-%dT%H:%M:%S%z')] Target: ${domain}\n\n"
 }
 
 function end() {
@@ -2959,7 +2968,7 @@ function end() {
 	find $dir -type f -empty -print | grep -v '.called_fn' | grep -v '.log' | grep -v '.tmp' | xargs rm -f 2>>"$LOGFILE" >/dev/null
 	find $dir -type d -empty -print -delete 2>>"$LOGFILE" >/dev/null
 
-	echo "End $(date +"%F") $(date +"%T")" >>"${LOGFILE}"
+	echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] End >>"${LOGFILE}"
 
 	if [[ $PRESERVE != true ]]; then
 		find $dir -type f -empty | grep -v "called_fn" | xargs rm -f 2>>"$LOGFILE" >/dev/null
@@ -2987,11 +2996,11 @@ function end() {
 	global_end=$(date +%s)
 	getElapsedTime $global_start $global_end
 	printf "${bgreen}#######################################################################${reset}\n"
-	notification "Finished Recon on: ${domain} under ${finaldir} in: ${runtime}" good
-	[ "$SOFT_NOTIFICATION" = true ] && echo "Finished Recon on: ${domain} under ${finaldir} in: ${runtime}" | notify -silent
+	notification "Finished Recon on: ${domain} under ${finaldir} in: ${runtime}" good $(date +'%Y-%m-%dT%H:%M:%S%z')
+	[ "$SOFT_NOTIFICATION" = true ] && echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] Finished Recon on: ${domain} under ${finaldir} in: ${runtime}" | notify -silent
 	printf "${bgreen}#######################################################################${reset}\n"
-	#Seperator for more clear messges in telegram_Bot
-	echo "******  Stay safe 🦠 and secure 🔐  ******" | $NOTIFY
+	#Separator for more clear messges in telegram_Bot
+	echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] ******  Stay safe 🦠 and secure 🔐  ******" | $NOTIFY
 
 }
 
@@ -3266,10 +3275,10 @@ function multi_recon() {
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
 		printf "${bgreen}#######################################################################${reset}\n"
-		printf "${bgreen} $domain finished 1st loop in ${runtime} $currently ${reset}\n"
+		printf "${bgreen}[$(date +'%Y-%m-%dT%H:%M:%S%z')] $domain finished 1st loop in ${runtime} $currently ${reset}\n"
 		if [[ -n $flist ]]; then
 			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
-			printf "\n${yellow} $domain is $POSINLIST of $LISTTOTAL${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] $domain is $POSINLIST of $LISTTOTAL${reset}\n"
 		fi
 		printf "${bgreen}#######################################################################${reset}\n"
 	done
@@ -3304,10 +3313,10 @@ function multi_recon() {
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
 		printf "${bgreen}#######################################################################${reset}\n"
-		printf "${bgreen} $domain finished 2nd loop in ${runtime} $currently ${reset}\n"
+		printf "${bgreen}[$(date +'%Y-%m-%dT%H:%M:%S%z')] $domain finished 2nd loop in ${runtime} $currently ${reset}\n"
 		if [[ -n $flist ]]; then
 			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
-			printf "\n${yellow} $domain is $POSINLIST of $LISTTOTAL${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] $domain is $POSINLIST of $LISTTOTAL${reset}\n"
 		fi
 		printf "${bgreen}#######################################################################${reset}\n"
 	done
@@ -3360,10 +3369,10 @@ function multi_recon() {
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
 		printf "${bgreen}#######################################################################${reset}\n"
-		printf "${bgreen} $domain finished 3rd loop in ${runtime} $currently ${reset}\n"
+		printf "${bgreen}[$(date +'%Y-%m-%dT%H:%M:%S%z')] $domain finished 3rd loop in ${runtime} $currently ${reset}\n"
 		if [[ -n $flist ]]; then
 			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
-			printf "\n${yellow} $domain is $POSINLIST of $LISTTOTAL${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] $domain is $POSINLIST of $LISTTOTAL${reset}\n"
 		fi
 		printf "${bgreen}#######################################################################${reset}\n"
 	done
@@ -3390,10 +3399,10 @@ function multi_recon() {
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
 		printf "${bgreen}#######################################################################${reset}\n"
-		printf "${bgreen} $domain finished final loop in ${runtime} $currently ${reset}\n"
+		printf "${bgreen}[$(date +'%Y-%m-%dT%H:%M:%S%z')] $domain finished final loop in ${runtime} $currently ${reset}\n"
 		if [[ -n $flist ]]; then
 			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
-			printf "\n${yellow} $domain is $POSINLIST of $LISTTOTAL${reset}\n"
+			printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] $domain is $POSINLIST of $LISTTOTAL${reset}\n"
 		fi
 		printf "${bgreen}#######################################################################${reset}\n"
 	done
@@ -3481,10 +3490,10 @@ function multi_custom() {
 			loopend=$(date +%s)
 			getElapsedTime $loopstart $loopend
 			printf "${bgreen}#######################################################################${reset}\n"
-			printf "${bgreen} $domain finished $custom_f in ${runtime} $currently ${reset}\n"
+			printf "${bgreen}[$(date +'%Y-%m-%dT%H:%M:%S%z')] $domain finished $custom_f in ${runtime} $currently ${reset}\n"
 			if [[ -n $flist ]]; then
 				POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
-				printf "\n${yellow} $domain is $POSINLIST of $LISTTOTAL (${func_count}/${LISTFUNCTOTAL})${reset}\n"
+				printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] $domain is $POSINLIST of $LISTTOTAL (${func_count}/${LISTFUNCTOTAL})${reset}\n"
 			fi
 			printf "${bgreen}#######################################################################${reset}\n"
 		done
