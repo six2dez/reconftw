@@ -10,6 +10,9 @@ ARG SHODAN_API_KEY="XXXXXXXXXXXXXX"
 ARG LANG=en_US.UTF-8
 ARG LANGUAGE=en_US
 
+ARG GIT_REPOSITORY_AXIOM
+ARG GIT_REPOSITORY_RECONFTW
+
 ##################################################
 ###> Do NOT change anything beyond this point <###
 ##################################################
@@ -37,6 +40,9 @@ ENV SHODAN_API_KEY=$SHODAN_API_KEY
 ENV LANG=$LANG
 ENV LANGUAGE=$LANGUAGE
 ENV LC_ALL=$LANG
+
+ENV GIT_REPOSITORY_AXIOM=${GIT_REPOSITORY_AXIOM:-"https://github.com/pry0cc/axiom"}
+ENV GIT_REPOSITORY_RECONFTW=${GIT_REPOSITORY_RECONFTW:-"https://github.com/six2dez/reconftw"}
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DEBCONF_NONINTERACTIVE_SEEN=true
@@ -80,7 +86,7 @@ localepurge
 
 ###>> Configure Axiom <<###
 mkdir -p /root/.axiom/
-git clone https://github.com/pry0cc/axiom /root/.axiom/
+git clone ${AXIOM_GIT_REPOSITORY} /root/.axiom/
 cd /root/.axiom/interact
 ./axiom-configure --unattended --shell Bash
 ## This avoids useless error messages later.
@@ -90,7 +96,7 @@ touch /root/.axiom/interact/includes/functions.sh
 ###>> Install reconFTW <<###
 mkdir -p /root/Tools
 mkdir -p /reconftw
-git clone https://github.com/six2dez/reconftw.git /reconftw
+git clone ${GIT_REPOSITORY_RECONFTW} /reconftw
 cd /reconftw
 sh -c 'echo 1 | ./install.sh'
 

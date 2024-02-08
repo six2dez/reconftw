@@ -12,6 +12,19 @@
 #	   ░        ░  ░░ ░          ░ ░           ░                      ░
 #
 
+
+# Error Management
+set -eEuo pipefail
+function failure() {
+	local lineno=$1
+	local msg=$2
+	shift 2
+	local func=$(echo "${@}"|tr ' ' '|')
+	echo "##### ERROR [$lineno][$func] $msg #####"
+}
+trap 'failure ${LINENO} "$BASH_COMMAND" ${FUNCNAME[@]}' ERR
+
+
 function banner_graber() {
 	source "${SCRIPTPATH}"/banners.txt
 	randx=$(shuf -i 1-23 -n 1)
@@ -404,6 +417,7 @@ function google_dorks() {
 
 	mkdir -p osint
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GOOGLE_DORKS == true ]] && [[ $OSINT == true ]]; then
+		start_func "${FUNCNAME[0]}" "Google Dorks in process"
 		python3 ${tools}/dorks_hunter/dorks_hunter.py -d "$domain" -o osint/dorks.txt || {
 			echo "dorks_hunter command failed"
 			exit 1
@@ -1277,7 +1291,7 @@ function s3buckets() {
 }
 
 ###############################################################################################################
-############################################# GEOLOCALIZATION INFO #######################################################
+############################################# GEOLOCALIZATION INFO ############################################
 ###############################################################################################################
 
 function geo_info() {
@@ -1348,7 +1362,7 @@ function webprobe_simple() {
 	mkdir -p {.tmp,webs,subdomains}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $WEBPROBESIMPLE == true ]]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Http probing $domain"
-		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt"
+		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt" && touch .tmp/web_full_info.txt webs/web_full_info.txt
 		if [[ $AXIOM != true ]]; then
 			cat subdomains/subdomains.txt | httpx ${HTTPX_FLAGS} -no-color -json -random-agent -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -retries 2 -timeout $HTTPX_TIMEOUT -o .tmp/web_full_info_probe.txt 2>>"$LOGFILE" >/dev/null
 		else
@@ -1380,7 +1394,7 @@ function webprobe_full() {
 	mkdir -p {.tmp,webs,subdomains}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $WEBPROBEFULL == true ]]; then
 		start_func ${FUNCNAME[0]} "Http probing non standard ports"
-		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt"
+		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt" && touch webs/webs.txt 
 		if [[ -s "subdomains/subdomains.txt" ]]; then
 			if [[ $AXIOM != true ]]; then
 				if [[ -s "subdomains/subdomains.txt" ]]; then
@@ -1548,11 +1562,9 @@ function portscan() {
 				formatted_json+="]"
 				echo "$formatted_json" >"${dir}/hosts/portscan_shodan.txt"
 			fi
-		else
-			printf "${yellow} ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 		if [[ $PORTSCAN_PASSIVE == true ]] && [[ ! -f "hosts/portscan_passive.txt" ]] && [[ -s ".tmp/ips_nocdn.txt" ]]; then
-			smap -iL .tmp/ips_nocdn.txt >hosts/portscan_passive.txt
+			smap -iL .tmp/ips_nocdn.txt >hosts/portscan_passive.txt 
 		fi
 		if [[ $PORTSCAN_ACTIVE == true ]]; then
 			if [[ $AXIOM != true ]]; then
@@ -1569,7 +1581,7 @@ function portscan() {
 			notification "Webs detected from port scan: ${NUMOFLINES} new websites" good
 			cat hosts/webs.txt
 		fi
-		end_func "Results are saved in hosts/portscan_[passive|active|shodan].txt" ${FUNCNAME[0]}
+		end_func "Results are saved in hosts/portscan_[passive|active|shodan].[txt|xml]" ${FUNCNAME[0]}
 	else
 		if [[ $PORTSCANNER == false ]]; then
 			printf "\n${yellow} ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -1641,14 +1653,14 @@ function nuclei_check() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $NUCLEICHECK == true ]]; then
 		start_func ${FUNCNAME[0]} "Templates based web scanner"
 		nuclei -update 2>>"$LOGFILE" >/dev/null
-		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt"
+		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt"  && touch webs/webs.txt webs/webs_uncommon_ports.txt 
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
 		[ ! -s ".tmp/webs_subs.txt" ] && cat subdomains/subdomains.txt webs/webs_all.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
 		if [[ $AXIOM != true ]]; then # avoid globbing (expansion of *).
 			IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
 			for crit in "${severity_array[@]}"; do
 				printf "${yellow}\n Running : Nuclei $crit ${reset}\n\n"
-				cat .tmp/webs_subs.txt 2>/dev/null | nuclei $NUCLEI_FLAGS -severity $crit -nh -rl $NUCLEI_RATELIMIT -o nuclei_output/${crit}.txt
+				cat .tmp/webs_subs.txt 2>/dev/null | nuclei $NUCLEI_FLAGS -severity $crit -nh -rl $NUCLEI_RATELIMIT -j -o nuclei_output/${crit}.json
 			done
 			printf "\n\n"
 		else
@@ -1656,8 +1668,8 @@ function nuclei_check() {
 				IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
 				for crit in "${severity_array[@]}"; do
 					printf "${yellow}\n Running : Nuclei $crit, check results on nuclei_output folder${reset}\n\n"
-					axiom-scan .tmp/webs_subs.txt -m nuclei --nuclei-templates ${NUCLEI_TEMPLATES_PATH} -severity ${crit} -nh -rl $NUCLEI_RATELIMIT -o nuclei_output/${crit}.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
-					[ -s "nuclei_output/${crit}.txt" ] && cat nuclei_output/${crit}.txt
+					axiom-scan .tmp/webs_subs.txt -m nuclei --nuclei-templates ${NUCLEI_TEMPLATES_PATH} -severity ${crit} -nh -rl $NUCLEI_RATELIMIT -j -o nuclei_output/${crit}.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+					[ -s "nuclei_output/${crit}.json" ] && jq -r '.|[.info.severity,.host,.info.nameo,.url]|@csv' |tr -d '"'  nuclei_output/${crit}.json
 				done
 				printf "\n\n"
 			fi
@@ -1678,7 +1690,7 @@ function fuzz() {
 	mkdir -p {.tmp/fuzzing,webs,fuzzing}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $FUZZ == true ]]; then
 		start_func ${FUNCNAME[0]} "Web directory fuzzing"
-		[[ -n $multi ]] && [ ! -f "$dir/webs/webs.txt" ] && echo "$domain" > "$dir/webs/webs.txt"
+		[[ -n $multi ]] && [ ! -f "$dir/webs/webs.txt" ] && echo "$domain" > "$dir/webs/webs.txt" && touch webs/webs_uncommon_ports.txt
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
 		if [[ -s "webs/webs_all.txt" ]]; then
 			if [[ $AXIOM != true ]]; then
@@ -1719,7 +1731,7 @@ function cms_scanner() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $CMS_SCANNER == true ]]; then
 		start_func ${FUNCNAME[0]} "CMS Scanner"
 		rm -rf $dir/cms/*
-		[[ -n $multi ]] && [ ! -f "$dir/webs/webs.txt" ] && echo "$domain" > "$dir/webs/webs.txt"
+		[[ -n $multi ]] && [ ! -f "$dir/webs/webs.txt" ] && echo "$domain" > "$dir/webs/webs.txt" && touch webs/webs_uncommon_ports.txt
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
 		if [[ -s "webs/webs_all.txt" ]]; then
 			tr '\n' ',' <webs/webs_all.txt >.tmp/cms.txt 2>>"$LOGFILE"
@@ -2764,7 +2776,7 @@ function axiom_lauch() {
 	# let's fire up a FLEET!
 	if [[ $AXIOM_FLEET_LAUNCH == true ]] && [[ -n $AXIOM_FLEET_NAME ]] && [[ -n $AXIOM_FLEET_COUNT ]]; then
 		start_func ${FUNCNAME[0]} "Launching our Axiom fleet"
-		python3 -m pip install --upgrade linode-cli 2>>"$LOGFILE" >/dev/null
+		#python3 -m pip install --upgrade linode-cli 2>>"$LOGFILE" >/dev/null
 		# Check to see if we have a fleet already, if so, SKIP THIS!
 		NUMOFNODES=$(timeout 30 axiom-ls | grep -c "$AXIOM_FLEET_NAME")
 		if [[ $NUMOFNODES -ge $AXIOM_FLEET_COUNT ]]; then
@@ -3368,7 +3380,7 @@ function multi_custom() {
 		exit 1
 	}
 
-	mkdir -p {.log}
+	mkdir -p .log
 	NOW=$(date +"%F")
 	NOWT=$(date +"%T")
 	LOGFILE="${workdir}/.log/${NOW}_${NOWT}.txt"
@@ -3383,13 +3395,18 @@ function multi_custom() {
 		axiom_selected
 	fi
 
-	custom_function_list=$(echo $custom_function|sed -i 's/,/\n/')
+	custom_function_list=$(echo $custom_function|tr ',' '\n')
+
 
 	[ -n "$custom_function_list" ] && LISTFUNCTOTAL=$(echo "$flist" | wc -l)
 
 	for domain in $targets; do
 		loopstart=$(date +%s)
 		dir=$workdir/targets/$domain
+		mkdir -p $dir || {
+			echo "Failed to create directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"
+			exit 1
+		}
 
 		cd "$dir" || {
 			echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
@@ -3398,10 +3415,9 @@ function multi_custom() {
 		mkdir -p {.called_fn,.log}
 		called_fn_dir=$dir/.called_fn
 
-		echo $domain > $dir/.tmp/webs_subs.txt
 		func_count=0
 		for custom_f in $custom_function_list; do
-			((func_count++))
+			((func_count=func_count+1))
 
 			loopstart=$(date +%s)
 			
@@ -3411,7 +3427,7 @@ function multi_custom() {
 			loopend=$(date +%s)
 			getElapsedTime $loopstart $loopend
 			printf "${bgreen}#######################################################################${reset}\n"
-			printf "${bgreen} $domain finished $custom_function in ${runtime} $currently ${reset}\n"
+			printf "${bgreen} $domain finished $custom_f in ${runtime} $currently ${reset}\n"
 			if [[ -n $flist ]]; then
 				POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
 				printf "\n${yellow} $domain is $POSINLIST of $LISTTOTAL (${func_count}/${LISTFUNCTOTAL})${reset}\n"
@@ -3655,6 +3671,19 @@ while true; do
 		;;
 	esac
 done
+
+# Initialize some variables
+opt_deep="${opt_deep:=false}"
+rate_limit="${rate_limit:=0}"
+outOfScope_file="${outOfScope_file:=}"
+inScope_file="${inScope_file:=}"
+domain="${domain:=}"
+multi="${multi:=}"
+list="${list:=}"
+opt_mode="${opt_mode:=}"
+custom_function="${custom_function:=}"
+AXIOM="${AXIOM:=false}"
+CUSTOM_CONFIG="${CUSTOM_CONFIG:=}"
 
 # This is the first thing to do to read in alternate config
 SCRIPTPATH="$(
