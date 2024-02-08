@@ -2957,7 +2957,7 @@ function start() {
 	NOWT=$(date +"%T")
 	LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
 	touch .log/${NOW}_${NOWT}.txt
-	echo "Start ${NOW} ${NOWT}" >"${LOGFILE}"
+	echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
 
 	printf "\n"
 	printf "${bred}[$(date +'%Y-%m-%dT%H:%M:%S%z')] Target: ${domain}\n\n"
@@ -3123,7 +3123,7 @@ function multi_osint() {
 	NOWT=$(date +"%T")
 	LOGFILE="${workdir}/.log/${NOW}_${NOWT}.txt"
 	touch .log/${NOW}_${NOWT}.txt
-	echo "Start ${NOW} ${NOWT}" >"${LOGFILE}"
+	echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
 
 	for domain in $targets; do
 		dir=$workdir/targets/$domain
@@ -3138,7 +3138,7 @@ function multi_osint() {
 		NOWT=$(date +"%T")
 		LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
 		touch .log/${NOW}_${NOWT}.txt
-		echo "Start ${NOW} ${NOWT}" >"${LOGFILE}"
+		echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
 		domain_info
 		ip_info
 		emails
@@ -3240,7 +3240,7 @@ function multi_recon() {
 	NOWT=$(date +"%T")
 	LOGFILE="${workdir}/.log/${NOW}_${NOWT}.txt"
 	touch .log/${NOW}_${NOWT}.txt
-	echo "Start ${NOW} ${NOWT}" >"${LOGFILE}"
+	echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
 
 	[ -n "$flist" ] && LISTTOTAL=$(cat "$flist" | wc -l)
 
@@ -3258,7 +3258,7 @@ function multi_recon() {
 		NOWT=$(date +"%T")
 		LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
 		touch .log/${NOW}_${NOWT}.txt
-		echo "Start ${NOW} ${NOWT}" >"${LOGFILE}"
+		echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
 		loopstart=$(date +%s)
 
 		domain_info
@@ -3449,10 +3449,9 @@ function multi_custom() {
 	NOWT=$(date +"%T")
 	LOGFILE="${workdir}/.log/${NOW}_${NOWT}.txt"
 	touch .log/${NOW}_${NOWT}.txt
-	echo "Start ${NOW} ${NOWT}" >"${LOGFILE}"
+	echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
 
-	[ -n "$flist" ] && LISTTOTAL=$(cat "$flist" | wc -l)
-
+	[ -n "$flist" ] && entries=$(cat "$flist" | wc -l)
 
 	if [[ $AXIOM == true ]]; then
 		axiom_launch
@@ -3460,44 +3459,23 @@ function multi_custom() {
 	fi
 
 	custom_function_list=$(echo $custom_function|tr ',' '\n')
+	[ -n "$custom_function_list" ] && func_total=$(cat "$custom_function_list" | wc -l)
 
+	func_count=0
+	domain=$(cat $flist)
+	for custom_f in $custom_function_list; do
+		((func_count=func_count+1))
 
-	[ -n "$custom_function_list" ] && LISTFUNCTOTAL=$(echo "$flist" | wc -l)
-
-	for domain in $targets; do
 		loopstart=$(date +%s)
-		dir=$workdir/targets/$domain
-		mkdir -p $dir || {
-			echo "Failed to create directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"
-			exit 1
-		}
+		
+		$custom_f
 
-		cd "$dir" || {
-			echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
-			exit 1
-		}
-		mkdir -p {.called_fn,.log}
-		called_fn_dir=$dir/.called_fn
-
-		func_count=0
-		for custom_f in $custom_function_list; do
-			((func_count=func_count+1))
-
-			loopstart=$(date +%s)
-			
-			$custom_f
-
-			currently=$(date +"%H:%M:%S")
-			loopend=$(date +%s)
-			getElapsedTime $loopstart $loopend
-			printf "${bgreen}#######################################################################${reset}\n"
-			printf "${bgreen}[$(date +'%Y-%m-%dT%H:%M:%S%z')] $domain finished $custom_f in ${runtime} $currently ${reset}\n"
-			if [[ -n $flist ]]; then
-				POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
-				printf "\n${yellow}[$(date +'%Y-%m-%dT%H:%M:%S%z')] $domain is $POSINLIST of $LISTTOTAL (${func_count}/${LISTFUNCTOTAL})${reset}\n"
-			fi
-			printf "${bgreen}#######################################################################${reset}\n"
-		done
+		currently=$(date +"%H:%M:%S")
+		loopend=$(date +%s)
+		getElapsedTime $loopstart $loopend
+		printf "${bgreen}#######################################################################${reset}\n"
+		printf "${bgreen}[$(date +'%Y-%m-%dT%H:%M:%S%z')] Finished $custom_f ($func_count/$func_total) for $entries entries in ${runtime} $currently ${reset}\n"
+		printf "${bgreen}#######################################################################${reset}\n"
 	done
 
 	if [[ $AXIOM == true ]]; then
