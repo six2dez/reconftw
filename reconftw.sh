@@ -2862,7 +2862,7 @@ function axiom_launch() {
 
 			NUMOFNODES=$(timeout 30 axiom-ls | grep -c "$AXIOM_FLEET_NAME" || true)
 			echo "[$(date +"%Y-%m-%dT%H:%M:%S%z")] Axiom fleet $AXIOM_FLEET_NAME launched w/ $NUMOFNODES instances" | $NOTIFY
-			end_func "Axiom fleet $AXIOM_FLEET_NAME launched w/ $NUMOFNODES instances"
+			end_func "Axiom fleet $AXIOM_FLEET_NAME launched w/ $NUMOFNODES instances" info
 		fi
 	fi
 }
@@ -2883,12 +2883,12 @@ function axiom_shutdown() {
 function axiom_selected() {
 
 	if [[ ! $(axiom-ls | tail -n +2 | sed '$ d' | wc -l) -gt 0 ]]; then
-		notification "\n\n${bred} No axiom instances running ${reset}\n\n" error
+		notification "No axiom instances running ${reset}\n\n" error
 		exit
 	fi
 
 	if [[ ! $(cat ~/.axiom/selected.conf | sed '/^\s*$/d' | wc -l) -gt 0 ]]; then
-		notification "\n\n${bred} No axiom instances selected ${reset}\n\n" error
+		notification "No axiom instances selected ${reset}\n\n" error
 		exit
 	fi
 }
@@ -2933,7 +2933,7 @@ function start() {
 	fi
 
 	if [[ -z $domain ]]; then
-		notification "\n\n${bred} No domain or list provided ${reset}\n\n" error
+		notification "${bred} No domain or list provided ${reset}\n\n" error
 		exit
 	fi
 
