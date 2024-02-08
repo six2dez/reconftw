@@ -2833,13 +2833,13 @@ function ipcidr_target() {
 	fi
 }
 
-function axiom_lauch() {
+function axiom_launch() {
 	# let's fire up a FLEET!
 	if [[ $AXIOM_FLEET_LAUNCH == true ]] && [[ -n $AXIOM_FLEET_NAME ]] && [[ -n $AXIOM_FLEET_COUNT ]]; then
 		start_func ${FUNCNAME[0]} "Launching our Axiom fleet"
 		#python3 -m pip install --upgrade linode-cli 2>>"$LOGFILE" >/dev/null
 		# Check to see if we have a fleet already, if so, SKIP THIS!
-		NUMOFNODES=$(timeout 30 axiom-ls | grep -c "$AXIOM_FLEET_NAME")
+		NUMOFNODES=$(timeout 30 axiom-ls | grep -c "$AXIOM_FLEET_NAME" || true)
 		if [[ $NUMOFNODES -ge $AXIOM_FLEET_COUNT ]]; then
 			axiom-select "$AXIOM_FLEET_NAME*"
 			end_func "Axiom fleet $AXIOM_FLEET_NAME already has $NUMOFNODES instances"
@@ -2860,8 +2860,8 @@ function axiom_lauch() {
 				eval "$AXIOM_POST_START" 2>>"$LOGFILE" >/dev/null
 			fi
 
-			NUMOFNODES=$(timeout 30 axiom-ls | grep -c "$AXIOM_FLEET_NAME")
-			echo "Axiom fleet $AXIOM_FLEET_NAME launched w/ $NUMOFNODES instances" | $NOTIFY
+			NUMOFNODES=$(timeout 30 axiom-ls | grep -c "$AXIOM_FLEET_NAME" || true)
+			echo "[$(date +"%Y-%m-%dT%H:%M:%S%z")] Axiom fleet $AXIOM_FLEET_NAME launched w/ $NUMOFNODES instances" | $NOTIFY
 			end_func "Axiom fleet $AXIOM_FLEET_NAME launched w/ $NUMOFNODES instances"
 		fi
 	fi
@@ -2875,7 +2875,7 @@ function axiom_shutdown() {
 			return
 		fi
 		eval axiom-rm -f "$AXIOM_FLEET_NAME*"
-		echo "Axiom fleet $AXIOM_FLEET_NAME shutdown" | $NOTIFY
+		echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] Axiom fleet $AXIOM_FLEET_NAME shutdown" | $NOTIFY
 		notification "Axiom fleet $AXIOM_FLEET_NAME shutdown" info
 	fi
 }
@@ -3027,7 +3027,7 @@ function passive() {
 	SUB_RECURSIVE_BRUTE=false
 	WEBPROBESIMPLE=false
 	if [[ $AXIOM == true ]]; then
-		axiom_lauch
+		axiom_launch
 		axiom_selected
 	fi
 
@@ -3172,7 +3172,7 @@ function recon() {
 	favicon
 
 	if [[ $AXIOM == true ]]; then
-		axiom_lauch
+		axiom_launch
 		axiom_selected
 	fi
 
@@ -3288,7 +3288,7 @@ function multi_recon() {
 	}
 
 	if [[ $AXIOM == true ]]; then
-		axiom_lauch
+		axiom_launch
 		axiom_selected
 	fi
 
@@ -3454,7 +3454,7 @@ function multi_custom() {
 
 
 	if [[ $AXIOM == true ]]; then
-		axiom_lauch
+		axiom_launch
 		axiom_selected
 	fi
 
@@ -3510,7 +3510,7 @@ function subs_menu() {
 	start
 
 	if [[ $AXIOM == true ]]; then
-		axiom_lauch
+		axiom_launch
 		axiom_selected
 	fi
 
