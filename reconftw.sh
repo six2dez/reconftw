@@ -2968,7 +2968,7 @@ function end() {
 	find $dir -type f -empty -print | grep -v '.called_fn' | grep -v '.log' | grep -v '.tmp' | xargs rm -f 2>>"$LOGFILE" >/dev/null
 	find $dir -type d -empty -print -delete 2>>"$LOGFILE" >/dev/null
 
-	echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] End >>"${LOGFILE}"
+	echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] End" >>"${LOGFILE}"
 
 	if [[ $PRESERVE != true ]]; then
 		find $dir -type f -empty | grep -v "called_fn" | xargs rm -f 2>>"$LOGFILE" >/dev/null
