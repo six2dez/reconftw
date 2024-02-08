@@ -3747,6 +3747,7 @@ list="${list:=}"
 opt_mode="${opt_mode:=}"
 custom_function="${custom_function:=}"
 AXIOM="${AXIOM:=false}"
+AXIOM_POST_START="${AXIOM_POST_START:=}"
 CUSTOM_CONFIG="${CUSTOM_CONFIG:=}"
 
 # This is the first thing to do to read in alternate config
