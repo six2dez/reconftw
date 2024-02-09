@@ -1244,7 +1244,7 @@ function s3buckets() {
 		fi
 		# Cloudenum
 		keyword=${domain%%.*}
-		python3 ~/Tools/cloud_enum/cloud_enum.py -k $keyword -l .tmp/output_cloud.txt 2>>"$LOGFILE" >/dev/null
+		timeout -k 1m 20m python3 ~/Tools/cloud_enum/cloud_enum.py -k $keyword -l .tmp/output_cloud.txt 2>>"$LOGFILE" >/dev/null
 
 		NUMOFLINES1=$(cat .tmp/output_cloud.txt 2>>"$LOGFILE" | sed '/^#/d' | sed '/^$/d' | anew subdomains/cloud_assets.txt | wc -l)
 		if [[ $NUMOFLINES1 -gt 0 ]]; then
@@ -1281,7 +1281,7 @@ function s3buckets() {
 function geo_info() {
 
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GEO_INFO == true ]]; then
-		start_func ${FUNCNAME[0]} "Running: ipinfo via ipapi.co"
+		start_func ${FUNCNAME[0]} "Running: ipinfo and geoinfo"
 		ips_file="${dir}/hosts/ips.txt"
 		if [ ! -f $ips_file ]; then
 			echo "File ${dir}/hosts/ips.txt does not exist."
@@ -2950,9 +2950,9 @@ function passive() {
 	remove_big_files
 	favicon
 	cdnprovider
-	geo_info
 	PORTSCAN_ACTIVE=false
 	portscan
+	geo_info
 
 	if [[ $AXIOM == true ]]; then
 		axiom_shutdown
@@ -3099,8 +3099,8 @@ function recon() {
 	screenshot
 	#	virtualhosts
 	cdnprovider
-	geo_info
 	portscan
+	geo_info
 	waf_checks
 	nuclei_check
 	fuzz
@@ -3222,8 +3222,8 @@ function multi_recon() {
 		screenshot
 		#		virtualhosts
 		cdnprovider
-		geo_info
 		portscan
+		geo_info
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
 		getElapsedTime $loopstart $loopend
@@ -3435,7 +3435,7 @@ if [[ $OSTYPE == "darwin"* ]]; then
 	PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
 fi
 
-PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:rspanvh::' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,deep,help,vps' -n 'reconFTW' -- "$@")
+PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:rspanwvh::' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,deep,help,vps' -n 'reconFTW' -- "$@")
 
 # Note the quotes around "$PROGARGS": they are essential!
 eval set -- "$PROGARGS"
