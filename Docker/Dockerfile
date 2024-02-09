@@ -125,9 +125,6 @@ COPY github_tokens.txt /root/Tools/.github_tokens
 COPY notify.conf /root/.config/notify/notify.conf
 
 ###>> Configure Axiom Provider <<###
-COPY axiom-config.ini /root/.axiom/configs/config.ini
-COPY axiom-custom-provider.json /root/.axiom/accounts/personal.json
-
 RUN <<eot
 ###>> Regenerate SSH Keys <<###
 # You REALLY do NOT want to use the default SSH keys in the base image
@@ -138,6 +135,9 @@ eot
 
 RUN axiom-account personal
 RUN az group delete --name axiom --yes --no-wait
+
+COPY axiom-config.ini /root/.axiom/configs/config.ini
+COPY axiom-custom-provider.json /root/.axiom/accounts/personal.json
 
 # This command exits with return code 1, so leave the '|| :' or the build will fail.
 RUN axiom-build reconftw || :
