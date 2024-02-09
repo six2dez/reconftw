@@ -345,26 +345,28 @@ eval git config --global --unset https.proxy $DEBUG_STD
 
 printf "${bblue} Running: Looking for new reconFTW version${reset}\n\n"
 
-if ! eval git fetch $DEBUG_STD; then
-	echo "Failed to fetch updates."
-	exit 1
-fi
+timeout 10 git fetch
+exit_status=$?
+if [[ ${exit_status} -eq 0 ]]; then
 
-BRANCH=$(git rev-parse --abbrev-ref HEAD)
-HEADHASH=$(git rev-parse HEAD)
-UPSTREAMHASH=$(git rev-parse "${BRANCH}@{upstream}")
+	BRANCH=$(git rev-parse --abbrev-ref HEAD)
+	HEADHASH=$(git rev-parse HEAD)
+	UPSTREAMHASH=$(git rev-parse "${BRANCH}@{upstream}")
 
-if [[ $HEADHASH != "$UPSTREAMHASH" ]]; then
-	printf "${yellow} There is a new version, updating...${reset}\n\n"
-	if git status --porcelain | grep -q 'reconftw.cfg$'; then
-		mv reconftw.cfg reconftw.cfg_bck
-		printf "${yellow} reconftw.cfg has been backed up in reconftw.cfg_bck${reset}\n\n"
+	if [[ $HEADHASH != "$UPSTREAMHASH" ]]; then
+		printf "${yellow} There is a new version, updating...${reset}\n\n"
+		if git status --porcelain | grep -q 'reconftw.cfg$'; then
+			mv reconftw.cfg reconftw.cfg_bck
+			printf "${yellow} reconftw.cfg has been backed up in reconftw.cfg_bck${reset}\n\n"
+		fi
+		eval git reset --hard $DEBUG_STD
+		eval git pull $DEBUG_STD
+		printf "${bgreen} Updated! Running new installer version...${reset}\n\n"
+	else
+		printf "${bgreen} reconFTW is already up to date!${reset}\n\n"
 	fi
-	eval git reset --hard $DEBUG_STD
-	eval git pull $DEBUG_STD
-	printf "${bgreen} Updated! Running new installer version...${reset}\n\n"
 else
-	printf "${bgreen} reconFTW is already up to date!${reset}\n\n"
+	printf "\n${bred} Unable to check updates ${reset}\n\n"
 fi
 
 printf "${bblue} Running: Installing system packages ${reset}\n\n"
