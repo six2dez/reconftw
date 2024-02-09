@@ -124,6 +124,24 @@ COPY amass_config.ini /root/.config/amass/config.ini
 COPY github_tokens.txt /root/Tools/.github_tokens
 COPY notify.conf /root/.config/notify/notify.conf
 
+###>> Configure Axiom Provider <<###
+COPY axiom-config.ini /root/.axiom/configs/config.ini
+COPY axiom-custom-provider.json /root/.axiom/accounts/personal.json
+
+RUN <<eot
+###>> Regenerate SSH Keys <<###
+# You REALLY do NOT want to use the default SSH keys in the base image
+find /root/.ssh -type f -delete
+ssh-keygen -b 2048 -t rsa -f /root/.ssh/axiom_rsa -q -N ""
+cat /root/.ssh/axiom_rsa.pub > /root/.axiom/configs/authorized_keys
+eot
+
+RUN axiom-account personal
+RUN az group delete --name axiom --yes --no-wait
+
+# This command exits with return code 1, so leave the '|| :' or the build will fail.
+RUN axiom-build reconftw || :
+
 ## Issue 271
 EXPOSE 85-90
 
