@@ -139,6 +139,7 @@ RUN axiom-account personal
 RUN az group delete --name axiom --yes --no-wait
 
 # This command exits with return code 1, so leave the '|| :' or the build will fail.
+COPY axiom-custom-provider.json /root/.axiom/accounts/personal.json
 RUN axiom-build reconftw || :
 
 ## Issue 271
