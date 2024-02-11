@@ -107,6 +107,7 @@ repos["trufflehog"]="trufflesecurity/trufflehog"
 repos["dontgo403"]="devploit/dontgo403"
 repos["SwaggerSpy"]="UndeadSec/SwaggerSpy"
 repos["LeakSearch"]="JoelGMSec/LeakSearch"
+repos["Wapiti"]="wapiti-scanner/wapiti"
 
 function banner() {
 	tput clear
@@ -216,6 +217,9 @@ function install_tools() {
             if [[ "dontgo403" == "$repo" ]]; then
                 eval go get $DEBUG_STD && eval go build $DEBUG_STD && eval chmod +x ./dontgo403 $DEBUG_STD
             fi
+			 if [[ "wapiti" == "$repo" ]]; then
+                eval make install $DEBUG_STD
+            fi
         fi
 		if [[ "gf" == "$repo" ]]; then
             eval cp -r examples ~/.gf $DEBUG_ERROR
@@ -230,18 +234,18 @@ function install_tools() {
 
 	if [[ "True" == "$IS_ARM" ]]; then
         if [[ "True" == "$RPI_3" ]]; then
-            install_ppfuzz "https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz" "ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz"
+            install_ppfuzz "https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.2/ppfuzz-v1.0.2-armv7-unknown-linux-gnueabihf.tar.gz" "ppfuzz-v1.0.2-armv7-unknown-linux-gnueabihf.tar.gz"
         elif [[ "True" == "$RPI_4" ]]; then
-            install_ppfuzz "https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz" "ppfuzz-v1.0.1-aarch64-unknown-linux-gnueabihf.tar.gz"
+            install_ppfuzz "https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.2/ppfuzz-v1.0.2-aarch64-unknown-linux-gnueabihf.tar.gz" "ppfuzz-v1.0.2-aarch64-unknown-linux-gnueabihf.tar.gz"
         fi
     elif [[ "True" == "$IS_MAC" ]]; then
         if [[ "True" == "$IS_ARM" ]]; then
-			install_ppfuzz "https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz" "ppfuzz-v1.0.1-armv7-unknown-linux-gnueabihf.tar.gz"
+			install_ppfuzz "https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.2/ppfuzz-v1.0.2-armv7-unknown-linux-gnueabihf.tar.gz" "ppfuzz-v1.0.2-armv7-unknown-linux-gnueabihf.tar.gz"
 		else
-			install_ppfuzz "https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz" "ppfuzz-v1.0.1-x86_64-apple-darwin.tar.gz"
+			install_ppfuzz "https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.2/ppfuzz-v1.0.2-x86_64-apple-darwin.tar.gz" "ppfuzz-v1.0.2-x86_64-apple-darwin.tar.gz"
 		fi
 	else
-		install_ppfuzz "https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.1/ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz" "ppfuzz-v1.0.1-x86_64-unknown-linux-musl.tar.gz"
+		install_ppfuzz "https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.2/ppfuzz-v1.0.2-x86_64-unknown-linux-musl.tar.gz" "ppfuzz-v1.0.2-x86_64-unknown-linux-musl.tar.gz"
 	fi
 	eval $SUDO chmod 755 /usr/local/bin/ppfuzz
 	eval $SUDO strip -s /usr/local/bin/ppfuzz $DEBUG_STD
