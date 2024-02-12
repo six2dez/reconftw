@@ -73,7 +73,7 @@ echo "deb-src http://kali.download/kali kali-rolling main contrib non-free" >> /
 apt clean all
 apt update
 apt full-upgrade -f -y --allow-downgrades
-apt install -y --no-install-recommends apt-utils ca-certificates curl git lsb-release nano wget
+apt install -y --no-install-recommends apt-utils ca-certificates curl git lsb-release nano wget vim jq htop nmon
 
 ###>> Congifure Locales <<###
 apt install -y --no-install-recommends locales
