@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
-source ./modules/extras.sh
-source ./modules/hosts.sh
-source ./modules/osint.sh
-source ./modules/subdomains.sh
-source ./modules/tools.sh
-source ./modules/vulns.sh
-source ./modules/webs.sh
+
+RECONFTW_DIR="$(
+	cd "$(dirname "$0")" >/dev/null 2>&1 || exit
+	pwd -P
+)"
+
+source ./modules/extras.sh "$RECONFTW_DIR/reconftw.cfg"
+source ./modules/hosts.sh "$RECONFTW_DIR/reconftw.cfg"
+source ./modules/osint.sh "$RECONFTW_DIR/reconftw.cfg"
+source ./modules/subdomains.sh "$RECONFTW_DIR/reconftw.cfg"
+source ./modules/tools.sh "$RECONFTW_DIR/reconftw.cfg"
+source ./modules/vulns.sh "$RECONFTW_DIR/reconftw.cfg"
+source ./modules/webs.sh "$RECONFTW_DIR/reconftw.cfg"
 
 # Welcome to reconFTW main script
 #	 ██▀███  ▓█████  ▄████▄   ▒█████   ███▄    █   █████▒▄▄▄█████▓ █     █░
