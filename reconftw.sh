@@ -5,13 +5,13 @@ RECONFTW_DIR="$(
 	pwd -P
 )"
 
-source ./modules/extras.sh "$RECONFTW_DIR/reconftw.cfg"
-source ./modules/hosts.sh "$RECONFTW_DIR/reconftw.cfg"
-source ./modules/osint.sh "$RECONFTW_DIR/reconftw.cfg"
-source ./modules/subdomains.sh "$RECONFTW_DIR/reconftw.cfg"
-source ./modules/tools.sh "$RECONFTW_DIR/reconftw.cfg"
-source ./modules/vulns.sh "$RECONFTW_DIR/reconftw.cfg"
-source ./modules/webs.sh "$RECONFTW_DIR/reconftw.cfg"
+source ./modules/extras.sh "$RECONFTW_DIR"
+source ./modules/hosts.sh "$RECONFTW_DIR"
+source ./modules/osint.sh "$RECONFTW_DIR"
+source ./modules/subdomains.sh "$RECONFTW_DIR"
+source ./modules/tools.sh "$RECONFTW_DIR"
+source ./modules/vulns.sh "$RECONFTW_DIR"
+source ./modules/webs.sh "$RECONFTW_DIR"
 
 # Welcome to reconFTW main script
 #	 ██▀███  ▓█████  ▄████▄   ▒█████   ███▄    █   █████▒▄▄▄█████▓ █     █░
