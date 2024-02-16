@@ -2254,7 +2254,7 @@ function ssti() {
 		if [[ -s "gf/ssti.txt" ]]; then
 			cat gf/ssti.txt | qsreplace FUZZ | sed '/FUZZ/!d' | anew -q .tmp/tmp_ssti.txt
 			if [[ $DEEP == true ]] || [[ $(cat .tmp/tmp_ssti.txt | wc -l) -le $DEEP_LIMIT ]]; then
-				#TInjA url -u "file:./Recon/eazybi.com/gf/ssti.txt" --csti --reportpath "vulns/"
+				#TInjA url -u "file:./Recon/DOMAIN/gf/ssti.txt" --csti --reportpath "vulns/"
 				interlace -tL .tmp/tmp_ssti.txt -threads ${INTERLACE_THREADS} -c "ffuf -v -r -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w ${ssti_wordlist} -u \"_target_\" -mr \"ssti49\" " 2>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssti.txt
 				end_func "Results are saved in vulns/ssti.txt" ${FUNCNAME[0]}
 			else
