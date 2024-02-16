@@ -299,8 +299,8 @@ function tools_installed() {
 		printf "${bred} [*] mapcidr			[NO]${reset}\n"
 		allinstalled=false
 	}
-	command -v ppfuzz &>/dev/null || {
-		printf "${bred} [*] ppfuzz			[NO]${reset}\n"
+	command -v ppmap &>/dev/null || {
+		printf "${bred} [*] ppmap			[NO]${reset}\n"
 		allinstalled=false
 	}
 	command -v cdncheck &>/dev/null || {
@@ -917,7 +917,7 @@ function sub_scraping() {
 						[ -s ".tmp/probed_tmp_scrap.txt" ] && axiom-scan .tmp/probed_tmp_scrap.txt -m katana -jc -kf all -d 2 -fs rdn -o .tmp/katana.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 					fi
 				fi
-				sed -i '/^.\{2048\}./d' .tmp/katana.txt
+				[ -s ".tmp/katana.txt" ] && sed -i '/^.\{2048\}./d' .tmp/katana.txt
 				[ -s ".tmp/katana.txt" ] && cat .tmp/katana.txt | unfurl -u domains 2>>"$LOGFILE" | grep ".$domain$" | grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' | anew -q .tmp/scrap_subs.txt
 				[ -s ".tmp/scrap_subs.txt" ] && puredns resolve .tmp/scrap_subs.txt -w .tmp/scrap_subs_resolved.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" >/dev/null
 				if [[ $INSCOPE == true ]]; then
@@ -1631,19 +1631,21 @@ function nuclei_check() {
 		mkdir -p nuclei_output
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
 		[ ! -s ".tmp/webs_subs.txt" ] && cat subdomains/subdomains.txt webs/webs_all.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
+		[ -s "$dir/fuzzing/fuzzing_full.txt" ] && cat $dir/fuzzing/fuzzing_full.txt | grep -e "^200" | cut -d " " -f3 | anew -q .tmp/webs_fuzz.txt
+		cat .tmp/webs_subs.txt .tmp/webs_fuzz.txt 2>>"$LOGFILE" | anew -q .tmp/webs_nuclei.txt
 		if [[ $AXIOM != true ]]; then # avoid globbing (expansion of *).
 			IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
 			for crit in "${severity_array[@]}"; do
 				printf "${yellow}\n Running : Nuclei $crit ${reset}\n\n"
-				cat .tmp/webs_subs.txt 2>/dev/null | nuclei $NUCLEI_FLAGS -severity $crit -nh -rl $NUCLEI_RATELIMIT -o nuclei_output/${crit}.txt
+				cat .tmp/webs_nuclei.txt 2>/dev/null | nuclei $NUCLEI_FLAGS -severity $crit -nh -rl $NUCLEI_RATELIMIT -o nuclei_output/${crit}.txt
 			done
 			printf "\n\n"
 		else
-			if [[ -s ".tmp/webs_subs.txt" ]]; then
+			if [[ -s ".tmp/webs_nuclei.txt" ]]; then
 				IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
 				for crit in "${severity_array[@]}"; do
 					printf "${yellow}\n Running : Nuclei $crit, check results on nuclei_output folder${reset}\n\n"
-					axiom-scan .tmp/webs_subs.txt -m nuclei --nuclei-templates ${NUCLEI_TEMPLATES_PATH} -severity ${crit} -nh -rl $NUCLEI_RATELIMIT -o nuclei_output/${crit}.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+					axiom-scan .tmp/webs_nuclei.txt -m nuclei --nuclei-templates ${NUCLEI_TEMPLATES_PATH} -severity ${crit} -nh -rl $NUCLEI_RATELIMIT -o nuclei_output/${crit}.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 					[ -s "nuclei_output/${crit}.txt" ] && cat nuclei_output/${crit}.txt
 				done
 				printf "\n\n"
@@ -2252,7 +2254,7 @@ function ssti() {
 		if [[ -s "gf/ssti.txt" ]]; then
 			cat gf/ssti.txt | qsreplace FUZZ | sed '/FUZZ/!d' | anew -q .tmp/tmp_ssti.txt
 			if [[ $DEEP == true ]] || [[ $(cat .tmp/tmp_ssti.txt | wc -l) -le $DEEP_LIMIT ]]; then
-				#TInjA url -u "file://.tmp/tmp_ssti.txt" --csti --reportpath "vulns/"
+				#TInjA url -u "file:./Recon/eazybi.com/gf/ssti.txt" --csti --reportpath "vulns/"
 				interlace -tL .tmp/tmp_ssti.txt -threads ${INTERLACE_THREADS} -c "ffuf -v -r -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w ${ssti_wordlist} -u \"_target_\" -mr \"ssti49\" " 2>/dev/null | grep "URL" | sed 's/| URL | //' | anew -q vulns/ssti.txt
 				end_func "Results are saved in vulns/ssti.txt" ${FUNCNAME[0]}
 			else
@@ -2398,8 +2400,8 @@ function prototype_pollution() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $PROTO_POLLUTION == true ]]; then
 		start_func ${FUNCNAME[0]} "Prototype Pollution checks"
 		if [[ $DEEP == true ]] || [[ $(cat webs/url_extract.txt | wc -l) -le $DEEP_LIMIT ]]; then
-			[ -s "webs/url_extract.txt" ] && ppfuzz -l webs/url_extract.txt -c $PPFUZZ_THREADS 2>/dev/null | anew -q .tmp/prototype_pollution.txt
-			[ -s ".tmp/prototype_pollution.txt" ] && cat .tmp/prototype_pollution.txt | sed -e '1,8d' | sed '/^\[ERR/d' | anew -q vulns/prototype_pollution.txt
+			[ -s "webs/url_extract.txt" ] && cat webs/url_extract.txt | ppmap &> .tmp/prototype_pollution.txt
+			[ -s ".tmp/prototype_pollution.txt" ] && cat .tmp/prototype_pollution.txt | grep "EXPL" | anew -q vulns/prototype_pollution.txt
 			end_func "Results are saved in vulns/prototype_pollution.txt" ${FUNCNAME[0]}
 		else
 			end_func "Skipping Prototype Pollution: Too many URLs to test, try with --deep flag" ${FUNCNAME[0]}
@@ -3102,8 +3104,8 @@ function recon() {
 	portscan
 	geo_info
 	waf_checks
-	nuclei_check
 	fuzz
+	nuclei_check
 	iishortname
 	urlchecks
 	jschecks
@@ -3360,9 +3362,9 @@ function webs_menu() {
 	screenshot
 	#	virtualhosts
 	waf_checks
+	fuzz
 	nuclei_check
 	cms_scanner
-	fuzz
 	iishortname
 	urlchecks
 	jschecks
@@ -3472,7 +3474,6 @@ while true; do
 		shift 2
 		continue
 		;;
-
 	# modes
 	'-r' | '--recon')
 		opt_mode='r'
