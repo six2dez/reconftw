@@ -537,8 +537,8 @@ function apileaks() {
 			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
 		}
 
-		[ -s "osint/postman_leaks.txt" ] && trufflehog filesystem ${dir}/osint/postman_leaks.txt -j | jq -c | anew -q ${dir}/osint/postman_leaks_trufflehog.json
-		[ -s "osint/swagger_leaks.txt" ] && trufflehog filesystem ${dir}/osint/swagger_leaks.txt -j | jq -c | anew -q ${dir}/osint/swagger_leaks_trufflehog.json
+		[ -s "osint/postman_leaks.txt" ] && trufflehog filesystem ${dir}/osint/postman_leaks.txt -j 2>/dev/null | jq -c | anew -q ${dir}/osint/postman_leaks_trufflehog.json
+		[ -s "osint/swagger_leaks.txt" ] && trufflehog filesystem ${dir}/osint/swagger_leaks.txt -j 2>/dev/null | jq -c | anew -q ${dir}/osint/swagger_leaks_trufflehog.json
 
 		end_func "Results are saved in $domain/osint/[software/authors/metadata_results].txt" ${FUNCNAME[0]}
 	else
@@ -1255,7 +1255,7 @@ function s3buckets() {
 			notification "${NUMOFLINES2} new S3 buckets found" info
 		fi
 
-		[ -s "subdomains/s3buckets.txt" ] && for i in $(cat subdomains/s3buckets.txt); do trufflehog s3 --bucket="$i" -j | jq -c | anew -q subdomains/s3buckets_trufflehog.txt; done
+		[ -s "subdomains/s3buckets.txt" ] && for i in $(cat subdomains/s3buckets.txt); do trufflehog s3 --bucket="$i" -j 2>/dev/null | jq -c | anew -q subdomains/s3buckets_trufflehog.txt; done
 
 		end_func "Results are saved in subdomains/s3buckets.txt and subdomains/cloud_assets.txt" ${FUNCNAME[0]}
 	else
@@ -1937,7 +1937,7 @@ function jschecks() {
 				[ -s "js/js_livelinks.txt" ] && cat js/js_livelinks.txt | mantra -ua ${HEADER} -s | anew -q js/js_secrets.txt
 			else
 				[ -s "js/js_livelinks.txt" ] && axiom-scan js/js_livelinks.txt -m mantra -ua \"${HEADER}\" -s -o js/js_secrets.txt $AXIOM_EXTRA_ARGS &>/dev/null
-				[ -s "js/js_secrets.txt" ] && trufflehog filesystem js/js_secrets.txt -j | jq -c | anew -q js/js_secrets_trufflehog.txt
+				[ -s "js/js_secrets.txt" ] && trufflehog filesystem js/js_secrets.txt -j 2>/dev/null | jq -c | anew -q js/js_secrets_trufflehog.txt
 			fi
 			[ -s "js/js_secrets.txt" ] && sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2};?)?)?[mGK]//g" -i js/js_secrets.txt
 			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
@@ -2482,7 +2482,7 @@ function fuzzparams() {
 		if [[ $DEEP == true ]] || [[ $(cat webs/url_extract.txt | wc -l) -le $DEEP_LIMIT2 ]]; then
 			if [[ $AXIOM != true ]]; then
 				nuclei -update 2>>"$LOGFILE" >/dev/null
-				git -C ${tools}/fuzzing-templates pull
+				git -C ${tools}/fuzzing-templates pull 2>>"$LOGFILE"
 				cat webs/url_extract.txt 2>/dev/null | nuclei -silent -retries 3 -rl $NUCLEI_RATELIMIT -t ${tools}/fuzzing-templates -o .tmp/fuzzparams.txt
 			else
 				axiom-exec "git clone https://github.com/projectdiscovery/fuzzing-templates /home/op/fuzzing-templates" &>/dev/null
