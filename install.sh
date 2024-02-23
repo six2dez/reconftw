@@ -182,7 +182,7 @@ function install_tools() {
 				continue
 			}
 		fi
-		eval git clone https://github.com/${repos[$repo]} "${dir}"/$repo $DEBUG_STD
+		eval git clone --filter="blob:none" https://github.com/${repos[$repo]} "${dir}"/$repo $DEBUG_STD
         eval cd "${dir}"/$repo $DEBUG_STD
 		eval git pull $DEBUG_STD
 		exit_status=$?
@@ -281,7 +281,6 @@ install_apt() {
 	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
 	eval source "${HOME}/.cargo/env $DEBUG_STD"
 	eval cargo install ripgen $DEBUG_STD
-	eval source "${HOME}/.cargo/env $DEBUG_STD"
 }
 
 install_brew() {
