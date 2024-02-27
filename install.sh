@@ -73,6 +73,7 @@ gotools["s3scanner"]="go install -v github.com/sa7mon/s3scanner@latest"
 gotools["nmapurls"]="go install -v github.com/sdcampbell/nmapurls@latest"
 gotools["shortscan"]="go install -v github.com/bitquark/shortscan/cmd/shortscan@latest"
 gotools["sns"]="go install github.com/sw33tLie/sns@latest"
+gotools["ppmap"]="go install -v github.com/kleiton0x00/ppmap@latest"
 
 # Declaring repositories and their paths
 declare -A repos
@@ -123,15 +124,6 @@ function banner() {
 	printf "    ░        ░  ░░ ░          ░ ░           ░                      ░    \n"
 	printf "                 ░                                                      \n"
 	printf " ${reconftw_version}                                         by @six2dez\n"
-}
-
-function install_ppfuzz() {
-	local url=$1
-	local tar_file=$2
-
-	eval wget -N -c "$url" $DEBUG_STD
-	eval $SUDO tar -C /usr/local/bin/ -xzf "$tar_file" $DEBUG_STD
-	eval $SUDO rm -rf "$tar_file" $DEBUG_STD
 }
 
 # This function installs various tools and repositories as per the configuration.
@@ -232,23 +224,6 @@ function install_tools() {
 		}
 	done
 
-	if [[ "True" == "$IS_ARM" ]]; then
-        if [[ "True" == "$RPI_3" ]]; then
-            install_ppfuzz "https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.2/ppfuzz-v1.0.2-armv7-unknown-linux-gnueabihf.tar.gz" "ppfuzz-v1.0.2-armv7-unknown-linux-gnueabihf.tar.gz"
-        elif [[ "True" == "$RPI_4" ]]; then
-            install_ppfuzz "https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.2/ppfuzz-v1.0.2-aarch64-unknown-linux-gnueabihf.tar.gz" "ppfuzz-v1.0.2-aarch64-unknown-linux-gnueabihf.tar.gz"
-        fi
-    elif [[ "True" == "$IS_MAC" ]]; then
-        if [[ "True" == "$IS_ARM" ]]; then
-			install_ppfuzz "https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.2/ppfuzz-v1.0.2-armv7-unknown-linux-gnueabihf.tar.gz" "ppfuzz-v1.0.2-armv7-unknown-linux-gnueabihf.tar.gz"
-		else
-			install_ppfuzz "https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.2/ppfuzz-v1.0.2-x86_64-apple-darwin.tar.gz" "ppfuzz-v1.0.2-x86_64-apple-darwin.tar.gz"
-		fi
-	else
-		install_ppfuzz "https://github.com/dwisiswant0/ppfuzz/releases/download/v1.0.2/ppfuzz-v1.0.2-x86_64-unknown-linux-musl.tar.gz" "ppfuzz-v1.0.2-x86_64-unknown-linux-musl.tar.gz"
-	fi
-	eval $SUDO chmod 755 /usr/local/bin/ppfuzz
-	eval $SUDO strip -s /usr/local/bin/ppfuzz $DEBUG_STD
 	eval notify $DEBUG_STD
 	eval subfinder $DEBUG_STD
 	eval subfinder $DEBUG_STD
@@ -349,26 +324,28 @@ eval git config --global --unset https.proxy $DEBUG_STD
 
 printf "${bblue} Running: Looking for new reconFTW version${reset}\n\n"
 
-if ! eval git fetch $DEBUG_STD; then
-	echo "Failed to fetch updates."
-	exit 1
-fi
+timeout 10 git fetch
+exit_status=$?
+if [[ ${exit_status} -eq 0 ]]; then
 
-BRANCH=$(git rev-parse --abbrev-ref HEAD)
-HEADHASH=$(git rev-parse HEAD)
-UPSTREAMHASH=$(git rev-parse "${BRANCH}@{upstream}")
+	BRANCH=$(git rev-parse --abbrev-ref HEAD)
+	HEADHASH=$(git rev-parse HEAD)
+	UPSTREAMHASH=$(git rev-parse "${BRANCH}@{upstream}")
 
-if [[ $HEADHASH != "$UPSTREAMHASH" ]]; then
-	printf "${yellow} There is a new version, updating...${reset}\n\n"
-	if git status --porcelain | grep -q 'reconftw.cfg$'; then
-		mv reconftw.cfg reconftw.cfg_bck
-		printf "${yellow} reconftw.cfg has been backed up in reconftw.cfg_bck${reset}\n\n"
+	if [[ $HEADHASH != "$UPSTREAMHASH" ]]; then
+		printf "${yellow} There is a new version, updating...${reset}\n\n"
+		if git status --porcelain | grep -q 'reconftw.cfg$'; then
+			mv reconftw.cfg reconftw.cfg_bck
+			printf "${yellow} reconftw.cfg has been backed up in reconftw.cfg_bck${reset}\n\n"
+		fi
+		eval git reset --hard $DEBUG_STD
+		eval git pull $DEBUG_STD
+		printf "${bgreen} Updated! Running new installer version...${reset}\n\n"
+	else
+		printf "${bgreen} reconFTW is already up to date!${reset}\n\n"
 	fi
-	eval git reset --hard $DEBUG_STD
-	eval git pull $DEBUG_STD
-	printf "${bgreen} Updated! Running new installer version...${reset}\n\n"
 else
-	printf "${bgreen} reconFTW is already up to date!${reset}\n\n"
+	printf "\n${bred} Unable to check updates ${reset}\n\n"
 fi
 
 printf "${bblue} Running: Installing system packages ${reset}\n\n"

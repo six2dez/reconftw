@@ -536,7 +536,7 @@ reset='\033[0m'
 - SSTI ([ffuf](https://github.com/ffuf/ffuf))
 - SSL tests ([testssl](https://github.com/drwetter/testssl.sh))
 - Broken Links Checker ([katana](https://github.com/projectdiscovery/katana))
-- Prototype Pollution ([ppfuzz](https://github.com/dwisiswant0/ppfuzz))
+- Prototype Pollution ([ppmap](https://github.com/kleiton0x00/ppmap))
 - Web Cache Vulnerabilities ([Web-Cache-Vulnerability-Scanner](https://github.com/Hackmanit/Web-Cache-Vulnerability-Scanner))
 - 4XX Bypasser ([dontgo403](https://github.com/devploit/dontgo403))
 
