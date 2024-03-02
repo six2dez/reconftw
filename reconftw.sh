@@ -88,7 +88,7 @@ function tools_installed() {
 		printf "${bred} [*] dorks_hunter		[NO]${reset}\n"
 		allinstalled=false
 	}
-	[ -f "${tools}/brutespray/brutespray" ] || {
+	[ -f "${tools}/brutespray/brutespray/main" ] || {
 		printf "${bred} [*] brutespray			[NO]${reset}\n"
 		allinstalled=false
 	}
