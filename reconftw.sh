@@ -75,7 +75,7 @@ function tools_installed() {
 		printf "${bred} [*] dorks_hunter		[NO]${reset}\n"
 		allinstalled=false
 	}
-	[ -f "${tools}/brutespray/brutespray.py" ] || {
+	[ -f "${tools}/brutespray/brutespray" ] || {
 		printf "${bred} [*] brutespray			[NO]${reset}\n"
 		allinstalled=false
 	}
@@ -167,8 +167,8 @@ function tools_installed() {
 		printf "${bred} [*] regulator			[NO]${reset}\n"
 		allinstalled=false
 	}
-	[ -f "${tools}/dontgo403/dontgo403" ] || {
-		printf "${bred} [*] dontgo403			[NO]${reset}\n"
+	[ -f "${tools}/nomore403/nomore403" ] || {
+		printf "${bred} [*] nomore403			[NO]${reset}\n"
 		allinstalled=false
 	}
 	[ -f "${tools}/SwaggerSpy/swaggerspy.py" ] || {
@@ -537,8 +537,8 @@ function apileaks() {
 			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
 		}
 
-		[ -s "osint/postman_leaks.txt" ] && trufflehog filesystem ${dir}/osint/postman_leaks.txt -j | jq -c | anew -q ${dir}/osint/postman_leaks_trufflehog.json
-		[ -s "osint/swagger_leaks.txt" ] && trufflehog filesystem ${dir}/osint/swagger_leaks.txt -j | jq -c | anew -q ${dir}/osint/swagger_leaks_trufflehog.json
+		[ -s "osint/postman_leaks.txt" ] && trufflehog filesystem ${dir}/osint/postman_leaks.txt -j 2>/dev/null | jq -c | anew -q ${dir}/osint/postman_leaks_trufflehog.json
+		[ -s "osint/swagger_leaks.txt" ] && trufflehog filesystem ${dir}/osint/swagger_leaks.txt -j 2>/dev/null | jq -c | anew -q ${dir}/osint/swagger_leaks_trufflehog.json
 
 		end_func "Results are saved in $domain/osint/[software/authors/metadata_results].txt" ${FUNCNAME[0]}
 	else
@@ -1255,7 +1255,7 @@ function s3buckets() {
 			notification "${NUMOFLINES2} new S3 buckets found" info
 		fi
 
-		[ -s "subdomains/s3buckets.txt" ] && for i in $(cat subdomains/s3buckets.txt); do trufflehog s3 --bucket="$i" -j | jq -c | anew -q subdomains/s3buckets_trufflehog.txt; done
+		[ -s "subdomains/s3buckets.txt" ] && for i in $(cat subdomains/s3buckets.txt); do trufflehog s3 --bucket="$i" -j 2>/dev/null | jq -c | anew -q subdomains/s3buckets_trufflehog.txt; done
 
 		end_func "Results are saved in subdomains/s3buckets.txt and subdomains/cloud_assets.txt" ${FUNCNAME[0]}
 	else
@@ -1710,9 +1710,9 @@ function iishortname() {
 			mkdir -p $$dir/vulns/iis-shortname-shortscan/
 			mkdir -p $$dir/vulns/iis-shortname-sns/
 			interlace -tL .tmp/iis_sites.txt -threads ${INTERLACE_THREADS} -c "shortscan _target_ -F -s -p 1 > _output_/_cleantarget_.txt" -o $dir/vulns/iis-shortname-shortscan/ 2>>"$LOGFILE" >/dev/null
-			find $dir/vulns/iis-shortname-shortscan/ -type f -print0 | xargs --null grep -Z -L 'Vulnerable: Yes' | xargs --null rm
+			find $dir/vulns/iis-shortname-shortscan/ -type f -print0 | xargs --null grep -Z -L 'Vulnerable: Yes' | xargs --null rm 2>>"$LOGFILE" >/dev/null
 			interlace -tL .tmp/iis_sites.txt -threads ${INTERLACE_THREADS} -c "sns -u _target_ > _output_/_cleantarget_.txt" -o $dir/vulns/iis-shortname-sns/ 2>>"$LOGFILE" >/dev/null
-			find $dir/vulns/iis-shortname-sns/ -type f -print0 | xargs --null grep -Z 'Target is not vulnerable' | xargs --null rm
+			find $dir/vulns/iis-shortname-sns/ -type f -print0 | xargs --null grep -Z 'Target is not vulnerable' | xargs --null rm 2>>"$LOGFILE" >/dev/null
 			end_func "Results are saved in vulns/iis-shortname/" ${FUNCNAME[0]}
 		else
 			end_func "No IIS sites detected, iishortname check skipped " ${FUNCNAME[0]}
@@ -1937,7 +1937,7 @@ function jschecks() {
 				[ -s "js/js_livelinks.txt" ] && cat js/js_livelinks.txt | mantra -ua ${HEADER} -s | anew -q js/js_secrets.txt
 			else
 				[ -s "js/js_livelinks.txt" ] && axiom-scan js/js_livelinks.txt -m mantra -ua \"${HEADER}\" -s -o js/js_secrets.txt $AXIOM_EXTRA_ARGS &>/dev/null
-				[ -s "js/js_secrets.txt" ] && trufflehog filesystem js/js_secrets.txt -j | jq -c | anew -q js/js_secrets_trufflehog.txt
+				[ -s "js/js_secrets.txt" ] && trufflehog filesystem js/js_secrets.txt -j 2>/dev/null | jq -c | anew -q js/js_secrets_trufflehog.txt
 			fi
 			[ -s "js/js_secrets.txt" ] && sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2};?)?)?[mGK]//g" -i js/js_secrets.txt
 			printf "${yellow} Running : Building wordlist 5/5${reset}\n"
@@ -2327,7 +2327,7 @@ function spraying() {
 			echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
 		}
 
-		python3 brutespray.py --file $dir/hosts/portscan_active.gnmap --threads $BRUTESPRAY_THREADS --hosts $BRUTESPRAY_CONCURRENCE -o $dir/vulns/brutespray 2>>"$LOGFILE" >/dev/null
+		brutespray/main -f $dir/hosts/portscan_active.gnmap -T $BRUTESPRAY_CONCURRENCE -o $dir/vulns/brutespray 2>>"$LOGFILE" >/dev/null
 		popd >/dev/null || {
 			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
 		}
@@ -2372,11 +2372,11 @@ function 4xxbypass() {
 			start_func "403 bypass"
 			cat $dir/fuzzing/fuzzing_full.txt 2>/dev/null | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 >$dir/.tmp/403test.txt
 
-			pushd "${tools}/dontgo403" >/dev/null || {
+			pushd "${tools}/nomore403" >/dev/null || {
 				echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
 			}
 
-			cat $dir/.tmp/403test.txt | ./dontgo403 >$dir/.tmp/4xxbypass.txt
+			cat $dir/.tmp/403test.txt | ./nomore403 >$dir/.tmp/4xxbypass.txt
 			popd >/dev/null || {
 				echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
 			}
@@ -2482,7 +2482,7 @@ function fuzzparams() {
 		if [[ $DEEP == true ]] || [[ $(cat webs/url_extract.txt | wc -l) -le $DEEP_LIMIT2 ]]; then
 			if [[ $AXIOM != true ]]; then
 				nuclei -update 2>>"$LOGFILE" >/dev/null
-				git -C ${tools}/fuzzing-templates pull
+				git -C ${tools}/fuzzing-templates pull 2>>"$LOGFILE"
 				cat webs/url_extract.txt 2>/dev/null | nuclei -silent -retries 3 -rl $NUCLEI_RATELIMIT -t ${tools}/fuzzing-templates -o .tmp/fuzzparams.txt
 			else
 				axiom-exec "git clone https://github.com/projectdiscovery/fuzzing-templates /home/op/fuzzing-templates" &>/dev/null
@@ -2626,7 +2626,7 @@ function sendToNotify {
 		fi
 		if [[ -n "$(find "${1}" -prune -size +8000000c)" ]]; then
 			printf '%s is larger than 8MB, sending over transfer.sh\n' "${1}"
-			transfer "${1}" | notify
+			transfer "${1}" | notify -silent
 			return 0
 		fi
 		if grep -q '^ telegram\|^telegram\|^    telegram' $NOTIFY_CONFIG; then
