@@ -75,7 +75,7 @@ function tools_installed() {
 		printf "${bred} [*] dorks_hunter		[NO]${reset}\n"
 		allinstalled=false
 	}
-	[ -f "${tools}/brutespray/brutespray.py" ] || {
+	[ -f "${tools}/brutespray/brutespray" ] || {
 		printf "${bred} [*] brutespray			[NO]${reset}\n"
 		allinstalled=false
 	}
@@ -167,8 +167,8 @@ function tools_installed() {
 		printf "${bred} [*] regulator			[NO]${reset}\n"
 		allinstalled=false
 	}
-	[ -f "${tools}/dontgo403/dontgo403" ] || {
-		printf "${bred} [*] dontgo403			[NO]${reset}\n"
+	[ -f "${tools}/nomore403/nomore403" ] || {
+		printf "${bred} [*] nomore403			[NO]${reset}\n"
 		allinstalled=false
 	}
 	[ -f "${tools}/SwaggerSpy/swaggerspy.py" ] || {
@@ -2327,7 +2327,7 @@ function spraying() {
 			echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
 		}
 
-		python3 brutespray.py --file $dir/hosts/portscan_active.gnmap --threads $BRUTESPRAY_THREADS --hosts $BRUTESPRAY_CONCURRENCE -o $dir/vulns/brutespray 2>>"$LOGFILE" >/dev/null
+		brutespray/main -f $dir/hosts/portscan_active.gnmap -T $BRUTESPRAY_CONCURRENCE -o $dir/vulns/brutespray 2>>"$LOGFILE" >/dev/null
 		popd >/dev/null || {
 			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
 		}
@@ -2372,11 +2372,11 @@ function 4xxbypass() {
 			start_func "403 bypass"
 			cat $dir/fuzzing/fuzzing_full.txt 2>/dev/null | grep -E '^4' | grep -Ev '^404' | cut -d ' ' -f3 >$dir/.tmp/403test.txt
 
-			pushd "${tools}/dontgo403" >/dev/null || {
+			pushd "${tools}/nomore403" >/dev/null || {
 				echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
 			}
 
-			cat $dir/.tmp/403test.txt | ./dontgo403 >$dir/.tmp/4xxbypass.txt
+			cat $dir/.tmp/403test.txt | ./nomore403 >$dir/.tmp/4xxbypass.txt
 			popd >/dev/null || {
 				echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
 			}
@@ -2626,7 +2626,7 @@ function sendToNotify {
 		fi
 		if [[ -n "$(find "${1}" -prune -size +8000000c)" ]]; then
 			printf '%s is larger than 8MB, sending over transfer.sh\n' "${1}"
-			transfer "${1}" | notify
+			transfer "${1}" | notify -silent
 			return 0
 		fi
 		if grep -q '^ telegram\|^telegram\|^    telegram' $NOTIFY_CONFIG; then

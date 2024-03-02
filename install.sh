@@ -105,7 +105,7 @@ repos["regulator"]="cramppet/regulator"
 repos["ghauri"]="r0oth3x49/ghauri"
 repos["gitleaks"]="gitleaks/gitleaks"
 repos["trufflehog"]="trufflesecurity/trufflehog"
-repos["dontgo403"]="devploit/dontgo403"
+repos["nomore403"]="devploit/nomore403"
 repos["SwaggerSpy"]="UndeadSec/SwaggerSpy"
 repos["LeakSearch"]="JoelGMSec/LeakSearch"
 
@@ -205,9 +205,12 @@ function install_tools() {
             if [[ "gitleaks" == "$repo" ]]; then
                 eval make build $DEBUG_STD && eval $SUDO cp ./gitleaks /usr/local/bin/ $DEBUG_ERROR
             fi
-            if [[ "dontgo403" == "$repo" ]]; then
-                eval go get $DEBUG_STD && eval go build $DEBUG_STD && eval chmod +x ./dontgo403 $DEBUG_STD
+            if [[ "nomore403" == "$repo" ]]; then
+                eval go get $DEBUG_STD && eval go build $DEBUG_STD && eval chmod +x ./nomore403 $DEBUG_STD
             fi
+			if [[ "brutespray" == "$repo" ]]; then
+				eval go build -o brutespray main.go $DEBUG_STD && eval chmod +x ./brutespray $DEBUG_STD
+			fi
         fi
 		if [[ "gf" == "$repo" ]]; then
             eval cp -r examples ~/.gf $DEBUG_ERROR
