@@ -108,6 +108,7 @@ repos["trufflehog"]="trufflesecurity/trufflehog"
 repos["nomore403"]="devploit/nomore403"
 repos["SwaggerSpy"]="UndeadSec/SwaggerSpy"
 repos["LeakSearch"]="JoelGMSec/LeakSearch"
+repos["Wapiti"]="wapiti-scanner/wapiti"
 
 function banner() {
 	tput clear
@@ -211,7 +212,11 @@ function install_tools() {
 			if [[ "brutespray" == "$repo" ]]; then
 				eval go build -o brutespray main.go $DEBUG_STD && eval chmod +x ./brutespray $DEBUG_STD
 			fi
-        fi
+			if [[ "wapiti" == "$repo" ]]; then
+                eval make install $DEBUG_STD
+            fi
+			 if [[ "wapiti" == "$repo" ]]; then
+                eval make install $DEBUG_STD
 		if [[ "gf" == "$repo" ]]; then
             eval cp -r examples ~/.gf $DEBUG_ERROR
         elif [[ "Gf-Patterns" == "$repo" ]]; then

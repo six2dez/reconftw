@@ -10,6 +10,9 @@ ARG SHODAN_API_KEY="XXXXXXXXXXXXXX"
 ARG LANG=en_US.UTF-8
 ARG LANGUAGE=en_US
 
+ARG GIT_REPOSITORY_AXIOM="https://github.com/pry0cc/axiom"
+ARG GIT_REPOSITORY_RECONFTW="https://github.com/six2dez/reconftw"
+
 ##################################################
 ###> Do NOT change anything beyond this point <###
 ##################################################
@@ -30,6 +33,9 @@ ARG SHODAN_API_KEY
 ARG LANG
 ARG LANGUAGE
 
+ARG GIT_REPOSITORY_AXIOM
+ARG GIT_REPOSITORY_RECONFTW
+
 ENV COLLAB_SERVER=$COLLAB_SERVER
 ENV XSS_SERVER=$XSS_SERVER
 ENV SHODAN_API_KEY=$SHODAN_API_KEY
@@ -37,6 +43,9 @@ ENV SHODAN_API_KEY=$SHODAN_API_KEY
 ENV LANG=$LANG
 ENV LANGUAGE=$LANGUAGE
 ENV LC_ALL=$LANG
+
+ENV GIT_REPOSITORY_AXIOM=$GIT_REPOSITORY_AXIOM
+ENV GIT_REPOSITORY_RECONFTW=$GIT_REPOSITORY_RECONFTW
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DEBCONF_NONINTERACTIVE_SEEN=true
@@ -64,7 +73,7 @@ echo "deb-src http://kali.download/kali kali-rolling main contrib non-free" >> /
 apt clean all
 apt update
 apt full-upgrade -f -y --allow-downgrades
-apt install -y --no-install-recommends apt-utils ca-certificates curl git lsb-release nano wget
+apt install -y --no-install-recommends apt-utils ca-certificates curl git lsb-release nano wget vim jq htop nmon
 
 ###>> Congifure Locales <<###
 apt install -y --no-install-recommends locales
@@ -80,7 +89,7 @@ localepurge
 
 ###>> Configure Axiom <<###
 mkdir -p /root/.axiom/
-git clone https://github.com/pry0cc/axiom /root/.axiom/
+git clone ${GIT_REPOSITORY_AXIOM} /root/.axiom/
 cd /root/.axiom/interact
 ./axiom-configure --unattended --shell Bash
 ## This avoids useless error messages later.
@@ -90,7 +99,7 @@ touch /root/.axiom/interact/includes/functions.sh
 ###>> Install reconFTW <<###
 mkdir -p /root/Tools
 mkdir -p /reconftw
-git clone https://github.com/six2dez/reconftw.git /reconftw
+git clone ${GIT_REPOSITORY_RECONFTW} /reconftw
 cd /reconftw
 sh -c 'echo 1 | ./install.sh'
 
@@ -114,6 +123,24 @@ eot
 COPY amass_config.ini /root/.config/amass/config.ini
 COPY github_tokens.txt /root/Tools/.github_tokens
 COPY notify.conf /root/.config/notify/notify.conf
+
+###>> Configure Axiom Provider <<###
+RUN <<eot
+###>> Regenerate SSH Keys <<###
+# You REALLY do NOT want to use the default SSH keys in the base image
+find /root/.ssh -type f -delete
+ssh-keygen -b 2048 -t rsa -f /root/.ssh/axiom_rsa -q -N ""
+cat /root/.ssh/axiom_rsa.pub > /root/.axiom/configs/authorized_keys
+eot
+
+COPY axiom-config.ini /root/.axiom/configs/config.ini
+COPY axiom-custom-provider.json /root/.axiom/accounts/personal.json
+RUN axiom-account personal
+RUN az group delete --name axiom --yes --no-wait
+
+# This command exits with return code 1, so leave the '|| :' or the build will fail.
+COPY axiom-custom-provider.json /root/.axiom/accounts/personal.json
+RUN axiom-build reconftw || :
 
 ## Issue 271
 EXPOSE 85-90
