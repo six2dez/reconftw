@@ -515,7 +515,7 @@ function metadata() {
 	mkdir -p osint
 	if { [[ ! -f "${called_fn_dir}/.${FUNCNAME[0]}" ]] || [[ ${DIFF} == true ]]; } && [[ ${METADATA} == true ]] && [[ ${OSINT} == true ]] && ! [[ ${domain} =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Scanning metadata in public files"
-		metafinder -d "$domain" -l $METAFINDER_LIMIT -o osint -go -bi -ba &>>"$LOGFILE" || {
+		metafinder -d "$domain" -l $METAFINDER_LIMIT -o osint -go -bi &>>"$LOGFILE" || {
 			echo "metafinder command failed"
 			exit 1
 		}
