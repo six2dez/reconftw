@@ -215,8 +215,9 @@ function install_tools() {
 			if [[ "wapiti" == "$repo" ]]; then
                 eval make install $DEBUG_STD
             fi
-			 if [[ "wapiti" == "$repo" ]]; then
+			if [[ "wapiti" == "$repo" ]]; then
                 eval make install $DEBUG_STD
+			fi
 		if [[ "gf" == "$repo" ]]; then
             eval cp -r examples ~/.gf $DEBUG_ERROR
         elif [[ "Gf-Patterns" == "$repo" ]]; then
