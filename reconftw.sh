@@ -12,18 +12,17 @@
 #	   ░        ░  ░░ ░          ░ ░           ░                      ░
 #
 
-
 # Error Management
-set -eEuo pipefail
-function failure() {
-	local lineno=$1
-	local msg=$2
-	shift 2
-	local func=$(echo "${@}"|tr ' ' '|')
-	echo "##### ERROR [$lineno][$func] $msg #####"
-}
-trap 'failure ${LINENO} "$BASH_COMMAND" ${FUNCNAME[@]}' ERR
-
+#set -eEuo pipefail
+#function failure() {
+#	local lineno=$1
+#	local msg=$2
+#	shift 2
+#	local func
+#	func=$(echo "${@}" | tr ' ' '|')
+#	echo "##### ERROR [$lineno][$func] $msg #####"
+#}
+#trap 'failure ${LINENO} "$BASH_COMMAND" ${FUNCNAME[@]}' ERR
 
 function banner_graber() {
 	source "${SCRIPTPATH}"/banners.txt
@@ -776,8 +775,8 @@ function sub_passive() {
 }
 
 function sub_crt() {
-
 	
+
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBCRT == true ]]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Crtsh Subdomain Enumeration"
 		crt -s -json -l ${CTR_LIMIT} $domain 2>>"$LOGFILE" | jq -r '.[].subdomain' 2>>"$LOGFILE" | sed -e 's/^\*\.//' | anew -q .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" >/dev/null
@@ -922,7 +921,7 @@ function sub_scraping() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBSCRAPING == true ]]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Source code scraping subdomain search"
 		touch .tmp/scrap_subs.txt
-		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt"
+		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" >"$dir/subdomains/subdomains.txt"
 		if [[ -s "$dir/subdomains/subdomains.txt" ]]; then
 			if [[ $(cat subdomains/subdomains.txt | wc -l) -le $DEEP_LIMIT ]] || [[ $DEEP == true ]]; then
 				if [[ $AXIOM != true ]]; then
@@ -1011,7 +1010,7 @@ function sub_permut() {
 	mkdir -p {.tmp,subdomains}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBPERMUTE == true ]]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Permutations Subdomain Enumeration"
-		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt"
+		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" >"$dir/subdomains/subdomains.txt"
 		if [[ $DEEP == true ]] || [[ "$(cat subdomains/subdomains.txt | wc -l)" -le $DEEP_LIMIT ]]; then
 			if [[ $PERMUTATIONS_OPTION == "gotator" ]]; then
 				[ -s "subdomains/subdomains.txt" ] && gotator -sub subdomains/subdomains.txt -perm ${tools}/permutations_list.txt $GOTATOR_FLAGS -silent 2>>"$LOGFILE" | head -c $PERMUTATIONS_LIMIT >.tmp/gotator1.txt
@@ -1076,7 +1075,7 @@ function sub_regex_permut() {
 		pushd "${tools}/regulator" >/dev/null || {
 			echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
 		}
-		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt"
+		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" >"$dir/subdomains/subdomains.txt"
 		python3 main.py -t $domain -f ${dir}/subdomains/subdomains.txt -o ${dir}/.tmp/${domain}.brute
 
 		popd >/dev/null || {
@@ -1113,7 +1112,7 @@ function sub_recursive_passive() {
 
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUB_RECURSIVE_PASSIVE == true ]] && [[ -s "subdomains/subdomains.txt" ]]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Subdomains recursive search passive"
-		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt"
+		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" >"$dir/subdomains/subdomains.txt"
 		# Passive recursive
 		[ -s "subdomains/subdomains.txt" ] && dsieve -if subdomains/subdomains.txt -f 3 -top $DEEP_RECURSIVE_PASSIVE >.tmp/subdomains_recurs_top.txt
 		if [[ $AXIOM != true ]]; then
@@ -1144,7 +1143,7 @@ function sub_recursive_brute() {
 	mkdir -p {.tmp,subdomains}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUB_RECURSIVE_BRUTE == true ]] && [[ -s "subdomains/subdomains.txt" ]]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Subdomains recursive search active"
-		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt"
+		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" >"$dir/subdomains/subdomains.txt"
 		if [[ $(cat subdomains/subdomains.txt | wc -l) -le $DEEP_LIMIT ]]; then
 			[ ! -s ".tmp/subdomains_recurs_top.txt" ] && dsieve -if subdomains/subdomains.txt -f 3 -top $DEEP_RECURSIVE_PASSIVE >.tmp/subdomains_recurs_top.txt
 			ripgen -d .tmp/subdomains_recurs_top.txt -w $subs_wordlist >.tmp/brute_recursive_wordlist.txt
@@ -1276,7 +1275,7 @@ function s3buckets() {
 	mkdir -p {.tmp,subdomains}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $S3BUCKETS == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "AWS S3 buckets search"
-		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt"
+		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" >"$dir/subdomains/subdomains.txt"
 		# S3Scanner
 		if [[ $AXIOM != true ]]; then
 			[ -s "subdomains/subdomains.txt" ] && s3scanner scan -f subdomains/subdomains.txt 2>>"$LOGFILE" | anew -q .tmp/s3buckets.txt
@@ -1388,7 +1387,7 @@ function webprobe_simple() {
 	mkdir -p {.tmp,webs,subdomains}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $WEBPROBESIMPLE == true ]]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Http probing $domain"
-		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt" && touch .tmp/web_full_info.txt webs/web_full_info.txt
+		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" >"$dir/subdomains/subdomains.txt" && touch .tmp/web_full_info.txt webs/web_full_info.txt
 		if [[ $AXIOM != true ]]; then
 			cat subdomains/subdomains.txt | httpx ${HTTPX_FLAGS} -no-color -json -random-agent -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -retries 2 -timeout $HTTPX_TIMEOUT -o .tmp/web_full_info_probe.txt 2>>"$LOGFILE" >/dev/null
 		else
@@ -1420,7 +1419,7 @@ function webprobe_full() {
 	mkdir -p {.tmp,webs,subdomains}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $WEBPROBEFULL == true ]]; then
 		start_func ${FUNCNAME[0]} "Http probing non standard ports"
-		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt" && touch webs/webs.txt 
+		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" >"$dir/subdomains/subdomains.txt" && touch webs/webs.txt
 		if [[ -s "subdomains/subdomains.txt" ]]; then
 			if [[ $AXIOM != true ]]; then
 				if [[ -s "subdomains/subdomains.txt" ]]; then
@@ -1590,7 +1589,7 @@ function portscan() {
 			fi
 		fi
 		if [[ $PORTSCAN_PASSIVE == true ]] && [[ ! -f "hosts/portscan_passive.txt" ]] && [[ -s ".tmp/ips_nocdn.txt" ]]; then
-			smap -iL .tmp/ips_nocdn.txt >hosts/portscan_passive.txt 
+			smap -iL .tmp/ips_nocdn.txt >hosts/portscan_passive.txt
 		fi
 		if [[ $PORTSCAN_ACTIVE == true ]]; then
 			if [[ $AXIOM != true ]]; then
@@ -1679,7 +1678,7 @@ function nuclei_check() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $NUCLEICHECK == true ]]; then
 		start_func ${FUNCNAME[0]} "Templates based web scanner"
 		nuclei -update 2>>"$LOGFILE" >/dev/null+
-		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" > "$dir/subdomains/subdomains.txt"  && touch webs/webs.txt webs/webs_uncommon_ports.txt 
+		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" >"$dir/subdomains/subdomains.txt" && touch webs/webs.txt webs/webs_uncommon_ports.txt
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
 		[ ! -s ".tmp/webs_subs.txt" ] && cat subdomains/subdomains.txt webs/webs_all.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
 		[ -s "$dir/fuzzing/fuzzing_full.txt" ] && cat $dir/fuzzing/fuzzing_full.txt | grep -e "^200" | cut -d " " -f3 | anew -q .tmp/webs_fuzz.txt
@@ -1718,7 +1717,7 @@ function fuzz() {
 	mkdir -p {.tmp/fuzzing,webs,fuzzing}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $FUZZ == true ]]; then
 		start_func ${FUNCNAME[0]} "Web directory fuzzing"
-		[[ -n $multi ]] && [ ! -f "$dir/webs/webs.txt" ] && echo "$domain" > "$dir/webs/webs.txt" && touch webs/webs_uncommon_ports.txt
+		[[ -n $multi ]] && [ ! -f "$dir/webs/webs.txt" ] && echo "$domain" >"$dir/webs/webs.txt" && touch webs/webs_uncommon_ports.txt
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
 		if [[ -s "webs/webs_all.txt" ]]; then
 			if [[ $AXIOM != true ]]; then
@@ -1757,7 +1756,7 @@ function iishortname() {
 
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $IIS_SHORTNAME == true ]]; then
 		start_func ${FUNCNAME[0]} "IIS Shortname Scanner"
-		[ -s "nuclei_output/info.txt" ] && cat nuclei_output/info.txt | grep "iis-version" | cut -d " " -f4 > .tmp/iis_sites.txt
+		[ -s "nuclei_output/info.txt" ] && cat nuclei_output/info.txt | grep "iis-version" | cut -d " " -f4 >.tmp/iis_sites.txt
 		if [[ -s ".tmp/iis_sites.txt" ]]; then
 			mkdir -p $$dir/vulns/iis-shortname-shortscan/
 			mkdir -p $$dir/vulns/iis-shortname-sns/
@@ -1785,7 +1784,7 @@ function cms_scanner() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $CMS_SCANNER == true ]]; then
 		start_func ${FUNCNAME[0]} "CMS Scanner"
 		rm -rf $dir/cms/*
-		[[ -n $multi ]] && [ ! -f "$dir/webs/webs.txt" ] && echo "$domain" > "$dir/webs/webs.txt" && touch webs/webs_uncommon_ports.txt
+		[[ -n $multi ]] && [ ! -f "$dir/webs/webs.txt" ] && echo "$domain" >"$dir/webs/webs.txt" && touch webs/webs_uncommon_ports.txt
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
 		if [[ -s "webs/webs_all.txt" ]]; then
 			tr '\n' ',' <webs/webs_all.txt >.tmp/cms.txt 2>>"$LOGFILE"
@@ -2375,7 +2374,7 @@ function test_ssl() {
 	mkdir -p {hosts,vulns}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $TEST_SSL == true ]]; then
 		start_func ${FUNCNAME[0]} "SSL Test"
-		[[ -n $multi ]] && [ ! -f "$dir/hosts/ips.txt" ] && echo "$domain" > "$dir/hosts/ips.txt"
+		[[ -n $multi ]] && [ ! -f "$dir/hosts/ips.txt" ] && echo "$domain" >"$dir/hosts/ips.txt"
 		${tools}/testssl.sh/testssl.sh --quiet --color 0 -U -iL hosts/ips.txt 2>>"$LOGFILE" >vulns/testssl.txt
 		end_func "Results are saved in vulns/testssl.txt" ${FUNCNAME[0]}
 	else
@@ -2474,7 +2473,7 @@ function prototype_pollution() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $PROTO_POLLUTION == true ]]; then
 		start_func ${FUNCNAME[0]} "Prototype Pollution checks"
 		if [[ $DEEP == true ]] || [[ $(cat webs/url_extract.txt | wc -l) -le $DEEP_LIMIT ]]; then
-			[ -s "webs/url_extract.txt" ] && cat webs/url_extract.txt | ppmap &> .tmp/prototype_pollution.txt
+			[ -s "webs/url_extract.txt" ] && cat webs/url_extract.txt | ppmap &>.tmp/prototype_pollution.txt
 			[ -s ".tmp/prototype_pollution.txt" ] && cat .tmp/prototype_pollution.txt | grep "EXPL" | anew -q vulns/prototype_pollution.txt
 			end_func "Results are saved in vulns/prototype_pollution.txt" ${FUNCNAME[0]}
 		else
@@ -3442,16 +3441,16 @@ function multi_custom() {
 		axiom_selected
 	fi
 
-	custom_function_list=$(echo $custom_function|tr ',' '\n')
+	custom_function_list=$(echo $custom_function | tr ',' '\n')
 	func_total=$(echo "$custom_function_list" | wc -l)
 
 	func_count=0
 	domain=$(cat $flist)
 	for custom_f in $custom_function_list; do
-		((func_count=func_count+1))
+		((func_count = func_count + 1))
 
 		loopstart=$(date +%s)
-		
+
 		$custom_f
 
 		currently=$(date +"%H:%M:%S")
