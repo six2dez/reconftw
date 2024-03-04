@@ -13,16 +13,14 @@
 #
 
 # Error Management
-#set -eEuo pipefail
-#function failure() {
-#	local lineno=$1
-#	local msg=$2
-#	shift 2
-#	local func
-#	func=$(echo "${@}" | tr ' ' '|')
-#	echo "##### ERROR [$lineno][$func] $msg #####"
-#}
-#trap 'failure ${LINENO} "$BASH_COMMAND" ${FUNCNAME[@]}' ERR
+set -eEuo pipefail
+function handle_error() {
+    local lineno="$1"
+    local msg="$2"
+    local command="$3"
+    echo "##### ERROR [Line $lineno] - $msg (Command: $command) #####"
+}
+trap 'handle_error ${LINENO} "$BASH_COMMAND" "${FUNCNAME[@]}"' ERR
 
 function banner_graber() {
 	source "${SCRIPTPATH}"/banners.txt
@@ -50,7 +48,7 @@ function test_connectivity() {
 ###############################################################################################################
 
 function check_version() {
-	timeout 10 git fetch
+	timeout 10 git fetch || ( true && echo "git fetch timeout reached")
 	exit_status=$?
 	if [[ ${exit_status} -eq 0 ]]; then
 		BRANCH=$(git rev-parse --abbrev-ref HEAD)
@@ -623,8 +621,8 @@ function domain_info() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $DOMAIN_INFO == true ]] && [[ $OSINT == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Searching domain info (whois, registrant name/email domains)"
 		whois -H $domain >osint/domain_info_general.txt || { echo "whois command failed"; }
-		if [[ $DEEP == true ]] || [[ $REVERSE_WHOIS == true ]]; then
-			timeout -k 1m ${AMASS_INTEL_TIMEOUT}m amass intel -d ${domain} -whois -timeout $AMASS_INTEL_TIMEOUT -o osint/domain_info_reverse_whois.txt 2>>"$LOGFILE" >>/dev/null
+		if [[ $DEEP == true ]] && [[ $REVERSE_WHOIS == true ]]; then
+			timeout -k 1m ${AMASS_INTEL_TIMEOUT}m amass intel -d ${domain} -whois -timeout $AMASS_INTEL_TIMEOUT -o osint/domain_info_reverse_whois.txt 2>>"$LOGFILE" >>/dev/null || ( true && echo "Amass timeout reached")
 		fi
 
 		curl -s "https://aadinternals.azurewebsites.net/api/tenantinfo?domainName=${domain}" -H "Origin: https://aadinternals.com" | jq -r .domains[].name >osint/azure_tenant_domains.txt
@@ -741,7 +739,7 @@ function sub_passive() {
 		start_subfunc ${FUNCNAME[0]} "Running : Passive Subdomain Enumeration"
 
 		if [[ $RUNAMASS == true ]]; then
-			timeout -k 1m ${AMASS_ENUM_TIMEOUT} amass enum -passive -d $domain -config $AMASS_CONFIG -timeout $AMASS_ENUM_TIMEOUT -json .tmp/amass_json.json 2>>"$LOGFILE" >>/dev/null
+			timeout -k 1m ${AMASS_ENUM_TIMEOUT} amass enum -passive -d $domain -config $AMASS_CONFIG -timeout $AMASS_ENUM_TIMEOUT -json .tmp/amass_json.json 2>>"$LOGFILE" >>/dev/null  || ( true && echo "Amass enum passive timeout reached")
 		fi
 		[ -s ".tmp/amass_json.json" ] && cat .tmp/amass_json.json | jq -r '.name' | anew -q .tmp/amass_psub.txt
 		[[ $RUNSUBFINDER == true ]] && subfinder -all -d "$domain" -silent -o .tmp/subfinder_psub.txt 2>>"$LOGFILE" >/dev/null
@@ -928,7 +926,7 @@ function sub_scraping() {
 					resolvers_update_quick_local
 					cat subdomains/subdomains.txt | httpx -follow-host-redirects -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info1.txt 2>>"$LOGFILE" >/dev/null
 					[ -s ".tmp/web_full_info1.txt" ] && cat .tmp/web_full_info1.txt | jq -r 'try .url' 2>/dev/null | grep "$domain" | grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' | sed "s/*.//" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
-					[ -s ".tmp/probed_tmp_scrap.txt" ] && timeout -k 1m 10m httpx -l .tmp/probed_tmp_scrap.txt -tls-grab -tls-probe -csp-probe -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -json -o .tmp/web_full_info2.txt 2>>"$LOGFILE" >/dev/null
+					[ -s ".tmp/probed_tmp_scrap.txt" ] && timeout -k 1m 10m httpx -l .tmp/probed_tmp_scrap.txt -tls-grab -tls-probe -csp-probe -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -json -o .tmp/web_full_info2.txt 2>>"$LOGFILE" >/dev/null || ( true && echo "Httpx TLS & CSP grab timeout reached")
 					[ -s ".tmp/web_full_info2.txt" ] && cat .tmp/web_full_info2.txt | jq -r 'try ."tls-grab"."dns_names"[],try .csp.domains[],try .url' 2>/dev/null | grep "$domain" | grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' | sed "s/*.//" | sort -u | httpx -silent | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
 
 					if [[ $DEEP == true ]]; then
@@ -940,7 +938,7 @@ function sub_scraping() {
 					resolvers_update_quick_axiom
 					axiom-scan subdomains/subdomains.txt -m httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info1.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 					[ -s ".tmp/web_full_info1.txt" ] && cat .tmp/web_full_info1.txt | jq -r 'try .url' 2>/dev/null | grep "$domain" | grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' | sed "s/*.//" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
-					[ -s ".tmp/probed_tmp_scrap.txt" ] && timeout -k 1m 10m axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -tls-grab -tls-probe -csp-probe -random-agent -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info2.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+					[ -s ".tmp/probed_tmp_scrap.txt" ] && timeout -k 1m 10m axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -tls-grab -tls-probe -csp-probe -random-agent -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info2.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null  || ( true && echo "git fetch timeout reached")
 					[ -s ".tmp/web_full_info2.txt" ] && cat .tmp/web_full_info2.txt | jq -r 'try ."tls-grab"."dns_names"[],try .csp.domains[],try .url' 2>/dev/null | grep "$domain" | grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' | sed "s/*.//" | sort -u | httpx -silent | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
 					if [[ $DEEP == true ]]; then
 						[ -s ".tmp/probed_tmp_scrap.txt" ] && axiom-scan .tmp/probed_tmp_scrap.txt -m katana -jc -kf all -d 3 -fs rdn -o .tmp/katana.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
@@ -1117,7 +1115,8 @@ function sub_recursive_passive() {
 		[ -s "subdomains/subdomains.txt" ] && dsieve -if subdomains/subdomains.txt -f 3 -top $DEEP_RECURSIVE_PASSIVE >.tmp/subdomains_recurs_top.txt
 		if [[ $AXIOM != true ]]; then
 			resolvers_update_quick_local
-			[ -s ".tmp/subdomains_recurs_top.txt" ] && timeout -k 1m ${AMASS_ENUM_TIMEOUT}m amass enum -passive -df .tmp/subdomains_recurs_top.txt -nf subdomains/subdomains.txt -config $AMASS_CONFIG -timeout $AMASS_ENUM_TIMEOUT 2>>"$LOGFILE" | anew -q .tmp/passive_recursive.txt
+			[ -s ".tmp/subdomains_recurs_top.txt" ] && timeout -k 1m ${AMASS_ENUM_TIMEOUT}m amass enum -passive -df .tmp/subdomains_recurs_top.txt -nf subdomains/subdomains.txt -config $AMASS_CONFIG -timeout $AMASS_ENUM_TIMEOUT -o .tmp/passive_recursive_tmp.txt 2>>"$LOGFILE" || ( true && echo "Amass recursive timeout reached")
+			[ -s ".tmp/passive_recursive_tmp.txt" ] && cat .tmp/passive_recursive_tmp.txt | anew -q .tmp/passive_recursive.txt
 			[ -s ".tmp/passive_recursive.txt" ] && puredns resolve .tmp/passive_recursive.txt -w .tmp/passive_recurs_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" >/dev/null
 		else
 			resolvers_update_quick_axiom
@@ -1285,7 +1284,7 @@ function s3buckets() {
 		fi
 		# Cloudenum
 		keyword=${domain%%.*}
-		timeout -k 1m 20m python3 ~/Tools/cloud_enum/cloud_enum.py -k $keyword -l .tmp/output_cloud.txt 2>>"$LOGFILE" >/dev/null
+		timeout -k 1m 20m python3 ~/Tools/cloud_enum/cloud_enum.py -k $keyword -l .tmp/output_cloud.txt 2>>"$LOGFILE" >/dev/null || ( true && echo "CloudEnum timeout reached")
 
 		NUMOFLINES1=$(cat .tmp/output_cloud.txt 2>>"$LOGFILE" | sed '/^#/d' | sed '/^$/d' | anew subdomains/cloud_assets.txt | wc -l)
 		if [[ $NUMOFLINES1 -gt 0 ]]; then
@@ -1788,7 +1787,7 @@ function cms_scanner() {
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
 		if [[ -s "webs/webs_all.txt" ]]; then
 			tr '\n' ',' <webs/webs_all.txt >.tmp/cms.txt 2>>"$LOGFILE"
-			timeout -k 1m ${CMSSCAN_TIMEOUT}s python3 ${tools}/CMSeeK/cmseek.py -l .tmp/cms.txt --batch -r &>>"$LOGFILE"
+			timeout -k 1m ${CMSSCAN_TIMEOUT}s python3 ${tools}/CMSeeK/cmseek.py -l .tmp/cms.txt --batch -r &>>"$LOGFILE"  || ( true && echo "CMSeek timeout reached")
 			exit_status=$?
 			if [[ ${exit_status} -eq 125 ]]; then
 				echo "TIMEOUT cmseek.py - investigate manually for $dir" >>"$LOGFILE"
