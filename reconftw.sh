@@ -2734,9 +2734,8 @@ function sendToNotify {
 }
 
 function start_func() {
-	current_date=$(date +'%Y-%m-%d %H:%M:%S')
 	printf "${bgreen}#######################################################################"
-	notification "${2}" info $current_date
+	notification "${2}" info
 	echo "[$current_date] Start function: ${1} " >>"${LOGFILE}"
 	start=$(date +%s)
 }
@@ -2745,16 +2744,14 @@ function end_func() {
 	touch $called_fn_dir/.${2}
 	end=$(date +%s)
 	getElapsedTime $start $end
-	current_date=$(date +'%Y-%m-%d %H:%M:%S')
-	notification "${2} Finished in ${runtime}" info $current_date
+	notification "${2} Finished in ${runtime}" info
 	echo "[$current_date] End function: ${2} " >>"${LOGFILE}"
 	printf "${bblue}[$current_date] ${1} ${reset}\n"
 	printf "${bgreen}#######################################################################${reset}\n"
 }
 
 function start_subfunc() {
-	current_date=$(date +'%Y-%m-%d %H:%M:%S')
-	notification "     ${2}" info $current_date
+	notification "     ${2}" info
 	echo "[$current_date] Start subfunction: ${1} " >>"${LOGFILE}"
 	start_sub=$(date +%s)
 }
@@ -2763,8 +2760,7 @@ function end_subfunc() {
 	touch $called_fn_dir/.${2}
 	end_sub=$(date +%s)
 	getElapsedTime $start_sub $end_sub
-	current_date=$(date +'%Y-%m-%d %H:%M:%S')
-	notification "     ${1} in ${runtime}" good $current_date
+	notification "     ${1} in ${runtime}" good
 	echo "[$current_date] End subfunction: ${1} " >>"${LOGFILE}"
 }
 
