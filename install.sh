@@ -210,6 +210,8 @@ function install_tools() {
                 eval go get $DEBUG_STD && eval go build $DEBUG_STD && eval chmod +x ./nomore403 $DEBUG_STD
             fi
 			if [[ "brutespray" == "$repo" ]]; then
+				eval git reset --hard origin/main $DEBUG_STD
+				eval git pull $DEBUG_STD
 				eval go build -o brutespray main.go $DEBUG_STD && eval chmod +x ./brutespray $DEBUG_STD
 			fi
 			if [[ "wapiti" == "$repo" ]]; then
