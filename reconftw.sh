@@ -13,14 +13,14 @@
 #
 
 # Error Management
-set -eEuo pipefail
-function handle_error() {
-    local lineno="$1"
-    local msg="$2"
-    local command="$3"
-    echo "##### ERROR [Line $lineno] - $msg (Command: $command) #####"
-}
-trap 'handle_error ${LINENO} "$BASH_COMMAND" "${FUNCNAME[@]}"' ERR
+#set -eEuo pipefail
+#function handle_error() {
+#    local lineno="$1"
+#    local msg="$2"
+#    local command="$3"
+#    echo "##### ERROR [Line $lineno] - $msg (Command: $command) #####"
+#}
+#trap 'handle_error ${LINENO} "$BASH_COMMAND" "${FUNCNAME[@]}"' ERR
 
 function banner_graber() {
 	source "${SCRIPTPATH}"/banners.txt
