@@ -32,6 +32,7 @@ fi
 # Declaring Go tools and their installation commands
 declare -A gotools
 gotools["gf"]="go install -v github.com/tomnomnom/gf@latest"
+gotools["brutespray"]="go install -v github.com/x90skysn3k/brutespray@latest"
 gotools["qsreplace"]="go install -v github.com/tomnomnom/qsreplace@latest"
 gotools["amass"]="go install -v github.com/owasp-amass/amass/v3/...@master"
 gotools["ffuf"]="go install -v github.com/ffuf/ffuf/v2@latest"
@@ -80,12 +81,9 @@ declare -A repos
 repos["dorks_hunter"]="six2dez/dorks_hunter"
 repos["dnsvalidator"]="vortexau/dnsvalidator"
 repos["interlace"]="codingo/Interlace"
-repos["brutespray"]="x90skysn3k/brutespray"
 repos["wafw00f"]="EnableSecurity/wafw00f"
 repos["gf"]="tomnomnom/gf"
 repos["Gf-Patterns"]="1ndianl33t/Gf-Patterns"
-repos["xnLinkFinder"]="xnl-h4ck3r/xnLinkFinder"
-repos["waymore"]="xnl-h4ck3r/waymore"
 repos["Corsy"]="s0md3v/Corsy"
 repos["CMSeeK"]="Tuhinshubhra/CMSeeK"
 repos["fav-up"]="pielco11/fav-up"

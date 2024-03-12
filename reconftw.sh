@@ -85,10 +85,6 @@ function tools_installed() {
 		printf "${bred} [*] dorks_hunter		[NO]${reset}\n"
 		allinstalled=false
 	}
-	[ -f "${tools}/brutespray/brutespray/main" ] || {
-		printf "${bred} [*] brutespray			[NO]${reset}\n"
-		allinstalled=false
-	}
 	[ -f "${tools}/fav-up/favUp.py" ] || {
 		printf "${bred} [*] fav-up			[NO]${reset}\n"
 		allinstalled=false
@@ -133,11 +129,15 @@ function tools_installed() {
 		printf "${bred} [*] resolvers_trusted		[NO]${reset}\n"
 		allinstalled=false
 	}
-	[ -f "${tools}/xnLinkFinder/xnLinkFinder.py" ] || {
+	command -v brutespray &>/dev/null || {
+		printf "${bred} [*] brutespray		[NO]${reset}\n"
+		allinstalled=false
+	}
+		command -v xnLinkFinder &>/dev/null || {
 		printf "${bred} [*] xnLinkFinder		[NO]${reset}\n"
 		allinstalled=false
 	}
-	[ -f "${tools}/waymore/waymore.py" ] || {
+	command -v waymore &>/dev/null || {
 		printf "${bred} [*] waymore		[NO]${reset}\n"
 		allinstalled=false
 	}
@@ -1834,7 +1834,7 @@ function urlchecks() {
 				if [[ $URL_CHECK_PASSIVE == true ]]; then
 					if [[ $DEEP == true ]]; then
 						cat webs/webs_all.txt | unfurl -u domains >.tmp/waymore_input.txt
-						python3 ${tools}/waymore/waymore.py -i .tmp/waymore_input.txt -mode U -f -oU .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
+						waymore -i .tmp/waymore_input.txt -mode U -f -oU .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
 					else
 						cat webs/webs_all.txt | gau --threads $GAU_THREADS | anew -q .tmp/url_extract_tmp.txt
 					fi
@@ -1981,7 +1981,7 @@ function jschecks() {
 				[ -s ".tmp/js_livelinks.txt" ] && cat .tmp/js_livelinks.txt | anew .tmp/web_full_info.txt | grep "[200]" | grep "javascript" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
 			fi
 			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] Running : Gathering endpoints 3/5${reset}\n"
-			[ -s "js/js_livelinks.txt" ] && python3 ${tools}/xnLinkFinder/xnLinkFinder.py -i js/js_livelinks.txt -sf subdomains/subdomains.txt -d $XNLINKFINDER_DEPTH -o .tmp/js_endpoints.txt 2>>"$LOGFILE" >/dev/null
+			[ -s "js/js_livelinks.txt" ] && xnLinkFinder -i js/js_livelinks.txt -sf subdomains/subdomains.txt -d $XNLINKFINDER_DEPTH -o .tmp/js_endpoints.txt 2>>"$LOGFILE" >/dev/null
 			[ -s "parameters.txt" ] && rm -f parameters.txt 2>>"$LOGFILE" >/dev/null
 			if [[ -s ".tmp/js_endpoints.txt" ]]; then
 				sed -i '/^\//!d' .tmp/js_endpoints.txt
@@ -1991,9 +1991,10 @@ function jschecks() {
 
 			if [[ $AXIOM != true ]]; then
 				[ -s "js/js_livelinks.txt" ] && cat js/js_livelinks.txt | mantra -ua ${HEADER} -s | anew -q js/js_secrets.txt
+				[ -s "js/js_secrets.txt" ] && trufflehog filesystem js/js_secrets.txt --only-verified -j 2>/dev/null | jq -c | anew -q js/js_secrets_trufflehog.txt
 			else
 				[ -s "js/js_livelinks.txt" ] && axiom-scan js/js_livelinks.txt -m mantra -ua \"${HEADER}\" -s -o js/js_secrets.txt $AXIOM_EXTRA_ARGS &>/dev/null
-				[ -s "js/js_secrets.txt" ] && trufflehog filesystem js/js_secrets.txt -j 2>/dev/null | jq -c | anew -q js/js_secrets_trufflehog.txt
+				[ -s "js/js_secrets.txt" ] && trufflehog filesystem js/js_secrets.txt --only-verified -j 2>/dev/null | jq -c | anew -q js/js_secrets_trufflehog.txt
 			fi
 			[ -s "js/js_secrets.txt" ] && sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2};?)?)?[mGK]//g" -i js/js_secrets.txt
 			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] Running : Building wordlist 5/5${reset}\n"
