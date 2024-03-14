@@ -137,7 +137,7 @@ function tools_installed() {
 		printf "${bred} [*] xnLinkFinder		[NO]${reset}\n"
 		allinstalled=false
 	}
-	[ -f "${tools}/waymore/waymore.py" ] || {
+	[ -f "${tools}/waymore/waymore/waymore.py" ] || {
 		printf "${bred} [*] waymore		[NO]${reset}\n"
 		allinstalled=false
 	}
@@ -1834,7 +1834,7 @@ function urlchecks() {
 				if [[ $URL_CHECK_PASSIVE == true ]]; then
 					if [[ $DEEP == true ]]; then
 						cat webs/webs_all.txt | unfurl -u domains >.tmp/waymore_input.txt
-						python3 ${tools}/waymore/waymore.py -i .tmp/waymore_input.txt -mode U -f -oU .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
+						python3 ${tools}/waymore/waymore/waymore.py -i .tmp/waymore_input.txt -mode U -f -oU .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
 					else
 						cat webs/webs_all.txt | gau --threads $GAU_THREADS | anew -q .tmp/url_extract_tmp.txt
 					fi
