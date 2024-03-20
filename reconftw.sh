@@ -2395,14 +2395,8 @@ function spraying() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SPRAY == true ]]; then
 		start_func ${FUNCNAME[0]} "Password spraying"
 
-		pushd "${tools}/brutespray" >/dev/null || {
-			echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
-		}
-
 		brutespray/main -f $dir/hosts/portscan_active.gnmap -T $BRUTESPRAY_CONCURRENCE -o $dir/vulns/brutespray 2>>"$LOGFILE" >/dev/null
-		popd >/dev/null || {
-			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
-		}
+		
 		end_func "Results are saved in vulns/brutespray folder" ${FUNCNAME[0]}
 	else
 		if [[ $SPRAY == false ]]; then
