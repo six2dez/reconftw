@@ -85,10 +85,6 @@ function tools_installed() {
 		printf "${bred} [*] dorks_hunter		[NO]${reset}\n"
 		allinstalled=false
 	}
-	[ -f "${tools}/brutespray/brutespray/main" ] || {
-		printf "${bred} [*] brutespray			[NO]${reset}\n"
-		allinstalled=false
-	}
 	[ -f "${tools}/fav-up/favUp.py" ] || {
 		printf "${bred} [*] fav-up			[NO]${reset}\n"
 		allinstalled=false
@@ -133,11 +129,15 @@ function tools_installed() {
 		printf "${bred} [*] resolvers_trusted		[NO]${reset}\n"
 		allinstalled=false
 	}
-	[ -f "${tools}/xnLinkFinder/xnLinkFinder.py" ] || {
+	command -v brutespray &>/dev/null || {
+		printf "${bred} [*] brutespray		[NO]${reset}\n"
+		allinstalled=false
+	}
+		command -v xnLinkFinder &>/dev/null || {
 		printf "${bred} [*] xnLinkFinder		[NO]${reset}\n"
 		allinstalled=false
 	}
-	[ -f "${tools}/waymore/waymore.py" ] || {
+	command -v waymore &>/dev/null || {
 		printf "${bred} [*] waymore		[NO]${reset}\n"
 		allinstalled=false
 	}
@@ -1429,7 +1429,7 @@ function webprobe_full() {
 			fi
 		fi
 		[ -s ".tmp/web_full_info_uncommon.txt" ] && cat .tmp/web_full_info_uncommon.txt | jq -r 'try .url' 2>/dev/null | grep "$domain" | grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?' | sed "s/*.//" | anew -q .tmp/probed_uncommon_ports_tmp.txt
-		[ -s ".tmp/web_full_info_uncommon.txt" ] && cat .tmp/web_full_info_uncommon.txt | jq -r 'try . |"\(.url) [\(.status_code)] [\(.title)] [\(.webserver)] \(.tech)"' | anew -q webs/web_full_info_uncommon_plain.txt
+		[ -s ".tmp/web_full_info_uncommon.txt" ] && cat .tmp/web_full_info_uncommon.txt | jq -r 'try . |"\(.url) [\(.status_code)] [\(.title)] [\(.webserver)] \(.tech)"' | grep "$domain" | anew -q webs/web_full_info_uncommon_plain.txt
 		if [[ -s ".tmp/web_full_info_uncommon.txt" ]]; then
 			if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 				cat .tmp/web_full_info_uncommon.txt 2>>"$LOGFILE" | anew -q webs/web_full_info_uncommon.txt
@@ -1834,7 +1834,7 @@ function urlchecks() {
 				if [[ $URL_CHECK_PASSIVE == true ]]; then
 					if [[ $DEEP == true ]]; then
 						cat webs/webs_all.txt | unfurl -u domains >.tmp/waymore_input.txt
-						python3 ${tools}/waymore/waymore.py -i .tmp/waymore_input.txt -mode U -f -oU .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
+						waymore -i .tmp/waymore_input.txt -mode U -f -oU .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
 					else
 						cat webs/webs_all.txt | gau --threads $GAU_THREADS | anew -q .tmp/url_extract_tmp.txt
 					fi
@@ -1981,7 +1981,7 @@ function jschecks() {
 				[ -s ".tmp/js_livelinks.txt" ] && cat .tmp/js_livelinks.txt | anew .tmp/web_full_info.txt | grep "[200]" | grep "javascript" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
 			fi
 			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] Running : Gathering endpoints 3/5${reset}\n"
-			[ -s "js/js_livelinks.txt" ] && python3 ${tools}/xnLinkFinder/xnLinkFinder.py -i js/js_livelinks.txt -sf subdomains/subdomains.txt -d $XNLINKFINDER_DEPTH -o .tmp/js_endpoints.txt 2>>"$LOGFILE" >/dev/null
+			[ -s "js/js_livelinks.txt" ] && xnLinkFinder -i js/js_livelinks.txt -sf subdomains/subdomains.txt -d $XNLINKFINDER_DEPTH -o .tmp/js_endpoints.txt 2>>"$LOGFILE" >/dev/null
 			[ -s "parameters.txt" ] && rm -f parameters.txt 2>>"$LOGFILE" >/dev/null
 			if [[ -s ".tmp/js_endpoints.txt" ]]; then
 				sed -i '/^\//!d' .tmp/js_endpoints.txt
@@ -1991,9 +1991,10 @@ function jschecks() {
 
 			if [[ $AXIOM != true ]]; then
 				[ -s "js/js_livelinks.txt" ] && cat js/js_livelinks.txt | mantra -ua ${HEADER} -s | anew -q js/js_secrets.txt
+				[ -s "js/js_secrets.txt" ] && trufflehog filesystem js/js_secrets.txt --only-verified -j 2>/dev/null | jq -c | anew -q js/js_secrets_trufflehog.txt
 			else
 				[ -s "js/js_livelinks.txt" ] && axiom-scan js/js_livelinks.txt -m mantra -ua \"${HEADER}\" -s -o js/js_secrets.txt $AXIOM_EXTRA_ARGS &>/dev/null
-				[ -s "js/js_secrets.txt" ] && trufflehog filesystem js/js_secrets.txt -j 2>/dev/null | jq -c | anew -q js/js_secrets_trufflehog.txt
+				[ -s "js/js_secrets.txt" ] && trufflehog filesystem js/js_secrets.txt --only-verified -j 2>/dev/null | jq -c | anew -q js/js_secrets_trufflehog.txt
 			fi
 			[ -s "js/js_secrets.txt" ] && sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2};?)?)?[mGK]//g" -i js/js_secrets.txt
 			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] Running : Building wordlist 5/5${reset}\n"
@@ -2394,14 +2395,8 @@ function spraying() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SPRAY == true ]]; then
 		start_func ${FUNCNAME[0]} "Password spraying"
 
-		pushd "${tools}/brutespray" >/dev/null || {
-			echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
-		}
-
-		brutespray/main -f $dir/hosts/portscan_active.gnmap -T $BRUTESPRAY_CONCURRENCE -o $dir/vulns/brutespray 2>>"$LOGFILE" >/dev/null
-		popd >/dev/null || {
-			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
-		}
+		brutespray -f $dir/hosts/portscan_active.gnmap -T $BRUTESPRAY_CONCURRENCE -o $dir/vulns/brutespray 2>>"$LOGFILE" >/dev/null
+		
 		end_func "Results are saved in vulns/brutespray folder" ${FUNCNAME[0]}
 	else
 		if [[ $SPRAY == false ]]; then
