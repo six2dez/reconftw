@@ -1758,8 +1758,8 @@ function iishortname() {
 		start_func ${FUNCNAME[0]} "IIS Shortname Scanner"
 		[ -s "nuclei_output/info.txt" ] && cat nuclei_output/info.txt | grep "iis-version" | cut -d " " -f4 > .tmp/iis_sites.txt
 		if [[ -s ".tmp/iis_sites.txt" ]]; then
-			mkdir -p $$dir/vulns/iis-shortname-shortscan/
-			mkdir -p $$dir/vulns/iis-shortname-sns/
+			mkdir -p $dir/vulns/iis-shortname-shortscan/
+			mkdir -p $dir/vulns/iis-shortname-sns/
 			interlace -tL .tmp/iis_sites.txt -threads ${INTERLACE_THREADS} -c "shortscan _target_ -F -s -p 1 > _output_/_cleantarget_.txt" -o $dir/vulns/iis-shortname-shortscan/ 2>>"$LOGFILE" >/dev/null
 			find $dir/vulns/iis-shortname-shortscan/ -type f -print0 | xargs --null grep -Z -L 'Vulnerable: Yes' | xargs --null rm 2>>"$LOGFILE" >/dev/null
 			interlace -tL .tmp/iis_sites.txt -threads ${INTERLACE_THREADS} -c "sns -u _target_ > _output_/_cleantarget_.txt" -o $dir/vulns/iis-shortname-sns/ 2>>"$LOGFILE" >/dev/null
