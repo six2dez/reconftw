@@ -2554,10 +2554,10 @@ function fuzzparams() {
 			if [[ $AXIOM != true ]]; then
 				nuclei -update 2>>"$LOGFILE" >/dev/null
 				git -C ${tools}/fuzzing-templates pull 2>>"$LOGFILE"
-				cat webs/url_extract.txt 2>/dev/null | nuclei -silent -retries 3 -rl $NUCLEI_RATELIMIT -t ${tools}/fuzzing-templates -o .tmp/fuzzparams.txt
+				cat webs/url_extract.txt 2>/dev/null | nuclei -silent -retries 3 -rl $NUCLEI_RATELIMIT -t ${tools}/fuzzing-templates -fuzz -o .tmp/fuzzparams.txt
 			else
 				axiom-exec "git clone https://github.com/projectdiscovery/fuzzing-templates /home/op/fuzzing-templates" &>/dev/null
-				axiom-scan webs/url_extract.txt -m nuclei -nh -retries 3 -w /home/op/fuzzing-templates -rl $NUCLEI_RATELIMIT -o .tmp/fuzzparams.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+				axiom-scan webs/url_extract.txt -m nuclei -nh -retries 3 -w /home/op/fuzzing-templates -rl $NUCLEI_RATELIMIT -fuzz -o .tmp/fuzzparams.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 			fi
 			[ -s ".tmp/fuzzparams.txt" ] && cat .tmp/fuzzparams.txt | anew -q vulns/fuzzparams.txt
 			end_func "Results are saved in vulns/fuzzparams.txt" ${FUNCNAME[0]}
