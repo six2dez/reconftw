@@ -1758,8 +1758,8 @@ function iishortname() {
 		start_func ${FUNCNAME[0]} "IIS Shortname Scanner"
 		[ -s "nuclei_output/info.txt" ] && cat nuclei_output/info.txt | grep "iis-version" | cut -d " " -f4 > .tmp/iis_sites.txt
 		if [[ -s ".tmp/iis_sites.txt" ]]; then
-			mkdir -p $$dir/vulns/iis-shortname-shortscan/
-			mkdir -p $$dir/vulns/iis-shortname-sns/
+			mkdir -p $dir/vulns/iis-shortname-shortscan/
+			mkdir -p $dir/vulns/iis-shortname-sns/
 			interlace -tL .tmp/iis_sites.txt -threads ${INTERLACE_THREADS} -c "shortscan _target_ -F -s -p 1 > _output_/_cleantarget_.txt" -o $dir/vulns/iis-shortname-shortscan/ 2>>"$LOGFILE" >/dev/null
 			find $dir/vulns/iis-shortname-shortscan/ -type f -print0 | xargs --null grep -Z -L 'Vulnerable: Yes' | xargs --null rm 2>>"$LOGFILE" >/dev/null
 			interlace -tL .tmp/iis_sites.txt -threads ${INTERLACE_THREADS} -c "sns -u _target_ > _output_/_cleantarget_.txt" -o $dir/vulns/iis-shortname-sns/ 2>>"$LOGFILE" >/dev/null
@@ -2554,10 +2554,12 @@ function fuzzparams() {
 			if [[ $AXIOM != true ]]; then
 				nuclei -update 2>>"$LOGFILE" >/dev/null
 				git -C ${tools}/fuzzing-templates pull 2>>"$LOGFILE"
+        
 				cat webs/url_extract.txt 2>/dev/null | nuclei -silent -retries 3 -rl $NUCLEI_RATELIMIT -t ${tools}/fuzzing-templates -dast -o .tmp/fuzzparams.txt
 			else
 				axiom-exec "git clone https://github.com/projectdiscovery/fuzzing-templates /home/op/fuzzing-templates" &>/dev/null
 				axiom-scan webs/url_extract.txt -m nuclei -nh -retries 3 -w /home/op/fuzzing-templates -rl $NUCLEI_RATELIMIT -dast -o .tmp/fuzzparams.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+
 			fi
 			[ -s ".tmp/fuzzparams.txt" ] && cat .tmp/fuzzparams.txt | anew -q vulns/fuzzparams.txt
 			end_func "Results are saved in vulns/fuzzparams.txt" ${FUNCNAME[0]}
