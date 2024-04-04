@@ -1836,7 +1836,8 @@ function urlchecks() {
 						cat webs/webs_all.txt | unfurl -u domains >.tmp/waymore_input.txt
 						waymore -i .tmp/waymore_input.txt -mode U -f -oU .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
 					else
-						cat webs/webs_all.txt | gau --threads $GAU_THREADS | anew -q .tmp/url_extract_tmp.txt
+						cat webs/webs_all.txt | unfurl -u domains >.tmp/waymore_input.txt
+						waymore -i .tmp/waymore_input.txt -mode U -f -oU .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null # could add -xcc to remove commoncrawl wich takes a bit longer
 					fi
 					if [[ -s ${GITHUB_TOKENS} ]]; then
 						github-endpoints -q -k -d $domain -t ${GITHUB_TOKENS} -o .tmp/github-endpoints.txt 2>>"$LOGFILE" >/dev/null
@@ -1909,16 +1910,17 @@ function url_gf() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $URL_GF == true ]]; then
 		start_func ${FUNCNAME[0]} "Vulnerable Pattern Search"
 		if [[ -s "webs/url_extract.txt" ]]; then
-			gf xss webs/url_extract.txt | anew -q gf/xss.txt
-			gf ssti webs/url_extract.txt | anew -q gf/ssti.txt
-			gf ssrf webs/url_extract.txt | anew -q gf/ssrf.txt
-			gf sqli webs/url_extract.txt | anew -q gf/sqli.txt
-			gf redirect webs/url_extract.txt | anew -q gf/redirect.txt
+			p1radup -i webs/url_extract.txt -o webs/url_extract_nodupes.txt
+			gf xss webs/url_extract_nodupes.txt | anew -q gf/xss.txt
+			gf ssti webs/url_extract_nodupes.txt | anew -q gf/ssti.txt
+			gf ssrf webs/url_extract_nodupes.txt | anew -q gf/ssrf.txt
+			gf sqli webs/url_extract_nodupes.txt | anew -q gf/sqli.txt
+			gf redirect webs/url_extract_nodupes.txt | anew -q gf/redirect.txt
 			[ -s "gf/ssrf.txt" ] && cat gf/ssrf.txt | anew -q gf/redirect.txt
-			gf rce webs/url_extract.txt | anew -q gf/rce.txt
-			gf potential webs/url_extract.txt | cut -d ':' -f3-5 | anew -q gf/potential.txt
+			gf rce webs/url_extract_nodupes.txt | anew -q gf/rce.txt
+			gf potential webs/url_extract_nodupes.txt | cut -d ':' -f3-5 | anew -q gf/potential.txt
 			[ -s ".tmp/url_extract_tmp.txt" ] && cat .tmp/url_extract_tmp.txt | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | unfurl -u format %s://%d%p 2>>"$LOGFILE" | anew -q gf/endpoints.txt
-			gf lfi webs/url_extract.txt | anew -q gf/lfi.txt
+			gf lfi webs/url_extract_nodupes.txt | anew -q gf/lfi.txt
 		fi
 		end_func "Results are saved in $domain/gf folder" ${FUNCNAME[0]}
 	else

@@ -35,5 +35,6 @@ tqdm                    # multiple
 ujson                   # multiple
 urllib3                 # multiple
 porch-pirate            # Tool
+p1radup                 # Tool
 git+https://github.com/xnl-h4ck3r/waymore.git                 # Tool
 git+https://github.com/xnl-h4ck3r/xnLinkFinder.git            # Tool
