@@ -2470,8 +2470,8 @@ function prototype_pollution() {
 	mkdir -p {.tmp,webs,vulns}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $PROTO_POLLUTION == true ]]; then
 		start_func ${FUNCNAME[0]} "Prototype Pollution checks"
-		if [[ $DEEP == true ]] || [[ $(cat webs/url_extract.txt | wc -l) -le $DEEP_LIMIT ]]; then
-			[ -s "webs/url_extract.txt" ] && cat webs/url_extract.txt | ppmap &>.tmp/prototype_pollution.txt
+		if [[ $DEEP == true ]] || [[ $(cat webs/url_extract_nodupes.txt | wc -l) -le $DEEP_LIMIT ]]; then
+			[ -s "webs/url_extract_nodupes.txt" ] && cat webs/url_extract_nodupes.txt | ppmap &>.tmp/prototype_pollution.txt
 			[ -s ".tmp/prototype_pollution.txt" ] && cat .tmp/prototype_pollution.txt | grep "EXPL" | anew -q vulns/prototype_pollution.txt
 			end_func "Results are saved in vulns/prototype_pollution.txt" ${FUNCNAME[0]}
 		else
@@ -2552,14 +2552,14 @@ function fuzzparams() {
 	mkdir -p {.tmp,webs,vulns}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $FUZZPARAMS == true ]]; then
 		start_func ${FUNCNAME[0]} "Fuzzing params values checks"
-		if [[ $DEEP == true ]] || [[ $(cat webs/url_extract.txt | wc -l) -le $DEEP_LIMIT2 ]]; then
+		if [[ $DEEP == true ]] || [[ $(cat webs/url_extract_nodupes.txt | wc -l) -le $DEEP_LIMIT2 ]]; then
 			if [[ $AXIOM != true ]]; then
 				nuclei -update 2>>"$LOGFILE" >/dev/null
 				git -C ${tools}/fuzzing-templates pull 2>>"$LOGFILE"
-				cat webs/url_extract.txt 2>/dev/null | nuclei -silent -retries 3 -rl $NUCLEI_RATELIMIT -t ${tools}/fuzzing-templates -fuzz -o .tmp/fuzzparams.txt
+				cat webs/url_extract_nodupes.txt 2>/dev/null | nuclei -silent -retries 3 -rl $NUCLEI_RATELIMIT -t ${tools}/fuzzing-templates -fuzz -o .tmp/fuzzparams.txt
 			else
 				axiom-exec "git clone https://github.com/projectdiscovery/fuzzing-templates /home/op/fuzzing-templates" &>/dev/null
-				axiom-scan webs/url_extract.txt -m nuclei -nh -retries 3 -w /home/op/fuzzing-templates -fuzz -rl $NUCLEI_RATELIMIT -o .tmp/fuzzparams.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+				axiom-scan webs/url_extract_nodupes.txt -m nuclei -nh -retries 3 -w /home/op/fuzzing-templates -fuzz -rl $NUCLEI_RATELIMIT -o .tmp/fuzzparams.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 			fi
 			[ -s ".tmp/fuzzparams.txt" ] && cat .tmp/fuzzparams.txt | anew -q vulns/fuzzparams.txt
 			end_func "Results are saved in vulns/fuzzparams.txt" ${FUNCNAME[0]}
