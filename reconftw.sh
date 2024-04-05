@@ -1680,7 +1680,7 @@ function nuclei_check() {
 		mkdir -p nuclei_output
 		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" >"$dir/subdomains/subdomains.txt" && touch webs/webs.txt webs/webs_uncommon_ports.txt
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
-		[ ! -s ".tmp/webs_subs.txt" ] && cat subdomains/subdomains.txt webs/webs_all.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
+		[ ! -s ".tmp/webs_subs.txt" ] && cat webs/url_extract_nodupes.txt subdomains/subdomains.txt webs/webs_all.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
 		[ -s "$dir/fuzzing/fuzzing_full.txt" ] && cat $dir/fuzzing/fuzzing_full.txt | grep -e "^200" | cut -d " " -f3 | anew -q .tmp/webs_fuzz.txt
 		cat .tmp/webs_subs.txt .tmp/webs_fuzz.txt 2>>"$LOGFILE" | anew -q .tmp/webs_nuclei.txt
 		if [[ $AXIOM != true ]]; then # avoid globbing (expansion of *).
@@ -1836,7 +1836,8 @@ function urlchecks() {
 						cat webs/webs_all.txt | unfurl -u domains >.tmp/waymore_input.txt
 						waymore -i .tmp/waymore_input.txt -mode U -f -oU .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
 					else
-						cat webs/webs_all.txt | gau --threads $GAU_THREADS | anew -q .tmp/url_extract_tmp.txt
+						cat webs/webs_all.txt | unfurl -u domains >.tmp/waymore_input.txt
+						waymore -i .tmp/waymore_input.txt -mode U -f -oU .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null # could add -xcc to remove commoncrawl wich takes a bit longer
 					fi
 					if [[ -s ${GITHUB_TOKENS} ]]; then
 						github-endpoints -q -k -d $domain -t ${GITHUB_TOKENS} -o .tmp/github-endpoints.txt 2>>"$LOGFILE" >/dev/null
@@ -1909,16 +1910,17 @@ function url_gf() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $URL_GF == true ]]; then
 		start_func ${FUNCNAME[0]} "Vulnerable Pattern Search"
 		if [[ -s "webs/url_extract.txt" ]]; then
-			gf xss webs/url_extract.txt | anew -q gf/xss.txt
-			gf ssti webs/url_extract.txt | anew -q gf/ssti.txt
-			gf ssrf webs/url_extract.txt | anew -q gf/ssrf.txt
-			gf sqli webs/url_extract.txt | anew -q gf/sqli.txt
-			gf redirect webs/url_extract.txt | anew -q gf/redirect.txt
+			p1radup -i webs/url_extract.txt -o webs/url_extract_nodupes.txt
+			gf xss webs/url_extract_nodupes.txt | anew -q gf/xss.txt
+			gf ssti webs/url_extract_nodupes.txt | anew -q gf/ssti.txt
+			gf ssrf webs/url_extract_nodupes.txt | anew -q gf/ssrf.txt
+			gf sqli webs/url_extract_nodupes.txt | anew -q gf/sqli.txt
+			gf redirect webs/url_extract_nodupes.txt | anew -q gf/redirect.txt
 			[ -s "gf/ssrf.txt" ] && cat gf/ssrf.txt | anew -q gf/redirect.txt
-			gf rce webs/url_extract.txt | anew -q gf/rce.txt
-			gf potential webs/url_extract.txt | cut -d ':' -f3-5 | anew -q gf/potential.txt
+			gf rce webs/url_extract_nodupes.txt | anew -q gf/rce.txt
+			gf potential webs/url_extract_nodupes.txt | cut -d ':' -f3-5 | anew -q gf/potential.txt
 			[ -s ".tmp/url_extract_tmp.txt" ] && cat .tmp/url_extract_tmp.txt | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | unfurl -u format %s://%d%p 2>>"$LOGFILE" | anew -q gf/endpoints.txt
-			gf lfi webs/url_extract.txt | anew -q gf/lfi.txt
+			gf lfi webs/url_extract_nodupes.txt | anew -q gf/lfi.txt
 		fi
 		end_func "Results are saved in $domain/gf folder" ${FUNCNAME[0]}
 	else
@@ -2468,8 +2470,8 @@ function prototype_pollution() {
 	mkdir -p {.tmp,webs,vulns}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $PROTO_POLLUTION == true ]]; then
 		start_func ${FUNCNAME[0]} "Prototype Pollution checks"
-		if [[ $DEEP == true ]] || [[ $(cat webs/url_extract.txt | wc -l) -le $DEEP_LIMIT ]]; then
-			[ -s "webs/url_extract.txt" ] && cat webs/url_extract.txt | ppmap &>.tmp/prototype_pollution.txt
+		if [[ $DEEP == true ]] || [[ $(cat webs/url_extract_nodupes.txt | wc -l) -le $DEEP_LIMIT ]]; then
+			[ -s "webs/url_extract_nodupes.txt" ] && cat webs/url_extract_nodupes.txt | ppmap &>.tmp/prototype_pollution.txt
 			[ -s ".tmp/prototype_pollution.txt" ] && cat .tmp/prototype_pollution.txt | grep "EXPL" | anew -q vulns/prototype_pollution.txt
 			end_func "Results are saved in vulns/prototype_pollution.txt" ${FUNCNAME[0]}
 		else
@@ -2550,15 +2552,14 @@ function fuzzparams() {
 	mkdir -p {.tmp,webs,vulns}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $FUZZPARAMS == true ]]; then
 		start_func ${FUNCNAME[0]} "Fuzzing params values checks"
-		if [[ $DEEP == true ]] || [[ $(cat webs/url_extract.txt | wc -l) -le $DEEP_LIMIT2 ]]; then
+		if [[ $DEEP == true ]] || [[ $(cat webs/url_extract_nodupes.txt | wc -l) -le $DEEP_LIMIT2 ]]; then
 			if [[ $AXIOM != true ]]; then
 				nuclei -update 2>>"$LOGFILE" >/dev/null
 				git -C ${tools}/fuzzing-templates pull 2>>"$LOGFILE"
-        
-				cat webs/url_extract.txt 2>/dev/null | nuclei -silent -retries 3 -rl $NUCLEI_RATELIMIT -t ${tools}/fuzzing-templates -dast -o .tmp/fuzzparams.txt
+				cat webs/url_extract_nodupes.txt 2>/dev/null | nuclei -silent -retries 3 -rl $NUCLEI_RATELIMIT -t ${tools}/fuzzing-templates -dast -o .tmp/fuzzparams.txt
 			else
 				axiom-exec "git clone https://github.com/projectdiscovery/fuzzing-templates /home/op/fuzzing-templates" &>/dev/null
-				axiom-scan webs/url_extract.txt -m nuclei -nh -retries 3 -w /home/op/fuzzing-templates -rl $NUCLEI_RATELIMIT -dast -o .tmp/fuzzparams.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+				axiom-scan webs/url_extract_nodupes.txt -m nuclei -nh -retries 3 -w /home/op/fuzzing-templates -rl $NUCLEI_RATELIMIT -dast -o .tmp/fuzzparams.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 
 			fi
 			[ -s ".tmp/fuzzparams.txt" ] && cat .tmp/fuzzparams.txt | anew -q vulns/fuzzparams.txt
@@ -3175,11 +3176,11 @@ function recon() {
 	geo_info
 	waf_checks
 	fuzz
-	nuclei_check
 	iishortname
 	urlchecks
 	jschecks
-
+	nuclei_check
+	
 	if [[ $AXIOM == true ]]; then
 		axiom_shutdown
 	fi
