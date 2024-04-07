@@ -3332,7 +3332,6 @@ function multi_recon() {
 	notification "- ${NUMOFLINES_cloudsprov_total} total IPs belongs to cloud" good
 	s3buckets
 	waf_checks
-	nuclei_check
 	for domain in $targets; do
 		loopstart=$(date +%s)
 		dir=$workdir/targets/$domain
@@ -3357,7 +3356,7 @@ function multi_recon() {
 		fi
 		printf "${bgreen}#######################################################################${reset}\n"
 	done
-
+	nuclei_check
 	if [[ $AXIOM == true ]]; then
 		axiom_shutdown
 	fi
@@ -3492,12 +3491,12 @@ function webs_menu() {
 	#	virtualhosts
 	waf_checks
 	fuzz
-	nuclei_check
 	cms_scanner
 	iishortname
 	urlchecks
 	jschecks
 	url_gf
+	nuclei_check
 	wordlist_gen
 	wordlist_gen_roboxtractor
 	password_dict
