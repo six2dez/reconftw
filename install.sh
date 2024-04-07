@@ -107,6 +107,7 @@ repos["nomore403"]="devploit/nomore403"
 repos["SwaggerSpy"]="UndeadSec/SwaggerSpy"
 repos["LeakSearch"]="JoelGMSec/LeakSearch"
 repos["Wapiti"]="wapiti-scanner/wapiti"
+repos["ffufPostprocessing"]="Damian89/ffufPostprocessing"
 
 function banner() {
 	tput clear
@@ -207,10 +208,10 @@ function install_tools() {
             if [[ "nomore403" == "$repo" ]]; then
                 eval go get $DEBUG_STD && eval go build $DEBUG_STD && eval chmod +x ./nomore403 $DEBUG_STD
             fi
-			if [[ "brutespray" == "$repo" ]]; then
+			if [[ "ffufPostprocessing" == "$repo" ]]; then
 				eval git reset --hard origin/main $DEBUG_STD
 				eval git pull $DEBUG_STD
-				eval go build -o brutespray main.go $DEBUG_STD && eval chmod +x ./brutespray $DEBUG_STD
+				eval go build -o ffufPostprocessing main.go $DEBUG_STD && eval chmod +x ./ffufPostprocessing $DEBUG_STD
 			fi
 			if [[ "wapiti" == "$repo" ]]; then
                 eval make install $DEBUG_STD
