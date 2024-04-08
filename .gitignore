@@ -10,4 +10,4 @@ test/
 *.tar.*
 *.zip
 .DS_Store
-reconftw.cfg_bck
+reconftw.cfg-personal

@@ -1890,6 +1890,7 @@ function urlchecks() {
 			NUMOFLINES=$(cat .tmp/url_extract_uddup.txt 2>>"$LOGFILE" | anew webs/url_extract.txt | sed '/^$/d' | wc -l)
 			notification "${NUMOFLINES} new urls with params" info
 			end_func "Results are saved in $domain/webs/url_extract.txt" ${FUNCNAME[0]}
+                        p1radup -i webs/url_extract.txt -o webs/url_extract_nodupes.txt
 			if [[ $PROXY == true ]] && [[ -n $proxy_url ]] && [[ $(cat webs/url_extract.txt | wc -l) -le $DEEP_LIMIT2 ]]; then
 				notification "Sending urls to proxy" info
 				ffuf -mc all -w webs/url_extract.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" >/dev/null
@@ -1911,7 +1912,6 @@ function url_gf() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $URL_GF == true ]]; then
 		start_func ${FUNCNAME[0]} "Vulnerable Pattern Search"
 		if [[ -s "webs/url_extract.txt" ]]; then
-			p1radup -i webs/url_extract.txt -o webs/url_extract_nodupes.txt
 			gf xss webs/url_extract_nodupes.txt | anew -q gf/xss.txt
 			gf ssti webs/url_extract_nodupes.txt | anew -q gf/ssti.txt
 			gf ssrf webs/url_extract_nodupes.txt | anew -q gf/ssrf.txt
