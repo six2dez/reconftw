@@ -1724,6 +1724,7 @@ function fuzz() {
 				interlace -tL webs/webs_all.txt -threads ${INTERLACE_THREADS} -c "ffuf ${FFUF_FLAGS} -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" -o $dir/.tmp/fuzzing 2>>"$LOGFILE" >/dev/null
 				for sub in $(cat webs/webs_all.txt); do
 					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
+					~/Tools/ffufPostprocessing/ffufPostprocessing -result-file $dir/.tmp/fuzzing/${sub_out}.json -overwrite-result-file
 					[ -s "$dir/.tmp/fuzzing/${sub_out}.json" ] && cat $dir/.tmp/fuzzing/${sub_out}.json | jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' | sort -k1 | anew -q $dir/fuzzing/${sub_out}.txt
 				done
 				find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | sort -k1 | anew -q $dir/fuzzing/fuzzing_full.txt
@@ -1889,6 +1890,7 @@ function urlchecks() {
 			NUMOFLINES=$(cat .tmp/url_extract_uddup.txt 2>>"$LOGFILE" | anew webs/url_extract.txt | sed '/^$/d' | wc -l)
 			notification "${NUMOFLINES} new urls with params" info
 			end_func "Results are saved in $domain/webs/url_extract.txt" ${FUNCNAME[0]}
+                        p1radup -i webs/url_extract.txt -o webs/url_extract_nodupes.txt
 			if [[ $PROXY == true ]] && [[ -n $proxy_url ]] && [[ $(cat webs/url_extract.txt | wc -l) -le $DEEP_LIMIT2 ]]; then
 				notification "Sending urls to proxy" info
 				ffuf -mc all -w webs/url_extract.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" >/dev/null
@@ -1910,7 +1912,6 @@ function url_gf() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $URL_GF == true ]]; then
 		start_func ${FUNCNAME[0]} "Vulnerable Pattern Search"
 		if [[ -s "webs/url_extract.txt" ]]; then
-			p1radup -i webs/url_extract.txt -o webs/url_extract_nodupes.txt
 			gf xss webs/url_extract_nodupes.txt | anew -q gf/xss.txt
 			gf ssti webs/url_extract_nodupes.txt | anew -q gf/ssti.txt
 			gf ssrf webs/url_extract_nodupes.txt | anew -q gf/ssrf.txt
@@ -3333,7 +3334,6 @@ function multi_recon() {
 	notification "- ${NUMOFLINES_cloudsprov_total} total IPs belongs to cloud" good
 	s3buckets
 	waf_checks
-	nuclei_check
 	for domain in $targets; do
 		loopstart=$(date +%s)
 		dir=$workdir/targets/$domain
@@ -3358,7 +3358,7 @@ function multi_recon() {
 		fi
 		printf "${bgreen}#######################################################################${reset}\n"
 	done
-
+	nuclei_check
 	if [[ $AXIOM == true ]]; then
 		axiom_shutdown
 	fi
@@ -3493,12 +3493,12 @@ function webs_menu() {
 	#	virtualhosts
 	waf_checks
 	fuzz
-	nuclei_check
 	cms_scanner
 	iishortname
 	urlchecks
 	jschecks
 	url_gf
+	nuclei_check
 	wordlist_gen
 	wordlist_gen_roboxtractor
 	password_dict

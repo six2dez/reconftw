@@ -10,3 +10,4 @@ test/
 *.tar.*
 *.zip
 .DS_Store
+reconftw.cfg-personal
