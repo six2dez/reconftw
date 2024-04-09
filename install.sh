@@ -9,7 +9,7 @@ double_check=false
 ARCH=$(uname -m)
 case $ARCH in
 amd64 | x86_64) IS_ARM="False" ;;
-arm64 | armv6l)
+arm64 | armv6l | aarch64)
 	IS_ARM="True"
 	RPI_4=$([[ $ARCH == "arm64" ]] && echo "True" || echo "False")
 	RPI_3=$([[ $ARCH == "arm64" ]] && echo "False" || echo "True")
