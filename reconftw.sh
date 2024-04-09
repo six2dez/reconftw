@@ -1890,7 +1890,7 @@ function urlchecks() {
 			NUMOFLINES=$(cat .tmp/url_extract_uddup.txt 2>>"$LOGFILE" | anew webs/url_extract.txt | sed '/^$/d' | wc -l)
 			notification "${NUMOFLINES} new urls with params" info
 			end_func "Results are saved in $domain/webs/url_extract.txt" ${FUNCNAME[0]}
-                        p1radup -i webs/url_extract.txt -o webs/url_extract_nodupes.txt
+                        p1radup -i webs/url_extract.txt -o webs/url_extract_nodupes.txt -s
 			if [[ $PROXY == true ]] && [[ -n $proxy_url ]] && [[ $(cat webs/url_extract.txt | wc -l) -le $DEEP_LIMIT2 ]]; then
 				notification "Sending urls to proxy" info
 				ffuf -mc all -w webs/url_extract.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" >/dev/null
