@@ -442,7 +442,7 @@ printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 #wget -q -O - https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json > ~/.gf/potential.json - Removed
 wget -q -O - https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py >${tools}/getjswords.py
 wget -q -O - https://raw.githubusercontent.com/n0kovo/n0kovo_subdomains/main/n0kovo_subdomains_huge.txt >${subs_wordlist_big}
-wget -q -O - https://raw.githubusercontent.com/six2dez/resolvers_reconftw/main/resolvers_trusted.txt >${resolvers_trusted}
+wget -q -O - https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw/trusted_resolvers.txt >${resolvers_trusted}
 wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt >${resolvers}
 wget -q -O - https://gist.github.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw >${subs_wordlist}
 wget -q -O - https://gist.github.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw >${tools}/permutations_list.txt
@@ -501,7 +501,7 @@ if [[ $generate_resolvers == true ]]; then
         [[ -s "tmp_resolvers" ]] && cat tmp_resolvers | anew -q $resolvers
         [[ -s "tmp_resolvers" ]] && rm -f tmp_resolvers &>/dev/null
         [[ ! -s $resolvers ]] && wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt >${resolvers}
-        [[ ! -s $resolvers_trusted ]] && wget -q -O - https://raw.githubusercontent.com/six2dez/resolvers_reconftw/main/resolvers_trusted.txt >${resolvers_trusted}
+        [[ ! -s $resolvers_trusted ]] && wget -q -O - https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw/trusted_resolvers.txt >${resolvers_trusted}
 		printf "${yellow} Resolvers updated\n ${reset}\n\n"
 	fi
 	generate_resolvers=false
@@ -509,7 +509,7 @@ else
 	[[ ! -s $resolvers ]] || if [[ $(find "$resolvers" -mtime +1 -print) ]]; then
 		${reset}"\n\nChecking resolvers lists...\n Accurate resolvers are the key to great results\n Downloading new resolvers ${reset}\n\n"
 		wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt >${resolvers}
-		wget -q -O - https://raw.githubusercontent.com/six2dez/resolvers_reconftw/main/resolvers_trusted.txt >${resolvers_trusted}
+		wget -q -O - https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw/trusted_resolvers.txt >${resolvers_trusted}
 		printf "${yellow} Resolvers updated\n ${reset}\n\n"
 	fi
 fi
