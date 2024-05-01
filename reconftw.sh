@@ -3063,6 +3063,7 @@ function passive() {
 	github_repos
 	metadata
 	apileaks
+	third_party_misconfigs
 	SUBNOERROR=false
 	SUBANALYTICS=false
 	SUBBRUTE=false
@@ -3107,6 +3108,7 @@ function osint() {
 	github_repos
 	metadata
 	apileaks
+	third_party_misconfigs
 	zonetransfer
 	favicon
 }
@@ -3186,6 +3188,7 @@ function multi_osint() {
 		github_repos
 		metadata
 		apileaks
+		third_party_misconfigs
 		zonetransfer
 		favicon
 	done
@@ -3207,6 +3210,7 @@ function recon() {
 	github_repos
 	metadata
 	apileaks
+	third_party_misconfigs
 	zonetransfer
 	favicon
 
@@ -3302,6 +3306,7 @@ function multi_recon() {
 		github_repos
 		metadata
 		apileaks
+		third_party_misconfigs
 		zonetransfer
 		favicon
 		currently=$(date +"%H:%M:%S")
