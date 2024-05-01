@@ -181,6 +181,14 @@ function tools_installed() {
 		printf "${bred} [*] nomore403			[NO]${reset}\n"
 		allinstalled=false
 	}
+	[ -f "${tools}/ffufPostprocessing/ffufPostprocessing" ] || {
+		printf "${bred} [*] ffufPostprocessing	[NO]${reset}\n"
+		allinstalled=false
+	}
+	[ -f "${tools}/misconfig-mapper/misconfig-mapper" ] || {
+		printf "${bred} [*] misconfig-mapper		[NO]${reset}\n"
+		allinstalled=false
+	}
 	[ -f "${tools}/SwaggerSpy/swaggerspy.py" ] || {
 		printf "${bred} [*] swaggerspy			[NO]${reset}\n"
 		allinstalled=false
@@ -633,6 +641,40 @@ function domain_info() {
 			return
 		else
 			if [[ $DOMAIN_INFO == false ]] || [[ $OSINT == false ]]; then
+				printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			else
+				printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
+		fi
+	fi
+
+}
+
+function third_party_misconfigs() {
+
+	mkdir -p 3rdparties
+	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $3RD_PARTIES == true ]] && [[ $OSINT == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+		start_func ${FUNCNAME[0]} "Searching for third parties misconfigurations"
+		company_name=$(echo $domain | unfurl format %r)
+
+		pushd "${tools}/misconfig-mapper" >/dev/null || {
+			echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
+		}
+		./misconfig-mapper -target $company_name -service "*" | grep "\[-\]" > ${dir}/3rdparties/visma_misconfigurations.txt
+
+		popd >/dev/null || {
+			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
+		}
+
+		end_func "Results are saved in $domain/3rdparties" ${FUNCNAME[0]}
+
+	else
+		if [[ $3RD_PARTIES == false ]] || [[ $OSINT == false ]]; then
+			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+		elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+			return
+		else
+			if [[ $3RD_PARTIES == false ]] || [[ $OSINT == false ]]; then
 				printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 			else
 				printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
@@ -1724,6 +1766,15 @@ function fuzz() {
 				interlace -tL webs/webs_all.txt -threads ${INTERLACE_THREADS} -c "ffuf ${FFUF_FLAGS} -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" -o $dir/.tmp/fuzzing 2>>"$LOGFILE" >/dev/null
 				for sub in $(cat webs/webs_all.txt); do
 					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
+
+					pushd "${tools}/ffufPostprocessing" >/dev/null || {
+						echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
+					}
+					./ffufPostprocessing -result-file $dir/.tmp/fuzzing/${sub_out}.json -overwrite-result-file
+					popd >/dev/null || {
+						echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
+					}
+
 					[ -s "$dir/.tmp/fuzzing/${sub_out}.json" ] && cat $dir/.tmp/fuzzing/${sub_out}.json | jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' | sort -k1 | anew -q $dir/fuzzing/${sub_out}.txt
 				done
 				find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | sort -k1 | anew -q $dir/fuzzing/fuzzing_full.txt
@@ -1889,6 +1940,7 @@ function urlchecks() {
 			NUMOFLINES=$(cat .tmp/url_extract_uddup.txt 2>>"$LOGFILE" | anew webs/url_extract.txt | sed '/^$/d' | wc -l)
 			notification "${NUMOFLINES} new urls with params" info
 			end_func "Results are saved in $domain/webs/url_extract.txt" ${FUNCNAME[0]}
+                        p1radup -i webs/url_extract.txt -o webs/url_extract_nodupes.txt -s
 			if [[ $PROXY == true ]] && [[ -n $proxy_url ]] && [[ $(cat webs/url_extract.txt | wc -l) -le $DEEP_LIMIT2 ]]; then
 				notification "Sending urls to proxy" info
 				ffuf -mc all -w webs/url_extract.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" >/dev/null
@@ -1910,7 +1962,6 @@ function url_gf() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $URL_GF == true ]]; then
 		start_func ${FUNCNAME[0]} "Vulnerable Pattern Search"
 		if [[ -s "webs/url_extract.txt" ]]; then
-			p1radup -i webs/url_extract.txt -o webs/url_extract_nodupes.txt
 			gf xss webs/url_extract_nodupes.txt | anew -q gf/xss.txt
 			gf ssti webs/url_extract_nodupes.txt | anew -q gf/ssti.txt
 			gf ssrf webs/url_extract_nodupes.txt | anew -q gf/ssrf.txt
@@ -3012,6 +3063,7 @@ function passive() {
 	github_repos
 	metadata
 	apileaks
+	third_party_misconfigs
 	SUBNOERROR=false
 	SUBANALYTICS=false
 	SUBBRUTE=false
@@ -3056,6 +3108,7 @@ function osint() {
 	github_repos
 	metadata
 	apileaks
+	third_party_misconfigs
 	zonetransfer
 	favicon
 }
@@ -3135,6 +3188,7 @@ function multi_osint() {
 		github_repos
 		metadata
 		apileaks
+		third_party_misconfigs
 		zonetransfer
 		favicon
 	done
@@ -3156,6 +3210,7 @@ function recon() {
 	github_repos
 	metadata
 	apileaks
+	third_party_misconfigs
 	zonetransfer
 	favicon
 
@@ -3251,6 +3306,7 @@ function multi_recon() {
 		github_repos
 		metadata
 		apileaks
+		third_party_misconfigs
 		zonetransfer
 		favicon
 		currently=$(date +"%H:%M:%S")
@@ -3333,7 +3389,6 @@ function multi_recon() {
 	notification "- ${NUMOFLINES_cloudsprov_total} total IPs belongs to cloud" good
 	s3buckets
 	waf_checks
-	nuclei_check
 	for domain in $targets; do
 		loopstart=$(date +%s)
 		dir=$workdir/targets/$domain
@@ -3358,7 +3413,7 @@ function multi_recon() {
 		fi
 		printf "${bgreen}#######################################################################${reset}\n"
 	done
-
+	nuclei_check
 	if [[ $AXIOM == true ]]; then
 		axiom_shutdown
 	fi
@@ -3493,12 +3548,12 @@ function webs_menu() {
 	#	virtualhosts
 	waf_checks
 	fuzz
-	nuclei_check
 	cms_scanner
 	iishortname
 	urlchecks
 	jschecks
 	url_gf
+	nuclei_check
 	wordlist_gen
 	wordlist_gen_roboxtractor
 	password_dict

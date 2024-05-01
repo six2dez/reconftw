@@ -9,7 +9,7 @@ double_check=false
 ARCH=$(uname -m)
 case $ARCH in
 amd64 | x86_64) IS_ARM="False" ;;
-arm64 | armv6l)
+arm64 | armv6l | aarch64)
 	IS_ARM="True"
 	RPI_4=$([[ $ARCH == "arm64" ]] && echo "True" || echo "False")
 	RPI_3=$([[ $ARCH == "arm64" ]] && echo "False" || echo "True")
@@ -106,7 +106,8 @@ repos["trufflehog"]="trufflesecurity/trufflehog"
 repos["nomore403"]="devploit/nomore403"
 repos["SwaggerSpy"]="UndeadSec/SwaggerSpy"
 repos["LeakSearch"]="JoelGMSec/LeakSearch"
-repos["Wapiti"]="wapiti-scanner/wapiti"
+repos["ffufPostprocessing"]="Damian89/ffufPostprocessing"
+repos["misconfig-mapper"]="intigriti/misconfig-mapper"
 
 function banner() {
 	tput clear
@@ -207,14 +208,16 @@ function install_tools() {
             if [[ "nomore403" == "$repo" ]]; then
                 eval go get $DEBUG_STD && eval go build $DEBUG_STD && eval chmod +x ./nomore403 $DEBUG_STD
             fi
-			if [[ "brutespray" == "$repo" ]]; then
+			if [[ "ffufPostprocessing" == "$repo" ]]; then
 				eval git reset --hard origin/main $DEBUG_STD
 				eval git pull $DEBUG_STD
-				eval go build -o brutespray main.go $DEBUG_STD && eval chmod +x ./brutespray $DEBUG_STD
+				eval go build -o ffufPostprocessing main.go $DEBUG_STD && eval chmod +x ./ffufPostprocessing $DEBUG_STD
 			fi
-			if [[ "wapiti" == "$repo" ]]; then
-                eval make install $DEBUG_STD
-            fi
+			if [[ "misconfig-mapper" == "$repo" ]]; then
+				eval git reset --hard origin/main $DEBUG_STD
+				eval git pull $DEBUG_STD
+				eval go build -o misconfig-mapper $DEBUG_STD && eval chmod +x ./misconfig-mapper $DEBUG_STD
+			fi
 		fi
 		if [[ "gf" == "$repo" ]]; then
             eval cp -r examples ~/.gf $DEBUG_ERROR
@@ -284,7 +287,7 @@ install_apt() {
 	eval $SUDO apt update -y $DEBUG_STD
 	eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium-browser -y $DEBUG_STD
 	eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium -y $DEBUG_STD
-	eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip python3-virtualenv build-essential gcc cmake ruby whois git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx medusa xvfb libxml2-utils procps bsdmainutils libdata-hexdump-perl -y $DEBUG_STD
+	eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip python3-virtualenv build-essential gcc cmake ruby whois git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx medusa xvfb libxml2-utils procps bsdmainutils libdata-hexdump-perl libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon-x11-0 libxcomposite-dev libxdamage1 libxrandr2 libgbm-dev libpangocairo-1.0-0 libasound2 -y $DEBUG_STD
 	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
 	eval source "${HOME}/.cargo/env $DEBUG_STD"
 	eval cargo install ripgen $DEBUG_STD
@@ -441,7 +444,7 @@ printf "${bblue}\n Running: Downloading required files ${reset}\n\n"
 #wget -q -O - https://raw.githubusercontent.com/devanshbatham/ParamSpider/master/gf_profiles/potential.json > ~/.gf/potential.json - Removed
 wget -q -O - https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py >${tools}/getjswords.py
 wget -q -O - https://raw.githubusercontent.com/n0kovo/n0kovo_subdomains/main/n0kovo_subdomains_huge.txt >${subs_wordlist_big}
-wget -q -O - https://raw.githubusercontent.com/six2dez/resolvers_reconftw/main/resolvers_trusted.txt >${resolvers_trusted}
+wget -q -O - https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw/trusted_resolvers.txt >${resolvers_trusted}
 wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt >${resolvers}
 wget -q -O - https://gist.github.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw >${subs_wordlist}
 wget -q -O - https://gist.github.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw >${tools}/permutations_list.txt
@@ -500,7 +503,7 @@ if [[ $generate_resolvers == true ]]; then
         [[ -s "tmp_resolvers" ]] && cat tmp_resolvers | anew -q $resolvers
         [[ -s "tmp_resolvers" ]] && rm -f tmp_resolvers &>/dev/null
         [[ ! -s $resolvers ]] && wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt >${resolvers}
-        [[ ! -s $resolvers_trusted ]] && wget -q -O - https://raw.githubusercontent.com/six2dez/resolvers_reconftw/main/resolvers_trusted.txt >${resolvers_trusted}
+        [[ ! -s $resolvers_trusted ]] && wget -q -O - https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw/trusted_resolvers.txt >${resolvers_trusted}
 		printf "${yellow} Resolvers updated\n ${reset}\n\n"
 	fi
 	generate_resolvers=false
@@ -508,7 +511,7 @@ else
 	[[ ! -s $resolvers ]] || if [[ $(find "$resolvers" -mtime +1 -print) ]]; then
 		${reset}"\n\nChecking resolvers lists...\n Accurate resolvers are the key to great results\n Downloading new resolvers ${reset}\n\n"
 		wget -q -O - https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt >${resolvers}
-		wget -q -O - https://raw.githubusercontent.com/six2dez/resolvers_reconftw/main/resolvers_trusted.txt >${resolvers_trusted}
+		wget -q -O - https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw/trusted_resolvers.txt >${resolvers_trusted}
 		printf "${yellow} Resolvers updated\n ${reset}\n\n"
 	fi
 fi
