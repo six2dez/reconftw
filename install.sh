@@ -106,8 +106,8 @@ repos["trufflehog"]="trufflesecurity/trufflehog"
 repos["nomore403"]="devploit/nomore403"
 repos["SwaggerSpy"]="UndeadSec/SwaggerSpy"
 repos["LeakSearch"]="JoelGMSec/LeakSearch"
-repos["Wapiti"]="wapiti-scanner/wapiti"
 repos["ffufPostprocessing"]="Damian89/ffufPostprocessing"
+repos["misconfig-mapper"]="intigriti/misconfig-mapper"
 
 function banner() {
 	tput clear
@@ -213,9 +213,11 @@ function install_tools() {
 				eval git pull $DEBUG_STD
 				eval go build -o ffufPostprocessing main.go $DEBUG_STD && eval chmod +x ./ffufPostprocessing $DEBUG_STD
 			fi
-			if [[ "wapiti" == "$repo" ]]; then
-                eval make install $DEBUG_STD
-            fi
+			if [[ "misconfig-mapper" == "$repo" ]]; then
+				eval git reset --hard origin/main $DEBUG_STD
+				eval git pull $DEBUG_STD
+				eval go build -o misconfig-mapper $DEBUG_STD && eval chmod +x ./misconfig-mapper $DEBUG_STD
+			fi
 		fi
 		if [[ "gf" == "$repo" ]]; then
             eval cp -r examples ~/.gf $DEBUG_ERROR
