@@ -2742,13 +2742,13 @@ function transfer {
 		fi
 		if [[ -d $file ]]; then
 			file_name="$file_name.zip"
-			(cd "$file" && zip -r -q - .) | curl --progress-bar --upload-file "-" "https://oshi.at" | tee /dev/null
+			(cd "$file" && zip -r -q - .) | curl --progress-bar --upload-file "-" "https://oshi.at/${file_name}" | tee /dev/null
 		else
-			cat "$file" | curl --progress-bar --upload-file "-" "https://oshi.at" | tee /dev/null
+			cat "$file" | curl --progress-bar --upload-file "-" "https://oshi.at/${file_name}" | tee /dev/null
 		fi
 	else
 		file_name=$1
-		curl --progress-bar --upload-file "-" "https://oshi.at" | tee /dev/null
+		curl --progress-bar --upload-file "-" "https://oshi.at/${file_name}" | tee /dev/null
 	fi
 }
 
