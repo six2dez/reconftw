@@ -594,7 +594,7 @@ function emails() {
 			echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
 		}
 
-		python3 LeakSearch.py -k $domain -o ${dir}/.tmp/passwords.txt 2>>"$LOGFILE" || {
+		python3 LeakSearch.py -k $domain -o ${dir}/.tmp/passwords.txt 1>>"$LOGFILE" || {
 			echo "LeakSearch command failed"
 		}
 
@@ -2742,13 +2742,13 @@ function transfer {
 		fi
 		if [[ -d $file ]]; then
 			file_name="$file_name.zip"
-			(cd "$file" && zip -r -q - .) | curl --progress-bar --upload-file "-" "https://transfer.sh/$file_name" | tee /dev/null
+			(cd "$file" && zip -r -q - .) | curl --progress-bar --upload-file "-" "https://oshi.at" | tee /dev/null
 		else
-			cat "$file" | curl --progress-bar --upload-file "-" "https://transfer.sh/$file_name" | tee /dev/null
+			cat "$file" | curl --progress-bar --upload-file "-" "https://oshi.at" | tee /dev/null
 		fi
 	else
 		file_name=$1
-		curl --progress-bar --upload-file "-" "https://transfer.sh/$file_name" | tee /dev/null
+		curl --progress-bar --upload-file "-" "https://oshi.at" | tee /dev/null
 	fi
 }
 
@@ -2760,7 +2760,7 @@ function sendToNotify {
 			NOTIFY_CONFIG=~/.config/notify/provider-config.yaml
 		fi
 		if [[ -n "$(find "${1}" -prune -size +8000000c)" ]]; then
-			printf '%s is larger than 8MB, sending over transfer.sh\n' "${1}"
+			printf '%s is larger than 8MB, sending over oshi.at\n' "${1}"
 			transfer "${1}" | notify -silent
 			return 0
 		fi
