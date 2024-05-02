@@ -653,7 +653,7 @@ function domain_info() {
 function third_party_misconfigs() {
 
 	mkdir -p 3rdparties
-	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $3RD_PARTIES == true ]] && [[ $OSINT == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $THIRD_PARTIES == true ]] && [[ $OSINT == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Searching for third parties misconfigurations"
 		company_name=$(echo $domain | unfurl format %r)
 
@@ -669,12 +669,12 @@ function third_party_misconfigs() {
 		end_func "Results are saved in $domain/3rdparties" ${FUNCNAME[0]}
 
 	else
-		if [[ $3RD_PARTIES == false ]] || [[ $OSINT == false ]]; then
+		if [[ $THIRD_PARTIES == false ]] || [[ $OSINT == false ]]; then
 			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 			return
 		else
-			if [[ $3RD_PARTIES == false ]] || [[ $OSINT == false ]]; then
+			if [[ $THIRD_PARTIES == false ]] || [[ $OSINT == false ]]; then
 				printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 			else
 				printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
