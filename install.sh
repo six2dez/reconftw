@@ -108,6 +108,7 @@ repos["SwaggerSpy"]="UndeadSec/SwaggerSpy"
 repos["LeakSearch"]="JoelGMSec/LeakSearch"
 repos["ffufPostprocessing"]="Damian89/ffufPostprocessing"
 repos["misconfig-mapper"]="intigriti/misconfig-mapper"
+repos["Spoofy"]="MattKeeley/Spoofy"
 
 function banner() {
 	tput clear

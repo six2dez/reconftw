@@ -189,6 +189,10 @@ function tools_installed() {
 		printf "${bred} [*] misconfig-mapper		[NO]${reset}\n"
 		allinstalled=false
 	}
+	[ -f "${tools}/Spoofy/spoofy.py" ] || {
+		printf "${bred} [*] spoofy			[NO]${reset}\n"
+		allinstalled=false
+	}
 	[ -f "${tools}/SwaggerSpy/swaggerspy.py" ] || {
 		printf "${bred} [*] swaggerspy			[NO]${reset}\n"
 		allinstalled=false
@@ -660,7 +664,7 @@ function third_party_misconfigs() {
 		pushd "${tools}/misconfig-mapper" >/dev/null || {
 			echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
 		}
-		./misconfig-mapper -target $company_name -service "*" | grep "\[-\]" > ${dir}/3rdparties/visma_misconfigurations.txt
+		./misconfig-mapper -target $company_name -service "*" | grep "\[-\]" > ${dir}/3rdparties/3rdparts_misconfigurations.txt
 
 		popd >/dev/null || {
 			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
@@ -675,6 +679,39 @@ function third_party_misconfigs() {
 			return
 		else
 			if [[ $THIRD_PARTIES == false ]] || [[ $OSINT == false ]]; then
+				printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			else
+				printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			fi
+		fi
+	fi
+
+}
+
+function spoof() {
+
+	mkdir -p spoof
+	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SPOOF == true ]] && [[ $OSINT == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+		start_func ${FUNCNAME[0]} "Searching for spoofable domains"
+
+		pushd "${tools}/Spoofy" >/dev/null || {
+			echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
+		}
+		./spoofy.py -d $domain > ${dir}/spoof/spoof.txt
+
+		popd >/dev/null || {
+			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
+		}
+
+		end_func "Results are saved in $domain/3rdparties" ${FUNCNAME[0]}
+
+	else
+		if [[ $SPOOF == false ]] || [[ $OSINT == false ]]; then
+			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+		elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+			return
+		else
+			if [[ $SPOOF == false ]] || [[ $OSINT == false ]]; then
 				printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 			else
 				printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
