@@ -664,7 +664,7 @@ function third_party_misconfigs() {
 		pushd "${tools}/misconfig-mapper" >/dev/null || {
 			echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
 		}
-		./misconfig-mapper -target $company_name -service "*" | grep "\[-\]" > ${dir}/osint/3rdparts_misconfigurations.txt
+		./misconfig-mapper -target $company_name -service "*" | grep -v "\[-\]" > ${dir}/osint/3rdparts_misconfigurations.txt
 
 		popd >/dev/null || {
 			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
