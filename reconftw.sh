@@ -656,7 +656,7 @@ function domain_info() {
 
 function third_party_misconfigs() {
 
-	mkdir -p 3rdparties
+	mkdir -p osint
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $THIRD_PARTIES == true ]] && [[ $OSINT == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Searching for third parties misconfigurations"
 		company_name=$(echo $domain | unfurl format %r)
@@ -664,13 +664,13 @@ function third_party_misconfigs() {
 		pushd "${tools}/misconfig-mapper" >/dev/null || {
 			echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
 		}
-		./misconfig-mapper -target $company_name -service "*" | grep "\[-\]" > ${dir}/3rdparties/3rdparts_misconfigurations.txt
+		./misconfig-mapper -target $company_name -service "*" | grep "\[-\]" > ${dir}/osint/3rdparts_misconfigurations.txt
 
 		popd >/dev/null || {
 			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
 		}
 
-		end_func "Results are saved in $domain/3rdparties" ${FUNCNAME[0]}
+		end_func "Results are saved in $domain/osint/3rdparts_misconfigurations.txt" ${FUNCNAME[0]}
 
 	else
 		if [[ $THIRD_PARTIES == false ]] || [[ $OSINT == false ]]; then
@@ -690,20 +690,20 @@ function third_party_misconfigs() {
 
 function spoof() {
 
-	mkdir -p spoof
+	mkdir -p osint
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SPOOF == true ]] && [[ $OSINT == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Searching for spoofable domains"
 
 		pushd "${tools}/Spoofy" >/dev/null || {
 			echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
 		}
-		./spoofy.py -d $domain > ${dir}/spoof/spoof.txt
+		./spoofy.py -d $domain > ${dir}/osint/spoof.txt
 
 		popd >/dev/null || {
 			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
 		}
 
-		end_func "Results are saved in $domain/3rdparties" ${FUNCNAME[0]}
+		end_func "Results are saved in $domain/osint/spoof.txt" ${FUNCNAME[0]}
 
 	else
 		if [[ $SPOOF == false ]] || [[ $OSINT == false ]]; then
