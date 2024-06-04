@@ -7,8 +7,8 @@
 </h1>
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.8.1">
-    <img src="https://img.shields.io/badge/release-v2.8.1-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.9">
+    <img src="https://img.shields.io/badge/release-v2.9-green">
   </a>
    </a>
   <a href="https://opensource.org/licenses/MIT">
@@ -144,9 +144,9 @@ Yes! reconFTW can also be easily deployed with Terraform and Ansible to AWS, if 
  <summary> :point_right: Click here to view default config file :point_left: </summary>
 
 ```yaml
-#################################################################
+#############################################
 #			reconFTW config file			#
-#################################################################
+#############################################
 
 # General values
 tools=~/Tools   # Path installed tools
@@ -162,8 +162,6 @@ proxy_url="http://127.0.0.1:8080/" # Proxy url
 install_golang=true # Set it to false if you already have Golang configured and ready
 upgrade_tools=true
 upgrade_before_running=false # Upgrade tools before running
-#SPINNY_FRAMES=(. .. ... .... ..... " ...." "  ..." "   .." "    ." "      " )
-SPINNY_DELAY=0.1
 #dir_output=/custom/output/path
 
 # Golang Vars (Comment or change on your own)
@@ -201,6 +199,8 @@ DOMAIN_INFO=true # whois info
 REVERSE_WHOIS=true # amass intel reverse whois info, takes some time
 IP_INFO=true    # Reverse IP search, geolocation and whois
 API_LEAKS=true # Check for API leaks
+THIRD_PARTIES=true # Check for 3rd parties misconfigs
+SPOOF=true # Check spoofable domains
 METAFINDER_LIMIT=20 # Max 250
 
 # Subdomains
@@ -238,8 +238,10 @@ UNCOMMON_PORTS_WEB="81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,30
 # Host
 FAVICON=true # Check Favicon domain discovery
 PORTSCANNER=true # Enable or disable the whole Port scanner module 
+GEO_INFO=true # Fetch Geolocalization info
 PORTSCAN_PASSIVE=true # Port scanner with Shodan
 PORTSCAN_ACTIVE=true # Port scanner with nmap
+PORTSCAN_ACTIVE_OPTIONS="--top-ports 200 -sV -n -Pn --open --max-retries 2 --script vulners"
 CDN_IP=true # Check which IPs belongs to CDN
 
 # Web analysis
@@ -256,6 +258,7 @@ URL_GF=true # Url patterns classification
 URL_EXT=true # Returns a list of files divided by extension
 JSCHECKS=true # JS analysis
 FUZZ=true # Web fuzzing
+IIS_SHORTNAME=true
 CMS_SCANNER=true # CMS scanner
 WORDLIST=true # Wordlist generation
 ROBOTSWORDLIST=true # Check historic disallow entries on waybackMachine
@@ -292,12 +295,12 @@ DEEP=false # DEEP mode, really slow and don't care about the number of results
 DEEP_LIMIT=500 # First limit to not run unless you run DEEP
 DEEP_LIMIT2=1500 # Second limit to not run unless you run DEEP
 DIFF=false # Diff function, run every module over an already scanned target, printing only new findings (but save everything)
-REMOVETMP=false # Delete temporary files after execution (to free up space)
+REMOVETMP=true # Delete temporary files after execution (to free up space)
 REMOVELOG=false # Delete logs after execution
 PROXY=false # Send to proxy the websites found
 SENDZIPNOTIFY=false # Send to zip the results (over notify)
 PRESERVE=true      # set to true to avoid deleting the .called_fn files on really large scans
-FFUF_FLAGS=" -mc all -fc 404 -ach -sf -of json" # Ffuf flags
+FFUF_FLAGS=" -mc all -fc 404 -sf -noninteractive -of json" # Ffuf flags
 HTTPX_FLAGS=" -follow-redirects -random-agent -status-code -silent -title -web-server -tech-detect -location -content-length" # Httpx flags for simple web probing
 
 # HTTP options
@@ -318,7 +321,6 @@ PUREDNS_TRUSTED_LIMIT=400
 PUREDNS_WILDCARDTEST_LIMIT=30
 PUREDNS_WILDCARDBATCH_LIMIT=1500000
 RESOLVE_DOMAINS_THREADS=150
-PPFUZZ_THREADS=30
 DNSVALIDATOR_THREADS=200
 INTERLACE_THREADS=10
 TLSX_THREADS=1000
@@ -482,6 +484,8 @@ reset='\033[0m'
 - Google Dorks ([dorks_hunter](https://github.com/six2dez/dorks_hunter))
 - Github Dorks ([gitdorks_go](https://github.com/damit5/gitdorks_go))
 - GitHub org analysis ([enumerepo](https://github.com/trickest/enumerepo), [trufflehog](https://github.com/trufflesecurity/trufflehog) and [gitleaks](https://github.com/gitleaks/gitleaks))
+- 3rd parties misconfigurations([misconfig-mapper](https://github.com/intigriti/misconfig-mapper))
+- Spoofable domains ([spoofcheck](https://github.com/MattKeeley/Spoofy))
 
 ## Subdomains
 
@@ -508,6 +512,7 @@ reset='\033[0m'
 - Port Scanner (Active with [nmap](https://github.com/nmap/nmap) and passive with [smap](https://github.com/s0md3v/Smap))
 - Port services vulnerability checks ([vulners](https://github.com/vulnersCom/nmap-vulners))
 - Password spraying ([brutespray](https://github.com/x90skysn3k/brutespray))
+- Geolocalization info (ipapi.co)
 
 ## Webs
 
@@ -518,7 +523,8 @@ reset='\033[0m'
 - Url extraction ([gau](https://github.com/lc/gau),[waymore](https://github.com/xnl-h4ck3r/waymore), [katana](https://github.com/projectdiscovery/katana), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3) and [JSA](https://github.com/w9w/JSA))
 - URL patterns Search and filtering ([urless](https://github.com/xnl-h4ck3r/urless), [gf](https://github.com/tomnomnom/gf) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns))
 - Favicon Real IP ([fav-up](https://github.com/pielco11/fav-up))
-- Javascript analysis ([subjs](https://github.com/lc/subjs), [JSA](https://github.com/w9w/JSA), [xnLinkFinder](https://github.com/xnl-h4ck3r/xnLinkFinder), [getjswords](https://github.com/m4ll0k/BBTz), [mantra](https://github.com/MrEmpy/mantra))
+- Javascript analysis ([subjs](https://github.com/lc/subjs), [JSA](https://github.com/w9w/JSA), [xnLinkFinder](https://github.com/xnl-h4ck3r/xnLinkFinder), [getjswords](https://github.com/m4ll0k/BBTz), [mantra](https://github.com/MrEmpy/mantra), [jsluice](https://github.com/BishopFox/jsluice))
+- Sourcemap JS extraction ([sourcemapper](https://github.com/denandz/sourcemapper))
 - Fuzzing ([ffuf](https://github.com/ffuf/ffuf))
 - URL sorting by extension
 - Wordlist generation
