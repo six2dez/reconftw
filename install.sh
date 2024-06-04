@@ -75,6 +75,8 @@ gotools["nmapurls"]="go install -v github.com/sdcampbell/nmapurls@latest"
 gotools["shortscan"]="go install -v github.com/bitquark/shortscan/cmd/shortscan@latest"
 gotools["sns"]="go install github.com/sw33tLie/sns@latest"
 gotools["ppmap"]="go install -v github.com/kleiton0x00/ppmap@latest"
+gotools["sourcemapper"]="go install -v github.com/denandz/sourcemapper@latest"
+gotools["jsluice"]="go install -v github.com/BishopFox/jsluice/cmd/jsluice@latest"
 
 # Declaring repositories and their paths
 declare -A repos

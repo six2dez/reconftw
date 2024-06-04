@@ -417,6 +417,14 @@ function tools_installed() {
 		printf "${bred} [*] sns			[NO]${reset}\n"
 		allinstalled=false
 	}
+	command -v sourcemapper &>/dev/null || {
+		printf "${bred} [*] sourcemapper			[NO]${reset}\n"
+		allinstalled=false
+	}
+	command -v jsluice &>/dev/null || {
+		printf "${bred} [*] jsluice			[NO]${reset}\n"
+		allinstalled=false
+	}
 	if [[ ${allinstalled} == true ]]; then
 		printf "${bgreen} Good! All installed! ${reset}\n\n"
 	else
@@ -1975,6 +1983,7 @@ function urlchecks() {
 			[ -s ".tmp/katana.txt" ] && sed -i '/^.\{2048\}./d' .tmp/katana.txt
 			[ -s ".tmp/katana.txt" ] && cat .tmp/katana.txt | anew -q .tmp/url_extract_tmp.txt
 			[ -s ".tmp/url_extract_tmp.txt" ] && cat .tmp/url_extract_tmp.txt | grep "${domain}" | grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' | grep -aEi "\.(js)" | anew -q .tmp/url_extract_js.txt
+			[ -s ".tmp/url_extract_tmp.txt" ] && cat .tmp/url_extract_tmp.txt | grep "${domain}" | grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' | grep -aEi "\.(js\.map)" | anew -q .tmp/url_extract_jsmap.txt
 			if [[ $DEEP == true ]]; then
 				[ -s ".tmp/url_extract_js.txt" ] && interlace -tL .tmp/url_extract_js.txt -threads 10 -c "python3 ${tools}/JSA/jsa.py -f target | anew -q .tmp/url_extract_tmp.txt" &>/dev/null
 			fi
@@ -2060,7 +2069,8 @@ function jschecks() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $JSCHECKS == true ]]; then
 		start_func ${FUNCNAME[0]} "Javascript Scan"
 		if [[ -s ".tmp/url_extract_js.txt" ]]; then
-			printf "${yellow} Running : Fetching Urls 1/5${reset}\n"
+
+			printf "${yellow} Running : Fetching Urls 1/6${reset}\n"
 			if [[ $AXIOM != true ]]; then
 				cat .tmp/url_extract_js.txt | subjs -ua "Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -c 40 | grep "$domain" | grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' | anew -q .tmp/subjslinks.txt
 			else
@@ -2069,31 +2079,36 @@ function jschecks() {
 			[ -s ".tmp/subjslinks.txt" ] && cat .tmp/subjslinks.txt | egrep -iv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)" | anew -q js/nojs_links.txt
 			[ -s ".tmp/subjslinks.txt" ] && cat .tmp/subjslinks.txt | grep -iE "\.js($|\?)" | anew -q .tmp/url_extract_js.txt
 			cat .tmp/url_extract_js.txt | python3 ${tools}/urless/urless/urless.py | anew -q js/url_extract_js.txt 2>>"$LOGFILE" >/dev/null
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] Running : Resolving JS Urls 2/5${reset}\n"
+
+			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] Running : Resolving JS Urls 2/6${reset}\n"
 			if [[ $AXIOM != true ]]; then
 				[ -s "js/url_extract_js.txt" ] && cat js/url_extract_js.txt | httpx -follow-redirects -random-agent -silent -timeout $HTTPX_TIMEOUT -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -status-code -content-type -retries 2 -no-color | grep "[200]" | grep "javascript" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
 			else
 				[ -s "js/url_extract_js.txt" ] && axiom-scan js/url_extract_js.txt -m httpx -follow-host-redirects -H \"${HEADER}\" -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -content-type -retries 2 -no-color -o .tmp/js_livelinks.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 				[ -s ".tmp/js_livelinks.txt" ] && cat .tmp/js_livelinks.txt | anew .tmp/web_full_info.txt | grep "[200]" | grep "javascript" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
 			fi
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] Running : Gathering endpoints 3/5${reset}\n"
+
+			printf "${yellow} Running : Extracting JS from sourcemaps 3/6${reset}\n"
+			mkdir -p .tmp/sourcemapper
+			[ -s "js/js_livelinks.txt" ] && interlace -tL js/js_livelinks.txt -threads ${INTERLACE_THREADS} -c "sourcemapper -jsurl '_target_' -output _output_/_cleantarget_" -o .tmp/sourcemapper 2>>"$LOGFILE" >/dev/null
+			[ -s ".tmp/url_extract_jsmap.txt" ] && interlace -tL js/js_livelinks.txt -threads ${INTERLACE_THREADS} -c "sourcemapper -url '_target_' -output _output_/_cleantarget_" -o .tmp/sourcemapper 2>>"$LOGFILE" >/dev/null
+
+			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] Running : Gathering endpoints 4/6${reset}\n"
 			[ -s "js/js_livelinks.txt" ] && xnLinkFinder -i js/js_livelinks.txt -sf subdomains/subdomains.txt -d $XNLINKFINDER_DEPTH -o .tmp/js_endpoints.txt 2>>"$LOGFILE" >/dev/null
+			find .tmp/sourcemapper/ \( -name "*.js" -o -name "*.ts" \) -type f | jsluice urls | jq -r .url | anew -q .tmp/js_endpoints.txt
 			[ -s "parameters.txt" ] && rm -f parameters.txt 2>>"$LOGFILE" >/dev/null
 			if [[ -s ".tmp/js_endpoints.txt" ]]; then
 				sed -i '/^\//!d' .tmp/js_endpoints.txt
 				cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt
 			fi
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] Running : Gathering secrets 4/5${reset}\n"
 
-			if [[ $AXIOM != true ]]; then
-				[ -s "js/js_livelinks.txt" ] && cat js/js_livelinks.txt | mantra -ua ${HEADER} -s | anew -q js/js_secrets.txt
-				[ -s "js/js_secrets.txt" ] && trufflehog filesystem js/js_secrets.txt --only-verified -j 2>/dev/null | jq -c | anew -q js/js_secrets_trufflehog.txt
-			else
-				[ -s "js/js_livelinks.txt" ] && axiom-scan js/js_livelinks.txt -m mantra -ua \"${HEADER}\" -s -o js/js_secrets.txt $AXIOM_EXTRA_ARGS &>/dev/null
-				[ -s "js/js_secrets.txt" ] && trufflehog filesystem js/js_secrets.txt --only-verified -j 2>/dev/null | jq -c | anew -q js/js_secrets_trufflehog.txt
-			fi
+			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] Running : Gathering secrets 5/6${reset}\n"
+			[ -s "js/js_livelinks.txt" ] && axiom-scan js/js_livelinks.txt -m mantra -ua \"${HEADER}\" -s -o js/js_secrets.txt $AXIOM_EXTRA_ARGS &>/dev/null
+			[ -s "js/js_secrets.txt" ] && trufflehog filesystem js/js_secrets.txt -j 2>/dev/null | jq -c | anew -q js/js_secrets_trufflehog.txt
+			[ -s "js/js_secrets.txt" ] && trufflehog filesystem .tmp/sourcemapper/ -j 2>/dev/null | jq -c | anew -q js/js_secrets_trufflehog.txt
 			[ -s "js/js_secrets.txt" ] && sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2};?)?)?[mGK]//g" -i js/js_secrets.txt
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] Running : Building wordlist 5/5${reset}\n"
+
+			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] Running : Building wordlist 6/6${reset}\n"
 			[ -s "js/js_livelinks.txt" ] && interlace -tL js/js_livelinks.txt -threads ${INTERLACE_THREADS} -c "python3 ${tools}/getjswords.py '_target_' | anew -q webs/dict_words.txt" 2>>"$LOGFILE" >/dev/null
 			end_func "Results are saved in $domain/js folder" ${FUNCNAME[0]}
 		else
