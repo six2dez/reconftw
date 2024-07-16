@@ -225,6 +225,14 @@ function tools_installed() {
 		printf "${bred} [*] dnsvalidator		[NO]${reset}\n"
 		allinstalled=false
 	}
+	command -v metafinder &>/dev/null || {
+		printf "${bred} [*] metafinder			[NO]${reset}\n"
+		allinstalled=false
+	}
+	command -v whois &>/dev/null || {
+		printf "${bred} [*] whois			[NO]${reset}\n"
+		allinstalled=false
+	}
 	command -v amass &>/dev/null || {
 		printf "${bred} [*] Amass			[NO]${reset}\n"
 		allinstalled=false
