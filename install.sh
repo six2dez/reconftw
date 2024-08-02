@@ -201,6 +201,7 @@ function install_tools() {
             fi
             if [[ -s "setup.py" ]]; then
                 eval $SUDO pip3 install . $DEBUG_STD
+				eval $SUDO python3 setup.py install $DEBUG_STD
             fi
             if [[ "massdns" == "$repo" ]]; then
                 eval make $DEBUG_STD && strip -s bin/massdns && eval $SUDO cp bin/massdns /usr/local/bin/ $DEBUG_ERROR
@@ -226,6 +227,8 @@ function install_tools() {
             eval cp -r examples ~/.gf $DEBUG_ERROR
         elif [[ "Gf-Patterns" == "$repo" ]]; then
             eval mv ./*.json ~/.gf $DEBUG_ERROR
+		elif [[ "trufflehog" == "$repo" ]]; then
+			eval curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sudo sh -s -- -v -b /usr/local/bin
         fi
         cd "${dir}" || {
 			echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"
@@ -290,7 +293,7 @@ install_apt() {
 	eval $SUDO apt update -y $DEBUG_STD
 	eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium-browser -y $DEBUG_STD
 	eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install chromium -y $DEBUG_STD
-	eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install python3 python3-pip python3-virtualenv build-essential gcc cmake ruby whois git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx medusa xvfb libxml2-utils procps bsdmainutils libdata-hexdump-perl libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon-x11-0 libxcomposite-dev libxdamage1 libxrandr2 libgbm-dev libpangocairo-1.0-0 libasound2 -y $DEBUG_STD
+	eval $SUDO DEBIAN_FRONTEND="noninteractive" apt install cargo python3 python3-pip python3-virtualenv build-essential gcc cmake ruby whois git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx medusa xvfb libxml2-utils procps bsdmainutils libdata-hexdump-perl libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon-x11-0 libxcomposite-dev libxdamage1 libxrandr2 libgbm-dev libpangocairo-1.0-0 libasound2 -y $DEBUG_STD
 	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
 	eval source "${HOME}/.cargo/env $DEBUG_STD"
 	eval cargo install ripgen $DEBUG_STD
