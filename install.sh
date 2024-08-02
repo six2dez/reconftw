@@ -228,7 +228,7 @@ function install_tools() {
         elif [[ "Gf-Patterns" == "$repo" ]]; then
             eval mv ./*.json ~/.gf $DEBUG_ERROR
 		elif [[ "trufflehog" == "$repo" ]]; then
-			eval curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sudo sh -s -- -v -b /usr/local/bin
+			eval curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sudo sh -s -- -v -b /usr/local/bin $DEBUG_STD
         fi
         cd "${dir}" || {
 			echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"
@@ -489,7 +489,7 @@ if [[ $double_check == "true" ]]; then
         elif [[ "Gf-Patterns" == "$repo" ]]; then
             eval mv ./*.json ~/.gf $DEBUG_ERROR
         elif [[ "trufflehog" == "$repo" ]]; then
-            eval go install $DEBUG_STD
+            eval curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sudo sh -s -- -v -b /usr/local/bin $DEBUG_STD
         fi
         cd "${dir}" || {
 			echo "Failed to cd to $dir in ${FUNCNAME[0]} @ line ${LINENO}"
