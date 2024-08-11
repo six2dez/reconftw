@@ -1375,22 +1375,50 @@ function s3buckets() {
 			axiom-scan subdomains/subdomains.txt -m s3scanner -o .tmp/s3buckets_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 			[ -s ".tmp/s3buckets_tmp.txt" ] && cat .tmp/s3buckets_tmp.txt .tmp/s3buckets_tmp2.txt 2>>"$LOGFILE" | anew -q .tmp/s3buckets.txt && sed -i '/^$/d' .tmp/s3buckets.txt
 		fi
-		# Cloudenum
-		keyword=${domain%%.*}
-		timeout -k 1m 20m python3 ~/Tools/cloud_enum/cloud_enum.py -k $keyword -l .tmp/output_cloud.txt 2>>"$LOGFILE" >/dev/null || ( true && echo "CloudEnum timeout reached")
 
-		NUMOFLINES1=$(cat .tmp/output_cloud.txt 2>>"$LOGFILE" | sed '/^#/d' | sed '/^$/d' | anew subdomains/cloud_assets.txt | wc -l)
-		if [[ $NUMOFLINES1 -gt 0 ]]; then
-			notification "${NUMOFLINES1} new cloud assets found" info
-		fi
-		NUMOFLINES2=$(cat .tmp/s3buckets.txt 2>>"$LOGFILE" | grep -aiv "not_exist" | grep -aiv "Warning:" | grep -aiv "invalid_name" | grep -aiv "^http" | awk 'NF' | anew subdomains/s3buckets.txt | sed '/^$/d' | wc -l)
-		if [[ $NUMOFLINES2 -gt 0 ]]; then
-			notification "${NUMOFLINES2} new S3 buckets found" info
-		fi
+        # Include root domain in the process
+        echo "$domain" > webs/full_webs.txt
+        cat webs/webs.txt >> webs/full_webs.txt
 
-		[ -s "subdomains/s3buckets.txt" ] && for i in $(cat subdomains/s3buckets.txt); do trufflehog s3 --bucket="$i" -j 2>/dev/null | jq -c | anew -q subdomains/s3buckets_trufflehog.txt; done
+        # Initialize the output file in the subdomains folder
+        > subdomains/cloudhunter_open_buckets.txt  # Create or clear the output file
 
-		end_func "Results are saved in subdomains/s3buckets.txt and subdomains/cloud_assets.txt" ${FUNCNAME[0]}
+        # Run CloudHunter on each URL in webs/full_webs.txt and append the output to the file in the subdomains folder
+        while IFS= read -r url; do
+            python3 ~/Tools/CloudHunter/cloudhunter.py -p ~/Tools/CloudHunter/permutations-big.txt -r ~/Tools/CloudHunter/resolvers.txt -t 50 "$url" >> subdomains/cloudhunter_open_buckets.txt 2>>"$LOGFILE"
+        done < webs/full_webs.txt
+
+		# Remove the full_webs.txt file after CloudHunter processing
+        rm webs/full_webs.txt
+
+        NUMOFLINES1=$(cat subdomains/cloudhunter_open_buckets.txt 2>>"$LOGFILE" | anew subdomains/cloud_assets.txt | wc -l)
+        if [[ $NUMOFLINES1 -gt 0 ]]; then
+            notification "${NUMOFLINES1} new cloud assets found" info
+        fi
+
+        NUMOFLINES2=$(cat .tmp/s3buckets.txt 2>>"$LOGFILE" | grep -aiv "not_exist" | grep -aiv "Warning:" | grep -aiv "invalid_name" | grep -aiv "^http" | awk 'NF' | anew subdomains/s3buckets.txt | sed '/^$/d' | wc -l)
+        if [[ $NUMOFLINES2 -gt 0 ]]; then
+            notification "${NUMOFLINES2} new S3 buckets found" info
+        fi
+
+        [ -s "subdomains/s3buckets.txt" ] && for i in $(cat subdomains/s3buckets.txt); do 
+            trufflehog s3 --bucket="$i" -j 2>/dev/null | jq -c | anew -q subdomains/s3buckets_trufflehog.txt; 
+        done
+
+        # Run trufflehog for open buckets found by CloudHunter
+        [ -s "subdomains/cloudhunter_open_buckets.txt" ] && while IFS= read -r line; do
+            if echo "$line" | grep -q "Aws Cloud"; then
+                # AWS S3 Bucket
+                bucket_name=$(echo "$line" | awk '{print $3}')
+                trufflehog s3 --bucket="$bucket_name" -j 2>/dev/null | jq -c | anew -q subdomains/cloudhunter_buckets_trufflehog.txt
+            elif echo "$line" | grep -q "Google Cloud"; then
+                # Google Cloud Storage
+                bucket_name=$(echo "$line" | awk '{print $3}')
+                trufflehog gs --bucket="$bucket_name" -j 2>/dev/null | jq -c | anew -q subdomains/cloudhunter_buckets_trufflehog.txt
+            fi
+        done < subdomains/cloudhunter_open_buckets.txt
+
+        end_func "Results are saved in subdomains/s3buckets.txt, subdomains/cloud_assets.txt, subdomains/s3buckets_trufflehog.txt, and subdomains/cloudhunter_buckets_trufflehog.txt" ${FUNCNAME[0]}
 	else
 		if [[ $S3BUCKETS == false ]]; then
 			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
