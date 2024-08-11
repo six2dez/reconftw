@@ -1378,7 +1378,7 @@ function s3buckets() {
 
         # Include root domain in the process
         echo "$domain" > webs/full_webs.txt
-        cat webs/webs.txt >> webs/full_webs.txt
+        cat webs/webs_all.txt >> webs/full_webs.txt
 
         # Initialize the output file in the subdomains folder
         > subdomains/cloudhunter_open_buckets.txt  # Create or clear the output file
