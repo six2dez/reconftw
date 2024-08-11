@@ -153,8 +153,8 @@ function tools_installed() {
 		printf "${bred} [*] JSA			[NO]${reset}\n"
 		allinstalled=false
 	}
-	[ -f "${tools}/cloud_enum/cloud_enum.py" ] || {
-		printf "${bred} [*] cloud_enum			[NO]${reset}\n"
+	[ -f "${tools}/CloudHunter/cloudhunter.py" ] || {
+		printf "${bred} [*] CloudHunter			[NO]${reset}\n"
 		allinstalled=false
 	}
 	[ -f "${tools}/ultimate-nmap-parser/ultimate-nmap-parser.sh" ] || {
