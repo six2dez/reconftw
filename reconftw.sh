@@ -3379,19 +3379,37 @@ function multi_recon() {
 
 	for domain in $targets; do
 		dir=$workdir/targets/$domain
-		called_fn_dir=$dir/.called_fn
-		mkdir -p $dir
-		cd "$dir" || {
-			echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
-			exit 1
-		}
-		mkdir -p {.log,.tmp,webs,hosts,vulns,osint,screenshots,subdomains}
+    called_fn_dir=$dir/.called_fn
 
-		NOW=$(date +"%F")
-		NOWT=$(date +"%T")
-		LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
-		touch .log/${NOW}_${NOWT}.txt
-		echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
+    # Ensure directories exist
+    mkdir -p "$dir" || {
+        echo "Failed to create directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
+        exit 1
+    }
+    mkdir -p "$called_fn_dir" || {
+        echo "Failed to create directory '$called_fn_dir' in ${FUNCNAME[0]} @ line ${LINENO}"
+        exit 1
+    }
+
+    cd "$dir" || {
+        echo "Failed to cd to directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
+        exit 1
+    }
+
+    mkdir -p {.log,.tmp,webs,hosts,vulns,osint,screenshots,subdomains}
+
+    NOW=$(date +"%F")
+    NOWT=$(date +"%T")
+    LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
+    
+    # Ensure the .log directory exists before touching the file
+    mkdir -p .log
+
+    touch "$LOGFILE" || {
+        echo "Failed to create log file: $LOGFILE"
+        exit 1
+    }
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"$LOGFILE"
 		loopstart=$(date +%s)
 
 		domain_info
