@@ -3364,6 +3364,8 @@ function recon() {
 
 function multi_recon() {
 
+	[ "$SOFT_NOTIFICATION" = true ] && echo "$(date +'%Y-%m-%d %H:%M:%S') Recon successfully started on ${multi}" | notify -silent
+
 	global_start=$(date +%s)
 
 	#[[ -n "$domain" ]] && ipcidr_target $domain
@@ -3582,6 +3584,7 @@ function multi_recon() {
 	dir=$workdir
 	domain=$multi
 	end
+	[ "$SOFT_NOTIFICATION" = true ] && echo "$(date +'%Y-%m-%d %H:%M:%S') Finished Recon on: ${multi} in ${runtime}" | notify -silent
 }
 
 function multi_custom() {
