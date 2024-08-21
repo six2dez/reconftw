@@ -1383,9 +1383,27 @@ function s3buckets() {
         # Initialize the output file in the subdomains folder
         > subdomains/cloudhunter_open_buckets.txt  # Create or clear the output file
 
+		# Determine the CloudHunter permutations flag based on the config
+		PERMUTATION_FLAG=""
+		case "$CLOUDHUNTER_PERMUTATION" in
+		DEEP)
+			PERMUTATION_FLAG="-p ~/Tools/CloudHunter/permutations-big.txt"
+			;;
+		NORMAL)
+			PERMUTATION_FLAG="-p ~/Tools/CloudHunter/permutations.txt"
+			;;
+		NONE)
+			PERMUTATION_FLAG=""
+			;;
+		*)
+			echo "Invalid value for CloudHunter_Permutations: $CloudHunter_Permutations" >> "$LOGFILE"
+			exit 1
+			;;
+        esac
+
         # Run CloudHunter on each URL in webs/full_webs.txt and append the output to the file in the subdomains folder
         while IFS= read -r url; do
-            python3 ~/Tools/CloudHunter/cloudhunter.py -p ~/Tools/CloudHunter/permutations-big.txt -r ~/Tools/CloudHunter/resolvers.txt -t 50 "$url" >> subdomains/cloudhunter_open_buckets.txt 2>>"$LOGFILE"
+            python3 ~/Tools/CloudHunter/cloudhunter.py $PERMUTATION_FLAG -r ~/Tools/CloudHunter/resolvers.txt -t 50 "$url" >> subdomains/cloudhunter_open_buckets.txt 2>>"$LOGFILE"
         done < webs/full_webs.txt
 
 		# Remove the full_webs.txt file after CloudHunter processing
