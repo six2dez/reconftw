@@ -3510,7 +3510,7 @@ function multi_recon() {
 	dir=$workdir
 	domain=$multi
 	end
-	[ "$SOFT_NOTIFICATION" = true ] && echo "$(date +'%Y-%m-%d %H:%M:%S') Finished Recon on: ${domain} in ${runtime}" | notify -silent
+	[ "$SOFT_NOTIFICATION" = true ] && echo "$(date +'%Y-%m-%d %H:%M:%S') Finished Recon on: ${multi} in ${runtime}" | notify -silent
 }
 
 function multi_custom() {
