@@ -1387,10 +1387,10 @@ function s3buckets() {
 		PERMUTATION_FLAG=""
 		case "$CLOUDHUNTER_PERMUTATION" in
 		DEEP)
-			PERMUTATION_FLAG="-p ~/Tools/CloudHunter/permutations-big.txt"
+			PERMUTATION_FLAG="-p $HOME/Tools/CloudHunter/permutations-big.txt"
 			;;
 		NORMAL)
-			PERMUTATION_FLAG="-p ~/Tools/CloudHunter/permutations.txt"
+			PERMUTATION_FLAG="-p $HOME/Tools/CloudHunter/permutations.txt"
 			;;
 		NONE)
 			PERMUTATION_FLAG=""
@@ -2069,17 +2069,17 @@ function url_gf() {
 	mkdir -p {.tmp,webs,gf}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $URL_GF == true ]]; then
 		start_func ${FUNCNAME[0]} "Vulnerable Pattern Search"
-		if [[ -s "webs/url_extract.txt" ]]; then
-			gf xss webs/url_extract_nodupes.txt | anew -q gf/xss.txt
-			gf ssti webs/url_extract_nodupes.txt | anew -q gf/ssti.txt
-			gf ssrf webs/url_extract_nodupes.txt | anew -q gf/ssrf.txt
-			gf sqli webs/url_extract_nodupes.txt | anew -q gf/sqli.txt
-			gf redirect webs/url_extract_nodupes.txt | anew -q gf/redirect.txt
+		if [[ -s "webs/webs_nuclei.txt" ]]; then
+			gf xss webs/webs_nuclei.txt | anew -q gf/xss.txt
+			gf ssti webs/webs_nuclei.txt | anew -q gf/ssti.txt
+			gf ssrf webs/webs_nuclei.txt | anew -q gf/ssrf.txt
+			gf sqli webs/webs_nuclei.txt | anew -q gf/sqli.txt
+			gf redirect webs/webs_nuclei.txt | anew -q gf/redirect.txt
 			[ -s "gf/ssrf.txt" ] && cat gf/ssrf.txt | anew -q gf/redirect.txt
-			gf rce webs/url_extract_nodupes.txt | anew -q gf/rce.txt
-			gf potential webs/url_extract_nodupes.txt | cut -d ':' -f3-5 | anew -q gf/potential.txt
+			gf rce webs/webs_nuclei.txt | anew -q gf/rce.txt
+			gf potential webs/webs_nuclei.txt | cut -d ':' -f3-5 | anew -q gf/potential.txt
 			[ -s ".tmp/url_extract_tmp.txt" ] && cat .tmp/url_extract_tmp.txt | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | unfurl -u format %s://%d%p 2>>"$LOGFILE" | anew -q gf/endpoints.txt
-			gf lfi webs/url_extract_nodupes.txt | anew -q gf/lfi.txt
+			gf lfi webs/webs_nuclei.txt | anew -q gf/lfi.txt
 		fi
 		end_func "Results are saved in $domain/gf folder" ${FUNCNAME[0]}
 	else
