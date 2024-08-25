@@ -1363,11 +1363,15 @@ function zonetransfer() {
 }
 
 function s3buckets() {
-
     mkdir -p {.tmp,subdomains}
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $S3BUCKETS == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
         start_func ${FUNCNAME[0]} "AWS S3 buckets search"
         [[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" >"$dir/subdomains/subdomains.txt"
+        
+        # Debug: Print current directory and tools variable
+        echo "Current directory: $(pwd)" >> "$LOGFILE"
+        echo "Tools directory: $tools" >> "$LOGFILE"
+
         # S3Scanner
         if [[ $AXIOM != true ]]; then
             [ -s "subdomains/subdomains.txt" ] && s3scanner scan -f subdomains/subdomains.txt 2>>"$LOGFILE" | anew -q .tmp/s3buckets.txt
@@ -1387,10 +1391,10 @@ function s3buckets() {
         PERMUTATION_FLAG=""
         case "$CLOUDHUNTER_PERMUTATION" in
         DEEP)
-            PERMUTATION_FLAG="-p $HOME/Tools/CloudHunter/permutations-big.txt"
+            PERMUTATION_FLAG="-p $tools/CloudHunter/permutations-big.txt"
             ;;
         NORMAL)
-            PERMUTATION_FLAG="-p $HOME/Tools/CloudHunter/permutations.txt"
+            PERMUTATION_FLAG="-p $tools/CloudHunter/permutations.txt"
             ;;
         NONE)
             PERMUTATION_FLAG=""
@@ -1401,9 +1405,37 @@ function s3buckets() {
             ;;
         esac
 
+        # Debug: Print the full CloudHunter command
+        echo "CloudHunter command: python3 $tools/CloudHunter/cloudhunter.py $PERMUTATION_FLAG -r $tools/CloudHunter/resolvers.txt -t 50 [URL]" >> "$LOGFILE"
+
+        # Debug: Check if files exist
+        if [[ -f "$tools/CloudHunter/cloudhunter.py" ]]; then
+            echo "cloudhunter.py exists" >> "$LOGFILE"
+        else
+            echo "cloudhunter.py not found" >> "$LOGFILE"
+        fi
+
+        if [[ -n "$PERMUTATION_FLAG" ]]; then
+            if [[ -f "${PERMUTATION_FLAG#-p }" ]]; then
+                echo "Permutations file exists" >> "$LOGFILE"
+            else
+                echo "Permutations file not found: ${PERMUTATION_FLAG#-p }" >> "$LOGFILE"
+            fi
+        fi
+
+        if [[ -f "$tools/CloudHunter/resolvers.txt" ]]; then
+            echo "resolvers.txt exists" >> "$LOGFILE"
+        else
+            echo "resolvers.txt not found" >> "$LOGFILE"
+        fi
+
         # Run CloudHunter on each URL in webs/full_webs.txt and append the output to the file in the subdomains folder
         while IFS= read -r url; do
-            python3 ~/Tools/CloudHunter/cloudhunter.py $PERMUTATION_FLAG -r ~/Tools/CloudHunter/resolvers.txt -t 50 "$url" >> subdomains/cloudhunter_open_buckets.txt 2>>"$LOGFILE"
+            echo "Processing URL: $url" >> "$LOGFILE"
+            (
+                cd "$tools/CloudHunter" || { echo "Failed to cd to $tools/CloudHunter" >> "$LOGFILE"; return 1; }
+                python3 ./cloudhunter.py ${PERMUTATION_FLAG#-p } -r ./resolvers.txt -t 50 "$url"
+            ) >> "$dir/subdomains/cloudhunter_open_buckets.txt" 2>> "$LOGFILE"
         done < webs/full_webs.txt
 
         # Remove the full_webs.txt file after CloudHunter processing
