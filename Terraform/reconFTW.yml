@@ -31,12 +31,6 @@
         update: yes  
     - name: Install ReconFTW
       command: chdir=/opt/reconftw/ ./install.sh
-    - name: Create amass folder
-      shell: mkdir -p /home/admin/.config/amass/
-    - name: Copy Config File
-      synchronize:
-        src: files/config.ini
-        dest: /home/admin/.config/amass/config.ini
     - name: Copy reconftw.cfg File
       synchronize:
         src: files/reconftw.cfg
