@@ -171,7 +171,6 @@ export PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH
 
 # Tools config files
 #NOTIFY_CONFIG=~/.config/notify/provider-config.yaml # No need to define
-AMASS_CONFIG=~/.config/amass/config.ini
 GITHUB_TOKENS=${tools}/.github_tokens
 GITLAB_TOKENS=${tools}/.gitlab_tokens
 #CUSTOM_CONFIG=custom_config_path.txt # In case you use a custom config file, uncomment this line and set your files path
@@ -196,7 +195,6 @@ GITHUB_REPOS=true
 METADATA=true # Fetch metadata from indexed office documents
 EMAILS=true # Fetch emails from differents sites 
 DOMAIN_INFO=true # whois info
-REVERSE_WHOIS=true # amass intel reverse whois info, takes some time
 IP_INFO=true    # Reverse IP search, geolocation and whois
 API_LEAKS=true # Check for API leaks
 THIRD_PARTIES=true # Check for 3rd parties misconfigs
@@ -204,8 +202,6 @@ SPOOF=true # Check spoofable domains
 METAFINDER_LIMIT=20 # Max 250
 
 # Subdomains
-RUNAMASS=true
-RUNSUBFINDER=true
 SUBDOMAINS_GENERAL=true # Enable or disable the whole Subdomains module
 SUBPASSIVE=true # Passive subdomains search
 SUBCRT=true # crtsh search
@@ -332,8 +328,7 @@ NUCLEI_RATELIMIT=150
 FFUF_RATELIMIT=0
 
 # Timeouts
-AMASS_INTEL_TIMEOUT=15          # Minutes
-AMASS_ENUM_TIMEOUT=180          # Minutes
+SUBFINDER_ENUM_TIMEOUT=180          # Minutes
 CMSSCAN_TIMEOUT=3600            # Seconds
 FFUF_MAXTIME=900                # Seconds
 HTTPX_TIMEOUT=10                # Seconds
@@ -477,7 +472,7 @@ reset='\033[0m'
 
 ## Osint
 
-- Domain information ([whois](https://github.com/rfc1036/whois) and [amass](https://github.com/OWASP/Amass))
+- Domain information ([whois](https://github.com/rfc1036/whois))
 - Emails addresses and passwords leaks ([emailfinder](https://github.com/Josue87/EmailFinder) and [LeakSearch](https://github.com/JoelGMSec/LeakSearch))
 - Metadata finder ([MetaFinder](https://github.com/Josue87/MetaFinder))
 - API leaks search ([porch-pirate](https://github.com/MandConsultingGroup/porch-pirate) and [SwaggerSpy](https://github.com/UndeadSec/SwaggerSpy))
@@ -489,7 +484,7 @@ reset='\033[0m'
 
 ## Subdomains
 
-- Passive ([amass](https://github.com/OWASP/Amass), [subfinder](https://github.com/projectdiscovery/subfinder) and [github-subdomains](https://github.com/gwen001/github-subdomains))
+- Passive ([subfinder](https://github.com/projectdiscovery/subfinder) and [github-subdomains](https://github.com/gwen001/github-subdomains))
 - Certificate transparency ([crt](https://github.com/cemulus/crt))
 - NOERROR subdomain discovery ([dnsx](https://github.com/projectdiscovery/dnsx), more info [here](https://www.securesystems.de/blog/enhancing-subdomain-enumeration-ents-and-noerror/))
 - Bruteforce ([puredns](https://github.com/d3mondev/puredns))

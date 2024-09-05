@@ -120,7 +120,6 @@ rm -rf /root/.cache
 rm -rf /root/go
 eot
 
-COPY amass_config.ini /root/.config/amass/config.ini
 COPY github_tokens.txt /root/Tools/.github_tokens
 COPY notify.conf /root/.config/notify/notify.conf
 

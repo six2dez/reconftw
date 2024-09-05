@@ -233,10 +233,6 @@ function tools_installed() {
 		printf "${bred} [*] whois			[NO]${reset}\n"
 		allinstalled=false
 	}
-	command -v amass &>/dev/null || {
-		printf "${bred} [*] Amass			[NO]${reset}\n"
-		allinstalled=false
-	}
 	command -v dnsx &>/dev/null || {
 		printf "${bred} [*] dnsx			[NO]${reset}\n"
 		allinstalled=false
@@ -647,9 +643,6 @@ function domain_info() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $DOMAIN_INFO == true ]] && [[ $OSINT == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
 		start_func ${FUNCNAME[0]} "Searching domain info (whois, registrant name/email domains)"
 		whois -H $domain >osint/domain_info_general.txt || { echo "whois command failed"; }
-		if [[ $DEEP == true ]] && [[ $REVERSE_WHOIS == true ]]; then
-			timeout -k 1m ${AMASS_INTEL_TIMEOUT}m amass intel -d ${domain} -whois -timeout $AMASS_INTEL_TIMEOUT -o osint/domain_info_reverse_whois.txt 2>>"$LOGFILE" >>/dev/null || ( true && echo "Amass timeout reached")
-		fi
 
 		curl -s "https://aadinternals.azurewebsites.net/api/tenantinfo?domainName=${domain}" -H "Origin: https://aadinternals.com" | jq -r .domains[].name >osint/azure_tenant_domains.txt
 
@@ -830,12 +823,7 @@ function sub_passive() {
 	mkdir -p .tmp
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBPASSIVE == true ]]; then
 		start_subfunc ${FUNCNAME[0]} "Running : Passive Subdomain Enumeration"
-
-		if [[ $RUNAMASS == true ]]; then
-			timeout -k 1m ${AMASS_ENUM_TIMEOUT} amass enum -passive -d $domain -config $AMASS_CONFIG -timeout $AMASS_ENUM_TIMEOUT -json .tmp/amass_json.json 2>>"$LOGFILE" >>/dev/null  || ( true && echo "Amass enum passive timeout reached")
-		fi
-		[ -s ".tmp/amass_json.json" ] && cat .tmp/amass_json.json | jq -r '.name' | anew -q .tmp/amass_psub.txt
-		[[ $RUNSUBFINDER == true ]] && subfinder -all -d "$domain" -silent -o .tmp/subfinder_psub.txt 2>>"$LOGFILE" >/dev/null
+		subfinder -all -d "$domain" -max-time ${SUBFINDER_ENUM_TIMEOUT} -silent -o .tmp/subfinder_psub.txt 2>>"$LOGFILE" >/dev/null
 
 		if [[ -s ${GITHUB_TOKENS} ]]; then
 			if [[ $DEEP == true ]]; then
@@ -848,7 +836,6 @@ function sub_passive() {
 			gitlab-subdomains -d "$domain" -t "$GITLAB_TOKENS" 2>>"$LOGFILE" | tee .tmp/gitlab_subdomains_psub.txt >/dev/null
 		fi
 		if [[ $INSCOPE == true ]]; then
-			check_inscope .tmp/amass_psub.txt 2>>"$LOGFILE" >/dev/null
 			check_inscope .tmp/subfinder_psub.txt 2>>"$LOGFILE" >/dev/null
 			check_inscope .tmp/github_subdomains_psub.txt 2>>"$LOGFILE" >/dev/null
 			check_inscope .tmp/gitlab_subdomains_psub.txt 2>>"$LOGFILE" >/dev/null
@@ -1208,13 +1195,13 @@ function sub_recursive_passive() {
 		[ -s "subdomains/subdomains.txt" ] && dsieve -if subdomains/subdomains.txt -f 3 -top $DEEP_RECURSIVE_PASSIVE >.tmp/subdomains_recurs_top.txt
 		if [[ $AXIOM != true ]]; then
 			resolvers_update_quick_local
-			[ -s ".tmp/subdomains_recurs_top.txt" ] && timeout -k 1m ${AMASS_ENUM_TIMEOUT}m amass enum -passive -df .tmp/subdomains_recurs_top.txt -nf subdomains/subdomains.txt -config $AMASS_CONFIG -timeout $AMASS_ENUM_TIMEOUT -o .tmp/passive_recursive_tmp.txt 2>>"$LOGFILE" || ( true && echo "Amass recursive timeout reached")
+			[ -s ".tmp/subdomains_recurs_top.txt" ] && subfinder -all -dL .tmp/subdomains_recurs_top.txt -max-time ${SUBFINDER_ENUM_TIMEOUT} -silent -o .tmp/passive_recursive_tmp.txt 2>>"$LOGFILE" || ( true && echo "Subfinder recursive timeout reached")
 			[ -s ".tmp/passive_recursive_tmp.txt" ] && cat .tmp/passive_recursive_tmp.txt | anew -q .tmp/passive_recursive.txt
 			[ -s ".tmp/passive_recursive.txt" ] && puredns resolve .tmp/passive_recursive.txt -w .tmp/passive_recurs_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" >/dev/null
 		else
 			resolvers_update_quick_axiom
-			[ -s ".tmp/subdomains_recurs_top.txt" ] && axiom-scan .tmp/subdomains_recurs_top.txt -m amass -passive -o .tmp/amass_prec.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
-			[ -s ".tmp/amass_prec.txt" ] && cat .tmp/amass_prec.txt | anew -q .tmp/passive_recursive.txt
+			[ -s ".tmp/subdomains_recurs_top.txt" ] && axiom-scan .tmp/subdomains_recurs_top.txt -m subfinder -all -o .tmp/subfinder_prec.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+			[ -s ".tmp/subfinder_prec.txt" ] && cat .tmp/subfinder_prec.txt | anew -q .tmp/passive_recursive.txt
 			[ -s ".tmp/passive_recursive.txt" ] && axiom-scan .tmp/passive_recursive.txt -m puredns-resolve -r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT -o .tmp/passive_recurs_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 		fi
 		[[ $INSCOPE == true ]] && check_inscope .tmp/passive_recurs_tmp.txt 2>>"$LOGFILE" >/dev/null

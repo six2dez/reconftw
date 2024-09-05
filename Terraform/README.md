@@ -17,7 +17,7 @@ As well as both `access_key` and `secret_key` (<https://aws.amazon.com/premiumsu
 Note: **this will charge costs (unless you are in the Free Tier)**
 
 1. Move to the Terraform folder (optional but recommended): `cd terraform`
-    - Put your own Amass config file and reconFTW config file on the files/ folder
+    - Put your own Subfinder config file and reconFTW config file on the files/ folder
 1. Create a key pair to be used, e.g: `ssh-keygen -f terraform-keys -t ecdsa -b 521`
 1. Run `terraform init`
 1. Run `terraform apply`
