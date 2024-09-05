@@ -153,8 +153,8 @@ function tools_installed() {
 		printf "${bred} [*] JSA			[NO]${reset}\n"
 		allinstalled=false
 	}
-	[ -f "${tools}/cloud_enum/cloud_enum.py" ] || {
-		printf "${bred} [*] cloud_enum			[NO]${reset}\n"
+	[ -f "${tools}/CloudHunter/cloudhunter.py" ] || {
+		printf "${bred} [*] CloudHunter			[NO]${reset}\n"
 		allinstalled=false
 	}
 	[ -f "${tools}/ultimate-nmap-parser/ultimate-nmap-parser.sh" ] || {
@@ -1363,48 +1363,121 @@ function zonetransfer() {
 }
 
 function s3buckets() {
+    mkdir -p {.tmp,subdomains}
+    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $S3BUCKETS == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+        start_func ${FUNCNAME[0]} "AWS S3 buckets search"
+        [[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" >"$dir/subdomains/subdomains.txt"
+        
+        # Debug: Print current directory and tools variable
+        echo "Current directory: $(pwd)" >> "$LOGFILE"
+        echo "Tools directory: $tools" >> "$LOGFILE"
 
-	mkdir -p {.tmp,subdomains}
-	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $S3BUCKETS == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
-		start_func ${FUNCNAME[0]} "AWS S3 buckets search"
-		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" >"$dir/subdomains/subdomains.txt"
-		# S3Scanner
-		if [[ $AXIOM != true ]]; then
-			[ -s "subdomains/subdomains.txt" ] && s3scanner scan -f subdomains/subdomains.txt 2>>"$LOGFILE" | anew -q .tmp/s3buckets.txt
-		else
-			axiom-scan subdomains/subdomains.txt -m s3scanner -o .tmp/s3buckets_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
-			[ -s ".tmp/s3buckets_tmp.txt" ] && cat .tmp/s3buckets_tmp.txt .tmp/s3buckets_tmp2.txt 2>>"$LOGFILE" | anew -q .tmp/s3buckets.txt && sed -i '/^$/d' .tmp/s3buckets.txt
-		fi
-		# Cloudenum
-		keyword=${domain%%.*}
-		timeout -k 1m 20m python3 ~/Tools/cloud_enum/cloud_enum.py -k $keyword -l .tmp/output_cloud.txt 2>>"$LOGFILE" >/dev/null || ( true && echo "CloudEnum timeout reached")
+        # S3Scanner
+        if [[ $AXIOM != true ]]; then
+            [ -s "subdomains/subdomains.txt" ] && s3scanner scan -f subdomains/subdomains.txt 2>>"$LOGFILE" | anew -q .tmp/s3buckets.txt
+        else
+            axiom-scan subdomains/subdomains.txt -m s3scanner -o .tmp/s3buckets_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+            [ -s ".tmp/s3buckets_tmp.txt" ] && cat .tmp/s3buckets_tmp.txt .tmp/s3buckets_tmp2.txt 2>>"$LOGFILE" | anew -q .tmp/s3buckets.txt && sed -i '/^$/d' .tmp/s3buckets.txt
+        fi
 
-		NUMOFLINES1=$(cat .tmp/output_cloud.txt 2>>"$LOGFILE" | sed '/^#/d' | sed '/^$/d' | anew subdomains/cloud_assets.txt | wc -l)
-		if [[ $NUMOFLINES1 -gt 0 ]]; then
-			notification "${NUMOFLINES1} new cloud assets found" info
-		fi
-		NUMOFLINES2=$(cat .tmp/s3buckets.txt 2>>"$LOGFILE" | grep -aiv "not_exist" | grep -aiv "Warning:" | grep -aiv "invalid_name" | grep -aiv "^http" | awk 'NF' | anew subdomains/s3buckets.txt | sed '/^$/d' | wc -l)
-		if [[ $NUMOFLINES2 -gt 0 ]]; then
-			notification "${NUMOFLINES2} new S3 buckets found" info
-		fi
+        # Include root domain in the process
+        echo "$domain" > webs/full_webs.txt
+        cat webs/webs_all.txt >> webs/full_webs.txt
 
-		[ -s "subdomains/s3buckets.txt" ] && for i in $(cat subdomains/s3buckets.txt); do trufflehog s3 --bucket="$i" -j 2>/dev/null | jq -c | anew -q subdomains/s3buckets_trufflehog.txt; done
+        # Initialize the output file in the subdomains folder
+        > subdomains/cloudhunter_open_buckets.txt  # Create or clear the output file
 
-		end_func "Results are saved in subdomains/s3buckets.txt and subdomains/cloud_assets.txt" ${FUNCNAME[0]}
-	else
-		if [[ $S3BUCKETS == false ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
-		elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
-			return
-		else
-			if [[ $S3BUCKETS == false ]]; then
-				printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
-			else
-				printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
-			fi
-		fi
-	fi
+        # Determine the CloudHunter permutations flag based on the config
+        PERMUTATION_FLAG=""
+        case "$CLOUDHUNTER_PERMUTATION" in
+        DEEP)
+            PERMUTATION_FLAG="-p $tools/CloudHunter/permutations-big.txt"
+            ;;
+        NORMAL)
+            PERMUTATION_FLAG="-p $tools/CloudHunter/permutations.txt"
+            ;;
+        NONE)
+            PERMUTATION_FLAG=""
+            ;;
+        *)
+            echo "Invalid value for CloudHunter_Permutations: $CLOUDHUNTER_PERMUTATION" >> "$LOGFILE"
+            exit 1
+            ;;
+        esac
 
+        # Debug: Print the full CloudHunter command
+        echo "CloudHunter command: python3 $tools/CloudHunter/cloudhunter.py $PERMUTATION_FLAG -r $tools/CloudHunter/resolvers.txt -t 50 [URL]" >> "$LOGFILE"
+
+        # Debug: Check if files exist
+        if [[ -f "$tools/CloudHunter/cloudhunter.py" ]]; then
+            echo "cloudhunter.py exists" >> "$LOGFILE"
+        else
+            echo "cloudhunter.py not found" >> "$LOGFILE"
+        fi
+
+        if [[ -n "$PERMUTATION_FLAG" ]]; then
+            if [[ -f "${PERMUTATION_FLAG#-p }" ]]; then
+                echo "Permutations file exists" >> "$LOGFILE"
+            else
+                echo "Permutations file not found: ${PERMUTATION_FLAG#-p }" >> "$LOGFILE"
+            fi
+        fi
+
+        if [[ -f "$tools/CloudHunter/resolvers.txt" ]]; then
+            echo "resolvers.txt exists" >> "$LOGFILE"
+        else
+            echo "resolvers.txt not found" >> "$LOGFILE"
+        fi
+
+        # Run CloudHunter on each URL in webs/full_webs.txt and append the output to the file in the subdomains folder
+        while IFS= read -r url; do
+            echo "Processing URL: $url" >> "$LOGFILE"
+            (
+                cd "$tools/CloudHunter" || { echo "Failed to cd to $tools/CloudHunter" >> "$LOGFILE"; return 1; }
+                python3 ./cloudhunter.py ${PERMUTATION_FLAG#-p } -r ./resolvers.txt -t 50 "$url"
+            ) >> "$dir/subdomains/cloudhunter_open_buckets.txt" 2>> "$LOGFILE"
+        done < webs/full_webs.txt
+
+        # Remove the full_webs.txt file after CloudHunter processing
+        rm webs/full_webs.txt
+
+        NUMOFLINES1=$(cat subdomains/cloudhunter_open_buckets.txt 2>>"$LOGFILE" | anew subdomains/cloud_assets.txt | wc -l)
+        if [[ $NUMOFLINES1 -gt 0 ]]; then
+            notification "${NUMOFLINES1} new cloud assets found" info
+        fi
+
+        NUMOFLINES2=$(cat .tmp/s3buckets.txt 2>>"$LOGFILE" | grep -aiv "not_exist" | grep -aiv "Warning:" | grep -aiv "invalid_name" | grep -aiv "^http" | awk 'NF' | anew subdomains/s3buckets.txt | sed '/^$/d' | wc -l)
+        if [[ $NUMOFLINES2 -gt 0 ]]; then
+            notification "${NUMOFLINES2} new S3 buckets found" info
+        fi
+
+        [ -s "subdomains/s3buckets.txt" ] && for i in $(cat subdomains/s3buckets.txt); do 
+            trufflehog s3 --bucket="$i" -j 2>/dev/null | jq -c | anew -q subdomains/s3buckets_trufflehog.txt; 
+        done
+
+        # Run trufflehog for open buckets found by CloudHunter
+        [ -s "subdomains/cloudhunter_open_buckets.txt" ] && while IFS= read -r line; do
+            if echo "$line" | grep -q "Aws Cloud"; then
+                # AWS S3 Bucket
+                bucket_name=$(echo "$line" | awk '{print $3}')
+                trufflehog s3 --bucket="$bucket_name" -j 2>/dev/null | jq -c | anew -q subdomains/cloudhunter_buckets_trufflehog.txt
+            elif echo "$line" | grep -q "Google Cloud"; then
+                # Google Cloud Storage
+                bucket_name=$(echo "$line" | awk '{print $3}')
+                trufflehog gcs --bucket="$bucket_name" -j 2>/dev/null | jq -c | anew -q subdomains/cloudhunter_buckets_trufflehog.txt
+            fi
+        done < subdomains/cloudhunter_open_buckets.txt
+
+        end_func "Results are saved in subdomains/s3buckets.txt, subdomains/cloud_assets.txt, subdomains/s3buckets_trufflehog.txt, and subdomains/cloudhunter_buckets_trufflehog.txt" ${FUNCNAME[0]}
+    else
+        if [[ $S3BUCKETS == false ]]; then
+            printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+        elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+            return
+        else
+            printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+        fi
+    fi
 }
 
 ###############################################################################################################
@@ -1783,7 +1856,9 @@ function nuclei_check() {
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
 		[ ! -s ".tmp/webs_subs.txt" ] && cat webs/url_extract_nodupes.txt subdomains/subdomains.txt webs/webs_all.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
 		[ -s "$dir/fuzzing/fuzzing_full.txt" ] && cat $dir/fuzzing/fuzzing_full.txt | grep -e "^200" | cut -d " " -f3 | anew -q .tmp/webs_fuzz.txt
-		cat .tmp/webs_subs.txt .tmp/webs_fuzz.txt 2>>"$LOGFILE" | anew -q .tmp/webs_nuclei.txt
+		cat .tmp/webs_subs.txt .tmp/webs_fuzz.txt 2>>"$LOGFILE" | anew -q .tmp/webs_nuclei.txt | tee -a webs/webs_nuclei.txt
+		cp .tmp/webs_nuclei.txt webs/webs_nuclei.txt
+		
 		if [[ $AXIOM != true ]]; then # avoid globbing (expansion of *).
 			IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
 			for crit in "${severity_array[@]}"; do
@@ -2021,17 +2096,17 @@ function url_gf() {
 	mkdir -p {.tmp,webs,gf}
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $URL_GF == true ]]; then
 		start_func ${FUNCNAME[0]} "Vulnerable Pattern Search"
-		if [[ -s "webs/url_extract.txt" ]]; then
-			gf xss webs/url_extract_nodupes.txt | anew -q gf/xss.txt
-			gf ssti webs/url_extract_nodupes.txt | anew -q gf/ssti.txt
-			gf ssrf webs/url_extract_nodupes.txt | anew -q gf/ssrf.txt
-			gf sqli webs/url_extract_nodupes.txt | anew -q gf/sqli.txt
-			gf redirect webs/url_extract_nodupes.txt | anew -q gf/redirect.txt
+		if [[ -s "webs/webs_nuclei.txt" ]]; then
+			gf xss webs/webs_nuclei.txt | anew -q gf/xss.txt
+			gf ssti webs/webs_nuclei.txt | anew -q gf/ssti.txt
+			gf ssrf webs/webs_nuclei.txt | anew -q gf/ssrf.txt
+			gf sqli webs/webs_nuclei.txt | anew -q gf/sqli.txt
+			gf redirect webs/webs_nuclei.txt | anew -q gf/redirect.txt
 			[ -s "gf/ssrf.txt" ] && cat gf/ssrf.txt | anew -q gf/redirect.txt
-			gf rce webs/url_extract_nodupes.txt | anew -q gf/rce.txt
-			gf potential webs/url_extract_nodupes.txt | cut -d ':' -f3-5 | anew -q gf/potential.txt
+			gf rce webs/webs_nuclei.txt | anew -q gf/rce.txt
+			gf potential webs/webs_nuclei.txt | cut -d ':' -f3-5 | anew -q gf/potential.txt
 			[ -s ".tmp/url_extract_tmp.txt" ] && cat .tmp/url_extract_tmp.txt | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | unfurl -u format %s://%d%p 2>>"$LOGFILE" | anew -q gf/endpoints.txt
-			gf lfi webs/url_extract_nodupes.txt | anew -q gf/lfi.txt
+			gf lfi webs/webs_nuclei.txt | anew -q gf/lfi.txt
 		fi
 		end_func "Results are saved in $domain/gf folder" ${FUNCNAME[0]}
 	else
