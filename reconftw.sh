@@ -48,7 +48,7 @@ function test_connectivity() {
 ###############################################################################################################
 
 function check_version() {
-	timeout 10 git fetch || ( true && echo "git fetch timeout reached")
+	timeout 10 git fetch || (true && echo "git fetch timeout reached")
 	exit_status=$?
 	if [[ ${exit_status} -eq 0 ]]; then
 		BRANCH=$(git rev-parse --abbrev-ref HEAD)
@@ -133,7 +133,7 @@ function tools_installed() {
 		printf "${bred} [*] brutespray		[NO]${reset}\n"
 		allinstalled=false
 	}
-		command -v xnLinkFinder &>/dev/null || {
+	command -v xnLinkFinder &>/dev/null || {
 		printf "${bred} [*] xnLinkFinder		[NO]${reset}\n"
 		allinstalled=false
 	}
@@ -449,12 +449,12 @@ function tools_installed() {
 function google_dorks() {
 	mkdir -p osint
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GOOGLE_DORKS == true ]] && [[ $OSINT == true ]]; then
-	start_func "${FUNCNAME[0]}" "Google Dorks in process"
-	python3 ${tools}/dorks_hunter/dorks_hunter.py -d "$domain" -o osint/dorks.txt || {
-		echo "dorks_hunter command failed"
-		exit 1
-	}
-	end_func "Results are saved in $domain/osint/dorks.txt" "${FUNCNAME[0]}"
+		start_func "${FUNCNAME[0]}" "Google Dorks in process"
+		python3 ${tools}/dorks_hunter/dorks_hunter.py -d "$domain" -o osint/dorks.txt || {
+			echo "dorks_hunter command failed"
+			exit 1
+		}
+		end_func "Results are saved in $domain/osint/dorks.txt" "${FUNCNAME[0]}"
 	else
 		if [[ $GOOGLE_DORKS == false ]] || [[ $OSINT == false ]]; then
 			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -468,23 +468,23 @@ function google_dorks() {
 function github_dorks() {
 	mkdir -p osint
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GITHUB_DORKS == true ]] && [[ $OSINT == true ]]; then
-	start_func "${FUNCNAME[0]}" "Github Dorks in process"
-	if [[ -s ${GITHUB_TOKENS} ]]; then
-		if [[ $DEEP == true ]]; then
-			gitdorks_go -gd ${tools}/gitdorks_go/Dorks/medium_dorks.txt -nws 20 -target "$domain" -tf "${GITHUB_TOKENS}" -ew 3 | anew -q osint/gitdorks.txt || {
-				echo "gitdorks_go/anew command failed"
-				exit 1
-			}
+		start_func "${FUNCNAME[0]}" "Github Dorks in process"
+		if [[ -s ${GITHUB_TOKENS} ]]; then
+			if [[ $DEEP == true ]]; then
+				gitdorks_go -gd ${tools}/gitdorks_go/Dorks/medium_dorks.txt -nws 20 -target "$domain" -tf "${GITHUB_TOKENS}" -ew 3 | anew -q osint/gitdorks.txt || {
+					echo "gitdorks_go/anew command failed"
+					exit 1
+				}
+			else
+				gitdorks_go -gd ${tools}/gitdorks_go/Dorks/smalldorks.txt -nws 20 -target $domain -tf "${GITHUB_TOKENS}" -ew 3 | anew -q osint/gitdorks.txt || {
+					echo "gitdorks_go/anew command failed"
+					exit 1
+				}
+			fi
 		else
-			gitdorks_go -gd ${tools}/gitdorks_go/Dorks/smalldorks.txt -nws 20 -target $domain -tf "${GITHUB_TOKENS}" -ew 3 | anew -q osint/gitdorks.txt || {
-				echo "gitdorks_go/anew command failed"
-				exit 1
-			}
+			printf "\n${bred}[$(date +'%Y-%m-%d %H:%M:%S')] Required file ${GITHUB_TOKENS} not exists or empty${reset}\n"
 		fi
-	else
-		printf "\n${bred}[$(date +'%Y-%m-%d %H:%M:%S')] Required file ${GITHUB_TOKENS} not exists or empty${reset}\n"
-	fi
-	end_func "Results are saved in $domain/osint/gitdorks.txt" "${FUNCNAME[0]}"
+		end_func "Results are saved in $domain/osint/gitdorks.txt" "${FUNCNAME[0]}"
 	else
 		if [[ $GITHUB_DORKS == false ]] || [[ $OSINT == false ]]; then
 			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -673,7 +673,7 @@ function third_party_misconfigs() {
 		pushd "${tools}/misconfig-mapper" >/dev/null || {
 			echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
 		}
-		./misconfig-mapper -target $company_name -service "*" | grep -v "\[-\]" > ${dir}/osint/3rdparts_misconfigurations.txt
+		./misconfig-mapper -target $company_name -service "*" | grep -v "\[-\]" >${dir}/osint/3rdparts_misconfigurations.txt
 
 		popd >/dev/null || {
 			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
@@ -706,7 +706,7 @@ function spoof() {
 		pushd "${tools}/Spoofy" >/dev/null || {
 			echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
 		}
-		./spoofy.py -d $domain > ${dir}/osint/spoof.txt
+		./spoofy.py -d $domain >${dir}/osint/spoof.txt
 
 		popd >/dev/null || {
 			echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
@@ -1006,7 +1006,7 @@ function sub_scraping() {
 					resolvers_update_quick_local
 					cat subdomains/subdomains.txt | httpx -follow-host-redirects -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info1.txt 2>>"$LOGFILE" >/dev/null
 					[ -s ".tmp/web_full_info1.txt" ] && cat .tmp/web_full_info1.txt | jq -r 'try .url' 2>/dev/null | grep "$domain" | grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' | sed "s/*.//" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
-					[ -s ".tmp/probed_tmp_scrap.txt" ] && timeout -k 1m 10m httpx -l .tmp/probed_tmp_scrap.txt -tls-grab -tls-probe -csp-probe -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -json -o .tmp/web_full_info2.txt 2>>"$LOGFILE" >/dev/null || ( true && echo "Httpx TLS & CSP grab timeout reached")
+					[ -s ".tmp/probed_tmp_scrap.txt" ] && timeout -k 1m 10m httpx -l .tmp/probed_tmp_scrap.txt -tls-grab -tls-probe -csp-probe -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -no-color -json -o .tmp/web_full_info2.txt 2>>"$LOGFILE" >/dev/null || (true && echo "Httpx TLS & CSP grab timeout reached")
 					[ -s ".tmp/web_full_info2.txt" ] && cat .tmp/web_full_info2.txt | jq -r 'try ."tls-grab"."dns_names"[],try .csp.domains[],try .url' 2>/dev/null | grep "$domain" | grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' | sed "s/*.//" | sort -u | httpx -silent | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
 
 					if [[ $DEEP == true ]]; then
@@ -1018,7 +1018,7 @@ function sub_scraping() {
 					resolvers_update_quick_axiom
 					axiom-scan subdomains/subdomains.txt -m httpx -follow-host-redirects -random-agent -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info1.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 					[ -s ".tmp/web_full_info1.txt" ] && cat .tmp/web_full_info1.txt | jq -r 'try .url' 2>/dev/null | grep "$domain" | grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' | sed "s/*.//" | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
-					[ -s ".tmp/probed_tmp_scrap.txt" ] && timeout -k 1m 10m axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -tls-grab -tls-probe -csp-probe -random-agent -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info2.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null  || ( true && echo "git fetch timeout reached")
+					[ -s ".tmp/probed_tmp_scrap.txt" ] && timeout -k 1m 10m axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -tls-grab -tls-probe -csp-probe -random-agent -status-code -threads $HTTPX_THREADS -rl $HTTPX_RATELIMIT -timeout $HTTPX_TIMEOUT -silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info2.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null || (true && echo "git fetch timeout reached")
 					[ -s ".tmp/web_full_info2.txt" ] && cat .tmp/web_full_info2.txt | jq -r 'try ."tls-grab"."dns_names"[],try .csp.domains[],try .url' 2>/dev/null | grep "$domain" | grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' | sed "s/*.//" | sort -u | httpx -silent | anew .tmp/probed_tmp_scrap.txt | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
 					if [[ $DEEP == true ]]; then
 						[ -s ".tmp/probed_tmp_scrap.txt" ] && axiom-scan .tmp/probed_tmp_scrap.txt -m katana -jc -kf all -d 3 -fs rdn -o .tmp/katana.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
@@ -1195,7 +1195,7 @@ function sub_recursive_passive() {
 		[ -s "subdomains/subdomains.txt" ] && dsieve -if subdomains/subdomains.txt -f 3 -top $DEEP_RECURSIVE_PASSIVE >.tmp/subdomains_recurs_top.txt
 		if [[ $AXIOM != true ]]; then
 			resolvers_update_quick_local
-			[ -s ".tmp/subdomains_recurs_top.txt" ] && subfinder -all -dL .tmp/subdomains_recurs_top.txt -max-time ${SUBFINDER_ENUM_TIMEOUT} -silent -o .tmp/passive_recursive_tmp.txt 2>>"$LOGFILE" || ( true && echo "Subfinder recursive timeout reached")
+			[ -s ".tmp/subdomains_recurs_top.txt" ] && subfinder -all -dL .tmp/subdomains_recurs_top.txt -max-time ${SUBFINDER_ENUM_TIMEOUT} -silent -o .tmp/passive_recursive_tmp.txt 2>>"$LOGFILE" || (true && echo "Subfinder recursive timeout reached")
 			[ -s ".tmp/passive_recursive_tmp.txt" ] && cat .tmp/passive_recursive_tmp.txt | anew -q .tmp/passive_recursive.txt
 			[ -s ".tmp/passive_recursive.txt" ] && puredns resolve .tmp/passive_recursive.txt -w .tmp/passive_recurs_tmp.txt -r $resolvers --resolvers-trusted $resolvers_trusted -l $PUREDNS_PUBLIC_LIMIT --rate-limit-trusted $PUREDNS_TRUSTED_LIMIT --wildcard-tests $PUREDNS_WILDCARDTEST_LIMIT --wildcard-batch $PUREDNS_WILDCARDBATCH_LIMIT 2>>"$LOGFILE" >/dev/null
 		else
@@ -1350,121 +1350,124 @@ function zonetransfer() {
 }
 
 function s3buckets() {
-    mkdir -p {.tmp,subdomains}
-    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $S3BUCKETS == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
-        start_func ${FUNCNAME[0]} "AWS S3 buckets search"
-        [[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" >"$dir/subdomains/subdomains.txt"
-        
-        # Debug: Print current directory and tools variable
-        echo "Current directory: $(pwd)" >> "$LOGFILE"
-        echo "Tools directory: $tools" >> "$LOGFILE"
+	mkdir -p {.tmp,subdomains}
+	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $S3BUCKETS == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+		start_func ${FUNCNAME[0]} "AWS S3 buckets search"
+		[[ -n $multi ]] && [ ! -f "$dir/subdomains/subdomains.txt" ] && echo "$domain" >"$dir/subdomains/subdomains.txt"
 
-        # S3Scanner
-        if [[ $AXIOM != true ]]; then
-            [ -s "subdomains/subdomains.txt" ] && s3scanner scan -f subdomains/subdomains.txt 2>>"$LOGFILE" | anew -q .tmp/s3buckets.txt
-        else
-            axiom-scan subdomains/subdomains.txt -m s3scanner -o .tmp/s3buckets_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
-            [ -s ".tmp/s3buckets_tmp.txt" ] && cat .tmp/s3buckets_tmp.txt .tmp/s3buckets_tmp2.txt 2>>"$LOGFILE" | anew -q .tmp/s3buckets.txt && sed -i '/^$/d' .tmp/s3buckets.txt
-        fi
+		# Debug: Print current directory and tools variable
+		echo "Current directory: $(pwd)" >>"$LOGFILE"
+		echo "Tools directory: $tools" >>"$LOGFILE"
 
-        # Include root domain in the process
-        echo "$domain" > webs/full_webs.txt
-        cat webs/webs_all.txt >> webs/full_webs.txt
+		# S3Scanner
+		if [[ $AXIOM != true ]]; then
+			[ -s "subdomains/subdomains.txt" ] && s3scanner scan -f subdomains/subdomains.txt 2>>"$LOGFILE" | anew -q .tmp/s3buckets.txt
+		else
+			axiom-scan subdomains/subdomains.txt -m s3scanner -o .tmp/s3buckets_tmp.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+			[ -s ".tmp/s3buckets_tmp.txt" ] && cat .tmp/s3buckets_tmp.txt .tmp/s3buckets_tmp2.txt 2>>"$LOGFILE" | anew -q .tmp/s3buckets.txt && sed -i '/^$/d' .tmp/s3buckets.txt
+		fi
 
-        # Initialize the output file in the subdomains folder
-        > subdomains/cloudhunter_open_buckets.txt  # Create or clear the output file
+		# Include root domain in the process
+		echo "$domain" >webs/full_webs.txt
+		cat webs/webs_all.txt >>webs/full_webs.txt
 
-        # Determine the CloudHunter permutations flag based on the config
-        PERMUTATION_FLAG=""
-        case "$CLOUDHUNTER_PERMUTATION" in
-        DEEP)
-            PERMUTATION_FLAG="-p $tools/CloudHunter/permutations-big.txt"
-            ;;
-        NORMAL)
-            PERMUTATION_FLAG="-p $tools/CloudHunter/permutations.txt"
-            ;;
-        NONE)
-            PERMUTATION_FLAG=""
-            ;;
-        *)
-            echo "Invalid value for CloudHunter_Permutations: $CLOUDHUNTER_PERMUTATION" >> "$LOGFILE"
-            exit 1
-            ;;
-        esac
+		# Initialize the output file in the subdomains folder
+		>subdomains/cloudhunter_open_buckets.txt # Create or clear the output file
 
-        # Debug: Print the full CloudHunter command
-        echo "CloudHunter command: python3 $tools/CloudHunter/cloudhunter.py $PERMUTATION_FLAG -r $tools/CloudHunter/resolvers.txt -t 50 [URL]" >> "$LOGFILE"
+		# Determine the CloudHunter permutations flag based on the config
+		PERMUTATION_FLAG=""
+		case "$CLOUDHUNTER_PERMUTATION" in
+		DEEP)
+			PERMUTATION_FLAG="-p $tools/CloudHunter/permutations-big.txt"
+			;;
+		NORMAL)
+			PERMUTATION_FLAG="-p $tools/CloudHunter/permutations.txt"
+			;;
+		NONE)
+			PERMUTATION_FLAG=""
+			;;
+		*)
+			echo "Invalid value for CloudHunter_Permutations: $CLOUDHUNTER_PERMUTATION" >>"$LOGFILE"
+			exit 1
+			;;
+		esac
 
-        # Debug: Check if files exist
-        if [[ -f "$tools/CloudHunter/cloudhunter.py" ]]; then
-            echo "cloudhunter.py exists" >> "$LOGFILE"
-        else
-            echo "cloudhunter.py not found" >> "$LOGFILE"
-        fi
+		# Debug: Print the full CloudHunter command
+		echo "CloudHunter command: python3 $tools/CloudHunter/cloudhunter.py $PERMUTATION_FLAG -r $tools/CloudHunter/resolvers.txt -t 50 [URL]" >>"$LOGFILE"
 
-        if [[ -n "$PERMUTATION_FLAG" ]]; then
-            if [[ -f "${PERMUTATION_FLAG#-p }" ]]; then
-                echo "Permutations file exists" >> "$LOGFILE"
-            else
-                echo "Permutations file not found: ${PERMUTATION_FLAG#-p }" >> "$LOGFILE"
-            fi
-        fi
+		# Debug: Check if files exist
+		if [[ -f "$tools/CloudHunter/cloudhunter.py" ]]; then
+			echo "cloudhunter.py exists" >>"$LOGFILE"
+		else
+			echo "cloudhunter.py not found" >>"$LOGFILE"
+		fi
 
-        if [[ -f "$tools/CloudHunter/resolvers.txt" ]]; then
-            echo "resolvers.txt exists" >> "$LOGFILE"
-        else
-            echo "resolvers.txt not found" >> "$LOGFILE"
-        fi
+		if [[ -n $PERMUTATION_FLAG ]]; then
+			if [[ -f ${PERMUTATION_FLAG#-p } ]]; then
+				echo "Permutations file exists" >>"$LOGFILE"
+			else
+				echo "Permutations file not found: ${PERMUTATION_FLAG#-p }" >>"$LOGFILE"
+			fi
+		fi
 
-        # Run CloudHunter on each URL in webs/full_webs.txt and append the output to the file in the subdomains folder
-        while IFS= read -r url; do
-            echo "Processing URL: $url" >> "$LOGFILE"
-            (
-                cd "$tools/CloudHunter" || { echo "Failed to cd to $tools/CloudHunter" >> "$LOGFILE"; return 1; }
-                python3 ./cloudhunter.py ${PERMUTATION_FLAG#-p } -r ./resolvers.txt -t 50 "$url"
-            ) >> "$dir/subdomains/cloudhunter_open_buckets.txt" 2>> "$LOGFILE"
-        done < webs/full_webs.txt
+		if [[ -f "$tools/CloudHunter/resolvers.txt" ]]; then
+			echo "resolvers.txt exists" >>"$LOGFILE"
+		else
+			echo "resolvers.txt not found" >>"$LOGFILE"
+		fi
 
-        # Remove the full_webs.txt file after CloudHunter processing
-        rm webs/full_webs.txt
+		# Run CloudHunter on each URL in webs/full_webs.txt and append the output to the file in the subdomains folder
+		while IFS= read -r url; do
+			echo "Processing URL: $url" >>"$LOGFILE"
+			(
+				cd "$tools/CloudHunter" || {
+					echo "Failed to cd to $tools/CloudHunter" >>"$LOGFILE"
+					return 1
+				}
+				python3 ./cloudhunter.py ${PERMUTATION_FLAG#-p } -r ./resolvers.txt -t 50 "$url"
+			) >>"$dir/subdomains/cloudhunter_open_buckets.txt" 2>>"$LOGFILE"
+		done <webs/full_webs.txt
 
-        NUMOFLINES1=$(cat subdomains/cloudhunter_open_buckets.txt 2>>"$LOGFILE" | anew subdomains/cloud_assets.txt | wc -l)
-        if [[ $NUMOFLINES1 -gt 0 ]]; then
-            notification "${NUMOFLINES1} new cloud assets found" info
-        fi
+		# Remove the full_webs.txt file after CloudHunter processing
+		rm webs/full_webs.txt
 
-        NUMOFLINES2=$(cat .tmp/s3buckets.txt 2>>"$LOGFILE" | grep -aiv "not_exist" | grep -aiv "Warning:" | grep -aiv "invalid_name" | grep -aiv "^http" | awk 'NF' | anew subdomains/s3buckets.txt | sed '/^$/d' | wc -l)
-        if [[ $NUMOFLINES2 -gt 0 ]]; then
-            notification "${NUMOFLINES2} new S3 buckets found" info
-        fi
+		NUMOFLINES1=$(cat subdomains/cloudhunter_open_buckets.txt 2>>"$LOGFILE" | anew subdomains/cloud_assets.txt | wc -l)
+		if [[ $NUMOFLINES1 -gt 0 ]]; then
+			notification "${NUMOFLINES1} new cloud assets found" info
+		fi
 
-        [ -s "subdomains/s3buckets.txt" ] && for i in $(cat subdomains/s3buckets.txt); do 
-            trufflehog s3 --bucket="$i" -j 2>/dev/null | jq -c | anew -q subdomains/s3buckets_trufflehog.txt; 
-        done
+		NUMOFLINES2=$(cat .tmp/s3buckets.txt 2>>"$LOGFILE" | grep -aiv "not_exist" | grep -aiv "Warning:" | grep -aiv "invalid_name" | grep -aiv "^http" | awk 'NF' | anew subdomains/s3buckets.txt | sed '/^$/d' | wc -l)
+		if [[ $NUMOFLINES2 -gt 0 ]]; then
+			notification "${NUMOFLINES2} new S3 buckets found" info
+		fi
 
-        # Run trufflehog for open buckets found by CloudHunter
-        [ -s "subdomains/cloudhunter_open_buckets.txt" ] && while IFS= read -r line; do
-            if echo "$line" | grep -q "Aws Cloud"; then
-                # AWS S3 Bucket
-                bucket_name=$(echo "$line" | awk '{print $3}')
-                trufflehog s3 --bucket="$bucket_name" -j 2>/dev/null | jq -c | anew -q subdomains/cloudhunter_buckets_trufflehog.txt
-            elif echo "$line" | grep -q "Google Cloud"; then
-                # Google Cloud Storage
-                bucket_name=$(echo "$line" | awk '{print $3}')
-                trufflehog gcs --bucket="$bucket_name" -j 2>/dev/null | jq -c | anew -q subdomains/cloudhunter_buckets_trufflehog.txt
-            fi
-        done < subdomains/cloudhunter_open_buckets.txt
+		[ -s "subdomains/s3buckets.txt" ] && for i in $(cat subdomains/s3buckets.txt); do
+			trufflehog s3 --bucket="$i" -j 2>/dev/null | jq -c | anew -q subdomains/s3buckets_trufflehog.txt
+		done
 
-        end_func "Results are saved in subdomains/s3buckets.txt, subdomains/cloud_assets.txt, subdomains/s3buckets_trufflehog.txt, and subdomains/cloudhunter_buckets_trufflehog.txt" ${FUNCNAME[0]}
-    else
-        if [[ $S3BUCKETS == false ]]; then
-            printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
-        elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
-            return
-        else
-            printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
-        fi
-    fi
+		# Run trufflehog for open buckets found by CloudHunter
+		[ -s "subdomains/cloudhunter_open_buckets.txt" ] && while IFS= read -r line; do
+			if echo "$line" | grep -q "Aws Cloud"; then
+				# AWS S3 Bucket
+				bucket_name=$(echo "$line" | awk '{print $3}')
+				trufflehog s3 --bucket="$bucket_name" -j 2>/dev/null | jq -c | anew -q subdomains/cloudhunter_buckets_trufflehog.txt
+			elif echo "$line" | grep -q "Google Cloud"; then
+				# Google Cloud Storage
+				bucket_name=$(echo "$line" | awk '{print $3}')
+				trufflehog gcs --bucket="$bucket_name" -j 2>/dev/null | jq -c | anew -q subdomains/cloudhunter_buckets_trufflehog.txt
+			fi
+		done <subdomains/cloudhunter_open_buckets.txt
+
+		end_func "Results are saved in subdomains/s3buckets.txt, subdomains/cloud_assets.txt, subdomains/s3buckets_trufflehog.txt, and subdomains/cloudhunter_buckets_trufflehog.txt" ${FUNCNAME[0]}
+	else
+		if [[ $S3BUCKETS == false ]]; then
+			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+		elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9] ]]; then
+			return
+		else
+			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+		fi
+	fi
 }
 
 ###############################################################################################################
@@ -1845,7 +1848,7 @@ function nuclei_check() {
 		[ -s "$dir/fuzzing/fuzzing_full.txt" ] && cat $dir/fuzzing/fuzzing_full.txt | grep -e "^200" | cut -d " " -f3 | anew -q .tmp/webs_fuzz.txt
 		cat .tmp/webs_subs.txt .tmp/webs_fuzz.txt 2>>"$LOGFILE" | anew -q .tmp/webs_nuclei.txt | tee -a webs/webs_nuclei.txt
 		cp .tmp/webs_nuclei.txt webs/webs_nuclei.txt
-		
+
 		if [[ $AXIOM != true ]]; then # avoid globbing (expansion of *).
 			IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
 			for crit in "${severity_array[@]}"; do
@@ -1928,7 +1931,7 @@ function iishortname() {
 
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $IIS_SHORTNAME == true ]]; then
 		start_func ${FUNCNAME[0]} "IIS Shortname Scanner"
-		[ -s "nuclei_output/info.txt" ] && cat nuclei_output/info.txt | grep "iis-version" | cut -d " " -f4 > .tmp/iis_sites.txt
+		[ -s "nuclei_output/info.txt" ] && cat nuclei_output/info.txt | grep "iis-version" | cut -d " " -f4 >.tmp/iis_sites.txt
 		if [[ -s ".tmp/iis_sites.txt" ]]; then
 			mkdir -p $dir/vulns/iis-shortname-shortscan/
 			mkdir -p $dir/vulns/iis-shortname-sns/
@@ -1961,7 +1964,7 @@ function cms_scanner() {
 		[ ! -s "webs/webs_all.txt" ] && cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
 		if [[ -s "webs/webs_all.txt" ]]; then
 			tr '\n' ',' <webs/webs_all.txt >.tmp/cms.txt 2>>"$LOGFILE"
-			timeout -k 1m ${CMSSCAN_TIMEOUT}s python3 ${tools}/CMSeeK/cmseek.py -l .tmp/cms.txt --batch -r &>>"$LOGFILE"  || ( true && echo "CMSeek timeout reached")
+			timeout -k 1m ${CMSSCAN_TIMEOUT}s python3 ${tools}/CMSeeK/cmseek.py -l .tmp/cms.txt --batch -r &>>"$LOGFILE" || (true && echo "CMSeek timeout reached")
 			exit_status=$?
 			if [[ ${exit_status} -eq 125 ]]; then
 				echo "TIMEOUT cmseek.py - investigate manually for $dir" >>"$LOGFILE"
@@ -2062,7 +2065,7 @@ function urlchecks() {
 			NUMOFLINES=$(cat .tmp/url_extract_uddup.txt 2>>"$LOGFILE" | anew webs/url_extract.txt | sed '/^$/d' | wc -l)
 			notification "${NUMOFLINES} new urls with params" info
 			end_func "Results are saved in $domain/webs/url_extract.txt" ${FUNCNAME[0]}
-                        p1radup -i webs/url_extract.txt -o webs/url_extract_nodupes.txt -s
+			p1radup -i webs/url_extract.txt -o webs/url_extract_nodupes.txt -s
 			if [[ $PROXY == true ]] && [[ -n $proxy_url ]] && [[ $(cat webs/url_extract.txt | wc -l) -le $DEEP_LIMIT2 ]]; then
 				notification "Sending urls to proxy" info
 				ffuf -mc all -w webs/url_extract.txt -u FUZZ -replay-proxy $proxy_url 2>>"$LOGFILE" >/dev/null
@@ -2577,7 +2580,7 @@ function spraying() {
 		start_func ${FUNCNAME[0]} "Password spraying"
 
 		brutespray -f $dir/hosts/portscan_active.gnmap -T $BRUTESPRAY_CONCURRENCE -o $dir/vulns/brutespray 2>>"$LOGFILE" >/dev/null
-		
+
 		end_func "Results are saved in vulns/brutespray folder" ${FUNCNAME[0]}
 	else
 		if [[ $SPRAY == false ]]; then
@@ -3363,7 +3366,7 @@ function recon() {
 	urlchecks
 	jschecks
 	nuclei_check
-	
+
 	if [[ $AXIOM == true ]]; then
 		axiom_shutdown
 	fi
@@ -3413,37 +3416,37 @@ function multi_recon() {
 
 	for domain in $targets; do
 		dir=$workdir/targets/$domain
-    called_fn_dir=$dir/.called_fn
+		called_fn_dir=$dir/.called_fn
 
-    # Ensure directories exist
-    mkdir -p "$dir" || {
-        echo "Failed to create directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
-        exit 1
-    }
-    mkdir -p "$called_fn_dir" || {
-        echo "Failed to create directory '$called_fn_dir' in ${FUNCNAME[0]} @ line ${LINENO}"
-        exit 1
-    }
+		# Ensure directories exist
+		mkdir -p "$dir" || {
+			echo "Failed to create directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
+			exit 1
+		}
+		mkdir -p "$called_fn_dir" || {
+			echo "Failed to create directory '$called_fn_dir' in ${FUNCNAME[0]} @ line ${LINENO}"
+			exit 1
+		}
 
-    cd "$dir" || {
-        echo "Failed to cd to directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
-        exit 1
-    }
+		cd "$dir" || {
+			echo "Failed to cd to directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
+			exit 1
+		}
 
-    mkdir -p {.log,.tmp,webs,hosts,vulns,osint,screenshots,subdomains}
+		mkdir -p {.log,.tmp,webs,hosts,vulns,osint,screenshots,subdomains}
 
-    NOW=$(date +"%F")
-    NOWT=$(date +"%T")
-    LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
-    
-    # Ensure the .log directory exists before touching the file
-    mkdir -p .log
+		NOW=$(date +"%F")
+		NOWT=$(date +"%T")
+		LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
 
-    touch "$LOGFILE" || {
-        echo "Failed to create log file: $LOGFILE"
-        exit 1
-    }
-    echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"$LOGFILE"
+		# Ensure the .log directory exists before touching the file
+		mkdir -p .log
+
+		touch "$LOGFILE" || {
+			echo "Failed to create log file: $LOGFILE"
+			exit 1
+		}
+		echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"$LOGFILE"
 		loopstart=$(date +%s)
 
 		domain_info

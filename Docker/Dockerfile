@@ -1,5 +1,12 @@
 # syntax=docker/dockerfile:1.4
 
+# Specify a non-root user
+FROM kalilinux/kali-rolling:trunk AS base_reconftw
+USER nonrootuser
+
+# Add a healthcheck instruction
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 CMD curl --fail http://localhost/ || exit 1
+
 #-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
 
 ## You can change these variables
@@ -17,7 +24,7 @@ ARG GIT_REPOSITORY_RECONFTW="https://github.com/six2dez/reconftw"
 ###> Do NOT change anything beyond this point <###
 ##################################################
 
-FROM kalilinux/kali-rolling:latest AS base
+FROM kalilinux/kali-rolling:trunk AS base
 
 LABEL org.label-schema.name='reconftw'
 LABEL org.label-schema.description='A simple script for full recon'
