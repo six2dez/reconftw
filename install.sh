@@ -114,6 +114,7 @@ repos["Waymore"]="xnl-h4ck3r/waymore"
 repos["xnLinkFinder"]="xnl-h4ck3r/xnLinkFinder"
 repos["porch-pirate"]="MandConsultingGroup/porch-pirate"
 repos["MetaFinder"]="Josue87/MetaFinder"
+repos["MetaFinder"]="Josue87/EmailFinder"
 
 function banner() {
 	tput clear
