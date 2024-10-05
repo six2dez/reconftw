@@ -110,6 +110,7 @@ repos["LeakSearch"]="JoelGMSec/LeakSearch"
 repos["ffufPostprocessing"]="Damian89/ffufPostprocessing"
 repos["misconfig-mapper"]="intigriti/misconfig-mapper"
 repos["Spoofy"]="MattKeeley/Spoofy"
+repos["Waymore"]="xnl-h4ck3r/waymore"
 
 function banner() {
 	tput clear
