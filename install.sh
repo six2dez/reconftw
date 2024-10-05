@@ -112,6 +112,7 @@ repos["misconfig-mapper"]="intigriti/misconfig-mapper"
 repos["Spoofy"]="MattKeeley/Spoofy"
 repos["Waymore"]="xnl-h4ck3r/waymore"
 repos["xnLinkFinder"]="xnl-h4ck3r/xnLinkFinder"
+repos["porch-pirate"]="MandConsultingGroup/porch-pirate"
 
 function banner() {
 	tput clear
