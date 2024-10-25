@@ -368,7 +368,7 @@ function install_golang_version() {
 				;;
 			esac
 
-			"$SUDO" ln -sf /usr/local/go/bin/go /usr/local/bin/
+			"$SUDO" ln -sf /usr/local/go/bin/go /usr/local/bin/ 2>/dev/null
 			export GOROOT=/usr/local/go
 			export GOPATH="${HOME}/go"
 			export PATH="$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH"
