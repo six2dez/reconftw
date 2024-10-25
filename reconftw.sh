@@ -597,7 +597,7 @@ function third_party_misconfigs() {
 		fi
 
 		# Run misconfig-mapper and handle errors
-		./misconfig-mapper -target "$company_name" -service "*" | grep -v "\-\]" >"${dir}/osint/3rdparts_misconfigurations.txt"
+		./misconfig-mapper -target "$company_name" -service "*" 2>&1 | grep -v "\-\]" | grep -v "Failed" >"${dir}/osint/3rdparts_misconfigurations.txt"
 
 		# Return to the previous directory
 		if ! popd >/dev/null; then
