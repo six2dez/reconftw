@@ -202,7 +202,7 @@ function install_tools() {
 		fi
 		# Clone the repository
 		if [[ ! -d "${dir}/${repo}" || -z "$(ls -A "${dir}/${repo}")" ]]; then
-			git clone --filter="blob:none" "https://github.com/${repos[$repo]}" "${dir}/${repo}" #&>/dev/null
+			git clone --filter="blob:none" "https://github.com/${repos[$repo]}" "${dir}/${repo}" &>/dev/null
 			exit_status=$?
 			if [[ $exit_status -ne 0 ]]; then
 				echo -e "${red}Unable to clone repository $repo.${reset}"
