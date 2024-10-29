@@ -2073,7 +2073,7 @@ function sub_recursive_brute() {
 			fi
 
 			if [[ -s ".tmp/brute_recursive_result.txt" ]]; then
-				cat .tmp/brute_recursive.txt | anew -q .tmp/brute_recursive_result.txt
+				cat .tmp/brute_recursive_result.txt | anew -q .tmp/brute_recursive.txt
 			fi
 
 			# Generate permutations
