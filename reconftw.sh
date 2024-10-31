@@ -852,6 +852,7 @@ function sub_passive() {
 
 		# Run subfinder and check for errors
 		subfinder -all -d "$domain" -max-time "$SUBFINDER_ENUM_TIMEOUT" -silent -o .tmp/subfinder_psub.txt 2>>"$LOGFILE" >/dev/null
+		merklemap-cli search $domain 2>/dev/null | awk -F' ' '{for(i=1;i<=NF;i++) if($i ~ /^domain=/) {split($i,a,"="); print a[2]}}' | anew -q .tmp/subfinder_psub.txt 2>>"$LOGFILE" >/dev/null
 
 		# Run github-subdomains if GITHUB_TOKENS is set and file is not empty
 		if [[ -s $GITHUB_TOKENS ]]; then
