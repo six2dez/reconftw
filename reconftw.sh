@@ -323,17 +323,12 @@ function github_repos() {
 
 			if ! enumerepo -token-string "$GH_TOKEN" -usernames .tmp/company_name.txt -o .tmp/company_repos.txt 2>>"$LOGFILE" >/dev/null; then
 				printf "%b[!] enumerepo command failed.%b\n" "$bred" "$reset"
-				return 1
 			fi
 
 			if [[ -s ".tmp/company_repos.txt" ]]; then
 				if ! jq -r '.[].repos[]|.url' <.tmp/company_repos.txt >.tmp/company_repos_url.txt 2>>"$LOGFILE"; then
 					printf "%b[!] jq command failed.%b\n" "$bred" "$reset"
-					return 1
 				fi
-			else
-				printf "%b[!] No repositories found for the company.%b\n" "$yellow" "$reset"
-				return 1
 			fi
 
 			mkdir -p .tmp/github_repos 2>>"$LOGFILE"
@@ -1632,7 +1627,7 @@ function sub_analytics() {
 			fi
 		fi
 
-		if ! NUMOFLINES=$(anew subdomains/subdomains.txt <.tmp/analytics_subs_resolved.txt | sed '/^$/d' | wc -l); then
+		if ! NUMOFLINES=$(anew subdomains/subdomains.txt <.tmp/analytics_subs_resolved.txt 2>/dev/null| sed '/^$/d' | wc -l); then
 			printf "%b[!] Failed to count new subdomains.%b\n" "$bred" "$reset"
 			NUMOFLINES=0
 		fi
@@ -2390,8 +2385,6 @@ function s3buckets() {
 				if ! sed -i '/^$/d' .tmp/s3buckets.txt; then
 					printf "%b[!] Failed to clean s3buckets.txt.%b\n" "$bred" "$reset"
 				fi
-			else
-				printf "%b[!] No s3buckets_tmp.txt found.%b\n" "$yellow" "$reset"
 			fi
 		fi
 
@@ -2498,7 +2491,6 @@ function s3buckets() {
 			fi
 		else
 			NUMOFLINES2=0
-			printf "%b[!] No s3buckets.txt found or it is empty.%b\n" "$yellow" "$reset"
 		fi
 
 		# Run trufflehog for S3 buckets
@@ -2506,8 +2498,6 @@ function s3buckets() {
 			while IFS= read -r bucket; do
 				trufflehog s3 --bucket="$bucket" -j 2>/dev/null | jq -c | anew -q subdomains/s3buckets_trufflehog.txt
 			done <subdomains/s3buckets.txt
-		else
-			printf "%b[!] No S3 buckets to scan with trufflehog.%b\n" "$yellow" "$reset"
 		fi
 
 		# Run trufflehog for open buckets found by CloudHunter
@@ -3384,10 +3374,7 @@ function nuclei_check() {
 function fuzz() {
 
 	# Create necessary directories
-	if ! mkdir -p .tmp/fuzzing webs fuzzing nuclei_output; then
-		printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-		return 1
-	fi
+	mkdir -p .tmp/fuzzing webs fuzzing nuclei_output; then
 
 	# Check if the function should run
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $FUZZ == true ]] &&
@@ -3410,65 +3397,45 @@ function fuzz() {
 			cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
 		fi
 
-		# Combine url_extract_nodupes.txt, subdomains.txt, and webs_all.txt into webs_subs.txt if it doesn't exist
-		if [[ ! -s ".tmp/webs_subs.txt" ]]; then
-			cat webs/url_extract_nodupes.txt subdomains/subdomains.txt webs/webs_all.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
-		fi
+		if [[ -s "webs/webs_all.txt" ]]; then
+			if [[ $AXIOM != true ]]; then
+				interlace -tL webs/webs_all.txt -threads ${INTERLACE_THREADS} -c "ffuf ${FFUF_FLAGS} -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" -o $dir/.tmp/fuzzing 2>>"$LOGFILE" >/dev/null
+				for sub in $(cat webs/webs_all.txt); do
+					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
 
-		# If fuzzing_full.txt exists, process it and create webs_fuzz.txt
-		if [[ -s "$dir/fuzzing/fuzzing_full.txt" ]]; then
-			grep "^200" "$dir/fuzzing/fuzzing_full.txt" | cut -d " " -f3 | anew -q .tmp/webs_fuzz.txt
-		fi
+					pushd "${tools}/ffufPostprocessing" >/dev/null || {
+						echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
+					}
+					./ffufPostprocessing -result-file $dir/.tmp/fuzzing/${sub_out}.json -overwrite-result-file
+					popd >/dev/null || {
+						echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
+					}
 
-		# Combine webs_subs.txt and webs_fuzz.txt into webs_nuclei.txt and duplicate it
-		cat .tmp/webs_subs.txt .tmp/webs_fuzz.txt 2>>"$LOGFILE" | anew -q .tmp/webs_nuclei.txt | tee -a webs/webs_nuclei.txt
-
-		# Check if AXIOM is enabled
-		if [[ $AXIOM != true ]]; then
-			# Split severity levels into an array
-			IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
-
-			for crit in "${severity_array[@]}"; do
-				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Nuclei Severity: $crit ${reset}\n\n"
-
-				# Run nuclei for each severity level
-				nuclei $NUCLEI_FLAGS -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" -o "nuclei_output/${crit}.txt" <.tmp/webs_nuclei.txt
-			done
-			printf "\n\n"
-		else
-			# Check if webs_nuclei.txt exists and is not empty
-			if [[ -s ".tmp/webs_nuclei.txt" ]]; then
-				# Split severity levels into an array
-				IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
-
-				for crit in "${severity_array[@]}"; do
-					printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Axiom Nuclei Severity: $crit. Check results in nuclei_output folder.${reset}\n\n"
-
-					# Run axiom-scan with nuclei module for each severity level
-					axiom-scan .tmp/webs_nuclei.txt -m nuclei \
-						--nuclei-templates "$NUCLEI_TEMPLATES_PATH" \
-						-severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" \
-						-o "nuclei_output/${crit}.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
-
-					# Display the results if the output file exists and is not empty
-					if [[ -s "nuclei_output/${crit}.txt" ]]; then
-						cat "nuclei_output/${crit}.txt"
-					fi
+					[ -s "$dir/.tmp/fuzzing/${sub_out}.json" ] && cat $dir/.tmp/fuzzing/${sub_out}.json | jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' | sort -k1 | anew -q $dir/fuzzing/${sub_out}.txt
 				done
-				printf "\n\n"
+				find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | sort -k1 | anew -q $dir/fuzzing/fuzzing_full.txt
+			else
+				axiom-exec "mkdir -p /home/op/lists/seclists/Discovery/Web-Content/" &>/dev/null
+				axiom-exec "wget -q -O - ${fuzzing_remote_list} > /home/op/lists/fuzz_wordlist.txt" &>/dev/null
+				axiom-exec "wget -q -O - ${fuzzing_remote_list} > /home/op/lists/seclists/Discovery/Web-Content/big.txt" &>/dev/null
+				axiom-scan webs/webs_all.txt -m ffuf_base -H "${HEADER}" $FFUF_FLAGS -s -maxtime $FFUF_MAXTIME -o $dir/.tmp/ffuf-content.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+				for sub in $(cat webs/webs_all.txt); do
+					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
+					[ -s "$dir/.tmp/ffuf-content.json" ] && cat .tmp/ffuf-content.json | jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' | grep $sub | sort -k1 | anew -q fuzzing/${sub_out}.txt
+				done
+				find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | sort -k1 | anew -q $dir/fuzzing/fuzzing_full.txt
 			fi
+			end_func "Results are saved in $domain/fuzzing/*subdomain*.txt" ${FUNCNAME[0]}
+		else
+			end_func "No $domain/web/webs.txts file found, fuzzing skipped " ${FUNCNAME[0]}
 		fi
 
 		end_func "Results are saved in $domain/nuclei_output folder" "${FUNCNAME[0]}"
 	else
-		# Handle cases where NUCLEICHECK is false or the function has already been processed
 		if [[ $FUZZ == false ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
-		elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-			# Domain is an IP address; skip the function
-			return
+			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
 		else
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]}${reset}\n\n"
+			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
 		fi
 	fi
 
