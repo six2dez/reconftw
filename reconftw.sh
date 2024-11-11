@@ -732,7 +732,7 @@ function subdomains_full() {
 
 	# Check if domain is an IP address
 	if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-		printf "%b[%s] Scanning IP %s%s\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$domain" "$reset"
+		printf "%b[%s] Scanning IP %s%b\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$domain" "$reset"
 	else
 		printf "%b[%s] Subdomain Enumeration %s%b\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$domain" "$reset"
 	fi
@@ -820,7 +820,7 @@ function subdomains_full() {
 	fi
 
 	# Display results
-	printf "%b\n[%s] Total subdomains:%s\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+	printf "%b\n[%s] Total subdomains:%b\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
 	notification "- ${NUMOFLINES_subs} alive" "good"
 
 	if [[ -s "subdomains/subdomains.txt" ]]; then
@@ -838,7 +838,7 @@ function subdomains_full() {
 	fi
 
 	notification "Subdomain Enumeration Finished" "good"
-	printf "%b[%s] Results are saved in %s/subdomains/subdomains.txt and webs/webs.txt%s\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$domain" "$reset"
+	printf "%b[%s] Results are saved in %s/subdomains/subdomains.txt and webs/webs.txt%b\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$domain" "$reset"
 	printf "%b#######################################################################%b\n\n" "$bgreen" "$reset"
 
 }
@@ -3089,7 +3089,7 @@ function portscan() {
 		fi
 
 		# Display resolved IPs without CDN
-		printf "%b\n[%s] Resolved IP addresses (No CDN):%s\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+		printf "%b\n[%s] Resolved IP addresses (No CDN):%b\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
 		if [[ -s ".tmp/ips_nocdn.txt" ]]; then
 			sort ".tmp/ips_nocdn.txt"
 		else
@@ -3149,8 +3149,6 @@ function portscan() {
 
 		if [[ -s "hosts/portscan_active.xml" ]]; then
 			nmapurls <hosts/portscan_active.xml 2>>"$LOGFILE" | anew -q hosts/webs.txt
-		else
-			printf "%b[!] No portscan_active.xml found.%b\n" "$yellow" "$reset"
 		fi
 
 		if [[ -s "hosts/webs.txt" ]]; then
@@ -3160,8 +3158,6 @@ function portscan() {
 			fi
 			notification "Webs detected from port scan: ${NUMOFLINES} new websites" "good"
 			cat hosts/webs.txt
-		else
-			printf "%b[!] No webs detected from port scan.%b\n" "$yellow" "$reset"
 		fi
 
 		end_func "Results are saved in hosts/portscan_[passive|active|shodan].[txt|xml]" "${FUNCNAME[0]}"
@@ -3518,8 +3514,6 @@ function iishortname() {
 				xargs --null rm 2>>"$LOGFILE" >/dev/null
 
 			end_func "Results are saved in vulns/iis-shortname/" "${FUNCNAME[0]}"
-		else
-			end_func "No IIS sites detected, iishortname check skipped." "${FUNCNAME[0]}"
 		fi
 	else
 		# Handle cases where IIS_SHORTNAME is false or the function has already been processed
@@ -3596,8 +3590,6 @@ function cms_scanner() {
 				else
 					rm -rf "${tools}/CMSeeK/Result/${sub_out}" 2>>"$LOGFILE"
 				fi
-			else
-				printf "%b[!] cms.json does not exist or is empty for $sub_out.%b\n" "$yellow" "$reset"
 			fi
 		done <"webs/webs_all.txt"
 
@@ -3892,7 +3884,7 @@ function jschecks() {
 
 		if [[ -s ".tmp/url_extract_js.txt" ]]; then
 
-			printf "%bRunning: Fetching URLs 1/6%s\n" "$yellow" "$reset"
+			printf "%bRunning: Fetching URLs 1/6%b\n" "$yellow" "$reset"
 			if [[ $AXIOM != true ]]; then
 				subjs -ua "Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -c 40 <.tmp/url_extract_js.txt |
 					grep "$domain" |
@@ -3913,7 +3905,7 @@ function jschecks() {
 			python3 "${tools}/urless/urless/urless.py" <.tmp/url_extract_js.txt |
 				anew -q js/url_extract_js.txt 2>>"$LOGFILE" >/dev/null
 
-			printf "%b[%s] Running: Resolving JS URLs 2/6%s\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+			printf "%b[%s] Running: Resolving JS URLs 2/6%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
 			if [[ $AXIOM != true ]]; then
 				if [[ -s "js/url_extract_js.txt" ]]; then
 					httpx -follow-redirects -random-agent -silent -timeout "$HTTPX_TIMEOUT" -threads "$HTTPX_THREADS" \
@@ -3938,7 +3930,7 @@ function jschecks() {
 				fi
 			fi
 
-			printf "%bRunning: Extracting JS from sourcemaps 3/6%s\n" "$yellow" "$reset"
+			printf "%bRunning: Extracting JS from sourcemaps 3/6%b\n" "$yellow" "$reset"
 			if ! mkdir -p .tmp/sourcemapper; then
 				printf "%b[!] Failed to create sourcemapper directory.%b\n" "$bred" "$reset"
 			fi
@@ -3956,7 +3948,7 @@ function jschecks() {
 					-o .tmp/sourcemapper 2>>"$LOGFILE" >/dev/null
 			fi
 
-			printf "%b[%s] Running: Gathering endpoints 4/6%s\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+			printf "%b[%s] Running: Gathering endpoints 4/6%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
 			if [[ -s "js/js_livelinks.txt" ]]; then
 				xnLinkFinder -i js/js_livelinks.txt -sf subdomains/subdomains.txt -d "$XNLINKFINDER_DEPTH" \
 					-o .tmp/js_endpoints.txt 2>>"$LOGFILE" >/dev/null
@@ -3974,7 +3966,7 @@ function jschecks() {
 				printf "%b[!] No JavaScript endpoints found.%b\n" "$yellow" "$reset"
 			fi
 
-			printf "%b[%s] Running: Gathering secrets 5/6%s\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+			printf "%b[%s] Running: Gathering secrets 5/6%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
 			if [[ -s "js/js_livelinks.txt" ]]; then
 				axiom-scan js/js_livelinks.txt -m mantra -ua "$HEADER" -s -o js/js_secrets.txt "$AXIOM_EXTRA_ARGS" &>/dev/null
 				if [[ -s "js/js_secrets.txt" ]]; then
@@ -3990,7 +3982,7 @@ function jschecks() {
 				printf "%b[!] No live JavaScript links for secret gathering.%b\n" "$yellow" "$reset"
 			fi
 
-			printf "%b[%s] Running: Building wordlist 6/6%s\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+			printf "%b[%s] Running: Building wordlist 6/6%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
 			if [[ -s "js/js_livelinks.txt" ]]; then
 				interlace -tL js/js_livelinks.txt -threads "$INTERLACE_THREADS" \
 					-c "python3 ${tools}/getjswords.py '_target_' | anew -q webs/dict_words.txt" 2>>"$LOGFILE" >/dev/null
@@ -4957,8 +4949,6 @@ function prototype_pollution() {
 				# Filter and save relevant results
 				if [[ -s ".tmp/prototype_pollution.txt" ]]; then
 					grep "EXPL" ".tmp/prototype_pollution.txt" | anew -q "vulns/prototype_pollution.txt"
-				else
-					printf "%b[!] No Prototype Pollution findings detected.%b\n" "$bred" "$reset"
 				fi
 
 				end_func "Results are saved in vulns/prototype_pollution.txt" "${FUNCNAME[0]}"
@@ -6304,7 +6294,6 @@ while true; do
 	'-v' | '--vps')
 		command -v axiom-ls &>/dev/null || {
 			printf "\n Axiom is needed for this mode and is not installed \n You have to install it manually \n" && exit
-			allinstalled=false
 		}
 		AXIOM=true
 		shift
