@@ -3374,7 +3374,7 @@ function nuclei_check() {
 function fuzz() {
 
 	# Create necessary directories
-	mkdir -p .tmp/fuzzing webs fuzzing nuclei_output; then
+	mkdir -p .tmp/fuzzing webs fuzzing nuclei_output
 
 	# Check if the function should run
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $FUZZ == true ]] &&
