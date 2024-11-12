@@ -3419,7 +3419,13 @@ function fuzz() {
 				axiom-exec "wget -q -O - ${fuzzing_remote_list} > /home/op/lists/fuzz_wordlist.txt" &>/dev/null
 				axiom-exec "wget -q -O - ${fuzzing_remote_list} > /home/op/lists/seclists/Discovery/Web-Content/big.txt" &>/dev/null
 				axiom-scan webs/webs_all.txt -m ffuf_base -H "${HEADER}" $FFUF_FLAGS -s -maxtime $FFUF_MAXTIME -o $dir/.tmp/ffuf-content.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
-				[ -s "$dir/.tmp/ffuf-content.json" ] && ./ffufPostprocessing -result-file $dir/.tmp/ffuf-content.json -overwrite-result-file
+				pushd "${tools}/ffufPostprocessing" >/dev/null || {
+						echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
+					}
+					[ -s "$dir/.tmp/ffuf-content.json" ] && ./ffufPostprocessing -result-file $dir/.tmp/ffuf-content.json -overwrite-result-file
+				popd >/dev/null || {
+					echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
+				}
 				for sub in $(cat webs/webs_all.txt); do
 					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
 					[ -s "$dir/.tmp/ffuf-content.json" ] && cat .tmp/ffuf-content.json | jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' | grep $sub | sort -k1 | anew -q fuzzing/${sub_out}.txt
