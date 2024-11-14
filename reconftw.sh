@@ -3458,8 +3458,6 @@ function iishortname() {
 		if [[ -s "nuclei_output/info.txt" ]]; then
 			# Extract IIS version information and save to .tmp/iis_sites.txt
 			grep "iis-version" "nuclei_output/info.txt" | cut -d " " -f4 >.tmp/iis_sites.txt
-		else
-			printf "%b[!] nuclei_output/info.txt does not exist or is empty.%b\n" "$yellow" "$reset"
 		fi
 
 		# Proceed only if iis_sites.txt exists and is non-empty
@@ -3487,8 +3485,8 @@ function iishortname() {
 				xargs --null grep -Z 'Target is not vulnerable' |
 				xargs --null rm 2>>"$LOGFILE" >/dev/null
 
-			end_func "Results are saved in vulns/iis-shortname/" "${FUNCNAME[0]}"
 		fi
+		end_func "Results are saved in vulns/iis-shortname/" "${FUNCNAME[0]}"
 	else
 		# Handle cases where IIS_SHORTNAME is false or the function has already been processed
 		if [[ $IIS_SHORTNAME == false ]]; then
