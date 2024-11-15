@@ -6098,6 +6098,31 @@ function webs_menu() {
 	end
 }
 
+function zen_menu() {
+	if [[ $AXIOM == true ]]; then
+		axiom_launch
+		axiom_selected
+	fi
+	subdomains_full
+	webprobe_full
+	subtakeover
+	remove_big_files
+	s3buckets
+	screenshot
+	#	virtualhosts
+	cdnprovider
+	waf_checks
+	fuzz
+	iishortname
+	nuclei_check
+
+	if [[ $AXIOM == true ]]; then
+		axiom_shutdown
+	fi
+	cms_scanner
+	end
+}
+
 function help() {
 	printf "\n Usage: $0 [-d domain.tld] [-m name] [-l list.txt] [-x oos.txt] [-i in.txt] "
 	printf "\n           	      [-r] [-s] [-p] [-a] [-w] [-n] [-i] [-h] [-f] [--deep] [-o OUTPUT]\n\n"
@@ -6105,16 +6130,17 @@ function help() {
 	printf "   -d domain.tld     Target domain\n"
 	printf "   -m company        Target company name\n"
 	printf "   -l list.txt       Targets list (One on each line)\n"
-	printf "   -x oos.txt        Exclude subdomains list (Out Of Scope)\n"
-	printf "   -i in.txt         Include subdomains list\n"
+	printf "   -x oos.txt        Excludes subdomains list (Out Of Scope)\n"
+	printf "   -i in.txt         Includes subdomains list\n"
 	printf " \n"
 	printf " ${bblue}MODE OPTIONS${reset}\n"
-	printf "   -r, --recon       Recon - Perform full recon process (without attacks)\n"
-	printf "   -s, --subdomains  Subdomains - Perform Subdomain Enumeration, Web probing and check for sub-tko\n"
-	printf "   -p, --passive     Passive - Perform only passive steps\n"
-	printf "   -a, --all         All - Perform all checks and active exploitations\n"
-	printf "   -w, --web         Web - Perform web checks from list of subdomains\n"
-	printf "   -n, --osint       OSINT - Check for public intel data\n"
+	printf "   -r, --recon       Recon - Performs full recon process (without attacks)\n"
+	printf "   -s, --subdomains  Subdomains - Performs Subdomain Enumeration, Web probing and check for sub-tko\n"
+	printf "   -p, --passive     Passive - Performs only passive steps\n"
+	printf "   -a, --all         All - Performs all checks and active exploitations\n"
+	printf "   -w, --web         Web - Performs web checks from list of subdomains\n"
+	printf "   -n, --osint       OSINT - Checks for public intel data\n"
+	printf "   -z, --zen         Zen - Performs a recon process covering the basics and some vulns \n"
 	printf "   -c, --custom      Custom - Launches specific function against target, u need to know the function name first\n"
 	printf "   -h                Help - Show help section\n"
 	printf " \n"
@@ -6158,7 +6184,7 @@ if [[ $OSTYPE == "darwin"* ]]; then
 	PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
 fi
 
-PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:rspanwvh::' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,deep,help,vps' -n 'reconFTW' -- "$@")
+PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:z:rspanwvh::' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps' -n 'reconFTW' -- "$@")
 
 # Note the quotes around "$PROGARGS": they are essential!
 eval set -- "$PROGARGS"
@@ -6230,6 +6256,11 @@ while true; do
 		custom_function=$2
 		opt_mode='c'
 		shift 2
+		continue
+		;;
+	'-z' | '--zen')
+		opt_mode='z'
+		shift
 		continue
 		;;
 	# extra stuff
@@ -6466,6 +6497,19 @@ case $opt_mode in
 		start
 		osint
 		end
+	fi
+	;;
+'z')
+	if [[ -n $list ]]; then
+		if [[ $AXIOM == true ]]; then
+			mode="zen_menu"
+		fi
+		sed -i 's/\r$//' $list
+		for domain in $(cat $list); do
+			zen_menu
+		done
+	else
+		zen_menu
 	fi
 	;;
 'c')
