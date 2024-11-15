@@ -3306,7 +3306,7 @@ function nuclei_check() {
 				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Nuclei Severity: $crit ${reset}\n\n"
 
 				# Run nuclei for each severity level
-				nuclei $NUCLEI_FLAGS -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" -o "nuclei_output/${crit}.txt" <.tmp/webs_nuclei.txt
+				nuclei $NUCLEI_FLAGS -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" "$NUCLEI_EXTRA_ARGS" -o "nuclei_output/${crit}.txt" <.tmp/webs_nuclei.txt
 			done
 			printf "\n\n"
 		else
@@ -3321,7 +3321,7 @@ function nuclei_check() {
 					axiom-scan .tmp/webs_nuclei.txt -m nuclei \
 						--nuclei-templates "$NUCLEI_TEMPLATES_PATH" \
 						-severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" \
-						-o "nuclei_output/${crit}.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+						"$NUCLEI_EXTRA_ARGS" -o "nuclei_output/${crit}.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
 
 					# Display the results if the output file exists and is not empty
 					if [[ -s "nuclei_output/${crit}.txt" ]]; then
