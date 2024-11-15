@@ -6099,6 +6099,7 @@ function webs_menu() {
 }
 
 function zen_menu() {
+	start
 	if [[ $AXIOM == true ]]; then
 		axiom_launch
 		axiom_selected
