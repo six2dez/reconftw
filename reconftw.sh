@@ -1614,11 +1614,7 @@ function sub_analytics() {
 							2>>"$LOGFILE" >/dev/null
 					fi
 				fi
-			else
-				printf "%b[!] No analytics subdomains found.%b\n" "$yellow" "$reset"
 			fi
-		else
-			printf "%b[!] File .tmp/probed_tmp_scrap.txt does not exist or is empty.%b\n" "$yellow" "$reset"
 		fi
 
 		if [[ $INSCOPE == true ]]; then
@@ -1627,7 +1623,7 @@ function sub_analytics() {
 			fi
 		fi
 
-		if ! NUMOFLINES=$(anew subdomains/subdomains.txt <.tmp/analytics_subs_resolved.txt 2>/dev/null| sed '/^$/d' | wc -l); then
+		if ! NUMOFLINES=$(anew subdomains/subdomains.txt <.tmp/analytics_subs_resolved.txt 2>/dev/null | sed '/^$/d' | wc -l); then
 			printf "%b[!] Failed to count new subdomains.%b\n" "$bred" "$reset"
 			NUMOFLINES=0
 		fi
@@ -2642,8 +2638,6 @@ function webprobe_simple() {
 				grep "$domain" |
 				grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' |
 				sed 's/*.//' | anew -q .tmp/probed_tmp.txt
-		else
-			printf "%b[!] webs/web_full_info.txt does not exist or is empty.%b\n" "$yellow" "$reset"
 		fi
 
 		# Extract web info to plain text
@@ -2660,7 +2654,7 @@ function webprobe_simple() {
 		fi
 
 		# Count new websites
-		if ! NUMOFLINES=$(anew webs/webs.txt <.tmp/probed_tmp.txt 2>>"$LOGFILE" | sed '/^$/d' | wc -l); then
+		if ! NUMOFLINES=$(anew webs/webs.txt <.tmp/probed_tmp.txt 2>/dev/null | sed '/^$/d' | wc -l); then
 			printf "%b[!] Failed to count new websites.%b\n" "$bred" "$reset"
 			NUMOFLINES=0
 		fi
@@ -2723,8 +2717,6 @@ function webprobe_full() {
 					-silent -retries 2 -title -web-server -tech-detect -location -no-color -json \
 					-o .tmp/web_full_info_uncommon.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
 			fi
-		else
-			printf "%b[!] subdomains/subdomains.txt does not exist or is empty.%b\n" "$yellow" "$reset"
 		fi
 
 		# Process web_full_info_uncommon.txt
@@ -2774,8 +2766,6 @@ function webprobe_full() {
 				notification "Sending websites with uncommon ports to proxy" "info"
 				ffuf -mc all -w webs/webs_uncommon_ports.txt -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
 			fi
-		else
-			printf "%b[!] .tmp/web_full_info_uncommon.txt does not exist or is empty.%b\n" "$yellow" "$reset"
 		fi
 	else
 		if [[ $WEBPROBEFULL == false ]]; then
@@ -2810,14 +2800,10 @@ function screenshot() {
 		if [[ $AXIOM != true ]]; then
 			if [[ -s "webs/webs_all.txt" ]]; then
 				nuclei -headless -id screenshot -V dir='screenshots' <webs/webs_all.txt 2>>"$LOGFILE"
-			else
-				printf "%b[!] webs/webs_all.txt does not exist or is empty.%b\n" "$yellow" "$reset"
 			fi
 		else
 			if [[ -s "webs/webs_all.txt" ]]; then
 				axiom-scan webs/webs_all.txt -m nuclei-screenshots -o screenshots "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
-			else
-				printf "%b[!] webs/webs_all.txt does not exist or is empty.%b\n" "$yellow" "$reset"
 			fi
 		fi
 
@@ -2866,8 +2852,6 @@ function screenshot() {
 				notification "Sending websites with uncommon ports to proxy" "info"
 				ffuf -mc all -w webs/webs_uncommon_ports.txt -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
 			fi
-		else
-			printf "%b[!] .tmp/web_full_info_uncommon.txt does not exist or is empty.%b\n" "$yellow" "$reset"
 		fi
 	else
 		if [[ $WEBSCREENSHOT == false ]]; then
@@ -2922,8 +2906,6 @@ function virtualhosts() {
 
 				if [[ -s $json_file ]]; then
 					jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' "$json_file" | sort | anew -q "$txt_file"
-				else
-					printf "%b[!] JSON file %s does not exist or is empty.%b\n" "$yellow" "$json_file" "$reset"
 				fi
 			done
 
@@ -2994,8 +2976,6 @@ function favicon() {
 
 			# Remove the JSON file
 			rm -f favicontest.json 2>>"$LOGFILE"
-		else
-			printf "%b[!] favicontest.json does not exist or is empty.%b\n" "$yellow" "$reset"
 		fi
 
 		# Return to the original directory
@@ -3037,8 +3017,6 @@ function portscan() {
 			if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
 				# Extract host and IP from JSON
 				jq -r 'try . | "\(.host) \(.a[0])"' "subdomains/subdomains_dnsregs.json" | anew -q .tmp/subs_ips.txt
-			else
-				printf "%b[!] subdomains_dnsregs.json does not exist or is empty.%b\n" "$yellow" "$reset"
 			fi
 
 			if [[ -s ".tmp/subs_ips.txt" ]]; then
@@ -3186,8 +3164,6 @@ function cdnprovider() {
 				grep -aEiv "^(127|10|169\.254|172\.(1[6-9]|2[0-9]|3[01])|192\.168)\." |
 				grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" |
 				sort -u >.tmp/ips_cdn.txt
-		else
-			printf "%b[!] subdomains/subdomains_dnsregs.json does not exist or is empty.%b\n" "$yellow" "$reset"
 		fi
 
 		# Check if ips_cdn.txt exists and is not empty
@@ -3693,8 +3669,6 @@ function urlchecks() {
 			else
 				printf "%b[!] No URLs extracted.%b\n" "$yellow" "$reset"
 			fi
-		else
-			printf "%b[!] webs/webs_all.txt does not exist or is empty.%b\n" "$yellow" "$reset"
 		fi
 	else
 		if [[ $URL_CHECK == false ]]; then
@@ -4011,8 +3985,6 @@ function wordlist_gen() {
 			# Extract words by removing punctuation
 			printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Extracting words...${reset}\n"
 			tr "[:punct:]" "\n" <".tmp/url_extract_tmp.txt" | anew -q "webs/dict_words.txt"
-		else
-			printf "%b[!] .tmp/url_extract_tmp.txt does not exist or is empty.%b\n" "$yellow" "$reset"
 		fi
 
 		# Process js_endpoints.txt if it exists and is not empty
@@ -5198,7 +5170,6 @@ function zipSnedOutputFolder {
 	zip_name1=$(date +"%Y_%m_%d-%H.%M.%S")
 	zip_name="${zip_name1}_${domain}.zip" 2>>"$LOGFILE" >/dev/null
 	(cd "$dir" && zip -r "$zip_name" .) 2>>"$LOGFILE" >/dev/null
-
 	echo "Sending zip file "${dir}/${zip_name}""
 	if [[ -s "${dir}/$zip_name" ]]; then
 		sendToNotify "$dir/$zip_name"
@@ -5232,37 +5203,45 @@ function remove_big_files() {
 }
 
 function notification() {
-	if [[ -n $1 ]] && [[ -n $2 ]]; then
-		if [[ $NOTIFICATION == true ]]; then
-			NOTIFY="notify -silent"
-		else
-			NOTIFY="true"
-		fi
-		if [[ -z $3 ]]; then
-			current_date=$(date +'%Y-%m-%d %H:%M:%S')
-		else
-			current_date="$3"
-		fi
-		case $2 in
-		info)
-			text="\n${bblue}[$current_date] ${1} ${reset}"
-			printf "${text}\n" && printf "${text} - ${domain}\n" | $NOTIFY
-			;;
-		warn)
-			text="\n${yellow}[$current_date] ${1} ${reset}"
-			printf "${text}\n" && printf "${text} - ${domain}\n" | $NOTIFY
-			;;
-		error)
-			text="\n${bred}[$current_date] ${1} ${reset}"
-			printf "${text}\n" && printf "${text} - ${domain}\n" | $NOTIFY
-			;;
-		good)
-			text="\n${bgreen}[$current_date] ${1} ${reset}"
-			printf "${text}\n" && printf "${text} - ${domain}\n" | $NOTIFY
-			;;
-		esac
-	fi
+    if [[ -n $1 ]] && [[ -n $2 ]]; then
+        if [[ $NOTIFICATION == true ]]; then
+            NOTIFY="notify -silent"
+        else
+            NOTIFY=""
+        fi
+        if [[ -z $3 ]]; then
+            current_date=$(date +'%Y-%m-%d %H:%M:%S')
+        else
+            current_date="$3"
+        fi
+
+        case $2 in
+        info)
+            text="\n${bblue}[$current_date] ${1} ${reset}"
+            ;;
+        warn)
+            text="\n${yellow}[$current_date] ${1} ${reset}"
+            ;;
+        error)
+            text="\n${bred}[$current_date] ${1} ${reset}"
+            ;;
+        good)
+            text="\n${bgreen}[$current_date] ${1} ${reset}"
+            ;;
+        esac
+
+        # Print to terminal
+        printf "${text}\n"
+
+        # Send to notify if notifications are enabled
+        if [[ -n $NOTIFY ]]; then
+            # Remove color codes for the notification
+            clean_text=$(echo -e "${text} - ${domain}" | sed 's/\x1B\[[0-9;]*[JKmsu]//g')
+            echo -e "${clean_text}" | $NOTIFY >/dev/null 2>&1
+        fi
+    fi
 }
+
 
 function transfer {
 	if [[ $# -eq 0 ]]; then
@@ -5302,14 +5281,14 @@ function sendToNotify {
 		fi
 		if grep -q '^ telegram\|^telegram\|^    telegram' $NOTIFY_CONFIG; then
 			notification "[$(date +'%Y-%m-%d %H:%M:%S')] Sending ${domain} data over Telegram" info
-			telegram_chat_id=$(cat ${NOTIFY_CONFIG} | grep '^    telegram_chat_id\|^telegram_chat_id\|^    telegram_chat_id' | xargs | cut -d' ' -f2)
-			telegram_key=$(cat ${NOTIFY_CONFIG} | grep '^    telegram_api_key\|^telegram_api_key\|^    telegram_apikey' | xargs | cut -d' ' -f2)
-			curl -F document=@${1} "https://api.telegram.org/bot${telegram_key}/sendDocument?chat_id=${telegram_chat_id}" 2>>"$LOGFILE" >/dev/null
+			telegram_chat_id=$(sed -n '/^telegram:/,/^[^ ]/p' ${NOTIFY_CONFIG} | sed -n 's/^[ ]*telegram_chat_id:[ ]*"\([^"]*\)".*/\1/p')
+			telegram_key=$(sed -n '/^telegram:/,/^[^ ]/p' ${NOTIFY_CONFIG} | sed -n 's/^[ ]*telegram_api_key:[ ]*"\([^"]*\)".*/\1/p')
+			curl -F "chat_id=${telegram_chat_id}" -F "document=@${1}" https://api.telegram.org/bot${telegram_key}/sendDocument 2>>"$LOGFILE" >/dev/null
 		fi
 		if grep -q '^ discord\|^discord\|^    discord' $NOTIFY_CONFIG; then
 			notification "[$(date +'%Y-%m-%d %H:%M:%S')] Sending ${domain} data over Discord" info
-			discord_url=$(cat ${NOTIFY_CONFIG} | grep '^ discord_webhook_url\|^discord_webhook_url\|^    discord_webhook_url' | xargs | cut -d' ' -f2)
-			curl -v -i -H "Accept: application/json" -H "Content-Type: multipart/form-data" -X POST -F file1=@${1} $discord_url 2>>"$LOGFILE" >/dev/null
+			discord_url=$(sed -n '/^discord:/,/^[^ ]/p' ${NOTIFY_CONFIG} | sed -n 's/^[ ]*discord_webhook_url:[ ]*"\([^"]*\)".*/\1/p')
+			curl -v -i -H "Accept: application/json" -H "Content-Type: multipart/form-data" -X POST -F 'payload_json={"username": "test", "content": "hello"}' -F file1=@${1} $discord_url 2>>"$LOGFILE" >/dev/null
 		fi
 		if [[ -n $slack_channel ]] && [[ -n $slack_auth ]]; then
 			notification "[$(date +'%Y-%m-%d %H:%M:%S')] Sending ${domain} data over Slack" info
