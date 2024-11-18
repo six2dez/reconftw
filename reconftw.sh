@@ -156,7 +156,7 @@ function tools_installed() {
 	declare -A tools_commands=(
 		["brutespray"]="brutespray"
 		["xnLinkFinder"]="xnLinkFinder"
-		["waymore"]="waymore"
+		["urlfinder"]="urlfinder"
 		["github-endpoints"]="github-endpoints"
 		["github-subdomains"]="github-subdomains"
 		["gitlab-subdomains"]="gitlab-subdomains"
@@ -3575,14 +3575,7 @@ function urlchecks() {
 		if [[ -s "webs/webs_all.txt" ]]; then
 			if [[ $AXIOM != true ]]; then
 				if [[ $URL_CHECK_PASSIVE == true ]]; then
-					if [[ $DEEP == true ]]; then
-						unfurl -u domains <webs/webs_all.txt >.tmp/waymore_input.txt
-						waymore -i .tmp/waymore_input.txt -mode U -f -oU .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
-					else
-						unfurl -u domains <webs/webs_all.txt >.tmp/waymore_input.txt
-						waymore -i .tmp/waymore_input.txt -mode U -f -oU .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
-					fi
-
+					urlfinder -d $domain -o .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
 					if [[ -s $GITHUB_TOKENS ]]; then
 						github-endpoints -q -k -d "$domain" -t "$GITHUB_TOKENS" -o .tmp/github-endpoints.txt 2>>"$LOGFILE" >/dev/null
 						if [[ -s ".tmp/github-endpoints.txt" ]]; then

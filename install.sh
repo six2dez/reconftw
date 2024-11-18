@@ -98,6 +98,7 @@ declare -A gotools=(
 	["ppmap"]="go install -v github.com/kleiton0x00/ppmap@latest"
 	["sourcemapper"]="go install -v github.com/denandz/sourcemapper@latest"
 	["jsluice"]="go install -v github.com/BishopFox/jsluice/cmd/jsluice@latest"
+	["urlfinder"]="go install -v github.com/projectdiscovery/urlfinder/cmd/urlfinder@latest"
 )
 
 # Declare repositories and their paths
@@ -133,7 +134,6 @@ declare -A repos=(
 	["ffufPostprocessing"]="Damian89/ffufPostprocessing"
 	["misconfig-mapper"]="intigriti/misconfig-mapper"
 	["Spoofy"]="MattKeeley/Spoofy"
-	["Waymore"]="xnl-h4ck3r/waymore"
 	["xnLinkFinder"]="xnl-h4ck3r/xnLinkFinder"
 	["porch-pirate"]="MandConsultingGroup/porch-pirate"
 	["MetaFinder"]="Josue87/MetaFinder"
@@ -636,7 +636,7 @@ function initial_setup() {
 	"$SUDO" cp "${GOPATH}/bin/"* /usr/local/bin/ &>/dev/null || true
 
 	# Final reminders
-	echo -e "${yellow}Remember to set your API keys:\n- subfinder (${HOME}/.config/subfinder/provider-config.yaml)\n- GitHub (${HOME}/Tools/.github_tokens)\n- GitLab (${HOME}/Tools/.gitlab_tokens)\n- SSRF Server (COLLAB_SERVER in reconftw.cfg or env var)\n- Waymore (${HOME}/.config/waymore/config.yml)\n- Blind XSS Server (XSS_SERVER in reconftw.cfg or env var)\n- notify (${HOME}/.config/notify/provider-config.yaml)\n- WHOISXML API (WHOISXML_API in reconftw.cfg or env var)\n${reset}"
+	echo -e "${yellow}Remember to set your API keys:\n- subfinder (${HOME}/.config/subfinder/provider-config.yaml)\n- GitHub (${HOME}/Tools/.github_tokens)\n- GitLab (${HOME}/Tools/.gitlab_tokens)\n- SSRF Server (COLLAB_SERVER in reconftw.cfg or env var)\n- Blind XSS Server (XSS_SERVER in reconftw.cfg or env var)\n- notify (${HOME}/.config/notify/provider-config.yaml)\n- WHOISXML API (WHOISXML_API in reconftw.cfg or env var)\n${reset}"
 	echo -e "${bgreen}Finished!${reset}\n"
 	echo -e "${bgreen}#######################################################################${reset}"
 }
