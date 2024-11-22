@@ -1011,7 +1011,7 @@ function sub_tls() {
 		if [[ $DEEP == true ]]; then
 			if [[ $AXIOM != true ]]; then
 				tlsx -san -cn -silent -ro -c "$TLSX_THREADS" \
-					-p "$TLS_PORTS" -q .tmp/subdomains_tlsx.txt <subdomains/subdomains.txt \
+					-p "$TLS_PORTS" -o .tmp/subdomains_tlsx.txt <subdomains/subdomains.txt \
 					2>>"$LOGFILE" >/dev/null
 			else
 				axiom-scan subdomains/subdomains.txt -m tlsx \
