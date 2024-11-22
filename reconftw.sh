@@ -1602,7 +1602,7 @@ function sub_analytics() {
 			fi
 		fi
 
-		if ! NUMOFLINES=$(anew subdomains/subdomains.txt <.tmp/analytics_subs_resolved.txt 2>/dev/null | sed '/^$/d' | wc -l); then
+		if ! NUMOFLINES=$(anew subdomains/subdomains.txt 2>/dev/null <.tmp/analytics_subs_resolved.txt 2>/dev/null | sed '/^$/d' | wc -l); then
 			printf "%b[!] Failed to count new subdomains.%b\n" "$bred" "$reset"
 			NUMOFLINES=0
 		fi
