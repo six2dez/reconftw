@@ -1906,7 +1906,7 @@ function sub_recursive_passive() {
 			fi
 
 			if [[ -s ".tmp/passive_recursive_tmp.txt" ]]; then
-				cat .tmp/passive_recursive_tmp.txt| anew -q .tmp/passive_recursive.txt
+				cat .tmp/passive_recursive_tmp.txt | anew -q .tmp/passive_recursive.txt
 			fi
 
 			if [[ -s ".tmp/passive_recursive.txt" ]]; then
@@ -2742,7 +2742,7 @@ function screenshot() {
 
 		# Combine webs.txt and webs_uncommon_ports.txt into webs_all.txt if it doesn't exist
 		if [[ ! -s "webs/webs_all.txt" ]]; then
-			 cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
+			cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
 		fi
 
 		# Run nuclei or axiom-scan based on AXIOM flag
@@ -2990,9 +2990,9 @@ function portscan() {
 
 		if [[ -s "hosts/ips.txt" ]]; then
 			# Remove CDN IPs
-			comm -23 <(sort -u hosts/ips.txt) <(cut -d'[' -f1 hosts/cdn_providers.txt | sed 's/[[:space:]]*$//' | sort -u) \
-				| grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' \
-				| sort -u | anew -q .tmp/ips_nocdn.txt
+			comm -23 <(sort -u hosts/ips.txt) <(cut -d'[' -f1 hosts/cdn_providers.txt | sed 's/[[:space:]]*$//' | sort -u) |
+				grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' |
+				sort -u | anew -q .tmp/ips_nocdn.txt
 		fi
 
 		# Display resolved IPs without CDN
@@ -3043,7 +3043,7 @@ function portscan() {
 			else
 				if [[ -s ".tmp/ips_nocdn.txt" ]]; then
 					axiom-scan .tmp/ips_nocdn.txt -m nmapx $PORTSCAN_ACTIVE_OPTIONS \
-					-oA hosts/portscan_active $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+						-oA hosts/portscan_active $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 				fi
 			fi
 		fi
@@ -3327,9 +3327,9 @@ function fuzz() {
 				axiom-exec "wget -q -O - ${fuzzing_remote_list} > /home/op/lists/seclists/Discovery/Web-Content/big.txt" &>/dev/null
 				axiom-scan webs/webs_all.txt -m ffuf_base -H "${HEADER}" $FFUF_FLAGS -s -maxtime $FFUF_MAXTIME -o $dir/.tmp/ffuf-content.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 				pushd "${tools}/ffufPostprocessing" >/dev/null || {
-						echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
-					}
-					[ -s "$dir/.tmp/ffuf-content.json" ] && ./ffufPostprocessing -result-file $dir/.tmp/ffuf-content.json -overwrite-result-file 2>>"$LOGFILE" >/dev/null
+					echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
+				}
+				[ -s "$dir/.tmp/ffuf-content.json" ] && ./ffufPostprocessing -result-file $dir/.tmp/ffuf-content.json -overwrite-result-file 2>>"$LOGFILE" >/dev/null
 				popd >/dev/null || {
 					echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
 				}
@@ -4105,8 +4105,8 @@ function xss() {
 			# Run Dalfox with Katana output
 			if [[ -s ".tmp/xss_reflected.txt" ]]; then
 				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Dalfox with Katana${reset}\n\n"
-				dalfox pipe --silence --no-color --no-spinner --only-poc r --ignore-return 302,404,403 --skip-bav $OPTIONS -d "$DEPTH" <".tmp/xss_reflected.txt" 2>>"$LOGFILE" \
-				| anew -q "vulns/xss.txt"
+				dalfox pipe --silence --no-color --no-spinner --only-poc r --ignore-return 302,404,403 --skip-bav $OPTIONS -d "$DEPTH" <".tmp/xss_reflected.txt" 2>>"$LOGFILE" |
+					anew -q "vulns/xss.txt"
 			fi
 		else
 			# Using Axiom
@@ -4253,7 +4253,6 @@ function ssrf_checks() {
 		# Handle COLLAB_SERVER configuration
 		if [[ -z $COLLAB_SERVER ]]; then
 			interactsh-client &>.tmp/ssrf_callback.txt &
-			INTERACTSH_PID=$!
 			sleep 2
 
 			# Extract FFUFHASH from interactsh_callback.txt
@@ -4502,7 +4501,7 @@ function sqli() {
 				if [[ $SQLMAP == true ]]; then
 					printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: SQLMap for SQLi Checks${reset}\n\n"
 					python3 "${tools}/sqlmap/sqlmap.py" -m ".tmp/tmp_sqli.txt" -b -o --smart \
-					--batch --disable-coloring --random-agent --output-dir="vulns/sqlmap" 2>>"$LOGFILE" >/dev/null
+						--batch --disable-coloring --random-agent --output-dir="vulns/sqlmap" 2>>"$LOGFILE" >/dev/null
 				fi
 
 				# Check if GHAURI is enabled and run Ghauri
@@ -5061,45 +5060,44 @@ function remove_big_files() {
 }
 
 function notification() {
-    if [[ -n $1 ]] && [[ -n $2 ]]; then
-        if [[ $NOTIFICATION == true ]]; then
-            NOTIFY="notify -silent"
-        else
-            NOTIFY=""
-        fi
-        if [[ -z $3 ]]; then
-            current_date=$(date +'%Y-%m-%d %H:%M:%S')
-        else
-            current_date="$3"
-        fi
+	if [[ -n $1 ]] && [[ -n $2 ]]; then
+		if [[ $NOTIFICATION == true ]]; then
+			NOTIFY="notify -silent"
+		else
+			NOTIFY=""
+		fi
+		if [[ -z $3 ]]; then
+			current_date=$(date +'%Y-%m-%d %H:%M:%S')
+		else
+			current_date="$3"
+		fi
 
-        case $2 in
-        info)
-            text="\n${bblue}[$current_date] ${1} ${reset}"
-            ;;
-        warn)
-            text="\n${yellow}[$current_date] ${1} ${reset}"
-            ;;
-        error)
-            text="\n${bred}[$current_date] ${1} ${reset}"
-            ;;
-        good)
-            text="\n${bgreen}[$current_date] ${1} ${reset}"
-            ;;
-        esac
+		case $2 in
+		info)
+			text="\n${bblue}[$current_date] ${1} ${reset}"
+			;;
+		warn)
+			text="\n${yellow}[$current_date] ${1} ${reset}"
+			;;
+		error)
+			text="\n${bred}[$current_date] ${1} ${reset}"
+			;;
+		good)
+			text="\n${bgreen}[$current_date] ${1} ${reset}"
+			;;
+		esac
 
-        # Print to terminal
-        printf "${text}\n"
+		# Print to terminal
+		printf "${text}\n"
 
-        # Send to notify if notifications are enabled
-        if [[ -n $NOTIFY ]]; then
-            # Remove color codes for the notification
-            clean_text=$(echo -e "${text} - ${domain}" | sed 's/\x1B\[[0-9;]*[JKmsu]//g')
-            echo -e "${clean_text}" | $NOTIFY >/dev/null 2>&1
-        fi
-    fi
+		# Send to notify if notifications are enabled
+		if [[ -n $NOTIFY ]]; then
+			# Remove color codes for the notification
+			clean_text=$(echo -e "${text} - ${domain}" | sed 's/\x1B\[[0-9;]*[JKmsu]//g')
+			echo -e "${clean_text}" | $NOTIFY >/dev/null 2>&1
+		fi
+	fi
 }
-
 
 function transfer {
 	if [[ $# -eq 0 ]]; then
@@ -5322,7 +5320,7 @@ function start() {
 	global_start=$(date +%s)
 
 	printf "\n${bgreen}#######################################################################${reset}"
-	notification "Recon succesfully started on ${domain}" good $(date +'%Y-%m-%d %H:%M:%S')
+	notification "Recon succesfully started on ${domain}" "good" "$(date +'%Y-%m-%d %H:%M:%S')"
 	[ "$SOFT_NOTIFICATION" = true ] && echo "$(date +'%Y-%m-%d %H:%M:%S') Recon succesfully started on ${domain}" | notify -silent
 	printf "${bgreen}#######################################################################${reset}\n"
 	if [[ $upgrade_before_running == true ]]; then
@@ -5414,7 +5412,7 @@ function end() {
 	global_end=$(date +%s)
 	getElapsedTime $global_start $global_end
 	printf "${bgreen}#######################################################################${reset}\n"
-	notification "Finished Recon on: ${domain} under ${finaldir} in: ${runtime}" good $(date +'%Y-%m-%d %H:%M:%S')
+	notification "Finished Recon on: ${domain} under ${finaldir} in: ${runtime}" good "$(date +'%Y-%m-%d %H:%M:%S')"
 	[ "$SOFT_NOTIFICATION" = true ] && echo "[$(date +'%Y-%m-%d %H:%M:%S')] Finished Recon on: ${domain} under ${finaldir} in: ${runtime}" | notify -silent
 	printf "${bgreen}#######################################################################${reset}\n"
 	#Separator for more clear messges in telegram_Bot
