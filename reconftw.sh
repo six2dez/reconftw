@@ -340,7 +340,6 @@ function github_repos() {
 					return 1
 				fi
 			else
-				printf "%b[!] No repository URLs found to clone.%b\n" "$yellow" "$reset"
 				end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}"
 				return 1
 			fi
@@ -348,7 +347,6 @@ function github_repos() {
 			if [[ -d ".tmp/github_repos/" ]]; then
 				ls .tmp/github_repos >.tmp/github_repos_folders.txt
 			else
-				printf "%b[!] No repositories cloned.%b\n" "$yellow" "$reset"
 				end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}"
 				return 1
 			fi
@@ -360,7 +358,6 @@ function github_repos() {
 					return 1
 				fi
 			else
-				printf "%b[!] No repository folders found for gitleaks.%b\n" "$yellow" "$reset"
 				end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}"
 				return 1
 			fi
@@ -378,7 +375,6 @@ function github_repos() {
 					return 1
 				fi
 			else
-				printf "%b[!] No secrets found to compile.%b\n" "$yellow" "$reset"
 				end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}"
 				return 1
 			fi
@@ -1036,9 +1032,6 @@ function sub_tls() {
 			grep "\.$domain$\|^$domain$" .tmp/subdomains_tlsx.txt |
 				grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' |
 				sed "s/|__ //" | anew -q .tmp/subdomains_tlsx_clean.txt
-		else
-			printf "%b[!] No subdomains found in tlsx output.%b\n" "$yellow" "$reset"
-			return 0
 		fi
 
 		if [[ $AXIOM != true ]]; then
@@ -1052,9 +1045,6 @@ function sub_tls() {
 					-l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
 					--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
 					2>>"$LOGFILE" >/dev/null
-			else
-				printf "%b[!] No subdomains to resolve.%b\n" "$yellow" "$reset"
-				return 0
 			fi
 		else
 			if ! resolvers_update_quick_axiom; then
@@ -1067,9 +1057,6 @@ function sub_tls() {
 					--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
 					-o .tmp/subdomains_tlsx_resolved.txt $AXIOM_EXTRA_ARGS \
 					2>>"$LOGFILE" >/dev/null
-			else
-				printf "%b[!] No subdomains to resolve.%b\n" "$yellow" "$reset"
-				return 0
 			fi
 		fi
 
@@ -1288,9 +1275,6 @@ function sub_brute() {
 					-l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
 					--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
 					2>>"$LOGFILE" >/dev/null
-			else
-				printf "%b[!] No subdomains found during bruteforce.%b\n" "$yellow" "$reset"
-				return 0
 			fi
 
 		else
@@ -1314,9 +1298,6 @@ function sub_brute() {
 					--resolvers-trusted /home/op/lists/resolvers_trusted.txt \
 					--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
 					-o .tmp/subs_brute_valid.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
-			else
-				printf "%b[!] No subdomains found during bruteforce.%b\n" "$yellow" "$reset"
-				return 0
 			fi
 		fi
 
@@ -1549,8 +1530,6 @@ function sub_scraping() {
 			else
 				end_subfunc "Skipping Subdomains Web Scraping: Too Many Subdomains" "${FUNCNAME[0]}"
 			fi
-		else
-			end_subfunc "No subdomains to search (code scraping)" "${FUNCNAME[0]}"
 		fi
 
 	else
@@ -1911,9 +1890,6 @@ function sub_recursive_passive() {
 		# Passive recursive
 		if [[ -s "subdomains/subdomains.txt" ]]; then
 			dsieve -if subdomains/subdomains.txt -f 3 -top "$DEEP_RECURSIVE_PASSIVE" >.tmp/subdomains_recurs_top.txt
-		else
-			printf "%b[!] No subdomains to process.%b\n" "$yellow" "$reset"
-			return 1
 		fi
 
 		if [[ $AXIOM != true ]]; then
@@ -1926,14 +1902,12 @@ function sub_recursive_passive() {
 				subfinder -all -dL .tmp/subdomains_recurs_top.txt -max-time "${SUBFINDER_ENUM_TIMEOUT}" \
 					-silent -o .tmp/passive_recursive_tmp.txt 2>>"$LOGFILE"
 			else
-				printf "%b[!] No top subdomains to process.%b\n" "$yellow" "$reset"
 				return 1
 			fi
 
 			if [[ -s ".tmp/passive_recursive_tmp.txt" ]]; then
 				cat .tmp/passive_recursive_tmp.txt| anew -q .tmp/passive_recursive.txt
 			else
-				printf "%b[!] No passive recursive subdomains found.%b\n" "$yellow" "$reset"
 			fi
 
 			if [[ -s ".tmp/passive_recursive.txt" ]]; then
@@ -1941,8 +1915,6 @@ function sub_recursive_passive() {
 					-l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
 					--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
 					2>>"$LOGFILE" >/dev/null
-			else
-				printf "%b[!] No subdomains to resolve.%b\n" "$yellow" "$reset"
 			fi
 
 		else
@@ -1954,14 +1926,11 @@ function sub_recursive_passive() {
 			if [[ -s ".tmp/subdomains_recurs_top.txt" ]]; then
 				axiom-scan .tmp/subdomains_recurs_top.txt -m subfinder -all -o .tmp/subfinder_prec.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
 			else
-				printf "%b[!] No top subdomains to process.%b\n" "$yellow" "$reset"
 				return 1
 			fi
 
 			if [[ -s ".tmp/subfinder_prec.txt" ]]; then
 				cat .tmp/subfinder_prec.txt | anew -q .tmp/passive_recursive.txt
-			else
-				printf "%b[!] No passive recursive subdomains found.%b\n" "$yellow" "$reset"
 			fi
 
 			if [[ -s ".tmp/passive_recursive.txt" ]]; then
@@ -1969,8 +1938,6 @@ function sub_recursive_passive() {
 					-r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt \
 					--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
 					-o .tmp/passive_recurs_tmp.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
-			else
-				printf "%b[!] No subdomains to resolve.%b\n" "$yellow" "$reset"
 			fi
 		fi
 
@@ -2249,8 +2216,6 @@ function subtakeover() {
 				axiom-scan .tmp/webs_subs.txt -m nuclei --nuclei-templates "${NUCLEI_TEMPLATES_PATH}" \
 					-tags takeover -nh -severity info,low,medium,high,critical -retries 3 -rl "$NUCLEI_RATELIMIT" \
 					-t "${NUCLEI_TEMPLATES_PATH}" -o .tmp/tko.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
-			else
-				printf "%b[!] No web subdomains to scan.%b\n" "$yellow" "$reset"
 			fi
 		fi
 
@@ -2261,8 +2226,6 @@ function subtakeover() {
 		if [[ -s ".tmp/subs_dns_tko.txt" ]]; then
 			cat .tmp/subs_dns_tko.txt 2>/dev/null | dnstake -c "$DNSTAKE_THREADS" -s 2>>"$LOGFILE" |
 				sed '/^$/d' | anew -q .tmp/tko.txt
-		else
-			printf "%b[!] No subdomains for DNS takeover scan.%b\n" "$yellow" "$reset"
 		fi
 
 		# Remove empty lines from tko.txt
@@ -2320,8 +2283,6 @@ function zonetransfer() {
 			if ! grep -q "Transfer failed" "subdomains/zonetransfer.txt"; then
 				notification "Zone transfer found on ${domain}!" "info"
 			fi
-		else
-			printf "%b[!] No zone transfer data collected.%b\n" "$yellow" "$reset"
 		fi
 
 		end_func "Results are saved in $domain/subdomains/zonetransfer.txt" "${FUNCNAME[0]}"
@@ -2368,8 +2329,6 @@ function s3buckets() {
 		if [[ $AXIOM != true ]]; then
 			if [[ -s "subdomains/subdomains.txt" ]]; then
 				s3scanner scan -f subdomains/subdomains.txt 2>>"$LOGFILE" | anew -q .tmp/s3buckets.txt
-			else
-				printf "%b[!] No subdomains to scan with s3scanner.%b\n" "$yellow" "$reset"
 			fi
 		else
 			axiom-scan subdomains/subdomains.txt -m s3scanner -o .tmp/s3buckets_tmp.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
@@ -2473,7 +2432,6 @@ function s3buckets() {
 			fi
 		else
 			NUMOFLINES1=0
-			printf "%b[!] No cloudhunter_open_buckets.txt found or it is empty.%b\n" "$yellow" "$reset"
 		fi
 
 		# Process s3buckets results
@@ -2509,8 +2467,6 @@ function s3buckets() {
 					trufflehog gcs --bucket="$bucket_name" -j 2>/dev/null | jq -c | anew -q subdomains/cloudhunter_buckets_trufflehog.txt
 				fi
 			done <subdomains/cloudhunter_open_buckets.txt
-		else
-			printf "%b[!] No cloudhunter_open_buckets.txt found or it is empty.%b\n" "$yellow" "$reset"
 		fi
 
 		end_func "Results are saved in subdomains/s3buckets.txt, subdomains/cloud_assets.txt, subdomains/s3buckets_trufflehog.txt, and subdomains/cloudhunter_buckets_trufflehog.txt" "${FUNCNAME[0]}"
@@ -2559,8 +2515,6 @@ function geo_info() {
 						grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." |
 						grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" |
 						anew -q hosts/ips.txt
-				else
-					printf "%b[!] No valid IPs found in subs_ips_vhosts.txt.%b\n" "$yellow" "$reset"
 				fi
 			else
 				printf "%b\n" "$domain" |
@@ -2578,8 +2532,6 @@ function geo_info() {
 			while IFS= read -r ip; do
 				curl -s "https://ipinfo.io/widget/demo/$ip" >>"${dir}/hosts/ipinfo.txt"
 			done <"$ips_file"
-		else
-			printf "%b[!] No IPs to process in %s.%b\n" "$yellow" "$ips_file" "$reset"
 		fi
 
 		end_func "Results are saved in hosts/ipinfo.txt" "${FUNCNAME[0]}"
@@ -2752,8 +2704,6 @@ function webprobe_full() {
 			# Display new uncommon ports websites
 			if [[ -s "webs/webs_uncommon_ports.txt" ]]; then
 				cat "webs/webs_uncommon_ports.txt"
-			else
-				printf "%b[!] No new websites with uncommon ports found.%b\n" "$yellow" "$reset"
 			fi
 
 			# Update webs_all.txt
@@ -2838,8 +2788,6 @@ function screenshot() {
 			# Display new uncommon ports websites
 			if [[ -s "webs/webs_uncommon_ports.txt" ]]; then
 				cat "webs/webs_uncommon_ports.txt"
-			else
-				printf "%b[!] No new websites with uncommon ports found.%b\n" "$yellow" "$reset"
 			fi
 
 			# Update webs_all.txt
@@ -3022,15 +2970,11 @@ function portscan() {
 			if [[ -s ".tmp/subs_ips.txt" ]]; then
 				# Reorder fields and sort
 				awk '{ print $2 " " $1}' ".tmp/subs_ips.txt" | sort -k2 -n | anew -q hosts/subs_ips_vhosts.txt
-			else
-				printf "%b[!] No IPs found in subs_ips.txt.%b\n" "$yellow" "$reset"
 			fi
 
 			if [[ -s "hosts/subs_ips_vhosts.txt" ]]; then
 				# Extract IPs, filter out private ranges
 				awk '{print $1}' "hosts/subs_ips_vhosts.txt" | grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' | anew -q hosts/ips.txt
-			else
-				printf "%b[!] No data in subs_ips_vhosts.txt.%b\n" "$yellow" "$reset"
 			fi
 
 		else
@@ -3042,8 +2986,6 @@ function portscan() {
 		if [[ ! -s "hosts/cdn_providers.txt" ]]; then
 			if [[ -s "hosts/ips.txt" ]]; then
 				cdncheck -silent -resp -cdn -waf -nc <hosts/ips.txt 2>/dev/null >hosts/cdn_providers.txt
-			else
-				printf "%b[!] No IPs found in hosts/ips.txt.%b\n" "$yellow" "$reset"
 			fi
 		fi
 
@@ -3052,16 +2994,12 @@ function portscan() {
 			comm -23 <(sort -u hosts/ips.txt) <(cut -d'[' -f1 hosts/cdn_providers.txt | sed 's/[[:space:]]*$//' | sort -u) \
 				| grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' \
 				| sort -u | anew -q .tmp/ips_nocdn.txt
-		else
-			printf "%b[!] No IPs to process in hosts/ips.txt.%b\n" "$yellow" "$reset"
 		fi
 
 		# Display resolved IPs without CDN
 		printf "%b\n[%s] Resolved IP addresses (No CDN):%b\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
 		if [[ -s ".tmp/ips_nocdn.txt" ]]; then
 			sort ".tmp/ips_nocdn.txt"
-		else
-			printf "%b[!] No IPs found after CDN filtering.%b\n" "$yellow" "$reset"
 		fi
 
 		printf "%b\n[%s] Scanning ports...%b\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
@@ -3102,15 +3040,11 @@ function portscan() {
 			if [[ $AXIOM != true ]]; then
 				if [[ -s ".tmp/ips_nocdn.txt" ]]; then
 					"$SUDO" nmap $PORTSCAN_ACTIVE_OPTIONS -iL .tmp/ips_nocdn.txt -oA hosts/portscan_active 2>>"$LOGFILE" >/dev/null
-				else
-					printf "%b[!] No IPs to scan for active port scan.%b\n" "$yellow" "$reset"
 				fi
 			else
 				if [[ -s ".tmp/ips_nocdn.txt" ]]; then
 					axiom-scan .tmp/ips_nocdn.txt -m nmapx $PORTSCAN_ACTIVE_OPTIONS \
 					-oA hosts/portscan_active $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
-				else
-					printf "%b[!] No IPs to scan for active port scan.%b\n" "$yellow" "$reset"
 				fi
 			fi
 		fi
@@ -3170,8 +3104,6 @@ function cdnprovider() {
 		if [[ -s ".tmp/ips_cdn.txt" ]]; then
 			# Run cdncheck on the IPs and save to cdn_providers.txt
 			cdncheck -silent -resp -nc <.tmp/ips_cdn.txt | anew -q "$dir/hosts/cdn_providers.txt"
-		else
-			printf "%b[!] No IPs found for CDN provider check.%b\n" "$yellow" "$reset"
 		fi
 
 		end_func "Results are saved in hosts/cdn_providers.txt" "${FUNCNAME[0]}"
@@ -3382,7 +3314,7 @@ function fuzz() {
 					pushd "${tools}/ffufPostprocessing" >/dev/null || {
 						echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
 					}
-					./ffufPostprocessing -result-file $dir/.tmp/fuzzing/${sub_out}.json -overwrite-result-file
+					./ffufPostprocessing -result-file $dir/.tmp/fuzzing/${sub_out}.json -overwrite-result-file 2>>"$LOGFILE" >/dev/null
 					popd >/dev/null || {
 						echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
 					}
@@ -3398,7 +3330,7 @@ function fuzz() {
 				pushd "${tools}/ffufPostprocessing" >/dev/null || {
 						echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
 					}
-					[ -s "$dir/.tmp/ffuf-content.json" ] && ./ffufPostprocessing -result-file $dir/.tmp/ffuf-content.json -overwrite-result-file
+					[ -s "$dir/.tmp/ffuf-content.json" ] && ./ffufPostprocessing -result-file $dir/.tmp/ffuf-content.json -overwrite-result-file 2>>"$LOGFILE" >/dev/null
 				popd >/dev/null || {
 					echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
 				}
@@ -3659,8 +3591,6 @@ function urlchecks() {
 					notification "Sending URLs to proxy" "info"
 					ffuf -mc all -w webs/url_extract.txt -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
 				fi
-			else
-				printf "%b[!] No URLs extracted.%b\n" "$yellow" "$reset"
 			fi
 		fi
 	else
@@ -3771,7 +3701,6 @@ function url_ext() {
 
 			# Iterate over extensions and extract matching URLs
 			for t in "${ext[@]}"; do
-				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Processing extension: $t${reset}\n"
 
 				# Extract unique matching URLs
 				matches=$(grep -aEi "\.(${t})($|/|\?)" ".tmp/url_extract_tmp.txt" | sort -u | sed '/^$/d')
@@ -3837,21 +3766,17 @@ function jschecks() {
 				grep -Eiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" .tmp/subjslinks.txt |
 					anew -q js/nojs_links.txt
 				grep -iE "\.js($|\?)" .tmp/subjslinks.txt | anew -q .tmp/url_extract_js.txt
-			else
-				printf "%b[!] No subjslinks found.%b\n" "$yellow" "$reset"
 			fi
 
 			python3 "${tools}/urless/urless/urless.py" <.tmp/url_extract_js.txt |
 				anew -q js/url_extract_js.txt 2>>"$LOGFILE" >/dev/null
 
-			printf "%b[%s] Running: Resolving JS URLs 2/6%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+			printf "%bRunning: Resolving JS URLs 2/6%b\n" "$yellow" "$reset"
 			if [[ $AXIOM != true ]]; then
 				if [[ -s "js/url_extract_js.txt" ]]; then
 					httpx -follow-redirects -random-agent -silent -timeout "$HTTPX_TIMEOUT" -threads "$HTTPX_THREADS" \
 						-rl "$HTTPX_RATELIMIT" -status-code -content-type -retries 2 -no-color <js/url_extract_js.txt |
 						grep "[200]" | grep "javascript" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
-				else
-					printf "%b[!] No JavaScript URLs to resolve.%b\n" "$yellow" "$reset"
 				fi
 			else
 				if [[ -s "js/url_extract_js.txt" ]]; then
@@ -3861,11 +3786,7 @@ function jschecks() {
 					if [[ -s ".tmp/js_livelinks.txt" ]]; then
 						cat .tmp/js_livelinks.txt | anew .tmp/web_full_info.txt |
 							grep "[200]" | grep "javascript" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
-					else
-						printf "%b[!] No live JavaScript links found.%b\n" "$yellow" "$reset"
 					fi
-				else
-					printf "%b[!] No JavaScript URLs to resolve.%b\n" "$yellow" "$reset"
 				fi
 			fi
 
@@ -3877,8 +3798,6 @@ function jschecks() {
 				interlace -tL js/js_livelinks.txt -threads "$INTERLACE_THREADS" \
 					-c "sourcemapper -jsurl '_target_' -output _output_/_cleantarget_" \
 					-o .tmp/sourcemapper 2>>"$LOGFILE" >/dev/null
-			else
-				printf "%b[!] No live JavaScript links for sourcemapping.%b\n" "$yellow" "$reset"
 			fi
 
 			if [[ -s ".tmp/url_extract_jsmap.txt" ]]; then
@@ -3887,12 +3806,10 @@ function jschecks() {
 					-o .tmp/sourcemapper 2>>"$LOGFILE" >/dev/null
 			fi
 
-			printf "%b[%s] Running: Gathering endpoints 4/6%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+			printf "%bRunning: Gathering endpoints 4/6%b\n" "$yellow" "$reset"
 			if [[ -s "js/js_livelinks.txt" ]]; then
 				xnLinkFinder -i js/js_livelinks.txt -sf subdomains/subdomains.txt -d "$XNLINKFINDER_DEPTH" \
 					-o .tmp/js_endpoints.txt 2>>"$LOGFILE" >/dev/null
-			else
-				printf "%b[!] No live JavaScript links for endpoint extraction.%b\n" "$yellow" "$reset"
 			fi
 
 			find .tmp/sourcemapper/ \( -name "*.js" -o -name "*.ts" \) -type f |
@@ -3901,11 +3818,8 @@ function jschecks() {
 			if [[ -s ".tmp/js_endpoints.txt" ]]; then
 				sed -i '/^\//!d' .tmp/js_endpoints.txt
 				cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt
-			else
-				printf "%b[!] No JavaScript endpoints found.%b\n" "$yellow" "$reset"
 			fi
-
-			printf "%b[%s] Running: Gathering secrets 5/6%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+			printf "%bRunning: Gathering secrets 5/6%b\n" "$yellow" "$reset"
 			if [[ -s "js/js_livelinks.txt" ]]; then
 				axiom-scan js/js_livelinks.txt -m mantra -ua "$HEADER" -s -o js/js_secrets.txt "$AXIOM_EXTRA_ARGS" &>/dev/null
 				if [[ -s "js/js_secrets.txt" ]]; then
@@ -3914,24 +3828,14 @@ function jschecks() {
 					trufflehog filesystem .tmp/sourcemapper/ -j 2>/dev/null |
 						jq -c | anew -q js/js_secrets_trufflehog.txt
 					sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2};?)?)?[mGK]//g" -i js/js_secrets.txt
-				else
-					printf "%b[!] No secrets found in JavaScript files.%b\n" "$yellow" "$reset"
 				fi
-			else
-				printf "%b[!] No live JavaScript links for secret gathering.%b\n" "$yellow" "$reset"
 			fi
-
-			printf "%b[%s] Running: Building wordlist 6/6%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+			printf "%bRunning: Building wordlist 6/6%b\n" "$yellow" "$reset"
 			if [[ -s "js/js_livelinks.txt" ]]; then
 				interlace -tL js/js_livelinks.txt -threads "$INTERLACE_THREADS" \
 					-c "python3 ${tools}/getjswords.py '_target_' | anew -q webs/dict_words.txt" 2>>"$LOGFILE" >/dev/null
-			else
-				printf "%b[!] No live JavaScript links for wordlist building.%b\n" "$yellow" "$reset"
 			fi
-
 			end_func "Results are saved in $domain/js folder" "${FUNCNAME[0]}"
-		else
-			end_func "No JS URLs found for $domain, function skipped" "${FUNCNAME[0]}"
 		fi
 	else
 		if [[ $JSCHECKS == false ]]; then
@@ -3948,7 +3852,7 @@ function jschecks() {
 function wordlist_gen() {
 
 	# Create necessary directories
-	if ! mkdir -p .tmp webs gf; then
+	if ! mkdir -p .tmp webs; then
 		printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
 		return 1
 	fi
@@ -3980,27 +3884,7 @@ function wordlist_gen() {
 			tr "[:punct:]" "\n" <".tmp/url_extract_tmp.txt" | anew -q "webs/dict_words.txt"
 		fi
 
-		# Process js_endpoints.txt if it exists and is not empty
-		if [[ -s ".tmp/js_endpoints.txt" ]]; then
-			printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Processing js_endpoints.txt...${reset}\n"
-			unfurl -u format '%s://%d%p' ".tmp/js_endpoints.txt" 2>>"$LOGFILE" |
-				anew -q "webs/all_paths.txt"
-		fi
-
-		# Process url_extract_tmp.txt if it exists and is not empty
-		if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
-			printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Processing url_extract_tmp.txt...${reset}\n"
-			unfurl -u format '%s://%d%p' ".tmp/url_extract_tmp.txt" 2>>"$LOGFILE" |
-				anew -q "webs/all_paths.txt"
-		fi
-
 		end_func "Results are saved in $domain/webs/dict_[words|paths].txt" "${FUNCNAME[0]}"
-
-		# Handle proxy if conditions are met
-		if [[ $PROXY == true ]] && [[ -n $proxy_url ]] && [[ "$(wc -l <webs/all_paths.txt)" -le $DEEP_LIMIT2 ]]; then
-			notification "Sending URLs to proxy" info
-			ffuf -mc all -w "webs/all_paths.txt" -u "FUZZ" -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
-		fi
 
 	else
 		# Handle cases where WORDLIST is false or function already processed
@@ -4085,7 +3969,6 @@ function password_dict() {
 		word="${domain%%.*}"
 
 		# Run pydictor.py with specified parameters
-		printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: pydictor.py for Password Dictionary Generation${reset}\n\n"
 		python3 "${tools}/pydictor/pydictor.py" -extend "$word" --leet 0 1 2 11 21 --len "$PASSWORD_MIN_LENGTH" "$PASSWORD_MAX_LENGTH" -o "$dir/webs/password_dict.txt" 2>>"$LOGFILE" >/dev/null
 		end_func "Results are saved in $domain/webs/password_dict.txt" "${FUNCNAME[0]}"
 
@@ -4834,8 +4717,6 @@ function 4xxbypass() {
 			# Append unique bypassed URLs to the vulns directory
 			if [[ -s "$dir/.tmp/4xxbypass.txt" ]]; then
 				cat "$dir/.tmp/4xxbypass.txt" | anew -q "vulns/4xxbypass.txt"
-			else
-				printf "%b[!] No bypassed URLs found in 4xxbypass.txt.%b\n" "$bred" "$reset"
 			fi
 
 			end_func "Results are saved in vulns/4xxbypass.txt" "${FUNCNAME[0]}"
@@ -4960,8 +4841,6 @@ function smuggling() {
 			# Append unique smuggling results to vulns directory
 			if [[ -s "$dir/.tmp/smuggling.txt" ]]; then
 				cat "$dir/.tmp/smuggling.txt" | grep "EXPL" | anew -q "vulns/prototype_pollution.txt"
-			else
-				printf "%b[!] No smuggling results found in smuggling.txt.%b\n" "$bred" "$reset"
 			fi
 
 			end_func "Results are saved in vulns/smuggling_log.txt and findings in vulns/smuggling/" "${FUNCNAME[0]}"
@@ -5030,8 +4909,6 @@ function webcache() {
 			# Append unique findings to vulns/webcache.txt
 			if [[ -s "$dir/.tmp/webcache.txt" ]]; then
 				cat "$dir/.tmp/webcache.txt" | anew -q "vulns/webcache.txt"
-			else
-				printf "%b[!] No findings found in webcache.txt.%b\n" "$bred" "$reset"
 			fi
 
 			end_func "Results are saved in vulns/webcache.txt" "${FUNCNAME[0]}"
@@ -5106,8 +4983,6 @@ function fuzzparams() {
 			# Append unique results to vulns/fuzzparams.txt
 			if [[ -s ".tmp/fuzzparams.txt" ]]; then
 				cat ".tmp/fuzzparams.txt" | anew -q "vulns/fuzzparams.txt"
-			else
-				printf "%b[!] No results found in fuzzparams.txt.%b\n" "$bred" "$reset"
 			fi
 
 			end_func "Results are saved in vulns/fuzzparams.txt" "${FUNCNAME[0]}"
