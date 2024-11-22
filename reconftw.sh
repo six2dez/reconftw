@@ -1907,7 +1907,6 @@ function sub_recursive_passive() {
 
 			if [[ -s ".tmp/passive_recursive_tmp.txt" ]]; then
 				cat .tmp/passive_recursive_tmp.txt| anew -q .tmp/passive_recursive.txt
-			else
 			fi
 
 			if [[ -s ".tmp/passive_recursive.txt" ]]; then
