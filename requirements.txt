@@ -11,7 +11,7 @@ colorclass              # dnsvalidator
 dank                    # regulator
 datetime                # JSA
 datrie                  # regulator
-dnspython               # ip2provider
+dnspython               # multiple
 emailfinder             # Tool
 editdistance            # regulator
 fake-useragent          # fav-up
@@ -34,8 +34,8 @@ tldextract              # dorks_hunter
 tqdm                    # multiple
 ujson                   # multiple
 urllib3                 # multiple
+xmltodict               # CloudHunter
 porch-pirate            # Tool
 p1radup                 # Tool
 jsbeautifier            # Tool
-git+https://github.com/xnl-h4ck3r/waymore.git                 # Tool
 git+https://github.com/xnl-h4ck3r/xnLinkFinder.git            # Tool

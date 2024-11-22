@@ -3505,17 +3505,18 @@ function urlchecks() {
 		fi
 
 		if [[ -s "webs/webs_all.txt" ]]; then
-			if [[ $AXIOM != true ]]; then
-				if [[ $URL_CHECK_PASSIVE == true ]]; then
-					urlfinder -d $domain -o .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
-					if [[ -s $GITHUB_TOKENS ]]; then
-						github-endpoints -q -k -d "$domain" -t "$GITHUB_TOKENS" -o .tmp/github-endpoints.txt 2>>"$LOGFILE" >/dev/null
-						if [[ -s ".tmp/github-endpoints.txt" ]]; then
-							cat .tmp/github-endpoints.txt | anew -q .tmp/url_extract_tmp.txt
-						fi
+
+			if [[ $URL_CHECK_PASSIVE == true ]]; then
+				urlfinder -d $domain -o .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
+				if [[ -s $GITHUB_TOKENS ]]; then
+					github-endpoints -q -k -d "$domain" -t "$GITHUB_TOKENS" -o .tmp/github-endpoints.txt 2>>"$LOGFILE" >/dev/null
+					if [[ -s ".tmp/github-endpoints.txt" ]]; then
+						cat .tmp/github-endpoints.txt | anew -q .tmp/url_extract_tmp.txt
 					fi
 				fi
+			fi
 
+			if [[ $AXIOM != true ]]; then
 				diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt 2>>"$LOGFILE") <(sort -u webs/webs_all.txt 2>>"$LOGFILE") | wc -l)
 				if [[ $diff_webs != "0" ]] || [[ ! -s ".tmp/katana.txt" ]]; then
 					if [[ $URL_CHECK_ACTIVE == true ]]; then
@@ -3527,22 +3528,6 @@ function urlchecks() {
 					fi
 				fi
 			else
-				if [[ $URL_CHECK_PASSIVE == true ]]; then
-					if [[ $DEEP == true ]]; then
-						unfurl -u domains <webs/webs_all.txt >.tmp/waymore_input.txt
-						axiom-scan .tmp/waymore_input.txt -m waymore -o .tmp/url_extract_tmp.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
-					else
-						axiom-scan webs/webs_all.txt -m gau -o .tmp/url_extract_tmp.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
-					fi
-
-					if [[ -s $GITHUB_TOKENS ]]; then
-						github-endpoints -q -k -d "$domain" -t "$GITHUB_TOKENS" -o .tmp/github-endpoints.txt 2>>"$LOGFILE" >/dev/null
-						if [[ -s ".tmp/github-endpoints.txt" ]]; then
-							cat .tmp/github-endpoints.txt | anew -q .tmp/url_extract_tmp.txt
-						fi
-					fi
-				fi
-
 				diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt) <(sort -u webs/webs_all.txt) | wc -l)
 				if [[ $diff_webs != "0" ]] || [[ ! -s ".tmp/katana.txt" ]]; then
 					if [[ $URL_CHECK_ACTIVE == true ]]; then
@@ -3806,22 +3791,27 @@ function jschecks() {
 					-o .tmp/sourcemapper 2>>"$LOGFILE" >/dev/null
 			fi
 
+			find .tmp/sourcemapper/ \( -name "*.js" -o -name "*.ts" \) -type f |
+				jsluice urls | jq -r .url | anew -q .tmp/js_endpoints.txt
+
 			printf "%bRunning: Gathering endpoints 4/6%b\n" "$yellow" "$reset"
 			if [[ -s "js/js_livelinks.txt" ]]; then
 				xnLinkFinder -i js/js_livelinks.txt -sf subdomains/subdomains.txt -d "$XNLINKFINDER_DEPTH" \
 					-o .tmp/js_endpoints.txt 2>>"$LOGFILE" >/dev/null
 			fi
 
-			find .tmp/sourcemapper/ \( -name "*.js" -o -name "*.ts" \) -type f |
-				jsluice urls | jq -r .url | anew -q .tmp/js_endpoints.txt
-
 			if [[ -s ".tmp/js_endpoints.txt" ]]; then
 				sed -i '/^\//!d' .tmp/js_endpoints.txt
 				cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt
 			fi
+
 			printf "%bRunning: Gathering secrets 5/6%b\n" "$yellow" "$reset"
 			if [[ -s "js/js_livelinks.txt" ]]; then
-				axiom-scan js/js_livelinks.txt -m mantra -ua "$HEADER" -s -o js/js_secrets.txt "$AXIOM_EXTRA_ARGS" &>/dev/null
+				if [[ $AXIOM != true ]]; then
+					cat js/js_livelinks.txt | mantra -ua "$HEADER" -s -o js/js_secrets.txt 2>>"$LOGFILE" >/dev/null
+				else
+					axiom-scan js/js_livelinks.txt -m mantra -ua "$HEADER" -s -o js/js_secrets.txt "$AXIOM_EXTRA_ARGS" &>/dev/null
+				fi
 				if [[ -s "js/js_secrets.txt" ]]; then
 					trufflehog filesystem js/js_secrets.txt -j 2>/dev/null |
 						jq -c | anew -q js/js_secrets_trufflehog.txt
@@ -3830,6 +3820,7 @@ function jschecks() {
 					sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2};?)?)?[mGK]//g" -i js/js_secrets.txt
 				fi
 			fi
+
 			printf "%bRunning: Building wordlist 6/6%b\n" "$yellow" "$reset"
 			if [[ -s "js/js_livelinks.txt" ]]; then
 				interlace -tL js/js_livelinks.txt -threads "$INTERLACE_THREADS" \
