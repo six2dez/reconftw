@@ -76,6 +76,7 @@ gotools["sns"]="go install github.com/sw33tLie/sns@latest"
 gotools["ppmap"]="go install -v github.com/kleiton0x00/ppmap@latest"
 gotools["sourcemapper"]="go install -v github.com/denandz/sourcemapper@latest"
 gotools["jsluice"]="go install -v github.com/BishopFox/jsluice/cmd/jsluice@latest"
+gotools["subjack"]="go install -v github.com/haccer/subjack@latest"
 
 # Declaring repositories and their paths
 declare -A repos
