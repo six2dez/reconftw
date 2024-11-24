@@ -1313,6 +1313,12 @@ function subtakeover() {
 			notification "${NUMOFLINES} new possible takeovers found" info
 		fi
 		end_func "Results are saved in $domain/webs/takeover.txt" ${FUNCNAME[0]}
+  
+  		# SUBDOMAIN TAKEOVER CHECKER
+		while read -r line; do
+		  host=$(echo $line | awk '{print $4}' | tr -d '["]')
+		  subjack -d $host -v -m >> $domain/webs/subdomain_takeover.txt
+		done < $domain/webs/takeover.txt  
 	else
 		if [[ $SUBTAKEOVER == false ]]; then
 			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
