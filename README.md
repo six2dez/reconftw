@@ -501,7 +501,7 @@ reset='\033[0m'
 
 ## Hosts
 
-- IP info ([whoisxmlapi API](https://www.whoisxmlapi.com/))
+- IP info ([ipinfo](https://www.ipinfo.io/))
 - CDN checker ([ipcdn](https://github.com/six2dez/ipcdn))
 - WAF checker ([wafw00f](https://github.com/EnableSecurity/wafw00f))
 - Port Scanner (Active with [nmap](https://github.com/nmap/nmap) and passive with [smap](https://github.com/s0md3v/Smap))
