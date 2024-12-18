@@ -232,7 +232,7 @@ function install_tools() {
 
 		# Install dependencies if setup.py exists
 		if [[ -f "setup.py" ]]; then
-			eval "$SUDO pip3 install . $DEBUG_STD" &>/dev/null
+			eval "$SUDO pipx install . $DEBUG_STD" &>/dev/null
 		fi
 
 		# Special handling for certain repositories
@@ -426,7 +426,7 @@ function install_system_packages() {
 # Function to install required packages for Debian-based systems
 function install_apt() {
 	"$SUDO" apt update -y &>/dev/null
-	"$SUDO" DEBIAN_FRONTEND="noninteractive" apt install -y chromium-browser python3 python3-pip python3-virtualenv build-essential gcc cmake ruby whois git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx medusa xvfb libxml2-utils procps bsdmainutils libdata-hexdump-perl libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon-x11-0 libxcomposite-dev libxdamage1 libxrandr2 libgbm-dev libpangocairo-1.0-0 libasound2 &>/dev/null
+	"$SUDO" DEBIAN_FRONTEND="noninteractive" apt install -y chromium-browser python3 python3-pip pipx python3-virtualenv build-essential gcc cmake ruby whois git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx medusa xvfb libxml2-utils procps bsdmainutils libdata-hexdump-perl libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon-x11-0 libxcomposite-dev libxdamage1 libxrandr2 libgbm-dev libpangocairo-1.0-0 libasound2 &>/dev/null
 	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
 	source "${HOME}/.cargo/env"
 	cargo install ripgen &>/dev/null
@@ -441,7 +441,7 @@ function install_brew() {
 	fi
 	brew update &>/dev/null
 	brew install --cask chromium &>/dev/null
-	brew install bash coreutils python massdns jq gcc cmake ruby git curl libpcap-dev wget zip python3-dev pv dnsutils whois libssl-dev libffi-dev libxml2-dev libxslt-dev zlib libnss3 atk bridge2.0 cups xkbcommon xcomposite xdamage xrandr gbm pangocairo alsa libxml2-utils &>/dev/null
+	brew install bash coreutils python massdns jq gcc cmake ruby git curl libpcap-dev wget zip python3-dev pipx pv dnsutils whois libssl-dev libffi-dev libxml2-dev libxslt-dev zlib libnss3 atk bridge2.0 cups xkbcommon xcomposite xdamage xrandr gbm pangocairo alsa libxml2-utils &>/dev/null
 	brew install rustup &>/dev/null
 	rustup-init -y &>/dev/null
 	cargo install ripgen &>/dev/null
@@ -450,7 +450,7 @@ function install_brew() {
 # Function to install required packages for RedHat-based systems
 function install_yum() {
 	"$SUDO" yum groupinstall "Development Tools" -y &>/dev/null
-	"$SUDO" yum install -y python3 python3-pip gcc cmake ruby git curl libpcap whois wget zip pv bind-utils openssl-devel libffi-devel libxml2-devel libxslt-devel zlib-devel nmap jq lynx medusa xorg-x11-server-xvfb &>/dev/null
+	"$SUDO" yum install -y python3 python3-pip gcc cmake ruby git curl libpcap whois wget pipx zip pv bind-utils openssl-devel libffi-devel libxml2-devel libxslt-devel zlib-devel nmap jq lynx medusa xorg-x11-server-xvfb &>/dev/null
 	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
 	source "${HOME}/.cargo/env"
 	cargo install ripgen &>/dev/null
@@ -458,7 +458,7 @@ function install_yum() {
 
 # Function to install required packages for Arch-based systems
 function install_pacman() {
-	"$SUDO" pacman -Sy --noconfirm python python-pip base-devel gcc cmake ruby git curl libpcap whois wget zip pv bind openssl libffi libxml2 libxslt zlib nmap jq lynx medusa xorg-server-xvfb &>/dev/null
+	"$SUDO" pacman -Sy --noconfirm python python-pip base-devel gcc cmake ruby git curl libpcap pipx whois wget zip pv bind openssl libffi libxml2 libxslt zlib nmap jq lynx medusa xorg-server-xvfb &>/dev/null
 	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
 	source "${HOME}/.cargo/env"
 	cargo install ripgen &>/dev/null
