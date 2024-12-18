@@ -489,6 +489,9 @@ function initial_setup() {
 	python3 /tmp/get-pip.py &>/dev/null
 	rm -f /tmp/get-pip.py
 
+	pipx install reconftw &>/dev/null
+	pipx inject mkdocs -r requirements.txt &>/dev/null
+
 	install_tools
 
 	# Repositorios con configuraciones especiales
