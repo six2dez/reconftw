@@ -187,6 +187,43 @@ function install_tools() {
 		fi
 	done
 
+	echo -e "\n${bblue}Running: Installing pipx tools (${#repos[@]})${reset}\n"
+
+	local pipx_step=0
+	local failed_pipx_tools=()
+
+	for pipxtool in "${!pipxtools[@]}"; do
+		((pipx_step++))
+		if [[ $upgrade_tools == "false" ]]; then
+			if command -v "$pipxtool" &>/dev/null; then
+				echo -e "[${yellow}SKIPPING${reset}] $pipxtool already installed at $(command -v "$pipxtool")"
+				continue
+			fi
+		fi
+
+		# Install the pipx tool
+		eval pipx install "git+https://github.com/${pipxtools[$pipxtool]}" &>/dev/null
+		exit_status=$?
+		if [[ $exit_status -ne 0 ]]; then
+			echo -e "${red}Failed to install $pipxtool, try manually (${pipx_step}/${#pipxtools[@]})${reset}"
+			failed_pipx_tools+=("$pipxtool")
+			double_check=true
+			continue
+		fi
+
+		# Upgrade the pipx tool
+		eval pipx upgrade "${pipxtool}" &>/dev/null
+		exit_status=$?
+		if [[ $exit_status -ne 0 ]]; then
+			echo -e "${red}Failed to upgrade $pipxtool, try manually (${pipx_step}/${#pipxtools[@]})${reset}"
+			failed_pipx_tools+=("$pipxtool")
+			double_check=true
+			continue
+		fi
+
+		echo -e "${yellow}$pipxtool installed (${pipx_step}/${#pipxtools[@]})${reset}"
+	done
+
 	echo -e "\n${bblue}Running: Installing repositories (${#repos[@]})${reset}\n"
 
 	local repos_step=0
@@ -286,6 +323,10 @@ function install_tools() {
 	# Handle failed installations
 	if [[ ${#failed_tools[@]} -ne 0 ]]; then
 		echo -e "\n${red}Failed to install the following Go tools: ${failed_tools[*]}${reset}"
+	fi
+
+	if [[ ${#failed_pipx_tools[@]} -ne 0 ]]; then
+		echo -e "\n${red}Failed to install the following pipx tools: ${failed_pipx_tools[*]}${reset}"
 	fi
 
 	if [[ ${#failed_repos[@]} -ne 0 ]]; then
@@ -485,12 +526,8 @@ function initial_setup() {
 	touch "${dir}/.github_tokens"
 	touch "${dir}/.gitlab_tokens"
 
-	wget -N -c https://bootstrap.pypa.io/get-pip.py -O /tmp/get-pip.py &>/dev/null
-	python3 /tmp/get-pip.py &>/dev/null
-	rm -f /tmp/get-pip.py
-
-	pipx install reconftw &>/dev/null
-	pipx inject mkdocs -r requirements.txt &>/dev/null
+	eval pipx ensurepath $DEBUG_STD
+	source "${HOME}/${profile_shell}"
 
 	install_tools
 
