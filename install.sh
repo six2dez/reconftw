@@ -269,7 +269,7 @@ function install_tools() {
 		if [[ $repo == "gf" ]]; then
 			cp -r examples ${HOME}/.gf &>/dev/null
 		elif [[ $repo == "Gf-Patterns" ]]; then
-			mv ./*.json ${HOME}/.gf &>/dev/null
+			cp ./*.json ${HOME}/.gf &>/dev/null
 		fi
 
 		# Return to the main directory
