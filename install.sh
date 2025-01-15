@@ -425,8 +425,7 @@ function install_brew() {
 		/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 	fi
 	brew update &>/dev/null
-	brew install --cask chromium &>/dev/null
-	brew install bash coreutils python massdns jq gcc cmake ruby git curl libpcap-dev wget zip python3-dev pipx pv dnsutils whois libssl-dev libffi-dev libxml2-dev libxslt-dev zlib libnss3 atk bridge2.0 cups xkbcommon xcomposite xdamage xrandr gbm pangocairo alsa libxml2-utils &>/dev/null
+	brew install --formula bash coreutils gnu-getopt python pipx massdns jq gcc cmake ruby git curl wget zip pv bind whois nmap jq lynx medusa &>/dev/null
 	brew install rustup &>/dev/null
 	rustup-init -y &>/dev/null
 	cargo install ripgen &>/dev/null
