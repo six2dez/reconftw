@@ -114,7 +114,7 @@ declare -A repos=(
 	["fav-up"]="pielco11/fav-up"
 	["massdns"]="blechschmidt/massdns"
 	["Oralyzer"]="r0075h3ll/Oralyzer"
-	["testssl"]="drwetter/testssl.sh"
+	["testssl.sh"]="drwetter/testssl.sh"
 	["commix"]="commixproject/commix"
 	["JSA"]="w9w/JSA"
 	["CloudHunter"]="belane/CloudHunter"
@@ -518,15 +518,6 @@ function initial_setup() {
 	else
 		#printf "${yellow}Updating sqlmap...${reset}\n"
 		eval git -C "${dir}/sqlmap" pull $DEBUG_STD
-	fi
-
-	# testssl.sh
-	if [[ ! -d "${dir}/testssl.sh" ]]; then
-		#printf "${yellow}Cloning testssl.sh...${reset}\n"
-		eval git clone --depth 1 https://github.com/drwetter/testssl.sh.git "${dir}/testssl.sh" $DEBUG_STD
-	else
-		#printf "${yellow}Updating testssl.sh...${reset}\n"
-		eval git -C "${dir}/testssl.sh" pull $DEBUG_STD
 	fi
 
 	# massdns
