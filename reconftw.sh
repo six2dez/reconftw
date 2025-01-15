@@ -120,10 +120,14 @@ function tools_installed() {
 	# Define tools and their paths/commands
 	declare -A tools_files=(
 		["dorks_hunter"]="${tools}/dorks_hunter/dorks_hunter.py"
+		["dorks_hunter_python"]="${tools}/dorks_hunter/venv/bin/python3"
 		["fav-up"]="${tools}/fav-up/favUp.py"
+		["fav-up_python"]="${tools}/fav-up/venv/bin/python3"
 		["Corsy"]="${tools}/Corsy/corsy.py"
+		["Corsy_python"]="${tools}/Corsy/venv/bin/python3"
 		["testssl"]="${tools}/testssl.sh/testssl.sh"
 		["CMSeeK"]="${tools}/CMSeeK/cmseek.py"
+		["CMSeeK_python"]="${tools}/CMSeeK/venv/bin/python3"
 		["OneListForAll"]="$fuzz_wordlist"
 		["lfi_wordlist"]="$lfi_wordlist"
 		["ssti_wordlist"]="$ssti_wordlist"
@@ -133,17 +137,25 @@ function tools_installed() {
 		["resolvers_trusted"]="$resolvers_trusted"
 		["getjswords"]="${tools}/getjswords.py"
 		["JSA"]="${tools}/JSA/jsa.py"
+		["JSA_python"]="${tools}/JSA/venv/bin/python3"
 		["CloudHunter"]="${tools}/CloudHunter/cloudhunter.py"
+		["CloudHunter_python"]="${tools}/CloudHunter/venv/bin/python3"
 		["nmap-parse-output"]="${tools}/ultimate-nmap-parser/ultimate-nmap-parser.sh"
 		["pydictor"]="${tools}/pydictor/pydictor.py"
 		["smuggler"]="${tools}/smuggler/smuggler.py"
 		["regulator"]="${tools}/regulator/main.py"
+		["regulator_python"]="${tools}/regulator/venv/bin/python3"
 		["nomore403"]="${tools}/nomore403/nomore403"
 		["ffufPostprocessing"]="${tools}/ffufPostprocessing/ffufPostprocessing"
 		["misconfig-mapper"]="${tools}/misconfig-mapper/misconfig-mapper"
 		["spoofy"]="${tools}/Spoofy/spoofy.py"
+		["spoofy_python"]="${tools}/Spoofy/venv/bin/python3"
 		["swaggerspy"]="${tools}/SwaggerSpy/swaggerspy.py"
+		["swaggerspy_python"]="${tools}/SwaggerSpy/venv/bin/python3"
 		["LeakSearch"]="${tools}/LeakSearch/LeakSearch.py"
+		["LeakSearch_python"]="${tools}/LeakSearch/venv/bin/python3"
+		["Oralyzer"]="${tools}/Oralyzer/oralyzer.py"
+		["Oralyzer_python"]="${tools}/Oralyzer/venv/bin/python3"
 	)
 
 	declare -A tools_folders=(
@@ -268,7 +280,7 @@ function google_dorks() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GOOGLE_DORKS == true ]] && [[ $OSINT == true ]]; then
 		start_func "${FUNCNAME[0]}" "Running: Google Dorks in process"
 
-		python3 "${tools}/dorks_hunter/dorks_hunter.py" -d "$domain" -o "osint/dorks.txt"
+		"${tools}/dorks_hunter/venv/bin/python3" "${tools}/dorks_hunter/dorks_hunter.py" -d "$domain" -o "osint/dorks.txt"
 		end_func "Results are saved in $domain/osint/dorks.txt" "${FUNCNAME[0]}"
 	else
 		if [[ $GOOGLE_DORKS == false ]] || [[ $OSINT == false ]]; then
@@ -452,7 +464,7 @@ function apileaks() {
 		fi
 
 		# Run swaggerspy.py and handle errors
-		python3 swaggerspy.py "$domain" 2>>"$LOGFILE" | grep -i "[*]\|URL" >"${dir}/osint/swagger_leaks.txt"
+		"${tools}/SwaggerSpy/venv/bin/python3" swaggerspy.py "$domain" 2>>"$LOGFILE" | grep -i "[*]\|URL" >"${dir}/osint/swagger_leaks.txt"
 
 		# Return to the previous directory
 		if ! popd >/dev/null; then
@@ -506,7 +518,7 @@ function emails() {
 		fi
 
 		# Run LeakSearch.py and handle errors
-		python3 LeakSearch.py -k "$domain" -o "${dir}/.tmp/passwords.txt" 1>>"$LOGFILE"
+		"${tools}/LeakSearch/venv/bin/python3" LeakSearch.py -k "$domain" -o "${dir}/.tmp/passwords.txt" 1>>"$LOGFILE"
 
 		# Return to the previous directory
 		if ! popd >/dev/null; then
@@ -630,7 +642,7 @@ function spoof() {
 		fi
 
 		# Run spoofy.py and handle errors
-		./spoofy.py -d "$domain" >"${dir}/osint/spoof.txt"
+		"${tools}/Spoofy/venv/bin/python3" spoofy.py -d "$domain" >"${dir}/osint/spoof.txt"
 
 		# Return to the previous directory
 		if ! popd >/dev/null; then
@@ -1793,7 +1805,7 @@ function sub_regex_permut() {
 		fi
 
 		# Run the main.py script
-		python3 main.py -t "$domain" -f "${dir}/subdomains/subdomains.txt" -o "${dir}/.tmp/${domain}.brute" \
+		"${tools}/regulator/venv/bin/python3" main.py -t "$domain" -f "${dir}/subdomains/subdomains.txt" -o "${dir}/.tmp/${domain}.brute" \
 			2>>"$LOGFILE" >/dev/null
 
 		# Return to the previous directory
@@ -2377,7 +2389,7 @@ function s3buckets() {
 		esac
 
 		# Debug: Print the full CloudHunter command
-		printf "CloudHunter command: python3 %s/cloudhunter.py %s -r %s/resolvers.txt -t 50 [URL]\n" "$tools/CloudHunter" "$PERMUTATION_FLAG" "$tools/CloudHunter" >>"$LOGFILE"
+		printf "CloudHunter command: %s/venv/bin/python3 %s/cloudhunter.py %s -r %s/resolvers.txt -t 50 [URL]\n" "$tools/CloudHunter" "$tools/CloudHunter" "$PERMUTATION_FLAG" "$tools/CloudHunter" >>"$LOGFILE"
 
 		# Debug: Check if files exist
 		if [[ -f "$tools/CloudHunter/cloudhunter.py" ]]; then
@@ -2409,7 +2421,7 @@ function s3buckets() {
 					printf "%b[!] Failed to cd to %s.%b\n" "$bred" "$tools/CloudHunter" "$reset"
 					return 1
 				fi
-				if ! python3 ./cloudhunter.py ${PERMUTATION_FLAG#-p } -r ./resolvers.txt -t 50 "$url"; then
+				if ! "${tools}/CloudHunter/venv/bin/python3" ./cloudhunter.py ${PERMUTATION_FLAG#-p } -r ./resolvers.txt -t 50 "$url"; then
 					printf "%b[!] CloudHunter command failed for URL %s.%b\n" "$bred" "$url" "$reset"
 				fi
 			) >>"$dir/subdomains/cloudhunter_open_buckets.txt" 2>>"$LOGFILE"
@@ -2908,7 +2920,7 @@ function favicon() {
 		fi
 
 		# Run the favicon IP lookup tool
-		python3 favUp.py -w "$domain" -sc -o favicontest.json 2>>"$LOGFILE" >/dev/null
+		"${tools}/fav-up/venv/bin/python3" "${tools}/fav-up/favUp.py" -w "$domain" -sc -o favicontest.json 2>>"$LOGFILE" >/dev/null
 
 		# Process the results if favicontest.json exists and is not empty
 		if [[ -s "favicontest.json" ]]; then
@@ -3444,7 +3456,7 @@ function cms_scanner() {
 		fi
 
 		# Run CMSeeK with timeout
-		if ! timeout -k 1m "${CMSSCAN_TIMEOUT}s" python3 "${tools}/CMSeeK/cmseek.py" -l .tmp/cms.txt --batch -r &>>"$LOGFILE"; then
+		if ! timeout -k 1m "${CMSSCAN_TIMEOUT}s" "${tools}/CMSeeK/venv/bin/python3" "${tools}/CMSeeK/cmseek.py" -l .tmp/cms.txt --batch -r &>>"$LOGFILE"; then
 			exit_status=$?
 			if [[ ${exit_status} -eq 124 || ${exit_status} -eq 137 ]]; then
 				echo "TIMEOUT cmseek.py - investigate manually for $dir" >>"$LOGFILE"
@@ -3548,7 +3560,7 @@ function urlchecks() {
 				grep "$domain" .tmp/url_extract_tmp.txt | grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' | grep -aEi "\.js$" | anew -q .tmp/url_extract_js.txt
 				grep "$domain" .tmp/url_extract_tmp.txt | grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' | grep -aEi "\.js\.map$" | anew -q .tmp/url_extract_jsmap.txt
 				if [[ $DEEP == true ]] && [[ -s ".tmp/url_extract_js.txt" ]]; then
-					interlace -tL .tmp/url_extract_js.txt -threads 10 -c "python3 ${tools}/JSA/jsa.py -f _target_ | anew -q .tmp/url_extract_tmp.txt" &>/dev/null
+					interlace -tL .tmp/url_extract_js.txt -threads 10 -c "${tools}/JSA/venv/bin/python3 ${tools}/JSA/jsa.py -f _target_ | anew -q .tmp/url_extract_tmp.txt" &>/dev/null
 				fi
 
 				grep "$domain" .tmp/url_extract_tmp.txt | grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | anew -q .tmp/url_extract_tmp2.txt
@@ -4168,7 +4180,7 @@ function cors() {
 		# Proceed only if webs_all.txt exists and is non-empty
 		if [[ -s "webs/webs_all.txt" ]]; then
 			printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Corsy for CORS Scan${reset}\n\n"
-			python3 "${tools}/Corsy/corsy.py" -i "webs/webs_all.txt" -o "vulns/cors.txt" 2>>"$LOGFILE" >/dev/null
+			"${tools}/Corsy/venv/bin/python3" "${tools}/Corsy/corsy.py" -i "webs/webs_all.txt" -o "vulns/cors.txt" 2>>"$LOGFILE" >/dev/null
 		else
 			end_func "No webs/webs_all.txt file found, CORS Scan skipped." "${FUNCNAME[0]}"
 			return
@@ -4213,7 +4225,7 @@ function open_redirect() {
 			qsreplace FUZZ <"gf/redirect.txt" | sed '/FUZZ/!d' | anew -q ".tmp/tmp_redirect.txt"
 
 			# Run Oralyzer with the generated payloads
-			python3 "${tools}/Oralyzer/oralyzer.py" -l ".tmp/tmp_redirect.txt" -p "${tools}/Oralyzer/payloads.txt" >"vulns/redirect.txt" 2>>"$LOGFILE" >/dev/null
+			"${tools}/Oralyzer/venv/bin/python3" "${tools}/Oralyzer/oralyzer.py" -l ".tmp/tmp_redirect.txt" -p "${tools}/Oralyzer/payloads.txt" >"vulns/redirect.txt" 2>>"$LOGFILE" >/dev/null
 
 			# Remove ANSI color codes from the output
 			sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" "vulns/redirect.txt"

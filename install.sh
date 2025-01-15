@@ -271,9 +271,14 @@ function install_tools() {
 			continue
 		fi
 
-		# Install dependencies if setup.py exists
-		if [[ -f "setup.py" ]]; then
-			eval "$SUDO pipx install . $DEBUG_STD" &>/dev/null
+		# Install requirements inside a virtual environment
+		if [[ -s "requirements.txt" ]]; then
+			if [[ ! -f "venv/bin/activate" ]]; then
+				python3 -m venv venv &>/dev/null
+			fi
+			source venv/bin/activate
+			eval "pip3 install --upgrade -r requirements.txt $DEBUG_STD" &>/dev/null
+			deactivate
 		fi
 
 		# Special handling for certain repositories
