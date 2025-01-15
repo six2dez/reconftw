@@ -131,13 +131,11 @@ function tools_installed() {
 		["subs_wordlist_big"]="$subs_wordlist_big"
 		["resolvers"]="$resolvers"
 		["resolvers_trusted"]="$resolvers_trusted"
-		["commix"]="${tools}/commix/commix.py"
 		["getjswords"]="${tools}/getjswords.py"
 		["JSA"]="${tools}/JSA/jsa.py"
 		["CloudHunter"]="${tools}/CloudHunter/cloudhunter.py"
 		["nmap-parse-output"]="${tools}/ultimate-nmap-parser/ultimate-nmap-parser.sh"
 		["pydictor"]="${tools}/pydictor/pydictor.py"
-		["urless"]="${tools}/urless/urless/urless.py"
 		["smuggler"]="${tools}/smuggler/smuggler.py"
 		["regulator"]="${tools}/regulator/main.py"
 		["nomore403"]="${tools}/nomore403/nomore403"
@@ -212,6 +210,8 @@ function tools_installed() {
 		["sns"]="sns"
 		["sourcemapper"]="sourcemapper"
 		["jsluice"]="jsluice"
+		["commix"]="commix"
+		["urless"]="urless"
 	)
 
 	# Check for tool files
@@ -3554,7 +3554,7 @@ function urlchecks() {
 				grep "$domain" .tmp/url_extract_tmp.txt | grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | anew -q .tmp/url_extract_tmp2.txt
 
 				if [[ -s ".tmp/url_extract_tmp2.txt" ]]; then
-					python3 "${tools}/urless/urless/urless.py" <.tmp/url_extract_tmp2.txt | anew -q .tmp/url_extract_uddup.txt 2>>"$LOGFILE" >/dev/null
+					urless <.tmp/url_extract_tmp2.txt | anew -q .tmp/url_extract_uddup.txt 2>>"$LOGFILE" >/dev/null
 				fi
 
 				if [[ -s ".tmp/url_extract_uddup.txt" ]]; then
@@ -3752,7 +3752,7 @@ function jschecks() {
 				grep -iE "\.js($|\?)" .tmp/subjslinks.txt | anew -q .tmp/url_extract_js.txt
 			fi
 
-			python3 "${tools}/urless/urless/urless.py" <.tmp/url_extract_js.txt |
+			urless <.tmp/url_extract_js.txt |
 				anew -q js/url_extract_js.txt 2>>"$LOGFILE" >/dev/null
 
 			printf "%bRunning: Resolving JS URLs 2/6%b\n" "$yellow" "$reset"
@@ -4638,7 +4638,7 @@ function command_injection() {
 				# Run Commix if enabled
 				if [[ $SQLMAP == true ]]; then
 					printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Commix for Command Injection Checks${reset}\n\n"
-					python3 "${tools}/commix/commix.py" --batch -m ".tmp/tmp_rce.txt" --output-dir "vulns/command_injection" 2>>"$LOGFILE" >/dev/null
+					commix --batch -m ".tmp/tmp_rce.txt" --output-dir "vulns/command_injection" 2>>"$LOGFILE" >/dev/null
 				fi
 
 				# Additional tools can be integrated here (e.g., Ghauri, sqlmap)

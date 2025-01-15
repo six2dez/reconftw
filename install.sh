@@ -101,12 +101,23 @@ declare -A gotools=(
 	["urlfinder"]="go install -v github.com/projectdiscovery/urlfinder/cmd/urlfinder@latest"
 )
 
-# Declare repositories and their paths
-declare -A repos=(
-	["dorks_hunter"]="six2dez/dorks_hunter"
+# Declare pipx tools and their paths
+declare -A pipxtools=(
 	["dnsvalidator"]="vortexau/dnsvalidator"
 	["interlace"]="codingo/Interlace"
 	["wafw00f"]="EnableSecurity/wafw00f"
+	["commix"]="commixproject/commix"
+	["urless"]="xnl-h4ck3r/urless"
+	["ghauri"]="r0oth3x49/ghauri"
+	["xnLinkFinder"]="xnl-h4ck3r/xnLinkFinder"
+	["porch-pirate"]="MandConsultingGroup/porch-pirate"
+	["MetaFinder"]="Josue87/MetaFinder"
+	["EmailFinder"]="Josue87/EmailFinder"
+)
+
+# Declare repositories and their paths
+declare -A repos=(
+	["dorks_hunter"]="six2dez/dorks_hunter"
 	["gf"]="tomnomnom/gf"
 	["Gf-Patterns"]="1ndianl33t/Gf-Patterns"
 	["Corsy"]="s0md3v/Corsy"
@@ -115,17 +126,14 @@ declare -A repos=(
 	["massdns"]="blechschmidt/massdns"
 	["Oralyzer"]="r0075h3ll/Oralyzer"
 	["testssl"]="drwetter/testssl.sh"
-	["commix"]="commixproject/commix"
 	["JSA"]="w9w/JSA"
 	["CloudHunter"]="belane/CloudHunter"
 	["ultimate-nmap-parser"]="shifty0g/ultimate-nmap-parser"
 	["pydictor"]="LandGrey/pydictor"
 	["gitdorks_go"]="damit5/gitdorks_go"
-	["urless"]="xnl-h4ck3r/urless"
 	["smuggler"]="defparam/smuggler"
 	["Web-Cache-Vulnerability-Scanner"]="Hackmanit/Web-Cache-Vulnerability-Scanner"
 	["regulator"]="cramppet/regulator"
-	["ghauri"]="r0oth3x49/ghauri"
 	["gitleaks"]="gitleaks/gitleaks"
 	["trufflehog"]="trufflesecurity/trufflehog"
 	["nomore403"]="devploit/nomore403"
@@ -134,10 +142,6 @@ declare -A repos=(
 	["ffufPostprocessing"]="Damian89/ffufPostprocessing"
 	["misconfig-mapper"]="intigriti/misconfig-mapper"
 	["Spoofy"]="MattKeeley/Spoofy"
-	["xnLinkFinder"]="xnl-h4ck3r/xnLinkFinder"
-	["porch-pirate"]="MandConsultingGroup/porch-pirate"
-	["MetaFinder"]="Josue87/MetaFinder"
-	["EmailFinder"]="Josue87/EmailFinder"
 )
 
 # Function to display the banner
@@ -576,26 +580,6 @@ function initial_setup() {
 	else
 		#printf "${yellow}Updating massdns...${reset}\n"
 		eval git -C "${dir}/massdns" pull $DEBUG_STD
-	fi
-
-	# Interlace
-	if [[ ! -d "${dir}/interlace" ]]; then
-		#printf "${yellow}Cloning Interlace...${reset}\n"
-		eval git clone https://github.com/codingo/Interlace.git "${dir}/interlace" $DEBUG_STD
-		eval cd "${dir}/interlace" && eval $SUDO python3 setup.py install $DEBUG_STD
-	else
-		#printf "${yellow}Updating Interlace...${reset}\n"
-		eval git -C "${dir}/interlace" pull $DEBUG_STD
-	fi
-
-	# wafw00f
-	if [[ ! -d "${dir}/wafw00f" ]]; then
-		#printf "${yellow}Cloning wafw00f...${reset}\n"
-		eval git clone https://github.com/EnableSecurity/wafw00f.git "${dir}/wafw00f" $DEBUG_STD
-		eval cd "${dir}/wafw00f" && eval $SUDO python3 setup.py install $DEBUG_STD
-	else
-		#printf "${yellow}Updating wafw00f...${reset}\n"
-		eval git -C "${dir}/wafw00f" pull $DEBUG_STD
 	fi
 
 	# gf patterns
