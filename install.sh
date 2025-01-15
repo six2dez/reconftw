@@ -458,7 +458,7 @@ function install_yum() {
 
 # Function to install required packages for Arch-based systems
 function install_pacman() {
-	"$SUDO" pacman -Sy --noconfirm python python-pip base-devel gcc cmake ruby git curl libpcap pipx whois wget zip pv bind openssl libffi libxml2 libxslt zlib nmap jq lynx medusa xorg-server-xvfb &>/dev/null
+	"$SUDO" pacman -Sy --noconfirm python python-pip base-devel gcc cmake ruby git curl libpcap python-pipx whois wget zip pv bind openssl libffi libxml2 libxslt zlib nmap jq lynx medusa xorg-server-xvfb &>/dev/null
 	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
 	source "${HOME}/.cargo/env"
 	cargo install ripgen &>/dev/null
