@@ -260,6 +260,9 @@ function install_tools() {
 			go build -o misconfig-mapper &>/dev/null
 			chmod +x ./misconfig-mapper
 			;;
+		"trufflehog")
+			go install &>/dev/null
+			;;
 		esac
 
 		# Copy gf patterns if applicable
