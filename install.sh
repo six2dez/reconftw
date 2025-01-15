@@ -249,7 +249,7 @@ function install_tools() {
 			chmod +x ./nomore403
 			;;
 		"ffufPostprocessing")
-			git reset --hard origin/main &>/dev/null
+			git reset --hard origin/master &>/dev/null
 			git pull &>/dev/null
 			go build -o ffufPostprocessing main.go &>/dev/null
 			chmod +x ./ffufPostprocessing
