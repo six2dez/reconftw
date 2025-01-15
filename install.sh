@@ -19,24 +19,6 @@ double_check=false
 
 # ARM Detection
 ARCH=$(uname -m)
-case "$ARCH" in
-amd64 | x86_64)
-	IS_ARM="False"
-	;;
-arm64 | armv6l | aarch64)
-	IS_ARM="True"
-	if [[ $ARCH == "arm64" ]]; then
-		RPI_4="True"
-		RPI_3="False"
-	else
-		RPI_4="False"
-		RPI_3="True"
-	fi
-	;;
-*)
-	IS_ARM="False"
-	;;
-esac
 
 # macOS Detection
 IS_MAC=$([[ $OSTYPE == "darwin"* ]] && echo "True" || echo "False")
@@ -344,27 +326,30 @@ function install_golang_version() {
 
 			case "$ARCH" in
 			arm64 | aarch64)
-				if [[ $RPI_4 == "True" ]]; then
+				if [[ $IS_MAC == "True" ]]; then
+					wget "https://dl.google.com/go/${version}.darwin-arm64.tar.gz" -O "/tmp/${version}.darwin-arm64.tar.gz" &>/dev/null
+					"$SUDO" tar -C /usr/local -xzf "/tmp/${version}.darwin-arm64.tar.gz" &>/dev/null
+				else
 					wget "https://dl.google.com/go/${version}.linux-arm64.tar.gz" -O "/tmp/${version}.linux-arm64.tar.gz" &>/dev/null
 					"$SUDO" tar -C /usr/local -xzf "/tmp/${version}.linux-arm64.tar.gz" &>/dev/null
-				elif [[ $RPI_3 == "True" ]]; then
-					wget "https://dl.google.com/go/${version}.linux-armv6l.tar.gz" -O "/tmp/${version}.linux-armv6l.tar.gz" &>/dev/null
-					"$SUDO" tar -C /usr/local -xzf "/tmp/${version}.linux-armv6l.tar.gz" &>/dev/null
 				fi
 				;;
-			*)
+			armv6l | armv7l)
+				wget "https://dl.google.com/go/${version}.linux-armv6l.tar.gz" -O "/tmp/${version}.linux-armv6l.tar.gz" &>/dev/null
+				"$SUDO" tar -C /usr/local -xzf "/tmp/${version}.linux-armv6l.tar.gz" &>/dev/null
+				;;
+			amd64 | x86_64)
 				if [[ $IS_MAC == "True" ]]; then
-					if [[ $IS_ARM == "True" ]]; then
-						wget "https://dl.google.com/go/${version}.darwin-arm64.tar.gz" -O "/tmp/${version}.darwin-arm64.tar.gz" &>/dev/null
-						"$SUDO" tar -C /usr/local -xzf "/tmp/${version}.darwin-arm64.tar.gz" &>/dev/null
-					else
-						wget "https://dl.google.com/go/${version}.darwin-amd64.tar.gz" -O "/tmp/${version}.darwin-amd64.tar.gz" &>/dev/null
-						"$SUDO" tar -C /usr/local -xzf "/tmp/${version}.darwin-amd64.tar.gz" &>/dev/null
-					fi
+					wget "https://dl.google.com/go/${version}.darwin-amd64.tar.gz" -O "/tmp/${version}.darwin-amd64.tar.gz" &>/dev/null
+					"$SUDO" tar -C /usr/local -xzf "/tmp/${version}.darwin-amd64.tar.gz" &>/dev/null
 				else
 					wget "https://dl.google.com/go/${version}.linux-amd64.tar.gz" -O "/tmp/${version}.linux-amd64.tar.gz" &>/dev/null
 					"$SUDO" tar -C /usr/local -xzf "/tmp/${version}.linux-amd64.tar.gz" &>/dev/null
 				fi
+				;;
+			*)
+				echo -e "${bred}[!] Unsupported architecture. Please install go manually.${reset}"
+				exit 1
 				;;
 			esac
 
