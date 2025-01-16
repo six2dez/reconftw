@@ -154,6 +154,13 @@ function tools_installed() {
 	)
 
 	declare -A tools_commands=(
+		["python3"]="python3"
+		["curl"]="curl"
+		["wget"]="wget"
+		["zip"]="zip"
+		["nmap"]="nmap"
+		["dig"]="dig"
+		["timeout"]="timeout"
 		["brutespray"]="brutespray"
 		["xnLinkFinder"]="xnLinkFinder"
 		["urlfinder"]="urlfinder"
@@ -212,6 +219,7 @@ function tools_installed() {
 		["sns"]="sns"
 		["sourcemapper"]="sourcemapper"
 		["jsluice"]="jsluice"
+		["dnstake"]="dnstake"
 	)
 
 	# Check for tool files
