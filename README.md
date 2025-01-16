@@ -408,6 +408,7 @@ reset='\033[0m'
 | -o | Output directory |
 | -v | Axiom distributed VPS |
 | -q | Rate limit in requests per second |
+| --check-tools | Exit if one of the tools is missing |
 
 ## Example Usage
 

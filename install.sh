@@ -19,24 +19,6 @@ double_check=false
 
 # ARM Detection
 ARCH=$(uname -m)
-case "$ARCH" in
-amd64 | x86_64)
-	IS_ARM="False"
-	;;
-arm64 | armv6l | aarch64)
-	IS_ARM="True"
-	if [[ $ARCH == "arm64" ]]; then
-		RPI_4="True"
-		RPI_3="False"
-	else
-		RPI_4="False"
-		RPI_3="True"
-	fi
-	;;
-*)
-	IS_ARM="False"
-	;;
-esac
 
 # macOS Detection
 IS_MAC=$([[ $OSTYPE == "darwin"* ]] && echo "True" || echo "False")
@@ -295,7 +277,7 @@ function install_tools() {
 			chmod +x ./nomore403
 			;;
 		"ffufPostprocessing")
-			git reset --hard origin/main &>/dev/null
+			git reset --hard origin/master &>/dev/null
 			git pull &>/dev/null
 			go build -o ffufPostprocessing main.go &>/dev/null
 			chmod +x ./ffufPostprocessing
@@ -306,13 +288,16 @@ function install_tools() {
 			go build -o misconfig-mapper &>/dev/null
 			chmod +x ./misconfig-mapper
 			;;
+		"trufflehog")
+			go install &>/dev/null
+			;;
 		esac
 
 		# Copy gf patterns if applicable
 		if [[ $repo == "gf" ]]; then
 			cp -r examples ${HOME}/.gf &>/dev/null
 		elif [[ $repo == "Gf-Patterns" ]]; then
-			mv ./*.json ${HOME}/.gf &>/dev/null
+			cp ./*.json ${HOME}/.gf &>/dev/null
 		fi
 
 		# Return to the main directory
@@ -394,27 +379,30 @@ function install_golang_version() {
 
 			case "$ARCH" in
 			arm64 | aarch64)
-				if [[ $RPI_4 == "True" ]]; then
+				if [[ $IS_MAC == "True" ]]; then
+					wget "https://dl.google.com/go/${version}.darwin-arm64.tar.gz" -O "/tmp/${version}.darwin-arm64.tar.gz" &>/dev/null
+					"$SUDO" tar -C /usr/local -xzf "/tmp/${version}.darwin-arm64.tar.gz" &>/dev/null
+				else
 					wget "https://dl.google.com/go/${version}.linux-arm64.tar.gz" -O "/tmp/${version}.linux-arm64.tar.gz" &>/dev/null
 					"$SUDO" tar -C /usr/local -xzf "/tmp/${version}.linux-arm64.tar.gz" &>/dev/null
-				elif [[ $RPI_3 == "True" ]]; then
-					wget "https://dl.google.com/go/${version}.linux-armv6l.tar.gz" -O "/tmp/${version}.linux-armv6l.tar.gz" &>/dev/null
-					"$SUDO" tar -C /usr/local -xzf "/tmp/${version}.linux-armv6l.tar.gz" &>/dev/null
 				fi
 				;;
-			*)
+			armv6l | armv7l)
+				wget "https://dl.google.com/go/${version}.linux-armv6l.tar.gz" -O "/tmp/${version}.linux-armv6l.tar.gz" &>/dev/null
+				"$SUDO" tar -C /usr/local -xzf "/tmp/${version}.linux-armv6l.tar.gz" &>/dev/null
+				;;
+			amd64 | x86_64)
 				if [[ $IS_MAC == "True" ]]; then
-					if [[ $IS_ARM == "True" ]]; then
-						wget "https://dl.google.com/go/${version}.darwin-arm64.tar.gz" -O "/tmp/${version}.darwin-arm64.tar.gz" &>/dev/null
-						"$SUDO" tar -C /usr/local -xzf "/tmp/${version}.darwin-arm64.tar.gz" &>/dev/null
-					else
-						wget "https://dl.google.com/go/${version}.darwin-amd64.tar.gz" -O "/tmp/${version}.darwin-amd64.tar.gz" &>/dev/null
-						"$SUDO" tar -C /usr/local -xzf "/tmp/${version}.darwin-amd64.tar.gz" &>/dev/null
-					fi
+					wget "https://dl.google.com/go/${version}.darwin-amd64.tar.gz" -O "/tmp/${version}.darwin-amd64.tar.gz" &>/dev/null
+					"$SUDO" tar -C /usr/local -xzf "/tmp/${version}.darwin-amd64.tar.gz" &>/dev/null
 				else
 					wget "https://dl.google.com/go/${version}.linux-amd64.tar.gz" -O "/tmp/${version}.linux-amd64.tar.gz" &>/dev/null
 					"$SUDO" tar -C /usr/local -xzf "/tmp/${version}.linux-amd64.tar.gz" &>/dev/null
 				fi
+				;;
+			*)
+				echo -e "${bred}[!] Unsupported architecture. Please install go manually.${reset}"
+				exit 1
 				;;
 			esac
 
@@ -475,8 +463,11 @@ function install_system_packages() {
 
 # Function to install required packages for Debian-based systems
 function install_apt() {
-	"$SUDO" apt update -y &>/dev/null
-	"$SUDO" DEBIAN_FRONTEND="noninteractive" apt install -y chromium-browser python3 python3-pip pipx python3-virtualenv build-essential gcc cmake ruby whois git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx medusa xvfb libxml2-utils procps bsdmainutils libdata-hexdump-perl libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon-x11-0 libxcomposite-dev libxdamage1 libxrandr2 libgbm-dev libpangocairo-1.0-0 libasound2 &>/dev/null
+	"$SUDO" apt-get update -y &>/dev/null
+	"$SUDO" DEBIAN_FRONTEND="noninteractive" apt-get install -y python3 python3-pip python3-venv pipx python3-virtualenv build-essential gcc cmake ruby whois git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx medusa xvfb libxml2-utils procps bsdmainutils libdata-hexdump-perl &>/dev/null
+	# Move chromium browser dependencies (required by `nuclei -headless -id screenshot`) into a separate apt install command, and add a fallback for Ubuntu 24.04 (where `libasound2` is renamed to `libasound2t64`)
+	"$SUDO" DEBIAN_FRONTEND="noninteractive" apt-get install -y libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon-x11-0 libxcomposite-dev libxdamage1 libxrandr2 libgbm-dev libpangocairo-1.0-0 libasound2 &>/dev/null || \
+		"$SUDO" DEBIAN_FRONTEND="noninteractive" apt-get install -y libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon-x11-0 libxcomposite-dev libxdamage1 libxrandr2 libgbm-dev libpangocairo-1.0-0 libasound2t64 &>/dev/null
 	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
 	source "${HOME}/.cargo/env"
 	cargo install ripgen &>/dev/null
@@ -490,8 +481,7 @@ function install_brew() {
 		/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 	fi
 	brew update &>/dev/null
-	brew install --cask chromium &>/dev/null
-	brew install bash coreutils python massdns jq gcc cmake ruby git curl libpcap-dev wget zip python3-dev pipx pv dnsutils whois libssl-dev libffi-dev libxml2-dev libxslt-dev zlib libnss3 atk bridge2.0 cups xkbcommon xcomposite xdamage xrandr gbm pangocairo alsa libxml2-utils &>/dev/null
+	brew install --formula bash coreutils gnu-getopt python pipx massdns jq gcc cmake ruby git curl wget zip pv bind whois nmap jq lynx medusa &>/dev/null
 	brew install rustup &>/dev/null
 	rustup-init -y &>/dev/null
 	cargo install ripgen &>/dev/null
@@ -564,15 +554,6 @@ function initial_setup() {
 	else
 		#printf "${yellow}Updating sqlmap...${reset}\n"
 		eval git -C "${dir}/sqlmap" pull $DEBUG_STD
-	fi
-
-	# testssl.sh
-	if [[ ! -d "${dir}/testssl.sh" ]]; then
-		#printf "${yellow}Cloning testssl.sh...${reset}\n"
-		eval git clone --depth 1 https://github.com/drwetter/testssl.sh.git "${dir}/testssl.sh" $DEBUG_STD
-	else
-		#printf "${yellow}Updating testssl.sh...${reset}\n"
-		eval git -C "${dir}/testssl.sh" pull $DEBUG_STD
 	fi
 
 	# massdns
