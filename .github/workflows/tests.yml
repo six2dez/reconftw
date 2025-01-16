@@ -1,0 +1,39 @@
+name: tests
+
+on: [push, pull_request]
+
+jobs:
+  tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-14
+          - macos-15
+          - ubuntu-20.04
+          - ubuntu-22.04
+          - ubuntu-24.04
+
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Install bash from homebrew
+        if: ${{ startsWith(matrix.os, 'macos-') }}
+        run: brew install bash
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install reconFTW
+        shell: bash
+        continue-on-error: true
+        run: ./install.sh
+
+      - name: Check if all tools are installed
+        shell: bash
+        run: ./reconftw.sh --check-tools
+
+      - name: Check if chromium dependencies are installed
+        shell: bash
+        run: nuclei -headless -id screenshot
