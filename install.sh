@@ -96,7 +96,7 @@ declare -A repos=(
 	["fav-up"]="pielco11/fav-up"
 	["massdns"]="blechschmidt/massdns"
 	["Oralyzer"]="r0075h3ll/Oralyzer"
-	["testssl"]="drwetter/testssl.sh"
+	["testssl.sh"]="drwetter/testssl.sh"
 	["commix"]="commixproject/commix"
 	["JSA"]="w9w/JSA"
 	["CloudHunter"]="belane/CloudHunter"
@@ -231,7 +231,7 @@ function install_tools() {
 			chmod +x ./nomore403
 			;;
 		"ffufPostprocessing")
-			git reset --hard origin/main &>/dev/null
+			git reset --hard origin/master &>/dev/null
 			git pull &>/dev/null
 			go build -o ffufPostprocessing main.go &>/dev/null
 			chmod +x ./ffufPostprocessing
@@ -242,13 +242,16 @@ function install_tools() {
 			go build -o misconfig-mapper &>/dev/null
 			chmod +x ./misconfig-mapper
 			;;
+		"trufflehog")
+			go install &>/dev/null
+			;;
 		esac
 
 		# Copy gf patterns if applicable
 		if [[ $repo == "gf" ]]; then
 			cp -r examples ${HOME}/.gf &>/dev/null
 		elif [[ $repo == "Gf-Patterns" ]]; then
-			mv ./*.json ${HOME}/.gf &>/dev/null
+			cp ./*.json ${HOME}/.gf &>/dev/null
 		fi
 
 		# Return to the main directory
@@ -505,15 +508,6 @@ function initial_setup() {
 	else
 		#printf "${yellow}Updating sqlmap...${reset}\n"
 		eval git -C "${dir}/sqlmap" pull $DEBUG_STD
-	fi
-
-	# testssl.sh
-	if [[ ! -d "${dir}/testssl.sh" ]]; then
-		#printf "${yellow}Cloning testssl.sh...${reset}\n"
-		eval git clone --depth 1 https://github.com/drwetter/testssl.sh.git "${dir}/testssl.sh" $DEBUG_STD
-	else
-		#printf "${yellow}Updating testssl.sh...${reset}\n"
-		eval git -C "${dir}/testssl.sh" pull $DEBUG_STD
 	fi
 
 	# massdns

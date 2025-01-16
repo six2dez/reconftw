@@ -122,7 +122,7 @@ function tools_installed() {
 		["dorks_hunter"]="${tools}/dorks_hunter/dorks_hunter.py"
 		["fav-up"]="${tools}/fav-up/favUp.py"
 		["Corsy"]="${tools}/Corsy/corsy.py"
-		["testssl"]="${tools}/testssl.sh/testssl.sh"
+		["testssl.sh"]="${tools}/testssl.sh/testssl.sh"
 		["CMSeeK"]="${tools}/CMSeeK/cmseek.py"
 		["OneListForAll"]="$fuzz_wordlist"
 		["lfi_wordlist"]="$lfi_wordlist"
