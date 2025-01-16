@@ -83,12 +83,23 @@ declare -A gotools=(
 	["urlfinder"]="go install -v github.com/projectdiscovery/urlfinder/cmd/urlfinder@latest"
 )
 
-# Declare repositories and their paths
-declare -A repos=(
-	["dorks_hunter"]="six2dez/dorks_hunter"
+# Declare pipx tools and their paths
+declare -A pipxtools=(
 	["dnsvalidator"]="vortexau/dnsvalidator"
 	["interlace"]="codingo/Interlace"
 	["wafw00f"]="EnableSecurity/wafw00f"
+	["commix"]="commixproject/commix"
+	["urless"]="xnl-h4ck3r/urless"
+	["ghauri"]="r0oth3x49/ghauri"
+	["xnLinkFinder"]="xnl-h4ck3r/xnLinkFinder"
+	["porch-pirate"]="MandConsultingGroup/porch-pirate"
+	["MetaFinder"]="Josue87/MetaFinder"
+	["EmailFinder"]="Josue87/EmailFinder"
+)
+
+# Declare repositories and their paths
+declare -A repos=(
+	["dorks_hunter"]="six2dez/dorks_hunter"
 	["gf"]="tomnomnom/gf"
 	["Gf-Patterns"]="1ndianl33t/Gf-Patterns"
 	["Corsy"]="s0md3v/Corsy"
@@ -96,18 +107,15 @@ declare -A repos=(
 	["fav-up"]="pielco11/fav-up"
 	["massdns"]="blechschmidt/massdns"
 	["Oralyzer"]="r0075h3ll/Oralyzer"
-	["testssl.sh"]="drwetter/testssl.sh"
-	["commix"]="commixproject/commix"
+	["testssl"]="drwetter/testssl.sh"
 	["JSA"]="w9w/JSA"
 	["CloudHunter"]="belane/CloudHunter"
 	["ultimate-nmap-parser"]="shifty0g/ultimate-nmap-parser"
 	["pydictor"]="LandGrey/pydictor"
 	["gitdorks_go"]="damit5/gitdorks_go"
-	["urless"]="xnl-h4ck3r/urless"
 	["smuggler"]="defparam/smuggler"
 	["Web-Cache-Vulnerability-Scanner"]="Hackmanit/Web-Cache-Vulnerability-Scanner"
 	["regulator"]="cramppet/regulator"
-	["ghauri"]="r0oth3x49/ghauri"
 	["gitleaks"]="gitleaks/gitleaks"
 	["trufflehog"]="trufflesecurity/trufflehog"
 	["nomore403"]="devploit/nomore403"
@@ -116,10 +124,6 @@ declare -A repos=(
 	["ffufPostprocessing"]="Damian89/ffufPostprocessing"
 	["misconfig-mapper"]="intigriti/misconfig-mapper"
 	["Spoofy"]="MattKeeley/Spoofy"
-	["xnLinkFinder"]="xnl-h4ck3r/xnLinkFinder"
-	["porch-pirate"]="MandConsultingGroup/porch-pirate"
-	["MetaFinder"]="Josue87/MetaFinder"
-	["EmailFinder"]="Josue87/EmailFinder"
 )
 
 # Function to display the banner
@@ -169,6 +173,43 @@ function install_tools() {
 		fi
 	done
 
+	echo -e "\n${bblue}Running: Installing pipx tools (${#repos[@]})${reset}\n"
+
+	local pipx_step=0
+	local failed_pipx_tools=()
+
+	for pipxtool in "${!pipxtools[@]}"; do
+		((pipx_step++))
+		if [[ $upgrade_tools == "false" ]]; then
+			if command -v "$pipxtool" &>/dev/null; then
+				echo -e "[${yellow}SKIPPING${reset}] $pipxtool already installed at $(command -v "$pipxtool")"
+				continue
+			fi
+		fi
+
+		# Install the pipx tool
+		eval pipx install "git+https://github.com/${pipxtools[$pipxtool]}" &>/dev/null
+		exit_status=$?
+		if [[ $exit_status -ne 0 ]]; then
+			echo -e "${red}Failed to install $pipxtool, try manually (${pipx_step}/${#pipxtools[@]})${reset}"
+			failed_pipx_tools+=("$pipxtool")
+			double_check=true
+			continue
+		fi
+
+		# Upgrade the pipx tool
+		eval pipx upgrade "${pipxtool}" &>/dev/null
+		exit_status=$?
+		if [[ $exit_status -ne 0 ]]; then
+			echo -e "${red}Failed to upgrade $pipxtool, try manually (${pipx_step}/${#pipxtools[@]})${reset}"
+			failed_pipx_tools+=("$pipxtool")
+			double_check=true
+			continue
+		fi
+
+		echo -e "${yellow}$pipxtool installed (${pipx_step}/${#pipxtools[@]})${reset}"
+	done
+
 	echo -e "\n${bblue}Running: Installing repositories (${#repos[@]})${reset}\n"
 
 	local repos_step=0
@@ -212,9 +253,14 @@ function install_tools() {
 			continue
 		fi
 
-		# Install dependencies if setup.py exists
-		if [[ -f "setup.py" ]]; then
-			eval "$SUDO pipx install . $DEBUG_STD" &>/dev/null
+		# Install requirements inside a virtual environment
+		if [[ -s "requirements.txt" ]]; then
+			if [[ ! -f "venv/bin/activate" ]]; then
+				python3 -m venv venv &>/dev/null
+			fi
+			source venv/bin/activate
+			eval "pip3 install --upgrade -r requirements.txt $DEBUG_STD" &>/dev/null
+			deactivate
 		fi
 
 		# Special handling for certain repositories
@@ -271,6 +317,10 @@ function install_tools() {
 	# Handle failed installations
 	if [[ ${#failed_tools[@]} -ne 0 ]]; then
 		echo -e "\n${red}Failed to install the following Go tools: ${failed_tools[*]}${reset}"
+	fi
+
+	if [[ ${#failed_pipx_tools[@]} -ne 0 ]]; then
+		echo -e "\n${red}Failed to install the following pipx tools: ${failed_pipx_tools[*]}${reset}"
 	fi
 
 	if [[ ${#failed_repos[@]} -ne 0 ]]; then
@@ -448,7 +498,7 @@ function install_yum() {
 
 # Function to install required packages for Arch-based systems
 function install_pacman() {
-	"$SUDO" pacman -Sy --noconfirm python python-pip base-devel gcc cmake ruby git curl libpcap pipx whois wget zip pv bind openssl libffi libxml2 libxslt zlib nmap jq lynx medusa xorg-server-xvfb &>/dev/null
+	"$SUDO" pacman -Sy --noconfirm python python-pip base-devel gcc cmake ruby git curl libpcap python-pipx whois wget zip pv bind openssl libffi libxml2 libxslt zlib nmap jq lynx medusa xorg-server-xvfb &>/dev/null
 	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
 	source "${HOME}/.cargo/env"
 	cargo install ripgen &>/dev/null
@@ -475,12 +525,8 @@ function initial_setup() {
 	touch "${dir}/.github_tokens"
 	touch "${dir}/.gitlab_tokens"
 
-	wget -N -c https://bootstrap.pypa.io/get-pip.py -O /tmp/get-pip.py &>/dev/null
-	python3 /tmp/get-pip.py &>/dev/null
-	rm -f /tmp/get-pip.py
-
-	pipx install reconftw &>/dev/null
-	pipx inject mkdocs -r requirements.txt &>/dev/null
+	eval pipx ensurepath $DEBUG_STD
+	source "${HOME}/${profile_shell}"
 
 	install_tools
 
@@ -520,26 +566,6 @@ function initial_setup() {
 	else
 		#printf "${yellow}Updating massdns...${reset}\n"
 		eval git -C "${dir}/massdns" pull $DEBUG_STD
-	fi
-
-	# Interlace
-	if [[ ! -d "${dir}/interlace" ]]; then
-		#printf "${yellow}Cloning Interlace...${reset}\n"
-		eval git clone https://github.com/codingo/Interlace.git "${dir}/interlace" $DEBUG_STD
-		eval cd "${dir}/interlace" && eval $SUDO python3 setup.py install $DEBUG_STD
-	else
-		#printf "${yellow}Updating Interlace...${reset}\n"
-		eval git -C "${dir}/interlace" pull $DEBUG_STD
-	fi
-
-	# wafw00f
-	if [[ ! -d "${dir}/wafw00f" ]]; then
-		#printf "${yellow}Cloning wafw00f...${reset}\n"
-		eval git clone https://github.com/EnableSecurity/wafw00f.git "${dir}/wafw00f" $DEBUG_STD
-		eval cd "${dir}/wafw00f" && eval $SUDO python3 setup.py install $DEBUG_STD
-	else
-		#printf "${yellow}Updating wafw00f...${reset}\n"
-		eval git -C "${dir}/wafw00f" pull $DEBUG_STD
 	fi
 
 	# gf patterns
