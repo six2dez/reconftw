@@ -125,7 +125,7 @@ function tools_installed() {
 		["fav-up_python"]="${tools}/fav-up/venv/bin/python3"
 		["Corsy"]="${tools}/Corsy/corsy.py"
 		["Corsy_python"]="${tools}/Corsy/venv/bin/python3"
-		["testssl"]="${tools}/testssl.sh/testssl.sh"
+		["testssl.sh"]="${tools}/testssl.sh/testssl.sh"
 		["CMSeeK"]="${tools}/CMSeeK/cmseek.py"
 		["CMSeeK_python"]="${tools}/CMSeeK/venv/bin/python3"
 		["OneListForAll"]="$fuzz_wordlist"
