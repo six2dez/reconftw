@@ -2232,14 +2232,19 @@ function subtakeover() {
 			fi
 			cat subdomains/subdomains.txt webs/webs_all.txt 2>/dev/null | nuclei -silent -nh -tags takeover \
 				-severity info,low,medium,high,critical -retries 3 -rl "$NUCLEI_RATELIMIT" \
-				-t "${NUCLEI_TEMPLATES_PATH}" -o .tmp/tko.txt
+				-t "${NUCLEI_TEMPLATES_PATH}" -j -o .tmp/tko_json.txt 2>>"$LOGFILE" >/dev/null
 		else
 			cat subdomains/subdomains.txt webs/webs_all.txt 2>>"$LOGFILE" | sed '/^$/d' | anew -q .tmp/webs_subs.txt
 			if [[ -s ".tmp/webs_subs.txt" ]]; then
 				axiom-scan .tmp/webs_subs.txt -m nuclei --nuclei-templates "${NUCLEI_TEMPLATES_PATH}" \
 					-tags takeover -nh -severity info,low,medium,high,critical -retries 3 -rl "$NUCLEI_RATELIMIT" \
-					-t "${NUCLEI_TEMPLATES_PATH}" -o .tmp/tko.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+					-t "${NUCLEI_TEMPLATES_PATH}" -j -o .tmp/tko_json.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 			fi
+		fi
+
+		# Convert JSON to text
+		if [[ -s ".tmp/tko_json.txt" ]]; then
+			jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' .tmp/tko_json.txt > .tmp/tko.txt
 		fi
 
 		# DNS Takeover
@@ -2262,6 +2267,16 @@ function subtakeover() {
 
 		if [[ $NUMOFLINES -gt 0 ]]; then
 			notification "${NUMOFLINES} new possible takeovers found" info
+		fi
+
+		if [[ $FARADAY == true ]]; then
+			if ! faraday-cli status 2>>"$LOGFILE" >/dev/null; then
+				printf "%b[!] Faraday server is not running. Skipping Faraday integration.%b\n" "$bred" "$reset"
+			else
+				if [[ -s ".tmp/tko_json.txt" ]]; then
+					faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei .tmp/tko_json.txt 2>>"$LOGFILE" >/dev/null
+				fi
+			fi
 		fi
 
 		end_func "Results are saved in $domain/webs/takeover.txt" "${FUNCNAME[0]}"
@@ -2864,9 +2879,10 @@ function virtualhosts() {
 					-u _target_ -of json -o _output_/_cleantarget_.json" \
 					-o .tmp/virtualhosts 2>>"$LOGFILE" >/dev/null
 			else
-				# Run axiom-scan with nuclei-screenshots module
-				axiom-scan webs/webs_all.txt -m nuclei-screenshots \
-					-o virtualhosts "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+				# Run axiom-scan with ffuf module
+				axiom-scan webs/webs_all.txt -m ffuf -ac -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} \
+					-H "${HEADER}" -H "Host: FUZZ._cleantarget_" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} \
+					-o .tmp/virtualhosts "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
 			fi
 
 			# Process ffuf output
@@ -3076,6 +3092,19 @@ function portscan() {
 			nmapurls <hosts/portscan_active.xml 2>>"$LOGFILE" | anew -q hosts/webs.txt
 		fi
 
+
+		if [[ $FARADAY == true ]]; then
+			# Check if the Faraday server is running
+			if ! faraday-cli status 2>>"$LOGFILE" >/dev/null; then
+				printf "%b[!] Faraday server is not running. Skipping Faraday integration.%b\n" "$bred" "$reset"
+			else
+				if [[ -s "hosts/portscan_active.xml" ]]; then
+					faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nmap hosts/portscan_active.xml 2>>"$LOGFILE" >/dev/null
+				fi
+			fi
+		fi
+
+
 		if [[ -s "hosts/webs.txt" ]]; then
 			if ! NUMOFLINES=$(wc -l <hosts/webs.txt); then
 				printf "%b[!] Failed to count lines in hosts/webs.txt.%b\n" "$bred" "$reset"
@@ -3261,7 +3290,7 @@ function nuclei_check() {
 				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Nuclei Severity: $crit ${reset}\n\n"
 
 				# Run nuclei for each severity level
-				nuclei $NUCLEI_FLAGS -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" "$NUCLEI_EXTRA_ARGS" -o "nuclei_output/${crit}.txt" <.tmp/webs_nuclei.txt
+				nuclei $NUCLEI_FLAGS -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" "$NUCLEI_EXTRA_ARGS" -j -o "nuclei_output/${crit}_json.txt" <.tmp/webs_nuclei.txt
 			done
 			printf "\n\n"
 		else
@@ -3276,12 +3305,28 @@ function nuclei_check() {
 					axiom-scan .tmp/webs_nuclei.txt -m nuclei \
 						--nuclei-templates "$NUCLEI_TEMPLATES_PATH" \
 						-severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" \
-						"$NUCLEI_EXTRA_ARGS" -o "nuclei_output/${crit}.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+						"$NUCLEI_EXTRA_ARGS" -j -o "nuclei_output/${crit}_json.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+
+					# Parse the JSON output and save the results to a text file
+					jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' nuclei_output/${crit}_json.txt > nuclei_output/${crit}.txt
 
 					# Display the results if the output file exists and is not empty
 					if [[ -s "nuclei_output/${crit}.txt" ]]; then
 						cat "nuclei_output/${crit}.txt"
 					fi
+
+					# Faraday integration
+					if [[ $FARADAY == true ]]; then
+						# Check if the Faraday server is running
+						if ! faraday-cli status 2>>"$LOGFILE" >/dev/null; then
+							printf "%b[!] Faraday server is not running. Skipping Faraday integration.%b\n" "$bred" "$reset"
+						else
+							if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
+								faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei nuclei_output/${crit}_json.txt 2>>"$LOGFILE" >/dev/null
+							fi
+						fi
+					fi
+
 				done
 				printf "\n\n"
 			fi
@@ -3305,7 +3350,7 @@ function nuclei_check() {
 function fuzz() {
 
 	# Create necessary directories
-	mkdir -p .tmp/fuzzing webs fuzzing nuclei_output
+	mkdir -p .tmp/fuzzing webs fuzzing
 
 	# Check if the function should run
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $FUZZ == true ]] &&
@@ -3368,7 +3413,7 @@ function fuzz() {
 			end_func "No $domain/web/webs.txts file found, fuzzing skipped " ${FUNCNAME[0]}
 		fi
 
-		end_func "Results are saved in $domain/nuclei_output folder" "${FUNCNAME[0]}"
+		end_func "Results are saved in $domain/fuzzing folder" "${FUNCNAME[0]}"
 	else
 		if [[ $FUZZ == false ]]; then
 			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -4979,7 +5024,7 @@ function fuzzparams() {
 				fi
 
 				# Execute Nuclei with the fuzzing templates
-				nuclei -silent -retries 3 -rl "$NUCLEI_RATELIMIT" -t ${NUCLEI_FUZZING_TEMPLATES_PATH} -dast -o ".tmp/fuzzparams.txt" <"webs/url_extract_nodupes.txt" 2>>"$LOGFILE"
+				nuclei -silent -retries 3 -rl "$NUCLEI_RATELIMIT" -t ${NUCLEI_FUZZING_TEMPLATES_PATH} -dast -j -o ".tmp/fuzzparams_json.txt" <"webs/url_extract_nodupes.txt" 2>>"$LOGFILE"
 
 			else
 				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Axiom with Nuclei${reset}\n\n"
@@ -4990,12 +5035,27 @@ function fuzzparams() {
 				fi
 
 				# Execute Axiom scan with Nuclei
-				axiom-scan "webs/url_extract_nodupes.txt" -m nuclei -nh -retries 3 -w "/home/op/fuzzing-templates" -rl "$NUCLEI_RATELIMIT" -dast -o ".tmp/fuzzparams.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+				axiom-scan "webs/url_extract_nodupes.txt" -m nuclei -nh -retries 3 -w "/home/op/fuzzing-templates" -rl "$NUCLEI_RATELIMIT" -dast -j -o ".tmp/fuzzparams_json.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 			fi
+
+			# Convert JSON output to text
+			jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' .tmp/fuzzparams_json.txt > .tmp/fuzzparams.txt
 
 			# Append unique results to vulns/fuzzparams.txt
 			if [[ -s ".tmp/fuzzparams.txt" ]]; then
 				cat ".tmp/fuzzparams.txt" | anew -q "vulns/fuzzparams.txt"
+			fi
+
+			# Faraday integration
+			if [[ $FARADAY == true ]]; then
+				# Check if the Faraday server is running
+				if ! faraday-cli status 2>>"$LOGFILE" >/dev/null; then
+					printf "%b[!] Faraday server is not running. Skipping Faraday integration.%b\n" "$bred" "$reset"
+				else
+					if [[ -s ".tmp/fuzzparams_json.txt" ]]; then
+						faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei .tmp/fuzzparams_json.txt 2>>"$LOGFILE" >/dev/null
+					fi
+				fi
 			fi
 
 			end_func "Results are saved in vulns/fuzzparams.txt" "${FUNCNAME[0]}"
