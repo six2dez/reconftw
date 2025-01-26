@@ -263,10 +263,10 @@ function install_tools() {
 		# Special handling for certain repositories
 		case "$repo" in
 		"massdns")
-			make &>/dev/null && strip -s bin/massdns && "$SUDO" cp bin/massdns /usr/local/bin/ &>/dev/null
+			make &>/dev/null && strip -s bin/massdns && $SUDO cp bin/massdns /usr/local/bin/ &>/dev/null
 			;;
 		"gitleaks")
-			make build &>/dev/null && "$SUDO" cp ./gitleaks /usr/local/bin/ &>/dev/null
+			make build &>/dev/null && $SUDO cp ./gitleaks /usr/local/bin/ &>/dev/null
 			;;
 		"nomore403")
 			go get &>/dev/null
@@ -372,29 +372,29 @@ function install_golang_version() {
 		if command -v go &>/dev/null && [[ $version == "$(go version | awk '{print $3}')" ]]; then
 			echo -e "${bgreen}Golang is already installed and up to date.${reset}\n"
 		else
-			"$SUDO" rm -rf /usr/local/go &>/dev/null || true
+			$SUDO rm -rf /usr/local/go &>/dev/null || true
 
 			case "$ARCH" in
 			arm64 | aarch64)
 				if [[ $IS_MAC == "True" ]]; then
 					wget "https://dl.google.com/go/${version}.darwin-arm64.tar.gz" -O "/tmp/${version}.darwin-arm64.tar.gz" &>/dev/null
-					"$SUDO" tar -C /usr/local -xzf "/tmp/${version}.darwin-arm64.tar.gz" &>/dev/null
+					$SUDO tar -C /usr/local -xzf "/tmp/${version}.darwin-arm64.tar.gz" &>/dev/null
 				else
 					wget "https://dl.google.com/go/${version}.linux-arm64.tar.gz" -O "/tmp/${version}.linux-arm64.tar.gz" &>/dev/null
-					"$SUDO" tar -C /usr/local -xzf "/tmp/${version}.linux-arm64.tar.gz" &>/dev/null
+					$SUDO tar -C /usr/local -xzf "/tmp/${version}.linux-arm64.tar.gz" &>/dev/null
 				fi
 				;;
 			armv6l | armv7l)
 				wget "https://dl.google.com/go/${version}.linux-armv6l.tar.gz" -O "/tmp/${version}.linux-armv6l.tar.gz" &>/dev/null
-				"$SUDO" tar -C /usr/local -xzf "/tmp/${version}.linux-armv6l.tar.gz" &>/dev/null
+				$SUDO tar -C /usr/local -xzf "/tmp/${version}.linux-armv6l.tar.gz" &>/dev/null
 				;;
 			amd64 | x86_64)
 				if [[ $IS_MAC == "True" ]]; then
 					wget "https://dl.google.com/go/${version}.darwin-amd64.tar.gz" -O "/tmp/${version}.darwin-amd64.tar.gz" &>/dev/null
-					"$SUDO" tar -C /usr/local -xzf "/tmp/${version}.darwin-amd64.tar.gz" &>/dev/null
+					$SUDO tar -C /usr/local -xzf "/tmp/${version}.darwin-amd64.tar.gz" &>/dev/null
 				else
 					wget "https://dl.google.com/go/${version}.linux-amd64.tar.gz" -O "/tmp/${version}.linux-amd64.tar.gz" &>/dev/null
-					"$SUDO" tar -C /usr/local -xzf "/tmp/${version}.linux-amd64.tar.gz" &>/dev/null
+					$SUDO tar -C /usr/local -xzf "/tmp/${version}.linux-amd64.tar.gz" &>/dev/null
 				fi
 				;;
 			*)
@@ -403,7 +403,7 @@ function install_golang_version() {
 				;;
 			esac
 
-			"$SUDO" ln -sf /usr/local/go/bin/go /usr/local/bin/ 2>/dev/null
+			$SUDO ln -sf /usr/local/go/bin/go /usr/local/bin/ 2>/dev/null
 			export GOROOT=/usr/local/go
 			export GOPATH="${HOME}/go"
 			export PATH="$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH"
@@ -460,11 +460,11 @@ function install_system_packages() {
 
 # Function to install required packages for Debian-based systems
 function install_apt() {
-	"$SUDO" apt-get update -y &>/dev/null
-	"$SUDO" DEBIAN_FRONTEND="noninteractive" apt-get install -y python3 python3-pip python3-venv pipx python3-virtualenv build-essential gcc cmake ruby whois git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx medusa xvfb libxml2-utils procps bsdmainutils libdata-hexdump-perl &>/dev/null
+	$SUDO apt-get update -y &>/dev/null
+	$SUDO DEBIAN_FRONTEND="noninteractive" apt-get install -y python3 python3-pip python3-venv pipx python3-virtualenv build-essential gcc cmake ruby whois git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx medusa xvfb libxml2-utils procps bsdmainutils libdata-hexdump-perl &>/dev/null
 	# Move chromium browser dependencies (required by `nuclei -headless -id screenshot`) into a separate apt install command, and add a fallback for Ubuntu 24.04 (where `libasound2` is renamed to `libasound2t64`)
-	"$SUDO" DEBIAN_FRONTEND="noninteractive" apt-get install -y libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon-x11-0 libxcomposite-dev libxdamage1 libxrandr2 libgbm-dev libpangocairo-1.0-0 libasound2 &>/dev/null || \
-		"$SUDO" DEBIAN_FRONTEND="noninteractive" apt-get install -y libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon-x11-0 libxcomposite-dev libxdamage1 libxrandr2 libgbm-dev libpangocairo-1.0-0 libasound2t64 &>/dev/null
+	$SUDO DEBIAN_FRONTEND="noninteractive" apt-get install -y libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon-x11-0 libxcomposite-dev libxdamage1 libxrandr2 libgbm-dev libpangocairo-1.0-0 libasound2 &>/dev/null || \
+		$SUDO DEBIAN_FRONTEND="noninteractive" apt-get install -y libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon-x11-0 libxcomposite-dev libxdamage1 libxrandr2 libgbm-dev libpangocairo-1.0-0 libasound2t64 &>/dev/null
 	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
 	source "${HOME}/.cargo/env"
 	cargo install ripgen &>/dev/null
@@ -486,8 +486,8 @@ function install_brew() {
 
 # Function to install required packages for RedHat-based systems
 function install_yum() {
-	"$SUDO" yum groupinstall "Development Tools" -y &>/dev/null
-	"$SUDO" yum install -y python3 python3-pip gcc cmake ruby git curl libpcap whois wget pipx zip pv bind-utils openssl-devel libffi-devel libxml2-devel libxslt-devel zlib-devel nmap jq lynx medusa xorg-x11-server-xvfb &>/dev/null
+	$SUDO yum groupinstall "Development Tools" -y &>/dev/null
+	$SUDO yum install -y python3 python3-pip gcc cmake ruby git curl libpcap whois wget pipx zip pv bind-utils openssl-devel libffi-devel libxml2-devel libxslt-devel zlib-devel nmap jq lynx medusa xorg-x11-server-xvfb &>/dev/null
 	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
 	source "${HOME}/.cargo/env"
 	cargo install ripgen &>/dev/null
@@ -495,7 +495,7 @@ function install_yum() {
 
 # Function to install required packages for Arch-based systems
 function install_pacman() {
-	"$SUDO" pacman -Sy --noconfirm python python-pip base-devel gcc cmake ruby git curl libpcap python-pipx whois wget zip pv bind openssl libffi libxml2 libxslt zlib nmap jq lynx medusa xorg-server-xvfb &>/dev/null
+	$SUDO pacman -Sy --noconfirm python python-pip base-devel gcc cmake ruby git curl libpcap python-pipx whois wget zip pv bind openssl libffi libxml2 libxslt zlib nmap jq lynx medusa xorg-server-xvfb &>/dev/null
 	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
 	source "${HOME}/.cargo/env"
 	cargo install ripgen &>/dev/null
@@ -640,7 +640,7 @@ function initial_setup() {
 
 	# Strip all Go binaries and copy to /usr/local/bin
 	strip -s "${GOPATH}/bin/"* &>/dev/null || true
-	"$SUDO" cp "${GOPATH}/bin/"* /usr/local/bin/ &>/dev/null || true
+	$SUDO cp "${GOPATH}/bin/"* /usr/local/bin/ &>/dev/null || true
 
 	# Final reminders
 	echo -e "${yellow}Remember to set your API keys:\n- subfinder (${HOME}/.config/subfinder/provider-config.yaml)\n- GitHub (${HOME}/Tools/.github_tokens)\n- GitLab (${HOME}/Tools/.gitlab_tokens)\n- SSRF Server (COLLAB_SERVER in reconftw.cfg or env var)\n- Blind XSS Server (XSS_SERVER in reconftw.cfg or env var)\n- notify (${HOME}/.config/notify/provider-config.yaml)\n- WHOISXML API (WHOISXML_API in reconftw.cfg or env var)\n${reset}"

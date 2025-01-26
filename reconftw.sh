@@ -3078,7 +3078,7 @@ function portscan() {
 		if [[ $PORTSCAN_ACTIVE == true ]]; then
 			if [[ $AXIOM != true ]]; then
 				if [[ -s ".tmp/ips_nocdn.txt" ]]; then
-					"$SUDO" nmap $PORTSCAN_ACTIVE_OPTIONS -iL .tmp/ips_nocdn.txt -oA hosts/portscan_active 2>>"$LOGFILE" >/dev/null
+					$SUDO nmap $PORTSCAN_ACTIVE_OPTIONS -iL .tmp/ips_nocdn.txt -oA hosts/portscan_active 2>>"$LOGFILE" >/dev/null
 				fi
 			else
 				if [[ -s ".tmp/ips_nocdn.txt" ]]; then
