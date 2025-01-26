@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-# Enable strict error handling
-#IFS=$'\n\t'
-
 # Load main configuration
 CONFIG_FILE="./reconftw.cfg"
 
@@ -129,7 +126,7 @@ declare -A repos=(
 # Function to display the banner
 function banner() {
 	tput clear
-	cat <<"EOF"
+	cat <<EOF
 
   ██▀███  ▓█████  ▄████▄   ▒█████   ███▄    █   █████▒▄▄▄█████▓ █     █░
  ▓██ ▒ ██▒▓█   ▀ ▒██▀ ▀█  ▒██▒  ██▒ ██ ▀█   █ ▓██   ▒ ▓  ██▒ ▓▒▓█░ █ ░█░
