@@ -138,7 +138,7 @@ function banner() {
    ░░   ░    ░   ░        ░ ░ ░ ▒     ░   ░ ░  ░ ░      ░        ░   ░
     ░        ░  ░░ ░          ░ ░           ░                      ░
 
-                 ${reconftw_version}                                         by @six2dez
+ ${reconftw_version}                                         by @six2dez
 
 EOF
 }
