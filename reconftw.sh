@@ -3924,20 +3924,14 @@ function wordlist_gen() {
 		# Ensure url_extract_tmp.txt exists and is not empty
 		if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
 			# Define patterns for keys and values
-			patterns=("keys" "values")
-
-			for pattern in "${patterns[@]}"; do
-				output_file="webs/dict_${pattern}.txt"
-				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Extracting ${pattern}...${reset}\n"
-
-				if [[ $pattern == "keys" || $pattern == "values" ]]; then
-					unfurl -u "$pattern" ".tmp/url_extract_tmp.txt" 2>>"$LOGFILE" |
+			unfurl -u keys ".tmp/url_extract_tmp.txt" 2>>"$LOGFILE" |
 						sed 's/[][]//g' | sed 's/[#]//g' | sed 's/[}{]//g' |
-						anew -q "$output_file"
-				fi
-			done
+						anew -q webs/dict_keys.txt
 
-			# Extract words by removing punctuation
+			unfurl -u values ".tmp/url_extract_tmp.txt" 2>>"$LOGFILE" |
+						sed 's/[][]//g' | sed 's/[#]//g' | sed 's/[}{]//g' |
+						anew -q webs/dict_values.txt
+
 			printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Extracting words...${reset}\n"
 			tr "[:punct:]" "\n" <".tmp/url_extract_tmp.txt" | anew -q "webs/dict_words.txt"
 		fi
