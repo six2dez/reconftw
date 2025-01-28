@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # Welcome to reconFTW main script
 #	 ██▀███  ▓█████  ▄████▄   ▒█████   ███▄    █   █████▒▄▄▄█████▓ █     █░
@@ -336,7 +336,7 @@ function github_dorks() {
 }
 
 function github_repos() {
-	mkdir -p .tmp
+	mkdir -p osint
 
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GITHUB_REPOS == true ]] && [[ $OSINT == true ]]; then
 		start_func "${FUNCNAME[0]}" "Github Repos analysis in process"
@@ -1090,6 +1090,8 @@ function sub_tls() {
 				return 1
 			fi
 		fi
+
+		touch .tmp/subdomains_tlsx_resolved.txt
 
 		if ! NUMOFLINES=$(anew subdomains/subdomains.txt <.tmp/subdomains_tlsx_resolved.txt | sed '/^$/d' | wc -l); then
 			printf "%b[!] Counting new subdomains failed.%b\n" "$bred" "$reset"
@@ -2643,6 +2645,8 @@ function webprobe_simple() {
 			fi
 		fi
 
+		touch .tmp/probed_tmp.txt
+
 		# Count new websites
 		if ! NUMOFLINES=$(anew webs/webs.txt <.tmp/probed_tmp.txt 2>/dev/null | sed '/^$/d' | wc -l); then
 			printf "%b[!] Failed to count new websites.%b\n" "$bred" "$reset"
@@ -3092,7 +3096,6 @@ function portscan() {
 			nmapurls <hosts/portscan_active.xml 2>>"$LOGFILE" | anew -q hosts/webs.txt
 		fi
 
-
 		if [[ $FARADAY == true ]]; then
 			# Check if the Faraday server is running
 			if ! faraday-cli status 2>>"$LOGFILE" >/dev/null; then
@@ -3103,7 +3106,6 @@ function portscan() {
 				fi
 			fi
 		fi
-
 
 		if [[ -s "hosts/webs.txt" ]]; then
 			if ! NUMOFLINES=$(wc -l <hosts/webs.txt); then
@@ -3379,32 +3381,29 @@ function fuzz() {
 				for sub in $(cat webs/webs_all.txt); do
 					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
 
-					pushd "${tools}/ffufPostprocessing" >/dev/null || {
-						echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
-					}
-					./ffufPostprocessing -result-file $dir/.tmp/fuzzing/${sub_out}.json -overwrite-result-file 2>>"$LOGFILE" >/dev/null
-					popd >/dev/null || {
-						echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
-					}
+#					pushd "${tools}/ffufPostprocessing" >/dev/null || {
+#						echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
+#					}
+#					./ffufPostprocessing -result-file $dir/.tmp/fuzzing/${sub_out}.json -overwrite-result-file 2>>"$LOGFILE" >/dev/null
+#					popd >/dev/null || {
+#						echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
+#					}
 
 					[ -s "$dir/.tmp/fuzzing/${sub_out}.json" ] && cat $dir/.tmp/fuzzing/${sub_out}.json | jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' | sort -k1 | anew -q $dir/fuzzing/${sub_out}.txt
 				done
 				find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | sort -k1 | anew -q $dir/fuzzing/fuzzing_full.txt
 			else
-				axiom-exec "mkdir -p /home/op/lists/seclists/Discovery/Web-Content/" &>/dev/null
-				axiom-exec "wget -q -O - ${fuzzing_remote_list} > /home/op/lists/fuzz_wordlist.txt" &>/dev/null
-				axiom-exec "wget -q -O - ${fuzzing_remote_list} > /home/op/lists/seclists/Discovery/Web-Content/big.txt" &>/dev/null
-				axiom-scan webs/webs_all.txt -m ffuf_base -H "${HEADER}" $FFUF_FLAGS -s -maxtime $FFUF_MAXTIME -o $dir/.tmp/ffuf-content.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
-				pushd "${tools}/ffufPostprocessing" >/dev/null || {
-					echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
-				}
-				[ -s "$dir/.tmp/ffuf-content.json" ] && ./ffufPostprocessing -result-file $dir/.tmp/ffuf-content.json -overwrite-result-file 2>>"$LOGFILE" >/dev/null
-				popd >/dev/null || {
-					echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
-				}
+				axiom-scan webs/webs_all.txt -m ffuf -wL ${fuzzing_remote_list} -H "${HEADER}" $FFUF_FLAGS -s -maxtime $FFUF_MAXTIME -o $dir/.tmp/ffuf-content.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+#				pushd "${tools}/ffufPostprocessing" >/dev/null || {
+#					echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
+#				}
+#				[ -s "$dir/.tmp/ffuf-content.json" ] && ./ffufPostprocessing -result-file $dir/.tmp/ffuf-content.json -overwrite-result-file 2>>"$LOGFILE" >/dev/null
+#				popd >/dev/null || {
+#					echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
+#				}
 				for sub in $(cat webs/webs_all.txt); do
 					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-					[ -s "$dir/.tmp/ffuf-content.json" ] && cat .tmp/ffuf-content.json | jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' | grep $sub | sort -k1 | anew -q fuzzing/${sub_out}.txt
+					[ -s "$dir/.tmp/ffuf-content.json" ] && cat $dir/.tmp/ffuf-content.json 	 | grep $sub | sort -k1 | anew -q fuzzing/${sub_out}.txt
 				done
 				find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | sort -k1 | anew -q $dir/fuzzing/fuzzing_full.txt
 			fi
@@ -6122,7 +6121,7 @@ function help() {
 
 # macOS PATH initialization, thanks @0xtavian <3
 if [[ $OSTYPE == "darwin"* ]]; then
-	if ! command -v brew &> /dev/null; then
+	if ! command -v brew &>/dev/null; then
 		printf "\n%bBrew is not installed or not in the PATH.%b\n\n" "$bred" "$reset"
 		exit 1
 	fi

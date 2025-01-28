@@ -1,5 +1,18 @@
 name: tests
 
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  actions: read
+  checks: read
+  deployments: read
+  discussions: read
+  packages: read
+  repository-projects: read
+  security-events: read
+  statuses: read
+
 on: [push, pull_request]
 
 jobs:
@@ -10,7 +23,7 @@ jobs:
         os:
           - ubuntu-20.04
           - ubuntu-22.04
-          - ubuntu-24.04
+          - ubuntu-latest
 
     name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
