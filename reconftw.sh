@@ -3290,9 +3290,17 @@ function nuclei_check() {
 
 			for crit in "${severity_array[@]}"; do
 				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Nuclei Severity: $crit ${reset}\n\n"
-
 				# Run nuclei for each severity level
-				nuclei $NUCLEI_FLAGS -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" "$NUCLEI_EXTRA_ARGS" -j -o "nuclei_output/${crit}_json.txt" <.tmp/webs_nuclei.txt
+				nuclei "$NUCLEI_FLAGS" -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" "$NUCLEI_EXTRA_ARGS" -j -o "nuclei_output/${crit}_json.txt" <.tmp/webs_nuclei.txt
+
+				# Parse the JSON output and save the results to a text file
+				if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
+					jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' nuclei_output/${crit}_json.txt > nuclei_output/${crit}.txt
+					# Display the results if the output file exists and is not empty
+					if [[ -s "nuclei_output/${crit}.txt" ]]; then
+						cat "nuclei_output/${crit}.txt"
+					fi
+				fi
 			done
 			printf "\n\n"
 		else
@@ -3308,29 +3316,30 @@ function nuclei_check() {
 						--nuclei-templates "$NUCLEI_TEMPLATES_PATH" \
 						-severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" \
 						"$NUCLEI_EXTRA_ARGS" -j -o "nuclei_output/${crit}_json.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
-
 					# Parse the JSON output and save the results to a text file
-					jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' nuclei_output/${crit}_json.txt > nuclei_output/${crit}.txt
+					if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
+						jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' nuclei_output/${crit}_json.txt > nuclei_output/${crit}.txt
 
-					# Display the results if the output file exists and is not empty
-					if [[ -s "nuclei_output/${crit}.txt" ]]; then
-						cat "nuclei_output/${crit}.txt"
-					fi
-
-					# Faraday integration
-					if [[ $FARADAY == true ]]; then
-						# Check if the Faraday server is running
-						if ! faraday-cli status 2>>"$LOGFILE" >/dev/null; then
-							printf "%b[!] Faraday server is not running. Skipping Faraday integration.%b\n" "$bred" "$reset"
-						else
-							if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
-								faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei nuclei_output/${crit}_json.txt 2>>"$LOGFILE" >/dev/null
-							fi
+						# Display the results if the output file exists and is not empty
+						if [[ -s "nuclei_output/${crit}.txt" ]]; then
+							cat "nuclei_output/${crit}.txt"
 						fi
 					fi
-
 				done
 				printf "\n\n"
+			fi
+		fi
+
+
+		# Faraday integration
+		if [[ $FARADAY == true ]]; then
+			# Check if the Faraday server is running
+			if ! faraday-cli status 2>>"$LOGFILE" >/dev/null; then
+				printf "%b[!] Faraday server is not running. Skipping Faraday integration.%b\n" "$bred" "$reset"
+			else
+				if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
+					faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei nuclei_output/${crit}_json.txt 2>>"$LOGFILE" >/dev/null
+				fi
 			fi
 		fi
 
