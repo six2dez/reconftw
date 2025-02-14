@@ -217,7 +217,6 @@ function tools_installed() {
 		["subfinder"]="subfinder"
 		["ghauri"]="ghauri"
 		["hakip2host"]="hakip2host"
-		["gau"]="gau"
 		["crt"]="crt"
 		["gitleaks"]="gitleaks"
 		["trufflehog"]="trufflehog"

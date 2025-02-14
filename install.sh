@@ -67,7 +67,6 @@ declare -A gotools=(
 	["Web-Cache-Vulnerability-Scanner"]="go install -v github.com/Hackmanit/Web-Cache-Vulnerability-Scanner@latest"
 	["subfinder"]="go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest"
 	["hakip2host"]="go install -v github.com/hakluke/hakip2host@latest"
-	["gau"]="go install -v github.com/lc/gau/v2/cmd/gau@latest"
 	["mantra"]="go install -v github.com/Brosck/mantra@latest"
 	["crt"]="go install -v github.com/cemulus/crt@latest"
 	["s3scanner"]="go install -v github.com/sa7mon/s3scanner@latest"

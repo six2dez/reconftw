@@ -309,7 +309,6 @@ HTTPX_UNCOMMONPORTS_THREADS=100
 KATANA_THREADS=20
 BRUTESPRAY_THREADS=20
 BRUTESPRAY_CONCURRENCE=10
-GAU_THREADS=10
 DNSTAKE_THREADS=100
 DALFOX_THREADS=200
 PUREDNS_PUBLIC_LIMIT=0 # Set between 2000 - 10000 if your router blows up, 0 means unlimited
@@ -516,7 +515,7 @@ reset='\033[0m'
 - Web screenshoting ([nuclei](https://github.com/projectdiscovery/nuclei))
 - Web templates scanner ([nuclei](https://github.com/projectdiscovery/nuclei) and [nuclei geeknik](https://github.com/geeknik/the-nuclei-templates.git))
 - CMS Scanner ([CMSeeK](https://github.com/Tuhinshubhra/CMSeeK))
-- Url extraction ([gau](https://github.com/lc/gau),[waymore](https://github.com/xnl-h4ck3r/waymore), [katana](https://github.com/projectdiscovery/katana), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3) and [JSA](https://github.com/w9w/JSA))
+- Url extraction ([urlfinder](https://github.com/projectdiscovery/urlfinder), [katana](https://github.com/projectdiscovery/katana), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3) and [JSA](https://github.com/w9w/JSA))
 - URL patterns Search and filtering ([urless](https://github.com/xnl-h4ck3r/urless), [gf](https://github.com/tomnomnom/gf) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns))
 - Favicon Real IP ([fav-up](https://github.com/pielco11/fav-up))
 - Javascript analysis ([subjs](https://github.com/lc/subjs), [JSA](https://github.com/w9w/JSA), [xnLinkFinder](https://github.com/xnl-h4ck3r/xnLinkFinder), [getjswords](https://github.com/m4ll0k/BBTz), [mantra](https://github.com/MrEmpy/mantra), [jsluice](https://github.com/BishopFox/jsluice))
