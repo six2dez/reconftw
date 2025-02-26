@@ -3932,11 +3932,11 @@ function wordlist_gen() {
 		# Ensure url_extract_tmp.txt exists and is not empty
 		if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
 			# Define patterns for keys and values
-			unfurl -u keys ".tmp/url_extract_tmp.txt" 2>>"$LOGFILE" |
+			cat ".tmp/url_extract_tmp.txt" | unfurl -u keys 2>>"$LOGFILE" |
 						sed 's/[][]//g' | sed 's/[#]//g' | sed 's/[}{]//g' |
 						anew -q webs/dict_keys.txt
 
-			unfurl -u values ".tmp/url_extract_tmp.txt" 2>>"$LOGFILE" |
+			cat ".tmp/url_extract_tmp.txt" | unfurl -u values  2>>"$LOGFILE" |
 						sed 's/[][]//g' | sed 's/[#]//g' | sed 's/[}{]//g' |
 						anew -q webs/dict_values.txt
 
