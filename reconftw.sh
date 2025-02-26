@@ -2427,7 +2427,7 @@ function s3buckets() {
 		fi
 
 		if [[ -n $PERMUTATION_FLAG ]]; then
-			permutation_file="${PERMUTATION_FLAG#-p }"
+			permutation_file="${PERMUTATION_FLAG}"
 			if [[ -f $permutation_file ]]; then
 				printf "Permutations file exists\n" >>"$LOGFILE"
 			else
@@ -2449,7 +2449,7 @@ function s3buckets() {
 					printf "%b[!] Failed to cd to %s.%b\n" "$bred" "$tools/CloudHunter" "$reset"
 					return 1
 				fi
-				if ! "${tools}/CloudHunter/venv/bin/python3" ./cloudhunter.py ${PERMUTATION_FLAG#-p } -r ./resolvers.txt -t 50 "$url"; then
+				if ! "${tools}/CloudHunter/venv/bin/python3" ./cloudhunter.py ${PERMUTATION_FLAG} -r ./resolvers.txt -t 50 "$url"; then
 					printf "%b[!] CloudHunter command failed for URL %s.%b\n" "$bred" "$url" "$reset"
 				fi
 			) >>"$dir/subdomains/cloudhunter_open_buckets.txt" 2>>"$LOGFILE"
