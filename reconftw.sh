@@ -3389,26 +3389,13 @@ function fuzz() {
 				for sub in $(cat webs/webs_all.txt); do
 					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
 
-#					pushd "${tools}/ffufPostprocessing" >/dev/null || {
-#						echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
-#					}
-#					./ffufPostprocessing -result-file $dir/.tmp/fuzzing/${sub_out}.json -overwrite-result-file 2>>"$LOGFILE" >/dev/null
-#					popd >/dev/null || {
-#						echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
-#					}
-
 					[ -s "$dir/.tmp/fuzzing/${sub_out}.json" ] && cat $dir/.tmp/fuzzing/${sub_out}.json | jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' | sort -k1 | anew -q $dir/fuzzing/${sub_out}.txt
 				done
 				find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | sort -k1 | anew -q $dir/fuzzing/fuzzing_full.txt
 			else
-				axiom-scan webs/webs_all.txt -m ffuf -wL ${fuzzing_remote_list} -H "${HEADER}" $FFUF_FLAGS -s -maxtime $FFUF_MAXTIME -o $dir/.tmp/ffuf-content.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
-#				pushd "${tools}/ffufPostprocessing" >/dev/null || {
-#					echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
-#				}
-#				[ -s "$dir/.tmp/ffuf-content.json" ] && ./ffufPostprocessing -result-file $dir/.tmp/ffuf-content.json -overwrite-result-file 2>>"$LOGFILE" >/dev/null
-#				popd >/dev/null || {
-#					echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
-#				}
+				wget -q -O - ${fuzzing_remote_list} > .tmp/fuzzing_remote_list.txt
+				axiom-scan webs/webs_all.txt -m ffuf -wL .tmp/fuzzing_remote_list.txt -H "${HEADER}" $FFUF_FLAGS -s -maxtime $FFUF_MAXTIME -o $dir/.tmp/ffuf-content.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+
 				for sub in $(cat webs/webs_all.txt); do
 					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
 					[ -s "$dir/.tmp/ffuf-content.json" ] && cat $dir/.tmp/ffuf-content.json 	 | grep $sub | sort -k1 | anew -q fuzzing/${sub_out}.txt
