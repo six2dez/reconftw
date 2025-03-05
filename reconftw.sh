@@ -3797,6 +3797,8 @@ function jschecks() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $JSCHECKS == true ]]; then
 		start_func "${FUNCNAME[0]}" "JavaScript Scan"
 
+		[[ ! -s ".tmp/url_extract_js.txt" ]] && cat js/url_extract_js.txt | anew -q .tmp/url_extract_js.txt
+
 		if [[ -s ".tmp/url_extract_js.txt" ]]; then
 
 			printf "%bRunning: Fetching URLs 1/6%b\n" "$yellow" "$reset"
@@ -3890,6 +3892,7 @@ function jschecks() {
 			fi
 			end_func "Results are saved in $domain/js folder" "${FUNCNAME[0]}"
 		fi
+		end_func "No JS files to process" "${FUNCNAME[0]}"
 	else
 		if [[ $JSCHECKS == false ]]; then
 			printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
