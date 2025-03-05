@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # Welcome to reconFTW main script
 #	 ██▀███  ▓█████  ▄████▄   ▒█████   ███▄    █   █████▒▄▄▄█████▓ █     █░
@@ -120,10 +120,14 @@ function tools_installed() {
 	# Define tools and their paths/commands
 	declare -A tools_files=(
 		["dorks_hunter"]="${tools}/dorks_hunter/dorks_hunter.py"
+		["dorks_hunter_python"]="${tools}/dorks_hunter/venv/bin/python3"
 		["fav-up"]="${tools}/fav-up/favUp.py"
+		["fav-up_python"]="${tools}/fav-up/venv/bin/python3"
 		["Corsy"]="${tools}/Corsy/corsy.py"
-		["testssl"]="${tools}/testssl.sh/testssl.sh"
+		["Corsy_python"]="${tools}/Corsy/venv/bin/python3"
+		["testssl.sh"]="${tools}/testssl.sh/testssl.sh"
 		["CMSeeK"]="${tools}/CMSeeK/cmseek.py"
+		["CMSeeK_python"]="${tools}/CMSeeK/venv/bin/python3"
 		["OneListForAll"]="$fuzz_wordlist"
 		["lfi_wordlist"]="$lfi_wordlist"
 		["ssti_wordlist"]="$ssti_wordlist"
@@ -131,21 +135,29 @@ function tools_installed() {
 		["subs_wordlist_big"]="$subs_wordlist_big"
 		["resolvers"]="$resolvers"
 		["resolvers_trusted"]="$resolvers_trusted"
-		["commix"]="${tools}/commix/commix.py"
 		["getjswords"]="${tools}/getjswords.py"
 		["JSA"]="${tools}/JSA/jsa.py"
+		["JSA_python"]="${tools}/JSA/venv/bin/python3"
 		["CloudHunter"]="${tools}/CloudHunter/cloudhunter.py"
+		["CloudHunter_python"]="${tools}/CloudHunter/venv/bin/python3"
 		["nmap-parse-output"]="${tools}/ultimate-nmap-parser/ultimate-nmap-parser.sh"
 		["pydictor"]="${tools}/pydictor/pydictor.py"
-		["urless"]="${tools}/urless/urless/urless.py"
 		["smuggler"]="${tools}/smuggler/smuggler.py"
 		["regulator"]="${tools}/regulator/main.py"
+		["regulator_python"]="${tools}/regulator/venv/bin/python3"
 		["nomore403"]="${tools}/nomore403/nomore403"
 		["ffufPostprocessing"]="${tools}/ffufPostprocessing/ffufPostprocessing"
 		["misconfig-mapper"]="${tools}/misconfig-mapper/misconfig-mapper"
 		["spoofy"]="${tools}/Spoofy/spoofy.py"
+		["spoofy_python"]="${tools}/Spoofy/venv/bin/python3"
 		["swaggerspy"]="${tools}/SwaggerSpy/swaggerspy.py"
+		["swaggerspy_python"]="${tools}/SwaggerSpy/venv/bin/python3"
 		["LeakSearch"]="${tools}/LeakSearch/LeakSearch.py"
+		["LeakSearch_python"]="${tools}/LeakSearch/venv/bin/python3"
+		["Oralyzer"]="${tools}/Oralyzer/oralyzer.py"
+		["Oralyzer_python"]="${tools}/Oralyzer/venv/bin/python3"
+		["msftrecon"]="${tools}/msftrecon/msftrecon/msftrecon.py"
+		["msftrecon_python"]="${tools}/msftrecon/venv/bin/python3"
 	)
 
 	declare -A tools_folders=(
@@ -154,6 +166,13 @@ function tools_installed() {
 	)
 
 	declare -A tools_commands=(
+		["python3"]="python3"
+		["curl"]="curl"
+		["wget"]="wget"
+		["zip"]="zip"
+		["nmap"]="nmap"
+		["dig"]="dig"
+		["timeout"]="timeout"
 		["brutespray"]="brutespray"
 		["xnLinkFinder"]="xnLinkFinder"
 		["urlfinder"]="urlfinder"
@@ -200,7 +219,6 @@ function tools_installed() {
 		["subfinder"]="subfinder"
 		["ghauri"]="ghauri"
 		["hakip2host"]="hakip2host"
-		["gau"]="gau"
 		["crt"]="crt"
 		["gitleaks"]="gitleaks"
 		["trufflehog"]="trufflehog"
@@ -212,6 +230,9 @@ function tools_installed() {
 		["sns"]="sns"
 		["sourcemapper"]="sourcemapper"
 		["jsluice"]="jsluice"
+		["commix"]="commix"
+		["urless"]="urless"
+		["dnstake"]="dnstake"
 	)
 
 	# Check for tool files
@@ -256,6 +277,10 @@ function tools_installed() {
 
 	printf "%b[%s] Tools check finished%b\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
 	printf "%b#######################################################################\n%b" "$bgreen" "$reset"
+
+	if [[ $CHECK_TOOLS_OR_EXIT == true && $all_installed != true ]]; then
+		exit 2
+	fi
 }
 
 #####################################################################cc##########################################
@@ -268,7 +293,7 @@ function google_dorks() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GOOGLE_DORKS == true ]] && [[ $OSINT == true ]]; then
 		start_func "${FUNCNAME[0]}" "Running: Google Dorks in process"
 
-		python3 "${tools}/dorks_hunter/dorks_hunter.py" -d "$domain" -o "osint/dorks.txt"
+		"${tools}/dorks_hunter/venv/bin/python3" "${tools}/dorks_hunter/dorks_hunter.py" -d "$domain" -o "osint/dorks.txt"
 		end_func "Results are saved in $domain/osint/dorks.txt" "${FUNCNAME[0]}"
 	else
 		if [[ $GOOGLE_DORKS == false ]] || [[ $OSINT == false ]]; then
@@ -312,7 +337,7 @@ function github_dorks() {
 }
 
 function github_repos() {
-	mkdir -p .tmp
+	mkdir -p osint
 
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GITHUB_REPOS == true ]] && [[ $OSINT == true ]]; then
 		start_func "${FUNCNAME[0]}" "Github Repos analysis in process"
@@ -452,7 +477,7 @@ function apileaks() {
 		fi
 
 		# Run swaggerspy.py and handle errors
-		python3 swaggerspy.py "$domain" 2>>"$LOGFILE" | grep -i "[*]\|URL" >"${dir}/osint/swagger_leaks.txt"
+		"${tools}/SwaggerSpy/venv/bin/python3" swaggerspy.py "$domain" 2>>"$LOGFILE" | grep -i "[*]\|URL" >"${dir}/osint/swagger_leaks.txt"
 
 		# Return to the previous directory
 		if ! popd >/dev/null; then
@@ -506,7 +531,7 @@ function emails() {
 		fi
 
 		# Run LeakSearch.py and handle errors
-		python3 LeakSearch.py -k "$domain" -o "${dir}/.tmp/passwords.txt" 1>>"$LOGFILE"
+		"${tools}/LeakSearch/venv/bin/python3" LeakSearch.py -k "$domain" -o "${dir}/.tmp/passwords.txt" 1>>"$LOGFILE"
 
 		# Return to the previous directory
 		if ! popd >/dev/null; then
@@ -545,12 +570,7 @@ function domain_info() {
 		# Run whois command and check for errors
 		whois -H "$domain" >"osint/domain_info_general.txt"
 
-		# Fetch tenant info using curl and check for errors
-		curl -s "https://aadinternals.azurewebsites.net/api/tenantinfo?domainName=${domain}" \
-			-H "Origin: https://aadinternals.com" \
-			-H "Referer: https://aadinternals.com/" \
-			-H "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" |
-			jq -r '.domains[].name' >"osint/azure_tenant_domains.txt"
+		msftrecon -d ${domain} > osint/azure_tenant_domains.txt
 
 		end_func "Results are saved in ${domain}/osint/domain_info_[general/azure_tenant_domains].txt" "${FUNCNAME[0]}"
 
@@ -630,7 +650,7 @@ function spoof() {
 		fi
 
 		# Run spoofy.py and handle errors
-		./spoofy.py -d "$domain" >"${dir}/osint/spoof.txt"
+		"${tools}/Spoofy/venv/bin/python3" spoofy.py -d "$domain" >"${dir}/osint/spoof.txt"
 
 		# Return to the previous directory
 		if ! popd >/dev/null; then
@@ -1066,6 +1086,8 @@ function sub_tls() {
 				return 1
 			fi
 		fi
+
+		touch .tmp/subdomains_tlsx_resolved.txt
 
 		if ! NUMOFLINES=$(anew subdomains/subdomains.txt <.tmp/subdomains_tlsx_resolved.txt | sed '/^$/d' | wc -l); then
 			printf "%b[!] Counting new subdomains failed.%b\n" "$bred" "$reset"
@@ -1793,7 +1815,7 @@ function sub_regex_permut() {
 		fi
 
 		# Run the main.py script
-		python3 main.py -t "$domain" -f "${dir}/subdomains/subdomains.txt" -o "${dir}/.tmp/${domain}.brute" \
+		"${tools}/regulator/venv/bin/python3" main.py -t "$domain" -f "${dir}/subdomains/subdomains.txt" -o "${dir}/.tmp/${domain}.brute" \
 			2>>"$LOGFILE" >/dev/null
 
 		# Return to the previous directory
@@ -2208,14 +2230,19 @@ function subtakeover() {
 			fi
 			cat subdomains/subdomains.txt webs/webs_all.txt 2>/dev/null | nuclei -silent -nh -tags takeover \
 				-severity info,low,medium,high,critical -retries 3 -rl "$NUCLEI_RATELIMIT" \
-				-t "${NUCLEI_TEMPLATES_PATH}" -o .tmp/tko.txt
+				-t "${NUCLEI_TEMPLATES_PATH}" -j -o .tmp/tko_json.txt 2>>"$LOGFILE" >/dev/null
 		else
 			cat subdomains/subdomains.txt webs/webs_all.txt 2>>"$LOGFILE" | sed '/^$/d' | anew -q .tmp/webs_subs.txt
 			if [[ -s ".tmp/webs_subs.txt" ]]; then
 				axiom-scan .tmp/webs_subs.txt -m nuclei --nuclei-templates "${NUCLEI_TEMPLATES_PATH}" \
 					-tags takeover -nh -severity info,low,medium,high,critical -retries 3 -rl "$NUCLEI_RATELIMIT" \
-					-t "${NUCLEI_TEMPLATES_PATH}" -o .tmp/tko.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+					-t "${NUCLEI_TEMPLATES_PATH}" -j -o .tmp/tko_json.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 			fi
+		fi
+
+		# Convert JSON to text
+		if [[ -s ".tmp/tko_json.txt" ]]; then
+			jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' .tmp/tko_json.txt > .tmp/tko.txt
 		fi
 
 		# DNS Takeover
@@ -2238,6 +2265,16 @@ function subtakeover() {
 
 		if [[ $NUMOFLINES -gt 0 ]]; then
 			notification "${NUMOFLINES} new possible takeovers found" info
+		fi
+
+		if [[ $FARADAY == true ]]; then
+			if ! faraday-cli status 2>>"$LOGFILE" >/dev/null; then
+				printf "%b[!] Faraday server is not running. Skipping Faraday integration.%b\n" "$bred" "$reset"
+			else
+				if [[ -s ".tmp/tko_json.txt" ]]; then
+					faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei .tmp/tko_json.txt 2>>"$LOGFILE" >/dev/null
+				fi
+			fi
 		fi
 
 		end_func "Results are saved in $domain/webs/takeover.txt" "${FUNCNAME[0]}"
@@ -2377,7 +2414,7 @@ function s3buckets() {
 		esac
 
 		# Debug: Print the full CloudHunter command
-		printf "CloudHunter command: python3 %s/cloudhunter.py %s -r %s/resolvers.txt -t 50 [URL]\n" "$tools/CloudHunter" "$PERMUTATION_FLAG" "$tools/CloudHunter" >>"$LOGFILE"
+		printf "CloudHunter command: %s/venv/bin/python3 %s/cloudhunter.py %s -r %s/resolvers.txt -t 50 [URL]\n" "$tools/CloudHunter" "$tools/CloudHunter" "$PERMUTATION_FLAG" "$tools/CloudHunter" >>"$LOGFILE"
 
 		# Debug: Check if files exist
 		if [[ -f "$tools/CloudHunter/cloudhunter.py" ]]; then
@@ -2387,7 +2424,7 @@ function s3buckets() {
 		fi
 
 		if [[ -n $PERMUTATION_FLAG ]]; then
-			permutation_file="${PERMUTATION_FLAG#-p }"
+			permutation_file="${PERMUTATION_FLAG}"
 			if [[ -f $permutation_file ]]; then
 				printf "Permutations file exists\n" >>"$LOGFILE"
 			else
@@ -2409,7 +2446,7 @@ function s3buckets() {
 					printf "%b[!] Failed to cd to %s.%b\n" "$bred" "$tools/CloudHunter" "$reset"
 					return 1
 				fi
-				if ! python3 ./cloudhunter.py ${PERMUTATION_FLAG#-p } -r ./resolvers.txt -t 50 "$url"; then
+				if ! "${tools}/CloudHunter/venv/bin/python3" ./cloudhunter.py ${PERMUTATION_FLAG} -r ./resolvers.txt -t 50 "$url"; then
 					printf "%b[!] CloudHunter command failed for URL %s.%b\n" "$bred" "$url" "$reset"
 				fi
 			) >>"$dir/subdomains/cloudhunter_open_buckets.txt" 2>>"$LOGFILE"
@@ -2603,6 +2640,8 @@ function webprobe_simple() {
 				printf "%b[!] Failed to delete out-of-scope entries.%b\n" "$bred" "$reset"
 			fi
 		fi
+
+		touch .tmp/probed_tmp.txt
 
 		# Count new websites
 		if ! NUMOFLINES=$(anew webs/webs.txt <.tmp/probed_tmp.txt 2>/dev/null | sed '/^$/d' | wc -l); then
@@ -2840,9 +2879,10 @@ function virtualhosts() {
 					-u _target_ -of json -o _output_/_cleantarget_.json" \
 					-o .tmp/virtualhosts 2>>"$LOGFILE" >/dev/null
 			else
-				# Run axiom-scan with nuclei-screenshots module
-				axiom-scan webs/webs_all.txt -m nuclei-screenshots \
-					-o virtualhosts "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+				# Run axiom-scan with ffuf module
+				axiom-scan webs/webs_all.txt -m ffuf -ac -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} \
+					-H "${HEADER}" -H "Host: FUZZ._cleantarget_" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} \
+					-o .tmp/virtualhosts "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
 			fi
 
 			# Process ffuf output
@@ -2908,7 +2948,7 @@ function favicon() {
 		fi
 
 		# Run the favicon IP lookup tool
-		python3 favUp.py -w "$domain" -sc -o favicontest.json 2>>"$LOGFILE" >/dev/null
+		"${tools}/fav-up/venv/bin/python3" "${tools}/fav-up/favUp.py" -w "$domain" -sc -o favicontest.json 2>>"$LOGFILE" >/dev/null
 
 		# Process the results if favicontest.json exists and is not empty
 		if [[ -s "favicontest.json" ]]; then
@@ -3038,7 +3078,7 @@ function portscan() {
 		if [[ $PORTSCAN_ACTIVE == true ]]; then
 			if [[ $AXIOM != true ]]; then
 				if [[ -s ".tmp/ips_nocdn.txt" ]]; then
-					"$SUDO" nmap $PORTSCAN_ACTIVE_OPTIONS -iL .tmp/ips_nocdn.txt -oA hosts/portscan_active 2>>"$LOGFILE" >/dev/null
+					$SUDO nmap $PORTSCAN_ACTIVE_OPTIONS -iL .tmp/ips_nocdn.txt -oA hosts/portscan_active 2>>"$LOGFILE" >/dev/null
 				fi
 			else
 				if [[ -s ".tmp/ips_nocdn.txt" ]]; then
@@ -3050,6 +3090,17 @@ function portscan() {
 
 		if [[ -s "hosts/portscan_active.xml" ]]; then
 			nmapurls <hosts/portscan_active.xml 2>>"$LOGFILE" | anew -q hosts/webs.txt
+		fi
+
+		if [[ $FARADAY == true ]]; then
+			# Check if the Faraday server is running
+			if ! faraday-cli status 2>>"$LOGFILE" >/dev/null; then
+				printf "%b[!] Faraday server is not running. Skipping Faraday integration.%b\n" "$bred" "$reset"
+			else
+				if [[ -s "hosts/portscan_active.xml" ]]; then
+					faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nmap hosts/portscan_active.xml 2>>"$LOGFILE" >/dev/null
+				fi
+			fi
 		fi
 
 		if [[ -s "hosts/webs.txt" ]]; then
@@ -3235,9 +3286,17 @@ function nuclei_check() {
 
 			for crit in "${severity_array[@]}"; do
 				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Nuclei Severity: $crit ${reset}\n\n"
-
 				# Run nuclei for each severity level
-				nuclei $NUCLEI_FLAGS -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" "$NUCLEI_EXTRA_ARGS" -o "nuclei_output/${crit}.txt" <.tmp/webs_nuclei.txt
+				nuclei "$NUCLEI_FLAGS" -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" "$NUCLEI_EXTRA_ARGS" -j -o "nuclei_output/${crit}_json.txt" <.tmp/webs_nuclei.txt
+
+				# Parse the JSON output and save the results to a text file
+				if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
+					jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' nuclei_output/${crit}_json.txt > nuclei_output/${crit}.txt
+					# Display the results if the output file exists and is not empty
+					if [[ -s "nuclei_output/${crit}.txt" ]]; then
+						cat "nuclei_output/${crit}.txt"
+					fi
+				fi
 			done
 			printf "\n\n"
 		else
@@ -3252,14 +3311,31 @@ function nuclei_check() {
 					axiom-scan .tmp/webs_nuclei.txt -m nuclei \
 						--nuclei-templates "$NUCLEI_TEMPLATES_PATH" \
 						-severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" \
-						"$NUCLEI_EXTRA_ARGS" -o "nuclei_output/${crit}.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+						"$NUCLEI_EXTRA_ARGS" -j -o "nuclei_output/${crit}_json.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+					# Parse the JSON output and save the results to a text file
+					if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
+						jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' nuclei_output/${crit}_json.txt > nuclei_output/${crit}.txt
 
-					# Display the results if the output file exists and is not empty
-					if [[ -s "nuclei_output/${crit}.txt" ]]; then
-						cat "nuclei_output/${crit}.txt"
+						# Display the results if the output file exists and is not empty
+						if [[ -s "nuclei_output/${crit}.txt" ]]; then
+							cat "nuclei_output/${crit}.txt"
+						fi
 					fi
 				done
 				printf "\n\n"
+			fi
+		fi
+
+
+		# Faraday integration
+		if [[ $FARADAY == true ]]; then
+			# Check if the Faraday server is running
+			if ! faraday-cli status 2>>"$LOGFILE" >/dev/null; then
+				printf "%b[!] Faraday server is not running. Skipping Faraday integration.%b\n" "$bred" "$reset"
+			else
+				if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
+					faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei nuclei_output/${crit}_json.txt 2>>"$LOGFILE" >/dev/null
+				fi
 			fi
 		fi
 
@@ -3281,7 +3357,7 @@ function nuclei_check() {
 function fuzz() {
 
 	# Create necessary directories
-	mkdir -p .tmp/fuzzing webs fuzzing nuclei_output
+	mkdir -p .tmp/fuzzing webs fuzzing
 
 	# Check if the function should run
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $FUZZ == true ]] &&
@@ -3310,32 +3386,16 @@ function fuzz() {
 				for sub in $(cat webs/webs_all.txt); do
 					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
 
-					pushd "${tools}/ffufPostprocessing" >/dev/null || {
-						echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
-					}
-					./ffufPostprocessing -result-file $dir/.tmp/fuzzing/${sub_out}.json -overwrite-result-file 2>>"$LOGFILE" >/dev/null
-					popd >/dev/null || {
-						echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
-					}
-
 					[ -s "$dir/.tmp/fuzzing/${sub_out}.json" ] && cat $dir/.tmp/fuzzing/${sub_out}.json | jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' | sort -k1 | anew -q $dir/fuzzing/${sub_out}.txt
 				done
 				find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | sort -k1 | anew -q $dir/fuzzing/fuzzing_full.txt
 			else
-				axiom-exec "mkdir -p /home/op/lists/seclists/Discovery/Web-Content/" &>/dev/null
-				axiom-exec "wget -q -O - ${fuzzing_remote_list} > /home/op/lists/fuzz_wordlist.txt" &>/dev/null
-				axiom-exec "wget -q -O - ${fuzzing_remote_list} > /home/op/lists/seclists/Discovery/Web-Content/big.txt" &>/dev/null
-				axiom-scan webs/webs_all.txt -m ffuf_base -H "${HEADER}" $FFUF_FLAGS -s -maxtime $FFUF_MAXTIME -o $dir/.tmp/ffuf-content.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
-				pushd "${tools}/ffufPostprocessing" >/dev/null || {
-					echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
-				}
-				[ -s "$dir/.tmp/ffuf-content.json" ] && ./ffufPostprocessing -result-file $dir/.tmp/ffuf-content.json -overwrite-result-file 2>>"$LOGFILE" >/dev/null
-				popd >/dev/null || {
-					echo "Failed to popd in ${FUNCNAME[0]} @ line ${LINENO}"
-				}
+				wget -q -O - ${fuzzing_remote_list} > .tmp/fuzzing_remote_list.txt
+				axiom-scan webs/webs_all.txt -m ffuf -wL .tmp/fuzzing_remote_list.txt -H "${HEADER}" $FFUF_FLAGS -s -maxtime $FFUF_MAXTIME -o $dir/.tmp/ffuf-content.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+
 				for sub in $(cat webs/webs_all.txt); do
 					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-					[ -s "$dir/.tmp/ffuf-content.json" ] && cat .tmp/ffuf-content.json | jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' | grep $sub | sort -k1 | anew -q fuzzing/${sub_out}.txt
+					[ -s "$dir/.tmp/ffuf-content.json" ] && cat $dir/.tmp/ffuf-content.json 	 | grep $sub | sort -k1 | anew -q fuzzing/${sub_out}.txt
 				done
 				find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | sort -k1 | anew -q $dir/fuzzing/fuzzing_full.txt
 			fi
@@ -3344,7 +3404,7 @@ function fuzz() {
 			end_func "No $domain/web/webs.txts file found, fuzzing skipped " ${FUNCNAME[0]}
 		fi
 
-		end_func "Results are saved in $domain/nuclei_output folder" "${FUNCNAME[0]}"
+		end_func "Results are saved in $domain/fuzzing folder" "${FUNCNAME[0]}"
 	else
 		if [[ $FUZZ == false ]]; then
 			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -3444,7 +3504,7 @@ function cms_scanner() {
 		fi
 
 		# Run CMSeeK with timeout
-		if ! timeout -k 1m "${CMSSCAN_TIMEOUT}s" python3 "${tools}/CMSeeK/cmseek.py" -l .tmp/cms.txt --batch -r &>>"$LOGFILE"; then
+		if ! timeout -k 1m "${CMSSCAN_TIMEOUT}s" "${tools}/CMSeeK/venv/bin/python3" "${tools}/CMSeeK/cmseek.py" -l .tmp/cms.txt --batch -r &>>"$LOGFILE"; then
 			exit_status=$?
 			if [[ ${exit_status} -eq 124 || ${exit_status} -eq 137 ]]; then
 				echo "TIMEOUT cmseek.py - investigate manually for $dir" >>"$LOGFILE"
@@ -3548,13 +3608,13 @@ function urlchecks() {
 				grep "$domain" .tmp/url_extract_tmp.txt | grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' | grep -aEi "\.js$" | anew -q .tmp/url_extract_js.txt
 				grep "$domain" .tmp/url_extract_tmp.txt | grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' | grep -aEi "\.js\.map$" | anew -q .tmp/url_extract_jsmap.txt
 				if [[ $DEEP == true ]] && [[ -s ".tmp/url_extract_js.txt" ]]; then
-					interlace -tL .tmp/url_extract_js.txt -threads 10 -c "python3 ${tools}/JSA/jsa.py -f _target_ | anew -q .tmp/url_extract_tmp.txt" &>/dev/null
+					interlace -tL .tmp/url_extract_js.txt -threads 10 -c "${tools}/JSA/venv/bin/python3 ${tools}/JSA/jsa.py -f _target_ | anew -q .tmp/url_extract_tmp.txt" &>/dev/null
 				fi
 
 				grep "$domain" .tmp/url_extract_tmp.txt | grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | anew -q .tmp/url_extract_tmp2.txt
 
 				if [[ -s ".tmp/url_extract_tmp2.txt" ]]; then
-					python3 "${tools}/urless/urless/urless.py" <.tmp/url_extract_tmp2.txt | anew -q .tmp/url_extract_uddup.txt 2>>"$LOGFILE" >/dev/null
+					urless <.tmp/url_extract_tmp2.txt | anew -q .tmp/url_extract_uddup.txt 2>>"$LOGFILE" >/dev/null
 				fi
 
 				if [[ -s ".tmp/url_extract_uddup.txt" ]]; then
@@ -3734,6 +3794,8 @@ function jschecks() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $JSCHECKS == true ]]; then
 		start_func "${FUNCNAME[0]}" "JavaScript Scan"
 
+		[[ ! -s ".tmp/url_extract_js.txt" ]] && cat js/url_extract_js.txt | anew -q .tmp/url_extract_js.txt
+
 		if [[ -s ".tmp/url_extract_js.txt" ]]; then
 
 			printf "%bRunning: Fetching URLs 1/6%b\n" "$yellow" "$reset"
@@ -3752,7 +3814,7 @@ function jschecks() {
 				grep -iE "\.js($|\?)" .tmp/subjslinks.txt | anew -q .tmp/url_extract_js.txt
 			fi
 
-			python3 "${tools}/urless/urless/urless.py" <.tmp/url_extract_js.txt |
+			urless <.tmp/url_extract_js.txt |
 				anew -q js/url_extract_js.txt 2>>"$LOGFILE" >/dev/null
 
 			printf "%bRunning: Resolving JS URLs 2/6%b\n" "$yellow" "$reset"
@@ -3807,7 +3869,7 @@ function jschecks() {
 			printf "%bRunning: Gathering secrets 5/6%b\n" "$yellow" "$reset"
 			if [[ -s "js/js_livelinks.txt" ]]; then
 				if [[ $AXIOM != true ]]; then
-					cat js/js_livelinks.txt | mantra -ua "$HEADER" -s -o js/js_secrets.txt 2>>"$LOGFILE" >/dev/null
+					cat js/js_livelinks.txt | mantra -ua "$HEADER" -s | anew -q js/js_secrets.txt 2>>"$LOGFILE" >/dev/null
 				else
 					axiom-scan js/js_livelinks.txt -m mantra -ua "$HEADER" -s -o js/js_secrets.txt "$AXIOM_EXTRA_ARGS" &>/dev/null
 				fi
@@ -3827,6 +3889,7 @@ function jschecks() {
 			fi
 			end_func "Results are saved in $domain/js folder" "${FUNCNAME[0]}"
 		fi
+		end_func "No JS files to process" "${FUNCNAME[0]}"
 	else
 		if [[ $JSCHECKS == false ]]; then
 			printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
@@ -3853,23 +3916,18 @@ function wordlist_gen() {
 
 		start_func "${FUNCNAME[0]}" "Wordlist Generation"
 
+		[[ -s ".tmp/url_extract_tmp.txt" ]] && cat webs/url_extract.txt | anew -q .tmp/url_extract_tmp.txt
 		# Ensure url_extract_tmp.txt exists and is not empty
 		if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
 			# Define patterns for keys and values
-			patterns=("keys" "values")
-
-			for pattern in "${patterns[@]}"; do
-				output_file="webs/dict_${pattern}.txt"
-				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Extracting ${pattern}...${reset}\n"
-
-				if [[ $pattern == "keys" || $pattern == "values" ]]; then
-					unfurl -u "$pattern" ".tmp/url_extract_tmp.txt" 2>>"$LOGFILE" |
+			cat ".tmp/url_extract_tmp.txt" | unfurl -u keys 2>>"$LOGFILE" |
 						sed 's/[][]//g' | sed 's/[#]//g' | sed 's/[}{]//g' |
-						anew -q "$output_file"
-				fi
-			done
+						anew -q webs/dict_keys.txt
 
-			# Extract words by removing punctuation
+			cat ".tmp/url_extract_tmp.txt" | unfurl -u values  2>>"$LOGFILE" |
+						sed 's/[][]//g' | sed 's/[#]//g' | sed 's/[}{]//g' |
+						anew -q webs/dict_values.txt
+
 			printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Extracting words...${reset}\n"
 			tr "[:punct:]" "\n" <".tmp/url_extract_tmp.txt" | anew -q "webs/dict_words.txt"
 		fi
@@ -4168,7 +4226,7 @@ function cors() {
 		# Proceed only if webs_all.txt exists and is non-empty
 		if [[ -s "webs/webs_all.txt" ]]; then
 			printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Corsy for CORS Scan${reset}\n\n"
-			python3 "${tools}/Corsy/corsy.py" -i "webs/webs_all.txt" -o "vulns/cors.txt" 2>>"$LOGFILE" >/dev/null
+			"${tools}/Corsy/venv/bin/python3" "${tools}/Corsy/corsy.py" -i "webs/webs_all.txt" -o "vulns/cors.txt" 2>>"$LOGFILE" >/dev/null
 		else
 			end_func "No webs/webs_all.txt file found, CORS Scan skipped." "${FUNCNAME[0]}"
 			return
@@ -4213,7 +4271,7 @@ function open_redirect() {
 			qsreplace FUZZ <"gf/redirect.txt" | sed '/FUZZ/!d' | anew -q ".tmp/tmp_redirect.txt"
 
 			# Run Oralyzer with the generated payloads
-			python3 "${tools}/Oralyzer/oralyzer.py" -l ".tmp/tmp_redirect.txt" -p "${tools}/Oralyzer/payloads.txt" >"vulns/redirect.txt" 2>>"$LOGFILE" >/dev/null
+			"${tools}/Oralyzer/venv/bin/python3" "${tools}/Oralyzer/oralyzer.py" -l ".tmp/tmp_redirect.txt" -p "${tools}/Oralyzer/payloads.txt" >"vulns/redirect.txt" 2>>"$LOGFILE" >/dev/null
 
 			# Remove ANSI color codes from the output
 			sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" "vulns/redirect.txt"
@@ -4638,7 +4696,7 @@ function command_injection() {
 				# Run Commix if enabled
 				if [[ $SQLMAP == true ]]; then
 					printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Commix for Command Injection Checks${reset}\n\n"
-					python3 "${tools}/commix/commix.py" --batch -m ".tmp/tmp_rce.txt" --output-dir "vulns/command_injection" 2>>"$LOGFILE" >/dev/null
+					commix --batch -m ".tmp/tmp_rce.txt" --output-dir "vulns/command_injection" 2>>"$LOGFILE" >/dev/null
 				fi
 
 				# Additional tools can be integrated here (e.g., Ghauri, sqlmap)
@@ -4955,7 +5013,7 @@ function fuzzparams() {
 				fi
 
 				# Execute Nuclei with the fuzzing templates
-				nuclei -silent -retries 3 -rl "$NUCLEI_RATELIMIT" -t ${NUCLEI_FUZZING_TEMPLATES_PATH} -dast -o ".tmp/fuzzparams.txt" <"webs/url_extract_nodupes.txt" 2>>"$LOGFILE"
+				nuclei -silent -retries 3 -rl "$NUCLEI_RATELIMIT" -t ${NUCLEI_FUZZING_TEMPLATES_PATH} -dast -j -o ".tmp/fuzzparams_json.txt" <"webs/url_extract_nodupes.txt" 2>>"$LOGFILE"
 
 			else
 				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Axiom with Nuclei${reset}\n\n"
@@ -4966,12 +5024,27 @@ function fuzzparams() {
 				fi
 
 				# Execute Axiom scan with Nuclei
-				axiom-scan "webs/url_extract_nodupes.txt" -m nuclei -nh -retries 3 -w "/home/op/fuzzing-templates" -rl "$NUCLEI_RATELIMIT" -dast -o ".tmp/fuzzparams.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+				axiom-scan "webs/url_extract_nodupes.txt" -m nuclei -nh -retries 3 -w "/home/op/fuzzing-templates" -rl "$NUCLEI_RATELIMIT" -dast -j -o ".tmp/fuzzparams_json.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 			fi
+
+			# Convert JSON output to text
+			jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' .tmp/fuzzparams_json.txt > .tmp/fuzzparams.txt
 
 			# Append unique results to vulns/fuzzparams.txt
 			if [[ -s ".tmp/fuzzparams.txt" ]]; then
 				cat ".tmp/fuzzparams.txt" | anew -q "vulns/fuzzparams.txt"
+			fi
+
+			# Faraday integration
+			if [[ $FARADAY == true ]]; then
+				# Check if the Faraday server is running
+				if ! faraday-cli status 2>>"$LOGFILE" >/dev/null; then
+					printf "%b[!] Faraday server is not running. Skipping Faraday integration.%b\n" "$bred" "$reset"
+				else
+					if [[ -s ".tmp/fuzzparams_json.txt" ]]; then
+						faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei .tmp/fuzzparams_json.txt 2>>"$LOGFILE" >/dev/null
+					fi
+				fi
 			fi
 
 			end_func "Results are saved in vulns/fuzzparams.txt" "${FUNCNAME[0]}"
@@ -5397,6 +5470,38 @@ function end() {
 
 	if [[ $REMOVELOG == true ]]; then
 		rm -rf $dir/.log
+	fi
+
+	if [[ $FARADAY == true ]]; then
+		if ! faraday-cli status 2>>"$LOGFILE" >/dev/null; then
+			printf "%b[!] Faraday server is not running. Skipping Faraday integration.%b\n" "$bred" "$reset"
+		else
+			if [[ -s ".tmp/tko_json.txt" ]]; then
+				faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei .tmp/tko_json.txt# 2>>"$LOGFILE" >/dev/null
+			fi
+			if [[ -s "hosts/portscan_active.xml" ]]; then
+				faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nmap hosts/portscan_active.xml 2>>"$LOGFILE" >/dev/null
+			fi
+			if [[ -s ".tmp/fuzzparams_json.txt" ]]; then
+					faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei .tmp/fuzzparams_json.txt 2>>"$LOGFILE" >/dev/null
+			fi
+			if [[ -s "nuclei_output/info_json.txt" ]]; then
+				faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei nuclei_output/info_json.txt 2>>"$LOGFILE" >/dev/null
+			fi
+			if [[ -s "nuclei_output/low_json.txt" ]]; then
+				faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei nuclei_output/low_json.txt 2>>"$LOGFILE" >/dev/null
+			fi
+			if [[ -s "nuclei_output/medium_json.txt" ]]; then
+				faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei nuclei_output/medium_json.txt 2>>"$LOGFILE" >/dev/null
+			fi
+			if [[ -s "nuclei_output/high_json.txt" ]]; then
+				faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei nuclei_output/high_json.txt 2>>"$LOGFILE" >/dev/null
+			fi
+			if [[ -s "nuclei_output/critical_json.txt" ]]; then
+				faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei nuclei_output/critical_json.txt 2>>"$LOGFILE" >/dev/null
+			fi
+			notification "Information sent to Faraday" "good"
+		fi
 	fi
 
 	if [[ -n $dir_output ]]; then
@@ -6007,6 +6112,7 @@ function help() {
 	printf "   -o output/path    Define output folder\n"
 	printf "   -v, --vps         Axiom distributed VPS \n"
 	printf "   -q                Rate limit in requests per second \n"
+	printf "   --check-tools     Exit if one of the tools is missing\n"
 	printf " \n"
 	printf " ${bblue}USAGE EXAMPLES${reset}\n"
 	printf " ${byellow}Perform full recon (without attacks):${reset}\n"
@@ -6037,11 +6143,29 @@ function help() {
 
 # macOS PATH initialization, thanks @0xtavian <3
 if [[ $OSTYPE == "darwin"* ]]; then
-	PATH="/usr/local/opt/gnu-getopt/bin:$PATH"
-	PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
+	if ! command -v brew &>/dev/null; then
+		printf "\n%bBrew is not installed or not in the PATH.%b\n\n" "$bred" "$reset"
+		exit 1
+	fi
+	if [[ ! -x "$(brew --prefix gnu-getopt)/bin/getopt" ]]; then
+		printf "\n%bBrew formula gnu-getopt is not installed.%b\n\n" "$bred" "$reset"
+		exit 1
+	fi
+	if [[ ! -d "$(brew --prefix coreutils)/libexec/gnubin" ]]; then
+		printf "\n%bBrew formula coreutils is not installed.%b\n\n" "$bred" "$reset"
+		exit 1
+	fi
+	# Prefix is different depending on Intel vs Apple Silicon
+	PATH="$(brew --prefix gnu-getopt)/bin:$PATH"
+	PATH="$(brew --prefix coreutils)/libexec/gnubin:$PATH"
 fi
 
-PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:z:rspanwvh::' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps' -n 'reconFTW' -- "$@")
+PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:z:rspanwvh::' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,check-tools' -n 'reconFTW' -- "$@")
+
+exit_status=$?
+if [[ $exit_status -ne 0 ]]; then
+	UNKNOWN_ARGUMENT=true
+fi
 
 # Note the quotes around "$PROGARGS": they are essential!
 eval set -- "$PROGARGS"
@@ -6158,13 +6282,18 @@ while true; do
 		shift
 		break
 		;;
-	'--help' | '-h' | *)
+	'--check-tools')
+		CHECK_TOOLS_OR_EXIT=true
+		shift
+		continue
+		;;
+	'--help' | '-h')
+		break
+		;;
+	*)
 		# echo "Unknown argument: $1"
-		. ./reconftw.cfg
-		banner
-		help
-		tools_installed
-		exit 1
+		UNKNOWN_ARGUMENT=true
+		break
 		;;
 	esac
 done
@@ -6396,6 +6525,8 @@ case $opt_mode in
 *)
 	help
 	tools_installed
-	exit 1
+	if [[ $UNKNOWN_ARGUMENT == true ]]; then
+		exit 1
+	fi
 	;;
 esac
