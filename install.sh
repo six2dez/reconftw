@@ -92,6 +92,7 @@ declare -A pipxtools=(
 	["MetaFinder"]="Josue87/MetaFinder"
 	["EmailFinder"]="Josue87/EmailFinder"
 	["p1radup"]="iambouali/p1radup"
+	["msftrecon"]="Arcanum-Sec/msftrecon"
 )
 
 # Declare repositories and their paths
