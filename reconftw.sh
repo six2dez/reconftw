@@ -3919,6 +3919,7 @@ function wordlist_gen() {
 
 		start_func "${FUNCNAME[0]}" "Wordlist Generation"
 
+		[[ -s ".tmp/url_extract_tmp.txt" ]] && cat webs/url_extract.txt | anew -q .tmp/url_extract_tmp.txt
 		# Ensure url_extract_tmp.txt exists and is not empty
 		if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
 			# Define patterns for keys and values
