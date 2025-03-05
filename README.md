@@ -7,8 +7,8 @@
 </h1>
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.9">
-    <img src="https://img.shields.io/badge/release-v2.9-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v3.0">
+    <img src="https://img.shields.io/badge/release-v3.0-green">
   </a>
    </a>
   <a href="https://opensource.org/licenses/MIT">
@@ -43,7 +43,7 @@ So, what are you waiting for? Go! Go! Go! :boom:
 
 ## 📔 Table of Contents
 
------------------
+---
 
 - [⚙️ Config file](#️-config-file)
 - [Usage](#usage)
@@ -53,12 +53,13 @@ So, what are you waiting for? Go! Go! Go! :boom:
   - [Example Usage](#example-usage)
     - [To perform a full recon on single target](#to-perform-a-full-recon-on-single-target)
     - [To perform a full recon on a list of targets](#to-perform-a-full-recon-on-a-list-of-targets)
-    - [Perform full recon with more time intense tasks *(VPS intended only)*](#perform-full-recon-with-more-time-intense-tasks-vps-intended-only)
+    - [Perform full recon with more time intense tasks _(VPS intended only)_](#perform-full-recon-with-more-time-intense-tasks-vps-intended-only)
     - [Perform recon in a multi domain target](#perform-recon-in-a-multi-domain-target)
     - [Perform recon with axiom integration](#perform-recon-with-axiom-integration)
     - [Perform all steps (whole recon + all attacks) a.k.a. YOLO mode](#perform-all-steps-whole-recon--all-attacks-aka-yolo-mode)
     - [Show help section](#show-help-section)
 - [Axiom Support :cloud:](#axiom-support-cloud)
+- [Faraday Support :computer:](#faraday-support-computer)
 - [Sample video](#sample-video)
 - [:fire: Features :fire:](#fire-features-fire)
   - [Osint](#osint)
@@ -81,7 +82,7 @@ So, what are you waiting for? Go! Go! Go! :boom:
   - [Thanks :pray:](#thanks-pray)
   - [Disclaimer](#disclaimer)
 
------------------
+---
 
 ## 💿 Installation
 
@@ -133,10 +134,10 @@ Please refer to the [Docker](https://github.com/six2dez/reconftw/wiki/4.-Docker)
 Yes! reconFTW can also be easily deployed with Terraform and Ansible to AWS, if you want to know how to do it, you can check the guide [here](Terraform/README.md)
 
 # ⚙️ Config file
->
+
 > You can find a detailed explanation of the configuration file [here](https://github.com/six2dez/reconftw/wiki/3.-Configuration-file) :book:
 
-- Through ```reconftw.cfg``` file the whole execution of the tool can be controlled.
+- Through `reconftw.cfg` file the whole execution of the tool can be controlled.
 - Hunters can set various scanning modes, execution preferences, tools, config files, APIs/TOKENS, personalized wordlists and much more.
 
 <details>
@@ -149,7 +150,7 @@ Yes! reconFTW can also be easily deployed with Terraform and Ansible to AWS, if 
 #############################################
 
 # General values
-tools=~/Tools   # Path installed tools
+tools=$HOME/Tools   # Path installed tools
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )" # Get current script's path
 profile_shell=".$(basename $(echo $SHELL))rc" # Get current shell profile
 reconftw_version=$(git rev-parse --abbrev-ref HEAD)-$(git describe --tags) # Fetch current reconftw version
@@ -157,7 +158,7 @@ generate_resolvers=false # Generate custom resolvers with dnsvalidator
 update_resolvers=true # Fetch and rewrite resolvers from trickest/resolvers before DNS resolution
 resolvers_url="https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt"
 resolvers_trusted_url="https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw/trusted_resolvers.txt"
-fuzzing_remote_list="https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt" # Used to send to axiom(if used) on fuzzing 
+fuzzing_remote_list="https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt" # Used to send to axiom(if used) on fuzzing
 proxy_url="http://127.0.0.1:8080/" # Proxy url
 install_golang=true # Set it to false if you already have Golang configured and ready
 upgrade_tools=true
@@ -168,6 +169,9 @@ upgrade_before_running=false # Upgrade tools before running
 export GOROOT=/usr/local/go
 export GOPATH=$HOME/go
 export PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH
+
+# Rust Vars (Comment or change on your own)
+export PATH="$HOME/.cargo/bin:$PATH"
 
 # Tools config files
 #NOTIFY_CONFIG=~/.config/notify/provider-config.yaml # No need to define
@@ -193,7 +197,7 @@ GOOGLE_DORKS=true
 GITHUB_DORKS=true
 GITHUB_REPOS=true
 METADATA=true # Fetch metadata from indexed office documents
-EMAILS=true # Fetch emails from differents sites 
+EMAILS=true # Fetch emails from differents sites
 DOMAIN_INFO=true # whois info
 IP_INFO=true    # Reverse IP search, geolocation and whois
 API_LEAKS=true # Check for API leaks
@@ -222,7 +226,7 @@ ZONETRANSFER=true # Check zone transfer
 S3BUCKETS=true # Check S3 buckets misconfigs
 REVERSE_IP=false # Check reverse IP subdomain search (set True if your target is CIDR/IP)
 TLS_PORTS="21,22,25,80,110,135,143,261,271,324,443,448,465,563,614,631,636,664,684,695,832,853,854,990,993,989,992,994,995,1129,1131,1184,2083,2087,2089,2096,2221,2252,2376,2381,2478,2479,2482,2484,2679,2762,3077,3078,3183,3191,3220,3269,3306,3410,3424,3471,3496,3509,3529,3539,3535,3660,36611,3713,3747,3766,3864,3885,3995,3896,4031,4036,4062,4064,4081,4083,4116,4335,4336,4536,4590,4740,4843,4849,5443,5007,5061,5321,5349,5671,5783,5868,5986,5989,5990,6209,6251,6443,6513,6514,6619,6697,6771,7202,7443,7673,7674,7677,7775,8243,8443,8991,8989,9089,9295,9318,9443,9444,9614,9802,10161,10162,11751,12013,12109,14143,15002,16995,41230,16993,20003"
-INSCOPE=false # Uses inscope tool to filter the scope, requires .scope file in reconftw folder 
+INSCOPE=false # Uses inscope tool to filter the scope, requires .scope file in reconftw folder
 
 # Web detection
 WEBPROBESIMPLE=true # Web probing on 80/443
@@ -233,7 +237,7 @@ UNCOMMON_PORTS_WEB="81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,30
 
 # Host
 FAVICON=true # Check Favicon domain discovery
-PORTSCANNER=true # Enable or disable the whole Port scanner module 
+PORTSCANNER=true # Enable or disable the whole Port scanner module
 GEO_INFO=true # Fetch Geolocalization info
 PORTSCAN_PASSIVE=true # Port scanner with Shodan
 PORTSCAN_ACTIVE=true # Port scanner with nmap
@@ -245,6 +249,8 @@ WAF_DETECTION=true # Detect WAFs
 NUCLEICHECK=true # Enable or disable nuclei
 NUCLEI_TEMPLATES_PATH="$HOME/nuclei-templates" # Set nuclei templates path
 NUCLEI_SEVERITY="info,low,medium,high,critical" # Set templates criticity
+NUCLEI_EXTRA_ARGS="" # Additional nuclei extra flags, don't set the severity here but the exclusions like " -etags openssh"
+#NUCLEI_EXTRA_ARGS="-etags openssh,ssl -eid node-express-dev-env,keycloak-xss,CVE-2023-24044,CVE-2021-20323,header-sql,header-reflection" # Additional nuclei extra flags, don't set the severity here but the exclusions like " -etags openssh"
 NUCLEI_FLAGS=" -silent -t ${NUCLEI_TEMPLATES_PATH}/ -retries 2" # Additional nuclei extra flags, don't set the severity here but the exclusions like " -etags openssh"
 NUCLEI_FLAGS_JS=" -silent -tags exposure,token -severity info,low,medium,high,critical" # Additional nuclei extra flags for js secrets
 URL_CHECK=true # Enable or disable URL collection
@@ -261,6 +267,8 @@ ROBOTSWORDLIST=true # Check historic disallow entries on waybackMachine
 PASSWORD_DICT=true # Generate password dictionary
 PASSWORD_MIN_LENGTH=5 # Min password length
 PASSWORD_MAX_LENGTH=14 # Max password length
+CLOUDHUNTER_PERMUTATION=NORMAL # Options: DEEP (very slow), NORMAL (slow), NONE
+NUCLEI_FUZZING_TEMPLATES_PATH="${tools}/fuzzing-templates" # Set nuclei templates path
 
 # Vulns
 VULNS_GENERAL=false # Enable or disable the vulnerability module (very intrusive and slow)
@@ -291,7 +299,7 @@ DEEP=false # DEEP mode, really slow and don't care about the number of results
 DEEP_LIMIT=500 # First limit to not run unless you run DEEP
 DEEP_LIMIT2=1500 # Second limit to not run unless you run DEEP
 DIFF=false # Diff function, run every module over an already scanned target, printing only new findings (but save everything)
-REMOVETMP=true # Delete temporary files after execution (to free up space)
+REMOVETMP=false # Delete temporary files after execution (to free up space)
 REMOVELOG=false # Delete logs after execution
 PROXY=false # Send to proxy the websites found
 SENDZIPNOTIFY=false # Send to zip the results (over notify)
@@ -356,6 +364,13 @@ AXIOM_FLEET_SHUTDOWN=true # # Enable or disable delete the fleet after the execu
 AXIOM_EXTRA_ARGS="" # Leave empty if you don't want to add extra arguments
 #AXIOM_EXTRA_ARGS=" --rm-logs" # Example
 
+# Faraday-Server
+FARADAY=false # Enable or disable Faraday integration
+FARADAY_SERVER="http://localhost:5985" # Faraday server address
+FARADAY_USER="faraday" # Faraday user
+FARADAY_PASS="FARADAY_PASSWORD" # Faraday password
+FARADAY_WORKSPACE="reconftw" # Faraday workspace
+
 # TERM COLORS
 bred='\033[1;31m'
 bblue='\033[1;34m'
@@ -377,37 +392,38 @@ reset='\033[0m'
 
 ## TARGET OPTIONS
 
-| Flag | Description |
-|------|-------------|
-| -d | Single Target domain *(example.com)*  |
-| -l | List of targets *(one per line)* |
-| -m | Multiple domain target *(companyName)*  |
-| -x | Exclude subdomains list *(Out Of Scope)* |
-| -i | Include subdomains list *(In Scope)* |
+| Flag | Description                              |
+| ---- | ---------------------------------------- |
+| -d   | Single Target domain _(example.com)_     |
+| -l   | List of targets _(one per line)_         |
+| -m   | Multiple domain target _(companyName)_   |
+| -x   | Exclude subdomains list _(Out Of Scope)_ |
+| -i   | Include subdomains list _(In Scope)_     |
 
 ## MODE OPTIONS
 
-| Flag | Description |
-|------|-------------|
-| -r | Recon - Full recon process (without attacks like sqli,ssrf,xss,ssti,lfi etc.) |
-| -s | Subdomains - Perform only subdomain enumeration, web probing, subdomain takeovers |
-| -p | Passive - Perform only passive steps |
-| -a | All - Perform whole recon and all active attacks |
-| -w | Web - Perform only vulnerability checks/attacks on particular target |
-| -n | OSINT - Performs an OSINT scan (no subdomain enumeration and attacks) |
-| -c | Custom - Launches specific function against target |
-| -h | Help - Show this help menu |
+| Flag | Description                                                                       |
+| ---- | --------------------------------------------------------------------------------- |
+| -r   | Recon - Full recon process (without attacks like sqli,ssrf,xss,ssti,lfi etc.)     |
+| -s   | Subdomains - Perform only subdomain enumeration, web probing, subdomain takeovers |
+| -p   | Passive - Perform only passive steps                                              |
+| -a   | All - Perform whole recon and all active attacks                                  |
+| -w   | Web - Perform only vulnerability checks/attacks on particular target              |
+| -n   | OSINT - Performs an OSINT scan (no subdomain enumeration and attacks)             |
+| -z   | Zen - Performs a recon process covering the basics and some vulns                 |
+| -c   | Custom - Launches specific function against target                                |
+| -h   | Help - Show this help menu                                                        |
 
 ## GENERAL OPTIONS
 
-| Flag | Description |
-|------|-------------|
-| --deep | Deep scan (Enable some slow options for deeper scan, *vps intended mode*) |
-| -f | Custom config file path |
-| -o | Output directory |
-| -v | Axiom distributed VPS |
-| -q | Rate limit in requests per second |
-| --check-tools | Exit if one of the tools is missing |
+| Flag          | Description                                                               |
+| ------------- | ------------------------------------------------------------------------- |
+| --deep        | Deep scan (Enable some slow options for deeper scan, _vps intended mode_) |
+| -f            | Custom config file path                                                   |
+| -o            | Output directory                                                          |
+| -v            | Axiom distributed VPS                                                     |
+| -q            | Rate limit in requests per second                                         |
+| --check-tools | Exit if one of the tools is missing                                       |
 
 ## Example Usage
 
@@ -425,7 +441,7 @@ reset='\033[0m'
 ./reconftw.sh -l sites.txt -r -o /output/directory/
 ```
 
-### Perform full recon with more time intense tasks *(VPS intended only)*
+### Perform full recon with more time intense tasks _(VPS intended only)_
 
 ```bash
 ./reconftw.sh -d target.com -r --deep -o /output/directory/
@@ -458,11 +474,15 @@ reset='\033[0m'
 # Axiom Support :cloud:
 
 ![](https://i.ibb.co/Jzrgkqt/axiom-readme.png)
+
 > Check out the wiki section for more info [Axiom Support](https://github.com/six2dez/reconftw/wiki/5.-Axiom-version)
 
 - As reconFTW actively hits the target with a lot of web traffic, hence there was a need to move to Axiom distributing the work load among various instances leading to reduction of execution time.
 - During the configuration of axiom you need to select `reconftw` as provisoner.
 - You can create your own axiom's fleet before running reconFTW or let reconFTW to create and destroy it automatically just modifying reconftw.cfg file.
+
+# Faraday Support :computer:
+- For Faraday community support, you need to install Faraday by yourself, authenticate in faraday-cli and set the workspace both in the config file and in the faraday-cli.
 
 # Sample video
 
@@ -474,11 +494,12 @@ reset='\033[0m'
 
 - Domain information ([whois](https://github.com/rfc1036/whois))
 - Emails addresses and passwords leaks ([emailfinder](https://github.com/Josue87/EmailFinder) and [LeakSearch](https://github.com/JoelGMSec/LeakSearch))
+- Microsoft 365 and Azure tenant mapper ([msftrecon](https://github.com/Arcanum-Sec/msftrecon))
 - Metadata finder ([MetaFinder](https://github.com/Josue87/MetaFinder))
 - API leaks search ([porch-pirate](https://github.com/MandConsultingGroup/porch-pirate) and [SwaggerSpy](https://github.com/UndeadSec/SwaggerSpy))
 - Google Dorks ([dorks_hunter](https://github.com/six2dez/dorks_hunter))
 - Github Dorks ([gitdorks_go](https://github.com/damit5/gitdorks_go))
-- GitHub org analysis ([enumerepo](https://github.com/trickest/enumerepo), [trufflehog](https://github.com/trufflesecurity/trufflehog) and [gitleaks](https://github.com/gitleaks/gitleaks))
+- GitHub org's repos analysis ([enumerepo](https://github.com/trickest/enumerepo), [trufflehog](https://github.com/trufflesecurity/trufflehog) and [gitleaks](https://github.com/gitleaks/gitleaks))
 - 3rd parties misconfigurations([misconfig-mapper](https://github.com/intigriti/misconfig-mapper))
 - Spoofable domains ([spoofcheck](https://github.com/MattKeeley/Spoofy))
 
@@ -497,7 +518,7 @@ reset='\033[0m'
 - Subdomains takeover ([nuclei](https://github.com/projectdiscovery/nuclei))
 - DNS takeover ([dnstake](https://github.com/pwnesia/dnstake))
 - DNS Zone Transfer ([dig](https://linux.die.net/man/1/dig))
-- Cloud checkers ([S3Scanner](https://github.com/sa7mon/S3Scanner) and [cloud_enum](https://github.com/initstring/cloud_enum))
+- Cloud checkers ([S3Scanner](https://github.com/sa7mon/S3Scanner) and [CloudHunter](https://github.com/belane/CloudHunter))
 
 ## Hosts
 
@@ -507,7 +528,7 @@ reset='\033[0m'
 - Port Scanner (Active with [nmap](https://github.com/nmap/nmap) and passive with [smap](https://github.com/s0md3v/Smap))
 - Port services vulnerability checks ([vulners](https://github.com/vulnersCom/nmap-vulners))
 - Password spraying ([brutespray](https://github.com/x90skysn3k/brutespray))
-- Geolocalization info (ipapi.co)
+- Geolocalization info (ipinfo.io)
 
 ## Webs
 
@@ -554,7 +575,8 @@ reset='\033[0m'
 - Diff support for continuous running (cron mode)
 - Support for targets with multiple domains
 - Raspberry Pi/ARM support
-- 6 modes (recon, passive, subdomains, web, osint and all)
+- 7 modes (recon, passive, subdomains, web, osint, zen and all)
+- Integration with FaradaySec for webUI and reporting
 - Out of Scope Support + optional [inscope](https://github.com/tomnomnom/hacks/tree/master/inscope) support
 - Notification system with Slack, Discord and Telegram ([notify](https://github.com/projectdiscovery/notify)) and sending zipped results support
 
