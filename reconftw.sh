@@ -156,6 +156,8 @@ function tools_installed() {
 		["LeakSearch_python"]="${tools}/LeakSearch/venv/bin/python3"
 		["Oralyzer"]="${tools}/Oralyzer/oralyzer.py"
 		["Oralyzer_python"]="${tools}/Oralyzer/venv/bin/python3"
+		["msftrecon"]="${tools}/msftrecon/msftrecon/msftrecon.py"
+		["msftrecon_python"]="${tools}/msftrecon/venv/bin/python3"
 	)
 
 	declare -A tools_folders=(
@@ -568,12 +570,7 @@ function domain_info() {
 		# Run whois command and check for errors
 		whois -H "$domain" >"osint/domain_info_general.txt"
 
-		# Fetch tenant info using curl and check for errors
-		curl -s "https://aadinternals.azurewebsites.net/api/tenantinfo?domainName=${domain}" \
-			-H "Origin: https://aadinternals.com" \
-			-H "Referer: https://aadinternals.com/" \
-			-H "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" |
-			jq -r '.domains[].name' >"osint/azure_tenant_domains.txt"
+		msftrecon -d ${domain} > osint/azure_tenant_domains.txt
 
 		end_func "Results are saved in ${domain}/osint/domain_info_[general/azure_tenant_domains].txt" "${FUNCNAME[0]}"
 
@@ -5473,6 +5470,38 @@ function end() {
 
 	if [[ $REMOVELOG == true ]]; then
 		rm -rf $dir/.log
+	fi
+
+	if [[ $FARADAY == true ]]; then
+		if ! faraday-cli status 2>>"$LOGFILE" >/dev/null; then
+			printf "%b[!] Faraday server is not running. Skipping Faraday integration.%b\n" "$bred" "$reset"
+		else
+			if [[ -s ".tmp/tko_json.txt" ]]; then
+				faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei .tmp/tko_json.txt# 2>>"$LOGFILE" >/dev/null
+			fi
+			if [[ -s "hosts/portscan_active.xml" ]]; then
+				faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nmap hosts/portscan_active.xml 2>>"$LOGFILE" >/dev/null
+			fi
+			if [[ -s ".tmp/fuzzparams_json.txt" ]]; then
+					faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei .tmp/fuzzparams_json.txt 2>>"$LOGFILE" >/dev/null
+			fi
+			if [[ -s "nuclei_output/info_json.txt" ]]; then
+				faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei nuclei_output/info_json.txt 2>>"$LOGFILE" >/dev/null
+			fi
+			if [[ -s "nuclei_output/low_json.txt" ]]; then
+				faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei nuclei_output/low_json.txt 2>>"$LOGFILE" >/dev/null
+			fi
+			if [[ -s "nuclei_output/medium_json.txt" ]]; then
+				faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei nuclei_output/medium_json.txt 2>>"$LOGFILE" >/dev/null
+			fi
+			if [[ -s "nuclei_output/high_json.txt" ]]; then
+				faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei nuclei_output/high_json.txt 2>>"$LOGFILE" >/dev/null
+			fi
+			if [[ -s "nuclei_output/critical_json.txt" ]]; then
+				faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei nuclei_output/critical_json.txt 2>>"$LOGFILE" >/dev/null
+			fi
+			notification "Information sent to Faraday" "good"
+		fi
 	fi
 
 	if [[ -n $dir_output ]]; then
