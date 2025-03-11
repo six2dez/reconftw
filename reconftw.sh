@@ -468,7 +468,7 @@ function apileaks() {
 		start_func "${FUNCNAME[0]}" "Scanning for leaks in public API directories"
 
 		# Run porch-pirate and handle errors
-		porch-pirate -s "$domain" --dump 2>>"$LOGFILE" >"${dir}/osint/postman_leaks.txt"
+		porch-pirate -s "$domain" -l 25 --dump 2>>"$LOGFILE" >"${dir}/osint/postman_leaks.txt"
 
 		# Change directory to SwaggerSpy
 		if ! pushd "${tools}/SwaggerSpy" >/dev/null; then
@@ -3287,7 +3287,7 @@ function nuclei_check() {
 			for crit in "${severity_array[@]}"; do
 				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Nuclei Severity: $crit ${reset}\n\n"
 				# Run nuclei for each severity level
-				nuclei "$NUCLEI_FLAGS" -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" "$NUCLEI_EXTRA_ARGS" -j -o "nuclei_output/${crit}_json.txt" <.tmp/webs_nuclei.txt
+				nuclei -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" "$NUCLEI_FLAGS" "$NUCLEI_EXTRA_ARGS" -j -o "nuclei_output/${crit}_json.txt" <.tmp/webs_nuclei.txt
 
 				# Parse the JSON output and save the results to a text file
 				if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
