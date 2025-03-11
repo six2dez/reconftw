@@ -468,7 +468,7 @@ function apileaks() {
 		start_func "${FUNCNAME[0]}" "Scanning for leaks in public API directories"
 
 		# Run porch-pirate and handle errors
-		porch-pirate -s "$domain" --dump 2>>"$LOGFILE" >"${dir}/osint/postman_leaks.txt"
+		porch-pirate -s "$domain" -l 25 --dump 2>>"$LOGFILE" >"${dir}/osint/postman_leaks.txt"
 
 		# Change directory to SwaggerSpy
 		if ! pushd "${tools}/SwaggerSpy" >/dev/null; then
