@@ -414,7 +414,8 @@ function install_golang_version() {
 			export PATH="$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH"
 
 			# Append Go environment variables to shell profile
-			cat <<EOF >>${HOME}/"${profile_shell}"
+            if ! grep -q "export GOROOT=/usr/local/go" "$HOME/${profile_shell}"; then
+                cat <<EOF >>"${HOME}/${profile_shell}"
 
 # Golang environment variables
 export GOROOT=/usr/local/go
@@ -529,7 +530,7 @@ function initial_setup() {
 	touch "${dir}/.gitlab_tokens"
 
 	eval pipx ensurepath $DEBUG_STD
-	source "${HOME}/${profile_shell}"
+	source "${HOME}/${profile_shell}" $DEBUG_ERROR
 
 	install_tools
 
