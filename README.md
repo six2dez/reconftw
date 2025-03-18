@@ -678,10 +678,4 @@ The material contained in this repository is licensed under MIT.
 
 ## Star History
 
-<a href="https://www.star-history.com/#six2dez/reconftw&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=six2dez/reconftw&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=six2dez/reconftw&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=six2dez/reconftw&type=Date" />
- </picture>
-</a>
+[![Star History Chart](https://api.star-history.com/svg?repos=six2dez/reconftw&type=Date)](https://star-history.com/#six2dez/reconftw&Date)
