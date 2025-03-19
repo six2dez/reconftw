@@ -2441,19 +2441,34 @@ function s3buckets() {
 			printf "resolvers.txt not found\n" >>"$LOGFILE"
 		fi
 
+		if [[ $DEEP == true ]]; then
 		# Run CloudHunter on each URL in webs/full_webs.txt and append the output to the file in the subdomains folder
-		while IFS= read -r url; do
-			printf "Processing URL: %s\n" "$url" >>"$LOGFILE"
-			(
-				if ! cd "$tools/CloudHunter"; then
-					printf "%b[!] Failed to cd to %s.%b\n" "$bred" "$tools/CloudHunter" "$reset"
-					return 1
-				fi
-				if ! "${tools}/CloudHunter/venv/bin/python3" ./cloudhunter.py ${PERMUTATION_FLAG} -r ./resolvers.txt -t 50 "$url"; then
-					printf "%b[!] CloudHunter command failed for URL %s.%b\n" "$bred" "$url" "$reset"
-				fi
-			) >>"$dir/subdomains/cloudhunter_open_buckets.txt" 2>>"$LOGFILE"
-		done <webs/full_webs.txt
+			while IFS= read -r url; do
+				printf "Processing URL: %s\n" "$url" >>"$LOGFILE"
+				(
+					if ! cd "$tools/CloudHunter"; then
+						printf "%b[!] Failed to cd to %s.%b\n" "$bred" "$tools/CloudHunter" "$reset"
+						return 1
+					fi
+					if ! "${tools}/CloudHunter/venv/bin/python3" ./cloudhunter.py ${PERMUTATION_FLAG} -r ./resolvers.txt -t 50 "$url"; then
+						printf "%b[!] CloudHunter command failed for URL %s.%b\n" "$bred" "$url" "$reset"
+					fi
+				) >>"$dir/subdomains/cloudhunter_open_buckets.txt" 2>>"$LOGFILE"
+			done <webs/full_webs.txt
+		fi
+				# Run CloudHunter on each URL in webs/full_webs.txt and append the output to the file in the subdomains folder
+
+		printf "Processing domain: %s\n" "$domain" >>"$LOGFILE"
+		(
+			if ! cd "$tools/CloudHunter"; then
+				printf "%b[!] Failed to cd to %s.%b\n" "$bred" "$tools/CloudHunter" "$reset"
+				return 1
+			fi
+			if ! "${tools}/CloudHunter/venv/bin/python3" ./cloudhunter.py ${PERMUTATION_FLAG} -r ./resolvers.txt -t 50 "$domain"; then
+				printf "%b[!] CloudHunter command failed for URL %s.%b\n" "$bred" "$url" "$reset"
+			fi
+		) >>"$dir/subdomains/cloudhunter_open_buckets.txt" 2>>"$LOGFILE"
+
 
 		# Remove the full_webs.txt file after CloudHunter processing
 		if ! rm webs/full_webs.txt; then
