@@ -77,6 +77,7 @@ declare -A gotools=(
 	["sourcemapper"]="go install -v github.com/denandz/sourcemapper@latest"
 	["jsluice"]="go install -v github.com/BishopFox/jsluice/cmd/jsluice@latest"
 	["urlfinder"]="go install -v github.com/projectdiscovery/urlfinder/cmd/urlfinder@latest"
+	["cent"]="go install -v github.com/xm1k3/cent@latest"
 )
 
 # Declare pipx tools and their paths
@@ -311,6 +312,9 @@ function install_tools() {
 	notify &>/dev/null
 	subfinder &>/dev/null
 	subfinder &>/dev/null
+	mkdir -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
+	cent init -f &>/dev/null
+	cent -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
 
 	# Handle failed installations
 	if [[ ${#failed_tools[@]} -ne 0 ]]; then
@@ -535,15 +539,11 @@ function initial_setup() {
 	# Nuclei Templates
 	if [[ ! -d ${NUCLEI_TEMPLATES_PATH} ]]; then
 		#printf "${yellow}Cloning Nuclei templates...${reset}\n"
-		eval git clone https://github.com/projectdiscovery/nuclei-templates.git "${NUCLEI_TEMPLATES_PATH}" $DEBUG_STD
-		eval git clone https://github.com/geeknik/the-nuclei-templates.git "${NUCLEI_TEMPLATES_PATH}/extra_templates" $DEBUG_STD
 		eval git clone https://github.com/projectdiscovery/fuzzing-templates ${tools}/fuzzing-templates $DEBUG_STD
-		eval nuclei -update-templates update-template-dir "${NUCLEI_TEMPLATES_PATH}" $DEBUG_STD
-	else
-		#printf "${yellow}Updating Nuclei templates...${reset}\n"
 		eval git -C "${NUCLEI_TEMPLATES_PATH}" pull $DEBUG_STD
 		eval git -C "${NUCLEI_TEMPLATES_PATH}/extra_templates" pull $DEBUG_STD
 		eval git -C "${tools}/fuzzing-templates" pull $DEBUG_STD
+		eval nuclei -update-templates update-template-dir "${NUCLEI_TEMPLATES_PATH}" $DEBUG_STD
 	fi
 
 	# sqlmap

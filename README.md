@@ -675,3 +675,7 @@ If you want to contribute to this project, you can do it in multiple ways:
 Usage of this program for attacking targets without consent is illegal. It is the user's responsibility to obey all applicable laws. The developer assumes no liability and is not responsible for any misuse or damage caused by this program. Please use responsibly.
 
 The material contained in this repository is licensed under MIT.
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=six2dez/reconftw&type=Date)](https://star-history.com/#six2dez/reconftw&Date)
