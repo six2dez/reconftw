@@ -3888,7 +3888,7 @@ function jschecks() {
 			printf "%bRunning: Gathering secrets 5/6%b\n" "$yellow" "$reset"
 			if [[ -s "js/js_livelinks.txt" ]]; then
 				if [[ $AXIOM != true ]]; then
-					cat js/js_livelinks.txt | mantra -ua "$HEADER" -s | anew -q js/js_secrets.txt 2>>"$LOGFILE" >/dev/null
+					cat js/js_livelinks.txt | mantra -ua \"$HEADER\" -s | anew -q js/js_secrets.txt 2>>"$LOGFILE" >/dev/null
 				else
 					axiom-scan js/js_livelinks.txt -m mantra -ua "$HEADER" -s -o js/js_secrets.txt "$AXIOM_EXTRA_ARGS" &>/dev/null
 				fi
