@@ -536,17 +536,21 @@ function initial_setup() {
 	install_tools
 
 	# Repositorios con configuraciones especiales
-	printf "${bblue}\nRunning: Configuring special repositories${reset}\n"
+	echo -e "${bblue}\nRunning: Configuring special repositories${reset}\n"
 
 	# Nuclei Templates
 	if [[ ! -d ${NUCLEI_TEMPLATES_PATH} ]]; then
 		#printf "${yellow}Cloning Nuclei templates...${reset}\n"
-		mkdir -p ${NUCLEI_FUZZING_TEMPLATES_PATH} $DEBUG_STD
-		eval git clone https://github.com/projectdiscovery/fuzzing-templates "${NUCLEI_FUZZING_TEMPLATES_PATH}" $DEBUG_STD
+		
 		eval git -C "${NUCLEI_TEMPLATES_PATH}" pull $DEBUG_STD
 		eval git -C "${NUCLEI_TEMPLATES_PATH}/extra_templates" pull $DEBUG_STD
 		eval git -C "${tools}/fuzzing-templates" pull $DEBUG_STD
 		eval nuclei -update-templates update-template-dir "${NUCLEI_TEMPLATES_PATH}" $DEBUG_STD
+	fi
+	
+	if [[ ! -d ${NUCLEI_FUZZING_TEMPLATES_PATH} ]]; then
+		mkdir -p ${NUCLEI_FUZZING_TEMPLATES_PATH} $DEBUG_STD
+		eval git clone https://github.com/projectdiscovery/fuzzing-templates "${NUCLEI_FUZZING_TEMPLATES_PATH}" $DEBUG_STD
 	fi
 
 	# sqlmap
