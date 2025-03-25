@@ -1188,7 +1188,7 @@ function sub_dns() {
 					grep -E '^([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}$' |
 					anew -q .tmp/subdomains_dns.txt
 
-				jq -r 'try .a[]' <"subdomains/subdomains_dnsregs.json" | sort -u |
+				jq -r 'try .a[]' <"subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" >/dev/null | sort -u |
 					hakip2host | awk '{print $3}' | unfurl -u domains |
 					sed -e 's/^\*\.//' -e 's/\.$//' -e '/\./!d' |
 					grep "\.$domain$" |
@@ -1217,10 +1217,10 @@ function sub_dns() {
 			fi
 
 			if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
-				jq -r 'try .a[]' <"subdomains/subdomains_dnsregs.json" | sort -u |
+				jq -r 'try .a[]' <"subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" >/dev/null | sort -u |
 					anew -q .tmp/subdomains_dns_a_records.txt
 
-				jq -r 'try .a[]' <"subdomains/subdomains_dnsregs.json" | sort -u |
+				jq -r 'try .a[]' <"subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" >/dev/null | sort -u |
 					hakip2host | awk '{print $3}' | unfurl -u domains |
 					sed -e 's/^\*\.//' -e 's/\.$//' -e '/\./!d' |
 					grep "\.$domain$" |
@@ -2559,7 +2559,7 @@ function geo_info() {
 			# Attempt to generate hosts/ips.txt
 			if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 				if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
-					jq -r 'try . | "\(.host) \(.a[0])"' "subdomains/subdomains_dnsregs.json" | anew -q .tmp/subs_ips.txt
+					jq -r 'try . | "\(.host) \(.a[0])"' "subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" >/dev/null | anew -q .tmp/subs_ips.txt
 				fi
 				if [[ -s ".tmp/subs_ips.txt" ]]; then
 					awk '{ print $2 " " $1}' .tmp/subs_ips.txt | sort -k2 -n | anew -q hosts/subs_ips_vhosts.txt
@@ -3021,7 +3021,7 @@ function portscan() {
 			# Not an IP address
 			if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
 				# Extract host and IP from JSON
-				jq -r 'try . | "\(.host) \(.a[0])"' "subdomains/subdomains_dnsregs.json" | anew -q .tmp/subs_ips.txt
+				jq -r 'try . | "\(.host) \(.a[0])"' "subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" >/dev/null | anew -q .tmp/subs_ips.txt
 			fi
 
 			if [[ -s ".tmp/subs_ips.txt" ]]; then
@@ -3162,7 +3162,7 @@ function cdnprovider() {
 		# Check if subdomains_dnsregs.json exists and is not empty
 		if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
 			# Extract IPs from .a[] fields, exclude private IPs, extract IPs, sort uniquely
-			jq -r 'try . | .a[]' "subdomains/subdomains_dnsregs.json" |
+			jq -r 'try . | .a[]' "subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" >/dev/null |
 				grep -aEiv "^(127|10|169\.254|172\.(1[6-9]|2[0-9]|3[01])|192\.168)\." |
 				grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" |
 				sort -u >.tmp/ips_cdn.txt
