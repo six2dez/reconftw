@@ -3624,13 +3624,13 @@ function urlchecks() {
 			fi
 
 			if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
-				grep "$domain" .tmp/url_extract_tmp.txt | grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' | grep -aEi "\.js$" | anew -q .tmp/url_extract_js.txt
-				grep "$domain" .tmp/url_extract_tmp.txt | grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' | grep -aEi "\.js\.map$" | anew -q .tmp/url_extract_jsmap.txt
+				grep -a "$domain" .tmp/url_extract_tmp.txt | grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' | grep -aEi "\.js$" | anew -q .tmp/url_extract_js.txt
+				grep -a "$domain" .tmp/url_extract_tmp.txt | grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' | grep -aEi "\.js\.map$" | anew -q .tmp/url_extract_jsmap.txt
 				if [[ $DEEP == true ]] && [[ -s ".tmp/url_extract_js.txt" ]]; then
 					interlace -tL .tmp/url_extract_js.txt -threads 10 -c "${tools}/JSA/venv/bin/python3 ${tools}/JSA/jsa.py -f _target_ | anew -q .tmp/url_extract_tmp.txt" &>/dev/null
 				fi
 
-				grep "$domain" .tmp/url_extract_tmp.txt | grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | anew -q .tmp/url_extract_tmp2.txt
+				grep -a "$domain" .tmp/url_extract_tmp.txt | grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | anew -q .tmp/url_extract_tmp2.txt
 
 				if [[ -s ".tmp/url_extract_tmp2.txt" ]]; then
 					urless <.tmp/url_extract_tmp2.txt | anew -q .tmp/url_extract_uddup.txt 2>>"$LOGFILE" >/dev/null
