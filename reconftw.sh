@@ -3271,7 +3271,8 @@ function nuclei_check() {
 		fi
 
 		# Combine webs_subs.txt and webs_fuzz.txt into webs_nuclei.txt and duplicate it
-		cat .tmp/webs_subs.txt .tmp/webs_fuzz.txt 2>>"$LOGFILE" | anew -q .tmp/webs_nuclei.txt | tee -a webs/webs_nuclei.txt
+		cat .tmp/webs_subs.txt .tmp/webs_fuzz.txt 2>>"$LOGFILE" | anew -q .tmp/webs_nuclei.txt
+		cat .tmp/webs_nuclei.txt | anew -q webs/webs_nuclei.txt
 		# Check if AXIOM is enabled
 		if [[ $AXIOM != true ]]; then
 			# Split severity levels into an array
