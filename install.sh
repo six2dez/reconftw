@@ -90,8 +90,6 @@ declare -A pipxtools=(
 	["ghauri"]="r0oth3x49/ghauri"
 	["xnLinkFinder"]="xnl-h4ck3r/xnLinkFinder"
 	["porch-pirate"]="MandConsultingGroup/porch-pirate"
-	["MetaFinder"]="Josue87/MetaFinder"
-	["EmailFinder"]="Josue87/EmailFinder"
 	["p1radup"]="iambouali/p1radup"
 )
 
@@ -123,6 +121,8 @@ declare -A repos=(
 	["misconfig-mapper"]="intigriti/misconfig-mapper"
 	["Spoofy"]="MattKeeley/Spoofy"
 	["msftrecon"]="Arcanum-Sec/msftrecon"
+	["metagoofil"]="opsdisk/metagoofil"
+	["EmailHarvester"]="maldevel/EmailHarvester"
 )
 
 # Function to display the banner

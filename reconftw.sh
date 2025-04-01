@@ -158,6 +158,10 @@ function tools_installed() {
 		["Oralyzer_python"]="${tools}/Oralyzer/venv/bin/python3"
 		["msftrecon"]="${tools}/msftrecon/msftrecon/msftrecon.py"
 		["msftrecon_python"]="${tools}/msftrecon/venv/bin/python3"
+		["EmailHarvester"]="${tools}EmailHarvester"
+		["EmailHarvester_python"]="${tools}/EmailHarvester/venv/bin/python3"
+		["metagoofil"]="${tools}metagoofil"
+		["metagoofil_python"]="${tools}/metagoofil/venv/bin/python3"
 	)
 
 	declare -A tools_folders=(
@@ -182,7 +186,6 @@ function tools_installed() {
 		["katana"]="katana"
 		["wafw00f"]="wafw00f"
 		["dnsvalidator"]="dnsvalidator"
-		["metafinder"]="metafinder"
 		["whois"]="whois"
 		["dnsx"]="dnsx"
 		["gotator"]="gotator"
@@ -202,7 +205,6 @@ function tools_installed() {
 		["notify"]="notify"
 		["dalfox"]="dalfox"
 		["puredns"]="puredns"
-		["emailfinder"]="emailfinder"
 		["analyticsrelationships"]="analyticsrelationships"
 		["mapcidr"]="mapcidr"
 		["ppmap"]="ppmap"
@@ -426,25 +428,9 @@ function metadata() {
 	if { [[ ! -f "${called_fn_dir}/.${FUNCNAME[0]}" ]] || [[ ${DIFF} == true ]]; } && [[ ${METADATA} == true ]] && [[ ${OSINT} == true ]] && ! [[ ${domain} =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 		start_func "${FUNCNAME[0]}" "Scanning metadata in public files"
 
-		# Run metafinder and check for errors
-		if ! metafinder -d "${domain}" -l "${METAFINDER_LIMIT}" -o osint -go -bi &>>"${LOGFILE}"; then
-			printf "%b[!] metafinder command failed.%b\n" "${bred}" "${reset}"
-			return 1
-		fi
-
-		# Move result files and check for errors
-		if [ -d "osint/${domain}" ] && [ "$(ls -A "osint/${domain}")" ]; then
-			if ! mv "osint/${domain}/"*.txt "osint/" 2>>"${LOGFILE}"; then
-				printf "%b[!] Failed to move metadata files.%b\n" "${bred}" "${reset}"
-				return 1
-			fi
-		fi
-
-		# Remove temporary directory and check for errors
-		if ! rm -rf "osint/${domain}" 2>>"${LOGFILE}"; then
-			printf "%b[!] Failed to remove temporary directory.%b\n" "${bred}" "${reset}"
-			return 1
-		fi
+		mkdir -p ".tmp/metagoofil_${domain}/" 2>>"${LOGFILE}"
+		"${tools}/metagoofil/venv/bin/python3" "${tools}/metagoofil/metagoofil.py" -d "${domain}" -t pdf,docx,xlsx -l 10 -w -o ".tmp/metagoofil_${domain}/" 2>>"${LOGFILE}"
+		exiftool -r .tmp/metagoofil_${domain}/* | egrep -i "Author|Creator|Email|Producer|Template" | sort -u | anew -q "osint/metadata_results.txt"
 
 		end_func "Results are saved in ${domain}/osint/[software/authors/metadata_results].txt" "${FUNCNAME[0]}"
 	else
@@ -517,12 +503,12 @@ function emails() {
 
 		start_func "${FUNCNAME[0]}" "Searching for emails/users/passwords leaks"
 
-		# Run emailfinder and handle errors
-		emailfinder -d "$domain" 2>>"$LOGFILE" | anew -q .tmp/emailfinder.txt
+
+		"${tools}/EmailHarvester/venv/bin/python3" "${tools}/EmailHarvester/EmailHarvester.py" -d ${domain} -e all -l 20 2>>"$LOGFILE" | anew -q .tmp/EmailHarvester.txt
 
 		# Process emailfinder results
-		if [[ -s ".tmp/emailfinder.txt" ]]; then
-			grep "@" .tmp/emailfinder.txt | grep -iv "|_" | anew -q osint/emails.txt
+		if [[ -s ".tmp/EmailHarvester.txt" ]]; then
+			grep "@" .tmp/EmailHarvester.txt | anew -q osint/emails.txt
 		fi
 
 		# Change directory to LeakSearch
@@ -570,8 +556,7 @@ function domain_info() {
 
 		# Run whois command and check for errors
 		whois -H "$domain" >"osint/domain_info_general.txt"
-
-		msftrecon -d ${domain} > osint/azure_tenant_domains.txt
+		"${tools}/msftrecon/venv/bin/python3" "${tools}/msftrecon/msftrecon/msftrecon.py" -d ${domain} > osint/azure_tenant_domains.txt
 
 		end_func "Results are saved in ${domain}/osint/domain_info_[general/azure_tenant_domains].txt" "${FUNCNAME[0]}"
 
@@ -1031,7 +1016,7 @@ function sub_tls() {
 
 		if [[ $DEEP == true ]]; then
 			if [[ $AXIOM != true ]]; then
-				tlsx -san -cn -silent -ro -c "$TLSX_THREADS" \
+				cat subdomains/subdomains.txt | tlsx -san -cn -silent -ro -c "$TLSX_THREADS" \
 					-p "$TLS_PORTS" -o .tmp/subdomains_tlsx.txt <subdomains/subdomains.txt \
 					2>>"$LOGFILE" >/dev/null
 			else
@@ -1041,7 +1026,7 @@ function sub_tls() {
 			fi
 		else
 			if [[ $AXIOM != true ]]; then
-				tlsx -san -cn -silent -ro -c "$TLSX_THREADS" <subdomains/subdomains.txt >.tmp/subdomains_tlsx.txt 2>>"$LOGFILE"
+				cat subdomains/subdomains.txt | tlsx -san -cn -silent -ro -c "$TLSX_THREADS" <subdomains/subdomains.txt >.tmp/subdomains_tlsx.txt 2>>"$LOGFILE"
 			else
 				axiom-scan subdomains/subdomains.txt -m tlsx \
 					-san -cn -silent -ro -c "$TLSX_THREADS" \
@@ -3269,7 +3254,6 @@ function nuclei_check() {
 	# Check if the function should run
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $NUCLEICHECK == true ]]; then
 		start_func "${FUNCNAME[0]}" "Templates-based Web Scanner"
-
 		cent update -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
 		# Update nuclei templates
 		nuclei -update 2>>"$LOGFILE" >/dev/null
@@ -3297,7 +3281,6 @@ function nuclei_check() {
 
 		# Combine webs_subs.txt and webs_fuzz.txt into webs_nuclei.txt and duplicate it
 		cat .tmp/webs_subs.txt .tmp/webs_fuzz.txt 2>>"$LOGFILE" | anew -q .tmp/webs_nuclei.txt | tee -a webs/webs_nuclei.txt
-
 		# Check if AXIOM is enabled
 		if [[ $AXIOM != true ]]; then
 			# Split severity levels into an array
@@ -3306,8 +3289,7 @@ function nuclei_check() {
 			for crit in "${severity_array[@]}"; do
 				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Nuclei Severity: $crit ${reset}\n\n"
 				# Run nuclei for each severity level
-				nuclei -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" "$NUCLEI_FLAGS" "$NUCLEI_EXTRA_ARGS" -j -o "nuclei_output/${crit}_json.txt" <.tmp/webs_nuclei.txt
-
+				nuclei -l .tmp/webs_nuclei.txt -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 ${NUCLEI_EXTRA_ARGS} -t ${NUCLEI_TEMPLATES_PATH} -j -o "nuclei_output/${crit}_json.txt" 2>>"$LOGFILE" >/dev/null
 				# Parse the JSON output and save the results to a text file
 				if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
 					jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' nuclei_output/${crit}_json.txt > nuclei_output/${crit}.txt
@@ -3330,7 +3312,7 @@ function nuclei_check() {
 					axiom-scan .tmp/webs_nuclei.txt -m nuclei \
 						--nuclei-templates "$NUCLEI_TEMPLATES_PATH" \
 						-severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" \
-						"$NUCLEI_EXTRA_ARGS" -j -o "nuclei_output/${crit}_json.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+						-silent -retries 2 "$NUCLEI_EXTRA_ARGS" -j -o "nuclei_output/${crit}_json.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
 					# Parse the JSON output and save the results to a text file
 					if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
 						jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' nuclei_output/${crit}_json.txt > nuclei_output/${crit}.txt
@@ -3344,7 +3326,6 @@ function nuclei_check() {
 				printf "\n\n"
 			fi
 		fi
-
 
 		# Faraday integration
 		if [[ $FARADAY == true ]]; then
@@ -6181,7 +6162,7 @@ if [[ $OSTYPE == "darwin"* ]]; then
 	PATH="$(brew --prefix coreutils)/libexec/gnubin:$PATH"
 fi
 
-PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:z:rspanwvh::' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,check-tools' -n 'reconFTW' -- "$@")
+PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c::zrspanwvh::' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,check-tools' -n 'reconFTW' -- "$@")
 
 exit_status=$?
 if [[ $exit_status -ne 0 ]]; then
