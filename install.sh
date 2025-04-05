@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Detect if the script is being run in MacOS with Homebrew Bash
+if [[ "$OSTYPE" == "darwin"* && "$BASH" != "/opt/homebrew/bin/bash" ]]; then
+    exec /opt/homebrew/bin/bash "$0" "$@"
+fi
+
 # Load main configuration
 CONFIG_FILE="./reconftw.cfg"
 
@@ -580,6 +585,7 @@ function initial_setup() {
 
 	echo -e "\n${bblue}Running: Downloading required files${reset}\n"
 
+	mkdir -p ${HOME}/.config/notify
 	# Download required files with error handling
 	declare -A downloads=(
 	    ["notify_provider_config"]="https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw ${HOME}/.config/notify/provider-config.yaml"
