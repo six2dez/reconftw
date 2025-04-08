@@ -12,6 +12,11 @@
 #	   ░        ░  ░░ ░          ░ ░           ░                      ░
 #
 
+# Detect if the script is being run in MacOS with Homebrew Bash
+if [[ $OSTYPE == "darwin"* && $BASH != "/opt/homebrew/bin/bash" ]]; then
+	exec /opt/homebrew/bin/bash "$0" "$@"
+fi
+
 function banner_grabber() {
 	local banner_file="${SCRIPTPATH}/banners.txt"
 
@@ -158,9 +163,9 @@ function tools_installed() {
 		["Oralyzer_python"]="${tools}/Oralyzer/venv/bin/python3"
 		["msftrecon"]="${tools}/msftrecon/msftrecon/msftrecon.py"
 		["msftrecon_python"]="${tools}/msftrecon/venv/bin/python3"
-		["EmailHarvester"]="${tools}EmailHarvester"
+		["EmailHarvester"]="${tools}/EmailHarvester/EmailHarvester.py"
 		["EmailHarvester_python"]="${tools}/EmailHarvester/venv/bin/python3"
-		["metagoofil"]="${tools}metagoofil"
+		["metagoofil"]="${tools}/metagoofil/metagoofil.py"
 		["metagoofil_python"]="${tools}/metagoofil/venv/bin/python3"
 	)
 
@@ -429,8 +434,8 @@ function metadata() {
 		start_func "${FUNCNAME[0]}" "Scanning metadata in public files"
 
 		mkdir -p ".tmp/metagoofil_${domain}/" 2>>"${LOGFILE}"
-		"${tools}/metagoofil/venv/bin/python3" "${tools}/metagoofil/metagoofil.py" -d "${domain}" -t pdf,docx,xlsx -l 10 -w -o ".tmp/metagoofil_${domain}/" 2>>"${LOGFILE}"
-		exiftool -r .tmp/metagoofil_${domain}/* | egrep -i "Author|Creator|Email|Producer|Template" | sort -u | anew -q "osint/metadata_results.txt"
+		"${tools}/metagoofil/venv/bin/python3" "${tools}/metagoofil/metagoofil.py" -d "${domain}" -t pdf,docx,xlsx -l 10 -w -o ".tmp/metagoofil_${domain}/" 2>>"${LOGFILE}" > /dev/null
+		exiftool -r .tmp/metagoofil_${domain}/* 2>>"${LOGFILE}" | tee /dev/null | egrep -i "Author|Creator|Email|Producer|Template" | sort -u | anew -q "osint/metadata_results.txt"
 
 		end_func "Results are saved in ${domain}/osint/[software/authors/metadata_results].txt" "${FUNCNAME[0]}"
 	else
@@ -503,7 +508,6 @@ function emails() {
 
 		start_func "${FUNCNAME[0]}" "Searching for emails/users/passwords leaks"
 
-
 		"${tools}/EmailHarvester/venv/bin/python3" "${tools}/EmailHarvester/EmailHarvester.py" -d ${domain} -e all -l 20 2>>"$LOGFILE" | anew -q .tmp/EmailHarvester.txt
 
 		# Process emailfinder results
@@ -555,8 +559,8 @@ function domain_info() {
 		start_func "${FUNCNAME[0]}" "Searching domain info (whois, registrant name/email domains)"
 
 		# Run whois command and check for errors
-		whois -H "$domain" >"osint/domain_info_general.txt"
-		"${tools}/msftrecon/venv/bin/python3" "${tools}/msftrecon/msftrecon/msftrecon.py" -d ${domain} > osint/azure_tenant_domains.txt
+		whois "$domain" >"osint/domain_info_general.txt"
+		"${tools}/msftrecon/venv/bin/python3" "${tools}/msftrecon/msftrecon/msftrecon.py" -d ${domain} >osint/azure_tenant_domains.txt
 
 		end_func "Results are saved in ${domain}/osint/domain_info_[general/azure_tenant_domains].txt" "${FUNCNAME[0]}"
 
@@ -1017,8 +1021,7 @@ function sub_tls() {
 		if [[ $DEEP == true ]]; then
 			if [[ $AXIOM != true ]]; then
 				cat subdomains/subdomains.txt | tlsx -san -cn -silent -ro -c "$TLSX_THREADS" \
-					-p "$TLS_PORTS" -o .tmp/subdomains_tlsx.txt <subdomains/subdomains.txt \
-					2>>"$LOGFILE" >/dev/null
+					-p "$TLS_PORTS" -o .tmp/subdomains_tlsx.txt 2>>"$LOGFILE" >/dev/null
 			else
 				axiom-scan subdomains/subdomains.txt -m tlsx \
 					-san -cn -silent -ro -c "$TLSX_THREADS" -p "$TLS_PORTS" \
@@ -1026,7 +1029,7 @@ function sub_tls() {
 			fi
 		else
 			if [[ $AXIOM != true ]]; then
-				cat subdomains/subdomains.txt | tlsx -san -cn -silent -ro -c "$TLSX_THREADS" <subdomains/subdomains.txt >.tmp/subdomains_tlsx.txt 2>>"$LOGFILE"
+				cat subdomains/subdomains.txt | tlsx -san -cn -silent -ro -c "$TLSX_THREADS" >.tmp/subdomains_tlsx.txt 2>>"$LOGFILE"
 			else
 				axiom-scan subdomains/subdomains.txt -m tlsx \
 					-san -cn -silent -ro -c "$TLSX_THREADS" \
@@ -1173,7 +1176,7 @@ function sub_dns() {
 					grep -E '^([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}$' |
 					anew -q .tmp/subdomains_dns.txt
 
-				jq -r 'try .a[]' <"subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" >/dev/null | sort -u |
+				jq -r 'try .a[]' <"subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" | tee /dev/null | sort -u |
 					hakip2host | awk '{print $3}' | unfurl -u domains |
 					sed -e 's/^\*\.//' -e 's/\.$//' -e '/\./!d' |
 					grep "\.$domain$" |
@@ -1202,10 +1205,10 @@ function sub_dns() {
 			fi
 
 			if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
-				jq -r 'try .a[]' <"subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" >/dev/null | sort -u |
+				jq -r 'try .a[]' <"subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" | tee /dev/null | sort -u |
 					anew -q .tmp/subdomains_dns_a_records.txt
 
-				jq -r 'try .a[]' <"subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" >/dev/null | sort -u |
+				jq -r 'try .a[]' <"subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" | tee /dev/null | sort -u |
 					hakip2host | awk '{print $3}' | unfurl -u domains |
 					sed -e 's/^\*\.//' -e 's/\.$//' -e '/\./!d' |
 					grep "\.$domain$" |
@@ -1610,7 +1613,7 @@ function sub_analytics() {
 			fi
 		fi
 
-		if ! NUMOFLINES=$(anew subdomains/subdomains.txt 2>/dev/null <.tmp/analytics_subs_resolved.txt 2>/dev/null | sed '/^$/d' | wc -l); then
+		if ! NUMOFLINES=$(cat .tmp/analytics_subs_resolved.txt 2>/dev/null | anew subdomains/subdomains.txt 2>/dev/null | sed '/^$/d' | wc -l); then
 			printf "%b[!] Failed to count new subdomains.%b\n" "$bred" "$reset"
 			NUMOFLINES=0
 		fi
@@ -2230,7 +2233,7 @@ function subtakeover() {
 
 		# Convert JSON to text
 		if [[ -s ".tmp/tko_json.txt" ]]; then
-			jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' .tmp/tko_json.txt > .tmp/tko.txt
+			jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' .tmp/tko_json.txt >.tmp/tko.txt
 		fi
 
 		# DNS Takeover
@@ -2298,8 +2301,8 @@ function zonetransfer() {
 		fi
 
 		# Perform zone transfer check
-		for ns in $(dig +short ns "$domain"); do
-			dig axfr "$domain" @"$ns" >>"subdomains/zonetransfer.txt" 2>>"$LOGFILE"
+		for ns in $(dig +short ns "$domain" 2>/dev/null); do
+			dig axfr "${domain}" @"$ns" 2>>"$LOGFILE" | tee -a "subdomains/zonetransfer.txt" >/dev/null
 		done
 
 		# Check if zone transfer was successful
@@ -2427,7 +2430,7 @@ function s3buckets() {
 		fi
 
 		if [[ $DEEP == true ]]; then
-		# Run CloudHunter on each URL in webs/full_webs.txt and append the output to the file in the subdomains folder
+			# Run CloudHunter on each URL in webs/full_webs.txt and append the output to the file in the subdomains folder
 			while IFS= read -r url; do
 				printf "Processing URL: %s\n" "$url" >>"$LOGFILE"
 				(
@@ -2441,7 +2444,7 @@ function s3buckets() {
 				) >>"$dir/subdomains/cloudhunter_open_buckets.txt" 2>>"$LOGFILE"
 			done <webs/full_webs.txt
 		fi
-				# Run CloudHunter on each URL in webs/full_webs.txt and append the output to the file in the subdomains folder
+		# Run CloudHunter on each URL in webs/full_webs.txt and append the output to the file in the subdomains folder
 
 		printf "Processing domain: %s\n" "$domain" >>"$LOGFILE"
 		(
@@ -2453,7 +2456,6 @@ function s3buckets() {
 				printf "%b[!] CloudHunter command failed for URL %s.%b\n" "$bred" "$url" "$reset"
 			fi
 		) >>"$dir/subdomains/cloudhunter_open_buckets.txt" 2>>"$LOGFILE"
-
 
 		# Remove the full_webs.txt file after CloudHunter processing
 		if ! rm webs/full_webs.txt; then
@@ -2544,7 +2546,7 @@ function geo_info() {
 			# Attempt to generate hosts/ips.txt
 			if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 				if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
-					jq -r 'try . | "\(.host) \(.a[0])"' "subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" >/dev/null | anew -q .tmp/subs_ips.txt
+					jq -r 'try . | "\(.host) \(.a[0])"' "subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" | tee /dev/null | anew -q .tmp/subs_ips.txt
 				fi
 				if [[ -s ".tmp/subs_ips.txt" ]]; then
 					awk '{ print $2 " " $1}' .tmp/subs_ips.txt | sort -k2 -n | anew -q hosts/subs_ips_vhosts.txt
@@ -3006,7 +3008,7 @@ function portscan() {
 			# Not an IP address
 			if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
 				# Extract host and IP from JSON
-				jq -r 'try . | "\(.host) \(.a[0])"' "subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" >/dev/null | anew -q .tmp/subs_ips.txt
+				jq -r 'try . | "\(.host) \(.a[0])"' "subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" | tee /dev/null | anew -q .tmp/subs_ips.txt
 			fi
 
 			if [[ -s ".tmp/subs_ips.txt" ]]; then
@@ -3147,7 +3149,7 @@ function cdnprovider() {
 		# Check if subdomains_dnsregs.json exists and is not empty
 		if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
 			# Extract IPs from .a[] fields, exclude private IPs, extract IPs, sort uniquely
-			jq -r 'try . | .a[]' "subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" >/dev/null |
+			jq -r 'try . | .a[]' "subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" | tee /dev/null |
 				grep -aEiv "^(127|10|169\.254|172\.(1[6-9]|2[0-9]|3[01])|192\.168)\." |
 				grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" |
 				sort -u >.tmp/ips_cdn.txt
@@ -3280,7 +3282,8 @@ function nuclei_check() {
 		fi
 
 		# Combine webs_subs.txt and webs_fuzz.txt into webs_nuclei.txt and duplicate it
-		cat .tmp/webs_subs.txt .tmp/webs_fuzz.txt 2>>"$LOGFILE" | anew -q .tmp/webs_nuclei.txt | tee -a webs/webs_nuclei.txt
+		cat .tmp/webs_subs.txt .tmp/webs_fuzz.txt 2>>"$LOGFILE" | anew -q .tmp/webs_nuclei.txt
+		cat .tmp/webs_nuclei.txt | anew -q webs/webs_nuclei.txt
 		# Check if AXIOM is enabled
 		if [[ $AXIOM != true ]]; then
 			# Split severity levels into an array
@@ -3292,7 +3295,7 @@ function nuclei_check() {
 				nuclei -l .tmp/webs_nuclei.txt -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 ${NUCLEI_EXTRA_ARGS} -t ${NUCLEI_TEMPLATES_PATH} -j -o "nuclei_output/${crit}_json.txt" 2>>"$LOGFILE" >/dev/null
 				# Parse the JSON output and save the results to a text file
 				if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
-					jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' nuclei_output/${crit}_json.txt > nuclei_output/${crit}.txt
+					jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' nuclei_output/${crit}_json.txt >nuclei_output/${crit}.txt
 					# Display the results if the output file exists and is not empty
 					if [[ -s "nuclei_output/${crit}.txt" ]]; then
 						cat "nuclei_output/${crit}.txt"
@@ -3315,7 +3318,7 @@ function nuclei_check() {
 						-silent -retries 2 "$NUCLEI_EXTRA_ARGS" -j -o "nuclei_output/${crit}_json.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
 					# Parse the JSON output and save the results to a text file
 					if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
-						jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' nuclei_output/${crit}_json.txt > nuclei_output/${crit}.txt
+						jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' nuclei_output/${crit}_json.txt >nuclei_output/${crit}.txt
 
 						# Display the results if the output file exists and is not empty
 						if [[ -s "nuclei_output/${crit}.txt" ]]; then
@@ -3390,12 +3393,12 @@ function fuzz() {
 				done
 				find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | sort -k1 | anew -q $dir/fuzzing/fuzzing_full.txt
 			else
-				wget -q -O - ${fuzzing_remote_list} > .tmp/fuzzing_remote_list.txt
-				axiom-scan webs/webs_all.txt -m ffuf -wL .tmp/fuzzing_remote_list.txt -H "${HEADER}" $FFUF_FLAGS -s -maxtime $FFUF_MAXTIME -o $dir/.tmp/ffuf-content.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+				wget -q -O - ${fuzzing_remote_list} >.tmp/fuzzing_remote_list.txt
+				axiom-scan webs/webs_all.txt -m ffuf -wL .tmp/fuzzing_remote_list.txt -H "${HEADER}" $FFUF_FLAGS -s -maxtime $FFUF_MAXTIME -oJ $dir/.tmp/ffuf-content.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 
 				for sub in $(cat webs/webs_all.txt); do
 					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-					[ -s "$dir/.tmp/ffuf-content.json" ] && cat $dir/.tmp/ffuf-content.json 	 | grep $sub | sort -k1 | anew -q fuzzing/${sub_out}.txt
+					[ -s "$dir/.tmp/ffuf-content.json" ] && cat $dir/.tmp/ffuf-content.json | jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' | grep $sub | sort -k1 | anew -q fuzzing/${sub_out}.txt
 				done
 				find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | sort -k1 | anew -q $dir/fuzzing/fuzzing_full.txt
 			fi
@@ -3921,12 +3924,12 @@ function wordlist_gen() {
 		if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
 			# Define patterns for keys and values
 			cat ".tmp/url_extract_tmp.txt" | unfurl -u keys 2>>"$LOGFILE" |
-						sed 's/[][]//g' | sed 's/[#]//g' | sed 's/[}{]//g' |
-						anew -q webs/dict_keys.txt
+				sed 's/[][]//g' | sed 's/[#]//g' | sed 's/[}{]//g' |
+				anew -q webs/dict_keys.txt
 
-			cat ".tmp/url_extract_tmp.txt" | unfurl -u values  2>>"$LOGFILE" |
-						sed 's/[][]//g' | sed 's/[#]//g' | sed 's/[}{]//g' |
-						anew -q webs/dict_values.txt
+			cat ".tmp/url_extract_tmp.txt" | unfurl -u values 2>>"$LOGFILE" |
+				sed 's/[][]//g' | sed 's/[#]//g' | sed 's/[}{]//g' |
+				anew -q webs/dict_values.txt
 
 			printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Extracting words...${reset}\n"
 			tr "[:punct:]" "\n" <".tmp/url_extract_tmp.txt" | anew -q "webs/dict_words.txt"
@@ -4271,7 +4274,7 @@ function open_redirect() {
 			qsreplace FUZZ <"gf/redirect.txt" | sed '/FUZZ/!d' | anew -q ".tmp/tmp_redirect.txt"
 
 			# Run Oralyzer with the generated payloads
-			"${tools}/Oralyzer/venv/bin/python3" "${tools}/Oralyzer/oralyzer.py" -l ".tmp/tmp_redirect.txt" -p "${tools}/Oralyzer/payloads.txt" >"vulns/redirect.txt" 2>>"$LOGFILE" >/dev/null
+			"${tools}/Oralyzer/venv/bin/python3" "${tools}/Oralyzer/oralyzer.py" -l ".tmp/tmp_redirect.txt" -p "${tools}/Oralyzer/payloads.txt" >"vulns/redirect.txt" 2>>"$LOGFILE"
 
 			# Remove ANSI color codes from the output
 			sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" "vulns/redirect.txt"
@@ -5015,7 +5018,7 @@ function fuzzparams() {
 				fi
 
 				# Execute Nuclei with the fuzzing templates
-				nuclei -silent -retries 3 -rl "$NUCLEI_RATELIMIT" -t ${NUCLEI_FUZZING_TEMPLATES_PATH} -dast -j -o ".tmp/fuzzparams_json.txt" <"webs/url_extract_nodupes.txt" 2>>"$LOGFILE"
+				nuclei -l webs/url_extract_nodupes.txt -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 ${NUCLEI_EXTRA_ARGS} -t ${NUCLEI_FUZZING_TEMPLATES_PATH} -dast -j -o ".tmp/fuzzparams_json.txt" <"webs/url_extract_nodupes.txt" 2>>"$LOGFILE" >/dev/null
 
 			else
 				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Axiom with Nuclei${reset}\n\n"
@@ -5025,12 +5028,14 @@ function fuzzparams() {
 					axiom-exec "git clone https://github.com/projectdiscovery/fuzzing-templates /home/op/fuzzing-templates" &>/dev/null
 				fi
 
-				# Execute Axiom scan with Nuclei
-				axiom-scan "webs/url_extract_nodupes.txt" -m nuclei -nh -retries 3 -w "/home/op/fuzzing-templates" -rl "$NUCLEI_RATELIMIT" -dast -j -o ".tmp/fuzzparams_json.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+				axiom-scan .tmp/webs_nuclei.txt -m nuclei \
+						--remote-folder "/home/op/fuzzing-templates" \
+						-nh -rl "$NUCLEI_RATELIMIT" \
+						-silent -retries 2 "$NUCLEI_EXTRA_ARGS" -dast -j -o ".tmp/fuzzparams_json.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 			fi
 
 			# Convert JSON output to text
-			jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' .tmp/fuzzparams_json.txt > .tmp/fuzzparams.txt
+			jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' .tmp/fuzzparams_json.txt >.tmp/fuzzparams.txt
 
 			# Append unique results to vulns/fuzzparams.txt
 			if [[ -s ".tmp/fuzzparams.txt" ]]; then
@@ -5485,7 +5490,7 @@ function end() {
 				faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nmap hosts/portscan_active.xml 2>>"$LOGFILE" >/dev/null
 			fi
 			if [[ -s ".tmp/fuzzparams_json.txt" ]]; then
-					faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei .tmp/fuzzparams_json.txt 2>>"$LOGFILE" >/dev/null
+				faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei .tmp/fuzzparams_json.txt 2>>"$LOGFILE" >/dev/null
 			fi
 			if [[ -s "nuclei_output/info_json.txt" ]]; then
 				faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei nuclei_output/info_json.txt 2>>"$LOGFILE" >/dev/null
