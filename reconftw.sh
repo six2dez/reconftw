@@ -589,14 +589,8 @@ function third_party_misconfigs() {
 		# Extract company name from domain
 		company_name=$(unfurl format %r <<<"$domain")
 
+		# Run misconfig-mapper and handle errors
 		misconfig-mapper -target "$company_name" -service "*" 2>&1 | grep -v "\-\]" | grep -v "Failed" >"${dir}/osint/3rdparts_misconfigurations.txt"
-
-		# Return to the previous directory
-		if ! popd >/dev/null; then
-			printf "%b[!] Failed to return to previous directory in %s at line %s.%b\n" \
-				"$bred" "${FUNCNAME[0]}" "$LINENO" "$reset"
-			return 1
-		fi
 
 		end_func "Results are saved in $domain/osint/3rdparts_misconfigurations.txt" "${FUNCNAME[0]}"
 
