@@ -3394,11 +3394,11 @@ function fuzz() {
 				find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | sort -k1 | anew -q $dir/fuzzing/fuzzing_full.txt
 			else
 				wget -q -O - ${fuzzing_remote_list} >.tmp/fuzzing_remote_list.txt
-				axiom-scan webs/webs_all.txt -m ffuf -wL .tmp/fuzzing_remote_list.txt -H "${HEADER}" $FFUF_FLAGS -s -maxtime $FFUF_MAXTIME -o $dir/.tmp/ffuf-content.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+				axiom-scan webs/webs_all.txt -m ffuf -wL .tmp/fuzzing_remote_list.txt -H "${HEADER}" $FFUF_FLAGS -s -maxtime $FFUF_MAXTIME -oJ $dir/.tmp/ffuf-content.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 
 				for sub in $(cat webs/webs_all.txt); do
 					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-					[ -s "$dir/.tmp/ffuf-content.json" ] && cat $dir/.tmp/ffuf-content.json | grep $sub | sort -k1 | anew -q fuzzing/${sub_out}.txt
+					[ -s "$dir/.tmp/ffuf-content.json" ] && cat $dir/.tmp/ffuf-content.json | jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' | grep $sub | sort -k1 | anew -q fuzzing/${sub_out}.txt
 				done
 				find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | sort -k1 | anew -q $dir/fuzzing/fuzzing_full.txt
 			fi
@@ -5018,7 +5018,7 @@ function fuzzparams() {
 				fi
 
 				# Execute Nuclei with the fuzzing templates
-				nuclei -silent -retries 3 -rl "$NUCLEI_RATELIMIT" -t ${NUCLEI_FUZZING_TEMPLATES_PATH} -dast -j -o ".tmp/fuzzparams_json.txt" <"webs/url_extract_nodupes.txt" 2>>"$LOGFILE"
+				nuclei -l webs/url_extract_nodupes.txt -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 ${NUCLEI_EXTRA_ARGS} -t ${NUCLEI_FUZZING_TEMPLATES_PATH} -dast -j -o ".tmp/fuzzparams_json.txt" <"webs/url_extract_nodupes.txt" 2>>"$LOGFILE" >/dev/null
 
 			else
 				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Axiom with Nuclei${reset}\n\n"
@@ -5028,8 +5028,10 @@ function fuzzparams() {
 					axiom-exec "git clone https://github.com/projectdiscovery/fuzzing-templates /home/op/fuzzing-templates" &>/dev/null
 				fi
 
-				# Execute Axiom scan with Nuclei
-				axiom-scan "webs/url_extract_nodupes.txt" -m nuclei -nh -retries 3 -w "/home/op/fuzzing-templates" -rl "$NUCLEI_RATELIMIT" -dast -j -o ".tmp/fuzzparams_json.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+				axiom-scan .tmp/webs_nuclei.txt -m nuclei \
+						--remote-folder "/home/op/fuzzing-templates" \
+						-nh -rl "$NUCLEI_RATELIMIT" \
+						-silent -retries 2 "$NUCLEI_EXTRA_ARGS" -dast -j -o ".tmp/fuzzparams_json.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 			fi
 
 			# Convert JSON output to text
