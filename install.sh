@@ -83,6 +83,7 @@ declare -A gotools=(
 	["jsluice"]="go install -v github.com/BishopFox/jsluice/cmd/jsluice@latest"
 	["urlfinder"]="go install -v github.com/projectdiscovery/urlfinder/cmd/urlfinder@latest"
 	["cent"]="go install -v github.com/xm1k3/cent@latest"
+	["misconfig-mapper"]="go install -v github.com/intigriti/misconfig-mapper/cmd/misconfig-mapper@latest"
 )
 
 # Declare pipx tools and their paths
@@ -123,7 +124,6 @@ declare -A repos=(
 	["SwaggerSpy"]="UndeadSec/SwaggerSpy"
 	["LeakSearch"]="JoelGMSec/LeakSearch"
 	["ffufPostprocessing"]="Damian89/ffufPostprocessing"
-	["misconfig-mapper"]="intigriti/misconfig-mapper"
 	["Spoofy"]="MattKeeley/Spoofy"
 	["msftrecon"]="Arcanum-Sec/msftrecon"
 	["metagoofil"]="opsdisk/metagoofil"
@@ -177,7 +177,7 @@ function install_tools() {
 		fi
 	done
 
-	echo -e "\n${bblue}Running: Installing pipx tools (${#repos[@]})${reset}\n"
+	echo -e "\n${bblue}Running: Installing pipx tools (${#pipxtools[@]})${reset}\n"
 
 	local pipx_step=0
 	local failed_pipx_tools=()
@@ -285,14 +285,6 @@ function install_tools() {
 			git pull &>/dev/null
 			go build -o ffufPostprocessing main.go &>/dev/null
 			chmod +x ./ffufPostprocessing
-			;;
-		"misconfig-mapper")
-			git reset --hard origin/main &>/dev/null
-			git pull &>/dev/null
-			go mod tidy &>/dev/null
-			go build -o misconfig-mapper &>/dev/null
-			chmod +x ./misconfig-mapper &>/dev/null
-			cp misconfig-mapper $HOME/go/bin/ &>/dev/null
 			;;
 		"trufflehog")
 			go install &>/dev/null
