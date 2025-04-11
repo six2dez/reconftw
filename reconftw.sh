@@ -3029,7 +3029,7 @@ function portscan() {
 		# Check for CDN providers
 		if [[ ! -s "hosts/cdn_providers.txt" ]]; then
 			if [[ -s "hosts/ips.txt" ]]; then
-				cdncheck -silent -resp -cdn -waf -nc <hosts/ips.txt 2>/dev/null >hosts/cdn_providers.txt
+				cat hosts/ips.txt | cdncheck -silent -resp -cdn -waf -nc 2>/dev/null | anew -q hosts/cdn_providers.txt
 			fi
 		fi
 
