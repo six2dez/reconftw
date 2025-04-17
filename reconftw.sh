@@ -2213,7 +2213,7 @@ function subtakeover() {
 			cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
 		fi
 
-		cent update -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
+		#cent update -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
 
 		if [[ $AXIOM != true ]]; then
 			if ! nuclei -update 2>>"$LOGFILE" >/dev/null; then
@@ -3256,7 +3256,7 @@ function nuclei_check() {
 	# Check if the function should run
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $NUCLEICHECK == true ]]; then
 		start_func "${FUNCNAME[0]}" "Templates-based Web Scanner"
-		cent update -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
+		#cent update -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
 		# Update nuclei templates
 		nuclei -update 2>>"$LOGFILE" >/dev/null
 
@@ -4990,7 +4990,7 @@ function fuzzparams() {
 		URL_COUNT=$(wc -l <"webs/url_extract_nodupes.txt")
 		if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT2 ]]; then
 
-			cent update -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
+			#cent update -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
 
 			if [[ $AXIOM != true ]]; then
 				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Nuclei Setup and Execution${reset}\n\n"
