@@ -3399,7 +3399,6 @@ function fuzz() {
 			end_func "No $domain/web/webs.txts file found, fuzzing skipped " ${FUNCNAME[0]}
 		fi
 
-		end_func "Results are saved in $domain/fuzzing folder" "${FUNCNAME[0]}"
 	else
 		if [[ $FUZZ == false ]]; then
 			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
