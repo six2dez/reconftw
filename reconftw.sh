@@ -2198,7 +2198,7 @@ function subtakeover() {
 			cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
 		fi
 
-		cent update -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
+		#cent update -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
 
 		if [[ $AXIOM != true ]]; then
 			if ! nuclei -update 2>>"$LOGFILE" >/dev/null; then
@@ -3241,7 +3241,7 @@ function nuclei_check() {
 	# Check if the function should run
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $NUCLEICHECK == true ]]; then
 		start_func "${FUNCNAME[0]}" "Templates-based Web Scanner"
-		cent update -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
+		#cent update -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
 		# Update nuclei templates
 		nuclei -update 2>>"$LOGFILE" >/dev/null
 
@@ -3258,17 +3258,9 @@ function nuclei_check() {
 
 		# Combine url_extract_nodupes.txt, subdomains.txt, and webs_all.txt into webs_subs.txt if it doesn't exist
 		if [[ ! -s ".tmp/webs_subs.txt" ]]; then
-			cat webs/url_extract_nodupes.txt subdomains/subdomains.txt webs/webs_all.txt 2>>"$LOGFILE" | anew -q .tmp/webs_subs.txt
+			cat subdomains/subdomains.txt webs/webs_all.txt 2>>"$LOGFILE" > .tmp/webs_subs.txt
 		fi
 
-		# If fuzzing_full.txt exists, process it and create webs_fuzz.txt
-		if [[ -s "$dir/fuzzing/fuzzing_full.txt" ]]; then
-			grep "^200" "$dir/fuzzing/fuzzing_full.txt" | cut -d " " -f3 | anew -q .tmp/webs_fuzz.txt
-		fi
-
-		# Combine webs_subs.txt and webs_fuzz.txt into webs_nuclei.txt and duplicate it
-		cat .tmp/webs_subs.txt .tmp/webs_fuzz.txt 2>>"$LOGFILE" | anew -q .tmp/webs_nuclei.txt
-		cat .tmp/webs_nuclei.txt | anew -q webs/webs_nuclei.txt
 		# Check if AXIOM is enabled
 		if [[ $AXIOM != true ]]; then
 			# Split severity levels into an array
@@ -3277,7 +3269,7 @@ function nuclei_check() {
 			for crit in "${severity_array[@]}"; do
 				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Nuclei Severity: $crit ${reset}\n\n"
 				# Run nuclei for each severity level
-				nuclei -l .tmp/webs_nuclei.txt -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 ${NUCLEI_EXTRA_ARGS} -t ${NUCLEI_TEMPLATES_PATH} -j -o "nuclei_output/${crit}_json.txt" 2>>"$LOGFILE" >/dev/null
+				nuclei -l .tmp/webs_subs.txt -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 ${NUCLEI_EXTRA_ARGS} -t ${NUCLEI_TEMPLATES_PATH} -j -o "nuclei_output/${crit}_json.txt" 2>>"$LOGFILE" >/dev/null
 				# Parse the JSON output and save the results to a text file
 				if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
 					jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' nuclei_output/${crit}_json.txt >nuclei_output/${crit}.txt
@@ -3297,7 +3289,7 @@ function nuclei_check() {
 				for crit in "${severity_array[@]}"; do
 					printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Axiom Nuclei Severity: $crit. Check results in nuclei_output folder.${reset}\n\n"
 					# Run axiom-scan with nuclei module for each severity level
-					axiom-scan .tmp/webs_nuclei.txt -m nuclei \
+					axiom-scan .tmp/webs_subs.txt -m nuclei \
 						--nuclei-templates "$NUCLEI_TEMPLATES_PATH" \
 						-severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" \
 						-silent -retries 2 "$NUCLEI_EXTRA_ARGS" -j -o "nuclei_output/${crit}_json.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
@@ -3392,7 +3384,6 @@ function fuzz() {
 			end_func "No $domain/web/webs.txts file found, fuzzing skipped " ${FUNCNAME[0]}
 		fi
 
-		end_func "Results are saved in $domain/fuzzing folder" "${FUNCNAME[0]}"
 	else
 		if [[ $FUZZ == false ]]; then
 			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
@@ -4983,7 +4974,7 @@ function fuzzparams() {
 		URL_COUNT=$(wc -l <"webs/url_extract_nodupes.txt")
 		if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT2 ]]; then
 
-			cent update -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
+			#cent update -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
 
 			if [[ $AXIOM != true ]]; then
 				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Nuclei Setup and Execution${reset}\n\n"
@@ -5003,7 +4994,7 @@ function fuzzparams() {
 				fi
 
 				# Execute Nuclei with the fuzzing templates
-				nuclei -l webs/url_extract_nodupes.txt -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 ${NUCLEI_EXTRA_ARGS} -t ${NUCLEI_FUZZING_TEMPLATES_PATH} -dast -j -o ".tmp/fuzzparams_json.txt" <"webs/url_extract_nodupes.txt" 2>>"$LOGFILE" >/dev/null
+				nuclei -l webs/url_extract_nodupes.txt -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 ${NUCLEI_EXTRA_ARGS} -t ${NUCLEI_TEMPLATES_PATH}/dast -dast -j -o ".tmp/fuzzparams_json.txt" <"webs/url_extract_nodupes.txt" 2>>"$LOGFILE" >/dev/null
 
 			else
 				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Axiom with Nuclei${reset}\n\n"
@@ -5013,7 +5004,7 @@ function fuzzparams() {
 					axiom-exec "git clone https://github.com/projectdiscovery/fuzzing-templates /home/op/fuzzing-templates" &>/dev/null
 				fi
 
-				axiom-scan .tmp/webs_nuclei.txt -m nuclei \
+				axiom-scan webs/url_extract_nodupes.txt -m nuclei \
 						--remote-folder "/home/op/fuzzing-templates" \
 						-nh -rl "$NUCLEI_RATELIMIT" \
 						-silent -retries 2 "$NUCLEI_EXTRA_ARGS" -dast -j -o ".tmp/fuzzparams_json.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
