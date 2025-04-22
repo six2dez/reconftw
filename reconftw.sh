@@ -5704,11 +5704,11 @@ function recon() {
 	portscan
 	geo_info
 	waf_checks
+	nuclei_check
 	fuzz
 	iishortname
 	urlchecks
 	jschecks
-	nuclei_check
 
 	if [[ $AXIOM == true ]]; then
 		axiom_shutdown
@@ -5883,6 +5883,7 @@ function multi_recon() {
 	notification "- ${NUMOFLINES_cloudsprov_total} total IPs belongs to cloud" good
 	s3buckets
 	waf_checks
+	nuclei_check
 	for domain in $targets; do
 		loopstart=$(date +%s)
 		dir=$workdir/targets/$domain
@@ -5907,7 +5908,7 @@ function multi_recon() {
 		fi
 		printf "${bgreen}#######################################################################${reset}\n"
 	done
-	nuclei_check
+	
 	if [[ $AXIOM == true ]]; then
 		axiom_shutdown
 	fi
@@ -6042,13 +6043,13 @@ function webs_menu() {
 	screenshot
 	#	virtualhosts
 	waf_checks
+	nuclei_check
 	fuzz
 	cms_scanner
 	iishortname
 	urlchecks
 	jschecks
 	url_gf
-	nuclei_check
 	wordlist_gen
 	wordlist_gen_roboxtractor
 	password_dict
@@ -6072,16 +6073,16 @@ function zen_menu() {
 	#	virtualhosts
 	cdnprovider
 	waf_checks
+	nuclei_check
 	fuzz
 	iishortname
-	nuclei_check
-
 	if [[ $AXIOM == true ]]; then
 		axiom_shutdown
 	fi
 	cms_scanner
 	end
 }
+
 
 function help() {
 	printf "\n Usage: $0 [-d domain.tld] [-m name] [-l list.txt] [-x oos.txt] [-i in.txt] "
