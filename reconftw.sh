@@ -2782,51 +2782,6 @@ function screenshot() {
 				axiom-scan webs/webs_all.txt -m nuclei-screenshots -o screenshots "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
 			fi
 		fi
-
-		# Extract and process URLs from web_full_info_uncommon.txt
-		if [[ -s ".tmp/web_full_info_uncommon.txt" ]]; then
-			jq -r 'try .url' .tmp/web_full_info_uncommon.txt 2>/dev/null |
-				grep "$domain" |
-				grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?' |
-				sed 's/*.//' |
-				anew -q .tmp/probed_uncommon_ports_tmp.txt
-
-			jq -r 'try . | "\(.url) [\(.status_code)] [\(.title)] [\(.webserver)] \(.tech)"' .tmp/web_full_info_uncommon.txt |
-				grep "$domain" |
-				anew -q webs/web_full_info_uncommon_plain.txt
-
-			# Update webs_full_info_uncommon.txt based on whether domain is IP
-			if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-				cat .tmp/web_full_info_uncommon.txt 2>>"$LOGFILE" | anew -q webs/web_full_info_uncommon.txt
-			else
-				grep "$domain" .tmp/web_full_info_uncommon.txt | anew -q webs/web_full_info_uncommon.txt
-			fi
-
-			# Count new websites
-			if ! NUMOFLINES=$(anew webs/webs_uncommon_ports.txt <.tmp/probed_uncommon_ports_tmp.txt 2>>"$LOGFILE" | sed '/^$/d' | wc -l); then
-				printf "%b[!] Failed to count new websites.%b\n" "$bred" "$reset"
-				NUMOFLINES=0
-			fi
-
-			# Notify user
-			notification "Uncommon web ports: ${NUMOFLINES} new websites" "good"
-
-			# Display new uncommon ports websites
-			if [[ -s "webs/webs_uncommon_ports.txt" ]]; then
-				cat "webs/webs_uncommon_ports.txt"
-			fi
-
-			# Update webs_all.txt
-			cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
-
-			end_func "Results are saved in $domain/screenshots folder" "${FUNCNAME[0]}"
-
-			# Send to proxy if conditions met
-			if [[ $PROXY == true ]] && [[ -n $proxy_url ]] && [[ $(wc -l <webs/webs_uncommon_ports.txt) -le $DEEP_LIMIT2 ]]; then
-				notification "Sending websites with uncommon ports to proxy" "info"
-				ffuf -mc all -w webs/webs_uncommon_ports.txt -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
-			fi
-		fi
 	else
 		if [[ $WEBSCREENSHOT == false ]]; then
 			printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
