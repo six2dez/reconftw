@@ -5113,6 +5113,7 @@ function transfer {
 		echo "No arguments specified.\nUsage:\n transfer <file|directory>\n ... | transfer <file_name>" >&2
 		return 1
 	fi
+
 	if tty -s; then
 		file="$1"
 		file_name=$(basename "$file")
@@ -5120,15 +5121,10 @@ function transfer {
 			echo "$file: No such file or directory" >&2
 			return 1
 		fi
-		if [[ -d $file ]]; then
-			file_name="$file_name.zip"
-			(cd "$file" && zip -r -q - .) | curl --progress-bar --upload-file "-" "https://oshi.at/${file_name}" | tee /dev/null
-		else
-			cat "$file" | curl --progress-bar --upload-file "-" "https://oshi.at/${file_name}" | tee /dev/null
-		fi
+		tar -czvf /tmp/$file_name $file > /dev/null 2>&1 && curl -s https://bashupload.com/$file.tgz --data-binary @/tmp/$file_name | grep wget
 	else
 		file_name=$1
-		curl --progress-bar --upload-file "-" "https://oshi.at/${file_name}" | tee /dev/null
+		tar -czvf /tmp/$file_name $file > /dev/null 2>&1 && curl -s https://bashupload.com/$file.tgz --data-binary @/tmp/$file_name | grep wget
 	fi
 }
 
@@ -5140,7 +5136,7 @@ function sendToNotify {
 			NOTIFY_CONFIG=~/.config/notify/provider-config.yaml
 		fi
 		if [[ -n "$(find "${1}" -prune -size +8000000c)" ]]; then
-			printf '%s is larger than 8MB, sending over oshi.at\n' "${1}"
+			printf '%s is larger than 8MB, sending over external service\n' "${1}"
 			transfer "${1}" | notify -silent
 			return 0
 		fi
