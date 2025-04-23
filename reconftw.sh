@@ -2414,23 +2414,6 @@ function s3buckets() {
 			printf "resolvers.txt not found\n" >>"$LOGFILE"
 		fi
 
-		if [[ $DEEP == true ]]; then
-			# Run CloudHunter on each URL in webs/full_webs.txt and append the output to the file in the subdomains folder
-			while IFS= read -r url; do
-				printf "Processing URL: %s\n" "$url" >>"$LOGFILE"
-				(
-					if ! cd "$tools/CloudHunter"; then
-						printf "%b[!] Failed to cd to %s.%b\n" "$bred" "$tools/CloudHunter" "$reset"
-						return 1
-					fi
-					if ! "${tools}/CloudHunter/venv/bin/python3" ./cloudhunter.py ${PERMUTATION_FLAG} -r ./resolvers.txt -t 50 "$url"; then
-						printf "%b[!] CloudHunter command failed for URL %s.%b\n" "$bred" "$url" "$reset"
-					fi
-				) >>"$dir/subdomains/cloudhunter_open_buckets.txt" 2>>"$LOGFILE"
-			done <webs/full_webs.txt
-		fi
-		# Run CloudHunter on each URL in webs/full_webs.txt and append the output to the file in the subdomains folder
-
 		printf "Processing domain: %s\n" "$domain" >>"$LOGFILE"
 		(
 			if ! cd "$tools/CloudHunter"; then
@@ -2782,51 +2765,6 @@ function screenshot() {
 		else
 			if [[ -s "webs/webs_all.txt" ]]; then
 				axiom-scan webs/webs_all.txt -m nuclei-screenshots -o screenshots "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
-			fi
-		fi
-
-		# Extract and process URLs from web_full_info_uncommon.txt
-		if [[ -s ".tmp/web_full_info_uncommon.txt" ]]; then
-			jq -r 'try .url' .tmp/web_full_info_uncommon.txt 2>/dev/null |
-				grep "$domain" |
-				grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?' |
-				sed 's/*.//' |
-				anew -q .tmp/probed_uncommon_ports_tmp.txt
-
-			jq -r 'try . | "\(.url) [\(.status_code)] [\(.title)] [\(.webserver)] \(.tech)"' .tmp/web_full_info_uncommon.txt |
-				grep "$domain" |
-				anew -q webs/web_full_info_uncommon_plain.txt
-
-			# Update webs_full_info_uncommon.txt based on whether domain is IP
-			if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-				cat .tmp/web_full_info_uncommon.txt 2>>"$LOGFILE" | anew -q webs/web_full_info_uncommon.txt
-			else
-				grep "$domain" .tmp/web_full_info_uncommon.txt | anew -q webs/web_full_info_uncommon.txt
-			fi
-
-			# Count new websites
-			if ! NUMOFLINES=$(anew webs/webs_uncommon_ports.txt <.tmp/probed_uncommon_ports_tmp.txt 2>>"$LOGFILE" | sed '/^$/d' | wc -l); then
-				printf "%b[!] Failed to count new websites.%b\n" "$bred" "$reset"
-				NUMOFLINES=0
-			fi
-
-			# Notify user
-			notification "Uncommon web ports: ${NUMOFLINES} new websites" "good"
-
-			# Display new uncommon ports websites
-			if [[ -s "webs/webs_uncommon_ports.txt" ]]; then
-				cat "webs/webs_uncommon_ports.txt"
-			fi
-
-			# Update webs_all.txt
-			cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
-
-			end_func "Results are saved in $domain/screenshots folder" "${FUNCNAME[0]}"
-
-			# Send to proxy if conditions met
-			if [[ $PROXY == true ]] && [[ -n $proxy_url ]] && [[ $(wc -l <webs/webs_uncommon_ports.txt) -le $DEEP_LIMIT2 ]]; then
-				notification "Sending websites with uncommon ports to proxy" "info"
-				ffuf -mc all -w webs/webs_uncommon_ports.txt -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
 			fi
 		fi
 	else
@@ -3281,30 +3219,27 @@ function nuclei_check() {
 			done
 			printf "\n\n"
 		else
-			# Check if webs_nuclei.txt exists and is not empty
-			if [[ -s ".tmp/webs_nuclei.txt" ]]; then
-				# Split severity levels into an array
-				IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
+			# Split severity levels into an array
+			IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
 
-				for crit in "${severity_array[@]}"; do
-					printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Axiom Nuclei Severity: $crit. Check results in nuclei_output folder.${reset}\n\n"
-					# Run axiom-scan with nuclei module for each severity level
-					axiom-scan .tmp/webs_subs.txt -m nuclei \
-						--nuclei-templates "$NUCLEI_TEMPLATES_PATH" \
-						-severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" \
-						-silent -retries 2 "$NUCLEI_EXTRA_ARGS" -j -o "nuclei_output/${crit}_json.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
-					# Parse the JSON output and save the results to a text file
-					if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
-						jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' nuclei_output/${crit}_json.txt >nuclei_output/${crit}.txt
+			for crit in "${severity_array[@]}"; do
+				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Axiom Nuclei Severity: $crit. Check results in nuclei_output folder.${reset}\n\n"
+				# Run axiom-scan with nuclei module for each severity level
+				axiom-scan .tmp/webs_subs.txt -m nuclei \
+					--nuclei-templates "$NUCLEI_TEMPLATES_PATH" \
+					-severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" \
+					-silent -retries 2 "$NUCLEI_EXTRA_ARGS" -j -o "nuclei_output/${crit}_json.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+				# Parse the JSON output and save the results to a text file
+				if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
+					jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' nuclei_output/${crit}_json.txt >nuclei_output/${crit}.txt
 
-						# Display the results if the output file exists and is not empty
-						if [[ -s "nuclei_output/${crit}.txt" ]]; then
-							cat "nuclei_output/${crit}.txt"
-						fi
+					# Display the results if the output file exists and is not empty
+					if [[ -s "nuclei_output/${crit}.txt" ]]; then
+						cat "nuclei_output/${crit}.txt"
 					fi
+				fi
 				done
-				printf "\n\n"
-			fi
+			printf "\n\n"
 		fi
 
 		# Faraday integration
@@ -5160,6 +5095,7 @@ function transfer {
 		echo "No arguments specified.\nUsage:\n transfer <file|directory>\n ... | transfer <file_name>" >&2
 		return 1
 	fi
+
 	if tty -s; then
 		file="$1"
 		file_name=$(basename "$file")
@@ -5167,15 +5103,10 @@ function transfer {
 			echo "$file: No such file or directory" >&2
 			return 1
 		fi
-		if [[ -d $file ]]; then
-			file_name="$file_name.zip"
-			(cd "$file" && zip -r -q - .) | curl --progress-bar --upload-file "-" "https://oshi.at/${file_name}" | tee /dev/null
-		else
-			cat "$file" | curl --progress-bar --upload-file "-" "https://oshi.at/${file_name}" | tee /dev/null
-		fi
+		tar -czvf /tmp/$file_name $file > /dev/null 2>&1 && curl -s https://bashupload.com/$file.tgz --data-binary @/tmp/$file_name | grep wget
 	else
 		file_name=$1
-		curl --progress-bar --upload-file "-" "https://oshi.at/${file_name}" | tee /dev/null
+		tar -czvf /tmp/$file_name $file > /dev/null 2>&1 && curl -s https://bashupload.com/$file.tgz --data-binary @/tmp/$file_name | grep wget
 	fi
 }
 
@@ -5187,7 +5118,7 @@ function sendToNotify {
 			NOTIFY_CONFIG=~/.config/notify/provider-config.yaml
 		fi
 		if [[ -n "$(find "${1}" -prune -size +8000000c)" ]]; then
-			printf '%s is larger than 8MB, sending over oshi.at\n' "${1}"
+			printf '%s is larger than 8MB, sending over external service\n' "${1}"
 			transfer "${1}" | notify -silent
 			return 0
 		fi
@@ -5689,11 +5620,11 @@ function recon() {
 	portscan
 	geo_info
 	waf_checks
+	nuclei_check
 	fuzz
 	iishortname
 	urlchecks
 	jschecks
-	nuclei_check
 
 	if [[ $AXIOM == true ]]; then
 		axiom_shutdown
@@ -5868,6 +5799,7 @@ function multi_recon() {
 	notification "- ${NUMOFLINES_cloudsprov_total} total IPs belongs to cloud" good
 	s3buckets
 	waf_checks
+	nuclei_check
 	for domain in $targets; do
 		loopstart=$(date +%s)
 		dir=$workdir/targets/$domain
@@ -5892,7 +5824,7 @@ function multi_recon() {
 		fi
 		printf "${bgreen}#######################################################################${reset}\n"
 	done
-	nuclei_check
+	
 	if [[ $AXIOM == true ]]; then
 		axiom_shutdown
 	fi
@@ -6027,13 +5959,13 @@ function webs_menu() {
 	screenshot
 	#	virtualhosts
 	waf_checks
+	nuclei_check
 	fuzz
 	cms_scanner
 	iishortname
 	urlchecks
 	jschecks
 	url_gf
-	nuclei_check
 	wordlist_gen
 	wordlist_gen_roboxtractor
 	password_dict
@@ -6057,16 +5989,16 @@ function zen_menu() {
 	#	virtualhosts
 	cdnprovider
 	waf_checks
+	nuclei_check
 	fuzz
 	iishortname
-	nuclei_check
-
 	if [[ $AXIOM == true ]]; then
 		axiom_shutdown
 	fi
 	cms_scanner
 	end
 }
+
 
 function help() {
 	printf "\n Usage: $0 [-d domain.tld] [-m name] [-l list.txt] [-x oos.txt] [-i in.txt] "
