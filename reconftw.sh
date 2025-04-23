@@ -3234,30 +3234,27 @@ function nuclei_check() {
 			done
 			printf "\n\n"
 		else
-			# Check if webs_nuclei.txt exists and is not empty
-			if [[ -s ".tmp/webs_nuclei.txt" ]]; then
-				# Split severity levels into an array
-				IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
+			# Split severity levels into an array
+			IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
 
-				for crit in "${severity_array[@]}"; do
-					printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Axiom Nuclei Severity: $crit. Check results in nuclei_output folder.${reset}\n\n"
-					# Run axiom-scan with nuclei module for each severity level
-					axiom-scan .tmp/webs_subs.txt -m nuclei \
-						--nuclei-templates "$NUCLEI_TEMPLATES_PATH" \
-						-severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" \
-						-silent -retries 2 "$NUCLEI_EXTRA_ARGS" -j -o "nuclei_output/${crit}_json.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
-					# Parse the JSON output and save the results to a text file
-					if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
-						jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' nuclei_output/${crit}_json.txt >nuclei_output/${crit}.txt
+			for crit in "${severity_array[@]}"; do
+				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Axiom Nuclei Severity: $crit. Check results in nuclei_output folder.${reset}\n\n"
+				# Run axiom-scan with nuclei module for each severity level
+				axiom-scan .tmp/webs_subs.txt -m nuclei \
+					--nuclei-templates "$NUCLEI_TEMPLATES_PATH" \
+					-severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" \
+					-silent -retries 2 "$NUCLEI_EXTRA_ARGS" -j -o "nuclei_output/${crit}_json.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+				# Parse the JSON output and save the results to a text file
+				if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
+					jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' nuclei_output/${crit}_json.txt >nuclei_output/${crit}.txt
 
-						# Display the results if the output file exists and is not empty
-						if [[ -s "nuclei_output/${crit}.txt" ]]; then
-							cat "nuclei_output/${crit}.txt"
-						fi
+					# Display the results if the output file exists and is not empty
+					if [[ -s "nuclei_output/${crit}.txt" ]]; then
+						cat "nuclei_output/${crit}.txt"
 					fi
+				fi
 				done
-				printf "\n\n"
-			fi
+			printf "\n\n"
 		fi
 
 		# Faraday integration
