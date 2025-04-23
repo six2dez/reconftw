@@ -2743,6 +2743,7 @@ function webprobe_full() {
 				ffuf -mc all -w webs/webs_uncommon_ports.txt -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
 			fi
 		fi
+		end_func "Results are saved in $domain/webs/webs_uncommon_ports.txt" "${FUNCNAME[0]}"
 	else
 		if [[ $WEBPROBEFULL == false ]]; then
 			printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
@@ -2782,6 +2783,7 @@ function screenshot() {
 				axiom-scan webs/webs_all.txt -m nuclei-screenshots -o screenshots "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
 			fi
 		fi
+		end_func "Results are saved in $domain/screenshots" "${FUNCNAME[0]}"
 	else
 		if [[ $WEBSCREENSHOT == false ]]; then
 			printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
