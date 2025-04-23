@@ -83,6 +83,8 @@ declare -A gotools=(
 	["jsluice"]="go install -v github.com/BishopFox/jsluice/cmd/jsluice@latest"
 	["urlfinder"]="go install -v github.com/projectdiscovery/urlfinder/cmd/urlfinder@latest"
 	["cent"]="go install -v github.com/xm1k3/cent@latest"
+	["csprecon"]="go install github.com/edoardottt/csprecon/cmd/csprecon@latest"
+	["VhostFinder"]="go install -v github.com/wdahlenburg/VhostFinder@latest"
 )
 
 # Declare pipx tools and their paths
