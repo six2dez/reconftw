@@ -241,6 +241,8 @@ function tools_installed() {
 		["urless"]="urless"
 		["dnstake"]="dnstake"
 		["cent"]="cent"
+		["csprecon"]="csprecon"
+		["VhostFinder"]="VhostFinder"
 	)
 
 	# Check for tool files
@@ -846,14 +848,14 @@ function subdomains_full() {
 
 function sub_passive() {
 
-	mkdir -p .tmp
+	mkdir -p .tmp subdomains
 
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBPASSIVE == true ]]; then
 		start_subfunc "${FUNCNAME[0]}" "Running: Passive Subdomain Enumeration"
 
 		# Run subfinder and check for errors
 		subfinder -all -d "$domain" -max-time "$SUBFINDER_ENUM_TIMEOUT" -silent -o .tmp/subfinder_psub.txt 2>>"$LOGFILE" >/dev/null
-		merklemap-cli search $domain 2>/dev/null | awk -F' ' '{for(i=1;i<=NF;i++) if($i ~ /^domain=/) {split($i,a,"="); print a[2]}}' | anew -q .tmp/subfinder_psub.txt 2>>"$LOGFILE" >/dev/null
+		#merklemap-cli search $domain 2>/dev/null | awk -F' ' '{for(i=1;i<=NF;i++) if($i ~ /^domain=/) {split($i,a,"="); print a[2]}}' | anew -q .tmp/subfinder_psub.txt 2>>"$LOGFILE" >/dev/null
 
 		# Run github-subdomains if GITHUB_TOKENS is set and file is not empty
 		if [[ -s $GITHUB_TOKENS ]]; then
@@ -1157,34 +1159,31 @@ function sub_noerror() {
 }
 
 function sub_dns() {
-	mkdir -p .tmp subdomains
+	mkdir -p .tmp subdomains hosts
 
 	if [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; then
 		start_subfunc "${FUNCNAME[0]}" "Running: DNS Subdomain Enumeration and PTR search"
 
 		if [[ $AXIOM != true ]]; then
 			if [[ -s "subdomains/subdomains.txt" ]]; then
-				dnsx -r "$resolvers_trusted" -a -aaaa -cname -ns -ptr -mx -soa -silent -retry 3 -json \
+				dnsx -r "$resolvers_trusted" -recon -silent -retry 3 -json \
 					-o "subdomains/subdomains_dnsregs.json" <"subdomains/subdomains.txt" 2>>"$LOGFILE" >/dev/null
 			fi
 
 			if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
 				# Extract various DNS records and process them
-				jq -r 'try .a[], try .aaaa[], try .cname[], try .ns[], try .ptr[], try .mx[], try .soa[]' \
-					<"subdomains/subdomains_dnsregs.json" 2>/dev/null |
-					grep "\.$domain$" |
-					grep -E '^([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}$' |
+				jq -r --arg domain "$domain" '.. | strings | select(test("\\." + $domain + "$"))' <"subdomains/subdomains_dnsregs.json" |
+					grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' |
+					sort -u | anew -q .tmp/subdomains_dns.txt
+
+				jq -r '.. | strings | select(test("^(\\d{1,3}\\.){3}\\d{1,3}$|^[0-9a-fA-F:]+$"))' <"subdomains/subdomains_dnsregs.json" |
+					sort -u | hakip2host | awk '{print $3}' | unfurl -u domains |
+					sed -e 's/^\*\.//' -e 's/\.$//' -e '/\./!d' | grep "\.$domain$" |
+					grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' | sort -u |
 					anew -q .tmp/subdomains_dns.txt
 
-				jq -r 'try .a[]' <"subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" | tee /dev/null | sort -u |
-					hakip2host | awk '{print $3}' | unfurl -u domains |
-					sed -e 's/^\*\.//' -e 's/\.$//' -e '/\./!d' |
-					grep "\.$domain$" |
-					grep -E '^([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}$' |
-					anew -q .tmp/subdomains_dns.txt
-
-				jq -r 'try "\(.host) - \(.a[])"' <"subdomains/subdomains_dnsregs.json" 2>/dev/null |
-					sort -u -k2 | anew -q "subdomains/subdomains_ips.txt"
+				jq -r 'select(.host) |"\(.host) - \((.a // [])[])", "\(.host) - \((.aaaa // [])[])"' <"subdomains/subdomains_dnsregs.json" |
+					grep -E ' - [0-9a-fA-F:.]+$' | sort -u | anew -q "subdomains/subdomains_ips.txt"
 			fi
 
 			if ! resolvers_update_quick_local; then
@@ -1200,29 +1199,24 @@ function sub_dns() {
 			fi
 		else
 			if [[ -s "subdomains/subdomains.txt" ]]; then
-				axiom-scan "subdomains/subdomains.txt" -m dnsx -retry 3 -a -aaaa -cname -ns -ptr -mx -soa -json \
+				axiom-scan "subdomains/subdomains.txt" -m dnsx -recon -retry 3 -json \
 					-o "subdomains/subdomains_dnsregs.json" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
 			fi
 
 			if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
-				jq -r 'try .a[]' <"subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" | tee /dev/null | sort -u |
-					anew -q .tmp/subdomains_dns_a_records.txt
+				# Extract various DNS records and process them
+				jq -r --arg domain "$domain" '.. | strings | select(test("\\." + $domain + "$"))' <"subdomains/subdomains_dnsregs.json" |
+					grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' |
+					sort -u | anew -q .tmp/subdomains_dns.txt
 
-				jq -r 'try .a[]' <"subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" | tee /dev/null | sort -u |
-					hakip2host | awk '{print $3}' | unfurl -u domains |
-					sed -e 's/^\*\.//' -e 's/\.$//' -e '/\./!d' |
-					grep "\.$domain$" |
-					grep -E '^([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}$' |
+				jq -r '.. | strings | select(test("^(\\d{1,3}\\.){3}\\d{1,3}$|^[0-9a-fA-F:]+$"))' <"subdomains/subdomains_dnsregs.json" |
+					sort -u | hakip2host | awk '{print $3}' | unfurl -u domains |
+					sed -e 's/^\*\.//' -e 's/\.$//' -e '/\./!d' | grep "\.$domain$" |
+					grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' | sort -u |
 					anew -q .tmp/subdomains_dns.txt
 
-				jq -r 'try .a[], try .aaaa[], try .cname[], try .ns[], try .ptr[], try .mx[], try .soa[]' \
-					<"subdomains/subdomains_dnsregs.json" 2>/dev/null |
-					grep "\.$domain$" |
-					grep -E '^([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}$' |
-					anew -q .tmp/subdomains_dns.txt
-
-				jq -r 'try "\(.host) - \(.a[])"' <"subdomains/subdomains_dnsregs.json" 2>/dev/null |
-					sort -u -k2 | anew -q "subdomains/subdomains_ips.txt"
+				jq -r 'select(.host) |"\(.host) - \((.a // [])[])", "\(.host) - \((.aaaa // [])[])"' <"subdomains/subdomains_dnsregs.json" |
+					grep -E ' - [0-9a-fA-F:.]+$' | sort -u | anew -q "subdomains/subdomains_ips.txt"
 			fi
 
 			if ! resolvers_update_quick_axiom; then
@@ -1237,6 +1231,10 @@ function sub_dns() {
 					2>>"$LOGFILE" >/dev/null
 			fi
 		fi
+
+		cut -d ' ' -f1 subdomains/subdomains_ips.txt |
+        grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." |
+        grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | sort -u | anew -q hosts/ips.txt
 
 		if [[ $INSCOPE == true ]]; then
 			if ! check_inscope .tmp/subdomains_dns_resolved.txt 2>>"$LOGFILE" >/dev/null; then
@@ -1375,6 +1373,14 @@ function sub_scraping() {
 			subdomains_count=$(wc -l <"$dir/subdomains/subdomains.txt")
 			if [[ $subdomains_count -le $DEEP_LIMIT ]] || [[ $DEEP == true ]]; then
 
+				urlfinder -d $domain -s all -o .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
+
+				if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
+					cat .tmp/url_extract_tmp.txt | grep "$domain" |
+						grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' |
+						sed "s/^\*\.//" | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
+				fi
+
 				if [[ $AXIOM != true ]]; then
 					if ! resolvers_update_quick_local; then
 						printf "%b[!] Failed to update resolvers locally.%b\n" "$bred" "$reset"
@@ -1398,33 +1404,15 @@ function sub_scraping() {
 					fi
 
 					if [[ -s ".tmp/probed_tmp_scrap.txt" ]]; then
-						timeout -k 1m 10m httpx -l .tmp/probed_tmp_scrap.txt -tls-grab -tls-probe -csp-probe \
-							-status-code -threads "$HTTPX_THREADS" -rl "$HTTPX_RATELIMIT" -timeout "$HTTPX_TIMEOUT" \
-							-silent -retries 2 -no-color -json -o .tmp/web_full_info2.txt \
-							2>>"$LOGFILE" >/dev/null
-					fi
-
-					if [[ -s ".tmp/web_full_info2.txt" ]]; then
-						cat .tmp/web_full_info2.txt | jq -r 'try ."tls-grab"."dns_names"[], try .csp.domains[], try .url' 2>/dev/null |
-							grep "$domain" |
-							grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' |
-							sed "s/^\*\.//" |
-							sort -u |
-							httpx -silent |
-							anew .tmp/probed_tmp_scrap.txt |
-							unfurl -u domains 2>>"$LOGFILE" |
-							anew -q .tmp/scrap_subs.txt
+						cat .tmp/probed_tmp_scrap.txt | csprecon -s | grep "$domain" | sed "s/^\*\.//" | sort -u |
+							unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
 					fi
 
 					if [[ -s ".tmp/probed_tmp_scrap.txt" ]]; then
 						if [[ $DEEP == true ]]; then
-							katana_depth=3
-						else
-							katana_depth=2
-						fi
-
-						katana -silent -list .tmp/probed_tmp_scrap.txt -jc -kf all -c "$KATANA_THREADS" -d "$katana_depth" \
+							katana -silent -list .tmp/probed_tmp_scrap.txt -jc -kf all -c "$KATANA_THREADS" -d 2 \
 							-fs rdn -o .tmp/katana.txt 2>>"$LOGFILE" >/dev/null
+						fi
 					fi
 
 				else
@@ -1450,33 +1438,15 @@ function sub_scraping() {
 					fi
 
 					if [[ -s ".tmp/probed_tmp_scrap.txt" ]]; then
-						timeout -k 1m 10m axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -tls-grab -tls-probe -csp-probe \
-							-random-agent -status-code -threads "$HTTPX_THREADS" -rl "$HTTPX_RATELIMIT" -timeout "$HTTPX_TIMEOUT" \
-							-silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info2.txt \
-							$AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
-					fi
-
-					if [[ -s ".tmp/web_full_info2.txt" ]]; then
-						cat .tmp/web_full_info2.txt | jq -r 'try ."tls-grab"."dns_names"[], try .csp.domains[], try .url' 2>/dev/null |
-							grep "$domain" |
-							grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' |
-							sed "s/^\*\.//" |
-							sort -u |
-							httpx -silent |
-							anew .tmp/probed_tmp_scrap.txt |
-							unfurl -u domains 2>>"$LOGFILE" |
-							anew -q .tmp/scrap_subs.txt
+						cat .tmp/probed_tmp_scrap.txt | csprecon -s | grep "$domain" | sed "s/^\*\.//" | sort -u |
+							unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
 					fi
 
 					if [[ -s ".tmp/probed_tmp_scrap.txt" ]]; then
 						if [[ $DEEP == true ]]; then
-							katana_depth=3
-						else
-							katana_depth=2
-						fi
-
-						axiom-scan .tmp/probed_tmp_scrap.txt -m katana -jc -kf all -d "$katana_depth" -fs rdn \
+							axiom-scan .tmp/probed_tmp_scrap.txt -m katana -jc -kf all -d 2 -fs rdn \
 							-o .tmp/katana.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+						fi
 					fi
 				fi
 
@@ -2529,13 +2499,12 @@ function geo_info() {
 			# Attempt to generate hosts/ips.txt
 			if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 				if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
-					jq -r 'try . | "\(.host) \(.a[0])"' "subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" | tee /dev/null | anew -q .tmp/subs_ips.txt
+					jq -r 'select(.host) |"\(.host) - \((.a // [])[])", "\(.host) - \((.aaaa // [])[])"' <"subdomains/subdomains_dnsregs.json" |
+					grep -E ' - [0-9a-fA-F:.]+$' | sort -u | anew -q "subdomains/subdomains_ips.txt"
 				fi
-				if [[ -s ".tmp/subs_ips.txt" ]]; then
-					awk '{ print $2 " " $1}' .tmp/subs_ips.txt | sort -k2 -n | anew -q hosts/subs_ips_vhosts.txt
-				fi
-				if [[ -s "hosts/subs_ips_vhosts.txt" ]]; then
-					cut -d ' ' -f1 hosts/subs_ips_vhosts.txt |
+
+				if [[ -s "subdomains/subdomains_ips.txt" ]]; then
+					cut -d ' ' -f3 subdomains/subdomains_ips.txt |
 						grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." |
 						grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" |
 						anew -q hosts/ips.txt
@@ -2814,40 +2783,12 @@ function virtualhosts() {
 		fi
 
 		# Proceed only if webs_all.txt exists and is non-empty
-		if [[ -s "webs/webs_all.txt" ]]; then
-			if [[ $AXIOM != true ]]; then
-				# Run ffuf using interlace
-				interlace -tL webs/webs_all.txt -threads "$INTERLACE_THREADS" \
-					-c "ffuf -ac -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} \
-					-H \"${HEADER}\" -H \"Host: FUZZ._cleantarget_\" \
-					-w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} \
-					-u _target_ -of json -o _output_/_cleantarget_.json" \
-					-o .tmp/virtualhosts 2>>"$LOGFILE" >/dev/null
-			else
-				# Run axiom-scan with ffuf module
-				axiom-scan webs/webs_all.txt -m ffuf -ac -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} \
-					-H "${HEADER}" -H "Host: FUZZ._cleantarget_" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} \
-					-o .tmp/virtualhosts "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
-			fi
-
-			# Process ffuf output
-			while IFS= read -r sub; do
-				sub_out=$(echo "$sub" | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-				json_file="$dir/.tmp/virtualhosts/${sub_out}.json"
-				txt_file="$dir/virtualhosts/${sub_out}.txt"
-
-				if [[ -s $json_file ]]; then
-					jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' "$json_file" | sort | anew -q "$txt_file"
-				fi
-			done
-
-			# Merge all virtual host txt files into virtualhosts_full.txt
-			find "$dir/virtualhosts/" -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | anew -q "$dir/virtualhosts/virtualhosts_full.txt"
-
-			end_func "Results are saved in $domain/virtualhosts/*subdomain*.txt" "${FUNCNAME[0]}"
+		if [[ -s "subdomains/subdomains.txt" ]] && [[ -s "hosts/ips.txt" ]] ;  then
+			VhostFinder -ips hosts/ips.txt -wordlist subdomains/subdomains.txt -verify | grep "+" | anew -q "$dir/webs/virtualhosts.txt"
+			end_func "Results are saved in $domain/webs/virtualhosts.txt" "${FUNCNAME[0]}"
 
 		else
-			end_func "No webs/webs_all.txt file found, virtualhosts skipped." "${FUNCNAME[0]}"
+			end_func "No subdomains or hosts file found, virtualhosts skipped." "${FUNCNAME[0]}"
 		fi
 
 		# Optionally send to proxy if conditions are met
@@ -2946,19 +2887,11 @@ function portscan() {
 		# Determine if domain is IP address or domain name
 		if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 			# Not an IP address
-			if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
-				# Extract host and IP from JSON
-				jq -r 'try . | "\(.host) \(.a[0])"' "subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" | tee /dev/null | anew -q .tmp/subs_ips.txt
-			fi
-
-			if [[ -s ".tmp/subs_ips.txt" ]]; then
-				# Reorder fields and sort
-				awk '{ print $2 " " $1}' ".tmp/subs_ips.txt" | sort -k2 -n | anew -q hosts/subs_ips_vhosts.txt
-			fi
-
-			if [[ -s "hosts/subs_ips_vhosts.txt" ]]; then
-				# Extract IPs, filter out private ranges
-				awk '{print $1}' "hosts/subs_ips_vhosts.txt" | grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' | anew -q hosts/ips.txt
+			if [[ -s "subdomains/subdomains_ips.txt" ]]; then
+				cut -d ' ' -f3 subdomains/subdomains_ips.txt |
+					grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." |
+					grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" |
+					anew -q hosts/ips.txt
 			fi
 
 		else
@@ -3087,18 +3020,17 @@ function cdnprovider() {
 		start_func "${FUNCNAME[0]}" "CDN Provider Check"
 
 		# Check if subdomains_dnsregs.json exists and is not empty
-		if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
-			# Extract IPs from .a[] fields, exclude private IPs, extract IPs, sort uniquely
-			jq -r 'try . | .a[]' "subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" | tee /dev/null |
-				grep -aEiv "^(127|10|169\.254|172\.(1[6-9]|2[0-9]|3[01])|192\.168)\." |
+		if [[ -s "subdomains/subdomains_ips.txt" ]]; then
+			cut -d ' ' -f3 subdomains/subdomains_ips.txt |
+				grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." |
 				grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" |
-				sort -u >.tmp/ips_cdn.txt
+				anew -q hosts/ips.txt
 		fi
 
 		# Check if ips_cdn.txt exists and is not empty
-		if [[ -s ".tmp/ips_cdn.txt" ]]; then
+		if [[ -s "hosts/ips.txt" ]]; then
 			# Run cdncheck on the IPs and save to cdn_providers.txt
-			cdncheck -silent -resp -nc <.tmp/ips_cdn.txt | anew -q "$dir/hosts/cdn_providers.txt"
+			cdncheck -silent -resp -nc <hosts/ips.txt | anew -q "$dir/hosts/cdn_providers.txt"
 		fi
 
 		end_func "Results are saved in hosts/cdn_providers.txt" "${FUNCNAME[0]}"
@@ -3497,7 +3429,7 @@ function urlchecks() {
 		if [[ -s "webs/webs_all.txt" ]]; then
 
 			if [[ $URL_CHECK_PASSIVE == true ]]; then
-				urlfinder -d $domain -o .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
+				urlfinder -d $domain -s all -o .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
 				if [[ -s $GITHUB_TOKENS ]]; then
 					github-endpoints -q -k -d "$domain" -t "$GITHUB_TOKENS" -o .tmp/github-endpoints.txt 2>>"$LOGFILE" >/dev/null
 					if [[ -s ".tmp/github-endpoints.txt" ]]; then
