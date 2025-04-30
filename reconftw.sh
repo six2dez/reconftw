@@ -3475,7 +3475,7 @@ function urlchecks() {
 					interlace -tL .tmp/url_extract_js.txt -threads 10 -c "${tools}/JSA/venv/bin/python3 ${tools}/JSA/jsa.py -f _target_ | anew -q .tmp/url_extract_tmp.txt" &>/dev/null
 				fi
 
-				grep -a "$domain" .tmp/url_extract_tmp.txt | grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | anew -q .tmp/url_extract_tmp2.txt
+				grep -a "$domain" .tmp/url_extract_tmp.txt | grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg)$" | anew -q .tmp/url_extract_tmp2.txt
 
 				if [[ -s ".tmp/url_extract_tmp2.txt" ]]; then
 					urless <.tmp/url_extract_tmp2.txt | anew -q .tmp/url_extract_uddup.txt 2>>"$LOGFILE" >/dev/null
@@ -3711,7 +3711,7 @@ function jschecks() {
 			fi
 
 			if [[ -s ".tmp/url_extract_jsmap.txt" ]]; then
-				interlace -tL js/js_livelinks.txt -threads "$INTERLACE_THREADS" \
+				interlace -tL js/url_extract_jsmap.txt -threads "$INTERLACE_THREADS" \
 					-c "sourcemapper -url '_target_' -output _output_/_cleantarget_" \
 					-o .tmp/sourcemapper 2>>"$LOGFILE" >/dev/null
 			fi
@@ -3735,15 +3735,13 @@ function jschecks() {
 				if [[ $AXIOM != true ]]; then
 					cat js/js_livelinks.txt | mantra -ua \"$HEADER\" -s | anew -q js/js_secrets.txt 2>>"$LOGFILE" >/dev/null
 				else
+					axiom-exec "go install github.com/Brosck/mantra@latest" 2>>"$LOGFILE" >/dev/null
 					axiom-scan js/js_livelinks.txt -m mantra -ua "$HEADER" -s -o js/js_secrets.txt "$AXIOM_EXTRA_ARGS" &>/dev/null
 				fi
-				if [[ -s "js/js_secrets.txt" ]]; then
-					trufflehog filesystem js/js_secrets.txt -j 2>/dev/null |
-						jq -c | anew -q js/js_secrets_trufflehog.txt
-					trufflehog filesystem .tmp/sourcemapper/ -j 2>/dev/null |
-						jq -c | anew -q js/js_secrets_trufflehog.txt
-					sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2};?)?)?[mGK]//g" -i js/js_secrets.txt
-				fi
+				mkdir -p .tmp/sourcemapper/secrets
+				for i in $( cat js/js_secrets.txt | cut -d' ' -f2 ); do wget -q -P .tmp/sourcemapper/secrets $i  ; done
+				trufflehog filesystem .tmp/sourcemapper/ -j 2>/dev/null | jq -c | anew -q js/js_secrets_jsmap.txt
+				find .tmp/sourcemapper/ -type f -name "*.js" | jsluice secrets -j --patterns=~/Tools/jsluice-patterns.json | anew -q js/js_secrets_jsmap_jsluice.txt
 			fi
 
 			printf "%bRunning: Building wordlist 6/6%b\n" "$yellow" "$reset"
