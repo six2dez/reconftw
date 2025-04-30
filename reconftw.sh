@@ -184,6 +184,7 @@ function tools_installed() {
 		["timeout"]="timeout"
 		["brutespray"]="brutespray"
 		["xnLinkFinder"]="xnLinkFinder"
+		["xnldorker"]="xnldorker"
 		["urlfinder"]="urlfinder"
 		["github-endpoints"]="github-endpoints"
 		["github-subdomains"]="github-subdomains"

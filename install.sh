@@ -96,6 +96,7 @@ declare -A pipxtools=(
 	["urless"]="xnl-h4ck3r/urless"
 	["ghauri"]="r0oth3x49/ghauri"
 	["xnLinkFinder"]="xnl-h4ck3r/xnLinkFinder"
+	["xnldorker"]="xnl-h4ck3r/xnldorker"
 	["porch-pirate"]="MandConsultingGroup/porch-pirate"
 	["p1radup"]="iambouali/p1radup"
 )
