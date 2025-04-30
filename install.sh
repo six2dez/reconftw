@@ -267,6 +267,9 @@ function install_tools() {
 			fi
 			source venv/bin/activate
 			eval "pip3 install --upgrade -r requirements.txt $DEBUG_STD" &>/dev/null
+			if [ "$repo" = "dorks_hunter" ]; then
+				pip install xnldorker &>/dev/null
+			fi
 			deactivate
 		fi
 
