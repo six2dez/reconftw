@@ -106,6 +106,7 @@ declare -A repos=(
 	["dorks_hunter"]="six2dez/dorks_hunter"
 	["gf"]="tomnomnom/gf"
 	["Gf-Patterns"]="1ndianl33t/Gf-Patterns"
+	["sus_params"]="g0ldencybersec/sus_param"
 	["Corsy"]="s0md3v/Corsy"
 	["CMSeeK"]="Tuhinshubhra/CMSeeK"
 	["fav-up"]="pielco11/fav-up"
@@ -310,6 +311,12 @@ function install_tools() {
 			cp -r examples ${HOME}/.gf &>/dev/null
 		elif [[ $repo == "Gf-Patterns" ]]; then
 			cp ./*.json ${HOME}/.gf &>/dev/null
+		elif [[ $repo == "susparams" ]]; then
+			for f in ./gf-patterns/*.json; do
+				base=$(basename "$f")
+				dest="${HOME}/.gf/$base"
+				cat "$f" | anew -q "$dest" >/dev/null
+			done
 		fi
 
 		# Return to the main directory
