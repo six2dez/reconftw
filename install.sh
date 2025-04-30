@@ -130,6 +130,7 @@ declare -A repos=(
 	["misconfig-mapper"]="intigriti/misconfig-mapper"
 	["Spoofy"]="MattKeeley/Spoofy"
 	["msftrecon"]="Arcanum-Sec/msftrecon"
+	["Scopify"]="Arcanum-Sec/Scopify"
 	["metagoofil"]="opsdisk/metagoofil"
 	["EmailHarvester"]="maldevel/EmailHarvester"
 )

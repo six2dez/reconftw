@@ -163,6 +163,8 @@ function tools_installed() {
 		["Oralyzer_python"]="${tools}/Oralyzer/venv/bin/python3"
 		["msftrecon"]="${tools}/msftrecon/msftrecon/msftrecon.py"
 		["msftrecon_python"]="${tools}/msftrecon/venv/bin/python3"
+		["Scopify"]="${tools}/Scopify/scopify.py"
+		["Scopify_python"]="${tools}/Scopify/venv/bin/python3"
 		["EmailHarvester"]="${tools}/EmailHarvester/EmailHarvester.py"
 		["EmailHarvester_python"]="${tools}/EmailHarvester/venv/bin/python3"
 		["metagoofil"]="${tools}/metagoofil/metagoofil.py"
@@ -564,6 +566,9 @@ function domain_info() {
 		# Run whois command and check for errors
 		whois "$domain" >"osint/domain_info_general.txt"
 		"${tools}/msftrecon/venv/bin/python3" "${tools}/msftrecon/msftrecon/msftrecon.py" -d ${domain} >osint/azure_tenant_domains.txt
+
+		company_name=$(unfurl format %r <<<"$domain")
+		"${tools}/Scopify/venv/bin/python3" "${tools}/scopify/scopify.py" -c ${company_name} >osint/scopify.txt
 
 		end_func "Results are saved in ${domain}/osint/domain_info_[general/azure_tenant_domains].txt" "${FUNCNAME[0]}"
 
