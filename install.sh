@@ -333,8 +333,8 @@ function install_tools() {
 	subfinder &>/dev/null
 	subfinder &>/dev/null
 	mkdir -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
-	cent init -f &>/dev/null
-	cent -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
+	#cent init -f &>/dev/null
+	#cent -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
 
 	# Handle failed installations
 	if [[ ${#failed_tools[@]} -ne 0 ]]; then
