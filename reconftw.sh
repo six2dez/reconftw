@@ -6028,7 +6028,7 @@ if [[ $OSTYPE == "darwin"* ]]; then
 	PATH="$(brew --prefix coreutils)/libexec/gnubin:$PATH"
 fi
 
-PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c::zrspanwvh::' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,check-tools' -n 'reconFTW' -- "$@")
+PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:zrspanwvh' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,check-tools' -n 'reconFTW' -- "$@")
 
 exit_status=$?
 if [[ $exit_status -ne 0 ]]; then
