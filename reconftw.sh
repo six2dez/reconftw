@@ -568,7 +568,7 @@ function domain_info() {
 		"${tools}/msftrecon/venv/bin/python3" "${tools}/msftrecon/msftrecon/msftrecon.py" -d ${domain} 2>>"$LOGFILE" >osint/azure_tenant_domains.txt
 
 		company_name=$(unfurl format %r <<<"$domain")
-		"${tools}/Scopify/venv/bin/python3" "${tools}/scopify/scopify.py" -c ${company_name} >osint/scopify.txt
+		"${tools}/Scopify/venv/bin/python3" "${tools}/Scopify/scopify.py" -c ${company_name} >osint/scopify.txt
 
 		end_func "Results are saved in ${domain}/osint/domain_info_[general/azure_tenant_domains].txt" "${FUNCNAME[0]}"
 
