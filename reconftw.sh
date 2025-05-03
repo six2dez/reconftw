@@ -565,7 +565,7 @@ function domain_info() {
 
 		# Run whois command and check for errors
 		whois "$domain" >"osint/domain_info_general.txt"
-		"${tools}/msftrecon/venv/bin/python3" "${tools}/msftrecon/msftrecon/msftrecon.py" -d ${domain} >osint/azure_tenant_domains.txt
+		"${tools}/msftrecon/venv/bin/python3" "${tools}/msftrecon/msftrecon/msftrecon.py" -d ${domain} 2>>"$LOGFILE" >osint/azure_tenant_domains.txt
 
 		company_name=$(unfurl format %r <<<"$domain")
 		"${tools}/Scopify/venv/bin/python3" "${tools}/scopify/scopify.py" -c ${company_name} >osint/scopify.txt
