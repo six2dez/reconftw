@@ -439,7 +439,7 @@ function metadata() {
 		start_func "${FUNCNAME[0]}" "Scanning metadata in public files"
 
 		mkdir -p ".tmp/metagoofil_${domain}/" 2>>"${LOGFILE}"
-		"${tools}/metagoofil/venv/bin/python3" "${tools}/metagoofil/metagoofil.py" -d "${domain}" -t pdf,docx,xlsx -l 10 -w -o ".tmp/metagoofil_${domain}/" 2>>"${LOGFILE}" > /dev/null
+		"${tools}/metagoofil/venv/bin/python3" "${tools}/metagoofil/metagoofil.py" -d "${domain}" -t pdf,docx,xlsx -l 10 -w -o ".tmp/metagoofil_${domain}/" 2>>"${LOGFILE}" >/dev/null
 		exiftool -r .tmp/metagoofil_${domain}/* 2>>"${LOGFILE}" | tee /dev/null | egrep -i "Author|Creator|Email|Producer|Template" | sort -u | anew -q "osint/metadata_results.txt"
 
 		end_func "Results are saved in ${domain}/osint/[software/authors/metadata_results].txt" "${FUNCNAME[0]}"
@@ -784,7 +784,7 @@ function subdomains_full() {
 		sub_brute
 		sub_permut
 		sub_regex_permut
-		# sub_gpt (commented out)
+		sub_ia_permut
 		sub_recursive_passive
 		sub_recursive_brute
 		sub_dns
@@ -1239,8 +1239,8 @@ function sub_dns() {
 		fi
 
 		cut -d ' ' -f1 subdomains/subdomains_ips.txt |
-        grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." |
-        grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | sort -u | anew -q hosts/ips.txt
+			grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." |
+			grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | sort -u | anew -q hosts/ips.txt
 
 		if [[ $INSCOPE == true ]]; then
 			if ! check_inscope .tmp/subdomains_dns_resolved.txt 2>>"$LOGFILE" >/dev/null; then
@@ -1417,7 +1417,7 @@ function sub_scraping() {
 					if [[ -s ".tmp/probed_tmp_scrap.txt" ]]; then
 						if [[ $DEEP == true ]]; then
 							katana -silent -list .tmp/probed_tmp_scrap.txt -jc -kf all -c "$KATANA_THREADS" -d 2 \
-							-fs rdn -o .tmp/katana.txt 2>>"$LOGFILE" >/dev/null
+								-fs rdn -o .tmp/katana.txt 2>>"$LOGFILE" >/dev/null
 						fi
 					fi
 
@@ -1451,7 +1451,7 @@ function sub_scraping() {
 					if [[ -s ".tmp/probed_tmp_scrap.txt" ]]; then
 						if [[ $DEEP == true ]]; then
 							axiom-scan .tmp/probed_tmp_scrap.txt -m katana -jc -kf all -d 2 -fs rdn \
-							-o .tmp/katana.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+								-o .tmp/katana.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 						fi
 					fi
 				fi
@@ -1857,6 +1857,88 @@ function sub_regex_permut() {
 
 }
 
+function sub_ia_permut() {
+
+	# Create necessary directories
+	if ! mkdir -p .tmp subdomains; then
+		printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
+		return 1
+	fi
+
+	# Check if the function should run
+	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBIAPERMUTE == true ]]; then
+		start_subfunc "${FUNCNAME[0]}" "Running: Permutations by IA analysis"
+
+		subwiz -i subdomains/subdomains.txt --no-resolve -o .tmp/subwiz.txt 2>>"$LOGFILE" >/dev/null
+
+		# Resolve the generated domains
+		if [[ $AXIOM != true ]]; then
+			if ! resolvers_update_quick_local; then
+				printf "%b[!] Failed to update resolvers locally.%b\n" "$bred" "$reset"
+				return 1
+			fi
+
+			if [[ -s ".tmp/subwiz.txt" ]]; then
+				puredns resolve ".tmp/subwiz.txt" -w .tmp/subwiz_resolved.txt -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
+					-l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
+					--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
+					2>>"$LOGFILE" >/dev/null
+			fi
+		else
+			if ! resolvers_update_quick_axiom; then
+				printf "%b[!] Failed to update resolvers on Axiom.%b\n" "$bred" "$reset"
+				return 1
+			fi
+
+			if [[ -s ".tmp/subwiz.txt" ]]; then
+				axiom-scan ".tmp/subwiz.txt" -m puredns-resolve \
+					-r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt \
+					--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
+					-o .tmp/subwiz_resolved.txt $AXIOM_EXTRA_ARGS \
+					2>>"$LOGFILE" >/dev/null
+			fi
+		fi
+
+		# Process the resolved domains
+		if [[ -s ".tmp/subwiz_resolved.txt" ]]; then
+			if [[ -s $outOfScope_file ]]; then
+				if ! deleteOutScoped "$outOfScope_file" .tmp/subwiz_resolved.txt; then
+					printf "%b[!] deleteOutScoped command failed.%b\n" "$bred" "$reset"
+				fi
+			fi
+
+			if [[ $INSCOPE == true ]]; then
+				if ! check_inscope .tmp/subwiz_resolved.txt 2>>"$LOGFILE" >/dev/null; then
+					printf "%b[!] check_inscope command failed.%b\n" "$bred" "$reset"
+				fi
+			fi
+
+			if ! NUMOFLINES=$(grep "\.$domain$\|^$domain$" .tmp/subwiz_resolved.txt 2>>"$LOGFILE" |
+				grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' |
+				anew subdomains/subdomains.txt |
+				sed '/^$/d' |
+				wc -l); then
+				printf "%b[!] Failed to count new subdomains.%b\n" "$bred" "$reset"
+				NUMOFLINES=0
+			fi
+		else
+			NUMOFLINES=0
+		fi
+
+		end_subfunc "${NUMOFLINES} new subs (permutations by IA)" "${FUNCNAME[0]}"
+
+	else
+		if [[ $SUBIAPERMUTE == false ]]; then
+			printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
+				"$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+		else
+			printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
+				"$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "/.${FUNCNAME[0]}" "$reset"
+		fi
+	fi
+
+}
+
 function sub_recursive_passive() {
 
 	# Create necessary directories
@@ -1987,39 +2069,30 @@ function sub_recursive_brute() {
 				dsieve -if subdomains/subdomains.txt -f 3 -top "$DEEP_RECURSIVE_PASSIVE" >.tmp/subdomains_recurs_top.txt
 			fi
 
-			# Generate brute recursive wordlist
-			ripgen -d .tmp/subdomains_recurs_top.txt -w "$subs_wordlist" >.tmp/brute_recursive_wordlist.txt
-
-			if [[ $AXIOM != true ]]; then
-				if ! resolvers_update_quick_local; then
-					printf "%b[!] Failed to update resolvers locally.%b\n" "$bred" "$reset"
-					return 1
-				fi
-
-				if [[ -s ".tmp/brute_recursive_wordlist.txt" ]]; then
-					puredns resolve .tmp/brute_recursive_wordlist.txt -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
+			for subdomain_top in $(cat .tmp/subdomains_recurs_top.txt); do
+				if [[ $AXIOM != true ]]; then
+					if ! resolvers_update_quick_local; then
+						printf "%b[!] Failed to update resolvers locally.%b\n" "$bred" "$reset"
+						return 1
+					fi
+					puredns bruteforce "$subs_wordlist" "$subdomain_top" -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
 						-l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
 						--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
-						-w .tmp/brute_recursive_result.txt 2>>"$LOGFILE" >/dev/null
-				fi
-			else
-				if ! resolvers_update_quick_axiom; then
-					printf "%b[!] Failed to update resolvers on axiom.%b\n" "$bred" "$reset"
-					return 1
-				fi
-
-				if [[ -s ".tmp/brute_recursive_wordlist.txt" ]]; then
-					axiom-scan .tmp/brute_recursive_wordlist.txt -m puredns-resolve \
+						-w .tmp/brute_recursive_result_part.txt 2>>"$LOGFILE" >/dev/null
+					cat .tmp/brute_recursive_result_part.txt | anew -q .tmp/brute_recursive.txt
+				else
+					if ! resolvers_update_quick_axiom; then
+						printf "%b[!] Failed to update resolvers on axiom.%b\n" "$bred" "$reset"
+						return 1
+					fi
+					axiom-scan "$subs_wordlist" -m puredns-single "$subdomain_top" \
 						-r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt \
 						--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
-						-o .tmp/brute_recursive_result.txt $AXIOM_EXTRA_ARGS \
+						-o .tmp/brute_recursive_result_part.txt $AXIOM_EXTRA_ARGS \
 						2>>"$LOGFILE" >/dev/null
+					cat .tmp/brute_recursive_result_part.txt | anew -q .tmp/brute_recursive.txt
 				fi
-			fi
-
-			if [[ -s ".tmp/brute_recursive_result.txt" ]]; then
-				cat .tmp/brute_recursive_result.txt | anew -q .tmp/brute_recursive.txt
-			fi
+			done
 
 			# Generate permutations
 			if [[ $PERMUTATIONS_OPTION == "gotator" ]]; then
@@ -2506,7 +2579,7 @@ function geo_info() {
 			if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 				if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
 					jq -r 'select(.host) |"\(.host) - \((.a // [])[])", "\(.host) - \((.aaaa // [])[])"' <"subdomains/subdomains_dnsregs.json" |
-					grep -E ' - [0-9a-fA-F:.]+$' | sort -u | anew -q "subdomains/subdomains_ips.txt"
+						grep -E ' - [0-9a-fA-F:.]+$' | sort -u | anew -q "subdomains/subdomains_ips.txt"
 				fi
 
 				if [[ -s "subdomains/subdomains_ips.txt" ]]; then
@@ -2789,7 +2862,7 @@ function virtualhosts() {
 		fi
 
 		# Proceed only if webs_all.txt exists and is non-empty
-		if [[ -s "subdomains/subdomains.txt" ]] && [[ -s "hosts/ips.txt" ]] ;  then
+		if [[ -s "subdomains/subdomains.txt" ]] && [[ -s "hosts/ips.txt" ]]; then
 			VhostFinder -ips hosts/ips.txt -wordlist subdomains/subdomains.txt -verify | grep "+" | anew -q "$dir/webs/virtualhosts.txt"
 			end_func "Results are saved in $domain/webs/virtualhosts.txt" "${FUNCNAME[0]}"
 
@@ -3151,7 +3224,7 @@ function nuclei_check() {
 
 		# Combine url_extract_nodupes.txt, subdomains.txt, and webs_all.txt into webs_subs.txt if it doesn't exist
 		if [[ ! -s ".tmp/webs_subs.txt" ]]; then
-			cat subdomains/subdomains.txt webs/webs_all.txt 2>>"$LOGFILE" > .tmp/webs_subs.txt
+			cat subdomains/subdomains.txt webs/webs_all.txt 2>>"$LOGFILE" >.tmp/webs_subs.txt
 		fi
 
 		# Check if AXIOM is enabled
@@ -3193,7 +3266,7 @@ function nuclei_check() {
 						cat "nuclei_output/${crit}.txt"
 					fi
 				fi
-				done
+			done
 			printf "\n\n"
 		fi
 
@@ -3744,7 +3817,7 @@ function jschecks() {
 					axiom-scan js/js_livelinks.txt -m mantra -ua "$HEADER" -s -o js/js_secrets.txt "$AXIOM_EXTRA_ARGS" &>/dev/null
 				fi
 				mkdir -p .tmp/sourcemapper/secrets
-				for i in $( cat js/js_secrets.txt | cut -d' ' -f2 ); do wget -q -P .tmp/sourcemapper/secrets $i  ; done
+				for i in $(cat js/js_secrets.txt | cut -d' ' -f2); do wget -q -P .tmp/sourcemapper/secrets $i; done
 				trufflehog filesystem .tmp/sourcemapper/ -j 2>/dev/null | jq -c | anew -q js/js_secrets_jsmap.txt
 				find .tmp/sourcemapper/ -type f -name "*.js" | jsluice secrets -j --patterns=~/Tools/jsluice-patterns.json | anew -q js/js_secrets_jsmap_jsluice.txt
 			fi
@@ -4893,9 +4966,9 @@ function fuzzparams() {
 				fi
 
 				axiom-scan webs/url_extract_nodupes.txt -m nuclei \
-						--remote-folder "/home/op/fuzzing-templates" \
-						-nh -rl "$NUCLEI_RATELIMIT" \
-						-silent -retries 2 "$NUCLEI_EXTRA_ARGS" -dast -j -o ".tmp/fuzzparams_json.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+					--remote-folder "/home/op/fuzzing-templates" \
+					-nh -rl "$NUCLEI_RATELIMIT" \
+					-silent -retries 2 "$NUCLEI_EXTRA_ARGS" -dast -j -o ".tmp/fuzzparams_json.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 			fi
 
 			# Convert JSON output to text
@@ -5056,10 +5129,10 @@ function transfer {
 			echo "$file: No such file or directory" >&2
 			return 1
 		fi
-		tar -czvf /tmp/$file_name $file > /dev/null 2>&1 && curl -s https://bashupload.com/$file.tgz --data-binary @/tmp/$file_name | grep wget
+		tar -czvf /tmp/$file_name $file >/dev/null 2>&1 && curl -s https://bashupload.com/$file.tgz --data-binary @/tmp/$file_name | grep wget
 	else
 		file_name=$1
-		tar -czvf /tmp/$file_name $file > /dev/null 2>&1 && curl -s https://bashupload.com/$file.tgz --data-binary @/tmp/$file_name | grep wget
+		tar -czvf /tmp/$file_name $file >/dev/null 2>&1 && curl -s https://bashupload.com/$file.tgz --data-binary @/tmp/$file_name | grep wget
 	fi
 }
 
@@ -5777,7 +5850,7 @@ function multi_recon() {
 		fi
 		printf "${bgreen}#######################################################################${reset}\n"
 	done
-	
+
 	if [[ $AXIOM == true ]]; then
 		axiom_shutdown
 	fi
@@ -5951,7 +6024,6 @@ function zen_menu() {
 	cms_scanner
 	end
 }
-
 
 function help() {
 	printf "\n Usage: $0 [-d domain.tld] [-m name] [-l list.txt] [-x oos.txt] [-i in.txt] "
