@@ -1170,28 +1170,26 @@ function sub_dns() {
 	if [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; then
 		start_subfunc "${FUNCNAME[0]}" "Running: DNS Subdomain Enumeration and PTR search"
 
+		if [[ -s "subdomains/subdomains.txt" ]]; then
+			dnsx -r "$resolvers_trusted" -recon -silent -retry 3 -json \
+				-o "subdomains/subdomains_dnsregs.json" <"subdomains/subdomains.txt" 2>>"$LOGFILE" >/dev/null
+		fi
+		if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
+			# Extract various DNS records and process them
+			jq -r --arg domain "$domain" '.. | strings | select(test("\\." + $domain + "$"))' <"subdomains/subdomains_dnsregs.json" |
+				grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' |
+				sort -u | anew -q .tmp/subdomains_dns.txt
+
+			jq -r '.. | strings | select(test("^(\\d{1,3}\\.){3}\\d{1,3}$|^[0-9a-fA-F:]+$"))' <"subdomains/subdomains_dnsregs.json" |
+				sort -u | hakip2host | awk '{print $3}' | unfurl -u domains |
+				sed -e 's/^\*\.//' -e 's/\.$//' -e '/\./!d' | grep "\.$domain$" |
+				grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' | sort -u |
+				anew -q .tmp/subdomains_dns.txt
+
+			jq -r 'select(.host) |"\(.host) - \((.a // [])[])", "\(.host) - \((.aaaa // [])[])"' <"subdomains/subdomains_dnsregs.json" |
+				grep -E ' - [0-9a-fA-F:.]+$' | sort -u | anew -q "subdomains/subdomains_ips.txt"
+		fi
 		if [[ $AXIOM != true ]]; then
-			if [[ -s "subdomains/subdomains.txt" ]]; then
-				dnsx -r "$resolvers_trusted" -recon -silent -retry 3 -json \
-					-o "subdomains/subdomains_dnsregs.json" <"subdomains/subdomains.txt" 2>>"$LOGFILE" >/dev/null
-			fi
-
-			if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
-				# Extract various DNS records and process them
-				jq -r --arg domain "$domain" '.. | strings | select(test("\\." + $domain + "$"))' <"subdomains/subdomains_dnsregs.json" |
-					grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' |
-					sort -u | anew -q .tmp/subdomains_dns.txt
-
-				jq -r '.. | strings | select(test("^(\\d{1,3}\\.){3}\\d{1,3}$|^[0-9a-fA-F:]+$"))' <"subdomains/subdomains_dnsregs.json" |
-					sort -u | hakip2host | awk '{print $3}' | unfurl -u domains |
-					sed -e 's/^\*\.//' -e 's/\.$//' -e '/\./!d' | grep "\.$domain$" |
-					grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' | sort -u |
-					anew -q .tmp/subdomains_dns.txt
-
-				jq -r 'select(.host) |"\(.host) - \((.a // [])[])", "\(.host) - \((.aaaa // [])[])"' <"subdomains/subdomains_dnsregs.json" |
-					grep -E ' - [0-9a-fA-F:.]+$' | sort -u | anew -q "subdomains/subdomains_ips.txt"
-			fi
-
 			if ! resolvers_update_quick_local; then
 				printf "%b[!] Failed to update resolvers.%b\n" "$bred" "$reset"
 			fi
@@ -1204,27 +1202,6 @@ function sub_dns() {
 					2>>"$LOGFILE" >/dev/null
 			fi
 		else
-			if [[ -s "subdomains/subdomains.txt" ]]; then
-				axiom-scan "subdomains/subdomains.txt" -m dnsx -recon -retry 3 -json \
-					-o "subdomains/subdomains_dnsregs.json" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
-			fi
-
-			if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
-				# Extract various DNS records and process them
-				jq -r --arg domain "$domain" '.. | strings | select(test("\\." + $domain + "$"))' <"subdomains/subdomains_dnsregs.json" |
-					grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' |
-					sort -u | anew -q .tmp/subdomains_dns.txt
-
-				jq -r '.. | strings | select(test("^(\\d{1,3}\\.){3}\\d{1,3}$|^[0-9a-fA-F:]+$"))' <"subdomains/subdomains_dnsregs.json" |
-					sort -u | hakip2host | awk '{print $3}' | unfurl -u domains |
-					sed -e 's/^\*\.//' -e 's/\.$//' -e '/\./!d' | grep "\.$domain$" |
-					grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' | sort -u |
-					anew -q .tmp/subdomains_dns.txt
-
-				jq -r 'select(.host) |"\(.host) - \((.a // [])[])", "\(.host) - \((.aaaa // [])[])"' <"subdomains/subdomains_dnsregs.json" |
-					grep -E ' - [0-9a-fA-F:.]+$' | sort -u | anew -q "subdomains/subdomains_ips.txt"
-			fi
-
 			if ! resolvers_update_quick_axiom; then
 				printf "%b[!] Failed to update resolvers.%b\n" "$bred" "$reset"
 			fi
