@@ -169,6 +169,8 @@ function tools_installed() {
 		["EmailHarvester_python"]="${tools}/EmailHarvester/venv/bin/python3"
 		["metagoofil"]="${tools}/metagoofil/metagoofil.py"
 		["metagoofil_python"]="${tools}/metagoofil/venv/bin/python3"
+		["reconftw_ai"]="${tools}/reconftw_ai/reconftw_ai.py"
+		["reconftw_ai_python"]="${tools}/reconftw_ai/venv/bin/python3"
 	)
 
 	declare -A tools_folders=(
@@ -1047,7 +1049,7 @@ function sub_tls() {
 
 		if [[ -s ".tmp/subdomains_tlsx.txt" ]]; then
 			grep "\.$domain$\|^$domain$" .tmp/subdomains_tlsx.txt |
-				grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' |
+				grep -aEo 'https?://[^ ]+' |
 				sed "s/|__ //" | anew -q .tmp/subdomains_tlsx_clean.txt
 		fi
 
@@ -1360,7 +1362,7 @@ function sub_scraping() {
 
 				if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
 					cat .tmp/url_extract_tmp.txt | grep "$domain" |
-						grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' |
+						grep -aEo 'https?://[^ ]+' |
 						sed "s/^\*\.//" | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
 				fi
 
@@ -1379,7 +1381,7 @@ function sub_scraping() {
 					if [[ -s ".tmp/web_full_info1.txt" ]]; then
 						cat .tmp/web_full_info1.txt | jq -r 'try .url' 2>/dev/null |
 							grep "$domain" |
-							grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' |
+							grep -aEo 'https?://[^ ]+' |
 							sed "s/^\*\.//" |
 							anew .tmp/probed_tmp_scrap.txt |
 							unfurl -u domains 2>>"$LOGFILE" |
@@ -1393,7 +1395,7 @@ function sub_scraping() {
 
 					if [[ -s ".tmp/probed_tmp_scrap.txt" ]]; then
 						if [[ $DEEP == true ]]; then
-							katana -silent -list .tmp/probed_tmp_scrap.txt -jc -kf all -c "$KATANA_THREADS" -d 2 \
+							timeout 3h katana -silent -list .tmp/probed_tmp_scrap.txt -jc -kf all -c "$KATANA_THREADS" -d 2 \
 								-fs rdn -o .tmp/katana.txt 2>>"$LOGFILE" >/dev/null
 						fi
 					fi
@@ -1413,7 +1415,7 @@ function sub_scraping() {
 					if [[ -s ".tmp/web_full_info1.txt" ]]; then
 						cat .tmp/web_full_info1.txt | jq -r 'try .url' 2>/dev/null |
 							grep "$domain" |
-							grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' |
+							grep -aEo 'https?://[^ ]+' |
 							sed "s/^\*\.//" |
 							anew .tmp/probed_tmp_scrap.txt |
 							unfurl -u domains 2>>"$LOGFILE" |
@@ -1428,7 +1430,7 @@ function sub_scraping() {
 					if [[ -s ".tmp/probed_tmp_scrap.txt" ]]; then
 						if [[ $DEEP == true ]]; then
 							axiom-scan .tmp/probed_tmp_scrap.txt -m katana -jc -kf all -d 2 -fs rdn \
-								-o .tmp/katana.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+								-o .tmp/katana.txt $AXIOM_EXTRA_ARGS --max-runtime 4h 2>>"$LOGFILE" >/dev/null
 						fi
 					fi
 				fi
@@ -1478,7 +1480,7 @@ function sub_scraping() {
 					if [[ -s ".tmp/web_full_info3.txt" ]]; then
 						cat .tmp/web_full_info3.txt | jq -r 'try .url' 2>/dev/null |
 							grep "$domain" |
-							grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' |
+							grep -aEo 'https?://[^ ]+' |
 							sed "s/^\*\.//" |
 							anew .tmp/probed_tmp_scrap.txt |
 							unfurl -u domains 2>>"$LOGFILE" |
@@ -2637,7 +2639,7 @@ function webprobe_simple() {
 		if [[ -s "webs/web_full_info.txt" ]]; then
 			jq -r 'try .url' webs/web_full_info.txt 2>/dev/null |
 				grep "$domain" |
-				grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' |
+				grep -aEo 'https?://[^ ]+' |
 				sed 's/*.//' | anew -q .tmp/probed_tmp.txt
 		fi
 
@@ -2727,7 +2729,7 @@ function webprobe_full() {
 			# Extract URLs
 			jq -r 'try .url' .tmp/web_full_info_uncommon.txt 2>/dev/null |
 				grep "$domain" |
-				grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?' |
+				grep -aEo 'https?://[^ ]+' |
 				sed 's/*.//' |
 				anew -q .tmp/probed_uncommon_ports_tmp.txt
 
@@ -3499,9 +3501,9 @@ function urlchecks() {
 				if [[ $diff_webs != "0" ]] || [[ ! -s ".tmp/katana.txt" ]]; then
 					if [[ $URL_CHECK_ACTIVE == true ]]; then
 						if [[ $DEEP == true ]]; then
-							katana -silent -list webs/webs_all.txt -jc -kf all -c "$KATANA_THREADS" -d 3 -fs rdn -o .tmp/katana.txt 2>>"$LOGFILE" >/dev/null
+							timeout 4h katana -silent -list webs/webs_all.txt -jc -kf all -c "$KATANA_THREADS" -d 3 -fs rdn -o .tmp/katana.txt 2>>"$LOGFILE" >/dev/null
 						else
-							katana -silent -list webs/webs_all.txt -jc -kf all -c "$KATANA_THREADS" -d 2 -fs rdn -o .tmp/katana.txt 2>>"$LOGFILE" >/dev/null
+							timeout 3h katana -silent -list webs/webs_all.txt -jc -kf all -c "$KATANA_THREADS" -d 2 -fs rdn -o .tmp/katana.txt 2>>"$LOGFILE" >/dev/null
 						fi
 					fi
 				fi
@@ -3510,9 +3512,9 @@ function urlchecks() {
 				if [[ $diff_webs != "0" ]] || [[ ! -s ".tmp/katana.txt" ]]; then
 					if [[ $URL_CHECK_ACTIVE == true ]]; then
 						if [[ $DEEP == true ]]; then
-							axiom-scan webs/webs_all.txt -m katana -jc -kf all -d 3 -fs rdn -o .tmp/katana.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+							axiom-scan webs/webs_all.txt -m katana -jc -kf all -d 3 -fs rdn --max-runtime 4h -o .tmp/katana.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
 						else
-							axiom-scan webs/webs_all.txt -m katana -jc -kf all -d 2 -fs rdn -o .tmp/katana.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+							axiom-scan webs/webs_all.txt -m katana -jc -kf all -d 2 -fs rdn --max-runtime 3h -o .tmp/katana.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
 						fi
 					fi
 				fi
@@ -3524,13 +3526,13 @@ function urlchecks() {
 			fi
 
 			if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
-				grep -a "$domain" .tmp/url_extract_tmp.txt | grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' | grep -aEi "\.js$" | anew -q .tmp/url_extract_js.txt
-				grep -a "$domain" .tmp/url_extract_tmp.txt | grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' | grep -aEi "\.js\.map$" | anew -q .tmp/url_extract_jsmap.txt
+				grep -a "$domain" .tmp/url_extract_tmp.txt | grep -aEo 'https?://[^ ]+' | grep -iE '\.js([?#].*)?$|\.js([/?&].*)' | anew -q .tmp/url_extract_js.txt
+				grep -a "$domain" .tmp/url_extract_tmp.txt | grep -aEo 'https?://[^ ]+' | grep -iE '\.map([/?#].*)?$' | anew -q .tmp/url_extract_jsmap.txt
 				if [[ $DEEP == true ]] && [[ -s ".tmp/url_extract_js.txt" ]]; then
 					interlace -tL .tmp/url_extract_js.txt -threads 10 -c "${tools}/JSA/venv/bin/python3 ${tools}/JSA/jsa.py -f _target_ | anew -q .tmp/url_extract_tmp.txt" &>/dev/null
 				fi
 
-				grep -a "$domain" .tmp/url_extract_tmp.txt | grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg)$" | anew -q .tmp/url_extract_tmp2.txt
+				grep -a "$domain" .tmp/url_extract_tmp.txt | grep -aEo 'https?://[^ ]+' | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg)$" | anew -q .tmp/url_extract_tmp2.txt
 
 				if [[ -s ".tmp/url_extract_tmp2.txt" ]]; then
 					urless <.tmp/url_extract_tmp2.txt | anew -q .tmp/url_extract_uddup.txt 2>>"$LOGFILE" >/dev/null
@@ -3721,8 +3723,7 @@ function jschecks() {
 			if [[ $AXIOM != true ]]; then
 				subjs -ua "Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -c 40 <.tmp/url_extract_js.txt |
 					grep "$domain" |
-					grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' |
-					anew -q .tmp/subjslinks.txt
+					grep -aEo 'https?://[^ ]+' | anew -q .tmp/subjslinks.txt
 			else
 				axiom-scan .tmp/url_extract_js.txt -m subjs -o .tmp/subjslinks.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
 			fi
@@ -3730,7 +3731,7 @@ function jschecks() {
 			if [[ -s ".tmp/subjslinks.txt" ]]; then
 				grep -Eiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" .tmp/subjslinks.txt |
 					anew -q js/nojs_links.txt
-				grep -iE "\.js($|\?)" .tmp/subjslinks.txt | anew -q .tmp/url_extract_js.txt
+				grep -iE '\.js([?#].*)?$|\.js([/?&].*)' .tmp/subjslinks.txt | anew -q .tmp/url_extract_js.txt
 			fi
 
 			urless <.tmp/url_extract_js.txt |
@@ -3983,9 +3984,9 @@ function brokenLinks() {
 				# Use katana for scanning
 				if [[ ! -s ".tmp/katana.txt" ]]; then
 					if [[ $DEEP == true ]]; then
-						katana -silent -list "webs/webs_all.txt" -jc -kf all -c "$KATANA_THREADS" -d 3 -o ".tmp/katana.txt" 2>>"$LOGFILE" >/dev/null
+						timeout 4h katana -silent -list "webs/webs_all.txt" -jc -kf all -c "$KATANA_THREADS" -d 3 -o ".tmp/katana.txt" 2>>"$LOGFILE" >/dev/null
 					else
-						katana -silent -list "webs/webs_all.txt" -jc -kf all -c "$KATANA_THREADS" -d 2 -o ".tmp/katana.txt" 2>>"$LOGFILE" >/dev/null
+						timeout 3h katana -silent -list "webs/webs_all.txt" -jc -kf all -c "$KATANA_THREADS" -d 2 -o ".tmp/katana.txt" 2>>"$LOGFILE" >/dev/null
 					fi
 				fi
 				# Remove lines longer than 2048 characters
@@ -3996,9 +3997,9 @@ function brokenLinks() {
 				# Use axiom-scan for scanning
 				if [[ ! -s ".tmp/katana.txt" ]]; then
 					if [[ $DEEP == true ]]; then
-						axiom-scan "webs/webs_all.txt" -m katana -jc -kf all -d 3 -o ".tmp/katana.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+						axiom-scan "webs/webs_all.txt" -m katana -jc -kf all -d 3 --max-runtime 4h -o ".tmp/katana.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 					else
-						axiom-scan "webs/webs_all.txt" -m katana -jc -kf all -d 2 -o ".tmp/katana.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+						axiom-scan "webs/webs_all.txt" -m katana -jc -kf all -d 2 --max-runtime 3h -o ".tmp/katana.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 					fi
 					# Remove lines longer than 2048 characters
 					if [[ -s ".tmp/katana.txt" ]]; then
@@ -5371,6 +5372,12 @@ function start() {
 
 function end() {
 
+	if [[ $opt_ai ]]; then
+		notification "[$(date +'%Y-%m-%d %H:%M:%S')] Sending ${domain} data to AI" info
+		mkdir -p "${dir}/ai_result" 2>>"${LOGFILE}"
+		"${tools}/reconftw_ai/venv/bin/python3" "${tools}/reconftw_ai/reconftw_ai.py" --results-dir ${dir} --output-dir ${dir}/ai_result --model ${AI_MODEL} --output-format ${AI_REPORT_TYPE} --report-type ${AI_REPORT_PROFILE} --prompts-file ${tools}/reconftw_ai/prompts.json 2>>"${LOGFILE}" >/dev/null
+	fi
+
 	find $dir -type f -empty -print | grep -v '.called_fn' | grep -v '.log' | grep -v '.tmp' | xargs rm -f 2>>"$LOGFILE" >/dev/null
 	find $dir -type d -empty -print -delete 2>>"$LOGFILE" >/dev/null
 
@@ -5431,6 +5438,7 @@ function end() {
 	if [[ $SENDZIPNOTIFY == true ]]; then
 		zipSnedOutputFolder
 	fi
+
 	global_end=$(date +%s)
 	getElapsedTime $global_start $global_end
 	printf "${bgreen}#######################################################################${reset}\n"
@@ -6003,53 +6011,54 @@ function zen_menu() {
 }
 
 function help() {
-	printf "\n Usage: $0 [-d domain.tld] [-m name] [-l list.txt] [-x oos.txt] [-i in.txt] "
-	printf "\n           	      [-r] [-s] [-p] [-a] [-w] [-n] [-i] [-h] [-f] [--deep] [-o OUTPUT]\n\n"
-	printf " ${bblue}TARGET OPTIONS${reset}\n"
-	printf "   -d domain.tld     Target domain\n"
-	printf "   -m company        Target company name\n"
-	printf "   -l list.txt       Targets list (One on each line)\n"
-	printf "   -x oos.txt        Excludes subdomains list (Out Of Scope)\n"
-	printf "   -i in.txt         Includes subdomains list\n"
-	printf " \n"
-	printf " ${bblue}MODE OPTIONS${reset}\n"
-	printf "   -r, --recon       Recon - Performs full recon process (without attacks)\n"
-	printf "   -s, --subdomains  Subdomains - Performs Subdomain Enumeration, Web probing and check for sub-tko\n"
-	printf "   -p, --passive     Passive - Performs only passive steps\n"
-	printf "   -a, --all         All - Performs all checks and active exploitations\n"
-	printf "   -w, --web         Web - Performs web checks from list of subdomains\n"
-	printf "   -n, --osint       OSINT - Checks for public intel data\n"
-	printf "   -z, --zen         Zen - Performs a recon process covering the basics and some vulns \n"
-	printf "   -c, --custom      Custom - Launches specific function against target, u need to know the function name first\n"
-	printf "   -h                Help - Show help section\n"
-	printf " \n"
-	printf " ${bblue}GENERAL OPTIONS${reset}\n"
-	printf "   --deep            Deep scan (Enable some slow options for deeper scan)\n"
-	printf "   -f config_file    Alternate reconftw.cfg file\n"
-	printf "   -o output/path    Define output folder\n"
-	printf "   -v, --vps         Axiom distributed VPS \n"
-	printf "   -q                Rate limit in requests per second \n"
-	printf "   --check-tools     Exit if one of the tools is missing\n"
-	printf " \n"
-	printf " ${bblue}USAGE EXAMPLES${reset}\n"
-	printf " ${byellow}Perform full recon (without attacks):${reset}\n"
-	printf " ./reconftw.sh -d example.com -r\n"
-	printf " \n"
-	printf " ${byellow}Perform subdomain enumeration on multiple targets:${reset}\n"
-	printf " ./reconftw.sh -l targets.txt -s\n"
-	printf " \n"
-	printf " ${byellow}Perform Web based scanning on a subdomains list:${reset}\n"
-	printf " ./reconftw.sh -d example.com -l targets.txt -w\n"
-	printf " \n"
-	printf " ${byellow}Multidomain recon:${reset}\n"
-	printf " ./reconftw.sh -m company -l domainlist.txt -r\n"
-	printf " \n"
-	printf " ${byellow}Perform full recon (with active attacks) along Out-Of-Scope subdomains list:${reset}\n"
-	printf " ./reconftw.sh -d example.com -x out.txt -a\n"
-	printf " \n"
-	printf " ${byellow}Perform full recon and store output to specified directory:${reset}\n"
-	printf " ./reconftw.sh -d example.com -r -o custom/path\n"
-	printf " \n"
+    printf "\n Usage: $0 [-d domain.tld] [-m name] [-l list.txt] [-x oos.txt] [-i in.txt] "
+    printf "\n           	      [-r] [-s] [-p] [-a] [-w] [-n] [-z] [-c] [-y] [-h] [-f] [--ai] [--deep] [-o OUTPUT]\n\n"
+    printf " ${bblue}TARGET OPTIONS${reset}\n"
+    printf "   -d domain.tld     Target domain\n"
+    printf "   -m company        Target company name\n"
+    printf "   -l list.txt       Targets list (One on each line)\n"
+    printf "   -x oos.txt        Excludes subdomains list (Out Of Scope)\n"
+    printf "   -i in.txt         Includes subdomains list\n"
+    printf " \n"
+    printf " ${bblue}MODE OPTIONS${reset}\n"
+    printf "   -r, --recon       Recon - Performs full recon process (without attacks)\n"
+    printf "   -s, --subdomains  Subdomains - Performs Subdomain Enumeration, Web probing and check for sub-tko\n"
+    printf "   -p, --passive     Passive - Performs only passive steps\n"
+    printf "   -a, --all         All - Performs all checks and active exploitations\n"
+    printf "   -w, --web         Web - Performs web checks from list of subdomains\n"
+    printf "   -n, --osint       OSINT - Checks for public intel data\n"
+    printf "   -z, --zen         Zen - Performs a recon process covering the basics and some vulns\n"
+    printf "   -c, --custom      Custom - Launches specific function against target, u need to know the function name first\n"
+    printf "   -y, --ai          AI - Analyzes ReconFTW results using a local LLM\n"
+    printf "   -h                Help - Show help section\n"
+    printf " \n"
+    printf " ${bblue}GENERAL OPTIONS${reset}\n"
+    printf "   --deep            Deep scan (Enable some slow options for deeper scan)\n"
+    printf "   -f config_file    Alternate reconftw.cfg file\n"
+    printf "   -o output/path    Define output folder\n"
+    printf "   -v, --vps         Axiom distributed VPS\n"
+    printf "   -q                Rate limit in requests per second\n"
+    printf "   --check-tools     Exit if one of the tools is missing\n"
+    printf " \n"
+    printf " ${bblue}USAGE EXAMPLES${reset}\n"
+    printf " ${byellow}Perform full recon (without attacks):${reset}\n"
+    printf " ./reconftw.sh -d example.com -r\n"
+    printf " \n"
+    printf " ${byellow}Perform subdomain enumeration on multiple targets:${reset}\n"
+    printf " ./reconftw.sh -l targets.txt -s\n"
+    printf " \n"
+    printf " ${byellow}Perform Web based scanning on a subdomains list:${reset}\n"
+    printf " ./reconftw.sh -d example.com -l targets.txt -w\n"
+    printf " \n"
+    printf " ${byellow}Multidomain recon:${reset}\n"
+    printf " ./reconftw.sh -m company -l domainlist.txt -r\n"
+    printf " \n"
+    printf " ${byellow}Perform full recon (with active attacks) along Out-Of-Scope subdomains list:${reset}\n"
+    printf " ./reconftw.sh -d example.com -x out.txt -a\n"
+    printf " \n"
+    printf " ${byellow}Analyze ReconFTW results with AI:${reset}\n"
+    printf " ./reconftw.sh -d example.com -r --ai\n"
+    printf " \n"
 	printf " ${byellow}Run custom function:${reset}\n"
 	printf " ./reconftw.sh -d example.com -c nuclei_check \n"
 }
@@ -6077,7 +6086,7 @@ if [[ $OSTYPE == "darwin"* ]]; then
 	PATH="$(brew --prefix coreutils)/libexec/gnubin:$PATH"
 fi
 
-PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:zrspanwvh' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,check-tools' -n 'reconFTW' -- "$@")
+PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:zrspanwvyh' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,ai,check-tools' -n 'reconFTW' -- "$@")
 
 exit_status=$?
 if [[ $exit_status -ne 0 ]]; then
@@ -6161,6 +6170,11 @@ while true; do
 		shift
 		continue
 		;;
+	'-y' | '--ai')
+        opt_ai=true
+        shift
+        continue
+        ;;
 	# extra stuff
 	'-o')
 		if [[ $2 != /* ]]; then

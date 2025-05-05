@@ -134,6 +134,7 @@ declare -A repos=(
 	["Scopify"]="Arcanum-Sec/Scopify"
 	["metagoofil"]="opsdisk/metagoofil"
 	["EmailHarvester"]="maldevel/EmailHarvester"
+	["reconftw_ai"]="six2dez/reconftw_ai"
 )
 
 # Function to display the banner
