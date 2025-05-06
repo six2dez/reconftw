@@ -599,9 +599,23 @@ function third_party_misconfigs() {
 		# Extract company name from domain
 		company_name=$(unfurl format %r <<<"$domain")
 
+		# Change directory to Spoofy tool
+		if ! pushd "${tools}/misconfig-mapper" >/dev/null; then
+			printf "%b[!] Failed to change directory to %s in %s at line %s.%b\n" \
+				"$bred" "${tools}/misconfig-mapper" "${FUNCNAME[0]}" "$LINENO" "$reset"
+			return 1
+		fi
+
 		# Run misconfig-mapper and handle errors
 		misconfig-mapper -target "$company_name" -service "*" 2>&1 | grep -v "\-\]" | grep -v "Failed" >"${dir}/osint/3rdparts_misconfigurations.txt"
 
+		# Return to the previous directory
+		if ! popd >/dev/null; then
+			printf "%b[!] Failed to return to previous directory in %s at line %s.%b\n" \
+				"$bred" "${FUNCNAME[0]}" "$LINENO" "$reset"
+			return 1
+		fi
+		
 		end_func "Results are saved in $domain/osint/3rdparts_misconfigurations.txt" "${FUNCNAME[0]}"
 
 	else
@@ -2875,7 +2889,7 @@ function favicon() {
 		fi
 
 		# Run the favicon IP lookup tool
-		"${tools}/fav-up/venv/bin/python3" "${tools}/fav-up/favUp.py" -w "$domain" -sc -o favicontest.json 2>>"$LOGFILE" >/dev/null
+		timeout 10m "${tools}/fav-up/venv/bin/python3" "${tools}/fav-up/favUp.py" -w "$domain" -sc -o favicontest.json 2>>"$LOGFILE" >/dev/null
 
 		# Process the results if favicontest.json exists and is not empty
 		if [[ -s "favicontest.json" ]]; then
