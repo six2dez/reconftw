@@ -3797,7 +3797,7 @@ function jschecks() {
 				mkdir -p .tmp/sourcemapper/secrets
 				for i in $(cat js/js_secrets.txt | cut -d' ' -f2); do wget -q -P .tmp/sourcemapper/secrets $i; done
 				trufflehog filesystem .tmp/sourcemapper/ -j 2>/dev/null | jq -c | anew -q js/js_secrets_jsmap.txt
-				find .tmp/sourcemapper/ -type f -name "*.js" | jsluice secrets -j --patterns=~/Tools/jsluice-patterns.json | anew -q js/js_secrets_jsmap_jsluice.txt
+				find .tmp/sourcemapper/ -type f -name "*.js" | jsluice secrets -j --patterns=~/Tools/jsluice_patterns.json | anew -q js/js_secrets_jsmap_jsluice.txt
 			fi
 
 			printf "%bRunning: Building wordlist 6/6%b\n" "$yellow" "$reset"
