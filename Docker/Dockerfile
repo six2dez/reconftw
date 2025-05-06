@@ -1,7 +1,6 @@
 # syntax=docker/dockerfile:1.4
 
-# Specify a non-root user
-FROM kalilinux/kali-rolling:trunk AS base_reconftw
+FROM ubuntu:latest AS base_reconftw
 USER nonrootuser
 
 # Add a healthcheck instruction
@@ -17,14 +16,11 @@ ARG SHODAN_API_KEY="XXXXXXXXXXXXXX"
 ARG LANG=en_US.UTF-8
 ARG LANGUAGE=en_US
 
-ARG GIT_REPOSITORY_AXIOM="https://github.com/pry0cc/axiom"
-ARG GIT_REPOSITORY_RECONFTW="https://github.com/six2dez/reconftw"
-
 ##################################################
 ###> Do NOT change anything beyond this point <###
 ##################################################
 
-FROM kalilinux/kali-rolling:trunk AS base
+FROM ubuntu:latest AS base
 
 LABEL org.label-schema.name='reconftw'
 LABEL org.label-schema.description='A simple script for full recon'
@@ -40,8 +36,8 @@ ARG SHODAN_API_KEY
 ARG LANG
 ARG LANGUAGE
 
-ARG GIT_REPOSITORY_AXIOM
-ARG GIT_REPOSITORY_RECONFTW
+ARG GIT_REPOSITORY_AXIOM="https://github.com/attacksurge/ax.git"
+ARG GIT_REPOSITORY_RECONFTW="https://github.com/six2dez/reconftw"
 
 ENV COLLAB_SERVER=$COLLAB_SERVER
 ENV XSS_SERVER=$XSS_SERVER
@@ -72,15 +68,11 @@ set -x
 ###>> Backup .bashrc <<###
 cp /root/.bashrc /root/original.bashrc
 
-###>> Update Sources <<###
-echo "deb http://kali.download/kali kali-rolling main contrib non-free" > /etc/apt/sources.list
-echo "deb-src http://kali.download/kali kali-rolling main contrib non-free" >> /etc/apt/sources.list
-
 ###>> System Configuration <<###
 apt clean all
 apt update
 apt full-upgrade -f -y --allow-downgrades
-apt install -y --no-install-recommends apt-utils ca-certificates curl git lsb-release nano wget vim jq htop nmon
+apt install -y --no-install-recommends apt-utils ca-certificates curl git lsb-release nano wget vim jq htop net-tools dnsutils nmap python3 python3-pip unzip whois
 
 ###>> Congifure Locales <<###
 apt install -y --no-install-recommends locales
@@ -133,19 +125,29 @@ COPY notify.conf /root/.config/notify/notify.conf
 ###>> Configure Axiom Provider <<###
 RUN <<eot
 ###>> Regenerate SSH Keys <<###
-# You REALLY do NOT want to use the default SSH keys in the base image
-find /root/.ssh -type f -delete
+apt update && apt install -y --no-install-recommends openssh-client
+
+mkdir -p /root/.ssh
+mkdir -p /root/.axiom/configs
+
 ssh-keygen -b 2048 -t rsa -f /root/.ssh/axiom_rsa -q -N ""
 cat /root/.ssh/axiom_rsa.pub > /root/.axiom/configs/authorized_keys
+
+apt remove --purge -y openssh-client && apt autoremove -y && apt clean all
+find /var/lib/apt/lists -type f -delete
+find /var/cache -type f -delete
+find /var/log -type f -delete
+find /tmp -type f -delete
+rm -rf /root/.cache
 eot
 
-COPY axiom-config.ini /root/.axiom/configs/config.ini
-COPY axiom-custom-provider.json /root/.axiom/accounts/personal.json
+#COPY axiom-config.ini /root/.axiom/configs/config.ini
+#COPY axiom-custom-provider.json /root/.axiom/accounts/personal.json
 RUN axiom-account personal
-RUN az group delete --name axiom --yes --no-wait
+# RUN az group delete --name axiom --yes --no-wait
 
-# This command exits with return code 1, so leave the '|| :' or the build will fail.
-COPY axiom-custom-provider.json /root/.axiom/accounts/personal.json
+ # This command exits with return code 1, so leave the '|| :' or the build will fail.
+# COPY axiom-custom-provider.json /root/.axiom/accounts/personal.json
 RUN axiom-build reconftw || :
 
 ## Issue 271

@@ -162,10 +162,14 @@ function tools_installed() {
 		["Oralyzer_python"]="${tools}/Oralyzer/venv/bin/python3"
 		["msftrecon"]="${tools}/msftrecon/msftrecon/msftrecon.py"
 		["msftrecon_python"]="${tools}/msftrecon/venv/bin/python3"
+		["Scopify"]="${tools}/Scopify/scopify.py"
+		["Scopify_python"]="${tools}/Scopify/venv/bin/python3"
 		["EmailHarvester"]="${tools}/EmailHarvester/EmailHarvester.py"
 		["EmailHarvester_python"]="${tools}/EmailHarvester/venv/bin/python3"
 		["metagoofil"]="${tools}/metagoofil/metagoofil.py"
 		["metagoofil_python"]="${tools}/metagoofil/venv/bin/python3"
+		["reconftw_ai"]="${tools}/reconftw_ai/reconftw_ai.py"
+		["reconftw_ai_python"]="${tools}/reconftw_ai/venv/bin/python3"
 	)
 
 	declare -A tools_folders=(
@@ -183,6 +187,7 @@ function tools_installed() {
 		["timeout"]="timeout"
 		["brutespray"]="brutespray"
 		["xnLinkFinder"]="xnLinkFinder"
+		["xnldorker"]="xnldorker"
 		["urlfinder"]="urlfinder"
 		["github-endpoints"]="github-endpoints"
 		["github-subdomains"]="github-subdomains"
@@ -240,6 +245,8 @@ function tools_installed() {
 		["urless"]="urless"
 		["dnstake"]="dnstake"
 		["cent"]="cent"
+		["csprecon"]="csprecon"
+		["VhostFinder"]="VhostFinder"
 	)
 
 	# Check for tool files
@@ -433,7 +440,7 @@ function metadata() {
 		start_func "${FUNCNAME[0]}" "Scanning metadata in public files"
 
 		mkdir -p ".tmp/metagoofil_${domain}/" 2>>"${LOGFILE}"
-		"${tools}/metagoofil/venv/bin/python3" "${tools}/metagoofil/metagoofil.py" -d "${domain}" -t pdf,docx,xlsx -l 10 -w -o ".tmp/metagoofil_${domain}/" 2>>"${LOGFILE}" > /dev/null
+		"${tools}/metagoofil/venv/bin/python3" "${tools}/metagoofil/metagoofil.py" -d "${domain}" -t pdf,docx,xlsx -l 10 -w -o ".tmp/metagoofil_${domain}/" 2>>"${LOGFILE}" >/dev/null
 		exiftool -r .tmp/metagoofil_${domain}/* 2>>"${LOGFILE}" | tee /dev/null | egrep -i "Author|Creator|Email|Producer|Template" | sort -u | anew -q "osint/metadata_results.txt"
 
 		end_func "Results are saved in ${domain}/osint/[software/authors/metadata_results].txt" "${FUNCNAME[0]}"
@@ -559,7 +566,10 @@ function domain_info() {
 
 		# Run whois command and check for errors
 		whois "$domain" >"osint/domain_info_general.txt"
-		"${tools}/msftrecon/venv/bin/python3" "${tools}/msftrecon/msftrecon/msftrecon.py" -d ${domain} >osint/azure_tenant_domains.txt
+		"${tools}/msftrecon/venv/bin/python3" "${tools}/msftrecon/msftrecon/msftrecon.py" -d ${domain} 2>>"$LOGFILE" >osint/azure_tenant_domains.txt
+
+		company_name=$(unfurl format %r <<<"$domain")
+		"${tools}/Scopify/venv/bin/python3" "${tools}/Scopify/scopify.py" -c ${company_name} >osint/scopify.txt
 
 		end_func "Results are saved in ${domain}/osint/domain_info_[general/azure_tenant_domains].txt" "${FUNCNAME[0]}"
 
@@ -761,7 +771,7 @@ function subdomains_full() {
 		sub_brute
 		sub_permut
 		sub_regex_permut
-		# sub_gpt (commented out)
+		sub_ia_permut
 		sub_recursive_passive
 		sub_recursive_brute
 		sub_dns
@@ -831,14 +841,14 @@ function subdomains_full() {
 
 function sub_passive() {
 
-	mkdir -p .tmp
+	mkdir -p .tmp subdomains
 
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBPASSIVE == true ]]; then
 		start_subfunc "${FUNCNAME[0]}" "Running: Passive Subdomain Enumeration"
 
 		# Run subfinder and check for errors
 		subfinder -all -d "$domain" -max-time "$SUBFINDER_ENUM_TIMEOUT" -silent -o .tmp/subfinder_psub.txt 2>>"$LOGFILE" >/dev/null
-		merklemap-cli search $domain 2>/dev/null | awk -F' ' '{for(i=1;i<=NF;i++) if($i ~ /^domain=/) {split($i,a,"="); print a[2]}}' | anew -q .tmp/subfinder_psub.txt 2>>"$LOGFILE" >/dev/null
+		#merklemap-cli search $domain 2>/dev/null | awk -F' ' '{for(i=1;i<=NF;i++) if($i ~ /^domain=/) {split($i,a,"="); print a[2]}}' | anew -q .tmp/subfinder_psub.txt 2>>"$LOGFILE" >/dev/null
 
 		# Run github-subdomains if GITHUB_TOKENS is set and file is not empty
 		if [[ -s $GITHUB_TOKENS ]]; then
@@ -1024,7 +1034,7 @@ function sub_tls() {
 
 		if [[ -s ".tmp/subdomains_tlsx.txt" ]]; then
 			grep "\.$domain$\|^$domain$" .tmp/subdomains_tlsx.txt |
-				grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' |
+				grep -aEo 'https?://[^ ]+' |
 				sed "s/|__ //" | anew -q .tmp/subdomains_tlsx_clean.txt
 		fi
 
@@ -1142,36 +1152,31 @@ function sub_noerror() {
 }
 
 function sub_dns() {
-	mkdir -p .tmp subdomains
+	mkdir -p .tmp subdomains hosts
 
 	if [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; then
 		start_subfunc "${FUNCNAME[0]}" "Running: DNS Subdomain Enumeration and PTR search"
 
+		if [[ -s "subdomains/subdomains.txt" ]]; then
+			dnsx -r "$resolvers_trusted" -recon -silent -retry 3 -json \
+				-o "subdomains/subdomains_dnsregs.json" <"subdomains/subdomains.txt" 2>>"$LOGFILE" >/dev/null
+		fi
+		if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
+			# Extract various DNS records and process them
+			jq -r --arg domain "$domain" '.. | strings | select(test("\\." + $domain + "$"))' <"subdomains/subdomains_dnsregs.json" |
+				grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' |
+				sort -u | anew -q .tmp/subdomains_dns.txt
+
+			jq -r '.. | strings | select(test("^(\\d{1,3}\\.){3}\\d{1,3}$|^[0-9a-fA-F:]+$"))' <"subdomains/subdomains_dnsregs.json" |
+				sort -u | hakip2host | awk '{print $3}' | unfurl -u domains |
+				sed -e 's/^\*\.//' -e 's/\.$//' -e '/\./!d' | grep "\.$domain$" |
+				grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' | sort -u |
+				anew -q .tmp/subdomains_dns.txt
+
+			jq -r 'select(.host) |"\(.host) - \((.a // [])[])", "\(.host) - \((.aaaa // [])[])"' <"subdomains/subdomains_dnsregs.json" |
+				grep -E ' - [0-9a-fA-F:.]+$' | sort -u | anew -q "subdomains/subdomains_ips.txt"
+		fi
 		if [[ $AXIOM != true ]]; then
-			if [[ -s "subdomains/subdomains.txt" ]]; then
-				dnsx -r "$resolvers_trusted" -a -aaaa -cname -ns -ptr -mx -soa -silent -retry 3 -json \
-					-o "subdomains/subdomains_dnsregs.json" <"subdomains/subdomains.txt" 2>>"$LOGFILE" >/dev/null
-			fi
-
-			if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
-				# Extract various DNS records and process them
-				jq -r 'try .a[], try .aaaa[], try .cname[], try .ns[], try .ptr[], try .mx[], try .soa[]' \
-					<"subdomains/subdomains_dnsregs.json" 2>/dev/null |
-					grep "\.$domain$" |
-					grep -E '^([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}$' |
-					anew -q .tmp/subdomains_dns.txt
-
-				jq -r 'try .a[]' <"subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" | tee /dev/null | sort -u |
-					hakip2host | awk '{print $3}' | unfurl -u domains |
-					sed -e 's/^\*\.//' -e 's/\.$//' -e '/\./!d' |
-					grep "\.$domain$" |
-					grep -E '^([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}$' |
-					anew -q .tmp/subdomains_dns.txt
-
-				jq -r 'try "\(.host) - \(.a[])"' <"subdomains/subdomains_dnsregs.json" 2>/dev/null |
-					sort -u -k2 | anew -q "subdomains/subdomains_ips.txt"
-			fi
-
 			if ! resolvers_update_quick_local; then
 				printf "%b[!] Failed to update resolvers.%b\n" "$bred" "$reset"
 			fi
@@ -1184,32 +1189,6 @@ function sub_dns() {
 					2>>"$LOGFILE" >/dev/null
 			fi
 		else
-			if [[ -s "subdomains/subdomains.txt" ]]; then
-				axiom-scan "subdomains/subdomains.txt" -m dnsx -retry 3 -a -aaaa -cname -ns -ptr -mx -soa -json \
-					-o "subdomains/subdomains_dnsregs.json" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
-			fi
-
-			if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
-				jq -r 'try .a[]' <"subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" | tee /dev/null | sort -u |
-					anew -q .tmp/subdomains_dns_a_records.txt
-
-				jq -r 'try .a[]' <"subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" | tee /dev/null | sort -u |
-					hakip2host | awk '{print $3}' | unfurl -u domains |
-					sed -e 's/^\*\.//' -e 's/\.$//' -e '/\./!d' |
-					grep "\.$domain$" |
-					grep -E '^([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}$' |
-					anew -q .tmp/subdomains_dns.txt
-
-				jq -r 'try .a[], try .aaaa[], try .cname[], try .ns[], try .ptr[], try .mx[], try .soa[]' \
-					<"subdomains/subdomains_dnsregs.json" 2>/dev/null |
-					grep "\.$domain$" |
-					grep -E '^([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}$' |
-					anew -q .tmp/subdomains_dns.txt
-
-				jq -r 'try "\(.host) - \(.a[])"' <"subdomains/subdomains_dnsregs.json" 2>/dev/null |
-					sort -u -k2 | anew -q "subdomains/subdomains_ips.txt"
-			fi
-
 			if ! resolvers_update_quick_axiom; then
 				printf "%b[!] Failed to update resolvers.%b\n" "$bred" "$reset"
 			fi
@@ -1222,6 +1201,10 @@ function sub_dns() {
 					2>>"$LOGFILE" >/dev/null
 			fi
 		fi
+
+		cut -d ' ' -f1 subdomains/subdomains_ips.txt |
+			grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." |
+			grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | sort -u | anew -q hosts/ips.txt
 
 		if [[ $INSCOPE == true ]]; then
 			if ! check_inscope .tmp/subdomains_dns_resolved.txt 2>>"$LOGFILE" >/dev/null; then
@@ -1360,6 +1343,14 @@ function sub_scraping() {
 			subdomains_count=$(wc -l <"$dir/subdomains/subdomains.txt")
 			if [[ $subdomains_count -le $DEEP_LIMIT ]] || [[ $DEEP == true ]]; then
 
+				urlfinder -d $domain -s all -o .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
+
+				if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
+					cat .tmp/url_extract_tmp.txt | grep "$domain" |
+						grep -aEo 'https?://[^ ]+' |
+						sed "s/^\*\.//" | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
+				fi
+
 				if [[ $AXIOM != true ]]; then
 					if ! resolvers_update_quick_local; then
 						printf "%b[!] Failed to update resolvers locally.%b\n" "$bred" "$reset"
@@ -1375,7 +1366,7 @@ function sub_scraping() {
 					if [[ -s ".tmp/web_full_info1.txt" ]]; then
 						cat .tmp/web_full_info1.txt | jq -r 'try .url' 2>/dev/null |
 							grep "$domain" |
-							grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' |
+							grep -aEo 'https?://[^ ]+' |
 							sed "s/^\*\.//" |
 							anew .tmp/probed_tmp_scrap.txt |
 							unfurl -u domains 2>>"$LOGFILE" |
@@ -1383,33 +1374,15 @@ function sub_scraping() {
 					fi
 
 					if [[ -s ".tmp/probed_tmp_scrap.txt" ]]; then
-						timeout -k 1m 10m httpx -l .tmp/probed_tmp_scrap.txt -tls-grab -tls-probe -csp-probe \
-							-status-code -threads "$HTTPX_THREADS" -rl "$HTTPX_RATELIMIT" -timeout "$HTTPX_TIMEOUT" \
-							-silent -retries 2 -no-color -json -o .tmp/web_full_info2.txt \
-							2>>"$LOGFILE" >/dev/null
-					fi
-
-					if [[ -s ".tmp/web_full_info2.txt" ]]; then
-						cat .tmp/web_full_info2.txt | jq -r 'try ."tls-grab"."dns_names"[], try .csp.domains[], try .url' 2>/dev/null |
-							grep "$domain" |
-							grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' |
-							sed "s/^\*\.//" |
-							sort -u |
-							httpx -silent |
-							anew .tmp/probed_tmp_scrap.txt |
-							unfurl -u domains 2>>"$LOGFILE" |
-							anew -q .tmp/scrap_subs.txt
+						cat .tmp/probed_tmp_scrap.txt | csprecon -s | grep "$domain" | sed "s/^\*\.//" | sort -u |
+							unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
 					fi
 
 					if [[ -s ".tmp/probed_tmp_scrap.txt" ]]; then
 						if [[ $DEEP == true ]]; then
-							katana_depth=3
-						else
-							katana_depth=2
+							timeout 3h katana -silent -list .tmp/probed_tmp_scrap.txt -jc -kf all -c "$KATANA_THREADS" -d 2 \
+								-fs rdn -o .tmp/katana.txt 2>>"$LOGFILE" >/dev/null
 						fi
-
-						katana -silent -list .tmp/probed_tmp_scrap.txt -jc -kf all -c "$KATANA_THREADS" -d "$katana_depth" \
-							-fs rdn -o .tmp/katana.txt 2>>"$LOGFILE" >/dev/null
 					fi
 
 				else
@@ -1427,7 +1400,7 @@ function sub_scraping() {
 					if [[ -s ".tmp/web_full_info1.txt" ]]; then
 						cat .tmp/web_full_info1.txt | jq -r 'try .url' 2>/dev/null |
 							grep "$domain" |
-							grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' |
+							grep -aEo 'https?://[^ ]+' |
 							sed "s/^\*\.//" |
 							anew .tmp/probed_tmp_scrap.txt |
 							unfurl -u domains 2>>"$LOGFILE" |
@@ -1435,33 +1408,15 @@ function sub_scraping() {
 					fi
 
 					if [[ -s ".tmp/probed_tmp_scrap.txt" ]]; then
-						timeout -k 1m 10m axiom-scan .tmp/probed_tmp_scrap.txt -m httpx -tls-grab -tls-probe -csp-probe \
-							-random-agent -status-code -threads "$HTTPX_THREADS" -rl "$HTTPX_RATELIMIT" -timeout "$HTTPX_TIMEOUT" \
-							-silent -retries 2 -title -web-server -tech-detect -location -no-color -json -o .tmp/web_full_info2.txt \
-							$AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
-					fi
-
-					if [[ -s ".tmp/web_full_info2.txt" ]]; then
-						cat .tmp/web_full_info2.txt | jq -r 'try ."tls-grab"."dns_names"[], try .csp.domains[], try .url' 2>/dev/null |
-							grep "$domain" |
-							grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' |
-							sed "s/^\*\.//" |
-							sort -u |
-							httpx -silent |
-							anew .tmp/probed_tmp_scrap.txt |
-							unfurl -u domains 2>>"$LOGFILE" |
-							anew -q .tmp/scrap_subs.txt
+						cat .tmp/probed_tmp_scrap.txt | csprecon -s | grep "$domain" | sed "s/^\*\.//" | sort -u |
+							unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
 					fi
 
 					if [[ -s ".tmp/probed_tmp_scrap.txt" ]]; then
 						if [[ $DEEP == true ]]; then
-							katana_depth=3
-						else
-							katana_depth=2
+							axiom-scan .tmp/probed_tmp_scrap.txt -m katana -jc -kf all -d 2 -fs rdn \
+								-o .tmp/katana.txt $AXIOM_EXTRA_ARGS --max-runtime 4h 2>>"$LOGFILE" >/dev/null
 						fi
-
-						axiom-scan .tmp/probed_tmp_scrap.txt -m katana -jc -kf all -d "$katana_depth" -fs rdn \
-							-o .tmp/katana.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 					fi
 				fi
 
@@ -1510,7 +1465,7 @@ function sub_scraping() {
 					if [[ -s ".tmp/web_full_info3.txt" ]]; then
 						cat .tmp/web_full_info3.txt | jq -r 'try .url' 2>/dev/null |
 							grep "$domain" |
-							grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' |
+							grep -aEo 'https?://[^ ]+' |
 							sed "s/^\*\.//" |
 							anew .tmp/probed_tmp_scrap.txt |
 							unfurl -u domains 2>>"$LOGFILE" |
@@ -1866,6 +1821,88 @@ function sub_regex_permut() {
 
 }
 
+function sub_ia_permut() {
+
+	# Create necessary directories
+	if ! mkdir -p .tmp subdomains; then
+		printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
+		return 1
+	fi
+
+	# Check if the function should run
+	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBIAPERMUTE == true ]]; then
+		start_subfunc "${FUNCNAME[0]}" "Running: Permutations by IA analysis"
+
+		subwiz -i subdomains/subdomains.txt --no-resolve -o .tmp/subwiz.txt 2>>"$LOGFILE" >/dev/null
+
+		# Resolve the generated domains
+		if [[ $AXIOM != true ]]; then
+			if ! resolvers_update_quick_local; then
+				printf "%b[!] Failed to update resolvers locally.%b\n" "$bred" "$reset"
+				return 1
+			fi
+
+			if [[ -s ".tmp/subwiz.txt" ]]; then
+				puredns resolve ".tmp/subwiz.txt" -w .tmp/subwiz_resolved.txt -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
+					-l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
+					--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
+					2>>"$LOGFILE" >/dev/null
+			fi
+		else
+			if ! resolvers_update_quick_axiom; then
+				printf "%b[!] Failed to update resolvers on Axiom.%b\n" "$bred" "$reset"
+				return 1
+			fi
+
+			if [[ -s ".tmp/subwiz.txt" ]]; then
+				axiom-scan ".tmp/subwiz.txt" -m puredns-resolve \
+					-r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt \
+					--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
+					-o .tmp/subwiz_resolved.txt $AXIOM_EXTRA_ARGS \
+					2>>"$LOGFILE" >/dev/null
+			fi
+		fi
+
+		# Process the resolved domains
+		if [[ -s ".tmp/subwiz_resolved.txt" ]]; then
+			if [[ -s $outOfScope_file ]]; then
+				if ! deleteOutScoped "$outOfScope_file" .tmp/subwiz_resolved.txt; then
+					printf "%b[!] deleteOutScoped command failed.%b\n" "$bred" "$reset"
+				fi
+			fi
+
+			if [[ $INSCOPE == true ]]; then
+				if ! check_inscope .tmp/subwiz_resolved.txt 2>>"$LOGFILE" >/dev/null; then
+					printf "%b[!] check_inscope command failed.%b\n" "$bred" "$reset"
+				fi
+			fi
+
+			if ! NUMOFLINES=$(grep "\.$domain$\|^$domain$" .tmp/subwiz_resolved.txt 2>>"$LOGFILE" |
+				grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' |
+				anew subdomains/subdomains.txt |
+				sed '/^$/d' |
+				wc -l); then
+				printf "%b[!] Failed to count new subdomains.%b\n" "$bred" "$reset"
+				NUMOFLINES=0
+			fi
+		else
+			NUMOFLINES=0
+		fi
+
+		end_subfunc "${NUMOFLINES} new subs (permutations by IA)" "${FUNCNAME[0]}"
+
+	else
+		if [[ $SUBIAPERMUTE == false ]]; then
+			printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
+				"$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+		else
+			printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
+				"$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "/.${FUNCNAME[0]}" "$reset"
+		fi
+	fi
+
+}
+
 function sub_recursive_passive() {
 
 	# Create necessary directories
@@ -1996,39 +2033,30 @@ function sub_recursive_brute() {
 				dsieve -if subdomains/subdomains.txt -f 3 -top "$DEEP_RECURSIVE_PASSIVE" >.tmp/subdomains_recurs_top.txt
 			fi
 
-			# Generate brute recursive wordlist
-			ripgen -d .tmp/subdomains_recurs_top.txt -w "$subs_wordlist" >.tmp/brute_recursive_wordlist.txt
-
-			if [[ $AXIOM != true ]]; then
-				if ! resolvers_update_quick_local; then
-					printf "%b[!] Failed to update resolvers locally.%b\n" "$bred" "$reset"
-					return 1
-				fi
-
-				if [[ -s ".tmp/brute_recursive_wordlist.txt" ]]; then
-					puredns resolve .tmp/brute_recursive_wordlist.txt -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
+			for subdomain_top in $(cat .tmp/subdomains_recurs_top.txt); do
+				if [[ $AXIOM != true ]]; then
+					if ! resolvers_update_quick_local; then
+						printf "%b[!] Failed to update resolvers locally.%b\n" "$bred" "$reset"
+						return 1
+					fi
+					puredns bruteforce "$subs_wordlist" "$subdomain_top" -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
 						-l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
 						--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
-						-w .tmp/brute_recursive_result.txt 2>>"$LOGFILE" >/dev/null
-				fi
-			else
-				if ! resolvers_update_quick_axiom; then
-					printf "%b[!] Failed to update resolvers on axiom.%b\n" "$bred" "$reset"
-					return 1
-				fi
-
-				if [[ -s ".tmp/brute_recursive_wordlist.txt" ]]; then
-					axiom-scan .tmp/brute_recursive_wordlist.txt -m puredns-resolve \
+						-w .tmp/brute_recursive_result_part.txt 2>>"$LOGFILE" >/dev/null
+					cat .tmp/brute_recursive_result_part.txt | anew -q .tmp/brute_recursive.txt
+				else
+					if ! resolvers_update_quick_axiom; then
+						printf "%b[!] Failed to update resolvers on axiom.%b\n" "$bred" "$reset"
+						return 1
+					fi
+					axiom-scan "$subs_wordlist" -m puredns-single "$subdomain_top" \
 						-r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt \
 						--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
-						-o .tmp/brute_recursive_result.txt $AXIOM_EXTRA_ARGS \
+						-o .tmp/brute_recursive_result_part.txt $AXIOM_EXTRA_ARGS \
 						2>>"$LOGFILE" >/dev/null
+					cat .tmp/brute_recursive_result_part.txt | anew -q .tmp/brute_recursive.txt
 				fi
-			fi
-
-			if [[ -s ".tmp/brute_recursive_result.txt" ]]; then
-				cat .tmp/brute_recursive_result.txt | anew -q .tmp/brute_recursive.txt
-			fi
+			done
 
 			# Generate permutations
 			if [[ $PERMUTATIONS_OPTION == "gotator" ]]; then
@@ -2514,13 +2542,12 @@ function geo_info() {
 			# Attempt to generate hosts/ips.txt
 			if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 				if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
-					jq -r 'try . | "\(.host) \(.a[0])"' "subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" | tee /dev/null | anew -q .tmp/subs_ips.txt
+					jq -r 'select(.host) |"\(.host) - \((.a // [])[])", "\(.host) - \((.aaaa // [])[])"' <"subdomains/subdomains_dnsregs.json" |
+						grep -E ' - [0-9a-fA-F:.]+$' | sort -u | anew -q "subdomains/subdomains_ips.txt"
 				fi
-				if [[ -s ".tmp/subs_ips.txt" ]]; then
-					awk '{ print $2 " " $1}' .tmp/subs_ips.txt | sort -k2 -n | anew -q hosts/subs_ips_vhosts.txt
-				fi
-				if [[ -s "hosts/subs_ips_vhosts.txt" ]]; then
-					cut -d ' ' -f1 hosts/subs_ips_vhosts.txt |
+
+				if [[ -s "subdomains/subdomains_ips.txt" ]]; then
+					cut -d ' ' -f3 subdomains/subdomains_ips.txt |
 						grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." |
 						grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" |
 						anew -q hosts/ips.txt
@@ -2597,7 +2624,7 @@ function webprobe_simple() {
 		if [[ -s "webs/web_full_info.txt" ]]; then
 			jq -r 'try .url' webs/web_full_info.txt 2>/dev/null |
 				grep "$domain" |
-				grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' |
+				grep -aEo 'https?://[^ ]+' |
 				sed 's/*.//' | anew -q .tmp/probed_tmp.txt
 		fi
 
@@ -2687,7 +2714,7 @@ function webprobe_full() {
 			# Extract URLs
 			jq -r 'try .url' .tmp/web_full_info_uncommon.txt 2>/dev/null |
 				grep "$domain" |
-				grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?' |
+				grep -aEo 'https?://[^ ]+' |
 				sed 's/*.//' |
 				anew -q .tmp/probed_uncommon_ports_tmp.txt
 
@@ -2720,14 +2747,13 @@ function webprobe_full() {
 			# Update webs_all.txt
 			cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
 
-			end_func "Results are saved in $domain/webs/webs_uncommon_ports.txt" "${FUNCNAME[0]}"
-
 			# Send to proxy if conditions met
 			if [[ $PROXY == true ]] && [[ -n $proxy_url ]] && [[ $(wc -l <webs/webs_uncommon_ports.txt) -le $DEEP_LIMIT2 ]]; then
 				notification "Sending websites with uncommon ports to proxy" "info"
 				ffuf -mc all -w webs/webs_uncommon_ports.txt -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
 			fi
 		fi
+		end_func "Results are saved in $domain/webs/webs_uncommon_ports.txt" "${FUNCNAME[0]}"
 	else
 		if [[ $WEBPROBEFULL == false ]]; then
 			printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
@@ -2767,6 +2793,7 @@ function screenshot() {
 				axiom-scan webs/webs_all.txt -m nuclei-screenshots -o screenshots "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
 			fi
 		fi
+		end_func "Results are saved in $domain/screenshots" "${FUNCNAME[0]}"
 	else
 		if [[ $WEBSCREENSHOT == false ]]; then
 			printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
@@ -2797,40 +2824,12 @@ function virtualhosts() {
 		fi
 
 		# Proceed only if webs_all.txt exists and is non-empty
-		if [[ -s "webs/webs_all.txt" ]]; then
-			if [[ $AXIOM != true ]]; then
-				# Run ffuf using interlace
-				interlace -tL webs/webs_all.txt -threads "$INTERLACE_THREADS" \
-					-c "ffuf -ac -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} \
-					-H \"${HEADER}\" -H \"Host: FUZZ._cleantarget_\" \
-					-w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} \
-					-u _target_ -of json -o _output_/_cleantarget_.json" \
-					-o .tmp/virtualhosts 2>>"$LOGFILE" >/dev/null
-			else
-				# Run axiom-scan with ffuf module
-				axiom-scan webs/webs_all.txt -m ffuf -ac -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} \
-					-H "${HEADER}" -H "Host: FUZZ._cleantarget_" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} \
-					-o .tmp/virtualhosts "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
-			fi
-
-			# Process ffuf output
-			while IFS= read -r sub; do
-				sub_out=$(echo "$sub" | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-				json_file="$dir/.tmp/virtualhosts/${sub_out}.json"
-				txt_file="$dir/virtualhosts/${sub_out}.txt"
-
-				if [[ -s $json_file ]]; then
-					jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' "$json_file" | sort | anew -q "$txt_file"
-				fi
-			done
-
-			# Merge all virtual host txt files into virtualhosts_full.txt
-			find "$dir/virtualhosts/" -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | anew -q "$dir/virtualhosts/virtualhosts_full.txt"
-
-			end_func "Results are saved in $domain/virtualhosts/*subdomain*.txt" "${FUNCNAME[0]}"
+		if [[ -s "subdomains/subdomains.txt" ]] && [[ -s "hosts/ips.txt" ]]; then
+			VhostFinder -ips hosts/ips.txt -wordlist subdomains/subdomains.txt -verify | grep "+" | anew -q "$dir/webs/virtualhosts.txt"
+			end_func "Results are saved in $domain/webs/virtualhosts.txt" "${FUNCNAME[0]}"
 
 		else
-			end_func "No webs/webs_all.txt file found, virtualhosts skipped." "${FUNCNAME[0]}"
+			end_func "No subdomains or hosts file found, virtualhosts skipped." "${FUNCNAME[0]}"
 		fi
 
 		# Optionally send to proxy if conditions are met
@@ -2929,19 +2928,11 @@ function portscan() {
 		# Determine if domain is IP address or domain name
 		if ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 			# Not an IP address
-			if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
-				# Extract host and IP from JSON
-				jq -r 'try . | "\(.host) \(.a[0])"' "subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" | tee /dev/null | anew -q .tmp/subs_ips.txt
-			fi
-
-			if [[ -s ".tmp/subs_ips.txt" ]]; then
-				# Reorder fields and sort
-				awk '{ print $2 " " $1}' ".tmp/subs_ips.txt" | sort -k2 -n | anew -q hosts/subs_ips_vhosts.txt
-			fi
-
-			if [[ -s "hosts/subs_ips_vhosts.txt" ]]; then
-				# Extract IPs, filter out private ranges
-				awk '{print $1}' "hosts/subs_ips_vhosts.txt" | grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' | anew -q hosts/ips.txt
+			if [[ -s "subdomains/subdomains_ips.txt" ]]; then
+				cut -d ' ' -f3 subdomains/subdomains_ips.txt |
+					grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." |
+					grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" |
+					anew -q hosts/ips.txt
 			fi
 
 		else
@@ -3070,18 +3061,17 @@ function cdnprovider() {
 		start_func "${FUNCNAME[0]}" "CDN Provider Check"
 
 		# Check if subdomains_dnsregs.json exists and is not empty
-		if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
-			# Extract IPs from .a[] fields, exclude private IPs, extract IPs, sort uniquely
-			jq -r 'try . | .a[]' "subdomains/subdomains_dnsregs.json" 2>>"$LOGFILE" | tee /dev/null |
-				grep -aEiv "^(127|10|169\.254|172\.(1[6-9]|2[0-9]|3[01])|192\.168)\." |
+		if [[ -s "subdomains/subdomains_ips.txt" ]]; then
+			cut -d ' ' -f3 subdomains/subdomains_ips.txt |
+				grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." |
 				grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" |
-				sort -u >.tmp/ips_cdn.txt
+				anew -q hosts/ips.txt
 		fi
 
 		# Check if ips_cdn.txt exists and is not empty
-		if [[ -s ".tmp/ips_cdn.txt" ]]; then
+		if [[ -s "hosts/ips.txt" ]]; then
 			# Run cdncheck on the IPs and save to cdn_providers.txt
-			cdncheck -silent -resp -nc <.tmp/ips_cdn.txt | anew -q "$dir/hosts/cdn_providers.txt"
+			cdncheck -silent -resp -nc <hosts/ips.txt | anew -q "$dir/hosts/cdn_providers.txt"
 		fi
 
 		end_func "Results are saved in hosts/cdn_providers.txt" "${FUNCNAME[0]}"
@@ -3196,7 +3186,7 @@ function nuclei_check() {
 
 		# Combine url_extract_nodupes.txt, subdomains.txt, and webs_all.txt into webs_subs.txt if it doesn't exist
 		if [[ ! -s ".tmp/webs_subs.txt" ]]; then
-			cat subdomains/subdomains.txt webs/webs_all.txt 2>>"$LOGFILE" > .tmp/webs_subs.txt
+			cat subdomains/subdomains.txt webs/webs_all.txt 2>>"$LOGFILE" >.tmp/webs_subs.txt
 		fi
 
 		# Check if AXIOM is enabled
@@ -3238,7 +3228,7 @@ function nuclei_check() {
 						cat "nuclei_output/${crit}.txt"
 					fi
 				fi
-				done
+			done
 			printf "\n\n"
 		fi
 
@@ -3480,7 +3470,7 @@ function urlchecks() {
 		if [[ -s "webs/webs_all.txt" ]]; then
 
 			if [[ $URL_CHECK_PASSIVE == true ]]; then
-				urlfinder -d $domain -o .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
+				urlfinder -d $domain -s all -o .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
 				if [[ -s $GITHUB_TOKENS ]]; then
 					github-endpoints -q -k -d "$domain" -t "$GITHUB_TOKENS" -o .tmp/github-endpoints.txt 2>>"$LOGFILE" >/dev/null
 					if [[ -s ".tmp/github-endpoints.txt" ]]; then
@@ -3494,9 +3484,9 @@ function urlchecks() {
 				if [[ $diff_webs != "0" ]] || [[ ! -s ".tmp/katana.txt" ]]; then
 					if [[ $URL_CHECK_ACTIVE == true ]]; then
 						if [[ $DEEP == true ]]; then
-							katana -silent -list webs/webs_all.txt -jc -kf all -c "$KATANA_THREADS" -d 3 -fs rdn -o .tmp/katana.txt 2>>"$LOGFILE" >/dev/null
+							timeout 4h katana -silent -list webs/webs_all.txt -jc -kf all -c "$KATANA_THREADS" -d 3 -fs rdn -o .tmp/katana.txt 2>>"$LOGFILE" >/dev/null
 						else
-							katana -silent -list webs/webs_all.txt -jc -kf all -c "$KATANA_THREADS" -d 2 -fs rdn -o .tmp/katana.txt 2>>"$LOGFILE" >/dev/null
+							timeout 3h katana -silent -list webs/webs_all.txt -jc -kf all -c "$KATANA_THREADS" -d 2 -fs rdn -o .tmp/katana.txt 2>>"$LOGFILE" >/dev/null
 						fi
 					fi
 				fi
@@ -3505,9 +3495,9 @@ function urlchecks() {
 				if [[ $diff_webs != "0" ]] || [[ ! -s ".tmp/katana.txt" ]]; then
 					if [[ $URL_CHECK_ACTIVE == true ]]; then
 						if [[ $DEEP == true ]]; then
-							axiom-scan webs/webs_all.txt -m katana -jc -kf all -d 3 -fs rdn -o .tmp/katana.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+							axiom-scan webs/webs_all.txt -m katana -jc -kf all -d 3 -fs rdn --max-runtime 4h -o .tmp/katana.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
 						else
-							axiom-scan webs/webs_all.txt -m katana -jc -kf all -d 2 -fs rdn -o .tmp/katana.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+							axiom-scan webs/webs_all.txt -m katana -jc -kf all -d 2 -fs rdn --max-runtime 3h -o .tmp/katana.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
 						fi
 					fi
 				fi
@@ -3519,13 +3509,13 @@ function urlchecks() {
 			fi
 
 			if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
-				grep -a "$domain" .tmp/url_extract_tmp.txt | grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' | grep -aEi "\.js$" | anew -q .tmp/url_extract_js.txt
-				grep -a "$domain" .tmp/url_extract_tmp.txt | grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' | grep -aEi "\.js\.map$" | anew -q .tmp/url_extract_jsmap.txt
+				grep -a "$domain" .tmp/url_extract_tmp.txt | grep -aEo 'https?://[^ ]+' | grep -iE '\.js([?#].*)?$|\.js([/?&].*)' | anew -q .tmp/url_extract_js.txt
+				grep -a "$domain" .tmp/url_extract_tmp.txt | grep -aEo 'https?://[^ ]+' | grep -iE '\.map([/?#].*)?$' | anew -q .tmp/url_extract_jsmap.txt
 				if [[ $DEEP == true ]] && [[ -s ".tmp/url_extract_js.txt" ]]; then
 					interlace -tL .tmp/url_extract_js.txt -threads 10 -c "${tools}/JSA/venv/bin/python3 ${tools}/JSA/jsa.py -f _target_ | anew -q .tmp/url_extract_tmp.txt" &>/dev/null
 				fi
 
-				grep -a "$domain" .tmp/url_extract_tmp.txt | grep -E '^((http|https):\/\/)?([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}(\/.*)?$' | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" | anew -q .tmp/url_extract_tmp2.txt
+				grep -a "$domain" .tmp/url_extract_tmp.txt | grep -aEo 'https?://[^ ]+' | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg)$" | anew -q .tmp/url_extract_tmp2.txt
 
 				if [[ -s ".tmp/url_extract_tmp2.txt" ]]; then
 					urless <.tmp/url_extract_tmp2.txt | anew -q .tmp/url_extract_uddup.txt 2>>"$LOGFILE" >/dev/null
@@ -3716,8 +3706,7 @@ function jschecks() {
 			if [[ $AXIOM != true ]]; then
 				subjs -ua "Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -c 40 <.tmp/url_extract_js.txt |
 					grep "$domain" |
-					grep -E '^((http|https):\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{1,}(\/.*)?$' |
-					anew -q .tmp/subjslinks.txt
+					grep -aEo 'https?://[^ ]+' | anew -q .tmp/subjslinks.txt
 			else
 				axiom-scan .tmp/url_extract_js.txt -m subjs -o .tmp/subjslinks.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
 			fi
@@ -3725,7 +3714,7 @@ function jschecks() {
 			if [[ -s ".tmp/subjslinks.txt" ]]; then
 				grep -Eiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" .tmp/subjslinks.txt |
 					anew -q js/nojs_links.txt
-				grep -iE "\.js($|\?)" .tmp/subjslinks.txt | anew -q .tmp/url_extract_js.txt
+				grep -iE '\.js([?#].*)?$|\.js([/?&].*)' .tmp/subjslinks.txt | anew -q .tmp/url_extract_js.txt
 			fi
 
 			urless <.tmp/url_extract_js.txt |
@@ -3761,7 +3750,7 @@ function jschecks() {
 			fi
 
 			if [[ -s ".tmp/url_extract_jsmap.txt" ]]; then
-				interlace -tL js/js_livelinks.txt -threads "$INTERLACE_THREADS" \
+				interlace -tL js/url_extract_jsmap.txt -threads "$INTERLACE_THREADS" \
 					-c "sourcemapper -url '_target_' -output _output_/_cleantarget_" \
 					-o .tmp/sourcemapper 2>>"$LOGFILE" >/dev/null
 			fi
@@ -3785,15 +3774,13 @@ function jschecks() {
 				if [[ $AXIOM != true ]]; then
 					cat js/js_livelinks.txt | mantra -ua \"$HEADER\" -s | anew -q js/js_secrets.txt 2>>"$LOGFILE" >/dev/null
 				else
+					axiom-exec "go install github.com/Brosck/mantra@latest" 2>>"$LOGFILE" >/dev/null
 					axiom-scan js/js_livelinks.txt -m mantra -ua "$HEADER" -s -o js/js_secrets.txt "$AXIOM_EXTRA_ARGS" &>/dev/null
 				fi
-				if [[ -s "js/js_secrets.txt" ]]; then
-					trufflehog filesystem js/js_secrets.txt -j 2>/dev/null |
-						jq -c | anew -q js/js_secrets_trufflehog.txt
-					trufflehog filesystem .tmp/sourcemapper/ -j 2>/dev/null |
-						jq -c | anew -q js/js_secrets_trufflehog.txt
-					sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2};?)?)?[mGK]//g" -i js/js_secrets.txt
-				fi
+				mkdir -p .tmp/sourcemapper/secrets
+				for i in $(cat js/js_secrets.txt | cut -d' ' -f2); do wget -q -P .tmp/sourcemapper/secrets $i; done
+				trufflehog filesystem .tmp/sourcemapper/ -j 2>/dev/null | jq -c | anew -q js/js_secrets_jsmap.txt
+				find .tmp/sourcemapper/ -type f -name "*.js" | jsluice secrets -j --patterns=~/Tools/jsluice_patterns.json | anew -q js/js_secrets_jsmap_jsluice.txt
 			fi
 
 			printf "%bRunning: Building wordlist 6/6%b\n" "$yellow" "$reset"
@@ -3980,9 +3967,9 @@ function brokenLinks() {
 				# Use katana for scanning
 				if [[ ! -s ".tmp/katana.txt" ]]; then
 					if [[ $DEEP == true ]]; then
-						katana -silent -list "webs/webs_all.txt" -jc -kf all -c "$KATANA_THREADS" -d 3 -o ".tmp/katana.txt" 2>>"$LOGFILE" >/dev/null
+						timeout 4h katana -silent -list "webs/webs_all.txt" -jc -kf all -c "$KATANA_THREADS" -d 3 -o ".tmp/katana.txt" 2>>"$LOGFILE" >/dev/null
 					else
-						katana -silent -list "webs/webs_all.txt" -jc -kf all -c "$KATANA_THREADS" -d 2 -o ".tmp/katana.txt" 2>>"$LOGFILE" >/dev/null
+						timeout 3h katana -silent -list "webs/webs_all.txt" -jc -kf all -c "$KATANA_THREADS" -d 2 -o ".tmp/katana.txt" 2>>"$LOGFILE" >/dev/null
 					fi
 				fi
 				# Remove lines longer than 2048 characters
@@ -3993,9 +3980,9 @@ function brokenLinks() {
 				# Use axiom-scan for scanning
 				if [[ ! -s ".tmp/katana.txt" ]]; then
 					if [[ $DEEP == true ]]; then
-						axiom-scan "webs/webs_all.txt" -m katana -jc -kf all -d 3 -o ".tmp/katana.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+						axiom-scan "webs/webs_all.txt" -m katana -jc -kf all -d 3 --max-runtime 4h -o ".tmp/katana.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 					else
-						axiom-scan "webs/webs_all.txt" -m katana -jc -kf all -d 2 -o ".tmp/katana.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+						axiom-scan "webs/webs_all.txt" -m katana -jc -kf all -d 2 --max-runtime 3h -o ".tmp/katana.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 					fi
 					# Remove lines longer than 2048 characters
 					if [[ -s ".tmp/katana.txt" ]]; then
@@ -4940,9 +4927,9 @@ function fuzzparams() {
 				fi
 
 				axiom-scan webs/url_extract_nodupes.txt -m nuclei \
-						--remote-folder "/home/op/fuzzing-templates" \
-						-nh -rl "$NUCLEI_RATELIMIT" \
-						-silent -retries 2 "$NUCLEI_EXTRA_ARGS" -dast -j -o ".tmp/fuzzparams_json.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+					--remote-folder "/home/op/fuzzing-templates" \
+					-nh -rl "$NUCLEI_RATELIMIT" \
+					-silent -retries 2 "$NUCLEI_EXTRA_ARGS" -dast -j -o ".tmp/fuzzparams_json.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 			fi
 
 			# Convert JSON output to text
@@ -5103,10 +5090,10 @@ function transfer {
 			echo "$file: No such file or directory" >&2
 			return 1
 		fi
-		tar -czvf /tmp/$file_name $file > /dev/null 2>&1 && curl -s https://bashupload.com/$file.tgz --data-binary @/tmp/$file_name | grep wget
+		tar -czvf /tmp/$file_name $file >/dev/null 2>&1 && curl -s https://bashupload.com/$file.tgz --data-binary @/tmp/$file_name | grep wget
 	else
 		file_name=$1
-		tar -czvf /tmp/$file_name $file > /dev/null 2>&1 && curl -s https://bashupload.com/$file.tgz --data-binary @/tmp/$file_name | grep wget
+		tar -czvf /tmp/$file_name $file >/dev/null 2>&1 && curl -s https://bashupload.com/$file.tgz --data-binary @/tmp/$file_name | grep wget
 	fi
 }
 
@@ -5368,6 +5355,12 @@ function start() {
 
 function end() {
 
+	if [[ $opt_ai ]]; then
+		notification "[$(date +'%Y-%m-%d %H:%M:%S')] Sending ${domain} data to AI" info
+		mkdir -p "${dir}/ai_result" 2>>"${LOGFILE}"
+		"${tools}/reconftw_ai/venv/bin/python3" "${tools}/reconftw_ai/reconftw_ai.py" --results-dir ${dir} --output-dir ${dir}/ai_result --model ${AI_MODEL} --output-format ${AI_REPORT_TYPE} --report-type ${AI_REPORT_PROFILE} --prompts-file ${tools}/reconftw_ai/prompts.json 2>>"${LOGFILE}" >/dev/null
+	fi
+
 	find $dir -type f -empty -print | grep -v '.called_fn' | grep -v '.log' | grep -v '.tmp' | xargs rm -f 2>>"$LOGFILE" >/dev/null
 	find $dir -type d -empty -print -delete 2>>"$LOGFILE" >/dev/null
 
@@ -5428,6 +5421,7 @@ function end() {
 	if [[ $SENDZIPNOTIFY == true ]]; then
 		zipSnedOutputFolder
 	fi
+
 	global_end=$(date +%s)
 	getElapsedTime $global_start $global_end
 	printf "${bgreen}#######################################################################${reset}\n"
@@ -5824,7 +5818,7 @@ function multi_recon() {
 		fi
 		printf "${bgreen}#######################################################################${reset}\n"
 	done
-	
+
 	if [[ $AXIOM == true ]]; then
 		axiom_shutdown
 	fi
@@ -5999,55 +5993,55 @@ function zen_menu() {
 	end
 }
 
-
 function help() {
-	printf "\n Usage: $0 [-d domain.tld] [-m name] [-l list.txt] [-x oos.txt] [-i in.txt] "
-	printf "\n           	      [-r] [-s] [-p] [-a] [-w] [-n] [-i] [-h] [-f] [--deep] [-o OUTPUT]\n\n"
-	printf " ${bblue}TARGET OPTIONS${reset}\n"
-	printf "   -d domain.tld     Target domain\n"
-	printf "   -m company        Target company name\n"
-	printf "   -l list.txt       Targets list (One on each line)\n"
-	printf "   -x oos.txt        Excludes subdomains list (Out Of Scope)\n"
-	printf "   -i in.txt         Includes subdomains list\n"
-	printf " \n"
-	printf " ${bblue}MODE OPTIONS${reset}\n"
-	printf "   -r, --recon       Recon - Performs full recon process (without attacks)\n"
-	printf "   -s, --subdomains  Subdomains - Performs Subdomain Enumeration, Web probing and check for sub-tko\n"
-	printf "   -p, --passive     Passive - Performs only passive steps\n"
-	printf "   -a, --all         All - Performs all checks and active exploitations\n"
-	printf "   -w, --web         Web - Performs web checks from list of subdomains\n"
-	printf "   -n, --osint       OSINT - Checks for public intel data\n"
-	printf "   -z, --zen         Zen - Performs a recon process covering the basics and some vulns \n"
-	printf "   -c, --custom      Custom - Launches specific function against target, u need to know the function name first\n"
-	printf "   -h                Help - Show help section\n"
-	printf " \n"
-	printf " ${bblue}GENERAL OPTIONS${reset}\n"
-	printf "   --deep            Deep scan (Enable some slow options for deeper scan)\n"
-	printf "   -f config_file    Alternate reconftw.cfg file\n"
-	printf "   -o output/path    Define output folder\n"
-	printf "   -v, --vps         Axiom distributed VPS \n"
-	printf "   -q                Rate limit in requests per second \n"
-	printf "   --check-tools     Exit if one of the tools is missing\n"
-	printf " \n"
-	printf " ${bblue}USAGE EXAMPLES${reset}\n"
-	printf " ${byellow}Perform full recon (without attacks):${reset}\n"
-	printf " ./reconftw.sh -d example.com -r\n"
-	printf " \n"
-	printf " ${byellow}Perform subdomain enumeration on multiple targets:${reset}\n"
-	printf " ./reconftw.sh -l targets.txt -s\n"
-	printf " \n"
-	printf " ${byellow}Perform Web based scanning on a subdomains list:${reset}\n"
-	printf " ./reconftw.sh -d example.com -l targets.txt -w\n"
-	printf " \n"
-	printf " ${byellow}Multidomain recon:${reset}\n"
-	printf " ./reconftw.sh -m company -l domainlist.txt -r\n"
-	printf " \n"
-	printf " ${byellow}Perform full recon (with active attacks) along Out-Of-Scope subdomains list:${reset}\n"
-	printf " ./reconftw.sh -d example.com -x out.txt -a\n"
-	printf " \n"
-	printf " ${byellow}Perform full recon and store output to specified directory:${reset}\n"
-	printf " ./reconftw.sh -d example.com -r -o custom/path\n"
-	printf " \n"
+    printf "\n Usage: $0 [-d domain.tld] [-m name] [-l list.txt] [-x oos.txt] [-i in.txt] "
+    printf "\n           	      [-r] [-s] [-p] [-a] [-w] [-n] [-z] [-c] [-y] [-h] [-f] [--ai] [--deep] [-o OUTPUT]\n\n"
+    printf " ${bblue}TARGET OPTIONS${reset}\n"
+    printf "   -d domain.tld     Target domain\n"
+    printf "   -m company        Target company name\n"
+    printf "   -l list.txt       Targets list (One on each line)\n"
+    printf "   -x oos.txt        Excludes subdomains list (Out Of Scope)\n"
+    printf "   -i in.txt         Includes subdomains list\n"
+    printf " \n"
+    printf " ${bblue}MODE OPTIONS${reset}\n"
+    printf "   -r, --recon       Recon - Performs full recon process (without attacks)\n"
+    printf "   -s, --subdomains  Subdomains - Performs Subdomain Enumeration, Web probing and check for sub-tko\n"
+    printf "   -p, --passive     Passive - Performs only passive steps\n"
+    printf "   -a, --all         All - Performs all checks and active exploitations\n"
+    printf "   -w, --web         Web - Performs web checks from list of subdomains\n"
+    printf "   -n, --osint       OSINT - Checks for public intel data\n"
+    printf "   -z, --zen         Zen - Performs a recon process covering the basics and some vulns\n"
+    printf "   -c, --custom      Custom - Launches specific function against target, u need to know the function name first\n"
+    printf "   -y, --ai          AI - Analyzes ReconFTW results using a local LLM\n"
+    printf "   -h                Help - Show help section\n"
+    printf " \n"
+    printf " ${bblue}GENERAL OPTIONS${reset}\n"
+    printf "   --deep            Deep scan (Enable some slow options for deeper scan)\n"
+    printf "   -f config_file    Alternate reconftw.cfg file\n"
+    printf "   -o output/path    Define output folder\n"
+    printf "   -v, --vps         Axiom distributed VPS\n"
+    printf "   -q                Rate limit in requests per second\n"
+    printf "   --check-tools     Exit if one of the tools is missing\n"
+    printf " \n"
+    printf " ${bblue}USAGE EXAMPLES${reset}\n"
+    printf " ${byellow}Perform full recon (without attacks):${reset}\n"
+    printf " ./reconftw.sh -d example.com -r\n"
+    printf " \n"
+    printf " ${byellow}Perform subdomain enumeration on multiple targets:${reset}\n"
+    printf " ./reconftw.sh -l targets.txt -s\n"
+    printf " \n"
+    printf " ${byellow}Perform Web based scanning on a subdomains list:${reset}\n"
+    printf " ./reconftw.sh -d example.com -l targets.txt -w\n"
+    printf " \n"
+    printf " ${byellow}Multidomain recon:${reset}\n"
+    printf " ./reconftw.sh -m company -l domainlist.txt -r\n"
+    printf " \n"
+    printf " ${byellow}Perform full recon (with active attacks) along Out-Of-Scope subdomains list:${reset}\n"
+    printf " ./reconftw.sh -d example.com -x out.txt -a\n"
+    printf " \n"
+    printf " ${byellow}Analyze ReconFTW results with AI:${reset}\n"
+    printf " ./reconftw.sh -d example.com -r --ai\n"
+    printf " \n"
 	printf " ${byellow}Run custom function:${reset}\n"
 	printf " ./reconftw.sh -d example.com -c nuclei_check \n"
 }
@@ -6075,7 +6069,7 @@ if [[ $OSTYPE == "darwin"* ]]; then
 	PATH="$(brew --prefix coreutils)/libexec/gnubin:$PATH"
 fi
 
-PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c::zrspanwvh::' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,check-tools' -n 'reconFTW' -- "$@")
+PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:zrspanwvyh' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,ai,check-tools' -n 'reconFTW' -- "$@")
 
 exit_status=$?
 if [[ $exit_status -ne 0 ]]; then
@@ -6159,6 +6153,11 @@ while true; do
 		shift
 		continue
 		;;
+	'-y' | '--ai')
+        opt_ai=true
+        shift
+        continue
+        ;;
 	# extra stuff
 	'-o')
 		if [[ $2 != /* ]]; then

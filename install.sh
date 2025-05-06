@@ -83,7 +83,8 @@ declare -A gotools=(
 	["jsluice"]="go install -v github.com/BishopFox/jsluice/cmd/jsluice@latest"
 	["urlfinder"]="go install -v github.com/projectdiscovery/urlfinder/cmd/urlfinder@latest"
 	["cent"]="go install -v github.com/xm1k3/cent@latest"
-	["misconfig-mapper"]="go install -v github.com/intigriti/misconfig-mapper/cmd/misconfig-mapper@latest"
+	["csprecon"]="go install github.com/edoardottt/csprecon/cmd/csprecon@latest"
+	["VhostFinder"]="go install -v github.com/wdahlenburg/VhostFinder@latest"
 )
 
 # Declare pipx tools and their paths
@@ -95,8 +96,10 @@ declare -A pipxtools=(
 	["urless"]="xnl-h4ck3r/urless"
 	["ghauri"]="r0oth3x49/ghauri"
 	["xnLinkFinder"]="xnl-h4ck3r/xnLinkFinder"
+	["xnldorker"]="xnl-h4ck3r/xnldorker"
 	["porch-pirate"]="MandConsultingGroup/porch-pirate"
 	["p1radup"]="iambouali/p1radup"
+	["subwiz"]="hadriansecurity/subwiz"
 )
 
 # Declare repositories and their paths
@@ -104,6 +107,7 @@ declare -A repos=(
 	["dorks_hunter"]="six2dez/dorks_hunter"
 	["gf"]="tomnomnom/gf"
 	["Gf-Patterns"]="1ndianl33t/Gf-Patterns"
+	["sus_params"]="g0ldencybersec/sus_params"
 	["Corsy"]="s0md3v/Corsy"
 	["CMSeeK"]="Tuhinshubhra/CMSeeK"
 	["fav-up"]="pielco11/fav-up"
@@ -124,10 +128,13 @@ declare -A repos=(
 	["SwaggerSpy"]="UndeadSec/SwaggerSpy"
 	["LeakSearch"]="JoelGMSec/LeakSearch"
 	["ffufPostprocessing"]="Damian89/ffufPostprocessing"
+	["misconfig-mapper"]="intigriti/misconfig-mapper"
 	["Spoofy"]="MattKeeley/Spoofy"
 	["msftrecon"]="Arcanum-Sec/msftrecon"
+	["Scopify"]="Arcanum-Sec/Scopify"
 	["metagoofil"]="opsdisk/metagoofil"
 	["EmailHarvester"]="maldevel/EmailHarvester"
+	["reconftw_ai"]="six2dez/reconftw_ai"
 )
 
 # Function to display the banner
@@ -177,7 +184,7 @@ function install_tools() {
 		fi
 	done
 
-	echo -e "\n${bblue}Running: Installing pipx tools (${#pipxtools[@]})${reset}\n"
+	echo -e "\n${bblue}Running: Installing pipx tools (${#repos[@]})${reset}\n"
 
 	local pipx_step=0
 	local failed_pipx_tools=()
@@ -264,6 +271,9 @@ function install_tools() {
 			fi
 			source venv/bin/activate
 			eval "pip3 install --upgrade -r requirements.txt $DEBUG_STD" &>/dev/null
+			if [ "$repo" = "dorks_hunter" ]; then
+				pip install xnldorker &>/dev/null
+			fi
 			deactivate
 		fi
 
@@ -286,6 +296,14 @@ function install_tools() {
 			go build -o ffufPostprocessing main.go &>/dev/null
 			chmod +x ./ffufPostprocessing
 			;;
+		"misconfig-mapper")
+			git reset --hard origin/main &>/dev/null
+			git pull &>/dev/null
+			go mod tidy &>/dev/null
+			go build -o misconfig-mapper &>/dev/null
+			chmod +x ./misconfig-mapper &>/dev/null
+			cp misconfig-mapper $HOME/go/bin/ &>/dev/null
+			;;
 		"trufflehog")
 			go install &>/dev/null
 			;;
@@ -296,6 +314,12 @@ function install_tools() {
 			cp -r examples ${HOME}/.gf &>/dev/null
 		elif [[ $repo == "Gf-Patterns" ]]; then
 			cp ./*.json ${HOME}/.gf &>/dev/null
+		elif [[ $repo == "sus_params" ]]; then
+			for f in ./gf-patterns/*.json; do
+				base=$(basename "$f")
+				dest="${HOME}/.gf/$base"
+				cat "$f" | anew -q "$dest" >/dev/null
+			done
 		fi
 
 		# Return to the main directory
@@ -312,8 +336,8 @@ function install_tools() {
 	subfinder &>/dev/null
 	subfinder &>/dev/null
 	mkdir -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
-	cent init -f &>/dev/null
-	cent -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
+	#cent init -f &>/dev/null
+	#cent -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
 
 	# Handle failed installations
 	if [[ ${#failed_tools[@]} -ne 0 ]]; then
@@ -600,6 +624,7 @@ function initial_setup() {
 	    ["ssti_wordlist"]="https://gist.githubusercontent.com/six2dez/ab5277b11da7369bf4e9db72b49ad3c1/raw ${ssti_wordlist}"
 	    ["headers_inject"]="https://gist.github.com/six2dez/d62ab8f8ffd28e1c206d401081d977ae/raw ${tools}/headers_inject.txt"
 	    ["axiom_config"]="https://gist.githubusercontent.com/six2dez/6e2d9f4932fd38d84610eb851014b26e/raw ${tools}/axiom_config.sh"
+		["jsluice_patterns"]="https://gist.githubusercontent.com/six2dez/2aafa8dc2b682bb0081684e71900e747/raw ${tools}/jsluice_patterns.json"
 	)
 	
 	for key in "${!downloads[@]}"; do

@@ -81,6 +81,7 @@ So, what are you waiting for? Go! Go! Go! :boom:
     - [GitHub sponsorship](#github-sponsorship)
   - [Thanks :pray:](#thanks-pray)
   - [Disclaimer](#disclaimer)
+  - [Star History](#star-history)
 
 ---
 
@@ -482,6 +483,7 @@ reset='\033[0m'
 - You can create your own axiom's fleet before running reconFTW or let reconFTW to create and destroy it automatically just modifying reconftw.cfg file.
 
 # Faraday Support :computer:
+
 - For Faraday community support, you need to install Faraday by yourself, authenticate in faraday-cli and set the workspace both in the config file and in the faraday-cli.
 
 # Sample video
@@ -497,8 +499,7 @@ reset='\033[0m'
 - Microsoft 365 and Azure tenant mapper ([msftrecon](https://github.com/Arcanum-Sec/msftrecon))
 - Metadata finder ([MetaFinder](https://github.com/Josue87/MetaFinder))
 - API leaks search ([porch-pirate](https://github.com/MandConsultingGroup/porch-pirate) and [SwaggerSpy](https://github.com/UndeadSec/SwaggerSpy))
-- Google Dorks ([dorks_hunter](https://github.com/six2dez/dorks_hunter))
-- Github Dorks ([gitdorks_go](https://github.com/damit5/gitdorks_go))
+- Google Dorks ([dorks_hunter](https://github.com/six2dez/dorks_hunter) and [xnldorker](https://github.com/xnl-h4ck3r/xnldorker))
 - GitHub org's repos analysis ([enumerepo](https://github.com/trickest/enumerepo), [trufflehog](https://github.com/trufflesecurity/trufflehog) and [gitleaks](https://github.com/gitleaks/gitleaks))
 - 3rd parties misconfigurations([misconfig-mapper](https://github.com/intigriti/misconfig-mapper))
 - Spoofable domains ([spoofcheck](https://github.com/MattKeeley/Spoofy))
@@ -678,4 +679,4 @@ The material contained in this repository is licensed under MIT.
 
 ## Star History
 
-![](images/six2dez_reconftw-stars-history.png)
+[![Star History Chart](https://api.star-history.com/svg?repos=six2dez/reconftw&type=Date)](https://www.star-history.com/#six2dez/reconftw&Date)
