@@ -2762,8 +2762,6 @@ function webprobe_full() {
 			# Update webs_all.txt
 			cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
 
-			end_func "Results are saved in $domain/webs/webs_uncommon_ports.txt" "${FUNCNAME[0]}"
-
 			# Send to proxy if conditions met
 			if [[ $PROXY == true ]] && [[ -n $proxy_url ]] && [[ $(wc -l <webs/webs_uncommon_ports.txt) -le $DEEP_LIMIT2 ]]; then
 				notification "Sending websites with uncommon ports to proxy" "info"
