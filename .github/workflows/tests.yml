@@ -21,8 +21,8 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-22.04
           - ubuntu-latest
+          - macos-latest
 
     name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
