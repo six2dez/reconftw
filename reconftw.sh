@@ -5038,9 +5038,23 @@ function isAsciiText {
 }
 
 function output() {
-	mkdir -p $dir_output
-	cp -r $dir $dir_output
-	[[ "$(dirname $dir)" != "$dir_output" ]] && rm -rf "$dir"
+	mkdir -p "$dir_output"
+	# Ensure both $dir and $dir_output are absolute paths
+	dir="$(realpath "$dir")"
+	dir_output="$(realpath "$dir_output")"
+
+	# Prevent accidental deletion if $dir_output is a parent of $dir
+	if [[ "$dir" == "$dir_output"* ]]; then
+		echo "[!] Output directory is a parent of the working directory. Aborting to prevent data loss."
+		return 1
+	fi
+
+	cp -r "$dir" "$dir_output"
+
+	# Only delete if source and destination are clearly different and safe
+	if [[ "$(dirname "$dir")" != "$dir_output" ]]; then
+		rm -rf "$dir"
+	fi
 }
 
 function remove_big_files() {
