@@ -11,3 +11,4 @@ test/
 *.zip
 .DS_Store
 reconftw.cfg-personal
+reconftw.cfg
