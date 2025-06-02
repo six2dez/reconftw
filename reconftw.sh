@@ -1357,7 +1357,7 @@ function sub_scraping() {
 			subdomains_count=$(wc -l <"$dir/subdomains/subdomains.txt")
 			if [[ $subdomains_count -le $DEEP_LIMIT ]] || [[ $DEEP == true ]]; then
 
-				urlfinder -d $domain -s all -o .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
+				urlfinder -d $domain all -o .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
 
 				if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
 					cat .tmp/url_extract_tmp.txt | grep "$domain" |
@@ -3484,7 +3484,7 @@ function urlchecks() {
 		if [[ -s "webs/webs_all.txt" ]]; then
 
 			if [[ $URL_CHECK_PASSIVE == true ]]; then
-				urlfinder -d $domain -s all -o .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
+				urlfinder -d $domain all -o .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
 				if [[ -s $GITHUB_TOKENS ]]; then
 					github-endpoints -q -k -d "$domain" -t "$GITHUB_TOKENS" -o .tmp/github-endpoints.txt 2>>"$LOGFILE" >/dev/null
 					if [[ -s ".tmp/github-endpoints.txt" ]]; then
