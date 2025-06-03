@@ -498,6 +498,7 @@ function install_apt() {
 	source "${HOME}/.cargo/env"
 	cargo install ripgen &>/dev/null
 	pipx ensurepath -f &>/dev/null
+ 	pip install jsbeautifier &>/dev/null
 }
 
 # Function to install required packages for macOS
