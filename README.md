@@ -190,6 +190,28 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 
 reconFTW supports multiple installation methods to suit different environments. Ensure you have sufficient disk space (at least 10 GB recommended) and a stable internet connection.
 
+### Quickstart
+
+1) Clone and install
+
+```bash
+git clone https://github.com/six2dez/reconftw
+cd reconftw
+./install.sh --verbose
+```
+
+2) Run a scan (full + resume)
+
+```bash
+./reconftw.sh -d example.com -r
+```
+
+3) Minimal run (fast profile, fewer deps)
+
+```bash
+./reconftw.sh -d example.com --profile fast
+```
+
 ### Local Installation (PC/VPS/VM)
 
 1. **Prerequisites**:
@@ -243,6 +265,31 @@ reconFTW supports multiple installation methods to suit different environments. 
 - Follow the guide in [Terraform/README.md](Terraform/README.md) for setup instructions.
 
 ---
+
+## 🛠️ Troubleshooting
+
+- Bash 4+ on macOS: The scripts auto-relaunch under Homebrew Bash. If you see a message about Bash < 4, run `brew install bash`, open a new terminal, and re-run `./install.sh`.
+- timeout on macOS: macOS provides `gtimeout` via `brew install coreutils`. The scripts now detect and use it automatically.
+- Network hiccups: Installers hide most command output. If something fails, re-run with `upgrade_tools=true` in `reconftw.cfg` or install the missing tool manually (the error will name it).
+- GOPATH binaries: Binaries are copied to `/usr/local/bin`. If you prefer not to, ensure `~/go/bin` is in your `PATH`.
+- Nuclei templates: If templates weren’t cloned, remove `~/nuclei-templates` and re-run `./install.sh`.
+
+## 🔑 API Checklist (Optional)
+
+- `subfinder`: `~/.config/subfinder/provider-config.yaml`
+- GitHub tokens: `~/Tools/.github_tokens` (one per line)
+- GitLab tokens: `~/Tools/.gitlab_tokens` (one per line)
+- WHOISXML: set `WHOISXML_API` in `reconftw.cfg` or env var
+- Slack/Discord/Telegram: configure `notify` in `~/.config/notify/provider-config.yaml`
+- SSRF server: set `COLLAB_SERVER` env/cfg if used
+- Blind XSS server: set `XSS_SERVER` env/cfg if used
+
+## 💾 Requirements
+
+- Disk: 10–20 GB free recommended (toolchain + data)
+- Network: stable connection during installation and updates
+- OS: Linux/macOS with Bash ≥ 4
+- Extras: `shellcheck` and `shfmt` (optional) for `make lint`/`make fmt`
 
 ## ⚙️ Configuration
 
