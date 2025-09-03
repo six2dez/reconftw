@@ -1,7 +1,9 @@
 #!/bin/bash
 
 # Safer bash defaults
-set -Eeuo pipefail
+set -o pipefail
+set -E
+set +e
 IFS=$'\n\t'
 
 # Detect if the script is being run in MacOS with Homebrew Bash
@@ -448,9 +450,14 @@ function check_updates() {
     printf "%bRunning: Looking for new reconFTW version%b\n" "$bblue" "$reset"
 
     if { [[ -n "$TIMEOUT_CMD" ]] && $TIMEOUT_CMD 10 git fetch; } || git fetch; then
-        BRANCH=$(git rev-parse --abbrev-ref HEAD)
-        HEADHASH=$(git rev-parse HEAD)
-        UPSTREAMHASH=$(git rev-parse "${BRANCH}@{upstream}")
+        BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "HEAD")
+        HEADHASH=$(git rev-parse HEAD 2>/dev/null || true)
+        # Skip auto-update if no upstream (detached HEAD or no tracking branch)
+        if ! git rev-parse --abbrev-ref --symbolic-full-name @{u} >/dev/null 2>&1; then
+            printf "%bNo upstream configured (detached HEAD). Skipping auto-update.%b\n" "$yellow" "$reset"
+            return 0
+        fi
+        UPSTREAMHASH=$(git rev-parse "@{u}")
 
         if [[ $HEADHASH != "$UPSTREAMHASH" ]]; then
             if git status --porcelain | grep -q .; then
