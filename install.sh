@@ -97,10 +97,11 @@ trap 'rc=$?; ts=$(date +"%Y-%m-%d %H:%M:%S"); cmd=${BASH_COMMAND}; loc_ln=${BASH
 # Basic network precheck
 check_network() {
     printf "%bRunning: Network precheck%b\n" "$bblue" "$reset"
-    if ! run_to 5 bash -lc 'getent hosts github.com 2>/dev/null || dig +short github.com 2>/dev/null || nslookup github.com 2>/dev/null'; then
+    # Silence successful output; show message only on failure. Use q_to to respect --verbose.
+    if ! q_to 5 bash -lc 'getent hosts github.com >/dev/null 2>&1 || dig +short github.com >/dev/null 2>&1 || nslookup github.com >/dev/null 2>&1'; then
         printf "%b[!] DNS resolution for github.com failed. Check your network.%b\n" "$bred" "$reset"
     fi
-    if ! run_to 10 curl -I -s https://github.com >/dev/null 2>&1; then
+    if ! q_to 10 curl -I -s https://github.com >/dev/null 2>&1; then
         printf "%b[!] HTTPS connectivity to github.com failed. Installer may fail.%b\n" "$yellow" "$reset"
     fi
 }
@@ -710,12 +711,8 @@ function initial_setup() {
     q pipx ensurepath
     # Ensure $HOME/.local/bin is available now even if profile isn't sourced
     export PATH="${HOME}/.local/bin:${PATH}"
-    # Source only the matching shell profile to refresh PATH changes
-    if [[ -n "${BASH_VERSION-}" ]]; then
-        [[ -f "${HOME}/.bashrc" ]] && source "${HOME}/.bashrc"
-    elif [[ -n "${ZSH_VERSION-}" ]]; then
-        [[ -f "${HOME}/.zshrc" ]] && source "${HOME}/.zshrc"
-    fi
+    # Do not source user shell profiles here to avoid errors like 'PS1: unbound variable'
+    # in non-interactive shells with 'set -u'. PATH for this process is already updated.
 
 	install_tools
 
