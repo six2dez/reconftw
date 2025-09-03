@@ -615,10 +615,10 @@ function install_yum() {
 	$SUDO yum install -y python3 python3-pip gcc cmake ruby git curl libpcap whois wget pipx zip pv bind-utils openssl-devel libffi-devel libxml2-devel libxslt-devel zlib-devel nmap jq lynx medusa xorg-x11-server-xvfb &>/dev/null
 
 	# Ensure Python >= 3.7 on yum-based systems
-	if ! python3 - <<'PYCHK' &>/dev/null; then
-import sys; raise SystemExit(0 if sys.version_info >= (3,7) else 1)
-PYCHK
-	then
+		if ! python3 - <<-'PYCHK' &>/dev/null; then
+	import sys; raise SystemExit(0 if sys.version_info >= (3,7) else 1)
+	PYCHK
+
 		# Try DNF/YUM module streams (EL8+/EL9+) for newer Python
 		if command -v dnf &>/dev/null || $SUDO yum -y module list python38 &>/dev/null; then
 			# Prefer 3.9, then 3.8
@@ -642,10 +642,10 @@ PYCHK
 		fi
 
 		# If python3.9/3.8/3.7 binaries exist, prefer the newest by creating a higher-priority symlink
-		if ! python3 - <<'PYCHK' &>/dev/null; then
-import sys; raise SystemExit(0 if sys.version_info >= (3,7) else 1)
-PYCHK
-		then
+			if ! python3 - <<-'PYCHK' &>/dev/null; then
+	import sys; raise SystemExit(0 if sys.version_info >= (3,7) else 1)
+	PYCHK
+
 			NEW_PY=""
 			for cand in /usr/bin/python3.11 /usr/bin/python3.10 /usr/bin/python3.9 /usr/bin/python3.8 /usr/bin/python3.7; do
 				[[ -x "$cand" ]] && NEW_PY="$cand" && break
