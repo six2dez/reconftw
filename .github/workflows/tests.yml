@@ -21,7 +21,6 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-22.04
           - ubuntu-latest
 
     name: ${{ matrix.os }}
