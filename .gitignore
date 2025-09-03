@@ -4,6 +4,7 @@ output/
 .obsidian/
 test/
 .trunk/
+.vscode/
 
 #Ignoring compressed files
 *.tar

@@ -740,7 +740,7 @@ function initial_setup() {
             retry 3 3 q_to 60 git -C "${NUCLEI_FUZZING_TEMPLATES_PATH}" pull || true
         fi
     fi
-    nuclei -update-templates update-template-dir "${NUCLEI_TEMPLATES_PATH}" >/dev/null 2>&1 || true
+    nuclei -update-templates -update-template-dir "${NUCLEI_TEMPLATES_PATH}" >/dev/null 2>&1 || true
 
 	# sqlmap
 	if [[ ! -d "${dir}/sqlmap" ]]; then

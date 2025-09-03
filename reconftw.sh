@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# Defaults aimed at unattended execution (fail-soft)
+set -o pipefail
+set -E
+set +e
+IFS=$'\n\t'
+
 # Welcome to reconFTW main script
 #	 ██▀███  ▓█████  ▄████▄   ▒█████   ███▄    █   █████▒▄▄▄█████▓ █     █░
 #	▓██ ▒ ██▒▓█   ▀ ▒██▀ ▀█  ▒██▒  ██▒ ██ ▀█   █ ▓██   ▒ ▓  ██▒ ▓▒▓█░ █ ░█░
@@ -14,8 +20,21 @@
 
 # Detect if the script is being run in MacOS with Homebrew Bash
 if [[ $OSTYPE == "darwin"* && $BASH != "/opt/homebrew/bin/bash" ]]; then
-	exec /opt/homebrew/bin/bash "$0" "$@"
+    exec /opt/homebrew/bin/bash "$0" "$@"
 fi
+
+# timeout/gtimeout compatibility
+if command -v timeout >/dev/null 2>&1; then
+    TIMEOUT_CMD="timeout"
+elif command -v gtimeout >/dev/null 2>&1; then
+    TIMEOUT_CMD="gtimeout"
+else
+    TIMEOUT_CMD=""
+fi
+
+# Ensure a safe default for early log redirections
+# If LOGFILE is unset or empty, send logs to /dev/null until later initialization
+: "${LOGFILE:=/dev/null}"
 
 function banner_grabber() {
 	local banner_file="${SCRIPTPATH}/banners.txt"
@@ -75,8 +94,8 @@ function check_version() {
 		return 1
 	fi
 
-	# Fetch updates with a timeout
-	if ! timeout 10 git fetch >/dev/null 2>&1; then
+	# Fetch updates with a timeout (supports gtimeout on macOS)
+	if ! { [[ -n "$TIMEOUT_CMD" ]] && $TIMEOUT_CMD 10 git fetch >/dev/null 2>&1; } && ! git fetch >/dev/null 2>&1; then
 		printf "\n%bUnable to check updates (git fetch timed out).%b\n\n" "$bred" "$reset"
 		return 1
 	fi
@@ -440,7 +459,10 @@ function metadata() {
 		start_func "${FUNCNAME[0]}" "Scanning metadata in public files"
 
 		mkdir -p ".tmp/metagoofil_${domain}/" 2>>"${LOGFILE}"
-		"${tools}/metagoofil/venv/bin/python3" "${tools}/metagoofil/metagoofil.py" -d "${domain}" -t pdf,docx,xlsx -l 10 -w -o ".tmp/metagoofil_${domain}/" 2>>"${LOGFILE}" >/dev/null
+		pushd "${tools}/metagoofil" >/dev/null || { printf "%b[!] Failed to change directory to %s in %s at line %s.%b\n" "${bred}" "${tools}/metagoofil" "${FUNCNAME[0]}" "${LINENO}" "${reset}"; return 1; }
+		"${tools}/metagoofil/venv/bin/python3" "${tools}/metagoofil/metagoofil.py" -d "${domain}" -t pdf,docx,xlsx -l 10 -w -o "${dir}/.tmp/metagoofil_${domain}/" 2>>"${LOGFILE}" >/dev/null
+		popd >/dev/null || { printf "%b[!] Failed to return to the previous directory in %s at line %s.%b\n" "${bred}" "${FUNCNAME[0]}" "${LINENO}" "${reset}"; return 1; }
+		
 		exiftool -r .tmp/metagoofil_${domain}/* 2>>"${LOGFILE}" | tee /dev/null | egrep -i "Author|Creator|Email|Producer|Template" | sort -u | anew -q "osint/metadata_results.txt"
 
 		end_func "Results are saved in ${domain}/osint/[software/authors/metadata_results].txt" "${FUNCNAME[0]}"
@@ -514,11 +536,11 @@ function emails() {
 
 		start_func "${FUNCNAME[0]}" "Searching for emails/users/passwords leaks"
 
-		"${tools}/EmailHarvester/venv/bin/python3" "${tools}/EmailHarvester/EmailHarvester.py" -d ${domain} -e all -l 20 2>>"$LOGFILE" | anew -q .tmp/EmailHarvester.txt
+		PYTHONWARNINGS=ignore "${tools}/EmailHarvester/venv/bin/python3" "${tools}/EmailHarvester/EmailHarvester.py" -d ${domain} -e all -l 20 2>>"$LOGFILE" | anew -q .tmp/EmailHarvester.txt || true
 
 		# Process emailfinder results
 		if [[ -s ".tmp/EmailHarvester.txt" ]]; then
-			grep "@" .tmp/EmailHarvester.txt | anew -q osint/emails.txt
+			grep "@" .tmp/EmailHarvester.txt | anew -q osint/emails.txt || true
 		fi
 
 		# Change directory to LeakSearch
@@ -566,7 +588,7 @@ function domain_info() {
 
 		# Run whois command and check for errors
 		whois "$domain" >"osint/domain_info_general.txt"
-		"${tools}/msftrecon/venv/bin/python3" "${tools}/msftrecon/msftrecon/msftrecon.py" -d ${domain} 2>>"$LOGFILE" >osint/azure_tenant_domains.txt
+		"${tools}/msftrecon/venv/bin/python3" "${tools}/msftrecon/msftrecon/msftrecon.py" -d ${domain} 2>>"$LOGFILE" >osint/azure_tenant_domains.txt || true
 
 		company_name=$(unfurl format %r <<<"$domain")
 		"${tools}/Scopify/venv/bin/python3" "${tools}/Scopify/scopify.py" -c ${company_name} >osint/scopify.txt
@@ -811,7 +833,6 @@ function subdomains_full() {
 			fi
 		fi
 		if ! NUMOFLINES_subs=$(cat "subdomains/subdomains.txt" 2>>"$LOGFILE" | anew ".tmp/subdomains_old.txt" | sed '/^$/d' | wc -l); then
-			printf "%b[!] Failed to count new subdomains.%b\n" "$bred" "$reset"
 			NUMOFLINES_subs="0"
 		fi
 	fi
@@ -1463,7 +1484,6 @@ function sub_scraping() {
 						anew subdomains/subdomains.txt |
 						tee .tmp/diff_scrap.txt |
 						sed '/^$/d' | wc -l); then
-						printf "%b[!] Failed to count new subdomains.%b\n" "$bred" "$reset"
 						NUMOFLINES=0
 					fi
 				else
@@ -1568,7 +1588,6 @@ function sub_analytics() {
 		fi
 
 		if ! NUMOFLINES=$(cat .tmp/analytics_subs_resolved.txt 2>/dev/null | anew subdomains/subdomains.txt 2>/dev/null | sed '/^$/d' | wc -l); then
-			printf "%b[!] Failed to count new subdomains.%b\n" "$bred" "$reset"
 			NUMOFLINES=0
 		fi
 
@@ -1814,7 +1833,6 @@ function sub_regex_permut() {
 				anew subdomains/subdomains.txt |
 				sed '/^$/d' |
 				wc -l); then
-				printf "%b[!] Failed to count new subdomains.%b\n" "$bred" "$reset"
 				NUMOFLINES=0
 			fi
 		else
@@ -1896,7 +1914,6 @@ function sub_ia_permut() {
 				anew subdomains/subdomains.txt |
 				sed '/^$/d' |
 				wc -l); then
-				printf "%b[!] Failed to count new subdomains.%b\n" "$bred" "$reset"
 				NUMOFLINES=0
 			fi
 		else
@@ -1999,7 +2016,6 @@ function sub_recursive_passive() {
 				sed '/^$/d' |
 				anew subdomains/subdomains.txt |
 				wc -l); then
-				printf "%b[!] Failed to count new subdomains.%b\n" "$bred" "$reset"
 				NUMOFLINES=0
 			fi
 		else
@@ -2193,7 +2209,6 @@ function sub_recursive_brute() {
 				sed '/^$/d' |
 				anew subdomains/subdomains.txt |
 				wc -l); then
-				printf "%b[!] Failed to count new subdomains.%b\n" "$bred" "$reset"
 				NUMOFLINES=0
 			fi
 		else
@@ -5058,11 +5073,11 @@ function output() {
 }
 
 function remove_big_files() {
-	eval rm -rf .tmp/gotator*.txt 2>>"$LOGFILE"
-	eval rm -rf .tmp/brute_recursive_wordlist.txt 2>>"$LOGFILE"
-	eval rm -rf .tmp/subs_dns_tko.txt 2>>"$LOGFILE"
-	eval rm -rf .tmp/subs_no_resolved.txt .tmp/subdomains_dns.txt .tmp/brute_dns_tko.txt .tmp/scrap_subs.txt .tmp/analytics_subs_clean.txt .tmp/gotator1.txt .tmp/gotator2.txt .tmp/passive_recursive.txt .tmp/brute_recursive_wordlist.txt .tmp/gotator1_recursive.txt .tmp/gotator2_recursive.txt 2>>"$LOGFILE"
-	eval find .tmp -type f -size +200M -exec rm -f {} + 2>>"$LOGFILE"
+	rm -rf .tmp/gotator*.txt 2>>"$LOGFILE"
+	rm -rf .tmp/brute_recursive_wordlist.txt 2>>"$LOGFILE"
+	rm -rf .tmp/subs_dns_tko.txt 2>>"$LOGFILE"
+	rm -rf .tmp/subs_no_resolved.txt .tmp/subdomains_dns.txt .tmp/brute_dns_tko.txt .tmp/scrap_subs.txt .tmp/analytics_subs_clean.txt .tmp/gotator1.txt .tmp/gotator2.txt .tmp/passive_recursive.txt .tmp/brute_recursive_wordlist.txt .tmp/gotator1_recursive.txt .tmp/gotator2_recursive.txt 2>>"$LOGFILE"
+	find .tmp -type f -size +200M -exec rm -f {} + 2>>"$LOGFILE"
 }
 
 function notification() {
@@ -5099,8 +5114,8 @@ function notification() {
 		# Send to notify if notifications are enabled
 		if [[ -n $NOTIFY ]]; then
 			# Remove color codes for the notification
-			clean_text=$(echo -e "${text} - ${domain}" | sed 's/\x1B\[[0-9;]*[JKmsu]//g')
-			echo -e "${clean_text}" | $NOTIFY >/dev/null 2>&1
+			clean_text=$(printf "%b" "${text} - ${domain}" | sed 's/\x1B\[[0-9;]*[JKmsu]//g')
+			printf "%s" "${clean_text}" | $NOTIFY >/dev/null 2>&1
 		fi
 	fi
 }
@@ -5196,7 +5211,7 @@ function resolvers_update() {
 		if [[ $AXIOM != true ]]; then
 			if [[ ! -s $resolvers ]] || [[ $(find "$resolvers" -mtime +1 -print) ]]; then
 				notification "Resolvers seem older than 1 day\n Generating custom resolvers..." warn
-				eval rm -f $resolvers 2>>"$LOGFILE"
+				rm -f -- "$resolvers" 2>>"$LOGFILE"
 				dnsvalidator -tL https://public-dns.info/nameservers.txt -threads $DNSVALIDATOR_THREADS -o $resolvers 2>>"$LOGFILE" >/dev/null
 				dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads $DNSVALIDATOR_THREADS -o tmp_resolvers 2>>"$LOGFILE" >/dev/null
 				[ -s "tmp_resolvers" ] && cat tmp_resolvers | anew -q $resolvers
@@ -5274,15 +5289,17 @@ function axiom_launch() {
 			else
 				startcount=$((AXIOM_FLEET_COUNT - NUMOFNODES))
 			fi
-			AXIOM_ARGS=" -i $startcount"
-			# Temporarily disabled multiple axiom regions
-			# [ -n "$AXIOM_FLEET_REGIONS" ] && axiom_args="$axiom_args --regions=\"$AXIOM_FLEET_REGIONS\" "
+				# Build args safely to avoid word-splitting issues
+				local -a AXIOM_FLEET_ARGS=( -i "$startcount" )
+				# Regions intentionally disabled here per original comment
+				# To re-enable: [[ -n ${AXIOM_FLEET_REGIONS-} ]] && AXIOM_FLEET_ARGS+=( --regions="${AXIOM_FLEET_REGIONS}" )
 
-			echo "axiom-fleet ${AXIOM_FLEET_NAME} ${AXIOM_ARGS}"
-			axiom-fleet ${AXIOM_FLEET_NAME} ${AXIOM_ARGS}
+				# Show the exact command with proper quoting
+				printf 'axiom-fleet %q' "${AXIOM_FLEET_NAME}"; printf ' %q' "${AXIOM_FLEET_ARGS[@]}"; echo
+				axiom-fleet "${AXIOM_FLEET_NAME}" "${AXIOM_FLEET_ARGS[@]}"
 			axiom-select "$AXIOM_FLEET_NAME*"
 			if [[ -n $AXIOM_POST_START ]]; then
-				eval "$AXIOM_POST_START" 2>>"$LOGFILE" >/dev/null
+				bash -lc "$AXIOM_POST_START" 2>>"$LOGFILE" >/dev/null
 			fi
 
 			NUMOFNODES=$(timeout 30 axiom-ls | grep -c "$AXIOM_FLEET_NAME" || true)
@@ -5298,7 +5315,7 @@ function axiom_shutdown() {
 			notification "Automatic Axiom fleet shutdown is not enabled in this mode" info
 			return
 		fi
-		eval axiom-rm -f "$AXIOM_FLEET_NAME*" || true
+		axiom-rm -f "$AXIOM_FLEET_NAME*" || true
 		axiom-ls | grep "$AXIOM_FLEET_NAME" || true
 		notification "Axiom fleet $AXIOM_FLEET_NAME shutdown" info
 	fi
@@ -5325,6 +5342,19 @@ function start() {
 	notification "Recon succesfully started on ${domain}" "good" "$(date +'%Y-%m-%d %H:%M:%S')"
 	[ "$SOFT_NOTIFICATION" = true ] && echo "$(date +'%Y-%m-%d %H:%M:%S') Recon succesfully started on ${domain}" | notify -silent
 	printf "${bgreen}#######################################################################${reset}\n"
+
+	# Raise ulimit for long-running VPS jobs (fail-soft on failure)
+	if [[ "${RAISE_ULIMIT:-true}" == "true" ]]; then
+		ULIMIT_TARGET=${ULIMIT_TARGET:-65535}
+		ulimit -n "$ULIMIT_TARGET" 2>>"${LOGFILE:-/dev/null}" >/dev/null || true
+	fi
+
+	# Log version and key flags
+	{
+		printf "[%s] reconFTW version: %s\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$reconftw_version"
+			printf "[%s] Flags: OSINT=%s SUBDOMAINS_GENERAL=%s VULNS_GENERAL=%s DEEP=%s\n" \
+				"$(date +'%Y-%m-%d %H:%M:%S')" "$OSINT" "$SUBDOMAINS_GENERAL" "$VULNS_GENERAL" "$DEEP"
+		} >>"${LOGFILE:-/dev/null}"
 	if [[ $upgrade_before_running == true ]]; then
 		${SCRIPTPATH}/install.sh --tools
 	fi
@@ -5376,6 +5406,9 @@ function start() {
 	LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
 	touch .log/${NOW}_${NOWT}.txt
 	echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
+
+# Non-fatal error trap: log and continue
+	trap 'rc=$?; ts=$(date +"%Y-%m-%d %H:%M:%S"); cmd=${BASH_COMMAND}; loc_fn=${FUNCNAME[0]:-main}; loc_ln=${BASH_LINENO[0]:-0}; msg="[$ts] ERR($rc) @ ${loc_fn}:${loc_ln} :: ${cmd}"; if [[ -n "${LOGFILE:-}" ]]; then echo "$msg" >>"$LOGFILE"; else echo "$msg" >&2; fi' ERR
 
 	printf "\n"
 	printf "${bred}[$(date +'%Y-%m-%d %H:%M:%S')] Target: ${domain}\n\n"
@@ -5747,7 +5780,7 @@ function multi_recon() {
 		printf "${bgreen}#######################################################################${reset}\n"
 		printf "${bgreen}[$(date +'%Y-%m-%d %H:%M:%S')] $domain finished 1st loop in ${runtime} $currently ${reset}\n"
 		if [[ -n $flist ]]; then
-			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
+			POSINLIST=$(grep -nrE "^${domain}$" "$flist" | cut -f1 -d':')
 			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] $domain is $POSINLIST of $LISTTOTAL${reset}\n"
 		fi
 		printf "${bgreen}#######################################################################${reset}\n"
@@ -5785,7 +5818,7 @@ function multi_recon() {
 		printf "${bgreen}#######################################################################${reset}\n"
 		printf "${bgreen}[$(date +'%Y-%m-%d %H:%M:%S')] $domain finished 2nd loop in ${runtime} $currently ${reset}\n"
 		if [[ -n $flist ]]; then
-			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
+			POSINLIST=$(grep -nrE "^${domain}$" "$flist" | cut -f1 -d':')
 			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] $domain is $POSINLIST of $LISTTOTAL${reset}\n"
 		fi
 		printf "${bgreen}#######################################################################${reset}\n"
@@ -5841,7 +5874,7 @@ function multi_recon() {
 		printf "${bgreen}#######################################################################${reset}\n"
 		printf "${bgreen}[$(date +'%Y-%m-%d %H:%M:%S')] $domain finished 3rd loop in ${runtime} $currently ${reset}\n"
 		if [[ -n $flist ]]; then
-			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
+			POSINLIST=$(grep -nrE "^${domain}$" "$flist" | cut -f1 -d':')
 			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] $domain is $POSINLIST of $LISTTOTAL${reset}\n"
 		fi
 		printf "${bgreen}#######################################################################${reset}\n"
@@ -5871,7 +5904,7 @@ function multi_recon() {
 		printf "${bgreen}#######################################################################${reset}\n"
 		printf "${bgreen}[$(date +'%Y-%m-%d %H:%M:%S')] $domain finished final loop in ${runtime} $currently ${reset}\n"
 		if [[ -n $flist ]]; then
-			POSINLIST=$(eval grep -nrE "^$domain$" "$flist" | cut -f1 -d':')
+			POSINLIST=$(grep -nrE "^${domain}$" "$flist" | cut -f1 -d':')
 			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] $domain is $POSINLIST of $LISTTOTAL${reset}\n"
 		fi
 		printf "${bgreen}#######################################################################${reset}\n"
@@ -6092,9 +6125,14 @@ if [[ $OSTYPE == "darwin"* ]]; then
 		printf "\n%bBrew formula coreutils is not installed.%b\n\n" "$bred" "$reset"
 		exit 1
 	fi
+	if [[ ! -d "$(brew --prefix gnu-sed)/libexec/gnubin" ]]; then
+		printf "\n%bBrew formula gnu-sed is not installed.%b\n\n" "$bred" "$reset"
+		exit 1
+	fi
 	# Prefix is different depending on Intel vs Apple Silicon
 	PATH="$(brew --prefix gnu-getopt)/bin:$PATH"
 	PATH="$(brew --prefix coreutils)/libexec/gnubin:$PATH"
+	PATH="$(brew --prefix gnu-sed)/libexec/gnubin:$PATH"
 fi
 
 PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:zrspanwvyh' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,ai,check-tools' -n 'reconFTW' -- "$@")
