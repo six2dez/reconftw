@@ -1,5 +1,46 @@
 #!/bin/bash
 
+# Debug/verbosity handling
+# Parse --debug early so we can control output behavior globally
+DEBUG=false
+for arg in "$@"; do
+  case "$arg" in
+    --debug)
+      DEBUG=true
+      ;;
+  esac
+done
+
+# Default LOGFILE if not set by environment
+if [[ -z "$LOGFILE" ]]; then
+  LOGFILE=".tmp/reconftw.log"
+fi
+
+# Ensure .tmp exists for logs
+mkdir -p .tmp 2>/dev/null || true
+
+# Define redirection helpers that are disabled in debug mode
+if [[ "$DEBUG" == true ]]; then
+  # Show commands and route logs to stderr for visibility
+  set -o xtrace
+  export LOGFILE="/dev/stderr"
+  REDIR_OUT=""
+  REDIR_ERRNULL=""
+  REDIR_BOTH=""
+  PUSHD_REDIR=""
+  POPD_REDIR=""
+else
+  REDIR_OUT=">/dev/null"
+  REDIR_ERRNULL="2>/dev/null"
+  REDIR_BOTH=">/dev/null 2>&1"
+  PUSHD_REDIR=">/dev/null"
+  POPD_REDIR=">/dev/null"
+fi
+
+# Wrap pushd/popd so existing calls honor debug verbosity without editing all of them
+pushd() { builtin pushd "$@" ${PUSHD_REDIR}; }
+popd() { builtin popd ${POPD_REDIR}; }
+
 # Welcome to reconFTW main script
 #	 ██▀███  ▓█████  ▄████▄   ▒█████   ███▄    █   █████▒▄▄▄█████▓ █     █░
 #	▓██ ▒ ██▒▓█   ▀ ▒██▀ ▀█  ▒██▒  ██▒ ██ ▀█   █ ▓██   ▒ ▓  ██▒ ▓▒▓█░ █ ░█░
@@ -64,19 +105,19 @@ function banner() {
 function check_version() {
 
 	# Check if git is installed
-	if ! command -v git >/dev/null 2>&1; then
+	if ! command -v git ${REDIR_BOTH}; then
 		printf "\n%bGit is not installed. Cannot check for updates.%b\n\n" "$bred" "$reset"
 		return 1
 	fi
 
 	# Check if current directory is a git repository
-	if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+	if ! git rev-parse --is-inside-work-tree ${REDIR_BOTH}; then
 		printf "\n%bCurrent directory is not a git repository. Cannot check for updates.%b\n\n" "$bred" "$reset"
 		return 1
 	fi
 
 	# Fetch updates with a timeout
-	if ! timeout 10 git fetch >/dev/null 2>&1; then
+	if ! timeout 10 git fetch ${REDIR_BOTH}; then
 		printf "\n%bUnable to check updates (git fetch timed out).%b\n\n" "$bred" "$reset"
 		return 1
 	fi
@@ -87,7 +128,7 @@ function check_version() {
 
 	# Get upstream branch
 	local UPSTREAM
-	UPSTREAM=$(git rev-parse --abbrev-ref --symbolic-full-name "@{u}" 2>/dev/null)
+	UPSTREAM=$(git rev-parse --abbrev-ref --symbolic-full-name "@{u}" ${REDIR_ERRNULL})
 	if [[ -z $UPSTREAM ]]; then
 		printf "\n%bNo upstream branch set for '%s'. Cannot check for updates.%b\n\n" "$bred" "$BRANCH" "$reset"
 		return 1
@@ -269,7 +310,7 @@ function tools_installed() {
 
 	# Check for tool commands
 	for tool in "${!tools_commands[@]}"; do
-		if ! command -v "${tools_commands[$tool]}" >/dev/null 2>&1; then
+		if ! command -v "${tools_commands[$tool]}" ${REDIR_BOTH}; then
 			#			printf "%b [*] %s\t\t[NO]%b\n" "$bred" "$tool" "$reset"
 			all_installed=false
 			missing_tools+=("$tool")
@@ -5373,8 +5414,12 @@ function start() {
 
 	NOW=$(date +"%F")
 	NOWT=$(date +"%T")
-	LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
-	touch .log/${NOW}_${NOWT}.txt
+	if [[ "$DEBUG" == true ]]; then
+		LOGFILE="/dev/stderr"
+	else
+		LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
+		touch .log/${NOW}_${NOWT}.txt
+	fi
 	echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
 
 	printf "\n"
@@ -6023,12 +6068,13 @@ function zen_menu() {
 
 function help() {
     printf "\n Usage: $0 [-d domain.tld] [-m name] [-l list.txt] [-x oos.txt] [-i in.txt] "
-    printf "\n           	      [-r] [-s] [-p] [-a] [-w] [-n] [-z] [-c] [-y] [-h] [-f] [--ai] [--deep] [-o OUTPUT]\n\n"
+    printf "\n            \t      [-r] [-s] [-p] [-a] [-w] [-n] [-z] [-c] [-y] [-h] [-f] [--ai] [--deep] [--debug] [-o OUTPUT]\n\n"
     printf " ${bblue}TARGET OPTIONS${reset}\n"
     printf "   -d domain.tld     Target domain\n"
     printf "   -m company        Target company name\n"
     printf "   -l list.txt       Targets list (One on each line)\n"
     printf "   -x oos.txt        Excludes subdomains list (Out Of Scope)\n"
+    printf "   --debug          Enable debug output\n"
     printf "   -i in.txt         Includes subdomains list\n"
     printf " \n"
     printf " ${bblue}MODE OPTIONS${reset}\n"
@@ -6070,6 +6116,9 @@ function help() {
     printf " ${byellow}Analyze ReconFTW results with AI:${reset}\n"
     printf " ./reconftw.sh -d example.com -r --ai\n"
     printf " \n"
+	printf " ${byellow}Enable verbose output for all commands:${reset}\n"
+	printf " ./reconftw.sh -d example.com -r --debug\n"
+	printf " \n"
 	printf " ${byellow}Run custom function:${reset}\n"
 	printf " ./reconftw.sh -d example.com -c nuclei_check \n"
 }
@@ -6216,6 +6265,12 @@ while true; do
 		;;
 	'--deep')
 		opt_deep=true
+		shift
+		continue
+		;;
+
+	'--debug')
+		# already parsed early; just consume it
 		shift
 		continue
 		;;
