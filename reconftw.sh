@@ -29,12 +29,18 @@ if [[ "$DEBUG" == true ]]; then
   REDIR_BOTH=""
   PUSHD_REDIR=""
   POPD_REDIR=""
+  # Quiet flags disabled in debug
+  SUBFINDER_QFLAG=""
+  TLSX_QFLAG=""
 else
   REDIR_OUT=">/dev/null"
   REDIR_ERRNULL="2>/dev/null"
   REDIR_BOTH=">/dev/null 2>&1"
   PUSHD_REDIR=">/dev/null"
   POPD_REDIR=">/dev/null"
+  # Default quiet flags
+  SUBFINDER_QFLAG="-silent"
+  TLSX_QFLAG="-silent"
 fi
 
 # Wrap pushd/popd so existing calls honor debug verbosity without editing all of them
@@ -401,7 +407,7 @@ function github_repos() {
 			GH_TOKEN=$(head -n 1 "$GITHUB_TOKENS")
 			echo "$domain" | unfurl format %r >.tmp/company_name.txt
 
-			if ! enumerepo -token-string "$GH_TOKEN" -usernames .tmp/company_name.txt -o .tmp/company_repos.txt 2>>"$LOGFILE" >/dev/null; then
+			if ! enumerepo -token-string "$GH_TOKEN" -usernames .tmp/company_name.txt -o .tmp/company_repos.txt 2>>"$LOGFILE" ${REDIR_OUT}; then
 				printf "%b[!] enumerepo command failed.%b\n" "$bred" "$reset"
 			fi
 
@@ -415,7 +421,7 @@ function github_repos() {
 			mkdir -p .tmp/github 2>>"$LOGFILE"
 
 			if [[ -s ".tmp/company_repos_url.txt" ]]; then
-				if ! interlace -tL .tmp/company_repos_url.txt -threads "$INTERLACE_THREADS" -c "git clone _target_ .tmp/github_repos/_cleantarget_" 2>>"$LOGFILE" >/dev/null; then
+				if ! interlace -tL .tmp/company_repos_url.txt -threads "$INTERLACE_THREADS" -c "git clone _target_ .tmp/github_repos/_cleantarget_" 2>>"$LOGFILE" ${REDIR_OUT}; then
 					printf "%b[!] interlace git clone command failed.%b\n" "$bred" "$reset"
 					return 1
 				fi
@@ -432,7 +438,7 @@ function github_repos() {
 			fi
 
 			if [[ -s ".tmp/github_repos_folders.txt" ]]; then
-				if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "gitleaks detect --source .tmp/github_repos/_target_ --no-banner --no-color -r .tmp/github/gh_secret_cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
+				if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "gitleaks detect --source .tmp/github_repos/_target_ --no-banner --no-color -r .tmp/github/gh_secret_cleantarget_.json" 2>>"$LOGFILE" ${REDIR_OUT}; then
 					printf "%b[!] interlace gitleaks command failed.%b\n" "$bred" "$reset"
 					end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}"
 					return 1
@@ -443,14 +449,14 @@ function github_repos() {
 			fi
 
 			if [[ -s ".tmp/company_repos_url.txt" ]]; then
-				if ! interlace -tL .tmp/company_repos_url.txt -threads "$INTERLACE_THREADS" -c "trufflehog git _target_ -j 2>&1 | jq -c > _output_/_cleantarget_" -o .tmp/github/ 2>>"$LOGFILE" >/dev/null; then
+				if ! interlace -tL .tmp/company_repos_url.txt -threads "$INTERLACE_THREADS" -c "trufflehog git _target_ -j 2>&1 | jq -c > _output_/_cleantarget_" -o .tmp/github/ 2>>"$LOGFILE" ${REDIR_OUT}; then
 					printf "%b[!] interlace trufflehog command failed.%b\n" "$bred" "$reset"
 					return 1
 				fi
 			fi
 
 			if [[ -d ".tmp/github/" ]]; then
-				if ! cat .tmp/github/* 2>/dev/null | jq -c | jq -r >"osint/github_company_secrets.json" 2>>"$LOGFILE"; then
+				if ! cat .tmp/github/* ${REDIR_ERRNULL} | jq -c | jq -r >"osint/github_company_secrets.json" 2>>"$LOGFILE"; then
 					printf "%b[!] Error combining results.%b\n" "$bred" "$reset"
 					return 1
 				fi
@@ -510,7 +516,7 @@ function apileaks() {
 		porch-pirate -s "$domain" -l 25 --dump 2>>"$LOGFILE" >"${dir}/osint/postman_leaks.txt"
 
 		# Change directory to SwaggerSpy
-		if ! pushd "${tools}/SwaggerSpy" >/dev/null; then
+		if ! pushd "${tools}/SwaggerSpy"; then
 			printf "%b[!] Failed to change directory to %s in %s at line %s.%b\n" "$bred" "${tools}/SwaggerSpy" "${FUNCNAME[0]}" "$LINENO" "$reset"
 			return 1
 		fi
@@ -519,7 +525,7 @@ function apileaks() {
 		"${tools}/SwaggerSpy/venv/bin/python3" swaggerspy.py "$domain" 2>>"$LOGFILE" | grep -i "[*]\|URL" >"${dir}/osint/swagger_leaks.txt"
 
 		# Return to the previous directory
-		if ! popd >/dev/null; then
+		if ! popd; then
 			printf "%b[!] Failed to return to the previous directory in %s at line %s.%b\n" "$bred" "${FUNCNAME[0]}" "$LINENO" "$reset"
 			return 1
 		fi
@@ -563,7 +569,7 @@ function emails() {
 		fi
 
 		# Change directory to LeakSearch
-		if ! pushd "${tools}/LeakSearch" >/dev/null; then
+		if ! pushd "${tools}/LeakSearch"; then
 			printf "%b[!] Failed to change directory to %s in %s at line %s.%b\n" "$bred" "${tools}/LeakSearch" "${FUNCNAME[0]}" "$LINENO" "$reset"
 			return 1
 		fi
@@ -641,7 +647,7 @@ function third_party_misconfigs() {
 		company_name=$(unfurl format %r <<<"$domain")
 
 		# Change directory to Spoofy tool
-		if ! pushd "${tools}/misconfig-mapper" >/dev/null; then
+		if ! pushd "${tools}/misconfig-mapper"; then
 			printf "%b[!] Failed to change directory to %s in %s at line %s.%b\n" \
 				"$bred" "${tools}/misconfig-mapper" "${FUNCNAME[0]}" "$LINENO" "$reset"
 			return 1
@@ -651,7 +657,7 @@ function third_party_misconfigs() {
 		misconfig-mapper -target "$company_name" -service "*" 2>&1 | grep -v "\-\]" | grep -v "Failed" >"${dir}/osint/3rdparts_misconfigurations.txt"
 
 		# Return to the previous directory
-		if ! popd >/dev/null; then
+		if ! popd; then
 			printf "%b[!] Failed to return to previous directory in %s at line %s.%b\n" \
 				"$bred" "${FUNCNAME[0]}" "$LINENO" "$reset"
 			return 1
@@ -683,7 +689,7 @@ function spoof() {
 		start_func "${FUNCNAME[0]}" "Searching for spoofable domains"
 
 		# Change directory to Spoofy tool
-		if ! pushd "${tools}/Spoofy" >/dev/null; then
+		if ! pushd "${tools}/Spoofy"; then
 			printf "%b[!] Failed to change directory to %s in %s at line %s.%b\n" \
 				"$bred" "${tools}/Spoofy" "${FUNCNAME[0]}" "$LINENO" "$reset"
 			return 1
@@ -902,7 +908,7 @@ function sub_passive() {
 		start_subfunc "${FUNCNAME[0]}" "Running: Passive Subdomain Enumeration"
 
 		# Run subfinder and check for errors
-		subfinder -all -d "$domain" -max-time "$SUBFINDER_ENUM_TIMEOUT" -silent -o .tmp/subfinder_psub.txt 2>>"$LOGFILE" >/dev/null
+		subfinder -all -d "$domain" -max-time "$SUBFINDER_ENUM_TIMEOUT" ${SUBFINDER_QFLAG} -o .tmp/subfinder_psub.txt 2>>"$LOGFILE" ${REDIR_OUT}
 		#merklemap-cli search $domain 2>/dev/null | awk -F' ' '{for(i=1;i<=NF;i++) if($i ~ /^domain=/) {split($i,a,"="); print a[2]}}' | anew -q .tmp/subfinder_psub.txt 2>>"$LOGFILE" >/dev/null
 
 		# Run github-subdomains if GITHUB_TOKENS is set and file is not empty
@@ -1070,12 +1076,12 @@ function sub_tls() {
 
 		if [[ $DEEP == true ]]; then
 			if [[ $AXIOM != true ]]; then
-				cat subdomains/subdomains.txt | tlsx -san -cn -silent -ro -c "$TLSX_THREADS" \
-					-p "$TLS_PORTS" -o .tmp/subdomains_tlsx.txt 2>>"$LOGFILE" >/dev/null
+				cat subdomains/subdomains.txt | tlsx -san -cn ${TLSX_QFLAG} -ro -c "$TLSX_THREADS" \
+					-p "$TLS_PORTS" -o .tmp/subdomains_tlsx.txt 2>>"$LOGFILE" ${REDIR_OUT}
 			else
 				axiom-scan subdomains/subdomains.txt -m tlsx \
-					-san -cn -silent -ro -c "$TLSX_THREADS" -p "$TLS_PORTS" \
-					-o .tmp/subdomains_tlsx.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+					-san -cn ${TLSX_QFLAG} -ro -c "$TLSX_THREADS" -p "$TLS_PORTS" \
+					-o .tmp/subdomains_tlsx.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" ${REDIR_OUT}
 			fi
 		else
 			if [[ $AXIOM != true ]]; then
@@ -3226,7 +3232,7 @@ function nuclei_check() {
 		start_func "${FUNCNAME[0]}" "Templates-based Web Scanner"
 		#cent update -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
 		# Update nuclei templates
-		nuclei -update 2>>"$LOGFILE" >/dev/null
+		nuclei -update 2>>"$LOGFILE" ${REDIR_OUT}
 
 		# Handle multi mode and initialize subdomains.txt if necessary
 		if [[ -n $multi ]] && [[ ! -f "$dir/subdomains/subdomains.txt" ]]; then
@@ -3592,7 +3598,7 @@ function urlchecks() {
 
 				if [[ $PROXY == true ]] && [[ -n $proxy_url ]] && [[ $(wc -l <webs/url_extract.txt) -le $DEEP_LIMIT2 ]]; then
 					notification "Sending URLs to proxy" "info"
-					ffuf -mc all -w webs/url_extract.txt -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
+					ffuf -mc all -w webs/url_extract.txt -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" ${REDIR_OUT}
 				fi
 			fi
 		fi
