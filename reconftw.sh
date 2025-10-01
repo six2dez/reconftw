@@ -2334,7 +2334,7 @@ function zonetransfer() {
 
 		# Check if zone transfer was successful
 		if [[ -s "subdomains/zonetransfer.txt" ]]; then
-			if ! grep -q "Transfer failed" "subdomains/zonetransfer.txt"; then
+			if ! grep -q "Transfer failed\|failed: network unreachable" "subdomains/zonetransfer.txt"; then
 				notification "Zone transfer found on ${domain}!" "info"
 			fi
 		fi
