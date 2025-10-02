@@ -5076,7 +5076,7 @@ function getElapsedTime {
 
 function zipSnedOutputFolder {
 	zip_name1=$(date +"%Y_%m_%d-%H.%M.%S")
-	zip_name="${zip_name1}_${domain}.zip" 2>>"$LOGFILE" ${REDIR_OUT}
+	zip_name="${zip_name1}_${domain}.zip"
 	(cd "$dir" && zip -r "$zip_name" .) 2>>"$LOGFILE" ${REDIR_OUT}
 	echo "Sending zip file "${dir}/${zip_name}""
 	if [[ -s "${dir}/$zip_name" ]]; then
