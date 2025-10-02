@@ -2441,7 +2441,7 @@ function s3buckets() {
 		# S3Scanner
 		if [[ $AXIOM != true ]]; then
 			if [[ -s "subdomains/subdomains.txt" ]]; then
-				s3scanner scan -f subdomains/subdomains.txt 2>>"$LOGFILE" | anew -q .tmp/s3buckets.txt
+				s3scanner -bf subdomains/subdomains.txt 2>>"$LOGFILE" | anew -q .tmp/s3buckets.txt
 			fi
 		else
 			axiom-scan subdomains/subdomains.txt -m s3scanner -o .tmp/s3buckets_tmp.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" ${REDIR_OUT}
@@ -5077,7 +5077,7 @@ function getElapsedTime {
 function zipSnedOutputFolder {
 	zip_name1=$(date +"%Y_%m_%d-%H.%M.%S")
 	zip_name="${zip_name1}_${domain}.zip"
-	(cd "$dir" && zip -r "$zip_name" .) 2>>"$LOGFILE" ${REDIR_OUT}
+	(cd "$dir" && zip -r "$zip_name" .) 2>>"$LOGFILE"
 	echo "Sending zip file "${dir}/${zip_name}""
 	if [[ -s "${dir}/$zip_name" ]]; then
 		sendToNotify "$dir/$zip_name"
