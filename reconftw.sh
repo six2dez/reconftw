@@ -504,6 +504,44 @@ function apileaks() {
 	fi
 }
 
+function google_api_scan() {
+    mkdir -p osint
+
+    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } &&
+        [[ $GOOGLE_API_SCAN == true ]] && [[ $OSINT == true ]] &&
+        ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+
+        start_func "${FUNCNAME[0]}" "Scanning for exposed Google/Gemini API keys in JS/HTML assets"
+
+        # Change into the Gemini API scanner directory
+        if ! pushd "${tools}/gemini_api_scanner" >/dev/null; then
+            printf "%b[!] Failed to change directory to gemini_api_scanner%b\n" "$bred" "$reset"
+            return 1
+        fi
+
+        # Run the scanner - adjust flags according to repo docs
+        python3 scanner.py -d "$domain" --validate false -o "../../osint/gemini_api_scan_results.json" 2>>"$LOGFILE"
+
+        if ! popd >/dev/null; then
+            printf "%b[!] Failed to return to previous directory%b\n" "$bred" "$reset"
+            return 1
+        fi
+
+        end_func "Results saved in osint/gemini_api_scan_results.json" "${FUNCNAME[0]}"
+
+    else
+        if [[ $GOOGLE_API_SCAN == false ]] || [[ $OSINT == false ]]; then
+            printf "\n%b[%s] %s skipped due to mode or configuration settings.%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+        elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            return
+        else
+            printf "%b[%s] %s already processed. To force, delete:\n    %s/.%s%b\n\n" \
+                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "/.${FUNCNAME[0]}" "$reset"
+        fi
+    fi
+}
+
+
 function emails() {
 	mkdir -p .tmp osint
 
