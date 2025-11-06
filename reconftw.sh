@@ -20,17 +20,27 @@ IFS=$'\n\t'
 
 # Detect if the script is being run in MacOS with Homebrew Bash
 if [[ $OSTYPE == "darwin"* && $BASH != "/opt/homebrew/bin/bash" ]]; then
-    exec /opt/homebrew/bin/bash "$0" "$@"
+	exec /opt/homebrew/bin/bash "$0" "$@"
 fi
 
 # timeout/gtimeout compatibility
 if command -v timeout >/dev/null 2>&1; then
-    TIMEOUT_CMD="timeout"
+	TIMEOUT_CMD="timeout"
 elif command -v gtimeout >/dev/null 2>&1; then
-    TIMEOUT_CMD="gtimeout"
+	TIMEOUT_CMD="gtimeout"
 else
-    TIMEOUT_CMD=""
+	TIMEOUT_CMD=""
 fi
+
+# --------------------------------------
+# Classic UI wrappers (no tput/icons)
+# --------------------------------------
+
+pt_header() { :; }
+pt_msg_run() { printf "\n%b[%s] %s%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$1" "$reset"; }
+pt_msg_ok() { printf "\n%b[%s] %s%b\n" "$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$1" "$reset"; }
+pt_msg_warn() { printf "\n%b[%s] %s%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$1" "$reset"; }
+pt_msg_err() { printf "\n%b[%s] %s%b\n" "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$1" "$reset"; }
 
 # Ensure a safe default for early log redirections
 # If LOGFILE is unset or empty, send logs to /dev/null until later initialization
@@ -95,7 +105,7 @@ function check_version() {
 	fi
 
 	# Fetch updates with a timeout (supports gtimeout on macOS)
-	if ! { [[ -n "$TIMEOUT_CMD" ]] && $TIMEOUT_CMD 10 git fetch >/dev/null 2>&1; } && ! git fetch >/dev/null 2>&1; then
+	if ! { [[ -n $TIMEOUT_CMD ]] && $TIMEOUT_CMD 10 git fetch >/dev/null 2>&1; } && ! git fetch >/dev/null 2>&1; then
 		printf "\n%bUnable to check updates (git fetch timed out).%b\n\n" "$bred" "$reset"
 		return 1
 	fi
@@ -203,7 +213,7 @@ function tools_installed() {
 		["zip"]="zip"
 		["nmap"]="nmap"
 		["dig"]="dig"
-		["timeout"]="timeout"
+		["timeout"]="${TIMEOUT_CMD:-timeout}"
 		["brutespray"]="brutespray"
 		["xnLinkFinder"]="xnLinkFinder"
 		["xnldorker"]="xnldorker"
@@ -266,6 +276,10 @@ function tools_installed() {
 		["cent"]="cent"
 		["csprecon"]="csprecon"
 		["VhostFinder"]="VhostFinder"
+		["grpcurl"]="grpcurl"
+		["arjun"]="arjun"
+		["gqlspection"]="gqlspection"
+		["cloud_enum"]="cloud_enum"
 	)
 
 	# Check for tool files
@@ -459,10 +473,16 @@ function metadata() {
 		start_func "${FUNCNAME[0]}" "Scanning metadata in public files"
 
 		mkdir -p ".tmp/metagoofil_${domain}/" 2>>"${LOGFILE}"
-		pushd "${tools}/metagoofil" >/dev/null || { printf "%b[!] Failed to change directory to %s in %s at line %s.%b\n" "${bred}" "${tools}/metagoofil" "${FUNCNAME[0]}" "${LINENO}" "${reset}"; return 1; }
+		pushd "${tools}/metagoofil" >/dev/null || {
+			printf "%b[!] Failed to change directory to %s in %s at line %s.%b\n" "${bred}" "${tools}/metagoofil" "${FUNCNAME[0]}" "${LINENO}" "${reset}"
+			return 1
+		}
 		"${tools}/metagoofil/venv/bin/python3" "${tools}/metagoofil/metagoofil.py" -d "${domain}" -t pdf,docx,xlsx -l 10 -w -o "${dir}/.tmp/metagoofil_${domain}/" 2>>"${LOGFILE}" >/dev/null
-		popd >/dev/null || { printf "%b[!] Failed to return to the previous directory in %s at line %s.%b\n" "${bred}" "${FUNCNAME[0]}" "${LINENO}" "${reset}"; return 1; }
-		
+		popd >/dev/null || {
+			printf "%b[!] Failed to return to the previous directory in %s at line %s.%b\n" "${bred}" "${FUNCNAME[0]}" "${LINENO}" "${reset}"
+			return 1
+		}
+
 		exiftool -r .tmp/metagoofil_${domain}/* 2>>"${LOGFILE}" | tee /dev/null | egrep -i "Author|Creator|Email|Producer|Template" | sort -u | anew -q "osint/metadata_results.txt"
 
 		end_func "Results are saved in ${domain}/osint/[software/authors/metadata_results].txt" "${FUNCNAME[0]}"
@@ -637,7 +657,7 @@ function third_party_misconfigs() {
 				"$bred" "${FUNCNAME[0]}" "$LINENO" "$reset"
 			return 1
 		fi
-		
+
 		end_func "Results are saved in $domain/osint/3rdparts_misconfigurations.txt" "${FUNCNAME[0]}"
 
 	else
@@ -691,6 +711,55 @@ function spoof() {
 		else
 			printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
 				"$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "/.${FUNCNAME[0]}" "$reset"
+		fi
+	fi
+}
+
+function mail_hygiene() {
+	mkdir -p osint
+
+	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } &&
+		[[ $MAIL_HYGIENE == true ]] && [[ $OSINT == true ]] &&
+		! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+
+		start_func "${FUNCNAME[0]}" "Mail hygiene (SPF/DMARC)"
+		{
+			printf "Domain: %s\n" "$domain"
+			printf "\nTXT records:\n"
+			dig +short TXT "$domain" | sed 's/^/  /'
+			printf "\nDMARC record:\n"
+			dig +short TXT "_dmarc.$domain" | sed 's/^/  /'
+		} >"osint/mail_hygiene.txt" 2>>"$LOGFILE"
+		end_func "Results are saved in $domain/osint/mail_hygiene.txt" "${FUNCNAME[0]}"
+	else
+		if [[ $MAIL_HYGIENE == false ]] || [[ $OSINT == false ]]; then
+			printf "\n%b[%s] %s skipped due to mode or configuration settings.%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+		elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+			return
+		else
+			printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s %b\n\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "${FUNCNAME[0]}" "$reset"
+		fi
+	fi
+}
+
+function cloud_enum_scan() {
+	mkdir -p osint
+
+	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } &&
+		[[ $CLOUD_ENUM == true ]] && [[ $OSINT == true ]] &&
+		! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+
+		start_func "${FUNCNAME[0]}" "Cloud storage enumeration"
+		company_name=$(unfurl format %r <<<"$domain")
+		cloud_enum -k "$company_name" -k "$domain" -k "${domain%%.*}" 2>>"$LOGFILE" | anew -q osint/cloud_enum.txt
+		end_func "Results are saved in $domain/osint/cloud_enum.txt" "${FUNCNAME[0]}"
+	else
+		if [[ $CLOUD_ENUM == false ]] || [[ $OSINT == false ]]; then
+			printf "\n%b[%s] %s skipped due to mode or configuration settings.%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+		elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+			return
+		else
+			printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s %b\n\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "${FUNCNAME[0]}" "$reset"
 		fi
 	fi
 }
@@ -872,6 +941,21 @@ function subdomains_full() {
 	printf "%b[%s] Results are saved in %s/subdomains/subdomains.txt and webs/webs.txt%b\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$domain" "$reset"
 	printf "%b#######################################################################%b\n\n" "$bgreen" "$reset"
 
+	# Emit plugin event
+	plugins_emit after_subdomains "$domain" "$dir"
+
+	# Persist counts for quick-rescan logic
+	echo "$NUMOFLINES_subs" >.tmp/subs_new_count
+	echo "$NUMOFLINES_probed" >.tmp/webs_new_count
+
+	# Asset store: append new subdomains
+	if [[ -s .tmp/subdomains_old.txt ]]; then
+		comm -13 <(sort -u .tmp/subdomains_old.txt) <(sort -u subdomains/subdomains.txt) | sed '/^$/d' >.tmp/subs_new_only.txt
+		append_assets_from_file subdomain name .tmp/subs_new_only.txt
+	else
+		append_assets_from_file subdomain name subdomains/subdomains.txt
+	fi
+
 }
 
 function sub_passive() {
@@ -985,6 +1069,7 @@ function sub_active() {
 				printf "%b[!] resolvers_update_quick_local command failed.%b\n" "$bred" "$reset"
 				return 1
 			fi
+			[[ $RESOLVER_IQ == true ]] && resolvers_optimize_local
 
 			# Resolve subdomains using puredns
 			if [[ -s ".tmp/subs_no_resolved.txt" ]]; then
@@ -1078,6 +1163,7 @@ function sub_tls() {
 				printf "%b[!] resolvers_update_quick_local command failed.%b\n" "$bred" "$reset"
 				return 1
 			fi
+			[[ $RESOLVER_IQ == true ]] && resolvers_optimize_local
 			if [[ -s ".tmp/subdomains_tlsx_clean.txt" ]]; then
 				puredns resolve .tmp/subdomains_tlsx_clean.txt -w .tmp/subdomains_tlsx_resolved.txt \
 					-r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
@@ -2256,11 +2342,8 @@ function subtakeover() {
 		fi
 
 		#cent update -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
-
 		if [[ $AXIOM != true ]]; then
-			if ! nuclei -update 2>>"$LOGFILE" >/dev/null; then
-				printf "%b[!] Failed to update nuclei.%b\n" "$bred" "$reset"
-			fi
+			maybe_update_nuclei
 			cat subdomains/subdomains.txt webs/webs_all.txt 2>/dev/null | nuclei -silent -nh -tags takeover \
 				-severity info,low,medium,high,critical -retries 3 -rl "$NUCLEI_RATELIMIT" \
 				-t "${NUCLEI_TEMPLATES_PATH}" -j -o .tmp/tko_json.txt 2>>"$LOGFILE" >/dev/null
@@ -2530,10 +2613,14 @@ function s3buckets() {
 				elif echo "$line" | grep -q "Google Cloud"; then
 					# Google Cloud Storage
 					bucket_name=$(echo "$line" | awk '{print $3}')
-					trufflehog gcs --bucket="$bucket_name" -j 2>/dev/null | jq -c | anew -q subdomains/cloudhunter_buckets_trufflehog.txt
+					trufflehog gcs --project-id="$bucket_name" -j 2>/dev/null | jq -c | anew -q subdomains/cloudhunter_buckets_trufflehog.txt
 				fi
 			done <subdomains/cloudhunter_open_buckets.txt
 		fi
+
+		# Append cloud assets to asset store
+		append_assets_from_file cloud asset subdomains/cloudhunter_open_buckets.txt
+		append_assets_from_file cloud s3bucket subdomains/s3buckets.txt
 
 		end_func "Results are saved in subdomains/s3buckets.txt, subdomains/cloud_assets.txt, subdomains/s3buckets_trufflehog.txt, and subdomains/cloudhunter_buckets_trufflehog.txt" "${FUNCNAME[0]}"
 	else
@@ -2545,6 +2632,60 @@ function s3buckets() {
 		else
 			printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" ".${FUNCNAME[0]}" "$reset"
 		fi
+	fi
+}
+
+function cloud_extra_providers() {
+	mkdir -p subdomains .tmp
+
+	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+		start_func "${FUNCNAME[0]}" "Extra cloud providers checks"
+		# Candidate names from domain and subdomains
+		company=$(unfurl format %r <<<"$domain")
+		printf "%s\n%s\n${domain%%.*}" "$company" "$domain" | sed 's/[^a-zA-Z0-9-]//g' | awk 'length>2' | sort -u >.tmp/cloudnames.txt
+		[[ -s subdomains/subdomains.txt ]] && awk -F. -v r=$(echo "$domain" | awk -F. '{print $(NF-1)"."$NF}') '{print $(NF-2)}' subdomains/subdomains.txt 2>/dev/null | sed 's/[^a-zA-Z0-9-]//g' | awk 'length>2' | sort -u >>.tmp/cloudnames.txt
+		sed -i 's/^\///; s/\.$//' .tmp/cloudnames.txt
+		sort -u .tmp/cloudnames.txt -o .tmp/cloudnames.txt
+
+		# Common container names for Azure (best-effort)
+		printf "public\nstatic\nmedia\nimages\nassets\nbackup\nbackups\nfiles\ncdn" >.tmp/azcontainers.txt
+
+		: >subdomains/cloud_extra.txt
+
+		while IFS= read -r name; do
+			# GCS
+			for u in \
+				"https://storage.googleapis.com/$name/" \
+				"https://$name.storage.googleapis.com/"; do
+				code=$(curl -sk -o /dev/null -w '%{http_code}' "$u" || true)
+				if [[ $code =~ ^20|403$ ]]; then printf "GCS %s %s\n" "$name" "$u" | anew -q subdomains/cloud_extra.txt; fi
+			done
+
+			# Azure Blob (requires container; try a few)
+			while IFS= read -r c; do
+				u="https://$name.blob.core.windows.net/$c?restype=container&comp=list"
+				code=$(curl -sk -o /dev/null -w '%{http_code}' "$u" || true)
+				if [[ $code =~ ^20|403$ ]]; then printf "AZURE %s %s\n" "$name/$c" "$u" | anew -q subdomains/cloud_extra.txt; fi
+			done <.tmp/azcontainers.txt
+
+			# DigitalOcean Spaces (regional)
+			for r in ams3 nyc3 sfo3 sgp1 fra1 blr1; do
+				u="https://$name.$r.digitaloceanspaces.com/"
+				code=$(curl -sk -o /dev/null -w '%{http_code}' "$u" || true)
+				if [[ $code =~ ^20|403$ ]]; then printf "DOSPACE %s %s\n" "$name.$r" "$u" | anew -q subdomains/cloud_extra.txt; fi
+			done
+
+			# Backblaze B2 (best-effort listing)
+			u="https://f000.backblazeb2.com/file/$name/"
+			code=$(curl -sk -o /dev/null -w '%{http_code}' "$u" || true)
+			if [[ $code =~ ^20|403$ ]]; then printf "B2 %s %s\n" "$name" "$u" | anew -q subdomains/cloud_extra.txt; fi
+
+		done <.tmp/cloudnames.txt
+
+		append_assets_from_file cloud asset subdomains/cloud_extra.txt
+		end_func "Results are saved in subdomains/cloud_extra.txt" "${FUNCNAME[0]}"
+	else
+		printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped or already processed.${reset}\n"
 	fi
 }
 
@@ -2657,6 +2798,12 @@ function webprobe_simple() {
 				sed 's/*.//' | anew -q .tmp/probed_tmp.txt
 		fi
 
+		# Adaptive throttling heuristics: mark slow hosts (429/403) from httpx
+		if [[ -s "webs/web_full_info.txt" ]]; then
+			jq -r 'try select(.status_code==403 or .status_code==429) | .url' webs/web_full_info.txt 2>/dev/null |
+				awk -F/ '{print $3}' | sed 's/\:$//' | sort -u >.tmp/slow_hosts.txt
+		fi
+
 		# Extract web info to plain text
 		if [[ -s "webs/web_full_info.txt" ]]; then
 			jq -r 'try . |"\(.url) [\(.status_code)] [\(.title)] [\(.webserver)] \(.tech)"' webs/web_full_info.txt |
@@ -2681,6 +2828,9 @@ function webprobe_simple() {
 		# Update webs_all.txt
 		cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
 
+		# Asset store: append probed webs
+		append_assets_from_file web url webs/webs.txt
+
 		end_subfunc "${NUMOFLINES} new websites resolved" "${FUNCNAME[0]}"
 
 		# Send websites to proxy if conditions met
@@ -2691,13 +2841,14 @@ function webprobe_simple() {
 
 	else
 		if [[ $WEBPROBESIMPLE == false ]]; then
-			printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
-				"$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		else
-			printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
-				"$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" ".${FUNCNAME[0]}" "$reset"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
+
+	# Emit plugin event
+	plugins_emit after_webprobe "$domain" "$dir"
 
 }
 
@@ -2785,11 +2936,9 @@ function webprobe_full() {
 		end_func "Results are saved in $domain/webs/webs_uncommon_ports.txt" "${FUNCNAME[0]}"
 	else
 		if [[ $WEBPROBEFULL == false ]]; then
-			printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
-				"$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		else
-			printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
-				"$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" ".${FUNCNAME[0]}" "$reset"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 
@@ -2825,11 +2974,9 @@ function screenshot() {
 		end_func "Results are saved in $domain/screenshots" "${FUNCNAME[0]}"
 	else
 		if [[ $WEBSCREENSHOT == false ]]; then
-			printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
-				"$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		else
-			printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
-				"$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" ".${FUNCNAME[0]}" "$reset"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 
@@ -2993,6 +3140,16 @@ function portscan() {
 
 		ips_file="${dir}/hosts/ips.txt"
 
+		# Discover IPv6 addresses from DNS JSON if enabled
+		if [[ $IPV6_SCAN == true ]]; then
+			if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
+				jq -r '.. | strings | select(test("^[0-9a-fA-F:]+$"))' <"subdomains/subdomains_dnsregs.json" |
+					grep -v '\\.' | sort -u | anew -q hosts/ips_v6.txt
+			fi
+			# Add target if it's an IPv6 literal
+			if [[ $domain =~ : ]]; then echo "$domain" | anew -q hosts/ips_v6.txt; fi
+		fi
+
 		if [[ $PORTSCAN_PASSIVE == true ]]; then
 			if [[ ! -f $ips_file ]]; then
 				printf "%b[!] File %s does not exist.%b\n" "$bred" "$ips_file" "$reset"
@@ -3028,6 +3185,9 @@ function portscan() {
 				if [[ -s ".tmp/ips_nocdn.txt" ]]; then
 					$SUDO nmap $PORTSCAN_ACTIVE_OPTIONS -iL .tmp/ips_nocdn.txt -oA hosts/portscan_active 2>>"$LOGFILE" >/dev/null
 				fi
+				if [[ $IPV6_SCAN == true && -s "hosts/ips_v6.txt" ]]; then
+					$SUDO nmap -6 $PORTSCAN_ACTIVE_OPTIONS -iL hosts/ips_v6.txt -oA hosts/portscan_active_v6 2>>"$LOGFILE" >/dev/null
+				fi
 			else
 				if [[ -s ".tmp/ips_nocdn.txt" ]]; then
 					axiom-scan .tmp/ips_nocdn.txt -m nmapx $PORTSCAN_ACTIVE_OPTIONS \
@@ -3038,6 +3198,10 @@ function portscan() {
 
 		if [[ -s "hosts/portscan_active.xml" ]]; then
 			nmapurls <hosts/portscan_active.xml 2>>"$LOGFILE" | anew -q hosts/webs.txt
+		fi
+		if [[ -s "hosts/portscan_active_v6.xml" ]]; then
+			nmapurls <hosts/portscan_active_v6.xml 2>>"$LOGFILE" | anew -q hosts/webs_v6.txt
+			[[ -s hosts/webs_v6.txt ]] && cat hosts/webs_v6.txt | anew -q webs/webs.txt
 		fi
 
 		if [[ $FARADAY == true ]]; then
@@ -3058,6 +3222,7 @@ function portscan() {
 			fi
 			notification "Webs detected from port scan: ${NUMOFLINES} new websites" "good"
 			cat hosts/webs.txt
+			append_assets_from_file web url hosts/webs.txt
 		fi
 
 		end_func "Results are saved in hosts/portscan_[passive|active|shodan].[txt|xml]" "${FUNCNAME[0]}"
@@ -3176,12 +3341,12 @@ function waf_checks() {
 	else
 		# Handle cases where WAF_DETECTION is false or the function has already been processed
 		if [[ $WAF_DETECTION == false ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 			# Domain is an IP address; skip the function
 			return
 		else
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]}${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 
@@ -3199,8 +3364,8 @@ function nuclei_check() {
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $NUCLEICHECK == true ]]; then
 		start_func "${FUNCNAME[0]}" "Templates-based Web Scanner"
 		#cent update -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
-		# Update nuclei templates
-		nuclei -update 2>>"$LOGFILE" >/dev/null
+		# Update nuclei templates once per run
+		maybe_update_nuclei
 
 		# Handle multi mode and initialize subdomains.txt if necessary
 		if [[ -n $multi ]] && [[ ! -f "$dir/subdomains/subdomains.txt" ]]; then
@@ -3218,6 +3383,29 @@ function nuclei_check() {
 			cat subdomains/subdomains.txt webs/webs_all.txt 2>>"$LOGFILE" >.tmp/webs_subs.txt
 		fi
 
+		# Prepare WAF-aware lists
+		WAF_LIST=.tmp/webs_waf.txt
+		NOWAF_LIST=.tmp/webs_nowaf.txt
+		if [[ -s webs/webs_wafs.txt ]]; then
+			cut -d';' -f1 webs/webs_wafs.txt | sed 's/https\?:\/\///' | sed 's/\/$//' | sort -u >.tmp/waf_hosts.txt
+			awk -F/ '{print $3}' .tmp/webs_subs.txt | sed 's/\:$//' | while read -r host; do
+				if grep -q "^$host$" .tmp/waf_hosts.txt; then
+					grep "://${host}[:/\n]" .tmp/webs_subs.txt | anew -q "$WAF_LIST"
+				else
+					grep "://${host}[:/\n]" .tmp/webs_subs.txt | anew -q "$NOWAF_LIST"
+				fi
+			done
+		else
+			cp .tmp/webs_subs.txt "$NOWAF_LIST"
+		fi
+
+		# Include slow hosts (429/403) into WAF list as well
+		if [[ -s .tmp/slow_hosts.txt ]]; then
+			while read -r host; do
+				grep "://${host}[:/\n]" .tmp/webs_subs.txt | anew -q "$WAF_LIST"
+			done <.tmp/slow_hosts.txt
+		fi
+
 		# Check if AXIOM is enabled
 		if [[ $AXIOM != true ]]; then
 			# Split severity levels into an array
@@ -3225,11 +3413,22 @@ function nuclei_check() {
 
 			for crit in "${severity_array[@]}"; do
 				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Nuclei Severity: $crit ${reset}\n\n"
-				# Run nuclei for each severity level
-				nuclei -l .tmp/webs_subs.txt -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 ${NUCLEI_EXTRA_ARGS} -t ${NUCLEI_TEMPLATES_PATH} -j -o "nuclei_output/${crit}_json.txt" 2>>"$LOGFILE" >/dev/null
+				# Non-WAF at default rate
+				if [[ -s $NOWAF_LIST ]]; then
+					nuclei -l "$NOWAF_LIST" -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 ${NUCLEI_EXTRA_ARGS} -t ${NUCLEI_TEMPLATES_PATH} -j -o "nuclei_output/${crit}_json.txt" 2>>"$LOGFILE" >/dev/null
+				fi
+				# WAF hosts at slower rate
+				if [[ -s $WAF_LIST ]]; then
+					local slow_rl
+					slow_rl=$((NUCLEI_RATELIMIT / 3 + 1))
+					nuclei -l "$WAF_LIST" -severity "$crit" -nh -rl "$slow_rl" -silent -retries 2 ${NUCLEI_EXTRA_ARGS} -t ${NUCLEI_TEMPLATES_PATH} -j -o "nuclei_output/${crit}_waf_json.txt" 2>>"$LOGFILE" >/dev/null
+					[[ -s nuclei_output/${crit}_waf_json.txt ]] && cat nuclei_output/${crit}_waf_json.txt >>nuclei_output/${crit}_json.txt
+				fi
 				# Parse the JSON output and save the results to a text file
 				if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
 					jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' nuclei_output/${crit}_json.txt >nuclei_output/${crit}.txt
+					# Asset store: append findings
+					append_assets_from_file finding value nuclei_output/${crit}.txt
 					# Display the results if the output file exists and is not empty
 					if [[ -s "nuclei_output/${crit}.txt" ]]; then
 						cat "nuclei_output/${crit}.txt"
@@ -3274,18 +3473,108 @@ function nuclei_check() {
 		fi
 
 		end_func "Results are saved in $domain/nuclei_output folder" "${FUNCNAME[0]}"
+
+		# Emit plugin event
+		plugins_emit after_nuclei "$domain" "$dir"
 	else
 		# Handle cases where NUCLEICHECK is false or the function has already been processed
 		if [[ $NUCLEICHECK == false ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 			# Domain is an IP address; skip the function
 			return
 		else
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]}${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 
+}
+
+function graphql_scan() {
+	# Detect GraphQL endpoints and introspection
+	mkdir -p .tmp webs nuclei_output vulns/graphql
+
+	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GRAPHQL_CHECK == true ]]; then
+		start_func "${FUNCNAME[0]}" "GraphQL detection"
+		# Prepare input
+		[[ ! -s .tmp/webs_subs.txt ]] && cat subdomains/subdomains.txt webs/webs_all.txt 2>>"$LOGFILE" >.tmp/webs_subs.txt
+		maybe_update_nuclei
+		if [[ -s .tmp/webs_subs.txt ]]; then
+			nuclei -l .tmp/webs_subs.txt -tags graphql -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 -t ${NUCLEI_TEMPLATES_PATH} -j -o nuclei_output/graphql_json.txt 2>>"$LOGFILE" >/dev/null
+			if [[ -s nuclei_output/graphql_json.txt ]]; then
+				jq -r '["[" + .["template-id"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host)] | .[]' nuclei_output/graphql_json.txt >nuclei_output/graphql.txt
+				# Optionally run GQLSpection on endpoints
+				if [[ $GQLSPECTION == true ]]; then
+					jq -r '.["matched-at"] // .host' nuclei_output/graphql_json.txt | sort -u | while read -r ep; do
+						[[ -z $ep ]] && continue
+						hostfile="vulns/graphql/$(echo "$ep" | sed 's|^[^/]*//||; s|/.*$||')"
+						mkdir -p "$(dirname "$hostfile")" 2>>"$LOGFILE" || true
+						gqlspection -t "$ep" -o "${hostfile}.json" 2>>"$LOGFILE" >/dev/null || true
+					done
+				fi
+			fi
+		fi
+		end_func "Results are saved in nuclei_output/graphql* and vulns/graphql" "${FUNCNAME[0]}"
+	else
+		if [[ $GRAPHQL_CHECK == false ]]; then
+			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+		else
+			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]}${reset}\n\n"
+		fi
+	fi
+}
+
+function param_discovery() {
+	mkdir -p webs .tmp
+
+	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $PARAM_DISCOVERY == true ]]; then
+		start_func "${FUNCNAME[0]}" "Parameter discovery (arjun)"
+		local input_file="webs/url_extract_nodupes.txt"
+		[[ ! -s $input_file ]] && input_file="webs/webs_all.txt"
+		if [[ -s $input_file ]]; then
+			arjun -i "$input_file" -t "$ARJUN_THREADS" -oJ .tmp/arjun.json 2>>"$LOGFILE" >/dev/null || true
+			if [[ -s .tmp/arjun.json ]]; then
+				jq -r '..|.url? // empty' .tmp/arjun.json | sed 's/^/URL: /' | anew -q webs/params_discovered.txt
+				jq -r '..|.params? // empty | to_entries[] | .key' .tmp/arjun.json | sed 's/^/PARAM: /' | sort -u | anew -q webs/params_discovered.txt
+			fi
+		fi
+		end_func "Results are saved in webs/params_discovered.txt" "${FUNCNAME[0]}"
+	else
+		if [[ $PARAM_DISCOVERY == false ]]; then
+			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+		else
+			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]}${reset}\n\n"
+		fi
+	fi
+}
+
+function grpc_reflection() {
+	mkdir -p hosts .tmp
+
+	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GRPC_SCAN == true ]]; then
+		start_func "${FUNCNAME[0]}" "gRPC reflection probing"
+		# Build target IP list
+		local ips_file="hosts/ips.txt"
+		local targets=()
+		[[ -s $ips_file ]] && targets+=($(cat "$ips_file"))
+		[[ -s "hosts/ips_v6.txt" ]] && targets+=($(cat "hosts/ips_v6.txt"))
+		printf "%s\n" "${targets[@]}" | sort -u >.tmp/grpc_ips.txt
+		if [[ -s .tmp/grpc_ips.txt ]]; then
+			# Probe common plaintext gRPC ports
+			while read -r ip; do
+				for p in 50051 50052; do
+					grpcurl -plaintext -max-msg-sz 10485760 -d '{}' "$ip:$p" list 2>>"$LOGFILE" | sed "s/^/[$ip:$p] /" | anew -q hosts/grpc_reflection.txt || true
+				done
+			done <.tmp/grpc_ips.txt
+		fi
+		end_func "Results are saved in hosts/grpc_reflection.txt" "${FUNCNAME[0]}"
+	else
+		if [[ $GRPC_SCAN == false ]]; then
+			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+		else
+			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]}${reset}\n\n"
+		fi
+	fi
 }
 
 function fuzz() {
@@ -3316,7 +3605,30 @@ function fuzz() {
 
 		if [[ -s "webs/webs_all.txt" ]]; then
 			if [[ $AXIOM != true ]]; then
-				interlace -tL webs/webs_all.txt -threads ${INTERLACE_THREADS} -c "ffuf ${FFUF_FLAGS} -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" -o $dir/.tmp/fuzzing 2>>"$LOGFILE" >/dev/null
+				# Split targets by slow hosts
+				>.tmp/webs_slow.txt
+				>.tmp/webs_normal.txt
+				if [[ -s .tmp/slow_hosts.txt ]]; then
+					while read -r host; do
+						grep "://${host}[:/\n]" webs/webs_all.txt | anew -q .tmp/webs_slow.txt
+					done <.tmp/slow_hosts.txt
+					comm -23 <(sort -u webs/webs_all.txt) <(sort -u .tmp/webs_slow.txt) >.tmp/webs_normal.txt
+				else
+					cp webs/webs_all.txt .tmp/webs_normal.txt
+				fi
+
+				# Normal targets
+				if [[ -s .tmp/webs_normal.txt ]]; then
+					interlace -tL .tmp/webs_normal.txt -threads ${INTERLACE_THREADS} -c "ffuf ${FFUF_FLAGS} -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" -o $dir/.tmp/fuzzing 2>>"$LOGFILE" >/dev/null
+				fi
+				# Slow targets with reduced threads/rate
+				if [[ -s .tmp/webs_slow.txt ]]; then
+					slow_threads=$((FFUF_THREADS / 3))
+					[[ $slow_threads -lt 5 ]] && slow_threads=5
+					slow_rate=$FFUF_RATELIMIT
+					[[ ${FFUF_RATELIMIT:-0} -eq 0 ]] && slow_rate=50 || slow_rate=$((FFUF_RATELIMIT / 3 + 1))
+					interlace -tL .tmp/webs_slow.txt -threads ${INTERLACE_THREADS} -c "ffuf ${FFUF_FLAGS} -t ${slow_threads} -rate ${slow_rate} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" -o $dir/.tmp/fuzzing 2>>"$LOGFILE" >/dev/null
+				fi
 				for sub in $(cat webs/webs_all.txt); do
 					sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
 
@@ -3340,9 +3652,9 @@ function fuzz() {
 
 	else
 		if [[ $FUZZ == false ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		else
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} is already processed, to force executing ${FUNCNAME[0]} delete\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 
@@ -3469,12 +3781,12 @@ function cms_scanner() {
 	else
 		# Handle cases where CMS_SCANNER is false or the function has already been processed
 		if [[ $CMS_SCANNER == false ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 			# Domain is an IP address; skip the function
 			return
 		else
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]}${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 }
@@ -3512,10 +3824,55 @@ function urlchecks() {
 				diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt 2>>"$LOGFILE") <(sort -u webs/webs_all.txt 2>>"$LOGFILE") | wc -l)
 				if [[ $diff_webs != "0" ]] || [[ ! -s ".tmp/katana.txt" ]]; then
 					if [[ $URL_CHECK_ACTIVE == true ]]; then
-						if [[ $DEEP == true ]]; then
-							timeout 4h katana -silent -list webs/webs_all.txt -jc -kf all -c "$KATANA_THREADS" -d 3 -fs rdn -o .tmp/katana.txt 2>>"$LOGFILE" >/dev/null
+						# Split slow vs normal targets based on httpx status (403/429)
+						>.tmp/katana_targets_slow.txt
+						>.tmp/katana_targets_normal.txt
+						if [[ -s .tmp/slow_hosts.txt ]]; then
+							while read -r host; do
+								grep "://${host}[:/\n]" webs/webs_all.txt | anew -q .tmp/katana_targets_slow.txt
+							done <.tmp/slow_hosts.txt
+							comm -23 <(sort -u webs/webs_all.txt) <(sort -u .tmp/katana_targets_slow.txt) >.tmp/katana_targets_normal.txt
 						else
-							timeout 3h katana -silent -list webs/webs_all.txt -jc -kf all -c "$KATANA_THREADS" -d 2 -fs rdn -o .tmp/katana.txt 2>>"$LOGFILE" >/dev/null
+							cp webs/webs_all.txt .tmp/katana_targets_normal.txt
+						fi
+
+						>.tmp/katana.txt
+						# Normal targets
+						if [[ -s .tmp/katana_targets_normal.txt ]]; then
+							LINES=$(wc -l <.tmp/katana_targets_normal.txt)
+							if [[ $LINES -gt ${CHUNK_LIMIT:-2000} ]]; then
+								if [[ $DEEP == true ]]; then
+									process_in_chunks .tmp/katana_targets_normal.txt ${CHUNK_LIMIT:-2000} "katana -silent -list _chunk_ -jc -kf all -c $KATANA_THREADS -d 3 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\" >/dev/null"
+								else
+									process_in_chunks .tmp/katana_targets_normal.txt ${CHUNK_LIMIT:-2000} "katana -silent -list _chunk_ -jc -kf all -c $KATANA_THREADS -d 2 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\" >/dev/null"
+								fi
+							else
+								if [[ $DEEP == true ]]; then
+									timeout 4h katana -silent -list .tmp/katana_targets_normal.txt -jc -kf all -c "$KATANA_THREADS" -d 3 -fs rdn >>.tmp/katana.txt 2>>"$LOGFILE" >/dev/null
+								else
+									timeout 3h katana -silent -list .tmp/katana_targets_normal.txt -jc -kf all -c "$KATANA_THREADS" -d 2 -fs rdn >>.tmp/katana.txt 2>>"$LOGFILE" >/dev/null
+								fi
+							fi
+						fi
+
+						# Slow targets with reduced concurrency
+						if [[ -s .tmp/katana_targets_slow.txt ]]; then
+							slow_c=$((KATANA_THREADS / 3))
+							[[ $slow_c -lt 2 ]] && slow_c=2
+							LINES=$(wc -l <.tmp/katana_targets_slow.txt)
+							if [[ $LINES -gt ${CHUNK_LIMIT:-2000} ]]; then
+								if [[ $DEEP == true ]]; then
+									process_in_chunks .tmp/katana_targets_slow.txt ${CHUNK_LIMIT:-2000} "katana -silent -list _chunk_ -jc -kf all -c $slow_c -d 3 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\" >/dev/null"
+								else
+									process_in_chunks .tmp/katana_targets_slow.txt ${CHUNK_LIMIT:-2000} "katana -silent -list _chunk_ -jc -kf all -c $slow_c -d 2 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\" >/dev/null"
+								fi
+							else
+								if [[ $DEEP == true ]]; then
+									timeout 4h katana -silent -list .tmp/katana_targets_slow.txt -jc -kf all -c "$slow_c" -d 3 -fs rdn >>.tmp/katana.txt 2>>"$LOGFILE" >/dev/null
+								else
+									timeout 3h katana -silent -list .tmp/katana_targets_slow.txt -jc -kf all -c "$slow_c" -d 2 -fs rdn >>.tmp/katana.txt 2>>"$LOGFILE" >/dev/null
+								fi
+							fi
 						fi
 					fi
 				fi
@@ -3556,6 +3913,8 @@ function urlchecks() {
 						NUMOFLINES=0
 					fi
 					notification "${NUMOFLINES} new URLs with parameters" "info"
+					# Asset store: append new URLs
+					append_assets_from_file url value webs/url_extract.txt
 				else
 					NUMOFLINES=0
 				fi
@@ -3572,11 +3931,9 @@ function urlchecks() {
 		fi
 	else
 		if [[ $URL_CHECK == false ]]; then
-			printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
-				"$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		else
-			printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
-				"$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" ".${FUNCNAME[0]}" "$reset"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 
@@ -3822,14 +4179,59 @@ function jschecks() {
 		end_func "No JS files to process" "${FUNCNAME[0]}"
 	else
 		if [[ $JSCHECKS == false ]]; then
-			printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
-				"$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		else
-			printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
-				"$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" ".${FUNCNAME[0]}" "$reset"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 
+}
+
+function websocket_checks() {
+	mkdir -p webs vulns .tmp
+
+	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $URL_CHECK == true ]]; then
+		start_func "${FUNCNAME[0]}" "WebSocket discovery and handshake"
+		# Collect ws/wss endpoints from JS endpoints and URLs
+		touch .tmp/ws_endpoints_raw.txt
+		[[ -s js/js_endpoints.txt ]] && grep -aEo 'wss?://[^ ]+' js/js_endpoints.txt | anew -q .tmp/ws_endpoints_raw.txt
+		[[ -s webs/url_extract.txt ]] && grep -aEo 'wss?://[^ ]+' webs/url_extract.txt | anew -q .tmp/ws_endpoints_raw.txt
+		if [[ -s .tmp/ws_endpoints_raw.txt ]]; then
+			# Normalize and de-dup
+			cat .tmp/ws_endpoints_raw.txt | sed 's/\"//g' | sed 's/[\]\[ ]//g' | sort -u >.tmp/ws_endpoints.txt
+			# Handshake test and origin check
+			while IFS= read -r ws; do
+				[[ -z $ws ]] && continue
+				url_no_proto=$(echo "$ws" | sed 's|^wss\?://||')
+				host=$(echo "$url_no_proto" | cut -d'/' -f1)
+				# Prepare Sec-WebSocket headers for accurate handshake
+				wskey=$(head -c 16 /dev/urandom | base64 2>/dev/null || echo dGVzdGtleQ==)
+				code=$(curl -sk --http1.1 -o /dev/null -w '%{http_code}' \
+					-H 'Connection: Upgrade' -H 'Upgrade: websocket' \
+					-H "Host: $host" \
+					-H "Sec-WebSocket-Key: $wskey" \
+					-H 'Sec-WebSocket-Version: 13' \
+					"$ws" || true)
+				if [[ $code == "101" ]]; then
+					printf "HANDSHAKE %s\n" "$ws" | anew -q vulns/websockets.txt
+					# Origin test: send a cross-origin header, expect failure ideally
+					wskey2=$(head -c 16 /dev/urandom | base64 2>/dev/null || echo dGVzdGtleQ==)
+					code2=$(curl -sk --http1.1 -o /dev/null -w '%{http_code}' \
+						-H 'Connection: Upgrade' -H 'Upgrade: websocket' \
+						-H "Origin: https://evil.example" -H "Host: $host" \
+						-H "Sec-WebSocket-Key: $wskey2" \
+						-H 'Sec-WebSocket-Version: 13' \
+						"$ws" || true)
+					if [[ $code2 == "101" ]]; then
+						printf "ORIGIN-ALLOWED %s\n" "$ws" | anew -q vulns/websocket_misconfig.txt
+					fi
+				fi
+			done <.tmp/ws_endpoints.txt
+		fi
+		end_func "Results are saved in vulns/websocket_misconfig.txt" "${FUNCNAME[0]}"
+	else
+		printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped or already processed.${reset}\n"
+	fi
 }
 
 function wordlist_gen() {
@@ -4042,12 +4444,12 @@ function brokenLinks() {
 	else
 		# Handle cases where BROKENLINKS is false or function already processed
 		if [[ $BROKENLINKS == false ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 			# Domain is an IP address; skip the function
 			return
 		else
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]}${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 
@@ -4124,11 +4526,11 @@ function xss() {
 	else
 		# Handle cases where XSS is false, no vulnerable URLs, or already processed
 		if [[ $XSS == false ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		elif [[ ! -s "gf/xss.txt" ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped: No URLs potentially vulnerable to XSS ${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for XSS"
 		else
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 
@@ -4167,11 +4569,11 @@ function cors() {
 	else
 		# Handle cases where CORS is false, no vulnerable URLs, or already processed
 		if [[ $CORS == false ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		elif [[ ! -s "gf/xss.txt" ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped: No URLs available for CORS Scan.${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for CORS"
 		else
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 
@@ -4214,11 +4616,11 @@ function open_redirect() {
 	else
 		# Handle cases where OPEN_REDIRECT is false, no vulnerable URLs, or already processed
 		if [[ $OPEN_REDIRECT == false ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		elif [[ ! -s "gf/redirect.txt" ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped: No URLs potentially vulnerable to Open Redirect.${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for open redirect"
 		else
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 
@@ -4301,11 +4703,11 @@ function ssrf_checks() {
 	else
 		# Handle cases where SSRF_CHECKS is false, no vulnerable URLs, or already processed
 		if [[ $SSRF_CHECKS == false ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		elif [[ ! -s "gf/ssrf.txt" ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped: No URLs potentially vulnerable to SSRF.${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for SSRF"
 		else
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 
@@ -4346,11 +4748,11 @@ function crlf_checks() {
 	else
 		# Handle cases where CRLF_CHECKS is false, no vulnerable URLs, or already processed
 		if [[ $CRLF_CHECKS == false ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		elif [[ ! -s "gf/crlf.txt" ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped: No URLs potentially vulnerable to CRLF.${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for CRLF"
 		else
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 
@@ -4398,11 +4800,11 @@ function lfi() {
 	else
 		# Handle cases where LFI is false, no vulnerable URLs, or already processed
 		if [[ $LFI == false ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		elif [[ ! -s "gf/lfi.txt" ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped: No URLs potentially vulnerable to LFI.${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for LFI"
 		else
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 
@@ -4450,11 +4852,11 @@ function ssti() {
 	else
 		# Handle cases where SSTI is false, no vulnerable URLs, or already processed
 		if [[ $SSTI == false ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		elif [[ ! -s "gf/ssti.txt" ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped: No URLs potentially vulnerable to SSTI.${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for SSTI"
 		else
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 
@@ -4509,11 +4911,11 @@ function sqli() {
 	else
 		# Handle cases where SQLI is false, no vulnerable URLs, or already processed
 		if [[ $SQLI == false ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		elif [[ ! -s "gf/sqli.txt" ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped: No URLs potentially vulnerable to SQLi.${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for SQLi"
 		else
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 
@@ -4547,11 +4949,11 @@ function test_ssl() {
 	else
 		# Handle cases where TEST_SSL is false, no vulnerable URLs, or already processed
 		if [[ $TEST_SSL == false ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		elif [[ ! -s "gf/testssl.txt" ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped: No URLs potentially vulnerable to SSL issues.${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped: no candidate targets for SSL tests"
 		else
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 
@@ -4588,11 +4990,11 @@ function spraying() {
 	else
 		# Handle cases where SPRAY is false, required files are missing, or already processed
 		if [[ $SPRAY == false ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		elif [[ ! -s "$dir/hosts/portscan_active.gnmap" ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped: No active port scan results found.${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped: missing active port scan"
 		else
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 
@@ -4642,11 +5044,11 @@ function command_injection() {
 	else
 		# Handle cases where COMM_INJ is false, no vulnerable URLs, or already processed
 		if [[ $COMM_INJ == false ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		elif [[ ! -s "gf/rce.txt" ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped: No URLs potentially vulnerable to Command Injection.${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for command injection"
 		else
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 
@@ -4706,11 +5108,11 @@ function 4xxbypass() {
 	else
 		# Handle cases where BYPASSER4XX is false, no vulnerable URLs, or already processed
 		if [[ $BYPASSER4XX == false ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		elif [[ ! -s "fuzzing/fuzzing_full.txt" ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped: No URLs potentially vulnerable to 4xx bypass.${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for 4xx bypass"
 		else
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 
@@ -4760,11 +5162,11 @@ function prototype_pollution() {
 	else
 		# Handle cases where PROTO_POLLUTION is false, no vulnerable URLs, or already processed
 		if [[ $PROTO_POLLUTION == false ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		elif [[ ! -s "webs/url_extract_nodupes.txt" ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped: No URLs potentially vulnerable to Prototype Pollution.${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for prototype pollution"
 		else
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 
@@ -4830,11 +5232,11 @@ function smuggling() {
 	else
 		# Handle cases where SMUGGLING is false, no vulnerable URLs, or already processed
 		if [[ $SMUGGLING == false ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		elif [[ ! -s "webs/webs_all.txt" ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped: No URLs potentially vulnerable to HTTP Request Smuggling.${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for HTTP request smuggling"
 		else
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 
@@ -4897,11 +5299,11 @@ function webcache() {
 	else
 		# Handle cases where WEBCACHE is false, no vulnerable URLs, or already processed
 		if [[ $WEBCACHE == false ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		elif [[ ! -s "fuzzing/fuzzing_full.txt" ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped: No URLs potentially vulnerable to Web Cache Poisoning.${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for web cache tests"
 		else
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 
@@ -4930,12 +5332,8 @@ function fuzzparams() {
 			if [[ $AXIOM != true ]]; then
 				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Nuclei Setup and Execution${reset}\n\n"
 
-				# Update Nuclei
-				if ! nuclei -update 2>>"$LOGFILE" >/dev/null; then
-					printf "%b[!] Nuclei update failed.%b\n" "$bred" "$reset"
-					end_func "Nuclei update failed." "${FUNCNAME[0]}"
-					return 1
-				fi
+				# Update Nuclei once per run
+				maybe_update_nuclei
 
 				# Pull latest fuzzing templates
 				if ! git -C ${NUCLEI_FUZZING_TEMPLATES_PATH} pull 2>>"$LOGFILE"; then
@@ -4990,11 +5388,11 @@ function fuzzparams() {
 	else
 		# Handle cases where FUZZPARAMS is false, no vulnerable URLs, or already processed
 		if [[ $FUZZPARAMS == false ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
 		elif [[ ! -s "webs/url_extract_nodupes.txt" ]]; then
-			printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped: No URLs potentially vulnerable to Fuzzing Parameters.${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for parameter fuzzing"
 		else
-			printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
 		fi
 	fi
 
@@ -5059,7 +5457,7 @@ function output() {
 	dir_output="$(realpath "$dir_output")"
 
 	# Prevent accidental deletion if $dir_output is a parent of $dir
-	if [[ "$dir" == "$dir_output"* ]]; then
+	if [[ $dir == "$dir_output"* ]]; then
 		echo "[!] Output directory is a parent of the working directory. Aborting to prevent data loss."
 		return 1
 	fi
@@ -5205,6 +5603,95 @@ function check_inscope() {
 	cat $1 | inscope >$1_tmp && cp $1_tmp $1 && rm -f $1_tmp
 }
 
+function maybe_update_nuclei() {
+	# Update nuclei templates once per run per target directory
+	mkdir -p .tmp
+	local stamp_file=".tmp/.nuclei_updated"
+	if [[ ! -f $stamp_file ]]; then
+		if [[ -n ${NUCLEI_TEMPLATES_PATH-} ]]; then
+			nuclei -update-templates -update-template-dir "${NUCLEI_TEMPLATES_PATH}" 2>>"$LOGFILE" >/dev/null || true
+		else
+			nuclei -update 2>>"$LOGFILE" >/dev/null || true
+		fi
+		if [[ -n ${NUCLEI_FUZZING_TEMPLATES_PATH-} && -d ${NUCLEI_FUZZING_TEMPLATES_PATH} ]]; then
+			nuclei -update-templates -update-template-dir "${NUCLEI_FUZZING_TEMPLATES_PATH}" 2>>"$LOGFILE" >/dev/null || true
+		fi
+		touch "$stamp_file"
+	fi
+}
+
+# Plugin framework
+PLUGINS_LOADED=false
+function plugins_load() {
+	local plugdir="${SCRIPTPATH}/modules"
+	if [[ -d $plugdir ]]; then
+		for f in "$plugdir"/*.sh; do
+			[[ -f $f ]] && source "$f" || true
+		done
+	fi
+	PLUGINS_LOADED=true
+}
+
+function plugins_emit() {
+	local event="$1"
+	shift || true
+	if declare -F reconftw_plugins >/dev/null 2>&1; then
+		reconftw_plugins "$event" "$@" || true
+	fi
+}
+
+# Asset store
+function append_asset() {
+	# Usage: append_asset type key value extras...
+	[[ $ASSET_STORE != true ]] && return 0
+	local type="$1"
+	shift
+	local key="$1"
+	shift
+	local val="$1"
+	shift
+	local now
+	now=$(date +'%Y-%m-%d %H:%M:%S')
+	mkdir -p .tmp
+	printf '{"type":"%s","%s":"%s","ts":"%s","source":"%s"}\n' \
+		"$type" "$key" "${val//\"/\\\"}" "$now" "${FUNCNAME[1]}" >>assets.jsonl 2>/dev/null
+}
+
+function append_assets_from_file() {
+	# Usage: append_assets_from_file type key file
+	[[ $ASSET_STORE != true ]] && return 0
+	local type="$1"
+	local key="$2"
+	local file="$3"
+	[[ ! -s $file ]] && return 0
+	while IFS= read -r line; do
+		[[ -z $line ]] && continue
+		append_asset "$type" "$key" "$line"
+	done <"$file"
+}
+
+# Chunk helper
+function process_in_chunks() {
+	# process_in_chunks <file> <chunk_size> <command with _chunk_ placeholder>
+	local infile="$1"
+	local chunksize="$2"
+	shift 2
+	[[ ! -s $infile ]] && return 0
+	local lines
+	lines=$(wc -l <"$infile" 2>/dev/null || echo 0)
+	if [[ $lines -le $chunksize ]]; then
+		eval "$*"
+		return $?
+	fi
+	mkdir -p .tmp/chunks
+	split -l "$chunksize" -d "$infile" .tmp/chunks/part_
+	for part in .tmp/chunks/part_*; do
+		local cmd
+		cmd="${*//_chunk_/\"$part\"}"
+		bash -lc "$cmd"
+	done
+}
+
 function resolvers_update() {
 
 	if [[ $generate_resolvers == true ]]; then
@@ -5223,7 +5710,7 @@ function resolvers_update() {
 		else
 			notification "Checking resolvers lists...\n Accurate resolvers are the key to great results\n This may take around 10 minutes if it's not updated" warn
 			# shellcheck disable=SC2016
-			axiom-exec 'if [[ $(find "/home/op/lists/resolvers.txt" -mtime +1 -print) ]] || [[ $(cat /home/op/lists/resolvers.txt | wc -l) -le 40 ] ; then dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 200 -o /home/op/lists/resolvers.txt ; fi' &>/dev/null
+			axiom-exec '([[ $(find "/home/op/lists/resolvers.txt" -mtime +1 -print) ]] || [[ $(wc -l < /home/op/lists/resolvers.txt) -le 40 ]]) && dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 200 -o /home/op/lists/resolvers.txt' &>/dev/null
 			axiom-exec "wget -q -O - ${resolvers_url} > /home/op/lists/resolvers.txt" 2>>"$LOGFILE" >/dev/null
 			axiom-exec "wget -q -O - ${resolvers_trusted_url} > /home/op/lists/resolvers_trusted.txt" 2>>"$LOGFILE" >/dev/null
 			notification "Updated\n" good
@@ -5251,6 +5738,12 @@ function resolvers_update_quick_local() {
 function resolvers_update_quick_axiom() {
 	axiom-exec "wget -q -O - ${resolvers_url} > /home/op/lists/resolvers.txt" 2>>"$LOGFILE" >/dev/null
 	axiom-exec "wget -q -O - ${resolvers_trusted_url} > /home/op/lists/resolvers_trusted.txt" 2>>"$LOGFILE" >/dev/null
+}
+
+function resolvers_optimize_local() {
+	# Experimental: dedupe resolvers; prefer faster ones if dnsx available
+	sort -u "$resolvers" -o "$resolvers" 2>/dev/null || true
+	sort -u "$resolvers_trusted" -o "$resolvers_trusted" 2>/dev/null || true
 }
 
 function ipcidr_target() {
@@ -5289,14 +5782,16 @@ function axiom_launch() {
 			else
 				startcount=$((AXIOM_FLEET_COUNT - NUMOFNODES))
 			fi
-				# Build args safely to avoid word-splitting issues
-				local -a AXIOM_FLEET_ARGS=( -i "$startcount" )
-				# Regions intentionally disabled here per original comment
-				# To re-enable: [[ -n ${AXIOM_FLEET_REGIONS-} ]] && AXIOM_FLEET_ARGS+=( --regions="${AXIOM_FLEET_REGIONS}" )
+			# Build args safely to avoid word-splitting issues
+			local -a AXIOM_FLEET_ARGS=(-i "$startcount")
+			# Regions intentionally disabled here per original comment
+			# To re-enable: [[ -n ${AXIOM_FLEET_REGIONS-} ]] && AXIOM_FLEET_ARGS+=( --regions="${AXIOM_FLEET_REGIONS}" )
 
-				# Show the exact command with proper quoting
-				printf 'axiom-fleet %q' "${AXIOM_FLEET_NAME}"; printf ' %q' "${AXIOM_FLEET_ARGS[@]}"; echo
-				axiom-fleet "${AXIOM_FLEET_NAME}" "${AXIOM_FLEET_ARGS[@]}"
+			# Show the exact command with proper quoting
+			printf 'axiom-fleet %q' "${AXIOM_FLEET_NAME}"
+			printf ' %q' "${AXIOM_FLEET_ARGS[@]}"
+			echo
+			axiom-fleet "${AXIOM_FLEET_NAME}" "${AXIOM_FLEET_ARGS[@]}"
 			axiom-select "$AXIOM_FLEET_NAME*"
 			if [[ -n $AXIOM_POST_START ]]; then
 				bash -lc "$AXIOM_POST_START" 2>>"$LOGFILE" >/dev/null
@@ -5338,13 +5833,8 @@ function start() {
 
 	global_start=$(date +%s)
 
-	printf "\n${bgreen}#######################################################################${reset}"
-	notification "Recon succesfully started on ${domain}" "good" "$(date +'%Y-%m-%d %H:%M:%S')"
-	[ "$SOFT_NOTIFICATION" = true ] && echo "$(date +'%Y-%m-%d %H:%M:%S') Recon succesfully started on ${domain}" | notify -silent
-	printf "${bgreen}#######################################################################${reset}\n"
-
 	# Raise ulimit for long-running VPS jobs (fail-soft on failure)
-	if [[ "${RAISE_ULIMIT:-true}" == "true" ]]; then
+	if [[ ${RAISE_ULIMIT:-true} == "true" ]]; then
 		ULIMIT_TARGET=${ULIMIT_TARGET:-65535}
 		ulimit -n "$ULIMIT_TARGET" 2>>"${LOGFILE:-/dev/null}" >/dev/null || true
 	fi
@@ -5352,9 +5842,9 @@ function start() {
 	# Log version and key flags
 	{
 		printf "[%s] reconFTW version: %s\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$reconftw_version"
-			printf "[%s] Flags: OSINT=%s SUBDOMAINS_GENERAL=%s VULNS_GENERAL=%s DEEP=%s\n" \
-				"$(date +'%Y-%m-%d %H:%M:%S')" "$OSINT" "$SUBDOMAINS_GENERAL" "$VULNS_GENERAL" "$DEEP"
-		} >>"${LOGFILE:-/dev/null}"
+		printf "[%s] Flags: OSINT=%s SUBDOMAINS_GENERAL=%s VULNS_GENERAL=%s DEEP=%s\n" \
+			"$(date +'%Y-%m-%d %H:%M:%S')" "$OSINT" "$SUBDOMAINS_GENERAL" "$VULNS_GENERAL" "$DEEP"
+	} >>"${LOGFILE:-/dev/null}"
 	if [[ $upgrade_before_running == true ]]; then
 		${SCRIPTPATH}/install.sh --tools
 	fi
@@ -5370,9 +5860,11 @@ function start() {
 				called_fn_dir="$dir"/.called_fn
 			fi
 			if [[ $list == /* ]]; then
-				install -D "$list" "$dir"/webs/webs.txt
+				mkdir -p "$dir/webs"
+				cp "$list" "$dir/webs/webs.txt"
 			else
-				install -D "${SCRIPTPATH}"/"$list" "$dir"/webs/webs.txt
+				mkdir -p "$dir/webs"
+				cp "${SCRIPTPATH}/${list}" "$dir/webs/webs.txt"
 			fi
 		fi
 	else
@@ -5401,17 +5893,25 @@ function start() {
 	fi
 	mkdir -p {.log,.tmp,webs,hosts,vulns,osint,screenshots,subdomains}
 
+	# Load plugins and emit start event
+	plugins_load
+	plugins_emit start "$domain" "$dir"
+
 	NOW=$(date +"%F")
 	NOWT=$(date +"%T")
 	LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
 	touch .log/${NOW}_${NOWT}.txt
 	echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
 
-# Non-fatal error trap: log and continue
+	# init time saved estimator
+	TIME_SAVED_EST=0
+
+	# Non-fatal error trap: log and continue
 	trap 'rc=$?; ts=$(date +"%Y-%m-%d %H:%M:%S"); cmd=${BASH_COMMAND}; loc_fn=${FUNCNAME[0]:-main}; loc_ln=${BASH_LINENO[0]:-0}; msg="[$ts] ERR($rc) @ ${loc_fn}:${loc_ln} :: ${cmd}"; if [[ -n "${LOGFILE:-}" ]]; then echo "$msg" >>"$LOGFILE"; else echo "$msg" >&2; fi' ERR
 
 	printf "\n"
 	printf "${bred}[$(date +'%Y-%m-%d %H:%M:%S')] Target: ${domain}\n\n"
+	printf "%b[LEGAL]%b Authorized testing only. By running this scan you confirm you have explicit permission for the specified targets and will comply with all applicable laws and program rules. Unauthorized use is prohibited.\n\n" "$yellow" "$reset"
 }
 
 function end() {
@@ -5483,15 +5983,68 @@ function end() {
 		zipSnedOutputFolder
 	fi
 
+	# Screenshot diffs (hashing)
+	if [[ -d screenshots ]]; then
+		if [[ -f screenshots/hashes.txt ]]; then mv screenshots/hashes.txt screenshots/hashes_prev.txt 2>>"$LOGFILE" || true; fi
+		find screenshots -type f -name '*.png' -print0 | xargs -0 -I{} sh -c 'sha256sum "$1" 2>/dev/null || shasum -a 256 "$1"' -- {} | sed 's|  ./||' >screenshots/hashes.txt 2>>"$LOGFILE" || true
+		if [[ -f screenshots/hashes_prev.txt ]]; then
+			comm -3 <(cut -d' ' -f1,2 screenshots/hashes_prev.txt | sort) <(cut -d' ' -f1,2 screenshots/hashes.txt | sort) | awk '{print $2}' | sed '/^$/d' >screenshots/diff_changed.txt 2>>"$LOGFILE" || true
+		fi
+	fi
+
+	# Emit end plugin event
+	plugins_emit end "$domain" "$dir"
+
+	# Build hotlist (risk summary)
+	build_hotlist || true
+
 	global_end=$(date +%s)
 	getElapsedTime $global_start $global_end
 	printf "${bgreen}#######################################################################${reset}\n"
 	notification "Finished Recon on: ${domain} under ${finaldir} in: ${runtime}" good "$(date +'%Y-%m-%d %H:%M:%S')"
 	[ "$SOFT_NOTIFICATION" = true ] && echo "[$(date +'%Y-%m-%d %H:%M:%S')] Finished Recon on: ${domain} under ${finaldir} in: ${runtime}" | notify -silent
 	printf "${bgreen}#######################################################################${reset}\n"
-	#Separator for more clear messges in telegram_Bot
-	notification echo "[$(date +'%Y-%m-%d %H:%M:%S')] ******  Stay safe 🦠 and secure 🔐  ******" info
 
+}
+
+function build_hotlist() {
+	mkdir -p .tmp
+	declare -A score
+	# Nuclei high/critical
+	for f in nuclei_output/high_json.txt nuclei_output/critical_json.txt; do
+		[[ -s $f ]] || continue
+		jq -r '.["matched-at"] // .host' "$f" 2>/dev/null | while read -r h; do
+			[[ -z $h ]] && continue
+			score["$h"]=$((${score["$h"]:-0} + 10))
+		done
+	done
+	# Takeovers
+	[[ -s webs/takeover.txt ]] && while read -r h; do score["$h"]=$((${score["$h"]:-0} + 8)); done <webs/takeover.txt
+	# Secrets
+	for s in js/js_secrets.txt js/js_secrets_jsmap.txt js/js_secrets_jsmap_jsluice.txt; do
+		[[ -s $s ]] || continue
+		awk '{print $1}' "$s" | while read -r h; do score["$h"]=$((${score["$h"]:-0} + 6)); done
+	done
+	# Real IPs via favicon
+	if [[ -s hosts/favicontest.txt ]]; then
+		while read -r ip; do
+			score["$ip"]=$((${score["$ip"]:-0} + 4))
+		done <hosts/favicontest.txt
+	fi
+	# New assets bonus
+	for p in .tmp/subs_new_only.txt webs/url_extract.txt; do
+		[[ -s $p ]] || continue
+		while read -r l; do
+			host=$(echo "$l" | unfurl -u domains 2>/dev/null)
+			[[ -z $host ]] && continue
+			score["$host"]=$((${score["$host"]:-0} + 2))
+		done <"$p"
+	done
+	# Emit hotlist sorted
+	{
+		for k in "${!score[@]}"; do printf "%s %s\n" "${score[$k]}" "$k"; done | sort -nr | head -n "${HOTLIST_TOP:-50}"
+	} >hotlist.txt
+	[[ -s hotlist.txt ]] && notification "Hotlist ready (top ${HOTLIST_TOP:-50})" info
 }
 
 ###############################################################################################################
@@ -5556,6 +6109,8 @@ function osint() {
 	third_party_misconfigs
 	zonetransfer
 	favicon
+	mail_hygiene
+	cloud_enum_scan
 }
 
 function vulns() {
@@ -5669,17 +6224,34 @@ function recon() {
 	subtakeover
 	remove_big_files
 	s3buckets
+	cloud_extra_providers
 	screenshot
 	#	virtualhosts
 	cdnprovider
 	portscan
 	geo_info
-	waf_checks
-	nuclei_check
-	fuzz
-	iishortname
-	urlchecks
-	jschecks
+	# Quick-rescan gating
+	subs_new=$(cat .tmp/subs_new_count 2>/dev/null || echo 1)
+	webs_new=$(cat .tmp/webs_new_count 2>/dev/null || echo 1)
+	if [[ $QUICK_RESCAN == true && $subs_new -eq 0 && $webs_new -eq 0 ]]; then
+		notification "Quick rescan: no new subs/webs; skipping heavy web stages" info
+		# estimate time saved for skipped modules
+		TIME_SAVED_EST=$((${TIME_SAVED_EST:-0} + \
+			${TIME_EST_WAF:-0} + ${TIME_EST_NUCLEI:-600} + ${TIME_EST_API:-300} + ${TIME_EST_GQL:-180} + \
+			${TIME_EST_FUZZ:-900} + ${TIME_EST_IIS:-60} + ${TIME_EST_URLCHECKS:-300} + ${TIME_EST_JSCHECKS:-300} + \
+			${TIME_EST_PARAM:-240} + ${TIME_EST_GRPC:-120}))
+	else
+		waf_checks
+		nuclei_check
+		graphql_scan
+		fuzz
+		iishortname
+		urlchecks
+		jschecks
+		websocket_checks
+		param_discovery
+		grpc_reflection
+	fi
 
 	if [[ $AXIOM == true ]]; then
 		axiom_shutdown
@@ -6015,16 +6587,20 @@ function webs_menu() {
 	#	virtualhosts
 	waf_checks
 	nuclei_check
+	graphql_scan
 	fuzz
 	cms_scanner
 	iishortname
 	urlchecks
 	jschecks
+	websocket_checks
 	url_gf
 	wordlist_gen
 	wordlist_gen_roboxtractor
 	password_dict
 	url_ext
+	param_discovery
+	grpc_reflection
 	vulns
 	end
 }
@@ -6045,6 +6621,7 @@ function zen_menu() {
 	cdnprovider
 	waf_checks
 	nuclei_check
+	graphql_scan
 	fuzz
 	iishortname
 	if [[ $AXIOM == true ]]; then
@@ -6055,54 +6632,56 @@ function zen_menu() {
 }
 
 function help() {
-    printf "\n Usage: $0 [-d domain.tld] [-m name] [-l list.txt] [-x oos.txt] [-i in.txt] "
-    printf "\n           	      [-r] [-s] [-p] [-a] [-w] [-n] [-z] [-c] [-y] [-h] [-f] [--ai] [--deep] [-o OUTPUT]\n\n"
-    printf " ${bblue}TARGET OPTIONS${reset}\n"
-    printf "   -d domain.tld     Target domain\n"
-    printf "   -m company        Target company name\n"
-    printf "   -l list.txt       Targets list (One on each line)\n"
-    printf "   -x oos.txt        Excludes subdomains list (Out Of Scope)\n"
-    printf "   -i in.txt         Includes subdomains list\n"
-    printf " \n"
-    printf " ${bblue}MODE OPTIONS${reset}\n"
-    printf "   -r, --recon       Recon - Performs full recon process (without attacks)\n"
-    printf "   -s, --subdomains  Subdomains - Performs Subdomain Enumeration, Web probing and check for sub-tko\n"
-    printf "   -p, --passive     Passive - Performs only passive steps\n"
-    printf "   -a, --all         All - Performs all checks and active exploitations\n"
-    printf "   -w, --web         Web - Performs web checks from list of subdomains\n"
-    printf "   -n, --osint       OSINT - Checks for public intel data\n"
-    printf "   -z, --zen         Zen - Performs a recon process covering the basics and some vulns\n"
-    printf "   -c, --custom      Custom - Launches specific function against target, u need to know the function name first\n"
-    printf "   -y, --ai          AI - Analyzes ReconFTW results using a local LLM\n"
-    printf "   -h                Help - Show help section\n"
-    printf " \n"
-    printf " ${bblue}GENERAL OPTIONS${reset}\n"
-    printf "   --deep            Deep scan (Enable some slow options for deeper scan)\n"
-    printf "   -f config_file    Alternate reconftw.cfg file\n"
-    printf "   -o output/path    Define output folder\n"
-    printf "   -v, --vps         Axiom distributed VPS\n"
-    printf "   -q                Rate limit in requests per second\n"
-    printf "   --check-tools     Exit if one of the tools is missing\n"
-    printf " \n"
-    printf " ${bblue}USAGE EXAMPLES${reset}\n"
-    printf " ${byellow}Perform full recon (without attacks):${reset}\n"
-    printf " ./reconftw.sh -d example.com -r\n"
-    printf " \n"
-    printf " ${byellow}Perform subdomain enumeration on multiple targets:${reset}\n"
-    printf " ./reconftw.sh -l targets.txt -s\n"
-    printf " \n"
-    printf " ${byellow}Perform Web based scanning on a subdomains list:${reset}\n"
-    printf " ./reconftw.sh -d example.com -l targets.txt -w\n"
-    printf " \n"
-    printf " ${byellow}Multidomain recon:${reset}\n"
-    printf " ./reconftw.sh -m company -l domainlist.txt -r\n"
-    printf " \n"
-    printf " ${byellow}Perform full recon (with active attacks) along Out-Of-Scope subdomains list:${reset}\n"
-    printf " ./reconftw.sh -d example.com -x out.txt -a\n"
-    printf " \n"
-    printf " ${byellow}Analyze ReconFTW results with AI:${reset}\n"
-    printf " ./reconftw.sh -d example.com -r --ai\n"
-    printf " \n"
+	pt_header "Usage"
+	printf "\n Usage: $0 [-d domain.tld] [-m name] [-l list.txt] [-x oos.txt] [-i in.txt] "
+	printf "\n           	      [-r] [-s] [-p] [-a] [-w] [-n] [-z] [-c] [-y] [-h] [-f] [--ai] [--deep] [-o OUTPUT]\n\n"
+	printf " ${bblue}TARGET OPTIONS${reset}\n"
+	printf "   -d domain.tld     Target domain\n"
+	printf "   -m company        Target company name\n"
+	printf "   -l list.txt       Targets list (One on each line)\n"
+	printf "   -x oos.txt        Excludes subdomains list (Out Of Scope)\n"
+	printf "   -i in.txt         Includes subdomains list\n"
+	printf " \n"
+	printf " ${bblue}MODE OPTIONS${reset}\n"
+	printf "   -r, --recon       Recon - Performs full recon process (without attacks)\n"
+	printf "   -s, --subdomains  Subdomains - Performs Subdomain Enumeration, Web probing and check for sub-tko\n"
+	printf "   -p, --passive     Passive - Performs only passive steps\n"
+	printf "   -a, --all         All - Performs all checks and active exploitations\n"
+	printf "   -w, --web         Web - Performs web checks from list of subdomains\n"
+	printf "   -n, --osint       OSINT - Checks for public intel data\n"
+	printf "   -z, --zen         Zen - Performs a recon process covering the basics and some vulns\n"
+	printf "   -c, --custom      Custom - Launches specific function against target, u need to know the function name first\n"
+	printf "   -y, --ai          AI - Analyzes ReconFTW results using a local LLM\n"
+	printf "   -h                Help - Show help section\n"
+	printf " \n"
+	printf " ${bblue}GENERAL OPTIONS${reset}\n"
+	printf "   --deep            Deep scan (Enable some slow options for deeper scan)\n"
+	printf "   -f config_file    Alternate reconftw.cfg file\n"
+	printf "   -o output/path    Define output folder\n"
+	printf "   -v, --vps         Axiom distributed VPS\n"
+	printf "   -q                Rate limit in requests per second\n"
+	printf "   --check-tools     Exit if one of the tools is missing\n"
+	printf "   --quick-rescan    Skip heavy steps if no new subs/webs this run\n"
+	printf " \n"
+	printf " ${bblue}USAGE EXAMPLES${reset}\n"
+	printf " ${byellow}Perform full recon (without attacks):${reset}\n"
+	printf " ./reconftw.sh -d example.com -r\n"
+	printf " \n"
+	printf " ${byellow}Perform subdomain enumeration on multiple targets:${reset}\n"
+	printf " ./reconftw.sh -l targets.txt -s\n"
+	printf " \n"
+	printf " ${byellow}Perform Web based scanning on a subdomains list:${reset}\n"
+	printf " ./reconftw.sh -d example.com -l targets.txt -w\n"
+	printf " \n"
+	printf " ${byellow}Multidomain recon:${reset}\n"
+	printf " ./reconftw.sh -m company -l domainlist.txt -r\n"
+	printf " \n"
+	printf " ${byellow}Perform full recon (with active attacks) along Out-Of-Scope subdomains list:${reset}\n"
+	printf " ./reconftw.sh -d example.com -x out.txt -a\n"
+	printf " \n"
+	printf " ${byellow}Analyze ReconFTW results with AI:${reset}\n"
+	printf " ./reconftw.sh -d example.com -r --ai\n"
+	printf " \n"
 	printf " ${byellow}Run custom function:${reset}\n"
 	printf " ./reconftw.sh -d example.com -c nuclei_check \n"
 }
@@ -6135,7 +6714,7 @@ if [[ $OSTYPE == "darwin"* ]]; then
 	PATH="$(brew --prefix gnu-sed)/libexec/gnubin:$PATH"
 fi
 
-PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:zrspanwvyh' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,ai,check-tools' -n 'reconFTW' -- "$@")
+PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:zrspanwvyh' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,ai,check-tools,quick-rescan' -n 'reconFTW' -- "$@")
 
 exit_status=$?
 if [[ $exit_status -ne 0 ]]; then
@@ -6220,10 +6799,10 @@ while true; do
 		continue
 		;;
 	'-y' | '--ai')
-        opt_ai=true
-        shift
-        continue
-        ;;
+		opt_ai=true
+		shift
+		continue
+		;;
 	# extra stuff
 	'-o')
 		if [[ $2 != /* ]]; then
@@ -6264,6 +6843,11 @@ while true; do
 		;;
 	'--check-tools')
 		CHECK_TOOLS_OR_EXIT=true
+		shift
+		continue
+		;;
+	'--quick-rescan')
+		QUICK_RESCAN=true
 		shift
 		continue
 		;;
