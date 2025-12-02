@@ -2480,7 +2480,7 @@ function s3buckets() {
 		# S3Scanner
 		if [[ $AXIOM != true ]]; then
 			if [[ -s "subdomains/subdomains.txt" ]]; then
-				s3scanner scan -f subdomains/subdomains.txt 2>>"$LOGFILE" | anew -q .tmp/s3buckets.txt
+				s3scanner -bucket-file subdomains/subdomains.txt 2>>"$LOGFILE" | anew -q .tmp/s3buckets.txt
 			fi
 		else
 			axiom-scan subdomains/subdomains.txt -m s3scanner -o .tmp/s3buckets_tmp.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
