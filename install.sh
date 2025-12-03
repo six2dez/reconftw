@@ -612,6 +612,16 @@ function check_updates() {
 			fi
 		else
 			printf "%breconFTW is already up to date!%b\n" "$bgreen" "$reset"
+			# If config is locally modified, still provide a diff against current default
+			if ! git diff --quiet -- reconftw.cfg; then
+				local cfg_diff_ts cfg_diff_file
+				cfg_diff_ts=$(date +%Y%m%d_%H%M%S)
+				mkdir -p .tmp
+				cfg_diff_file=".tmp/reconftw_cfg_diff_${cfg_diff_ts}.patch"
+				if git diff HEAD --unified -- reconftw.cfg >"$cfg_diff_file"; then
+					printf "%bLocal reconftw.cfg differs from default; diff saved to %s.%b\n" "$yellow" "$cfg_diff_file" "$reset"
+				fi
+			fi
 		fi
 	else
 		printf "\n%b[!] Unable to check for updates.%b\n" "$bred" "$reset"
