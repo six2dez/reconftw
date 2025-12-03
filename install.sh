@@ -580,6 +580,7 @@ function check_updates() {
 		UPSTREAMHASH=$(git rev-parse "@{u}")
 
 		if [[ $HEADHASH != "$UPSTREAMHASH" ]]; then
+			local cfg_backup="" cfg_backup_ts=""
 			if git status --porcelain | grep -q .; then
 				if [[ $FORCE_UPDATE == "true" ]]; then
 					printf "%bLocal changes detected; forcing update.%b\n" "$yellow" "$reset"
@@ -590,12 +591,25 @@ function check_updates() {
 			fi
 			printf "%bA new version is available. Updating...%b\n" "$yellow" "$reset"
 			if git status --porcelain | grep -q 'reconftw.cfg$'; then
-				mv reconftw.cfg reconftw.cfg_bck
-				printf "%breconftw.cfg has been backed up to reconftw.cfg_bck%b\n" "$yellow" "$reset"
+				cfg_backup_ts=$(date +%Y%m%d_%H%M%S)
+				cfg_backup="reconftw.cfg.bak.${cfg_backup_ts}"
+				cp reconftw.cfg "$cfg_backup"
+				printf "%breconftw.cfg has been backed up to %s%b\n" "$yellow" "$cfg_backup" "$reset"
 			fi
 			git reset --hard &>/dev/null
 			run_to 60 git pull &>/dev/null
 			printf "%bUpdated! Running the new installer version...%b\n" "$bgreen" "$reset"
+
+			# Show config diff against new default
+			if [[ -n $cfg_backup && -f reconftw.cfg ]]; then
+				mkdir -p .tmp
+				cfg_diff_file=".tmp/reconftw_cfg_diff_${cfg_backup_ts}.patch"
+				if diff -u "$cfg_backup" reconftw.cfg >"$cfg_diff_file"; then
+					printf "%bConfig unchanged between versions (diff: %s).%b\n" "$yellow" "$cfg_diff_file" "$reset"
+				else
+					printf "%bConfig differences saved to %s (old -> new).%b\n" "$yellow" "$cfg_diff_file" "$reset"
+				fi
+			fi
 		else
 			printf "%breconFTW is already up to date!%b\n" "$bgreen" "$reset"
 		fi

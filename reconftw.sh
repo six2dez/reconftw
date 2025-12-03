@@ -46,6 +46,27 @@ pt_msg_err() { printf "\n%b[%s] %s%b\n" "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "
 # If LOGFILE is unset or empty, send logs to /dev/null until later initialization
 : "${LOGFILE:=/dev/null}"
 
+enable_command_trace() {
+	# Enable bash xtrace to the current LOGFILE when SHOW_COMMANDS=true
+	if [[ ${SHOW_COMMANDS:-false} != true ]]; then
+		return
+	fi
+	[[ -z ${LOGFILE:-} ]] && return
+
+	# Close any previous trace descriptor
+	if [[ -n ${TRACE_FD:-} ]]; then
+		eval "exec ${TRACE_FD}>&-"
+	fi
+
+	# Open a new descriptor against the active log
+	if ! exec {TRACE_FD}>>"$LOGFILE"; then
+		return
+	fi
+	export BASH_XTRACEFD=$TRACE_FD
+	export PS4='+ ${BASH_SOURCE##*/}:${LINENO}: '
+	set -x
+}
+
 function banner_grabber() {
 	local banner_file="${SCRIPTPATH}/banners.txt"
 
@@ -517,7 +538,16 @@ function apileaks() {
 		fi
 
 		# Run swaggerspy.py and handle errors
-		"${tools}/SwaggerSpy/venv/bin/python3" swaggerspy.py "$domain" 2>>"$LOGFILE" | grep -i "[*]\|URL" >"${dir}/osint/swagger_leaks.txt"
+		local swag_cmd=("${tools}/SwaggerSpy/venv/bin/python3" "swaggerspy.py" "$domain")
+		[[ -n ${TIMEOUT_CMD:-} ]] && swag_cmd=("$TIMEOUT_CMD" 2m "${swag_cmd[@]}")
+		local swagger_rc=0
+		{
+			"${swag_cmd[@]}" 2>>"$LOGFILE" | grep -i "[*]\|URL" >"${dir}/osint/swagger_leaks.txt"
+			swagger_rc=${PIPESTATUS[0]:-0} # ignore grep exit code (no matches is fine)
+		} || true
+		if (( swagger_rc != 0 )); then
+			printf "%b[%s] SwaggerSpy failed (exit %s), continuing without swagger results.%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$swagger_rc" "$reset" | tee -a "$LOGFILE" >/dev/null
+		fi
 
 		# Return to the previous directory
 		if ! popd >/dev/null; then
@@ -5902,6 +5932,7 @@ function start() {
 	LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
 	touch .log/${NOW}_${NOWT}.txt
 	echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
+	enable_command_trace
 
 	# init time saved estimator
 	TIME_SAVED_EST=0
@@ -6165,6 +6196,7 @@ function multi_osint() {
 	LOGFILE="${workdir}/.log/${NOW}_${NOWT}.txt"
 	touch .log/${NOW}_${NOWT}.txt
 	echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
+	enable_command_trace
 
 	for domain in $targets; do
 		dir=$workdir/targets/$domain
@@ -6333,6 +6365,7 @@ function multi_recon() {
 			exit 1
 		}
 		echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"$LOGFILE"
+		enable_command_trace
 		loopstart=$(date +%s)
 
 		domain_info
@@ -6521,6 +6554,7 @@ function multi_custom() {
 	LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
 	touch .log/${NOW}_${NOWT}.txt
 	echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
+	enable_command_trace
 
 	[ -n "$flist" ] && entries=$(cat "$flist" | wc -l)
 

@@ -264,6 +264,15 @@ cd reconftw
      six2dez/reconftw:main -d example.com -r
    ```
 
+   For a list of targets, bind the list file into the container and reference the in-container path:
+
+   ```bash
+   docker run -it --rm \
+     -v "${PWD}/domains.txt:/reconftw/domains.txt:ro" \
+     -v "${PWD}/OutputFolder/:/reconftw/Recon/" \
+     six2dez/reconftw:main -l /reconftw/domains.txt -r
+   ```
+
 3. **View Results**:
 
    - Results are saved in the `OutputFolder` directory on the host (not inside the container).
