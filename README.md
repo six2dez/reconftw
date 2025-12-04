@@ -8,8 +8,8 @@
 </h1>
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v3.1">
-    <img src="https://img.shields.io/badge/release-v3.1-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v3.2">
+    <img src="https://img.shields.io/badge/release-v3.2-green">
   </a>
    </a>
   <a href="https://opensource.org/licenses/MIT">
@@ -190,6 +190,8 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **Faraday Integration**: Exports results to [Faraday](https://github.com/infobyte/faraday) for reporting .
 - **AI Report Generation**: Generates reports using local AI models ([reconftw_ai](https://github.com/six2dez/reconftw_ai)).
 - **Quick Rescan Mode**: Skips heavy stages automatically when no new assets are discovered (`--quick-rescan` / `QUICK_RESCAN`).
+- **Hotlist Builder**: Scores and highlights the riskiest assets (`hotlist.txt`) based on new findings.
+- **Command Tracing**: Toggle `SHOW_COMMANDS` to log every executed command into target logs for debugging.
 - **Asset Store**: Appends findings to `assets.jsonl` for downstream automation when `ASSET_STORE` is enabled.
 - **ARM Support**: Compatible with Raspberry Pi and ARM architectures (including MacOS MX).
 
@@ -279,6 +281,8 @@ cd reconftw
 
 4. **Customization**:
    - Modify the Docker image or build your own; see the [Docker Guide](https://github.com/six2dez/reconftw/wiki/4.-Docker).
+   - To skip Axiom tooling in custom builds, pass `--build-arg INSTALL_AXIOM=false`.
+   - Mount your notify config at `~/.config/notify/providerconfig.yaml` inside the container if you use notifications.
 
 ### Terraform + Ansible
 
@@ -324,7 +328,7 @@ The `reconftw.cfg` file controls the entire execution of reconFTW. It allows fin
 - **Axiom**: Configure distributed scanning (`AXIOM_FLEET_NAME`, `AXIOM_FLEET_COUNT`).
 - **AI Reporting**: Select AI model and report format (`AI_MODEL`, `AI_REPORT_TYPE`).
 - **Advanced Web Checks**: Toggle GraphQL introspection, parameter discovery, WebSocket testing, gRPC probing, and IPv6 scanning.
-- **Automation & Data**: Control quick rescan heuristics, asset logging, chunk sizes, and hotlists (`QUICK_RESCAN`, `ASSET_STORE`, `CHUNK_LIMIT`, `HOTLIST_TOP`).
+- **Automation & Data**: Control quick rescan heuristics, asset logging, chunk sizes, hotlists, and debug tracing (`QUICK_RESCAN`, `ASSET_STORE`, `CHUNK_LIMIT`, `HOTLIST_TOP`, `SHOW_COMMANDS`).
 
 **Example Configuration**:
 
@@ -353,6 +357,7 @@ install_golang=true # Set it to false if you already have Golang configured and 
 upgrade_tools=true
 upgrade_before_running=false # Upgrade tools before running
 #dir_output=/custom/output/path
+SHOW_COMMANDS=false # Log every executed command to the per-target log (verbose; may include sensitive data)
 
 # Golang Vars (Comment or change on your own)
 export GOROOT="${GOROOT:-/usr/local/go}"
@@ -790,6 +795,13 @@ Use the provided `Makefile` for easy repository management (requires [GitHub CLI
 3. **Upload Data**:
    ```bash
    make upload
+   ```
+
+4. **Lint / Format Scripts**:
+
+   ```bash
+   make lint   # shellcheck for install.sh & reconftw.sh (best effort)
+   make fmt    # shfmt with project defaults
    ```
 
 ### Manual
