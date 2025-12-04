@@ -8,8 +8,8 @@
 </h1>
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v3.1">
-    <img src="https://img.shields.io/badge/release-v3.1-green">
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v3.2">
+    <img src="https://img.shields.io/badge/release-v3.2-green">
   </a>
    </a>
   <a href="https://opensource.org/licenses/MIT">
@@ -101,6 +101,8 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **Google Dorking**: Automated Google dork queries for sensitive information ([dorks_hunter](https://github.com/six2dez/dorks_hunter) and [xnldorker](https://github.com/xnl-h4ck3r/xnldorker)).
 - **GitHub Analysis**: Scans GitHub organizations for repositories and secrets ([enumerepo](https://github.com/trickest/enumerepo), [trufflehog](https://github.com/trufflesecurity/trufflehog) and [gitleaks](https://github.com/gitleaks/gitleaks)).
 - **Third-Party Misconfigurations**: Identifies misconfigured third-party services ([misconfig-mapper](https://github.com/intigriti/misconfig-mapper)).
+- **Mail Hygiene**: Reviews SPF/DMARC configuration to flag spoofing or deliverability issues.
+- **Cloud Storage Enumeration**: Surveys buckets across major providers for exposure ([cloud_enum](https://github.com/initstring/cloud_enum)).
 - **Spoofable Domains**: Checks for domains vulnerable to spoofing ([spoofcheck](https://github.com/MattKeeley/Spoofy)).
 
 ### Subdomains
@@ -129,6 +131,7 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **Service Vulnerabilities**: Checks for vulnerabilities in open ports ([vulners](https://github.com/vulnersCom/nmap-vulners)).
 - **Password Spraying**: Attempts password spraying on identified services ([brutespray](https://github.com/x90skysn3k/brutespray)).
 - **Geolocation**: Maps IP addresses to geographic locations ([ipinfo](https://www.ipinfo.io/)).
+- **IPv6 Discovery**: Optionally enumerates and scans discovered IPv6 targets when `IPV6_SCAN` is enabled.
 
 ### Web Analysis
 
@@ -141,6 +144,10 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **Favicon Analysis**: Discovers real IPs behind favicons ([fav-up](https://github.com/pielco11/fav-up)).
 - **JavaScript Analysis**: Extracts secrets and endpoints from JS files ([subjs](https://github.com/lc/subjs), [JSA](https://github.com/w9w/JSA), [xnLinkFinder](https://github.com/xnl-h4ck3r/xnLinkFinder), [getjswords](https://github.com/m4ll0k/BBTz), [mantra](https://github.com/MrEmpy/mantra), [jsluice](https://github.com/BishopFox/jsluice)).
 - **Source Map Extraction**: Retrieves sensitive data from JavaScript source maps ([sourcemapper](https://github.com/denandz/sourcemapper)).
+- **GraphQL Detection**: Discovers GraphQL endpoints with nuclei and optionally performs in-depth introspection ([GQLSpection](https://github.com/doyensec/GQLSpection)).
+- **Parameter Discovery**: Bruteforces hidden parameters on endpoints ([arjun](https://github.com/s0md3v/Arjun)).
+- **WebSocket Auditing**: Validates upgrade handshakes and origin handling on `ws://` and `wss://` endpoints.
+- **gRPC Reflection**: Probes common gRPC ports for exposed service reflection ([grpcurl](https://github.com/fullstorydev/grpcurl)).
 - **Fuzzing**: Performs directory and parameter fuzzing ([ffuf](https://github.com/ffuf/ffuf)).
 - **File Extension Sorting**: Organizes URLs by file extensions.
 - **Wordlist Generation**: Creates custom wordlists for fuzzing.
@@ -182,6 +189,10 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **Result Zipping**: Compresses and sends results.
 - **Faraday Integration**: Exports results to [Faraday](https://github.com/infobyte/faraday) for reporting .
 - **AI Report Generation**: Generates reports using local AI models ([reconftw_ai](https://github.com/six2dez/reconftw_ai)).
+- **Quick Rescan Mode**: Skips heavy stages automatically when no new assets are discovered (`--quick-rescan` / `QUICK_RESCAN`).
+- **Hotlist Builder**: Scores and highlights the riskiest assets (`hotlist.txt`) based on new findings.
+- **Command Tracing**: Toggle `SHOW_COMMANDS` to log every executed command into target logs for debugging.
+- **Asset Store**: Appends findings to `assets.jsonl` for downstream automation when `ASSET_STORE` is enabled.
 - **ARM Support**: Compatible with Raspberry Pi and ARM architectures (including MacOS MX).
 
 ---
@@ -189,6 +200,30 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 ## 💿 Installation
 
 reconFTW supports multiple installation methods to suit different environments. Ensure you have sufficient disk space (at least 10 GB recommended) and a stable internet connection.
+
+### Quickstart
+
+1) Clone and install
+
+```yaml
+git clone https://github.com/six2dez/reconftw
+cd reconftw
+./install.sh --verbose
+```
+
+2) Run a scan (full + resume)
+
+```bash
+./reconftw.sh -d example.com -r
+```
+
+3) Minimal run (passive-only footprint)
+
+```bash
+./reconftw.sh -d example.com -p
+```
+
+> Tip: re-run `./install.sh --tools` later to refresh the toolchain without reinstalling system packages.
 
 ### Local Installation (PC/VPS/VM)
 
@@ -210,9 +245,10 @@ reconFTW supports multiple installation methods to suit different environments. 
    ```
 
 3. **Notes**:
-   - The `install.sh` script installs dependencies, tools, and configures paths (`GOROOT`, `GOPATH`, `PATH`).
-   - Set `install_golang=false` in `reconftw.cfg` if Golang is already configured.
-   - Check the [Installation Guide](https://github.com/six2dez/reconftw/wiki/0.-Installation-Guide) for detailed instructions.
+- The `install.sh` script installs dependencies, tools, and configures paths (`GOROOT`, `GOPATH`, `PATH`).
+- Set `install_golang=false` in `reconftw.cfg` if Golang is already configured.
+- For existing setups, run `./install.sh --tools` to refresh Go binaries, pipx packages, and repositories without touching system packages.
+- Check the [Installation Guide](https://github.com/six2dez/reconftw/wiki/0.-Installation-Guide) for detailed instructions.
 
 ### Docker
 
@@ -230,12 +266,23 @@ reconFTW supports multiple installation methods to suit different environments. 
      six2dez/reconftw:main -d example.com -r
    ```
 
+   For a list of targets, bind the list file into the container and reference the in-container path:
+
+   ```bash
+   docker run -it --rm \
+     -v "${PWD}/domains.txt:/reconftw/domains.txt:ro" \
+     -v "${PWD}/OutputFolder/:/reconftw/Recon/" \
+     six2dez/reconftw:main -l /reconftw/domains.txt -r
+   ```
+
 3. **View Results**:
 
    - Results are saved in the `OutputFolder` directory on the host (not inside the container).
 
 4. **Customization**:
    - Modify the Docker image or build your own; see the [Docker Guide](https://github.com/six2dez/reconftw/wiki/4.-Docker).
+   - To skip Axiom tooling in custom builds, pass `--build-arg INSTALL_AXIOM=false`.
+   - Mount your notify config at `~/.config/notify/providerconfig.yaml` inside the container if you use notifications.
 
 ### Terraform + Ansible
 
@@ -243,6 +290,31 @@ reconFTW supports multiple installation methods to suit different environments. 
 - Follow the guide in [Terraform/README.md](Terraform/README.md) for setup instructions.
 
 ---
+
+## 🛠️ Troubleshooting
+
+- Bash 4+ on macOS: The scripts auto-relaunch under Homebrew Bash. If you see a message about Bash < 4, run `brew install bash`, open a new terminal, and re-run `./install.sh`.
+- timeout on macOS: macOS provides `gtimeout` via `brew install coreutils`. The scripts now detect and use it automatically.
+- Network hiccups: Installers hide most command output. If something fails, re-run with `upgrade_tools=true` in `reconftw.cfg`, execute `./install.sh --tools`, or install the missing tool manually (the error will name it).
+- GOPATH binaries: Binaries are copied to `/usr/local/bin`. If you prefer not to, ensure `~/go/bin` is in your `PATH`.
+- Nuclei templates: If templates weren’t cloned, remove `~/nuclei-templates` and re-run `./install.sh`.
+
+## 🔑 API Checklist (Optional)
+
+- `subfinder`: `~/.config/subfinder/provider-config.yaml`
+- GitHub tokens: `~/Tools/.github_tokens` (one per line)
+- GitLab tokens: `~/Tools/.gitlab_tokens` (one per line)
+- WHOISXML: set `WHOISXML_API` in `reconftw.cfg` or env var
+- Slack/Discord/Telegram: configure `notify` in `~/.config/notify/provider-config.yaml`
+- SSRF server: set `COLLAB_SERVER` env/cfg if used
+- Blind XSS server: set `XSS_SERVER` env/cfg if used
+
+## 💾 Requirements
+
+- Disk: 10–20 GB free recommended (toolchain + data)
+- Network: stable connection during installation and updates
+- OS: Linux/macOS with Bash ≥ 4
+- Extras: `shellcheck` and `shfmt` (optional) for `make lint`/`make fmt`
 
 ## ⚙️ Configuration
 
@@ -255,10 +327,12 @@ The `reconftw.cfg` file controls the entire execution of reconFTW. It allows fin
 - **Notifications**: Set up Slack, Discord, or Telegram notifications (`NOTIFY_CONFIG`).
 - **Axiom**: Configure distributed scanning (`AXIOM_FLEET_NAME`, `AXIOM_FLEET_COUNT`).
 - **AI Reporting**: Select AI model and report format (`AI_MODEL`, `AI_REPORT_TYPE`).
+- **Advanced Web Checks**: Toggle GraphQL introspection, parameter discovery, WebSocket testing, gRPC probing, and IPv6 scanning.
+- **Automation & Data**: Control quick rescan heuristics, asset logging, chunk sizes, hotlists, and debug tracing (`QUICK_RESCAN`, `ASSET_STORE`, `CHUNK_LIMIT`, `HOTLIST_TOP`, `SHOW_COMMANDS`).
 
 **Example Configuration**:
 
-```yaml
+```bash
 #############################################
 #			reconFTW config file			#
 #############################################
@@ -266,23 +340,41 @@ The `reconftw.cfg` file controls the entire execution of reconFTW. It allows fin
 # General values
 tools=$HOME/Tools   # Path installed tools
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )" # Get current script's path
-profile_shell=".$(basename $(echo $SHELL))rc" # Get current shell profile
-reconftw_version=$(git rev-parse --abbrev-ref HEAD)-$(git describe --tags) # Fetch current reconftw version
+_detected_shell="${SHELL:-/bin/bash}"
+profile_shell=".$(basename "${_detected_shell}")rc" # Get current shell profile
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+	reconftw_version="$(git rev-parse --abbrev-ref HEAD)-$(git describe --tags 2>/dev/null || git rev-parse --short HEAD)"
+else
+	reconftw_version="standalone"
+fi # Fetch current reconftw version
 generate_resolvers=false # Generate custom resolvers with dnsvalidator
 update_resolvers=true # Fetch and rewrite resolvers from trickest/resolvers before DNS resolution
 resolvers_url="https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt"
 resolvers_trusted_url="https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw/trusted_resolvers.txt"
-fuzzing_remote_list="https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt" # Used to send to axiom(if used) on fuzzing
+fuzzing_remote_list="https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt" # Used to send to axiom(if used) on fuzzing 
 proxy_url="http://127.0.0.1:8080/" # Proxy url
 install_golang=true # Set it to false if you already have Golang configured and ready
 upgrade_tools=true
 upgrade_before_running=false # Upgrade tools before running
 #dir_output=/custom/output/path
+SHOW_COMMANDS=false # Log every executed command to the per-target log (verbose; may include sensitive data)
 
 # Golang Vars (Comment or change on your own)
-export GOROOT=/usr/local/go
-export GOPATH=$HOME/go
-export PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH
+export GOROOT="${GOROOT:-/usr/local/go}"
+export GOPATH="${GOPATH:-$HOME/go}"
+case ":${PATH}:" in
+	*":$GOPATH/bin:"*) ;;
+	*) PATH="$GOPATH/bin:$PATH" ;;
+esac
+case ":${PATH}:" in
+	*":$GOROOT/bin:"*) ;;
+	*) PATH="$GOROOT/bin:$PATH" ;;
+esac
+case ":${PATH}:" in
+	*":$HOME/.local/bin:"*) ;;
+	*) PATH="$HOME/.local/bin:$PATH" ;;
+esac
+export PATH
 
 # Rust Vars (Comment or change on your own)
 export PATH="$HOME/.cargo/bin:$PATH"
@@ -311,13 +403,15 @@ GOOGLE_DORKS=true
 GITHUB_DORKS=true
 GITHUB_REPOS=true
 METADATA=true # Fetch metadata from indexed office documents
-EMAILS=true # Fetch emails from differents sites
+EMAILS=true # Fetch emails from differents sites 
 DOMAIN_INFO=true # whois info
 IP_INFO=true    # Reverse IP search, geolocation and whois
 API_LEAKS=true # Check for API leaks
 THIRD_PARTIES=true # Check for 3rd parties misconfigs
 SPOOF=true # Check spoofable domains
 METAFINDER_LIMIT=20 # Max 250
+MAIL_HYGIENE=true # Check DMARC/SPF records
+CLOUD_ENUM=true # Enumerate cloud storage across providers with cloud_enum
 
 # Subdomains
 SUBDOMAINS_GENERAL=true # Enable or disable the whole Subdomains module
@@ -341,7 +435,7 @@ ZONETRANSFER=true # Check zone transfer
 S3BUCKETS=true # Check S3 buckets misconfigs
 REVERSE_IP=false # Check reverse IP subdomain search (set True if your target is CIDR/IP)
 TLS_PORTS="21,22,25,80,110,135,143,261,271,324,443,448,465,563,614,631,636,664,684,695,832,853,854,990,993,989,992,994,995,1129,1131,1184,2083,2087,2089,2096,2221,2252,2376,2381,2478,2479,2482,2484,2679,2762,3077,3078,3183,3191,3220,3269,3306,3410,3424,3471,3496,3509,3529,3539,3535,3660,36611,3713,3747,3766,3864,3885,3995,3896,4031,4036,4062,4064,4081,4083,4116,4335,4336,4536,4590,4740,4843,4849,5443,5007,5061,5321,5349,5671,5783,5868,5986,5989,5990,6209,6251,6443,6513,6514,6619,6697,6771,7202,7443,7673,7674,7677,7775,8243,8443,8991,8989,9089,9295,9318,9443,9444,9614,9802,10161,10162,11751,12013,12109,14143,15002,16995,41230,16993,20003"
-INSCOPE=false # Uses inscope tool to filter the scope, requires .scope file in reconftw folder
+INSCOPE=false # Uses inscope tool to filter the scope, requires .scope file in reconftw folder 
 
 # Web detection
 WEBPROBESIMPLE=true # Web probing on 80/443
@@ -352,7 +446,7 @@ UNCOMMON_PORTS_WEB="81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,30
 
 # Host
 FAVICON=true # Check Favicon domain discovery
-PORTSCANNER=true # Enable or disable the whole Port scanner module
+PORTSCANNER=true # Enable or disable the whole Port scanner module 
 GEO_INFO=true # Fetch Geolocalization info
 PORTSCAN_PASSIVE=true # Port scanner with Shodan
 PORTSCAN_ACTIVE=true # Port scanner with nmap
@@ -382,7 +476,7 @@ ROBOTSWORDLIST=true # Check historic disallow entries on waybackMachine
 PASSWORD_DICT=true # Generate password dictionary
 PASSWORD_MIN_LENGTH=5 # Min password length
 PASSWORD_MAX_LENGTH=14 # Max password length
-CLOUDHUNTER_PERMUTATION=NORMAL # Options: DEEP (very slow), NORMAL (slow), NONE
+CLOUDHUNTER_PERMUTATION=NORMAL # Options: DEEP (very slow), NORMAL (slow), NONE 
 NUCLEI_FUZZING_TEMPLATES_PATH="${tools}/fuzzing-templates" # Set nuclei templates path
 
 # Vulns
@@ -491,6 +585,41 @@ AI_MODEL="llama3:8b" # Model to use
 AI_REPORT_TYPE="md" # Report type to use (md, txt)
 AI_REPORT_PROFILE="bughunter" # Report profile to use (executive, brief, or bughunter)
 
+# API & Advanced Web Checks
+GRAPHQL_CHECK=true # Detect GraphQL endpoints and introspection
+GQLSPECTION=false # Run GQLSpection deep introspection on detected GraphQL endpoints (heavier)
+PARAM_DISCOVERY=true # Parameter discovery with arjun
+GRPC_SCAN=false # Attempt basic gRPC reflection on common ports
+
+# IPv6
+IPV6_SCAN=true # Attempt IPv6 discovery/portscan where addresses exist
+
+# Wordlists / threads for new modules
+ARJUN_THREADS=10
+
+# Data & Automation
+ASSET_STORE=true # Append assets/findings to assets.jsonl
+QUICK_RESCAN=false # Skip heavy steps if no new subdomains/webs
+CHUNK_LIMIT=2000 # Split very large lists into chunks (urls, webs)
+HOTLIST_TOP=50 # Number of top risky assets to highlight
+
+# Performance
+RESOLVER_IQ=false # Prefer fast/healthy resolvers (experimental)
+
+# Intrusive controls (keep false by default)
+INTRUSIVE=false # Enable intrusive cloud write/CORS tests (dangerous)
+
+# Estimated durations for skipped heavy modules (seconds)
+TIME_EST_NUCLEI=600
+TIME_EST_FUZZ=900
+TIME_EST_URLCHECKS=300
+TIME_EST_JSCHECKS=300
+TIME_EST_API=300
+TIME_EST_GQL=180
+TIME_EST_PARAM=240
+TIME_EST_GRPC=120
+TIME_EST_IIS=60
+
 # TERM COLORS
 bred='\033[1;31m'
 bblue='\033[1;34m'
@@ -546,6 +675,7 @@ reconFTW supports multiple modes and options for flexible reconnaissance. Use th
 | `-q`            | Set rate limit (requests per second)           |
 | `-y`            | Enables AI results analysis                    |
 | `--check-tools` | Exit if required tools are missing             |
+| `--quick-rescan` | Skip heavy modules when no new subs/webs are found |
 
 ### Example Usage
 
@@ -643,6 +773,8 @@ AI_REPORT_PROFILE="bughunter"
 
 Manage scan data and API keys securely using a private repository.
 
+When `ASSET_STORE=true`, reconFTW aggregates key findings into `assets.jsonl` during each run, making it easy to sync only actionable deltas to your private repo.
+
 ### Makefile
 
 Use the provided `Makefile` for easy repository management (requires [GitHub CLI](https://cli.github.com/)).
@@ -663,6 +795,13 @@ Use the provided `Makefile` for easy repository management (requires [GitHub CLI
 3. **Upload Data**:
    ```bash
    make upload
+   ```
+
+4. **Lint / Format Scripts**:
+
+   ```bash
+   make lint   # shellcheck for install.sh & reconftw.sh (best effort)
+   make fmt    # shfmt with project defaults
    ```
 
 ### Manual

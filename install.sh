@@ -1,15 +1,21 @@
 #!/bin/bash
 
+# Safer bash defaults
+set -o pipefail
+set -E
+set +e
+IFS=$'\n\t'
+
 # Detect if the script is being run in MacOS with Homebrew Bash
-if [[ "$OSTYPE" == "darwin"* && "$BASH" != "/opt/homebrew/bin/bash" ]]; then
-    exec /opt/homebrew/bin/bash "$0" "$@"
+if [[ $OSTYPE == "darwin"* && $BASH != "/opt/homebrew/bin/bash" ]]; then
+	exec /opt/homebrew/bin/bash "$0" "$@"
 fi
 
 # Load main configuration
 CONFIG_FILE="./reconftw.cfg"
 
 if [[ ! -f $CONFIG_FILE ]]; then
-	echo -e "${bred}[!] Config file reconftw.cfg not found.${reset}"
+	printf "%b[!] Config file reconftw.cfg not found.%b\n" "$bred" "$reset"
 	exit 1
 fi
 
@@ -25,12 +31,159 @@ ARCH=$(uname -m)
 # macOS Detection
 IS_MAC=$([[ $OSTYPE == "darwin"* ]] && echo "True" || echo "False")
 
+# timeout/gtimeout compatibility
+if command -v timeout >/dev/null 2>&1; then
+	TIMEOUT_CMD="timeout"
+elif command -v gtimeout >/dev/null 2>&1; then
+	TIMEOUT_CMD="gtimeout"
+else
+	TIMEOUT_CMD=""
+fi
+
+# Globals for CLI overrides
+FORCE_UPDATE=${FORCE_UPDATE:-false}
+VERBOSE=${VERBOSE:-false}
+LOGFILE=${LOGFILE-}
+DRY_RUN=${DRY_RUN:-false}
+TOOLS_ONLY=${TOOLS_ONLY:-false}
+
+# If LOGFILE provided via env/flag, tee all output
+if [[ -n ${LOGFILE} ]]; then
+	exec > >(tee -a "${LOGFILE}") 2>&1
+fi
+
+# Helper: run with timeout seconds if available
+run_to() {
+	local secs=$1
+	shift || true
+	if [[ -n $TIMEOUT_CMD ]]; then "$TIMEOUT_CMD" "$secs" "$@"; else "$@"; fi
+}
+
+# Helper: optionally dry-run
+run_cmd() {
+	if [[ $DRY_RUN == "true" ]]; then
+		printf "%s\n" "[DRY-RUN] $*"
+		return 0
+	fi
+	"$@"
+}
+
+# Helper: quiet run (respect VERBOSE)
+q() {
+	if [[ $DRY_RUN == "true" ]]; then
+		printf "%s\n" "[DRY-RUN] $*"
+		return 0
+	fi
+	if [[ $VERBOSE == "true" ]]; then "$@"; else { "$@"; } &>/dev/null; fi
+}
+
+# Helper: quiet run with timeout
+q_to() {
+	local secs=$1
+	shift || true
+	if [[ $DRY_RUN == "true" ]]; then
+		printf "%s\n" "[DRY-RUN] (to ${secs}) $*"
+		return 0
+	fi
+	if [[ -n $TIMEOUT_CMD ]]; then
+		if [[ $VERBOSE == "true" ]]; then "$TIMEOUT_CMD" "$secs" "$@"; else { "$TIMEOUT_CMD" "$secs" "$@"; } &>/dev/null; fi
+	else
+		if [[ $VERBOSE == "true" ]]; then "$@"; else { "$@"; } &>/dev/null; fi
+	fi
+}
+
+# Helper: retry with linear backoff
+retry() {
+	local attempts=$1
+	local delay=$2
+	shift 2
+	local n=0
+	until "$@"; do
+		n=$((n + 1))
+		if ((n >= attempts)); then return 1; fi
+		sleep $((delay * n))
+	done
+}
+
+ensure_git_dir() {
+	local _path="$1"
+	if [[ -d "$_path" && ! -d "$_path/.git" ]]; then
+		rm -rf "$_path" 2>/dev/null || true
+	fi
+}
+
+# Non-fatal error trap: log and continue
+trap 'rc=$?; ts=$(date +"%Y-%m-%d %H:%M:%S"); cmd=${BASH_COMMAND}; loc_ln=${BASH_LINENO[0]:-0}; msg="[$ts] install.sh ERR($rc) @ line ${loc_ln} :: ${cmd}"; if [[ -n "${LOGFILE:-}" ]]; then echo "$msg" >>"$LOGFILE"; else echo "$msg" >&2; fi' ERR
+
+# -------------------------------
+# Minimal UI helpers (classic style)
+# -------------------------------
+
+header() { printf "%bRunning: %s%b\n" "$bblue" "$1" "$reset"; }
+msg_run() { printf "%b%s%b\n" "$yellow" "$1" "$reset"; }
+msg_ok() { printf "%b%s%b\n" "$yellow" "$1" "$reset"; }
+msg_warn() { printf "%b%s%b\n" "$yellow" "$1" "$reset"; }
+msg_err() { printf "%b%s%b\n" "$red" "$1" "$reset"; }
+
+# Progress helper (simple spinner output)
+progress_update() { :; }
+with_spinner() {
+	local _msg="$1"
+	shift
+	if [[ $DRY_RUN == "true" ]]; then
+		printf "%s\n" "[DRY-RUN] ${_msg}"
+		printf "%s\n" "[DRY-RUN] $*"
+		return 0
+	fi
+	if [[ $VERBOSE == "true" ]]; then
+		[[ -n $_msg ]] && printf "%s\n" "$_msg"
+		"$@"
+		return $?
+	fi
+	local spinner="|/-\\"
+	local spinner_len=4
+	local i=0
+	[[ -n $_msg ]] && printf "%s " "$_msg"
+	"$@" &
+	local cmd_pid=$!
+	while kill -0 "$cmd_pid" 2>/dev/null; do
+		printf "\r%s %s" "$_msg" "${spinner:i:1}"
+		i=$(((i + 1) % spinner_len))
+		sleep 0.1
+	done
+	wait "$cmd_pid"
+	local exit_code=$?
+	if [[ $exit_code -eq 0 ]]; then
+		printf "\r%s done\n" "$_msg"
+	else
+		printf "\r%s failed\n" "$_msg"
+	fi
+	return $exit_code
+}
+
+# Keep arrays defined for potential later use, but classic UI prints a short summary only
+declare -a INST_GO_OK INST_GO_SKIP INST_GO_FAIL
+declare -a INST_PX_OK INST_PX_SKIP INST_PX_FAIL
+declare -a REPOS_CLONED REPOS_SKIPPED REPOS_FAIL
+
+# Basic network precheck
+check_network() {
+	printf "%bRunning: Network precheck%b\n" "$bblue" "$reset"
+	# Silence successful output; show message only on failure. Use q_to to respect --verbose.
+	if ! q_to 5 bash -lc 'getent hosts github.com >/dev/null 2>&1 || dig +short github.com >/dev/null 2>&1 || nslookup github.com >/dev/null 2>&1'; then
+		printf "%b[!] DNS resolution for github.com failed. Check your network.%b\n" "$bred" "$reset"
+	fi
+	if ! q_to 10 curl -I -s https://github.com >/dev/null 2>&1; then
+		printf "%b[!] HTTPS connectivity to github.com failed. Installer may fail.%b\n" "$yellow" "$reset"
+	fi
+}
+
 # Check Bash version
 BASH_VERSION_NUM=$(bash --version | awk 'NR==1{print $4}' | cut -d'.' -f1)
 if [[ $BASH_VERSION_NUM -lt 4 ]]; then
-	echo -e "${bred}Your Bash version is lower than 4, please update.${reset}"
+	printf "%bYour Bash version is lower than 4, please update.%b\n" "$bred" "$reset"
 	if [[ $IS_MAC == "True" ]]; then
-		echo -e "${yellow}For macOS, run 'brew install bash' and rerun the installer in a new terminal.${reset}"
+		printf "%bFor macOS, run 'brew install bash' and rerun the installer in a new terminal.%b\n" "$yellow" "$reset"
 	fi
 	exit 1
 fi
@@ -86,6 +239,7 @@ declare -A gotools=(
 	["csprecon"]="go install github.com/edoardottt/csprecon/cmd/csprecon@latest"
 	["VhostFinder"]="go install -v github.com/wdahlenburg/VhostFinder@latest"
 	["misconfig-mapper"]="go install github.com/intigriti/misconfig-mapper/cmd/misconfig-mapper@latest"
+	["grpcurl"]="go install -v github.com/fullstorydev/grpcurl/cmd/grpcurl@latest"
 )
 
 # Declare pipx tools and their paths
@@ -101,6 +255,9 @@ declare -A pipxtools=(
 	["porch-pirate"]="MandConsultingGroup/porch-pirate"
 	["p1radup"]="iambouali/p1radup"
 	["subwiz"]="hadriansecurity/subwiz"
+	["arjun"]="s0md3v/Arjun"
+	["gqlspection"]="doyensec/GQLSpection"
+	["cloud_enum"]="initstring/cloud_enum"
 )
 
 # Declare repositories and their paths
@@ -160,107 +317,154 @@ EOF
 
 # Function to install Go tools
 function install_tools() {
-	echo -e "${bblue}Running: Installing Golang tools (${#gotools[@]})${reset}\n"
+	header "Installing Golang tools (${#gotools[@]})"
 
 	local go_step=0
 	local failed_tools=()
+	local total_go=${#gotools[@]}
+	local go_ok=0 go_skip=0 go_fail=0
 	for gotool in "${!gotools[@]}"; do
-		((go_step++))
+		((++go_step))
 		if [[ $upgrade_tools == "false" ]]; then
 			if command -v "$gotool" &>/dev/null; then
-				echo -e "[${yellow}SKIPPING${reset}] $gotool already installed at $(command -v "$gotool")"
+				INST_GO_SKIP+=("$gotool")
+				((++go_skip))
+				progress_update "Go tools" "$go_step" "$total_go" "$go_ok" "$go_skip" "$go_fail"
+				[[ $COMPACT != "true" ]] && msg_warn "[$go_step/$total_go] ${CLR_CYAN}${gotool}${RESET} already installed"
 				continue
 			fi
 		fi
 
 		# Install the Go tool
-		eval "${gotools[$gotool]}" &>/dev/null
-		exit_status=$?
-		if [[ $exit_status -eq 0 ]]; then
-			echo -e "${yellow}$gotool installed (${go_step}/${#gotools[@]})${reset}"
+		if q bash -lc "${gotools[$gotool]}"; then
+			INST_GO_OK+=("$gotool")
+			((++go_ok))
+			progress_update "Go tools" "$go_step" "$total_go" "$go_ok" "$go_skip" "$go_fail"
+			[[ $COMPACT != "true" ]] && msg_ok "[$go_step/$total_go] ${CLR_CYAN}${gotool}${RESET} installed"
 		else
-			echo -e "${red}Unable to install $gotool, try manually (${go_step}/${#gotools[@]})${reset}"
 			failed_tools+=("$gotool")
+			INST_GO_FAIL+=("$gotool")
+			((++go_fail))
 			double_check=true
+			progress_update "Go tools" "$go_step" "$total_go" "$go_ok" "$go_skip" "$go_fail"
+			msg_err "[$go_step/$total_go] ${CLR_CYAN}${gotool}${RESET} failed"
 		fi
 	done
+	[[ $COMPACT == "true" && $IS_TTY -eq 1 ]] && printf "\n"
 
-	echo -e "\n${bblue}Running: Installing pipx tools (${#repos[@]})${reset}\n"
+	header "Installing pipx tools (${#pipxtools[@]})"
 
 	local pipx_step=0
 	local failed_pipx_tools=()
+	local total_px=${#pipxtools[@]}
+	local px_ok=0 px_skip=0 px_fail=0
 
 	for pipxtool in "${!pipxtools[@]}"; do
-		((pipx_step++))
+		((++pipx_step))
 		if [[ $upgrade_tools == "false" ]]; then
 			if command -v "$pipxtool" &>/dev/null; then
-				echo -e "[${yellow}SKIPPING${reset}] $pipxtool already installed at $(command -v "$pipxtool")"
+				INST_PX_SKIP+=("$pipxtool")
+				((++px_skip))
+				progress_update "pipx tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
+				[[ $COMPACT != "true" ]] && msg_warn "[$pipx_step/$total_px] ${CLR_CYAN}${pipxtool}${RESET} already installed"
 				continue
 			fi
 		fi
 
 		# Install the pipx tool
-		eval pipx install "git+https://github.com/${pipxtools[$pipxtool]}" &>/dev/null
+		q pipx install "git+https://github.com/${pipxtools[$pipxtool]}"
 		exit_status=$?
 		if [[ $exit_status -ne 0 ]]; then
-			echo -e "${red}Failed to install $pipxtool, try manually (${pipx_step}/${#pipxtools[@]})${reset}"
 			failed_pipx_tools+=("$pipxtool")
+			INST_PX_FAIL+=("$pipxtool")
+			((++px_fail))
 			double_check=true
+			progress_update "pipx tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
+			msg_err "[$pipx_step/$total_px] ${CLR_CYAN}${pipxtool}${RESET} install failed"
 			continue
 		fi
 
 		# Upgrade the pipx tool
-		eval pipx upgrade "${pipxtool}" &>/dev/null
+		q pipx upgrade "${pipxtool}"
 		exit_status=$?
 		if [[ $exit_status -ne 0 ]]; then
-			echo -e "${red}Failed to upgrade $pipxtool, try manually (${pipx_step}/${#pipxtools[@]})${reset}"
 			failed_pipx_tools+=("$pipxtool")
+			INST_PX_FAIL+=("$pipxtool")
+			((++px_fail))
 			double_check=true
+			progress_update "pipx tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
+			msg_err "[$pipx_step/$total_px] ${CLR_CYAN}${pipxtool}${RESET} upgrade failed"
 			continue
 		fi
 
-		echo -e "${yellow}$pipxtool installed (${pipx_step}/${#pipxtools[@]})${reset}"
+		INST_PX_OK+=("$pipxtool")
+		((++px_ok))
+		progress_update "pipx tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
+		[[ $COMPACT != "true" ]] && msg_ok "[$pipx_step/$total_px] ${CLR_CYAN}${pipxtool}${RESET} ready"
 	done
+	[[ $COMPACT == "true" && $IS_TTY -eq 1 ]] && printf "\n"
 
-	echo -e "\n${bblue}Running: Installing repositories (${#repos[@]})${reset}\n"
+	header "Installing repositories (${#repos[@]})"
 
 	local repos_step=0
 	local failed_repos=()
+	local total_repo=${#repos[@]}
+	local repo_ok=0 repo_skip=0 repo_fail=0
 
 	for repo in "${!repos[@]}"; do
-		((repos_step++))
+		((++repos_step))
 		if [[ $upgrade_tools == "false" ]]; then
 			if [[ -d "${dir}/${repo}" ]]; then
-				echo -e "[${yellow}SKIPPING${reset}] Repository $repo already cloned in ${dir}/${repo}"
+				REPOS_SKIPPED+=("$repo")
+				((++repo_skip))
+				progress_update "repos" "$repos_step" "$total_repo" "$repo_ok" "$repo_skip" "$repo_fail"
+				[[ $COMPACT != "true" ]] && msg_warn "[$repos_step/$total_repo] $repo already present at ${dir}/${repo}"
 				continue
 			fi
 		fi
 		# Clone the repository
 		if [[ ! -d "${dir}/${repo}" || -z "$(ls -A "${dir}/${repo}")" ]]; then
-			git clone --filter="blob:none" "https://github.com/${repos[$repo]}" "${dir}/${repo}" &>/dev/null
-			exit_status=$?
+			msg_run "[$repos_step/${#repos[@]}] $repo (clone)"
+			if retry 3 3 q_to 180 git clone --filter="blob:none" "https://github.com/${repos[$repo]}" "${dir}/${repo}"; then
+				exit_status=0
+			else
+				exit_status=$?
+			fi
 			if [[ $exit_status -ne 0 ]]; then
-				echo -e "${red}Unable to clone repository $repo.${reset}"
+				msg_err "[$repos_step/$total_repo] $repo clone failed"
 				failed_repos+=("$repo")
+				REPOS_FAIL+=("$repo")
+				((++repo_fail))
 				double_check=true
 				continue
 			fi
+			REPOS_CLONED+=("$repo")
+			((++repo_ok))
+			progress_update "repos" "$repos_step" "$total_repo" "$repo_ok" "$repo_skip" "$repo_fail"
 		fi
 
 		# Navigate to the repository directory
 		cd "${dir}/${repo}" || {
-			echo -e "${red}Failed to navigate to directory '${dir}/${repo}'${reset}"
+			msg_err "[$repos_step/$total_repo] $repo: cannot enter ${dir}/${repo}"
 			failed_repos+=("$repo")
+			REPOS_FAIL+=("$repo")
+			((++repo_fail))
 			double_check=true
 			continue
 		}
 
 		# Pull the latest changes
-		git pull &>/dev/null
-		exit_status=$?
+		msg_run "[$repos_step/${#repos[@]}] $repo (pull)"
+		if retry 3 3 q_to 60 git pull; then
+			exit_status=0
+		else
+			exit_status=$?
+		fi
 		if [[ $exit_status -ne 0 ]]; then
-			echo -e "${red}Failed to pull updates for repository $repo.${reset}"
+			msg_err "[$repos_step/$total_repo] $repo pull failed"
 			failed_repos+=("$repo")
+			REPOS_FAIL+=("$repo")
+			((++repo_fail))
 			double_check=true
 			continue
 		fi
@@ -270,12 +474,19 @@ function install_tools() {
 			if [[ ! -f "venv/bin/activate" ]]; then
 				python3 -m venv venv &>/dev/null
 			fi
+			# shellcheck disable=SC1091
 			source venv/bin/activate
-			eval "pip3 install --upgrade -r requirements.txt $DEBUG_STD" &>/dev/null
-			if [ "$repo" = "dorks_hunter" ]; then
-				pip install xnldorker &>/dev/null
+			if ! pip3 install --upgrade -r requirements.txt &>/dev/null; then
+				msg_err "[$repos_step/$total_repo] $repo: pip requirements failed"
+				failed_repos+=("$repo")
+				REPOS_FAIL+=("$repo")
+				((++repo_fail))
+				double_check=true
 			fi
-			deactivate
+			if [ "$repo" = "dorks_hunter" ]; then
+				pip install xnldorker &>/dev/null || true
+			fi
+			deactivate || true
 		fi
 
 		# Special handling for certain repositories
@@ -297,14 +508,6 @@ function install_tools() {
 			go build -o ffufPostprocessing main.go &>/dev/null
 			chmod +x ./ffufPostprocessing
 			;;
-		"misconfig-mapper")
-			git reset --hard origin/main &>/dev/null
-			git pull &>/dev/null
-			go mod tidy &>/dev/null
-			go build -o misconfig-mapper &>/dev/null
-			chmod +x ./misconfig-mapper &>/dev/null
-			cp misconfig-mapper $HOME/go/bin/ &>/dev/null
-			;;
 		"trufflehog")
 			go install &>/dev/null
 			;;
@@ -312,45 +515,47 @@ function install_tools() {
 
 		# Copy gf patterns if applicable
 		if [[ $repo == "gf" ]]; then
-			cp -r examples ${HOME}/.gf &>/dev/null
+			cp -r examples "${HOME}/.gf" &>/dev/null || true
 		elif [[ $repo == "Gf-Patterns" ]]; then
-			cp ./*.json ${HOME}/.gf &>/dev/null
+			cp ./*.json "${HOME}/.gf" &>/dev/null || true
 		elif [[ $repo == "sus_params" ]]; then
 			for f in ./gf-patterns/*.json; do
 				base=$(basename "$f")
 				dest="${HOME}/.gf/$base"
-				cat "$f" | anew -q "$dest" >/dev/null
+				cat "$f" | anew -q "$dest" >/dev/null || true
 			done
 		fi
 
 		# Return to the main directory
 		cd "$dir" || {
-			echo -e "${red}Failed to navigate back to directory '$dir'.${reset}"
+			msg_err "Failed to navigate back to directory '$dir'"
 			exit 1
 		}
 
-		echo -e "${yellow}$repo installed (${repos_step}/${#repos[@]})${reset}"
+		msg_ok "[$repos_step/$total_repo] $repo ready"
 	done
+	[[ $COMPACT == "true" && $IS_TTY -eq 1 ]] && printf "\n"
 
 	# Notify and ensure subfinder is installed twice (as per original script)
-	notify &>/dev/null
-	subfinder &>/dev/null
-	subfinder &>/dev/null
+	# Guard with command checks to avoid aborting under set -e
+	q command -v notify >/dev/null 2>&1 && q notify || true
+	q command -v subfinder >/dev/null 2>&1 && q subfinder || true
+	q command -v subfinder >/dev/null 2>&1 && q subfinder || true
 	mkdir -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
 	#cent init -f &>/dev/null
 	#cent -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
 
 	# Handle failed installations
 	if [[ ${#failed_tools[@]} -ne 0 ]]; then
-		echo -e "\n${red}Failed to install the following Go tools: ${failed_tools[*]}${reset}"
+		printf "\n%bFailed to install the following Go tools: %s%b\n" "$red" "${failed_tools[*]}" "$reset"
 	fi
 
 	if [[ ${#failed_pipx_tools[@]} -ne 0 ]]; then
-		echo -e "\n${red}Failed to install the following pipx tools: ${failed_pipx_tools[*]}${reset}"
+		printf "\n%bFailed to install the following pipx tools: %s%b\n" "$red" "${failed_pipx_tools[*]}" "$reset"
 	fi
 
 	if [[ ${#failed_repos[@]} -ne 0 ]]; then
-		echo -e "\n${red}Failed to clone or update the following repositories:\n${failed_repos[*]}${reset}"
+		printf "\n%bFailed to clone or update the following repositories:%b\n%s\n" "$red" "$reset" "${failed_repos[*]}"
 	fi
 }
 
@@ -362,110 +567,196 @@ function reset_git_proxies() {
 
 # Function to check for updates
 function check_updates() {
-	echo -e "${bblue}Running: Looking for new reconFTW version${reset}\n"
+	printf "%bRunning: Looking for new reconFTW version%b\n" "$bblue" "$reset"
 
-	if timeout 10 git fetch; then
-		BRANCH=$(git rev-parse --abbrev-ref HEAD)
-		HEADHASH=$(git rev-parse HEAD)
-		UPSTREAMHASH=$(git rev-parse "${BRANCH}@{upstream}")
+	if { [[ -n $TIMEOUT_CMD ]] && $TIMEOUT_CMD 10 git fetch; } || git fetch; then
+		BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "HEAD")
+		HEADHASH=$(git rev-parse HEAD 2>/dev/null || true)
+		# Skip auto-update if no upstream (detached HEAD or no tracking branch)
+		if ! git rev-parse --abbrev-ref --symbolic-full-name @{u} >/dev/null 2>&1; then
+			printf "%bNo upstream configured (detached HEAD). Skipping auto-update.%b\n" "$yellow" "$reset"
+			return 0
+		fi
+		UPSTREAMHASH=$(git rev-parse "@{u}")
 
 		if [[ $HEADHASH != "$UPSTREAMHASH" ]]; then
-			echo -e "${yellow}A new version is available. Updating...${reset}\n"
+			local cfg_backup="" cfg_backup_ts=""
+			if git status --porcelain | grep -q .; then
+				if [[ $FORCE_UPDATE == "true" ]]; then
+					printf "%bLocal changes detected; forcing update.%b\n" "$yellow" "$reset"
+				else
+					printf "%bLocal changes detected. Skipping auto-update. Re-run with --force-update to override.%b\n" "$yellow" "$reset"
+					return 0
+				fi
+			fi
+			printf "%bA new version is available. Updating...%b\n" "$yellow" "$reset"
 			if git status --porcelain | grep -q 'reconftw.cfg$'; then
-				mv reconftw.cfg reconftw.cfg_bck
-				echo -e "${yellow}reconftw.cfg has been backed up to reconftw.cfg_bck${reset}\n"
+				cfg_backup_ts=$(date +%Y%m%d_%H%M%S)
+				cfg_backup="reconftw.cfg.bak.${cfg_backup_ts}"
+				cp reconftw.cfg "$cfg_backup"
+				printf "%breconftw.cfg has been backed up to %s%b\n" "$yellow" "$cfg_backup" "$reset"
 			fi
 			git reset --hard &>/dev/null
-			git pull &>/dev/null
-			echo -e "${bgreen}Updated! Running the new installer version...${reset}\n"
+			run_to 60 git pull &>/dev/null
+			printf "%bUpdated! Running the new installer version...%b\n" "$bgreen" "$reset"
+
+			# Show config diff against new default
+			if [[ -n $cfg_backup && -f reconftw.cfg ]]; then
+				mkdir -p .tmp
+				cfg_diff_file=".tmp/reconftw_cfg_diff_${cfg_backup_ts}.patch"
+				if diff -u "$cfg_backup" reconftw.cfg >"$cfg_diff_file"; then
+					printf "%bConfig unchanged between versions (diff: %s).%b\n" "$yellow" "$cfg_diff_file" "$reset"
+				else
+					printf "%bConfig differences saved to %s (old -> new).%b\n" "$yellow" "$cfg_diff_file" "$reset"
+				fi
+			fi
 		else
-			echo -e "${bgreen}reconFTW is already up to date!${reset}\n"
+			printf "%breconFTW is already up to date!%b\n" "$bgreen" "$reset"
+			# If config is locally modified, still provide a diff against current default
+			if ! git diff --quiet -- reconftw.cfg; then
+				local cfg_diff_ts cfg_diff_file
+				cfg_diff_ts=$(date +%Y%m%d_%H%M%S)
+				mkdir -p .tmp
+				cfg_diff_file=".tmp/reconftw_cfg_diff_${cfg_diff_ts}.patch"
+				if git diff HEAD --unified -- reconftw.cfg >"$cfg_diff_file"; then
+					printf "%bLocal reconftw.cfg differs from default; diff saved to %s.%b\n" "$yellow" "$cfg_diff_file" "$reset"
+				fi
+			fi
 		fi
 	else
-		echo -e "\n${bred}[!] Unable to check for updates.${reset}\n"
+		printf "\n%b[!] Unable to check for updates.%b\n" "$bred" "$reset"
 	fi
 }
 
 # Function to install Golang
 function install_golang_version() {
-	local version="go1.20.7"
-	local latest_version
-	latest_version=$(curl -s https://go.dev/VERSION?m=text | head -1 || echo "go1.20.7")
-	if [[ $latest_version == g* ]]; then
-		version="$latest_version"
-	fi
+    local version="go1.25.3"
+    local latest_version
+    latest_version=$(curl -s https://go.dev/VERSION?m=text | head -1 || echo "go1.20.7")
+    if [[ $latest_version == g* ]]; then
+        version="$latest_version"
+    fi
 
-	echo -e "${bblue}Running: Installing/Updating Golang($version) ${reset}\n"
+    printf "%bRunning: Installing/Updating Golang(%s) %b\n" "$bblue" "$version" "$reset"
 
-	if [[ $install_golang == "true" ]]; then
-		if command -v go &>/dev/null && [[ $version == "$(go version | awk '{print $3}')" ]]; then
-			echo -e "${bgreen}Golang is already installed and up to date.${reset}\n"
-		else
-			$SUDO rm -rf /usr/local/go &>/dev/null || true
+    if [[ $install_golang == "true" ]]; then
+        local current_version=""
+        if command -v go &>/dev/null; then
+            current_version="$(go version | awk '{print $3}')"
+        fi
 
-			case "$ARCH" in
-			arm64 | aarch64)
-				if [[ $IS_MAC == "True" ]]; then
-					wget "https://dl.google.com/go/${version}.darwin-arm64.tar.gz" -O "/tmp/${version}.darwin-arm64.tar.gz" &>/dev/null
-					$SUDO tar -C /usr/local -xzf "/tmp/${version}.darwin-arm64.tar.gz" &>/dev/null
-				else
-					wget "https://dl.google.com/go/${version}.linux-arm64.tar.gz" -O "/tmp/${version}.linux-arm64.tar.gz" &>/dev/null
-					$SUDO tar -C /usr/local -xzf "/tmp/${version}.linux-arm64.tar.gz" &>/dev/null
-				fi
-				;;
-			armv6l | armv7l)
-				wget "https://dl.google.com/go/${version}.linux-armv6l.tar.gz" -O "/tmp/${version}.linux-armv6l.tar.gz" &>/dev/null
-				$SUDO tar -C /usr/local -xzf "/tmp/${version}.linux-armv6l.tar.gz" &>/dev/null
-				;;
-			amd64 | x86_64)
-				if [[ $IS_MAC == "True" ]]; then
-					wget "https://dl.google.com/go/${version}.darwin-amd64.tar.gz" -O "/tmp/${version}.darwin-amd64.tar.gz" &>/dev/null
-					$SUDO tar -C /usr/local -xzf "/tmp/${version}.darwin-amd64.tar.gz" &>/dev/null
-				else
-					wget "https://dl.google.com/go/${version}.linux-amd64.tar.gz" -O "/tmp/${version}.linux-amd64.tar.gz" &>/dev/null
-					$SUDO tar -C /usr/local -xzf "/tmp/${version}.linux-amd64.tar.gz" &>/dev/null
-				fi
-				;;
-			*)
-				echo -e "${bred}[!] Unsupported architecture. Please install go manually.${reset}"
-				exit 1
-				;;
-			esac
+        if [[ -n $current_version && $version == "$current_version" ]]; then
+            printf "%bGolang is already installed and up to date.%b\n" "$bgreen" "$reset"
+        else
+            local archive_suffix=""
 
-			$SUDO ln -sf /usr/local/go/bin/go /usr/local/bin/ 2>/dev/null
-			export GOROOT=/usr/local/go
-			export GOPATH="${HOME}/go"
-			export PATH="$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH"
+            case "$ARCH" in
+            arm64 | aarch64)
+                if [[ $IS_MAC == "True" ]]; then
+                    archive_suffix="darwin-arm64"
+                else
+                    archive_suffix="linux-arm64"
+                fi
+                ;;
+            armv6l | armv7l)
+                archive_suffix="linux-armv6l"
+                ;;
+            amd64 | x86_64)
+                if [[ $IS_MAC == "True" ]]; then
+                    archive_suffix="darwin-amd64"
+                else
+                    archive_suffix="linux-amd64"
+                fi
+                ;;
+            *)
+                msg_err "[!] Unsupported architecture. Please install go manually."
+                return 1
+                ;;
+            esac
 
-			# Append Go environment variables to shell profile
-			cat <<EOF >>${HOME}/"${profile_shell}"
+            local archive_url="https://dl.google.com/go/${version}.${archive_suffix}.tar.gz"
+            local archive_path="/tmp/${version}.${archive_suffix}.tar.gz"
 
-# Golang environment variables
-export GOROOT=/usr/local/go
-export GOPATH=\$HOME/go
-export PATH=\$GOPATH/bin:\$GOROOT/bin:\$HOME/.local/bin:\$PATH
-EOF
-		fi
-	else
-		echo -e "${byellow}Golang will not be configured according to the user's preferences (install_golang=false in reconftw.cfg).${reset}\n"
-	fi
+            if ! wget "$archive_url" -O "$archive_path" &>/dev/null; then
+                msg_err "[!] Failed to download Golang archive from ${archive_url}"
+                return 1
+            fi
 
-	# Validate Go environment variables
-	if [[ -z ${GOPATH-} ]]; then
-		echo -e "${bred}GOPATH environment variable not detected. Add Golang environment variables to your \$HOME/.bashrc or \$HOME/.zshrc:${reset}"
-		echo -e "export GOROOT=/usr/local/go"
-		echo -e 'export GOPATH=$HOME/go'
-		echo -e "export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH\n"
-		exit 1
-	fi
+            local tmp_unpack
+            tmp_unpack=$(mktemp -d 2>/dev/null || mktemp -d -t goinstall)
+            if ! tar -C "$tmp_unpack" -xzf "$archive_path" &>/dev/null; then
+                msg_err "[!] Failed to extract ${archive_path}"
+                rm -rf "$tmp_unpack"
+                return 1
+            fi
 
-	if [[ -z ${GOROOT-} ]]; then
-		echo -e "${bred}GOROOT environment variable not detected. Add Golang environment variables to your \$HOME/.bashrc or \$HOME/.zshrc:${reset}"
-		echo -e "export GOROOT=/usr/local/go"
-		echo -e 'export GOPATH=$HOME/go'
-		echo -e "export PATH=\$GOPATH/bin:\$GOROOT/bin:\$PATH\n"
-		exit 1
-	fi
+            if [[ ! -d "${tmp_unpack}/go" ]]; then
+                msg_err "[!] Extracted archive missing 'go' directory"
+                rm -rf "$tmp_unpack"
+                return 1
+            fi
+
+            local go_backup=""
+            if [[ -d /usr/local/go ]]; then
+                go_backup="/usr/local/go.reconftw.$(date +%s)"
+                if ! $SUDO mv /usr/local/go "$go_backup" &>/dev/null; then
+                    msg_warn "[!] Unable to backup existing /usr/local/go; attempting in-place overwrite."
+                    go_backup=""
+                    if ! ($SUDO rm -rf /usr/local/go &>/dev/null); then
+                        msg_warn "[!] Failed to remove existing /usr/local/go; installation may overwrite partially."
+                    fi
+                fi
+            fi
+            if ! $SUDO mv "${tmp_unpack}/go" /usr/local/go; then
+                msg_err "[!] Failed to move Golang into /usr/local/go"
+                if [[ -n $go_backup && -d $go_backup ]]; then
+                    $SUDO mv "$go_backup" /usr/local/go &>/dev/null || msg_warn "[!] Unable to restore previous Golang installation from backup."
+                fi
+                rm -rf "$tmp_unpack"
+                return 1
+            fi
+            if [[ -n $go_backup ]]; then
+                $SUDO rm -rf "$go_backup" &>/dev/null
+            fi
+
+            rm -rf "$tmp_unpack"
+            rm -f "$archive_path" 2>/dev/null
+
+            $SUDO ln -sf /usr/local/go/bin/go /usr/local/bin/ 2>/dev/null
+        fi
+
+        export GOROOT=/usr/local/go
+        export GOPATH="${HOME}/go"
+        export PATH="$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH"
+
+        if [[ -n ${profile_shell:-} ]]; then
+            local profile_path="${HOME}/${profile_shell}"
+            local marker="# Golang environment variables (reconFTW)"
+            if ! grep -Fq "$marker" "$profile_path" 2>/dev/null; then
+                {
+                    printf '\n%s\n' "$marker"
+                    printf 'export GOROOT=/usr/local/go\n'
+                    printf 'export GOPATH=$HOME/go\n'
+                    printf 'export PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH\n'
+                } >>"$profile_path"
+            fi
+        fi
+    else
+        msg_warn "Golang will not be configured according to the user's preferences (install_golang=false in reconftw.cfg)."
+    fi
+
+    if ! command -v go &>/dev/null; then
+        msg_err "[!] Go binary not found in PATH. Please install Go or enable install_golang in reconftw.cfg."
+        return 1
+    fi
+
+    local detected_gopath detected_goroot
+    detected_gopath="${GOPATH:-$(go env GOPATH 2>/dev/null || true)}"
+    detected_goroot="${GOROOT:-$(go env GOROOT 2>/dev/null || true)}"
+
+    if [[ -z $detected_gopath || -z $detected_goroot ]]; then
+        msg_warn "Go environment variables not fully configured. Ensure GOPATH and GOROOT are set or available via 'go env'."
+    fi
 }
 
 # Function to install system packages based on OS
@@ -482,7 +773,7 @@ function install_system_packages() {
 	elif [[ -f /etc/os-release ]]; then
 		install_yum # Assuming RedHat-based
 	else
-		echo -e "${bred}[!] Unsupported OS. Please install dependencies manually.${reset}"
+		printf "%b[!] Unsupported OS. Please install dependencies manually.%b\n" "$bred" "$reset"
 		exit 1
 	fi
 }
@@ -498,18 +789,20 @@ function install_apt() {
 	source "${HOME}/.cargo/env"
 	cargo install ripgen &>/dev/null
 	pipx ensurepath -f &>/dev/null
- 	pip install jsbeautifier &>/dev/null
+	# Install jsbeautifier and shodan CLI in isolated environments to avoid PEP 668 conflicts
+	pipx install jsbeautifier &>/dev/null || true
+	pipx install shodan &>/dev/null || pipx upgrade shodan &>/dev/null || true
 }
 
 # Function to install required packages for macOS
 function install_brew() {
 	if command -v brew &>/dev/null; then
-		echo -e "${bgreen}brew is already installed.${reset}\n"
+		printf "%bbrew is already installed.%b\n" "$bgreen" "$reset"
 	else
 		/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 	fi
 	brew update &>/dev/null
-	brew install --formula bash coreutils gnu-getopt python pipx massdns jq gcc cmake ruby git curl wget zip pv bind whois nmap jq lynx medusa &>/dev/null
+	brew install --formula bash coreutils gnu-getopt gnu-sed python pipx massdns jq gcc cmake ruby git curl wget zip pv bind whois nmap lynx medusa shodan &>/dev/null
 	brew install rustup &>/dev/null
 	rustup-init -y &>/dev/null
 	cargo install ripgen &>/dev/null
@@ -518,10 +811,67 @@ function install_brew() {
 # Function to install required packages for RedHat-based systems
 function install_yum() {
 	$SUDO yum groupinstall "Development Tools" -y &>/dev/null
+	# Base install first (python3 may be 3.6 on older EL)
+	$SUDO yum install -y epel-release &>/dev/null || true
 	$SUDO yum install -y python3 python3-pip gcc cmake ruby git curl libpcap whois wget pipx zip pv bind-utils openssl-devel libffi-devel libxml2-devel libxslt-devel zlib-devel nmap jq lynx medusa xorg-x11-server-xvfb &>/dev/null
+
+	# Ensure Python >= 3.7 on yum-based systems
+	if ! python3 - <<-'PYCHK' &>/dev/null; then
+		import sys; raise SystemExit(0 if sys.version_info >= (3,7) else 1)
+	PYCHK
+
+		# Try DNF/YUM module streams (EL8+/EL9+) for newer Python
+		if command -v dnf &>/dev/null || $SUDO yum -y module list python38 &>/dev/null; then
+			# Prefer 3.9, then 3.8
+			if command -v dnf &>/dev/null; then
+				$SUDO dnf -y module install python39 &>/dev/null || $SUDO dnf -y module install python38 &>/dev/null || true
+			else
+				$SUDO yum -y module install python39 &>/dev/null || $SUDO yum -y module install python38 &>/dev/null || true
+			fi
+		fi
+
+		# Amazon Linux 2 path
+		if command -v amazon-linux-extras &>/dev/null; then
+			$SUDO amazon-linux-extras install -y python3.8 &>/dev/null || true
+		fi
+
+		# EL7 fallback via IUS (best-effort)
+		REL_VER=$( (cat /etc/redhat-release 2>/dev/null || cat /etc/centos-release 2>/dev/null) || true)
+		if [[ $REL_VER == *" 7."* ]]; then
+			$SUDO yum install -y https://repo.ius.io/ius-release-el7.rpm &>/dev/null || true
+			$SUDO yum install -y python37u python37u-pip python37u-devel &>/dev/null || true
+		fi
+
+		# If python3.9/3.8/3.7 binaries exist, prefer the newest by creating a higher-priority symlink
+		if ! python3 - <<-'PYCHK' &>/dev/null; then
+			import sys; raise SystemExit(0 if sys.version_info >= (3,7) else 1)
+		PYCHK
+
+			NEW_PY=""
+			for cand in /usr/bin/python3.11 /usr/bin/python3.10 /usr/bin/python3.9 /usr/bin/python3.8 /usr/bin/python3.7; do
+				[[ -x $cand ]] && NEW_PY="$cand" && break
+			done
+			if [[ -n $NEW_PY ]]; then
+				$SUDO ln -sf "$NEW_PY" /usr/local/bin/python3 2>/dev/null || true
+				export PATH="/usr/local/bin:$PATH"
+			fi
+		fi
+	fi
+
+	# Ensure pipx uses the selected python3
+	export PIPX_DEFAULT_PYTHON="$(command -v python3 || echo python3)"
+
+	# Ensure pipx is present even on older EL (install via pip if the rpm doesn't exist)
+	if ! command -v pipx &>/dev/null; then
+		python3 -m pip install --user -U pip pipx &>/dev/null || true
+		export PATH="$HOME/.local/bin:$PATH"
+	fi
 	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
 	source "${HOME}/.cargo/env"
 	cargo install ripgen &>/dev/null
+	# Ensure pipx path and install shodan CLI
+	pipx ensurepath -f &>/dev/null || true
+	pipx install shodan &>/dev/null || pipx upgrade shodan &>/dev/null || true
 }
 
 # Function to install required packages for Arch-based systems
@@ -530,6 +880,9 @@ function install_pacman() {
 	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
 	source "${HOME}/.cargo/env"
 	cargo install ripgen &>/dev/null
+	# Ensure pipx path and install shodan CLI
+	pipx ensurepath -f &>/dev/null || true
+	pipx install shodan &>/dev/null || pipx upgrade shodan &>/dev/null || true
 }
 
 # Function to perform initial setup
@@ -537,15 +890,28 @@ function initial_setup() {
 	banner
 	reset_git_proxies
 
-	echo -e "${bblue}Running: Checking for updates${reset}\n"
-	check_updates
+	if [[ $TOOLS_ONLY == "true" ]]; then
+		header "Tools-only mode"
+		with_spinner "Installing/validating Golang" install_golang_version
+		mkdir -p ${HOME}/.gf
+		mkdir -p "$tools"
+		mkdir -p ${HOME}/.config/notify/
+		mkdir -p ${HOME}/.config/nuclei/
+		touch "${dir}/.github_tokens"
+		touch "${dir}/.gitlab_tokens"
 
-	echo -e "${bblue}Running: Installing system packages${reset}\n"
-	install_system_packages
+		q pipx ensurepath
+		export PATH="${HOME}/.local/bin:${PATH}"
 
-	install_golang_version
+		install_tools
+		return
+	fi
 
-	echo -e "${bblue}Running: Installing Python requirements${reset}\n"
+	header "Install/Update"
+	with_spinner "Checking for updates" check_updates
+	with_spinner "Installing system packages" install_system_packages
+	check_network
+	with_spinner "Installing/validating Golang" install_golang_version
 	mkdir -p ${HOME}/.gf
 	mkdir -p "$tools"
 	mkdir -p ${HOME}/.config/notify/
@@ -553,109 +919,135 @@ function initial_setup() {
 	touch "${dir}/.github_tokens"
 	touch "${dir}/.gitlab_tokens"
 
-	eval pipx ensurepath $DEBUG_STD
-	source "${HOME}/${profile_shell}"
+	q pipx ensurepath
+	# Ensure $HOME/.local/bin is available now even if profile isn't sourced
+	export PATH="${HOME}/.local/bin:${PATH}"
+	# Do not source user shell profiles here to avoid errors like 'PS1: unbound variable'
+	# in non-interactive shells with 'set -u'. PATH for this process is already updated.
 
 	install_tools
 
-	# Repositorios con configuraciones especiales
-	echo -e "${bblue}\nRunning: Configuring special repositories${reset}\n"
+	# Repositories with special configurations
+	header "Configuring special repositories"
 
-	# Nuclei Templates
-	if [[ ! -d ${NUCLEI_TEMPLATES_PATH} ]]; then
-		#printf "${yellow}Cloning Nuclei templates...${reset}\n"
-		
-		eval git -C "${NUCLEI_TEMPLATES_PATH}" pull $DEBUG_STD
-		eval git -C "${NUCLEI_TEMPLATES_PATH}/extra_templates" pull $DEBUG_STD
-		eval git -C "${tools}/fuzzing-templates" pull $DEBUG_STD
-		eval nuclei -update-templates update-template-dir "${NUCLEI_TEMPLATES_PATH}" $DEBUG_STD
+	# Nuclei Templates (opt-out with MANAGE_NUCLEI_TEMPLATES=false)
+	MANAGE_NUCLEI_TEMPLATES=${MANAGE_NUCLEI_TEMPLATES:-true}
+	if [[ $MANAGE_NUCLEI_TEMPLATES == "true" ]]; then
+		ensure_git_dir "${NUCLEI_TEMPLATES_PATH}"
+		if [[ ! -d ${NUCLEI_TEMPLATES_PATH} ]]; then
+			q mkdir -p "${NUCLEI_TEMPLATES_PATH}"
+			with_spinner "Cloning nuclei-templates" retry 3 3 q_to 300 git clone https://github.com/projectdiscovery/nuclei-templates "${NUCLEI_TEMPLATES_PATH}" || true
+		else
+			with_spinner "Updating nuclei-templates" retry 3 3 q_to 120 git -C "${NUCLEI_TEMPLATES_PATH}" pull || true
+		fi
+		ensure_git_dir "${NUCLEI_TEMPLATES_PATH}/extra_templates"
+		if [[ ! -d ${NUCLEI_TEMPLATES_PATH}/extra_templates ]]; then
+			with_spinner "Cloning extra fuzzing-templates" retry 3 3 q_to 120 git clone https://github.com/projectdiscovery/fuzzing-templates "${NUCLEI_TEMPLATES_PATH}/extra_templates" || true
+		else
+			with_spinner "Updating extra fuzzing-templates" retry 3 3 q_to 60 git -C "${NUCLEI_TEMPLATES_PATH}/extra_templates" pull || true
+		fi
+		ensure_git_dir "${NUCLEI_FUZZING_TEMPLATES_PATH}"
+		if [[ ! -d ${NUCLEI_FUZZING_TEMPLATES_PATH} ]]; then
+			q mkdir -p ${NUCLEI_FUZZING_TEMPLATES_PATH}
+			with_spinner "Cloning fuzzing-templates" retry 3 3 q_to 120 git clone https://github.com/projectdiscovery/fuzzing-templates "${NUCLEI_FUZZING_TEMPLATES_PATH}" || true
+		else
+			with_spinner "Updating fuzzing-templates" retry 3 3 q_to 60 git -C "${NUCLEI_FUZZING_TEMPLATES_PATH}" pull || true
+		fi
 	fi
-	
-	if [[ ! -d ${NUCLEI_FUZZING_TEMPLATES_PATH} ]]; then
-		mkdir -p ${NUCLEI_FUZZING_TEMPLATES_PATH} $DEBUG_STD
-		eval git clone https://github.com/projectdiscovery/fuzzing-templates "${NUCLEI_FUZZING_TEMPLATES_PATH}" $DEBUG_STD
-	fi
+	with_spinner "Nuclei template update" nuclei -update-templates -update-template-dir "${NUCLEI_TEMPLATES_PATH}" >/dev/null 2>&1 || true
 
 	# sqlmap
+	ensure_git_dir "${dir}/sqlmap"
 	if [[ ! -d "${dir}/sqlmap" ]]; then
 		#printf "${yellow}Cloning sqlmap...${reset}\n"
-		eval git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git "${dir}/sqlmap" $DEBUG_STD
+		if ! retry 3 3 q_to 120 git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git "${dir}/sqlmap"; then true; fi
 	else
 		#printf "${yellow}Updating sqlmap...${reset}\n"
-		eval git -C "${dir}/sqlmap" pull $DEBUG_STD
+		if ! retry 3 3 q_to 60 git -C "${dir}/sqlmap" pull; then true; fi
 	fi
 
 	# massdns
+	ensure_git_dir "${dir}/massdns"
 	if [[ ! -d "${dir}/massdns" ]]; then
 		#printf "${yellow}Cloning and compiling massdns...${reset}\n"
-		eval git clone https://github.com/blechschmidt/massdns.git "${dir}/massdns" $DEBUG_STD
-		eval make -C "${dir}/massdns" $DEBUG_STD
-		eval strip -s "${dir}/massdns/bin/massdns" $DEBUG_ERROR
-		eval $SUDO cp "${dir}/massdns/bin/massdns" /usr/local/bin/ $DEBUG_ERROR
+		if ! retry 3 3 q_to 120 git clone https://github.com/blechschmidt/massdns.git "${dir}/massdns"; then true; fi
+		q make -C "${dir}/massdns"
+		strip -s "${dir}/massdns/bin/massdns" 2>/dev/null
+		$SUDO cp "${dir}/massdns/bin/massdns" /usr/local/bin/ 2>/dev/null
 	else
 		#printf "${yellow}Updating massdns...${reset}\n"
-		eval git -C "${dir}/massdns" pull $DEBUG_STD
+		if ! retry 3 3 q_to 60 git -C "${dir}/massdns" pull; then true; fi
 	fi
 
 	# gf patterns
 	if [[ ! -d "$HOME/.gf" ]]; then
 		#printf "${yellow}Installing gf patterns...${reset}\n"
-		eval git clone https://github.com/tomnomnom/gf.git "${dir}/gf" $DEBUG_STD
-		eval cp -r "${dir}/gf/examples" ~/.gf $DEBUG_ERROR
-		eval git clone https://github.com/1ndianl33t/Gf-Patterns "${dir}/Gf-Patterns" $DEBUG_STD
-		eval cp "${dir}/Gf-Patterns"/*.json ~/.gf/ $DEBUG_ERROR
+		ensure_git_dir "${dir}/gf"
+		if ! retry 3 3 q_to 120 git clone https://github.com/tomnomnom/gf.git "${dir}/gf"; then true; fi
+		cp -r "${dir}/gf/examples" ~/.gf 2>/dev/null || true
+		ensure_git_dir "${dir}/Gf-Patterns"
+		if ! retry 3 3 q_to 120 git clone https://github.com/1ndianl33t/Gf-Patterns "${dir}/Gf-Patterns"; then true; fi
+		cp "${dir}/Gf-Patterns"/*.json ~/.gf/ 2>/dev/null || true
 	else
 		#printf "${yellow}Updating gf patterns...${reset}\n"
-		eval git -C "${dir}/Gf-Patterns" pull $DEBUG_STD
+		ensure_git_dir "${dir}/Gf-Patterns"
+		if ! retry 3 3 q_to 60 git -C "${dir}/Gf-Patterns" pull; then true; fi
 	fi
 
-	echo -e "\n${bblue}Running: Downloading required files${reset}\n"
+	header "Downloading required files"
 
 	mkdir -p ${HOME}/.config/notify
 	# Download required files with error handling
 	declare -A downloads=(
-	    ["notify_provider_config"]="https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw ${HOME}/.config/notify/provider-config.yaml"
-	    ["getjswords"]="https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py ${tools}/getjswords.py"
-	    ["subdomains_huge"]="https://raw.githubusercontent.com/n0kovo/n0kovo_subdomains/main/n0kovo_subdomains_huge.txt ${subs_wordlist_big}"
-	    ["trusted_resolvers"]="https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw ${resolvers_trusted}"
-	    ["resolvers"]="https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt ${resolvers}"
-	    ["subs_wordlist"]="https://gist.github.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw ${subs_wordlist}"
-	    ["permutations_list"]="https://gist.github.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw ${tools}/permutations_list.txt"
-	    ["fuzz_wordlist"]="https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt ${fuzz_wordlist}"
-	    ["lfi_wordlist"]="https://gist.githubusercontent.com/six2dez/a89a0c7861d49bb61a09822d272d5395/raw ${lfi_wordlist}"
-	    ["ssti_wordlist"]="https://gist.githubusercontent.com/six2dez/ab5277b11da7369bf4e9db72b49ad3c1/raw ${ssti_wordlist}"
-	    ["headers_inject"]="https://gist.github.com/six2dez/d62ab8f8ffd28e1c206d401081d977ae/raw ${tools}/headers_inject.txt"
-	    ["axiom_config"]="https://gist.githubusercontent.com/six2dez/6e2d9f4932fd38d84610eb851014b26e/raw ${tools}/axiom_config.sh"
+		["notify_provider_config"]="https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw ${HOME}/.config/notify/provider-config.yaml"
+		["getjswords"]="https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py ${tools}/getjswords.py"
+		["subdomains_huge"]="https://raw.githubusercontent.com/n0kovo/n0kovo_subdomains/main/n0kovo_subdomains_huge.txt ${subs_wordlist_big}"
+		["trusted_resolvers"]="https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw ${resolvers_trusted}"
+		["resolvers"]="https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt ${resolvers}"
+		["subs_wordlist"]="https://gist.github.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw ${subs_wordlist}"
+		["permutations_list"]="https://gist.github.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw ${tools}/permutations_list.txt"
+		["fuzz_wordlist"]="https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt ${fuzz_wordlist}"
+		["lfi_wordlist"]="https://gist.githubusercontent.com/six2dez/a89a0c7861d49bb61a09822d272d5395/raw ${lfi_wordlist}"
+		["ssti_wordlist"]="https://gist.githubusercontent.com/six2dez/ab5277b11da7369bf4e9db72b49ad3c1/raw ${ssti_wordlist}"
+		["headers_inject"]="https://gist.github.com/six2dez/d62ab8f8ffd28e1c206d401081d977ae/raw ${tools}/headers_inject.txt"
+		["axiom_config"]="https://gist.githubusercontent.com/six2dez/6e2d9f4932fd38d84610eb851014b26e/raw ${tools}/axiom_config.sh"
 		["jsluice_patterns"]="https://gist.githubusercontent.com/six2dez/2aafa8dc2b682bb0081684e71900e747/raw ${tools}/jsluice_patterns.json"
 	)
-	
+
 	for key in "${!downloads[@]}"; do
-	    url="${downloads[$key]% *}"
-	    destination="${downloads[$key]#* }"
-	
-	    # Skip download if provider-config.yaml already exists
-	    if [[ "$key" == "notify_provider_config" && -f "$destination" ]]; then
-	        echo -e "[${yellow}SKIPPING${reset}] $key as it already exists at $destination.${reset}"
-	        continue
-	    fi
-	
-	    wget -q -O "$destination" "$url" || {
-	        echo -e "${red}[!] Failed to download $key from $url.${reset}"
-	        continue
-	    }
+		url="${downloads[$key]% *}"
+		destination="${downloads[$key]#* }"
+
+		# Skip download if provider-config.yaml already exists
+		if [[ $key == "notify_provider_config" && -f $destination ]]; then
+			printf "[%bSKIPPING%b] %s as it already exists at %s.\n" "$yellow" "$reset" "$key" "$destination"
+			continue
+		fi
+
+		# Ensure destination directory exists
+		mkdir -p "$(dirname "$destination")" 2>/dev/null || true
+
+		if with_spinner "Fetching $key" retry 3 3 q_to 120 wget -q -O "$destination" "$url"; then
+			:
+		else
+			msg_err "Failed to download $key from $url"
+			continue
+		fi
 	done
+
+	# (removed) kiterunner routes tarball handling
 
 	# Make axiom_config.sh executable
 	chmod +x "${tools}/axiom_config.sh" || {
-		echo -e "${red}[!] Failed to make axiom_config.sh executable.${reset}"
+		printf "%b[!] Failed to make axiom_config.sh executable.%b\n" "$red" "$reset"
 	}
 
-	echo -e "${bblue}Running: Performing last configurations${reset}\n"
+	header "Final configuration"
 
 	# Update resolvers if generate_resolvers is true
 	if [[ $generate_resolvers == true ]]; then
 		if [[ ! -s $resolvers || $(find "$resolvers" -mtime +1 -print) ]]; then
-			echo -e "${yellow}Checking resolvers lists...\nAccurate resolvers are the key to great results.\nThis may take around 10 minutes if it's not updated.${reset}\n"
+			printf "%bChecking resolvers lists...\nAccurate resolvers are the key to great results.\nThis may take around 10 minutes if it's not updated.%b\n" "$yellow" "$reset"
 			rm -f "$resolvers" &>/dev/null
 			dnsvalidator -tL https://public-dns.info/nameservers.txt -threads "$DNSVALIDATOR_THREADS" -o "$resolvers" &>/dev/null
 			dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads "$DNSVALIDATOR_THREADS" -o tmp_resolvers &>/dev/null
@@ -667,44 +1059,61 @@ function initial_setup() {
 
 			[[ ! -s $resolvers ]] && wget -q -O "$resolvers" https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt
 			[[ ! -s $resolvers_trusted ]] && wget -q -O "$resolvers_trusted" https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw/trusted_resolvers.txt
-			echo -e "${yellow}Resolvers updated.${reset}\n"
+			printf "%bResolvers updated.%b\n" "$yellow" "$reset"
 		fi
 		generate_resolvers=false
 	else
 		if [[ -s $resolvers && $(find "$resolvers" -mtime +1 -print) ]]; then
-			echo -e "${yellow}Checking resolvers lists...\nAccurate resolvers are the key to great results.\nDownloading new resolvers.${reset}\n"
+			printf "%bChecking resolvers lists...\nAccurate resolvers are the key to great results.\nDownloading new resolvers.%b\n" "$yellow" "$reset"
 			wget -q -O "$resolvers" https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt
 			wget -q -O "$resolvers_trusted" https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw/trusted_resolvers.txt
-			echo -e "${yellow}Resolvers updated.${reset}\n"
+			printf "%bResolvers updated.%b\n" "$yellow" "$reset"
 		fi
 	fi
 
-	# Strip all Go binaries and copy to /usr/local/bin
-	strip -s "${GOPATH}/bin/"* &>/dev/null || true
-	$SUDO cp "${GOPATH}/bin/"* /usr/local/bin/ &>/dev/null || true
+	# Strip all Go binaries and copy to /usr/local/bin (files only)
+	find "${GOPATH}/bin" -type f -perm -u+x -exec strip -s {} \; 2>/dev/null || true
+	find "${GOPATH}/bin" -type f -perm -u+x -exec $SUDO cp {} /usr/local/bin/ \; 2>/dev/null || true
 
-	# Final reminders
-	echo -e "${yellow}Remember to set your API keys:\n- subfinder (${HOME}/.config/subfinder/provider-config.yaml)\n- GitHub (${HOME}/Tools/.github_tokens)\n- GitLab (${HOME}/Tools/.gitlab_tokens)\n- SSRF Server (COLLAB_SERVER in reconftw.cfg or env var)\n- Blind XSS Server (XSS_SERVER in reconftw.cfg or env var)\n- notify (${HOME}/.config/notify/provider-config.yaml)\n- WHOISXML API (WHOISXML_API in reconftw.cfg or env var)\n${reset}"
-	echo -e "${bgreen}Finished!${reset}\n"
-	echo -e "${bgreen}#######################################################################${reset}"
+	# Final reminders (classic output)
+	local final_reminder
+	final_reminder="$(cat <<EOF
+Remember to set your API keys:
+- subfinder (${HOME}/.config/subfinder/provider-config.yaml)
+- GitHub (${HOME}/Tools/.github_tokens)
+- GitLab (${HOME}/Tools/.gitlab_tokens)
+- SSRF Server (COLLAB_SERVER in reconftw.cfg or env var)
+- Blind XSS Server (XSS_SERVER in reconftw.cfg or env var)
+- notify (${HOME}/.config/notify/provider-config.yaml)
+- WHOISXML API (WHOISXML_API in reconftw.cfg or env var)
+EOF
+)"
+	printf "%b%s%b\n" "$yellow" "$final_reminder" "$reset"
+	printf "%bFinished!%b\n" "$bgreen" "$reset"
+	printf "%b#######################################################################%b\n" "$bgreen" "$reset"
 }
 
 # Function to display additional help
 function show_additional_help() {
-	echo "Usage: $0 [OPTION]"
-	echo "Run the script with specified options."
-	echo ""
-	echo "  -h, --help       Display this help and exit."
-	echo "  --tools          Install the tools before running, useful for upgrading."
-	echo ""
-	echo "  ****             Without any arguments, the script will update reconftw"
-	echo "                   and install all dependencies and requirements."
+	cat <<USAGE
+Usage: $0 [OPTIONS]
+
+Options:
+  -h, --help          Show this help and exit
+  --tools             Only install/upgrade tools and exit
+  --verbose           Show detailed installer output (overrides DEBUG_STD/DEBUG_ERROR)
+  --log <file>        Tee all installer output to <file>
+  --force-update      Force git reset/pull even with local changes
+  --dry-run           Print actions without executing changes
+
+Without options, the script checks for updates and installs all dependencies.
+USAGE
 	exit 0
 }
 
 # Function to handle installation arguments
 function handle_install_arguments() {
-	echo -e "\n${bgreen}reconFTW installer/updater script${reset}\n"
+	printf "\n%breconFTW installer/updater script%b\n" "$bgreen" "$reset"
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
@@ -712,28 +1121,46 @@ function handle_install_arguments() {
 			show_additional_help
 			;;
 		--tools)
-			install_tools
+			TOOLS_ONLY=true
+			shift
+			;;
+		--verbose)
+			VERBOSE=true
+			DEBUG_STD=""
+			DEBUG_ERROR=""
+			shift
+			;;
+		--log)
+			LOGFILE="$2"
+			shift 2 || true
+			;;
+		--force-update)
+			FORCE_UPDATE=true
+			shift
+			;;
+		--dry-run)
+			DRY_RUN=true
 			shift
 			;;
 		*)
-			echo -e "${bred}Error: Invalid argument '$1'${reset}"
+			printf "%bError: Invalid argument '%s'%b\n" "$bred" "$1" "$reset"
 			echo "Use -h or --help for usage information."
 			exit 1
 			;;
 		esac
 	done
 
-	echo -e "${yellow}This may take some time. Grab a coffee!${reset}\n"
+	printf "%bThis may take some time. Grab a coffee!%b\n" "$yellow" "$reset"
 
 	# Determine if the script is run as root
 	if [[ "$(id -u)" -eq 0 ]]; then
 		SUDO=""
 	else
 		if ! sudo -n true 2>/dev/null; then
-			echo -e "${bred}It is strongly recommended to add your user to sudoers.${reset}"
-			echo -e "${bred}This will avoid prompts for sudo password during installation and scans.${reset}"
-			echo -e "${bred}Run the following command to add your user to sudoers:${reset}"
-			echo -e "${bred}echo \"${USER}  ALL=(ALL:ALL) NOPASSWD: ALL\" | sudo tee /etc/sudoers.d/reconFTW${reset}\n"
+			printf "%bIt is strongly recommended to add your user to sudoers.%b\n" "$bred" "$reset"
+			printf "%bThis will avoid prompts for sudo password during installation and scans.%b\n" "$bred" "$reset"
+			printf "%bRun the following command to add your user to sudoers:%b\n" "$bred" "$reset"
+			printf "%becho \"%s  ALL=(ALL:ALL) NOPASSWD: ALL\" | sudo tee /etc/sudoers.d/reconFTW%b\n\n" "$bred" "$USER" "$reset"
 		fi
 		SUDO="sudo"
 	fi

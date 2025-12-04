@@ -34,6 +34,11 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0    # full history for git describe
+
+      - name: Fetch tags
+        run: git fetch --force --prune --tags
 
       - name: Install reconFTW
         shell: bash
