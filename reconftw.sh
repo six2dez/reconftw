@@ -2817,7 +2817,7 @@ function webprobe_simple() {
 		fi
 
 		# Merge web_full_info files
-		cat .tmp/web_full_info.txt .tmp/web_full_info_probe.txt webs/web_full_info.txt 2>>"$LOGFILE" |
+		cat .tmp/web_full_info.txt 2>>"$LOGFILE" |
 			jq -s 'try .' | jq 'try unique_by(.input)' | jq 'try .[]' 2>>"$LOGFILE" >webs/web_full_info.txt
 
 		# Extract URLs
