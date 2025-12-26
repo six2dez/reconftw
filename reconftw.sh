@@ -6434,10 +6434,7 @@ function multi_recon() {
 	find . -type f -name 'portscan_active.gnmap' -exec cat {} + | tee hosts/portscan_active.gnmap 2>>"$LOGFILE" >/dev/null
 	find . -type f -name 'portscan_passive.txt' -exec cat {} + | tee hosts/portscan_passive.txt 2>&1 >>"$LOGFILE" >/dev/null
 
-	notification "- ${NUMOFLINES_users_total} total users found" good
 	notification "- ${NUMOFLINES_pwndb_total} total creds leaked" good
-	notification "- ${NUMOFLINES_software_total} total software found" good
-	notification "- ${NUMOFLINES_authors_total} total authors found" good
 	notification "- ${NUMOFLINES_subs_total} total subdomains" good
 	notification "- ${NUMOFLINES_subtko_total} total probably subdomain takeovers" good
 	notification "- ${NUMOFLINES_webs_total} total websites" good
