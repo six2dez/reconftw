@@ -3661,7 +3661,7 @@ function fuzz() {
 			fi
 			end_func "Results are saved in $domain/fuzzing/*subdomain*.txt" ${FUNCNAME[0]}
 		else
-			end_func "No $domain/web/webs.txts file found, fuzzing skipped " ${FUNCNAME[0]}
+			end_func "No $domain/webs/webs.txts file found, fuzzing skipped " ${FUNCNAME[0]}
 		fi
 
 	else
@@ -4005,7 +4005,7 @@ function url_gf() {
 			fi
 
 		else
-			end_func "No webs/webs/url_extract.txt file found, URL_GF check skipped." "${FUNCNAME[0]}"
+			end_func "No webs/url_extract.txt file found, URL_GF check skipped." "${FUNCNAME[0]}"
 			return
 		fi
 
@@ -4763,7 +4763,7 @@ function crlf_checks() {
 		# Handle cases where CRLF_CHECKS is false, no vulnerable URLs, or already processed
 		if [[ $CRLF_CHECKS == false ]]; then
 			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
-		elif [[ ! -s "gf/crlf.txt" ]]; then
+		elif [[ ! -s "vulns/crlf.txt" ]]; then
 			pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for CRLF"
 		else
 			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
@@ -4956,7 +4956,7 @@ function test_ssl() {
 
 		# Run testssl.sh
 		printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: SSL Test with testssl.sh${reset}\n\n"
-		"${tools}/testssl.sh/testssl.sh" --quiet --color 0 -U -iL "hosts/ips.txt" 2>>"$LOGFILE" >"vulns/testssl.txt"
+		"${tools}/testssl.sh/testssl.sh" --quiet --color 0 -U -iL "$dir/hosts/ips.txt" 2>>"$LOGFILE" >"vulns/testssl.txt"
 
 		end_func "Results are saved in vulns/testssl.txt" "${FUNCNAME[0]}"
 
@@ -4964,7 +4964,7 @@ function test_ssl() {
 		# Handle cases where TEST_SSL is false, no vulnerable URLs, or already processed
 		if [[ $TEST_SSL == false ]]; then
 			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
-		elif [[ ! -s "gf/testssl.txt" ]]; then
+		elif [[ ! -s "vulns/testssl.txt" ]]; then
 			pt_msg_warn "${FUNCNAME[0]} skipped: no candidate targets for SSL tests"
 		else
 			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
@@ -6425,10 +6425,9 @@ function multi_recon() {
 	NUMOFLINES_subs_total=$(find . -type f -name 'subdomains.txt' -exec cat {} + | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
 	NUMOFLINES_subtko_total=$(find . -type f -name 'takeover.txt' -exec cat {} + | anew webs/takeover.txt | sed '/^$/d' | wc -l)
 	NUMOFLINES_webs_total=$(find . -type f -name 'webs.txt' -exec cat {} + | anew webs/webs.txt | sed '/^$/d' | wc -l)
-	NUMOFLINES_webs_total=$(find . -type f -name 'webs_uncommon_ports.txt' -exec cat {} + | anew webs/webs_uncommon_ports.txt | sed '/^$/d' | wc -l)
+	NUMOFLINES_webs_total_uncommon=$(find . -type f -name 'webs_uncommon_ports.txt' -exec cat {} + | anew webs/webs_uncommon_ports.txt | sed '/^$/d' | wc -l)
 	NUMOFLINES_ips_total=$(find . -type f -name 'ips.txt' -exec cat {} + | anew hosts/ips.txt | sed '/^$/d' | wc -l)
 	NUMOFLINES_cloudsprov_total=$(find . -type f -name 'cdn_providers.txt' -exec cat {} + | anew hosts/cdn_providers.txt | sed '/^$/d' | wc -l)
-	find . -type f -name 'portscan_active.txt' -exec cat {} + | tee -a hosts/portscan_active.txt >>"$LOGFILE" 2>&1 >/dev/null
 	find . -type f -name 'portscan_active.gnmap' -exec cat {} + | tee hosts/portscan_active.gnmap 2>>"$LOGFILE" >/dev/null
 	find . -type f -name 'portscan_passive.txt' -exec cat {} + | tee hosts/portscan_passive.txt 2>&1 >>"$LOGFILE" >/dev/null
 
@@ -6439,6 +6438,7 @@ function multi_recon() {
 	notification "- ${NUMOFLINES_subs_total} total subdomains" good
 	notification "- ${NUMOFLINES_subtko_total} total probably subdomain takeovers" good
 	notification "- ${NUMOFLINES_webs_total} total websites" good
+	notification "- ${NUMOFLINES_webs_total_uncommon} total websites on uncommon ports" good
 	notification "- ${NUMOFLINES_ips_total} total ips" good
 	notification "- ${NUMOFLINES_cloudsprov_total} total IPs belongs to cloud" good
 	s3buckets
