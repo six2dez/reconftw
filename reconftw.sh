@@ -997,7 +997,7 @@ function sub_passive() {
 
 		# Run subfinder and check for errors
 		subfinder -all -d "$domain" -max-time "$SUBFINDER_ENUM_TIMEOUT" -silent -o .tmp/subfinder_psub.txt 2>>"$LOGFILE" >/dev/null
-		#merklemap-cli search $domain 2>/dev/null | awk -F' ' '{for(i=1;i<=NF;i++) if($i ~ /^domain=/) {split($i,a,"="); print a[2]}}' | anew -q .tmp/subfinder_psub.txt 2>>"$LOGFILE" >/dev/null
+		curl -s https://ip.thc.org/sb/$domain | grep -v ";;" | anew -q .tmp/subfinder_psub.txt 2>>"$LOGFILE" >/dev/null
 
 		# Run github-subdomains if GITHUB_TOKENS is set and file is not empty
 		if [[ -s $GITHUB_TOKENS ]]; then
@@ -1323,6 +1323,12 @@ function sub_dns() {
 				sed -e 's/^\*\.//' -e 's/\.$//' -e '/\./!d' | grep "\.$domain$" |
 				grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' | sort -u |
 				anew -q .tmp/subdomains_dns.txt
+
+			for i in $(); do
+				curl -s https://ip.thc.org/$i 2>>"$LOGFILE" | grep "\.$domain$" |
+					grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' | sort -u |
+					anew -q .tmp/subdomains_dns.txt
+			done
 
 			jq -r 'select(.host) |"\(.host) - \((.a // [])[])", "\(.host) - \((.aaaa // [])[])"' <"subdomains/subdomains_dnsregs.json" |
 				grep -E ' - [0-9a-fA-F:.]+$' | sort -u | anew -q "subdomains/subdomains_ips.txt"
