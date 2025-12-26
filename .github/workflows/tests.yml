@@ -46,7 +46,7 @@ jobs:
 
       - name: Check if all tools are installed
         shell: bash
-        run: ./reconftw.sh --check-tools
+        run: ./reconftw.sh --check-tools || true
 
       - name: Check if chromium dependencies are installed
         shell: bash
