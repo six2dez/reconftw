@@ -4945,8 +4945,7 @@ function test_ssl() {
 	fi
 
 	# Check if the function should run
-	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $TEST_SSL == true ]] &&
-		[[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $TEST_SSL == true ]]; then
 
 		start_func "${FUNCNAME[0]}" "SSL Test"
 
@@ -4955,9 +4954,10 @@ function test_ssl() {
 			echo "$domain" >"$dir/hosts/ips.txt"
 		fi
 
+		cat $dir/hosts/ips.txt $dir/webs/webs_all.txt 2>/dev/null > $dir/.tmp/ssl_targets.txt
 		# Run testssl.sh
 		printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: SSL Test with testssl.sh${reset}\n\n"
-		"${tools}/testssl.sh/testssl.sh" --quiet --color 0 -U -iL "$dir/hosts/ips.txt" 2>>"$LOGFILE" >"vulns/testssl.txt"
+		"${tools}/testssl.sh/testssl.sh" --quiet --color 0 -U -iL "$dir/.tmp/ssl_targets.txt" 2>>"$LOGFILE" >"vulns/testssl.txt"
 
 		end_func "Results are saved in vulns/testssl.txt" "${FUNCNAME[0]}"
 
