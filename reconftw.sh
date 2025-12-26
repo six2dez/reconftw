@@ -3983,8 +3983,8 @@ function url_gf() {
 
 		start_func "${FUNCNAME[0]}" "Vulnerable Pattern Search"
 
-		# Ensure webs_nuclei.txt exists and is not empty
-		if [[ -s "webs/webs_nuclei.txt" ]]; then
+		# Ensure webs/url_extract.txt exists and is not empty
+		if [[ -s "webs/url_extract.txt" ]]; then
 			# Define an array of GF patterns
 			declare -A gf_patterns=(
 				["xss"]="gf/xss.txt"
@@ -4003,13 +4003,13 @@ function url_gf() {
 				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: GF Pattern '$pattern'${reset}\n\n"
 				if [[ $pattern == "potential" ]]; then
 					# Special handling for 'potential' pattern
-					gf "$pattern" "webs/webs_nuclei.txt" | cut -d ':' -f3-5 | anew -q "$output_file"
+					gf "$pattern" "webs/url_extract.txt" | cut -d ':' -f3-5 | anew -q "$output_file"
 				elif [[ $pattern == "redirect" && -s "gf/ssrf.txt" ]]; then
 					# Append SSFR results to redirect if ssrf.txt exists
-					gf "$pattern" "webs/webs_nuclei.txt" | anew -q "$output_file"
+					gf "$pattern" "webs/url_extract.txt" | anew -q "$output_file"
 				else
 					# General handling for other patterns
-					gf "$pattern" "webs/webs_nuclei.txt" | anew -q "$output_file"
+					gf "$pattern" "webs/url_extract.txt" | anew -q "$output_file"
 				fi
 			done
 
@@ -4021,7 +4021,7 @@ function url_gf() {
 			fi
 
 		else
-			end_func "No webs/webs_nuclei.txt file found, URL_GF check skipped." "${FUNCNAME[0]}"
+			end_func "No webs/webs/url_extract.txt file found, URL_GF check skipped." "${FUNCNAME[0]}"
 			return
 		fi
 
@@ -5305,7 +5305,7 @@ function webcache() {
 			fi
 
 			# Run the Web-Cache-Vulnerability-Scanner
-			./Web-Cache-Vulnerability-Scanner -u "file:$dir/webs/webs_all.txt" -v 0 2>>"$LOGFILE" |
+			Web-Cache-Vulnerability-Scanner -u "file:$dir/webs/webs_all.txt" -v 0 2>>"$LOGFILE" |
 				anew -q "$dir/.tmp/webcache.txt"
 
 			# Return to the original directory
