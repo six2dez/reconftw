@@ -506,7 +506,7 @@ function metadata() {
 
 		exiftool -r .tmp/metagoofil_${domain}/* 2>>"${LOGFILE}" | tee /dev/null | egrep -i "Author|Creator|Email|Producer|Template" | sort -u | anew -q "osint/metadata_results.txt"
 
-		end_func "Results are saved in ${domain}/osint/[software/authors/metadata_results].txt" "${FUNCNAME[0]}"
+		end_func "Results are saved in ${domain}/osint/metadata_results.txt" "${FUNCNAME[0]}"
 	else
 		if [[ ${METADATA} == false ]] || [[ ${OSINT} == false ]]; then
 			printf "\n%b[%s] %s skipped due to mode or configuration settings.%b\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "${reset}"
@@ -997,7 +997,7 @@ function sub_passive() {
 
 		# Run subfinder and check for errors
 		subfinder -all -d "$domain" -max-time "$SUBFINDER_ENUM_TIMEOUT" -silent -o .tmp/subfinder_psub.txt 2>>"$LOGFILE" >/dev/null
-		#merklemap-cli search $domain 2>/dev/null | awk -F' ' '{for(i=1;i<=NF;i++) if($i ~ /^domain=/) {split($i,a,"="); print a[2]}}' | anew -q .tmp/subfinder_psub.txt 2>>"$LOGFILE" >/dev/null
+		curl -s https://ip.thc.org/sb/$domain | grep -v ";;" | anew -q .tmp/subfinder_psub.txt 2>>"$LOGFILE" >/dev/null
 
 		# Run github-subdomains if GITHUB_TOKENS is set and file is not empty
 		if [[ -s $GITHUB_TOKENS ]]; then
@@ -1323,6 +1323,12 @@ function sub_dns() {
 				sed -e 's/^\*\.//' -e 's/\.$//' -e '/\./!d' | grep "\.$domain$" |
 				grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' | sort -u |
 				anew -q .tmp/subdomains_dns.txt
+
+			for i in $(); do
+				curl -s https://ip.thc.org/$i 2>>"$LOGFILE" | grep "\.$domain$" |
+					grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' | sort -u |
+					anew -q .tmp/subdomains_dns.txt
+			done
 
 			jq -r 'select(.host) |"\(.host) - \((.a // [])[])", "\(.host) - \((.aaaa // [])[])"' <"subdomains/subdomains_dnsregs.json" |
 				grep -E ' - [0-9a-fA-F:.]+$' | sort -u | anew -q "subdomains/subdomains_ips.txt"
@@ -2525,17 +2531,6 @@ function s3buckets() {
 			fi
 		fi
 
-		# Include root domain in the process
-		if ! printf "%b\n" "$domain" >webs/full_webs.txt; then
-			printf "%b[!] Failed to create webs/full_webs.txt.%b\n" "$bred" "$reset"
-		fi
-
-		if [[ -s "webs/webs_all.txt" ]]; then
-			if ! cat webs/webs_all.txt >>webs/full_webs.txt; then
-				printf "%b[!] Failed to append webs_all.txt to full_webs.txt.%b\n" "$bred" "$reset"
-			fi
-		fi
-
 		# Initialize the output file in the subdomains folder
 		if ! : >subdomains/cloudhunter_open_buckets.txt; then
 			printf "%b[!] Failed to initialize cloudhunter_open_buckets.txt.%b\n" "$bred" "$reset"
@@ -2594,11 +2589,6 @@ function s3buckets() {
 				printf "%b[!] CloudHunter command failed for URL %s.%b\n" "$bred" "$url" "$reset"
 			fi
 		) >>"$dir/subdomains/cloudhunter_open_buckets.txt" 2>>"$LOGFILE"
-
-		# Remove the full_webs.txt file after CloudHunter processing
-		if ! rm webs/full_webs.txt; then
-			printf "%b[!] Failed to remove webs/full_webs.txt.%b\n" "$bred" "$reset"
-		fi
 
 		# Process CloudHunter results
 		if [[ -s "subdomains/cloudhunter_open_buckets.txt" ]]; then
@@ -3122,7 +3112,7 @@ function favicon() {
 function portscan() {
 
 	# Create necessary directories
-	if ! mkdir -p .tmp subdomains hosts; then
+	if ! mkdir -p .tmp subdomains hosts webs; then
 		printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
 		return 1
 	fi
@@ -3677,7 +3667,7 @@ function fuzz() {
 			fi
 			end_func "Results are saved in $domain/fuzzing/*subdomain*.txt" ${FUNCNAME[0]}
 		else
-			end_func "No $domain/web/webs.txts file found, fuzzing skipped " ${FUNCNAME[0]}
+			end_func "No $domain/webs/webs_all.txt file found, fuzzing skipped " ${FUNCNAME[0]}
 		fi
 
 	else
@@ -4021,7 +4011,7 @@ function url_gf() {
 			fi
 
 		else
-			end_func "No webs/webs/url_extract.txt file found, URL_GF check skipped." "${FUNCNAME[0]}"
+			end_func "No webs/url_extract.txt file found, URL_GF check skipped." "${FUNCNAME[0]}"
 			return
 		fi
 
@@ -4205,8 +4195,9 @@ function jschecks() {
 					-c "python3 ${tools}/getjswords.py '_target_' | anew -q webs/dict_words.txt" 2>>"$LOGFILE" >/dev/null
 			fi
 			end_func "Results are saved in $domain/js folder" "${FUNCNAME[0]}"
+		else
+			end_func "No JS files to process" "${FUNCNAME[0]}"
 		fi
-		end_func "No JS files to process" "${FUNCNAME[0]}"
 	else
 		if [[ $JSCHECKS == false ]]; then
 			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
@@ -4779,7 +4770,7 @@ function crlf_checks() {
 		# Handle cases where CRLF_CHECKS is false, no vulnerable URLs, or already processed
 		if [[ $CRLF_CHECKS == false ]]; then
 			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
-		elif [[ ! -s "gf/crlf.txt" ]]; then
+		elif [[ ! -s "vulns/crlf.txt" ]]; then
 			pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for CRLF"
 		else
 			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
@@ -4960,8 +4951,7 @@ function test_ssl() {
 	fi
 
 	# Check if the function should run
-	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $TEST_SSL == true ]] &&
-		! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $TEST_SSL == true ]]; then
 
 		start_func "${FUNCNAME[0]}" "SSL Test"
 
@@ -4972,7 +4962,7 @@ function test_ssl() {
 
 		# Run testssl.sh
 		printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: SSL Test with testssl.sh${reset}\n\n"
-		"${tools}/testssl.sh/testssl.sh" --quiet --color 0 -U -iL "hosts/ips.txt" 2>>"$LOGFILE" >"vulns/testssl.txt"
+		"${tools}/testssl.sh/testssl.sh" --quiet --color 0 -U -iL "$dir/hosts/ips.txt" 2>>"$LOGFILE" >"vulns/testssl.txt"
 
 		end_func "Results are saved in vulns/testssl.txt" "${FUNCNAME[0]}"
 
@@ -4980,7 +4970,7 @@ function test_ssl() {
 		# Handle cases where TEST_SSL is false, no vulnerable URLs, or already processed
 		if [[ $TEST_SSL == false ]]; then
 			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
-		elif [[ ! -s "gf/testssl.txt" ]]; then
+		elif [[ ! -s "vulns/testssl.txt" ]]; then
 			pt_msg_warn "${FUNCNAME[0]} skipped: no candidate targets for SSL tests"
 		else
 			pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
@@ -6434,27 +6424,21 @@ function multi_recon() {
 	}
 
 	notification "############################# Total data ############################" info
-	NUMOFLINES_users_total=$(find . -type f -name 'users.txt' -exec cat {} + | anew osint/users.txt | sed '/^$/d' | wc -l)
 	NUMOFLINES_pwndb_total=$(find . -type f -name 'passwords.txt' -exec cat {} + | anew osint/passwords.txt | sed '/^$/d' | wc -l)
-	NUMOFLINES_software_total=$(find . -type f -name 'software.txt' -exec cat {} + | anew osint/software.txt | sed '/^$/d' | wc -l)
-	NUMOFLINES_authors_total=$(find . -type f -name 'authors.txt' -exec cat {} + | anew osint/authors.txt | sed '/^$/d' | wc -l)
 	NUMOFLINES_subs_total=$(find . -type f -name 'subdomains.txt' -exec cat {} + | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
 	NUMOFLINES_subtko_total=$(find . -type f -name 'takeover.txt' -exec cat {} + | anew webs/takeover.txt | sed '/^$/d' | wc -l)
 	NUMOFLINES_webs_total=$(find . -type f -name 'webs.txt' -exec cat {} + | anew webs/webs.txt | sed '/^$/d' | wc -l)
-	NUMOFLINES_webs_total=$(find . -type f -name 'webs_uncommon_ports.txt' -exec cat {} + | anew webs/webs_uncommon_ports.txt | sed '/^$/d' | wc -l)
+	NUMOFLINES_webs_total_uncommon=$(find . -type f -name 'webs_uncommon_ports.txt' -exec cat {} + | anew webs/webs_uncommon_ports.txt | sed '/^$/d' | wc -l)
 	NUMOFLINES_ips_total=$(find . -type f -name 'ips.txt' -exec cat {} + | anew hosts/ips.txt | sed '/^$/d' | wc -l)
 	NUMOFLINES_cloudsprov_total=$(find . -type f -name 'cdn_providers.txt' -exec cat {} + | anew hosts/cdn_providers.txt | sed '/^$/d' | wc -l)
-	find . -type f -name 'portscan_active.txt' -exec cat {} + | tee -a hosts/portscan_active.txt >>"$LOGFILE" 2>&1 >/dev/null
 	find . -type f -name 'portscan_active.gnmap' -exec cat {} + | tee hosts/portscan_active.gnmap 2>>"$LOGFILE" >/dev/null
 	find . -type f -name 'portscan_passive.txt' -exec cat {} + | tee hosts/portscan_passive.txt 2>&1 >>"$LOGFILE" >/dev/null
 
-	notification "- ${NUMOFLINES_users_total} total users found" good
 	notification "- ${NUMOFLINES_pwndb_total} total creds leaked" good
-	notification "- ${NUMOFLINES_software_total} total software found" good
-	notification "- ${NUMOFLINES_authors_total} total authors found" good
 	notification "- ${NUMOFLINES_subs_total} total subdomains" good
 	notification "- ${NUMOFLINES_subtko_total} total probably subdomain takeovers" good
 	notification "- ${NUMOFLINES_webs_total} total websites" good
+	notification "- ${NUMOFLINES_webs_total_uncommon} total websites on uncommon ports" good
 	notification "- ${NUMOFLINES_ips_total} total ips" good
 	notification "- ${NUMOFLINES_cloudsprov_total} total IPs belongs to cloud" good
 	s3buckets
