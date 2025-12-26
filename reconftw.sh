@@ -3106,7 +3106,7 @@ function favicon() {
 function portscan() {
 
 	# Create necessary directories
-	if ! mkdir -p .tmp subdomains hosts; then
+	if ! mkdir -p .tmp subdomains hosts webs; then
 		printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
 		return 1
 	fi
@@ -4954,10 +4954,9 @@ function test_ssl() {
 			echo "$domain" >"$dir/hosts/ips.txt"
 		fi
 
-		cat $dir/hosts/ips.txt $dir/webs/webs_all.txt 2>/dev/null > $dir/.tmp/ssl_targets.txt
 		# Run testssl.sh
 		printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: SSL Test with testssl.sh${reset}\n\n"
-		"${tools}/testssl.sh/testssl.sh" --quiet --color 0 -U -iL "$dir/.tmp/ssl_targets.txt" 2>>"$LOGFILE" >"vulns/testssl.txt"
+		"${tools}/testssl.sh/testssl.sh" --quiet --color 0 -U -iL "$dir/hosts/ips.txt" 2>>"$LOGFILE" >"vulns/testssl.txt"
 
 		end_func "Results are saved in vulns/testssl.txt" "${FUNCNAME[0]}"
 
