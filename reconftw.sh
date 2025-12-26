@@ -3661,7 +3661,7 @@ function fuzz() {
 			fi
 			end_func "Results are saved in $domain/fuzzing/*subdomain*.txt" ${FUNCNAME[0]}
 		else
-			end_func "No $domain/webs/webs.txts file found, fuzzing skipped " ${FUNCNAME[0]}
+			end_func "No $domain/webs/webs_all.txt file found, fuzzing skipped " ${FUNCNAME[0]}
 		fi
 
 	else
@@ -4189,8 +4189,9 @@ function jschecks() {
 					-c "python3 ${tools}/getjswords.py '_target_' | anew -q webs/dict_words.txt" 2>>"$LOGFILE" >/dev/null
 			fi
 			end_func "Results are saved in $domain/js folder" "${FUNCNAME[0]}"
+		else
+			end_func "No JS files to process" "${FUNCNAME[0]}"
 		fi
-		end_func "No JS files to process" "${FUNCNAME[0]}"
 	else
 		if [[ $JSCHECKS == false ]]; then
 			pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
@@ -4945,7 +4946,7 @@ function test_ssl() {
 
 	# Check if the function should run
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $TEST_SSL == true ]] &&
-		! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+		[[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 
 		start_func "${FUNCNAME[0]}" "SSL Test"
 
@@ -6418,10 +6419,7 @@ function multi_recon() {
 	}
 
 	notification "############################# Total data ############################" info
-	NUMOFLINES_users_total=$(find . -type f -name 'users.txt' -exec cat {} + | anew osint/users.txt | sed '/^$/d' | wc -l)
 	NUMOFLINES_pwndb_total=$(find . -type f -name 'passwords.txt' -exec cat {} + | anew osint/passwords.txt | sed '/^$/d' | wc -l)
-	NUMOFLINES_software_total=$(find . -type f -name 'software.txt' -exec cat {} + | anew osint/software.txt | sed '/^$/d' | wc -l)
-	NUMOFLINES_authors_total=$(find . -type f -name 'authors.txt' -exec cat {} + | anew osint/authors.txt | sed '/^$/d' | wc -l)
 	NUMOFLINES_subs_total=$(find . -type f -name 'subdomains.txt' -exec cat {} + | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
 	NUMOFLINES_subtko_total=$(find . -type f -name 'takeover.txt' -exec cat {} + | anew webs/takeover.txt | sed '/^$/d' | wc -l)
 	NUMOFLINES_webs_total=$(find . -type f -name 'webs.txt' -exec cat {} + | anew webs/webs.txt | sed '/^$/d' | wc -l)
