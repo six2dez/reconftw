@@ -506,7 +506,7 @@ function metadata() {
 
 		exiftool -r .tmp/metagoofil_${domain}/* 2>>"${LOGFILE}" | tee /dev/null | egrep -i "Author|Creator|Email|Producer|Template" | sort -u | anew -q "osint/metadata_results.txt"
 
-		end_func "Results are saved in ${domain}/osint/[software/authors/metadata_results].txt" "${FUNCNAME[0]}"
+		end_func "Results are saved in ${domain}/osint/metadata_results.txt" "${FUNCNAME[0]}"
 	else
 		if [[ ${METADATA} == false ]] || [[ ${OSINT} == false ]]; then
 			printf "\n%b[%s] %s skipped due to mode or configuration settings.%b\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "${reset}"
@@ -2525,17 +2525,6 @@ function s3buckets() {
 			fi
 		fi
 
-		# Include root domain in the process
-		if ! printf "%b\n" "$domain" >webs/full_webs.txt; then
-			printf "%b[!] Failed to create webs/full_webs.txt.%b\n" "$bred" "$reset"
-		fi
-
-		if [[ -s "webs/webs_all.txt" ]]; then
-			if ! cat webs/webs_all.txt >>webs/full_webs.txt; then
-				printf "%b[!] Failed to append webs_all.txt to full_webs.txt.%b\n" "$bred" "$reset"
-			fi
-		fi
-
 		# Initialize the output file in the subdomains folder
 		if ! : >subdomains/cloudhunter_open_buckets.txt; then
 			printf "%b[!] Failed to initialize cloudhunter_open_buckets.txt.%b\n" "$bred" "$reset"
@@ -2594,11 +2583,6 @@ function s3buckets() {
 				printf "%b[!] CloudHunter command failed for URL %s.%b\n" "$bred" "$url" "$reset"
 			fi
 		) >>"$dir/subdomains/cloudhunter_open_buckets.txt" 2>>"$LOGFILE"
-
-		# Remove the full_webs.txt file after CloudHunter processing
-		if ! rm webs/full_webs.txt; then
-			printf "%b[!] Failed to remove webs/full_webs.txt.%b\n" "$bred" "$reset"
-		fi
 
 		# Process CloudHunter results
 		if [[ -s "subdomains/cloudhunter_open_buckets.txt" ]]; then
