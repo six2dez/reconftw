@@ -4682,9 +4682,9 @@ function ssrf_checks() {
 			printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: SSRF Payload Generation${reset}\n\n"
 
 			# Generate temporary SSRF payloads
-			qsreplace "$COLLAB_SERVER_FIX" <"gf/ssrf.txt" | sed '/FUZZ/!d' | anew -q ".tmp/tmp_ssrf.txt"
+			qsreplace "$COLLAB_SERVER_FIX" <"gf/ssrf.txt" | anew -q ".tmp/tmp_ssrf.txt"
 
-			qsreplace "$COLLAB_SERVER_URL" <"gf/ssrf.txt" | sed '/FUZZ/!d' | anew -q ".tmp/tmp_ssrf.txt"
+			qsreplace "$COLLAB_SERVER_URL" <"gf/ssrf.txt" | anew -q ".tmp/tmp_ssrf.txt"
 
 			# Run FFUF to find requested URLs
 			printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: FFUF for SSRF Requested URLs${reset}\n\n"
