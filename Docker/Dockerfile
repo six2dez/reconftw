@@ -125,6 +125,7 @@ COPY notify.conf /root/.config/notify/provider-config.yaml
 
 ###>> Configure Axiom Provider <<###
 RUN <<eot
+#!/bin/bash
 set -euxo pipefail
 if [ "${INSTALL_AXIOM}" = "true" ]; then
     ###>> Regenerate SSH Keys <<###
