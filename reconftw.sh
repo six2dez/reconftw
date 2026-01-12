@@ -197,7 +197,6 @@ function tools_installed() {
 		["CloudHunter_python"]="${tools}/CloudHunter/venv/bin/python3"
 		["nmap-parse-output"]="${tools}/ultimate-nmap-parser/ultimate-nmap-parser.sh"
 		["pydictor"]="${tools}/pydictor/pydictor.py"
-		["smuggler"]="${tools}/smuggler/smuggler.py"
 		["regulator"]="${tools}/regulator/main.py"
 		["regulator_python"]="${tools}/regulator/venv/bin/python3"
 		["nomore403"]="${tools}/nomore403/nomore403"
@@ -273,6 +272,7 @@ function tools_installed() {
 		["smap"]="smap"
 		["gitdorks_go"]="gitdorks_go"
 		["ripgen"]="ripgen"
+		["smugglex"]="smugglex"
 		["dsieve"]="dsieve"
 		["inscope"]="inscope"
 		["enumerepo"]="enumerepo"
@@ -5217,32 +5217,15 @@ function smuggling() {
 
 			printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: HTTP Request Smuggling Checks${reset}\n\n"
 
-			# Navigate to smuggler tool directory
-			if ! pushd "${tools}/smuggler" >/dev/null; then
-				printf "%b[!] Failed to navigate to smuggler directory.%b\n" "$bred" "$reset"
-				end_func "Failed to navigate to smuggler directory during HTTP Request Smuggling Checks." "${FUNCNAME[0]}"
-				return 1
-			fi
-
-			# Run smuggler.py on the list of URLs
-			python3 "smuggler.py" -f "$dir/webs/webs_all.txt" -o "$dir/.tmp/smuggling.txt" 2>>"$LOGFILE" >/dev/null
-
-			# Move payload files to vulns/smuggling/
-			find "payloads" -type f ! -name "README*" -exec mv {} "$dir/vulns/smuggling/" \;
-
-			# Return to the original directory
-			if ! popd >/dev/null; then
-				printf "%b[!] Failed to return to the original directory.%b\n" "$bred" "$reset"
-				end_func "Failed to return to the original directory during HTTP Request Smuggling Checks." "${FUNCNAME[0]}"
-				return 1
-			fi
+			# Run smugglex on the list of URLs
+			cat "$dir/webs/webs_all.txt" | smugglex -f plain -o "$dir/.tmp/smuggling.txt" 2>>"$LOGFILE" >/dev/null
 
 			# Append unique smuggling results to vulns directory
 			if [[ -s "$dir/.tmp/smuggling.txt" ]]; then
-				cat "$dir/.tmp/smuggling.txt" | grep "EXPL" | anew -q "vulns/prototype_pollution.txt"
+				cat "$dir/.tmp/smuggling.txt" | jq -c 2>>"$LOGFILE" >/dev/null | anew -q "vulns/smuggling.txt"
 			fi
 
-			end_func "Results are saved in vulns/smuggling_log.txt and findings in vulns/smuggling/" "${FUNCNAME[0]}"
+			end_func "Findings are saved in vulns/smuggling.txt" "${FUNCNAME[0]}"
 
 		else
 			notification "Too many URLs to bypass, skipping" warn

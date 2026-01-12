@@ -277,7 +277,6 @@ declare -A repos=(
 	["ultimate-nmap-parser"]="shifty0g/ultimate-nmap-parser"
 	["pydictor"]="LandGrey/pydictor"
 	["gitdorks_go"]="damit5/gitdorks_go"
-	["smuggler"]="defparam/smuggler"
 	["Web-Cache-Vulnerability-Scanner"]="Hackmanit/Web-Cache-Vulnerability-Scanner"
 	["regulator"]="cramppet/regulator"
 	["gitleaks"]="gitleaks/gitleaks"
@@ -788,6 +787,7 @@ function install_apt() {
 	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
 	source "${HOME}/.cargo/env"
 	cargo install ripgen &>/dev/null
+	cargo install smugglex &>/dev/null
 	pipx ensurepath -f &>/dev/null
 	# Install jsbeautifier and shodan CLI in isolated environments to avoid PEP 668 conflicts
 	pipx install jsbeautifier &>/dev/null || true
@@ -806,6 +806,7 @@ function install_brew() {
 	brew install rustup &>/dev/null
 	rustup-init -y &>/dev/null
 	cargo install ripgen &>/dev/null
+	cargo install smugglex &>/dev/null
 }
 
 # Function to install required packages for RedHat-based systems
@@ -869,6 +870,7 @@ function install_yum() {
 	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
 	source "${HOME}/.cargo/env"
 	cargo install ripgen &>/dev/null
+	cargo install smugglex &>/dev/null
 	# Ensure pipx path and install shodan CLI
 	pipx ensurepath -f &>/dev/null || true
 	pipx install shodan &>/dev/null || pipx upgrade shodan &>/dev/null || true
@@ -880,6 +882,7 @@ function install_pacman() {
 	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
 	source "${HOME}/.cargo/env"
 	cargo install ripgen &>/dev/null
+	cargo install smugglex &>/dev/null
 	# Ensure pipx path and install shodan CLI
 	pipx ensurepath -f &>/dev/null || true
 	pipx install shodan &>/dev/null || pipx upgrade shodan &>/dev/null || true
