@@ -2619,7 +2619,7 @@ function s3buckets() {
 		esac
 
 		# Debug: Print the full CloudHunter command
-		printf "CloudHunter command: %s/venv/bin/python3 %s/cloudhunter.py %s -r %s/resolvers.txt -t 50 [URL]\n" "$tools/CloudHunter" "$tools/CloudHunter" "$PERMUTATION_FLAG" "$tools/CloudHunter" >>"$LOGFILE"
+		#printf "CloudHunter command: %s/venv/bin/python3 %s/cloudhunter.py %s -r %s/resolvers.txt -t 50 [URL]\n" "$tools/CloudHunter" "$tools/CloudHunter" "$PERMUTATION_FLAG" "$tools/CloudHunter" >>"$LOGFILE"
 
 		# Debug: Check if files exist
 		if [[ -f "$tools/CloudHunter/cloudhunter.py" ]]; then
@@ -2649,7 +2649,7 @@ function s3buckets() {
 				printf "%b[!] Failed to cd to %s.%b\n" "$bred" "$tools/CloudHunter" "$reset"
 				return 1
 			fi
-			if ! "${tools}/CloudHunter/venv/bin/python3" ./cloudhunter.py ${PERMUTATION_FLAG} -r ./resolvers.txt -t 50 "$domain"; then
+			if ! "${tools}/CloudHunter/venv/bin/python3" ./cloudhunter.py -p ${PERMUTATION_FLAG} -r ./resolvers.txt -t 50 "$domain"; then
 				printf "%b[!] CloudHunter command failed for domain %s.%b\n" "$bred" "$domain" "$reset"
 			fi
 		) >>"$dir/subdomains/cloudhunter_open_buckets.txt" 2>>"$LOGFILE"
