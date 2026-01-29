@@ -169,7 +169,7 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **Broken Links**: Identifies broken links on web pages ([katana](https://github.com/projectdiscovery/katana)).
 - **Command Injection**: Tests for command injection vulnerabilities ([commix](https://github.com/commixproject/commix)).
 - **Prototype Pollution**: Detects JavaScript prototype pollution ([ppmap](https://github.com/kleiton0x00/ppmap)).
-- **HTTP Request Smuggling**: Checks for request smuggling vulnerabilities ([smuggler](https://github.com/defparam/smuggler)).
+- **HTTP Request Smuggling**: Checks for request smuggling vulnerabilities ([smugglex](https://github.com/hahwul/smugglex)).
 - **Web Cache**: Identifies web cache vulnerabilities ([Web-Cache-Vulnerability-Scanner](https://github.com/Hackmanit/Web-Cache-Vulnerability-Scanner)).
 - **4XX Bypassing**: Attempts to bypass 4XX responses ([nomore403](https://github.com/devploit/nomore403)).
 - **Parameter Fuzzing**: Fuzzes URL parameters for vulnerabilities ([nuclei](https://github.com/projectdiscovery/nuclei)).
@@ -423,7 +423,7 @@ SUBANALYTICS=true # Google Analytics search
 SUBBRUTE=true # DNS bruteforcing
 SUBSCRAPING=true # Subdomains extraction from web crawling
 SUBPERMUTE=true # DNS permutations
-SUBIAPERMUTE=true # Permutations by IA analysis
+SUBIAPERMUTE=true # Permutations by AI analysis
 SUBREGEXPERMUTE=true # Permutations by regex analysis
 PERMUTATIONS_OPTION=gotator # The alternative is "ripgen" (faster, not deeper)
 GOTATOR_FLAGS=" -depth 1 -numbers 3 -mindup -adv -md" # Flags for gotator

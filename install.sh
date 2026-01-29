@@ -329,7 +329,7 @@ function install_tools() {
 				INST_GO_SKIP+=("$gotool")
 				((++go_skip))
 				progress_update "Go tools" "$go_step" "$total_go" "$go_ok" "$go_skip" "$go_fail"
-				[[ $COMPACT != "true" ]] && msg_warn "[$go_step/$total_go] ${CLR_CYAN}${gotool}${RESET} already installed"
+				[[ $COMPACT != "true" ]] && msg_warn "[$go_step/$total_go] ${gotool} already installed"
 				continue
 			fi
 		fi
@@ -339,14 +339,14 @@ function install_tools() {
 			INST_GO_OK+=("$gotool")
 			((++go_ok))
 			progress_update "Go tools" "$go_step" "$total_go" "$go_ok" "$go_skip" "$go_fail"
-			[[ $COMPACT != "true" ]] && msg_ok "[$go_step/$total_go] ${CLR_CYAN}${gotool}${RESET} installed"
+			[[ $COMPACT != "true" ]] && msg_ok "[$go_step/$total_go] ${gotool} installed"
 		else
 			failed_tools+=("$gotool")
 			INST_GO_FAIL+=("$gotool")
 			((++go_fail))
 			double_check=true
 			progress_update "Go tools" "$go_step" "$total_go" "$go_ok" "$go_skip" "$go_fail"
-			msg_err "[$go_step/$total_go] ${CLR_CYAN}${gotool}${RESET} failed"
+			msg_err "[$go_step/$total_go] ${gotool} failed"
 		fi
 	done
 	[[ $COMPACT == "true" && $IS_TTY -eq 1 ]] && printf "\n"
@@ -365,7 +365,7 @@ function install_tools() {
 				INST_PX_SKIP+=("$pipxtool")
 				((++px_skip))
 				progress_update "pipx tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
-				[[ $COMPACT != "true" ]] && msg_warn "[$pipx_step/$total_px] ${CLR_CYAN}${pipxtool}${RESET} already installed"
+				[[ $COMPACT != "true" ]] && msg_warn "[$pipx_step/$total_px] ${pipxtool} already installed"
 				continue
 			fi
 		fi
@@ -379,7 +379,7 @@ function install_tools() {
 			((++px_fail))
 			double_check=true
 			progress_update "pipx tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
-			msg_err "[$pipx_step/$total_px] ${CLR_CYAN}${pipxtool}${RESET} install failed"
+			msg_err "[$pipx_step/$total_px] ${pipxtool} install failed"
 			continue
 		fi
 
@@ -392,14 +392,14 @@ function install_tools() {
 			((++px_fail))
 			double_check=true
 			progress_update "pipx tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
-			msg_err "[$pipx_step/$total_px] ${CLR_CYAN}${pipxtool}${RESET} upgrade failed"
+			msg_err "[$pipx_step/$total_px] ${pipxtool} upgrade failed"
 			continue
 		fi
 
 		INST_PX_OK+=("$pipxtool")
 		((++px_ok))
 		progress_update "pipx tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
-		[[ $COMPACT != "true" ]] && msg_ok "[$pipx_step/$total_px] ${CLR_CYAN}${pipxtool}${RESET} ready"
+		[[ $COMPACT != "true" ]] && msg_ok "[$pipx_step/$total_px] ${pipxtool} ready"
 	done
 	[[ $COMPACT == "true" && $IS_TTY -eq 1 ]] && printf "\n"
 
@@ -483,6 +483,7 @@ function install_tools() {
 				double_check=true
 			fi
 			if [ "$repo" = "dorks_hunter" ]; then
+				source venv/bin/activate
 				pip install xnldorker &>/dev/null || true
 			fi
 			deactivate || true
@@ -962,29 +963,29 @@ function initial_setup() {
 	# sqlmap
 	ensure_git_dir "${dir}/sqlmap"
 	if [[ ! -d "${dir}/sqlmap" ]]; then
-		#printf "${yellow}Cloning sqlmap...${reset}\n"
+		#printf "${yellow}Cloning sqlmap...\n"
 		if ! retry 3 3 q_to 120 git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git "${dir}/sqlmap"; then true; fi
 	else
-		#printf "${yellow}Updating sqlmap...${reset}\n"
+		#printf "${yellow}Updating sqlmap...\n"
 		if ! retry 3 3 q_to 60 git -C "${dir}/sqlmap" pull; then true; fi
 	fi
 
 	# massdns
 	ensure_git_dir "${dir}/massdns"
 	if [[ ! -d "${dir}/massdns" ]]; then
-		#printf "${yellow}Cloning and compiling massdns...${reset}\n"
+		#printf "${yellow}Cloning and compiling massdns...\n"
 		if ! retry 3 3 q_to 120 git clone https://github.com/blechschmidt/massdns.git "${dir}/massdns"; then true; fi
 		q make -C "${dir}/massdns"
 		strip -s "${dir}/massdns/bin/massdns" 2>/dev/null
 		$SUDO cp "${dir}/massdns/bin/massdns" /usr/local/bin/ 2>/dev/null
 	else
-		#printf "${yellow}Updating massdns...${reset}\n"
+		#printf "${yellow}Updating massdns...\n"
 		if ! retry 3 3 q_to 60 git -C "${dir}/massdns" pull; then true; fi
 	fi
 
 	# gf patterns
 	if [[ ! -d "$HOME/.gf" ]]; then
-		#printf "${yellow}Installing gf patterns...${reset}\n"
+		#printf "${yellow}Installing gf patterns...\n"
 		ensure_git_dir "${dir}/gf"
 		if ! retry 3 3 q_to 120 git clone https://github.com/tomnomnom/gf.git "${dir}/gf"; then true; fi
 		cp -r "${dir}/gf/examples" ~/.gf 2>/dev/null || true
@@ -992,7 +993,7 @@ function initial_setup() {
 		if ! retry 3 3 q_to 120 git clone https://github.com/1ndianl33t/Gf-Patterns "${dir}/Gf-Patterns"; then true; fi
 		cp "${dir}/Gf-Patterns"/*.json ~/.gf/ 2>/dev/null || true
 	else
-		#printf "${yellow}Updating gf patterns...${reset}\n"
+		#printf "${yellow}Updating gf patterns...\n"
 		ensure_git_dir "${dir}/Gf-Patterns"
 		if ! retry 3 3 q_to 60 git -C "${dir}/Gf-Patterns" pull; then true; fi
 	fi
