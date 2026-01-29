@@ -54,6 +54,8 @@ ENV AXIOMPATH='/root/.axiom/interact'
 ENV CARGOPATH='/root/.cargo/bin'
 ENV PATH="${GOROOT}/bin:${GOPATH}/bin:${AXIOMPATH}:${CARGOPATH}:${PATH}"
 
+SHELL [ "/bin/bash", "-c" ]
+
 COPY 01_nodoc /etc/dpkg/dpkg.cfg.d/
 
 RUN <<eot
@@ -82,7 +84,7 @@ dpkg-reconfigure localepurge
 localepurge
 
 ###>> Configure Axiom <<###
-if [[ "${INSTALL_AXIOM}" == "true" ]]; then
+if [ "${INSTALL_AXIOM}" = "true" ]; then
     mkdir -p /root/.axiom/
     git clone ${GIT_REPOSITORY_AXIOM} /root/.axiom/
     cd /root/.axiom/interact
@@ -123,8 +125,9 @@ COPY notify.conf /root/.config/notify/provider-config.yaml
 
 ###>> Configure Axiom Provider <<###
 RUN <<eot
+#!/bin/bash
 set -euxo pipefail
-if [[ "${INSTALL_AXIOM}" == "true" ]]; then
+if [ "${INSTALL_AXIOM}" = "true" ]; then
     ###>> Regenerate SSH Keys <<###
     apt update && apt install -y --no-install-recommends openssh-client
 
@@ -147,18 +150,17 @@ eot
 
 #COPY axiom-config.ini /root/.axiom/configs/config.ini
 #COPY axiom-custom-provider.json /root/.axiom/accounts/personal.json
-RUN if [[ "${INSTALL_AXIOM}" == "true" ]]; then axiom-account personal || echo "Axiom account not configured; provide provider config to enable it."; fi
+RUN if [ "${INSTALL_AXIOM}" = "true" ]; then axiom-account personal || echo "Axiom account not configured; provide provider config to enable it."; fi
 # RUN az group delete --name axiom --yes --no-wait
 
  # This command exits with return code 1, so leave the '|| :' or the build will fail.
 # COPY axiom-custom-provider.json /root/.axiom/accounts/personal.json
-RUN if [[ "${INSTALL_AXIOM}" == "true" ]]; then axiom-build reconftw || :; fi
+RUN if [ "${INSTALL_AXIOM}" = "true" ]; then axiom-build reconftw || :; fi
 
 ## Issue 271
 EXPOSE 85-90
 
 WORKDIR /reconftw
 
-SHELL [ "/bin/bash", "-c" ]
 ENTRYPOINT [ "./reconftw.sh" ]
 CMD [ "--help" ]

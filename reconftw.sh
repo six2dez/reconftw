@@ -197,7 +197,6 @@ function tools_installed() {
 		["CloudHunter_python"]="${tools}/CloudHunter/venv/bin/python3"
 		["nmap-parse-output"]="${tools}/ultimate-nmap-parser/ultimate-nmap-parser.sh"
 		["pydictor"]="${tools}/pydictor/pydictor.py"
-		["smuggler"]="${tools}/smuggler/smuggler.py"
 		["regulator"]="${tools}/regulator/main.py"
 		["regulator_python"]="${tools}/regulator/venv/bin/python3"
 		["nomore403"]="${tools}/nomore403/nomore403"
@@ -273,6 +272,7 @@ function tools_installed() {
 		["smap"]="smap"
 		["gitdorks_go"]="gitdorks_go"
 		["ripgen"]="ripgen"
+		["smugglex"]="smugglex"
 		["dsieve"]="dsieve"
 		["inscope"]="inscope"
 		["enumerepo"]="enumerepo"
@@ -348,6 +348,70 @@ function tools_installed() {
 
 	if [[ $CHECK_TOOLS_OR_EXIT == true && $all_installed != true ]]; then
 		exit 2
+	fi
+}
+
+###############################################################################################################
+#################################### CRITICAL DEPENDENCIES CHECK ##############################################
+###############################################################################################################
+
+# Check critical dependencies required for basic operation
+# This performs a quick check of essential tools before starting
+function check_critical_dependencies() {
+	local critical_tools=(
+		"bash:Bash shell"
+		"python3:Python 3"
+		"curl:Curl"
+		"git:Git"
+		"jq:JQ JSON processor"
+	)
+
+	local missing_critical=()
+	local all_critical_ok=true
+
+	printf "\n%b#######################################################################%b\n" "$bgreen" "$reset"
+	printf "%b[%s] Checking critical dependencies%b\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+
+	for item in "${critical_tools[@]}"; do
+		local tool="${item%%:*}"
+		local description="${item#*:}"
+
+		if ! command -v "$tool" >/dev/null 2>&1; then
+			printf "%b [✗] %s (%s) - MISSING%b\n" "$bred" "$description" "$tool" "$reset"
+			missing_critical+=("$tool")
+			all_critical_ok=false
+		else
+			local version=""
+			case "$tool" in
+				"python3")
+					version=$($tool --version 2>&1 | head -n1)
+					;;
+				"bash")
+					version="$BASH_VERSION"
+					;;
+				*)
+					version=$($tool --version 2>&1 | head -n1 || echo "installed")
+					;;
+			esac
+			printf "%b [✓] %s (%s) - %s%b\n" "$bgreen" "$description" "$tool" "$version" "$reset"
+		fi
+	done
+
+	printf "\n"
+
+	if [[ $all_critical_ok == false ]]; then
+		printf "%b[%s] ERROR: Critical dependencies missing!%b\n" "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+		printf "%bThe following tools are required for reconFTW to function:%b\n" "$yellow" "$reset"
+		for tool in "${missing_critical[@]}"; do
+			printf "%b  - %s%b\n" "$bred" "$tool" "$reset"
+		done
+		printf "\n%bPlease install these tools and try again.%b\n" "$yellow" "$reset"
+		printf "%bYou can run: ./install.sh to install all dependencies.%b\n" "$yellow" "$reset"
+		printf "%b#######################################################################%b\n\n" "$bgreen" "$reset"
+		exit 1
+	else
+		printf "%b[%s] All critical dependencies are installed%b\n" "$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+		printf "%b#######################################################################%b\n\n" "$bgreen" "$reset"
 	fi
 }
 
@@ -1324,7 +1388,7 @@ function sub_dns() {
 				grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' | sort -u |
 				anew -q .tmp/subdomains_dns.txt
 
-			for i in $(); do
+			for i in $( jq -r '.. | strings | select(test("^(\\d{1,3}\\.){3}\\d{1,3}$|^[0-9a-fA-F:]+$"))' <"subdomains/subdomains_dnsregs.json" | sort -u ); do
 				curl -s https://ip.thc.org/$i 2>>"$LOGFILE" | grep "\.$domain$" |
 					grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' | sort -u |
 					anew -q .tmp/subdomains_dns.txt
@@ -1578,7 +1642,7 @@ function sub_scraping() {
 				fi
 
 				if [[ -s ".tmp/katana.txt" ]]; then
-					sed -i '/^.\{2048\}./d' .tmp/katana.txt
+					sed_i '/^.\{2048\}./d' .tmp/katana.txt
 
 					cat .tmp/katana.txt | unfurl -u domains 2>>"$LOGFILE" |
 						grep "\.$domain$" |
@@ -1985,7 +2049,7 @@ function sub_ia_permut() {
 
 	# Check if the function should run
 	if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBIAPERMUTE == true ]]; then
-		start_subfunc "${FUNCNAME[0]}" "Running: Permutations by IA analysis"
+		start_subfunc "${FUNCNAME[0]}" "Running: Permutations by AI analysis"
 
 		subwiz -i subdomains/subdomains.txt --no-resolve -o .tmp/subwiz.txt 2>>"$LOGFILE" >/dev/null
 
@@ -2407,7 +2471,7 @@ function subtakeover() {
 		fi
 
 		# Remove empty lines from tko.txt
-		sed -i '/^$/d' .tmp/tko.txt
+		sed_i '/^$/d' .tmp/tko.txt
 
 		# Count new takeover entries
 		if ! NUMOFLINES=$(cat .tmp/tko.txt 2>>"$LOGFILE" | anew webs/takeover.txt | sed '/^$/d' | wc -l); then
@@ -2525,7 +2589,7 @@ function s3buckets() {
 				if ! cat .tmp/s3buckets_tmp.txt .tmp/s3buckets_tmp2.txt 2>>"$LOGFILE" | anew -q .tmp/s3buckets.txt; then
 					printf "%b[!] Failed to process s3buckets_tmp.txt.%b\n" "$bred" "$reset"
 				fi
-				if ! sed -i '/^$/d' .tmp/s3buckets.txt; then
+				if ! sed_i '/^$/d' .tmp/s3buckets.txt; then
 					printf "%b[!] Failed to clean s3buckets.txt.%b\n" "$bred" "$reset"
 				fi
 			fi
@@ -2555,7 +2619,7 @@ function s3buckets() {
 		esac
 
 		# Debug: Print the full CloudHunter command
-		printf "CloudHunter command: %s/venv/bin/python3 %s/cloudhunter.py %s -r %s/resolvers.txt -t 50 [URL]\n" "$tools/CloudHunter" "$tools/CloudHunter" "$PERMUTATION_FLAG" "$tools/CloudHunter" >>"$LOGFILE"
+		#printf "CloudHunter command: %s/venv/bin/python3 %s/cloudhunter.py %s -r %s/resolvers.txt -t 50 [URL]\n" "$tools/CloudHunter" "$tools/CloudHunter" "$PERMUTATION_FLAG" "$tools/CloudHunter" >>"$LOGFILE"
 
 		# Debug: Check if files exist
 		if [[ -f "$tools/CloudHunter/cloudhunter.py" ]]; then
@@ -2585,8 +2649,8 @@ function s3buckets() {
 				printf "%b[!] Failed to cd to %s.%b\n" "$bred" "$tools/CloudHunter" "$reset"
 				return 1
 			fi
-			if ! "${tools}/CloudHunter/venv/bin/python3" ./cloudhunter.py ${PERMUTATION_FLAG} -r ./resolvers.txt -t 50 "$domain"; then
-				printf "%b[!] CloudHunter command failed for URL %s.%b\n" "$bred" "$url" "$reset"
+			if ! "${tools}/CloudHunter/venv/bin/python3" ./cloudhunter.py -p ${PERMUTATION_FLAG} -r ./resolvers.txt -t 50 "$domain"; then
+				printf "%b[!] CloudHunter command failed for domain %s.%b\n" "$bred" "$domain" "$reset"
 			fi
 		) >>"$dir/subdomains/cloudhunter_open_buckets.txt" 2>>"$LOGFILE"
 
@@ -2664,7 +2728,7 @@ function cloud_extra_providers() {
 		company=$(unfurl format %r <<<"$domain")
 		printf "%s\n%s\n${domain%%.*}" "$company" "$domain" | sed 's/[^a-zA-Z0-9-]//g' | awk 'length>2' | sort -u >.tmp/cloudnames.txt
 		[[ -s subdomains/subdomains.txt ]] && awk -F. -v r=$(echo "$domain" | awk -F. '{print $(NF-1)"."$NF}') '{print $(NF-2)}' subdomains/subdomains.txt 2>/dev/null | sed 's/[^a-zA-Z0-9-]//g' | awk 'length>2' | sort -u >>.tmp/cloudnames.txt
-		sed -i 's/^\///; s/\.$//' .tmp/cloudnames.txt
+		sed_i 's/^\///; s/\.$//' .tmp/cloudnames.txt
 		sort -u .tmp/cloudnames.txt -o .tmp/cloudnames.txt
 
 		# Common container names for Azure (best-effort)
@@ -3079,7 +3143,7 @@ function favicon() {
 				grep -v "not-found" >favicontest.txt
 
 			# Replace '|' with newlines
-			sed -i "s/|/\n/g" favicontest.txt
+			sed_i "s/|/\n/g" favicontest.txt
 
 			# Move the processed IPs to the hosts directory
 			mv favicontest.txt "$dir/hosts/favicontest.txt" 2>>"$LOGFILE"
@@ -3656,7 +3720,7 @@ function fuzz() {
 				done
 				find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | sort -k1 | anew -q $dir/fuzzing/fuzzing_full.txt
 			else
-				wget -q -O - ${fuzzing_remote_list} >.tmp/fuzzing_remote_list.txt
+				cached_download "${fuzzing_remote_list}" ".tmp/fuzzing_remote_list.txt" "onelistforallmicro.txt"
 				axiom-scan webs/webs_all.txt -m ffuf -wL .tmp/fuzzing_remote_list.txt -H "${HEADER}" $FFUF_FLAGS -s -maxtime $FFUF_MAXTIME -oJ $dir/.tmp/ffuf-content.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 
 				for sub in $(cat webs/webs_all.txt); do
@@ -3910,7 +3974,7 @@ function urlchecks() {
 			fi
 
 			if [[ -s ".tmp/katana.txt" ]]; then
-				sed -i '/^.\{2048\}./d' .tmp/katana.txt
+				sed_i '/^.\{2048\}./d' .tmp/katana.txt
 				cat .tmp/katana.txt | anew -q .tmp/url_extract_tmp.txt
 			fi
 
@@ -4171,7 +4235,7 @@ function jschecks() {
 			fi
 
 			if [[ -s ".tmp/js_endpoints.txt" ]]; then
-				sed -i '/^\//!d' .tmp/js_endpoints.txt
+				sed_i '/^\//!d' .tmp/js_endpoints.txt
 				cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt
 			fi
 
@@ -4426,7 +4490,7 @@ function brokenLinks() {
 				fi
 				# Remove lines longer than 2048 characters
 				if [[ -s ".tmp/katana.txt" ]]; then
-					sed -i '/^.\{2048\}./d' ".tmp/katana.txt"
+					sed_i '/^.\{2048\}./d' ".tmp/katana.txt"
 				fi
 			else
 				# Use axiom-scan for scanning
@@ -4438,7 +4502,7 @@ function brokenLinks() {
 					fi
 					# Remove lines longer than 2048 characters
 					if [[ -s ".tmp/katana.txt" ]]; then
-						sed -i '/^.\{2048\}./d' ".tmp/katana.txt"
+						sed_i '/^.\{2048\}./d' ".tmp/katana.txt"
 					fi
 				fi
 			fi
@@ -4682,9 +4746,9 @@ function ssrf_checks() {
 			printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: SSRF Payload Generation${reset}\n\n"
 
 			# Generate temporary SSRF payloads
-			qsreplace "$COLLAB_SERVER_FIX" <"gf/ssrf.txt" | sed '/FUZZ/!d' | anew -q ".tmp/tmp_ssrf.txt"
+			qsreplace "$COLLAB_SERVER_FIX" <"gf/ssrf.txt" | anew -q ".tmp/tmp_ssrf.txt"
 
-			qsreplace "$COLLAB_SERVER_URL" <"gf/ssrf.txt" | sed '/FUZZ/!d' | anew -q ".tmp/tmp_ssrf.txt"
+			qsreplace "$COLLAB_SERVER_URL" <"gf/ssrf.txt" | anew -q ".tmp/tmp_ssrf.txt"
 
 			# Run FFUF to find requested URLs
 			printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: FFUF for SSRF Requested URLs${reset}\n\n"
@@ -5046,7 +5110,7 @@ function command_injection() {
 			if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT ]]; then
 
 				# Run Commix if enabled
-				if [[ $SQLMAP == true ]]; then
+				if [[ $COMM_INJ == true ]]; then
 					printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Commix for Command Injection Checks${reset}\n\n"
 					commix --batch -m ".tmp/tmp_rce.txt" --output-dir "vulns/command_injection" 2>>"$LOGFILE" >/dev/null
 				fi
@@ -5217,32 +5281,15 @@ function smuggling() {
 
 			printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: HTTP Request Smuggling Checks${reset}\n\n"
 
-			# Navigate to smuggler tool directory
-			if ! pushd "${tools}/smuggler" >/dev/null; then
-				printf "%b[!] Failed to navigate to smuggler directory.%b\n" "$bred" "$reset"
-				end_func "Failed to navigate to smuggler directory during HTTP Request Smuggling Checks." "${FUNCNAME[0]}"
-				return 1
-			fi
-
-			# Run smuggler.py on the list of URLs
-			python3 "smuggler.py" -f "$dir/webs/webs_all.txt" -o "$dir/.tmp/smuggling.txt" 2>>"$LOGFILE" >/dev/null
-
-			# Move payload files to vulns/smuggling/
-			find "payloads" -type f ! -name "README*" -exec mv {} "$dir/vulns/smuggling/" \;
-
-			# Return to the original directory
-			if ! popd >/dev/null; then
-				printf "%b[!] Failed to return to the original directory.%b\n" "$bred" "$reset"
-				end_func "Failed to return to the original directory during HTTP Request Smuggling Checks." "${FUNCNAME[0]}"
-				return 1
-			fi
+			# Run smugglex on the list of URLs
+			cat "$dir/webs/webs_all.txt" | smugglex -f plain -o "$dir/.tmp/smuggling.txt" 2>>"$LOGFILE" >/dev/null
 
 			# Append unique smuggling results to vulns directory
 			if [[ -s "$dir/.tmp/smuggling.txt" ]]; then
-				cat "$dir/.tmp/smuggling.txt" | grep "EXPL" | anew -q "vulns/prototype_pollution.txt"
+				cat "$dir/.tmp/smuggling.txt" | jq -c 2>>"$LOGFILE" >/dev/null | anew -q "vulns/smuggling.txt"
 			fi
 
-			end_func "Results are saved in vulns/smuggling_log.txt and findings in vulns/smuggling/" "${FUNCNAME[0]}"
+			end_func "Findings are saved in vulns/smuggling.txt" "${FUNCNAME[0]}"
 
 		else
 			notification "Too many URLs to bypass, skipping" warn
@@ -5368,14 +5415,8 @@ function fuzzparams() {
 			else
 				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Axiom with Nuclei${reset}\n\n"
 
-				# Clone fuzzing-templates if not already present
-				if [[ ! -d "/home/op/fuzzing-templates" ]]; then
-					axiom-exec "git clone https://github.com/projectdiscovery/fuzzing-templates /home/op/fuzzing-templates" &>/dev/null
-				fi
-
 				axiom-scan webs/url_extract_nodupes.txt -m nuclei \
-					--remote-folder "/home/op/fuzzing-templates" \
-					-nh -rl "$NUCLEI_RATELIMIT" \
+					-dast -nh -rl "$NUCLEI_RATELIMIT" \
 					-silent -retries 2 "$NUCLEI_EXTRA_ARGS" -dast -j -o ".tmp/fuzzparams_json.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 			fi
 
@@ -5427,9 +5468,9 @@ function deleteOutScoped() {
 		cat $1 | while read outscoped; do
 			if grep -q "^[*]" <<<$outscoped; then
 				outscoped="${outscoped:1}"
-				sed -i /"$outscoped$"/d $2
+				sed_i /"$outscoped$"/d $2
 			else
-				sed -i /$outscoped/d $2
+				sed_i /$outscoped/d $2
 			fi
 		done
 	fi
@@ -5447,6 +5488,610 @@ function getElapsedTime {
 	((M > 0)) && runtime="$runtime$M minutes, "
 	runtime="$runtime$S seconds."
 }
+
+# Retry with exponential backoff
+# Usage: retry_with_backoff <max_attempts> <command> [args...]
+# Example: retry_with_backoff 3 curl -s "https://example.com"
+function retry_with_backoff() {
+	local max_attempts="$1"
+	shift
+	local attempt=1
+	local delay=1
+	local max_delay=60
+
+	while [ $attempt -le "$max_attempts" ]; do
+		if "$@"; then
+			return 0
+		fi
+
+		if [ $attempt -lt "$max_attempts" ]; then
+			printf "%b[%s] Attempt %d/%d failed. Retrying in %d seconds...%b\n" \
+				"$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$attempt" "$max_attempts" "$delay" "$reset" >>"$LOGFILE"
+			sleep "$delay"
+
+			# Exponential backoff with max cap
+			delay=$((delay * 2))
+			if [ $delay -gt $max_delay ]; then
+				delay=$max_delay
+			fi
+		fi
+
+		attempt=$((attempt + 1))
+	done
+
+	printf "%b[%s] Command failed after %d attempts: %s%b\n" \
+		"$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$max_attempts" "$*" "$reset" >>"$LOGFILE"
+	return 1
+}
+
+# Check available disk space
+# Usage: check_disk_space <required_gb> <path>
+# Returns 0 if enough space, 1 otherwise
+function check_disk_space() {
+	local required_gb="$1"
+	local check_path="${2:-.}"
+
+	# Get available space in GB
+	local available_gb
+	if [[ "$OSTYPE" == "darwin"* ]]; then
+		# macOS
+		available_gb=$(df -g "$check_path" | awk 'NR==2 {print $4}')
+	else
+		# Linux
+		available_gb=$(df -BG "$check_path" | awk 'NR==2 {gsub(/G/, "", $4); print $4}')
+	fi
+
+	if [ -z "$available_gb" ] || [ "$available_gb" -lt "$required_gb" ]; then
+		printf "%b[%s] WARNING: Insufficient disk space. Required: %dGB, Available: %dGB at %s%b\n" \
+			"$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$required_gb" "${available_gb:-0}" "$check_path" "$reset"
+		return 1
+	fi
+
+	printf "%b[%s] Disk space OK: %dGB available at %s%b\n" \
+		"$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$available_gb" "$check_path" "$reset"
+	return 0
+}
+
+# Show progress bar for operations
+# Usage: progress_bar <current> <total> <message>
+function progress_bar() {
+	local current=$1
+	local total=$2
+	local message="${3:-Processing}"
+	local width=50
+
+	# Calculate percentage
+	local percent=$((current * 100 / total))
+	local filled=$((width * current / total))
+	local empty=$((width - filled))
+
+	# Build progress bar
+	local bar=""
+	for ((i=0; i<filled; i++)); do bar="${bar}█"; done
+	for ((i=0; i<empty; i++)); do bar="${bar}░"; done
+
+	# Print progress (using \r to overwrite the line)
+	printf "\r%b[%s] %s [%s] %d%% (%d/%d)%b" \
+		"$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$message" "$bar" "$percent" "$current" "$total" "$reset"
+
+	# Print newline when complete
+	if [ "$current" -eq "$total" ]; then
+		printf "\n"
+	fi
+}
+
+# Execute command in dry-run mode if enabled
+# Usage: run_command <command> [args...]
+function run_command() {
+	if [[ "${DRY_RUN:-false}" == "true" ]]; then
+		printf "%b[DRY-RUN] Would execute: %s%b\n" "$yellow" "$*" "$reset"
+		return 0
+	else
+		"$@"
+	fi
+}
+
+# Cross-platform sed_i wrapper
+# Usage: sed_i 's/old/new/g' file.txt
+# Works on both macOS (BSD sed) and Linux (GNU sed)
+function sed_i() {
+	if [[ $# -lt 2 ]]; then
+		echo "Usage: sed_i 'pattern' file" >&2
+		return 1
+	fi
+
+	local pattern="$1"
+	local file="$2"
+
+	# Check if we're using GNU sed or BSD sed
+	if sed --version >/dev/null 2>&1; then
+		# GNU sed (Linux or installed via brew on macOS)
+		sed -i "$pattern" "$file"
+	else
+		# BSD sed (default macOS)
+		sed -i '' "$pattern" "$file"
+	fi
+}
+
+###############################################################################################################
+#################################### RATE LIMITING ADAPTATIVO #################################################
+###############################################################################################################
+
+# Adaptive rate limiting - detects rate limit errors and adjusts automatically
+# Global variables for rate limiting
+ADAPTIVE_RATE_LIMIT=${ADAPTIVE_RATE_LIMIT:-false}
+CURRENT_RATE_LIMIT=${NUCLEI_RATELIMIT:-150}
+MIN_RATE_LIMIT=10
+MAX_RATE_LIMIT=500
+RATE_LIMIT_BACKOFF_FACTOR=0.5
+RATE_LIMIT_INCREASE_FACTOR=1.2
+
+# Detect rate limit errors in command output
+# Usage: detect_rate_limit_error <output_file_or_string>
+function detect_rate_limit_error() {
+	local output="$1"
+
+	# Check for common rate limit indicators
+	if grep -qiE "(429|too many requests|rate limit|limit exceeded|503|service unavailable)" <<< "$output"; then
+		return 0  # Rate limit detected
+	fi
+	return 1  # No rate limit detected
+}
+
+# Adjust rate limit based on errors
+# Usage: adjust_rate_limit <increase|decrease>
+function adjust_rate_limit() {
+	local action="$1"
+
+	[[ "$ADAPTIVE_RATE_LIMIT" != "true" ]] && return 0
+
+	case "$action" in
+		decrease)
+			local new_limit=$(awk "BEGIN {printf \"%.0f\", $CURRENT_RATE_LIMIT * $RATE_LIMIT_BACKOFF_FACTOR}")
+			if [ "$new_limit" -lt "$MIN_RATE_LIMIT" ]; then
+				new_limit=$MIN_RATE_LIMIT
+			fi
+			CURRENT_RATE_LIMIT=$new_limit
+			printf "%b[%s] Rate limit decreased to %d req/s due to errors%b\n" \
+				"$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$CURRENT_RATE_LIMIT" "$reset" | tee -a "$LOGFILE"
+			;;
+		increase)
+			local new_limit=$(awk "BEGIN {printf \"%.0f\", $CURRENT_RATE_LIMIT * $RATE_LIMIT_INCREASE_FACTOR}")
+			if [ "$new_limit" -gt "$MAX_RATE_LIMIT" ]; then
+				new_limit=$MAX_RATE_LIMIT
+			fi
+			CURRENT_RATE_LIMIT=$new_limit
+			printf "%b[%s] Rate limit increased to %d req/s%b\n" \
+				"$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$CURRENT_RATE_LIMIT" "$reset" >> "$LOGFILE"
+			;;
+	esac
+
+	# Update tool-specific rate limits
+	NUCLEI_RATELIMIT=$CURRENT_RATE_LIMIT
+	FFUF_RATELIMIT=$CURRENT_RATE_LIMIT
+	HTTPX_RATELIMIT=$CURRENT_RATE_LIMIT
+}
+
+# Execute command with adaptive rate limiting
+# Usage: run_with_adaptive_rate <command> [args...]
+function run_with_adaptive_rate() {
+	[[ "$ADAPTIVE_RATE_LIMIT" != "true" ]] && { "$@"; return $?; }
+
+	local max_retries=3
+	local retry=0
+	local temp_output=$(mktemp)
+
+	while [ $retry -lt $max_retries ]; do
+		if "$@" 2>&1 | tee "$temp_output"; then
+			# Command succeeded, check if we can increase rate
+			if [ $retry -eq 0 ]; then
+				adjust_rate_limit increase
+			fi
+			rm -f "$temp_output"
+			return 0
+		fi
+
+		# Check if failure was due to rate limiting
+		if detect_rate_limit_error "$(cat "$temp_output")"; then
+			adjust_rate_limit decrease
+			retry=$((retry + 1))
+			if [ $retry -lt $max_retries ]; then
+				printf "%b[%s] Retrying with lower rate limit (%d/%d)...%b\n" \
+					"$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$retry" "$max_retries" "$reset" | tee -a "$LOGFILE"
+				sleep 2
+			fi
+		else
+			# Non rate-limit error, don't retry
+			rm -f "$temp_output"
+			return 1
+		fi
+	done
+
+	rm -f "$temp_output"
+	return 1
+}
+
+###############################################################################################################
+####################################### SECURITY ################################################
+###############################################################################################################
+
+# Sanitize domain input to prevent command injection
+# Usage: sanitize_domain <domain>
+# Returns: sanitized domain string
+function sanitize_domain() {
+	local input_domain="$1"
+
+	# Remove any characters that are not alphanumeric, dots, or hyphens
+	# This prevents command injection via malicious domain names
+	local sanitized=$(echo "$input_domain" | tr -cd 'a-zA-Z0-9.-')
+
+	# Additional validations
+	# Remove leading/trailing dots and hyphens
+	sanitized=$(echo "$sanitized" | sed 's/^[.-]*//; s/[.-]*$//')
+
+	# Check if domain is empty after sanitization
+	if [[ -z "$sanitized" ]]; then
+		printf "%b[%s] ERROR: Invalid domain after sanitization: '%s'%b\n" \
+			"$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$input_domain" "$reset" >&2
+		return 1
+	fi
+
+	# Check for basic domain format (at least one dot for TLD)
+	if [[ ! "$sanitized" =~ \. ]]; then
+		printf "%b[%s] WARNING: Domain '%s' has no TLD, may be invalid%b\n" \
+			"$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$sanitized" "$reset" >&2
+	fi
+
+	# If sanitization removed characters, warn user
+	if [[ "$input_domain" != "$sanitized" ]]; then
+		printf "%b[%s] INFO: Domain sanitized from '%s' to '%s'%b\n" \
+			"$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$input_domain" "$sanitized" "$reset" >&2
+	fi
+
+	echo "$sanitized"
+	return 0
+}
+
+# Validate and sanitize IP/CIDR input
+# Usage: sanitize_ip <ip_or_cidr>
+function sanitize_ip() {
+	local input="$1"
+
+	# Allow digits, dots, and slash for CIDR
+	local sanitized=$(echo "$input" | tr -cd '0-9./,')
+
+	if [[ -z "$sanitized" ]]; then
+		printf "%b[%s] ERROR: Invalid IP/CIDR after sanitization: '%s'%b\n" \
+			"$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$input" "$reset" >&2
+		return 1
+	fi
+
+	echo "$sanitized"
+	return 0
+}
+
+###############################################################################################################
+####################################### CACHÉ DE RECURSOS #####################################################
+###############################################################################################################
+
+CACHE_DIR="${SCRIPTPATH}/.cache"
+CACHE_MAX_AGE_DAYS=30  # 1 month
+
+# Initialize cache directory
+function cache_init() {
+	mkdir -p "$CACHE_DIR"/{wordlists,resolvers,tools}
+}
+
+# Check if cached file is still valid (less than 30 days old)
+# Usage: cache_is_valid <cache_file>
+# Returns: 0 if valid, 1 if expired or missing
+function cache_is_valid() {
+	local cache_file="$1"
+
+	[[ ! -f "$cache_file" ]] && return 1
+
+	# Get file age in days
+	local file_age_seconds
+	if [[ "$OSTYPE" == "darwin"* ]]; then
+		# macOS
+		file_age_seconds=$(( $(date +%s) - $(stat -f %m "$cache_file") ))
+	else
+		# Linux
+		file_age_seconds=$(( $(date +%s) - $(stat -c %Y "$cache_file") ))
+	fi
+
+	local file_age_days=$((file_age_seconds / 86400))
+
+	if [ $file_age_days -lt $CACHE_MAX_AGE_DAYS ]; then
+		printf "%b[%s] Using cached file (age: %d days): %s%b\n" \
+			"$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$file_age_days" "$(basename "$cache_file")" "$reset" >> "$LOGFILE"
+		return 0
+	else
+		printf "%b[%s] Cache expired (age: %d days): %s%b\n" \
+			"$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$file_age_days" "$(basename "$cache_file")" "$reset" >> "$LOGFILE"
+		return 1
+	fi
+}
+
+# Download file with caching support
+# Usage: cached_download <url> <destination> [cache_name]
+# If cache exists and is valid, copies from cache instead of downloading
+function cached_download() {
+	local url="$1"
+	local destination="$2"
+	local cache_name="${3:-$(basename "$url")}"
+	local cache_file="$CACHE_DIR/$cache_name"
+
+	cache_init
+
+	# Check if we have valid cached version
+	if cache_is_valid "$cache_file"; then
+		cp "$cache_file" "$destination"
+		return 0
+	fi
+
+	# Download fresh copy
+	printf "%b[%s] Downloading: %s%b\n" \
+		"$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$(basename "$url")" "$reset"
+
+	if curl -sL "$url" -o "$destination"; then
+		# Save to cache for future use
+		cp "$destination" "$cache_file"
+		printf "%b[%s] Cached for future use: %s%b\n" \
+			"$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$cache_name" "$reset" >> "$LOGFILE"
+		return 0
+	else
+		printf "%b[%s] Download failed: %s%b\n" \
+			"$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$url" "$reset" >&2
+		return 1
+	fi
+}
+
+# Clear old cache files
+# Usage: cache_clean [max_age_days]
+function cache_clean() {
+	local max_age="${1:-$CACHE_MAX_AGE_DAYS}"
+
+	[[ ! -d "$CACHE_DIR" ]] && return 0
+
+	local cleaned=0
+	while IFS= read -r -d '' file; do
+		local file_age_seconds
+		if [[ "$OSTYPE" == "darwin"* ]]; then
+			file_age_seconds=$(( $(date +%s) - $(stat -f %m "$file") ))
+		else
+			file_age_seconds=$(( $(date +%s) - $(stat -c %Y "$file") ))
+		fi
+
+		local file_age_days=$((file_age_seconds / 86400))
+
+		if [ $file_age_days -gt $max_age ]; then
+			rm -f "$file"
+			cleaned=$((cleaned + 1))
+		fi
+	done < <(find "$CACHE_DIR" -type f -print0 2>/dev/null)
+
+	if [ $cleaned -gt 0 ]; then
+		printf "%b[%s] Cleaned %d expired cache files%b\n" \
+			"$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$cleaned" "$reset"
+	fi
+}
+
+###############################################################################################################
+####################################### LOGGING ##################################################
+###############################################################################################################
+
+# Structured JSON logging (optional, controlled by STRUCTURED_LOGGING config)
+STRUCTURED_LOGGING=${STRUCTURED_LOGGING:-false}
+STRUCTURED_LOG_FILE=""
+
+# Initialize structured logging
+function log_init() {
+	[[ "$STRUCTURED_LOGGING" != "true" ]] && return 0
+
+	STRUCTURED_LOG_FILE="${dir}/.log/structured_$(date +%Y%m%d_%H%M%S).jsonl"
+	mkdir -p "$(dirname "$STRUCTURED_LOG_FILE")"
+
+	printf "%b[%s] Structured logging enabled: %s%b\n" \
+		"$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$STRUCTURED_LOG_FILE" "$reset"
+}
+
+# Log structured JSON event
+# Usage: log_json <level> <function> <message> [key1=val1] [key2=val2] ...
+function log_json() {
+	[[ "$STRUCTURED_LOGGING" != "true" ]] && return 0
+	[[ -z "$STRUCTURED_LOG_FILE" ]] && return 0
+
+	local level="$1"
+	local function="$2"
+	local message="$3"
+	shift 3
+
+	# Build JSON object
+	local json_obj=$(jq -n \
+		--arg ts "$(date -Iseconds)" \
+		--arg lvl "$level" \
+		--arg fn "$function" \
+		--arg msg "$message" \
+		--arg domain "${domain:-N/A}" \
+		'{timestamp:$ts, level:$lvl, function:$fn, message:$msg, domain:$domain}')
+
+	# Add extra key-value pairs if provided
+	for kv in "$@"; do
+		if [[ "$kv" =~ ^([^=]+)=(.+)$ ]]; then
+			local key="${BASH_REMATCH[1]}"
+			local val="${BASH_REMATCH[2]}"
+			json_obj=$(echo "$json_obj" | jq --arg k "$key" --arg v "$val" '. + {($k): $v}')
+		fi
+	done
+
+	echo "$json_obj" >> "$STRUCTURED_LOG_FILE"
+}
+
+# Convenience wrappers for different log levels
+function log_info() {
+	log_json "INFO" "${FUNCNAME[1]:-main}" "$@"
+}
+
+function log_warn() {
+	log_json "WARN" "${FUNCNAME[1]:-main}" "$@"
+}
+
+function log_error() {
+	log_json "ERROR" "${FUNCNAME[1]:-main}" "$@"
+}
+
+function log_success() {
+	log_json "SUCCESS" "${FUNCNAME[1]:-main}" "$@"
+}
+
+###############################################################################################################
+######################################### INCREMENTAL MODE ####################################################
+###############################################################################################################
+
+# Incremental mode - only scan new assets since last run
+# This mode compares current results with previous runs and only processes new findings
+
+INCREMENTAL_MODE=${INCREMENTAL_MODE:-false}
+INCREMENTAL_DIR=".incremental"
+
+# Initialize incremental mode structure
+function incremental_init() {
+	[[ "$INCREMENTAL_MODE" != "true" ]] && return 0
+
+	mkdir -p "$INCREMENTAL_DIR"/{subdomains,webs,hosts,vulns,previous}
+
+	printf "%b[%s] Incremental mode enabled - will only process new findings%b\n" \
+		"$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+}
+
+# Save current state for next incremental run
+# Usage: incremental_save <type> <file>
+function incremental_save() {
+	[[ "$INCREMENTAL_MODE" != "true" ]] && return 0
+
+	local type="$1"
+	local file="$2"
+
+	if [[ -s "$file" ]]; then
+		cp "$file" "$INCREMENTAL_DIR/previous/${type}_$(date +%Y%m%d_%H%M%S).txt"
+		cp "$file" "$INCREMENTAL_DIR/previous/${type}_latest.txt"
+		printf "%b[%s] Saved %s state for incremental mode%b\n" \
+			"$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$type" "$reset" >> "$LOGFILE"
+	fi
+}
+
+# Get new items compared to previous run
+# Usage: incremental_diff <type> <current_file> <output_file>
+# Returns: 0 if new items found, 1 if no new items
+function incremental_diff() {
+	[[ "$INCREMENTAL_MODE" != "true" ]] && { cp "$2" "$3" 2>/dev/null; return 0; }
+
+	local type="$1"
+	local current_file="$2"
+	local output_file="$3"
+	local previous_file="$INCREMENTAL_DIR/previous/${type}_latest.txt"
+
+	if [[ ! -f "$previous_file" ]]; then
+		# First run, all items are new
+		cp "$current_file" "$output_file" 2>/dev/null
+		local count=$(wc -l < "$output_file" 2>/dev/null || echo 0)
+		printf "%b[%s] Incremental mode: First run for %s - %d items total%b\n" \
+			"$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$type" "$count" "$reset"
+		return 0
+	fi
+
+	# Compare and get only new items
+	if [[ -s "$current_file" ]]; then
+		comm -13 <(sort -u "$previous_file") <(sort -u "$current_file") | sed '/^$/d' > "$output_file"
+		local new_count=$(wc -l < "$output_file" 2>/dev/null || echo 0)
+		local total_count=$(wc -l < "$current_file" 2>/dev/null || echo 0)
+		local previous_count=$(wc -l < "$previous_file" 2>/dev/null || echo 0)
+
+		printf "%b[%s] Incremental mode %s: %d new (previous: %d, total: %d)%b\n" \
+			"$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$type" "$new_count" "$previous_count" "$total_count" "$reset"
+
+		if [[ $new_count -eq 0 ]]; then
+			return 1  # No new items
+		fi
+		return 0  # New items found
+	else
+		touch "$output_file"
+		return 1
+	fi
+}
+
+# Generate incremental report
+function incremental_report() {
+	[[ "$INCREMENTAL_MODE" != "true" ]] && return 0
+
+	local report_file="$INCREMENTAL_DIR/incremental_report_$(date +%Y%m%d_%H%M%S).txt"
+
+	{
+		echo "==============================================="
+		echo "Incremental Scan Report"
+		echo "Domain: $domain"
+		echo "Date: $(date +'%Y-%m-%d %H:%M:%S')"
+		echo "==============================================="
+		echo ""
+
+		# Subdomain changes
+		if [[ -f "$INCREMENTAL_DIR/previous/subdomains_latest.txt" ]]; then
+			local new_subs=$(comm -13 <(sort -u "$INCREMENTAL_DIR/previous/subdomains_latest.txt" 2>/dev/null || touch /tmp/empty) \
+			                          <(sort -u "subdomains/subdomains.txt" 2>/dev/null || touch /tmp/empty) | wc -l)
+			echo "New Subdomains: $new_subs"
+			if [[ $new_subs -gt 0 ]]; then
+				echo "---"
+				comm -13 <(sort -u "$INCREMENTAL_DIR/previous/subdomains_latest.txt" 2>/dev/null || touch /tmp/empty) \
+				         <(sort -u "subdomains/subdomains.txt" 2>/dev/null || touch /tmp/empty) | head -20
+				[[ $new_subs -gt 20 ]] && echo "... and $((new_subs - 20)) more"
+				echo ""
+			fi
+		fi
+
+		# Web changes
+		if [[ -f "$INCREMENTAL_DIR/previous/webs_latest.txt" ]]; then
+			local new_webs=$(comm -13 <(sort -u "$INCREMENTAL_DIR/previous/webs_latest.txt" 2>/dev/null || touch /tmp/empty) \
+			                          <(sort -u "webs/webs.txt" 2>/dev/null || touch /tmp/empty) | wc -l)
+			echo "New Webs: $new_webs"
+			if [[ $new_webs -gt 0 ]]; then
+				echo "---"
+				comm -13 <(sort -u "$INCREMENTAL_DIR/previous/webs_latest.txt" 2>/dev/null || touch /tmp/empty) \
+				         <(sort -u "webs/webs.txt" 2>/dev/null || touch /tmp/empty) | head -20
+				[[ $new_webs -gt 20 ]] && echo "... and $((new_webs - 20)) more"
+				echo ""
+			fi
+		fi
+
+		echo "==============================================="
+		echo "Full report saved to: $report_file"
+		echo "==============================================="
+	} | tee "$report_file"
+
+	printf "%b[%s] Incremental report generated: %s%b\n" \
+		"$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$report_file" "$reset"
+}
+
+# Check if incremental mode should skip heavy operations
+# Usage: incremental_should_skip
+# Returns: 0 to skip, 1 to continue
+function incremental_should_skip() {
+	[[ "$INCREMENTAL_MODE" != "true" ]] && return 1  # Don't skip
+
+	# Check if we have new findings
+	local new_subs=$(cat .tmp/subs_new_count 2>/dev/null || echo 1)
+	local new_webs=$(cat .tmp/webs_new_count 2>/dev/null || echo 1)
+
+	if [[ $new_subs -eq 0 && $new_webs -eq 0 ]]; then
+		printf "%b[%s] Incremental mode: No new assets found, skipping heavy scans%b\n" \
+			"$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+		return 0  # Skip
+	fi
+
+	return 1  # Don't skip
+}
+
+###############################################################################################################
 
 function zipSnedOutputFolder {
 	zip_name1=$(date +"%Y_%m_%d-%H.%M.%S")
@@ -5740,8 +6385,8 @@ function resolvers_update() {
 
 		if [[ ! -s $resolvers ]] || [[ $(find "$resolvers" -mtime +1 -print) ]]; then
 			notification "Resolvers seem older than 1 day\n Downloading new resolvers..." warn
-			wget -q -O - ${resolvers_url} >$resolvers
-			wget -q -O - ${resolvers_trusted_url} >$resolvers_trusted
+			cached_download "${resolvers_url}" "$resolvers" "resolvers.txt"
+			cached_download "${resolvers_trusted_url}" "$resolvers_trusted" "resolvers_trusted.txt"
 			notification "Resolvers updated\n" good
 		fi
 	fi
@@ -5750,8 +6395,8 @@ function resolvers_update() {
 
 function resolvers_update_quick_local() {
 	if [[ $update_resolvers == true ]]; then
-		wget -q -O - ${resolvers_url} >$resolvers
-		wget -q -O - ${resolvers_trusted_url} >$resolvers_trusted
+		cached_download "${resolvers_url}" "$resolvers" "resolvers.txt"
+		cached_download "${resolvers_trusted_url}" "$resolvers_trusted" "resolvers_trusted.txt"
 	fi
 }
 
@@ -5781,7 +6426,7 @@ function ipcidr_target() {
 		fi
 		if [[ -n $2 ]]; then
 			cat $list | anew -q $2
-			sed -i '/\/[0-9]*$/d' $2
+			sed_i '/\/[0-9]*$/d' $2
 		fi
 	fi
 }
@@ -5853,6 +6498,13 @@ function start() {
 
 	global_start=$(date +%s)
 
+	# Check available disk space before starting (require at least 5GB by default)
+	local required_space_gb="${MIN_DISK_SPACE_GB:-5}"
+	if ! check_disk_space "$required_space_gb" "."; then
+		printf "%b[%s] WARNING: Low disk space detected. Continuing anyway...%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+		# Not exiting, just warning - user can set MIN_DISK_SPACE_GB=0 to disable
+	fi
+
 	# Raise ulimit for long-running VPS jobs (fail-soft on failure)
 	if [[ ${RAISE_ULIMIT:-true} == "true" ]]; then
 		ULIMIT_TARGET=${ULIMIT_TARGET:-65535}
@@ -5869,6 +6521,9 @@ function start() {
 		${SCRIPTPATH}/install.sh --tools
 	fi
 	tools_installed
+
+	# Initialize incremental mode if enabled
+	incremental_init
 
 	#[[ -n "$domain" ]] && ipcidr_target $domain
 
@@ -5924,6 +6579,12 @@ function start() {
 	echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
 	enable_command_trace
 
+	# Initialize structured logging if enabled
+	log_init
+
+	# Initialize cache for wordlists/resolvers
+	cache_init
+
 	# init time saved estimator
 	TIME_SAVED_EST=0
 
@@ -5966,7 +6627,7 @@ function end() {
 			printf "%b[!] Faraday server is not running. Skipping Faraday integration.%b\n" "$bred" "$reset"
 		else
 			if [[ -s ".tmp/tko_json.txt" ]]; then
-				faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei .tmp/tko_json.txt# 2>>"$LOGFILE" >/dev/null
+				faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei .tmp/tko_json.txt 2>>"$LOGFILE" >/dev/null
 			fi
 			if [[ -s "hosts/portscan_active.xml" ]]; then
 				faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nmap hosts/portscan_active.xml 2>>"$LOGFILE" >/dev/null
@@ -6163,7 +6824,7 @@ function multi_osint() {
 	#[[ -n "$domain" ]] && ipcidr_target $domain
 
 	if [[ -s $list ]]; then
-		sed -i 's/\r$//' $list
+		sed_i 's/\r$//' $list
 		targets=$(cat $list)
 	else
 		notification "Target list not provided" error
@@ -6296,7 +6957,7 @@ function multi_recon() {
 	#[[ -n "$domain" ]] && ipcidr_target $domain
 
 	if [[ -s $list ]]; then
-		sed -i 's/\r$//' $list
+		sed_i 's/\r$//' $list
 		targets=$(cat $list)
 	else
 		notification "Target list not provided" error
@@ -6513,7 +7174,7 @@ function multi_custom() {
 	global_start=$(date +%s)
 
 	if [[ -s $list ]]; then
-		sed -i 's/\r$//' $list
+		sed_i 's/\r$//' $list
 		targets=$(cat $list)
 	else
 		notification "Target list not provided" error
@@ -6680,6 +7341,9 @@ function help() {
 	printf "   -q                Rate limit in requests per second\n"
 	printf "   --check-tools     Exit if one of the tools is missing\n"
 	printf "   --quick-rescan    Skip heavy steps if no new subs/webs this run\n"
+	printf "   --incremental     Only scan new findings since last run\n"
+	printf "   --adaptive-rate   Automatically adjust rate limits on errors (429/503)\n"
+	printf "   --dry-run         Show what would be executed without running commands\n"
 	printf " \n"
 	printf " ${bblue}USAGE EXAMPLES${reset}\n"
 	printf " ${byellow}Perform full recon (without attacks):${reset}\n"
@@ -6732,7 +7396,7 @@ if [[ $OSTYPE == "darwin"* ]]; then
 	PATH="$(brew --prefix gnu-sed)/libexec/gnubin:$PATH"
 fi
 
-PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:zrspanwvyh' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,ai,check-tools,quick-rescan' -n 'reconFTW' -- "$@")
+PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:zrspanwvyh' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,ai,check-tools,quick-rescan,incremental,adaptive-rate,dry-run' -n 'reconFTW' -- "$@")
 
 exit_status=$?
 if [[ $exit_status -ne 0 ]]; then
@@ -6746,8 +7410,13 @@ unset PROGARGS
 while true; do
 	case "$1" in
 	'-d' | '--domain')
-		domain=$2
-		ipcidr_target $2
+		# Sanitize domain input to prevent command injection
+		if ! domain=$(sanitize_domain "$2"); then
+			printf "%b[%s] ERROR: Invalid domain provided: '%s'%b\n" \
+				"$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$2" "$reset"
+			exit 1
+		fi
+		ipcidr_target "$domain"
 		shift 2
 		continue
 		;;
@@ -6869,6 +7538,21 @@ while true; do
 		shift
 		continue
 		;;
+	'--incremental')
+		INCREMENTAL_MODE=true
+		shift
+		continue
+		;;
+	'--adaptive-rate')
+		ADAPTIVE_RATE_LIMIT=true
+		shift
+		continue
+		;;
+	'--dry-run')
+		DRY_RUN=true
+		shift
+		continue
+		;;
 	'--help' | '-h')
 		break
 		;;
@@ -6950,6 +7634,18 @@ banner
 
 check_version
 
+# Check critical dependencies before proceeding
+if [[ "${SKIP_CRITICAL_CHECK:-false}" != "true" ]]; then
+	check_critical_dependencies
+fi
+
+# Show DRY_RUN mode warning if enabled
+if [[ "${DRY_RUN:-false}" == "true" ]]; then
+	printf "\n%b#######################################################################%b\n" "$bgreen" "$reset"
+	printf "%b[%s] DRY-RUN MODE ENABLED - Commands will be shown but not executed%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+	printf "%b#######################################################################%b\n\n" "$bgreen" "$reset"
+fi
+
 startdir=${PWD}
 if [[ -n $list ]]; then
 	if [[ $list == ./* ]]; then
@@ -6978,7 +7674,7 @@ case $opt_mode in
 		if [[ $AXIOM == true ]]; then
 			mode="list_recon"
 		fi
-		sed -i 's/\r$//' $list
+		sed_i 's/\r$//' $list
 		for domain in $(cat $list); do
 			start
 			recon
@@ -6998,7 +7694,7 @@ case $opt_mode in
 		if [[ $AXIOM == true ]]; then
 			mode="subs_menu"
 		fi
-		sed -i 's/\r$//' $list
+		sed_i 's/\r$//' $list
 		for domain in $(cat $list); do
 			subs_menu
 		done
@@ -7011,7 +7707,7 @@ case $opt_mode in
 		if [[ $AXIOM == true ]]; then
 			mode="passive"
 		fi
-		sed -i 's/\r$//' $list
+		sed_i 's/\r$//' $list
 		for domain in $(cat $list); do
 			passive
 		done
@@ -7025,7 +7721,7 @@ case $opt_mode in
 		if [[ $AXIOM == true ]]; then
 			mode="all"
 		fi
-		sed -i 's/\r$//' $list
+		sed_i 's/\r$//' $list
 		for domain in $(cat $list); do
 			all
 		done
@@ -7055,7 +7751,7 @@ case $opt_mode in
 		exit
 	fi
 	if [[ -n $list ]]; then
-		sed -i 's/\r$//' $list
+		sed_i 's/\r$//' $list
 		while IFS= read -r domain; do
 			start
 			osint
@@ -7072,7 +7768,7 @@ case $opt_mode in
 		if [[ $AXIOM == true ]]; then
 			mode="zen_menu"
 		fi
-		sed -i 's/\r$//' $list
+		sed_i 's/\r$//' $list
 		for domain in $(cat $list); do
 			zen_menu
 		done
