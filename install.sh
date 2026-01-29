@@ -945,18 +945,6 @@ function initial_setup() {
 			with_spinner "Updating nuclei-templates" retry 3 3 q_to 120 git -C "${NUCLEI_TEMPLATES_PATH}" pull || true
 		fi
 		ensure_git_dir "${NUCLEI_TEMPLATES_PATH}/extra_templates"
-		if [[ ! -d ${NUCLEI_TEMPLATES_PATH}/extra_templates ]]; then
-			with_spinner "Cloning extra fuzzing-templates" retry 3 3 q_to 120 git clone https://github.com/projectdiscovery/fuzzing-templates "${NUCLEI_TEMPLATES_PATH}/extra_templates" || true
-		else
-			with_spinner "Updating extra fuzzing-templates" retry 3 3 q_to 60 git -C "${NUCLEI_TEMPLATES_PATH}/extra_templates" pull || true
-		fi
-		ensure_git_dir "${NUCLEI_FUZZING_TEMPLATES_PATH}"
-		if [[ ! -d ${NUCLEI_FUZZING_TEMPLATES_PATH} ]]; then
-			q mkdir -p ${NUCLEI_FUZZING_TEMPLATES_PATH}
-			with_spinner "Cloning fuzzing-templates" retry 3 3 q_to 120 git clone https://github.com/projectdiscovery/fuzzing-templates "${NUCLEI_FUZZING_TEMPLATES_PATH}" || true
-		else
-			with_spinner "Updating fuzzing-templates" retry 3 3 q_to 60 git -C "${NUCLEI_FUZZING_TEMPLATES_PATH}" pull || true
-		fi
 	fi
 	with_spinner "Nuclei template update" nuclei -update-templates -update-template-dir "${NUCLEI_TEMPLATES_PATH}" >/dev/null 2>&1 || true
 

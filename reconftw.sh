@@ -5415,14 +5415,8 @@ function fuzzparams() {
 			else
 				printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Axiom with Nuclei${reset}\n\n"
 
-				# Clone fuzzing-templates if not already present
-				if [[ ! -d "/home/op/fuzzing-templates" ]]; then
-					axiom-exec "git clone https://github.com/projectdiscovery/fuzzing-templates /home/op/fuzzing-templates" &>/dev/null
-				fi
-
 				axiom-scan webs/url_extract_nodupes.txt -m nuclei \
-					--remote-folder "/home/op/fuzzing-templates" \
-					-nh -rl "$NUCLEI_RATELIMIT" \
+					-dast -nh -rl "$NUCLEI_RATELIMIT" \
 					-silent -retries 2 "$NUCLEI_EXTRA_ARGS" -dast -j -o ".tmp/fuzzparams_json.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 			fi
 
