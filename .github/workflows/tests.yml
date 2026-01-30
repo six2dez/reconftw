@@ -16,6 +16,38 @@ permissions:
 on: [push, pull_request]
 
 jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Run ShellCheck on reconftw.sh
+        run: shellcheck -S warning reconftw.sh
+
+      - name: Run ShellCheck on install.sh
+        run: shellcheck -S warning install.sh
+        continue-on-error: true
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install bats-core
+        run: |
+          git clone https://github.com/bats-core/bats-core.git /tmp/bats
+          sudo /tmp/bats/install.sh /usr/local
+
+      - name: Run unit tests
+        run: bats tests/unit/*.bats
+
   tests:
     strategy:
       fail-fast: false

@@ -1,9 +1,7 @@
 # syntax=docker/dockerfile:1.4
 
-## You can change these variables
-ARG COLLAB_SERVER="XXXXXXXXXX"
-ARG XSS_SERVER="XXXXXXXXXXX"
-ARG SHODAN_API_KEY="XXXXXXXXXXXXXX"
+## Secrets should be passed at runtime, not build time:
+##   docker run -e COLLAB_SERVER=xxx -e XSS_SERVER=xxx -e SHODAN_API_KEY=xxx ...
 
 ARG LANG=en_US.UTF-8
 ARG LANGUAGE=en_US
@@ -21,20 +19,12 @@ LABEL org.label-schema.url='https://github.com/six2dez/reconftw'
 LABEL org.label-schema.docker.cmd.devel='docker run --rm -ti six2dez/reconftw'
 LABEL MAINTAINER="six2dez"
 
-ARG COLLAB_SERVER
-ARG XSS_SERVER
-ARG SHODAN_API_KEY
-
 ARG LANG
 ARG LANGUAGE
 
 ARG GIT_REPOSITORY_AXIOM="https://github.com/attacksurge/ax.git"
 ARG GIT_REPOSITORY_RECONFTW="https://github.com/six2dez/reconftw"
 ARG INSTALL_AXIOM=true
-
-ENV COLLAB_SERVER=$COLLAB_SERVER
-ENV XSS_SERVER=$XSS_SERVER
-ENV SHODAN_API_KEY=$SHODAN_API_KEY
 
 ENV LANG=$LANG
 ENV LANGUAGE=$LANGUAGE

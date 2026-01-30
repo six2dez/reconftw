@@ -6,6 +6,17 @@ set -E
 set +e
 IFS=$'\n\t'
 
+# Standard exit/return codes
+readonly E_SUCCESS=0
+readonly E_GENERAL=1
+readonly E_MISSING_DEP=2
+readonly E_INVALID_INPUT=3
+readonly E_NETWORK=4
+readonly E_DISK_SPACE=5
+readonly E_PERMISSION=6
+readonly E_TIMEOUT=7
+readonly E_CONFIG=8
+
 # Welcome to reconFTW main script
 #	 ██▀███  ▓█████  ▄████▄   ▒█████   ███▄    █   █████▒▄▄▄█████▓ █     █░
 #	▓██ ▒ ██▒▓█   ▀ ▒██▀ ▀█  ▒██▒  ██▒ ██ ▀█   █ ▓██   ▒ ▓  ██▒ ▓▒▓█░ █ ░█░
@@ -53,9 +64,9 @@ enable_command_trace() {
 	fi
 	[[ -z ${LOGFILE:-} ]] && return
 
-	# Close any previous trace descriptor
+	# Close any previous trace descriptor (native bash {varname} redirect syntax)
 	if [[ -n ${TRACE_FD:-} ]]; then
-		eval "exec ${TRACE_FD}>&-"
+		exec {TRACE_FD}>&- 2>/dev/null || true
 	fi
 
 	# Open a new descriptor against the active log
@@ -1184,8 +1195,8 @@ function sub_active() {
 			# Resolve subdomains using axiom-scan
 			if [[ -s ".tmp/subs_no_resolved.txt" ]]; then
 				axiom-scan .tmp/subs_no_resolved.txt -m puredns-resolve \
-					-r /home/op/lists/resolvers.txt \
-					--resolvers-trusted /home/op/lists/resolvers_trusted.txt \
+					-r ${AXIOM_RESOLVERS_PATH} \
+					--resolvers-trusted ${AXIOM_RESOLVERS_TRUSTED_PATH} \
 					--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" \
 					--wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
 					-o .tmp/subdomains_tmp.txt $AXIOM_EXTRA_ARGS \
@@ -1272,7 +1283,7 @@ function sub_tls() {
 			fi
 			if [[ -s ".tmp/subdomains_tlsx_clean.txt" ]]; then
 				axiom-scan .tmp/subdomains_tlsx_clean.txt -m puredns-resolve \
-					-r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt \
+					-r ${AXIOM_RESOLVERS_PATH} --resolvers-trusted ${AXIOM_RESOLVERS_TRUSTED_PATH} \
 					--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
 					-o .tmp/subdomains_tlsx_resolved.txt $AXIOM_EXTRA_ARGS \
 					2>>"$LOGFILE" >/dev/null
@@ -1416,7 +1427,7 @@ function sub_dns() {
 
 			if [[ -s ".tmp/subdomains_dns.txt" ]]; then
 				axiom-scan .tmp/subdomains_dns.txt -m puredns-resolve \
-					-r "/home/op/lists/resolvers.txt" --resolvers-trusted "/home/op/lists/resolvers_trusted.txt" \
+					-r "${AXIOM_RESOLVERS_PATH}" --resolvers-trusted "${AXIOM_RESOLVERS_TRUSTED_PATH}" \
 					--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
 					-o .tmp/subdomains_dns_resolved.txt "$AXIOM_EXTRA_ARGS" \
 					2>>"$LOGFILE" >/dev/null
@@ -1487,15 +1498,15 @@ function sub_brute() {
 			[[ $DEEP == true ]] && wordlist="$subs_wordlist_big"
 
 			# Run axiom-scan with puredns-single
-			axiom-scan "$wordlist" -m puredns-single "$domain" -r /home/op/lists/resolvers.txt \
-				--resolvers-trusted /home/op/lists/resolvers_trusted.txt \
+			axiom-scan "$wordlist" -m puredns-single "$domain" -r ${AXIOM_RESOLVERS_PATH} \
+				--resolvers-trusted ${AXIOM_RESOLVERS_TRUSTED_PATH} \
 				--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
 				-o .tmp/subs_brute.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
 
 			# Resolve the subdomains using axiom-scan
 			if [[ -s ".tmp/subs_brute.txt" ]]; then
-				axiom-scan .tmp/subs_brute.txt -m puredns-resolve -r /home/op/lists/resolvers.txt \
-					--resolvers-trusted /home/op/lists/resolvers_trusted.txt \
+				axiom-scan .tmp/subs_brute.txt -m puredns-resolve -r ${AXIOM_RESOLVERS_PATH} \
+					--resolvers-trusted ${AXIOM_RESOLVERS_TRUSTED_PATH} \
 					--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
 					-o .tmp/subs_brute_valid.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
 			fi
@@ -1758,7 +1769,7 @@ function sub_analytics() {
 
 					if [[ -s ".tmp/analytics_subs_clean.txt" ]]; then
 						axiom-scan .tmp/analytics_subs_clean.txt -m puredns-resolve \
-							-r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt \
+							-r ${AXIOM_RESOLVERS_PATH} --resolvers-trusted ${AXIOM_RESOLVERS_TRUSTED_PATH} \
 							--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
 							-o .tmp/analytics_subs_resolved.txt $AXIOM_EXTRA_ARGS \
 							2>>"$LOGFILE" >/dev/null
@@ -1858,8 +1869,8 @@ function sub_permut() {
 				return 1
 			fi
 			if [[ -s ".tmp/gotator1.txt" ]]; then
-				axiom-scan .tmp/gotator1.txt -m puredns-resolve -r /home/op/lists/resolvers.txt \
-					--resolvers-trusted /home/op/lists/resolvers_trusted.txt \
+				axiom-scan .tmp/gotator1.txt -m puredns-resolve -r ${AXIOM_RESOLVERS_PATH} \
+					--resolvers-trusted ${AXIOM_RESOLVERS_TRUSTED_PATH} \
 					--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
 					-o .tmp/permute1.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 			fi
@@ -1888,8 +1899,8 @@ function sub_permut() {
 			fi
 		else
 			if [[ -s ".tmp/gotator2.txt" ]]; then
-				axiom-scan .tmp/gotator2.txt -m puredns-resolve -r /home/op/lists/resolvers.txt \
-					--resolvers-trusted /home/op/lists/resolvers_trusted.txt \
+				axiom-scan .tmp/gotator2.txt -m puredns-resolve -r ${AXIOM_RESOLVERS_PATH} \
+					--resolvers-trusted ${AXIOM_RESOLVERS_TRUSTED_PATH} \
 					--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
 					-o .tmp/permute2.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 			fi
@@ -1993,7 +2004,7 @@ function sub_regex_permut() {
 
 			if [[ -s ".tmp/${domain}.brute" ]]; then
 				axiom-scan ".tmp/${domain}.brute" -m puredns-resolve \
-					-r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt \
+					-r ${AXIOM_RESOLVERS_PATH} --resolvers-trusted ${AXIOM_RESOLVERS_TRUSTED_PATH} \
 					--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
 					-o .tmp/regulator.txt $AXIOM_EXTRA_ARGS \
 					2>>"$LOGFILE" >/dev/null
@@ -2074,7 +2085,7 @@ function sub_ia_permut() {
 
 			if [[ -s ".tmp/subwiz.txt" ]]; then
 				axiom-scan ".tmp/subwiz.txt" -m puredns-resolve \
-					-r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt \
+					-r ${AXIOM_RESOLVERS_PATH} --resolvers-trusted ${AXIOM_RESOLVERS_TRUSTED_PATH} \
 					--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
 					-o .tmp/subwiz_resolved.txt $AXIOM_EXTRA_ARGS \
 					2>>"$LOGFILE" >/dev/null
@@ -2184,7 +2195,7 @@ function sub_recursive_passive() {
 
 			if [[ -s ".tmp/passive_recursive.txt" ]]; then
 				axiom-scan .tmp/passive_recursive.txt -m puredns-resolve \
-					-r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt \
+					-r ${AXIOM_RESOLVERS_PATH} --resolvers-trusted ${AXIOM_RESOLVERS_TRUSTED_PATH} \
 					--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
 					-o .tmp/passive_recurs_tmp.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
 			fi
@@ -2266,7 +2277,7 @@ function sub_recursive_brute() {
 						return 1
 					fi
 					axiom-scan "$subs_wordlist" -m puredns-single "$subdomain_top" \
-						-r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt \
+						-r ${AXIOM_RESOLVERS_PATH} --resolvers-trusted ${AXIOM_RESOLVERS_TRUSTED_PATH} \
 						--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
 						-o .tmp/brute_recursive_result_part.txt $AXIOM_EXTRA_ARGS \
 						2>>"$LOGFILE" >/dev/null
@@ -2299,7 +2310,7 @@ function sub_recursive_brute() {
 			else
 				if [[ -s ".tmp/gotator1_recursive.txt" ]]; then
 					axiom-scan .tmp/gotator1_recursive.txt -m puredns-resolve \
-						-r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt \
+						-r ${AXIOM_RESOLVERS_PATH} --resolvers-trusted ${AXIOM_RESOLVERS_TRUSTED_PATH} \
 						--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
 						-o .tmp/permute1_recursive.txt $AXIOM_EXTRA_ARGS \
 						2>>"$LOGFILE" >/dev/null
@@ -2331,7 +2342,7 @@ function sub_recursive_brute() {
 			else
 				if [[ -s ".tmp/gotator2_recursive.txt" ]]; then
 					axiom-scan .tmp/gotator2_recursive.txt -m puredns-resolve \
-						-r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt \
+						-r ${AXIOM_RESOLVERS_PATH} --resolvers-trusted ${AXIOM_RESOLVERS_TRUSTED_PATH} \
 						--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
 						-o .tmp/permute2_recursive.txt $AXIOM_EXTRA_ARGS \
 						2>>"$LOGFILE" >/dev/null
@@ -2381,7 +2392,7 @@ function sub_recursive_brute() {
 		else
 			if [[ -s ".tmp/brute_perm_recursive.txt" ]]; then
 				axiom-scan .tmp/brute_perm_recursive.txt -m puredns-resolve \
-					-r /home/op/lists/resolvers.txt --resolvers-trusted /home/op/lists/resolvers_trusted.txt \
+					-r ${AXIOM_RESOLVERS_PATH} --resolvers-trusted ${AXIOM_RESOLVERS_TRUSTED_PATH} \
 					--wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
 					-o .tmp/brute_perm_recursive_final.txt $AXIOM_EXTRA_ARGS \
 					2>>"$LOGFILE" >/dev/null
@@ -5464,16 +5475,100 @@ function fuzzparams() {
 ###############################################################################################################
 
 function deleteOutScoped() {
-	if [[ -s $1 ]]; then
-		cat $1 | while read outscoped; do
-			if grep -q "^[*]" <<<$outscoped; then
-				outscoped="${outscoped:1}"
-				sed_i /"$outscoped$"/d $2
+	if [[ -s "$1" ]]; then
+		while IFS= read -r outscoped; do
+			[[ -z "$outscoped" ]] && continue
+			# Escape regex metacharacters to prevent injection
+			local escaped
+			escaped=$(printf '%s' "$outscoped" | sed 's/[.[\*^$()+?{|\\]/\\&/g')
+			if grep -q "^[*]" <<<"$outscoped"; then
+				escaped=$(printf '%s' "${outscoped:1}" | sed 's/[.[\*^$()+?{|\\]/\\&/g')
+				sed_i "/${escaped}$/d" "$2"
 			else
-				sed_i /$outscoped/d $2
+				sed_i "/${escaped}/d" "$2"
 			fi
-		done
+		done < "$1"
 	fi
+}
+
+function cleanup_on_exit() {
+	printf "\n%b[%s] Interrupted. Cleaning up...%b\n" "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+	# Clean temporary chunk files
+	rm -rf -- "${dir:-.}/.tmp/chunks" 2>/dev/null
+	# Kill any background processes we spawned
+	jobs -p 2>/dev/null | xargs -r kill 2>/dev/null || true
+	# Log the interruption
+	echo "[$(date +'%Y-%m-%d %H:%M:%S')] Interrupted by signal" >>"${LOGFILE:-/dev/null}"
+	exit 130
+}
+
+function rotate_logs() {
+	local log_dir="$1"
+	local max_logs="${2:-10}"
+	local max_age_days="${3:-30}"
+
+	[[ ! -d "$log_dir" ]] && return 0
+
+	# Delete logs older than max_age_days
+	find "$log_dir" -name "*.txt" -type f -mtime +"${max_age_days}" -delete 2>/dev/null || true
+
+	# If still too many, keep only the newest max_logs
+	local count
+	count=$(find "$log_dir" -name "*.txt" -type f 2>/dev/null | wc -l)
+	if [[ $count -gt $max_logs ]]; then
+		find "$log_dir" -name "*.txt" -type f -printf '%T@ %p\n' 2>/dev/null |
+			sort -n | head -n $((count - max_logs)) | cut -d' ' -f2- |
+			xargs -r rm -f -- 2>/dev/null || true
+	fi
+}
+
+function sanitize_interlace_input() {
+	# Remove lines containing shell metacharacters that could be exploited
+	# via interlace template substitution (_target_, _output_, _cleantarget_)
+	local infile="$1"
+	local outfile="${2:-$1}"
+	if [[ "$infile" == "$outfile" ]]; then
+		local tmpfile
+		tmpfile=$(mktemp)
+		grep -v '[;|&$`\\(){}]' "$infile" > "$tmpfile" 2>/dev/null || true
+		mv "$tmpfile" "$outfile"
+	else
+		grep -v '[;|&$`\\(){}]' "$infile" > "$outfile" 2>/dev/null || true
+	fi
+}
+
+function validate_config() {
+	local warnings=0
+	local errors=0
+
+	# Check conflicting configs
+	if [[ ${VULNS_GENERAL:-false} == true && ${SUBDOMAINS_GENERAL:-false} == false ]]; then
+		printf "%b[WARN] VULNS_GENERAL=true but SUBDOMAINS_GENERAL=false -- vulnerability scans need subdomain data%b\n" "$yellow" "$reset"
+		warnings=$((warnings + 1))
+	fi
+
+	# Validate numeric thread/rate variables
+	for var in FFUF_THREADS HTTPX_THREADS DALFOX_THREADS KATANA_THREADS HTTPX_RATELIMIT NUCLEI_RATELIMIT FFUF_RATELIMIT; do
+		if [[ -n "${!var:-}" && ! "${!var}" =~ ^[0-9]+$ ]]; then
+			printf "%b[ERROR] %s must be numeric, got: %s%b\n" "$bred" "$var" "${!var}" "$reset"
+			errors=$((errors + 1))
+		fi
+	done
+
+	# Check Axiom tool availability if enabled
+	if [[ ${AXIOM:-false} == true ]] && ! command -v axiom-scan >/dev/null 2>&1; then
+		printf "%b[WARN] AXIOM=true but axiom-scan not found in PATH%b\n" "$yellow" "$reset"
+		warnings=$((warnings + 1))
+	fi
+
+	if [[ $errors -gt 0 ]]; then
+		printf "%b[ERROR] Configuration has %d error(s). Please fix before running.%b\n" "$bred" "$errors" "$reset"
+		return $E_CONFIG
+	fi
+	if [[ $warnings -gt 0 ]]; then
+		printf "%b[INFO] Configuration has %d warning(s).%b\n" "$yellow" "$warnings" "$reset"
+	fi
+	return 0
 }
 
 function getElapsedTime {
@@ -6130,8 +6225,14 @@ function output() {
 	cp -r "$dir" "$dir_output"
 
 	# Only delete if source and destination are clearly different and safe
+	# Safety: refuse to delete outside of Recon/ directory
 	if [[ "$(dirname "$dir")" != "$dir_output" ]]; then
-		rm -rf "$dir"
+		if [[ "$dir" == "${SCRIPTPATH}/Recon/"* ]]; then
+			rm -rf -- "$dir"
+		else
+			echo "[!] Refusing to delete directory outside Recon/: $dir"
+			return 1
+		fi
 	fi
 }
 
@@ -6241,9 +6342,9 @@ function start_func() {
 }
 
 function end_func() {
-	touch $called_fn_dir/.${2}
+	touch "$called_fn_dir/.${2}"
 	end=$(date +%s)
-	getElapsedTime $start $end
+	getElapsedTime "$start" "$end"
 	notification "${2} Finished in ${runtime}" info
 	echo "[$current_date] End function: ${2} " >>"${LOGFILE}"
 	printf "${bblue}[$current_date] ${1} ${reset}\n"
@@ -6257,15 +6358,15 @@ function start_subfunc() {
 }
 
 function end_subfunc() {
-	touch $called_fn_dir/.${2}
+	touch "$called_fn_dir/.${2}"
 	end_sub=$(date +%s)
-	getElapsedTime $start_sub $end_sub
+	getElapsedTime "$start_sub" "$end_sub"
 	notification "     ${1} in ${runtime}" good
 	echo "[$current_date] End subfunction: ${1} " >>"${LOGFILE}"
 }
 
 function check_inscope() {
-	cat $1 | inscope >$1_tmp && cp $1_tmp $1 && rm -f $1_tmp
+	cat "$1" | inscope >"${1}_tmp" && cp "${1}_tmp" "$1" && rm -f "${1}_tmp"
 }
 
 function maybe_update_nuclei() {
@@ -6274,12 +6375,12 @@ function maybe_update_nuclei() {
 	local stamp_file=".tmp/.nuclei_updated"
 	if [[ ! -f $stamp_file ]]; then
 		if [[ -n ${NUCLEI_TEMPLATES_PATH-} ]]; then
-			nuclei -update-templates -update-template-dir "${NUCLEI_TEMPLATES_PATH}" 2>>"$LOGFILE" >/dev/null || true
+			nuclei -update-templates -update-template-dir "${NUCLEI_TEMPLATES_PATH}" 2>>"$LOGFILE" >/dev/null || true # non-fatal: template update failure shouldn't block scan
 		else
-			nuclei -update 2>>"$LOGFILE" >/dev/null || true
+			nuclei -update 2>>"$LOGFILE" >/dev/null || true # non-fatal: template update failure shouldn't block scan
 		fi
 		if [[ -n ${NUCLEI_FUZZING_TEMPLATES_PATH-} && -d ${NUCLEI_FUZZING_TEMPLATES_PATH} ]]; then
-			nuclei -update-templates -update-template-dir "${NUCLEI_FUZZING_TEMPLATES_PATH}" 2>>"$LOGFILE" >/dev/null || true
+			nuclei -update-templates -update-template-dir "${NUCLEI_FUZZING_TEMPLATES_PATH}" 2>>"$LOGFILE" >/dev/null || true # non-fatal
 		fi
 		touch "$stamp_file"
 	fi
@@ -6345,7 +6446,7 @@ function process_in_chunks() {
 	local lines
 	lines=$(wc -l <"$infile" 2>/dev/null || echo 0)
 	if [[ $lines -le $chunksize ]]; then
-		eval "$*"
+		bash -lc "$*"
 		return $?
 	fi
 	mkdir -p .tmp/chunks
@@ -6374,10 +6475,9 @@ function resolvers_update() {
 			fi
 		else
 			notification "Checking resolvers lists...\n Accurate resolvers are the key to great results\n This may take around 10 minutes if it's not updated" warn
-			# shellcheck disable=SC2016
-			axiom-exec '([[ $(find "/home/op/lists/resolvers.txt" -mtime +1 -print) ]] || [[ $(wc -l < /home/op/lists/resolvers.txt) -le 40 ]]) && dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 200 -o /home/op/lists/resolvers.txt' &>/dev/null
-			axiom-exec "wget -q -O - ${resolvers_url} > /home/op/lists/resolvers.txt" 2>>"$LOGFILE" >/dev/null
-			axiom-exec "wget -q -O - ${resolvers_trusted_url} > /home/op/lists/resolvers_trusted.txt" 2>>"$LOGFILE" >/dev/null
+			axiom-exec "([[ \$(find \"${AXIOM_RESOLVERS_PATH}\" -mtime +1 -print) ]] || [[ \$(wc -l < \"${AXIOM_RESOLVERS_PATH}\") -le 40 ]]) && dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 200 -o ${AXIOM_RESOLVERS_PATH}" &>/dev/null
+			axiom-exec "wget -q -O - ${resolvers_url} > ${AXIOM_RESOLVERS_PATH}" 2>>"$LOGFILE" >/dev/null
+			axiom-exec "wget -q -O - ${resolvers_trusted_url} > ${AXIOM_RESOLVERS_TRUSTED_PATH}" 2>>"$LOGFILE" >/dev/null
 			notification "Updated\n" good
 		fi
 		generate_resolvers=false
@@ -6401,8 +6501,8 @@ function resolvers_update_quick_local() {
 }
 
 function resolvers_update_quick_axiom() {
-	axiom-exec "wget -q -O - ${resolvers_url} > /home/op/lists/resolvers.txt" 2>>"$LOGFILE" >/dev/null
-	axiom-exec "wget -q -O - ${resolvers_trusted_url} > /home/op/lists/resolvers_trusted.txt" 2>>"$LOGFILE" >/dev/null
+	axiom-exec "wget -q -O - ${resolvers_url} > ${AXIOM_RESOLVERS_PATH}" 2>>"$LOGFILE" >/dev/null
+	axiom-exec "wget -q -O - ${resolvers_trusted_url} > ${AXIOM_RESOLVERS_TRUSTED_PATH}" 2>>"$LOGFILE" >/dev/null
 }
 
 function resolvers_optimize_local() {
@@ -6498,6 +6598,9 @@ function start() {
 
 	global_start=$(date +%s)
 
+	# Validate configuration before starting
+	validate_config || exit $?
+
 	# Check available disk space before starting (require at least 5GB by default)
 	local required_space_gb="${MIN_DISK_SPACE_GB:-5}"
 	if ! check_disk_space "$required_space_gb" "."; then
@@ -6567,6 +6670,7 @@ function start() {
 		fi
 	fi
 	mkdir -p {.log,.tmp,webs,hosts,vulns,osint,screenshots,subdomains}
+	chmod 700 .tmp 2>/dev/null || true
 
 	# Load plugins and emit start event
 	plugins_load
@@ -6575,9 +6679,15 @@ function start() {
 	NOW=$(date +"%F")
 	NOWT=$(date +"%T")
 	LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
-	touch .log/${NOW}_${NOWT}.txt
+	touch ".log/${NOW}_${NOWT}.txt"
 	echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
 	enable_command_trace
+
+	# Rotate old log files
+	rotate_logs "${dir}/.log" "${MAX_LOG_FILES:-10}" "${MAX_LOG_AGE_DAYS:-30}"
+
+	# Trap for cleanup on unexpected exit
+	trap 'cleanup_on_exit' INT TERM
 
 	# Initialize structured logging if enabled
 	log_init
@@ -6604,22 +6714,22 @@ function end() {
 		"${tools}/reconftw_ai/venv/bin/python3" "${tools}/reconftw_ai/reconftw_ai.py" --results-dir ${dir} --output-dir ${dir}/ai_result --model ${AI_MODEL} --output-format ${AI_REPORT_TYPE} --report-type ${AI_REPORT_PROFILE} --prompts-file ${tools}/reconftw_ai/prompts.json 2>>"${LOGFILE}" >/dev/null
 	fi
 
-	find $dir -type f -empty -print | grep -v '.called_fn' | grep -v '.log' | grep -v '.tmp' | xargs rm -f 2>>"$LOGFILE" >/dev/null
-	find $dir -type d -empty -print -delete 2>>"$LOGFILE" >/dev/null
+	find "$dir" -type f -empty -print | grep -v '.called_fn' | grep -v '.log' | grep -v '.tmp' | xargs -r rm -f -- 2>>"$LOGFILE" >/dev/null
+	find "$dir" -type d -empty -print -delete 2>>"$LOGFILE" >/dev/null
 
 	echo "[$(date +'%Y-%m-%d %H:%M:%S')] End" >>"${LOGFILE}"
 
 	if [[ $PRESERVE != true ]]; then
-		find $dir -type f -empty | grep -v "called_fn" | xargs rm -f 2>>"$LOGFILE" >/dev/null
-		find $dir -type d -empty | grep -v "called_fn" | xargs rm -rf 2>>"$LOGFILE" >/dev/null
+		find "$dir" -type f -empty | grep -v "called_fn" | xargs -r rm -f -- 2>>"$LOGFILE" >/dev/null
+		find "$dir" -type d -empty | grep -v "called_fn" | xargs -r rm -rf -- 2>>"$LOGFILE" >/dev/null
 	fi
 
 	if [[ $REMOVETMP == true ]]; then
-		rm -rf $dir/.tmp
+		rm -rf -- "$dir/.tmp"
 	fi
 
 	if [[ $REMOVELOG == true ]]; then
-		rm -rf $dir/.log
+		rm -rf -- "$dir/.log"
 	fi
 
 	if [[ $FARADAY == true ]]; then
@@ -6823,16 +6933,15 @@ function multi_osint() {
 
 	#[[ -n "$domain" ]] && ipcidr_target $domain
 
-	if [[ -s $list ]]; then
-		sed_i 's/\r$//' $list
-		targets=$(cat $list)
+	if [[ -s "$list" ]]; then
+		sed_i 's/\r$//' "$list"
 	else
 		notification "Target list not provided" error
 		exit
 	fi
 
-	workdir=${SCRIPTPATH}/Recon/$multi
-	mkdir -p $workdir || {
+	workdir="${SCRIPTPATH}/Recon/${multi}"
+	mkdir -p "$workdir" || {
 		echo "Failed to create directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"
 		exit 1
 	}
@@ -6845,14 +6954,15 @@ function multi_osint() {
 	NOW=$(date +"%F")
 	NOWT=$(date +"%T")
 	LOGFILE="${workdir}/.log/${NOW}_${NOWT}.txt"
-	touch .log/${NOW}_${NOWT}.txt
+	touch ".log/${NOW}_${NOWT}.txt"
 	echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
 	enable_command_trace
 
-	for domain in $targets; do
-		dir=$workdir/targets/$domain
-		called_fn_dir=$dir/.called_fn
-		mkdir -p $dir
+	while IFS= read -r domain; do
+		[[ -z "$domain" ]] && continue
+		dir="$workdir/targets/$domain"
+		called_fn_dir="$dir/.called_fn"
+		mkdir -p "$dir"
 		cd "$dir" || {
 			echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
 			exit 1
@@ -6861,7 +6971,7 @@ function multi_osint() {
 		NOW=$(date +"%F")
 		NOWT=$(date +"%T")
 		LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
-		touch .log/${NOW}_${NOWT}.txt
+		touch ".log/${NOW}_${NOWT}.txt"
 		echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
 		domain_info
 		ip_info
@@ -6874,7 +6984,7 @@ function multi_osint() {
 		third_party_misconfigs
 		zonetransfer
 		favicon
-	done
+	done < "$list"
 	cd "$workdir" || {
 		echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"
 		exit 1
@@ -6956,16 +7066,16 @@ function multi_recon() {
 
 	#[[ -n "$domain" ]] && ipcidr_target $domain
 
-	if [[ -s $list ]]; then
-		sed_i 's/\r$//' $list
-		targets=$(cat $list)
+	if [[ -s "$list" ]]; then
+		sed_i 's/\r$//' "$list"
+		mapfile -t targets < "$list"
 	else
 		notification "Target list not provided" error
 		exit
 	fi
 
-	workdir=${SCRIPTPATH}/Recon/$multi
-	mkdir -p $workdir || {
+	workdir="${SCRIPTPATH}/Recon/${multi}"
+	mkdir -p "$workdir" || {
 		echo "Failed to create directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"
 		exit 1
 	}
@@ -6978,14 +7088,15 @@ function multi_recon() {
 	NOW=$(date +"%F")
 	NOWT=$(date +"%T")
 	LOGFILE="${workdir}/.log/${NOW}_${NOWT}.txt"
-	touch .log/${NOW}_${NOWT}.txt
+	touch ".log/${NOW}_${NOWT}.txt"
 	echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
 
-	[ -n "$flist" ] && LISTTOTAL=$(cat "$flist" | wc -l)
+	[ -n "$flist" ] && LISTTOTAL=$(wc -l < "$flist")
 
-	for domain in $targets; do
-		dir=$workdir/targets/$domain
-		called_fn_dir=$dir/.called_fn
+	for domain in "${targets[@]}"; do
+		[[ -z "$domain" ]] && continue
+		dir="$workdir/targets/$domain"
+		called_fn_dir="$dir/.called_fn"
 
 		# Ensure directories exist
 		mkdir -p "$dir" || {
@@ -7032,7 +7143,7 @@ function multi_recon() {
 		favicon
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
-		getElapsedTime $loopstart $loopend
+		getElapsedTime "$loopstart" "$loopend"
 		printf "${bgreen}#######################################################################${reset}\n"
 		printf "${bgreen}[$(date +'%Y-%m-%d %H:%M:%S')] $domain finished 1st loop in ${runtime} $currently ${reset}\n"
 		if [[ -n $flist ]]; then
@@ -7051,10 +7162,11 @@ function multi_recon() {
 		axiom_selected
 	fi
 
-	for domain in $targets; do
+	for domain in "${targets[@]}"; do
+		[[ -z "$domain" ]] && continue
 		loopstart=$(date +%s)
-		dir=$workdir/targets/$domain
-		called_fn_dir=$dir/.called_fn
+		dir="$workdir/targets/$domain"
+		called_fn_dir="$dir/.called_fn"
 		cd "$dir" || {
 			echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
 			exit 1
@@ -7070,7 +7182,7 @@ function multi_recon() {
 		geo_info
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
-		getElapsedTime $loopstart $loopend
+		getElapsedTime "$loopstart" "$loopend"
 		printf "${bgreen}#######################################################################${reset}\n"
 		printf "${bgreen}[$(date +'%Y-%m-%d %H:%M:%S')] $domain finished 2nd loop in ${runtime} $currently ${reset}\n"
 		if [[ -n $flist ]]; then
@@ -7105,10 +7217,11 @@ function multi_recon() {
 	s3buckets
 	waf_checks
 	nuclei_check
-	for domain in $targets; do
+	for domain in "${targets[@]}"; do
+		[[ -z "$domain" ]] && continue
 		loopstart=$(date +%s)
-		dir=$workdir/targets/$domain
-		called_fn_dir=$dir/.called_fn
+		dir="$workdir/targets/$domain"
+		called_fn_dir="$dir/.called_fn"
 		cd "$dir" || {
 			echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
 			exit 1
@@ -7120,7 +7233,7 @@ function multi_recon() {
 		jschecks
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
-		getElapsedTime $loopstart $loopend
+		getElapsedTime "$loopstart" "$loopend"
 		printf "${bgreen}#######################################################################${reset}\n"
 		printf "${bgreen}[$(date +'%Y-%m-%d %H:%M:%S')] $domain finished 3rd loop in ${runtime} $currently ${reset}\n"
 		if [[ -n $flist ]]; then
@@ -7134,10 +7247,11 @@ function multi_recon() {
 		axiom_shutdown
 	fi
 
-	for domain in $targets; do
+	for domain in "${targets[@]}"; do
+		[[ -z "$domain" ]] && continue
 		loopstart=$(date +%s)
-		dir=$workdir/targets/$domain
-		called_fn_dir=$dir/.called_fn
+		dir="$workdir/targets/$domain"
+		called_fn_dir="$dir/.called_fn"
 		cd "$dir" || {
 			echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
 			exit 1
@@ -7150,7 +7264,7 @@ function multi_recon() {
 		url_ext
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
-		getElapsedTime $loopstart $loopend
+		getElapsedTime "$loopstart" "$loopend"
 		printf "${bgreen}#######################################################################${reset}\n"
 		printf "${bgreen}[$(date +'%Y-%m-%d %H:%M:%S')] $domain finished final loop in ${runtime} $currently ${reset}\n"
 		if [[ -n $flist ]]; then
@@ -7173,17 +7287,20 @@ function multi_custom() {
 
 	global_start=$(date +%s)
 
-	if [[ -s $list ]]; then
-		sed_i 's/\r$//' $list
-		targets=$(cat $list)
+	if [[ -s "$list" ]]; then
+		sed_i 's/\r$//' "$list"
 	else
 		notification "Target list not provided" error
 		exit
 	fi
 
-	dir=${SCRIPTPATH}/Recon/$multi
-	rm -rf $dir
-	mkdir -p $dir || {
+	dir="${SCRIPTPATH}/Recon/${multi}"
+	if [[ -z "$multi" || "$dir" != "${SCRIPTPATH}/Recon/"* ]]; then
+		echo "[!] Refusing to remove '$dir' -- safety check failed"
+		return 1
+	fi
+	rm -rf -- "$dir"
+	mkdir -p "$dir" || {
 		echo "Failed to create directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
 		exit 1
 	}
@@ -7193,26 +7310,26 @@ function multi_custom() {
 	}
 
 	mkdir -p {.called_fn,.log}
-	called_fn_dir=$dir/.called_fn
+	called_fn_dir="$dir/.called_fn"
 	NOW=$(date +"%F")
 	NOWT=$(date +"%T")
 	LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
-	touch .log/${NOW}_${NOWT}.txt
+	touch ".log/${NOW}_${NOWT}.txt"
 	echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
 	enable_command_trace
 
-	[ -n "$flist" ] && entries=$(cat "$flist" | wc -l)
+	[ -n "$flist" ] && entries=$(wc -l < "$flist")
 
 	if [[ $AXIOM == true ]]; then
 		axiom_launch
 		axiom_selected
 	fi
 
-	custom_function_list=$(echo $custom_function | tr ',' '\n')
+	custom_function_list=$(echo "$custom_function" | tr ',' '\n')
 	func_total=$(echo "$custom_function_list" | wc -l)
 
 	func_count=0
-	domain=$(cat $flist)
+	domain=$(cat "$flist")
 	for custom_f in $custom_function_list; do
 		((func_count = func_count + 1))
 
@@ -7222,7 +7339,7 @@ function multi_custom() {
 
 		currently=$(date +"%H:%M:%S")
 		loopend=$(date +%s)
-		getElapsedTime $loopstart $loopend
+		getElapsedTime "$loopstart" "$loopend"
 		printf "${bgreen}#######################################################################${reset}\n"
 		printf "${bgreen}[$(date +'%Y-%m-%d %H:%M:%S')] Finished $custom_f ($func_count/$func_total) for $entries entries in ${runtime} $currently ${reset}\n"
 		printf "${bgreen}#######################################################################${reset}\n"
@@ -7404,6 +7521,7 @@ if [[ $exit_status -ne 0 ]]; then
 fi
 
 # Note the quotes around "$PROGARGS": they are essential!
+# shellcheck disable=SC2086 -- Standard getopt idiom; PROGARGS is sanitized getopt output
 eval set -- "$PROGARGS"
 unset PROGARGS
 
@@ -7426,10 +7544,11 @@ while true; do
 		continue
 		;;
 	'-l' | '--list')
-		list=$2
-		for t in $(cat $list); do
-			ipcidr_target $t $list
-		done
+		list="$2"
+		while IFS= read -r t; do
+			[[ -z "$t" ]] && continue
+			ipcidr_target "$t" "$list"
+		done < "$list"
 		shift 2
 		continue
 		;;
@@ -7584,9 +7703,12 @@ SCRIPTPATH="$(
 	pwd -P
 )"
 . "${SCRIPTPATH}"/reconftw.cfg || {
-	echo "Error importing reconftw.ctg"
+	echo "Error importing reconftw.cfg"
 	exit 1
 }
+
+# Source optional secrets file (gitignored, for API keys and tokens)
+[[ -f "${SCRIPTPATH}/secrets.cfg" ]] && . "${SCRIPTPATH}/secrets.cfg"
 
 if [[ -s $CUSTOM_CONFIG ]]; then
 	# shellcheck source=/home/six2dez/Tools/reconftw/custom_config.cfg
@@ -7661,6 +7783,11 @@ else
 	flist=''
 fi
 
+# Allow sourcing functions without execution (for testing)
+if [[ "${1:-}" == "--source-only" ]]; then
+	return 0 2>/dev/null || exit 0
+fi
+
 case $opt_mode in
 'r')
 	if [[ -n $multi ]]; then
@@ -7674,12 +7801,13 @@ case $opt_mode in
 		if [[ $AXIOM == true ]]; then
 			mode="list_recon"
 		fi
-		sed_i 's/\r$//' $list
-		for domain in $(cat $list); do
+		sed_i 's/\r$//' "$list"
+		while IFS= read -r domain; do
+			[[ -z "$domain" ]] && continue
 			start
 			recon
 			end
-		done
+		done < "$list"
 	else
 		if [[ $AXIOM == true ]]; then
 			mode="recon"
@@ -7694,10 +7822,11 @@ case $opt_mode in
 		if [[ $AXIOM == true ]]; then
 			mode="subs_menu"
 		fi
-		sed_i 's/\r$//' $list
-		for domain in $(cat $list); do
+		sed_i 's/\r$//' "$list"
+		while IFS= read -r domain; do
+			[[ -z "$domain" ]] && continue
 			subs_menu
-		done
+		done < "$list"
 	else
 		subs_menu
 	fi
@@ -7707,10 +7836,11 @@ case $opt_mode in
 		if [[ $AXIOM == true ]]; then
 			mode="passive"
 		fi
-		sed_i 's/\r$//' $list
-		for domain in $(cat $list); do
+		sed_i 's/\r$//' "$list"
+		while IFS= read -r domain; do
+			[[ -z "$domain" ]] && continue
 			passive
-		done
+		done < "$list"
 	else
 		passive
 	fi
@@ -7721,10 +7851,11 @@ case $opt_mode in
 		if [[ $AXIOM == true ]]; then
 			mode="all"
 		fi
-		sed_i 's/\r$//' $list
-		for domain in $(cat $list); do
+		sed_i 's/\r$//' "$list"
+		while IFS= read -r domain; do
+			[[ -z "$domain" ]] && continue
 			all
-		done
+		done < "$list"
 	else
 		all
 	fi
@@ -7733,9 +7864,9 @@ case $opt_mode in
 	if [[ -n $list ]]; then
 		start
 		if [[ $list == /* ]]; then
-			cp $list $dir/webs/webs.txt
+			cp "$list" "$dir/webs/webs.txt"
 		else
-			cp ${SCRIPTPATH}/$list $dir/webs/webs.txt
+			cp "${SCRIPTPATH}/$list" "$dir/webs/webs.txt"
 		fi
 	else
 		printf "\n\n${bred} Web mode needs a website list file as target (./reconftw.sh -l target.txt -w) ${reset}\n\n"
@@ -7751,12 +7882,13 @@ case $opt_mode in
 		exit
 	fi
 	if [[ -n $list ]]; then
-		sed_i 's/\r$//' $list
+		sed_i 's/\r$//' "$list"
 		while IFS= read -r domain; do
+			[[ -z "$domain" ]] && continue
 			start
 			osint
 			end
-		done
+		done < "$list"
 	else
 		start
 		osint
@@ -7768,10 +7900,11 @@ case $opt_mode in
 		if [[ $AXIOM == true ]]; then
 			mode="zen_menu"
 		fi
-		sed_i 's/\r$//' $list
-		for domain in $(cat $list); do
+		sed_i 's/\r$//' "$list"
+		while IFS= read -r domain; do
+			[[ -z "$domain" ]] && continue
 			zen_menu
-		done
+		done < "$list"
 	else
 		zen_menu
 	fi

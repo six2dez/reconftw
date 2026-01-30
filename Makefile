@@ -1,7 +1,7 @@
 GH_CLI := $(shell command -v gh 2> /dev/null)
 PRIVATE_REPO := $(shell echo $${PRIV_REPO-reconftw-data})
 
-.PHONY: sync upload bootstrap rm lint fmt
+.PHONY: sync upload bootstrap rm lint fmt test test-all
 
 # bootstrap a private repo to store data
 bootstrap:
@@ -32,7 +32,7 @@ upload:
 
 lint:
 	@if command -v shellcheck >/dev/null 2>&1; then \
-		shellcheck install.sh reconftw.sh || true; \
+		shellcheck -S warning reconftw.sh install.sh; \
 	else \
 		echo "shellcheck not found. Install: https://www.shellcheck.net/"; \
 	fi
@@ -42,4 +42,18 @@ fmt:
 		shfmt -w -i 4 -bn -ci install.sh reconftw.sh; \
 	else \
 		echo "shfmt not found. Install: https://github.com/mvdan/sh"; \
+	fi
+
+test:
+	@if command -v bats >/dev/null 2>&1; then \
+		bats tests/unit/*.bats; \
+	else \
+		echo "bats-core not found. Install: https://github.com/bats-core/bats-core"; \
+	fi
+
+test-all:
+	@if command -v bats >/dev/null 2>&1; then \
+		bats tests/unit/*.bats tests/integration/*.bats; \
+	else \
+		echo "bats-core not found. Install: https://github.com/bats-core/bats-core"; \
 	fi
