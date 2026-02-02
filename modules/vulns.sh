@@ -884,9 +884,7 @@ function fuzzparams() {
                         printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Axiom with Nuclei${reset}\n\n"
 
                         run_command axiom-scan webs/url_extract_nodupes.txt -m nuclei \
-
                             -dast -nh -rl "$NUCLEI_RATELIMIT" \
-
                             -silent -retries 2 "$NUCLEI_EXTRA_ARGS" -dast -j -o ".tmp/fuzzparams_json.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
 
                     fi

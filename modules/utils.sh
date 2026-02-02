@@ -304,9 +304,10 @@ function adjust_rate_limit() {
 
     [[ "$ADAPTIVE_RATE_LIMIT" != "true" ]] && return 0
 
+    local new_limit
     case "$action" in
         decrease)
-            local new_limit=$(awk "BEGIN {printf \"%.0f\", $CURRENT_RATE_LIMIT * $RATE_LIMIT_BACKOFF_FACTOR}")
+            new_limit=$(awk "BEGIN {printf \"%.0f\", $CURRENT_RATE_LIMIT * $RATE_LIMIT_BACKOFF_FACTOR}")
             if [ "$new_limit" -lt "$MIN_RATE_LIMIT" ]; then
                 new_limit=$MIN_RATE_LIMIT
             fi
@@ -315,7 +316,7 @@ function adjust_rate_limit() {
                 "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$CURRENT_RATE_LIMIT" "$reset" | tee -a "$LOGFILE"
             ;;
         increase)
-            local new_limit=$(awk "BEGIN {printf \"%.0f\", $CURRENT_RATE_LIMIT * $RATE_LIMIT_INCREASE_FACTOR}")
+            new_limit=$(awk "BEGIN {printf \"%.0f\", $CURRENT_RATE_LIMIT * $RATE_LIMIT_INCREASE_FACTOR}")
             if [ "$new_limit" -gt "$MAX_RATE_LIMIT" ]; then
                 new_limit=$MAX_RATE_LIMIT
             fi
@@ -327,7 +328,9 @@ function adjust_rate_limit() {
 
     # Update tool-specific rate limits
     NUCLEI_RATELIMIT=$CURRENT_RATE_LIMIT
+    # shellcheck disable=SC2034  # Used by external tools
     FFUF_RATELIMIT=$CURRENT_RATE_LIMIT
+    # shellcheck disable=SC2034  # Used by external tools
     HTTPX_RATELIMIT=$CURRENT_RATE_LIMIT
 }
 
@@ -341,7 +344,8 @@ function run_with_adaptive_rate() {
 
     local max_retries=3
     local retry=0
-    local temp_output=$(mktemp)
+    local temp_output
+    temp_output=$(mktemp)
 
     while [ $retry -lt $max_retries ]; do
         if "$@" 2>&1 | tee "$temp_output"; then
@@ -421,9 +425,10 @@ function sanitize_domain() {
 # Usage: sanitize_ip <ip_or_cidr>
 function sanitize_ip() {
     local input="$1"
+    local sanitized
 
     # Allow digits, dots, and slash for CIDR
-    local sanitized=$(echo "$input" | tr -cd '0-9./,')
+    sanitized=$(echo "$input" | tr -cd '0-9./,')
 
     if [[ -z "$sanitized" ]]; then
         printf "%b[%s] ERROR: Invalid IP/CIDR after sanitization: '%s'%b\n" \

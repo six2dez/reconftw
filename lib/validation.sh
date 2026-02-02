@@ -5,6 +5,7 @@
 set -o pipefail
 
 # Error codes
+# shellcheck disable=SC2034  # These are exported for use in modules
 readonly E_INVALID_DOMAIN=20
 readonly E_INVALID_IP=21
 readonly E_INVALID_PATH=22

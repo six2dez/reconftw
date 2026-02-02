@@ -815,6 +815,7 @@ function grpc_reflection() {
         # Build target IP list
         local ips_file="hosts/ips.txt"
         local targets=()
+        # shellcheck disable=SC2207  # Word splitting intended for array population
         [[ -s $ips_file ]] && targets+=($(cat "$ips_file"))
         [[ -s "hosts/ips_v6.txt" ]] && targets+=($(cat "hosts/ips_v6.txt"))
         printf "%s\n" "${targets[@]}" | sort -u >.tmp/grpc_ips.txt
@@ -865,8 +866,8 @@ function fuzz() {
         if [[ -s "webs/webs_all.txt" ]]; then
             if [[ $AXIOM != true ]]; then
                 # Split targets by slow hosts
-                >.tmp/webs_slow.txt
-                >.tmp/webs_normal.txt
+                : >.tmp/webs_slow.txt
+                : >.tmp/webs_normal.txt
                 if [[ -s .tmp/slow_hosts.txt ]]; then
                     while read -r host; do
                         grep "://${host}[:/\n]" webs/webs_all.txt | anew -q .tmp/webs_slow.txt
@@ -890,8 +891,6 @@ function fuzz() {
                 fi
                 for sub in $(cat webs/webs_all.txt); do
                     sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-
-                    [ -s "$dir/.tmp/fuzzing/${sub_out}.json" ] && cat $dir/.tmp/fuzzing/${sub_out}.json | jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' | sort -k1 | anew -q $dir/fuzzing/${sub_out}.txt
                 done
                 find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | sort -k1 | anew -q $dir/fuzzing/fuzzing_full.txt
             else
@@ -1084,8 +1083,8 @@ function urlchecks() {
                 if [[ $diff_webs != "0" ]] || [[ ! -s ".tmp/katana.txt" ]]; then
                     if [[ $URL_CHECK_ACTIVE == true ]]; then
                         # Split slow vs normal targets based on httpx status (403/429)
-                        >.tmp/katana_targets_slow.txt
-                        >.tmp/katana_targets_normal.txt
+                        : >.tmp/katana_targets_slow.txt
+                        : >.tmp/katana_targets_normal.txt
                         if [[ -s .tmp/slow_hosts.txt ]]; then
                             while read -r host; do
                                 grep "://${host}[:/\n]" webs/webs_all.txt | anew -q .tmp/katana_targets_slow.txt
@@ -1095,7 +1094,7 @@ function urlchecks() {
                             cp webs/webs_all.txt .tmp/katana_targets_normal.txt
                         fi
 
-                        >.tmp/katana.txt
+                        : >.tmp/katana.txt
                         # Normal targets
                         if [[ -s .tmp/katana_targets_normal.txt ]]; then
                             LINES=$(wc -l <.tmp/katana_targets_normal.txt)

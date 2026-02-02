@@ -96,6 +96,7 @@ function _load_config_file() {
 	fi
 
 	# Source the file with error handling
+	# shellcheck source=/dev/null
 	if ! source "$conf_file" 2>/dev/null; then
 		printf "[ERROR] Failed to load config file: %s\n" "$conf_file" >&2
 		return $E_CONFIG_SYNTAX

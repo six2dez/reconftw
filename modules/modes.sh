@@ -276,6 +276,7 @@ function passive() {
     metadata
     apileaks
     third_party_misconfigs
+    # shellcheck disable=SC2034  # These flags control module behavior
     SUBNOERROR=false
     SUBANALYTICS=false
     SUBBRUTE=false
@@ -293,6 +294,7 @@ function passive() {
     remove_big_files
     favicon
     cdnprovider
+    # shellcheck disable=SC2034  # PORTSCAN_ACTIVE controls scan behavior
     PORTSCAN_ACTIVE=false
     portscan
     geo_info

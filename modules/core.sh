@@ -92,6 +92,7 @@ function banner_grabber() {
     fi
 
     # Source the banner file
+    # shellcheck source=/dev/null
     source "$banner_file"
 
     # Collect all banner variable names
@@ -583,7 +584,9 @@ function incremental_diff() {
 function incremental_report() {
     [[ "$INCREMENTAL_MODE" != "true" ]] && return 0
 
-    local report_file="$INCREMENTAL_DIR/incremental_report_$(date +%Y%m%d_%H%M%S).txt"
+    local report_file
+    local new_subs new_webs
+    report_file="$INCREMENTAL_DIR/incremental_report_$(date +%Y%m%d_%H%M%S).txt"
 
     {
         echo "==============================================="
@@ -595,7 +598,7 @@ function incremental_report() {
 
         # Subdomain changes
         if [[ -f "$INCREMENTAL_DIR/previous/subdomains_latest.txt" ]]; then
-            local new_subs=$(comm -13 <(sort -u "$INCREMENTAL_DIR/previous/subdomains_latest.txt" 2>/dev/null || touch /tmp/empty) \
+            new_subs=$(comm -13 <(sort -u "$INCREMENTAL_DIR/previous/subdomains_latest.txt" 2>/dev/null || touch /tmp/empty) \
                 <(sort -u "subdomains/subdomains.txt" 2>/dev/null || touch /tmp/empty) | wc -l)
             echo "New Subdomains: $new_subs"
             if [[ $new_subs -gt 0 ]]; then
@@ -609,7 +612,7 @@ function incremental_report() {
 
         # Web changes
         if [[ -f "$INCREMENTAL_DIR/previous/webs_latest.txt" ]]; then
-            local new_webs=$(comm -13 <(sort -u "$INCREMENTAL_DIR/previous/webs_latest.txt" 2>/dev/null || touch /tmp/empty) \
+            new_webs=$(comm -13 <(sort -u "$INCREMENTAL_DIR/previous/webs_latest.txt" 2>/dev/null || touch /tmp/empty) \
                 <(sort -u "webs/webs.txt" 2>/dev/null || touch /tmp/empty) | wc -l)
             echo "New Webs: $new_webs"
             if [[ $new_webs -gt 0 ]]; then
@@ -637,8 +640,9 @@ function incremental_should_skip() {
     [[ "$INCREMENTAL_MODE" != "true" ]] && return 1 # Don't skip
 
     # Check if we have new findings
-    local new_subs=$(cat .tmp/subs_new_count 2>/dev/null || echo 1)
-    local new_webs=$(cat .tmp/webs_new_count 2>/dev/null || echo 1)
+    local new_subs new_webs
+    new_subs=$(cat .tmp/subs_new_count 2>/dev/null || echo 1)
+    new_webs=$(cat .tmp/webs_new_count 2>/dev/null || echo 1)
 
     if [[ $new_subs -eq 0 && $new_webs -eq 0 ]]; then
         printf "%b[%s] Incremental mode: No new assets found, skipping heavy scans%b\n" \
@@ -665,6 +669,7 @@ function zipSnedOutputFolder {
 }
 
 function isAsciiText {
+    # shellcheck disable=SC2034  # IS_ASCII used by callers
     IS_ASCII="False"
     if [[ $(file $1 | grep -o 'ASCII text$') == "ASCII text" ]]; then
         IS_ASCII="True"
@@ -849,11 +854,13 @@ function maybe_update_nuclei() {
 }
 
 # Plugin framework
+# shellcheck disable=SC2034  # PLUGINS_LOADED used for state tracking
 PLUGINS_LOADED=false
 function plugins_load() {
     local plugdir="${SCRIPTPATH}/plugins"
     if [[ -d $plugdir ]]; then
         for f in "$plugdir"/*.sh; do
+            # shellcheck source=/dev/null
             [[ -f $f ]] && source "$f" || true
         done
     fi

@@ -1839,7 +1839,8 @@ function cloud_extra_providers() {
         # Candidate names from domain and subdomains
         company=$(unfurl format %r <<<"$domain")
         printf "%s\n%s\n${domain%%.*}" "$company" "$domain" | sed 's/[^a-zA-Z0-9-]//g' | awk 'length>2' | sort -u >.tmp/cloudnames.txt
-        [[ -s subdomains/subdomains.txt ]] && awk -F. -v r=$(echo "$domain" | awk -F. '{print $(NF-1)"."$NF}') '{print $(NF-2)}' subdomains/subdomains.txt 2>/dev/null | sed 's/[^a-zA-Z0-9-]//g' | awk 'length>2' | sort -u >>.tmp/cloudnames.txt
+        # shellcheck disable=SC2046  # Word splitting intended for awk
+        [[ -s subdomains/subdomains.txt ]] && awk -F. -v r="$(echo "$domain" | awk -F. '{print $(NF-1)"."$NF}')" '{print $(NF-2)}' subdomains/subdomains.txt 2>/dev/null | sed 's/[^a-zA-Z0-9-]//g' | awk 'length>2' | sort -u >>.tmp/cloudnames.txt
         sed_i 's/^\///; s/\.$//' .tmp/cloudnames.txt
         sort -u .tmp/cloudnames.txt -o .tmp/cloudnames.txt
 

@@ -6,6 +6,7 @@
 # This file is sourced by reconftw.sh - do not execute directly
 
 # shellcheck disable=SC2154  # Variables defined in reconftw.cfg
+# shellcheck disable=SC2034  # Variables exported for use in other modules
 
 [[ -z "${SCRIPTPATH:-}" ]] && {
     echo "Error: This module must be sourced by reconftw.sh" >&2

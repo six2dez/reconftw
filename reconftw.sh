@@ -7,6 +7,7 @@ set +e
 IFS=$'\n\t'
 
 # Standard exit/return codes (guard for re-source in test harnesses)
+# shellcheck disable=SC2034  # These are exported for use in modules and custom scripts
 if [[ -z "${E_SUCCESS+x}" ]]; then
     readonly E_SUCCESS=0
     readonly E_GENERAL=1
