@@ -952,15 +952,22 @@ function print_timing_summary() {
 
     local total=0
     local fn dur
+    local -a sorted_entries=()
 
-    # Collect and sort by duration (descending)
+    # First pass: calculate total and collect entries
     for fn in "${!FUNC_TIMINGS[@]}"; do
         dur=${FUNC_TIMINGS[$fn]}
-        total=$((total + dur))
-        printf "%s %s\n" "$dur" "$fn"
-    done | sort -rn | while read -r dur fn; do
+        # Ensure dur is numeric
+        if [[ "$dur" =~ ^[0-9]+$ ]]; then
+            total=$((total + dur))
+            sorted_entries+=("$dur|$fn")
+        fi
+    done
+
+    # Sort entries by duration (descending) and print
+    printf '%s\n' "${sorted_entries[@]}" | sort -t'|' -k1 -rn | while IFS='|' read -r dur fn; do
         local pct=0
-        if [[ $total -gt 0 ]]; then
+        if [[ $total -gt 0 ]] && [[ "$dur" =~ ^[0-9]+$ ]]; then
             pct=$((dur * 100 / total))
         fi
         local mins=$((dur / 60))
