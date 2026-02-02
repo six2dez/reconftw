@@ -30,14 +30,35 @@ function deleteOutScoped() {
 }
 
 function cleanup_on_exit() {
+    local exit_code="${1:-130}"
     printf "\n%b[%s] Interrupted. Cleaning up...%b\n" "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+    
+    # Save checkpoint before cleanup if enabled
+    if [[ "${CHECKPOINT_ENABLED:-false}" == "true" ]] && [[ -n "${CHECKPOINT_DIR:-}" ]]; then
+        echo "interrupted=$(date -Iseconds)" >> "$CHECKPOINT_DIR/scan_info.txt" 2>/dev/null || true
+    fi
+    
     # Clean temporary chunk files
     rm -rf -- "${dir:-.}/.tmp/chunks" 2>/dev/null
-    # Kill any background processes we spawned
-    jobs -p 2>/dev/null | xargs -r kill 2>/dev/null || true
+    
+    # Kill any background processes we spawned (safely)
+    local pids
+    pids=$(jobs -p 2>/dev/null) || true
+    if [[ -n "$pids" ]]; then
+        echo "$pids" | while read -r pid; do
+            [[ -n "$pid" ]] && kill "$pid" 2>/dev/null || true
+        done
+    fi
+    
+    # Kill tracked interactsh process if running
+    if [[ -n "${INTERACTSH_PID:-}" ]]; then
+        kill "$INTERACTSH_PID" 2>/dev/null || true
+    fi
+    
     # Log the interruption
-    echo "[$(date +'%Y-%m-%d %H:%M:%S')] Interrupted by signal" >>"${LOGFILE:-/dev/null}"
-    exit 130
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] Interrupted by signal (exit code: $exit_code)" >>"${LOGFILE:-/dev/null}"
+    
+    exit "$exit_code"
 }
 
 function rotate_logs() {

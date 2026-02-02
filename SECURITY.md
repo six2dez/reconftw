@@ -80,11 +80,28 @@ reconFTW sanitizes all user-supplied input to prevent command injection:
 
 | Function | Purpose |
 |----------|---------|
-| `sanitize_domain()` | Strips characters not valid in domain names |
+| `sanitize_domain()` | Strips characters not valid in domain names, converts to lowercase |
 | `sanitize_ip()` | Validates and cleans IP/CIDR input |
 | `sanitize_interlace_input()` | Removes shell metacharacters from interlace arguments |
+| `validate_domain()` | Validates domain format without modification |
+| `validate_ipv4()` | Validates IPv4 address format |
 
 All `eval` usage on user input has been removed. Variables are quoted throughout the codebase to prevent word-splitting and globbing attacks.
+
+## Security Testing
+
+The test suite includes security-focused tests in `tests/security/`:
+
+- Command injection attempts via domain parameter
+- Pipe and redirect injection tests
+- Backtick and dollar substitution tests
+- Path traversal prevention tests
+
+Run security tests with:
+
+```bash
+make test-security
+```
 
 ## Security-Related Configuration
 

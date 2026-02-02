@@ -51,6 +51,26 @@ setup() {
     [ "$status" -ne 0 ]
 }
 
+@test "sanitize_domain handles empty input" {
+    run sanitize_domain ""
+    [ "$status" -ne 0 ]
+}
+
+@test "sanitize_domain handles only dots" {
+    run sanitize_domain "..."
+    [ "$status" -ne 0 ]
+}
+
+@test "sanitize_domain strips leading/trailing dots" {
+    result=$(sanitize_domain ".example.com.")
+    [ "$result" = "example.com" ]
+}
+
+@test "sanitize_domain strips leading/trailing hyphens" {
+    result=$(sanitize_domain "-example.com-")
+    [ "$result" = "example.com" ]
+}
+
 @test "sanitize_interlace_input removes shell metacharacters" {
     local tmpfile
     tmpfile=$(mktemp)
