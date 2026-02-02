@@ -522,19 +522,27 @@ function cache_is_valid() {
 
     [[ ! -f "$cache_file" ]] && return 1
 
-    # Get file age in days
-    local file_age_seconds
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS
-        file_age_seconds=$(($(date +%s) - $(stat -f %m "$cache_file")))
+    # Get file modification time in seconds since epoch
+    local file_mtime
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        # macOS: stat -f %m returns modification time
+        file_mtime=$(stat -f "%m" "$cache_file" 2>/dev/null)
     else
-        # Linux
-        file_age_seconds=$(($(date +%s) - $(stat -c %Y "$cache_file")))
+        # Linux: stat -c %Y returns modification time
+        file_mtime=$(stat -c "%Y" "$cache_file" 2>/dev/null)
+    fi
+    
+    # Fallback if stat failed
+    if [[ -z "$file_mtime" ]] || ! [[ "$file_mtime" =~ ^[0-9]+$ ]]; then
+        return 1
     fi
 
+    local current_time
+    current_time=$(date +%s)
+    local file_age_seconds=$((current_time - file_mtime))
     local file_age_days=$((file_age_seconds / 86400))
 
-    if [ $file_age_days -lt $CACHE_MAX_AGE_DAYS ]; then
+    if [ $file_age_days -lt ${CACHE_MAX_AGE_DAYS:-30} ]; then
         printf "%b[%s] Using cached file (age: %d days): %s%b\n" \
             "$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$file_age_days" "$(basename "$cache_file")" "$reset" >>"$LOGFILE"
         return 0
@@ -582,19 +590,26 @@ function cached_download() {
 # Clear old cache files
 # Usage: cache_clean [max_age_days]
 function cache_clean() {
-    local max_age="${1:-$CACHE_MAX_AGE_DAYS}"
+    local max_age="${1:-${CACHE_MAX_AGE_DAYS:-30}}"
 
     [[ ! -d "$CACHE_DIR" ]] && return 0
 
     local cleaned=0
+    local current_time
+    current_time=$(date +%s)
+    
     while IFS= read -r -d '' file; do
-        local file_age_seconds
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            file_age_seconds=$(($(date +%s) - $(stat -f %m "$file")))
+        local file_mtime
+        if [[ "$(uname -s)" == "Darwin" ]]; then
+            file_mtime=$(stat -f "%m" "$file" 2>/dev/null)
         else
-            file_age_seconds=$(($(date +%s) - $(stat -c %Y "$file")))
+            file_mtime=$(stat -c "%Y" "$file" 2>/dev/null)
         fi
+        
+        # Skip if stat failed
+        [[ -z "$file_mtime" ]] || ! [[ "$file_mtime" =~ ^[0-9]+$ ]] && continue
 
+        local file_age_seconds=$((current_time - file_mtime))
         local file_age_days=$((file_age_seconds / 86400))
 
         if [ $file_age_days -gt $max_age ]; then
