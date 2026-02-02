@@ -1,0 +1,20 @@
+#!/bin/bash
+# Mock subfinder for testing
+
+# Parse domain from args
+domain=""
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -d) domain="$2"; shift 2 ;;
+        -silent|-all) shift ;;
+        *) shift ;;
+    esac
+done
+
+if [[ -n "$domain" ]]; then
+    echo "www.$domain"
+    echo "api.$domain"
+    echo "mail.$domain"
+    echo "dev.$domain"
+fi
+exit 0

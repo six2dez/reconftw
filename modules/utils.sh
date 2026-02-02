@@ -414,6 +414,30 @@ function sanitize_ip() {
 }
 
 ###############################################################################################################
+####################################### DEEP/AXIOM HELPERS ####################################################
+###############################################################################################################
+
+# Check if we should run in DEEP mode based on flag or item count
+# Usage: should_run_deep <count> [limit]
+# Returns: 0 if should run deep, 1 otherwise
+function should_run_deep() {
+    local count="${1:-0}"
+    local limit="${2:-$DEEP_LIMIT}"
+
+    [[ "$DEEP" == true ]] && return 0
+    [[ "$count" -le "$limit" ]] && return 0
+    return 1
+}
+
+# Check if we should run in DEEP mode with custom limit
+# Usage: should_run_deep2 <count>
+# Returns: 0 if should run deep, 1 otherwise
+function should_run_deep2() {
+    local count="${1:-0}"
+    should_run_deep "$count" "${DEEP_LIMIT2:-500}"
+}
+
+###############################################################################################################
 ####################################### CACHÉ DE RECURSOS #####################################################
 ###############################################################################################################
 

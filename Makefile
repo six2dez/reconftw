@@ -1,7 +1,22 @@
 GH_CLI := $(shell command -v gh 2> /dev/null)
 PRIVATE_REPO := $(shell echo $${PRIV_REPO-reconftw-data})
 
-.PHONY: sync upload bootstrap rm lint fmt test test-all
+.PHONY: sync upload bootstrap rm lint lint-fix fmt test test-all test-security setup-dev help
+
+help:
+	@echo "reconFTW Development Commands"
+	@echo ""
+	@echo "  make test          - Run unit tests"
+	@echo "  make test-all      - Run all tests (unit + integration)"
+	@echo "  make test-security - Run security tests"
+	@echo "  make lint          - Check code with shellcheck"
+	@echo "  make lint-fix      - Show shellcheck issues with context"
+	@echo "  make fmt           - Format code with shfmt"
+	@echo "  make setup-dev     - Install pre-commit hooks"
+	@echo ""
+	@echo "  make bootstrap     - Create private data repo"
+	@echo "  make sync          - Sync with upstream"
+	@echo "  make upload        - Upload data to private repo"
 
 # bootstrap a private repo to store data
 bootstrap:
@@ -32,16 +47,26 @@ upload:
 
 lint:
 	@if command -v shellcheck >/dev/null 2>&1; then \
-		shellcheck -S warning reconftw.sh modules/*.sh install.sh; \
+		shellcheck -S error reconftw.sh modules/*.sh lib/*.sh install.sh; \
 	else \
 		echo "shellcheck not found. Install: https://www.shellcheck.net/"; \
+		exit 1; \
+	fi
+
+lint-fix:
+	@if command -v shellcheck >/dev/null 2>&1; then \
+		shellcheck -S warning -f gcc reconftw.sh modules/*.sh lib/*.sh install.sh; \
+	else \
+		echo "shellcheck not found. Install: https://www.shellcheck.net/"; \
+		exit 1; \
 	fi
 
 fmt:
 	@if command -v shfmt >/dev/null 2>&1; then \
-		shfmt -w -i 4 -bn -ci install.sh reconftw.sh modules/*.sh; \
+		shfmt -w -i 4 -bn -ci install.sh reconftw.sh modules/*.sh lib/*.sh; \
 	else \
 		echo "shfmt not found. Install: https://github.com/mvdan/sh"; \
+		exit 1; \
 	fi
 
 test:
@@ -49,11 +74,30 @@ test:
 		bats tests/unit/*.bats; \
 	else \
 		echo "bats-core not found. Install: https://github.com/bats-core/bats-core"; \
+		exit 1; \
+	fi
+
+test-security:
+	@if command -v bats >/dev/null 2>&1; then \
+		bats tests/security/*.bats; \
+	else \
+		echo "bats-core not found. Install: https://github.com/bats-core/bats-core"; \
+		exit 1; \
 	fi
 
 test-all:
 	@if command -v bats >/dev/null 2>&1; then \
-		bats tests/unit/*.bats tests/integration/*.bats; \
+		bats tests/unit/*.bats tests/security/*.bats; \
 	else \
 		echo "bats-core not found. Install: https://github.com/bats-core/bats-core"; \
+		exit 1; \
+	fi
+
+setup-dev:
+	@if command -v pre-commit >/dev/null 2>&1; then \
+		pre-commit install; \
+		echo "Pre-commit hooks installed!"; \
+	else \
+		echo "pre-commit not found. Install: pip install pre-commit"; \
+		exit 1; \
 	fi

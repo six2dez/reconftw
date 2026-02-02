@@ -1102,13 +1102,13 @@ function urlchecks() {
                                 if [[ $DEEP == true ]]; then
                                     process_in_chunks .tmp/katana_targets_normal.txt ${CHUNK_LIMIT:-2000} "katana -silent -list _chunk_ -jc -kf all -c $KATANA_THREADS -d 3 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\" >/dev/null"
                                 else
-                                    process_in_chunks .tmp/katana_targets_normal.txt ${CHUNK_LIMIT:-2000} "katana -silent -list _chunk_ -jc -kf all -c $KATANA_THREADS -d 2 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\" >/dev/null"
+                                    process_in_chunks .tmp/katana_targets_normal.txt ${CHUNK_LIMIT:-2000} "katana -silent -list _chunk_ -jc -kf all -c $KATANA_THREADS -d 2 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\""
                                 fi
                             else
                                 if [[ $DEEP == true ]]; then
-                                    timeout 4h katana -silent -list .tmp/katana_targets_normal.txt -jc -kf all -c "$KATANA_THREADS" -d 3 -fs rdn >>.tmp/katana.txt 2>>"$LOGFILE" >/dev/null
+                                    timeout 4h katana -silent -list .tmp/katana_targets_normal.txt -jc -kf all -c "$KATANA_THREADS" -d 3 -fs rdn >>.tmp/katana.txt 2>>"$LOGFILE"
                                 else
-                                    timeout 3h katana -silent -list .tmp/katana_targets_normal.txt -jc -kf all -c "$KATANA_THREADS" -d 2 -fs rdn >>.tmp/katana.txt 2>>"$LOGFILE" >/dev/null
+                                    timeout 3h katana -silent -list .tmp/katana_targets_normal.txt -jc -kf all -c "$KATANA_THREADS" -d 2 -fs rdn >>.tmp/katana.txt 2>>"$LOGFILE"
                                 fi
                             fi
                         fi
@@ -1120,15 +1120,15 @@ function urlchecks() {
                             LINES=$(wc -l <.tmp/katana_targets_slow.txt)
                             if [[ $LINES -gt ${CHUNK_LIMIT:-2000} ]]; then
                                 if [[ $DEEP == true ]]; then
-                                    process_in_chunks .tmp/katana_targets_slow.txt ${CHUNK_LIMIT:-2000} "katana -silent -list _chunk_ -jc -kf all -c $slow_c -d 3 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\" >/dev/null"
+                                    process_in_chunks .tmp/katana_targets_slow.txt ${CHUNK_LIMIT:-2000} "katana -silent -list _chunk_ -jc -kf all -c $slow_c -d 3 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\""
                                 else
-                                    process_in_chunks .tmp/katana_targets_slow.txt ${CHUNK_LIMIT:-2000} "katana -silent -list _chunk_ -jc -kf all -c $slow_c -d 2 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\" >/dev/null"
+                                    process_in_chunks .tmp/katana_targets_slow.txt ${CHUNK_LIMIT:-2000} "katana -silent -list _chunk_ -jc -kf all -c $slow_c -d 2 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\""
                                 fi
                             else
                                 if [[ $DEEP == true ]]; then
-                                    timeout 4h katana -silent -list .tmp/katana_targets_slow.txt -jc -kf all -c "$slow_c" -d 3 -fs rdn >>.tmp/katana.txt 2>>"$LOGFILE" >/dev/null
+                                    timeout 4h katana -silent -list .tmp/katana_targets_slow.txt -jc -kf all -c "$slow_c" -d 3 -fs rdn >>.tmp/katana.txt 2>>"$LOGFILE"
                                 else
-                                    timeout 3h katana -silent -list .tmp/katana_targets_slow.txt -jc -kf all -c "$slow_c" -d 2 -fs rdn >>.tmp/katana.txt 2>>"$LOGFILE" >/dev/null
+                                    timeout 3h katana -silent -list .tmp/katana_targets_slow.txt -jc -kf all -c "$slow_c" -d 2 -fs rdn >>.tmp/katana.txt 2>>"$LOGFILE"
                                 fi
                             fi
                         fi

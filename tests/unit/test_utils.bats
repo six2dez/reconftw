@@ -84,3 +84,39 @@ setup() {
     [ "$E_INVALID_INPUT" -eq 3 ]
     [ "$E_CONFIG" -eq 8 ]
 }
+
+# Tests for should_run_deep helper
+@test "should_run_deep returns true when DEEP is true" {
+    DEEP=true
+    DEEP_LIMIT=100
+    run should_run_deep 500
+    [ "$status" -eq 0 ]
+}
+
+@test "should_run_deep returns true when count below limit" {
+    DEEP=false
+    DEEP_LIMIT=100
+    run should_run_deep 50
+    [ "$status" -eq 0 ]
+}
+
+@test "should_run_deep returns false when count above limit and DEEP false" {
+    DEEP=false
+    DEEP_LIMIT=100
+    run should_run_deep 200
+    [ "$status" -ne 0 ]
+}
+
+@test "should_run_deep accepts custom limit" {
+    DEEP=false
+    DEEP_LIMIT=100
+    run should_run_deep 150 200
+    [ "$status" -eq 0 ]
+}
+
+@test "should_run_deep2 uses DEEP_LIMIT2" {
+    DEEP=false
+    DEEP_LIMIT2=500
+    run should_run_deep2 300
+    [ "$status" -eq 0 ]
+}

@@ -1,0 +1,27 @@
+# See https://pre-commit.com for more information
+# Install: pip install pre-commit && pre-commit install
+repos:
+  - repo: https://github.com/koalaman/shellcheck-precommit
+    rev: v0.9.0
+    hooks:
+      - id: shellcheck
+        args: ["--severity=error"]
+        files: \.(sh|bash)$
+        exclude: ^tests/mocks/
+
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.7.0-1
+    hooks:
+      - id: shfmt
+        args: ["-i", "4", "-ci", "-bn"]
+        files: \.(sh|bash)$
+        exclude: ^tests/mocks/
+
+  - repo: local
+    hooks:
+      - id: bats-tests
+        name: Run bats tests
+        entry: bash -c 'bats tests/unit/'
+        language: system
+        pass_filenames: false
+        files: \.(sh|bash|bats)$

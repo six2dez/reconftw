@@ -58,6 +58,9 @@ fi
 _INIT_SCRIPTPATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd -P)"
 SCRIPTPATH="${_INIT_SCRIPTPATH}"
 
+# Source libraries first (pure utilities)
+source "${_INIT_SCRIPTPATH}/lib/validation.sh"
+
 # Source all modules in dependency order
 source "${_INIT_SCRIPTPATH}/modules/utils.sh"
 source "${_INIT_SCRIPTPATH}/modules/core.sh"
