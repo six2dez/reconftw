@@ -543,3 +543,154 @@ function cache_clean() {
             "$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$cleaned" "$reset"
     fi
 }
+
+###############################################################################################################
+####################################### CHECKPOINT SYSTEM #####################################################
+###############################################################################################################
+
+# Checkpoint system for scan recovery
+# Allows resuming scans from the last completed phase after interruption
+CHECKPOINT_DIR=""
+CHECKPOINT_ENABLED=${CHECKPOINT_ENABLED:-true}
+
+# Initialize checkpoint system for a scan
+# Usage: checkpoint_init
+function checkpoint_init() {
+    [[ "$CHECKPOINT_ENABLED" != "true" ]] && return 0
+    [[ -z "${dir:-}" ]] && return 1
+
+    CHECKPOINT_DIR="${dir}/.checkpoints"
+    mkdir -p "$CHECKPOINT_DIR"
+
+    # Save scan metadata
+    {
+        echo "domain=${domain:-unknown}"
+        echo "started=$(date -Iseconds)"
+        echo "mode=${MODE:-unknown}"
+        echo "deep=${DEEP:-false}"
+    } >"$CHECKPOINT_DIR/scan_info.txt"
+
+    printf "%b[%s] Checkpoint system initialized%b\n" \
+        "$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset" >>"${LOGFILE:-/dev/null}"
+}
+
+# Save a checkpoint after completing a phase
+# Usage: checkpoint_save <phase_name>
+function checkpoint_save() {
+    [[ "$CHECKPOINT_ENABLED" != "true" ]] && return 0
+    [[ -z "$CHECKPOINT_DIR" ]] && return 1
+
+    local phase="$1"
+    local checkpoint_file="$CHECKPOINT_DIR/${phase}.done"
+
+    # Save phase completion with timestamp
+    {
+        echo "phase=$phase"
+        echo "completed=$(date -Iseconds)"
+        echo "status=completed"
+    } >"$checkpoint_file"
+
+    printf "%b[%s] Checkpoint saved: %s%b\n" \
+        "$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$phase" "$reset" >>"${LOGFILE:-/dev/null}"
+}
+
+# Check if a phase checkpoint exists (already completed)
+# Usage: checkpoint_exists <phase_name>
+# Returns: 0 if checkpoint exists, 1 if not
+function checkpoint_exists() {
+    [[ "$CHECKPOINT_ENABLED" != "true" ]] && return 1
+    [[ -z "$CHECKPOINT_DIR" ]] && return 1
+
+    local phase="$1"
+    [[ -f "$CHECKPOINT_DIR/${phase}.done" ]]
+}
+
+# List completed checkpoints
+# Usage: checkpoint_list
+function checkpoint_list() {
+    [[ -z "$CHECKPOINT_DIR" ]] && return 1
+    [[ ! -d "$CHECKPOINT_DIR" ]] && return 1
+
+    printf "%b[%s] Completed phases:%b\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+    for f in "$CHECKPOINT_DIR"/*.done; do
+        [[ -f "$f" ]] || continue
+        local phase
+        phase=$(basename "$f" .done)
+        local completed
+        completed=$(grep "^completed=" "$f" 2>/dev/null | cut -d= -f2)
+        printf "  - %s (completed: %s)\n" "$phase" "${completed:-unknown}"
+    done
+}
+
+# Clear all checkpoints (for fresh scan)
+# Usage: checkpoint_clear
+function checkpoint_clear() {
+    [[ -z "$CHECKPOINT_DIR" ]] && return 1
+
+    rm -rf "$CHECKPOINT_DIR"
+    mkdir -p "$CHECKPOINT_DIR"
+
+    printf "%b[%s] Checkpoints cleared%b\n" \
+        "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+}
+
+###############################################################################################################
+####################################### CIRCUIT BREAKER #######################################################
+###############################################################################################################
+
+# Circuit breaker pattern for unreliable external tools
+# Prevents repeated calls to tools that are consistently failing
+declare -A CIRCUIT_BREAKER_FAILURES
+declare -A CIRCUIT_BREAKER_STATE
+CIRCUIT_BREAKER_THRESHOLD=${CIRCUIT_BREAKER_THRESHOLD:-3}
+CIRCUIT_BREAKER_TIMEOUT=${CIRCUIT_BREAKER_TIMEOUT:-300}  # 5 minutes
+
+# Check if a tool's circuit breaker is open (should skip)
+# Usage: circuit_breaker_is_open <tool_name>
+# Returns: 0 if open (skip tool), 1 if closed (run tool)
+function circuit_breaker_is_open() {
+    local tool="$1"
+    local state="${CIRCUIT_BREAKER_STATE[$tool]:-closed}"
+    local failures="${CIRCUIT_BREAKER_FAILURES[$tool]:-0}"
+
+    if [[ "$state" == "open" ]]; then
+        # Check if timeout has passed
+        local opened_at="${CIRCUIT_BREAKER_STATE[${tool}_opened]:-0}"
+        local now
+        now=$(date +%s)
+        if (( now - opened_at > CIRCUIT_BREAKER_TIMEOUT )); then
+            # Reset to half-open (allow one retry)
+            CIRCUIT_BREAKER_STATE[$tool]="half-open"
+            return 1  # Allow retry
+        fi
+        printf "%b[%s] Circuit breaker OPEN for %s (skipping)%b\n" \
+            "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$tool" "$reset" >>"${LOGFILE:-/dev/null}"
+        return 0  # Skip
+    fi
+
+    return 1  # Run tool
+}
+
+# Record a tool failure
+# Usage: circuit_breaker_record_failure <tool_name>
+function circuit_breaker_record_failure() {
+    local tool="$1"
+    local failures="${CIRCUIT_BREAKER_FAILURES[$tool]:-0}"
+    failures=$((failures + 1))
+    CIRCUIT_BREAKER_FAILURES[$tool]=$failures
+
+    if (( failures >= CIRCUIT_BREAKER_THRESHOLD )); then
+        CIRCUIT_BREAKER_STATE[$tool]="open"
+        CIRCUIT_BREAKER_STATE[${tool}_opened]=$(date +%s)
+        printf "%b[%s] Circuit breaker OPENED for %s after %d failures%b\n" \
+            "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$tool" "$failures" "$reset"
+    fi
+}
+
+# Record a tool success (reset failure count)
+# Usage: circuit_breaker_record_success <tool_name>
+function circuit_breaker_record_success() {
+    local tool="$1"
+    CIRCUIT_BREAKER_FAILURES[$tool]=0
+    CIRCUIT_BREAKER_STATE[$tool]="closed"
+}

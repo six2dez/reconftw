@@ -120,3 +120,82 @@ setup() {
     run should_run_deep2 300
     [ "$status" -eq 0 ]
 }
+
+# Tests for checkpoint system
+@test "checkpoint_init creates directory" {
+    export dir=$(mktemp -d)
+    export CHECKPOINT_ENABLED=true
+    export domain="test.com"
+    export MODE="recon"
+    export DEEP=false
+    
+    checkpoint_init
+    [ -d "$dir/.checkpoints" ]
+    [ -f "$dir/.checkpoints/scan_info.txt" ]
+    
+    rm -rf "$dir"
+}
+
+@test "checkpoint_save creates checkpoint file" {
+    export dir=$(mktemp -d)
+    export CHECKPOINT_ENABLED=true
+    export CHECKPOINT_DIR="$dir/.checkpoints"
+    mkdir -p "$CHECKPOINT_DIR"
+    
+    checkpoint_save "subdomains"
+    [ -f "$CHECKPOINT_DIR/subdomains.done" ]
+    
+    rm -rf "$dir"
+}
+
+@test "checkpoint_exists returns true for existing checkpoint" {
+    export dir=$(mktemp -d)
+    export CHECKPOINT_ENABLED=true
+    export CHECKPOINT_DIR="$dir/.checkpoints"
+    mkdir -p "$CHECKPOINT_DIR"
+    touch "$CHECKPOINT_DIR/web.done"
+    
+    checkpoint_exists "web"
+    [ "$?" -eq 0 ]
+    
+    rm -rf "$dir"
+}
+
+@test "checkpoint_exists returns false for missing checkpoint" {
+    export dir=$(mktemp -d)
+    export CHECKPOINT_ENABLED=true
+    export CHECKPOINT_DIR="$dir/.checkpoints"
+    mkdir -p "$CHECKPOINT_DIR"
+    
+    ! checkpoint_exists "missing_phase"
+    
+    rm -rf "$dir"
+}
+
+# Tests for circuit breaker
+@test "circuit_breaker_is_open returns false initially" {
+    run circuit_breaker_is_open "newtool"
+    [ "$status" -ne 0 ]
+}
+
+@test "circuit_breaker opens after threshold failures" {
+    CIRCUIT_BREAKER_THRESHOLD=2
+    CIRCUIT_BREAKER_FAILURES=()
+    CIRCUIT_BREAKER_STATE=()
+    
+    circuit_breaker_record_failure "flakytool"
+    circuit_breaker_record_failure "flakytool"
+    
+    circuit_breaker_is_open "flakytool"
+    [ "$?" -eq 0 ]
+}
+
+@test "circuit_breaker resets on success" {
+    CIRCUIT_BREAKER_FAILURES=()
+    CIRCUIT_BREAKER_STATE=()
+    
+    circuit_breaker_record_failure "tool1"
+    circuit_breaker_record_success "tool1"
+    
+    [ "${CIRCUIT_BREAKER_FAILURES[tool1]}" -eq 0 ]
+}
