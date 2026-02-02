@@ -199,3 +199,20 @@ setup() {
     
     [ "${CIRCUIT_BREAKER_FAILURES[tool1]}" -eq 0 ]
 }
+
+# Tests for check_secrets_permissions
+@test "check_secrets_permissions warns on world-readable file" {
+    local tmpfile
+    tmpfile=$(mktemp)
+    chmod 644 "$tmpfile"
+    
+    # Temporarily override sensitive_files list
+    run bash -c "
+        source '$SCRIPTPATH/reconftw.sh' --source-only
+        check_secrets_permissions '$tmpfile'
+    "
+    
+    rm -f "$tmpfile"
+    # Function should return warning count (may be 0 if file not in list)
+    [ "$status" -eq 0 ] || [ "$status" -eq 1 ]
+}

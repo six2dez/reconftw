@@ -87,3 +87,9 @@ setup() {
     [ "$status" -ne 0 ]
     [[ "$output" == *"ERROR"* ]] || [[ "$output" == *"not found"* ]]
 }
+
+@test "invalid custom function shows error" {
+    run timeout 5 bash "$SCRIPTPATH/reconftw.sh" -d test.com -c "nonexistent_function_xyz" 2>&1
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"not defined"* ]] || [[ "$output" == *"Error"* ]]
+}

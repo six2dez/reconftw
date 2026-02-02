@@ -213,6 +213,13 @@ while true; do
             ;;
         '-c' | '--custom')
             custom_function=$2
+            # Validate that the custom function exists
+            if ! declare -f "$custom_function" >/dev/null 2>&1; then
+                printf "%bError: Custom function '%s' is not defined%b\n" "$bred" "$custom_function" "$reset" >&2
+                printf "Available functions can be found in modules/*.sh\n" >&2
+                printf "Example: -c my_custom_recon\n" >&2
+                exit $E_INVALID_INPUT
+            fi
             opt_mode='c'
             shift 2
             continue
