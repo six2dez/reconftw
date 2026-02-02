@@ -1017,10 +1017,18 @@ function health_check() {
     # 4. Check disk space
     printf "\n%b[*] Checking disk space...%b\n" "$yellow" "$reset"
     local avail_gb
-    avail_gb=$(df -BG . 2>/dev/null | awk 'NR==2 {gsub(/G/,"",$4); print $4}' || df -g . 2>/dev/null | awk 'NR==2 {print $4}' || echo "0")
-    if [[ ${avail_gb:-0} -ge 5 ]]; then
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS: df -g shows GB directly
+        avail_gb=$(df -g . 2>/dev/null | awk 'NR==2 {print $4}')
+    else
+        # Linux: df -BG shows GB with G suffix
+        avail_gb=$(df -BG . 2>/dev/null | awk 'NR==2 {gsub(/G/,"",$4); print $4}')
+    fi
+    avail_gb=${avail_gb:-0}
+    
+    if [[ ${avail_gb} -ge 5 ]]; then
         printf "  %b[OK]%b %s GB available\n" "$bgreen" "$reset" "$avail_gb"
-    elif [[ ${avail_gb:-0} -ge 1 ]]; then
+    elif [[ ${avail_gb} -ge 1 ]]; then
         printf "  %b[WARN]%b Only %s GB available (recommend 5+ GB)\n" "$byellow" "$reset" "$avail_gb"
         ((warnings++))
     else
