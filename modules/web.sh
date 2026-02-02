@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2154  # Variables defined in reconftw.cfg
 # reconFTW - Web analysis module
 # Contains: webprobe_simple, webprobe_full, screenshot, virtualhosts, favicon,
 #           portscan, cdnprovider, waf_checks, nuclei_check, graphql_scan,

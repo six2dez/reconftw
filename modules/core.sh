@@ -3,6 +3,9 @@
 # Contains: UI wrappers, banner, version check, tools check, logging,
 #           output/notification, lifecycle (start_func/end_func), plugins, assets
 # This file is sourced by reconftw.sh - do not execute directly
+
+# shellcheck disable=SC2154  # Variables defined in reconftw.cfg
+
 [[ -z "${SCRIPTPATH:-}" ]] && {
     echo "Error: This module must be sourced by reconftw.sh" >&2
     exit 1
@@ -421,7 +424,8 @@ function log_json() {
     shift 3
 
     # Build JSON object
-    local json_obj=$(jq -n \
+    local json_obj
+    json_obj=$(jq -n \
         --arg ts "$(date -Iseconds)" \
         --arg lvl "$level" \
         --arg fn "$function" \
@@ -511,7 +515,8 @@ function incremental_diff() {
     if [[ ! -f "$previous_file" ]]; then
         # First run, all items are new
         cp "$current_file" "$output_file" 2>/dev/null
-        local count=$(wc -l <"$output_file" 2>/dev/null || echo 0)
+        local count
+        count=$(wc -l <"$output_file" 2>/dev/null || echo 0)
         printf "%b[%s] Incremental mode: First run for %s - %d items total%b\n" \
             "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$type" "$count" "$reset"
         return 0
@@ -520,9 +525,10 @@ function incremental_diff() {
     # Compare and get only new items
     if [[ -s "$current_file" ]]; then
         comm -13 <(sort -u "$previous_file") <(sort -u "$current_file") | sed '/^$/d' >"$output_file"
-        local new_count=$(wc -l <"$output_file" 2>/dev/null || echo 0)
-        local total_count=$(wc -l <"$current_file" 2>/dev/null || echo 0)
-        local previous_count=$(wc -l <"$previous_file" 2>/dev/null || echo 0)
+        local new_count total_count previous_count
+        new_count=$(wc -l <"$output_file" 2>/dev/null || echo 0)
+        total_count=$(wc -l <"$current_file" 2>/dev/null || echo 0)
+        previous_count=$(wc -l <"$previous_file" 2>/dev/null || echo 0)
 
         printf "%b[%s] Incremental mode %s: %d new (previous: %d, total: %d)%b\n" \
             "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$type" "$new_count" "$previous_count" "$total_count" "$reset"

@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2154  # Variables defined in reconftw.cfg
 # reconFTW - Mode/workflow orchestration module
 # Contains: start, end, build_hotlist, passive, osint, all, vulns,
 #           multi_osint, recon, multi_recon, multi_custom,

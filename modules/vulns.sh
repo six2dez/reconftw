@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2154  # Variables defined in reconftw.cfg
 # reconFTW - Vulnerability scanning module
 # Contains: xss, cors, open_redirect, ssrf_checks, crlf_checks, lfi, ssti,
 #           sqli, test_ssl, spraying, command_injection, 4xxbypass,

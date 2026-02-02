@@ -4,6 +4,9 @@
 #           resolvers_update_quick_axiom, resolvers_optimize_local,
 #           ipcidr_target, axiom_launch, axiom_shutdown, axiom_selected
 # This file is sourced by reconftw.sh - do not execute directly
+
+# shellcheck disable=SC2154  # Variables defined in reconftw.cfg
+
 [[ -z "${SCRIPTPATH:-}" ]] && {
     echo "Error: This module must be sourced by reconftw.sh" >&2
     exit 1

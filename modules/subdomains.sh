@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2154  # Variables defined in reconftw.cfg
 # reconFTW - Subdomain enumeration module
 # Contains: subdomains_full, sub_passive, sub_crt, sub_active, sub_tls,
 #           sub_noerror, sub_dns, sub_brute, sub_scraping, sub_analytics,

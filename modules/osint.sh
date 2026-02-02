@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2154  # Variables defined in reconftw.cfg
 # reconFTW - OSINT module
 # Contains: google_dorks, github_dorks, github_repos, metadata, apileaks,
 #           emails, domain_info, third_party_misconfigs, spoof, mail_hygiene,

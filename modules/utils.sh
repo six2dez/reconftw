@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2154  # Variables defined in reconftw.cfg
 # reconFTW - Utility functions module
 # Contains: deleteOutScoped, cleanup, rotate_logs, sanitization, validation,
 #           getElapsedTime, retry, disk check, rate limiting, caching
