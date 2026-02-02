@@ -4,13 +4,15 @@
 
 set -o pipefail
 
-# Error codes
+# Error codes (guard for re-source in test harnesses)
 # shellcheck disable=SC2034  # These are exported for use in modules
-readonly E_INVALID_DOMAIN=20
-readonly E_INVALID_IP=21
-readonly E_INVALID_PATH=22
-readonly E_INVALID_URL=23
-readonly E_INVALID_EMAIL=24
+if [[ -z "${E_INVALID_DOMAIN+x}" ]]; then
+    readonly E_INVALID_DOMAIN=20
+    readonly E_INVALID_IP=21
+    readonly E_INVALID_PATH=22
+    readonly E_INVALID_URL=23
+    readonly E_INVALID_EMAIL=24
+fi
 
 # validate_domain()
 # Description: Validates a domain name format
