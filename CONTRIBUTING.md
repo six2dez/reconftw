@@ -59,6 +59,8 @@ reconftw/
 │   ├── run_tests.sh         # Test runner (--all for integration)
 │   ├── unit/                # bats-core unit tests
 │   ├── integration/         # bats-core integration tests
+│   ├── security/            # Security/injection tests
+│   ├── mocks/               # Tool mocks for isolated testing
 │   └── fixtures/            # Test data files
 ├── Docker/
 │   └── Dockerfile           # Official Docker image definition
@@ -156,12 +158,24 @@ When adding new configuration variables:
 # Unit tests only
 make test
 
-# Unit + integration tests
+# Security tests only
+make test-security
+
+# Unit + security tests
 make test-all
 
 # Via the runner script
 ./tests/run_tests.sh         # unit only
 ./tests/run_tests.sh --all   # unit + integration
+```
+
+### Pre-commit Hooks
+
+Install pre-commit hooks for automatic linting:
+
+```bash
+pip install pre-commit
+make setup-dev
 ```
 
 ### Writing Tests

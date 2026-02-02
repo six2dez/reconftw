@@ -86,6 +86,7 @@ reconFTW leverages a wide range of techniques, including passive and active subd
 - [💖 Support This Project](#-support-this-project)
 - [🙏 Thanks](#-thanks)
 - [📝 Changelog](#-changelog)
+- [🛠️ Development](#️-development)
 - [📜 License](#-license)
 - [⭐ Star History](#-star-history)
 
@@ -1102,6 +1103,44 @@ Special thanks to the following services for supporting reconFTW:
 ## 📝 Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes in each release.
+
+---
+
+## 🛠️ Development
+
+### Project Structure
+
+```
+reconftw/
+├── reconftw.sh          # Main entry point
+├── reconftw.cfg         # Configuration file
+├── modules/             # Phase modules (what to do)
+│   ├── utils.sh         # Utilities, sanitization, caching
+│   ├── core.sh          # Framework core, logging, lifecycle
+│   ├── subdomains.sh    # Subdomain enumeration
+│   ├── web.sh           # Web analysis
+│   ├── vulns.sh         # Vulnerability scanning
+│   └── ...
+├── lib/                 # Pure utility libraries
+│   └── validation.sh    # Input validation
+├── tests/               # Test suite
+│   ├── unit/            # Unit tests (bats)
+│   └── security/        # Security tests
+└── docs/                # Documentation
+```
+
+### Running Tests
+
+```bash
+make test          # Unit tests
+make test-security # Security tests
+make test-all      # All tests
+make lint          # Shellcheck
+```
+
+### Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
 
 ---
 
