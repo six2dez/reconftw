@@ -25,12 +25,48 @@ pt_msg_err() { printf "\n%b[%s] %s%b\n" "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "
 # If LOGFILE is unset or empty, send logs to /dev/null until later initialization
 : "${LOGFILE:=/dev/null}"
 
+# List of environment variables containing secrets that should be redacted in logs
+REDACT_VARS=(
+    "SHODAN_API_KEY"
+    "WHOISXML_API"
+    "GITHUB_TOKEN"
+    "GITLAB_TOKEN"
+    "DISCORD_WEBHOOK_URL"
+    "SLACK_WEBHOOK_URL"
+    "slack_auth"
+    "XSS_SERVER"
+    "COLLAB_SERVER"
+)
+
+# redact_secrets()
+# Description: Redacts sensitive values from a string
+# Arguments: $1 - String to redact
+# Returns: Redacted string via stdout
+function redact_secrets() {
+    local text="$1"
+    local redacted="$text"
+    
+    for var in "${REDACT_VARS[@]}"; do
+        local value="${!var:-}"
+        if [[ -n "$value" && ${#value} -gt 4 ]]; then
+            # Replace the secret with [REDACTED]
+            redacted="${redacted//$value/[REDACTED]}"
+        fi
+    done
+    
+    echo "$redacted"
+}
+
 enable_command_trace() {
     # Enable bash xtrace to the current LOGFILE when SHOW_COMMANDS=true
+    # WARNING: This may log sensitive data. Use redact_secrets() when reviewing logs.
     if [[ ${SHOW_COMMANDS:-false} != true ]]; then
         return
     fi
     [[ -z ${LOGFILE:-} ]] && return
+
+    printf "%b[%s] WARNING: Command tracing enabled. Logs may contain sensitive data.%b\n" \
+        "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset" >&2
 
     # Close any previous trace descriptor (native bash {varname} redirect syntax)
     if [[ -n ${TRACE_FD:-} ]]; then

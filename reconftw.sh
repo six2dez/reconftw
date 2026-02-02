@@ -146,6 +146,13 @@ while true; do
             ;;
         '-l' | '--list')
             list="$2"
+            if ! validate_file_readable "$list"; then
+                printf "%b[%s] ERROR: List file not found or not readable: '%s'%b\n" \
+                    "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$list" "$reset" >&2
+                printf "%bUsage: -l <file> where file contains one target per line%b\n" \
+                    "$yellow" "$reset" >&2
+                exit 1
+            fi
             while IFS= read -r t; do
                 [[ -z "$t" ]] && continue
                 ipcidr_target "$t" "$list"
@@ -155,11 +162,21 @@ while true; do
             ;;
         '-x')
             outOfScope_file=$2
+            if [[ -n "$outOfScope_file" ]] && ! validate_file_readable "$outOfScope_file"; then
+                printf "%b[%s] ERROR: Out-of-scope file not found or not readable: '%s'%b\n" \
+                    "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$outOfScope_file" "$reset" >&2
+                exit 1
+            fi
             shift 2
             continue
             ;;
         '-i')
             inScope_file=$2
+            if [[ -n "$inScope_file" ]] && ! validate_file_readable "$inScope_file"; then
+                printf "%b[%s] ERROR: In-scope file not found or not readable: '%s'%b\n" \
+                    "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$inScope_file" "$reset" >&2
+                exit 1
+            fi
             shift 2
             continue
             ;;

@@ -127,3 +127,47 @@ setup() {
     run validate_boolean "maybe"
     [ "$status" -ne 0 ]
 }
+
+# File validation tests
+@test "validate_file_exists returns true for existing file" {
+    local tmpfile
+    tmpfile=$(mktemp)
+    run validate_file_exists "$tmpfile"
+    [ "$status" -eq 0 ]
+    rm -f "$tmpfile"
+}
+
+@test "validate_file_exists returns false for non-existent file" {
+    run validate_file_exists "/nonexistent/file/path"
+    [ "$status" -ne 0 ]
+}
+
+@test "validate_file_readable returns true for readable file" {
+    local tmpfile
+    tmpfile=$(mktemp)
+    echo "test" > "$tmpfile"
+    run validate_file_readable "$tmpfile"
+    [ "$status" -eq 0 ]
+    rm -f "$tmpfile"
+}
+
+@test "validate_directory returns true for existing directory" {
+    local tmpdir
+    tmpdir=$(mktemp -d)
+    run validate_directory "$tmpdir"
+    [ "$status" -eq 0 ]
+    rmdir "$tmpdir"
+}
+
+@test "validate_directory returns false for non-existent directory" {
+    run validate_directory "/nonexistent/directory"
+    [ "$status" -ne 0 ]
+}
+
+@test "validate_writable_directory returns true for writable dir" {
+    local tmpdir
+    tmpdir=$(mktemp -d)
+    run validate_writable_directory "$tmpdir"
+    [ "$status" -eq 0 ]
+    rmdir "$tmpdir"
+}

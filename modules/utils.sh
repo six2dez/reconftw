@@ -436,6 +436,44 @@ function sanitize_ip() {
 }
 
 ###############################################################################################################
+####################################### SECURITY CHECKS #######################################################
+###############################################################################################################
+
+# Check and warn about insecure permissions on sensitive files
+# Usage: check_secrets_permissions
+function check_secrets_permissions() {
+    local sensitive_files=(
+        "${SCRIPTPATH}/secrets.cfg"
+        "${SCRIPTPATH}/.github_tokens"
+        "${SCRIPTPATH}/.gitlab_tokens"
+        "${HOME}/.config/notify/provider-config.yaml"
+    )
+    
+    local warnings=0
+    
+    for file in "${sensitive_files[@]}"; do
+        if [[ -f "$file" ]]; then
+            local perms
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                perms=$(stat -f "%OLp" "$file" 2>/dev/null)
+            else
+                perms=$(stat -c "%a" "$file" 2>/dev/null)
+            fi
+            
+            # Check if file is readable by group or others
+            if [[ -n "$perms" && "$perms" != "600" && "$perms" != "400" ]]; then
+                printf "%b[%s] WARNING: Insecure permissions (%s) on sensitive file: %s%b\n" \
+                    "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$perms" "$file" "$reset" >&2
+                printf "%b         Recommended: chmod 600 %s%b\n" "$yellow" "$file" "$reset" >&2
+                ((warnings++))
+            fi
+        fi
+    done
+    
+    return $warnings
+}
+
+###############################################################################################################
 ####################################### DEEP/AXIOM HELPERS ####################################################
 ###############################################################################################################
 

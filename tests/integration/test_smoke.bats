@@ -75,3 +75,15 @@ setup() {
     # Should NOT execute any dangerous command
     [[ "$output" != *"cannot remove"* ]]
 }
+
+@test "missing list file shows error" {
+    run timeout 5 bash "$SCRIPTPATH/reconftw.sh" -l "/nonexistent/file.txt" --dry-run 2>&1
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"ERROR"* ]] || [[ "$output" == *"not found"* ]] || [[ "$output" == *"not readable"* ]]
+}
+
+@test "missing inscope file shows error" {
+    run timeout 5 bash "$SCRIPTPATH/reconftw.sh" -d test.com -i "/nonexistent/inscope.txt" --dry-run 2>&1
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"ERROR"* ]] || [[ "$output" == *"not found"* ]]
+}
