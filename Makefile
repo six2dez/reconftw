@@ -32,14 +32,14 @@ upload:
 
 lint:
 	@if command -v shellcheck >/dev/null 2>&1; then \
-		shellcheck -S warning reconftw.sh install.sh; \
+		shellcheck -S warning reconftw.sh modules/*.sh install.sh; \
 	else \
 		echo "shellcheck not found. Install: https://www.shellcheck.net/"; \
 	fi
 
 fmt:
 	@if command -v shfmt >/dev/null 2>&1; then \
-		shfmt -w -i 4 -bn -ci install.sh reconftw.sh; \
+		shfmt -w -i 4 -bn -ci install.sh reconftw.sh modules/*.sh; \
 	else \
 		echo "shfmt not found. Install: https://github.com/mvdan/sh"; \
 	fi

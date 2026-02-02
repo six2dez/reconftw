@@ -152,5 +152,8 @@ EXPOSE 85-90
 
 WORKDIR /reconftw
 
+HEALTHCHECK --interval=60s --timeout=30s --retries=3 \
+  CMD ./reconftw.sh --health-check || exit 1
+
 ENTRYPOINT [ "./reconftw.sh" ]
 CMD [ "--help" ]

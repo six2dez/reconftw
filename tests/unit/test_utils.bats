@@ -3,16 +3,18 @@
 # Unit tests for reconFTW utility functions
 
 setup() {
-    export SCRIPTPATH="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
+    local project_root
+    project_root="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
     # Set minimal required variables before sourcing
     export tools="$HOME/Tools"
     export LOGFILE="/dev/null"
     export bred='' bblue='' bgreen='' byellow='' yellow='' reset=''
     export NOTIFICATION=false
     export AXIOM=false
-    # Source the config first, then the script
-    source "$SCRIPTPATH/reconftw.cfg" 2>/dev/null || true
-    source "$SCRIPTPATH/reconftw.sh" --source-only 2>/dev/null || true
+    # Source the config first, then restore SCRIPTPATH (cfg overrides it with $0)
+    source "$project_root/reconftw.cfg" 2>/dev/null || true
+    export SCRIPTPATH="$project_root"
+    source "$project_root/reconftw.sh" --source-only
 }
 
 @test "getElapsedTime calculates zero duration" {

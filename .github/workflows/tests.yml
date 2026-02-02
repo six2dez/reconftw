@@ -29,6 +29,10 @@ jobs:
       - name: Run ShellCheck on reconftw.sh
         run: shellcheck -S warning reconftw.sh
 
+      - name: Run ShellCheck on modules
+        run: shellcheck -S warning modules/*.sh
+        continue-on-error: true
+
       - name: Run ShellCheck on install.sh
         run: shellcheck -S warning install.sh
         continue-on-error: true

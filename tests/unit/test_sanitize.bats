@@ -3,14 +3,17 @@
 # Unit tests for reconFTW sanitization functions
 
 setup() {
-    export SCRIPTPATH="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
+    local project_root
+    project_root="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
     export tools="$HOME/Tools"
     export LOGFILE="/dev/null"
     export bred='' bblue='' bgreen='' byellow='' yellow='' reset=''
     export NOTIFICATION=false
     export AXIOM=false
-    source "$SCRIPTPATH/reconftw.cfg" 2>/dev/null || true
-    source "$SCRIPTPATH/reconftw.sh" --source-only 2>/dev/null || true
+    source "$project_root/reconftw.cfg" 2>/dev/null || true
+    # Restore SCRIPTPATH after cfg overrides it with $0
+    export SCRIPTPATH="$project_root"
+    source "$project_root/reconftw.sh" --source-only
 }
 
 @test "sanitize_domain accepts valid domain" {
@@ -20,6 +23,16 @@ setup() {
 
 @test "sanitize_domain accepts subdomain" {
     result=$(sanitize_domain "sub.example.com")
+    [ "$result" = "sub.example.com" ]
+}
+
+@test "sanitize_domain converts to lowercase" {
+    result=$(sanitize_domain "EXAMPLE.COM")
+    [ "$result" = "example.com" ]
+}
+
+@test "sanitize_domain handles mixed case" {
+    result=$(sanitize_domain "Sub.ExAmPlE.CoM")
     [ "$result" = "sub.example.com" ]
 }
 
