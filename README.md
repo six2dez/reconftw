@@ -207,6 +207,9 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **Dry-Run Mode**: Preview what would be executed without running commands (`--dry-run`).
 - **Modular Architecture**: Codebase split into 8 focused modules for maintainability.
 - **Secrets Management**: Environment variables, `secrets.cfg`, and Docker runtime secrets (see [SECURITY.md](SECURITY.md)).
+- **Circuit Breaker**: Automatically skips tools after repeated failures to avoid scan hangs.
+- **Checkpoint System**: Resume interrupted scans from the last successful phase.
+- **macOS Native Support**: Full compatibility with macOS (BSD coreutils, Homebrew Bash 4+).
 
 ---
 
@@ -998,9 +1001,24 @@ tests/
 ├── run_tests.sh        # Test runner script
 ├── unit/               # Unit tests (fast, no network)
 │   ├── test_sanitize.bats
-│   └── test_utils.bats
+│   ├── test_utils.bats
+│   └── test_validation.bats
 ├── integration/        # Integration tests (require installed tools)
+│   └── test_smoke.bats
+├── security/           # Security tests (injection, etc.)
+│   └── test_injection.bats
+├── mocks/              # Mock tools for offline testing
 └── fixtures/           # Shared test data files
+```
+
+### Running Security Tests
+
+```bash
+# Test command injection prevention
+make test-security
+
+# Or directly
+bats tests/security/
 ```
 
 ### Writing Tests
@@ -1112,35 +1130,57 @@ See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes in each release.
 
 ```
 reconftw/
-├── reconftw.sh          # Main entry point
+├── reconftw.sh          # Main entry point (~500 lines)
 ├── reconftw.cfg         # Configuration file
-├── modules/             # Phase modules (what to do)
-│   ├── utils.sh         # Utilities, sanitization, caching
-│   ├── core.sh          # Framework core, logging, lifecycle
+├── modules/             # Phase modules
+│   ├── utils.sh         # Utilities, sanitization, caching, circuit breaker
+│   ├── core.sh          # Framework core, logging, lifecycle, health check
+│   ├── modes.sh         # Scan modes, argument parsing
 │   ├── subdomains.sh    # Subdomain enumeration
-│   ├── web.sh           # Web analysis
+│   ├── web.sh           # Web analysis, nuclei scans
 │   ├── vulns.sh         # Vulnerability scanning
-│   └── ...
+│   ├── osint.sh         # OSINT functions
+│   └── axiom.sh         # Axiom/Ax fleet helpers
 ├── lib/                 # Pure utility libraries
-│   └── validation.sh    # Input validation
-├── tests/               # Test suite
+│   └── validation.sh    # Input validation functions
+├── tests/               # Test suite (100+ tests)
 │   ├── unit/            # Unit tests (bats)
-│   └── security/        # Security tests
-└── docs/                # Documentation
+│   ├── integration/     # Integration/smoke tests
+│   └── security/        # Injection prevention tests
+├── docs/                # Documentation
+│   └── ARCHITECTURE.md  # Detailed architecture guide
+└── secrets.cfg.example  # Template for API keys
 ```
 
 ### Running Tests
 
 ```bash
 make test          # Unit tests
-make test-security # Security tests
+make test-security # Security tests  
 make test-all      # All tests
 make lint          # Shellcheck
+make lint-fix      # Auto-fix with shfmt
+```
+
+### Development Workflow
+
+```bash
+# 1. Source without executing (for testing)
+source ./reconftw.sh --source-only
+
+# 2. Test individual functions
+sanitize_domain "test;domain.com"
+
+# 3. Run health check
+./reconftw.sh --health-check
+
+# 4. Dry run to preview
+./reconftw.sh -d example.com -r --dry-run
 ```
 
 ### Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for technical details.
 
 ---
 
