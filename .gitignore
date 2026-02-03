@@ -13,4 +13,4 @@ test/
 .DS_Store
 reconftw.cfg-personal
 secrets.cfg
-.env
+.env.cache/

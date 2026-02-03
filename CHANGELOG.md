@@ -9,70 +9,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-#### Phase 1 — Input Sanitization & Safety
-- `sanitize_domain()`, `sanitize_ip()`, `sanitize_interlace_input()` functions for user-supplied input
-- Configurable Axiom resolver paths (`AXIOM_RESOLVERS_PATH`, `AXIOM_RESOLVERS_TRUSTED_PATH`)
-
-#### Phase 2 — Error Handling & Operational Robustness
-- Numeric error codes for distinct failure categories
-- Log rotation (`MAX_LOG_FILES`, `MAX_LOG_AGE_DAYS`) to prevent unbounded log growth
-- Cleanup traps (`trap … EXIT`) for graceful shutdown and temp-file removal
-- Structured JSON logging option (`STRUCTURED_LOGGING`)
-- Pre-flight disk-space check (`MIN_DISK_SPACE_GB`)
-- `validate_config` function to catch configuration errors before scanning starts
-
-#### Phase 3 — Secrets & Configuration Security
-- Environment-variable fallback pattern for all API keys (`SHODAN_API_KEY="${SHODAN_API_KEY:-}"`)
-- Optional `secrets.cfg` file (gitignored) that is auto-sourced when present
-- Docker secrets guidance — pass secrets at runtime via `-e` flags, not baked into the image
-- Input validation hardening across configuration loading
-
-#### Phase 4 — Testing Infrastructure
-- `tests/` directory with `unit/`, `integration/`, and `fixtures/` sub-directories
-- bats-core unit tests (`test_sanitize.bats`, `test_utils.bats`)
-- `--source-only` flag in `reconftw.sh` to allow sourcing without execution (enables unit testing)
-- `tests/run_tests.sh` runner script (`--all` for integration tests)
-- GitHub Actions CI workflow (`tests.yml`) — ShellCheck + unit tests + integration matrix
-- Makefile targets: `make test` (unit), `make test-all` (unit + integration)
-
-#### Phase 5 — Modularization
-- 8-module architecture under `modules/`:
+**Modular Architecture**
+- Split monolithic script into 8 focused modules under `modules/`:
   - `core.sh` — lifecycle, logging, notifications, cleanup
-  - `modes.sh` — scan modes, argument parsing, help
-  - `subdomains.sh` — all subdomain enumeration functions
-  - `web.sh` — web analysis, fuzzing, JS checks
-  - `vulns.sh` — vulnerability scanning functions
-  - `osint.sh` — OSINT module functions
-  - `axiom.sh` — Axiom/Ax fleet management helpers
-  - `utils.sh` — shared utilities, sanitization, validation
-- `reconftw.sh` reduced to a ~536-line entry point (sourcing, arg parsing, dispatch)
+  - `modes.sh` — scan modes and argument parsing
+  - `subdomains.sh` — subdomain enumeration
+  - `web.sh` — web analysis, fuzzing, nuclei scans
+  - `vulns.sh` — vulnerability scanning
+  - `osint.sh` — OSINT functions
+  - `axiom.sh` — Axiom fleet helpers
+  - `utils.sh` — shared utilities
+- Validation library at `lib/validation.sh` for input sanitization
 
-#### Phase 6 — Health Checks, Performance & Operational Modes
-- `--health-check` flag — run system health check and exit (also used by Docker `HEALTHCHECK`)
-- `--incremental` flag — only scan new findings since last run (`INCREMENTAL_MODE`)
-- `--adaptive-rate` flag — automatically adjust rate limits on 429/503 errors (`ADAPTIVE_RATE_LIMIT`)
-- `--dry-run` flag — show what would be executed without running commands
-- Performance timing for scan stages
-- Docker `HEALTHCHECK` directive in Dockerfile
-- Cache configuration (`CACHE_MAX_AGE_DAYS`) for wordlists and resolvers
+**New CLI Flags**
+- `--health-check` — system diagnostics before scanning
+- `--dry-run` — preview commands without execution
+- `--source-only` — source functions without running (for testing/scripting)
+
+**Robustness Features**
+- Circuit breaker pattern: auto-skip tools after repeated failures
+- Checkpoint system: resume scans from last successful phase
+- Adaptive rate limiting on 429/503 responses
+- Disk space pre-flight check (`MIN_DISK_SPACE_GB`)
+- Log rotation (`MAX_LOG_FILES`, `MAX_LOG_AGE_DAYS`)
+- Cleanup traps for graceful shutdown
+
+**Input Validation**
+- `sanitize_domain()` strips dangerous characters and converts to lowercase
+- `validate_file_exists()`, `validate_file_readable()` for `--list`, `--inscope`, etc.
+- `validate_custom_function()` ensures `-c` targets exist before execution
+
+**Testing**
+- 100+ bats tests covering unit, integration, and security scenarios
+- `tests/security/test_injection.bats` for command injection prevention
+- `tests/mocks/` for offline testing
+- Makefile targets: `make test`, `make lint`, `make test-security`
+
+**Other**
+- 6 new ASCII banners (#25-30)
+- `secrets.cfg` support (gitignored) for API keys
+- Performance timing summary at scan completion
+- DEEP mode helpers: `should_run_deep_*()` functions
 
 ### Changed
-- `reconftw.sh` refactored from monolithic script into modular entry point + 8 modules
-- All `eval` usage on user input removed; replaced with safe alternatives
-- All API key variables now use env-var fallback pattern (`${VAR:-}`) instead of hardcoded placeholders
-- `reconftw.cfg` updated with new sections: incremental mode, adaptive rate limiting, cache, log rotation, structured logging, disk space check
-- Makefile `lint` target now covers `modules/*.sh` in addition to `reconftw.sh` and `install.sh`
-- Plugin/tool path references updated for modular layout
+- Main script reduced from ~7000 to ~500 lines (entry point only)
+- Nuclei scans now use only URLs with protocol, avoiding duplicate scans
+- All API keys use env-var fallback pattern (`${VAR:-}`)
+- Interactsh process tracked by PID instead of `pkill -f`
 
 ### Fixed
-- Docker image no longer embeds secrets at build time
-- Variable quoting issues across the codebase
-- Potential command injection through unsanitized domain/path inputs
+- macOS compatibility: `stat`, `df`, `sed` commands now detect OS correctly
+- Syntax error in `vulns.sh` (pipe at wrong line position)
+- Timing summary crash when function names contained spaces
+- Readonly variable error when re-sourcing the script
+- Duplicate nuclei findings (domain vs URL targeting same host)
 
 ### Security
-- All user-supplied input (domains, IPs, shell metacharacters) is sanitized before use
-- `eval` removed from code paths handling user input
-- Secrets management via environment variables and `secrets.cfg` (never committed)
-- Docker runtime secrets pattern documented and enforced
+- Removed all `eval` on user input
+- Input sanitization prevents shell metacharacter injection
+- Secrets redacted from logs when `SHOW_COMMANDS=true`
+- File permission checks for `secrets.cfg`
 
 [Unreleased]: https://github.com/six2dez/reconftw/compare/v3.2...HEAD
