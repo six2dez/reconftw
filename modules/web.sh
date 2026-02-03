@@ -637,9 +637,10 @@ function nuclei_check() {
             cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
         fi
 
-        # Combine url_extract_nodupes.txt, subdomains.txt, and webs_all.txt into webs_subs.txt if it doesn't exist
+        # Combine webs_all.txt targets (with protocol) - avoid duplicate scans
+        # Note: subdomains without protocol would cause duplicate nuclei scans
         if [[ ! -s ".tmp/webs_subs.txt" ]]; then
-            cat subdomains/subdomains.txt webs/webs_all.txt 2>>"$LOGFILE" >.tmp/webs_subs.txt
+            cat webs/webs_all.txt 2>>"$LOGFILE" | sort -u >.tmp/webs_subs.txt
         fi
 
         # Prepare WAF-aware lists
@@ -755,8 +756,8 @@ function graphql_scan() {
 
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GRAPHQL_CHECK == true ]]; then
         start_func "${FUNCNAME[0]}" "GraphQL detection"
-        # Prepare input
-        [[ ! -s .tmp/webs_subs.txt ]] && cat subdomains/subdomains.txt webs/webs_all.txt 2>>"$LOGFILE" >.tmp/webs_subs.txt
+        # Prepare input - use webs with protocol only
+        [[ ! -s .tmp/webs_subs.txt ]] && cat webs/webs_all.txt 2>>"$LOGFILE" | sort -u >.tmp/webs_subs.txt
         maybe_update_nuclei
         if [[ -s .tmp/webs_subs.txt ]]; then
             nuclei -l .tmp/webs_subs.txt -tags graphql -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 -t ${NUCLEI_TEMPLATES_PATH} -j -o nuclei_output/graphql_json.txt 2>>"$LOGFILE" >/dev/null
