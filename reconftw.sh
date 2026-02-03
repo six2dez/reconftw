@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2034,SC2154
 
 # Defaults aimed at unattended execution (fail-soft)
 set -o pipefail
@@ -6,8 +7,10 @@ set -E
 set +e
 IFS=$'\n\t'
 
+# SC2034: Variables set here are used in sourced modules (modes.sh, vulns.sh, web.sh, etc.)
+# SC2154: Variables like bred, reset, bgreen, yellow are defined in reconftw.cfg
+
 # Standard exit/return codes (guard for re-source in test harnesses)
-# shellcheck disable=SC2034  # These are exported for use in modules and custom scripts
 if [[ -z "${E_SUCCESS+x}" ]]; then
     readonly E_SUCCESS=0
     readonly E_GENERAL=1
