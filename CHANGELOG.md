@@ -72,6 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **New CLI Flags**
 - `--health-check` — system diagnostics before scanning
 - `--dry-run` — preview commands without execution
+- `--parallel` — run independent functions in parallel (faster, more RAM)
 - `--source-only` — source functions without running (for testing/scripting)
 
 **Robustness Features**
