@@ -1381,7 +1381,10 @@ function jschecks() {
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $JSCHECKS == true ]]; then
         start_func "${FUNCNAME[0]}" "JavaScript Scan"
 
-        [[ ! -s ".tmp/url_extract_js.txt" ]] && cat js/url_extract_js.txt | anew -q .tmp/url_extract_js.txt
+        # If .tmp/url_extract_js.txt doesn't exist, try to recover from previous run output
+        if [[ ! -s ".tmp/url_extract_js.txt" ]] && [[ -s "js/url_extract_js.txt" ]]; then
+            cat js/url_extract_js.txt | anew -q .tmp/url_extract_js.txt
+        fi
 
         if [[ -s ".tmp/url_extract_js.txt" ]]; then
 
@@ -1433,7 +1436,7 @@ function jschecks() {
             fi
 
             if [[ -s ".tmp/url_extract_jsmap.txt" ]]; then
-                interlace -tL js/url_extract_jsmap.txt -threads "$INTERLACE_THREADS" \
+                interlace -tL .tmp/url_extract_jsmap.txt -threads "$INTERLACE_THREADS" \
                     -c "sourcemapper -url '_target_' -output _output_/_cleantarget_" \
                     -o .tmp/sourcemapper 2>>"$LOGFILE" >/dev/null
             fi
@@ -1463,7 +1466,7 @@ function jschecks() {
                 mkdir -p .tmp/sourcemapper/secrets
                 for i in $(cat js/js_secrets.txt | cut -d' ' -f2); do wget -q -P .tmp/sourcemapper/secrets $i; done
                 trufflehog filesystem .tmp/sourcemapper/ -j 2>/dev/null | jq -c | anew -q js/js_secrets_jsmap.txt
-                find .tmp/sourcemapper/ -type f -name "*.js" | jsluice secrets -j --patterns=~/Tools/jsluice_patterns.json | anew -q js/js_secrets_jsmap_jsluice.txt
+                find .tmp/sourcemapper/ -type f -name "*.js" | jsluice secrets -j --patterns="${tools}/jsluice_patterns.json" | anew -q js/js_secrets_jsmap_jsluice.txt
             fi
 
             printf "%bRunning: Building wordlist 6/6%b\n" "$yellow" "$reset"
