@@ -161,15 +161,17 @@ _subdomains_finalize() {
 ###############################################################################
 
 # Main subdomain enumeration orchestrator
-# Usage: subdomains_full [--parallel]
+# Usage: subdomains_full
+# Uses PARALLEL_MODE global variable if set
 function subdomains_full() {
-    local parallel_mode="${1:-}"
+    local parallel_flag=""
+    [[ "${PARALLEL_MODE:-false}" == "true" ]] && parallel_flag="--parallel"
     
     # Initialize
     _subdomains_init || return 1
     
     # Enumerate
-    _subdomains_enumerate "$parallel_mode"
+    _subdomains_enumerate "$parallel_flag"
     
     # Web probing
     webprobe_simple || printf "%b[!] webprobe_simple failed%b\n" "$bred" "$reset"

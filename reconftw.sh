@@ -111,7 +111,7 @@ if [[ $OSTYPE == "darwin"* ]]; then
     PATH="$(brew --prefix gnu-sed)/libexec/gnubin:$PATH"
 fi
 
-PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:zrspanwvyh' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,ai,check-tools,health-check,quick-rescan,incremental,adaptive-rate,dry-run' -n 'reconFTW' -- "$@")
+PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:zrspanwvyh' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,ai,check-tools,health-check,quick-rescan,incremental,adaptive-rate,dry-run,parallel' -n 'reconFTW' -- "$@")
 
 exit_status=$?
 if [[ $exit_status -ne 0 ]]; then
@@ -305,6 +305,11 @@ while true; do
             ;;
         '--dry-run')
             DRY_RUN=true
+            shift
+            continue
+            ;;
+        '--parallel')
+            PARALLEL_MODE=true
             shift
             continue
             ;;

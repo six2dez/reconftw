@@ -886,6 +886,7 @@ function help() {
     printf "   --incremental     Only scan new findings since last run\n"
     printf "   --adaptive-rate   Automatically adjust rate limits on errors (429/503)\n"
     printf "   --dry-run         Show what would be executed without running commands\n"
+    printf "   --parallel        Run independent functions in parallel (faster but uses more resources)\n"
     printf " \n"
     printf " ${bblue}USAGE EXAMPLES${reset}\n"
     printf " ${byellow}Perform full recon (without attacks):${reset}\n"
