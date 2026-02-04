@@ -12,9 +12,72 @@
     exit 1
 }
 
-###############################################################################################################
-########################################### WEB DETECTION #####################################################
-###############################################################################################################
+###############################################################################
+# Helper Functions for Web Module
+###############################################################################
+
+# Run httpx probe on input file
+# Usage: _run_httpx input_file output_file [extra_flags...]
+_run_httpx() {
+    local input="$1"
+    local output="$2"
+    shift 2
+    local extra_flags=("$@")
+    
+    if [[ $AXIOM != true ]]; then
+        # shellcheck disable=SC2086  # HTTPX_FLAGS intentionally word-split
+        httpx $HTTPX_FLAGS -no-color -json -random-agent \
+            "${extra_flags[@]}" \
+            -o "$output" <"$input" 2>>"$LOGFILE" >/dev/null
+    else
+        # shellcheck disable=SC2086  # HTTPX_FLAGS intentionally word-split
+        axiom-scan "$input" -m httpx $HTTPX_FLAGS -no-color -json -random-agent \
+            "${extra_flags[@]}" \
+            -o "$output" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+    fi
+}
+
+# Process httpx JSON output: extract URLs and web info
+# Usage: _process_httpx_output json_file url_output info_output
+_process_httpx_output() {
+    local json_file="$1"
+    local url_output="$2"
+    local info_output="$3"
+    
+    [[ ! -s "$json_file" ]] && return 0
+    
+    # Extract URLs
+    jq -r 'try .url' "$json_file" 2>/dev/null \
+        | grep "$domain" \
+        | grep -aEo 'https?://[^ ]+' \
+        | sed 's/*.//' \
+        | anew -q "$url_output"
+    
+    # Extract plain web info
+    jq -r 'try . | "\(.url) [\(.status_code)] [\(.title)] [\(.webserver)] \(.tech)"' "$json_file" \
+        | grep "$domain" \
+        | anew -q "$info_output"
+}
+
+# Send URLs to proxy if enabled
+# Usage: _send_to_proxy urls_file
+_send_to_proxy() {
+    local urls_file="$1"
+    local max_urls="${2:-$DEEP_LIMIT2}"
+    
+    if [[ $PROXY == true ]] && [[ -n $proxy_url ]] && [[ -s "$urls_file" ]]; then
+        local count
+        count=$(wc -l < "$urls_file" | tr -d ' ')
+        if [[ $count -le $max_urls ]]; then
+            notification "Sending websites to proxy" "info"
+            ffuf -mc all -w "$urls_file" -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
+        fi
+    fi
+}
+
+###############################################################################
+# Main Web Functions  
+###############################################################################
 
 function webprobe_simple() {
 

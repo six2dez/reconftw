@@ -12,59 +12,75 @@
     exit 1
 }
 
-###############################################################################################################
-############################################### SUBDOMAINS ####################################################
-###############################################################################################################
+###############################################################################
+# Helper Functions for subdomains_full
+###############################################################################
 
-function subdomains_full() {
-
-    # Create necessary directories
+# Initialize subdomain enumeration environment
+# Usage: _subdomains_init
+_subdomains_init() {
     if ! ensure_dirs .tmp webs subdomains; then
         return 1
     fi
-
+    
     NUMOFLINES_subs="0"
     NUMOFLINES_probed="0"
-
+    
     printf "%b#######################################################################%b\n\n" "$bgreen" "$reset"
-
-    # Check if domain is an IP address
+    
     if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         printf "%b[%s] Scanning IP %s%b\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$domain" "$reset"
     else
         printf "%b[%s] Subdomain Enumeration %s%b\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$domain" "$reset"
     fi
-
-    # Backup existing subdomains and webs
-    if [[ -s "subdomains/subdomains.txt" ]]; then
-        if ! cp "subdomains/subdomains.txt" ".tmp/subdomains_old.txt"; then
-            printf "%b[!] Failed to backup subdomains.txt.%b\n" "$bred" "$reset"
-        fi
+    
+    # Backup existing files
+    safe_backup "subdomains/subdomains.txt" ".tmp/subdomains_old.txt"
+    safe_backup "webs/webs.txt" ".tmp/probed_old.txt"
+    
+    # Update resolvers if needed
+    if { [[ ! -f "$called_fn_dir/.sub_active" ]] || [[ ! -f "$called_fn_dir/.sub_brute" ]] || \
+         [[ ! -f "$called_fn_dir/.sub_permut" ]] || [[ ! -f "$called_fn_dir/.sub_recursive_brute" ]]; } || \
+       [[ $DIFF == true ]]; then
+        resolvers_update || return 1
     fi
-
-    if [[ -s "webs/webs.txt" ]]; then
-        if ! cp "webs/webs.txt" ".tmp/probed_old.txt"; then
-            printf "%b[!] Failed to backup webs.txt.%b\n" "$bred" "$reset"
-        fi
-    fi
-
-    # Update resolvers if necessary
-    if { [[ ! -f "$called_fn_dir/.sub_active" ]] || [[ ! -f "$called_fn_dir/.sub_brute" ]] || [[ ! -f "$called_fn_dir/.sub_permut" ]] || [[ ! -f "$called_fn_dir/.sub_recursive_brute" ]]; } || [[ $DIFF == true ]]; then
-        if ! resolvers_update; then
-            printf "%b[!] Failed to update resolvers.%b\n" "$bred" "$reset"
-            return 1
-        fi
-    fi
-
+    
     # Add in-scope subdomains
-    if [[ -s $inScope_file ]]; then
-        if ! cat "$inScope_file" | anew -q subdomains/subdomains.txt; then
-            printf "%b[!] Failed to update subdomains.txt with in-scope domains.%b\n" "$bred" "$reset"
-        fi
-    fi
+    [[ -s $inScope_file ]] && cat "$inScope_file" | anew -q subdomains/subdomains.txt
+    
+    return 0
+}
 
-    # Subdomain enumeration
-    if [[ ! $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] && [[ $SUBDOMAINS_GENERAL == true ]]; then
+# Run subdomain enumeration functions (sequential or parallel)
+# Usage: _subdomains_enumerate [--parallel]
+_subdomains_enumerate() {
+    local use_parallel="${1:-}"
+    
+    if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ $SUBDOMAINS_GENERAL != true ]]; then
+        notification "IP/CIDR detected, subdomains search skipped" "info"
+        printf "%b\n" "$domain" | anew -q subdomains/subdomains.txt
+        return 0
+    fi
+    
+    if [[ "$use_parallel" == "--parallel" ]] && declare -f parallel_funcs &>/dev/null; then
+        # Parallel execution using lib/parallel.sh
+        printf "%b[*] Running subdomain enumeration in parallel mode%b\n" "$bblue" "$reset"
+        
+        # Phase 1: Passive (all can run in parallel)
+        parallel_funcs 4 sub_passive sub_crt sub_tls sub_analytics
+        
+        # Phase 2: Active DNS (parallel)
+        parallel_funcs 3 sub_active sub_noerror sub_dns
+        
+        # Phase 3: Brute force (limited parallelism - resource intensive)
+        parallel_funcs 2 sub_brute sub_permut sub_regex_permut sub_ia_permut
+        
+        # Phase 4: Recursive and scraping (sequential - depends on previous results)
+        sub_recursive_passive
+        sub_recursive_brute
+        sub_scraping
+    else
+        # Sequential execution (original behavior)
         sub_passive
         sub_crt
         sub_active
@@ -79,87 +95,84 @@ function subdomains_full() {
         sub_dns
         sub_scraping
         sub_analytics
-    else
-        notification "IP/CIDR detected, subdomains search skipped" "info"
-        if ! printf "%b\n" "$domain" | anew -q subdomains/subdomains.txt; then
-            printf "%b[!] Failed to add domain to subdomains.txt.%b\n" "$bred" "$reset"
-        fi
     fi
+}
 
-    # Web probing
-    if ! webprobe_simple; then
-        printf "%b[!] webprobe_simple function failed.%b\n" "$bred" "$reset"
+# Process and finalize subdomain results
+# Usage: _subdomains_finalize
+_subdomains_finalize() {
+    # Remove out-of-scope entries
+    if [[ -s "subdomains/subdomains.txt" ]] && [[ -s $outOfScope_file ]]; then
+        deleteOutScoped "$outOfScope_file" "subdomains/subdomains.txt"
     fi
-
-    # Process subdomains
+    
+    if [[ -s "webs/webs.txt" ]] && [[ -s $outOfScope_file ]]; then
+        deleteOutScoped "$outOfScope_file" "webs/webs.txt"
+    fi
+    
+    # Count new results
     if [[ -s "subdomains/subdomains.txt" ]]; then
-        if [[ -s $outOfScope_file ]]; then
-            if ! deleteOutScoped "$outOfScope_file" "subdomains/subdomains.txt"; then
-                printf "%b[!] Failed to remove out-of-scope subdomains.%b\n" "$bred" "$reset"
-            fi
-        fi
-        if ! NUMOFLINES_subs=$(cat "subdomains/subdomains.txt" 2>>"$LOGFILE" | anew ".tmp/subdomains_old.txt" | sed '/^$/d' | wc -l); then
-            NUMOFLINES_subs="0"
-        fi
+        NUMOFLINES_subs=$(cat "subdomains/subdomains.txt" 2>>"$LOGFILE" | anew ".tmp/subdomains_old.txt" | sed '/^$/d' | wc -l) || NUMOFLINES_subs=0
     fi
-
-    # Process webs
+    
     if [[ -s "webs/webs.txt" ]]; then
-        if [[ -s $outOfScope_file ]]; then
-            if ! deleteOutScoped "$outOfScope_file" "webs/webs.txt"; then
-                printf "%b[!] Failed to remove out-of-scope webs.%b\n" "$bred" "$reset"
-            fi
-        fi
-        if ! NUMOFLINES_probed=$(cat "webs/webs.txt" 2>>"$LOGFILE" | anew ".tmp/probed_old.txt" | sed '/^$/d' | wc -l); then
-            printf "%b[!] Failed to count new probed webs.%b\n" "$bred" "$reset"
-            NUMOFLINES_probed="0"
-        fi
+        NUMOFLINES_probed=$(cat "webs/webs.txt" 2>>"$LOGFILE" | anew ".tmp/probed_old.txt" | sed '/^$/d' | wc -l) || NUMOFLINES_probed=0
     fi
-
+    
     # Display results
     printf "%b\n[%s] Total subdomains:%b\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
     notification "- ${NUMOFLINES_subs} alive" "good"
-
-    if [[ -s "subdomains/subdomains.txt" ]]; then
-        if ! sort "subdomains/subdomains.txt"; then
-            printf "%b[!] Failed to sort subdomains.txt.%b\n" "$bred" "$reset"
-        fi
-    fi
-
+    [[ -s "subdomains/subdomains.txt" ]] && sort "subdomains/subdomains.txt" >/dev/null
+    
     notification "- ${NUMOFLINES_probed} new web probed" "good"
-
-    if [[ -s "webs/webs.txt" ]]; then
-        if ! sort "webs/webs.txt"; then
-            printf "%b[!] Failed to sort webs.txt.%b\n" "$bred" "$reset"
-        fi
-    fi
-
+    [[ -s "webs/webs.txt" ]] && sort "webs/webs.txt" >/dev/null
+    
     notification "Subdomain Enumeration Finished" "good"
-    printf "%b[%s] Results are saved in %s/subdomains/subdomains.txt and webs/webs.txt%b\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$domain" "$reset"
+    printf "%b[%s] Results are saved in %s/subdomains/subdomains.txt and webs/webs.txt%b\n" \
+        "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$domain" "$reset"
     printf "%b#######################################################################%b\n\n" "$bgreen" "$reset"
-
+    
     # Emit plugin event
     plugins_emit after_subdomains "$domain" "$dir"
-
-    # Incremental mode: get new subdomains and save state
+    
+    # Incremental mode
     incremental_diff "subdomains" "subdomains/subdomains.txt" "subdomains/subdomains_new.txt"
     incremental_save "subdomains" "subdomains/subdomains.txt"
-
-    # Incremental mode: get new webs and save state
     incremental_diff "webs" "webs/webs.txt" "webs/webs_new.txt"
     incremental_save "webs" "webs/webs.txt"
-
-    # Persist counts for quick-rescan logic
+    
+    # Persist counts
     wc -l < "subdomains/subdomains_new.txt" 2>/dev/null > .tmp/subs_new_count
     wc -l < "webs/webs_new.txt" 2>/dev/null > .tmp/webs_new_count
-
-    # Asset store: append new subdomains
+    
+    # Asset store
     if [[ -s subdomains/subdomains_new.txt ]]; then
         append_assets_from_file subdomain name subdomains/subdomains_new.txt
     else
         append_assets_from_file subdomain name subdomains/subdomains.txt
     fi
+}
 
+###############################################################################
+# Main Subdomain Functions
+###############################################################################
+
+# Main subdomain enumeration orchestrator
+# Usage: subdomains_full [--parallel]
+function subdomains_full() {
+    local parallel_mode="${1:-}"
+    
+    # Initialize
+    _subdomains_init || return 1
+    
+    # Enumerate
+    _subdomains_enumerate "$parallel_mode"
+    
+    # Web probing
+    webprobe_simple || printf "%b[!] webprobe_simple failed%b\n" "$bred" "$reset"
+    
+    # Finalize
+    _subdomains_finalize
 }
 
 function sub_passive() {
