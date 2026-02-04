@@ -69,6 +69,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **Parallelization Order**
 - `sub_tls` and `sub_analytics` now run AFTER `sub_active` (require resolved subdomains)
 
+**List Mode (-l flag)**
+- Fixed bug where only first domain in target list was processed
+- Changed while loops to use dedicated file descriptor (FD 3)
+- Prevents internal commands from consuming stdin and breaking the loop
+- Now correctly processes all domains in the list sequentially
+
 ### Changed
 
 - Replaced 107 duplicate `mkdir -p` patterns with `ensure_dirs()`

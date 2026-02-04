@@ -443,13 +443,13 @@ case $opt_mode in
             if [[ $AXIOM == true ]]; then
                 mode="list_recon"
             fi
-            sed_i 's/\r$//' "$list"
-            while IFS= read -r domain; do
+            sed_i 's/\r$//' "$flist"
+            while IFS= read -r domain <&3; do
                 [[ -z "$domain" ]] && continue
                 start
                 recon
                 end
-            done <"$list"
+            done 3<"$flist"
         else
             if [[ $AXIOM == true ]]; then
                 mode="recon"
@@ -464,11 +464,11 @@ case $opt_mode in
             if [[ $AXIOM == true ]]; then
                 mode="subs_menu"
             fi
-            sed_i 's/\r$//' "$list"
-            while IFS= read -r domain; do
+            sed_i 's/\r$//' "$flist"
+            while IFS= read -r domain <&3; do
                 [[ -z "$domain" ]] && continue
                 subs_menu
-            done <"$list"
+            done 3<"$flist"
         else
             subs_menu
         fi
@@ -478,11 +478,11 @@ case $opt_mode in
             if [[ $AXIOM == true ]]; then
                 mode="passive"
             fi
-            sed_i 's/\r$//' "$list"
-            while IFS= read -r domain; do
+            sed_i 's/\r$//' "$flist"
+            while IFS= read -r domain <&3; do
                 [[ -z "$domain" ]] && continue
                 passive
-            done <"$list"
+            done 3<"$flist"
         else
             passive
         fi
@@ -493,11 +493,11 @@ case $opt_mode in
             if [[ $AXIOM == true ]]; then
                 mode="all"
             fi
-            sed_i 's/\r$//' "$list"
-            while IFS= read -r domain; do
+            sed_i 's/\r$//' "$flist"
+            while IFS= read -r domain <&3; do
                 [[ -z "$domain" ]] && continue
                 all
-            done <"$list"
+            done 3<"$flist"
         else
             all
         fi
@@ -524,13 +524,13 @@ case $opt_mode in
             exit
         fi
         if [[ -n $list ]]; then
-            sed_i 's/\r$//' "$list"
-            while IFS= read -r domain; do
+            sed_i 's/\r$//' "$flist"
+            while IFS= read -r domain <&3; do
                 [[ -z "$domain" ]] && continue
                 start
                 osint
                 end
-            done <"$list"
+            done 3<"$flist"
         else
             start
             osint
@@ -542,11 +542,11 @@ case $opt_mode in
             if [[ $AXIOM == true ]]; then
                 mode="zen_menu"
             fi
-            sed_i 's/\r$//' "$list"
-            while IFS= read -r domain; do
+            sed_i 's/\r$//' "$flist"
+            while IFS= read -r domain <&3; do
                 [[ -z "$domain" ]] && continue
                 zen_menu
-            done <"$list"
+            done 3<"$flist"
         else
             zen_menu
         fi
