@@ -205,6 +205,7 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **Structured Logging**: Optional JSON log output for advanced analysis (`STRUCTURED_LOGGING`).
 - **Input Sanitization**: All user input is sanitized to prevent command injection.
 - **Dry-Run Mode**: Preview what would be executed without running commands (`--dry-run`).
+- **Parallel Mode**: Run independent functions in parallel for faster scans (`--parallel`).
 - **Modular Architecture**: Codebase split into 8 focused modules for maintainability.
 - **Secrets Management**: Environment variables, `secrets.cfg`, and Docker runtime secrets (see [SECURITY.md](SECURITY.md)).
 - **Circuit Breaker**: Automatically skips tools after repeated failures to avoid scan hangs.
@@ -796,7 +797,8 @@ reconFTW supports multiple modes and options for flexible reconnaissance. Use th
 | `--health-check`  | Run system health check and exit                         |
 | `--incremental`   | Only scan new findings since last run                    |
 | `--adaptive-rate` | Automatically adjust rate limits on errors (429/503)     |
-| `--dry-run`       | Show what would be executed without running commands      |
+| `--dry-run`       | Show what would be executed without running commands     |
+| `--parallel`      | Run independent functions in parallel (faster, more RAM) |
 
 ### Example Usage
 
@@ -818,7 +820,13 @@ reconFTW supports multiple modes and options for flexible reconnaissance. Use th
    ./reconftw.sh -d target.com -r --deep
    ```
 
-4. **Multi-Domain Recon**:
+4. **Parallel Mode (Faster, requires more RAM)**:
+
+   ```bash
+   ./reconftw.sh -d target.com -r --parallel
+   ```
+
+5. **Multi-Domain Recon**:
 
    ```bash
    ./reconftw.sh -m company -l domains.txt -r
