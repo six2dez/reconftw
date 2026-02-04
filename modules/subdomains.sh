@@ -66,16 +66,19 @@ _subdomains_enumerate() {
         # Parallel execution using lib/parallel.sh
         printf "%b[*] Running subdomain enumeration in parallel mode%b\n" "$bblue" "$reset"
         
-        # Phase 1: Passive (all can run in parallel)
-        parallel_funcs 4 sub_passive sub_crt sub_tls sub_analytics
+        # Phase 1: Passive sources (all can run in parallel)
+        parallel_funcs 4 sub_passive sub_crt
         
-        # Phase 2: Active DNS (parallel)
+        # Phase 2: Active DNS resolution (parallel)
         parallel_funcs 3 sub_active sub_noerror sub_dns
         
-        # Phase 3: Brute force (limited parallelism - resource intensive)
+        # Phase 3: Post-active (depend on resolved subdomains)
+        parallel_funcs 2 sub_tls sub_analytics
+        
+        # Phase 4: Brute force (limited parallelism - resource intensive)
         parallel_funcs 2 sub_brute sub_permut sub_regex_permut sub_ia_permut
         
-        # Phase 4: Recursive and scraping (sequential - depends on previous results)
+        # Phase 5: Recursive and scraping (sequential - depends on previous results)
         sub_recursive_passive
         sub_recursive_brute
         sub_scraping

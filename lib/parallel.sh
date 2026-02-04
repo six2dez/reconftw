@@ -168,19 +168,17 @@ cleanup_parallel_jobs() {
 
 # Run passive subdomain enumeration in parallel
 # Usage: parallel_passive_enum
-# Runs: sub_passive, sub_crt, sub_tls, sub_analytics in parallel
+# Runs: sub_passive, sub_crt in parallel (sources that don't need resolved subs)
 parallel_passive_enum() {
     local funcs=(
         "sub_passive"
-        "sub_crt" 
-        "sub_tls"
-        "sub_analytics"
+        "sub_crt"
     )
     
     printf "%b[*] Running passive enumeration in parallel (%d functions)%b\n" \
         "${bblue:-}" "${#funcs[@]}" "${reset:-}"
     
-    parallel_funcs 4 "${funcs[@]}"
+    parallel_funcs 2 "${funcs[@]}"
 }
 
 # Run active subdomain enumeration in parallel
@@ -197,6 +195,21 @@ parallel_active_enum() {
         "${bblue:-}" "${#funcs[@]}" "${reset:-}"
     
     parallel_funcs 3 "${funcs[@]}"
+}
+
+# Run post-active subdomain enumeration in parallel
+# Usage: parallel_postactive_enum
+# Runs: sub_tls, sub_analytics (require resolved subdomains from sub_active)
+parallel_postactive_enum() {
+    local funcs=(
+        "sub_tls"
+        "sub_analytics"
+    )
+    
+    printf "%b[*] Running post-active enumeration in parallel (%d functions)%b\n" \
+        "${bblue:-}" "${#funcs[@]}" "${reset:-}"
+    
+    parallel_funcs 2 "${funcs[@]}"
 }
 
 # Run brute force enumeration (typically sequential due to resource usage)
@@ -298,22 +311,25 @@ parallel_subdomains_full() {
     printf "%b[*] Starting parallelized subdomain enumeration%b\n" \
         "${bblue:-}" "${reset:-}"
     
-    # Phase 1: Passive enumeration (all parallel)
+    # Phase 1: Passive enumeration (parallel - no dependencies)
     parallel_passive_enum
     
     # Merge passive results before active phase
     [[ -s ".tmp/passive_subs.txt" ]] && cat .tmp/passive_subs.txt | anew -q subdomains/subdomains.txt
     [[ -s ".tmp/crtsh_subs.txt" ]] && cat .tmp/crtsh_subs.txt | anew -q subdomains/subdomains.txt
     
-    # Phase 2: Active enumeration (parallel)
+    # Phase 2: Active enumeration (parallel - resolves subdomains)
     parallel_active_enum
     
-    # Phase 3: Brute force (limited parallel due to resource usage)
+    # Phase 3: Post-active (parallel - requires resolved subdomains)
+    parallel_postactive_enum
+    
+    # Phase 4: Brute force (limited parallel due to resource usage)
     if [[ ${SUBBRUTE:-false} == true ]] || [[ ${SUBPERMUTE:-false} == true ]]; then
         parallel_brute_enum
     fi
     
-    # Phase 4: Scraping and recursive (sequential - depends on previous results)
+    # Phase 5: Scraping and recursive (sequential - depends on previous results)
     [[ ${SUBSCRAPING:-false} == true ]] && sub_scraping
     [[ ${SUB_RECURSIVE_BRUTE:-false} == true ]] && sub_recursive_brute
     
