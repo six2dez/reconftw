@@ -15,7 +15,7 @@
 ###############################################################################################################
 
 function google_dorks() {
-    mkdir -p osint
+    ensure_dirs osint
 
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GOOGLE_DORKS == true ]] && [[ $OSINT == true ]]; then
         start_func "${FUNCNAME[0]}" "Running: Google Dorks in process"
@@ -24,15 +24,15 @@ function google_dorks() {
         end_func "Results are saved in $domain/osint/dorks.txt" "${FUNCNAME[0]}"
     else
         if [[ $GOOGLE_DORKS == false ]] || [[ $OSINT == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or configuration settings.%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            skip_notification "disabled"
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s %b\n\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "${FUNCNAME[0]}" "$reset"
+            skip_notification "processed"
         fi
     fi
 }
 
 function github_dorks() {
-    mkdir -p osint
+    ensure_dirs osint
 
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GITHUB_DORKS == true ]] && [[ $OSINT == true ]]; then
         start_func "${FUNCNAME[0]}" "Running: Github Dorks in process"
@@ -56,15 +56,15 @@ function github_dorks() {
         end_func "Results are saved in $domain/osint/gitdorks.txt" "${FUNCNAME[0]}"
     else
         if [[ $GITHUB_DORKS == false ]] || [[ $OSINT == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or configuration settings.%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            skip_notification "disabled"
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s %b\n\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "${FUNCNAME[0]}" "$reset"
+            skip_notification "processed"
         fi
     fi
 }
 
 function github_repos() {
-    mkdir -p osint
+    ensure_dirs osint
 
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GITHUB_REPOS == true ]] && [[ $OSINT == true ]]; then
         start_func "${FUNCNAME[0]}" "Github Repos analysis in process"
@@ -83,8 +83,7 @@ function github_repos() {
                 fi
             fi
 
-            mkdir -p .tmp/github_repos 2>>"$LOGFILE"
-            mkdir -p .tmp/github 2>>"$LOGFILE"
+            ensure_dirs .tmp/github_repos .tmp/github
 
             if [[ -s ".tmp/company_repos_url.txt" ]]; then
                 if ! interlace -tL .tmp/company_repos_url.txt -threads "$INTERLACE_THREADS" -c "git clone _target_ .tmp/github_repos/_cleantarget_" 2>>"$LOGFILE" >/dev/null; then
@@ -138,21 +137,21 @@ function github_repos() {
         fi
     else
         if [[ $GITHUB_REPOS == false ]] || [[ $OSINT == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or configuration settings.%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            skip_notification "disabled"
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s %b\n\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "${FUNCNAME[0]}" "$reset"
+            skip_notification "processed"
         fi
     fi
 }
 
 function metadata() {
-    mkdir -p osint
+    ensure_dirs osint
 
     # Check if the function should run
     if { [[ ! -f "${called_fn_dir}/.${FUNCNAME[0]}" ]] || [[ ${DIFF} == true ]]; } && [[ ${METADATA} == true ]] && [[ ${OSINT} == true ]] && ! [[ ${domain} =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         start_func "${FUNCNAME[0]}" "Scanning metadata in public files"
 
-        mkdir -p ".tmp/metagoofil_${domain}/" 2>>"${LOGFILE}"
+        ensure_dirs ".tmp/metagoofil_${domain}"
         pushd "${tools}/metagoofil" >/dev/null || {
             printf "%b[!] Failed to change directory to %s in %s at line %s.%b\n" "${bred}" "${tools}/metagoofil" "${FUNCNAME[0]}" "${LINENO}" "${reset}"
             return 1
@@ -168,17 +167,17 @@ function metadata() {
         end_func "Results are saved in ${domain}/osint/metadata_results.txt" "${FUNCNAME[0]}"
     else
         if [[ ${METADATA} == false ]] || [[ ${OSINT} == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or configuration settings.%b\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "${reset}"
+            skip_notification "disabled"
         elif [[ ${domain} =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             return
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s %b\n\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "${called_fn_dir}" "${FUNCNAME[0]}" "${reset}"
+            skip_notification "processed"
         fi
     fi
 }
 
 function apileaks() {
-    mkdir -p osint
+    ensure_dirs osint
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } \
@@ -235,7 +234,7 @@ function apileaks() {
 }
 
 function emails() {
-    mkdir -p .tmp osint
+    ensure_dirs .tmp osint
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } \
@@ -285,7 +284,7 @@ function emails() {
 
 function domain_info() {
 
-    mkdir -p osint
+    ensure_dirs osint
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } \
@@ -317,7 +316,7 @@ function domain_info() {
 }
 
 function third_party_misconfigs() {
-    mkdir -p osint
+    ensure_dirs osint
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } \
@@ -362,7 +361,7 @@ function third_party_misconfigs() {
 }
 
 function spoof() {
-    mkdir -p osint
+    ensure_dirs osint
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } \
@@ -404,7 +403,7 @@ function spoof() {
 }
 
 function mail_hygiene() {
-    mkdir -p osint
+    ensure_dirs osint
 
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } \
         && [[ $MAIL_HYGIENE == true ]] && [[ $OSINT == true ]] \
@@ -431,7 +430,7 @@ function mail_hygiene() {
 }
 
 function cloud_enum_scan() {
-    mkdir -p osint
+    ensure_dirs osint
 
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } \
         && [[ $CLOUD_ENUM == true ]] && [[ $OSINT == true ]] \
@@ -454,7 +453,7 @@ function cloud_enum_scan() {
 
 function ip_info() {
 
-    mkdir -p osint
+    ensure_dirs osint
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } \

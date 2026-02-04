@@ -19,8 +19,7 @@
 function subdomains_full() {
 
     # Create necessary directories
-    if ! mkdir -p .tmp webs subdomains; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
+    if ! ensure_dirs .tmp webs subdomains; then
         return 1
     fi
 
@@ -165,7 +164,7 @@ function subdomains_full() {
 
 function sub_passive() {
 
-    mkdir -p .tmp subdomains
+    ensure_dirs .tmp subdomains
 
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBPASSIVE == true ]]; then
         start_subfunc "${FUNCNAME[0]}" "Running: Passive Subdomain Enumeration"
@@ -196,7 +195,9 @@ function sub_passive() {
         fi
 
         # Combine results and count new lines
-        NUMOFLINES=$(find .tmp -type f -iname "*_psub.txt" -exec cat {} + | sed "s/^\*\.//" | anew .tmp/passive_subs.txt | sed '/^$/d' | wc -l)
+        if ! NUMOFLINES=$(find .tmp -type f -iname "*_psub.txt" -exec cat {} + | sed "s/^\*\.//" | anew .tmp/passive_subs.txt | sed '/^$/d' | wc -l); then
+            NUMOFLINES=0
+        fi
         end_subfunc "${NUMOFLINES} new subs (passive)" "${FUNCNAME[0]}"
 
     else
@@ -211,7 +212,7 @@ function sub_passive() {
 
 function sub_crt() {
 
-    mkdir -p .tmp subdomains
+    ensure_dirs .tmp subdomains
 
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBCRT == true ]]; then
         start_subfunc "${FUNCNAME[0]}" "Running: Crtsh Subdomain Enumeration"
@@ -234,7 +235,9 @@ function sub_crt() {
         fi
 
         # Process subdomains and append new ones to .tmp/crtsh_subs.txt, count new lines
-        NUMOFLINES=$(sed 's/^\*\.//' .tmp/crtsh_subs_tmp.txt | sed '/^$/d' | anew .tmp/crtsh_subs.txt | wc -l)
+        if ! NUMOFLINES=$(sed 's/^\*\.//' .tmp/crtsh_subs_tmp.txt | sed '/^$/d' | anew .tmp/crtsh_subs.txt | wc -l); then
+            NUMOFLINES=0
+        fi
 
         end_subfunc "${NUMOFLINES} new subs (cert transparency)" "${FUNCNAME[0]}"
     else
@@ -250,7 +253,7 @@ function sub_crt() {
 
 function sub_active() {
 
-    mkdir -p .tmp subdomains
+    ensure_dirs .tmp subdomains
 
     if [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; then
         start_subfunc "${FUNCNAME[0]}" "Running: Active Subdomain Enumeration"
@@ -334,7 +337,7 @@ function sub_active() {
 }
 
 function sub_tls() {
-    mkdir -p .tmp subdomains
+    ensure_dirs .tmp subdomains
 
     if [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; then
         start_subfunc "${FUNCNAME[0]}" "Running: TLS Active Subdomain Enumeration"
@@ -415,7 +418,7 @@ function sub_tls() {
 
 function sub_noerror() {
 
-    mkdir -p .tmp subdomains
+    ensure_dirs .tmp subdomains
 
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBNOERROR == true ]]; then
         start_subfunc "${FUNCNAME[0]}" "Running: Checking NOERROR DNS response"
@@ -479,7 +482,7 @@ function sub_noerror() {
 }
 
 function sub_dns() {
-    mkdir -p .tmp subdomains hosts
+    ensure_dirs .tmp subdomains hosts
 
     if [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; then
         start_subfunc "${FUNCNAME[0]}" "Running: DNS Subdomain Enumeration and PTR search"
@@ -561,7 +564,7 @@ function sub_dns() {
 
 function sub_brute() {
 
-    mkdir -p .tmp subdomains
+    ensure_dirs .tmp subdomains
 
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBBRUTE == true ]]; then
         start_subfunc "${FUNCNAME[0]}" "Running: Bruteforce Subdomain Enumeration"
@@ -606,8 +609,8 @@ function sub_brute() {
 
             # Resolve the subdomains using axiom-scan
             if [[ -s ".tmp/subs_brute.txt" ]]; then
-                axiom-scan .tmp/subs_brute.txt -m puredns-resolve -r ${AXIOM_RESOLVERS_PATH} \
-                    --resolvers-trusted ${AXIOM_RESOLVERS_TRUSTED_PATH} \
+                axiom-scan .tmp/subs_brute.txt -m puredns-resolve -r "${AXIOM_RESOLVERS_PATH}" \
+                    --resolvers-trusted "${AXIOM_RESOLVERS_TRUSTED_PATH}" \
                     --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
                     -o .tmp/subs_brute_valid.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
             fi
@@ -647,8 +650,7 @@ function sub_brute() {
 function sub_scraping() {
 
     # Create necessary directories
-    if ! mkdir -p .tmp subdomains; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
+    if ! ensure_dirs .tmp subdomains; then
         return 1
     fi
 
@@ -904,7 +906,7 @@ function sub_analytics() {
 
 function sub_permut() {
 
-    mkdir -p .tmp subdomains
+    ensure_dirs .tmp subdomains
 
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBPERMUTE == true ]]; then
         start_subfunc "${FUNCNAME[0]}" "Running: Permutations Subdomain Enumeration"
@@ -970,10 +972,10 @@ function sub_permut() {
                 return 1
             fi
             if [[ -s ".tmp/gotator1.txt" ]]; then
-                axiom-scan .tmp/gotator1.txt -m puredns-resolve -r ${AXIOM_RESOLVERS_PATH} \
-                    --resolvers-trusted ${AXIOM_RESOLVERS_TRUSTED_PATH} \
+                axiom-scan .tmp/gotator1.txt -m puredns-resolve -r "${AXIOM_RESOLVERS_PATH}" \
+                    --resolvers-trusted "${AXIOM_RESOLVERS_TRUSTED_PATH}" \
                     --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
-                    -o .tmp/permute1.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+                    -o .tmp/permute1.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
             fi
         fi
 
@@ -1000,10 +1002,10 @@ function sub_permut() {
             fi
         else
             if [[ -s ".tmp/gotator2.txt" ]]; then
-                axiom-scan .tmp/gotator2.txt -m puredns-resolve -r ${AXIOM_RESOLVERS_PATH} \
-                    --resolvers-trusted ${AXIOM_RESOLVERS_TRUSTED_PATH} \
+                axiom-scan .tmp/gotator2.txt -m puredns-resolve -r "${AXIOM_RESOLVERS_PATH}" \
+                    --resolvers-trusted "${AXIOM_RESOLVERS_TRUSTED_PATH}" \
                     --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
-                    -o .tmp/permute2.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+                    -o .tmp/permute2.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
             fi
         fi
 
@@ -1832,7 +1834,7 @@ function s3buckets() {
 }
 
 function cloud_extra_providers() {
-    mkdir -p subdomains .tmp
+    ensure_dirs subdomains .tmp
 
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         start_func "${FUNCNAME[0]}" "Extra cloud providers checks"

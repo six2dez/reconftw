@@ -127,7 +127,7 @@ function end() {
     if [[ $opt_ai ]]; then
         notification "[$(date +'%Y-%m-%d %H:%M:%S')] Sending ${domain} data to AI" info
         mkdir -p "${dir}/ai_result" 2>>"${LOGFILE}"
-        "${tools}/reconftw_ai/venv/bin/python3" "${tools}/reconftw_ai/reconftw_ai.py" --results-dir ${dir} --output-dir ${dir}/ai_result --model ${AI_MODEL} --output-format ${AI_REPORT_TYPE} --report-type ${AI_REPORT_PROFILE} --prompts-file ${tools}/reconftw_ai/prompts.json 2>>"${LOGFILE}" >/dev/null
+        "${tools}/reconftw_ai/venv/bin/python3" "${tools}/reconftw_ai/reconftw_ai.py" --results-dir "${dir}" --output-dir "${dir}/ai_result" --model "${AI_MODEL}" --output-format "${AI_REPORT_TYPE}" --report-type "${AI_REPORT_PROFILE}" --prompts-file "${tools}/reconftw_ai/prompts.json" 2>>"${LOGFILE}" >/dev/null
     fi
 
     find "$dir" -type f -empty -print | grep -v '.called_fn' | grep -v '.log' | grep -v '.tmp' | xargs -r rm -f -- 2>>"$LOGFILE" >/dev/null

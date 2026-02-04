@@ -14,3 +14,4 @@ test/
 reconftw.cfg-personal
 secrets.cfg
 .env.cache/
+documentation/

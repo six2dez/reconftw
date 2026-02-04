@@ -671,7 +671,7 @@ function zipSnedOutputFolder {
 function isAsciiText {
     # shellcheck disable=SC2034  # IS_ASCII used by callers
     IS_ASCII="False"
-    if [[ $(file $1 | grep -o 'ASCII text$') == "ASCII text" ]]; then
+    if [[ $(file "$1" | grep -o 'ASCII text$') == "ASCII text" ]]; then
         IS_ASCII="True"
     else
         IS_ASCII="False"

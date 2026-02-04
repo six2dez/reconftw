@@ -64,6 +64,8 @@ SCRIPTPATH="${_INIT_SCRIPTPATH}"
 
 # Source libraries first (pure utilities)
 source "${_INIT_SCRIPTPATH}/lib/validation.sh"
+source "${_INIT_SCRIPTPATH}/lib/common.sh"
+source "${_INIT_SCRIPTPATH}/lib/parallel.sh"
 
 # Source all modules in dependency order
 source "${_INIT_SCRIPTPATH}/modules/utils.sh"

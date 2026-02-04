@@ -13,10 +13,7 @@
 function xss() {
 
     # Create necessary directories
-    if ! mkdir -p .tmp webs vulns; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs .tmp webs vulns; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $XSS == true ]] && [[ -s "gf/xss.txt" ]] \
@@ -96,10 +93,7 @@ function xss() {
 function cors() {
 
     # Create necessary directories
-    if ! mkdir -p .tmp webs vulns; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs .tmp webs vulns; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $CORS == true ]] \
@@ -139,10 +133,7 @@ function cors() {
 function open_redirect() {
 
     # Create necessary directories
-    if ! mkdir -p .tmp webs vulns; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs .tmp webs vulns; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $OPEN_REDIRECT == true ]] \
@@ -186,10 +177,7 @@ function open_redirect() {
 function ssrf_checks() {
 
     # Create necessary directories
-    if ! mkdir -p .tmp gf vulns; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs .tmp gf vulns; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SSRF_CHECKS == true ]] \
@@ -243,7 +231,9 @@ function ssrf_checks() {
             # Process SSRF callback results if INTERACT is enabled
             if [[ $INTERACT == true ]] && [[ -s ".tmp/ssrf_callback.txt" ]]; then
                 tail -n +11 .tmp/ssrf_callback.txt | anew -q "vulns/ssrf_callback.txt"
-                NUMOFLINES=$(tail -n +12 .tmp/ssrf_callback.txt | sed '/^$/d' | wc -l)
+                if ! NUMOFLINES=$(tail -n +12 .tmp/ssrf_callback.txt | sed '/^$/d' | wc -l); then
+                    NUMOFLINES=0
+                fi
                 notification "SSRF: ${NUMOFLINES} callbacks received" info
             fi
 
@@ -275,10 +265,7 @@ function ssrf_checks() {
 function crlf_checks() {
 
     # Create necessary directories
-    if ! mkdir -p webs vulns; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs webs vulns; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $CRLF_CHECKS == true ]] \
@@ -320,10 +307,7 @@ function crlf_checks() {
 function lfi() {
 
     # Create necessary directories
-    if ! mkdir -p .tmp gf vulns; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs .tmp gf vulns; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $LFI == true ]] \
@@ -372,10 +356,7 @@ function lfi() {
 function ssti() {
 
     # Create necessary directories
-    if ! mkdir -p .tmp gf vulns; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs .tmp gf vulns; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SSTI == true ]] \
@@ -424,10 +405,7 @@ function ssti() {
 function sqli() {
 
     # Create necessary directories
-    if ! mkdir -p .tmp gf vulns; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs .tmp gf vulns; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SQLI == true ]] \
@@ -482,10 +460,7 @@ function sqli() {
 function test_ssl() {
 
     # Create necessary directories
-    if ! mkdir -p hosts vulns; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs hosts vulns; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $TEST_SSL == true ]]; then
@@ -519,10 +494,7 @@ function test_ssl() {
 function spraying() {
 
     # Create necessary directories
-    if ! mkdir -p "vulns"; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs vulns; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SPRAY == true ]] \
@@ -560,10 +532,7 @@ function spraying() {
 function command_injection() {
 
     # Create necessary directories
-    if ! mkdir -p .tmp gf vulns; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs .tmp gf vulns; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $COMM_INJ == true ]] \
@@ -614,10 +583,7 @@ function command_injection() {
 function 4xxbypass() {
 
     # Create necessary directories
-    if ! mkdir -p .tmp fuzzing vulns; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs .tmp fuzzing vulns; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $BYPASSER4XX == true ]] \
@@ -678,10 +644,7 @@ function 4xxbypass() {
 function prototype_pollution() {
 
     # Create necessary directories
-    if ! mkdir -p .tmp webs vulns; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs .tmp webs vulns; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $PROTO_POLLUTION == true ]] \
@@ -732,10 +695,7 @@ function prototype_pollution() {
 function smuggling() {
 
     # Create necessary directories
-    if ! mkdir -p .tmp webs vulns/smuggling; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs .tmp webs vulns/smuggling; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SMUGGLING == true ]] \
@@ -785,10 +745,7 @@ function smuggling() {
 function webcache() {
 
     # Create necessary directories
-    if ! mkdir -p .tmp webs vulns; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs .tmp webs vulns; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $WEBCACHE == true ]] \
@@ -852,10 +809,7 @@ function webcache() {
 function fuzzparams() {
 
     # Create necessary directories
-    if ! mkdir -p .tmp webs vulns; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs .tmp webs vulns; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $FUZZPARAMS == true ]] \

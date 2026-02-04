@@ -19,10 +19,7 @@
 function webprobe_simple() {
 
     # Create necessary directories
-    if ! mkdir -p .tmp webs subdomains; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs .tmp webs subdomains; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $WEBPROBESIMPLE == true ]]; then
@@ -36,11 +33,13 @@ function webprobe_simple() {
 
         # Run httpx or axiom-scan
         if [[ $AXIOM != true ]]; then
-            httpx ${HTTPX_FLAGS} -no-color -json -random-agent -threads "$HTTPX_THREADS" -rl "$HTTPX_RATELIMIT" \
+            # shellcheck disable=SC2086  # HTTPX_FLAGS intentionally word-split
+            httpx $HTTPX_FLAGS -no-color -json -random-agent -threads "$HTTPX_THREADS" -rl "$HTTPX_RATELIMIT" \
                 -retries 2 -timeout "$HTTPX_TIMEOUT" -o .tmp/web_full_info_probe.txt \
                 <subdomains/subdomains.txt 2>>"$LOGFILE" >/dev/null
         else
-            axiom-scan subdomains/subdomains.txt -m httpx ${HTTPX_FLAGS} -no-color -json -random-agent \
+            # shellcheck disable=SC2086  # HTTPX_FLAGS intentionally word-split
+            axiom-scan subdomains/subdomains.txt -m httpx $HTTPX_FLAGS -no-color -json -random-agent \
                 -threads "$HTTPX_THREADS" -rl "$HTTPX_RATELIMIT" -retries 2 -timeout "$HTTPX_TIMEOUT" \
                 -o .tmp/web_full_info_probe.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
         fi
@@ -114,10 +113,7 @@ function webprobe_simple() {
 function webprobe_full() {
 
     # Create necessary directories
-    if ! mkdir -p .tmp webs subdomains; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs .tmp webs subdomains; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $WEBPROBEFULL == true ]]; then
@@ -206,10 +202,7 @@ function webprobe_full() {
 function screenshot() {
 
     # Create necessary directories
-    if ! mkdir -p webs screenshots; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs webs screenshots; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $WEBSCREENSHOT == true ]]; then
@@ -244,10 +237,7 @@ function screenshot() {
 function virtualhosts() {
 
     # Create necessary directories
-    if ! mkdir -p .tmp/virtualhosts virtualhosts webs; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs .tmp/virtualhosts virtualhosts webs; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $VIRTUALHOSTS == true ]]; then
@@ -290,10 +280,7 @@ function virtualhosts() {
 function favicon() {
 
     # Create necessary directories
-    if ! mkdir -p hosts .tmp/virtualhosts; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs hosts .tmp/virtualhosts; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } \
@@ -351,10 +338,7 @@ function favicon() {
 function portscan() {
 
     # Create necessary directories
-    if ! mkdir -p .tmp subdomains hosts webs; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs .tmp subdomains hosts webs; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $PORTSCANNER == true ]]; then
@@ -442,15 +426,18 @@ function portscan() {
         if [[ $PORTSCAN_ACTIVE == true ]]; then
             if [[ $AXIOM != true ]]; then
                 if [[ -s ".tmp/ips_nocdn.txt" ]]; then
+                    # shellcheck disable=SC2086  # SUDO and PORTSCAN_ACTIVE_OPTIONS intentionally word-split
                     run_command $SUDO nmap $PORTSCAN_ACTIVE_OPTIONS -iL .tmp/ips_nocdn.txt -oA hosts/portscan_active 2>>"$LOGFILE" >/dev/null
                 fi
                 if [[ $IPV6_SCAN == true && -s "hosts/ips_v6.txt" ]]; then
+                    # shellcheck disable=SC2086  # SUDO and PORTSCAN_ACTIVE_OPTIONS intentionally word-split
                     run_command $SUDO nmap -6 $PORTSCAN_ACTIVE_OPTIONS -iL hosts/ips_v6.txt -oA hosts/portscan_active_v6 2>>"$LOGFILE" >/dev/null
                 fi
             else
                 if [[ -s ".tmp/ips_nocdn.txt" ]]; then
+                    # shellcheck disable=SC2086  # PORTSCAN_ACTIVE_OPTIONS intentionally word-split
                     run_command axiom-scan .tmp/ips_nocdn.txt -m nmapx $PORTSCAN_ACTIVE_OPTIONS \
-                        -oA hosts/portscan_active $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+                        -oA hosts/portscan_active "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
                 fi
             fi
         fi
@@ -501,10 +488,7 @@ function portscan() {
 function cdnprovider() {
 
     # Create necessary directories
-    if ! mkdir -p .tmp subdomains hosts; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs .tmp subdomains hosts; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } \
@@ -549,10 +533,7 @@ function cdnprovider() {
 function waf_checks() {
 
     # Create necessary directories
-    if ! mkdir -p .tmp webs; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs .tmp webs; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $WAF_DETECTION == true ]]; then
@@ -614,10 +595,7 @@ function waf_checks() {
 function nuclei_check() {
 
     # Create necessary directories
-    if ! mkdir -p .tmp webs subdomains nuclei_output; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs .tmp webs subdomains nuclei_output; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $NUCLEICHECK == true ]]; then
@@ -752,7 +730,7 @@ function nuclei_check() {
 
 function graphql_scan() {
     # Detect GraphQL endpoints and introspection
-    mkdir -p .tmp webs nuclei_output vulns/graphql
+    ensure_dirs .tmp webs nuclei_output vulns/graphql
 
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GRAPHQL_CHECK == true ]]; then
         start_func "${FUNCNAME[0]}" "GraphQL detection"
@@ -785,7 +763,7 @@ function graphql_scan() {
 }
 
 function param_discovery() {
-    mkdir -p webs .tmp
+    ensure_dirs webs .tmp
 
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $PARAM_DISCOVERY == true ]]; then
         start_func "${FUNCNAME[0]}" "Parameter discovery (arjun)"
@@ -809,7 +787,7 @@ function param_discovery() {
 }
 
 function grpc_reflection() {
-    mkdir -p hosts .tmp
+    ensure_dirs hosts .tmp
 
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GRPC_SCAN == true ]]; then
         start_func "${FUNCNAME[0]}" "gRPC reflection probing"
@@ -841,7 +819,7 @@ function grpc_reflection() {
 function fuzz() {
 
     # Create necessary directories
-    mkdir -p .tmp/fuzzing webs fuzzing
+    ensure_dirs .tmp/fuzzing webs fuzzing
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $FUZZ == true ]] \
@@ -1053,10 +1031,7 @@ function cms_scanner() {
 function urlchecks() {
 
     # Create necessary directories
-    if ! mkdir -p .tmp webs; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs .tmp webs; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $URL_CHECK == true ]]; then
@@ -1497,10 +1472,7 @@ function websocket_checks() {
 function wordlist_gen() {
 
     # Create necessary directories
-    if ! mkdir -p .tmp webs; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
-        return 1
-    fi
+    if ! ensure_dirs .tmp webs; then return 1; fi
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $WORDLIST == true ]] \
