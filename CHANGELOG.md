@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+**Deep Wildcard Detection** (Based on DEF CON Subdomain Enumeration research)
+- `deep_wildcard_filter()` - Iterative wildcard detection at all subdomain levels
+- `DEEP_WILDCARD_FILTER` config option to enable/disable
+- Prevents false positives from nested wildcard DNS records
+
+**Time-Based Certificate Filtering**
+- `DNS_TIME_FENCE_DAYS` config option to filter crt.sh results by age
+- Recommended value: 90 days to focus on recent certificates
+- Set to 0 to disable (default, backward compatible)
+
+**Sensitive Domain Exclusion**
+- `EXCLUDE_SENSITIVE` config option to skip scanning sensitive domains
+- `config/sensitive_domains.txt` - Curated list of patterns to exclude:
+  - Government domains (*.gov, *.gob.*, *.gouv.*)
+  - Military domains (*.mil)
+  - Education domains (*.edu)
+  - Financial institutions
+  - Healthcare organizations
+- `_is_sensitive_domain()` helper function for pattern matching
+
 **Parallelization Framework** (lib/parallel.sh)
 - `parallel_run()` - Run commands in parallel with configurable job limit
 - `parallel_funcs()` - Run bash functions in parallel subshells

@@ -1,0 +1,99 @@
+# Sensitive Domains Exclusion List for reconFTW
+# Based on DEF CON Subdomain Enumeration Retrospective recommendations
+# These patterns will be excluded when EXCLUDE_SENSITIVE=true
+#
+# Format: One pattern per line
+# - Patterns starting with *. will match any subdomain of that domain
+# - Exact domain names will be matched as-is
+# - Lines starting with # are comments
+# - Empty lines are ignored
+#
+# WARNING: Scanning these domains without authorization may have legal consequences
+
+# Government domains (International)
+*.gov
+*.gov.*
+*.gob.*
+*.gouv.*
+*.gobierno.*
+*.govt.*
+*.government.*
+
+# Military domains
+*.mil
+*.mil.*
+*.military.*
+*.army.*
+*.navy.*
+*.airforce.*
+*.mod.*
+*.defense.*
+*.defence.*
+
+# Educational institutions
+*.edu
+*.edu.*
+*.ac.*
+*.university.*
+*.college.*
+*.school.*
+
+# Financial institutions
+*.bank
+*.bank.*
+*.banking.*
+*.creditunion.*
+
+# Critical infrastructure
+*.nhs.*
+*.hospital.*
+*.healthcare.*
+*.police.*
+*.emergency.*
+*.911.*
+
+# International government TLDs and patterns
+*.gov.uk
+*.gov.au
+*.gov.ca
+*.gov.in
+*.gov.br
+*.gov.cn
+*.gov.jp
+*.gov.de
+*.gov.fr
+*.gov.it
+*.gov.es
+*.gov.nl
+*.gov.be
+*.gov.ch
+*.gov.at
+*.gov.pl
+*.gov.ru
+*.gov.kr
+*.gov.sg
+*.gov.hk
+*.gov.tw
+*.gov.my
+*.gov.ph
+*.gov.id
+*.gov.th
+*.gov.vn
+*.gov.za
+*.gov.ng
+*.gov.ke
+*.gov.eg
+*.gov.mx
+*.gov.ar
+*.gov.co
+*.gov.cl
+*.gov.pe
+*.gov.ve
+*.gob.mx
+*.gob.ar
+*.gob.es
+*.gob.pe
+*.gob.cl
+*.gouv.fr
+*.gouv.ca
+*.gouv.qc.ca

@@ -6,6 +6,7 @@
 #           sub_permut, sub_regex_permut, sub_ia_permut, sub_recursive_passive,
 #           sub_recursive_brute, subtakeover, zonetransfer, s3buckets,
 #           cloud_extra_providers, geo_info
+# Helpers: deep_wildcard_filter, _is_sensitive_domain
 # This file is sourced by reconftw.sh - do not execute directly
 [[ -z "${SCRIPTPATH:-}" ]] && {
     echo "Error: This module must be sourced by reconftw.sh" >&2
@@ -16,38 +17,226 @@
 # Helper Functions for subdomains_full
 ###############################################################################
 
+# Deep wildcard detection - filters wildcards at all subdomain levels
+# Based on DEF CON Subdomain Enumeration techniques
+# Usage: deep_wildcard_filter input_file output_file
+# Returns: 0 on success, writes filtered results to output_file
+deep_wildcard_filter() {
+    local input_file="$1"
+    local output_file="$2"
+    local max_iterations=5
+    local iteration=0
+    local wildcards_found=1
+
+    if [[ ! -s "$input_file" ]]; then
+        touch "$output_file"
+        return 0
+    fi
+
+    # Copy input to working file
+    cp "$input_file" ".tmp/dwf_working.txt"
+    : > ".tmp/dwf_wildcards.txt"
+
+    printf "%b[*] Running deep wildcard detection (max %d iterations)%b\n" "$bblue" "$max_iterations" "$reset"
+
+    while [[ $wildcards_found -gt 0 ]] && [[ $iteration -lt $max_iterations ]]; do
+        ((iteration++))
+        wildcards_found=0
+
+        # Extract unique parent domains at each level
+        # e.g., from "a.b.c.example.com" extract "b.c.example.com", "c.example.com"
+        : > ".tmp/dwf_parents.txt"
+        while IFS= read -r subdomain; do
+            # Skip if it's already the base domain or has no subdomain part
+            [[ "$subdomain" == "$domain" ]] && continue
+
+            # Extract parent by removing the first label
+            local parent
+            parent="${subdomain#*.}"
+
+            # Only consider parents that are still subdomains of target domain
+            if [[ "$parent" == *".$domain" ]] || [[ "$parent" == "$domain" ]]; then
+                echo "$parent" >> ".tmp/dwf_parents.txt"
+            fi
+        done < ".tmp/dwf_working.txt"
+
+        # Get unique parents
+        sort -u ".tmp/dwf_parents.txt" -o ".tmp/dwf_parents_unique.txt"
+
+        # Filter out already known wildcards and base domain
+        if [[ -s ".tmp/dwf_wildcards.txt" ]]; then
+            grep -v -F -f ".tmp/dwf_wildcards.txt" ".tmp/dwf_parents_unique.txt" 2>/dev/null > ".tmp/dwf_parents_check.txt" || true
+        else
+            cp ".tmp/dwf_parents_unique.txt" ".tmp/dwf_parents_check.txt"
+        fi
+
+        # Remove base domain from check list
+        grep -v "^${domain}$" ".tmp/dwf_parents_check.txt" > ".tmp/dwf_parents_final.txt" 2>/dev/null || true
+
+        if [[ ! -s ".tmp/dwf_parents_final.txt" ]]; then
+            break
+        fi
+
+        # Generate random probe hostnames for each parent
+        : > ".tmp/dwf_probes.txt"
+        while IFS= read -r parent; do
+            # Generate random string (alphanumeric)
+            local random_str
+            random_str=$(head -c 100 /dev/urandom 2>/dev/null | LC_ALL=C tr -dc 'a-z0-9' | head -c 12)
+            echo "${random_str}.${parent}" >> ".tmp/dwf_probes.txt"
+        done < ".tmp/dwf_parents_final.txt"
+
+        # Test which random probes resolve (indicating wildcard)
+        if [[ -s ".tmp/dwf_probes.txt" ]]; then
+            dnsx -silent -retry 2 -r "$resolvers_trusted" < ".tmp/dwf_probes.txt" > ".tmp/dwf_resolved_probes.txt" 2>/dev/null || true
+
+            # Extract parent domains that are wildcards
+            if [[ -s ".tmp/dwf_resolved_probes.txt" ]]; then
+                while IFS= read -r resolved_probe; do
+                    # Extract the parent (remove the random prefix we added)
+                    local wildcard_parent
+                    wildcard_parent="${resolved_probe#*.}"
+                    echo "$wildcard_parent" >> ".tmp/dwf_new_wildcards.txt"
+                    ((wildcards_found++))
+                done < ".tmp/dwf_resolved_probes.txt"
+
+                if [[ -s ".tmp/dwf_new_wildcards.txt" ]]; then
+                    sort -u ".tmp/dwf_new_wildcards.txt" >> ".tmp/dwf_wildcards.txt"
+                    sort -u ".tmp/dwf_wildcards.txt" -o ".tmp/dwf_wildcards.txt"
+                    rm -f ".tmp/dwf_new_wildcards.txt"
+
+                    # Filter out subdomains under wildcard parents
+                    : > ".tmp/dwf_filtered.txt"
+                    while IFS= read -r subdomain; do
+                        local is_under_wildcard=false
+                        while IFS= read -r wildcard; do
+                            if [[ "$subdomain" == *".$wildcard" ]] || [[ "$subdomain" == "$wildcard" ]]; then
+                                is_under_wildcard=true
+                                break
+                            fi
+                        done < ".tmp/dwf_wildcards.txt"
+
+                        if [[ "$is_under_wildcard" == false ]]; then
+                            echo "$subdomain" >> ".tmp/dwf_filtered.txt"
+                        fi
+                    done < ".tmp/dwf_working.txt"
+
+                    mv ".tmp/dwf_filtered.txt" ".tmp/dwf_working.txt"
+                fi
+            fi
+        fi
+
+        printf "%b    Iteration %d: found %d new wildcard parent(s)%b\n" "$yellow" "$iteration" "$wildcards_found" "$reset"
+    done
+
+    # Copy final results to output
+    cp ".tmp/dwf_working.txt" "$output_file"
+
+    # Report statistics
+    local original_count filtered_count wildcards_count
+    original_count=$(wc -l < "$input_file" | tr -d ' ')
+    filtered_count=$(wc -l < "$output_file" | tr -d ' ')
+    wildcards_count=$(wc -l < ".tmp/dwf_wildcards.txt" 2>/dev/null | tr -d ' ' || echo 0)
+    local removed=$((original_count - filtered_count))
+
+    printf "%b[*] Deep wildcard filter: %d wildcards detected, %d subdomains removed (%d -> %d)%b\n" \
+        "$bgreen" "$wildcards_count" "$removed" "$original_count" "$filtered_count" "$reset"
+
+    # Save wildcard list for reference
+    if [[ -s ".tmp/dwf_wildcards.txt" ]]; then
+        cp ".tmp/dwf_wildcards.txt" "subdomains/wildcards_detected.txt"
+    fi
+
+    # Cleanup temp files
+    rm -f ".tmp/dwf_"*.txt
+
+    return 0
+}
+
+# Check if a domain matches sensitive domain patterns
+# Usage: _is_sensitive_domain domain patterns_file
+# Returns: 0 if domain is sensitive, 1 if not
+_is_sensitive_domain() {
+    local check_domain="$1"
+    local patterns_file="$2"
+
+    [[ ! -s "$patterns_file" ]] && return 1
+
+    while IFS= read -r pattern; do
+        # Skip comments and empty lines
+        [[ -z "$pattern" ]] && continue
+        [[ "$pattern" =~ ^[[:space:]]*# ]] && continue
+
+        # Remove leading/trailing whitespace
+        pattern=$(echo "$pattern" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        [[ -z "$pattern" ]] && continue
+
+        # Handle wildcard patterns (*.gov, *.mil, etc.)
+        if [[ "$pattern" == \*.* ]]; then
+            # Remove leading *. for matching
+            local suffix="${pattern#\*.}"
+            # Check if domain ends with the pattern
+            if [[ "$check_domain" == *".$suffix" ]] || [[ "$check_domain" == "$suffix" ]]; then
+                return 0
+            fi
+        else
+            # Exact match or subdomain match
+            if [[ "$check_domain" == "$pattern" ]] || [[ "$check_domain" == *".$pattern" ]]; then
+                return 0
+            fi
+        fi
+    done < "$patterns_file"
+
+    return 1
+}
+
 # Initialize subdomain enumeration environment
 # Usage: _subdomains_init
 _subdomains_init() {
     if ! ensure_dirs .tmp webs subdomains; then
         return 1
     fi
-    
+
     NUMOFLINES_subs="0"
     NUMOFLINES_probed="0"
-    
+
     printf "%b#######################################################################%b\n\n" "$bgreen" "$reset"
-    
+
     if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         printf "%b[%s] Scanning IP %s%b\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$domain" "$reset"
     else
         printf "%b[%s] Subdomain Enumeration %s%b\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$domain" "$reset"
     fi
-    
+
+    # Check for sensitive domain exclusion
+    if [[ "${EXCLUDE_SENSITIVE:-false}" == true ]]; then
+        local sensitive_file="${SCRIPTPATH}/config/sensitive_domains.txt"
+        if [[ -s "$sensitive_file" ]]; then
+            # Check if target domain matches any sensitive pattern
+            if _is_sensitive_domain "$domain" "$sensitive_file"; then
+                printf "%b[!] WARNING: Target domain '%s' matches sensitive domain pattern.%b\n" "$bred" "$domain" "$reset"
+                printf "%b[!] EXCLUDE_SENSITIVE=true is set. Aborting scan to prevent scanning critical infrastructure.%b\n" "$bred" "$reset"
+                printf "%b[!] If this is an authorized engagement, set EXCLUDE_SENSITIVE=false or remove the pattern from config/sensitive_domains.txt%b\n" "$byellow" "$reset"
+                return 1
+            fi
+            printf "%b[*] Sensitive domain exclusion is enabled%b\n" "$bblue" "$reset"
+        fi
+    fi
+
     # Backup existing files
     safe_backup "subdomains/subdomains.txt" ".tmp/subdomains_old.txt"
     safe_backup "webs/webs.txt" ".tmp/probed_old.txt"
-    
+
     # Update resolvers if needed
     if { [[ ! -f "$called_fn_dir/.sub_active" ]] || [[ ! -f "$called_fn_dir/.sub_brute" ]] || \
          [[ ! -f "$called_fn_dir/.sub_permut" ]] || [[ ! -f "$called_fn_dir/.sub_recursive_brute" ]]; } || \
        [[ $DIFF == true ]]; then
         resolvers_update || return 1
     fi
-    
+
     # Add in-scope subdomains
     [[ -s $inScope_file ]] && cat "$inScope_file" | anew -q subdomains/subdomains.txt
-    
+
     return 0
 }
 
@@ -108,11 +297,19 @@ _subdomains_finalize() {
     if [[ -s "subdomains/subdomains.txt" ]] && [[ -s $outOfScope_file ]]; then
         deleteOutScoped "$outOfScope_file" "subdomains/subdomains.txt"
     fi
-    
+
     if [[ -s "webs/webs.txt" ]] && [[ -s $outOfScope_file ]]; then
         deleteOutScoped "$outOfScope_file" "webs/webs.txt"
     fi
-    
+
+    # Apply deep wildcard filtering if enabled
+    if [[ "${DEEP_WILDCARD_FILTER:-false}" == true ]] && [[ -s "subdomains/subdomains.txt" ]]; then
+        deep_wildcard_filter "subdomains/subdomains.txt" "subdomains/subdomains_filtered.txt"
+        if [[ -s "subdomains/subdomains_filtered.txt" ]]; then
+            mv "subdomains/subdomains_filtered.txt" "subdomains/subdomains.txt"
+        fi
+    fi
+
     # Count new results
     if [[ -s "subdomains/subdomains.txt" ]]; then
         NUMOFLINES_subs=$(cat "subdomains/subdomains.txt" 2>>"$LOGFILE" | anew ".tmp/subdomains_old.txt" | sed '/^$/d' | wc -l) || NUMOFLINES_subs=0
@@ -236,9 +433,27 @@ function sub_crt() {
         start_subfunc "${FUNCNAME[0]}" "Running: Crtsh Subdomain Enumeration"
 
         # Run crt command and check for errors
-        run_command crt -s -json -l "${CTR_LIMIT}" "$domain" 2>>"$LOGFILE" \
-            | jq -r '.[].subdomain' 2>>"$LOGFILE" \
-            | sed -e 's/^\*\.//' >.tmp/crtsh_subdomains.txt
+        # Apply time fencing if DNS_TIME_FENCE_DAYS is set and > 0
+        if [[ ${DNS_TIME_FENCE_DAYS:-0} -gt 0 ]]; then
+            local cutoff_date
+            cutoff_date=$(date -v-"${DNS_TIME_FENCE_DAYS}"d +%Y-%m-%d 2>/dev/null || date -d "-${DNS_TIME_FENCE_DAYS} days" +%Y-%m-%d 2>/dev/null)
+            if [[ -n "$cutoff_date" ]]; then
+                run_command crt -s -json -l "${CTR_LIMIT}" "$domain" 2>>"$LOGFILE" \
+                    | jq -r --arg cutoff "$cutoff_date" '[.[] | select(.not_before >= $cutoff)] | .[].subdomain' 2>>"$LOGFILE" \
+                    | sed -e 's/^\*\.//' >.tmp/crtsh_subdomains.txt
+                printf "%b[*] Time fencing enabled: filtering crt.sh results to last %d days (since %s)%b\n" \
+                    "$bblue" "${DNS_TIME_FENCE_DAYS}" "$cutoff_date" "$reset"
+            else
+                # Fallback if date calculation fails
+                run_command crt -s -json -l "${CTR_LIMIT}" "$domain" 2>>"$LOGFILE" \
+                    | jq -r '.[].subdomain' 2>>"$LOGFILE" \
+                    | sed -e 's/^\*\.//' >.tmp/crtsh_subdomains.txt
+            fi
+        else
+            run_command crt -s -json -l "${CTR_LIMIT}" "$domain" 2>>"$LOGFILE" \
+                | jq -r '.[].subdomain' 2>>"$LOGFILE" \
+                | sed -e 's/^\*\.//' >.tmp/crtsh_subdomains.txt
+        fi
 
         run_command curl -s "https://bgp.he.net/certs/api/list?domain=$domain" | jq -r 'try .domains[].domain' | sed -e 's/^\*\.//' | anew -q .tmp/crtsh_subdomains.txt
 
