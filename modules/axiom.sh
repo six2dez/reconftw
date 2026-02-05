@@ -67,21 +67,25 @@ function resolvers_optimize_local() {
 }
 
 function ipcidr_target() {
+    local caller_list="${2:-}"
+    local expanded_list="${PWD}/target_reconftw_ipcidr.txt"
     IP_CIDR_REGEX='(((25[0-5]|2[0-4][0-9]|1?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9][0-9]?))(\/([8-9]|[1-2][0-9]|3[0-2]))([^0-9.]|$)|(((25[0-5]|2[0-4][0-9]|1?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9][0-9]?)$)'
     if [[ $1 =~ ^$IP_CIDR_REGEX ]]; then
-        echo $1 | mapcidr -silent | anew -q target_reconftw_ipcidr.txt
-        if [[ -s "./target_reconftw_ipcidr.txt" ]]; then
-            [ "$REVERSE_IP" = true ] && cat ./target_reconftw_ipcidr.txt | hakip2host | cut -d' ' -f 3 | unfurl -u domains 2>/dev/null | sed -e 's/*\.//' -e 's/\.$//' -e '/\./!d' | anew -q ./target_reconftw_ipcidr.txt
-            if [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -eq 1 ]]; then
-                domain=$(cat ./target_reconftw_ipcidr.txt)
-            elif [[ $(cat ./target_reconftw_ipcidr.txt | wc -l) -gt 1 ]]; then
-                unset domain
-                list=${PWD}/target_reconftw_ipcidr.txt
+        echo "$1" | mapcidr -silent | anew -q "$expanded_list"
+        if [[ -s "$expanded_list" ]]; then
+            [ "$REVERSE_IP" = true ] && cat "$expanded_list" | hakip2host | cut -d' ' -f 3 | unfurl -u domains 2>/dev/null | sed -e 's/*\.//' -e 's/\.$//' -e '/\./!d' | anew -q "$expanded_list"
+            if [[ -z "$caller_list" ]]; then
+                if [[ $(wc -l <"$expanded_list") -eq 1 ]]; then
+                    domain=$(cat "$expanded_list")
+                elif [[ $(wc -l <"$expanded_list") -gt 1 ]]; then
+                    unset domain
+                    list="$expanded_list"
+                fi
             fi
         fi
-        if [[ -n $2 ]]; then
-            cat $list | anew -q $2
-            sed_i '/\/[0-9]*$/d' $2
+        if [[ -n "$caller_list" ]]; then
+            cat "$expanded_list" | anew -q "$caller_list"
+            sed_i '/\/[0-9]*$/d' "$caller_list"
         fi
     fi
 }
