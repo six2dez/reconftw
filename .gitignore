@@ -5,6 +5,7 @@ output/
 test/
 .trunk/
 .vscode/
+.cache/
 
 #Ignoring compressed files
 *.tar
