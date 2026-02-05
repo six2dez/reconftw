@@ -242,6 +242,7 @@ function build_hotlist() {
     # Real IPs via favicon
     if [[ -s hosts/favicontest.txt ]]; then
         while read -r ip; do
+            [[ -z $ip ]] && continue
             score["$ip"]=$((${score["$ip"]:-0} + 4))
         done <hosts/favicontest.txt
     fi
