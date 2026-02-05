@@ -386,7 +386,8 @@ if [[ -n $inScope_file ]]; then
 fi
 
 if [[ $(id -u | grep -o '^0$') == "0" ]]; then
-    SUDO=" "
+    # Root: keep empty to avoid passing a space as a command when IFS excludes spaces
+    SUDO=""
 else
     SUDO="sudo"
 fi
