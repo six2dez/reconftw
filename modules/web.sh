@@ -487,19 +487,27 @@ function portscan() {
         fi
 
         if [[ $PORTSCAN_ACTIVE == true ]]; then
+            # Split PORTSCAN_ACTIVE_OPTIONS safely even with IFS set to \n\t
+            local portscan_opts=()
+            if declare -p PORTSCAN_ACTIVE_OPTIONS 2>/dev/null | grep -q 'declare -a'; then
+                portscan_opts=("${PORTSCAN_ACTIVE_OPTIONS[@]}")
+            elif [[ -n "${PORTSCAN_ACTIVE_OPTIONS:-}" ]]; then
+                local _ifs="$IFS"
+                IFS=' '
+                read -r -a portscan_opts <<<"$PORTSCAN_ACTIVE_OPTIONS"
+                IFS="$_ifs"
+            fi
+
             if [[ $AXIOM != true ]]; then
                 if [[ -s ".tmp/ips_nocdn.txt" ]]; then
-                    # shellcheck disable=SC2086  # SUDO and PORTSCAN_ACTIVE_OPTIONS intentionally word-split
-                    run_command $SUDO nmap $PORTSCAN_ACTIVE_OPTIONS -iL .tmp/ips_nocdn.txt -oA hosts/portscan_active 2>>"$LOGFILE" >/dev/null
+                    run_command $SUDO nmap "${portscan_opts[@]}" -iL .tmp/ips_nocdn.txt -oA hosts/portscan_active 2>>"$LOGFILE" >/dev/null
                 fi
                 if [[ $IPV6_SCAN == true && -s "hosts/ips_v6.txt" ]]; then
-                    # shellcheck disable=SC2086  # SUDO and PORTSCAN_ACTIVE_OPTIONS intentionally word-split
-                    run_command $SUDO nmap -6 $PORTSCAN_ACTIVE_OPTIONS -iL hosts/ips_v6.txt -oA hosts/portscan_active_v6 2>>"$LOGFILE" >/dev/null
+                    run_command $SUDO nmap -6 "${portscan_opts[@]}" -iL hosts/ips_v6.txt -oA hosts/portscan_active_v6 2>>"$LOGFILE" >/dev/null
                 fi
             else
                 if [[ -s ".tmp/ips_nocdn.txt" ]]; then
-                    # shellcheck disable=SC2086  # PORTSCAN_ACTIVE_OPTIONS intentionally word-split
-                    run_command axiom-scan .tmp/ips_nocdn.txt -m nmapx $PORTSCAN_ACTIVE_OPTIONS \
+                    run_command axiom-scan .tmp/ips_nocdn.txt -m nmapx "${portscan_opts[@]}" \
                         -oA hosts/portscan_active "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
                 fi
             fi
