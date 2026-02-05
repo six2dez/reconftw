@@ -1085,9 +1085,15 @@ function sub_analytics() {
         start_subfunc "${FUNCNAME[0]}" "Running: Analytics Subdomain Enumeration"
 
         if [[ -s ".tmp/probed_tmp_scrap.txt" ]]; then
-            # Run analyticsrelationships and check for errors (tool may panic on empty input)
-            if ! analyticsrelationships -ch <.tmp/probed_tmp_scrap.txt >>.tmp/analytics_subs_tmp.txt 2>>"$LOGFILE"; then
-                printf "%b[!] analyticsrelationships failed (may need update: go install github.com/Josue87/analyticsrelationships@latest)%b\n" "$yellow" "$reset"
+            # Run analyticsrelationships with timeout; tool may panic on builtwith errors
+            if [[ -n ${TIMEOUT_CMD:-} ]]; then
+                if ! "$TIMEOUT_CMD" 2m analyticsrelationships -ch <.tmp/probed_tmp_scrap.txt >>.tmp/analytics_subs_tmp.txt 2>>"$LOGFILE"; then
+                    log_note "analyticsrelationships failed (builtwith error or panic); skipping" "${FUNCNAME[0]}" "${LINENO}"
+                fi
+            else
+                if ! analyticsrelationships -ch <.tmp/probed_tmp_scrap.txt >>.tmp/analytics_subs_tmp.txt 2>>"$LOGFILE"; then
+                    log_note "analyticsrelationships failed (builtwith error or panic); skipping" "${FUNCNAME[0]}" "${LINENO}"
+                fi
             fi
 
             if [[ -s ".tmp/analytics_subs_tmp.txt" ]]; then

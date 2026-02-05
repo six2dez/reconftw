@@ -194,8 +194,13 @@ function apileaks() {
 
         start_func "${FUNCNAME[0]}" "Scanning for leaks in public API directories"
 
-        # Run porch-pirate and handle errors
-        porch-pirate -s "$domain" -l 25 --dump 2>>"$LOGFILE" >"${dir}/osint/postman_leaks.txt"
+        # Run porch-pirate (full dump); fallback to light mode if dump fails
+        if ! porch-pirate -s "$domain" -l 25 --dump 2>>"$LOGFILE" >"${dir}/osint/postman_leaks.txt"; then
+            log_note "porch-pirate --dump failed; retrying without --dump" "${FUNCNAME[0]}" "${LINENO}"
+            if ! porch-pirate -s "$domain" -l 25 2>>"$LOGFILE" >"${dir}/osint/postman_leaks.txt"; then
+                log_note "porch-pirate failed even without --dump" "${FUNCNAME[0]}" "${LINENO}"
+            fi
+        fi
 
         # Change directory to SwaggerSpy
         if ! pushd "${tools}/SwaggerSpy" >/dev/null; then
@@ -205,7 +210,8 @@ function apileaks() {
 
         # Run swaggerspy.py and handle errors
         local swag_cmd=("${tools}/SwaggerSpy/venv/bin/python3" "swaggerspy.py" "$domain")
-        [[ -n ${TIMEOUT_CMD:-} ]] && swag_cmd=("$TIMEOUT_CMD" 2m "${swag_cmd[@]}")
+        local swag_timeout="${SWAGGERSPY_TIMEOUT:-5m}"
+        [[ -n ${TIMEOUT_CMD:-} ]] && swag_cmd=("$TIMEOUT_CMD" "$swag_timeout" "${swag_cmd[@]}")
         local swagger_rc=0
         {
             "${swag_cmd[@]}" 2>>"$LOGFILE" | grep -i "[*]\|URL" >"${dir}/osint/swagger_leaks.txt"
