@@ -983,9 +983,11 @@ function iishortname() {
                 -o "$dir/vulns/iis-shortname-shortscan/" 2>>"$LOGFILE" >/dev/null
 
             # Remove non-vulnerable shortscan results
-            find "$dir/vulns/iis-shortname-shortscan/" -type f -iname "*.txt" -print0 \
-                | xargs --null grep -Z -L 'Vulnerable: Yes' \
-                | xargs --null rm 2>>"$LOGFILE" >/dev/null
+            while IFS= read -r -d '' file; do
+                if ! grep -q 'Vulnerable: Yes' "$file" 2>/dev/null; then
+                    rm -f "$file" 2>>"$LOGFILE"
+                fi
+            done < <(find "$dir/vulns/iis-shortname-shortscan/" -type f -iname "*.txt" -print0 2>/dev/null)
 
             # Run sns using interlace
             interlace -tL .tmp/iis_sites.txt -threads "$INTERLACE_THREADS" \
@@ -993,9 +995,11 @@ function iishortname() {
                 -o "$dir/vulns/iis-shortname-sns/" 2>>"$LOGFILE" >/dev/null
 
             # Remove non-vulnerable sns results
-            find "$dir/vulns/iis-shortname-sns/" -type f -iname "*.txt" -print0 \
-                | xargs --null grep -Z 'Target is not vulnerable' \
-                | xargs --null rm 2>>"$LOGFILE" >/dev/null
+            while IFS= read -r -d '' file; do
+                if grep -q 'Target is not vulnerable' "$file" 2>/dev/null; then
+                    rm -f "$file" 2>>"$LOGFILE"
+                fi
+            done < <(find "$dir/vulns/iis-shortname-sns/" -type f -iname "*.txt" -print0 2>/dev/null)
 
         fi
         end_func "Results are saved in vulns/iis-shortname/" "${FUNCNAME[0]}"
@@ -1118,7 +1122,12 @@ function urlchecks() {
             fi
 
             if [[ $AXIOM != true ]]; then
-                diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt 2>>"$LOGFILE") <(sort -u webs/webs_all.txt 2>>"$LOGFILE") | wc -l)
+                if [[ -s ".tmp/probed_tmp.txt" && -s "webs/webs_all.txt" ]]; then
+                    diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt 2>>"$LOGFILE") <(sort -u webs/webs_all.txt 2>>"$LOGFILE") | wc -l)
+                else
+                    log_note "urlchecks: missing .tmp/probed_tmp.txt or webs/webs_all.txt; skipping diff" "${FUNCNAME[0]}" "${LINENO}"
+                    diff_webs=1
+                fi
                 if [[ $diff_webs != "0" ]] || [[ ! -s ".tmp/katana.txt" ]]; then
                     if [[ $URL_CHECK_ACTIVE == true ]]; then
                         # Split slow vs normal targets based on httpx status (403/429)
@@ -1174,7 +1183,12 @@ function urlchecks() {
                     fi
                 fi
             else
-                diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt) <(sort -u webs/webs_all.txt) | wc -l)
+                if [[ -s ".tmp/probed_tmp.txt" && -s "webs/webs_all.txt" ]]; then
+                    diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt) <(sort -u webs/webs_all.txt) | wc -l)
+                else
+                    log_note "urlchecks: missing .tmp/probed_tmp.txt or webs/webs_all.txt; skipping diff" "${FUNCNAME[0]}" "${LINENO}"
+                    diff_webs=1
+                fi
                 if [[ $diff_webs != "0" ]] || [[ ! -s ".tmp/katana.txt" ]]; then
                     if [[ $URL_CHECK_ACTIVE == true ]]; then
                         if [[ $DEEP == true ]]; then
@@ -1334,7 +1348,10 @@ function url_ext() {
             for t in "${ext[@]}"; do
 
                 # Extract unique matching URLs
-                matches=$(grep -aEi "\.(${t})($|/|\?)" ".tmp/url_extract_tmp.txt" | sort -u | sed '/^$/d')
+                matches=$(
+                    (grep -aEi "\.(${t})($|/|\?)" ".tmp/url_extract_tmp.txt" 2>>"$LOGFILE" || true) \
+                        | sort -u | sed '/^$/d'
+                )
 
                 NUMOFLINES=$(echo "$matches" | wc -l)
 

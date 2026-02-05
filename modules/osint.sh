@@ -20,7 +20,9 @@ function google_dorks() {
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GOOGLE_DORKS == true ]] && [[ $OSINT == true ]]; then
         start_func "${FUNCNAME[0]}" "Running: Google Dorks in process"
 
-        "${tools}/dorks_hunter/venv/bin/python3" "${tools}/dorks_hunter/dorks_hunter.py" -d "$domain" -o "osint/dorks.txt"
+        if ! "${tools}/dorks_hunter/venv/bin/python3" "${tools}/dorks_hunter/dorks_hunter.py" -d "$domain" -o "osint/dorks.txt" 2>>"$LOGFILE"; then
+            printf "%b[!] dorks_hunter command failed.%b\n" "$bred" "$reset"
+        fi
         end_func "Results are saved in $domain/osint/dorks.txt" "${FUNCNAME[0]}"
     else
         if [[ $GOOGLE_DORKS == false ]] || [[ $OSINT == false ]]; then
@@ -162,7 +164,13 @@ function metadata() {
             return 1
         }
 
-        exiftool -r .tmp/metagoofil_${domain}/* 2>>"${LOGFILE}" | tee /dev/null | egrep -i "Author|Creator|Email|Producer|Template" | sort -u | anew -q "osint/metadata_results.txt"
+        # Check if exiftool is installed before running
+        if command -v exiftool &>/dev/null; then
+            exiftool -r .tmp/metagoofil_${domain}/* 2>>"${LOGFILE}" | tee /dev/null | egrep -i "Author|Creator|Email|Producer|Template" | sort -u | anew -q "osint/metadata_results.txt"
+        else
+            printf "%b[!] exiftool is not installed. Skipping metadata extraction.%b\n" "${bred}" "${reset}"
+            printf "exiftool not installed - metadata extraction skipped\n" >>"${LOGFILE}"
+        fi
 
         end_func "Results are saved in ${domain}/osint/metadata_results.txt" "${FUNCNAME[0]}"
     else

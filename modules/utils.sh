@@ -179,6 +179,62 @@ function retry_with_backoff() {
     return 1
 }
 
+# Lightweight log helper for non-fatal explanations
+# Usage: log_note "message" [function] [line]
+function log_note() {
+    local msg="$1"
+    local fn="${2:-main}"
+    local ln="${3:-0}"
+    local ts
+    ts="$(date +'%Y-%m-%d %H:%M:%S')"
+    echo "[$ts] NOTE @ ${fn}:${ln} :: ${msg}" >>"${LOGFILE:-/dev/null}"
+}
+
+# Explain common non-fatal ERRs (e.g., anew -q with no new lines)
+# Usage: explain_err <rc> <cmd> <func> <line>
+function explain_err() {
+    local rc="$1"
+    local cmd="$2"
+    local fn="$3"
+    local ln="$4"
+
+    [[ $rc -ne 1 ]] && return 0
+
+    # Detect 'anew -q <target>' and emit a helpful note
+    if [[ $cmd =~ \banew[[:space:]]+-q[[:space:]]+([^[:space:]]+) ]]; then
+        local target="${BASH_REMATCH[1]}"
+
+        # Strip quotes
+        target="${target%\"}"
+        target="${target#\"}"
+        target="${target%\'}"
+        target="${target#\'}"
+
+        # Resolve variable references like $WAF_LIST or ${WAF_LIST}
+        if [[ $target =~ ^\\$\\{?([A-Za-z_][A-Za-z0-9_]*)\\}?$ ]]; then
+            local var="${BASH_REMATCH[1]}"
+            target="${!var}"
+        fi
+
+        if [[ -z "$target" ]]; then
+            log_note "anew returned no new lines (target unresolved)" "$fn" "$ln"
+        elif [[ ! -e "$target" ]]; then
+            log_note "anew target missing: $target (likely upstream produced no data)" "$fn" "$ln"
+        elif [[ ! -s "$target" ]]; then
+            log_note "anew target empty: $target (no new lines to add)" "$fn" "$ln"
+        else
+            log_note "anew returned no new lines for $target" "$fn" "$ln"
+        fi
+        return 0
+    fi
+
+    # Generic note for wc -l failures (often from missing input in pipelines)
+    if [[ $cmd =~ \bwc[[:space:]]+-l\b ]]; then
+        log_note "wc -l failed (likely upstream pipeline had no input or a missing file)" "$fn" "$ln"
+        return 0
+    fi
+}
+
 # Check available disk space
 # Usage: check_disk_space <required_gb> <path>
 # Returns 0 if enough space, 1 otherwise

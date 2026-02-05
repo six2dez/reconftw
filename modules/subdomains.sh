@@ -1040,8 +1040,17 @@ function sub_scraping() {
                     fi
                 fi
 
-                cat .tmp/web_full_info1.txt .tmp/web_full_info2.txt .tmp/web_full_info3.txt 2>>"$LOGFILE" \
-                    | jq -s 'try .' | jq 'try unique_by(.input)' | jq 'try .[]' 2>>"$LOGFILE" >.tmp/web_full_info.txt
+                local webinfo_files=()
+                [[ -s ".tmp/web_full_info1.txt" ]] && webinfo_files+=(".tmp/web_full_info1.txt")
+                [[ -s ".tmp/web_full_info2.txt" ]] && webinfo_files+=(".tmp/web_full_info2.txt")
+                [[ -s ".tmp/web_full_info3.txt" ]] && webinfo_files+=(".tmp/web_full_info3.txt")
+
+                if [[ ${#webinfo_files[@]} -gt 0 ]]; then
+                    cat "${webinfo_files[@]}" 2>>"$LOGFILE" \
+                        | jq -s 'try .' | jq 'try unique_by(.input)' | jq 'try .[]' 2>>"$LOGFILE" >.tmp/web_full_info.txt
+                else
+                    log_note "sub_scraping: web_full_info files missing/empty; skipping merge" "${FUNCNAME[0]}" "${LINENO}"
+                fi
 
                 end_subfunc "${NUMOFLINES} new subs (code scraping)" "${FUNCNAME[0]}"
 
@@ -1076,8 +1085,10 @@ function sub_analytics() {
         start_subfunc "${FUNCNAME[0]}" "Running: Analytics Subdomain Enumeration"
 
         if [[ -s ".tmp/probed_tmp_scrap.txt" ]]; then
-            # Run analyticsrelationships and check for errors
-            analyticsrelationships -ch <.tmp/probed_tmp_scrap.txt >>.tmp/analytics_subs_tmp.txt 2>>"$LOGFILE"
+            # Run analyticsrelationships and check for errors (tool may panic on empty input)
+            if ! analyticsrelationships -ch <.tmp/probed_tmp_scrap.txt >>.tmp/analytics_subs_tmp.txt 2>>"$LOGFILE"; then
+                printf "%b[!] analyticsrelationships failed (may need update: go install github.com/Josue87/analyticsrelationships@latest)%b\n" "$yellow" "$reset"
+            fi
 
             if [[ -s ".tmp/analytics_subs_tmp.txt" ]]; then
                 grep "\.$domain$\|^$domain$" .tmp/analytics_subs_tmp.txt \
@@ -1996,7 +2007,7 @@ function s3buckets() {
                 printf "%b[!] Failed to cd to %s.%b\n" "$bred" "$tools/CloudHunter" "$reset"
                 return 1
             fi
-            if ! "${tools}/CloudHunter/venv/bin/python3" ./cloudhunter.py -p ${PERMUTATION_FLAG} -r ./resolvers.txt -t 50 "$domain"; then
+            if ! "${tools}/CloudHunter/venv/bin/python3" ./cloudhunter.py ${PERMUTATION_FLAG} -r ./resolvers.txt -t 50 "$domain"; then
                 printf "%b[!] CloudHunter command failed for domain %s.%b\n" "$bred" "$domain" "$reset"
             fi
         ) >>"$dir/subdomains/cloudhunter_open_buckets.txt" 2>>"$LOGFILE"
