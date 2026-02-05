@@ -1496,8 +1496,33 @@ function jschecks() {
 
             printf "%bRunning: Building wordlist 6/6%b\n" "$yellow" "$reset"
             if [[ -s "js/js_livelinks.txt" ]]; then
-                interlace -tL js/js_livelinks.txt -threads "$INTERLACE_THREADS" \
-                    -c "python3 ${tools}/getjswords.py '_target_' | anew -q webs/dict_words.txt" 2>>"$LOGFILE" >/dev/null
+                if [[ -n "${GETJSWORDS_VENV:-}" ]]; then
+                    if [[ -f "${GETJSWORDS_VENV}/bin/activate" ]]; then
+                        (
+                            # shellcheck source=/dev/null
+                            source "${GETJSWORDS_VENV}/bin/activate"
+                            if python3 -c "import jsbeautifier" 2>/dev/null; then
+                                interlace -tL js/js_livelinks.txt -threads "$INTERLACE_THREADS" \
+                                    -c "python3 ${tools}/getjswords.py '_target_' | anew -q webs/dict_words.txt" 2>>"$LOGFILE" >/dev/null
+                            else
+                                log_note "jsbeautifier not installed in venv ${GETJSWORDS_VENV}; skipping getjswords wordlist step" "${FUNCNAME[0]}" "${LINENO}"
+                            fi
+                            deactivate || true
+                        )
+                    else
+                        log_note "GETJSWORDS_VENV invalid: ${GETJSWORDS_VENV}; skipping getjswords wordlist step" "${FUNCNAME[0]}" "${LINENO}"
+                    fi
+                else
+                    local getjs_py="${GETJSWORDS_PYTHON:-python3}"
+                    if ! command -v "$getjs_py" >/dev/null 2>&1; then
+                        log_note "getjswords python not found: ${getjs_py}; skipping wordlist step" "${FUNCNAME[0]}" "${LINENO}"
+                    elif "$getjs_py" -c "import jsbeautifier" 2>/dev/null; then
+                        interlace -tL js/js_livelinks.txt -threads "$INTERLACE_THREADS" \
+                            -c "${getjs_py} ${tools}/getjswords.py '_target_' | anew -q webs/dict_words.txt" 2>>"$LOGFILE" >/dev/null
+                    else
+                        log_note "jsbeautifier not installed in ${getjs_py}; skipping getjswords wordlist step" "${FUNCNAME[0]}" "${LINENO}"
+                    fi
+                fi
             fi
             end_func "Results are saved in $domain/js folder" "${FUNCNAME[0]}"
         else
