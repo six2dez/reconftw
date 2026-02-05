@@ -790,8 +790,7 @@ function install_apt() {
     cargo install ripgen &>/dev/null
     cargo install smugglex &>/dev/null
     pipx ensurepath -f &>/dev/null
-    # Install jsbeautifier and shodan CLI in isolated environments to avoid PEP 668 conflicts
-    pipx install jsbeautifier &>/dev/null || true
+    # Install shodan CLI in isolated environment to avoid PEP 668 conflicts
     pipx install shodan &>/dev/null || pipx upgrade shodan &>/dev/null || true
 }
 
@@ -889,6 +888,28 @@ function install_pacman() {
     pipx install shodan &>/dev/null || pipx upgrade shodan &>/dev/null || true
 }
 
+# Setup reconftw venv for python-only helpers (e.g., getjswords)
+function setup_reconftw_venv() {
+    local root_dir="${SCRIPTPATH:-$(pwd)}"
+    local venv_dir="${root_dir}/.venv"
+    if ! command -v python3 >/dev/null 2>&1; then
+        msg_warn "[!] python3 not found; skipping reconftw venv setup"
+        return 0
+    fi
+    if [[ ! -d "$venv_dir" ]]; then
+        python3 -m venv "$venv_dir" &>/dev/null || {
+            msg_warn "[!] Failed to create venv at ${venv_dir}"
+            return 0
+        }
+    fi
+    if [[ -x "${venv_dir}/bin/pip" ]]; then
+        "${venv_dir}/bin/pip" install -U pip &>/dev/null || true
+        "${venv_dir}/bin/pip" install jsbeautifier &>/dev/null || true
+    else
+        msg_warn "[!] venv pip not found at ${venv_dir}/bin/pip"
+    fi
+}
+
 # Function to perform initial setup
 function initial_setup() {
     banner
@@ -908,6 +929,7 @@ function initial_setup() {
         export PATH="${HOME}/.local/bin:${PATH}"
 
         install_tools
+        setup_reconftw_venv
         return
     fi
 
@@ -930,6 +952,7 @@ function initial_setup() {
     # in non-interactive shells with 'set -u'. PATH for this process is already updated.
 
     install_tools
+    setup_reconftw_venv
 
     # Repositories with special configurations
     header "Configuring special repositories"
