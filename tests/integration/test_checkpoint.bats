@@ -145,7 +145,7 @@ source_reconftw() {
     touch "$called_fn_dir/.webprobe_simple"
     
     # Clear all
-    rm -f "$called_fn_dir"/.*
+    rm -f "$called_fn_dir"/.??*
     
     local count
     count=$(find "$called_fn_dir" -name ".*" -type f 2>/dev/null | wc -l)

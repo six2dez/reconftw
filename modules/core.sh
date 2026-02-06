@@ -500,6 +500,68 @@ function log_success() {
 }
 
 ###############################################################################################################
+############################################ PROGRESS / ETA ###################################################
+###############################################################################################################
+
+_PROGRESS_TOTAL_STEPS=0
+_PROGRESS_CURRENT_STEP=0
+_PROGRESS_START_TIME=0
+
+# Initialize progress tracking
+# Usage: progress_init <total_steps> [total_est_seconds]
+function progress_init() {
+    _PROGRESS_TOTAL_STEPS=${1:-0}
+    _PROGRESS_CURRENT_STEP=0
+    _PROGRESS_START_TIME=$(date +%s)
+    _PROGRESS_TOTAL_EST=${2:-0}
+}
+
+# Adjust total progress steps at runtime (for conditional stage skipping)
+# Usage: progress_adjust_total <delta_steps>
+function progress_adjust_total() {
+    local delta="${1:-0}"
+    _PROGRESS_TOTAL_STEPS=$((_PROGRESS_TOTAL_STEPS + delta))
+    if [[ $_PROGRESS_TOTAL_STEPS -lt 1 ]]; then
+        _PROGRESS_TOTAL_STEPS=1
+    fi
+}
+
+# Advance progress and display ETA
+# Usage: progress_step <step_name>
+function progress_step() {
+    ((_PROGRESS_CURRENT_STEP++)) || true
+    local step_name="${1:-}"
+    local now elapsed remaining_steps avg_per_step eta_seconds eta_display pct
+
+    now=$(date +%s)
+    elapsed=$((now - _PROGRESS_START_TIME))
+    pct=0
+    eta_display="calculating..."
+
+    if [[ $_PROGRESS_TOTAL_STEPS -gt 0 ]]; then
+        pct=$(( (_PROGRESS_CURRENT_STEP * 100) / _PROGRESS_TOTAL_STEPS ))
+        remaining_steps=$((_PROGRESS_TOTAL_STEPS - _PROGRESS_CURRENT_STEP))
+
+        if [[ $_PROGRESS_CURRENT_STEP -gt 0 ]] && [[ $elapsed -gt 0 ]]; then
+            avg_per_step=$((elapsed / _PROGRESS_CURRENT_STEP))
+            eta_seconds=$((remaining_steps * avg_per_step))
+            if [[ $eta_seconds -ge 3600 ]]; then
+                eta_display="~$((eta_seconds / 3600))h $((eta_seconds % 3600 / 60))m"
+            elif [[ $eta_seconds -ge 60 ]]; then
+                eta_display="~$((eta_seconds / 60))m"
+            else
+                eta_display="~${eta_seconds}s"
+            fi
+        fi
+    fi
+
+    printf "%b[%s] Progress: [%d/%d] %d%% | ETA: %s | %s%b\n" \
+        "$bblue" "$(date +'%H:%M:%S')" \
+        "$_PROGRESS_CURRENT_STEP" "$_PROGRESS_TOTAL_STEPS" \
+        "$pct" "$eta_display" "$step_name" "$reset"
+}
+
+###############################################################################################################
 ######################################### INCREMENTAL MODE ####################################################
 ###############################################################################################################
 
@@ -631,6 +693,215 @@ function incremental_report() {
 
     printf "%b[%s] Incremental report generated: %s%b\n" \
         "$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$report_file" "$reset"
+}
+
+# Hash helper for alert fingerprinting.
+_hash_string() {
+    local input="$1"
+    if command -v sha256sum >/dev/null 2>&1; then
+        printf '%s' "$input" | sha256sum | awk '{print $1}'
+    else
+        printf '%s' "$input" | shasum -a 256 | awk '{print $1}'
+    fi
+}
+
+_monitor_mark_alert_seen() {
+    local category="$1"
+    local value="$2"
+    local seen_file="${ALERT_SEEN_FILE:-.incremental/alerts_seen.hashes}"
+    local fp
+    fp=$(_hash_string "${category}|${value}")
+    mkdir -p "$(dirname "$seen_file")"
+    touch "$seen_file"
+
+    if [[ "${ALERT_SUPPRESSION:-true}" == "true" ]] && grep -Fxq "$fp" "$seen_file"; then
+        return 1
+    fi
+    echo "$fp" >>"$seen_file"
+    return 0
+}
+
+_monitor_alert_summary() {
+    local snap="$1"
+    local critical_u=0 high_u=0 subs_u=0 webs_u=0
+    local critical_s=0 high_s=0 subs_s=0 webs_s=0
+    local line
+
+    if [[ -s "$snap/critical_new.txt" ]]; then
+        while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            if _monitor_mark_alert_seen "critical" "$line"; then ((critical_u++)); else ((critical_s++)); fi
+        done <"$snap/critical_new.txt"
+    fi
+    if [[ -s "$snap/high_new.txt" ]]; then
+        while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            if _monitor_mark_alert_seen "high" "$line"; then ((high_u++)); else ((high_s++)); fi
+        done <"$snap/high_new.txt"
+    fi
+    if [[ -s "$snap/subdomains_new.txt" ]]; then
+        while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            if _monitor_mark_alert_seen "subdomain" "$line"; then ((subs_u++)); else ((subs_s++)); fi
+        done <"$snap/subdomains_new.txt"
+    fi
+    if [[ -s "$snap/webs_new.txt" ]]; then
+        while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            if _monitor_mark_alert_seen "web" "$line"; then ((webs_u++)); else ((webs_s++)); fi
+        done <"$snap/webs_new.txt"
+    fi
+
+    if command -v jq >/dev/null 2>&1; then
+        jq -n \
+            --arg ts "$(date -Iseconds)" \
+            --arg cycle "${MONITOR_CYCLE:-0}" \
+            --argjson critical_new "$critical_u" \
+            --argjson high_new "$high_u" \
+            --argjson subdomains_new "$subs_u" \
+            --argjson webs_new "$webs_u" \
+            --argjson critical_suppressed "$critical_s" \
+            --argjson high_suppressed "$high_s" \
+            --argjson subdomains_suppressed "$subs_s" \
+            --argjson webs_suppressed "$webs_s" \
+            '{
+                timestamp:$ts,
+                cycle:($cycle|tonumber),
+                alerts:{
+                    critical_new:$critical_new,
+                    high_new:$high_new,
+                    subdomains_new:$subdomains_new,
+                    webs_new:$webs_new
+                },
+                suppressed:{
+                    critical:$critical_suppressed,
+                    high:$high_suppressed,
+                    subdomains:$subdomains_suppressed,
+                    webs:$webs_suppressed
+                }
+            }' >"$snap/alerts.json"
+    fi
+
+    printf '%s %s %s %s %s %s %s %s\n' \
+        "$critical_u" "$high_u" "$subs_u" "$webs_u" \
+        "$critical_s" "$high_s" "$subs_s" "$webs_s"
+}
+
+# Monitor snapshots and delta tracking.
+# Stores historical snapshots under .incremental/history/<timestamp>/ and computes deltas vs latest.
+function monitor_snapshot() {
+    [[ "${MONITOR_MODE:-false}" != "true" ]] && return 0
+
+    ensure_dirs .incremental/history || return 1
+    local ts snap prev_link prev_dir
+    ts=$(date +%Y%m%d_%H%M%S)
+    snap=".incremental/history/${ts}"
+    mkdir -p "$snap"
+
+    # Snapshot key artifacts for this cycle.
+    local src
+    for src in \
+        "subdomains/subdomains.txt" \
+        "webs/webs_all.txt" \
+        "nuclei_output/high.txt" \
+        "nuclei_output/critical.txt" \
+        "report/report.json" \
+        "hotlist.txt"; do
+        if [[ -s "$src" ]]; then
+            cp "$src" "$snap/$(basename "$src")"
+        fi
+    done
+
+    prev_link=".incremental/history/latest"
+    prev_dir=""
+    if [[ -L "$prev_link" || -d "$prev_link" ]]; then
+        prev_dir=$(cd "$prev_link" 2>/dev/null && pwd -P || true)
+    fi
+
+    local subs_new=0 webs_new=0 high_new=0 critical_new=0 delta_total=0
+    if [[ -n "$prev_dir" ]]; then
+        if [[ -s "$snap/subdomains.txt" ]] && [[ -s "$prev_dir/subdomains.txt" ]]; then
+            comm -13 <(sort -u "$prev_dir/subdomains.txt") <(sort -u "$snap/subdomains.txt") >"$snap/subdomains_new.txt"
+            subs_new=$(wc -l <"$snap/subdomains_new.txt" 2>/dev/null | tr -d ' ')
+        fi
+        if [[ -s "$snap/webs_all.txt" ]] && [[ -s "$prev_dir/webs_all.txt" ]]; then
+            comm -13 <(sort -u "$prev_dir/webs_all.txt") <(sort -u "$snap/webs_all.txt") >"$snap/webs_new.txt"
+            webs_new=$(wc -l <"$snap/webs_new.txt" 2>/dev/null | tr -d ' ')
+        fi
+        if [[ -s "$snap/high.txt" ]] && [[ -s "$prev_dir/high.txt" ]]; then
+            comm -13 <(sort -u "$prev_dir/high.txt") <(sort -u "$snap/high.txt") >"$snap/high_new.txt"
+            high_new=$(wc -l <"$snap/high_new.txt" 2>/dev/null | tr -d ' ')
+        fi
+        if [[ -s "$snap/critical.txt" ]] && [[ -s "$prev_dir/critical.txt" ]]; then
+            comm -13 <(sort -u "$prev_dir/critical.txt") <(sort -u "$snap/critical.txt") >"$snap/critical_new.txt"
+            critical_new=$(wc -l <"$snap/critical_new.txt" 2>/dev/null | tr -d ' ')
+        fi
+    else
+        # Baseline cycle: don't alert as "new", just record baseline.
+        subs_new=0
+        webs_new=0
+        high_new=0
+        critical_new=0
+    fi
+
+    subs_new=${subs_new:-0}
+    webs_new=${webs_new:-0}
+    high_new=${high_new:-0}
+    critical_new=${critical_new:-0}
+    delta_total=$((subs_new + webs_new + high_new + critical_new))
+    if command -v jq >/dev/null 2>&1; then
+        jq -n \
+            --arg ts "$(date -Iseconds)" \
+            --arg cycle "${MONITOR_CYCLE:-0}" \
+            --arg baseline "$( [[ -z "$prev_dir" ]] && echo true || echo false )" \
+            --argjson subs_new "$subs_new" \
+            --argjson webs_new "$webs_new" \
+            --argjson high_new "$high_new" \
+            --argjson critical_new "$critical_new" \
+            --argjson total_new "$delta_total" \
+            '{
+                timestamp:$ts,
+                cycle:($cycle|tonumber),
+                baseline:($baseline=="true"),
+                deltas:{
+                    subdomains_new:$subs_new,
+                    webs_new:$webs_new,
+                    high_findings_new:$high_new,
+                    critical_findings_new:$critical_new,
+                    total_new:$total_new
+                }
+            }' >"$snap/delta.json"
+    fi
+
+    if [[ -z "$prev_dir" ]]; then
+        notification "Monitor baseline snapshot stored (${snap})" info
+    elif [[ "$delta_total" -gt 0 ]]; then
+        local alert_stats critical_u high_u subs_u webs_u critical_s high_s subs_s webs_s
+        alert_stats=$(_monitor_alert_summary "$snap")
+        read -r critical_u high_u subs_u webs_u critical_s high_s subs_s webs_s <<<"$alert_stats"
+
+        if [[ "${critical_u:-0}" -gt 0 || "${high_u:-0}" -gt 0 ]]; then
+            notification "[ALERT] New high-impact findings: critical=${critical_u:-0}, high=${high_u:-0}" warn
+        fi
+        if [[ "${subs_u:-0}" -gt 0 || "${webs_u:-0}" -gt 0 ]]; then
+            notification "New assets detected: subdomains=${subs_u:-0}, webs=${webs_u:-0}" good
+        fi
+        if [[ "${critical_u:-0}" -eq 0 && "${high_u:-0}" -eq 0 && "${subs_u:-0}" -eq 0 && "${webs_u:-0}" -eq 0 ]]; then
+            notification "Monitor detected deltas but all were suppressed by fingerprint history" info
+        fi
+    else
+        notification "Monitor cycle: no changes detected" info
+    fi
+
+    # Update latest snapshot pointer.
+    if [[ -L "$prev_link" || -d "$prev_link" ]]; then
+        rm -rf -- "$prev_link"
+    fi
+    ln -s "$ts" "$prev_link" 2>/dev/null || {
+        cp -R "$snap" "$prev_link"
+    }
+
+    return 0
 }
 
 # Check if incremental mode should skip heavy operations
@@ -807,24 +1078,26 @@ function start_func() {
     notification "${2}" info
     echo "[$current_date] Start function: ${1} " >>"${LOGFILE}"
     start=$(date +%s)
+    log_json "INFO" "${1}" "Function started" "description=${2}"
 }
 
 function end_func() {
     touch "$called_fn_dir/.${2}"
     end=$(date +%s)
     getElapsedTime "$start" "$end"
-    # Record timing for performance summary
     record_func_timing "${2}" "$((end - start))"
     notification "${2} Finished in ${runtime}" info
     echo "[$current_date] End function: ${2} " >>"${LOGFILE}"
     printf "${bblue}[$current_date] ${1} ${reset}\n"
     printf "${bgreen}#######################################################################${reset}\n"
+    log_json "SUCCESS" "${2}" "Function completed" "runtime=${runtime}" "duration_sec=$((end - start))"
 }
 
 function start_subfunc() {
     notification "     ${2}" info
     echo "[$current_date] Start subfunction: ${1} " >>"${LOGFILE}"
     start_sub=$(date +%s)
+    log_json "INFO" "${1}" "Subfunction started" "description=${2}"
 }
 
 function end_subfunc() {
@@ -833,6 +1106,7 @@ function end_subfunc() {
     getElapsedTime "$start_sub" "$end_sub"
     notification "     ${1} in ${runtime}" good
     echo "[$current_date] End subfunction: ${1} " >>"${LOGFILE}"
+    log_json "SUCCESS" "${2}" "Subfunction completed" "runtime=${runtime}" "duration_sec=$((end_sub - start_sub))"
 }
 
 function check_inscope() {
@@ -979,6 +1253,474 @@ function print_timing_summary() {
     local total_secs=$((total % 60))
     printf "\n  %-35s %3dm %02ds\n" "TOTAL" "$total_mins" "$total_secs"
     printf "%b#######################################################################%b\n\n" "$bgreen" "$reset"
+}
+
+# Write machine-readable performance summary for dashboards/automation.
+# Output: .log/perf_summary.json
+function write_perf_summary() {
+    local summary_file="${dir}/.log/perf_summary.json"
+    local total=0
+    local fn dur
+
+    for fn in "${!FUNC_TIMINGS[@]}"; do
+        dur=${FUNC_TIMINGS[$fn]}
+        [[ "$dur" =~ ^[0-9]+$ ]] || continue
+        total=$((total + dur))
+    done
+
+    local subs_count webs_count hosts_count findings_count
+    subs_count=$(wc -l <"${dir}/subdomains/subdomains.txt" 2>/dev/null | tr -d ' ')
+    webs_count=$(wc -l <"${dir}/webs/webs_all.txt" 2>/dev/null | tr -d ' ')
+    hosts_count=$(wc -l <"${dir}/hosts/ips.txt" 2>/dev/null | tr -d ' ')
+    findings_count=$(find "${dir}/nuclei_output" -type f -name '*_json.txt' -exec cat {} + 2>/dev/null | wc -l | tr -d ' ')
+    subs_count=${subs_count:-0}
+    webs_count=${webs_count:-0}
+    hosts_count=${hosts_count:-0}
+    findings_count=${findings_count:-0}
+
+    # Build top functions by duration.
+    local top_json="[]"
+    local -a sorted_entries=()
+    for fn in "${!FUNC_TIMINGS[@]}"; do
+        dur=${FUNC_TIMINGS[$fn]}
+        [[ "$dur" =~ ^[0-9]+$ ]] || continue
+        sorted_entries+=("$dur|$fn")
+    done
+    if [[ ${#sorted_entries[@]} -gt 0 ]]; then
+        top_json=$(printf '%s\n' "${sorted_entries[@]}" \
+            | sort -t'|' -k1 -rn \
+            | head -n 15 \
+            | awk -F'|' '{printf "{\"function\":\"%s\",\"duration_sec\":%s}\n",$2,$1}' \
+            | jq -s '.')
+    fi
+
+    if command -v jq >/dev/null 2>&1; then
+        jq -n \
+            --arg ts "$(date -Iseconds)" \
+            --arg domain "${domain:-unknown}" \
+            --arg mode "${opt_mode:-unknown}" \
+            --arg profile "${PERF_PROFILE:-balanced}" \
+            --argjson total_sec "${total:-0}" \
+            --argjson subdomains "${subs_count:-0}" \
+            --argjson webs "${webs_count:-0}" \
+            --argjson hosts "${hosts_count:-0}" \
+            --argjson findings "${findings_count:-0}" \
+            --argjson top "${top_json}" \
+            '{
+                timestamp:$ts,
+                domain:$domain,
+                mode:$mode,
+                perf_profile:$profile,
+                total_duration_sec:$total_sec,
+                counts:{
+                  subdomains:$subdomains,
+                  webs:$webs,
+                  hosts:$hosts,
+                  findings:$findings
+                },
+                top_functions:$top
+            }' >"$summary_file"
+    else
+        printf '{"timestamp":"%s","domain":"%s","mode":"%s","perf_profile":"%s","total_duration_sec":%s}\n' \
+            "$(date -Iseconds)" "${domain:-unknown}" "${opt_mode:-unknown}" "${PERF_PROFILE:-balanced}" "${total:-0}" >"$summary_file"
+    fi
+}
+
+# Generate consolidated JSON + HTML report for the current scan.
+# Outputs:
+#   - report/report.json
+#   - report/index.html
+function generate_consolidated_report() {
+    ensure_dirs report || return 1
+
+    local report_json="report/report.json"
+    local report_html="report/index.html"
+    local subs_count webs_count hosts_count screenshots_count findings_total
+    local sev_info sev_low sev_medium sev_high sev_critical
+    local top_assets_json timeline_json links_json monitor_delta_json monitor_alerts_json
+
+    subs_count=$(wc -l <subdomains/subdomains.txt 2>/dev/null | tr -d ' ')
+    webs_count=$(wc -l <webs/webs_all.txt 2>/dev/null | tr -d ' ')
+    hosts_count=$(wc -l <hosts/ips.txt 2>/dev/null | tr -d ' ')
+    screenshots_count=$(find screenshots -type f -name '*.png' 2>/dev/null | wc -l | tr -d ' ')
+
+    sev_info=$(wc -l <nuclei_output/info_json.txt 2>/dev/null | tr -d ' ')
+    sev_low=$(wc -l <nuclei_output/low_json.txt 2>/dev/null | tr -d ' ')
+    sev_medium=$(wc -l <nuclei_output/medium_json.txt 2>/dev/null | tr -d ' ')
+    sev_high=$(wc -l <nuclei_output/high_json.txt 2>/dev/null | tr -d ' ')
+    sev_critical=$(wc -l <nuclei_output/critical_json.txt 2>/dev/null | tr -d ' ')
+
+    subs_count=${subs_count:-0}
+    webs_count=${webs_count:-0}
+    hosts_count=${hosts_count:-0}
+    screenshots_count=${screenshots_count:-0}
+    sev_info=${sev_info:-0}
+    sev_low=${sev_low:-0}
+    sev_medium=${sev_medium:-0}
+    sev_high=${sev_high:-0}
+    sev_critical=${sev_critical:-0}
+    findings_total=$((sev_info + sev_low + sev_medium + sev_high + sev_critical))
+
+    # Top assets from hotlist (if present)
+    if [[ -s hotlist.txt ]] && command -v jq >/dev/null 2>&1; then
+        top_assets_json=$(head -n "${HOTLIST_TOP:-50}" hotlist.txt \
+            | awk '{score=$1;$1=""; sub(/^ /,"",$0); printf "{\"asset\":\"%s\",\"score\":%s}\n",$0,score}' \
+            | jq -s '.')
+    else
+        top_assets_json="[]"
+    fi
+
+    # Timeline from structured log (preferred) or fallback from text log.
+    if [[ -n "${STRUCTURED_LOG_FILE:-}" ]] && [[ -s "${STRUCTURED_LOG_FILE}" ]] && command -v jq >/dev/null 2>&1; then
+        timeline_json=$(tail -n 80 "${STRUCTURED_LOG_FILE}" \
+            | jq -s 'map({timestamp:(.timestamp // ""), level:(.level // "INFO"), function:(.function // "unknown"), message:(.message // "")})')
+    elif [[ -s "${LOGFILE:-}" ]] && command -v jq >/dev/null 2>&1; then
+        timeline_json=$(tail -n 80 "${LOGFILE}" \
+            | awk -F'] ' '{
+                ts=$1; gsub(/^\[/,"",ts);
+                msg=$2;
+                if (msg ~ /Start function:/) { print "{\"timestamp\":\"" ts "\",\"level\":\"INFO\",\"function\":\"" msg "\",\"message\":\"started\"}" }
+                else if (msg ~ /End function:/) { print "{\"timestamp\":\"" ts "\",\"level\":\"SUCCESS\",\"function\":\"" msg "\",\"message\":\"completed\"}" }
+            }' \
+            | jq -s '.')
+    else
+        timeline_json="[]"
+    fi
+
+    # Quick links to important output files.
+    if command -v jq >/dev/null 2>&1; then
+        local link_path exists
+        links_json=$(
+            {
+                for entry in \
+                    "Subdomains|subdomains/subdomains.txt" \
+                    "Web Targets|webs/webs_all.txt" \
+                    "Takeovers|webs/takeover.txt" \
+                    "Nuclei Critical|nuclei_output/critical.txt" \
+                    "Nuclei High|nuclei_output/high.txt" \
+                    "Hotlist|hotlist.txt" \
+                    "Performance Summary|.log/perf_summary.json" \
+                    "Assets JSONL|assets.jsonl" \
+                    "Screenshots Changed|screenshots/diff_changed.txt" \
+                    "Latest Report JSON|report/latest/report.json" \
+                    "Latest Report HTML|report/latest/index.html"; do
+                    link_path="${entry#*|}"
+                    exists=false
+                    [[ -s "$link_path" ]] && exists=true
+                    printf '{"name":"%s","path":"%s","exists":%s}\n' "${entry%%|*}" "$link_path" "$exists"
+                done
+            } | jq -s '.'
+        )
+    else
+        links_json="[]"
+    fi
+
+    if command -v jq >/dev/null 2>&1; then
+        if [[ -s ".incremental/history/latest/delta.json" ]]; then
+            monitor_delta_json=$(cat ".incremental/history/latest/delta.json")
+        else
+            monitor_delta_json='{}'
+        fi
+        if [[ -s ".incremental/history/latest/alerts.json" ]]; then
+            monitor_alerts_json=$(cat ".incremental/history/latest/alerts.json")
+        else
+            monitor_alerts_json='{}'
+        fi
+
+        jq -n \
+            --arg generated_at "$(date -Iseconds)" \
+            --arg domain "${domain:-unknown}" \
+            --arg mode "${opt_mode:-unknown}" \
+            --arg runtime "${runtime:-unknown}" \
+            --arg profile "${PERF_PROFILE:-balanced}" \
+            --arg quick_rescan "${QUICK_RESCAN:-false}" \
+            --arg incremental "${INCREMENTAL_MODE:-false}" \
+            --arg parallel "${PARALLEL_MODE:-true}" \
+            --arg axiom "${AXIOM:-false}" \
+            --argjson subs "$subs_count" \
+            --argjson webs "$webs_count" \
+            --argjson hosts "$hosts_count" \
+            --argjson screenshots "$screenshots_count" \
+            --argjson findings_total "$findings_total" \
+            --argjson sev_info "$sev_info" \
+            --argjson sev_low "$sev_low" \
+            --argjson sev_medium "$sev_medium" \
+            --argjson sev_high "$sev_high" \
+            --argjson sev_critical "$sev_critical" \
+            --argjson top_assets "$top_assets_json" \
+            --argjson timeline "$timeline_json" \
+            --argjson links "$links_json" \
+            --argjson delta "$monitor_delta_json" \
+            --argjson alerts "$monitor_alerts_json" \
+            '{
+                generated_at:$generated_at,
+                domain:$domain,
+                mode:$mode,
+                runtime:$runtime,
+                metadata:{
+                    perf_profile:$profile,
+                    quick_rescan:($quick_rescan == "true"),
+                    incremental:($incremental == "true"),
+                    parallel:($parallel != "false"),
+                    axiom:($axiom == "true")
+                },
+                summary:{
+                    subdomains:$subs,
+                    webs:$webs,
+                    hosts:$hosts,
+                    screenshots:$screenshots,
+                    findings_total:$findings_total
+                },
+                severities:{
+                    info:$sev_info,
+                    low:$sev_low,
+                    medium:$sev_medium,
+                    high:$sev_high,
+                    critical:$sev_critical
+                },
+                top_assets:$top_assets,
+                timeline:$timeline,
+                links:$links,
+                delta_since_last:$delta,
+                alerts_last:$alerts
+            }' >"$report_json"
+    else
+        printf '{"generated_at":"%s","domain":"%s","mode":"%s","runtime":"%s"}\n' \
+            "$(date -Iseconds)" "${domain:-unknown}" "${opt_mode:-unknown}" "${runtime:-unknown}" >"$report_json"
+    fi
+
+    # HTML renderer with inlined JSON payload.
+    local report_payload
+    report_payload=$(jq -c '.' "$report_json" 2>/dev/null || echo '{}')
+    cat >"$report_html" <<EOF
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>reconFTW Report - ${domain}</title>
+  <style>
+    :root{--bg:#0b1320;--card:#111c2d;--text:#e8f0ff;--muted:#9ab0cc;--acc:#40c4ff;--ok:#32d583;--warn:#fdb022;--bad:#f97066}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif;background:linear-gradient(160deg,#0b1320,#0f1e35);color:var(--text)}
+    .wrap{max-width:1100px;margin:0 auto;padding:20px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+    .card{background:var(--card);border:1px solid #1b2a44;border-radius:14px;padding:14px}
+    h1,h2{margin:.2rem 0 .6rem}
+    .muted{color:var(--muted);font-size:.92rem}
+    .kpi{font-size:1.6rem;font-weight:700}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px;border-bottom:1px solid #213451;text-align:left;font-size:.93rem}
+    a{color:var(--acc);text-decoration:none}
+    .sev{display:flex;gap:10px;flex-wrap:wrap}
+    .pill{padding:4px 10px;border-radius:999px;background:#15243b}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>reconFTW Consolidated Report</h1>
+    <div class="muted" id="meta"></div>
+    <div class="grid" id="kpis"></div>
+    <h2>Severities</h2>
+    <div class="sev" id="severities"></div>
+    <h2>Top Assets</h2>
+    <div class="card"><table><thead><tr><th>Asset</th><th>Score</th></tr></thead><tbody id="topAssets"></tbody></table></div>
+    <h2>Delta Since Last Run</h2>
+    <div class="sev" id="delta"></div>
+    <h2>Timeline</h2>
+    <div class="card"><table><thead><tr><th>Timestamp</th><th>Level</th><th>Function</th><th>Message</th></tr></thead><tbody id="timeline"></tbody></table></div>
+    <h2>Quick Links</h2>
+    <div class="card"><table><thead><tr><th>Name</th><th>Path</th></tr></thead><tbody id="links"></tbody></table></div>
+  </div>
+  <script>
+    const REPORT = ${report_payload};
+    const s = REPORT.summary || {};
+    const sev = REPORT.severities || {};
+    document.getElementById('meta').textContent =
+      "Domain: " + (REPORT.domain||"n/a") + " | Mode: " + (REPORT.mode||"n/a") + " | Runtime: " + (REPORT.runtime||"n/a") + " | Generated: " + (REPORT.generated_at||"");
+    const kpis = [
+      ["Subdomains", s.subdomains||0],["Webs", s.webs||0],["Hosts", s.hosts||0],["Screenshots", s.screenshots||0],["Findings", s.findings_total||0]
+    ];
+    document.getElementById('kpis').innerHTML = kpis.map(([k,v]) => '<div class="card"><div class="muted">'+k+'</div><div class="kpi">'+v+'</div></div>').join('');
+    document.getElementById('severities').innerHTML =
+      [["Critical",sev.critical||0],["High",sev.high||0],["Medium",sev.medium||0],["Low",sev.low||0],["Info",sev.info||0]]
+      .map(([k,v]) => '<span class="pill">'+k+': '+v+'</span>').join('');
+    document.getElementById('topAssets').innerHTML = (REPORT.top_assets||[]).map(x => '<tr><td>'+x.asset+'</td><td>'+x.score+'</td></tr>').join('') || '<tr><td colspan="2">No data</td></tr>';
+    const d = (REPORT.delta_since_last && REPORT.delta_since_last.deltas) ? REPORT.delta_since_last.deltas : {};
+    document.getElementById('delta').innerHTML =
+      [["New Subdomains",d.subdomains_new||0],["New Webs",d.webs_new||0],["New High",d.high_findings_new||0],["New Critical",d.critical_findings_new||0]]
+      .map(([k,v]) => '<span class="pill">'+k+': '+v+'</span>').join('');
+    document.getElementById('timeline').innerHTML = (REPORT.timeline||[]).slice(-40).reverse().map(x =>
+      '<tr><td>'+ (x.timestamp||'') +'</td><td>'+ (x.level||'') +'</td><td>'+ (x.function||'') +'</td><td>'+ (x.message||'') +'</td></tr>'
+    ).join('') || '<tr><td colspan="4">No data</td></tr>';
+    document.getElementById('links').innerHTML = (REPORT.links||[]).map(x => {
+      const mark = x.exists ? 'ok' : 'missing';
+      return '<tr><td>'+x.name+' ('+mark+')</td><td><a href="../'+x.path+'">'+x.path+'</a></td></tr>';
+    }).join('');
+  </script>
+</body>
+</html>
+EOF
+
+    # Stable latest report paths for automation/UI.
+    mkdir -p report/latest
+    cp "$report_json" report/latest/report.json 2>/dev/null || true
+    cp "$report_html" report/latest/index.html 2>/dev/null || true
+
+    notification "Consolidated report generated at report/index.html" info
+}
+
+# Escape a value for CSV output.
+_csv_escape() {
+    local v="${1:-}"
+    v=${v//\"/\"\"}
+    printf '"%s"' "$v"
+}
+
+# Normalize findings into line-delimited JSON for downstream automation.
+# Outputs:
+#   - report/findings_normalized.jsonl
+#   - report/assets.jsonl (copy of assets.jsonl if present)
+#   - report/export_all.jsonl (assets + normalized findings)
+function export_findings_jsonl() {
+    ensure_dirs report || return 1
+    local out_norm="report/findings_normalized.jsonl"
+    local out_assets="report/assets.jsonl"
+    local out_merged="report/export_all.jsonl"
+    : >"$out_norm"
+
+    local sev f
+    for sev in info low medium high critical; do
+        f="nuclei_output/${sev}_json.txt"
+        [[ -s "$f" ]] || continue
+        if command -v jq >/dev/null 2>&1; then
+            jq -c --arg sev "$sev" '
+                {
+                  type:"finding",
+                  tool:"nuclei",
+                  severity:(.info.severity // $sev),
+                  template_id:(.["template-id"] // ""),
+                  matcher_name:(.["matcher-name"] // ""),
+                  finding_type:(.type // ""),
+                  target:(.["matched-at"] // .host // ""),
+                  host:(.host // ""),
+                  name:(.info.name // ""),
+                  tags:(.info.tags // []),
+                  extracted_results:(.["extracted-results"] // []),
+                  source_file:input_filename
+                }' "$f" >>"$out_norm" 2>/dev/null || true
+        else
+            while IFS= read -r line; do
+                [[ -z "$line" ]] && continue
+                printf '{"type":"finding","tool":"nuclei","severity":"%s","raw":"%s"}\n' \
+                    "$sev" "$(printf '%s' "$line" | sed 's/"/\\"/g')" >>"$out_norm"
+            done <"$f"
+        fi
+    done
+
+    if [[ -s assets.jsonl ]]; then
+        cp assets.jsonl "$out_assets"
+    else
+        : >"$out_assets"
+    fi
+
+    cat "$out_assets" "$out_norm" >"$out_merged" 2>/dev/null || true
+}
+
+# Export CSV artifacts for quick triage.
+# Outputs:
+#   - report/subdomains.csv
+#   - report/webs.csv
+#   - report/hosts.csv
+#   - report/findings.csv
+function export_csv_artifacts() {
+    ensure_dirs report || return 1
+
+    # Subdomains CSV
+    {
+        printf "subdomain\n"
+        if [[ -s subdomains/subdomains.txt ]]; then
+            while IFS= read -r sub; do
+                [[ -z "$sub" ]] && continue
+                _csv_escape "$sub"; printf "\n"
+            done <subdomains/subdomains.txt
+        fi
+    } >report/subdomains.csv
+
+    # Webs CSV
+    {
+        printf "url,scheme,host\n"
+        if [[ -s webs/webs_all.txt ]]; then
+            while IFS= read -r url; do
+                [[ -z "$url" ]] && continue
+                local scheme host
+                scheme=$(printf '%s' "$url" | awk -F:// '{print $1}')
+                host=$(printf '%s' "$url" | awk -F/ '{print $3}' | sed 's/:.*$//')
+                _csv_escape "$url"; printf ","
+                _csv_escape "$scheme"; printf ","
+                _csv_escape "$host"; printf "\n"
+            done <webs/webs_all.txt
+        fi
+    } >report/webs.csv
+
+    # Hosts CSV
+    {
+        printf "ip\n"
+        if [[ -s hosts/ips.txt ]]; then
+            while IFS= read -r ip; do
+                [[ -z "$ip" ]] && continue
+                _csv_escape "$ip"; printf "\n"
+            done <hosts/ips.txt
+        fi
+    } >report/hosts.csv
+
+    # Findings CSV (prefer normalized JSONL)
+    if [[ ! -s report/findings_normalized.jsonl ]]; then
+        export_findings_jsonl
+    fi
+    if command -v jq >/dev/null 2>&1 && [[ -s report/findings_normalized.jsonl ]]; then
+        {
+            printf "tool,severity,template_id,name,target,host,finding_type,matcher_name\n"
+            jq -r '[.tool,.severity,.template_id,.name,.target,.host,.finding_type,.matcher_name] | @csv' report/findings_normalized.jsonl
+        } >report/findings.csv
+    else
+        {
+            printf "raw\n"
+            [[ -s report/findings_normalized.jsonl ]] && while IFS= read -r line; do _csv_escape "$line"; printf "\n"; done <report/findings_normalized.jsonl
+        } >report/findings.csv
+    fi
+}
+
+# Export orchestrator.
+# EXPORT_FORMAT values: json | html | csv | all
+function export_reports() {
+    local fmt="${EXPORT_FORMAT:-}"
+    [[ -z "$fmt" ]] && return 0
+
+    # Ensure base consolidated report exists for all export types.
+    [[ -s report/report.json && -s report/index.html ]] || generate_consolidated_report || true
+
+    case "$fmt" in
+        json)
+            export_findings_jsonl
+            notification "Exported JSON artifacts under report/" info
+            ;;
+        html)
+            notification "Exported HTML report at report/index.html" info
+            ;;
+        csv)
+            export_findings_jsonl
+            export_csv_artifacts
+            notification "Exported CSV artifacts under report/" info
+            ;;
+        all)
+            export_findings_jsonl
+            export_csv_artifacts
+            notification "Exported JSONL + CSV + HTML artifacts under report/" info
+            ;;
+        *)
+            notification "Unknown EXPORT_FORMAT '$fmt' (expected json|html|csv|all)" warn
+            ;;
+    esac
 }
 
 function health_check() {

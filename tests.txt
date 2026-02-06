@@ -1,0 +1,217 @@
+tests
+
+## 1) Validación base (rápida)
+
+  ./reconftw.sh --health-check
+  ./reconftw.sh --check-tools
+  bash -n reconftw.sh modules/*.sh lib/*.sh
+
+  Qué esperar:
+
+  - --health-check: estado general OK/WARN de entorno.
+  - --check-tools: lista de herramientas faltantes si hay problemas.
+  - bash -n: sin errores de sintaxis.
+
+  ———
+
+  ## 2) Tests automáticos nuevos (Plan D)
+
+  ./tests/run_tests.sh --unit
+  ./tests/run_tests.sh --smoke
+  ./tests/run_tests.sh --integration
+  ./tests/run_tests.sh --all
+
+  Qué esperar:
+
+  - --unit: valida funciones core, monitor snapshot, exports, perf profile.
+  - --smoke: valida flujos clave rápidos (--report-only, --export, monitor básico).
+  - --integration: suite completa.
+  - --all: unit + integración completa.
+
+  Opcional vía Makefile:
+
+  make test-unit
+  make test-integration-smoke
+  make test-integration-full
+  make test-release-gate
+
+  ———
+
+  ## 3) Pruebas funcionales CLI de features nuevas (rápidas)
+
+  Usa un target autorizado, por ejemplo TARGET=tu-dominio.com.
+
+  TARGET="tu-dominio.com"
+  ./reconftw.sh -d "$TARGET" -r --dry-run --export all --refresh-cache
+
+  Qué esperar:
+
+  - No ejecuta scan real (--dry-run), pero ves flujo y comandos.
+  - Debe aceptar flags nuevos sin errores.
+
+  ———
+
+  ## 4) Scan real corto para generar artefactos nuevos
+
+  TARGET="tu-dominio.com"
+  ./reconftw.sh -d "$TARGET" -p --export all
+
+  Qué esperar en Recon/$TARGET/:
+
+  - report/report.json
+  - report/index.html
+  - report/latest/report.json
+  - report/latest/index.html
+  - report/findings_normalized.jsonl
+  - report/export_all.jsonl
+  - report/*.csv
+  - .log/perf_summary.json
+
+  ———
+
+  ## 5) Validar --report-only
+
+  TARGET="tu-dominio.com"
+  ./reconftw.sh -d "$TARGET" --report-only --export all
+
+  Qué esperar:
+
+  - Rebuild de reportes sin lanzar recon.
+  - Mensaje de “report-only completed”.
+  - Se regeneran/actualizan archivos en report/.
+
+  ———
+
+  ## 6) Validar monitor continuo + deltas/alerts
+
+  TARGET="tu-dominio.com"
+  ./reconftw.sh -d "$TARGET" -r --monitor --monitor-interval 1 --monitor-cycles 2 --export all
+
+  Qué esperar:
+
+  - 2 ciclos y salida automática.
+  - En Recon/$TARGET/.incremental/history/latest/:
+      - delta.json
+      - alerts.json
+  - En report JSON:
+      - delta_since_last
+      - alerts_last
+
+  ———
+
+  ## 7) Validar perfiles/performance/cache
+
+  TARGET="tu-dominio.com"
+  ./reconftw.sh -d "$TARGET" -p -f config/reconftw_quick.cfg --export json
+  ./reconftw.sh -d "$TARGET" -p -f config/reconftw_full.cfg --export json
+  ./reconftw.sh -d "$TARGET" -p -f config/reconftw_stealth.cfg --export json
+
+  Qué esperar:
+
+  - Distinto comportamiento/velocidad según perfil.
+  - .log/perf_summary.json refleja perf_profile y duraciones.
+  - Con --refresh-cache, fuerza refresco de recursos cacheados.
+
+
+• Checklist corta y directa por artefacto:
+
+  1. Recon/<target>/.log/perf_summary.json
+
+  - Campos: timestamp, domain, mode, perf_profile, total_duration_sec.
+  - counts con números >= 0.
+  - top_functions no vacío en scans reales.
+
+  2. Recon/<target>/report/report.json
+
+  - Campos clave: summary, severities, links, top_assets.
+  - Si usaste monitor: delta_since_last y alerts_last presentes.
+  - summary.findings_total consistente con suma de severidades.
+
+  3. Recon/<target>/report/index.html
+
+  - Abre bien en navegador.
+  - Debe mostrar KPIs, severidades, top assets y links.
+  - En modo monitor: bloque “Delta Since Last Run”.
+
+  4. Recon/<target>/report/latest/report.json y Recon/<target>/report/latest/index.html
+
+  - Existen y se actualizan tras cada ejecución con reporte.
+  - Deben reflejar la última corrida.
+
+  5. Recon/<target>/report/findings_normalized.jsonl
+
+  - Cada línea es JSON válido.
+  - Campos típicos: type, tool, severity, template_id, target.
+
+  6. Recon/<target>/report/export_all.jsonl
+
+  - Contiene mezcla de assets.jsonl + findings normalizados.
+  - Archivo no vacío cuando hay datos.
+
+  7. Recon/<target>/report/subdomains.csv
+
+  - Cabecera exacta: subdomain.
+  - Filas con subdominios sin columnas extra.
+
+  8. Recon/<target>/report/webs.csv
+
+  - Cabecera: url,scheme,host.
+  - scheme y host coherentes con url.
+
+  9. Recon/<target>/report/hosts.csv
+
+  - Cabecera: ip.
+  - IPs válidas (IPv4/IPv6 según tu scan).
+
+  10. Recon/<target>/report/findings.csv
+
+  - Cabecera: tool,severity,template_id,name,target,host,finding_type,matcher_name.
+  - Al menos algunas filas si hubo findings de nuclei.
+
+  11. Recon/<target>/.incremental/history/latest/delta.json (monitor/incremental)
+
+  - JSON válido.
+  - Contadores esperables: nuevos subdominios/webs/findings (>=0).
+
+  12. Recon/<target>/.incremental/history/latest/alerts.json (monitor/incremental)
+
+  - JSON válido con resumen de alertas del ciclo.
+  - Si ALERT_SUPPRESSION=true, no debería repetir alertas idénticas en ciclos consecutivos.
+
+  13. Recon/<target>/nuclei_output/*_json.txt
+
+  - Archivos por severidad (info, low, medium, high, critical).
+  - Líneas JSON válidas (una por finding).
+
+  14. tests runner
+
+  - ./tests/run_tests.sh --unit|--smoke|--integration|--all deben terminar con “Tests passed for mode: ...”.
+  - Si falla uno, revisar primero output del test y luego rutas/artefactos esperados.
+
+  15. release gate
+
+  - make test-release-gate:
+      - pasa sintaxis shell,
+      - corre unit + smoke,
+      - y si existe perf_summary.json, compara contra baseline sin regresión fuera del umbral.
+
+      Script batch:
+
+  - tests/check_artifacts_all.sh
+
+  Uso:
+
+  # Recorre todos los targets en Recon/
+  ./tests/check_artifacts_all.sh
+
+  # Directorio base custom
+  ./tests/check_artifacts_all.sh /ruta/a/Recon
+
+  # Checker custom (si lo mueves)
+  ./tests/check_artifacts_all.sh Recon ./tests/check_artifacts.sh
+
+  Salida:
+
+  - Te muestra validación por target.
+  - Al final resumen Passed/Failed.
+  - Devuelve exit code 1 si falla alguno (útil para CI).

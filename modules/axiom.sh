@@ -40,8 +40,8 @@ function resolvers_update() {
 
         if [[ ! -s $resolvers ]] || [[ $(find "$resolvers" -mtime +1 -print) ]]; then
             notification "Resolvers seem older than 1 day\n Downloading new resolvers..." warn
-            cached_download "${resolvers_url}" "$resolvers" "resolvers.txt"
-            cached_download "${resolvers_trusted_url}" "$resolvers_trusted" "resolvers_trusted.txt"
+            cached_download_typed "${resolvers_url}" "$resolvers" "resolvers.txt" "resolvers"
+            cached_download_typed "${resolvers_trusted_url}" "$resolvers_trusted" "resolvers_trusted.txt" "resolvers"
             notification "Resolvers updated\n" good
         fi
     fi
@@ -50,8 +50,8 @@ function resolvers_update() {
 
 function resolvers_update_quick_local() {
     if [[ $update_resolvers == true ]]; then
-        cached_download "${resolvers_url}" "$resolvers" "resolvers.txt"
-        cached_download "${resolvers_trusted_url}" "$resolvers_trusted" "resolvers_trusted.txt"
+        cached_download_typed "${resolvers_url}" "$resolvers" "resolvers.txt" "resolvers"
+        cached_download_typed "${resolvers_trusted_url}" "$resolvers_trusted" "resolvers_trusted.txt" "resolvers"
     fi
 }
 

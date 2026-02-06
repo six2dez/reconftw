@@ -663,16 +663,98 @@ function waf_checks() {
 
 }
 
+# Prepare WAF-aware target lists for nuclei scanning
+# Splits webs into WAF-protected and non-WAF lists for rate-limiting
+# Sets: WAF_LIST, NOWAF_LIST variables
+_nuclei_prepare_waf_lists() {
+    WAF_LIST=.tmp/webs_waf.txt
+    NOWAF_LIST=.tmp/webs_nowaf.txt
+
+    sort -u .tmp/webs_subs.txt -o .tmp/webs_subs.txt 2>/dev/null || true
+    : >"$WAF_LIST"
+    : >"$NOWAF_LIST"
+
+    if [[ -s webs/webs_wafs.txt ]]; then
+        cut -d';' -f1 webs/webs_wafs.txt | sed 's/https\?:\/\///' | sed 's/\/$//' | sort -u >.tmp/waf_hosts.txt
+        awk -F/ '{print $3}' .tmp/webs_subs.txt | sed 's/\:$//' | while read -r host; do
+            if grep -Fxq "$host" .tmp/waf_hosts.txt; then
+                awk -v h="$host" -F/ '{u=$3; sub(/:.*/,"",u); if (u==h) print $0}' .tmp/webs_subs.txt | anew -q "$WAF_LIST"
+            else
+                awk -v h="$host" -F/ '{u=$3; sub(/:.*/,"",u); if (u==h) print $0}' .tmp/webs_subs.txt | anew -q "$NOWAF_LIST"
+            fi
+        done
+    else
+        cp .tmp/webs_subs.txt "$NOWAF_LIST"
+    fi
+
+    # Include slow hosts (429/403) into WAF list as well
+    if [[ -s .tmp/slow_hosts.txt ]]; then
+        while read -r host; do
+            awk -v h="$host" -F/ '{u=$3; sub(/:.*/,"",u); if (u==h) print $0}' .tmp/webs_subs.txt | anew -q "$WAF_LIST"
+        done <.tmp/slow_hosts.txt
+    fi
+}
+
+# Parse nuclei JSON output to human-readable text and display results
+# Usage: _nuclei_parse_results severity_level
+_nuclei_parse_results() {
+    local crit="$1"
+    if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
+        jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' nuclei_output/${crit}_json.txt >nuclei_output/${crit}.txt
+        append_assets_from_file finding value nuclei_output/${crit}.txt
+        if [[ -s "nuclei_output/${crit}.txt" ]]; then
+            cat "nuclei_output/${crit}.txt"
+        fi
+    fi
+}
+
+# Run nuclei scan locally with WAF-aware rate limiting
+# Usage: _nuclei_scan_local
+_nuclei_scan_local() {
+    IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
+
+    for crit in "${severity_array[@]}"; do
+        printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Nuclei Severity: $crit ${reset}\n\n"
+        # Non-WAF at default rate
+        if [[ -s $NOWAF_LIST ]]; then
+            run_command nuclei -l "$NOWAF_LIST" -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 ${NUCLEI_EXTRA_ARGS} -t ${NUCLEI_TEMPLATES_PATH} -j -o "nuclei_output/${crit}_json.txt" 2>>"$LOGFILE" >/dev/null
+        fi
+        # WAF hosts at slower rate
+        if [[ -s $WAF_LIST ]]; then
+            local slow_rl
+            slow_rl=$((NUCLEI_RATELIMIT / 3 + 1))
+            run_command nuclei -l "$WAF_LIST" -severity "$crit" -nh -rl "$slow_rl" -silent -retries 2 ${NUCLEI_EXTRA_ARGS} -t ${NUCLEI_TEMPLATES_PATH} -j -o "nuclei_output/${crit}_waf_json.txt" 2>>"$LOGFILE" >/dev/null
+            [[ -s nuclei_output/${crit}_waf_json.txt ]] && cat nuclei_output/${crit}_waf_json.txt >>nuclei_output/${crit}_json.txt
+        fi
+        _nuclei_parse_results "$crit"
+    done
+    printf "\n\n"
+}
+
+# Run nuclei scan via Axiom distributed fleet
+# Usage: _nuclei_scan_axiom
+_nuclei_scan_axiom() {
+    IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
+
+    for crit in "${severity_array[@]}"; do
+        printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Axiom Nuclei Severity: $crit. Check results in nuclei_output folder.${reset}\n\n"
+        run_command axiom-scan .tmp/webs_subs.txt -m nuclei \
+            --nuclei-templates "$NUCLEI_TEMPLATES_PATH" \
+            -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" \
+            -silent -retries 2 "$NUCLEI_EXTRA_ARGS" -j -o "nuclei_output/${crit}_json.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+        _nuclei_parse_results "$crit"
+    done
+    printf "\n\n"
+}
+
 function nuclei_check() {
 
     # Create necessary directories
     if ! ensure_dirs .tmp webs subdomains nuclei_output; then return 1; fi
 
     # Check if the function should run
-    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $NUCLEICHECK == true ]]; then
+    if should_run "NUCLEICHECK"; then
         start_func "${FUNCNAME[0]}" "Templates-based Web Scanner"
-        #cent update -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
-        # Update nuclei templates once per run
         maybe_update_nuclei
 
         # Handle multi mode and initialize subdomains.txt if necessary
@@ -687,110 +769,40 @@ function nuclei_check() {
         fi
 
         # Combine webs_all.txt targets (with protocol) - avoid duplicate scans
-        # Note: subdomains without protocol would cause duplicate nuclei scans
         if [[ ! -s ".tmp/webs_subs.txt" ]]; then
             cat webs/webs_all.txt 2>>"$LOGFILE" | sort -u >.tmp/webs_subs.txt
         fi
 
-        # Prepare WAF-aware lists
-        WAF_LIST=.tmp/webs_waf.txt
-        NOWAF_LIST=.tmp/webs_nowaf.txt
-        if [[ -s webs/webs_wafs.txt ]]; then
-            cut -d';' -f1 webs/webs_wafs.txt | sed 's/https\?:\/\///' | sed 's/\/$//' | sort -u >.tmp/waf_hosts.txt
-            awk -F/ '{print $3}' .tmp/webs_subs.txt | sed 's/\:$//' | while read -r host; do
-                if grep -q "^$host$" .tmp/waf_hosts.txt; then
-                    grep "://${host}[:/\n]" .tmp/webs_subs.txt | anew -q "$WAF_LIST"
-                else
-                    grep "://${host}[:/\n]" .tmp/webs_subs.txt | anew -q "$NOWAF_LIST"
-                fi
-            done
-        else
-            cp .tmp/webs_subs.txt "$NOWAF_LIST"
-        fi
+        # Prepare WAF-aware lists and run scans
+        _nuclei_prepare_waf_lists
 
-        # Include slow hosts (429/403) into WAF list as well
-        if [[ -s .tmp/slow_hosts.txt ]]; then
-            while read -r host; do
-                grep "://${host}[:/\n]" .tmp/webs_subs.txt | anew -q "$WAF_LIST"
-            done <.tmp/slow_hosts.txt
-        fi
-
-        # Check if AXIOM is enabled
         if [[ $AXIOM != true ]]; then
-            # Split severity levels into an array
-            IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
-
-            for crit in "${severity_array[@]}"; do
-                printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Nuclei Severity: $crit ${reset}\n\n"
-                # Non-WAF at default rate
-                if [[ -s $NOWAF_LIST ]]; then
-                    run_command nuclei -l "$NOWAF_LIST" -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 ${NUCLEI_EXTRA_ARGS} -t ${NUCLEI_TEMPLATES_PATH} -j -o "nuclei_output/${crit}_json.txt" 2>>"$LOGFILE" >/dev/null
-                fi
-                # WAF hosts at slower rate
-                if [[ -s $WAF_LIST ]]; then
-                    local slow_rl
-                    slow_rl=$((NUCLEI_RATELIMIT / 3 + 1))
-                    run_command nuclei -l "$WAF_LIST" -severity "$crit" -nh -rl "$slow_rl" -silent -retries 2 ${NUCLEI_EXTRA_ARGS} -t ${NUCLEI_TEMPLATES_PATH} -j -o "nuclei_output/${crit}_waf_json.txt" 2>>"$LOGFILE" >/dev/null
-                    [[ -s nuclei_output/${crit}_waf_json.txt ]] && cat nuclei_output/${crit}_waf_json.txt >>nuclei_output/${crit}_json.txt
-                fi
-                # Parse the JSON output and save the results to a text file
-                if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
-                    jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' nuclei_output/${crit}_json.txt >nuclei_output/${crit}.txt
-                    # Asset store: append findings
-                    append_assets_from_file finding value nuclei_output/${crit}.txt
-                    # Display the results if the output file exists and is not empty
-                    if [[ -s "nuclei_output/${crit}.txt" ]]; then
-                        cat "nuclei_output/${crit}.txt"
-                    fi
-                fi
-            done
-            printf "\n\n"
+            _nuclei_scan_local
         else
-            # Split severity levels into an array
-            IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
-
-            for crit in "${severity_array[@]}"; do
-                printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Axiom Nuclei Severity: $crit. Check results in nuclei_output folder.${reset}\n\n"
-                # Run axiom-scan with nuclei module for each severity level
-                run_command axiom-scan .tmp/webs_subs.txt -m nuclei \
-                    --nuclei-templates "$NUCLEI_TEMPLATES_PATH" \
-                    -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" \
-                    -silent -retries 2 "$NUCLEI_EXTRA_ARGS" -j -o "nuclei_output/${crit}_json.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
-                # Parse the JSON output and save the results to a text file
-                if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
-                    jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' nuclei_output/${crit}_json.txt >nuclei_output/${crit}.txt
-
-                    # Display the results if the output file exists and is not empty
-                    if [[ -s "nuclei_output/${crit}.txt" ]]; then
-                        cat "nuclei_output/${crit}.txt"
-                    fi
-                fi
-            done
-            printf "\n\n"
+            _nuclei_scan_axiom
         fi
 
         # Faraday integration
         if [[ $FARADAY == true ]]; then
-            # Check if the Faraday server is running
             if ! faraday-cli status 2>>"$LOGFILE" >/dev/null; then
                 printf "%b[!] Faraday server is not running. Skipping Faraday integration.%b\n" "$bred" "$reset"
             else
-                if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
-                    faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei nuclei_output/${crit}_json.txt 2>>"$LOGFILE" >/dev/null
-                fi
+                # Report all severity levels to Faraday
+                IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
+                for crit in "${severity_array[@]}"; do
+                    if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
+                        faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nuclei "nuclei_output/${crit}_json.txt" 2>>"$LOGFILE" >/dev/null
+                    fi
+                done
             fi
         fi
 
         end_func "Results are saved in $domain/nuclei_output folder" "${FUNCNAME[0]}"
-
-        # Emit plugin event
         plugins_emit after_nuclei "$domain" "$dir"
     else
-        # Handle cases where NUCLEICHECK is false or the function has already been processed
         if [[ $NUCLEICHECK == false ]]; then
             pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            # Domain is an IP address; skip the function
             return
         else
             pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
@@ -887,75 +899,84 @@ function grpc_reflection() {
     fi
 }
 
+# Classify targets into normal and slow lists for adaptive fuzzing
+_fuzz_classify_targets() {
+    sort -u webs/webs_all.txt -o webs/webs_all.txt 2>/dev/null || true
+    : >.tmp/webs_slow.txt
+    : >.tmp/webs_normal.txt
+    if [[ -s .tmp/slow_hosts.txt ]]; then
+        while read -r host; do
+            awk -v h="$host" -F/ '{u=$3; sub(/:.*/,"",u); if (u==h) print $0}' webs/webs_all.txt | anew -q .tmp/webs_slow.txt
+        done <.tmp/slow_hosts.txt
+        comm -23 <(sort -u webs/webs_all.txt) <(sort -u .tmp/webs_slow.txt) >.tmp/webs_normal.txt
+    else
+        cp webs/webs_all.txt .tmp/webs_normal.txt
+    fi
+}
+
+# Run ffuf locally with interlace, handling normal and slow targets separately
+_fuzz_run_local() {
+    _fuzz_classify_targets
+
+    if [[ -s .tmp/webs_normal.txt ]]; then
+        interlace -tL .tmp/webs_normal.txt -threads ${INTERLACE_THREADS} -c "ffuf ${FFUF_FLAGS} -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" -o "$dir/.tmp/fuzzing" 2>>"$LOGFILE" >/dev/null
+    fi
+
+    if [[ -s .tmp/webs_slow.txt ]]; then
+        local slow_threads=$((FFUF_THREADS / 3))
+        [[ $slow_threads -lt 5 ]] && slow_threads=5
+        local slow_rate=$FFUF_RATELIMIT
+        [[ ${FFUF_RATELIMIT:-0} -eq 0 ]] && slow_rate=50 || slow_rate=$((FFUF_RATELIMIT / 3 + 1))
+        interlace -tL .tmp/webs_slow.txt -threads ${INTERLACE_THREADS} -c "ffuf ${FFUF_FLAGS} -t ${slow_threads} -rate ${slow_rate} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" -o "$dir/.tmp/fuzzing" 2>>"$LOGFILE" >/dev/null
+    fi
+}
+
+# Run ffuf via axiom-scan and parse per-subdomain results
+_fuzz_run_axiom() {
+    cached_download_typed "${fuzzing_remote_list}" ".tmp/fuzzing_remote_list.txt" "onelistforallmicro.txt" "wordlists"
+    axiom-scan webs/webs_all.txt -m ffuf -wL .tmp/fuzzing_remote_list.txt -H "${HEADER}" $FFUF_FLAGS -s -maxtime $FFUF_MAXTIME -oJ "$dir/.tmp/ffuf-content.json" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+
+    while read -r sub; do
+        local sub_out
+        sub_out=$(echo "$sub" | sed -e 's|^[^/]*//||' -e 's|/.*$||')
+        [[ -s "$dir/.tmp/ffuf-content.json" ]] && jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' "$dir/.tmp/ffuf-content.json" | grep "$sub" | sort -k1 | anew -q "fuzzing/${sub_out}.txt"
+    done <webs/webs_all.txt
+}
+
+# Merge all per-subdomain fuzzing results into fuzzing_full.txt
+_fuzz_merge_results() {
+    find "$dir/fuzzing/" -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | sort -k1 | anew -q "$dir/fuzzing/fuzzing_full.txt"
+}
+
 function fuzz() {
 
-    # Create necessary directories
     ensure_dirs .tmp/fuzzing webs fuzzing
 
-    # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $FUZZ == true ]] \
         && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 
         start_func "${FUNCNAME[0]}" "Web Directory Fuzzing"
 
-        # Handle multi mode and initialize subdomains.txt if necessary
+        # Handle multi mode initialization
         if [[ -n $multi ]] && [[ ! -f "$dir/webs/webs.txt" ]]; then
-            if ! printf "%b\n" "$domain" >"$dir/webs/webs.txt"; then
-                printf "%b[!] Failed to create webs.txt.%b\n" "$bred" "$reset"
-            fi
-            if ! touch webs/webs_uncommon_ports.txt; then
-                printf "%b[!] Failed to initialize webs_uncommon_ports.txt.%b\n" "$bred" "$reset"
-            fi
+            printf "%b\n" "$domain" >"$dir/webs/webs.txt" || printf "%b[!] Failed to create webs.txt.%b\n" "$bred" "$reset"
+            touch webs/webs_uncommon_ports.txt 2>>"$LOGFILE" || true
         fi
 
-        # Combine webs.txt and webs_uncommon_ports.txt into webs_all.txt if it doesn't exist
         if [[ ! -s "webs/webs_all.txt" ]]; then
             cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
         fi
 
         if [[ -s "webs/webs_all.txt" ]]; then
             if [[ $AXIOM != true ]]; then
-                # Split targets by slow hosts
-                : >.tmp/webs_slow.txt
-                : >.tmp/webs_normal.txt
-                if [[ -s .tmp/slow_hosts.txt ]]; then
-                    while read -r host; do
-                        grep "://${host}[:/\n]" webs/webs_all.txt | anew -q .tmp/webs_slow.txt
-                    done <.tmp/slow_hosts.txt
-                    comm -23 <(sort -u webs/webs_all.txt) <(sort -u .tmp/webs_slow.txt) >.tmp/webs_normal.txt
-                else
-                    cp webs/webs_all.txt .tmp/webs_normal.txt
-                fi
-
-                # Normal targets
-                if [[ -s .tmp/webs_normal.txt ]]; then
-                    interlace -tL .tmp/webs_normal.txt -threads ${INTERLACE_THREADS} -c "ffuf ${FFUF_FLAGS} -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" -o $dir/.tmp/fuzzing 2>>"$LOGFILE" >/dev/null
-                fi
-                # Slow targets with reduced threads/rate
-                if [[ -s .tmp/webs_slow.txt ]]; then
-                    slow_threads=$((FFUF_THREADS / 3))
-                    [[ $slow_threads -lt 5 ]] && slow_threads=5
-                    slow_rate=$FFUF_RATELIMIT
-                    [[ ${FFUF_RATELIMIT:-0} -eq 0 ]] && slow_rate=50 || slow_rate=$((FFUF_RATELIMIT / 3 + 1))
-                    interlace -tL .tmp/webs_slow.txt -threads ${INTERLACE_THREADS} -c "ffuf ${FFUF_FLAGS} -t ${slow_threads} -rate ${slow_rate} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" -o $dir/.tmp/fuzzing 2>>"$LOGFILE" >/dev/null
-                fi
-                for sub in $(cat webs/webs_all.txt); do
-                    sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-                done
-                find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | sort -k1 | anew -q $dir/fuzzing/fuzzing_full.txt
+                _fuzz_run_local
             else
-                cached_download "${fuzzing_remote_list}" ".tmp/fuzzing_remote_list.txt" "onelistforallmicro.txt"
-                axiom-scan webs/webs_all.txt -m ffuf -wL .tmp/fuzzing_remote_list.txt -H "${HEADER}" $FFUF_FLAGS -s -maxtime $FFUF_MAXTIME -oJ $dir/.tmp/ffuf-content.json $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
-
-                for sub in $(cat webs/webs_all.txt); do
-                    sub_out=$(echo $sub | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-                    [ -s "$dir/.tmp/ffuf-content.json" ] && cat $dir/.tmp/ffuf-content.json | jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' | grep $sub | sort -k1 | anew -q fuzzing/${sub_out}.txt
-                done
-                find $dir/fuzzing/ -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | sort -k1 | anew -q $dir/fuzzing/fuzzing_full.txt
+                _fuzz_run_axiom
             fi
-            end_func "Results are saved in $domain/fuzzing/*subdomain*.txt" ${FUNCNAME[0]}
+            _fuzz_merge_results
+            end_func "Results are saved in $domain/fuzzing/*subdomain*.txt" "${FUNCNAME[0]}"
         else
-            end_func "No $domain/webs/webs_all.txt file found, fuzzing skipped " ${FUNCNAME[0]}
+            end_func "No $domain/webs/webs_all.txt file found, fuzzing skipped " "${FUNCNAME[0]}"
         fi
 
     else

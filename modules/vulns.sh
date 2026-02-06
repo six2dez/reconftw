@@ -463,7 +463,7 @@ function test_ssl() {
     if ! ensure_dirs hosts vulns; then return 1; fi
 
     # Check if the function should run
-    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $TEST_SSL == true ]]; then
+    if should_run "TEST_SSL"; then
 
         start_func "${FUNCNAME[0]}" "SSL Test"
 

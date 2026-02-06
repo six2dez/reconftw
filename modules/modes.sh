@@ -16,6 +16,7 @@ function start() {
 
     # Validate configuration before starting
     validate_config || exit $?
+    apply_performance_profile
 
     # Check available disk space before starting (require at least 5GB by default)
     local required_space_gb="${MIN_DISK_SPACE_GB:-5}"
@@ -39,7 +40,11 @@ function start() {
     if [[ $upgrade_before_running == true ]]; then
         ${SCRIPTPATH}/install.sh --tools
     fi
-    tools_installed
+    if [[ "${MONITOR_MODE:-false}" == "true" ]] && [[ "${MONITOR_CYCLE:-1}" -gt 1 ]]; then
+        notification "Monitor cycle ${MONITOR_CYCLE}: skipping repeated tools check" info
+    else
+        tools_installed
+    fi
 
     # Initialize incremental mode if enabled
     incremental_init
@@ -110,6 +115,10 @@ function start() {
 
     # Initialize cache for wordlists/resolvers
     cache_init
+    cache_clean "${CACHE_MAX_AGE_DAYS:-30}" 2>>"${LOGFILE:-/dev/null}" || true
+    if [[ "${CACHE_REFRESH:-false}" == "true" ]]; then
+        notification "Cache refresh forced for this run" warn
+    fi
 
     # init time saved estimator
     TIME_SAVED_EST=0
@@ -127,7 +136,60 @@ function end() {
     if [[ $opt_ai ]]; then
         notification "[$(date +'%Y-%m-%d %H:%M:%S')] Sending ${domain} data to AI" info
         mkdir -p "${dir}/ai_result" 2>>"${LOGFILE}"
-        "${tools}/reconftw_ai/venv/bin/python3" "${tools}/reconftw_ai/reconftw_ai.py" --results-dir "${dir}" --output-dir "${dir}/ai_result" --model "${AI_MODEL}" --output-format "${AI_REPORT_TYPE}" --report-type "${AI_REPORT_PROFILE}" --prompts-file "${tools}/reconftw_ai/prompts.json" 2>>"${LOGFILE}" >/dev/null
+        local ai_script ai_prompts_file ai_venv_python ai_python ai_json_output ai_redact_flag ai_pull_flag ai_strict_flag
+        local -a ai_cmd
+        ai_script="${tools}/reconftw_ai/reconftw_ai.py"
+        ai_prompts_file="${AI_PROMPTS_FILE:-${tools}/reconftw_ai/prompts.json}"
+        ai_venv_python="${tools}/reconftw_ai/venv/bin/python3"
+        ai_python="${AI_EXECUTABLE:-python3}"
+        ai_json_output="${dir}/ai_result/reconftw_analysis.json"
+        ai_redact_flag="--redact"
+        ai_pull_flag=""
+        ai_strict_flag=""
+
+        if [[ "${AI_REDACT:-true}" != "true" ]]; then
+            ai_redact_flag="--no-redact"
+        fi
+        if [[ "${AI_ALLOW_MODEL_PULL:-false}" == "true" ]]; then
+            ai_pull_flag="--allow-model-pull"
+        fi
+        if [[ "${AI_STRICT:-false}" == "true" ]]; then
+            ai_strict_flag="--strict"
+        fi
+
+        if [[ -x "${ai_venv_python}" ]]; then
+            ai_python="${ai_venv_python}"
+        elif ! command -v "${ai_python}" >/dev/null 2>&1; then
+            notification "AI skipped: Python executable not found (${ai_python})" warn
+            ai_python=""
+        fi
+
+        if [[ -n "${ai_python}" && -f "${ai_script}" ]]; then
+            ai_cmd=(
+                "${ai_python}" "${ai_script}"
+                --results-dir "${dir}" \
+                --output-dir "${dir}/ai_result" \
+                --output-json "${ai_json_output}" \
+                --model "${AI_MODEL}" \
+                --output-format "${AI_REPORT_TYPE}" \
+                --report-type "${AI_REPORT_PROFILE}" \
+                --prompts-file "${ai_prompts_file}" \
+                --max-chars-per-file "${AI_MAX_CHARS_PER_FILE:-50000}" \
+                --max-files-per-category "${AI_MAX_FILES_PER_CATEGORY:-200}" \
+                "${ai_redact_flag}"
+            )
+            if [[ -n "${ai_pull_flag}" ]]; then
+                ai_cmd+=("${ai_pull_flag}")
+            fi
+            if [[ -n "${ai_strict_flag}" ]]; then
+                ai_cmd+=("${ai_strict_flag}")
+            fi
+            if ! "${ai_cmd[@]}" 2>>"${LOGFILE}" >/dev/null; then
+                notification "AI report failed; check ${LOGFILE} for details" warn
+            fi
+        elif [[ -n "${ai_python}" ]]; then
+            notification "AI skipped: reconftw_ai script not found at ${ai_script}" warn
+        fi
     fi
 
     find "$dir" -type f -empty -print | grep -v '.called_fn' | grep -v '.log' | grep -v '.tmp' | xargs -r rm -f -- 2>>"$LOGFILE" >/dev/null
@@ -218,6 +280,9 @@ function end() {
 
     # Print performance timing summary
     print_timing_summary
+    write_perf_summary
+    generate_consolidated_report || true
+    export_reports || true
 
 }
 
@@ -332,23 +397,47 @@ function osint() {
 
 function vulns() {
     if [[ $VULNS_GENERAL == true ]]; then
-        cors
-        open_redirect
-        ssrf_checks
-        crlf_checks
-        lfi
-        ssti
-        sqli
-        xss
-        command_injection
-        prototype_pollution
-        smuggling
-        webcache
-        spraying
-        brokenLinks
-        fuzzparams
-        4xxbypass
-        test_ssl
+        if [[ "${PARALLEL_MODE:-true}" == "true" ]] && declare -f parallel_funcs &>/dev/null; then
+            # Parallel execution - group independent checks
+            printf "%b[*] Running vulnerability checks in parallel mode%b\n" "$bblue" "$reset"
+            if ! parallel_funcs 4 cors open_redirect crlf_checks xss; then
+                notification "Parallel vulns batch failed (group 1)" error
+                return 1
+            fi
+            if ! parallel_funcs 4 ssrf_checks lfi ssti sqli; then
+                notification "Parallel vulns batch failed (group 2)" error
+                return 1
+            fi
+            if ! parallel_funcs 3 command_injection prototype_pollution smuggling; then
+                notification "Parallel vulns batch failed (group 3)" error
+                return 1
+            fi
+            if ! parallel_funcs 3 webcache spraying brokenLinks; then
+                notification "Parallel vulns batch failed (group 4)" error
+                return 1
+            fi
+            fuzzparams
+            4xxbypass
+            test_ssl
+        else
+            cors
+            open_redirect
+            ssrf_checks
+            crlf_checks
+            lfi
+            ssti
+            sqli
+            xss
+            command_injection
+            prototype_pollution
+            smuggling
+            webcache
+            spraying
+            brokenLinks
+            fuzzparams
+            4xxbypass
+            test_ssl
+        fi
     fi
 }
 
@@ -420,54 +509,119 @@ function multi_osint() {
 }
 
 function recon() {
-    domain_info
-    ip_info
-    emails
-    google_dorks
-    #github_dorks
-    github_repos
-    metadata
-    apileaks
-    third_party_misconfigs
-    zonetransfer
-    favicon
+    # Initialize progress tracking for selected execution model.
+    local progress_total
+    if [[ "${PARALLEL_MODE:-true}" == "true" ]] && declare -f parallel_funcs &>/dev/null; then
+        progress_total=24
+    else
+        progress_total=32
+    fi
+    progress_init "$progress_total"
+
+    if [[ "${PARALLEL_MODE:-true}" == "true" ]] && declare -f parallel_funcs &>/dev/null; then
+        progress_step "OSINT: domain_info, ip_info, emails, dorks"
+        if ! parallel_funcs 4 domain_info ip_info emails google_dorks; then
+            notification "Parallel OSINT batch failed (group 1)" error
+            return 1
+        fi
+        progress_step "OSINT: repos, metadata, api_leaks, 3rd_party"
+        if ! parallel_funcs 4 github_repos metadata apileaks third_party_misconfigs; then
+            notification "Parallel OSINT batch failed (group 2)" error
+            return 1
+        fi
+        progress_step "Zone transfer"
+        zonetransfer
+        progress_step "Favicon"
+        favicon
+    else
+        progress_step "domain_info"
+        domain_info
+        progress_step "ip_info"
+        ip_info
+        progress_step "emails"
+        emails
+        progress_step "google_dorks"
+        google_dorks
+        progress_step "github_repos"
+        #github_dorks
+        github_repos
+        progress_step "metadata"
+        metadata
+        progress_step "apileaks"
+        apileaks
+        progress_step "third_party_misconfigs"
+        third_party_misconfigs
+        progress_step "zonetransfer"
+        zonetransfer
+        progress_step "favicon"
+        favicon
+    fi
 
     if [[ $AXIOM == true ]]; then
         axiom_launch
         axiom_selected
     fi
 
+    progress_step "subdomains_full"
     subdomains_full
+    progress_step "webprobe_full"
     webprobe_full
+    progress_step "subtakeover"
     subtakeover
     remove_big_files
+    progress_step "s3buckets"
     s3buckets
     cloud_extra_providers
-    screenshot
-    #	virtualhosts
-    cdnprovider
-    portscan
-    geo_info
+
+    if [[ "${PARALLEL_MODE:-true}" == "true" ]] && declare -f parallel_funcs &>/dev/null; then
+        progress_step "screenshot, cdnprovider, portscan"
+        if ! parallel_funcs 3 screenshot cdnprovider portscan; then
+            notification "Parallel web/host batch failed" error
+            return 1
+        fi
+        progress_step "geo_info"
+        geo_info
+    else
+        progress_step "screenshot"
+        screenshot
+        #	virtualhosts
+        progress_step "cdnprovider"
+        cdnprovider
+        progress_step "portscan"
+        portscan
+        progress_step "geo_info"
+        geo_info
+    fi
     # Quick-rescan gating
     subs_new=$(cat .tmp/subs_new_count 2>/dev/null || echo 1)
     webs_new=$(cat .tmp/webs_new_count 2>/dev/null || echo 1)
     if [[ $QUICK_RESCAN == true && $subs_new -eq 0 && $webs_new -eq 0 ]]; then
         notification "Quick rescan: no new subs/webs; skipping heavy web stages" info
-        # estimate time saved for skipped modules
+        progress_adjust_total -10
         TIME_SAVED_EST=$((${TIME_SAVED_EST:-0} + \
             ${TIME_EST_WAF:-0} + ${TIME_EST_NUCLEI:-600} + ${TIME_EST_API:-300} + ${TIME_EST_GQL:-180} + \
             ${TIME_EST_FUZZ:-900} + ${TIME_EST_IIS:-60} + ${TIME_EST_URLCHECKS:-300} + ${TIME_EST_JSCHECKS:-300} + \
             ${TIME_EST_PARAM:-240} + ${TIME_EST_GRPC:-120}))
     else
+        progress_step "waf_checks"
         waf_checks
+        progress_step "nuclei_check"
         nuclei_check
+        progress_step "graphql_scan"
         graphql_scan
+        progress_step "fuzz"
         fuzz
+        progress_step "iishortname"
         iishortname
+        progress_step "urlchecks"
         urlchecks
+        progress_step "jschecks"
         jschecks
+        progress_step "websocket_checks"
         websocket_checks
+        progress_step "param_discovery"
         param_discovery
+        progress_step "grpc_reflection"
         grpc_reflection
     fi
 
@@ -475,10 +629,14 @@ function recon() {
         axiom_shutdown
     fi
 
+    progress_step "cms_scanner"
     cms_scanner
+    progress_step "url_gf"
     url_gf
+    progress_step "wordlist_gen"
     wordlist_gen
     wordlist_gen_roboxtractor
+    progress_step "password_dict"
     password_dict
     url_ext
 }
@@ -852,10 +1010,146 @@ function zen_menu() {
     end
 }
 
+function monitor_mode() {
+    local selected_mode="${1:-r}"
+
+    if [[ -z "${selected_mode}" ]]; then
+        selected_mode="r"
+    fi
+
+    if [[ -n "${multi:-}" ]]; then
+        notification "Monitor mode does not support -m multi-target runs" error
+        return 1
+    fi
+    if [[ "${selected_mode}" != "w" ]] && [[ -n "${list:-}" ]]; then
+        notification "Monitor mode supports -l only with web mode (-w)" error
+        return 1
+    fi
+
+    if [[ -n "${dir_output:-}" ]]; then
+        notification "Monitor mode ignores -o output relocation to preserve incremental state" warn
+        unset dir_output
+    fi
+
+    if [[ ! "${MONITOR_INTERVAL_MIN:-}" =~ ^[0-9]+$ ]] || [[ "${MONITOR_INTERVAL_MIN:-0}" -lt 1 ]]; then
+        MONITOR_INTERVAL_MIN=60
+    fi
+    if [[ ! "${MONITOR_MAX_CYCLES:-}" =~ ^[0-9]+$ ]]; then
+        MONITOR_MAX_CYCLES=0
+    fi
+
+    INCREMENTAL_MODE=true
+    QUICK_RESCAN=true
+    DIFF=true
+    local interval_sec=$((MONITOR_INTERVAL_MIN * 60))
+    local cycle=0
+
+    notification "Monitor mode enabled (mode=${selected_mode}, interval=${MONITOR_INTERVAL_MIN}m, max_cycles=${MONITOR_MAX_CYCLES:-0})" info
+
+    while true; do
+        cycle=$((cycle + 1))
+        MONITOR_CYCLE=$cycle
+
+        notification "Monitor cycle ${cycle} started" info
+
+        case "$selected_mode" in
+            'r')
+                start
+                recon
+                end
+                ;;
+            's')
+                subs_menu
+                ;;
+            'p')
+                passive
+                ;;
+            'a')
+                export VULNS_GENERAL=true
+                all
+                ;;
+            'w')
+                if [[ -n $list ]]; then
+                    start
+                    if [[ $list == /* ]]; then
+                        cp "$list" "$dir/webs/webs.txt"
+                    else
+                        cp "${SCRIPTPATH}/$list" "$dir/webs/webs.txt"
+                    fi
+                    webs_menu
+                else
+                    notification "Web mode in monitor requires -l list file" error
+                    return 1
+                fi
+                ;;
+            'n')
+                PRESERVE=true
+                start
+                osint
+                end
+                ;;
+            'z')
+                zen_menu
+                ;;
+            *)
+                notification "Unsupported mode '${selected_mode}' for monitor. Use one of: r,s,p,a,w,n,z" error
+                return 1
+                ;;
+        esac
+
+        monitor_snapshot || true
+
+        if [[ "${MONITOR_MAX_CYCLES:-0}" -gt 0 ]] && [[ "$cycle" -ge "${MONITOR_MAX_CYCLES}" ]]; then
+            notification "Monitor finished after ${cycle} cycle(s)" good
+            break
+        fi
+
+        notification "Monitor cycle ${cycle} completed, sleeping ${MONITOR_INTERVAL_MIN} minute(s)" info
+        sleep "$interval_sec"
+    done
+}
+
+function report_only_mode() {
+    if [[ -z "${domain:-}" ]]; then
+        notification "Report-only mode requires -d <domain>" error
+        return 1
+    fi
+    if [[ -n "${list:-}" ]] || [[ -n "${multi:-}" ]]; then
+        notification "Report-only mode currently supports single-target only" error
+        return 1
+    fi
+
+    dir="${SCRIPTPATH}/Recon/$domain"
+    called_fn_dir="${dir}/.called_fn"
+    if [[ ! -d "$dir" ]]; then
+        notification "Target directory not found for report-only mode: $dir" error
+        return 1
+    fi
+
+    cd "$dir" || {
+        notification "Failed to enter target directory: $dir" error
+        return 1
+    }
+
+    mkdir -p .log report
+    NOW=$(date +"%F")
+    NOWT=$(date +"%T")
+    LOGFILE="${dir}/.log/${NOW}_${NOWT}_report_only.txt"
+    touch "$LOGFILE"
+    runtime="report-only"
+
+    notification "Report-only mode: rebuilding reports from existing artifacts" info
+    build_hotlist || true
+    write_perf_summary || true
+    generate_consolidated_report || true
+    export_reports || true
+    notification "Report-only rebuild completed for ${domain}" good
+}
+
 function help() {
     pt_header "Usage"
     printf "\n Usage: $0 [-d domain.tld] [-m name] [-l list.txt] [-x oos.txt] [-i in.txt] "
-    printf "\n           	      [-r] [-s] [-p] [-a] [-w] [-n] [-z] [-c] [-y] [-h] [-f] [--ai] [--deep] [-o OUTPUT]\n\n"
+    printf "\n           	      [-r] [-s] [-p] [-a] [-w] [-n] [-z] [-c] [-y] [-h] [-f] [--ai] [--deep] [--monitor] [--monitor-interval m] [--monitor-cycles n] [--report-only] [--refresh-cache] [--export fmt] [-o OUTPUT]\n\n"
     printf " ${bblue}TARGET OPTIONS${reset}\n"
     printf "   -d domain.tld     Target domain\n"
     printf "   -m company        Target company name\n"
@@ -888,6 +1182,13 @@ function help() {
     printf "   --adaptive-rate   Automatically adjust rate limits on errors (429/503)\n"
     printf "   --dry-run         Show what would be executed without running commands\n"
     printf "   --parallel        Run independent functions in parallel (faster but uses more resources)\n"
+    printf "   --no-parallel     Force sequential execution\n"
+    printf "   --monitor         Continuous monitoring mode (single target; -w supports -l)\n"
+    printf "   --monitor-interval Minutes between cycles (default: 60)\n"
+    printf "   --monitor-cycles  Stop after N cycles (0 = infinite)\n"
+    printf "   --report-only     Rebuild report artifacts from existing Recon/<target>\n"
+    printf "   --refresh-cache   Force refresh of cached resolvers/wordlists\n"
+    printf "   --export fmt      Export artifacts: json|html|csv|all\n"
     printf " \n"
     printf " ${bblue}USAGE EXAMPLES${reset}\n"
     printf " ${byellow}Perform full recon (without attacks):${reset}\n"

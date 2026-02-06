@@ -111,7 +111,7 @@ if [[ $OSTYPE == "darwin"* ]]; then
     PATH="$(brew --prefix gnu-sed)/libexec/gnubin:$PATH"
 fi
 
-PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:zrspanwvyh' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,ai,check-tools,health-check,quick-rescan,incremental,adaptive-rate,dry-run,parallel' -n 'reconFTW' -- "$@")
+PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:zrspanwvyh' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,ai,check-tools,health-check,quick-rescan,incremental,adaptive-rate,dry-run,parallel,no-parallel,monitor,monitor-interval:,monitor-cycles:,refresh-cache,export:,report-only' -n 'reconFTW' -- "$@")
 
 exit_status=$?
 if [[ $exit_status -ne 0 ]]; then
@@ -313,6 +313,46 @@ while true; do
             shift
             continue
             ;;
+        '--no-parallel')
+            PARALLEL_MODE=false
+            shift
+            continue
+            ;;
+        '--monitor')
+            CLI_MONITOR_MODE=true
+            shift
+            continue
+            ;;
+        '--monitor-interval')
+            CLI_MONITOR_INTERVAL_MIN="$2"
+            shift 2
+            continue
+            ;;
+        '--monitor-cycles')
+            CLI_MONITOR_MAX_CYCLES="$2"
+            shift 2
+            continue
+            ;;
+        '--refresh-cache')
+            CLI_CACHE_REFRESH=true
+            shift
+            continue
+            ;;
+        '--export')
+            CLI_EXPORT_FORMAT="$2"
+            if [[ ! "$CLI_EXPORT_FORMAT" =~ ^(json|html|csv|all)$ ]]; then
+                printf "%b[%s] ERROR: Invalid --export value '%s' (allowed: json|html|csv|all)%b\n" \
+                    "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$CLI_EXPORT_FORMAT" "$reset" >&2
+                exit 1
+            fi
+            shift 2
+            continue
+            ;;
+        '--report-only')
+            CLI_REPORT_ONLY=true
+            shift
+            continue
+            ;;
         '--help' | '-h')
             break
             ;;
@@ -324,19 +364,6 @@ while true; do
     esac
 done
 
-# Initialize some variables
-#opt_deep="${opt_deep:=false}"
-#rate_limit="${rate_limit:=0}"
-#outOfScope_file="${outOfScope_file:=}"
-#inScope_file="${inScope_file:=}"
-#domain="${domain:=}"
-#multi="${multi:=}"
-#list="${list:=}"
-#opt_mode="${opt_mode:=}"
-#custom_function="${custom_function:=}"
-#AXIOM="${AXIOM:=false}"
-#AXIOM_POST_START="${AXIOM_POST_START:=}"
-#CUSTOM_CONFIG="${CUSTOM_CONFIG:=}"
 
 # This is the first thing to do to read in alternate config
 SCRIPTPATH="$(
@@ -354,9 +381,29 @@ SCRIPTPATH="$(
 if [[ -s $CUSTOM_CONFIG ]]; then
     # shellcheck source=/home/six2dez/Tools/reconftw/custom_config.cfg
     . "${CUSTOM_CONFIG}" || {
-        echo "Error importing reconftw.ctg"
+        echo "Error importing custom config"
         exit 1
     }
+fi
+
+# Re-apply CLI overrides after config load (config defaults should not clobber CLI flags)
+if [[ "${CLI_MONITOR_MODE:-false}" == "true" ]]; then
+    MONITOR_MODE=true
+fi
+if [[ -n "${CLI_MONITOR_INTERVAL_MIN:-}" ]]; then
+    MONITOR_INTERVAL_MIN="${CLI_MONITOR_INTERVAL_MIN}"
+fi
+if [[ -n "${CLI_MONITOR_MAX_CYCLES:-}" ]]; then
+    MONITOR_MAX_CYCLES="${CLI_MONITOR_MAX_CYCLES}"
+fi
+if [[ "${CLI_CACHE_REFRESH:-false}" == "true" ]]; then
+    CACHE_REFRESH=true
+fi
+if [[ -n "${CLI_EXPORT_FORMAT:-}" ]]; then
+    EXPORT_FORMAT="${CLI_EXPORT_FORMAT}"
+fi
+if [[ "${CLI_REPORT_ONLY:-false}" == "true" ]]; then
+    REPORT_ONLY=true
 fi
 
 if [[ $opt_deep ]]; then
@@ -370,7 +417,7 @@ if [[ $rate_limit ]]; then
 fi
 
 if [[ -n $outOfScope_file ]]; then
-    isAsciiText $outOfScope_file
+    isAsciiText "$outOfScope_file"
     if [[ "False" == "$IS_ASCII" ]]; then
         printf "\n\n${bred} Out of Scope file is not a text file${reset}\n\n"
         exit
@@ -378,7 +425,7 @@ if [[ -n $outOfScope_file ]]; then
 fi
 
 if [[ -n $inScope_file ]]; then
-    isAsciiText $inScope_file
+    isAsciiText "$inScope_file"
     if [[ "False" == "$IS_ASCII" ]]; then
         printf "\n\n${bred} In Scope file is not a text file${reset}\n\n"
         exit
@@ -429,6 +476,16 @@ if [[ -n $list ]]; then
     fi
 else
     flist=''
+fi
+
+if [[ "${REPORT_ONLY:-false}" == "true" ]]; then
+    report_only_mode
+    exit
+fi
+
+if [[ "${MONITOR_MODE:-false}" == "true" ]]; then
+    monitor_mode "${opt_mode:-r}"
+    exit
 fi
 
 case $opt_mode in
@@ -561,15 +618,15 @@ case $opt_mode in
         else
             export DIFF=true
             dir="${SCRIPTPATH}/Recon/$domain"
-            cd $dir || {
+            cd "$dir" || {
                 echo "Failed to cd directory '$dir'"
                 exit 1
             }
             LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
             called_fn_dir=$dir/.called_fn
             $custom_function
-            cd ${SCRIPTPATH} || {
-                echo "Failed to cd directory '$dir'"
+            cd "${SCRIPTPATH}" || {
+                echo "Failed to cd directory '${SCRIPTPATH}'"
                 exit 1
             }
         fi

@@ -16,6 +16,19 @@ PARALLEL_MAX_JOBS="${PARALLEL_MAX_JOBS:-4}"
 # Track running PIDs for cleanup
 declare -a _PARALLEL_PIDS=()
 
+_parallel_effective_max_jobs() {
+    local requested="${1:-$PARALLEL_MAX_JOBS}"
+    local pressure="${PARALLEL_PRESSURE_LEVEL:-normal}"
+    local effective="$requested"
+
+    # Backpressure: shrink concurrency when rate-limit pressure is high.
+    if [[ "$pressure" == "high" ]]; then
+        effective=$((requested / 2))
+        ((effective < 1)) && effective=1
+    fi
+    echo "$effective"
+}
+
 ###############################################################################
 # Core Parallel Execution
 ###############################################################################
@@ -24,7 +37,8 @@ declare -a _PARALLEL_PIDS=()
 # Usage: parallel_run max_jobs "cmd1" "cmd2" "cmd3" ...
 # Example: parallel_run 4 "subfinder -d $domain" "amass enum -d $domain"
 parallel_run() {
-    local max_jobs="${1:-$PARALLEL_MAX_JOBS}"
+    local max_jobs
+    max_jobs=$(_parallel_effective_max_jobs "${1:-$PARALLEL_MAX_JOBS}")
     shift
     
     local -a pids=()
@@ -32,8 +46,8 @@ parallel_run() {
     local running=0
     
     for cmd in "$@"; do
-        # Start command in background
-        eval "$cmd" &
+        # Start command in background (use bash -c to avoid eval injection)
+        bash -c "$cmd" &
         pids+=($!)
         ((running++))
         
@@ -52,7 +66,8 @@ parallel_run() {
 # Usage: parallel_funcs max_jobs func1 func2 func3 ...
 # Example: parallel_funcs 4 sub_passive sub_crt sub_active
 parallel_funcs() {
-    local max_jobs="${1:-$PARALLEL_MAX_JOBS}"
+    local max_jobs
+    max_jobs=$(_parallel_effective_max_jobs "${1:-$PARALLEL_MAX_JOBS}")
     shift
     
     local -a pids=()

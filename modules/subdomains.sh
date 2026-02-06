@@ -200,6 +200,9 @@ _subdomains_init() {
     NUMOFLINES_subs="0"
     NUMOFLINES_probed="0"
 
+    # Escape domain for safe use in grep regex (dots are literal, not wildcards)
+    DOMAIN_ESCAPED=$(escape_domain_regex "$domain")
+
     printf "%b#######################################################################%b\n\n" "$bgreen" "$reset"
 
     if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -255,17 +258,32 @@ _subdomains_enumerate() {
         # Parallel execution using lib/parallel.sh
         printf "%b[*] Running subdomain enumeration in parallel mode%b\n" "$bblue" "$reset"
         
+        # Phase 0: ASN enumeration (independent)
+        sub_asn
+        
         # Phase 1: Passive sources (all can run in parallel)
-        parallel_funcs 4 sub_passive sub_crt
+        if ! parallel_funcs 4 sub_passive sub_crt; then
+            notification "Parallel subdomain batch failed (passive)" error
+            return 1
+        fi
         
         # Phase 2: Active DNS resolution (parallel)
-        parallel_funcs 3 sub_active sub_noerror sub_dns
+        if ! parallel_funcs 3 sub_active sub_noerror sub_dns; then
+            notification "Parallel subdomain batch failed (active)" error
+            return 1
+        fi
         
         # Phase 3: Post-active (depend on resolved subdomains)
-        parallel_funcs 2 sub_tls sub_analytics
+        if ! parallel_funcs 2 sub_tls sub_analytics; then
+            notification "Parallel subdomain batch failed (post-active)" error
+            return 1
+        fi
         
         # Phase 4: Brute force (limited parallelism - resource intensive)
-        parallel_funcs 2 sub_brute sub_permut sub_regex_permut sub_ia_permut
+        if ! parallel_funcs 2 sub_brute sub_permut sub_regex_permut sub_ia_permut; then
+            notification "Parallel subdomain batch failed (bruteforce/permutations)" error
+            return 1
+        fi
         
         # Phase 5: Recursive and scraping (sequential - depends on previous results)
         sub_recursive_passive
@@ -273,6 +291,7 @@ _subdomains_enumerate() {
         sub_scraping
     else
         # Sequential execution (original behavior)
+        sub_asn
         sub_passive
         sub_crt
         sub_active
@@ -361,8 +380,9 @@ _subdomains_finalize() {
 # Usage: subdomains_full
 # Uses PARALLEL_MODE global variable if set
 function subdomains_full() {
-    local parallel_flag=""
-    [[ "${PARALLEL_MODE:-false}" == "true" ]] && parallel_flag="--parallel"
+    # Parallel mode is enabled by default; use PARALLEL_MODE=false to disable
+    local parallel_flag="--parallel"
+    [[ "${PARALLEL_MODE:-true}" == "false" ]] && parallel_flag=""
     
     # Initialize
     _subdomains_init || return 1
@@ -375,6 +395,60 @@ function subdomains_full() {
     
     # Finalize
     _subdomains_finalize
+}
+
+function sub_asn() {
+    ensure_dirs .tmp subdomains hosts
+
+    if should_run "ASN_ENUM"; then
+        start_subfunc "${FUNCNAME[0]}" "Running: ASN Enumeration"
+
+        # Discover ASN/CIDR metadata for the current target domain.
+        if command -v asnmap &>/dev/null; then
+            local asn_json
+            asn_json=".tmp/asnmap_${domain}.json"
+            asnmap -d "$domain" -silent -j 2>>"$LOGFILE" >"$asn_json"
+
+            jq -r '.cidr // empty' "$asn_json" | sed '/^$/d' | sort -u >.tmp/asn_cidrs.txt
+            jq -r '.as_number // empty' "$asn_json" | sed '/^$/d' | sort -u >.tmp/asn_numbers.txt
+
+            if [[ -s .tmp/asn_cidrs.txt ]]; then
+                cp .tmp/asn_cidrs.txt hosts/asn_cidrs.txt
+            fi
+            if [[ -s .tmp/asn_numbers.txt ]]; then
+                cp .tmp/asn_numbers.txt hosts/asn_numbers.txt
+            fi
+
+            local cidr_count asn_count
+            cidr_count=$(wc -l <.tmp/asn_cidrs.txt 2>/dev/null | tr -d ' ')
+            asn_count=$(wc -l <.tmp/asn_numbers.txt 2>/dev/null | tr -d ' ')
+
+            printf "%b[%s] ASN enumeration found %s ASNs and %s CIDR ranges%b\n" \
+                "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "${asn_count:-0}" "${cidr_count:-0}" "$reset"
+
+            # Optional: if asnmap yields discovered domains, feed them into subdomain pipeline.
+            jq -r '.domains[]? // empty' "$asn_json" \
+                | sed '/^$/d' \
+                | grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
+                | grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" \
+                | sort -u \
+                | anew -q .tmp/subs_no_resolved.txt
+            if [[ -s .tmp/subs_no_resolved.txt ]]; then
+                printf "%b[%s] ASN sources added %s in-scope domains%b\n" \
+                    "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$(wc -l <.tmp/subs_no_resolved.txt | tr -d ' ')" "$reset"
+            fi
+        else
+            printf "%b[!] asnmap not installed, skipping ASN enumeration%b\n" "$bred" "$reset"
+        fi
+
+        end_subfunc "${FUNCNAME[0]}" "${FUNCNAME[0]}"
+    else
+        if [[ $ASN_ENUM == false ]]; then
+            printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+        else
+            printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} already processed. To force, delete:\n    $called_fn_dir/.${FUNCNAME[0]}${reset}\n\n"
+        fi
+    fi
 }
 
 function sub_passive() {
@@ -554,7 +628,7 @@ function sub_active() {
         fi
 
         # Process subdomains and append new ones to subdomains.txt, count new lines
-        if ! NUMOFLINES=$(grep "\.$domain$\|^$domain$" .tmp/subdomains_tmp.txt 2>>"$LOGFILE" \
+        if ! NUMOFLINES=$(grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" .tmp/subdomains_tmp.txt 2>>"$LOGFILE" \
             | grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
             | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l); then
             printf "%b[!] Failed to process subdomains.%b\n" "$bred" "$reset"
@@ -595,7 +669,7 @@ function sub_tls() {
         fi
 
         if [[ -s ".tmp/subdomains_tlsx.txt" ]]; then
-            grep "\.$domain$\|^$domain$" .tmp/subdomains_tlsx.txt \
+            grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" .tmp/subdomains_tlsx.txt \
                 | grep -aEo 'https?://[^ ]+' \
                 | sed "s/|__ //" | anew -q .tmp/subdomains_tlsx_clean.txt
         fi
@@ -687,7 +761,7 @@ function sub_noerror() {
             fi
 
             # Process subdomains and append new ones to subdomains.txt, count new lines
-            if ! NUMOFLINES=$(grep "\.$domain$\|^$domain$" .tmp/subs_noerror.txt 2>>"$LOGFILE" \
+            if ! NUMOFLINES=$(grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" .tmp/subs_noerror.txt 2>>"$LOGFILE" \
                 | grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
                 | sed 's/^\*\.//' | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l); then
                 printf "%b[!] Failed to process subdomains.%b\n" "$bred" "$reset"
@@ -732,12 +806,12 @@ function sub_dns() {
 
             jq -r '.. | strings | select(test("^(\\d{1,3}\\.){3}\\d{1,3}$|^[0-9a-fA-F:]+$"))' <"subdomains/subdomains_dnsregs.json" \
                 | sort -u | hakip2host | awk '{print $3}' | unfurl -u domains \
-                | sed -e 's/^\*\.//' -e 's/\.$//' -e '/\./!d' | grep "\.$domain$" \
+                | sed -e 's/^\*\.//' -e 's/\.$//' -e '/\./!d' | grep "\.${DOMAIN_ESCAPED}$" \
                 | grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' | sort -u \
                 | anew -q .tmp/subdomains_dns.txt
 
             for i in $(jq -r '.. | strings | select(test("^(\\d{1,3}\\.){3}\\d{1,3}$|^[0-9a-fA-F:]+$"))' <"subdomains/subdomains_dnsregs.json" | sort -u); do
-                curl -s https://ip.thc.org/$i 2>>"$LOGFILE" | grep "\.$domain$" \
+                curl -s https://ip.thc.org/$i 2>>"$LOGFILE" | grep "\.${DOMAIN_ESCAPED}$" \
                     | grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' | sort -u \
                     | anew -q .tmp/subdomains_dns.txt
             done
@@ -781,7 +855,7 @@ function sub_dns() {
             fi
         fi
 
-        if ! NUMOFLINES=$(grep "\.$domain$\|^$domain$" .tmp/subdomains_dns_resolved.txt 2>>"$LOGFILE" \
+        if ! NUMOFLINES=$(grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" .tmp/subdomains_dns_resolved.txt 2>>"$LOGFILE" \
             | grep -E '^([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}$' \
             | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l); then
             printf "%b[!] Failed to count new subdomains.%b\n" "$bred" "$reset"
@@ -858,7 +932,7 @@ function sub_brute() {
         fi
 
         # Process subdomains and append new ones to subdomains.txt, count new lines
-        if ! NUMOFLINES=$(grep "\.$domain$\|^$domain$" .tmp/subs_brute_valid.txt 2>>"$LOGFILE" \
+        if ! NUMOFLINES=$(grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" .tmp/subs_brute_valid.txt 2>>"$LOGFILE" \
             | grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
             | sed 's/^\*\.//' | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l); then
             printf "%b[!] Failed to process subdomains.%b\n" "$bred" "$reset"
@@ -992,7 +1066,7 @@ function sub_scraping() {
                     sed_i '/^.\{2048\}./d' .tmp/katana.txt
 
                     cat .tmp/katana.txt | unfurl -u domains 2>>"$LOGFILE" \
-                        | grep "\.$domain$" \
+                        | grep "\.${DOMAIN_ESCAPED}$" \
                         | grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
                         | anew -q .tmp/scrap_subs.txt
                 fi
@@ -1012,7 +1086,7 @@ function sub_scraping() {
 
                 if [[ -s ".tmp/scrap_subs_resolved.txt" ]]; then
                     if ! NUMOFLINES=$(cat .tmp/scrap_subs_resolved.txt 2>>"$LOGFILE" \
-                        | grep "\.$domain$\|^$domain$" \
+                        | grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" \
                         | grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
                         | anew subdomains/subdomains.txt \
                         | tee .tmp/diff_scrap.txt \
@@ -1097,7 +1171,7 @@ function sub_analytics() {
             fi
 
             if [[ -s ".tmp/analytics_subs_tmp.txt" ]]; then
-                grep "\.$domain$\|^$domain$" .tmp/analytics_subs_tmp.txt \
+                grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" .tmp/analytics_subs_tmp.txt \
                     | grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
                     | sed "s/|__ //" | anew -q .tmp/analytics_subs_clean.txt
 
@@ -1278,7 +1352,7 @@ function sub_permut() {
             fi
 
             # Process subdomains and append new ones to subdomains.txt, count new lines
-            if ! NUMOFLINES=$(grep "\.$domain$\|^$domain$" .tmp/permute_subs.txt 2>>"$LOGFILE" \
+            if ! NUMOFLINES=$(grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" .tmp/permute_subs.txt 2>>"$LOGFILE" \
                 | grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
                 | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l); then
                 printf "%b[!] Failed to process subdomains.%b\n" "$bred" "$reset"
@@ -1378,7 +1452,7 @@ function sub_regex_permut() {
                 fi
             fi
 
-            if ! NUMOFLINES=$(grep "\.$domain$\|^$domain$" .tmp/regulator.txt 2>>"$LOGFILE" \
+            if ! NUMOFLINES=$(grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" .tmp/regulator.txt 2>>"$LOGFILE" \
                 | grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
                 | anew subdomains/subdomains.txt \
                 | sed '/^$/d' \
@@ -1459,7 +1533,7 @@ function sub_ia_permut() {
                 fi
             fi
 
-            if ! NUMOFLINES=$(grep "\.$domain$\|^$domain$" .tmp/subwiz_resolved.txt 2>>"$LOGFILE" \
+            if ! NUMOFLINES=$(grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" .tmp/subwiz_resolved.txt 2>>"$LOGFILE" \
                 | grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
                 | anew subdomains/subdomains.txt \
                 | sed '/^$/d' \
@@ -1561,7 +1635,7 @@ function sub_recursive_passive() {
         fi
 
         if [[ -s ".tmp/passive_recurs_tmp.txt" ]]; then
-            if ! NUMOFLINES=$(grep "\.$domain$\|^$domain$" .tmp/passive_recurs_tmp.txt 2>>"$LOGFILE" \
+            if ! NUMOFLINES=$(grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" .tmp/passive_recurs_tmp.txt 2>>"$LOGFILE" \
                 | grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
                 | sed '/^$/d' \
                 | anew subdomains/subdomains.txt \
@@ -1754,7 +1828,7 @@ function sub_recursive_brute() {
 
         # Process final results
         if [[ -s ".tmp/brute_perm_recursive_final.txt" ]]; then
-            if ! NUMOFLINES=$(grep "\.$domain$\|^$domain$" .tmp/brute_perm_recursive_final.txt 2>>"$LOGFILE" \
+            if ! NUMOFLINES=$(grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" .tmp/brute_perm_recursive_final.txt 2>>"$LOGFILE" \
                 | grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
                 | sed '/^$/d' \
                 | anew subdomains/subdomains.txt \

@@ -198,6 +198,7 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **Hotlist Builder**: Scores and highlights the riskiest assets (`hotlist.txt`) based on new findings.
 - **Command Tracing**: Toggle `SHOW_COMMANDS` to log every executed command into target logs for debugging.
 - **Asset Store**: Appends findings to `assets.jsonl` for downstream automation when `ASSET_STORE` is enabled.
+- **Consolidated Report**: Auto-generates `report/report.json` and `report/index.html` at end of scan.
 - **ARM Support**: Compatible with Raspberry Pi and ARM architectures (including MacOS MX).
 - **Health Check**: Built-in system health check via `--health-check` (also used by Docker `HEALTHCHECK`).
 - **Incremental Mode**: Only scan new findings since last run (`--incremental`).
@@ -205,7 +206,7 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **Structured Logging**: Optional JSON log output for advanced analysis (`STRUCTURED_LOGGING`).
 - **Input Sanitization**: All user input is sanitized to prevent command injection.
 - **Dry-Run Mode**: Preview what would be executed without running commands (`--dry-run`).
-- **Parallel Mode**: Run independent functions in parallel for faster scans (`--parallel`).
+- **Parallel Mode**: Run independent functions in parallel for faster scans (`--parallel`, disable with `--no-parallel`).
 - **Modular Architecture**: Codebase split into 8 focused modules for maintainability.
 - **Secrets Management**: Environment variables, `secrets.cfg`, and Docker runtime secrets (see [SECURITY.md](SECURITY.md)).
 - **Circuit Breaker**: Automatically skips tools after repeated failures to avoid scan hangs.
@@ -416,7 +417,7 @@ The `reconftw.cfg` file controls the entire execution of reconFTW. It allows fin
 - **Incremental Scanning**: Only scan new findings since last run (`INCREMENTAL_MODE`).
 - **Notifications**: Set up Slack, Discord, or Telegram notifications (`NOTIFY_CONFIG`).
 - **Axiom**: Configure distributed scanning and resolver paths (`AXIOM_FLEET_NAME`, `AXIOM_FLEET_COUNT`, `AXIOM_RESOLVERS_PATH`).
-- **AI Reporting**: Select AI model and report format (`AI_MODEL`, `AI_REPORT_TYPE`).
+- **AI Reporting**: Configure model/profile/format and context controls (`AI_MODEL`, `AI_REPORT_PROFILE`, `AI_REPORT_TYPE`, `AI_MAX_CHARS_PER_FILE`).
 - **Advanced Web Checks**: Toggle GraphQL introspection, parameter discovery, WebSocket testing, gRPC probing, and IPv6 scanning.
 - **Automation & Data**: Control quick rescan heuristics, asset logging, chunk sizes, hotlists, and debug tracing (`QUICK_RESCAN`, `ASSET_STORE`, `CHUNK_LIMIT`, `HOTLIST_TOP`, `SHOW_COMMANDS`).
 - **Disk & Logging**: Pre-flight disk check (`MIN_DISK_SPACE_GB`), log rotation (`MAX_LOG_FILES`, `MAX_LOG_AGE_DAYS`), structured JSON logging (`STRUCTURED_LOGGING`).
@@ -455,6 +456,11 @@ MIN_DISK_SPACE_GB=0 # Minimum required disk space in GB before starting reconnai
 
 # Incremental mode configuration
 INCREMENTAL_MODE=false # Only scan new findings since last run (use --incremental flag to enable)
+MONITOR_MODE=false # Continuous monitor mode (enabled by --monitor)
+MONITOR_INTERVAL_MIN=60 # Minutes between monitoring cycles
+MONITOR_MAX_CYCLES=0 # 0 = run forever until interrupted
+ALERT_SUPPRESSION=true # Suppress repeated monitor alerts by fingerprint history
+ALERT_SEEN_FILE=".incremental/alerts_seen.hashes" # Store of seen alert fingerprints
 
 # Adaptive rate limiting configuration
 ADAPTIVE_RATE_LIMIT=false # Automatically adjust rate limits when encountering 429/503 errors (use --adaptive-rate flag to enable)
@@ -465,6 +471,10 @@ RATE_LIMIT_INCREASE_FACTOR=1.2 # Multiply rate by this on success (1.2 = 20% fas
 
 # Cache configuration
 CACHE_MAX_AGE_DAYS=30 # Maximum age in days for cached wordlists/resolvers (30 = 1 month)
+CACHE_MAX_AGE_DAYS_RESOLVERS=7 # Resolver cache TTL
+CACHE_MAX_AGE_DAYS_WORDLISTS=30 # Wordlist cache TTL
+CACHE_MAX_AGE_DAYS_TOOLS=14 # Tool cache TTL
+CACHE_REFRESH=false # Force-refresh cache (or use --refresh-cache)
 
 # Log rotation
 MAX_LOG_FILES=10       # Maximum number of log files to keep per target
@@ -634,15 +644,16 @@ HTTPX_FLAGS=" -follow-redirects -random-agent -status-code -silent -title -web-s
 # HTTP options
 HEADER="User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" # Default header
 
-# Threads
-FFUF_THREADS=40
-HTTPX_THREADS=50
-HTTPX_UNCOMMONPORTS_THREADS=100
-KATANA_THREADS=20
-BRUTESPRAY_THREADS=20
-BRUTESPRAY_CONCURRENCE=10
-DNSTAKE_THREADS=100
-DALFOX_THREADS=200
+# Threads (auto-scaled based on CPU cores, override to set fixed values)
+AVAILABLE_CORES=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+FFUF_THREADS=$((AVAILABLE_CORES * 10))
+HTTPX_THREADS=$((AVAILABLE_CORES * 12))
+HTTPX_UNCOMMONPORTS_THREADS=$((AVAILABLE_CORES * 25))
+KATANA_THREADS=$((AVAILABLE_CORES * 5))
+BRUTESPRAY_THREADS=$((AVAILABLE_CORES * 5))
+BRUTESPRAY_CONCURRENCE=$((AVAILABLE_CORES * 2))
+DNSTAKE_THREADS=$((AVAILABLE_CORES * 25))
+DALFOX_THREADS=$((AVAILABLE_CORES * 50))
 PUREDNS_PUBLIC_LIMIT=0 # Set between 2000 - 10000 if your router blows up, 0 means unlimited
 PUREDNS_TRUSTED_LIMIT=400
 PUREDNS_WILDCARDTEST_LIMIT=30
@@ -699,9 +710,16 @@ FARADAY_PASS="FARADAY_PASSWORD" # Faraday password
 FARADAY_WORKSPACE="reconftw" # Faraday workspace
 
 # AI
+AI_EXECUTABLE="python3" # Python executable fallback if reconftw_ai venv python is not available
 AI_MODEL="llama3:8b" # Model to use
 AI_REPORT_TYPE="md" # Report type to use (md, txt)
 AI_REPORT_PROFILE="bughunter" # Report profile to use (executive, brief, or bughunter)
+AI_PROMPTS_FILE="" # Optional custom prompts file (empty uses reconftw_ai default)
+AI_MAX_CHARS_PER_FILE=50000 # Max chars loaded per file before truncation
+AI_MAX_FILES_PER_CATEGORY=200 # Max files loaded per category for AI context
+AI_REDACT=true # Redact sensitive indicators before AI analysis
+AI_ALLOW_MODEL_PULL=false # Allow reconftw_ai to auto-pull missing model
+AI_STRICT=false # Fail AI analysis if one or more categories have no data
 
 # API & Advanced Web Checks
 GRAPHQL_CHECK=true # Detect GraphQL endpoints and introspection
@@ -717,12 +735,15 @@ ARJUN_THREADS=10
 
 # Data & Automation
 ASSET_STORE=true # Append assets/findings to assets.jsonl
+EXPORT_FORMAT="" # Optional exporter at end of scan: json|html|csv|all
+REPORT_ONLY=false # Rebuild report artifacts from existing results (or use --report-only)
 QUICK_RESCAN=false # Skip heavy steps if no new subdomains/webs
 CHUNK_LIMIT=2000 # Split very large lists into chunks (urls, webs)
 HOTLIST_TOP=50 # Number of top risky assets to highlight
 
 # Performance
 RESOLVER_IQ=false # Prefer fast/healthy resolvers (experimental)
+PERF_PROFILE="balanced" # low|balanced|max
 
 # Intrusive controls (keep false by default)
 INTRUSIVE=false # Enable intrusive cloud write/CORS tests (dangerous)
@@ -799,6 +820,13 @@ reconFTW supports multiple modes and options for flexible reconnaissance. Use th
 | `--adaptive-rate` | Automatically adjust rate limits on errors (429/503)     |
 | `--dry-run`       | Show what would be executed without running commands     |
 | `--parallel`      | Run independent functions in parallel (faster, more RAM) |
+| `--no-parallel`   | Force sequential execution even if parallel is enabled   |
+| `--monitor`       | Continuous monitoring mode (single target; `-w` supports `-l`) |
+| `--monitor-interval` | Minutes between monitor cycles                        |
+| `--monitor-cycles`   | Stop after N cycles (0 = infinite)                    |
+| `--report-only`   | Rebuild report artifacts without scanning                |
+| `--refresh-cache` | Force refresh of cached resolvers/wordlists              |
+| `--export`        | Export artifacts: `json`, `html`, `csv`, or `all`        |
 
 ### Example Usage
 
@@ -826,27 +854,52 @@ reconFTW supports multiple modes and options for flexible reconnaissance. Use th
    ./reconftw.sh -d target.com -r --parallel
    ```
 
-5. **Multi-Domain Recon**:
+5. **Force Sequential Mode**:
+
+   ```bash
+   ./reconftw.sh -d target.com -r --no-parallel
+   ```
+6. **Multi-Domain Recon**:
 
    ```bash
    ./reconftw.sh -m company -l domains.txt -r
    ```
 
-5. **Axiom Integration**:
+7. **Axiom Integration**:
 
    ```bash
    ./reconftw.sh -d target.com -r -v
    ```
 
-6. **Full Recon with Attacks (YOLO Mode)**:
+8. **Full Recon with Attacks (YOLO Mode)**:
 
    ```bash
    ./reconftw.sh -d target.com -a
    ```
 
-7. **Show Help**:
+9. **Show Help**:
    ```bash
    ./reconftw.sh -h
+   ```
+
+10. **Force cache refresh**:
+   ```bash
+   ./reconftw.sh -d target.com -r --refresh-cache
+   ```
+
+11. **Export all report artifacts**:
+   ```bash
+   ./reconftw.sh -d target.com -r --export all
+   ```
+
+12. **Continuous monitoring (every 30m, 48 cycles)**:
+   ```bash
+   ./reconftw.sh -d target.com -r --monitor --monitor-interval 30 --monitor-cycles 48
+   ```
+
+13. **Rebuild reports only (no scan):**
+   ```bash
+   ./reconftw.sh -d target.com --report-only --export all
    ```
 
 **Full Guide**: See the [Usage Guide](https://github.com/six2dez/reconftw/wiki/2.-Usage-Guide).
@@ -887,13 +940,22 @@ reconFTW uses AI to generate detailed reports from scan results with the tool [r
 - **Model**: Configurable AI model (e.g., `llama3:8b` via `AI_MODEL`).
 - **Report Types**: Markdown or plain text (`AI_REPORT_TYPE`).
 - **Profiles**: Executive, brief, or bug hunter (`AI_REPORT_PROFILE`).
+- **Structured Output**: `reconftw` stores a machine-readable report in `ai_result/reconftw_analysis.json`.
+- **Context Controls**: Bound input size using `AI_MAX_CHARS_PER_FILE` and `AI_MAX_FILES_PER_CATEGORY`.
+- **Safety Controls**: Toggle redaction and strict mode with `AI_REDACT` and `AI_STRICT`.
 
 **Example**:
 
 ```yaml
+AI_EXECUTABLE="python3"
 AI_MODEL="llama3:8b"
 AI_REPORT_TYPE="md"
 AI_REPORT_PROFILE="bughunter"
+AI_MAX_CHARS_PER_FILE=50000
+AI_MAX_FILES_PER_CATEGORY=200
+AI_REDACT=true
+AI_ALLOW_MODEL_PULL=false
+AI_STRICT=false
 ```
 
 ---

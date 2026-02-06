@@ -10,7 +10,7 @@ ARG LANGUAGE=en_US
 ###> Do NOT change anything beyond this point <###
 ##################################################
 
-FROM ubuntu:latest AS base
+FROM ubuntu:24.04 AS base
 
 LABEL org.label-schema.name='reconftw'
 LABEL org.label-schema.description='A simple script for full recon'
@@ -107,7 +107,7 @@ find /var/cache -type f -delete
 find /var/log -type f -delete
 find /tmp -type f -delete
 rm -rf /root/.cache
-rm -rf /root/go
+rm -rf /root/go/pkg /root/go/src
 eot
 
 COPY github_tokens.txt /root/Tools/.github_tokens
@@ -118,14 +118,10 @@ RUN <<eot
 #!/bin/bash
 set -euxo pipefail
 if [ "${INSTALL_AXIOM}" = "true" ]; then
-    ###>> Regenerate SSH Keys <<###
     apt update && apt install -y --no-install-recommends openssh-client
 
     mkdir -p /root/.ssh
     mkdir -p /root/.axiom/configs
-
-    ssh-keygen -b 2048 -t rsa -f /root/.ssh/axiom_rsa -q -N ""
-    cat /root/.ssh/axiom_rsa.pub > /root/.axiom/configs/authorized_keys
 
     apt remove --purge -y openssh-client && apt autoremove -y && apt clean all
     find /var/lib/apt/lists -type f -delete
@@ -155,5 +151,8 @@ WORKDIR /reconftw
 HEALTHCHECK --interval=60s --timeout=30s --retries=3 \
   CMD ./reconftw.sh --health-check || exit 1
 
-ENTRYPOINT [ "./reconftw.sh" ]
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT [ "/entrypoint.sh" ]
 CMD [ "--help" ]

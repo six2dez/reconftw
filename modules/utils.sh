@@ -1,5 +1,5 @@
 #!/bin/bash
-# shellcheck disable=SC2154  # Variables defined in reconftw.cfg
+# shellcheck disable=SC2154,SC2034  # Variables defined in reconftw.cfg and runtime globals shared across modules
 # reconFTW - Utility functions module
 # Contains: deleteOutScoped, cleanup, rotate_logs, sanitization, validation,
 #           getElapsedTime, retry, disk check, rate limiting, caching
@@ -129,6 +129,63 @@ function validate_config() {
         printf "%b[INFO] Configuration has %d warning(s).%b\n" "$yellow" "$warnings" "$reset"
     fi
     return 0
+}
+
+# Auto-tune concurrency knobs according to host resources and PERF_PROFILE.
+# Usage: apply_performance_profile
+function apply_performance_profile() {
+    # shellcheck disable=SC2034  # Thread/rate vars are consumed by sourced modules at runtime
+    local profile="${PERF_PROFILE:-balanced}"
+    local cores mem_gb
+
+    cores=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        mem_gb=$(( $(sysctl -n hw.memsize 2>/dev/null || echo 8589934592) / 1024 / 1024 / 1024 ))
+    else
+        mem_gb=$(( $(awk '/MemTotal/ {print $2}' /proc/meminfo 2>/dev/null || echo 8388608) / 1024 / 1024 ))
+    fi
+    [[ "$cores" =~ ^[0-9]+$ ]] || cores=4
+    [[ "$mem_gb" =~ ^[0-9]+$ ]] || mem_gb=8
+
+    case "$profile" in
+        low)
+            PARALLEL_MAX_JOBS=${PARALLEL_MAX_JOBS:-2}
+            FFUF_THREADS=$((cores * 4))
+            HTTPX_THREADS=$((cores * 5))
+            HTTPX_UNCOMMONPORTS_THREADS=$((cores * 10))
+            KATANA_THREADS=$((cores * 3))
+            DALFOX_THREADS=$((cores * 20))
+            ;;
+        max)
+            PARALLEL_MAX_JOBS=${PARALLEL_MAX_JOBS:-$((cores > 2 ? cores - 1 : 2))}
+            FFUF_THREADS=$((cores * 14))
+            HTTPX_THREADS=$((cores * 16))
+            HTTPX_UNCOMMONPORTS_THREADS=$((cores * 28))
+            KATANA_THREADS=$((cores * 6))
+            DALFOX_THREADS=$((cores * 60))
+            ;;
+        *)
+            PARALLEL_MAX_JOBS=${PARALLEL_MAX_JOBS:-$((cores > 1 ? cores / 2 : 1))}
+            FFUF_THREADS=$((cores * 10))
+            HTTPX_THREADS=$((cores * 12))
+            HTTPX_UNCOMMONPORTS_THREADS=$((cores * 25))
+            KATANA_THREADS=$((cores * 5))
+            DALFOX_THREADS=$((cores * 50))
+            ;;
+    esac
+
+    # Clamp aggressive defaults for low-memory hosts.
+    if [[ "$mem_gb" -lt 6 ]]; then
+        ((PARALLEL_MAX_JOBS > 2)) && PARALLEL_MAX_JOBS=2
+        ((FFUF_THREADS > 24)) && FFUF_THREADS=24
+        ((HTTPX_THREADS > 40)) && HTTPX_THREADS=40
+        ((HTTPX_UNCOMMONPORTS_THREADS > 80)) && HTTPX_UNCOMMONPORTS_THREADS=80
+    fi
+
+    ((PARALLEL_MAX_JOBS < 1)) && PARALLEL_MAX_JOBS=1
+    printf "%b[%s] PERF_PROFILE=%s | cores=%s mem=%sGB | jobs=%s ffuf=%s httpx=%s%b\n" \
+        "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$profile" "$cores" "$mem_gb" \
+        "$PARALLEL_MAX_JOBS" "$FFUF_THREADS" "$HTTPX_THREADS" "$reset"
 }
 
 function getElapsedTime {
@@ -340,6 +397,7 @@ MIN_RATE_LIMIT=10
 MAX_RATE_LIMIT=500
 RATE_LIMIT_BACKOFF_FACTOR=0.5
 RATE_LIMIT_INCREASE_FACTOR=1.2
+PARALLEL_PRESSURE_LEVEL=${PARALLEL_PRESSURE_LEVEL:-normal}
 
 # Detect rate limit errors in command output
 # Usage: detect_rate_limit_error <output_file_or_string>
@@ -364,22 +422,24 @@ function adjust_rate_limit() {
     case "$action" in
         decrease)
             new_limit=$(awk "BEGIN {printf \"%.0f\", $CURRENT_RATE_LIMIT * $RATE_LIMIT_BACKOFF_FACTOR}")
-            if [ "$new_limit" -lt "$MIN_RATE_LIMIT" ]; then
-                new_limit=$MIN_RATE_LIMIT
-            fi
-            CURRENT_RATE_LIMIT=$new_limit
-            printf "%b[%s] Rate limit decreased to %d req/s due to errors%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$CURRENT_RATE_LIMIT" "$reset" | tee -a "$LOGFILE"
-            ;;
+        if [ "$new_limit" -lt "$MIN_RATE_LIMIT" ]; then
+            new_limit=$MIN_RATE_LIMIT
+        fi
+        CURRENT_RATE_LIMIT=$new_limit
+        PARALLEL_PRESSURE_LEVEL="high"
+        printf "%b[%s] Rate limit decreased to %d req/s due to errors%b\n" \
+            "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$CURRENT_RATE_LIMIT" "$reset" | tee -a "$LOGFILE"
+        ;;
         increase)
             new_limit=$(awk "BEGIN {printf \"%.0f\", $CURRENT_RATE_LIMIT * $RATE_LIMIT_INCREASE_FACTOR}")
-            if [ "$new_limit" -gt "$MAX_RATE_LIMIT" ]; then
-                new_limit=$MAX_RATE_LIMIT
-            fi
-            CURRENT_RATE_LIMIT=$new_limit
-            printf "%b[%s] Rate limit increased to %d req/s%b\n" \
-                "$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$CURRENT_RATE_LIMIT" "$reset" >>"$LOGFILE"
-            ;;
+        if [ "$new_limit" -gt "$MAX_RATE_LIMIT" ]; then
+            new_limit=$MAX_RATE_LIMIT
+        fi
+        CURRENT_RATE_LIMIT=$new_limit
+        PARALLEL_PRESSURE_LEVEL="normal"
+        printf "%b[%s] Rate limit increased to %d req/s%b\n" \
+            "$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$CURRENT_RATE_LIMIT" "$reset" >>"$LOGFILE"
+        ;;
     esac
 
     # Update tool-specific rate limits
@@ -570,13 +630,27 @@ function cache_init() {
     mkdir -p "$CACHE_DIR"/{wordlists,resolvers,tools}
 }
 
+# Resolve TTL per cache type.
+# Usage: cache_max_age_for_type <wordlists|resolvers|tools>
+function cache_max_age_for_type() {
+    case "${1:-tools}" in
+        resolvers) echo "${CACHE_MAX_AGE_DAYS_RESOLVERS:-${CACHE_MAX_AGE_DAYS:-30}}" ;;
+        wordlists) echo "${CACHE_MAX_AGE_DAYS_WORDLISTS:-${CACHE_MAX_AGE_DAYS:-30}}" ;;
+        tools|*) echo "${CACHE_MAX_AGE_DAYS_TOOLS:-${CACHE_MAX_AGE_DAYS:-30}}" ;;
+    esac
+}
+
 # Check if cached file is still valid (less than 30 days old)
 # Usage: cache_is_valid <cache_file>
 # Returns: 0 if valid, 1 if expired or missing
 function cache_is_valid() {
     local cache_file="$1"
+    local cache_type="${2:-tools}"
+    local max_age_days
+    max_age_days=$(cache_max_age_for_type "$cache_type")
 
     [[ ! -f "$cache_file" ]] && return 1
+    [[ "${CACHE_REFRESH:-false}" == "true" ]] && return 1
 
     # Get file modification time in seconds since epoch
     local file_mtime
@@ -598,7 +672,7 @@ function cache_is_valid() {
     local file_age_seconds=$((current_time - file_mtime))
     local file_age_days=$((file_age_seconds / 86400))
 
-    if [ $file_age_days -lt ${CACHE_MAX_AGE_DAYS:-30} ]; then
+    if [ "$file_age_days" -lt "$max_age_days" ]; then
         printf "%b[%s] Using cached file (age: %d days): %s%b\n" \
             "$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$file_age_days" "$(basename "$cache_file")" "$reset" >>"$LOGFILE"
         return 0
@@ -613,19 +687,27 @@ function cache_is_valid() {
 # Usage: cached_download <url> <destination> [cache_name]
 # If cache exists and is valid, copies from cache instead of downloading
 function cached_download() {
+    cached_download_typed "$1" "$2" "${3:-$(basename "$1")}" "tools"
+}
+
+# Download file with typed cache support
+# Usage: cached_download_typed <url> <destination> [cache_name] [cache_type]
+function cached_download_typed() {
     local url="$1"
     local destination="$2"
     local cache_name="${3:-$(basename "$url")}"
-    local cache_file="$CACHE_DIR/$cache_name"
+    local cache_type="${4:-tools}"
+    local cache_file="$CACHE_DIR/$cache_type/$cache_name"
 
     cache_init
 
     # Check if we have valid cached version
-    if cache_is_valid "$cache_file"; then
+    if cache_is_valid "$cache_file" "$cache_type"; then
         cp "$cache_file" "$destination"
         return 0
     fi
 
+    mkdir -p "$(dirname "$cache_file")"
     # Download fresh copy
     printf "%b[%s] Downloading: %s%b\n" \
         "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$(basename "$url")" "$reset"

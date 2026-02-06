@@ -5,12 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [v4.0] - 2026-02-05 Major Release
+## [v4.0] - 2026-02-06
 
 ### Added
 
 **Modular Architecture**
-- Split monolithic script into 8 focused modules under `modules/`:
+- Split monolithic script into focused modules under `modules/`:
   - `core.sh` — lifecycle, logging, notifications, cleanup
   - `modes.sh` — scan modes and argument parsing
   - `subdomains.sh` — subdomain enumeration
@@ -19,124 +19,125 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `osint.sh` — OSINT functions
   - `axiom.sh` — Axiom fleet helpers
   - `utils.sh` — shared utilities
-- Validation library at `lib/validation.sh` for input sanitization
+- Validation library at `lib/validation.sh` for input sanitization.
+- Shared libraries in `lib/common.sh` and `lib/parallel.sh`.
 
-**New CLI Flags**
-- `--health-check` — system diagnostics before scanning
-- `--dry-run` — preview commands without execution
-- `--parallel` — run independent functions in parallel (faster, more RAM)
-- `--source-only` — source functions without running (for testing/scripting)
+**New CLI and Runtime Modes**
+- `--health-check` for system diagnostics.
+- `--dry-run` to preview commands.
+- `--parallel` to run independent functions in parallel.
+- `--no-parallel` to force sequential mode.
+- `--source-only` for sourcing/testing workflows.
+- Continuous monitoring mode:
+  - `--monitor`
+  - `--monitor-interval <minutes>`
+  - `--monitor-cycles <n>` (0 = infinite)
+- `--report-only` to rebuild report artifacts from existing outputs.
+- `--refresh-cache` to force cache refresh.
+- `--export json|html|csv|all` export pipeline.
 
-**Robustness Features**
-- Circuit breaker pattern: auto-skip tools after repeated failures
-- Checkpoint system: resume scans from last successful phase
-- Adaptive rate limiting on 429/503 responses
-- Disk space pre-flight check (`MIN_DISK_SPACE_GB`)
-- Log rotation (`MAX_LOG_FILES`, `MAX_LOG_AGE_DAYS`)
-- Cleanup traps for graceful shutdown
+**Reporting and Output**
+- Consolidated reporting artifacts:
+  - `report/report.json`
+  - `report/index.html`
+  - `report/latest/report.json`
+  - `report/latest/index.html`
+- Export artifacts:
+  - JSONL: `report/findings_normalized.jsonl`, `report/export_all.jsonl`
+  - CSV: `report/subdomains.csv`, `report/webs.csv`, `report/hosts.csv`, `report/findings.csv`
+- Delta sections and timeline in report outputs.
+- Monitor history snapshots under `.incremental/history/<timestamp>/`.
+- Per-cycle alert summary at `.incremental/history/<timestamp>/alerts.json`.
+- Machine-readable run summary at `.log/perf_summary.json`.
+- Structured JSON logging support (`STRUCTURED_LOGGING=true`) with function/subfunction start/end events.
 
-**Input Validation**
-- `sanitize_domain()` strips dangerous characters and converts to lowercase
-- `validate_file_exists()`, `validate_file_readable()` for `--list`, `--inscope`, etc.
-- `validate_custom_function()` ensures `-c` targets exist before execution
+**AI and Automation Enhancements**
+- AI report generation integrated with local models via `reconftw_ai`.
+- AI profiles: `executive`, `brief`, `bughunter`.
+- Structured AI output artifact: `ai_result/reconftw_analysis.json`.
+- Human AI report artifact: `ai_result/reconftw_analysis_<profile>_<timestamp>.md|txt`.
+- New AI configuration controls:
+  - `AI_EXECUTABLE`
+  - `AI_PROMPTS_FILE`
+  - `AI_MAX_CHARS_PER_FILE`
+  - `AI_MAX_FILES_PER_CATEGORY`
+  - `AI_REDACT`
+  - `AI_ALLOW_MODEL_PULL`
+  - `AI_STRICT`
 
-**Testing**
-- 100+ bats tests covering unit, integration, and security scenarios
-- `tests/security/test_injection.bats` for command injection prevention
-- `tests/mocks/` for offline testing
-- Makefile targets: `make test`, `make lint`, `make test-security`
+**Configuration and Profiles**
+- New profile configs:
+  - `config/reconftw_quick.cfg`
+  - `config/reconftw_full.cfg`
+  - `config/reconftw_stealth.cfg`
+- Port lists externalized for easier maintenance:
+  - `config/tls_ports.txt`
+  - `config/uncommon_ports_web.txt`
+- Typed cache TTL controls:
+  - `CACHE_MAX_AGE_DAYS_RESOLVERS`
+  - `CACHE_MAX_AGE_DAYS_WORDLISTS`
+  - `CACHE_MAX_AGE_DAYS_TOOLS`
 
-**Other**
-- 6 new ASCII banners (#25-30)
-- `secrets.cfg` support (gitignored) for API keys
-- Performance timing summary at scan completion
-- DEEP mode helpers: `should_run_deep_*()` functions
+**Recon and Enumeration Enhancements**
+- ASN enumeration via `sub_asn()` using `asnmap`.
+- New `ASN_ENUM` option and outputs:
+  - `hosts/asn_numbers.txt`
+  - `hosts/asn_cidrs.txt`
+- Deep wildcard detection (`DEEP_WILDCARD_FILTER`) based on iterative wildcard checks.
+- Time-based certificate filtering (`DNS_TIME_FENCE_DAYS`).
+- Sensitive domain exclusion (`EXCLUDE_SENSITIVE`, `config/sensitive_domains.txt`).
 
-**Deep Wildcard Detection** (Based on DEF CON Subdomain Enumeration research)
-- `deep_wildcard_filter()` - Iterative wildcard detection at all subdomain levels
-- `DEEP_WILDCARD_FILTER` config option to enable/disable
-- Prevents false positives from nested wildcard DNS records
+**Progress and UX**
+- Progress/ETA functions (`progress_init()`, `progress_step()`) integrated in recon flows.
+- Better quick-rescan and monitor UX with adjusted totals and explicit cycle behavior.
 
-**Time-Based Certificate Filtering**
-- `DNS_TIME_FENCE_DAYS` config option to filter crt.sh results by age
-- Recommended value: 90 days to focus on recent certificates
-- Set to 0 to disable (default, backward compatible)
-
-**Sensitive Domain Exclusion**
-- `EXCLUDE_SENSITIVE` config option to skip scanning sensitive domains
-- `config/sensitive_domains.txt` - Curated list of patterns to exclude:
-  - Government domains (*.gov, *.gob.*, *.gouv.*)
-  - Military domains (*.mil)
-  - Education domains (*.edu)
-  - Financial institutions
-  - Healthcare organizations
-- `_is_sensitive_domain()` helper function for pattern matching
-
-**Parallelization Framework** (lib/parallel.sh)
-- `parallel_run()` - Run commands in parallel with configurable job limit
-- `parallel_funcs()` - Run bash functions in parallel subshells
-- `parallel_passive_enum()` - Parallel passive subdomain enumeration
-- `parallel_active_enum()` - Parallel active DNS checks
-- `parallel_postactive_enum()` - Parallel TLS/analytics (after resolution)
-- `parallel_brute_enum()` - Resource-limited parallel brute force
-- `parallel_web_vulns()` - Parallel web vulnerability scanning
-- `parallel_subdomains_full()` - Full parallelized subdomain orchestration
-
-**Common Utilities Library** (lib/common.sh)
-- `ensure_dirs()` - Create multiple directories safely
-- `safe_backup()` - Backup files with timestamps
-- `skip_notification()` - Standardized skip logging
-- `count_lines()`, `safe_count()` - Safe line counting
-- `dedupe_append()` - Append and deduplicate
-- `run_tool()` - Execute with timeout and error handling
-- `should_run_function()` - Checkpoint-aware function check
-
-**Integration Tests**
-- `tests/integration/test_full_flow.bats` - 17 tests for complete workflow
-- `tests/integration/test_checkpoint.bats` - 20 tests for resume functionality
-- Total test count: 164
-
-**Refactored Functions**
-- `subdomains_full()` decomposed into `_subdomains_init()`, `_subdomains_enumerate()`, `_subdomains_finalize()`
-- `webprobe_*()` uses shared helpers `_run_httpx()`, `_process_httpx_output()`
-- `--parallel` flag support for subdomain enumeration
-
-### Fixed
-
-**Security**
-- Fixed unquoted variable in `file $1` → `file "$1"` (core.sh)
-- Fixed unquoted AI command variables (modes.sh)  
-- Fixed unquoted HTTPX_FLAGS (web.sh)
-- Added NUMOFLINES validation with fallback to 0
-
-**Parallelization Order**
-- `sub_tls` and `sub_analytics` now run AFTER `sub_active` (require resolved subdomains)
-
-**List Mode (-l flag)**
-- Fixed bug where only first domain in target list was processed
-- Changed while loops to use dedicated file descriptor (FD 3)
-- Prevents internal commands from consuming stdin and breaking the loop
-- Now correctly processes all domains in the list sequentially
-
-**Others**
-- macOS compatibility: `stat`, `df`, `sed` commands now detect OS correctly
-- Syntax error in `vulns.sh` (pipe at wrong line position)
-- Timing summary crash when function names contained spaces
-- Readonly variable error when re-sourcing the script
-- Duplicate nuclei findings (domain vs URL targeting same host)
+**Testing and Tooling**
+- Expanded BATS test coverage (unit/integration/security) and mocks.
+- Integration tests for full flow and checkpoint behavior.
+- Additional test helpers/scripts for artifact and mode validation.
 
 ### Changed
 
-- Replaced 107 duplicate `mkdir -p` patterns with `ensure_dirs()`
-- Replaced skip notification printf patterns with `skip_notification()`
-- Module loading order updated to include lib/common.sh and lib/parallel.sh
-- Main script reduced from ~7000 to ~500 lines (entry point only)
-- Nuclei scans now use only URLs with protocol, avoiding duplicate scans
-- All API keys use env-var fallback pattern (`${VAR:-}`)
-- Interactsh process tracked by PID instead of `pkill -f`
+- Main script reduced to entry-point style with modular delegation.
+- Module loading order updated to include shared libraries (`lib/common.sh`, `lib/parallel.sh`).
+- Replaced repetitive utility patterns with centralized helpers:
+  - `ensure_dirs()`
+  - `skip_notification()`
+  - `count_lines()`/`safe_count()`
+  - `run_tool()`
+  - `should_run_function()`
+- Profile configuration behavior changed to override-only semantics (preserving preloaded secrets/env).
+- Nuclei targeting adjusted to prioritize URL-with-protocol inputs and reduce duplicate host scans.
+- Parallel scheduler improved with backpressure signals from adaptive rate limiting.
+- Threading/performance tuning improved with `PERF_PROFILE` (`low|balanced|max`).
+
+### Fixed
+
+**Stability and Correctness**
+- List mode (`-l`) now processes all targets reliably (FD-safe loops).
+- Fixed syntax/runtime edge cases in module scripts.
+- Corrected timing/perf summary handling edge cases.
+- Resolved readonly/re-source issues in script lifecycle.
+- Fixed duplicate findings/reporting edge cases.
+- Corrected `sub_asn()` behavior to avoid redundant repeated runs.
+- Corrected host matching in WAF/slow-host grouping to literal-safe comparisons.
+- Parallel group failures now propagate correctly instead of being silently ignored.
+
+**CI/CD and Docker**
+- ShellCheck failures now fail CI (removed permissive `continue-on-error`).
+- Added Docker nightly verification steps (`--help`, `--health-check`).
+- Nightly image health-check failures now fail workflows.
+- Docker image security improved by generating Axiom SSH keys at runtime via `Docker/entrypoint.sh` instead of build-time.
+
+**Cross-platform/Operational Fixes**
+- Improved macOS compatibility for `stat`, `df`, and `sed` behavior.
+- Improved cache lifecycle behavior and runtime refresh handling.
+- Progress totals now correctly account for quick-rescan skips and execution model differences.
 
 ### Security
-- Removed all `eval` on user input
-- Input sanitization prevents shell metacharacter injection
-- Secrets redacted from logs when `SHOW_COMMANDS=true`
-- File permission checks for `secrets.cfg`
+
+- Removed unsafe `eval` usage on user-influenced input paths.
+- Hardened input sanitization against shell metacharacter injection.
+- Improved quoting and command construction across modules.
+- Secrets handling hardened (`secrets.cfg` checks, env fallback patterns, log redaction with command tracing).
+- Docker key handling moved to runtime generation to avoid shared-key risk across images.

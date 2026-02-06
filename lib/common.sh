@@ -187,7 +187,9 @@ filter_and_process() {
     local count=0
     
     if [[ -s "$input" ]]; then
-        count=$(grep "\\.${domain}$\\|^${domain}$" "$input" 2>/dev/null \
+        local escaped
+        escaped=$(escape_domain_regex "$domain")
+        count=$(grep "\\.${escaped}$\\|^${escaped}$" "$input" 2>/dev/null \
             | anew "$output" 2>/dev/null \
             | sed '/^$/d' \
             | wc -l | tr -d ' ')
@@ -195,6 +197,77 @@ filter_and_process() {
     
     [[ "$count" =~ ^[0-9]+$ ]] || count=0
     echo "$count"
+}
+
+###############################################################################
+# Domain Matching Helpers
+###############################################################################
+
+# Escape a domain name for safe use in grep regex patterns
+# Dots are literal in domain names but regex metacharacters
+# Usage: escaped=$(escape_domain_regex "example.com")
+escape_domain_regex() {
+    printf '%s' "$1" | sed 's/[.[\*^$()+?{|]/\\&/g'
+}
+
+# Grep lines matching a domain (as subdomain or exact match) with proper escaping
+# Usage: grep_domain input_file domain [extra_grep_flags...]
+# Matches: "*.domain" and "domain" exactly (anchored)
+grep_domain() {
+    local input="$1"
+    local raw_domain="$2"
+    shift 2
+    local escaped
+    escaped=$(escape_domain_regex "$raw_domain")
+    grep "$@" "\.${escaped}$\|^${escaped}$" "$input"
+}
+
+###############################################################################
+# Axiom/Local Execution Helper
+###############################################################################
+
+# Run a tool command, automatically choosing between local and axiom-scan
+# Usage: run_scan <input_file> <output_file> <tool_name> [tool_args...]
+# Example: run_scan .tmp/input.txt .tmp/output.txt subfinder -silent
+# With AXIOM: axiom-scan input -m tool args -o output $AXIOM_EXTRA_ARGS
+# Without:    tool args < input > output (or with -o flag)
+run_scan() {
+    local input="$1"
+    local output="$2"
+    local tool="$3"
+    shift 3
+
+    if [[ ${AXIOM:-false} == true ]]; then
+        axiom-scan "$input" -m "$tool" "$@" -o "$output" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+    else
+        "$tool" "$@" -o "$output" <"$input" 2>>"$LOGFILE" >/dev/null
+    fi
+}
+
+###############################################################################
+# Function Gate Helper
+###############################################################################
+
+# Check if a function should run based on its flag and checkpoint
+# Usage: if should_run "FLAG_VAR_NAME"; then ... fi
+# Replaces the repeated pattern:
+#   if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $FLAG == true ]]; then
+should_run() {
+    local flag_var="$1"
+    local func_name="${FUNCNAME[1]:-unknown}"
+    local checkpoint_file="${called_fn_dir:-.}/.${func_name}"
+
+    # Check if feature flag is enabled
+    if [[ "${!flag_var:-false}" != true ]]; then
+        return 1
+    fi
+
+    # Check if already processed (unless DIFF mode)
+    if [[ -f "$checkpoint_file" ]] && [[ ${DIFF:-false} != true ]]; then
+        return 1
+    fi
+
+    return 0
 }
 
 ###############################################################################
