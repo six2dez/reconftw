@@ -49,3 +49,13 @@ JSON
   grep -q '"delta_since_last"' report/report.json
   grep -q '"alerts_last"' report/report.json
 }
+
+@test "report generation handles missing optional artifacts gracefully" {
+  rm -f subdomains/subdomains.txt webs/webs_all.txt hosts/ips.txt
+  rm -rf nuclei_output
+
+  run generate_consolidated_report
+  [ "$status" -eq 0 ]
+  [ -f report/report.json ]
+  [[ "$output" != *"No such file or directory"* ]]
+}

@@ -93,15 +93,17 @@ function github_repos() {
                     return 1
                 fi
             else
+                log_note "No GitHub repos found for ${domain}; continuing" "${FUNCNAME[0]}" "${LINENO}"
                 end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}"
-                return 1
+                return 0
             fi
 
             if [[ -d ".tmp/github_repos/" ]]; then
                 ls .tmp/github_repos >.tmp/github_repos_folders.txt
             else
+                log_note "GitHub clone directory missing for ${domain}; no repo artifacts to process" "${FUNCNAME[0]}" "${LINENO}"
                 end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}"
-                return 1
+                return 0
             fi
 
             if [[ -s ".tmp/github_repos_folders.txt" ]]; then
@@ -111,8 +113,9 @@ function github_repos() {
                     return 1
                 fi
             else
+                log_note "No cloned GitHub repos to scan with gitleaks for ${domain}" "${FUNCNAME[0]}" "${LINENO}"
                 end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}"
-                return 1
+                return 0
             fi
 
             if [[ -s ".tmp/company_repos_url.txt" ]]; then
@@ -128,8 +131,9 @@ function github_repos() {
                     return 1
                 fi
             else
+                log_note "No GitHub scan outputs available to merge for ${domain}" "${FUNCNAME[0]}" "${LINENO}"
                 end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}"
-                return 1
+                return 0
             fi
 
             end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}"
@@ -349,8 +353,24 @@ function third_party_misconfigs() {
             return 1
         fi
 
-        # Run misconfig-mapper and handle errors
-        misconfig-mapper -target "$company_name" -service "*" 2>&1 | grep -v "\-\]" | grep -v "Failed" >"${dir}/osint/3rdparts_misconfigurations.txt"
+        # Run misconfig-mapper and treat manual interrupts as non-fatal so recon can continue.
+        local misconfig_rc=0
+        {
+            misconfig-mapper -target "$company_name" -service "*" 2>&1 \
+                | grep -v "\-\]" \
+                | grep -v "Failed" >"${dir}/osint/3rdparts_misconfigurations.txt"
+            misconfig_rc=${PIPESTATUS[0]:-0}
+        } || true
+        if [[ $misconfig_rc -eq 130 || $misconfig_rc -eq 137 || $misconfig_rc -eq 143 ]]; then
+            notification "misconfig-mapper interrupted (rc=${misconfig_rc}); skipping third_party_misconfigs and continuing" warn
+            log_note "misconfig-mapper interrupted by user/system (rc=${misconfig_rc})" "${FUNCNAME[0]}" "${LINENO}"
+            if ! popd >/dev/null; then
+                printf "%b[!] Failed to return to previous directory in %s at line %s.%b\n" \
+                    "$bred" "${FUNCNAME[0]}" "$LINENO" "$reset"
+                return 1
+            fi
+            return 0
+        fi
 
         # Return to the previous directory
         if ! popd >/dev/null; then

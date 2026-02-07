@@ -115,7 +115,7 @@ function axiom_launch() {
             printf 'axiom-fleet %q' "${AXIOM_FLEET_NAME}"
             printf ' %q' "${AXIOM_FLEET_ARGS[@]}"
             echo
-            axiom-fleet "${AXIOM_FLEET_NAME}" "${AXIOM_FLEET_ARGS[@]}"
+            axiom-fleet2 "${AXIOM_FLEET_NAME}" "${AXIOM_FLEET_ARGS[@]}"
             axiom-select "$AXIOM_FLEET_NAME*"
             if [[ -n $AXIOM_POST_START ]]; then
                 bash -lc "$AXIOM_POST_START" 2>>"$LOGFILE" >/dev/null

@@ -274,6 +274,9 @@ function end() {
     global_end=$(date +%s)
     getElapsedTime $global_start $global_end
     printf "${bgreen}#######################################################################${reset}\n"
+    if [[ "${RECON_PARTIAL_RUN:-false}" == "true" ]]; then
+        notification "Run completed with non-fatal warnings (osint_parallel=${RECON_OSINT_PARALLEL_FAILURES:-0})" warn
+    fi
     notification "Finished Recon on: ${domain} under ${finaldir} in: ${runtime}" good "$(date +'%Y-%m-%d %H:%M:%S')"
     [ "$SOFT_NOTIFICATION" = true ] && echo "[$(date +'%Y-%m-%d %H:%M:%S')] Finished Recon on: ${domain} under ${finaldir} in: ${runtime}" | notify -silent
     printf "${bgreen}#######################################################################${reset}\n"
@@ -400,21 +403,49 @@ function vulns() {
         if [[ "${PARALLEL_MODE:-true}" == "true" ]] && declare -f parallel_funcs &>/dev/null; then
             # Parallel execution - group independent checks
             printf "%b[*] Running vulnerability checks in parallel mode%b\n" "$bblue" "$reset"
-            if ! parallel_funcs 4 cors open_redirect crlf_checks xss; then
-                notification "Parallel vulns batch failed (group 1)" error
-                return 1
+            parallel_funcs 4 cors open_redirect crlf_checks xss
+            local vulns_g1_rc=$?
+            if ((vulns_g1_rc > 0)); then
+                if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
+                    RECON_PARTIAL_RUN=true
+                    notification "Parallel vulns group 1 completed with ${vulns_g1_rc} warning(s); continuing" warn
+                else
+                    notification "Parallel vulns batch failed (group 1)" error
+                    return 1
+                fi
             fi
-            if ! parallel_funcs 4 ssrf_checks lfi ssti sqli; then
-                notification "Parallel vulns batch failed (group 2)" error
-                return 1
+            parallel_funcs 4 ssrf_checks lfi ssti sqli
+            local vulns_g2_rc=$?
+            if ((vulns_g2_rc > 0)); then
+                if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
+                    RECON_PARTIAL_RUN=true
+                    notification "Parallel vulns group 2 completed with ${vulns_g2_rc} warning(s); continuing" warn
+                else
+                    notification "Parallel vulns batch failed (group 2)" error
+                    return 1
+                fi
             fi
-            if ! parallel_funcs 3 command_injection prototype_pollution smuggling; then
-                notification "Parallel vulns batch failed (group 3)" error
-                return 1
+            parallel_funcs 3 command_injection prototype_pollution smuggling
+            local vulns_g3_rc=$?
+            if ((vulns_g3_rc > 0)); then
+                if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
+                    RECON_PARTIAL_RUN=true
+                    notification "Parallel vulns group 3 completed with ${vulns_g3_rc} warning(s); continuing" warn
+                else
+                    notification "Parallel vulns batch failed (group 3)" error
+                    return 1
+                fi
             fi
-            if ! parallel_funcs 3 webcache spraying brokenLinks; then
-                notification "Parallel vulns batch failed (group 4)" error
-                return 1
+            parallel_funcs 3 webcache spraying brokenLinks
+            local vulns_g4_rc=$?
+            if ((vulns_g4_rc > 0)); then
+                if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
+                    RECON_PARTIAL_RUN=true
+                    notification "Parallel vulns group 4 completed with ${vulns_g4_rc} warning(s); continuing" warn
+                else
+                    notification "Parallel vulns batch failed (group 4)" error
+                    return 1
+                fi
             fi
             fuzzparams
             4xxbypass
@@ -509,6 +540,9 @@ function multi_osint() {
 }
 
 function recon() {
+    RECON_PARTIAL_RUN=false
+    RECON_OSINT_PARALLEL_FAILURES=0
+
     # Initialize progress tracking for selected execution model.
     local progress_total
     if [[ "${PARALLEL_MODE:-true}" == "true" ]] && declare -f parallel_funcs &>/dev/null; then
@@ -520,14 +554,20 @@ function recon() {
 
     if [[ "${PARALLEL_MODE:-true}" == "true" ]] && declare -f parallel_funcs &>/dev/null; then
         progress_step "OSINT: domain_info, ip_info, emails, dorks"
-        if ! parallel_funcs 4 domain_info ip_info emails google_dorks; then
-            notification "Parallel OSINT batch failed (group 1)" error
-            return 1
+        parallel_funcs 4 domain_info ip_info emails google_dorks
+        local osint_g1_rc=$?
+        if ((osint_g1_rc > 0)); then
+            RECON_PARTIAL_RUN=true
+            RECON_OSINT_PARALLEL_FAILURES=$((RECON_OSINT_PARALLEL_FAILURES + osint_g1_rc))
+            notification "Parallel OSINT group 1 completed with ${osint_g1_rc} warning(s); continuing" warn
         fi
         progress_step "OSINT: repos, metadata, api_leaks, 3rd_party"
-        if ! parallel_funcs 4 github_repos metadata apileaks third_party_misconfigs; then
-            notification "Parallel OSINT batch failed (group 2)" error
-            return 1
+        parallel_funcs 4 github_repos metadata apileaks third_party_misconfigs
+        local osint_g2_rc=$?
+        if ((osint_g2_rc > 0)); then
+            RECON_PARTIAL_RUN=true
+            RECON_OSINT_PARALLEL_FAILURES=$((RECON_OSINT_PARALLEL_FAILURES + osint_g2_rc))
+            notification "Parallel OSINT group 2 completed with ${osint_g2_rc} warning(s); continuing" warn
         fi
         progress_step "Zone transfer"
         zonetransfer
@@ -557,6 +597,10 @@ function recon() {
         favicon
     fi
 
+    if [[ "${RECON_PARTIAL_RUN:-false}" == "true" ]]; then
+        notification "Recon is continuing in partial mode (OSINT warnings: ${RECON_OSINT_PARALLEL_FAILURES:-0})" warn
+    fi
+
     if [[ $AXIOM == true ]]; then
         axiom_launch
         axiom_selected
@@ -575,9 +619,16 @@ function recon() {
 
     if [[ "${PARALLEL_MODE:-true}" == "true" ]] && declare -f parallel_funcs &>/dev/null; then
         progress_step "screenshot, cdnprovider, portscan"
-        if ! parallel_funcs 3 screenshot cdnprovider portscan; then
-            notification "Parallel web/host batch failed" error
-            return 1
+        parallel_funcs 3 screenshot cdnprovider portscan
+        local webhost_rc=$?
+        if ((webhost_rc > 0)); then
+            if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
+                RECON_PARTIAL_RUN=true
+                notification "Parallel web/host batch completed with ${webhost_rc} warning(s); continuing" warn
+            else
+                notification "Parallel web/host batch failed" error
+                return 1
+            fi
         fi
         progress_step "geo_info"
         geo_info

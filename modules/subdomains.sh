@@ -262,27 +262,51 @@ _subdomains_enumerate() {
         sub_asn
         
         # Phase 1: Passive sources (all can run in parallel)
-        if ! parallel_funcs 4 sub_passive sub_crt; then
-            notification "Parallel subdomain batch failed (passive)" error
-            return 1
+        parallel_funcs 4 sub_passive sub_crt
+        local sub_g1_rc=$?
+        if ((sub_g1_rc > 0)); then
+            if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
+                notification "Parallel subdomain passive phase completed with ${sub_g1_rc} warning(s); continuing" warn
+            else
+                notification "Parallel subdomain batch failed (passive)" error
+                return 1
+            fi
         fi
         
         # Phase 2: Active DNS resolution (parallel)
-        if ! parallel_funcs 3 sub_active sub_noerror sub_dns; then
-            notification "Parallel subdomain batch failed (active)" error
-            return 1
+        parallel_funcs 3 sub_active sub_noerror sub_dns
+        local sub_g2_rc=$?
+        if ((sub_g2_rc > 0)); then
+            if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
+                notification "Parallel subdomain active phase completed with ${sub_g2_rc} warning(s); continuing" warn
+            else
+                notification "Parallel subdomain batch failed (active)" error
+                return 1
+            fi
         fi
         
         # Phase 3: Post-active (depend on resolved subdomains)
-        if ! parallel_funcs 2 sub_tls sub_analytics; then
-            notification "Parallel subdomain batch failed (post-active)" error
-            return 1
+        parallel_funcs 2 sub_tls sub_analytics
+        local sub_g3_rc=$?
+        if ((sub_g3_rc > 0)); then
+            if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
+                notification "Parallel subdomain post-active phase completed with ${sub_g3_rc} warning(s); continuing" warn
+            else
+                notification "Parallel subdomain batch failed (post-active)" error
+                return 1
+            fi
         fi
         
         # Phase 4: Brute force (limited parallelism - resource intensive)
-        if ! parallel_funcs 2 sub_brute sub_permut sub_regex_permut sub_ia_permut; then
-            notification "Parallel subdomain batch failed (bruteforce/permutations)" error
-            return 1
+        parallel_funcs 2 sub_brute sub_permut sub_regex_permut sub_ia_permut
+        local sub_g4_rc=$?
+        if ((sub_g4_rc > 0)); then
+            if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
+                notification "Parallel subdomain bruteforce/permutations phase completed with ${sub_g4_rc} warning(s); continuing" warn
+            else
+                notification "Parallel subdomain batch failed (bruteforce/permutations)" error
+                return 1
+            fi
         fi
         
         # Phase 5: Recursive and scraping (sequential - depends on previous results)

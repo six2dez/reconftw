@@ -84,6 +84,24 @@ teardown() {
     [ "$status" -eq 1 ]
 }
 
+@test "parallel_funcs buffers output per function" {
+    func_a() { echo "A1"; sleep 0.05; echo "A2"; }
+    func_b() { echo "B1"; sleep 0.05; echo "B2"; }
+
+    run parallel_funcs 2 func_a func_b
+    [ "$status" -eq 0 ]
+    [[ "$output" == *$'A1\nA2'* ]]
+    [[ "$output" == *$'B1\nB2'* ]]
+}
+
+@test "parallel_funcs cleans temporary buffered output" {
+    func_ok() { echo "ok"; }
+
+    run parallel_funcs 2 func_ok
+    [ "$status" -eq 0 ]
+    [ ! -d "/tmp/reconftw_parallel.$$" ]
+}
+
 ###############################################################################
 # parallel_batch tests
 ###############################################################################

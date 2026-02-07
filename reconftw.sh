@@ -122,6 +122,7 @@ fi
 # shellcheck disable=SC2086
 eval set -- "$PROGARGS"
 unset PROGARGS
+CLI_PARALLEL_MODE=""
 
 while true; do
     case "$1" in
@@ -310,11 +311,13 @@ while true; do
             ;;
         '--parallel')
             PARALLEL_MODE=true
+            CLI_PARALLEL_MODE=true
             shift
             continue
             ;;
         '--no-parallel')
             PARALLEL_MODE=false
+            CLI_PARALLEL_MODE=false
             shift
             continue
             ;;
@@ -404,6 +407,9 @@ if [[ -n "${CLI_EXPORT_FORMAT:-}" ]]; then
 fi
 if [[ "${CLI_REPORT_ONLY:-false}" == "true" ]]; then
     REPORT_ONLY=true
+fi
+if [[ -n "${CLI_PARALLEL_MODE:-}" ]]; then
+    PARALLEL_MODE="${CLI_PARALLEL_MODE}"
 fi
 
 if [[ $opt_deep ]]; then

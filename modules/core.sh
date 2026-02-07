@@ -1269,10 +1269,14 @@ function write_perf_summary() {
     done
 
     local subs_count webs_count hosts_count findings_count
-    subs_count=$(wc -l <"${dir}/subdomains/subdomains.txt" 2>/dev/null | tr -d ' ')
-    webs_count=$(wc -l <"${dir}/webs/webs_all.txt" 2>/dev/null | tr -d ' ')
-    hosts_count=$(wc -l <"${dir}/hosts/ips.txt" 2>/dev/null | tr -d ' ')
-    findings_count=$(find "${dir}/nuclei_output" -type f -name '*_json.txt' -exec cat {} + 2>/dev/null | wc -l | tr -d ' ')
+    subs_count=$(count_lines "${dir}/subdomains/subdomains.txt")
+    webs_count=$(count_lines "${dir}/webs/webs_all.txt")
+    hosts_count=$(count_lines "${dir}/hosts/ips.txt")
+    if [[ -d "${dir}/nuclei_output" ]]; then
+        findings_count=$(find "${dir}/nuclei_output" -type f -name '*_json.txt' -exec cat {} + 2>/dev/null | wc -l | tr -d ' ')
+    else
+        findings_count=0
+    fi
     subs_count=${subs_count:-0}
     webs_count=${webs_count:-0}
     hosts_count=${hosts_count:-0}
@@ -1339,16 +1343,16 @@ function generate_consolidated_report() {
     local sev_info sev_low sev_medium sev_high sev_critical
     local top_assets_json timeline_json links_json monitor_delta_json monitor_alerts_json
 
-    subs_count=$(wc -l <subdomains/subdomains.txt 2>/dev/null | tr -d ' ')
-    webs_count=$(wc -l <webs/webs_all.txt 2>/dev/null | tr -d ' ')
-    hosts_count=$(wc -l <hosts/ips.txt 2>/dev/null | tr -d ' ')
+    subs_count=$(count_lines "subdomains/subdomains.txt")
+    webs_count=$(count_lines "webs/webs_all.txt")
+    hosts_count=$(count_lines "hosts/ips.txt")
     screenshots_count=$(find screenshots -type f -name '*.png' 2>/dev/null | wc -l | tr -d ' ')
 
-    sev_info=$(wc -l <nuclei_output/info_json.txt 2>/dev/null | tr -d ' ')
-    sev_low=$(wc -l <nuclei_output/low_json.txt 2>/dev/null | tr -d ' ')
-    sev_medium=$(wc -l <nuclei_output/medium_json.txt 2>/dev/null | tr -d ' ')
-    sev_high=$(wc -l <nuclei_output/high_json.txt 2>/dev/null | tr -d ' ')
-    sev_critical=$(wc -l <nuclei_output/critical_json.txt 2>/dev/null | tr -d ' ')
+    sev_info=$(count_lines "nuclei_output/info_json.txt")
+    sev_low=$(count_lines "nuclei_output/low_json.txt")
+    sev_medium=$(count_lines "nuclei_output/medium_json.txt")
+    sev_high=$(count_lines "nuclei_output/high_json.txt")
+    sev_critical=$(count_lines "nuclei_output/critical_json.txt")
 
     subs_count=${subs_count:-0}
     webs_count=${webs_count:-0}
