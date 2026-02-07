@@ -184,11 +184,13 @@ parallel_batch() {
 # Usage: wait_for_jobs [timeout_seconds]
 wait_for_jobs() {
     local timeout="${1:-0}"
-    local start_time=$(date +%s)
+    local start_time
+    start_time=$(date +%s)
     
     while jobs -p | grep -q .; do
         if ((timeout > 0)); then
-            local elapsed=$(($(date +%s) - start_time))
+            local elapsed
+            elapsed=$(($(date +%s) - start_time))
             if ((elapsed >= timeout)); then
                 printf "%b[!] Timeout reached, killing remaining jobs%b\n" "${bred:-}" "${reset:-}" >&2
                 jobs -p | xargs -r kill 2>/dev/null || true

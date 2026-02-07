@@ -879,6 +879,7 @@ function grpc_reflection() {
         local targets=()
         # shellcheck disable=SC2207  # Word splitting intended for array population
         [[ -s $ips_file ]] && targets+=($(cat "$ips_file"))
+        # shellcheck disable=SC2207  # Word splitting intended for array population
         [[ -s "hosts/ips_v6.txt" ]] && targets+=($(cat "hosts/ips_v6.txt"))
         printf "%s\n" "${targets[@]}" | sort -u >.tmp/grpc_ips.txt
         if [[ -s .tmp/grpc_ips.txt ]]; then

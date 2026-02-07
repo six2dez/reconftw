@@ -345,14 +345,21 @@ function passive() {
     metadata
     apileaks
     third_party_misconfigs
-    # shellcheck disable=SC2034  # These flags control module behavior
+    # shellcheck disable=SC2034  # These globals are consumed by downstream module functions
     SUBNOERROR=false
+    # shellcheck disable=SC2034
     SUBANALYTICS=false
+    # shellcheck disable=SC2034
     SUBBRUTE=false
+    # shellcheck disable=SC2034
     SUBSCRAPING=false
+    # shellcheck disable=SC2034
     SUBPERMUTE=false
+    # shellcheck disable=SC2034
     SUBREGEXPERMUTE=false
+    # shellcheck disable=SC2034
     SUB_RECURSIVE_BRUTE=false
+    # shellcheck disable=SC2034
     WEBPROBESIMPLE=false
     if [[ $AXIOM == true ]]; then
         axiom_launch
@@ -1089,8 +1096,10 @@ function monitor_mode() {
         MONITOR_MAX_CYCLES=0
     fi
 
+    # shellcheck disable=SC2034  # Used by downstream execution functions in monitor cycles
     INCREMENTAL_MODE=true
     QUICK_RESCAN=true
+    # shellcheck disable=SC2034  # Used by downstream execution functions in monitor cycles
     DIFF=true
     local interval_sec=$((MONITOR_INTERVAL_MIN * 60))
     local cycle=0

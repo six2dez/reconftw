@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2154,SC2034
 
 # Safer bash defaults
 set -o pipefail
@@ -19,6 +20,7 @@ if [[ ! -f $CONFIG_FILE ]]; then
     exit 1
 fi
 
+# shellcheck source=./reconftw.cfg
 source "$CONFIG_FILE"
 
 # Initialize variables
@@ -570,10 +572,11 @@ function check_updates() {
     printf "%bRunning: Looking for new reconFTW version%b\n" "$bblue" "$reset"
 
     if { [[ -n $TIMEOUT_CMD ]] && $TIMEOUT_CMD 10 git fetch; } || git fetch; then
+        local BRANCH
         BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "HEAD")
         HEADHASH=$(git rev-parse HEAD 2>/dev/null || true)
         # Skip auto-update if no upstream (detached HEAD or no tracking branch)
-        if ! git rev-parse --abbrev-ref --symbolic-full-name @{u} >/dev/null 2>&1; then
+        if ! git rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
             printf "%bNo upstream configured (detached HEAD). Skipping auto-update.%b\n" "$yellow" "$reset"
             return 0
         fi
@@ -860,7 +863,9 @@ function install_yum() {
     fi
 
     # Ensure pipx uses the selected python3
-    export PIPX_DEFAULT_PYTHON="$(command -v python3 || echo python3)"
+    local pipx_python
+    pipx_python="$(command -v python3 || echo python3)"
+    export PIPX_DEFAULT_PYTHON="$pipx_python"
 
     # Ensure pipx is present even on older EL (install via pip if the rpm doesn't exist)
     if ! command -v pipx &>/dev/null; then

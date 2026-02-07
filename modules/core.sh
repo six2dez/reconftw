@@ -940,13 +940,8 @@ function zipSnedOutputFolder {
 }
 
 function isAsciiText {
-    # shellcheck disable=SC2034  # IS_ASCII used by callers
-    IS_ASCII="False"
-    if [[ $(file "$1" | grep -o 'ASCII text$') == "ASCII text" ]]; then
-        IS_ASCII="True"
-    else
-        IS_ASCII="False"
-    fi
+    # shellcheck disable=SC2034  # IS_ASCII is consumed by callers after invoking this helper
+    IS_ASCII=$([[ $(file "$1" | grep -o 'ASCII text$') == "ASCII text" ]] && echo "True" || echo "False")
 }
 
 function output() {
@@ -1128,8 +1123,6 @@ function maybe_update_nuclei() {
 }
 
 # Plugin framework
-# shellcheck disable=SC2034  # PLUGINS_LOADED used for state tracking
-PLUGINS_LOADED=false
 function plugins_load() {
     local plugdir="${SCRIPTPATH}/plugins"
     if [[ -d $plugdir ]]; then
@@ -1138,7 +1131,6 @@ function plugins_load() {
             [[ -f $f ]] && source "$f" || true
         done
     fi
-    PLUGINS_LOADED=true
 }
 
 function plugins_emit() {
