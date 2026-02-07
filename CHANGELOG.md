@@ -120,6 +120,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Resolved readonly/re-source issues in script lifecycle.
 - Fixed duplicate findings/reporting edge cases.
 - Corrected `sub_asn()` behavior to avoid redundant repeated runs.
+- `sub_asn()` now requires `PDCP_API_KEY` before running `asnmap`, logs explicit skip reason when unset, and applies a 120s timeout guard when available.
 - Corrected host matching in WAF/slow-host grouping to literal-safe comparisons.
 - Parallel group failures now propagate correctly instead of being silently ignored.
 

@@ -29,6 +29,7 @@ pt_msg_err() { printf "\n%b[%s] %s%b\n" "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "
 REDACT_VARS=(
     "SHODAN_API_KEY"
     "WHOISXML_API"
+    "PDCP_API_KEY"
     "GITHUB_TOKEN"
     "GITLAB_TOKEN"
     "DISCORD_WEBHOOK_URL"

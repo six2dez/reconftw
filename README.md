@@ -357,6 +357,7 @@ cd reconftw
    ```bash
    docker run -it --rm \
      -e SHODAN_API_KEY="your-key" \
+     -e PDCP_API_KEY="your-projectdiscovery-key" \
      -e COLLAB_SERVER="your-server" \
      -e XSS_SERVER="your-server" \
      -v "${PWD}/OutputFolder/:/reconftw/Recon/" \
@@ -394,6 +395,7 @@ cd reconftw
 - GitHub tokens: `~/Tools/.github_tokens` (one per line)
 - GitLab tokens: `~/Tools/.gitlab_tokens` (one per line)
 - WHOISXML: set `WHOISXML_API` in `reconftw.cfg` or env var
+- ASN enumeration (`asnmap`): set `PDCP_API_KEY` in env/config (`ASN_ENUM` skips if unset)
 - Slack/Discord/Telegram: configure `notify` in `~/.config/notify/provider-config.yaml`
 - SSRF server: set `COLLAB_SERVER` env/cfg if used
 - Blind XSS server: set `XSS_SERVER` env/cfg if used
@@ -513,6 +515,7 @@ GITLAB_TOKENS=${tools}/.gitlab_tokens
 # Environment variables take precedence if set.
 SHODAN_API_KEY="${SHODAN_API_KEY:-}"
 WHOISXML_API="${WHOISXML_API:-}"
+PDCP_API_KEY="${PDCP_API_KEY:-}"
 XSS_SERVER="${XSS_SERVER:-}"
 COLLAB_SERVER="${COLLAB_SERVER:-}"
 slack_channel="${slack_channel:-}"

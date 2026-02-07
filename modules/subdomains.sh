@@ -273,43 +273,55 @@ _subdomains_enumerate() {
             fi
         fi
         
-        # Phase 2: Active DNS resolution (parallel)
-        parallel_funcs 3 sub_active sub_noerror sub_dns
+        # Phase 2: Active base list (must complete before dependent phases)
+        sub_active
         local sub_g2_rc=$?
         if ((sub_g2_rc > 0)); then
             if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
-                notification "Parallel subdomain active phase completed with ${sub_g2_rc} warning(s); continuing" warn
+                notification "sub_active completed with warning(s); continuing with dependent subdomain phases" warn
             else
-                notification "Parallel subdomain batch failed (active)" error
+                notification "sub_active failed" error
                 return 1
             fi
         fi
         
-        # Phase 3: Post-active (depend on resolved subdomains)
-        parallel_funcs 2 sub_tls sub_analytics
+        # Phase 3: Dependent active enrichment (runs after sub_active is ready)
+        parallel_funcs 3 sub_noerror sub_dns
         local sub_g3_rc=$?
         if ((sub_g3_rc > 0)); then
             if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
-                notification "Parallel subdomain post-active phase completed with ${sub_g3_rc} warning(s); continuing" warn
+                notification "Parallel subdomain dependent active phase completed with ${sub_g3_rc} warning(s); continuing" warn
+            else
+                notification "Parallel subdomain batch failed (dependent active)" error
+                return 1
+            fi
+        fi
+
+        # Phase 4: Post-active analysis (depends on active/enrichment results)
+        parallel_funcs 2 sub_tls sub_analytics
+        local sub_g4_rc=$?
+        if ((sub_g4_rc > 0)); then
+            if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
+                notification "Parallel subdomain post-active phase completed with ${sub_g4_rc} warning(s); continuing" warn
             else
                 notification "Parallel subdomain batch failed (post-active)" error
                 return 1
             fi
         fi
         
-        # Phase 4: Brute force (limited parallelism - resource intensive)
+        # Phase 5: Brute force (limited parallelism - resource intensive)
         parallel_funcs 2 sub_brute sub_permut sub_regex_permut sub_ia_permut
-        local sub_g4_rc=$?
-        if ((sub_g4_rc > 0)); then
+        local sub_g5_rc=$?
+        if ((sub_g5_rc > 0)); then
             if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
-                notification "Parallel subdomain bruteforce/permutations phase completed with ${sub_g4_rc} warning(s); continuing" warn
+                notification "Parallel subdomain bruteforce/permutations phase completed with ${sub_g5_rc} warning(s); continuing" warn
             else
                 notification "Parallel subdomain batch failed (bruteforce/permutations)" error
                 return 1
             fi
         fi
         
-        # Phase 5: Recursive and scraping (sequential - depends on previous results)
+        # Phase 6: Recursive and scraping (sequential - depends on previous results)
         sub_recursive_passive
         sub_recursive_brute
         sub_scraping
@@ -429,40 +441,79 @@ function sub_asn() {
 
         # Discover ASN/CIDR metadata for the current target domain.
         if command -v asnmap &>/dev/null; then
-            local asn_json
+            local asn_json pdcp_key timeout_tool asn_rc
             asn_json=".tmp/asnmap_${domain}.json"
-            asnmap -d "$domain" -silent -j 2>>"$LOGFILE" >"$asn_json"
+            pdcp_key="${PDCP_API_KEY:-}"
+            asn_rc=0
+            : >"$asn_json"
 
-            jq -r '.cidr // empty' "$asn_json" | sed '/^$/d' | sort -u >.tmp/asn_cidrs.txt
-            jq -r '.as_number // empty' "$asn_json" | sed '/^$/d' | sort -u >.tmp/asn_numbers.txt
+            if [[ -z "${pdcp_key//[[:space:]]/}" ]]; then
+                printf "%b[%s] ASN_ENUM enabled but PDCP_API_KEY is not set. Skipping asnmap ASN enumeration.%b\n" \
+                    "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset" | tee -a "$LOGFILE"
+            else
+                if command -v timeout >/dev/null 2>&1; then
+                    timeout_tool="timeout"
+                elif command -v gtimeout >/dev/null 2>&1; then
+                    timeout_tool="gtimeout"
+                else
+                    timeout_tool=""
+                    printf "%b[%s] timeout/gtimeout not found; running asnmap without timeout guard.%b\n" \
+                        "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset" | tee -a "$LOGFILE"
+                fi
 
-            if [[ -s .tmp/asn_cidrs.txt ]]; then
-                cp .tmp/asn_cidrs.txt hosts/asn_cidrs.txt
-            fi
-            if [[ -s .tmp/asn_numbers.txt ]]; then
-                cp .tmp/asn_numbers.txt hosts/asn_numbers.txt
-            fi
+                if [[ -n "$timeout_tool" ]]; then
+                    if PDCP_API_KEY="$pdcp_key" "$timeout_tool" 120 asnmap -d "$domain" -silent -j 2>>"$LOGFILE" >"$asn_json"; then
+                        asn_rc=0
+                    else
+                        asn_rc=$?
+                    fi
+                else
+                    if PDCP_API_KEY="$pdcp_key" asnmap -d "$domain" -silent -j 2>>"$LOGFILE" >"$asn_json"; then
+                        asn_rc=0
+                    else
+                        asn_rc=$?
+                    fi
+                fi
 
-            local cidr_count asn_count
-            cidr_count=$(wc -l <.tmp/asn_cidrs.txt 2>/dev/null | tr -d ' ')
-            asn_count=$(wc -l <.tmp/asn_numbers.txt 2>/dev/null | tr -d ' ')
+                if [[ $asn_rc -eq 0 && -s "$asn_json" ]]; then
+                    jq -r '.cidr // empty' "$asn_json" | sed '/^$/d' | sort -u >.tmp/asn_cidrs.txt
+                    jq -r '.as_number // empty' "$asn_json" | sed '/^$/d' | sort -u >.tmp/asn_numbers.txt
 
-            printf "%b[%s] ASN enumeration found %s ASNs and %s CIDR ranges%b\n" \
-                "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "${asn_count:-0}" "${cidr_count:-0}" "$reset"
+                    if [[ -s .tmp/asn_cidrs.txt ]]; then
+                        cp .tmp/asn_cidrs.txt hosts/asn_cidrs.txt
+                    fi
+                    if [[ -s .tmp/asn_numbers.txt ]]; then
+                        cp .tmp/asn_numbers.txt hosts/asn_numbers.txt
+                    fi
 
-            # Optional: if asnmap yields discovered domains, feed them into subdomain pipeline.
-            jq -r '.domains[]? // empty' "$asn_json" \
-                | sed '/^$/d' \
-                | grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
-                | grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" \
-                | sort -u \
-                | anew -q .tmp/subs_no_resolved.txt
-            if [[ -s .tmp/subs_no_resolved.txt ]]; then
-                printf "%b[%s] ASN sources added %s in-scope domains%b\n" \
-                    "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$(wc -l <.tmp/subs_no_resolved.txt | tr -d ' ')" "$reset"
+                    local cidr_count asn_count
+                    cidr_count=$(wc -l <.tmp/asn_cidrs.txt 2>/dev/null | tr -d ' ')
+                    asn_count=$(wc -l <.tmp/asn_numbers.txt 2>/dev/null | tr -d ' ')
+
+                    printf "%b[%s] ASN enumeration found %s ASNs and %s CIDR ranges%b\n" \
+                        "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "${asn_count:-0}" "${cidr_count:-0}" "$reset"
+
+                    # Optional: if asnmap yields discovered domains, feed them into subdomain pipeline.
+                    jq -r '.domains[]? // empty' "$asn_json" \
+                        | sed '/^$/d' \
+                        | grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
+                        | grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" \
+                        | sort -u \
+                        | anew -q .tmp/subs_no_resolved.txt
+                    if [[ -s .tmp/subs_no_resolved.txt ]]; then
+                        printf "%b[%s] ASN sources added %s in-scope domains%b\n" \
+                            "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$(wc -l <.tmp/subs_no_resolved.txt | tr -d ' ')" "$reset"
+                    fi
+                elif [[ $asn_rc -eq 124 ]]; then
+                    printf "%b[%s] asnmap timed out after 120s. Skipping ASN output for %s.%b\n" \
+                        "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$domain" "$reset" | tee -a "$LOGFILE"
+                else
+                    printf "%b[%s] asnmap failed (exit %s). Skipping ASN output for %s.%b\n" \
+                        "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${asn_rc:-1}" "$domain" "$reset" | tee -a "$LOGFILE"
+                fi
             fi
         else
-            printf "%b[!] asnmap not installed, skipping ASN enumeration%b\n" "$bred" "$reset"
+            printf "%b[!] asnmap not installed, skipping ASN enumeration%b\n" "$bred" "$reset" | tee -a "$LOGFILE"
         fi
 
         end_subfunc "${FUNCNAME[0]}" "${FUNCNAME[0]}"
@@ -869,9 +920,14 @@ function sub_dns() {
             fi
         fi
 
-        cut -d ' ' -f3 subdomains/subdomains_ips.txt \
-            | grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." \
-            | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | sort -u | anew -q hosts/ips.txt
+        if [[ -s "subdomains/subdomains_ips.txt" ]]; then
+            cut -d ' ' -f3 subdomains/subdomains_ips.txt \
+                | grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." \
+                | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | sort -u | anew -q hosts/ips.txt
+        else
+            printf "%b[%s] No DNS IP pairs found in sub_dns; skipping hosts/ips enrichment.%b\n" \
+                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset" | tee -a "$LOGFILE"
+        fi
 
         if [[ $INSCOPE == true ]]; then
             if ! check_inscope .tmp/subdomains_dns_resolved.txt 2>>"$LOGFILE" >/dev/null; then
@@ -879,11 +935,17 @@ function sub_dns() {
             fi
         fi
 
-        if ! NUMOFLINES=$(grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" .tmp/subdomains_dns_resolved.txt 2>>"$LOGFILE" \
-            | grep -E '^([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}$' \
-            | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l); then
-            printf "%b[!] Failed to count new subdomains.%b\n" "$bred" "$reset"
-            return 1
+        if [[ -s ".tmp/subdomains_dns_resolved.txt" ]]; then
+            if ! NUMOFLINES=$(grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" .tmp/subdomains_dns_resolved.txt 2>>"$LOGFILE" \
+                | grep -E '^([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}$' \
+                | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l); then
+                printf "%b[!] Failed to count new subdomains.%b\n" "$bred" "$reset"
+                return 1
+            fi
+        else
+            NUMOFLINES=0
+            printf "%b[%s] No DNS-resolved subdomains produced by sub_dns; continuing.%b\n" \
+                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset" | tee -a "$LOGFILE"
         fi
 
         end_subfunc "${NUMOFLINES} new subs (dns resolution)" "${FUNCNAME[0]}"
