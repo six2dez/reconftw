@@ -812,28 +812,43 @@ function nuclei_check() {
 }
 
 function graphql_scan() {
-    # Detect GraphQL endpoints and introspection
+    # Reuse nuclei_check findings for GraphQL detection and optional introspection
     ensure_dirs .tmp webs nuclei_output vulns/graphql
 
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GRAPHQL_CHECK == true ]]; then
         start_func "${FUNCNAME[0]}" "GraphQL detection"
-        # Prepare input - use webs with protocol only
-        [[ ! -s .tmp/webs_subs.txt ]] && cat webs/webs_all.txt 2>>"$LOGFILE" | sort -u >.tmp/webs_subs.txt
-        maybe_update_nuclei
-        if [[ -s .tmp/webs_subs.txt ]]; then
-            nuclei -l .tmp/webs_subs.txt -tags graphql -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 -t ${NUCLEI_TEMPLATES_PATH} -j -o nuclei_output/graphql_json.txt 2>>"$LOGFILE" >/dev/null
-            if [[ -s nuclei_output/graphql_json.txt ]]; then
-                jq -r '["[" + .["template-id"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host)] | .[]' nuclei_output/graphql_json.txt >nuclei_output/graphql.txt
-                # Optionally run GQLSpection on endpoints
-                if [[ $GQLSPECTION == true ]]; then
-                    jq -r '.["matched-at"] // .host' nuclei_output/graphql_json.txt | sort -u | while read -r ep; do
-                        [[ -z $ep ]] && continue
-                        hostfile="vulns/graphql/$(echo "$ep" | sed 's|^[^/]*//||; s|/.*$||')"
-                        mkdir -p "$(dirname "$hostfile")" 2>>"$LOGFILE" || true
-                        gqlspection -t "$ep" -o "${hostfile}.json" 2>>"$LOGFILE" >/dev/null || true
-                    done
-                fi
+
+        : >nuclei_output/graphql_json.txt
+        : >.tmp/graphql_endpoints.txt
+        IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
+
+        for crit in "${severity_array[@]}"; do
+            local src_json="nuclei_output/${crit}_json.txt"
+            if [[ -s "$src_json" ]]; then
+                jq -c 'select(."template-id" == "graphql-detect")' "$src_json" \
+                    | tee -a nuclei_output/graphql_json.txt \
+                    | jq -r '.["matched-at"] // .host // empty' \
+                    | sed '/^$/d' \
+                    | sort -u \
+                    | anew -q .tmp/graphql_endpoints.txt
             fi
+        done
+
+        if [[ -s nuclei_output/graphql_json.txt ]]; then
+            jq -r '["[" + .["template-id"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host)] | .[]' nuclei_output/graphql_json.txt >nuclei_output/graphql.txt
+        else
+            printf "%b[%s] No graphql-detect findings in nuclei_check outputs; skipping GraphQL deep checks.%b\n" \
+                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset" | tee -a "$LOGFILE"
+        fi
+
+        # Optionally run GQLSpection on endpoints discovered by nuclei_check (graphql-detect)
+        if [[ $GQLSPECTION == true ]] && [[ -s .tmp/graphql_endpoints.txt ]]; then
+            while read -r ep; do
+                [[ -z $ep ]] && continue
+                hostfile="vulns/graphql/$(echo "$ep" | sed 's|^[^/]*//||; s|/.*$||')"
+                mkdir -p "$(dirname "$hostfile")" 2>>"$LOGFILE" || true
+                gqlspection -t "$ep" -o "${hostfile}.json" 2>>"$LOGFILE" >/dev/null || true
+            done <.tmp/graphql_endpoints.txt
         fi
         end_func "Results are saved in nuclei_output/graphql* and vulns/graphql" "${FUNCNAME[0]}"
     else
