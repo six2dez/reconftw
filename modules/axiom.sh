@@ -151,4 +151,48 @@ function axiom_selected() {
         notification "No axiom instances selected ${reset}\n\n" error
         exit
     fi
+
+    # Probe Axiom connectivity and optionally auto-repair host-key mismatches.
+    local axiom_probe_out
+    axiom_probe_out="$(axiom-exec "echo reconftw-axiom-probe" 2>&1 || true)"
+    if echo "$axiom_probe_out" | grep -q "REMOTE HOST IDENTIFICATION HAS CHANGED"; then
+        echo "$axiom_probe_out" >>"${LOGFILE:-/dev/null}"
+
+        if [[ "${AXIOM_AUTO_FIX_HOSTKEY:-true}" == "true" ]]; then
+            notification "Axiom host-key mismatch detected; attempting automatic known_hosts repair" warn
+
+            local known_hosts_file
+            known_hosts_file="${HOME}/.ssh/known_hosts"
+            mkdir -p "${HOME}/.ssh" 2>>"${LOGFILE:-/dev/null}" || true
+            touch "$known_hosts_file" 2>>"${LOGFILE:-/dev/null}" || true
+
+            local -a hostports
+            mapfile -t hostports < <(printf "%s\n" "$axiom_probe_out" | grep -oE '\[[^]]+\]:[0-9]+' | sort -u)
+
+            local hp host port
+            for hp in "${hostports[@]}"; do
+                [[ -z "$hp" ]] && continue
+                ssh-keygen -f "$known_hosts_file" -R "$hp" >/dev/null 2>>"${LOGFILE:-/dev/null}" || true
+
+                host="${hp%\]:*}"
+                host="${host#[}"
+                port="${hp##*:}"
+                if [[ -n "$host" && -n "$port" ]]; then
+                    ssh-keyscan -T 10 -p "$port" "$host" >>"$known_hosts_file" 2>>"${LOGFILE:-/dev/null}" || true
+                fi
+            done
+
+            axiom_probe_out="$(axiom-exec "echo reconftw-axiom-probe" 2>&1 || true)"
+            if echo "$axiom_probe_out" | grep -q "REMOTE HOST IDENTIFICATION HAS CHANGED"; then
+                notification "Axiom host-key mismatch persists after auto-repair; disabling AXIOM for this run and continuing locally" warn
+                echo "$axiom_probe_out" >>"${LOGFILE:-/dev/null}"
+                AXIOM=false
+            else
+                notification "Axiom known_hosts auto-repair completed successfully" good
+            fi
+        else
+            notification "Axiom host-key mismatch detected; disabling AXIOM for this run and continuing locally" warn
+            AXIOM=false
+        fi
+    fi
 }

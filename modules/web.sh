@@ -1161,14 +1161,14 @@ function urlchecks() {
                 if [[ -s $GITHUB_TOKENS ]]; then
                     github-endpoints -q -k -d "$domain" -t "$GITHUB_TOKENS" -o .tmp/github-endpoints.txt 2>>"$LOGFILE" >/dev/null
                     if [[ -s ".tmp/github-endpoints.txt" ]]; then
-                        cat .tmp/github-endpoints.txt | anew -q .tmp/url_extract_tmp.txt
+                        cat .tmp/github-endpoints.txt | anew -q .tmp/url_extract_tmp.txt || true
                     fi
                 fi
             fi
 
             if [[ $AXIOM != true ]]; then
                 if [[ -s ".tmp/probed_tmp.txt" && -s "webs/webs_all.txt" ]]; then
-                    diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt 2>>"$LOGFILE") <(sort -u webs/webs_all.txt 2>>"$LOGFILE") | wc -l)
+                    diff_webs=$(comm -3 <(sort -u .tmp/probed_tmp.txt 2>>"$LOGFILE") <(sort -u webs/webs_all.txt 2>>"$LOGFILE") | wc -l)
                 else
                     log_note "urlchecks: missing .tmp/probed_tmp.txt or webs/webs_all.txt; skipping diff" "${FUNCNAME[0]}" "${LINENO}"
                     diff_webs=1
@@ -1229,7 +1229,7 @@ function urlchecks() {
                 fi
             else
                 if [[ -s ".tmp/probed_tmp.txt" && -s "webs/webs_all.txt" ]]; then
-                    diff_webs=$(diff <(sort -u .tmp/probed_tmp.txt) <(sort -u webs/webs_all.txt) | wc -l)
+                    diff_webs=$(comm -3 <(sort -u .tmp/probed_tmp.txt) <(sort -u webs/webs_all.txt) | wc -l)
                 else
                     log_note "urlchecks: missing .tmp/probed_tmp.txt or webs/webs_all.txt; skipping diff" "${FUNCNAME[0]}" "${LINENO}"
                     diff_webs=1
@@ -1247,20 +1247,20 @@ function urlchecks() {
 
             if [[ -s ".tmp/katana.txt" ]]; then
                 sed_i '/^.\{2048\}./d' .tmp/katana.txt
-                cat .tmp/katana.txt | anew -q .tmp/url_extract_tmp.txt
+                cat .tmp/katana.txt | anew -q .tmp/url_extract_tmp.txt || true
             fi
 
             if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
-                grep -a "$domain" .tmp/url_extract_tmp.txt | grep -aEo 'https?://[^ ]+' | grep -iE '\.js([?#].*)?$|\.js([/?&].*)' | anew -q .tmp/url_extract_js.txt
-                grep -a "$domain" .tmp/url_extract_tmp.txt | grep -aEo 'https?://[^ ]+' | grep -iE '\.map([/?#].*)?$' | anew -q .tmp/url_extract_jsmap.txt
+                grep -a "$domain" .tmp/url_extract_tmp.txt | grep -aEo 'https?://[^ ]+' | grep -iE '\.js([?#].*)?$|\.js([/?&].*)' | anew -q .tmp/url_extract_js.txt || true
+                grep -a "$domain" .tmp/url_extract_tmp.txt | grep -aEo 'https?://[^ ]+' | grep -iE '\.map([/?#].*)?$' | anew -q .tmp/url_extract_jsmap.txt || true
                 if [[ $DEEP == true ]] && [[ -s ".tmp/url_extract_js.txt" ]]; then
                     interlace -tL .tmp/url_extract_js.txt -threads 10 -c "${tools}/JSA/venv/bin/python3 ${tools}/JSA/jsa.py -f _target_ | anew -q .tmp/url_extract_tmp.txt" &>/dev/null
                 fi
 
-                grep -a "$domain" .tmp/url_extract_tmp.txt | grep -aEo 'https?://[^ ]+' | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg)$" | anew -q .tmp/url_extract_tmp2.txt
+                grep -a "$domain" .tmp/url_extract_tmp.txt | grep -aEo 'https?://[^ ]+' | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg)$" | anew -q .tmp/url_extract_tmp2.txt || true
 
                 if [[ -s ".tmp/url_extract_tmp2.txt" ]]; then
-                    urless <.tmp/url_extract_tmp2.txt | anew -q .tmp/url_extract_uddup.txt 2>>"$LOGFILE" >/dev/null
+                    urless <.tmp/url_extract_tmp2.txt | anew -q .tmp/url_extract_uddup.txt 2>>"$LOGFILE" >/dev/null || true
                 fi
 
                 if [[ -s ".tmp/url_extract_uddup.txt" ]]; then
@@ -1277,11 +1277,16 @@ function urlchecks() {
 
                 end_func "Results are saved in $domain/webs/url_extract.txt" "${FUNCNAME[0]}"
 
-                p1radup -i webs/url_extract.txt -o webs/url_extract_nodupes.txt -s 2>>"$LOGFILE" >/dev/null
+                if [[ -s "webs/url_extract.txt" ]]; then
+                    p1radup -i webs/url_extract.txt -o webs/url_extract_nodupes.txt -s 2>>"$LOGFILE" >/dev/null || true
 
-                if [[ $PROXY == true ]] && [[ -n $proxy_url ]] && [[ $(wc -l <webs/url_extract.txt) -le $DEEP_LIMIT2 ]]; then
-                    notification "Sending URLs to proxy" "info"
-                    ffuf -mc all -w webs/url_extract.txt -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
+                    if [[ $PROXY == true ]] && [[ -n $proxy_url ]] && [[ $(wc -l <webs/url_extract.txt) -le $DEEP_LIMIT2 ]]; then
+                        notification "Sending URLs to proxy" "info"
+                        ffuf -mc all -w webs/url_extract.txt -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
+                    fi
+                else
+                    printf "%b[%s] No URL extraction output generated; skipping p1radup/proxy replay.%b\n" \
+                        "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset" | tee -a "$LOGFILE"
                 fi
             fi
         fi
