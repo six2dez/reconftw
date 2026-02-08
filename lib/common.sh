@@ -87,10 +87,13 @@ count_lines_stdin() {
 # Usage: skip_notification reason
 # reason: "disabled" | "processed" | custom message
 skip_notification() {
+    # In quiet mode, suppress skip messages entirely
+    [[ "${OUTPUT_VERBOSITY:-1}" -eq 0 ]] && return 0
+
     local func_name="${FUNCNAME[1]:-unknown}"
     local reason="${1:-mode or configuration settings}"
     local checkpoint_hint=""
-    
+
     case "$reason" in
         disabled)
             reason="mode or configuration settings"
@@ -100,7 +103,7 @@ skip_notification() {
             checkpoint_hint="\n    To force re-run, delete: ${called_fn_dir:-.}/.${func_name}"
             ;;
     esac
-    
+
     printf "\n%b[%s] %s skipped: %s%b${checkpoint_hint}\n" \
         "${yellow:-}" \
         "$(date +'%Y-%m-%d %H:%M:%S')" \

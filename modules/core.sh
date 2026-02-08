@@ -557,10 +557,12 @@ function progress_step() {
         fi
     fi
 
-    printf "%b[%s] Progress: [%d/%d] %d%% | ETA: %s | %s%b\n" \
-        "$bblue" "$(date +'%H:%M:%S')" \
-        "$_PROGRESS_CURRENT_STEP" "$_PROGRESS_TOTAL_STEPS" \
-        "$pct" "$eta_display" "$step_name" "$reset"
+    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
+        printf "%b[%s] Progress: [%d/%d] %d%% | ETA: %s | %s%b\n" \
+            "$bblue" "$(date +'%H:%M:%S')" \
+            "$_PROGRESS_CURRENT_STEP" "$_PROGRESS_TOTAL_STEPS" \
+            "$pct" "$eta_display" "$step_name" "$reset"
+    fi
 }
 
 ###############################################################################################################
@@ -987,6 +989,7 @@ function notification() {
         else
             NOTIFY=""
         fi
+        # Always set current_date so start_func/end_func have it
         if [[ -z $3 ]]; then
             current_date=$(date +'%Y-%m-%d %H:%M:%S')
         else
@@ -1007,6 +1010,16 @@ function notification() {
                 text="\n${bgreen}[$current_date] ${1} ${reset}"
                 ;;
         esac
+
+        # In quiet mode (OUTPUT_VERBOSITY==0), only print errors to terminal
+        if [[ "${OUTPUT_VERBOSITY:-1}" -eq 0 ]] && [[ "$2" != "error" ]]; then
+            # Still send to notify if enabled, just skip terminal print
+            if [[ -n $NOTIFY ]]; then
+                clean_text=$(printf "%b" "${text} - ${domain}" | sed 's/\x1B\[[0-9;]*[JKmsu]//g')
+                printf "%s" "${clean_text}" | $NOTIFY >/dev/null 2>&1
+            fi
+            return 0
+        fi
 
         # Print to terminal
         printf "${text}\n"
@@ -1071,7 +1084,9 @@ function sendToNotify {
 }
 
 function start_func() {
-    printf "${bgreen}#######################################################################"
+    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
+        printf "${bgreen}#######################################################################"
+    fi
     notification "${2}" info
     echo "[$current_date] Start function: ${1} " >>"${LOGFILE}"
     start=$(date +%s)
@@ -1085,8 +1100,10 @@ function end_func() {
     record_func_timing "${2}" "$((end - start))"
     notification "${2} Finished in ${runtime}" info
     echo "[$current_date] End function: ${2} " >>"${LOGFILE}"
-    printf "${bblue}[$current_date] ${1} ${reset}\n"
-    printf "${bgreen}#######################################################################${reset}\n"
+    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
+        printf "${bblue}[$current_date] ${1} ${reset}\n"
+        printf "${bgreen}#######################################################################${reset}\n"
+    fi
     log_json "SUCCESS" "${2}" "Function completed" "runtime=${runtime}" "duration_sec=$((end - start))"
 }
 
@@ -1101,7 +1118,9 @@ function end_subfunc() {
     touch "$called_fn_dir/.${2}"
     end_sub=$(date +%s)
     getElapsedTime "$start_sub" "$end_sub"
-    notification "     ${1} in ${runtime}" good
+    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
+        notification "     ${1} in ${runtime}" good
+    fi
     echo "[$current_date] End subfunction: ${1} " >>"${LOGFILE}"
     log_json "SUCCESS" "${2}" "Subfunction completed" "runtime=${runtime}" "duration_sec=$((end_sub - start_sub))"
 }

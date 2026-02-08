@@ -381,17 +381,51 @@ _subdomains_finalize() {
     notification "- ${NUMOFLINES_subs} new subs alive" "good"
     if [[ -s "subdomains/subdomains.txt" ]]; then
         sort -o "subdomains/subdomains.txt" "subdomains/subdomains.txt"
-        while IFS= read -r sub; do
-            printf "%b[%s]   %s%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$sub" "$reset"
-        done < "subdomains/subdomains.txt"
+        if [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
+            # Verbose: list all
+            while IFS= read -r sub; do
+                printf "%b[%s]   %s%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$sub" "$reset"
+            done < "subdomains/subdomains.txt"
+        elif [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
+            # Normal: list up to 20, then truncate
+            local _sub_count _shown=0
+            _sub_count=$(wc -l < "subdomains/subdomains.txt" | tr -d ' ')
+            while IFS= read -r sub; do
+                ((_shown++))
+                if [[ $_shown -le 20 ]]; then
+                    printf "%b[%s]   %s%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$sub" "$reset"
+                else
+                    printf "%b[%s]   ... and %d more%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$((_sub_count - 20))" "$reset"
+                    break
+                fi
+            done < "subdomains/subdomains.txt"
+        fi
+        # Quiet (0): no listing at all
     fi
 
     notification "- ${NUMOFLINES_probed} new web probed" "good"
     if [[ -s "webs/webs.txt" ]]; then
         sort -o "webs/webs.txt" "webs/webs.txt"
-        while IFS= read -r web; do
-            printf "%b[%s]   %s%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$web" "$reset"
-        done < "webs/webs.txt"
+        if [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
+            # Verbose: list all
+            while IFS= read -r web; do
+                printf "%b[%s]   %s%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$web" "$reset"
+            done < "webs/webs.txt"
+        elif [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
+            # Normal: list up to 20, then truncate
+            local _web_count _wshown=0
+            _web_count=$(wc -l < "webs/webs.txt" | tr -d ' ')
+            while IFS= read -r web; do
+                ((_wshown++))
+                if [[ $_wshown -le 20 ]]; then
+                    printf "%b[%s]   %s%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$web" "$reset"
+                else
+                    printf "%b[%s]   ... and %d more%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$((_web_count - 20))" "$reset"
+                    break
+                fi
+            done < "webs/webs.txt"
+        fi
+        # Quiet (0): no listing at all
     fi
     
     notification "Subdomain Enumeration Finished" "good"

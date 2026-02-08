@@ -30,6 +30,78 @@ _parallel_effective_max_jobs() {
 }
 
 ###############################################################################
+# Output Helpers
+###############################################################################
+
+# Emit output for a single parallel job based on PARALLEL_LOG_MODE
+# Usage: _parallel_emit_job_output func_name log_file rc start_ts end_ts
+_parallel_emit_job_output() {
+    local func_name="$1"
+    local log_file="$2"
+    local rc="$3"
+    local start_ts="$4"
+    local end_ts="$5"
+    local mode="${PARALLEL_LOG_MODE:-summary}"
+    local tail_lines="${PARALLEL_TAIL_LINES:-20}"
+    local duration=$((end_ts - start_ts))
+
+    # In quiet mode (OUTPUT_VERBOSITY==0), only show failures
+    if [[ "${OUTPUT_VERBOSITY:-1}" -eq 0 ]] && [[ "$rc" -eq 0 ]]; then
+        return 0
+    fi
+
+    case "$mode" in
+        summary)
+            if [[ "$rc" -eq 0 ]]; then
+                printf "  %b[OK]%b   %-35s %4ds%b\n" "${bgreen:-}" "${reset:-}" "$func_name" "$duration" "${reset:-}"
+            else
+                printf "  %b[FAIL]%b %-35s %4ds%b\n" "${bred:-}" "${reset:-}" "$func_name" "$duration" "${reset:-}"
+                if [[ -s "$log_file" ]]; then
+                    printf "    ^ last 5 lines:\n"
+                    tail -n 5 "$log_file" | while IFS= read -r line; do
+                        printf "      %s\n" "$line"
+                    done
+                fi
+            fi
+            ;;
+        tail)
+            local show_lines="$tail_lines"
+            [[ "$rc" -ne 0 ]] && show_lines=$((tail_lines * 2))
+            if [[ "$rc" -eq 0 ]]; then
+                printf "  %b[OK]%b   %-35s %4ds%b\n" "${bgreen:-}" "${reset:-}" "$func_name" "$duration" "${reset:-}"
+            else
+                printf "  %b[FAIL]%b %-35s %4ds%b\n" "${bred:-}" "${reset:-}" "$func_name" "$duration" "${reset:-}"
+            fi
+            if [[ -s "$log_file" ]]; then
+                tail -n "$show_lines" "$log_file"
+            fi
+            ;;
+        full)
+            printf "\n%b[%s] Output (%s) [rc=%d, %ds]%b\n" "${bblue:-}" "$(date +'%Y-%m-%d %H:%M:%S')" "$func_name" "$rc" "$duration" "${reset:-}"
+            if [[ -s "$log_file" ]]; then
+                cat "$log_file"
+            fi
+            ;;
+    esac
+}
+
+# Print a summary line for a completed batch
+# Usage: _parallel_batch_summary total_jobs failed_count batch_start_ts
+_parallel_batch_summary() {
+    local total="$1"
+    local failed="$2"
+    local batch_start="$3"
+    local batch_end
+    batch_end=$(date +%s)
+    local elapsed=$((batch_end - batch_start))
+
+    # Skip in quiet mode
+    [[ "${OUTPUT_VERBOSITY:-1}" -eq 0 ]] && return 0
+
+    printf "  --- batch: %d jobs, %d failed, %ds elapsed ---\n" "$total" "$failed" "$elapsed"
+}
+
+###############################################################################
 # Core Parallel Execution
 ###############################################################################
 
@@ -40,24 +112,24 @@ parallel_run() {
     local max_jobs
     max_jobs=$(_parallel_effective_max_jobs "${1:-$PARALLEL_MAX_JOBS}")
     shift
-    
+
     local -a pids=()
     local cmd
     local running=0
-    
+
     for cmd in "$@"; do
         # Start command in background (use bash -c to avoid eval injection)
         bash -c "$cmd" &
         pids+=($!)
         ((running++))
-        
+
         # If we've reached max jobs, wait for one to finish
         if ((running >= max_jobs)); then
             wait -n 2>/dev/null || true
             ((running--))
         fi
     done
-    
+
     # Wait for all remaining jobs
     wait "${pids[@]}" 2>/dev/null
 }
@@ -81,8 +153,11 @@ parallel_funcs() {
     local -a batch_pids=()
     local -a batch_funcs=()
     local -a batch_logs=()
+    local -a batch_starts=()
     local func
     local failed=0
+    local batch_start_ts
+    batch_start_ts=$(date +%s)
 
     for func in "$@"; do
         # Check if function exists
@@ -92,6 +167,9 @@ parallel_funcs() {
         fi
 
         local log_file="${parallel_log_root}/${func}.$$.$RANDOM.log"
+        local job_start_ts
+        job_start_ts=$(date +%s)
+
         # Run function in background subshell
         (
             "$func"
@@ -99,51 +177,60 @@ parallel_funcs() {
         batch_pids+=("$!")
         batch_funcs+=("$func")
         batch_logs+=("$log_file")
+        batch_starts+=("$job_start_ts")
 
-        # Log if verbose
-        [[ ${VERBOSE:-false} == true ]] && \
+        # Log if verbose (OUTPUT_VERBOSITY >= 2)
+        [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && \
             printf "%b[*] Started %s (PID: %d)%b\n" "${cyan:-}" "$func" "${batch_pids[${#batch_pids[@]}-1]}" "${reset:-}"
 
         # If we've reached max jobs, flush the current batch.
         if ((${#batch_pids[@]} >= max_jobs)); then
-            local idx rc
+            local idx rc batch_failed=0
             for idx in "${!batch_pids[@]}"; do
                 if wait "${batch_pids[$idx]}" 2>/dev/null; then
                     rc=0
                 else
                     rc=$?
                 fi
-                if [[ -s "${batch_logs[$idx]}" ]]; then
-                    printf "\n%b[%s] Output (%s)%b\n" "${bblue:-}" "$(date +'%Y-%m-%d %H:%M:%S')" "${batch_funcs[$idx]}" "${reset:-}"
-                    cat "${batch_logs[$idx]}"
+                local job_end_ts
+                job_end_ts=$(date +%s)
+                _parallel_emit_job_output "${batch_funcs[$idx]}" "${batch_logs[$idx]}" "$rc" "${batch_starts[$idx]}" "$job_end_ts"
+                [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && printf "%b[*] Finished %s (PID: %s, rc=%s)%b\n" "${cyan:-}" "${batch_funcs[$idx]}" "${batch_pids[$idx]}" "$rc" "${reset:-}"
+                if [[ $rc -ne 0 ]]; then
+                    ((failed++))
+                    ((batch_failed++))
                 fi
-                [[ ${VERBOSE:-false} == true ]] && printf "%b[*] Finished %s (PID: %s, rc=%s)%b\n" "${cyan:-}" "${batch_funcs[$idx]}" "${batch_pids[$idx]}" "$rc" "${reset:-}"
-                [[ $rc -ne 0 ]] && ((failed++))
                 rm -f "${batch_logs[$idx]}" 2>/dev/null || true
             done
+            _parallel_batch_summary "${#batch_pids[@]}" "$batch_failed" "$batch_start_ts"
             batch_pids=()
             batch_funcs=()
             batch_logs=()
+            batch_starts=()
+            batch_start_ts=$(date +%s)
         fi
     done
 
     # Wait for all remaining jobs and collect exit codes
     if ((${#batch_pids[@]} > 0)); then
-        local idx rc
+        local idx rc batch_failed=0
         for idx in "${!batch_pids[@]}"; do
             if wait "${batch_pids[$idx]}" 2>/dev/null; then
                 rc=0
             else
                 rc=$?
             fi
-            if [[ -s "${batch_logs[$idx]}" ]]; then
-                printf "\n%b[%s] Output (%s)%b\n" "${bblue:-}" "$(date +'%Y-%m-%d %H:%M:%S')" "${batch_funcs[$idx]}" "${reset:-}"
-                cat "${batch_logs[$idx]}"
+            local job_end_ts
+            job_end_ts=$(date +%s)
+            _parallel_emit_job_output "${batch_funcs[$idx]}" "${batch_logs[$idx]}" "$rc" "${batch_starts[$idx]}" "$job_end_ts"
+            [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && printf "%b[*] Finished %s (PID: %s, rc=%s)%b\n" "${cyan:-}" "${batch_funcs[$idx]}" "${batch_pids[$idx]}" "$rc" "${reset:-}"
+            if [[ $rc -ne 0 ]]; then
+                ((failed++))
+                ((batch_failed++))
             fi
-            [[ ${VERBOSE:-false} == true ]] && printf "%b[*] Finished %s (PID: %s, rc=%s)%b\n" "${cyan:-}" "${batch_funcs[$idx]}" "${batch_pids[$idx]}" "$rc" "${reset:-}"
-            [[ $rc -ne 0 ]] && ((failed++))
             rm -f "${batch_logs[$idx]}" 2>/dev/null || true
         done
+        _parallel_batch_summary "${#batch_pids[@]}" "$batch_failed" "$batch_start_ts"
     fi
     rmdir "$parallel_log_root" 2>/dev/null || true
 

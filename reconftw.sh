@@ -111,7 +111,7 @@ if [[ $OSTYPE == "darwin"* ]]; then
     PATH="$(brew --prefix gnu-sed)/libexec/gnubin:$PATH"
 fi
 
-PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:zrspanwvyh' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,ai,check-tools,health-check,quick-rescan,incremental,adaptive-rate,dry-run,parallel,no-parallel,monitor,monitor-interval:,monitor-cycles:,refresh-cache,export:,report-only' -n 'reconFTW' -- "$@")
+PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:zrspanwvyh' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,ai,check-tools,health-check,quick-rescan,incremental,adaptive-rate,dry-run,parallel,no-parallel,monitor,monitor-interval:,monitor-cycles:,refresh-cache,export:,report-only,parallel-log:,quiet,verbose' -n 'reconFTW' -- "$@")
 
 exit_status=$?
 if [[ $exit_status -ne 0 ]]; then
@@ -356,6 +356,26 @@ while true; do
             shift
             continue
             ;;
+        '--parallel-log')
+            CLI_PARALLEL_LOG_MODE="$2"
+            if [[ ! "$CLI_PARALLEL_LOG_MODE" =~ ^(summary|tail|full)$ ]]; then
+                printf "%b[%s] ERROR: Invalid --parallel-log value '%s' (allowed: summary|tail|full)%b\n" \
+                    "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$CLI_PARALLEL_LOG_MODE" "$reset" >&2
+                exit 1
+            fi
+            shift 2
+            continue
+            ;;
+        '--quiet')
+            CLI_OUTPUT_VERBOSITY=0
+            shift
+            continue
+            ;;
+        '--verbose')
+            CLI_OUTPUT_VERBOSITY=2
+            shift
+            continue
+            ;;
         '--help' | '-h')
             break
             ;;
@@ -410,6 +430,14 @@ if [[ "${CLI_REPORT_ONLY:-false}" == "true" ]]; then
 fi
 if [[ -n "${CLI_PARALLEL_MODE:-}" ]]; then
     PARALLEL_MODE="${CLI_PARALLEL_MODE}"
+fi
+if [[ -n "${CLI_PARALLEL_LOG_MODE:-}" ]]; then
+    PARALLEL_LOG_MODE="${CLI_PARALLEL_LOG_MODE}"
+fi
+if [[ -n "${CLI_OUTPUT_VERBOSITY:-}" ]]; then
+    OUTPUT_VERBOSITY="${CLI_OUTPUT_VERBOSITY}"
+    # Backward compat: verbose level sets VERBOSE=true
+    [[ "${OUTPUT_VERBOSITY}" -ge 2 ]] && VERBOSE=true
 fi
 
 if [[ $opt_deep ]]; then

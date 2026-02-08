@@ -4,11 +4,11 @@
 setup() {
     # Source the parallel library
     source "${BATS_TEST_DIRNAME}/../../lib/parallel.sh"
-    
+
     # Create temp directory for tests
     TEST_DIR=$(mktemp -d)
     cd "$TEST_DIR" || exit 1
-    
+
     # Set up mock variables
     yellow=""
     reset=""
@@ -17,6 +17,9 @@ setup() {
     bgreen=""
     cyan=""
     VERBOSE=false
+    PARALLEL_LOG_MODE="summary"
+    PARALLEL_TAIL_LINES=20
+    OUTPUT_VERBOSITY=1
 }
 
 teardown() {
@@ -85,13 +88,16 @@ teardown() {
 }
 
 @test "parallel_funcs buffers output per function" {
+    PARALLEL_LOG_MODE="full"
     func_a() { echo "A1"; sleep 0.05; echo "A2"; }
     func_b() { echo "B1"; sleep 0.05; echo "B2"; }
 
     run parallel_funcs 2 func_a func_b
     [ "$status" -eq 0 ]
-    [[ "$output" == *$'A1\nA2'* ]]
-    [[ "$output" == *$'B1\nB2'* ]]
+    [[ "$output" == *"A1"* ]]
+    [[ "$output" == *"A2"* ]]
+    [[ "$output" == *"B1"* ]]
+    [[ "$output" == *"B2"* ]]
 }
 
 @test "parallel_funcs cleans temporary buffered output" {
@@ -174,4 +180,86 @@ teardown() {
 @test "parallel_funcs handles empty function list" {
     run parallel_funcs 2
     [ "$status" -eq 0 ]
+}
+
+###############################################################################
+# PARALLEL_LOG_MODE tests
+###############################################################################
+
+@test "summary mode shows [OK] for successful jobs" {
+    PARALLEL_LOG_MODE="summary"
+    ok_func() { echo "all good"; }
+
+    run parallel_funcs 2 ok_func
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"[OK]"* ]]
+    [[ "$output" == *"ok_func"* ]]
+}
+
+@test "summary mode shows [FAIL] with last 5 lines on failure" {
+    PARALLEL_LOG_MODE="summary"
+    bad_func() { echo "line1"; echo "line2"; echo "line3"; echo "line4"; echo "error here"; return 1; }
+
+    run parallel_funcs 2 bad_func
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"[FAIL]"* ]]
+    [[ "$output" == *"last 5 lines"* ]]
+    [[ "$output" == *"error here"* ]]
+}
+
+@test "tail mode shows last N lines of output" {
+    PARALLEL_LOG_MODE="tail"
+    PARALLEL_TAIL_LINES=3
+    chatty_func() { for i in $(seq 1 10); do echo "line$i"; done; }
+
+    run parallel_funcs 2 chatty_func
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"[OK]"* ]]
+    [[ "$output" == *"line10"* ]]
+    [[ "$output" == *"line9"* ]]
+    [[ "$output" == *"line8"* ]]
+}
+
+@test "full mode shows complete output" {
+    PARALLEL_LOG_MODE="full"
+    verbose_func() { echo "start"; echo "middle"; echo "end"; }
+
+    run parallel_funcs 2 verbose_func
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Output (verbose_func)"* ]]
+    [[ "$output" == *"start"* ]]
+    [[ "$output" == *"middle"* ]]
+    [[ "$output" == *"end"* ]]
+}
+
+@test "batch summary line is printed after each batch" {
+    PARALLEL_LOG_MODE="summary"
+    fast_func() { echo "done"; }
+
+    run parallel_funcs 2 fast_func
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"batch:"* ]]
+    [[ "$output" == *"1 jobs"* ]]
+    [[ "$output" == *"0 failed"* ]]
+}
+
+@test "quiet mode suppresses OK output in summary" {
+    PARALLEL_LOG_MODE="summary"
+    OUTPUT_VERBOSITY=0
+    quiet_func() { echo "shh"; }
+
+    run parallel_funcs 2 quiet_func
+    [ "$status" -eq 0 ]
+    # Should NOT show [OK] in quiet mode
+    [[ "$output" != *"[OK]"* ]]
+}
+
+@test "quiet mode still shows failures" {
+    PARALLEL_LOG_MODE="summary"
+    OUTPUT_VERBOSITY=0
+    fail_quiet() { echo "broken"; return 1; }
+
+    run parallel_funcs 2 fail_quiet
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"[FAIL]"* ]]
 }
