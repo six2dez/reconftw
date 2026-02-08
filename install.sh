@@ -250,6 +250,7 @@ declare -A pipxtools=(
     ["interlace"]="codingo/Interlace"
     ["wafw00f"]="EnableSecurity/wafw00f"
     ["commix"]="commixproject/commix"
+    ["waymore"]="xnl-h4ck3r/waymore"
     ["urless"]="xnl-h4ck3r/urless"
     ["ghauri"]="r0oth3x49/ghauri"
     ["xnLinkFinder"]="xnl-h4ck3r/xnLinkFinder"

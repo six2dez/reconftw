@@ -117,7 +117,7 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **NOERROR Discovery**: Identifies subdomains with DNS NOERROR responses ([dnsx](https://github.com/projectdiscovery/dnsx), more info [here](https://www.securesystems.de/blog/enhancing-subdomain-enumeration-ents-and-noerror/)).
 - **Bruteforce**: Performs DNS bruteforcing with customizable wordlists ([puredns](https://github.com/d3mondev/puredns) and custom wordlists).
 - **Permutations**: Generates subdomain permutations using AI, regex and tools ([Gotator](https://github.com/Josue87/gotator), [ripgen](https://github.com/resyncgg/ripgen), [regulator](https://github.com/cramppet/regulator) and [subwiz](https://github.com/hadriansecurity/subwiz)).
-- **Web Scraping**: Extracts subdomains from web crawling and JS files ([katana](https://github.com/projectdiscovery/katana)).
+- **Web Scraping**: Extracts subdomains from passive URL sources and live web metadata ([urlfinder](https://github.com/projectdiscovery/urlfinder), [waymore](https://github.com/xnl-h4ck3r/waymore), [httpx](https://github.com/projectdiscovery/httpx), [csprecon](https://github.com/edoardottt/csprecon)).
 - **DNS Records**: Resolves DNS records for subdomains ([dnsx](https://github.com/projectdiscovery/dnsx)).
 - **Google Analytics**: Identifies subdomains via Analytics IDs ([AnalyticsRelationships](https://github.com/Josue87/AnalyticsRelationships)).
 - **TLS Handshake**: Discovers subdomains via TLS ports ([tlsx](https://github.com/projectdiscovery/tlsx)).
@@ -144,7 +144,7 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **Screenshots**: Captures screenshots of web pages ([nuclei](https://github.com/projectdiscovery/nuclei)).
 - **Virtual Host Fuzzing**: Identifies virtual hosts by fuzzing HTTP headers ([VhostFinder](https://github.com/wdahlenburg/VhostFinder)).
 - **CMS Detection**: Identifies content management systems ([CMSeeK](https://github.com/Tuhinshubhra/CMSeeK)).
-- **URL Extraction**: Collects URLs passively and actively ([urlfinder](https://github.com/projectdiscovery/urlfinder), [katana](https://github.com/projectdiscovery/katana), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3) and [JSA](https://github.com/w9w/JSA)).
+- **URL Extraction**: Collects URLs passively and actively ([urlfinder](https://github.com/projectdiscovery/urlfinder), [waymore](https://github.com/xnl-h4ck3r/waymore), [katana](https://github.com/projectdiscovery/katana), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3) and [JSA](https://github.com/w9w/JSA)).
 - **URL Pattern Analysis**: Classifies URLs using patterns ([urless](https://github.com/xnl-h4ck3r/urless), [gf](https://github.com/tomnomnom/gf) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns)).
 - **Favicon Analysis**: Discovers real IPs behind favicons ([fav-up](https://github.com/pielco11/fav-up)).
 - **JavaScript Analysis**: Extracts secrets and endpoints from JS files ([subjs](https://github.com/lc/subjs), [JSA](https://github.com/w9w/JSA), [xnLinkFinder](https://github.com/xnl-h4ck3r/xnLinkFinder), [getjswords](https://github.com/m4ll0k/BBTz), [mantra](https://github.com/MrEmpy/mantra), [jsluice](https://github.com/BishopFox/jsluice)).
@@ -550,7 +550,7 @@ CTR_LIMIT=999999 # Limit the number of results
 SUBNOERROR=false # Check DNS NOERROR response and BF on them
 SUBANALYTICS=true # Google Analytics search
 SUBBRUTE=true # DNS bruteforcing
-SUBSCRAPING=true # Subdomains extraction from web crawling
+SUBSCRAPING=true # Subdomains extraction from passive URLs and live web metadata
 SUBPERMUTE=true # DNS permutations
 SUBIAPERMUTE=true # Permutations by AI analysis
 SUBREGEXPERMUTE=true # Permutations by regex analysis
@@ -594,6 +594,8 @@ NUCLEI_FLAGS_JS="-silent -tags exposure,token -severity info,low,medium,high,cri
 URL_CHECK=true # Enable or disable URL collection
 URL_CHECK_PASSIVE=true # Search for urls, passive methods from Archive, OTX, CommonCrawl, etc
 URL_CHECK_ACTIVE=true # Search for urls by crawling the websites
+WAYMORE_TIMEOUT=30m # Timeout for waymore passive URL collection
+WAYMORE_LIMIT=5000 # Optional URL collection limit for waymore
 URL_GF=true # Url patterns classification
 URL_EXT=true # Returns a list of files divided by extension
 JSCHECKS=true # JS analysis

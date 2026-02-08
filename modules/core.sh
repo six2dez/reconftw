@@ -308,6 +308,7 @@ function tools_installed() {
         ["sourcemapper"]="sourcemapper"
         ["jsluice"]="jsluice"
         ["commix"]="commix"
+        ["waymore"]="waymore"
         ["urless"]="urless"
         ["dnstake"]="dnstake"
         ["cent"]="cent"

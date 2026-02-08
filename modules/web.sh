@@ -1158,6 +1158,16 @@ function urlchecks() {
 
             if [[ $URL_CHECK_PASSIVE == true ]]; then
                 urlfinder -d $domain -all -o .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
+                if command -v waymore &>/dev/null; then
+                    if ! "$TIMEOUT_CMD" "${WAYMORE_TIMEOUT:-30m}" waymore -i "$domain" -mode U -oU .tmp/waymore_urls.txt 2>>"$LOGFILE" >/dev/null; then
+                        log_note "urlchecks: waymore failed or timed out; continuing with other passive sources" "${FUNCNAME[0]}" "${LINENO}"
+                    fi
+                    if [[ -s ".tmp/waymore_urls.txt" ]]; then
+                        cat .tmp/waymore_urls.txt | anew -q .tmp/url_extract_tmp.txt || true
+                    fi
+                else
+                    log_note "urlchecks: waymore not found; skipping passive waymore collection" "${FUNCNAME[0]}" "${LINENO}"
+                fi
                 if [[ -s $GITHUB_TOKENS ]]; then
                     github-endpoints -q -k -d "$domain" -t "$GITHUB_TOKENS" -o .tmp/github-endpoints.txt 2>>"$LOGFILE" >/dev/null
                     if [[ -s ".tmp/github-endpoints.txt" ]]; then

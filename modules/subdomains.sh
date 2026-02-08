@@ -1079,6 +1079,19 @@ function sub_scraping() {
                         | sed "s/^\*\.//" | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
                 fi
 
+                if command -v waymore &>/dev/null; then
+                    if ! "$TIMEOUT_CMD" "${WAYMORE_TIMEOUT:-30m}" waymore -i "$domain" -mode U -oU .tmp/waymore_urls_subs.txt 2>>"$LOGFILE" >/dev/null; then
+                        log_note "sub_scraping: waymore failed or timed out; continuing" "${FUNCNAME[0]}" "${LINENO}"
+                    fi
+                    if [[ -s ".tmp/waymore_urls_subs.txt" ]]; then
+                        cat .tmp/waymore_urls_subs.txt | grep "$domain" \
+                            | grep -aEo 'https?://[^ ]+' \
+                            | sed "s/^\*\.//" | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
+                    fi
+                else
+                    log_note "sub_scraping: waymore not found; skipping waymore passive collection" "${FUNCNAME[0]}" "${LINENO}"
+                fi
+
                 if [[ $AXIOM != true ]]; then
                     if ! resolvers_update_quick_local; then
                         printf "%b[!] Failed to update resolvers locally.%b\n" "$bred" "$reset"
@@ -1104,13 +1117,6 @@ function sub_scraping() {
                     if [[ -s ".tmp/probed_tmp_scrap.txt" ]]; then
                         cat .tmp/probed_tmp_scrap.txt | csprecon -s | grep "$domain" | sed "s/^\*\.//" | sort -u \
                             | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
-                    fi
-
-                    if [[ -s ".tmp/probed_tmp_scrap.txt" ]]; then
-                        if [[ $DEEP == true ]]; then
-                            timeout 3h katana -silent -list .tmp/probed_tmp_scrap.txt -jc -kf all -c "$KATANA_THREADS" -d 2 \
-                                -fs rdn -o .tmp/katana.txt 2>>"$LOGFILE" >/dev/null
-                        fi
                     fi
 
                 else
@@ -1140,21 +1146,6 @@ function sub_scraping() {
                             | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
                     fi
 
-                    if [[ -s ".tmp/probed_tmp_scrap.txt" ]]; then
-                        if [[ $DEEP == true ]]; then
-                            axiom-scan .tmp/probed_tmp_scrap.txt -m katana -jc -kf all -d 2 -fs rdn \
-                                -o .tmp/katana.txt $AXIOM_EXTRA_ARGS --max-runtime 4h 2>>"$LOGFILE" >/dev/null
-                        fi
-                    fi
-                fi
-
-                if [[ -s ".tmp/katana.txt" ]]; then
-                    sed_i '/^.\{2048\}./d' .tmp/katana.txt
-
-                    cat .tmp/katana.txt | unfurl -u domains 2>>"$LOGFILE" \
-                        | grep "\.${DOMAIN_ESCAPED}$" \
-                        | grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
-                        | anew -q .tmp/scrap_subs.txt
                 fi
 
                 if [[ -s ".tmp/scrap_subs.txt" ]]; then
