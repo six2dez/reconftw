@@ -112,7 +112,7 @@ function axiom_launch() {
             # To re-enable: [[ -n ${AXIOM_FLEET_REGIONS-} ]] && AXIOM_FLEET_ARGS+=( --regions="${AXIOM_FLEET_REGIONS}" )
 
             # Show the exact command with proper quoting
-            printf 'axiom-fleet %q' "${AXIOM_FLEET_NAME}"
+            printf 'axiom-fleet2 %q' "${AXIOM_FLEET_NAME}"
             printf ' %q' "${AXIOM_FLEET_ARGS[@]}"
             echo
             axiom-fleet2 "${AXIOM_FLEET_NAME}" "${AXIOM_FLEET_ARGS[@]}"

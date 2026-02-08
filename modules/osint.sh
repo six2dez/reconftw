@@ -21,7 +21,7 @@ function google_dorks() {
         start_func "${FUNCNAME[0]}" "Running: Google Dorks in process"
 
         if ! "${tools}/dorks_hunter/venv/bin/python3" "${tools}/dorks_hunter/dorks_hunter.py" -d "$domain" -o "osint/dorks.txt" 2>>"$LOGFILE"; then
-            printf "%b[!] dorks_hunter command failed.%b\n" "$bred" "$reset"
+            _print_error "dorks_hunter command failed"
         fi
         end_func "Results are saved in $domain/osint/dorks.txt" "${FUNCNAME[0]}"
     else
@@ -42,17 +42,17 @@ function github_dorks() {
         if [[ -s $GITHUB_TOKENS ]]; then
             if [[ $DEEP == true ]]; then
                 if ! gitdorks_go -gd "${tools}/gitdorks_go/Dorks/medium_dorks.txt" -nws 20 -target "$domain" -tf "$GITHUB_TOKENS" -ew 3 | anew -q osint/gitdorks.txt; then
-                    printf "%b[!] gitdorks_go command failed.%b\n" "$bred" "$reset"
+                    _print_error "gitdorks_go command failed"
                     return 1
                 fi
             else
                 if ! gitdorks_go -gd "${tools}/gitdorks_go/Dorks/smalldorks.txt" -nws 20 -target "$domain" -tf "$GITHUB_TOKENS" -ew 3 | anew -q osint/gitdorks.txt; then
-                    printf "%b[!] gitdorks_go command failed.%b\n" "$bred" "$reset"
+                    _print_error "gitdorks_go command failed"
                     return 1
                 fi
             fi
         else
-            printf "\n%b[%s] Required file %s does not exist or is empty.%b\n" "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$GITHUB_TOKENS" "$reset"
+            _print_error "Required file ${GITHUB_TOKENS} does not exist or is empty"
             return 1
         fi
         end_func "Results are saved in $domain/osint/gitdorks.txt" "${FUNCNAME[0]}"
@@ -76,12 +76,12 @@ function github_repos() {
             echo "$domain" | unfurl format %r >.tmp/company_name.txt
 
             if ! enumerepo -token-string "$GH_TOKEN" -usernames .tmp/company_name.txt -o .tmp/company_repos.txt 2>>"$LOGFILE" >/dev/null; then
-                printf "%b[!] enumerepo command failed.%b\n" "$bred" "$reset"
+                _print_error "enumerepo command failed"
             fi
 
             if [[ -s ".tmp/company_repos.txt" ]]; then
                 if ! jq -r '.[].repos[]|.url' <.tmp/company_repos.txt >.tmp/company_repos_url.txt 2>>"$LOGFILE"; then
-                    printf "%b[!] jq command failed.%b\n" "$bred" "$reset"
+                    _print_error "jq command failed"
                 fi
             fi
 
@@ -89,7 +89,7 @@ function github_repos() {
 
             if [[ -s ".tmp/company_repos_url.txt" ]]; then
                 if ! interlace -tL .tmp/company_repos_url.txt -threads "$INTERLACE_THREADS" -c "git clone _target_ .tmp/github_repos/_cleantarget_" 2>>"$LOGFILE" >/dev/null; then
-                    printf "%b[!] interlace git clone command failed.%b\n" "$bred" "$reset"
+                    _print_error "interlace git clone command failed"
                     return 1
                 fi
             else
@@ -108,7 +108,7 @@ function github_repos() {
 
             if [[ -s ".tmp/github_repos_folders.txt" ]]; then
                 if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "gitleaks detect --source .tmp/github_repos/_target_ --no-banner --no-color -r .tmp/github/gh_secret_cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
-                    printf "%b[!] interlace gitleaks command failed.%b\n" "$bred" "$reset"
+                    _print_error "interlace gitleaks command failed"
                     end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}"
                     return 1
                 fi
@@ -120,14 +120,14 @@ function github_repos() {
 
             if [[ -s ".tmp/company_repos_url.txt" ]]; then
                 if ! interlace -tL .tmp/company_repos_url.txt -threads "$INTERLACE_THREADS" -c "trufflehog git _target_ -j 2>&1 | jq -c > _output_/_cleantarget_" -o .tmp/github/ 2>>"$LOGFILE" >/dev/null; then
-                    printf "%b[!] interlace trufflehog command failed.%b\n" "$bred" "$reset"
+                    _print_error "interlace trufflehog command failed"
                     return 1
                 fi
             fi
 
             if [[ -d ".tmp/github/" ]]; then
                 if ! cat .tmp/github/* 2>/dev/null | jq -c | jq -r >"osint/github_company_secrets.json" 2>>"$LOGFILE"; then
-                    printf "%b[!] Error combining results.%b\n" "$bred" "$reset"
+                    _print_error "Error combining results"
                     return 1
                 fi
             else
@@ -138,7 +138,7 @@ function github_repos() {
 
             end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}"
         else
-            printf "\n%s[%s] Required file %s does not exist or is empty.%b\n" "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$GITHUB_TOKENS" "$reset"
+            _print_error "Required file ${GITHUB_TOKENS} does not exist or is empty"
             return 1
         fi
     else
@@ -159,20 +159,28 @@ function metadata() {
 
         ensure_dirs ".tmp/metagoofil_${domain}"
         pushd "${tools}/metagoofil" >/dev/null || {
-            printf "%b[!] Failed to change directory to %s in %s at line %s.%b\n" "${bred}" "${tools}/metagoofil" "${FUNCNAME[0]}" "${LINENO}" "${reset}"
+            _print_error "Failed to change directory to ${tools}/metagoofil in ${FUNCNAME[0]} at line ${LINENO}"
             return 1
         }
         "${tools}/metagoofil/venv/bin/python3" "${tools}/metagoofil/metagoofil.py" -d "${domain}" -t pdf,docx,xlsx -l 10 -w -o "${dir}/.tmp/metagoofil_${domain}/" 2>>"${LOGFILE}" >/dev/null
         popd >/dev/null || {
-            printf "%b[!] Failed to return to the previous directory in %s at line %s.%b\n" "${bred}" "${FUNCNAME[0]}" "${LINENO}" "${reset}"
+            _print_error "Failed to return to the previous directory in ${FUNCNAME[0]} at line ${LINENO}"
             return 1
         }
 
         # Check if exiftool is installed before running
         if command -v exiftool &>/dev/null; then
-            exiftool -r .tmp/metagoofil_${domain}/* 2>>"${LOGFILE}" | tee /dev/null | egrep -i "Author|Creator|Email|Producer|Template" | sort -u | anew -q "osint/metadata_results.txt"
+            if find ".tmp/metagoofil_${domain}" -type f -print -quit 2>/dev/null | grep -q .; then
+                exiftool -r ".tmp/metagoofil_${domain}" 2>>"${LOGFILE}" \
+                    | tee /dev/null \
+                    | egrep -i "Author|Creator|Email|Producer|Template" \
+                    | sort -u \
+                    | anew -q "osint/metadata_results.txt" || true
+            else
+                log_note "metadata: no files downloaded by metagoofil; skipping exif extraction" "${FUNCNAME[0]}" "${LINENO}"
+            fi
         else
-            printf "%b[!] exiftool is not installed. Skipping metadata extraction.%b\n" "${bred}" "${reset}"
+            _print_error "exiftool is not installed. Skipping metadata extraction"
             printf "exiftool not installed - metadata extraction skipped\n" >>"${LOGFILE}"
         fi
 
@@ -205,10 +213,13 @@ function apileaks() {
                 log_note "porch-pirate failed even without --dump" "${FUNCNAME[0]}" "${LINENO}"
             fi
         fi
+        if [[ ! -s "${dir}/osint/postman_leaks.txt" ]]; then
+            log_note "apileaks: porch-pirate returned empty output; continuing with swagger pipeline" "${FUNCNAME[0]}" "${LINENO}"
+        fi
 
         # Change directory to SwaggerSpy
         if ! pushd "${tools}/SwaggerSpy" >/dev/null; then
-            printf "%b[!] Failed to change directory to %s in %s at line %s.%b\n" "$bred" "${tools}/SwaggerSpy" "${FUNCNAME[0]}" "$LINENO" "$reset"
+            _print_error "Failed to change directory to ${tools}/SwaggerSpy in ${FUNCNAME[0]} at line ${LINENO}"
             return 1
         fi
 
@@ -227,7 +238,7 @@ function apileaks() {
 
         # Return to the previous directory
         if ! popd >/dev/null; then
-            printf "%b[!] Failed to return to the previous directory in %s at line %s.%b\n" "$bred" "${FUNCNAME[0]}" "$LINENO" "$reset"
+            _print_error "Failed to return to the previous directory in ${FUNCNAME[0]} at line ${LINENO}"
             return 1
         fi
 
@@ -270,7 +281,7 @@ function emails() {
 
         # Change directory to LeakSearch
         if ! pushd "${tools}/LeakSearch" >/dev/null; then
-            printf "%b[!] Failed to change directory to %s in %s at line %s.%b\n" "$bred" "${tools}/LeakSearch" "${FUNCNAME[0]}" "$LINENO" "$reset"
+            _print_error "Failed to change directory to ${tools}/LeakSearch in ${FUNCNAME[0]} at line ${LINENO}"
             return 1
         fi
 
@@ -279,7 +290,7 @@ function emails() {
 
         # Return to the previous directory
         if ! popd >/dev/null; then
-            printf "%b[!] Failed to return to the previous directory in %s at line %s.%b\n" "$bred" "${FUNCNAME[0]}" "$LINENO" "$reset"
+            _print_error "Failed to return to the previous directory in ${FUNCNAME[0]} at line ${LINENO}"
             return 1
         fi
 

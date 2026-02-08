@@ -18,7 +18,7 @@ ensure_dirs() {
         return 0
     fi
     if ! mkdir -p "$@" 2>/dev/null; then
-        printf "%b[!] Failed to create directories: %s%b\n" "${bred:-}" "$*" "${reset:-}" >&2
+        _print_error "Failed to create directories: $*"
         return 1
     fi
     return 0
@@ -77,6 +77,54 @@ count_lines_stdin() {
     local count
     count=$(sed '/^$/d' | wc -l | tr -d ' ') || count=0
     echo "${count:-0}"
+}
+
+###############################################################################
+# Output Primitives
+###############################################################################
+
+# Section header for major phases (OSINT, Subdomains, Web, Vulns, etc.)
+# Usage: _print_section "OSINT"
+# Output: ══════════════════ OSINT ══════════════════
+_print_section() {
+    [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
+    local title="$1"
+    printf "\n%b══════════════════ %s ══════════════════%b\n\n" "${bgreen:-}" "$title" "${reset:-}"
+}
+
+# Compact status line for OK/FAIL/WARN/SKIP/INFO
+# Usage: _print_status OK "sub_passive" "12s"
+#        _print_status SKIP "sub_crt" "(disabled)"
+_print_status() {
+    [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
+    local badge="$1" text="$2" detail="${3:-}"
+    local color
+    case "$badge" in
+        OK)   color="${bgreen:-}" ;;
+        FAIL) color="${bred:-}" ;;
+        WARN) color="${yellow:-}" ;;
+        SKIP) color="${yellow:-}" ;;
+        *)    color="${bblue:-}" ;;
+    esac
+    if [[ -n "$detail" ]]; then
+        printf "  %b[%-4s]%b %-38s %s\n" "$color" "$badge" "${reset:-}" "$text" "$detail"
+    else
+        printf "  %b[%-4s]%b %s\n" "$color" "$badge" "${reset:-}" "$text"
+    fi
+}
+
+# Error that always shows (even in quiet mode)
+# Usage: _print_error "something failed"
+_print_error() {
+    local msg="$1"
+    printf "%b[%s] ERROR: %s%b\n" "${bred:-}" "$(date +'%Y-%m-%d %H:%M:%S')" "$msg" "${reset:-}" >&2
+}
+
+# Thin decorative rule (replaces heavy ###...### separators)
+# Usage: _print_rule
+_print_rule() {
+    [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
+    printf "%b──────────────────────────────────────────────────────────────%b\n" "${bgreen:-}" "${reset:-}"
 }
 
 ###############################################################################

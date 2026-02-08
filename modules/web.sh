@@ -419,13 +419,16 @@ function portscan() {
 
         else
             # Domain is an IP address
-            printf "%b\n" "$domain" | grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' | anew -q hosts/ips.txt
+            printf "%b\n" "$domain" \
+                | grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." \
+                | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' \
+                | anew -q hosts/ips.txt || true
         fi
 
         # Check for CDN providers
         if [[ ! -s "hosts/cdn_providers.txt" ]]; then
             if [[ -s "hosts/ips.txt" ]]; then
-                cat hosts/ips.txt | cdncheck -silent -resp -cdn -waf -nc 2>/dev/null | anew -q hosts/cdn_providers.txt
+                cat hosts/ips.txt | cdncheck -silent -resp -cdn -waf -nc 2>/dev/null | anew -q hosts/cdn_providers.txt || true
             fi
         fi
 
@@ -433,7 +436,7 @@ function portscan() {
             # Remove CDN IPs
             comm -23 <(sort -u hosts/ips.txt) <(cut -d'[' -f1 hosts/cdn_providers.txt | sed 's/[[:space:]]*$//' | sort -u) \
                 | grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' \
-                | sort -u | anew -q .tmp/ips_nocdn.txt
+                | sort -u | anew -q .tmp/ips_nocdn.txt || true
         fi
 
         # Display resolved IPs without CDN
@@ -458,10 +461,10 @@ function portscan() {
         if [[ $IPV6_SCAN == true ]]; then
             if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
                 jq -r '.. | strings | select(test("^[0-9a-fA-F:]+$"))' <"subdomains/subdomains_dnsregs.json" \
-                    | grep -v '\\.' | sort -u | anew -q hosts/ips_v6.txt
+                    | grep -v '\\.' | sort -u | anew -q hosts/ips_v6.txt || true
             fi
             # Add target if it's an IPv6 literal
-            if [[ $domain =~ : ]]; then echo "$domain" | anew -q hosts/ips_v6.txt; fi
+            if [[ $domain =~ : ]]; then echo "$domain" | anew -q hosts/ips_v6.txt || true; fi
         fi
 
         if [[ $PORTSCAN_PASSIVE == true ]]; then
@@ -1106,8 +1109,31 @@ function cms_scanner() {
         fi
 
         # Run CMSeeK with timeout
-        if ! timeout -k 1m "${CMSSCAN_TIMEOUT}s" "${tools}/CMSeeK/venv/bin/python3" "${tools}/CMSeeK/cmseek.py" -l .tmp/cms.txt --batch -r &>>"$LOGFILE"; then
+        local cmseek_cmd=(
+            timeout -k 1m "${CMSSCAN_TIMEOUT}s"
+            "${tools}/CMSeeK/venv/bin/python3" "${tools}/CMSeeK/cmseek.py"
+            -l .tmp/cms.txt --batch -r
+        )
+        local exit_status=0
+        local log_start=0
+        log_start=$(wc -l <"$LOGFILE" 2>/dev/null || echo 0)
+        if ! "${cmseek_cmd[@]}" &>>"$LOGFILE"; then
             exit_status=$?
+            # Attempt one-time repair on known CMSeeK index corruption.
+            if tail -n +"$((log_start + 1))" "$LOGFILE" 2>/dev/null | grep -q "cmseekdb/createindex.py" \
+                && tail -n +"$((log_start + 1))" "$LOGFILE" 2>/dev/null | grep -q "JSONDecodeError"; then
+                log_note "cms_scanner: detected CMSeeK index corruption, repairing index and retrying once" "${FUNCNAME[0]}" "${LINENO}"
+                find "${tools}/CMSeeK/Result" -type f -name "*.json" -size 0 -delete 2>>"$LOGFILE" || true
+                if [[ -f "${tools}/CMSeeK/cmseekdb/createindex.py" ]]; then
+                    "${tools}/CMSeeK/venv/bin/python3" "${tools}/CMSeeK/cmseekdb/createindex.py" &>>"$LOGFILE" || true
+                fi
+                if ! "${cmseek_cmd[@]}" &>>"$LOGFILE"; then
+                    exit_status=$?
+                else
+                    exit_status=0
+                fi
+            fi
+
             if [[ ${exit_status} -eq 124 || ${exit_status} -eq 137 ]]; then
                 echo "TIMEOUT cmseek.py - investigate manually for $dir" >>"$LOGFILE"
                 end_func "TIMEOUT cmseek.py - investigate manually for $dir" "${FUNCNAME[0]}"
@@ -1416,22 +1442,21 @@ function url_ext() {
             for t in "${ext[@]}"; do
 
                 # Extract unique matching URLs
-                matches=$(
-                    (grep -aEi "\.(${t})($|/|\?)" ".tmp/url_extract_tmp.txt" 2>>"$LOGFILE" || true) \
-                        | sort -u | sed '/^$/d'
-                )
+                grep -aEi "\.(${t})($|/|\?)" ".tmp/url_extract_tmp.txt" 2>>"$LOGFILE" \
+                    | sort -u \
+                    | sed '/^$/d' >".tmp/urls_by_ext_${t}.tmp" || true
 
-                NUMOFLINES=$(echo "$matches" | wc -l)
+                NUMOFLINES=$(wc -l <".tmp/urls_by_ext_${t}.tmp" 2>/dev/null || echo 0)
 
                 if [[ $NUMOFLINES -gt 0 ]]; then
                     printf "\n############################\n + %s + \n############################\n" "$t" >>webs/urls_by_ext.txt
-                    echo "$matches" >>webs/urls_by_ext.txt
+                    cat ".tmp/urls_by_ext_${t}.tmp" >>webs/urls_by_ext.txt
                 fi
             done
 
             # Append ssrf.txt to redirect.txt if ssrf.txt exists and is not empty
             if [[ -s "gf/ssrf.txt" ]]; then
-                cat "gf/ssrf.txt" | anew -q "gf/redirect.txt"
+                cat "gf/ssrf.txt" | anew -q "gf/redirect.txt" || true
             fi
 
             end_func "Results are saved in $domain/webs/urls_by_ext.txt" "${FUNCNAME[0]}"
@@ -1476,17 +1501,17 @@ function jschecks() {
             printf "%bRunning: Fetching URLs 1/6%b\n" "$yellow" "$reset"
             if [[ $AXIOM != true ]]; then
                 subjs -ua "Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -c 40 <.tmp/url_extract_js.txt \
-                    | grep "$domain" \
-                    | grep -aEo 'https?://[^ ]+' | anew -q .tmp/subjslinks.txt
+                    | grep -F "$domain" \
+                    | grep -aEo 'https?://[^ ]+' | anew -q .tmp/subjslinks.txt || true
             else
                 axiom-scan .tmp/url_extract_js.txt -m subjs -o .tmp/subjslinks.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
             fi
 
-            if [[ -s ".tmp/subjslinks.txt" ]]; then
-                grep -Eiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" .tmp/subjslinks.txt \
-                    | anew -q js/nojs_links.txt
-                grep -iE '\.js([?#].*)?$|\.js([/?&].*)' .tmp/subjslinks.txt | anew -q .tmp/url_extract_js.txt
-            fi
+                if [[ -s ".tmp/subjslinks.txt" ]]; then
+                    grep -Eiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" .tmp/subjslinks.txt \
+                        | anew -q js/nojs_links.txt || true
+                    grep -iE '\.js([?#].*)?$|\.js([/?&].*)' .tmp/subjslinks.txt | anew -q .tmp/url_extract_js.txt || true
+                fi
 
             urless <.tmp/url_extract_js.txt \
                 | anew -q js/url_extract_js.txt 2>>"$LOGFILE" >/dev/null
@@ -1505,7 +1530,7 @@ function jschecks() {
                         -content-type -retries 2 -no-color -o .tmp/js_livelinks.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
                     if [[ -s ".tmp/js_livelinks.txt" ]]; then
                         cat .tmp/js_livelinks.txt | anew .tmp/web_full_info.txt \
-                            | grep "[200]" | grep "javascript" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
+                            | grep "[200]" | grep "javascript" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt || true
                     fi
                 fi
             fi
@@ -1527,7 +1552,7 @@ function jschecks() {
             fi
 
             find .tmp/sourcemapper/ \( -name "*.js" -o -name "*.ts" \) -type f \
-                | jsluice urls | jq -r .url | anew -q .tmp/js_endpoints.txt
+                | jsluice urls | jq -r .url | anew -q .tmp/js_endpoints.txt || true
 
             printf "%bRunning: Gathering endpoints 4/6%b\n" "$yellow" "$reset"
             if [[ -s "js/js_livelinks.txt" ]]; then
@@ -1537,19 +1562,24 @@ function jschecks() {
 
             if [[ -s ".tmp/js_endpoints.txt" ]]; then
                 sed_i '/^\//!d' .tmp/js_endpoints.txt
-                cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt
+                cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt || true
             fi
 
             printf "%bRunning: Gathering secrets 5/6%b\n" "$yellow" "$reset"
             if [[ -s "js/js_livelinks.txt" ]]; then
                 if [[ $AXIOM != true ]]; then
-                    cat js/js_livelinks.txt | mantra -ua \"$HEADER\" -s | anew -q js/js_secrets.txt 2>>"$LOGFILE" >/dev/null
+                    cat js/js_livelinks.txt | mantra -ua \"$HEADER\" -s | anew -q js/js_secrets.txt 2>>"$LOGFILE" >/dev/null || true
                 else
                     axiom-exec "go install github.com/Brosck/mantra@latest" 2>>"$LOGFILE" >/dev/null
                     axiom-scan js/js_livelinks.txt -m mantra -ua "$HEADER" -s -o js/js_secrets.txt "$AXIOM_EXTRA_ARGS" &>/dev/null
                 fi
                 mkdir -p .tmp/sourcemapper/secrets
-                for i in $(cat js/js_secrets.txt | cut -d' ' -f2); do wget -q -P .tmp/sourcemapper/secrets $i; done
+                if [[ -s "js/js_secrets.txt" ]]; then
+                    while IFS= read -r i; do
+                        [[ -z "$i" ]] && continue
+                        wget -q -P .tmp/sourcemapper/secrets -- "$i" || true
+                    done < <(cut -d' ' -f2 js/js_secrets.txt)
+                fi
                 trufflehog filesystem .tmp/sourcemapper/ -j 2>/dev/null | jq -c | anew -q js/js_secrets_jsmap.txt
                 find .tmp/sourcemapper/ -type f -name "*.js" | jsluice secrets -j --patterns="${tools}/jsluice_patterns.json" | anew -q js/js_secrets_jsmap_jsluice.txt
             fi
@@ -1561,11 +1591,11 @@ function jschecks() {
                         (
                             # shellcheck source=/dev/null
                             source "${GETJSWORDS_VENV}/bin/activate"
-                            if python3 -c "import jsbeautifier" 2>/dev/null; then
+                            if python3 -c "import jsbeautifier, requests" 2>/dev/null; then
                                 interlace -tL js/js_livelinks.txt -threads "$INTERLACE_THREADS" \
                                     -c "python3 ${tools}/getjswords.py '_target_' | anew -q webs/dict_words.txt" 2>>"$LOGFILE" >/dev/null
                             else
-                                log_note "jsbeautifier not installed in venv ${GETJSWORDS_VENV}; skipping getjswords wordlist step" "${FUNCNAME[0]}" "${LINENO}"
+                                log_note "jschecks: jsbeautifier/requests missing in venv ${GETJSWORDS_VENV}; skipping getjswords wordlist step" "${FUNCNAME[0]}" "${LINENO}"
                             fi
                             deactivate || true
                         )
@@ -1576,11 +1606,11 @@ function jschecks() {
                     local getjs_py="${GETJSWORDS_PYTHON:-python3}"
                     if ! command -v "$getjs_py" >/dev/null 2>&1; then
                         log_note "getjswords python not found: ${getjs_py}; skipping wordlist step" "${FUNCNAME[0]}" "${LINENO}"
-                    elif "$getjs_py" -c "import jsbeautifier" 2>/dev/null; then
+                    elif "$getjs_py" -c "import jsbeautifier, requests" 2>/dev/null; then
                         interlace -tL js/js_livelinks.txt -threads "$INTERLACE_THREADS" \
                             -c "${getjs_py} ${tools}/getjswords.py '_target_' | anew -q webs/dict_words.txt" 2>>"$LOGFILE" >/dev/null
                     else
-                        log_note "jsbeautifier not installed in ${getjs_py}; skipping getjswords wordlist step" "${FUNCNAME[0]}" "${LINENO}"
+                        log_note "jschecks: jsbeautifier/requests missing in ${getjs_py}; skipping getjswords wordlist step" "${FUNCNAME[0]}" "${LINENO}"
                     fi
                 fi
             fi
@@ -1605,8 +1635,8 @@ function websocket_checks() {
         start_func "${FUNCNAME[0]}" "WebSocket discovery and handshake"
         # Collect ws/wss endpoints from JS endpoints and URLs
         touch .tmp/ws_endpoints_raw.txt
-        [[ -s js/js_endpoints.txt ]] && grep -aEo 'wss?://[^ ]+' js/js_endpoints.txt | anew -q .tmp/ws_endpoints_raw.txt
-        [[ -s webs/url_extract.txt ]] && grep -aEo 'wss?://[^ ]+' webs/url_extract.txt | anew -q .tmp/ws_endpoints_raw.txt
+        [[ -s js/js_endpoints.txt ]] && grep -aEo 'wss?://[^ ]+' js/js_endpoints.txt | anew -q .tmp/ws_endpoints_raw.txt || true
+        [[ -s webs/url_extract.txt ]] && grep -aEo 'wss?://[^ ]+' webs/url_extract.txt | anew -q .tmp/ws_endpoints_raw.txt || true
         if [[ -s .tmp/ws_endpoints_raw.txt ]]; then
             # Normalize and de-dup
             cat .tmp/ws_endpoints_raw.txt | sed 's/\"//g' | sed 's/[\]\[ ]//g' | sort -u >.tmp/ws_endpoints.txt
@@ -1624,7 +1654,7 @@ function websocket_checks() {
                     -H 'Sec-WebSocket-Version: 13' \
                     "$ws" || true)
                 if [[ $code == "101" ]]; then
-                    printf "HANDSHAKE %s\n" "$ws" | anew -q vulns/websockets.txt
+                    printf "HANDSHAKE %s\n" "$ws" | anew -q vulns/websockets.txt || true
                     # Origin test: send a cross-origin header, expect failure ideally
                     wskey2=$(head -c 16 /dev/urandom | base64 2>/dev/null || echo dGVzdGtleQ==)
                     code2=$(curl -sk --http1.1 -o /dev/null -w '%{http_code}' \
@@ -1634,7 +1664,7 @@ function websocket_checks() {
                         -H 'Sec-WebSocket-Version: 13' \
                         "$ws" || true)
                     if [[ $code2 == "101" ]]; then
-                        printf "ORIGIN-ALLOWED %s\n" "$ws" | anew -q vulns/websocket_misconfig.txt
+                        printf "ORIGIN-ALLOWED %s\n" "$ws" | anew -q vulns/websocket_misconfig.txt || true
                     fi
                 fi
             done <.tmp/ws_endpoints.txt

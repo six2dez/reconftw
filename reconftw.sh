@@ -90,19 +90,19 @@ fi
 # macOS PATH initialization, thanks @0xtavian <3
 if [[ $OSTYPE == "darwin"* ]]; then
     if ! command -v brew &>/dev/null; then
-        printf "\n%bBrew is not installed or not in the PATH.%b\n\n" "$bred" "$reset"
+        _print_error "Brew is not installed or not in the PATH"
         exit 1
     fi
     if [[ ! -x "$(brew --prefix gnu-getopt)/bin/getopt" ]]; then
-        printf "\n%bBrew formula gnu-getopt is not installed.%b\n\n" "$bred" "$reset"
+        _print_error "Brew formula gnu-getopt is not installed"
         exit 1
     fi
     if [[ ! -d "$(brew --prefix coreutils)/libexec/gnubin" ]]; then
-        printf "\n%bBrew formula coreutils is not installed.%b\n\n" "$bred" "$reset"
+        _print_error "Brew formula coreutils is not installed"
         exit 1
     fi
     if [[ ! -d "$(brew --prefix gnu-sed)/libexec/gnubin" ]]; then
-        printf "\n%bBrew formula gnu-sed is not installed.%b\n\n" "$bred" "$reset"
+        _print_error "Brew formula gnu-sed is not installed"
         exit 1
     fi
     # Prefix is different depending on Intel vs Apple Silicon
@@ -222,7 +222,7 @@ while true; do
             custom_function=$2
             # Validate that the custom function exists
             if ! declare -f "$custom_function" >/dev/null 2>&1; then
-                printf "%bError: Custom function '%s' is not defined%b\n" "$bred" "$custom_function" "$reset" >&2
+                _print_error "Custom function '${custom_function}' is not defined"
                 printf "Available functions can be found in modules/*.sh\n" >&2
                 printf "Example: -c my_custom_recon\n" >&2
                 exit $E_INVALID_INPUT
@@ -453,7 +453,7 @@ fi
 if [[ -n $outOfScope_file ]]; then
     isAsciiText "$outOfScope_file"
     if [[ "False" == "$IS_ASCII" ]]; then
-        printf "\n\n${bred} Out of Scope file is not a text file${reset}\n\n"
+        _print_error "Out of Scope file is not a text file"
         exit
     fi
 fi
@@ -461,7 +461,7 @@ fi
 if [[ -n $inScope_file ]]; then
     isAsciiText "$inScope_file"
     if [[ "False" == "$IS_ASCII" ]]; then
-        printf "\n\n${bred} In Scope file is not a text file${reset}\n\n"
+        _print_error "In Scope file is not a text file"
         exit
     fi
 fi
@@ -492,9 +492,9 @@ fi
 
 # Show DRY_RUN mode warning if enabled
 if [[ "${DRY_RUN:-false}" == "true" ]]; then
-    printf "\n%b#######################################################################%b\n" "$bgreen" "$reset"
-    printf "%b[%s] DRY-RUN MODE ENABLED - Commands will be shown but not executed%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
-    printf "%b#######################################################################%b\n\n" "$bgreen" "$reset"
+    _print_rule
+    _print_status WARN "DRY-RUN MODE ENABLED" "Commands will be shown but not executed"
+    _print_rule
 fi
 
 startdir=${PWD}
@@ -603,7 +603,7 @@ case $opt_mode in
                 cp "${SCRIPTPATH}/$list" "$dir/webs/webs.txt"
             fi
         else
-            printf "\n\n${bred} Web mode needs a website list file as target (./reconftw.sh -l target.txt -w) ${reset}\n\n"
+            _print_error "Web mode needs a website list file as target (./reconftw.sh -l target.txt -w)"
             exit
         fi
         webs_menu

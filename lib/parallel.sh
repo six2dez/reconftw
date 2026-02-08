@@ -320,10 +320,11 @@ parallel_passive_enum() {
         "sub_passive"
         "sub_crt"
     )
-    
-    printf "%b[*] Running passive enumeration in parallel (%d functions)%b\n" \
-        "${bblue:-}" "${#funcs[@]}" "${reset:-}"
-    
+
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && \
+        printf "%b[*] Running passive enumeration in parallel (%d functions)%b\n" \
+            "${bblue:-}" "${#funcs[@]}" "${reset:-}"
+
     parallel_funcs 2 "${funcs[@]}"
 }
 
@@ -336,10 +337,11 @@ parallel_active_enum() {
         "sub_noerror"
         "sub_dns"
     )
-    
-    printf "%b[*] Running active enumeration in parallel (%d functions)%b\n" \
-        "${bblue:-}" "${#funcs[@]}" "${reset:-}"
-    
+
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && \
+        printf "%b[*] Running active enumeration in parallel (%d functions)%b\n" \
+            "${bblue:-}" "${#funcs[@]}" "${reset:-}"
+
     parallel_funcs 3 "${funcs[@]}"
 }
 
@@ -351,10 +353,11 @@ parallel_postactive_enum() {
         "sub_tls"
         "sub_analytics"
     )
-    
-    printf "%b[*] Running post-active enumeration in parallel (%d functions)%b\n" \
-        "${bblue:-}" "${#funcs[@]}" "${reset:-}"
-    
+
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && \
+        printf "%b[*] Running post-active enumeration in parallel (%d functions)%b\n" \
+            "${bblue:-}" "${#funcs[@]}" "${reset:-}"
+
     parallel_funcs 2 "${funcs[@]}"
 }
 
@@ -368,9 +371,10 @@ parallel_brute_enum() {
     )
     
     # Brute force is resource intensive, run with limit of 2
-    printf "%b[*] Running brute force enumeration (limited parallelism)%b\n" \
-        "${bblue:-}" "${reset:-}"
-    
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && \
+        printf "%b[*] Running brute force enumeration (limited parallelism)%b\n" \
+            "${bblue:-}" "${reset:-}"
+
     parallel_funcs 2 "${funcs[@]}"
 }
 
@@ -388,9 +392,10 @@ parallel_web_vulns() {
         "xss"
     )
     
-    printf "%b[*] Running web vulnerability checks in parallel (%d checks)%b\n" \
-        "${bblue:-}" "${#funcs[@]}" "${reset:-}"
-    
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && \
+        printf "%b[*] Running web vulnerability checks in parallel (%d checks)%b\n" \
+            "${bblue:-}" "${#funcs[@]}" "${reset:-}"
+
     parallel_funcs 4 "${funcs[@]}"
 }
 
@@ -404,9 +409,10 @@ parallel_injection_vulns() {
         "command_injection"
     )
     
-    printf "%b[*] Running injection vulnerability checks in parallel (%d checks)%b\n" \
-        "${bblue:-}" "${#funcs[@]}" "${reset:-}"
-    
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && \
+        printf "%b[*] Running injection vulnerability checks in parallel (%d checks)%b\n" \
+            "${bblue:-}" "${#funcs[@]}" "${reset:-}"
+
     parallel_funcs 4 "${funcs[@]}"
 }
 
@@ -419,9 +425,10 @@ parallel_server_vulns() {
         "smuggling"
     )
     
-    printf "%b[*] Running server-side vulnerability checks in parallel (%d checks)%b\n" \
-        "${bblue:-}" "${#funcs[@]}" "${reset:-}"
-    
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && \
+        printf "%b[*] Running server-side vulnerability checks in parallel (%d checks)%b\n" \
+            "${bblue:-}" "${#funcs[@]}" "${reset:-}"
+
     parallel_funcs 3 "${funcs[@]}"
 }
 
@@ -440,9 +447,10 @@ parallel_osint() {
         "domain_info"
     )
     
-    printf "%b[*] Running OSINT gathering in parallel (%d sources)%b\n" \
-        "${bblue:-}" "${#funcs[@]}" "${reset:-}"
-    
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && \
+        printf "%b[*] Running OSINT gathering in parallel (%d sources)%b\n" \
+            "${bblue:-}" "${#funcs[@]}" "${reset:-}"
+
     parallel_funcs 4 "${funcs[@]}"
 }
 
@@ -454,8 +462,9 @@ parallel_osint() {
 # Usage: parallel_subdomains_full
 # This replaces the sequential execution in subdomains_full()
 parallel_subdomains_full() {
-    printf "%b[*] Starting parallelized subdomain enumeration%b\n" \
-        "${bblue:-}" "${reset:-}"
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && \
+        printf "%b[*] Starting parallelized subdomain enumeration%b\n" \
+            "${bblue:-}" "${reset:-}"
     
     # Phase 1: Passive enumeration (parallel - no dependencies)
     parallel_passive_enum
@@ -479,15 +488,17 @@ parallel_subdomains_full() {
     [[ ${SUBSCRAPING:-false} == true ]] && sub_scraping
     [[ ${SUB_RECURSIVE_BRUTE:-false} == true ]] && sub_recursive_brute
     
-    printf "%b[*] Parallelized subdomain enumeration complete%b\n" \
-        "${bgreen:-}" "${reset:-}"
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && \
+        printf "%b[*] Parallelized subdomain enumeration complete%b\n" \
+            "${bgreen:-}" "${reset:-}"
 }
 
 # Orchestrate full vulnerability scanning with parallelization
 # Usage: parallel_vulns_full
 parallel_vulns_full() {
-    printf "%b[*] Starting parallelized vulnerability scanning%b\n" \
-        "${bblue:-}" "${reset:-}"
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && \
+        printf "%b[*] Starting parallelized vulnerability scanning%b\n" \
+            "${bblue:-}" "${reset:-}"
     
     # Run nuclei first (it's comprehensive)
     nuclei_check
@@ -497,6 +508,7 @@ parallel_vulns_full() {
     parallel_injection_vulns
     parallel_server_vulns
     
-    printf "%b[*] Parallelized vulnerability scanning complete%b\n" \
-        "${bgreen:-}" "${reset:-}"
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && \
+        printf "%b[*] Parallelized vulnerability scanning complete%b\n" \
+            "${bgreen:-}" "${reset:-}"
 }

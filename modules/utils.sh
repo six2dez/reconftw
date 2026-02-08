@@ -299,15 +299,9 @@ function check_disk_space() {
     local required_gb="$1"
     local check_path="${2:-.}"
 
-    # Get available space in GB
+    # Get available space in GB (portable across macOS/Linux).
     local available_gb
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS
-        available_gb=$(df -g "$check_path" | awk 'NR==2 {print $4}')
-    else
-        # Linux
-        available_gb=$(df -BG "$check_path" | awk 'NR==2 {gsub(/G/, "", $4); print $4}')
-    fi
+    available_gb=$(df -Pk "$check_path" 2>/dev/null | awk 'NR==2 {print int($4 / 1024 / 1024)}')
 
     if [ -z "$available_gb" ] || [ "$available_gb" -lt "$required_gb" ]; then
         printf "%b[%s] WARNING: Insufficient disk space. Required: %dGB, Available: %dGB at %s%b\n" \

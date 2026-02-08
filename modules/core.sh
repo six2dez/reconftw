@@ -11,15 +11,8 @@
     exit 1
 }
 
-# --------------------------------------
-# Classic UI wrappers (no tput/icons)
-# --------------------------------------
-
+# pt_header kept as no-op for backward compatibility (used by help())
 pt_header() { :; }
-pt_msg_run() { printf "\n%b[%s] %s%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$1" "$reset"; }
-pt_msg_ok() { printf "\n%b[%s] %s%b\n" "$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$1" "$reset"; }
-pt_msg_warn() { printf "\n%b[%s] %s%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$1" "$reset"; }
-pt_msg_err() { printf "\n%b[%s] %s%b\n" "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$1" "$reset"; }
 
 # Ensure a safe default for early log redirections
 # If LOGFILE is unset or empty, send logs to /dev/null until later initialization
@@ -66,8 +59,7 @@ enable_command_trace() {
     fi
     [[ -z ${LOGFILE:-} ]] && return
 
-    printf "%b[%s] WARNING: Command tracing enabled. Logs may contain sensitive data.%b\n" \
-        "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset" >&2
+    _print_status WARN "Command tracing enabled" "Logs may contain sensitive data"
 
     # Close any previous trace descriptor (native bash {varname} redirect syntax)
     if [[ -n ${TRACE_FD:-} ]]; then
@@ -132,19 +124,19 @@ function check_version() {
 
     # Check if git is installed
     if ! command -v git >/dev/null 2>&1; then
-        printf "\n%bGit is not installed. Cannot check for updates.%b\n\n" "$bred" "$reset"
+        _print_error "Git is not installed. Cannot check for updates"
         return 1
     fi
 
     # Check if current directory is a git repository
     if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        printf "\n%bCurrent directory is not a git repository. Cannot check for updates.%b\n\n" "$bred" "$reset"
+        _print_error "Current directory is not a git repository. Cannot check for updates"
         return 1
     fi
 
     # Fetch updates with a timeout (supports gtimeout on macOS)
     if ! { [[ -n $TIMEOUT_CMD ]] && $TIMEOUT_CMD 10 git fetch >/dev/null 2>&1; } && ! git fetch >/dev/null 2>&1; then
-        printf "\n%bUnable to check updates (git fetch timed out).%b\n\n" "$bred" "$reset"
+        _print_error "Unable to check updates (git fetch timed out)"
         return 1
     fi
 
@@ -156,7 +148,7 @@ function check_version() {
     local UPSTREAM
     UPSTREAM=$(git rev-parse --abbrev-ref --symbolic-full-name "@{u}" 2>/dev/null)
     if [[ -z $UPSTREAM ]]; then
-        printf "\n%bNo upstream branch set for '%s'. Cannot check for updates.%b\n\n" "$bred" "$BRANCH" "$reset"
+        _print_error "No upstream branch set for '${BRANCH}'. Cannot check for updates"
         return 1
     fi
 
@@ -167,14 +159,13 @@ function check_version() {
 
     # Compare local and remote hashes
     if [[ $LOCAL != "$REMOTE" ]]; then
-        printf "\n%bThere is a new version available. Run ./install.sh to get the latest version.%b\n\n" "$yellow" "$reset"
+        _print_status WARN "New version available" "Run ./install.sh to update"
     fi
 }
 
 function tools_installed() {
     # Check if all tools are installed
-    printf "\n\n%b#######################################################################%b\n" "$bgreen" "$reset"
-    printf "%b[%s] Checking installed tools %b\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+    _print_section "Tools Check"
 
     local all_installed=true
     local missing_tools=()
@@ -183,7 +174,7 @@ function tools_installed() {
     local env_vars=("GOPATH" "GOROOT" "PATH")
     for var in "${env_vars[@]}"; do
         if [[ -z ${!var} ]]; then
-            printf "%b [*] %s variable\t\t[NO]%b\n" "$bred" "$var" "$reset"
+            _print_status FAIL "${var} variable"
             all_installed=false
             missing_tools+=("$var environment variable")
         fi
@@ -348,20 +339,16 @@ function tools_installed() {
     done
 
     if [[ $all_installed == true ]]; then
-        printf "%b\n Good! All tools are installed! %b\n\n" "$bgreen" "$reset"
+        _print_status OK "All tools are installed"
     else
-        printf "\n%bSome tools or directories are missing:%b\n\n" "$yellow" "$reset"
+        _print_status WARN "Some tools or directories are missing"
         for tool in "${missing_tools[@]}"; do
-            printf "%b - %s %b\n" "$bred" "$tool" "$reset"
+            _print_status FAIL "$tool"
         done
         printf "\n%bTry running the installer script again: ./install.sh%b\n" "$yellow" "$reset"
-        printf "%bIf it fails, try installing the missing tools manually.%b\n" "$yellow" "$reset"
-        printf "%bEnsure that the %b\$tools%b variable is correctly set at the start of this script.%b\n" "$yellow" "$bred" "$yellow" "$reset"
-        printf "%bIf you need assistance, feel free to contact me! :D%b\n\n" "$yellow" "$reset"
     fi
 
-    printf "%b[%s] Tools check finished%b\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
-    printf "%b#######################################################################\n%b" "$bgreen" "$reset"
+    _print_status INFO "Tools check finished"
 
     if [[ $CHECK_TOOLS_OR_EXIT == true && $all_installed != true ]]; then
         exit 2
@@ -386,15 +373,14 @@ function check_critical_dependencies() {
     local missing_critical=()
     local all_critical_ok=true
 
-    printf "\n%b#######################################################################%b\n" "$bgreen" "$reset"
-    printf "%b[%s] Checking critical dependencies%b\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+    _print_section "Critical Dependencies"
 
     for item in "${critical_tools[@]}"; do
         local tool="${item%%:*}"
         local description="${item#*:}"
 
         if ! command -v "$tool" >/dev/null 2>&1; then
-            printf "%b [✗] %s (%s) - MISSING%b\n" "$bred" "$description" "$tool" "$reset"
+            _print_status FAIL "${description} (${tool})" "MISSING"
             missing_critical+=("$tool")
             all_critical_ok=false
         else
@@ -410,26 +396,31 @@ function check_critical_dependencies() {
                     version=$($tool --version 2>&1 | head -n1 || echo "installed")
                     ;;
             esac
-            printf "%b [✓] %s (%s) - %s%b\n" "$bgreen" "$description" "$tool" "$version" "$reset"
+            _print_status OK "${description} (${tool})" "${version}"
         fi
     done
 
-    printf "\n"
-
     if [[ $all_critical_ok == false ]]; then
-        printf "%b[%s] ERROR: Critical dependencies missing!%b\n" "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
-        printf "%bThe following tools are required for reconFTW to function:%b\n" "$yellow" "$reset"
+        _print_error "Critical dependencies missing!"
         for tool in "${missing_critical[@]}"; do
-            printf "%b  - %s%b\n" "$bred" "$tool" "$reset"
+            _print_status FAIL "$tool"
         done
-        printf "\n%bPlease install these tools and try again.%b\n" "$yellow" "$reset"
-        printf "%bYou can run: ./install.sh to install all dependencies.%b\n" "$yellow" "$reset"
-        printf "%b#######################################################################%b\n\n" "$bgreen" "$reset"
+        printf "\n%bPlease install these tools and try again: ./install.sh%b\n" "$yellow" "$reset"
         exit 1
     else
-        printf "%b[%s] All critical dependencies are installed%b\n" "$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
-        printf "%b#######################################################################%b\n\n" "$bgreen" "$reset"
+        _print_status OK "All critical dependencies are installed"
     fi
+}
+
+# Report optional API keys used by passive URL providers.
+# Missing keys are informational only; scan continues in best-effort mode.
+function check_optional_api_keys() {
+    local urlscan_state="configured"
+    local vt_state="configured"
+    [[ -z "${URLSCAN_API_KEY:-}" ]] && urlscan_state="not configured (best-effort mode)"
+    [[ -z "${VIRUSTOTAL_API_KEY:-}" ]] && vt_state="not configured (best-effort mode)"
+
+    _print_status INFO "Optional API keys" "URLSCAN=${urlscan_state} | VT=${vt_state}"
 }
 
 ###############################################################################################################
@@ -447,8 +438,7 @@ function log_init() {
     STRUCTURED_LOG_FILE="${dir}/.log/structured_$(date +%Y%m%d_%H%M%S).jsonl"
     mkdir -p "$(dirname "$STRUCTURED_LOG_FILE")"
 
-    printf "%b[%s] Structured logging enabled: %s%b\n" \
-        "$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$STRUCTURED_LOG_FILE" "$reset"
+    _print_status OK "Structured logging enabled" "$STRUCTURED_LOG_FILE"
 }
 
 # Log structured JSON event
@@ -1055,7 +1045,7 @@ function transfer {
 
 function sendToNotify {
     if [[ -z $1 ]]; then
-        printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] No file provided to send ${reset}\n"
+        _print_status WARN "No file provided to send"
     else
         if [[ -z $NOTIFY_CONFIG ]]; then
             NOTIFY_CONFIG=~/.config/notify/provider-config.yaml
@@ -1084,9 +1074,7 @@ function sendToNotify {
 }
 
 function start_func() {
-    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
-        printf "${bgreen}#######################################################################"
-    fi
+    _print_rule
     notification "${2}" info
     echo "[$current_date] Start function: ${1} " >>"${LOGFILE}"
     start=$(date +%s)
@@ -1098,13 +1086,15 @@ function end_func() {
     end=$(date +%s)
     getElapsedTime "$start" "$end"
     record_func_timing "${2}" "$((end - start))"
-    notification "${2} Finished in ${runtime}" info
+    local duration=$((end - start))
     echo "[$current_date] End function: ${2} " >>"${LOGFILE}"
     if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
-        printf "${bblue}[$current_date] ${1} ${reset}\n"
-        printf "${bgreen}#######################################################################${reset}\n"
+        _print_status OK "${2}" "${duration}s"
+        if [[ -n "${1:-}" ]]; then
+            printf "  %b%s%b\n" "${bblue:-}" "${1}" "${reset:-}"
+        fi
     fi
-    log_json "SUCCESS" "${2}" "Function completed" "runtime=${runtime}" "duration_sec=$((end - start))"
+    log_json "SUCCESS" "${2}" "Function completed" "runtime=${runtime}" "duration_sec=${duration}"
 }
 
 function start_subfunc() {
@@ -1118,11 +1108,12 @@ function end_subfunc() {
     touch "$called_fn_dir/.${2}"
     end_sub=$(date +%s)
     getElapsedTime "$start_sub" "$end_sub"
+    local duration=$((end_sub - start_sub))
     if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
-        notification "     ${1} in ${runtime}" good
+        _print_status OK "  ${2}" "${duration}s"
     fi
     echo "[$current_date] End subfunction: ${1} " >>"${LOGFILE}"
-    log_json "SUCCESS" "${2}" "Subfunction completed" "runtime=${runtime}" "duration_sec=$((end_sub - start_sub))"
+    log_json "SUCCESS" "${2}" "Subfunction completed" "runtime=${runtime}" "duration_sec=${duration}"
 }
 
 function check_inscope() {
@@ -1707,6 +1698,29 @@ function export_csv_artifacts() {
     fi
 }
 
+# Export clean text artifacts for copy/paste workflows.
+# Outputs:
+#   - report/subdomains_clean.txt
+#   - report/webs_clean.txt
+#   - report/ips_clean.txt
+function export_clean_text_artifacts() {
+    ensure_dirs report || return 1
+
+    if [[ -s subdomains/subdomains.txt ]]; then
+        sed '/^$/d' subdomains/subdomains.txt | sort -u >report/subdomains_clean.txt
+    else
+        : >report/subdomains_clean.txt
+    fi
+
+    if [[ -s webs/webs_all.txt ]]; then
+        sed '/^$/d' webs/webs_all.txt | sort -u >report/webs_clean.txt
+    else
+        : >report/webs_clean.txt
+    fi
+
+    cat hosts/ips.txt hosts/ips_v6.txt 2>/dev/null | sed '/^$/d' | sort -u >report/ips_clean.txt
+}
+
 # Export orchestrator.
 # EXPORT_FORMAT values: json | html | csv | all
 function export_reports() {
@@ -1719,19 +1733,23 @@ function export_reports() {
     case "$fmt" in
         json)
             export_findings_jsonl
+            export_clean_text_artifacts
             notification "Exported JSON artifacts under report/" info
             ;;
         html)
+            export_clean_text_artifacts
             notification "Exported HTML report at report/index.html" info
             ;;
         csv)
             export_findings_jsonl
             export_csv_artifacts
+            export_clean_text_artifacts
             notification "Exported CSV artifacts under report/" info
             ;;
         all)
             export_findings_jsonl
             export_csv_artifacts
+            export_clean_text_artifacts
             notification "Exported JSONL + CSV + HTML artifacts under report/" info
             ;;
         *)
@@ -1744,78 +1762,71 @@ function health_check() {
     local failures=0
     local warnings=0
 
-    printf "\n%b#######################################################################%b\n" "$bgreen" "$reset"
-    printf "%b[%s] reconFTW Health Check%b\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+    _print_section "Health Check"
 
     # 1. Check critical tools
-    printf "%b[*] Checking critical tools...%b\n" "$yellow" "$reset"
+    _print_status INFO "Checking critical tools..."
     local critical_tools=("bash" "python3" "curl" "git" "jq")
     for tool in "${critical_tools[@]}"; do
         if command -v "$tool" >/dev/null 2>&1; then
-            printf "  %b[OK]%b %s\n" "$bgreen" "$reset" "$tool"
+            _print_status OK "$tool"
         else
-            printf "  %b[FAIL]%b %s not found\n" "$bred" "$reset" "$tool"
+            _print_status FAIL "$tool" "not found"
             ((failures++))
         fi
     done
 
     # 2. Check key recon tools
-    printf "\n%b[*] Checking recon tools...%b\n" "$yellow" "$reset"
+    _print_status INFO "Checking recon tools..."
     local recon_tools=("subfinder" "httpx" "nuclei" "naabu" "ffuf" "dnsx" "anew" "notify")
     for tool in "${recon_tools[@]}"; do
         if command -v "$tool" >/dev/null 2>&1; then
-            printf "  %b[OK]%b %s\n" "$bgreen" "$reset" "$tool"
+            _print_status OK "$tool"
         else
-            printf "  %b[WARN]%b %s not found\n" "$byellow" "$reset" "$tool"
+            _print_status WARN "$tool" "not found"
             ((warnings++))
         fi
     done
 
     # 3. Check network connectivity
-    printf "\n%b[*] Checking network connectivity...%b\n" "$yellow" "$reset"
+    _print_status INFO "Checking network connectivity..."
     if curl -s --connect-timeout 5 -o /dev/null -w "%{http_code}" "https://www.google.com" | grep -q "200\|301\|302"; then
-        printf "  %b[OK]%b Internet connectivity\n" "$bgreen" "$reset"
+        _print_status OK "Internet connectivity"
     else
-        printf "  %b[WARN]%b No internet connectivity\n" "$byellow" "$reset"
+        _print_status WARN "No internet connectivity"
         ((warnings++))
     fi
 
     # 4. Check disk space
-    printf "\n%b[*] Checking disk space...%b\n" "$yellow" "$reset"
+    _print_status INFO "Checking disk space..."
     local avail_gb
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS: df -g shows GB directly
-        avail_gb=$(df -g . 2>/dev/null | awk 'NR==2 {print $4}')
-    else
-        # Linux: df -BG shows GB with G suffix
-        avail_gb=$(df -BG . 2>/dev/null | awk 'NR==2 {gsub(/G/,"",$4); print $4}')
-    fi
+    avail_gb=$(df -Pk . 2>/dev/null | awk 'NR==2 {print int($4 / 1024 / 1024)}')
     avail_gb=${avail_gb:-0}
-    
+
     if [[ ${avail_gb} -ge 5 ]]; then
-        printf "  %b[OK]%b %s GB available\n" "$bgreen" "$reset" "$avail_gb"
+        _print_status OK "Disk space" "${avail_gb} GB available"
     elif [[ ${avail_gb} -ge 1 ]]; then
-        printf "  %b[WARN]%b Only %s GB available (recommend 5+ GB)\n" "$byellow" "$reset" "$avail_gb"
+        _print_status WARN "Disk space" "Only ${avail_gb} GB available (recommend 5+ GB)"
         ((warnings++))
     else
-        printf "  %b[FAIL]%b Less than 1 GB available\n" "$bred" "$reset"
+        _print_status FAIL "Disk space" "Less than 1 GB available"
         ((failures++))
     fi
 
     # 5. Check resolver files
-    printf "\n%b[*] Checking resolver files...%b\n" "$yellow" "$reset"
+    _print_status INFO "Checking resolver files..."
     local resolvers_path="${resolvers:-${SCRIPTPATH}/resolvers.txt}"
     if [[ -s "$resolvers_path" ]]; then
         local count
         count=$(wc -l <"$resolvers_path")
-        printf "  %b[OK]%b Resolvers file: %s (%s entries)\n" "$bgreen" "$reset" "$resolvers_path" "$count"
+        _print_status OK "Resolvers file" "${resolvers_path} (${count} entries)"
     else
-        printf "  %b[WARN]%b Resolvers file not found or empty: %s\n" "$byellow" "$reset" "$resolvers_path"
+        _print_status WARN "Resolvers file" "not found or empty: ${resolvers_path}"
         ((warnings++))
     fi
 
     # 6. Check API key status
-    printf "\n%b[*] Checking API keys...%b\n" "$yellow" "$reset"
+    _print_status INFO "Checking API keys..."
     local -A api_keys=(
         ["SHODAN_API_KEY"]="${SHODAN_API_KEY:-}"
         ["WHOISXML_API"]="${WHOISXML_API:-}"
@@ -1824,25 +1835,21 @@ function health_check() {
     )
     for key_name in "${!api_keys[@]}"; do
         if [[ -n "${api_keys[$key_name]}" ]]; then
-            printf "  %b[OK]%b %s configured\n" "$bgreen" "$reset" "$key_name"
+            _print_status OK "$key_name" "configured"
         else
-            printf "  %b[INFO]%b %s not set\n" "$bblue" "$reset" "$key_name"
+            _print_status INFO "$key_name" "not set"
         fi
     done
 
     # Summary
-    printf "\n%b#######################################################################%b\n" "$bgreen" "$reset"
+    _print_rule
     if [[ $failures -gt 0 ]]; then
-        printf "%b[%s] Health check: %d FAILURES, %d warnings%b\n" \
-            "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$failures" "$warnings" "$reset"
+        _print_status FAIL "Health check" "${failures} FAILURES, ${warnings} warnings"
     elif [[ $warnings -gt 0 ]]; then
-        printf "%b[%s] Health check: PASSED with %d warnings%b\n" \
-            "$byellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$warnings" "$reset"
+        _print_status WARN "Health check" "PASSED with ${warnings} warnings"
     else
-        printf "%b[%s] Health check: ALL PASSED%b\n" \
-            "$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+        _print_status OK "Health check" "ALL PASSED"
     fi
-    printf "%b#######################################################################%b\n\n" "$bgreen" "$reset"
 
     return $failures
 }

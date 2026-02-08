@@ -391,7 +391,7 @@ _subdomains_finalize() {
             local _sub_count _shown=0
             _sub_count=$(wc -l < "subdomains/subdomains.txt" | tr -d ' ')
             while IFS= read -r sub; do
-                ((_shown++))
+                _shown=$((_shown + 1))
                 if [[ $_shown -le 20 ]]; then
                     printf "%b[%s]   %s%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$sub" "$reset"
                 else
@@ -416,7 +416,7 @@ _subdomains_finalize() {
             local _web_count _wshown=0
             _web_count=$(wc -l < "webs/webs.txt" | tr -d ' ')
             while IFS= read -r web; do
-                ((_wshown++))
+                _wshown=$((_wshown + 1))
                 if [[ $_wshown -le 20 ]]; then
                     printf "%b[%s]   %s%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$web" "$reset"
                 else
@@ -627,33 +627,47 @@ function sub_crt() {
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBCRT == true ]]; then
         start_subfunc "${FUNCNAME[0]}" "Running: Crtsh Subdomain Enumeration"
 
+        : >.tmp/crtsh_subdomains.txt
+        : >.tmp/crtsh_subs_tmp.txt
+
         # Run crt command and check for errors
         # Apply time fencing if DNS_TIME_FENCE_DAYS is set and > 0
         if [[ ${DNS_TIME_FENCE_DAYS:-0} -gt 0 ]]; then
             local cutoff_date
             cutoff_date=$(date -v-"${DNS_TIME_FENCE_DAYS}"d +%Y-%m-%d 2>/dev/null || date -d "-${DNS_TIME_FENCE_DAYS} days" +%Y-%m-%d 2>/dev/null)
             if [[ -n "$cutoff_date" ]]; then
-                run_command crt -s -json -l "${CTR_LIMIT}" "$domain" 2>>"$LOGFILE" \
+                if ! run_command crt -s -json -l "${CTR_LIMIT}" "$domain" 2>>"$LOGFILE" \
                     | jq -r --arg cutoff "$cutoff_date" '[.[] | select(.not_before >= $cutoff)] | .[].subdomain' 2>>"$LOGFILE" \
-                    | sed -e 's/^\*\.//' >.tmp/crtsh_subdomains.txt
+                    | sed -e 's/^\*\.//' >.tmp/crtsh_subdomains.txt; then
+                    log_note "sub_crt: crt source returned no valid JSON; continuing with fallback sources" "${FUNCNAME[0]}" "${LINENO}"
+                fi
                 printf "%b[*] Time fencing enabled: filtering crt.sh results to last %d days (since %s)%b\n" \
                     "$bblue" "${DNS_TIME_FENCE_DAYS}" "$cutoff_date" "$reset"
             else
                 # Fallback if date calculation fails
-                run_command crt -s -json -l "${CTR_LIMIT}" "$domain" 2>>"$LOGFILE" \
+                if ! run_command crt -s -json -l "${CTR_LIMIT}" "$domain" 2>>"$LOGFILE" \
                     | jq -r '.[].subdomain' 2>>"$LOGFILE" \
-                    | sed -e 's/^\*\.//' >.tmp/crtsh_subdomains.txt
+                    | sed -e 's/^\*\.//' >.tmp/crtsh_subdomains.txt; then
+                    log_note "sub_crt: crt source returned no valid JSON; continuing with fallback sources" "${FUNCNAME[0]}" "${LINENO}"
+                fi
             fi
         else
-            run_command crt -s -json -l "${CTR_LIMIT}" "$domain" 2>>"$LOGFILE" \
+            if ! run_command crt -s -json -l "${CTR_LIMIT}" "$domain" 2>>"$LOGFILE" \
                 | jq -r '.[].subdomain' 2>>"$LOGFILE" \
-                | sed -e 's/^\*\.//' >.tmp/crtsh_subdomains.txt
+                | sed -e 's/^\*\.//' >.tmp/crtsh_subdomains.txt; then
+                log_note "sub_crt: crt source returned no valid JSON; continuing with fallback sources" "${FUNCNAME[0]}" "${LINENO}"
+            fi
         fi
 
-        run_command curl -s "https://bgp.he.net/certs/api/list?domain=$domain" | jq -r 'try .domains[].domain' | sed -e 's/^\*\.//' | anew -q .tmp/crtsh_subdomains.txt
+        run_command curl -s "https://bgp.he.net/certs/api/list?domain=$domain" \
+            | jq -r 'try .domains[].domain' \
+            | sed -e 's/^\*\.//' \
+            | anew -q .tmp/crtsh_subdomains.txt || true
 
         # Use anew to get new subdomains
-        cat .tmp/crtsh_subdomains.txt | anew -q .tmp/crtsh_subs_tmp.txt
+        if [[ -s ".tmp/crtsh_subdomains.txt" ]]; then
+            anew -q .tmp/crtsh_subs_tmp.txt <.tmp/crtsh_subdomains.txt || true
+        fi
         # If INSCOPE is true, check inscope
         if [[ $INSCOPE == true ]]; then
             if ! check_inscope .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" >/dev/null; then
@@ -931,11 +945,16 @@ function sub_dns() {
                 | grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' | sort -u \
                 | anew -q .tmp/subdomains_dns.txt
 
-            for i in $(jq -r '.. | strings | select(test("^(\\d{1,3}\\.){3}\\d{1,3}$|^[0-9a-fA-F:]+$"))' <"subdomains/subdomains_dnsregs.json" | sort -u); do
-                curl -s https://ip.thc.org/$i 2>>"$LOGFILE" | grep "\.${DOMAIN_ESCAPED}$" \
-                    | grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' | sort -u \
-                    | anew -q .tmp/subdomains_dns.txt
-            done
+            jq -r '.. | strings | select(test("^(\\d{1,3}\\.){3}\\d{1,3}$|^[0-9a-fA-F:]+$"))' <"subdomains/subdomains_dnsregs.json" \
+                | sort -u \
+                | while IFS= read -r ip; do
+                    [[ -z "$ip" ]] && continue
+                    curl -s "https://ip.thc.org/$ip" 2>>"$LOGFILE" \
+                        | grep "\.${DOMAIN_ESCAPED}$" \
+                        | grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' \
+                        | sort -u \
+                        | anew -q .tmp/subdomains_dns.txt || true
+                done
 
             jq -r 'select(.host) |"\(.host) - \((.a // [])[])", "\(.host) - \((.aaaa // [])[])"' <"subdomains/subdomains_dnsregs.json" \
                 | grep -E ' - [0-9a-fA-F:.]+$' | sort -u | anew -q "subdomains/subdomains_ips.txt"
@@ -1122,7 +1141,7 @@ function sub_scraping() {
                 if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
                     cat .tmp/url_extract_tmp.txt | grep -a "$domain" \
                         | grep -aEo 'https?://[^ ]+' \
-                        | sed "s/^\*\.//" | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
+                        | sed "s/^\*\.//" | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt || true
                 fi
 
                 if command -v waymore &>/dev/null; then
@@ -1132,7 +1151,7 @@ function sub_scraping() {
                     if [[ -s ".tmp/waymore_urls_subs.txt" ]]; then
                         cat .tmp/waymore_urls_subs.txt | grep -a "$domain" \
                             | grep -aEo 'https?://[^ ]+' \
-                            | sed "s/^\*\.//" | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
+                            | sed "s/^\*\.//" | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt || true
                     fi
                 else
                     log_note "sub_scraping: waymore not found; skipping waymore passive collection" "${FUNCNAME[0]}" "${LINENO}"
@@ -1157,12 +1176,12 @@ function sub_scraping() {
                             | sed "s/^\*\.//" \
                             | anew .tmp/probed_tmp_scrap.txt \
                             | unfurl -u domains 2>>"$LOGFILE" \
-                            | anew -q .tmp/scrap_subs.txt
+                            | anew -q .tmp/scrap_subs.txt || true
                     fi
 
                     if [[ -s ".tmp/probed_tmp_scrap.txt" ]]; then
                         cat .tmp/probed_tmp_scrap.txt | csprecon -s | grep -a "$domain" | sed "s/^\*\.//" | sort -u \
-                            | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
+                            | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt || true
                     fi
 
                 else
@@ -1184,12 +1203,12 @@ function sub_scraping() {
                             | sed "s/^\*\.//" \
                             | anew .tmp/probed_tmp_scrap.txt \
                             | unfurl -u domains 2>>"$LOGFILE" \
-                            | anew -q .tmp/scrap_subs.txt
+                            | anew -q .tmp/scrap_subs.txt || true
                     fi
 
                     if [[ -s ".tmp/probed_tmp_scrap.txt" ]]; then
                         cat .tmp/probed_tmp_scrap.txt | csprecon -s | grep -a "$domain" | sed "s/^\*\.//" | sort -u \
-                            | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
+                            | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt || true
                     fi
 
                 fi
@@ -1201,7 +1220,7 @@ function sub_scraping() {
                         --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" 2>>"$LOGFILE" >/dev/null
                 fi
 
-                if [[ $INSCOPE == true ]]; then
+                if [[ $INSCOPE == true ]] && [[ -s ".tmp/scrap_subs_resolved.txt" ]]; then
                     if ! check_inscope .tmp/scrap_subs_resolved.txt 2>>"$LOGFILE" >/dev/null; then
                         printf "%b[!] check_inscope command failed.%b\n" "$bred" "$reset"
                     fi
@@ -1233,7 +1252,7 @@ function sub_scraping() {
                             | sed "s/^\*\.//" \
                             | anew .tmp/probed_tmp_scrap.txt \
                             | unfurl -u domains 2>>"$LOGFILE" \
-                            | anew -q .tmp/scrap_subs.txt
+                            | anew -q .tmp/scrap_subs.txt || true
                     fi
                 fi
 
@@ -2024,7 +2043,9 @@ function subtakeover() {
 
         # DNS Takeover
         cat .tmp/subs_no_resolved.txt .tmp/subdomains_dns.txt .tmp/scrap_subs.txt \
-            .tmp/analytics_subs_clean.txt .tmp/passive_recursive.txt 2>/dev/null | anew -q .tmp/subs_dns_tko.txt
+            .tmp/analytics_subs_clean.txt .tmp/passive_recursive.txt 2>/dev/null \
+            | sed '/^$/d' \
+            | anew -q .tmp/subs_dns_tko.txt || true
 
         if [[ -s ".tmp/subs_dns_tko.txt" ]]; then
             cat .tmp/subs_dns_tko.txt 2>/dev/null | dnstake -c "$DNSTAKE_THREADS" -s 2>>"$LOGFILE" \

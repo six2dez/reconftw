@@ -21,7 +21,7 @@ function start() {
     # Check available disk space before starting (require at least 5GB by default)
     local required_space_gb="${MIN_DISK_SPACE_GB:-5}"
     if ! check_disk_space "$required_space_gb" "."; then
-        printf "%b[%s] WARNING: Low disk space detected. Continuing anyway...%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+        _print_status WARN "Low disk space detected" "Continuing anyway..."
         # Not exiting, just warning - user can set MIN_DISK_SPACE_GB=0 to disable
     fi
 
@@ -44,6 +44,7 @@ function start() {
         notification "Monitor cycle ${MONITOR_CYCLE}: skipping repeated tools check" info
     else
         tools_installed
+        check_optional_api_keys
     fi
 
     # Initialize incremental mode if enabled
@@ -126,9 +127,16 @@ function start() {
     # Non-fatal error trap: log and continue (plus short explanation for common cases)
     trap 'rc=$?; ts=$(date +"%Y-%m-%d %H:%M:%S"); cmd=${BASH_COMMAND}; loc_fn=${FUNCNAME[0]:-main}; loc_ln=${BASH_LINENO[0]:-0}; msg="[$ts] ERR($rc) @ ${loc_fn}:${loc_ln} :: ${cmd}"; if [[ -n "${LOGFILE:-}" ]]; then echo "$msg" >>"$LOGFILE"; else echo "$msg" >&2; fi; explain_err "$rc" "$cmd" "$loc_fn" "$loc_ln"' ERR
 
-    printf "\n"
-    printf "${bred}[$(date +'%Y-%m-%d %H:%M:%S')] Target: ${domain}\n\n"
-    printf "%b[LEGAL]%b Authorized testing only. By running this scan you confirm you have explicit permission for the specified targets and will comply with all applicable laws and program rules. Unauthorized use is prohibited.\n\n" "$yellow" "$reset"
+    _print_rule
+    printf "%b  Target: %s%b\n" "${bred:-}" "$domain" "${reset:-}"
+    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
+        printf "%b  Mode:   %s | Parallel: %s | Verbosity: %s%b\n" \
+            "${bblue:-}" "${opt_mode:-r}" "${PARALLEL_MODE:-true}" "${OUTPUT_VERBOSITY:-1}" "${reset:-}"
+    fi
+    _print_rule
+    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
+        printf "%b[LEGAL]%b Authorized testing only. By running this scan you confirm you have explicit permission for the specified targets and will comply with all applicable laws and program rules. Unauthorized use is prohibited.\n\n" "$yellow" "$reset"
+    fi
 }
 
 function end() {
@@ -212,7 +220,7 @@ function end() {
 
     if [[ $FARADAY == true ]]; then
         if ! faraday-cli status 2>>"$LOGFILE" >/dev/null; then
-            printf "%b[!] Faraday server is not running. Skipping Faraday integration.%b\n" "$bred" "$reset"
+            _print_error "Faraday server is not running. Skipping Faraday integration"
         else
             if [[ -s ".tmp/tko_json.txt" ]]; then
                 faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei .tmp/tko_json.txt 2>>"$LOGFILE" >/dev/null
@@ -273,13 +281,16 @@ function end() {
 
     global_end=$(date +%s)
     getElapsedTime $global_start $global_end
-    printf "${bgreen}#######################################################################${reset}\n"
+    _print_section "Scan Complete"
     if [[ "${RECON_PARTIAL_RUN:-false}" == "true" ]]; then
-        notification "Run completed with non-fatal warnings (osint_parallel=${RECON_OSINT_PARALLEL_FAILURES:-0})" warn
+        _print_status WARN "Run completed with non-fatal warnings" "osint_parallel=${RECON_OSINT_PARALLEL_FAILURES:-0}"
     fi
+    printf "%b  Target:   %s%b\n" "${bgreen:-}" "$domain" "${reset:-}"
+    printf "%b  Duration: %s%b\n" "${bgreen:-}" "$runtime" "${reset:-}"
+    printf "%b  Output:   %s%b\n" "${bgreen:-}" "$finaldir" "${reset:-}"
+    _print_rule
     notification "Finished Recon on: ${domain} under ${finaldir} in: ${runtime}" good "$(date +'%Y-%m-%d %H:%M:%S')"
     [ "$SOFT_NOTIFICATION" = true ] && echo "[$(date +'%Y-%m-%d %H:%M:%S')] Finished Recon on: ${domain} under ${finaldir} in: ${runtime}" | notify -silent
-    printf "${bgreen}#######################################################################${reset}\n"
 
     # Print performance timing summary
     print_timing_summary
@@ -336,6 +347,9 @@ function build_hotlist() {
 
 function passive() {
     start
+
+    _print_section "OSINT"
+
     domain_info
     ip_info
     emails
@@ -366,8 +380,13 @@ function passive() {
         axiom_selected
     fi
 
+    _print_section "Subdomains"
+
     subdomains_full
     remove_big_files
+
+    _print_section "Web Detection"
+
     favicon
     cdnprovider
     # shellcheck disable=SC2034  # PORTSCAN_ACTIVE controls scan behavior
@@ -409,7 +428,7 @@ function vulns() {
     if [[ $VULNS_GENERAL == true ]]; then
         if [[ "${PARALLEL_MODE:-true}" == "true" ]] && declare -f parallel_funcs &>/dev/null; then
             # Parallel execution - group independent checks
-            printf "%b[*] Running vulnerability checks in parallel mode%b\n" "$bblue" "$reset"
+            [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && printf "%b[*] Running vulnerability checks in parallel mode%b\n" "$bblue" "$reset"
             parallel_funcs 4 cors open_redirect crlf_checks xss
             local vulns_g1_rc=$?
             if ((vulns_g1_rc > 0)); then
@@ -559,6 +578,8 @@ function recon() {
     fi
     progress_init "$progress_total"
 
+    _print_section "OSINT"
+
     if [[ "${PARALLEL_MODE:-true}" == "true" ]] && declare -f parallel_funcs &>/dev/null; then
         progress_step "OSINT: domain_info, ip_info, emails, dorks"
         parallel_funcs 4 domain_info ip_info emails google_dorks
@@ -613,6 +634,8 @@ function recon() {
         axiom_selected
     fi
 
+    _print_section "Subdomains"
+
     progress_step "subdomains_full"
     subdomains_full
     progress_step "webprobe_full"
@@ -623,6 +646,8 @@ function recon() {
     progress_step "s3buckets"
     s3buckets
     cloud_extra_providers
+
+    _print_section "Web Detection"
 
     if [[ "${PARALLEL_MODE:-true}" == "true" ]] && declare -f parallel_funcs &>/dev/null; then
         progress_step "screenshot, cdnprovider, portscan"
@@ -661,6 +686,8 @@ function recon() {
             ${TIME_EST_FUZZ:-900} + ${TIME_EST_IIS:-60} + ${TIME_EST_URLCHECKS:-300} + ${TIME_EST_JSCHECKS:-300} + \
             ${TIME_EST_PARAM:-240} + ${TIME_EST_GRPC:-120}))
     else
+        _print_section "Web Analysis"
+
         progress_step "waf_checks"
         waf_checks
         progress_step "nuclei_check"
@@ -686,6 +713,8 @@ function recon() {
     if [[ $AXIOM == true ]]; then
         axiom_shutdown
     fi
+
+    _print_section "Finalization"
 
     progress_step "cms_scanner"
     cms_scanner
@@ -1001,6 +1030,8 @@ function subs_menu() {
         axiom_selected
     fi
 
+    _print_section "Subdomains"
+
     subdomains_full
     webprobe_full
     subtakeover
@@ -1018,10 +1049,15 @@ function subs_menu() {
 }
 
 function webs_menu() {
+    _print_section "Web Detection"
+
     subtakeover
     remove_big_files
     screenshot
     #	virtualhosts
+
+    _print_section "Web Analysis"
+
     waf_checks
     nuclei_check
     graphql_scan
@@ -1038,6 +1074,9 @@ function webs_menu() {
     url_ext
     param_discovery
     grpc_reflection
+
+    _print_section "Vulnerability Checks"
+
     vulns
     end
 }
@@ -1048,11 +1087,17 @@ function zen_menu() {
         axiom_launch
         axiom_selected
     fi
+
+    _print_section "Subdomains"
+
     subdomains_full
     webprobe_full
     subtakeover
     remove_big_files
     s3buckets
+
+    _print_section "Web Analysis"
+
     screenshot
     #	virtualhosts
     cdnprovider
@@ -1241,6 +1286,9 @@ function help() {
     printf "   --incremental     Only scan new findings since last run\n"
     printf "   --adaptive-rate   Automatically adjust rate limits on errors (429/503)\n"
     printf "   --dry-run         Show what would be executed without running commands\n"
+    printf "   --quiet           Minimal output (errors and final summary only)\n"
+    printf "   --verbose         Extra output (PIDs, debug info)\n"
+    printf "   --parallel-log m  Parallel output mode: summary (default), tail, or full\n"
     printf "   --parallel        Run independent functions in parallel (faster but uses more resources)\n"
     printf "   --no-parallel     Force sequential execution\n"
     printf "   --monitor         Continuous monitoring mode (single target; -w supports -l)\n"
