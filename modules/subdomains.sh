@@ -375,12 +375,24 @@ _subdomains_finalize() {
     fi
     
     # Display results
-    printf "%b\n[%s] Total subdomains:%b\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
-    notification "- ${NUMOFLINES_subs} alive" "good"
-    [[ -s "subdomains/subdomains.txt" ]] && sort "subdomains/subdomains.txt" >/dev/null
-    
+    TOTAL_SUBS=$(sed '/^$/d' "subdomains/subdomains.txt" 2>/dev/null | wc -l | tr -d ' ')
+    TOTAL_WEBS=$(sed '/^$/d' "webs/webs.txt" 2>/dev/null | wc -l | tr -d ' ')
+    printf "%b\n[%s] Total subdomains: %s | Total webs: %s%b\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$TOTAL_SUBS" "$TOTAL_WEBS" "$reset"
+    notification "- ${NUMOFLINES_subs} new subs alive" "good"
+    if [[ -s "subdomains/subdomains.txt" ]]; then
+        sort -o "subdomains/subdomains.txt" "subdomains/subdomains.txt"
+        while IFS= read -r sub; do
+            printf "%b[%s]   %s%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$sub" "$reset"
+        done < "subdomains/subdomains.txt"
+    fi
+
     notification "- ${NUMOFLINES_probed} new web probed" "good"
-    [[ -s "webs/webs.txt" ]] && sort "webs/webs.txt" >/dev/null
+    if [[ -s "webs/webs.txt" ]]; then
+        sort -o "webs/webs.txt" "webs/webs.txt"
+        while IFS= read -r web; do
+            printf "%b[%s]   %s%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$web" "$reset"
+        done < "webs/webs.txt"
+    fi
     
     notification "Subdomain Enumeration Finished" "good"
     printf "%b[%s] Results are saved in %s/subdomains/subdomains.txt and webs/webs.txt%b\n" \
@@ -1074,7 +1086,7 @@ function sub_scraping() {
                 urlfinder -d $domain -all -o .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
 
                 if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
-                    cat .tmp/url_extract_tmp.txt | grep "$domain" \
+                    cat .tmp/url_extract_tmp.txt | grep -a "$domain" \
                         | grep -aEo 'https?://[^ ]+' \
                         | sed "s/^\*\.//" | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
                 fi
@@ -1084,7 +1096,7 @@ function sub_scraping() {
                         log_note "sub_scraping: waymore failed or timed out; continuing" "${FUNCNAME[0]}" "${LINENO}"
                     fi
                     if [[ -s ".tmp/waymore_urls_subs.txt" ]]; then
-                        cat .tmp/waymore_urls_subs.txt | grep "$domain" \
+                        cat .tmp/waymore_urls_subs.txt | grep -a "$domain" \
                             | grep -aEo 'https?://[^ ]+' \
                             | sed "s/^\*\.//" | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
                     fi
@@ -1106,7 +1118,7 @@ function sub_scraping() {
 
                     if [[ -s ".tmp/web_full_info1.txt" ]]; then
                         cat .tmp/web_full_info1.txt | jq -r 'try .url' 2>/dev/null \
-                            | grep "$domain" \
+                            | grep -a "$domain" \
                             | grep -aEo 'https?://[^ ]+' \
                             | sed "s/^\*\.//" \
                             | anew .tmp/probed_tmp_scrap.txt \
@@ -1115,7 +1127,7 @@ function sub_scraping() {
                     fi
 
                     if [[ -s ".tmp/probed_tmp_scrap.txt" ]]; then
-                        cat .tmp/probed_tmp_scrap.txt | csprecon -s | grep "$domain" | sed "s/^\*\.//" | sort -u \
+                        cat .tmp/probed_tmp_scrap.txt | csprecon -s | grep -a "$domain" | sed "s/^\*\.//" | sort -u \
                             | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
                     fi
 
@@ -1133,7 +1145,7 @@ function sub_scraping() {
 
                     if [[ -s ".tmp/web_full_info1.txt" ]]; then
                         cat .tmp/web_full_info1.txt | jq -r 'try .url' 2>/dev/null \
-                            | grep "$domain" \
+                            | grep -a "$domain" \
                             | grep -aEo 'https?://[^ ]+' \
                             | sed "s/^\*\.//" \
                             | anew .tmp/probed_tmp_scrap.txt \
@@ -1142,7 +1154,7 @@ function sub_scraping() {
                     fi
 
                     if [[ -s ".tmp/probed_tmp_scrap.txt" ]]; then
-                        cat .tmp/probed_tmp_scrap.txt | csprecon -s | grep "$domain" | sed "s/^\*\.//" | sort -u \
+                        cat .tmp/probed_tmp_scrap.txt | csprecon -s | grep -a "$domain" | sed "s/^\*\.//" | sort -u \
                             | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt
                     fi
 
@@ -1163,8 +1175,8 @@ function sub_scraping() {
 
                 if [[ -s ".tmp/scrap_subs_resolved.txt" ]]; then
                     if ! NUMOFLINES=$(cat .tmp/scrap_subs_resolved.txt 2>>"$LOGFILE" \
-                        | grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" \
-                        | grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
+                        | grep -a "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" \
+                        | grep -Ea '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
                         | anew subdomains/subdomains.txt \
                         | tee .tmp/diff_scrap.txt \
                         | sed '/^$/d' | wc -l); then
@@ -1182,7 +1194,7 @@ function sub_scraping() {
 
                     if [[ -s ".tmp/web_full_info3.txt" ]]; then
                         cat .tmp/web_full_info3.txt | jq -r 'try .url' 2>/dev/null \
-                            | grep "$domain" \
+                            | grep -a "$domain" \
                             | grep -aEo 'https?://[^ ]+' \
                             | sed "s/^\*\.//" \
                             | anew .tmp/probed_tmp_scrap.txt \

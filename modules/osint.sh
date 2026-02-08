@@ -353,24 +353,11 @@ function third_party_misconfigs() {
             return 1
         fi
 
-        # Run misconfig-mapper and treat manual interrupts as non-fatal so recon can continue.
-        local misconfig_rc=0
-        {
-            misconfig-mapper -target "$company_name" -service "*" 2>&1 \
-                | grep -v "\-\]" \
-                | grep -v "Failed" >"${dir}/osint/3rdparts_misconfigurations.txt"
-            misconfig_rc=${PIPESTATUS[0]:-0}
-        } || true
-        if [[ $misconfig_rc -eq 130 || $misconfig_rc -eq 137 || $misconfig_rc -eq 143 ]]; then
-            notification "misconfig-mapper interrupted (rc=${misconfig_rc}); skipping third_party_misconfigs and continuing" warn
-            log_note "misconfig-mapper interrupted by user/system (rc=${misconfig_rc})" "${FUNCNAME[0]}" "${LINENO}"
-            if ! popd >/dev/null; then
-                printf "%b[!] Failed to return to previous directory in %s at line %s.%b\n" \
-                    "$bred" "${FUNCNAME[0]}" "$LINENO" "$reset"
-                return 1
-            fi
-            return 0
-        fi
+        misconfig-mapper -update-templates 1>>"$LOGFILE"
+        misconfig-mapper -target visma.com -as-domain true -permutations false -skip-ssl \
+            -service "*" -verbose 0 | anew -q "${dir}/osint/3rdparts_misconfigurations.txt"
+        misconfig-mapper -target "$company_name" -skip-ssl -verbose 0 -service "*" \
+            | anew -q "${dir}/osint/3rdparts_misconfigurations.txt"
 
         # Return to the previous directory
         if ! popd >/dev/null; then
