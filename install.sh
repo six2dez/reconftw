@@ -327,17 +327,7 @@ function install_tools() {
     local go_ok=0 go_skip=0 go_fail=0
     for gotool in "${!gotools[@]}"; do
         ((++go_step))
-        if [[ $upgrade_tools == "false" ]]; then
-            if command -v "$gotool" &>/dev/null; then
-                INST_GO_SKIP+=("$gotool")
-                ((++go_skip))
-                progress_update "Go tools" "$go_step" "$total_go" "$go_ok" "$go_skip" "$go_fail"
-                [[ $COMPACT != "true" ]] && msg_warn "[$go_step/$total_go] ${gotool} already installed"
-                continue
-            fi
-        fi
-
-        # Install the Go tool
+        # Always run go install so already-present binaries also get updated.
         if q bash -lc "${gotools[$gotool]}"; then
             INST_GO_OK+=("$gotool")
             ((++go_ok))
@@ -363,40 +353,33 @@ function install_tools() {
 
     for pipxtool in "${!pipxtools[@]}"; do
         ((++pipx_step))
-        if [[ $upgrade_tools == "false" ]]; then
-            if command -v "$pipxtool" &>/dev/null; then
-                INST_PX_SKIP+=("$pipxtool")
-                ((++px_skip))
+        if command -v "$pipxtool" &>/dev/null; then
+            # Force upgrade when already installed instead of skipping/failing on install.
+            q pipx upgrade "${pipxtool}"
+            exit_status=$?
+            if [[ $exit_status -ne 0 ]]; then
+                failed_pipx_tools+=("$pipxtool")
+                INST_PX_FAIL+=("$pipxtool")
+                ((++px_fail))
+                double_check=true
                 progress_update "pipx tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
-                [[ $COMPACT != "true" ]] && msg_warn "[$pipx_step/$total_px] ${pipxtool} already installed"
+                msg_err "[$pipx_step/$total_px] ${pipxtool} upgrade failed"
                 continue
             fi
-        fi
-
-        # Install the pipx tool
-        q pipx install "git+https://github.com/${pipxtools[$pipxtool]}"
-        exit_status=$?
-        if [[ $exit_status -ne 0 ]]; then
-            failed_pipx_tools+=("$pipxtool")
-            INST_PX_FAIL+=("$pipxtool")
-            ((++px_fail))
-            double_check=true
-            progress_update "pipx tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
-            msg_err "[$pipx_step/$total_px] ${pipxtool} install failed"
-            continue
-        fi
-
-        # Upgrade the pipx tool
-        q pipx upgrade "${pipxtool}"
-        exit_status=$?
-        if [[ $exit_status -ne 0 ]]; then
-            failed_pipx_tools+=("$pipxtool")
-            INST_PX_FAIL+=("$pipxtool")
-            ((++px_fail))
-            double_check=true
-            progress_update "pipx tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
-            msg_err "[$pipx_step/$total_px] ${pipxtool} upgrade failed"
-            continue
+        else
+            # First-time install.
+            q pipx install "git+https://github.com/${pipxtools[$pipxtool]}"
+            exit_status=$?
+            if [[ $exit_status -ne 0 ]]; then
+                failed_pipx_tools+=("$pipxtool")
+                INST_PX_FAIL+=("$pipxtool")
+                ((++px_fail))
+                double_check=true
+                progress_update "pipx tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
+                msg_err "[$pipx_step/$total_px] ${pipxtool} install failed"
+                continue
+            fi
+            q pipx upgrade "${pipxtool}" || true
         fi
 
         INST_PX_OK+=("$pipxtool")
@@ -413,10 +396,40 @@ function install_tools() {
     local total_repo=${#repos[@]}
     local repo_ok=0 repo_skip=0 repo_fail=0
 
+    install_repo_requirements() {
+        if [[ -s "requirements.txt" ]]; then
+            if [[ ! -f "venv/bin/activate" ]]; then
+                python3 -m venv venv &>/dev/null
+            fi
+            # shellcheck disable=SC1091
+            source venv/bin/activate
+            if ! pip3 install --upgrade -r requirements.txt &>/dev/null; then
+                deactivate || true
+                return 1
+            fi
+            if [[ $1 == "dorks_hunter" ]]; then
+                pip install --upgrade xnldorker &>/dev/null || true
+            fi
+            deactivate || true
+        fi
+        return 0
+    }
+
     for repo in "${!repos[@]}"; do
         ((++repos_step))
         if [[ $upgrade_tools == "false" ]]; then
             if [[ -d "${dir}/${repo}" ]]; then
+                # Keep Python deps updated even when repository sync is skipped.
+                if cd "${dir}/${repo}" 2>/dev/null; then
+                    if ! install_repo_requirements "$repo"; then
+                        msg_err "[$repos_step/$total_repo] $repo: pip requirements failed"
+                        failed_repos+=("$repo")
+                        REPOS_FAIL+=("$repo")
+                        ((++repo_fail))
+                        double_check=true
+                    fi
+                    cd "$dir" || true
+                fi
                 REPOS_SKIPPED+=("$repo")
                 ((++repo_skip))
                 progress_update "repos" "$repos_step" "$total_repo" "$repo_ok" "$repo_skip" "$repo_fail"
@@ -472,24 +485,12 @@ function install_tools() {
         fi
 
         # Install requirements inside a virtual environment
-        if [[ -s "requirements.txt" ]]; then
-            if [[ ! -f "venv/bin/activate" ]]; then
-                python3 -m venv venv &>/dev/null
-            fi
-            # shellcheck disable=SC1091
-            source venv/bin/activate
-            if ! pip3 install --upgrade -r requirements.txt &>/dev/null; then
-                msg_err "[$repos_step/$total_repo] $repo: pip requirements failed"
-                failed_repos+=("$repo")
-                REPOS_FAIL+=("$repo")
-                ((++repo_fail))
-                double_check=true
-            fi
-            if [ "$repo" = "dorks_hunter" ]; then
-                source venv/bin/activate
-                pip install xnldorker &>/dev/null || true
-            fi
-            deactivate || true
+        if ! install_repo_requirements "$repo"; then
+            msg_err "[$repos_step/$total_repo] $repo: pip requirements failed"
+            failed_repos+=("$repo")
+            REPOS_FAIL+=("$repo")
+            ((++repo_fail))
+            double_check=true
         fi
 
         # Special handling for certain repositories
