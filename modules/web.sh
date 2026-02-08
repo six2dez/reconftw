@@ -437,10 +437,18 @@ function portscan() {
         fi
 
         # Display resolved IPs without CDN
-        printf "%b\n[%s] Resolved IP addresses (No CDN):%b\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+        ips_nocdn_count=0
         if [[ -s ".tmp/ips_nocdn.txt" ]]; then
-            sort ".tmp/ips_nocdn.txt"
+            ips_nocdn_count=$(sort -u ".tmp/ips_nocdn.txt" | wc -l | tr -d ' ')
         fi
+
+        printf "%b\n[%s] Resolved IP addresses (No CDN): %s%b\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$ips_nocdn_count" "$reset"
+        if ((ips_nocdn_count > 0)); then
+            sort -u ".tmp/ips_nocdn.txt"
+        else
+            printf "None\n"
+        fi
+        printf "\n"
 
         printf "%b\n[%s] Scanning ports...%b\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
 
