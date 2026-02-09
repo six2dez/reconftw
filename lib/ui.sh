@@ -154,26 +154,24 @@ ui_batch_end() {
 
 ui_summary() {
     local target="$1" duration="$2" outdir="$3"
-    local subs="${4:-0}" webs="${5:-0}" findings="${6:-0}"
+    local subs="${4:-0}" webs="${5:-0}"
+    local crit="${6:-0}" high="${7:-0}" med="${8:-0}" low="${9:-0}" info="${10:-0}"
 
-    printf "\n"
-    _print_section "Scan Complete"
-    printf "  Target:    %b%s%b\n" "${bgreen:-}" "$target" "${reset:-}"
-    printf "  Duration:  %b%s%b\n" "${bgreen:-}" "$duration" "${reset:-}"
-    printf "  Output:    %b%s%b\n" "${bgreen:-}" "$outdir" "${reset:-}"
-    printf "\n"
-    printf "  Modules: %b%d OK%b │ %b%d WARN%b │ %b%d FAIL%b │ %b%d SKIP%b\n" \
-        "${bgreen:-}" "$_UI_OK_COUNT" "${reset:-}" \
-        "${yellow:-}" "$_UI_WARN_COUNT" "${reset:-}" \
-        "${bred:-}" "$_UI_FAIL_COUNT" "${reset:-}" \
-        "${yellow:-}" "$_UI_SKIP_COUNT" "${reset:-}"
-
-    if [[ "$subs" -gt 0 ]] || [[ "$webs" -gt 0 ]] || [[ "$findings" -gt 0 ]]; then
-        printf "  Assets:  %d subdomains │ %d web hosts │ %d findings\n" \
-            "$subs" "$webs" "$findings"
-    fi
     printf "\n"
     _print_rule
+    printf "  %bRESULTS: %s%b\n" "${bblue:-}" "$target" "${reset:-}"
+    _print_rule
+    printf "  Subdomains:     %s\n" "$subs"
+    printf "  Web hosts:      %s\n" "$webs"
+    printf "  Vulnerabilities: %b🔴 %d%b │ %b🟠 %d%b │ %b🟡 %d%b │ %b🔵 %d%b\n" \
+        "${bred:-}" "$crit" "${reset:-}" \
+        "${yellow:-}" "$high" "${reset:-}" \
+        "${yellow:-}" "$med" "${reset:-}" \
+        "${bblue:-}" "$low" "${reset:-}"
+    printf "  Duration:       %s\n" "$duration"
+    printf "  Output:         %s\n" "$outdir"
+    _print_rule
+    printf "\n"
 }
 
 ui_module_end() {

@@ -98,13 +98,33 @@ _print_status() {
     [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
     local badge="$1" text="$2" detail="${3:-}"
     local color
+    
+    # Special handling for SKIP to be more discrete
+    if [[ "$badge" == "SKIP" ]]; then
+        local text_len=${#text}
+        local dot_count=$((50 - text_len))
+        ((dot_count < 2)) && dot_count=2
+        local dots
+        dots=$(printf '%*s' "$dot_count" '' | tr ' ' '.')
+        
+        # Grey/dim style for SKIP if supported, otherwise blue
+        local skip_color="${bblue:-}"
+        
+        if [[ -n "$detail" ]]; then
+            printf "  %s %s %b[SKIP]%b %s\n" "$text" "$dots" "$skip_color" "${reset:-}" "$detail"
+        else
+            printf "  %s %s %b[SKIP]%b\n" "$text" "$dots" "$skip_color" "${reset:-}"
+        fi
+        return
+    fi
+
     case "$badge" in
         OK)   color="${bgreen:-}" ;;
         FAIL) color="${bred:-}" ;;
         WARN) color="${yellow:-}" ;;
-        SKIP) color="${yellow:-}" ;;
         *)    color="${bblue:-}" ;;
     esac
+    
     if [[ -n "$detail" ]]; then
         local text_len=${#text}
         local dot_count=$((40 - text_len))

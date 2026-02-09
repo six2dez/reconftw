@@ -137,8 +137,7 @@ function start() {
         fi
         _print_rule
     fi
-    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
-            fi
+
 }
 
 function end() {
@@ -287,15 +286,21 @@ function end() {
         if [[ "${RECON_PARTIAL_RUN:-false}" == "true" ]]; then
             _print_status WARN "Run completed with non-fatal warnings" "osint_parallel=${RECON_OSINT_PARALLEL_FAILURES:-0}"
         fi
-        local subs_count webs_count findings_count
+        local subs_count webs_count
+        local -A vulns_count=( [critical]=0 [high]=0 [medium]=0 [low]=0 [info]=0 )
         subs_count=$(count_lines "${dir}/subdomains/subdomains.txt")
         webs_count=$(count_lines "${dir}/webs/webs_all.txt")
+        
         if [[ -d "${dir}/nuclei_output" ]]; then
-            findings_count=$(find "${dir}/nuclei_output" -type f -name '*_json.txt' -exec cat {} + 2>/dev/null | wc -l | tr -d ' ')
-        else
-            findings_count=0
+            for sev in "${!vulns_count[@]}"; do
+                if [[ -s "${dir}/nuclei_output/${sev}.txt" ]]; then
+                    vulns_count[$sev]=$(count_lines "${dir}/nuclei_output/${sev}.txt")
+                fi
+            done
         fi
-        ui_summary "$domain" "$runtime" "$finaldir" "${subs_count:-0}" "${webs_count:-0}" "${findings_count:-0}"
+        ui_summary "$domain" "$runtime" "$finaldir" "${subs_count:-0}" "${webs_count:-0}" \
+            "${vulns_count[critical]}" "${vulns_count[high]}" "${vulns_count[medium]}" \
+            "${vulns_count[low]}" "${vulns_count[info]}"
     else
         _print_section "Scan Complete"
         if [[ "${RECON_PARTIAL_RUN:-false}" == "true" ]]; then
@@ -442,6 +447,7 @@ function osint() {
 }
 
 function vulns() {
+    _print_section "Vulnerability Checks"
     if [[ $VULNS_GENERAL == true ]]; then
         if [[ "${PARALLEL_MODE:-true}" == "true" ]] && declare -f parallel_funcs &>/dev/null; then
             # Parallel execution - group independent checks
@@ -796,13 +802,13 @@ function multi_recon() {
         currently=$(date +"%H:%M:%S")
         loopend=$(date +%s)
         getElapsedTime "$loopstart" "$loopend"
-        printf "${bgreen}#######################################################################${reset}\n"
-        printf "${bgreen}[$(date +'%Y-%m-%d %H:%M:%S')] $domain finished 1st loop in ${runtime} $currently ${reset}\n"
+        _print_rule
+        printf "${bgreen}  Target:   %s finished 1st loop in %s (%s)${reset}\n" "$domain" "$runtime" "$currently"
         if [[ -n $flist ]]; then
             POSINLIST=$(grep -nrE "^${domain}$" "$flist" | cut -f1 -d':')
-            printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] $domain is $POSINLIST of $LISTTOTAL${reset}\n"
+            printf "  Progress: %s of %s\n" "$POSINLIST" "$LISTTOTAL"
         fi
-        printf "${bgreen}#######################################################################${reset}\n"
+        _print_rule
     done
     cd "$workdir" || {
         echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"
@@ -835,20 +841,20 @@ function multi_recon() {
         currently=$(date +"%H:%M:%S")
         loopend=$(date +%s)
         getElapsedTime "$loopstart" "$loopend"
-        printf "${bgreen}#######################################################################${reset}\n"
-        printf "${bgreen}[$(date +'%Y-%m-%d %H:%M:%S')] $domain finished 2nd loop in ${runtime} $currently ${reset}\n"
+        _print_rule
+        printf "${bgreen}  Target:   %s finished 2nd loop in %s (%s)${reset}\n" "$domain" "$runtime" "$currently"
         if [[ -n $flist ]]; then
             POSINLIST=$(grep -nrE "^${domain}$" "$flist" | cut -f1 -d':')
-            printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] $domain is $POSINLIST of $LISTTOTAL${reset}\n"
+            printf "  Progress: %s of %s\n" "$POSINLIST" "$LISTTOTAL"
         fi
-        printf "${bgreen}#######################################################################${reset}\n"
+        _print_rule
     done
     cd "$workdir" || {
         echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"
         exit 1
     }
 
-    notification "############################# Total data ############################" info
+    _print_section "Total Data"
     NUMOFLINES_pwndb_total=$(find . -type f -name 'passwords.txt' -exec cat {} + | anew osint/passwords.txt | sed '/^$/d' | wc -l)
     NUMOFLINES_subs_total=$(find . -type f -name 'subdomains.txt' -exec cat {} + | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l)
     NUMOFLINES_subtko_total=$(find . -type f -name 'takeover.txt' -exec cat {} + | anew webs/takeover.txt | sed '/^$/d' | wc -l)
@@ -886,13 +892,13 @@ function multi_recon() {
         currently=$(date +"%H:%M:%S")
         loopend=$(date +%s)
         getElapsedTime "$loopstart" "$loopend"
-        printf "${bgreen}#######################################################################${reset}\n"
-        printf "${bgreen}[$(date +'%Y-%m-%d %H:%M:%S')] $domain finished 3rd loop in ${runtime} $currently ${reset}\n"
+        _print_rule
+        printf "${bgreen}  Target:   %s finished 3rd loop in %s (%s)${reset}\n" "$domain" "$runtime" "$currently"
         if [[ -n $flist ]]; then
             POSINLIST=$(grep -nrE "^${domain}$" "$flist" | cut -f1 -d':')
-            printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] $domain is $POSINLIST of $LISTTOTAL${reset}\n"
+            printf "  Progress: %s of %s\n" "$POSINLIST" "$LISTTOTAL"
         fi
-        printf "${bgreen}#######################################################################${reset}\n"
+        _print_rule
     done
 
     if [[ $AXIOM == true ]]; then
@@ -917,13 +923,13 @@ function multi_recon() {
         currently=$(date +"%H:%M:%S")
         loopend=$(date +%s)
         getElapsedTime "$loopstart" "$loopend"
-        printf "${bgreen}#######################################################################${reset}\n"
-        printf "${bgreen}[$(date +'%Y-%m-%d %H:%M:%S')] $domain finished final loop in ${runtime} $currently ${reset}\n"
+        _print_rule
+        printf "${bgreen}  Target:   %s finished final loop in %s (%s)${reset}\n" "$domain" "$runtime" "$currently"
         if [[ -n $flist ]]; then
             POSINLIST=$(grep -nrE "^${domain}$" "$flist" | cut -f1 -d':')
-            printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] $domain is $POSINLIST of $LISTTOTAL${reset}\n"
+            printf "  Progress: %s of %s\n" "$POSINLIST" "$LISTTOTAL"
         fi
-        printf "${bgreen}#######################################################################${reset}\n"
+        _print_rule
     done
     cd "$workdir" || {
         echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"
@@ -992,9 +998,9 @@ function multi_custom() {
         currently=$(date +"%H:%M:%S")
         loopend=$(date +%s)
         getElapsedTime "$loopstart" "$loopend"
-        printf "${bgreen}#######################################################################${reset}\n"
-        printf "${bgreen}[$(date +'%Y-%m-%d %H:%M:%S')] Finished $custom_f ($func_count/$func_total) for $entries entries in ${runtime} $currently ${reset}\n"
-        printf "${bgreen}#######################################################################${reset}\n"
+        _print_rule
+        printf "${bgreen}  Finished %s (%s/%s) for %s entries in %s (%s)${reset}\n" "$custom_f" "$func_count" "$func_total" "$entries" "$runtime" "$currently"
+        _print_rule
     done
 
     if [[ $AXIOM == true ]]; then
@@ -1056,8 +1062,6 @@ function webs_menu() {
     url_ext
     param_discovery
     grpc_reflection
-
-    _print_section "Vulnerability Checks"
 
     vulns
     end
