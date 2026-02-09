@@ -20,7 +20,7 @@ function google_dorks() {
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GOOGLE_DORKS == true ]] && [[ $OSINT == true ]]; then
         start_func "${FUNCNAME[0]}" "Running: Google Dorks in process"
 
-        if ! "${tools}/dorks_hunter/venv/bin/python3" "${tools}/dorks_hunter/dorks_hunter.py" -d "$domain" -o "osint/dorks.txt" 2>>"$LOGFILE"; then
+        if ! "${tools}/dorks_hunter/venv/bin/python3" "${tools}/dorks_hunter/dorks_hunter.py" -d "$domain" -o "osint/dorks.txt" 2>>"$LOGFILE" >/dev/null; then
             _print_error "dorks_hunter command failed"
         fi
         end_func "Results are saved in $domain/osint/dorks.txt" "${FUNCNAME[0]}"
@@ -162,7 +162,9 @@ function metadata() {
             _print_error "Failed to change directory to ${tools}/metagoofil in ${FUNCNAME[0]} at line ${LINENO}"
             return 1
         }
-        "${tools}/metagoofil/venv/bin/python3" "${tools}/metagoofil/metagoofil.py" -d "${domain}" -t pdf,docx,xlsx -l 10 -w -o "${dir}/.tmp/metagoofil_${domain}/" 2>>"${LOGFILE}" >/dev/null
+        if ! "${tools}/metagoofil/venv/bin/python3" "${tools}/metagoofil/metagoofil.py" -d "${domain}" -t pdf,docx,xlsx -l 10 -w -o "${dir}/.tmp/metagoofil_${domain}/" 2>>"${LOGFILE}" >/dev/null; then
+            log_note "metadata: metagoofil failed; skipping metadata extraction" "${FUNCNAME[0]}" "${LINENO}"
+        fi
         popd >/dev/null || {
             _print_error "Failed to return to the previous directory in ${FUNCNAME[0]} at line ${LINENO}"
             return 1
@@ -233,7 +235,8 @@ function apileaks() {
             swagger_rc=${PIPESTATUS[0]:-0} # ignore grep exit code (no matches is fine)
         } || true
         if ((swagger_rc != 0)); then
-            printf "%b[%s] SwaggerSpy failed (exit %s), continuing without swagger results.%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$swagger_rc" "$reset" | tee -a "$LOGFILE" >/dev/null
+            _print_msg WARN "SwaggerSpy failed (exit ${swagger_rc}), continuing without swagger results."
+            log_note "SwaggerSpy failed (exit ${swagger_rc}), continuing without swagger results." "${FUNCNAME[0]}" "${LINENO}"
         fi
 
         # Return to the previous directory
@@ -253,11 +256,11 @@ function apileaks() {
                 end_func "Results are saved in $domain/osint/[postman_leaks_trufflehog.json, swagger_leaks_trufflehog.json]" "${FUNCNAME[0]}"
     else
         if [[ $API_LEAKS == false ]] || [[ $OSINT == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or configuration settings.%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or configuration settings."
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             return
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s %b\n\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
     fi
 }
@@ -302,11 +305,11 @@ function emails() {
         end_func "Results are saved in $domain/osint/emails.txt and passwords.txt" "${FUNCNAME[0]}"
     else
         if [[ $EMAILS == false ]] || [[ $OSINT == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or configuration settings.%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or configuration settings."
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             return
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "/.${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
     fi
 }
@@ -333,13 +336,11 @@ function domain_info() {
 
     else
         if [[ $DOMAIN_INFO == false ]] || [[ $OSINT == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or configuration settings.%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or configuration settings."
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             return
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "/.${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
     fi
 }
@@ -381,13 +382,11 @@ function third_party_misconfigs() {
 
     else
         if [[ $THIRD_PARTIES == false ]] || [[ $OSINT == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or configuration settings.%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or configuration settings."
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             return
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "/.${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
     fi
 }
@@ -423,13 +422,11 @@ function spoof() {
 
     else
         if [[ $SPOOF == false ]] || [[ $OSINT == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or configuration settings.%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or configuration settings."
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             return
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "/.${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
     fi
 }
@@ -452,11 +449,11 @@ function mail_hygiene() {
         end_func "Results are saved in $domain/osint/mail_hygiene.txt" "${FUNCNAME[0]}"
     else
         if [[ $MAIL_HYGIENE == false ]] || [[ $OSINT == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or configuration settings.%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or configuration settings."
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             return
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s %b\n\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
     fi
 }
@@ -474,11 +471,11 @@ function cloud_enum_scan() {
         end_func "Results are saved in $domain/osint/cloud_enum.txt" "${FUNCNAME[0]}"
     else
         if [[ $CLOUD_ENUM == false ]] || [[ $OSINT == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or configuration settings.%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or configuration settings."
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             return
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s %b\n\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
     fi
 }
@@ -515,19 +512,16 @@ function ip_info() {
             end_func "Results are saved in ${domain}/osint/ip_[domain_relations|whois|location].txt" "${FUNCNAME[0]}"
 
         else
-            printf "\n%s[%s] WHOISXML_API variable is not defined. Skipping function.%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+            _print_msg WARN "WHOISXML_API variable is not defined. Skipping function."
         fi
 
     else
         if [[ $IP_INFO == false ]] || [[ $OSINT == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or configuration settings.%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or configuration settings."
         elif ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             return
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "/.${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
     fi
 

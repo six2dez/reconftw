@@ -365,11 +365,10 @@ _subdomains_finalize() {
     
     # Display results
     TOTAL_SUBS=$(sed '/^$/d' "subdomains/subdomains.txt" 2>/dev/null | wc -l | tr -d ' ')
-    TOTAL_WEBS=$(sed '/^$/d' "webs/webs.txt" 2>/dev/null | wc -l | tr -d ' ')
 
     if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
         _print_status OK "subdomains_full"
-        printf "         Total: %s subdomains | %s webs\n" "$TOTAL_SUBS" "$TOTAL_WEBS"
+        printf "         Total: %s subdomains\n" "$TOTAL_SUBS"
 
         if [[ -s "subdomains/subdomains.txt" ]]; then
             sort -o "subdomains/subdomains.txt" "subdomains/subdomains.txt"
@@ -389,9 +388,6 @@ _subdomains_finalize() {
             done < "subdomains/subdomains.txt"
         fi
 
-        if [[ -s "webs/webs.txt" ]]; then
-            sort -o "webs/webs.txt" "webs/webs.txt"
-        fi
     fi
     
     # Emit plugin event
@@ -433,9 +429,6 @@ function subdomains_full() {
     # Enumerate
     _subdomains_enumerate "$parallel_flag"
     
-    # Web probing
-    webprobe_simple || printf "%b[!] webprobe_simple failed%b\n" "$bred" "$reset"
-    
     # Finalize
     _subdomains_finalize
 }
@@ -447,34 +440,28 @@ function sub_asn() {
         start_subfunc "${FUNCNAME[0]}" "Running: ASN Enumeration"
 
         # Discover ASN/CIDR metadata for the current target domain.
+        local asn_json pdcp_key asn_rc asn_status
         if command -v asnmap &>/dev/null; then
-            local asn_json pdcp_key timeout_tool asn_rc
             asn_json=".tmp/asnmap_${domain}.json"
             pdcp_key="${PDCP_API_KEY:-}"
             asn_rc=0
+            asn_status="OK"
             : >"$asn_json"
 
             if [[ -z "${pdcp_key//[[:space:]]/}" ]]; then
-                printf "%b[%s] ASN_ENUM enabled but PDCP_API_KEY is not set. Skipping asnmap ASN enumeration.%b\n" \
-                    "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset" | tee -a "$LOGFILE"
+                _print_msg WARN "ASN_ENUM enabled but PDCP_API_KEY is not set. Skipping asnmap ASN enumeration."
+                log_note "ASN_ENUM enabled but PDCP_API_KEY is not set. Skipping asnmap ASN enumeration." "${FUNCNAME[0]}" "${LINENO}"
+                asn_status="WARN"
             else
-                if command -v timeout >/dev/null 2>&1; then
-                    timeout_tool="timeout"
-                elif command -v gtimeout >/dev/null 2>&1; then
-                    timeout_tool="gtimeout"
-                else
-                    timeout_tool=""
-                    printf "%b[%s] timeout/gtimeout not found; running asnmap without timeout guard.%b\n" \
-                        "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset" | tee -a "$LOGFILE"
-                fi
-
-                if [[ -n "$timeout_tool" ]]; then
-                    if PDCP_API_KEY="$pdcp_key" "$timeout_tool" 120 asnmap -d "$domain" -silent -j 2>>"$LOGFILE" >"$asn_json"; then
+                if [[ -n "${TIMEOUT_CMD:-}" ]]; then
+                    if PDCP_API_KEY="$pdcp_key" "$TIMEOUT_CMD" -k 10 120 asnmap -d "$domain" -silent -j 2>>"$LOGFILE" >"$asn_json"; then
                         asn_rc=0
                     else
                         asn_rc=$?
                     fi
                 else
+                    _print_msg WARN "timeout/gtimeout not found; running asnmap without timeout guard."
+                    log_note "timeout/gtimeout not found; running asnmap without timeout guard." "${FUNCNAME[0]}" "${LINENO}"
                     if PDCP_API_KEY="$pdcp_key" asnmap -d "$domain" -silent -j 2>>"$LOGFILE" >"$asn_json"; then
                         asn_rc=0
                     else
@@ -497,8 +484,7 @@ function sub_asn() {
                     cidr_count=$(wc -l <.tmp/asn_cidrs.txt 2>/dev/null | tr -d ' ')
                     asn_count=$(wc -l <.tmp/asn_numbers.txt 2>/dev/null | tr -d ' ')
 
-                    printf "%b[%s] ASN enumeration found %s ASNs and %s CIDR ranges%b\n" \
-                        "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "${asn_count:-0}" "${cidr_count:-0}" "$reset"
+                    _print_msg INFO "ASN enumeration found ${asn_count:-0} ASNs and ${cidr_count:-0} CIDR ranges"
 
                     # Optional: if asnmap yields discovered domains, feed them into subdomain pipeline.
                     jq -r '.domains[]? // empty' "$asn_json" \
@@ -508,27 +494,30 @@ function sub_asn() {
                         | sort -u \
                         | anew -q .tmp/subs_no_resolved.txt
                     if [[ -s .tmp/subs_no_resolved.txt ]]; then
-                        printf "%b[%s] ASN sources added %s in-scope domains%b\n" \
-                            "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$(wc -l <.tmp/subs_no_resolved.txt | tr -d ' ')" "$reset"
+                        _print_msg INFO "ASN sources added $(wc -l <.tmp/subs_no_resolved.txt | tr -d ' ') in-scope domains"
                     fi
-                elif [[ $asn_rc -eq 124 ]]; then
-                    printf "%b[%s] asnmap timed out after 120s. Skipping ASN output for %s.%b\n" \
-                        "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$domain" "$reset" | tee -a "$LOGFILE"
+                elif [[ $asn_rc -eq 124 || $asn_rc -eq 137 ]]; then
+                    _print_msg WARN "asnmap timed out after 120s. Skipping ASN output for ${domain}."
+                    log_note "asnmap timed out after 120s. Skipping ASN output for ${domain}." "${FUNCNAME[0]}" "${LINENO}"
+                    asn_status="WARN"
                 else
-                    printf "%b[%s] asnmap failed (exit %s). Skipping ASN output for %s.%b\n" \
-                        "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${asn_rc:-1}" "$domain" "$reset" | tee -a "$LOGFILE"
+                    _print_msg FAIL "asnmap failed (exit ${asn_rc:-1}). Skipping ASN output for ${domain}."
+                    log_note "asnmap failed (exit ${asn_rc:-1}). Skipping ASN output for ${domain}." "${FUNCNAME[0]}" "${LINENO}"
+                    asn_status="FAIL"
                 fi
             fi
         else
-            printf "%b[!] asnmap not installed, skipping ASN enumeration%b\n" "$bred" "$reset" | tee -a "$LOGFILE"
+            _print_msg WARN "asnmap not installed, skipping ASN enumeration"
+            log_note "asnmap not installed, skipping ASN enumeration" "${FUNCNAME[0]}" "${LINENO}"
+            asn_status="WARN"
         fi
 
-        end_subfunc "${FUNCNAME[0]}" "${FUNCNAME[0]}"
+        end_subfunc "${FUNCNAME[0]}" "${FUNCNAME[0]}" "${asn_status:-OK}"
     else
         if [[ $ASN_ENUM == false ]]; then
-            printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+            _print_msg WARN "${FUNCNAME[0]} skipped due to configuration settings."
         else
-            printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} already processed. To force, delete:\n    $called_fn_dir/.${FUNCNAME[0]}${reset}\n\n"
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
     fi
 }
@@ -573,9 +562,9 @@ function sub_passive() {
 
     else
         if [[ $SUBPASSIVE == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or configuration settings.%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or configuration settings."
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "/.${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
     fi
 
@@ -645,11 +634,9 @@ function sub_crt() {
         end_subfunc "${NUMOFLINES} new subs (cert transparency)" "${FUNCNAME[0]}"
     else
         if [[ $SUBCRT == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "/.${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
     fi
 }
@@ -725,9 +712,7 @@ function sub_active() {
 
         end_subfunc "${NUMOFLINES} subs DNS resolved from passive" "${FUNCNAME[0]}"
     else
-        printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
-            "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" \
-            "$called_fn_dir" "/.${FUNCNAME[0]}" "$reset"
+        _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
     fi
 }
 
@@ -797,9 +782,7 @@ function sub_tls() {
 
         end_subfunc "${NUMOFLINES} new subs (tls active enum)" "${FUNCNAME[0]}"
     else
-        printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
-            "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" \
-            "$called_fn_dir" "/.${FUNCNAME[0]}" "$reset"
+        _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
     fi
 }
 
@@ -847,18 +830,14 @@ function sub_noerror() {
             end_subfunc "${NUMOFLINES} new subs (DNS noerror)" "${FUNCNAME[0]}"
 
         else
-            printf "\n%s[%s] Detected DNSSEC black lies, skipping this technique.%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+            _print_msg WARN "Detected DNSSEC black lies, skipping this technique."
         fi
 
     else
         if [[ $SUBNOERROR == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" \
-                "$called_fn_dir" "/.${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
     fi
 
@@ -925,8 +904,8 @@ function sub_dns() {
                 | grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." \
                 | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | sort -u | anew -q hosts/ips.txt
         else
-            printf "%b[%s] No DNS IP pairs found in sub_dns; skipping hosts/ips enrichment.%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset" | tee -a "$LOGFILE"
+            _print_msg WARN "No DNS IP pairs found in sub_dns; skipping hosts/ips enrichment."
+            log_note "No DNS IP pairs found in sub_dns; skipping hosts/ips enrichment." "${FUNCNAME[0]}" "${LINENO}"
         fi
 
         if [[ $INSCOPE == true ]]; then
@@ -944,14 +923,13 @@ function sub_dns() {
             fi
         else
             NUMOFLINES=0
-            printf "%b[%s] No DNS-resolved subdomains produced by sub_dns; continuing.%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset" | tee -a "$LOGFILE"
+            _print_msg WARN "No DNS-resolved subdomains produced by sub_dns; continuing."
+            log_note "No DNS-resolved subdomains produced by sub_dns; continuing." "${FUNCNAME[0]}" "${LINENO}"
         fi
 
         end_subfunc "${NUMOFLINES} new subs (dns resolution)" "${FUNCNAME[0]}"
     else
-        printf "\n%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
-            "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "/.${FUNCNAME[0]}" "$reset"
+        _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
     fi
 }
 
@@ -1021,12 +999,9 @@ function sub_brute() {
 
     else
         if [[ $SUBBRUTE == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" \
-                "$called_fn_dir" "/.${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
     fi
 
@@ -1196,12 +1171,9 @@ function sub_scraping() {
 
     else
         if [[ $SUBSCRAPING == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" \
-                "$called_fn_dir" "/.${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
     fi
 
@@ -1272,11 +1244,9 @@ function sub_analytics() {
 
     else
         if [[ $SUBANALYTICS == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "/.${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
     fi
 }
@@ -1411,12 +1381,9 @@ function sub_permut() {
 
     else
         if [[ $SUBPERMUTE == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" \
-                "$called_fn_dir" "/.${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
     fi
 
@@ -1504,11 +1471,9 @@ function sub_regex_permut() {
 
     else
         if [[ $SUBREGEXPERMUTE == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "/.${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
     fi
 
@@ -1577,11 +1542,9 @@ function sub_ia_permut() {
 
     else
         if [[ $SUBIAPERMUTE == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "/.${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
     fi
 
@@ -1671,14 +1634,11 @@ function sub_recursive_passive() {
 
     else
         if [[ $SUB_RECURSIVE_PASSIVE == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
         elif [[ ! -s "subdomains/subdomains.txt" ]]; then
-            printf "\n%s[%s] No subdomains to process.%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+            _print_msg WARN "No subdomains to process."
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "/.${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
     fi
 
@@ -1856,15 +1816,11 @@ function sub_recursive_brute() {
 
     else
         if [[ $SUB_RECURSIVE_BRUTE == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
         elif [[ ! -s "subdomains/subdomains.txt" ]]; then
-            printf "\n%s[%s] No subdomains to process.%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+            _print_msg WARN "No subdomains to process."
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" \
-                "$called_fn_dir" "/.${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
     fi
 }
@@ -1950,11 +1906,9 @@ function subtakeover() {
 
     else
         if [[ $SUBTAKEOVER == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s %b\n\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" ".${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
     fi
 
@@ -1994,14 +1948,11 @@ function zonetransfer() {
 
     else
         if [[ $ZONETRANSFER == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            printf "\n%s[%s] Domain is an IP address; skipping zone transfer.%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+            _print_msg WARN "Domain is an IP address; skipping zone transfer."
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" ".${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
     fi
 
@@ -2076,8 +2027,8 @@ function s3buckets() {
             if [[ -f "$permutation_file" ]]; then
                 PERMUTATION_FLAG="-p"
             else
-                printf "%b[%s] CloudHunter permutations file not found (%s); continuing without permutations.%b\n" \
-                    "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$permutation_file" "$reset" | tee -a "$LOGFILE"
+                _print_msg WARN "CloudHunter permutations file not found (${permutation_file}); continuing without permutations."
+                log_note "CloudHunter permutations file not found (${permutation_file}); continuing without permutations." "${FUNCNAME[0]}" "${LINENO}"
                 permutation_file=""
                 PERMUTATION_FLAG=""
             fi
@@ -2114,10 +2065,10 @@ function s3buckets() {
                 return 1
             fi
             if [[ -n "$permutation_file" ]]; then
-                if ! "${tools}/CloudHunter/venv/bin/python3" ./cloudhunter.py "$PERMUTATION_FLAG" "$permutation_file" -r ./resolvers.txt -t 50 "$domain"; then
+                if ! PYTHONWARNINGS=ignore "${tools}/CloudHunter/venv/bin/python3" -W ignore ./cloudhunter.py "$PERMUTATION_FLAG" "$permutation_file" -r ./resolvers.txt -t 50 "$domain"; then
                     printf "%b[!] CloudHunter command failed for domain %s.%b\n" "$bred" "$domain" "$reset"
                 fi
-            elif ! "${tools}/CloudHunter/venv/bin/python3" ./cloudhunter.py -r ./resolvers.txt -t 50 "$domain"; then
+            elif ! PYTHONWARNINGS=ignore "${tools}/CloudHunter/venv/bin/python3" -W ignore ./cloudhunter.py -r ./resolvers.txt -t 50 "$domain"; then
                 printf "%b[!] CloudHunter command failed for domain %s.%b\n" "$bred" "$domain" "$reset"
             fi
         ) >>"$dir/subdomains/cloudhunter_open_buckets.txt" 2>>"$LOGFILE"
@@ -2177,12 +2128,12 @@ function s3buckets() {
         end_func "Results are saved in subdomains/s3buckets.txt, subdomains/cloud_assets.txt, subdomains/s3buckets_trufflehog.txt, and subdomains/cloudhunter_buckets_trufflehog.txt" "${FUNCNAME[0]}"
     else
         if [[ $S3BUCKETS == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            printf "\n%s[%s] Domain is an IP address; skipping S3 buckets search.%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+            _print_msg WARN "Domain is an IP address; skipping S3 buckets search."
             return 0
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" ".${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
     fi
 }
@@ -2238,7 +2189,7 @@ function cloud_extra_providers() {
         append_assets_from_file cloud asset subdomains/cloud_extra.txt
         end_func "Results are saved in subdomains/cloud_extra.txt" "${FUNCNAME[0]}"
     else
-        printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped or already processed.${reset}\n"
+        _print_msg WARN "${FUNCNAME[0]} skipped or already processed."
     fi
 }
 
@@ -2296,11 +2247,9 @@ function geo_info() {
         end_func "Results are saved in hosts/ipinfo.txt" "${FUNCNAME[0]}"
     else
         if [[ $GEO_INFO == false ]]; then
-            printf "\n%b[%s] %s skipped due to mode or defined in reconftw.cfg.%b\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
         else
-            printf "%b[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%b\n\n" \
-                "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" ".${FUNCNAME[0]}" "$reset"
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
     fi
 

@@ -187,6 +187,7 @@ ui_module_end() {
         files_list="${files_list%, }"
         printf "  %bOutput:%b %s\n\n" "${bblue:-}" "${reset:-}" "$files_list"
     fi
+    _print_module_end "$module"
 }
 
 ui_json_escape() {

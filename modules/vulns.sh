@@ -23,7 +23,7 @@ function xss() {
 
         # Process gf/xss.txt with qsreplace and Gxss
         if [[ -s "gf/xss.txt" ]]; then
-            printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: XSS Payload Generation${reset}\n\n"
+            _print_msg INFO "Running: XSS Payload Generation"
             qsreplace FUZZ <"gf/xss.txt" | sed '/FUZZ/!d' | Gxss -c 100 -p Xss | qsreplace FUZZ | sed '/FUZZ/!d' \
                 | anew -q ".tmp/xss_reflected.txt"
         fi
@@ -40,13 +40,13 @@ function xss() {
             if [[ -n $XSS_SERVER ]]; then
                 OPTIONS="-b ${XSS_SERVER} -w $DALFOX_THREADS"
             else
-                printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] No XSS_SERVER defined, blind XSS skipped\n\n"
+                _print_msg WARN "No XSS_SERVER defined, blind XSS skipped"
                 OPTIONS="-w $DALFOX_THREADS"
             fi
 
                 # Run Dalfox with Katana output
                 if [[ -s ".tmp/xss_reflected.txt" ]]; then
-                    printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Dalfox with Katana${reset}\n\n"
+                    _print_msg INFO "Running: Dalfox with Katana"
                     run_command dalfox pipe --silence --no-color --no-spinner --only-poc r --ignore-return 302,404,403 --skip-bav $OPTIONS -d "$DEPTH" <".tmp/xss_reflected.txt" 2>>"$LOGFILE" |
                         anew -q "vulns/xss.txt"
                 fi
@@ -65,13 +65,13 @@ function xss() {
             if [[ -n $XSS_SERVER ]]; then
                 OPTIONS="-b ${XSS_SERVER} -w $DALFOX_THREADS"
             else
-                printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] No XSS_SERVER defined, blind XSS skipped\n\n"
+                _print_msg WARN "No XSS_SERVER defined, blind XSS skipped"
                 OPTIONS="-w $DALFOX_THREADS"
             fi
 
             # Run Dalfox with Axiom-scan output
             if [[ -s ".tmp/xss_reflected.txt" ]]; then
-                printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Dalfox with Axiom${reset}\n\n"
+                _print_msg INFO "Running: Dalfox with Axiom"
                 axiom-scan ".tmp/xss_reflected.txt" -m dalfox --skip-bav $OPTIONS -d "$DEPTH" -o "vulns/xss.txt" $AXIOM_ARGS 2>>"$LOGFILE" >/dev/null
             fi
         fi
@@ -108,7 +108,7 @@ function cors() {
 
         # Proceed only if webs_all.txt exists and is non-empty
         if [[ -s "webs/webs_all.txt" ]]; then
-            printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Corsy for CORS Scan${reset}\n\n"
+            _print_msg INFO "Running: Corsy for CORS Scan"
             "${tools}/Corsy/venv/bin/python3" "${tools}/Corsy/corsy.py" -i "webs/webs_all.txt" -o "vulns/cors.txt" 2>>"$LOGFILE" >/dev/null
         else
             end_func "No webs/webs_all.txt file found, CORS Scan skipped." "${FUNCNAME[0]}"
@@ -145,7 +145,7 @@ function open_redirect() {
         URL_COUNT=$(wc -l <"gf/redirect.txt")
         if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT ]]; then
 
-            printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Open Redirects Payload Generation${reset}\n\n"
+            _print_msg INFO "Running: Open Redirects Payload Generation"
 
             # Process redirect.txt with qsreplace and filter lines containing 'FUZZ'
             qsreplace FUZZ <"gf/redirect.txt" | sed '/FUZZ/!d' | anew -q ".tmp/tmp_redirect.txt"
@@ -204,7 +204,7 @@ function ssrf_checks() {
         URL_COUNT=$(wc -l <"gf/ssrf.txt")
         if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT ]]; then
 
-            printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: SSRF Payload Generation${reset}\n\n"
+            _print_msg INFO "Running: SSRF Payload Generation"
 
             # Generate temporary SSRF payloads
             qsreplace "$COLLAB_SERVER_FIX" <"gf/ssrf.txt" | anew -q ".tmp/tmp_ssrf.txt"
@@ -212,16 +212,16 @@ function ssrf_checks() {
             qsreplace "$COLLAB_SERVER_URL" <"gf/ssrf.txt" | anew -q ".tmp/tmp_ssrf.txt"
 
     # Run FFUF to find requested URLs
-    printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: FFUF for SSRF Requested URLs${reset}\n\n"
+    _print_msg INFO "Running: FFUF for SSRF Requested URLs"
     run_command ffuf -v -H "${HEADER}" -t "$FFUF_THREADS" -rate "$FFUF_RATELIMIT" -w ".tmp/tmp_ssrf.txt" -u "FUZZ" 2>/dev/null \
         | anew -q "vulns/ssrf_requested.txt"
 
     # Run FFUF with header injection for SSRF
-    printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: FFUF for SSRF Requested Headers with COLLAB_SERVER_FIX${reset}\n\n"
+    _print_msg INFO "Running: FFUF for SSRF Requested Headers with COLLAB_SERVER_FIX"
     run_command ffuf -v -w ".tmp/tmp_ssrf.txt:W1,${tools}/headers_inject.txt:W2" -H "${HEADER}" -H "W2: ${COLLAB_SERVER_FIX}" -t "$FFUF_THREADS" \
         -rate "$FFUF_RATELIMIT" -u "W1" 2>/dev/null | anew -q "vulns/ssrf_requested_headers.txt"
 
-    printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: FFUF for SSRF Requested Headers with COLLAB_SERVER_URL${reset}\n\n"
+    _print_msg INFO "Running: FFUF for SSRF Requested Headers with COLLAB_SERVER_URL"
     run_command ffuf -v -w ".tmp/tmp_ssrf.txt:W1,${tools}/headers_inject.txt:W2" -H "${HEADER}" -H "W2: ${COLLAB_SERVER_URL}" -t "$FFUF_THREADS" \
         -rate "$FFUF_RATELIMIT" -u "W1" 2>/dev/null | anew -q "vulns/ssrf_requested_headers.txt"
 
@@ -282,7 +282,7 @@ function crlf_checks() {
         URL_COUNT=$(wc -l <"webs/webs_all.txt")
         if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT ]]; then
 
-            printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: CRLF Fuzzing${reset}\n\n"
+            _print_msg INFO "Running: CRLF Fuzzing"
 
             # Run CRLFuzz
             crlfuzz -l "webs/webs_all.txt" -o "vulns/crlf.txt" 2>>"$LOGFILE" >/dev/null
@@ -317,7 +317,7 @@ function lfi() {
 
         # Ensure gf/lfi.txt is not empty
         if [[ -s "gf/lfi.txt" ]]; then
-            printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: LFI Payload Generation${reset}\n\n"
+            _print_msg INFO "Running: LFI Payload Generation"
 
             # Process lfi.txt with qsreplace and filter lines containing 'FUZZ'
             qsreplace "FUZZ" <"gf/lfi.txt" | sed '/FUZZ/!d' | anew -q ".tmp/tmp_lfi.txt"
@@ -326,7 +326,7 @@ function lfi() {
             URL_COUNT=$(wc -l <".tmp/tmp_lfi.txt")
             if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT ]]; then
 
-                printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: LFI Fuzzing with FFUF${reset}\n\n"
+                _print_msg INFO "Running: LFI Fuzzing with FFUF"
 
                 # Use Interlace to parallelize FFUF scanning
                 interlace -tL ".tmp/tmp_lfi.txt" -threads "$INTERLACE_THREADS" -c "ffuf -v -r -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w \"${lfi_wordlist}\" -u \"_target_\" -mr \"root:\" " 2>>"$LOGFILE" \
@@ -366,7 +366,7 @@ function ssti() {
 
         # Ensure gf/ssti.txt is not empty
         if [[ -s "gf/ssti.txt" ]]; then
-            printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: SSTI Payload Generation${reset}\n\n"
+            _print_msg INFO "Running: SSTI Payload Generation"
 
             # Process ssti.txt with qsreplace and filter lines containing 'FUZZ'
             qsreplace "FUZZ" <"gf/ssti.txt" | sed '/FUZZ/!d' | anew -q ".tmp/tmp_ssti.txt"
@@ -375,7 +375,7 @@ function ssti() {
             URL_COUNT=$(wc -l <".tmp/tmp_ssti.txt")
             if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT ]]; then
 
-                printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: SSTI Fuzzing with FFUF${reset}\n\n"
+                _print_msg INFO "Running: SSTI Fuzzing with FFUF"
 
                 # Use Interlace to parallelize FFUF scanning
                 interlace -tL ".tmp/tmp_ssti.txt" -threads "$INTERLACE_THREADS" -c "ffuf -v -r -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w \"${ssti_wordlist}\" -u \"_target_\" -mr \"ssti49\"" 2>>"$LOGFILE" \
@@ -415,7 +415,7 @@ function sqli() {
 
         # Ensure gf/sqli.txt is not empty
         if [[ -s "gf/sqli.txt" ]]; then
-            printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: SQLi Payload Generation${reset}\n\n"
+            _print_msg INFO "Running: SQLi Payload Generation"
 
             # Process sqli.txt with qsreplace and filter lines containing 'FUZZ'
             qsreplace "FUZZ" <"gf/sqli.txt" | sed '/FUZZ/!d' | anew -q ".tmp/tmp_sqli.txt"
@@ -426,13 +426,13 @@ function sqli() {
 
                     # Check if SQLMAP is enabled and run SQLMap
                     if [[ $SQLMAP == true ]]; then
-                        printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: SQLMap for SQLi Checks${reset}\n\n"
+                        _print_msg INFO "Running: SQLMap for SQLi Checks"
                         run_command python3 "${tools}/sqlmap/sqlmap.py" -m ".tmp/tmp_sqli.txt" -b -o --smart \
                             --batch --disable-coloring --random-agent --output-dir="vulns/sqlmap" 2>>"$LOGFILE" >/dev/null
                     fi
                                 # Check if GHAURI is enabled and run Ghauri
                 if [[ $GHAURI == true ]]; then
-                    printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Ghauri for SQLi Checks${reset}\n\n"
+                    _print_msg INFO "Running: Ghauri for SQLi Checks"
                     interlace -tL ".tmp/tmp_sqli.txt" -threads "$INTERLACE_THREADS" -c "ghauri -u _target_ --batch -H \"${HEADER}\" --force-ssl >> vulns/ghauri_log.txt" 2>>"$LOGFILE" >/dev/null
                 fi
 
@@ -473,7 +473,7 @@ function test_ssl() {
         fi
 
         # Run testssl.sh
-        printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: SSL Test with testssl.sh${reset}\n\n"
+        _print_msg INFO "Running: SSL Test with testssl.sh"
         "${tools}/testssl.sh/testssl.sh" --quiet --color 0 -U -iL "$dir/hosts/ips.txt" 2>>"$LOGFILE" >"vulns/testssl.txt"
 
         end_func "Results are saved in vulns/testssl.txt" "${FUNCNAME[0]}"
@@ -509,7 +509,7 @@ function spraying() {
             return 1
         fi
 
-        printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Password Spraying with BruteSpray${reset}\n\n"
+        _print_msg INFO "Running: Password Spraying with BruteSpray"
 
         # Run BruteSpray for password spraying
         brutespray -f "$dir/hosts/portscan_active.gnmap" -T "$BRUTESPRAY_CONCURRENCE" -o "$dir/vulns/brutespray" 2>>"$LOGFILE" >/dev/null
@@ -542,7 +542,7 @@ function command_injection() {
 
         # Ensure gf/rce.txt is not empty and process it
         if [[ -s "gf/rce.txt" ]]; then
-            printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Command Injection Payload Generation${reset}\n\n"
+            _print_msg INFO "Running: Command Injection Payload Generation"
 
             # Process rce.txt with qsreplace and filter lines containing 'FUZZ'
             qsreplace "FUZZ" <"gf/rce.txt" | sed '/FUZZ/!d' | anew -q ".tmp/tmp_rce.txt"
@@ -553,7 +553,7 @@ function command_injection() {
 
     # Run Commix if enabled
     if [[ $COMMIX == true ]]; then
-        printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Commix for Command Injection Checks${reset}\n\n"
+        _print_msg INFO "Running: Commix for Command Injection Checks"
         run_command commix --batch -m ".tmp/tmp_rce.txt" --output-dir "vulns/command_injection" 2>>"$LOGFILE" >/dev/null
     fi
 
@@ -590,7 +590,7 @@ function 4xxbypass() {
         && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 
         # Extract relevant URLs starting with 4xx but not 404
-        printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: 403 Bypass${reset}\n\n"
+        _print_msg INFO "Running: 403 Bypass"
         grep -E '^4' "fuzzing/fuzzing_full.txt" 2>/dev/null | grep -Ev '^404' | awk '{print $3}' | anew -q ".tmp/403test.txt"
 
         # Count the number of URLs to process
@@ -658,7 +658,7 @@ function prototype_pollution() {
 
             # Ensure fuzzing_full.txt exists and has content
             if [[ -s "webs/url_extract_nodupes.txt" ]]; then
-                printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Prototype Pollution Mapping${reset}\n\n"
+                _print_msg INFO "Running: Prototype Pollution Mapping"
 
                 # Process URL list with ppmap and save results
                 ppmap <"webs/url_extract_nodupes.txt" >".tmp/prototype_pollution.txt" 2>>"$LOGFILE"
@@ -712,7 +712,7 @@ function smuggling() {
         URL_COUNT=$(wc -l <"webs/webs_all.txt")
         if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT ]]; then
 
-            printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: HTTP Request Smuggling Checks${reset}\n\n"
+            _print_msg INFO "Running: HTTP Request Smuggling Checks"
 
             # Run smugglex on the list of URLs
             cat "$dir/webs/webs_all.txt" | smugglex -f plain -o "$dir/.tmp/smuggling.txt" 2>>"$LOGFILE" >/dev/null
@@ -762,7 +762,7 @@ function webcache() {
         URL_COUNT=$(wc -l <"webs/webs_all.txt")
         if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT ]]; then
 
-            printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Web Cache Poisoning Checks${reset}\n\n"
+            _print_msg INFO "Running: Web Cache Poisoning Checks"
 
             # Navigate to Web-Cache-Vulnerability-Scanner tool directory
             if ! pushd "${tools}/Web-Cache-Vulnerability-Scanner" >/dev/null; then
@@ -824,7 +824,7 @@ function fuzzparams() {
             #cent update -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
 
             if [[ $AXIOM != true ]]; then
-                printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Nuclei Setup and Execution${reset}\n\n"
+                _print_msg INFO "Running: Nuclei Setup and Execution"
 
                 # Update Nuclei once per run
                 maybe_update_nuclei
@@ -835,7 +835,7 @@ function fuzzparams() {
 
                     else
 
-                        printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Axiom with Nuclei${reset}\n\n"
+                        _print_msg INFO "Running: Axiom with Nuclei"
 
                         run_command axiom-scan webs/url_extract_nodupes.txt -m nuclei \
                             -dast -nh -rl "$NUCLEI_RATELIMIT" \

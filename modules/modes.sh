@@ -143,7 +143,7 @@ function start() {
 function end() {
 
     if [[ $opt_ai ]]; then
-        notification "[$(date +'%Y-%m-%d %H:%M:%S')] Sending ${domain} data to AI" info
+        notification "Sending ${domain} data to AI" info
         mkdir -p "${dir}/ai_result" 2>>"${LOGFILE}"
         local ai_script ai_prompts_file ai_venv_python ai_python ai_json_output ai_redact_flag ai_pull_flag ai_strict_flag
         local -a ai_cmd
@@ -410,6 +410,8 @@ function passive() {
 
     _print_section "Web Detection"
 
+    webprobe_simple
+    webprobe_full
     favicon
     cdnprovider
     # shellcheck disable=SC2034  # PORTSCAN_ACTIVE controls scan behavior
@@ -639,7 +641,6 @@ function recon() {
     _print_section "Subdomains"
 
     subdomains_full
-    webprobe_full
     subtakeover
     remove_big_files
     s3buckets
@@ -649,6 +650,8 @@ function recon() {
     progress_module "Subdomains"
 
     _print_section "Web Detection"
+    webprobe_simple
+    webprobe_full
 
     if [[ "${PARALLEL_MODE:-true}" == "true" ]] && declare -f parallel_funcs &>/dev/null; then
         parallel_funcs 3 screenshot cdnprovider portscan
@@ -830,6 +833,7 @@ function multi_recon() {
             exit 1
         }
         subdomains_full
+        webprobe_simple
         webprobe_full
         subtakeover
         remove_big_files
@@ -1015,13 +1019,16 @@ function subs_menu() {
     _print_section "Subdomains"
 
     subdomains_full
-    webprobe_full
     subtakeover
     remove_big_files
-    screenshot
-    #	virtualhosts
     zonetransfer
     s3buckets
+
+    _print_section "Web Detection"
+    webprobe_simple
+    webprobe_full
+    screenshot
+    #	virtualhosts
 
     if [[ $AXIOM == true ]]; then
         axiom_shutdown
@@ -1033,6 +1040,8 @@ function subs_menu() {
 function webs_menu() {
     _print_section "Web Detection"
 
+    webprobe_simple
+    webprobe_full
     subtakeover
     remove_big_files
     screenshot
@@ -1071,16 +1080,19 @@ function zen_menu() {
     _print_section "Subdomains"
 
     subdomains_full
-    webprobe_full
     subtakeover
     remove_big_files
     s3buckets
 
-    _print_section "Web Analysis"
-
+    _print_section "Web Detection"
+    webprobe_simple
+    webprobe_full
     screenshot
     #	virtualhosts
     cdnprovider
+
+    _print_section "Web Analysis"
+
     waf_checks
     nuclei_check
     graphql_scan

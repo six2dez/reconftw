@@ -83,12 +83,51 @@ count_lines_stdin() {
 # Output Primitives
 ###############################################################################
 
+# Generic message with [LEVEL] prefix (INFO/WARN/FAIL/OK)
+# Usage: _print_msg WARN "something happened"
+_print_msg() {
+    [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
+    local level="$1"
+    shift
+    local msg="$*"
+    local color
+    
+    case "$level" in
+        OK|SUCCESS) color="${bgreen:-}" ;;
+        WARN) color="${yellow:-}" ;;
+        FAIL|ERROR) color="${bred:-}" ;;
+        INFO) color="${bblue:-}" ;;
+        *) color="${bblue:-}" ;;
+    esac
+    
+    printf "%b[%s]%b %s\n" "$color" "$level" "${reset:-}" "$msg"
+}
+
+# Module start message with timestamp
+# Usage: _print_module_start "OSINT"
+_print_module_start() {
+    [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
+    local title="${1^^}"
+    local ts
+    ts=$(date +'%Y-%m-%d %H:%M:%S')
+    printf "\n%b── %s %s%b\n" "${bgreen:-}" "$title" "──────────────────────────────────────────────────────────────" "${reset:-}"
+    _print_msg "INFO" "${title} started at ${ts}"
+}
+
+# Module end message with timestamp
+# Usage: _print_module_end "OSINT"
+_print_module_end() {
+    [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
+    local title="${1^^}"
+    local ts
+    ts=$(date +'%Y-%m-%d %H:%M:%S')
+    _print_msg "INFO" "${title} completed at ${ts}"
+}
+
 # Section header for major phases (OSINT, Subdomains, Web, Vulns, etc.)
 # Usage: _print_section "OSINT"
 _print_section() {
-    [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
-    local title="${1^^}"
-    printf "\n%b── %s %s%b\n" "${bgreen:-}" "$title" "──────────────────────────────────────────────────────────────" "${reset:-}" | cut -c 1-64
+    _print_module_start "$1"
 }
 
 # Compact status line with dot-fill and right-aligned detail
@@ -141,7 +180,7 @@ _print_status() {
 # Usage: _print_error "something failed"
 _print_error() {
     local msg="$1"
-    printf "%b[%s] ERROR: %s%b\n" "${bred:-}" "$(date +'%Y-%m-%d %H:%M:%S')" "$msg" "${reset:-}" >&2
+    printf "%b[FAIL]%b %s\n" "${bred:-}" "${reset:-}" "$msg" >&2
 }
 
 # Thin decorative rule (replaces heavy ###...### separators)

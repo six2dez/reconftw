@@ -976,37 +976,23 @@ function notification() {
         else
             NOTIFY=""
         fi
-        # Always set current_date so start_func/end_func have it
-        if [[ -z $3 ]]; then
-            current_date=$(date +'%Y-%m-%d %H:%M:%S')
-        else
-            current_date="$3"
-        fi
-
+        local level="INFO"
         case $2 in
-            info)
-                text="\n${bblue}[$current_date] ${1} ${reset}"
-                ;;
-            warn)
-                text="\n${yellow}[$current_date] ${1} ${reset}"
-                ;;
-            error)
-                text="\n${bred}[$current_date] ${1} ${reset}"
-                ;;
-            good)
-                text="\n${bgreen}[$current_date] ${1} ${reset}"
-                ;;
+            info) level="INFO" ;;
+            warn) level="WARN" ;;
+            error) level="FAIL" ;;
+            good) level="OK" ;;
         esac
-
+ 
         if declare -F ui_log_jsonl >/dev/null 2>&1; then
-            local level="INFO"
+            local ui_level="INFO"
             case "$2" in
-                info) level="INFO" ;;
-                warn) level="WARN" ;;
-                error) level="ERROR" ;;
-                good) level="SUCCESS" ;;
+                info) ui_level="INFO" ;;
+                warn) ui_level="WARN" ;;
+                error) ui_level="ERROR" ;;
+                good) ui_level="SUCCESS" ;;
             esac
-            ui_log_jsonl "$level" "${FUNCNAME[1]:-main}" "$1"
+            ui_log_jsonl "$ui_level" "${FUNCNAME[1]:-main}" "$1"
         fi
 
         # Quiet mode (OUTPUT_VERBOSITY==0): only print errors to terminal
@@ -1022,20 +1008,18 @@ function notification() {
         if [[ "$should_print" != true ]]; then
             # Still send to notify if enabled, just skip terminal print
             if [[ -n $NOTIFY ]]; then
-                clean_text=$(printf "%b" "${text} - ${domain}" | sed 's/\x1B\[[0-9;]*[JKmsu]//g')
-                printf "%s" "${clean_text}" | $NOTIFY >/dev/null 2>&1
+                printf "%s" "[${level}] ${1} - ${domain}" | $NOTIFY >/dev/null 2>&1
             fi
             return 0
         fi
-
+ 
         # Print to terminal
-        printf "${text}\n"
-
+        _print_msg "$level" "$1"
+ 
         # Send to notify if notifications are enabled
         if [[ -n $NOTIFY ]]; then
             # Remove color codes for the notification
-            clean_text=$(printf "%b" "${text} - ${domain}" | sed 's/\x1B\[[0-9;]*[JKmsu]//g')
-            printf "%s" "${clean_text}" | $NOTIFY >/dev/null 2>&1
+            printf "%s" "[${level}] ${1} - ${domain}" | $NOTIFY >/dev/null 2>&1
         fi
     fi
 }
@@ -1073,18 +1057,18 @@ function sendToNotify {
             return 0
         fi
         if grep -q '^ telegram\|^telegram\|^    telegram' $NOTIFY_CONFIG; then
-            notification "[$(date +'%Y-%m-%d %H:%M:%S')] Sending ${domain} data over Telegram" info
+            notification "Sending ${domain} data over Telegram" info
             telegram_chat_id=$(sed -n '/^telegram:/,/^[^ ]/p' ${NOTIFY_CONFIG} | sed -n 's/^[ ]*telegram_chat_id:[ ]*"\([^"]*\)".*/\1/p')
             telegram_key=$(sed -n '/^telegram:/,/^[^ ]/p' ${NOTIFY_CONFIG} | sed -n 's/^[ ]*telegram_api_key:[ ]*"\([^"]*\)".*/\1/p')
             curl -F "chat_id=${telegram_chat_id}" -F "document=@${1}" https://api.telegram.org/bot${telegram_key}/sendDocument 2>>"$LOGFILE" >/dev/null
         fi
         if grep -q '^ discord\|^discord\|^    discord' $NOTIFY_CONFIG; then
-            notification "[$(date +'%Y-%m-%d %H:%M:%S')] Sending ${domain} data over Discord" info
+            notification "Sending ${domain} data over Discord" info
             discord_url=$(sed -n '/^discord:/,/^[^ ]/p' ${NOTIFY_CONFIG} | sed -n 's/^[ ]*discord_webhook_url:[ ]*"\([^"]*\)".*/\1/p')
             curl -v -i -H "Accept: application/json" -H "Content-Type: multipart/form-data" -X POST -F 'payload_json={"username": "test", "content": "hello"}' -F file1=@${1} $discord_url 2>>"$LOGFILE" >/dev/null
         fi
         if [[ -n $slack_channel ]] && [[ -n $slack_auth ]]; then
-            notification "[$(date +'%Y-%m-%d %H:%M:%S')] Sending ${domain} data over Slack" info
+            notification "Sending ${domain} data over Slack" info
             curl -F file=@${1} -F "initial_comment=reconftw zip file" -F channels=${slack_channel} -H "Authorization: Bearer ${slack_auth}" https://slack.com/api/files.upload 2>>"$LOGFILE" >/dev/null
         fi
     fi
@@ -1097,6 +1081,9 @@ function start_func() {
     log_json "INFO" "${1}" "Function started" "description=${2}"
     if declare -F ui_log_jsonl >/dev/null 2>&1; then
         ui_log_jsonl "INFO" "${1}" "Function started" "description=${2}"
+    fi
+    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
+        _print_msg "INFO" "Running ${1}..."
     fi
 }
 
@@ -1172,6 +1159,9 @@ function start_subfunc() {
     if declare -F ui_log_jsonl >/dev/null 2>&1; then
         ui_log_jsonl "INFO" "${1}" "Subfunction started" "description=${2}"
     fi
+    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
+        _print_msg "INFO" "Running ${1}..."
+    fi
 }
 
 function end_subfunc() {
@@ -1180,7 +1170,8 @@ function end_subfunc() {
     getElapsedTime "$start_sub" "$end_sub"
     local duration=$((end_sub - start_sub))
     if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
-        _print_status OK "  ${2}" "${duration}s"
+        local status="${3:-OK}"
+        _print_status "$status" "  ${2}" "${duration}s"
     fi
     echo "[$current_date] End subfunction: ${1} " >>"${LOGFILE}"
     log_json "SUCCESS" "${2}" "Subfunction completed" "runtime=${runtime}" "duration_sec=${duration}"
@@ -1188,7 +1179,12 @@ function end_subfunc() {
         ui_log_jsonl "SUCCESS" "${2}" "Subfunction completed" "runtime=${runtime}" "duration_sec=${duration}"
     fi
     if declare -F ui_count_inc >/dev/null 2>&1; then
-        ui_count_inc OK
+        case "${3:-OK}" in
+            WARN) ui_count_inc WARN ;;
+            FAIL) ui_count_inc FAIL ;;
+            SKIP) ui_count_inc SKIP ;;
+            *) ui_count_inc OK ;;
+        esac
     fi
 }
 
@@ -1411,6 +1407,11 @@ function write_perf_summary() {
     fi
 }
 
+# Strip control characters except tabs/newlines (pre-jq sanitation)
+sanitize_control_chars() {
+    LC_ALL=C tr -d '\000-\010\013\014\016-\037'
+}
+
 # Generate consolidated JSON + HTML report for the current scan.
 # Outputs:
 #   - report/report.json
@@ -1458,9 +1459,11 @@ function generate_consolidated_report() {
     # Timeline from structured log (preferred) or fallback from text log.
     if [[ -n "${STRUCTURED_LOG_FILE:-}" ]] && [[ -s "${STRUCTURED_LOG_FILE}" ]] && command -v jq >/dev/null 2>&1; then
         timeline_json=$(tail -n 80 "${STRUCTURED_LOG_FILE}" \
+            | sanitize_control_chars \
             | jq -s 'map({timestamp:(.timestamp // ""), level:(.level // "INFO"), function:(.function // "unknown"), message:(.message // "")})')
     elif [[ -s "${LOGFILE:-}" ]] && command -v jq >/dev/null 2>&1; then
         timeline_json=$(tail -n 80 "${LOGFILE}" \
+            | sanitize_control_chars \
             | awk -F'] ' '{
                 ts=$1; gsub(/^\[/,"",ts);
                 msg=$2;
