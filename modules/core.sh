@@ -164,11 +164,10 @@ function check_version() {
 }
 
 function tools_installed() {
-    # Check if all tools are installed
-    _print_section "Tools Check"
-
     local all_installed=true
     local missing_tools=()
+    local tools_start
+    tools_start=$(date +%s)
 
     # Check environment variables
     local env_vars=("GOPATH" "GOROOT" "PATH")
@@ -338,17 +337,16 @@ function tools_installed() {
         fi
     done
 
-    if [[ $all_installed == true ]]; then
-        _print_status OK "All tools are installed"
-    else
-        _print_status WARN "Some tools or directories are missing"
-        for tool in "${missing_tools[@]}"; do
-            _print_status FAIL "$tool"
-        done
-        printf "\n%bTry running the installer script again: ./install.sh%b\n" "$yellow" "$reset"
-    fi
+    local tools_end
+    tools_end=$(date +%s)
+    local tools_dur=$((tools_end - tools_start))
 
-    _print_status INFO "Tools check finished"
+    if [[ $all_installed == true ]]; then
+        _print_status OK "Tools check" "${tools_dur}s"
+    else
+        _print_status WARN "Tools check" "${tools_dur}s"
+        printf "         Pending: %s\n" "${missing_tools[*]}"
+    fi
 
     if [[ $CHECK_TOOLS_OR_EXIT == true && $all_installed != true ]]; then
         exit 2
@@ -372,55 +370,43 @@ function check_critical_dependencies() {
 
     local missing_critical=()
     local all_critical_ok=true
-
-    _print_section "Critical Dependencies"
+    local dep_start
+    dep_start=$(date +%s)
 
     for item in "${critical_tools[@]}"; do
         local tool="${item%%:*}"
-        local description="${item#*:}"
-
         if ! command -v "$tool" >/dev/null 2>&1; then
-            _print_status FAIL "${description} (${tool})" "MISSING"
             missing_critical+=("$tool")
             all_critical_ok=false
-        else
-            local version=""
-            case "$tool" in
-                "python3")
-                    version=$($tool --version 2>&1 | head -n1)
-                    ;;
-                "bash")
-                    version="$BASH_VERSION"
-                    ;;
-                *)
-                    version=$($tool --version 2>&1 | head -n1 || echo "installed")
-                    ;;
-            esac
-            _print_status OK "${description} (${tool})" "${version}"
         fi
     done
 
+    local dep_end
+    dep_end=$(date +%s)
+    local dep_dur=$((dep_end - dep_start))
+
     if [[ $all_critical_ok == false ]]; then
-        _print_error "Critical dependencies missing!"
-        for tool in "${missing_critical[@]}"; do
-            _print_status FAIL "$tool"
-        done
+        _print_status FAIL "Critical dependencies" "${dep_dur}s"
+        printf "         Missing: %s\n" "${missing_critical[*]}"
         printf "\n%bPlease install these tools and try again: ./install.sh%b\n" "$yellow" "$reset"
         exit 1
     else
-        _print_status OK "All critical dependencies are installed"
+        _print_status OK "Critical dependencies" "${dep_dur}s"
     fi
 }
 
 # Report optional API keys used by passive URL providers.
 # Missing keys are informational only; scan continues in best-effort mode.
 function check_optional_api_keys() {
-    local urlscan_state="configured"
-    local vt_state="configured"
-    [[ -z "${URLSCAN_API_KEY:-}" ]] && urlscan_state="not configured (best-effort mode)"
-    [[ -z "${VIRUSTOTAL_API_KEY:-}" ]] && vt_state="not configured (best-effort mode)"
+    local missing_keys=()
+    [[ -z "${URLSCAN_API_KEY:-}" ]] && missing_keys+=("URLSCAN")
+    [[ -z "${VIRUSTOTAL_API_KEY:-}" ]] && missing_keys+=("VT")
 
-    _print_status INFO "Optional API keys" "URLSCAN=${urlscan_state} | VT=${vt_state}"
+    if [[ ${#missing_keys[@]} -gt 0 ]]; then
+        _print_status WARN "API keys not configured: ${missing_keys[*]}" "0s"
+    elif [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
+        _print_status OK "API keys" "0s"
+    fi
 }
 
 ###############################################################################################################
@@ -548,11 +534,43 @@ function progress_step() {
     fi
 
     if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
-        printf "%b[%s] Progress: [%d/%d] %d%% | ETA: %s | %s%b\n" \
-            "$bblue" "$(date +'%H:%M:%S')" \
-            "$_PROGRESS_CURRENT_STEP" "$_PROGRESS_TOTAL_STEPS" \
-            "$pct" "$eta_display" "$step_name" "$reset"
+        if declare -F ui_progress >/dev/null 2>&1; then
+            ui_progress "$step_name" "$_PROGRESS_CURRENT_STEP" "$_PROGRESS_TOTAL_STEPS" "$pct" "$eta_display"
+        else
+            printf "%b[%s] Progress: [%d/%d] %d%% | ETA: %s | %s%b\n" \
+                "$bblue" "$(date +'%H:%M:%S')" \
+                "$_PROGRESS_CURRENT_STEP" "$_PROGRESS_TOTAL_STEPS" \
+                "$pct" "$eta_display" "$step_name" "$reset"
+        fi
     fi
+}
+
+# Module-level progress tracker
+# Usage: progress_module "OSINT"
+# Shows: [3/7] 43% | OSINT complete | OK:8 WARN:0 FAIL:0 SKIP:2
+_PROGRESS_MODULE_CURRENT=0
+_PROGRESS_MODULE_TOTAL=0
+
+function progress_module_init() {
+    _PROGRESS_MODULE_TOTAL=${1:-0}
+    _PROGRESS_MODULE_CURRENT=0
+}
+
+function progress_module() {
+    [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
+    ((_PROGRESS_MODULE_CURRENT++)) || true
+    local module_name="${1:-}"
+    local pct=0
+    if [[ $_PROGRESS_MODULE_TOTAL -gt 0 ]]; then
+        pct=$((_PROGRESS_MODULE_CURRENT * 100 / _PROGRESS_MODULE_TOTAL))
+    fi
+    local counters=""
+    if declare -F ui_counts_summary >/dev/null 2>&1; then
+        counters=$(ui_counts_summary)
+    fi
+    printf "\n  %b[%d/%d] %d%% │ %s complete │ %s%b\n\n" \
+        "${bblue:-}" "$_PROGRESS_MODULE_CURRENT" "$_PROGRESS_MODULE_TOTAL" "$pct" \
+        "$module_name" "$counters" "${reset:-}"
 }
 
 ###############################################################################################################
@@ -1001,8 +1019,28 @@ function notification() {
                 ;;
         esac
 
-        # In quiet mode (OUTPUT_VERBOSITY==0), only print errors to terminal
-        if [[ "${OUTPUT_VERBOSITY:-1}" -eq 0 ]] && [[ "$2" != "error" ]]; then
+        if declare -F ui_log_jsonl >/dev/null 2>&1; then
+            local level="INFO"
+            case "$2" in
+                info) level="INFO" ;;
+                warn) level="WARN" ;;
+                error) level="ERROR" ;;
+                good) level="SUCCESS" ;;
+            esac
+            ui_log_jsonl "$level" "${FUNCNAME[1]:-main}" "$1"
+        fi
+
+        # Quiet mode (OUTPUT_VERBOSITY==0): only print errors to terminal
+        # Normal mode (OUTPUT_VERBOSITY==1): only print warn/error to terminal
+        # Verbose mode (OUTPUT_VERBOSITY>=2): print everything
+        local should_print=false
+        case "$2" in
+            error)      should_print=true ;;
+            warn)       [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && should_print=true ;;
+            info|good)  [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && should_print=true ;;
+        esac
+
+        if [[ "$should_print" != true ]]; then
             # Still send to notify if enabled, just skip terminal print
             if [[ -n $NOTIFY ]]; then
                 clean_text=$(printf "%b" "${text} - ${domain}" | sed 's/\x1B\[[0-9;]*[JKmsu]//g')
@@ -1074,34 +1112,87 @@ function sendToNotify {
 }
 
 function start_func() {
-    _print_rule
-    notification "${2}" info
+    current_date=$(date +'%Y-%m-%d %H:%M:%S')
     echo "[$current_date] Start function: ${1} " >>"${LOGFILE}"
     start=$(date +%s)
     log_json "INFO" "${1}" "Function started" "description=${2}"
+    if declare -F ui_log_jsonl >/dev/null 2>&1; then
+        ui_log_jsonl "INFO" "${1}" "Function started" "description=${2}"
+    fi
 }
 
 function end_func() {
-    touch "$called_fn_dir/.${2}"
+    local message="${1:-}"
+    local fn="${2:-${FUNCNAME[1]:-unknown}}"
+    local status="${3:-}"
+
+    # Backward-compatible status handling:
+    # - end_func "msg" "func" warn
+    # - end_func "msg" warn
+    if [[ -n "$status" ]]; then
+        case "$status" in
+            info|warn|error|good|OK|WARN|FAIL|SKIP)
+                ;; # keep as-is
+            *)
+                status="OK"
+                ;;
+        esac
+    else
+        case "$fn" in
+            info|warn|error|good|OK|WARN|FAIL|SKIP)
+                status="$fn"
+                fn="${FUNCNAME[1]:-unknown}"
+                ;;
+            *)
+                status="OK"
+                ;;
+        esac
+    fi
+
+    touch "$called_fn_dir/.${fn}"
     end=$(date +%s)
     getElapsedTime "$start" "$end"
-    record_func_timing "${2}" "$((end - start))"
+    record_func_timing "${fn}" "$((end - start))"
     local duration=$((end - start))
-    echo "[$current_date] End function: ${2} " >>"${LOGFILE}"
+    echo "[$current_date] End function: ${fn} " >>"${LOGFILE}"
     if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
-        _print_status OK "${2}" "${duration}s"
-        if [[ -n "${1:-}" ]]; then
-            printf "  %b%s%b\n" "${bblue:-}" "${1}" "${reset:-}"
+        local badge="OK"
+        case "$status" in
+            info|INFO) badge="INFO" ;;
+            warn|WARN) badge="WARN" ;;
+            error|ERROR) badge="FAIL" ;;
+            good|SUCCESS) badge="OK" ;;
+            OK|WARN|FAIL|SKIP) badge="$status" ;;
+        esac
+        _print_status "$badge" "${fn}" "${duration}s"
+        # Show detail line for non-OK statuses when message is present
+        if [[ -n "$message" ]] && [[ "$badge" != "OK" && "$badge" != "INFO" ]]; then
+            printf "         %s\n" "$message"
         fi
     fi
-    log_json "SUCCESS" "${2}" "Function completed" "runtime=${runtime}" "duration_sec=${duration}"
+    log_json "SUCCESS" "${fn}" "Function completed" "runtime=${runtime}" "duration_sec=${duration}"
+    if declare -F ui_log_jsonl >/dev/null 2>&1; then
+        ui_log_jsonl "SUCCESS" "${fn}" "Function completed" "runtime=${runtime}" "duration_sec=${duration}"
+    fi
+
+    if declare -F ui_count_inc >/dev/null 2>&1; then
+        case "$status" in
+            warn|WARN) ui_count_inc WARN ;;
+            error|ERROR|FAIL) ui_count_inc FAIL ;;
+            SKIP) ui_count_inc SKIP ;;
+            *) ui_count_inc OK ;;
+        esac
+    fi
 }
 
 function start_subfunc() {
-    notification "     ${2}" info
+    current_date=$(date +'%Y-%m-%d %H:%M:%S')
     echo "[$current_date] Start subfunction: ${1} " >>"${LOGFILE}"
     start_sub=$(date +%s)
     log_json "INFO" "${1}" "Subfunction started" "description=${2}"
+    if declare -F ui_log_jsonl >/dev/null 2>&1; then
+        ui_log_jsonl "INFO" "${1}" "Subfunction started" "description=${2}"
+    fi
 }
 
 function end_subfunc() {
@@ -1114,6 +1205,12 @@ function end_subfunc() {
     fi
     echo "[$current_date] End subfunction: ${1} " >>"${LOGFILE}"
     log_json "SUCCESS" "${2}" "Subfunction completed" "runtime=${runtime}" "duration_sec=${duration}"
+    if declare -F ui_log_jsonl >/dev/null 2>&1; then
+        ui_log_jsonl "SUCCESS" "${2}" "Subfunction completed" "runtime=${runtime}" "duration_sec=${duration}"
+    fi
+    if declare -F ui_count_inc >/dev/null 2>&1; then
+        ui_count_inc OK
+    fi
 }
 
 function check_inscope() {
@@ -1220,7 +1317,8 @@ function record_func_timing() {
 }
 
 function print_timing_summary() {
-    # Print sorted timing summary of all recorded functions
+    # Print sorted timing summary of all recorded functions (verbose only)
+    [[ "${OUTPUT_VERBOSITY:-1}" -lt 2 ]] && return 0
     if [[ ${#FUNC_TIMINGS[@]} -eq 0 ]] 2>/dev/null; then
         return 0
     fi

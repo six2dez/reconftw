@@ -57,11 +57,11 @@ teardown() {
 # notification() verbosity tests
 ###############################################################################
 
-@test "notification prints info at verbosity 1" {
+@test "notification suppresses info at verbosity 1" {
     OUTPUT_VERBOSITY=1
     run notification "hello world" info
     [ "$status" -eq 0 ]
-    [[ "$output" == *"hello world"* ]]
+    [[ "$output" == "" ]]
 }
 
 @test "notification suppresses info at verbosity 0" {
@@ -93,7 +93,7 @@ teardown() {
     OUTPUT_VERBOSITY=1
     run skip_notification "disabled"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"skipped"* ]]
+    [[ "$output" == *"[SKIP]"* ]]
 }
 
 @test "skip_notification suppressed at verbosity 0" {
@@ -107,11 +107,12 @@ teardown() {
 # start_func / end_func verbosity tests
 ###############################################################################
 
-@test "start_func shows rule at verbosity 1" {
+@test "start_func silent at verbosity 1" {
     OUTPUT_VERBOSITY=1
     run start_func "test_fn" "Testing function"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"──"* ]]
+    # start_func no longer produces visible output (only logs)
+    [[ "$output" == "" ]]
 }
 
 @test "start_func hides rule at verbosity 0" {

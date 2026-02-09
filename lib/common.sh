@@ -92,7 +92,7 @@ _print_section() {
     printf "\n%b══════════════════ %s ══════════════════%b\n\n" "${bgreen:-}" "$title" "${reset:-}"
 }
 
-# Compact status line for OK/FAIL/WARN/SKIP/INFO
+# Compact status line with dot-fill and right-aligned detail
 # Usage: _print_status OK "sub_passive" "12s"
 #        _print_status SKIP "sub_crt" "(disabled)"
 _print_status() {
@@ -107,7 +107,12 @@ _print_status() {
         *)    color="${bblue:-}" ;;
     esac
     if [[ -n "$detail" ]]; then
-        printf "  %b[%-4s]%b %-38s %s\n" "$color" "$badge" "${reset:-}" "$text" "$detail"
+        local text_len=${#text}
+        local dot_count=$((40 - text_len))
+        ((dot_count < 2)) && dot_count=2
+        local dots
+        dots=$(printf '%*s' "$dot_count" '' | tr ' ' '.')
+        printf "  %b[%-4s]%b %s %s %6s\n" "$color" "$badge" "${reset:-}" "$text" "$dots" "$detail"
     else
         printf "  %b[%-4s]%b %s\n" "$color" "$badge" "${reset:-}" "$text"
     fi
@@ -135,12 +140,8 @@ _print_rule() {
 # Usage: skip_notification reason
 # reason: "disabled" | "processed" | custom message
 skip_notification() {
-    # In quiet mode, suppress skip messages entirely
-    [[ "${OUTPUT_VERBOSITY:-1}" -eq 0 ]] && return 0
-
     local func_name="${FUNCNAME[1]:-unknown}"
     local reason="${1:-mode or configuration settings}"
-    local checkpoint_hint=""
 
     case "$reason" in
         disabled)
@@ -148,16 +149,28 @@ skip_notification() {
             ;;
         processed)
             reason="already processed"
-            checkpoint_hint="\n    To force re-run, delete: ${called_fn_dir:-.}/.${func_name}"
             ;;
     esac
 
-    printf "\n%b[%s] %s skipped: %s%b${checkpoint_hint}\n" \
-        "${yellow:-}" \
-        "$(date +'%Y-%m-%d %H:%M:%S')" \
-        "$func_name" \
-        "$reason" \
-        "${reset:-}"
+    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
+        _print_status SKIP "$func_name"
+        if [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
+            printf "         %s\n" "$reason"
+            if [[ "$reason" == "already processed" ]]; then
+                printf "         To force re-run, delete: %s/.%s\n" "${called_fn_dir:-.}" "$func_name"
+            fi
+        fi
+    fi
+
+    # Track skip for summary if UI layer is available
+    if declare -F ui_count_inc >/dev/null 2>&1; then
+        ui_count_inc SKIP
+    fi
+
+    # Emit skip marker for parent process (parallel mode)
+    if [[ -n "${called_fn_dir:-}" ]]; then
+        : >"${called_fn_dir}/.skip_${func_name}" 2>/dev/null || true
+    fi
 }
 
 # Wrapper for skip notification when function is disabled

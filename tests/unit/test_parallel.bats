@@ -2,6 +2,8 @@
 # Tests for lib/parallel.sh parallel execution utilities
 
 setup() {
+    # Source common library (needed for _print_status used by parallel output)
+    source "${BATS_TEST_DIRNAME}/../../lib/common.sh"
     # Source the parallel library
     source "${BATS_TEST_DIRNAME}/../../lib/parallel.sh"
 
@@ -192,7 +194,7 @@ teardown() {
 
     run parallel_funcs 2 ok_func
     [ "$status" -eq 0 ]
-    [[ "$output" == *"[OK]"* ]]
+    [[ "$output" == *"[OK"* ]]
     [[ "$output" == *"ok_func"* ]]
 }
 
@@ -202,8 +204,7 @@ teardown() {
 
     run parallel_funcs 2 bad_func
     [ "$status" -eq 1 ]
-    [[ "$output" == *"[FAIL]"* ]]
-    [[ "$output" == *"last 5 lines"* ]]
+    [[ "$output" == *"[FAIL"* ]]
     [[ "$output" == *"error here"* ]]
 }
 
@@ -214,7 +215,7 @@ teardown() {
 
     run parallel_funcs 2 chatty_func
     [ "$status" -eq 0 ]
-    [[ "$output" == *"[OK]"* ]]
+    [[ "$output" == *"[OK"* ]]
     [[ "$output" == *"line10"* ]]
     [[ "$output" == *"line9"* ]]
     [[ "$output" == *"line8"* ]]
@@ -226,7 +227,7 @@ teardown() {
 
     run parallel_funcs 2 verbose_func
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Output (verbose_func)"* ]]
+    [[ "$output" == *"verbose_func"* ]]
     [[ "$output" == *"start"* ]]
     [[ "$output" == *"middle"* ]]
     [[ "$output" == *"end"* ]]
@@ -261,5 +262,5 @@ teardown() {
 
     run parallel_funcs 2 fail_quiet
     [ "$status" -eq 1 ]
-    [[ "$output" == *"[FAIL]"* ]]
+    [[ "$output" == *"[FAIL"* ]]
 }

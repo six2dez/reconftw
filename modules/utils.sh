@@ -183,9 +183,7 @@ function apply_performance_profile() {
     fi
 
     ((PARALLEL_MAX_JOBS < 1)) && PARALLEL_MAX_JOBS=1
-    printf "%b[%s] PERF_PROFILE=%s | cores=%s mem=%sGB | jobs=%s ffuf=%s httpx=%s%b\n" \
-        "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$profile" "$cores" "$mem_gb" \
-        "$PARALLEL_MAX_JOBS" "$FFUF_THREADS" "$HTTPX_THREADS" "$reset"
+    PERF_PROFILE_INFO="PERF_PROFILE=${profile} | cores=${cores} mem=${mem_gb}GB | jobs=${PARALLEL_MAX_JOBS} ffuf=${FFUF_THREADS} httpx=${HTTPX_THREADS}"
 }
 
 function getElapsedTime {
@@ -304,13 +302,11 @@ function check_disk_space() {
     available_gb=$(df -Pk "$check_path" 2>/dev/null | awk 'NR==2 {print int($4 / 1024 / 1024)}')
 
     if [ -z "$available_gb" ] || [ "$available_gb" -lt "$required_gb" ]; then
-        printf "%b[%s] WARNING: Insufficient disk space. Required: %dGB, Available: %dGB at %s%b\n" \
-            "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$required_gb" "${available_gb:-0}" "$check_path" "$reset"
+        DISK_SPACE_INFO="Disk space LOW: required ${required_gb}GB, available ${available_gb:-0}GB at ${check_path}"
         return 1
     fi
 
-    printf "%b[%s] Disk space OK: %dGB available at %s%b\n" \
-        "$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$available_gb" "$check_path" "$reset"
+    DISK_SPACE_INFO="Disk space OK: ${available_gb}GB available at ${check_path}"
     return 0
 }
 

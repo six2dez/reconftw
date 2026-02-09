@@ -127,15 +127,21 @@ function start() {
     # Non-fatal error trap: log and continue (plus short explanation for common cases)
     trap 'rc=$?; ts=$(date +"%Y-%m-%d %H:%M:%S"); cmd=${BASH_COMMAND}; loc_fn=${FUNCNAME[0]:-main}; loc_ln=${BASH_LINENO[0]:-0}; msg="[$ts] ERR($rc) @ ${loc_fn}:${loc_ln} :: ${cmd}"; if [[ -n "${LOGFILE:-}" ]]; then echo "$msg" >>"$LOGFILE"; else echo "$msg" >&2; fi; explain_err "$rc" "$cmd" "$loc_fn" "$loc_ln"' ERR
 
-    _print_rule
-    printf "%b  Target: %s%b\n" "${bred:-}" "$domain" "${reset:-}"
-    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
-        printf "%b  Mode:   %s | Parallel: %s | Verbosity: %s%b\n" \
-            "${bblue:-}" "${opt_mode:-r}" "${PARALLEL_MODE:-true}" "${OUTPUT_VERBOSITY:-1}" "${reset:-}"
+    if declare -F ui_header >/dev/null 2>&1; then
+        ui_header
+    else
+        _print_rule
+        printf "%b  Target: %s%b\n" "${bred:-}" "$domain" "${reset:-}"
+        if [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
+            printf "%b  Mode:   %s | Parallel: %s | Verbosity: %s%b\n" \
+                "${bblue:-}" "${opt_mode:-r}" "${PARALLEL_MODE:-true}" "${OUTPUT_VERBOSITY:-1}" "${reset:-}"
+        fi
+        _print_rule
     fi
-    _print_rule
     if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
-        printf "%b[LEGAL]%b Authorized testing only. By running this scan you confirm you have explicit permission for the specified targets and will comply with all applicable laws and program rules. Unauthorized use is prohibited.\n\n" "$yellow" "$reset"
+        printf "  %b[LEGAL]%b Authorized testing only. You confirm explicit permission\n" "$yellow" "$reset"
+        printf "          for specified targets and compliance with applicable laws.\n"
+        printf "          Unauthorized use is prohibited.\n\n"
     fi
 }
 
@@ -281,14 +287,29 @@ function end() {
 
     global_end=$(date +%s)
     getElapsedTime $global_start $global_end
-    _print_section "Scan Complete"
-    if [[ "${RECON_PARTIAL_RUN:-false}" == "true" ]]; then
-        _print_status WARN "Run completed with non-fatal warnings" "osint_parallel=${RECON_OSINT_PARALLEL_FAILURES:-0}"
+    if declare -F ui_summary >/dev/null 2>&1; then
+        if [[ "${RECON_PARTIAL_RUN:-false}" == "true" ]]; then
+            _print_status WARN "Run completed with non-fatal warnings" "osint_parallel=${RECON_OSINT_PARALLEL_FAILURES:-0}"
+        fi
+        local subs_count webs_count findings_count
+        subs_count=$(count_lines "${dir}/subdomains/subdomains.txt")
+        webs_count=$(count_lines "${dir}/webs/webs_all.txt")
+        if [[ -d "${dir}/nuclei_output" ]]; then
+            findings_count=$(find "${dir}/nuclei_output" -type f -name '*_json.txt' -exec cat {} + 2>/dev/null | wc -l | tr -d ' ')
+        else
+            findings_count=0
+        fi
+        ui_summary "$domain" "$runtime" "$finaldir" "${subs_count:-0}" "${webs_count:-0}" "${findings_count:-0}"
+    else
+        _print_section "Scan Complete"
+        if [[ "${RECON_PARTIAL_RUN:-false}" == "true" ]]; then
+            _print_status WARN "Run completed with non-fatal warnings" "osint_parallel=${RECON_OSINT_PARALLEL_FAILURES:-0}"
+        fi
+        printf "%b  Target:   %s%b\n" "${bgreen:-}" "$domain" "${reset:-}"
+        printf "%b  Duration: %s%b\n" "${bgreen:-}" "$runtime" "${reset:-}"
+        printf "%b  Output:   %s%b\n" "${bgreen:-}" "$finaldir" "${reset:-}"
+        _print_rule
     fi
-    printf "%b  Target:   %s%b\n" "${bgreen:-}" "$domain" "${reset:-}"
-    printf "%b  Duration: %s%b\n" "${bgreen:-}" "$runtime" "${reset:-}"
-    printf "%b  Output:   %s%b\n" "${bgreen:-}" "$finaldir" "${reset:-}"
-    _print_rule
     notification "Finished Recon on: ${domain} under ${finaldir} in: ${runtime}" good "$(date +'%Y-%m-%d %H:%M:%S')"
     [ "$SOFT_NOTIFICATION" = true ] && echo "[$(date +'%Y-%m-%d %H:%M:%S')] Finished Recon on: ${domain} under ${finaldir} in: ${runtime}" | notify -silent
 
@@ -428,7 +449,7 @@ function vulns() {
     if [[ $VULNS_GENERAL == true ]]; then
         if [[ "${PARALLEL_MODE:-true}" == "true" ]] && declare -f parallel_funcs &>/dev/null; then
             # Parallel execution - group independent checks
-            [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && printf "%b[*] Running vulnerability checks in parallel mode%b\n" "$bblue" "$reset"
+            [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && printf "%b[*] Running vulnerability checks in parallel mode%b\n" "$bblue" "$reset"
             parallel_funcs 4 cors open_redirect crlf_checks xss
             local vulns_g1_rc=$?
             if ((vulns_g1_rc > 0)); then
@@ -569,65 +590,43 @@ function recon() {
     RECON_PARTIAL_RUN=false
     RECON_OSINT_PARALLEL_FAILURES=0
 
-    # Initialize progress tracking for selected execution model.
-    local progress_total
-    if [[ "${PARALLEL_MODE:-true}" == "true" ]] && declare -f parallel_funcs &>/dev/null; then
-        progress_total=24
-    else
-        progress_total=32
-    fi
-    progress_init "$progress_total"
+    # Initialize module-level progress (7 modules: OSINT, Subdomains, Web Detection, Web Analysis, Finalization, + 2 optional)
+    local module_total=5
+    progress_module_init "$module_total"
 
     _print_section "OSINT"
 
     if [[ "${PARALLEL_MODE:-true}" == "true" ]] && declare -f parallel_funcs &>/dev/null; then
-        progress_step "OSINT: domain_info, ip_info, emails, dorks"
-        parallel_funcs 4 domain_info ip_info emails google_dorks
+        # Group 1: balanced with third_party_misconfigs (slow) alongside fast ones
+        parallel_funcs 5 domain_info ip_info emails google_dorks third_party_misconfigs
         local osint_g1_rc=$?
         if ((osint_g1_rc > 0)); then
             RECON_PARTIAL_RUN=true
             RECON_OSINT_PARALLEL_FAILURES=$((RECON_OSINT_PARALLEL_FAILURES + osint_g1_rc))
-            notification "Parallel OSINT group 1 completed with ${osint_g1_rc} warning(s); continuing" warn
         fi
-        progress_step "OSINT: repos, metadata, api_leaks, 3rd_party"
-        parallel_funcs 4 github_repos metadata apileaks third_party_misconfigs
+        # Group 2: remaining OSINT + zonetransfer + favicon (were sequential, now parallel)
+        parallel_funcs 5 github_repos metadata apileaks zonetransfer favicon
         local osint_g2_rc=$?
         if ((osint_g2_rc > 0)); then
             RECON_PARTIAL_RUN=true
             RECON_OSINT_PARALLEL_FAILURES=$((RECON_OSINT_PARALLEL_FAILURES + osint_g2_rc))
-            notification "Parallel OSINT group 2 completed with ${osint_g2_rc} warning(s); continuing" warn
         fi
-        progress_step "Zone transfer"
-        zonetransfer
-        progress_step "Favicon"
-        favicon
     else
-        progress_step "domain_info"
         domain_info
-        progress_step "ip_info"
         ip_info
-        progress_step "emails"
         emails
-        progress_step "google_dorks"
         google_dorks
-        progress_step "github_repos"
         #github_dorks
         github_repos
-        progress_step "metadata"
         metadata
-        progress_step "apileaks"
         apileaks
-        progress_step "third_party_misconfigs"
         third_party_misconfigs
-        progress_step "zonetransfer"
         zonetransfer
-        progress_step "favicon"
         favicon
     fi
 
-    if [[ "${RECON_PARTIAL_RUN:-false}" == "true" ]]; then
-        notification "Recon is continuing in partial mode (OSINT warnings: ${RECON_OSINT_PARALLEL_FAILURES:-0})" warn
-    fi
+    ui_module_end "OSINT" "osint/dorks.txt" "osint/emails.txt" "osint/domain_info.txt"
+    progress_module "OSINT"
 
     if [[ $AXIOM == true ]]; then
         axiom_launch
@@ -636,51 +635,46 @@ function recon() {
 
     _print_section "Subdomains"
 
-    progress_step "subdomains_full"
     subdomains_full
-    progress_step "webprobe_full"
     webprobe_full
-    progress_step "subtakeover"
     subtakeover
     remove_big_files
-    progress_step "s3buckets"
     s3buckets
     cloud_extra_providers
+
+    ui_module_end "Subdomains" "subdomains/subdomains.txt" "webs/webs.txt"
+    progress_module "Subdomains"
 
     _print_section "Web Detection"
 
     if [[ "${PARALLEL_MODE:-true}" == "true" ]] && declare -f parallel_funcs &>/dev/null; then
-        progress_step "screenshot, cdnprovider, portscan"
         parallel_funcs 3 screenshot cdnprovider portscan
         local webhost_rc=$?
         if ((webhost_rc > 0)); then
             if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
                 RECON_PARTIAL_RUN=true
-                notification "Parallel web/host batch completed with ${webhost_rc} warning(s); continuing" warn
             else
                 notification "Parallel web/host batch failed" error
                 return 1
             fi
         fi
-        progress_step "geo_info"
         geo_info
     else
-        progress_step "screenshot"
         screenshot
         #	virtualhosts
-        progress_step "cdnprovider"
         cdnprovider
-        progress_step "portscan"
         portscan
-        progress_step "geo_info"
         geo_info
     fi
+
+    ui_module_end "Web Detection" "hosts/ips.txt" "hosts/cdn_providers.txt"
+    progress_module "Web Detection"
+
     # Quick-rescan gating
     subs_new=$(cat .tmp/subs_new_count 2>/dev/null || echo 1)
     webs_new=$(cat .tmp/webs_new_count 2>/dev/null || echo 1)
     if [[ $QUICK_RESCAN == true && $subs_new -eq 0 && $webs_new -eq 0 ]]; then
-        notification "Quick rescan: no new subs/webs; skipping heavy web stages" info
-        progress_adjust_total -10
+        _print_status SKIP "Web Analysis" "(no new subs/webs)"
         TIME_SAVED_EST=$((${TIME_SAVED_EST:-0} + \
             ${TIME_EST_WAF:-0} + ${TIME_EST_NUCLEI:-600} + ${TIME_EST_API:-300} + ${TIME_EST_GQL:-180} + \
             ${TIME_EST_FUZZ:-900} + ${TIME_EST_IIS:-60} + ${TIME_EST_URLCHECKS:-300} + ${TIME_EST_JSCHECKS:-300} + \
@@ -688,26 +682,19 @@ function recon() {
     else
         _print_section "Web Analysis"
 
-        progress_step "waf_checks"
         waf_checks
-        progress_step "nuclei_check"
         nuclei_check
-        progress_step "graphql_scan"
         graphql_scan
-        progress_step "fuzz"
         fuzz
-        progress_step "iishortname"
         iishortname
-        progress_step "urlchecks"
         urlchecks
-        progress_step "jschecks"
         jschecks
-        progress_step "websocket_checks"
         websocket_checks
-        progress_step "param_discovery"
         param_discovery
-        progress_step "grpc_reflection"
         grpc_reflection
+
+        ui_module_end "Web Analysis" "vulns/" "nuclei_output/"
+        progress_module "Web Analysis"
     fi
 
     if [[ $AXIOM == true ]]; then
@@ -716,16 +703,15 @@ function recon() {
 
     _print_section "Finalization"
 
-    progress_step "cms_scanner"
     cms_scanner
-    progress_step "url_gf"
     url_gf
-    progress_step "wordlist_gen"
     wordlist_gen
     wordlist_gen_roboxtractor
-    progress_step "password_dict"
     password_dict
     url_ext
+
+    ui_module_end "Finalization" "fuzzing/" "js/"
+    progress_module "Finalization"
 }
 
 function multi_recon() {

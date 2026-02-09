@@ -203,26 +203,15 @@ _subdomains_init() {
     # Escape domain for safe use in grep regex (dots are literal, not wildcards)
     DOMAIN_ESCAPED=$(escape_domain_regex "$domain")
 
-    printf "%b#######################################################################%b\n\n" "$bgreen" "$reset"
-
-    if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        printf "%b[%s] Scanning IP %s%b\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$domain" "$reset"
-    else
-        printf "%b[%s] Subdomain Enumeration %s%b\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$domain" "$reset"
-    fi
-
     # Check for sensitive domain exclusion
     if [[ "${EXCLUDE_SENSITIVE:-false}" == true ]]; then
         local sensitive_file="${SCRIPTPATH}/config/sensitive_domains.txt"
         if [[ -s "$sensitive_file" ]]; then
-            # Check if target domain matches any sensitive pattern
             if _is_sensitive_domain "$domain" "$sensitive_file"; then
-                printf "%b[!] WARNING: Target domain '%s' matches sensitive domain pattern.%b\n" "$bred" "$domain" "$reset"
-                printf "%b[!] EXCLUDE_SENSITIVE=true is set. Aborting scan to prevent scanning critical infrastructure.%b\n" "$bred" "$reset"
-                printf "%b[!] If this is an authorized engagement, set EXCLUDE_SENSITIVE=false or remove the pattern from config/sensitive_domains.txt%b\n" "$byellow" "$reset"
+                _print_status FAIL "Sensitive domain" "0s"
+                printf "         Domain '%s' matches sensitive pattern. Set EXCLUDE_SENSITIVE=false to override.\n" "$domain"
                 return 1
             fi
-            printf "%b[*] Sensitive domain exclusion is enabled%b\n" "$bblue" "$reset"
         fi
     fi
 
@@ -256,7 +245,7 @@ _subdomains_enumerate() {
     
     if [[ "$use_parallel" == "--parallel" ]] && declare -f parallel_funcs &>/dev/null; then
         # Parallel execution using lib/parallel.sh
-        printf "%b[*] Running subdomain enumeration in parallel mode%b\n" "$bblue" "$reset"
+        [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && printf "%b[*] Running subdomain enumeration in parallel mode%b\n" "$bblue" "$reset"
         
         # Phase 0: ASN enumeration (independent)
         sub_asn
@@ -377,61 +366,33 @@ _subdomains_finalize() {
     # Display results
     TOTAL_SUBS=$(sed '/^$/d' "subdomains/subdomains.txt" 2>/dev/null | wc -l | tr -d ' ')
     TOTAL_WEBS=$(sed '/^$/d' "webs/webs.txt" 2>/dev/null | wc -l | tr -d ' ')
-    printf "%b\n[%s] Total subdomains: %s | Total webs: %s%b\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$TOTAL_SUBS" "$TOTAL_WEBS" "$reset"
-    notification "- ${NUMOFLINES_subs} new subs alive" "good"
-    if [[ -s "subdomains/subdomains.txt" ]]; then
-        sort -o "subdomains/subdomains.txt" "subdomains/subdomains.txt"
-        if [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
-            # Verbose: list all
-            while IFS= read -r sub; do
-                printf "%b[%s]   %s%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$sub" "$reset"
-            done < "subdomains/subdomains.txt"
-        elif [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
-            # Normal: list up to 20, then truncate
+
+    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
+        _print_status OK "subdomains_full"
+        printf "         Total: %s subdomains | %s webs\n" "$TOTAL_SUBS" "$TOTAL_WEBS"
+
+        if [[ -s "subdomains/subdomains.txt" ]]; then
+            sort -o "subdomains/subdomains.txt" "subdomains/subdomains.txt"
             local _sub_count _shown=0
             _sub_count=$(wc -l < "subdomains/subdomains.txt" | tr -d ' ')
+            local _max_show=10
+            [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && _max_show=$_sub_count
+
             while IFS= read -r sub; do
                 _shown=$((_shown + 1))
-                if [[ $_shown -le 20 ]]; then
-                    printf "%b[%s]   %s%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$sub" "$reset"
+                if [[ $_shown -le $_max_show ]]; then
+                    printf "         %s\n" "$sub"
                 else
-                    printf "%b[%s]   ... and %d more%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$((_sub_count - 20))" "$reset"
+                    printf "         ... and %d more (see subdomains/subdomains.txt)\n" "$((_sub_count - _max_show))"
                     break
                 fi
             done < "subdomains/subdomains.txt"
         fi
-        # Quiet (0): no listing at all
-    fi
 
-    notification "- ${NUMOFLINES_probed} new web probed" "good"
-    if [[ -s "webs/webs.txt" ]]; then
-        sort -o "webs/webs.txt" "webs/webs.txt"
-        if [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
-            # Verbose: list all
-            while IFS= read -r web; do
-                printf "%b[%s]   %s%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$web" "$reset"
-            done < "webs/webs.txt"
-        elif [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
-            # Normal: list up to 20, then truncate
-            local _web_count _wshown=0
-            _web_count=$(wc -l < "webs/webs.txt" | tr -d ' ')
-            while IFS= read -r web; do
-                _wshown=$((_wshown + 1))
-                if [[ $_wshown -le 20 ]]; then
-                    printf "%b[%s]   %s%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$web" "$reset"
-                else
-                    printf "%b[%s]   ... and %d more%b\n" "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$((_web_count - 20))" "$reset"
-                    break
-                fi
-            done < "webs/webs.txt"
+        if [[ -s "webs/webs.txt" ]]; then
+            sort -o "webs/webs.txt" "webs/webs.txt"
         fi
-        # Quiet (0): no listing at all
     fi
-    
-    notification "Subdomain Enumeration Finished" "good"
-    printf "%b[%s] Results are saved in %s/subdomains/subdomains.txt and webs/webs.txt%b\n" \
-        "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$domain" "$reset"
-    printf "%b#######################################################################%b\n\n" "$bgreen" "$reset"
     
     # Emit plugin event
     plugins_emit after_subdomains "$domain" "$dir"
@@ -716,10 +677,6 @@ function sub_active() {
 
         if [[ $AXIOM != true ]]; then
             # Update resolvers locally
-            if ! resolvers_update_quick_local; then
-                printf "%b[!] resolvers_update_quick_local command failed.%b\n" "$bred" "$reset"
-                return 1
-            fi
             [[ $RESOLVER_IQ == true ]] && resolvers_optimize_local
 
             # Resolve subdomains using puredns
@@ -733,10 +690,6 @@ function sub_active() {
             fi
         else
             # Update resolvers using axiom
-            if ! resolvers_update_quick_axiom; then
-                printf "%b[!] resolvers_update_quick_axiom command failed.%b\n" "$bred" "$reset"
-                return 1
-            fi
 
             # Resolve subdomains using axiom-scan
             if [[ -s ".tmp/subs_no_resolved.txt" ]]; then
@@ -810,10 +763,6 @@ function sub_tls() {
         fi
 
         if [[ $AXIOM != true ]]; then
-            if ! resolvers_update_quick_local; then
-                printf "%b[!] resolvers_update_quick_local command failed.%b\n" "$bred" "$reset"
-                return 1
-            fi
             [[ $RESOLVER_IQ == true ]] && resolvers_optimize_local
             if [[ -s ".tmp/subdomains_tlsx_clean.txt" ]]; then
                 puredns resolve .tmp/subdomains_tlsx_clean.txt -w .tmp/subdomains_tlsx_resolved.txt \
@@ -823,10 +772,6 @@ function sub_tls() {
                     2>>"$LOGFILE" >/dev/null
             fi
         else
-            if ! resolvers_update_quick_axiom; then
-                printf "%b[!] resolvers_update_quick_axiom command failed.%b\n" "$bred" "$reset"
-                return 1
-            fi
             if [[ -s ".tmp/subdomains_tlsx_clean.txt" ]]; then
                 axiom-scan .tmp/subdomains_tlsx_clean.txt -m puredns-resolve \
                     -r ${AXIOM_RESOLVERS_PATH} --resolvers-trusted ${AXIOM_RESOLVERS_TRUSTED_PATH} \
@@ -870,10 +815,6 @@ function sub_noerror() {
         dns_response=$(echo "$random_subdomain" | dnsx -r "$resolvers" -rcode noerror,nxdomain -retry 3 -silent | cut -d' ' -f2)
 
         if [[ $dns_response == "[NXDOMAIN]" ]]; then
-            if ! resolvers_update_quick_local; then
-                printf "%b[!] Failed to update resolvers.%b\n" "$bred" "$reset"
-                return 1
-            fi
 
             # Determine wordlist based on DEEP setting
             if [[ $DEEP == true ]]; then
@@ -960,9 +901,6 @@ function sub_dns() {
                 | grep -E ' - [0-9a-fA-F:.]+$' | sort -u | anew -q "subdomains/subdomains_ips.txt"
         fi
         if [[ $AXIOM != true ]]; then
-            if ! resolvers_update_quick_local; then
-                printf "%b[!] Failed to update resolvers.%b\n" "$bred" "$reset"
-            fi
 
             if [[ -s ".tmp/subdomains_dns.txt" ]]; then
                 puredns resolve .tmp/subdomains_dns.txt -w .tmp/subdomains_dns_resolved.txt \
@@ -972,9 +910,6 @@ function sub_dns() {
                     2>>"$LOGFILE" >/dev/null
             fi
         else
-            if ! resolvers_update_quick_axiom; then
-                printf "%b[!] Failed to update resolvers.%b\n" "$bred" "$reset"
-            fi
 
             if [[ -s ".tmp/subdomains_dns.txt" ]]; then
                 axiom-scan .tmp/subdomains_dns.txt -m puredns-resolve \
@@ -1028,10 +963,6 @@ function sub_brute() {
         start_subfunc "${FUNCNAME[0]}" "Running: Bruteforce Subdomain Enumeration"
 
         if [[ $AXIOM != true ]]; then
-            if ! resolvers_update_quick_local; then
-                printf "%b[!] Failed to update resolvers.%b\n" "$bred" "$reset"
-                return 1
-            fi
 
             wordlist="$subs_wordlist"
             [[ $DEEP == true ]] && wordlist="$subs_wordlist_big"
@@ -1051,10 +982,6 @@ function sub_brute() {
             fi
 
         else
-            if ! resolvers_update_quick_axiom; then
-                printf "%b[!] Failed to update resolvers on axiom.%b\n" "$bred" "$reset"
-                return 1
-            fi
 
             wordlist="$subs_wordlist"
             [[ $DEEP == true ]] && wordlist="$subs_wordlist_big"
@@ -1158,10 +1085,6 @@ function sub_scraping() {
                 fi
 
                 if [[ $AXIOM != true ]]; then
-                    if ! resolvers_update_quick_local; then
-                        printf "%b[!] Failed to update resolvers locally.%b\n" "$bred" "$reset"
-                        return 1
-                    fi
 
                     # Run httpx to gather web info
                     run_command httpx -follow-host-redirects -status-code -threads "$HTTPX_THREADS" -rl "$HTTPX_RATELIMIT" \
@@ -1186,10 +1109,6 @@ function sub_scraping() {
 
                 else
                     # AXIOM mode
-                    if ! resolvers_update_quick_axiom; then
-                        printf "%b[!] Failed to update resolvers on axiom.%b\n" "$bred" "$reset"
-                        return 1
-                    fi
 
                     axiom-scan subdomains/subdomains.txt -m httpx -follow-host-redirects -random-agent -status-code \
                         -threads "$HTTPX_THREADS" -rl "$HTTPX_RATELIMIT" -timeout "$HTTPX_TIMEOUT" -silent -retries 2 \
@@ -1318,10 +1237,6 @@ function sub_analytics() {
                     | sed "s/|__ //" | anew -q .tmp/analytics_subs_clean.txt
 
                 if [[ $AXIOM != true ]]; then
-                    if ! resolvers_update_quick_local; then
-                        printf "%b[!] Failed to update resolvers locally.%b\n" "$bred" "$reset"
-                        return 1
-                    fi
 
                     if [[ -s ".tmp/analytics_subs_clean.txt" ]]; then
                         puredns resolve .tmp/analytics_subs_clean.txt -w .tmp/analytics_subs_resolved.txt \
@@ -1331,10 +1246,6 @@ function sub_analytics() {
                             2>>"$LOGFILE" >/dev/null
                     fi
                 else
-                    if ! resolvers_update_quick_axiom; then
-                        printf "%b[!] Failed to update resolvers on Axiom.%b\n" "$bred" "$reset"
-                        return 1
-                    fi
 
                     if [[ -s ".tmp/analytics_subs_clean.txt" ]]; then
                         axiom-scan .tmp/analytics_subs_clean.txt -m puredns-resolve \
@@ -1422,10 +1333,6 @@ function sub_permut() {
 
         # Resolve the permutations
         if [[ $AXIOM != true ]]; then
-            if ! resolvers_update_quick_local; then
-                printf "%b[!] Failed to update resolvers.%b\n" "$bred" "$reset"
-                return 1
-            fi
             if [[ -s ".tmp/gotator1.txt" ]]; then
                 puredns resolve .tmp/gotator1.txt -w .tmp/permute1.txt -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
                     -l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
@@ -1433,10 +1340,6 @@ function sub_permut() {
                     2>>"$LOGFILE" >/dev/null
             fi
         else
-            if ! resolvers_update_quick_axiom; then
-                printf "%b[!] Failed to update resolvers on axiom.%b\n" "$bred" "$reset"
-                return 1
-            fi
             if [[ -s ".tmp/gotator1.txt" ]]; then
                 axiom-scan .tmp/gotator1.txt -m puredns-resolve -r "${AXIOM_RESOLVERS_PATH}" \
                     --resolvers-trusted "${AXIOM_RESOLVERS_TRUSTED_PATH}" \
@@ -1554,10 +1457,6 @@ function sub_regex_permut() {
 
         # Resolve the generated domains
         if [[ $AXIOM != true ]]; then
-            if ! resolvers_update_quick_local; then
-                printf "%b[!] Failed to update resolvers locally.%b\n" "$bred" "$reset"
-                return 1
-            fi
 
             if [[ -s ".tmp/${domain}.brute" ]]; then
                 puredns resolve ".tmp/${domain}.brute" -w .tmp/regulator.txt -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
@@ -1566,10 +1465,6 @@ function sub_regex_permut() {
                     2>>"$LOGFILE" >/dev/null
             fi
         else
-            if ! resolvers_update_quick_axiom; then
-                printf "%b[!] Failed to update resolvers on Axiom.%b\n" "$bred" "$reset"
-                return 1
-            fi
 
             if [[ -s ".tmp/${domain}.brute" ]]; then
                 axiom-scan ".tmp/${domain}.brute" -m puredns-resolve \
@@ -1635,10 +1530,6 @@ function sub_ia_permut() {
 
         # Resolve the generated domains
         if [[ $AXIOM != true ]]; then
-            if ! resolvers_update_quick_local; then
-                printf "%b[!] Failed to update resolvers locally.%b\n" "$bred" "$reset"
-                return 1
-            fi
 
             if [[ -s ".tmp/subwiz.txt" ]]; then
                 puredns resolve ".tmp/subwiz.txt" -w .tmp/subwiz_resolved.txt -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
@@ -1647,10 +1538,6 @@ function sub_ia_permut() {
                     2>>"$LOGFILE" >/dev/null
             fi
         else
-            if ! resolvers_update_quick_axiom; then
-                printf "%b[!] Failed to update resolvers on Axiom.%b\n" "$bred" "$reset"
-                return 1
-            fi
 
             if [[ -s ".tmp/subwiz.txt" ]]; then
                 axiom-scan ".tmp/subwiz.txt" -m puredns-resolve \
@@ -1723,10 +1610,6 @@ function sub_recursive_passive() {
         fi
 
         if [[ $AXIOM != true ]]; then
-            if ! resolvers_update_quick_local; then
-                printf "%b[!] Failed to update resolvers locally.%b\n" "$bred" "$reset"
-                return 1
-            fi
 
             if [[ -s ".tmp/subdomains_recurs_top.txt" ]]; then
                 subfinder -all -dL .tmp/subdomains_recurs_top.txt -max-time "${SUBFINDER_ENUM_TIMEOUT}" \
@@ -1747,10 +1630,6 @@ function sub_recursive_passive() {
             fi
 
         else
-            if ! resolvers_update_quick_axiom; then
-                printf "%b[!] Failed to update resolvers on Axiom.%b\n" "$bred" "$reset"
-                return 1
-            fi
 
             if [[ -s ".tmp/subdomains_recurs_top.txt" ]]; then
                 axiom-scan .tmp/subdomains_recurs_top.txt -m subfinder -all -o .tmp/subfinder_prec.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
@@ -1831,20 +1710,12 @@ function sub_recursive_brute() {
 
             for subdomain_top in $(cat .tmp/subdomains_recurs_top.txt); do
                 if [[ $AXIOM != true ]]; then
-                    if ! resolvers_update_quick_local; then
-                        printf "%b[!] Failed to update resolvers locally.%b\n" "$bred" "$reset"
-                        return 1
-                    fi
                     puredns bruteforce "$subs_wordlist" "$subdomain_top" -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
                         -l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
                         --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
                         -w .tmp/brute_recursive_result_part.txt 2>>"$LOGFILE" >/dev/null
                     cat .tmp/brute_recursive_result_part.txt | anew -q .tmp/brute_recursive.txt
                 else
-                    if ! resolvers_update_quick_axiom; then
-                        printf "%b[!] Failed to update resolvers on axiom.%b\n" "$bred" "$reset"
-                        return 1
-                    fi
                     axiom-scan "$subs_wordlist" -m puredns-single "$subdomain_top" \
                         -r ${AXIOM_RESOLVERS_PATH} --resolvers-trusted ${AXIOM_RESOLVERS_TRUSTED_PATH} \
                         --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \

@@ -65,6 +65,7 @@ SCRIPTPATH="${_INIT_SCRIPTPATH}"
 # Source libraries first (pure utilities)
 source "${_INIT_SCRIPTPATH}/lib/validation.sh"
 source "${_INIT_SCRIPTPATH}/lib/common.sh"
+source "${_INIT_SCRIPTPATH}/lib/ui.sh"
 source "${_INIT_SCRIPTPATH}/lib/parallel.sh"
 
 # Source all modules in dependency order
@@ -111,7 +112,7 @@ if [[ $OSTYPE == "darwin"* ]]; then
     PATH="$(brew --prefix gnu-sed)/libexec/gnubin:$PATH"
 fi
 
-PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:zrspanwvyh' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,ai,check-tools,health-check,quick-rescan,incremental,adaptive-rate,dry-run,parallel,no-parallel,monitor,monitor-interval:,monitor-cycles:,refresh-cache,export:,report-only,parallel-log:,quiet,verbose' -n 'reconFTW' -- "$@")
+PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:zrspanwvyh' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,ai,check-tools,health-check,quick-rescan,incremental,adaptive-rate,dry-run,parallel,no-parallel,monitor,monitor-interval:,monitor-cycles:,refresh-cache,export:,report-only,parallel-log:,quiet,verbose,no-color,log-format:' -n 'reconFTW' -- "$@")
 
 exit_status=$?
 if [[ $exit_status -ne 0 ]]; then
@@ -376,6 +377,21 @@ while true; do
             shift
             continue
             ;;
+        '--no-color')
+            CLI_NO_COLOR=1
+            shift
+            continue
+            ;;
+        '--log-format')
+            CLI_LOG_FORMAT="$2"
+            if [[ ! "$CLI_LOG_FORMAT" =~ ^(plain|jsonl)$ ]]; then
+                printf "%b[%s] ERROR: Invalid --log-format value '%s' (allowed: plain|jsonl)%b\n" \
+                    "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$CLI_LOG_FORMAT" "$reset" >&2
+                exit 1
+            fi
+            shift 2
+            continue
+            ;;
         '--help' | '-h')
             break
             ;;
@@ -439,6 +455,12 @@ if [[ -n "${CLI_OUTPUT_VERBOSITY:-}" ]]; then
     # Backward compat: verbose level sets VERBOSE=true
     [[ "${OUTPUT_VERBOSITY}" -ge 2 ]] && VERBOSE=true
 fi
+if [[ -n "${CLI_LOG_FORMAT:-}" ]]; then
+    LOG_FORMAT="${CLI_LOG_FORMAT}"
+fi
+if [[ -n "${CLI_NO_COLOR:-}" ]]; then
+    NO_COLOR=1
+fi
 
 if [[ $opt_deep ]]; then
     DEEP=true
@@ -475,7 +497,11 @@ fi
 
 startdir=${PWD}
 
+# Initialize UI layer after config and CLI overrides (before any output)
+ui_init
+
 banner
+printf "\n"
 
 check_version
 
@@ -492,9 +518,7 @@ fi
 
 # Show DRY_RUN mode warning if enabled
 if [[ "${DRY_RUN:-false}" == "true" ]]; then
-    _print_rule
-    _print_status WARN "DRY-RUN MODE ENABLED" "Commands will be shown but not executed"
-    _print_rule
+    _print_status WARN "DRY-RUN MODE ENABLED" "0s"
 fi
 
 startdir=${PWD}

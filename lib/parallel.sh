@@ -45,39 +45,65 @@ _parallel_emit_job_output() {
     local tail_lines="${PARALLEL_TAIL_LINES:-20}"
     local duration=$((end_ts - start_ts))
 
+    local skip_marker=""
+    if [[ -n "${called_fn_dir:-}" ]]; then
+        skip_marker="${called_fn_dir}/.skip_${func_name}"
+    fi
+
+    local badge=""
+    if [[ -n "$skip_marker" && -f "$skip_marker" ]]; then
+        badge="SKIP"
+        rm -f "$skip_marker" 2>/dev/null || true
+    elif [[ "$rc" -eq 0 ]]; then
+        badge="OK"
+    else
+        badge="FAIL"
+    fi
+
+    if declare -F ui_count_inc >/dev/null 2>&1; then
+        ui_count_inc "$badge"
+    fi
+
     # In quiet mode (OUTPUT_VERBOSITY==0), only show failures
-    if [[ "${OUTPUT_VERBOSITY:-1}" -eq 0 ]] && [[ "$rc" -eq 0 ]]; then
+    if [[ "${OUTPUT_VERBOSITY:-1}" -eq 0 ]] && [[ "$badge" != "FAIL" ]]; then
         return 0
     fi
 
+    # For failures in quiet mode, print directly since _print_status is gated on verbosity
+    local _force_print=false
+    [[ "${OUTPUT_VERBOSITY:-1}" -eq 0 ]] && [[ "$badge" == "FAIL" ]] && _force_print=true
+
     case "$mode" in
         summary)
-            if [[ "$rc" -eq 0 ]]; then
-                printf "  %b[OK]%b   %-35s %4ds%b\n" "${bgreen:-}" "${reset:-}" "$func_name" "$duration" "${reset:-}"
+            if [[ "$_force_print" == true ]]; then
+                printf "  %b[%-4s]%b %s %6s\n" "${bred:-}" "$badge" "${reset:-}" "$func_name" "${duration}s"
             else
-                printf "  %b[FAIL]%b %-35s %4ds%b\n" "${bred:-}" "${reset:-}" "$func_name" "$duration" "${reset:-}"
-                if [[ -s "$log_file" ]]; then
-                    printf "    ^ last 5 lines:\n"
-                    tail -n 5 "$log_file" | while IFS= read -r line; do
-                        printf "      %s\n" "$line"
-                    done
-                fi
+                _print_status "$badge" "$func_name" "${duration}s"
+            fi
+            if [[ "$badge" == "FAIL" ]] && [[ -s "$log_file" ]]; then
+                tail -n 5 "$log_file" | while IFS= read -r line; do
+                    printf "         %s\n" "$line"
+                done
             fi
             ;;
         tail)
             local show_lines="$tail_lines"
             [[ "$rc" -ne 0 ]] && show_lines=$((tail_lines * 2))
-            if [[ "$rc" -eq 0 ]]; then
-                printf "  %b[OK]%b   %-35s %4ds%b\n" "${bgreen:-}" "${reset:-}" "$func_name" "$duration" "${reset:-}"
+            if [[ "$_force_print" == true ]]; then
+                printf "  %b[%-4s]%b %s %6s\n" "${bred:-}" "$badge" "${reset:-}" "$func_name" "${duration}s"
             else
-                printf "  %b[FAIL]%b %-35s %4ds%b\n" "${bred:-}" "${reset:-}" "$func_name" "$duration" "${reset:-}"
+                _print_status "$badge" "$func_name" "${duration}s"
             fi
             if [[ -s "$log_file" ]]; then
                 tail -n "$show_lines" "$log_file"
             fi
             ;;
         full)
-            printf "\n%b[%s] Output (%s) [rc=%d, %ds]%b\n" "${bblue:-}" "$(date +'%Y-%m-%d %H:%M:%S')" "$func_name" "$rc" "$duration" "${reset:-}"
+            if [[ "$_force_print" == true ]]; then
+                printf "  %b[%-4s]%b %s %6s\n" "${bred:-}" "$badge" "${reset:-}" "$func_name" "${duration}s"
+            else
+                _print_status "$badge" "$func_name" "${duration}s"
+            fi
             if [[ -s "$log_file" ]]; then
                 cat "$log_file"
             fi
@@ -98,7 +124,12 @@ _parallel_batch_summary() {
     # Skip in quiet mode
     [[ "${OUTPUT_VERBOSITY:-1}" -eq 0 ]] && return 0
 
-    printf "  --- batch: %d jobs, %d failed, %ds elapsed ---\n" "$total" "$failed" "$elapsed"
+    if declare -F ui_batch_end >/dev/null 2>&1; then
+        local ok_count=$((total - failed))
+        ui_batch_end "$ok_count" 0 "$failed" "$elapsed"
+    else
+        printf "  --- batch: %d jobs, %d failed, %ds elapsed ---\n" "$total" "$failed" "$elapsed"
+    fi
 }
 
 ###############################################################################
@@ -158,12 +189,19 @@ parallel_funcs() {
     local failed=0
     local batch_start_ts
     batch_start_ts=$(date +%s)
+    local batch_label="${PARALLEL_LABEL:-parallel}"
 
     for func in "$@"; do
         # Check if function exists
         if ! declare -f "$func" >/dev/null 2>&1; then
             printf "%b[!] Function %s not found, skipping%b\n" "${yellow:-}" "$func" "${reset:-}" >&2
             continue
+        fi
+
+        if ((${#batch_pids[@]} == 0)); then
+            if declare -F ui_batch_start >/dev/null 2>&1; then
+                ui_batch_start "$batch_label" "$max_jobs"
+            fi
         fi
 
         local log_file="${parallel_log_root}/${func}.$$.$RANDOM.log"
@@ -321,7 +359,7 @@ parallel_passive_enum() {
         "sub_crt"
     )
 
-    [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && \
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && \
         printf "%b[*] Running passive enumeration in parallel (%d functions)%b\n" \
             "${bblue:-}" "${#funcs[@]}" "${reset:-}"
 
@@ -338,7 +376,7 @@ parallel_active_enum() {
         "sub_dns"
     )
 
-    [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && \
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && \
         printf "%b[*] Running active enumeration in parallel (%d functions)%b\n" \
             "${bblue:-}" "${#funcs[@]}" "${reset:-}"
 
@@ -354,7 +392,7 @@ parallel_postactive_enum() {
         "sub_analytics"
     )
 
-    [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && \
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && \
         printf "%b[*] Running post-active enumeration in parallel (%d functions)%b\n" \
             "${bblue:-}" "${#funcs[@]}" "${reset:-}"
 
@@ -371,7 +409,7 @@ parallel_brute_enum() {
     )
     
     # Brute force is resource intensive, run with limit of 2
-    [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && \
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && \
         printf "%b[*] Running brute force enumeration (limited parallelism)%b\n" \
             "${bblue:-}" "${reset:-}"
 
@@ -392,7 +430,7 @@ parallel_web_vulns() {
         "xss"
     )
     
-    [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && \
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && \
         printf "%b[*] Running web vulnerability checks in parallel (%d checks)%b\n" \
             "${bblue:-}" "${#funcs[@]}" "${reset:-}"
 
@@ -409,7 +447,7 @@ parallel_injection_vulns() {
         "command_injection"
     )
     
-    [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && \
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && \
         printf "%b[*] Running injection vulnerability checks in parallel (%d checks)%b\n" \
             "${bblue:-}" "${#funcs[@]}" "${reset:-}"
 
@@ -425,7 +463,7 @@ parallel_server_vulns() {
         "smuggling"
     )
     
-    [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && \
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && \
         printf "%b[*] Running server-side vulnerability checks in parallel (%d checks)%b\n" \
             "${bblue:-}" "${#funcs[@]}" "${reset:-}"
 
@@ -447,7 +485,7 @@ parallel_osint() {
         "domain_info"
     )
     
-    [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && \
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && \
         printf "%b[*] Running OSINT gathering in parallel (%d sources)%b\n" \
             "${bblue:-}" "${#funcs[@]}" "${reset:-}"
 
@@ -462,7 +500,7 @@ parallel_osint() {
 # Usage: parallel_subdomains_full
 # This replaces the sequential execution in subdomains_full()
 parallel_subdomains_full() {
-    [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && \
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && \
         printf "%b[*] Starting parallelized subdomain enumeration%b\n" \
             "${bblue:-}" "${reset:-}"
     
@@ -488,7 +526,7 @@ parallel_subdomains_full() {
     [[ ${SUBSCRAPING:-false} == true ]] && sub_scraping
     [[ ${SUB_RECURSIVE_BRUTE:-false} == true ]] && sub_recursive_brute
     
-    [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && \
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && \
         printf "%b[*] Parallelized subdomain enumeration complete%b\n" \
             "${bgreen:-}" "${reset:-}"
 }
@@ -496,7 +534,7 @@ parallel_subdomains_full() {
 # Orchestrate full vulnerability scanning with parallelization
 # Usage: parallel_vulns_full
 parallel_vulns_full() {
-    [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && \
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && \
         printf "%b[*] Starting parallelized vulnerability scanning%b\n" \
             "${bblue:-}" "${reset:-}"
     
@@ -508,7 +546,7 @@ parallel_vulns_full() {
     parallel_injection_vulns
     parallel_server_vulns
     
-    [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && \
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && \
         printf "%b[*] Parallelized vulnerability scanning complete%b\n" \
             "${bgreen:-}" "${reset:-}"
 }
