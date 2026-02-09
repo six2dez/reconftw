@@ -501,6 +501,10 @@ startdir=${PWD}
 ui_init
 
 banner
+printf "\n\n" # Two empty lines after banner
+printf "  %b[LEGAL]%b Authorized testing only. You confirm explicit permission\n" "$yellow" "$reset"
+printf "          for specified targets and compliance with applicable laws.\n"
+printf "          Unauthorized use is prohibited.\n\n"
 printf "\n"
 
 check_version

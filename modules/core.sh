@@ -342,9 +342,8 @@ function tools_installed() {
     local tools_dur=$((tools_end - tools_start))
 
     if [[ $all_installed == true ]]; then
-        _print_status OK "Tools check" "${tools_dur}s"
+        : # Tools check OK, no output
     else
-        _print_status WARN "Tools check" "${tools_dur}s"
         printf "         Pending: %s\n" "${missing_tools[*]}"
     fi
 
@@ -385,29 +384,9 @@ function check_critical_dependencies() {
     dep_end=$(date +%s)
     local dep_dur=$((dep_end - dep_start))
 
-    if [[ $all_critical_ok == false ]]; then
-        _print_status FAIL "Critical dependencies" "${dep_dur}s"
-        printf "         Missing: %s\n" "${missing_critical[*]}"
-        printf "\n%bPlease install these tools and try again: ./install.sh%b\n" "$yellow" "$reset"
-        exit 1
-    else
-        _print_status OK "Critical dependencies" "${dep_dur}s"
-    fi
+
 }
 
-# Report optional API keys used by passive URL providers.
-# Missing keys are informational only; scan continues in best-effort mode.
-function check_optional_api_keys() {
-    local missing_keys=()
-    [[ -z "${URLSCAN_API_KEY:-}" ]] && missing_keys+=("URLSCAN")
-    [[ -z "${VIRUSTOTAL_API_KEY:-}" ]] && missing_keys+=("VT")
-
-    if [[ ${#missing_keys[@]} -gt 0 ]]; then
-        _print_status WARN "API keys not configured: ${missing_keys[*]}" "0s"
-    elif [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
-        _print_status OK "API keys" "0s"
-    fi
-}
 
 ###############################################################################################################
 ####################################### LOGGING ##################################################

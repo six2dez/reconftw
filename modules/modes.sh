@@ -44,7 +44,6 @@ function start() {
         notification "Monitor cycle ${MONITOR_CYCLE}: skipping repeated tools check" info
     else
         tools_installed
-        check_optional_api_keys
     fi
 
     # Initialize incremental mode if enabled
@@ -139,10 +138,7 @@ function start() {
         _print_rule
     fi
     if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
-        printf "  %b[LEGAL]%b Authorized testing only. You confirm explicit permission\n" "$yellow" "$reset"
-        printf "          for specified targets and compliance with applicable laws.\n"
-        printf "          Unauthorized use is prohibited.\n\n"
-    fi
+            fi
 }
 
 function end() {

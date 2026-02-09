@@ -85,11 +85,10 @@ count_lines_stdin() {
 
 # Section header for major phases (OSINT, Subdomains, Web, Vulns, etc.)
 # Usage: _print_section "OSINT"
-# Output: ══════════════════ OSINT ══════════════════
 _print_section() {
     [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
-    local title="$1"
-    printf "\n%b══════════════════ %s ══════════════════%b\n\n" "${bgreen:-}" "$title" "${reset:-}"
+    local title="${1^^}"
+    printf "\n%b── %s %s%b\n" "${bgreen:-}" "$title" "──────────────────────────────────────────────────────────────" "${reset:-}" | cut -c 1-64
 }
 
 # Compact status line with dot-fill and right-aligned detail
