@@ -38,7 +38,7 @@ function start() {
             "$(date +'%Y-%m-%d %H:%M:%S')" "$OSINT" "$SUBDOMAINS_GENERAL" "$VULNS_GENERAL" "$DEEP"
     } >>"${LOGFILE:-/dev/null}"
     if [[ $upgrade_before_running == true ]]; then
-        ${SCRIPTPATH}/install.sh --tools
+        "${SCRIPTPATH}/install.sh" --tools
     fi
     if [[ "${MONITOR_MODE:-false}" == "true" ]] && [[ "${MONITOR_CYCLE:-1}" -gt 1 ]]; then
         notification "Monitor cycle ${MONITOR_CYCLE}: skipping repeated tools check" info
@@ -224,28 +224,28 @@ function end() {
             _print_error "Faraday server is not running. Skipping Faraday integration"
         else
             if [[ -s ".tmp/tko_json.txt" ]]; then
-                faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei .tmp/tko_json.txt 2>>"$LOGFILE" >/dev/null
+                faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nuclei .tmp/tko_json.txt 2>>"$LOGFILE" >/dev/null
             fi
             if [[ -s "hosts/portscan_active.xml" ]]; then
-                faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nmap hosts/portscan_active.xml 2>>"$LOGFILE" >/dev/null
+                faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nmap hosts/portscan_active.xml 2>>"$LOGFILE" >/dev/null
             fi
             if [[ -s ".tmp/fuzzparams_json.txt" ]]; then
-                faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei .tmp/fuzzparams_json.txt 2>>"$LOGFILE" >/dev/null
+                faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nuclei .tmp/fuzzparams_json.txt 2>>"$LOGFILE" >/dev/null
             fi
             if [[ -s "nuclei_output/info_json.txt" ]]; then
-                faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei nuclei_output/info_json.txt 2>>"$LOGFILE" >/dev/null
+                faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nuclei nuclei_output/info_json.txt 2>>"$LOGFILE" >/dev/null
             fi
             if [[ -s "nuclei_output/low_json.txt" ]]; then
-                faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei nuclei_output/low_json.txt 2>>"$LOGFILE" >/dev/null
+                faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nuclei nuclei_output/low_json.txt 2>>"$LOGFILE" >/dev/null
             fi
             if [[ -s "nuclei_output/medium_json.txt" ]]; then
-                faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei nuclei_output/medium_json.txt 2>>"$LOGFILE" >/dev/null
+                faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nuclei nuclei_output/medium_json.txt 2>>"$LOGFILE" >/dev/null
             fi
             if [[ -s "nuclei_output/high_json.txt" ]]; then
-                faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei nuclei_output/high_json.txt 2>>"$LOGFILE" >/dev/null
+                faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nuclei nuclei_output/high_json.txt 2>>"$LOGFILE" >/dev/null
             fi
             if [[ -s "nuclei_output/critical_json.txt" ]]; then
-                faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei nuclei_output/critical_json.txt 2>>"$LOGFILE" >/dev/null
+                faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nuclei nuclei_output/critical_json.txt 2>>"$LOGFILE" >/dev/null
             fi
             notification "Information sent to Faraday" "good"
         fi
@@ -265,6 +265,7 @@ function end() {
     # Screenshot diffs (hashing)
     if [[ -d screenshots ]]; then
         if [[ -f screenshots/hashes.txt ]]; then mv screenshots/hashes.txt screenshots/hashes_prev.txt 2>>"$LOGFILE" || true; fi
+        # shellcheck disable=SC2016  # $1 is intentionally for sh -c, not bash
         find screenshots -type f -name '*.png' -print0 | xargs -0 -I{} sh -c 'sha256sum "$1" 2>/dev/null || shasum -a 256 "$1"' -- {} | sed 's|  ./||' >screenshots/hashes.txt 2>>"$LOGFILE" || true
         if [[ -f screenshots/hashes_prev.txt ]]; then
             comm -3 <(cut -d' ' -f1,2 screenshots/hashes_prev.txt | sort) <(cut -d' ' -f1,2 screenshots/hashes.txt | sort) | awk '{print $2}' | sed '/^$/d' >screenshots/diff_changed.txt 2>>"$LOGFILE" || true
@@ -281,7 +282,7 @@ function end() {
     incremental_report
 
     global_end=$(date +%s)
-    getElapsedTime $global_start $global_end
+    getElapsedTime "$global_start" "$global_end"
     if declare -F ui_summary >/dev/null 2>&1; then
         if [[ "${RECON_PARTIAL_RUN:-false}" == "true" ]]; then
             _print_status WARN "Run completed with non-fatal warnings" "osint_parallel=${RECON_OSINT_PARALLEL_FAILURES:-0}"
@@ -328,17 +329,17 @@ function build_hotlist() {
     # Nuclei high/critical
     for f in nuclei_output/high_json.txt nuclei_output/critical_json.txt; do
         [[ -s $f ]] || continue
-        jq -r '.["matched-at"] // .host' "$f" 2>/dev/null | while read -r h; do
+        while read -r h; do
             [[ -z $h ]] && continue
             score["$h"]=$((${score["$h"]:-0} + 10))
-        done
+        done < <(jq -r '.["matched-at"] // .host' "$f" 2>/dev/null)
     done
     # Takeovers
     [[ -s webs/takeover.txt ]] && while read -r h; do score["$h"]=$((${score["$h"]:-0} + 8)); done <webs/takeover.txt
     # Secrets
     for s in js/js_secrets.txt js/js_secrets_jsmap.txt js/js_secrets_jsmap_jsluice.txt; do
         [[ -s $s ]] || continue
-        awk '{print $1}' "$s" | while read -r h; do score["$h"]=$((${score["$h"]:-0} + 6)); done
+        while read -r h; do score["$h"]=$((${score["$h"]:-0} + 6)); done < <(awk '{print $1}' "$s")
     done
     # Real IPs via favicon
     if [[ -s hosts/favicontest.txt ]]; then
@@ -802,13 +803,12 @@ function multi_recon() {
         currently=$(date +"%H:%M:%S")
         loopend=$(date +%s)
         getElapsedTime "$loopstart" "$loopend"
-        _print_rule
-        printf "${bgreen}  Target:   %s finished 1st loop in %s (%s)${reset}\n" "$domain" "$runtime" "$currently"
         if [[ -n $flist ]]; then
             POSINLIST=$(grep -nrE "^${domain}$" "$flist" | cut -f1 -d':')
-            printf "  Progress: %s of %s\n" "$POSINLIST" "$LISTTOTAL"
+            _print_status OK "${domain} (OSINT ${POSINLIST}/${LISTTOTAL})" "$runtime"
+        else
+            _print_status OK "${domain} (OSINT)" "$runtime"
         fi
-        _print_rule
     done
     cd "$workdir" || {
         echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"
@@ -841,13 +841,12 @@ function multi_recon() {
         currently=$(date +"%H:%M:%S")
         loopend=$(date +%s)
         getElapsedTime "$loopstart" "$loopend"
-        _print_rule
-        printf "${bgreen}  Target:   %s finished 2nd loop in %s (%s)${reset}\n" "$domain" "$runtime" "$currently"
         if [[ -n $flist ]]; then
             POSINLIST=$(grep -nrE "^${domain}$" "$flist" | cut -f1 -d':')
-            printf "  Progress: %s of %s\n" "$POSINLIST" "$LISTTOTAL"
+            _print_status OK "${domain} (recon ${POSINLIST}/${LISTTOTAL})" "$runtime"
+        else
+            _print_status OK "${domain} (recon)" "$runtime"
         fi
-        _print_rule
     done
     cd "$workdir" || {
         echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"
@@ -865,13 +864,10 @@ function multi_recon() {
     find . -type f -name 'portscan_active.gnmap' -exec cat {} + | tee hosts/portscan_active.gnmap 2>>"$LOGFILE" >/dev/null
     find . -type f -name 'portscan_passive.txt' -exec cat {} + | tee hosts/portscan_passive.txt 2>&1 >>"$LOGFILE" >/dev/null
 
-    notification "- ${NUMOFLINES_pwndb_total} total creds leaked" good
-    notification "- ${NUMOFLINES_subs_total} total subdomains" good
-    notification "- ${NUMOFLINES_subtko_total} total probably subdomain takeovers" good
-    notification "- ${NUMOFLINES_webs_total} total websites" good
-    notification "- ${NUMOFLINES_webs_total_uncommon} total websites on uncommon ports" good
-    notification "- ${NUMOFLINES_ips_total} total ips" good
-    notification "- ${NUMOFLINES_cloudsprov_total} total IPs belongs to cloud" good
+    printf "  Creds: %s │ Subs: %s │ Takeovers: %s │ Webs: %s (+%s uncommon) │ IPs: %s │ Cloud: %s\n" \
+        "$NUMOFLINES_pwndb_total" "$NUMOFLINES_subs_total" "$NUMOFLINES_subtko_total" \
+        "$NUMOFLINES_webs_total" "$NUMOFLINES_webs_total_uncommon" \
+        "$NUMOFLINES_ips_total" "$NUMOFLINES_cloudsprov_total"
     s3buckets
     waf_checks
     nuclei_check
@@ -892,13 +888,12 @@ function multi_recon() {
         currently=$(date +"%H:%M:%S")
         loopend=$(date +%s)
         getElapsedTime "$loopstart" "$loopend"
-        _print_rule
-        printf "${bgreen}  Target:   %s finished 3rd loop in %s (%s)${reset}\n" "$domain" "$runtime" "$currently"
         if [[ -n $flist ]]; then
             POSINLIST=$(grep -nrE "^${domain}$" "$flist" | cut -f1 -d':')
-            printf "  Progress: %s of %s\n" "$POSINLIST" "$LISTTOTAL"
+            _print_status OK "${domain} (vulns ${POSINLIST}/${LISTTOTAL})" "$runtime"
+        else
+            _print_status OK "${domain} (vulns)" "$runtime"
         fi
-        _print_rule
     done
 
     if [[ $AXIOM == true ]]; then
@@ -923,13 +918,12 @@ function multi_recon() {
         currently=$(date +"%H:%M:%S")
         loopend=$(date +%s)
         getElapsedTime "$loopstart" "$loopend"
-        _print_rule
-        printf "${bgreen}  Target:   %s finished final loop in %s (%s)${reset}\n" "$domain" "$runtime" "$currently"
         if [[ -n $flist ]]; then
             POSINLIST=$(grep -nrE "^${domain}$" "$flist" | cut -f1 -d':')
-            printf "  Progress: %s of %s\n" "$POSINLIST" "$LISTTOTAL"
+            _print_status OK "${domain} (final ${POSINLIST}/${LISTTOTAL})" "$runtime"
+        else
+            _print_status OK "${domain} (final)" "$runtime"
         fi
-        _print_rule
     done
     cd "$workdir" || {
         echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"
@@ -1239,16 +1233,16 @@ function report_only_mode() {
 
 function help() {
     pt_header "Usage"
-    printf "\n Usage: $0 [-d domain.tld] [-m name] [-l list.txt] [-x oos.txt] [-i in.txt] "
+    printf "\n Usage: %s [-d domain.tld] [-m name] [-l list.txt] [-x oos.txt] [-i in.txt] " "$0"
     printf "\n           	      [-r] [-s] [-p] [-a] [-w] [-n] [-z] [-c] [-y] [-h] [-f] [--ai] [--deep] [--monitor] [--monitor-interval m] [--monitor-cycles n] [--report-only] [--refresh-cache] [--export fmt] [-o OUTPUT]\n\n"
-    printf " ${bblue}TARGET OPTIONS${reset}\n"
+    printf " %sTARGET OPTIONS%s\n" "${bblue}" "${reset}"
     printf "   -d domain.tld     Target domain\n"
     printf "   -m company        Target company name\n"
     printf "   -l list.txt       Targets list (One on each line)\n"
     printf "   -x oos.txt        Excludes subdomains list (Out Of Scope)\n"
     printf "   -i in.txt         Includes subdomains list\n"
     printf " \n"
-    printf " ${bblue}MODE OPTIONS${reset}\n"
+    printf " %sMODE OPTIONS%s\n" "${bblue}" "${reset}"
     printf "   -r, --recon       Recon - Performs full recon process (without attacks)\n"
     printf "   -s, --subdomains  Subdomains - Performs Subdomain Enumeration, Web probing and check for sub-tko\n"
     printf "   -p, --passive     Passive - Performs only passive steps\n"
@@ -1260,7 +1254,7 @@ function help() {
     printf "   -y, --ai          AI - Analyzes ReconFTW results using a local LLM\n"
     printf "   -h                Help - Show help section\n"
     printf " \n"
-    printf " ${bblue}GENERAL OPTIONS${reset}\n"
+    printf " %sGENERAL OPTIONS%s\n" "${bblue}" "${reset}"
     printf "   --deep            Deep scan (Enable some slow options for deeper scan)\n"
     printf "   -f config_file    Alternate reconftw.cfg file\n"
     printf "   -o output/path    Define output folder\n"
@@ -1284,25 +1278,25 @@ function help() {
     printf "   --refresh-cache   Force refresh of cached resolvers/wordlists\n"
     printf "   --export fmt      Export artifacts: json|html|csv|all\n"
     printf " \n"
-    printf " ${bblue}USAGE EXAMPLES${reset}\n"
-    printf " ${byellow}Perform full recon (without attacks):${reset}\n"
+    printf " %sUSAGE EXAMPLES%s\n" "${bblue}" "${reset}"
+    printf " %sPerform full recon (without attacks):%s\n" "${byellow}" "${reset}"
     printf " ./reconftw.sh -d example.com -r\n"
     printf " \n"
-    printf " ${byellow}Perform subdomain enumeration on multiple targets:${reset}\n"
+    printf " %sPerform subdomain enumeration on multiple targets:%s\n" "${byellow}" "${reset}"
     printf " ./reconftw.sh -l targets.txt -s\n"
     printf " \n"
-    printf " ${byellow}Perform Web based scanning on a subdomains list:${reset}\n"
+    printf " %sPerform Web based scanning on a subdomains list:%s\n" "${byellow}" "${reset}"
     printf " ./reconftw.sh -d example.com -l targets.txt -w\n"
     printf " \n"
-    printf " ${byellow}Multidomain recon:${reset}\n"
+    printf " %sMultidomain recon:%s\n" "${byellow}" "${reset}"
     printf " ./reconftw.sh -m company -l domainlist.txt -r\n"
     printf " \n"
-    printf " ${byellow}Perform full recon (with active attacks) along Out-Of-Scope subdomains list:${reset}\n"
+    printf " %sPerform full recon (with active attacks) along Out-Of-Scope subdomains list:%s\n" "${byellow}" "${reset}"
     printf " ./reconftw.sh -d example.com -x out.txt -a\n"
     printf " \n"
-    printf " ${byellow}Analyze ReconFTW results with AI:${reset}\n"
+    printf " %sAnalyze ReconFTW results with AI:%s\n" "${byellow}" "${reset}"
     printf " ./reconftw.sh -d example.com -r --ai\n"
     printf " \n"
-    printf " ${byellow}Run custom function:${reset}\n"
+    printf " %sRun custom function:%s\n" "${byellow}" "${reset}"
     printf " ./reconftw.sh -d example.com -c nuclei_check \n"
 }

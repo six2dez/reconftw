@@ -19,13 +19,15 @@ function resolvers_update() {
         if [[ $AXIOM != true ]]; then
             if [[ ! -s $resolvers ]] || [[ $(find "$resolvers" -mtime +1 -print) ]]; then
                 notification "Resolvers seem older than 1 day\n Generating custom resolvers..." warn
-                rm -f -- "$resolvers" 2>>"$LOGFILE"
-                dnsvalidator -tL https://public-dns.info/nameservers.txt -threads $DNSVALIDATOR_THREADS -o $resolvers 2>>"$LOGFILE" >/dev/null
-                dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads $DNSVALIDATOR_THREADS -o tmp_resolvers 2>>"$LOGFILE" >/dev/null
-                [ -s "tmp_resolvers" ] && cat tmp_resolvers | anew -q $resolvers
+                {
+                    rm -f -- "$resolvers"
+                    dnsvalidator -tL https://public-dns.info/nameservers.txt -threads "$DNSVALIDATOR_THREADS" -o "$resolvers" >/dev/null
+                    dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads "$DNSVALIDATOR_THREADS" -o tmp_resolvers >/dev/null
+                } 2>>"$LOGFILE"
+                [ -s "tmp_resolvers" ] && cat tmp_resolvers | anew -q "$resolvers"
                 [ -s "tmp_resolvers" ] && rm -f tmp_resolvers 2>>"$LOGFILE" >/dev/null
-                [ ! -s "$resolvers" ] && wget -q -O - ${resolvers_url} >$resolvers
-                [ ! -s "$resolvers_trusted" ] && wget -q -O - ${resolvers_trusted_url} >$resolvers_trusted
+                [ ! -s "$resolvers" ] && wget -q -O - "${resolvers_url}" >"$resolvers"
+                [ ! -s "$resolvers_trusted" ] && wget -q -O - "${resolvers_trusted_url}" >"$resolvers_trusted"
                 notification "Updated\n" good
             fi
         else
@@ -93,12 +95,12 @@ function ipcidr_target() {
 function axiom_launch() {
     # let's fire up a FLEET!
     if [[ $AXIOM_FLEET_LAUNCH == true ]] && [[ -n $AXIOM_FLEET_NAME ]] && [[ -n $AXIOM_FLEET_COUNT ]]; then
-        start_func ${FUNCNAME[0]} "Launching our Axiom fleet"
+        start_func "${FUNCNAME[0]}" "Launching our Axiom fleet"
 
         # Check to see if we have a fleet already, if so, SKIP THIS!
-        NUMOFNODES=$(timeout 30 axiom-ls | grep -c "$AXIOM_FLEET_NAME" || true)
+        NUMOFNODES=$(timeout 30 axiom-ls 2>>"$LOGFILE" | grep -c "$AXIOM_FLEET_NAME" || true)
         if [[ $NUMOFNODES -ge $AXIOM_FLEET_COUNT ]]; then
-            axiom-select "$AXIOM_FLEET_NAME*"
+            axiom-select "$AXIOM_FLEET_NAME*" 2>>"$LOGFILE" >/dev/null
             end_func "Axiom fleet $AXIOM_FLEET_NAME already has $NUMOFNODES instances" info
         else
             if [[ $NUMOFNODES -eq 0 ]]; then
@@ -113,12 +115,12 @@ function axiom_launch() {
 
             # Show the exact command with proper quoting
             axiom-fleet2 "${AXIOM_FLEET_NAME}" "${AXIOM_FLEET_ARGS[@]}" >/dev/null 2>&1
-            axiom-select "$AXIOM_FLEET_NAME*"
+            axiom-select "$AXIOM_FLEET_NAME*" 2>>"$LOGFILE" >/dev/null
             if [[ -n $AXIOM_POST_START ]]; then
                 bash -lc "$AXIOM_POST_START" 2>>"$LOGFILE" >/dev/null
             fi
 
-            NUMOFNODES=$(timeout 30 axiom-ls | grep -c "$AXIOM_FLEET_NAME" || true)
+            NUMOFNODES=$(timeout 30 axiom-ls 2>>"$LOGFILE" | grep -c "$AXIOM_FLEET_NAME" || true)
             end_func "Axiom fleet $AXIOM_FLEET_NAME launched $NUMOFNODES instances" info
         fi
     fi
@@ -131,15 +133,15 @@ function axiom_shutdown() {
             notification "Automatic Axiom fleet shutdown is not enabled in this mode" info
             return
         fi
-        axiom-rm -f "$AXIOM_FLEET_NAME*" || true
-        axiom-ls | grep "$AXIOM_FLEET_NAME" || true
-        notification "Axiom fleet $AXIOM_FLEET_NAME shutdown" info
+        axiom-rm -f "$AXIOM_FLEET_NAME*" 2>>"$LOGFILE" >/dev/null || true
+        axiom-ls 2>>"$LOGFILE" | grep "$AXIOM_FLEET_NAME" >>"$LOGFILE" || true
+        [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && notification "Axiom fleet $AXIOM_FLEET_NAME shutdown" info
     fi
 }
 
 function axiom_selected() {
 
-    if [[ ! $(axiom-ls | tail -n +2 | sed '$ d' | wc -l) -gt 0 ]]; then
+    if [[ ! $(axiom-ls 2>>"${LOGFILE:-/dev/null}" | tail -n +2 | sed '$ d' | wc -l) -gt 0 ]]; then
         notification "No axiom instances running ${reset}\n\n" error
         exit
     fi

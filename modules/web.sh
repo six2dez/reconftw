@@ -279,7 +279,7 @@ function screenshot() {
         # Run nuclei or axiom-scan based on AXIOM flag
         if [[ $AXIOM != true ]]; then
             if [[ -s "webs/webs_all.txt" ]]; then
-                nuclei -headless -id screenshot -V dir='screenshots' <webs/webs_all.txt 2>>"$LOGFILE"
+                nuclei -headless -id screenshot -V dir='screenshots' <webs/webs_all.txt 2>>"$LOGFILE" >/dev/null
             fi
         else
             if [[ -s "webs/webs_all.txt" ]]; then
@@ -328,9 +328,9 @@ function virtualhosts() {
 
     else
         if [[ $VIRTUALHOSTS == false ]]; then
-            printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+            printf "\n%s[%s] %s skipped in this mode or defined in reconftw.cfg %s\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "${reset}"
         else
-            printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]} ${reset}\n\n"
+            printf "%s[%s] %s has already been processed. To force execution, delete:\n    %s/.%s %s\n\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "${FUNCNAME[0]}" "${reset}"
         fi
     fi
 
@@ -387,12 +387,12 @@ function favicon() {
 
     else
         if [[ $FAVICON == false ]]; then
-            printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+            printf "\n%s[%s] %s skipped due to configuration settings.%s\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "${reset}"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             # Domain is an IP, do nothing
             return
         else
-            printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]}${reset}\n\n"
+            printf "%s[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%s\n\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "${FUNCNAME[0]}" "${reset}"
         fi
     fi
 
@@ -511,10 +511,10 @@ function portscan() {
 
             if [[ $AXIOM != true ]]; then
                 if [[ -s ".tmp/ips_nocdn.txt" ]]; then
-                    run_command $SUDO nmap "${portscan_opts[@]}" -iL .tmp/ips_nocdn.txt -oA hosts/portscan_active 2>>"$LOGFILE" >/dev/null
+                    run_command "$SUDO" nmap "${portscan_opts[@]}" -iL .tmp/ips_nocdn.txt -oA hosts/portscan_active 2>>"$LOGFILE" >/dev/null
                 fi
                 if [[ $IPV6_SCAN == true && -s "hosts/ips_v6.txt" ]]; then
-                    run_command $SUDO nmap -6 "${portscan_opts[@]}" -iL hosts/ips_v6.txt -oA hosts/portscan_active_v6 2>>"$LOGFILE" >/dev/null
+                    run_command "$SUDO" nmap -6 "${portscan_opts[@]}" -iL hosts/ips_v6.txt -oA hosts/portscan_active_v6 2>>"$LOGFILE" >/dev/null
                 fi
             else
                 if [[ -s ".tmp/ips_nocdn.txt" ]]; then
@@ -538,7 +538,7 @@ function portscan() {
                 printf "%b[!] Faraday server is not running. Skipping Faraday integration.%b\n" "$bred" "$reset"
             else
                 if [[ -s "hosts/portscan_active.xml" ]]; then
-                    faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nmap hosts/portscan_active.xml 2>>"$LOGFILE" >/dev/null
+                    faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nmap hosts/portscan_active.xml 2>>"$LOGFILE" >/dev/null
                 fi
             fi
         fi
@@ -597,12 +597,12 @@ function cdnprovider() {
 
     else
         if [[ $CDN_IP == false ]]; then
-            printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+            printf "\n%s[%s] %s skipped due to configuration settings.%s\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "${reset}"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             # Domain is an IP, do nothing
             return
         else
-            printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]}${reset}\n\n"
+            printf "%s[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%s\n\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "${FUNCNAME[0]}" "${reset}"
         fi
     fi
 
@@ -711,8 +711,8 @@ _nuclei_prepare_waf_lists() {
 _nuclei_parse_results() {
     local crit="$1"
     if [[ -s "nuclei_output/${crit}_json.txt" ]]; then
-        jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' nuclei_output/${crit}_json.txt >nuclei_output/${crit}.txt
-        append_assets_from_file finding value nuclei_output/${crit}.txt
+        jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' "nuclei_output/${crit}_json.txt" >"nuclei_output/${crit}.txt"
+        append_assets_from_file finding value "nuclei_output/${crit}.txt"
         if [[ -s "nuclei_output/${crit}.txt" ]]; then
             cat "nuclei_output/${crit}.txt"
         fi
@@ -725,17 +725,17 @@ _nuclei_scan_local() {
     IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
 
     for crit in "${severity_array[@]}"; do
-        printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Nuclei Severity: $crit ${reset}\n\n"
+        printf "%s\n[%s] Running: Nuclei Severity: %s %s\n\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "$crit" "${reset}"
         # Non-WAF at default rate
-        if [[ -s $NOWAF_LIST ]]; then
-            run_command nuclei -l "$NOWAF_LIST" -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 ${NUCLEI_EXTRA_ARGS} -t ${NUCLEI_TEMPLATES_PATH} -j -o "nuclei_output/${crit}_json.txt" 2>>"$LOGFILE" >/dev/null
+        if [[ -s "$NOWAF_LIST" ]]; then
+            run_command nuclei -l "$NOWAF_LIST" -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 "${NUCLEI_EXTRA_ARGS}" -t "${NUCLEI_TEMPLATES_PATH}" -j -o "nuclei_output/${crit}_json.txt" 2>>"$LOGFILE" >/dev/null
         fi
         # WAF hosts at slower rate
-        if [[ -s $WAF_LIST ]]; then
+        if [[ -s "$WAF_LIST" ]]; then
             local slow_rl
             slow_rl=$((NUCLEI_RATELIMIT / 3 + 1))
-            run_command nuclei -l "$WAF_LIST" -severity "$crit" -nh -rl "$slow_rl" -silent -retries 2 ${NUCLEI_EXTRA_ARGS} -t ${NUCLEI_TEMPLATES_PATH} -j -o "nuclei_output/${crit}_waf_json.txt" 2>>"$LOGFILE" >/dev/null
-            [[ -s nuclei_output/${crit}_waf_json.txt ]] && cat nuclei_output/${crit}_waf_json.txt >>nuclei_output/${crit}_json.txt
+            run_command nuclei -l "$WAF_LIST" -severity "$crit" -nh -rl "$slow_rl" -silent -retries 2 "${NUCLEI_EXTRA_ARGS}" -t "${NUCLEI_TEMPLATES_PATH}" -j -o "nuclei_output/${crit}_waf_json.txt" 2>>"$LOGFILE" >/dev/null
+            [[ -s "nuclei_output/${crit}_waf_json.txt" ]] && cat "nuclei_output/${crit}_waf_json.txt" >>"nuclei_output/${crit}_json.txt"
         fi
         _nuclei_parse_results "$crit"
     done
@@ -748,7 +748,7 @@ _nuclei_scan_axiom() {
     IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
 
     for crit in "${severity_array[@]}"; do
-        printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Axiom Nuclei Severity: $crit. Check results in nuclei_output folder.${reset}\n\n"
+        printf "%s\n[%s] Running: Axiom Nuclei Severity: %s. Check results in nuclei_output folder.%s\n\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "$crit" "${reset}"
         run_command axiom-scan .tmp/webs_subs.txt -m nuclei \
             --nuclei-templates "$NUCLEI_TEMPLATES_PATH" \
             -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" \
@@ -864,9 +864,9 @@ function graphql_scan() {
         end_func "Results are saved in nuclei_output/graphql* and vulns/graphql" "${FUNCNAME[0]}"
     else
         if [[ $GRAPHQL_CHECK == false ]]; then
-            printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+            printf "\n%s[%s] %s skipped due to configuration settings.%s\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "${reset}"
         else
-            printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]}${reset}\n\n"
+            printf "%s[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%s\n\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "${FUNCNAME[0]}" "${reset}"
         fi
     fi
 }
@@ -888,9 +888,9 @@ function param_discovery() {
         end_func "Results are saved in webs/params_discovered.txt" "${FUNCNAME[0]}"
     else
         if [[ $PARAM_DISCOVERY == false ]]; then
-            printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+            printf "\n%s[%s] %s skipped due to configuration settings.%s\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "${reset}"
         else
-            printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]}${reset}\n\n"
+            printf "%s[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%s\n\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "${FUNCNAME[0]}" "${reset}"
         fi
     fi
 }
@@ -919,9 +919,9 @@ function grpc_reflection() {
         end_func "Results are saved in hosts/grpc_reflection.txt" "${FUNCNAME[0]}"
     else
         if [[ $GRPC_SCAN == false ]]; then
-            printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+            printf "\n%s[%s] %s skipped due to configuration settings.%s\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "${reset}"
         else
-            printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]}${reset}\n\n"
+            printf "%s[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%s\n\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "${FUNCNAME[0]}" "${reset}"
         fi
     fi
 }
@@ -946,7 +946,7 @@ _fuzz_run_local() {
     _fuzz_classify_targets
 
     if [[ -s .tmp/webs_normal.txt ]]; then
-        interlace -tL .tmp/webs_normal.txt -threads ${INTERLACE_THREADS} -c "ffuf ${FFUF_FLAGS} -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" -o "$dir/.tmp/fuzzing" 2>>"$LOGFILE" >/dev/null
+        interlace -tL .tmp/webs_normal.txt -threads "${INTERLACE_THREADS}" -c "ffuf ${FFUF_FLAGS} -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" -o "$dir/.tmp/fuzzing" 2>>"$LOGFILE" >/dev/null
     fi
 
     if [[ -s .tmp/webs_slow.txt ]]; then
@@ -954,14 +954,14 @@ _fuzz_run_local() {
         [[ $slow_threads -lt 5 ]] && slow_threads=5
         local slow_rate=$FFUF_RATELIMIT
         [[ ${FFUF_RATELIMIT:-0} -eq 0 ]] && slow_rate=50 || slow_rate=$((FFUF_RATELIMIT / 3 + 1))
-        interlace -tL .tmp/webs_slow.txt -threads ${INTERLACE_THREADS} -c "ffuf ${FFUF_FLAGS} -t ${slow_threads} -rate ${slow_rate} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" -o "$dir/.tmp/fuzzing" 2>>"$LOGFILE" >/dev/null
+        interlace -tL .tmp/webs_slow.txt -threads "${INTERLACE_THREADS}" -c "ffuf ${FFUF_FLAGS} -t ${slow_threads} -rate ${slow_rate} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" -o "$dir/.tmp/fuzzing" 2>>"$LOGFILE" >/dev/null
     fi
 }
 
 # Run ffuf via axiom-scan and parse per-subdomain results
 _fuzz_run_axiom() {
     cached_download_typed "${fuzzing_remote_list}" ".tmp/fuzzing_remote_list.txt" "onelistforallmicro.txt" "wordlists"
-    axiom-scan webs/webs_all.txt -m ffuf -wL .tmp/fuzzing_remote_list.txt -H "${HEADER}" $FFUF_FLAGS -s -maxtime $FFUF_MAXTIME -oJ "$dir/.tmp/ffuf-content.json" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+    axiom-scan webs/webs_all.txt -m ffuf -wL .tmp/fuzzing_remote_list.txt -H "${HEADER}" "$FFUF_FLAGS" -s -maxtime "$FFUF_MAXTIME" -oJ "$dir/.tmp/ffuf-content.json" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
 
     while read -r sub; do
         local sub_out
@@ -1062,12 +1062,12 @@ function iishortname() {
     else
         # Handle cases where IIS_SHORTNAME is false or the function has already been processed
         if [[ $IIS_SHORTNAME == false ]]; then
-            printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+            printf "\n%s[%s] %s skipped due to configuration settings.%s\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "${reset}"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             # Domain is an IP address; skip the function
             return
         else
-            printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]}${reset}\n\n"
+            printf "%s[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%s\n\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "${FUNCNAME[0]}" "${reset}"
         fi
     fi
 
@@ -1191,7 +1191,7 @@ function urlchecks() {
         if [[ -s "webs/webs_all.txt" ]]; then
 
             if [[ $URL_CHECK_PASSIVE == true ]]; then
-                urlfinder -d $domain -all -o .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
+                urlfinder -d "$domain" -all -o .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
                 if command -v waymore &>/dev/null; then
                     if ! "$TIMEOUT_CMD" "${WAYMORE_TIMEOUT:-30m}" waymore -i "$domain" -mode U -oU .tmp/waymore_urls.txt 2>>"$LOGFILE" >/dev/null; then
                         log_note "urlchecks: waymore failed or timed out; continuing with other passive sources" "${FUNCNAME[0]}" "${LINENO}"
@@ -1237,9 +1237,9 @@ function urlchecks() {
                             LINES=$(wc -l <.tmp/katana_targets_normal.txt)
                             if [[ $LINES -gt ${CHUNK_LIMIT:-2000} ]]; then
                                 if [[ $DEEP == true ]]; then
-                                    process_in_chunks .tmp/katana_targets_normal.txt ${CHUNK_LIMIT:-2000} "katana -silent -list _chunk_ -jc -kf all -c $KATANA_THREADS -d 3 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\" >/dev/null"
+                                    process_in_chunks .tmp/katana_targets_normal.txt "${CHUNK_LIMIT:-2000}" "katana -silent -list _chunk_ -jc -kf all -c $KATANA_THREADS -d 3 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\" >/dev/null"
                                 else
-                                    process_in_chunks .tmp/katana_targets_normal.txt ${CHUNK_LIMIT:-2000} "katana -silent -list _chunk_ -jc -kf all -c $KATANA_THREADS -d 2 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\""
+                                    process_in_chunks .tmp/katana_targets_normal.txt "${CHUNK_LIMIT:-2000}" "katana -silent -list _chunk_ -jc -kf all -c $KATANA_THREADS -d 2 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\""
                                 fi
                             else
                                 if [[ $DEEP == true ]]; then
@@ -1257,9 +1257,9 @@ function urlchecks() {
                             LINES=$(wc -l <.tmp/katana_targets_slow.txt)
                             if [[ $LINES -gt ${CHUNK_LIMIT:-2000} ]]; then
                                 if [[ $DEEP == true ]]; then
-                                    process_in_chunks .tmp/katana_targets_slow.txt ${CHUNK_LIMIT:-2000} "katana -silent -list _chunk_ -jc -kf all -c $slow_c -d 3 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\""
+                                    process_in_chunks .tmp/katana_targets_slow.txt "${CHUNK_LIMIT:-2000}" "katana -silent -list _chunk_ -jc -kf all -c $slow_c -d 3 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\""
                                 else
-                                    process_in_chunks .tmp/katana_targets_slow.txt ${CHUNK_LIMIT:-2000} "katana -silent -list _chunk_ -jc -kf all -c $slow_c -d 2 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\""
+                                    process_in_chunks .tmp/katana_targets_slow.txt "${CHUNK_LIMIT:-2000}" "katana -silent -list _chunk_ -jc -kf all -c $slow_c -d 2 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\""
                                 fi
                             else
                                 if [[ $DEEP == true ]]; then
@@ -1375,7 +1375,7 @@ function url_gf() {
             # Iterate over GF patterns and process each
             for pattern in "${!gf_patterns[@]}"; do
                 output_file="${gf_patterns[$pattern]}"
-                printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: GF Pattern '$pattern'${reset}\n\n"
+                printf "%s\n[%s] Running: GF Pattern '%s'%s\n\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "$pattern" "${reset}"
                 if [[ $pattern == "potential" ]]; then
                     # Special handling for 'potential' pattern
                     gf "$pattern" "webs/url_extract.txt" | cut -d ':' -f3-5 | anew -q "$output_file"
@@ -1390,7 +1390,7 @@ function url_gf() {
 
             # Process endpoints extraction
             if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
-                printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Extracting endpoints...${reset}\n\n"
+                printf "%s\n[%s] Extracting endpoints...%s\n\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${reset}"
                 grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg|txt|js)$" ".tmp/url_extract_tmp.txt" \
                     | unfurl -u format '%s://%d%p' 2>>"$LOGFILE" | anew -q "gf/endpoints.txt"
             fi
@@ -1404,12 +1404,12 @@ function url_gf() {
     else
         # Handle cases where URL_GF is false or the function has already been processed
         if [[ $URL_GF == false ]]; then
-            printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+            printf "\n%s[%s] %s skipped due to configuration settings.%s\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "${reset}"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             # Domain is an IP address; skip the function
             return
         else
-            printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]}${reset}\n\n"
+            printf "%s[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%s\n\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "${FUNCNAME[0]}" "${reset}"
         fi
     fi
 
@@ -1468,12 +1468,12 @@ function url_ext() {
     else
         # Handle cases where URL_EXT is false or function already processed
         if [[ $URL_EXT == false ]]; then
-            printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+            printf "\n%s[%s] %s skipped in this mode or defined in reconftw.cfg %s\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "${reset}"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             # Domain is an IP address; skip the function
             return
         else
-            printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]}${reset}\n\n"
+            printf "%s[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%s\n\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "${FUNCNAME[0]}" "${reset}"
         fi
     fi
 
@@ -1671,7 +1671,7 @@ function websocket_checks() {
         fi
         end_func "Results are saved in vulns/websocket_misconfig.txt" "${FUNCNAME[0]}"
     else
-        printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped or already processed.${reset}\n"
+        printf "\n%s[%s] %s skipped or already processed.%s\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "${reset}"
     fi
 }
 
@@ -1698,7 +1698,7 @@ function wordlist_gen() {
                 | sed 's/[][]//g' | sed 's/[#]//g' | sed 's/[}{]//g' \
                 | anew -q webs/dict_values.txt
 
-            printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Extracting words...${reset}\n"
+            printf "%s\n[%s] Extracting words...%s\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${reset}"
             tr "[:punct:]" "\n" <".tmp/url_extract_tmp.txt" | anew -q "webs/dict_words.txt"
         fi
 
@@ -1707,12 +1707,12 @@ function wordlist_gen() {
     else
         # Handle cases where WORDLIST is false or function already processed
         if [[ $WORDLIST == false ]]; then
-            printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg ${reset}\n"
+            printf "\n%s[%s] %s skipped in this mode or defined in reconftw.cfg %s\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "${reset}"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             # Domain is an IP address; skip the function
             return
         else
-            printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]}${reset}\n\n"
+            printf "%s[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%s\n\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "${FUNCNAME[0]}" "${reset}"
         fi
     fi
 
@@ -1740,7 +1740,7 @@ function wordlist_gen_roboxtractor() {
         # Proceed only if webs_all.txt exists and is non-empty
         if [[ -s "webs/webs_all.txt" ]]; then
             # Extract URLs using roboxtractor and append unique entries to robots_wordlist.txt
-            printf "${yellow}\n[$(date +'%Y-%m-%d %H:%M:%S')] Running: Roboxtractor for Robots Wordlist${reset}\n\n"
+            printf "%s\n[%s] Running: Roboxtractor for Robots Wordlist%s\n\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${reset}"
             roboxtractor -m 1 -wb <"webs/webs_all.txt" 2>>"$LOGFILE" | anew -q "webs/robots_wordlist.txt"
         else
             end_func "No webs/webs_all.txt file found, Robots Wordlist generation skipped." "${FUNCNAME[0]}"
@@ -1758,12 +1758,12 @@ function wordlist_gen_roboxtractor() {
     else
         # Handle cases where ROBOTSWORDLIST is false or function already processed
         if [[ $ROBOTSWORDLIST == false ]]; then
-            printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+            printf "\n%s[%s] %s skipped due to configuration settings.%s\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "${reset}"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             # Domain is an IP address; skip the function
             return
         else
-            printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]}${reset}\n\n"
+            printf "%s[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%s\n\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "${FUNCNAME[0]}" "${reset}"
         fi
     fi
 
@@ -1796,12 +1796,12 @@ function password_dict() {
     else
         # Handle cases where PASSWORD_DICT is false or function already processed
         if [[ $PASSWORD_DICT == false ]]; then
-            printf "\n${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} skipped due to configuration settings.${reset}\n"
+            printf "\n%s[%s] %s skipped due to configuration settings.%s\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "${reset}"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             # Domain is an IP address; skip the function
             return
         else
-            printf "${yellow}[$(date +'%Y-%m-%d %H:%M:%S')] ${FUNCNAME[0]} has already been processed. To force execution, delete:\n    $called_fn_dir/.${FUNCNAME[0]}${reset}\n\n"
+            printf "%s[%s] %s has already been processed. To force execution, delete:\n    %s/.%s%s\n\n" "${yellow}" "$(date +'%Y-%m-%d %H:%M:%S')" "${FUNCNAME[0]}" "$called_fn_dir" "${FUNCNAME[0]}" "${reset}"
         fi
     fi
 

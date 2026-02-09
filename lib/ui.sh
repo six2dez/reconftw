@@ -29,7 +29,9 @@ ui_init() {
     fi
 
     if [[ "$_UI_NO_COLOR" == true ]]; then
+        # shellcheck disable=SC2034  # Color vars used by modules that source this file
         bred="" bgreen="" bblue="" byellow="" yellow="" reset=""
+        # shellcheck disable=SC2034
         red="" blue="" green="" cyan=""
     fi
 
@@ -163,11 +165,12 @@ ui_summary() {
     _print_rule
     printf "  Subdomains:     %s\n" "$subs"
     printf "  Web hosts:      %s\n" "$webs"
-    printf "  Vulnerabilities: %b🔴 %d%b │ %b🟠 %d%b │ %b🟡 %d%b │ %b🔵 %d%b\n" \
+    printf "  Vulnerabilities: %b🔴 %d%b │ %b🟠 %d%b │ %b🟡 %d%b │ %b🔵 %d%b │ %bℹ️  %d%b\n" \
         "${bred:-}" "$crit" "${reset:-}" \
         "${yellow:-}" "$high" "${reset:-}" \
         "${yellow:-}" "$med" "${reset:-}" \
-        "${bblue:-}" "$low" "${reset:-}"
+        "${bblue:-}" "$low" "${reset:-}" \
+        "${cyan:-}" "$info" "${reset:-}"
     printf "  Duration:       %s\n" "$duration"
     printf "  Output:         %s\n" "$outdir"
     _print_rule

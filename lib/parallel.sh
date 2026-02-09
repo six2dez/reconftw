@@ -123,6 +123,8 @@ _parallel_batch_summary() {
 
     # Skip in quiet mode
     [[ "${OUTPUT_VERBOSITY:-1}" -eq 0 ]] && return 0
+    # Skip batch envelope in summary mode at normal verbosity
+    [[ "${PARALLEL_LOG_MODE:-summary}" == "summary" ]] && [[ "${OUTPUT_VERBOSITY:-1}" -lt 2 ]] && return 0
 
     if declare -F ui_batch_end >/dev/null 2>&1; then
         local ok_count=$((total - failed))
@@ -200,7 +202,10 @@ parallel_funcs() {
 
         if ((${#batch_pids[@]} == 0)); then
             if declare -F ui_batch_start >/dev/null 2>&1; then
-                ui_batch_start "$batch_label" "$max_jobs"
+                # Skip batch envelope in summary mode at normal verbosity - individual status lines suffice
+                if [[ "${PARALLEL_LOG_MODE:-summary}" != "summary" ]] || [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
+                    ui_batch_start "$batch_label" "$max_jobs"
+                fi
             fi
         fi
 

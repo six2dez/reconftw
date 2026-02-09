@@ -233,15 +233,35 @@ teardown() {
     [[ "$output" == *"end"* ]]
 }
 
-@test "batch summary line is printed after each batch" {
+@test "batch summary line is suppressed in summary mode at normal verbosity" {
     PARALLEL_LOG_MODE="summary"
+    OUTPUT_VERBOSITY=1
     fast_func() { echo "done"; }
 
     run parallel_funcs 2 fast_func
     [ "$status" -eq 0 ]
-    [[ "$output" == *"batch:"* ]]
-    [[ "$output" == *"1 jobs"* ]]
-    [[ "$output" == *"0 failed"* ]]
+    [[ "$output" != *"batch:"* ]]
+    [[ "$output" != *"jobs"* ]]
+}
+
+@test "batch summary line is shown in summary mode at verbose" {
+    PARALLEL_LOG_MODE="summary"
+    OUTPUT_VERBOSITY=2
+    fast_func() { echo "done"; }
+
+    run parallel_funcs 2 fast_func
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"batch:"* ]] || [[ "$output" == *"ok:"* ]]
+}
+
+@test "batch summary line is shown in tail mode" {
+    PARALLEL_LOG_MODE="tail"
+    OUTPUT_VERBOSITY=1
+    fast_func() { echo "done"; }
+
+    run parallel_funcs 2 fast_func
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"batch:"* ]] || [[ "$output" == *"ok:"* ]]
 }
 
 @test "quiet mode suppresses OK output in summary" {
