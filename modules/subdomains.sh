@@ -37,7 +37,8 @@ deep_wildcard_filter() {
     cp "$input_file" ".tmp/dwf_working.txt"
     : > ".tmp/dwf_wildcards.txt"
 
-    printf "%b[*] Running deep wildcard detection (max %d iterations)%b\n" "$bblue" "$max_iterations" "$reset"
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && \
+        printf "%b[*] Running deep wildcard detection (max %d iterations)%b\n" "$bblue" "$max_iterations" "$reset"
 
     while [[ $wildcards_found -gt 0 ]] && [[ $iteration -lt $max_iterations ]]; do
         ((iteration++))
@@ -126,7 +127,8 @@ deep_wildcard_filter() {
             fi
         fi
 
-        printf "%b    Iteration %d: found %d new wildcard parent(s)%b\n" "$yellow" "$iteration" "$wildcards_found" "$reset"
+        [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && \
+            printf "%b    Iteration %d: found %d new wildcard parent(s)%b\n" "$yellow" "$iteration" "$wildcards_found" "$reset"
     done
 
     # Copy final results to output
@@ -139,8 +141,9 @@ deep_wildcard_filter() {
     wildcards_count=$(wc -l < ".tmp/dwf_wildcards.txt" 2>/dev/null | tr -d ' ' || echo 0)
     local removed=$((original_count - filtered_count))
 
-    printf "%b[*] Deep wildcard filter: %d wildcards detected, %d subdomains removed (%d -> %d)%b\n" \
-        "$bgreen" "$wildcards_count" "$removed" "$original_count" "$filtered_count" "$reset"
+    [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && \
+        printf "%b[*] Deep wildcard filter: %d wildcards detected, %d subdomains removed (%d -> %d)%b\n" \
+            "$bgreen" "$wildcards_count" "$removed" "$original_count" "$filtered_count" "$reset"
 
     # Save wildcard list for reference
     if [[ -s ".tmp/dwf_wildcards.txt" ]]; then
@@ -367,27 +370,8 @@ _subdomains_finalize() {
     TOTAL_SUBS=$(sed '/^$/d' "subdomains/subdomains.txt" 2>/dev/null | wc -l | tr -d ' ')
 
     if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
-        _print_status OK "subdomains_full"
-        printf "         Total: %s subdomains\n" "$TOTAL_SUBS"
-
-        if [[ -s "subdomains/subdomains.txt" ]]; then
-            sort -o "subdomains/subdomains.txt" "subdomains/subdomains.txt"
-            local _sub_count _shown=0
-            _sub_count=$(wc -l < "subdomains/subdomains.txt" | tr -d ' ')
-            local _max_show=10
-            [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && _max_show=$_sub_count
-
-            while IFS= read -r sub; do
-                _shown=$((_shown + 1))
-                if [[ $_shown -le $_max_show ]]; then
-                    printf "         %s\n" "$sub"
-                else
-                    printf "         ... and %d more (see subdomains/subdomains.txt)\n" "$((_sub_count - _max_show))"
-                    break
-                fi
-            done < "subdomains/subdomains.txt"
-        fi
-
+        _print_status OK "subdomains_full" "${TOTAL_SUBS} found -> subdomains/subdomains.txt"
+        print_artifacts "subdomains/subdomains.txt"
     fi
     
     # Emit plugin event
@@ -396,11 +380,16 @@ _subdomains_finalize() {
     # Incremental mode
     incremental_diff "subdomains" "subdomains/subdomains.txt" "subdomains/subdomains_new.txt"
     incremental_save "subdomains" "subdomains/subdomains.txt"
-    incremental_diff "webs" "webs/webs.txt" "webs/webs_new.txt"
-    incremental_save "webs" "webs/webs.txt"
+    if [[ -s "webs/webs.txt" ]]; then
+        incremental_diff "webs" "webs/webs.txt" "webs/webs_new.txt"
+        incremental_save "webs" "webs/webs.txt"
+    else
+        : > "webs/webs_new.txt"
+    fi
     
     # Persist counts
     wc -l < "subdomains/subdomains_new.txt" 2>/dev/null > .tmp/subs_new_count
+    [[ -f "webs/webs_new.txt" ]] || : > "webs/webs_new.txt"
     wc -l < "webs/webs_new.txt" 2>/dev/null > .tmp/webs_new_count
     
     # Asset store
@@ -581,8 +570,9 @@ function sub_crt() {
                     | sed -e 's/^\*\.//' >.tmp/crtsh_subdomains.txt; then
                     log_note "sub_crt: crt source returned no valid JSON; continuing with fallback sources" "${FUNCNAME[0]}" "${LINENO}"
                 fi
-                printf "%b[*] Time fencing enabled: filtering crt.sh results to last %d days (since %s)%b\n" \
-                    "$bblue" "${DNS_TIME_FENCE_DAYS}" "$cutoff_date" "$reset"
+                [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && \
+                    printf "%b[*] Time fencing enabled: filtering crt.sh results to last %d days (since %s)%b\n" \
+                        "$bblue" "${DNS_TIME_FENCE_DAYS}" "$cutoff_date" "$reset"
             else
                 # Fallback if date calculation fails
                 if ! run_command crt -s -json -l "${CTR_LIMIT}" "$domain" 2>>"$LOGFILE" \
@@ -611,7 +601,7 @@ function sub_crt() {
         # If INSCOPE is true, check inscope
         if [[ $INSCOPE == true ]]; then
             if ! check_inscope .tmp/crtsh_subs_tmp.txt 2>>"$LOGFILE" >/dev/null; then
-                printf "%b[!] check_inscope command failed.%b\n" "$bred" "$reset"
+                print_warnf "check_inscope command failed."
                 return 1
             fi
         fi
@@ -640,14 +630,14 @@ function sub_active() {
 
         # Combine subdomain files into subs_no_resolved.txt
         if ! find .tmp -type f -iname "*_subs.txt" -exec cat {} + | anew -q .tmp/subs_no_resolved.txt; then
-            printf "%b[!] Failed to collect subdomains into subs_no_resolved.txt.%b\n" "$bred" "$reset"
+            print_warnf "Failed to collect subdomains into subs_no_resolved.txt."
             return 1
         fi
 
         # Delete out-of-scope domains if outOfScope_file exists
         if [[ -s $outOfScope_file ]]; then
             if ! deleteOutScoped "$outOfScope_file" .tmp/subs_no_resolved.txt; then
-                printf "%b[!] deleteOutScoped command failed.%b\n" "$bred" "$reset"
+                print_warnf "deleteOutScoped command failed."
                 return 1
             fi
         fi
@@ -687,7 +677,7 @@ function sub_active() {
         # If INSCOPE is true, check inscope
         if [[ $INSCOPE == true ]]; then
             if ! check_inscope .tmp/subdomains_tmp.txt 2>>"$LOGFILE" >/dev/null; then
-                printf "%b[!] check_inscope command failed.%b\n" "$bred" "$reset"
+                print_warnf "check_inscope command failed."
                 return 1
             fi
         fi
@@ -696,7 +686,7 @@ function sub_active() {
         if ! NUMOFLINES=$(grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" .tmp/subdomains_tmp.txt 2>>"$LOGFILE" \
             | grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
             | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l); then
-            printf "%b[!] Failed to process subdomains.%b\n" "$bred" "$reset"
+            print_warnf "Failed to process subdomains."
             return 1
         fi
 
@@ -758,7 +748,7 @@ function sub_tls() {
 
         if [[ $INSCOPE == true ]]; then
             if ! check_inscope .tmp/subdomains_tlsx_resolved.txt 2>>"$LOGFILE" >/dev/null; then
-                printf "%b[!] check_inscope command failed.%b\n" "$bred" "$reset"
+                print_warnf "check_inscope command failed."
                 return 1
             fi
         fi
@@ -766,7 +756,7 @@ function sub_tls() {
         touch .tmp/subdomains_tlsx_resolved.txt
 
         if ! NUMOFLINES=$(anew subdomains/subdomains.txt <.tmp/subdomains_tlsx_resolved.txt | sed '/^$/d' | wc -l); then
-            printf "%b[!] Counting new subdomains failed.%b\n" "$bred" "$reset"
+            print_warnf "Counting new subdomains failed."
             return 1
         fi
 
@@ -804,7 +794,7 @@ function sub_noerror() {
             # Check inscope if INSCOPE is true
             if [[ $INSCOPE == true ]]; then
                 if ! check_inscope .tmp/subs_noerror.txt 2>>"$LOGFILE" >/dev/null; then
-                    printf "%b[!] check_inscope command failed.%b\n" "$bred" "$reset"
+                    print_warnf "check_inscope command failed."
                     return 1
                 fi
             fi
@@ -813,7 +803,7 @@ function sub_noerror() {
             if ! NUMOFLINES=$(grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" .tmp/subs_noerror.txt 2>>"$LOGFILE" \
                 | grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
                 | sed 's/^\*\.//' | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l); then
-                printf "%b[!] Failed to process subdomains.%b\n" "$bred" "$reset"
+                print_warnf "Failed to process subdomains."
                 return 1
             fi
 
@@ -900,7 +890,7 @@ function sub_dns() {
 
         if [[ $INSCOPE == true ]]; then
             if ! check_inscope .tmp/subdomains_dns_resolved.txt 2>>"$LOGFILE" >/dev/null; then
-                printf "%b[!] check_inscope command failed.%b\n" "$bred" "$reset"
+                print_warnf "check_inscope command failed."
             fi
         fi
 
@@ -908,7 +898,7 @@ function sub_dns() {
             if ! NUMOFLINES=$(grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" .tmp/subdomains_dns_resolved.txt 2>>"$LOGFILE" \
                 | grep -E '^([a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{1,}$' \
                 | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l); then
-                printf "%b[!] Failed to count new subdomains.%b\n" "$bred" "$reset"
+                print_warnf "Failed to count new subdomains."
                 return 1
             fi
         else
@@ -972,7 +962,7 @@ function sub_brute() {
         # Check inscope if INSCOPE is true
         if [[ $INSCOPE == true ]]; then
             if ! check_inscope .tmp/subs_brute_valid.txt 2>>"$LOGFILE" >/dev/null; then
-                printf "%b[!] check_inscope command failed.%b\n" "$bred" "$reset"
+                print_warnf "check_inscope command failed."
                 return 1
             fi
         fi
@@ -981,7 +971,7 @@ function sub_brute() {
         if ! NUMOFLINES=$(grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" .tmp/subs_brute_valid.txt 2>>"$LOGFILE" \
             | grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
             | sed 's/^\*\.//' | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l); then
-            printf "%b[!] Failed to process subdomains.%b\n" "$bred" "$reset"
+            print_warnf "Failed to process subdomains."
             return 1
         fi
 
@@ -1010,14 +1000,14 @@ function sub_scraping() {
 
         # Initialize scrap_subs.txt
         if ! touch .tmp/scrap_subs.txt; then
-            printf "%b[!] Failed to create .tmp/scrap_subs.txt.%b\n" "$bred" "$reset"
+            print_warnf "Failed to create .tmp/scrap_subs.txt."
             return 1
         fi
 
         # If in multi mode and subdomains.txt doesn't exist, create it
         if [[ -n $multi ]] && [[ ! -f "$dir/subdomains/subdomains.txt" ]]; then
             if ! printf "%b\n" "$domain" >"$dir/subdomains/subdomains.txt"; then
-                printf "%b[!] Failed to create subdomains.txt.%b\n" "$bred" "$reset"
+                print_warnf "Failed to create subdomains.txt."
                 return 1
             fi
         fi
@@ -1106,7 +1096,7 @@ function sub_scraping() {
 
                 if [[ $INSCOPE == true ]] && [[ -s ".tmp/scrap_subs_resolved.txt" ]]; then
                     if ! check_inscope .tmp/scrap_subs_resolved.txt 2>>"$LOGFILE" >/dev/null; then
-                        printf "%b[!] check_inscope command failed.%b\n" "$bred" "$reset"
+                        print_warnf "check_inscope command failed."
                     fi
                 fi
 
@@ -1173,7 +1163,7 @@ function sub_analytics() {
 
     # Create necessary directories
     if ! mkdir -p .tmp subdomains; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
+        print_warnf "Failed to create directories."
         return 1
     fi
 
@@ -1222,7 +1212,7 @@ function sub_analytics() {
 
         if [[ $INSCOPE == true ]]; then
             if ! check_inscope .tmp/analytics_subs_resolved.txt 2>>"$LOGFILE" >/dev/null; then
-                printf "%b[!] check_inscope command failed.%b\n" "$bred" "$reset"
+                print_warnf "check_inscope command failed."
             fi
         fi
 
@@ -1345,14 +1335,14 @@ function sub_permut() {
             # Remove out-of-scope domains if applicable
             if [[ -s $outOfScope_file ]]; then
                 if ! deleteOutScoped "$outOfScope_file" .tmp/permute_subs.txt; then
-                    printf "%b[!] deleteOutScoped command failed.%b\n" "$bred" "$reset"
+                    print_warnf "deleteOutScoped command failed."
                 fi
             fi
 
             # Check inscope if INSCOPE is true
             if [[ $INSCOPE == true ]]; then
                 if ! check_inscope .tmp/permute_subs.txt 2>>"$LOGFILE" >/dev/null; then
-                    printf "%b[!] check_inscope command failed.%b\n" "$bred" "$reset"
+                    print_warnf "check_inscope command failed."
                 fi
             fi
 
@@ -1360,7 +1350,7 @@ function sub_permut() {
             if ! NUMOFLINES=$(grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" .tmp/permute_subs.txt 2>>"$LOGFILE" \
                 | grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
                 | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l); then
-                printf "%b[!] Failed to process subdomains.%b\n" "$bred" "$reset"
+                print_warnf "Failed to process subdomains."
                 return 1
             fi
         else
@@ -1383,7 +1373,7 @@ function sub_regex_permut() {
 
     # Create necessary directories
     if ! mkdir -p .tmp subdomains; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
+        print_warnf "Failed to create directories."
         return 1
     fi
 
@@ -1393,7 +1383,7 @@ function sub_regex_permut() {
 
         # Change to the regulator directory
         if ! pushd "${tools}/regulator" >/dev/null; then
-            printf "%b[!] Failed to change directory to %s.%b\n" "$bred" "${tools}/regulator" "$reset"
+            print_warnf "Failed to change directory to %s." "${tools}/regulator"
             return 1
         fi
 
@@ -1408,7 +1398,7 @@ function sub_regex_permut() {
 
         # Return to the previous directory
         if ! popd >/dev/null; then
-            printf "%b[!] Failed to return to previous directory.%b\n" "$bred" "$reset"
+            print_warnf "Failed to return to previous directory."
             return 1
         fi
 
@@ -1436,13 +1426,13 @@ function sub_regex_permut() {
         if [[ -s ".tmp/regulator.txt" ]]; then
             if [[ -s $outOfScope_file ]]; then
                 if ! deleteOutScoped "$outOfScope_file" .tmp/regulator.txt; then
-                    printf "%b[!] deleteOutScoped command failed.%b\n" "$bred" "$reset"
+                    print_warnf "deleteOutScoped command failed."
                 fi
             fi
 
             if [[ $INSCOPE == true ]]; then
                 if ! check_inscope .tmp/regulator.txt 2>>"$LOGFILE" >/dev/null; then
-                    printf "%b[!] check_inscope command failed.%b\n" "$bred" "$reset"
+                    print_warnf "check_inscope command failed."
                 fi
             fi
 
@@ -1473,7 +1463,7 @@ function sub_ia_permut() {
 
     # Create necessary directories
     if ! mkdir -p .tmp subdomains; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
+        print_warnf "Failed to create directories."
         return 1
     fi
 
@@ -1507,13 +1497,13 @@ function sub_ia_permut() {
         if [[ -s ".tmp/subwiz_resolved.txt" ]]; then
             if [[ -s $outOfScope_file ]]; then
                 if ! deleteOutScoped "$outOfScope_file" .tmp/subwiz_resolved.txt; then
-                    printf "%b[!] deleteOutScoped command failed.%b\n" "$bred" "$reset"
+                    print_warnf "deleteOutScoped command failed."
                 fi
             fi
 
             if [[ $INSCOPE == true ]]; then
                 if ! check_inscope .tmp/subwiz_resolved.txt 2>>"$LOGFILE" >/dev/null; then
-                    printf "%b[!] check_inscope command failed.%b\n" "$bred" "$reset"
+                    print_warnf "check_inscope command failed."
                 fi
             fi
 
@@ -1544,7 +1534,7 @@ function sub_recursive_passive() {
 
     # Create necessary directories
     if ! mkdir -p .tmp subdomains; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
+        print_warnf "Failed to create directories."
         return 1
     fi
 
@@ -1604,7 +1594,7 @@ function sub_recursive_passive() {
 
         if [[ $INSCOPE == true ]]; then
             if ! check_inscope .tmp/passive_recurs_tmp.txt 2>>"$LOGFILE" >/dev/null; then
-                printf "%b[!] check_inscope command failed.%b\n" "$bred" "$reset"
+                print_warnf "check_inscope command failed."
             fi
         fi
 
@@ -1637,7 +1627,7 @@ function sub_recursive_passive() {
 function sub_recursive_brute() {
     # Create necessary directories
     if ! mkdir -p .tmp subdomains; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
+        print_warnf "Failed to create directories."
         return 1
     fi
 
@@ -1752,12 +1742,12 @@ function sub_recursive_brute() {
         if [[ $INSCOPE == true ]]; then
             if [[ -s ".tmp/permute_recursive.txt" ]]; then
                 if ! check_inscope .tmp/permute_recursive.txt 2>>"$LOGFILE" >/dev/null; then
-                    printf "%b[!] check_inscope command failed on permute_recursive.txt.%b\n" "$bred" "$reset"
+                    print_warnf "check_inscope command failed on permute_recursive.txt."
                 fi
             fi
             if [[ -s ".tmp/brute_recursive.txt" ]]; then
                 if ! check_inscope .tmp/brute_recursive.txt 2>>"$LOGFILE" >/dev/null; then
-                    printf "%b[!] check_inscope command failed on brute_recursive.txt.%b\n" "$bred" "$reset"
+                    print_warnf "check_inscope command failed on brute_recursive.txt."
                 fi
             fi
         fi
@@ -1765,7 +1755,7 @@ function sub_recursive_brute() {
         # Combine results for final validation
         if [[ -s ".tmp/permute_recursive.txt" ]] || [[ -s ".tmp/brute_recursive.txt" ]]; then
             if ! cat .tmp/permute_recursive.txt .tmp/brute_recursive.txt 2>>"$LOGFILE" | anew -q .tmp/brute_perm_recursive.txt; then
-                printf "%b[!] Failed to combine final results.%b\n" "$bred" "$reset"
+                print_warnf "Failed to combine final results."
                 return 1
             fi
         fi
@@ -1819,7 +1809,7 @@ function subtakeover() {
 
     # Create necessary directories
     if ! mkdir -p .tmp webs subdomains; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
+        print_warnf "Failed to create directories."
         return 1
     fi
 
@@ -1829,7 +1819,7 @@ function subtakeover() {
 
         # Initialize takeover file
         if ! touch .tmp/tko.txt; then
-            printf "%b[!] Failed to create .tmp/tko.txt.%b\n" "$bred" "$reset"
+            print_warnf "Failed to create .tmp/tko.txt."
             return 1
         fi
 
@@ -1874,7 +1864,7 @@ function subtakeover() {
 
         # Count new takeover entries
         if ! NUMOFLINES=$(cat .tmp/tko.txt 2>>"$LOGFILE" | anew webs/takeover.txt | sed '/^$/d' | wc -l); then
-            printf "%b[!] Failed to count takeover entries.%b\n" "$bred" "$reset"
+            print_warnf "Failed to count takeover entries."
             NUMOFLINES=0
         fi
 
@@ -1884,7 +1874,7 @@ function subtakeover() {
 
         if [[ $FARADAY == true ]]; then
             if ! faraday-cli status 2>>"$LOGFILE" >/dev/null; then
-                printf "%b[!] Faraday server is not running. Skipping Faraday integration.%b\n" "$bred" "$reset"
+                print_warnf "Faraday server is not running. Skipping Faraday integration."
             else
                 if [[ -s ".tmp/tko_json.txt" ]]; then
                     faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei .tmp/tko_json.txt 2>>"$LOGFILE" >/dev/null
@@ -1908,7 +1898,7 @@ function zonetransfer() {
 
     # Create necessary directories
     if ! mkdir -p subdomains; then
-        printf "%b[!] Failed to create subdomains directory.%b\n" "$bred" "$reset"
+        print_warnf "Failed to create subdomains directory."
         return 1
     fi
 
@@ -1918,7 +1908,7 @@ function zonetransfer() {
 
         # Initialize output file
         if ! : >"subdomains/zonetransfer.txt"; then
-            printf "%b[!] Failed to create zonetransfer.txt.%b\n" "$bred" "$reset"
+            print_warnf "Failed to create zonetransfer.txt."
             return 1
         fi
 
@@ -1951,7 +1941,7 @@ function zonetransfer() {
 function s3buckets() {
     # Create necessary directories
     if ! mkdir -p .tmp subdomains; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
+        print_warnf "Failed to create directories."
         return 1
     fi
 
@@ -1962,7 +1952,7 @@ function s3buckets() {
         # If in multi mode and subdomains.txt doesn't exist, create it
         if [[ -n $multi ]] && [[ ! -f "$dir/subdomains/subdomains.txt" ]]; then
             if ! printf "%b\n" "$domain" >"$dir/subdomains/subdomains.txt"; then
-                printf "%b[!] Failed to create subdomains.txt.%b\n" "$bred" "$reset"
+                print_warnf "Failed to create subdomains.txt."
                 return 1
             fi
         fi
@@ -1981,17 +1971,17 @@ function s3buckets() {
 
             if [[ -s ".tmp/s3buckets_tmp.txt" ]]; then
                 if ! cat .tmp/s3buckets_tmp.txt .tmp/s3buckets_tmp2.txt 2>>"$LOGFILE" | anew -q .tmp/s3buckets.txt; then
-                    printf "%b[!] Failed to process s3buckets_tmp.txt.%b\n" "$bred" "$reset"
+                    print_warnf "Failed to process s3buckets_tmp.txt."
                 fi
                 if ! sed_i '/^$/d' .tmp/s3buckets.txt; then
-                    printf "%b[!] Failed to clean s3buckets.txt.%b\n" "$bred" "$reset"
+                    print_warnf "Failed to clean s3buckets.txt."
                 fi
             fi
         fi
 
         # Initialize the output file in the subdomains folder
         if ! : >subdomains/cloudhunter_open_buckets.txt; then
-            printf "%b[!] Failed to initialize cloudhunter_open_buckets.txt.%b\n" "$bred" "$reset"
+            print_warnf "Failed to initialize cloudhunter_open_buckets.txt."
         fi
 
         # Determine the CloudHunter permutations flag based on the config
@@ -2008,7 +1998,7 @@ function s3buckets() {
                 permutation_file=""
                 ;;
             *)
-                printf "%b[!] Invalid value for CLOUDHUNTER_PERMUTATION: %s.%b\n" "$bred" "$CLOUDHUNTER_PERMUTATION" "$reset"
+                print_warnf "Invalid value for CLOUDHUNTER_PERMUTATION: %s." "$CLOUDHUNTER_PERMUTATION"
                 return 1
                 ;;
         esac
@@ -2051,22 +2041,22 @@ function s3buckets() {
         printf "Processing domain: %s\n" "$domain" >>"$LOGFILE"
         (
             if ! cd "$tools/CloudHunter"; then
-                printf "%b[!] Failed to cd to %s.%b\n" "$bred" "$tools/CloudHunter" "$reset"
+                print_warnf "Failed to cd to %s." "$tools/CloudHunter"
                 return 1
             fi
             if [[ -n "$permutation_file" ]]; then
                 if ! PYTHONWARNINGS=ignore "${tools}/CloudHunter/venv/bin/python3" -W ignore ./cloudhunter.py "$PERMUTATION_FLAG" "$permutation_file" -r ./resolvers.txt -t 50 "$domain"; then
-                    printf "%b[!] CloudHunter command failed for domain %s.%b\n" "$bred" "$domain" "$reset"
+                    print_warnf "CloudHunter command failed for domain %s." "$domain"
                 fi
             elif ! PYTHONWARNINGS=ignore "${tools}/CloudHunter/venv/bin/python3" -W ignore ./cloudhunter.py -r ./resolvers.txt -t 50 "$domain"; then
-                printf "%b[!] CloudHunter command failed for domain %s.%b\n" "$bred" "$domain" "$reset"
+                print_warnf "CloudHunter command failed for domain %s." "$domain"
             fi
         ) >>"$dir/subdomains/cloudhunter_open_buckets.txt" 2>>"$LOGFILE"
 
         # Process CloudHunter results
         if [[ -s "subdomains/cloudhunter_open_buckets.txt" ]]; then
             if ! NUMOFLINES1=$(cat subdomains/cloudhunter_open_buckets.txt 2>>"$LOGFILE" | anew subdomains/cloud_assets.txt | wc -l); then
-                printf "%b[!] Failed to process cloudhunter_open_buckets.txt.%b\n" "$bred" "$reset"
+                print_warnf "Failed to process cloudhunter_open_buckets.txt."
                 NUMOFLINES1=0
             fi
             if [[ $NUMOFLINES1 -gt 0 ]]; then
@@ -2079,7 +2069,7 @@ function s3buckets() {
         # Process s3buckets results
         if [[ -s ".tmp/s3buckets.txt" ]]; then
             if ! NUMOFLINES2=$(cat .tmp/s3buckets.txt 2>>"$LOGFILE" | grep -aiv "not_exist" | grep -aiv "Warning:" | grep -aiv "invalid_name" | grep -aiv "^http" | awk 'NF' | anew subdomains/s3buckets.txt | sed '/^$/d' | wc -l); then
-                printf "%b[!] Failed to process s3buckets.txt.%b\n" "$bred" "$reset"
+                print_warnf "Failed to process s3buckets.txt."
                 NUMOFLINES2=0
             fi
             if [[ $NUMOFLINES2 -gt 0 ]]; then
@@ -2191,7 +2181,7 @@ function geo_info() {
 
     # Create necessary directories
     if ! mkdir -p hosts; then
-        printf "%b[!] Failed to create hosts directory.%b\n" "$bred" "$reset"
+        print_warnf "Failed to create hosts directory."
         return 1
     fi
 
@@ -2226,7 +2216,7 @@ function geo_info() {
 
         if [[ -s $ips_file ]]; then
             if ! touch "${dir}/hosts/ipinfo.txt"; then
-                printf "%b[!] Failed to create ipinfo.txt.%b\n" "$bred" "$reset"
+                print_warnf "Failed to create ipinfo.txt."
             fi
 
             while IFS= read -r ip; do

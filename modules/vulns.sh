@@ -504,7 +504,7 @@ function spraying() {
 
         # Ensure portscan_active.gnmap exists and is not empty
         if [[ ! -s "$dir/hosts/portscan_active.gnmap" ]]; then
-            printf "%b[!] File $dir/hosts/portscan_active.gnmap does not exist or is empty.%b\n" "$bred" "$reset"
+            print_warnf "File %s/hosts/portscan_active.gnmap does not exist or is empty." "$dir"
             end_func "Port scan results missing. Password Spraying aborted." "${FUNCNAME[0]}"
             return 1
         fi
@@ -601,7 +601,7 @@ function 4xxbypass() {
 
             # Navigate to nomore403 tool directory
             if ! pushd "${tools}/nomore403" >/dev/null; then
-                printf "%b[!] Failed to navigate to nomore403 directory.%b\n" "$bred" "$reset"
+                print_warnf "Failed to navigate to nomore403 directory."
                 end_func "Failed to navigate to nomore403 directory during 403 Bypass." "${FUNCNAME[0]}"
                 return 1
             fi
@@ -611,7 +611,7 @@ function 4xxbypass() {
 
             # Return to the original directory
             if ! popd >/dev/null; then
-                printf "%b[!] Failed to return to the original directory.%b\n" "$bred" "$reset"
+                print_warnf "Failed to return to the original directory."
                 end_func "Failed to return to the original directory during 403 Bypass." "${FUNCNAME[0]}"
                 return 1
             fi
@@ -670,7 +670,7 @@ function prototype_pollution() {
 
                 end_func "Results are saved in vulns/prototype_pollution.txt" "${FUNCNAME[0]}"
             else
-                printf "%b[!] File webs/url_extract_nodupes.txt is missing or empty.%b\n" "$bred" "$reset"
+                print_warnf "File webs/url_extract_nodupes.txt is missing or empty."
                 end_func "File webs/url_extract_nodupes.txt is missing or empty." "${FUNCNAME[0]}"
                 return 1
             fi
@@ -766,7 +766,7 @@ function webcache() {
 
             # Navigate to Web-Cache-Vulnerability-Scanner tool directory
             if ! pushd "${tools}/Web-Cache-Vulnerability-Scanner" >/dev/null; then
-                printf "%b[!] Failed to navigate to Web-Cache-Vulnerability-Scanner directory.%b\n" "$bred" "$reset"
+                print_warnf "Failed to navigate to Web-Cache-Vulnerability-Scanner directory."
                 end_func "Failed to navigate to Web-Cache-Vulnerability-Scanner directory during Web Cache Poisoning Checks." "${FUNCNAME[0]}"
                 return 1
             fi
@@ -777,7 +777,7 @@ function webcache() {
 
             # Return to the original directory
             if ! popd >/dev/null; then
-                printf "%b[!] Failed to return to the original directory.%b\n" "$bred" "$reset"
+                print_warnf "Failed to return to the original directory."
                 end_func "Failed to return to the original directory during Web Cache Poisoning Checks." "${FUNCNAME[0]}"
                 return 1
             fi
@@ -857,7 +857,7 @@ function fuzzparams() {
             if [[ $FARADAY == true ]]; then
                 # Check if the Faraday server is running
                 if ! faraday-cli status 2>>"$LOGFILE" >/dev/null; then
-                    printf "%b[!] Faraday server is not running. Skipping Faraday integration.%b\n" "$bred" "$reset"
+                    print_warnf "Faraday server is not running. Skipping Faraday integration."
                 else
                     if [[ -s ".tmp/fuzzparams_json.txt" ]]; then
                         faraday-cli tool report -w $FARADAY_WORKSPACE --plugin-id nuclei .tmp/fuzzparams_json.txt 2>>"$LOGFILE" >/dev/null

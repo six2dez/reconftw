@@ -360,8 +360,8 @@ function third_party_misconfigs() {
 
         # Change directory to Spoofy tool
         if ! pushd "${tools}/misconfig-mapper" >/dev/null; then
-            printf "%b[!] Failed to change directory to %s in %s at line %s.%b\n" \
-                "$bred" "${tools}/misconfig-mapper" "${FUNCNAME[0]}" "$LINENO" "$reset"
+            print_warnf "Failed to change directory to %s in %s at line %s." \
+                "${tools}/misconfig-mapper" "${FUNCNAME[0]}" "$LINENO"
             return 1
         fi
 
@@ -373,8 +373,8 @@ function third_party_misconfigs() {
 
         # Return to the previous directory
         if ! popd >/dev/null; then
-            printf "%b[!] Failed to return to previous directory in %s at line %s.%b\n" \
-                "$bred" "${FUNCNAME[0]}" "$LINENO" "$reset"
+            print_warnf "Failed to return to previous directory in %s at line %s." \
+                "${FUNCNAME[0]}" "$LINENO"
             return 1
         fi
 
@@ -403,8 +403,8 @@ function spoof() {
 
         # Change directory to Spoofy tool
         if ! pushd "${tools}/Spoofy" >/dev/null; then
-            printf "%b[!] Failed to change directory to %s in %s at line %s.%b\n" \
-                "$bred" "${tools}/Spoofy" "${FUNCNAME[0]}" "$LINENO" "$reset"
+            print_warnf "Failed to change directory to %s in %s at line %s." \
+                "${tools}/Spoofy" "${FUNCNAME[0]}" "$LINENO"
             return 1
         fi
 
@@ -413,8 +413,8 @@ function spoof() {
 
         # Return to the previous directory
         if ! popd >/dev/null; then
-            printf "%b[!] Failed to return to previous directory in %s at line %s.%b\n" \
-                "$bred" "${FUNCNAME[0]}" "$LINENO" "$reset"
+            print_warnf "Failed to return to previous directory in %s at line %s." \
+                "${FUNCNAME[0]}" "$LINENO"
             return 1
         fi
 

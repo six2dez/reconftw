@@ -29,6 +29,36 @@ _parallel_effective_max_jobs() {
     echo "$effective"
 }
 
+_parallel_compact_list() {
+    local max="${2:-6}"
+    local list="$1"
+    if [[ -z "$list" ]]; then
+        printf "none"
+        return 0
+    fi
+    local count
+    count=$(awk -F',' 'NF{print NF}' <<<"$list")
+    if ((count <= max)); then
+        printf "%s" "$list"
+    else
+        local trimmed
+        trimmed=$(echo "$list" | awk -F',' -v m="$max" '{out=""; for(i=1;i<=m;i++){out=out $i (i<m? ",":"")} print out}')
+        printf "%s, +%d more" "$trimmed" "$((count - max))"
+    fi
+}
+
+_parallel_snapshot() {
+    local active_list="$1"
+    local done_list="$2"
+    local queue_count="$3"
+    [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
+    local active_fmt done_fmt
+    active_fmt=$(_parallel_compact_list "$active_list" 6)
+    done_fmt=$(_parallel_compact_list "$done_list" 6)
+    printf "Active: %s\n" "$active_fmt"
+    printf "Done:   %s | Queue: %s pending\n" "$done_fmt" "$queue_count"
+}
+
 ###############################################################################
 # Output Helpers
 ###############################################################################
@@ -46,22 +76,23 @@ _parallel_emit_job_output() {
     local duration=$((end_ts - start_ts))
 
     local skip_marker=""
+    local cache_marker=""
     if [[ -n "${called_fn_dir:-}" ]]; then
         skip_marker="${called_fn_dir}/.skip_${func_name}"
+        cache_marker="${called_fn_dir}/.cache_${func_name}"
     fi
 
     local badge=""
-    if [[ -n "$skip_marker" && -f "$skip_marker" ]]; then
+    if [[ -n "$cache_marker" && -f "$cache_marker" ]]; then
+        badge="CACHE"
+        rm -f "$cache_marker" 2>/dev/null || true
+    elif [[ -n "$skip_marker" && -f "$skip_marker" ]]; then
         badge="SKIP"
         rm -f "$skip_marker" 2>/dev/null || true
     elif [[ "$rc" -eq 0 ]]; then
         badge="OK"
     else
         badge="FAIL"
-    fi
-
-    if declare -F ui_count_inc >/dev/null 2>&1; then
-        ui_count_inc "$badge"
     fi
 
     # In quiet mode (OUTPUT_VERBOSITY==0), only show failures
@@ -76,11 +107,14 @@ _parallel_emit_job_output() {
     case "$mode" in
         summary)
             if [[ "$_force_print" == true ]]; then
-                printf "  %b[%-4s]%b %s %6s\n" "${bred:-}" "$badge" "${reset:-}" "$func_name" "${duration}s"
+                if declare -F ui_count_inc >/dev/null 2>&1; then
+                    ui_count_inc "$badge"
+                fi
+                print_task "$badge" "$func_name" "$duration" ""
             else
                 _print_status "$badge" "$func_name" "${duration}s"
             fi
-            if [[ "$badge" == "FAIL" ]] && [[ -s "$log_file" ]]; then
+            if [[ "$badge" == "FAIL" ]] && [[ -s "$log_file" ]] && [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
                 tail -n 5 "$log_file" | while IFS= read -r line; do
                     printf "         %s\n" "$line"
                 done
@@ -90,7 +124,10 @@ _parallel_emit_job_output() {
             local show_lines="$tail_lines"
             [[ "$rc" -ne 0 ]] && show_lines=$((tail_lines * 2))
             if [[ "$_force_print" == true ]]; then
-                printf "  %b[%-4s]%b %s %6s\n" "${bred:-}" "$badge" "${reset:-}" "$func_name" "${duration}s"
+                if declare -F ui_count_inc >/dev/null 2>&1; then
+                    ui_count_inc "$badge"
+                fi
+                print_task "$badge" "$func_name" "$duration" ""
             else
                 _print_status "$badge" "$func_name" "${duration}s"
             fi
@@ -100,7 +137,10 @@ _parallel_emit_job_output() {
             ;;
         full)
             if [[ "$_force_print" == true ]]; then
-                printf "  %b[%-4s]%b %s %6s\n" "${bred:-}" "$badge" "${reset:-}" "$func_name" "${duration}s"
+                if declare -F ui_count_inc >/dev/null 2>&1; then
+                    ui_count_inc "$badge"
+                fi
+                print_task "$badge" "$func_name" "$duration" ""
             else
                 _print_status "$badge" "$func_name" "${duration}s"
             fi
@@ -192,11 +232,14 @@ parallel_funcs() {
     local batch_start_ts
     batch_start_ts=$(date +%s)
     local batch_label="${PARALLEL_LABEL:-parallel}"
+    local total_funcs=$#
+    local queued_count=0
+    local done_list=""
 
     for func in "$@"; do
         # Check if function exists
         if ! declare -f "$func" >/dev/null 2>&1; then
-            printf "%b[!] Function %s not found, skipping%b\n" "${yellow:-}" "$func" "${reset:-}" >&2
+            print_warnf "Function %s not found, skipping" "$func"
             continue
         fi
 
@@ -221,6 +264,7 @@ parallel_funcs() {
         batch_funcs+=("$func")
         batch_logs+=("$log_file")
         batch_starts+=("$job_start_ts")
+        queued_count=$((queued_count + 1))
 
         # Log if verbose (OUTPUT_VERBOSITY >= 2)
         [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && \
@@ -228,6 +272,15 @@ parallel_funcs() {
 
         # If we've reached max jobs, flush the current batch.
         if ((${#batch_pids[@]} >= max_jobs)); then
+            if [[ "${PARALLEL_MODE:-true}" == "true" ]]; then
+                local active_list=""
+                local i
+                for i in "${batch_funcs[@]}"; do
+                    [[ -z "$active_list" ]] && active_list="${i} 00:00" || active_list="${active_list}, ${i} 00:00"
+                done
+                local queue_count=$((total_funcs - queued_count))
+                _parallel_snapshot "$active_list" "$done_list" "$queue_count"
+            fi
             local idx rc batch_failed=0
             for idx in "${!batch_pids[@]}"; do
                 if wait "${batch_pids[$idx]}" 2>/dev/null; then
@@ -238,6 +291,14 @@ parallel_funcs() {
                 local job_end_ts
                 job_end_ts=$(date +%s)
                 _parallel_emit_job_output "${batch_funcs[$idx]}" "${batch_logs[$idx]}" "$rc" "${batch_starts[$idx]}" "$job_end_ts"
+                local job_dur=$((job_end_ts - batch_starts[$idx]))
+                local dur_fmt
+                dur_fmt=$(format_duration "$job_dur")
+                if [[ -z "$done_list" ]]; then
+                    done_list="${batch_funcs[$idx]} ${dur_fmt}"
+                else
+                    done_list="${done_list}, ${batch_funcs[$idx]} ${dur_fmt}"
+                fi
                 [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && printf "%b[*] Finished %s (PID: %s, rc=%s)%b\n" "${cyan:-}" "${batch_funcs[$idx]}" "${batch_pids[$idx]}" "$rc" "${reset:-}"
                 if [[ $rc -ne 0 ]]; then
                     ((failed++))
@@ -246,6 +307,10 @@ parallel_funcs() {
                 rm -f "${batch_logs[$idx]}" 2>/dev/null || true
             done
             _parallel_batch_summary "${#batch_pids[@]}" "$batch_failed" "$batch_start_ts"
+            if [[ "${PARALLEL_MODE:-true}" == "true" ]]; then
+                local queue_count=$((total_funcs - queued_count))
+                _parallel_snapshot "none" "$done_list" "$queue_count"
+            fi
             batch_pids=()
             batch_funcs=()
             batch_logs=()
@@ -256,6 +321,15 @@ parallel_funcs() {
 
     # Wait for all remaining jobs and collect exit codes
     if ((${#batch_pids[@]} > 0)); then
+        if [[ "${PARALLEL_MODE:-true}" == "true" ]]; then
+            local active_list=""
+            local i
+            for i in "${batch_funcs[@]}"; do
+                [[ -z "$active_list" ]] && active_list="${i} 00:00" || active_list="${active_list}, ${i} 00:00"
+            done
+            local queue_count=$((total_funcs - queued_count))
+            _parallel_snapshot "$active_list" "$done_list" "$queue_count"
+        fi
         local idx rc batch_failed=0
         for idx in "${!batch_pids[@]}"; do
             if wait "${batch_pids[$idx]}" 2>/dev/null; then
@@ -266,6 +340,14 @@ parallel_funcs() {
             local job_end_ts
             job_end_ts=$(date +%s)
             _parallel_emit_job_output "${batch_funcs[$idx]}" "${batch_logs[$idx]}" "$rc" "${batch_starts[$idx]}" "$job_end_ts"
+            local job_dur=$((job_end_ts - batch_starts[$idx]))
+            local dur_fmt
+            dur_fmt=$(format_duration "$job_dur")
+            if [[ -z "$done_list" ]]; then
+                done_list="${batch_funcs[$idx]} ${dur_fmt}"
+            else
+                done_list="${done_list}, ${batch_funcs[$idx]} ${dur_fmt}"
+            fi
             [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && printf "%b[*] Finished %s (PID: %s, rc=%s)%b\n" "${cyan:-}" "${batch_funcs[$idx]}" "${batch_pids[$idx]}" "$rc" "${reset:-}"
             if [[ $rc -ne 0 ]]; then
                 ((failed++))
@@ -274,6 +356,9 @@ parallel_funcs() {
             rm -f "${batch_logs[$idx]}" 2>/dev/null || true
         done
         _parallel_batch_summary "${#batch_pids[@]}" "$batch_failed" "$batch_start_ts"
+        if [[ "${PARALLEL_MODE:-true}" == "true" ]]; then
+            _parallel_snapshot "none" "$done_list" "0"
+        fi
     fi
     rmdir "$parallel_log_root" 2>/dev/null || true
 
@@ -322,7 +407,7 @@ wait_for_jobs() {
             local elapsed
             elapsed=$(($(date +%s) - start_time))
             if ((elapsed >= timeout)); then
-                printf "%b[!] Timeout reached, killing remaining jobs%b\n" "${bred:-}" "${reset:-}" >&2
+                print_warnf "Timeout reached, killing remaining jobs"
                 jobs -p | xargs -r kill 2>/dev/null || true
                 return 1
             fi

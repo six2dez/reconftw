@@ -5,6 +5,8 @@
 # Prevent multiple sourcing
 [[ -n "$_COMMON_SH_LOADED" ]] && return 0
 declare -r _COMMON_SH_LOADED=1
+declare -a INCIDENTS_LEVELS=()
+declare -a INCIDENTS_ITEMS=()
 
 ###############################################################################
 # Directory Management
@@ -83,14 +85,147 @@ count_lines_stdin() {
 # Output Primitives
 ###############################################################################
 
+# Format duration in seconds to human-friendly form: 0s, 6s, 1m 23s, 19m 04s
+# Usage: format_duration 83
+format_duration() {
+    local input="${1:-0}"
+    if [[ "$input" =~ [a-zA-Z] ]] && ! [[ "$input" =~ ^[0-9]+$ ]]; then
+        printf "%s" "$input"
+        return 0
+    fi
+    if [[ "$input" =~ ^[0-9]+s$ ]]; then
+        input="${input%s}"
+    fi
+    if ! [[ "$input" =~ ^[0-9]+$ ]]; then
+        input=0
+    fi
+    local total="$input"
+    local mins=$((total / 60))
+    local secs=$((total % 60))
+    if ((mins > 0)); then
+        printf "%dm %02ds" "$mins" "$secs"
+    else
+        printf "%ds" "$secs"
+    fi
+}
+
+# Print a normalized task/status line
+# Usage: print_task STATE module duration_seconds reason
+print_task() {
+    [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
+    local state="$1" module="$2" duration="${3:-0}" reason="${4:-}"
+    local color=""
+    local dim_color="${blue:-}"
+    local duration_fmt
+    duration_fmt=$(format_duration "$duration")
+
+    case "$state" in
+        OK) color="${bgreen:-}" ;;
+        WARN) color="${yellow:-}" ;;
+        FAIL) color="${bred:-}" ;;
+        SKIP|CACHE) color="${dim_color:-}" ;;
+        INFO) color="${bblue:-}" ;;
+        *) color="${bblue:-}" ;;
+    esac
+
+    local module_pad=26
+    local mod="$module"
+    local pad=$((module_pad - ${#mod}))
+    ((pad < 1)) && pad=1
+    local spaces
+    spaces=$(printf '%*s' "$pad" "")
+
+    printf "%b%-5s%b %s%s %6s" "$color" "$state" "${reset:-}" "$mod" "$spaces" "$duration_fmt"
+    if [[ -n "$reason" ]]; then
+        printf " (%s)" "$reason"
+    fi
+    printf "\n"
+}
+
+record_incident() {
+    local level="$1" module="$2" reason="$3"
+    [[ -z "$module" ]] && return 0
+    [[ -z "$reason" ]] && return 0
+    INCIDENTS_LEVELS+=("$level")
+    INCIDENTS_ITEMS+=("${module} — ${reason}")
+}
+
+print_incidents() {
+    local debug_log="${1:-}"
+    local count=${#INCIDENTS_ITEMS[@]}
+    ((count == 0)) && return 0
+    printf "\nINCIDENTS (actionable)\n"
+    local i
+    for i in "${!INCIDENTS_ITEMS[@]}"; do
+        printf "%d. %s\n" "$((i + 1))" "${INCIDENTS_ITEMS[$i]}"
+    done
+    if [[ -n "$debug_log" ]]; then
+        printf "Debug log: %s\n" "$debug_log"
+    fi
+    printf "\n"
+}
+
+# Print a compact artifacts line
+# Usage: print_artifacts "file1" ["file2"...]
+print_artifacts() {
+    [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
+    local items="$*"
+    [[ -z "$items" ]] && return 0
+    printf "Artifacts: %s\n" "$items"
+}
+
+# Print a notice line without affecting counters
+# Usage: print_notice LEVEL module message
+print_notice() {
+    local level="$1" module="$2" message="$3"
+    [[ -z "$module" ]] && module="notice"
+    print_task "$level" "$module" "0" "$message"
+}
+
+# Formatted WARN message without color codes
+# Usage: print_warnf "message %s" "arg"
+print_warnf() {
+    local fmt="$1"
+    shift
+    local msg
+    printf -v msg "$fmt" "$@"
+    _print_msg WARN "$msg"
+}
+
+# Formatted FAIL message (stderr, always visible)
+# Usage: print_errorf "message %s" "arg"
+print_errorf() {
+    local fmt="$1"
+    shift
+    local msg
+    printf -v msg "$fmt" "$@"
+    _print_error "$msg"
+}
+
 # Generic message with [LEVEL] prefix (INFO/WARN/FAIL/OK)
 # Usage: _print_msg WARN "something happened"
 _print_msg() {
-    [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
     local level="$1"
     shift
     local msg="$*"
     local color
+
+    if [[ "$level" == "WARN" ]]; then
+        if [[ "$msg" == *"already processed"* ]]; then
+            _print_status CACHE "${FUNCNAME[1]:-module}" "0s"
+            if [[ -n "${called_fn_dir:-}" ]]; then
+                : >"${called_fn_dir}/.cache_${FUNCNAME[1]:-module}" 2>/dev/null || true
+            fi
+            return 0
+        fi
+        if [[ "$msg" == *"skipped"* ]]; then
+            _print_status SKIP "${FUNCNAME[1]:-module}" "0s"
+            if [[ -n "${called_fn_dir:-}" ]]; then
+                : >"${called_fn_dir}/.skip_${FUNCNAME[1]:-module}" 2>/dev/null || true
+            fi
+            return 0
+        fi
+    fi
     
     case "$level" in
         OK|SUCCESS) color="${bgreen:-}" ;;
@@ -99,7 +234,10 @@ _print_msg() {
         INFO) color="${bblue:-}" ;;
         *) color="${bblue:-}" ;;
     esac
-    
+    if [[ "$level" == "INFO" ]] && [[ "${OUTPUT_VERBOSITY:-1}" -lt 2 ]]; then
+        return 0
+    fi
+    [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
     printf "%b[%s]%b %s\n" "$color" "$level" "${reset:-}" "$msg"
 }
 
@@ -110,8 +248,9 @@ _print_module_start() {
     local title="${1^^}"
     local ts
     ts=$(date +'%Y-%m-%d %H:%M:%S')
-    printf "\n%b── %s %s%b\n" "${bgreen:-}" "$title" "──────────────────────────────────────────────────────────────" "${reset:-}"
-    _print_msg "INFO" "${title} started at ${ts}"
+    printf "\n%b── %s ───────────────────────────────────────────────────────────────%b\n" \
+        "${bgreen:-}" "$title" "${reset:-}"
+    printf "Started: %s\n" "$ts"
 }
 
 # Module end message with timestamp
@@ -121,7 +260,7 @@ _print_module_end() {
     local title="${1^^}"
     local ts
     ts=$(date +'%Y-%m-%d %H:%M:%S')
-    _print_msg "INFO" "${title} completed at ${ts}"
+    printf "Completed: %s\n" "$ts"
 }
 
 # Section header for major phases (OSINT, Subdomains, Web, Vulns, etc.)
@@ -136,43 +275,37 @@ _print_section() {
 _print_status() {
     [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
     local badge="$1" text="$2" detail="${3:-}"
-    local color
-    
-    # Special handling for SKIP to be more discrete
-    if [[ "$badge" == "SKIP" ]]; then
-        local text_len=${#text}
-        local dot_count=$((50 - text_len))
-        ((dot_count < 2)) && dot_count=2
-        local dots
-        dots=$(printf '%*s' "$dot_count" '' | tr ' ' '.')
-        
-        # Grey/dim style for SKIP if supported, otherwise blue
-        local skip_color="${bblue:-}"
-        
-        if [[ -n "$detail" ]]; then
-            printf "  %s %s %b[SKIP]%b %s\n" "$text" "$dots" "$skip_color" "${reset:-}" "$detail"
+    local duration="0"
+    local reason=""
+
+    if [[ -n "$detail" ]]; then
+        if [[ "$detail" =~ ^[0-9]+$ ]]; then
+            duration="$detail"
+        elif [[ "$detail" =~ ^[0-9]+s$ ]]; then
+            duration="${detail%s}"
+        elif [[ "$detail" =~ ^[0-9]+m ]]; then
+            duration="$detail"
         else
-            printf "  %s %s %b[SKIP]%b\n" "$text" "$dots" "$skip_color" "${reset:-}"
+            reason="${detail}"
         fi
-        return
     fi
 
-    case "$badge" in
-        OK)   color="${bgreen:-}" ;;
-        FAIL) color="${bred:-}" ;;
-        WARN) color="${yellow:-}" ;;
-        *)    color="${bblue:-}" ;;
-    esac
-    
-    if [[ -n "$detail" ]]; then
-        local text_len=${#text}
-        local dot_count=$((40 - text_len))
-        ((dot_count < 2)) && dot_count=2
-        local dots
-        dots=$(printf '%*s' "$dot_count" '' | tr ' ' '.')
-        printf "  %b[%-4s]%b %s %s %6s\n" "$color" "$badge" "${reset:-}" "$text" "$dots" "$detail"
-    else
-        printf "  %b[%-4s]%b %s\n" "$color" "$badge" "${reset:-}" "$text"
+    if [[ "$badge" == "CACHE" ]] && [[ "${SHOW_CACHE:-false}" != "true" ]]; then
+        if declare -F ui_count_inc >/dev/null 2>&1; then
+            ui_count_inc "$badge"
+        fi
+        return 0
+    fi
+
+    if declare -F ui_count_inc >/dev/null 2>&1; then
+        ui_count_inc "$badge"
+    fi
+    print_task "$badge" "$text" "$duration" "$reason"
+    if [[ "$badge" == "FAIL" ]]; then
+        [[ -z "$reason" ]] && reason="see debug.log"
+        record_incident "FAIL" "$text" "$reason"
+    elif [[ "$badge" == "WARN" ]] && [[ -n "$reason" ]]; then
+        record_incident "WARN" "$text" "$reason"
     fi
 }
 
@@ -200,6 +333,7 @@ _print_rule() {
 skip_notification() {
     local func_name="${FUNCNAME[1]:-unknown}"
     local reason="${1:-mode or configuration settings}"
+    local badge="SKIP"
 
     case "$reason" in
         disabled)
@@ -207,11 +341,12 @@ skip_notification() {
             ;;
         processed)
             reason="already processed"
+            badge="CACHE"
             ;;
     esac
 
     if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
-        _print_status SKIP "$func_name"
+        _print_status "$badge" "$func_name" "0s"
         if [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
             printf "         %s\n" "$reason"
             if [[ "$reason" == "already processed" ]]; then
@@ -220,14 +355,32 @@ skip_notification() {
         fi
     fi
 
-    # Track skip for summary if UI layer is available
-    if declare -F ui_count_inc >/dev/null 2>&1; then
-        ui_count_inc SKIP
-    fi
-
     # Emit skip marker for parent process (parallel mode)
     if [[ -n "${called_fn_dir:-}" ]]; then
-        : >"${called_fn_dir}/.skip_${func_name}" 2>/dev/null || true
+        if [[ "$badge" == "CACHE" ]]; then
+            : >"${called_fn_dir}/.cache_${func_name}" 2>/dev/null || true
+        else
+            : >"${called_fn_dir}/.skip_${func_name}" 2>/dev/null || true
+        fi
+    fi
+}
+
+# Compatibility: map pt_msg_warn to new status model
+pt_msg_warn() {
+    local msg="$*"
+    if [[ "$msg" == *"already processed"* ]]; then
+        _print_status CACHE "${FUNCNAME[1]:-module}" "0s"
+        if [[ -n "${called_fn_dir:-}" ]]; then
+            : >"${called_fn_dir}/.cache_${FUNCNAME[1]:-module}" 2>/dev/null || true
+        fi
+    elif [[ "$msg" == *"skipped"* ]]; then
+        _print_status SKIP "${FUNCNAME[1]:-module}" "0s"
+        if [[ -n "${called_fn_dir:-}" ]]; then
+            : >"${called_fn_dir}/.skip_${FUNCNAME[1]:-module}" 2>/dev/null || true
+        fi
+    else
+        _print_status WARN "${FUNCNAME[1]:-module}" "0s"
+        _print_msg WARN "$msg"
     fi
 }
 

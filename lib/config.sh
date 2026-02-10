@@ -18,6 +18,23 @@ readonly E_CONFIG_NOT_FOUND=10
 readonly E_CONFIG_INVALID=11
 readonly E_CONFIG_SYNTAX=12
 
+# Local output helpers (prefer global UI if available)
+_cfg_warn() {
+	if declare -F print_warnf >/dev/null 2>&1; then
+		print_warnf "$@"
+	else
+		printf "[WARN] $1\n" "${@:2}" >&2
+	fi
+}
+
+_cfg_error() {
+	if declare -F print_errorf >/dev/null 2>&1; then
+		print_errorf "$@"
+	else
+		printf "[ERROR] $1\n" "${@:2}" >&2
+	fi
+}
+
 # Configuration sections and their files
 # Order matters - loaded in this sequence
 declare -a CONFIG_SECTIONS=(
@@ -44,7 +61,7 @@ function load_config_hierarchical() {
 
 	# Validate config directory exists
 	if [[ ! -d "$config_dir" ]]; then
-		printf "[ERROR] Configuration directory not found: %s\n" "$config_dir" >&2
+		_cfg_error "Configuration directory not found: %s" "$config_dir"
 		exit $E_CONFIG_NOT_FOUND
 	fi
 
@@ -63,12 +80,12 @@ function load_config_hierarchical() {
 
 	# Validate loaded configuration
 	if ! validate_config; then
-		printf "[ERROR] Configuration validation failed\n" >&2
+		_cfg_error "Configuration validation failed"
 		errors=$((errors + 1))
 	fi
 
 	if [[ $errors -gt 0 ]]; then
-		printf "[WARN] %d configuration errors detected\n" "$errors" >&2
+		_cfg_warn "%d configuration errors detected" "$errors"
 		return 1
 	fi
 
@@ -86,19 +103,19 @@ function _load_config_file() {
 	local perms
 	perms=$(stat -c "%a" "$conf_file" 2>/dev/null || stat -f "%Lp" "$conf_file" 2>/dev/null)
 	if [[ -n "$perms" && "$perms" -gt 644 ]]; then
-		printf "[WARN] Config file has overly permissive permissions (%s): %s\n" "$perms" "$conf_file" >&2
+		_cfg_warn "Config file has overly permissive permissions (%s): %s" "$perms" "$conf_file"
 	fi
 
 	# Check for dangerous patterns before sourcing
 	if grep -qE '(eval[[:space:]]|\$\(.*\)|`.*`|rm[[:space:]]+-rf)' "$conf_file" 2>/dev/null; then
-		printf "[ERROR] Config file contains potentially dangerous commands: %s\n" "$conf_file" >&2
+		_cfg_error "Config file contains potentially dangerous commands: %s" "$conf_file"
 		return $E_CONFIG_INVALID
 	fi
 
 	# Source the file with error handling
 	# shellcheck source=/dev/null
 	if ! source "$conf_file" 2>/dev/null; then
-		printf "[ERROR] Failed to load config file: %s\n" "$conf_file" >&2
+		_cfg_error "Failed to load config file: %s" "$conf_file"
 		return $E_CONFIG_SYNTAX
 	fi
 
@@ -162,7 +179,7 @@ function _validate_config_var() {
 	# Boolean validation
 	if [[ "$var" =~ ^(OSINT|SUBDOMAINS_GENERAL|VULNS_GENERAL|DEEP|AXIOM|NOTIFICATION|FARADAY|INCREMENTAL_MODE|ADAPTIVE_RATE_LIMIT|STRUCTURED_LOGGING|ASSET_STORE|QUICK_RESCAN)$ ]]; then
 		if [[ ! "$value" =~ ^(true|false)$ ]]; then
-			printf "[WARN] Invalid boolean value for %s: %s (expected true/false)\n" "$var" "$value" >&2
+			_cfg_warn "Invalid boolean value for %s: %s (expected true/false)" "$var" "$value"
 			return 1
 		fi
 	fi
@@ -170,7 +187,7 @@ function _validate_config_var() {
 	# Numeric validation
 	if [[ "$var" =~ _THREADS$|_RATELIMIT$|_TIMEOUT$ ]]; then
 		if [[ ! "$value" =~ ^[0-9]+$ ]]; then
-			printf "[WARN] Invalid numeric value for %s: %s\n" "$var" "$value" >&2
+			_cfg_warn "Invalid numeric value for %s: %s" "$var" "$value"
 			return 1
 		fi
 	fi
@@ -188,7 +205,7 @@ function validate_config() {
 
 	# Check conflicting configurations
 	if [[ "${VULNS_GENERAL:-false}" == true && "${SUBDOMAINS_GENERAL:-false}" == false ]]; then
-		printf "[WARN] VULNS_GENERAL=true but SUBDOMAINS_GENERAL=false\n" >&2
+		_cfg_warn "VULNS_GENERAL=true but SUBDOMAINS_GENERAL=false"
 		warnings=$((warnings + 1))
 	fi
 
@@ -207,7 +224,7 @@ function validate_config() {
 		local var_value
 		var_value="${!var:-}"
 		if [[ -n "$var_value" && ! "$var_value" =~ ^[0-9]+$ ]]; then
-			printf "[ERROR] %s must be numeric, got: %s\n" "$var" "$var_value" >&2
+			_cfg_error "%s must be numeric, got: %s" "$var" "$var_value"
 			errors=$((errors + 1))
 		fi
 	done
@@ -216,7 +233,7 @@ function validate_config() {
 	if [[ "${ADAPTIVE_RATE_LIMIT:-false}" == true ]]; then
 		if [[ -n "${MIN_RATE_LIMIT:-}" && -n "${MAX_RATE_LIMIT:-}" ]]; then
 			if [[ $MIN_RATE_LIMIT -gt $MAX_RATE_LIMIT ]]; then
-				printf "[ERROR] MIN_RATE_LIMIT > MAX_RATE_LIMIT\n" >&2
+				_cfg_error "MIN_RATE_LIMIT > MAX_RATE_LIMIT"
 				errors=$((errors + 1))
 			fi
 		fi
@@ -225,13 +242,13 @@ function validate_config() {
 	# Validate Axiom configuration
 	if [[ "${AXIOM:-false}" == true ]]; then
 		if ! command -v axiom-scan &>/dev/null; then
-			printf "[WARN] AXIOM=true but axiom-scan not found\n" >&2
+			_cfg_warn "AXIOM=true but axiom-scan not found"
 			warnings=$((warnings + 1))
 		fi
 	fi
 
 	if [[ $errors -gt 0 ]]; then
-		printf "[ERROR] Configuration validation failed\n" >&2
+		_cfg_error "Configuration validation failed"
 		return 1
 	fi
 
@@ -260,7 +277,7 @@ function migrate_legacy_config() {
 	local new_config_dir="${2:-$RECONFTW_CONFIG_DIR}"
 
 	if [[ ! -f "$old_config" ]]; then
-		printf "[ERROR] Legacy config file not found: %s\n" "$old_config" >&2
+		_cfg_error "Legacy config file not found: %s" "$old_config"
 		return 1
 	fi
 

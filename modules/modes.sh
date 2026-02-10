@@ -40,11 +40,6 @@ function start() {
     if [[ $upgrade_before_running == true ]]; then
         "${SCRIPTPATH}/install.sh" --tools
     fi
-    if [[ "${MONITOR_MODE:-false}" == "true" ]] && [[ "${MONITOR_CYCLE:-1}" -gt 1 ]]; then
-        notification "Monitor cycle ${MONITOR_CYCLE}: skipping repeated tools check" info
-    else
-        tools_installed
-    fi
 
     # Initialize incremental mode if enabled
     incremental_init
@@ -81,7 +76,7 @@ function start() {
     fi
     mkdir -p "$dir"
     cd "$dir" || {
-        echo "Failed to cd directory in ${FUNCNAME[0]} @ line ${LINENO}"
+        print_errorf "Failed to cd directory in %s @ line %s" "${FUNCNAME[0]}" "${LINENO}"
         exit 1
     }
     if [[ $AXIOM == true ]]; then
@@ -101,6 +96,8 @@ function start() {
     NOWT=$(date +"%T")
     LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
     touch ".log/${NOW}_${NOWT}.txt"
+    DEBUG_LOG="${dir}/debug.log"
+    touch "$DEBUG_LOG"
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
     enable_command_trace
 
@@ -112,6 +109,10 @@ function start() {
 
     # Initialize structured logging if enabled
     log_init
+
+    # Reset incidents for this run
+    INCIDENTS_LEVELS=()
+    INCIDENTS_ITEMS=()
 
     # Initialize cache for wordlists/resolvers
     cache_init
@@ -136,6 +137,12 @@ function start() {
                 "${bblue:-}" "${opt_mode:-r}" "${PARALLEL_MODE:-true}" "${OUTPUT_VERBOSITY:-1}" "${reset:-}"
         fi
         _print_rule
+    fi
+
+    if [[ "${MONITOR_MODE:-false}" == "true" ]] && [[ "${MONITOR_CYCLE:-1}" -gt 1 ]]; then
+        notification "Monitor cycle ${MONITOR_CYCLE}: skipping repeated tools check" info
+    else
+        tools_installed
     fi
 
 }
@@ -194,7 +201,7 @@ function end() {
                 ai_cmd+=("${ai_strict_flag}")
             fi
             if ! "${ai_cmd[@]}" 2>>"${LOGFILE}" >/dev/null; then
-                notification "AI report failed; check ${LOGFILE} for details" warn
+                notification "AI report failed; check ${DEBUG_LOG} for details" warn
             fi
         elif [[ -n "${ai_python}" ]]; then
             notification "AI skipped: reconftw_ai script not found at ${ai_script}" warn
@@ -299,9 +306,23 @@ function end() {
                 fi
             done
         fi
-        ui_summary "$domain" "$runtime" "$finaldir" "${subs_count:-0}" "${webs_count:-0}" \
+        local mode_label="FULL"
+        case "${opt_mode:-r}" in
+            n) mode_label="OSINT-ONLY" ;;
+            w) mode_label="WEB" ;;
+            s) mode_label="SUBDOMAINS" ;;
+            p) mode_label="PASSIVE" ;;
+            a) mode_label="ALL" ;;
+            z) mode_label="ZEN" ;;
+        esac
+        if [[ "${opt_mode:-r}" == "n" ]]; then
+            subs_count="N/A (OSINT-only)"
+            webs_count="N/A (OSINT-only)"
+        fi
+        ui_summary "$domain" "$runtime" "$finaldir" "$mode_label" "${subs_count:-0}" "${webs_count:-0}" \
             "${vulns_count[critical]}" "${vulns_count[high]}" "${vulns_count[medium]}" \
             "${vulns_count[low]}" "${vulns_count[info]}"
+        print_incidents "${DEBUG_LOG:-}"
     else
         _print_section "Scan Complete"
         if [[ "${RECON_PARTIAL_RUN:-false}" == "true" ]]; then
@@ -311,6 +332,7 @@ function end() {
         printf "%b  Duration: %s%b\n" "${bgreen:-}" "$runtime" "${reset:-}"
         printf "%b  Output:   %s%b\n" "${bgreen:-}" "$finaldir" "${reset:-}"
         _print_rule
+        print_incidents "${DEBUG_LOG:-}"
     fi
     notification "Finished Recon on: ${domain} under ${finaldir} in: ${runtime}" good "$(date +'%Y-%m-%d %H:%M:%S')"
     [ "$SOFT_NOTIFICATION" = true ] && echo "[$(date +'%Y-%m-%d %H:%M:%S')] Finished Recon on: ${domain} under ${finaldir} in: ${runtime}" | notify -silent
@@ -318,8 +340,10 @@ function end() {
     # Print performance timing summary
     print_timing_summary
     write_perf_summary
-    generate_consolidated_report || true
-    export_reports || true
+    if [[ "${NO_REPORT:-false}" != "true" ]]; then
+        generate_consolidated_report || true
+        export_reports || true
+    fi
 
 }
 
@@ -410,8 +434,6 @@ function passive() {
 
     _print_section "Web Detection"
 
-    webprobe_simple
-    webprobe_full
     favicon
     cdnprovider
     # shellcheck disable=SC2034  # PORTSCAN_ACTIVE controls scan behavior
@@ -539,11 +561,11 @@ function multi_osint() {
 
     workdir="${SCRIPTPATH}/Recon/${multi}"
     mkdir -p "$workdir" || {
-        echo "Failed to create directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"
+        print_errorf "Failed to create directory '%s' in %s @ line %s" "$workdir" "${FUNCNAME[0]}" "${LINENO}"
         exit 1
     }
     cd "$workdir" || {
-        echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"
+        print_errorf "Failed to cd directory '%s' in %s @ line %s" "$workdir" "${FUNCNAME[0]}" "${LINENO}"
         exit 1
     }
     mkdir -p {.log,.tmp,webs,hosts,vulns,osint,screenshots,subdomains}
@@ -552,6 +574,8 @@ function multi_osint() {
     NOWT=$(date +"%T")
     LOGFILE="${workdir}/.log/${NOW}_${NOWT}.txt"
     touch ".log/${NOW}_${NOWT}.txt"
+    DEBUG_LOG="${workdir}/debug.log"
+    touch "$DEBUG_LOG"
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
     enable_command_trace
 
@@ -561,7 +585,7 @@ function multi_osint() {
         called_fn_dir="$dir/.called_fn"
         mkdir -p "$dir"
         cd "$dir" || {
-            echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
+            print_errorf "Failed to cd directory '%s' in %s @ line %s" "$dir" "${FUNCNAME[0]}" "${LINENO}"
             exit 1
         }
         mkdir -p {.log,.tmp,webs,hosts,vulns,osint,screenshots,subdomains}
@@ -569,6 +593,8 @@ function multi_osint() {
         NOWT=$(date +"%T")
         LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
         touch ".log/${NOW}_${NOWT}.txt"
+        DEBUG_LOG="${dir}/debug.log"
+        touch "$DEBUG_LOG"
         echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
         domain_info
         ip_info
@@ -583,7 +609,7 @@ function multi_osint() {
         favicon
     done <"$list"
     cd "$workdir" || {
-        echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"
+        print_errorf "Failed to cd directory '%s' in %s @ line %s" "$workdir" "${FUNCNAME[0]}" "${LINENO}"
         exit 1
     }
     dir=$workdir
@@ -738,11 +764,11 @@ function multi_recon() {
 
     workdir="${SCRIPTPATH}/Recon/${multi}"
     mkdir -p "$workdir" || {
-        echo "Failed to create directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"
+        print_errorf "Failed to create directory '%s' in %s @ line %s" "$workdir" "${FUNCNAME[0]}" "${LINENO}"
         exit 1
     }
     cd "$workdir" || {
-        echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"
+        print_errorf "Failed to cd directory '%s' in %s @ line %s" "$workdir" "${FUNCNAME[0]}" "${LINENO}"
         exit 1
     }
 
@@ -751,6 +777,8 @@ function multi_recon() {
     NOWT=$(date +"%T")
     LOGFILE="${workdir}/.log/${NOW}_${NOWT}.txt"
     touch ".log/${NOW}_${NOWT}.txt"
+    DEBUG_LOG="${workdir}/debug.log"
+    touch "$DEBUG_LOG"
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
 
     [ -n "$flist" ] && LISTTOTAL=$(wc -l <"$flist")
@@ -762,16 +790,16 @@ function multi_recon() {
 
         # Ensure directories exist
         mkdir -p "$dir" || {
-            echo "Failed to create directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
+            print_errorf "Failed to create directory '%s' in %s @ line %s" "$dir" "${FUNCNAME[0]}" "${LINENO}"
             exit 1
         }
         mkdir -p "$called_fn_dir" || {
-            echo "Failed to create directory '$called_fn_dir' in ${FUNCNAME[0]} @ line ${LINENO}"
+            print_errorf "Failed to create directory '%s' in %s @ line %s" "$called_fn_dir" "${FUNCNAME[0]}" "${LINENO}"
             exit 1
         }
 
         cd "$dir" || {
-            echo "Failed to cd to directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
+            print_errorf "Failed to cd to directory '%s' in %s @ line %s" "$dir" "${FUNCNAME[0]}" "${LINENO}"
             exit 1
         }
 
@@ -785,9 +813,11 @@ function multi_recon() {
         mkdir -p .log
 
         touch "$LOGFILE" || {
-            echo "Failed to create log file: $LOGFILE"
+            print_errorf "Failed to create log file: %s" "$LOGFILE"
             exit 1
         }
+        DEBUG_LOG="${dir}/debug.log"
+        touch "$DEBUG_LOG"
         echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"$LOGFILE"
         enable_command_trace
         loopstart=$(date +%s)
@@ -814,7 +844,7 @@ function multi_recon() {
         fi
     done
     cd "$workdir" || {
-        echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"
+        print_errorf "Failed to cd directory '%s' in %s @ line %s" "$workdir" "${FUNCNAME[0]}" "${LINENO}"
         exit 1
     }
 
@@ -829,7 +859,7 @@ function multi_recon() {
         dir="$workdir/targets/$domain"
         called_fn_dir="$dir/.called_fn"
         cd "$dir" || {
-            echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
+            print_errorf "Failed to cd directory '%s' in %s @ line %s" "$dir" "${FUNCNAME[0]}" "${LINENO}"
             exit 1
         }
         subdomains_full
@@ -853,7 +883,7 @@ function multi_recon() {
         fi
     done
     cd "$workdir" || {
-        echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"
+        print_errorf "Failed to cd directory '%s' in %s @ line %s" "$workdir" "${FUNCNAME[0]}" "${LINENO}"
         exit 1
     }
 
@@ -881,7 +911,7 @@ function multi_recon() {
         dir="$workdir/targets/$domain"
         called_fn_dir="$dir/.called_fn"
         cd "$dir" || {
-            echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
+            print_errorf "Failed to cd directory '%s' in %s @ line %s" "$dir" "${FUNCNAME[0]}" "${LINENO}"
             exit 1
         }
         loopstart=$(date +%s)
@@ -910,7 +940,7 @@ function multi_recon() {
         dir="$workdir/targets/$domain"
         called_fn_dir="$dir/.called_fn"
         cd "$dir" || {
-            echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
+            print_errorf "Failed to cd directory '%s' in %s @ line %s" "$dir" "${FUNCNAME[0]}" "${LINENO}"
             exit 1
         }
         cms_scanner
@@ -930,7 +960,7 @@ function multi_recon() {
         fi
     done
     cd "$workdir" || {
-        echo "Failed to cd directory '$workdir' in ${FUNCNAME[0]} @ line ${LINENO}"
+        print_errorf "Failed to cd directory '%s' in %s @ line %s" "$workdir" "${FUNCNAME[0]}" "${LINENO}"
         exit 1
     }
     dir=$workdir
@@ -952,16 +982,16 @@ function multi_custom() {
 
     dir="${SCRIPTPATH}/Recon/${multi}"
     if [[ -z "$multi" || "$dir" != "${SCRIPTPATH}/Recon/"* ]]; then
-        echo "[!] Refusing to remove '$dir' -- safety check failed"
+        print_errorf "Refusing to remove '%s' -- safety check failed" "$dir"
         return 1
     fi
     rm -rf -- "$dir"
     mkdir -p "$dir" || {
-        echo "Failed to create directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
+        print_errorf "Failed to create directory '%s' in %s @ line %s" "$dir" "${FUNCNAME[0]}" "${LINENO}"
         exit 1
     }
     cd "$dir" || {
-        echo "Failed to cd directory '$dir' in ${FUNCNAME[0]} @ line ${LINENO}"
+        print_errorf "Failed to cd directory '%s' in %s @ line %s" "$dir" "${FUNCNAME[0]}" "${LINENO}"
         exit 1
     }
 
@@ -971,6 +1001,8 @@ function multi_custom() {
     NOWT=$(date +"%T")
     LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
     touch ".log/${NOW}_${NOWT}.txt"
+    DEBUG_LOG="${dir}/debug.log"
+    touch "$DEBUG_LOG"
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
     enable_command_trace
 
@@ -995,10 +1027,10 @@ function multi_custom() {
 
         currently=$(date +"%H:%M:%S")
         loopend=$(date +%s)
-        getElapsedTime "$loopstart" "$loopend"
-        _print_rule
-        printf "${bgreen}  Finished %s (%s/%s) for %s entries in %s (%s)${reset}\n" "$custom_f" "$func_count" "$func_total" "$entries" "$runtime" "$currently"
-        _print_rule
+        local duration=$((loopend - loopstart))
+        _print_status OK "$custom_f" "${duration}s"
+        [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && \
+            print_notice INFO "$custom_f" "entries ${entries} (${func_count}/${func_total}) at ${currently}"
     done
 
     if [[ $AXIOM == true ]]; then
@@ -1233,29 +1265,33 @@ function report_only_mode() {
     NOWT=$(date +"%T")
     LOGFILE="${dir}/.log/${NOW}_${NOWT}_report_only.txt"
     touch "$LOGFILE"
+    DEBUG_LOG="${dir}/debug.log"
+    touch "$DEBUG_LOG"
     runtime="report-only"
 
     notification "Report-only mode: rebuilding reports from existing artifacts" info
     build_hotlist || true
     write_perf_summary || true
-    generate_consolidated_report || true
-    export_reports || true
+    if [[ "${NO_REPORT:-false}" != "true" ]]; then
+        generate_consolidated_report || true
+        export_reports || true
+    fi
     notification "Report-only rebuild completed for ${domain}" good
 }
 
 function help() {
     pt_header "Usage"
     printf "\n Usage: %s [-d domain.tld] [-m name] [-l list.txt] [-x oos.txt] [-i in.txt] " "$0"
-    printf "\n           	      [-r] [-s] [-p] [-a] [-w] [-n] [-z] [-c] [-y] [-h] [-f] [--ai] [--deep] [--monitor] [--monitor-interval m] [--monitor-cycles n] [--report-only] [--refresh-cache] [--export fmt] [-o OUTPUT]\n\n"
-    printf " %sTARGET OPTIONS%s\n" "${bblue}" "${reset}"
+    printf "\n           	      [-r] [-s] [-p] [-a] [-w] [-n] [-z] [-c] [-y] [-h] [-f] [--ai] [--deep] [--monitor] [--monitor-interval m] [--monitor-cycles n] [--report-only] [--refresh-cache] [--gen-resolvers] [--export fmt] [-o OUTPUT]\n\n"
+    printf " %bTARGET OPTIONS%b\n" "${bblue}" "${reset}"
     printf "   -d domain.tld     Target domain\n"
     printf "   -m company        Target company name\n"
     printf "   -l list.txt       Targets list (One on each line)\n"
     printf "   -x oos.txt        Excludes subdomains list (Out Of Scope)\n"
     printf "   -i in.txt         Includes subdomains list\n"
     printf " \n"
-    printf " %sMODE OPTIONS%s\n" "${bblue}" "${reset}"
-    printf "   -r, --recon       Recon - Performs full recon process (without attacks)\n"
+    printf " %bMODE OPTIONS%b\n" "${bblue}" "${reset}"
+    printf "   -r, --recon       Recon - Performs full recon process (includes nuclei and fuzzing)\n"
     printf "   -s, --subdomains  Subdomains - Performs Subdomain Enumeration, Web probing and check for sub-tko\n"
     printf "   -p, --passive     Passive - Performs only passive steps\n"
     printf "   -a, --all         All - Performs all checks and active exploitations\n"
@@ -1266,7 +1302,7 @@ function help() {
     printf "   -y, --ai          AI - Analyzes ReconFTW results using a local LLM\n"
     printf "   -h                Help - Show help section\n"
     printf " \n"
-    printf " %sGENERAL OPTIONS%s\n" "${bblue}" "${reset}"
+    printf " %bGENERAL OPTIONS%b\n" "${bblue}" "${reset}"
     printf "   --deep            Deep scan (Enable some slow options for deeper scan)\n"
     printf "   -f config_file    Alternate reconftw.cfg file\n"
     printf "   -o output/path    Define output folder\n"
@@ -1283,32 +1319,37 @@ function help() {
     printf "   --parallel-log m  Parallel output mode: summary (default), tail, or full\n"
     printf "   --parallel        Run independent functions in parallel (faster but uses more resources)\n"
     printf "   --no-parallel     Force sequential execution\n"
+    printf "   --show-cache      Show cached modules lines (default collapses)\n"
+    printf "   --no-banner       Disable ASCII banner\n"
+    printf "   --legal           Show full legal block\n"
     printf "   --monitor         Continuous monitoring mode (single target; -w supports -l)\n"
     printf "   --monitor-interval Minutes between cycles (default: 60)\n"
     printf "   --monitor-cycles  Stop after N cycles (0 = infinite)\n"
     printf "   --report-only     Rebuild report artifacts from existing Recon/<target>\n"
+    printf "   --no-report       Disable report generation and exports\n"
     printf "   --refresh-cache   Force refresh of cached resolvers/wordlists\n"
-    printf "   --export fmt      Export artifacts: json|html|csv|all\n"
+    printf "   --gen-resolvers   Generate custom resolvers with dnsvalidator\n"
+    printf "   --export fmt      Export artifacts: json|html|csv|all (default: all)\n"
     printf " \n"
-    printf " %sUSAGE EXAMPLES%s\n" "${bblue}" "${reset}"
-    printf " %sPerform full recon (without attacks):%s\n" "${byellow}" "${reset}"
+    printf " %bUSAGE EXAMPLES%b\n" "${bblue}" "${reset}"
+    printf " %bPerform full recon (without attacks):%b\n" "${byellow}" "${reset}"
     printf " ./reconftw.sh -d example.com -r\n"
     printf " \n"
-    printf " %sPerform subdomain enumeration on multiple targets:%s\n" "${byellow}" "${reset}"
+    printf " %bPerform subdomain enumeration on multiple targets:%b\n" "${byellow}" "${reset}"
     printf " ./reconftw.sh -l targets.txt -s\n"
     printf " \n"
-    printf " %sPerform Web based scanning on a subdomains list:%s\n" "${byellow}" "${reset}"
+    printf " %bPerform Web based scanning on a subdomains list:%b\n" "${byellow}" "${reset}"
     printf " ./reconftw.sh -d example.com -l targets.txt -w\n"
     printf " \n"
-    printf " %sMultidomain recon:%s\n" "${byellow}" "${reset}"
+    printf " %bMultidomain recon:%b\n" "${byellow}" "${reset}"
     printf " ./reconftw.sh -m company -l domainlist.txt -r\n"
     printf " \n"
-    printf " %sPerform full recon (with active attacks) along Out-Of-Scope subdomains list:%s\n" "${byellow}" "${reset}"
+    printf " %bPerform full recon (with active attacks) along Out-Of-Scope subdomains list:%b\n" "${byellow}" "${reset}"
     printf " ./reconftw.sh -d example.com -x out.txt -a\n"
     printf " \n"
-    printf " %sAnalyze ReconFTW results with AI:%s\n" "${byellow}" "${reset}"
+    printf " %bAnalyze ReconFTW results with AI:%b\n" "${byellow}" "${reset}"
     printf " ./reconftw.sh -d example.com -r --ai\n"
     printf " \n"
-    printf " %sRun custom function:%s\n" "${byellow}" "${reset}"
+    printf " %bRun custom function:%b\n" "${byellow}" "${reset}"
     printf " ./reconftw.sh -d example.com -c nuclei_check \n"
 }

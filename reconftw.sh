@@ -112,7 +112,7 @@ if [[ $OSTYPE == "darwin"* ]]; then
     PATH="$(brew --prefix gnu-sed)/libexec/gnubin:$PATH"
 fi
 
-PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:zrspanwvyh' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,ai,check-tools,health-check,quick-rescan,incremental,adaptive-rate,dry-run,parallel,no-parallel,monitor,monitor-interval:,monitor-cycles:,refresh-cache,export:,report-only,parallel-log:,quiet,verbose,no-color,log-format:' -n 'reconFTW' -- "$@")
+PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:zrspanwvyh' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,ai,check-tools,health-check,quick-rescan,incremental,adaptive-rate,dry-run,parallel,no-parallel,monitor,monitor-interval:,monitor-cycles:,refresh-cache,gen-resolvers,export:,report-only,no-report,parallel-log:,quiet,verbose,no-color,log-format:,show-cache,banner,no-banner,legal' -n 'reconFTW' -- "$@")
 
 exit_status=$?
 if [[ $exit_status -ne 0 ]]; then
@@ -124,6 +124,9 @@ fi
 eval set -- "$PROGARGS"
 unset PROGARGS
 CLI_PARALLEL_MODE=""
+SHOW_CACHE=false
+SHOW_BANNER=false
+SHOW_LEGAL=false
 
 while true; do
     case "$1" in
@@ -132,14 +135,12 @@ while true; do
             target_input="$2"
             if [[ "$target_input" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(/[0-9]+)?$ ]]; then
                 if ! domain=$(sanitize_ip "$target_input"); then
-                    printf "%b[%s] ERROR: Invalid IP/CIDR provided: '%s'%b\n" \
-                        "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$target_input" "$reset"
+                    print_errorf "Invalid IP/CIDR provided: '%s'" "$target_input"
                     exit 1
                 fi
             else
                 if ! domain=$(sanitize_domain "$target_input"); then
-                    printf "%b[%s] ERROR: Invalid domain provided: '%s'%b\n" \
-                        "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$target_input" "$reset"
+                    print_errorf "Invalid domain provided: '%s'" "$target_input"
                     exit 1
                 fi
             fi
@@ -155,10 +156,8 @@ while true; do
         '-l' | '--list')
             list="$2"
             if ! validate_file_readable "$list"; then
-                printf "%b[%s] ERROR: List file not found or not readable: '%s'%b\n" \
-                    "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$list" "$reset" >&2
-                printf "%bUsage: -l <file> where file contains one target per line%b\n" \
-                    "$yellow" "$reset" >&2
+                print_errorf "List file not found or not readable: '%s'" "$list"
+                _print_msg WARN "Usage: -l <file> where file contains one target per line"
                 exit 1
             fi
             while IFS= read -r t; do
@@ -171,8 +170,7 @@ while true; do
         '-x')
             outOfScope_file=$2
             if [[ -n "$outOfScope_file" ]] && ! validate_file_readable "$outOfScope_file"; then
-                printf "%b[%s] ERROR: Out-of-scope file not found or not readable: '%s'%b\n" \
-                    "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$outOfScope_file" "$reset" >&2
+                print_errorf "Out-of-scope file not found or not readable: '%s'" "$outOfScope_file"
                 exit 1
             fi
             shift 2
@@ -181,8 +179,7 @@ while true; do
         '-i')
             inScope_file=$2
             if [[ -n "$inScope_file" ]] && ! validate_file_readable "$inScope_file"; then
-                printf "%b[%s] ERROR: In-scope file not found or not readable: '%s'%b\n" \
-                    "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$inScope_file" "$reset" >&2
+                print_errorf "In-scope file not found or not readable: '%s'" "$inScope_file"
                 exit 1
             fi
             shift 2
@@ -230,6 +227,26 @@ while true; do
             fi
             opt_mode='c'
             shift 2
+            continue
+            ;;
+        '--show-cache')
+            SHOW_CACHE=true
+            shift
+            continue
+            ;;
+        '--banner')
+            SHOW_BANNER=true
+            shift
+            continue
+            ;;
+        '--no-banner')
+            NO_BANNER=true
+            shift
+            continue
+            ;;
+        '--legal')
+            SHOW_LEGAL=true
+            shift
             continue
             ;;
         '-z' | '--zen')
@@ -342,11 +359,15 @@ while true; do
             shift
             continue
             ;;
+        '--gen-resolvers')
+            CLI_GENERATE_RESOLVERS=true
+            shift
+            continue
+            ;;
         '--export')
             CLI_EXPORT_FORMAT="$2"
             if [[ ! "$CLI_EXPORT_FORMAT" =~ ^(json|html|csv|all)$ ]]; then
-                printf "%b[%s] ERROR: Invalid --export value '%s' (allowed: json|html|csv|all)%b\n" \
-                    "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$CLI_EXPORT_FORMAT" "$reset" >&2
+                print_errorf "Invalid --export value '%s' (allowed: json|html|csv|all)" "$CLI_EXPORT_FORMAT"
                 exit 1
             fi
             shift 2
@@ -357,11 +378,15 @@ while true; do
             shift
             continue
             ;;
+        '--no-report')
+            NO_REPORT=true
+            shift
+            continue
+            ;;
         '--parallel-log')
             CLI_PARALLEL_LOG_MODE="$2"
             if [[ ! "$CLI_PARALLEL_LOG_MODE" =~ ^(summary|tail|full)$ ]]; then
-                printf "%b[%s] ERROR: Invalid --parallel-log value '%s' (allowed: summary|tail|full)%b\n" \
-                    "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$CLI_PARALLEL_LOG_MODE" "$reset" >&2
+                print_errorf "Invalid --parallel-log value '%s' (allowed: summary|tail|full)" "$CLI_PARALLEL_LOG_MODE"
                 exit 1
             fi
             shift 2
@@ -385,14 +410,14 @@ while true; do
         '--log-format')
             CLI_LOG_FORMAT="$2"
             if [[ ! "$CLI_LOG_FORMAT" =~ ^(plain|jsonl)$ ]]; then
-                printf "%b[%s] ERROR: Invalid --log-format value '%s' (allowed: plain|jsonl)%b\n" \
-                    "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$CLI_LOG_FORMAT" "$reset" >&2
+                print_errorf "Invalid --log-format value '%s' (allowed: plain|jsonl)" "$CLI_LOG_FORMAT"
                 exit 1
             fi
             shift 2
             continue
             ;;
         '--help' | '-h')
+            HELP_REQUESTED=true
             break
             ;;
         *)
@@ -410,7 +435,7 @@ SCRIPTPATH="$(
     pwd -P
 )"
 . "${SCRIPTPATH}"/reconftw.cfg || {
-    echo "Error importing reconftw.cfg"
+    _print_error "Error importing reconftw.cfg"
     exit 1
 }
 
@@ -420,7 +445,7 @@ SCRIPTPATH="$(
 if [[ -s $CUSTOM_CONFIG ]]; then
     # shellcheck source=/home/six2dez/Tools/reconftw/custom_config.cfg
     . "${CUSTOM_CONFIG}" || {
-        echo "Error importing custom config"
+        _print_error "Error importing custom config"
         exit 1
     }
 fi
@@ -437,6 +462,9 @@ if [[ -n "${CLI_MONITOR_MAX_CYCLES:-}" ]]; then
 fi
 if [[ "${CLI_CACHE_REFRESH:-false}" == "true" ]]; then
     CACHE_REFRESH=true
+fi
+if [[ "${CLI_GENERATE_RESOLVERS:-false}" == "true" ]]; then
+    generate_resolvers=true
 fi
 if [[ -n "${CLI_EXPORT_FORMAT:-}" ]]; then
     EXPORT_FORMAT="${CLI_EXPORT_FORMAT}"
@@ -460,6 +488,23 @@ if [[ -n "${CLI_LOG_FORMAT:-}" ]]; then
 fi
 if [[ -n "${CLI_NO_COLOR:-}" ]]; then
     NO_COLOR=1
+fi
+
+if [[ "${HELP_REQUESTED:-false}" == "true" ]]; then
+    help
+    exit 0
+fi
+
+if [[ "${NO_BANNER:-false}" == "true" ]]; then
+    SHOW_BANNER=false
+else
+    SHOW_BANNER=true
+fi
+
+if [[ "${NO_REPORT:-false}" == "true" ]]; then
+    EXPORT_FORMAT=""
+elif [[ -z "${EXPORT_FORMAT:-}" ]]; then
+    EXPORT_FORMAT="all"
 fi
 
 if [[ $opt_deep ]]; then
@@ -496,16 +541,21 @@ else
 fi
 
 startdir=${PWD}
+SHOW_BANNER=${SHOW_BANNER:-true}
 
 # Initialize UI layer after config and CLI overrides (before any output)
 ui_init
 
-banner
-printf "\n\n" # Two empty lines after banner
-printf "  %b[LEGAL]%b Authorized testing only. You confirm explicit permission\n" "$yellow" "$reset"
-printf "          for specified targets and compliance with applicable laws.\n"
-printf "          Unauthorized use is prohibited.\n\n"
-printf "\n"
+if [[ "${SHOW_BANNER:-false}" == "true" ]]; then
+    banner
+    printf "\n\n" # Two empty lines after banner
+fi
+if [[ "${SHOW_LEGAL:-false}" == "true" ]]; then
+    printf "  %b[LEGAL]%b Authorized testing only. You confirm explicit permission\n" "$yellow" "$reset"
+    printf "          for specified targets and compliance with applicable laws.\n"
+    printf "          Unauthorized use is prohibited.\n\n"
+    printf "\n"
+fi
 
 check_version
 

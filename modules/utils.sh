@@ -103,30 +103,30 @@ function validate_config() {
 
     # Check conflicting configs
     if [[ ${VULNS_GENERAL:-false} == true && ${SUBDOMAINS_GENERAL:-false} == false ]]; then
-        printf "%b[WARN] VULNS_GENERAL=true but SUBDOMAINS_GENERAL=false -- vulnerability scans need subdomain data%b\n" "$yellow" "$reset"
+        print_warnf "VULNS_GENERAL=true but SUBDOMAINS_GENERAL=false -- vulnerability scans need subdomain data"
         warnings=$((warnings + 1))
     fi
 
     # Validate numeric thread/rate variables
     for var in FFUF_THREADS HTTPX_THREADS DALFOX_THREADS KATANA_THREADS HTTPX_RATELIMIT NUCLEI_RATELIMIT FFUF_RATELIMIT; do
         if [[ -n "${!var:-}" && ! "${!var}" =~ ^[0-9]+$ ]]; then
-            printf "%b[ERROR] %s must be numeric, got: %s%b\n" "$bred" "$var" "${!var}" "$reset"
+            print_errorf "%s must be numeric, got: %s" "$var" "${!var}"
             errors=$((errors + 1))
         fi
     done
 
     # Check Axiom tool availability if enabled
     if [[ ${AXIOM:-false} == true ]] && ! command -v axiom-scan >/dev/null 2>&1; then
-        printf "%b[WARN] AXIOM=true but axiom-scan not found in PATH%b\n" "$yellow" "$reset"
+        print_warnf "AXIOM=true but axiom-scan not found in PATH"
         warnings=$((warnings + 1))
     fi
 
     if [[ $errors -gt 0 ]]; then
-        printf "%b[ERROR] Configuration has %d error(s). Please fix before running.%b\n" "$bred" "$errors" "$reset"
+        print_errorf "Configuration has %d error(s). Please fix before running." "$errors"
         return $E_CONFIG
     fi
     if [[ $warnings -gt 0 ]]; then
-        printf "%b[INFO] Configuration has %d warning(s).%b\n" "$yellow" "$warnings" "$reset"
+        print_notice INFO "config" "Configuration has ${warnings} warning(s)."
     fi
     return 0
 }
@@ -349,7 +349,15 @@ function run_command() {
     if [[ "${ADAPTIVE_RATE_LIMIT:-false}" == "true" ]]; then
         run_with_adaptive_rate "$@"
     else
-        "$@"
+        if [[ -n "${DEBUG_LOG:-}" ]]; then
+            if [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
+                "$@" 2> >(tee -a "$DEBUG_LOG" >&2)
+            else
+                "$@" 2>>"$DEBUG_LOG"
+            fi
+        else
+            "$@"
+        fi
     fi
 }
 
@@ -506,21 +514,18 @@ function sanitize_domain() {
 
     # Check if domain is empty after sanitization
     if [[ -z "$sanitized" ]]; then
-        printf "%b[%s] ERROR: Invalid domain after sanitization: '%s'%b\n" \
-            "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$input_domain" "$reset" >&2
+        print_errorf "Invalid domain after sanitization: '%s'" "$input_domain"
         return 1
     fi
 
     # Check for basic domain format (at least one dot for TLD)
     if [[ ! "$sanitized" =~ \. ]]; then
-        printf "%b[%s] WARNING: Domain '%s' has no TLD, may be invalid%b\n" \
-            "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$sanitized" "$reset" >&2
+        print_warnf "Domain '%s' has no TLD, may be invalid" "$sanitized"
     fi
 
     # If sanitization removed characters, warn user
     if [[ "$input_domain" != "$sanitized" ]]; then
-        printf "%b[%s] INFO: Domain sanitized from '%s' to '%s'%b\n" \
-            "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$input_domain" "$sanitized" "$reset" >&2
+        print_notice INFO "sanitize_domain" "Domain sanitized from '${input_domain}' to '${sanitized}'"
     fi
 
     echo "$sanitized"
@@ -537,8 +542,7 @@ function sanitize_ip() {
     sanitized=$(echo "$input" | tr -cd '0-9./,')
 
     if [[ -z "$sanitized" ]]; then
-        printf "%b[%s] ERROR: Invalid IP/CIDR after sanitization: '%s'%b\n" \
-            "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$input" "$reset" >&2
+        print_errorf "Invalid IP/CIDR after sanitization: '%s'" "$input"
         return 1
     fi
 
@@ -573,9 +577,8 @@ function check_secrets_permissions() {
             
             # Check if file is readable by group or others
             if [[ -n "$perms" && "$perms" != "600" && "$perms" != "400" ]]; then
-                printf "%b[%s] WARNING: Insecure permissions (%s) on sensitive file: %s%b\n" \
-                    "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$perms" "$file" "$reset" >&2
-                printf "%b         Recommended: chmod 600 %s%b\n" "$yellow" "$file" "$reset" >&2
+                print_warnf "Insecure permissions (%s) on sensitive file: %s" "$perms" "$file"
+                print_notice WARN "config" "Recommended: chmod 600 ${file}"
                 ((warnings++))
             fi
         fi

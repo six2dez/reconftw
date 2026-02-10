@@ -83,22 +83,9 @@ print_webs_summary() {
     [[ -s "$webs_file" ]] || return 0
 
     sort -u "$webs_file" -o "$webs_file" 2>/dev/null || true
-    local web_count shown max_show
+    local web_count
     web_count=$(wc -l <"$webs_file" | tr -d ' ')
-    max_show=10
-    [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && max_show=$web_count
-
-    printf "         Total: %s webs\n" "$web_count"
-    shown=0
-    while IFS= read -r web; do
-        shown=$((shown + 1))
-        if [[ $shown -le $max_show ]]; then
-            printf "         %s\n" "$web"
-        else
-            printf "         ... and %d more (see %s)\n" "$((web_count - max_show))" "$webs_file"
-            break
-        fi
-    done <"$webs_file"
+    print_artifacts "${web_count} hosts -> ${webs_file}"
 }
 
 ###############################################################################
@@ -160,7 +147,7 @@ function webprobe_simple() {
         # Remove out-of-scope entries
         if [[ -s $outOfScope_file ]]; then
             if ! deleteOutScoped "$outOfScope_file" .tmp/probed_tmp.txt; then
-                printf "%b[!] Failed to delete out-of-scope entries.%b\n" "$bred" "$reset"
+                print_warnf "Failed to delete out-of-scope entries."
             fi
         fi
 
@@ -168,7 +155,7 @@ function webprobe_simple() {
 
         # Count new websites
         if ! NUMOFLINES=$(anew webs/webs.txt <.tmp/probed_tmp.txt 2>/dev/null | sed '/^$/d' | wc -l); then
-            printf "%b[!] Failed to count new websites.%b\n" "$bred" "$reset"
+            print_warnf "Failed to count new websites."
             NUMOFLINES=0
         fi
 
@@ -256,17 +243,12 @@ function webprobe_full() {
 
             # Count new websites
             if ! NUMOFLINES=$(anew webs/webs_uncommon_ports.txt <.tmp/probed_uncommon_ports_tmp.txt | sed '/^$/d' | wc -l); then
-                printf "%b[!] Failed to count new websites.%b\n" "$bred" "$reset"
+                print_warnf "Failed to count new websites."
                 NUMOFLINES=0
             fi
 
             # Notify user
             notification "Uncommon web ports: ${NUMOFLINES} new websites" "good"
-
-            # Display new uncommon ports websites
-            if [[ -s "webs/webs_uncommon_ports.txt" ]]; then
-                cat "webs/webs_uncommon_ports.txt"
-            fi
 
             # Update webs_all.txt
             cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
@@ -381,8 +363,8 @@ function favicon() {
 
         # Navigate to the fav-up tool directory
         if ! pushd "${tools}/fav-up" >/dev/null; then
-            printf "%b[!] Failed to change directory to %s in %s @ line %s.%b\n" \
-                "$bred" "${tools}/fav-up" "${FUNCNAME[0]}" "${LINENO}" "$reset"
+            print_warnf "Failed to change directory to %s in %s @ line %s." \
+                "${tools}/fav-up" "${FUNCNAME[0]}" "${LINENO}"
             return 1
         fi
 
@@ -414,8 +396,8 @@ function favicon() {
 
         # Return to the original directory
         if ! popd >/dev/null; then
-            printf "%b[!] Failed to return to the previous directory in %s @ line %s.%b\n" \
-                "$bred" "${FUNCNAME[0]}" "${LINENO}" "$reset"
+            print_warnf "Failed to return to the previous directory in %s @ line %s." \
+                "${FUNCNAME[0]}" "${LINENO}"
         fi
 
         end_func "Results are saved in hosts/favicontest.txt" "${FUNCNAME[0]}"
@@ -480,11 +462,10 @@ function portscan() {
             ips_nocdn_count=$(sort -u ".tmp/ips_nocdn.txt" | wc -l | tr -d ' ')
         fi
 
-        _print_msg INFO "Resolved IP addresses (No CDN): ${ips_nocdn_count}"
         if ((ips_nocdn_count > 0)); then
-            sort -u ".tmp/ips_nocdn.txt"
+            _print_msg INFO "Resolved IP addresses (No CDN): ${ips_nocdn_count} (see .tmp/ips_nocdn.txt)"
         else
-            printf "  None\n"
+            _print_msg INFO "Resolved IP addresses (No CDN): none"
         fi
         printf "\n"
 
@@ -504,12 +485,12 @@ function portscan() {
 
         if [[ $PORTSCAN_PASSIVE == true ]]; then
             if [[ ! -f $ips_file ]]; then
-                printf "%b[!] File %s does not exist.%b\n" "$bred" "$ips_file" "$reset"
+                print_warnf "File %s does not exist." "$ips_file"
             else
                 json_array=()
                 while IFS= read -r cip; do
                     if ! json_result=$(curl -s "https://internetdb.shodan.io/${cip}"); then
-                        printf "%b[!] Failed to retrieve data for IP %s.%b\n" "$bred" "$cip" "$reset"
+                        print_warnf "Failed to retrieve data for IP %s." "$cip"
                     else
                         json_array+=("$json_result")
                     fi
@@ -523,7 +504,7 @@ function portscan() {
                 done
                 formatted_json+="]"
                 if ! echo "$formatted_json" >"${dir}/hosts/portscan_shodan.txt"; then
-                    printf "%b[!] Failed to write portscan_shodan.txt.%b\n" "$bred" "$reset"
+                    print_warnf "Failed to write portscan_shodan.txt."
                 fi
             fi
         fi
@@ -570,7 +551,7 @@ function portscan() {
         if [[ $FARADAY == true ]]; then
             # Check if the Faraday server is running
             if ! faraday-cli status 2>>"$LOGFILE" >/dev/null; then
-                printf "%b[!] Faraday server is not running. Skipping Faraday integration.%b\n" "$bred" "$reset"
+                print_warnf "Faraday server is not running. Skipping Faraday integration."
             else
                 if [[ -s "hosts/portscan_active.xml" ]]; then
                     faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nmap hosts/portscan_active.xml 2>>"$LOGFILE" >/dev/null
@@ -580,11 +561,10 @@ function portscan() {
 
         if [[ -s "hosts/webs.txt" ]]; then
             if ! NUMOFLINES=$(wc -l <hosts/webs.txt); then
-                printf "%b[!] Failed to count lines in hosts/webs.txt.%b\n" "$bred" "$reset"
+                print_warnf "Failed to count lines in hosts/webs.txt."
                 NUMOFLINES=0
             fi
             notification "Webs detected from port scan: ${NUMOFLINES} new websites" "good"
-            cat hosts/webs.txt
             append_assets_from_file web url hosts/webs.txt
         fi
 
@@ -676,7 +656,7 @@ function waf_checks() {
 
                 # Count the number of websites protected by WAF
                 if ! NUMOFLINES=$(sed '/^$/d' "webs/webs_wafs.txt" 2>>"$LOGFILE" | wc -l); then
-                    printf "%b[!] Failed to count lines in webs_wafs.txt.%b\n" "$bred" "$reset"
+                    print_warnf "Failed to count lines in webs_wafs.txt."
                     NUMOFLINES=0
                 fi
 
@@ -747,7 +727,9 @@ _nuclei_parse_results() {
         jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' "nuclei_output/${crit}_json.txt" >"nuclei_output/${crit}.txt"
         append_assets_from_file finding value "nuclei_output/${crit}.txt"
         if [[ -s "nuclei_output/${crit}.txt" ]]; then
-            cat "nuclei_output/${crit}.txt"
+            local _count
+            _count=$(wc -l <"nuclei_output/${crit}.txt" | tr -d ' ')
+            _print_status OK "nuclei_${crit}" "${_count} findings -> nuclei_output/${crit}.txt"
         fi
     fi
 }
@@ -829,7 +811,7 @@ function nuclei_check() {
         # Faraday integration
         if [[ $FARADAY == true ]]; then
             if ! faraday-cli status 2>>"$LOGFILE" >/dev/null; then
-                printf "%b[!] Faraday server is not running. Skipping Faraday integration.%b\n" "$bred" "$reset"
+                print_warnf "Faraday server is not running. Skipping Faraday integration."
             else
                 # Report all severity levels to Faraday
                 IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
@@ -1019,7 +1001,7 @@ function fuzz() {
 
         # Handle multi mode initialization
         if [[ -n $multi ]] && [[ ! -f "$dir/webs/webs.txt" ]]; then
-            printf "%b\n" "$domain" >"$dir/webs/webs.txt" || printf "%b[!] Failed to create webs.txt.%b\n" "$bred" "$reset"
+            printf "%b\n" "$domain" >"$dir/webs/webs.txt" || print_warnf "Failed to create webs.txt."
             touch webs/webs_uncommon_ports.txt 2>>"$LOGFILE" || true
         fi
 
@@ -1110,7 +1092,7 @@ function cms_scanner() {
 
     # Create necessary directories
     if ! mkdir -p .tmp/fuzzing webs cms; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
+        print_warnf "Failed to create directories."
         return 1
     fi
 
@@ -1352,7 +1334,7 @@ function urlchecks() {
 
                 if [[ -s ".tmp/url_extract_uddup.txt" ]]; then
                     if ! NUMOFLINES=$(anew webs/url_extract.txt <.tmp/url_extract_uddup.txt | sed '/^$/d' | wc -l); then
-                        printf "%b[!] Failed to update url_extract.txt.%b\n" "$bred" "$reset"
+                        print_warnf "Failed to update url_extract.txt."
                         NUMOFLINES=0
                     fi
                     notification "${NUMOFLINES} new URLs with parameters" "info"
@@ -1391,7 +1373,7 @@ function url_gf() {
 
     # Create necessary directories
     if ! mkdir -p .tmp webs gf; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
+        print_warnf "Failed to create directories."
         return 1
     fi
 
@@ -1462,7 +1444,7 @@ function url_ext() {
 
     # Create necessary directories
     if ! mkdir -p .tmp webs gf; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
+        print_warnf "Failed to create directories."
         return 1
     fi
 
@@ -1478,7 +1460,7 @@ function url_ext() {
 
             # Initialize the output file
             if ! : >webs/urls_by_ext.txt; then
-                printf "%b[!] Failed to initialize webs/urls_by_ext.txt.%b\n" "$bred" "$reset"
+                print_warnf "Failed to initialize webs/urls_by_ext.txt."
             fi
 
             # Iterate over extensions and extract matching URLs
@@ -1526,7 +1508,7 @@ function jschecks() {
 
     # Create necessary directories
     if ! mkdir -p .tmp webs subdomains js; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
+        print_warnf "Failed to create directories."
         return 1
     fi
 
@@ -1541,7 +1523,7 @@ function jschecks() {
 
         if [[ -s ".tmp/url_extract_js.txt" ]]; then
 
-            printf "%bRunning: Fetching URLs 1/6%b\n" "$yellow" "$reset"
+            [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && printf "%bRunning: Fetching URLs 1/6%b\n" "$yellow" "$reset"
             if [[ $AXIOM != true ]]; then
                 subjs -ua "Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -c 40 <.tmp/url_extract_js.txt \
                     | grep -F "$domain" \
@@ -1559,7 +1541,7 @@ function jschecks() {
             urless <.tmp/url_extract_js.txt \
                 | anew -q js/url_extract_js.txt 2>>"$LOGFILE" >/dev/null
 
-            printf "%bRunning: Resolving JS URLs 2/6%b\n" "$yellow" "$reset"
+            [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && printf "%bRunning: Resolving JS URLs 2/6%b\n" "$yellow" "$reset"
             if [[ $AXIOM != true ]]; then
                 if [[ -s "js/url_extract_js.txt" ]]; then
                     httpx -follow-redirects -random-agent -silent -timeout "$HTTPX_TIMEOUT" -threads "$HTTPX_THREADS" \
@@ -1578,9 +1560,9 @@ function jschecks() {
                 fi
             fi
 
-            printf "%bRunning: Extracting JS from sourcemaps 3/6%b\n" "$yellow" "$reset"
+            [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && printf "%bRunning: Extracting JS from sourcemaps 3/6%b\n" "$yellow" "$reset"
             if ! mkdir -p .tmp/sourcemapper; then
-                printf "%b[!] Failed to create sourcemapper directory.%b\n" "$bred" "$reset"
+                print_warnf "Failed to create sourcemapper directory."
             fi
             if [[ -s "js/js_livelinks.txt" ]]; then
                 interlace -tL js/js_livelinks.txt -threads "$INTERLACE_THREADS" \
@@ -1597,7 +1579,7 @@ function jschecks() {
             find .tmp/sourcemapper/ \( -name "*.js" -o -name "*.ts" \) -type f \
                 | jsluice urls | jq -r .url | anew -q .tmp/js_endpoints.txt || true
 
-            printf "%bRunning: Gathering endpoints 4/6%b\n" "$yellow" "$reset"
+            [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && printf "%bRunning: Gathering endpoints 4/6%b\n" "$yellow" "$reset"
             if [[ -s "js/js_livelinks.txt" ]]; then
                 xnLinkFinder -i js/js_livelinks.txt -sf subdomains/subdomains.txt -d "$XNLINKFINDER_DEPTH" \
                     -o .tmp/js_endpoints.txt 2>>"$LOGFILE" >/dev/null
@@ -1608,7 +1590,7 @@ function jschecks() {
                 cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt || true
             fi
 
-            printf "%bRunning: Gathering secrets 5/6%b\n" "$yellow" "$reset"
+            [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && printf "%bRunning: Gathering secrets 5/6%b\n" "$yellow" "$reset"
             if [[ -s "js/js_livelinks.txt" ]]; then
                 if [[ $AXIOM != true ]]; then
                     cat js/js_livelinks.txt | mantra -ua \"$HEADER\" -s | anew -q js/js_secrets.txt 2>>"$LOGFILE" >/dev/null || true
@@ -1627,7 +1609,7 @@ function jschecks() {
                 find .tmp/sourcemapper/ -type f -name "*.js" | jsluice secrets -j --patterns="${tools}/jsluice_patterns.json" | anew -q js/js_secrets_jsmap_jsluice.txt
             fi
 
-            printf "%bRunning: Building wordlist 6/6%b\n" "$yellow" "$reset"
+            [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && printf "%bRunning: Building wordlist 6/6%b\n" "$yellow" "$reset"
             if [[ -s "js/js_livelinks.txt" ]]; then
                 if [[ -n "${GETJSWORDS_VENV:-}" ]]; then
                     if [[ -f "${GETJSWORDS_VENV}/bin/activate" ]]; then
@@ -1765,7 +1747,7 @@ function wordlist_gen_roboxtractor() {
 
     # Create necessary directories
     if ! mkdir -p .tmp webs gf; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
+        print_warnf "Failed to create directories."
         return 1
     fi
 
@@ -1816,7 +1798,7 @@ function password_dict() {
 
     # Create necessary directories
     if ! mkdir -p "$dir/webs"; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
+        print_warnf "Failed to create directories."
         return 1
     fi
 
@@ -1858,7 +1840,7 @@ function brokenLinks() {
 
     # Create necessary directories
     if ! mkdir -p .tmp webs vulns; then
-        printf "%b[!] Failed to create directories.%b\n" "$bred" "$reset"
+        print_warnf "Failed to create directories."
         return 1
     fi
 

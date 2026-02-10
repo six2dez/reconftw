@@ -14,6 +14,7 @@ _UI_OK_COUNT=0
 _UI_WARN_COUNT=0
 _UI_FAIL_COUNT=0
 _UI_SKIP_COUNT=0
+_UI_CACHE_COUNT=0
 
 ui_init() {
     # TTY detection
@@ -48,12 +49,13 @@ ui_count_inc() {
         WARN) ((_UI_WARN_COUNT++)) || true ;;
         FAIL) ((_UI_FAIL_COUNT++)) || true ;;
         SKIP) ((_UI_SKIP_COUNT++)) || true ;;
+        CACHE) ((_UI_CACHE_COUNT++)) || true ;;
     esac
 }
 
 ui_counts_summary() {
-    printf "OK:%d WARN:%d FAIL:%d SKIP:%d" \
-        "$_UI_OK_COUNT" "$_UI_WARN_COUNT" "$_UI_FAIL_COUNT" "$_UI_SKIP_COUNT"
+    printf "OK:%d WARN:%d FAIL:%d SKIP:%d CACHE:%d" \
+        "$_UI_OK_COUNT" "$_UI_WARN_COUNT" "$_UI_FAIL_COUNT" "$_UI_SKIP_COUNT" "$_UI_CACHE_COUNT"
 }
 
 ui_header() {
@@ -64,12 +66,29 @@ ui_header() {
     local outdir="${dir:-unknown}"
     local started
     started=$(date +'%Y-%m-%d %H:%M:%S')
+    local mode_label="FULL"
+    case "${opt_mode:-r}" in
+        n) mode_label="OSINT-ONLY" ;;
+        w) mode_label="WEB" ;;
+        s) mode_label="SUBDOMAINS" ;;
+        p) mode_label="PASSIVE" ;;
+        a) mode_label="ALL" ;;
+        z) mode_label="ZEN" ;;
+    esac
 
-    printf "\n%b───────────────────────────────────────────────────────────────%b\n" "${bgreen:-}" "${reset:-}"
-    printf "  Target:   %b%s%b\n" "${bred:-}" "$target" "${reset:-}"
-    printf "  Profile:  %s │ Parallel: %s │ Jobs: %s\n" \
-        "$(basename "${profile}")" "$parallel" "$threads"
-    printf "  Output:   %s\n" "$outdir"
+    local header_line
+    header_line=$(printf "reconftw %s by @six2dez | Authorized testing only" "${reconftw_version:-}")
+    local header_rule=""
+    local i
+    for ((i = 0; i < ${#header_line}; i++)); do
+        header_rule+="─"
+    done
+    printf "%b%s%b\n" "${bgreen:-}" "$header_rule" "${reset:-}"
+    printf "%b%s%b\n" "${bgreen:-}" "$header_line" "${reset:-}"
+    printf "%b%s%b\n" "${bgreen:-}" "$header_rule" "${reset:-}"
+    printf "Mode: %s | Target: %s | Profile: %s | Parallel: %s | Jobs: %s\n" \
+        "$mode_label" "$target" "$(basename "${profile}")" "$parallel" "$threads"
+    printf "Output: %s\n" "$outdir"
     if [[ -n "${PERF_PROFILE_INFO:-}" ]] || [[ -n "${DISK_SPACE_INFO:-}" ]]; then
         local info_line=""
         if [[ -n "${PERF_PROFILE_INFO:-}" ]]; then
@@ -82,10 +101,9 @@ ui_header() {
                 info_line="${DISK_SPACE_INFO}"
             fi
         fi
-        printf "  Info:     %s\n" "$info_line"
+        printf "System: %s\n" "$info_line"
     fi
-    printf "  Started:  %s\n" "$started"
-    printf "%b───────────────────────────────────────────────────────────────%b\n\n" "${bgreen:-}" "${reset:-}"
+    printf "Started: %s\n\n" "$started"
 }
 
 ui_section() {
@@ -124,27 +142,10 @@ ui_batch_start() {
 
 ui_batch_row() {
     local badge="$1" task="$2" duration="$3" detail="${4:-}"
-    local color dots
-
-    case "$badge" in
-        OK)   color="${bgreen:-}" ;;
-        FAIL) color="${bred:-}" ;;
-        WARN) color="${yellow:-}" ;;
-        SKIP) color="${yellow:-}" ;;
-        *)    color="" ;;
-    esac
-
-    local task_len=${#task}
-    local dot_count=$((34 - task_len))
-    ((dot_count < 2)) && dot_count=2
-    dots=$(printf '%*s' "$dot_count" '' | tr ' ' '.')
-
-    if [[ -n "$detail" ]]; then
-        printf "    %b[%-4s]%b %s %s %4ss → %s\n" \
-            "$color" "$badge" "${reset:-}" "$task" "$dots" "$duration" "$detail"
+    if declare -F print_task >/dev/null 2>&1; then
+        print_task "$badge" "$task" "$duration" "$detail"
     else
-        printf "    %b[%-4s]%b %s %s %4ss\n" \
-            "$color" "$badge" "${reset:-}" "$task" "$dots" "$duration"
+        printf "    [%s] %s %ss\n" "$badge" "$task" "$duration"
     fi
 }
 
@@ -155,25 +156,23 @@ ui_batch_end() {
 }
 
 ui_summary() {
-    local target="$1" duration="$2" outdir="$3"
-    local subs="${4:-0}" webs="${5:-0}"
-    local crit="${6:-0}" high="${7:-0}" med="${8:-0}" low="${9:-0}" info="${10:-0}"
+    local target="$1" duration="$2" outdir="$3" mode_label="$4"
+    local subs="${5:-0}" webs="${6:-0}"
+    local crit="${7:-0}" high="${8:-0}" med="${9:-0}" low="${10:-0}" info="${11:-0}"
+    local debug_log="${DEBUG_LOG:-}"
 
     printf "\n"
-    _print_rule
-    printf "  %bRESULTS: %s%b\n" "${bblue:-}" "$target" "${reset:-}"
-    _print_rule
-    printf "  Subdomains:     %s\n" "$subs"
-    printf "  Web hosts:      %s\n" "$webs"
-    printf "  Vulnerabilities: %b🔴 %d%b │ %b🟠 %d%b │ %b🟡 %d%b │ %b🔵 %d%b │ %bℹ️  %d%b\n" \
-        "${bred:-}" "$crit" "${reset:-}" \
-        "${yellow:-}" "$high" "${reset:-}" \
-        "${yellow:-}" "$med" "${reset:-}" \
-        "${bblue:-}" "$low" "${reset:-}" \
-        "${cyan:-}" "$info" "${reset:-}"
-    printf "  Duration:       %s\n" "$duration"
-    printf "  Output:         %s\n" "$outdir"
-    _print_rule
+    printf "RESULTS  %s\n" "$target"
+    printf "Mode: %s\n" "$mode_label"
+    printf "Subdomains: %s\n" "$subs"
+    printf "Web hosts: %s\n" "$webs"
+    printf "Findings: C %d | H %d | M %d | L %d | I %d\n" \
+        "$crit" "$high" "$med" "$low" "$info"
+    printf "Duration: %s\n" "$duration"
+    printf "Output: %s\n" "$outdir"
+    if [[ -n "$debug_log" ]] && (( _UI_FAIL_COUNT > 0 || _UI_WARN_COUNT > 0 )); then
+        printf "Debug log: %s\n" "$debug_log"
+    fi
     printf "\n"
 }
 

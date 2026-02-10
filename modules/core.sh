@@ -110,7 +110,6 @@ function banner() {
     local banner_code
     if banner_code=$(banner_grabber); then
         printf "\n%b%s" "$bgreen" "$banner_code"
-        printf "\n %s                                 by @six2dez%b\n" "$reconftw_version" "$reset"
     else
         printf "\n%bFailed to load banner.%b\n" "$bgreen" "$reset"
     fi
@@ -344,7 +343,11 @@ function tools_installed() {
     if [[ $all_installed == true ]]; then
         : # Tools check OK, no output
     else
-        printf "         Pending: %s\n" "${missing_tools[*]}"
+        if (( ${#missing_tools[@]} == 1 )); then
+            _print_msg WARN "Pending tool: ${missing_tools[0]}"
+        else
+            _print_msg WARN "Pending tools: ${missing_tools[*]}"
+        fi
     fi
 
     if [[ $CHECK_TOOLS_OR_EXIT == true && $all_installed != true ]]; then
@@ -568,8 +571,7 @@ function incremental_init() {
 
     mkdir -p "$INCREMENTAL_DIR"/{subdomains,webs,hosts,vulns,previous}
 
-    printf "%b[%s] Incremental mode enabled - will only process new findings%b\n" \
-        "$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+    print_notice INFO "incremental" "Incremental mode enabled - will only process new findings"
 }
 
 # Save current state for next incremental run
@@ -607,8 +609,7 @@ function incremental_diff() {
         cp "$current_file" "$output_file" 2>/dev/null
         local count
         count=$(wc -l <"$output_file" 2>/dev/null || echo 0)
-        printf "%b[%s] Incremental mode: First run for %s - %d items total%b\n" \
-            "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$type" "$count" "$reset"
+        print_notice INFO "incremental" "First run for ${type}: ${count} items total"
         return 0
     fi
 
@@ -620,8 +621,7 @@ function incremental_diff() {
         total_count=$(wc -l <"$current_file" 2>/dev/null || echo 0)
         previous_count=$(wc -l <"$previous_file" 2>/dev/null || echo 0)
 
-        printf "%b[%s] Incremental mode %s: %d new (previous: %d, total: %d)%b\n" \
-            "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$type" "$new_count" "$previous_count" "$total_count" "$reset"
+        print_notice INFO "incremental" "${type}: ${new_count} new (previous: ${previous_count}, total: ${total_count})"
 
         if [[ $new_count -eq 0 ]]; then
             return 1 # No new items
@@ -639,7 +639,29 @@ function incremental_report() {
 
     local report_file
     local new_subs new_webs
+    local subs_diff webs_diff
     report_file="$INCREMENTAL_DIR/incremental_report_$(date +%Y%m%d_%H%M%S).txt"
+
+    subs_diff="$(mktemp 2>/dev/null || echo /tmp/incremental_subs.$$)"
+    webs_diff="$(mktemp 2>/dev/null || echo /tmp/incremental_webs.$$)"
+    : >"$subs_diff"
+    : >"$webs_diff"
+
+    if [[ -f "$INCREMENTAL_DIR/previous/subdomains_latest.txt" ]]; then
+        comm -13 <(sort -u "$INCREMENTAL_DIR/previous/subdomains_latest.txt" 2>/dev/null || true) \
+            <(sort -u "subdomains/subdomains.txt" 2>/dev/null || true) >"$subs_diff"
+        new_subs=$(wc -l <"$subs_diff" | tr -d ' ')
+    else
+        new_subs=0
+    fi
+
+    if [[ -f "$INCREMENTAL_DIR/previous/webs_latest.txt" ]]; then
+        comm -13 <(sort -u "$INCREMENTAL_DIR/previous/webs_latest.txt" 2>/dev/null || true) \
+            <(sort -u "webs/webs.txt" 2>/dev/null || true) >"$webs_diff"
+        new_webs=$(wc -l <"$webs_diff" | tr -d ' ')
+    else
+        new_webs=0
+    fi
 
     {
         echo "==============================================="
@@ -648,42 +670,27 @@ function incremental_report() {
         echo "Date: $(date +'%Y-%m-%d %H:%M:%S')"
         echo "==============================================="
         echo ""
-
-        # Subdomain changes
-        if [[ -f "$INCREMENTAL_DIR/previous/subdomains_latest.txt" ]]; then
-            new_subs=$(comm -13 <(sort -u "$INCREMENTAL_DIR/previous/subdomains_latest.txt" 2>/dev/null || touch /tmp/empty) \
-                <(sort -u "subdomains/subdomains.txt" 2>/dev/null || touch /tmp/empty) | wc -l)
-            echo "New Subdomains: $new_subs"
-            if [[ $new_subs -gt 0 ]]; then
-                echo "---"
-                comm -13 <(sort -u "$INCREMENTAL_DIR/previous/subdomains_latest.txt" 2>/dev/null || touch /tmp/empty) \
-                    <(sort -u "subdomains/subdomains.txt" 2>/dev/null || touch /tmp/empty) | head -20
-                [[ $new_subs -gt 20 ]] && echo "... and $((new_subs - 20)) more"
-                echo ""
-            fi
+        echo "New Subdomains: $new_subs"
+        if [[ $new_subs -gt 0 ]]; then
+            echo "---"
+            head -20 "$subs_diff"
+            [[ $new_subs -gt 20 ]] && echo "... and $((new_subs - 20)) more"
+            echo ""
         fi
-
-        # Web changes
-        if [[ -f "$INCREMENTAL_DIR/previous/webs_latest.txt" ]]; then
-            new_webs=$(comm -13 <(sort -u "$INCREMENTAL_DIR/previous/webs_latest.txt" 2>/dev/null || touch /tmp/empty) \
-                <(sort -u "webs/webs.txt" 2>/dev/null || touch /tmp/empty) | wc -l)
-            echo "New Webs: $new_webs"
-            if [[ $new_webs -gt 0 ]]; then
-                echo "---"
-                comm -13 <(sort -u "$INCREMENTAL_DIR/previous/webs_latest.txt" 2>/dev/null || touch /tmp/empty) \
-                    <(sort -u "webs/webs.txt" 2>/dev/null || touch /tmp/empty) | head -20
-                [[ $new_webs -gt 20 ]] && echo "... and $((new_webs - 20)) more"
-                echo ""
-            fi
+        echo "New Webs: $new_webs"
+        if [[ $new_webs -gt 0 ]]; then
+            echo "---"
+            head -20 "$webs_diff"
+            [[ $new_webs -gt 20 ]] && echo "... and $((new_webs - 20)) more"
+            echo ""
         fi
-
         echo "==============================================="
         echo "Full report saved to: $report_file"
         echo "==============================================="
-    } | tee "$report_file"
+    } >"$report_file"
 
-    printf "%b[%s] Incremental report generated: %s%b\n" \
-        "$bgreen" "$(date +'%Y-%m-%d %H:%M:%S')" "$report_file" "$reset"
+    rm -f "$subs_diff" "$webs_diff" 2>/dev/null || true
+    _print_status INFO "incremental_report" "subs ${new_subs}, webs ${new_webs} -> ${report_file}"
 }
 
 # Hash helper for alert fingerprinting.
@@ -907,8 +914,7 @@ function incremental_should_skip() {
     new_webs=$(cat .tmp/webs_new_count 2>/dev/null || echo 1)
 
     if [[ $new_subs -eq 0 && $new_webs -eq 0 ]]; then
-        printf "%b[%s] Incremental mode: No new assets found, skipping heavy scans%b\n" \
-            "$yellow" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
+        print_notice WARN "incremental" "No new assets found, skipping heavy scans"
         return 0 # Skip
     fi
 
@@ -943,7 +949,7 @@ function output() {
 
     # Prevent accidental deletion if $dir_output is a parent of $dir
     if [[ $dir == "$dir_output"* ]]; then
-        echo "[!] Output directory is a parent of the working directory. Aborting to prevent data loss."
+        _print_error "Output directory is a parent of the working directory. Aborting to prevent data loss."
         return 1
     fi
 
@@ -955,7 +961,7 @@ function output() {
         if [[ "$dir" == "${SCRIPTPATH}/Recon/"* ]]; then
             rm -rf -- "$dir"
         else
-            echo "[!] Refusing to delete directory outside Recon/: $dir"
+            _print_error "Refusing to delete directory outside Recon/: $dir"
             return 1
         fi
     fi
@@ -1013,8 +1019,11 @@ function notification() {
             return 0
         fi
  
-        # Print to terminal
-        _print_msg "$level" "$1"
+        # Print to terminal in structured format (no counters)
+        print_notice "$level" "${FUNCNAME[1]:-notice}" "$1"
+        if [[ "$level" == "WARN" || "$level" == "FAIL" ]]; then
+            record_incident "$level" "${FUNCNAME[1]:-notice}" "$1"
+        fi
  
         # Send to notify if notifications are enabled
         if [[ -n $NOTIFY ]]; then
@@ -1082,7 +1091,7 @@ function start_func() {
     if declare -F ui_log_jsonl >/dev/null 2>&1; then
         ui_log_jsonl "INFO" "${1}" "Function started" "description=${2}"
     fi
-    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
+    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
         _print_msg "INFO" "Running ${1}..."
     fi
 }
@@ -1134,6 +1143,9 @@ function end_func() {
         # Show detail line for non-OK statuses when message is present
         if [[ -n "$message" ]] && [[ "$badge" != "OK" && "$badge" != "INFO" ]]; then
             printf "         %s\n" "$message"
+            if [[ "$badge" == "FAIL" || "$badge" == "WARN" ]]; then
+                record_incident "$badge" "$fn" "$message"
+            fi
         fi
     fi
     log_json "SUCCESS" "${fn}" "Function completed" "runtime=${runtime}" "duration_sec=${duration}"
@@ -1141,14 +1153,7 @@ function end_func() {
         ui_log_jsonl "SUCCESS" "${fn}" "Function completed" "runtime=${runtime}" "duration_sec=${duration}"
     fi
 
-    if declare -F ui_count_inc >/dev/null 2>&1; then
-        case "$status" in
-            warn|WARN) ui_count_inc WARN ;;
-            error|ERROR|FAIL) ui_count_inc FAIL ;;
-            SKIP) ui_count_inc SKIP ;;
-            *) ui_count_inc OK ;;
-        esac
-    fi
+    :
 }
 
 function start_subfunc() {
@@ -1159,7 +1164,7 @@ function start_subfunc() {
     if declare -F ui_log_jsonl >/dev/null 2>&1; then
         ui_log_jsonl "INFO" "${1}" "Subfunction started" "description=${2}"
     fi
-    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
+    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
         _print_msg "INFO" "Running ${1}..."
     fi
 }
@@ -1178,14 +1183,7 @@ function end_subfunc() {
     if declare -F ui_log_jsonl >/dev/null 2>&1; then
         ui_log_jsonl "SUCCESS" "${2}" "Subfunction completed" "runtime=${runtime}" "duration_sec=${duration}"
     fi
-    if declare -F ui_count_inc >/dev/null 2>&1; then
-        case "${3:-OK}" in
-            WARN) ui_count_inc WARN ;;
-            FAIL) ui_count_inc FAIL ;;
-            SKIP) ui_count_inc SKIP ;;
-            *) ui_count_inc OK ;;
-        esac
-    fi
+    :
 }
 
 function check_inscope() {
@@ -1858,7 +1856,7 @@ function health_check() {
 
     # 2. Check key recon tools
     _print_status INFO "Checking recon tools..."
-    local recon_tools=("subfinder" "httpx" "nuclei" "naabu" "ffuf" "dnsx" "anew" "notify")
+    local recon_tools=("subfinder" "httpx" "nuclei" "ffuf" "dnsx" "anew" "notify" "nmap" "nmapurls")
     for tool in "${recon_tools[@]}"; do
         if command -v "$tool" >/dev/null 2>&1; then
             _print_status OK "$tool"
