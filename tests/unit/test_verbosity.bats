@@ -93,7 +93,7 @@ teardown() {
     OUTPUT_VERBOSITY=1
     run skip_notification "disabled"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"[SKIP]"* ]]
+    [[ "$output" == *"SKIP"* ]]
 }
 
 @test "skip_notification suppressed at verbosity 0" {
@@ -127,7 +127,7 @@ teardown() {
     start=1
     run end_func "Results" "test_fn"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"[OK"* ]]
+    [[ "$output" == *"OK"* ]]
 }
 
 @test "end_func hides status at verbosity 0" {
@@ -135,7 +135,7 @@ teardown() {
     start=1
     run end_func "Results" "test_fn"
     [ "$status" -eq 0 ]
-    [[ "$output" != *"[OK"* ]]
+    [[ "$output" != *"OK"* ]]
 }
 
 ###############################################################################

@@ -181,7 +181,11 @@ print_artifacts() {
 print_notice() {
     local level="$1" module="$2" message="$3"
     [[ -z "$module" ]] && module="notice"
-    print_task "$level" "$module" "0" "$message"
+    if [[ "$level" == "FAIL" ]] && [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]]; then
+        (OUTPUT_VERBOSITY=1; print_task "$level" "$module" "0" "$message")
+    else
+        print_task "$level" "$module" "0" "$message"
+    fi
 }
 
 # Formatted WARN message without color codes
@@ -296,6 +300,9 @@ _print_status() {
         if declare -F ui_count_inc >/dev/null 2>&1; then
             ui_count_inc "$badge"
         fi
+        return 0
+    fi
+    if [[ "$badge" == "INFO" ]] && [[ "${OUTPUT_VERBOSITY:-1}" -lt 2 ]]; then
         return 0
     fi
 

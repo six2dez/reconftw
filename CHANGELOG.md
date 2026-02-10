@@ -110,6 +110,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Nuclei targeting adjusted to prioritize URL-with-protocol inputs and reduce duplicate host scans.
 - Parallel scheduler improved with backpressure signals from adaptive rate limiting.
 - Threading/performance tuning improved with `PERF_PROFILE` (`low|balanced|max`).
+- Output header now uses a banner-style H1 block with rules sized to the header text.
+- Default exports now generate all report artifacts unless `--no-report` is set.
+- Help output formatting uses proper color escapes (no literal `\033`).
+- `--pretty` option removed (no longer supported).
+- Health-check tool list updated to reflect actual runtime usage (`nmap`, `nmapurls`).
 
 ### Fixed
 
@@ -118,6 +123,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed syntax/runtime edge cases in module scripts.
 - Corrected timing/perf summary handling edge cases.
 - Resolved readonly/re-source issues in script lifecycle.
+- `.log/*.txt` files are no longer empty (LOGFILE no longer overwritten by debug log).
+- Incidents no longer show `\n` literals; debug log line only appears if non-empty.
+- Passive mode no longer runs `webprobe_simple`/`webprobe_full`.
+- Missing `webs/webs_new.txt` now handled safely.
+
+### Added
+
+- `--no-banner` to disable banner output (banner is on by default).
+- `--no-report` to skip report generation/exports.
+- `--gen-resolvers` to generate resolvers with `dnsvalidator`.
+- `--force` to ignore cached module markers and re-run all phases.
 - Fixed duplicate findings/reporting edge cases.
 - Corrected `sub_asn()` behavior to avoid redundant repeated runs.
 - `sub_asn()` now requires `PDCP_API_KEY` before running `asnmap`, logs explicit skip reason when unset, and applies a 120s timeout guard when available.

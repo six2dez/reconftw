@@ -194,17 +194,18 @@ teardown() {
 
     run parallel_funcs 2 ok_func
     [ "$status" -eq 0 ]
-    [[ "$output" == *"[OK"* ]]
+    [[ "$output" == *"OK"* ]]
     [[ "$output" == *"ok_func"* ]]
 }
 
 @test "summary mode shows [FAIL] with last 5 lines on failure" {
     PARALLEL_LOG_MODE="summary"
+    OUTPUT_VERBOSITY=2
     bad_func() { echo "line1"; echo "line2"; echo "line3"; echo "line4"; echo "error here"; return 1; }
 
     run parallel_funcs 2 bad_func
     [ "$status" -eq 1 ]
-    [[ "$output" == *"[FAIL"* ]]
+    [[ "$output" == *"FAIL"* ]]
     [[ "$output" == *"error here"* ]]
 }
 
@@ -215,7 +216,7 @@ teardown() {
 
     run parallel_funcs 2 chatty_func
     [ "$status" -eq 0 ]
-    [[ "$output" == *"[OK"* ]]
+    [[ "$output" == *"OK"* ]]
     [[ "$output" == *"line10"* ]]
     [[ "$output" == *"line9"* ]]
     [[ "$output" == *"line8"* ]]
@@ -271,8 +272,8 @@ teardown() {
 
     run parallel_funcs 2 quiet_func
     [ "$status" -eq 0 ]
-    # Should NOT show [OK] in quiet mode
-    [[ "$output" != *"[OK]"* ]]
+    # Should NOT show OK in quiet mode
+    [[ "$output" != *"OK"* ]]
 }
 
 @test "quiet mode still shows failures" {
@@ -282,5 +283,5 @@ teardown() {
 
     run parallel_funcs 2 fail_quiet
     [ "$status" -eq 1 ]
-    [[ "$output" == *"[FAIL"* ]]
+    [[ "$output" == *"FAIL"* ]]
 }

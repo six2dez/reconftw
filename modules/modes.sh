@@ -74,6 +74,9 @@ function start() {
     if [[ ! -d $called_fn_dir ]]; then
         mkdir -p "$called_fn_dir"
     fi
+    if [[ "${FORCE_RESCAN:-false}" == "true" ]]; then
+        rm -f "$called_fn_dir"/.* 2>>"${LOGFILE:-/dev/null}" || true
+    fi
     mkdir -p "$dir"
     cd "$dir" || {
         print_errorf "Failed to cd directory in %s @ line %s" "${FUNCNAME[0]}" "${LINENO}"
@@ -139,6 +142,9 @@ function start() {
         _print_rule
     fi
 
+    if [[ "${FORCE_RESCAN:-false}" == "true" ]]; then
+        _print_msg WARN "Force rescan enabled: ignoring cached module markers"
+    fi
     if [[ "${MONITOR_MODE:-false}" == "true" ]] && [[ "${MONITOR_CYCLE:-1}" -gt 1 ]]; then
         notification "Monitor cycle ${MONITOR_CYCLE}: skipping repeated tools check" info
     else
@@ -564,6 +570,9 @@ function multi_osint() {
         print_errorf "Failed to create directory '%s' in %s @ line %s" "$workdir" "${FUNCNAME[0]}" "${LINENO}"
         exit 1
     }
+    if [[ "${FORCE_RESCAN:-false}" == "true" ]]; then
+        rm -f "$workdir"/.called_fn/.* 2>>"${LOGFILE:-/dev/null}" || true
+    fi
     cd "$workdir" || {
         print_errorf "Failed to cd directory '%s' in %s @ line %s" "$workdir" "${FUNCNAME[0]}" "${LINENO}"
         exit 1
@@ -1282,7 +1291,7 @@ function report_only_mode() {
 function help() {
     pt_header "Usage"
     printf "\n Usage: %s [-d domain.tld] [-m name] [-l list.txt] [-x oos.txt] [-i in.txt] " "$0"
-    printf "\n           	      [-r] [-s] [-p] [-a] [-w] [-n] [-z] [-c] [-y] [-h] [-f] [--ai] [--deep] [--monitor] [--monitor-interval m] [--monitor-cycles n] [--report-only] [--refresh-cache] [--gen-resolvers] [--export fmt] [-o OUTPUT]\n\n"
+    printf "\n           	      [-r] [-s] [-p] [-a] [-w] [-n] [-z] [-c] [-y] [-h] [-f] [--ai] [--deep] [--monitor] [--monitor-interval m] [--monitor-cycles n] [--report-only] [--refresh-cache] [--gen-resolvers] [--force] [--export fmt] [-o OUTPUT]\n\n"
     printf " %bTARGET OPTIONS%b\n" "${bblue}" "${reset}"
     printf "   -d domain.tld     Target domain\n"
     printf "   -m company        Target company name\n"
@@ -1329,6 +1338,7 @@ function help() {
     printf "   --no-report       Disable report generation and exports\n"
     printf "   --refresh-cache   Force refresh of cached resolvers/wordlists\n"
     printf "   --gen-resolvers   Generate custom resolvers with dnsvalidator\n"
+    printf "   --force           Re-run all modules (ignore cached markers)\n"
     printf "   --export fmt      Export artifacts: json|html|csv|all (default: all)\n"
     printf " \n"
     printf " %bUSAGE EXAMPLES%b\n" "${bblue}" "${reset}"

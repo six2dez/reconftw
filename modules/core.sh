@@ -550,7 +550,7 @@ function progress_module() {
     if declare -F ui_counts_summary >/dev/null 2>&1; then
         counters=$(ui_counts_summary)
     fi
-    printf "\n  %b[%d/%d] %d%% │ %s complete │ %s%b\n\n" \
+    printf "  %b[%d/%d] %d%% │ %s complete │ %s%b\n\n" \
         "${bblue:-}" "$_PROGRESS_MODULE_CURRENT" "$_PROGRESS_MODULE_TOTAL" "$pct" \
         "$module_name" "$counters" "${reset:-}"
 }

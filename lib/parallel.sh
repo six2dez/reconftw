@@ -110,7 +110,7 @@ _parallel_emit_job_output() {
                 if declare -F ui_count_inc >/dev/null 2>&1; then
                     ui_count_inc "$badge"
                 fi
-                print_task "$badge" "$func_name" "$duration" ""
+                (OUTPUT_VERBOSITY=1; print_task "$badge" "$func_name" "$duration" "")
             else
                 _print_status "$badge" "$func_name" "${duration}s"
             fi
@@ -127,7 +127,7 @@ _parallel_emit_job_output() {
                 if declare -F ui_count_inc >/dev/null 2>&1; then
                     ui_count_inc "$badge"
                 fi
-                print_task "$badge" "$func_name" "$duration" ""
+                (OUTPUT_VERBOSITY=1; print_task "$badge" "$func_name" "$duration" "")
             else
                 _print_status "$badge" "$func_name" "${duration}s"
             fi
@@ -140,7 +140,7 @@ _parallel_emit_job_output() {
                 if declare -F ui_count_inc >/dev/null 2>&1; then
                     ui_count_inc "$badge"
                 fi
-                print_task "$badge" "$func_name" "$duration" ""
+                (OUTPUT_VERBOSITY=1; print_task "$badge" "$func_name" "$duration" "")
             else
                 _print_status "$badge" "$func_name" "${duration}s"
             fi
