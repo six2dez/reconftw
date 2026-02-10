@@ -146,6 +146,8 @@ record_incident() {
     local level="$1" module="$2" reason="$3"
     [[ -z "$module" ]] && return 0
     [[ -z "$reason" ]] && return 0
+    reason=${reason//\\n/ }
+    reason=${reason//$'\n'/ }
     INCIDENTS_LEVELS+=("$level")
     INCIDENTS_ITEMS+=("${module} — ${reason}")
 }
@@ -159,7 +161,7 @@ print_incidents() {
     for i in "${!INCIDENTS_ITEMS[@]}"; do
         printf "%d. %s\n" "$((i + 1))" "${INCIDENTS_ITEMS[$i]}"
     done
-    if [[ -n "$debug_log" ]]; then
+    if [[ -n "$debug_log" ]] && [[ -s "$debug_log" ]]; then
         printf "Debug log: %s\n" "$debug_log"
     fi
     printf "\n"

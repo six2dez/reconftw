@@ -18,7 +18,7 @@ function resolvers_update() {
     if [[ $generate_resolvers == true ]]; then
         if [[ $AXIOM != true ]]; then
             if [[ ! -s $resolvers ]] || [[ $(find "$resolvers" -mtime +1 -print) ]]; then
-                notification "Resolvers seem older than 1 day\n Generating custom resolvers..." warn
+                notification "Resolvers seem older than 1 day. Generating custom resolvers..." warn
                 {
                     rm -f -- "$resolvers"
                     dnsvalidator -tL https://public-dns.info/nameservers.txt -threads "$DNSVALIDATOR_THREADS" -o "$resolvers" >/dev/null
@@ -31,7 +31,7 @@ function resolvers_update() {
                 notification "Updated\n" good
             fi
         else
-            notification "Checking resolvers lists...\n Accurate resolvers are the key to great results\n This may take around 10 minutes if it's not updated" warn
+            notification "Checking resolvers lists. Accurate resolvers are key to good results. This may take around 10 minutes if outdated." warn
             axiom-exec "([[ \$(find \"${AXIOM_RESOLVERS_PATH}\" -mtime +1 -print) ]] || [[ \$(wc -l < \"${AXIOM_RESOLVERS_PATH}\") -le 40 ]]) && dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 200 -o ${AXIOM_RESOLVERS_PATH}" &>/dev/null
             axiom-exec "wget -q -O - ${resolvers_url} > ${AXIOM_RESOLVERS_PATH}" 2>>"$LOGFILE" >/dev/null
             axiom-exec "wget -q -O - ${resolvers_trusted_url} > ${AXIOM_RESOLVERS_TRUSTED_PATH}" 2>>"$LOGFILE" >/dev/null
@@ -41,7 +41,7 @@ function resolvers_update() {
     else
 
         if [[ ! -s $resolvers ]] || [[ $(find "$resolvers" -mtime +1 -print) ]]; then
-            notification "Resolvers seem older than 1 day\n Downloading new resolvers..." warn
+            notification "Resolvers seem older than 1 day. Downloading new resolvers..." warn
             cached_download_typed "${resolvers_url}" "$resolvers" "resolvers.txt" "resolvers"
             cached_download_typed "${resolvers_trusted_url}" "$resolvers_trusted" "resolvers_trusted.txt" "resolvers"
             notification "Resolvers updated\n" good
