@@ -453,20 +453,10 @@ function sub_asn() {
                 log_note "ASN_ENUM enabled but PDCP_API_KEY is not set. Skipping asnmap ASN enumeration." "${FUNCNAME[0]}" "${LINENO}"
                 asn_status="WARN"
             else
-                if [[ -n "${TIMEOUT_CMD:-}" ]]; then
-                    if PDCP_API_KEY="$pdcp_key" "$TIMEOUT_CMD" -k 10 120 asnmap -d "$domain" -silent -j 2>>"$LOGFILE" >"$asn_json"; then
-                        asn_rc=0
-                    else
-                        asn_rc=$?
-                    fi
+                if asnmap -d "$domain" -silent -j 2>>"$LOGFILE" >"$asn_json"; then
+                    asn_rc=0
                 else
-                    _print_msg WARN "timeout/gtimeout not found; running asnmap without timeout guard."
-                    log_note "timeout/gtimeout not found; running asnmap without timeout guard." "${FUNCNAME[0]}" "${LINENO}"
-                    if PDCP_API_KEY="$pdcp_key" asnmap -d "$domain" -silent -j 2>>"$LOGFILE" >"$asn_json"; then
-                        asn_rc=0
-                    else
-                        asn_rc=$?
-                    fi
+                    asn_rc=$?
                 fi
 
                 if [[ $asn_rc -eq 0 && -s "$asn_json" ]]; then
