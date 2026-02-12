@@ -26,12 +26,12 @@ _run_httpx() {
     
     if [[ $AXIOM != true ]]; then
         # shellcheck disable=SC2086  # HTTPX_FLAGS intentionally word-split
-        httpx $HTTPX_FLAGS -no-color -json -random-agent \
+        run_command httpx $HTTPX_FLAGS -no-color -json -random-agent \
             "${extra_flags[@]}" \
             -o "$output" <"$input" 2>>"$LOGFILE" >/dev/null
     else
         # shellcheck disable=SC2086  # HTTPX_FLAGS intentionally word-split
-        axiom-scan "$input" -m httpx $HTTPX_FLAGS -no-color -json -random-agent \
+        run_command axiom-scan "$input" -m httpx $HTTPX_FLAGS -no-color -json -random-agent \
             "${extra_flags[@]}" \
             -o "$output" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
     fi
@@ -70,7 +70,7 @@ _send_to_proxy() {
         count=$(wc -l < "$urls_file" | tr -d ' ')
         if [[ $count -le $max_urls ]]; then
             notification "Sending websites to proxy" "info"
-            ffuf -mc all -w "$urls_file" -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
+            run_command ffuf -mc all -w "$urls_file" -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
         fi
     fi
 }
@@ -110,12 +110,12 @@ function webprobe_simple() {
         # Run httpx or axiom-scan
         if [[ $AXIOM != true ]]; then
             # shellcheck disable=SC2086  # HTTPX_FLAGS intentionally word-split
-            httpx $HTTPX_FLAGS -no-color -json -random-agent -threads "$HTTPX_THREADS" -rl "$HTTPX_RATELIMIT" \
+            run_command httpx $HTTPX_FLAGS -no-color -json -random-agent -threads "$HTTPX_THREADS" -rl "$HTTPX_RATELIMIT" \
                 -retries 2 -timeout "$HTTPX_TIMEOUT" -o .tmp/web_full_info_probe.txt \
                 <subdomains/subdomains.txt 2>>"$LOGFILE" >/dev/null
         else
             # shellcheck disable=SC2086  # HTTPX_FLAGS intentionally word-split
-            axiom-scan subdomains/subdomains.txt -m httpx $HTTPX_FLAGS -no-color -json -random-agent \
+            run_command axiom-scan subdomains/subdomains.txt -m httpx $HTTPX_FLAGS -no-color -json -random-agent \
                 -threads "$HTTPX_THREADS" -rl "$HTTPX_RATELIMIT" -retries 2 -timeout "$HTTPX_TIMEOUT" \
                 -o .tmp/web_full_info_probe.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
         fi
@@ -170,7 +170,7 @@ function webprobe_simple() {
         # Send websites to proxy if conditions met
         if [[ $PROXY == true ]] && [[ -n $proxy_url ]] && [[ $(wc -l <webs/webs.txt) -le $DEEP_LIMIT2 ]]; then
             notification "Sending websites to proxy" "info"
-            ffuf -mc all -w webs/webs.txt -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
+            run_command ffuf -mc all -w webs/webs.txt -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
         fi
 
     else
@@ -256,7 +256,7 @@ function webprobe_full() {
             # Send to proxy if conditions met
             if [[ $PROXY == true ]] && [[ -n $proxy_url ]] && [[ $(wc -l <webs/webs_uncommon_ports.txt) -le $DEEP_LIMIT2 ]]; then
                 notification "Sending websites with uncommon ports to proxy" "info"
-                ffuf -mc all -w webs/webs_uncommon_ports.txt -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
+                run_command ffuf -mc all -w webs/webs_uncommon_ports.txt -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
             fi
         fi
         end_func "Results are saved in $domain/webs/webs_uncommon_ports.txt" "${FUNCNAME[0]}"
@@ -288,11 +288,11 @@ function screenshot() {
         # Run nuclei or axiom-scan based on AXIOM flag
         if [[ $AXIOM != true ]]; then
             if [[ -s "webs/webs_all.txt" ]]; then
-                nuclei -headless -id screenshot -V dir='screenshots' <webs/webs_all.txt 2>>"$LOGFILE" >/dev/null
+                run_command nuclei -headless -id screenshot -V dir='screenshots' <webs/webs_all.txt 2>>"$LOGFILE" >/dev/null
             fi
         else
             if [[ -s "webs/webs_all.txt" ]]; then
-                axiom-scan webs/webs_all.txt -m nuclei-screenshots -o screenshots "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+                run_command axiom-scan webs/webs_all.txt -m nuclei-screenshots -o screenshots "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
             fi
         fi
         end_func "Results are saved in $domain/screenshots" "${FUNCNAME[0]}"
@@ -332,7 +332,7 @@ function virtualhosts() {
         # Optionally send to proxy if conditions are met
         if [[ $PROXY == true ]] && [[ -n $proxy_url ]] && [[ $(wc -l <webs/webs_uncommon_ports.txt) -le $DEEP_LIMIT2 ]]; then
             notification "Sending websites with uncommon ports to proxy" "info"
-            ffuf -mc all -w webs/webs_uncommon_ports.txt -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
+            run_command ffuf -mc all -w webs/webs_uncommon_ports.txt -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
         fi
 
     else
@@ -370,11 +370,11 @@ function favicon() {
 
         # Run the favicon IP lookup tool
         if [[ -n "${TIMEOUT_CMD:-}" ]]; then
-            if ! "$TIMEOUT_CMD" -k 10s 10m "${tools}/fav-up/venv/bin/python3" "${tools}/fav-up/favUp.py" -w "$domain" -sc -o favicontest.json 2>>"$LOGFILE" >/dev/null; then
+            if ! run_command "$TIMEOUT_CMD" -k 10s 10m "${tools}/fav-up/venv/bin/python3" "${tools}/fav-up/favUp.py" -w "$domain" -sc -o favicontest.json 2>>"$LOGFILE" >/dev/null; then
                 log_note "favicon: fav-up failed or timed out; skipping" "${FUNCNAME[0]}" "${LINENO}"
             fi
         else
-            if ! "${tools}/fav-up/venv/bin/python3" "${tools}/fav-up/favUp.py" -w "$domain" -sc -o favicontest.json 2>>"$LOGFILE" >/dev/null; then
+            if ! run_command "${tools}/fav-up/venv/bin/python3" "${tools}/fav-up/favUp.py" -w "$domain" -sc -o favicontest.json 2>>"$LOGFILE" >/dev/null; then
                 log_note "favicon: fav-up failed; skipping" "${FUNCNAME[0]}" "${LINENO}"
             fi
         fi
@@ -489,7 +489,7 @@ function portscan() {
             else
                 json_array=()
                 while IFS= read -r cip; do
-                    if ! json_result=$(curl -s "https://internetdb.shodan.io/${cip}"); then
+                    if ! json_result=$(run_command curl -s "https://internetdb.shodan.io/${cip}"); then
                         print_warnf "Failed to retrieve data for IP %s." "$cip"
                     else
                         json_array+=("$json_result")
@@ -510,7 +510,7 @@ function portscan() {
         fi
 
         if [[ $PORTSCAN_PASSIVE == true ]] && [[ ! -f "hosts/portscan_passive.txt" ]] && [[ -s ".tmp/ips_nocdn.txt" ]]; then
-            smap -iL .tmp/ips_nocdn.txt >hosts/portscan_passive.txt
+            run_command smap -iL .tmp/ips_nocdn.txt >hosts/portscan_passive.txt
         fi
 
         if [[ $PORTSCAN_ACTIVE == true ]]; then
@@ -603,7 +603,7 @@ function cdnprovider() {
         # Check if ips_cdn.txt exists and is not empty
         if [[ -s "hosts/ips.txt" ]]; then
             # Run cdncheck on the IPs and save to cdn_providers.txt
-            cdncheck -silent -resp -nc <hosts/ips.txt | anew -q "$dir/hosts/cdn_providers.txt"
+            run_command cdncheck -silent -resp -nc <hosts/ips.txt | anew -q "$dir/hosts/cdn_providers.txt"
         fi
 
         end_func "Results are saved in hosts/cdn_providers.txt" "${FUNCNAME[0]}"
@@ -646,7 +646,7 @@ function waf_checks() {
                 wafw00f -i "webs/webs_all.txt" -o ".tmp/wafs.txt" 2>>"$LOGFILE" >/dev/null
             else
                 # Run axiom-scan with wafw00f module on webs_all.txt
-                axiom-scan "webs/webs_all.txt" -m wafw00f -o ".tmp/wafs.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+                run_command axiom-scan "webs/webs_all.txt" -m wafw00f -o ".tmp/wafs.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
             fi
 
             # Process wafs.txt if it exists and is not empty
@@ -729,7 +729,9 @@ _nuclei_parse_results() {
         if [[ -s "nuclei_output/${crit}.txt" ]]; then
             local _count
             _count=$(wc -l <"nuclei_output/${crit}.txt" | tr -d ' ')
-            _print_status OK "nuclei_${crit}" "${_count} findings -> nuclei_output/${crit}.txt"
+            if [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
+                _print_status OK "nuclei_${crit}" "${_count} findings -> nuclei_output/${crit}.txt"
+            fi
         fi
     fi
 }
@@ -894,7 +896,7 @@ function param_discovery() {
         local input_file="webs/url_extract_nodupes.txt"
         [[ ! -s $input_file ]] && input_file="webs/webs_all.txt"
         if [[ -s $input_file ]]; then
-            arjun -i "$input_file" -t "$ARJUN_THREADS" -oJ .tmp/arjun.json 2>>"$LOGFILE" >/dev/null || true
+            run_command arjun -i "$input_file" -t "$ARJUN_THREADS" -oJ .tmp/arjun.json 2>>"$LOGFILE" >/dev/null || true
             if [[ -s .tmp/arjun.json ]]; then
                 jq -r '..|.url? // empty' .tmp/arjun.json | sed 's/^/URL: /' | anew -q webs/params_discovered.txt
                 jq -r '..|.params? // empty | to_entries[] | .key' .tmp/arjun.json | sed 's/^/PARAM: /' | sort -u | anew -q webs/params_discovered.txt
@@ -927,7 +929,7 @@ function grpc_reflection() {
             # Probe common plaintext gRPC ports
             while read -r ip; do
                 for p in 50051 50052; do
-                    grpcurl -plaintext -max-msg-sz 10485760 -d '{}' "$ip:$p" list 2>>"$LOGFILE" | sed "s/^/[$ip:$p] /" | anew -q hosts/grpc_reflection.txt || true
+                    run_command grpcurl -plaintext -max-msg-sz 10485760 -d '{}' "$ip:$p" list 2>>"$LOGFILE" | sed "s/^/[$ip:$p] /" | anew -q hosts/grpc_reflection.txt || true
                 done
             done <.tmp/grpc_ips.txt
         fi
@@ -961,7 +963,7 @@ _fuzz_run_local() {
     _fuzz_classify_targets
 
     if [[ -s .tmp/webs_normal.txt ]]; then
-        interlace -tL .tmp/webs_normal.txt -threads "${INTERLACE_THREADS}" -c "ffuf ${FFUF_FLAGS} -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" -o "$dir/.tmp/fuzzing" 2>>"$LOGFILE" >/dev/null
+        run_command interlace -tL .tmp/webs_normal.txt -threads "${INTERLACE_THREADS}" -c "ffuf ${FFUF_FLAGS} -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" -o "$dir/.tmp/fuzzing" 2>>"$LOGFILE" >/dev/null
     fi
 
     if [[ -s .tmp/webs_slow.txt ]]; then
@@ -969,14 +971,14 @@ _fuzz_run_local() {
         [[ $slow_threads -lt 5 ]] && slow_threads=5
         local slow_rate=$FFUF_RATELIMIT
         [[ ${FFUF_RATELIMIT:-0} -eq 0 ]] && slow_rate=50 || slow_rate=$((FFUF_RATELIMIT / 3 + 1))
-        interlace -tL .tmp/webs_slow.txt -threads "${INTERLACE_THREADS}" -c "ffuf ${FFUF_FLAGS} -t ${slow_threads} -rate ${slow_rate} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" -o "$dir/.tmp/fuzzing" 2>>"$LOGFILE" >/dev/null
+        run_command interlace -tL .tmp/webs_slow.txt -threads "${INTERLACE_THREADS}" -c "ffuf ${FFUF_FLAGS} -t ${slow_threads} -rate ${slow_rate} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" -o "$dir/.tmp/fuzzing" 2>>"$LOGFILE" >/dev/null
     fi
 }
 
 # Run ffuf via axiom-scan and parse per-subdomain results
 _fuzz_run_axiom() {
     cached_download_typed "${fuzzing_remote_list}" ".tmp/fuzzing_remote_list.txt" "onelistforallmicro.txt" "wordlists"
-    axiom-scan webs/webs_all.txt -m ffuf -wL .tmp/fuzzing_remote_list.txt -H "${HEADER}" "$FFUF_FLAGS" -s -maxtime "$FFUF_MAXTIME" -oJ "$dir/.tmp/ffuf-content.json" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+    run_command axiom-scan webs/webs_all.txt -m ffuf -wL .tmp/fuzzing_remote_list.txt -H "${HEADER}" "$FFUF_FLAGS" -s -maxtime "$FFUF_MAXTIME" -oJ "$dir/.tmp/ffuf-content.json" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
 
     while read -r sub; do
         local sub_out
@@ -1049,7 +1051,7 @@ function iishortname() {
             mkdir -p "$dir/vulns/iis-shortname-shortscan/" "$dir/vulns/iis-shortname-sns/"
 
             # Run shortscan using interlace
-            interlace -tL .tmp/iis_sites.txt -threads "$INTERLACE_THREADS" \
+            run_command interlace -tL .tmp/iis_sites.txt -threads "$INTERLACE_THREADS" \
                 -c "shortscan _target_ -F -s -p 1 > _output_/_cleantarget_.txt" \
                 -o "$dir/vulns/iis-shortname-shortscan/" 2>>"$LOGFILE" >/dev/null
 
@@ -1061,7 +1063,7 @@ function iishortname() {
             done < <(find "$dir/vulns/iis-shortname-shortscan/" -type f -iname "*.txt" -print0 2>/dev/null)
 
             # Run sns using interlace
-            interlace -tL .tmp/iis_sites.txt -threads "$INTERLACE_THREADS" \
+            run_command interlace -tL .tmp/iis_sites.txt -threads "$INTERLACE_THREADS" \
                 -c "sns -u _target_ > _output_/_cleantarget_.txt" \
                 -o "$dir/vulns/iis-shortname-sns/" 2>>"$LOGFILE" >/dev/null
 
@@ -1110,15 +1112,8 @@ function cms_scanner() {
             touch webs/webs_uncommon_ports.txt
         fi
 
-        # Combine webs.txt and webs_uncommon_ports.txt into webs_all.txt if it doesn't exist
+        # Ensure webs_all.txt exists
         if [[ ! -s "webs/webs_all.txt" ]]; then
-            cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
-        fi
-
-        # Combine webs_all.txt into .tmp/cms.txt as a comma-separated list
-        if [[ -s "webs/webs_all.txt" ]]; then
-            tr '\n' ',' <webs/webs_all.txt >.tmp/cms.txt 2>>"$LOGFILE"
-        else
             end_func "No webs/webs_all.txt file found, cms scanner skipped." "${FUNCNAME[0]}"
             return
         fi
@@ -1127,28 +1122,12 @@ function cms_scanner() {
         local cmseek_cmd=(
             timeout -k 1m "${CMSSCAN_TIMEOUT}s"
             "${tools}/CMSeeK/venv/bin/python3" "${tools}/CMSeeK/cmseek.py"
-            -l .tmp/cms.txt --batch -r
+            -l webs/webs_all.txt --batch -r
         )
         local exit_status=0
-        local log_start=0
-        log_start=$(wc -l <"$LOGFILE" 2>/dev/null || echo 0)
-        if ! "${cmseek_cmd[@]}" &>>"$LOGFILE"; then
+        if ! run_command "${cmseek_cmd[@]}" &>>"$LOGFILE"; then
             exit_status=$?
             # Attempt one-time repair on known CMSeeK index corruption.
-            if tail -n +"$((log_start + 1))" "$LOGFILE" 2>/dev/null | grep -q "cmseekdb/createindex.py" \
-                && tail -n +"$((log_start + 1))" "$LOGFILE" 2>/dev/null | grep -q "JSONDecodeError"; then
-                log_note "cms_scanner: detected CMSeeK index corruption, repairing index and retrying once" "${FUNCNAME[0]}" "${LINENO}"
-                find "${tools}/CMSeeK/Result" -type f -name "*.json" -size 0 -delete 2>>"$LOGFILE" || true
-                if [[ -f "${tools}/CMSeeK/cmseekdb/createindex.py" ]]; then
-                    (cd "${tools}/CMSeeK" && "${tools}/CMSeeK/venv/bin/python3" cmseekdb/createindex.py) &>>"$LOGFILE" || true
-                fi
-                if ! "${cmseek_cmd[@]}" &>>"$LOGFILE"; then
-                    exit_status=$?
-                else
-                    exit_status=0
-                fi
-            fi
-
             if [[ ${exit_status} -eq 124 || ${exit_status} -eq 137 ]]; then
                 echo "TIMEOUT cmseek.py - investigate manually for $dir" >>"$LOGFILE"
                 end_func "TIMEOUT cmseek.py - investigate manually for $dir" "${FUNCNAME[0]}"
@@ -1163,14 +1142,15 @@ function cms_scanner() {
         # Process CMSeeK results
         while IFS= read -r sub; do
             sub_out=$(echo "$sub" | sed -e 's|^[^/]*//||' -e 's|/.*$||')
+            sub_out="${sub_out//$'\r'/}"
+            sub_out="${sub_out//:/_}"
             cms_json_path="${tools}/CMSeeK/Result/${sub_out}/cms.json"
 
             if [[ -s $cms_json_path ]]; then
-                cms_id=$(jq -r 'try .cms_id' "$cms_json_path")
-                if [[ -n $cms_id ]]; then
-                    mv -f "${tools}/CMSeeK/Result/${sub_out}" "$dir/cms/" 2>>"$LOGFILE"
-                else
-                    rm -rf "${tools}/CMSeeK/Result/${sub_out}" 2>>"$LOGFILE"
+                cms_id=$(jq -r 'try .cms_id // empty' "$cms_json_path")
+                mv -f "${tools}/CMSeeK/Result/${sub_out}" "$dir/cms/" 2>>"$LOGFILE"
+                if [[ -z $cms_id ]]; then
+                    log_note "cms_scanner: empty cms_id for ${sub_out}, results moved for inspection" "${FUNCNAME[0]}" "${LINENO}"
                 fi
             fi
         done <"webs/webs_all.txt"
@@ -1197,6 +1177,9 @@ function urlchecks() {
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $URL_CHECK == true ]]; then
         start_func "${FUNCNAME[0]}" "URL Extraction"
+        local end_message="Results are saved in $domain/webs/url_extract.txt"
+        local katana_timeout_cmd="${TIMEOUT_CMD:-timeout}"
+        local waymore_timeout_cmd="${TIMEOUT_CMD:-timeout}"
 
         # Combine webs.txt and webs_uncommon_ports.txt if webs_all.txt doesn't exist
         if [[ ! -s "webs/webs_all.txt" ]]; then
@@ -1210,14 +1193,14 @@ function urlchecks() {
                     log_note "urlchecks: reusing urlfinder output from sub_scraping" "${FUNCNAME[0]}" "${LINENO}"
                 else
                     : >.tmp/url_extract_tmp.txt
-                    urlfinder -d "$domain" -all -o .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
+                    run_command urlfinder -d "$domain" -all -o .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
                 fi
                 if command -v waymore &>/dev/null; then
                     if [[ -s ".tmp/waymore_urls_subs.txt" ]]; then
                         log_note "urlchecks: reusing waymore output from sub_scraping" "${FUNCNAME[0]}" "${LINENO}"
                         cat .tmp/waymore_urls_subs.txt | anew -q .tmp/url_extract_tmp.txt || true
                     else
-                        if ! "$TIMEOUT_CMD" "${WAYMORE_TIMEOUT:-30m}" waymore -i "$domain" -mode U -oU .tmp/waymore_urls.txt 2>>"$LOGFILE" >/dev/null; then
+                        if ! run_command "$waymore_timeout_cmd" "${WAYMORE_TIMEOUT:-30m}" waymore -i "$domain" -mode U -oU .tmp/waymore_urls.txt 2>>"$LOGFILE" >/dev/null; then
                             log_note "urlchecks: waymore failed or timed out; continuing with other passive sources" "${FUNCNAME[0]}" "${LINENO}"
                         fi
                         if [[ -s ".tmp/waymore_urls.txt" ]]; then
@@ -1228,7 +1211,7 @@ function urlchecks() {
                     log_note "urlchecks: waymore not found; skipping passive waymore collection" "${FUNCNAME[0]}" "${LINENO}"
                 fi
                 if [[ -s $GITHUB_TOKENS ]]; then
-                    github-endpoints -q -k -d "$domain" -t "$GITHUB_TOKENS" -o .tmp/github-endpoints.txt 2>>"$LOGFILE" >/dev/null
+                    run_command github-endpoints -q -k -d "$domain" -t "$GITHUB_TOKENS" -o .tmp/github-endpoints.txt 2>>"$LOGFILE" >/dev/null
                     if [[ -s ".tmp/github-endpoints.txt" ]]; then
                         cat .tmp/github-endpoints.txt | anew -q .tmp/url_extract_tmp.txt || true
                     fi
@@ -1268,9 +1251,9 @@ function urlchecks() {
                                 fi
                             else
                                 if [[ $DEEP == true ]]; then
-                                    timeout 4h katana -silent -list .tmp/katana_targets_normal.txt -jc -kf all -c "$KATANA_THREADS" -d 3 -fs rdn >>.tmp/katana.txt 2>>"$LOGFILE"
+                                    run_command "$katana_timeout_cmd" 4h katana -silent -list .tmp/katana_targets_normal.txt -jc -kf all -c "$KATANA_THREADS" -d 3 -fs rdn >>.tmp/katana.txt 2>>"$LOGFILE"
                                 else
-                                    timeout 3h katana -silent -list .tmp/katana_targets_normal.txt -jc -kf all -c "$KATANA_THREADS" -d 2 -fs rdn >>.tmp/katana.txt 2>>"$LOGFILE"
+                                    run_command "$katana_timeout_cmd" 3h katana -silent -list .tmp/katana_targets_normal.txt -jc -kf all -c "$KATANA_THREADS" -d 2 -fs rdn >>.tmp/katana.txt 2>>"$LOGFILE"
                                 fi
                             fi
                         fi
@@ -1288,9 +1271,9 @@ function urlchecks() {
                                 fi
                             else
                                 if [[ $DEEP == true ]]; then
-                                    timeout 4h katana -silent -list .tmp/katana_targets_slow.txt -jc -kf all -c "$slow_c" -d 3 -fs rdn >>.tmp/katana.txt 2>>"$LOGFILE"
+                                    run_command "$katana_timeout_cmd" 4h katana -silent -list .tmp/katana_targets_slow.txt -jc -kf all -c "$slow_c" -d 3 -fs rdn >>.tmp/katana.txt 2>>"$LOGFILE"
                                 else
-                                    timeout 3h katana -silent -list .tmp/katana_targets_slow.txt -jc -kf all -c "$slow_c" -d 2 -fs rdn >>.tmp/katana.txt 2>>"$LOGFILE"
+                                    run_command "$katana_timeout_cmd" 3h katana -silent -list .tmp/katana_targets_slow.txt -jc -kf all -c "$slow_c" -d 2 -fs rdn >>.tmp/katana.txt 2>>"$LOGFILE"
                                 fi
                             fi
                         fi
@@ -1306,9 +1289,9 @@ function urlchecks() {
                 if [[ $diff_webs != "0" ]] || [[ ! -s ".tmp/katana.txt" ]]; then
                     if [[ $URL_CHECK_ACTIVE == true ]]; then
                         if [[ $DEEP == true ]]; then
-                            axiom-scan webs/webs_all.txt -m katana -jc -kf all -d 3 -fs rdn --max-runtime 4h -o .tmp/katana.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+                            run_command axiom-scan webs/webs_all.txt -m katana -jc -kf all -d 3 -fs rdn --max-runtime 4h -o .tmp/katana.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
                         else
-                            axiom-scan webs/webs_all.txt -m katana -jc -kf all -d 2 -fs rdn --max-runtime 3h -o .tmp/katana.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+                            run_command axiom-scan webs/webs_all.txt -m katana -jc -kf all -d 2 -fs rdn --max-runtime 3h -o .tmp/katana.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
                         fi
                     fi
                 fi
@@ -1323,7 +1306,7 @@ function urlchecks() {
                 grep -a "$domain" .tmp/url_extract_tmp.txt | grep -aEo 'https?://[^ ]+' | grep -iE '\.js([?#].*)?$|\.js([/?&].*)' | anew -q .tmp/url_extract_js.txt || true
                 grep -a "$domain" .tmp/url_extract_tmp.txt | grep -aEo 'https?://[^ ]+' | grep -iE '\.map([/?#].*)?$' | anew -q .tmp/url_extract_jsmap.txt || true
                 if [[ $DEEP == true ]] && [[ -s ".tmp/url_extract_js.txt" ]]; then
-                    interlace -tL .tmp/url_extract_js.txt -threads 10 -c "${tools}/JSA/venv/bin/python3 ${tools}/JSA/jsa.py -f _target_ | anew -q .tmp/url_extract_tmp.txt" &>/dev/null
+                    run_command interlace -tL .tmp/url_extract_js.txt -threads 10 -c "${tools}/JSA/venv/bin/python3 ${tools}/JSA/jsa.py -f _target_ | anew -q .tmp/url_extract_tmp.txt" &>/dev/null
                 fi
 
                 grep -a "$domain" .tmp/url_extract_tmp.txt | grep -aEo 'https?://[^ ]+' | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg)$" | anew -q .tmp/url_extract_tmp2.txt || true
@@ -1344,21 +1327,27 @@ function urlchecks() {
                     NUMOFLINES=0
                 fi
 
-                end_func "Results are saved in $domain/webs/url_extract.txt" "${FUNCNAME[0]}"
-
                 if [[ -s "webs/url_extract.txt" ]]; then
                     p1radup -i webs/url_extract.txt -o webs/url_extract_nodupes.txt -s 2>>"$LOGFILE" >/dev/null || true
 
                     if [[ $PROXY == true ]] && [[ -n $proxy_url ]] && [[ $(wc -l <webs/url_extract.txt) -le $DEEP_LIMIT2 ]]; then
                         notification "Sending URLs to proxy" "info"
-                        ffuf -mc all -w webs/url_extract.txt -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
+                        run_command ffuf -mc all -w webs/url_extract.txt -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
                     fi
                 else
                     _print_msg WARN "No URL extraction output generated; skipping p1radup/proxy replay."
                     log_note "No URL extraction output generated; skipping p1radup/proxy replay." "${FUNCNAME[0]}" "${LINENO}"
+                    end_message="No URL extraction output generated."
                 fi
+            else
+                end_message="No URL extraction candidates generated."
+                _print_msg WARN "No URL extraction candidates generated."
             fi
+        else
+            end_message="No web targets available for URL extraction."
+            _print_msg WARN "No web targets available for URL extraction."
         fi
+        end_func "${end_message}" "${FUNCNAME[0]}"
     else
         if [[ $URL_CHECK == false ]]; then
             pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
@@ -1403,13 +1392,13 @@ function url_gf() {
                 _print_msg INFO "Running: GF Pattern '${pattern}'"
                 if [[ $pattern == "potential" ]]; then
                     # Special handling for 'potential' pattern
-                    gf "$pattern" "webs/url_extract.txt" | cut -d ':' -f3-5 | anew -q "$output_file"
+                    run_command gf "$pattern" "webs/url_extract.txt" | cut -d ':' -f3-5 | anew -q "$output_file"
                 elif [[ $pattern == "redirect" && -s "gf/ssrf.txt" ]]; then
                     # Append SSFR results to redirect if ssrf.txt exists
-                    gf "$pattern" "webs/url_extract.txt" | anew -q "$output_file"
+                    run_command gf "$pattern" "webs/url_extract.txt" | anew -q "$output_file"
                 else
                     # General handling for other patterns
-                    gf "$pattern" "webs/url_extract.txt" | anew -q "$output_file"
+                    run_command gf "$pattern" "webs/url_extract.txt" | anew -q "$output_file"
                 fi
             done
 
@@ -1529,7 +1518,7 @@ function jschecks() {
                     | grep -F "$domain" \
                     | grep -aEo 'https?://[^ ]+' | anew -q .tmp/subjslinks.txt || true
             else
-                axiom-scan .tmp/url_extract_js.txt -m subjs -o .tmp/subjslinks.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+                run_command axiom-scan .tmp/url_extract_js.txt -m subjs -o .tmp/subjslinks.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
             fi
 
                 if [[ -s ".tmp/subjslinks.txt" ]]; then
@@ -1544,13 +1533,13 @@ function jschecks() {
             [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && printf "%bRunning: Resolving JS URLs 2/6%b\n" "$yellow" "$reset"
             if [[ $AXIOM != true ]]; then
                 if [[ -s "js/url_extract_js.txt" ]]; then
-                    httpx -follow-redirects -random-agent -silent -timeout "$HTTPX_TIMEOUT" -threads "$HTTPX_THREADS" \
+                    run_command httpx -follow-redirects -random-agent -silent -timeout "$HTTPX_TIMEOUT" -threads "$HTTPX_THREADS" \
                         -rl "$HTTPX_RATELIMIT" -status-code -content-type -retries 2 -no-color <js/url_extract_js.txt \
                         | grep "[200]" | grep "javascript" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
                 fi
             else
                 if [[ -s "js/url_extract_js.txt" ]]; then
-                    axiom-scan js/url_extract_js.txt -m httpx -follow-host-redirects -H "$HEADER" -status-code \
+                    run_command axiom-scan js/url_extract_js.txt -m httpx -follow-host-redirects -H "$HEADER" -status-code \
                         -threads "$HTTPX_THREADS" -rl "$HTTPX_RATELIMIT" -timeout "$HTTPX_TIMEOUT" -silent \
                         -content-type -retries 2 -no-color -o .tmp/js_livelinks.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
                     if [[ -s ".tmp/js_livelinks.txt" ]]; then
@@ -1565,19 +1554,19 @@ function jschecks() {
                 print_warnf "Failed to create sourcemapper directory."
             fi
             if [[ -s "js/js_livelinks.txt" ]]; then
-                interlace -tL js/js_livelinks.txt -threads "$INTERLACE_THREADS" \
+                run_command interlace -tL js/js_livelinks.txt -threads "$INTERLACE_THREADS" \
                     -c "sourcemapper -jsurl '_target_' -output _output_/_cleantarget_" \
                     -o .tmp/sourcemapper 2>>"$LOGFILE" >/dev/null
             fi
 
             if [[ -s ".tmp/url_extract_jsmap.txt" ]]; then
-                interlace -tL .tmp/url_extract_jsmap.txt -threads "$INTERLACE_THREADS" \
+                run_command interlace -tL .tmp/url_extract_jsmap.txt -threads "$INTERLACE_THREADS" \
                     -c "sourcemapper -url '_target_' -output _output_/_cleantarget_" \
                     -o .tmp/sourcemapper 2>>"$LOGFILE" >/dev/null
             fi
 
             find .tmp/sourcemapper/ \( -name "*.js" -o -name "*.ts" \) -type f \
-                | jsluice urls | jq -r .url | anew -q .tmp/js_endpoints.txt || true
+                | run_command jsluice urls | jq -r .url | anew -q .tmp/js_endpoints.txt || true
 
             [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && printf "%bRunning: Gathering endpoints 4/6%b\n" "$yellow" "$reset"
             if [[ -s "js/js_livelinks.txt" ]]; then
@@ -1596,17 +1585,17 @@ function jschecks() {
                     cat js/js_livelinks.txt | mantra -ua \"$HEADER\" -s | anew -q js/js_secrets.txt 2>>"$LOGFILE" >/dev/null || true
                 else
                     axiom-exec "go install github.com/Brosck/mantra@latest" 2>>"$LOGFILE" >/dev/null
-                    axiom-scan js/js_livelinks.txt -m mantra -ua "$HEADER" -s -o js/js_secrets.txt "$AXIOM_EXTRA_ARGS" &>/dev/null
+                    run_command axiom-scan js/js_livelinks.txt -m mantra -ua "$HEADER" -s -o js/js_secrets.txt "$AXIOM_EXTRA_ARGS" &>/dev/null
                 fi
                 mkdir -p .tmp/sourcemapper/secrets
                 if [[ -s "js/js_secrets.txt" ]]; then
                     while IFS= read -r i; do
                         [[ -z "$i" ]] && continue
-                        wget -q -P .tmp/sourcemapper/secrets -- "$i" || true
+                        run_command wget -q -P .tmp/sourcemapper/secrets -- "$i" || true
                     done < <(cut -d' ' -f2 js/js_secrets.txt)
                 fi
-                trufflehog filesystem .tmp/sourcemapper/ -j 2>/dev/null | jq -c | anew -q js/js_secrets_jsmap.txt
-                find .tmp/sourcemapper/ -type f -name "*.js" | jsluice secrets -j --patterns="${tools}/jsluice_patterns.json" | anew -q js/js_secrets_jsmap_jsluice.txt
+                run_command trufflehog filesystem .tmp/sourcemapper/ -j 2>/dev/null | jq -c | anew -q js/js_secrets_jsmap.txt
+                find .tmp/sourcemapper/ -type f -name "*.js" | run_command jsluice secrets -j --patterns="${tools}/jsluice_patterns.json" | anew -q js/js_secrets_jsmap_jsluice.txt
             fi
 
             [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && printf "%bRunning: Building wordlist 6/6%b\n" "$yellow" "$reset"
@@ -1617,7 +1606,7 @@ function jschecks() {
                             # shellcheck source=/dev/null
                             source "${GETJSWORDS_VENV}/bin/activate"
                             if python3 -c "import jsbeautifier, requests" 2>/dev/null; then
-                                interlace -tL js/js_livelinks.txt -threads "$INTERLACE_THREADS" \
+                                run_command interlace -tL js/js_livelinks.txt -threads "$INTERLACE_THREADS" \
                                     -c "python3 ${tools}/getjswords.py '_target_' | anew -q webs/dict_words.txt" 2>>"$LOGFILE" >/dev/null
                             else
                                 log_note "jschecks: jsbeautifier/requests missing in venv ${GETJSWORDS_VENV}; skipping getjswords wordlist step" "${FUNCNAME[0]}" "${LINENO}"
@@ -1632,7 +1621,7 @@ function jschecks() {
                     if ! command -v "$getjs_py" >/dev/null 2>&1; then
                         log_note "getjswords python not found: ${getjs_py}; skipping wordlist step" "${FUNCNAME[0]}" "${LINENO}"
                     elif "$getjs_py" -c "import jsbeautifier, requests" 2>/dev/null; then
-                        interlace -tL js/js_livelinks.txt -threads "$INTERLACE_THREADS" \
+                        run_command interlace -tL js/js_livelinks.txt -threads "$INTERLACE_THREADS" \
                             -c "${getjs_py} ${tools}/getjswords.py '_target_' | anew -q webs/dict_words.txt" 2>>"$LOGFILE" >/dev/null
                     else
                         log_note "jschecks: jsbeautifier/requests missing in ${getjs_py}; skipping getjswords wordlist step" "${FUNCNAME[0]}" "${LINENO}"
@@ -1672,7 +1661,7 @@ function websocket_checks() {
                 host=$(echo "$url_no_proto" | cut -d'/' -f1)
                 # Prepare Sec-WebSocket headers for accurate handshake
                 wskey=$(head -c 16 /dev/urandom | base64 2>/dev/null || echo dGVzdGtleQ==)
-                code=$(curl -sk --http1.1 -o /dev/null -w '%{http_code}' \
+                code=$(run_command curl -sk --http1.1 -o /dev/null -w '%{http_code}' \
                     -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
                     -H "Host: $host" \
                     -H "Sec-WebSocket-Key: $wskey" \
@@ -1682,7 +1671,7 @@ function websocket_checks() {
                     printf "HANDSHAKE %s\n" "$ws" | anew -q vulns/websockets.txt || true
                     # Origin test: send a cross-origin header, expect failure ideally
                     wskey2=$(head -c 16 /dev/urandom | base64 2>/dev/null || echo dGVzdGtleQ==)
-                    code2=$(curl -sk --http1.1 -o /dev/null -w '%{http_code}' \
+                    code2=$(run_command curl -sk --http1.1 -o /dev/null -w '%{http_code}' \
                         -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
                         -H "Origin: https://evil.example" -H "Host: $host" \
                         -H "Sec-WebSocket-Key: $wskey2" \
@@ -1777,7 +1766,7 @@ function wordlist_gen_roboxtractor() {
         # Handle Proxy if conditions are met
         if [[ $PROXY == true ]] && [[ -n $proxy_url ]] && [[ "$(wc -l <"webs/robots_wordlist.txt")" -le $DEEP_LIMIT2 ]]; then
             notification "Sending URLs to proxy" info
-            ffuf -mc all -w "webs/robots_wordlist.txt" -u "FUZZ" -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
+            run_command ffuf -mc all -w "webs/robots_wordlist.txt" -u "FUZZ" -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
         fi
 
     else
@@ -1812,7 +1801,7 @@ function password_dict() {
         word="${domain%%.*}"
 
         # Run pydictor.py with specified parameters
-        python3 "${tools}/pydictor/pydictor.py" -extend "$word" --leet 0 1 2 11 21 --len "$PASSWORD_MIN_LENGTH" "$PASSWORD_MAX_LENGTH" -o "$dir/webs/password_dict.txt" 2>>"$LOGFILE" >/dev/null
+        run_command python3 "${tools}/pydictor/pydictor.py" -extend "$word" --leet 0 1 2 11 21 --len "$PASSWORD_MIN_LENGTH" "$PASSWORD_MAX_LENGTH" -o "$dir/webs/password_dict.txt" 2>>"$LOGFILE" >/dev/null
         end_func "Results are saved in $domain/webs/password_dict.txt" "${FUNCNAME[0]}"
 
         # Optionally, create a marker file to indicate the function has been processed
@@ -1874,9 +1863,9 @@ function brokenLinks() {
                 # Use axiom-scan for scanning
                 if [[ ! -s ".tmp/katana.txt" ]]; then
                     if [[ $DEEP == true ]]; then
-                        axiom-scan "webs/webs_all.txt" -m katana -jc -kf all -d 3 --max-runtime 4h -o ".tmp/katana.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+                        run_command axiom-scan "webs/webs_all.txt" -m katana -jc -kf all -d 3 --max-runtime 4h -o ".tmp/katana.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
                     else
-                        axiom-scan "webs/webs_all.txt" -m katana -jc -kf all -d 2 --max-runtime 3h -o ".tmp/katana.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+                        run_command axiom-scan "webs/webs_all.txt" -m katana -jc -kf all -d 2 --max-runtime 3h -o ".tmp/katana.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
                     fi
                     # Remove lines longer than 2048 characters
                     if [[ -s ".tmp/katana.txt" ]]; then
@@ -1887,7 +1876,7 @@ function brokenLinks() {
 
             # Process katana.txt to find broken links
             if [[ -s ".tmp/katana.txt" ]]; then
-                httpx -follow-redirects -random-agent -status-code -threads "$HTTPX_THREADS" -rl "$HTTPX_RATELIMIT" -timeout "$HTTPX_TIMEOUT" -silent -retries 2 -no-color <".tmp/katana.txt" 2>>"$LOGFILE" \
+                run_command httpx -follow-redirects -random-agent -status-code -threads "$HTTPX_THREADS" -rl "$HTTPX_RATELIMIT" -timeout "$HTTPX_TIMEOUT" -silent -retries 2 -no-color <".tmp/katana.txt" 2>>"$LOGFILE" \
                     | grep "\[4" | cut -d ' ' -f1 | anew -q ".tmp/brokenLinks_total.txt"
             fi
 

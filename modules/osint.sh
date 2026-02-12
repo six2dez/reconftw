@@ -20,7 +20,7 @@ function google_dorks() {
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GOOGLE_DORKS == true ]] && [[ $OSINT == true ]]; then
         start_func "${FUNCNAME[0]}" "Running: Google Dorks in process"
 
-        if ! "${tools}/dorks_hunter/venv/bin/python3" "${tools}/dorks_hunter/dorks_hunter.py" -d "$domain" -o "osint/dorks.txt" 2>>"$LOGFILE" >/dev/null; then
+        if ! run_command "${tools}/dorks_hunter/venv/bin/python3" "${tools}/dorks_hunter/dorks_hunter.py" -d "$domain" -o "osint/dorks.txt" 2>>"$LOGFILE" >/dev/null; then
             _print_error "dorks_hunter command failed"
         fi
         end_func "Results are saved in $domain/osint/dorks.txt" "${FUNCNAME[0]}"
@@ -41,12 +41,12 @@ function github_dorks() {
 
         if [[ -s $GITHUB_TOKENS ]]; then
             if [[ $DEEP == true ]]; then
-                if ! gitdorks_go -gd "${tools}/gitdorks_go/Dorks/medium_dorks.txt" -nws 20 -target "$domain" -tf "$GITHUB_TOKENS" -ew 3 | anew -q osint/gitdorks.txt; then
+                if ! run_command gitdorks_go -gd "${tools}/gitdorks_go/Dorks/medium_dorks.txt" -nws 20 -target "$domain" -tf "$GITHUB_TOKENS" -ew 3 | anew -q osint/gitdorks.txt; then
                     _print_error "gitdorks_go command failed"
                     return 1
                 fi
             else
-                if ! gitdorks_go -gd "${tools}/gitdorks_go/Dorks/smalldorks.txt" -nws 20 -target "$domain" -tf "$GITHUB_TOKENS" -ew 3 | anew -q osint/gitdorks.txt; then
+                if ! run_command gitdorks_go -gd "${tools}/gitdorks_go/Dorks/smalldorks.txt" -nws 20 -target "$domain" -tf "$GITHUB_TOKENS" -ew 3 | anew -q osint/gitdorks.txt; then
                     _print_error "gitdorks_go command failed"
                     return 1
                 fi
@@ -75,7 +75,7 @@ function github_repos() {
             GH_TOKEN=$(head -n 1 "$GITHUB_TOKENS")
             echo "$domain" | unfurl format %r >.tmp/company_name.txt
 
-            if ! enumerepo -token-string "$GH_TOKEN" -usernames .tmp/company_name.txt -o .tmp/company_repos.txt 2>>"$LOGFILE" >/dev/null; then
+            if ! run_command enumerepo -token-string "$GH_TOKEN" -usernames .tmp/company_name.txt -o .tmp/company_repos.txt 2>>"$LOGFILE" >/dev/null; then
                 _print_error "enumerepo command failed"
             fi
 
@@ -88,7 +88,7 @@ function github_repos() {
             ensure_dirs .tmp/github_repos .tmp/github
 
             if [[ -s ".tmp/company_repos_url.txt" ]]; then
-                if ! interlace -tL .tmp/company_repos_url.txt -threads "$INTERLACE_THREADS" -c "git clone _target_ .tmp/github_repos/_cleantarget_" 2>>"$LOGFILE" >/dev/null; then
+                if ! run_command interlace -tL .tmp/company_repos_url.txt -threads "$INTERLACE_THREADS" -c "git clone _target_ .tmp/github_repos/_cleantarget_" 2>>"$LOGFILE" >/dev/null; then
                     _print_error "interlace git clone command failed"
                     return 1
                 fi
@@ -162,7 +162,7 @@ function metadata() {
             _print_error "Failed to change directory to ${tools}/metagoofil in ${FUNCNAME[0]} at line ${LINENO}"
             return 1
         }
-        if ! "${tools}/metagoofil/venv/bin/python3" "${tools}/metagoofil/metagoofil.py" -d "${domain}" -t pdf,docx,xlsx -l 10 -w -o "${dir}/.tmp/metagoofil_${domain}/" 2>>"${LOGFILE}" >/dev/null; then
+        if ! run_command "${tools}/metagoofil/venv/bin/python3" "${tools}/metagoofil/metagoofil.py" -d "${domain}" -t pdf,docx,xlsx -l 10 -w -o "${dir}/.tmp/metagoofil_${domain}/" 2>>"${LOGFILE}" >/dev/null; then
             log_note "metadata: metagoofil failed; skipping metadata extraction" "${FUNCNAME[0]}" "${LINENO}"
         fi
         popd >/dev/null || {
@@ -173,7 +173,7 @@ function metadata() {
         # Check if exiftool is installed before running
         if command -v exiftool &>/dev/null; then
             if find ".tmp/metagoofil_${domain}" -type f -print -quit 2>/dev/null | grep -q .; then
-                exiftool -r ".tmp/metagoofil_${domain}" 2>>"${LOGFILE}" \
+                run_command exiftool -r ".tmp/metagoofil_${domain}" 2>>"${LOGFILE}" \
                     | tee /dev/null \
                     | egrep -i "Author|Creator|Email|Producer|Template" \
                     | sort -u \
@@ -209,9 +209,9 @@ function apileaks() {
         start_func "${FUNCNAME[0]}" "Scanning for leaks in public API directories"
 
         # Run porch-pirate (full dump); fallback to light mode if dump fails
-        if ! porch-pirate -s "$domain" -l 25 --dump 2>>"$LOGFILE" >"${dir}/osint/postman_leaks.txt"; then
+        if ! run_command porch-pirate -s "$domain" -l 25 --dump 2>>"$LOGFILE" >"${dir}/osint/postman_leaks.txt"; then
             log_note "porch-pirate --dump failed; retrying without --dump" "${FUNCNAME[0]}" "${LINENO}"
-            if ! porch-pirate -s "$domain" -l 25 2>>"$LOGFILE" >"${dir}/osint/postman_leaks.txt"; then
+            if ! run_command porch-pirate -s "$domain" -l 25 2>>"$LOGFILE" >"${dir}/osint/postman_leaks.txt"; then
                 log_note "porch-pirate failed even without --dump" "${FUNCNAME[0]}" "${LINENO}"
             fi
         fi
@@ -231,7 +231,7 @@ function apileaks() {
         [[ -n ${TIMEOUT_CMD:-} ]] && swag_cmd=("$TIMEOUT_CMD" "$swag_timeout" "${swag_cmd[@]}")
         local swagger_rc=0
         {
-            "${swag_cmd[@]}" 2>>"$LOGFILE" | grep -i "[*]\|URL" >"${dir}/osint/swagger_leaks.txt"
+            run_command "${swag_cmd[@]}" 2>>"$LOGFILE" | grep -i "[*]\|URL" >"${dir}/osint/swagger_leaks.txt"
             swagger_rc=${PIPESTATUS[0]:-0} # ignore grep exit code (no matches is fine)
         } || true
         if ((swagger_rc != 0)); then
@@ -243,6 +243,11 @@ function apileaks() {
         if ! popd >/dev/null; then
             _print_error "Failed to return to the previous directory in ${FUNCNAME[0]} at line ${LINENO}"
             return 1
+        fi
+
+        if [[ "${DRY_RUN:-false}" == "true" ]]; then
+            end_func "Dry-run: apileaks commands recorded" "${FUNCNAME[0]}" "SKIP"
+            return
         fi
 
             # Analyze leaks with trufflehog
@@ -275,7 +280,7 @@ function emails() {
 
         start_func "${FUNCNAME[0]}" "Searching for emails/users/passwords leaks"
 
-        PYTHONWARNINGS=ignore "${tools}/EmailHarvester/venv/bin/python3" "${tools}/EmailHarvester/EmailHarvester.py" -d ${domain} -e all -l 20 2>>"$LOGFILE" | anew -q .tmp/EmailHarvester.txt || true
+        run_command env PYTHONWARNINGS=ignore "${tools}/EmailHarvester/venv/bin/python3" "${tools}/EmailHarvester/EmailHarvester.py" -d ${domain} -e all -l 20 2>>"$LOGFILE" | anew -q .tmp/EmailHarvester.txt || true
 
         # Process emailfinder results
         if [[ -s ".tmp/EmailHarvester.txt" ]]; then
@@ -289,7 +294,7 @@ function emails() {
         fi
 
         # Run LeakSearch.py and handle errors
-        "${tools}/LeakSearch/venv/bin/python3" LeakSearch.py -k "$domain" -o "${dir}/.tmp/passwords.txt" 1>>"$LOGFILE"
+        run_command "${tools}/LeakSearch/venv/bin/python3" LeakSearch.py -k "$domain" -o "${dir}/.tmp/passwords.txt" 1>>"$LOGFILE"
 
         # Return to the previous directory
         if ! popd >/dev/null; then
@@ -326,11 +331,11 @@ function domain_info() {
         start_func "${FUNCNAME[0]}" "Searching domain info (whois, registrant name/email domains)"
 
         # Run whois command and check for errors
-        whois "$domain" >"osint/domain_info_general.txt"
-        "${tools}/msftrecon/venv/bin/python3" "${tools}/msftrecon/msftrecon/msftrecon.py" -d ${domain} 2>>"$LOGFILE" >osint/azure_tenant_domains.txt || true
+        run_command whois "$domain" >"osint/domain_info_general.txt"
+        run_command "${tools}/msftrecon/venv/bin/python3" "${tools}/msftrecon/msftrecon/msftrecon.py" -d ${domain} 2>>"$LOGFILE" >osint/azure_tenant_domains.txt || true
 
         company_name=$(unfurl format %r <<<"$domain")
-        "${tools}/Scopify/venv/bin/python3" "${tools}/Scopify/scopify.py" -c ${company_name} >osint/scopify.txt
+        run_command "${tools}/Scopify/venv/bin/python3" "${tools}/Scopify/scopify.py" -c ${company_name} >osint/scopify.txt
 
         end_func "Results are saved in ${domain}/osint/domain_info_[general/azure_tenant_domains].txt" "${FUNCNAME[0]}"
 
@@ -365,10 +370,10 @@ function third_party_misconfigs() {
             return 1
         fi
 
-        misconfig-mapper -update-templates 1>>"$LOGFILE"
-        misconfig-mapper -target visma.com -as-domain true -permutations false -skip-ssl \
+        run_command misconfig-mapper -update-templates 1>>"$LOGFILE"
+        run_command misconfig-mapper -target visma.com -as-domain true -permutations false -skip-ssl \
             -service "*" -verbose 0 | anew -q "${dir}/osint/3rdparts_misconfigurations.txt"
-        misconfig-mapper -target "$company_name" -skip-ssl -verbose 0 -service "*" \
+        run_command misconfig-mapper -target "$company_name" -skip-ssl -verbose 0 -service "*" \
             | anew -q "${dir}/osint/3rdparts_misconfigurations.txt"
 
         # Return to the previous directory
@@ -409,7 +414,7 @@ function spoof() {
         fi
 
         # Run spoofy.py and handle errors
-        "${tools}/Spoofy/venv/bin/python3" spoofy.py -d "$domain" >"${dir}/osint/spoof.txt"
+        run_command "${tools}/Spoofy/venv/bin/python3" spoofy.py -d "$domain" >"${dir}/osint/spoof.txt"
 
         # Return to the previous directory
         if ! popd >/dev/null; then
@@ -442,9 +447,9 @@ function mail_hygiene() {
         {
             printf "Domain: %s\n" "$domain"
             printf "\nTXT records:\n"
-            dig +short TXT "$domain" | sed 's/^/  /'
+            run_command dig +short TXT "$domain" | sed 's/^/  /'
             printf "\nDMARC record:\n"
-            dig +short TXT "_dmarc.$domain" | sed 's/^/  /'
+            run_command dig +short TXT "_dmarc.$domain" | sed 's/^/  /'
         } >"osint/mail_hygiene.txt" 2>>"$LOGFILE"
         end_func "Results are saved in $domain/osint/mail_hygiene.txt" "${FUNCNAME[0]}"
     else
@@ -467,7 +472,7 @@ function cloud_enum_scan() {
 
         start_func "${FUNCNAME[0]}" "Cloud storage enumeration"
         company_name=$(unfurl format %r <<<"$domain")
-        cloud_enum -k "$company_name" -k "$domain" -k "${domain%%.*}" 2>>"$LOGFILE" | anew -q osint/cloud_enum.txt
+        run_command cloud_enum -k "$company_name" -k "$domain" -k "${domain%%.*}" 2>>"$LOGFILE" | anew -q osint/cloud_enum.txt
         end_func "Results are saved in $domain/osint/cloud_enum.txt" "${FUNCNAME[0]}"
     else
         if [[ $CLOUD_ENUM == false ]] || [[ $OSINT == false ]]; then
@@ -494,18 +499,18 @@ function ip_info() {
         if [[ -n $WHOISXML_API ]]; then
 
             # Reverse IP lookup
-            curl -s "https://reverse-ip.whoisxmlapi.com/api/v1?apiKey=${WHOISXML_API}&ip=${domain}" \
+            run_command curl -s "https://reverse-ip.whoisxmlapi.com/api/v1?apiKey=${WHOISXML_API}&ip=${domain}" \
                 | jq -r '.result[].name' 2>>"$LOGFILE" \
                 | sed -e "s/$/ ${domain}/" \
                 | anew -q "osint/ip_${domain}_relations.txt"
 
             # WHOIS lookup
-            curl -s "https://www.whoisxmlapi.com/whoisserver/WhoisService?apiKey=${WHOISXML_API}&domainName=${domain}&outputFormat=json&da=2&registryRawText=1&registrarRawText=1&ignoreRawTexts=1" \
+            run_command curl -s "https://www.whoisxmlapi.com/whoisserver/WhoisService?apiKey=${WHOISXML_API}&domainName=${domain}&outputFormat=json&da=2&registryRawText=1&registrarRawText=1&ignoreRawTexts=1" \
                 | jq 2>>"$LOGFILE" \
                 | anew -q "osint/ip_${domain}_whois.txt"
 
             # IP Geolocation
-            curl -s "https://ip-geolocation.whoisxmlapi.com/api/v1?apiKey=${WHOISXML_API}&ipAddress=${domain}" \
+            run_command curl -s "https://ip-geolocation.whoisxmlapi.com/api/v1?apiKey=${WHOISXML_API}&ipAddress=${domain}" \
                 | jq -r '.ip,.location' 2>>"$LOGFILE" \
                 | anew -q "osint/ip_${domain}_location.txt"
 

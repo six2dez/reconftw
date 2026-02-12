@@ -13,6 +13,7 @@
 function start() {
 
     global_start=$(date +%s)
+    set +m 2>/dev/null || true
 
     # Validate configuration before starting
     validate_config || exit $?
@@ -237,28 +238,28 @@ function end() {
             _print_error "Faraday server is not running. Skipping Faraday integration"
         else
             if [[ -s ".tmp/tko_json.txt" ]]; then
-                faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nuclei .tmp/tko_json.txt 2>>"$LOGFILE" >/dev/null
+                run_command faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nuclei .tmp/tko_json.txt 2>>"$LOGFILE" >/dev/null
             fi
             if [[ -s "hosts/portscan_active.xml" ]]; then
-                faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nmap hosts/portscan_active.xml 2>>"$LOGFILE" >/dev/null
+                run_command faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nmap hosts/portscan_active.xml 2>>"$LOGFILE" >/dev/null
             fi
             if [[ -s ".tmp/fuzzparams_json.txt" ]]; then
-                faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nuclei .tmp/fuzzparams_json.txt 2>>"$LOGFILE" >/dev/null
+                run_command faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nuclei .tmp/fuzzparams_json.txt 2>>"$LOGFILE" >/dev/null
             fi
             if [[ -s "nuclei_output/info_json.txt" ]]; then
-                faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nuclei nuclei_output/info_json.txt 2>>"$LOGFILE" >/dev/null
+                run_command faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nuclei nuclei_output/info_json.txt 2>>"$LOGFILE" >/dev/null
             fi
             if [[ -s "nuclei_output/low_json.txt" ]]; then
-                faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nuclei nuclei_output/low_json.txt 2>>"$LOGFILE" >/dev/null
+                run_command faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nuclei nuclei_output/low_json.txt 2>>"$LOGFILE" >/dev/null
             fi
             if [[ -s "nuclei_output/medium_json.txt" ]]; then
-                faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nuclei nuclei_output/medium_json.txt 2>>"$LOGFILE" >/dev/null
+                run_command faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nuclei nuclei_output/medium_json.txt 2>>"$LOGFILE" >/dev/null
             fi
             if [[ -s "nuclei_output/high_json.txt" ]]; then
-                faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nuclei nuclei_output/high_json.txt 2>>"$LOGFILE" >/dev/null
+                run_command faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nuclei nuclei_output/high_json.txt 2>>"$LOGFILE" >/dev/null
             fi
             if [[ -s "nuclei_output/critical_json.txt" ]]; then
-                faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nuclei nuclei_output/critical_json.txt 2>>"$LOGFILE" >/dev/null
+                run_command faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nuclei nuclei_output/critical_json.txt 2>>"$LOGFILE" >/dev/null
             fi
             notification "Information sent to Faraday" "good"
         fi

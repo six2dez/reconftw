@@ -1046,10 +1046,10 @@ function transfer {
             echo "$file: No such file or directory" >&2
             return 1
         fi
-        tar -czvf /tmp/$file_name $file >/dev/null 2>&1 && curl -s https://bashupload.com/$file.tgz --data-binary @/tmp/$file_name | grep wget
+        run_command tar -czvf /tmp/$file_name $file >/dev/null 2>&1 && run_command curl -s https://bashupload.com/$file.tgz --data-binary @/tmp/$file_name | grep wget
     else
         file_name=$1
-        tar -czvf /tmp/$file_name $file >/dev/null 2>&1 && curl -s https://bashupload.com/$file.tgz --data-binary @/tmp/$file_name | grep wget
+        run_command tar -czvf /tmp/$file_name $file >/dev/null 2>&1 && run_command curl -s https://bashupload.com/$file.tgz --data-binary @/tmp/$file_name | grep wget
     fi
 }
 
@@ -1069,16 +1069,16 @@ function sendToNotify {
             notification "Sending ${domain} data over Telegram" info
             telegram_chat_id=$(sed -n '/^telegram:/,/^[^ ]/p' ${NOTIFY_CONFIG} | sed -n 's/^[ ]*telegram_chat_id:[ ]*"\([^"]*\)".*/\1/p')
             telegram_key=$(sed -n '/^telegram:/,/^[^ ]/p' ${NOTIFY_CONFIG} | sed -n 's/^[ ]*telegram_api_key:[ ]*"\([^"]*\)".*/\1/p')
-            curl -F "chat_id=${telegram_chat_id}" -F "document=@${1}" https://api.telegram.org/bot${telegram_key}/sendDocument 2>>"$LOGFILE" >/dev/null
+            run_command curl -F "chat_id=${telegram_chat_id}" -F "document=@${1}" https://api.telegram.org/bot${telegram_key}/sendDocument 2>>"$LOGFILE" >/dev/null
         fi
         if grep -q '^ discord\|^discord\|^    discord' $NOTIFY_CONFIG; then
             notification "Sending ${domain} data over Discord" info
             discord_url=$(sed -n '/^discord:/,/^[^ ]/p' ${NOTIFY_CONFIG} | sed -n 's/^[ ]*discord_webhook_url:[ ]*"\([^"]*\)".*/\1/p')
-            curl -v -i -H "Accept: application/json" -H "Content-Type: multipart/form-data" -X POST -F 'payload_json={"username": "test", "content": "hello"}' -F file1=@${1} $discord_url 2>>"$LOGFILE" >/dev/null
+            run_command curl -v -i -H "Accept: application/json" -H "Content-Type: multipart/form-data" -X POST -F 'payload_json={"username": "test", "content": "hello"}' -F file1=@${1} $discord_url 2>>"$LOGFILE" >/dev/null
         fi
         if [[ -n $slack_channel ]] && [[ -n $slack_auth ]]; then
             notification "Sending ${domain} data over Slack" info
-            curl -F file=@${1} -F "initial_comment=reconftw zip file" -F channels=${slack_channel} -H "Authorization: Bearer ${slack_auth}" https://slack.com/api/files.upload 2>>"$LOGFILE" >/dev/null
+            run_command curl -F file=@${1} -F "initial_comment=reconftw zip file" -F channels=${slack_channel} -H "Authorization: Bearer ${slack_auth}" https://slack.com/api/files.upload 2>>"$LOGFILE" >/dev/null
         fi
     fi
 }
@@ -1130,15 +1130,21 @@ function end_func() {
     record_func_timing "${fn}" "$((end - start))"
     local duration=$((end - start))
     echo "[$current_date] End function: ${fn} " >>"${LOGFILE}"
+    local badge="OK"
+    case "$status" in
+        info|INFO) badge="INFO" ;;
+        warn|WARN) badge="WARN" ;;
+        error|ERROR) badge="FAIL" ;;
+        good|SUCCESS) badge="OK" ;;
+        OK|WARN|FAIL|SKIP|CACHE) badge="$status" ;;
+    esac
+
+    # Persist per-function final status for parallel aggregator.
+    if [[ -n "${called_fn_dir:-}" ]]; then
+        printf "%s\n" "$badge" >"${called_fn_dir}/.status_${fn}" 2>/dev/null || true
+    fi
+
     if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
-        local badge="OK"
-        case "$status" in
-            info|INFO) badge="INFO" ;;
-            warn|WARN) badge="WARN" ;;
-            error|ERROR) badge="FAIL" ;;
-            good|SUCCESS) badge="OK" ;;
-            OK|WARN|FAIL|SKIP) badge="$status" ;;
-        esac
         _print_status "$badge" "${fn}" "${duration}s"
         # Show detail line for non-OK statuses when message is present
         if [[ -n "$message" ]] && [[ "$badge" != "OK" && "$badge" != "INFO" ]]; then
@@ -1174,8 +1180,14 @@ function end_subfunc() {
     end_sub=$(date +%s)
     getElapsedTime "$start_sub" "$end_sub"
     local duration=$((end_sub - start_sub))
+    local status="${3:-OK}"
+
+    # Persist per-subfunction final status for parallel aggregator.
+    if [[ -n "${called_fn_dir:-}" ]]; then
+        printf "%s\n" "$status" >"${called_fn_dir}/.status_${2}" 2>/dev/null || true
+    fi
+
     if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
-        local status="${3:-OK}"
         _print_status "$status" "  ${2}" "${duration}s"
     fi
     echo "[$current_date] End subfunction: ${1} " >>"${LOGFILE}"
@@ -1196,9 +1208,9 @@ function maybe_update_nuclei() {
     local stamp_file=".tmp/.nuclei_updated"
     if [[ ! -f $stamp_file ]]; then
         if [[ -n ${NUCLEI_TEMPLATES_PATH-} ]]; then
-            nuclei -update-templates -update-template-dir "${NUCLEI_TEMPLATES_PATH}" 2>>"$LOGFILE" >/dev/null || true # non-fatal: template update failure shouldn't block scan
+            run_command nuclei -update-templates -update-template-dir "${NUCLEI_TEMPLATES_PATH}" 2>>"$LOGFILE" >/dev/null || true # non-fatal: template update failure shouldn't block scan
         else
-            nuclei -update 2>>"$LOGFILE" >/dev/null || true # non-fatal: template update failure shouldn't block scan
+            run_command nuclei -update 2>>"$LOGFILE" >/dev/null || true # non-fatal: template update failure shouldn't block scan
         fi
         touch "$stamp_file"
     fi
@@ -1868,7 +1880,7 @@ function health_check() {
 
     # 3. Check network connectivity
     _print_status INFO "Checking network connectivity..."
-    if curl -s --connect-timeout 5 -o /dev/null -w "%{http_code}" "https://www.google.com" | grep -q "200\|301\|302"; then
+    if run_command curl -s --connect-timeout 5 -o /dev/null -w "%{http_code}" "https://www.google.com" | grep -q "200\|301\|302"; then
         _print_status OK "Internet connectivity"
     else
         _print_status WARN "No internet connectivity"

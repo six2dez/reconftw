@@ -254,6 +254,12 @@ _print_module_start() {
     local title="${1^^}"
     local ts
     ts=$(date +'%Y-%m-%d %H:%M:%S')
+
+    # Reset dry-run tracking for new module
+    if declare -F ui_dryrun_reset >/dev/null 2>&1; then
+        ui_dryrun_reset
+    fi
+
     printf "\n%b── %s ───────────────────────────────────────────────────────────────%b\n" \
         "${bgreen:-}" "$title" "${reset:-}"
     printf "Started: %s\n" "$ts"
@@ -266,6 +272,12 @@ _print_module_end() {
     local title="${1^^}"
     local ts
     ts=$(date +'%Y-%m-%d %H:%M:%S')
+
+    # Show dry-run summary before completion timestamp
+    if declare -F ui_dryrun_summary >/dev/null 2>&1; then
+        ui_dryrun_summary
+    fi
+
     printf "Completed: %s\n" "$ts"
 }
 
@@ -357,9 +369,10 @@ skip_notification() {
     if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
         _print_status "$badge" "$func_name" "0s"
         if [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
-            printf "         %s\n" "$reason"
-            if [[ "$reason" == "already processed" ]]; then
-                printf "         To force re-run, delete: %s/.%s\n" "${called_fn_dir:-.}" "$func_name"
+            if [[ "$badge" == "CACHE" ]]; then
+                _print_msg INFO "${func_name} already processed. To force re-run, delete: ${called_fn_dir:-.}/.${func_name}"
+            else
+                _print_msg INFO "${func_name} skipped: ${reason}"
             fi
         fi
     fi
@@ -415,17 +428,25 @@ skip_if_processed() {
 run_tool() {
     local name="$1"
     shift
-    
+
     if [[ ${DRY_RUN:-false} == true ]]; then
-        printf "%b[DRY-RUN] Would execute: %s %s%b\n" "${cyan:-}" "$name" "$*" "${reset:-}"
+        local full_cmd="$name $*"
+
+        # Track command for module summary
+        if declare -F ui_dryrun_track >/dev/null 2>&1; then
+            ui_dryrun_track "$name" "$full_cmd"
+        else
+            # Fallback to old behavior if ui_dryrun_track not available
+            printf "%b[DRY-RUN] Would execute: %s %s%b\n" "${cyan:-}" "$name" "$*" "${reset:-}"
+        fi
         return 0
     fi
-    
+
     # Log the command if LOGFILE is set
     if [[ -n "${LOGFILE:-}" ]]; then
         echo "[$(date +'%Y-%m-%d %H:%M:%S')] Running: $name $*" >> "$LOGFILE"
     fi
-    
+
     "$@"
 }
 

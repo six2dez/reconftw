@@ -24,7 +24,7 @@ function xss() {
         # Process gf/xss.txt with qsreplace and Gxss
         if [[ -s "gf/xss.txt" ]]; then
             _print_msg INFO "Running: XSS Payload Generation"
-            qsreplace FUZZ <"gf/xss.txt" | sed '/FUZZ/!d' | Gxss -c 100 -p Xss | qsreplace FUZZ | sed '/FUZZ/!d' \
+            run_command qsreplace FUZZ <"gf/xss.txt" | sed '/FUZZ/!d' | Gxss -c 100 -p Xss | qsreplace FUZZ | sed '/FUZZ/!d' \
                 | anew -q ".tmp/xss_reflected.txt"
         fi
 
@@ -72,7 +72,7 @@ function xss() {
             # Run Dalfox with Axiom-scan output
             if [[ -s ".tmp/xss_reflected.txt" ]]; then
                 _print_msg INFO "Running: Dalfox with Axiom"
-                axiom-scan ".tmp/xss_reflected.txt" -m dalfox --skip-bav $OPTIONS -d "$DEPTH" -o "vulns/xss.txt" $AXIOM_ARGS 2>>"$LOGFILE" >/dev/null
+                run_command axiom-scan ".tmp/xss_reflected.txt" -m dalfox --skip-bav $OPTIONS -d "$DEPTH" -o "vulns/xss.txt" $AXIOM_ARGS 2>>"$LOGFILE" >/dev/null
             fi
         fi
 
@@ -109,7 +109,7 @@ function cors() {
         # Proceed only if webs_all.txt exists and is non-empty
         if [[ -s "webs/webs_all.txt" ]]; then
             _print_msg INFO "Running: Corsy for CORS Scan"
-            "${tools}/Corsy/venv/bin/python3" "${tools}/Corsy/corsy.py" -i "webs/webs_all.txt" -o "vulns/cors.txt" 2>>"$LOGFILE" >/dev/null
+            run_command "${tools}/Corsy/venv/bin/python3" "${tools}/Corsy/corsy.py" -i "webs/webs_all.txt" -o "vulns/cors.txt" 2>>"$LOGFILE" >/dev/null
         else
             end_func "No webs/webs_all.txt file found, CORS Scan skipped." "${FUNCNAME[0]}"
             return
@@ -148,10 +148,10 @@ function open_redirect() {
             _print_msg INFO "Running: Open Redirects Payload Generation"
 
             # Process redirect.txt with qsreplace and filter lines containing 'FUZZ'
-            qsreplace FUZZ <"gf/redirect.txt" | sed '/FUZZ/!d' | anew -q ".tmp/tmp_redirect.txt"
+            run_command qsreplace FUZZ <"gf/redirect.txt" | sed '/FUZZ/!d' | anew -q ".tmp/tmp_redirect.txt"
 
             # Run Oralyzer with the generated payloads
-            "${tools}/Oralyzer/venv/bin/python3" "${tools}/Oralyzer/oralyzer.py" -l ".tmp/tmp_redirect.txt" -p "${tools}/Oralyzer/payloads.txt" >"vulns/redirect.txt" 2>>"$LOGFILE"
+            run_command "${tools}/Oralyzer/venv/bin/python3" "${tools}/Oralyzer/oralyzer.py" -l ".tmp/tmp_redirect.txt" -p "${tools}/Oralyzer/payloads.txt" >"vulns/redirect.txt" 2>>"$LOGFILE"
 
             # Remove ANSI color codes from the output
             sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" "vulns/redirect.txt"
@@ -207,9 +207,9 @@ function ssrf_checks() {
             _print_msg INFO "Running: SSRF Payload Generation"
 
             # Generate temporary SSRF payloads
-            qsreplace "$COLLAB_SERVER_FIX" <"gf/ssrf.txt" | anew -q ".tmp/tmp_ssrf.txt"
+            run_command qsreplace "$COLLAB_SERVER_FIX" <"gf/ssrf.txt" | anew -q ".tmp/tmp_ssrf.txt"
 
-            qsreplace "$COLLAB_SERVER_URL" <"gf/ssrf.txt" | anew -q ".tmp/tmp_ssrf.txt"
+            run_command qsreplace "$COLLAB_SERVER_URL" <"gf/ssrf.txt" | anew -q ".tmp/tmp_ssrf.txt"
 
     # Run FFUF to find requested URLs
     _print_msg INFO "Running: FFUF for SSRF Requested URLs"
@@ -285,7 +285,7 @@ function crlf_checks() {
             _print_msg INFO "Running: CRLF Fuzzing"
 
             # Run CRLFuzz
-            crlfuzz -l "webs/webs_all.txt" -o "vulns/crlf.txt" 2>>"$LOGFILE" >/dev/null
+            run_command crlfuzz -l "webs/webs_all.txt" -o "vulns/crlf.txt" 2>>"$LOGFILE" >/dev/null
 
             end_func "Results are saved in vulns/crlf.txt" "${FUNCNAME[0]}"
         else
@@ -320,7 +320,7 @@ function lfi() {
             _print_msg INFO "Running: LFI Payload Generation"
 
             # Process lfi.txt with qsreplace and filter lines containing 'FUZZ'
-            qsreplace "FUZZ" <"gf/lfi.txt" | sed '/FUZZ/!d' | anew -q ".tmp/tmp_lfi.txt"
+            run_command qsreplace "FUZZ" <"gf/lfi.txt" | sed '/FUZZ/!d' | anew -q ".tmp/tmp_lfi.txt"
 
             # Determine whether to proceed based on DEEP flag or number of URLs
             URL_COUNT=$(wc -l <".tmp/tmp_lfi.txt")
@@ -329,7 +329,7 @@ function lfi() {
                 _print_msg INFO "Running: LFI Fuzzing with FFUF"
 
                 # Use Interlace to parallelize FFUF scanning
-                interlace -tL ".tmp/tmp_lfi.txt" -threads "$INTERLACE_THREADS" -c "ffuf -v -r -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w \"${lfi_wordlist}\" -u \"_target_\" -mr \"root:\" " 2>>"$LOGFILE" \
+                run_command interlace -tL ".tmp/tmp_lfi.txt" -threads "$INTERLACE_THREADS" -c "ffuf -v -r -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w \"${lfi_wordlist}\" -u \"_target_\" -mr \"root:\" " 2>>"$LOGFILE" \
                     | grep "URL" | sed 's/| URL | //' | anew -q "vulns/lfi.txt"
 
                 end_func "Results are saved in vulns/lfi.txt" "${FUNCNAME[0]}"
@@ -369,7 +369,7 @@ function ssti() {
             _print_msg INFO "Running: SSTI Payload Generation"
 
             # Process ssti.txt with qsreplace and filter lines containing 'FUZZ'
-            qsreplace "FUZZ" <"gf/ssti.txt" | sed '/FUZZ/!d' | anew -q ".tmp/tmp_ssti.txt"
+            run_command qsreplace "FUZZ" <"gf/ssti.txt" | sed '/FUZZ/!d' | anew -q ".tmp/tmp_ssti.txt"
 
             # Determine whether to proceed based on DEEP flag or number of URLs
             URL_COUNT=$(wc -l <".tmp/tmp_ssti.txt")
@@ -378,7 +378,7 @@ function ssti() {
                 _print_msg INFO "Running: SSTI Fuzzing with FFUF"
 
                 # Use Interlace to parallelize FFUF scanning
-                interlace -tL ".tmp/tmp_ssti.txt" -threads "$INTERLACE_THREADS" -c "ffuf -v -r -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w \"${ssti_wordlist}\" -u \"_target_\" -mr \"ssti49\"" 2>>"$LOGFILE" \
+                run_command interlace -tL ".tmp/tmp_ssti.txt" -threads "$INTERLACE_THREADS" -c "ffuf -v -r -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w \"${ssti_wordlist}\" -u \"_target_\" -mr \"ssti49\"" 2>>"$LOGFILE" \
                     | grep "URL" | sed 's/| URL | //' | anew -q "vulns/ssti.txt"
 
                 end_func "Results are saved in vulns/ssti.txt" "${FUNCNAME[0]}"
@@ -418,7 +418,7 @@ function sqli() {
             _print_msg INFO "Running: SQLi Payload Generation"
 
             # Process sqli.txt with qsreplace and filter lines containing 'FUZZ'
-            qsreplace "FUZZ" <"gf/sqli.txt" | sed '/FUZZ/!d' | anew -q ".tmp/tmp_sqli.txt"
+            run_command qsreplace "FUZZ" <"gf/sqli.txt" | sed '/FUZZ/!d' | anew -q ".tmp/tmp_sqli.txt"
 
             # Determine whether to proceed based on DEEP flag or number of URLs
             URL_COUNT=$(wc -l <".tmp/tmp_sqli.txt")
@@ -433,7 +433,7 @@ function sqli() {
                                 # Check if GHAURI is enabled and run Ghauri
                 if [[ $GHAURI == true ]]; then
                     _print_msg INFO "Running: Ghauri for SQLi Checks"
-                    interlace -tL ".tmp/tmp_sqli.txt" -threads "$INTERLACE_THREADS" -c "ghauri -u _target_ --batch -H \"${HEADER}\" --force-ssl >> vulns/ghauri_log.txt" 2>>"$LOGFILE" >/dev/null
+                    run_command interlace -tL ".tmp/tmp_sqli.txt" -threads "$INTERLACE_THREADS" -c "ghauri -u _target_ --batch -H \"${HEADER}\" --force-ssl >> vulns/ghauri_log.txt" 2>>"$LOGFILE" >/dev/null
                 fi
 
                 end_func "Results are saved in vulns/sqlmap folder" "${FUNCNAME[0]}"
@@ -474,7 +474,7 @@ function test_ssl() {
 
         # Run testssl.sh
         _print_msg INFO "Running: SSL Test with testssl.sh"
-        "${tools}/testssl.sh/testssl.sh" --quiet --color 0 -U -iL "$dir/hosts/ips.txt" 2>>"$LOGFILE" >"vulns/testssl.txt"
+        run_command "${tools}/testssl.sh/testssl.sh" --quiet --color 0 -U -iL "$dir/hosts/ips.txt" 2>>"$LOGFILE" >"vulns/testssl.txt"
 
         end_func "Results are saved in vulns/testssl.txt" "${FUNCNAME[0]}"
 
@@ -545,7 +545,7 @@ function command_injection() {
             _print_msg INFO "Running: Command Injection Payload Generation"
 
             # Process rce.txt with qsreplace and filter lines containing 'FUZZ'
-            qsreplace "FUZZ" <"gf/rce.txt" | sed '/FUZZ/!d' | anew -q ".tmp/tmp_rce.txt"
+            run_command qsreplace "FUZZ" <"gf/rce.txt" | sed '/FUZZ/!d' | anew -q ".tmp/tmp_rce.txt"
 
             # Determine whether to proceed based on DEEP flag or number of URLs
             URL_COUNT=$(wc -l <".tmp/tmp_rce.txt")
@@ -652,8 +652,14 @@ function prototype_pollution() {
 
         start_func "${FUNCNAME[0]}" "Prototype Pollution Checks"
 
+        if [[ ! -s "webs/url_extract_nodupes.txt" ]]; then
+            _print_msg WARN "File webs/url_extract_nodupes.txt is missing or empty."
+            end_func "Skipping prototype pollution: missing URL candidates." "${FUNCNAME[0]}" "SKIP"
+            return
+        fi
+
         # Determine whether to proceed based on DEEP flag or number of URLs
-        URL_COUNT=$(wc -l <"webs/url_extract_nodupes.txt" 2>/dev/null)
+        URL_COUNT=$(wc -l <"webs/url_extract_nodupes.txt" 2>/dev/null || echo 0)
         if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT ]]; then
 
             # Ensure fuzzing_full.txt exists and has content
@@ -670,9 +676,8 @@ function prototype_pollution() {
 
                 end_func "Results are saved in vulns/prototype_pollution.txt" "${FUNCNAME[0]}"
             else
-                print_warnf "File webs/url_extract_nodupes.txt is missing or empty."
-                end_func "File webs/url_extract_nodupes.txt is missing or empty." "${FUNCNAME[0]}"
-                return 1
+                end_func "Skipping prototype pollution: missing URL candidates." "${FUNCNAME[0]}" "SKIP"
+                return
             fi
 
         else
@@ -817,8 +822,14 @@ function fuzzparams() {
 
         start_func "${FUNCNAME[0]}" "Fuzzing Parameters Values Checks"
 
+        if [[ ! -s "webs/url_extract_nodupes.txt" ]]; then
+            _print_msg WARN "File webs/url_extract_nodupes.txt is missing or empty."
+            end_func "Skipping fuzzparams: missing URL candidates." "${FUNCNAME[0]}" "SKIP"
+            return
+        fi
+
         # Determine if we should proceed based on DEEP flag or number of URLs
-        URL_COUNT=$(wc -l <"webs/url_extract_nodupes.txt")
+        URL_COUNT=$(wc -l <"webs/url_extract_nodupes.txt" 2>/dev/null || echo 0)
         if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT2 ]]; then
 
             #cent update -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
@@ -846,7 +857,12 @@ function fuzzparams() {
                 
 
             # Convert JSON output to text
-            jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' .tmp/fuzzparams_json.txt >.tmp/fuzzparams.txt
+            if [[ -s ".tmp/fuzzparams_json.txt" ]]; then
+                jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host) + (if .["extracted-results"] != null then " " + (.["extracted-results"] | @json) else "" end)] | .[]' .tmp/fuzzparams_json.txt >.tmp/fuzzparams.txt
+            else
+                : >.tmp/fuzzparams.txt
+                log_note "fuzzparams: nuclei produced no JSON output; skipping conversion" "${FUNCNAME[0]}" "${LINENO}"
+            fi
 
             # Append unique results to vulns/fuzzparams.txt
             if [[ -s ".tmp/fuzzparams.txt" ]]; then

@@ -16,6 +16,12 @@ _UI_FAIL_COUNT=0
 _UI_SKIP_COUNT=0
 _UI_CACHE_COUNT=0
 
+# Dry-run tracking
+_UI_DRYRUN_COUNT=0
+_UI_DRYRUN_COMMANDS=()
+_UI_DRYRUN_FULL_COMMANDS=()
+_UI_DRYRUN_SHARED_FILE=""
+
 ui_init() {
     # TTY detection
     if [[ -t 1 ]]; then
@@ -151,8 +157,9 @@ ui_batch_row() {
 
 ui_batch_end() {
     local ok="$1" warn="$2" fail="$3" elapsed="$4"
-    printf "  %b── ok:%d warn:%d fail:%d │ %ds elapsed ──%b\n" \
-        "${bgreen:-}" "$ok" "$warn" "$fail" "$elapsed" "${reset:-}"
+    local skip="${5:-0}" cache="${6:-0}"
+    printf "  %b── ok:%d warn:%d fail:%d skip:%d cache:%d │ %ds elapsed ──%b\n" \
+        "${bgreen:-}" "$ok" "$warn" "$fail" "$skip" "$cache" "$elapsed" "${reset:-}"
 }
 
 ui_summary() {
@@ -223,4 +230,101 @@ ui_log_jsonl() {
 
     printf '{"ts":"%s","level":"%s","module":"%s","msg":"%s","domain":"%s"%s}\n' \
         "$ts" "$lvl" "$mod" "$msg" "$dom" "$extra"
+}
+
+# Track dry-run commands for module-level summaries
+# Usage: ui_dryrun_track "tool_name" "full command string"
+ui_dryrun_track() {
+    local tool_name="$1"
+    local full_command="$2"
+    local redacted_command
+
+    # Normalize whitespace: replace newlines with spaces, squeeze multiple spaces
+    local normalized_command
+    normalized_command=$(echo "$full_command" | tr '\n' ' ' | tr -s ' ')
+    redacted_command="$normalized_command"
+
+    # Use centralized redaction when available.
+    if declare -F redact_secrets >/dev/null 2>&1; then
+        redacted_command=$(redact_secrets "$redacted_command")
+    fi
+    # Fallback masking for common inline secrets shown in command args.
+    redacted_command=$(echo "$redacted_command" \
+        | sed -E 's/(-token-string[[:space:]]+)[^[:space:]]+/\1[REDACTED]/g' \
+        | sed -E 's/([?&]apiKey=)[^&[:space:]]+/\1[REDACTED]/g' \
+        | sed -E 's/(Authorization:[[:space:]]*Bearer[[:space:]])[^[:space:]]+/\1[REDACTED]/g')
+
+    ((_UI_DRYRUN_COUNT++)) || true
+    _UI_DRYRUN_COMMANDS+=("$tool_name")
+    _UI_DRYRUN_FULL_COMMANDS+=("$redacted_command")
+
+    # Shared module-local dry-run log (visible from parallel subshells)
+    if [[ -n "${_UI_DRYRUN_SHARED_FILE:-}" ]]; then
+        printf "%s\t%s\n" "$tool_name" "$redacted_command" >>"${_UI_DRYRUN_SHARED_FILE}" 2>/dev/null || true
+    fi
+
+    # Immediate output only if verbose (OUTPUT_VERBOSITY >= 2)
+    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
+        printf "%b[DRY-RUN]%b %s\n" "${yellow:-}" "${reset:-}" "$redacted_command"
+    fi
+}
+
+# Show dry-run summary at end of module
+# Usage: ui_dryrun_summary
+ui_dryrun_summary() {
+    [[ "${DRY_RUN:-false}" != "true" ]] && return 0
+    [[ "$_UI_DRYRUN_COUNT" -eq 0 ]] && return 0
+    [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
+
+    local -a summary_tools=()
+    local -a summary_cmds=()
+    local unique_tools
+
+    if [[ -n "${_UI_DRYRUN_SHARED_FILE:-}" ]] && [[ -f "${_UI_DRYRUN_SHARED_FILE}" ]]; then
+        while IFS=$'\t' read -r t c; do
+            [[ -n "$t" ]] && summary_tools+=("$t")
+            [[ -n "$c" ]] && summary_cmds+=("$c")
+        done <"${_UI_DRYRUN_SHARED_FILE}"
+    fi
+
+    # Fallback when shared file isn't available
+    if [[ ${#summary_tools[@]} -eq 0 ]]; then
+        summary_tools=("${_UI_DRYRUN_COMMANDS[@]}")
+        summary_cmds=("${_UI_DRYRUN_FULL_COMMANDS[@]}")
+    fi
+
+    _UI_DRYRUN_COUNT=${#summary_cmds[@]}
+    [[ "$_UI_DRYRUN_COUNT" -eq 0 ]] && return 0
+
+    # Deduplicate and sort tool names
+    unique_tools=$(printf "%s\n" "${summary_tools[@]}" 2>/dev/null | sed '/^$/d' | sort -u | tr '\n' ', ' | sed 's/,$//' | sed 's/,/, /g')
+
+    # Truncate if too long (> 100 chars)
+    if [[ ${#unique_tools} -gt 100 ]]; then
+        unique_tools="${unique_tools:0:97}..."
+    fi
+
+    printf "  %b[DRY-RUN]%b Would execute %d commands: %s\n" \
+        "${byellow:-}" "${reset:-}" "$_UI_DRYRUN_COUNT" "$unique_tools"
+
+    # Verbose: show individual commands
+    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
+        printf "  Full command list:\n"
+        local cmd
+        for cmd in "${summary_cmds[@]}"; do
+            printf "    - %s\n" "$cmd"
+        done
+    fi
+}
+
+# Reset dry-run tracking (called at module start)
+# Usage: ui_dryrun_reset
+ui_dryrun_reset() {
+    _UI_DRYRUN_COUNT=0
+    _UI_DRYRUN_COMMANDS=()
+    _UI_DRYRUN_FULL_COMMANDS=()
+    _UI_DRYRUN_SHARED_FILE="${dir:-/tmp}/.tmp/.dryrun_commands.${PPID:-$$}.${RANDOM}.log"
+    mkdir -p "$(dirname "$_UI_DRYRUN_SHARED_FILE")" 2>/dev/null || true
+    : >"$_UI_DRYRUN_SHARED_FILE" 2>/dev/null || true
+    export _UI_DRYRUN_SHARED_FILE
 }

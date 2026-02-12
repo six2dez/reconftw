@@ -18,33 +18,33 @@ function resolvers_update() {
     if [[ $generate_resolvers == true ]]; then
         if [[ $AXIOM != true ]]; then
             if [[ ! -s $resolvers ]] || [[ $(find "$resolvers" -mtime +1 -print) ]]; then
-                notification "Resolvers seem older than 1 day. Generating custom resolvers..." warn
+                _print_msg WARN "Resolvers seem older than 1 day. Generating custom resolvers..."
                 {
                     rm -f -- "$resolvers"
-                    dnsvalidator -tL https://public-dns.info/nameservers.txt -threads "$DNSVALIDATOR_THREADS" -o "$resolvers" >/dev/null
-                    dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads "$DNSVALIDATOR_THREADS" -o tmp_resolvers >/dev/null
+                    run_command dnsvalidator -tL https://public-dns.info/nameservers.txt -threads "$DNSVALIDATOR_THREADS" -o "$resolvers" >/dev/null
+                    run_command dnsvalidator -tL https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt -threads "$DNSVALIDATOR_THREADS" -o tmp_resolvers >/dev/null
                 } 2>>"$LOGFILE"
                 [ -s "tmp_resolvers" ] && cat tmp_resolvers | anew -q "$resolvers"
                 [ -s "tmp_resolvers" ] && rm -f tmp_resolvers 2>>"$LOGFILE" >/dev/null
-                [ ! -s "$resolvers" ] && wget -q -O - "${resolvers_url}" >"$resolvers"
-                [ ! -s "$resolvers_trusted" ] && wget -q -O - "${resolvers_trusted_url}" >"$resolvers_trusted"
-                notification "Updated\n" good
+                [ ! -s "$resolvers" ] && run_command wget -q -O - "${resolvers_url}" >"$resolvers"
+                [ ! -s "$resolvers_trusted" ] && run_command wget -q -O - "${resolvers_trusted_url}" >"$resolvers_trusted"
+                _print_msg OK "Updated resolvers"
             fi
         else
-            notification "Checking resolvers lists. Accurate resolvers are key to good results. This may take around 10 minutes if outdated." warn
-            axiom-exec "([[ \$(find \"${AXIOM_RESOLVERS_PATH}\" -mtime +1 -print) ]] || [[ \$(wc -l < \"${AXIOM_RESOLVERS_PATH}\") -le 40 ]]) && dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 200 -o ${AXIOM_RESOLVERS_PATH}" &>/dev/null
-            axiom-exec "wget -q -O - ${resolvers_url} > ${AXIOM_RESOLVERS_PATH}" 2>>"$LOGFILE" >/dev/null
-            axiom-exec "wget -q -O - ${resolvers_trusted_url} > ${AXIOM_RESOLVERS_TRUSTED_PATH}" 2>>"$LOGFILE" >/dev/null
-            notification "Updated\n" good
+            _print_msg WARN "Checking resolvers lists. Accurate resolvers are key to good results. This may take around 10 minutes if outdated."
+            run_command axiom-exec "([[ \$(find \"${AXIOM_RESOLVERS_PATH}\" -mtime +1 -print) ]] || [[ \$(wc -l < \"${AXIOM_RESOLVERS_PATH}\") -le 40 ]]) && dnsvalidator -tL https://public-dns.info/nameservers.txt -threads 200 -o ${AXIOM_RESOLVERS_PATH}" &>/dev/null
+            run_command axiom-exec "wget -q -O - ${resolvers_url} > ${AXIOM_RESOLVERS_PATH}" 2>>"$LOGFILE" >/dev/null
+            run_command axiom-exec "wget -q -O - ${resolvers_trusted_url} > ${AXIOM_RESOLVERS_TRUSTED_PATH}" 2>>"$LOGFILE" >/dev/null
+            _print_msg OK "Updated resolvers"
         fi
         generate_resolvers=false
     else
 
         if [[ ! -s $resolvers ]] || [[ $(find "$resolvers" -mtime +1 -print) ]]; then
-            notification "Resolvers seem older than 1 day. Downloading new resolvers..." warn
+            _print_msg WARN "Resolvers seem older than 1 day. Downloading new resolvers..."
             cached_download_typed "${resolvers_url}" "$resolvers" "resolvers.txt" "resolvers"
             cached_download_typed "${resolvers_trusted_url}" "$resolvers_trusted" "resolvers_trusted.txt" "resolvers"
-            notification "Resolvers updated\n" good
+            _print_msg OK "Resolvers updated"
         fi
     fi
 
@@ -58,8 +58,8 @@ function resolvers_update_quick_local() {
 }
 
 function resolvers_update_quick_axiom() {
-    axiom-exec "wget -q -O - ${resolvers_url} > ${AXIOM_RESOLVERS_PATH}" 2>>"$LOGFILE" >/dev/null
-    axiom-exec "wget -q -O - ${resolvers_trusted_url} > ${AXIOM_RESOLVERS_TRUSTED_PATH}" 2>>"$LOGFILE" >/dev/null
+    run_command axiom-exec "wget -q -O - ${resolvers_url} > ${AXIOM_RESOLVERS_PATH}" 2>>"$LOGFILE" >/dev/null
+    run_command axiom-exec "wget -q -O - ${resolvers_trusted_url} > ${AXIOM_RESOLVERS_TRUSTED_PATH}" 2>>"$LOGFILE" >/dev/null
 }
 
 function resolvers_optimize_local() {
@@ -73,9 +73,9 @@ function ipcidr_target() {
     local expanded_list="${PWD}/target_reconftw_ipcidr.txt"
     IP_CIDR_REGEX='(((25[0-5]|2[0-4][0-9]|1?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9][0-9]?))(\/([8-9]|[1-2][0-9]|3[0-2]))([^0-9.]|$)|(((25[0-5]|2[0-4][0-9]|1?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9][0-9]?)$)'
     if [[ $1 =~ ^$IP_CIDR_REGEX ]]; then
-        echo "$1" | mapcidr -silent | anew -q "$expanded_list"
+        echo "$1" | run_command mapcidr -silent | anew -q "$expanded_list"
         if [[ -s "$expanded_list" ]]; then
-            [ "$REVERSE_IP" = true ] && cat "$expanded_list" | hakip2host | cut -d' ' -f 3 | unfurl -u domains 2>/dev/null | sed -e 's/*\.//' -e 's/\.$//' -e '/\./!d' | anew -q "$expanded_list"
+            [ "$REVERSE_IP" = true ] && cat "$expanded_list" | run_command hakip2host | cut -d' ' -f 3 | unfurl -u domains 2>/dev/null | sed -e 's/*\.//' -e 's/\.$//' -e '/\./!d' | anew -q "$expanded_list"
             if [[ -z "$caller_list" ]]; then
                 if [[ $(wc -l <"$expanded_list") -eq 1 ]]; then
                     domain=$(cat "$expanded_list")

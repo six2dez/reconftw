@@ -342,7 +342,26 @@ function progress_bar() {
 # Usage: run_command <command> [args...]
 function run_command() {
     if [[ "${DRY_RUN:-false}" == "true" ]]; then
-        printf "%b[DRY-RUN] Would execute: %s%b\n" "$yellow" "$*" "$reset"
+        # Extract tool name (first word, strip path)
+        local tool_name="${1##*/}"
+        local full_cmd="$*"
+        local redacted_cmd="$full_cmd"
+
+        if declare -F redact_secrets >/dev/null 2>&1; then
+            redacted_cmd=$(redact_secrets "$redacted_cmd")
+        fi
+        redacted_cmd=$(echo "$redacted_cmd" \
+            | sed -E 's/(-token-string[[:space:]]+)[^[:space:]]+/\1[REDACTED]/g' \
+            | sed -E 's/([?&]apiKey=)[^&[:space:]]+/\1[REDACTED]/g' \
+            | sed -E 's/(Authorization:[[:space:]]*Bearer[[:space:]])[^[:space:]]+/\1[REDACTED]/g')
+
+        # Track command for module summary
+        if declare -F ui_dryrun_track >/dev/null 2>&1; then
+            ui_dryrun_track "$tool_name" "$redacted_cmd"
+        else
+            # Fallback to old behavior if ui_dryrun_track not available
+            printf "%b[DRY-RUN] Would execute: %s%b\n" "$yellow" "$redacted_cmd" "$reset"
+        fi
         return 0
     fi
 
@@ -705,7 +724,7 @@ function cached_download_typed() {
     printf "%b[%s] Downloading: %s%b\n" \
         "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$(basename "$url")" "$reset"
 
-    if curl -sL "$url" -o "$destination"; then
+    if run_command curl -sL "$url" -o "$destination"; then
         # Save to cache for future use
         cp "$destination" "$cache_file"
         printf "%b[%s] Cached for future use: %s%b\n" \

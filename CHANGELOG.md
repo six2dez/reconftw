@@ -128,6 +128,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Passive mode no longer runs `webprobe_simple`/`webprobe_full`.
 - Missing `webs/webs_new.txt` now handled safely.
 
+**Dry-Run Mode**
+- Wrapped 83 unwrapped command executions across all modules to respect `DRY_RUN` flag:
+  - `osint.sh`: 24 commands (whois, dig, curl APIs, gitdorks_go, enumerepo, porch-pirate, misconfig-mapper, exiftool, interlace git clone, Python tools: dorks_hunter, metagoofil, SwaggerSpy, EmailHarvester, LeakSearch, msftrecon, Scopify, Spoofy)
+  - `subdomains.sh`: 15 commands (asnmap, dig zone transfer, curl APIs, hakip2host, csprecon, regulator, cloud enumeration)
+  - `web.sh`: 20 commands (fav-up, grpcurl, CMSeeK, JSA, getjswords, jsluice, wget, interlace/ffuf, curl WebSocket, pydictor)
+  - `vulns.sh`: 5 commands (Corsy, Oralyzer, interlace/ffuf LFI, interlace/ffuf SSTI, interlace/ghauri SQLi)
+  - `core.sh`: 8 commands (tar/curl uploads, Telegram/Discord/Slack notifications, connectivity checks)
+  - `modes.sh`: 8 commands (faraday-cli reporting)
+  - `axiom.sh`: 3 commands (hakip2host, mapcidr)
+- Added module-level dry-run command tracking and summaries in `lib/ui.sh`:
+  - `ui_dryrun_track()`: Records commands during dry-run execution
+  - `ui_dryrun_summary()`: Displays count + unique tool names at module completion
+  - `ui_dryrun_reset()`: Clears tracking at module boundaries
+- Dry-run summaries now show:
+  - Normal mode: `[DRY-RUN] Would execute N commands: tool1, tool2, ...`
+  - Verbose mode: Full command list with normalized single-line formatting
+  - Quiet mode: No dry-run output
+- Module lifecycle hooks (`_print_module_start()`, `_print_module_end()`) now reset and display dry-run summaries automatically
+- Command normalization removes newlines/extra whitespace from multi-line command strings for cleaner display
+- Dry-run command previews now redact sensitive CLI values (for example `-token-string`, API keys, and bearer tokens).
+- Dry-run in parallel mode now aggregates commands emitted from child subshells, so module summaries reflect full command volume.
+- Dry-run no longer produces noisy parser/file errors in guarded paths (`apileaks`, `sub_crt`, `prototype_pollution`, `fuzzparams`, `sub_tls`, `sub_permut`, `urlchecks`).
+- `test_ssl` now respects `run_command`, preventing real execution during dry-run.
+- `sub_asn` now applies timeout fencing with kill semantics (`-k`) when timeout tooling is available and reports non-OK outcomes correctly.
+- `subdomains` finalization now safely creates missing incremental files before counting to avoid stderr noise.
+
+**Parallel Execution and Status Reporting**
+- Parallel aggregation now preserves per-function final badges (`OK/WARN/FAIL/SKIP/CACHE`) from module functions/subfunctions instead of inferring only from process exit code.
+- Parallel batch summary lines now expose real counters for `ok/warn/fail/skip/cache`.
+- Cache/skip messaging was normalized to avoid unformatted "already processed" lines and keep status output consistent.
+
 ### Added
 
 - `--no-banner` to disable banner output (banner is on by default).
