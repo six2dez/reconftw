@@ -1106,7 +1106,7 @@ function end_func() {
     # - end_func "msg" warn
     if [[ -n "$status" ]]; then
         case "$status" in
-            info|warn|error|good|OK|WARN|FAIL|SKIP)
+            info|warn|error|good|OK|WARN|FAIL|SKIP|SKIP_CONFIG|SKIP_NOINPUT|CACHE_HIT)
                 ;; # keep as-is
             *)
                 status="OK"
@@ -1114,7 +1114,7 @@ function end_func() {
         esac
     else
         case "$fn" in
-            info|warn|error|good|OK|WARN|FAIL|SKIP)
+            info|warn|error|good|OK|WARN|FAIL|SKIP|SKIP_CONFIG|SKIP_NOINPUT|CACHE_HIT)
                 status="$fn"
                 fn="${FUNCNAME[1]:-unknown}"
                 ;;
@@ -1133,21 +1133,44 @@ function end_func() {
     end_date=$(date +'%Y-%m-%d %H:%M:%S')
     echo "[$end_date] End function: ${fn} " >>"${LOGFILE}"
     local badge="OK"
+    local reason_code=""
     case "$status" in
         info|INFO) badge="INFO" ;;
         warn|WARN) badge="WARN" ;;
         error|ERROR) badge="FAIL" ;;
         good|SUCCESS) badge="OK" ;;
         OK|WARN|FAIL|SKIP|CACHE) badge="$status" ;;
+        SKIP_CONFIG) badge="SKIP"; reason_code="config" ;;
+        SKIP_NOINPUT) badge="SKIP"; reason_code="noinput" ;;
+        CACHE_HIT) badge="CACHE"; reason_code="cache" ;;
     esac
+
+    # Auto-normalize common "no input" skip patterns when caller didn't set explicit status.
+    if [[ "$badge" == "OK" ]] && [[ -n "$message" ]]; then
+        local msg_lc
+        msg_lc=$(printf "%s" "$message" | tr '[:upper:]' '[:lower:]')
+        if [[ "$msg_lc" == no\ * ]] && [[ "$msg_lc" == *"skip"* ]]; then
+            badge="SKIP"
+            reason_code="noinput"
+        elif [[ "$msg_lc" == *"missing url candidates"* ]]; then
+            badge="SKIP"
+            reason_code="noinput"
+        fi
+    fi
 
     # Persist per-function final status for parallel aggregator.
     if [[ -n "${called_fn_dir:-}" ]]; then
         printf "%s\n" "$badge" >"${called_fn_dir}/.status_${fn}" 2>/dev/null || true
+        if [[ -n "$reason_code" ]]; then
+            printf "%s\n" "$reason_code" >"${called_fn_dir}/.status_reason_${fn}" 2>/dev/null || true
+        fi
     fi
 
     if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
         _print_status "$badge" "${fn}" "${duration}s"
+        if [[ -n "$reason_code" ]] && { [[ "$badge" != "CACHE" ]] || [[ "${SHOW_CACHE:-false}" == "true" ]]; }; then
+            printf "         reason: %s\n" "$reason_code"
+        fi
         # Show detail line for non-OK statuses when message is present
         if [[ -n "$message" ]] && [[ "$badge" != "OK" && "$badge" != "INFO" ]]; then
             printf "         %s\n" "$message"
@@ -1183,14 +1206,27 @@ function end_subfunc() {
     getElapsedTime "$start_sub" "$end_sub"
     local duration=$((end_sub - start_sub))
     local status="${3:-OK}"
+    local badge="$status"
+    local reason_code=""
+    case "$status" in
+        SKIP_CONFIG) badge="SKIP"; reason_code="config" ;;
+        SKIP_NOINPUT) badge="SKIP"; reason_code="noinput" ;;
+        CACHE_HIT) badge="CACHE"; reason_code="cache" ;;
+    esac
 
     # Persist per-subfunction final status for parallel aggregator.
     if [[ -n "${called_fn_dir:-}" ]]; then
-        printf "%s\n" "$status" >"${called_fn_dir}/.status_${2}" 2>/dev/null || true
+        printf "%s\n" "$badge" >"${called_fn_dir}/.status_${2}" 2>/dev/null || true
+        if [[ -n "$reason_code" ]]; then
+            printf "%s\n" "$reason_code" >"${called_fn_dir}/.status_reason_${2}" 2>/dev/null || true
+        fi
     fi
 
     if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
-        _print_status "$status" "  ${2}" "${duration}s"
+        _print_status "$badge" "  ${2}" "${duration}s"
+        if [[ -n "$reason_code" ]] && { [[ "$badge" != "CACHE" ]] || [[ "${SHOW_CACHE:-false}" == "true" ]]; }; then
+            printf "         reason: %s\n" "$reason_code"
+        fi
     fi
     local end_sub_date
     end_sub_date=$(date +'%Y-%m-%d %H:%M:%S')

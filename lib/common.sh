@@ -355,6 +355,7 @@ skip_notification() {
     local func_name="${FUNCNAME[1]:-unknown}"
     local reason="${1:-mode or configuration settings}"
     local badge="SKIP"
+    local reason_code="config"
 
     case "$reason" in
         disabled)
@@ -363,11 +364,21 @@ skip_notification() {
         processed)
             reason="already processed"
             badge="CACHE"
+            reason_code="cache"
+            ;;
+        noinput)
+            reason="missing required input data"
+            reason_code="noinput"
             ;;
     esac
 
     if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
         _print_status "$badge" "$func_name" "0s"
+        if [[ "$badge" == "SKIP" ]]; then
+            printf "         reason: %s\n" "$reason_code"
+        elif [[ "$badge" == "CACHE" ]] && [[ "${SHOW_CACHE:-false}" == "true" ]]; then
+            printf "         reason: %s\n" "$reason_code"
+        fi
         if [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
             if [[ "$badge" == "CACHE" ]]; then
                 _print_msg INFO "${func_name} already processed. To force re-run, delete: ${called_fn_dir:-.}/.${func_name}"
@@ -379,6 +390,7 @@ skip_notification() {
 
     # Emit skip marker for parent process (parallel mode)
     if [[ -n "${called_fn_dir:-}" ]]; then
+        printf "%s\n" "$reason_code" >"${called_fn_dir}/.status_reason_${func_name}" 2>/dev/null || true
         if [[ "$badge" == "CACHE" ]]; then
             : >"${called_fn_dir}/.cache_${func_name}" 2>/dev/null || true
         else
@@ -502,6 +514,17 @@ run_with_heartbeat() {
     done
 
     wait "$cmd_pid"
+}
+
+# Shell-string variant for commands that require complex redirections.
+# Usage: run_with_heartbeat_shell "label" "command string"
+run_with_heartbeat_shell() {
+    local label="${1:-task}"
+    local shell_cmd="${2:-}"
+    if [[ -z "$shell_cmd" ]]; then
+        return 1
+    fi
+    run_with_heartbeat "$label" /bin/bash -lc "$shell_cmd"
 }
 
 # Execute command and capture line count result with validation

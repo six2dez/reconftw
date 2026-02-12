@@ -158,8 +158,9 @@ ui_batch_row() {
 ui_batch_end() {
     local ok="$1" warn="$2" fail="$3" elapsed="$4"
     local skip="${5:-0}" cache="${6:-0}"
-    printf "  %b── ok:%d warn:%d fail:%d skip:%d cache:%d │ %ds elapsed ──%b\n" \
-        "${bgreen:-}" "$ok" "$warn" "$fail" "$skip" "$cache" "$elapsed" "${reset:-}"
+    local completed="${7:-0}" total="${8:-0}"
+    printf "  %b── ok:%d warn:%d fail:%d skip:%d cache:%d │ %d/%d completed │ %ds elapsed ──%b\n" \
+        "${bgreen:-}" "$ok" "$warn" "$fail" "$skip" "$cache" "$completed" "$total" "$elapsed" "${reset:-}"
 }
 
 ui_summary() {

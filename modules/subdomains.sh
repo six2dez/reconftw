@@ -254,7 +254,7 @@ _subdomains_enumerate() {
         sub_asn
         
         # Phase 1: Passive sources (all can run in parallel)
-        parallel_funcs 4 sub_passive sub_crt
+        parallel_funcs "${PAR_SUB_PASSIVE_GROUP_SIZE:-4}" sub_passive sub_crt
         local sub_g1_rc=$?
         if ((sub_g1_rc > 0)); then
             if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
@@ -278,7 +278,7 @@ _subdomains_enumerate() {
         fi
         
         # Phase 3: Dependent active enrichment (runs after sub_active is ready)
-        parallel_funcs 3 sub_noerror sub_dns
+        parallel_funcs "${PAR_SUB_DEP_ACTIVE_GROUP_SIZE:-3}" sub_noerror sub_dns
         local sub_g3_rc=$?
         if ((sub_g3_rc > 0)); then
             if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
@@ -290,7 +290,7 @@ _subdomains_enumerate() {
         fi
 
         # Phase 4: Post-active analysis (depends on active/enrichment results)
-        parallel_funcs 2 sub_tls sub_analytics
+        parallel_funcs "${PAR_SUB_POST_ACTIVE_GROUP_SIZE:-2}" sub_tls sub_analytics
         local sub_g4_rc=$?
         if ((sub_g4_rc > 0)); then
             if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
@@ -302,7 +302,7 @@ _subdomains_enumerate() {
         fi
         
         # Phase 5: Brute force (limited parallelism - resource intensive)
-        parallel_funcs 2 sub_brute sub_permut sub_regex_permut sub_ia_permut
+        parallel_funcs "${PAR_SUB_BRUTE_GROUP_SIZE:-2}" sub_brute sub_permut sub_regex_permut sub_ia_permut
         local sub_g5_rc=$?
         if ((sub_g5_rc > 0)); then
             if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
@@ -380,6 +380,7 @@ _subdomains_finalize() {
     # Incremental mode
     incremental_diff "subdomains" "subdomains/subdomains.txt" "subdomains/subdomains_new.txt"
     incremental_save "subdomains" "subdomains/subdomains.txt"
+    ensure_dirs webs .tmp subdomains
     if [[ -s "webs/webs.txt" ]]; then
         incremental_diff "webs" "webs/webs.txt" "webs/webs_new.txt"
         incremental_save "webs" "webs/webs.txt"

@@ -158,6 +158,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Parallel job output now strips ANSI/control sequences before replaying tail/full logs, reducing report/export parser issues.
 - Function/subfunction end log timestamps now use real end times (not reused start timestamps).
 - Added heartbeat progress lines for long-running phases (`nuclei`, `ffuf/interlace`, `cmseek`, and selected passive collectors) to avoid "stuck" perception.
+- Added `run_with_heartbeat_shell` for complex shell/redirection cases to keep heartbeat coverage in long-running URL collection paths.
+- Skip/cache output now includes explicit reason hints (`config`, `noinput`, `cache`) while preserving existing summary counters.
+- Parallel UI now defaults to a cleaner mode with aggregated progress snapshots (`X/Y`, `%`, elapsed, ETA) and reduced process-noise.
+- In clean parallel UI mode, `Queue` lines are suppressed when pending count is `0` to keep terminal output compact.
+- Added configurable parallel UX and sizing knobs in `reconftw.cfg` (`PARALLEL_UI_MODE`, progress visibility toggles, and per-group parallel sizes).
+- Parallel batch summaries now include completion ratio (`completed/total`) to make long blocks easier to track.
 
 **Parallel Execution and Status Reporting**
 - Parallel aggregation now preserves per-function final badges (`OK/WARN/FAIL/SKIP/CACHE`) from module functions/subfunctions instead of inferring only from process exit code.

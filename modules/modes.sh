@@ -484,7 +484,7 @@ function vulns() {
         if [[ "${PARALLEL_MODE:-true}" == "true" ]] && declare -f parallel_funcs &>/dev/null; then
             # Parallel execution - group independent checks
             [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && printf "%b[*] Running vulnerability checks in parallel mode%b\n" "$bblue" "$reset"
-            parallel_funcs 4 cors open_redirect crlf_checks xss
+            parallel_funcs "${PAR_VULNS_GROUP1_SIZE:-4}" cors open_redirect crlf_checks xss
             local vulns_g1_rc=$?
             if ((vulns_g1_rc > 0)); then
                 if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
@@ -495,7 +495,7 @@ function vulns() {
                     return 1
                 fi
             fi
-            parallel_funcs 4 ssrf_checks lfi ssti sqli
+            parallel_funcs "${PAR_VULNS_GROUP2_SIZE:-4}" ssrf_checks lfi ssti sqli
             local vulns_g2_rc=$?
             if ((vulns_g2_rc > 0)); then
                 if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
@@ -506,7 +506,7 @@ function vulns() {
                     return 1
                 fi
             fi
-            parallel_funcs 3 command_injection prototype_pollution smuggling
+            parallel_funcs "${PAR_VULNS_GROUP3_SIZE:-3}" command_injection prototype_pollution smuggling
             local vulns_g3_rc=$?
             if ((vulns_g3_rc > 0)); then
                 if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
@@ -517,7 +517,7 @@ function vulns() {
                     return 1
                 fi
             fi
-            parallel_funcs 3 webcache spraying brokenLinks
+            parallel_funcs "${PAR_VULNS_GROUP4_SIZE:-3}" webcache spraying brokenLinks
             local vulns_g4_rc=$?
             if ((vulns_g4_rc > 0)); then
                 if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
@@ -639,14 +639,14 @@ function recon() {
 
     if [[ "${PARALLEL_MODE:-true}" == "true" ]] && declare -f parallel_funcs &>/dev/null; then
         # Group 1: balanced with third_party_misconfigs (slow) alongside fast ones
-        parallel_funcs 5 domain_info ip_info emails google_dorks third_party_misconfigs
+        parallel_funcs "${PAR_OSINT_GROUP1_SIZE:-5}" domain_info ip_info emails google_dorks third_party_misconfigs
         local osint_g1_rc=$?
         if ((osint_g1_rc > 0)); then
             RECON_PARTIAL_RUN=true
             RECON_OSINT_PARALLEL_FAILURES=$((RECON_OSINT_PARALLEL_FAILURES + osint_g1_rc))
         fi
         # Group 2: remaining OSINT + zonetransfer + favicon (were sequential, now parallel)
-        parallel_funcs 5 github_repos metadata apileaks zonetransfer favicon
+        parallel_funcs "${PAR_OSINT_GROUP2_SIZE:-5}" github_repos metadata apileaks zonetransfer favicon
         local osint_g2_rc=$?
         if ((osint_g2_rc > 0)); then
             RECON_PARTIAL_RUN=true
@@ -690,7 +690,7 @@ function recon() {
     webprobe_full
 
     if [[ "${PARALLEL_MODE:-true}" == "true" ]] && declare -f parallel_funcs &>/dev/null; then
-        parallel_funcs 3 screenshot cdnprovider portscan
+        parallel_funcs "${PAR_WEB_DETECT_GROUP_SIZE:-3}" screenshot cdnprovider portscan
         local webhost_rc=$?
         if ((webhost_rc > 0)); then
             if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then

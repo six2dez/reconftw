@@ -1030,7 +1030,7 @@ function fuzz() {
             _fuzz_merge_results
             end_func "Results are saved in $domain/fuzzing/*subdomain*.txt" "${FUNCNAME[0]}"
         else
-            end_func "No $domain/webs/webs_all.txt file found, fuzzing skipped " "${FUNCNAME[0]}"
+            end_func "No $domain/webs/webs_all.txt file found, fuzzing skipped " "${FUNCNAME[0]}" "SKIP_NOINPUT"
         fi
 
     else
@@ -1124,7 +1124,7 @@ function cms_scanner() {
 
         # Ensure webs_all.txt exists
         if [[ ! -s "webs/webs_all.txt" ]]; then
-            end_func "No webs/webs_all.txt file found, cms scanner skipped." "${FUNCNAME[0]}"
+            end_func "No webs/webs_all.txt file found, cms scanner skipped." "${FUNCNAME[0]}" "SKIP_NOINPUT"
             return
         fi
 
@@ -1261,9 +1261,9 @@ function urlchecks() {
                                 fi
                             else
                                 if [[ $DEEP == true ]]; then
-                                    run_command "$katana_timeout_cmd" 4h katana -silent -list .tmp/katana_targets_normal.txt -jc -kf all -c "$KATANA_THREADS" -d 3 -fs rdn >>.tmp/katana.txt 2>>"$LOGFILE"
+                                    run_with_heartbeat_shell "katana normal targets (deep)" "$katana_timeout_cmd 4h katana -silent -list .tmp/katana_targets_normal.txt -jc -kf all -c $KATANA_THREADS -d 3 -fs rdn >> .tmp/katana.txt 2>> \"$LOGFILE\""
                                 else
-                                    run_command "$katana_timeout_cmd" 3h katana -silent -list .tmp/katana_targets_normal.txt -jc -kf all -c "$KATANA_THREADS" -d 2 -fs rdn >>.tmp/katana.txt 2>>"$LOGFILE"
+                                    run_with_heartbeat_shell "katana normal targets" "$katana_timeout_cmd 3h katana -silent -list .tmp/katana_targets_normal.txt -jc -kf all -c $KATANA_THREADS -d 2 -fs rdn >> .tmp/katana.txt 2>> \"$LOGFILE\""
                                 fi
                             fi
                         fi
@@ -1281,9 +1281,9 @@ function urlchecks() {
                                 fi
                             else
                                 if [[ $DEEP == true ]]; then
-                                    run_command "$katana_timeout_cmd" 4h katana -silent -list .tmp/katana_targets_slow.txt -jc -kf all -c "$slow_c" -d 3 -fs rdn >>.tmp/katana.txt 2>>"$LOGFILE"
+                                    run_with_heartbeat_shell "katana slow targets (deep)" "$katana_timeout_cmd 4h katana -silent -list .tmp/katana_targets_slow.txt -jc -kf all -c $slow_c -d 3 -fs rdn >> .tmp/katana.txt 2>> \"$LOGFILE\""
                                 else
-                                    run_command "$katana_timeout_cmd" 3h katana -silent -list .tmp/katana_targets_slow.txt -jc -kf all -c "$slow_c" -d 2 -fs rdn >>.tmp/katana.txt 2>>"$LOGFILE"
+                                    run_with_heartbeat_shell "katana slow targets" "$katana_timeout_cmd 3h katana -silent -list .tmp/katana_targets_slow.txt -jc -kf all -c $slow_c -d 2 -fs rdn >> .tmp/katana.txt 2>> \"$LOGFILE\""
                                 fi
                             fi
                         fi
@@ -1357,7 +1357,11 @@ function urlchecks() {
             end_message="No web targets available for URL extraction."
             _print_msg WARN "No web targets available for URL extraction."
         fi
-        end_func "${end_message}" "${FUNCNAME[0]}"
+        if [[ "$end_message" == No\ * ]]; then
+            end_func "${end_message}" "${FUNCNAME[0]}" "SKIP_NOINPUT"
+        else
+            end_func "${end_message}" "${FUNCNAME[0]}"
+        fi
     else
         if [[ $URL_CHECK == false ]]; then
             pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
