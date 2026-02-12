@@ -371,7 +371,7 @@ function third_party_misconfigs() {
         fi
 
         run_command misconfig-mapper -update-templates 1>>"$LOGFILE"
-        run_command misconfig-mapper -target visma.com -as-domain true -permutations false -skip-ssl \
+        run_command misconfig-mapper -target "$domain" -as-domain true -permutations false -skip-ssl \
             -service "*" -verbose 0 | anew -q "${dir}/osint/3rdparts_misconfigurations.txt"
         run_command misconfig-mapper -target "$company_name" -skip-ssl -verbose 0 -service "*" \
             | anew -q "${dir}/osint/3rdparts_misconfigurations.txt"

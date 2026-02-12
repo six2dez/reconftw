@@ -1129,7 +1129,9 @@ function end_func() {
     getElapsedTime "$start" "$end"
     record_func_timing "${fn}" "$((end - start))"
     local duration=$((end - start))
-    echo "[$current_date] End function: ${fn} " >>"${LOGFILE}"
+    local end_date
+    end_date=$(date +'%Y-%m-%d %H:%M:%S')
+    echo "[$end_date] End function: ${fn} " >>"${LOGFILE}"
     local badge="OK"
     case "$status" in
         info|INFO) badge="INFO" ;;
@@ -1190,7 +1192,9 @@ function end_subfunc() {
     if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
         _print_status "$status" "  ${2}" "${duration}s"
     fi
-    echo "[$current_date] End subfunction: ${1} " >>"${LOGFILE}"
+    local end_sub_date
+    end_sub_date=$(date +'%Y-%m-%d %H:%M:%S')
+    echo "[$end_sub_date] End subfunction: ${1} " >>"${LOGFILE}"
     log_json "SUCCESS" "${2}" "Subfunction completed" "runtime=${runtime}" "duration_sec=${duration}"
     if declare -F ui_log_jsonl >/dev/null 2>&1; then
         ui_log_jsonl "SUCCESS" "${2}" "Subfunction completed" "runtime=${runtime}" "duration_sec=${duration}"

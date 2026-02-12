@@ -450,6 +450,60 @@ run_tool() {
     "$@"
 }
 
+# Remove ANSI/control sequences from a text stream.
+# Usage: some_command | strip_ansi_stream
+strip_ansi_stream() {
+    # CSI + OSC sequence stripping, keeping regular text intact.
+    sed -E $'s/\x1B\\[[0-9;?]*[ -/]*[@-~]//g; s/\x1B\\][^\a]*(\a|\x1B\\\\)//g'
+}
+
+# Run a command with periodic heartbeat status lines for long-running tasks.
+# Usage: run_with_heartbeat "label" [interval_seconds] command [args...]
+run_with_heartbeat() {
+    local label="${1:-task}"
+    shift
+    local interval="${HEARTBEAT_INTERVAL_SECONDS:-20}"
+    if [[ "${1:-}" =~ ^[0-9]+$ ]]; then
+        interval="$1"
+        shift
+    fi
+
+    if [[ $# -eq 0 ]]; then
+        return 1
+    fi
+
+    if [[ "${DRY_RUN:-false}" == "true" ]]; then
+        run_command "$@"
+        return $?
+    fi
+
+    local start_ts now_ts elapsed last_hb
+    start_ts=$(date +%s)
+    last_hb="$start_ts"
+
+    local hb_log="/dev/null"
+    if [[ -n "${LOGFILE:-}" ]]; then
+        hb_log="$LOGFILE"
+    fi
+
+    run_command "$@" >>"$hb_log" 2>&1 &
+    local cmd_pid=$!
+
+    while kill -0 "$cmd_pid" 2>/dev/null; do
+        sleep 1
+        now_ts=$(date +%s)
+        if ((now_ts - last_hb >= interval)); then
+            elapsed=$((now_ts - start_ts))
+            if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
+                _print_msg INFO "${label} still running (${elapsed}s elapsed)"
+            fi
+            last_hb="$now_ts"
+        fi
+    done
+
+    wait "$cmd_pid"
+}
+
 # Execute command and capture line count result with validation
 # Usage: NUMOFLINES=$(safe_count "command | pipeline")
 # Always returns a valid number (0 on failure)

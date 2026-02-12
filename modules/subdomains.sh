@@ -478,7 +478,7 @@ function sub_asn() {
                         | grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
                         | grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" \
                         | sort -u \
-                        | anew -q .tmp/subs_no_resolved.txt
+                        | anew -q .tmp/subs_no_resolved.txt || true
                     if [[ -s .tmp/subs_no_resolved.txt ]]; then
                         _print_msg INFO "ASN sources added $(wc -l <.tmp/subs_no_resolved.txt | tr -d ' ') in-scope domains"
                     fi
@@ -604,7 +604,7 @@ function sub_crt() {
         fi
 
         run_command curl -s "https://bgp.he.net/certs/api/list?domain=$domain" \
-            | jq -r 'try .domains[].domain' \
+            | jq -r 'try .domains[]?.domain // empty' 2>>"$LOGFILE" \
             | sed -e 's/^\*\.//' \
             | anew -q .tmp/crtsh_subdomains.txt || true
 
@@ -861,13 +861,13 @@ function sub_dns() {
             # Extract various DNS records and process them
             jq -r --arg domain "$domain" '.. | strings | select(test("\\." + $domain + "$"))' <"subdomains/subdomains_dnsregs.json" \
                 | grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' \
-                | sort -u | anew -q .tmp/subdomains_dns.txt
+                | sort -u | anew -q .tmp/subdomains_dns.txt || true
 
             jq -r '.. | strings | select(test("^(\\d{1,3}\\.){3}\\d{1,3}$|^[0-9a-fA-F:]+$"))' <"subdomains/subdomains_dnsregs.json" \
                 | sort -u | run_command hakip2host | awk '{print $3}' | unfurl -u domains \
                 | sed -e 's/^\*\.//' -e 's/\.$//' -e '/\./!d' | grep "\.${DOMAIN_ESCAPED}$" \
                 | grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' | sort -u \
-                | anew -q .tmp/subdomains_dns.txt
+                | anew -q .tmp/subdomains_dns.txt || true
 
             jq -r '.. | strings | select(test("^(\\d{1,3}\\.){3}\\d{1,3}$|^[0-9a-fA-F:]+$"))' <"subdomains/subdomains_dnsregs.json" \
                 | sort -u \
@@ -881,7 +881,7 @@ function sub_dns() {
                 done
 
             jq -r 'select(.host) |"\(.host) - \((.a // [])[])", "\(.host) - \((.aaaa // [])[])"' <"subdomains/subdomains_dnsregs.json" \
-                | grep -E ' - [0-9a-fA-F:.]+$' | sort -u | anew -q "subdomains/subdomains_ips.txt"
+                | grep -E ' - [0-9a-fA-F:.]+$' | sort -u | anew -q "subdomains/subdomains_ips.txt" || true
         fi
         if [[ $AXIOM != true ]]; then
 
@@ -1214,7 +1214,7 @@ function sub_analytics() {
             if [[ -s ".tmp/analytics_subs_tmp.txt" ]]; then
                 grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" .tmp/analytics_subs_tmp.txt \
                     | grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
-                    | sed "s/|__ //" | anew -q .tmp/analytics_subs_clean.txt
+                    | sed "s/|__ //" | anew -q .tmp/analytics_subs_clean.txt || true
 
                 if [[ $AXIOM != true ]]; then
 

@@ -745,13 +745,17 @@ _nuclei_scan_local() {
         _print_msg INFO "Running: Nuclei Severity: ${crit}"
         # Non-WAF at default rate
         if [[ -s "$NOWAF_LIST" ]]; then
-            run_command nuclei -l "$NOWAF_LIST" -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 "${NUCLEI_EXTRA_ARGS}" -t "${NUCLEI_TEMPLATES_PATH}" -j -o "nuclei_output/${crit}_json.txt" 2>>"$LOGFILE" >/dev/null
+            run_with_heartbeat "nuclei ${crit} (normal targets)" nuclei \
+                -l "$NOWAF_LIST" -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 \
+                "${NUCLEI_EXTRA_ARGS}" -t "${NUCLEI_TEMPLATES_PATH}" -j -o "nuclei_output/${crit}_json.txt"
         fi
         # WAF hosts at slower rate
         if [[ -s "$WAF_LIST" ]]; then
             local slow_rl
             slow_rl=$((NUCLEI_RATELIMIT / 3 + 1))
-            run_command nuclei -l "$WAF_LIST" -severity "$crit" -nh -rl "$slow_rl" -silent -retries 2 "${NUCLEI_EXTRA_ARGS}" -t "${NUCLEI_TEMPLATES_PATH}" -j -o "nuclei_output/${crit}_waf_json.txt" 2>>"$LOGFILE" >/dev/null
+            run_with_heartbeat "nuclei ${crit} (waf targets)" nuclei \
+                -l "$WAF_LIST" -severity "$crit" -nh -rl "$slow_rl" -silent -retries 2 \
+                "${NUCLEI_EXTRA_ARGS}" -t "${NUCLEI_TEMPLATES_PATH}" -j -o "nuclei_output/${crit}_waf_json.txt"
             [[ -s "nuclei_output/${crit}_waf_json.txt" ]] && cat "nuclei_output/${crit}_waf_json.txt" >>"nuclei_output/${crit}_json.txt"
         fi
         _nuclei_parse_results "$crit"
@@ -766,10 +770,10 @@ _nuclei_scan_axiom() {
 
     for crit in "${severity_array[@]}"; do
         _print_msg INFO "Running: Axiom Nuclei Severity: ${crit}. Check results in nuclei_output folder."
-        run_command axiom-scan .tmp/webs_subs.txt -m nuclei \
+        run_with_heartbeat "axiom nuclei ${crit}" axiom-scan .tmp/webs_subs.txt -m nuclei \
             --nuclei-templates "$NUCLEI_TEMPLATES_PATH" \
             -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" \
-            -silent -retries 2 "$NUCLEI_EXTRA_ARGS" -j -o "nuclei_output/${crit}_json.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+            -silent -retries 2 "$NUCLEI_EXTRA_ARGS" -j -o "nuclei_output/${crit}_json.txt" "$AXIOM_EXTRA_ARGS"
         _nuclei_parse_results "$crit"
     done
     printf "\n\n"
@@ -963,7 +967,10 @@ _fuzz_run_local() {
     _fuzz_classify_targets
 
     if [[ -s .tmp/webs_normal.txt ]]; then
-        run_command interlace -tL .tmp/webs_normal.txt -threads "${INTERLACE_THREADS}" -c "ffuf ${FFUF_FLAGS} -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" -o "$dir/.tmp/fuzzing" 2>>"$LOGFILE" >/dev/null
+        run_with_heartbeat "ffuf normal targets" interlace \
+            -tL .tmp/webs_normal.txt -threads "${INTERLACE_THREADS}" \
+            -c "ffuf ${FFUF_FLAGS} -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" \
+            -o "$dir/.tmp/fuzzing"
     fi
 
     if [[ -s .tmp/webs_slow.txt ]]; then
@@ -971,14 +978,17 @@ _fuzz_run_local() {
         [[ $slow_threads -lt 5 ]] && slow_threads=5
         local slow_rate=$FFUF_RATELIMIT
         [[ ${FFUF_RATELIMIT:-0} -eq 0 ]] && slow_rate=50 || slow_rate=$((FFUF_RATELIMIT / 3 + 1))
-        run_command interlace -tL .tmp/webs_slow.txt -threads "${INTERLACE_THREADS}" -c "ffuf ${FFUF_FLAGS} -t ${slow_threads} -rate ${slow_rate} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" -o "$dir/.tmp/fuzzing" 2>>"$LOGFILE" >/dev/null
+        run_with_heartbeat "ffuf slow targets" interlace \
+            -tL .tmp/webs_slow.txt -threads "${INTERLACE_THREADS}" \
+            -c "ffuf ${FFUF_FLAGS} -t ${slow_threads} -rate ${slow_rate} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" \
+            -o "$dir/.tmp/fuzzing"
     fi
 }
 
 # Run ffuf via axiom-scan and parse per-subdomain results
 _fuzz_run_axiom() {
     cached_download_typed "${fuzzing_remote_list}" ".tmp/fuzzing_remote_list.txt" "onelistforallmicro.txt" "wordlists"
-    run_command axiom-scan webs/webs_all.txt -m ffuf -wL .tmp/fuzzing_remote_list.txt -H "${HEADER}" "$FFUF_FLAGS" -s -maxtime "$FFUF_MAXTIME" -oJ "$dir/.tmp/ffuf-content.json" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+    run_with_heartbeat "axiom ffuf" axiom-scan webs/webs_all.txt -m ffuf -wL .tmp/fuzzing_remote_list.txt -H "${HEADER}" "$FFUF_FLAGS" -s -maxtime "$FFUF_MAXTIME" -oJ "$dir/.tmp/ffuf-content.json" "$AXIOM_EXTRA_ARGS"
 
     while read -r sub; do
         local sub_out
@@ -1124,9 +1134,9 @@ function cms_scanner() {
             "${tools}/CMSeeK/venv/bin/python3" "${tools}/CMSeeK/cmseek.py"
             -l webs/webs_all.txt --batch -r
         )
-        local exit_status=0
-        if ! run_command "${cmseek_cmd[@]}" &>>"$LOGFILE"; then
-            exit_status=$?
+        run_with_heartbeat "cmseek batch scan" "${cmseek_cmd[@]}"
+        local exit_status=$?
+        if [[ ${exit_status} -ne 0 ]]; then
             # Attempt one-time repair on known CMSeeK index corruption.
             if [[ ${exit_status} -eq 124 || ${exit_status} -eq 137 ]]; then
                 echo "TIMEOUT cmseek.py - investigate manually for $dir" >>"$LOGFILE"
@@ -1200,7 +1210,7 @@ function urlchecks() {
                         log_note "urlchecks: reusing waymore output from sub_scraping" "${FUNCNAME[0]}" "${LINENO}"
                         cat .tmp/waymore_urls_subs.txt | anew -q .tmp/url_extract_tmp.txt || true
                     else
-                        if ! run_command "$waymore_timeout_cmd" "${WAYMORE_TIMEOUT:-30m}" waymore -i "$domain" -mode U -oU .tmp/waymore_urls.txt 2>>"$LOGFILE" >/dev/null; then
+                        if ! run_with_heartbeat "waymore passive urls" "$waymore_timeout_cmd" "${WAYMORE_TIMEOUT:-30m}" waymore -i "$domain" -mode U -oU .tmp/waymore_urls.txt; then
                             log_note "urlchecks: waymore failed or timed out; continuing with other passive sources" "${FUNCNAME[0]}" "${LINENO}"
                         fi
                         if [[ -s ".tmp/waymore_urls.txt" ]]; then
@@ -1289,9 +1299,9 @@ function urlchecks() {
                 if [[ $diff_webs != "0" ]] || [[ ! -s ".tmp/katana.txt" ]]; then
                     if [[ $URL_CHECK_ACTIVE == true ]]; then
                         if [[ $DEEP == true ]]; then
-                            run_command axiom-scan webs/webs_all.txt -m katana -jc -kf all -d 3 -fs rdn --max-runtime 4h -o .tmp/katana.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+                            run_with_heartbeat "axiom katana (deep)" axiom-scan webs/webs_all.txt -m katana -jc -kf all -d 3 -fs rdn --max-runtime 4h -o .tmp/katana.txt "$AXIOM_EXTRA_ARGS"
                         else
-                            run_command axiom-scan webs/webs_all.txt -m katana -jc -kf all -d 2 -fs rdn --max-runtime 3h -o .tmp/katana.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+                            run_with_heartbeat "axiom katana" axiom-scan webs/webs_all.txt -m katana -jc -kf all -d 2 -fs rdn --max-runtime 3h -o .tmp/katana.txt "$AXIOM_EXTRA_ARGS"
                         fi
                     fi
                 fi
@@ -1700,20 +1710,20 @@ function wordlist_gen() {
 
         start_func "${FUNCNAME[0]}" "Wordlist Generation"
 
-        [[ -s ".tmp/url_extract_tmp.txt" ]] && cat webs/url_extract.txt | anew -q .tmp/url_extract_tmp.txt
+        [[ -s ".tmp/url_extract_tmp.txt" ]] && cat webs/url_extract.txt | anew -q .tmp/url_extract_tmp.txt || true
         # Ensure url_extract_tmp.txt exists and is not empty
         if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
             # Define patterns for keys and values
             cat ".tmp/url_extract_tmp.txt" | unfurl -u keys 2>>"$LOGFILE" \
                 | sed 's/[][]//g' | sed 's/[#]//g' | sed 's/[}{]//g' \
-                | anew -q webs/dict_keys.txt
+                | anew -q webs/dict_keys.txt || true
 
             cat ".tmp/url_extract_tmp.txt" | unfurl -u values 2>>"$LOGFILE" \
                 | sed 's/[][]//g' | sed 's/[#]//g' | sed 's/[}{]//g' \
-                | anew -q webs/dict_values.txt
+                | anew -q webs/dict_values.txt || true
 
             _print_msg INFO "Extracting words..."
-            tr "[:punct:]" "\n" <".tmp/url_extract_tmp.txt" | anew -q "webs/dict_words.txt"
+            tr "[:punct:]" "\n" <".tmp/url_extract_tmp.txt" | anew -q "webs/dict_words.txt" || true
         fi
 
         end_func "Results are saved in $domain/webs/dict_[words|paths].txt" "${FUNCNAME[0]}"

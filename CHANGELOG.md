@@ -153,6 +153,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `test_ssl` now respects `run_command`, preventing real execution during dry-run.
 - `sub_asn` now applies timeout fencing with kill semantics (`-k`) when timeout tooling is available and reports non-OK outcomes correctly.
 - `subdomains` finalization now safely creates missing incremental files before counting to avoid stderr noise.
+- Fixed benign non-zero paths (`anew`, optional pipelines) that were surfacing as false `ERR(1)` noise in logs.
+- Hardened `sub_crt` JSON parsing to avoid noisy `jq` parse errors on malformed/empty upstream responses.
+- Parallel job output now strips ANSI/control sequences before replaying tail/full logs, reducing report/export parser issues.
+- Function/subfunction end log timestamps now use real end times (not reused start timestamps).
+- Added heartbeat progress lines for long-running phases (`nuclei`, `ffuf/interlace`, `cmseek`, and selected passive collectors) to avoid "stuck" perception.
 
 **Parallel Execution and Status Reporting**
 - Parallel aggregation now preserves per-function final badges (`OK/WARN/FAIL/SKIP/CACHE`) from module functions/subfunctions instead of inferring only from process exit code.
