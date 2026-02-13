@@ -8,28 +8,35 @@
 </h1>
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v4.0">
-    <img src="https://img.shields.io/badge/release-v4.0-green">
-  </a>
-   </a>
-  <a href="https://opensource.org/licenses/MIT">
-      <img src="https://img.shields.io/badge/License-MIT-yellow.svg">
-  </a>
-  <a href="https://twitter.com/Six2dez1">
-    <img src="https://img.shields.io/badge/twitter-%40Six2dez1-blue">
-  </a>
-    <a href="https://github.com/six2dez/reconftw/issues?q=is%3Aissue+is%3Aclosed">
-    <img src="https://img.shields.io/github/issues-closed-raw/six2dez/reconftw.svg">
-  </a>
-  <a href="https://github.com/six2dez/reconftw/wiki">
-    <img src="https://img.shields.io/badge/doc-wiki-blue.svg">
-  </a>
-  <a href="https://t.me/joinchat/H5bAaw3YbzzmI5co">
-    <img src="https://img.shields.io/badge/telegram-@ReconFTW-blue.svg">
-  </a>
-  <a href="https://discord.gg/R5DdXVEdTy">
-    <img src="https://img.shields.io/discord/1048623782912340038.svg?logo=discord">
-  </a>
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v4.0"><img src="https://img.shields.io/badge/release-v4.0-2ea043?style=for-the-badge" alt="Release"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge" alt="License"></a>
+  <a href="https://github.com/six2dez/reconftw/issues?q=is%3Aissue+is%3Aclosed"><img src="https://img.shields.io/github/issues-closed-raw/six2dez/reconftw.svg?style=for-the-badge" alt="Closed Issues"></a>
+  <a href="https://discord.gg/R5DdXVEdTy"><img src="https://img.shields.io/discord/1048623782912340038.svg?style=for-the-badge&logo=discord&label=discord" alt="Discord"></a>
+  <a href="https://t.me/joinchat/H5bAaw3YbzzmI5co"><img src="https://img.shields.io/badge/telegram-@ReconFTW-26A5E4?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram"></a>
+  <a href="https://twitter.com/Six2dez1"><img src="https://img.shields.io/badge/twitter-@Six2dez1-1D9BF0?style=for-the-badge&logo=x&logoColor=white" alt="Twitter"></a>
+</p>
+
+<p align="center">
+  <a href="https://docs.reconftw.com"><img src="https://img.shields.io/badge/GitBook-%23000000.svg?style=for-the-badge&logo=gitbook&logoColor=white" alt="Docs"></a>
+  <a href="https://github.com/six2dez/reconftw"><img src="https://img.shields.io/badge/Bash%20Script-%23121011.svg?style=for-the-badge&logo=gnu-bash&logoColor=white" alt="Bash Script"></a>
+  <a href="https://github.com/six2dez/reconftw"><img src="https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black" alt="Linux"></a>
+  <a href="https://github.com/six2dez/reconftw"><img src="https://img.shields.io/badge/macOS-000000?style=for-the-badge&logo=macos&logoColor=F0F0F0" alt="macOS"></a>
+  <a href="https://github.com/six2dez/reconftw"><img src="https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white" alt="GitHub"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/six2dez/reconftw/actions"><img src="https://img.shields.io/badge/github_actions-%232671E5.svg?style=for-the-badge&logo=githubactions&logoColor=white" alt="GitHub Actions"></a>
+  <a href="https://hub.docker.com/r/six2dez/reconftw"><img src="https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"></a>
+  <a href="https://github.com/six2dez/reconftw/tree/main/Terraform"><img src="https://img.shields.io/badge/terraform-%23844FBA.svg?style=for-the-badge&logo=terraform&logoColor=white" alt="Terraform"></a>
+  <a href="https://github.com/six2dez/reconftw/tree/main/Terraform"><img src="https://img.shields.io/badge/ansible-%231A1918.svg?style=for-the-badge&logo=ansible&logoColor=white" alt="Ansible"></a>
+  <a href="https://github.com/six2dez/reconftw"><img src="https://img.shields.io/badge/Go-00ADD8.svg?style=for-the-badge&logo=go&logoColor=white" alt="Go"></a>
+  <a href="https://github.com/six2dez/reconftw"><img src="https://img.shields.io/badge/Python-3776AB.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python"></a>
+</p>
+
+<p align="center">
+  <a href="https://www.buymeacoffee.com/six2dez"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee"></a>
+  <a href="https://github.com/sponsors/six2dez"><img src="https://img.shields.io/badge/sponsor-30363D?style=for-the-badge&logo=GitHub-Sponsors&logoColor=EA4AAA" alt="GitHub Sponsors"></a>
+  <a href="https://www.paypal.com/paypalme/six2dez"><img src="https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white" alt="PayPal"></a>
 </p>
 
 **reconFTW** is a powerful automated reconnaissance tool designed for security researchers and penetration testers. It streamlines the process of gathering intelligence on a target by performing subdomain enumeration, vulnerability scanning, OSINT and more. With a modular design, extensive configuration options, and support for distributed scanning via AX Framework, reconFTW is built to deliver comprehensive results efficiently.
@@ -102,7 +109,7 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **Email and Password Leaks**: Searches for leaked emails and credentials ([emailfinder](https://github.com/Josue87/EmailFinder) and [LeakSearch](https://github.com/JoelGMSec/LeakSearch)).
 - **Microsoft 365/Azure Mapping**: Identifies Microsoft 365 and Azure tenants ([msftrecon](https://github.com/Arcanum-Sec/msftrecon)).
 - **Metadata Extraction**: Extracts metadata from indexed office documents ([metagoofil](https://github.com/opsdisk/metagoofil)).
-- **API Leaks**: Detects exposed APIs in public sources ([porch-pirate](https://github.com/MandConsultingGroup/porch-pirate) and [SwaggerSpy](https://github.com/UndeadSec/SwaggerSpy)).
+- **API Leaks**: Detects exposed APIs in public sources ([porch-pirate](https://github.com/MandConsultingGroup/porch-pirate), [SwaggerSpy](https://github.com/UndeadSec/SwaggerSpy) and [postleaksNg](https://github.com/six2dez/postleaksNG)).
 - **Google Dorking**: Automated Google dork queries for sensitive information ([dorks_hunter](https://github.com/six2dez/dorks_hunter) and [xnldorker](https://github.com/xnl-h4ck3r/xnldorker)).
 - **GitHub Analysis**: Scans GitHub organizations for repositories and secrets ([enumerepo](https://github.com/trickest/enumerepo), [trufflehog](https://github.com/trufflesecurity/trufflehog) and [gitleaks](https://github.com/gitleaks/gitleaks)).
 - **Third-Party Misconfigurations**: Identifies misconfigured third-party services ([misconfig-mapper](https://github.com/intigriti/misconfig-mapper)).
@@ -146,7 +153,7 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **CMS Detection**: Identifies content management systems ([CMSeeK](https://github.com/Tuhinshubhra/CMSeeK)).
 - **URL Extraction**: Collects URLs passively and actively ([urlfinder](https://github.com/projectdiscovery/urlfinder), [waymore](https://github.com/xnl-h4ck3r/waymore), [katana](https://github.com/projectdiscovery/katana), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3) and [JSA](https://github.com/w9w/JSA)).
 - **URL Pattern Analysis**: Classifies URLs using patterns ([urless](https://github.com/xnl-h4ck3r/urless), [gf](https://github.com/tomnomnom/gf) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns)).
-- **Favicon Analysis**: Discovers real IPs behind favicons ([fav-up](https://github.com/pielco11/fav-up)).
+- **Favicon Analysis**: Discovers real IPs behind favicons ([fav-up](https://github.com/pielco11/fav-up)) and identifies technologies from favicon hashes ([favirecon](https://github.com/edoardottt/favirecon)).
 - **JavaScript Analysis**: Extracts secrets and endpoints from JS files ([subjs](https://github.com/lc/subjs), [JSA](https://github.com/w9w/JSA), [xnLinkFinder](https://github.com/xnl-h4ck3r/xnLinkFinder), [getjswords](https://github.com/m4ll0k/BBTz), [mantra](https://github.com/MrEmpy/mantra), [jsluice](https://github.com/BishopFox/jsluice)).
 - **Source Map Extraction**: Retrieves sensitive data from JavaScript source maps ([sourcemapper](https://github.com/denandz/sourcemapper)).
 - **GraphQL Detection**: Discovers GraphQL endpoints with nuclei and optionally performs in-depth introspection ([GQLSpection](https://github.com/doyensec/GQLSpection)).
@@ -169,13 +176,13 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **SSRF**: Tests for server-side request forgery ([interactsh](https://github.com/projectdiscovery/interactsh) and param values with [ffuf](https://github.com/ffuf/ffuf)).
 - **CRLF**: Checks for CRLF injection vulnerabilities ([crlfuzz](https://github.com/dwisiswant0/crlfuzz)).
 - **LFI**: Tests for local file inclusion via fuzzing ([ffuf](https://github.com/ffuf/ffuf)).
-- **SSTI**: Detects server-side template injection ([ffuf](https://github.com/ffuf/ffuf)).
+- **SSTI**: Detects server-side template injection ([TInjA](https://github.com/Hackmanit/TInjA), with legacy ffuf mode available).
 - **SQLi**: Tests for SQL injection ([SQLMap](https://github.com/sqlmapproject/sqlmap) and [ghauri](https://github.com/r0oth3x49/ghauri)).
-- **Broken Links**: Identifies broken links on web pages ([katana](https://github.com/projectdiscovery/katana)).
+- **Broken Links**: Identifies broken links and external references likely to be takeover-prone ([second-order](https://github.com/mhmdiaa/second-order), with legacy katana mode available).
 - **Command Injection**: Tests for command injection vulnerabilities ([commix](https://github.com/commixproject/commix)).
 - **Prototype Pollution**: Detects JavaScript prototype pollution ([ppmap](https://github.com/kleiton0x00/ppmap)).
 - **HTTP Request Smuggling**: Checks for request smuggling vulnerabilities ([smugglex](https://github.com/hahwul/smugglex)).
-- **Web Cache**: Identifies web cache vulnerabilities ([Web-Cache-Vulnerability-Scanner](https://github.com/Hackmanit/Web-Cache-Vulnerability-Scanner)).
+- **Web Cache**: Identifies web cache vulnerabilities ([Web-Cache-Vulnerability-Scanner](https://github.com/Hackmanit/Web-Cache-Vulnerability-Scanner) and [toxicache](https://github.com/xhzeem/toxicache)).
 - **4XX Bypassing**: Attempts to bypass 4XX responses ([nomore403](https://github.com/devploit/nomore403)).
 - **Parameter Fuzzing**: Fuzzes URL parameters for vulnerabilities ([nuclei](https://github.com/projectdiscovery/nuclei)).
 
@@ -536,6 +543,7 @@ EMAILS=true # Fetch emails from differents sites
 DOMAIN_INFO=true # whois info
 IP_INFO=true    # Reverse IP search, geolocation and whois
 API_LEAKS=true # Check for API leaks
+API_LEAKS_POSTLEAKS=true # Enhance API leaks with postleaksNg
 THIRD_PARTIES=true # Check for 3rd parties misconfigs
 SPOOF=true # Check spoofable domains
 METAFINDER_LIMIT=20 # Max 250
@@ -575,6 +583,7 @@ UNCOMMON_PORTS_WEB="81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,30
 
 # Host
 FAVICON=true # Check Favicon domain discovery
+FAVIRECON=true # Favicon-based technology recon for discovered web targets
 PORTSCANNER=true # Enable or disable the whole Port scanner module
 GEO_INFO=true # Fetch Geolocalization info
 PORTSCAN_PASSIVE=true # Port scanner with Shodan
@@ -619,15 +628,18 @@ SSRF_CHECKS=true # SSRF checks
 CRLF_CHECKS=true # CRLF checks
 LFI=true # LFI by fuzzing
 SSTI=true # SSTI by fuzzing
+SSTI_ENGINE="tinja" # SSTI engine: tinja|legacy
 SQLI=true # Check SQLI
 SQLMAP=true # Check SQLI with sqlmap
 GHAURI=false # Check SQLI with ghauri
 BROKENLINKS=true # Check for brokenlinks
+BROKENLINKS_ENGINE="second-order" # Broken links engine: second-order|legacy
 SPRAY=true # Performs password spraying
 COMM_INJ=true # Check for command injections with commix
 PROTO_POLLUTION=true # Check for prototype pollution flaws
 SMUGGLING=true # Check for HTTP request smuggling flaws
 WEBCACHE=true # Check for Web Cache issues
+WEBCACHE_TOXICACHE=true # Complement web cache checks with toxicache
 BYPASSER4XX=true # Check for 4XX bypasses
 FUZZPARAMS=true # Fuzz parameters values
 

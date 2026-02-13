@@ -245,6 +245,36 @@ function apileaks() {
             return 1
         fi
 
+        # Optional postleaksNg integration (Postman public library leaks)
+        if [[ ${API_LEAKS_POSTLEAKS:-true} == true ]]; then
+            local postleaks_bin="${tools}/postleaksNg/.venv/bin/postleaksNg"
+            local postleaks_out="${dir}/osint/postman_leaks_postleaksng"
+            mkdir -p "$postleaks_out"
+            if [[ -x "$postleaks_bin" ]]; then
+                local -a postleaks_cmd=(
+                    "$postleaks_bin"
+                    -k "$domain"
+                    --output "$postleaks_out"
+                    -t "${POSTLEAKS_THREADS:-10}"
+                )
+                [[ -n "${POSTLEAKS_INCLUDE:-}" ]] && postleaks_cmd+=(--include "${POSTLEAKS_INCLUDE}")
+                [[ -n "${POSTLEAKS_EXCLUDE:-}" ]] && postleaks_cmd+=(--exclude "${POSTLEAKS_EXCLUDE}")
+
+                if ! run_command "${postleaks_cmd[@]}" 2>>"$LOGFILE" >/dev/null; then
+                    log_note "apileaks: postleaksNg failed" "${FUNCNAME[0]}" "${LINENO}"
+                fi
+
+                # Aggregate discovered URLs into the existing postman leaks artifact.
+                if compgen -G "${postleaks_out}/*.json" >/dev/null 2>&1; then
+                    jq -r '.url // empty' "${postleaks_out}"/*.json 2>/dev/null \
+                        | grep -aE '^https?://' \
+                        | anew -q "${dir}/osint/postman_leaks.txt"
+                fi
+            else
+                log_note "apileaks: postleaksNg binary not found at ${postleaks_bin}" "${FUNCNAME[0]}" "${LINENO}"
+            fi
+        fi
+
         if [[ "${DRY_RUN:-false}" == "true" ]]; then
             end_func "Dry-run: apileaks commands recorded" "${FUNCNAME[0]}" "SKIP"
             return
@@ -253,6 +283,9 @@ function apileaks() {
             # Analyze leaks with trufflehog
             if [[ -s "${dir}/osint/postman_leaks.txt" ]]; then
                 run_command trufflehog filesystem "${dir}/osint/postman_leaks.txt" -j 2>/dev/null | jq -c | anew -q "${dir}/osint/postman_leaks_trufflehog.json"
+            fi
+            if [[ -d "${dir}/osint/postman_leaks_postleaksng" ]]; then
+                run_command trufflehog filesystem "${dir}/osint/postman_leaks_postleaksng" -j 2>/dev/null | jq -c | anew -q "${dir}/osint/postman_leaks_trufflehog.json"
             fi
         
             if [[ -s "${dir}/osint/swagger_leaks.txt" ]]; then

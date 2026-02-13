@@ -211,6 +211,7 @@ function tools_installed() {
         ["spoofy_python"]="${tools}/Spoofy/venv/bin/python3"
         ["swaggerspy"]="${tools}/SwaggerSpy/swaggerspy.py"
         ["swaggerspy_python"]="${tools}/SwaggerSpy/venv/bin/python3"
+        ["postleaksNg"]="${tools}/postleaksNg/.venv/bin/postleaksNg"
         ["LeakSearch"]="${tools}/LeakSearch/LeakSearch.py"
         ["LeakSearch_python"]="${tools}/LeakSearch/venv/bin/python3"
         ["Oralyzer"]="${tools}/Oralyzer/oralyzer.py"
@@ -307,6 +308,10 @@ function tools_installed() {
         ["arjun"]="arjun"
         ["gqlspection"]="gqlspection"
         ["cloud_enum"]="cloud_enum"
+        ["toxicache"]="toxicache"
+        ["favirecon"]="favirecon"
+        ["tinja"]="tinja"
+        ["second-order"]="second-order"
     )
 
     # Check for tool files

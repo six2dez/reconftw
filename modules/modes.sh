@@ -690,7 +690,7 @@ function recon() {
     webprobe_full
 
     if [[ "${PARALLEL_MODE:-true}" == "true" ]] && declare -f parallel_funcs &>/dev/null; then
-        parallel_funcs "${PAR_WEB_DETECT_GROUP_SIZE:-3}" screenshot cdnprovider portscan
+        parallel_funcs "${PAR_WEB_DETECT_GROUP_SIZE:-3}" screenshot cdnprovider portscan favirecon_tech
         local webhost_rc=$?
         if ((webhost_rc > 0)); then
             if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
@@ -706,6 +706,7 @@ function recon() {
         #	virtualhosts
         cdnprovider
         portscan
+        favirecon_tech
         geo_info
     fi
 
@@ -1069,6 +1070,7 @@ function subs_menu() {
     _print_section "Web Detection"
     webprobe_simple
     webprobe_full
+    favirecon_tech
     screenshot
     #	virtualhosts
 
@@ -1084,6 +1086,7 @@ function webs_menu() {
 
     webprobe_simple
     webprobe_full
+    favirecon_tech
     subtakeover
     remove_big_files
     screenshot
@@ -1129,6 +1132,7 @@ function zen_menu() {
     _print_section "Web Detection"
     webprobe_simple
     webprobe_full
+    favirecon_tech
     screenshot
     #	virtualhosts
     cdnprovider

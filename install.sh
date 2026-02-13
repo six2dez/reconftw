@@ -242,6 +242,10 @@ declare -A gotools=(
     ["VhostFinder"]="go install -v github.com/wdahlenburg/VhostFinder@latest"
     ["misconfig-mapper"]="go install github.com/intigriti/misconfig-mapper/cmd/misconfig-mapper@latest"
     ["grpcurl"]="go install -v github.com/fullstorydev/grpcurl/cmd/grpcurl@latest"
+    ["toxicache"]="go install -v github.com/xhzeem/toxicache@latest"
+    ["favirecon"]="go install -v github.com/edoardottt/favirecon/cmd/favirecon@latest"
+    ["second-order"]="go install -v github.com/mhmdiaa/second-order@latest"
+    ["tinja"]="go install -v github.com/Hackmanit/TInjA@latest"
 )
 
 # Declare pipx tools and their paths
@@ -295,6 +299,7 @@ declare -A repos=(
     ["metagoofil"]="opsdisk/metagoofil"
     ["EmailHarvester"]="maldevel/EmailHarvester"
     ["reconftw_ai"]="six2dez/reconftw_ai"
+    ["postleaksNg"]="six2dez/postleaksNG"
 )
 
 # Function to display the banner
@@ -514,6 +519,18 @@ function install_tools() {
                 ;;
             "trufflehog")
                 go install &>/dev/null
+                ;;
+            "postleaksNg")
+                if [[ ! -d "venv" ]]; then
+                    python3 -m venv venv &>/dev/null || true
+                fi
+                if [[ -f "venv/bin/activate" ]]; then
+                    # shellcheck disable=SC1091
+                    source venv/bin/activate
+                    pip3 install --upgrade pip &>/dev/null || true
+                    pip3 install -e . &>/dev/null || true
+                    deactivate || true
+                fi
                 ;;
         esac
 

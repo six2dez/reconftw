@@ -366,6 +366,8 @@ function ssti() {
 
         # Ensure gf/ssti.txt is not empty
         if [[ -s "gf/ssti.txt" ]]; then
+            local ssti_engine="${SSTI_ENGINE:-tinja}"
+
             _print_msg INFO "Running: SSTI Payload Generation"
 
             # Process ssti.txt with qsreplace and filter lines containing 'FUZZ'
@@ -374,12 +376,44 @@ function ssti() {
             # Determine whether to proceed based on DEEP flag or number of URLs
             URL_COUNT=$(wc -l <".tmp/tmp_ssti.txt")
             if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT ]]; then
+                : >".tmp/ssti_candidates.txt"
 
-                _print_msg INFO "Running: SSTI Fuzzing with FFUF"
+                if [[ "$ssti_engine" == "tinja" ]] && command -v tinja >/dev/null 2>&1; then
+                    _print_msg INFO "Running: SSTI Checks with TInjA"
+                    local tinja_report_dir="$dir/.tmp/tinja"
+                    mkdir -p "$tinja_report_dir"
+                    local -a tinja_cmd=(tinja url --reportpath "${tinja_report_dir}/" --ratelimit "${TINJA_RATELIMIT:-0}" --timeout "${TINJA_TIMEOUT:-15}" --verbosity 0)
+                    if [[ -n "${HEADER:-}" ]]; then
+                        tinja_cmd+=(-H "${HEADER}")
+                    fi
+                    while IFS= read -r u; do
+                        [[ -n "$u" ]] && tinja_cmd+=(--url "$u")
+                    done <".tmp/tmp_ssti.txt"
 
-                # Use Interlace to parallelize FFUF scanning
-                run_command interlace -tL ".tmp/tmp_ssti.txt" -threads "$INTERLACE_THREADS" -c "ffuf -v -r -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w \"${ssti_wordlist}\" -u \"_target_\" -mr \"ssti49\"" 2>>"$LOGFILE" \
-                    | grep "URL" | sed 's/| URL | //' | anew -q "vulns/ssti.txt"
+                    if ! run_command "${tinja_cmd[@]}" 2>>"$LOGFILE" >/dev/null; then
+                        log_note "ssti: tinja execution failed, no findings collected" "${FUNCNAME[0]}" "${LINENO}"
+                    fi
+
+                    local report_file=""
+                    report_file=$(ls -1t "${tinja_report_dir}"/*.jsonl 2>/dev/null | head -n 1 || true)
+                    if [[ -n "$report_file" && -s "$report_file" ]]; then
+                        jq -r 'select((.isWebpageVulnerable == true) or any(.parameters[]?; .isParameterVulnerable == true)) | (.url // empty) + " [certainty:" + (.certainty // "unknown") + "]"' "$report_file" 2>/dev/null \
+                            | sed '/^\s*$/d' \
+                            | anew -q ".tmp/ssti_candidates.txt"
+                    fi
+                else
+                    [[ "$ssti_engine" == "tinja" ]] && _print_msg WARN "TInjA not found. Falling back to legacy SSTI check."
+                    _print_msg INFO "Running: SSTI Fuzzing with FFUF"
+
+                    # Use Interlace to parallelize FFUF scanning
+                    run_command interlace -tL ".tmp/tmp_ssti.txt" -threads "$INTERLACE_THREADS" -c "ffuf -v -r -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w \"${ssti_wordlist}\" -u \"_target_\" -mr \"ssti49\"" 2>>"$LOGFILE" \
+                        | grep "URL" | sed 's/| URL | //' | anew -q ".tmp/ssti_candidates.txt"
+                fi
+
+                if [[ -s ".tmp/ssti_candidates.txt" ]]; then
+                    cat ".tmp/ssti_candidates.txt" | anew -q "vulns/ssti_tinja.txt"
+                    cat ".tmp/ssti_candidates.txt" | anew -q "vulns/ssti.txt"
+                fi
 
                 end_func "Results are saved in vulns/ssti.txt" "${FUNCNAME[0]}"
             else
@@ -790,6 +824,15 @@ function webcache() {
             # Append unique findings to vulns/webcache.txt
             if [[ -s "$dir/.tmp/webcache.txt" ]]; then
                 cat "$dir/.tmp/webcache.txt" | anew -q "vulns/webcache.txt"
+            fi
+
+            # Optional second engine (toxicache) to complement findings
+            if [[ ${WEBCACHE_TOXICACHE:-true} == true ]] && command -v toxicache >/dev/null 2>&1; then
+                local toxicache_out="$dir/.tmp/webcache_toxicache.txt"
+                run_command toxicache -i "$dir/webs/webs_all.txt" -o "$toxicache_out" -t "${TOXICACHE_THREADS:-70}" -ua "${TOXICACHE_USER_AGENT:-Mozilla/5.0 (X11; Linux x86_64)}" 2>>"$LOGFILE" >/dev/null || true
+                if [[ -s "$toxicache_out" ]]; then
+                    cat "$toxicache_out" | anew -q "vulns/webcache_toxicache.txt"
+                fi
             fi
 
             end_func "Results are saved in vulns/webcache.txt" "${FUNCNAME[0]}"

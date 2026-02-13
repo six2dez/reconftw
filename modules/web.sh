@@ -2,6 +2,7 @@
 # shellcheck disable=SC2154  # Variables defined in reconftw.cfg
 # reconFTW - Web analysis module
 # Contains: webprobe_simple, webprobe_full, screenshot, virtualhosts, favicon,
+#           favirecon_tech,
 #           portscan, cdnprovider, waf_checks, nuclei_check, graphql_scan,
 #           param_discovery, grpc_reflection, fuzz, iishortname, cms_scanner,
 #           urlchecks, url_gf, url_ext, jschecks, websocket_checks,
@@ -413,6 +414,67 @@ function favicon() {
         fi
     fi
 
+}
+
+function favirecon_tech() {
+
+    # Create necessary directories
+    if ! ensure_dirs .tmp webs; then return 1; fi
+
+    # Check if the function should run
+    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } \
+        && [[ ${FAVIRECON:-true} == true ]] \
+        && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+
+        start_func "${FUNCNAME[0]}" "Favicon Technology Recon"
+
+        # Combine webs.txt and webs_uncommon_ports.txt into webs_all.txt if it doesn't exist
+        if [[ ! -s "webs/webs_all.txt" ]]; then
+            cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q "webs/webs_all.txt"
+        fi
+
+        if [[ -s "webs/webs_all.txt" ]]; then
+            local fav_cmd=(
+                favirecon
+                -l "webs/webs_all.txt"
+                -c "${FAVIRECON_CONCURRENCY:-50}"
+                -t "${FAVIRECON_TIMEOUT:-10}"
+                -s
+                -j
+                -o "webs/favirecon.json"
+            )
+
+            if [[ -n "${FAVIRECON_PROXY:-}" ]]; then
+                fav_cmd+=(-px "${FAVIRECON_PROXY}")
+            fi
+            if [[ "${FAVIRECON_RATE_LIMIT:-0}" -gt 0 ]]; then
+                fav_cmd+=(-rl "${FAVIRECON_RATE_LIMIT}")
+            fi
+
+            if ! run_command "${fav_cmd[@]}" 2>>"$LOGFILE" >/dev/null; then
+                log_note "favirecon_tech: favirecon command failed" "${FUNCNAME[0]}" "${LINENO}"
+            fi
+
+            if [[ -s "webs/favirecon.json" ]]; then
+                jq -r '[(.URL // .url // ""), (.Name // .name // "unknown"), (.Hash // .hash // "unknown")] | @tsv' "webs/favirecon.json" 2>/dev/null \
+                    | awk -F'\t' 'NF>=1 && $1 ~ /^https?:\/\// {printf "%s [%s] [%s]\n", $1, $2, $3}' \
+                    | anew -q "webs/favirecon.txt"
+            fi
+        else
+            log_note "favirecon_tech: no webs/webs_all.txt found" "${FUNCNAME[0]}" "${LINENO}"
+        fi
+
+        end_func "Results are saved in webs/favirecon.[json|txt]" "${FUNCNAME[0]}"
+
+    else
+        if [[ ${FAVIRECON:-true} == false ]]; then
+            _print_msg WARN "${FUNCNAME[0]} skipped due to configuration settings."
+        elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            return
+        else
+            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+        fi
+    fi
 }
 
 function portscan() {
@@ -1860,46 +1922,86 @@ function brokenLinks() {
 
         # Check if webs_all.txt exists and is not empty
         if [[ -s "webs/webs_all.txt" ]]; then
-            if [[ $AXIOM != true ]]; then
-                # Use katana for scanning
-                if [[ ! -s ".tmp/katana.txt" ]]; then
-                    if [[ $DEEP == true ]]; then
-                        timeout 4h katana -silent -list "webs/webs_all.txt" -jc -kf all -c "$KATANA_THREADS" -d 3 -o ".tmp/katana.txt" 2>>"$LOGFILE" >/dev/null
-                    else
-                        timeout 3h katana -silent -list "webs/webs_all.txt" -jc -kf all -c "$KATANA_THREADS" -d 2 -o ".tmp/katana.txt" 2>>"$LOGFILE" >/dev/null
+            local bl_engine="${BROKENLINKS_ENGINE:-second-order}"
+            if [[ "$bl_engine" == "second-order" ]]; then
+                local so_depth="${SECOND_ORDER_DEPTH:-1}"
+                [[ $DEEP == true ]] && so_depth=$((so_depth + 1))
+
+                rm -rf ".tmp/second_order" >/dev/null 2>&1 || true
+                mkdir -p ".tmp/second_order"
+                : >".tmp/brokenLinks_total.txt"
+
+                while IFS= read -r target; do
+                    [[ -z "$target" ]] && continue
+                    local safe_target
+                    safe_target=$(echo "$target" | sed 's|https\?://||; s|[^A-Za-z0-9._-]|_|g')
+                    local out_dir=".tmp/second_order/${safe_target}"
+                    mkdir -p "$out_dir"
+
+                    local so_cmd=(
+                        second-order
+                        -target "$target"
+                        -config "${SECOND_ORDER_CONFIG:-${tools}/second-order/config/takeover.json}"
+                        -depth "$so_depth"
+                        -threads "${SECOND_ORDER_THREADS:-10}"
+                        -output "$out_dir"
+                    )
+                    if [[ ${SECOND_ORDER_INSECURE:-false} == true ]]; then
+                        so_cmd+=(-insecure)
                     fi
-                fi
-                # Remove lines longer than 2048 characters
-                if [[ -s ".tmp/katana.txt" ]]; then
-                    sed_i '/^.\{2048\}./d' ".tmp/katana.txt"
-                fi
+                    if [[ -n "${HEADER:-}" ]]; then
+                        so_cmd+=(-header "${HEADER}")
+                    fi
+
+                    run_command "${so_cmd[@]}" 2>>"$LOGFILE" >/dev/null || true
+
+                    if [[ -s "${out_dir}/non-200-url-attributes.json" ]]; then
+                        jq -r 'to_entries[]?.value | to_entries[]?.value[]? // empty' "${out_dir}/non-200-url-attributes.json" 2>/dev/null \
+                            | grep -aE '^https?://' \
+                            | anew -q ".tmp/brokenLinks_total.txt"
+                    fi
+                done <"webs/webs_all.txt"
             else
-                # Use axiom-scan for scanning
-                if [[ ! -s ".tmp/katana.txt" ]]; then
-                    if [[ $DEEP == true ]]; then
-                        run_command axiom-scan "webs/webs_all.txt" -m katana -jc -kf all -d 3 --max-runtime 4h -o ".tmp/katana.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
-                    else
-                        run_command axiom-scan "webs/webs_all.txt" -m katana -jc -kf all -d 2 --max-runtime 3h -o ".tmp/katana.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+                if [[ $AXIOM != true ]]; then
+                    # Use katana for scanning
+                    if [[ ! -s ".tmp/katana.txt" ]]; then
+                        if [[ $DEEP == true ]]; then
+                            timeout 4h katana -silent -list "webs/webs_all.txt" -jc -kf all -c "$KATANA_THREADS" -d 3 -o ".tmp/katana.txt" 2>>"$LOGFILE" >/dev/null
+                        else
+                            timeout 3h katana -silent -list "webs/webs_all.txt" -jc -kf all -c "$KATANA_THREADS" -d 2 -o ".tmp/katana.txt" 2>>"$LOGFILE" >/dev/null
+                        fi
                     fi
                     # Remove lines longer than 2048 characters
                     if [[ -s ".tmp/katana.txt" ]]; then
                         sed_i '/^.\{2048\}./d' ".tmp/katana.txt"
                     fi
+                else
+                    # Use axiom-scan for scanning
+                    if [[ ! -s ".tmp/katana.txt" ]]; then
+                        if [[ $DEEP == true ]]; then
+                            run_command axiom-scan "webs/webs_all.txt" -m katana -jc -kf all -d 3 --max-runtime 4h -o ".tmp/katana.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+                        else
+                            run_command axiom-scan "webs/webs_all.txt" -m katana -jc -kf all -d 2 --max-runtime 3h -o ".tmp/katana.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+                        fi
+                        # Remove lines longer than 2048 characters
+                        if [[ -s ".tmp/katana.txt" ]]; then
+                            sed_i '/^.\{2048\}./d' ".tmp/katana.txt"
+                        fi
+                    fi
                 fi
-            fi
 
-            # Process katana.txt to find broken links
-            if [[ -s ".tmp/katana.txt" ]]; then
-                run_command httpx -follow-redirects -random-agent -status-code -threads "$HTTPX_THREADS" -rl "$HTTPX_RATELIMIT" -timeout "$HTTPX_TIMEOUT" -silent -retries 2 -no-color <".tmp/katana.txt" 2>>"$LOGFILE" \
-                    | grep "\[4" | cut -d ' ' -f1 | anew -q ".tmp/brokenLinks_total.txt"
+                # Process katana.txt to find broken links
+                if [[ -s ".tmp/katana.txt" ]]; then
+                    run_command httpx -follow-redirects -random-agent -status-code -threads "$HTTPX_THREADS" -rl "$HTTPX_RATELIMIT" -timeout "$HTTPX_TIMEOUT" -silent -retries 2 -no-color <".tmp/katana.txt" 2>>"$LOGFILE" \
+                        | grep "\[4" | cut -d ' ' -f1 | anew -q ".tmp/brokenLinks_total.txt"
+                fi
             fi
 
             # Update brokenLinks.txt with unique entries
             if [[ -s ".tmp/brokenLinks_total.txt" ]]; then
-                NUMOFLINES=$(wc -l <".tmp/brokenLinks_total.txt" 2>>"$LOGFILE" | awk '{print $1}')
-                cat .tmp/brokenLinks_total.txt | anew -q "vulns/brokenLinks.txt"
+                cat ".tmp/brokenLinks_total.txt" | anew -q "vulns/brokenLinks.txt"
                 NUMOFLINES=$(sed '/^$/d' "vulns/brokenLinks.txt" | wc -l)
-                notification "${NUMOFLINES} new broken links found" info
+                notification "${NUMOFLINES} broken links found" info
             fi
 
             end_func "Results are saved in vulns/brokenLinks.txt" "${FUNCNAME[0]}"

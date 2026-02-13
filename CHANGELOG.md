@@ -86,6 +86,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Deep wildcard detection (`DEEP_WILDCARD_FILTER`) based on iterative wildcard checks.
 - Time-based certificate filtering (`DNS_TIME_FENCE_DAYS`).
 - Sensitive domain exclusion (`EXCLUDE_SENSITIVE`, `config/sensitive_domains.txt`).
+- New integrated engines/tools:
+  - `toxicache` for additional web cache poisoning coverage.
+  - `postleaksNg` in `apileaks` for Postman leak discovery.
+  - `favirecon` as `favirecon_tech` for favicon-based technology reconnaissance.
+  - `TInjA` as the default `ssti` engine (`SSTI_ENGINE=tinja`, with legacy fallback).
+  - `second-order` as default `brokenLinks` engine (`BROKENLINKS_ENGINE=second-order`, with legacy fallback).
 
 **Progress and UX**
 - Progress/ETA functions (`progress_init()`, `progress_step()`) integrated in recon flows.
@@ -130,10 +136,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Dry-Run Mode**
 - Wrapped 83 unwrapped command executions across all modules to respect `DRY_RUN` flag:
-  - `osint.sh`: 24 commands (whois, dig, curl APIs, gitdorks_go, enumerepo, porch-pirate, misconfig-mapper, exiftool, interlace git clone, Python tools: dorks_hunter, metagoofil, SwaggerSpy, EmailHarvester, LeakSearch, msftrecon, Scopify, Spoofy)
+  - `osint.sh`: 24 commands (whois, dig, curl APIs, gitdorks_go, enumerepo, porch-pirate, postleaksNg, misconfig-mapper, exiftool, interlace git clone, Python tools: dorks_hunter, metagoofil, SwaggerSpy, EmailHarvester, LeakSearch, msftrecon, Scopify, Spoofy)
   - `subdomains.sh`: 15 commands (asnmap, dig zone transfer, curl APIs, hakip2host, csprecon, regulator, cloud enumeration)
-  - `web.sh`: 20 commands (fav-up, grpcurl, CMSeeK, JSA, getjswords, jsluice, wget, interlace/ffuf, curl WebSocket, pydictor)
-  - `vulns.sh`: 5 commands (Corsy, Oralyzer, interlace/ffuf LFI, interlace/ffuf SSTI, interlace/ghauri SQLi)
+  - `web.sh`: 20 commands (fav-up, favirecon, grpcurl, CMSeeK, JSA, getjswords, jsluice, wget, interlace/ffuf, curl WebSocket, pydictor, second-order)
+  - `vulns.sh`: 6 commands (Corsy, Oralyzer, interlace/ffuf LFI, TInjA/legacy SSTI, interlace/ghauri SQLi, toxicache)
   - `core.sh`: 8 commands (tar/curl uploads, Telegram/Discord/Slack notifications, connectivity checks)
   - `modes.sh`: 8 commands (faraday-cli reporting)
   - `axiom.sh`: 3 commands (hakip2host, mapcidr)
@@ -149,7 +155,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Command normalization removes newlines/extra whitespace from multi-line command strings for cleaner display
 - Dry-run command previews now redact sensitive CLI values (for example `-token-string`, API keys, and bearer tokens).
 - Dry-run in parallel mode now aggregates commands emitted from child subshells, so module summaries reflect full command volume.
-- Dry-run no longer produces noisy parser/file errors in guarded paths (`apileaks`, `sub_crt`, `prototype_pollution`, `fuzzparams`, `sub_tls`, `sub_permut`, `urlchecks`).
+- Dry-run no longer produces noisy parser/file errors in guarded paths (`apileaks`, `sub_crt`, `prototype_pollution`, `fuzzparams`, `sub_tls`, `sub_permut`, `urlchecks`, `favirecon_tech`, `webcache`, `brokenLinks`, `ssti`).
 - `test_ssl` now respects `run_command`, preventing real execution during dry-run.
 - `sub_asn` now applies timeout fencing with kill semantics (`-k`) when timeout tooling is available and reports non-OK outcomes correctly.
 - `subdomains` finalization now safely creates missing incremental files before counting to avoid stderr noise.
