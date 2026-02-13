@@ -109,10 +109,17 @@ format_duration() {
     fi
 }
 
+_ui_live_break_if_needed() {
+    if declare -F ui_live_progress_break >/dev/null 2>&1; then
+        ui_live_progress_break
+    fi
+}
+
 # Print a normalized task/status line
 # Usage: print_task STATE module duration_seconds reason
 print_task() {
     [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
+    _ui_live_break_if_needed
     local state="$1" module="$2" duration="${3:-0}" reason="${4:-}"
     local color=""
     local dim_color="${blue:-}"
@@ -244,6 +251,7 @@ _print_msg() {
         return 0
     fi
     [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
+    _ui_live_break_if_needed
     printf "%b[%s]%b %s\n" "$color" "$level" "${reset:-}" "$msg"
 }
 
@@ -251,6 +259,9 @@ _print_msg() {
 # Usage: _print_module_start "OSINT"
 _print_module_start() {
     [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
+    if declare -F ui_live_progress_end >/dev/null 2>&1; then
+        ui_live_progress_end
+    fi
     local title="${1^^}"
     local ts
     ts=$(date +'%Y-%m-%d %H:%M:%S')
@@ -269,6 +280,9 @@ _print_module_start() {
 # Usage: _print_module_end "OSINT"
 _print_module_end() {
     [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
+    if declare -F ui_live_progress_end >/dev/null 2>&1; then
+        ui_live_progress_end
+    fi
     local title="${1^^}"
     local ts
     ts=$(date +'%Y-%m-%d %H:%M:%S')
@@ -334,6 +348,7 @@ _print_status() {
 # Usage: _print_error "something failed"
 _print_error() {
     local msg="$1"
+    _ui_live_break_if_needed
     printf "%b[FAIL]%b %s\n" "${bred:-}" "${reset:-}" "$msg" >&2
 }
 
@@ -490,6 +505,7 @@ run_with_heartbeat() {
     fi
 
     local start_ts now_ts elapsed last_hb
+    local use_live=false
     start_ts=$(date +%s)
     last_hb="$start_ts"
 
@@ -501,19 +517,43 @@ run_with_heartbeat() {
     run_command "$@" >>"$hb_log" 2>&1 &
     local cmd_pid=$!
 
+    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
+        if declare -F ui_is_tty >/dev/null 2>&1 && ui_is_tty && declare -F ui_live_progress_begin >/dev/null 2>&1; then
+            use_live=true
+            ui_live_progress_begin
+            if declare -F ui_live_progress_update >/dev/null 2>&1; then
+                ui_live_progress_update "Running: ${label} | elapsed 0s | ETA: --"
+            fi
+        else
+            printf "Started: %s\n" "$label"
+        fi
+    fi
+
     while kill -0 "$cmd_pid" 2>/dev/null; do
         sleep 1
         now_ts=$(date +%s)
         if ((now_ts - last_hb >= interval)); then
             elapsed=$((now_ts - start_ts))
-            if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
-                _print_msg INFO "${label} still running (${elapsed}s elapsed)"
+            if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && [[ "$use_live" == true ]] && declare -F ui_live_progress_update >/dev/null 2>&1; then
+                ui_live_progress_update "Running: ${label} | elapsed $(format_duration "$elapsed") | ETA: --"
             fi
             last_hb="$now_ts"
         fi
     done
 
     wait "$cmd_pid"
+    local rc=$?
+    elapsed=$(($(date +%s) - start_ts))
+
+    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
+        if [[ "$use_live" == true ]] && declare -F ui_live_progress_end >/dev/null 2>&1; then
+            ui_live_progress_end
+        else
+            printf "Completed: %s (%s)\n" "$label" "$(format_duration "$elapsed")"
+        fi
+    fi
+
+    return "$rc"
 }
 
 # Shell-string variant for commands that require complex redirections.

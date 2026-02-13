@@ -23,6 +23,12 @@ PARALLEL_TRACE_SLOW_SECONDS="${PARALLEL_TRACE_SLOW_SECONDS:-30}"
 declare -a _PARALLEL_PIDS=()
 _PARALLEL_LAST_BADGE=""
 
+_parallel_live_break() {
+    if declare -F ui_live_progress_break >/dev/null 2>&1; then
+        ui_live_progress_break
+    fi
+}
+
 _parallel_get_ui_mode() {
     case "${PARALLEL_UI_MODE:-clean}" in
         clean|balanced|trace) printf "%s" "${PARALLEL_UI_MODE:-clean}" ;;
@@ -93,7 +99,7 @@ _parallel_snapshot() {
     local elapsed_batch="${6:-0}"
     [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
 
-    local mode active_max active_fmt done_fmt progress_pct eta="-"
+    local mode active_max active_fmt done_fmt progress_pct eta="--"
     mode=$(_parallel_get_ui_mode)
     active_max="${PARALLEL_PROGRESS_COMPACT_ACTIVE_MAX:-4}"
     active_fmt=$(_parallel_compact_list "$active_list" "$active_max")
@@ -105,32 +111,36 @@ _parallel_snapshot() {
         progress_pct=0
     fi
 
-    if [[ "${PARALLEL_PROGRESS_SHOW_ETA:-true}" == "true" ]] && ((done_count > 0)) && ((total_count > done_count)); then
+    if [[ "${PARALLEL_PROGRESS_SHOW_ETA:-true}" == "true" ]] && ((done_count >= 2)) && ((total_count > done_count)) && ((elapsed_batch >= 60)); then
         local avg remaining eta_seconds
         avg=$((elapsed_batch / done_count))
         remaining=$((total_count - done_count))
         eta_seconds=$((avg * remaining))
         eta=$(format_duration "$eta_seconds")
-    elif [[ "${PARALLEL_PROGRESS_SHOW_ETA:-true}" == "true" ]] && ((total_count > done_count)); then
-        eta="calculating..."
     fi
 
-    printf "Progress: %d/%d (%d%%) | elapsed %s" \
-        "$done_count" "$total_count" "$progress_pct" "$(format_duration "$elapsed_batch")"
-    if [[ "${PARALLEL_PROGRESS_SHOW_ETA:-true}" == "true" ]]; then
-        printf " | ETA ~%s" "$eta"
-    fi
-    printf "\n"
-
-    if [[ "${PARALLEL_PROGRESS_SHOW_ACTIVE:-true}" == "true" ]] && [[ "$active_fmt" != "none" || "$mode" == "trace" ]]; then
-        printf "Active: %s\n" "$active_fmt"
-    fi
-
-    if [[ "$mode" == "trace" ]]; then
-        printf "Done:   %s | Queue: %s pending\n" "$done_fmt" "$queue_count"
-    else
+    if declare -F ui_is_tty >/dev/null 2>&1 && ui_is_tty && declare -F ui_live_progress_update >/dev/null 2>&1; then
+        local line
+        line=$(printf "Progress: %d/%d (%d%%) | elapsed %s" \
+            "$done_count" "$total_count" "$progress_pct" "$(format_duration "$elapsed_batch")")
+        if [[ "${PARALLEL_PROGRESS_SHOW_ETA:-true}" == "true" ]]; then
+            line="${line} | ETA: ${eta}"
+        fi
+        if [[ "${PARALLEL_PROGRESS_SHOW_ACTIVE:-true}" == "true" ]] && [[ "$active_fmt" != "none" || "$mode" == "trace" ]]; then
+            line="${line} | Active: ${active_fmt}"
+        fi
+        if [[ "$mode" == "trace" ]]; then
+            line="${line} | Done: ${done_fmt}"
+        fi
         if [[ "$mode" != "clean" ]] || ((queue_count > 0)); then
-            printf "Queue: %s pending\n" "$queue_count"
+            line="${line} | Queue: ${queue_count}"
+        fi
+        if declare -F ui_live_progress_begin >/dev/null 2>&1; then
+            ui_live_progress_begin
+        fi
+        ui_live_progress_update "$line"
+        if ((total_count > 0)) && ((done_count >= total_count)) && declare -F ui_live_progress_end >/dev/null 2>&1; then
+            ui_live_progress_end
         fi
     fi
 }
@@ -385,6 +395,7 @@ parallel_funcs() {
 
         # Log if verbose (OUTPUT_VERBOSITY >= 2)
         if _parallel_should_show_started; then
+            _parallel_live_break
             printf "%b[*] Started %s (PID: %d)%b\n" "${cyan:-}" "$func" "${batch_pids[${#batch_pids[@]}-1]}" "${reset:-}"
         fi
 
@@ -467,6 +478,7 @@ parallel_funcs() {
                     done_list="${done_list}, ${batch_funcs[$idx]} ${dur_fmt}"
                 fi
                 if _parallel_should_show_finished "$rc" "$job_dur" "${_PARALLEL_LAST_BADGE:-OK}"; then
+                    _parallel_live_break
                     printf "%b[*] Finished %s (PID: %s, rc=%s)%b\n" "${cyan:-}" "${batch_funcs[$idx]}" "${batch_pids[$idx]}" "$rc" "${reset:-}"
                 fi
                 rm -f "${batch_logs[$idx]}" 2>/dev/null || true
@@ -564,6 +576,7 @@ parallel_funcs() {
                 done_list="${done_list}, ${batch_funcs[$idx]} ${dur_fmt}"
             fi
             if _parallel_should_show_finished "$rc" "$job_dur" "${_PARALLEL_LAST_BADGE:-OK}"; then
+                _parallel_live_break
                 printf "%b[*] Finished %s (PID: %s, rc=%s)%b\n" "${cyan:-}" "${batch_funcs[$idx]}" "${batch_pids[$idx]}" "$rc" "${reset:-}"
             fi
             rm -f "${batch_logs[$idx]}" 2>/dev/null || true

@@ -21,6 +21,7 @@ _UI_DRYRUN_COUNT=0
 _UI_DRYRUN_COMMANDS=()
 _UI_DRYRUN_FULL_COMMANDS=()
 _UI_DRYRUN_SHARED_FILE=""
+_UI_LIVE_ACTIVE=false
 
 ui_init() {
     # TTY detection
@@ -47,6 +48,36 @@ ui_init() {
 
 ui_is_tty() {
     [[ "$_UI_IS_TTY" == true ]]
+}
+
+ui_live_progress_begin() {
+    [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
+    ui_is_tty || return 0
+    _UI_LIVE_ACTIVE=true
+}
+
+ui_live_progress_update() {
+    [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
+    ui_is_tty || return 0
+    local line="$1"
+    _UI_LIVE_ACTIVE=true
+    printf "\r  %b%s%b\033[K" "${bblue:-}" "$line" "${reset:-}"
+}
+
+ui_live_progress_break() {
+    [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
+    ui_is_tty || return 0
+    [[ "$_UI_LIVE_ACTIVE" == true ]] || return 0
+    printf "\r\033[K"
+}
+
+ui_live_progress_end() {
+    [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
+    ui_is_tty || return 0
+    if [[ "$_UI_LIVE_ACTIVE" == true ]]; then
+        printf "\r\033[K"
+    fi
+    _UI_LIVE_ACTIVE=false
 }
 
 ui_count_inc() {
@@ -122,16 +153,16 @@ ui_progress() {
     counters=$(ui_counts_summary)
 
     if ui_is_tty; then
-        printf "\r  %b▸ [%d/%d] %d%% │ ETA: %s │ %s │ %s%b\033[K" \
-            "${bblue:-}" "$current" "$total" "$pct" "$eta" "$step" "$counters" "${reset:-}"
+        ui_live_progress_begin
+        ui_live_progress_update "▸ [${current}/${total}] ${pct}% | ETA: ${eta} | ${step} | ${counters}"
     else
-        printf "[%s] [%d/%d] %d%% | ETA: %s | %s | %s\n" \
-            "$(date +'%H:%M:%S')" "$current" "$total" "$pct" "$eta" "$step" "$counters"
+        :
     fi
 }
 
 ui_batch_start() {
     local label="$1" total_jobs="$2" batch_num="${3:-}" batch_total="${4:-}"
+    ui_live_progress_break
 
     if ui_is_tty; then
         printf "\n"
@@ -159,6 +190,7 @@ ui_batch_end() {
     local ok="$1" warn="$2" fail="$3" elapsed="$4"
     local skip="${5:-0}" cache="${6:-0}"
     local completed="${7:-0}" total="${8:-0}"
+    ui_live_progress_break
     printf "  %b── ok:%d warn:%d fail:%d skip:%d cache:%d │ %d/%d completed │ %ds elapsed ──%b\n" \
         "${bgreen:-}" "$ok" "$warn" "$fail" "$skip" "$cache" "$completed" "$total" "$elapsed" "${reset:-}"
 }
@@ -169,6 +201,7 @@ ui_summary() {
     local crit="${7:-0}" high="${8:-0}" med="${9:-0}" low="${10:-0}" info="${11:-0}"
     local debug_log="${DEBUG_LOG:-}"
 
+    ui_live_progress_end
     printf "\n"
     printf "RESULTS  %s\n" "$target"
     printf "Mode: %s\n" "$mode_label"
