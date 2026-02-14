@@ -651,12 +651,7 @@ function sub_active() {
 
             # Resolve subdomains using puredns
             if [[ -s ".tmp/subs_no_resolved.txt" ]]; then
-                run_command puredns resolve .tmp/subs_no_resolved.txt -w .tmp/subdomains_tmp.txt \
-                    -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
-                    -l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
-                    --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" \
-                    --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
-                    2>>"$LOGFILE" >/dev/null
+                _resolve_domains .tmp/subs_no_resolved.txt .tmp/subdomains_tmp.txt
             fi
         else
             # Update resolvers using axiom
@@ -743,11 +738,7 @@ function sub_tls() {
         if [[ $AXIOM != true ]]; then
             [[ $RESOLVER_IQ == true ]] && resolvers_optimize_local
             if [[ -s ".tmp/subdomains_tlsx_clean.txt" ]]; then
-                run_command puredns resolve .tmp/subdomains_tlsx_clean.txt -w .tmp/subdomains_tlsx_resolved.txt \
-                    -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
-                    -l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
-                    --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
-                    2>>"$LOGFILE" >/dev/null
+                _resolve_domains .tmp/subdomains_tlsx_clean.txt .tmp/subdomains_tlsx_resolved.txt
             fi
         else
             if [[ -s ".tmp/subdomains_tlsx_clean.txt" ]]; then
@@ -875,11 +866,7 @@ function sub_dns() {
         if [[ $AXIOM != true ]]; then
 
             if [[ -s ".tmp/subdomains_dns.txt" ]]; then
-                run_command puredns resolve .tmp/subdomains_dns.txt -w .tmp/subdomains_dns_resolved.txt \
-                    -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
-                    -l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
-                    --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
-                    2>>"$LOGFILE" >/dev/null
+                _resolve_domains .tmp/subdomains_dns.txt .tmp/subdomains_dns_resolved.txt
             fi
         else
 
@@ -938,18 +925,11 @@ function sub_brute() {
             wordlist="$subs_wordlist"
             [[ $DEEP == true ]] && wordlist="$subs_wordlist_big"
 
-            # Run puredns bruteforce
-            run_command puredns bruteforce "$wordlist" "$domain" -w .tmp/subs_brute.txt -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
-                -l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
-                --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
-                2>>"$LOGFILE" >/dev/null
+            _bruteforce_domains "$wordlist" "$domain" .tmp/subs_brute.txt
 
             # Resolve the subdomains
             if [[ -s ".tmp/subs_brute.txt" ]]; then
-                run_command puredns resolve .tmp/subs_brute.txt -w .tmp/subs_brute_valid.txt -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
-                    -l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
-                    --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
-                    2>>"$LOGFILE" >/dev/null
+                _resolve_domains .tmp/subs_brute.txt .tmp/subs_brute_valid.txt
             fi
 
         else
@@ -1105,10 +1085,7 @@ function sub_scraping() {
                 fi
 
                 if [[ -s ".tmp/scrap_subs.txt" ]]; then
-                    run_command puredns resolve .tmp/scrap_subs.txt -w .tmp/scrap_subs_resolved.txt -r "$resolvers" \
-                        --resolvers-trusted "$resolvers_trusted" -l "$PUREDNS_PUBLIC_LIMIT" \
-                        --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" \
-                        --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" 2>>"$LOGFILE" >/dev/null
+                    _resolve_domains .tmp/scrap_subs.txt .tmp/scrap_subs_resolved.txt
                 fi
 
                 if [[ $INSCOPE == true ]] && [[ -s ".tmp/scrap_subs_resolved.txt" ]]; then
@@ -1208,11 +1185,7 @@ function sub_analytics() {
                 if [[ $AXIOM != true ]]; then
 
                     if [[ -s ".tmp/analytics_subs_clean.txt" ]]; then
-                        run_command puredns resolve .tmp/analytics_subs_clean.txt -w .tmp/analytics_subs_resolved.txt \
-                            -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
-                            -l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
-                            --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
-                            2>>"$LOGFILE" >/dev/null
+                        _resolve_domains .tmp/analytics_subs_clean.txt .tmp/analytics_subs_resolved.txt
                     fi
                 else
 
@@ -1248,57 +1221,46 @@ function sub_analytics() {
     fi
 }
 
-_permutations_engine_selected() {
-    local engine="${PERMUTATIONS_ENGINE:-}"
-    if [[ -z "$engine" ]] && [[ -n "${PERMUTATIONS_OPTION:-}" ]]; then
-        engine="${PERMUTATIONS_OPTION}"
-    fi
-    [[ -z "$engine" ]] && engine="gotator"
+_select_permutations_wordlist() {
+    local source_file="$1"
+    local full_list="${WORDLISTS_DIR}/permutations_list.txt"
+    local short_list="${WORDLISTS_DIR}/permutations_list_short.txt"
+    local mode="${PERMUTATIONS_WORDLIST_MODE:-auto}"
+    local threshold="${PERMUTATIONS_SHORT_THRESHOLD:-100}"
 
-    case "$engine" in
-        gotator|ripgen|alterx|both)
-            printf '%s\n' "$engine"
+    case "$mode" in
+        full)  printf '%s\n' "$full_list" ;;
+        short) printf '%s\n' "$short_list" ;;
+        auto)
+            if [[ "${DEEP:-false}" == true ]]; then
+                printf '%s\n' "$full_list"
+                return
+            fi
+            local count=0
+            [[ -s "$source_file" ]] && count=$(wc -l < "$source_file" | tr -d ' ')
+            if (( count <= threshold )); then
+                printf '%s\n' "$full_list"
+            else
+                printf '%s\n' "$short_list"
+            fi
             ;;
-        *)
-            log_note "sub_permut: invalid permutations engine '${engine}', defaulting to gotator" "${FUNCNAME[0]}" "${LINENO}"
-            printf '%s\n' "gotator"
-            ;;
+        *) printf '%s\n' "$full_list" ;;
     esac
 }
 
-_run_permutation_engine_single() {
-    local engine="$1"
-    local source_file="$2"
-    case "$engine" in
-        gotator)
-            run_command gotator -sub "$source_file" -perm "${tools}/permutations_list.txt" $GOTATOR_FLAGS -silent 2>>"$LOGFILE"
-            ;;
-        ripgen)
-            run_command ripgen -d "$source_file" -w "${tools}/permutations_list.txt" 2>>"$LOGFILE"
-            ;;
-        alterx)
-            # alterx interface can vary by version; try list mode then stdin mode.
-            run_command alterx -l "$source_file" 2>>"$LOGFILE" || run_command alterx <"$source_file" 2>>"$LOGFILE"
-            ;;
-    esac
+_run_permutation_engine() {
+    local source_file="$1"
+    local wordlist
+    wordlist=$(_select_permutations_wordlist "$source_file")
+    run_command gotator -sub "$source_file" -perm "$wordlist" $GOTATOR_FLAGS -silent 2>>"$LOGFILE"
 }
 
 _generate_permutation_candidates() {
     local source_file="$1"
     local output_file="$2"
-    local engine
-    engine=$(_permutations_engine_selected)
     : >"$output_file"
     [[ -s "$source_file" ]] || return 0
-
-    if [[ "$engine" == "both" ]]; then
-        {
-            _run_permutation_engine_single "gotator" "$source_file"
-            _run_permutation_engine_single "alterx" "$source_file"
-        } | sed '/^\s*$/d' | head -c "$PERMUTATIONS_LIMIT" >"$output_file"
-    else
-        _run_permutation_engine_single "$engine" "$source_file" | sed '/^\s*$/d' | head -c "$PERMUTATIONS_LIMIT" >"$output_file"
-    fi
+    _run_permutation_engine "$source_file" | sed '/^\s*$/d' | head -c "$PERMUTATIONS_LIMIT" >"$output_file"
 }
 
 function sub_permut() {
@@ -1343,10 +1305,7 @@ function sub_permut() {
         # Resolve the permutations
         if [[ $AXIOM != true ]]; then
             if [[ -s ".tmp/gotator1.txt" ]]; then
-                run_command puredns resolve .tmp/gotator1.txt -w .tmp/permute1.txt -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
-                    -l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
-                    --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
-                    2>>"$LOGFILE" >/dev/null
+                _resolve_domains .tmp/gotator1.txt .tmp/permute1.txt
             fi
         else
             if [[ -s ".tmp/gotator1.txt" ]]; then
@@ -1363,10 +1322,7 @@ function sub_permut() {
         # Resolve the second round of permutations
         if [[ $AXIOM != true ]]; then
             if [[ -s ".tmp/gotator2.txt" ]]; then
-                run_command puredns resolve .tmp/gotator2.txt -w .tmp/permute2.txt -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
-                    -l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
-                    --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
-                    2>>"$LOGFILE" >/dev/null
+                _resolve_domains .tmp/gotator2.txt .tmp/permute2.txt
             fi
         else
             if [[ -s ".tmp/gotator2.txt" ]]; then
@@ -1455,10 +1411,7 @@ function sub_regex_permut() {
         if [[ $AXIOM != true ]]; then
 
             if [[ -s ".tmp/${domain}.brute" ]]; then
-                run_command puredns resolve ".tmp/${domain}.brute" -w .tmp/regulator.txt -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
-                    -l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
-                    --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
-                    2>>"$LOGFILE" >/dev/null
+                _resolve_domains ".tmp/${domain}.brute" .tmp/regulator.txt
             fi
         else
 
@@ -1526,10 +1479,7 @@ function sub_ia_permut() {
         if [[ $AXIOM != true ]]; then
 
             if [[ -s ".tmp/subwiz.txt" ]]; then
-                run_command puredns resolve ".tmp/subwiz.txt" -w .tmp/subwiz_resolved.txt -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
-                    -l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
-                    --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
-                    2>>"$LOGFILE" >/dev/null
+                _resolve_domains .tmp/subwiz.txt .tmp/subwiz_resolved.txt
             fi
         else
 
@@ -1615,10 +1565,7 @@ function sub_recursive_passive() {
             fi
 
             if [[ -s ".tmp/passive_recursive.txt" ]]; then
-                run_command puredns resolve .tmp/passive_recursive.txt -w .tmp/passive_recurs_tmp.txt -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
-                    -l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
-                    --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
-                    2>>"$LOGFILE" >/dev/null
+                _resolve_domains .tmp/passive_recursive.txt .tmp/passive_recurs_tmp.txt
             fi
 
         else
@@ -1699,10 +1646,7 @@ function sub_recursive_brute() {
 
             for subdomain_top in $(cat .tmp/subdomains_recurs_top.txt); do
                 if [[ $AXIOM != true ]]; then
-                    run_command puredns bruteforce "$subs_wordlist" "$subdomain_top" -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
-                        -l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
-                        --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
-                        -w .tmp/brute_recursive_result_part.txt 2>>"$LOGFILE" >/dev/null
+                    _bruteforce_domains "$subs_wordlist" "$subdomain_top" .tmp/brute_recursive_result_part.txt
                     cat .tmp/brute_recursive_result_part.txt | anew -q .tmp/brute_recursive.txt
                 else
                     run_command axiom-scan "$subs_wordlist" -m puredns-single "$subdomain_top" \
@@ -1720,11 +1664,7 @@ function sub_recursive_brute() {
             # Resolve permutations
             if [[ $AXIOM != true ]]; then
                 if [[ -s ".tmp/gotator1_recursive.txt" ]]; then
-                    run_command puredns resolve .tmp/gotator1_recursive.txt -w .tmp/permute1_recursive.txt \
-                        -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
-                        -l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
-                        --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
-                        2>>"$LOGFILE" >/dev/null
+                    _resolve_domains .tmp/gotator1_recursive.txt .tmp/permute1_recursive.txt
                 fi
             else
                 if [[ -s ".tmp/gotator1_recursive.txt" ]]; then
@@ -1742,11 +1682,7 @@ function sub_recursive_brute() {
             # Resolve second round of permutations
             if [[ $AXIOM != true ]]; then
                 if [[ -s ".tmp/gotator2_recursive.txt" ]]; then
-                    run_command puredns resolve .tmp/gotator2_recursive.txt -w .tmp/permute2_recursive.txt \
-                        -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
-                        -l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
-                        --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
-                        2>>"$LOGFILE" >/dev/null
+                    _resolve_domains .tmp/gotator2_recursive.txt .tmp/permute2_recursive.txt
                 fi
             else
                 if [[ -s ".tmp/gotator2_recursive.txt" ]]; then
@@ -1792,11 +1728,7 @@ function sub_recursive_brute() {
         # Final resolve
         if [[ $AXIOM != true ]]; then
             if [[ -s ".tmp/brute_perm_recursive.txt" ]]; then
-                run_command puredns resolve .tmp/brute_perm_recursive.txt -w .tmp/brute_perm_recursive_final.txt \
-                    -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
-                    -l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
-                    --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
-                    2>>"$LOGFILE" >/dev/null
+                _resolve_domains .tmp/brute_perm_recursive.txt .tmp/brute_perm_recursive_final.txt
             fi
         else
             if [[ -s ".tmp/brute_perm_recursive.txt" ]]; then

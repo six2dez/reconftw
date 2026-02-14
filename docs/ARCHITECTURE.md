@@ -62,6 +62,26 @@ Target Input → Sanitization → Phase Execution → Output Files
 - `deleteOutScoped(scopefile, targetfile)` - Remove out-of-scope entries
 - `run_command(cmd, args...)` - Execute with logging (respects DRY_RUN)
 
+### DNS Resolution Functions (utils.sh)
+
+All DNS resolution goes through two global wrappers that auto-select between puredns and dnsx based on the network environment:
+
+- `_get_local_ip()` - Get the primary local IP address (cross-platform). Uses `route -n get default` on macOS and `ip -4 route get 1.1.1.1` on Linux to find the correct interface regardless of naming.
+- `_ip_is_public_ipv4(ip)` - Conservative check for publicly routable IPv4. Treats RFC1918, CGNAT (100.64.0.0/10), loopback, link-local, multicast/reserved as non-public.
+- `_is_behind_nat()` - Detect if running behind NAT (or unknown network) by checking the primary local IP. Defaults to NAT-safe behavior if detection fails.
+- `init_dns_resolver()` - Evaluates resolver selection once per run and caches it in `DNS_RESOLVER_SELECTED` when `DNS_RESOLVER=auto`.
+- `_select_dns_resolver()` - Select DNS resolver based on `DNS_RESOLVER` config. `puredns`/`dnsx` force the resolver; `auto` uses the cached selection from `init_dns_resolver()` (with a safe fallback if unset).
+- `_resolve_domains(input_file, output_file)` - Resolve a list of domains. Uses puredns (massdns + wildcard filter) on VPS or dnsx (Go net resolver + basic wildcard threshold) behind NAT.
+- `_bruteforce_domains(wordlist, target_domain, output_file)` - Bruteforce subdomains. Equivalent to `puredns bruteforce wordlist domain` or `dnsx -d domain -w wordlist`.
+
+**Why two resolvers:** puredns uses massdns which sends raw UDP packets to thousands of resolvers simultaneously. This floods the NAT table on consumer routers and can kill connectivity. dnsx uses Go's standard net resolver through the OS networking stack, which is NAT-friendly but lacks puredns's advanced wildcard detection.
+
+### Permutation Functions (subdomains.sh)
+
+- `_select_permutations_wordlist(source_file)` - Choose wordlist based on `PERMUTATIONS_WORDLIST_MODE` and subdomain count. In `auto` mode: full list (849 words) for <=100 subs or DEEP mode, short list (162 words) for >100 subs.
+- `_run_permutation_engine(source_file)` - Run gotator with the auto-selected wordlist.
+- `_generate_permutation_candidates(source_file, output_file)` - Generate permutation candidates with byte-size limit.
+
 ### Validation Functions (lib/validation.sh)
 - `validate_domain(domain)` - Validate domain format
 - `validate_ipv4(ip)` - Validate IPv4 address
@@ -79,6 +99,10 @@ Target Input → Sanitization → Phase Execution → Output Files
 - `$DEEP_LIMIT` - Threshold for auto-deep mode
 - `$AXIOM` - Enable distributed scanning
 - `$*_THREADS` - Thread counts per tool
+- `$DNS_RESOLVER` - DNS resolver selection (`auto`|`puredns`|`dnsx`)
+- `$DNS_RESOLVER_SELECTED` - Cached resolver selection for this run (set by `init_dns_resolver()` when `DNS_RESOLVER=auto`)
+- `$PERMUTATIONS_WORDLIST_MODE` - Wordlist selection (`auto`|`full`|`short`)
+- `$PERMUTATIONS_SHORT_THRESHOLD` - Subdomain count threshold for short wordlist (default: 100)
 
 ## Error Codes
 

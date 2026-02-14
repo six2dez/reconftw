@@ -133,9 +133,9 @@ function ssrf_checks() {
 
             # Run FFUF with header injection for SSRF.
             _print_msg INFO "Running: FFUF for SSRF Requested Headers with callback tokens"
-            run_command ffuf -v -w ".tmp/tmp_ssrf.txt:W1,${tools}/headers_inject.txt:W2" -H "${HEADER}" -H "W2: ${COLLAB_SERVER_FIX}" -t "$FFUF_THREADS" \
+            run_command ffuf -v -w ".tmp/tmp_ssrf.txt:W1,${headers_inject}:W2" -H "${HEADER}" -H "W2: ${COLLAB_SERVER_FIX}" -t "$FFUF_THREADS" \
                 -rate "$FFUF_RATELIMIT" -u "W1" 2>/dev/null | anew -q "vulns/ssrf_requested_headers.txt"
-            run_command ffuf -v -w ".tmp/tmp_ssrf.txt:W1,${tools}/headers_inject.txt:W2" -H "${HEADER}" -H "W2: ${COLLAB_SERVER_URL}" -t "$FFUF_THREADS" \
+            run_command ffuf -v -w ".tmp/tmp_ssrf.txt:W1,${headers_inject}:W2" -H "${HEADER}" -H "W2: ${COLLAB_SERVER_URL}" -t "$FFUF_THREADS" \
                 -rate "$FFUF_RATELIMIT" -u "W1" 2>/dev/null | anew -q "vulns/ssrf_requested_headers.txt"
 
             # Additional protocol payloads (gopher/dict/file/metadata endpoints).

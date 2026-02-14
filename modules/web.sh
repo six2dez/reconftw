@@ -1712,7 +1712,7 @@ function jschecks() {
                     done < <(cut -d' ' -f2 js/js_secrets.txt)
                 fi
                 run_command trufflehog filesystem .tmp/sourcemapper/ -j 2>/dev/null | jq -c | anew -q js/js_secrets_jsmap.txt
-                find .tmp/sourcemapper/ -type f -name "*.js" | run_command jsluice secrets -j --patterns="${tools}/jsluice_patterns.json" | anew -q js/js_secrets_jsmap_jsluice.txt
+                find .tmp/sourcemapper/ -type f -name "*.js" | run_command jsluice secrets -j --patterns="${PATTERNS_DIR}/jsluice_patterns.json" | anew -q js/js_secrets_jsmap_jsluice.txt
             fi
 
             [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && printf "%bRunning: Building wordlist 6/6%b\n" "$yellow" "$reset"

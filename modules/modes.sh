@@ -105,6 +105,9 @@ function start() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
     enable_command_trace
 
+    # Cache resolver selection once per run (auto mode detects NAT/CGNAT and picks dnsx vs puredns).
+    init_dns_resolver
+
     # Rotate old log files
     rotate_logs "${dir}/.log" "${MAX_LOG_FILES:-10}" "${MAX_LOG_AGE_DAYS:-30}"
 
@@ -577,6 +580,7 @@ function multi_osint() {
     DEBUG_LOG="${workdir}/debug.log"
     touch "$DEBUG_LOG"
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
+    init_dns_resolver
     enable_command_trace
 
     while IFS= read -r domain; do
@@ -779,6 +783,7 @@ function multi_recon() {
     DEBUG_LOG="${workdir}/debug.log"
     touch "$DEBUG_LOG"
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
+    init_dns_resolver
 
     [ -n "$flist" ] && LISTTOTAL=$(wc -l <"$flist")
 
@@ -1003,6 +1008,7 @@ function multi_custom() {
     touch "$DEBUG_LOG"
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] Start ${NOW} ${NOWT}" >"${LOGFILE}"
     enable_command_trace
+    init_dns_resolver
 
     [ -n "$flist" ] && entries=$(wc -l <"$flist")
 

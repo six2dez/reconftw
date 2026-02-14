@@ -211,13 +211,12 @@ declare -A gotools=(
     ["crlfuzz"]="go install -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest"
     ["dalfox"]="go install -v github.com/hahwul/dalfox/v2@latest"
     ["puredns"]="go install -v github.com/d3mondev/puredns/v2@latest"
-    ["interactsh-client"]="go install -v github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest"
-    ["analyticsrelationships"]="go install -v github.com/Josue87/analyticsrelationships@latest"
-    ["gotator"]="go install -v github.com/Josue87/gotator@latest"
-    ["alterx"]="go install -v github.com/projectdiscovery/alterx/cmd/alterx@latest"
-    ["roboxtractor"]="go install -v github.com/Josue87/roboxtractor@latest"
-    ["mapcidr"]="go install -v github.com/projectdiscovery/mapcidr/cmd/mapcidr@latest"
-    ["cdncheck"]="go install -v github.com/projectdiscovery/cdncheck/cmd/cdncheck@latest"
+	    ["interactsh-client"]="go install -v github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest"
+	    ["analyticsrelationships"]="go install -v github.com/Josue87/analyticsrelationships@latest"
+	    ["gotator"]="go install -v github.com/Josue87/gotator@latest"
+	    ["roboxtractor"]="go install -v github.com/Josue87/roboxtractor@latest"
+	    ["mapcidr"]="go install -v github.com/projectdiscovery/mapcidr/cmd/mapcidr@latest"
+	    ["cdncheck"]="go install -v github.com/projectdiscovery/cdncheck/cmd/cdncheck@latest"
     ["dnstake"]="go install -v github.com/pwnesia/dnstake/cmd/dnstake@latest"
     ["tlsx"]="go install -v github.com/projectdiscovery/tlsx/cmd/tlsx@latest"
     ["gitdorks_go"]="go install -v github.com/damit5/gitdorks_go@latest"
@@ -805,12 +804,11 @@ function install_apt() {
     # Move chromium browser dependencies (required by `nuclei -headless -id screenshot`) into a separate apt install command, and add a fallback for Ubuntu 24.04 (where `libasound2` is renamed to `libasound2t64`)
     $SUDO apt-get install -y libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon-x11-0 libxcomposite-dev libxdamage1 libxrandr2 libgbm-dev libpangocairo-1.0-0 libasound2 &>/dev/null \
         || $SUDO apt-get install -y libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon-x11-0 libxcomposite-dev libxdamage1 libxrandr2 libgbm-dev libpangocairo-1.0-0 libasound2t64 &>/dev/null
-    curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
-    source "${HOME}/.cargo/env"
-    cargo install ripgen &>/dev/null
-    cargo install smugglex &>/dev/null
-    pipx ensurepath -f &>/dev/null
-    # Install shodan CLI in isolated environment to avoid PEP 668 conflicts
+	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
+	source "${HOME}/.cargo/env"
+	cargo install smugglex &>/dev/null
+	pipx ensurepath -f &>/dev/null
+	# Install shodan CLI in isolated environment to avoid PEP 668 conflicts
     pipx install shodan &>/dev/null || pipx upgrade shodan &>/dev/null || true
 }
 
@@ -822,11 +820,10 @@ function install_brew() {
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     fi
     brew update &>/dev/null
-    brew install --formula bash coreutils gnu-getopt gnu-sed python pipx massdns jq gcc cmake ruby git curl wget zip pv bind whois nmap lynx medusa shodan &>/dev/null
-    brew install rustup &>/dev/null
-    rustup-init -y &>/dev/null
-    cargo install ripgen &>/dev/null
-    cargo install smugglex &>/dev/null
+	brew install --formula bash coreutils gnu-getopt gnu-sed python pipx massdns jq gcc cmake ruby git curl wget zip pv bind whois nmap lynx medusa shodan &>/dev/null
+	brew install rustup &>/dev/null
+	rustup-init -y &>/dev/null
+	cargo install smugglex &>/dev/null
 }
 
 # Function to install required packages for RedHat-based systems
@@ -889,24 +886,22 @@ function install_yum() {
         python3 -m pip install --user -U pip pipx &>/dev/null || true
         export PATH="$HOME/.local/bin:$PATH"
     fi
-    curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
-    source "${HOME}/.cargo/env"
-    cargo install ripgen &>/dev/null
-    cargo install smugglex &>/dev/null
-    # Ensure pipx path and install shodan CLI
-    pipx ensurepath -f &>/dev/null || true
+	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
+	source "${HOME}/.cargo/env"
+	cargo install smugglex &>/dev/null
+	# Ensure pipx path and install shodan CLI
+	pipx ensurepath -f &>/dev/null || true
     pipx install shodan &>/dev/null || pipx upgrade shodan &>/dev/null || true
 }
 
 # Function to install required packages for Arch-based systems
 function install_pacman() {
     $SUDO pacman -Sy --noconfirm python python-pip base-devel gcc cmake ruby git curl libpcap python-pipx whois wget zip pv bind openssl libffi libxml2 libxslt zlib nmap jq lynx medusa xorg-server-xvfb &>/dev/null
-    curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
-    source "${HOME}/.cargo/env"
-    cargo install ripgen &>/dev/null
-    cargo install smugglex &>/dev/null
-    # Ensure pipx path and install shodan CLI
-    pipx ensurepath -f &>/dev/null || true
+	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
+	source "${HOME}/.cargo/env"
+	cargo install smugglex &>/dev/null
+	# Ensure pipx path and install shodan CLI
+	pipx ensurepath -f &>/dev/null || true
     pipx install shodan &>/dev/null || pipx upgrade shodan &>/dev/null || true
 }
 
@@ -1035,21 +1030,14 @@ function initial_setup() {
 
     mkdir -p ${HOME}/.config/notify
     # Download required files with error handling
-    declare -A downloads=(
-        ["notify_provider_config"]="https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw ${HOME}/.config/notify/provider-config.yaml"
-        ["getjswords"]="https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py ${tools}/getjswords.py"
-        ["subdomains_huge"]="https://raw.githubusercontent.com/n0kovo/n0kovo_subdomains/main/n0kovo_subdomains_huge.txt ${subs_wordlist_big}"
-        ["trusted_resolvers"]="https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw ${resolvers_trusted}"
-        ["resolvers"]="https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt ${resolvers}"
-        ["subs_wordlist"]="https://gist.github.com/six2dez/a307a04a222fab5a57466c51e1569acf/raw ${subs_wordlist}"
-        ["permutations_list"]="https://gist.github.com/six2dez/ffc2b14d283e8f8eff6ac83e20a3c4b4/raw ${tools}/permutations_list.txt"
-        ["fuzz_wordlist"]="https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt ${fuzz_wordlist}"
-        ["lfi_wordlist"]="https://gist.githubusercontent.com/six2dez/a89a0c7861d49bb61a09822d272d5395/raw ${lfi_wordlist}"
-        ["ssti_wordlist"]="https://gist.githubusercontent.com/six2dez/ab5277b11da7369bf4e9db72b49ad3c1/raw ${ssti_wordlist}"
-        ["headers_inject"]="https://gist.github.com/six2dez/d62ab8f8ffd28e1c206d401081d977ae/raw ${tools}/headers_inject.txt"
-        ["axiom_config"]="https://gist.githubusercontent.com/six2dez/6e2d9f4932fd38d84610eb851014b26e/raw ${tools}/axiom_config.sh"
-        ["jsluice_patterns"]="https://gist.githubusercontent.com/six2dez/2aafa8dc2b682bb0081684e71900e747/raw ${tools}/jsluice_patterns.json"
-    )
+	    declare -A downloads=(
+	        ["notify_provider_config"]="https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw ${HOME}/.config/notify/provider-config.yaml"
+	        ["getjswords"]="https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py ${tools}/getjswords.py"
+	        ["subdomains_huge"]="https://raw.githubusercontent.com/n0kovo/n0kovo_subdomains/main/n0kovo_subdomains_huge.txt ${subs_wordlist_big}"
+	        ["trusted_resolvers"]="https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw ${resolvers_trusted}"
+	        ["resolvers"]="https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt ${resolvers}"
+	        ["axiom_config"]="https://gist.githubusercontent.com/six2dez/6e2d9f4932fd38d84610eb851014b26e/raw ${tools}/axiom_config.sh"
+	    )
 
     for key in "${!downloads[@]}"; do
         url="${downloads[$key]% *}"

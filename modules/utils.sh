@@ -107,10 +107,28 @@ function validate_config() {
         warnings=$((warnings + 1))
     fi
 
-    # Compat / deprecations (one-release window).
-    if [[ -n "${PERMUTATIONS_OPTION:-}" && -z "${PERMUTATIONS_ENGINE:-}" ]]; then
-        print_warnf "PERMUTATIONS_OPTION is deprecated; use PERMUTATIONS_ENGINE (got '%s')" "$PERMUTATIONS_OPTION"
+    # Validate enum-like config knobs (warn-only; runtime uses safe defaults)
+    if [[ -n "${PERMUTATIONS_ENGINE:-}" && "${PERMUTATIONS_ENGINE}" != "gotator" ]]; then
+        print_warnf "PERMUTATIONS_ENGINE now only supports 'gotator' (got '%s')" "$PERMUTATIONS_ENGINE"
         warnings=$((warnings + 1))
+    fi
+    if [[ -n "${PERMUTATIONS_WORDLIST_MODE:-}" ]]; then
+        case "${PERMUTATIONS_WORDLIST_MODE}" in
+            auto|full|short) : ;;
+            *)
+                print_warnf "PERMUTATIONS_WORDLIST_MODE invalid: '%s' (use auto|full|short)" "$PERMUTATIONS_WORDLIST_MODE"
+                warnings=$((warnings + 1))
+                ;;
+        esac
+    fi
+    if [[ -n "${DNS_RESOLVER:-}" ]]; then
+        case "${DNS_RESOLVER}" in
+            auto|puredns|dnsx) : ;;
+            *)
+                print_warnf "DNS_RESOLVER invalid: '%s' (use auto|puredns|dnsx)" "$DNS_RESOLVER"
+                warnings=$((warnings + 1))
+                ;;
+        esac
     fi
     for deprecated in CORS OPEN_REDIRECT PROTO_POLLUTION FAVICON; do
         if [[ -n "${!deprecated:-}" ]]; then
@@ -130,7 +148,7 @@ function validate_config() {
     fi
 
     # Validate numeric thread/rate variables
-    for var in FFUF_THREADS HTTPX_THREADS DALFOX_THREADS KATANA_THREADS HTTPX_RATELIMIT NUCLEI_RATELIMIT FFUF_RATELIMIT; do
+    for var in FFUF_THREADS HTTPX_THREADS DALFOX_THREADS KATANA_THREADS HTTPX_RATELIMIT NUCLEI_RATELIMIT FFUF_RATELIMIT DNSX_THREADS DNSX_RATE_LIMIT PERMUTATIONS_SHORT_THRESHOLD; do
         if [[ -n "${!var:-}" && ! "${!var}" =~ ^[0-9]+$ ]]; then
             print_errorf "%s must be numeric, got: %s" "$var" "${!var}"
             errors=$((errors + 1))
@@ -947,4 +965,190 @@ function circuit_breaker_record_success() {
     local tool="$1"
     CIRCUIT_BREAKER_FAILURES[$tool]=0
     CIRCUIT_BREAKER_STATE[$tool]="closed"
+}
+
+###############################################################################################################
+########################################## DNS RESOLVER AUTO-DETECTION ########################################
+###############################################################################################################
+
+# Get the primary local IP address (cross-platform: macOS + Linux).
+# Uses the default route to find the correct interface/IP regardless of naming.
+_get_local_ip() {
+    local ip=""
+    if [[ "$(uname)" == "Darwin" ]]; then
+        # Get the interface used for the default route (not hardcoded to en0/en1)
+        local iface
+        iface=$(route -n get default 2>/dev/null | awk '/interface:/{print $2}')
+        [[ -n "$iface" ]] && ip=$(ipconfig getifaddr "$iface" 2>/dev/null)
+    else
+        # Use ip route to find the src IP for outbound traffic (works on all Linux)
+        ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1); exit}')
+        # Fallback to hostname -I if ip route fails
+        [[ -z "$ip" ]] && ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+    fi
+    echo "$ip"
+}
+
+# Cached resolver selection for this run when DNS_RESOLVER=auto (set by init_dns_resolver()).
+DNS_RESOLVER_SELECTED="${DNS_RESOLVER_SELECTED:-}"
+
+# Return 0 if the IP looks like a publicly routable IPv4 address.
+# Conservative: anything unknown/unroutable returns false (so we default to dnsx).
+_ip_is_public_ipv4() {
+    local ip="$1"
+    local o1 o2 o3 o4
+
+    [[ -z "$ip" ]] && return 1
+    if [[ "$ip" =~ ^([0-9]{1,3})\\.([0-9]{1,3})\\.([0-9]{1,3})\\.([0-9]{1,3})$ ]]; then
+        o1="${BASH_REMATCH[1]}"
+        o2="${BASH_REMATCH[2]}"
+        o3="${BASH_REMATCH[3]}"
+        o4="${BASH_REMATCH[4]}"
+    else
+        return 1
+    fi
+
+    for o in "$o1" "$o2" "$o3" "$o4"; do
+        [[ "$o" =~ ^[0-9]+$ ]] || return 1
+        (( o >= 0 && o <= 255 )) || return 1
+    done
+
+    # Non-routable ranges
+    (( o1 == 0 )) && return 1
+    (( o1 == 10 )) && return 1
+    (( o1 == 127 )) && return 1
+    (( o1 == 169 && o2 == 254 )) && return 1 # link-local
+    (( o1 == 172 && o2 >= 16 && o2 <= 31 )) && return 1
+    (( o1 == 192 && o2 == 168 )) && return 1
+    (( o1 == 100 && o2 >= 64 && o2 <= 127 )) && return 1 # CGNAT (100.64.0.0/10)
+    (( o1 >= 224 )) && return 1                           # multicast/reserved/broadcast
+
+    return 0
+}
+
+# Detect if running behind NAT (home router / CGNAT / unknown network) by checking local IP.
+# Returns 0 (true) if behind NAT or undetectable, 1 (false) if public IP (VPS/dedicated).
+_is_behind_nat() {
+    local ip
+    ip=$(_get_local_ip)
+    _ip_is_public_ipv4 "$ip" && return 1
+    return 0
+}
+
+# Initialize and cache DNS resolver selection (evaluate once per run).
+# Must be called after config is loaded.
+init_dns_resolver() {
+    local mode="${DNS_RESOLVER:-auto}"
+    local ip
+    ip=$(_get_local_ip)
+
+    DNS_RESOLVER_SELECTED=""
+    case "$mode" in
+        puredns|dnsx)
+            DNS_RESOLVER_SELECTED="$mode"
+            ;;
+        auto|"")
+            if _ip_is_public_ipv4 "$ip"; then
+                DNS_RESOLVER_SELECTED="puredns"
+            else
+                DNS_RESOLVER_SELECTED="dnsx"
+            fi
+            ;;
+        *)
+            print_warnf "DNS_RESOLVER invalid: '%s' (use auto|puredns|dnsx). Defaulting to auto." "$mode"
+            if _ip_is_public_ipv4 "$ip"; then
+                DNS_RESOLVER_SELECTED="puredns"
+            else
+                DNS_RESOLVER_SELECTED="dnsx"
+            fi
+            ;;
+    esac
+
+    export DNS_RESOLVER_SELECTED
+    printf "[%s] DNS resolver selected: %s (DNS_RESOLVER=%s, local_ip=%s)\n" \
+        "$(date +'%Y-%m-%d %H:%M:%S')" "$DNS_RESOLVER_SELECTED" "${DNS_RESOLVER:-auto}" "${ip:-}" >>"${LOGFILE:-/dev/null}"
+}
+
+# Select DNS resolver based on DNS_RESOLVER config and NAT detection.
+# Returns "puredns" or "dnsx".
+_select_dns_resolver() {
+    local mode="${DNS_RESOLVER:-auto}"
+    case "$mode" in
+        puredns) echo "puredns" ;;
+        dnsx)    echo "dnsx" ;;
+        auto|"")
+            if [[ -n "${DNS_RESOLVER_SELECTED:-}" ]]; then
+                echo "$DNS_RESOLVER_SELECTED"
+            elif _is_behind_nat; then
+                echo "dnsx"
+            else
+                echo "puredns"
+            fi
+            ;;
+        *)
+            # Invalid values behave like auto (safe default behind NAT/unknown networks).
+            if [[ -n "${DNS_RESOLVER_SELECTED:-}" ]]; then
+                echo "$DNS_RESOLVER_SELECTED"
+            elif _is_behind_nat; then
+                echo "dnsx"
+            else
+                echo "puredns"
+            fi
+            ;;
+    esac
+}
+
+# Resolve a list of domains using the auto-selected resolver.
+# Usage: _resolve_domains <input_file> <output_file>
+# Replaces all direct puredns resolve calls for consistent NAT-safe behavior.
+_resolve_domains() {
+    local input_file="$1"
+    local output_file="$2"
+    local resolver
+    resolver=$(_select_dns_resolver)
+
+    if [[ "$resolver" == "dnsx" ]]; then
+        run_command dnsx -l "$input_file" -silent -retry 2 \
+            -t "${DNSX_THREADS:-25}" -rl "${DNSX_RATE_LIMIT:-100}" \
+            -r "$resolvers_trusted" -wt 5 2>>"$LOGFILE" \
+            | cut -d' ' -f1 | sort -u > "$output_file"
+    else
+        run_command puredns resolve "$input_file" -w "$output_file" \
+            -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
+            -l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
+            --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" \
+            --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
+            2>>"$LOGFILE" >/dev/null
+    fi
+}
+
+# Bruteforce subdomains using the auto-selected resolver.
+# Usage: _bruteforce_domains <wordlist> <target_domain> <output_file>
+#
+# puredns bruteforce: wordlist + domain → massdns raw UDP → wildcard filter → trusted validation
+# dnsx equivalent:    -d domain -w wordlist → Go net resolver → wt threshold filter
+#
+# dnsx -d domain -w wordlist generates word.domain combinations and resolves them.
+# -wt 5 filters wildcards where >5 subdomains resolve to the same IP (basic heuristic,
+# less robust than puredns's wildcard detection but safe for home routers).
+_bruteforce_domains() {
+    local wordlist="$1"
+    local target_domain="$2"
+    local output_file="$3"
+    local resolver
+    resolver=$(_select_dns_resolver)
+
+    if [[ "$resolver" == "dnsx" ]]; then
+        run_command dnsx -d "$target_domain" -w "$wordlist" -silent -retry 2 \
+            -t "${DNSX_THREADS:-25}" -rl "${DNSX_RATE_LIMIT:-100}" \
+            -r "$resolvers_trusted" -wt 5 2>>"$LOGFILE" \
+            | cut -d' ' -f1 | sort -u > "$output_file"
+    else
+        run_command puredns bruteforce "$wordlist" "$target_domain" \
+            -w "$output_file" -r "$resolvers" --resolvers-trusted "$resolvers_trusted" \
+            -l "$PUREDNS_PUBLIC_LIMIT" --rate-limit-trusted "$PUREDNS_TRUSTED_LIMIT" \
+            --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" \
+            --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
+            2>>"$LOGFILE" >/dev/null
+    fi
 }

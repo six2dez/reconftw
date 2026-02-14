@@ -11,13 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `nuclei_dast` module: dedicated `nuclei -dast` pass over `webs/`, `url_extract`, and `gf/` candidates (outputs `nuclei_output/dast_json.txt`, `vulns/nuclei_dast.txt`).
 - Portscan strategy `PORTSCAN_STRATEGY=naabu_nmap`: naabu pre-discovery + targeted nmap outputs (`hosts/naabu_open.txt`, `hosts/portscan_active_targeted.*`).
 - Optional UDP scan: `PORTSCAN_UDP=true` produces `hosts/portscan_active_udp.*`.
-- Subdomain permutation engine `alterx` and `PERMUTATIONS_ENGINE=both` (gotator + alterx merged), with `PERMUTATIONS_OPTION` kept as a legacy alias.
 - Monitor alert threshold `MONITOR_MIN_SEVERITY` (critical|high|medium|low|info).
 - SSRF alternate protocol payload pass via `config/ssrf_payloads.txt` (output `vulns/ssrf_alt_protocols.txt`).
 - Katana headless profile selection: `KATANA_HEADLESS_PROFILE=off|smart|full`.
 - DEEP-only ffuf recursion: `FUZZ_RECURSION_DEPTH`.
 - CDN origin discovery (best-effort) via `hakoriginfinder` with `CDN_BYPASS=true` (output `hosts/origin_ips.txt`).
 - Password dictionary engine `cewl` (Ruby gem) with tuning knobs.
+- Adaptive permutation wordlist: `PERMUTATIONS_WORDLIST_MODE=auto|full|short` with `PERMUTATIONS_SHORT_THRESHOLD=100`. Uses a curated 162-word list for large targets (>100 subs) and the full 849-word list for small targets or DEEP mode.
+- Auto-detection of DNS resolver: `DNS_RESOLVER=auto|puredns|dnsx`. Detects if running behind NAT/CGNAT (non-public IPv4) and switches to dnsx (Go net resolver, safe for home routers) instead of puredns (massdns raw UDP sockets that can overwhelm consumer router NAT tables). Configurable with `DNSX_THREADS` and `DNSX_RATE_LIMIT`.
+- Global DNS resolution wrappers `_resolve_domains()` and `_bruteforce_domains()` in `modules/utils.sh` — all 16 puredns call sites now use these wrappers for consistent resolver selection.
+- Cross-platform local IP detection via `_get_local_ip()` using default route (works on any macOS/Linux interface naming).
+- DNS permutation benchmark script `benchmark_dns_permutations.sh` for comparing gotator, alterx, and ripgen.
+- Built-in wordlists and patterns are now vendored in-repo under `data/` (wordlists: `data/wordlists/`, patterns: `data/patterns/`). Config exposes `DATA_DIR`, `WORDLISTS_DIR`, and `PATTERNS_DIR`.
 
 ### Changed
 - Fixed `webprobe_simple()` httpx merge bug (probe output now correctly merged with prior cache).
@@ -26,14 +31,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ssti`: if `tinja` is missing, the module warns and skips (no automatic ffuf fallback).
 - `iishortname`: uses `shortscan` only (sns removed).
 - `nuclei_dast`: when vuln scanning is enabled (`VULNS_GENERAL=true`, e.g. `-a`), the DAST pass is force-enabled to avoid accidental coverage loss.
+- Permutation engine simplified to gotator-only (benchmark showed gotator produces the best quality permutations with exclusive valid findings that other tools miss).
+- DNS resolver auto-selection is evaluated once per run and cached (see `DNS_RESOLVER_SELECTED` via `init_dns_resolver()`).
 
 ### Removed
 - Obsolete tool-based modules: `cors` (Corsy), `open_redirect` (Oralyzer), `prototype_pollution` (ppmap), favicon real-IP discovery (fav-up).
 - Deprecated/removed config flags: `CORS`, `OPEN_REDIRECT`, `PROTO_POLLUTION`, `FAVICON`.
+- Permutation engines `ripgen`, `alterx`, and `PERMUTATIONS_ENGINE=both` option. Gotator is now the only permutation engine (benchmark winner: best yield, exclusive findings, fastest).
+- Legacy `PERMUTATIONS_OPTION` alias.
 
 ### Migration Notes
 - Prefer Nuclei templates (and `nuclei_dast`) for CORS/open-redirect/prototype-pollution coverage.
-- Use `PERMUTATIONS_ENGINE` (legacy `PERMUTATIONS_OPTION` is still accepted with a warning for a compatibility window).
+- `PERMUTATIONS_ENGINE` now only accepts `gotator`. Remove any `ripgen`/`alterx`/`both` values from custom configs.
+- If running from home/behind NAT, the resolver auto-detection will use dnsx automatically. Set `DNS_RESOLVER=puredns` to force puredns on VPS.
 
 ## [v4.0] - 2026-02-06
 
