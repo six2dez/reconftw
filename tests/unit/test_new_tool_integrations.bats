@@ -188,3 +188,45 @@ SH
   [ -s "osint/postman_leaks.txt" ]
   grep -q "postman.new.example.com" "osint/postman_leaks.txt"
 }
+
+@test "nuclei_dast is forced on when VULNS_GENERAL=true" {
+  mkdir -p webs .tmp gf vulns nuclei_output
+  printf 'https://target.example.com\n' > webs/webs_all.txt
+
+  # Mock nuclei: write one JSON line when -o <file> is used; no-op for update calls.
+  cat > "$MOCK_BIN/nuclei" <<'SH'
+#!/usr/bin/env bash
+outfile=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o)
+      outfile="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+if [[ -n "$outfile" ]]; then
+  mkdir -p "$(dirname "$outfile")"
+  printf '%s\n' '{"template-id":"mock-dast","type":"http","info":{"severity":"high"},"host":"https://target.example.com","matched-at":"https://target.example.com/"}' > "$outfile"
+fi
+exit 0
+SH
+  chmod +x "$MOCK_BIN/nuclei"
+
+  export VULNS_GENERAL=true
+  export NUCLEI_DAST=false
+  export NUCLEI_RATELIMIT=10
+  export DEEP=false
+  export DEEP_LIMIT2=1500
+  export NUCLEI_TEMPLATES_PATH="$TEST_DIR/nuclei-templates"
+  mkdir -p "$NUCLEI_TEMPLATES_PATH/dast"
+
+  run nuclei_dast
+  [ "$status" -eq 0 ]
+  [ -s "nuclei_output/dast_json.txt" ]
+  [ -s "vulns/nuclei_dast.txt" ]
+  grep -q "mock-dast" "vulns/nuclei_dast.txt"
+}

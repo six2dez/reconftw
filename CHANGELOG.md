@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `nuclei_dast` module: dedicated `nuclei -dast` pass over `webs/`, `url_extract`, and `gf/` candidates (outputs `nuclei_output/dast_json.txt`, `vulns/nuclei_dast.txt`).
+- Portscan strategy `PORTSCAN_STRATEGY=naabu_nmap`: naabu pre-discovery + targeted nmap outputs (`hosts/naabu_open.txt`, `hosts/portscan_active_targeted.*`).
+- Optional UDP scan: `PORTSCAN_UDP=true` produces `hosts/portscan_active_udp.*`.
+- Subdomain permutation engine `alterx` and `PERMUTATIONS_ENGINE=both` (gotator + alterx merged), with `PERMUTATIONS_OPTION` kept as a legacy alias.
+- Monitor alert threshold `MONITOR_MIN_SEVERITY` (critical|high|medium|low|info).
+- SSRF alternate protocol payload pass via `config/ssrf_payloads.txt` (output `vulns/ssrf_alt_protocols.txt`).
+- Katana headless profile selection: `KATANA_HEADLESS_PROFILE=off|smart|full`.
+- DEEP-only ffuf recursion: `FUZZ_RECURSION_DEPTH`.
+- CDN origin discovery (best-effort) via `hakoriginfinder` with `CDN_BYPASS=true` (output `hosts/origin_ips.txt`).
+- Password dictionary engine `cewl` (Ruby gem) with tuning knobs.
+
+### Changed
+- Fixed `webprobe_simple()` httpx merge bug (probe output now correctly merged with prior cache).
+- Wrapped local `wafw00f` execution with `run_command` for dry-run/log consistency.
+- `PORTSCAN_ACTIVE_OPTIONS` default no longer includes `--script vulners`; moved to `PORTSCAN_DEEP_OPTIONS`.
+- `ssti`: if `tinja` is missing, the module warns and skips (no automatic ffuf fallback).
+- `iishortname`: uses `shortscan` only (sns removed).
+- `nuclei_dast`: when vuln scanning is enabled (`VULNS_GENERAL=true`, e.g. `-a`), the DAST pass is force-enabled to avoid accidental coverage loss.
+
+### Removed
+- Obsolete tool-based modules: `cors` (Corsy), `open_redirect` (Oralyzer), `prototype_pollution` (ppmap), favicon real-IP discovery (fav-up).
+- Deprecated/removed config flags: `CORS`, `OPEN_REDIRECT`, `PROTO_POLLUTION`, `FAVICON`.
+
+### Migration Notes
+- Prefer Nuclei templates (and `nuclei_dast`) for CORS/open-redirect/prototype-pollution coverage.
+- Use `PERMUTATIONS_ENGINE` (legacy `PERMUTATIONS_OPTION` is still accepted with a warning for a compatibility window).
+
 ## [v4.0] - 2026-02-06
 
 ### Added

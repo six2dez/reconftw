@@ -64,3 +64,28 @@ teardown() {
   run _monitor_mark_alert_seen "critical" "https://a.example.com"
   [ "$status" -eq 1 ]
 }
+
+@test "monitor_snapshot honors MONITOR_MIN_SEVERITY=medium and includes medium deltas" {
+  mkdir -p nuclei_output
+  export MONITOR_MIN_SEVERITY="medium"
+
+  printf 'a.example.com\n' > subdomains/subdomains.txt
+  printf 'https://a.example.com\n' > webs/webs_all.txt
+  printf '[tpl-c] [http] [critical] https://a.example.com\n' > nuclei_output/critical.txt
+  printf '[tpl-m] [http] [medium] https://a.example.com\n' > nuclei_output/medium.txt
+
+  export MONITOR_CYCLE=1
+  monitor_snapshot
+
+  printf 'b.example.com\n' >> subdomains/subdomains.txt
+  printf 'https://b.example.com\n' >> webs/webs_all.txt
+  printf '[tpl-m] [http] [medium] https://b.example.com\n' >> nuclei_output/medium.txt
+
+  export MONITOR_CYCLE=2
+  run monitor_snapshot
+  [ "$status" -eq 0 ]
+
+  latest_dir=".incremental/history/$(readlink .incremental/history/latest)"
+  [ -f "$latest_dir/medium_new.txt" ]
+  grep -q "b.example.com" "$latest_dir/medium_new.txt"
+}

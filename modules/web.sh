@@ -1,7 +1,7 @@
 #!/bin/bash
 # shellcheck disable=SC2154  # Variables defined in reconftw.cfg
 # reconFTW - Web analysis module
-# Contains: webprobe_simple, webprobe_full, screenshot, virtualhosts, favicon,
+# Contains: webprobe_simple, webprobe_full, screenshot, virtualhosts,
 #           favirecon_tech,
 #           portscan, cdnprovider, waf_checks, nuclei_check, graphql_scan,
 #           param_discovery, grpc_reflection, fuzz, iishortname, cms_scanner,
@@ -121,8 +121,8 @@ function webprobe_simple() {
                 -o .tmp/web_full_info_probe.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
         fi
 
-        # Merge web_full_info files
-        cat .tmp/web_full_info.txt 2>>"$LOGFILE" \
+        # Merge current probe output with prior cache/state.
+        cat .tmp/web_full_info_probe.txt .tmp/web_full_info.txt 2>>"$LOGFILE" \
             | jq -s 'try .' | jq 'try unique_by(.input)' | jq 'try .[]' 2>>"$LOGFILE" >webs/web_full_info.txt
 
         # Extract URLs
@@ -350,72 +350,6 @@ function virtualhosts() {
 ############################################# HOST SCAN #######################################################
 ###############################################################################################################
 
-function favicon() {
-
-    # Create necessary directories
-    if ! ensure_dirs hosts .tmp/virtualhosts; then return 1; fi
-
-    # Check if the function should run
-    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } \
-        && [[ $FAVICON == true ]] \
-        && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-
-        start_func "${FUNCNAME[0]}" "Favicon IP Lookup"
-
-        # Navigate to the fav-up tool directory
-        if ! pushd "${tools}/fav-up" >/dev/null; then
-            print_warnf "Failed to change directory to %s in %s @ line %s." \
-                "${tools}/fav-up" "${FUNCNAME[0]}" "${LINENO}"
-            return 1
-        fi
-
-        # Run the favicon IP lookup tool
-        if [[ -n "${TIMEOUT_CMD:-}" ]]; then
-            if ! run_command "$TIMEOUT_CMD" -k 10s 10m "${tools}/fav-up/venv/bin/python3" "${tools}/fav-up/favUp.py" -w "$domain" -sc -o favicontest.json 2>>"$LOGFILE" >/dev/null; then
-                log_note "favicon: fav-up failed or timed out; skipping" "${FUNCNAME[0]}" "${LINENO}"
-            fi
-        else
-            if ! run_command "${tools}/fav-up/venv/bin/python3" "${tools}/fav-up/favUp.py" -w "$domain" -sc -o favicontest.json 2>>"$LOGFILE" >/dev/null; then
-                log_note "favicon: fav-up failed; skipping" "${FUNCNAME[0]}" "${LINENO}"
-            fi
-        fi
-
-        # Process the results if favicontest.json exists and is not empty
-        if [[ -s "favicontest.json" ]]; then
-            jq -r 'try .found_ips' favicontest.json 2>>"$LOGFILE" \
-                | grep -v "not-found" >favicontest.txt
-
-            # Replace '|' with newlines
-            sed_i "s/|/\n/g" favicontest.txt
-
-            # Move the processed IPs to the hosts directory
-            mv favicontest.txt "$dir/hosts/favicontest.txt" 2>>"$LOGFILE"
-
-            # Remove the JSON file
-            rm -f favicontest.json 2>>"$LOGFILE"
-        fi
-
-        # Return to the original directory
-        if ! popd >/dev/null; then
-            print_warnf "Failed to return to the previous directory in %s @ line %s." \
-                "${FUNCNAME[0]}" "${LINENO}"
-        fi
-
-        end_func "Results are saved in hosts/favicontest.txt" "${FUNCNAME[0]}"
-
-    else
-        if [[ $FAVICON == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to configuration settings."
-        elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            # Domain is an IP, do nothing
-            return
-        else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
-        fi
-    fi
-
-}
-
 function favirecon_tech() {
 
     # Create necessary directories
@@ -512,13 +446,36 @@ function portscan() {
         fi
 
         if [[ -s "hosts/ips.txt" ]]; then
-            # Remove CDN IPs
+            # Remove CDN IPs.
             comm -23 <(sort -u hosts/ips.txt) <(cut -d'[' -f1 hosts/cdn_providers.txt | sed 's/[[:space:]]*$//' | sort -u) \
                 | grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' \
                 | sort -u | anew -q .tmp/ips_nocdn.txt || true
         fi
 
-        # Display resolved IPs without CDN
+        # Optional CDN bypass to recover origin IPs.
+        if [[ ${CDN_BYPASS:-true} == true ]] && command -v hakoriginfinder >/dev/null 2>&1; then
+            : >".tmp/origin_input_hosts.txt"
+            if [[ -s "subdomains/subdomains.txt" ]]; then
+                cat subdomains/subdomains.txt | anew -q ".tmp/origin_input_hosts.txt"
+            elif [[ -s "webs/webs_all.txt" ]]; then
+                awk -F/ '{print $3}' webs/webs_all.txt | sed 's/:.*$//' | sed '/^$/d' | sort -u | anew -q ".tmp/origin_input_hosts.txt"
+            fi
+            if [[ -s ".tmp/origin_input_hosts.txt" ]]; then
+                if run_command hakoriginfinder <".tmp/origin_input_hosts.txt" >".tmp/hakoriginfinder_raw.txt" 2>>"$LOGFILE"; then
+                    grep -aoE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' ".tmp/hakoriginfinder_raw.txt" \
+                        | grep -aEiv "^(127|10|169\.254|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168)\." \
+                        | sort -u >"hosts/origin_ips.txt"
+                    if [[ -s "hosts/origin_ips.txt" ]]; then
+                        cat hosts/origin_ips.txt | anew -q .tmp/ips_nocdn.txt
+                        cat hosts/origin_ips.txt | anew -q hosts/ips.txt
+                    fi
+                else
+                    log_note "portscan: hakoriginfinder failed, skipping CDN bypass origins" "${FUNCNAME[0]}" "${LINENO}"
+                fi
+            fi
+        fi
+
+        # Display resolved IPs without CDN.
         ips_nocdn_count=0
         if [[ -s ".tmp/ips_nocdn.txt" ]]; then
             ips_nocdn_count=$(sort -u ".tmp/ips_nocdn.txt" | wc -l | tr -d ' ')
@@ -535,13 +492,13 @@ function portscan() {
 
         ips_file="${dir}/hosts/ips.txt"
 
-        # Discover IPv6 addresses from DNS JSON if enabled
+        # Discover IPv6 addresses from DNS JSON if enabled.
         if [[ $IPV6_SCAN == true ]]; then
             if [[ -s "subdomains/subdomains_dnsregs.json" ]]; then
                 jq -r '.. | strings | select(test("^[0-9a-fA-F:]+$"))' <"subdomains/subdomains_dnsregs.json" \
                     | grep -v '\\.' | sort -u | anew -q hosts/ips_v6.txt || true
             fi
-            # Add target if it's an IPv6 literal
+            # Add target if it's an IPv6 literal.
             if [[ $domain =~ : ]]; then echo "$domain" | anew -q hosts/ips_v6.txt || true; fi
         fi
 
@@ -576,30 +533,92 @@ function portscan() {
         fi
 
         if [[ $PORTSCAN_ACTIVE == true ]]; then
-            # Split PORTSCAN_ACTIVE_OPTIONS safely even with IFS set to \n\t
+            # Resolve active nmap options (deep profile optional).
+            local active_opts_raw
+            active_opts_raw="${PORTSCAN_ACTIVE_OPTIONS:-}"
+            if [[ $DEEP == true ]] && [[ -n "${PORTSCAN_DEEP_OPTIONS:-}" ]]; then
+                active_opts_raw="${PORTSCAN_DEEP_OPTIONS}"
+            fi
             local portscan_opts=()
-            if declare -p PORTSCAN_ACTIVE_OPTIONS 2>/dev/null | grep -q 'declare -a'; then
-                portscan_opts=("${PORTSCAN_ACTIVE_OPTIONS[@]}")
-            elif [[ -n "${PORTSCAN_ACTIVE_OPTIONS:-}" ]]; then
+            if [[ -n "$active_opts_raw" ]]; then
                 local _ifs="$IFS"
                 IFS=' '
-                read -r -a portscan_opts <<<"$PORTSCAN_ACTIVE_OPTIONS"
+                read -r -a portscan_opts <<<"$active_opts_raw"
                 IFS="$_ifs"
             fi
 
-            if [[ $AXIOM != true ]]; then
-                if [[ -s ".tmp/ips_nocdn.txt" ]]; then
-                    run_command "$SUDO" nmap "${portscan_opts[@]}" -iL .tmp/ips_nocdn.txt -oA hosts/portscan_active 2>>"$LOGFILE" >/dev/null
+            local strategy="${PORTSCAN_STRATEGY:-legacy}"
+            local used_targeted_output=false
+
+            if [[ "$strategy" == "naabu_nmap" ]] && [[ ${NAABU_ENABLE:-true} == true ]] && [[ $AXIOM != true ]]; then
+                if command -v naabu >/dev/null 2>&1; then
+                    local naabu_ports_raw="${NAABU_PORTS:---top-ports 1000}"
+                    local naabu_opts=()
+                    if [[ -n "$naabu_ports_raw" ]]; then
+                        local _ifs="$IFS"
+                        IFS=' '
+                        read -r -a naabu_opts <<<"$naabu_ports_raw"
+                        IFS="$_ifs"
+                    fi
+
+                    if [[ -s ".tmp/ips_nocdn.txt" ]]; then
+                        run_command naabu -list ".tmp/ips_nocdn.txt" -silent -rate "${NAABU_RATE:-1000}" "${naabu_opts[@]}" -o "hosts/naabu_open.txt" 2>>"$LOGFILE" >/dev/null
+                    fi
+
+                    if [[ -s "hosts/naabu_open.txt" ]]; then
+                        local naabu_ports_csv=""
+                        naabu_ports_csv=$(cut -d':' -f2 "hosts/naabu_open.txt" | sed '/^$/d' | sort -un | paste -sd, -)
+                        if [[ -n "$naabu_ports_csv" ]]; then
+                            run_command "$SUDO" nmap "${portscan_opts[@]}" -p "$naabu_ports_csv" -iL ".tmp/ips_nocdn.txt" -oA "hosts/portscan_active_targeted" 2>>"$LOGFILE" >/dev/null
+                            used_targeted_output=true
+                        fi
+                    fi
+                else
+                    _print_msg WARN "PORTSCAN_STRATEGY=naabu_nmap requested but naabu is missing. Falling back to legacy nmap."
                 fi
-                if [[ $IPV6_SCAN == true && -s "hosts/ips_v6.txt" ]]; then
-                    run_command "$SUDO" nmap -6 "${portscan_opts[@]}" -iL hosts/ips_v6.txt -oA hosts/portscan_active_v6 2>>"$LOGFILE" >/dev/null
-                fi
-            else
-                if [[ -s ".tmp/ips_nocdn.txt" ]]; then
-                    run_command axiom-scan .tmp/ips_nocdn.txt -m nmapx "${portscan_opts[@]}" \
-                        -oA hosts/portscan_active "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+            elif [[ "$strategy" == "naabu_nmap" ]] && [[ $AXIOM == true ]]; then
+                _print_msg WARN "PORTSCAN_STRATEGY=naabu_nmap is not enabled for AXIOM yet. Falling back to legacy nmapx."
+            fi
+
+            # Legacy fallback.
+            if [[ "$used_targeted_output" != true ]]; then
+                if [[ $AXIOM != true ]]; then
+                    if [[ -s ".tmp/ips_nocdn.txt" ]]; then
+                        run_command "$SUDO" nmap "${portscan_opts[@]}" -iL .tmp/ips_nocdn.txt -oA hosts/portscan_active 2>>"$LOGFILE" >/dev/null
+                    fi
+                else
+                    if [[ -s ".tmp/ips_nocdn.txt" ]]; then
+                        run_command axiom-scan .tmp/ips_nocdn.txt -m nmapx "${portscan_opts[@]}" \
+                            -oA hosts/portscan_active "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+                    fi
                 fi
             fi
+
+            # Keep compatibility output names if targeted flow ran.
+            if [[ "$used_targeted_output" == true ]] && [[ ! -s "hosts/portscan_active.xml" ]] && [[ -s "hosts/portscan_active_targeted.xml" ]]; then
+                cp "hosts/portscan_active_targeted.xml" "hosts/portscan_active.xml"
+                [[ -s "hosts/portscan_active_targeted.gnmap" ]] && cp "hosts/portscan_active_targeted.gnmap" "hosts/portscan_active.gnmap"
+                [[ -s "hosts/portscan_active_targeted.nmap" ]] && cp "hosts/portscan_active_targeted.nmap" "hosts/portscan_active.nmap"
+            fi
+
+            if [[ $IPV6_SCAN == true && -s "hosts/ips_v6.txt" ]] && [[ $AXIOM != true ]]; then
+                run_command "$SUDO" nmap -6 "${portscan_opts[@]}" -iL hosts/ips_v6.txt -oA hosts/portscan_active_v6 2>>"$LOGFILE" >/dev/null
+            fi
+        fi
+
+        # Optional UDP top-ports scan (local-only, requires privileges).
+        if [[ ${PORTSCAN_UDP:-false} == true ]] && [[ $AXIOM != true ]] && [[ -s ".tmp/ips_nocdn.txt" ]]; then
+            local udp_opts_raw="${PORTSCAN_UDP_OPTIONS:---top-ports 20 -sU -sV -n -Pn --open}"
+            local udp_opts=()
+            if [[ -n "$udp_opts_raw" ]]; then
+                local _ifs="$IFS"
+                IFS=' '
+                read -r -a udp_opts <<<"$udp_opts_raw"
+                IFS="$_ifs"
+            fi
+            run_command "$SUDO" nmap "${udp_opts[@]}" -iL ".tmp/ips_nocdn.txt" -oA "hosts/portscan_active_udp" 2>>"$LOGFILE" >/dev/null
+        elif [[ ${PORTSCAN_UDP:-false} == true ]] && [[ $AXIOM == true ]]; then
+            _print_msg WARN "PORTSCAN_UDP is local-only for now; skipped in AXIOM mode."
         fi
 
         if [[ -s "hosts/portscan_active.xml" ]]; then
@@ -611,12 +630,15 @@ function portscan() {
         fi
 
         if [[ $FARADAY == true ]]; then
-            # Check if the Faraday server is running
+            # Check if the Faraday server is running.
             if ! faraday-cli status 2>>"$LOGFILE" >/dev/null; then
                 print_warnf "Faraday server is not running. Skipping Faraday integration."
             else
                 if [[ -s "hosts/portscan_active.xml" ]]; then
                     faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nmap hosts/portscan_active.xml 2>>"$LOGFILE" >/dev/null
+                fi
+                if [[ -s "hosts/portscan_active_udp.xml" ]]; then
+                    faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nmap hosts/portscan_active_udp.xml 2>>"$LOGFILE" >/dev/null
                 fi
             fi
         fi
@@ -630,7 +652,7 @@ function portscan() {
             append_assets_from_file web url hosts/webs.txt
         fi
 
-        end_func "Results are saved in hosts/portscan_[passive|active|shodan].[txt|xml]" "${FUNCNAME[0]}"
+        end_func "Results are saved in hosts/portscan_[passive|active|active_targeted|active_udp|shodan].*" "${FUNCNAME[0]}"
 
     else
         if [[ $PORTSCANNER == false ]]; then
@@ -702,10 +724,10 @@ function waf_checks() {
         fi
 
         # Proceed only if webs_all.txt exists and is non-empty
-        if [[ -s "webs/webs_all.txt" ]]; then
-            if [[ $AXIOM != true ]]; then
+            if [[ -s "webs/webs_all.txt" ]]; then
+                if [[ $AXIOM != true ]]; then
                 # Run wafw00f on webs_all.txt
-                wafw00f -i "webs/webs_all.txt" -o ".tmp/wafs.txt" 2>>"$LOGFILE" >/dev/null
+                run_command wafw00f -i "webs/webs_all.txt" -o ".tmp/wafs.txt" 2>>"$LOGFILE" >/dev/null
             else
                 # Run axiom-scan with wafw00f module on webs_all.txt
                 run_command axiom-scan "webs/webs_all.txt" -m wafw00f -o ".tmp/wafs.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
@@ -807,17 +829,19 @@ _nuclei_scan_local() {
         _print_msg INFO "Running: Nuclei Severity: ${crit}"
         # Non-WAF at default rate
         if [[ -s "$NOWAF_LIST" ]]; then
+            # shellcheck disable=SC2086  # Intentionally allow user-provided nuclei args
             run_with_heartbeat "nuclei ${crit} (normal targets)" nuclei \
                 -l "$NOWAF_LIST" -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 \
-                "${NUCLEI_EXTRA_ARGS}" -t "${NUCLEI_TEMPLATES_PATH}" -j -o "nuclei_output/${crit}_json.txt"
+                $NUCLEI_EXTRA_ARGS -t "${NUCLEI_TEMPLATES_PATH}" -j -o "nuclei_output/${crit}_json.txt"
         fi
         # WAF hosts at slower rate
         if [[ -s "$WAF_LIST" ]]; then
             local slow_rl
             slow_rl=$((NUCLEI_RATELIMIT / 3 + 1))
+            # shellcheck disable=SC2086  # Intentionally allow user-provided nuclei args
             run_with_heartbeat "nuclei ${crit} (waf targets)" nuclei \
                 -l "$WAF_LIST" -severity "$crit" -nh -rl "$slow_rl" -silent -retries 2 \
-                "${NUCLEI_EXTRA_ARGS}" -t "${NUCLEI_TEMPLATES_PATH}" -j -o "nuclei_output/${crit}_waf_json.txt"
+                $NUCLEI_EXTRA_ARGS -t "${NUCLEI_TEMPLATES_PATH}" -j -o "nuclei_output/${crit}_waf_json.txt"
             [[ -s "nuclei_output/${crit}_waf_json.txt" ]] && cat "nuclei_output/${crit}_waf_json.txt" >>"nuclei_output/${crit}_json.txt"
         fi
         _nuclei_parse_results "$crit"
@@ -832,10 +856,11 @@ _nuclei_scan_axiom() {
 
     for crit in "${severity_array[@]}"; do
         _print_msg INFO "Running: Axiom Nuclei Severity: ${crit}. Check results in nuclei_output folder."
+        # shellcheck disable=SC2086  # Intentionally allow user-provided nuclei args
         run_with_heartbeat "axiom nuclei ${crit}" axiom-scan .tmp/webs_subs.txt -m nuclei \
             --nuclei-templates "$NUCLEI_TEMPLATES_PATH" \
             -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" \
-            -silent -retries 2 "$NUCLEI_EXTRA_ARGS" -j -o "nuclei_output/${crit}_json.txt" "$AXIOM_EXTRA_ARGS"
+            -silent -retries 2 $NUCLEI_EXTRA_ARGS -j -o "nuclei_output/${crit}_json.txt" "$AXIOM_EXTRA_ARGS"
         _nuclei_parse_results "$crit"
     done
     printf "\n\n"
@@ -1027,11 +1052,15 @@ _fuzz_classify_targets() {
 # Run ffuf locally with interlace, handling normal and slow targets separately
 _fuzz_run_local() {
     _fuzz_classify_targets
+    local ffuf_recursion_flags=""
+    if [[ ${DEEP:-false} == true ]]; then
+        ffuf_recursion_flags="-recursion -recursion-depth ${FUZZ_RECURSION_DEPTH:-2}"
+    fi
 
     if [[ -s .tmp/webs_normal.txt ]]; then
         run_with_heartbeat "ffuf normal targets" interlace \
             -tL .tmp/webs_normal.txt -threads "${INTERLACE_THREADS}" \
-            -c "ffuf ${FFUF_FLAGS} -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" \
+            -c "ffuf ${FFUF_FLAGS} ${ffuf_recursion_flags} -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" \
             -o "$dir/.tmp/fuzzing"
     fi
 
@@ -1042,7 +1071,7 @@ _fuzz_run_local() {
         [[ ${FFUF_RATELIMIT:-0} -eq 0 ]] && slow_rate=50 || slow_rate=$((FFUF_RATELIMIT / 3 + 1))
         run_with_heartbeat "ffuf slow targets" interlace \
             -tL .tmp/webs_slow.txt -threads "${INTERLACE_THREADS}" \
-            -c "ffuf ${FFUF_FLAGS} -t ${slow_threads} -rate ${slow_rate} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" \
+            -c "ffuf ${FFUF_FLAGS} ${ffuf_recursion_flags} -t ${slow_threads} -rate ${slow_rate} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" \
             -o "$dir/.tmp/fuzzing"
     fi
 }
@@ -1119,8 +1148,8 @@ function iishortname() {
 
         # Proceed only if iis_sites.txt exists and is non-empty
         if [[ -s ".tmp/iis_sites.txt" ]]; then
-            # Create necessary directories
-            mkdir -p "$dir/vulns/iis-shortname-shortscan/" "$dir/vulns/iis-shortname-sns/"
+            # Create necessary directory
+            mkdir -p "$dir/vulns/iis-shortname-shortscan/"
 
             # Run shortscan using interlace
             run_command interlace -tL .tmp/iis_sites.txt -threads "$INTERLACE_THREADS" \
@@ -1133,18 +1162,6 @@ function iishortname() {
                     rm -f "$file" 2>>"$LOGFILE"
                 fi
             done < <(find "$dir/vulns/iis-shortname-shortscan/" -type f -iname "*.txt" -print0 2>/dev/null)
-
-            # Run sns using interlace
-            run_command interlace -tL .tmp/iis_sites.txt -threads "$INTERLACE_THREADS" \
-                -c "sns -u _target_ > _output_/_cleantarget_.txt" \
-                -o "$dir/vulns/iis-shortname-sns/" 2>>"$LOGFILE" >/dev/null
-
-            # Remove non-vulnerable sns results
-            while IFS= read -r -d '' file; do
-                if grep -q 'Target is not vulnerable' "$file" 2>/dev/null; then
-                    rm -f "$file" 2>>"$LOGFILE"
-                fi
-            done < <(find "$dir/vulns/iis-shortname-sns/" -type f -iname "*.txt" -print0 2>/dev/null)
 
         fi
         end_func "Results are saved in vulns/iis-shortname/" "${FUNCNAME[0]}"
@@ -1241,6 +1258,26 @@ function cms_scanner() {
     fi
 }
 
+_katana_headless_flags() {
+    local target_count="${1:-0}"
+    local profile="${KATANA_HEADLESS_PROFILE:-off}"
+    case "$profile" in
+        off) echo "" ;;
+        full) echo "-headless" ;;
+        smart)
+            if [[ "$target_count" -le "${KATANA_HEADLESS_SMART_LIMIT:-15}" ]]; then
+                echo "-headless"
+            else
+                echo ""
+            fi
+            ;;
+        *)
+            log_note "urlchecks: invalid KATANA_HEADLESS_PROFILE='${profile}', using off" "${FUNCNAME[0]}" "${LINENO}"
+            echo ""
+            ;;
+    esac
+}
+
 function urlchecks() {
 
     # Create necessary directories
@@ -1252,6 +1289,7 @@ function urlchecks() {
         local end_message="Results are saved in $domain/webs/url_extract.txt"
         local katana_timeout_cmd="${TIMEOUT_CMD:-timeout}"
         local waymore_timeout_cmd="${TIMEOUT_CMD:-timeout}"
+        local katana_headless_flags=""
 
         # Combine webs.txt and webs_uncommon_ports.txt if webs_all.txt doesn't exist
         if [[ ! -s "webs/webs_all.txt" ]]; then
@@ -1259,6 +1297,9 @@ function urlchecks() {
         fi
 
         if [[ -s "webs/webs_all.txt" ]]; then
+            local katana_target_count=0
+            katana_target_count=$(wc -l <"webs/webs_all.txt" 2>/dev/null || echo 0)
+            katana_headless_flags=$(_katana_headless_flags "$katana_target_count")
 
             if [[ $URL_CHECK_PASSIVE == true ]]; then
                 if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
@@ -1317,15 +1358,15 @@ function urlchecks() {
                             LINES=$(wc -l <.tmp/katana_targets_normal.txt)
                             if [[ $LINES -gt ${CHUNK_LIMIT:-2000} ]]; then
                                 if [[ $DEEP == true ]]; then
-                                    process_in_chunks .tmp/katana_targets_normal.txt "${CHUNK_LIMIT:-2000}" "katana -silent -list _chunk_ -jc -kf all -c $KATANA_THREADS -d 3 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\" >/dev/null"
+                                    process_in_chunks .tmp/katana_targets_normal.txt "${CHUNK_LIMIT:-2000}" "katana -silent -list _chunk_ ${katana_headless_flags} -jc -kf all -c $KATANA_THREADS -d 3 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\" >/dev/null"
                                 else
-                                    process_in_chunks .tmp/katana_targets_normal.txt "${CHUNK_LIMIT:-2000}" "katana -silent -list _chunk_ -jc -kf all -c $KATANA_THREADS -d 2 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\""
+                                    process_in_chunks .tmp/katana_targets_normal.txt "${CHUNK_LIMIT:-2000}" "katana -silent -list _chunk_ ${katana_headless_flags} -jc -kf all -c $KATANA_THREADS -d 2 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\""
                                 fi
                             else
                                 if [[ $DEEP == true ]]; then
-                                    run_with_heartbeat_shell "katana normal targets (deep)" "$katana_timeout_cmd 4h katana -silent -list .tmp/katana_targets_normal.txt -jc -kf all -c $KATANA_THREADS -d 3 -fs rdn >> .tmp/katana.txt 2>> \"$LOGFILE\""
+                                    run_with_heartbeat_shell "katana normal targets (deep)" "$katana_timeout_cmd 4h katana -silent -list .tmp/katana_targets_normal.txt ${katana_headless_flags} -jc -kf all -c $KATANA_THREADS -d 3 -fs rdn >> .tmp/katana.txt 2>> \"$LOGFILE\""
                                 else
-                                    run_with_heartbeat_shell "katana normal targets" "$katana_timeout_cmd 3h katana -silent -list .tmp/katana_targets_normal.txt -jc -kf all -c $KATANA_THREADS -d 2 -fs rdn >> .tmp/katana.txt 2>> \"$LOGFILE\""
+                                    run_with_heartbeat_shell "katana normal targets" "$katana_timeout_cmd 3h katana -silent -list .tmp/katana_targets_normal.txt ${katana_headless_flags} -jc -kf all -c $KATANA_THREADS -d 2 -fs rdn >> .tmp/katana.txt 2>> \"$LOGFILE\""
                                 fi
                             fi
                         fi
@@ -1337,15 +1378,15 @@ function urlchecks() {
                             LINES=$(wc -l <.tmp/katana_targets_slow.txt)
                             if [[ $LINES -gt ${CHUNK_LIMIT:-2000} ]]; then
                                 if [[ $DEEP == true ]]; then
-                                    process_in_chunks .tmp/katana_targets_slow.txt "${CHUNK_LIMIT:-2000}" "katana -silent -list _chunk_ -jc -kf all -c $slow_c -d 3 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\""
+                                    process_in_chunks .tmp/katana_targets_slow.txt "${CHUNK_LIMIT:-2000}" "katana -silent -list _chunk_ ${katana_headless_flags} -jc -kf all -c $slow_c -d 3 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\""
                                 else
-                                    process_in_chunks .tmp/katana_targets_slow.txt "${CHUNK_LIMIT:-2000}" "katana -silent -list _chunk_ -jc -kf all -c $slow_c -d 2 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\""
+                                    process_in_chunks .tmp/katana_targets_slow.txt "${CHUNK_LIMIT:-2000}" "katana -silent -list _chunk_ ${katana_headless_flags} -jc -kf all -c $slow_c -d 2 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\""
                                 fi
                             else
                                 if [[ $DEEP == true ]]; then
-                                    run_with_heartbeat_shell "katana slow targets (deep)" "$katana_timeout_cmd 4h katana -silent -list .tmp/katana_targets_slow.txt -jc -kf all -c $slow_c -d 3 -fs rdn >> .tmp/katana.txt 2>> \"$LOGFILE\""
+                                    run_with_heartbeat_shell "katana slow targets (deep)" "$katana_timeout_cmd 4h katana -silent -list .tmp/katana_targets_slow.txt ${katana_headless_flags} -jc -kf all -c $slow_c -d 3 -fs rdn >> .tmp/katana.txt 2>> \"$LOGFILE\""
                                 else
-                                    run_with_heartbeat_shell "katana slow targets" "$katana_timeout_cmd 3h katana -silent -list .tmp/katana_targets_slow.txt -jc -kf all -c $slow_c -d 2 -fs rdn >> .tmp/katana.txt 2>> \"$LOGFILE\""
+                                    run_with_heartbeat_shell "katana slow targets" "$katana_timeout_cmd 3h katana -silent -list .tmp/katana_targets_slow.txt ${katana_headless_flags} -jc -kf all -c $slow_c -d 2 -fs rdn >> .tmp/katana.txt 2>> \"$LOGFILE\""
                                 fi
                             fi
                         fi
@@ -1361,9 +1402,9 @@ function urlchecks() {
                 if [[ $diff_webs != "0" ]] || [[ ! -s ".tmp/katana.txt" ]]; then
                     if [[ $URL_CHECK_ACTIVE == true ]]; then
                         if [[ $DEEP == true ]]; then
-                            run_with_heartbeat "axiom katana (deep)" axiom-scan webs/webs_all.txt -m katana -jc -kf all -d 3 -fs rdn --max-runtime 4h -o .tmp/katana.txt "$AXIOM_EXTRA_ARGS"
+                            run_with_heartbeat "axiom katana (deep)" axiom-scan webs/webs_all.txt -m katana $katana_headless_flags -jc -kf all -d 3 -fs rdn --max-runtime 4h -o .tmp/katana.txt "$AXIOM_EXTRA_ARGS"
                         else
-                            run_with_heartbeat "axiom katana" axiom-scan webs/webs_all.txt -m katana -jc -kf all -d 2 -fs rdn --max-runtime 3h -o .tmp/katana.txt "$AXIOM_EXTRA_ARGS"
+                            run_with_heartbeat "axiom katana" axiom-scan webs/webs_all.txt -m katana $katana_headless_flags -jc -kf all -d 2 -fs rdn --max-runtime 3h -o .tmp/katana.txt "$AXIOM_EXTRA_ARGS"
                         fi
                     fi
                 fi
@@ -1862,7 +1903,7 @@ function wordlist_gen_roboxtractor() {
 function password_dict() {
 
     # Create necessary directories
-    if ! mkdir -p "$dir/webs"; then
+    if ! mkdir -p "$dir/webs" "$dir/.tmp"; then
         print_warnf "Failed to create directories."
         return 1
     fi
@@ -1873,11 +1914,74 @@ function password_dict() {
 
         start_func "${FUNCNAME[0]}" "Password Dictionary Generation"
 
-        # Extract the first part of the domain
-        word="${domain%%.*}"
+        local dict_engine="${PASSWORD_DICT_ENGINE:-cewl}"
+        local dict_output="$dir/webs/password_dict.txt"
+        : >"$dict_output"
 
-        # Run pydictor.py with specified parameters
-        run_command python3 "${tools}/pydictor/pydictor.py" -extend "$word" --leet 0 1 2 11 21 --len "$PASSWORD_MIN_LENGTH" "$PASSWORD_MAX_LENGTH" -o "$dir/webs/password_dict.txt" 2>>"$LOGFILE" >/dev/null
+        # Ensure web targets exist for cewl.
+        if [[ ! -s "webs/webs_all.txt" ]]; then
+            cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q "webs/webs_all.txt"
+        fi
+
+        if [[ "$dict_engine" == "cewl" ]]; then
+            local cewl_cmd=()
+            if command -v cewl >/dev/null 2>&1; then
+                cewl_cmd=(cewl)
+            elif [[ -f "${tools}/CeWL/cewl.rb" ]]; then
+                cewl_cmd=(ruby "${tools}/CeWL/cewl.rb")
+            fi
+
+            if [[ ${#cewl_cmd[@]} -gt 0 ]] && [[ -s "webs/webs_all.txt" ]]; then
+                local max_targets="${PASSWORD_DICT_MAX_TARGETS:-50}"
+                if [[ ${DEEP:-false} == true ]]; then
+                    max_targets=0
+                fi
+                if [[ "$max_targets" -gt 0 ]]; then
+                    head -n "$max_targets" "webs/webs_all.txt" >".tmp/password_dict_targets.txt"
+                else
+                    cp "webs/webs_all.txt" ".tmp/password_dict_targets.txt"
+                fi
+
+                : >".tmp/password_dict_raw.txt"
+                while IFS= read -r target; do
+                    [[ -z "$target" ]] && continue
+                    if [[ -n "${TIMEOUT_CMD:-}" ]]; then
+                        run_command "$TIMEOUT_CMD" -k 5s "${PASSWORD_DICT_CEWL_TIMEOUT:-45}" "${cewl_cmd[@]}" "$target" \
+                            -d "${PASSWORD_DICT_CEWL_DEPTH:-1}" -m "${PASSWORD_MIN_LENGTH:-5}" \
+                            -w ".tmp/password_dict_part.txt" 2>>"$LOGFILE" >/dev/null || true
+                    else
+                        run_command "${cewl_cmd[@]}" "$target" \
+                            -d "${PASSWORD_DICT_CEWL_DEPTH:-1}" -m "${PASSWORD_MIN_LENGTH:-5}" \
+                            -w ".tmp/password_dict_part.txt" 2>>"$LOGFILE" >/dev/null || true
+                    fi
+                    if [[ -s ".tmp/password_dict_part.txt" ]]; then
+                        cat ".tmp/password_dict_part.txt" >>".tmp/password_dict_raw.txt"
+                        : >".tmp/password_dict_part.txt"
+                    fi
+                done <".tmp/password_dict_targets.txt"
+
+                if [[ -s ".tmp/password_dict_raw.txt" ]]; then
+                    awk -v min="${PASSWORD_MIN_LENGTH:-5}" -v max="${PASSWORD_MAX_LENGTH:-14}" '
+                        {
+                            w=tolower($0);
+                            gsub(/[^a-z0-9._-]/, "", w);
+                            if (length(w) >= min && length(w) <= max) print w;
+                        }' ".tmp/password_dict_raw.txt" | sort -u >"$dict_output"
+                fi
+            fi
+        fi
+
+        # Fallback to pydictor when cewl is unavailable/empty or explicitly requested.
+        if [[ ! -s "$dict_output" ]] || [[ "$dict_engine" == "pydictor" ]]; then
+            local word="${domain%%.*}"
+            if [[ -s "${tools}/pydictor/pydictor.py" ]]; then
+                run_command python3 "${tools}/pydictor/pydictor.py" -extend "$word" --leet 0 1 2 11 21 --len "$PASSWORD_MIN_LENGTH" "$PASSWORD_MAX_LENGTH" -o "$dict_output" 2>>"$LOGFILE" >/dev/null
+                [[ "$dict_engine" == "cewl" ]] && log_note "password_dict: cewl unavailable/empty, pydictor fallback used" "${FUNCNAME[0]}" "${LINENO}"
+            elif [[ "$dict_engine" == "cewl" ]]; then
+                log_note "password_dict: cewl and pydictor unavailable, skipping output generation" "${FUNCNAME[0]}" "${LINENO}"
+            fi
+        fi
+
         end_func "Results are saved in $domain/webs/password_dict.txt" "${FUNCNAME[0]}"
 
         # Optionally, create a marker file to indicate the function has been processed
@@ -1962,13 +2066,15 @@ function brokenLinks() {
                     fi
                 done <"webs/webs_all.txt"
             else
+                local katana_legacy_headless=""
+                katana_legacy_headless=$(_katana_headless_flags "$(wc -l <webs/webs_all.txt 2>/dev/null || echo 0)")
                 if [[ $AXIOM != true ]]; then
                     # Use katana for scanning
                     if [[ ! -s ".tmp/katana.txt" ]]; then
                         if [[ $DEEP == true ]]; then
-                            timeout 4h katana -silent -list "webs/webs_all.txt" -jc -kf all -c "$KATANA_THREADS" -d 3 -o ".tmp/katana.txt" 2>>"$LOGFILE" >/dev/null
+                            timeout 4h katana -silent -list "webs/webs_all.txt" $katana_legacy_headless -jc -kf all -c "$KATANA_THREADS" -d 3 -o ".tmp/katana.txt" 2>>"$LOGFILE" >/dev/null
                         else
-                            timeout 3h katana -silent -list "webs/webs_all.txt" -jc -kf all -c "$KATANA_THREADS" -d 2 -o ".tmp/katana.txt" 2>>"$LOGFILE" >/dev/null
+                            timeout 3h katana -silent -list "webs/webs_all.txt" $katana_legacy_headless -jc -kf all -c "$KATANA_THREADS" -d 2 -o ".tmp/katana.txt" 2>>"$LOGFILE" >/dev/null
                         fi
                     fi
                     # Remove lines longer than 2048 characters
@@ -1979,9 +2085,9 @@ function brokenLinks() {
                     # Use axiom-scan for scanning
                     if [[ ! -s ".tmp/katana.txt" ]]; then
                         if [[ $DEEP == true ]]; then
-                            run_command axiom-scan "webs/webs_all.txt" -m katana -jc -kf all -d 3 --max-runtime 4h -o ".tmp/katana.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+                            run_command axiom-scan "webs/webs_all.txt" -m katana $katana_legacy_headless -jc -kf all -d 3 --max-runtime 4h -o ".tmp/katana.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
                         else
-                            run_command axiom-scan "webs/webs_all.txt" -m katana -jc -kf all -d 2 --max-runtime 3h -o ".tmp/katana.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+                            run_command axiom-scan "webs/webs_all.txt" -m katana $katana_legacy_headless -jc -kf all -d 2 --max-runtime 3h -o ".tmp/katana.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
                         fi
                         # Remove lines longer than 2048 characters
                         if [[ -s ".tmp/katana.txt" ]]; then

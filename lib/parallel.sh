@@ -782,9 +782,10 @@ parallel_injection_vulns() {
 # Usage: parallel_server_vulns
 parallel_server_vulns() {
     local funcs=(
+        "crlf_checks"
+        "xss"
         "ssrf_checks"
-        "prototype_pollution"
-        "smuggling"
+        "lfi"
     )
     
     if [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
@@ -792,7 +793,7 @@ parallel_server_vulns() {
             "${bblue:-}" "${#funcs[@]}" "${reset:-}"
     fi
 
-    parallel_funcs "${PAR_VULNS_GROUP3_SIZE:-3}" "${funcs[@]}"
+    parallel_funcs "${PAR_VULNS_GROUP1_SIZE:-4}" "${funcs[@]}"
 }
 
 ###############################################################################

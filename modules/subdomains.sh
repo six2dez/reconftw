@@ -200,9 +200,6 @@ _subdomains_init() {
         return 1
     fi
 
-    NUMOFLINES_subs="0"
-    NUMOFLINES_probed="0"
-
     # Escape domain for safe use in grep regex (dots are literal, not wildcards)
     DOMAIN_ESCAPED=$(escape_domain_regex "$domain")
 
@@ -357,15 +354,6 @@ _subdomains_finalize() {
         fi
     fi
 
-    # Count new results
-    if [[ -s "subdomains/subdomains.txt" ]]; then
-        NUMOFLINES_subs=$(cat "subdomains/subdomains.txt" 2>>"$LOGFILE" | anew ".tmp/subdomains_old.txt" | sed '/^$/d' | wc -l) || NUMOFLINES_subs=0
-    fi
-    
-    if [[ -s "webs/webs.txt" ]]; then
-        NUMOFLINES_probed=$(cat "webs/webs.txt" 2>>"$LOGFILE" | anew ".tmp/probed_old.txt" | sed '/^$/d' | wc -l) || NUMOFLINES_probed=0
-    fi
-    
     # Display results
     TOTAL_SUBS=$(sed '/^$/d' "subdomains/subdomains.txt" 2>/dev/null | wc -l | tr -d ' ')
 
@@ -1260,6 +1248,59 @@ function sub_analytics() {
     fi
 }
 
+_permutations_engine_selected() {
+    local engine="${PERMUTATIONS_ENGINE:-}"
+    if [[ -z "$engine" ]] && [[ -n "${PERMUTATIONS_OPTION:-}" ]]; then
+        engine="${PERMUTATIONS_OPTION}"
+    fi
+    [[ -z "$engine" ]] && engine="gotator"
+
+    case "$engine" in
+        gotator|ripgen|alterx|both)
+            printf '%s\n' "$engine"
+            ;;
+        *)
+            log_note "sub_permut: invalid permutations engine '${engine}', defaulting to gotator" "${FUNCNAME[0]}" "${LINENO}"
+            printf '%s\n' "gotator"
+            ;;
+    esac
+}
+
+_run_permutation_engine_single() {
+    local engine="$1"
+    local source_file="$2"
+    case "$engine" in
+        gotator)
+            run_command gotator -sub "$source_file" -perm "${tools}/permutations_list.txt" $GOTATOR_FLAGS -silent 2>>"$LOGFILE"
+            ;;
+        ripgen)
+            run_command ripgen -d "$source_file" -w "${tools}/permutations_list.txt" 2>>"$LOGFILE"
+            ;;
+        alterx)
+            # alterx interface can vary by version; try list mode then stdin mode.
+            run_command alterx -l "$source_file" 2>>"$LOGFILE" || run_command alterx <"$source_file" 2>>"$LOGFILE"
+            ;;
+    esac
+}
+
+_generate_permutation_candidates() {
+    local source_file="$1"
+    local output_file="$2"
+    local engine
+    engine=$(_permutations_engine_selected)
+    : >"$output_file"
+    [[ -s "$source_file" ]] || return 0
+
+    if [[ "$engine" == "both" ]]; then
+        {
+            _run_permutation_engine_single "gotator" "$source_file"
+            _run_permutation_engine_single "alterx" "$source_file"
+        } | sed '/^\s*$/d' | head -c "$PERMUTATIONS_LIMIT" >"$output_file"
+    else
+        _run_permutation_engine_single "$engine" "$source_file" | sed '/^\s*$/d' | head -c "$PERMUTATIONS_LIMIT" >"$output_file"
+    fi
+}
+
 function sub_permut() {
 
     ensure_dirs .tmp subdomains
@@ -1288,32 +1329,11 @@ function sub_permut() {
         # Check if DEEP mode is enabled or subdomains are within DEEP_LIMIT
         if [[ $DEEP == true ]] || [[ $subdomain_count -le $DEEP_LIMIT ]]; then
 
-            # Select the permutations tool
-            if [[ $PERMUTATIONS_OPTION == "gotator" ]]; then
-                if [[ -s "subdomains/subdomains.txt" ]]; then
-                    run_command gotator -sub subdomains/subdomains.txt -perm "${tools}/permutations_list.txt" $GOTATOR_FLAGS \
-                        -silent 2>>"$LOGFILE" | head -c "$PERMUTATIONS_LIMIT" >.tmp/gotator1.txt
-                fi
-            else
-                if [[ -s "subdomains/subdomains.txt" ]]; then
-                    run_command ripgen -d subdomains/subdomains.txt -w "${tools}/permutations_list.txt" \
-                        2>>"$LOGFILE" | head -c "$PERMUTATIONS_LIMIT" >.tmp/gotator1.txt
-                fi
-            fi
+            _generate_permutation_candidates "subdomains/subdomains.txt" ".tmp/gotator1.txt"
 
         elif [[ "$subs_no_resolved_count" -le $DEEP_LIMIT2 ]]; then
 
-            if [[ $PERMUTATIONS_OPTION == "gotator" ]]; then
-                if [[ -s ".tmp/subs_no_resolved.txt" ]]; then
-                    run_command gotator -sub .tmp/subs_no_resolved.txt -perm "${tools}/permutations_list.txt" $GOTATOR_FLAGS \
-                        -silent 2>>"$LOGFILE" | head -c "$PERMUTATIONS_LIMIT" >.tmp/gotator1.txt
-                fi
-            else
-                if [[ -s ".tmp/subs_no_resolved.txt" ]]; then
-                    run_command ripgen -d .tmp/subs_no_resolved.txt -w "${tools}/permutations_list.txt" \
-                        2>>"$LOGFILE" | head -c "$PERMUTATIONS_LIMIT" >.tmp/gotator1.txt
-                fi
-            fi
+            _generate_permutation_candidates ".tmp/subs_no_resolved.txt" ".tmp/gotator1.txt"
 
         else
             end_subfunc "Skipping Permutations: Too Many Subdomains" "${FUNCNAME[0]}"
@@ -1338,17 +1358,7 @@ function sub_permut() {
         fi
 
         # Generate second round of permutations
-        if [[ $PERMUTATIONS_OPTION == "gotator" ]]; then
-            if [[ -s ".tmp/permute1.txt" ]]; then
-                run_command gotator -sub .tmp/permute1.txt -perm "${tools}/permutations_list.txt" \
-                    $GOTATOR_FLAGS -silent 2>>"$LOGFILE" | head -c "$PERMUTATIONS_LIMIT" >.tmp/gotator2.txt
-            fi
-        else
-            if [[ -s ".tmp/permute1.txt" ]]; then
-                run_command ripgen -d .tmp/permute1.txt -w "${tools}/permutations_list.txt" \
-                    2>>"$LOGFILE" | head -c "$PERMUTATIONS_LIMIT" >.tmp/gotator2.txt
-            fi
-        fi
+        _generate_permutation_candidates ".tmp/permute1.txt" ".tmp/gotator2.txt"
 
         # Resolve the second round of permutations
         if [[ $AXIOM != true ]]; then
@@ -1705,17 +1715,7 @@ function sub_recursive_brute() {
             done
 
             # Generate permutations
-            if [[ $PERMUTATIONS_OPTION == "gotator" ]]; then
-                if [[ -s ".tmp/brute_recursive.txt" ]]; then
-                    run_command gotator -sub .tmp/brute_recursive.txt -perm "${tools}/permutations_list.txt" $GOTATOR_FLAGS -silent \
-                        2>>"$LOGFILE" | head -c "$PERMUTATIONS_LIMIT" >.tmp/gotator1_recursive.txt
-                fi
-            else
-                if [[ -s ".tmp/brute_recursive.txt" ]]; then
-                    run_command ripgen -d .tmp/brute_recursive.txt -w "${tools}/permutations_list.txt" \
-                        2>>"$LOGFILE" | head -c "$PERMUTATIONS_LIMIT" >.tmp/gotator1_recursive.txt
-                fi
-            fi
+            _generate_permutation_candidates ".tmp/brute_recursive.txt" ".tmp/gotator1_recursive.txt"
 
             # Resolve permutations
             if [[ $AXIOM != true ]]; then
@@ -1737,17 +1737,7 @@ function sub_recursive_brute() {
             fi
 
             # Second round of permutations
-            if [[ $PERMUTATIONS_OPTION == "gotator" ]]; then
-                if [[ -s ".tmp/permute1_recursive.txt" ]]; then
-                    run_command gotator -sub .tmp/permute1_recursive.txt -perm "${tools}/permutations_list.txt" $GOTATOR_FLAGS -silent \
-                        2>>"$LOGFILE" | head -c "$PERMUTATIONS_LIMIT" >.tmp/gotator2_recursive.txt
-                fi
-            else
-                if [[ -s ".tmp/permute1_recursive.txt" ]]; then
-                    run_command ripgen -d .tmp/permute1_recursive.txt -w "${tools}/permutations_list.txt" \
-                        2>>"$LOGFILE" | head -c "$PERMUTATIONS_LIMIT" >.tmp/gotator2_recursive.txt
-                fi
-            fi
+            _generate_permutation_candidates ".tmp/permute1_recursive.txt" ".tmp/gotator2_recursive.txt"
 
             # Resolve second round of permutations
             if [[ $AXIOM != true ]]; then

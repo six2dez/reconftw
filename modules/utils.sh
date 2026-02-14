@@ -107,6 +107,28 @@ function validate_config() {
         warnings=$((warnings + 1))
     fi
 
+    # Compat / deprecations (one-release window).
+    if [[ -n "${PERMUTATIONS_OPTION:-}" && -z "${PERMUTATIONS_ENGINE:-}" ]]; then
+        print_warnf "PERMUTATIONS_OPTION is deprecated; use PERMUTATIONS_ENGINE (got '%s')" "$PERMUTATIONS_OPTION"
+        warnings=$((warnings + 1))
+    fi
+    for deprecated in CORS OPEN_REDIRECT PROTO_POLLUTION FAVICON; do
+        if [[ -n "${!deprecated:-}" ]]; then
+            print_warnf "%s flag is deprecated/removed; set it in config has no effect anymore" "$deprecated"
+            warnings=$((warnings + 1))
+        fi
+    done
+
+    if [[ -n "${MONITOR_MIN_SEVERITY:-}" ]]; then
+        case "${MONITOR_MIN_SEVERITY,,}" in
+            critical|high|medium|low|info) : ;;
+            *)
+                print_warnf "MONITOR_MIN_SEVERITY invalid: '%s' (use critical|high|medium|low|info)" "$MONITOR_MIN_SEVERITY"
+                warnings=$((warnings + 1))
+                ;;
+        esac
+    fi
+
     # Validate numeric thread/rate variables
     for var in FFUF_THREADS HTTPX_THREADS DALFOX_THREADS KATANA_THREADS HTTPX_RATELIMIT NUCLEI_RATELIMIT FFUF_RATELIMIT; do
         if [[ -n "${!var:-}" && ! "${!var}" =~ ^[0-9]+$ ]]; then
@@ -539,12 +561,14 @@ function sanitize_domain() {
 
     # Check for basic domain format (at least one dot for TLD)
     if [[ ! "$sanitized" =~ \. ]]; then
-        print_warnf "Domain '%s' has no TLD, may be invalid" "$sanitized"
+        # Important: sanitize_domain is commonly used in command substitution (domain=$(sanitize_domain ...)).
+        # Emit warnings to stderr so they don't pollute the captured value.
+        print_warnf "Domain '%s' has no TLD, may be invalid" "$sanitized" >&2
     fi
 
     # If sanitization removed characters, warn user
     if [[ "$input_domain" != "$sanitized" ]]; then
-        print_notice INFO "sanitize_domain" "Domain sanitized from '${input_domain}' to '${sanitized}'"
+        print_notice INFO "sanitize_domain" "Domain sanitized from '${input_domain}' to '${sanitized}'" >&2
     fi
 
     echo "$sanitized"

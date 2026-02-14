@@ -165,8 +165,6 @@ function check_version() {
 function tools_installed() {
     local all_installed=true
     local missing_tools=()
-    local tools_start
-    tools_start=$(date +%s)
 
     # Check environment variables
     local env_vars=("GOPATH" "GOROOT" "PATH")
@@ -182,10 +180,6 @@ function tools_installed() {
     declare -A tools_files=(
         ["dorks_hunter"]="${tools}/dorks_hunter/dorks_hunter.py"
         ["dorks_hunter_python"]="${tools}/dorks_hunter/venv/bin/python3"
-        ["fav-up"]="${tools}/fav-up/favUp.py"
-        ["fav-up_python"]="${tools}/fav-up/venv/bin/python3"
-        ["Corsy"]="${tools}/Corsy/corsy.py"
-        ["Corsy_python"]="${tools}/Corsy/venv/bin/python3"
         ["testssl.sh"]="${tools}/testssl.sh/testssl.sh"
         ["CMSeeK"]="${tools}/CMSeeK/cmseek.py"
         ["CMSeeK_python"]="${tools}/CMSeeK/venv/bin/python3"
@@ -202,7 +196,6 @@ function tools_installed() {
         ["CloudHunter"]="${tools}/CloudHunter/cloudhunter.py"
         ["CloudHunter_python"]="${tools}/CloudHunter/venv/bin/python3"
         ["nmap-parse-output"]="${tools}/ultimate-nmap-parser/ultimate-nmap-parser.sh"
-        ["pydictor"]="${tools}/pydictor/pydictor.py"
         ["regulator"]="${tools}/regulator/main.py"
         ["regulator_python"]="${tools}/regulator/venv/bin/python3"
         ["nomore403"]="${tools}/nomore403/nomore403"
@@ -214,8 +207,6 @@ function tools_installed() {
         ["postleaksNg"]="${tools}/postleaksNg/.venv/bin/postleaksNg"
         ["LeakSearch"]="${tools}/LeakSearch/LeakSearch.py"
         ["LeakSearch_python"]="${tools}/LeakSearch/venv/bin/python3"
-        ["Oralyzer"]="${tools}/Oralyzer/oralyzer.py"
-        ["Oralyzer_python"]="${tools}/Oralyzer/venv/bin/python3"
         ["msftrecon"]="${tools}/msftrecon/msftrecon/msftrecon.py"
         ["msftrecon_python"]="${tools}/msftrecon/venv/bin/python3"
         ["Scopify"]="${tools}/Scopify/scopify.py"
@@ -271,7 +262,6 @@ function tools_installed() {
         ["puredns"]="puredns"
         ["analyticsrelationships"]="analyticsrelationships"
         ["mapcidr"]="mapcidr"
-        ["ppmap"]="ppmap"
         ["cdncheck"]="cdncheck"
         ["interactsh-client"]="interactsh-client"
         ["tlsx"]="tlsx"
@@ -292,9 +282,12 @@ function tools_installed() {
         ["s3scanner"]="s3scanner"
         ["mantra"]="mantra"
         ["nmapurls"]="nmapurls"
+        ["naabu"]="naabu"
+        ["alterx"]="alterx"
         ["porch-pirate"]="porch-pirate"
         ["shortscan"]="shortscan"
-        ["sns"]="sns"
+        ["cewl"]="cewl"
+        ["hakoriginfinder"]="hakoriginfinder"
         ["sourcemapper"]="sourcemapper"
         ["jsluice"]="jsluice"
         ["commix"]="commix"
@@ -341,10 +334,6 @@ function tools_installed() {
         fi
     done
 
-    local tools_end
-    tools_end=$(date +%s)
-    local tools_dur=$((tools_end - tools_start))
-
     if [[ $all_installed == true ]]; then
         : # Tools check OK, no output
     else
@@ -376,23 +365,20 @@ function check_critical_dependencies() {
     )
 
     local missing_critical=()
-    local all_critical_ok=true
-    local dep_start
-    dep_start=$(date +%s)
 
     for item in "${critical_tools[@]}"; do
         local tool="${item%%:*}"
         if ! command -v "$tool" >/dev/null 2>&1; then
             missing_critical+=("$tool")
-            all_critical_ok=false
         fi
     done
 
-    local dep_end
-    dep_end=$(date +%s)
-    local dep_dur=$((dep_end - dep_start))
+    if (( ${#missing_critical[@]} > 0 )); then
+        _print_msg WARN "Missing critical dependencies: ${missing_critical[*]}"
+        return 1
+    fi
 
-
+    return 0
 }
 
 
@@ -708,6 +694,35 @@ _hash_string() {
     fi
 }
 
+_monitor_severity_rank() {
+    case "${1,,}" in
+        critical) echo 5 ;;
+        high) echo 4 ;;
+        medium) echo 3 ;;
+        low) echo 2 ;;
+        info) echo 1 ;;
+        *) echo 0 ;;
+    esac
+}
+
+_monitor_selected_severities() {
+    local min_sev="${MONITOR_MIN_SEVERITY:-high}"
+    local min_rank
+    min_rank=$(_monitor_severity_rank "$min_sev")
+    if [[ "$min_rank" -eq 0 ]]; then
+        log_note "monitor: invalid MONITOR_MIN_SEVERITY='${min_sev}', defaulting to high" "${FUNCNAME[0]}" "${LINENO}"
+        min_rank=4
+    fi
+
+    local sev rank
+    for sev in critical high medium low info; do
+        rank=$(_monitor_severity_rank "$sev")
+        if ((rank >= min_rank)); then
+            printf '%s\n' "$sev"
+        fi
+    done
+}
+
 _monitor_mark_alert_seen() {
     local category="$1"
     local value="$2"
@@ -726,22 +741,37 @@ _monitor_mark_alert_seen() {
 
 _monitor_alert_summary() {
     local snap="$1"
-    local critical_u=0 high_u=0 subs_u=0 webs_u=0
-    local critical_s=0 high_s=0 subs_s=0 webs_s=0
+    local critical_u=0 high_u=0 medium_u=0 low_u=0 info_u=0
+    local critical_s=0 high_s=0 medium_s=0 low_s=0 info_s=0
+    local nuclei_u=0 nuclei_s=0 subs_u=0 webs_u=0 subs_s=0 webs_s=0
     local line
 
-    if [[ -s "$snap/critical_new.txt" ]]; then
-        while IFS= read -r line; do
-            [[ -z "$line" ]] && continue
-            if _monitor_mark_alert_seen "critical" "$line"; then ((critical_u++)); else ((critical_s++)); fi
-        done <"$snap/critical_new.txt"
-    fi
-    if [[ -s "$snap/high_new.txt" ]]; then
-        while IFS= read -r line; do
-            [[ -z "$line" ]] && continue
-            if _monitor_mark_alert_seen "high" "$line"; then ((high_u++)); else ((high_s++)); fi
-        done <"$snap/high_new.txt"
-    fi
+    local sev
+    while IFS= read -r sev; do
+        [[ -z "$sev" ]] && continue
+        local sev_u=0 sev_s=0
+        local sev_file="$snap/${sev}_new.txt"
+        if [[ -s "$sev_file" ]]; then
+            while IFS= read -r line; do
+                [[ -z "$line" ]] && continue
+                if _monitor_mark_alert_seen "$sev" "$line"; then
+                    ((sev_u++))
+                else
+                    ((sev_s++))
+                fi
+            done <"$sev_file"
+        fi
+        case "$sev" in
+            critical) critical_u=$sev_u; critical_s=$sev_s ;;
+            high) high_u=$sev_u; high_s=$sev_s ;;
+            medium) medium_u=$sev_u; medium_s=$sev_s ;;
+            low) low_u=$sev_u; low_s=$sev_s ;;
+            info) info_u=$sev_u; info_s=$sev_s ;;
+        esac
+        nuclei_u=$((nuclei_u + sev_u))
+        nuclei_s=$((nuclei_s + sev_s))
+    done < <(_monitor_selected_severities)
+
     if [[ -s "$snap/subdomains_new.txt" ]]; then
         while IFS= read -r line; do
             [[ -z "$line" ]] && continue
@@ -759,26 +789,44 @@ _monitor_alert_summary() {
         jq -n \
             --arg ts "$(date -Iseconds)" \
             --arg cycle "${MONITOR_CYCLE:-0}" \
+            --arg min_sev "${MONITOR_MIN_SEVERITY:-high}" \
+            --argjson nuclei_new "$nuclei_u" \
             --argjson critical_new "$critical_u" \
             --argjson high_new "$high_u" \
+            --argjson medium_new "$medium_u" \
+            --argjson low_new "$low_u" \
+            --argjson info_new "$info_u" \
             --argjson subdomains_new "$subs_u" \
             --argjson webs_new "$webs_u" \
+            --argjson nuclei_suppressed "$nuclei_s" \
             --argjson critical_suppressed "$critical_s" \
             --argjson high_suppressed "$high_s" \
+            --argjson medium_suppressed "$medium_s" \
+            --argjson low_suppressed "$low_s" \
+            --argjson info_suppressed "$info_s" \
             --argjson subdomains_suppressed "$subs_s" \
             --argjson webs_suppressed "$webs_s" \
             '{
                 timestamp:$ts,
                 cycle:($cycle|tonumber),
+                monitor_min_severity:$min_sev,
                 alerts:{
+                    nuclei_new:$nuclei_new,
                     critical_new:$critical_new,
                     high_new:$high_new,
+                    medium_new:$medium_new,
+                    low_new:$low_new,
+                    info_new:$info_new,
                     subdomains_new:$subdomains_new,
                     webs_new:$webs_new
                 },
                 suppressed:{
+                    nuclei:$nuclei_suppressed,
                     critical:$critical_suppressed,
                     high:$high_suppressed,
+                    medium:$medium_suppressed,
+                    low:$low_suppressed,
+                    info:$info_suppressed,
                     subdomains:$subdomains_suppressed,
                     webs:$webs_suppressed
                 }
@@ -786,8 +834,8 @@ _monitor_alert_summary() {
     fi
 
     printf '%s %s %s %s %s %s %s %s\n' \
-        "$critical_u" "$high_u" "$subs_u" "$webs_u" \
-        "$critical_s" "$high_s" "$subs_s" "$webs_s"
+        "$nuclei_u" "$subs_u" "$webs_u" "$nuclei_s" \
+        "$subs_s" "$webs_s" "$critical_u" "$high_u"
 }
 
 # Monitor snapshots and delta tracking.
@@ -806,12 +854,18 @@ function monitor_snapshot() {
     for src in \
         "subdomains/subdomains.txt" \
         "webs/webs_all.txt" \
-        "nuclei_output/high.txt" \
-        "nuclei_output/critical.txt" \
         "report/report.json" \
         "hotlist.txt"; do
         if [[ -s "$src" ]]; then
             cp "$src" "$snap/$(basename "$src")"
+        fi
+    done
+    local -a monitor_severities=()
+    mapfile -t monitor_severities < <(_monitor_selected_severities)
+    local sev
+    for sev in "${monitor_severities[@]}"; do
+        if [[ -s "nuclei_output/${sev}.txt" ]]; then
+            cp "nuclei_output/${sev}.txt" "$snap/${sev}.txt"
         fi
     done
 
@@ -821,7 +875,9 @@ function monitor_snapshot() {
         prev_dir=$(cd "$prev_link" 2>/dev/null && pwd -P || true)
     fi
 
-    local subs_new=0 webs_new=0 high_new=0 critical_new=0 delta_total=0
+    local subs_new=0 webs_new=0
+    local critical_new=0 high_new=0 medium_new=0 low_new=0 info_new=0
+    local nuclei_new_total=0 delta_total=0
     if [[ -n "$prev_dir" ]]; then
         if [[ -s "$snap/subdomains.txt" ]] && [[ -s "$prev_dir/subdomains.txt" ]]; then
             comm -13 <(sort -u "$prev_dir/subdomains.txt") <(sort -u "$snap/subdomains.txt") >"$snap/subdomains_new.txt"
@@ -831,46 +887,72 @@ function monitor_snapshot() {
             comm -13 <(sort -u "$prev_dir/webs_all.txt") <(sort -u "$snap/webs_all.txt") >"$snap/webs_new.txt"
             webs_new=$(wc -l <"$snap/webs_new.txt" 2>/dev/null | tr -d ' ')
         fi
-        if [[ -s "$snap/high.txt" ]] && [[ -s "$prev_dir/high.txt" ]]; then
-            comm -13 <(sort -u "$prev_dir/high.txt") <(sort -u "$snap/high.txt") >"$snap/high_new.txt"
-            high_new=$(wc -l <"$snap/high_new.txt" 2>/dev/null | tr -d ' ')
-        fi
-        if [[ -s "$snap/critical.txt" ]] && [[ -s "$prev_dir/critical.txt" ]]; then
-            comm -13 <(sort -u "$prev_dir/critical.txt") <(sort -u "$snap/critical.txt") >"$snap/critical_new.txt"
-            critical_new=$(wc -l <"$snap/critical_new.txt" 2>/dev/null | tr -d ' ')
-        fi
+        for sev in "${monitor_severities[@]}"; do
+            local sev_new_file="$snap/${sev}_new.txt"
+            local sev_count=0
+            if [[ -s "$snap/${sev}.txt" ]] && [[ -s "$prev_dir/${sev}.txt" ]]; then
+                comm -13 <(sort -u "$prev_dir/${sev}.txt") <(sort -u "$snap/${sev}.txt") >"$sev_new_file"
+                sev_count=$(wc -l <"$sev_new_file" 2>/dev/null | tr -d ' ')
+            fi
+            case "$sev" in
+                critical) critical_new=$sev_count ;;
+                high) high_new=$sev_count ;;
+                medium) medium_new=$sev_count ;;
+                low) low_new=$sev_count ;;
+                info) info_new=$sev_count ;;
+            esac
+            nuclei_new_total=$((nuclei_new_total + sev_count))
+        done
     else
         # Baseline cycle: don't alert as "new", just record baseline.
         subs_new=0
         webs_new=0
-        high_new=0
         critical_new=0
+        high_new=0
+        medium_new=0
+        low_new=0
+        info_new=0
+        nuclei_new_total=0
     fi
 
     subs_new=${subs_new:-0}
     webs_new=${webs_new:-0}
-    high_new=${high_new:-0}
     critical_new=${critical_new:-0}
-    delta_total=$((subs_new + webs_new + high_new + critical_new))
+    high_new=${high_new:-0}
+    medium_new=${medium_new:-0}
+    low_new=${low_new:-0}
+    info_new=${info_new:-0}
+    nuclei_new_total=${nuclei_new_total:-0}
+    delta_total=$((subs_new + webs_new + nuclei_new_total))
     if command -v jq >/dev/null 2>&1; then
         jq -n \
             --arg ts "$(date -Iseconds)" \
             --arg cycle "${MONITOR_CYCLE:-0}" \
             --arg baseline "$( [[ -z "$prev_dir" ]] && echo true || echo false )" \
+            --arg min_sev "${MONITOR_MIN_SEVERITY:-high}" \
             --argjson subs_new "$subs_new" \
             --argjson webs_new "$webs_new" \
-            --argjson high_new "$high_new" \
             --argjson critical_new "$critical_new" \
+            --argjson high_new "$high_new" \
+            --argjson medium_new "$medium_new" \
+            --argjson low_new "$low_new" \
+            --argjson info_new "$info_new" \
+            --argjson nuclei_new_total "$nuclei_new_total" \
             --argjson total_new "$delta_total" \
             '{
                 timestamp:$ts,
                 cycle:($cycle|tonumber),
                 baseline:($baseline=="true"),
+                monitor_min_severity:$min_sev,
                 deltas:{
                     subdomains_new:$subs_new,
                     webs_new:$webs_new,
                     high_findings_new:$high_new,
                     critical_findings_new:$critical_new,
+                    medium_findings_new:$medium_new,
+                    low_findings_new:$low_new,
+                    info_findings_new:$info_new,
+                    nuclei_findings_new_total:$nuclei_new_total,
                     total_new:$total_new
                 }
             }' >"$snap/delta.json"
@@ -879,17 +961,20 @@ function monitor_snapshot() {
     if [[ -z "$prev_dir" ]]; then
         notification "Monitor baseline snapshot stored (${snap})" info
     elif [[ "$delta_total" -gt 0 ]]; then
-        local alert_stats critical_u high_u subs_u webs_u critical_s high_s subs_s webs_s
+        local alert_stats nuclei_u subs_u webs_u nuclei_s subs_s webs_s critical_u high_u
         alert_stats=$(_monitor_alert_summary "$snap")
-        read -r critical_u high_u subs_u webs_u critical_s high_s subs_s webs_s <<<"$alert_stats"
+        read -r nuclei_u subs_u webs_u nuclei_s subs_s webs_s critical_u high_u <<<"$alert_stats"
 
+        if [[ "${nuclei_u:-0}" -gt 0 ]]; then
+            notification "[ALERT] New nuclei findings (>=${MONITOR_MIN_SEVERITY:-high}): ${nuclei_u:-0}" warn
+        fi
         if [[ "${critical_u:-0}" -gt 0 || "${high_u:-0}" -gt 0 ]]; then
             notification "[ALERT] New high-impact findings: critical=${critical_u:-0}, high=${high_u:-0}" warn
         fi
         if [[ "${subs_u:-0}" -gt 0 || "${webs_u:-0}" -gt 0 ]]; then
             notification "New assets detected: subdomains=${subs_u:-0}, webs=${webs_u:-0}" good
         fi
-        if [[ "${critical_u:-0}" -eq 0 && "${high_u:-0}" -eq 0 && "${subs_u:-0}" -eq 0 && "${webs_u:-0}" -eq 0 ]]; then
+        if [[ "${nuclei_u:-0}" -eq 0 && "${subs_u:-0}" -eq 0 && "${webs_u:-0}" -eq 0 ]]; then
             notification "Monitor detected deltas but all were suppressed by fingerprint history" info
         fi
     else
@@ -1144,7 +1229,7 @@ function end_func() {
         warn|WARN) badge="WARN" ;;
         error|ERROR) badge="FAIL" ;;
         good|SUCCESS) badge="OK" ;;
-        OK|WARN|FAIL|SKIP|CACHE) badge="$status" ;;
+        OK|FAIL|SKIP|CACHE) badge="$status" ;;
         SKIP_CONFIG) badge="SKIP"; reason_code="config" ;;
         SKIP_NOINPUT) badge="SKIP"; reason_code="noinput" ;;
         CACHE_HIT) badge="CACHE"; reason_code="cache" ;;

@@ -123,7 +123,7 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **Certificate Transparency**: Queries certificate transparency logs ([crt](https://github.com/cemulus/crt)).
 - **NOERROR Discovery**: Identifies subdomains with DNS NOERROR responses ([dnsx](https://github.com/projectdiscovery/dnsx), more info [here](https://www.securesystems.de/blog/enhancing-subdomain-enumeration-ents-and-noerror/)).
 - **Bruteforce**: Performs DNS bruteforcing with customizable wordlists ([puredns](https://github.com/d3mondev/puredns) and custom wordlists).
-- **Permutations**: Generates subdomain permutations using AI, regex and tools ([Gotator](https://github.com/Josue87/gotator), [ripgen](https://github.com/resyncgg/ripgen), [regulator](https://github.com/cramppet/regulator) and [subwiz](https://github.com/hadriansecurity/subwiz)).
+- **Permutations**: Generates subdomain permutations using AI, regex and tools ([Gotator](https://github.com/Josue87/gotator), [ripgen](https://github.com/resyncgg/ripgen), [alterx](https://github.com/projectdiscovery/alterx), [regulator](https://github.com/cramppet/regulator) and [subwiz](https://github.com/hadriansecurity/subwiz)).
 - **Web Scraping**: Extracts subdomains from passive URL sources and live web metadata ([urlfinder](https://github.com/projectdiscovery/urlfinder), [waymore](https://github.com/xnl-h4ck3r/waymore), [httpx](https://github.com/projectdiscovery/httpx), [csprecon](https://github.com/edoardottt/csprecon)).
 - **DNS Records**: Resolves DNS records for subdomains ([dnsx](https://github.com/projectdiscovery/dnsx)).
 - **Google Analytics**: Identifies subdomains via Analytics IDs ([AnalyticsRelationships](https://github.com/Josue87/AnalyticsRelationships)).
@@ -139,8 +139,8 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **IP Information**: Retrieves geolocation and WHOIS data ([ipinfo](https://www.ipinfo.io/)).
 - **CDN Detection**: Identifies IPs behind CDNs ([cdncheck](https://github.com/projectdiscovery/cdncheck)).
 - **WAF Detection**: Detects Web Application Firewalls ([wafw00f](https://github.com/EnableSecurity/wafw00f)).
-- **Port Scanning**: Active scanning with [nmap](https://github.com/nmap/nmap) and passive scanning with [smap](https://github.com/s0md3v/Smap).
-- **Service Vulnerabilities**: Checks for vulnerabilities in open ports ([vulners](https://github.com/vulnersCom/nmap-vulners)).
+- **Port Scanning**: Active scanning with [nmap](https://github.com/nmap/nmap) (optionally preceded by [naabu](https://github.com/projectdiscovery/naabu)) and passive scanning with [smap](https://github.com/s0md3v/Smap).
+- **Service Vulnerabilities (Optional)**: Deep portscan profile can enrich results with CVE matching via [vulners](https://github.com/vulnersCom/nmap-vulners).
 - **Password Spraying**: Attempts password spraying on identified services ([brutespray](https://github.com/x90skysn3k/brutespray)).
 - **Geolocation**: Maps IP addresses to geographic locations ([ipinfo](https://www.ipinfo.io/)).
 - **IPv6 Discovery**: Optionally enumerates and scans discovered IPv6 targets when `IPV6_SCAN` is enabled.
@@ -153,7 +153,7 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **CMS Detection**: Identifies content management systems ([CMSeeK](https://github.com/Tuhinshubhra/CMSeeK)).
 - **URL Extraction**: Collects URLs passively and actively ([urlfinder](https://github.com/projectdiscovery/urlfinder), [waymore](https://github.com/xnl-h4ck3r/waymore), [katana](https://github.com/projectdiscovery/katana), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3) and [JSA](https://github.com/w9w/JSA)).
 - **URL Pattern Analysis**: Classifies URLs using patterns ([urless](https://github.com/xnl-h4ck3r/urless), [gf](https://github.com/tomnomnom/gf) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns)).
-- **Favicon Analysis**: Discovers real IPs behind favicons ([fav-up](https://github.com/pielco11/fav-up)) and identifies technologies from favicon hashes ([favirecon](https://github.com/edoardottt/favirecon)).
+- **Favicon Tech Recon**: Identifies technologies from favicon hashes ([favirecon](https://github.com/edoardottt/favirecon)).
 - **JavaScript Analysis**: Extracts secrets and endpoints from JS files ([subjs](https://github.com/lc/subjs), [JSA](https://github.com/w9w/JSA), [xnLinkFinder](https://github.com/xnl-h4ck3r/xnLinkFinder), [getjswords](https://github.com/m4ll0k/BBTz), [mantra](https://github.com/MrEmpy/mantra), [jsluice](https://github.com/BishopFox/jsluice)).
 - **Source Map Extraction**: Retrieves sensitive data from JavaScript source maps ([sourcemapper](https://github.com/denandz/sourcemapper)).
 - **GraphQL Detection**: Discovers GraphQL endpoints with nuclei and optionally performs in-depth introspection ([GQLSpection](https://github.com/doyensec/GQLSpection)).
@@ -163,24 +163,22 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **Fuzzing**: Performs directory and parameter fuzzing ([ffuf](https://github.com/ffuf/ffuf)).
 - **File Extension Sorting**: Organizes URLs by file extensions.
 - **Wordlist Generation**: Creates custom wordlists for fuzzing.
-- **Password Dictionary**: Generates password dictionaries ([pydictor](https://github.com/LandGrey/pydictor)).
-- **IIS Shortname Scanning**: Detects IIS shortname vulnerabilities ([shortscan](https://github.com/bitquark/shortscan) and [sns](https://github.com/sw33tLie/sns)).
+- **Password Dictionary**: Generates password dictionaries from live content ([cewl](https://github.com/digininja/CeWL)).
+- **IIS Shortname Scanning**: Detects IIS shortname vulnerabilities ([shortscan](https://github.com/bitquark/shortscan)).
 
 ### Vulnerability Checks
 
 - **CVEs**: Checks for CVE and common vulnerabilites [nuclei](https://github.com/projectdiscovery/nuclei)
+- **Nuclei DAST**: Runs `nuclei -dast` templates over collected URLs and GF candidates for additional DAST coverage.
 - **XSS**: Tests for cross-site scripting vulnerabilities ([dalfox](https://github.com/hahwul/dalfox)).
-- **CORS**: Identifies CORS misconfigurations ([Corsy](https://github.com/s0md3v/Corsy)).
 - **SSL/TLS**: Checks for SSL/TLS misconfigurations ([testssl](https://github.com/drwetter/testssl.sh)).
-- **Open Redirects**: Detects open redirect vulnerabilities ([Oralyzer](https://github.com/r0075h3ll/Oralyzer)).
-- **SSRF**: Tests for server-side request forgery ([interactsh](https://github.com/projectdiscovery/interactsh) and param values with [ffuf](https://github.com/ffuf/ffuf)).
+- **SSRF**: Tests for server-side request forgery ([interactsh](https://github.com/projectdiscovery/interactsh), parameter values with [ffuf](https://github.com/ffuf/ffuf), and optional alternate protocol payloads).
 - **CRLF**: Checks for CRLF injection vulnerabilities ([crlfuzz](https://github.com/dwisiswant0/crlfuzz)).
 - **LFI**: Tests for local file inclusion via fuzzing ([ffuf](https://github.com/ffuf/ffuf)).
-- **SSTI**: Detects server-side template injection ([TInjA](https://github.com/Hackmanit/TInjA), with legacy ffuf mode available).
+- **SSTI**: Detects server-side template injection ([TInjA](https://github.com/Hackmanit/TInjA), with optional legacy ffuf mode if explicitly selected).
 - **SQLi**: Tests for SQL injection ([SQLMap](https://github.com/sqlmapproject/sqlmap) and [ghauri](https://github.com/r0oth3x49/ghauri)).
 - **Broken Links**: Identifies broken links and external references likely to be takeover-prone ([second-order](https://github.com/mhmdiaa/second-order), with legacy katana mode available).
 - **Command Injection**: Tests for command injection vulnerabilities ([commix](https://github.com/commixproject/commix)).
-- **Prototype Pollution**: Detects JavaScript prototype pollution ([ppmap](https://github.com/kleiton0x00/ppmap)).
 - **HTTP Request Smuggling**: Checks for request smuggling vulnerabilities ([smugglex](https://github.com/hahwul/smugglex)).
 - **Web Cache**: Identifies web cache vulnerabilities ([Web-Cache-Vulnerability-Scanner](https://github.com/Hackmanit/Web-Cache-Vulnerability-Scanner) and [toxicache](https://github.com/xhzeem/toxicache)).
 - **4XX Bypassing**: Attempts to bypass 4XX responses ([nomore403](https://github.com/devploit/nomore403)).
@@ -562,7 +560,7 @@ SUBSCRAPING=true # Subdomains extraction from passive URLs and live web metadata
 SUBPERMUTE=true # DNS permutations
 SUBIAPERMUTE=true # Permutations by AI analysis
 SUBREGEXPERMUTE=true # Permutations by regex analysis
-PERMUTATIONS_OPTION=gotator # The alternative is "ripgen" (faster, not deeper)
+PERMUTATIONS_ENGINE=gotator # gotator|ripgen|alterx|both (PERMUTATIONS_OPTION is a legacy alias)
 GOTATOR_FLAGS=" -depth 1 -numbers 3 -mindup -adv -md" # Flags for gotator
 SUBTAKEOVER=true # Check subdomain takeovers, false by default cuz nuclei already check this
 SUB_RECURSIVE_PASSIVE=false # Uses a lot of API keys queries
@@ -582,14 +580,21 @@ VIRTUALHOSTS=false # Check virtualhosts by fuzzing HOST header
 UNCOMMON_PORTS_WEB="81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3001,3002,3003,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9092,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55440,55672"
 
 # Host
-FAVICON=true # Check Favicon domain discovery
 FAVIRECON=true # Favicon-based technology recon for discovered web targets
 PORTSCANNER=true # Enable or disable the whole Port scanner module
 GEO_INFO=true # Fetch Geolocalization info
 PORTSCAN_PASSIVE=true # Port scanner with Shodan
 PORTSCAN_ACTIVE=true # Port scanner with nmap
-PORTSCAN_ACTIVE_OPTIONS="--top-ports 200 -sV -n -Pn --open --max-retries 2 --script vulners"
+PORTSCAN_ACTIVE_OPTIONS="--top-ports 200 -sV -n -Pn --open --max-retries 2"
+PORTSCAN_DEEP_OPTIONS="--top-ports 1000 -sV -n -Pn --open --max-retries 2 --script vulners"
+PORTSCAN_STRATEGY=legacy # legacy|naabu_nmap
+NAABU_ENABLE=true
+NAABU_RATE=1000
+NAABU_PORTS="--top-ports 1000"
+PORTSCAN_UDP=false
+PORTSCAN_UDP_OPTIONS="--top-ports 20 -sU -sV -n -Pn --open"
 CDN_IP=true # Check which IPs belongs to CDN
+CDN_BYPASS=true # Try origin IP discovery on CDN-fronted hosts with hakoriginfinder
 
 # Web analysis
 WAF_DETECTION=true # Detect WAFs
@@ -600,6 +605,7 @@ NUCLEI_EXTRA_ARGS="" # Additional nuclei extra flags, don't set the severity her
 #NUCLEI_EXTRA_ARGS="-etags openssh,ssl -eid node-express-dev-env,keycloak-xss,CVE-2023-24044,CVE-2021-20323,header-sql,header-reflection" # Additional nuclei extra flags, don't set the severity here but the exclusions like " -etags openssh"
 NUCLEI_FLAGS="-silent -retries 2" # Additional nuclei extra flags, don't set the severity here but the exclusions like " -etags openssh"
 NUCLEI_FLAGS_JS="-silent -tags exposure,token -severity info,low,medium,high,critical" # Additional nuclei extra flags for js secrets
+NUCLEI_DAST=true # Run additional nuclei -dast module over webs/urls/gf candidates (forced on when VULNS_GENERAL=true, e.g. -a)
 URL_CHECK=true # Enable or disable URL collection
 URL_CHECK_PASSIVE=true # Search for urls, passive methods from Archive, OTX, CommonCrawl, etc
 URL_CHECK_ACTIVE=true # Search for urls by crawling the websites
@@ -609,21 +615,22 @@ URL_GF=true # Url patterns classification
 URL_EXT=true # Returns a list of files divided by extension
 JSCHECKS=true # JS analysis
 FUZZ=true # Web fuzzing
+FUZZ_RECURSION_DEPTH=2 # ffuf recursion depth used in DEEP mode
 IIS_SHORTNAME=true
 CMS_SCANNER=true # CMS scanner
 WORDLIST=true # Wordlist generation
 ROBOTSWORDLIST=true # Check historic disallow entries on waybackMachine
 PASSWORD_DICT=true # Generate password dictionary
+PASSWORD_DICT_ENGINE=cewl # cewl|pydictor
 PASSWORD_MIN_LENGTH=5 # Min password length
 PASSWORD_MAX_LENGTH=14 # Max password length
-CLOUDHUNTER_PERMUTATION=NORMAL # Options: DEEP (very slow), NORMAL (slow), NONE
+KATANA_HEADLESS_PROFILE=off # off|smart|full
+CLOUDHUNTER_PERMUTATION=NORMAL # Options: DEEP (very slow), NORMAL (slow), NONE 
 
 # Vulns
 VULNS_GENERAL=false # Enable or disable the vulnerability module (very intrusive and slow)
 XSS=true # Check for xss with dalfox
-CORS=true # CORS misconfigs
 TEST_SSL=true # SSL misconfigs
-OPEN_REDIRECT=true # Check open redirects
 SSRF_CHECKS=true # SSRF checks
 CRLF_CHECKS=true # CRLF checks
 LFI=true # LFI by fuzzing
@@ -636,7 +643,6 @@ BROKENLINKS=true # Check for brokenlinks
 BROKENLINKS_ENGINE="second-order" # Broken links engine: second-order|legacy
 SPRAY=true # Performs password spraying
 COMM_INJ=true # Check for command injections with commix
-PROTO_POLLUTION=true # Check for prototype pollution flaws
 SMUGGLING=true # Check for HTTP request smuggling flaws
 WEBCACHE=true # Check for Web Cache issues
 WEBCACHE_TOXICACHE=true # Complement web cache checks with toxicache

@@ -114,8 +114,10 @@ function start() {
     # Initialize structured logging if enabled
     log_init
 
-    # Reset incidents for this run
+    # Reset incidents for this run (global arrays consumed by lib/common.sh helpers)
+    # shellcheck disable=SC2034
     INCIDENTS_LEVELS=()
+    # shellcheck disable=SC2034
     INCIDENTS_ITEMS=()
 
     # Initialize cache for wordlists/resolvers
@@ -372,12 +374,14 @@ function build_hotlist() {
         [[ -s $s ]] || continue
         while read -r h; do score["$h"]=$((${score["$h"]:-0} + 6)); done < <(awk '{print $1}' "$s")
     done
-    # Real IPs via favicon
-    if [[ -s hosts/favicontest.txt ]]; then
-        while read -r ip; do
-            [[ -z $ip ]] && continue
-            score["$ip"]=$((${score["$ip"]:-0} + 4))
-        done <hosts/favicontest.txt
+    # Favicon technology fingerprints (favirecon)
+    if [[ -s webs/favirecon.txt ]]; then
+        while read -r line; do
+            [[ -z $line ]] && continue
+            host=$(printf '%s' "$line" | awk '{print $1}' | awk -F/ '{print $3}' | sed 's/:.*$//')
+            [[ -z $host ]] && continue
+            score["$host"]=$((${score["$host"]:-0} + 4))
+        done <webs/favirecon.txt
     fi
     # New assets bonus
     for p in .tmp/subs_new_only.txt webs/url_extract.txt; do
@@ -441,7 +445,6 @@ function passive() {
 
     _print_section "Web Detection"
 
-    favicon
     cdnprovider
     # shellcheck disable=SC2034  # PORTSCAN_ACTIVE controls scan behavior
     PORTSCAN_ACTIVE=false
@@ -473,7 +476,6 @@ function osint() {
     apileaks
     third_party_misconfigs
     zonetransfer
-    favicon
     mail_hygiene
     cloud_enum_scan
 }
@@ -484,7 +486,7 @@ function vulns() {
         if [[ "${PARALLEL_MODE:-true}" == "true" ]] && declare -f parallel_funcs &>/dev/null; then
             # Parallel execution - group independent checks
             [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && printf "%b[*] Running vulnerability checks in parallel mode%b\n" "$bblue" "$reset"
-            parallel_funcs "${PAR_VULNS_GROUP1_SIZE:-4}" cors open_redirect crlf_checks xss
+            parallel_funcs "${PAR_VULNS_GROUP1_SIZE:-4}" crlf_checks xss ssrf_checks lfi
             local vulns_g1_rc=$?
             if ((vulns_g1_rc > 0)); then
                 if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
@@ -495,7 +497,7 @@ function vulns() {
                     return 1
                 fi
             fi
-            parallel_funcs "${PAR_VULNS_GROUP2_SIZE:-4}" ssrf_checks lfi ssti sqli
+            parallel_funcs "${PAR_VULNS_GROUP2_SIZE:-4}" ssti sqli command_injection smuggling
             local vulns_g2_rc=$?
             if ((vulns_g2_rc > 0)); then
                 if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
@@ -503,17 +505,6 @@ function vulns() {
                     notification "Parallel vulns group 2 completed with ${vulns_g2_rc} warning(s); continuing" warn
                 else
                     notification "Parallel vulns batch failed (group 2)" error
-                    return 1
-                fi
-            fi
-            parallel_funcs "${PAR_VULNS_GROUP3_SIZE:-3}" command_injection prototype_pollution smuggling
-            local vulns_g3_rc=$?
-            if ((vulns_g3_rc > 0)); then
-                if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
-                    RECON_PARTIAL_RUN=true
-                    notification "Parallel vulns group 3 completed with ${vulns_g3_rc} warning(s); continuing" warn
-                else
-                    notification "Parallel vulns batch failed (group 3)" error
                     return 1
                 fi
             fi
@@ -529,24 +520,23 @@ function vulns() {
                 fi
             fi
             fuzzparams
+            nuclei_dast
             4xxbypass
             test_ssl
         else
-            cors
-            open_redirect
-            ssrf_checks
             crlf_checks
+            xss
+            ssrf_checks
             lfi
             ssti
             sqli
-            xss
             command_injection
-            prototype_pollution
             smuggling
             webcache
             spraying
             brokenLinks
             fuzzparams
+            nuclei_dast
             4xxbypass
             test_ssl
         fi
@@ -616,7 +606,6 @@ function multi_osint() {
         apileaks
         third_party_misconfigs
         zonetransfer
-        favicon
     done <"$list"
     cd "$workdir" || {
         print_errorf "Failed to cd directory '%s' in %s @ line %s" "$workdir" "${FUNCNAME[0]}" "${LINENO}"
@@ -645,8 +634,8 @@ function recon() {
             RECON_PARTIAL_RUN=true
             RECON_OSINT_PARALLEL_FAILURES=$((RECON_OSINT_PARALLEL_FAILURES + osint_g1_rc))
         fi
-        # Group 2: remaining OSINT + zonetransfer + favicon (were sequential, now parallel)
-        parallel_funcs "${PAR_OSINT_GROUP2_SIZE:-5}" github_repos metadata apileaks zonetransfer favicon
+        # Group 2: remaining OSINT + zonetransfer
+        parallel_funcs "${PAR_OSINT_GROUP2_SIZE:-4}" github_repos metadata apileaks zonetransfer
         local osint_g2_rc=$?
         if ((osint_g2_rc > 0)); then
             RECON_PARTIAL_RUN=true
@@ -663,7 +652,6 @@ function recon() {
         apileaks
         third_party_misconfigs
         zonetransfer
-        favicon
     fi
 
     ui_module_end "OSINT" "osint/dorks.txt" "osint/emails.txt" "osint/domain_info.txt"
@@ -843,7 +831,6 @@ function multi_recon() {
         apileaks
         third_party_misconfigs
         zonetransfer
-        favicon
         currently=$(date +"%H:%M:%S")
         loopend=$(date +%s)
         getElapsedTime "$loopstart" "$loopend"

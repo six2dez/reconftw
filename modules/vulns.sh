@@ -1,9 +1,9 @@
 #!/bin/bash
 # shellcheck disable=SC2154  # Variables defined in reconftw.cfg
 # reconFTW - Vulnerability scanning module
-# Contains: xss, cors, open_redirect, ssrf_checks, crlf_checks, lfi, ssti,
+# Contains: xss, ssrf_checks, crlf_checks, lfi, ssti,
 #           sqli, test_ssl, spraying, command_injection, 4xxbypass,
-#           prototype_pollution, smuggling, webcache, fuzzparams
+#           smuggling, webcache, fuzzparams, nuclei_dast
 # This file is sourced by reconftw.sh - do not execute directly
 [[ -z "${SCRIPTPATH:-}" ]] && {
     echo "Error: This module must be sourced by reconftw.sh" >&2
@@ -90,90 +90,6 @@ function xss() {
 
 }
 
-function cors() {
-
-    # Create necessary directories
-    if ! ensure_dirs .tmp webs vulns; then return 1; fi
-
-    # Check if the function should run
-    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $CORS == true ]] \
-        && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-
-        start_func "${FUNCNAME[0]}" "CORS Scan"
-
-        # Combine webs.txt and webs_uncommon_ports.txt into webs_all.txt if it doesn't exist
-        if [[ ! -s "webs/webs_all.txt" ]]; then
-            cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q "webs/webs_all.txt"
-        fi
-
-        # Proceed only if webs_all.txt exists and is non-empty
-        if [[ -s "webs/webs_all.txt" ]]; then
-            _print_msg INFO "Running: Corsy for CORS Scan"
-            run_command "${tools}/Corsy/venv/bin/python3" "${tools}/Corsy/corsy.py" -i "webs/webs_all.txt" -o "vulns/cors.txt" 2>>"$LOGFILE" >/dev/null
-        else
-            end_func "No webs/webs_all.txt file found, CORS Scan skipped." "${FUNCNAME[0]}"
-            return
-        fi
-
-        end_func "Results are saved in vulns/cors.txt" "${FUNCNAME[0]}"
-
-    else
-        # Handle cases where CORS is false, no vulnerable URLs, or already processed
-        if [[ $CORS == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
-        elif [[ ! -s "gf/xss.txt" ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for CORS"
-        else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
-        fi
-    fi
-
-}
-
-function open_redirect() {
-
-    # Create necessary directories
-    if ! ensure_dirs .tmp webs vulns; then return 1; fi
-
-    # Check if the function should run
-    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $OPEN_REDIRECT == true ]] \
-        && [[ -s "gf/redirect.txt" ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-
-        start_func "${FUNCNAME[0]}" "Open Redirects Checks"
-
-        # Determine whether to proceed based on DEEP flag or number of URLs
-        URL_COUNT=$(wc -l <"gf/redirect.txt")
-        if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT ]]; then
-
-            _print_msg INFO "Running: Open Redirects Payload Generation"
-
-            # Process redirect.txt with qsreplace and filter lines containing 'FUZZ'
-            run_command qsreplace FUZZ <"gf/redirect.txt" | sed '/FUZZ/!d' | anew -q ".tmp/tmp_redirect.txt"
-
-            # Run Oralyzer with the generated payloads
-            run_command "${tools}/Oralyzer/venv/bin/python3" "${tools}/Oralyzer/oralyzer.py" -l ".tmp/tmp_redirect.txt" -p "${tools}/Oralyzer/payloads.txt" >"vulns/redirect.txt" 2>>"$LOGFILE"
-
-            # Remove ANSI color codes from the output
-            sed -r -i "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" "vulns/redirect.txt"
-
-            end_func "Results are saved in vulns/redirect.txt" "${FUNCNAME[0]}"
-        else
-            end_func "Skipping Open Redirects: Too many URLs to test, try with --deep flag." "${FUNCNAME[0]}"
-            printf "${bgreen}#######################################################################${reset}\n"
-        fi
-    else
-        # Handle cases where OPEN_REDIRECT is false, no vulnerable URLs, or already processed
-        if [[ $OPEN_REDIRECT == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
-        elif [[ ! -s "gf/redirect.txt" ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for open redirect"
-        else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
-        fi
-    fi
-
-}
-
 function ssrf_checks() {
 
     # Create necessary directories
@@ -206,29 +122,45 @@ function ssrf_checks() {
 
             _print_msg INFO "Running: SSRF Payload Generation"
 
-            # Generate temporary SSRF payloads
+            # Generate classic callback payloads.
             run_command qsreplace "$COLLAB_SERVER_FIX" <"gf/ssrf.txt" | anew -q ".tmp/tmp_ssrf.txt"
-
             run_command qsreplace "$COLLAB_SERVER_URL" <"gf/ssrf.txt" | anew -q ".tmp/tmp_ssrf.txt"
 
-    # Run FFUF to find requested URLs
-    _print_msg INFO "Running: FFUF for SSRF Requested URLs"
-    run_command ffuf -v -H "${HEADER}" -t "$FFUF_THREADS" -rate "$FFUF_RATELIMIT" -w ".tmp/tmp_ssrf.txt" -u "FUZZ" 2>/dev/null \
-        | anew -q "vulns/ssrf_requested.txt"
+            # Run FFUF to find requested URLs.
+            _print_msg INFO "Running: FFUF for SSRF Requested URLs"
+            run_command ffuf -v -H "${HEADER}" -t "$FFUF_THREADS" -rate "$FFUF_RATELIMIT" -w ".tmp/tmp_ssrf.txt" -u "FUZZ" 2>/dev/null \
+                | anew -q "vulns/ssrf_requested.txt"
 
-    # Run FFUF with header injection for SSRF
-    _print_msg INFO "Running: FFUF for SSRF Requested Headers with COLLAB_SERVER_FIX"
-    run_command ffuf -v -w ".tmp/tmp_ssrf.txt:W1,${tools}/headers_inject.txt:W2" -H "${HEADER}" -H "W2: ${COLLAB_SERVER_FIX}" -t "$FFUF_THREADS" \
-        -rate "$FFUF_RATELIMIT" -u "W1" 2>/dev/null | anew -q "vulns/ssrf_requested_headers.txt"
+            # Run FFUF with header injection for SSRF.
+            _print_msg INFO "Running: FFUF for SSRF Requested Headers with callback tokens"
+            run_command ffuf -v -w ".tmp/tmp_ssrf.txt:W1,${tools}/headers_inject.txt:W2" -H "${HEADER}" -H "W2: ${COLLAB_SERVER_FIX}" -t "$FFUF_THREADS" \
+                -rate "$FFUF_RATELIMIT" -u "W1" 2>/dev/null | anew -q "vulns/ssrf_requested_headers.txt"
+            run_command ffuf -v -w ".tmp/tmp_ssrf.txt:W1,${tools}/headers_inject.txt:W2" -H "${HEADER}" -H "W2: ${COLLAB_SERVER_URL}" -t "$FFUF_THREADS" \
+                -rate "$FFUF_RATELIMIT" -u "W1" 2>/dev/null | anew -q "vulns/ssrf_requested_headers.txt"
 
-    _print_msg INFO "Running: FFUF for SSRF Requested Headers with COLLAB_SERVER_URL"
-    run_command ffuf -v -w ".tmp/tmp_ssrf.txt:W1,${tools}/headers_inject.txt:W2" -H "${HEADER}" -H "W2: ${COLLAB_SERVER_URL}" -t "$FFUF_THREADS" \
-        -rate "$FFUF_RATELIMIT" -u "W1" 2>/dev/null | anew -q "vulns/ssrf_requested_headers.txt"
+            # Additional protocol payloads (gopher/dict/file/metadata endpoints).
+            local ssrf_payloads_file="${SCRIPTPATH}/config/ssrf_payloads.txt"
+            if [[ -s "$ssrf_payloads_file" ]]; then
+                : >".tmp/tmp_ssrf_protocols.txt"
+                while IFS= read -r payload || [[ -n "$payload" ]]; do
+                    [[ -z "$payload" || "$payload" =~ ^# ]] && continue
+                    payload="${payload//\{COLLAB\}/$COLLAB_SERVER_FIX}"
+                    payload="${payload//\{COLLAB_URL\}/$COLLAB_SERVER_URL}"
+                        run_command qsreplace "$payload" <"gf/ssrf.txt" | anew -q ".tmp/tmp_ssrf_protocols.txt"
+                done <"$ssrf_payloads_file"
 
-            # Allow time for callbacks to be received
+                if [[ -s ".tmp/tmp_ssrf_protocols.txt" ]]; then
+                    _print_msg INFO "Running: FFUF for SSRF alternate protocols"
+                    run_command ffuf -v -H "${HEADER}" -t "$FFUF_THREADS" -rate "$FFUF_RATELIMIT" -w ".tmp/tmp_ssrf_protocols.txt" -u "FUZZ" \
+                        -mr "${SSRF_ALT_MATCH_REGEX:-169\\.254\\.169\\.254|latest/meta-data|root:|127\\.0\\.0\\.1|localhost|gopher://|dict://|file://}" 2>/dev/null \
+                        | grep "URL" | sed 's/| URL | //' | anew -q "vulns/ssrf_alt_protocols.txt"
+                fi
+            fi
+
+            # Allow time for callbacks to be received.
             sleep 5
 
-            # Process SSRF callback results if INTERACT is enabled
+            # Process SSRF callback results if INTERACT is enabled.
             if [[ $INTERACT == true ]] && [[ -s ".tmp/ssrf_callback.txt" ]]; then
                 tail -n +11 .tmp/ssrf_callback.txt | anew -q "vulns/ssrf_callback.txt"
                 if ! NUMOFLINES=$(tail -n +12 .tmp/ssrf_callback.txt | sed '/^$/d' | wc -l); then
@@ -237,7 +169,7 @@ function ssrf_checks() {
                 notification "SSRF: ${NUMOFLINES} callbacks received" info
             fi
 
-            end_func "Results are saved in vulns/ssrf_*" "${FUNCNAME[0]}"
+            end_func "Results are saved in vulns/ssrf_* (including alternate protocols)" "${FUNCNAME[0]}"
         else
             end_func "Skipping SSRF: Too many URLs to test, try with --deep flag." "${FUNCNAME[0]}"
             printf "${bgreen}#######################################################################${reset}\n"
@@ -367,6 +299,9 @@ function ssti() {
         # Ensure gf/ssti.txt is not empty
         if [[ -s "gf/ssti.txt" ]]; then
             local ssti_engine="${SSTI_ENGINE:-tinja}"
+            if [[ "$ssti_engine" != "tinja" ]]; then
+                _print_msg WARN "SSTI_ENGINE='${ssti_engine}' is deprecated; using TInjA."
+            fi
 
             _print_msg INFO "Running: SSTI Payload Generation"
 
@@ -378,36 +313,32 @@ function ssti() {
             if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT ]]; then
                 : >".tmp/ssti_candidates.txt"
 
-                if [[ "$ssti_engine" == "tinja" ]] && command -v tinja >/dev/null 2>&1; then
-                    _print_msg INFO "Running: SSTI Checks with TInjA"
-                    local tinja_report_dir="$dir/.tmp/tinja"
-                    mkdir -p "$tinja_report_dir"
-                    local -a tinja_cmd=(tinja url --reportpath "${tinja_report_dir}/" --ratelimit "${TINJA_RATELIMIT:-0}" --timeout "${TINJA_TIMEOUT:-15}" --verbosity 0)
-                    if [[ -n "${HEADER:-}" ]]; then
-                        tinja_cmd+=(-H "${HEADER}")
-                    fi
-                    while IFS= read -r u; do
-                        [[ -n "$u" ]] && tinja_cmd+=(--url "$u")
-                    done <".tmp/tmp_ssti.txt"
+                if ! command -v tinja >/dev/null 2>&1; then
+                    end_func "Skipping SSTI: TInjA not installed (no legacy fallback)." "${FUNCNAME[0]}" "SKIP_MISSING_TOOL"
+                    return 0
+                fi
 
-                    if ! run_command "${tinja_cmd[@]}" 2>>"$LOGFILE" >/dev/null; then
-                        log_note "ssti: tinja execution failed, no findings collected" "${FUNCNAME[0]}" "${LINENO}"
-                    fi
+                _print_msg INFO "Running: SSTI Checks with TInjA"
+                local tinja_report_dir="$dir/.tmp/tinja"
+                mkdir -p "$tinja_report_dir"
+                local -a tinja_cmd=(tinja url --reportpath "${tinja_report_dir}/" --ratelimit "${TINJA_RATELIMIT:-0}" --timeout "${TINJA_TIMEOUT:-15}" --verbosity 0)
+                if [[ -n "${HEADER:-}" ]]; then
+                    tinja_cmd+=(-H "${HEADER}")
+                fi
+                while IFS= read -r u; do
+                    [[ -n "$u" ]] && tinja_cmd+=(--url "$u")
+                done <".tmp/tmp_ssti.txt"
 
-                    local report_file=""
-                    report_file=$(ls -1t "${tinja_report_dir}"/*.jsonl 2>/dev/null | head -n 1 || true)
-                    if [[ -n "$report_file" && -s "$report_file" ]]; then
-                        jq -r 'select((.isWebpageVulnerable == true) or any(.parameters[]?; .isParameterVulnerable == true)) | (.url // empty) + " [certainty:" + (.certainty // "unknown") + "]"' "$report_file" 2>/dev/null \
-                            | sed '/^\s*$/d' \
-                            | anew -q ".tmp/ssti_candidates.txt"
-                    fi
-                else
-                    [[ "$ssti_engine" == "tinja" ]] && _print_msg WARN "TInjA not found. Falling back to legacy SSTI check."
-                    _print_msg INFO "Running: SSTI Fuzzing with FFUF"
+                if ! run_command "${tinja_cmd[@]}" 2>>"$LOGFILE" >/dev/null; then
+                    log_note "ssti: tinja execution failed, no findings collected" "${FUNCNAME[0]}" "${LINENO}"
+                fi
 
-                    # Use Interlace to parallelize FFUF scanning
-                    run_command interlace -tL ".tmp/tmp_ssti.txt" -threads "$INTERLACE_THREADS" -c "ffuf -v -r -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w \"${ssti_wordlist}\" -u \"_target_\" -mr \"ssti49\"" 2>>"$LOGFILE" \
-                        | grep "URL" | sed 's/| URL | //' | anew -q ".tmp/ssti_candidates.txt"
+                local report_file=""
+                report_file=$(ls -1t "${tinja_report_dir}"/*.jsonl 2>/dev/null | head -n 1 || true)
+                if [[ -n "$report_file" && -s "$report_file" ]]; then
+                    jq -r 'select((.isWebpageVulnerable == true) or any(.parameters[]?; .isParameterVulnerable == true)) | (.url // empty) + " [certainty:" + (.certainty // "unknown") + "]"' "$report_file" 2>/dev/null \
+                        | sed '/^\s*$/d' \
+                        | anew -q ".tmp/ssti_candidates.txt"
                 fi
 
                 if [[ -s ".tmp/ssti_candidates.txt" ]]; then
@@ -675,62 +606,6 @@ function 4xxbypass() {
 
 }
 
-function prototype_pollution() {
-
-    # Create necessary directories
-    if ! ensure_dirs .tmp webs vulns; then return 1; fi
-
-    # Check if the function should run
-    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $PROTO_POLLUTION == true ]] \
-        && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-
-        start_func "${FUNCNAME[0]}" "Prototype Pollution Checks"
-
-        if [[ ! -s "webs/url_extract_nodupes.txt" ]]; then
-            _print_msg WARN "File webs/url_extract_nodupes.txt is missing or empty."
-            end_func "Skipping prototype pollution: missing URL candidates." "${FUNCNAME[0]}" "SKIP"
-            return
-        fi
-
-        # Determine whether to proceed based on DEEP flag or number of URLs
-        URL_COUNT=$(wc -l <"webs/url_extract_nodupes.txt" 2>/dev/null || echo 0)
-        if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT ]]; then
-
-            # Ensure fuzzing_full.txt exists and has content
-            if [[ -s "webs/url_extract_nodupes.txt" ]]; then
-                _print_msg INFO "Running: Prototype Pollution Mapping"
-
-                # Process URL list with ppmap and save results
-                ppmap <"webs/url_extract_nodupes.txt" >".tmp/prototype_pollution.txt" 2>>"$LOGFILE"
-
-                # Filter and save relevant results
-                if [[ -s ".tmp/prototype_pollution.txt" ]]; then
-                    grep "EXPL" ".tmp/prototype_pollution.txt" | anew -q "vulns/prototype_pollution.txt"
-                fi
-
-                end_func "Results are saved in vulns/prototype_pollution.txt" "${FUNCNAME[0]}"
-            else
-                end_func "Skipping prototype pollution: missing URL candidates." "${FUNCNAME[0]}" "SKIP"
-                return
-            fi
-
-        else
-            end_func "Skipping Prototype Pollution: Too many URLs to test, try with --deep flag." "${FUNCNAME[0]}"
-        fi
-
-    else
-        # Handle cases where PROTO_POLLUTION is false, no vulnerable URLs, or already processed
-        if [[ $PROTO_POLLUTION == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
-        elif [[ ! -s "webs/url_extract_nodupes.txt" ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for prototype pollution"
-        else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
-        fi
-    fi
-
-}
-
 function smuggling() {
 
     # Create necessary directories
@@ -941,4 +816,93 @@ function fuzzparams() {
         fi
     fi
 
+}
+
+_nuclei_dast_collect_targets() {
+    : >".tmp/nuclei_dast_targets.txt"
+
+    # Baseline web targets.
+    if [[ -s "webs/webs_all.txt" ]]; then
+        grep -aE '^https?://' "webs/webs_all.txt" | anew -q ".tmp/nuclei_dast_targets.txt"
+    fi
+    if [[ -s "webs/url_extract_nodupes.txt" ]]; then
+        grep -aE '^https?://' "webs/url_extract_nodupes.txt" | anew -q ".tmp/nuclei_dast_targets.txt"
+    fi
+
+    # Candidate URLs generated by GF patterns across vuln modules.
+    local gf_file
+    for gf_file in gf/*.txt; do
+        [[ -s "$gf_file" ]] || continue
+        grep -aE '^https?://' "$gf_file" | anew -q ".tmp/nuclei_dast_targets.txt"
+    done
+
+    sort -u ".tmp/nuclei_dast_targets.txt" -o ".tmp/nuclei_dast_targets.txt" 2>/dev/null || true
+}
+
+function nuclei_dast() {
+
+    if ! ensure_dirs .tmp webs gf vulns nuclei_output; then return 1; fi
+
+    # nuclei_dast is part of the vulnerability scanning pipeline.
+    # If the user enables vulns (e.g. `-a`), force-enable this DAST pass to replace deprecated single-purpose modules.
+    local dast_enabled="${NUCLEI_DAST:-true}"
+    if [[ ${VULNS_GENERAL:-false} == true ]]; then
+        if [[ ${NUCLEI_DAST:-true} != true ]]; then
+            _print_msg WARN "NUCLEI_DAST is forced enabled when VULNS_GENERAL=true (e.g. -a)."
+        fi
+        dast_enabled=true
+    fi
+
+    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ "$dast_enabled" == true ]]; then
+        start_func "${FUNCNAME[0]}" "Nuclei DAST Scanner"
+        maybe_update_nuclei
+
+        _nuclei_dast_collect_targets
+        if [[ ! -s ".tmp/nuclei_dast_targets.txt" ]]; then
+            end_func "No DAST targets available from webs/url/gf inputs." "${FUNCNAME[0]}" "SKIP_NOINPUT"
+            return 0
+        fi
+
+        local url_count
+        url_count=$(wc -l <".tmp/nuclei_dast_targets.txt" 2>/dev/null || echo 0)
+        if [[ $DEEP != true ]] && [[ "$url_count" -gt "${DEEP_LIMIT2:-1500}" ]]; then
+            end_func "Skipping Nuclei DAST: too many targets (${url_count}), use --deep." "${FUNCNAME[0]}"
+            return 0
+        fi
+
+        local dast_templates="${NUCLEI_DAST_TEMPLATE_PATH:-${NUCLEI_TEMPLATES_PATH}/dast}"
+        if [[ $AXIOM != true ]]; then
+            # shellcheck disable=SC2086  # Intentionally allow user-provided nuclei args
+            run_command nuclei -l ".tmp/nuclei_dast_targets.txt" -dast -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 \
+                $NUCLEI_EXTRA_ARGS $NUCLEI_DAST_EXTRA_ARGS -t "$dast_templates" -j -o ".tmp/nuclei_dast_json_raw.txt" \
+                2>>"$LOGFILE" >/dev/null
+        else
+            # shellcheck disable=SC2086  # Intentionally allow user-provided nuclei args
+            run_command axiom-scan ".tmp/nuclei_dast_targets.txt" -m nuclei -dast -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 \
+                $NUCLEI_EXTRA_ARGS $NUCLEI_DAST_EXTRA_ARGS -t "$dast_templates" -j -o ".tmp/nuclei_dast_json_raw.txt" \
+                $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+        fi
+
+        if [[ -s ".tmp/nuclei_dast_json_raw.txt" ]]; then
+            jq -c '. + {scan_scope:"dast"}' ".tmp/nuclei_dast_json_raw.txt" 2>/dev/null >"nuclei_output/dast_json.txt"
+            jq -r '["[" + .["template-id"] + (if .["matcher-name"] != null then ":" + .["matcher-name"] else "" end) + "] [" + .["type"] + "] [" + .info.severity + "] " + (.["matched-at"] // .host)] | .[]' \
+                "nuclei_output/dast_json.txt" 2>/dev/null | anew -q "vulns/nuclei_dast.txt"
+        else
+            : >"nuclei_output/dast_json.txt"
+        fi
+
+        if [[ $FARADAY == true ]] && [[ -s "nuclei_output/dast_json.txt" ]]; then
+            if faraday-cli status 2>>"$LOGFILE" >/dev/null; then
+                faraday-cli tool report -w "$FARADAY_WORKSPACE" --plugin-id nuclei "nuclei_output/dast_json.txt" 2>>"$LOGFILE" >/dev/null
+            fi
+        fi
+
+        end_func "Results are saved in nuclei_output/dast_json.txt and vulns/nuclei_dast.txt" "${FUNCNAME[0]}"
+    else
+        if [[ "$dast_enabled" == false ]]; then
+            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+        else
+            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+        fi
+    fi
 }

