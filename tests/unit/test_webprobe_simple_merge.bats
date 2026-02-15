@@ -63,3 +63,61 @@ SH
   grep -q "new.example.com" "webs/web_full_info.txt"
 }
 
+@test "webprobe_simple works when prior web_full_info cache is missing" {
+  mkdir -p .tmp webs subdomains
+  rm -f .tmp/web_full_info.txt
+  printf "a.example.com\n" > subdomains/subdomains.txt
+
+  cat > "$MOCK_BIN/httpx" <<'SH'
+#!/usr/bin/env bash
+out=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o)
+      out="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+printf '%s\n' '{"input":"new","url":"https://new.example.com"}' > "$out"
+SH
+  chmod +x "$MOCK_BIN/httpx"
+
+  run webprobe_simple
+  [ "$status" -eq 0 ]
+  [ -s "webs/web_full_info.txt" ]
+  grep -q "new.example.com" "webs/web_full_info.txt"
+}
+
+@test "webprobe_simple falls back when cache contains non-JSON" {
+  mkdir -p .tmp webs subdomains
+  printf "a.example.com\n" > subdomains/subdomains.txt
+  printf '%s\n' 'NOT_JSON' > .tmp/web_full_info.txt
+
+  cat > "$MOCK_BIN/httpx" <<'SH'
+#!/usr/bin/env bash
+out=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o)
+      out="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+printf '%s\n' '{"input":"new","url":"https://new.example.com"}' > "$out"
+SH
+  chmod +x "$MOCK_BIN/httpx"
+
+  run webprobe_simple
+  [ "$status" -eq 0 ]
+  [ -s "webs/web_full_info.txt" ]
+  grep -q "new.example.com" "webs/web_full_info.txt"
+  ! grep -q "NOT_JSON" ".tmp/web_full_info.txt"
+}

@@ -217,6 +217,7 @@ declare -A gotools=(
 	    ["roboxtractor"]="go install -v github.com/Josue87/roboxtractor@latest"
 	    ["mapcidr"]="go install -v github.com/projectdiscovery/mapcidr/cmd/mapcidr@latest"
 	    ["cdncheck"]="go install -v github.com/projectdiscovery/cdncheck/cmd/cdncheck@latest"
+	    ["asnmap"]="go install -v github.com/projectdiscovery/asnmap/cmd/asnmap@latest"
     ["dnstake"]="go install -v github.com/pwnesia/dnstake/cmd/dnstake@latest"
     ["tlsx"]="go install -v github.com/projectdiscovery/tlsx/cmd/tlsx@latest"
     ["gitdorks_go"]="go install -v github.com/damit5/gitdorks_go@latest"
@@ -800,7 +801,7 @@ function install_system_packages() {
 # Function to install required packages for Debian-based systems
 function install_apt() {
     $SUDO apt-get update -y &>/dev/null
-    $SUDO apt-get install -y python3 python3-pip python3-venv pipx python3-virtualenv build-essential gcc cmake ruby whois git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx medusa xvfb libxml2-utils procps bsdmainutils libdata-hexdump-perl &>/dev/null
+    $SUDO apt-get install -y python3 python3-pip python3-venv pipx python3-virtualenv build-essential gcc cmake ruby whois git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx medusa xvfb libxml2-utils procps bsdmainutils libdata-hexdump-perl libimage-exiftool-perl &>/dev/null
     # Move chromium browser dependencies (required by `nuclei -headless -id screenshot`) into a separate apt install command, and add a fallback for Ubuntu 24.04 (where `libasound2` is renamed to `libasound2t64`)
     $SUDO apt-get install -y libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon-x11-0 libxcomposite-dev libxdamage1 libxrandr2 libgbm-dev libpangocairo-1.0-0 libasound2 &>/dev/null \
         || $SUDO apt-get install -y libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon-x11-0 libxcomposite-dev libxdamage1 libxrandr2 libgbm-dev libpangocairo-1.0-0 libasound2t64 &>/dev/null
@@ -820,7 +821,7 @@ function install_brew() {
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     fi
     brew update &>/dev/null
-	brew install --formula bash coreutils gnu-getopt gnu-sed python pipx massdns jq gcc cmake ruby git curl wget zip pv bind whois nmap lynx medusa shodan &>/dev/null
+	brew install --formula bash coreutils gnu-getopt gnu-sed python pipx massdns jq gcc cmake ruby git curl wget zip pv bind whois exiftool nmap lynx medusa shodan &>/dev/null
 	brew install rustup &>/dev/null
 	rustup-init -y &>/dev/null
 	cargo install smugglex &>/dev/null
@@ -831,7 +832,7 @@ function install_yum() {
     $SUDO yum groupinstall "Development Tools" -y &>/dev/null
     # Base install first (python3 may be 3.6 on older EL)
     $SUDO yum install -y epel-release &>/dev/null || true
-    $SUDO yum install -y python3 python3-pip gcc cmake ruby git curl libpcap whois wget pipx zip pv bind-utils openssl-devel libffi-devel libxml2-devel libxslt-devel zlib-devel nmap jq lynx medusa xorg-x11-server-xvfb &>/dev/null
+    $SUDO yum install -y python3 python3-pip gcc cmake ruby git curl libpcap whois perl-Image-ExifTool wget pipx zip pv bind-utils openssl-devel libffi-devel libxml2-devel libxslt-devel zlib-devel nmap jq lynx medusa xorg-x11-server-xvfb &>/dev/null
 
     # Ensure Python >= 3.7 on yum-based systems
     if ! python3 - <<-'PYCHK' &>/dev/null; then
@@ -896,7 +897,7 @@ function install_yum() {
 
 # Function to install required packages for Arch-based systems
 function install_pacman() {
-    $SUDO pacman -Sy --noconfirm python python-pip base-devel gcc cmake ruby git curl libpcap python-pipx whois wget zip pv bind openssl libffi libxml2 libxslt zlib nmap jq lynx medusa xorg-server-xvfb &>/dev/null
+    $SUDO pacman -Sy --noconfirm python python-pip base-devel gcc cmake ruby git curl libpcap python-pipx whois perl-image-exiftool wget zip pv bind openssl libffi libxml2 libxslt zlib nmap jq lynx medusa xorg-server-xvfb &>/dev/null
 	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
 	source "${HOME}/.cargo/env"
 	cargo install smugglex &>/dev/null
@@ -921,7 +922,7 @@ function setup_reconftw_venv() {
     fi
     if [[ -x "${venv_dir}/bin/pip" ]]; then
         "${venv_dir}/bin/pip" install -U pip &>/dev/null || true
-        "${venv_dir}/bin/pip" install jsbeautifier &>/dev/null || true
+        "${venv_dir}/bin/pip" install jsbeautifier requests &>/dev/null || true
     else
         msg_warn "[!] venv pip not found at ${venv_dir}/bin/pip"
     fi

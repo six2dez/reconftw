@@ -12,6 +12,9 @@ ARG LANGUAGE=en_US
 
 FROM ubuntu:24.04 AS base
 
+# NOTE: This image intentionally runs as root. Some recon tooling relies on privileged operations
+# (e.g., raw sockets/capabilities) and is commonly executed with elevated permissions.
+
 LABEL org.label-schema.name='reconftw'
 LABEL org.label-schema.description='A simple script for full recon'
 LABEL org.label-schema.usage='https://github.com/six2dez/reconftw'
@@ -61,13 +64,13 @@ apt update
 apt full-upgrade -f -y --allow-downgrades
 apt install -y --no-install-recommends apt-utils ca-certificates curl git lsb-release nano wget vim jq htop net-tools dnsutils nmap python3 python3-pip unzip whois
 
-###>> Congifure Locales <<###
+###>> Configure Locales <<###
 apt install -y --no-install-recommends locales
 sed -i -- "/${LANG}/s/^# //g" /etc/locale.gen
 dpkg-reconfigure locales
 update-locale LANG=${LANG}
 
-###>> Congifure localepurge <<###
+###>> Configure localepurge <<###
 apt install -y --no-install-recommends localepurge
 sed -i -- '/^USE_DPKG/s/^/#/' /etc/locale.nopurge
 dpkg-reconfigure localepurge

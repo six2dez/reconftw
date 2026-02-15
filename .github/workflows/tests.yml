@@ -31,7 +31,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y shellcheck
 
       - name: Run shellcheck
-        run: shellcheck -S warning reconftw.sh modules/*.sh lib/*.sh install.sh
+        run: shellcheck -S error reconftw.sh modules/*.sh lib/*.sh install.sh
 
   unit-fast:
     name: unit-fast

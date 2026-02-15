@@ -1,37 +1,37 @@
 ---
 - hosts: all
   become: true
+  vars:
+    reconftw_repo: "https://github.com/six2dez/reconftw.git"
+    reconftw_dest: "/opt/reconftw"
+    reconftw_branch_default: "main"
   tasks:
-    - name: Update and upgrade apt packages
-      become: true
-      apt:
-       upgrade: no
-       update_cache: yes
-       cache_valid_time: 86400 #One day
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 86400
 
-    - name: Install GoLang
-      apt:
-        name: golang
-        state: present
-    - name: Install rsync
-      apt:
-        name: rsync
-        state: present
-    - name: Add Go into the PATH variable
-      shell: echo "export PATH=$PATH:/usr/local/go/bin" > /etc/profile.d/go.sh 
-    - name: Install Git
-      apt:
+    - name: Ensure git is installed (required to clone the repo)
+      ansible.builtin.apt:
         name: git
         state: present
-    - name: Clone ReconFTW
-      git:
-        repo: https://github.com/six2dez/reconftw.git
-        dest: /opt/reconftw/
-        clone: yes
-        update: yes  
-    - name: Install ReconFTW
-      command: chdir=/opt/reconftw/ ./install.sh
-    - name: Copy reconftw.cfg File
-      synchronize:
+
+    - name: Clone reconFTW
+      ansible.builtin.git:
+        repo: "{{ reconftw_repo }}"
+        dest: "{{ reconftw_dest }}"
+        version: "{{ reconftw_branch | default(reconftw_branch_default) }}"
+        update: yes
+
+    - name: Install reconFTW dependencies and tools
+      ansible.builtin.command: ./install.sh --verbose
+      args:
+        chdir: "{{ reconftw_dest }}"
+
+    - name: Copy reconftw.cfg
+      ansible.builtin.copy:
         src: files/reconftw.cfg
-        dest: /opt/reconftw/reconftw.cfg
+        dest: "{{ reconftw_dest }}/reconftw.cfg"
+        owner: root
+        group: root
+        mode: "0644"

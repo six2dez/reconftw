@@ -91,6 +91,9 @@ function start() {
     fi
     mkdir -p {.log,.tmp,webs,hosts,vulns,osint,screenshots,subdomains}
     chmod 700 .tmp 2>/dev/null || true
+    # Baseline inputs expected by multiple modules (avoid pipefail errors on missing files).
+    touch webs/webs.txt webs/webs_uncommon_ports.txt webs/webs_all.txt \
+        subdomains/subdomains.txt .tmp/web_full_info.txt 2>/dev/null || true
 
     # Load plugins and emit start event
     plugins_load
@@ -572,6 +575,8 @@ function multi_osint() {
         exit 1
     }
     mkdir -p {.log,.tmp,webs,hosts,vulns,osint,screenshots,subdomains}
+    touch webs/webs.txt webs/webs_uncommon_ports.txt webs/webs_all.txt \
+        subdomains/subdomains.txt .tmp/web_full_info.txt 2>/dev/null || true
 
     NOW=$(date +"%F")
     NOWT=$(date +"%T")
@@ -593,6 +598,8 @@ function multi_osint() {
             exit 1
         }
         mkdir -p {.log,.tmp,webs,hosts,vulns,osint,screenshots,subdomains}
+        touch webs/webs.txt webs/webs_uncommon_ports.txt webs/webs_all.txt \
+            subdomains/subdomains.txt .tmp/web_full_info.txt 2>/dev/null || true
         NOW=$(date +"%F")
         NOWT=$(date +"%T")
         LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
@@ -776,6 +783,8 @@ function multi_recon() {
     }
 
     mkdir -p {.log,.tmp,webs,hosts,vulns,osint,screenshots,subdomains}
+    touch webs/webs.txt webs/webs_uncommon_ports.txt webs/webs_all.txt \
+        subdomains/subdomains.txt .tmp/web_full_info.txt 2>/dev/null || true
     NOW=$(date +"%F")
     NOWT=$(date +"%T")
     LOGFILE="${workdir}/.log/${NOW}_${NOWT}.txt"
@@ -808,6 +817,8 @@ function multi_recon() {
         }
 
         mkdir -p {.log,.tmp,webs,hosts,vulns,osint,screenshots,subdomains}
+        touch webs/webs.txt webs/webs_uncommon_ports.txt webs/webs_all.txt \
+            subdomains/subdomains.txt .tmp/web_full_info.txt 2>/dev/null || true
 
         NOW=$(date +"%F")
         NOWT=$(date +"%T")

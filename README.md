@@ -353,7 +353,7 @@ cd reconftw
 4. **Customization**:
    - Modify the Docker image or build your own; see the [Docker Guide](https://github.com/six2dez/reconftw/wiki/4.-Docker).
    - To skip Axiom tooling in custom builds, pass `--build-arg INSTALL_AXIOM=false`.
-   - Mount your notify config at `~/.config/notify/providerconfig.yaml` inside the container if you use notifications.
+   - Mount your notify config at `~/.config/notify/provider-config.yaml` inside the container if you use notifications.
 
 5. **Secrets at Runtime**:
 
@@ -1265,7 +1265,7 @@ reconftw/
 
 ```bash
 make test          # Unit tests
-make test-security # Security tests  
+make test-security # Security tests
 make test-all      # All tests
 make lint          # Shellcheck
 make lint-fix      # Auto-fix with shfmt

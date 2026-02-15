@@ -99,14 +99,17 @@ function webprobe_simple() {
     if ! ensure_dirs .tmp webs subdomains; then return 1; fi
 
     # Check if the function should run
-    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $WEBPROBESIMPLE == true ]]; then
-        start_subfunc "${FUNCNAME[0]}" "Running: HTTP probing $domain"
+	    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $WEBPROBESIMPLE == true ]]; then
+	        start_subfunc "${FUNCNAME[0]}" "Running: HTTP probing $domain"
 
-        # If in multi mode and subdomains.txt doesn't exist, create it
-        if [[ -n $multi ]] && [[ ! -f "$dir/subdomains/subdomains.txt" ]]; then
-            printf "%b\n" "$domain" >"$dir/subdomains/subdomains.txt"
-            touch .tmp/web_full_info.txt webs/web_full_info.txt
-        fi
+	        # Baseline cache files (some modules merge into these).
+	        touch .tmp/web_full_info.txt .tmp/web_full_info_probe.txt webs/web_full_info.txt 2>/dev/null || true
+
+	        # If in multi mode and subdomains.txt doesn't exist, create it
+	        if [[ -n $multi ]] && [[ ! -f "$dir/subdomains/subdomains.txt" ]]; then
+	            printf "%b\n" "$domain" >"$dir/subdomains/subdomains.txt"
+	            touch .tmp/web_full_info.txt webs/web_full_info.txt
+	        fi
 
         # Run httpx or axiom-scan
         if [[ $AXIOM != true ]]; then
@@ -119,11 +122,22 @@ function webprobe_simple() {
             run_command axiom-scan subdomains/subdomains.txt -m httpx $HTTPX_FLAGS -no-color -json -random-agent \
                 -threads "$HTTPX_THREADS" -rl "$HTTPX_RATELIMIT" -retries 2 -timeout "$HTTPX_TIMEOUT" \
                 -o .tmp/web_full_info_probe.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
-        fi
+	        fi
 
-        # Merge current probe output with prior cache/state.
-        cat .tmp/web_full_info_probe.txt .tmp/web_full_info.txt 2>>"$LOGFILE" \
-            | jq -s 'try .' | jq 'try unique_by(.input)' | jq 'try .[]' 2>>"$LOGFILE" >webs/web_full_info.txt
+	        # Merge current probe output with prior cache/state.
+	        touch .tmp/web_full_info_probe.txt .tmp/web_full_info.txt 2>/dev/null || true
+	        if ! cat .tmp/web_full_info_probe.txt .tmp/web_full_info.txt 2>>"$LOGFILE" \
+	            | jq -cs 'unique_by(.input)[]' 2>>"$LOGFILE" >webs/web_full_info.txt; then
+	            log_note "webprobe_simple: failed to merge httpx JSON; falling back to probe-only" "${FUNCNAME[0]}" "${LINENO}"
+	            awk 'match($0, /^[[:space:]]*\\{/) {print}' .tmp/web_full_info_probe.txt >.tmp/web_full_info_merge_input.jsonl 2>/dev/null || true
+	            if [[ -s ".tmp/web_full_info_merge_input.jsonl" ]]; then
+	                jq -cs 'unique_by(.input)[]' .tmp/web_full_info_merge_input.jsonl 2>>"$LOGFILE" >webs/web_full_info.txt || : >webs/web_full_info.txt
+	            else
+	                : >webs/web_full_info.txt
+	            fi
+	        fi
+	        # Keep cache as JSONL for later merges.
+	        cp webs/web_full_info.txt .tmp/web_full_info.txt 2>/dev/null || true
 
         # Extract URLs
         if [[ -s "webs/web_full_info.txt" ]]; then
@@ -158,13 +172,13 @@ function webprobe_simple() {
         if ! NUMOFLINES=$(anew webs/webs.txt <.tmp/probed_tmp.txt 2>/dev/null | sed '/^$/d' | wc -l); then
             print_warnf "Failed to count new websites."
             NUMOFLINES=0
-        fi
+	        fi
 
-        # Update webs_all.txt
-        cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
+	        # Update webs_all.txt
+	        ensure_webs_all || true
 
-        # Asset store: append probed webs
-        append_assets_from_file web url webs/webs.txt
+	        # Asset store: append probed webs
+	        append_assets_from_file web url webs/webs.txt
 
         end_subfunc "${NUMOFLINES} new websites resolved" "${FUNCNAME[0]}"
 
@@ -249,15 +263,15 @@ function webprobe_full() {
             fi
 
             # Notify user
-            notification "Uncommon web ports: ${NUMOFLINES} new websites" "good"
+	        notification "Uncommon web ports: ${NUMOFLINES} new websites" "good"
 
-            # Update webs_all.txt
-            cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
+	        # Update webs_all.txt
+	        ensure_webs_all || true
 
-            # Send to proxy if conditions met
-            if [[ $PROXY == true ]] && [[ -n $proxy_url ]] && [[ $(wc -l <webs/webs_uncommon_ports.txt) -le $DEEP_LIMIT2 ]]; then
-                notification "Sending websites with uncommon ports to proxy" "info"
-                run_command ffuf -mc all -w webs/webs_uncommon_ports.txt -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
+	        # Send to proxy if conditions met
+	        if [[ $PROXY == true ]] && [[ -n $proxy_url ]] && [[ $(wc -l <webs/webs_uncommon_ports.txt) -le $DEEP_LIMIT2 ]]; then
+	            notification "Sending websites with uncommon ports to proxy" "info"
+	            run_command ffuf -mc all -w webs/webs_uncommon_ports.txt -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
             fi
         fi
         end_func "Results are saved in $domain/webs/webs_uncommon_ports.txt" "${FUNCNAME[0]}"
@@ -281,15 +295,13 @@ function screenshot() {
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $WEBSCREENSHOT == true ]]; then
         start_func "${FUNCNAME[0]}" "Web Screenshots"
 
-        # Combine webs.txt and webs_uncommon_ports.txt into webs_all.txt if it doesn't exist
-        if [[ ! -s "webs/webs_all.txt" ]]; then
-            cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
-        fi
+	        # Build/refresh webs_all.txt from current web targets.
+	        ensure_webs_all || true
 
-        # Run nuclei or axiom-scan based on AXIOM flag
-        if [[ $AXIOM != true ]]; then
-            if [[ -s "webs/webs_all.txt" ]]; then
-                run_command nuclei -headless -id screenshot -V dir='screenshots' <webs/webs_all.txt 2>>"$LOGFILE" >/dev/null
+	        # Run nuclei or axiom-scan based on AXIOM flag
+	        if [[ $AXIOM != true ]]; then
+	            if [[ -s "webs/webs_all.txt" ]]; then
+	                run_command nuclei -headless -id screenshot -V dir='screenshots' <webs/webs_all.txt 2>>"$LOGFILE" >/dev/null
             fi
         else
             if [[ -s "webs/webs_all.txt" ]]; then
@@ -316,15 +328,13 @@ function virtualhosts() {
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $VIRTUALHOSTS == true ]]; then
         start_func "${FUNCNAME[0]}" "Virtual Hosts Discovery"
 
-        # Combine webs.txt and webs_uncommon_ports.txt into webs_all.txt if it doesn't exist
-        if [[ ! -s "webs/webs_all.txt" ]]; then
-            cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
-        fi
+	        # Build/refresh webs_all.txt from current web targets.
+	        ensure_webs_all || true
 
-        # Proceed only if webs_all.txt exists and is non-empty
-        if [[ -s "subdomains/subdomains.txt" ]] && [[ -s "hosts/ips.txt" ]]; then
-            VhostFinder -ips hosts/ips.txt -wordlist subdomains/subdomains.txt -verify | grep "+" | anew -q "$dir/webs/virtualhosts.txt"
-            end_func "Results are saved in $domain/webs/virtualhosts.txt" "${FUNCNAME[0]}"
+	        # Proceed only if webs_all.txt exists and is non-empty
+	        if [[ -s "subdomains/subdomains.txt" ]] && [[ -s "hosts/ips.txt" ]]; then
+	            VhostFinder -ips hosts/ips.txt -wordlist subdomains/subdomains.txt -verify | grep "+" | anew -q "$dir/webs/virtualhosts.txt"
+	            end_func "Results are saved in $domain/webs/virtualhosts.txt" "${FUNCNAME[0]}"
 
         else
             end_func "No subdomains or hosts file found, virtualhosts skipped." "${FUNCNAME[0]}"
@@ -362,10 +372,7 @@ function favirecon_tech() {
 
         start_func "${FUNCNAME[0]}" "Favicon Technology Recon"
 
-        # Combine webs.txt and webs_uncommon_ports.txt into webs_all.txt if it doesn't exist
-        if [[ ! -s "webs/webs_all.txt" ]]; then
-            cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q "webs/webs_all.txt"
-        fi
+        ensure_webs_all || true
 
         if [[ -s "webs/webs_all.txt" ]]; then
             local fav_cmd=(
@@ -715,52 +722,49 @@ function waf_checks() {
     if ! ensure_dirs .tmp webs; then return 1; fi
 
     # Check if the function should run
-    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $WAF_DETECTION == true ]]; then
-        start_func "${FUNCNAME[0]}" "Website's WAF Detection"
+	    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $WAF_DETECTION == true ]]; then
+	        start_func "${FUNCNAME[0]}" "Website's WAF Detection"
 
-        # Combine webs.txt and webs_uncommon_ports.txt into webs_all.txt if it doesn't exist
-        if [[ ! -s "webs/webs_all.txt" ]]; then
-            cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
-        fi
+	        ensure_webs_all || true
 
-        # Proceed only if webs_all.txt exists and is non-empty
-            if [[ -s "webs/webs_all.txt" ]]; then
-                if [[ $AXIOM != true ]]; then
-                # Run wafw00f on webs_all.txt
-                run_command wafw00f -i "webs/webs_all.txt" -o ".tmp/wafs.txt" 2>>"$LOGFILE" >/dev/null
-            else
-                # Run axiom-scan with wafw00f module on webs_all.txt
-                run_command axiom-scan "webs/webs_all.txt" -m wafw00f -o ".tmp/wafs.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
-            fi
+	        # Proceed only if webs_all.txt exists and is non-empty
+	        if [[ -s "webs/webs_all.txt" ]]; then
+	            if [[ $AXIOM != true ]]; then
+	                # Run wafw00f on webs_all.txt
+	                run_command wafw00f -i "webs/webs_all.txt" -o ".tmp/wafs.txt" 2>>"$LOGFILE" >/dev/null
+	            else
+	                # Run axiom-scan with wafw00f module on webs_all.txt
+	                run_command axiom-scan "webs/webs_all.txt" -m wafw00f -o ".tmp/wafs.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+	            fi
 
-            # Process wafs.txt if it exists and is not empty
-            if [[ -s ".tmp/wafs.txt" ]]; then
-                # Format the wafs.txt file
-                sed -e 's/^[ \t]*//' -e 's/ \+ /\t/g' -e '/(None)/d' ".tmp/wafs.txt" | tr -s "\t" ";" >"webs/webs_wafs.txt"
+	            # Process wafs.txt if it exists and is not empty
+	            if [[ -s ".tmp/wafs.txt" ]]; then
+	                # Format the wafs.txt file
+	                sed -e 's/^[ \t]*//' -e 's/ \+ /\t/g' -e '/(None)/d' ".tmp/wafs.txt" | tr -s "\t" ";" >"webs/webs_wafs.txt"
 
-                # Count the number of websites protected by WAF
-                if ! NUMOFLINES=$(sed '/^$/d' "webs/webs_wafs.txt" 2>>"$LOGFILE" | wc -l); then
-                    print_warnf "Failed to count lines in webs_wafs.txt."
-                    NUMOFLINES=0
-                fi
+	                # Count the number of websites protected by WAF
+	                if ! NUMOFLINES=$(sed '/^$/d' "webs/webs_wafs.txt" 2>>"$LOGFILE" | wc -l); then
+	                    print_warnf "Failed to count lines in webs_wafs.txt."
+	                    NUMOFLINES=0
+	                fi
 
-                # Send a notification about the number of WAF-protected websites
-                notification "${NUMOFLINES} websites protected by WAF" "info"
+	                # Send a notification about the number of WAF-protected websites
+	                notification "${NUMOFLINES} websites protected by WAF" "info"
 
-                # End the function with a success message
-                end_func "Results are saved in webs/webs_wafs.txt" "${FUNCNAME[0]}"
-            else
-                # End the function indicating no results were found
-                end_func "No results found" "${FUNCNAME[0]}"
-            fi
-        else
-            # End the function indicating there are no websites to scan
-            end_func "No websites to scan" "${FUNCNAME[0]}"
-        fi
-    else
-        # Handle cases where WAF_DETECTION is false or the function has already been processed
-        if [[ $WAF_DETECTION == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+	                # End the function with a success message
+	                end_func "Results are saved in webs/webs_wafs.txt" "${FUNCNAME[0]}"
+	            else
+	                # End the function indicating no results were found
+	                end_func "No results found" "${FUNCNAME[0]}"
+	            fi
+	        else
+	            # End the function indicating there are no websites to scan
+	            end_func "No websites to scan" "${FUNCNAME[0]}"
+	        fi
+	    else
+	        # Handle cases where WAF_DETECTION is false or the function has already been processed
+	        if [[ $WAF_DETECTION == false ]]; then
+	            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             # Domain is an IP address; skip the function
             return
@@ -882,10 +886,7 @@ function nuclei_check() {
             touch webs/webs.txt webs/webs_uncommon_ports.txt
         fi
 
-        # Combine webs.txt and webs_uncommon_ports.txt into webs_all.txt if it doesn't exist
-        if [[ ! -s "webs/webs_all.txt" ]]; then
-            cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
-        fi
+        ensure_webs_all || true
 
         # Combine webs_all.txt targets (with protocol) - avoid duplicate scans
         if [[ ! -s ".tmp/webs_subs.txt" ]]; then
@@ -1084,7 +1085,15 @@ _fuzz_run_axiom() {
     while read -r sub; do
         local sub_out
         sub_out=$(echo "$sub" | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-        [[ -s "$dir/.tmp/ffuf-content.json" ]] && jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' "$dir/.tmp/ffuf-content.json" | grep "$sub" | sort -k1 | anew -q "fuzzing/${sub_out}.txt"
+        if [[ -s "$dir/.tmp/ffuf-content.json" ]]; then
+            local tmp_out=".tmp/ffuf_${sub_out}.txt"
+            jq -r --arg sub "$sub" 'try .results[] | select(.url | contains($sub)) | "\(.status) \(.length) \(.url)"' "$dir/.tmp/ffuf-content.json" 2>>"$LOGFILE" \
+                | sort -k1 >"$tmp_out" || true
+            if [[ -s "$tmp_out" ]]; then
+                anew -q "fuzzing/${sub_out}.txt" <"$tmp_out" 2>>"$LOGFILE" || true
+            fi
+            rm -f "$tmp_out" 2>/dev/null || true
+        fi
     done <webs/webs_all.txt
 }
 
@@ -1108,9 +1117,7 @@ function fuzz() {
             touch webs/webs_uncommon_ports.txt 2>>"$LOGFILE" || true
         fi
 
-        if [[ ! -s "webs/webs_all.txt" ]]; then
-            cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
-        fi
+        ensure_webs_all || true
 
         if [[ -s "webs/webs_all.txt" ]]; then
             if [[ $AXIOM != true ]]; then
@@ -1140,10 +1147,13 @@ function iishortname() {
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $IIS_SHORTNAME == true ]]; then
         start_func "${FUNCNAME[0]}" "IIS Shortname Scanner"
 
+        ensure_dirs .tmp || true
+        : >.tmp/iis_sites.txt
+
         # Ensure nuclei_output/info.txt exists and is not empty
         if [[ -s "nuclei_output/info.txt" ]]; then
-            # Extract IIS version information and save to .tmp/iis_sites.txt
-            grep "iis-version" "nuclei_output/info.txt" | cut -d " " -f4 >.tmp/iis_sites.txt
+            # Extract IIS targets (if any) without triggering pipefail on "no matches".
+            awk '/iis-version/ {print $4}' "nuclei_output/info.txt" >.tmp/iis_sites.txt
         fi
 
         # Proceed only if iis_sites.txt exists and is non-empty
@@ -1291,10 +1301,7 @@ function urlchecks() {
         local waymore_timeout_cmd="${TIMEOUT_CMD:-timeout}"
         local katana_headless_flags=""
 
-        # Combine webs.txt and webs_uncommon_ports.txt if webs_all.txt doesn't exist
-        if [[ ! -s "webs/webs_all.txt" ]]; then
-            cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
-        fi
+        ensure_webs_all || true
 
         if [[ -s "webs/webs_all.txt" ]]; then
             local katana_target_count=0
@@ -1647,24 +1654,23 @@ function jschecks() {
             urless <.tmp/url_extract_js.txt \
                 | anew -q js/url_extract_js.txt 2>>"$LOGFILE" >/dev/null
 
-            [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && printf "%bRunning: Resolving JS URLs 2/6%b\n" "$yellow" "$reset"
-            if [[ $AXIOM != true ]]; then
-                if [[ -s "js/url_extract_js.txt" ]]; then
-                    run_command httpx -follow-redirects -random-agent -silent -timeout "$HTTPX_TIMEOUT" -threads "$HTTPX_THREADS" \
-                        -rl "$HTTPX_RATELIMIT" -status-code -content-type -retries 2 -no-color <js/url_extract_js.txt \
-                        | grep "[200]" | grep "javascript" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt
-                fi
-            else
-                if [[ -s "js/url_extract_js.txt" ]]; then
-                    run_command axiom-scan js/url_extract_js.txt -m httpx -follow-host-redirects -H "$HEADER" -status-code \
-                        -threads "$HTTPX_THREADS" -rl "$HTTPX_RATELIMIT" -timeout "$HTTPX_TIMEOUT" -silent \
-                        -content-type -retries 2 -no-color -o .tmp/js_livelinks.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
-                    if [[ -s ".tmp/js_livelinks.txt" ]]; then
-                        cat .tmp/js_livelinks.txt | anew .tmp/web_full_info.txt \
-                            | grep "[200]" | grep "javascript" | cut -d ' ' -f1 | anew -q js/js_livelinks.txt || true
-                    fi
-                fi
-            fi
+	            [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && printf "%bRunning: Resolving JS URLs 2/6%b\n" "$yellow" "$reset"
+	            if [[ $AXIOM != true ]]; then
+	                if [[ -s "js/url_extract_js.txt" ]]; then
+	                    run_command httpx -follow-redirects -random-agent -silent -timeout "$HTTPX_TIMEOUT" -threads "$HTTPX_THREADS" \
+	                        -rl "$HTTPX_RATELIMIT" -status-code -content-type -retries 2 -no-color <js/url_extract_js.txt \
+	                        | awk '/\\[200\\]/ && /javascript/ {print $1}' | anew -q js/js_livelinks.txt || true
+	                fi
+	            else
+	                if [[ -s "js/url_extract_js.txt" ]]; then
+	                    run_command axiom-scan js/url_extract_js.txt -m httpx -follow-host-redirects -H "$HEADER" -status-code \
+	                        -threads "$HTTPX_THREADS" -rl "$HTTPX_RATELIMIT" -timeout "$HTTPX_TIMEOUT" -silent \
+	                        -content-type -retries 2 -no-color -o .tmp/js_livelinks.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+	                    if [[ -s ".tmp/js_livelinks.txt" ]]; then
+	                        awk '/\\[200\\]/ && /javascript/ {print $1}' .tmp/js_livelinks.txt | anew -q js/js_livelinks.txt || true
+	                    fi
+	                fi
+	            fi
 
             [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && printf "%bRunning: Extracting JS from sourcemaps 3/6%b\n" "$yellow" "$reset"
             if ! mkdir -p .tmp/sourcemapper; then
@@ -1863,10 +1869,7 @@ function wordlist_gen_roboxtractor() {
 
         start_func "${FUNCNAME[0]}" "Robots Wordlist Generation"
 
-        # Combine webs.txt and webs_uncommon_ports.txt into webs_all.txt if it doesn't exist
-        if [[ ! -s "webs/webs_all.txt" ]]; then
-            cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q "webs/webs_all.txt"
-        fi
+        ensure_webs_all || true
 
         # Proceed only if webs_all.txt exists and is non-empty
         if [[ -s "webs/webs_all.txt" ]]; then
@@ -1919,9 +1922,7 @@ function password_dict() {
         : >"$dict_output"
 
         # Ensure web targets exist for cewl.
-        if [[ ! -s "webs/webs_all.txt" ]]; then
-            cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q "webs/webs_all.txt"
-        fi
+        ensure_webs_all || true
 
         if [[ "$dict_engine" == "cewl" ]]; then
             local cewl_cmd=()
@@ -2017,17 +2018,14 @@ function brokenLinks() {
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $BROKENLINKS == true ]] \
         && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 
-        start_func "${FUNCNAME[0]}" "Broken Links Checks"
+	        start_func "${FUNCNAME[0]}" "Broken Links Checks"
 
-        # Combine webs.txt and webs_uncommon_ports.txt into webs_all.txt if it doesn't exist
-        if [[ ! -s "webs/webs_all.txt" ]]; then
-            cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q "webs/webs_all.txt"
-        fi
+	        ensure_webs_all || true
 
-        # Check if webs_all.txt exists and is not empty
-        if [[ -s "webs/webs_all.txt" ]]; then
-            local bl_engine="${BROKENLINKS_ENGINE:-second-order}"
-            if [[ "$bl_engine" == "second-order" ]]; then
+	        # Check if webs_all.txt exists and is not empty
+	        if [[ -s "webs/webs_all.txt" ]]; then
+	            local bl_engine="${BROKENLINKS_ENGINE:-second-order}"
+	            if [[ "$bl_engine" == "second-order" ]]; then
                 local so_depth="${SECOND_ORDER_DEPTH:-1}"
                 [[ $DEEP == true ]] && so_depth=$((so_depth + 1))
 

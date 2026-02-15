@@ -32,6 +32,36 @@ ensure_workdirs() {
     ensure_dirs .tmp webs subdomains hosts vulns osint fuzzing js screenshots
 }
 
+# Ensure webs/webs_all.txt exists and is populated from the current web targets.
+# This avoids pipefail noise when one of the source files doesn't exist yet.
+# Usage: ensure_webs_all
+ensure_webs_all() {
+    if ! ensure_dirs webs .tmp; then
+        return 1
+    fi
+
+    local out="webs/webs_all.txt"
+    local tmp=".tmp/webs_all_candidates.txt"
+
+    : >"$tmp" 2>/dev/null || return 1
+
+    [[ -s "webs/webs.txt" ]] && cat "webs/webs.txt" >>"$tmp"
+    [[ -s "webs/webs_uncommon_ports.txt" ]] && cat "webs/webs_uncommon_ports.txt" >>"$tmp"
+
+    touch "$out" 2>/dev/null || return 1
+
+    if [[ -s "$tmp" ]]; then
+        # Strip empty lines to avoid polluting target lists.
+        if command -v anew &>/dev/null; then
+            sed '/^$/d' "$tmp" | anew -q "$out" 2>/dev/null || true
+        else
+            sed '/^$/d' "$tmp" >>"$out" 2>/dev/null || return 1
+        fi
+    fi
+
+    return 0
+}
+
 ###############################################################################
 # File Operations
 ###############################################################################

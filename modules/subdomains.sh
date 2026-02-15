@@ -710,6 +710,10 @@ function sub_tls() {
             return
         fi
 
+        # Always reset temp outputs to avoid stale data from previous runs.
+        : >".tmp/subdomains_tlsx_clean.txt"
+        : >".tmp/subdomains_tlsx_resolved.txt"
+
         if [[ $DEEP == true ]]; then
             if [[ $AXIOM != true ]]; then
                 cat subdomains/subdomains.txt | tlsx -san -cn -silent -ro -c "$TLSX_THREADS" \
@@ -732,7 +736,9 @@ function sub_tls() {
         if [[ -s ".tmp/subdomains_tlsx.txt" ]]; then
             grep "\.${DOMAIN_ESCAPED}$\|^${DOMAIN_ESCAPED}$" .tmp/subdomains_tlsx.txt \
                 | grep -aEo 'https?://[^ ]+' \
-                | sed "s/|__ //" | anew -q .tmp/subdomains_tlsx_clean.txt
+                | sed "s/|__ //" \
+                | sed '/^$/d' \
+                | anew -q .tmp/subdomains_tlsx_clean.txt || true
         fi
 
         if [[ $AXIOM != true ]]; then
@@ -1130,8 +1136,13 @@ function sub_scraping() {
                 [[ -s ".tmp/web_full_info3.txt" ]] && webinfo_files+=(".tmp/web_full_info3.txt")
 
                 if [[ ${#webinfo_files[@]} -gt 0 ]]; then
-                    cat "${webinfo_files[@]}" 2>>"$LOGFILE" \
-                        | jq -s 'try .' | jq 'try unique_by(.input)' | jq 'try .[]' 2>>"$LOGFILE" >.tmp/web_full_info.txt
+                    # Keep .tmp/web_full_info.txt as JSONL (1 JSON object per line) for later merges.
+                    : >.tmp/web_full_info.txt
+                    if ! cat "${webinfo_files[@]}" 2>>"$LOGFILE" \
+                        | jq -cs 'unique_by(.input)[]' 2>>"$LOGFILE" >.tmp/web_full_info.txt; then
+                        : >.tmp/web_full_info.txt
+                        log_note "sub_scraping: failed to merge web_full_info JSON; continuing without cache" "${FUNCNAME[0]}" "${LINENO}"
+                    fi
                 else
                     log_note "sub_scraping: web_full_info files missing/empty; skipping merge" "${FUNCNAME[0]}" "${LINENO}"
                 fi
@@ -1773,6 +1784,7 @@ function subtakeover() {
         print_warnf "Failed to create directories."
         return 1
     fi
+    touch subdomains/subdomains.txt webs/webs.txt webs/webs_uncommon_ports.txt webs/webs_all.txt 2>/dev/null || true
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBTAKEOVER == true ]]; then
@@ -1784,10 +1796,8 @@ function subtakeover() {
             return 1
         fi
 
-        # Combine webs.txt and webs_uncommon_ports.txt if webs_all.txt doesn't exist
-        if [[ ! -s "webs/webs_all.txt" ]]; then
-            cat webs/webs.txt webs/webs_uncommon_ports.txt 2>/dev/null | anew -q webs/webs_all.txt
-        fi
+        # Build/refresh webs_all.txt from current web targets.
+        ensure_webs_all || true
 
         #cent update -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
         if [[ $AXIOM != true ]]; then
