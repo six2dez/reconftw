@@ -817,6 +817,39 @@ function cache_clean() {
 }
 
 ###############################################################################################################
+####################################### WORDLIST HELPERS ######################################################
+###############################################################################################################
+
+# Ensure a plaintext wordlist exists; if missing, try to expand a sibling .gz file.
+# Usage: ensure_wordlist_file <path>
+function ensure_wordlist_file() {
+    local file="$1"
+    local gz_file="${file}.gz"
+
+    # Prefer existing plaintext.
+    [[ -s "$file" ]] && return 0
+    [[ ! -s "$gz_file" ]] && return 1
+
+    command -v gzip >/dev/null 2>&1 || return 1
+
+    mkdir -p "$(dirname "$file")" 2>/dev/null || true
+
+    local tmp
+    if command -v mktemp >/dev/null 2>&1; then
+        tmp="$(mktemp "${file}.tmp.XXXXXX" 2>/dev/null || true)"
+    fi
+    [[ -z "${tmp:-}" ]] && tmp="${file}.tmp.$$"
+
+    if gzip -dc "$gz_file" >"$tmp" 2>/dev/null; then
+        mv -f "$tmp" "$file"
+        return 0
+    fi
+
+    rm -f "$tmp" 2>/dev/null || true
+    return 1
+}
+
+###############################################################################################################
 ####################################### CHECKPOINT SYSTEM #####################################################
 ###############################################################################################################
 

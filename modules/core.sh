@@ -166,6 +166,10 @@ function tools_installed() {
     local all_installed=true
     local missing_tools=()
 
+    # Some vendored wordlists are stored compressed to keep the repo small.
+    # Expand them on-demand before checking tool/file presence.
+    ensure_wordlist_file "${subs_wordlist:-}" || true
+
     # Check environment variables
     local env_vars=("GOPATH" "GOROOT" "PATH")
     for var in "${env_vars[@]}"; do
@@ -228,6 +232,7 @@ function tools_installed() {
         ["curl"]="curl"
         ["wget"]="wget"
         ["zip"]="zip"
+        ["gzip"]="gzip"
         ["nmap"]="nmap"
         ["dig"]="dig"
         ["timeout"]="${TIMEOUT_CMD:-timeout}"

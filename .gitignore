@@ -16,3 +16,6 @@ reconftw.cfg-personal
 secrets.cfg
 .env.cache/
 documentation/
+
+# Vendored wordlists that are stored compressed in-repo (expanded on-demand)
+data/wordlists/subdomains.txt
