@@ -679,7 +679,6 @@ function recon() {
     subtakeover
     remove_big_files
     s3buckets
-    cloud_extra_providers
 
     ui_module_end "Subdomains" "subdomains/subdomains.txt" "webs/webs.txt"
     progress_module "Subdomains"

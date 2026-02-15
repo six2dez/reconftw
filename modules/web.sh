@@ -103,7 +103,7 @@ function webprobe_simple() {
 	        start_subfunc "${FUNCNAME[0]}" "Running: HTTP probing $domain"
 
 	        # Baseline cache files (some modules merge into these).
-	        touch .tmp/web_full_info.txt .tmp/web_full_info_probe.txt webs/web_full_info.txt 2>/dev/null || true
+	        touch .tmp/web_full_info.txt .tmp/web_full_info_probe.txt webs/web_full_info.txt webs/webs.txt 2>/dev/null || true
 
 	        # If in multi mode and subdomains.txt doesn't exist, create it
 	        if [[ -n $multi ]] && [[ ! -f "$dir/subdomains/subdomains.txt" ]]; then
@@ -124,33 +124,51 @@ function webprobe_simple() {
                 -o .tmp/web_full_info_probe.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
 	        fi
 
-	        # Merge current probe output with prior cache/state.
-	        touch .tmp/web_full_info_probe.txt .tmp/web_full_info.txt 2>/dev/null || true
-	        if ! cat .tmp/web_full_info_probe.txt .tmp/web_full_info.txt 2>>"$LOGFILE" \
-	            | jq -cs 'unique_by(.input)[]' 2>>"$LOGFILE" >webs/web_full_info.txt; then
-	            log_note "webprobe_simple: failed to merge httpx JSON; falling back to probe-only" "${FUNCNAME[0]}" "${LINENO}"
-	            awk 'match($0, /^[[:space:]]*\\{/) {print}' .tmp/web_full_info_probe.txt >.tmp/web_full_info_merge_input.jsonl 2>/dev/null || true
-	            if [[ -s ".tmp/web_full_info_merge_input.jsonl" ]]; then
-	                jq -cs 'unique_by(.input)[]' .tmp/web_full_info_merge_input.jsonl 2>>"$LOGFILE" >webs/web_full_info.txt || : >webs/web_full_info.txt
-	            else
-	                : >webs/web_full_info.txt
-	            fi
-	        fi
-	        # Keep cache as JSONL for later merges.
-	        cp webs/web_full_info.txt .tmp/web_full_info.txt 2>/dev/null || true
+		        # webprobe_simple is expected to write JSONL when using httpx -json.
+		        # Some runners (or wrappers) may produce a plain URL list instead.
+		        # Detect the format early to avoid jq parse errors and missing webs/webs.txt.
+		        local probe_first_line probe_is_json
+		        probe_first_line="$(awk 'NF {print; exit}' .tmp/web_full_info_probe.txt 2>/dev/null || true)"
+		        probe_is_json=false
+		        [[ "$probe_first_line" =~ ^[[:space:]]*\\{ ]] && probe_is_json=true
 
-        # Extract URLs
-        if [[ -s "webs/web_full_info.txt" ]]; then
-            jq -r 'try .url' webs/web_full_info.txt 2>/dev/null \
-                | grep "$domain" \
-                | grep -aEo 'https?://[^ ]+' \
-                | sed 's/*.//' | anew -q .tmp/probed_tmp.txt
-        fi
+		        # Always start fresh for this run (used by urlchecks diff too).
+		        : >.tmp/probed_tmp.txt 2>/dev/null || true
 
-        # Adaptive throttling heuristics: mark slow hosts (429/403) from httpx
-        if [[ -s "webs/web_full_info.txt" ]]; then
-            jq -r 'try select(.status_code==403 or .status_code==429) | .url' webs/web_full_info.txt 2>/dev/null \
-                | awk -F/ '{print $3}' | sed 's/\:$//' | sort -u >.tmp/slow_hosts.txt
+		        if [[ "$probe_is_json" == true ]]; then
+		            # Merge current probe output with prior cache/state.
+		            touch .tmp/web_full_info_probe.txt .tmp/web_full_info.txt 2>/dev/null || true
+		            if ! cat .tmp/web_full_info_probe.txt .tmp/web_full_info.txt 2>>"$LOGFILE" \
+		                | jq -cs 'unique_by(.input)[]' 2>>"$LOGFILE" >webs/web_full_info.txt; then
+		                log_note "webprobe_simple: failed to merge httpx JSON; falling back to probe-only" "${FUNCNAME[0]}" "${LINENO}"
+		                awk 'match($0, /^[[:space:]]*\\{/) {print}' .tmp/web_full_info_probe.txt >.tmp/web_full_info_merge_input.jsonl 2>/dev/null || true
+		                if [[ -s ".tmp/web_full_info_merge_input.jsonl" ]]; then
+		                    jq -cs 'unique_by(.input)[]' .tmp/web_full_info_merge_input.jsonl 2>>"$LOGFILE" >webs/web_full_info.txt || : >webs/web_full_info.txt
+		                else
+		                    : >webs/web_full_info.txt
+		                fi
+		            fi
+		            # Keep cache as JSONL for later merges.
+		            cp webs/web_full_info.txt .tmp/web_full_info.txt 2>/dev/null || true
+
+		            # Extract URLs from JSONL
+		            if [[ -s "webs/web_full_info.txt" ]]; then
+		                jq -r 'try (.url // empty)' webs/web_full_info.txt 2>/dev/null \
+		                    | awk -v dom="$domain" 'index($0, dom) && $0 ~ /^https?:\\/\\// {print}' \
+		                    | sed 's/*.//' | anew -q .tmp/probed_tmp.txt
+		            fi
+		        else
+		            log_note "webprobe_simple: probe output not JSON; treating as URL list" "${FUNCNAME[0]}" "${LINENO}"
+		            if [[ -s ".tmp/web_full_info_probe.txt" ]]; then
+		                awk -v dom="$domain" 'index($0, dom) && $0 ~ /^https?:\\/\\// {print}' .tmp/web_full_info_probe.txt 2>/dev/null \
+		                    | sed 's/*.//' | anew -q .tmp/probed_tmp.txt
+		            fi
+		        fi
+
+	        # Adaptive throttling heuristics: mark slow hosts (429/403) from httpx
+	        if [[ -s "webs/web_full_info.txt" ]]; then
+	            jq -r 'try select(.status_code==403 or .status_code==429) | .url' webs/web_full_info.txt 2>/dev/null \
+	                | awk -F/ '{print $3}' | sed 's/\:$//' | sort -u >.tmp/slow_hosts.txt
         fi
 
         # Extract web info to plain text
@@ -164,14 +182,14 @@ function webprobe_simple() {
             if ! deleteOutScoped "$outOfScope_file" .tmp/probed_tmp.txt; then
                 print_warnf "Failed to delete out-of-scope entries."
             fi
-        fi
+	        fi
 
-        touch .tmp/probed_tmp.txt
+	        touch .tmp/probed_tmp.txt
 
-        # Count new websites
-        if ! NUMOFLINES=$(anew webs/webs.txt <.tmp/probed_tmp.txt 2>/dev/null | sed '/^$/d' | wc -l); then
-            print_warnf "Failed to count new websites."
-            NUMOFLINES=0
+	        # Count new websites
+	        if ! NUMOFLINES=$(anew webs/webs.txt <.tmp/probed_tmp.txt 2>/dev/null | sed '/^$/d' | wc -l); then
+	            print_warnf "Failed to count new websites."
+	            NUMOFLINES=0
 	        fi
 
 	        # Update webs_all.txt

@@ -5,7 +5,7 @@
 #           sub_noerror, sub_dns, sub_brute, sub_scraping, sub_analytics,
 #           sub_permut, sub_regex_permut, sub_ia_permut, sub_recursive_passive,
 #           sub_recursive_brute, subtakeover, zonetransfer, s3buckets,
-#           cloud_extra_providers, geo_info
+#           geo_info
 # Helpers: deep_wildcard_filter, _is_sensitive_domain
 # This file is sourced by reconftw.sh - do not execute directly
 [[ -z "${SCRIPTPATH:-}" ]] && {
@@ -2086,61 +2086,6 @@ function s3buckets() {
         else
             _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
         fi
-    fi
-}
-
-function cloud_extra_providers() {
-    ensure_dirs subdomains .tmp
-
-    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        start_func "${FUNCNAME[0]}" "Extra cloud providers checks"
-        # Candidate names from domain and subdomains
-        company=$(unfurl format %r <<<"$domain")
-        printf "%s\n%s\n${domain%%.*}" "$company" "$domain" | sed 's/[^a-zA-Z0-9-]//g' | awk 'length>2' | sort -u >.tmp/cloudnames.txt
-        # shellcheck disable=SC2046  # Word splitting intended for awk
-        [[ -s subdomains/subdomains.txt ]] && awk -F. -v r="$(echo "$domain" | awk -F. '{print $(NF-1)"."$NF}')" '{print $(NF-2)}' subdomains/subdomains.txt 2>/dev/null | sed 's/[^a-zA-Z0-9-]//g' | awk 'length>2' | sort -u >>.tmp/cloudnames.txt
-        sed_i 's/^\///; s/\.$//' .tmp/cloudnames.txt
-        sort -u .tmp/cloudnames.txt -o .tmp/cloudnames.txt
-
-        # Common container names for Azure (best-effort)
-        printf "public\nstatic\nmedia\nimages\nassets\nbackup\nbackups\nfiles\ncdn" >.tmp/azcontainers.txt
-
-        : >subdomains/cloud_extra.txt
-
-        while IFS= read -r name; do
-            # GCS
-            for u in \
-                "https://storage.googleapis.com/$name/" \
-                "https://$name.storage.googleapis.com/"; do
-                code=$(run_command curl -sk -o /dev/null -w '%{http_code}' "$u" || true)
-                if [[ $code =~ ^20|403$ ]]; then printf "GCS %s %s\n" "$name" "$u" | anew -q subdomains/cloud_extra.txt; fi
-            done
-
-            # Azure Blob (requires container; try a few)
-            while IFS= read -r c; do
-                u="https://$name.blob.core.windows.net/$c?restype=container&comp=list"
-                code=$(run_command curl -sk -o /dev/null -w '%{http_code}' "$u" || true)
-                if [[ $code =~ ^20|403$ ]]; then printf "AZURE %s %s\n" "$name/$c" "$u" | anew -q subdomains/cloud_extra.txt; fi
-            done <.tmp/azcontainers.txt
-
-            # DigitalOcean Spaces (regional)
-            for r in ams3 nyc3 sfo3 sgp1 fra1 blr1; do
-                u="https://$name.$r.digitaloceanspaces.com/"
-                code=$(run_command curl -sk -o /dev/null -w '%{http_code}' "$u" || true)
-                if [[ $code =~ ^20|403$ ]]; then printf "DOSPACE %s %s\n" "$name.$r" "$u" | anew -q subdomains/cloud_extra.txt; fi
-            done
-
-            # Backblaze B2 (best-effort listing)
-            u="https://f000.backblazeb2.com/file/$name/"
-            code=$(run_command curl -sk -o /dev/null -w '%{http_code}' "$u" || true)
-            if [[ $code =~ ^20|403$ ]]; then printf "B2 %s %s\n" "$name" "$u" | anew -q subdomains/cloud_extra.txt; fi
-
-        done <.tmp/cloudnames.txt
-
-        append_assets_from_file cloud asset subdomains/cloud_extra.txt
-        end_func "Results are saved in subdomains/cloud_extra.txt" "${FUNCNAME[0]}"
-    else
-        _print_msg WARN "${FUNCNAME[0]} skipped or already processed."
     fi
 }
 
