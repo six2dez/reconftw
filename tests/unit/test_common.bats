@@ -231,3 +231,40 @@ teardown() {
     run test_func
     [ "$status" -eq 0 ]
 }
+
+###############################################################################
+# anew_safe / anew_q_safe tests
+###############################################################################
+
+@test "anew_q_safe returns 0 when anew adds new lines" {
+    local outfile="$TEST_DIR/out.txt"
+    touch "$outfile"
+    run bash -c 'echo "newline" | anew_q_safe "'"$outfile"'"'
+    [ "$status" -eq 0 ]
+    grep -q "newline" "$outfile"
+}
+
+@test "anew_q_safe returns 0 when anew adds no new lines (rc=1 from anew)" {
+    local outfile="$TEST_DIR/out.txt"
+    echo "duplicate" > "$outfile"
+    run bash -c 'echo "duplicate" | anew_q_safe "'"$outfile"'"'
+    [ "$status" -eq 0 ]
+}
+
+@test "anew_q_safe writes unique lines to file" {
+    local outfile="$TEST_DIR/out.txt"
+    echo "existing" > "$outfile"
+    run bash -c 'printf "existing\nnewone\n" | anew_q_safe "'"$outfile"'"'
+    [ "$status" -eq 0 ]
+    grep -q "newone" "$outfile"
+    [ "$(wc -l < "$outfile")" -eq 2 ]
+}
+
+@test "anew_safe returns 0 and outputs new lines" {
+    local outfile="$TEST_DIR/out.txt"
+    echo "old" > "$outfile"
+    run bash -c 'printf "old\nnew\n" | anew_safe "'"$outfile"'"'
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"new"* ]]
+    grep -q "new" "$outfile"
+}

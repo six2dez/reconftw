@@ -1030,6 +1030,7 @@ function sub_scraping() {
                 fi
 
                 if command -v waymore &>/dev/null; then
+                    print_notice RUN "waymore" "collecting passive URLs (waymore)"
                     if ! "$TIMEOUT_CMD" "${WAYMORE_TIMEOUT:-30m}" waymore -i "$domain" -mode U -oU .tmp/waymore_urls_subs.txt 2>>"$LOGFILE" >/dev/null; then
                         log_note "sub_scraping: waymore failed or timed out; continuing" "${FUNCNAME[0]}" "${LINENO}"
                     fi
@@ -1808,6 +1809,7 @@ function subtakeover() {
         else
             cat subdomains/subdomains.txt webs/webs_all.txt 2>>"$LOGFILE" | sed '/^$/d' | anew -q .tmp/webs_subs.txt
             if [[ -s ".tmp/webs_subs.txt" ]]; then
+                print_notice RUN "takeover_nuclei" "scanning takeovers on axiom"
                 run_command axiom-scan .tmp/webs_subs.txt -m nuclei --nuclei-templates "${NUCLEI_TEMPLATES_PATH}" \
                     -tags takeover -nh -severity info,low,medium,high,critical -retries 3 -rl "$NUCLEI_RATELIMIT" \
                     -t "${NUCLEI_TEMPLATES_PATH}" -j -o .tmp/tko_json.txt $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
@@ -2010,6 +2012,7 @@ function s3buckets() {
         fi
 
         printf "Processing domain: %s\n" "$domain" >>"$LOGFILE"
+        print_notice RUN "cloudhunter" "enumerating cloud buckets (CloudHunter)"
         (
             if ! cd "$tools/CloudHunter"; then
                 print_warnf "Failed to cd to %s." "$tools/CloudHunter"

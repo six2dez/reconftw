@@ -98,6 +98,7 @@ function axiom_launch() {
         start_func "${FUNCNAME[0]}" "Launching our Axiom fleet"
 
         # Check to see if we have a fleet already, if so, SKIP THIS!
+        print_notice RUN "axiom_launch" "launching axiom fleet"
         NUMOFNODES=$(timeout 30 axiom-ls 2>>"$LOGFILE" | grep -c "$AXIOM_FLEET_NAME" || true)
         if [[ $NUMOFNODES -ge $AXIOM_FLEET_COUNT ]]; then
             axiom-select "$AXIOM_FLEET_NAME*" 2>>"$LOGFILE" >/dev/null
@@ -152,6 +153,7 @@ function axiom_selected() {
     fi
 
     # Probe Axiom connectivity and optionally auto-repair host-key mismatches.
+    print_notice RUN "axiom_selected" "checking axiom connectivity"
     local axiom_probe_out
     axiom_probe_out="$(axiom-exec "echo reconftw-axiom-probe" 2>&1 || true)"
     if echo "$axiom_probe_out" | grep -q "REMOTE HOST IDENTIFICATION HAS CHANGED"; then

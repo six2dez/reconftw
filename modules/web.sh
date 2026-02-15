@@ -52,12 +52,12 @@ _process_httpx_output() {
         | grep "$domain" \
         | grep -aEo 'https?://[^ ]+' \
         | sed 's/*.//' \
-        | anew -q "$url_output"
-    
+        | anew_q_safe "$url_output"
+
     # Extract plain web info
     jq -r 'try . | "\(.url) [\(.status_code)] [\(.title)] [\(.webserver)] \(.tech)"' "$json_file" \
         | grep "$domain" \
-        | anew -q "$info_output"
+        | anew_q_safe "$info_output"
 }
 
 # Send URLs to proxy if enabled
@@ -155,13 +155,13 @@ function webprobe_simple() {
 		            if [[ -s "webs/web_full_info.txt" ]]; then
 		                jq -r 'try (.url // empty)' webs/web_full_info.txt 2>/dev/null \
 		                    | awk -v dom="$domain" 'index($0, dom) && $0 ~ /^https?:\\/\\// {print}' \
-		                    | sed 's/*.//' | anew -q .tmp/probed_tmp.txt
+		                    | sed 's/*.//' | anew_q_safe .tmp/probed_tmp.txt
 		            fi
 		        else
 		            log_note "webprobe_simple: probe output not JSON; treating as URL list" "${FUNCNAME[0]}" "${LINENO}"
 		            if [[ -s ".tmp/web_full_info_probe.txt" ]]; then
 		                awk -v dom="$domain" 'index($0, dom) && $0 ~ /^https?:\\/\\// {print}' .tmp/web_full_info_probe.txt 2>/dev/null \
-		                    | sed 's/*.//' | anew -q .tmp/probed_tmp.txt
+		                    | sed 's/*.//' | anew_q_safe .tmp/probed_tmp.txt
 		            fi
 		        fi
 
@@ -174,7 +174,7 @@ function webprobe_simple() {
         # Extract web info to plain text
         if [[ -s "webs/web_full_info.txt" ]]; then
             jq -r 'try . |"\(.url) [\(.status_code)] [\(.title)] [\(.webserver)] \(.tech)"' webs/web_full_info.txt \
-                | grep "$domain" | anew -q webs/web_full_info_plain.txt
+                | grep "$domain" | anew_q_safe webs/web_full_info_plain.txt
         fi
 
         # Remove out-of-scope entries
@@ -187,7 +187,7 @@ function webprobe_simple() {
 	        touch .tmp/probed_tmp.txt
 
 	        # Count new websites
-	        if ! NUMOFLINES=$(anew webs/webs.txt <.tmp/probed_tmp.txt 2>/dev/null | sed '/^$/d' | wc -l); then
+	        if ! NUMOFLINES=$(anew_safe webs/webs.txt <.tmp/probed_tmp.txt 2>/dev/null | sed '/^$/d' | wc -l); then
 	            print_warnf "Failed to count new websites."
 	            NUMOFLINES=0
 	        fi
@@ -260,22 +260,22 @@ function webprobe_full() {
                 | grep "$domain" \
                 | grep -aEo 'https?://[^ ]+' \
                 | sed 's/*.//' \
-                | anew -q .tmp/probed_uncommon_ports_tmp.txt
+                | anew_q_safe .tmp/probed_uncommon_ports_tmp.txt
 
             # Extract plain web info
             jq -r 'try . | "\(.url) [\(.status_code)] [\(.title)] [\(.webserver)] \(.tech)"' .tmp/web_full_info_uncommon.txt \
                 | grep "$domain" \
-                | anew -q webs/web_full_info_uncommon_plain.txt
+                | anew_q_safe webs/web_full_info_uncommon_plain.txt
 
             # Update webs_full_info_uncommon.txt based on whether domain is IP
             if [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-                cat .tmp/web_full_info_uncommon.txt 2>>"$LOGFILE" | anew -q webs/web_full_info_uncommon.txt
+                cat .tmp/web_full_info_uncommon.txt 2>>"$LOGFILE" | anew_q_safe webs/web_full_info_uncommon.txt
             else
-                grep "$domain" .tmp/web_full_info_uncommon.txt | anew -q webs/web_full_info_uncommon.txt
+                grep "$domain" .tmp/web_full_info_uncommon.txt | anew_q_safe webs/web_full_info_uncommon.txt
             fi
 
             # Count new websites
-            if ! NUMOFLINES=$(anew webs/webs_uncommon_ports.txt <.tmp/probed_uncommon_ports_tmp.txt | sed '/^$/d' | wc -l); then
+            if ! NUMOFLINES=$(anew_safe webs/webs_uncommon_ports.txt <.tmp/probed_uncommon_ports_tmp.txt | sed '/^$/d' | wc -l); then
                 print_warnf "Failed to count new websites."
                 NUMOFLINES=0
             fi

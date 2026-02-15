@@ -126,6 +126,9 @@ ui_header() {
     printf "Mode: %s | Target: %s | Profile: %s | Parallel: %s | Jobs: %s\n" \
         "$mode_label" "$target" "$(basename "${profile}")" "$parallel" "$threads"
     printf "Output: %s\n" "$outdir"
+    if [[ -n "${RECON_BEHIND_NAT:-}" ]] || [[ -n "${DNS_RESOLVER_SELECTED:-}" ]]; then
+        printf "Network: behind_nat=%s | DNS: %s\n" "${RECON_BEHIND_NAT:-unknown}" "${DNS_RESOLVER_SELECTED:-unknown}"
+    fi
     if [[ -n "${PERF_PROFILE_INFO:-}" ]] || [[ -n "${DISK_SPACE_INFO:-}" ]]; then
         local info_line=""
         if [[ -n "${PERF_PROFILE_INFO:-}" ]]; then

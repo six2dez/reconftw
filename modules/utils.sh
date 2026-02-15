@@ -1075,6 +1075,15 @@ init_dns_resolver() {
     local ip
     ip=$(_get_local_ip)
 
+    # Expose NAT detection and local IP for UI/logging.
+    # Note: This is a best-effort heuristic based on the primary local IPv4 address.
+    RECON_LOCAL_IP="${ip:-}"
+    RECON_BEHIND_NAT="yes"
+    if _ip_is_public_ipv4 "$ip"; then
+        RECON_BEHIND_NAT="no"
+    fi
+    export RECON_LOCAL_IP RECON_BEHIND_NAT
+
     DNS_RESOLVER_SELECTED=""
     case "$mode" in
         puredns|dnsx)

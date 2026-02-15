@@ -91,6 +91,34 @@ dedupe_append() {
     fi
 }
 
+# Pipe-safe anew wrapper: treats rc=1 (no new lines added) as success.
+# Usage: ... | anew_safe <file>
+anew_safe() {
+    local file="$1"
+    if ! command -v anew &>/dev/null; then
+        cat >> "$file"
+        return 0
+    fi
+    anew "$file"
+    local rc=$?
+    (( rc <= 1 )) && return 0
+    return "$rc"
+}
+
+# Pipe-safe anew -q wrapper: treats rc=1 (no new lines added) as success.
+# Usage: ... | anew_q_safe <file>
+anew_q_safe() {
+    local file="$1"
+    if ! command -v anew &>/dev/null; then
+        cat >> "$file"
+        return 0
+    fi
+    anew -q "$file"
+    local rc=$?
+    (( rc <= 1 )) && return 0
+    return "$rc"
+}
+
 # Count non-empty lines in a file safely
 # Usage: count_lines filename
 # Returns: line count (0 if file doesn't exist or is empty)
@@ -161,6 +189,7 @@ print_task() {
         WARN) color="${yellow:-}" ;;
         FAIL) color="${bred:-}" ;;
         SKIP|CACHE) color="${dim_color:-}" ;;
+        RUN) color="${cyan:-}" ;;
         INFO) color="${bblue:-}" ;;
         *) color="${bblue:-}" ;;
     esac
