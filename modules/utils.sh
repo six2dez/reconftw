@@ -1029,32 +1029,33 @@ DNS_RESOLVER_SELECTED="${DNS_RESOLVER_SELECTED:-}"
 # Conservative: anything unknown/unroutable returns false (so we default to dnsx).
 _ip_is_public_ipv4() {
     local ip="$1"
-    local o1 o2 o3 o4
-
     [[ -z "$ip" ]] && return 1
-    if [[ "$ip" =~ ^([0-9]{1,3})\\.([0-9]{1,3})\\.([0-9]{1,3})\\.([0-9]{1,3})$ ]]; then
-        o1="${BASH_REMATCH[1]}"
-        o2="${BASH_REMATCH[2]}"
-        o3="${BASH_REMATCH[3]}"
-        o4="${BASH_REMATCH[4]}"
-    else
-        return 1
-    fi
 
+    # Split by dots using IFS (avoids BASH_REMATCH portability issues)
+    local old_ifs="$IFS"
+    IFS='.'
+    local -a parts=($ip)
+    IFS="$old_ifs"
+    [[ ${#parts[@]} -ne 4 ]] && return 1
+
+    local o1="${parts[0]}" o2="${parts[1]}" o3="${parts[2]}" o4="${parts[3]}"
+
+    # Validate each octet is a number 0-255
+    local o
     for o in "$o1" "$o2" "$o3" "$o4"; do
         [[ "$o" =~ ^[0-9]+$ ]] || return 1
-        (( o >= 0 && o <= 255 )) || return 1
+        [[ "$o" -ge 0 ]] && [[ "$o" -le 255 ]] || return 1
     done
 
-    # Non-routable ranges
-    (( o1 == 0 )) && return 1
-    (( o1 == 10 )) && return 1
-    (( o1 == 127 )) && return 1
-    (( o1 == 169 && o2 == 254 )) && return 1 # link-local
-    (( o1 == 172 && o2 >= 16 && o2 <= 31 )) && return 1
-    (( o1 == 192 && o2 == 168 )) && return 1
-    (( o1 == 100 && o2 >= 64 && o2 <= 127 )) && return 1 # CGNAT (100.64.0.0/10)
-    (( o1 >= 224 )) && return 1                           # multicast/reserved/broadcast
+    # Non-routable ranges (using [[ -eq ]] to avoid (( )) ERR trap issues)
+    [[ "$o1" -eq 0 ]] && return 1
+    [[ "$o1" -eq 10 ]] && return 1
+    [[ "$o1" -eq 127 ]] && return 1
+    [[ "$o1" -eq 169 ]] && [[ "$o2" -eq 254 ]] && return 1  # link-local
+    [[ "$o1" -eq 172 ]] && [[ "$o2" -ge 16 ]] && [[ "$o2" -le 31 ]] && return 1
+    [[ "$o1" -eq 192 ]] && [[ "$o2" -eq 168 ]] && return 1
+    [[ "$o1" -eq 100 ]] && [[ "$o2" -ge 64 ]] && [[ "$o2" -le 127 ]] && return 1  # CGNAT
+    [[ "$o1" -ge 224 ]] && return 1  # multicast/reserved/broadcast
 
     return 0
 }
@@ -1066,27 +1067,19 @@ _is_cloud_vps() {
     return 1
 }
 
-# Get external public IPv4 via a remote service. Returns empty on failure.
-_get_external_ipv4() {
-    local ext=""
-    ext=$(curl -4 -sf --max-time 5 ifconfig.me 2>/dev/null)
-    [[ -z "$ext" ]] && ext=$(curl -4 -sf --max-time 5 api.ipify.org 2>/dev/null)
-    _ip_is_public_ipv4 "$ext" && echo "$ext" && return 0
-    return 1
-}
-
 # Determine if puredns is safe to use (public network / cloud VPS).
 # Returns 0 (true = puredns safe) or 1 (false = use dnsx).
 # Priority:
 #   1. Local IP is public                       → puredns (bare-metal / dedicated)
 #   2. Cloud metadata endpoint responds          → puredns (cloud VPS with 1:1 NAT)
-#   3. External IPv4 reachable and public        → puredns (VPS behind transparent NAT)
-#   4. None of the above                         → dnsx   (home/office/unknown)
+#   3. None of the above                         → dnsx   (home/office/unknown)
+# Note: external IP check (curl ifconfig.me) is intentionally NOT used because
+# home networks also have public IPs from the ISP, making it indistinguishable
+# from cloud VPS. For rare VPS without metadata, use DNS_RESOLVER=puredns in config.
 _can_use_puredns() {
     local ip="$1"
     _ip_is_public_ipv4 "$ip" && return 0
     _is_cloud_vps && return 0
-    _get_external_ipv4 >/dev/null 2>&1 && return 0
     return 1
 }
 
