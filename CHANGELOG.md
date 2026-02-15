@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Katana headless profile selection: `KATANA_HEADLESS_PROFILE=off|smart|full`.
 - DEEP-only ffuf recursion: `FUZZ_RECURSION_DEPTH`.
 - CDN origin discovery (best-effort) via `hakoriginfinder` with `CDN_BYPASS=true` (output `hosts/origin_ips.txt`).
-- Password dictionary engine `cewl` (Ruby gem) with tuning knobs.
+- Password dictionary engine `cewler` (Python) with tuning knobs.
 - Adaptive permutation wordlist: `PERMUTATIONS_WORDLIST_MODE=auto|full|short` with `PERMUTATIONS_SHORT_THRESHOLD=100`. Uses a curated 162-word list for large targets (>100 subs) and the full 849-word list for small targets or DEEP mode.
 - Auto-detection of DNS resolver: `DNS_RESOLVER=auto|puredns|dnsx`. Detects if running behind NAT/CGNAT (non-public IPv4) and switches to dnsx (Go net resolver, safe for home routers) instead of puredns (massdns raw UDP sockets that can overwhelm consumer router NAT tables). Configurable with `DNSX_THREADS` and `DNSX_RATE_LIMIT`.
 - Global DNS resolution wrappers `_resolve_domains()` and `_bruteforce_domains()` in `modules/utils.sh` — all 16 puredns call sites now use these wrappers for consistent resolver selection.
@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed `webprobe_simple()` httpx merge bug (probe output now correctly merged with prior cache).
 - Wrapped local `wafw00f` execution with `run_command` for dry-run/log consistency.
 - `PORTSCAN_ACTIVE_OPTIONS` default no longer includes `--script vulners`; moved to `PORTSCAN_DEEP_OPTIONS`.
-- `ssti`: if `tinja` is missing, the module warns and skips (no automatic ffuf fallback).
+- `ssti`: if `TInjA` is missing, the module warns and skips (no automatic ffuf fallback).
 - `iishortname`: uses `shortscan` only (sns removed).
 - `nuclei_dast`: when vuln scanning is enabled (`VULNS_GENERAL=true`, e.g. `-a`), the DAST pass is force-enabled to avoid accidental coverage loss.
 - Permutation engine simplified to gotator-only (benchmark showed gotator produces the best quality permutations with exclusive valid findings that other tools miss).
@@ -130,7 +130,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `toxicache` for additional web cache poisoning coverage.
   - `postleaksNg` in `apileaks` for Postman leak discovery.
   - `favirecon` as `favirecon_tech` for favicon-based technology reconnaissance.
-  - `TInjA` as the default `ssti` engine (`SSTI_ENGINE=tinja`, with legacy fallback).
+  - `TInjA` as the default `ssti` engine (`SSTI_ENGINE=TInjA`, with legacy fallback).
   - `second-order` as default `brokenLinks` engine (`BROKENLINKS_ENGINE=second-order`, with legacy fallback).
 
 **Progress and UX**

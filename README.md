@@ -163,7 +163,7 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **Fuzzing**: Performs directory and parameter fuzzing ([ffuf](https://github.com/ffuf/ffuf)).
 - **File Extension Sorting**: Organizes URLs by file extensions.
 - **Wordlist Generation**: Creates custom wordlists for fuzzing.
-- **Password Dictionary**: Generates password dictionaries from live content ([cewl](https://github.com/digininja/CeWL)).
+- **Password Dictionary**: Generates password dictionaries from live content ([cewler](https://github.com/roys/cewler)).
 - **IIS Shortname Scanning**: Detects IIS shortname vulnerabilities ([shortscan](https://github.com/bitquark/shortscan)).
 
 ### Vulnerability Checks
@@ -646,7 +646,7 @@ SSRF_CHECKS=true # SSRF checks
 CRLF_CHECKS=true # CRLF checks
 LFI=true # LFI by fuzzing
 SSTI=true # SSTI by fuzzing
-SSTI_ENGINE="tinja" # SSTI engine: tinja|legacy
+SSTI_ENGINE="TInjA" # SSTI engine: TInjA|legacy
 SQLI=true # Check SQLI
 SQLMAP=true # Check SQLI with sqlmap
 GHAURI=false # Check SQLI with ghauri

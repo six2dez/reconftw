@@ -29,11 +29,11 @@ teardown() {
   [[ -d "$TEST_DIR" ]] && rm -rf "$TEST_DIR"
 }
 
-@test "ssti uses tinja engine and writes compatible output" {
+@test "ssti uses TInjA engine and writes compatible output" {
   mkdir -p gf .tmp vulns
   printf 'https://target.example.com/?q=test\n' > gf/ssti.txt
 
-  cat > "$MOCK_BIN/tinja" <<'SH'
+  cat > "$MOCK_BIN/TInjA" <<'SH'
 #!/usr/bin/env bash
 report_dir=""
 while [[ $# -gt 0 ]]; do
@@ -50,12 +50,12 @@ done
 mkdir -p "$report_dir"
 printf '%s\n' '{"url":"https://target.example.com/?q=FUZZ","isWebpageVulnerable":true,"certainty":"high","parameters":[]}' > "${report_dir}/mock_Report.jsonl"
 SH
-  chmod +x "$MOCK_BIN/tinja"
+  chmod +x "$MOCK_BIN/TInjA"
 
   export SSTI=true
-  export SSTI_ENGINE="tinja"
-  export TINJA_RATELIMIT=0
-  export TINJA_TIMEOUT=15
+  export SSTI_ENGINE="TInjA"
+  export TInjA_RATELIMIT=0
+  export TInjA_TIMEOUT=15
   export DEEP=false
   export DEEP_LIMIT=500
 

@@ -298,8 +298,8 @@ function ssti() {
 
         # Ensure gf/ssti.txt is not empty
         if [[ -s "gf/ssti.txt" ]]; then
-            local ssti_engine="${SSTI_ENGINE:-tinja}"
-            if [[ "$ssti_engine" != "tinja" ]]; then
+            local ssti_engine="${SSTI_ENGINE:-TInjA}"
+            if [[ "$ssti_engine" != "TInjA" ]]; then
                 _print_msg WARN "SSTI_ENGINE='${ssti_engine}' is deprecated; using TInjA."
             fi
 
@@ -313,28 +313,28 @@ function ssti() {
             if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT ]]; then
                 : >".tmp/ssti_candidates.txt"
 
-                if ! command -v tinja >/dev/null 2>&1; then
+                if ! command -v TInjA >/dev/null 2>&1; then
                     end_func "Skipping SSTI: TInjA not installed (no legacy fallback)." "${FUNCNAME[0]}" "SKIP_MISSING_TOOL"
                     return 0
                 fi
 
                 _print_msg INFO "Running: SSTI Checks with TInjA"
-                local tinja_report_dir="$dir/.tmp/tinja"
-                mkdir -p "$tinja_report_dir"
-                local -a tinja_cmd=(tinja url --reportpath "${tinja_report_dir}/" --ratelimit "${TINJA_RATELIMIT:-0}" --timeout "${TINJA_TIMEOUT:-15}" --verbosity 0)
+                local TInjA_report_dir="$dir/.tmp/TInjA"
+                mkdir -p "$TInjA_report_dir"
+                local -a TInjA_cmd=(TInjA url --reportpath "${TInjA_report_dir}/" --ratelimit "${TInjA_RATELIMIT:-0}" --timeout "${TInjA_TIMEOUT:-15}" --verbosity 0)
                 if [[ -n "${HEADER:-}" ]]; then
-                    tinja_cmd+=(-H "${HEADER}")
+                    TInjA_cmd+=(-H "${HEADER}")
                 fi
                 while IFS= read -r u; do
-                    [[ -n "$u" ]] && tinja_cmd+=(--url "$u")
+                    [[ -n "$u" ]] && TInjA_cmd+=(--url "$u")
                 done <".tmp/tmp_ssti.txt"
 
-                if ! run_command "${tinja_cmd[@]}" 2>>"$LOGFILE" >/dev/null; then
-                    log_note "ssti: tinja execution failed, no findings collected" "${FUNCNAME[0]}" "${LINENO}"
+                if ! run_command "${TInjA_cmd[@]}" 2>>"$LOGFILE" >/dev/null; then
+                    log_note "ssti: TInjA execution failed, no findings collected" "${FUNCNAME[0]}" "${LINENO}"
                 fi
 
                 local report_file=""
-                report_file=$(ls -1t "${tinja_report_dir}"/*.jsonl 2>/dev/null | head -n 1 || true)
+                report_file=$(ls -1t "${TInjA_report_dir}"/*.jsonl 2>/dev/null | head -n 1 || true)
                 if [[ -n "$report_file" && -s "$report_file" ]]; then
                     jq -r 'select((.isWebpageVulnerable == true) or any(.parameters[]?; .isParameterVulnerable == true)) | (.url // empty) + " [certainty:" + (.certainty // "unknown") + "]"' "$report_file" 2>/dev/null \
                         | sed '/^\s*$/d' \
@@ -342,7 +342,7 @@ function ssti() {
                 fi
 
                 if [[ -s ".tmp/ssti_candidates.txt" ]]; then
-                    cat ".tmp/ssti_candidates.txt" | anew -q "vulns/ssti_tinja.txt"
+                    cat ".tmp/ssti_candidates.txt" | anew -q "vulns/ssti_TInjA.txt"
                     cat ".tmp/ssti_candidates.txt" | anew -q "vulns/ssti.txt"
                 fi
 

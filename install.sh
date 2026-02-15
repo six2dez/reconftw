@@ -246,8 +246,7 @@ declare -A gotools=(
     ["toxicache"]="go install -v github.com/xhzeem/toxicache@latest"
     ["favirecon"]="go install -v github.com/edoardottt/favirecon/cmd/favirecon@latest"
     ["second-order"]="go install -v github.com/mhmdiaa/second-order@latest"
-    ["tinja"]="go install -v github.com/Hackmanit/TInjA@latest"
-    ["cewl"]="gem install cewl --no-document"
+    ["TInjA"]="go install -v github.com/Hackmanit/TInjA@latest"
 )
 
 # Declare pipx tools and their paths
@@ -280,6 +279,7 @@ declare -A repos=(
     ["testssl.sh"]="drwetter/testssl.sh"
     ["JSA"]="w9w/JSA"
     ["CloudHunter"]="belane/CloudHunter"
+    ["cewler"]="roys/cewler"
     ["ultimate-nmap-parser"]="shifty0g/ultimate-nmap-parser"
     ["gitdorks_go"]="damit5/gitdorks_go"
     ["Web-Cache-Vulnerability-Scanner"]="Hackmanit/Web-Cache-Vulnerability-Scanner"
@@ -518,7 +518,7 @@ function install_tools() {
             "trufflehog")
                 go install &>/dev/null
                 ;;
-            "postleaksNg")
+            "postleaksNg"|"cewler")
                 if [[ ! -d "venv" ]]; then
                     python3 -m venv venv &>/dev/null || true
                 fi

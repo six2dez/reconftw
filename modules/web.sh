@@ -1935,22 +1935,22 @@ function password_dict() {
 
         start_func "${FUNCNAME[0]}" "Password Dictionary Generation"
 
-        local dict_engine="${PASSWORD_DICT_ENGINE:-cewl}"
+        local dict_engine="${PASSWORD_DICT_ENGINE:-cewler}"
         local dict_output="$dir/webs/password_dict.txt"
         : >"$dict_output"
 
-        # Ensure web targets exist for cewl.
+        # Ensure web targets exist for cewler.
         ensure_webs_all || true
 
-        if [[ "$dict_engine" == "cewl" ]]; then
-            local cewl_cmd=()
-            if command -v cewl >/dev/null 2>&1; then
-                cewl_cmd=(cewl)
-            elif [[ -f "${tools}/CeWL/cewl.rb" ]]; then
-                cewl_cmd=(ruby "${tools}/CeWL/cewl.rb")
+        if [[ "$dict_engine" == "cewler" ]]; then
+            local cewler_cmd=()
+            if command -v cewler >/dev/null 2>&1; then
+                cewler_cmd=(cewler)
+            elif [[ -x "${tools}/cewler/venv/bin/cewler" ]]; then
+                cewler_cmd=("${tools}/cewler/venv/bin/cewler")
             fi
 
-            if [[ ${#cewl_cmd[@]} -gt 0 ]] && [[ -s "webs/webs_all.txt" ]]; then
+            if [[ ${#cewler_cmd[@]} -gt 0 ]] && [[ -s "webs/webs_all.txt" ]]; then
                 local max_targets="${PASSWORD_DICT_MAX_TARGETS:-50}"
                 if [[ ${DEEP:-false} == true ]]; then
                     max_targets=0
@@ -1965,13 +1965,13 @@ function password_dict() {
                 while IFS= read -r target; do
                     [[ -z "$target" ]] && continue
                     if [[ -n "${TIMEOUT_CMD:-}" ]]; then
-                        run_command "$TIMEOUT_CMD" -k 5s "${PASSWORD_DICT_CEWL_TIMEOUT:-45}" "${cewl_cmd[@]}" "$target" \
-                            -d "${PASSWORD_DICT_CEWL_DEPTH:-1}" -m "${PASSWORD_MIN_LENGTH:-5}" \
-                            -w ".tmp/password_dict_part.txt" 2>>"$LOGFILE" >/dev/null || true
+                        run_command "$TIMEOUT_CMD" -k 5s "${PASSWORD_DICT_CEWLER_TIMEOUT:-45}" "${cewler_cmd[@]}" \
+                            -d "${PASSWORD_DICT_CEWLER_DEPTH:-1}" -m "${PASSWORD_MIN_LENGTH:-5}" \
+                            -l -o ".tmp/password_dict_part.txt" "$target" 2>>"$LOGFILE" >/dev/null || true
                     else
-                        run_command "${cewl_cmd[@]}" "$target" \
-                            -d "${PASSWORD_DICT_CEWL_DEPTH:-1}" -m "${PASSWORD_MIN_LENGTH:-5}" \
-                            -w ".tmp/password_dict_part.txt" 2>>"$LOGFILE" >/dev/null || true
+                        run_command "${cewler_cmd[@]}" \
+                            -d "${PASSWORD_DICT_CEWLER_DEPTH:-1}" -m "${PASSWORD_MIN_LENGTH:-5}" \
+                            -l -o ".tmp/password_dict_part.txt" "$target" 2>>"$LOGFILE" >/dev/null || true
                     fi
                     if [[ -s ".tmp/password_dict_part.txt" ]]; then
                         cat ".tmp/password_dict_part.txt" >>".tmp/password_dict_raw.txt"
@@ -1982,7 +1982,7 @@ function password_dict() {
                 if [[ -s ".tmp/password_dict_raw.txt" ]]; then
                     awk -v min="${PASSWORD_MIN_LENGTH:-5}" -v max="${PASSWORD_MAX_LENGTH:-14}" '
                         {
-                            w=tolower($0);
+                            w=$0;
                             gsub(/[^a-z0-9._-]/, "", w);
                             if (length(w) >= min && length(w) <= max) print w;
                         }' ".tmp/password_dict_raw.txt" | sort -u >"$dict_output"
@@ -1990,14 +1990,14 @@ function password_dict() {
             fi
         fi
 
-        # Fallback to pydictor when cewl is unavailable/empty or explicitly requested.
+        # Fallback to pydictor when cewler is unavailable/empty or explicitly requested.
         if [[ ! -s "$dict_output" ]] || [[ "$dict_engine" == "pydictor" ]]; then
             local word="${domain%%.*}"
             if [[ -s "${tools}/pydictor/pydictor.py" ]]; then
                 run_command python3 "${tools}/pydictor/pydictor.py" -extend "$word" --leet 0 1 2 11 21 --len "$PASSWORD_MIN_LENGTH" "$PASSWORD_MAX_LENGTH" -o "$dict_output" 2>>"$LOGFILE" >/dev/null
-                [[ "$dict_engine" == "cewl" ]] && log_note "password_dict: cewl unavailable/empty, pydictor fallback used" "${FUNCNAME[0]}" "${LINENO}"
-            elif [[ "$dict_engine" == "cewl" ]]; then
-                log_note "password_dict: cewl and pydictor unavailable, skipping output generation" "${FUNCNAME[0]}" "${LINENO}"
+                [[ "$dict_engine" == "cewler" ]] && log_note "password_dict: cewler unavailable/empty, pydictor fallback used" "${FUNCNAME[0]}" "${LINENO}"
+            elif [[ "$dict_engine" == "cewler" ]]; then
+                log_note "password_dict: cewler and pydictor unavailable, skipping output generation" "${FUNCNAME[0]}" "${LINENO}"
             fi
         fi
 

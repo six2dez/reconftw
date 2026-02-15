@@ -289,7 +289,7 @@ function tools_installed() {
 	        ["naabu"]="naabu"
 	        ["porch-pirate"]="porch-pirate"
 	        ["shortscan"]="shortscan"
-        ["cewl"]="cewl"
+        ["cewler"]="cewler"
         ["hakoriginfinder"]="hakoriginfinder"
         ["sourcemapper"]="sourcemapper"
         ["jsluice"]="jsluice"
@@ -306,7 +306,7 @@ function tools_installed() {
         ["cloud_enum"]="cloud_enum"
         ["toxicache"]="toxicache"
         ["favirecon"]="favirecon"
-        ["tinja"]="tinja"
+        ["TInjA"]="TInjA"
         ["second-order"]="second-order"
     )
 
