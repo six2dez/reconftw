@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v4.0] - 2026-02-06
 
 ### Added
 - `nuclei_dast` module: dedicated `nuclei -dast` pass over `webs/`, `url_extract`, and `gf/` candidates (outputs `nuclei_output/dast_json.txt`, `vulns/nuclei_dast.txt`).
@@ -18,36 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CDN origin discovery (best-effort) via `hakoriginfinder` with `CDN_BYPASS=true` (output `hosts/origin_ips.txt`).
 - Password dictionary engine `cewler` (Python) with tuning knobs.
 - Adaptive permutation wordlist: `PERMUTATIONS_WORDLIST_MODE=auto|full|short` with `PERMUTATIONS_SHORT_THRESHOLD=100`. Uses a curated 162-word list for large targets (>100 subs) and the full 849-word list for small targets or DEEP mode.
-- Auto-detection of DNS resolver: `DNS_RESOLVER=auto|puredns|dnsx`. Detects if running behind NAT/CGNAT (non-public IPv4) and switches to dnsx (Go net resolver, safe for home routers) instead of puredns (massdns raw UDP sockets that can overwhelm consumer router NAT tables). Configurable with `DNSX_THREADS` and `DNSX_RATE_LIMIT`.
+- Auto-detection of DNS resolver: `DNS_RESOLVER=auto|puredns|dnsx`. Two-step heuristic: (1) public local IP → puredns, (2) cloud metadata endpoint (169.254.169.254) → puredns, otherwise → dnsx. Handles cloud VPS with private IPs (AWS, GCP, DO, etc.) correctly. Configurable with `DNSX_THREADS` and `DNSX_RATE_LIMIT`.
 - Global DNS resolution wrappers `_resolve_domains()` and `_bruteforce_domains()` in `modules/utils.sh` — all 16 puredns call sites now use these wrappers for consistent resolver selection.
 - Cross-platform local IP detection via `_get_local_ip()` using default route (works on any macOS/Linux interface naming).
 - DNS permutation benchmark script `benchmark_dns_permutations.sh` for comparing gotator, alterx, and ripgen.
 - Built-in wordlists and patterns are now vendored in-repo under `data/` (wordlists: `data/wordlists/`, patterns: `data/patterns/`). Config exposes `DATA_DIR`, `WORDLISTS_DIR`, and `PATTERNS_DIR`.
-
-### Changed
-- Fixed `webprobe_simple()` httpx merge bug (probe output now correctly merged with prior cache).
-- Wrapped local `wafw00f` execution with `run_command` for dry-run/log consistency.
-- `PORTSCAN_ACTIVE_OPTIONS` default no longer includes `--script vulners`; moved to `PORTSCAN_DEEP_OPTIONS`.
-- `ssti`: if `TInjA` is missing, the module warns and skips (no automatic ffuf fallback).
-- `iishortname`: uses `shortscan` only (sns removed).
-- `nuclei_dast`: when vuln scanning is enabled (`VULNS_GENERAL=true`, e.g. `-a`), the DAST pass is force-enabled to avoid accidental coverage loss.
-- Permutation engine simplified to gotator-only (benchmark showed gotator produces the best quality permutations with exclusive valid findings that other tools miss).
-- DNS resolver auto-selection is evaluated once per run and cached (see `DNS_RESOLVER_SELECTED` via `init_dns_resolver()`).
-
-### Removed
-- Obsolete tool-based modules: `cors` (Corsy), `open_redirect` (Oralyzer), `prototype_pollution` (ppmap), favicon real-IP discovery (fav-up).
-- Deprecated/removed config flags: `CORS`, `OPEN_REDIRECT`, `PROTO_POLLUTION`, `FAVICON`.
-- Permutation engines `ripgen`, `alterx`, and `PERMUTATIONS_ENGINE=both` option. Gotator is now the only permutation engine (benchmark winner: best yield, exclusive findings, fastest).
-- Legacy `PERMUTATIONS_OPTION` alias.
-
-### Migration Notes
-- Prefer Nuclei templates (and `nuclei_dast`) for CORS/open-redirect/prototype-pollution coverage.
-- `PERMUTATIONS_ENGINE` now only accepts `gotator`. Remove any `ripgen`/`alterx`/`both` values from custom configs.
-- If running from home/behind NAT, the resolver auto-detection will use dnsx automatically. Set `DNS_RESOLVER=puredns` to force puredns on VPS.
-
-## [v4.0] - 2026-02-06
-
-### Added
+- `--no-banner` to disable banner output (banner is on by default).
+- `--no-report` to skip report generation/exports.
+- `--gen-resolvers` to generate resolvers with `dnsvalidator`.
+- `--force` to ignore cached module markers and re-run all phases.
 
 **Modular Architecture**
 - Split monolithic script into focused modules under `modules/`:
@@ -142,8 +121,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Integration tests for full flow and checkpoint behavior.
 - Additional test helpers/scripts for artifact and mode validation.
 
-### Changed
+**CI/CD and Docker**
+- ShellCheck failures now fail CI (removed permissive `continue-on-error`).
+- Added Docker nightly verification steps (`--help`, `--health-check`).
+- Nightly image health-check failures now fail workflows.
+- Docker image security improved by generating Axiom SSH keys at runtime via `Docker/entrypoint.sh` instead of build-time.
 
+### Changed
+- Fixed `webprobe_simple()` httpx merge bug (probe output now correctly merged with prior cache).
+- Wrapped local `wafw00f` execution with `run_command` for dry-run/log consistency.
+- `PORTSCAN_ACTIVE_OPTIONS` default no longer includes `--script vulners`; moved to `PORTSCAN_DEEP_OPTIONS`.
+- `ssti`: if `TInjA` is missing, the module warns and skips (no automatic ffuf fallback).
+- `iishortname`: uses `shortscan` only (sns removed).
+- `nuclei_dast`: when vuln scanning is enabled (`VULNS_GENERAL=true`, e.g. `-a`), the DAST pass is force-enabled to avoid accidental coverage loss.
+- Permutation engine simplified to gotator-only (benchmark showed gotator produces the best quality permutations with exclusive valid findings that other tools miss).
+- DNS resolver auto-selection is evaluated once per run and cached (see `DNS_RESOLVER_SELECTED` via `init_dns_resolver()`).
 - Main script reduced to entry-point style with modular delegation.
 - Module loading order updated to include shared libraries (`lib/common.sh`, `lib/parallel.sh`).
 - Replaced repetitive utility patterns with centralized helpers:
@@ -161,6 +153,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Help output formatting uses proper color escapes (no literal `\033`).
 - `--pretty` option removed (no longer supported).
 - Health-check tool list updated to reflect actual runtime usage (`nmap`, `nmapurls`).
+- Fixed duplicate findings/reporting edge cases.
+- Corrected `sub_asn()` behavior to avoid redundant repeated runs.
+- `sub_asn()` now requires `PDCP_API_KEY` before running `asnmap`, logs explicit skip reason when unset, and applies a 120s timeout guard when available.
+- Corrected host matching in WAF/slow-host grouping to literal-safe comparisons.
+- Parallel group failures now propagate correctly instead of being silently ignored.
+
+**Cross-platform/Operational Fixes**
+- Improved macOS compatibility for `stat`, `df`, and `sed` behavior.
+- Improved cache lifecycle behavior and runtime refresh handling.
+- Progress totals now correctly account for quick-rescan skips and execution model differences.
 
 ### Fixed
 
@@ -216,31 +218,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Parallel batch summary lines now expose real counters for `ok/warn/fail/skip/cache`.
 - Cache/skip messaging was normalized to avoid unformatted "already processed" lines and keep status output consistent.
 
-### Added
+### Removed
+- Obsolete tool-based modules: `cors` (Corsy), `open_redirect` (Oralyzer), `prototype_pollution` (ppmap), favicon real-IP discovery (fav-up).
+- Deprecated/removed config flags: `CORS`, `OPEN_REDIRECT`, `PROTO_POLLUTION`, `FAVICON`.
+- Permutation engines `ripgen`, `alterx`, and `PERMUTATIONS_ENGINE=both` option. Gotator is now the only permutation engine (benchmark winner: best yield, exclusive findings, fastest).
+- Legacy `PERMUTATIONS_OPTION` alias.
 
-- `--no-banner` to disable banner output (banner is on by default).
-- `--no-report` to skip report generation/exports.
-- `--gen-resolvers` to generate resolvers with `dnsvalidator`.
-- `--force` to ignore cached module markers and re-run all phases.
-- Fixed duplicate findings/reporting edge cases.
-- Corrected `sub_asn()` behavior to avoid redundant repeated runs.
-- `sub_asn()` now requires `PDCP_API_KEY` before running `asnmap`, logs explicit skip reason when unset, and applies a 120s timeout guard when available.
-- Corrected host matching in WAF/slow-host grouping to literal-safe comparisons.
-- Parallel group failures now propagate correctly instead of being silently ignored.
-
-**CI/CD and Docker**
-- ShellCheck failures now fail CI (removed permissive `continue-on-error`).
-- Added Docker nightly verification steps (`--help`, `--health-check`).
-- Nightly image health-check failures now fail workflows.
-- Docker image security improved by generating Axiom SSH keys at runtime via `Docker/entrypoint.sh` instead of build-time.
-
-**Cross-platform/Operational Fixes**
-- Improved macOS compatibility for `stat`, `df`, and `sed` behavior.
-- Improved cache lifecycle behavior and runtime refresh handling.
-- Progress totals now correctly account for quick-rescan skips and execution model differences.
+### Migration Notes
+- Prefer Nuclei templates (and `nuclei_dast`) for CORS/open-redirect/prototype-pollution coverage.
+- `PERMUTATIONS_ENGINE` now only accepts `gotator`. Remove any `ripgen`/`alterx`/`both` values from custom configs.
+- If running from home/behind NAT, the resolver auto-detection will use dnsx automatically. Set `DNS_RESOLVER=puredns` to force puredns on VPS.
 
 ### Security
-
 - Removed unsafe `eval` usage on user-influenced input paths.
 - Hardened input sanitization against shell metacharacter injection.
 - Improved quoting and command construction across modules.
