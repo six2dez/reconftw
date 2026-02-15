@@ -1059,13 +1059,35 @@ _ip_is_public_ipv4() {
     return 0
 }
 
-# Detect if running behind NAT (home router / CGNAT / unknown network) by checking local IP.
-# Returns 0 (true) if behind NAT or undetectable, 1 (false) if public IP (VPS/dedicated).
-_is_behind_nat() {
-    local ip
-    ip=$(_get_local_ip)
-    _ip_is_public_ipv4 "$ip" && return 1
-    return 0
+# Check if a cloud metadata endpoint is reachable (AWS, GCP, Azure, DO, Hetzner, Oracle).
+# Returns 0 if running on a cloud VPS, 1 otherwise.
+_is_cloud_vps() {
+    curl -sf --max-time 2 -o /dev/null http://169.254.169.254/ 2>/dev/null && return 0
+    return 1
+}
+
+# Get external public IPv4 via a remote service. Returns empty on failure.
+_get_external_ipv4() {
+    local ext=""
+    ext=$(curl -4 -sf --max-time 5 ifconfig.me 2>/dev/null)
+    [[ -z "$ext" ]] && ext=$(curl -4 -sf --max-time 5 api.ipify.org 2>/dev/null)
+    _ip_is_public_ipv4 "$ext" && echo "$ext" && return 0
+    return 1
+}
+
+# Determine if puredns is safe to use (public network / cloud VPS).
+# Returns 0 (true = puredns safe) or 1 (false = use dnsx).
+# Priority:
+#   1. Local IP is public                       → puredns (bare-metal / dedicated)
+#   2. Cloud metadata endpoint responds          → puredns (cloud VPS with 1:1 NAT)
+#   3. External IPv4 reachable and public        → puredns (VPS behind transparent NAT)
+#   4. None of the above                         → dnsx   (home/office/unknown)
+_can_use_puredns() {
+    local ip="$1"
+    _ip_is_public_ipv4 "$ip" && return 0
+    _is_cloud_vps && return 0
+    _get_external_ipv4 >/dev/null 2>&1 && return 0
+    return 1
 }
 
 # Initialize and cache DNS resolver selection (evaluate once per run).
@@ -1076,10 +1098,9 @@ init_dns_resolver() {
     ip=$(_get_local_ip)
 
     # Expose NAT detection and local IP for UI/logging.
-    # Note: This is a best-effort heuristic based on the primary local IPv4 address.
     RECON_LOCAL_IP="${ip:-}"
     RECON_BEHIND_NAT="yes"
-    if _ip_is_public_ipv4 "$ip"; then
+    if _can_use_puredns "$ip"; then
         RECON_BEHIND_NAT="no"
     fi
     export RECON_LOCAL_IP RECON_BEHIND_NAT
@@ -1090,7 +1111,7 @@ init_dns_resolver() {
             DNS_RESOLVER_SELECTED="$mode"
             ;;
         auto|"")
-            if _ip_is_public_ipv4 "$ip"; then
+            if [[ "$RECON_BEHIND_NAT" == "no" ]]; then
                 DNS_RESOLVER_SELECTED="puredns"
             else
                 DNS_RESOLVER_SELECTED="dnsx"
@@ -1098,7 +1119,7 @@ init_dns_resolver() {
             ;;
         *)
             print_warnf "DNS_RESOLVER invalid: '%s' (use auto|puredns|dnsx). Defaulting to auto." "$mode"
-            if _ip_is_public_ipv4 "$ip"; then
+            if [[ "$RECON_BEHIND_NAT" == "no" ]]; then
                 DNS_RESOLVER_SELECTED="puredns"
             else
                 DNS_RESOLVER_SELECTED="dnsx"
@@ -1107,8 +1128,8 @@ init_dns_resolver() {
     esac
 
     export DNS_RESOLVER_SELECTED
-    printf "[%s] DNS resolver selected: %s (DNS_RESOLVER=%s, local_ip=%s)\n" \
-        "$(date +'%Y-%m-%d %H:%M:%S')" "$DNS_RESOLVER_SELECTED" "${DNS_RESOLVER:-auto}" "${ip:-}" >>"${LOGFILE:-/dev/null}"
+    printf "[%s] DNS resolver selected: %s (DNS_RESOLVER=%s, local_ip=%s, behind_nat=%s)\n" \
+        "$(date +'%Y-%m-%d %H:%M:%S')" "$DNS_RESOLVER_SELECTED" "${DNS_RESOLVER:-auto}" "${ip:-}" "$RECON_BEHIND_NAT" >>"${LOGFILE:-/dev/null}"
 }
 
 # Select DNS resolver based on DNS_RESOLVER config and NAT detection.

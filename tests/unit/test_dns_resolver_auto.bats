@@ -24,23 +24,39 @@ setup() {
     done
 }
 
-@test "_is_behind_nat returns true for RFC1918 and CGNAT and false for public IPv4" {
-    _get_local_ip() { echo "192.168.1.10"; }
-    run _is_behind_nat
+@test "_can_use_puredns returns true for public local IP" {
+    _is_cloud_vps() { return 1; }
+    _get_external_ipv4() { return 1; }
+    run _can_use_puredns "8.8.8.8"
     [ "$status" -eq 0 ]
+}
 
-    _get_local_ip() { echo "100.64.10.20"; }
-    run _is_behind_nat
+@test "_can_use_puredns returns true for private IP on cloud VPS (metadata)" {
+    _is_cloud_vps() { return 0; }
+    _get_external_ipv4() { return 1; }
+    run _can_use_puredns "10.0.0.5"
     [ "$status" -eq 0 ]
+}
 
-    _get_local_ip() { echo "8.8.8.8"; }
-    run _is_behind_nat
+@test "_can_use_puredns returns true for private IP with external IPv4 reachable" {
+    _is_cloud_vps() { return 1; }
+    _get_external_ipv4() { echo "203.0.113.50"; return 0; }
+    run _can_use_puredns "10.0.0.5"
+    [ "$status" -eq 0 ]
+}
+
+@test "_can_use_puredns returns false for private IP without cloud or external" {
+    _is_cloud_vps() { return 1; }
+    _get_external_ipv4() { return 1; }
+    run _can_use_puredns "192.168.1.10"
     [ "$status" -ne 0 ]
 }
 
 @test "init_dns_resolver caches auto selection (does not re-evaluate on each _select_dns_resolver)" {
     export DNS_RESOLVER="auto"
     _get_local_ip() { echo "192.168.1.10"; }
+    _is_cloud_vps() { return 1; }
+    _get_external_ipv4() { return 1; }
     init_dns_resolver
     [ "$DNS_RESOLVER_SELECTED" = "dnsx" ]
 
@@ -53,6 +69,8 @@ setup() {
 
 @test "DNS_RESOLVER override forces puredns/dnsx regardless of network" {
     _get_local_ip() { echo "192.168.1.10"; }
+    _is_cloud_vps() { return 1; }
+    _get_external_ipv4() { return 1; }
 
     export DNS_RESOLVER="puredns"
     init_dns_resolver
