@@ -138,7 +138,7 @@ SH
 @test "apileaks integrates postleaksNg output" {
   mkdir -p osint
   export tools="$TEST_DIR/tools"
-  mkdir -p "$tools/SwaggerSpy/venv/bin" "$tools/SwaggerSpy" "$tools/postleaksNg/.venv/bin"
+  mkdir -p "$tools/SwaggerSpy/venv/bin" "$tools/SwaggerSpy"
 
   cat > "$MOCK_BIN/porch-pirate" <<'SH'
 #!/usr/bin/env bash
@@ -153,7 +153,7 @@ SH
   chmod +x "$tools/SwaggerSpy/venv/bin/python3"
   printf '%s\n' 'print("mock")' > "$tools/SwaggerSpy/swaggerspy.py"
 
-  cat > "$tools/postleaksNg/.venv/bin/postleaksNg" <<'SH'
+  cat > "$MOCK_BIN/postleaksNg" <<'SH'
 #!/usr/bin/env bash
 out=""
 while [[ $# -gt 0 ]]; do
@@ -170,7 +170,7 @@ done
 mkdir -p "$out"
 printf '%s\n' '{"url":"https://postman.new.example.com/path"}' > "$out/postleaks.json"
 SH
-  chmod +x "$tools/postleaksNg/.venv/bin/postleaksNg"
+  chmod +x "$MOCK_BIN/postleaksNg"
 
   cat > "$MOCK_BIN/trufflehog" <<'SH'
 #!/usr/bin/env bash

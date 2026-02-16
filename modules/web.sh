@@ -1946,8 +1946,6 @@ function password_dict() {
             local cewler_cmd=()
             if command -v cewler >/dev/null 2>&1; then
                 cewler_cmd=(cewler)
-            elif [[ -x "${tools}/cewler/venv/bin/cewler" ]]; then
-                cewler_cmd=("${tools}/cewler/venv/bin/cewler")
             fi
 
             if [[ ${#cewler_cmd[@]} -gt 0 ]] && [[ -s "webs/webs_all.txt" ]]; then

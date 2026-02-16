@@ -249,7 +249,7 @@ declare -A gotools=(
     ["TInjA"]="go install -v github.com/Hackmanit/TInjA@latest"
 )
 
-# Declare pipx tools and their paths
+# Declare uv tool-managed Python tools and their GitHub paths
 declare -A pipxtools=(
     ["dnsvalidator"]="vortexau/dnsvalidator"
     ["interlace"]="codingo/Interlace"
@@ -266,6 +266,8 @@ declare -A pipxtools=(
     ["arjun"]="s0md3v/Arjun"
     ["gqlspection"]="doyensec/GQLSpection"
     ["cloud_enum"]="initstring/cloud_enum"
+    ["postleaksNg"]="six2dez/postleaksNG"
+    ["cewler"]="roys/cewler"
 )
 
 # Declare repositories and their paths
@@ -279,7 +281,6 @@ declare -A repos=(
     ["testssl.sh"]="drwetter/testssl.sh"
     ["JSA"]="w9w/JSA"
     ["CloudHunter"]="belane/CloudHunter"
-    ["cewler"]="roys/cewler"
     ["ultimate-nmap-parser"]="shifty0g/ultimate-nmap-parser"
     ["gitdorks_go"]="damit5/gitdorks_go"
     ["Web-Cache-Vulnerability-Scanner"]="Hackmanit/Web-Cache-Vulnerability-Scanner"
@@ -297,7 +298,6 @@ declare -A repos=(
     ["metagoofil"]="opsdisk/metagoofil"
     ["EmailHarvester"]="maldevel/EmailHarvester"
     ["reconftw_ai"]="six2dez/reconftw_ai"
-    ["postleaksNg"]="six2dez/postleaksNG"
 )
 
 # Function to display the banner
@@ -347,7 +347,7 @@ function install_tools() {
     done
     [[ $COMPACT == "true" && $IS_TTY -eq 1 ]] && printf "\n"
 
-    header "Installing pipx tools (${#pipxtools[@]})"
+    header "Installing uv tools (${#pipxtools[@]})"
 
     local pipx_step=0
     local failed_pipx_tools=()
@@ -358,36 +358,36 @@ function install_tools() {
         ((++pipx_step))
         if command -v "$pipxtool" &>/dev/null; then
             # Force upgrade when already installed instead of skipping/failing on install.
-            q pipx upgrade "${pipxtool}"
+            q uv tool upgrade "${pipxtool}"
             exit_status=$?
             if [[ $exit_status -ne 0 ]]; then
                 failed_pipx_tools+=("$pipxtool")
                 INST_PX_FAIL+=("$pipxtool")
                 ((++px_fail))
                 double_check=true
-                progress_update "pipx tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
+                progress_update "uv tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
                 msg_err "[$pipx_step/$total_px] ${pipxtool} upgrade failed"
                 continue
             fi
         else
             # First-time install.
-            q pipx install "git+https://github.com/${pipxtools[$pipxtool]}"
+            q uv tool install "git+https://github.com/${pipxtools[$pipxtool]}"
             exit_status=$?
             if [[ $exit_status -ne 0 ]]; then
                 failed_pipx_tools+=("$pipxtool")
                 INST_PX_FAIL+=("$pipxtool")
                 ((++px_fail))
                 double_check=true
-                progress_update "pipx tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
+                progress_update "uv tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
                 msg_err "[$pipx_step/$total_px] ${pipxtool} install failed"
                 continue
             fi
-            q pipx upgrade "${pipxtool}" || true
+            q uv tool upgrade "${pipxtool}" || true
         fi
 
         INST_PX_OK+=("$pipxtool")
         ((++px_ok))
-        progress_update "pipx tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
+        progress_update "uv tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
         [[ $COMPACT != "true" ]] && msg_ok "[$pipx_step/$total_px] ${pipxtool} ready"
     done
     [[ $COMPACT == "true" && $IS_TTY -eq 1 ]] && printf "\n"
@@ -401,19 +401,15 @@ function install_tools() {
 
     install_repo_requirements() {
         if [[ -s "requirements.txt" ]]; then
-            if [[ ! -f "venv/bin/activate" ]]; then
-                python3 -m venv venv &>/dev/null
+            if [[ ! -d "venv" ]]; then
+                uv venv venv &>/dev/null
             fi
-            # shellcheck disable=SC1091
-            source venv/bin/activate
-            if ! pip3 install --upgrade -r requirements.txt &>/dev/null; then
-                deactivate || true
+            if ! uv pip install --upgrade -r requirements.txt --python venv/bin/python3 &>/dev/null; then
                 return 1
             fi
             if [[ $1 == "dorks_hunter" ]]; then
-                pip install --upgrade xnldorker &>/dev/null || true
+                uv pip install --upgrade xnldorker --python venv/bin/python3 &>/dev/null || true
             fi
-            deactivate || true
         fi
         return 0
     }
@@ -518,18 +514,6 @@ function install_tools() {
             "trufflehog")
                 go install &>/dev/null
                 ;;
-            "postleaksNg"|"cewler")
-                if [[ ! -d "venv" ]]; then
-                    python3 -m venv venv &>/dev/null || true
-                fi
-                if [[ -f "venv/bin/activate" ]]; then
-                    # shellcheck disable=SC1091
-                    source venv/bin/activate
-                    pip3 install --upgrade pip &>/dev/null || true
-                    pip3 install -e . &>/dev/null || true
-                    deactivate || true
-                fi
-                ;;
         esac
 
         # Copy gf patterns if applicable
@@ -570,7 +554,7 @@ function install_tools() {
     fi
 
     if [[ ${#failed_pipx_tools[@]} -ne 0 ]]; then
-        printf "\n%bFailed to install the following pipx tools: %s%b\n" "$red" "${failed_pipx_tools[*]}" "$reset"
+        printf "\n%bFailed to install the following uv tools: %s%b\n" "$red" "${failed_pipx_tools[*]}" "$reset"
     fi
 
     if [[ ${#failed_repos[@]} -ne 0 ]]; then
@@ -801,16 +785,19 @@ function install_system_packages() {
 # Function to install required packages for Debian-based systems
 function install_apt() {
     $SUDO apt-get update -y &>/dev/null
-    $SUDO apt-get install -y python3 python3-pip python3-venv pipx python3-virtualenv build-essential gcc cmake ruby whois git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx medusa xvfb libxml2-utils procps bsdmainutils libdata-hexdump-perl libimage-exiftool-perl &>/dev/null
+    $SUDO apt-get install -y python3 build-essential gcc cmake ruby whois git curl libpcap-dev wget zip python3-dev pv dnsutils libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev nmap jq apt-transport-https lynx medusa xvfb libxml2-utils procps bsdmainutils libdata-hexdump-perl libimage-exiftool-perl &>/dev/null
     # Move chromium browser dependencies (required by `nuclei -headless -id screenshot`) into a separate apt install command, and add a fallback for Ubuntu 24.04 (where `libasound2` is renamed to `libasound2t64`)
     $SUDO apt-get install -y libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon-x11-0 libxcomposite-dev libxdamage1 libxrandr2 libgbm-dev libpangocairo-1.0-0 libasound2 &>/dev/null \
         || $SUDO apt-get install -y libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon-x11-0 libxcomposite-dev libxdamage1 libxrandr2 libgbm-dev libpangocairo-1.0-0 libasound2t64 &>/dev/null
 	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
 	source "${HOME}/.cargo/env"
 	cargo install smugglex &>/dev/null
-	pipx ensurepath -f &>/dev/null
-	# Install shodan CLI in isolated environment to avoid PEP 668 conflicts
-    pipx install shodan &>/dev/null || pipx upgrade shodan &>/dev/null || true
+	# Install uv (replaces pip, venv, pipx)
+	curl -LsSf https://astral.sh/uv/install.sh | sh &>/dev/null
+	source "${HOME}/.local/bin/env" 2>/dev/null || export PATH="${HOME}/.local/bin:$PATH"
+	uv tool update-shell &>/dev/null || true
+	# Install shodan CLI via uv
+	uv tool install shodan &>/dev/null || uv tool upgrade shodan &>/dev/null || true
 }
 
 # Function to install required packages for macOS
@@ -821,10 +808,13 @@ function install_brew() {
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     fi
     brew update &>/dev/null
-	brew install --formula bash coreutils gnu-getopt gnu-sed python pipx massdns jq gcc cmake ruby git curl wget zip pv bind whois exiftool nmap lynx medusa shodan &>/dev/null
+	brew install --formula bash coreutils gnu-getopt gnu-sed python uv massdns jq gcc cmake ruby git curl wget zip pv bind whois exiftool nmap lynx medusa &>/dev/null
 	brew install rustup &>/dev/null
 	rustup-init -y &>/dev/null
 	cargo install smugglex &>/dev/null
+	uv tool update-shell &>/dev/null || true
+	# Install shodan CLI via uv
+	uv tool install shodan &>/dev/null || uv tool upgrade shodan &>/dev/null || true
 }
 
 # Function to install required packages for RedHat-based systems
@@ -832,7 +822,7 @@ function install_yum() {
     $SUDO yum groupinstall "Development Tools" -y &>/dev/null
     # Base install first (python3 may be 3.6 on older EL)
     $SUDO yum install -y epel-release &>/dev/null || true
-    $SUDO yum install -y python3 python3-pip gcc cmake ruby git curl libpcap whois perl-Image-ExifTool wget pipx zip pv bind-utils openssl-devel libffi-devel libxml2-devel libxslt-devel zlib-devel nmap jq lynx medusa xorg-x11-server-xvfb &>/dev/null
+    $SUDO yum install -y python3 gcc cmake ruby git curl libpcap whois perl-Image-ExifTool wget zip pv bind-utils openssl-devel libffi-devel libxml2-devel libxslt-devel zlib-devel nmap jq lynx medusa xorg-x11-server-xvfb &>/dev/null
 
     # Ensure Python >= 3.7 on yum-based systems
     if ! python3 - <<-'PYCHK' &>/dev/null; then
@@ -877,33 +867,29 @@ function install_yum() {
         fi
     fi
 
-    # Ensure pipx uses the selected python3
-    local pipx_python
-    pipx_python="$(command -v python3 || echo python3)"
-    export PIPX_DEFAULT_PYTHON="$pipx_python"
-
-    # Ensure pipx is present even on older EL (install via pip if the rpm doesn't exist)
-    if ! command -v pipx &>/dev/null; then
-        python3 -m pip install --user -U pip pipx &>/dev/null || true
-        export PATH="$HOME/.local/bin:$PATH"
-    fi
 	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
 	source "${HOME}/.cargo/env"
 	cargo install smugglex &>/dev/null
-	# Ensure pipx path and install shodan CLI
-	pipx ensurepath -f &>/dev/null || true
-    pipx install shodan &>/dev/null || pipx upgrade shodan &>/dev/null || true
+	# Install uv (replaces pip, venv, pipx)
+	curl -LsSf https://astral.sh/uv/install.sh | sh &>/dev/null
+	source "${HOME}/.local/bin/env" 2>/dev/null || export PATH="${HOME}/.local/bin:$PATH"
+	uv tool update-shell &>/dev/null || true
+	# Install shodan CLI via uv
+	uv tool install shodan &>/dev/null || uv tool upgrade shodan &>/dev/null || true
 }
 
 # Function to install required packages for Arch-based systems
 function install_pacman() {
-    $SUDO pacman -Sy --noconfirm python python-pip base-devel gcc cmake ruby git curl libpcap python-pipx whois perl-image-exiftool wget zip pv bind openssl libffi libxml2 libxslt zlib nmap jq lynx medusa xorg-server-xvfb &>/dev/null
+    $SUDO pacman -Sy --noconfirm python base-devel gcc cmake ruby git curl libpcap whois perl-image-exiftool wget zip pv bind openssl libffi libxml2 libxslt zlib nmap jq lynx medusa xorg-server-xvfb &>/dev/null
 	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
 	source "${HOME}/.cargo/env"
 	cargo install smugglex &>/dev/null
-	# Ensure pipx path and install shodan CLI
-	pipx ensurepath -f &>/dev/null || true
-    pipx install shodan &>/dev/null || pipx upgrade shodan &>/dev/null || true
+	# Install uv (replaces pip, venv, pipx)
+	curl -LsSf https://astral.sh/uv/install.sh | sh &>/dev/null
+	source "${HOME}/.local/bin/env" 2>/dev/null || export PATH="${HOME}/.local/bin:$PATH"
+	uv tool update-shell &>/dev/null || true
+	# Install shodan CLI via uv
+	uv tool install shodan &>/dev/null || uv tool upgrade shodan &>/dev/null || true
 }
 
 # Setup reconftw venv for python-only helpers (e.g., getjswords)
@@ -915,17 +901,14 @@ function setup_reconftw_venv() {
         return 0
     fi
     if [[ ! -d "$venv_dir" ]]; then
-        python3 -m venv "$venv_dir" &>/dev/null || {
+        uv venv "$venv_dir" &>/dev/null || {
             msg_warn "[!] Failed to create venv at ${venv_dir}"
             return 0
         }
     fi
-    if [[ -x "${venv_dir}/bin/pip" ]]; then
-        "${venv_dir}/bin/pip" install -U pip &>/dev/null || true
-        "${venv_dir}/bin/pip" install jsbeautifier requests &>/dev/null || true
-    else
-        msg_warn "[!] venv pip not found at ${venv_dir}/bin/pip"
-    fi
+    uv pip install jsbeautifier requests --python "${venv_dir}/bin/python3" &>/dev/null || {
+        msg_warn "[!] Failed to install getjswords deps in ${venv_dir}"
+    }
 }
 
 # Function to perform initial setup
@@ -943,7 +926,7 @@ function initial_setup() {
         touch "${dir}/.github_tokens"
         touch "${dir}/.gitlab_tokens"
 
-        q pipx ensurepath
+        q uv tool update-shell
         export PATH="${HOME}/.local/bin:${PATH}"
 
         install_tools
@@ -963,7 +946,7 @@ function initial_setup() {
     touch "${dir}/.github_tokens"
     touch "${dir}/.gitlab_tokens"
 
-    q pipx ensurepath
+    q uv tool update-shell
     # Ensure $HOME/.local/bin is available now even if profile isn't sourced
     export PATH="${HOME}/.local/bin:${PATH}"
     # Do not source user shell profiles here to avoid errors like 'PS1: unbound variable'

@@ -208,7 +208,7 @@ function tools_installed() {
         ["spoofy_python"]="${tools}/Spoofy/venv/bin/python3"
         ["swaggerspy"]="${tools}/SwaggerSpy/swaggerspy.py"
         ["swaggerspy_python"]="${tools}/SwaggerSpy/venv/bin/python3"
-        ["postleaksNg"]="${tools}/postleaksNg/.venv/bin/postleaksNg"
+        ["postleaksNg"]="postleaksNg"
         ["LeakSearch"]="${tools}/LeakSearch/LeakSearch.py"
         ["LeakSearch_python"]="${tools}/LeakSearch/venv/bin/python3"
         ["msftrecon"]="${tools}/msftrecon/msftrecon/msftrecon.py"

@@ -247,10 +247,11 @@ function apileaks() {
 
         # Optional postleaksNg integration (Postman public library leaks)
         if [[ ${API_LEAKS_POSTLEAKS:-true} == true ]]; then
-            local postleaks_bin="${tools}/postleaksNg/.venv/bin/postleaksNg"
+            local postleaks_bin
+            postleaks_bin="$(command -v postleaksNg 2>/dev/null || true)"
             local postleaks_out="${dir}/osint/postman_leaks_postleaksng"
             mkdir -p "$postleaks_out"
-            if [[ -x "$postleaks_bin" ]]; then
+            if [[ -n "$postleaks_bin" && -x "$postleaks_bin" ]]; then
                 local -a postleaks_cmd=(
                     "$postleaks_bin"
                     -k "$domain"
@@ -271,7 +272,7 @@ function apileaks() {
                         | anew -q "${dir}/osint/postman_leaks.txt"
                 fi
             else
-                log_note "apileaks: postleaksNg binary not found at ${postleaks_bin}" "${FUNCNAME[0]}" "${LINENO}"
+                log_note "apileaks: postleaksNg not found in PATH" "${FUNCNAME[0]}" "${LINENO}"
             fi
         fi
 

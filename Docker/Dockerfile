@@ -50,6 +50,7 @@ ENV PATH="${GOROOT}/bin:${GOPATH}/bin:${AXIOMPATH}:${CARGOPATH}:${PATH}"
 SHELL [ "/bin/bash", "-c" ]
 
 COPY 01_nodoc /etc/dpkg/dpkg.cfg.d/
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 RUN <<eot
 #!/bin/bash
@@ -62,7 +63,7 @@ cp /root/.bashrc /root/original.bashrc
 apt clean all
 apt update
 apt full-upgrade -f -y --allow-downgrades
-apt install -y --no-install-recommends apt-utils ca-certificates curl git lsb-release nano wget vim jq htop net-tools dnsutils nmap python3 python3-pip unzip whois
+apt install -y --no-install-recommends apt-utils ca-certificates curl git lsb-release nano wget vim jq htop net-tools dnsutils nmap python3 unzip whois
 
 ###>> Configure Locales <<###
 apt install -y --no-install-recommends locales
