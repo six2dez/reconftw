@@ -736,14 +736,27 @@ function install_golang_version() {
         if [[ -n ${profile_shell:-} ]]; then
             local profile_path="${HOME}/${profile_shell}"
             local marker="# Golang environment variables (reconFTW)"
-            if ! grep -Fq "$marker" "$profile_path" 2>/dev/null; then
-                {
-                    printf '\n%s\n' "$marker"
-                    printf 'export GOROOT=/usr/local/go\n'
-                    printf 'export GOPATH=$HOME/go\n'
-                    printf 'export PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH\n'
-                } >>"$profile_path"
+
+            # Remove ALL previous golang env blocks (old-style and reconFTW-style)
+            # to prevent duplicates from accumulating across runs
+            if [[ -f "$profile_path" ]] && grep -q '^# Golang environment variables' "$profile_path" 2>/dev/null; then
+                local tmp_profile
+                tmp_profile=$(mktemp)
+                awk '
+                    /^# Golang environment variables/ { skip = 3; next }
+                    skip > 0 && /^export (GOROOT|GOPATH|PATH)=/ { skip--; next }
+                    skip > 0 { skip = 0 }
+                    { print }
+                ' "$profile_path" > "$tmp_profile" && mv "$tmp_profile" "$profile_path"
             fi
+
+            # Append single canonical block
+            {
+                printf '\n%s\n' "$marker"
+                printf 'export GOROOT=/usr/local/go\n'
+                printf 'export GOPATH=$HOME/go\n'
+                printf 'export PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH\n'
+            } >>"$profile_path"
         fi
     else
         msg_warn "Golang will not be configured according to the user's preferences (install_golang=false in reconftw.cfg)."
