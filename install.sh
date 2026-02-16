@@ -358,7 +358,7 @@ function install_tools() {
         ((++pipx_step))
         if command -v "$pipxtool" &>/dev/null; then
             # Force upgrade when already installed instead of skipping/failing on install.
-            q uv tool upgrade "${pipxtool}"
+            q uv tool install "${pipxtool}" --force
             exit_status=$?
             if [[ $exit_status -ne 0 ]]; then
                 failed_pipx_tools+=("$pipxtool")
@@ -371,7 +371,7 @@ function install_tools() {
             fi
         else
             # First-time install.
-            q uv tool install "git+https://github.com/${pipxtools[$pipxtool]}"
+            q uv tool install "git+https://github.com/${pipxtools[$pipxtool]}" --force
             exit_status=$?
             if [[ $exit_status -ne 0 ]]; then
                 failed_pipx_tools+=("$pipxtool")
@@ -810,7 +810,7 @@ function install_apt() {
 	source "${HOME}/.local/bin/env" 2>/dev/null || export PATH="${HOME}/.local/bin:$PATH"
 	uv tool update-shell &>/dev/null || true
 	# Install shodan CLI via uv
-	uv tool install shodan &>/dev/null || uv tool upgrade shodan &>/dev/null || true
+	uv tool install shodan --force &>/dev/null || uv tool upgrade shodan &>/dev/null || true
 }
 
 # Function to install required packages for macOS
@@ -827,7 +827,7 @@ function install_brew() {
 	cargo install smugglex &>/dev/null
 	uv tool update-shell &>/dev/null || true
 	# Install shodan CLI via uv
-	uv tool install shodan &>/dev/null || uv tool upgrade shodan &>/dev/null || true
+	uv tool install shodan --force &>/dev/null || uv tool upgrade shodan &>/dev/null || true
 }
 
 # Function to install required packages for RedHat-based systems
@@ -888,7 +888,7 @@ function install_yum() {
 	source "${HOME}/.local/bin/env" 2>/dev/null || export PATH="${HOME}/.local/bin:$PATH"
 	uv tool update-shell &>/dev/null || true
 	# Install shodan CLI via uv
-	uv tool install shodan &>/dev/null || uv tool upgrade shodan &>/dev/null || true
+	uv tool install shodan --force &>/dev/null || uv tool upgrade shodan &>/dev/null || true
 }
 
 # Function to install required packages for Arch-based systems
@@ -902,7 +902,7 @@ function install_pacman() {
 	source "${HOME}/.local/bin/env" 2>/dev/null || export PATH="${HOME}/.local/bin:$PATH"
 	uv tool update-shell &>/dev/null || true
 	# Install shodan CLI via uv
-	uv tool install shodan &>/dev/null || uv tool upgrade shodan &>/dev/null || true
+	uv tool install shodan --force &>/dev/null || uv tool upgrade shodan &>/dev/null || true
 }
 
 # Setup reconftw venv for python-only helpers (e.g., getjswords)
