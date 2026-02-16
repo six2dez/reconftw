@@ -356,39 +356,36 @@ function install_tools() {
 
     for pipxtool in "${!pipxtools[@]}"; do
         ((++pipx_step))
-        if command -v "$pipxtool" &>/dev/null; then
-            # Force upgrade when already installed instead of skipping/failing on install.
-            q uv tool install "${pipxtool}" --force
-            exit_status=$?
-            if [[ $exit_status -ne 0 ]]; then
-                failed_pipx_tools+=("$pipxtool")
-                INST_PX_FAIL+=("$pipxtool")
-                ((++px_fail))
-                double_check=true
-                progress_update "uv tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
-                msg_err "[$pipx_step/$total_px] ${pipxtool} upgrade failed"
-                continue
-            fi
-        else
-            # First-time install.
-            q uv tool install "git+https://github.com/${pipxtools[$pipxtool]}" --force
-            exit_status=$?
-            if [[ $exit_status -ne 0 ]]; then
-                failed_pipx_tools+=("$pipxtool")
-                INST_PX_FAIL+=("$pipxtool")
-                ((++px_fail))
-                double_check=true
-                progress_update "uv tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
-                msg_err "[$pipx_step/$total_px] ${pipxtool} install failed"
-                continue
-            fi
-            q uv tool upgrade "${pipxtool}" || true
+
+        # Always use git+https URL for both install and upgrade to avoid PyPI lookups
+        # which fail for tools not on PyPI.
+        local tool_url="git+https://github.com/${pipxtools[$pipxtool]}"
+        
+        # Prepare arguments array
+        local tool_args=()
+
+        # Special case for postleaksNg to fix jellyfish dependency issue
+        if [[ "$pipxtool" == "postleaksNg" ]]; then
+             tool_args+=("--with" "jellyfish>=1.1.3")
         fi
 
-        INST_PX_OK+=("$pipxtool")
-        ((++px_ok))
-        progress_update "uv tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
-        [[ $COMPACT != "true" ]] && msg_ok "[$pipx_step/$total_px] ${pipxtool} ready"
+        # Always force install/reinstall from the git URL
+        # This handles both initial install and upgrades correctly
+        if q uv tool install "${tool_args[@]}" "$tool_url" --force; then
+             if [[ " ${INST_PX_OK[*]} " != *" $pipxtool "* ]]; then
+                 INST_PX_OK+=("$pipxtool")
+                 ((++px_ok))
+             fi
+             progress_update "uv tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
+             [[ $COMPACT != "true" ]] && msg_ok "[$pipx_step/$total_px] ${pipxtool} ready"
+        else
+             failed_pipx_tools+=("$pipxtool")
+             INST_PX_FAIL+=("$pipxtool")
+             ((++px_fail))
+             double_check=true
+             progress_update "uv tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
+             msg_err "[$pipx_step/$total_px] ${pipxtool} failed"
+        fi
     done
     [[ $COMPACT == "true" && $IS_TTY -eq 1 ]] && printf "\n"
 
