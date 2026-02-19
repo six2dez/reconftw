@@ -230,3 +230,86 @@ SH
   [ -s "vulns/nuclei_dast.txt" ]
   grep -q "mock-dast" "vulns/nuclei_dast.txt"
 }
+
+@test "github_leaks searches GitHub-wide secrets with ghleaks" {
+  mkdir -p osint
+  export tools="$TEST_DIR/tools"
+  mkdir -p "$tools/ghleaks"
+
+  # Create mock ghleaks binary
+  cat > "$tools/ghleaks/ghleaks" <<'SH'
+#!/usr/bin/env bash
+report=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --report)
+      report="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+if [[ -n "$report" ]]; then
+  printf '%s\n' '{"RuleID":"generic-api-key","Match":"AKIA1234567890ABCDEF","File":"config.yml","URL":"https://github.com/example/repo/blob/main/config.yml"}' > "$report"
+fi
+SH
+  chmod +x "$tools/ghleaks/ghleaks"
+
+  # Create GitHub tokens file
+  printf '%s\n' 'ghp_mock_token_12345' > "$TEST_DIR/.github_tokens"
+  export GITHUB_TOKENS="$TEST_DIR/.github_tokens"
+
+  export GITHUB_LEAKS=true
+  export OSINT=true
+  export DEEP=false
+  export GHLEAKS_THREADS=2
+
+  run github_leaks
+  [ "$status" -eq 0 ]
+  [ -s "osint/github_leaks.json" ]
+  grep -q "generic-api-key" "osint/github_leaks.json"
+}
+
+@test "github_leaks adds --exhaustive flag in DEEP mode" {
+  mkdir -p osint
+  export tools="$TEST_DIR/tools"
+  mkdir -p "$tools/ghleaks"
+
+  # Create mock ghleaks that records its arguments
+  cat > "$tools/ghleaks/ghleaks" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > /tmp/ghleaks_args.txt
+report=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --report)
+      report="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+if [[ -n "$report" ]]; then
+  printf '%s\n' '{}' > "$report"
+fi
+SH
+  chmod +x "$tools/ghleaks/ghleaks"
+
+  printf '%s\n' 'ghp_mock_token_12345' > "$TEST_DIR/.github_tokens"
+  export GITHUB_TOKENS="$TEST_DIR/.github_tokens"
+
+  export GITHUB_LEAKS=true
+  export OSINT=true
+  export DEEP=true
+  export GHLEAKS_THREADS=2
+
+  run github_leaks
+  [ "$status" -eq 0 ]
+  grep -q "\-\-exhaustive" /tmp/ghleaks_args.txt
+  rm -f /tmp/ghleaks_args.txt
+}
+

@@ -111,6 +111,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `favirecon` as `favirecon_tech` for favicon-based technology reconnaissance.
   - `TInjA` as the default `ssti` engine (`SSTI_ENGINE=TInjA`, with legacy fallback).
   - `second-order` as default `brokenLinks` engine (`BROKENLINKS_ENGINE=second-order`, with legacy fallback).
+  - `ghleaks` in `github_leaks` for GitHub-wide secret search across all public repositories (combines GitHub Code Search API with gitleaks detection rules). Configurable via `GITHUB_LEAKS`, `GHLEAKS_THREADS`, and `--exhaustive` mode in DEEP.
 
 **Progress and UX**
 - Progress/ETA functions (`progress_init()`, `progress_step()`) integrated in recon flows.

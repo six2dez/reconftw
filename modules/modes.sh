@@ -420,6 +420,7 @@ function passive() {
     google_dorks
     #github_dorks
     github_repos
+    github_leaks
     metadata
     apileaks
     third_party_misconfigs
@@ -478,6 +479,7 @@ function osint() {
     google_dorks
     #github_dorks
     github_repos
+    github_leaks
     metadata
     apileaks
     third_party_misconfigs
@@ -613,6 +615,7 @@ function multi_osint() {
         google_dorks
         #github_dorks
         github_repos
+        github_leaks
         metadata
         apileaks
         third_party_misconfigs
@@ -646,7 +649,7 @@ function recon() {
             RECON_OSINT_PARALLEL_FAILURES=$((RECON_OSINT_PARALLEL_FAILURES + osint_g1_rc))
         fi
         # Group 2: remaining OSINT + zonetransfer
-        parallel_funcs "${PAR_OSINT_GROUP2_SIZE:-4}" github_repos metadata apileaks zonetransfer
+        parallel_funcs "${PAR_OSINT_GROUP2_SIZE:-4}" github_repos github_leaks metadata apileaks zonetransfer
         local osint_g2_rc=$?
         if ((osint_g2_rc > 0)); then
             RECON_PARTIAL_RUN=true
@@ -659,6 +662,7 @@ function recon() {
         google_dorks
         #github_dorks
         github_repos
+        github_leaks
         metadata
         apileaks
         third_party_misconfigs
@@ -842,6 +846,7 @@ function multi_recon() {
         google_dorks
         #github_dorks
         github_repos
+        github_leaks
         metadata
         apileaks
         third_party_misconfigs

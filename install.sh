@@ -286,6 +286,7 @@ declare -A repos=(
     ["Web-Cache-Vulnerability-Scanner"]="Hackmanit/Web-Cache-Vulnerability-Scanner"
     ["regulator"]="cramppet/regulator"
     ["gitleaks"]="gitleaks/gitleaks"
+    ["ghleaks"]="dinosn/ghleaks"
     ["trufflehog"]="trufflesecurity/trufflehog"
     ["nomore403"]="devploit/nomore403"
     ["SwaggerSpy"]="UndeadSec/SwaggerSpy"
@@ -496,6 +497,9 @@ function install_tools() {
                 ;;
             "gitleaks")
                 make build &>/dev/null && $SUDO cp ./gitleaks /usr/local/bin/ &>/dev/null
+                ;;
+            "ghleaks")
+                go build -o ghleaks . &>/dev/null && chmod +x ./ghleaks
                 ;;
             "nomore403")
                 go get &>/dev/null

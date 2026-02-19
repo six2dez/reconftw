@@ -1,9 +1,9 @@
 #!/bin/bash
 # shellcheck disable=SC2154  # Variables defined in reconftw.cfg
 # reconFTW - OSINT module
-# Contains: google_dorks, github_dorks, github_repos, metadata, apileaks,
-#           emails, domain_info, third_party_misconfigs, spoof, mail_hygiene,
-#           cloud_enum_scan, ip_info
+# Contains: google_dorks, github_dorks, github_repos, github_leaks, metadata,
+#           apileaks, emails, domain_info, third_party_misconfigs, spoof,
+#           mail_hygiene, cloud_enum_scan, ip_info
 # This file is sourced by reconftw.sh - do not execute directly
 [[ -z "${SCRIPTPATH:-}" ]] && {
     echo "Error: This module must be sourced by reconftw.sh" >&2
@@ -144,6 +144,46 @@ function github_repos() {
     else
         if [[ $GITHUB_REPOS == false ]] || [[ $OSINT == false ]]; then
             skip_notification "disabled"
+        else
+            skip_notification "processed"
+        fi
+    fi
+}
+
+function github_leaks() {
+    ensure_dirs osint
+
+    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } \
+        && [[ $GITHUB_LEAKS == true ]] && [[ $OSINT == true ]] \
+        && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+
+        start_func "${FUNCNAME[0]}" "Running: GitHub-wide secret search with ghleaks"
+
+        if [[ -s $GITHUB_TOKENS ]]; then
+            GH_TOKEN=$(head -n 1 "$GITHUB_TOKENS")
+            local -a ghleaks_cmd=(
+                "${tools}/ghleaks/ghleaks"
+                -q "$domain"
+                --token "$GH_TOKEN"
+                --threads "${GHLEAKS_THREADS:-5}"
+                --report "${dir}/osint/github_leaks.json"
+                --no-banner
+            )
+            [[ $DEEP == true ]] && ghleaks_cmd+=(--exhaustive)
+
+            if ! run_command "${ghleaks_cmd[@]}" 2>>"$LOGFILE" >/dev/null; then
+                _print_error "ghleaks command failed"
+            fi
+        else
+            _print_error "Required file ${GITHUB_TOKENS} does not exist or is empty"
+            return 1
+        fi
+        end_func "Results are saved in $domain/osint/github_leaks.json" "${FUNCNAME[0]}"
+    else
+        if [[ $GITHUB_LEAKS == false ]] || [[ $OSINT == false ]]; then
+            skip_notification "disabled"
+        elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            return
         else
             skip_notification "processed"
         fi
