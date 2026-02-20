@@ -109,7 +109,7 @@ function github_repos() {
             if [[ -s ".tmp/github_repos_folders.txt" ]]; then
                 if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "gitleaks detect --source .tmp/github_repos/_target_ --no-banner --no-color -r .tmp/github/gh_secret_cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
                     _print_error "interlace gitleaks command failed"
-                    end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}"
+                    end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}" FAIL
                     return 1
                 fi
             else
@@ -335,11 +335,11 @@ function apileaks() {
                 end_func "Results are saved in $domain/osint/[postman_leaks_trufflehog.json, swagger_leaks_trufflehog.json]" "${FUNCNAME[0]}"
     else
         if [[ $API_LEAKS == false ]] || [[ $OSINT == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or configuration settings."
+            skip_notification "disabled"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             return
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 }
@@ -384,11 +384,11 @@ function emails() {
         end_func "Results are saved in $domain/osint/emails.txt and passwords.txt" "${FUNCNAME[0]}"
     else
         if [[ $EMAILS == false ]] || [[ $OSINT == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or configuration settings."
+            skip_notification "disabled"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             return
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 }
@@ -415,11 +415,11 @@ function domain_info() {
 
     else
         if [[ $DOMAIN_INFO == false ]] || [[ $OSINT == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or configuration settings."
+            skip_notification "disabled"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             return
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 }
@@ -461,11 +461,11 @@ function third_party_misconfigs() {
 
     else
         if [[ $THIRD_PARTIES == false ]] || [[ $OSINT == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or configuration settings."
+            skip_notification "disabled"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             return
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 }
@@ -501,11 +501,11 @@ function spoof() {
 
     else
         if [[ $SPOOF == false ]] || [[ $OSINT == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or configuration settings."
+            skip_notification "disabled"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             return
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 }
@@ -528,11 +528,11 @@ function mail_hygiene() {
         end_func "Results are saved in $domain/osint/mail_hygiene.txt" "${FUNCNAME[0]}"
     else
         if [[ $MAIL_HYGIENE == false ]] || [[ $OSINT == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or configuration settings."
+            skip_notification "disabled"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             return
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 }
@@ -544,17 +544,21 @@ function cloud_enum_scan() {
         && [[ $CLOUD_ENUM == true ]] && [[ $OSINT == true ]] \
         && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 
+        if ! command -v cloud_enum >/dev/null 2>&1; then
+            _print_msg WARN "${FUNCNAME[0]}: cloud_enum not found in PATH"
+            return 0
+        fi
         start_func "${FUNCNAME[0]}" "Cloud storage enumeration"
         company_name=$(unfurl format %r <<<"$domain")
         run_command cloud_enum -k "$company_name" -k "$domain" -k "${domain%%.*}" 2>>"$LOGFILE" | anew -q osint/cloud_enum.txt
         end_func "Results are saved in $domain/osint/cloud_enum.txt" "${FUNCNAME[0]}"
     else
         if [[ $CLOUD_ENUM == false ]] || [[ $OSINT == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or configuration settings."
+            skip_notification "disabled"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             return
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 }
@@ -592,15 +596,16 @@ function ip_info() {
 
         else
             _print_msg WARN "WHOISXML_API variable is not defined. Skipping function."
+            end_func "WHOISXML_API not configured, ip_info skipped." "${FUNCNAME[0]}"
         fi
 
     else
         if [[ $IP_INFO == false ]] || [[ $OSINT == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or configuration settings."
+            skip_notification "disabled"
         elif ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             return
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 

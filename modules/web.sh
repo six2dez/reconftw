@@ -208,9 +208,9 @@ function webprobe_simple() {
 
     else
         if [[ $WEBPROBESIMPLE == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+            skip_notification "disabled"
         else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -296,9 +296,9 @@ function webprobe_full() {
         print_webs_summary
     else
         if [[ $WEBPROBEFULL == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+            skip_notification "disabled"
         else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -311,6 +311,16 @@ function screenshot() {
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $WEBSCREENSHOT == true ]]; then
+        if [[ $AXIOM != true ]]; then
+            if ! command -v nuclei >/dev/null 2>&1; then
+                _print_msg WARN "${FUNCNAME[0]}: nuclei binary not found in PATH - install nuclei first"
+                return 0
+            fi
+            if [[ ! -d "${NUCLEI_TEMPLATES_PATH:-}" ]]; then
+                _print_msg WARN "${FUNCNAME[0]}: nuclei templates not found at '${NUCLEI_TEMPLATES_PATH}'"
+                return 0
+            fi
+        fi
         start_func "${FUNCNAME[0]}" "Web Screenshots"
 
 	        # Build/refresh webs_all.txt from current web targets.
@@ -329,9 +339,9 @@ function screenshot() {
         end_func "Results are saved in $domain/screenshots" "${FUNCNAME[0]}"
     else
         if [[ $WEBSCREENSHOT == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+            skip_notification "disabled"
         else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -344,18 +354,18 @@ function virtualhosts() {
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $VIRTUALHOSTS == true ]]; then
+        if ! command -v VhostFinder >/dev/null 2>&1; then
+            _print_msg WARN "${FUNCNAME[0]}: VhostFinder not found in PATH"
+            return 0
+        fi
         start_func "${FUNCNAME[0]}" "Virtual Hosts Discovery"
 
 	        # Build/refresh webs_all.txt from current web targets.
 	        ensure_webs_all || true
 
-	        # Proceed only if webs_all.txt exists and is non-empty
+	        # Proceed only if input files exist
 	        if [[ -s "subdomains/subdomains.txt" ]] && [[ -s "hosts/ips.txt" ]]; then
 	            VhostFinder -ips hosts/ips.txt -wordlist subdomains/subdomains.txt -verify | grep "+" | anew -q "$dir/webs/virtualhosts.txt"
-	            end_func "Results are saved in $domain/webs/virtualhosts.txt" "${FUNCNAME[0]}"
-
-        else
-            end_func "No subdomains or hosts file found, virtualhosts skipped." "${FUNCNAME[0]}"
         fi
 
         # Optionally send to proxy if conditions are met
@@ -364,11 +374,13 @@ function virtualhosts() {
             run_command ffuf -mc all -w webs/webs_uncommon_ports.txt -u FUZZ -replay-proxy "$proxy_url" 2>>"$LOGFILE" >/dev/null
         fi
 
+        end_func "Results are saved in $domain/webs/virtualhosts.txt" "${FUNCNAME[0]}"
+
     else
         if [[ $VIRTUALHOSTS == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg."
+            skip_notification "disabled"
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -427,11 +439,11 @@ function favirecon_tech() {
 
     else
         if [[ ${FAVIRECON:-true} == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to configuration settings."
+            skip_notification "disabled"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             return
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 }
@@ -681,9 +693,9 @@ function portscan() {
 
     else
         if [[ $PORTSCANNER == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
+            skip_notification "disabled"
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -719,12 +731,11 @@ function cdnprovider() {
 
     else
         if [[ $CDN_IP == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to configuration settings."
+            skip_notification "disabled"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            # Domain is an IP, do nothing
             return
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -741,6 +752,10 @@ function waf_checks() {
 
     # Check if the function should run
 	    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $WAF_DETECTION == true ]]; then
+	        if [[ $AXIOM != true ]] && ! command -v wafw00f >/dev/null 2>&1; then
+	            _print_msg WARN "${FUNCNAME[0]}: wafw00f not found in PATH"
+	            return 0
+	        fi
 	        start_func "${FUNCNAME[0]}" "Website's WAF Detection"
 
 	        ensure_webs_all || true
@@ -780,14 +795,12 @@ function waf_checks() {
 	            end_func "No websites to scan" "${FUNCNAME[0]}"
 	        fi
 	    else
-	        # Handle cases where WAF_DETECTION is false or the function has already been processed
 	        if [[ $WAF_DETECTION == false ]]; then
-	            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+	            skip_notification "disabled"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            # Domain is an IP address; skip the function
             return
         else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -949,11 +962,11 @@ function nuclei_check() {
         plugins_emit after_nuclei "$domain" "$dir"
     else
         if [[ $NUCLEICHECK == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+            skip_notification "disabled"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             return
         else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -1001,9 +1014,9 @@ function graphql_scan() {
         end_func "Results are saved in nuclei_output/graphql* and vulns/graphql" "${FUNCNAME[0]}"
     else
         if [[ $GRAPHQL_CHECK == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to configuration settings."
+            skip_notification "disabled"
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 }
@@ -1012,6 +1025,10 @@ function param_discovery() {
     ensure_dirs webs .tmp
 
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $PARAM_DISCOVERY == true ]]; then
+        if ! command -v arjun >/dev/null 2>&1; then
+            _print_msg WARN "${FUNCNAME[0]}: arjun not found in PATH"
+            return 0
+        fi
         start_func "${FUNCNAME[0]}" "Parameter discovery (arjun)"
         local input_file="webs/url_extract_nodupes.txt"
         [[ ! -s $input_file ]] && input_file="webs/webs_all.txt"
@@ -1025,9 +1042,9 @@ function param_discovery() {
         end_func "Results are saved in webs/params_discovered.txt" "${FUNCNAME[0]}"
     else
         if [[ $PARAM_DISCOVERY == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to configuration settings."
+            skip_notification "disabled"
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 }
@@ -1036,6 +1053,10 @@ function grpc_reflection() {
     ensure_dirs hosts .tmp
 
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GRPC_SCAN == true ]]; then
+        if ! command -v grpcurl >/dev/null 2>&1; then
+            _print_msg WARN "${FUNCNAME[0]}: grpcurl not found in PATH"
+            return 0
+        fi
         start_func "${FUNCNAME[0]}" "gRPC reflection probing"
         # Build target IP list
         local ips_file="hosts/ips.txt"
@@ -1056,9 +1077,9 @@ function grpc_reflection() {
         end_func "Results are saved in hosts/grpc_reflection.txt" "${FUNCNAME[0]}"
     else
         if [[ $GRPC_SCAN == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to configuration settings."
+            skip_notification "disabled"
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 }
@@ -1161,9 +1182,9 @@ function fuzz() {
 
     else
         if [[ $FUZZ == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+            skip_notification "disabled"
         else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -1204,14 +1225,12 @@ function iishortname() {
         fi
         end_func "Results are saved in vulns/iis-shortname/" "${FUNCNAME[0]}"
     else
-        # Handle cases where IIS_SHORTNAME is false or the function has already been processed
         if [[ $IIS_SHORTNAME == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to configuration settings."
+            skip_notification "disabled"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            # Domain is an IP address; skip the function
             return
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -1284,14 +1303,12 @@ function cms_scanner() {
 
         end_func "Results are saved in $domain/cms/*subdomain* folder" "${FUNCNAME[0]}"
     else
-        # Handle cases where CMS_SCANNER is false or the function has already been processed
         if [[ $CMS_SCANNER == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+            skip_notification "disabled"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            # Domain is an IP address; skip the function
             return
         else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 }
@@ -1502,9 +1519,9 @@ function urlchecks() {
         fi
     else
         if [[ $URL_CHECK == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+            skip_notification "disabled"
         else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -1522,6 +1539,10 @@ function url_gf() {
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $URL_GF == true ]] \
         && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 
+        if ! command -v gf >/dev/null 2>&1; then
+            _print_msg WARN "${FUNCNAME[0]}: gf not found in PATH"
+            return 0
+        fi
         start_func "${FUNCNAME[0]}" "Vulnerable Pattern Search"
 
         # Ensure webs/url_extract.txt exists and is not empty
@@ -1568,14 +1589,12 @@ function url_gf() {
 
         end_func "Results are saved in $domain/gf folder" "${FUNCNAME[0]}"
     else
-        # Handle cases where URL_GF is false or the function has already been processed
         if [[ $URL_GF == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to configuration settings."
+            skip_notification "disabled"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            # Domain is an IP address; skip the function
             return
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -1632,14 +1651,12 @@ function url_ext() {
         fi
 
     else
-        # Handle cases where URL_EXT is false or function already processed
         if [[ $URL_EXT == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg."
+            skip_notification "disabled"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            # Domain is an IP address; skip the function
             return
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -1785,9 +1802,9 @@ function jschecks() {
         fi
     else
         if [[ $JSCHECKS == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+            skip_notification "disabled"
         else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -1836,7 +1853,7 @@ function websocket_checks() {
         fi
         end_func "Results are saved in vulns/websocket_misconfig.txt" "${FUNCNAME[0]}"
     else
-        _print_msg WARN "${FUNCNAME[0]} skipped or already processed."
+        skip_notification "processed"
     fi
 }
 
@@ -1870,14 +1887,12 @@ function wordlist_gen() {
         end_func "Results are saved in $domain/webs/dict_[words|paths].txt" "${FUNCNAME[0]}"
 
     else
-        # Handle cases where WORDLIST is false or function already processed
         if [[ $WORDLIST == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped in this mode or defined in reconftw.cfg."
+            skip_notification "disabled"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            # Domain is an IP address; skip the function
             return
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -1918,14 +1933,12 @@ function wordlist_gen_roboxtractor() {
         fi
 
     else
-        # Handle cases where ROBOTSWORDLIST is false or function already processed
         if [[ $ROBOTSWORDLIST == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to configuration settings."
+            skip_notification "disabled"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            # Domain is an IP address; skip the function
             return
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -2015,14 +2028,12 @@ function password_dict() {
         touch "$called_fn_dir/.${FUNCNAME[0]}"
 
     else
-        # Handle cases where PASSWORD_DICT is false or function already processed
         if [[ $PASSWORD_DICT == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to configuration settings."
+            skip_notification "disabled"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            # Domain is an IP address; skip the function
             return
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -2140,14 +2151,12 @@ function brokenLinks() {
             return
         fi
     else
-        # Handle cases where BROKENLINKS is false or function already processed
         if [[ $BROKENLINKS == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+            skip_notification "disabled"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            # Domain is an IP address; skip the function
             return
         else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 

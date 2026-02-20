@@ -201,6 +201,10 @@ function crlf_checks() {
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $CRLF_CHECKS == true ]] \
         && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 
+        if ! command -v crlfuzz >/dev/null 2>&1; then
+            _print_msg WARN "${FUNCNAME[0]}: crlfuzz not found in PATH"
+            return 0
+        fi
         start_func "${FUNCNAME[0]}" "CRLF Checks"
 
         # Combine webs.txt and webs_uncommon_ports.txt into webs_all.txt if it doesn't exist
@@ -438,13 +442,12 @@ function test_ssl() {
         end_func "Results are saved in vulns/testssl.txt" "${FUNCNAME[0]}"
 
     else
-        # Handle cases where TEST_SSL is false, no vulnerable URLs, or already processed
         if [[ $TEST_SSL == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+            skip_notification "disabled"
         elif [[ ! -s "vulns/testssl.txt" ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped: no candidate targets for SSL tests"
+            skip_notification "noinput"
         else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -459,6 +462,10 @@ function spraying() {
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SPRAY == true ]] \
         && [[ -s "$dir/hosts/portscan_active.gnmap" ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 
+        if ! command -v brutespray >/dev/null 2>&1; then
+            _print_msg WARN "${FUNCNAME[0]}: brutespray not found in PATH"
+            return 0
+        fi
         start_func "${FUNCNAME[0]}" "Password Spraying"
 
         # Ensure portscan_active.gnmap exists and is not empty
@@ -476,13 +483,12 @@ function spraying() {
         end_func "Results are saved in vulns/brutespray folder" "${FUNCNAME[0]}"
 
     else
-        # Handle cases where SPRAY is false, required files are missing, or already processed
         if [[ $SPRAY == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+            skip_notification "disabled"
         elif [[ ! -s "$dir/hosts/portscan_active.gnmap" ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped: missing active port scan"
+            skip_notification "noinput"
         else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -548,14 +554,14 @@ function 4xxbypass() {
         && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 
         # Extract relevant URLs starting with 4xx but not 404
-        _print_msg INFO "Running: 403 Bypass"
         grep -E '^4' "fuzzing/fuzzing_full.txt" 2>/dev/null | grep -Ev '^404' | awk '{print $3}' | anew -q ".tmp/403test.txt"
 
         # Count the number of URLs to process
         URL_COUNT=$(wc -l <".tmp/403test.txt")
-        if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT ]]; then
 
-            start_func "${FUNCNAME[0]}" "403 Bypass"
+        start_func "${FUNCNAME[0]}" "403 Bypass"
+
+        if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT ]]; then
 
             # Navigate to nomore403 tool directory
             if ! pushd "${tools}/nomore403" >/dev/null; then
@@ -587,13 +593,12 @@ function 4xxbypass() {
         fi
 
     else
-        # Handle cases where BYPASSER4XX is false, no vulnerable URLs, or already processed
         if [[ $BYPASSER4XX == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+            skip_notification "disabled"
         elif [[ ! -s "fuzzing/fuzzing_full.txt" ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for 4xx bypass"
+            skip_notification "noinput"
         else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -608,6 +613,10 @@ function smuggling() {
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SMUGGLING == true ]] \
         && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 
+        if ! command -v smugglex >/dev/null 2>&1; then
+            _print_msg WARN "${FUNCNAME[0]}: smugglex not found in PATH"
+            return 0
+        fi
         start_func "${FUNCNAME[0]}" "HTTP Request Smuggling Checks"
 
         # Combine webs.txt and webs_uncommon_ports.txt into webs_all.txt if it doesn't exist
@@ -637,13 +646,12 @@ function smuggling() {
         fi
 
     else
-        # Handle cases where SMUGGLING is false, no vulnerable URLs, or already processed
         if [[ $SMUGGLING == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+            skip_notification "disabled"
         elif [[ ! -s "webs/webs_all.txt" ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for HTTP request smuggling"
+            skip_notification "noinput"
         else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -658,6 +666,10 @@ function webcache() {
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $WEBCACHE == true ]] \
         && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 
+        if ! command -v Web-Cache-Vulnerability-Scanner >/dev/null 2>&1; then
+            _print_msg WARN "${FUNCNAME[0]}: Web-Cache-Vulnerability-Scanner not found in PATH"
+            return 0
+        fi
         start_func "${FUNCNAME[0]}" "Web Cache Poisoning Checks"
 
         # Combine webs.txt and webs_uncommon_ports.txt into webs_all.txt if it doesn't exist
@@ -710,13 +722,12 @@ function webcache() {
         fi
 
     else
-        # Handle cases where WEBCACHE is false, no vulnerable URLs, or already processed
         if [[ $WEBCACHE == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+            skip_notification "disabled"
         elif [[ ! -s "fuzzing/fuzzing_full.txt" ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for web cache tests"
+            skip_notification "noinput"
         else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -731,6 +742,16 @@ function fuzzparams() {
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $FUZZPARAMS == true ]] \
         && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 
+        if [[ $AXIOM != true ]]; then
+            if ! command -v nuclei >/dev/null 2>&1; then
+                _print_msg WARN "${FUNCNAME[0]}: nuclei binary not found in PATH - install nuclei first"
+                return 0
+            fi
+            if [[ ! -d "${NUCLEI_TEMPLATES_PATH:-}" ]]; then
+                _print_msg WARN "${FUNCNAME[0]}: nuclei templates not found at '${NUCLEI_TEMPLATES_PATH}'"
+                return 0
+            fi
+        fi
         start_func "${FUNCNAME[0]}" "Fuzzing Parameters Values Checks"
 
         if [[ ! -s "webs/url_extract_nodupes.txt" ]]; then
@@ -799,13 +820,12 @@ function fuzzparams() {
         fi
 
     else
-        # Handle cases where FUZZPARAMS is false, no vulnerable URLs, or already processed
         if [[ $FUZZPARAMS == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+            skip_notification "disabled"
         elif [[ ! -s "webs/url_extract_nodupes.txt" ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for parameter fuzzing"
+            skip_notification "noinput"
         else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -847,6 +867,16 @@ function nuclei_dast() {
     fi
 
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ "$dast_enabled" == true ]]; then
+        if [[ $AXIOM != true ]]; then
+            if ! command -v nuclei >/dev/null 2>&1; then
+                _print_msg WARN "${FUNCNAME[0]}: nuclei binary not found in PATH - install nuclei first"
+                return 0
+            fi
+            if [[ ! -d "${NUCLEI_TEMPLATES_PATH:-}" ]]; then
+                _print_msg WARN "${FUNCNAME[0]}: nuclei templates not found at '${NUCLEI_TEMPLATES_PATH}'"
+                return 0
+            fi
+        fi
         start_func "${FUNCNAME[0]}" "Nuclei DAST Scanner"
         maybe_update_nuclei
 
@@ -893,9 +923,9 @@ function nuclei_dast() {
         end_func "Results are saved in nuclei_output/dast_json.txt and vulns/nuclei_dast.txt" "${FUNCNAME[0]}"
     else
         if [[ "$dast_enabled" == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+            skip_notification "disabled"
         else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 }

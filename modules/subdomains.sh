@@ -490,9 +490,9 @@ function sub_asn() {
         end_subfunc "${FUNCNAME[0]}" "${FUNCNAME[0]}" "${asn_status:-OK}"
     else
         if [[ $ASN_ENUM == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to configuration settings."
+            skip_notification "disabled"
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 }
@@ -537,9 +537,9 @@ function sub_passive() {
 
     else
         if [[ $SUBPASSIVE == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or configuration settings."
+            skip_notification "disabled"
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -617,9 +617,9 @@ function sub_crt() {
         end_subfunc "${NUMOFLINES} new subs (cert transparency)" "${FUNCNAME[0]}"
     else
         if [[ $SUBCRT == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
+            skip_notification "disabled"
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 }
@@ -694,7 +694,7 @@ function sub_active() {
 
         end_subfunc "${NUMOFLINES} subs DNS resolved from passive" "${FUNCNAME[0]}"
     else
-        _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+        skip_notification "processed"
     fi
 }
 
@@ -772,7 +772,7 @@ function sub_tls() {
 
         end_subfunc "${NUMOFLINES} new subs (tls active enum)" "${FUNCNAME[0]}"
     else
-        _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+        skip_notification "processed"
     fi
 }
 
@@ -821,13 +821,14 @@ function sub_noerror() {
 
         else
             _print_msg WARN "Detected DNSSEC black lies, skipping this technique."
+            end_subfunc "DNSSEC black lies detected, sub_noerror skipped." "${FUNCNAME[0]}"
         fi
 
     else
         if [[ $SUBNOERROR == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
+            skip_notification "disabled"
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -915,7 +916,7 @@ function sub_dns() {
 
         end_subfunc "${NUMOFLINES} new subs (dns resolution)" "${FUNCNAME[0]}"
     else
-        _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+        skip_notification "processed"
     fi
 }
 
@@ -982,9 +983,9 @@ function sub_brute() {
 
     else
         if [[ $SUBBRUTE == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
+            skip_notification "disabled"
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -1157,9 +1158,9 @@ function sub_scraping() {
 
     else
         if [[ $SUBSCRAPING == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
+            skip_notification "disabled"
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -1226,9 +1227,9 @@ function sub_analytics() {
 
     else
         if [[ $SUBANALYTICS == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
+            skip_notification "disabled"
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 }
@@ -1378,9 +1379,9 @@ function sub_permut() {
 
     else
         if [[ $SUBPERMUTE == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
+            skip_notification "disabled"
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -1465,9 +1466,9 @@ function sub_regex_permut() {
 
     else
         if [[ $SUBREGEXPERMUTE == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
+            skip_notification "disabled"
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -1533,9 +1534,9 @@ function sub_ia_permut() {
 
     else
         if [[ $SUBIAPERMUTE == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
+            skip_notification "disabled"
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -1622,11 +1623,11 @@ function sub_recursive_passive() {
 
     else
         if [[ $SUB_RECURSIVE_PASSIVE == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
+            skip_notification "disabled"
         elif [[ ! -s "subdomains/subdomains.txt" ]]; then
-            _print_msg WARN "No subdomains to process."
+            skip_notification "noinput"
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -1769,11 +1770,11 @@ function sub_recursive_brute() {
 
     else
         if [[ $SUB_RECURSIVE_BRUTE == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
+            skip_notification "disabled"
         elif [[ ! -s "subdomains/subdomains.txt" ]]; then
-            _print_msg WARN "No subdomains to process."
+            skip_notification "noinput"
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 }
@@ -1789,6 +1790,20 @@ function subtakeover() {
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBTAKEOVER == true ]]; then
+        if [[ $AXIOM != true ]]; then
+            if ! command -v nuclei >/dev/null 2>&1; then
+                _print_msg WARN "${FUNCNAME[0]}: nuclei binary not found in PATH - install nuclei first"
+                return 0
+            fi
+            if [[ ! -d "${NUCLEI_TEMPLATES_PATH:-}" ]]; then
+                _print_msg WARN "${FUNCNAME[0]}: nuclei templates not found at '${NUCLEI_TEMPLATES_PATH}'"
+                return 0
+            fi
+        fi
+        if ! command -v dnstake >/dev/null 2>&1; then
+            _print_msg WARN "${FUNCNAME[0]}: dnstake binary not found in PATH - install dnstake first"
+            return 0
+        fi
         start_func "${FUNCNAME[0]}" "Looking for possible subdomain and DNS takeover"
 
         # Initialize takeover file
@@ -1859,9 +1874,9 @@ function subtakeover() {
 
     else
         if [[ $SUBTAKEOVER == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
+            skip_notification "disabled"
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -1901,11 +1916,11 @@ function zonetransfer() {
 
     else
         if [[ $ZONETRANSFER == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
+            skip_notification "disabled"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            _print_msg WARN "Domain is an IP address; skipping zone transfer."
+            skip_notification "noinput"
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -2082,12 +2097,12 @@ function s3buckets() {
         end_func "Results are saved in subdomains/s3buckets.txt, subdomains/cloud_assets.txt, subdomains/s3buckets_trufflehog.txt, and subdomains/cloudhunter_buckets_trufflehog.txt" "${FUNCNAME[0]}"
     else
         if [[ $S3BUCKETS == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
+            skip_notification "disabled"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            _print_msg WARN "Domain is an IP address; skipping S3 buckets search."
+            skip_notification "noinput"
             return 0
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 }
@@ -2146,9 +2161,9 @@ function geo_info() {
         end_func "Results are saved in hosts/ipinfo.txt" "${FUNCNAME[0]}"
     else
         if [[ $GEO_INFO == false ]]; then
-            _print_msg WARN "${FUNCNAME[0]} skipped due to mode or defined in reconftw.cfg."
+            skip_notification "disabled"
         else
-            _print_msg WARN "${FUNCNAME[0]} already processed. To force execution, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
