@@ -383,9 +383,12 @@ parallel_funcs() {
         local job_start_ts
         job_start_ts=$(date +%s)
 
-        # Run function in background subshell
+        # Run function in background subshell; write end timestamp after completion
         (
-            "$func"
+            local _rc=0
+            "$func" || _rc=$?
+            date +%s >"${log_file%.log}.endts"
+            exit "$_rc"
         ) >"$log_file" 2>&1 &
         batch_pids+=("$!")
         batch_funcs+=("$func")
@@ -458,8 +461,14 @@ parallel_funcs() {
                 else
                     rc=$?
                 fi
-                local job_end_ts
-                job_end_ts=$(date +%s)
+                local job_end_ts endts_file
+                endts_file="${batch_logs[$idx]%.log}.endts"
+                if [[ -f "$endts_file" ]]; then
+                    job_end_ts=$(< "$endts_file")
+                    rm -f "$endts_file" 2>/dev/null || true
+                else
+                    job_end_ts=$(date +%s)
+                fi
                 _parallel_emit_job_output "${batch_funcs[$idx]}" "${batch_logs[$idx]}" "$rc" "${batch_starts[$idx]}" "$job_end_ts"
                 case "${_PARALLEL_LAST_BADGE:-OK}" in
                     OK) ((batch_ok++)) || true ;;
@@ -556,8 +565,14 @@ parallel_funcs() {
             else
                 rc=$?
             fi
-            local job_end_ts
-            job_end_ts=$(date +%s)
+            local job_end_ts endts_file
+            endts_file="${batch_logs[$idx]%.log}.endts"
+            if [[ -f "$endts_file" ]]; then
+                job_end_ts=$(< "$endts_file")
+                rm -f "$endts_file" 2>/dev/null || true
+            else
+                job_end_ts=$(date +%s)
+            fi
             _parallel_emit_job_output "${batch_funcs[$idx]}" "${batch_logs[$idx]}" "$rc" "${batch_starts[$idx]}" "$job_end_ts"
             case "${_PARALLEL_LAST_BADGE:-OK}" in
                 OK) ((batch_ok++)) || true ;;
@@ -720,22 +735,44 @@ parallel_postactive_enum() {
     parallel_funcs "${PAR_SUB_POST_ACTIVE_GROUP_SIZE:-2}" "${funcs[@]}"
 }
 
-# Run brute force enumeration (typically sequential due to resource usage)
+# Run brute force enumeration sequentially (resource usage and shared artifacts)
 # Usage: parallel_brute_enum
 parallel_brute_enum() {
     local funcs=(
         "sub_brute"
         "sub_permut"
         "sub_regex_permut"
+        "sub_ia_permut"
     )
-    
-    # Brute force is resource intensive, run with limit of 2
+
+    # Kept for compatibility with existing helper-based orchestrators.
+    # Brute force/permutation stages should not run concurrently.
     if [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
-        printf "%b[*] Running brute force enumeration (limited parallelism)%b\n" \
+        printf "%b[*] Running brute force enumeration sequentially%b\n" \
             "${bblue:-}" "${reset:-}"
     fi
 
-    parallel_funcs "${PAR_SUB_BRUTE_GROUP_SIZE:-2}" "${funcs[@]}"
+    local func rc failed=0
+    for func in "${funcs[@]}"; do
+        if ! declare -f "$func" >/dev/null 2>&1; then
+            print_warnf "Function %s not found, skipping" "$func"
+            continue
+        fi
+
+        "$func"
+        rc=$?
+        if ((rc > 0)); then
+            if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
+                print_warnf "Brute phase function %s failed (rc=%d); continuing" "$func" "$rc"
+                ((failed++)) || true
+            else
+                print_errorf "Brute phase function %s failed (rc=%d)" "$func" "$rc"
+                return 1
+            fi
+        fi
+    done
+
+    return "$failed"
 }
 
 ###############################################################################
@@ -849,7 +886,7 @@ parallel_subdomains_full() {
     # Phase 3: Post-active (parallel - requires resolved subdomains)
     parallel_postactive_enum
     
-    # Phase 4: Brute force (limited parallel due to resource usage)
+    # Phase 4: Brute force (sequential due to resource usage and shared files)
     if [[ ${SUBBRUTE:-false} == true ]] || [[ ${SUBPERMUTE:-false} == true ]]; then
         parallel_brute_enum
     fi

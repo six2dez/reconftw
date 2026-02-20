@@ -672,7 +672,7 @@ function recon() {
         zonetransfer
     fi
 
-    ui_module_end "OSINT" "osint/dorks.txt" "osint/emails.txt" "osint/domain_info.txt"
+    ui_module_end "OSINT" "osint/"
     progress_module "OSINT"
 
     if [[ $AXIOM == true ]]; then
@@ -687,7 +687,7 @@ function recon() {
     remove_big_files
     s3buckets
 
-    ui_module_end "Subdomains" "subdomains/subdomains.txt" "webs/webs.txt"
+    ui_module_end "Subdomains" "subdomains/" "webs/"
     progress_module "Subdomains"
 
     _print_section "Web Detection"
@@ -715,7 +715,7 @@ function recon() {
         geo_info
     fi
 
-    ui_module_end "Web Detection" "hosts/ips.txt" "hosts/cdn_providers.txt"
+    ui_module_end "Web Detection" "hosts/"
     progress_module "Web Detection"
 
     # Quick-rescan gating

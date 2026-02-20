@@ -274,42 +274,53 @@ _subdomains_enumerate() {
             fi
         fi
         
-        # Phase 3: Dependent active enrichment (runs after sub_active is ready)
+        # Phase 3: Brute force — sequential (resource-intensive, shared artifacts)
+        # Respect CONTINUE_ON_TOOL_ERROR semantics even in sequential mode.
+        local sub_g3_rc=0
+        local -a sub_g3_funcs=(
+            sub_brute
+            sub_permut
+            sub_regex_permut
+            sub_ia_permut
+        )
+        local sub_g3_fn
+        for sub_g3_fn in "${sub_g3_funcs[@]}"; do
+            "$sub_g3_fn"
+            sub_g3_rc=$?
+            if ((sub_g3_rc > 0)); then
+                if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
+                    notification "Subdomain brute phase: ${sub_g3_fn} failed (rc=${sub_g3_rc}); continuing" warn
+                else
+                    notification "Subdomain brute phase failed (${sub_g3_fn}, rc=${sub_g3_rc})" error
+                    return 1
+                fi
+            fi
+        done
+
+        # Phase 4: Dependent active enrichment (runs after sub_active is ready)
         parallel_funcs "${PAR_SUB_DEP_ACTIVE_GROUP_SIZE:-3}" sub_noerror sub_dns
-        local sub_g3_rc=$?
-        if ((sub_g3_rc > 0)); then
+        local sub_g4_rc=$?
+        if ((sub_g4_rc > 0)); then
             if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
-                notification "Parallel subdomain dependent active phase completed with ${sub_g3_rc} warning(s); continuing" warn
+                notification "Parallel subdomain dependent active phase completed with ${sub_g4_rc} warning(s); continuing" warn
             else
                 notification "Parallel subdomain batch failed (dependent active)" error
                 return 1
             fi
         fi
 
-        # Phase 4: Post-active analysis (depends on active/enrichment results)
+        # Phase 5: Post-active analysis (depends on active/enrichment results)
         parallel_funcs "${PAR_SUB_POST_ACTIVE_GROUP_SIZE:-2}" sub_tls sub_analytics
-        local sub_g4_rc=$?
-        if ((sub_g4_rc > 0)); then
+        local sub_g5_rc=$?
+        if ((sub_g5_rc > 0)); then
             if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
-                notification "Parallel subdomain post-active phase completed with ${sub_g4_rc} warning(s); continuing" warn
+                notification "Parallel subdomain post-active phase completed with ${sub_g5_rc} warning(s); continuing" warn
             else
                 notification "Parallel subdomain batch failed (post-active)" error
                 return 1
             fi
         fi
-        
-        # Phase 5: Brute force (limited parallelism - resource intensive)
-        parallel_funcs "${PAR_SUB_BRUTE_GROUP_SIZE:-2}" sub_brute sub_permut sub_regex_permut sub_ia_permut
-        local sub_g5_rc=$?
-        if ((sub_g5_rc > 0)); then
-            if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
-                notification "Parallel subdomain bruteforce/permutations phase completed with ${sub_g5_rc} warning(s); continuing" warn
-            else
-                notification "Parallel subdomain batch failed (bruteforce/permutations)" error
-                return 1
-            fi
-        fi
-        
+
         # Phase 6: Recursive and scraping (sequential - depends on previous results)
         sub_recursive_passive
         sub_recursive_brute
@@ -358,8 +369,8 @@ _subdomains_finalize() {
     TOTAL_SUBS=$(sed '/^$/d' "subdomains/subdomains.txt" 2>/dev/null | wc -l | tr -d ' ')
 
     if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
-        _print_status OK "subdomains_full" "${TOTAL_SUBS} found -> subdomains/subdomains.txt"
-        print_artifacts "subdomains/subdomains.txt"
+        _print_status OK "subdomains_full" "0s"
+        print_artifacts "${TOTAL_SUBS} found -> subdomains/subdomains.txt"
     fi
     
     # Emit plugin event
@@ -926,6 +937,7 @@ function sub_brute() {
 
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBBRUTE == true ]]; then
         start_subfunc "${FUNCNAME[0]}" "Running: Bruteforce Subdomain Enumeration"
+        print_notice RUN "sub_brute" "bruteforcing subdomains"
 
         if [[ $AXIOM != true ]]; then
 
@@ -1282,6 +1294,7 @@ function sub_permut() {
 
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBPERMUTE == true ]]; then
         start_subfunc "${FUNCNAME[0]}" "Running: Permutations Subdomain Enumeration"
+        print_notice RUN "sub_permut" "generating permutations"
 
         # If in multi mode and subdomains.txt doesn't exist, create it with the domain
         if [[ -n $multi ]] && [[ ! -f "$dir/subdomains/subdomains.txt" ]]; then
@@ -1936,6 +1949,7 @@ function s3buckets() {
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $S3BUCKETS == true ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         start_func "${FUNCNAME[0]}" "AWS S3 buckets search"
+        print_notice RUN "s3buckets" "scanning S3 buckets"
 
         # If in multi mode and subdomains.txt doesn't exist, create it
         if [[ -n $multi ]] && [[ ! -f "$dir/subdomains/subdomains.txt" ]]; then

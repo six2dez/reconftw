@@ -147,6 +147,7 @@ count_lines_stdin() {
 # Usage: format_duration 83
 format_duration() {
     local input="${1:-0}"
+    [[ "$input" == "--" ]] && { printf "%s" "--"; return 0; }
     if [[ "$input" =~ [a-zA-Z] ]] && ! [[ "$input" =~ ^[0-9]+$ ]]; then
         printf "%s" "$input"
         return 0
@@ -248,9 +249,9 @@ print_notice() {
     local level="$1" module="$2" message="$3"
     [[ -z "$module" ]] && module="notice"
     if [[ "$level" == "FAIL" ]] && [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]]; then
-        (OUTPUT_VERBOSITY=1; print_task "$level" "$module" "0" "$message")
+        (OUTPUT_VERBOSITY=1; print_task "$level" "$module" "--" "$message")
     else
-        print_task "$level" "$module" "0" "$message"
+        print_task "$level" "$module" "--" "$message"
     fi
 }
 

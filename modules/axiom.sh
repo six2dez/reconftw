@@ -102,7 +102,7 @@ function axiom_launch() {
         NUMOFNODES=$(timeout 30 axiom-ls 2>>"$LOGFILE" | grep -c "$AXIOM_FLEET_NAME" || true)
         if [[ $NUMOFNODES -ge $AXIOM_FLEET_COUNT ]]; then
             axiom-select "$AXIOM_FLEET_NAME*" 2>>"$LOGFILE" >/dev/null
-            end_func "Axiom fleet $AXIOM_FLEET_NAME already has $NUMOFNODES instances" info
+            end_func "" "${FUNCNAME[0]}"
         else
             if [[ $NUMOFNODES -eq 0 ]]; then
                 startcount=$AXIOM_FLEET_COUNT
@@ -122,7 +122,7 @@ function axiom_launch() {
             fi
 
             NUMOFNODES=$(timeout 30 axiom-ls 2>>"$LOGFILE" | grep -c "$AXIOM_FLEET_NAME" || true)
-            end_func "Axiom fleet $AXIOM_FLEET_NAME launched $NUMOFNODES instances" info
+            end_func "" "${FUNCNAME[0]}"
         fi
     fi
 }
@@ -141,13 +141,16 @@ function axiom_shutdown() {
 }
 
 function axiom_selected() {
+    start_func "${FUNCNAME[0]}" "Checking Axiom connectivity"
 
     if [[ ! $(axiom-ls 2>>"${LOGFILE:-/dev/null}" | tail -n +2 | sed '$ d' | wc -l) -gt 0 ]]; then
+        end_func "No axiom instances running" "${FUNCNAME[0]}" warn
         notification "No axiom instances running ${reset}\n\n" error
         exit
     fi
 
     if [[ ! $(cat ~/.axiom/selected.conf | sed '/^\s*$/d' | wc -l) -gt 0 ]]; then
+        end_func "No axiom instances selected" "${FUNCNAME[0]}" warn
         notification "No axiom instances selected ${reset}\n\n" error
         exit
     fi
@@ -196,4 +199,5 @@ function axiom_selected() {
             AXIOM=false
         fi
     fi
+    end_func "" "${FUNCNAME[0]}"
 }

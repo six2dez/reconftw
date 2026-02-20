@@ -1317,7 +1317,7 @@ function end_subfunc() {
     fi
 
     if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
-        _print_status "$badge" "  ${2}" "${duration}s"
+        _print_status "$badge" "${2}" "${duration}s"
         if [[ -n "$reason_code" ]] && { [[ "$badge" != "CACHE" ]] || [[ "${SHOW_CACHE:-false}" == "true" ]]; }; then
             printf "         reason: %s\n" "$reason_code"
         fi
