@@ -116,8 +116,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `gato` as optional GitHub Actions audit module (`github_actions_audit`, output `osint/github_actions_audit.[json|txt]`).
     - `julius` as optional LLM endpoint probing module (`llm_probe`, output `webs/llm_probe.[jsonl|txt]`).
   - `TInjA` as the default `ssti` engine (`SSTI_ENGINE=TInjA`, with legacy fallback).
-  - `second-order` as default `brokenLinks` engine (`BROKENLINKS_ENGINE=second-order`, with legacy fallback).
-  - `ghleaks` in `github_leaks` for GitHub-wide secret search across all public repositories (combines GitHub Code Search API with gitleaks detection rules). Configurable via `GITHUB_LEAKS`, `GHLEAKS_THREADS`, and `--exhaustive` mode in DEEP.
+- `second-order` as default `brokenLinks` engine (`BROKENLINKS_ENGINE=second-order`, with legacy fallback).
+- `ghleaks` in `github_leaks` for GitHub-wide secret search across all public repositories (combines GitHub Code Search API with gitleaks detection rules). Configurable via `GITHUB_LEAKS`, `GHLEAKS_THREADS`, and `--exhaustive` mode in DEEP.
+
+### Changed
+- `PERMUTATIONS_ENGINE` is now treated as deprecated/ignored legacy config; gotator is always used for permutations.
+- Removed obsolete/no-op knobs from public config examples and templates: `NUCLEI_FLAGS`, `NUCLEI_FLAGS_JS`, `BRUTESPRAY_THREADS`, `METAFINDER_LIMIT`, `RESOLVE_DOMAINS_THREADS`, `INTRUSIVE`, `FARADAY_SERVER`, `FARADAY_USER`, `FARADAY_PASS`.
+- Removed no-op legacy overrides from lightweight profile examples (`BROKENLINKS_ENGINE`/`SSTI_ENGINE` when module is disabled).
 
 **Progress and UX**
 - Progress/ETA functions (`progress_init()`, `progress_step()`) integrated in recon flows.

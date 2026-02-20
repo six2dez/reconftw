@@ -178,9 +178,9 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **SSRF**: Tests for server-side request forgery ([interactsh](https://github.com/projectdiscovery/interactsh), parameter values with [ffuf](https://github.com/ffuf/ffuf), and optional alternate protocol payloads).
 - **CRLF**: Checks for CRLF injection vulnerabilities ([crlfuzz](https://github.com/dwisiswant0/crlfuzz)).
 - **LFI**: Tests for local file inclusion via fuzzing ([ffuf](https://github.com/ffuf/ffuf)).
-- **SSTI**: Detects server-side template injection ([TInjA](https://github.com/Hackmanit/TInjA), with optional legacy ffuf mode if explicitly selected).
+- **SSTI**: Detects server-side template injection ([TInjA](https://github.com/Hackmanit/TInjA)).
 - **SQLi**: Tests for SQL injection ([SQLMap](https://github.com/sqlmapproject/sqlmap) and [ghauri](https://github.com/r0oth3x49/ghauri)).
-- **Broken Links**: Identifies broken links and external references likely to be takeover-prone ([second-order](https://github.com/mhmdiaa/second-order), with legacy katana mode available).
+- **Broken Links**: Identifies broken links and external references likely to be takeover-prone ([second-order](https://github.com/mhmdiaa/second-order)).
 - **Command Injection**: Tests for command injection vulnerabilities ([commix](https://github.com/commixproject/commix)).
 - **HTTP Request Smuggling**: Checks for request smuggling vulnerabilities ([smugglex](https://github.com/hahwul/smugglex)).
 - **Web Cache**: Identifies web cache vulnerabilities ([Web-Cache-Vulnerability-Scanner](https://github.com/Hackmanit/Web-Cache-Vulnerability-Scanner) and [toxicache](https://github.com/xhzeem/toxicache)).
@@ -556,7 +556,6 @@ API_LEAKS=true # Check for API leaks
 API_LEAKS_POSTLEAKS=true # Enhance API leaks with postleaksNg
 THIRD_PARTIES=true # Check for 3rd parties misconfigs
 SPOOF=true # Check spoofable domains
-METAFINDER_LIMIT=20 # Max 250
 MAIL_HYGIENE=true # Check DMARC/SPF records
 CLOUD_ENUM=true # Enumerate cloud storage across providers with cloud_enum
 GITHUB_LEAKS=true # Search for leaked secrets across GitHub with ghleaks
@@ -579,7 +578,6 @@ SUBSCRAPING=true # Subdomains extraction from passive URLs and live web metadata
 SUBPERMUTE=true # DNS permutations
 SUBIAPERMUTE=true # Permutations by AI analysis
 SUBREGEXPERMUTE=true # Permutations by regex analysis
-PERMUTATIONS_ENGINE=gotator # Permutation engine (gotator is the benchmark winner)
 GOTATOR_FLAGS=" -depth 1 -numbers 3 -mindup -adv -md" # Flags for gotator
 PERMUTATIONS_WORDLIST_MODE=auto # auto|full|short (auto: short if subs > threshold, full if DEEP)
 PERMUTATIONS_SHORT_THRESHOLD=100 # Use short wordlist when subdomain count exceeds this
@@ -627,8 +625,6 @@ NUCLEI_TEMPLATES_PATH="$HOME/nuclei-templates" # Set nuclei templates path
 NUCLEI_SEVERITY="info,low,medium,high,critical" # Set templates criticity
 NUCLEI_EXTRA_ARGS="" # Additional nuclei extra flags, don't set the severity here but the exclusions like " -etags openssh"
 #NUCLEI_EXTRA_ARGS="-etags openssh,ssl -eid node-express-dev-env,keycloak-xss,CVE-2023-24044,CVE-2021-20323,header-sql,header-reflection" # Additional nuclei extra flags, don't set the severity here but the exclusions like " -etags openssh"
-NUCLEI_FLAGS="-silent -retries 2" # Additional nuclei extra flags, don't set the severity here but the exclusions like " -etags openssh"
-NUCLEI_FLAGS_JS="-silent -tags exposure,token -severity info,low,medium,high,critical" # Additional nuclei extra flags for js secrets
 NUCLEI_DAST=true # Run additional nuclei -dast module over webs/urls/gf candidates (forced on when VULNS_GENERAL=true, e.g. -a)
 URL_CHECK=true # Enable or disable URL collection
 URL_CHECK_PASSIVE=true # Search for urls, passive methods from Archive, OTX, CommonCrawl, etc
@@ -645,7 +641,7 @@ CMS_SCANNER=true # CMS scanner
 WORDLIST=true # Wordlist generation
 ROBOTSWORDLIST=true # Check historic disallow entries on waybackMachine
 PASSWORD_DICT=true # Generate password dictionary
-PASSWORD_DICT_ENGINE=cewl # cewl|pydictor
+PASSWORD_DICT_ENGINE=cewler # cewler|pydictor
 PASSWORD_MIN_LENGTH=5 # Min password length
 PASSWORD_MAX_LENGTH=14 # Max password length
 KATANA_HEADLESS_PROFILE=off # off|smart|full
@@ -659,12 +655,12 @@ SSRF_CHECKS=true # SSRF checks
 CRLF_CHECKS=true # CRLF checks
 LFI=true # LFI by fuzzing
 SSTI=true # SSTI by fuzzing
-SSTI_ENGINE="TInjA" # SSTI engine: TInjA|legacy
+SSTI_ENGINE="TInjA" # SSTI engine
 SQLI=true # Check SQLI
 SQLMAP=true # Check SQLI with sqlmap
 GHAURI=false # Check SQLI with ghauri
 BROKENLINKS=true # Check for brokenlinks
-BROKENLINKS_ENGINE="second-order" # Broken links engine: second-order|legacy
+BROKENLINKS_ENGINE="second-order" # Broken links engine
 SPRAY=true # Performs password spraying
 SPRAY_ENGINE="brutespray" # brutespray|brutus
 SPRAY_BRUTUS_ONLY_DEEP=true # Run brutus only in DEEP mode unless disabled
@@ -702,7 +698,6 @@ FFUF_THREADS=$((AVAILABLE_CORES * 10))
 HTTPX_THREADS=$((AVAILABLE_CORES * 12))
 HTTPX_UNCOMMONPORTS_THREADS=$((AVAILABLE_CORES * 25))
 KATANA_THREADS=$((AVAILABLE_CORES * 5))
-BRUTESPRAY_THREADS=$((AVAILABLE_CORES * 5))
 BRUTESPRAY_CONCURRENCE=$((AVAILABLE_CORES * 2))
 DNSTAKE_THREADS=$((AVAILABLE_CORES * 25))
 DALFOX_THREADS=$((AVAILABLE_CORES * 50))
@@ -713,7 +708,6 @@ PUREDNS_WILDCARDTEST_LIMIT=30
 PUREDNS_WILDCARDBATCH_LIMIT=1500000
 DNSX_THREADS=25 # Threads for dnsx when behind NAT (safe for home routers)
 DNSX_RATE_LIMIT=100 # QPS for dnsx
-RESOLVE_DOMAINS_THREADS=150
 DNSVALIDATOR_THREADS=200
 INTERLACE_THREADS=10
 TLSX_THREADS=1000
@@ -761,9 +755,6 @@ AXIOM_EXTRA_ARGS="" # Leave empty if you don't want to add extra arguments
 
 # Faraday-Server
 FARADAY=false # Enable or disable Faraday integration
-FARADAY_SERVER="http://localhost:5985" # Faraday server address
-FARADAY_USER="faraday" # Faraday user
-FARADAY_PASS="FARADAY_PASSWORD" # Faraday password
 FARADAY_WORKSPACE="reconftw" # Faraday workspace
 
 # AI
@@ -803,9 +794,6 @@ HOTLIST_TOP=50 # Number of top risky assets to highlight
 # Performance
 RESOLVER_IQ=false # Prefer fast/healthy resolvers (experimental)
 PERF_PROFILE="balanced" # low|balanced|max
-
-# Intrusive controls (keep false by default)
-INTRUSIVE=false # Enable intrusive cloud write/CORS tests (dangerous)
 
 # Estimated durations for skipped heavy modules (seconds)
 TIME_EST_NUCLEI=600
@@ -987,7 +975,7 @@ reconFTW integrates with [Ax](https://github.com/attacksurge/ax) for distributed
 
 reconFTW integrates with [Faraday](https://faradaysec.com/) for web-based reporting and vulnerability management.
 
-- **Setup**: Install Faraday, authenticate via `faraday-cli`, and configure the workspace in `reconftw.cfg` (`FARADAY_SERVER`, `FARADAY_USER`, `FARADAY_PASS`, `FARADAY_WORKSPACE`).
+- **Setup**: Install Faraday, authenticate via `faraday-cli`, and configure the workspace in `reconftw.cfg` (`FARADAY_WORKSPACE`).
 - **Usage**: Enable with `FARADAY=true` in `reconftw.cfg`.
 
 ---

@@ -107,11 +107,17 @@ function validate_config() {
         warnings=$((warnings + 1))
     fi
 
-    # Validate enum-like config knobs (warn-only; runtime uses safe defaults)
+    # Legacy/no-op config knobs (warn-only; runtime uses safe defaults)
     if [[ -n "${PERMUTATIONS_ENGINE:-}" && "${PERMUTATIONS_ENGINE}" != "gotator" ]]; then
-        print_warnf "PERMUTATIONS_ENGINE now only supports 'gotator' (got '%s')" "$PERMUTATIONS_ENGINE"
+        print_warnf "PERMUTATIONS_ENGINE is deprecated/ignored (got '%s'); gotator is always used" "$PERMUTATIONS_ENGINE"
         warnings=$((warnings + 1))
     fi
+    for deprecated_noop in NUCLEI_FLAGS NUCLEI_FLAGS_JS BRUTESPRAY_THREADS METAFINDER_LIMIT RESOLVE_DOMAINS_THREADS INTRUSIVE FARADAY_SERVER FARADAY_USER FARADAY_PASS; do
+        if [[ -n "${!deprecated_noop:-}" ]]; then
+            print_warnf "%s is deprecated/removed; set it in config has no effect anymore" "$deprecated_noop"
+            warnings=$((warnings + 1))
+        fi
+    done
     if [[ -n "${PERMUTATIONS_WORDLIST_MODE:-}" ]]; then
         case "${PERMUTATIONS_WORDLIST_MODE}" in
             auto|full|short) : ;;

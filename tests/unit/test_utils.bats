@@ -77,6 +77,27 @@ setup() {
     [[ "$output" == *"ERROR"* ]]
 }
 
+@test "validate_config accepts PERMUTATIONS_ENGINE=gotator without warning" {
+    export PERMUTATIONS_ENGINE="gotator"
+    run validate_config
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"PERMUTATIONS_ENGINE is deprecated/ignored"* ]]
+}
+
+@test "validate_config warns when PERMUTATIONS_ENGINE is legacy non-gotator value" {
+    export PERMUTATIONS_ENGINE="alterx"
+    run validate_config
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"PERMUTATIONS_ENGINE is deprecated/ignored"* ]]
+}
+
+@test "validate_config warns for deprecated no-op config knobs" {
+    export NUCLEI_FLAGS="-silent"
+    run validate_config
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"NUCLEI_FLAGS is deprecated/removed"* ]]
+}
+
 @test "error codes are defined" {
     [ "$E_SUCCESS" -eq 0 ]
     [ "$E_GENERAL" -eq 1 ]
