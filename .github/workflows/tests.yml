@@ -2,53 +2,75 @@ name: tests
 
 permissions:
   contents: read
-  issues: write
-  pull-requests: write
-  actions: read
-  checks: read
-  deployments: read
-  discussions: read
-  packages: read
-  repository-projects: read
-  security-events: read
-  statuses: read
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run_full_integration:
+        description: Run full integration suite
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+  schedule:
+    - cron: "0 3 * * 0"
 
 jobs:
-  tests:
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-
-    name: ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
     steps:
-      - name: Install bash from homebrew
-        if: ${{ startsWith(matrix.os, 'macos-') }}
-        run: brew install bash
-
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0    # full history for git describe
 
-      - name: Fetch tags
-        run: git fetch --force --prune --tags
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
 
-      - name: Install reconFTW
-        shell: bash
-        continue-on-error: true
-        run: ./install.sh
+      - name: Run shellcheck
+        run: shellcheck -S error reconftw.sh modules/*.sh lib/*.sh install.sh
 
-      - name: Check if all tools are installed
-        shell: bash
-        run: ./reconftw.sh --check-tools || true
+  unit-fast:
+    name: unit-fast
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Check if chromium dependencies are installed
-        shell: bash
-        run: nuclei -headless -id screenshot
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y bats jq
+
+      - name: Run unit tests
+        run: ./tests/run_tests.sh --unit
+
+  integration-smoke:
+    name: integration-smoke
+    runs-on: ubuntu-latest
+    needs:
+      - unit-fast
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y bats jq
+
+      - name: Run integration smoke tests
+        run: ./tests/run_tests.sh --smoke
+
+  integration-full:
+    name: integration-full
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.run_full_integration == 'true')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y bats jq
+
+      - name: Run full integration tests
+        run: ./tests/run_tests.sh --integration

@@ -2,6 +2,9 @@
 
 This is an automated script created to work under AWS by using Terraform and Ansible. It allows you to easily deploy it or to easily adapt it into your IaaC strategy.
 
+> Note (best-effort): This Terraform/Ansible setup is provided as a reference. Cloud images, SSH usernames, and
+> package repos change over time, so you may need to adjust it for your environment. It is not covered by reconFTW CI.
+
 ## Requirements
 
 You would need to have installed:
@@ -10,17 +13,18 @@ You would need to have installed:
 - Terraform (<https://learn.hashicorp.com/tutorials/terraform/install-cli>)
 - Ansible (<https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html>)
 
-As well as both `access_key` and `secret_key` (<https://aws.amazon.com/premiumsupport/knowledge-center/create-access-key/>)
+And AWS credentials configured via the standard AWS provider chain (e.g., `AWS_PROFILE`, env vars, or an IAM role).
 
 ## Deploying reconFTW on the AWS Cloud using Terraform and Ansible
 
 Note: **this will charge costs (unless you are in the Free Tier)**
 
-1. Move to the Terraform folder (optional but recommended): `cd terraform`
+1. Move to the Terraform folder (optional but recommended): `cd Terraform`
     - Put your own Subfinder config file and reconFTW config file on the files/ folder
 1. Create a key pair to be used, e.g: `ssh-keygen -f terraform-keys -t ecdsa -b 521`
 1. Run `terraform init`
 1. Run `terraform apply`
+    - You will be prompted for `allowed_ssh_cidr` (recommended: your public IP + `/32`)
 1. Type "yes" and hit enter
 1. Wait, because it can take up to 15 min.
 1. Once the process has finished, you can now login, using `ssh admin@ip -i terraform-keys`

@@ -1,0 +1,3178 @@
+[
+  {
+    "name": "base64",
+    "value": "(eyJ|YTo|Tzo|PD[89]|rO0)[%a-zA-Z0-9+/]+={0,2}",
+    "severity": "low"
+  },
+  {
+    "name": "genericSecret",
+    "key": "\\b(?:[A-Z_]{2,}|[a-z0-9_]+_[a-z0-9_]+)(secret|private|key)\\b",
+    "value": "[%a-zA-Z0-9+/]{16,}"
+  },
+  {
+    "name": "firebaseConfig",
+    "severity": "high",
+    "object": [
+      {
+        "key": "apiKey",
+        "value": "^AIza.+"
+      },
+      {
+        "key": "authDomain"
+      },
+      {
+        "key": "projectId"
+      },
+      {
+        "key": "storageBucket"
+      }
+    ]
+  },
+  {
+    "name": "AWS Access Key",
+    "key": "(AWS_ACCESS_KEY_ID|aws_access_key_id)",
+    "value": "AKIA[0-9A-Z]{16}"
+  },
+  {
+    "name": "AWS Secret Key",
+    "key": "(AWS_SECRET_ACCESS_KEY|aws_secret_access_key)",
+    "value": "[0-9a-zA-Z/+]{40}"
+  },
+  {
+    "name": "GitHub Personal Access Token",
+    "key": "(github_token|GITHUB_TOKEN)",
+    "value": "ghp_[0-9a-zA-Z]{36}"
+  },
+  {
+    "name": "Google API Key",
+    "key": "(google_api_key|GOOGLE_API_KEY)",
+    "value": "AIza[0-9A-Za-z_-]{35}"
+  },
+  {
+    "name": "Slack Webhook URL",
+    "key": "(slack_webhook|SLACK_WEBHOOK)",
+    "value": "https://hooks\\.slack\\.com/services/T[0-9A-Z]{8}/B[0-9A-Z]{8}/[0-9A-Za-z]{24}"
+  },
+  {
+    "name": "Stripe API Key",
+    "key": "(stripe_api_key|STRIPE_API_KEY)",
+    "value": "sk_live_[0-9a-zA-Z]{24}"
+  },
+  {
+    "name": "Twilio API Key",
+    "key": "(twilio_api_key|TWILIO_API_KEY)",
+    "value": "SK[0-9a-fA-F]{32}"
+  },
+  {
+    "name": "SendGrid API Key",
+    "key": "(sendgrid_api_key|SENDGRID_API_KEY)",
+    "value": "SG\\.[0-9a-zA-Z_-]{22}\\.[0-9a-zA-Z_-]{43}"
+  },
+  {
+    "name": "MailChimp API Key",
+    "key": "(mailchimp_api_key|MAILCHIMP_API_KEY)",
+    "value": "[0-9a-f]{32}-us[0-9]{1,2}"
+  },
+  {
+    "name": "PayPal Client ID",
+    "key": "(paypal_client_id|PAYPAL_CLIENT_ID)",
+    "value": "AU[0-9a-zA-Z_-]{32}"
+  },
+  {
+    "name": "Square Access Token",
+    "key": "(square_access_token|SQUARE_ACCESS_TOKEN)",
+    "value": "sqOatp-[0-9A-Za-z_-]{22}"
+  },
+  {
+    "name": "SSH Private Key",
+    "key": "(ssh_key|id_rsa)",
+    "value": "-----BEGIN RSA PRIVATE KEY-----[a-zA-Z0-9+/=\\s]+-----END RSA PRIVATE KEY-----"
+  },
+  {
+    "name": "JSON Web Token (JWT)",
+    "key": "(jwt_token|JWT_TOKEN)",
+    "value": "eyJ[a-zA-Z0-9_-]+\\.[a-zA-Z0-9_-]+\\.[a-zA-Z0-9_-]+"
+  },
+  {
+    "name": "Heroku API Key",
+    "key": "(heroku_api_key|HEROKU_API_KEY)",
+    "value": "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+  },
+  {
+    "name": "Cloudinary API Secret",
+    "key": "(cloudinary_api_secret|CLOUDINARY_API_SECRET)",
+    "value": "[0-9a-zA-Z_-]{32}"
+  },
+  {
+    "name": "Pusher App Secret",
+    "key": "(pusher_app_secret|PUSHER_APP_SECRET)",
+    "value": "[0-9a-f]{32}"
+  },
+  {
+    "name": "Shopify Shared Secret",
+    "key": "(shopify_shared_secret|SHOPIFY_SHARED_SECRET)",
+    "value": "shpss_[0-9a-fA-F]{32}"
+  },
+  {
+    "name": "Twitch Client Secret",
+    "key": "(twitch_client_secret|TWITCH_CLIENT_SECRET)",
+    "value": "[0-9a-zA-Z]{30}"
+  },
+  {
+    "name": "Algolia API Key",
+    "key": "(algolia_api_key|ALGOLIA_API_KEY)",
+    "value": "[0-9a-zA-Z]{32}"
+  },
+  {
+    "name": "Mapbox Access Token",
+    "key": "(mapbox_access_token|MAPBOX_ACCESS_TOKEN)",
+    "value": "pk\\.[0-9a-zA-Z]+\\.[0-9a-zA-Z]+"
+  },
+  {
+    "name": "Zendesk Access Token",
+    "key": "(zendesk_access_token|ZENDESK_ACCESS_TOKEN)",
+    "value": "[0-9a-fA-F]{40}"
+  },
+  {
+    "name": "Box Developer Token",
+    "key": "(box_developer_token|BOX_DEVELOPER_TOKEN)",
+    "value": "[0-9a-zA-Z]{32}"
+  },
+  {
+    "name": "DigitalOcean Personal Access Token",
+    "key": "(digitalocean_token|DIGITALOCEAN_TOKEN)",
+    "value": "dop_v1_[0-9a-f]{64}"
+  },
+  {
+    "name": "HubSpot API Key",
+    "key": "(hubspot_api_key|HUBSPOT_API_KEY)",
+    "value": "sk[0-9a-f]{32}"
+  },
+  {
+    "name": "New Relic API Key",
+    "key": "(new_relic_api_key|NEW_RELIC_API_KEY)",
+    "value": "NRAK-[0-9A-Z]{27}"
+  },
+  {
+    "name": "PagerDuty API Key",
+    "key": "(pagerduty_api_key|PAGERDUTY_API_KEY)",
+    "value": "[0-9a-zA-Z]{32}"
+  },
+  {
+    "name": "Travis CI Access Token",
+    "key": "(travis_ci_token|TRAVIS_CI_TOKEN)",
+    "value": "[0-9a-zA-Z]{20}"
+  },
+  {
+    "name": "Trello API Key",
+    "key": "(trello_api_key|TRELLO_API_KEY)",
+    "value": "[0-9a-f]{32}"
+  },
+  {
+    "name": "Braintree Access Token",
+    "key": "(braintree_access_token|BRAINTREE_ACCESS_TOKEN)",
+    "value": "access_token\\$production\\$[0-9a-z]{16}\\$[0-9a-f]{32}"
+  },
+  {
+    "name": "Contentful Access Token",
+    "key": "(contentful_access_token|CONTENTFUL_ACCESS_TOKEN)",
+    "value": "CFPAT-[0-9a-zA-Z_-]{43}"
+  },
+  {
+    "name": "Drift Access Token",
+    "key": "(drift_access_token|DRIFT_ACCESS_TOKEN)",
+    "value": "driftapi-[0-9a-zA-Z]{64}"
+  },
+  {
+    "name": "Dropbox Access Token",
+    "key": "(dropbox_access_token|DROPBOX_ACCESS_TOKEN)",
+    "value": "sl\\.[0-9a-zA-Z-_]{135}"
+  },
+  {
+    "name": "HubSpot Access Token",
+    "key": "(hubspot_access_token|HUBSPOT_ACCESS_TOKEN)",
+    "value": "CJT[0-9a-zA-Z-_]{188}"
+  },
+  {
+    "name": "Intercom Access Token",
+    "key": "(intercom_access_token|INTERCOM_ACCESS_TOKEN)",
+    "value": "[0-9a-f]{64}"
+  },
+  {
+    "name": "Linear API Key",
+    "key": "(linear_api_key|LINEAR_API_KEY)",
+    "value": "lin_api_[0-9a-zA-Z]{40}"
+  },
+  {
+    "name": "Mixpanel API Secret",
+    "key": "(mixpanel_api_secret|MIXPANEL_API_SECRET)",
+    "value": "[0-9a-f]{32}"
+  },
+  {
+    "name": "Monday API Token",
+    "key": "(monday_api_token|MONDAY_API_TOKEN)",
+    "value": "eyJhbGciOiJIUzI1NiJ9\\.[0-9a-zA-Z-_]+\\.[0-9a-zA-Z-_]+"
+  },
+  {
+    "name": "Pipedrive API Token",
+    "key": "(pipedrive_api_token|PIPEDRIVE_API_TOKEN)",
+    "value": "[0-9a-f]{40}"
+  },
+  {
+    "name": "Postman API Key",
+    "key": "(postman_api_key|POSTMAN_API_KEY)",
+    "value": "PMAK-[0-9a-f]{24}-[0-9a-f]{34}"
+  },
+  {
+    "name": "ProdPad API Token",
+    "key": "(prodpad_api_token|PRODPAD_API_TOKEN)",
+    "value": "sk_[0-9a-zA-Z]{32}"
+  },
+  {
+    "name": "Rollbar Access Token",
+    "key": "(rollbar_access_token|ROLLBAR_ACCESS_TOKEN)",
+    "value": "[0-9a-f]{32}"
+  },
+  {
+    "name": "Segment API Key",
+    "key": "(segment_api_key|SEGMENT_API_KEY)",
+    "value": "sg_[0-9a-zA-Z]{24}"
+  },
+  {
+    "name": "SendGrid API Key",
+    "key": "(sendgrid_api_key|SENDGRID_API_KEY)",
+    "value": "SG\\.[0-9a-zA-Z_-]{22}\\.[0-9a-zA-Z_-]{43}"
+  },
+  {
+    "name": "Eval Usage",
+    "value": "\\beval\\s*\\("
+  },
+  {
+    "name": "Command Injection",
+    "value": "\\b(exec|execSync|spawn|spawnSync)\\s*\\("
+  },
+  {
+    "name": "Unsafe DOM Manipulation",
+    "value": "\\.(innerHTML|outerHTML|insertAdjacentHTML)\\s*="
+  },
+  {
+    "name": "Insecure WebSocket Usage",
+    "value": "new\\s+WebSocket\\s*\\(['\"]ws://"
+  },
+  {
+    "name": "Indirect Eval Usage",
+    "value": "\\b(setTimeout|setInterval|Function)\\s*\\(['\"][^'\"]*['\"]\\s*,?"
+  },
+  {
+    "name": "Dynamic Property Access",
+    "value": "\\[\\s*['\"]\\s*\\+|\\[\\s*`.*\\${?.*}?.*`\\s*\\]"
+  },
+  {
+    "name": "Weak Randomness",
+    "value": "Math\\.random\\s*\\("
+  },
+  {
+    "name": "Prototype Pollution",
+    "value": "Object\\.assign\\s*\\(|\\.\\.\\."
+  },
+  {
+    "name": "Potential Information Leak",
+    "value": "console\\.(log|error|info|warn)\\s*\\("
+  },
+  {
+    "name": "Insecure CORS Configuration",
+    "value": "\\.setHeader\\s*\\(['\"]Access-Control-Allow-Origin['\"]\\s*,\\s*['\"][^*]['\"]\\)"
+  },
+  {
+    "name": "Potential XSS in Template Literals",
+    "value": "`[^`]*\\${?.*}?.*`"
+  },
+  {
+    "name": "Insufficient CSRF Protection",
+    "value": "\\bfetch\\s*\\([^,]+,\\s*{[^}]*method:\\s*['\"](?:POST|PUT|DELETE)['\"][^}]*}\\)"
+  },
+  {
+    "name": "Potential Regex DoS",
+    "value": "\\bnew RegExp\\s*\\(['\"][^*+?]+([*+?]\\s*{\\s*\\d+\\s*,?\\s*\\}|[*+?]\\s*[*+?])['\"]"
+  },
+  {
+    "name": "Use of Deprecated Crypto",
+    "value": "\\bcrypto\\.createCipher\\s*\\("
+  },
+  {
+    "name": "Potential Prototype Pollution",
+    "value": "\\[\\s*['\"]__proto__['\"]\\s*\\]\\s*="
+  },
+  {
+    "name": "Insufficient HSTS Usage",
+    "value": "\\.setHeader\\s*\\(['\"]Strict-Transport-Security['\"]\\s*,\\s*['\"][^;]+max-age=(?:0|[1-9]\\d{0,5})['\"]\\)"
+  },
+  {
+    "name": "pattern_1",
+    "value": "Basic [A-Za-z0-9+/]{15}`, \"(xox[p|b|o|a]-[0-9]{12}-[0-9]{12}-[0-9]{12}-[a-z0-9]{32})"
+  },
+  {
+    "name": "pattern_2",
+    "value": "https://hooks.slack.com/services/T[a-zA-Z0-9_]{8}/B[a-zA-Z0-9_]{8}/[a-zA-Z0-9_]{24}"
+  },
+  {
+    "name": "pattern_3",
+    "value": "[f|F][a|A][c|C][e|E][b|B][o|O][o|O][k|K].{0,30}['\\\"\\s][0-9a-f]{32}['\\\"\\s]"
+  },
+  {
+    "name": "pattern_4",
+    "value": "[t|T][w|W][i|I][t|T][t|T][e|E][r|R].{0,30}['\\\"\\s][0-9a-zA-Z]{35,44}['\\\"\\s]"
+  },
+  {
+    "name": "pattern_5",
+    "value": "[h|H][e|E][r|R][o|O][k|K][u|U].{0,30}[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}"
+  },
+  {
+    "name": "pattern_6",
+    "value": "key-[0-9a-zA-Z]{32}"
+  },
+  {
+    "name": "pattern_7",
+    "value": "[0-9a-f]{32}-us[0-9]{1,2}"
+  },
+  {
+    "name": "pattern_8",
+    "value": "sk_live_[0-9a-z]{32}"
+  },
+  {
+    "name": "pattern_9",
+    "value": "[0-9(+-[0-9A-Za-z_]{32}.apps.qooqleusercontent.com"
+  },
+  {
+    "name": "pattern_10",
+    "value": "AIza[0-9A-Za-z-_]{35}"
+  },
+  {
+    "name": "pattern_11",
+    "value": "6L[0-9A-Za-z-_]{38}"
+  },
+  {
+    "name": "pattern_12",
+    "value": "ya29\\.[0-9A-Za-z\\-_]+"
+  },
+  {
+    "name": "pattern_13",
+    "value": "AKIA[0-9A-Z]{16}"
+  },
+  {
+    "name": "pattern_14",
+    "value": "amzn\\.mws\\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+  },
+  {
+    "name": "pattern_15",
+    "value": "s3\\.amazonaws.com[/]+|[a-zA-Z0-9_-]*\\.s3\\.amazonaws.com"
+  },
+  {
+    "name": "pattern_16",
+    "value": "EAACEdEose0cBA[0-9A-Za-z]+"
+  },
+  {
+    "name": "pattern_17",
+    "value": "key-[0-9a-zA-Z]{32}"
+  },
+  {
+    "name": "pattern_18",
+    "value": "SK[0-9a-fA-F]{32}"
+  },
+  {
+    "name": "pattern_19",
+    "value": "AC[a-zA-Z0-9_\\-]{32}"
+  },
+  {
+    "name": "pattern_20",
+    "value": "AP[a-zA-Z0-9_\\-]{32}"
+  },
+  {
+    "name": "pattern_21",
+    "value": "access_token\\$production\\$[0-9a-z]{16}\\$[0-9a-f]{32}"
+  },
+  {
+    "name": "pattern_22",
+    "value": "sq0csp-[ 0-9A-Za-z\\-_]{43}"
+  },
+  {
+    "name": "pattern_23",
+    "value": "sqOatp-[0-9A-Za-z\\-_]{22}"
+  },
+  {
+    "name": "pattern_24",
+    "value": "sk_live_[0-9a-zA-Z]{24}"
+  },
+  {
+    "name": "pattern_25",
+    "value": "rk_live_[0-9a-zA-Z]{24}"
+  },
+  {
+    "name": "pattern_26",
+    "value": "[a-zA-Z0-9_-]*:[a-zA-Z0-9_\\-]+@github\\.com*"
+  },
+  {
+    "name": "pattern_27",
+    "value": "-----BEGIN PRIVATE KEY-----[a-zA-Z0-9\\S]{100,}-----END PRIVATE KEY-----"
+  },
+  {
+    "name": "pattern_28",
+    "value": "-----BEGIN RSA PRIVATE KEY-----[a-zA-Z0-9\\S]{100,}-----END RSA PRIVATE KEY-----"
+  },
+  {
+    "name": "pattern_29",
+    "value": "(?i)[\\\"']?zopim[_-]?account[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_30",
+    "value": "(?i)[\\\"']?zhuliang[_-]?gh[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_31",
+    "value": "(?i)[\\\"']?zensonatypepassword[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_32",
+    "value": "(?i)zendesk(_api_token|_key|_token|-travis-github|_url|_username)(\\s|=)"
+  },
+  {
+    "name": "pattern_33",
+    "value": "(?i)[\\\"']?yt[_-]?server[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_34",
+    "value": "(?i)[\\\"']?yt[_-]?partner[_-]?refresh[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_35",
+    "value": "(?i)[\\\"']?yt[_-]?partner[_-]?client[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_36",
+    "value": "(?i)[\\\"']?yt[_-]?client[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_37",
+    "value": "(?i)[\\\"']?yt[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_38",
+    "value": "(?i)[\\\"']?yt[_-]?account[_-]?refresh[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_39",
+    "value": "(?i)[\\\"']?yt[_-]?account[_-]?client[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_40",
+    "value": "(?i)[\\\"']?yangshun[_-]?gh[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_41",
+    "value": "(?i)[\\\"']?yangshun[_-]?gh[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_42",
+    "value": "(?i)[\\\"']?www[_-]?googleapis[_-]?com[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_43",
+    "value": "(?i)[\\\"']?wpt[_-]?ssh[_-]?private[_-]?key[_-]?base64[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_44",
+    "value": "(?i)[\\\"']?wpt[_-]?ssh[_-]?connect[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_45",
+    "value": "(?i)[\\\"']?wpt[_-]?report[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_46",
+    "value": "(?i)[\\\"']?wpt[_-]?prepare[_-]?dir[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_47",
+    "value": "(?i)[\\\"']?wpt[_-]?db[_-]?user[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_48",
+    "value": "(?i)[\\\"']?wpt[_-]?db[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_49",
+    "value": "(?i)[\\\"']?wporg[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_50",
+    "value": "(?i)[\\\"']?wpjm[_-]?phpunit[_-]?google[_-]?geocode[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_51",
+    "value": "(?i)[\\\"']?wordpress[_-]?db[_-]?user[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_52",
+    "value": "(?i)[\\\"']?wordpress[_-]?db[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_53",
+    "value": "(?i)[\\\"']?wincert[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_54",
+    "value": "(?i)[\\\"']?widget[_-]?test[_-]?server[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_55",
+    "value": "(?i)[\\\"']?widget[_-]?fb[_-]?password[_-]?3[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_56",
+    "value": "(?i)[\\\"']?widget[_-]?fb[_-]?password[_-]?2[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_57",
+    "value": "(?i)[\\\"']?widget[_-]?fb[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_58",
+    "value": "(?i)[\\\"']?widget[_-]?basic[_-]?password[_-]?5[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_59",
+    "value": "(?i)[\\\"']?widget[_-]?basic[_-]?password[_-]?4[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_60",
+    "value": "(?i)[\\\"']?widget[_-]?basic[_-]?password[_-]?3[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_61",
+    "value": "(?i)[\\\"']?widget[_-]?basic[_-]?password[_-]?2[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_62",
+    "value": "(?i)[\\\"']?widget[_-]?basic[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_63",
+    "value": "(?i)[\\\"']?watson[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_64",
+    "value": "(?i)[\\\"']?watson[_-]?device[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_65",
+    "value": "(?i)[\\\"']?watson[_-]?conversation[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_66",
+    "value": "(?i)[\\\"']?wakatime[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_67",
+    "value": "(?i)[\\\"']?vscetoken[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_68",
+    "value": "(?i)[\\\"']?visual[_-]?recognition[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_69",
+    "value": "(?i)[\\\"']?virustotal[_-]?apikey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_70",
+    "value": "(?i)[\\\"']?vip[_-]?github[_-]?deploy[_-]?key[_-]?pass[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_71",
+    "value": "(?i)[\\\"']?vip[_-]?github[_-]?deploy[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_72",
+    "value": "(?i)[\\\"']?vip[_-]?github[_-]?build[_-]?repo[_-]?deploy[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_73",
+    "value": "(?i)[\\\"']?v[_-]?sfdc[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_74",
+    "value": "(?i)[\\\"']?v[_-]?sfdc[_-]?client[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_75",
+    "value": "(?i)[\\\"']?usertravis[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_76",
+    "value": "(?i)[\\\"']?user[_-]?assets[_-]?secret[_-]?access[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_77",
+    "value": "(?i)[\\\"']?user[_-]?assets[_-]?access[_-]?key[_-]?id[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_78",
+    "value": "(?i)[\\\"']?use[_-]?ssh[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_79",
+    "value": "(?i)[\\\"']?us[_-]?east[_-]?1[_-]?elb[_-]?amazonaws[_-]?com[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_80",
+    "value": "(?i)[\\\"']?urban[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_81",
+    "value": "(?i)[\\\"']?urban[_-]?master[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_82",
+    "value": "(?i)[\\\"']?urban[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_83",
+    "value": "(?i)[\\\"']?unity[_-]?serial[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_84",
+    "value": "(?i)[\\\"']?unity[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_85",
+    "value": "(?i)[\\\"']?twitteroauthaccesstoken[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_86",
+    "value": "(?i)[\\\"']?twitteroauthaccesssecret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_87",
+    "value": "(?i)[\\\"']?twitter[_-]?consumer[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_88",
+    "value": "(?i)[\\\"']?twitter[_-]?consumer[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_89",
+    "value": "(?i)[\\\"']?twine[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_90",
+    "value": "(?i)[\\\"']?twilio[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_91",
+    "value": "(?i)[\\\"']?twilio[_-]?sid[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_92",
+    "value": "(?i)[\\\"']?twilio[_-]?configuration[_-]?sid[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_93",
+    "value": "(?i)[\\\"']?twilio[_-]?chat[_-]?account[_-]?api[_-]?service[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_94",
+    "value": "(?i)[\\\"']?twilio[_-]?api[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_95",
+    "value": "(?i)[\\\"']?twilio[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_96",
+    "value": "(?i)[\\\"']?trex[_-]?okta[_-]?client[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_97",
+    "value": "(?i)[\\\"']?trex[_-]?client[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_98",
+    "value": "(?i)[\\\"']?travis[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_99",
+    "value": "(?i)[\\\"']?travis[_-]?secure[_-]?env[_-]?vars[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_100",
+    "value": "(?i)[\\\"']?travis[_-]?pull[_-]?request[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_101",
+    "value": "(?i)[\\\"']?travis[_-]?gh[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_102",
+    "value": "(?i)[\\\"']?travis[_-]?e2e[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_103",
+    "value": "(?i)[\\\"']?travis[_-]?com[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_104",
+    "value": "(?i)[\\\"']?travis[_-]?branch[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_105",
+    "value": "(?i)[\\\"']?travis[_-]?api[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_106",
+    "value": "(?i)[\\\"']?travis[_-]?access[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_107",
+    "value": "(?i)[\\\"']?token[_-]?core[_-]?java[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_108",
+    "value": "(?i)[\\\"']?thera[_-]?oss[_-]?access[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_109",
+    "value": "(?i)[\\\"']?tester[_-]?keys[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_110",
+    "value": "(?i)[\\\"']?test[_-]?test[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_111",
+    "value": "(?i)[\\\"']?test[_-]?github[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_112",
+    "value": "(?i)[\\\"']?tesco[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_113",
+    "value": "(?i)[\\\"']?svn[_-]?pass[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_114",
+    "value": "(?i)[\\\"']?surge[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_115",
+    "value": "(?i)[\\\"']?surge[_-]?login[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_116",
+    "value": "(?i)[\\\"']?stripe[_-]?public[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_117",
+    "value": "(?i)[\\\"']?stripe[_-]?private[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_118",
+    "value": "(?i)[\\\"']?strip[_-]?secret[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_119",
+    "value": "(?i)[\\\"']?strip[_-]?publishable[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_120",
+    "value": "(?i)[\\\"']?stormpath[_-]?api[_-]?key[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_121",
+    "value": "(?i)[\\\"']?stormpath[_-]?api[_-]?key[_-]?id[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_122",
+    "value": "(?i)[\\\"']?starship[_-]?auth[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_123",
+    "value": "(?i)[\\\"']?starship[_-]?account[_-]?sid[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_124",
+    "value": "(?i)[\\\"']?star[_-]?test[_-]?secret[_-]?access[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_125",
+    "value": "(?i)[\\\"']?star[_-]?test[_-]?location[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_126",
+    "value": "(?i)[\\\"']?star[_-]?test[_-]?bucket[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_127",
+    "value": "(?i)[\\\"']?star[_-]?test[_-]?aws[_-]?access[_-]?key[_-]?id[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_128",
+    "value": "(?i)[\\\"']?staging[_-]?base[_-]?url[_-]?runscope[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_129",
+    "value": "(?i)[\\\"']?ssmtp[_-]?config[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_130",
+    "value": "(?i)[\\\"']?sshpass[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_131",
+    "value": "(?i)[\\\"']?srcclr[_-]?api[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_132",
+    "value": "(?i)[\\\"']?square[_-]?reader[_-]?sdk[_-]?repository[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_133",
+    "value": "(?i)[\\\"']?sqssecretkey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_134",
+    "value": "(?i)[\\\"']?sqsaccesskey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_135",
+    "value": "(?i)[\\\"']?spring[_-]?mail[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_136",
+    "value": "(?i)[\\\"']?spotify[_-]?api[_-]?client[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_137",
+    "value": "(?i)[\\\"']?spotify[_-]?api[_-]?access[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_138",
+    "value": "(?i)[\\\"']?spaces[_-]?secret[_-]?access[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_139",
+    "value": "(?i)[\\\"']?spaces[_-]?access[_-]?key[_-]?id[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_140",
+    "value": "(?i)[\\\"']?soundcloud[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_141",
+    "value": "(?i)[\\\"']?soundcloud[_-]?client[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_142",
+    "value": "(?i)[\\\"']?sonatypepassword[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_143",
+    "value": "(?i)[\\\"']?sonatype[_-]?token[_-]?user[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_144",
+    "value": "(?i)[\\\"']?sonatype[_-]?token[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_145",
+    "value": "(?i)[\\\"']?sonatype[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_146",
+    "value": "(?i)[\\\"']?sonatype[_-]?pass[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_147",
+    "value": "(?i)[\\\"']?sonatype[_-]?nexus[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_148",
+    "value": "(?i)[\\\"']?sonatype[_-]?gpg[_-]?passphrase[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_149",
+    "value": "(?i)[\\\"']?sonatype[_-]?gpg[_-]?key[_-]?name[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_150",
+    "value": "(?i)[\\\"']?sonar[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_151",
+    "value": "(?i)[\\\"']?sonar[_-]?project[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_152",
+    "value": "(?i)[\\\"']?sonar[_-]?organization[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_153",
+    "value": "(?i)[\\\"']?socrata[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_154",
+    "value": "(?i)[\\\"']?socrata[_-]?app[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_155",
+    "value": "(?i)[\\\"']?snyk[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_156",
+    "value": "(?i)[\\\"']?snyk[_-]?api[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_157",
+    "value": "(?i)[\\\"']?snoowrap[_-]?refresh[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_158",
+    "value": "(?i)[\\\"']?snoowrap[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_159",
+    "value": "(?i)[\\\"']?snoowrap[_-]?client[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_160",
+    "value": "(?i)[\\\"']?slate[_-]?user[_-]?email[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_161",
+    "value": "(?i)[\\\"']?slash[_-]?developer[_-]?space[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_162",
+    "value": "(?i)[\\\"']?slash[_-]?developer[_-]?space[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_163",
+    "value": "(?i)[\\\"']?signing[_-]?key[_-]?sid[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_164",
+    "value": "(?i)[\\\"']?signing[_-]?key[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_165",
+    "value": "(?i)[\\\"']?signing[_-]?key[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_166",
+    "value": "(?i)[\\\"']?signing[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_167",
+    "value": "(?i)[\\\"']?setsecretkey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_168",
+    "value": "(?i)[\\\"']?setdstsecretkey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_169",
+    "value": "(?i)[\\\"']?setdstaccesskey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_170",
+    "value": "(?i)[\\\"']?ses[_-]?secret[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_171",
+    "value": "(?i)[\\\"']?ses[_-]?access[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_172",
+    "value": "(?i)[\\\"']?service[_-]?account[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_173",
+    "value": "(?i)[\\\"']?sentry[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_174",
+    "value": "(?i)[\\\"']?sentry[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_175",
+    "value": "(?i)[\\\"']?sentry[_-]?endpoint[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_176",
+    "value": "(?i)[\\\"']?sentry[_-]?default[_-]?org[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_177",
+    "value": "(?i)[\\\"']?sentry[_-]?auth[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_178",
+    "value": "(?i)[\\\"']?sendwithus[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_179",
+    "value": "(?i)[\\\"']?sendgrid[_-]?username[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_180",
+    "value": "(?i)[\\\"']?sendgrid[_-]?user[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_181",
+    "value": "(?i)[\\\"']?sendgrid[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_182",
+    "value": "(?i)[\\\"']?sendgrid[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_183",
+    "value": "(?i)[\\\"']?sendgrid[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_184",
+    "value": "(?i)[\\\"']?sendgrid[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_185",
+    "value": "(?i)[\\\"']?selion[_-]?selenium[_-]?host[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_186",
+    "value": "(?i)[\\\"']?selion[_-]?log[_-]?level[_-]?dev[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_187",
+    "value": "(?i)[\\\"']?segment[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_188",
+    "value": "(?i)[\\\"']?secretkey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_189",
+    "value": "(?i)[\\\"']?secretaccesskey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_190",
+    "value": "(?i)[\\\"']?secret[_-]?key[_-]?base[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_191",
+    "value": "(?i)[\\\"']?secret[_-]?9[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_192",
+    "value": "(?i)[\\\"']?secret[_-]?8[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_193",
+    "value": "(?i)[\\\"']?secret[_-]?7[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_194",
+    "value": "(?i)[\\\"']?secret[_-]?6[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_195",
+    "value": "(?i)[\\\"']?secret[_-]?5[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_196",
+    "value": "(?i)[\\\"']?secret[_-]?4[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_197",
+    "value": "(?i)[\\\"']?secret[_-]?3[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_198",
+    "value": "(?i)[\\\"']?secret[_-]?2[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_199",
+    "value": "(?i)[\\\"']?secret[_-]?11[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_200",
+    "value": "(?i)[\\\"']?secret[_-]?10[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_201",
+    "value": "(?i)[\\\"']?secret[_-]?1[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_202",
+    "value": "(?i)[\\\"']?secret[_-]?0[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_203",
+    "value": "(?i)[\\\"']?sdr[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_204",
+    "value": "(?i)[\\\"']?scrutinizer[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_205",
+    "value": "(?i)[\\\"']?sauce[_-]?access[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_206",
+    "value": "(?i)[\\\"']?sandbox[_-]?aws[_-]?secret[_-]?access[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_207",
+    "value": "(?i)[\\\"']?sandbox[_-]?aws[_-]?access[_-]?key[_-]?id[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_208",
+    "value": "(?i)[\\\"']?sandbox[_-]?access[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_209",
+    "value": "(?i)[\\\"']?salesforce[_-]?bulk[_-]?test[_-]?security[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_210",
+    "value": "(?i)[\\\"']?salesforce[_-]?bulk[_-]?test[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_211",
+    "value": "(?i)[\\\"']?sacloud[_-]?api[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_212",
+    "value": "(?i)[\\\"']?sacloud[_-]?access[_-]?token[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_213",
+    "value": "(?i)[\\\"']?sacloud[_-]?access[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_214",
+    "value": "(?i)[\\\"']?s3[_-]?user[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_215",
+    "value": "(?i)[\\\"']?s3[_-]?secret[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_216",
+    "value": "(?i)[\\\"']?s3[_-]?secret[_-]?assets[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_217",
+    "value": "(?i)[\\\"']?s3[_-]?secret[_-]?app[_-]?logs[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_218",
+    "value": "(?i)[\\\"']?s3[_-]?key[_-]?assets[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_219",
+    "value": "(?i)[\\\"']?s3[_-]?key[_-]?app[_-]?logs[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_220",
+    "value": "(?i)[\\\"']?s3[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_221",
+    "value": "(?i)[\\\"']?s3[_-]?external[_-]?3[_-]?amazonaws[_-]?com[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_222",
+    "value": "(?i)[\\\"']?s3[_-]?bucket[_-]?name[_-]?assets[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_223",
+    "value": "(?i)[\\\"']?s3[_-]?bucket[_-]?name[_-]?app[_-]?logs[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_224",
+    "value": "(?i)[\\\"']?s3[_-]?access[_-]?key[_-]?id[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_225",
+    "value": "(?i)[\\\"']?s3[_-]?access[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_226",
+    "value": "(?i)[\\\"']?rubygems[_-]?auth[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_227",
+    "value": "(?i)[\\\"']?rtd[_-]?store[_-]?pass[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_228",
+    "value": "(?i)[\\\"']?rtd[_-]?key[_-]?pass[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_229",
+    "value": "(?i)[\\\"']?route53[_-]?access[_-]?key[_-]?id[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_230",
+    "value": "(?i)[\\\"']?ropsten[_-]?private[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_231",
+    "value": "(?i)[\\\"']?rinkeby[_-]?private[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_232",
+    "value": "(?i)[\\\"']?rest[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_233",
+    "value": "(?i)[\\\"']?repotoken[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_234",
+    "value": "(?i)[\\\"']?reporting[_-]?webdav[_-]?url[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_235",
+    "value": "(?i)[\\\"']?reporting[_-]?webdav[_-]?pwd[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_236",
+    "value": "(?i)[\\\"']?release[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_237",
+    "value": "(?i)[\\\"']?release[_-]?gh[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_238",
+    "value": "(?i)[\\\"']?registry[_-]?secure[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_239",
+    "value": "(?i)[\\\"']?registry[_-]?pass[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_240",
+    "value": "(?i)[\\\"']?refresh[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_241",
+    "value": "(?i)[\\\"']?rediscloud[_-]?url[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_242",
+    "value": "(?i)[\\\"']?redis[_-]?stunnel[_-]?urls[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_243",
+    "value": "(?i)[\\\"']?randrmusicapiaccesstoken[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_244",
+    "value": "(?i)[\\\"']?rabbitmq[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_245",
+    "value": "(?i)[\\\"']?quip[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_246",
+    "value": "(?i)[\\\"']?qiita[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_247",
+    "value": "(?i)[\\\"']?pypi[_-]?passowrd[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_248",
+    "value": "(?i)[\\\"']?pushover[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_249",
+    "value": "(?i)[\\\"']?publish[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_250",
+    "value": "(?i)[\\\"']?publish[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_251",
+    "value": "(?i)[\\\"']?publish[_-]?access[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_252",
+    "value": "(?i)[\\\"']?project[_-]?config[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_253",
+    "value": "(?i)[\\\"']?prod[_-]?secret[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_254",
+    "value": "(?i)[\\\"']?prod[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_255",
+    "value": "(?i)[\\\"']?prod[_-]?access[_-]?key[_-]?id[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_256",
+    "value": "(?i)[\\\"']?private[_-]?signing[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_257",
+    "value": "(?i)[\\\"']?pring[_-]?mail[_-]?username[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_258",
+    "value": "(?i)[\\\"']?preferred[_-]?username[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_259",
+    "value": "(?i)[\\\"']?prebuild[_-]?auth[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_260",
+    "value": "(?i)[\\\"']?postgresql[_-]?pass[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_261",
+    "value": "(?i)[\\\"']?postgresql[_-]?db[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_262",
+    "value": "(?i)[\\\"']?postgres[_-]?env[_-]?postgres[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_263",
+    "value": "(?i)[\\\"']?postgres[_-]?env[_-]?postgres[_-]?db[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_264",
+    "value": "(?i)[\\\"']?plugin[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_265",
+    "value": "(?i)[\\\"']?plotly[_-]?apikey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_266",
+    "value": "(?i)[\\\"']?places[_-]?apikey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_267",
+    "value": "(?i)[\\\"']?places[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_268",
+    "value": "(?i)[\\\"']?pg[_-]?host[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_269",
+    "value": "(?i)[\\\"']?pg[_-]?database[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_270",
+    "value": "(?i)[\\\"']?personal[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_271",
+    "value": "(?i)[\\\"']?personal[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_272",
+    "value": "(?i)[\\\"']?percy[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_273",
+    "value": "(?i)[\\\"']?percy[_-]?project[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_274",
+    "value": "(?i)[\\\"']?paypal[_-]?client[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_275",
+    "value": "(?i)[\\\"']?passwordtravis[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_276",
+    "value": "(?i)[\\\"']?parse[_-]?js[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_277",
+    "value": "(?i)[\\\"']?pagerduty[_-]?apikey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_278",
+    "value": "(?i)[\\\"']?packagecloud[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_279",
+    "value": "(?i)[\\\"']?ossrh[_-]?username[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_280",
+    "value": "(?i)[\\\"']?ossrh[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_281",
+    "value": "(?i)[\\\"']?ossrh[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_282",
+    "value": "(?i)[\\\"']?ossrh[_-]?pass[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_283",
+    "value": "(?i)[\\\"']?ossrh[_-]?jira[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_284",
+    "value": "(?i)[\\\"']?os[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_285",
+    "value": "(?i)[\\\"']?os[_-]?auth[_-]?url[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_286",
+    "value": "(?i)[\\\"']?org[_-]?project[_-]?gradle[_-]?sonatype[_-]?nexus[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_287",
+    "value": "(?i)[\\\"']?org[_-]?gradle[_-]?project[_-]?sonatype[_-]?nexus[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_288",
+    "value": "(?i)[\\\"']?openwhisk[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_289",
+    "value": "(?i)[\\\"']?open[_-]?whisk[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_290",
+    "value": "(?i)[\\\"']?onesignal[_-]?user[_-]?auth[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_291",
+    "value": "(?i)[\\\"']?onesignal[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_292",
+    "value": "(?i)[\\\"']?omise[_-]?skey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_293",
+    "value": "(?i)[\\\"']?omise[_-]?pubkey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_294",
+    "value": "(?i)[\\\"']?omise[_-]?pkey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_295",
+    "value": "(?i)[\\\"']?omise[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_296",
+    "value": "(?i)[\\\"']?okta[_-]?oauth2[_-]?clientsecret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_297",
+    "value": "(?i)[\\\"']?okta[_-]?oauth2[_-]?client[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_298",
+    "value": "(?i)[\\\"']?okta[_-]?client[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_299",
+    "value": "(?i)[\\\"']?ofta[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_300",
+    "value": "(?i)[\\\"']?ofta[_-]?region[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_301",
+    "value": "(?i)[\\\"']?ofta[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_302",
+    "value": "(?i)[\\\"']?octest[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_303",
+    "value": "(?i)[\\\"']?octest[_-]?app[_-]?username[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_304",
+    "value": "(?i)[\\\"']?octest[_-]?app[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_305",
+    "value": "(?i)[\\\"']?oc[_-]?pass[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_306",
+    "value": "(?i)[\\\"']?object[_-]?store[_-]?creds[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_307",
+    "value": "(?i)[\\\"']?object[_-]?store[_-]?bucket[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_308",
+    "value": "(?i)[\\\"']?object[_-]?storage[_-]?region[_-]?name[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_309",
+    "value": "(?i)[\\\"']?object[_-]?storage[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_310",
+    "value": "(?i)[\\\"']?oauth[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_311",
+    "value": "(?i)[\\\"']?numbers[_-]?service[_-]?pass[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_312",
+    "value": "(?i)[\\\"']?nuget[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_313",
+    "value": "(?i)[\\\"']?nuget[_-]?apikey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_314",
+    "value": "(?i)[\\\"']?nuget[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_315",
+    "value": "(?i)[\\\"']?npm[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_316",
+    "value": "(?i)[\\\"']?npm[_-]?secret[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_317",
+    "value": "(?i)[\\\"']?npm[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_318",
+    "value": "(?i)[\\\"']?npm[_-]?email[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_319",
+    "value": "(?i)[\\\"']?npm[_-]?auth[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_320",
+    "value": "(?i)[\\\"']?npm[_-]?api[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_321",
+    "value": "(?i)[\\\"']?npm[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_322",
+    "value": "(?i)[\\\"']?now[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_323",
+    "value": "(?i)[\\\"']?non[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_324",
+    "value": "(?i)[\\\"']?node[_-]?pre[_-]?gyp[_-]?secretaccesskey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_325",
+    "value": "(?i)[\\\"']?node[_-]?pre[_-]?gyp[_-]?github[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_326",
+    "value": "(?i)[\\\"']?node[_-]?pre[_-]?gyp[_-]?accesskeyid[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_327",
+    "value": "(?i)[\\\"']?node[_-]?env[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_328",
+    "value": "(?i)[\\\"']?ngrok[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_329",
+    "value": "(?i)[\\\"']?ngrok[_-]?auth[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_330",
+    "value": "(?i)[\\\"']?nexuspassword[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_331",
+    "value": "(?i)[\\\"']?nexus[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_332",
+    "value": "(?i)[\\\"']?new[_-]?relic[_-]?beta[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_333",
+    "value": "(?i)[\\\"']?netlify[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_334",
+    "value": "(?i)[\\\"']?nativeevents[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_335",
+    "value": "(?i)[\\\"']?mysqlsecret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_336",
+    "value": "(?i)[\\\"']?mysqlmasteruser[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_337",
+    "value": "(?i)[\\\"']?mysql[_-]?username[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_338",
+    "value": "(?i)[\\\"']?mysql[_-]?user[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_339",
+    "value": "(?i)[\\\"']?mysql[_-]?root[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_340",
+    "value": "(?i)[\\\"']?mysql[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_341",
+    "value": "(?i)[\\\"']?mysql[_-]?hostname[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_342",
+    "value": "(?i)[\\\"']?mysql[_-]?database[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_343",
+    "value": "(?i)[\\\"']?my[_-]?secret[_-]?env[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_344",
+    "value": "(?i)[\\\"']?multi[_-]?workspace[_-]?sid[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_345",
+    "value": "(?i)[\\\"']?multi[_-]?workflow[_-]?sid[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_346",
+    "value": "(?i)[\\\"']?multi[_-]?disconnect[_-]?sid[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_347",
+    "value": "(?i)[\\\"']?multi[_-]?connect[_-]?sid[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_348",
+    "value": "(?i)[\\\"']?multi[_-]?bob[_-]?sid[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_349",
+    "value": "(?i)[\\\"']?minio[_-]?secret[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_350",
+    "value": "(?i)[\\\"']?minio[_-]?access[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_351",
+    "value": "(?i)[\\\"']?mile[_-]?zero[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_352",
+    "value": "(?i)[\\\"']?mh[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_353",
+    "value": "(?i)[\\\"']?mh[_-]?apikey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_354",
+    "value": "(?i)[\\\"']?mg[_-]?public[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_355",
+    "value": "(?i)[\\\"']?mg[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_356",
+    "value": "(?i)[\\\"']?mapboxaccesstoken[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_357",
+    "value": "(?i)[\\\"']?mapbox[_-]?aws[_-]?secret[_-]?access[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_358",
+    "value": "(?i)[\\\"']?mapbox[_-]?aws[_-]?access[_-]?key[_-]?id[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_359",
+    "value": "(?i)[\\\"']?mapbox[_-]?api[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_360",
+    "value": "(?i)[\\\"']?mapbox[_-]?access[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_361",
+    "value": "(?i)[\\\"']?manifest[_-]?app[_-]?url[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_362",
+    "value": "(?i)[\\\"']?manifest[_-]?app[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_363",
+    "value": "(?i)[\\\"']?mandrill[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_364",
+    "value": "(?i)[\\\"']?managementapiaccesstoken[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_365",
+    "value": "(?i)[\\\"']?management[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_366",
+    "value": "(?i)[\\\"']?manage[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_367",
+    "value": "(?i)[\\\"']?manage[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_368",
+    "value": "(?i)[\\\"']?mailgun[_-]?secret[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_369",
+    "value": "(?i)[\\\"']?mailgun[_-]?pub[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_370",
+    "value": "(?i)[\\\"']?mailgun[_-]?pub[_-]?apikey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_371",
+    "value": "(?i)[\\\"']?mailgun[_-]?priv[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_372",
+    "value": "(?i)[\\\"']?mailgun[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_373",
+    "value": "(?i)[\\\"']?mailgun[_-]?apikey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_374",
+    "value": "(?i)[\\\"']?mailgun[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_375",
+    "value": "(?i)[\\\"']?mailer[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_376",
+    "value": "(?i)[\\\"']?mailchimp[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_377",
+    "value": "(?i)[\\\"']?mailchimp[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_378",
+    "value": "(?i)[\\\"']?mail[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_379",
+    "value": "(?i)[\\\"']?magento[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_380",
+    "value": "(?i)[\\\"']?magento[_-]?auth[_-]?username [\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_381",
+    "value": "(?i)[\\\"']?magento[_-]?auth[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_382",
+    "value": "(?i)[\\\"']?lottie[_-]?upload[_-]?cert[_-]?key[_-]?store[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_383",
+    "value": "(?i)[\\\"']?lottie[_-]?upload[_-]?cert[_-]?key[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_384",
+    "value": "(?i)[\\\"']?lottie[_-]?s3[_-]?secret[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_385",
+    "value": "(?i)[\\\"']?lottie[_-]?happo[_-]?secret[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_386",
+    "value": "(?i)[\\\"']?lottie[_-]?happo[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_387",
+    "value": "(?i)[\\\"']?looker[_-]?test[_-]?runner[_-]?client[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_388",
+    "value": "(?i)[\\\"']?ll[_-]?shared[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_389",
+    "value": "(?i)[\\\"']?ll[_-]?publish[_-]?url[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_390",
+    "value": "(?i)[\\\"']?linux[_-]?signing[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_391",
+    "value": "(?i)[\\\"']?linkedin[_-]?client[_-]?secretor lottie[_-]?s3[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_392",
+    "value": "(?i)[\\\"']?lighthouse[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_393",
+    "value": "(?i)[\\\"']?lektor[_-]?deploy[_-]?username[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_394",
+    "value": "(?i)[\\\"']?lektor[_-]?deploy[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_395",
+    "value": "(?i)[\\\"']?leanplum[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_396",
+    "value": "(?i)[\\\"']?kxoltsn3vogdop92m[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_397",
+    "value": "(?i)[\\\"']?kubeconfig[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_398",
+    "value": "(?i)[\\\"']?kubecfg[_-]?s3[_-]?path[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_399",
+    "value": "(?i)[\\\"']?kovan[_-]?private[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_400",
+    "value": "(?i)[\\\"']?keystore[_-]?pass[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_401",
+    "value": "(?i)[\\\"']?kafka[_-]?rest[_-]?url[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_402",
+    "value": "(?i)[\\\"']?kafka[_-]?instance[_-]?name[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_403",
+    "value": "(?i)[\\\"']?kafka[_-]?admin[_-]?url[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_404",
+    "value": "(?i)[\\\"']?jwt[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_405",
+    "value": "(?i)[\\\"']?jdbc:mysql[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_406",
+    "value": "(?i)[\\\"']?jdbc[_-]?host[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_407",
+    "value": "(?i)[\\\"']?jdbc[_-]?databaseurl[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_408",
+    "value": "(?i)[\\\"']?itest[_-]?gh[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_409",
+    "value": "(?i)[\\\"']?ios[_-]?docs[_-]?deploy[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_410",
+    "value": "(?i)[\\\"']?internal[_-]?secrets[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_411",
+    "value": "(?i)[\\\"']?integration[_-]?test[_-]?appid[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_412",
+    "value": "(?i)[\\\"']?integration[_-]?test[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_413",
+    "value": "(?i)[\\\"']?index[_-]?name[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_414",
+    "value": "(?i)[\\\"']?ij[_-]?repo[_-]?username[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_415",
+    "value": "(?i)[\\\"']?ij[_-]?repo[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_416",
+    "value": "(?i)[\\\"']?hub[_-]?dxia2[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_417",
+    "value": "(?i)[\\\"']?homebrew[_-]?github[_-]?api[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_418",
+    "value": "(?i)[\\\"']?hockeyapp[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_419",
+    "value": "(?i)[\\\"']?heroku[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_420",
+    "value": "(?i)[\\\"']?heroku[_-]?email[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_421",
+    "value": "(?i)[\\\"']?heroku[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_422",
+    "value": "(?i)[\\\"']?hb[_-]?codesign[_-]?key[_-]?pass[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_423",
+    "value": "(?i)[\\\"']?hb[_-]?codesign[_-]?gpg[_-]?pass[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_424",
+    "value": "(?i)[\\\"']?hab[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_425",
+    "value": "(?i)[\\\"']?hab[_-]?auth[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_426",
+    "value": "(?i)[\\\"']?grgit[_-]?user[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_427",
+    "value": "(?i)[\\\"']?gren[_-]?github[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_428",
+    "value": "(?i)[\\\"']?gradle[_-]?signing[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_429",
+    "value": "(?i)[\\\"']?gradle[_-]?signing[_-]?key[_-]?id[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_430",
+    "value": "(?i)[\\\"']?gradle[_-]?publish[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_431",
+    "value": "(?i)[\\\"']?gradle[_-]?publish[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_432",
+    "value": "(?i)[\\\"']?gpg[_-]?secret[_-]?keys[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_433",
+    "value": "(?i)[\\\"']?gpg[_-]?private[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_434",
+    "value": "(?i)[\\\"']?gpg[_-]?passphrase[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_435",
+    "value": "(?i)[\\\"']?gpg[_-]?ownertrust[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_436",
+    "value": "(?i)[\\\"']?gpg[_-]?keyname[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_437",
+    "value": "(?i)[\\\"']?gpg[_-]?key[_-]?name[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_438",
+    "value": "(?i)[\\\"']?google[_-]?private[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_439",
+    "value": "(?i)[\\\"']?google[_-]?maps[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_440",
+    "value": "(?i)[\\\"']?google[_-]?client[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_441",
+    "value": "(?i)[\\\"']?google[_-]?client[_-]?id[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_442",
+    "value": "(?i)[\\\"']?google[_-]?client[_-]?email[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_443",
+    "value": "(?i)[\\\"']?google[_-]?account[_-]?type[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_444",
+    "value": "(?i)[\\\"']?gogs[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_445",
+    "value": "(?i)[\\\"']?gitlab[_-]?user[_-]?email[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_446",
+    "value": "(?i)[\\\"']?github[_-]?tokens[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_447",
+    "value": "(?i)[\\\"']?github[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_448",
+    "value": "(?i)[\\\"']?github[_-]?repo[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_449",
+    "value": "(?i)[\\\"']?github[_-]?release[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_450",
+    "value": "(?i)[\\\"']?github[_-]?pwd[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_451",
+    "value": "(?i)[\\\"']?github[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_452",
+    "value": "(?i)[\\\"']?github[_-]?oauth[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_453",
+    "value": "(?i)[\\\"']?github[_-]?oauth[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_454",
+    "value": "(?i)[\\\"']?github[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_455",
+    "value": "(?i)[\\\"']?github[_-]?hunter[_-]?username[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_456",
+    "value": "(?i)[\\\"']?github[_-]?hunter[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_457",
+    "value": "(?i)[\\\"']?github[_-]?deployment[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_458",
+    "value": "(?i)[\\\"']?github[_-]?deploy[_-]?hb[_-]?doc[_-]?pass[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_459",
+    "value": "(?i)[\\\"']?github[_-]?client[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_460",
+    "value": "(?i)[\\\"']?github[_-]?auth[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_461",
+    "value": "(?i)[\\\"']?github[_-]?auth[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_462",
+    "value": "(?i)[\\\"']?github[_-]?api[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_463",
+    "value": "(?i)[\\\"']?github[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_464",
+    "value": "(?i)[\\\"']?github[_-]?access[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_465",
+    "value": "(?i)[\\\"']?git[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_466",
+    "value": "(?i)[\\\"']?git[_-]?name[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_467",
+    "value": "(?i)[\\\"']?git[_-]?email[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_468",
+    "value": "(?i)[\\\"']?git[_-]?committer[_-]?name[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_469",
+    "value": "(?i)[\\\"']?git[_-]?committer[_-]?email[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_470",
+    "value": "(?i)[\\\"']?git[_-]?author[_-]?name[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_471",
+    "value": "(?i)[\\\"']?git[_-]?author[_-]?email[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_472",
+    "value": "(?i)[\\\"']?ghost[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_473",
+    "value": "(?i)[\\\"']?ghb[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_474",
+    "value": "(?i)[\\\"']?gh[_-]?unstable[_-]?oauth[_-]?client[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_475",
+    "value": "(?i)[\\\"']?gh[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_476",
+    "value": "(?i)[\\\"']?gh[_-]?repo[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_477",
+    "value": "(?i)[\\\"']?gh[_-]?oauth[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_478",
+    "value": "(?i)[\\\"']?gh[_-]?oauth[_-]?client[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_479",
+    "value": "(?i)[\\\"']?gh[_-]?next[_-]?unstable[_-]?oauth[_-]?client[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_480",
+    "value": "(?i)[\\\"']?gh[_-]?next[_-]?unstable[_-]?oauth[_-]?client[_-]?id[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_481",
+    "value": "(?i)[\\\"']?gh[_-]?next[_-]?oauth[_-]?client[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_482",
+    "value": "(?i)[\\\"']?gh[_-]?email[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_483",
+    "value": "(?i)[\\\"']?gh[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_484",
+    "value": "(?i)[\\\"']?gcs[_-]?bucket[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_485",
+    "value": "(?i)[\\\"']?gcr[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_486",
+    "value": "(?i)[\\\"']?gcloud[_-]?service[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_487",
+    "value": "(?i)[\\\"']?gcloud[_-]?project[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_488",
+    "value": "(?i)[\\\"']?gcloud[_-]?bucket[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_489",
+    "value": "(?i)[\\\"']?ftp[_-]?username[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_490",
+    "value": "(?i)[\\\"']?ftp[_-]?user[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_491",
+    "value": "(?i)[\\\"']?ftp[_-]?pw[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_492",
+    "value": "(?i)[\\\"']?ftp[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_493",
+    "value": "(?i)[\\\"']?ftp[_-]?login[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_494",
+    "value": "(?i)[\\\"']?ftp[_-]?host[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_495",
+    "value": "(?i)[\\\"']?fossa[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_496",
+    "value": "(?i)[\\\"']?flickr[_-]?api[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_497",
+    "value": "(?i)[\\\"']?flickr[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_498",
+    "value": "(?i)[\\\"']?flask[_-]?secret[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_499",
+    "value": "(?i)[\\\"']?firefox[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_500",
+    "value": "(?i)[\\\"']?firebase[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_501",
+    "value": "(?i)[\\\"']?firebase[_-]?project[_-]?develop[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_502",
+    "value": "(?i)[\\\"']?firebase[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_503",
+    "value": "(?i)[\\\"']?firebase[_-]?api[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_504",
+    "value": "(?i)[\\\"']?firebase[_-]?api[_-]?json[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_505",
+    "value": "(?i)[\\\"']?file[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_506",
+    "value": "(?i)[\\\"']?exp[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_507",
+    "value": "(?i)[\\\"']?eureka[_-]?awssecretkey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_508",
+    "value": "(?i)[\\\"']?env[_-]?sonatype[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_509",
+    "value": "(?i)[\\\"']?env[_-]?secret[_-]?access[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_510",
+    "value": "(?i)[\\\"']?env[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_511",
+    "value": "(?i)[\\\"']?env[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_512",
+    "value": "(?i)[\\\"']?env[_-]?heroku[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_513",
+    "value": "(?i)[\\\"']?env[_-]?github[_-]?oauth[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_514",
+    "value": "(?i)[\\\"']?end[_-]?user[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_515",
+    "value": "(?i)[\\\"']?encryption[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_516",
+    "value": "(?i)[\\\"']?elasticsearch[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_517",
+    "value": "(?i)[\\\"']?elastic[_-]?cloud[_-]?auth[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_518",
+    "value": "(?i)[\\\"']?dsonar[_-]?projectkey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_519",
+    "value": "(?i)[\\\"']?dsonar[_-]?login[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_520",
+    "value": "(?i)[\\\"']?droplet[_-]?travis[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_521",
+    "value": "(?i)[\\\"']?dropbox[_-]?oauth[_-]?bearer[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_522",
+    "value": "(?i)[\\\"']?doordash[_-]?auth[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_523",
+    "value": "(?i)[\\\"']?dockerhubpassword[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_524",
+    "value": "(?i)[\\\"']?dockerhub[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_525",
+    "value": "(?i)[\\\"']?docker[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_526",
+    "value": "(?i)[\\\"']?docker[_-]?postgres[_-]?url[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_527",
+    "value": "(?i)[\\\"']?docker[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_528",
+    "value": "(?i)[\\\"']?docker[_-]?passwd[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_529",
+    "value": "(?i)[\\\"']?docker[_-]?pass[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_530",
+    "value": "(?i)[\\\"']?docker[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_531",
+    "value": "(?i)[\\\"']?docker[_-]?hub[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_532",
+    "value": "(?i)[\\\"']?digitalocean[_-]?ssh[_-]?key[_-]?ids[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_533",
+    "value": "(?i)[\\\"']?digitalocean[_-]?ssh[_-]?key[_-]?body[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_534",
+    "value": "(?i)[\\\"']?digitalocean[_-]?access[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_535",
+    "value": "(?i)[\\\"']?dgpg[_-]?passphrase[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_536",
+    "value": "(?i)[\\\"']?deploy[_-]?user[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_537",
+    "value": "(?i)[\\\"']?deploy[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_538",
+    "value": "(?i)[\\\"']?deploy[_-]?secure[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_539",
+    "value": "(?i)[\\\"']?deploy[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_540",
+    "value": "(?i)[\\\"']?ddgc[_-]?github[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_541",
+    "value": "(?i)[\\\"']?ddg[_-]?test[_-]?email[_-]?pw[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_542",
+    "value": "(?i)[\\\"']?ddg[_-]?test[_-]?email[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_543",
+    "value": "(?i)[\\\"']?db[_-]?username[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_544",
+    "value": "(?i)[\\\"']?db[_-]?user[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_545",
+    "value": "(?i)[\\\"']?db[_-]?pw[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_546",
+    "value": "(?i)[\\\"']?db[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_547",
+    "value": "(?i)[\\\"']?db[_-]?host[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_548",
+    "value": "(?i)[\\\"']?db[_-]?database[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_549",
+    "value": "(?i)[\\\"']?db[_-]?connection[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_550",
+    "value": "(?i)[\\\"']?datadog[_-]?app[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_551",
+    "value": "(?i)[\\\"']?datadog[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_552",
+    "value": "(?i)[\\\"']?database[_-]?username[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_553",
+    "value": "(?i)[\\\"']?database[_-]?user[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_554",
+    "value": "(?i)[\\\"']?database[_-]?port[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_555",
+    "value": "(?i)[\\\"']?database[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_556",
+    "value": "(?i)[\\\"']?database[_-]?name[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_557",
+    "value": "(?i)[\\\"']?database[_-]?host[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_558",
+    "value": "(?i)[\\\"']?danger[_-]?github[_-]?api[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_559",
+    "value": "(?i)[\\\"']?cypress[_-]?record[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_560",
+    "value": "(?i)[\\\"']?coverity[_-]?scan[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_561",
+    "value": "(?i)[\\\"']?coveralls[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_562",
+    "value": "(?i)[\\\"']?coveralls[_-]?repo[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_563",
+    "value": "(?i)[\\\"']?coveralls[_-]?api[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_564",
+    "value": "(?i)[\\\"']?cos[_-]?secrets[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_565",
+    "value": "(?i)[\\\"']?conversation[_-]?username[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_566",
+    "value": "(?i)[\\\"']?conversation[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_567",
+    "value": "(?i)[\\\"']?contentful[_-]?v2[_-]?access[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_568",
+    "value": "(?i)[\\\"']?contentful[_-]?test[_-]?org[_-]?cma[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_569",
+    "value": "(?i)[\\\"']?contentful[_-]?php[_-]?management[_-]?test[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_570",
+    "value": "(?i)[\\\"']?contentful[_-]?management[_-]?api[_-]?access[_-]?token[_-]?new[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_571",
+    "value": "(?i)[\\\"']?contentful[_-]?management[_-]?api[_-]?access[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_572",
+    "value": "(?i)[\\\"']?contentful[_-]?integration[_-]?management[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_573",
+    "value": "(?i)[\\\"']?contentful[_-]?cma[_-]?test[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_574",
+    "value": "(?i)[\\\"']?contentful[_-]?access[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_575",
+    "value": "(?i)[\\\"']?consumerkey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_576",
+    "value": "(?i)[\\\"']?consumer[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_577",
+    "value": "(?i)[\\\"']?conekta[_-]?apikey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_578",
+    "value": "(?i)[\\\"']?coding[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_579",
+    "value": "(?i)[\\\"']?codecov[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_580",
+    "value": "(?i)[\\\"']?codeclimate[_-]?repo[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_581",
+    "value": "(?i)[\\\"']?codacy[_-]?project[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_582",
+    "value": "(?i)[\\\"']?cocoapods[_-]?trunk[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_583",
+    "value": "(?i)[\\\"']?cocoapods[_-]?trunk[_-]?email[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_584",
+    "value": "(?i)[\\\"']?cn[_-]?secret[_-]?access[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_585",
+    "value": "(?i)[\\\"']?cn[_-]?access[_-]?key[_-]?id[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_586",
+    "value": "(?i)[\\\"']?clu[_-]?ssh[_-]?private[_-]?key[_-]?base64[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_587",
+    "value": "(?i)[\\\"']?clu[_-]?repo[_-]?url[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_588",
+    "value": "(?i)[\\\"']?cloudinary[_-]?url[_-]?staging[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_589",
+    "value": "(?i)[\\\"']?cloudinary[_-]?url[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_590",
+    "value": "(?i)[\\\"']?cloudflare[_-]?email[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_591",
+    "value": "(?i)[\\\"']?cloudflare[_-]?auth[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_592",
+    "value": "(?i)[\\\"']?cloudflare[_-]?auth[_-]?email[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_593",
+    "value": "(?i)[\\\"']?cloudflare[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_594",
+    "value": "(?i)[\\\"']?cloudant[_-]?service[_-]?database[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_595",
+    "value": "(?i)[\\\"']?cloudant[_-]?processed[_-]?database[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_596",
+    "value": "(?i)[\\\"']?cloudant[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_597",
+    "value": "(?i)[\\\"']?cloudant[_-]?parsed[_-]?database[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_598",
+    "value": "(?i)[\\\"']?cloudant[_-]?order[_-]?database[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_599",
+    "value": "(?i)[\\\"']?cloudant[_-]?instance[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_600",
+    "value": "(?i)[\\\"']?cloudant[_-]?database[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_601",
+    "value": "(?i)[\\\"']?cloudant[_-]?audited[_-]?database[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_602",
+    "value": "(?i)[\\\"']?cloudant[_-]?archived[_-]?database[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_603",
+    "value": "(?i)[\\\"']?cloud[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_604",
+    "value": "(?i)[\\\"']?clojars[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_605",
+    "value": "(?i)[\\\"']?client[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_606",
+    "value": "(?i)[\\\"']?cli[_-]?e2e[_-]?cma[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_607",
+    "value": "(?i)[\\\"']?claimr[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_608",
+    "value": "(?i)[\\\"']?claimr[_-]?superuser[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_609",
+    "value": "(?i)[\\\"']?claimr[_-]?db[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_610",
+    "value": "(?i)[\\\"']?claimr[_-]?database[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_611",
+    "value": "(?i)[\\\"']?ci[_-]?user[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_612",
+    "value": "(?i)[\\\"']?ci[_-]?server[_-]?name[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_613",
+    "value": "(?i)[\\\"']?ci[_-]?registry[_-]?user[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_614",
+    "value": "(?i)[\\\"']?ci[_-]?project[_-]?url[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_615",
+    "value": "(?i)[\\\"']?ci[_-]?deploy[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_616",
+    "value": "(?i)[\\\"']?chrome[_-]?refresh[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_617",
+    "value": "(?i)[\\\"']?chrome[_-]?client[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_618",
+    "value": "(?i)[\\\"']?cheverny[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_619",
+    "value": "(?i)[\\\"']?cf[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_620",
+    "value": "(?i)[\\\"']?certificate[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_621",
+    "value": "(?i)[\\\"']?censys[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_622",
+    "value": "(?i)[\\\"']?cattle[_-]?secret[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_623",
+    "value": "(?i)[\\\"']?cattle[_-]?agent[_-]?instance[_-]?auth[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_624",
+    "value": "(?i)[\\\"']?cattle[_-]?access[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_625",
+    "value": "(?i)[\\\"']?cargo[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_626",
+    "value": "(?i)[\\\"']?cache[_-]?s3[_-]?secret[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_627",
+    "value": "(?i)[\\\"']?bx[_-]?username[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_628",
+    "value": "(?i)[\\\"']?bx[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_629",
+    "value": "(?i)[\\\"']?bundlesize[_-]?github[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_630",
+    "value": "(?i)[\\\"']?built[_-]?branch[_-]?deploy[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_631",
+    "value": "(?i)[\\\"']?bucketeer[_-]?aws[_-]?secret[_-]?access[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_632",
+    "value": "(?i)[\\\"']?bucketeer[_-]?aws[_-]?access[_-]?key[_-]?id[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_633",
+    "value": "(?i)[\\\"']?browserstack[_-]?access[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_634",
+    "value": "(?i)[\\\"']?browser[_-]?stack[_-]?access[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_635",
+    "value": "(?i)[\\\"']?brackets[_-]?repo[_-]?oauth[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_636",
+    "value": "(?i)[\\\"']?bluemix[_-]?username[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_637",
+    "value": "(?i)[\\\"']?bluemix[_-]?pwd[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_638",
+    "value": "(?i)[\\\"']?bluemix[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_639",
+    "value": "(?i)[\\\"']?bluemix[_-]?pass[_-]?prod[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_640",
+    "value": "(?i)[\\\"']?bluemix[_-]?pass[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_641",
+    "value": "(?i)[\\\"']?bluemix[_-]?auth[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_642",
+    "value": "(?i)[\\\"']?bluemix[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_643",
+    "value": "(?i)[\\\"']?bintraykey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_644",
+    "value": "(?i)[\\\"']?bintray[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_645",
+    "value": "(?i)[\\\"']?bintray[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_646",
+    "value": "(?i)[\\\"']?bintray[_-]?gpg[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_647",
+    "value": "(?i)[\\\"']?bintray[_-]?apikey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_648",
+    "value": "(?i)[\\\"']?bintray[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_649",
+    "value": "(?i)[\\\"']?b2[_-]?bucket[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_650",
+    "value": "(?i)[\\\"']?b2[_-]?app[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_651",
+    "value": "(?i)[\\\"']?awssecretkey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_652",
+    "value": "(?i)[\\\"']?awscn[_-]?secret[_-]?access[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_653",
+    "value": "(?i)[\\\"']?awscn[_-]?access[_-]?key[_-]?id[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_654",
+    "value": "(?i)[\\\"']?awsaccesskeyid[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_655",
+    "value": "(?i)[\\\"']?aws[_-]?ses[_-]?secret[_-]?access[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_656",
+    "value": "(?i)[\\\"']?aws[_-]?ses[_-]?access[_-]?key[_-]?id[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_657",
+    "value": "(?i)[\\\"']?aws[_-]?secrets[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_658",
+    "value": "(?i)[\\\"']?aws[_-]?secret[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_659",
+    "value": "(?i)[\\\"']?aws[_-]?secret[_-]?access[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_660",
+    "value": "(?i)[\\\"']?aws[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_661",
+    "value": "(?i)[\\\"']?aws[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_662",
+    "value": "(?i)[\\\"']?aws[_-]?config[_-]?secretaccesskey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_663",
+    "value": "(?i)[\\\"']?aws[_-]?config[_-]?accesskeyid[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_664",
+    "value": "(?i)[\\\"']?aws[_-]?access[_-]?key[_-]?id[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_665",
+    "value": "(?i)[\\\"']?aws[_-]?access[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_666",
+    "value": "(?i)[\\\"']?aws[_-]?access[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_667",
+    "value": "(?i)[\\\"']?author[_-]?npm[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_668",
+    "value": "(?i)[\\\"']?author[_-]?email[_-]?addr[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_669",
+    "value": "(?i)[\\\"']?auth0[_-]?client[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_670",
+    "value": "(?i)[\\\"']?auth0[_-]?api[_-]?clientsecret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_671",
+    "value": "(?i)[\\\"']?auth[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_672",
+    "value": "(?i)[\\\"']?assistant[_-]?iam[_-]?apikey[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_673",
+    "value": "(?i)[\\\"']?artifacts[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_674",
+    "value": "(?i)[\\\"']?artifacts[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_675",
+    "value": "(?i)[\\\"']?artifacts[_-]?bucket[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_676",
+    "value": "(?i)[\\\"']?artifacts[_-]?aws[_-]?secret[_-]?access[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_677",
+    "value": "(?i)[\\\"']?artifacts[_-]?aws[_-]?access[_-]?key[_-]?id[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_678",
+    "value": "(?i)[\\\"']?artifactory[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_679",
+    "value": "(?i)[\\\"']?argos[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_680",
+    "value": "(?i)[\\\"']?apple[_-]?id[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_681",
+    "value": "(?i)[\\\"']?appclientsecret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_682",
+    "value": "(?i)[\\\"']?app[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_683",
+    "value": "(?i)[\\\"']?app[_-]?secrete[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_684",
+    "value": "(?i)[\\\"']?app[_-]?report[_-]?token[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_685",
+    "value": "(?i)[\\\"']?app[_-]?bucket[_-]?perm[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_686",
+    "value": "(?i)[\\\"']?apigw[_-]?access[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_687",
+    "value": "(?i)[\\\"']?apiary[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_688",
+    "value": "(?i)[\\\"']?api[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_689",
+    "value": "(?i)[\\\"']?api[_-]?key[_-]?sid[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_690",
+    "value": "(?i)[\\\"']?api[_-]?key[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_691",
+    "value": "(?i)[\\\"']?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_692",
+    "value": "(?i)[\\\"']?aos[_-]?sec[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_693",
+    "value": "(?i)[\\\"']?aos[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_694",
+    "value": "(?i)[\\\"']?ansible[_-]?vault[_-]?password[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_695",
+    "value": "(?i)[\\\"']?android[_-]?docs[_-]?deploy[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_696",
+    "value": "(?i)[\\\"']?anaconda[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_697",
+    "value": "(?i)[\\\"']?amazon[_-]?secret[_-]?access[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_698",
+    "value": "(?i)[\\\"']?amazon[_-]?bucket[_-]?name[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_699",
+    "value": "(?i)[\\\"']?alicloud[_-]?secret[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_700",
+    "value": "(?i)[\\\"']?alicloud[_-]?access[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_701",
+    "value": "(?i)[\\\"']?alias[_-]?pass[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_702",
+    "value": "(?i)[\\\"']?algolia[_-]?search[_-]?key[_-]?1[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_703",
+    "value": "(?i)[\\\"']?algolia[_-]?search[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_704",
+    "value": "(?i)[\\\"']?algolia[_-]?search[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_705",
+    "value": "(?i)[\\\"']?algolia[_-]?api[_-]?key[_-]?search[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_706",
+    "value": "(?i)[\\\"']?algolia[_-]?api[_-]?key[_-]?mcm[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_707",
+    "value": "(?i)[\\\"']?algolia[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_708",
+    "value": "(?i)[\\\"']?algolia[_-]?admin[_-]?key[_-]?mcm[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_709",
+    "value": "(?i)[\\\"']?algolia[_-]?admin[_-]?key[_-]?2[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_710",
+    "value": "(?i)[\\\"']?algolia[_-]?admin[_-]?key[_-]?1[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_711",
+    "value": "(?i)[\\\"']?air[-_]?table[-_]?api[-_]?key[\\\"']?[=:][\\\"']?.+[\\\"']"
+  },
+  {
+    "name": "pattern_712",
+    "value": "(?i)[\\\"']?adzerk[_-]?api[_-]?key[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_713",
+    "value": "(?i)[\\\"']?admin[_-]?email[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_714",
+    "value": "(?i)[\\\"']?account[_-]?sid[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_715",
+    "value": "(?i)[\\\"']?access[_-]?token[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_716",
+    "value": "(?i)[\\\"']?access[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  },
+  {
+    "name": "pattern_717",
+    "value": "(?i)[\\\"']?access[_-]?key[_-]?secret[\\\"']?[^\\S\\r\\n]*[=:][^\\S\\r\\n]*[\\\"']?[\\w-]+[\\\"']?"
+  }
+]

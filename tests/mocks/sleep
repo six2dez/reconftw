@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# test mock to avoid long sleeps in monitor tests
+exit 0

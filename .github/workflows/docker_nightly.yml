@@ -41,3 +41,9 @@ jobs:
           context: ./Docker
           push: true
           tags: six2dez/reconftw:main
+
+      - name: Verify image health
+        run: |
+          docker pull six2dez/reconftw:main
+          docker run --rm six2dez/reconftw:main --help
+          docker run --rm six2dez/reconftw:main --health-check

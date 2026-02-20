@@ -1,9 +1,7 @@
 # syntax=docker/dockerfile:1.4
 
-## You can change these variables
-ARG COLLAB_SERVER="XXXXXXXXXX"
-ARG XSS_SERVER="XXXXXXXXXXX"
-ARG SHODAN_API_KEY="XXXXXXXXXXXXXX"
+## Secrets should be passed at runtime, not build time:
+##   docker run -e COLLAB_SERVER=xxx -e XSS_SERVER=xxx -e SHODAN_API_KEY=xxx ...
 
 ARG LANG=en_US.UTF-8
 ARG LANGUAGE=en_US
@@ -12,7 +10,10 @@ ARG LANGUAGE=en_US
 ###> Do NOT change anything beyond this point <###
 ##################################################
 
-FROM ubuntu:latest AS base
+FROM ubuntu:24.04 AS base
+
+# NOTE: This image intentionally runs as root. Some recon tooling relies on privileged operations
+# (e.g., raw sockets/capabilities) and is commonly executed with elevated permissions.
 
 LABEL org.label-schema.name='reconftw'
 LABEL org.label-schema.description='A simple script for full recon'
@@ -21,20 +22,12 @@ LABEL org.label-schema.url='https://github.com/six2dez/reconftw'
 LABEL org.label-schema.docker.cmd.devel='docker run --rm -ti six2dez/reconftw'
 LABEL MAINTAINER="six2dez"
 
-ARG COLLAB_SERVER
-ARG XSS_SERVER
-ARG SHODAN_API_KEY
-
 ARG LANG
 ARG LANGUAGE
 
 ARG GIT_REPOSITORY_AXIOM="https://github.com/attacksurge/ax.git"
 ARG GIT_REPOSITORY_RECONFTW="https://github.com/six2dez/reconftw"
 ARG INSTALL_AXIOM=true
-
-ENV COLLAB_SERVER=$COLLAB_SERVER
-ENV XSS_SERVER=$XSS_SERVER
-ENV SHODAN_API_KEY=$SHODAN_API_KEY
 
 ENV LANG=$LANG
 ENV LANGUAGE=$LANGUAGE
@@ -57,6 +50,7 @@ ENV PATH="${GOROOT}/bin:${GOPATH}/bin:${AXIOMPATH}:${CARGOPATH}:${PATH}"
 SHELL [ "/bin/bash", "-c" ]
 
 COPY 01_nodoc /etc/dpkg/dpkg.cfg.d/
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 RUN <<eot
 #!/bin/bash
@@ -69,15 +63,15 @@ cp /root/.bashrc /root/original.bashrc
 apt clean all
 apt update
 apt full-upgrade -f -y --allow-downgrades
-apt install -y --no-install-recommends apt-utils ca-certificates curl git lsb-release nano wget vim jq htop net-tools dnsutils nmap python3 python3-pip unzip whois
+apt install -y --no-install-recommends apt-utils ca-certificates curl git lsb-release nano wget vim jq htop net-tools dnsutils nmap python3 unzip whois
 
-###>> Congifure Locales <<###
+###>> Configure Locales <<###
 apt install -y --no-install-recommends locales
 sed -i -- "/${LANG}/s/^# //g" /etc/locale.gen
 dpkg-reconfigure locales
 update-locale LANG=${LANG}
 
-###>> Congifure localepurge <<###
+###>> Configure localepurge <<###
 apt install -y --no-install-recommends localepurge
 sed -i -- '/^USE_DPKG/s/^/#/' /etc/locale.nopurge
 dpkg-reconfigure localepurge
@@ -117,7 +111,7 @@ find /var/cache -type f -delete
 find /var/log -type f -delete
 find /tmp -type f -delete
 rm -rf /root/.cache
-rm -rf /root/go
+rm -rf /root/go/pkg /root/go/src
 eot
 
 COPY github_tokens.txt /root/Tools/.github_tokens
@@ -128,14 +122,10 @@ RUN <<eot
 #!/bin/bash
 set -euxo pipefail
 if [ "${INSTALL_AXIOM}" = "true" ]; then
-    ###>> Regenerate SSH Keys <<###
     apt update && apt install -y --no-install-recommends openssh-client
 
     mkdir -p /root/.ssh
     mkdir -p /root/.axiom/configs
-
-    ssh-keygen -b 2048 -t rsa -f /root/.ssh/axiom_rsa -q -N ""
-    cat /root/.ssh/axiom_rsa.pub > /root/.axiom/configs/authorized_keys
 
     apt remove --purge -y openssh-client && apt autoremove -y && apt clean all
     find /var/lib/apt/lists -type f -delete
@@ -162,5 +152,11 @@ EXPOSE 85-90
 
 WORKDIR /reconftw
 
-ENTRYPOINT [ "./reconftw.sh" ]
+HEALTHCHECK --interval=60s --timeout=30s --retries=3 \
+  CMD ./reconftw.sh --health-check || exit 1
+
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT [ "/entrypoint.sh" ]
 CMD [ "--help" ]

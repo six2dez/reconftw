@@ -8,28 +8,35 @@
 </h1>
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v3.2">
-    <img src="https://img.shields.io/badge/release-v3.2-green">
-  </a>
-   </a>
-  <a href="https://opensource.org/licenses/MIT">
-      <img src="https://img.shields.io/badge/License-MIT-yellow.svg">
-  </a>
-  <a href="https://twitter.com/Six2dez1">
-    <img src="https://img.shields.io/badge/twitter-%40Six2dez1-blue">
-  </a>
-    <a href="https://github.com/six2dez/reconftw/issues?q=is%3Aissue+is%3Aclosed">
-    <img src="https://img.shields.io/github/issues-closed-raw/six2dez/reconftw.svg">
-  </a>
-  <a href="https://github.com/six2dez/reconftw/wiki">
-    <img src="https://img.shields.io/badge/doc-wiki-blue.svg">
-  </a>
-  <a href="https://t.me/joinchat/H5bAaw3YbzzmI5co">
-    <img src="https://img.shields.io/badge/telegram-@ReconFTW-blue.svg">
-  </a>
-  <a href="https://discord.gg/R5DdXVEdTy">
-    <img src="https://img.shields.io/discord/1048623782912340038.svg?logo=discord">
-  </a>
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v4.0"><img src="https://img.shields.io/badge/release-v4.0-2ea043?style=for-the-badge" alt="Release"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge" alt="License"></a>
+  <a href="https://github.com/six2dez/reconftw/issues?q=is%3Aissue+is%3Aclosed"><img src="https://img.shields.io/github/issues-closed-raw/six2dez/reconftw.svg?style=for-the-badge" alt="Closed Issues"></a>
+  <a href="https://discord.gg/R5DdXVEdTy"><img src="https://img.shields.io/discord/1048623782912340038.svg?style=for-the-badge&logo=discord&label=discord" alt="Discord"></a>
+  <a href="https://t.me/joinchat/H5bAaw3YbzzmI5co"><img src="https://img.shields.io/badge/telegram-@ReconFTW-26A5E4?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram"></a>
+  <a href="https://twitter.com/Six2dez1"><img src="https://img.shields.io/badge/twitter-@Six2dez1-1D9BF0?style=for-the-badge&logo=x&logoColor=white" alt="Twitter"></a>
+</p>
+
+<p align="center">
+  <a href="https://docs.reconftw.com"><img src="https://img.shields.io/badge/GitBook-%23000000.svg?style=for-the-badge&logo=gitbook&logoColor=white" alt="Docs"></a>
+  <a href="https://github.com/six2dez/reconftw"><img src="https://img.shields.io/badge/Bash%20Script-%23121011.svg?style=for-the-badge&logo=gnu-bash&logoColor=white" alt="Bash Script"></a>
+  <a href="https://github.com/six2dez/reconftw"><img src="https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black" alt="Linux"></a>
+  <a href="https://github.com/six2dez/reconftw"><img src="https://img.shields.io/badge/macOS-000000?style=for-the-badge&logo=macos&logoColor=F0F0F0" alt="macOS"></a>
+  <a href="https://github.com/six2dez/reconftw"><img src="https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white" alt="GitHub"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/six2dez/reconftw/actions"><img src="https://img.shields.io/badge/github_actions-%232671E5.svg?style=for-the-badge&logo=githubactions&logoColor=white" alt="GitHub Actions"></a>
+  <a href="https://hub.docker.com/r/six2dez/reconftw"><img src="https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"></a>
+  <a href="https://github.com/six2dez/reconftw/tree/main/Terraform"><img src="https://img.shields.io/badge/terraform-%23844FBA.svg?style=for-the-badge&logo=terraform&logoColor=white" alt="Terraform"></a>
+  <a href="https://github.com/six2dez/reconftw/tree/main/Terraform"><img src="https://img.shields.io/badge/ansible-%231A1918.svg?style=for-the-badge&logo=ansible&logoColor=white" alt="Ansible"></a>
+  <a href="https://github.com/six2dez/reconftw"><img src="https://img.shields.io/badge/Go-00ADD8.svg?style=for-the-badge&logo=go&logoColor=white" alt="Go"></a>
+  <a href="https://github.com/six2dez/reconftw"><img src="https://img.shields.io/badge/Python-3776AB.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python"></a>
+</p>
+
+<p align="center">
+  <a href="https://www.buymeacoffee.com/six2dez"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee"></a>
+  <a href="https://github.com/sponsors/six2dez"><img src="https://img.shields.io/badge/sponsor-30363D?style=for-the-badge&logo=GitHub-Sponsors&logoColor=EA4AAA" alt="GitHub Sponsors"></a>
+  <a href="https://www.paypal.com/paypalme/six2dez"><img src="https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white" alt="PayPal"></a>
 </p>
 
 **reconFTW** is a powerful automated reconnaissance tool designed for security researchers and penetration testers. It streamlines the process of gathering intelligence on a target by performing subdomain enumeration, vulnerability scanning, OSINT and more. With a modular design, extensive configuration options, and support for distributed scanning via AX Framework, reconFTW is built to deliver comprehensive results efficiently.
@@ -60,6 +67,7 @@ reconFTW leverages a wide range of techniques, including passive and active subd
   - [Web Analysis](#web-analysis)
   - [Vulnerability Checks](#vulnerability-checks)
   - [Extras](#extras)
+- [🏗️ Architecture](#️-architecture)
 - [💿 Installation](#-installation)
   - [Local Installation (PC/VPS/VM)](#local-installation-pcvpsvm)
   - [Docker](#docker)
@@ -76,12 +84,16 @@ reconFTW leverages a wide range of techniques, including passive and active subd
 - [🗂️ Data Management](#️-data-management)
   - [Makefile](#makefile)
   - [Manual](#manual)
+- [🧪 Testing](#-testing)
 - [Mindmap/Workflow](#mindmapworkflow)
 - [Sample video](#sample-video)
 - [🤝 How to Contribute](#-how-to-contribute)
+- [🔒 Security](#-security)
 - [❓ Need Help?](#-need-help)
 - [💖 Support This Project](#-support-this-project)
 - [🙏 Thanks](#-thanks)
+- [📝 Changelog](#-changelog)
+- [🛠️ Development](#️-development)
 - [📜 License](#-license)
 - [⭐ Star History](#-star-history)
 
@@ -97,9 +109,10 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **Email and Password Leaks**: Searches for leaked emails and credentials ([emailfinder](https://github.com/Josue87/EmailFinder) and [LeakSearch](https://github.com/JoelGMSec/LeakSearch)).
 - **Microsoft 365/Azure Mapping**: Identifies Microsoft 365 and Azure tenants ([msftrecon](https://github.com/Arcanum-Sec/msftrecon)).
 - **Metadata Extraction**: Extracts metadata from indexed office documents ([metagoofil](https://github.com/opsdisk/metagoofil)).
-- **API Leaks**: Detects exposed APIs in public sources ([porch-pirate](https://github.com/MandConsultingGroup/porch-pirate) and [SwaggerSpy](https://github.com/UndeadSec/SwaggerSpy)).
+- **API Leaks**: Detects exposed APIs in public sources ([porch-pirate](https://github.com/MandConsultingGroup/porch-pirate), [SwaggerSpy](https://github.com/UndeadSec/SwaggerSpy) and [postleaksNg](https://github.com/six2dez/postleaksNG)).
 - **Google Dorking**: Automated Google dork queries for sensitive information ([dorks_hunter](https://github.com/six2dez/dorks_hunter) and [xnldorker](https://github.com/xnl-h4ck3r/xnldorker)).
-- **GitHub Analysis**: Scans GitHub organizations for repositories and secrets ([enumerepo](https://github.com/trickest/enumerepo), [trufflehog](https://github.com/trufflesecurity/trufflehog) and [gitleaks](https://github.com/gitleaks/gitleaks)).
+- **GitHub Analysis**: Scans GitHub organizations for repositories and secrets with selectable engines ([enumerepo](https://github.com/trickest/enumerepo), [trufflehog](https://github.com/trufflesecurity/trufflehog), [gitleaks](https://github.com/gitleaks/gitleaks), [titus](https://github.com/praetorian-inc/titus), [noseyparker](https://github.com/praetorian-inc/noseyparker)).
+- **GitHub Actions Audit (Optional)**: Audits workflow artifacts and CI/CD exposure with [gato](https://github.com/praetorian-inc/gato).
 - **Third-Party Misconfigurations**: Identifies misconfigured third-party services ([misconfig-mapper](https://github.com/intigriti/misconfig-mapper)).
 - **Mail Hygiene**: Reviews SPF/DMARC configuration to flag spoofing or deliverability issues.
 - **Cloud Storage Enumeration**: Surveys buckets across major providers for exposure ([cloud_enum](https://github.com/initstring/cloud_enum)).
@@ -111,8 +124,8 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **Certificate Transparency**: Queries certificate transparency logs ([crt](https://github.com/cemulus/crt)).
 - **NOERROR Discovery**: Identifies subdomains with DNS NOERROR responses ([dnsx](https://github.com/projectdiscovery/dnsx), more info [here](https://www.securesystems.de/blog/enhancing-subdomain-enumeration-ents-and-noerror/)).
 - **Bruteforce**: Performs DNS bruteforcing with customizable wordlists ([puredns](https://github.com/d3mondev/puredns) and custom wordlists).
-- **Permutations**: Generates subdomain permutations using AI, regex and tools ([Gotator](https://github.com/Josue87/gotator), [ripgen](https://github.com/resyncgg/ripgen), [regulator](https://github.com/cramppet/regulator) and [subwiz](https://github.com/hadriansecurity/subwiz)).
-- **Web Scraping**: Extracts subdomains from web crawling and JS files ([katana](https://github.com/projectdiscovery/katana)).
+- **Permutations**: Generates subdomain permutations using AI, regex and tools ([Gotator](https://github.com/Josue87/gotator) as the single permutation engine, plus [regulator](https://github.com/cramppet/regulator) and [subwiz](https://github.com/hadriansecurity/subwiz)).
+- **Web Scraping**: Extracts subdomains from passive URL sources and live web metadata ([urlfinder](https://github.com/projectdiscovery/urlfinder), [waymore](https://github.com/xnl-h4ck3r/waymore), [httpx](https://github.com/projectdiscovery/httpx), [csprecon](https://github.com/edoardottt/csprecon)).
 - **DNS Records**: Resolves DNS records for subdomains ([dnsx](https://github.com/projectdiscovery/dnsx)).
 - **Google Analytics**: Identifies subdomains via Analytics IDs ([AnalyticsRelationships](https://github.com/Josue87/AnalyticsRelationships)).
 - **TLS Handshake**: Discovers subdomains via TLS ports ([tlsx](https://github.com/projectdiscovery/tlsx)).
@@ -127,9 +140,10 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **IP Information**: Retrieves geolocation and WHOIS data ([ipinfo](https://www.ipinfo.io/)).
 - **CDN Detection**: Identifies IPs behind CDNs ([cdncheck](https://github.com/projectdiscovery/cdncheck)).
 - **WAF Detection**: Detects Web Application Firewalls ([wafw00f](https://github.com/EnableSecurity/wafw00f)).
-- **Port Scanning**: Active scanning with [nmap](https://github.com/nmap/nmap) and passive scanning with [smap](https://github.com/s0md3v/Smap).
-- **Service Vulnerabilities**: Checks for vulnerabilities in open ports ([vulners](https://github.com/vulnersCom/nmap-vulners)).
-- **Password Spraying**: Attempts password spraying on identified services ([brutespray](https://github.com/x90skysn3k/brutespray)).
+- **Port Scanning**: Active scanning with [nmap](https://github.com/nmap/nmap) (optionally preceded by [naabu](https://github.com/projectdiscovery/naabu)) and passive scanning with [smap](https://github.com/s0md3v/Smap).
+- **Service Fingerprinting**: Fingerprints exposed services on discovered host:port pairs with [fingerprintx](https://github.com/praetorian-inc/fingerprintx).
+- **Service Vulnerabilities (Optional)**: Deep portscan profile can enrich results with CVE matching via [vulners](https://github.com/vulnersCom/nmap-vulners).
+- **Password Spraying**: Attempts password spraying on identified services with engine selection ([brutespray](https://github.com/x90skysn3k/brutespray) or [brutus](https://github.com/praetorian-inc/brutus)).
 - **Geolocation**: Maps IP addresses to geographic locations ([ipinfo](https://www.ipinfo.io/)).
 - **IPv6 Discovery**: Optionally enumerates and scans discovered IPv6 targets when `IPV6_SCAN` is enabled.
 
@@ -139,38 +153,37 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **Screenshots**: Captures screenshots of web pages ([nuclei](https://github.com/projectdiscovery/nuclei)).
 - **Virtual Host Fuzzing**: Identifies virtual hosts by fuzzing HTTP headers ([VhostFinder](https://github.com/wdahlenburg/VhostFinder)).
 - **CMS Detection**: Identifies content management systems ([CMSeeK](https://github.com/Tuhinshubhra/CMSeeK)).
-- **URL Extraction**: Collects URLs passively and actively ([urlfinder](https://github.com/projectdiscovery/urlfinder), [katana](https://github.com/projectdiscovery/katana), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3) and [JSA](https://github.com/w9w/JSA)).
+- **URL Extraction**: Collects URLs passively and actively ([urlfinder](https://github.com/projectdiscovery/urlfinder), [waymore](https://github.com/xnl-h4ck3r/waymore), [katana](https://github.com/projectdiscovery/katana), [github-endpoints](https://gist.github.com/six2dez/d1d516b606557526e9a78d7dd49cacd3) and [JSA](https://github.com/w9w/JSA)).
 - **URL Pattern Analysis**: Classifies URLs using patterns ([urless](https://github.com/xnl-h4ck3r/urless), [gf](https://github.com/tomnomnom/gf) and [gf-patterns](https://github.com/1ndianl33t/Gf-Patterns)).
-- **Favicon Analysis**: Discovers real IPs behind favicons ([fav-up](https://github.com/pielco11/fav-up)).
+- **Favicon Tech Recon**: Identifies technologies from favicon hashes ([favirecon](https://github.com/edoardottt/favirecon)).
 - **JavaScript Analysis**: Extracts secrets and endpoints from JS files ([subjs](https://github.com/lc/subjs), [JSA](https://github.com/w9w/JSA), [xnLinkFinder](https://github.com/xnl-h4ck3r/xnLinkFinder), [getjswords](https://github.com/m4ll0k/BBTz), [mantra](https://github.com/MrEmpy/mantra), [jsluice](https://github.com/BishopFox/jsluice)).
 - **Source Map Extraction**: Retrieves sensitive data from JavaScript source maps ([sourcemapper](https://github.com/denandz/sourcemapper)).
 - **GraphQL Detection**: Discovers GraphQL endpoints with nuclei and optionally performs in-depth introspection ([GQLSpection](https://github.com/doyensec/GQLSpection)).
 - **Parameter Discovery**: Bruteforces hidden parameters on endpoints ([arjun](https://github.com/s0md3v/Arjun)).
 - **WebSocket Auditing**: Validates upgrade handshakes and origin handling on `ws://` and `wss://` endpoints.
 - **gRPC Reflection**: Probes common gRPC ports for exposed service reflection ([grpcurl](https://github.com/fullstorydev/grpcurl)).
+- **LLM Service Fingerprinting (Optional)**: Probes discovered web/API endpoints for exposed LLM services with [julius](https://github.com/praetorian-inc/julius).
 - **Fuzzing**: Performs directory and parameter fuzzing ([ffuf](https://github.com/ffuf/ffuf)).
 - **File Extension Sorting**: Organizes URLs by file extensions.
 - **Wordlist Generation**: Creates custom wordlists for fuzzing.
-- **Password Dictionary**: Generates password dictionaries ([pydictor](https://github.com/LandGrey/pydictor)).
-- **IIS Shortname Scanning**: Detects IIS shortname vulnerabilities ([shortscan](https://github.com/bitquark/shortscan) and [sns](https://github.com/sw33tLie/sns)).
+- **Password Dictionary**: Generates password dictionaries from live content ([cewler](https://github.com/roys/cewler)).
+- **IIS Shortname Scanning**: Detects IIS shortname vulnerabilities ([shortscan](https://github.com/bitquark/shortscan)).
 
 ### Vulnerability Checks
 
 - **CVEs**: Checks for CVE and common vulnerabilites [nuclei](https://github.com/projectdiscovery/nuclei)
+- **Nuclei DAST**: Runs `nuclei -dast` templates over collected URLs and GF candidates for additional DAST coverage.
 - **XSS**: Tests for cross-site scripting vulnerabilities ([dalfox](https://github.com/hahwul/dalfox)).
-- **CORS**: Identifies CORS misconfigurations ([Corsy](https://github.com/s0md3v/Corsy)).
 - **SSL/TLS**: Checks for SSL/TLS misconfigurations ([testssl](https://github.com/drwetter/testssl.sh)).
-- **Open Redirects**: Detects open redirect vulnerabilities ([Oralyzer](https://github.com/r0075h3ll/Oralyzer)).
-- **SSRF**: Tests for server-side request forgery ([interactsh](https://github.com/projectdiscovery/interactsh) and param values with [ffuf](https://github.com/ffuf/ffuf)).
+- **SSRF**: Tests for server-side request forgery ([interactsh](https://github.com/projectdiscovery/interactsh), parameter values with [ffuf](https://github.com/ffuf/ffuf), and optional alternate protocol payloads).
 - **CRLF**: Checks for CRLF injection vulnerabilities ([crlfuzz](https://github.com/dwisiswant0/crlfuzz)).
 - **LFI**: Tests for local file inclusion via fuzzing ([ffuf](https://github.com/ffuf/ffuf)).
-- **SSTI**: Detects server-side template injection ([ffuf](https://github.com/ffuf/ffuf)).
+- **SSTI**: Detects server-side template injection ([TInjA](https://github.com/Hackmanit/TInjA)).
 - **SQLi**: Tests for SQL injection ([SQLMap](https://github.com/sqlmapproject/sqlmap) and [ghauri](https://github.com/r0oth3x49/ghauri)).
-- **Broken Links**: Identifies broken links on web pages ([katana](https://github.com/projectdiscovery/katana)).
+- **Broken Links**: Identifies broken links and external references likely to be takeover-prone ([second-order](https://github.com/mhmdiaa/second-order)).
 - **Command Injection**: Tests for command injection vulnerabilities ([commix](https://github.com/commixproject/commix)).
-- **Prototype Pollution**: Detects JavaScript prototype pollution ([ppmap](https://github.com/kleiton0x00/ppmap)).
 - **HTTP Request Smuggling**: Checks for request smuggling vulnerabilities ([smugglex](https://github.com/hahwul/smugglex)).
-- **Web Cache**: Identifies web cache vulnerabilities ([Web-Cache-Vulnerability-Scanner](https://github.com/Hackmanit/Web-Cache-Vulnerability-Scanner)).
+- **Web Cache**: Identifies web cache vulnerabilities ([Web-Cache-Vulnerability-Scanner](https://github.com/Hackmanit/Web-Cache-Vulnerability-Scanner) and [toxicache](https://github.com/xhzeem/toxicache)).
 - **4XX Bypassing**: Attempts to bypass 4XX responses ([nomore403](https://github.com/devploit/nomore403)).
 - **Parameter Fuzzing**: Fuzzes URL parameters for vulnerabilities ([nuclei](https://github.com/projectdiscovery/nuclei)).
 
@@ -193,7 +206,68 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **Hotlist Builder**: Scores and highlights the riskiest assets (`hotlist.txt`) based on new findings.
 - **Command Tracing**: Toggle `SHOW_COMMANDS` to log every executed command into target logs for debugging.
 - **Asset Store**: Appends findings to `assets.jsonl` for downstream automation when `ASSET_STORE` is enabled.
+- **Consolidated Report**: Auto-generates `report/report.json` and `report/index.html` at end of scan.
 - **ARM Support**: Compatible with Raspberry Pi and ARM architectures (including MacOS MX).
+- **Health Check**: Built-in system health check via `--health-check` (also used by Docker `HEALTHCHECK`).
+- **Incremental Mode**: Only scan new findings since last run (`--incremental`).
+- **Adaptive Rate Limiting**: Automatically back off on 429/503 errors (`--adaptive-rate`).
+- **Structured Logging**: Optional JSON log output for advanced analysis (`STRUCTURED_LOGGING`).
+- **Input Sanitization**: All user input is sanitized to prevent command injection.
+- **Dry-Run Mode**: Preview what would be executed without running commands (`--dry-run`).
+- **Parallel Mode**: Run independent functions in parallel for faster scans (`--parallel`, disable with `--no-parallel`).
+- **Modular Architecture**: Codebase split into 8 focused modules for maintainability.
+- **Secrets Management**: Environment variables, `secrets.cfg`, and Docker runtime secrets (see [SECURITY.md](SECURITY.md)).
+- **Circuit Breaker**: Automatically skips tools after repeated failures to avoid scan hangs.
+- **Checkpoint System**: Resume interrupted scans from the last successful phase.
+- **macOS Native Support**: Full compatibility with macOS (BSD coreutils, Homebrew Bash 4+).
+
+---
+
+## 🏗️ Architecture
+
+reconFTW uses a modular architecture. The main entry point (`reconftw.sh`) handles argument parsing and sources 8 specialized modules from the `modules/` directory.
+
+### Directory Layout
+
+```
+reconftw/
+├── reconftw.sh          # Entry point — arg parsing, module loading, dispatch
+├── reconftw.cfg         # Default configuration
+├── install.sh           # Installer
+├── Makefile             # Data management, lint, fmt, test targets
+├── modules/
+│   ├── core.sh          # Lifecycle, logging, notifications, cleanup (1024 lines)
+│   ├── modes.sh         # Scan modes, argument parsing, help (902 lines)
+│   ├── subdomains.sh    # Subdomain enumeration (1938 lines)
+│   ├── web.sh           # Web analysis, fuzzing, JS checks (1712 lines)
+│   ├── vulns.sh         # Vulnerability scanning (926 lines)
+│   ├── osint.sh         # OSINT functions (500 lines)
+│   ├── axiom.sh         # Axiom/Ax fleet helpers (143 lines)
+│   └── utils.sh         # Utilities, sanitization, validation (508 lines)
+├── tests/
+│   ├── run_tests.sh     # Test runner
+│   ├── unit/            # bats-core unit tests
+│   ├── integration/     # Integration tests
+│   └── fixtures/        # Test data
+├── Docker/
+│   └── Dockerfile       # Official Docker image
+└── Terraform/           # AWS deployment
+```
+
+### Module Reference
+
+| Module | Lines | Purpose |
+|--------|------:|---------|
+| `core.sh` | 1024 | Lifecycle management, logging, notifications, cleanup traps |
+| `modes.sh` | 902 | Scan mode definitions, argument parsing, help output |
+| `subdomains.sh` | 1938 | All subdomain enumeration functions |
+| `web.sh` | 1712 | Web analysis, fuzzing, JS analysis, CMS detection |
+| `vulns.sh` | 926 | Vulnerability scanning (XSS, SQLi, SSRF, etc.) |
+| `osint.sh` | 500 | OSINT functions (WHOIS, emails, dorks, metadata) |
+| `utils.sh` | 508 | Shared utilities, input sanitization, validation |
+| `axiom.sh` | 143 | Axiom/Ax distributed fleet management |
+
+The `--source-only` flag allows sourcing `reconftw.sh` without executing the main logic, enabling unit testing of individual functions.
 
 ---
 
@@ -282,7 +356,31 @@ cd reconftw
 4. **Customization**:
    - Modify the Docker image or build your own; see the [Docker Guide](https://github.com/six2dez/reconftw/wiki/4.-Docker).
    - To skip Axiom tooling in custom builds, pass `--build-arg INSTALL_AXIOM=false`.
-   - Mount your notify config at `~/.config/notify/providerconfig.yaml` inside the container if you use notifications.
+   - Mount your notify config at `~/.config/notify/provider-config.yaml` inside the container if you use notifications.
+
+5. **Secrets at Runtime**:
+
+   Pass API keys and secrets via environment variables — never bake them into the image:
+
+   ```bash
+   docker run -it --rm \
+     -e SHODAN_API_KEY="your-key" \
+     -e PDCP_API_KEY="your-projectdiscovery-key" \
+     -e COLLAB_SERVER="your-server" \
+     -e XSS_SERVER="your-server" \
+     -v "${PWD}/OutputFolder/:/reconftw/Recon/" \
+     six2dez/reconftw:main -d example.com -r
+   ```
+
+   See [SECURITY.md](SECURITY.md) for full secrets management guidance.
+
+6. **Health Check**:
+
+   The Docker image includes a built-in `HEALTHCHECK` that runs `./reconftw.sh --health-check` every 60 seconds. You can also run it manually:
+
+   ```bash
+   docker exec <container-id> ./reconftw.sh --health-check
+   ```
 
 ### Terraform + Ansible
 
@@ -305,6 +403,7 @@ cd reconftw
 - GitHub tokens: `~/Tools/.github_tokens` (one per line)
 - GitLab tokens: `~/Tools/.gitlab_tokens` (one per line)
 - WHOISXML: set `WHOISXML_API` in `reconftw.cfg` or env var
+- ASN enumeration (`asnmap`): set `PDCP_API_KEY` in env/config (`ASN_ENUM` skips if unset)
 - Slack/Discord/Telegram: configure `notify` in `~/.config/notify/provider-config.yaml`
 - SSRF server: set `COLLAB_SERVER` env/cfg if used
 - Blind XSS server: set `XSS_SERVER` env/cfg if used
@@ -321,14 +420,19 @@ cd reconftw
 The `reconftw.cfg` file controls the entire execution of reconFTW. It allows fine-grained customization of:
 
 - **Tool Paths**: Set paths for tools, resolvers, and wordlists (`tools`, `resolvers`, `fuzz_wordlist`).
-- **API Keys**: Configure keys for Shodan, WHOISXML, etc. (uncomment and set in `reconftw.cfg`).
+- **API Keys**: Configure keys for Shodan, WHOISXML, etc. via environment variables or `secrets.cfg` (see [SECURITY.md](SECURITY.md)).
 - **Scanning Modes**: Enable/disable modules (e.g., `OSINT`, `SUBDOMAINS_GENERAL`, `VULNS_GENERAL`).
 - **Performance**: Adjust threads, rate limits, and timeouts (e.g., `FFUF_THREADS`, `HTTPX_RATELIMIT`).
+- **Adaptive Rate Limiting**: Automatically back off on 429/503 errors (`ADAPTIVE_RATE_LIMIT`, `MIN_RATE_LIMIT`, `MAX_RATE_LIMIT`).
+- **Incremental Scanning**: Only scan new findings since last run (`INCREMENTAL_MODE`).
 - **Notifications**: Set up Slack, Discord, or Telegram notifications (`NOTIFY_CONFIG`).
-- **Axiom**: Configure distributed scanning (`AXIOM_FLEET_NAME`, `AXIOM_FLEET_COUNT`).
-- **AI Reporting**: Select AI model and report format (`AI_MODEL`, `AI_REPORT_TYPE`).
+- **Axiom**: Configure distributed scanning and resolver paths (`AXIOM_FLEET_NAME`, `AXIOM_FLEET_COUNT`, `AXIOM_RESOLVERS_PATH`).
+- **AI Reporting**: Configure model/profile/format and context controls (`AI_MODEL`, `AI_REPORT_PROFILE`, `AI_REPORT_TYPE`, `AI_MAX_CHARS_PER_FILE`).
 - **Advanced Web Checks**: Toggle GraphQL introspection, parameter discovery, WebSocket testing, gRPC probing, and IPv6 scanning.
 - **Automation & Data**: Control quick rescan heuristics, asset logging, chunk sizes, hotlists, and debug tracing (`QUICK_RESCAN`, `ASSET_STORE`, `CHUNK_LIMIT`, `HOTLIST_TOP`, `SHOW_COMMANDS`).
+- **Disk & Logging**: Pre-flight disk check (`MIN_DISK_SPACE_GB`), log rotation (`MAX_LOG_FILES`, `MAX_LOG_AGE_DAYS`), structured JSON logging (`STRUCTURED_LOGGING`).
+- **Caching**: Configure cache expiry for wordlists and resolvers (`CACHE_MAX_AGE_DAYS`).
+- **Secrets**: Use `secrets.cfg` for local overrides or environment variables for CI/Docker (see [SECURITY.md](SECURITY.md)).
 
 **Example Configuration**:
 
@@ -339,7 +443,13 @@ The `reconftw.cfg` file controls the entire execution of reconFTW. It allows fin
 
 # General values
 tools=$HOME/Tools   # Path installed tools
-SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )" # Get current script's path
+if [[ -z "${SCRIPTPATH:-}" ]]; then
+	if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+		SCRIPTPATH="$( cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 ; pwd -P )" # Get current script's path
+	else
+		SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )" # Get current script's path
+	fi
+fi
 _detected_shell="${SHELL:-/bin/bash}"
 profile_shell=".$(basename "${_detected_shell}")rc" # Get current shell profile
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -347,17 +457,50 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 else
 	reconftw_version="standalone"
 fi # Fetch current reconftw version
+DATA_DIR="${SCRIPTPATH}/data"
+WORDLISTS_DIR="${DATA_DIR}/wordlists"
+PATTERNS_DIR="${DATA_DIR}/patterns"
 generate_resolvers=false # Generate custom resolvers with dnsvalidator
 update_resolvers=true # Fetch and rewrite resolvers from trickest/resolvers before DNS resolution
 resolvers_url="https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt"
 resolvers_trusted_url="https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw/trusted_resolvers.txt"
-fuzzing_remote_list="https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt" # Used to send to axiom(if used) on fuzzing 
+fuzzing_remote_list="https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt" # Used to send to axiom(if used) on fuzzing
 proxy_url="http://127.0.0.1:8080/" # Proxy url
 install_golang=true # Set it to false if you already have Golang configured and ready
 upgrade_tools=true
 upgrade_before_running=false # Upgrade tools before running
 #dir_output=/custom/output/path
-SHOW_COMMANDS=false # Log every executed command to the per-target log (verbose; may include sensitive data)
+SHOW_COMMANDS=false # Set true to log every executed command to the per-target log (verbose; may include sensitive data)
+MIN_DISK_SPACE_GB=0 # Minimum required disk space in GB before starting reconnaissance (0 to disable check)
+
+# Incremental mode configuration
+INCREMENTAL_MODE=false # Only scan new findings since last run (use --incremental flag to enable)
+MONITOR_MODE=false # Continuous monitor mode (enabled by --monitor)
+MONITOR_INTERVAL_MIN=60 # Minutes between monitoring cycles
+MONITOR_MAX_CYCLES=0 # 0 = run forever until interrupted
+ALERT_SUPPRESSION=true # Suppress repeated monitor alerts by fingerprint history
+ALERT_SEEN_FILE=".incremental/alerts_seen.hashes" # Store of seen alert fingerprints
+
+# Adaptive rate limiting configuration
+ADAPTIVE_RATE_LIMIT=false # Automatically adjust rate limits when encountering 429/503 errors (use --adaptive-rate flag to enable)
+MIN_RATE_LIMIT=10 # Minimum rate limit (requests per second)
+MAX_RATE_LIMIT=500 # Maximum rate limit (requests per second)
+RATE_LIMIT_BACKOFF_FACTOR=0.5 # Multiply rate by this when errors occur (0.5 = half speed)
+RATE_LIMIT_INCREASE_FACTOR=1.2 # Multiply rate by this on success (1.2 = 20% faster)
+
+# Cache configuration
+CACHE_MAX_AGE_DAYS=30 # Maximum age in days for cached wordlists/resolvers (30 = 1 month)
+CACHE_MAX_AGE_DAYS_RESOLVERS=7 # Resolver cache TTL
+CACHE_MAX_AGE_DAYS_WORDLISTS=30 # Wordlist cache TTL
+CACHE_MAX_AGE_DAYS_TOOLS=14 # Tool cache TTL
+CACHE_REFRESH=false # Force-refresh cache (or use --refresh-cache)
+
+# Log rotation
+MAX_LOG_FILES=10       # Maximum number of log files to keep per target
+MAX_LOG_AGE_DAYS=30    # Delete log files older than this many days
+
+# Structured logging configuration (JSON format)
+STRUCTURED_LOGGING=false # Enable JSON structured logging for advanced log analysis
 
 # Golang Vars (Comment or change on your own)
 export GOROOT="${GOROOT:-/usr/local/go}"
@@ -385,13 +528,16 @@ GITHUB_TOKENS=${tools}/.github_tokens
 GITLAB_TOKENS=${tools}/.gitlab_tokens
 #CUSTOM_CONFIG=custom_config_path.txt # In case you use a custom config file, uncomment this line and set your files path
 
-# APIs/TOKENS - Uncomment the lines you want removing the '#' at the beginning of the line
-#SHODAN_API_KEY="XXXXXXXXXXXXX"
-#WHOISXML_API="XXXXXXXXXX"
-#XSS_SERVER="XXXXXXXXXXXXXXXXX"
-#COLLAB_SERVER="XXXXXXXXXXXXXXXXX"
-#slack_channel="XXXXXXXX"
-#slack_auth="xoXX-XXX-XXX-XXX"
+# APIs/TOKENS - Set via environment variables (preferred) or uncomment and edit below.
+# Environment variables take precedence if set.
+SHODAN_API_KEY="${SHODAN_API_KEY:-}"
+WHOISXML_API="${WHOISXML_API:-}"
+PDCP_API_KEY="${PDCP_API_KEY:-}"
+XSS_SERVER="${XSS_SERVER:-}"
+COLLAB_SERVER="${COLLAB_SERVER:-}"
+slack_channel="${slack_channel:-}"
+slack_auth="${slack_auth:-}"
+# For additional secrets, create a secrets.cfg file (gitignored) and it will be auto-sourced
 
 # File descriptors
 DEBUG_STD="&>/dev/null" # Skips STD output on installer
@@ -403,15 +549,22 @@ GOOGLE_DORKS=true
 GITHUB_DORKS=true
 GITHUB_REPOS=true
 METADATA=true # Fetch metadata from indexed office documents
-EMAILS=true # Fetch emails from differents sites 
+EMAILS=true # Fetch emails from differents sites
 DOMAIN_INFO=true # whois info
 IP_INFO=true    # Reverse IP search, geolocation and whois
 API_LEAKS=true # Check for API leaks
+API_LEAKS_POSTLEAKS=true # Enhance API leaks with postleaksNg
 THIRD_PARTIES=true # Check for 3rd parties misconfigs
 SPOOF=true # Check spoofable domains
-METAFINDER_LIMIT=20 # Max 250
 MAIL_HYGIENE=true # Check DMARC/SPF records
 CLOUD_ENUM=true # Enumerate cloud storage across providers with cloud_enum
+GITHUB_LEAKS=true # Search for leaked secrets across GitHub with ghleaks
+GHLEAKS_THREADS=5 # Concurrent download threads for ghleaks
+SECRETS_ENGINE="gitleaks" # gitleaks|titus|noseyparker|hybrid
+SECRETS_SCAN_GIT_HISTORY=false # Include git history scans when supported
+SECRETS_VALIDATE=false # Validate detected secrets when supported (titus)
+GITHUB_ACTIONS_AUDIT=false # Audit GitHub Actions artifacts/workflows with gato
+GATO_INCLUDE_ALL_ARTIFACT_SECRETS=false # Include noisy artifact secret matches in gato output
 
 # Subdomains
 SUBDOMAINS_GENERAL=true # Enable or disable the whole Subdomains module
@@ -421,12 +574,13 @@ CTR_LIMIT=999999 # Limit the number of results
 SUBNOERROR=false # Check DNS NOERROR response and BF on them
 SUBANALYTICS=true # Google Analytics search
 SUBBRUTE=true # DNS bruteforcing
-SUBSCRAPING=true # Subdomains extraction from web crawling
+SUBSCRAPING=true # Subdomains extraction from passive URLs and live web metadata
 SUBPERMUTE=true # DNS permutations
 SUBIAPERMUTE=true # Permutations by AI analysis
 SUBREGEXPERMUTE=true # Permutations by regex analysis
-PERMUTATIONS_OPTION=gotator # The alternative is "ripgen" (faster, not deeper)
 GOTATOR_FLAGS=" -depth 1 -numbers 3 -mindup -adv -md" # Flags for gotator
+PERMUTATIONS_WORDLIST_MODE=auto # auto|full|short (auto: short if subs > threshold, full if DEEP)
+PERMUTATIONS_SHORT_THRESHOLD=100 # Use short wordlist when subdomain count exceeds this
 SUBTAKEOVER=true # Check subdomain takeovers, false by default cuz nuclei already check this
 SUB_RECURSIVE_PASSIVE=false # Uses a lot of API keys queries
 DEEP_RECURSIVE_PASSIVE=10 # Number of top subdomains for recursion
@@ -435,7 +589,7 @@ ZONETRANSFER=true # Check zone transfer
 S3BUCKETS=true # Check S3 buckets misconfigs
 REVERSE_IP=false # Check reverse IP subdomain search (set True if your target is CIDR/IP)
 TLS_PORTS="21,22,25,80,110,135,143,261,271,324,443,448,465,563,614,631,636,664,684,695,832,853,854,990,993,989,992,994,995,1129,1131,1184,2083,2087,2089,2096,2221,2252,2376,2381,2478,2479,2482,2484,2679,2762,3077,3078,3183,3191,3220,3269,3306,3410,3424,3471,3496,3509,3529,3539,3535,3660,36611,3713,3747,3766,3864,3885,3995,3896,4031,4036,4062,4064,4081,4083,4116,4335,4336,4536,4590,4740,4843,4849,5443,5007,5061,5321,5349,5671,5783,5868,5986,5989,5990,6209,6251,6443,6513,6514,6619,6697,6771,7202,7443,7673,7674,7677,7775,8243,8443,8991,8989,9089,9295,9318,9443,9444,9614,9802,10161,10162,11751,12013,12109,14143,15002,16995,41230,16993,20003"
-INSCOPE=false # Uses inscope tool to filter the scope, requires .scope file in reconftw folder 
+INSCOPE=false # Uses inscope tool to filter the scope, requires .scope file in reconftw folder
 
 # Web detection
 WEBPROBESIMPLE=true # Web probing on 80/443
@@ -445,13 +599,24 @@ VIRTUALHOSTS=false # Check virtualhosts by fuzzing HOST header
 UNCOMMON_PORTS_WEB="81,300,591,593,832,981,1010,1311,1099,2082,2095,2096,2480,3000,3001,3002,3003,3128,3333,4243,4567,4711,4712,4993,5000,5104,5108,5280,5281,5601,5800,6543,7000,7001,7396,7474,8000,8001,8008,8014,8042,8060,8069,8080,8081,8083,8088,8090,8091,8095,8118,8123,8172,8181,8222,8243,8280,8281,8333,8337,8443,8500,8834,8880,8888,8983,9000,9001,9043,9060,9080,9090,9091,9092,9200,9443,9502,9800,9981,10000,10250,11371,12443,15672,16080,17778,18091,18092,20720,32000,55440,55672"
 
 # Host
-FAVICON=true # Check Favicon domain discovery
-PORTSCANNER=true # Enable or disable the whole Port scanner module 
+FAVIRECON=true # Favicon-based technology recon for discovered web targets
+PORTSCANNER=true # Enable or disable the whole Port scanner module
 GEO_INFO=true # Fetch Geolocalization info
 PORTSCAN_PASSIVE=true # Port scanner with Shodan
 PORTSCAN_ACTIVE=true # Port scanner with nmap
-PORTSCAN_ACTIVE_OPTIONS="--top-ports 200 -sV -n -Pn --open --max-retries 2 --script vulners"
+PORTSCAN_ACTIVE_OPTIONS="--top-ports 200 -sV -n -Pn --open --max-retries 2"
+PORTSCAN_DEEP_OPTIONS="--top-ports 1000 -sV -n -Pn --open --max-retries 2 --script vulners"
+PORTSCAN_STRATEGY=legacy # legacy|naabu_nmap
+NAABU_ENABLE=true
+NAABU_RATE=1000
+NAABU_PORTS="--top-ports 1000"
+SERVICE_FINGERPRINT=true # Fingerprint exposed services with fingerprintx
+SERVICE_FINGERPRINT_ENGINE="fingerprintx" # fingerprintx
+SERVICE_FINGERPRINT_TIMEOUT_MS=2000 # fingerprintx timeout per target (ms)
+PORTSCAN_UDP=false
+PORTSCAN_UDP_OPTIONS="--top-ports 20 -sU -sV -n -Pn --open"
 CDN_IP=true # Check which IPs belongs to CDN
+CDN_BYPASS=true # Try origin IP discovery on CDN-fronted hosts with hakoriginfinder
 
 # Web analysis
 WAF_DETECTION=true # Detect WAFs
@@ -460,43 +625,52 @@ NUCLEI_TEMPLATES_PATH="$HOME/nuclei-templates" # Set nuclei templates path
 NUCLEI_SEVERITY="info,low,medium,high,critical" # Set templates criticity
 NUCLEI_EXTRA_ARGS="" # Additional nuclei extra flags, don't set the severity here but the exclusions like " -etags openssh"
 #NUCLEI_EXTRA_ARGS="-etags openssh,ssl -eid node-express-dev-env,keycloak-xss,CVE-2023-24044,CVE-2021-20323,header-sql,header-reflection" # Additional nuclei extra flags, don't set the severity here but the exclusions like " -etags openssh"
-NUCLEI_FLAGS="-silent -retries 2" # Additional nuclei extra flags, don't set the severity here but the exclusions like " -etags openssh"
-NUCLEI_FLAGS_JS="-silent -tags exposure,token -severity info,low,medium,high,critical" # Additional nuclei extra flags for js secrets
+NUCLEI_DAST=true # Run additional nuclei -dast module over webs/urls/gf candidates (forced on when VULNS_GENERAL=true, e.g. -a)
 URL_CHECK=true # Enable or disable URL collection
 URL_CHECK_PASSIVE=true # Search for urls, passive methods from Archive, OTX, CommonCrawl, etc
 URL_CHECK_ACTIVE=true # Search for urls by crawling the websites
+WAYMORE_TIMEOUT=30m # Timeout for waymore passive URL collection
+WAYMORE_LIMIT=5000 # Optional URL collection limit for waymore
 URL_GF=true # Url patterns classification
 URL_EXT=true # Returns a list of files divided by extension
 JSCHECKS=true # JS analysis
 FUZZ=true # Web fuzzing
+FUZZ_RECURSION_DEPTH=2 # ffuf recursion depth used in DEEP mode
 IIS_SHORTNAME=true
 CMS_SCANNER=true # CMS scanner
 WORDLIST=true # Wordlist generation
 ROBOTSWORDLIST=true # Check historic disallow entries on waybackMachine
 PASSWORD_DICT=true # Generate password dictionary
+PASSWORD_DICT_ENGINE=cewler # cewler|pydictor
 PASSWORD_MIN_LENGTH=5 # Min password length
 PASSWORD_MAX_LENGTH=14 # Max password length
+KATANA_HEADLESS_PROFILE=off # off|smart|full
 CLOUDHUNTER_PERMUTATION=NORMAL # Options: DEEP (very slow), NORMAL (slow), NONE 
 
 # Vulns
 VULNS_GENERAL=false # Enable or disable the vulnerability module (very intrusive and slow)
 XSS=true # Check for xss with dalfox
-CORS=true # CORS misconfigs
 TEST_SSL=true # SSL misconfigs
-OPEN_REDIRECT=true # Check open redirects
 SSRF_CHECKS=true # SSRF checks
 CRLF_CHECKS=true # CRLF checks
 LFI=true # LFI by fuzzing
 SSTI=true # SSTI by fuzzing
+SSTI_ENGINE="TInjA" # SSTI engine
 SQLI=true # Check SQLI
 SQLMAP=true # Check SQLI with sqlmap
 GHAURI=false # Check SQLI with ghauri
 BROKENLINKS=true # Check for brokenlinks
+BROKENLINKS_ENGINE="second-order" # Broken links engine
 SPRAY=true # Performs password spraying
+SPRAY_ENGINE="brutespray" # brutespray|brutus
+SPRAY_BRUTUS_ONLY_DEEP=true # Run brutus only in DEEP mode unless disabled
+BRUTUS_USERNAMES="" # Optional comma-separated usernames for brutus
+BRUTUS_PASSWORDS="" # Optional comma-separated passwords for brutus
+BRUTUS_KEY_FILE="" # Optional SSH private key path for brutus
 COMM_INJ=true # Check for command injections with commix
-PROTO_POLLUTION=true # Check for prototype pollution flaws
 SMUGGLING=true # Check for HTTP request smuggling flaws
 WEBCACHE=true # Check for Web Cache issues
+WEBCACHE_TOXICACHE=true # Complement web cache checks with toxicache
 BYPASSER4XX=true # Check for 4XX bypasses
 FUZZPARAMS=true # Fuzz parameters values
 
@@ -518,20 +692,22 @@ HTTPX_FLAGS=" -follow-redirects -random-agent -status-code -silent -title -web-s
 # HTTP options
 HEADER="User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" # Default header
 
-# Threads
-FFUF_THREADS=40
-HTTPX_THREADS=50
-HTTPX_UNCOMMONPORTS_THREADS=100
-KATANA_THREADS=20
-BRUTESPRAY_THREADS=20
-BRUTESPRAY_CONCURRENCE=10
-DNSTAKE_THREADS=100
-DALFOX_THREADS=200
+# Threads (auto-scaled based on CPU cores, override to set fixed values)
+AVAILABLE_CORES=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+FFUF_THREADS=$((AVAILABLE_CORES * 10))
+HTTPX_THREADS=$((AVAILABLE_CORES * 12))
+HTTPX_UNCOMMONPORTS_THREADS=$((AVAILABLE_CORES * 25))
+KATANA_THREADS=$((AVAILABLE_CORES * 5))
+BRUTESPRAY_CONCURRENCE=$((AVAILABLE_CORES * 2))
+DNSTAKE_THREADS=$((AVAILABLE_CORES * 25))
+DALFOX_THREADS=$((AVAILABLE_CORES * 50))
+DNS_RESOLVER=auto # auto|puredns|dnsx (auto: detects NAT/CGNAT → dnsx for home, puredns for VPS)
 PUREDNS_PUBLIC_LIMIT=0 # Set between 2000 - 10000 if your router blows up, 0 means unlimited
 PUREDNS_TRUSTED_LIMIT=400
 PUREDNS_WILDCARDTEST_LIMIT=30
 PUREDNS_WILDCARDBATCH_LIMIT=1500000
-RESOLVE_DOMAINS_THREADS=150
+DNSX_THREADS=25 # Threads for dnsx when behind NAT (safe for home routers)
+DNSX_RATE_LIMIT=100 # QPS for dnsx
 DNSVALIDATOR_THREADS=200
 INTERLACE_THREADS=10
 TLSX_THREADS=1000
@@ -551,15 +727,19 @@ HTTPX_UNCOMMONPORTS_TIMEOUT=10  # Seconds
 PERMUTATIONS_LIMIT=21474836480  # Bytes, default is 20 GB
 
 # lists
-fuzz_wordlist=${tools}/fuzz_wordlist.txt
-lfi_wordlist=${tools}/lfi_wordlist.txt
-ssti_wordlist=${tools}/ssti_wordlist.txt
-subs_wordlist=${tools}/subdomains.txt
+fuzz_wordlist=${WORDLISTS_DIR}/fuzz_wordlist.txt
+lfi_wordlist=${WORDLISTS_DIR}/lfi_wordlist.txt
+ssti_wordlist=${WORDLISTS_DIR}/ssti_wordlist.txt
+subs_wordlist=${WORDLISTS_DIR}/subdomains.txt
 subs_wordlist_big=${tools}/subdomains_n0kovo_big.txt
+headers_inject=${WORDLISTS_DIR}/headers_inject.txt
 resolvers=${tools}/resolvers.txt
 resolvers_trusted=${tools}/resolvers_trusted.txt
 
 # Axiom Fleet
+# Resolver paths on Axiom instances (change if your fleet uses a different home dir)
+AXIOM_RESOLVERS_PATH="/home/op/lists/resolvers.txt"
+AXIOM_RESOLVERS_TRUSTED_PATH="/home/op/lists/resolvers_trusted.txt"
 # Will not start a new fleet if one exist w/ same name and size (or larger)
 # AXIOM=false Uncomment only to overwrite command line flags
 AXIOM_FLEET_LAUNCH=true # Enable or disable spin up a new fleet, if false it will use the current fleet with the AXIOM_FLEET_NAME prefix
@@ -567,6 +747,7 @@ AXIOM_FLEET_NAME="reconFTW" # Fleet's prefix name
 AXIOM_FLEET_COUNT=10 # Fleet's number
 AXIOM_FLEET_REGIONS="eu-central" # Fleet's region
 AXIOM_FLEET_SHUTDOWN=true # # Enable or disable delete the fleet after the execution
+AXIOM_AUTO_FIX_HOSTKEY=true # Auto-repair known_hosts entries on SSH host-key mismatch before fallback to local mode
 # This is a script on your reconftw host that might prep things your way...
 #AXIOM_POST_START="~/Tools/axiom_config.sh" # Useful  to send your config files to the fleet
 AXIOM_EXTRA_ARGS="" # Leave empty if you don't want to add extra arguments
@@ -574,21 +755,27 @@ AXIOM_EXTRA_ARGS="" # Leave empty if you don't want to add extra arguments
 
 # Faraday-Server
 FARADAY=false # Enable or disable Faraday integration
-FARADAY_SERVER="http://localhost:5985" # Faraday server address
-FARADAY_USER="faraday" # Faraday user
-FARADAY_PASS="FARADAY_PASSWORD" # Faraday password
 FARADAY_WORKSPACE="reconftw" # Faraday workspace
 
 # AI
+AI_EXECUTABLE="python3" # Python executable fallback if reconftw_ai venv python is not available
 AI_MODEL="llama3:8b" # Model to use
 AI_REPORT_TYPE="md" # Report type to use (md, txt)
 AI_REPORT_PROFILE="bughunter" # Report profile to use (executive, brief, or bughunter)
+AI_PROMPTS_FILE="" # Optional custom prompts file (empty uses reconftw_ai default)
+AI_MAX_CHARS_PER_FILE=50000 # Max chars loaded per file before truncation
+AI_MAX_FILES_PER_CATEGORY=200 # Max files loaded per category for AI context
+AI_REDACT=true # Redact sensitive indicators before AI analysis
+AI_ALLOW_MODEL_PULL=false # Allow reconftw_ai to auto-pull missing model
+AI_STRICT=false # Fail AI analysis if one or more categories have no data
 
 # API & Advanced Web Checks
 GRAPHQL_CHECK=true # Detect GraphQL endpoints and introspection
 GQLSPECTION=false # Run GQLSpection deep introspection on detected GraphQL endpoints (heavier)
 PARAM_DISCOVERY=true # Parameter discovery with arjun
 GRPC_SCAN=false # Attempt basic gRPC reflection on common ports
+LLM_PROBE=false # Probe discovered web/API endpoints for LLM services with julius
+LLM_PROBE_AUGUSTUS=false # Include augustus generator config in julius output
 
 # IPv6
 IPV6_SCAN=true # Attempt IPv6 discovery/portscan where addresses exist
@@ -598,15 +785,15 @@ ARJUN_THREADS=10
 
 # Data & Automation
 ASSET_STORE=true # Append assets/findings to assets.jsonl
+EXPORT_FORMAT="" # Optional exporter at end of scan: json|html|csv|all
+REPORT_ONLY=false # Rebuild report artifacts from existing results (or use --report-only)
 QUICK_RESCAN=false # Skip heavy steps if no new subdomains/webs
 CHUNK_LIMIT=2000 # Split very large lists into chunks (urls, webs)
 HOTLIST_TOP=50 # Number of top risky assets to highlight
 
 # Performance
 RESOLVER_IQ=false # Prefer fast/healthy resolvers (experimental)
-
-# Intrusive controls (keep false by default)
-INTRUSIVE=false # Enable intrusive cloud write/CORS tests (dangerous)
+PERF_PROFILE="balanced" # low|balanced|max
 
 # Estimated durations for skipped heavy modules (seconds)
 TIME_EST_NUCLEI=600
@@ -665,16 +852,28 @@ reconFTW supports multiple modes and options for flexible reconnaissance. Use th
 
 ### General Options
 
-| Flag            | Description                                    |
-| --------------- | ---------------------------------------------- |
-| `--deep`        | Enable deep scanning (slower, VPS recommended) |
-| `-f`            | Custom configuration file path                 |
-| `-o`            | Output directory for results                   |
-| `-v`            | Enable Axiom distributed scanning              |
-| `-q`            | Set rate limit (requests per second)           |
-| `-y`            | Enables AI results analysis                    |
-| `--check-tools` | Exit if required tools are missing             |
-| `--quick-rescan` | Skip heavy modules when no new subs/webs are found |
+| Flag              | Description                                              |
+| ----------------- | -------------------------------------------------------- |
+| `--deep`          | Enable deep scanning (slower, VPS recommended)           |
+| `-f`              | Custom configuration file path                           |
+| `-o`              | Output directory for results                             |
+| `-v`              | Enable Axiom distributed scanning                        |
+| `-q`              | Set rate limit (requests per second)                     |
+| `-y`              | Enables AI results analysis                              |
+| `--check-tools`   | Exit if required tools are missing                       |
+| `--quick-rescan`  | Skip heavy modules when no new subs/webs are found       |
+| `--health-check`  | Run system health check and exit                         |
+| `--incremental`   | Only scan new findings since last run                    |
+| `--adaptive-rate` | Automatically adjust rate limits on errors (429/503)     |
+| `--dry-run`       | Show what would be executed without running commands     |
+| `--parallel`      | Run independent functions in parallel (faster, more RAM) |
+| `--no-parallel`   | Force sequential execution even if parallel is enabled   |
+| `--monitor`       | Continuous monitoring mode (single target; `-w` supports `-l`) |
+| `--monitor-interval` | Minutes between monitor cycles                        |
+| `--monitor-cycles`   | Stop after N cycles (0 = infinite)                    |
+| `--report-only`   | Rebuild report artifacts without scanning                |
+| `--refresh-cache` | Force refresh of cached resolvers/wordlists              |
+| `--export`        | Export artifacts: `json`, `html`, `csv`, or `all`        |
 
 ### Example Usage
 
@@ -696,27 +895,58 @@ reconFTW supports multiple modes and options for flexible reconnaissance. Use th
    ./reconftw.sh -d target.com -r --deep
    ```
 
-4. **Multi-Domain Recon**:
+4. **Parallel Mode (Faster, requires more RAM)**:
+
+   ```bash
+   ./reconftw.sh -d target.com -r --parallel
+   ```
+
+5. **Force Sequential Mode**:
+
+   ```bash
+   ./reconftw.sh -d target.com -r --no-parallel
+   ```
+6. **Multi-Domain Recon**:
 
    ```bash
    ./reconftw.sh -m company -l domains.txt -r
    ```
 
-5. **Axiom Integration**:
+7. **Axiom Integration**:
 
    ```bash
    ./reconftw.sh -d target.com -r -v
    ```
 
-6. **Full Recon with Attacks (YOLO Mode)**:
+8. **Full Recon with Attacks (YOLO Mode)**:
 
    ```bash
    ./reconftw.sh -d target.com -a
    ```
 
-7. **Show Help**:
+9. **Show Help**:
    ```bash
    ./reconftw.sh -h
+   ```
+
+10. **Force cache refresh**:
+   ```bash
+   ./reconftw.sh -d target.com -r --refresh-cache
+   ```
+
+11. **Export all report artifacts**:
+   ```bash
+   ./reconftw.sh -d target.com -r --export all
+   ```
+
+12. **Continuous monitoring (every 30m, 48 cycles)**:
+   ```bash
+   ./reconftw.sh -d target.com -r --monitor --monitor-interval 30 --monitor-cycles 48
+   ```
+
+13. **Rebuild reports only (no scan):**
+   ```bash
+   ./reconftw.sh -d target.com --report-only --export all
    ```
 
 **Full Guide**: See the [Usage Guide](https://github.com/six2dez/reconftw/wiki/2.-Usage-Guide).
@@ -745,7 +975,7 @@ reconFTW integrates with [Ax](https://github.com/attacksurge/ax) for distributed
 
 reconFTW integrates with [Faraday](https://faradaysec.com/) for web-based reporting and vulnerability management.
 
-- **Setup**: Install Faraday, authenticate via `faraday-cli`, and configure the workspace in `reconftw.cfg` (`FARADAY_SERVER`, `FARADAY_USER`, `FARADAY_PASS`, `FARADAY_WORKSPACE`).
+- **Setup**: Install Faraday, authenticate via `faraday-cli`, and configure the workspace in `reconftw.cfg` (`FARADAY_WORKSPACE`).
 - **Usage**: Enable with `FARADAY=true` in `reconftw.cfg`.
 
 ---
@@ -757,13 +987,22 @@ reconFTW uses AI to generate detailed reports from scan results with the tool [r
 - **Model**: Configurable AI model (e.g., `llama3:8b` via `AI_MODEL`).
 - **Report Types**: Markdown or plain text (`AI_REPORT_TYPE`).
 - **Profiles**: Executive, brief, or bug hunter (`AI_REPORT_PROFILE`).
+- **Structured Output**: `reconftw` stores a machine-readable report in `ai_result/reconftw_analysis.json`.
+- **Context Controls**: Bound input size using `AI_MAX_CHARS_PER_FILE` and `AI_MAX_FILES_PER_CATEGORY`.
+- **Safety Controls**: Toggle redaction and strict mode with `AI_REDACT` and `AI_STRICT`.
 
 **Example**:
 
 ```yaml
+AI_EXECUTABLE="python3"
 AI_MODEL="llama3:8b"
 AI_REPORT_TYPE="md"
 AI_REPORT_PROFILE="bughunter"
+AI_MAX_CHARS_PER_FILE=50000
+AI_MAX_FILES_PER_CATEGORY=200
+AI_REDACT=true
+AI_ALLOW_MODEL_PULL=false
+AI_STRICT=false
 ```
 
 ---
@@ -799,8 +1038,15 @@ Use the provided `Makefile` for easy repository management (requires [GitHub CLI
 4. **Lint / Format Scripts**:
 
    ```bash
-   make lint   # shellcheck for install.sh & reconftw.sh (best effort)
+   make lint   # shellcheck for reconftw.sh, modules/*.sh & install.sh
    make fmt    # shfmt with project defaults
+   ```
+
+5. **Run Tests**:
+
+   ```bash
+   make test       # unit tests (bats-core)
+   make test-all   # unit + integration tests
    ```
 
 ### Manual
@@ -833,6 +1079,92 @@ Use the provided `Makefile` for easy repository management (requires [GitHub CLI
 
 ---
 
+## 🧪 Testing
+
+reconFTW uses [bats-core](https://github.com/bats-core/bats-core) for automated testing.
+
+### Install bats-core
+
+```bash
+# macOS
+brew install bats-core
+
+# Debian/Ubuntu
+apt install bats
+
+# From source
+git clone https://github.com/bats-core/bats-core.git /tmp/bats
+sudo /tmp/bats/install.sh /usr/local
+```
+
+### Running Tests
+
+```bash
+# Unit tests only
+make test
+
+# Unit + integration tests
+make test-all
+
+# Via the runner script
+./tests/run_tests.sh         # unit only
+./tests/run_tests.sh --all   # unit + integration
+```
+
+### Test Directory Structure
+
+```
+tests/
+├── run_tests.sh        # Test runner script
+├── unit/               # Unit tests (fast, no network)
+│   ├── test_sanitize.bats
+│   ├── test_utils.bats
+│   └── test_validation.bats
+├── integration/        # Integration tests (require installed tools)
+│   └── test_smoke.bats
+├── security/           # Security tests (injection, etc.)
+│   └── test_injection.bats
+├── mocks/              # Mock tools for offline testing
+└── fixtures/           # Shared test data files
+```
+
+### Running Security Tests
+
+```bash
+# Test command injection prevention
+make test-security
+
+# Or directly
+bats tests/security/
+```
+
+### Writing Tests
+
+Tests use the `--source-only` pattern to load functions without executing the main script:
+
+```bash
+#!/usr/bin/env bats
+
+setup() {
+    source ./reconftw.sh --source-only
+}
+
+@test "sanitize_domain strips invalid chars" {
+    result="$(sanitize_domain 'exam;ple.com')"
+    [ "$result" = "example.com" ]
+}
+```
+
+### CI Pipeline
+
+The GitHub Actions workflow (`.github/workflows/tests.yml`) runs on every push and pull request:
+
+1. **ShellCheck** — lints `reconftw.sh`, `modules/*.sh`, and `install.sh`
+2. **Unit Tests** — runs all `tests/unit/*.bats` files
+3. **Integration Tests** — installs reconFTW and validates tool availability
+
+---
+
 ## Mindmap/Workflow
 
 ![Mindmap](images/mindmap_obsidian.png)
@@ -847,12 +1179,19 @@ Use the provided `Makefile` for easy repository management (requires [GitHub CLI
 
 ## 🤝 How to Contribute
 
-Contributions are welcome! You can help by:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributing guide, including development setup, code style, testing, and PR process.
 
-- **Reporting Issues**: Submit bugs or feature requests via [GitHub Issues](https://github.com/six2dez/reconftw/issues/new/choose).
-- **Submitting Pull Requests**: Contribute code improvements to the [dev branch](https://github.com/six2dez/reconftw/tree/dev).
+Quick links:
 
-**Guidelines**: Follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+- [Report a Bug](https://github.com/six2dez/reconftw/issues/new/choose)
+- [Submit a Pull Request](https://github.com/six2dez/reconftw/tree/dev) (target the `dev` branch)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+
+---
+
+## 🔒 Security
+
+For security policy, secrets management, and vulnerability reporting, see [SECURITY.md](SECURITY.md).
 
 ---
 
@@ -893,6 +1232,72 @@ Special thanks to the following services for supporting reconFTW:
 - [Fofa](https://fofa.info/)
 - [intelx](https://intelx.io/)
 - [Whoxy](https://www.whoxy.com/)
+
+---
+
+## 📝 Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes in each release.
+
+---
+
+## 🛠️ Development
+
+### Project Structure
+
+```
+reconftw/
+├── reconftw.sh          # Main entry point (~500 lines)
+├── reconftw.cfg         # Configuration file
+├── modules/             # Phase modules
+│   ├── utils.sh         # Utilities, sanitization, caching, circuit breaker
+│   ├── core.sh          # Framework core, logging, lifecycle, health check
+│   ├── modes.sh         # Scan modes, argument parsing
+│   ├── subdomains.sh    # Subdomain enumeration
+│   ├── web.sh           # Web analysis, nuclei scans
+│   ├── vulns.sh         # Vulnerability scanning
+│   ├── osint.sh         # OSINT functions
+│   └── axiom.sh         # Axiom/Ax fleet helpers
+├── lib/                 # Pure utility libraries
+│   └── validation.sh    # Input validation functions
+├── tests/               # Test suite (100+ tests)
+│   ├── unit/            # Unit tests (bats)
+│   ├── integration/     # Integration/smoke tests
+│   └── security/        # Injection prevention tests
+├── docs/                # Documentation
+│   └── ARCHITECTURE.md  # Detailed architecture guide
+└── secrets.cfg.example  # Template for API keys
+```
+
+### Running Tests
+
+```bash
+make test          # Unit tests
+make test-security # Security tests
+make test-all      # All tests
+make lint          # Shellcheck
+make lint-fix      # Auto-fix with shfmt
+```
+
+### Development Workflow
+
+```bash
+# 1. Source without executing (for testing)
+source ./reconftw.sh --source-only
+
+# 2. Test individual functions
+sanitize_domain "test;domain.com"
+
+# 3. Run health check
+./reconftw.sh --health-check
+
+# 4. Dry run to preview
+./reconftw.sh -d example.com -r --dry-run
+```
+
+### Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for technical details.
 
 ---
 

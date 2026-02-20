@@ -1,0 +1,1 @@
+[tpl-crit] [http] [critical] https://c.example.com

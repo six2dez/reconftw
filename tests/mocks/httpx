@@ -1,0 +1,10 @@
+#!/bin/bash
+# Mock httpx for testing
+
+# Read from stdin or file and output with status
+while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ -z "$line" ]] && continue
+    # Simulate HTTP probing - return https version
+    echo "https://$line [200] [OK]"
+done
+exit 0

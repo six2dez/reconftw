@@ -5,6 +5,7 @@ output/
 test/
 .trunk/
 .vscode/
+.cache/
 
 #Ignoring compressed files
 *.tar
@@ -12,3 +13,9 @@ test/
 *.zip
 .DS_Store
 reconftw.cfg-personal
+secrets.cfg
+.env.cache/
+documentation/
+
+# Vendored wordlists that are stored compressed in-repo (expanded on-demand)
+data/wordlists/subdomains.txt
