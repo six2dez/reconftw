@@ -338,12 +338,21 @@ function install_tools() {
             progress_update "Go tools" "$go_step" "$total_go" "$go_ok" "$go_skip" "$go_fail"
             [[ $COMPACT != "true" ]] && msg_ok "[$go_step/$total_go] ${gotool} installed"
         else
-            failed_tools+=("$gotool")
-            INST_GO_FAIL+=("$gotool")
-            ((++go_fail))
-            double_check=true
-            progress_update "Go tools" "$go_step" "$total_go" "$go_ok" "$go_skip" "$go_fail"
-            msg_err "[$go_step/$total_go] ${gotool} failed"
+            # If the binary is already present, the upgrade failed but the tool still works.
+            # Treat this as a warning rather than a hard failure.
+            if command -v "$gotool" >/dev/null 2>&1; then
+                INST_GO_SKIP+=("$gotool")
+                ((++go_skip))
+                progress_update "Go tools" "$go_step" "$total_go" "$go_ok" "$go_skip" "$go_fail"
+                msg_warn "[$go_step/$total_go] ${gotool} upgrade failed (existing binary kept)"
+            else
+                failed_tools+=("$gotool")
+                INST_GO_FAIL+=("$gotool")
+                ((++go_fail))
+                double_check=true
+                progress_update "Go tools" "$go_step" "$total_go" "$go_ok" "$go_skip" "$go_fail"
+                msg_err "[$go_step/$total_go] ${gotool} failed"
+            fi
         fi
     done
     [[ $COMPACT == "true" && $IS_TTY -eq 1 ]] && printf "\n"

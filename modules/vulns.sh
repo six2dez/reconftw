@@ -78,13 +78,12 @@ function xss() {
 
         end_func "Results are saved in vulns/xss.txt" "${FUNCNAME[0]}"
     else
-        # Handle cases where XSS is false, no vulnerable URLs, or already processed
         if [[ $XSS == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+            skip_notification "disabled"
         elif [[ ! -s "gf/xss.txt" ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for XSS"
+            skip_notification "noinput"
         else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -182,13 +181,12 @@ function ssrf_checks() {
         fi
 
     else
-        # Handle cases where SSRF_CHECKS is false, no vulnerable URLs, or already processed
         if [[ $SSRF_CHECKS == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+            skip_notification "disabled"
         elif [[ ! -s "gf/ssrf.txt" ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for SSRF"
+            skip_notification "noinput"
         else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -224,13 +222,12 @@ function crlf_checks() {
             end_func "Skipping CRLF: Too many URLs to test, try with --deep flag." "${FUNCNAME[0]}"
         fi
     else
-        # Handle cases where CRLF_CHECKS is false, no vulnerable URLs, or already processed
         if [[ $CRLF_CHECKS == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
-        elif [[ ! -s "vulns/crlf.txt" ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for CRLF"
+            skip_notification "disabled"
+        elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            return
         else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -273,13 +270,12 @@ function lfi() {
             return
         fi
     else
-        # Handle cases where LFI is false, no vulnerable URLs, or already processed
         if [[ $LFI == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+            skip_notification "disabled"
         elif [[ ! -s "gf/lfi.txt" ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for LFI"
+            skip_notification "noinput"
         else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -355,13 +351,12 @@ function ssti() {
             return
         fi
     else
-        # Handle cases where SSTI is false, no vulnerable URLs, or already processed
         if [[ $SSTI == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+            skip_notification "disabled"
         elif [[ ! -s "gf/ssti.txt" ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for SSTI"
+            skip_notification "noinput"
         else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -410,13 +405,12 @@ function sqli() {
             return
         fi
     else
-        # Handle cases where SQLI is false, no vulnerable URLs, or already processed
         if [[ $SQLI == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+            skip_notification "disabled"
         elif [[ ! -s "gf/sqli.txt" ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for SQLi"
+            skip_notification "noinput"
         else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 
@@ -533,13 +527,12 @@ function command_injection() {
             return
         fi
     else
-        # Handle cases where COMM_INJ is false, no vulnerable URLs, or already processed
         if [[ $COMM_INJ == false ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped due to configuration"
+            skip_notification "disabled"
         elif [[ ! -s "gf/rce.txt" ]]; then
-            pt_msg_warn "${FUNCNAME[0]} skipped: no candidate URLs for command injection"
+            skip_notification "noinput"
         else
-            pt_msg_warn "${FUNCNAME[0]} already processed. To force, delete ${called_fn_dir}/.${FUNCNAME[0]}"
+            skip_notification "processed"
         fi
     fi
 

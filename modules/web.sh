@@ -895,6 +895,16 @@ function nuclei_check() {
 
     # Check if the function should run
     if should_run "NUCLEICHECK"; then
+        # Verify nuclei binary is available
+        if ! command -v nuclei >/dev/null 2>&1; then
+            _print_msg WARN "nuclei_check: nuclei binary not found in PATH - install nuclei first"
+            return 0
+        fi
+        # Verify templates directory exists (needed for -t flag)
+        if [[ ! -d "${NUCLEI_TEMPLATES_PATH:-}" ]]; then
+            _print_msg WARN "nuclei_check: templates directory '${NUCLEI_TEMPLATES_PATH}' not found - run 'nuclei -update-templates' first"
+            return 0
+        fi
         start_func "${FUNCNAME[0]}" "Templates-based Web Scanner"
         maybe_update_nuclei
 

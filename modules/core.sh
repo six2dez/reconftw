@@ -224,7 +224,7 @@ function tools_installed() {
     )
 
     declare -A tools_folders=(
-        ["NUCLEI_TEMPLATES_PATH"]="${NUCLEI_TEMPLATES_PATH}"
+        ["nuclei-templates"]="${NUCLEI_TEMPLATES_PATH}"
     )
 
     declare -A tools_commands=(

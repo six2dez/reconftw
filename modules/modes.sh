@@ -548,6 +548,8 @@ function vulns() {
             4xxbypass
             test_ssl
         fi
+    else
+        _print_msg WARN "Vulnerability module disabled (VULNS_GENERAL=false). Use -a flag or set VULNS_GENERAL=true in config."
     fi
 }
 
