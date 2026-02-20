@@ -4,9 +4,14 @@
 setup() {
     # Source the common library
     source "${BATS_TEST_DIRNAME}/../../lib/common.sh"
-    
+
     # Create temp directory for tests
     TEST_DIR=$(mktemp -d)
+    MOCK_BIN="${TEST_DIR}/mockbin"
+    ORIG_PATH="$PATH"
+    mkdir -p "$MOCK_BIN"
+    create_mock_anew
+    export PATH="${MOCK_BIN}:$ORIG_PATH"
     cd "$TEST_DIR" || exit 1
     
     # Set up mock variables that would normally come from reconftw
@@ -20,8 +25,39 @@ setup() {
 }
 
 teardown() {
+    PATH="$ORIG_PATH"
     cd /
     rm -rf "$TEST_DIR"
+}
+
+create_mock_anew() {
+    cat >"${MOCK_BIN}/anew" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+quiet=false
+if [[ "${1:-}" == "-q" ]]; then
+    quiet=true
+    shift
+fi
+target="${1:-}"
+touch "$target"
+added=0
+while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    if ! grep -Fxq "$line" "$target"; then
+        echo "$line" >>"$target"
+        added=1
+        if [[ "$quiet" != true ]]; then
+            echo "$line"
+        fi
+    fi
+done
+if [[ "$added" -eq 0 ]]; then
+    exit 1
+fi
+exit 0
+EOF
+    chmod +x "${MOCK_BIN}/anew"
 }
 
 ###############################################################################
