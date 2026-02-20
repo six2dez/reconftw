@@ -141,6 +141,21 @@ EOF
     [ ! -s "hosts/asn_numbers.txt" ]
 }
 
+@test "sub_asn continues silently when asnmap returns exit 0 with no ASN data" {
+    create_mock_asnmap
+    export ASNMAP_MOCK_CALLS="${TEST_DIR}/asnmap_calls.log"
+    export ASNMAP_MOCK_SCENARIO="empty"
+    export PDCP_API_KEY="pdcp_test_key"
+
+    run sub_asn
+
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"no ASN data"* ]]
+    ! grep -q "no ASN data" "$LOGFILE"
+    [ ! -s "hosts/asn_cidrs.txt" ]
+    [ ! -s "hosts/asn_numbers.txt" ]
+}
+
 @test "sub_asn skips when asnmap is not installed and logs it" {
     PATH="/usr/bin:/bin:${MOCK_BIN}"
     export PATH

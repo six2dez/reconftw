@@ -455,7 +455,7 @@ function sub_asn() {
                 if [[ "${DRY_RUN:-false}" == "true" ]]; then
                     _print_msg INFO "Dry-run: asnmap execution recorded, ASN parsing skipped."
                     asn_status="SKIP"
-                elif [[ $asn_rc -eq 0 && -s "$asn_json" ]]; then
+                elif [[ $asn_rc -eq 0 ]] && jq -e '((.cidr // "") | tostring | length) > 0 or ((.as_number // "") | tostring | length) > 0' "$asn_json" >/dev/null 2>&1; then
                     jq -r '.cidr // empty' "$asn_json" | sed '/^$/d' | sort -u >.tmp/asn_cidrs.txt
                     jq -r '.as_number // empty' "$asn_json" | sed '/^$/d' | sort -u >.tmp/asn_numbers.txt
 
@@ -482,6 +482,9 @@ function sub_asn() {
                     if [[ -s .tmp/subs_no_resolved.txt ]]; then
                         _print_msg INFO "ASN sources added $(wc -l <.tmp/subs_no_resolved.txt | tr -d ' ') in-scope domains"
                     fi
+                elif [[ $asn_rc -eq 0 ]]; then
+                    # No ASN data for this target: continue silently without warning.
+                    asn_status="OK"
                 elif [[ $asn_rc -eq 124 || $asn_rc -eq 137 ]]; then
                     _print_msg WARN "asnmap timed out after 120s. Skipping ASN output for ${domain}."
                     log_note "asnmap timed out after 120s. Skipping ASN output for ${domain}." "${FUNCNAME[0]}" "${LINENO}"
