@@ -2045,19 +2045,33 @@ function s3buckets() {
 
         printf "Processing domain: %s\n" "$domain" >>"$LOGFILE"
         print_notice RUN "cloudhunter" "enumerating cloud buckets (CloudHunter)"
-        (
-            if ! cd "$tools/CloudHunter"; then
-                print_warnf "Failed to cd to %s." "$tools/CloudHunter"
-                return 1
-            fi
+        start_subfunc "cloudhunter" "enumerating cloud buckets (CloudHunter)"
+        local cloudhunter_status="OK"
+        local cloudhunter_rc=0
+        local cloudhunter_prev_dir
+        cloudhunter_prev_dir="$(pwd)"
+        if cd "$tools/CloudHunter"; then
             if [[ -n "$permutation_file" ]]; then
-                if ! run_command env PYTHONWARNINGS=ignore "${tools}/CloudHunter/venv/bin/python3" -W ignore ./cloudhunter.py "$PERMUTATION_FLAG" "$permutation_file" -r ./resolvers.txt -t 50 "$domain"; then
-                    print_warnf "CloudHunter command failed for domain %s." "$domain"
-                fi
-            elif ! run_command env PYTHONWARNINGS=ignore "${tools}/CloudHunter/venv/bin/python3" -W ignore ./cloudhunter.py -r ./resolvers.txt -t 50 "$domain"; then
-                print_warnf "CloudHunter command failed for domain %s." "$domain"
+                run_command env PYTHONWARNINGS=ignore "${tools}/CloudHunter/venv/bin/python3" -W ignore ./cloudhunter.py \
+                    "$PERMUTATION_FLAG" "$permutation_file" -r ./resolvers.txt -t 50 "$domain" \
+                    >>"$dir/subdomains/cloudhunter_open_buckets.txt" 2>>"$LOGFILE" || cloudhunter_rc=$?
+            else
+                run_command env PYTHONWARNINGS=ignore "${tools}/CloudHunter/venv/bin/python3" -W ignore ./cloudhunter.py \
+                    -r ./resolvers.txt -t 50 "$domain" \
+                    >>"$dir/subdomains/cloudhunter_open_buckets.txt" 2>>"$LOGFILE" || cloudhunter_rc=$?
             fi
-        ) >>"$dir/subdomains/cloudhunter_open_buckets.txt" 2>>"$LOGFILE"
+        else
+            print_warnf "Failed to cd to %s." "$tools/CloudHunter"
+            cloudhunter_rc=1
+        fi
+        cd "$cloudhunter_prev_dir" 2>/dev/null || true
+
+        if [[ $cloudhunter_rc -ne 0 ]]; then
+            cloudhunter_status="WARN"
+            print_warnf "CloudHunter command failed for domain %s (exit %s)." "$domain" "$cloudhunter_rc"
+            log_note "CloudHunter command failed for domain ${domain} (exit ${cloudhunter_rc})." "${FUNCNAME[0]}" "${LINENO}"
+        fi
+        end_subfunc "cloudhunter done" "cloudhunter" "$cloudhunter_status"
 
         # Process CloudHunter results
         if [[ -s "subdomains/cloudhunter_open_buckets.txt" ]]; then

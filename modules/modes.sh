@@ -672,7 +672,7 @@ function recon() {
         zonetransfer
     fi
 
-    ui_module_end "OSINT" "osint/"
+    ui_module_end "OSINT" "osint/" "subdomains/"
     progress_module "OSINT"
 
     if [[ $AXIOM == true ]]; then
@@ -715,7 +715,7 @@ function recon() {
         geo_info
     fi
 
-    ui_module_end "Web Detection" "hosts/"
+    ui_module_end "Web Detection" "webs/" "hosts/" "screenshots/"
     progress_module "Web Detection"
 
     # Quick-rescan gating
@@ -742,7 +742,7 @@ function recon() {
         grpc_reflection
         llm_probe
 
-        ui_module_end "Web Analysis" "vulns/" "nuclei_output/"
+        ui_module_end "Web Analysis" "webs/" "hosts/" "vulns/" "nuclei_output/" "js/" "fuzzing/"
         progress_module "Web Analysis"
     fi
 
@@ -759,7 +759,7 @@ function recon() {
     password_dict
     url_ext
 
-    ui_module_end "Finalization" "fuzzing/" "js/"
+    ui_module_end "Finalization" "webs/" "gf/" "cms/"
     progress_module "Finalization"
 }
 

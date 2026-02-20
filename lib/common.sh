@@ -240,7 +240,7 @@ print_artifacts() {
     [[ "${OUTPUT_VERBOSITY:-1}" -lt 1 ]] && return 0
     local items="$*"
     [[ -z "$items" ]] && return 0
-    printf "Artifacts: %s\n" "$items"
+    printf "[INFO] Artifacts: %s\n" "$items"
 }
 
 # Print a notice line without affecting counters

@@ -1095,19 +1095,51 @@ function graphql_scan() {
 function param_discovery() {
     ensure_dirs webs .tmp
 
+    _parse_arjun_text_output() {
+        local arjun_out_file="$1"
+        [[ ! -s "$arjun_out_file" ]] && return 0
+
+        grep -aEo 'https?://[^ ]+' "$arjun_out_file" | sed 's/^/URL: /' | anew -q webs/params_discovered.txt || true
+        grep -aE 'Scanning [0-9]+/[0-9]+: https?://' "$arjun_out_file" | sed -E 's/^.*Scanning [0-9]+\/[0-9]+:[[:space:]]*//' \
+            | sed 's/^/URL: /' | anew -q webs/params_discovered.txt || true
+        grep -aE 'Parameters found:[[:space:]]*' "$arjun_out_file" | sed -E 's/^.*Parameters found:[[:space:]]*//' \
+            | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | sed '/^$/d' \
+            | sed 's/^/PARAM: /' | sort -u | anew -q webs/params_discovered.txt || true
+        grep -aEo '([?&][A-Za-z0-9_.-]+)=' "$arjun_out_file" \
+            | sed -E 's/^[?&]//; s/=.*$//' | sed '/^$/d' \
+            | sed 's/^/PARAM: /' | sort -u | anew -q webs/params_discovered.txt || true
+    }
+
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $PARAM_DISCOVERY == true ]]; then
-        if ! command -v arjun >/dev/null 2>&1; then
-            _print_msg WARN "${FUNCNAME[0]}: arjun not found in PATH"
-            return 0
-        fi
         start_func "${FUNCNAME[0]}" "Parameter discovery (arjun)"
         local input_file="webs/url_extract_nodupes.txt"
+        local arjun_axiom_ok=true
         [[ ! -s $input_file ]] && input_file="webs/webs_all.txt"
         if [[ -s $input_file ]]; then
-            run_command arjun -i "$input_file" -t "$ARJUN_THREADS" -oJ .tmp/arjun.json 2>>"$LOGFILE" >/dev/null || true
-            if [[ -s .tmp/arjun.json ]]; then
-                jq -r '..|.url? // empty' .tmp/arjun.json | sed 's/^/URL: /' | anew -q webs/params_discovered.txt
-                jq -r '..|.params? // empty | to_entries[] | .key' .tmp/arjun.json | sed 's/^/PARAM: /' | sort -u | anew -q webs/params_discovered.txt
+            if [[ $AXIOM == true ]]; then
+                if ! run_command axiom-scan "$input_file" -m arjun -o .tmp/arjun.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null; then
+                    arjun_axiom_ok=false
+                fi
+
+                _parse_arjun_text_output .tmp/arjun.txt
+
+                if [[ "$arjun_axiom_ok" != true ]] || [[ ! -s .tmp/arjun.txt ]]; then
+                    _print_msg WARN "${FUNCNAME[0]}: axiom arjun failed or returned no output; falling back to local arjun"
+                    log_note "${FUNCNAME[0]}: axiom arjun failed/no output; local fallback" "${FUNCNAME[0]}" "${LINENO}"
+                    if command -v arjun >/dev/null 2>&1; then
+                        run_command arjun -i "$input_file" -t "$ARJUN_THREADS" -oT .tmp/arjun.txt 2>>"$LOGFILE" >/dev/null || true
+                        _parse_arjun_text_output .tmp/arjun.txt
+                    else
+                        _print_msg WARN "${FUNCNAME[0]}: arjun not found in PATH for local fallback"
+                    fi
+                fi
+            else
+                if ! command -v arjun >/dev/null 2>&1; then
+                    _print_msg WARN "${FUNCNAME[0]}: arjun not found in PATH"
+                    return 0
+                fi
+                run_command arjun -i "$input_file" -t "$ARJUN_THREADS" -oT .tmp/arjun.txt 2>>"$LOGFILE" >/dev/null || true
+                _parse_arjun_text_output .tmp/arjun.txt
             fi
         fi
         end_func "Results are saved in webs/params_discovered.txt" "${FUNCNAME[0]}"
