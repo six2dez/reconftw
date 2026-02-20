@@ -1046,7 +1046,7 @@ function sub_scraping() {
                 fi
 
                 if command -v waymore &>/dev/null; then
-                    print_notice RUN "waymore" "collecting passive URLs (waymore)"
+                    print_notice RUN "sub_scraping" "collecting passive URLs"
                     if ! "$TIMEOUT_CMD" "${WAYMORE_TIMEOUT:-30m}" waymore -i "$domain" -mode U -oU .tmp/waymore_urls_subs.txt 2>>"$LOGFILE" >/dev/null; then
                         log_note "sub_scraping: waymore failed or timed out; continuing" "${FUNCNAME[0]}" "${LINENO}"
                     fi
