@@ -247,6 +247,10 @@ declare -A gotools=(
     ["favirecon"]="go install -v github.com/edoardottt/favirecon/cmd/favirecon@latest"
     ["second-order"]="go install -v github.com/mhmdiaa/second-order@latest"
     ["TInjA"]="go install -v github.com/Hackmanit/TInjA@latest"
+    ["fingerprintx"]="go install -v github.com/praetorian-inc/fingerprintx/cmd/fingerprintx@latest"
+    ["brutus"]="go install -v github.com/praetorian-inc/brutus/cmd/brutus@latest"
+    ["julius"]="go install -v github.com/praetorian-inc/julius/cmd/julius@latest"
+    ["titus"]="go install -v github.com/praetorian-inc/titus/cmd/titus@latest"
 )
 
 # Declare uv tool-managed Python tools and their GitHub paths
@@ -299,6 +303,7 @@ declare -A repos=(
     ["metagoofil"]="opsdisk/metagoofil"
     ["EmailHarvester"]="maldevel/EmailHarvester"
     ["reconftw_ai"]="six2dez/reconftw_ai"
+    ["gato"]="praetorian-inc/gato"
 )
 
 # Function to display the banner
@@ -523,6 +528,12 @@ function install_tools() {
                 ;;
             "trufflehog")
                 go install &>/dev/null
+                ;;
+            "gato")
+                if [[ ! -d "venv" ]]; then
+                    uv venv venv &>/dev/null || true
+                fi
+                uv pip install --upgrade -e . --python venv/bin/python3 &>/dev/null || true
                 ;;
         esac
 

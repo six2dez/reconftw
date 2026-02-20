@@ -71,76 +71,130 @@ function github_repos() {
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $GITHUB_REPOS == true ]] && [[ $OSINT == true ]]; then
         start_func "${FUNCNAME[0]}" "Github Repos analysis in process"
 
-        if [[ -s $GITHUB_TOKENS ]]; then
-            GH_TOKEN=$(head -n 1 "$GITHUB_TOKENS")
-            echo "$domain" | unfurl format %r >.tmp/company_name.txt
+        if [[ ! -s $GITHUB_TOKENS ]]; then
+            _print_error "Required file ${GITHUB_TOKENS} does not exist or is empty"
+            return 1
+        fi
 
-            if ! run_command enumerepo -token-string "$GH_TOKEN" -usernames .tmp/company_name.txt -o .tmp/company_repos.txt 2>>"$LOGFILE" >/dev/null; then
-                _print_error "enumerepo command failed"
+        GH_TOKEN=$(head -n 1 "$GITHUB_TOKENS")
+        echo "$domain" | unfurl format %r >.tmp/company_name.txt
+
+        if ! run_command enumerepo -token-string "$GH_TOKEN" -usernames .tmp/company_name.txt -o .tmp/company_repos.txt 2>>"$LOGFILE" >/dev/null; then
+            _print_error "enumerepo command failed"
+        fi
+
+        if [[ -s ".tmp/company_repos.txt" ]]; then
+            if ! jq -r '.[].repos[]|.url' <.tmp/company_repos.txt >.tmp/company_repos_url.txt 2>>"$LOGFILE"; then
+                _print_error "jq command failed"
             fi
+        fi
 
-            if [[ -s ".tmp/company_repos.txt" ]]; then
-                if ! jq -r '.[].repos[]|.url' <.tmp/company_repos.txt >.tmp/company_repos_url.txt 2>>"$LOGFILE"; then
-                    _print_error "jq command failed"
-                fi
+        ensure_dirs .tmp/github_repos .tmp/github
+
+        if [[ -s ".tmp/company_repos_url.txt" ]]; then
+            if ! run_command interlace -tL .tmp/company_repos_url.txt -threads "$INTERLACE_THREADS" -c "git clone _target_ .tmp/github_repos/_cleantarget_" 2>>"$LOGFILE" >/dev/null; then
+                _print_error "interlace git clone command failed"
+                return 1
             fi
+        else
+            log_note "No GitHub repos found for ${domain}; continuing" "${FUNCNAME[0]}" "${LINENO}"
+            end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}"
+            return 0
+        fi
 
-            ensure_dirs .tmp/github_repos .tmp/github
+        if [[ -d ".tmp/github_repos/" ]]; then
+            ls .tmp/github_repos >.tmp/github_repos_folders.txt
+        else
+            log_note "GitHub clone directory missing for ${domain}; no repo artifacts to process" "${FUNCNAME[0]}" "${LINENO}"
+            end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}"
+            return 0
+        fi
+        if [[ ! -s ".tmp/github_repos_folders.txt" ]]; then
+            log_note "No cloned GitHub repos to scan for ${domain}" "${FUNCNAME[0]}" "${LINENO}"
+            end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}"
+            return 0
+        fi
 
-            if [[ -s ".tmp/company_repos_url.txt" ]]; then
-                if ! run_command interlace -tL .tmp/company_repos_url.txt -threads "$INTERLACE_THREADS" -c "git clone _target_ .tmp/github_repos/_cleantarget_" 2>>"$LOGFILE" >/dev/null; then
-                    _print_error "interlace git clone command failed"
-                    return 1
-                fi
-            else
-                log_note "No GitHub repos found for ${domain}; continuing" "${FUNCNAME[0]}" "${LINENO}"
-                end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}"
-                return 0
-            fi
+        local secrets_engine="${SECRETS_ENGINE:-gitleaks}"
+        local titus_bin=""
+        if command -v titus >/dev/null 2>&1; then
+            titus_bin="$(command -v titus)"
+        elif [[ -x "${tools}/titus/dist/titus" ]]; then
+            titus_bin="${tools}/titus/dist/titus"
+        elif [[ -x "${HOME}/go/bin/titus" ]]; then
+            titus_bin="${HOME}/go/bin/titus"
+        fi
 
-            if [[ -d ".tmp/github_repos/" ]]; then
-                ls .tmp/github_repos >.tmp/github_repos_folders.txt
-            else
-                log_note "GitHub clone directory missing for ${domain}; no repo artifacts to process" "${FUNCNAME[0]}" "${LINENO}"
-                end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}"
-                return 0
-            fi
-
-            if [[ -s ".tmp/github_repos_folders.txt" ]]; then
+        case "$secrets_engine" in
+            gitleaks|hybrid)
                 if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "gitleaks detect --source .tmp/github_repos/_target_ --no-banner --no-color -r .tmp/github/gh_secret_cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
                     _print_error "interlace gitleaks command failed"
                     end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}" FAIL
                     return 1
                 fi
-            else
-                log_note "No cloned GitHub repos to scan with gitleaks for ${domain}" "${FUNCNAME[0]}" "${LINENO}"
-                end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}"
-                return 0
-            fi
-
-            if [[ -s ".tmp/company_repos_url.txt" ]]; then
-                if ! interlace -tL .tmp/company_repos_url.txt -threads "$INTERLACE_THREADS" -c "trufflehog git _target_ -j 2>&1 | jq -c > _output_/_cleantarget_" -o .tmp/github/ 2>>"$LOGFILE" >/dev/null; then
-                    _print_error "interlace trufflehog command failed"
+                ;;
+            titus)
+                if [[ -z "$titus_bin" ]]; then
+                    _print_msg WARN "titus requested but not found; falling back to gitleaks"
+                    if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "gitleaks detect --source .tmp/github_repos/_target_ --no-banner --no-color -r .tmp/github/gh_secret_cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
+                        _print_error "interlace gitleaks fallback failed"
+                        return 1
+                    fi
+                else
+                    local titus_opts=""
+                    [[ "${SECRETS_SCAN_GIT_HISTORY:-false}" == "true" ]] && titus_opts="${titus_opts} --git"
+                    [[ "${SECRETS_VALIDATE:-false}" == "true" ]] && titus_opts="${titus_opts} --validate"
+                    if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "\"${titus_bin}\" scan --format json ${titus_opts} .tmp/github_repos/_target_ > .tmp/github/titus__cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
+                        _print_error "interlace titus command failed"
+                        return 1
+                    fi
+                fi
+                ;;
+            noseyparker)
+                if ! command -v noseyparker >/dev/null 2>&1; then
+                    _print_msg WARN "noseyparker requested but not found; falling back to gitleaks"
+                    if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "gitleaks detect --source .tmp/github_repos/_target_ --no-banner --no-color -r .tmp/github/gh_secret_cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
+                        _print_error "interlace gitleaks fallback failed"
+                        return 1
+                    fi
+                else
+                    local np_scan_opts=""
+                    [[ "${SECRETS_SCAN_GIT_HISTORY:-false}" == "true" ]] && np_scan_opts="--git-history"
+                    if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "noseyparker scan ${np_scan_opts} --datastore .tmp/github/np_ds__cleantarget_ .tmp/github_repos/_target_ >/dev/null 2>>${LOGFILE}; noseyparker report --datastore .tmp/github/np_ds__cleantarget_ --format json > .tmp/github/nosey__cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
+                        _print_error "interlace noseyparker command failed"
+                        return 1
+                    fi
+                fi
+                ;;
+            *)
+                _print_msg WARN "Unknown SECRETS_ENGINE='${secrets_engine}', using gitleaks"
+                if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "gitleaks detect --source .tmp/github_repos/_target_ --no-banner --no-color -r .tmp/github/gh_secret_cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
+                    _print_error "interlace gitleaks fallback failed"
                     return 1
                 fi
-            fi
+                ;;
+        esac
 
-            if [[ -d ".tmp/github/" ]]; then
-                if ! cat .tmp/github/* 2>/dev/null | jq -c | jq -r >"osint/github_company_secrets.json" 2>>"$LOGFILE"; then
-                    _print_error "Error combining results"
-                    return 1
-                fi
-            else
-                log_note "No GitHub scan outputs available to merge for ${domain}" "${FUNCNAME[0]}" "${LINENO}"
-                end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}"
-                return 0
+        # Keep trufflehog enrichment (all engines).
+        if [[ -s ".tmp/company_repos_url.txt" ]]; then
+            if ! interlace -tL .tmp/company_repos_url.txt -threads "$INTERLACE_THREADS" -c "trufflehog git _target_ -j 2>&1 | jq -c > _output_/_cleantarget_" -o .tmp/github/ 2>>"$LOGFILE" >/dev/null; then
+                _print_error "interlace trufflehog command failed"
+                return 1
             fi
-
-            end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}"
-        else
-            _print_error "Required file ${GITHUB_TOKENS} does not exist or is empty"
-            return 1
         fi
+
+        if [[ -d ".tmp/github/" ]]; then
+            if ! cat .tmp/github/* 2>/dev/null | jq -c | jq -r >"osint/github_company_secrets.json" 2>>"$LOGFILE"; then
+                _print_error "Error combining results"
+                return 1
+            fi
+        else
+            log_note "No GitHub scan outputs available to merge for ${domain}" "${FUNCNAME[0]}" "${LINENO}"
+            end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}"
+            return 0
+        fi
+
+        end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}"
     else
         if [[ $GITHUB_REPOS == false ]] || [[ $OSINT == false ]]; then
             skip_notification "disabled"
@@ -181,6 +235,67 @@ function github_leaks() {
         end_func "Results are saved in $domain/osint/github_leaks.json" "${FUNCNAME[0]}"
     else
         if [[ $GITHUB_LEAKS == false ]] || [[ $OSINT == false ]]; then
+            skip_notification "disabled"
+        elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            return
+        else
+            skip_notification "processed"
+        fi
+    fi
+}
+
+function github_actions_audit() {
+    ensure_dirs osint .tmp
+
+    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } \
+        && [[ "${GITHUB_ACTIONS_AUDIT:-false}" == "true" ]] && [[ $OSINT == true ]] \
+        && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+
+        start_func "${FUNCNAME[0]}" "GitHub Actions security audit (gato)"
+
+        if [[ ! -s $GITHUB_TOKENS ]]; then
+            _print_error "Required file ${GITHUB_TOKENS} does not exist or is empty"
+            end_func "GitHub token missing, github_actions_audit skipped" "${FUNCNAME[0]}" SKIP
+            return 0
+        fi
+
+        local company_name
+        company_name=$(unfurl format %r <<<"$domain")
+        printf "%s\n" "$company_name" >".tmp/gato_orgs.txt"
+
+        local gato_cmd=""
+        if command -v gato >/dev/null 2>&1; then
+            gato_cmd="$(command -v gato)"
+        elif [[ -x "${tools}/gato/venv/bin/gato" ]]; then
+            gato_cmd="${tools}/gato/venv/bin/gato"
+        fi
+        if [[ -z "$gato_cmd" ]]; then
+            _print_msg WARN "${FUNCNAME[0]}: gato not found in PATH or ${tools}/gato/venv/bin/gato"
+            end_func "gato not available, github_actions_audit skipped" "${FUNCNAME[0]}" SKIP
+            return 0
+        fi
+
+        local -a gato_args=(e --enum_wf_artifacts --skip_sh_runner_enum -O ".tmp/gato_orgs.txt" -oJ "osint/github_actions_audit.json")
+        [[ "${GATO_INCLUDE_ALL_ARTIFACT_SECRETS:-false}" == "true" ]] && gato_args+=(--include_all_artifact_secrets)
+
+        if [[ -f "$GITHUB_TOKENS" ]]; then
+            export GH_TOKEN
+            GH_TOKEN="$(head -n 1 "$GITHUB_TOKENS")"
+        fi
+
+        if ! run_command "$gato_cmd" "${gato_args[@]}" 2>>"$LOGFILE" >/dev/null; then
+            _print_msg WARN "${FUNCNAME[0]}: gato execution failed"
+        fi
+
+        if [[ -s "osint/github_actions_audit.json" ]]; then
+            jq -r '.. | strings | select(test("(?i)(artifact|workflow|runner|secret)"))' "osint/github_actions_audit.json" 2>/dev/null \
+                | sort -u \
+                | anew -q "osint/github_actions_audit.txt"
+        fi
+
+        end_func "Results are saved in osint/github_actions_audit.[json|txt]" "${FUNCNAME[0]}"
+    else
+        if [[ "${GITHUB_ACTIONS_AUDIT:-false}" == "false" ]] || [[ $OSINT == false ]]; then
             skip_notification "disabled"
         elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             return

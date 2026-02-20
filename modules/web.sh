@@ -689,6 +689,8 @@ function portscan() {
             append_assets_from_file web url hosts/webs.txt
         fi
 
+        service_fingerprint
+
         end_func "Results are saved in hosts/portscan_[passive|active|active_targeted|active_udp|shodan].*" "${FUNCNAME[0]}"
 
     else
@@ -699,6 +701,75 @@ function portscan() {
         fi
     fi
 
+}
+
+_build_fingerprintx_targets_from_nmap() {
+    local nmap_gnmap="$1"
+    local out_file="$2"
+    [[ ! -s "$nmap_gnmap" ]] && return 0
+
+    awk '
+    /^Host: / {
+        host = $2
+        if (host == "") next
+        ports = $0
+        sub(/^.*Ports: /, "", ports)
+        n = split(ports, arr, ",")
+        for (i = 1; i <= n; i++) {
+            gsub(/^ +| +$/, "", arr[i])
+            split(arr[i], f, "/")
+            if (f[2] == "open" && f[1] ~ /^[0-9]+$/) {
+                print host ":" f[1]
+            }
+        }
+    }' "$nmap_gnmap" | sort -u | anew -q "$out_file"
+}
+
+function service_fingerprint() {
+    ensure_dirs hosts .tmp
+
+    if [[ "${SERVICE_FINGERPRINT:-true}" != "true" ]]; then
+        return 0
+    fi
+    if [[ "${SERVICE_FINGERPRINT_ENGINE:-fingerprintx}" != "fingerprintx" ]]; then
+        _print_msg WARN "${FUNCNAME[0]}: unsupported SERVICE_FINGERPRINT_ENGINE=${SERVICE_FINGERPRINT_ENGINE}"
+        return 0
+    fi
+    if [[ $AXIOM == true ]]; then
+        log_note "service_fingerprint: local-only for now, skipped in AXIOM mode" "${FUNCNAME[0]}" "${LINENO}"
+        return 0
+    fi
+    if ! command -v fingerprintx >/dev/null 2>&1; then
+        _print_msg WARN "${FUNCNAME[0]}: fingerprintx not found in PATH"
+        return 0
+    fi
+
+    start_subfunc "${FUNCNAME[0]}" "Service fingerprinting (fingerprintx)"
+
+    local targets_file=".tmp/fingerprintx_targets.txt"
+    : >"$targets_file"
+
+    if [[ -s "hosts/naabu_open.txt" ]]; then
+        awk -F: 'NF==2 && $2 ~ /^[0-9]+$/ {print $1 ":" $2}' "hosts/naabu_open.txt" | sort -u | anew -q "$targets_file"
+    fi
+    if [[ ! -s "$targets_file" ]]; then
+        _build_fingerprintx_targets_from_nmap "hosts/portscan_active.gnmap" "$targets_file"
+    fi
+    if [[ ! -s "$targets_file" ]]; then
+        _build_fingerprintx_targets_from_nmap "hosts/portscan_active_targeted.gnmap" "$targets_file"
+    fi
+
+    if [[ -s "$targets_file" ]]; then
+        local timeout_ms="${SERVICE_FINGERPRINT_TIMEOUT_MS:-2000}"
+        run_command fingerprintx --json -l "$targets_file" -w "$timeout_ms" -o "hosts/fingerprintx.jsonl" 2>>"$LOGFILE" >/dev/null || true
+        if [[ -s "hosts/fingerprintx.jsonl" ]]; then
+            jq -r '[(.host // .ip // .target // "unknown"), (.port // "unknown"), (.protocol // .service // "unknown")] | @tsv' "hosts/fingerprintx.jsonl" 2>/dev/null \
+                | awk -F'\t' '{printf "%s:%s [%s]\n", $1, $2, $3}' \
+                | anew -q "hosts/fingerprintx.txt"
+        fi
+    fi
+
+    end_subfunc "Results are saved in hosts/fingerprintx.[jsonl|txt]" "${FUNCNAME[0]}"
 }
 
 function cdnprovider() {
@@ -1077,6 +1148,42 @@ function grpc_reflection() {
         end_func "Results are saved in hosts/grpc_reflection.txt" "${FUNCNAME[0]}"
     else
         if [[ $GRPC_SCAN == false ]]; then
+            skip_notification "disabled"
+        else
+            skip_notification "processed"
+        fi
+    fi
+}
+
+function llm_probe() {
+    ensure_dirs webs .tmp
+
+    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ "${LLM_PROBE:-false}" == "true" ]]; then
+        if ! command -v julius >/dev/null 2>&1; then
+            _print_msg WARN "${FUNCNAME[0]}: julius not found in PATH"
+            return 0
+        fi
+        if [[ ! -s "webs/webs_all.txt" ]]; then
+            skip_notification "noinput"
+            return 0
+        fi
+        start_func "${FUNCNAME[0]}" "LLM service probing (julius)"
+
+        local -a julius_cmd=(julius -o jsonl -q probe -f "webs/webs_all.txt")
+        if [[ "${LLM_PROBE_AUGUSTUS:-false}" == "true" ]]; then
+            julius_cmd=(julius -o jsonl -q probe --augustus -f "webs/webs_all.txt")
+        fi
+
+        run_command "${julius_cmd[@]}" >"webs/llm_probe.jsonl" 2>>"$LOGFILE" || true
+        if [[ -s "webs/llm_probe.jsonl" ]]; then
+            jq -r '[(.target // .url // "unknown"), (.provider // .service // "unknown"), (.probe // "n/a")] | @tsv' "webs/llm_probe.jsonl" 2>/dev/null \
+                | awk -F'\t' '{printf "%s [%s] [%s]\n", $1, $2, $3}' \
+                | anew -q "webs/llm_probe.txt"
+        fi
+
+        end_func "Results are saved in webs/llm_probe.[jsonl|txt]" "${FUNCNAME[0]}"
+    else
+        if [[ "${LLM_PROBE:-false}" == "false" ]]; then
             skip_notification "disabled"
         else
             skip_notification "processed"

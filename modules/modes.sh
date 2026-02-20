@@ -651,7 +651,7 @@ function recon() {
             RECON_OSINT_PARALLEL_FAILURES=$((RECON_OSINT_PARALLEL_FAILURES + osint_g1_rc))
         fi
         # Group 2: remaining OSINT + zonetransfer
-        parallel_funcs "${PAR_OSINT_GROUP2_SIZE:-4}" github_repos github_leaks metadata apileaks zonetransfer
+        parallel_funcs "${PAR_OSINT_GROUP2_SIZE:-5}" github_repos github_leaks github_actions_audit metadata apileaks zonetransfer
         local osint_g2_rc=$?
         if ((osint_g2_rc > 0)); then
             RECON_PARTIAL_RUN=true
@@ -665,6 +665,7 @@ function recon() {
         #github_dorks
         github_repos
         github_leaks
+        github_actions_audit
         metadata
         apileaks
         third_party_misconfigs
@@ -739,6 +740,7 @@ function recon() {
         websocket_checks
         param_discovery
         grpc_reflection
+        llm_probe
 
         ui_module_end "Web Analysis" "vulns/" "nuclei_output/"
         progress_module "Web Analysis"

@@ -111,7 +111,8 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **Metadata Extraction**: Extracts metadata from indexed office documents ([metagoofil](https://github.com/opsdisk/metagoofil)).
 - **API Leaks**: Detects exposed APIs in public sources ([porch-pirate](https://github.com/MandConsultingGroup/porch-pirate), [SwaggerSpy](https://github.com/UndeadSec/SwaggerSpy) and [postleaksNg](https://github.com/six2dez/postleaksNG)).
 - **Google Dorking**: Automated Google dork queries for sensitive information ([dorks_hunter](https://github.com/six2dez/dorks_hunter) and [xnldorker](https://github.com/xnl-h4ck3r/xnldorker)).
-- **GitHub Analysis**: Scans GitHub organizations for repositories and secrets ([enumerepo](https://github.com/trickest/enumerepo), [trufflehog](https://github.com/trufflesecurity/trufflehog) and [gitleaks](https://github.com/gitleaks/gitleaks)).
+- **GitHub Analysis**: Scans GitHub organizations for repositories and secrets with selectable engines ([enumerepo](https://github.com/trickest/enumerepo), [trufflehog](https://github.com/trufflesecurity/trufflehog), [gitleaks](https://github.com/gitleaks/gitleaks), [titus](https://github.com/praetorian-inc/titus), [noseyparker](https://github.com/praetorian-inc/noseyparker)).
+- **GitHub Actions Audit (Optional)**: Audits workflow artifacts and CI/CD exposure with [gato](https://github.com/praetorian-inc/gato).
 - **Third-Party Misconfigurations**: Identifies misconfigured third-party services ([misconfig-mapper](https://github.com/intigriti/misconfig-mapper)).
 - **Mail Hygiene**: Reviews SPF/DMARC configuration to flag spoofing or deliverability issues.
 - **Cloud Storage Enumeration**: Surveys buckets across major providers for exposure ([cloud_enum](https://github.com/initstring/cloud_enum)).
@@ -140,8 +141,9 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **CDN Detection**: Identifies IPs behind CDNs ([cdncheck](https://github.com/projectdiscovery/cdncheck)).
 - **WAF Detection**: Detects Web Application Firewalls ([wafw00f](https://github.com/EnableSecurity/wafw00f)).
 - **Port Scanning**: Active scanning with [nmap](https://github.com/nmap/nmap) (optionally preceded by [naabu](https://github.com/projectdiscovery/naabu)) and passive scanning with [smap](https://github.com/s0md3v/Smap).
+- **Service Fingerprinting**: Fingerprints exposed services on discovered host:port pairs with [fingerprintx](https://github.com/praetorian-inc/fingerprintx).
 - **Service Vulnerabilities (Optional)**: Deep portscan profile can enrich results with CVE matching via [vulners](https://github.com/vulnersCom/nmap-vulners).
-- **Password Spraying**: Attempts password spraying on identified services ([brutespray](https://github.com/x90skysn3k/brutespray)).
+- **Password Spraying**: Attempts password spraying on identified services with engine selection ([brutespray](https://github.com/x90skysn3k/brutespray) or [brutus](https://github.com/praetorian-inc/brutus)).
 - **Geolocation**: Maps IP addresses to geographic locations ([ipinfo](https://www.ipinfo.io/)).
 - **IPv6 Discovery**: Optionally enumerates and scans discovered IPv6 targets when `IPV6_SCAN` is enabled.
 
@@ -160,6 +162,7 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **Parameter Discovery**: Bruteforces hidden parameters on endpoints ([arjun](https://github.com/s0md3v/Arjun)).
 - **WebSocket Auditing**: Validates upgrade handshakes and origin handling on `ws://` and `wss://` endpoints.
 - **gRPC Reflection**: Probes common gRPC ports for exposed service reflection ([grpcurl](https://github.com/fullstorydev/grpcurl)).
+- **LLM Service Fingerprinting (Optional)**: Probes discovered web/API endpoints for exposed LLM services with [julius](https://github.com/praetorian-inc/julius).
 - **Fuzzing**: Performs directory and parameter fuzzing ([ffuf](https://github.com/ffuf/ffuf)).
 - **File Extension Sorting**: Organizes URLs by file extensions.
 - **Wordlist Generation**: Creates custom wordlists for fuzzing.
@@ -556,6 +559,13 @@ SPOOF=true # Check spoofable domains
 METAFINDER_LIMIT=20 # Max 250
 MAIL_HYGIENE=true # Check DMARC/SPF records
 CLOUD_ENUM=true # Enumerate cloud storage across providers with cloud_enum
+GITHUB_LEAKS=true # Search for leaked secrets across GitHub with ghleaks
+GHLEAKS_THREADS=5 # Concurrent download threads for ghleaks
+SECRETS_ENGINE="gitleaks" # gitleaks|titus|noseyparker|hybrid
+SECRETS_SCAN_GIT_HISTORY=false # Include git history scans when supported
+SECRETS_VALIDATE=false # Validate detected secrets when supported (titus)
+GITHUB_ACTIONS_AUDIT=false # Audit GitHub Actions artifacts/workflows with gato
+GATO_INCLUDE_ALL_ARTIFACT_SECRETS=false # Include noisy artifact secret matches in gato output
 
 # Subdomains
 SUBDOMAINS_GENERAL=true # Enable or disable the whole Subdomains module
@@ -602,6 +612,9 @@ PORTSCAN_STRATEGY=legacy # legacy|naabu_nmap
 NAABU_ENABLE=true
 NAABU_RATE=1000
 NAABU_PORTS="--top-ports 1000"
+SERVICE_FINGERPRINT=true # Fingerprint exposed services with fingerprintx
+SERVICE_FINGERPRINT_ENGINE="fingerprintx" # fingerprintx
+SERVICE_FINGERPRINT_TIMEOUT_MS=2000 # fingerprintx timeout per target (ms)
 PORTSCAN_UDP=false
 PORTSCAN_UDP_OPTIONS="--top-ports 20 -sU -sV -n -Pn --open"
 CDN_IP=true # Check which IPs belongs to CDN
@@ -653,6 +666,11 @@ GHAURI=false # Check SQLI with ghauri
 BROKENLINKS=true # Check for brokenlinks
 BROKENLINKS_ENGINE="second-order" # Broken links engine: second-order|legacy
 SPRAY=true # Performs password spraying
+SPRAY_ENGINE="brutespray" # brutespray|brutus
+SPRAY_BRUTUS_ONLY_DEEP=true # Run brutus only in DEEP mode unless disabled
+BRUTUS_USERNAMES="" # Optional comma-separated usernames for brutus
+BRUTUS_PASSWORDS="" # Optional comma-separated passwords for brutus
+BRUTUS_KEY_FILE="" # Optional SSH private key path for brutus
 COMM_INJ=true # Check for command injections with commix
 SMUGGLING=true # Check for HTTP request smuggling flaws
 WEBCACHE=true # Check for Web Cache issues
@@ -765,6 +783,8 @@ GRAPHQL_CHECK=true # Detect GraphQL endpoints and introspection
 GQLSPECTION=false # Run GQLSpection deep introspection on detected GraphQL endpoints (heavier)
 PARAM_DISCOVERY=true # Parameter discovery with arjun
 GRPC_SCAN=false # Attempt basic gRPC reflection on common ports
+LLM_PROBE=false # Probe discovered web/API endpoints for LLM services with julius
+LLM_PROBE_AUGUSTUS=false # Include augustus generator config in julius output
 
 # IPv6
 IPV6_SCAN=true # Attempt IPv6 discovery/portscan where addresses exist

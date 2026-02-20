@@ -462,10 +462,6 @@ function spraying() {
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SPRAY == true ]] \
         && [[ -s "$dir/hosts/portscan_active.gnmap" ]] && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 
-        if ! command -v brutespray >/dev/null 2>&1; then
-            _print_msg WARN "${FUNCNAME[0]}: brutespray not found in PATH"
-            return 0
-        fi
         start_func "${FUNCNAME[0]}" "Password Spraying"
 
         # Ensure portscan_active.gnmap exists and is not empty
@@ -475,11 +471,52 @@ function spraying() {
             return 1
         fi
 
+        local spray_engine="${SPRAY_ENGINE:-brutespray}"
+        if [[ "$spray_engine" == "brutus" ]]; then
+            if [[ "${SPRAY_BRUTUS_ONLY_DEEP:-true}" == "true" && "${DEEP:-false}" != "true" ]]; then
+                end_func "Brutus spraying is DEEP-gated (set DEEP=true or SPRAY_BRUTUS_ONLY_DEEP=false)" "${FUNCNAME[0]}" SKIP
+                return 0
+            fi
+            if ! command -v brutus >/dev/null 2>&1; then
+                _print_msg WARN "${FUNCNAME[0]}: brutus not found in PATH"
+                end_func "Brutus not available, skipping" "${FUNCNAME[0]}" SKIP
+                return 0
+            fi
+
+            local brutus_input=""
+            if [[ -s "$dir/hosts/fingerprintx.jsonl" ]]; then
+                brutus_input="$dir/hosts/fingerprintx.jsonl"
+            elif [[ -s "$dir/hosts/naabu_open.txt" ]] && command -v fingerprintx >/dev/null 2>&1; then
+                run_command fingerprintx --json -l "$dir/hosts/naabu_open.txt" -o "$dir/.tmp/fingerprintx_for_brutus.jsonl" 2>>"$LOGFILE" >/dev/null || true
+                [[ -s "$dir/.tmp/fingerprintx_for_brutus.jsonl" ]] && brutus_input="$dir/.tmp/fingerprintx_for_brutus.jsonl"
+            fi
+
+            if [[ -z "$brutus_input" ]]; then
+                end_func "No fingerprintx JSON input for brutus (run portscan with SERVICE_FINGERPRINT=true)" "${FUNCNAME[0]}" SKIP
+                return 0
+            fi
+
+            local -a brutus_cmd=(brutus --json -o "$dir/vulns/brutus.jsonl")
+            [[ -n "${BRUTUS_USERNAMES:-}" ]] && brutus_cmd+=(-u "$BRUTUS_USERNAMES")
+            [[ -n "${BRUTUS_PASSWORDS:-}" ]] && brutus_cmd+=(-p "$BRUTUS_PASSWORDS")
+            [[ -n "${BRUTUS_KEY_FILE:-}" ]] && brutus_cmd+=(-k "$BRUTUS_KEY_FILE")
+
+            _print_msg INFO "Running: Password Spraying with Brutus"
+            if ! run_command "${brutus_cmd[@]}" <"$brutus_input" 2>>"$LOGFILE" >/dev/null; then
+                _print_msg WARN "Brutus command failed, continuing"
+            fi
+            end_func "Results are saved in vulns/brutus.jsonl" "${FUNCNAME[0]}"
+            return 0
+        fi
+
+        if ! command -v brutespray >/dev/null 2>&1; then
+            _print_msg WARN "${FUNCNAME[0]}: brutespray not found in PATH"
+            end_func "BruteSpray not available, skipping" "${FUNCNAME[0]}" SKIP
+            return 0
+        fi
+
         _print_msg INFO "Running: Password Spraying with BruteSpray"
-
-        # Run BruteSpray for password spraying
         brutespray -f "$dir/hosts/portscan_active.gnmap" -T "$BRUTESPRAY_CONCURRENCE" -o "$dir/vulns/brutespray" 2>>"$LOGFILE" >/dev/null
-
         end_func "Results are saved in vulns/brutespray folder" "${FUNCNAME[0]}"
 
     else

@@ -313,3 +313,91 @@ SH
   rm -f /tmp/ghleaks_args.txt
 }
 
+@test "service_fingerprint writes fingerprintx artifacts from naabu input" {
+  mkdir -p hosts .tmp
+  printf '%s\n' '10.10.10.10:22' > hosts/naabu_open.txt
+
+  cat > "$MOCK_BIN/fingerprintx" <<'SH'
+#!/usr/bin/env bash
+outfile=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o)
+      outfile="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+printf '%s\n' '{"host":"10.10.10.10","port":22,"protocol":"ssh"}' > "$outfile"
+SH
+  chmod +x "$MOCK_BIN/fingerprintx"
+
+  export SERVICE_FINGERPRINT=true
+  export SERVICE_FINGERPRINT_ENGINE="fingerprintx"
+  export SERVICE_FINGERPRINT_TIMEOUT_MS=500
+  export AXIOM=false
+
+  run service_fingerprint
+  [ "$status" -eq 0 ]
+  [ -s "hosts/fingerprintx.jsonl" ]
+  [ -s "hosts/fingerprintx.txt" ]
+  grep -q "10.10.10.10:22" "hosts/fingerprintx.txt"
+}
+
+@test "spraying supports brutus engine with fingerprintx json input" {
+  mkdir -p hosts vulns .tmp
+  printf '%s\n' 'Host: 10.10.10.10 () Ports: 22/open/tcp//ssh///' > hosts/portscan_active.gnmap
+  printf '%s\n' '{"host":"10.10.10.10","port":22,"protocol":"ssh"}' > hosts/fingerprintx.jsonl
+
+  cat > "$MOCK_BIN/brutus" <<'SH'
+#!/usr/bin/env bash
+outfile=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o)
+      outfile="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+cat >/dev/null
+printf '%s\n' '{"protocol":"ssh","target":"10.10.10.10:22","username":"root","password":"toor"}' > "$outfile"
+SH
+  chmod +x "$MOCK_BIN/brutus"
+
+  export SPRAY=true
+  export SPRAY_ENGINE="brutus"
+  export SPRAY_BRUTUS_ONLY_DEEP=false
+  export DEEP=false
+
+  run spraying
+  [ "$status" -eq 0 ]
+  [ -s "vulns/brutus.jsonl" ]
+  grep -q "10.10.10.10:22" "vulns/brutus.jsonl"
+}
+
+@test "llm_probe writes julius jsonl output" {
+  mkdir -p webs .tmp
+  printf '%s\n' 'https://llm.target.example.com' > webs/webs_all.txt
+
+  cat > "$MOCK_BIN/julius" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' '{"target":"https://llm.target.example.com","provider":"openai-compatible","probe":"chat-completions"}'
+SH
+  chmod +x "$MOCK_BIN/julius"
+
+  export LLM_PROBE=true
+  export LLM_PROBE_AUGUSTUS=false
+
+  run llm_probe
+  [ "$status" -eq 0 ]
+  [ -s "webs/llm_probe.jsonl" ]
+  [ -s "webs/llm_probe.txt" ]
+  grep -q "openai-compatible" "webs/llm_probe.txt"
+}

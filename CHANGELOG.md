@@ -109,6 +109,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `toxicache` for additional web cache poisoning coverage.
   - `postleaksNg` in `apileaks` for Postman leak discovery.
   - `favirecon` as `favirecon_tech` for favicon-based technology reconnaissance.
+  - Praetorian integrations:
+    - `fingerprintx` for service fingerprinting after host port discovery (`hosts/fingerprintx.[jsonl|txt]`).
+    - `brutus` as optional spraying engine (`SPRAY_ENGINE=brutus`) with DEEP gating support.
+    - `titus` and `noseyparker` as selectable GitHub repo secret engines (`SECRETS_ENGINE`).
+    - `gato` as optional GitHub Actions audit module (`github_actions_audit`, output `osint/github_actions_audit.[json|txt]`).
+    - `julius` as optional LLM endpoint probing module (`llm_probe`, output `webs/llm_probe.[jsonl|txt]`).
   - `TInjA` as the default `ssti` engine (`SSTI_ENGINE=TInjA`, with legacy fallback).
   - `second-order` as default `brokenLinks` engine (`BROKENLINKS_ENGINE=second-order`, with legacy fallback).
   - `ghleaks` in `github_leaks` for GitHub-wide secret search across all public repositories (combines GitHub Code Search API with gitleaks detection rules). Configurable via `GITHUB_LEAKS`, `GHLEAKS_THREADS`, and `--exhaustive` mode in DEEP.
