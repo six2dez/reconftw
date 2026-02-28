@@ -303,6 +303,7 @@ declare -A repos=(
     ["EmailHarvester"]="maldevel/EmailHarvester"
     ["reconftw_ai"]="six2dez/reconftw_ai"
     ["gato"]="praetorian-inc/gato"
+    ["SSTImap"]="vladko312/SSTImap"
 )
 
 # Function to display the banner
@@ -533,6 +534,12 @@ function install_tools() {
                     uv venv venv &>/dev/null || true
                 fi
                 uv pip install --upgrade -e . --python venv/bin/python3 &>/dev/null || true
+                ;;
+            "SSTImap")
+                if [[ ! -d "venv" ]]; then
+                    uv venv venv &>/dev/null || true
+                fi
+                uv pip install --upgrade -r requirements.txt --python venv/bin/python3 &>/dev/null || true
                 ;;
         esac
 

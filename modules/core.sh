@@ -411,6 +411,8 @@ function tools_installed() {
         ["reconftw_ai"]="${tools}/reconftw_ai/reconftw_ai.py"
         ["reconftw_ai_python"]="${tools}/reconftw_ai/venv/bin/python3"
         ["ghleaks"]="${tools}/ghleaks/ghleaks"
+        ["SSTImap"]="${tools}/SSTImap/sstimap.py"
+        ["SSTImap_python"]="${tools}/SSTImap/venv/bin/python3"
     )
 
     declare -A tools_folders=(
