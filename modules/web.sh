@@ -697,7 +697,7 @@ function portscan() {
 
 }
 
-_build_fingerprintx_targets_from_nmap() {
+_build_service_fp_targets_from_nmap() {
     local nmap_gnmap="$1"
     local out_file="$2"
     [[ ! -s "$nmap_gnmap" ]] && return 0
@@ -725,7 +725,7 @@ function service_fingerprint() {
     if [[ "${SERVICE_FINGERPRINT:-true}" != "true" ]]; then
         return 0
     fi
-    if [[ "${SERVICE_FINGERPRINT_ENGINE:-fingerprintx}" != "fingerprintx" ]]; then
+    if [[ "${SERVICE_FINGERPRINT_ENGINE:-nerva}" != "nerva" ]]; then
         _print_msg WARN "${FUNCNAME[0]}: unsupported SERVICE_FINGERPRINT_ENGINE=${SERVICE_FINGERPRINT_ENGINE}"
         return 0
     fi
@@ -733,37 +733,37 @@ function service_fingerprint() {
         log_note "service_fingerprint: local-only for now, skipped in AXIOM mode" "${FUNCNAME[0]}" "${LINENO}"
         return 0
     fi
-    if ! command -v fingerprintx >/dev/null 2>&1; then
-        _print_msg WARN "${FUNCNAME[0]}: fingerprintx not found in PATH"
+    if ! command -v nerva >/dev/null 2>&1; then
+        _print_msg WARN "${FUNCNAME[0]}: nerva not found in PATH"
         return 0
     fi
 
-    start_subfunc "${FUNCNAME[0]}" "Service fingerprinting (fingerprintx)"
+    start_subfunc "${FUNCNAME[0]}" "Service fingerprinting (nerva)"
 
-    local targets_file=".tmp/fingerprintx_targets.txt"
+    local targets_file=".tmp/service_fp_targets.txt"
     : >"$targets_file"
 
     if [[ -s "hosts/naabu_open.txt" ]]; then
         awk -F: 'NF==2 && $2 ~ /^[0-9]+$/ {print $1 ":" $2}' "hosts/naabu_open.txt" | sort -u | anew -q "$targets_file"
     fi
     if [[ ! -s "$targets_file" ]]; then
-        _build_fingerprintx_targets_from_nmap "hosts/portscan_active.gnmap" "$targets_file"
+        _build_service_fp_targets_from_nmap "hosts/portscan_active.gnmap" "$targets_file"
     fi
     if [[ ! -s "$targets_file" ]]; then
-        _build_fingerprintx_targets_from_nmap "hosts/portscan_active_targeted.gnmap" "$targets_file"
+        _build_service_fp_targets_from_nmap "hosts/portscan_active_targeted.gnmap" "$targets_file"
     fi
 
     if [[ -s "$targets_file" ]]; then
         local timeout_ms="${SERVICE_FINGERPRINT_TIMEOUT_MS:-2000}"
-        run_command fingerprintx --json -l "$targets_file" -w "$timeout_ms" -o "hosts/fingerprintx.jsonl" 2>>"$LOGFILE" >/dev/null || true
-        if [[ -s "hosts/fingerprintx.jsonl" ]]; then
-            jq -r '[(.host // .ip // .target // "unknown"), (.port // "unknown"), (.protocol // .service // "unknown")] | @tsv' "hosts/fingerprintx.jsonl" 2>/dev/null \
+        run_command nerva --json -l "$targets_file" -w "$timeout_ms" -o "hosts/service_fingerprints.jsonl" 2>>"$LOGFILE" >/dev/null || true
+        if [[ -s "hosts/service_fingerprints.jsonl" ]]; then
+            jq -r '[(.host // .ip // .target // "unknown"), (.port // "unknown"), (.protocol // .service // "unknown")] | @tsv' "hosts/service_fingerprints.jsonl" 2>/dev/null \
                 | awk -F'\t' '{printf "%s:%s [%s]\n", $1, $2, $3}' \
-                | anew -q "hosts/fingerprintx.txt"
+                | anew -q "hosts/service_fingerprints.txt"
         fi
     fi
 
-    end_subfunc "Results are saved in hosts/fingerprintx.[jsonl|txt]" "${FUNCNAME[0]}"
+    end_subfunc "Results are saved in hosts/service_fingerprints.[jsonl|txt]" "${FUNCNAME[0]}"
 }
 
 function cdnprovider() {

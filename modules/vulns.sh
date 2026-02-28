@@ -484,15 +484,15 @@ function spraying() {
             fi
 
             local brutus_input=""
-            if [[ -s "$dir/hosts/fingerprintx.jsonl" ]]; then
-                brutus_input="$dir/hosts/fingerprintx.jsonl"
-            elif [[ -s "$dir/hosts/naabu_open.txt" ]] && command -v fingerprintx >/dev/null 2>&1; then
-                run_command fingerprintx --json -l "$dir/hosts/naabu_open.txt" -o "$dir/.tmp/fingerprintx_for_brutus.jsonl" 2>>"$LOGFILE" >/dev/null || true
-                [[ -s "$dir/.tmp/fingerprintx_for_brutus.jsonl" ]] && brutus_input="$dir/.tmp/fingerprintx_for_brutus.jsonl"
+            if [[ -s "$dir/hosts/service_fingerprints.jsonl" ]]; then
+                brutus_input="$dir/hosts/service_fingerprints.jsonl"
+            elif [[ -s "$dir/hosts/naabu_open.txt" ]] && command -v nerva >/dev/null 2>&1; then
+                run_command nerva --json -l "$dir/hosts/naabu_open.txt" -o "$dir/.tmp/service_fp_for_brutus.jsonl" 2>>"$LOGFILE" >/dev/null || true
+                [[ -s "$dir/.tmp/service_fp_for_brutus.jsonl" ]] && brutus_input="$dir/.tmp/service_fp_for_brutus.jsonl"
             fi
 
             if [[ -z "$brutus_input" ]]; then
-                end_func "No fingerprintx JSON input for brutus (run portscan with SERVICE_FINGERPRINT=true)" "${FUNCNAME[0]}" SKIP
+                end_func "No service fingerprint JSON input for brutus (run portscan with SERVICE_FINGERPRINT=true)" "${FUNCNAME[0]}" SKIP
                 return 0
             fi
 
