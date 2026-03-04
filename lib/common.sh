@@ -612,37 +612,6 @@ skip_notification() {
     fi
 }
 
-# Compatibility: map pt_msg_warn to new status model
-pt_msg_warn() {
-    local msg="$*"
-    if [[ "$msg" == *"already processed"* ]]; then
-        _print_status CACHE "${FUNCNAME[1]:-module}" "0s"
-        if [[ -n "${called_fn_dir:-}" ]]; then
-            : >"${called_fn_dir}/.cache_${FUNCNAME[1]:-module}" 2>/dev/null || true
-        fi
-    elif [[ "$msg" == *"skipped"* ]]; then
-        _print_status SKIP "${FUNCNAME[1]:-module}" "0s"
-        if [[ -n "${called_fn_dir:-}" ]]; then
-            : >"${called_fn_dir}/.skip_${FUNCNAME[1]:-module}" 2>/dev/null || true
-        fi
-    else
-        _print_status WARN "${FUNCNAME[1]:-module}" "0s"
-        _print_msg WARN "$msg"
-    fi
-}
-
-# Wrapper for skip notification when function is disabled
-# Usage: skip_if_disabled && return
-skip_if_disabled() {
-    skip_notification "disabled"
-}
-
-# Wrapper for skip notification when function was already processed
-# Usage: skip_if_processed && return  
-skip_if_processed() {
-    skip_notification "processed"
-}
-
 ###############################################################################
 # Command Execution Helpers
 ###############################################################################
@@ -776,12 +745,20 @@ run_with_heartbeat_shell() {
     run_with_heartbeat "$label" /bin/bash -lc "$shell_cmd"
 }
 
-# Execute command and capture line count result with validation
-# Usage: NUMOFLINES=$(safe_count "command | pipeline")
+# Count non-empty lines in a file safely
+# Usage: NUMOFLINES=$(safe_count "file_path")
+#        NUMOFLINES=$(safe_count "command | pipeline")  # legacy: still supported via eval
 # Always returns a valid number (0 on failure)
 safe_count() {
     local result
-    result=$(eval "$1" 2>/dev/null | sed '/^$/d' | wc -l | tr -d ' ') || result=0
+    if [[ -f "$1" ]]; then
+        # Safe path: count lines in file directly, no eval
+        result=$(sed '/^$/d' "$1" 2>/dev/null | wc -l | tr -d ' ') || result=0
+    else
+        # Legacy fallback for callers passing pipeline strings
+        # TODO: migrate remaining callers to pass file paths
+        result=$(eval "$1" 2>/dev/null | sed '/^$/d' | wc -l | tr -d ' ') || result=0
+    fi
     [[ "$result" =~ ^[0-9]+$ ]] || result=0
     echo "$result"
 }

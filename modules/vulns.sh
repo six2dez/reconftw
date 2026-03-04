@@ -104,6 +104,8 @@ function ssrf_checks() {
         if [[ -z $COLLAB_SERVER ]]; then
             interactsh-client &>.tmp/ssrf_callback.txt &
             INTERACTSH_PID=$!
+            # Ensure interactsh is killed on function exit (prevents orphan processes)
+            trap 'kill "$INTERACTSH_PID" 2>/dev/null; trap - RETURN' RETURN
             sleep 2
 
             # Extract FFUFHASH from interactsh_callback.txt
@@ -171,7 +173,6 @@ function ssrf_checks() {
             end_func "Results are saved in vulns/ssrf_* (including alternate protocols)" "${FUNCNAME[0]}"
         else
             end_func "Skipping SSRF: Too many URLs to test, try with --deep flag." "${FUNCNAME[0]}"
-            printf "${bgreen}#######################################################################${reset}\n"
         fi
 
         # Terminate interactsh-client if it was started
@@ -422,7 +423,11 @@ function sqli() {
                                 # Check if GHAURI is enabled and run Ghauri
                 if [[ $GHAURI == true ]]; then
                     _print_msg INFO "Running: Ghauri for SQLi Checks"
-                    run_command interlace -tL ".tmp/tmp_sqli.txt" -threads "$INTERLACE_THREADS" -c "ghauri -u _target_ --batch -H \"${HEADER}\" --force-ssl >> vulns/ghauri_log.txt" 2>>"$LOGFILE" >/dev/null
+                    mkdir -p .tmp/ghauri_parts
+                    run_command interlace -tL ".tmp/tmp_sqli.txt" -threads "$INTERLACE_THREADS" -c "ghauri -u _target_ --batch -H \"${HEADER}\" --force-ssl >> .tmp/ghauri_parts/_cleantarget_.txt" 2>>"$LOGFILE" >/dev/null
+                    # Merge per-target outputs to avoid concurrent write corruption
+                    cat .tmp/ghauri_parts/*.txt 2>/dev/null | anew -q vulns/ghauri_log.txt || true
+                    rm -rf .tmp/ghauri_parts
                 fi
 
                 end_func "Results are saved in vulns/sqlmap folder" "${FUNCNAME[0]}"
@@ -460,9 +465,13 @@ function test_ssl() {
             echo "$domain" >"$dir/hosts/ips.txt"
         fi
 
-        # Run testssl.sh
+        # Run testssl.sh — prefer non-CDN IPs to avoid testing CDN TLS configs
+        local testssl_input="$dir/hosts/ips.txt"
+        if [[ -s "$dir/.tmp/ips_nocdn.txt" ]]; then
+            testssl_input="$dir/.tmp/ips_nocdn.txt"
+        fi
         _print_msg INFO "Running: SSL Test with testssl.sh"
-        run_command "${tools}/testssl.sh/testssl.sh" --quiet --color 0 -U -iL "$dir/hosts/ips.txt" 2>>"$LOGFILE" >"vulns/testssl.txt"
+        run_command "${tools}/testssl.sh/testssl.sh" --quiet --color 0 -U -iL "$testssl_input" 2>>"$LOGFILE" >"vulns/testssl.txt"
 
         end_func "Results are saved in vulns/testssl.txt" "${FUNCNAME[0]}"
 
@@ -625,20 +634,14 @@ function 4xxbypass() {
 
         if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT ]]; then
 
-            # Navigate to nomore403 tool directory
-            if ! pushd "${tools}/nomore403" >/dev/null; then
-                print_warnf "Failed to navigate to nomore403 directory."
-                end_func "Failed to navigate to nomore403 directory during 403 Bypass." "${FUNCNAME[0]}"
-                return 1
-            fi
-
-            # Run nomore403 on the processed URLs
-            ./nomore403 <"$dir/.tmp/403test.txt" >"$dir/.tmp/4xxbypass.txt" 2>>"$LOGFILE"
-
-            # Return to the original directory
-            if ! popd >/dev/null; then
-                print_warnf "Failed to return to the original directory."
-                end_func "Failed to return to the original directory during 403 Bypass." "${FUNCNAME[0]}"
+            # Run nomore403 in a subshell to avoid CWD pollution
+            (
+                cd "${tools}/nomore403" || exit 1
+                ./nomore403 <"$dir/.tmp/403test.txt" >"$dir/.tmp/4xxbypass.txt" 2>>"$LOGFILE"
+            )
+            if [[ $? -ne 0 ]]; then
+                print_warnf "nomore403 failed or directory not found."
+                end_func "Failed during 403 Bypass." "${FUNCNAME[0]}"
                 return 1
             fi
 
@@ -651,7 +654,7 @@ function 4xxbypass() {
 
         else
             notification "Too many URLs to bypass, skipping" warn
-            end_func "Skipping Command Injection: Too many URLs to test, try with --deep flag." "${FUNCNAME[0]}"
+            end_func "Skipping 403 Bypass: Too many URLs to test, try with --deep flag." "${FUNCNAME[0]}"
         fi
 
     else
@@ -745,22 +748,14 @@ function webcache() {
 
             _print_msg INFO "Running: Web Cache Poisoning Checks"
 
-            # Navigate to Web-Cache-Vulnerability-Scanner tool directory
-            if ! pushd "${tools}/Web-Cache-Vulnerability-Scanner" >/dev/null; then
-                print_warnf "Failed to navigate to Web-Cache-Vulnerability-Scanner directory."
-                end_func "Failed to navigate to Web-Cache-Vulnerability-Scanner directory during Web Cache Poisoning Checks." "${FUNCNAME[0]}"
-                return 1
-            fi
-
-            # Run the Web-Cache-Vulnerability-Scanner
-            Web-Cache-Vulnerability-Scanner -u "file:$dir/webs/webs_all.txt" -v 0 2>>"$LOGFILE" \
-                | anew -q "$dir/.tmp/webcache.txt"
-
-            # Return to the original directory
-            if ! popd >/dev/null; then
-                print_warnf "Failed to return to the original directory."
-                end_func "Failed to return to the original directory during Web Cache Poisoning Checks." "${FUNCNAME[0]}"
-                return 1
+            # Run Web-Cache-Vulnerability-Scanner in a subshell to avoid CWD pollution
+            (
+                cd "${tools}/Web-Cache-Vulnerability-Scanner" || exit 1
+                Web-Cache-Vulnerability-Scanner -u "file:$dir/webs/webs_all.txt" -v 0 2>>"$LOGFILE" \
+                    | anew -q "$dir/.tmp/webcache.txt"
+            )
+            if [[ $? -ne 0 ]]; then
+                print_warnf "Web-Cache-Vulnerability-Scanner failed or directory not found."
             fi
 
             # Append unique findings to vulns/webcache.txt

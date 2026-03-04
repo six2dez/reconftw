@@ -79,9 +79,14 @@ function github_repos() {
         GH_TOKEN=$(head -n 1 "$GITHUB_TOKENS")
         echo "$domain" | unfurl format %r >.tmp/company_name.txt
 
-        if ! run_command enumerepo -token-string "$GH_TOKEN" -usernames .tmp/company_name.txt -o .tmp/company_repos.txt 2>>"$LOGFILE" >/dev/null; then
+        # Use temp file for token to avoid exposing it in process list
+        local _token_file
+        _token_file=$(mktemp)
+        printf '%s' "$GH_TOKEN" > "$_token_file"
+        if ! run_command enumerepo -token-file "$_token_file" -usernames .tmp/company_name.txt -o .tmp/company_repos.txt 2>>"$LOGFILE" >/dev/null; then
             _print_error "enumerepo command failed"
         fi
+        rm -f "$_token_file"
 
         if [[ -s ".tmp/company_repos.txt" ]]; then
             if ! jq -r '.[].repos[]|.url' <.tmp/company_repos.txt >.tmp/company_repos_url.txt 2>>"$LOGFILE"; then
@@ -313,17 +318,12 @@ function metadata() {
         start_func "${FUNCNAME[0]}" "Scanning metadata in public files"
 
         ensure_dirs ".tmp/metagoofil_${domain}"
-        pushd "${tools}/metagoofil" >/dev/null || {
-            _print_error "Failed to change directory to ${tools}/metagoofil in ${FUNCNAME[0]} at line ${LINENO}"
-            return 1
-        }
-        if ! run_command "${tools}/metagoofil/venv/bin/python3" "${tools}/metagoofil/metagoofil.py" -d "${domain}" -t pdf,docx,xlsx -l 10 -w -o "${dir}/.tmp/metagoofil_${domain}/" 2>>"${LOGFILE}" >/dev/null; then
-            log_note "metadata: metagoofil failed; skipping metadata extraction" "${FUNCNAME[0]}" "${LINENO}"
-        fi
-        popd >/dev/null || {
-            _print_error "Failed to return to the previous directory in ${FUNCNAME[0]} at line ${LINENO}"
-            return 1
-        }
+        (
+            cd "${tools}/metagoofil" || exit 1
+            if ! run_command "${tools}/metagoofil/venv/bin/python3" "${tools}/metagoofil/metagoofil.py" -d "${domain}" -t pdf,docx,xlsx -l 10 -w -o "${dir}/.tmp/metagoofil_${domain}/" 2>>"${LOGFILE}" >/dev/null; then
+                log_note "metadata: metagoofil failed; skipping metadata extraction" "${FUNCNAME[0]}" "${LINENO}"
+            fi
+        )
 
         # Check if exiftool is installed before running
         if command -v exiftool &>/dev/null; then
@@ -374,31 +374,22 @@ function apileaks() {
             log_note "apileaks: porch-pirate returned empty output; continuing with swagger pipeline" "${FUNCNAME[0]}" "${LINENO}"
         fi
 
-        # Change directory to SwaggerSpy
-        if ! pushd "${tools}/SwaggerSpy" >/dev/null; then
-            _print_error "Failed to change directory to ${tools}/SwaggerSpy in ${FUNCNAME[0]} at line ${LINENO}"
-            return 1
-        fi
-
-        # Run swaggerspy.py and handle errors
-        local swag_cmd=("${tools}/SwaggerSpy/venv/bin/python3" "swaggerspy.py" "$domain")
-        local swag_timeout="${SWAGGERSPY_TIMEOUT:-5m}"
-        [[ -n ${TIMEOUT_CMD:-} ]] && swag_cmd=("$TIMEOUT_CMD" "$swag_timeout" "${swag_cmd[@]}")
-        local swagger_rc=0
-        {
-            run_command "${swag_cmd[@]}" 2>>"$LOGFILE" | grep -i "[*]\|URL" >"${dir}/osint/swagger_leaks.txt"
-            swagger_rc=${PIPESTATUS[0]:-0} # ignore grep exit code (no matches is fine)
-        } || true
-        if ((swagger_rc != 0)); then
-            _print_msg WARN "SwaggerSpy failed (exit ${swagger_rc}), continuing without swagger results."
-            log_note "SwaggerSpy failed (exit ${swagger_rc}), continuing without swagger results." "${FUNCNAME[0]}" "${LINENO}"
-        fi
-
-        # Return to the previous directory
-        if ! popd >/dev/null; then
-            _print_error "Failed to return to the previous directory in ${FUNCNAME[0]} at line ${LINENO}"
-            return 1
-        fi
+        # Run SwaggerSpy in a subshell to avoid CWD pollution
+        (
+            cd "${tools}/SwaggerSpy" || exit 1
+            local swag_cmd=("${tools}/SwaggerSpy/venv/bin/python3" "swaggerspy.py" "$domain")
+            local swag_timeout="${SWAGGERSPY_TIMEOUT:-5m}"
+            [[ -n ${TIMEOUT_CMD:-} ]] && swag_cmd=("$TIMEOUT_CMD" "$swag_timeout" "${swag_cmd[@]}")
+            local swagger_rc=0
+            {
+                run_command "${swag_cmd[@]}" 2>>"$LOGFILE" | grep -i "[*]\|URL" >"${dir}/osint/swagger_leaks.txt"
+                swagger_rc=${PIPESTATUS[0]:-0}
+            } || true
+            if ((swagger_rc != 0)); then
+                _print_msg WARN "SwaggerSpy failed (exit ${swagger_rc}), continuing without swagger results."
+                log_note "SwaggerSpy failed (exit ${swagger_rc}), continuing without swagger results." "${FUNCNAME[0]}" "${LINENO}"
+            fi
+        )
 
         # Optional postleaksNg integration (Postman public library leaks)
         if [[ ${API_LEAKS_POSTLEAKS:-true} == true ]]; then
@@ -476,20 +467,11 @@ function emails() {
             grep "@" .tmp/EmailHarvester.txt | anew -q osint/emails.txt || true
         fi
 
-        # Change directory to LeakSearch
-        if ! pushd "${tools}/LeakSearch" >/dev/null; then
-            _print_error "Failed to change directory to ${tools}/LeakSearch in ${FUNCNAME[0]} at line ${LINENO}"
-            return 1
-        fi
-
-        # Run LeakSearch.py and handle errors
-        run_command "${tools}/LeakSearch/venv/bin/python3" LeakSearch.py -k "$domain" -o "${dir}/.tmp/passwords.txt" 1>>"$LOGFILE"
-
-        # Return to the previous directory
-        if ! popd >/dev/null; then
-            _print_error "Failed to return to the previous directory in ${FUNCNAME[0]} at line ${LINENO}"
-            return 1
-        fi
+        # Run LeakSearch in a subshell to avoid CWD pollution
+        (
+            cd "${tools}/LeakSearch" || exit 1
+            run_command "${tools}/LeakSearch/venv/bin/python3" LeakSearch.py -k "$domain" -o "${dir}/.tmp/passwords.txt" 1>>"$LOGFILE"
+        )
 
         # Process passwords.txt
         if [[ -s "${dir}/.tmp/passwords.txt" ]]; then
@@ -568,25 +550,15 @@ function third_party_misconfigs() {
         # Extract company name from domain
         company_name=$(unfurl format %r <<<"$domain")
 
-        # Change directory to Spoofy tool
-        if ! pushd "${tools}/misconfig-mapper" >/dev/null; then
-            print_warnf "Failed to change directory to %s in %s at line %s." \
-                "${tools}/misconfig-mapper" "${FUNCNAME[0]}" "$LINENO"
-            return 1
-        fi
-
-        run_command misconfig-mapper -update-templates 1>>"$LOGFILE"
-        run_command misconfig-mapper -target "$domain" -as-domain true -permutations false -skip-ssl \
-            -service "*" -verbose 0 | anew -q "${dir}/osint/3rdparts_misconfigurations.txt"
-        run_command misconfig-mapper -target "$company_name" -skip-ssl -verbose 0 -service "*" \
-            | anew -q "${dir}/osint/3rdparts_misconfigurations.txt"
-
-        # Return to the previous directory
-        if ! popd >/dev/null; then
-            print_warnf "Failed to return to previous directory in %s at line %s." \
-                "${FUNCNAME[0]}" "$LINENO"
-            return 1
-        fi
+        # Run misconfig-mapper in a subshell to avoid CWD pollution
+        (
+            cd "${tools}/misconfig-mapper" || exit 1
+            run_command misconfig-mapper -update-templates 1>>"$LOGFILE"
+            run_command misconfig-mapper -target "$domain" -as-domain true -permutations false -skip-ssl \
+                -service "*" -verbose 0 | anew -q "${dir}/osint/3rdparts_misconfigurations.txt"
+            run_command misconfig-mapper -target "$company_name" -skip-ssl -verbose 0 -service "*" \
+                | anew -q "${dir}/osint/3rdparts_misconfigurations.txt"
+        )
 
         end_func "Results are saved in $domain/osint/3rdparts_misconfigurations.txt" "${FUNCNAME[0]}"
 
@@ -611,22 +583,11 @@ function spoof() {
 
         start_func "${FUNCNAME[0]}" "Searching for spoofable domains"
 
-        # Change directory to Spoofy tool
-        if ! pushd "${tools}/Spoofy" >/dev/null; then
-            print_warnf "Failed to change directory to %s in %s at line %s." \
-                "${tools}/Spoofy" "${FUNCNAME[0]}" "$LINENO"
-            return 1
-        fi
-
-        # Run spoofy.py and handle errors
-        run_command "${tools}/Spoofy/venv/bin/python3" spoofy.py -d "$domain" >"${dir}/osint/spoof.txt"
-
-        # Return to the previous directory
-        if ! popd >/dev/null; then
-            print_warnf "Failed to return to previous directory in %s at line %s." \
-                "${FUNCNAME[0]}" "$LINENO"
-            return 1
-        fi
+        # Run Spoofy in a subshell to avoid CWD pollution
+        (
+            cd "${tools}/Spoofy" || exit 1
+            run_command "${tools}/Spoofy/venv/bin/python3" spoofy.py -d "$domain" >"${dir}/osint/spoof.txt"
+        )
 
         end_func "Results are saved in $domain/osint/spoof.txt" "${FUNCNAME[0]}"
 

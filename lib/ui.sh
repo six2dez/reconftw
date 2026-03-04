@@ -221,10 +221,6 @@ ui_header() {
     printf "%s\n\n" "$(ui_truncate_text "$line" "$width")"
 }
 
-ui_section() {
-    _print_section "$1"
-}
-
 ui_progress() {
     local step="$1" current="$2" total="$3" pct="$4" eta="$5"
     local counters

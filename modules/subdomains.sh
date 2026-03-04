@@ -107,22 +107,11 @@ deep_wildcard_filter() {
                     rm -f ".tmp/dwf_new_wildcards.txt"
 
                     # Filter out subdomains under wildcard parents
-                    : > ".tmp/dwf_filtered.txt"
-                    while IFS= read -r subdomain; do
-                        local is_under_wildcard=false
-                        while IFS= read -r wildcard; do
-                            if [[ "$subdomain" == *".$wildcard" ]] || [[ "$subdomain" == "$wildcard" ]]; then
-                                is_under_wildcard=true
-                                break
-                            fi
-                        done < ".tmp/dwf_wildcards.txt"
-
-                        if [[ "$is_under_wildcard" == false ]]; then
-                            echo "$subdomain" >> ".tmp/dwf_filtered.txt"
-                        fi
-                    done < ".tmp/dwf_working.txt"
-
+                    # Build grep pattern file: each wildcard becomes a suffix pattern
+                    awk '{print "\\." $0 "$"; print "^" $0 "$"}' ".tmp/dwf_wildcards.txt" > ".tmp/dwf_grep_patterns.txt"
+                    grep -vEf ".tmp/dwf_grep_patterns.txt" ".tmp/dwf_working.txt" > ".tmp/dwf_filtered.txt" || true
                     mv ".tmp/dwf_filtered.txt" ".tmp/dwf_working.txt"
+                    rm -f ".tmp/dwf_grep_patterns.txt"
                 fi
             fi
         fi
@@ -210,7 +199,7 @@ _subdomains_init() {
         if [[ -s "$sensitive_file" ]]; then
             if _is_sensitive_domain "$domain" "$sensitive_file"; then
                 _print_status FAIL "Sensitive domain" "0s"
-                printf "         Domain '%s' matches sensitive pattern. Set EXCLUDE_SENSITIVE=false to override.\n" "$domain"
+                _print_msg WARN "Domain '${domain}' matches sensitive pattern. Set EXCLUDE_SENSITIVE=false to override."
                 return 1
             fi
         fi
@@ -589,8 +578,7 @@ function sub_crt() {
                     log_note "sub_crt: crt source returned no valid JSON; continuing with fallback sources" "${FUNCNAME[0]}" "${LINENO}"
                 fi
                 [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && \
-                    printf "%b[*] Time fencing enabled: filtering crt.sh results to last %d days (since %s)%b\n" \
-                        "$bblue" "${DNS_TIME_FENCE_DAYS}" "$cutoff_date" "$reset"
+                    _print_msg INFO "Time fencing enabled: filtering crt.sh results to last ${DNS_TIME_FENCE_DAYS} days (since ${cutoff_date})"
             else
                 # Fallback if date calculation fails
                 if ! run_command crt -s -json -l "${CTR_LIMIT}" "$domain" 2>>"$LOGFILE" \
@@ -699,12 +687,13 @@ function sub_active() {
         local matched_count=0
         if [[ -s ".tmp/subdomains_tmp.txt" ]]; then
             candidate_count=$(wc -l <.tmp/subdomains_tmp.txt 2>/dev/null | tr -d ' ')
-            matched_count=$(grep -E "$DOMAIN_MATCH_REGEX" .tmp/subdomains_tmp.txt 2>>"$LOGFILE" \
+            # Run the filtering pipeline ONCE, save matched results to temp file
+            grep -E "$DOMAIN_MATCH_REGEX" .tmp/subdomains_tmp.txt 2>>"$LOGFILE" \
                 | grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
-                | sed '/^$/d' | wc -l | tr -d ' ' || true)
-            NUMOFLINES=$(grep -E "$DOMAIN_MATCH_REGEX" .tmp/subdomains_tmp.txt 2>>"$LOGFILE" \
-                | grep -E '^([a-zA-Z0-9\.\-]+\.)+[a-zA-Z]{1,}$' \
-                | anew subdomains/subdomains.txt | sed '/^$/d' | wc -l | tr -d ' ' || true)
+                | sed '/^$/d' > .tmp/sub_active_matched.txt || true
+            matched_count=$(wc -l <.tmp/sub_active_matched.txt 2>/dev/null | tr -d ' ')
+            NUMOFLINES=$(anew subdomains/subdomains.txt <.tmp/sub_active_matched.txt | sed '/^$/d' | wc -l | tr -d ' ' || true)
+            rm -f .tmp/sub_active_matched.txt
             [[ "$matched_count" =~ ^[0-9]+$ ]] || matched_count=0
             [[ "$NUMOFLINES" =~ ^[0-9]+$ ]] || NUMOFLINES=0
         else
@@ -755,9 +744,10 @@ function sub_tls() {
         fi
 
         if [[ -s ".tmp/subdomains_tlsx.txt" ]]; then
+            # tlsx outputs plain domain names (not URLs), so match domains directly
             grep -E "$DOMAIN_MATCH_REGEX" .tmp/subdomains_tlsx.txt \
-                | grep -aEo 'https?://[^ ]+' \
                 | sed "s/|__ //" \
+                | grep -aEo '[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' \
                 | sed '/^$/d' \
                 | anew -q .tmp/subdomains_tlsx_clean.txt || true
         fi
@@ -1420,26 +1410,17 @@ function sub_regex_permut() {
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBREGEXPERMUTE == true ]]; then
         start_subfunc "${FUNCNAME[0]}" "Running: Permutations by regex analysis"
 
-        # Change to the regulator directory
-        if ! pushd "${tools}/regulator" >/dev/null; then
-            print_warnf "Failed to change directory to %s." "${tools}/regulator"
-            return 1
-        fi
-
         # If in multi mode and subdomains.txt doesn't exist, create it
         if [[ -n $multi ]] && [[ ! -f "$dir/subdomains/subdomains.txt" ]]; then
             printf "%b\n" "$domain" >"$dir/subdomains/subdomains.txt"
         fi
 
-        # Run the main.py script
-        run_command "${tools}/regulator/venv/bin/python3" main.py -t "$domain" -f "${dir}/subdomains/subdomains.txt" -o "${dir}/.tmp/${domain}.brute" \
-            2>>"$LOGFILE" >/dev/null
-
-        # Return to the previous directory
-        if ! popd >/dev/null; then
-            print_warnf "Failed to return to previous directory."
-            return 1
-        fi
+        # Run regulator in a subshell to avoid CWD pollution
+        (
+            cd "${tools}/regulator" || exit 1
+            run_command "${tools}/regulator/venv/bin/python3" main.py -t "$domain" -f "${dir}/subdomains/subdomains.txt" -o "${dir}/.tmp/${domain}.brute" \
+                2>>"$LOGFILE" >/dev/null
+        )
 
         # Resolve the generated domains
         if [[ $AXIOM != true ]]; then
@@ -2180,9 +2161,8 @@ function geo_info() {
                 print_warnf "Failed to create ipinfo.txt."
             fi
 
-            while IFS= read -r ip; do
-                run_command curl -s "https://ipinfo.io/widget/demo/$ip" >>"${dir}/hosts/ipinfo.txt"
-            done <"$ips_file"
+            # Parallel geo lookups (limit to first 500 IPs and 10 concurrent requests)
+            head -n 500 "$ips_file" | xargs -P 10 -I {} curl -s "https://ipinfo.io/widget/demo/{}" >> "${dir}/hosts/ipinfo.txt" 2>/dev/null || true
         fi
 
         end_func "Results are saved in hosts/ipinfo.txt" "${FUNCNAME[0]}"

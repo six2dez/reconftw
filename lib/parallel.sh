@@ -324,31 +324,7 @@ _parallel_batch_summary() {
 # Run multiple commands in parallel with a job limit
 # Usage: parallel_run max_jobs "cmd1" "cmd2" "cmd3" ...
 # Example: parallel_run 4 "subfinder -d $domain" "amass enum -d $domain"
-parallel_run() {
-    local max_jobs
-    max_jobs=$(_parallel_effective_max_jobs "${1:-$PARALLEL_MAX_JOBS}")
-    shift
-
-    local -a pids=()
-    local cmd
-    local running=0
-
-    for cmd in "$@"; do
-        # Start command in background (use bash -c to avoid eval injection)
-        bash -c "$cmd" &
-        pids+=($!)
-        ((running++))
-
-        # If we've reached max jobs, wait for one to finish
-        if ((running >= max_jobs)); then
-            wait -n 2>/dev/null || true
-            ((running--))
-        fi
-    done
-
-    # Wait for all remaining jobs
-    wait "${pids[@]}" 2>/dev/null
-}
+# parallel_run() removed — was unused and had injection vector (bash -c "$cmd")
 
 # Run multiple functions in parallel with a job limit
 # Usage: parallel_funcs max_jobs func1 func2 func3 ...
@@ -362,7 +338,7 @@ parallel_funcs() {
     if [[ -n "${dir:-}" ]]; then
         parallel_log_root="${dir}/.tmp/parallel"
     else
-        parallel_log_root="/tmp/reconftw_parallel.$$"
+        parallel_log_root="$(mktemp -d /tmp/reconftw_parallel.XXXXXX)"
     fi
     mkdir -p "$parallel_log_root" 2>/dev/null || true
 
@@ -800,8 +776,6 @@ parallel_brute_enum() {
 # Usage: parallel_web_vulns
 parallel_web_vulns() {
     local funcs=(
-        "cors"
-        "open_redirect"
         "crlf_checks"
         "xss"
     )
@@ -836,8 +810,6 @@ parallel_injection_vulns() {
 # Usage: parallel_server_vulns
 parallel_server_vulns() {
     local funcs=(
-        "crlf_checks"
-        "xss"
         "ssrf_checks"
         "lfi"
     )
@@ -878,68 +850,4 @@ parallel_osint() {
 ###############################################################################
 
 # Orchestrate full subdomain enumeration with parallelization
-# Usage: parallel_subdomains_full
-# This replaces the sequential execution in subdomains_full()
-parallel_subdomains_full() {
-    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
-        printf "%b[*] Starting parallelized subdomain enumeration%b\n" \
-            "${bblue:-}" "${reset:-}"
-    fi
-    
-    # Phase 1: Passive enumeration (parallel - no dependencies)
-    parallel_passive_enum
-    
-    # Merge passive results before active phase
-    if [[ -s ".tmp/passive_subs.txt" ]]; then
-        cat .tmp/passive_subs.txt | anew -q subdomains/subdomains.txt
-    fi
-    if [[ -s ".tmp/crtsh_subs.txt" ]]; then
-        cat .tmp/crtsh_subs.txt | anew -q subdomains/subdomains.txt
-    fi
-    
-    # Phase 2: Active enumeration (parallel - resolves subdomains)
-    parallel_active_enum
-    
-    # Phase 3: Post-active (parallel - requires resolved subdomains)
-    parallel_postactive_enum
-    
-    # Phase 4: Brute force (sequential due to resource usage and shared files)
-    if [[ ${SUBBRUTE:-false} == true ]] || [[ ${SUBPERMUTE:-false} == true ]]; then
-        parallel_brute_enum
-    fi
-    
-    # Phase 5: Scraping and recursive (sequential - depends on previous results)
-    if [[ ${SUBSCRAPING:-false} == true ]]; then
-        sub_scraping
-    fi
-    if [[ ${SUB_RECURSIVE_BRUTE:-false} == true ]]; then
-        sub_recursive_brute
-    fi
-    
-    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
-        printf "%b[*] Parallelized subdomain enumeration complete%b\n" \
-            "${bgreen:-}" "${reset:-}"
-    fi
-}
-
-# Orchestrate full vulnerability scanning with parallelization
-# Usage: parallel_vulns_full
-parallel_vulns_full() {
-    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
-        printf "%b[*] Starting parallelized vulnerability scanning%b\n" \
-            "${bblue:-}" "${reset:-}"
-    fi
-    
-    # Run nuclei first (it's comprehensive)
-    nuclei_check
-    
-    # Then run other checks in parallel batches
-    parallel_web_vulns
-    parallel_injection_vulns
-    parallel_server_vulns
-    
-    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]]; then
-        printf "%b[*] Parallelized vulnerability scanning complete%b\n" \
-            "${bgreen:-}" "${reset:-}"
-    fi
-}
+# parallel_subdomains_full() and parallel_vulns_full() removed — defined but never called

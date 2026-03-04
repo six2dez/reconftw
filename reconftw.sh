@@ -120,22 +120,24 @@ if [[ $OSTYPE == "darwin"* ]]; then
         _print_error "Brew is not installed or not in the PATH"
         exit 1
     fi
-    if [[ ! -x "$(brew --prefix gnu-getopt)/bin/getopt" ]]; then
+    # Cache brew --prefix to avoid calling it 6+ times (100-300ms each)
+    _brew_prefix="$(brew --prefix)"
+    if [[ ! -x "${_brew_prefix}/opt/gnu-getopt/bin/getopt" ]]; then
         _print_error "Brew formula gnu-getopt is not installed"
         exit 1
     fi
-    if [[ ! -d "$(brew --prefix coreutils)/libexec/gnubin" ]]; then
+    if [[ ! -d "${_brew_prefix}/opt/coreutils/libexec/gnubin" ]]; then
         _print_error "Brew formula coreutils is not installed"
         exit 1
     fi
-    if [[ ! -d "$(brew --prefix gnu-sed)/libexec/gnubin" ]]; then
+    if [[ ! -d "${_brew_prefix}/opt/gnu-sed/libexec/gnubin" ]]; then
         _print_error "Brew formula gnu-sed is not installed"
         exit 1
     fi
-    # Prefix is different depending on Intel vs Apple Silicon
-    PATH="$(brew --prefix gnu-getopt)/bin:$PATH"
-    PATH="$(brew --prefix coreutils)/libexec/gnubin:$PATH"
-    PATH="$(brew --prefix gnu-sed)/libexec/gnubin:$PATH"
+    PATH="${_brew_prefix}/opt/gnu-getopt/bin:$PATH"
+    PATH="${_brew_prefix}/opt/coreutils/libexec/gnubin:$PATH"
+    PATH="${_brew_prefix}/opt/gnu-sed/libexec/gnubin:$PATH"
+    unset _brew_prefix
 fi
 
 CLI_ARGS=()
@@ -347,22 +349,22 @@ while true; do
             continue
             ;;
         '--quick-rescan')
-            QUICK_RESCAN=true
+            CLI_QUICK_RESCAN=true
             shift
             continue
             ;;
         '--incremental')
-            INCREMENTAL_MODE=true
+            CLI_INCREMENTAL_MODE=true
             shift
             continue
             ;;
         '--adaptive-rate')
-            ADAPTIVE_RATE_LIMIT=true
+            CLI_ADAPTIVE_RATE_LIMIT=true
             shift
             continue
             ;;
         '--dry-run')
-            DRY_RUN=true
+            CLI_DRY_RUN=true
             shift
             continue
             ;;
@@ -404,7 +406,7 @@ while true; do
             continue
             ;;
         '--force')
-            FORCE_RESCAN=true
+            CLI_FORCE_RESCAN=true
             shift
             continue
             ;;
@@ -423,7 +425,7 @@ while true; do
             continue
             ;;
         '--no-report')
-            NO_REPORT=true
+            CLI_NO_REPORT=true
             shift
             continue
             ;;
@@ -538,6 +540,24 @@ if [[ -n "${CLI_AXIOM_FLEET_COUNT:-}" ]]; then
     AXIOM_FLEET_LAUNCH=true
     AXIOM_FLEET_COUNT="${CLI_AXIOM_FLEET_COUNT}"
 fi
+if [[ "${CLI_QUICK_RESCAN:-false}" == "true" ]]; then
+    QUICK_RESCAN=true
+fi
+if [[ "${CLI_INCREMENTAL_MODE:-false}" == "true" ]]; then
+    INCREMENTAL_MODE=true
+fi
+if [[ "${CLI_ADAPTIVE_RATE_LIMIT:-false}" == "true" ]]; then
+    ADAPTIVE_RATE_LIMIT=true
+fi
+if [[ "${CLI_DRY_RUN:-false}" == "true" ]]; then
+    DRY_RUN=true
+fi
+if [[ "${CLI_FORCE_RESCAN:-false}" == "true" ]]; then
+    FORCE_RESCAN=true
+fi
+if [[ "${CLI_NO_REPORT:-false}" == "true" ]]; then
+    NO_REPORT=true
+fi
 if [[ "${LOG_FORMAT:-plain}" == "jsonl-strict" ]]; then
     # Machine-only output mode: suppress human-oriented rendering.
     OUTPUT_VERBOSITY=0
@@ -578,7 +598,7 @@ if [[ -n $outOfScope_file ]]; then
     isAsciiText "$outOfScope_file"
     if [[ "False" == "$IS_ASCII" ]]; then
         _print_error "Out of Scope file is not a text file"
-        exit
+        exit $E_INVALID_INPUT
     fi
 fi
 
@@ -586,7 +606,7 @@ if [[ -n $inScope_file ]]; then
     isAsciiText "$inScope_file"
     if [[ "False" == "$IS_ASCII" ]]; then
         _print_error "In Scope file is not a text file"
-        exit
+        exit $E_INVALID_INPUT
     fi
 fi
 
@@ -743,10 +763,10 @@ case $opt_mode in
             fi
         else
             _print_error "Web mode needs a website list file as target (./reconftw.sh -l target.txt -w)"
-            exit
+            exit $E_INVALID_INPUT
         fi
         webs_menu
-        exit
+        exit 0
         ;;
     'n')
         PRESERVE=true

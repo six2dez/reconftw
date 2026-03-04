@@ -17,11 +17,11 @@ function deleteOutScoped() {
     if [[ -s "$1" ]]; then
         while IFS= read -r outscoped; do
             [[ -z "$outscoped" ]] && continue
-            # Escape regex metacharacters to prevent injection
+            # Escape regex metacharacters including / to prevent sed delimiter injection
             local escaped
-            escaped=$(printf '%s' "$outscoped" | sed 's/[.[\*^$()+?{|\\]/\\&/g')
+            escaped=$(printf '%s' "$outscoped" | sed 's/[.[\*^$()+?{|/\\]/\\&/g')
             if grep -q "^[*]" <<<"$outscoped"; then
-                escaped=$(printf '%s' "${outscoped:1}" | sed 's/[.[\*^$()+?{|\\]/\\&/g')
+                escaped=$(printf '%s' "${outscoped:1}" | sed 's/[.[\*^$()+?{|/\\]/\\&/g')
                 sed_i "/${escaped}$/d" "$2"
             else
                 sed_i "/${escaped}/d" "$2"
@@ -82,20 +82,7 @@ function rotate_logs() {
     fi
 }
 
-function sanitize_interlace_input() {
-    # Remove lines containing shell metacharacters that could be exploited
-    # via interlace template substitution (_target_, _output_, _cleantarget_)
-    local infile="$1"
-    local outfile="${2:-$1}"
-    if [[ "$infile" == "$outfile" ]]; then
-        local tmpfile
-        tmpfile=$(mktemp)
-        grep -v '[;|&$`\\(){}]' "$infile" >"$tmpfile" 2>/dev/null || true
-        mv "$tmpfile" "$outfile"
-    else
-        grep -v '[;|&$`\\(){}]' "$infile" >"$outfile" 2>/dev/null || true
-    fi
-}
+# sanitize_interlace_input() — canonical definition in lib/validation.sh
 
 function validate_config() {
     local warnings=0
@@ -241,16 +228,17 @@ function apply_performance_profile() {
 }
 
 function getElapsedTime {
+    # Sets $runtime (for backward compat) and also prints to stdout
     runtime=""
-    local T=$2-$1
+    local T=$(($2 - $1))
     local D=$((T / 60 / 60 / 24))
     local H=$((T / 60 / 60 % 24))
     local M=$((T / 60 % 60))
     local S=$((T % 60))
-    ((D > 0)) && runtime="$runtime$D days, "
-    ((H > 0)) && runtime="$runtime$H hours, "
-    ((M > 0)) && runtime="$runtime$M minutes, "
-    runtime="$runtime$S seconds."
+    ((D > 0)) && runtime="${runtime}${D} days, "
+    ((H > 0)) && runtime="${runtime}${H} hours, "
+    ((M > 0)) && runtime="${runtime}${M} minutes, "
+    runtime="${runtime}${S} seconds."
 }
 
 # Retry with exponential backoff
@@ -786,7 +774,7 @@ function should_run_deep2() {
 ###############################################################################################################
 
 CACHE_DIR="${SCRIPTPATH}/.cache"
-CACHE_MAX_AGE_DAYS=30 # 1 month
+CACHE_MAX_AGE_DAYS="${CACHE_MAX_AGE_DAYS:-30}" # 1 month default, user-configurable
 
 # Initialize cache directory
 function cache_init() {
