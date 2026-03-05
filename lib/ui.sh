@@ -73,15 +73,20 @@ ui_human_output_enabled() {
 }
 
 ui_term_width() {
+    if [[ -n "$_UI_CACHED_WIDTH" ]]; then
+        printf "%s" "$_UI_CACHED_WIDTH"
+        return 0
+    fi
     local width="${COLUMNS:-0}"
     if ! [[ "$width" =~ ^[0-9]+$ ]] || ((width < 20)); then
         if command -v tput >/dev/null 2>&1; then
-            width=$(tput cols 2>/dev/null || echo 0)
+            width=$(timeout 1 tput cols 2>/dev/null || echo 0)
         fi
     fi
     if ! [[ "$width" =~ ^[0-9]+$ ]] || ((width < 20)); then
         width=80
     fi
+    _UI_CACHED_WIDTH="$width"
     printf "%s" "$width"
 }
 
@@ -219,10 +224,6 @@ ui_header() {
     fi
     line=$(printf "Started: %s" "$started")
     printf "%s\n\n" "$(ui_truncate_text "$line" "$width")"
-}
-
-ui_section() {
-    _print_section "$1"
 }
 
 ui_progress() {

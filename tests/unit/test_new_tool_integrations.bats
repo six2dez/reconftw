@@ -988,11 +988,11 @@ SH
   rm -f /tmp/ghleaks_args.txt
 }
 
-@test "service_fingerprint writes fingerprintx artifacts from naabu input" {
+@test "service_fingerprint writes nerva artifacts from naabu input" {
   mkdir -p hosts .tmp
   printf '%s\n' '10.10.10.10:22' > hosts/naabu_open.txt
 
-  cat > "$MOCK_BIN/fingerprintx" <<'SH'
+  cat > "$MOCK_BIN/nerva" <<'SH'
 #!/usr/bin/env bash
 outfile=""
 while [[ $# -gt 0 ]]; do
@@ -1008,24 +1008,24 @@ while [[ $# -gt 0 ]]; do
 done
 printf '%s\n' '{"host":"10.10.10.10","port":22,"protocol":"ssh"}' > "$outfile"
 SH
-  chmod +x "$MOCK_BIN/fingerprintx"
+  chmod +x "$MOCK_BIN/nerva"
 
   export SERVICE_FINGERPRINT=true
-  export SERVICE_FINGERPRINT_ENGINE="fingerprintx"
+  export SERVICE_FINGERPRINT_ENGINE="nerva"
   export SERVICE_FINGERPRINT_TIMEOUT_MS=500
   export AXIOM=false
 
   run service_fingerprint
   [ "$status" -eq 0 ]
-  [ -s "hosts/fingerprintx.jsonl" ]
-  [ -s "hosts/fingerprintx.txt" ]
-  grep -q "10.10.10.10:22" "hosts/fingerprintx.txt"
+  [ -s "hosts/service_fingerprints.jsonl" ]
+  [ -s "hosts/service_fingerprints.txt" ]
+  grep -q "10.10.10.10:22" "hosts/service_fingerprints.txt"
 }
 
-@test "spraying supports brutus engine with fingerprintx json input" {
+@test "spraying supports brutus engine with service fingerprint json input" {
   mkdir -p hosts vulns .tmp
   printf '%s\n' 'Host: 10.10.10.10 () Ports: 22/open/tcp//ssh///' > hosts/portscan_active.gnmap
-  printf '%s\n' '{"host":"10.10.10.10","port":22,"protocol":"ssh"}' > hosts/fingerprintx.jsonl
+  printf '%s\n' '{"host":"10.10.10.10","port":22,"protocol":"ssh"}' > hosts/service_fingerprints.jsonl
 
   cat > "$MOCK_BIN/brutus" <<'SH'
 #!/usr/bin/env bash

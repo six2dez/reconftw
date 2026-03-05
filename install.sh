@@ -21,7 +21,10 @@ if [[ ! -f $CONFIG_FILE ]]; then
 fi
 
 # shellcheck source=./reconftw.cfg
-source "$CONFIG_FILE"
+if ! source "$CONFIG_FILE"; then
+    printf "[!] Failed to parse config file %s. Check for syntax errors.\n" "$CONFIG_FILE" >&2
+    exit 1
+fi
 
 # Initialize variables
 dir="${tools}"
@@ -114,6 +117,39 @@ ensure_git_dir() {
     fi
 }
 
+# Install Rust toolchain, uv package manager, smugglex, and shodan CLI.
+# Called from install_apt/install_yum/install_pacman/install_brew to avoid duplication.
+install_rust_uv() {
+    local _tmpfile
+    # Install rustup via downloaded script (verify before executing)
+    _tmpfile=$(mktemp "${TMPDIR:-/tmp}/rustup_install.XXXXXX")
+    if curl -sSf https://sh.rustup.rs -o "$_tmpfile" 2>/dev/null; then
+        sh "$_tmpfile" -y >/dev/null 2>&1
+    else
+        msg_warn "[!] Failed to download rustup installer"
+    fi
+    rm -f "$_tmpfile"
+
+    # shellcheck source=/dev/null
+    source "${HOME}/.cargo/env" 2>/dev/null || true
+    cargo install smugglex &>/dev/null
+
+    # Install uv via downloaded script (verify before executing)
+    _tmpfile=$(mktemp "${TMPDIR:-/tmp}/uv_install.XXXXXX")
+    if curl -LsSf https://astral.sh/uv/install.sh -o "$_tmpfile" 2>/dev/null; then
+        sh "$_tmpfile" &>/dev/null
+    else
+        msg_warn "[!] Failed to download uv installer"
+    fi
+    rm -f "$_tmpfile"
+
+    # shellcheck source=/dev/null
+    source "${HOME}/.local/bin/env" 2>/dev/null || export PATH="${HOME}/.local/bin:$PATH"
+    uv tool update-shell &>/dev/null || true
+    # Install shodan CLI via uv
+    uv tool install shodan --force &>/dev/null || uv tool upgrade shodan &>/dev/null || true
+}
+
 # Non-fatal error trap: log and continue
 trap 'rc=$?; ts=$(date +"%Y-%m-%d %H:%M:%S"); cmd=${BASH_COMMAND}; loc_ln=${BASH_LINENO[0]:-0}; msg="[$ts] install.sh ERR($rc) @ line ${loc_ln} :: ${cmd}"; if [[ -n "${LOGFILE:-}" ]]; then echo "$msg" >>"$LOGFILE"; else echo "$msg" >&2; fi' ERR
 
@@ -123,12 +159,10 @@ trap 'rc=$?; ts=$(date +"%Y-%m-%d %H:%M:%S"); cmd=${BASH_COMMAND}; loc_ln=${BASH
 
 header() { printf "%bRunning: %s%b\n" "$bblue" "$1" "$reset"; }
 msg_run() { printf "%b%s%b\n" "$yellow" "$1" "$reset"; }
-msg_ok() { printf "%b%s%b\n" "$yellow" "$1" "$reset"; }
+msg_ok() { printf "%b%s%b\n" "$bgreen" "$1" "$reset"; }
 msg_warn() { printf "%b%s%b\n" "$yellow" "$1" "$reset"; }
 msg_err() { printf "%b%s%b\n" "$red" "$1" "$reset"; }
 
-# Progress helper (simple spinner output)
-progress_update() { :; }
 with_spinner() {
     local _msg="$1"
     shift
@@ -141,6 +175,17 @@ with_spinner() {
         [[ -n $_msg ]] && printf "%s\n" "$_msg"
         "$@"
         return $?
+    fi
+    if [[ ! -t 1 ]]; then
+        [[ -n $_msg ]] && printf "%s ... " "$_msg"
+        "$@" >/dev/null 2>&1
+        local exit_code=$?
+        if [[ $exit_code -eq 0 ]]; then
+            printf "done\n"
+        else
+            printf "failed\n"
+        fi
+        return $exit_code
     fi
     local spinner="|/-\\"
     local spinner_len=4
@@ -163,20 +208,21 @@ with_spinner() {
     return $exit_code
 }
 
-# Keep arrays defined for potential later use, but classic UI prints a short summary only
-declare -a INST_GO_OK INST_GO_SKIP INST_GO_FAIL
-declare -a INST_PX_OK INST_PX_SKIP INST_PX_FAIL
-declare -a REPOS_CLONED REPOS_SKIPPED REPOS_FAIL
-
 # Basic network precheck
 check_network() {
     printf "%bRunning: Network precheck%b\n" "$bblue" "$reset"
+    local _net_ok=true
     # Silence successful output; show message only on failure. Use q_to to respect --verbose.
     if ! q_to 5 bash -lc 'getent hosts github.com >/dev/null 2>&1 || dig +short github.com >/dev/null 2>&1 || nslookup github.com >/dev/null 2>&1'; then
         printf "%b[!] DNS resolution for github.com failed. Check your network.%b\n" "$bred" "$reset"
+        _net_ok=false
     fi
     if ! q_to 10 curl -I -s https://github.com >/dev/null 2>&1; then
         printf "%b[!] HTTPS connectivity to github.com failed. Installer may fail.%b\n" "$yellow" "$reset"
+        _net_ok=false
+    fi
+    if [[ $_net_ok == true ]]; then
+        printf "%bNetwork OK%b\n" "$bgreen" "$reset"
     fi
 }
 
@@ -190,67 +236,101 @@ if [[ $BASH_VERSION_NUM -lt 4 ]]; then
     exit 1
 fi
 
-# Declare Go tools and their installation commands
+# Load pinned versions from manifest file
+VERSIONS_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/config/tool_versions.txt"
+declare -A TOOL_VERSIONS=()
+if [[ -f "$VERSIONS_FILE" ]]; then
+    local_section=""
+    while IFS= read -r line; do
+        # Skip comments and empty lines
+        [[ -z "$line" || "$line" == \#* ]] && continue
+        # Track section headers
+        if [[ "$line" == "[repos]" ]]; then
+            local_section="repos"
+            continue
+        fi
+        if [[ "$line" == *=* ]]; then
+            local_key="${line%%=*}"
+            local_val="${line#*=}"
+            # Prefix repo keys to avoid collisions with go tool names
+            if [[ "$local_section" == "repos" ]]; then
+                TOOL_VERSIONS["repo:${local_key}"]="$local_val"
+            else
+                TOOL_VERSIONS["${local_key}"]="$local_val"
+            fi
+        fi
+    done < "$VERSIONS_FILE"
+fi
+
+# Helper: get pinned version for a tool (returns "latest" if not found)
+get_tool_version() {
+    local tool="$1"
+    local prefix="${2:-}"  # optional prefix like "repo:"
+    local ver="${TOOL_VERSIONS[${prefix}${tool}]:-latest}"
+    echo "$ver"
+}
+
+# Declare Go tools: name -> module path (version resolved from config/tool_versions.txt)
 declare -A gotools=(
-    ["gf"]="go install -v github.com/tomnomnom/gf@latest"
-    ["brutespray"]="go install -v github.com/x90skysn3k/brutespray@latest"
-    ["qsreplace"]="go install -v github.com/tomnomnom/qsreplace@latest"
-    ["ffuf"]="go install -v github.com/ffuf/ffuf/v2@latest"
-    ["github-subdomains"]="go install -v github.com/gwen001/github-subdomains@latest"
-    ["gitlab-subdomains"]="go install -v github.com/gwen001/gitlab-subdomains@latest"
-    ["nuclei"]="go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest"
-    ["anew"]="go install -v github.com/tomnomnom/anew@latest"
-    ["notify"]="go install -v github.com/projectdiscovery/notify/cmd/notify@latest"
-    ["unfurl"]="go install -v github.com/tomnomnom/unfurl@v0.3.0"
-    ["httpx"]="go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest"
-    ["github-endpoints"]="go install -v github.com/gwen001/github-endpoints@latest"
-    ["dnsx"]="go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest"
-    ["subjs"]="go install -v github.com/lc/subjs@latest"
-    ["Gxss"]="go install -v github.com/KathanP19/Gxss@latest"
-    ["katana"]="go install -v github.com/projectdiscovery/katana/cmd/katana@latest"
-    ["crlfuzz"]="go install -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest"
-    ["dalfox"]="go install -v github.com/hahwul/dalfox/v2@latest"
-    ["puredns"]="go install -v github.com/d3mondev/puredns/v2@latest"
-	    ["interactsh-client"]="go install -v github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest"
-	    ["analyticsrelationships"]="go install -v github.com/Josue87/analyticsrelationships@latest"
-	    ["gotator"]="go install -v github.com/Josue87/gotator@latest"
-	    ["roboxtractor"]="go install -v github.com/Josue87/roboxtractor@latest"
-	    ["mapcidr"]="go install -v github.com/projectdiscovery/mapcidr/cmd/mapcidr@latest"
-	    ["cdncheck"]="go install -v github.com/projectdiscovery/cdncheck/cmd/cdncheck@latest"
-	    ["asnmap"]="go install -v github.com/projectdiscovery/asnmap/cmd/asnmap@latest"
-    ["dnstake"]="go install -v github.com/pwnesia/dnstake/cmd/dnstake@latest"
-    ["tlsx"]="go install -v github.com/projectdiscovery/tlsx/cmd/tlsx@latest"
-    ["gitdorks_go"]="go install -v github.com/damit5/gitdorks_go@latest"
-    ["smap"]="go install -v github.com/s0md3v/smap/cmd/smap@latest"
-    ["dsieve"]="go install -v github.com/trickest/dsieve@master"
-    ["inscope"]="go install -v github.com/tomnomnom/hacks/inscope@latest"
-    ["enumerepo"]="go install -v github.com/trickest/enumerepo@latest"
-    ["Web-Cache-Vulnerability-Scanner"]="go install -v github.com/Hackmanit/Web-Cache-Vulnerability-Scanner@latest"
-    ["subfinder"]="go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest"
-    ["hakip2host"]="go install -v github.com/hakluke/hakip2host@latest"
-    ["mantra"]="go install -v github.com/Brosck/mantra@latest"
-    ["crt"]="go install -v github.com/cemulus/crt@latest"
-    ["s3scanner"]="go install -v github.com/sa7mon/s3scanner@latest"
-    ["nmapurls"]="go install -v github.com/sdcampbell/nmapurls@latest"
-    ["naabu"]="go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest"
-    ["shortscan"]="go install -v github.com/bitquark/shortscan/cmd/shortscan@latest"
-    ["hakoriginfinder"]="go install -v github.com/hakluke/hakoriginfinder@latest"
-    ["sourcemapper"]="go install -v github.com/denandz/sourcemapper@latest"
-    ["jsluice"]="go install -v github.com/BishopFox/jsluice/cmd/jsluice@latest"
-    ["urlfinder"]="go install -v github.com/projectdiscovery/urlfinder/cmd/urlfinder@latest"
-    ["cent"]="go install -v github.com/xm1k3/cent@latest"
-    ["csprecon"]="go install github.com/edoardottt/csprecon/cmd/csprecon@latest"
-    ["VhostFinder"]="go install -v github.com/wdahlenburg/VhostFinder@latest"
-    ["misconfig-mapper"]="go install github.com/intigriti/misconfig-mapper/cmd/misconfig-mapper@latest"
-    ["grpcurl"]="go install -v github.com/fullstorydev/grpcurl/cmd/grpcurl@latest"
-    ["toxicache"]="go install -v github.com/xhzeem/toxicache@latest"
-    ["favirecon"]="go install -v github.com/edoardottt/favirecon/cmd/favirecon@latest"
-    ["second-order"]="go install -v github.com/mhmdiaa/second-order@latest"
-    ["TInjA"]="go install -v github.com/Hackmanit/TInjA@latest"
-    ["fingerprintx"]="go install -v github.com/praetorian-inc/fingerprintx/cmd/fingerprintx@latest"
-    ["brutus"]="go install -v github.com/praetorian-inc/brutus/cmd/brutus@latest"
-    ["julius"]="go install -v github.com/praetorian-inc/julius/cmd/julius@latest"
-    ["titus"]="go install -v github.com/praetorian-inc/titus/cmd/titus@latest"
+    ["gf"]="github.com/tomnomnom/gf"
+    ["brutespray"]="github.com/x90skysn3k/brutespray"
+    ["qsreplace"]="github.com/tomnomnom/qsreplace"
+    ["ffuf"]="github.com/ffuf/ffuf/v2"
+    ["github-subdomains"]="github.com/gwen001/github-subdomains"
+    ["gitlab-subdomains"]="github.com/gwen001/gitlab-subdomains"
+    ["nuclei"]="github.com/projectdiscovery/nuclei/v3/cmd/nuclei"
+    ["anew"]="github.com/tomnomnom/anew"
+    ["notify"]="github.com/projectdiscovery/notify/cmd/notify"
+    ["unfurl"]="github.com/tomnomnom/unfurl"
+    ["httpx"]="github.com/projectdiscovery/httpx/cmd/httpx"
+    ["github-endpoints"]="github.com/gwen001/github-endpoints"
+    ["dnsx"]="github.com/projectdiscovery/dnsx/cmd/dnsx"
+    ["subjs"]="github.com/lc/subjs"
+    ["Gxss"]="github.com/KathanP19/Gxss"
+    ["katana"]="github.com/projectdiscovery/katana/cmd/katana"
+    ["crlfuzz"]="github.com/dwisiswant0/crlfuzz/cmd/crlfuzz"
+    ["dalfox"]="github.com/hahwul/dalfox/v2"
+    ["puredns"]="github.com/d3mondev/puredns/v2"
+    ["interactsh-client"]="github.com/projectdiscovery/interactsh/cmd/interactsh-client"
+    ["analyticsrelationships"]="github.com/Josue87/analyticsrelationships"
+    ["gotator"]="github.com/Josue87/gotator"
+    ["roboxtractor"]="github.com/Josue87/roboxtractor"
+    ["mapcidr"]="github.com/projectdiscovery/mapcidr/cmd/mapcidr"
+    ["cdncheck"]="github.com/projectdiscovery/cdncheck/cmd/cdncheck"
+    ["asnmap"]="github.com/projectdiscovery/asnmap/cmd/asnmap"
+    ["dnstake"]="github.com/pwnesia/dnstake/cmd/dnstake"
+    ["tlsx"]="github.com/projectdiscovery/tlsx/cmd/tlsx"
+    ["gitdorks_go"]="github.com/damit5/gitdorks_go"
+    ["smap"]="github.com/s0md3v/smap/cmd/smap"
+    ["dsieve"]="github.com/trickest/dsieve"
+    ["inscope"]="github.com/tomnomnom/hacks/inscope"
+    ["enumerepo"]="github.com/trickest/enumerepo"
+    ["Web-Cache-Vulnerability-Scanner"]="github.com/Hackmanit/Web-Cache-Vulnerability-Scanner"
+    ["subfinder"]="github.com/projectdiscovery/subfinder/v2/cmd/subfinder"
+    ["hakip2host"]="github.com/hakluke/hakip2host"
+    ["mantra"]="github.com/Brosck/mantra"
+    ["crt"]="github.com/cemulus/crt"
+    ["s3scanner"]="github.com/sa7mon/s3scanner"
+    ["nmapurls"]="github.com/sdcampbell/nmapurls"
+    ["naabu"]="github.com/projectdiscovery/naabu/v2/cmd/naabu"
+    ["shortscan"]="github.com/bitquark/shortscan/cmd/shortscan"
+    ["hakoriginfinder"]="github.com/hakluke/hakoriginfinder"
+    ["sourcemapper"]="github.com/denandz/sourcemapper"
+    ["jsluice"]="github.com/BishopFox/jsluice/cmd/jsluice"
+    ["urlfinder"]="github.com/projectdiscovery/urlfinder/cmd/urlfinder"
+    ["cent"]="github.com/xm1k3/cent"
+    ["csprecon"]="github.com/edoardottt/csprecon/cmd/csprecon"
+    ["VhostFinder"]="github.com/wdahlenburg/VhostFinder"
+    ["misconfig-mapper"]="github.com/intigriti/misconfig-mapper/cmd/misconfig-mapper"
+    ["grpcurl"]="github.com/fullstorydev/grpcurl/cmd/grpcurl"
+    ["toxicache"]="github.com/xhzeem/toxicache"
+    ["favirecon"]="github.com/edoardottt/favirecon/cmd/favirecon"
+    ["second-order"]="github.com/mhmdiaa/second-order"
+    ["TInjA"]="github.com/Hackmanit/TInjA"
+    ["nerva"]="github.com/praetorian-inc/nerva/cmd/nerva"
+    ["brutus"]="github.com/praetorian-inc/brutus/cmd/brutus"
+    ["julius"]="github.com/praetorian-inc/julius/cmd/julius"
+    ["titus"]="github.com/praetorian-inc/titus/cmd/titus"
 )
 
 # Declare uv tool-managed Python tools and their GitHub paths
@@ -303,11 +383,12 @@ declare -A repos=(
     ["EmailHarvester"]="maldevel/EmailHarvester"
     ["reconftw_ai"]="six2dez/reconftw_ai"
     ["gato"]="praetorian-inc/gato"
+    ["SSTImap"]="vladko312/SSTImap"
 )
 
 # Function to display the banner
 function banner() {
-    tput clear
+    printf "\n"
     cat <<EOF
 
   ██▀███  ▓█████  ▄████▄   ▒█████   ███▄    █   █████▒▄▄▄█████▓ █     █░
@@ -335,31 +416,28 @@ function install_tools() {
     local go_ok=0 go_skip=0 go_fail=0
     for gotool in "${!gotools[@]}"; do
         ((++go_step))
+        # Build go install command with pinned version from manifest
+        local _go_ver
+        _go_ver=$(get_tool_version "$gotool")
+        local _go_cmd="go install -v ${gotools[$gotool]}@${_go_ver}"
         # Always run go install so already-present binaries also get updated.
-        if q bash -lc "${gotools[$gotool]}"; then
-            INST_GO_OK+=("$gotool")
+        if q bash -lc "$_go_cmd"; then
             ((++go_ok))
-            progress_update "Go tools" "$go_step" "$total_go" "$go_ok" "$go_skip" "$go_fail"
-            [[ $COMPACT != "true" ]] && msg_ok "[$go_step/$total_go] ${gotool} installed"
+            msg_ok "[$go_step/$total_go] ${gotool} installed"
         else
             # If the binary is already present, the upgrade failed but the tool still works.
             # Treat this as a warning rather than a hard failure.
             if command -v "$gotool" >/dev/null 2>&1; then
-                INST_GO_SKIP+=("$gotool")
                 ((++go_skip))
-                progress_update "Go tools" "$go_step" "$total_go" "$go_ok" "$go_skip" "$go_fail"
                 msg_warn "[$go_step/$total_go] ${gotool} upgrade failed (existing binary kept)"
             else
                 failed_tools+=("$gotool")
-                INST_GO_FAIL+=("$gotool")
                 ((++go_fail))
                 double_check=true
-                progress_update "Go tools" "$go_step" "$total_go" "$go_ok" "$go_skip" "$go_fail"
                 msg_err "[$go_step/$total_go] ${gotool} failed"
             fi
         fi
     done
-    [[ $COMPACT == "true" && $IS_TTY -eq 1 ]] && printf "\n"
 
     header "Installing uv tools (${#pipxtools[@]})"
 
@@ -372,8 +450,13 @@ function install_tools() {
         ((++pipx_step))
 
         # Always use git+https URL for both install and upgrade to avoid PyPI lookups
-        # which fail for tools not on PyPI.
+        # which fail for tools not on PyPI. Pin to version from manifest.
+        local _px_ver
+        _px_ver=$(get_tool_version "$pipxtool")
         local tool_url="git+https://github.com/${pipxtools[$pipxtool]}"
+        if [[ "$_px_ver" != "latest" && "$_px_ver" != "HEAD" ]]; then
+            tool_url="${tool_url}@${_px_ver}"
+        fi
         
         # Prepare arguments array
         local tool_args=()
@@ -386,22 +469,15 @@ function install_tools() {
         # Always force install/reinstall from the git URL
         # This handles both initial install and upgrades correctly
         if q uv tool install "${tool_args[@]}" "$tool_url" --force; then
-             if [[ " ${INST_PX_OK[*]} " != *" $pipxtool "* ]]; then
-                 INST_PX_OK+=("$pipxtool")
-                 ((++px_ok))
-             fi
-             progress_update "uv tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
-             [[ $COMPACT != "true" ]] && msg_ok "[$pipx_step/$total_px] ${pipxtool} ready"
+             ((++px_ok))
+             msg_ok "[$pipx_step/$total_px] ${pipxtool} ready"
         else
              failed_pipx_tools+=("$pipxtool")
-             INST_PX_FAIL+=("$pipxtool")
              ((++px_fail))
              double_check=true
-             progress_update "uv tools" "$pipx_step" "$total_px" "$px_ok" "$px_skip" "$px_fail"
              msg_err "[$pipx_step/$total_px] ${pipxtool} failed"
         fi
     done
-    [[ $COMPACT == "true" && $IS_TTY -eq 1 ]] && printf "\n"
 
     header "Installing repositories (${#repos[@]})"
 
@@ -430,49 +506,36 @@ function install_tools() {
         if [[ $upgrade_tools == "false" ]]; then
             if [[ -d "${dir}/${repo}" ]]; then
                 # Keep Python deps updated even when repository sync is skipped.
-                if cd "${dir}/${repo}" 2>/dev/null; then
-                    if ! install_repo_requirements "$repo"; then
-                        msg_err "[$repos_step/$total_repo] $repo: pip requirements failed"
-                        failed_repos+=("$repo")
-                        REPOS_FAIL+=("$repo")
-                        ((++repo_fail))
-                        double_check=true
-                    fi
-                    cd "$dir" || true
+                if ! ( cd "${dir}/${repo}" && install_repo_requirements "$repo" ); then
+                    msg_err "[$repos_step/$total_repo] $repo: pip requirements failed"
+                    failed_repos+=("$repo")
+                    ((++repo_fail))
+                    double_check=true
                 fi
-                REPOS_SKIPPED+=("$repo")
                 ((++repo_skip))
-                progress_update "repos" "$repos_step" "$total_repo" "$repo_ok" "$repo_skip" "$repo_fail"
-                [[ $COMPACT != "true" ]] && msg_warn "[$repos_step/$total_repo] $repo already present at ${dir}/${repo}"
+                msg_warn "[$repos_step/$total_repo] $repo already present at ${dir}/${repo}"
                 continue
             fi
         fi
-        # Clone the repository
-        if [[ ! -d "${dir}/${repo}" || -z "$(ls -A "${dir}/${repo}")" ]]; then
+        # Clone the repository (check for .git to detect incomplete clones)
+        if [[ ! -d "${dir}/${repo}/.git" ]]; then
             msg_run "[$repos_step/${#repos[@]}] $repo (clone)"
-            if retry 3 3 q_to 180 git clone --filter="blob:none" "https://github.com/${repos[$repo]}" "${dir}/${repo}"; then
-                exit_status=0
-            else
-                exit_status=$?
-            fi
+            retry 3 3 q_to 180 git clone --filter="blob:none" "https://github.com/${repos[$repo]}" "${dir}/${repo}"
+            exit_status=$?
             if [[ $exit_status -ne 0 ]]; then
                 msg_err "[$repos_step/$total_repo] $repo clone failed"
                 failed_repos+=("$repo")
-                REPOS_FAIL+=("$repo")
                 ((++repo_fail))
                 double_check=true
                 continue
             fi
-            REPOS_CLONED+=("$repo")
             ((++repo_ok))
-            progress_update "repos" "$repos_step" "$total_repo" "$repo_ok" "$repo_skip" "$repo_fail"
         fi
 
         # Navigate to the repository directory
         cd "${dir}/${repo}" || {
             msg_err "[$repos_step/$total_repo] $repo: cannot enter ${dir}/${repo}"
             failed_repos+=("$repo")
-            REPOS_FAIL+=("$repo")
             ((++repo_fail))
             double_check=true
             continue
@@ -480,59 +543,89 @@ function install_tools() {
 
         # Pull the latest changes
         msg_run "[$repos_step/${#repos[@]}] $repo (pull)"
-        if retry 3 3 q_to 60 git pull; then
-            exit_status=0
-        else
-            exit_status=$?
-        fi
+        retry 3 3 q_to 60 git pull
+        exit_status=$?
         if [[ $exit_status -ne 0 ]]; then
             msg_err "[$repos_step/$total_repo] $repo pull failed"
             failed_repos+=("$repo")
-            REPOS_FAIL+=("$repo")
             ((++repo_fail))
             double_check=true
             continue
+        fi
+
+        # Checkout pinned version from manifest if available
+        local _repo_ver
+        _repo_ver=$(get_tool_version "$repo" "repo:")
+        if [[ "$_repo_ver" != "latest" && "$_repo_ver" != "HEAD" ]]; then
+            git fetch --tags &>/dev/null || true
+            if ! git checkout "$_repo_ver" &>/dev/null; then
+                msg_warn "[$repos_step/$total_repo] $repo: could not checkout $_repo_ver, staying on HEAD"
+            fi
         fi
 
         # Install requirements inside a virtual environment
         if ! install_repo_requirements "$repo"; then
             msg_err "[$repos_step/$total_repo] $repo: pip requirements failed"
             failed_repos+=("$repo")
-            REPOS_FAIL+=("$repo")
             ((++repo_fail))
             double_check=true
         fi
 
-        # Special handling for certain repositories
+        # Special handling for certain repositories (verify build exit codes)
         case "$repo" in
             "massdns")
-                make &>/dev/null && strip -s bin/massdns && $SUDO cp bin/massdns /usr/local/bin/ &>/dev/null
+                if ! make &>/dev/null; then
+                    msg_warn "[$repos_step/$total_repo] $repo: make failed"
+                else
+                    strip -s bin/massdns 2>/dev/null || true
+                    $SUDO cp bin/massdns /usr/local/bin/ &>/dev/null
+                fi
                 ;;
             "gitleaks")
-                make build &>/dev/null && $SUDO cp ./gitleaks /usr/local/bin/ &>/dev/null
+                if ! make build &>/dev/null; then
+                    msg_warn "[$repos_step/$total_repo] $repo: make build failed"
+                else
+                    $SUDO cp ./gitleaks /usr/local/bin/ &>/dev/null
+                fi
                 ;;
             "ghleaks")
-                go build -o ghleaks . &>/dev/null && chmod +x ./ghleaks
+                if ! go build -o ghleaks . &>/dev/null; then
+                    msg_warn "[$repos_step/$total_repo] $repo: go build failed"
+                else
+                    chmod +x ./ghleaks
+                fi
                 ;;
             "nomore403")
-                go get &>/dev/null
-                go build &>/dev/null
-                chmod +x ./nomore403
+                go get &>/dev/null || true
+                if ! go build &>/dev/null; then
+                    msg_warn "[$repos_step/$total_repo] $repo: go build failed"
+                else
+                    chmod +x ./nomore403
+                fi
                 ;;
             "ffufPostprocessing")
                 git reset --hard origin/master &>/dev/null
                 git pull &>/dev/null
-                go build -o ffufPostprocessing main.go &>/dev/null
-                chmod +x ./ffufPostprocessing
+                if ! go build -o ffufPostprocessing main.go &>/dev/null; then
+                    msg_warn "[$repos_step/$total_repo] $repo: go build failed"
+                else
+                    chmod +x ./ffufPostprocessing
+                fi
                 ;;
             "trufflehog")
-                go install &>/dev/null
+                go install &>/dev/null || msg_warn "[$repos_step/$total_repo] $repo: go install failed"
                 ;;
             "gato")
                 if [[ ! -d "venv" ]]; then
                     uv venv venv &>/dev/null || true
                 fi
                 uv pip install --upgrade -e . --python venv/bin/python3 &>/dev/null || true
+                ;;
+            "SSTImap")
+                if [[ ! -d "venv" ]]; then
+                    uv venv venv &>/dev/null || true
+                fi
+                uv pip install --upgrade -r requirements.txt --python venv/bin/python3 &>/dev/null || true
                 ;;
         esac
 
@@ -557,28 +650,33 @@ function install_tools() {
 
         msg_ok "[$repos_step/$total_repo] $repo ready"
     done
-    [[ $COMPACT == "true" && $IS_TTY -eq 1 ]] && printf "\n"
 
-    # Notify and ensure subfinder is installed twice (as per original script)
-    # Guard with command checks to avoid aborting under set -e
+    # Initialize tool configs on first run
     q command -v notify >/dev/null 2>&1 && q notify || true
-    q command -v subfinder >/dev/null 2>&1 && q subfinder || true
     q command -v subfinder >/dev/null 2>&1 && q subfinder || true
     mkdir -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
     #cent init -f &>/dev/null
     #cent -p ${NUCLEI_TEMPLATES_PATH} &>/dev/null
 
-    # Handle failed installations
-    if [[ ${#failed_tools[@]} -ne 0 ]]; then
-        printf "\n%bFailed to install the following Go tools: %s%b\n" "$red" "${failed_tools[*]}" "$reset"
-    fi
+    # Installation summary
+    printf "\n%b--- Tool Installation Summary ---%b\n" "$bblue" "$reset"
+    printf "  Go tools:  %b%d OK%b, %d skipped, %b%d failed%b (of %d)\n" \
+        "$bgreen" "$go_ok" "$reset" "$go_skip" \
+        "$([[ $go_fail -gt 0 ]] && echo "$red" || echo "$bgreen")" "$go_fail" "$reset" "$total_go"
+    printf "  uv tools:  %b%d OK%b, %b%d failed%b (of %d)\n" \
+        "$bgreen" "$px_ok" "$reset" \
+        "$([[ $px_fail -gt 0 ]] && echo "$red" || echo "$bgreen")" "$px_fail" "$reset" "$total_px"
+    printf "  Repos:     %b%d OK%b, %d skipped, %b%d failed%b (of %d)\n" \
+        "$bgreen" "$repo_ok" "$reset" "$repo_skip" \
+        "$([[ $repo_fail -gt 0 ]] && echo "$red" || echo "$bgreen")" "$repo_fail" "$reset" "$total_repo"
 
-    if [[ ${#failed_pipx_tools[@]} -ne 0 ]]; then
-        printf "\n%bFailed to install the following uv tools: %s%b\n" "$red" "${failed_pipx_tools[*]}" "$reset"
-    fi
-
-    if [[ ${#failed_repos[@]} -ne 0 ]]; then
-        printf "\n%bFailed to clone or update the following repositories:%b\n%s\n" "$red" "$reset" "${failed_repos[*]}"
+    local _total_fail=$(( go_fail + px_fail + repo_fail ))
+    if [[ $_total_fail -gt 0 ]]; then
+        printf "\n%bFailed items:%b\n" "$red" "$reset"
+        [[ ${#failed_tools[@]} -gt 0 ]] && printf "  Go:    %s\n" "${failed_tools[*]}"
+        [[ ${#failed_pipx_tools[@]} -gt 0 ]] && printf "  uv:    %s\n" "${failed_pipx_tools[*]}"
+        [[ ${#failed_repos[@]} -gt 0 ]] && printf "  Repos: %s\n" "${failed_repos[*]}"
+        printf "\n%bRe-run install.sh to retry failed items.%b\n" "$yellow" "$reset"
     fi
 }
 
@@ -620,8 +718,9 @@ function check_updates() {
                 cp reconftw.cfg "$cfg_backup"
                 printf "%breconftw.cfg has been backed up to %s%b\n" "$yellow" "$cfg_backup" "$reset"
             fi
-            git reset --hard &>/dev/null
+            git stash --include-untracked &>/dev/null || true
             run_to 60 git pull &>/dev/null
+            git stash pop &>/dev/null || true
             printf "%bUpdated! Running the new installer version...%b\n" "$bgreen" "$reset"
 
             # Show config diff against new default
@@ -654,9 +753,9 @@ function check_updates() {
 
 # Function to install Golang
 function install_golang_version() {
-    local version="go1.25.3"
+    local version="go1.23.6"
     local latest_version
-    latest_version=$(curl -s https://go.dev/VERSION?m=text | head -1 || echo "go1.20.7")
+    latest_version=$(curl -s https://go.dev/VERSION?m=text | head -1 || echo "go1.23.6")
     if [[ $latest_version == g* ]]; then
         version="$latest_version"
     fi
@@ -706,17 +805,35 @@ function install_golang_version() {
                 return 1
             fi
 
+            # Verify SHA256 checksum from go.dev
+            local expected_sha256
+            expected_sha256=$(curl -sL "${archive_url}.sha256" 2>/dev/null || true)
+            if [[ -n $expected_sha256 ]]; then
+                local actual_sha256
+                if command -v sha256sum &>/dev/null; then
+                    actual_sha256=$(sha256sum "$archive_path" | awk '{print $1}')
+                elif command -v shasum &>/dev/null; then
+                    actual_sha256=$(shasum -a 256 "$archive_path" | awk '{print $1}')
+                fi
+                if [[ -n ${actual_sha256:-} && $actual_sha256 != "$expected_sha256" ]]; then
+                    msg_err "[!] SHA256 checksum mismatch for Go archive (expected: ${expected_sha256}, got: ${actual_sha256})"
+                    rm -f "$archive_path"
+                    return 1
+                fi
+            else
+                msg_warn "[!] Could not fetch SHA256 checksum for Go archive; skipping verification"
+            fi
+
             local tmp_unpack
             tmp_unpack=$(mktemp -d 2>/dev/null || mktemp -d -t goinstall)
+            trap 'rm -rf "$tmp_unpack" "$archive_path"' RETURN
             if ! tar -C "$tmp_unpack" -xzf "$archive_path" &>/dev/null; then
                 msg_err "[!] Failed to extract ${archive_path}"
-                rm -rf "$tmp_unpack"
                 return 1
             fi
 
             if [[ ! -d "${tmp_unpack}/go" ]]; then
                 msg_err "[!] Extracted archive missing 'go' directory"
-                rm -rf "$tmp_unpack"
                 return 1
             fi
 
@@ -736,16 +853,13 @@ function install_golang_version() {
                 if [[ -n $go_backup && -d $go_backup ]]; then
                     $SUDO mv "$go_backup" /usr/local/go &>/dev/null || msg_warn "[!] Unable to restore previous Golang installation from backup."
                 fi
-                rm -rf "$tmp_unpack"
                 return 1
             fi
             if [[ -n $go_backup ]]; then
                 $SUDO rm -rf "$go_backup" &>/dev/null
             fi
 
-            rm -rf "$tmp_unpack"
-            rm -f "$archive_path" 2>/dev/null
-
+            # tmp_unpack and archive_path cleaned up by RETURN trap
             $SUDO ln -sf /usr/local/go/bin/go /usr/local/bin/ 2>/dev/null
         fi
 
@@ -822,15 +936,7 @@ function install_apt() {
     # Move chromium browser dependencies (required by `nuclei -headless -id screenshot`) into a separate apt install command, and add a fallback for Ubuntu 24.04 (where `libasound2` is renamed to `libasound2t64`)
     $SUDO apt-get install -y libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon-x11-0 libxcomposite-dev libxdamage1 libxrandr2 libgbm-dev libpangocairo-1.0-0 libasound2 &>/dev/null \
         || $SUDO apt-get install -y libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon-x11-0 libxcomposite-dev libxdamage1 libxrandr2 libgbm-dev libpangocairo-1.0-0 libasound2t64 &>/dev/null
-	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
-	source "${HOME}/.cargo/env"
-	cargo install smugglex &>/dev/null
-	# Install uv (replaces pip, venv, pipx)
-	curl -LsSf https://astral.sh/uv/install.sh | sh &>/dev/null
-	source "${HOME}/.local/bin/env" 2>/dev/null || export PATH="${HOME}/.local/bin:$PATH"
-	uv tool update-shell &>/dev/null || true
-	# Install shodan CLI via uv
-	uv tool install shodan --force &>/dev/null || uv tool upgrade shodan &>/dev/null || true
+    install_rust_uv
 }
 
 # Function to install required packages for macOS
@@ -841,13 +947,13 @@ function install_brew() {
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     fi
     brew update &>/dev/null
-	brew install --formula bash coreutils gnu-getopt gnu-sed python uv massdns jq gcc cmake ruby git curl wget zip pv bind whois exiftool nmap lynx medusa &>/dev/null
-	brew install rustup &>/dev/null
-	rustup-init -y &>/dev/null
-	cargo install smugglex &>/dev/null
-	uv tool update-shell &>/dev/null || true
-	# Install shodan CLI via uv
-	uv tool install shodan --force &>/dev/null || uv tool upgrade shodan &>/dev/null || true
+    brew install --formula bash coreutils gnu-getopt gnu-sed python uv massdns jq gcc cmake ruby git curl wget zip pv bind whois exiftool nmap lynx medusa &>/dev/null
+    brew install rustup &>/dev/null
+    rustup-init -y &>/dev/null
+    cargo install smugglex &>/dev/null
+    uv tool update-shell &>/dev/null || true
+    # Install shodan CLI via uv
+    uv tool install shodan --force &>/dev/null || uv tool upgrade shodan &>/dev/null || true
 }
 
 # Function to install required packages for RedHat-based systems
@@ -900,29 +1006,13 @@ function install_yum() {
         fi
     fi
 
-	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
-	source "${HOME}/.cargo/env"
-	cargo install smugglex &>/dev/null
-	# Install uv (replaces pip, venv, pipx)
-	curl -LsSf https://astral.sh/uv/install.sh | sh &>/dev/null
-	source "${HOME}/.local/bin/env" 2>/dev/null || export PATH="${HOME}/.local/bin:$PATH"
-	uv tool update-shell &>/dev/null || true
-	# Install shodan CLI via uv
-	uv tool install shodan --force &>/dev/null || uv tool upgrade shodan &>/dev/null || true
+    install_rust_uv
 }
 
 # Function to install required packages for Arch-based systems
 function install_pacman() {
     $SUDO pacman -Sy --noconfirm python base-devel gcc cmake ruby git curl libpcap whois perl-image-exiftool wget zip pv bind openssl libffi libxml2 libxslt zlib nmap jq lynx medusa xorg-server-xvfb &>/dev/null
-	curl https://sh.rustup.rs -sSf | sh -s -- -y >/dev/null 2>&1
-	source "${HOME}/.cargo/env"
-	cargo install smugglex &>/dev/null
-	# Install uv (replaces pip, venv, pipx)
-	curl -LsSf https://astral.sh/uv/install.sh | sh &>/dev/null
-	source "${HOME}/.local/bin/env" 2>/dev/null || export PATH="${HOME}/.local/bin:$PATH"
-	uv tool update-shell &>/dev/null || true
-	# Install shodan CLI via uv
-	uv tool install shodan --force &>/dev/null || uv tool upgrade shodan &>/dev/null || true
+    install_rust_uv
 }
 
 # Setup reconftw venv for python-only helpers (e.g., getjswords)
@@ -1028,20 +1118,8 @@ function initial_setup() {
         if ! retry 3 3 q_to 60 git -C "${dir}/massdns" pull; then true; fi
     fi
 
-    # gf patterns
-    if [[ ! -d "$HOME/.gf" ]]; then
-        #printf "${yellow}Installing gf patterns...\n"
-        ensure_git_dir "${dir}/gf"
-        if ! retry 3 3 q_to 120 git clone https://github.com/tomnomnom/gf.git "${dir}/gf"; then true; fi
-        cp -r "${dir}/gf/examples" ~/.gf 2>/dev/null || true
-        ensure_git_dir "${dir}/Gf-Patterns"
-        if ! retry 3 3 q_to 120 git clone https://github.com/1ndianl33t/Gf-Patterns "${dir}/Gf-Patterns"; then true; fi
-        cp "${dir}/Gf-Patterns"/*.json ~/.gf/ 2>/dev/null || true
-    else
-        #printf "${yellow}Updating gf patterns...\n"
-        ensure_git_dir "${dir}/Gf-Patterns"
-        if ! retry 3 3 q_to 60 git -C "${dir}/Gf-Patterns" pull; then true; fi
-    fi
+    # gf patterns are already handled by install_tools() via repos array
+    # (gf, Gf-Patterns, sus_params repos clone/pull and copy patterns)
 
     header "Downloading required files"
 
@@ -1056,23 +1134,26 @@ function initial_setup() {
 	        ["axiom_config"]="https://gist.githubusercontent.com/six2dez/6e2d9f4932fd38d84610eb851014b26e/raw ${tools}/axiom_config.sh"
 	    )
 
+    local dl_step=0
+    local total_dl=${#downloads[@]}
     for key in "${!downloads[@]}"; do
+        ((++dl_step))
         url="${downloads[$key]% *}"
         destination="${downloads[$key]#* }"
 
         # Skip download if provider-config.yaml already exists
         if [[ $key == "notify_provider_config" && -f $destination ]]; then
-            printf "[%bSKIPPING%b] %s as it already exists at %s.\n" "$yellow" "$reset" "$key" "$destination"
+            msg_warn "[$dl_step/$total_dl] $key skipped (already exists)"
             continue
         fi
 
         # Ensure destination directory exists
         mkdir -p "$(dirname "$destination")" 2>/dev/null || true
 
-        if with_spinner "Fetching $key" retry 3 3 q_to 120 wget -q -O "$destination" "$url"; then
-            :
+        if with_spinner "[$dl_step/$total_dl] Fetching $key" retry 3 3 q_to 120 wget -q -O "$destination" "$url"; then
+            msg_ok "[$dl_step/$total_dl] $key fetched"
         else
-            msg_err "Failed to download $key from $url"
+            msg_err "[$dl_step/$total_dl] Failed to download $key from $url"
             continue
         fi
     done

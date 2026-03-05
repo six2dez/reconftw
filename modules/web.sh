@@ -517,7 +517,6 @@ function portscan() {
         else
             _print_msg INFO "Resolved IP addresses (No CDN): none"
         fi
-        printf "\n"
 
         _print_msg INFO "Scanning ports..."
 
@@ -697,7 +696,7 @@ function portscan() {
 
 }
 
-_build_fingerprintx_targets_from_nmap() {
+_build_service_fp_targets_from_nmap() {
     local nmap_gnmap="$1"
     local out_file="$2"
     [[ ! -s "$nmap_gnmap" ]] && return 0
@@ -725,7 +724,7 @@ function service_fingerprint() {
     if [[ "${SERVICE_FINGERPRINT:-true}" != "true" ]]; then
         return 0
     fi
-    if [[ "${SERVICE_FINGERPRINT_ENGINE:-fingerprintx}" != "fingerprintx" ]]; then
+    if [[ "${SERVICE_FINGERPRINT_ENGINE:-nerva}" != "nerva" ]]; then
         _print_msg WARN "${FUNCNAME[0]}: unsupported SERVICE_FINGERPRINT_ENGINE=${SERVICE_FINGERPRINT_ENGINE}"
         return 0
     fi
@@ -733,37 +732,37 @@ function service_fingerprint() {
         log_note "service_fingerprint: local-only for now, skipped in AXIOM mode" "${FUNCNAME[0]}" "${LINENO}"
         return 0
     fi
-    if ! command -v fingerprintx >/dev/null 2>&1; then
-        _print_msg WARN "${FUNCNAME[0]}: fingerprintx not found in PATH"
+    if ! command -v nerva >/dev/null 2>&1; then
+        _print_msg WARN "${FUNCNAME[0]}: nerva not found in PATH"
         return 0
     fi
 
-    start_subfunc "${FUNCNAME[0]}" "Service fingerprinting (fingerprintx)"
+    start_subfunc "${FUNCNAME[0]}" "Service fingerprinting (nerva)"
 
-    local targets_file=".tmp/fingerprintx_targets.txt"
+    local targets_file=".tmp/service_fp_targets.txt"
     : >"$targets_file"
 
     if [[ -s "hosts/naabu_open.txt" ]]; then
         awk -F: 'NF==2 && $2 ~ /^[0-9]+$/ {print $1 ":" $2}' "hosts/naabu_open.txt" | sort -u | anew -q "$targets_file"
     fi
     if [[ ! -s "$targets_file" ]]; then
-        _build_fingerprintx_targets_from_nmap "hosts/portscan_active.gnmap" "$targets_file"
+        _build_service_fp_targets_from_nmap "hosts/portscan_active.gnmap" "$targets_file"
     fi
     if [[ ! -s "$targets_file" ]]; then
-        _build_fingerprintx_targets_from_nmap "hosts/portscan_active_targeted.gnmap" "$targets_file"
+        _build_service_fp_targets_from_nmap "hosts/portscan_active_targeted.gnmap" "$targets_file"
     fi
 
     if [[ -s "$targets_file" ]]; then
         local timeout_ms="${SERVICE_FINGERPRINT_TIMEOUT_MS:-2000}"
-        run_command fingerprintx --json -l "$targets_file" -w "$timeout_ms" -o "hosts/fingerprintx.jsonl" 2>>"$LOGFILE" >/dev/null || true
-        if [[ -s "hosts/fingerprintx.jsonl" ]]; then
-            jq -r '[(.host // .ip // .target // "unknown"), (.port // "unknown"), (.protocol // .service // "unknown")] | @tsv' "hosts/fingerprintx.jsonl" 2>/dev/null \
+        run_command nerva --json -l "$targets_file" -w "$timeout_ms" -o "hosts/service_fingerprints.jsonl" 2>>"$LOGFILE" >/dev/null || true
+        if [[ -s "hosts/service_fingerprints.jsonl" ]]; then
+            jq -r '[(.host // .ip // .target // "unknown"), (.port // "unknown"), (.protocol // .service // "unknown")] | @tsv' "hosts/service_fingerprints.jsonl" 2>/dev/null \
                 | awk -F'\t' '{printf "%s:%s [%s]\n", $1, $2, $3}' \
-                | anew -q "hosts/fingerprintx.txt"
+                | anew -q "hosts/service_fingerprints.txt"
         fi
     fi
 
-    end_subfunc "Results are saved in hosts/fingerprintx.[jsonl|txt]" "${FUNCNAME[0]}"
+    end_subfunc "Results are saved in hosts/service_fingerprints.[jsonl|txt]" "${FUNCNAME[0]}"
 }
 
 function cdnprovider() {
@@ -884,13 +883,15 @@ _nuclei_prepare_waf_lists() {
 
     if [[ -s webs/webs_wafs.txt ]]; then
         cut -d';' -f1 webs/webs_wafs.txt | sed 's/https\?:\/\///' | sed 's/\/$//' | sort -u >.tmp/waf_hosts.txt
-        awk -F/ '{print $3}' .tmp/webs_subs.txt | sed 's/\:$//' | while read -r host; do
-            if grep -Fxq "$host" .tmp/waf_hosts.txt; then
-                awk -v h="$host" -F/ '{u=$3; sub(/:.*/,"",u); if (u==h) print $0}' .tmp/webs_subs.txt | anew -q "$WAF_LIST"
-            else
-                awk -v h="$host" -F/ '{u=$3; sub(/:.*/,"",u); if (u==h) print $0}' .tmp/webs_subs.txt | anew -q "$NOWAF_LIST"
-            fi
-        done
+        # Single-pass classification: NR==FNR loads WAF hosts, then classifies URLs
+        awk -F/ '
+            NR==FNR { waf[$1]=1; next }
+            {
+                host=$3; sub(/:.*/, "", host)
+                if (host in waf) print $0 > waf_out
+                else print $0 > nowaf_out
+            }
+        ' waf_out="$WAF_LIST" nowaf_out="$NOWAF_LIST" .tmp/waf_hosts.txt .tmp/webs_subs.txt
     else
         cp .tmp/webs_subs.txt "$NOWAF_LIST"
     fi
@@ -946,7 +947,6 @@ _nuclei_scan_local() {
         fi
         _nuclei_parse_results "$crit"
     done
-    printf "\n\n"
 }
 
 # Run nuclei scan via Axiom distributed fleet
@@ -963,7 +963,6 @@ _nuclei_scan_axiom() {
             -silent -retries 2 $NUCLEI_EXTRA_ARGS -j -o "nuclei_output/${crit}_json.txt" "$AXIOM_EXTRA_ARGS"
         _nuclei_parse_results "$crit"
     done
-    printf "\n\n"
 }
 
 function nuclei_check() {
@@ -1257,6 +1256,14 @@ _fuzz_run_local() {
             -c "ffuf ${FFUF_FLAGS} ${ffuf_recursion_flags} -t ${slow_threads} -rate ${slow_rate} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" \
             -o "$dir/.tmp/fuzzing"
     fi
+
+    # Convert JSON results to TXT in fuzzing/ directory (like axiom path does)
+    find "$dir/.tmp/fuzzing/" -type f -name "*.json" -print0 2>/dev/null | while IFS= read -r -d '' json_file; do
+        local base
+        base=$(basename "${json_file%.json}")
+        jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' "$json_file" 2>/dev/null \
+            | sort -k1 | anew -q "fuzzing/${base}.txt" 2>>"$LOGFILE" || true
+    done
 }
 
 # Run ffuf via axiom-scan and parse per-subdomain results
@@ -1525,16 +1532,24 @@ function urlchecks() {
                 fi
                 if [[ $diff_webs != "0" ]] || [[ ! -s ".tmp/katana.txt" ]]; then
                     if [[ $URL_CHECK_ACTIVE == true ]]; then
+                        # Only crawl NEW URLs when previous results exist (incremental)
+                        local katana_input_file="webs/webs_all.txt"
+                        if [[ -s ".tmp/katana.txt" ]] && [[ -s ".tmp/probed_tmp.txt" ]] && [[ -s "webs/webs_all.txt" ]]; then
+                            comm -23 <(sort -u webs/webs_all.txt) <(sort -u .tmp/probed_tmp.txt) > .tmp/katana_new_webs.txt 2>/dev/null || true
+                            if [[ -s ".tmp/katana_new_webs.txt" ]]; then
+                                katana_input_file=".tmp/katana_new_webs.txt"
+                            fi
+                        fi
                         # Split slow vs normal targets based on httpx status (403/429)
                         : >.tmp/katana_targets_slow.txt
                         : >.tmp/katana_targets_normal.txt
                         if [[ -s .tmp/slow_hosts.txt ]]; then
                             while read -r host; do
-                                grep "://${host}[:/\n]" webs/webs_all.txt | anew -q .tmp/katana_targets_slow.txt
+                                grep "://${host}[:/\n]" "$katana_input_file" | anew -q .tmp/katana_targets_slow.txt
                             done <.tmp/slow_hosts.txt
-                            comm -23 <(sort -u webs/webs_all.txt) <(sort -u .tmp/katana_targets_slow.txt) >.tmp/katana_targets_normal.txt
+                            comm -23 <(sort -u "$katana_input_file") <(sort -u .tmp/katana_targets_slow.txt) >.tmp/katana_targets_normal.txt
                         else
-                            cp webs/webs_all.txt .tmp/katana_targets_normal.txt
+                            cp "$katana_input_file" .tmp/katana_targets_normal.txt
                         fi
 
                         : >.tmp/katana.txt
@@ -1756,21 +1771,38 @@ function url_ext() {
                 print_warnf "Failed to initialize webs/urls_by_ext.txt."
             fi
 
-            # Iterate over extensions and extract matching URLs
-            for t in "${ext[@]}"; do
+            # Build a single regex pattern for all extensions (single-pass extraction)
+            local ext_pattern
+            ext_pattern=$(printf '%s|' "${ext[@]}")
+            ext_pattern="${ext_pattern%|}" # remove trailing pipe
 
-                # Extract unique matching URLs
-                grep -aEi "\.(${t})($|/|\?)" ".tmp/url_extract_tmp.txt" 2>>"$LOGFILE" \
-                    | sort -u \
-                    | sed '/^$/d' >".tmp/urls_by_ext_${t}.tmp" || true
+            # Single grep pass to classify URLs by extension using awk
+            awk -v exts="${ext_pattern}" '
+            BEGIN { split(exts, ea, "|"); for (i in ea) ext_map[ea[i]] = 1 }
+            {
+                url = $0
+                # Extract extension from URL
+                gsub(/[?#].*/, "", url)
+                gsub(/\/$/, "", url)
+                n = split(url, parts, ".")
+                if (n > 0) {
+                    ext = tolower(parts[n])
+                    if (ext in ext_map) {
+                        print ext "\t" $0
+                    }
+                }
+            }' ".tmp/url_extract_tmp.txt" 2>>"$LOGFILE" | sort -t$'\t' -k1,1 -k2,2 -u > ".tmp/urls_by_ext_all.tmp" || true
 
-                NUMOFLINES=$(wc -l <".tmp/urls_by_ext_${t}.tmp" 2>/dev/null || echo 0)
-
-                if [[ $NUMOFLINES -gt 0 ]]; then
+            # Group by extension and write output
+            local current_ext=""
+            while IFS=$'\t' read -r t url; do
+                if [[ "$t" != "$current_ext" ]]; then
+                    current_ext="$t"
                     printf "\n############################\n + %s + \n############################\n" "$t" >>webs/urls_by_ext.txt
-                    cat ".tmp/urls_by_ext_${t}.tmp" >>webs/urls_by_ext.txt
                 fi
-            done
+                printf "%s\n" "$url" >>webs/urls_by_ext.txt
+            done < ".tmp/urls_by_ext_all.tmp"
+            rm -f ".tmp/urls_by_ext_all.tmp"
 
             # Append ssrf.txt to redirect.txt if ssrf.txt exists and is not empty
             if [[ -s "gf/ssrf.txt" ]]; then
@@ -1890,10 +1922,8 @@ function jschecks() {
                 fi
                 mkdir -p .tmp/sourcemapper/secrets
                 if [[ -s "js/js_secrets.txt" ]]; then
-                    while IFS= read -r i; do
-                        [[ -z "$i" ]] && continue
-                        run_command wget -q -P .tmp/sourcemapper/secrets -- "$i" || true
-                    done < <(cut -d' ' -f2 js/js_secrets.txt)
+                    # Parallel downloads instead of serial wget loop
+                    cut -d' ' -f2 js/js_secrets.txt | xargs -P 10 -I {} wget -q -P .tmp/sourcemapper/secrets -- {} 2>/dev/null || true
                 fi
                 run_command trufflehog filesystem .tmp/sourcemapper/ -j 2>/dev/null | jq -c | anew -q js/js_secrets_jsmap.txt
                 find .tmp/sourcemapper/ -type f -name "*.js" | run_command jsluice secrets -j --patterns="${PATTERNS_DIR}/jsluice_patterns.json" | anew -q js/js_secrets_jsmap_jsluice.txt

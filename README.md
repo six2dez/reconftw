@@ -143,7 +143,7 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **CDN Detection**: Identifies IPs behind CDNs ([cdncheck](https://github.com/projectdiscovery/cdncheck)).
 - **WAF Detection**: Detects Web Application Firewalls ([wafw00f](https://github.com/EnableSecurity/wafw00f)).
 - **Port Scanning**: Active scanning with [nmap](https://github.com/nmap/nmap) (optionally preceded by [naabu](https://github.com/projectdiscovery/naabu)) and passive scanning with [smap](https://github.com/s0md3v/Smap).
-- **Service Fingerprinting**: Fingerprints exposed services on discovered host:port pairs with [fingerprintx](https://github.com/praetorian-inc/fingerprintx).
+- **Service Fingerprinting**: Fingerprints exposed services on discovered host:port pairs with [nerva](https://github.com/praetorian-inc/nerva).
 - **Service Vulnerabilities (Optional)**: Deep portscan profile can enrich results with CVE matching via [vulners](https://github.com/vulnersCom/nmap-vulners).
 - **Password Spraying**: Attempts password spraying on identified services with engine selection ([brutespray](https://github.com/x90skysn3k/brutespray) or [brutus](https://github.com/praetorian-inc/brutus)).
 - **Geolocation**: Maps IP addresses to geographic locations ([ipinfo](https://www.ipinfo.io/)).
@@ -617,9 +617,9 @@ PORTSCAN_STRATEGY=legacy # legacy|naabu_nmap
 NAABU_ENABLE=true
 NAABU_RATE=1000
 NAABU_PORTS="--top-ports 1000"
-SERVICE_FINGERPRINT=true # Fingerprint exposed services with fingerprintx
-SERVICE_FINGERPRINT_ENGINE="fingerprintx" # fingerprintx
-SERVICE_FINGERPRINT_TIMEOUT_MS=2000 # fingerprintx timeout per target (ms)
+SERVICE_FINGERPRINT=true # Fingerprint exposed services with nerva
+SERVICE_FINGERPRINT_ENGINE="nerva" # nerva
+SERVICE_FINGERPRINT_TIMEOUT_MS=2000 # nerva timeout per target (ms)
 PORTSCAN_UDP=false
 PORTSCAN_UDP_OPTIONS="--top-ports 20 -sU -sV -n -Pn --open"
 CDN_IP=true # Check which IPs belongs to CDN

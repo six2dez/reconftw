@@ -44,8 +44,6 @@ setup() {
     eval "$(sed -n '/^function start_func()/,/^}/p' "$corefile")"
     # Extract end_func
     eval "$(sed -n '/^function end_func()/,/^}/p' "$corefile")"
-    # Extract progress_step
-    eval "$(sed -n '/^function progress_step()/,/^}/p' "$corefile")"
 }
 
 teardown() {
@@ -138,26 +136,3 @@ teardown() {
     [[ "$output" != *"OK"* ]]
 }
 
-###############################################################################
-# progress_step() verbosity tests
-###############################################################################
-
-@test "progress_step prints at verbosity 1" {
-    OUTPUT_VERBOSITY=1
-    _PROGRESS_TOTAL_STEPS=10
-    _PROGRESS_CURRENT_STEP=0
-    _PROGRESS_START_TIME=$(date +%s)
-    run progress_step "scanning"
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"Progress"* ]]
-}
-
-@test "progress_step suppressed at verbosity 0" {
-    OUTPUT_VERBOSITY=0
-    _PROGRESS_TOTAL_STEPS=10
-    _PROGRESS_CURRENT_STEP=0
-    _PROGRESS_START_TIME=$(date +%s)
-    run progress_step "scanning"
-    [ "$status" -eq 0 ]
-    [[ "$output" == "" ]]
-}

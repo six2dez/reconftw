@@ -281,7 +281,7 @@ function end() {
     fi
     #Zip the output folder and send it via tg/discord/slack
     if [[ $SENDZIPNOTIFY == true ]]; then
-        zipSnedOutputFolder
+        zipSendOutputFolder
     fi
 
     # Screenshot diffs (hashing)
@@ -418,12 +418,20 @@ function passive() {
     ip_info
     emails
     google_dorks
-    #github_dorks
+    github_dorks
     github_repos
     github_leaks
     metadata
     apileaks
     third_party_misconfigs
+
+    # Save original values before overriding for passive-only mode
+    local _saved_SUBNOERROR="${SUBNOERROR:-}" _saved_SUBANALYTICS="${SUBANALYTICS:-}"
+    local _saved_SUBBRUTE="${SUBBRUTE:-}" _saved_SUBSCRAPING="${SUBSCRAPING:-}"
+    local _saved_SUBPERMUTE="${SUBPERMUTE:-}" _saved_SUBREGEXPERMUTE="${SUBREGEXPERMUTE:-}"
+    local _saved_SUB_RECURSIVE_BRUTE="${SUB_RECURSIVE_BRUTE:-}"
+    local _saved_PORTSCAN_ACTIVE="${PORTSCAN_ACTIVE:-}"
+
     # shellcheck disable=SC2034  # These globals are consumed by downstream module functions
     SUBNOERROR=false
     # shellcheck disable=SC2034
@@ -460,6 +468,16 @@ function passive() {
         axiom_shutdown
     fi
 
+    # Restore original values so subsequent modes (e.g. monitor) are not affected
+    SUBNOERROR="${_saved_SUBNOERROR}"
+    SUBANALYTICS="${_saved_SUBANALYTICS}"
+    SUBBRUTE="${_saved_SUBBRUTE}"
+    SUBSCRAPING="${_saved_SUBSCRAPING}"
+    SUBPERMUTE="${_saved_SUBPERMUTE}"
+    SUBREGEXPERMUTE="${_saved_SUBREGEXPERMUTE}"
+    SUB_RECURSIVE_BRUTE="${_saved_SUB_RECURSIVE_BRUTE}"
+    PORTSCAN_ACTIVE="${_saved_PORTSCAN_ACTIVE}"
+
     end
 }
 
@@ -471,19 +489,36 @@ function all() {
 }
 
 function osint() {
-    domain_info
-    ip_info
-    emails
-    google_dorks
-    #github_dorks
-    github_repos
-    github_leaks
-    metadata
-    apileaks
-    third_party_misconfigs
-    zonetransfer
-    mail_hygiene
-    cloud_enum_scan
+    if [[ "${PARALLEL_MODE:-false}" != "false" ]]; then
+        # Group 1: Independent lookups (no shared state)
+        parallel_funcs "${PAR_OSINT_GROUP1_SIZE:-4}" \
+            domain_info ip_info emails google_dorks github_dorks
+        # Group 2: GitHub/API analysis
+        parallel_funcs "${PAR_OSINT_GROUP2_SIZE:-3}" \
+            github_repos github_leaks github_actions_audit
+        # Group 3: Metadata, API leaks, third-party checks
+        parallel_funcs "${PAR_OSINT_GROUP3_SIZE:-4}" \
+            metadata apileaks third_party_misconfigs zonetransfer
+        # Group 4: Mail/DNS/Cloud
+        parallel_funcs "${PAR_OSINT_GROUP4_SIZE:-3}" \
+            mail_hygiene spoof cloud_enum_scan
+    else
+        domain_info
+        ip_info
+        emails
+        google_dorks
+        github_dorks
+        github_repos
+        github_leaks
+        github_actions_audit
+        metadata
+        apileaks
+        third_party_misconfigs
+        zonetransfer
+        mail_hygiene
+        spoof
+        cloud_enum_scan
+    fi
 }
 
 run_module_with_axiom_failover() {
@@ -1059,7 +1094,14 @@ function multi_custom() {
         print_errorf "Refusing to remove '%s' -- safety check failed" "$dir"
         return 1
     fi
-    rm -rf -- "$dir"
+    if [[ -d "$dir" ]]; then
+        if [[ "${FORCE_RESCAN:-false}" == "true" ]]; then
+            rm -rf -- "$dir"
+        else
+            # Preserve existing results; use --force to wipe
+            notification "Directory $dir exists; use --force to overwrite" warn
+        fi
+    fi
     mkdir -p "$dir" || {
         print_errorf "Failed to create directory '%s' in %s @ line %s" "$dir" "${FUNCNAME[0]}" "${LINENO}"
         exit 1

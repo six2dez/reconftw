@@ -30,32 +30,8 @@ teardown() {
 }
 
 ###############################################################################
-# parallel_run tests
+# parallel_run tests (function removed — was unused dead code with injection vector)
 ###############################################################################
-
-@test "parallel_run executes single command" {
-    run parallel_run 2 "echo hello > out1.txt"
-    [ "$status" -eq 0 ]
-    [ -f "out1.txt" ]
-    [ "$(cat out1.txt)" = "hello" ]
-}
-
-@test "parallel_run executes multiple commands" {
-    run parallel_run 2 "echo a > a.txt" "echo b > b.txt" "echo c > c.txt"
-    [ "$status" -eq 0 ]
-    [ -f "a.txt" ]
-    [ -f "b.txt" ]
-    [ -f "c.txt" ]
-}
-
-@test "parallel_run respects job limit" {
-    # This test verifies commands complete (timing would be flaky)
-    run parallel_run 2 "sleep 0.1 && echo 1 > 1.txt" "sleep 0.1 && echo 2 > 2.txt" "sleep 0.1 && echo 3 > 3.txt"
-    [ "$status" -eq 0 ]
-    [ -f "1.txt" ]
-    [ -f "2.txt" ]
-    [ -f "3.txt" ]
-}
 
 ###############################################################################
 # parallel_funcs tests
@@ -172,11 +148,6 @@ teardown() {
     
     # All should be written
     [ "$(wc -l < shared.txt | tr -d ' ')" -eq 3 ]
-}
-
-@test "parallel_run handles empty command list" {
-    run parallel_run 2
-    [ "$status" -eq 0 ]
 }
 
 @test "parallel_funcs handles empty function list" {

@@ -411,6 +411,8 @@ function tools_installed() {
         ["reconftw_ai"]="${tools}/reconftw_ai/reconftw_ai.py"
         ["reconftw_ai_python"]="${tools}/reconftw_ai/venv/bin/python3"
         ["ghleaks"]="${tools}/ghleaks/ghleaks"
+        ["SSTImap"]="${tools}/SSTImap/sstimap.py"
+        ["SSTImap_python"]="${tools}/SSTImap/venv/bin/python3"
     )
 
     declare -A tools_folders=(
@@ -622,26 +624,26 @@ function log_json() {
     local message="$3"
     shift 3
 
-    # Build JSON object
-    local json_obj
-    json_obj=$(jq -n \
-        --arg ts "$(date -Iseconds)" \
-        --arg lvl "$level" \
-        --arg fn "$function" \
-        --arg msg "$message" \
-        --arg domain "${domain:-N/A}" \
-        '{timestamp:$ts, level:$lvl, function:$fn, message:$msg, domain:$domain}')
-
-    # Add extra key-value pairs if provided
+    # Build JSON object with all key-value pairs in a single jq invocation
+    local -a jq_args=(
+        --arg ts "$(date -Iseconds)"
+        --arg lvl "$level"
+        --arg fn "$function"
+        --arg msg "$message"
+        --arg domain "${domain:-N/A}"
+    )
+    local jq_expr='{timestamp:$ts, level:$lvl, function:$fn, message:$msg, domain:$domain'
+    local idx=0
     for kv in "$@"; do
         if [[ "$kv" =~ ^([^=]+)=(.+)$ ]]; then
-            local key="${BASH_REMATCH[1]}"
-            local val="${BASH_REMATCH[2]}"
-            json_obj=$(echo "$json_obj" | jq --arg k "$key" --arg v "$val" '. + {($k): $v}')
+            jq_args+=(--arg "k${idx}" "${BASH_REMATCH[1]}" --arg "v${idx}" "${BASH_REMATCH[2]}")
+            jq_expr+=", (\$k${idx}): \$v${idx}"
+            ((idx++))
         fi
     done
+    jq_expr+='}'
 
-    echo "$json_obj" >>"$STRUCTURED_LOG_FILE"
+    jq -n "${jq_args[@]}" "$jq_expr" >>"$STRUCTURED_LOG_FILE"
 }
 
 # Convenience wrappers for different log levels
@@ -685,47 +687,6 @@ function progress_adjust_total() {
     _PROGRESS_TOTAL_STEPS=$((_PROGRESS_TOTAL_STEPS + delta))
     if [[ $_PROGRESS_TOTAL_STEPS -lt 1 ]]; then
         _PROGRESS_TOTAL_STEPS=1
-    fi
-}
-
-# Advance progress and display ETA
-# Usage: progress_step <step_name>
-function progress_step() {
-    ((_PROGRESS_CURRENT_STEP++)) || true
-    local step_name="${1:-}"
-    local now elapsed remaining_steps avg_per_step eta_seconds eta_display pct
-
-    now=$(date +%s)
-    elapsed=$((now - _PROGRESS_START_TIME))
-    pct=0
-    eta_display="calculating..."
-
-    if [[ $_PROGRESS_TOTAL_STEPS -gt 0 ]]; then
-        pct=$(( (_PROGRESS_CURRENT_STEP * 100) / _PROGRESS_TOTAL_STEPS ))
-        remaining_steps=$((_PROGRESS_TOTAL_STEPS - _PROGRESS_CURRENT_STEP))
-
-        if [[ $_PROGRESS_CURRENT_STEP -gt 0 ]] && [[ $elapsed -gt 0 ]]; then
-            avg_per_step=$((elapsed / _PROGRESS_CURRENT_STEP))
-            eta_seconds=$((remaining_steps * avg_per_step))
-            if [[ $eta_seconds -ge 3600 ]]; then
-                eta_display="~$((eta_seconds / 3600))h $((eta_seconds % 3600 / 60))m"
-            elif [[ $eta_seconds -ge 60 ]]; then
-                eta_display="~$((eta_seconds / 60))m"
-            else
-                eta_display="~${eta_seconds}s"
-            fi
-        fi
-    fi
-
-    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
-        if declare -F ui_progress >/dev/null 2>&1; then
-            ui_progress "$step_name" "$_PROGRESS_CURRENT_STEP" "$_PROGRESS_TOTAL_STEPS" "$pct" "$eta_display"
-        else
-            printf "%b[%s] Progress: [%d/%d] %d%% | ETA: %s | %s%b\n" \
-                "$bblue" "$(date +'%H:%M:%S')" \
-                "$_PROGRESS_CURRENT_STEP" "$_PROGRESS_TOTAL_STEPS" \
-                "$pct" "$eta_display" "$step_name" "$reset"
-        fi
     fi
 }
 
@@ -1224,11 +1185,11 @@ function incremental_should_skip() {
 
 ###############################################################################################################
 
-function zipSnedOutputFolder {
+function zipSendOutputFolder {
     zip_name1=$(date +"%Y_%m_%d-%H.%M.%S")
     zip_name="${zip_name1}_${domain}.zip" 2>>"$LOGFILE" >/dev/null
     (cd "$dir" && zip -r "$zip_name" .) 2>>"$LOGFILE" >/dev/null
-    echo "Sending zip file "${dir}/${zip_name}""
+    _print_msg INFO "Sending zip file ${dir}/${zip_name}"
     if [[ -s "${dir}/$zip_name" ]]; then
         sendToNotify "$dir/$zip_name"
         rm -f "${dir}/$zip_name"
@@ -1335,22 +1296,30 @@ function notification() {
 }
 
 function transfer {
+    # WARNING: This uploads recon results to an external service (bashupload.com)
+    # Requires explicit opt-in via ALLOW_TRANSFER=true in config
+    if [[ "${ALLOW_TRANSFER:-false}" != "true" ]]; then
+        notification "transfer() disabled by default (uploads to external service). Set ALLOW_TRANSFER=true to enable." warn
+        return 1
+    fi
+
     if [[ $# -eq 0 ]]; then
         echo "No arguments specified.\nUsage:\n transfer <file|directory>\n ... | transfer <file_name>" >&2
         return 1
     fi
 
     if tty -s; then
-        file="$1"
+        local file="$1"
+        local file_name
         file_name=$(basename "$file")
         if [[ ! -e $file ]]; then
             echo "$file: No such file or directory" >&2
             return 1
         fi
-        run_command tar -czvf /tmp/$file_name $file >/dev/null 2>&1 && run_command curl -s https://bashupload.com/$file.tgz --data-binary @/tmp/$file_name | grep wget
+        run_command tar -czvf "/tmp/$file_name" "$file" >/dev/null 2>&1 && run_command curl -s "https://bashupload.com/${file_name}.tgz" --data-binary "@/tmp/$file_name" | grep wget
     else
-        file_name=$1
-        run_command tar -czvf /tmp/$file_name $file >/dev/null 2>&1 && run_command curl -s https://bashupload.com/$file.tgz --data-binary @/tmp/$file_name | grep wget
+        local file_name="$1"
+        run_command tar -czvf "/tmp/$file_name" "$file" >/dev/null 2>&1 && run_command curl -s "https://bashupload.com/${file_name}.tgz" --data-binary "@/tmp/$file_name" | grep wget
     fi
 }
 
@@ -1362,7 +1331,7 @@ function sendToNotify {
             NOTIFY_CONFIG=~/.config/notify/provider-config.yaml
         fi
         if [[ -n "$(find "${1}" -prune -size +8000000c)" ]]; then
-            printf '%s is larger than 8MB, sending over external service\n' "${1}"
+            _print_msg WARN "${1} is larger than 8MB, sending over external service"
             transfer "${1}" | notify -silent
             return 0
         fi
@@ -1385,8 +1354,13 @@ function sendToNotify {
 }
 
 function start_func() {
+    local current_date
     current_date=$(date +'%Y-%m-%d %H:%M:%S')
     echo "[$current_date] Start function: ${1} " >>"${LOGFILE}"
+    # Use per-function start time to avoid race conditions in parallel mode
+    local _fn_name="${1}"
+    printf -v "_start_time_${_fn_name//[^a-zA-Z0-9_]/_}" '%s' "$(date +%s)"
+    # Keep global $start for backward compat (serial mode)
     start=$(date +%s)
     log_json "INFO" "${1}" "Function started" "description=${2}"
     if declare -F ui_log_jsonl >/dev/null 2>&1; then
@@ -1426,10 +1400,15 @@ function end_func() {
     fi
 
     touch "$called_fn_dir/.${fn}"
+    local end
     end=$(date +%s)
-    getElapsedTime "$start" "$end"
-    record_func_timing "${fn}" "$((end - start))"
-    local duration=$((end - start))
+    # Try per-function start time first (parallel-safe), fall back to global $start
+    local _start_var="_start_time_${fn//[^a-zA-Z0-9_]/_}"
+    local _fn_start="${!_start_var:-$start}"
+    local runtime=""
+    getElapsedTime "$_fn_start" "$end"
+    record_func_timing "${fn}" "$((end - _fn_start))"
+    local duration=$((end - _fn_start))
     local end_date
     end_date=$(date +'%Y-%m-%d %H:%M:%S')
     echo "[$end_date] End function: ${fn} " >>"${LOGFILE}"
@@ -1616,16 +1595,21 @@ function process_in_chunks() {
     local lines
     lines=$(wc -l <"$infile" 2>/dev/null || echo 0)
     if [[ $lines -le $chunksize ]]; then
-        bash -lc "$*"
+        # Use the original file path, properly quoted via array
+        local cmd_str="${*//_chunk_/$infile}"
+        bash -lc "$cmd_str"
         return $?
     fi
     mkdir -p .tmp/chunks
+    # Clean up old chunks to avoid stale data
+    rm -f .tmp/chunks/part_*
     split -l "$chunksize" -d "$infile" .tmp/chunks/part_
     for part in .tmp/chunks/part_*; do
-        local cmd
-        cmd="${*//_chunk_/\"$part\"}"
-        bash -lc "$cmd"
+        # Replace placeholder with the chunk path (already safe — generated by split)
+        local cmd_str="${*//_chunk_/$part}"
+        bash -lc "$cmd_str"
     done
+    rm -f .tmp/chunks/part_*
 }
 
 ###############################################################################################################
@@ -1649,7 +1633,8 @@ function print_timing_summary() {
         return 0
     fi
 
-    printf "\n%b#######################################################################%b\n" "$bgreen" "$reset"
+    printf "\n"
+    _print_rule
     printf "%b[%s] Performance Timing Summary%b\n\n" "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
 
     local total=0
@@ -1680,7 +1665,8 @@ function print_timing_summary() {
     local total_mins=$((total / 60))
     local total_secs=$((total % 60))
     printf "\n  %-35s %3dm %02ds\n" "TOTAL" "$total_mins" "$total_secs"
-    printf "%b#######################################################################%b\n\n" "$bgreen" "$reset"
+    _print_rule
+    printf "\n"
 }
 
 # Write machine-readable performance summary for dashboards/automation.
@@ -1929,8 +1915,13 @@ function generate_consolidated_report() {
     fi
 
     # HTML renderer with inlined JSON payload.
+    # Sanitize JSON for safe embedding in <script> tags:
+    # - Escape </script> to prevent tag breakout (XSS)
+    # - Escape <!-- to prevent HTML comment injection
     local report_payload
     report_payload=$(jq -c '.' "$report_json" 2>/dev/null || echo '{}')
+    report_payload="${report_payload//</\u003c}"
+    report_payload="${report_payload//>/\u003e}"
     cat >"$report_html" <<EOF
 <!doctype html>
 <html lang="en">

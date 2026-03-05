@@ -104,6 +104,8 @@ function ssrf_checks() {
         if [[ -z $COLLAB_SERVER ]]; then
             interactsh-client &>.tmp/ssrf_callback.txt &
             INTERACTSH_PID=$!
+            # Ensure interactsh is killed on function exit (prevents orphan processes)
+            trap 'kill "$INTERACTSH_PID" 2>/dev/null; trap - RETURN' RETURN
             sleep 2
 
             # Extract FFUFHASH from interactsh_callback.txt
@@ -171,7 +173,6 @@ function ssrf_checks() {
             end_func "Results are saved in vulns/ssrf_* (including alternate protocols)" "${FUNCNAME[0]}"
         else
             end_func "Skipping SSRF: Too many URLs to test, try with --deep flag." "${FUNCNAME[0]}"
-            printf "${bgreen}#######################################################################${reset}\n"
         fi
 
         # Terminate interactsh-client if it was started
@@ -299,9 +300,6 @@ function ssti() {
         # Ensure gf/ssti.txt is not empty
         if [[ -s "gf/ssti.txt" ]]; then
             local ssti_engine="${SSTI_ENGINE:-TInjA}"
-            if [[ "$ssti_engine" != "TInjA" ]]; then
-                _print_msg WARN "SSTI_ENGINE='${ssti_engine}' is deprecated; using TInjA."
-            fi
 
             _print_msg INFO "Running: SSTI Payload Generation"
 
@@ -313,36 +311,64 @@ function ssti() {
             if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT ]]; then
                 : >".tmp/ssti_candidates.txt"
 
-                if ! command -v TInjA >/dev/null 2>&1; then
-                    end_func "Skipping SSTI: TInjA not installed (no legacy fallback)." "${FUNCNAME[0]}" "SKIP_MISSING_TOOL"
-                    return 0
-                fi
+                if [[ "$ssti_engine" == "SSTImap" ]]; then
+                    # --- SSTImap branch ---
+                    local sstimap_bin="${tools}/SSTImap/sstimap.py"
+                    local sstimap_python="${tools}/SSTImap/venv/bin/python3"
+                    if [[ ! -f "$sstimap_bin" ]] || [[ ! -f "$sstimap_python" ]]; then
+                        end_func "Skipping SSTI: SSTImap not installed." "${FUNCNAME[0]}" "SKIP_MISSING_TOOL"
+                        return 0
+                    fi
 
-                _print_msg INFO "Running: SSTI Checks with TInjA"
-                local TInjA_report_dir="$dir/.tmp/TInjA"
-                mkdir -p "$TInjA_report_dir"
-                local -a TInjA_cmd=(TInjA url --reportpath "${TInjA_report_dir}/" --ratelimit "${TInjA_RATELIMIT:-0}" --timeout "${TInjA_TIMEOUT:-15}" --verbosity 0)
-                if [[ -n "${HEADER:-}" ]]; then
-                    TInjA_cmd+=(-H "${HEADER}")
-                fi
-                while IFS= read -r u; do
-                    [[ -n "$u" ]] && TInjA_cmd+=(--url "$u")
-                done <".tmp/tmp_ssti.txt"
+                    _print_msg INFO "Running: SSTI Checks with SSTImap (level ${SSTIMAP_LEVEL:-1})"
 
-                if ! run_command "${TInjA_cmd[@]}" 2>>"$LOGFILE" >/dev/null; then
-                    log_note "ssti: TInjA execution failed, no findings collected" "${FUNCNAME[0]}" "${LINENO}"
-                fi
+                    local -a sstimap_cmd=("$sstimap_python" "$sstimap_bin"
+                        --level "${SSTIMAP_LEVEL:-1}"
+                        --no-color
+                    )
+                    [[ "${SSTIMAP_LEGACY:-false}" == "true" ]] && sstimap_cmd+=(--legacy)
+                    [[ "${SSTIMAP_GENERIC:-false}" == "true" ]] && sstimap_cmd+=(--generic)
+                    [[ "${SSTIMAP_DELAY:-0}" -gt 0 ]] && sstimap_cmd+=(--delay "${SSTIMAP_DELAY}")
+                    [[ -n "${HEADER:-}" ]] && sstimap_cmd+=(-H "${HEADER}")
 
-                local report_file=""
-                report_file=$(ls -1t "${TInjA_report_dir}"/*.jsonl 2>/dev/null | head -n 1 || true)
-                if [[ -n "$report_file" && -s "$report_file" ]]; then
-                    jq -r 'select((.isWebpageVulnerable == true) or any(.parameters[]?; .isParameterVulnerable == true)) | (.url // empty) + " [certainty:" + (.certainty // "unknown") + "]"' "$report_file" 2>/dev/null \
-                        | sed '/^\s*$/d' \
-                        | anew -q ".tmp/ssti_candidates.txt"
+                    sstimap_cmd+=(--load-urls ".tmp/tmp_ssti.txt")
+
+                    if ! run_command "${sstimap_cmd[@]}" 2>>"$LOGFILE" | tee ".tmp/sstimap_raw.txt" | grep -i "confirmed\|identified" | grep -oP 'https?://[^\s]+' | anew -q ".tmp/ssti_candidates.txt"; then
+                        log_note "ssti: SSTImap execution failed or no findings" "${FUNCNAME[0]}" "${LINENO}"
+                    fi
+                else
+                    # --- TInjA branch (default) ---
+                    if ! command -v TInjA >/dev/null 2>&1; then
+                        end_func "Skipping SSTI: TInjA not installed." "${FUNCNAME[0]}" "SKIP_MISSING_TOOL"
+                        return 0
+                    fi
+
+                    _print_msg INFO "Running: SSTI Checks with TInjA"
+                    local TInjA_report_dir="$dir/.tmp/TInjA"
+                    mkdir -p "$TInjA_report_dir"
+                    local -a TInjA_cmd=(TInjA url --reportpath "${TInjA_report_dir}/" --ratelimit "${TInjA_RATELIMIT:-0}" --timeout "${TInjA_TIMEOUT:-15}" --verbosity 0)
+                    if [[ -n "${HEADER:-}" ]]; then
+                        TInjA_cmd+=(-H "${HEADER}")
+                    fi
+                    while IFS= read -r u; do
+                        [[ -n "$u" ]] && TInjA_cmd+=(--url "$u")
+                    done <".tmp/tmp_ssti.txt"
+
+                    if ! run_command "${TInjA_cmd[@]}" 2>>"$LOGFILE" >/dev/null; then
+                        log_note "ssti: TInjA execution failed, no findings collected" "${FUNCNAME[0]}" "${LINENO}"
+                    fi
+
+                    local report_file=""
+                    report_file=$(ls -1t "${TInjA_report_dir}"/*.jsonl 2>/dev/null | head -n 1 || true)
+                    if [[ -n "$report_file" && -s "$report_file" ]]; then
+                        jq -r 'select((.isWebpageVulnerable == true) or any(.parameters[]?; .isParameterVulnerable == true)) | (.url // empty) + " [certainty:" + (.certainty // "unknown") + "]"' "$report_file" 2>/dev/null \
+                            | sed '/^\s*$/d' \
+                            | anew -q ".tmp/ssti_candidates.txt"
+                    fi
                 fi
 
                 if [[ -s ".tmp/ssti_candidates.txt" ]]; then
-                    cat ".tmp/ssti_candidates.txt" | anew -q "vulns/ssti_TInjA.txt"
+                    cat ".tmp/ssti_candidates.txt" | anew -q "vulns/ssti_${ssti_engine}.txt"
                     cat ".tmp/ssti_candidates.txt" | anew -q "vulns/ssti.txt"
                 fi
 
@@ -397,7 +423,11 @@ function sqli() {
                                 # Check if GHAURI is enabled and run Ghauri
                 if [[ $GHAURI == true ]]; then
                     _print_msg INFO "Running: Ghauri for SQLi Checks"
-                    run_command interlace -tL ".tmp/tmp_sqli.txt" -threads "$INTERLACE_THREADS" -c "ghauri -u _target_ --batch -H \"${HEADER}\" --force-ssl >> vulns/ghauri_log.txt" 2>>"$LOGFILE" >/dev/null
+                    mkdir -p .tmp/ghauri_parts
+                    run_command interlace -tL ".tmp/tmp_sqli.txt" -threads "$INTERLACE_THREADS" -c "ghauri -u _target_ --batch -H \"${HEADER}\" --force-ssl >> .tmp/ghauri_parts/_cleantarget_.txt" 2>>"$LOGFILE" >/dev/null
+                    # Merge per-target outputs to avoid concurrent write corruption
+                    cat .tmp/ghauri_parts/*.txt 2>/dev/null | anew -q vulns/ghauri_log.txt || true
+                    rm -rf .tmp/ghauri_parts
                 fi
 
                 end_func "Results are saved in vulns/sqlmap folder" "${FUNCNAME[0]}"
@@ -435,9 +465,13 @@ function test_ssl() {
             echo "$domain" >"$dir/hosts/ips.txt"
         fi
 
-        # Run testssl.sh
+        # Run testssl.sh — prefer non-CDN IPs to avoid testing CDN TLS configs
+        local testssl_input="$dir/hosts/ips.txt"
+        if [[ -s "$dir/.tmp/ips_nocdn.txt" ]]; then
+            testssl_input="$dir/.tmp/ips_nocdn.txt"
+        fi
         _print_msg INFO "Running: SSL Test with testssl.sh"
-        run_command "${tools}/testssl.sh/testssl.sh" --quiet --color 0 -U -iL "$dir/hosts/ips.txt" 2>>"$LOGFILE" >"vulns/testssl.txt"
+        run_command "${tools}/testssl.sh/testssl.sh" --quiet --color 0 -U -iL "$testssl_input" 2>>"$LOGFILE" >"vulns/testssl.txt"
 
         end_func "Results are saved in vulns/testssl.txt" "${FUNCNAME[0]}"
 
@@ -484,15 +518,15 @@ function spraying() {
             fi
 
             local brutus_input=""
-            if [[ -s "$dir/hosts/fingerprintx.jsonl" ]]; then
-                brutus_input="$dir/hosts/fingerprintx.jsonl"
-            elif [[ -s "$dir/hosts/naabu_open.txt" ]] && command -v fingerprintx >/dev/null 2>&1; then
-                run_command fingerprintx --json -l "$dir/hosts/naabu_open.txt" -o "$dir/.tmp/fingerprintx_for_brutus.jsonl" 2>>"$LOGFILE" >/dev/null || true
-                [[ -s "$dir/.tmp/fingerprintx_for_brutus.jsonl" ]] && brutus_input="$dir/.tmp/fingerprintx_for_brutus.jsonl"
+            if [[ -s "$dir/hosts/service_fingerprints.jsonl" ]]; then
+                brutus_input="$dir/hosts/service_fingerprints.jsonl"
+            elif [[ -s "$dir/hosts/naabu_open.txt" ]] && command -v nerva >/dev/null 2>&1; then
+                run_command nerva --json -l "$dir/hosts/naabu_open.txt" -o "$dir/.tmp/service_fp_for_brutus.jsonl" 2>>"$LOGFILE" >/dev/null || true
+                [[ -s "$dir/.tmp/service_fp_for_brutus.jsonl" ]] && brutus_input="$dir/.tmp/service_fp_for_brutus.jsonl"
             fi
 
             if [[ -z "$brutus_input" ]]; then
-                end_func "No fingerprintx JSON input for brutus (run portscan with SERVICE_FINGERPRINT=true)" "${FUNCNAME[0]}" SKIP
+                end_func "No service fingerprint JSON input for brutus (run portscan with SERVICE_FINGERPRINT=true)" "${FUNCNAME[0]}" SKIP
                 return 0
             fi
 
@@ -600,20 +634,14 @@ function 4xxbypass() {
 
         if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT ]]; then
 
-            # Navigate to nomore403 tool directory
-            if ! pushd "${tools}/nomore403" >/dev/null; then
-                print_warnf "Failed to navigate to nomore403 directory."
-                end_func "Failed to navigate to nomore403 directory during 403 Bypass." "${FUNCNAME[0]}"
-                return 1
-            fi
-
-            # Run nomore403 on the processed URLs
-            ./nomore403 <"$dir/.tmp/403test.txt" >"$dir/.tmp/4xxbypass.txt" 2>>"$LOGFILE"
-
-            # Return to the original directory
-            if ! popd >/dev/null; then
-                print_warnf "Failed to return to the original directory."
-                end_func "Failed to return to the original directory during 403 Bypass." "${FUNCNAME[0]}"
+            # Run nomore403 in a subshell to avoid CWD pollution
+            (
+                cd "${tools}/nomore403" || exit 1
+                ./nomore403 <"$dir/.tmp/403test.txt" >"$dir/.tmp/4xxbypass.txt" 2>>"$LOGFILE"
+            )
+            if [[ $? -ne 0 ]]; then
+                print_warnf "nomore403 failed or directory not found."
+                end_func "Failed during 403 Bypass." "${FUNCNAME[0]}"
                 return 1
             fi
 
@@ -626,7 +654,7 @@ function 4xxbypass() {
 
         else
             notification "Too many URLs to bypass, skipping" warn
-            end_func "Skipping Command Injection: Too many URLs to test, try with --deep flag." "${FUNCNAME[0]}"
+            end_func "Skipping 403 Bypass: Too many URLs to test, try with --deep flag." "${FUNCNAME[0]}"
         fi
 
     else
@@ -720,22 +748,14 @@ function webcache() {
 
             _print_msg INFO "Running: Web Cache Poisoning Checks"
 
-            # Navigate to Web-Cache-Vulnerability-Scanner tool directory
-            if ! pushd "${tools}/Web-Cache-Vulnerability-Scanner" >/dev/null; then
-                print_warnf "Failed to navigate to Web-Cache-Vulnerability-Scanner directory."
-                end_func "Failed to navigate to Web-Cache-Vulnerability-Scanner directory during Web Cache Poisoning Checks." "${FUNCNAME[0]}"
-                return 1
-            fi
-
-            # Run the Web-Cache-Vulnerability-Scanner
-            Web-Cache-Vulnerability-Scanner -u "file:$dir/webs/webs_all.txt" -v 0 2>>"$LOGFILE" \
-                | anew -q "$dir/.tmp/webcache.txt"
-
-            # Return to the original directory
-            if ! popd >/dev/null; then
-                print_warnf "Failed to return to the original directory."
-                end_func "Failed to return to the original directory during Web Cache Poisoning Checks." "${FUNCNAME[0]}"
-                return 1
+            # Run Web-Cache-Vulnerability-Scanner in a subshell to avoid CWD pollution
+            (
+                cd "${tools}/Web-Cache-Vulnerability-Scanner" || exit 1
+                Web-Cache-Vulnerability-Scanner -u "file:$dir/webs/webs_all.txt" -v 0 2>>"$LOGFILE" \
+                    | anew -q "$dir/.tmp/webcache.txt"
+            )
+            if [[ $? -ne 0 ]]; then
+                print_warnf "Web-Cache-Vulnerability-Scanner failed or directory not found."
             fi
 
             # Append unique findings to vulns/webcache.txt
