@@ -1256,6 +1256,14 @@ _fuzz_run_local() {
             -c "ffuf ${FFUF_FLAGS} ${ffuf_recursion_flags} -t ${slow_threads} -rate ${slow_rate} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" \
             -o "$dir/.tmp/fuzzing"
     fi
+
+    # Convert JSON results to TXT in fuzzing/ directory (like axiom path does)
+    find "$dir/.tmp/fuzzing/" -type f -name "*.json" -print0 2>/dev/null | while IFS= read -r -d '' json_file; do
+        local base
+        base=$(basename "${json_file%.json}")
+        jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' "$json_file" 2>/dev/null \
+            | sort -k1 | anew -q "fuzzing/${base}.txt" 2>>"$LOGFILE" || true
+    done
 }
 
 # Run ffuf via axiom-scan and parse per-subdomain results
