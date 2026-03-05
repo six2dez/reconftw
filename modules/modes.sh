@@ -1205,6 +1205,7 @@ function webs_menu() {
     cms_scanner
     run_module_with_axiom_failover iishortname
     run_module_with_axiom_failover urlchecks
+    run_module_with_axiom_failover param_discovery
     run_module_with_axiom_failover jschecks
     websocket_checks
     url_gf
@@ -1212,7 +1213,6 @@ function webs_menu() {
     wordlist_gen_roboxtractor
     password_dict
     url_ext
-    run_module_with_axiom_failover param_discovery
     grpc_reflection
 
     vulns
