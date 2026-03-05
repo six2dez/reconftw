@@ -1110,8 +1110,10 @@ function param_discovery() {
         local input_file="webs/url_extract_nodupes.txt"
         local arjun_axiom_ok=true
         local arjun_urls_raw=".tmp/arjun_urls_raw.txt"
+        local arjun_urls_scoped=".tmp/arjun_urls_scoped.txt"
         local arjun_urls_params=".tmp/arjun_urls_params.txt"
         : >"$arjun_urls_raw"
+        : >"$arjun_urls_scoped"
         : >"$arjun_urls_params"
         [[ ! -s $input_file ]] && input_file="webs/webs_all.txt"
         if [[ -s $input_file ]]; then
@@ -1155,10 +1157,32 @@ function param_discovery() {
             fi
 
             if [[ -s "$arjun_urls_raw" ]]; then
+                local domain_regex
+                domain_regex=$(domain_match_regex "$domain")
+                awk -v re="$domain_regex" -F/ '
+                    /^https?:\/\// {
+                        h=$3
+                        sub(/:.*/, "", h)
+                        if (h ~ re) print
+                    }
+                ' "$arjun_urls_raw" | anew -q "$arjun_urls_scoped" || true
+
+                if [[ -s "$outOfScope_file" ]] && [[ -s "$arjun_urls_scoped" ]]; then
+                    deleteOutScoped "$outOfScope_file" "$arjun_urls_scoped" || true
+                fi
+
+                if [[ $INSCOPE == true ]] && [[ -s "$arjun_urls_scoped" ]]; then
+                    if ! check_inscope "$arjun_urls_scoped" 2>>"$LOGFILE" >/dev/null; then
+                        print_warnf "check_inscope command failed."
+                    fi
+                fi
+            fi
+
+            if [[ -s "$arjun_urls_scoped" ]]; then
                 if command -v urless >/dev/null 2>&1; then
-                    urless <"$arjun_urls_raw" | anew -q "$arjun_urls_params" 2>>"$LOGFILE" >/dev/null || true
+                    urless <"$arjun_urls_scoped" | anew -q "$arjun_urls_params" 2>>"$LOGFILE" >/dev/null || true
                 else
-                    cat "$arjun_urls_raw" | anew -q "$arjun_urls_params" || true
+                    cat "$arjun_urls_scoped" | anew -q "$arjun_urls_params" || true
                 fi
             fi
 
