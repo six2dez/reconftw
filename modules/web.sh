@@ -653,6 +653,8 @@ function portscan() {
 
         if [[ -s "hosts/portscan_active.xml" ]]; then
             nmapurls <hosts/portscan_active.xml 2>>"$LOGFILE" | anew -q hosts/webs.txt
+            # Feed IPv4 nmap URL findings back into the main web target set.
+            [[ -s hosts/webs.txt ]] && cat hosts/webs.txt | anew -q webs/webs.txt
         fi
         if [[ -s "hosts/portscan_active_v6.xml" ]]; then
             nmapurls <hosts/portscan_active_v6.xml 2>>"$LOGFILE" | anew -q hosts/webs_v6.txt
@@ -1107,6 +1109,10 @@ function param_discovery() {
         start_func "${FUNCNAME[0]}" "Parameter discovery (arjun)"
         local input_file="webs/url_extract_nodupes.txt"
         local arjun_axiom_ok=true
+        local arjun_urls_raw=".tmp/arjun_urls_raw.txt"
+        local arjun_urls_params=".tmp/arjun_urls_params.txt"
+        : >"$arjun_urls_raw"
+        : >"$arjun_urls_params"
         [[ ! -s $input_file ]] && input_file="webs/webs_all.txt"
         if [[ -s $input_file ]]; then
             if [[ $AXIOM == true ]]; then
@@ -1133,6 +1139,43 @@ function param_discovery() {
                 fi
                 run_command arjun -i "$input_file" -t "$ARJUN_THREADS" -oT .tmp/arjun.txt 2>>"$LOGFILE" >/dev/null || true
                 _parse_arjun_text_output .tmp/arjun.txt
+            fi
+
+            # Feed useful parameterized URLs discovered by arjun back into the main
+            # URL pipelines so gf/vuln modules can consume them.
+            if [[ -s ".tmp/arjun.txt" ]]; then
+                grep -aEo 'https?://[^ ]+' ".tmp/arjun.txt" \
+                    | sed -E 's/[[:space:]]+$//' \
+                    | sed -E 's/[),;]$//' \
+                    | sed 's/"$//' \
+                    | sed "s/'$//" \
+                    | grep -a '=' \
+                    | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg)$" \
+                    | anew -q "$arjun_urls_raw" || true
+            fi
+
+            if [[ -s "$arjun_urls_raw" ]]; then
+                if command -v urless >/dev/null 2>&1; then
+                    urless <"$arjun_urls_raw" | anew -q "$arjun_urls_params" 2>>"$LOGFILE" >/dev/null || true
+                else
+                    cat "$arjun_urls_raw" | anew -q "$arjun_urls_params" || true
+                fi
+            fi
+
+            if [[ -s "$arjun_urls_params" ]]; then
+                local arjun_added=0
+                if ! arjun_added=$(anew webs/url_extract.txt <"$arjun_urls_params" | sed '/^$/d' | wc -l); then
+                    arjun_added=0
+                fi
+                append_assets_from_file url value webs/url_extract.txt
+
+                if command -v p1radup >/dev/null 2>&1; then
+                    p1radup -i webs/url_extract.txt -o webs/url_extract_nodupes.txt -s 2>>"$LOGFILE" >/dev/null || true
+                else
+                    sort -u webs/url_extract.txt >webs/url_extract_nodupes.txt 2>>"$LOGFILE" || true
+                fi
+
+                notification "Parameter discovery merged: ${arjun_added} new parameterized URLs" "info"
             fi
         fi
         end_func "Results are saved in webs/params_discovered.txt" "${FUNCNAME[0]}"
