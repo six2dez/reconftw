@@ -648,7 +648,9 @@ if [[ "${SHOW_LEGAL:-false}" == "true" ]]; then
     printf "\n"
 fi
 
-check_version
+if [[ "${DRY_RUN:-false}" != "true" ]]; then
+    check_version
+fi
 
 # Check critical dependencies before proceeding
 if [[ "${SKIP_CRITICAL_CHECK:-false}" != "true" ]]; then
