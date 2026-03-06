@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v4.1] - 2026-03-06
+
+### Added
+
+**Advanced Subdomain & Asset Discovery**
+- `sub_srv` function: SRV record enumeration (`_ldap._tcp`, `_sip._tcp`, `_xmpp-server._tcp`, etc.) via dnsx. Discovers service infrastructure hosts. Config: `SRV_ENUM=true`. Output: `subdomains/srv_records.txt`. Data file: `data/wordlists/srv_prefixes.txt` (~27 SRV prefixes).
+- `sub_ptr_cidrs` function: PTR sweep over ASN CIDR ranges discovered by `sub_asn`. Expands CIDRs via mapcidr, runs reverse PTR lookups via dnsx, filters in-scope results. Config: `PTR_SWEEP=false` (off by default), `PTR_SWEEP_MAX_IPS=50000` (safety limit). Output: `subdomains/ptr_pivots.txt`.
+- `sub_ns_delegation` function: discovers delegated DNS zones (subdomains with their own NS records) and attempts AXFR zone transfers on each delegated nameserver. Complements existing `zonetransfer()` which only checks the main domain's NS. Config: `NS_DELEGATION=true`. Output: `subdomains/ns_delegated_zones.txt`.
+- `tls_ip_pivots` function: TLS certificate harvesting from raw IPs (not just known subdomains like `sub_tls`). Three phases: (A) passive cert harvest extracting SAN/CN via `tlsx -json`, (B) SNI brute-force using discovered labels as candidates (DEEP mode only), (C) reverse PTR + SNI probing via `tlsx -rev-ptr-sni`. Includes delta-only httpx probe for newly discovered subdomains. Config: `TLS_IP_PIVOTS=false`, `TLS_IP_SNI_BATCH_SIZE=1000`, `TLS_IP_DELTA_PROBE=true`. Output: `hosts/tls_ip_certs.jsonl`, `subdomains/tls_ip_pivots.txt`.
+- `sub_js_extract` function: extracts hostnames from JS/crawl output files (`js/nojs_links.txt`, `js/js_livelinks.txt`, `webs/url_extract.txt`, `js/js_secrets.txt`, etc.), resolves new candidates, and delta-probes them. Creates a feedback loop from web analysis back into subdomain discovery. Config: `JS_SUB_EXTRACT=true`.
+- `well_known_pivots` function: checks well-known metadata endpoints (`/.well-known/security.txt`, `/.well-known/openid-configuration`, `/.well-known/oauth-authorization-server`) for hostname references matching the target domain. Config: `WELLKNOWN_PIVOTS=false`, `WELLKNOWN_MAX_TARGETS=200`.
+- Reactivated `virtualhosts()` in all scan modes (`recon`, `subs_menu`, `webs_menu`, `zen_menu`, multi-domain recon). Was previously commented out. Gated by existing `VIRTUALHOSTS=false` config flag.
+
+**Pipeline Integration**
+- Subdomain Phase 4 (parallel): added `sub_srv` and `sub_ptr_cidrs` alongside `sub_noerror` and `sub_dns`.
+- Subdomain Phase 5 (parallel): added `sub_ns_delegation` alongside `sub_tls` and `sub_analytics`.
+- Web Detection: added `tls_ip_pivots` and `virtualhosts` after portscan/geo_info in both parallel and sequential paths.
+- Web Analysis: added `sub_js_extract` and `well_known_pivots` after `jschecks`.
+- `passive()` mode: `PTR_SWEEP`, `NS_DELEGATION`, and `TLS_IP_PIVOTS` are saved/restored as `false` to prevent active techniques in passive-only mode.
+
+**Config Profiles**
+- Full profile (`reconftw_full.cfg`): enables `PTR_SWEEP`, `SRV_ENUM`, `NS_DELEGATION`, `TLS_IP_PIVOTS`, `JS_SUB_EXTRACT`, `WELLKNOWN_PIVOTS`.
+- Quick profile (`reconftw_quick.cfg`): enables only `SRV_ENUM` (lightweight); disables all others.
+- Stealth profile (`reconftw_stealth.cfg`): enables only `SRV_ENUM`; disables all active techniques.
+
 ## [v4.0] - 2026-02-20
 
 ### Added

@@ -431,6 +431,8 @@ function passive() {
     local _saved_SUBPERMUTE="${SUBPERMUTE:-}" _saved_SUBREGEXPERMUTE="${SUBREGEXPERMUTE:-}"
     local _saved_SUB_RECURSIVE_BRUTE="${SUB_RECURSIVE_BRUTE:-}"
     local _saved_PORTSCAN_ACTIVE="${PORTSCAN_ACTIVE:-}"
+    local _saved_PTR_SWEEP="${PTR_SWEEP:-}" _saved_NS_DELEGATION="${NS_DELEGATION:-}"
+    local _saved_TLS_IP_PIVOTS="${TLS_IP_PIVOTS:-}"
 
     # shellcheck disable=SC2034  # These globals are consumed by downstream module functions
     SUBNOERROR=false
@@ -446,6 +448,12 @@ function passive() {
     SUBREGEXPERMUTE=false
     # shellcheck disable=SC2034
     SUB_RECURSIVE_BRUTE=false
+    # shellcheck disable=SC2034
+    PTR_SWEEP=false
+    # shellcheck disable=SC2034
+    NS_DELEGATION=false
+    # shellcheck disable=SC2034
+    TLS_IP_PIVOTS=false
     if [[ $AXIOM == true ]]; then
         axiom_launch
         axiom_selected
@@ -477,6 +485,9 @@ function passive() {
     SUBREGEXPERMUTE="${_saved_SUBREGEXPERMUTE}"
     SUB_RECURSIVE_BRUTE="${_saved_SUB_RECURSIVE_BRUTE}"
     PORTSCAN_ACTIVE="${_saved_PORTSCAN_ACTIVE}"
+    PTR_SWEEP="${_saved_PTR_SWEEP}"
+    NS_DELEGATION="${_saved_NS_DELEGATION}"
+    TLS_IP_PIVOTS="${_saved_TLS_IP_PIVOTS}"
 
     end
 }
@@ -791,13 +802,16 @@ function recon() {
             fi
         fi
         geo_info
+        tls_ip_pivots
+        virtualhosts
     else
         run_module_with_axiom_failover screenshot
-        #	virtualhosts
         run_module_with_axiom_failover cdnprovider
         run_module_with_axiom_failover portscan
         favirecon_tech
         run_module_with_axiom_failover geo_info
+        tls_ip_pivots
+        virtualhosts
     fi
 
     ui_module_end "Web Detection" "webs/" "hosts/" "screenshots/"
@@ -822,6 +836,8 @@ function recon() {
         run_module_with_axiom_failover iishortname
         run_module_with_axiom_failover urlchecks
         run_module_with_axiom_failover jschecks
+        sub_js_extract
+        well_known_pivots
         websocket_checks
         run_module_with_axiom_failover param_discovery
         grpc_reflection
@@ -977,10 +993,11 @@ function multi_recon() {
         run_module_with_axiom_failover subtakeover
         remove_big_files
         run_module_with_axiom_failover screenshot
-        #		virtualhosts
         run_module_with_axiom_failover cdnprovider
         run_module_with_axiom_failover portscan
         run_module_with_axiom_failover geo_info
+        tls_ip_pivots
+        virtualhosts
         currently=$(date +"%H:%M:%S")
         loopend=$(date +%s)
         getElapsedTime "$loopstart" "$loopend"
@@ -1177,7 +1194,8 @@ function subs_menu() {
     run_module_with_axiom_failover webprobe_full
     favirecon_tech
     run_module_with_axiom_failover screenshot
-    #	virtualhosts
+    tls_ip_pivots
+    virtualhosts
 
     if [[ $AXIOM == true ]]; then
         axiom_shutdown
@@ -1194,7 +1212,7 @@ function webs_menu() {
     run_module_with_axiom_failover subtakeover
     remove_big_files
     run_module_with_axiom_failover screenshot
-    #	virtualhosts
+    virtualhosts
 
     _print_section "Web Analysis"
 
@@ -1207,6 +1225,8 @@ function webs_menu() {
     run_module_with_axiom_failover urlchecks
     run_module_with_axiom_failover param_discovery
     run_module_with_axiom_failover jschecks
+    sub_js_extract
+    well_known_pivots
     websocket_checks
     url_gf
     wordlist_gen
@@ -1237,7 +1257,8 @@ function zen_menu() {
     run_module_with_axiom_failover webprobe_full
     favirecon_tech
     run_module_with_axiom_failover screenshot
-    #	virtualhosts
+    tls_ip_pivots
+    virtualhosts
     run_module_with_axiom_failover cdnprovider
 
     _print_section "Web Analysis"
