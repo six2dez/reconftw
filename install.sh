@@ -7,9 +7,23 @@ set -E
 set +e
 IFS=$'\n\t'
 
-# Detect if the script is being run in MacOS with Homebrew Bash
-if [[ $OSTYPE == "darwin"* && $BASH != "/opt/homebrew/bin/bash" ]]; then
-    exec /opt/homebrew/bin/bash "$0" "$@"
+# Detect if the script is being run in macOS and re-exec with modern Bash.
+# Supports both Apple Silicon (/opt/homebrew) and Intel (/usr/local) Homebrew prefixes.
+if [[ $OSTYPE == "darwin"* ]]; then
+    _mac_bash=""
+    for _candidate in /opt/homebrew/bin/bash /usr/local/bin/bash /bin/bash; do
+        if [[ -x "$_candidate" ]]; then
+            _major="$("$_candidate" -lc 'echo "${BASH_VERSINFO[0]}"' 2>/dev/null || echo 0)"
+            if [[ "$_major" =~ ^[0-9]+$ ]] && [[ "$_major" -ge 4 ]]; then
+                _mac_bash="$_candidate"
+                break
+            fi
+        fi
+    done
+    if [[ -n "$_mac_bash" ]] && [[ "$BASH" != "$_mac_bash" ]]; then
+        exec "$_mac_bash" "$0" "$@"
+    fi
+    unset _mac_bash _candidate _major
 fi
 
 # Load main configuration
