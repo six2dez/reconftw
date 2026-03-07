@@ -380,6 +380,160 @@ function virtualhosts() {
 
 }
 
+function tls_ip_pivots() {
+    ensure_dirs .tmp subdomains hosts webs
+
+    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ ${TLS_IP_PIVOTS:-false} == true ]]; then
+        start_func "${FUNCNAME[0]}" "TLS Certificate Harvesting from IPs"
+
+        # Collect IP sources
+        : >.tmp/tls_ip_targets.txt
+        [[ -s "hosts/ips.txt" ]]        && cat hosts/ips.txt        >> .tmp/tls_ip_targets.txt
+        [[ -s "hosts/origin_ips.txt" ]] && cat hosts/origin_ips.txt >> .tmp/tls_ip_targets.txt
+        sort -u .tmp/tls_ip_targets.txt -o .tmp/tls_ip_targets.txt
+
+        if [[ ! -s ".tmp/tls_ip_targets.txt" ]]; then
+            end_func "No IPs available for TLS IP pivoting" "${FUNCNAME[0]}" "SKIP_NOINPUT"
+            return
+        fi
+
+        local ip_count tls_ports batch_size
+        ip_count=$(wc -l <.tmp/tls_ip_targets.txt | tr -d ' ')
+        tls_ports="${TLS_PORTS:-443}"
+        batch_size="${TLS_IP_SNI_BATCH_SIZE:-1000}"
+        _print_msg INFO "TLS IP pivots: scanning ${ip_count} IPs for certificates"
+
+        # Phase A: Passive cert harvest — extract SAN/CN from TLS certs on IPs
+        : >hosts/tls_ip_certs.jsonl
+        if [[ $AXIOM != true ]]; then
+            run_command tlsx -san -cn -silent -ro -resp-only \
+                -p "$tls_ports" \
+                -c "$TLSX_THREADS" \
+                -json \
+                <.tmp/tls_ip_targets.txt \
+                >hosts/tls_ip_certs.jsonl 2>>"$LOGFILE" || true
+        else
+            run_command axiom-scan .tmp/tls_ip_targets.txt -m tlsx \
+                -san -cn -silent -ro -resp-only \
+                -p "$tls_ports" \
+                -c "$TLSX_THREADS" \
+                -json \
+                -o hosts/tls_ip_certs.jsonl $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+        fi
+
+        # Extract hostnames from SAN/CN in JSONL
+        : >.tmp/tls_ip_sans_all.txt
+        if [[ -s "hosts/tls_ip_certs.jsonl" ]]; then
+            jq -r '
+                (.subject_cn // empty),
+                (.subject_an[]? // empty)
+            ' hosts/tls_ip_certs.jsonl 2>/dev/null \
+                | sed -e 's/^\*\.//' -e 's/\.$//' -e '/^$/d' \
+                | grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' \
+                | sort -u >.tmp/tls_ip_sans_all.txt || true
+        fi
+
+        # Phase B: SNI brute — use discovered labels + domain as SNI candidates (only in DEEP mode)
+        : >.tmp/tls_ip_sni_results.txt
+        if [[ -s ".tmp/tls_ip_sans_all.txt" ]] && [[ ${DEEP:-false} == true ]]; then
+            # Build SNI candidate list from discovered names + existing subdomains
+            : >.tmp/tls_ip_sni_candidates.txt
+            cat .tmp/tls_ip_sans_all.txt >> .tmp/tls_ip_sni_candidates.txt
+            [[ -s "subdomains/subdomains.txt" ]] && cat subdomains/subdomains.txt >> .tmp/tls_ip_sni_candidates.txt
+            sort -u .tmp/tls_ip_sni_candidates.txt -o .tmp/tls_ip_sni_candidates.txt
+
+            head -n "$batch_size" .tmp/tls_ip_targets.txt \
+                | run_command tlsx -san -cn -silent -ro -resp-only \
+                    -p "$tls_ports" \
+                    -c "$TLSX_THREADS" \
+                    -sni-file .tmp/tls_ip_sni_candidates.txt \
+                    >.tmp/tls_ip_sni_results.txt 2>>"$LOGFILE" || true
+        fi
+
+        # Phase C: Reverse PTR + SNI probing
+        if [[ -s ".tmp/tls_ip_targets.txt" ]]; then
+            head -n "$batch_size" .tmp/tls_ip_targets.txt \
+                | run_command tlsx -san -cn -silent -ro -resp-only \
+                    -rev-ptr-sni \
+                    -p "$tls_ports" \
+                    -c "$TLSX_THREADS" \
+                    >>.tmp/tls_ip_sni_results.txt 2>>"$LOGFILE" || true
+        fi
+
+        # Merge all discovered hostnames
+        : >.tmp/tls_ip_all_hosts.txt
+        [[ -s ".tmp/tls_ip_sans_all.txt" ]]    && cat .tmp/tls_ip_sans_all.txt    >> .tmp/tls_ip_all_hosts.txt
+        if [[ -s ".tmp/tls_ip_sni_results.txt" ]]; then
+            sed -e 's/^\*\.//' -e 's/\.$//' -e '/^$/d' .tmp/tls_ip_sni_results.txt \
+                | grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' \
+                >> .tmp/tls_ip_all_hosts.txt 2>/dev/null || true
+        fi
+        sort -u .tmp/tls_ip_all_hosts.txt -o .tmp/tls_ip_all_hosts.txt
+
+        # Filter in-scope
+        : >subdomains/tls_ip_pivots.txt
+        if [[ -s ".tmp/tls_ip_all_hosts.txt" ]]; then
+            grep -E "$DOMAIN_MATCH_REGEX" .tmp/tls_ip_all_hosts.txt \
+                | sort -u >subdomains/tls_ip_pivots.txt 2>/dev/null || true
+        fi
+
+        if [[ $INSCOPE == true ]] && [[ -s "subdomains/tls_ip_pivots.txt" ]]; then
+            if ! check_inscope subdomains/tls_ip_pivots.txt 2>>"$LOGFILE" >/dev/null; then
+                print_warnf "check_inscope command failed."
+            fi
+        fi
+
+        # Resolve new candidates and merge
+        NUMOFLINES=0
+        if [[ -s "subdomains/tls_ip_pivots.txt" ]]; then
+            : >.tmp/tls_ip_pivots_resolved.txt
+            if [[ $AXIOM != true ]]; then
+                _resolve_domains subdomains/tls_ip_pivots.txt .tmp/tls_ip_pivots_resolved.txt
+            else
+                run_command axiom-scan subdomains/tls_ip_pivots.txt -m puredns-resolve \
+                    -r "${AXIOM_RESOLVERS_PATH}" --resolvers-trusted "${AXIOM_RESOLVERS_TRUSTED_PATH}" \
+                    --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
+                    -o .tmp/tls_ip_pivots_resolved.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+            fi
+
+            if [[ -s ".tmp/tls_ip_pivots_resolved.txt" ]]; then
+                NUMOFLINES=$(anew subdomains/subdomains.txt <.tmp/tls_ip_pivots_resolved.txt | sed '/^$/d' | wc -l | tr -d ' ' || true)
+                [[ "$NUMOFLINES" =~ ^[0-9]+$ ]] || NUMOFLINES=0
+            fi
+        fi
+
+        # Delta probe: run targeted httpx on new subs only
+        if [[ ${TLS_IP_DELTA_PROBE:-true} == true ]] && [[ ${NUMOFLINES:-0} -gt 0 ]] && [[ -s ".tmp/tls_ip_pivots_resolved.txt" ]]; then
+            _print_msg INFO "TLS IP pivots: delta-probing ${NUMOFLINES} new subdomains"
+            # Identify genuinely new subs by comparing against pre-existing list
+            if [[ -s ".tmp/subdomains_old.txt" ]]; then
+                comm -23 <(sort -u .tmp/tls_ip_pivots_resolved.txt) \
+                    <(sort -u .tmp/subdomains_old.txt) \
+                    >.tmp/tls_ip_delta_subs.txt 2>/dev/null || true
+            else
+                cp .tmp/tls_ip_pivots_resolved.txt .tmp/tls_ip_delta_subs.txt
+            fi
+
+            if [[ -s ".tmp/tls_ip_delta_subs.txt" ]]; then
+                run_command httpx -follow-host-redirects -random-agent -silent \
+                    -status-code -p "${WEBPROBE_PORTS:-80,443}" \
+                    -threads "${HTTPX_THREADS:-50}" -rl "${HTTPX_RATELIMIT:-0}" \
+                    -timeout "${HTTPX_TIMEOUT:-10}" -retries 2 -no-color \
+                    <.tmp/tls_ip_delta_subs.txt \
+                    | awk '{print $1}' | anew -q webs/webs.txt 2>/dev/null || true
+            fi
+        fi
+
+        end_func "${NUMOFLINES} new subs (tls ip pivots)" "${FUNCNAME[0]}"
+    else
+        if [[ ${TLS_IP_PIVOTS:-false} == false ]]; then
+            skip_notification "disabled"
+        else
+            skip_notification "processed"
+        fi
+    fi
+}
+
 ###############################################################################################################
 ############################################# HOST SCAN #######################################################
 ###############################################################################################################
@@ -2038,6 +2192,182 @@ function jschecks() {
         fi
     fi
 
+}
+
+function sub_js_extract() {
+    ensure_dirs .tmp subdomains webs
+
+    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ ${JS_SUB_EXTRACT:-true} == true ]]; then
+        start_func "${FUNCNAME[0]}" "Hostname extraction from JS/crawl outputs"
+
+        : >.tmp/js_extracted_hosts.txt
+
+        # Extract hostnames from URLs in JS/crawl output files
+        for f in js/nojs_links.txt js/js_livelinks.txt .tmp/subjslinks.txt .tmp/katana.txt webs/url_extract.txt; do
+            if [[ -s "$f" ]]; then
+                grep -aoE 'https?://[a-zA-Z0-9][-a-zA-Z0-9]*(\.[a-zA-Z0-9][-a-zA-Z0-9]*)+' "$f" \
+                    | sed -E 's|^https?://||' \
+                    | sed -E 's|[:/].*||' \
+                    | grep -E "$DOMAIN_MATCH_REGEX" \
+                    >> .tmp/js_extracted_hosts.txt 2>/dev/null || true
+            fi
+        done
+
+        # Extract hostnames from JS secrets files (may reference internal hosts)
+        for f in js/js_secrets.txt js/js_secrets_jsmap.txt; do
+            if [[ -s "$f" ]]; then
+                grep -aoE '[a-zA-Z0-9][-a-zA-Z0-9]*(\.[a-zA-Z0-9][-a-zA-Z0-9]*)+' "$f" \
+                    | grep -E "$DOMAIN_MATCH_REGEX" \
+                    >> .tmp/js_extracted_hosts.txt 2>/dev/null || true
+            fi
+        done
+
+        if [[ ! -s ".tmp/js_extracted_hosts.txt" ]]; then
+            end_func "No hostnames found in JS/crawl outputs" "${FUNCNAME[0]}" "SKIP_NOINPUT"
+            return
+        fi
+
+        # Deduplicate and filter valid domains
+        sort -u .tmp/js_extracted_hosts.txt \
+            | grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' \
+            >.tmp/js_extracted_hosts_clean.txt 2>/dev/null || true
+
+        # Remove already-known subdomains
+        if [[ -s "subdomains/subdomains.txt" ]] && [[ -s ".tmp/js_extracted_hosts_clean.txt" ]]; then
+            comm -23 <(sort -u .tmp/js_extracted_hosts_clean.txt) \
+                <(sort -u subdomains/subdomains.txt) \
+                >.tmp/js_extracted_hosts_new.txt 2>/dev/null || true
+        else
+            cp .tmp/js_extracted_hosts_clean.txt .tmp/js_extracted_hosts_new.txt 2>/dev/null || true
+        fi
+
+        NUMOFLINES=0
+        if [[ -s ".tmp/js_extracted_hosts_new.txt" ]]; then
+            # Resolve to validate
+            : >.tmp/js_extracted_hosts_resolved.txt
+            if [[ $AXIOM != true ]]; then
+                _resolve_domains .tmp/js_extracted_hosts_new.txt .tmp/js_extracted_hosts_resolved.txt
+            else
+                run_command axiom-scan .tmp/js_extracted_hosts_new.txt -m puredns-resolve \
+                    -r "${AXIOM_RESOLVERS_PATH}" --resolvers-trusted "${AXIOM_RESOLVERS_TRUSTED_PATH}" \
+                    --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
+                    -o .tmp/js_extracted_hosts_resolved.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+            fi
+
+            if [[ -s ".tmp/js_extracted_hosts_resolved.txt" ]]; then
+                NUMOFLINES=$(anew subdomains/subdomains.txt <.tmp/js_extracted_hosts_resolved.txt | sed '/^$/d' | wc -l | tr -d ' ' || true)
+                [[ "$NUMOFLINES" =~ ^[0-9]+$ ]] || NUMOFLINES=0
+
+                # Delta probe new subs
+                if [[ $NUMOFLINES -gt 0 ]]; then
+                    _print_msg INFO "JS extract: delta-probing ${NUMOFLINES} new subdomains"
+                    run_command httpx -follow-host-redirects -random-agent -silent \
+                        -status-code -p "${WEBPROBE_PORTS:-80,443}" \
+                        -threads "${HTTPX_THREADS:-50}" -rl "${HTTPX_RATELIMIT:-0}" \
+                        -timeout "${HTTPX_TIMEOUT:-10}" -retries 2 -no-color \
+                        <.tmp/js_extracted_hosts_resolved.txt \
+                        | awk '{print $1}' | anew -q webs/webs.txt 2>/dev/null || true
+                fi
+            fi
+        fi
+
+        end_func "${NUMOFLINES} new subs from JS/crawl extraction" "${FUNCNAME[0]}"
+    else
+        if [[ ${JS_SUB_EXTRACT:-true} == false ]]; then
+            skip_notification "disabled"
+        else
+            skip_notification "processed"
+        fi
+    fi
+}
+
+function well_known_pivots() {
+    ensure_dirs .tmp subdomains webs
+
+    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ ${WELLKNOWN_PIVOTS:-false} == true ]]; then
+        start_func "${FUNCNAME[0]}" "Well-known metadata endpoint pivots"
+
+        ensure_webs_all || true
+
+        if [[ ! -s "webs/webs_all.txt" ]]; then
+            end_func "No web targets for well-known pivots" "${FUNCNAME[0]}" "SKIP_NOINPUT"
+            return
+        fi
+
+        : >.tmp/wellknown_hosts.txt
+        local max_targets="${WELLKNOWN_MAX_TARGETS:-200}"
+
+        head -n "$max_targets" webs/webs_all.txt | while IFS= read -r url; do
+            [[ -z "$url" ]] && continue
+
+            # security.txt (RFC 9116)
+            local resp
+            for path in "/.well-known/security.txt" "/security.txt"; do
+                resp=$(curl -s -m 5 -L "${url}${path}" 2>/dev/null || true)
+                if [[ -n "$resp" ]]; then
+                    echo "$resp" \
+                        | grep -aoE '[a-zA-Z0-9][-a-zA-Z0-9]*(\.[a-zA-Z0-9][-a-zA-Z0-9]*)+' \
+                        | grep -E "$DOMAIN_MATCH_REGEX" \
+                        >> .tmp/wellknown_hosts.txt 2>/dev/null || true
+                fi
+            done
+
+            # OpenID Configuration
+            local oidc_resp
+            oidc_resp=$(curl -s -m 5 -L "${url}/.well-known/openid-configuration" 2>/dev/null || true)
+            if [[ -n "$oidc_resp" ]] && echo "$oidc_resp" | jq -e . >/dev/null 2>&1; then
+                echo "$oidc_resp" | jq -r '.. | strings' 2>/dev/null \
+                    | grep -aoE '[a-zA-Z0-9][-a-zA-Z0-9]*(\.[a-zA-Z0-9][-a-zA-Z0-9]*)+' \
+                    | grep -E "$DOMAIN_MATCH_REGEX" \
+                    >> .tmp/wellknown_hosts.txt 2>/dev/null || true
+            fi
+
+            # OAuth authorization server metadata (RFC 8414)
+            local oauth_resp
+            oauth_resp=$(curl -s -m 5 -L "${url}/.well-known/oauth-authorization-server" 2>/dev/null || true)
+            if [[ -n "$oauth_resp" ]] && echo "$oauth_resp" | jq -e . >/dev/null 2>&1; then
+                echo "$oauth_resp" | jq -r '.. | strings' 2>/dev/null \
+                    | grep -aoE '[a-zA-Z0-9][-a-zA-Z0-9]*(\.[a-zA-Z0-9][-a-zA-Z0-9]*)+' \
+                    | grep -E "$DOMAIN_MATCH_REGEX" \
+                    >> .tmp/wellknown_hosts.txt 2>/dev/null || true
+            fi
+        done
+
+        NUMOFLINES=0
+        if [[ -s ".tmp/wellknown_hosts.txt" ]]; then
+            sort -u .tmp/wellknown_hosts.txt \
+                | grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' \
+                >.tmp/wellknown_hosts_clean.txt 2>/dev/null || true
+
+            # Remove already known
+            if [[ -s "subdomains/subdomains.txt" ]]; then
+                comm -23 <(sort -u .tmp/wellknown_hosts_clean.txt) \
+                    <(sort -u subdomains/subdomains.txt) \
+                    >.tmp/wellknown_hosts_new.txt 2>/dev/null || true
+            else
+                cp .tmp/wellknown_hosts_clean.txt .tmp/wellknown_hosts_new.txt 2>/dev/null || true
+            fi
+
+            if [[ -s ".tmp/wellknown_hosts_new.txt" ]]; then
+                # Resolve
+                : >.tmp/wellknown_hosts_resolved.txt
+                _resolve_domains .tmp/wellknown_hosts_new.txt .tmp/wellknown_hosts_resolved.txt
+
+                if [[ -s ".tmp/wellknown_hosts_resolved.txt" ]]; then
+                    NUMOFLINES=$(anew subdomains/subdomains.txt <.tmp/wellknown_hosts_resolved.txt | sed '/^$/d' | wc -l | tr -d ' ' || true)
+                    [[ "$NUMOFLINES" =~ ^[0-9]+$ ]] || NUMOFLINES=0
+                fi
+            fi
+        fi
+
+        end_func "${NUMOFLINES} new subs from well-known endpoints" "${FUNCNAME[0]}"
+    else
+        if [[ ${WELLKNOWN_PIVOTS:-false} == false ]]; then
+            skip_notification "disabled"
+        else
+            skip_notification "processed"
+        fi
+    fi
 }
 
 function websocket_checks() {

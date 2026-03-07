@@ -288,7 +288,7 @@ _subdomains_enumerate() {
         done
 
         # Phase 4: Dependent active enrichment (runs after sub_active is ready)
-        parallel_funcs "${PAR_SUB_DEP_ACTIVE_GROUP_SIZE:-3}" sub_noerror sub_dns
+        parallel_funcs "${PAR_SUB_DEP_ACTIVE_GROUP_SIZE:-3}" sub_noerror sub_dns sub_srv sub_ptr_cidrs
         local sub_g4_rc=$?
         if ((sub_g4_rc > 0)); then
             if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
@@ -300,7 +300,7 @@ _subdomains_enumerate() {
         fi
 
         # Phase 5: Post-active analysis (depends on active/enrichment results)
-        parallel_funcs "${PAR_SUB_POST_ACTIVE_GROUP_SIZE:-2}" sub_tls sub_analytics
+        parallel_funcs "${PAR_SUB_POST_ACTIVE_GROUP_SIZE:-2}" sub_tls sub_analytics sub_ns_delegation
         local sub_g5_rc=$?
         if ((sub_g5_rc > 0)); then
             if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
@@ -323,6 +323,7 @@ _subdomains_enumerate() {
         sub_active
         sub_tls
         sub_noerror
+        sub_srv
         sub_brute
         sub_permut
         sub_regex_permut
@@ -330,8 +331,10 @@ _subdomains_enumerate() {
         sub_recursive_passive
         sub_recursive_brute
         sub_dns
+        sub_ptr_cidrs
         sub_scraping
         sub_analytics
+        sub_ns_delegation
     fi
 }
 
@@ -841,6 +844,74 @@ function sub_noerror() {
 
 }
 
+function sub_srv() {
+    ensure_dirs .tmp subdomains
+
+    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ ${SRV_ENUM:-true} == true ]]; then
+        start_subfunc "${FUNCNAME[0]}" "Running: SRV Record Enumeration"
+
+        local srv_prefixes="${WORDLISTS_DIR}/srv_prefixes.txt"
+        if [[ ! -s "$srv_prefixes" ]]; then
+            _print_msg WARN "SRV prefixes file not found: ${srv_prefixes}; skipping."
+            end_subfunc "0 new subs (srv enum)" "${FUNCNAME[0]}" "SKIP"
+            return
+        fi
+
+        # Build SRV query list: prefix.domain for each prefix
+        : >.tmp/srv_queries.txt
+        while IFS= read -r prefix; do
+            [[ -z "$prefix" || "$prefix" =~ ^[[:space:]]*# ]] && continue
+            printf '%s.%s\n' "$prefix" "$domain" >> .tmp/srv_queries.txt
+        done < "$srv_prefixes"
+
+        if [[ ! -s ".tmp/srv_queries.txt" ]]; then
+            end_subfunc "0 new subs (srv enum)" "${FUNCNAME[0]}" "SKIP"
+            return
+        fi
+
+        # Query SRV records via dnsx
+        : >.tmp/srv_results_raw.txt
+        run_command dnsx -srv -resp -silent -retry 2 \
+            -t "${DNSX_THREADS:-100}" -rl "${DNSX_RATE_LIMIT:-500}" \
+            -r "$resolvers_trusted" \
+            <.tmp/srv_queries.txt >.tmp/srv_results_raw.txt 2>>"$LOGFILE" || true
+
+        # Parse SRV target hostnames from output
+        : >.tmp/srv_hosts.txt
+        if [[ -s ".tmp/srv_results_raw.txt" ]]; then
+            # Save raw data for analysis
+            cp .tmp/srv_results_raw.txt subdomains/srv_records.txt
+
+            # Extract hostnames, filter in-scope
+            grep -aoE '[a-zA-Z0-9][-a-zA-Z0-9]*(\.[a-zA-Z0-9][-a-zA-Z0-9]*)+' .tmp/srv_results_raw.txt \
+                | sed -e 's/\.$//' -e '/^$/d' \
+                | grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' \
+                | grep -E "$DOMAIN_MATCH_REGEX" \
+                | sort -u >.tmp/srv_hosts.txt || true
+        fi
+
+        if [[ $INSCOPE == true ]] && [[ -s ".tmp/srv_hosts.txt" ]]; then
+            if ! check_inscope .tmp/srv_hosts.txt 2>>"$LOGFILE" >/dev/null; then
+                print_warnf "check_inscope command failed."
+            fi
+        fi
+
+        NUMOFLINES=0
+        if [[ -s ".tmp/srv_hosts.txt" ]]; then
+            NUMOFLINES=$(anew subdomains/subdomains.txt <.tmp/srv_hosts.txt | sed '/^$/d' | wc -l | tr -d ' ' || true)
+            [[ "$NUMOFLINES" =~ ^[0-9]+$ ]] || NUMOFLINES=0
+        fi
+
+        end_subfunc "${NUMOFLINES} new subs (srv enum)" "${FUNCNAME[0]}"
+    else
+        if [[ ${SRV_ENUM:-true} == false ]]; then
+            skip_notification "disabled"
+        else
+            skip_notification "processed"
+        fi
+    fi
+}
+
 function sub_dns() {
     ensure_dirs .tmp subdomains hosts
 
@@ -922,6 +993,78 @@ function sub_dns() {
         end_subfunc "${NUMOFLINES} new subs (dns resolution)" "${FUNCNAME[0]}"
     else
         skip_notification "processed"
+    fi
+}
+
+function sub_ptr_cidrs() {
+    ensure_dirs .tmp subdomains hosts
+
+    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ ${PTR_SWEEP:-false} == true ]]; then
+        start_subfunc "${FUNCNAME[0]}" "Running: PTR Sweep over ASN CIDRs"
+
+        if [[ ! -s "hosts/asn_cidrs.txt" ]]; then
+            _print_msg WARN "No ASN CIDRs available (hosts/asn_cidrs.txt missing); skipping PTR sweep."
+            end_subfunc "0 new subs (ptr sweep)" "${FUNCNAME[0]}" "SKIP"
+            return
+        fi
+
+        if ! command -v mapcidr &>/dev/null; then
+            _print_msg WARN "mapcidr not found; skipping CIDR expansion for PTR sweep."
+            end_subfunc "0 new subs (ptr sweep)" "${FUNCNAME[0]}" "SKIP"
+            return
+        fi
+
+        # Expand CIDRs to IPs with safety limit
+        local max_ips="${PTR_SWEEP_MAX_IPS:-50000}"
+        : >.tmp/ptr_ips_expanded.txt
+        mapcidr -silent <hosts/asn_cidrs.txt 2>>"$LOGFILE" \
+            | head -n "$max_ips" >.tmp/ptr_ips_expanded.txt || true
+
+        local expanded_count
+        expanded_count=$(wc -l <.tmp/ptr_ips_expanded.txt 2>/dev/null | tr -d ' ')
+        if [[ "${expanded_count:-0}" -eq 0 ]]; then
+            end_subfunc "0 new subs (ptr sweep - empty expansion)" "${FUNCNAME[0]}" "SKIP"
+            return
+        fi
+        _print_msg INFO "PTR sweep: scanning ${expanded_count} IPs from ASN CIDRs (limit: ${max_ips})"
+
+        # PTR lookups via dnsx
+        : >.tmp/ptr_results_raw.txt
+        run_command dnsx -ptr -resp-only -silent -retry 2 \
+            -t "${DNSX_THREADS:-100}" -rl "${DNSX_RATE_LIMIT:-500}" \
+            -r "$resolvers_trusted" \
+            <.tmp/ptr_ips_expanded.txt >.tmp/ptr_results_raw.txt 2>>"$LOGFILE" || true
+
+        # Filter in-scope, save raw + merged
+        : >.tmp/ptr_inscope.txt
+        if [[ -s ".tmp/ptr_results_raw.txt" ]]; then
+            sed -e 's/\.$//' -e '/^$/d' .tmp/ptr_results_raw.txt \
+                | grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' \
+                | sort -u >subdomains/ptr_pivots.txt || true
+
+            grep -E "$DOMAIN_MATCH_REGEX" subdomains/ptr_pivots.txt \
+                >.tmp/ptr_inscope.txt 2>/dev/null || true
+        fi
+
+        if [[ $INSCOPE == true ]] && [[ -s ".tmp/ptr_inscope.txt" ]]; then
+            if ! check_inscope .tmp/ptr_inscope.txt 2>>"$LOGFILE" >/dev/null; then
+                print_warnf "check_inscope command failed."
+            fi
+        fi
+
+        NUMOFLINES=0
+        if [[ -s ".tmp/ptr_inscope.txt" ]]; then
+            NUMOFLINES=$(anew subdomains/subdomains.txt <.tmp/ptr_inscope.txt | sed '/^$/d' | wc -l | tr -d ' ' || true)
+            [[ "$NUMOFLINES" =~ ^[0-9]+$ ]] || NUMOFLINES=0
+        fi
+
+        end_subfunc "${NUMOFLINES} new subs (ptr sweep)" "${FUNCNAME[0]}"
+    else
+        if [[ ${PTR_SWEEP:-false} == false ]]; then
+            skip_notification "disabled"
+        else
+            skip_notification "processed"
+        fi
     fi
 }
 
@@ -1239,6 +1382,90 @@ function sub_analytics() {
 
     else
         if [[ $SUBANALYTICS == false ]]; then
+            skip_notification "disabled"
+        else
+            skip_notification "processed"
+        fi
+    fi
+}
+
+function sub_ns_delegation() {
+    ensure_dirs .tmp subdomains
+
+    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ ${NS_DELEGATION:-true} == true ]]; then
+        start_subfunc "${FUNCNAME[0]}" "Running: NS Delegation Zone Transfer Check"
+
+        if [[ ! -s "subdomains/subdomains.txt" ]]; then
+            _print_msg WARN "No subdomains available for NS delegation check; skipping."
+            end_subfunc "0 new subs (ns delegation)" "${FUNCNAME[0]}" "SKIP"
+            return
+        fi
+
+        # Check NS records for each known subdomain
+        : >.tmp/ns_delegation_raw.txt
+        run_command dnsx -ns -resp -silent -retry 2 \
+            -t "${DNSX_THREADS:-100}" -rl "${DNSX_RATE_LIMIT:-500}" \
+            -r "$resolvers_trusted" \
+            <subdomains/subdomains.txt >.tmp/ns_delegation_raw.txt 2>>"$LOGFILE" || true
+
+        if [[ ! -s ".tmp/ns_delegation_raw.txt" ]]; then
+            end_subfunc "0 new subs (ns delegation - no NS records)" "${FUNCNAME[0]}" "SKIP"
+            return
+        fi
+
+        # Parse delegated zones and attempt AXFR on each
+        : >.tmp/ns_delegated_zones.txt
+        : >.tmp/ns_axfr_results.txt
+
+        while IFS= read -r line; do
+            local sub ns_raw
+            sub=$(echo "$line" | awk '{print $1}')
+            # Skip the base domain itself (already checked by zonetransfer())
+            [[ "$sub" == "$domain" ]] && continue
+            # Extract NS hostnames from the bracketed response
+            ns_raw=$(echo "$line" | grep -aoE '[a-zA-Z0-9][-a-zA-Z0-9]*(\.[a-zA-Z0-9][-a-zA-Z0-9]*)+' | tail -n +2)
+            if [[ -n "$ns_raw" ]]; then
+                echo "$sub" >> .tmp/ns_delegated_zones.txt
+                # Attempt AXFR on each delegated NS
+                while IFS= read -r ns; do
+                    [[ -z "$ns" ]] && continue
+                    dig axfr "$sub" @"$ns" +short 2>>"$LOGFILE" \
+                        | awk '{print $1}' \
+                        | sed -e 's/\.$//' -e '/^$/d' \
+                        >> .tmp/ns_axfr_results.txt || true
+                done <<< "$ns_raw"
+            fi
+        done < .tmp/ns_delegation_raw.txt
+
+        # Save delegation info
+        if [[ -s ".tmp/ns_delegated_zones.txt" ]]; then
+            sort -u .tmp/ns_delegated_zones.txt -o subdomains/ns_delegated_zones.txt
+        fi
+
+        # Filter and merge AXFR results
+        NUMOFLINES=0
+        if [[ -s ".tmp/ns_axfr_results.txt" ]]; then
+            grep -E '^([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}$' .tmp/ns_axfr_results.txt \
+                | grep -E "$DOMAIN_MATCH_REGEX" \
+                | sort -u >.tmp/ns_axfr_inscope.txt 2>/dev/null || true
+
+            if [[ $INSCOPE == true ]] && [[ -s ".tmp/ns_axfr_inscope.txt" ]]; then
+                if ! check_inscope .tmp/ns_axfr_inscope.txt 2>>"$LOGFILE" >/dev/null; then
+                    print_warnf "check_inscope command failed."
+                fi
+            fi
+
+            if [[ -s ".tmp/ns_axfr_inscope.txt" ]]; then
+                NUMOFLINES=$(anew subdomains/subdomains.txt <.tmp/ns_axfr_inscope.txt | sed '/^$/d' | wc -l | tr -d ' ' || true)
+                [[ "$NUMOFLINES" =~ ^[0-9]+$ ]] || NUMOFLINES=0
+            fi
+        fi
+
+        local delegated_count
+        delegated_count=$(wc -l <subdomains/ns_delegated_zones.txt 2>/dev/null | tr -d ' ')
+        end_subfunc "${NUMOFLINES} new subs (ns delegation, ${delegated_count:-0} delegated zones)" "${FUNCNAME[0]}"
+    else
+        if [[ ${NS_DELEGATION:-true} == false ]]; then
             skip_notification "disabled"
         else
             skip_notification "processed"

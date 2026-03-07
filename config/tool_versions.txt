@@ -1,0 +1,128 @@
+# reconFTW Tool Version Manifest
+# Format: tool_name=version
+# Use "latest" or "HEAD" for unpinned tools (not recommended)
+# Update versions here to control what gets installed.
+#
+# To update a single tool: change its version, re-run install.sh --tools
+# To update all: review changelogs, bump versions, re-run install.sh
+
+# ============================================================
+# Go tools (installed via go install)
+# ============================================================
+gf=latest
+brutespray=v2.4.2
+qsreplace=v0.0.3
+ffuf=v2.1.0
+github-subdomains=v1.2.2
+gitlab-subdomains=v1.0.1
+nuclei=v3.7.0
+anew=v0.1.1
+notify=v1.0.7
+unfurl=v0.4.3
+httpx=v1.8.1
+github-endpoints=v1.2.2
+dnsx=v1.2.3
+subjs=v1.0.1
+Gxss=v4.1
+katana=v1.4.0
+crlfuzz=v1.4.1
+dalfox=v2.12.0
+puredns=v2.1.1
+interactsh-client=v1.3.0
+analyticsrelationships=latest
+gotator=v1.1
+roboxtractor=latest
+mapcidr=v1.1.97
+cdncheck=v1.2.25
+asnmap=v1.1.1
+dnstake=v0.1.1
+tlsx=v1.2.2
+gitdorks_go=v0.1
+smap=0.1.12
+dsieve=v1.2.0
+inscope=latest
+enumerepo=v1.0.0
+Web-Cache-Vulnerability-Scanner=2.0.0
+subfinder=v2.12.0
+hakip2host=latest
+mantra=v3.1
+crt=v0.1.0
+s3scanner=v3.1.1
+nmapurls=v1.0.0
+naabu=v2.4.0
+shortscan=v0.9.2
+hakoriginfinder=latest
+sourcemapper=latest
+jsluice=latest
+urlfinder=v0.0.3
+cent=v2.0.0
+csprecon=v0.4.3
+VhostFinder=v0.1.0
+misconfig-mapper=v1.15.2
+grpcurl=v1.9.3
+toxicache=latest
+favirecon=v1.0.2
+second-order=v3.2
+TInjA=1.2.0
+nerva=v1.0.0
+brutus=v1.1.0
+julius=v1.2.0
+titus=v1.1.3
+
+# ============================================================
+# Python/uv tools (installed via uv tool install git+https://...)
+# Format: tool_name=version (appended as @version to git URL)
+# Use "HEAD" for tools without release tags
+# ============================================================
+dnsvalidator=HEAD
+interlace=1.6
+wafw00f=v2.4.2
+commix=v4.1
+waymore=v8.6
+urless=v2.6
+ghauri=1.4.3
+xnLinkFinder=v8.1
+xnldorker=v4.1
+porch-pirate=HEAD
+p1radup=HEAD
+subwiz=v1.0.1
+arjun=2.2.7
+gqlspection=0.2.3
+postleaksNg=HEAD
+cewler=v1.4.1
+
+# ============================================================
+# Git repositories (cloned via git clone)
+# Format: repo_name=version (used with git checkout after clone)
+# Use "HEAD" for repos without release tags
+# ============================================================
+[repos]
+dorks_hunter=v1.0
+gf=HEAD
+Gf-Patterns=HEAD
+sus_params=HEAD
+CMSeeK=v.1.1.3
+massdns=v1.1.0
+testssl.sh=v3.2.3
+JSA=HEAD
+cloud_enum=0.7
+ultimate-nmap-parser=HEAD
+gitdorks_go=v0.1
+Web-Cache-Vulnerability-Scanner=2.0.0
+regulator=HEAD
+gitleaks=v8.30.0
+ghleaks=HEAD
+trufflehog=v3.93.6
+nomore403=v1.1.8
+SwaggerSpy=HEAD
+LeakSearch=HEAD
+ffufPostprocessing=HEAD
+misconfig-mapper=v1.15.2
+Spoofy=v1.0.3
+msftrecon=HEAD
+Scopify=HEAD
+metagoofil=v1.4.0
+EmailHarvester=1.3.2
+reconftw_ai=HEAD
+gato=1.7
+SSTImap=v1.3
