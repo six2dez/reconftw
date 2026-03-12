@@ -224,6 +224,22 @@ check_network() {
     if [[ $_net_ok == true ]]; then
         printf "%bNetwork OK%b\n" "$bgreen" "$reset"
     fi
+
+    # Warn about low disk space (installer needs ~5GB free for Go cache, tools, repos)
+    local _avail_mb
+    _avail_mb=$(df -m "${HOME}" 2>/dev/null | awk 'NR==2{print $4}')
+    if [[ -n ${_avail_mb:-} ]] && (( _avail_mb < 5120 )); then
+        printf "%b[!] Low disk space: only %s MB free on %s. Installation needs ~5GB. Some tools may fail.%b\n" "$bred" "$_avail_mb" "$HOME" "$reset"
+    fi
+
+    # Warn about low memory (Go compilation needs at least 1GB)
+    if [[ -f /proc/meminfo ]]; then
+        local _mem_total_kb
+        _mem_total_kb=$(awk '/^MemTotal:/{print $2}' /proc/meminfo 2>/dev/null || true)
+        if [[ -n ${_mem_total_kb:-} ]] && (( _mem_total_kb < 1048576 )); then
+            printf "%b[!] Low memory: %s MB total. Go/Rust compilation may fail. Consider adding swap.%b\n" "$yellow" "$((_mem_total_kb / 1024))" "$reset"
+        fi
+    fi
 }
 
 # Check Bash version
@@ -351,6 +367,7 @@ declare -A pipxtools=(
     ["gqlspection"]="doyensec/GQLSpection"
     ["postleaksNg"]="six2dez/postleaksNG"
     ["cewler"]="roys/cewler"
+    ["fray"]="dalisecurity/fray"
 )
 
 # Declare repositories and their paths
@@ -379,7 +396,6 @@ declare -A repos=(
     ["Spoofy"]="MattKeeley/Spoofy"
     ["msftrecon"]="Arcanum-Sec/msftrecon"
     ["Scopify"]="Arcanum-Sec/Scopify"
-    ["metagoofil"]="opsdisk/metagoofil"
     ["EmailHarvester"]="maldevel/EmailHarvester"
     ["reconftw_ai"]="six2dez/reconftw_ai"
     ["gato"]="praetorian-inc/gato"
@@ -404,6 +420,28 @@ function banner() {
  ${reconftw_version}                                         by @six2dez
 
 EOF
+}
+
+# Clone a GitHub repo with retry + cleanup between attempts.
+# Falls back to full clone if --filter=blob:none is unsupported.
+clone_repo() {
+    local gh_path="$1" dest="$2"
+    local url="https://github.com/${gh_path}"
+    local n=0 max=3 delay=3
+    while true; do
+        rm -rf "$dest" 2>/dev/null
+        if q_to 180 git clone --filter="blob:none" "$url" "$dest"; then
+            return 0
+        fi
+        # Fallback: try full clone (in case server/git version doesn't support partial clone)
+        rm -rf "$dest" 2>/dev/null
+        if q_to 180 git clone "$url" "$dest"; then
+            return 0
+        fi
+        n=$((n + 1))
+        if ((n >= max)); then return 1; fi
+        sleep $((delay * n))
+    done
 }
 
 # Function to install Go tools
@@ -519,8 +557,10 @@ function install_tools() {
         fi
         # Clone the repository (check for .git to detect incomplete clones)
         if [[ ! -d "${dir}/${repo}/.git" ]]; then
+            # Remove leftover directory from a previously failed clone attempt
+            [[ -d "${dir}/${repo}" ]] && rm -rf "${dir}/${repo}"
             msg_run "[$repos_step/${#repos[@]}] $repo (clone)"
-            retry 3 3 q_to 180 git clone --filter="blob:none" "https://github.com/${repos[$repo]}" "${dir}/${repo}"
+            clone_repo "${repos[$repo]}" "${dir}/${repo}"
             exit_status=$?
             if [[ $exit_status -ne 0 ]]; then
                 msg_err "[$repos_step/$total_repo] $repo clone failed"
@@ -867,13 +907,23 @@ function install_golang_version() {
         export GOPATH="${HOME}/go"
         export PATH="$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH"
 
-        if [[ -n ${profile_shell:-} ]]; then
-            local profile_path="${HOME}/${profile_shell}"
-            local marker="# Golang environment variables (reconFTW)"
+        # Write Go env to profile files so it's available in login shells.
+        # Use ~/.profile (sourced by all login shells including non-interactive bash -lc)
+        # rather than ~/.bashrc (which has a non-interactive guard on Debian/Ubuntu).
+        local marker="# Golang environment variables (reconFTW)"
+        local _go_env_block
+        _go_env_block=$(printf '%s\nexport GOROOT=/usr/local/go\nexport GOPATH=$HOME/go\nexport PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH\n' "$marker")
 
-            # Remove ALL previous golang env blocks (old-style and reconFTW-style)
-            # to prevent duplicates from accumulating across runs
-            if [[ -f "$profile_path" ]] && grep -q '^# Golang environment variables' "$profile_path" 2>/dev/null; then
+        local _profile_targets=()
+        # Always write to ~/.profile (login shell)
+        _profile_targets+=("${HOME}/.profile")
+        # Also write to the user's detected shell rc if different
+        if [[ -n ${profile_shell:-} && "${profile_shell}" != ".profile" ]]; then
+            _profile_targets+=("${HOME}/${profile_shell}")
+        fi
+
+        for _ptarget in "${_profile_targets[@]}"; do
+            if [[ -f "$_ptarget" ]] && grep -q '^# Golang environment variables' "$_ptarget" 2>/dev/null; then
                 local tmp_profile
                 tmp_profile=$(mktemp)
                 awk '
@@ -881,17 +931,10 @@ function install_golang_version() {
                     skip > 0 && /^export (GOROOT|GOPATH|PATH)=/ { skip--; next }
                     skip > 0 { skip = 0 }
                     { print }
-                ' "$profile_path" > "$tmp_profile" && mv "$tmp_profile" "$profile_path"
+                ' "$_ptarget" > "$tmp_profile" && mv "$tmp_profile" "$_ptarget"
             fi
-
-            # Append single canonical block
-            {
-                printf '\n%s\n' "$marker"
-                printf 'export GOROOT=/usr/local/go\n'
-                printf 'export GOPATH=$HOME/go\n'
-                printf 'export PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH\n'
-            } >>"$profile_path"
-        fi
+            printf '\n%s\n' "$_go_env_block" >>"$_ptarget"
+        done
     else
         msg_warn "Golang will not be configured according to the user's preferences (install_golang=false in reconftw.cfg)."
     fi
@@ -1042,6 +1085,11 @@ function initial_setup() {
     if [[ $TOOLS_ONLY == "true" ]]; then
         header "Tools-only mode"
         with_spinner "Installing/validating Golang" install_golang_version
+        # Re-export Go env in current shell (with_spinner runs in background subshell, exports are lost)
+        export GOROOT=/usr/local/go
+        export GOPATH="${HOME}/go"
+        export PATH="$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH"
+
         mkdir -p ${HOME}/.gf
         mkdir -p "$tools"
         mkdir -p ${HOME}/.config/notify/
@@ -1062,6 +1110,11 @@ function initial_setup() {
     with_spinner "Installing system packages" install_system_packages
     check_network
     with_spinner "Installing/validating Golang" install_golang_version
+    # Re-export Go env in current shell (with_spinner runs in background subshell, exports are lost)
+    export GOROOT=/usr/local/go
+    export GOPATH="${HOME}/go"
+    export PATH="$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH"
+
     mkdir -p ${HOME}/.gf
     mkdir -p "$tools"
     mkdir -p ${HOME}/.config/notify/
@@ -1072,8 +1125,6 @@ function initial_setup() {
     q uv tool update-shell
     # Ensure $HOME/.local/bin is available now even if profile isn't sourced
     export PATH="${HOME}/.local/bin:${PATH}"
-    # Do not source user shell profiles here to avoid errors like 'PS1: unbound variable'
-    # in non-interactive shells with 'set -u'. PATH for this process is already updated.
 
     install_tools
     setup_reconftw_venv

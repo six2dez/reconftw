@@ -3,7 +3,7 @@
 # reconFTW - Vulnerability scanning module
 # Contains: xss, ssrf_checks, crlf_checks, lfi, ssti,
 #           sqli, test_ssl, spraying, command_injection, 4xxbypass,
-#           smuggling, webcache, fuzzparams, nuclei_dast
+#           smuggling, webcache, fuzzparams, nuclei_dast, fray_checks
 # This file is sourced by reconftw.sh - do not execute directly
 [[ -z "${SCRIPTPATH:-}" ]] && {
     echo "Error: This module must be sourced by reconftw.sh" >&2
@@ -980,6 +980,74 @@ function nuclei_dast() {
         end_func "Results are saved in nuclei_output/dast_json.txt and vulns/nuclei_dast.txt" "${FUNCNAME[0]}"
     else
         if [[ "$dast_enabled" == false ]]; then
+            skip_notification "disabled"
+        else
+            skip_notification "processed"
+        fi
+    fi
+}
+
+function fray_checks() {
+
+    # Create necessary directories
+    if ! ensure_dirs .tmp vulns; then return 1; fi
+
+    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $FRAY_EXTRA == true ]]; then
+        if ! command -v fray >/dev/null 2>&1; then
+            _print_msg WARN "${FUNCNAME[0]}: fray not found in PATH"
+            return 0
+        fi
+        start_func "${FUNCNAME[0]}" "Fray WAF-aware payload testing"
+
+        ensure_webs_all || true
+
+        if [[ -s "webs/webs_all.txt" ]]; then
+            local _targets="webs/webs_all.txt"
+
+            # Apply DEEP_LIMIT gate
+            if [[ $DEEP != true ]]; then
+                local _count
+                _count=$(wc -l < "$_targets" | tr -d ' ')
+                if (( _count > DEEP_LIMIT )); then
+                    head -n "$DEEP_LIMIT" "$_targets" > .tmp/fray_targets.txt
+                    _targets=".tmp/fray_targets.txt"
+                    _print_msg INFO "Limiting Fray to ${DEEP_LIMIT} targets (DEEP mode disabled)"
+                fi
+            fi
+
+            local total_findings=0
+
+            IFS=',' read -ra _fray_categories <<< "$FRAY_CATEGORIES"
+            for _fcat in "${_fray_categories[@]}"; do
+                _print_msg INFO "Fray testing category: ${_fcat}"
+
+                cat "$_targets" | fray test -c "$_fcat" \
+                    --max "${FRAY_MAX_PAYLOADS:-20}" \
+                    -t "${FRAY_TIMEOUT:-10}" \
+                    -d "${FRAY_DELAY:-0.5}" \
+                    --json 2>>"$LOGFILE" | grep '^{' > ".tmp/fray_${_fcat}.json" || true
+
+                # Extract targets with bypasses from JSONL output
+                if [[ -s ".tmp/fray_${_fcat}.json" ]]; then
+                    jq -r 'select(.bypassed != null and .bypassed > 0) |
+                        "\(.target) [bypass_rate:\(.bypass_rate)] \(.bypassed)/\(.total) payloads bypassed WAF"' \
+                        ".tmp/fray_${_fcat}.json" >> "vulns/fray_${_fcat}.txt" 2>/dev/null || true
+
+                    if [[ -s "vulns/fray_${_fcat}.txt" ]]; then
+                        local _cat_count
+                        _cat_count=$(wc -l < "vulns/fray_${_fcat}.txt" | tr -d ' ')
+                        total_findings=$((total_findings + _cat_count))
+                        append_assets_from_file finding value "vulns/fray_${_fcat}.txt"
+                    fi
+                fi
+            done
+
+            end_func "${total_findings} Fray findings saved in vulns/fray_*.txt" "${FUNCNAME[0]}"
+        else
+            end_func "No websites to scan" "${FUNCNAME[0]}"
+        fi
+    else
+        if [[ $FRAY_EXTRA == false ]]; then
             skip_notification "disabled"
         else
             skip_notification "processed"

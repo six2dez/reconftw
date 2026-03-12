@@ -406,8 +406,6 @@ function tools_installed() {
         ["Scopify_python"]="${tools}/Scopify/venv/bin/python3"
         ["EmailHarvester"]="${tools}/EmailHarvester/EmailHarvester.py"
         ["EmailHarvester_python"]="${tools}/EmailHarvester/venv/bin/python3"
-        ["metagoofil"]="${tools}/metagoofil/metagoofil.py"
-        ["metagoofil_python"]="${tools}/metagoofil/venv/bin/python3"
         ["reconftw_ai"]="${tools}/reconftw_ai/reconftw_ai.py"
         ["reconftw_ai_python"]="${tools}/reconftw_ai/venv/bin/python3"
         ["ghleaks"]="${tools}/ghleaks/ghleaks"
@@ -500,6 +498,8 @@ function tools_installed() {
         ["favirecon"]="favirecon"
         ["TInjA"]="TInjA"
         ["second-order"]="second-order"
+        ["exifray"]="exifray"
+        ["fray"]="fray"
     )
 
     # Check for tool files

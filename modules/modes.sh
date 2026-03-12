@@ -606,7 +606,7 @@ function vulns() {
                     return 1
                 fi
             fi
-            parallel_funcs "${PAR_VULNS_GROUP4_SIZE:-3}" webcache spraying brokenLinks
+            parallel_funcs "${PAR_VULNS_GROUP4_SIZE:-3}" webcache spraying brokenLinks fray_checks
             local vulns_g4_rc=$?
             if ((vulns_g4_rc > 0)); then
                 if [[ "${CONTINUE_ON_TOOL_ERROR:-true}" == "true" ]]; then
@@ -633,6 +633,7 @@ function vulns() {
             webcache
             spraying
             run_module_with_axiom_failover brokenLinks
+            fray_checks
             run_module_with_axiom_failover fuzzparams
             run_module_with_axiom_failover nuclei_dast
             4xxbypass
@@ -829,6 +830,7 @@ function recon() {
     else
         _print_section "Web Analysis"
 
+        # Heavy scanning functions run sequentially to avoid overwhelming targets
         run_module_with_axiom_failover waf_checks
         run_module_with_axiom_failover nuclei_check
         run_module_with_axiom_failover graphql_scan
@@ -838,10 +840,18 @@ function recon() {
         run_module_with_axiom_failover jschecks
         sub_js_extract
         well_known_pivots
-        websocket_checks
-        run_module_with_axiom_failover param_discovery
-        grpc_reflection
-        llm_probe
+
+        # Lightweight functions can run in parallel (minimal target load)
+        if [[ "${PARALLEL_MODE:-true}" == "true" ]] && declare -f parallel_funcs &>/dev/null; then
+            parallel_funcs "${PAR_WEB_ANALYSIS_LIGHT_SIZE:-3}" websocket_checks grpc_reflection llm_probe
+        else
+            websocket_checks
+            grpc_reflection
+            llm_probe
+        fi
+
+        # param_discovery runs locally only (arjun not available in axiom images)
+        param_discovery
 
         ui_module_end "Web Analysis" "webs/" "hosts/" "vulns/" "nuclei_output/" "js/" "fuzzing/"
         progress_module "Web Analysis"
@@ -1223,7 +1233,7 @@ function webs_menu() {
     cms_scanner
     run_module_with_axiom_failover iishortname
     run_module_with_axiom_failover urlchecks
-    run_module_with_axiom_failover param_discovery
+    param_discovery
     run_module_with_axiom_failover jschecks
     sub_js_extract
     well_known_pivots

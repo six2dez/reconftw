@@ -1077,87 +1077,26 @@ SH
   grep -q "openai-compatible" "webs/llm_probe.txt"
 }
 
-@test "param_discovery uses axiom arjun when AXIOM=true" {
+@test "param_discovery skips in non-deep mode" {
   mkdir -p webs .tmp
   printf '%s\n' 'https://target.example.com/path' > webs/url_extract_nodupes.txt
-
-  cat > "$MOCK_BIN/axiom-scan" <<'SH'
-#!/usr/bin/env bash
-outfile=""
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    -o)
-      outfile="$2"
-      shift 2
-      ;;
-    *)
-      shift
-      ;;
-  esac
-done
-printf '%s\n' 'https://target.example.com/path?a=1&b=2' > "$outfile"
-printf '%s\n' ' Scanning 0/1: https://target.example.com/path'
-printf '%s\n' ' Parameters found: a, b'
-exit 0
-SH
-  chmod +x "$MOCK_BIN/axiom-scan"
-
-  export AXIOM=true
-  export AXIOM_EXTRA_ARGS=""
-  export PARAM_DISCOVERY=true
-  export ARJUN_THREADS=5
-
-  run param_discovery
-  [ "$status" -eq 0 ]
-  [ -s "webs/params_discovered.txt" ]
-  grep -q "URL: https://target.example.com/path?a=1&b=2" "webs/params_discovered.txt"
-  grep -q "PARAM: a" "webs/params_discovered.txt"
-  grep -q "PARAM: b" "webs/params_discovered.txt"
-}
-
-@test "param_discovery falls back to local arjun when axiom arjun fails" {
-  mkdir -p webs .tmp
-  printf '%s\n' 'https://target.example.com/path' > webs/url_extract_nodupes.txt
-
-  cat > "$MOCK_BIN/axiom-scan" <<'SH'
-#!/usr/bin/env bash
-exit 1
-SH
-  chmod +x "$MOCK_BIN/axiom-scan"
 
   cat > "$MOCK_BIN/arjun" <<'SH'
 #!/usr/bin/env bash
-outfile=""
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    -oT)
-      outfile="$2"
-      shift 2
-      ;;
-    *)
-      shift
-      ;;
-  esac
-done
-printf '%s\n' 'https://target.example.com/path?x=1' > "$outfile"
 exit 0
 SH
   chmod +x "$MOCK_BIN/arjun"
 
-  export AXIOM=true
-  export AXIOM_EXTRA_ARGS=""
+  export DEEP=false
   export PARAM_DISCOVERY=true
   export ARJUN_THREADS=5
 
   run param_discovery
   [ "$status" -eq 0 ]
-  [[ "$output" == *"falling back to local arjun"* ]]
-  [ -s "webs/params_discovered.txt" ]
-  grep -q "URL: https://target.example.com/path?x=1" "webs/params_discovered.txt"
-  grep -q "PARAM: x" "webs/params_discovered.txt"
+  [[ "$output" == *"SKIP"* ]]
 }
 
-@test "param_discovery local mode uses arjun text output" {
+@test "param_discovery runs in deep mode with arjun text output" {
   mkdir -p webs .tmp
   printf '%s\n' 'https://target.example.com/path' > webs/url_extract_nodupes.txt
 
@@ -1180,6 +1119,7 @@ exit 0
 SH
   chmod +x "$MOCK_BIN/arjun"
 
+  export DEEP=true
   export AXIOM=false
   export PARAM_DISCOVERY=true
   export ARJUN_THREADS=5

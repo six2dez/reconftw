@@ -311,37 +311,61 @@ function github_actions_audit() {
 }
 
 function metadata() {
-    ensure_dirs osint
+    ensure_dirs osint .tmp
 
     # Check if the function should run
     if { [[ ! -f "${called_fn_dir}/.${FUNCNAME[0]}" ]] || [[ ${DIFF} == true ]]; } && [[ ${METADATA} == true ]] && [[ ${OSINT} == true ]] && ! [[ ${domain} =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         start_func "${FUNCNAME[0]}" "Scanning metadata in public files"
 
-        ensure_dirs ".tmp/metagoofil_${domain}"
-        (
-            cd "${tools}/metagoofil" || exit 1
-            if ! run_command "${tools}/metagoofil/venv/bin/python3" "${tools}/metagoofil/metagoofil.py" -d "${domain}" -t pdf,docx,xlsx -l 10 -w -o "${dir}/.tmp/metagoofil_${domain}/" 2>>"${LOGFILE}" >/dev/null; then
-                log_note "metadata: metagoofil failed; skipping metadata extraction" "${FUNCNAME[0]}" "${LINENO}"
+        if command -v exifray &>/dev/null; then
+            if ! run_command exifray -d "${domain}" --show-urls \
+                --timeout "${EXIFRAY_TIMEOUT:-30}" \
+                --max-retries "${EXIFRAY_RETRIES:-2}" \
+                -o "${dir}/osint/metadata.json" 2>>"${LOGFILE}"; then
+                log_note "metadata: exifray failed" "${FUNCNAME[0]}" "${LINENO}"
             fi
-        )
 
-        # Check if exiftool is installed before running
-        if command -v exiftool &>/dev/null; then
-            if find ".tmp/metagoofil_${domain}" -type f -print -quit 2>/dev/null | grep -q .; then
-                run_command exiftool -r ".tmp/metagoofil_${domain}" 2>>"${LOGFILE}" \
-                    | tee /dev/null \
-                    | egrep -i "Author|Creator|Email|Producer|Template" \
+            # Extract human-readable summary from JSON output
+            if [[ -s "${dir}/osint/metadata.json" ]]; then
+                jq -r '.findings[] | "\(.category): \(.details.Value) (\(.file))"' \
+                    "${dir}/osint/metadata.json" 2>/dev/null \
                     | sort -u \
                     | anew -q "osint/metadata_results.txt" || true
-            else
-                log_note "metadata: no files downloaded by metagoofil; skipping exif extraction" "${FUNCNAME[0]}" "${LINENO}"
+            fi
+
+            # Complement with urlfinder-discovered URLs
+            if [[ ${METADATA_URLFINDER:-true} == true ]] && command -v urlfinder &>/dev/null; then
+                run_command urlfinder -d "${domain}" -all \
+                    -o .tmp/metadata_urlfinder_raw.txt 2>>"${LOGFILE}" >/dev/null || true
+
+                if [[ -s ".tmp/metadata_urlfinder_raw.txt" ]]; then
+                    # Filter for metadata-relevant extensions only
+                    grep -aiE '\.(pdf|docx?|xlsx?|pptx?|odt|ods|odp|jpe?g|png|gif|tiff?|svg|webp|mp3)([?#].*)?$' \
+                        .tmp/metadata_urlfinder_raw.txt \
+                        | sort -u > .tmp/metadata_urlfinder_urls.txt || true
+
+                    if [[ -s ".tmp/metadata_urlfinder_urls.txt" ]]; then
+                        run_command exifray --urls .tmp/metadata_urlfinder_urls.txt \
+                            --timeout "${EXIFRAY_TIMEOUT:-30}" \
+                            --max-retries "${EXIFRAY_RETRIES:-2}" \
+                            -o "${dir}/osint/metadata_urlfinder.json" 2>>"${LOGFILE}" || true
+
+                        # Merge findings into main results
+                        if [[ -s "${dir}/osint/metadata_urlfinder.json" ]]; then
+                            jq -r '.findings[] | "\(.category): \(.details.Value) (\(.file))"' \
+                                "${dir}/osint/metadata_urlfinder.json" 2>/dev/null \
+                                | sort -u \
+                                | anew -q "osint/metadata_results.txt" || true
+                        fi
+                    fi
+                fi
             fi
         else
-            _print_error "exiftool is not installed. Skipping metadata extraction"
-            printf "exiftool not installed - metadata extraction skipped\n" >>"${LOGFILE}"
+            _print_error "exifray is not installed. Skipping metadata extraction"
+            printf "exifray not installed - metadata extraction skipped\n" >>"${LOGFILE}"
         fi
 
-        end_func "Results are saved in ${domain}/osint/metadata_results.txt" "${FUNCNAME[0]}"
+        end_func "Results are saved in ${domain}/osint/metadata[.json|_results.txt]" "${FUNCNAME[0]}"
     else
         if [[ ${METADATA} == false ]] || [[ ${OSINT} == false ]]; then
             skip_notification "disabled"

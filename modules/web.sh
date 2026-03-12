@@ -983,8 +983,16 @@ function waf_checks() {
 	        # Proceed only if webs_all.txt exists and is non-empty
 	        if [[ -s "webs/webs_all.txt" ]]; then
 	            if [[ $AXIOM != true ]]; then
-	                # Run wafw00f on webs_all.txt
-	                run_command wafw00f -i "webs/webs_all.txt" -o ".tmp/wafs.txt" 2>>"$LOGFILE" >/dev/null
+	                # Parallelize wafw00f across hosts using interlace for speed
+	                if command -v interlace >/dev/null 2>&1; then
+	                    mkdir -p .tmp/wafs_parts
+	                    run_command interlace -tL "webs/webs_all.txt" -threads "${INTERLACE_THREADS:-10}" \
+	                        -c "${TIMEOUT_CMD:+$TIMEOUT_CMD ${WAF_PER_HOST_TIMEOUT:-120}} wafw00f _target_ -o .tmp/wafs_parts/_cleantarget_.txt" 2>>"$LOGFILE" >/dev/null
+	                    cat .tmp/wafs_parts/*.txt >.tmp/wafs.txt 2>/dev/null || true
+	                    rm -rf .tmp/wafs_parts
+	                else
+	                    run_command wafw00f -i "webs/webs_all.txt" -o ".tmp/wafs.txt" 2>>"$LOGFILE" >/dev/null
+	                fi
 	            else
 	                # Run axiom-scan with wafw00f module on webs_all.txt
 	                run_command axiom-scan "webs/webs_all.txt" -m wafw00f -o ".tmp/wafs.txt" "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
@@ -1077,48 +1085,64 @@ _nuclei_parse_results() {
     fi
 }
 
-# Run nuclei scan locally with WAF-aware rate limiting
-# Usage: _nuclei_scan_local
-_nuclei_scan_local() {
-    IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
+# Split combined nuclei JSON output into per-severity files for backward compatibility
+# Usage: _nuclei_split_by_severity
+_nuclei_split_by_severity() {
+    if [[ ! -s ".tmp/nuclei_combined_json.txt" ]]; then
+        return 0
+    fi
 
+    IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
     for crit in "${severity_array[@]}"; do
-        _print_msg INFO "Running: Nuclei Severity: ${crit}"
-        # Non-WAF at default rate
-        if [[ -s "$NOWAF_LIST" ]]; then
-            # shellcheck disable=SC2086  # Intentionally allow user-provided nuclei args
-            run_with_heartbeat "nuclei ${crit} (normal targets)" nuclei \
-                -l "$NOWAF_LIST" -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 \
-                $NUCLEI_EXTRA_ARGS -t "${NUCLEI_TEMPLATES_PATH}" -j -o "nuclei_output/${crit}_json.txt"
-        fi
-        # WAF hosts at slower rate
-        if [[ -s "$WAF_LIST" ]]; then
-            local slow_rl
-            slow_rl=$((NUCLEI_RATELIMIT / 3 + 1))
-            # shellcheck disable=SC2086  # Intentionally allow user-provided nuclei args
-            run_with_heartbeat "nuclei ${crit} (waf targets)" nuclei \
-                -l "$WAF_LIST" -severity "$crit" -nh -rl "$slow_rl" -silent -retries 2 \
-                $NUCLEI_EXTRA_ARGS -t "${NUCLEI_TEMPLATES_PATH}" -j -o "nuclei_output/${crit}_waf_json.txt"
-            [[ -s "nuclei_output/${crit}_waf_json.txt" ]] && cat "nuclei_output/${crit}_waf_json.txt" >>"nuclei_output/${crit}_json.txt"
-        fi
+        jq -c "select(.info.severity == \"${crit}\")" ".tmp/nuclei_combined_json.txt" >"nuclei_output/${crit}_json.txt" 2>/dev/null || true
         _nuclei_parse_results "$crit"
     done
 }
 
-# Run nuclei scan via Axiom distributed fleet
+# Run nuclei scan locally with WAF-aware rate limiting (single pass, all severities)
+# Usage: _nuclei_scan_local
+_nuclei_scan_local() {
+    local all_severities="$NUCLEI_SEVERITY"
+
+    _print_msg INFO "Running: Nuclei Severities: ${all_severities}"
+    : >".tmp/nuclei_combined_json.txt"
+
+    # Non-WAF at default rate
+    if [[ -s "$NOWAF_LIST" ]]; then
+        # shellcheck disable=SC2086  # Intentionally allow user-provided nuclei args
+        run_with_heartbeat "nuclei (normal targets)" nuclei \
+            -l "$NOWAF_LIST" -severity "$all_severities" -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 \
+            $NUCLEI_EXTRA_ARGS -t "${NUCLEI_TEMPLATES_PATH}" -j -o ".tmp/nuclei_combined_json.txt"
+    fi
+    # WAF hosts at slower rate
+    if [[ -s "$WAF_LIST" ]]; then
+        local slow_rl
+        slow_rl=$((NUCLEI_RATELIMIT / 3 + 1))
+        # shellcheck disable=SC2086  # Intentionally allow user-provided nuclei args
+        run_with_heartbeat "nuclei (waf targets)" nuclei \
+            -l "$WAF_LIST" -severity "$all_severities" -nh -rl "$slow_rl" -silent -retries 2 \
+            $NUCLEI_EXTRA_ARGS -t "${NUCLEI_TEMPLATES_PATH}" -j -o ".tmp/nuclei_waf_combined_json.txt"
+        [[ -s ".tmp/nuclei_waf_combined_json.txt" ]] && cat ".tmp/nuclei_waf_combined_json.txt" >>".tmp/nuclei_combined_json.txt"
+    fi
+
+    # Split combined results into per-severity files for backward compatibility
+    _nuclei_split_by_severity
+}
+
+# Run nuclei scan via Axiom distributed fleet (single pass, all severities)
 # Usage: _nuclei_scan_axiom
 _nuclei_scan_axiom() {
-    IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
+    local all_severities="$NUCLEI_SEVERITY"
 
-    for crit in "${severity_array[@]}"; do
-        _print_msg INFO "Running: Axiom Nuclei Severity: ${crit}. Check results in nuclei_output folder."
-        # shellcheck disable=SC2086  # Intentionally allow user-provided nuclei args
-        run_with_heartbeat "axiom nuclei ${crit}" axiom-scan .tmp/webs_subs.txt -m nuclei \
-            --nuclei-templates "$NUCLEI_TEMPLATES_PATH" \
-            -severity "$crit" -nh -rl "$NUCLEI_RATELIMIT" \
-            -silent -retries 2 $NUCLEI_EXTRA_ARGS -j -o "nuclei_output/${crit}_json.txt" "$AXIOM_EXTRA_ARGS"
-        _nuclei_parse_results "$crit"
-    done
+    _print_msg INFO "Running: Axiom Nuclei Severities: ${all_severities}. Check results in nuclei_output folder."
+    # shellcheck disable=SC2086  # Intentionally allow user-provided nuclei args
+    run_with_heartbeat "axiom nuclei" axiom-scan .tmp/webs_subs.txt -m nuclei \
+        --nuclei-templates "$NUCLEI_TEMPLATES_PATH" \
+        -severity "$all_severities" -nh -rl "$NUCLEI_RATELIMIT" \
+        -silent -retries 2 $NUCLEI_EXTRA_ARGS -j -o ".tmp/nuclei_combined_json.txt" "$AXIOM_EXTRA_ARGS"
+
+    # Split combined results into per-severity files for backward compatibility
+    _nuclei_split_by_severity
 }
 
 function nuclei_check() {
@@ -1260,9 +1284,19 @@ function param_discovery() {
     }
 
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $PARAM_DISCOVERY == true ]]; then
+        # Only run in deep mode - arjun is too slow for normal scans
+        if [[ $DEEP != true ]]; then
+            skip_notification "mode"
+            return 0
+        fi
+
+        if ! command -v arjun >/dev/null 2>&1; then
+            _print_msg WARN "${FUNCNAME[0]}: arjun not found in PATH"
+            return 0
+        fi
+
         start_func "${FUNCNAME[0]}" "Parameter discovery (arjun)"
         local input_file="webs/url_extract_nodupes.txt"
-        local arjun_axiom_ok=true
         local arjun_urls_raw=".tmp/arjun_urls_raw.txt"
         local arjun_urls_scoped=".tmp/arjun_urls_scoped.txt"
         local arjun_urls_params=".tmp/arjun_urls_params.txt"
@@ -1270,32 +1304,29 @@ function param_discovery() {
         : >"$arjun_urls_scoped"
         : >"$arjun_urls_params"
         [[ ! -s $input_file ]] && input_file="webs/webs_all.txt"
-        if [[ -s $input_file ]]; then
-            if [[ $AXIOM == true ]]; then
-                if ! run_command axiom-scan "$input_file" -m arjun -o .tmp/arjun.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null; then
-                    arjun_axiom_ok=false
-                fi
 
-                _parse_arjun_text_output .tmp/arjun.txt
-
-                if [[ "$arjun_axiom_ok" != true ]] || [[ ! -s .tmp/arjun.txt ]]; then
-                    _print_msg WARN "${FUNCNAME[0]}: axiom arjun failed or returned no output; falling back to local arjun"
-                    log_note "${FUNCNAME[0]}: axiom arjun failed/no output; local fallback" "${FUNCNAME[0]}" "${LINENO}"
-                    if command -v arjun >/dev/null 2>&1; then
-                        run_command arjun -i "$input_file" -t "$ARJUN_THREADS" -oT .tmp/arjun.txt 2>>"$LOGFILE" >/dev/null || true
-                        _parse_arjun_text_output .tmp/arjun.txt
-                    else
-                        _print_msg WARN "${FUNCNAME[0]}: arjun not found in PATH for local fallback"
-                    fi
-                fi
-            else
-                if ! command -v arjun >/dev/null 2>&1; then
-                    _print_msg WARN "${FUNCNAME[0]}: arjun not found in PATH"
-                    return 0
-                fi
-                run_command arjun -i "$input_file" -t "$ARJUN_THREADS" -oT .tmp/arjun.txt 2>>"$LOGFILE" >/dev/null || true
-                _parse_arjun_text_output .tmp/arjun.txt
+        # Limit input URLs to avoid multi-hour runs
+        local arjun_input="$input_file"
+        if [[ -s "$input_file" ]] && [[ "${PARAM_MAX_URLS:-0}" -gt 0 ]]; then
+            local url_count
+            url_count=$(wc -l <"$input_file" | tr -d ' ')
+            if [[ "$url_count" -gt "${PARAM_MAX_URLS}" ]]; then
+                _print_msg INFO "${FUNCNAME[0]}: limiting ${url_count} URLs to ${PARAM_MAX_URLS} (PARAM_MAX_URLS)"
+                head -n "${PARAM_MAX_URLS}" "$input_file" >".tmp/arjun_input_limited.txt"
+                arjun_input=".tmp/arjun_input_limited.txt"
             fi
+        fi
+
+        # Build timeout prefix for arjun commands
+        local arjun_timeout_cmd=""
+        if [[ -n "${TIMEOUT_CMD:-}" ]] && [[ "${PARAM_DISCOVERY_TIMEOUT:-0}" -gt 0 ]]; then
+            arjun_timeout_cmd="$TIMEOUT_CMD ${PARAM_DISCOVERY_TIMEOUT}m"
+        fi
+
+        if [[ -s "$arjun_input" ]]; then
+            # shellcheck disable=SC2086  # Intentional word splitting for timeout command
+            run_command $arjun_timeout_cmd arjun -i "$arjun_input" -t "$ARJUN_THREADS" -oT .tmp/arjun.txt 2>>"$LOGFILE" >/dev/null || true
+            _parse_arjun_text_output .tmp/arjun.txt
 
             # Feed useful parameterized URLs discovered by arjun back into the main
             # URL pipelines so gf/vuln modules can consume them.
