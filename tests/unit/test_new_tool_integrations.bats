@@ -1192,3 +1192,183 @@ SH
   [ -s "webs/robots_wordlist.txt" ]
   grep -q "https://target.example.com/robots-path" "webs/robots_wordlist.txt"
 }
+
+# ── swagger_check (sj) tests ──────────────────────────────────────────
+
+@test "swagger_check discovers swagger via sj brute and writes swagger_urls.txt" {
+  mkdir -p webs .tmp
+
+  printf '%s\n' 'https://target.example.com' > webs/webs_all.txt
+
+  cat > "$MOCK_BIN/sj" <<'SH'
+#!/usr/bin/env bash
+if [[ "$1" == "brute" ]]; then
+  printf '%s\n' 'Definition file found: https://target.example.com/swagger.json'
+fi
+SH
+  chmod +x "$MOCK_BIN/sj"
+
+  cat > "$MOCK_BIN/interlace" <<'SH'
+#!/usr/bin/env bash
+targets="" cmd="" outdir=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -tL) targets="$2"; shift 2 ;;
+    -c)  cmd="$2"; shift 2 ;;
+    -o)  outdir="$2"; shift 2 ;;
+    *)   shift ;;
+  esac
+done
+mkdir -p "$outdir"
+while IFS= read -r target; do
+  clean=$(echo "$target" | sed 's|[^a-zA-Z0-9._-]|_|g')
+  real_cmd=$(echo "$cmd" | sed "s|_target_|$target|g" | sed "s|_output_|$outdir|g" | sed "s|_cleantarget_|$clean|g")
+  eval "$real_cmd"
+done < "$targets"
+SH
+  chmod +x "$MOCK_BIN/interlace"
+
+  cat > "$MOCK_BIN/anew" <<'SH'
+#!/usr/bin/env bash
+if [[ "$1" == "-q" ]]; then
+  target="$2"
+else
+  target="$1"
+fi
+while IFS= read -r line; do
+  if [[ -n "$target" ]]; then
+    printf '%s\n' "$line" >> "$target"
+  else
+    printf '%s\n' "$line"
+  fi
+done
+SH
+  chmod +x "$MOCK_BIN/anew"
+
+  export SJ_CHECK=true
+  export SJ_BRUTE=true
+  export SJ_AUTOMATE=false
+  export SJ_TIMEOUT=10
+  export SJ_MAX_TARGETS=100
+  export INTERLACE_THREADS=1
+  export NUCLEI_SEVERITY="info"
+  export DIFF=false
+
+  run swagger_check
+  [ "$status" -eq 0 ]
+  [ -s "webs/swagger_urls.txt" ]
+  grep -q "target.example.com/swagger.json" "webs/swagger_urls.txt"
+}
+
+@test "swagger_check aggregates nuclei swagger-api findings" {
+  mkdir -p webs .tmp nuclei_output
+
+  cat > "$MOCK_BIN/sj" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  chmod +x "$MOCK_BIN/sj"
+
+  cat > "$MOCK_BIN/anew" <<'SH'
+#!/usr/bin/env bash
+if [[ "$1" == "-q" ]]; then
+  target="$2"
+else
+  target="$1"
+fi
+while IFS= read -r line; do
+  if [[ -n "$target" ]]; then
+    printf '%s\n' "$line" >> "$target"
+  else
+    printf '%s\n' "$line"
+  fi
+done
+SH
+  chmod +x "$MOCK_BIN/anew"
+
+  # Nuclei output with swagger-api finding
+  printf '%s\n' '{"template-id":"swagger-api","matched-at":"https://target.example.com/v2/swagger.json","info":{"severity":"info"}}' \
+    > nuclei_output/info_json.txt
+
+  export SJ_CHECK=true
+  export SJ_BRUTE=false
+  export SJ_AUTOMATE=false
+  export SJ_TIMEOUT=10
+  export NUCLEI_SEVERITY="info"
+  export DIFF=false
+
+  run swagger_check
+  [ "$status" -eq 0 ]
+  [ -s "webs/swagger_urls.txt" ]
+  grep -q "target.example.com/v2/swagger.json" "webs/swagger_urls.txt"
+}
+
+@test "swagger_check runs sj automate and extracts accessible endpoints" {
+  mkdir -p webs .tmp vulns/swagger/automate
+
+  printf '%s\n' 'https://target.example.com/swagger.json' > .tmp/swagger_urls_all.txt
+  printf '%s\n' 'https://target.example.com/swagger.json' > webs/swagger_urls.txt
+
+  cat > "$MOCK_BIN/sj" <<'SH'
+#!/usr/bin/env bash
+if [[ "$1" == "endpoints" ]]; then
+  printf '%s\n' '/api/v1/users' '/api/v1/pets'
+elif [[ "$1" == "automate" ]]; then
+  outfile=""
+  for arg in "$@"; do
+    case "$prev" in
+      -o) outfile="$arg" ;;
+    esac
+    prev="$arg"
+  done
+  if [[ -n "$outfile" ]]; then
+    printf '%s\n' '{"method":"GET","status":200,"target":"/api/v1/users"}' > "$outfile"
+    printf '%s\n' '{"method":"POST","status":401,"target":"/api/v1/pets"}' >> "$outfile"
+  fi
+fi
+SH
+  chmod +x "$MOCK_BIN/sj"
+
+  cat > "$MOCK_BIN/anew" <<'SH'
+#!/usr/bin/env bash
+if [[ "$1" == "-q" ]]; then
+  target="$2"
+else
+  target="$1"
+fi
+while IFS= read -r line; do
+  if [[ -n "$target" ]]; then
+    printf '%s\n' "$line" >> "$target"
+  else
+    printf '%s\n' "$line"
+  fi
+done
+SH
+  chmod +x "$MOCK_BIN/anew"
+
+  export SJ_CHECK=true
+  export SJ_BRUTE=false
+  export SJ_AUTOMATE=true
+  export SJ_TIMEOUT=10
+  export NUCLEI_SEVERITY="info"
+  export DIFF=false
+
+  run swagger_check
+  [ "$status" -eq 0 ]
+  [ -s "vulns/swagger/endpoints_all.txt" ]
+  grep -q "/api/v1/users" "vulns/swagger/endpoints_all.txt"
+  [ -s "vulns/swagger/accessible_endpoints.txt" ]
+  grep -q "GET /api/v1/users" "vulns/swagger/accessible_endpoints.txt"
+  # 401 endpoint should NOT be in accessible list
+  ! grep -q "/api/v1/pets" "vulns/swagger/accessible_endpoints.txt"
+}
+
+@test "swagger_check skips when SJ_CHECK=false" {
+  mkdir -p webs .tmp
+
+  export SJ_CHECK=false
+
+  run swagger_check
+  [ "$status" -eq 0 ]
+  [ ! -f "webs/swagger_urls.txt" ]
+}

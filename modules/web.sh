@@ -1513,8 +1513,11 @@ _fuzz_run_local() {
     find "$dir/.tmp/fuzzing/" -type f -name "*.json" -print0 2>/dev/null | while IFS= read -r -d '' json_file; do
         local base
         base=$(basename "${json_file%.json}")
-        jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' "$json_file" 2>/dev/null \
-            | sort -k1 | anew -q "fuzzing/${base}.txt" 2>>"$LOGFILE" || true
+        # Preserve raw JSON in final output directory
+        cp "$json_file" "$dir/fuzzing/${base}.json" 2>>"$LOGFILE" || true
+        # Extract human-readable TXT summary
+        jq -r 'try .results[] | "\(.status) \(.length) \(.url)"' "$json_file" 2>>"$LOGFILE" \
+            | sort -k1 | anew -q "$dir/fuzzing/${base}.txt" 2>>"$LOGFILE" || true
     done
 }
 
@@ -1531,7 +1534,7 @@ _fuzz_run_axiom() {
             jq -r --arg sub "$sub" 'try .results[] | select(.url | contains($sub)) | "\(.status) \(.length) \(.url)"' "$dir/.tmp/ffuf-content.json" 2>>"$LOGFILE" \
                 | sort -k1 >"$tmp_out" || true
             if [[ -s "$tmp_out" ]]; then
-                anew -q "fuzzing/${sub_out}.txt" <"$tmp_out" 2>>"$LOGFILE" || true
+                anew -q "$dir/fuzzing/${sub_out}.txt" <"$tmp_out" 2>>"$LOGFILE" || true
             fi
             rm -f "$tmp_out" 2>/dev/null || true
         fi
@@ -1540,7 +1543,7 @@ _fuzz_run_axiom() {
 
 # Merge all per-subdomain fuzzing results into fuzzing_full.txt
 _fuzz_merge_results() {
-    find "$dir/fuzzing/" -type f -iname "*.txt" -exec cat {} + 2>>"$LOGFILE" | sort -k1 | anew -q "$dir/fuzzing/fuzzing_full.txt"
+    find "$dir/fuzzing/" -type f -iname "*.txt" ! -name "fuzzing_full.txt" -exec cat {} + 2>>"$LOGFILE" | sort -k1 | anew -q "$dir/fuzzing/fuzzing_full.txt"
 }
 
 function fuzz() {
@@ -1626,6 +1629,118 @@ function iishortname() {
         fi
     fi
 
+}
+
+function swagger_check() {
+    ensure_dirs .tmp webs vulns/swagger
+
+    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SJ_CHECK == true ]]; then
+        if ! command -v sj >/dev/null 2>&1; then
+            end_func "sj not found in PATH, skipping" "${FUNCNAME[0]}" "SKIP_NOINPUT"
+            return 0
+        fi
+        start_func "${FUNCNAME[0]}" "Swagger/OpenAPI analysis"
+
+        : >.tmp/swagger_urls_all.txt
+
+        # ── Phase 1: Brute-force discovery with sj brute ─────────────
+        if [[ $SJ_BRUTE == true ]] && [[ -s "webs/webs_all.txt" ]]; then
+            mkdir -p .tmp/sj_brute
+
+            local brute_targets=".tmp/sj_brute_targets.txt"
+            if [[ ${SJ_MAX_TARGETS:-0} -gt 0 ]]; then
+                head -n "${SJ_MAX_TARGETS}" webs/webs_all.txt >"$brute_targets"
+            else
+                cp webs/webs_all.txt "$brute_targets"
+            fi
+
+            run_command interlace -tL "$brute_targets" -threads "$INTERLACE_THREADS" \
+                -c "sj brute -u _target_ -qi -t ${SJ_TIMEOUT:-30} 2>/dev/null | grep -o 'Definition file found: .*' > _output_/_cleantarget_.txt" \
+                -o .tmp/sj_brute 2>>"$LOGFILE" >/dev/null || true
+
+            find .tmp/sj_brute/ -type f -name "*.txt" -print0 2>/dev/null \
+                | xargs -0 grep -hoP 'Definition file found: \K\S+' 2>/dev/null \
+                | sort -u \
+                | anew -q .tmp/swagger_urls_all.txt
+        fi
+
+        # ── Phase 2: Aggregate swagger URLs from other sources ────────
+        # Nuclei: template-ids "swagger-api" and "openapi" (already in scope)
+        if [[ -d "nuclei_output" ]]; then
+            IFS=',' read -ra severity_array <<<"$NUCLEI_SEVERITY"
+            for crit in "${severity_array[@]}"; do
+                local src_json="nuclei_output/${crit}_json.txt"
+                if [[ -s "$src_json" ]]; then
+                    jq -r 'select(."template-id" == "swagger-api" or ."template-id" == "openapi") | .["matched-at"] // .host // empty' "$src_json" 2>/dev/null \
+                        | sed '/^$/d' \
+                        | anew -q .tmp/swagger_urls_all.txt
+                fi
+            done
+        fi
+
+        # SwaggerSpy OSINT output: filter against scope before adding
+        if [[ -s "${dir}/osint/swagger_leaks.txt" ]]; then
+            grep -hioP 'https?://\S+' "${dir}/osint/swagger_leaks.txt" 2>/dev/null \
+                | grep -iE '\.(json|yaml|yml)$|swagger|openapi|api-docs' \
+                >.tmp/swagger_spy_candidates.txt || true
+            if [[ -s .tmp/swagger_spy_candidates.txt ]]; then
+                check_inscope .tmp/swagger_spy_candidates.txt 2>/dev/null || true
+                if [[ -s .tmp/swagger_spy_candidates.txt ]]; then
+                    cat .tmp/swagger_spy_candidates.txt | anew -q .tmp/swagger_urls_all.txt
+                fi
+            fi
+        fi
+
+        # Deduplicate
+        if [[ -s .tmp/swagger_urls_all.txt ]]; then
+            sort -u .tmp/swagger_urls_all.txt -o .tmp/swagger_urls_all.txt
+            cp .tmp/swagger_urls_all.txt "webs/swagger_urls.txt"
+        fi
+
+        local swagger_count
+        swagger_count=$(wc -l <.tmp/swagger_urls_all.txt 2>/dev/null || echo 0)
+        swagger_count=$((swagger_count + 0))
+
+        if [[ $swagger_count -eq 0 ]]; then
+            end_func "No swagger/openapi definitions discovered" "${FUNCNAME[0]}"
+            return
+        fi
+
+        # ── Phase 3: Endpoint extraction + auth testing ───────────────
+        : >vulns/swagger/endpoints_all.txt
+        mkdir -p vulns/swagger/automate
+
+        while IFS= read -r swagger_url; do
+            [[ -z "$swagger_url" ]] && continue
+
+            # Extract endpoints
+            sj endpoints -u "$swagger_url" -qi -t "${SJ_TIMEOUT:-30}" 2>>"$LOGFILE" \
+                | anew -q vulns/swagger/endpoints_all.txt || true
+
+            # Auth testing with sj automate
+            if [[ $SJ_AUTOMATE == true ]]; then
+                local clean_name
+                clean_name=$(echo "$swagger_url" | sed -e 's|^[^/]*//||' -e 's|[^a-zA-Z0-9._-]|_|g')
+                local automate_out="vulns/swagger/automate/${clean_name}.json"
+
+                sj automate -u "$swagger_url" -qi -t "${SJ_TIMEOUT:-30}" \
+                    -F json -o "$automate_out" 2>>"$LOGFILE" || true
+
+                if [[ -s "$automate_out" ]]; then
+                    jq -r 'select(.status == 200) | "\(.method) \(.target)"' "$automate_out" 2>/dev/null \
+                        | anew -q vulns/swagger/accessible_endpoints.txt || true
+                fi
+            fi
+        done <.tmp/swagger_urls_all.txt
+
+        end_func "Results are saved in webs/swagger_urls.txt and vulns/swagger/" "${FUNCNAME[0]}"
+    else
+        if [[ $SJ_CHECK == false ]]; then
+            skip_notification "disabled"
+        else
+            skip_notification "processed"
+        fi
+    fi
 }
 
 function cms_scanner() {

@@ -500,6 +500,7 @@ function tools_installed() {
         ["second-order"]="second-order"
         ["exifray"]="exifray"
         ["fray"]="fray"
+        ["sj"]="sj"
     )
 
     # Check for tool files

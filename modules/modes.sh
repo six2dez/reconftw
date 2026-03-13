@@ -825,7 +825,7 @@ function recon() {
         _print_status SKIP "Web Analysis" "(no new subs/webs)"
         TIME_SAVED_EST=$((${TIME_SAVED_EST:-0} + \
             ${TIME_EST_WAF:-0} + ${TIME_EST_NUCLEI:-600} + ${TIME_EST_API:-300} + ${TIME_EST_GQL:-180} + \
-            ${TIME_EST_FUZZ:-900} + ${TIME_EST_IIS:-60} + ${TIME_EST_URLCHECKS:-300} + ${TIME_EST_JSCHECKS:-300} + \
+            ${TIME_EST_FUZZ:-900} + ${TIME_EST_IIS:-60} + ${TIME_EST_SJ:-120} + ${TIME_EST_URLCHECKS:-300} + ${TIME_EST_JSCHECKS:-300} + \
             ${TIME_EST_PARAM:-240} + ${TIME_EST_GRPC:-120}))
     else
         _print_section "Web Analysis"
@@ -836,6 +836,7 @@ function recon() {
         run_module_with_axiom_failover graphql_scan
         run_module_with_axiom_failover fuzz
         run_module_with_axiom_failover iishortname
+        swagger_check
         run_module_with_axiom_failover urlchecks
         run_module_with_axiom_failover jschecks
         sub_js_extract
@@ -1053,6 +1054,7 @@ function multi_recon() {
         loopstart=$(date +%s)
         run_module_with_axiom_failover fuzz
         run_module_with_axiom_failover iishortname
+        swagger_check
         run_module_with_axiom_failover urlchecks
         run_module_with_axiom_failover jschecks
         currently=$(date +"%H:%M:%S")
@@ -1232,6 +1234,7 @@ function webs_menu() {
     run_module_with_axiom_failover fuzz
     cms_scanner
     run_module_with_axiom_failover iishortname
+    swagger_check
     run_module_with_axiom_failover urlchecks
     param_discovery
     run_module_with_axiom_failover jschecks
@@ -1278,6 +1281,7 @@ function zen_menu() {
     run_module_with_axiom_failover graphql_scan
     run_module_with_axiom_failover fuzz
     run_module_with_axiom_failover iishortname
+    swagger_check
     if [[ $AXIOM == true ]]; then
         axiom_shutdown
     fi

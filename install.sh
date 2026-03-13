@@ -333,6 +333,7 @@ declare -A gotools=(
     ["hakoriginfinder"]="github.com/hakluke/hakoriginfinder"
     ["sourcemapper"]="github.com/denandz/sourcemapper"
     ["jsluice"]="github.com/BishopFox/jsluice/cmd/jsluice"
+    ["sj"]="github.com/BishopFox/sj"
     ["urlfinder"]="github.com/projectdiscovery/urlfinder/cmd/urlfinder"
     ["cent"]="github.com/xm1k3/cent"
     ["csprecon"]="github.com/edoardottt/csprecon/cmd/csprecon"
