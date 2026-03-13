@@ -582,6 +582,15 @@ function install_tools() {
             continue
         }
 
+        # Return to default branch if stuck in detached HEAD (e.g. from a previous tag checkout)
+        if ! git symbolic-ref -q HEAD &>/dev/null; then
+            local _default_branch
+            _default_branch=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||')
+            # Fallback to network lookup if local ref is missing
+            [[ -z "$_default_branch" ]] && _default_branch=$(git remote show origin 2>/dev/null | awk '/HEAD branch/{print $NF}')
+            [[ -n "$_default_branch" ]] && git checkout "$_default_branch" &>/dev/null || true
+        fi
+
         # Pull the latest changes
         msg_run "[$repos_step/${#repos[@]}] $repo (pull)"
         retry 3 3 q_to 60 git pull
