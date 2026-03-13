@@ -451,6 +451,9 @@ function apileaks() {
             return
         fi
 
+            merge_scoped_urls_into_url_extract "${dir}/osint/postman_leaks.txt" "apileaks_postman"
+            merge_scoped_urls_into_url_extract "${dir}/osint/swagger_leaks.txt" "apileaks_swagger"
+
             # Analyze leaks with trufflehog
             if [[ -s "${dir}/osint/postman_leaks.txt" ]]; then
                 run_command trufflehog filesystem "${dir}/osint/postman_leaks.txt" -j 2>/dev/null | jq -c | anew -q "${dir}/osint/postman_leaks_trufflehog.json"

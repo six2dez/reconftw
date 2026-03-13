@@ -135,20 +135,50 @@ SH
   grep -q "GitLab" "webs/favirecon.txt"
 }
 
-@test "apileaks integrates postleaksNg output" {
+@test "apileaks merges scoped leak URLs into url_extract" {
   mkdir -p osint
   export tools="$TEST_DIR/tools"
   mkdir -p "$tools/SwaggerSpy/venv/bin" "$tools/SwaggerSpy"
+  export outOfScope_file="$TEST_DIR/out_of_scope.txt"
+  printf '%s\n' 'swagger.target.example.com' > "$outOfScope_file"
+
+  cat > "$MOCK_BIN/anew" <<'SH'
+#!/usr/bin/env bash
+quiet=false
+if [[ "${1:-}" == "-q" ]]; then
+  quiet=true
+  shift
+fi
+outfile="$1"
+mkdir -p "$(dirname "$outfile")"
+touch "$outfile"
+while IFS= read -r line; do
+  [[ -z "$line" ]] && continue
+  if ! grep -Fxq -- "$line" "$outfile"; then
+    printf '%s\n' "$line" >> "$outfile"
+    if [[ "$quiet" != true ]]; then
+      printf '%s\n' "$line"
+    fi
+  fi
+done
+SH
+  chmod +x "$MOCK_BIN/anew"
+
+  cat > "$MOCK_BIN/urless" <<'SH'
+#!/usr/bin/env bash
+cat
+SH
+  chmod +x "$MOCK_BIN/urless"
 
   cat > "$MOCK_BIN/porch-pirate" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' 'https://postman.initial.example.com/api'
+printf '%s\n' 'https://api.target.example.com/v1/users?first=1'
 SH
   chmod +x "$MOCK_BIN/porch-pirate"
 
   cat > "$tools/SwaggerSpy/venv/bin/python3" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' 'URL https://swagger.example.com/openapi.json'
+printf '%s\n' 'URL https://swagger.target.example.com/openapi.json'
 SH
   chmod +x "$tools/SwaggerSpy/venv/bin/python3"
   printf '%s\n' 'print("mock")' > "$tools/SwaggerSpy/swaggerspy.py"
@@ -168,7 +198,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 mkdir -p "$out"
-printf '%s\n' '{"url":"https://postman.new.example.com/path"}' > "$out/postleaks.json"
+printf '%s\n' '{"url":"https://postman.target.example.com/path?token=1"}' > "$out/postleaks.json"
+printf '%s\n' '{"url":"https://outside.example.net/path?next=target.example.com"}' > "$out/postleaks-outside.json"
 SH
   chmod +x "$MOCK_BIN/postleaksNg"
 
@@ -186,7 +217,124 @@ SH
   run apileaks
   [ "$status" -eq 0 ]
   [ -s "osint/postman_leaks.txt" ]
-  grep -q "postman.new.example.com" "osint/postman_leaks.txt"
+  grep -q "postman.target.example.com" "osint/postman_leaks.txt"
+  [ -s "webs/url_extract.txt" ]
+  grep -q '^https://api.target.example.com/v1/users?first=1$' "webs/url_extract.txt"
+  grep -q '^https://postman.target.example.com/path?token=1$' "webs/url_extract.txt"
+  ! grep -q 'outside.example.net' "webs/url_extract.txt"
+  ! grep -q 'swagger.target.example.com' "webs/url_extract.txt"
+}
+
+@test "jschecks merges only scoped JS-discovered URLs into url_extract" {
+  mkdir -p js webs .tmp subdomains
+  printf '%s\n' 'https://target.example.com/app.js' > .tmp/url_extract_js.txt
+  printf '%s\n' 'target.example.com' > subdomains/subdomains.txt
+  export outOfScope_file="$TEST_DIR/out_of_scope_js.txt"
+  printf '%s\n' 'graphql.target.example.com' > "$outOfScope_file"
+
+  cat > "$MOCK_BIN/anew" <<'SH'
+#!/usr/bin/env bash
+quiet=false
+if [[ "${1:-}" == "-q" ]]; then
+  quiet=true
+  shift
+fi
+outfile="$1"
+mkdir -p "$(dirname "$outfile")"
+touch "$outfile"
+while IFS= read -r line; do
+  [[ -z "$line" ]] && continue
+  if ! grep -Fxq -- "$line" "$outfile"; then
+    printf '%s\n' "$line" >> "$outfile"
+    if [[ "$quiet" != true ]]; then
+      printf '%s\n' "$line"
+    fi
+  fi
+done
+SH
+  chmod +x "$MOCK_BIN/anew"
+
+  cat > "$MOCK_BIN/urless" <<'SH'
+#!/usr/bin/env bash
+cat
+SH
+  chmod +x "$MOCK_BIN/urless"
+
+  cat > "$MOCK_BIN/subjs" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' 'https://api.target.example.com/v1/users?id=1'
+printf '%s\n' 'https://outside.example.net/relay?next=target.example.com'
+printf '%s\n' 'https://target.example.com/logo.png'
+printf '%s\n' 'https://target.example.com/app2.js'
+SH
+  chmod +x "$MOCK_BIN/subjs"
+
+  cat > "$MOCK_BIN/httpx" <<'SH'
+#!/usr/bin/env bash
+while IFS= read -r url; do
+  [[ -z "$url" ]] && continue
+  printf '%s [200] [text/javascript]\n' "$url"
+done
+SH
+  chmod +x "$MOCK_BIN/httpx"
+
+  cat > "$MOCK_BIN/interlace" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  chmod +x "$MOCK_BIN/interlace"
+
+  cat > "$MOCK_BIN/xnLinkFinder" <<'SH'
+#!/usr/bin/env bash
+outfile=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o)
+      outfile="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+printf '%s\n' 'https://graphql.target.example.com/query' > "$outfile"
+printf '%s\n' 'https://evil.example.org/path?host=target.example.com' >> "$outfile"
+SH
+  chmod +x "$MOCK_BIN/xnLinkFinder"
+
+  cat > "$MOCK_BIN/jsluice" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  chmod +x "$MOCK_BIN/jsluice"
+
+  cat > "$MOCK_BIN/mantra" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  chmod +x "$MOCK_BIN/mantra"
+
+  cat > "$MOCK_BIN/trufflehog" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  chmod +x "$MOCK_BIN/trufflehog"
+
+  export JSCHECKS=true
+  export AXIOM=false
+  export HTTPX_TIMEOUT=5
+  export HTTPX_THREADS=5
+  export HTTPX_RATELIMIT=0
+  export INTERLACE_THREADS=2
+  export XNLINKFINDER_DEPTH=1
+
+  run jschecks
+  [ "$status" -eq 0 ]
+  [ -s "webs/url_extract.txt" ]
+  grep -q '^https://api.target.example.com/v1/users?id=1$' "webs/url_extract.txt"
+  ! grep -q 'outside.example.net' "webs/url_extract.txt"
+  ! grep -q 'graphql.target.example.com' "webs/url_extract.txt"
 }
 
 @test "s3buckets uses cloud_enum and writes cloud_enum artifacts" {
@@ -1130,6 +1278,50 @@ SH
   grep -q "URL: http://testaspnet.vulnweb.com/login.aspx?__VIEWSTATE=3698&token=abc" "webs/params_discovered.txt"
   grep -q "PARAM: __VIEWSTATE" "webs/params_discovered.txt"
   grep -q "PARAM: token" "webs/params_discovered.txt"
+}
+
+@test "well_known_pivots probes newly discovered subdomains into webs.txt" {
+  mkdir -p webs .tmp subdomains
+  printf '%s\n' 'https://target.example.com' > webs/webs_all.txt
+
+  _resolve_domains() {
+    cat "$1" > "$2"
+  }
+
+  cat > "$MOCK_BIN/curl" <<'SH'
+#!/usr/bin/env bash
+url="${@: -1}"
+case "$url" in
+  *"/.well-known/security.txt"|*"/security.txt")
+    printf '%s\n' 'Contact: security@auth.target.example.com'
+    ;;
+  *)
+    printf '%s\n' ''
+    ;;
+esac
+SH
+  chmod +x "$MOCK_BIN/curl"
+
+  cat > "$MOCK_BIN/httpx" <<'SH'
+#!/usr/bin/env bash
+while IFS= read -r host; do
+  [[ -z "$host" ]] && continue
+  printf '%s 200\n' "https://${host}"
+done
+SH
+  chmod +x "$MOCK_BIN/httpx"
+
+  export WELLKNOWN_PIVOTS=true
+  export HTTPX_THREADS=5
+  export HTTPX_RATELIMIT=0
+  export HTTPX_TIMEOUT=5
+
+  run well_known_pivots
+  [ "$status" -eq 0 ]
+  [ -s "subdomains/subdomains.txt" ]
+  [ -s "webs/webs.txt" ]
+  grep -q '^auth.target.example.com$' "subdomains/subdomains.txt"
+  grep -q '^https://auth.target.example.com$' "webs/webs.txt"
 }
 
 @test "wordlist_gen_roboxtractor skips in non-DEEP mode with explicit mode reason" {

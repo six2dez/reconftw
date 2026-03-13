@@ -2279,6 +2279,9 @@ function jschecks() {
                 cat .tmp/js_endpoints.txt | anew -q js/js_endpoints.txt || true
             fi
 
+            merge_scoped_urls_into_url_extract "js/nojs_links.txt" "js_nojs"
+            merge_scoped_urls_into_url_extract "js/js_endpoints.txt" "js_endpoints"
+
             [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && printf "%bRunning: Gathering secrets 5/6%b\n" "$yellow" "$reset"
             if [[ -s "js/js_livelinks.txt" ]]; then
                 if [[ $AXIOM != true ]]; then
@@ -2502,6 +2505,16 @@ function well_known_pivots() {
                 if [[ -s ".tmp/wellknown_hosts_resolved.txt" ]]; then
                     NUMOFLINES=$(anew subdomains/subdomains.txt <.tmp/wellknown_hosts_resolved.txt | sed '/^$/d' | wc -l | tr -d ' ' || true)
                     [[ "$NUMOFLINES" =~ ^[0-9]+$ ]] || NUMOFLINES=0
+
+                    if [[ $NUMOFLINES -gt 0 ]]; then
+                        _print_msg INFO "Well-known pivots: delta-probing ${NUMOFLINES} new subdomains"
+                        run_command httpx -follow-host-redirects -random-agent -silent \
+                            -status-code -p "${WEBPROBE_PORTS:-80,443}" \
+                            -threads "${HTTPX_THREADS:-50}" -rl "${HTTPX_RATELIMIT:-0}" \
+                            -timeout "${HTTPX_TIMEOUT:-10}" -retries 2 -no-color \
+                            <.tmp/wellknown_hosts_resolved.txt \
+                            | awk '{print $1}' | anew -q webs/webs.txt 2>/dev/null || true
+                    fi
                 fi
             fi
         fi
