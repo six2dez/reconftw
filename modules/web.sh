@@ -2513,7 +2513,7 @@ function well_known_pivots() {
                             -threads "${HTTPX_THREADS:-50}" -rl "${HTTPX_RATELIMIT:-0}" \
                             -timeout "${HTTPX_TIMEOUT:-10}" -retries 2 -no-color \
                             <.tmp/wellknown_hosts_resolved.txt \
-                            | awk '{print $1}' | anew -q webs/webs.txt 2>/dev/null || true
+                            | awk '$2 ~ /^\[?[123]/ {print $1}' | anew -q webs/webs.txt 2>/dev/null || true
                     fi
                 fi
             fi

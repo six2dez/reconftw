@@ -1306,7 +1306,7 @@ SH
 #!/usr/bin/env bash
 while IFS= read -r host; do
   [[ -z "$host" ]] && continue
-  printf '%s 200\n' "https://${host}"
+  printf '%s [200]\n' "https://${host}"
 done
 SH
   chmod +x "$MOCK_BIN/httpx"

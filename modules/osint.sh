@@ -451,21 +451,21 @@ function apileaks() {
             return
         fi
 
-            merge_scoped_urls_into_url_extract "${dir}/osint/postman_leaks.txt" "apileaks_postman"
-            merge_scoped_urls_into_url_extract "${dir}/osint/swagger_leaks.txt" "apileaks_swagger"
+        merge_scoped_urls_into_url_extract "${dir}/osint/postman_leaks.txt" "apileaks_postman"
+        merge_scoped_urls_into_url_extract "${dir}/osint/swagger_leaks.txt" "apileaks_swagger"
 
-            # Analyze leaks with trufflehog
-            if [[ -s "${dir}/osint/postman_leaks.txt" ]]; then
-                run_command trufflehog filesystem "${dir}/osint/postman_leaks.txt" -j 2>/dev/null | jq -c | anew -q "${dir}/osint/postman_leaks_trufflehog.json"
-            fi
-            if [[ -d "${dir}/osint/postman_leaks_postleaksng" ]]; then
-                run_command trufflehog filesystem "${dir}/osint/postman_leaks_postleaksng" -j 2>/dev/null | jq -c | anew -q "${dir}/osint/postman_leaks_trufflehog.json"
-            fi
-        
-            if [[ -s "${dir}/osint/swagger_leaks.txt" ]]; then
-                run_command trufflehog filesystem "${dir}/osint/swagger_leaks.txt" -j 2>/dev/null | jq -c | anew -q "${dir}/osint/swagger_leaks_trufflehog.json"
-            fi
-                end_func "Results are saved in $domain/osint/[postman_leaks_trufflehog.json, swagger_leaks_trufflehog.json]" "${FUNCNAME[0]}"
+        # Analyze leaks with trufflehog
+        if [[ -s "${dir}/osint/postman_leaks.txt" ]]; then
+            run_command trufflehog filesystem "${dir}/osint/postman_leaks.txt" -j 2>/dev/null | jq -c | anew -q "${dir}/osint/postman_leaks_trufflehog.json"
+        fi
+        if [[ -d "${dir}/osint/postman_leaks_postleaksng" ]]; then
+            run_command trufflehog filesystem "${dir}/osint/postman_leaks_postleaksng" -j 2>/dev/null | jq -c | anew -q "${dir}/osint/postman_leaks_trufflehog.json"
+        fi
+
+        if [[ -s "${dir}/osint/swagger_leaks.txt" ]]; then
+            run_command trufflehog filesystem "${dir}/osint/swagger_leaks.txt" -j 2>/dev/null | jq -c | anew -q "${dir}/osint/swagger_leaks_trufflehog.json"
+        fi
+        end_func "Results are saved in $domain/osint/[postman_leaks_trufflehog.json, swagger_leaks_trufflehog.json]" "${FUNCNAME[0]}"
     else
         if [[ $API_LEAKS == false ]] || [[ $OSINT == false ]]; then
             skip_notification "disabled"

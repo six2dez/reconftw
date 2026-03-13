@@ -30,7 +30,9 @@ function deleteOutScoped() {
     fi
 }
 
-merge_scoped_urls_into_url_extract() {
+# Callers (apileaks, jschecks) run sequentially (OSINT phase then Web phase).
+# If future changes run callers in parallel, add file locking around the anew+p1radup section.
+function merge_scoped_urls_into_url_extract() {
     local source_file="$1"
     local source_label="${2:-url source}"
     local raw_file=".tmp/${source_label}_urls_raw.txt"
@@ -42,6 +44,8 @@ merge_scoped_urls_into_url_extract() {
     local added_count=0
 
     [[ ! -s "$source_file" ]] && return 0
+
+    trap 'rm -f "$raw_file" "$scoped_file" "$normalized_file" "$query_file" "$plain_file" 2>/dev/null' RETURN
 
     ensure_dirs .tmp webs || return 1
     domain_regex=$(domain_match_regex "$domain")
