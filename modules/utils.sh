@@ -30,6 +30,85 @@ function deleteOutScoped() {
     fi
 }
 
+merge_scoped_urls_into_url_extract() {
+    local source_file="$1"
+    local source_label="${2:-url source}"
+    local raw_file=".tmp/${source_label}_urls_raw.txt"
+    local scoped_file=".tmp/${source_label}_urls_scoped.txt"
+    local normalized_file=".tmp/${source_label}_urls_normalized.txt"
+    local query_file=".tmp/${source_label}_urls_query.txt"
+    local plain_file=".tmp/${source_label}_urls_plain.txt"
+    local domain_regex
+    local added_count=0
+
+    [[ ! -s "$source_file" ]] && return 0
+
+    ensure_dirs .tmp webs || return 1
+    domain_regex=$(domain_match_regex "$domain")
+    : >"$raw_file"
+    : >"$scoped_file"
+    : >"$normalized_file"
+    : >"$query_file"
+    : >"$plain_file"
+
+    grep -aEo 'https?://[^ ]+' "$source_file" \
+        | sed -E 's/[[:space:]]+$//' \
+        | sed -E 's/[),;]$//' \
+        | sed 's/"$//' \
+        | sed "s/'$//" \
+        | sort -u >"$raw_file" 2>/dev/null || true
+
+    if [[ -s "$raw_file" ]]; then
+        awk -v re="$domain_regex" -F/ '
+            /^https?:\/\// {
+                h=$3
+                sub(/:.*/, "", h)
+                if (h ~ re) print
+            }
+        ' "$raw_file" >"$scoped_file" 2>/dev/null || true
+    fi
+
+    if [[ -n "${outOfScope_file:-}" ]] && [[ -s "$outOfScope_file" ]] && [[ -s "$scoped_file" ]]; then
+        deleteOutScoped "$outOfScope_file" "$scoped_file" || true
+    fi
+
+    if [[ "${INSCOPE:-false}" == true ]] && [[ -s "$scoped_file" ]]; then
+        if ! check_inscope "$scoped_file" 2>>"$LOGFILE" >/dev/null; then
+            print_warnf "check_inscope command failed."
+        fi
+    fi
+
+    [[ ! -s "$scoped_file" ]] && return 0
+
+    awk '/\?/{print > q} !/\?/{print > p}' q="$query_file" p="$plain_file" "$scoped_file"
+    if command -v urless >/dev/null 2>&1 && [[ -s "$query_file" ]]; then
+        urless <"$query_file" >"$normalized_file" 2>>"$LOGFILE" || true
+    else
+        cat "$query_file" >"$normalized_file" 2>/dev/null || true
+    fi
+    [[ -s "$plain_file" ]] && cat "$plain_file" >>"$normalized_file"
+    sort -u "$normalized_file" -o "$normalized_file" 2>/dev/null || true
+
+    if [[ -s "$normalized_file" ]]; then
+        if ! added_count=$(anew webs/url_extract.txt <"$normalized_file" | sed '/^$/d' | wc -l | tr -d ' '); then
+            added_count=0
+        fi
+        [[ "$added_count" =~ ^[0-9]+$ ]] || added_count=0
+
+        if [[ "$added_count" -gt 0 ]]; then
+            if [[ "${ASSET_STORE:-false}" == "true" ]]; then
+                append_assets_from_file url value webs/url_extract.txt
+            fi
+            if command -v p1radup >/dev/null 2>&1; then
+                p1radup -i webs/url_extract.txt -o webs/url_extract_nodupes.txt -s 2>>"$LOGFILE" >/dev/null || true
+            else
+                sort -u webs/url_extract.txt >webs/url_extract_nodupes.txt 2>>"$LOGFILE" || true
+            fi
+            notification "${source_label}: ${added_count} scoped URLs merged" "info"
+        fi
+    fi
+}
+
 function cleanup_on_exit() {
     local exit_code="${1:-130}"
     printf "\n%b[%s] Interrupted. Cleaning up...%b\n" "$bred" "$(date +'%Y-%m-%d %H:%M:%S')" "$reset"
