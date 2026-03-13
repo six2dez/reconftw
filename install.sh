@@ -304,6 +304,7 @@ declare -A gotools=(
     ["urlfinder"]="github.com/projectdiscovery/urlfinder/cmd/urlfinder"
     ["cent"]="github.com/xm1k3/cent"
     ["csprecon"]="github.com/edoardottt/csprecon/cmd/csprecon"
+    ["exifray"]="github.com/mmarting/exifray"
     ["VhostFinder"]="github.com/wdahlenburg/VhostFinder"
     ["misconfig-mapper"]="github.com/intigriti/misconfig-mapper/cmd/misconfig-mapper"
     ["grpcurl"]="github.com/fullstorydev/grpcurl/cmd/grpcurl"
