@@ -353,7 +353,6 @@ declare -A repos=(
     ["gitdorks_go"]="damit5/gitdorks_go"
     ["Web-Cache-Vulnerability-Scanner"]="Hackmanit/Web-Cache-Vulnerability-Scanner"
     ["regulator"]="cramppet/regulator"
-    ["gitleaks"]="gitleaks/gitleaks"
     ["ghleaks"]="dinosn/ghleaks"
     ["trufflehog"]="trufflesecurity/trufflehog"
     ["nomore403"]="devploit/nomore403"
@@ -578,13 +577,6 @@ function install_tools() {
                 else
                     strip -s bin/massdns 2>/dev/null || true
                     $SUDO cp bin/massdns /usr/local/bin/ &>/dev/null
-                fi
-                ;;
-            "gitleaks")
-                if ! make build &>/dev/null; then
-                    msg_warn "[$repos_step/$total_repo] $repo: make build failed"
-                else
-                    $SUDO cp ./gitleaks /usr/local/bin/ &>/dev/null
                 fi
                 ;;
             "ghleaks")

@@ -472,7 +472,7 @@ function tools_installed() {
         ["ghauri"]="ghauri"
         ["hakip2host"]="hakip2host"
         ["crt"]="crt"
-        ["gitleaks"]="gitleaks"
+        ["titus"]="titus"
         ["trufflehog"]="trufflehog"
         ["s3scanner"]="s3scanner"
         ["mantra"]="mantra"

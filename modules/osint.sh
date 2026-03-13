@@ -120,7 +120,7 @@ function github_repos() {
             return 0
         fi
 
-        local secrets_engine="${SECRETS_ENGINE:-gitleaks}"
+        local secrets_engine="${SECRETS_ENGINE:-titus}"
         local titus_bin=""
         if command -v titus >/dev/null 2>&1; then
             titus_bin="$(command -v titus)"
@@ -131,50 +131,45 @@ function github_repos() {
         fi
 
         case "$secrets_engine" in
-            gitleaks|hybrid)
-                if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "gitleaks detect --source .tmp/github_repos/_target_ --no-banner --no-color -r .tmp/github/gh_secret_cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
-                    _print_error "interlace gitleaks command failed"
-                    end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}" FAIL
-                    return 1
-                fi
-                ;;
             titus)
                 if [[ -z "$titus_bin" ]]; then
-                    _print_msg WARN "titus requested but not found; falling back to gitleaks"
-                    if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "gitleaks detect --source .tmp/github_repos/_target_ --no-banner --no-color -r .tmp/github/gh_secret_cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
-                        _print_error "interlace gitleaks fallback failed"
-                        return 1
-                    fi
-                else
-                    local titus_opts=""
-                    [[ "${SECRETS_SCAN_GIT_HISTORY:-false}" == "true" ]] && titus_opts="${titus_opts} --git"
-                    [[ "${SECRETS_VALIDATE:-false}" == "true" ]] && titus_opts="${titus_opts} --validate"
-                    if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "\"${titus_bin}\" scan --format json ${titus_opts} .tmp/github_repos/_target_ > .tmp/github/titus__cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
-                        _print_error "interlace titus command failed"
-                        return 1
-                    fi
+                    _print_msg WARN "titus not found; skipping secrets scan"
+                    end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}" WARN
+                    return 0
+                fi
+                local titus_opts=""
+                [[ "${SECRETS_SCAN_GIT_HISTORY:-false}" == "true" ]] && titus_opts="${titus_opts} --git"
+                [[ "${SECRETS_VALIDATE:-false}" == "true" ]] && titus_opts="${titus_opts} --validate"
+                if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "\"${titus_bin}\" scan --format json ${titus_opts} .tmp/github_repos/_target_ > .tmp/github/titus__cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
+                    _print_error "interlace titus command failed"
+                    return 1
                 fi
                 ;;
             noseyparker)
                 if ! command -v noseyparker >/dev/null 2>&1; then
-                    _print_msg WARN "noseyparker requested but not found; falling back to gitleaks"
-                    if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "gitleaks detect --source .tmp/github_repos/_target_ --no-banner --no-color -r .tmp/github/gh_secret_cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
-                        _print_error "interlace gitleaks fallback failed"
-                        return 1
-                    fi
-                else
-                    local np_scan_opts=""
-                    [[ "${SECRETS_SCAN_GIT_HISTORY:-false}" == "true" ]] && np_scan_opts="--git-history"
-                    if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "noseyparker scan ${np_scan_opts} --datastore .tmp/github/np_ds__cleantarget_ .tmp/github_repos/_target_ >/dev/null 2>>${LOGFILE}; noseyparker report --datastore .tmp/github/np_ds__cleantarget_ --format json > .tmp/github/nosey__cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
-                        _print_error "interlace noseyparker command failed"
-                        return 1
-                    fi
+                    _print_msg WARN "noseyparker not found; skipping secrets scan"
+                    end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}" WARN
+                    return 0
+                fi
+                local np_scan_opts=""
+                [[ "${SECRETS_SCAN_GIT_HISTORY:-false}" == "true" ]] && np_scan_opts="--git-history"
+                if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "noseyparker scan ${np_scan_opts} --datastore .tmp/github/np_ds__cleantarget_ .tmp/github_repos/_target_ >/dev/null 2>>${LOGFILE}; noseyparker report --datastore .tmp/github/np_ds__cleantarget_ --format json > .tmp/github/nosey__cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
+                    _print_error "interlace noseyparker command failed"
+                    return 1
                 fi
                 ;;
             *)
-                _print_msg WARN "Unknown SECRETS_ENGINE='${secrets_engine}', using gitleaks"
-                if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "gitleaks detect --source .tmp/github_repos/_target_ --no-banner --no-color -r .tmp/github/gh_secret_cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
-                    _print_error "interlace gitleaks fallback failed"
+                _print_msg WARN "Unknown SECRETS_ENGINE='${secrets_engine}', using titus"
+                if [[ -z "$titus_bin" ]]; then
+                    _print_msg WARN "titus not found; skipping secrets scan"
+                    end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}" WARN
+                    return 0
+                fi
+                local titus_opts=""
+                [[ "${SECRETS_SCAN_GIT_HISTORY:-false}" == "true" ]] && titus_opts="${titus_opts} --git"
+                [[ "${SECRETS_VALIDATE:-false}" == "true" ]] && titus_opts="${titus_opts} --validate"
+                if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "\"${titus_bin}\" scan --format json ${titus_opts} .tmp/github_repos/_target_ > .tmp/github/titus__cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
+                    _print_error "interlace titus command failed"
                     return 1
                 fi
                 ;;
