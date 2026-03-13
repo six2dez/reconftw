@@ -48,12 +48,13 @@ fi
 # Globals for CLI overrides
 FORCE_UPDATE=${FORCE_UPDATE:-false}
 VERBOSE=${VERBOSE:-false}
-LOGFILE=${LOGFILE-}
+LOGFILE=${LOGFILE:-"./install.log"}
 DRY_RUN=${DRY_RUN:-false}
 TOOLS_ONLY=${TOOLS_ONLY:-false}
 
-# If LOGFILE provided via env/flag, tee all output
+# Log all output (default: install.log in repo root)
 if [[ -n ${LOGFILE} ]]; then
+    : > "${LOGFILE}"
     exec > >(tee -a "${LOGFILE}") 2>&1
 fi
 
