@@ -359,7 +359,7 @@ function virtualhosts() {
 
 	        # Proceed only if input files exist
 	        if [[ -s "subdomains/subdomains.txt" ]] && [[ -s "hosts/ips.txt" ]]; then
-	            VhostFinder -ips hosts/ips.txt -wordlist subdomains/subdomains.txt -verify | grep "+" | anew -q "$dir/webs/virtualhosts.txt"
+	            run_command VhostFinder -ips hosts/ips.txt -wordlist subdomains/subdomains.txt -verify | grep "+" | anew -q "$dir/webs/virtualhosts.txt"
         fi
 
         # Optionally send to proxy if conditions are met
@@ -626,7 +626,7 @@ function portscan() {
         # Check for CDN providers
         if [[ ! -s "hosts/cdn_providers.txt" ]]; then
             if [[ -s "hosts/ips.txt" ]]; then
-                cat hosts/ips.txt | cdncheck -silent -resp -cdn -waf -nc 2>/dev/null | anew -q hosts/cdn_providers.txt || true
+                cat hosts/ips.txt | run_command cdncheck -silent -resp -cdn -waf -nc 2>/dev/null | anew -q hosts/cdn_providers.txt || true
             fi
         fi
 
@@ -2215,7 +2215,7 @@ function jschecks() {
 
             [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && printf "%bRunning: Fetching URLs 1/6%b\n" "$yellow" "$reset"
             if [[ $AXIOM != true ]]; then
-                subjs -ua "Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -c 40 <.tmp/url_extract_js.txt \
+                run_command subjs -ua "Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0" -c 40 <.tmp/url_extract_js.txt \
                     | grep -F "$domain" \
                     | grep -aEo 'https?://[^ ]+' | anew -q .tmp/subjslinks.txt || true
             else

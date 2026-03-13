@@ -140,7 +140,7 @@ function github_repos() {
                 local titus_opts=""
                 [[ "${SECRETS_SCAN_GIT_HISTORY:-false}" == "true" ]] && titus_opts="${titus_opts} --git"
                 [[ "${SECRETS_VALIDATE:-false}" == "true" ]] && titus_opts="${titus_opts} --validate"
-                if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "\"${titus_bin}\" scan --format json ${titus_opts} .tmp/github_repos/_target_ > .tmp/github/titus__cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
+                if ! run_command interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "\"${titus_bin}\" scan --format json ${titus_opts} .tmp/github_repos/_target_ > .tmp/github/titus__cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
                     _print_error "interlace titus command failed"
                     return 1
                 fi
@@ -153,7 +153,7 @@ function github_repos() {
                 fi
                 local np_scan_opts=""
                 [[ "${SECRETS_SCAN_GIT_HISTORY:-false}" == "true" ]] && np_scan_opts="--git-history"
-                if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "noseyparker scan ${np_scan_opts} --datastore .tmp/github/np_ds__cleantarget_ .tmp/github_repos/_target_ >/dev/null 2>>${LOGFILE}; noseyparker report --datastore .tmp/github/np_ds__cleantarget_ --format json > .tmp/github/nosey__cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
+                if ! run_command interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "noseyparker scan ${np_scan_opts} --datastore .tmp/github/np_ds__cleantarget_ .tmp/github_repos/_target_ >/dev/null 2>>${LOGFILE}; noseyparker report --datastore .tmp/github/np_ds__cleantarget_ --format json > .tmp/github/nosey__cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
                     _print_error "interlace noseyparker command failed"
                     return 1
                 fi
@@ -168,7 +168,7 @@ function github_repos() {
                 local titus_opts=""
                 [[ "${SECRETS_SCAN_GIT_HISTORY:-false}" == "true" ]] && titus_opts="${titus_opts} --git"
                 [[ "${SECRETS_VALIDATE:-false}" == "true" ]] && titus_opts="${titus_opts} --validate"
-                if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "\"${titus_bin}\" scan --format json ${titus_opts} .tmp/github_repos/_target_ > .tmp/github/titus__cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
+                if ! run_command interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "\"${titus_bin}\" scan --format json ${titus_opts} .tmp/github_repos/_target_ > .tmp/github/titus__cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
                     _print_error "interlace titus command failed"
                     return 1
                 fi
@@ -177,7 +177,7 @@ function github_repos() {
 
         # Keep trufflehog enrichment (all engines).
         if [[ -s ".tmp/company_repos_url.txt" ]]; then
-            if ! interlace -tL .tmp/company_repos_url.txt -threads "$INTERLACE_THREADS" -c "trufflehog git _target_ -j 2>&1 | jq -c > _output_/_cleantarget_" -o .tmp/github/ 2>>"$LOGFILE" >/dev/null; then
+            if ! run_command interlace -tL .tmp/company_repos_url.txt -threads "$INTERLACE_THREADS" -c "trufflehog git _target_ -j 2>&1 | jq -c > _output_/_cleantarget_" -o .tmp/github/ 2>>"$LOGFILE" >/dev/null; then
                 _print_error "interlace trufflehog command failed"
                 return 1
             fi
