@@ -253,41 +253,7 @@ if [[ $BASH_VERSION_NUM -lt 4 ]]; then
     exit 1
 fi
 
-# Load pinned versions from manifest file
-VERSIONS_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/config/tool_versions.txt"
-declare -A TOOL_VERSIONS=()
-if [[ -f "$VERSIONS_FILE" ]]; then
-    local_section=""
-    while IFS= read -r line; do
-        # Skip comments and empty lines
-        [[ -z "$line" || "$line" == \#* ]] && continue
-        # Track section headers
-        if [[ "$line" == "[repos]" ]]; then
-            local_section="repos"
-            continue
-        fi
-        if [[ "$line" == *=* ]]; then
-            local_key="${line%%=*}"
-            local_val="${line#*=}"
-            # Prefix repo keys to avoid collisions with go tool names
-            if [[ "$local_section" == "repos" ]]; then
-                TOOL_VERSIONS["repo:${local_key}"]="$local_val"
-            else
-                TOOL_VERSIONS["${local_key}"]="$local_val"
-            fi
-        fi
-    done < "$VERSIONS_FILE"
-fi
-
-# Helper: get pinned version for a tool (returns "latest" if not found)
-get_tool_version() {
-    local tool="$1"
-    local prefix="${2:-}"  # optional prefix like "repo:"
-    local ver="${TOOL_VERSIONS[${prefix}${tool}]:-latest}"
-    echo "$ver"
-}
-
-# Declare Go tools: name -> module path (version resolved from config/tool_versions.txt)
+# Declare Go tools: name -> module path (always installed @latest)
 declare -A gotools=(
     ["gf"]="github.com/tomnomnom/gf"
     ["brutespray"]="github.com/x90skysn3k/brutespray"
@@ -456,10 +422,7 @@ function install_tools() {
     local go_ok=0 go_skip=0 go_fail=0
     for gotool in "${!gotools[@]}"; do
         ((++go_step))
-        # Build go install command with pinned version from manifest
-        local _go_ver
-        _go_ver=$(get_tool_version "$gotool")
-        local _go_cmd="go install -v ${gotools[$gotool]}@${_go_ver}"
+        local _go_cmd="go install -v ${gotools[$gotool]}@latest"
         # Always run go install so already-present binaries also get updated.
         if q bash -lc "$_go_cmd"; then
             ((++go_ok))
@@ -490,13 +453,8 @@ function install_tools() {
         ((++pipx_step))
 
         # Always use git+https URL for both install and upgrade to avoid PyPI lookups
-        # which fail for tools not on PyPI. Pin to version from manifest.
-        local _px_ver
-        _px_ver=$(get_tool_version "$pipxtool")
+        # which fail for tools not on PyPI.
         local tool_url="git+https://github.com/${pipxtools[$pipxtool]}"
-        if [[ "$_px_ver" != "latest" && "$_px_ver" != "HEAD" ]]; then
-            tool_url="${tool_url}@${_px_ver}"
-        fi
         
         # Prepare arguments array
         local tool_args=()
@@ -602,16 +560,6 @@ function install_tools() {
             ((++repo_fail))
             double_check=true
             continue
-        fi
-
-        # Checkout pinned version from manifest if available
-        local _repo_ver
-        _repo_ver=$(get_tool_version "$repo" "repo:")
-        if [[ "$_repo_ver" != "latest" && "$_repo_ver" != "HEAD" ]]; then
-            git fetch --tags &>/dev/null || true
-            if ! git checkout "$_repo_ver" &>/dev/null; then
-                msg_warn "[$repos_step/$total_repo] $repo: could not checkout $_repo_ver, staying on HEAD"
-            fi
         fi
 
         # Install requirements inside a virtual environment
