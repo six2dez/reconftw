@@ -131,20 +131,6 @@ function github_repos() {
         fi
 
         case "$secrets_engine" in
-            titus)
-                if [[ -z "$titus_bin" ]]; then
-                    _print_msg WARN "titus not found; skipping secrets scan"
-                    end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}" WARN
-                    return 0
-                fi
-                local titus_opts=""
-                [[ "${SECRETS_SCAN_GIT_HISTORY:-false}" == "true" ]] && titus_opts="${titus_opts} --git"
-                [[ "${SECRETS_VALIDATE:-false}" == "true" ]] && titus_opts="${titus_opts} --validate"
-                if ! run_command interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "\"${titus_bin}\" scan --format json ${titus_opts} .tmp/github_repos/_target_ > .tmp/github/titus__cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
-                    _print_error "interlace titus command failed"
-                    return 1
-                fi
-                ;;
             noseyparker)
                 if ! command -v noseyparker >/dev/null 2>&1; then
                     _print_msg WARN "noseyparker not found; skipping secrets scan"
@@ -158,8 +144,8 @@ function github_repos() {
                     return 1
                 fi
                 ;;
-            *)
-                _print_msg WARN "Unknown SECRETS_ENGINE='${secrets_engine}', using titus"
+            titus|*)
+                [[ "$secrets_engine" != "titus" ]] && _print_msg WARN "Unknown SECRETS_ENGINE='${secrets_engine}', using titus"
                 if [[ -z "$titus_bin" ]]; then
                     _print_msg WARN "titus not found; skipping secrets scan"
                     end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}" WARN

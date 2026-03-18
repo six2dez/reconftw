@@ -1257,6 +1257,7 @@ _ip_is_public_ipv4() {
 # Check if a cloud metadata endpoint is reachable (AWS, GCP, Azure, DO, Hetzner, Oracle).
 # Returns 0 if running on a cloud VPS, 1 otherwise.
 _is_cloud_vps() {
+    [[ "${DRY_RUN:-false}" == "true" ]] && return 1
     curl -sf --max-time 2 -o /dev/null http://169.254.169.254/ 2>/dev/null && return 0
     return 1
 }
