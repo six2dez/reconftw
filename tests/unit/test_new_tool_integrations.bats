@@ -29,6 +29,89 @@ teardown() {
   [[ -d "$TEST_DIR" ]] && rm -rf "$TEST_DIR"
 }
 
+@test "lfi generates one-parameter candidates and uses explicit budgets" {
+  mkdir -p gf .tmp vulns
+  printf '%s\n' 'https://target.example.com/download?file=1&q=test' > gf/lfi.txt
+  printf '%s\n' '/etc/passwd' > "$TEST_DIR/lfi_wordlist.txt"
+
+  cat > "$MOCK_BIN/anew" <<'SH'
+#!/usr/bin/env bash
+quiet=false
+if [[ "${1:-}" == "-q" ]]; then
+  quiet=true
+  shift
+fi
+outfile="$1"
+mkdir -p "$(dirname "$outfile")"
+touch "$outfile"
+while IFS= read -r line; do
+  [[ -z "$line" ]] && continue
+  if ! grep -Fxq -- "$line" "$outfile"; then
+    printf '%s\n' "$line" >> "$outfile"
+    if [[ "$quiet" != true ]]; then
+      printf '%s\n' "$line"
+    fi
+  fi
+done
+SH
+  chmod +x "$MOCK_BIN/anew"
+
+  cat > "$MOCK_BIN/interlace" <<'SH'
+#!/usr/bin/env bash
+raw_args="$*"
+input=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -tL)
+      input="$2"
+      shift 2
+      ;;
+    -c)
+      printf '%s\n' "$2" > "$TEST_DIR/lfi_ffuf_cmd.txt"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+printf '%s\n' "$0 $raw_args" > "$TEST_DIR/lfi_interlace_args.txt"
+if [[ -n "$input" ]]; then
+  head -n 1 "$input" | sed 's/^/| URL | /'
+fi
+SH
+  chmod +x "$MOCK_BIN/interlace"
+
+  export LFI=true
+  export DEEP=false
+  export DEEP_LIMIT=500
+  export lfi_wordlist="$TEST_DIR/lfi_wordlist.txt"
+  export HEADER="User-Agent: bats"
+  export LFI_INTERLACE_THREADS=3
+  export LFI_INTERLACE_TIMEOUT=44
+  export LFI_FFUF_THREADS=9
+  export LFI_FFUF_RATELIMIT=77
+  export LFI_FFUF_TIMEOUT=7
+  export LFI_FFUF_MAXTIME=33
+  export LFI_FOLLOW_REDIRECTS=false
+  export LFI_MAX_URLS=2
+
+  run lfi
+  [ "$status" -eq 0 ]
+  [ -s ".tmp/tmp_lfi.txt" ]
+  [ "$(wc -l < ".tmp/tmp_lfi.txt" | tr -d ' ')" -eq 2 ]
+  grep -qx 'https://target.example.com/download?file=FUZZ&q=test' ".tmp/tmp_lfi.txt"
+  grep -qx 'https://target.example.com/download?file=1&q=FUZZ' ".tmp/tmp_lfi.txt"
+  grep -q -- '-threads 3' "$TEST_DIR/lfi_interlace_args.txt"
+  grep -q -- '-timeout 44' "$TEST_DIR/lfi_interlace_args.txt"
+  grep -q -- '-noninteractive' "$TEST_DIR/lfi_ffuf_cmd.txt"
+  grep -q -- '-timeout 7' "$TEST_DIR/lfi_ffuf_cmd.txt"
+  grep -q -- '-maxtime 33' "$TEST_DIR/lfi_ffuf_cmd.txt"
+  grep -q -- '-rate 77' "$TEST_DIR/lfi_ffuf_cmd.txt"
+  ! grep -q -- ' -r ' "$TEST_DIR/lfi_ffuf_cmd.txt"
+  [ -s "vulns/lfi.txt" ]
+}
+
 @test "ssti uses TInjA engine and writes compatible output" {
   mkdir -p gf .tmp vulns
   printf 'https://target.example.com/?q=test\n' > gf/ssti.txt

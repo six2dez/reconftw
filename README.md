@@ -662,6 +662,7 @@ TEST_SSL=true # SSL misconfigs
 SSRF_CHECKS=true # SSRF checks
 CRLF_CHECKS=true # CRLF checks
 LFI=true # LFI by fuzzing
+LFI_MAX_URLS=150 # Max single-parameter LFI candidates to test per target (0 = unlimited)
 SSTI=true # SSTI by fuzzing
 SSTI_ENGINE="TInjA" # SSTI engine
 SQLI=true # Check SQLI
@@ -717,6 +718,7 @@ DNSX_THREADS=25 # Threads for dnsx when behind NAT (safe for home routers)
 DNSX_RATE_LIMIT=100 # QPS for dnsx
 DNSVALIDATOR_THREADS=200
 INTERLACE_THREADS=10
+LFI_INTERLACE_THREADS=4 # Dedicated interlace concurrency for LFI
 TLSX_THREADS=1000
 XNLINKFINDER_DEPTH=3
 
@@ -724,11 +726,17 @@ XNLINKFINDER_DEPTH=3
 HTTPX_RATELIMIT=150
 NUCLEI_RATELIMIT=150
 FFUF_RATELIMIT=0
+LFI_FFUF_THREADS=20 # Dedicated ffuf threads for LFI
+LFI_FFUF_RATELIMIT=50 # Dedicated ffuf rate limit for LFI
 
 # Timeouts
 SUBFINDER_ENUM_TIMEOUT=180          # Minutes
 CMSSCAN_TIMEOUT=3600            # Seconds
 FFUF_MAXTIME=900                # Seconds
+LFI_INTERLACE_TIMEOUT=180       # Seconds per LFI interlace worker
+LFI_FFUF_TIMEOUT=10             # Seconds per LFI HTTP request
+LFI_FFUF_MAXTIME=90             # Seconds per single LFI ffuf job
+LFI_FOLLOW_REDIRECTS=false      # Follow redirects during LFI fuzzing
 HTTPX_TIMEOUT=10                # Seconds
 HTTPX_UNCOMMONPORTS_TIMEOUT=10  # Seconds
 PERMUTATIONS_LIMIT=21474836480  # Bytes, default is 20 GB

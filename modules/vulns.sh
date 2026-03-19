@@ -238,6 +238,78 @@ function crlf_checks() {
 
 }
 
+_lfi_emit_single_param_candidates() {
+    local url="$1"
+    [[ "$url" == *"?"* ]] || return 0
+
+    local base="${url%%\?*}"
+    local query_and_fragment="${url#*\?}"
+    local query="$query_and_fragment"
+    local fragment=""
+
+    if [[ "$query_and_fragment" == *"#"* ]]; then
+        query="${query_and_fragment%%#*}"
+        fragment="#${query_and_fragment#*#}"
+    fi
+    [[ -n "$query" ]] || return 0
+
+    local IFS='&'
+    local -a params=()
+    read -r -a params <<<"$query"
+    [[ ${#params[@]} -gt 0 ]] || return 0
+
+    local -A seen=()
+    local idx j param key rebuilt other_param other_key new_param
+    for idx in "${!params[@]}"; do
+        param="${params[$idx]}"
+        key="${param%%=*}"
+        [[ -n "$key" ]] || continue
+        if [[ -n "${seen[$key]+x}" ]]; then
+            continue
+        fi
+        seen["$key"]=1
+
+        rebuilt=""
+        for j in "${!params[@]}"; do
+            other_param="${params[$j]}"
+            other_key="${other_param%%=*}"
+            if [[ "$other_key" == "$key" ]]; then
+                new_param="${other_key}=FUZZ"
+            else
+                new_param="$other_param"
+            fi
+
+            if [[ -n "$rebuilt" ]]; then
+                rebuilt="${rebuilt}&${new_param}"
+            else
+                rebuilt="$new_param"
+            fi
+        done
+
+        [[ -n "$rebuilt" ]] && printf "%s?%s%s\n" "$base" "$rebuilt" "$fragment"
+    done
+}
+
+_lfi_prepare_candidates() {
+    local input_file="$1"
+    local output_file="$2"
+    local all_candidates=".tmp/tmp_lfi_all.txt"
+    : >"$all_candidates"
+    : >"$output_file"
+
+    while IFS= read -r url || [[ -n "$url" ]]; do
+        [[ -z "$url" ]] && continue
+        _lfi_emit_single_param_candidates "$url"
+    done <"$input_file" | sort -u >"$all_candidates"
+
+    cat "$all_candidates" >"$output_file"
+
+    if [[ "${LFI_MAX_URLS:-0}" -gt 0 ]] && [[ -s "$output_file" ]]; then
+        head -n "${LFI_MAX_URLS}" "$output_file" >"${output_file}.limited"
+        mv "${output_file}.limited" "$output_file"
+    fi
+}
+
 function lfi() {
 
     # Create necessary directories
@@ -253,8 +325,12 @@ function lfi() {
         if [[ -s "gf/lfi.txt" ]]; then
             _print_msg INFO "Running: LFI Payload Generation"
 
-            # Process lfi.txt with qsreplace and filter lines containing 'FUZZ'
-            run_command qsreplace "FUZZ" <"gf/lfi.txt" | sed '/FUZZ/!d' | anew -q ".tmp/tmp_lfi.txt"
+            # Generate one candidate per parameter and prioritize likely LFI sinks first.
+            _lfi_prepare_candidates "gf/lfi.txt" ".tmp/tmp_lfi.txt"
+            if [[ ! -s ".tmp/tmp_lfi.txt" ]]; then
+                end_func "No per-parameter LFI candidates generated." "${FUNCNAME[0]}" "SKIP_NOINPUT"
+                return 0
+            fi
 
             # Determine whether to proceed based on DEEP flag or number of URLs
             URL_COUNT=$(wc -l <".tmp/tmp_lfi.txt")
@@ -262,8 +338,19 @@ function lfi() {
 
                 _print_msg INFO "Running: LFI Fuzzing with FFUF"
 
+                local lfi_interlace_threads="${LFI_INTERLACE_THREADS:-4}"
+                local lfi_interlace_timeout="${LFI_INTERLACE_TIMEOUT:-180}"
+                local lfi_ffuf_threads="${LFI_FFUF_THREADS:-20}"
+                local lfi_ffuf_rate="${LFI_FFUF_RATELIMIT:-50}"
+                local lfi_ffuf_timeout="${LFI_FFUF_TIMEOUT:-10}"
+                local lfi_ffuf_maxtime="${LFI_FFUF_MAXTIME:-90}"
+                local lfi_follow_redirects="${LFI_FOLLOW_REDIRECTS:-false}"
+                local lfi_redirect_flag=""
+                [[ "$lfi_follow_redirects" == true ]] && lfi_redirect_flag="-r"
+
                 # Use Interlace to parallelize FFUF scanning
-                run_command interlace -tL ".tmp/tmp_lfi.txt" -threads "$INTERLACE_THREADS" -c "ffuf -v -r -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w \"${lfi_wordlist}\" -u \"_target_\" -mr \"root:\" " 2>>"$LOGFILE" \
+                run_command interlace -tL ".tmp/tmp_lfi.txt" -threads "$lfi_interlace_threads" -timeout "$lfi_interlace_timeout" \
+                    -c "ffuf -v -noninteractive ${lfi_redirect_flag} -t ${lfi_ffuf_threads} -rate ${lfi_ffuf_rate} -timeout ${lfi_ffuf_timeout} -maxtime ${lfi_ffuf_maxtime} -H \"${HEADER}\" -w \"${lfi_wordlist}\" -u \"_target_\" -mr \"root:\" " 2>>"$LOGFILE" \
                     | grep "URL" | sed 's/| URL | //' | anew -q "vulns/lfi.txt"
 
                 end_func "Results are saved in vulns/lfi.txt" "${FUNCNAME[0]}"
