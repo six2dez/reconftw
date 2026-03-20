@@ -452,9 +452,12 @@ function install_tools() {
     for pipxtool in "${!pipxtools[@]}"; do
         ((++pipx_step))
 
-        # Always use git+https URL for both install and upgrade to avoid PyPI lookups
-        # which fail for tools not on PyPI.
+        # Default to git+https for tools that are not published on PyPI.
+        # fray is published on PyPI and its old GitHub install URL is no longer available.
         local tool_url="git+https://github.com/${pipxtools[$pipxtool]}"
+        if [[ "$pipxtool" == "fray" ]]; then
+            tool_url="fray"
+        fi
         
         # Prepare arguments array
         local tool_args=()
@@ -464,8 +467,8 @@ function install_tools() {
              tool_args+=("--with" "jellyfish>=1.1.3")
         fi
 
-        # Always force install/reinstall from the git URL
-        # This handles both initial install and upgrades correctly
+        # Always force install/reinstall from the selected source.
+        # This handles both initial installs and upgrades correctly.
         if q uv tool install "${tool_args[@]}" "$tool_url" --force; then
              ((++px_ok))
              msg_ok "[$pipx_step/$total_px] ${pipxtool} ready"
