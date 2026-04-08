@@ -350,7 +350,7 @@ declare -A gotools=(
 # Declare uv tool-managed Python tools and their GitHub paths
 declare -A pipxtools=(
     ["dnsvalidator"]="vortexau/dnsvalidator"
-    ["interlace"]="codingo/Interlace"
+    ["interlace"]="pry0cc/interlace"
     ["wafw00f"]="EnableSecurity/wafw00f"
     ["commix"]="commixproject/commix"
     ["waymore"]="xnl-h4ck3r/waymore"
@@ -478,6 +478,16 @@ function install_tools() {
         # Special case for postleaksNg to fix jellyfish dependency issue
         if [[ "$pipxtool" == "postleaksNg" ]]; then
              tool_args+=("--with" "jellyfish>=1.1.3")
+        fi
+
+        # Special case for interlace: colorclass is abandoned and broken on Python 3.10+
+        # PR https://github.com/Robpol86/colorclass/pull/27 never merged
+        if [[ "$pipxtool" == "interlace" ]]; then
+            local cc_codes
+            cc_codes="$(dirname "$(uv tool run --from interlace python -c 'import colorclass; print(colorclass.__file__)')")/codes.py" 2>/dev/null
+            if [[ -f "$cc_codes" ]]; then
+                sed -i 's/from collections import Mapping/from collections.abc import Mapping/' "$cc_codes"
+            fi
         fi
 
         # Always force install/reinstall from the git URL
