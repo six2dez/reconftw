@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `swagger_check()` function in `modules/web.sh`: Swagger/OpenAPI definition discovery and authentication analysis using [sj](https://github.com/BishopFox/sj) (Swagger Jacker). Three phases: (1) active brute-force discovery of hidden swagger/openapi definitions via `sj brute` with interlace parallelization, (2) aggregation of swagger URLs from nuclei (`swagger-api`/`openapi` templates) and SwaggerSpy OSINT output (with scope filtering via `check_inscope`), (3) endpoint extraction (`sj endpoints`) and authentication testing (`sj automate`) to identify unauthenticated API endpoints. Config: `SJ_CHECK=true`, `SJ_BRUTE=true`, `SJ_AUTOMATE=true`, `SJ_TIMEOUT=30`, `SJ_MAX_TARGETS=200`. Output: `webs/swagger_urls.txt`, `vulns/swagger/endpoints_all.txt`, `vulns/swagger/automate/*.json`, `vulns/swagger/accessible_endpoints.txt`.
+
+### Changed
+- Replaced metagoofil + exiftool with [exifray](https://github.com/mmarting/exifray) in `metadata()` function (`modules/osint.sh`). Single tool handles both file discovery and metadata extraction, outputting structured JSON (`osint/metadata.json`) plus a human-readable summary (`osint/metadata_results.txt`).
+
+### Removed
+- Removed metagoofil from `install.sh` git repos, `config/tool_versions.txt`, and `modules/core.sh` tool checks.
+
 ## [v4.1] - 2026-03-06
 
 ### Added

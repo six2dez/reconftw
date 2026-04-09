@@ -675,7 +675,7 @@ function sub_active() {
         fi
 
         # Add the domain itself to the list if it resolves
-        echo "$domain" | dnsx -retry 3 -silent -r "$resolvers_trusted" \
+        echo "$domain" | run_command dnsx -retry 3 -silent -r "$resolvers_trusted" \
             2>>"$LOGFILE" | anew -q .tmp/subdomains_tmp.txt
 
         # If INSCOPE is true, check inscope
@@ -729,7 +729,7 @@ function sub_tls() {
 
         if [[ $DEEP == true ]]; then
             if [[ $AXIOM != true ]]; then
-                cat subdomains/subdomains.txt | tlsx -san -cn -silent -ro -c "$TLSX_THREADS" \
+                cat subdomains/subdomains.txt | run_command tlsx -san -cn -silent -ro -c "$TLSX_THREADS" \
                     -p "$TLS_PORTS" -o .tmp/subdomains_tlsx.txt 2>>"$LOGFILE" >/dev/null
             else
                 run_command axiom-scan subdomains/subdomains.txt -m tlsx \
@@ -738,7 +738,7 @@ function sub_tls() {
             fi
         else
             if [[ $AXIOM != true ]]; then
-                cat subdomains/subdomains.txt | tlsx -san -cn -silent -ro -c "$TLSX_THREADS" >.tmp/subdomains_tlsx.txt 2>>"$LOGFILE"
+                cat subdomains/subdomains.txt | run_command tlsx -san -cn -silent -ro -c "$TLSX_THREADS" >.tmp/subdomains_tlsx.txt 2>>"$LOGFILE"
             else
                 run_command axiom-scan subdomains/subdomains.txt -m tlsx \
                     -san -cn -silent -ro -c "$TLSX_THREADS" \
@@ -797,7 +797,7 @@ function sub_noerror() {
 
         # Check for DNSSEC black lies
         random_subdomain="${RANDOM}thistotallynotexist${RANDOM}.$domain"
-        dns_response=$(echo "$random_subdomain" | dnsx -r "$resolvers" -rcode noerror,nxdomain -retry 3 -silent 2>>"$LOGFILE" | cut -d' ' -f2)
+        dns_response=$(echo "$random_subdomain" | run_command dnsx -r "$resolvers" -rcode noerror,nxdomain -retry 3 -silent 2>>"$LOGFILE" | cut -d' ' -f2)
 
         if [[ $dns_response == "[NXDOMAIN]" ]]; then
 
@@ -1017,7 +1017,7 @@ function sub_ptr_cidrs() {
         # Expand CIDRs to IPs with safety limit
         local max_ips="${PTR_SWEEP_MAX_IPS:-50000}"
         : >.tmp/ptr_ips_expanded.txt
-        mapcidr -silent <hosts/asn_cidrs.txt 2>>"$LOGFILE" \
+        run_command mapcidr -silent <hosts/asn_cidrs.txt 2>>"$LOGFILE" \
             | head -n "$max_ips" >.tmp/ptr_ips_expanded.txt || true
 
         local expanded_count
@@ -1177,7 +1177,7 @@ function sub_scraping() {
             subdomains_count=$(wc -l <"$dir/subdomains/subdomains.txt")
             if [[ $subdomains_count -le $DEEP_LIMIT ]] || [[ $DEEP == true ]]; then
 
-                urlfinder -d $domain -all -o .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
+                run_command urlfinder -d $domain -all -o .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
 
                 if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
                     cat .tmp/url_extract_tmp.txt | grep -a "$domain" \
@@ -1187,7 +1187,7 @@ function sub_scraping() {
 
                 if command -v waymore &>/dev/null; then
                     print_notice RUN "sub_scraping" "collecting passive URLs"
-                    if ! "$TIMEOUT_CMD" "${WAYMORE_TIMEOUT:-30m}" waymore -i "$domain" -mode U -oU .tmp/waymore_urls_subs.txt 2>>"$LOGFILE" >/dev/null; then
+                    if ! run_command "$TIMEOUT_CMD" "${WAYMORE_TIMEOUT:-30m}" waymore -i "$domain" -mode U -oU .tmp/waymore_urls_subs.txt 2>>"$LOGFILE" >/dev/null; then
                         log_note "sub_scraping: waymore failed or timed out; continuing" "${FUNCNAME[0]}" "${LINENO}"
                     fi
                     if [[ -s ".tmp/waymore_urls_subs.txt" ]]; then
@@ -1797,7 +1797,7 @@ function sub_recursive_passive() {
 
         # Passive recursive
         if [[ -s "subdomains/subdomains.txt" ]]; then
-            dsieve -if subdomains/subdomains.txt -f 3 -top "$DEEP_RECURSIVE_PASSIVE" >.tmp/subdomains_recurs_top.txt
+            run_command dsieve -if subdomains/subdomains.txt -f 3 -top "$DEEP_RECURSIVE_PASSIVE" >.tmp/subdomains_recurs_top.txt
         fi
 
         if [[ $AXIOM != true ]]; then
@@ -1889,7 +1889,7 @@ function sub_recursive_brute() {
         if [[ $subdomain_count -le $DEEP_LIMIT ]]; then
             # Generate top subdomains if not already done
             if [[ ! -s ".tmp/subdomains_recurs_top.txt" ]]; then
-                dsieve -if subdomains/subdomains.txt -f 3 -top "$DEEP_RECURSIVE_PASSIVE" >.tmp/subdomains_recurs_top.txt
+                run_command dsieve -if subdomains/subdomains.txt -f 3 -top "$DEEP_RECURSIVE_PASSIVE" >.tmp/subdomains_recurs_top.txt
             fi
 
             for subdomain_top in $(cat .tmp/subdomains_recurs_top.txt); do

@@ -29,6 +29,89 @@ teardown() {
   [[ -d "$TEST_DIR" ]] && rm -rf "$TEST_DIR"
 }
 
+@test "lfi generates one-parameter candidates and uses explicit budgets" {
+  mkdir -p gf .tmp vulns
+  printf '%s\n' 'https://target.example.com/download?file=1&q=test' > gf/lfi.txt
+  printf '%s\n' '/etc/passwd' > "$TEST_DIR/lfi_wordlist.txt"
+
+  cat > "$MOCK_BIN/anew" <<'SH'
+#!/usr/bin/env bash
+quiet=false
+if [[ "${1:-}" == "-q" ]]; then
+  quiet=true
+  shift
+fi
+outfile="$1"
+mkdir -p "$(dirname "$outfile")"
+touch "$outfile"
+while IFS= read -r line; do
+  [[ -z "$line" ]] && continue
+  if ! grep -Fxq -- "$line" "$outfile"; then
+    printf '%s\n' "$line" >> "$outfile"
+    if [[ "$quiet" != true ]]; then
+      printf '%s\n' "$line"
+    fi
+  fi
+done
+SH
+  chmod +x "$MOCK_BIN/anew"
+
+  cat > "$MOCK_BIN/interlace" <<'SH'
+#!/usr/bin/env bash
+raw_args="$*"
+input=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -tL)
+      input="$2"
+      shift 2
+      ;;
+    -c)
+      printf '%s\n' "$2" > "$TEST_DIR/lfi_ffuf_cmd.txt"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+printf '%s\n' "$0 $raw_args" > "$TEST_DIR/lfi_interlace_args.txt"
+if [[ -n "$input" ]]; then
+  head -n 1 "$input" | sed 's/^/| URL | /'
+fi
+SH
+  chmod +x "$MOCK_BIN/interlace"
+
+  export LFI=true
+  export DEEP=false
+  export DEEP_LIMIT=500
+  export lfi_wordlist="$TEST_DIR/lfi_wordlist.txt"
+  export HEADER="User-Agent: bats"
+  export LFI_INTERLACE_THREADS=3
+  export LFI_INTERLACE_TIMEOUT=44
+  export LFI_FFUF_THREADS=9
+  export LFI_FFUF_RATELIMIT=77
+  export LFI_FFUF_TIMEOUT=7
+  export LFI_FFUF_MAXTIME=33
+  export LFI_FOLLOW_REDIRECTS=false
+  export LFI_MAX_URLS=2
+
+  run lfi
+  [ "$status" -eq 0 ]
+  [ -s ".tmp/tmp_lfi.txt" ]
+  [ "$(wc -l < ".tmp/tmp_lfi.txt" | tr -d ' ')" -eq 2 ]
+  grep -qx 'https://target.example.com/download?file=FUZZ&q=test' ".tmp/tmp_lfi.txt"
+  grep -qx 'https://target.example.com/download?file=1&q=FUZZ' ".tmp/tmp_lfi.txt"
+  grep -q -- '-threads 3' "$TEST_DIR/lfi_interlace_args.txt"
+  grep -q -- '-timeout 44' "$TEST_DIR/lfi_interlace_args.txt"
+  grep -q -- '-noninteractive' "$TEST_DIR/lfi_ffuf_cmd.txt"
+  grep -q -- '-timeout 7' "$TEST_DIR/lfi_ffuf_cmd.txt"
+  grep -q -- '-maxtime 33' "$TEST_DIR/lfi_ffuf_cmd.txt"
+  grep -q -- '-rate 77' "$TEST_DIR/lfi_ffuf_cmd.txt"
+  ! grep -q -- ' -r ' "$TEST_DIR/lfi_ffuf_cmd.txt"
+  [ -s "vulns/lfi.txt" ]
+}
+
 @test "ssti uses TInjA engine and writes compatible output" {
   mkdir -p gf .tmp vulns
   printf 'https://target.example.com/?q=test\n' > gf/ssti.txt
@@ -135,20 +218,50 @@ SH
   grep -q "GitLab" "webs/favirecon.txt"
 }
 
-@test "apileaks integrates postleaksNg output" {
+@test "apileaks merges scoped leak URLs into url_extract" {
   mkdir -p osint
   export tools="$TEST_DIR/tools"
   mkdir -p "$tools/SwaggerSpy/venv/bin" "$tools/SwaggerSpy"
+  export outOfScope_file="$TEST_DIR/out_of_scope.txt"
+  printf '%s\n' 'swagger.target.example.com' > "$outOfScope_file"
+
+  cat > "$MOCK_BIN/anew" <<'SH'
+#!/usr/bin/env bash
+quiet=false
+if [[ "${1:-}" == "-q" ]]; then
+  quiet=true
+  shift
+fi
+outfile="$1"
+mkdir -p "$(dirname "$outfile")"
+touch "$outfile"
+while IFS= read -r line; do
+  [[ -z "$line" ]] && continue
+  if ! grep -Fxq -- "$line" "$outfile"; then
+    printf '%s\n' "$line" >> "$outfile"
+    if [[ "$quiet" != true ]]; then
+      printf '%s\n' "$line"
+    fi
+  fi
+done
+SH
+  chmod +x "$MOCK_BIN/anew"
+
+  cat > "$MOCK_BIN/urless" <<'SH'
+#!/usr/bin/env bash
+cat
+SH
+  chmod +x "$MOCK_BIN/urless"
 
   cat > "$MOCK_BIN/porch-pirate" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' 'https://postman.initial.example.com/api'
+printf '%s\n' 'https://api.target.example.com/v1/users?first=1'
 SH
   chmod +x "$MOCK_BIN/porch-pirate"
 
   cat > "$tools/SwaggerSpy/venv/bin/python3" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' 'URL https://swagger.example.com/openapi.json'
+printf '%s\n' 'URL https://swagger.target.example.com/openapi.json'
 SH
   chmod +x "$tools/SwaggerSpy/venv/bin/python3"
   printf '%s\n' 'print("mock")' > "$tools/SwaggerSpy/swaggerspy.py"
@@ -168,7 +281,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 mkdir -p "$out"
-printf '%s\n' '{"url":"https://postman.new.example.com/path"}' > "$out/postleaks.json"
+printf '%s\n' '{"url":"https://postman.target.example.com/path?token=1"}' > "$out/postleaks.json"
+printf '%s\n' '{"url":"https://outside.example.net/path?next=target.example.com"}' > "$out/postleaks-outside.json"
 SH
   chmod +x "$MOCK_BIN/postleaksNg"
 
@@ -186,7 +300,124 @@ SH
   run apileaks
   [ "$status" -eq 0 ]
   [ -s "osint/postman_leaks.txt" ]
-  grep -q "postman.new.example.com" "osint/postman_leaks.txt"
+  grep -q "postman.target.example.com" "osint/postman_leaks.txt"
+  [ -s "webs/url_extract.txt" ]
+  grep -q '^https://api.target.example.com/v1/users?first=1$' "webs/url_extract.txt"
+  grep -q '^https://postman.target.example.com/path?token=1$' "webs/url_extract.txt"
+  ! grep -q 'outside.example.net' "webs/url_extract.txt"
+  ! grep -q 'swagger.target.example.com' "webs/url_extract.txt"
+}
+
+@test "jschecks merges only scoped JS-discovered URLs into url_extract" {
+  mkdir -p js webs .tmp subdomains
+  printf '%s\n' 'https://target.example.com/app.js' > .tmp/url_extract_js.txt
+  printf '%s\n' 'target.example.com' > subdomains/subdomains.txt
+  export outOfScope_file="$TEST_DIR/out_of_scope_js.txt"
+  printf '%s\n' 'graphql.target.example.com' > "$outOfScope_file"
+
+  cat > "$MOCK_BIN/anew" <<'SH'
+#!/usr/bin/env bash
+quiet=false
+if [[ "${1:-}" == "-q" ]]; then
+  quiet=true
+  shift
+fi
+outfile="$1"
+mkdir -p "$(dirname "$outfile")"
+touch "$outfile"
+while IFS= read -r line; do
+  [[ -z "$line" ]] && continue
+  if ! grep -Fxq -- "$line" "$outfile"; then
+    printf '%s\n' "$line" >> "$outfile"
+    if [[ "$quiet" != true ]]; then
+      printf '%s\n' "$line"
+    fi
+  fi
+done
+SH
+  chmod +x "$MOCK_BIN/anew"
+
+  cat > "$MOCK_BIN/urless" <<'SH'
+#!/usr/bin/env bash
+cat
+SH
+  chmod +x "$MOCK_BIN/urless"
+
+  cat > "$MOCK_BIN/subjs" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' 'https://api.target.example.com/v1/users?id=1'
+printf '%s\n' 'https://outside.example.net/relay?next=target.example.com'
+printf '%s\n' 'https://target.example.com/logo.png'
+printf '%s\n' 'https://target.example.com/app2.js'
+SH
+  chmod +x "$MOCK_BIN/subjs"
+
+  cat > "$MOCK_BIN/httpx" <<'SH'
+#!/usr/bin/env bash
+while IFS= read -r url; do
+  [[ -z "$url" ]] && continue
+  printf '%s [200] [text/javascript]\n' "$url"
+done
+SH
+  chmod +x "$MOCK_BIN/httpx"
+
+  cat > "$MOCK_BIN/interlace" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  chmod +x "$MOCK_BIN/interlace"
+
+  cat > "$MOCK_BIN/xnLinkFinder" <<'SH'
+#!/usr/bin/env bash
+outfile=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o)
+      outfile="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+printf '%s\n' 'https://graphql.target.example.com/query' > "$outfile"
+printf '%s\n' 'https://evil.example.org/path?host=target.example.com' >> "$outfile"
+SH
+  chmod +x "$MOCK_BIN/xnLinkFinder"
+
+  cat > "$MOCK_BIN/jsluice" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  chmod +x "$MOCK_BIN/jsluice"
+
+  cat > "$MOCK_BIN/mantra" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  chmod +x "$MOCK_BIN/mantra"
+
+  cat > "$MOCK_BIN/trufflehog" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  chmod +x "$MOCK_BIN/trufflehog"
+
+  export JSCHECKS=true
+  export AXIOM=false
+  export HTTPX_TIMEOUT=5
+  export HTTPX_THREADS=5
+  export HTTPX_RATELIMIT=0
+  export INTERLACE_THREADS=2
+  export XNLINKFINDER_DEPTH=1
+
+  run jschecks
+  [ "$status" -eq 0 ]
+  [ -s "webs/url_extract.txt" ]
+  grep -q '^https://api.target.example.com/v1/users?id=1$' "webs/url_extract.txt"
+  ! grep -q 'outside.example.net' "webs/url_extract.txt"
+  ! grep -q 'graphql.target.example.com' "webs/url_extract.txt"
 }
 
 @test "s3buckets uses cloud_enum and writes cloud_enum artifacts" {
@@ -1077,87 +1308,26 @@ SH
   grep -q "openai-compatible" "webs/llm_probe.txt"
 }
 
-@test "param_discovery uses axiom arjun when AXIOM=true" {
+@test "param_discovery skips in non-deep mode" {
   mkdir -p webs .tmp
   printf '%s\n' 'https://target.example.com/path' > webs/url_extract_nodupes.txt
-
-  cat > "$MOCK_BIN/axiom-scan" <<'SH'
-#!/usr/bin/env bash
-outfile=""
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    -o)
-      outfile="$2"
-      shift 2
-      ;;
-    *)
-      shift
-      ;;
-  esac
-done
-printf '%s\n' 'https://target.example.com/path?a=1&b=2' > "$outfile"
-printf '%s\n' ' Scanning 0/1: https://target.example.com/path'
-printf '%s\n' ' Parameters found: a, b'
-exit 0
-SH
-  chmod +x "$MOCK_BIN/axiom-scan"
-
-  export AXIOM=true
-  export AXIOM_EXTRA_ARGS=""
-  export PARAM_DISCOVERY=true
-  export ARJUN_THREADS=5
-
-  run param_discovery
-  [ "$status" -eq 0 ]
-  [ -s "webs/params_discovered.txt" ]
-  grep -q "URL: https://target.example.com/path?a=1&b=2" "webs/params_discovered.txt"
-  grep -q "PARAM: a" "webs/params_discovered.txt"
-  grep -q "PARAM: b" "webs/params_discovered.txt"
-}
-
-@test "param_discovery falls back to local arjun when axiom arjun fails" {
-  mkdir -p webs .tmp
-  printf '%s\n' 'https://target.example.com/path' > webs/url_extract_nodupes.txt
-
-  cat > "$MOCK_BIN/axiom-scan" <<'SH'
-#!/usr/bin/env bash
-exit 1
-SH
-  chmod +x "$MOCK_BIN/axiom-scan"
 
   cat > "$MOCK_BIN/arjun" <<'SH'
 #!/usr/bin/env bash
-outfile=""
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    -oT)
-      outfile="$2"
-      shift 2
-      ;;
-    *)
-      shift
-      ;;
-  esac
-done
-printf '%s\n' 'https://target.example.com/path?x=1' > "$outfile"
 exit 0
 SH
   chmod +x "$MOCK_BIN/arjun"
 
-  export AXIOM=true
-  export AXIOM_EXTRA_ARGS=""
+  export DEEP=false
   export PARAM_DISCOVERY=true
   export ARJUN_THREADS=5
 
   run param_discovery
   [ "$status" -eq 0 ]
-  [[ "$output" == *"falling back to local arjun"* ]]
-  [ -s "webs/params_discovered.txt" ]
-  grep -q "URL: https://target.example.com/path?x=1" "webs/params_discovered.txt"
-  grep -q "PARAM: x" "webs/params_discovered.txt"
+  [[ "$output" == *"SKIP"* ]]
 }
 
-@test "param_discovery local mode uses arjun text output" {
+@test "param_discovery runs in deep mode with arjun text output" {
   mkdir -p webs .tmp
   printf '%s\n' 'https://target.example.com/path' > webs/url_extract_nodupes.txt
 
@@ -1180,6 +1350,7 @@ exit 0
 SH
   chmod +x "$MOCK_BIN/arjun"
 
+  export DEEP=true
   export AXIOM=false
   export PARAM_DISCOVERY=true
   export ARJUN_THREADS=5
@@ -1190,6 +1361,50 @@ SH
   grep -q "URL: http://testaspnet.vulnweb.com/login.aspx?__VIEWSTATE=3698&token=abc" "webs/params_discovered.txt"
   grep -q "PARAM: __VIEWSTATE" "webs/params_discovered.txt"
   grep -q "PARAM: token" "webs/params_discovered.txt"
+}
+
+@test "well_known_pivots probes newly discovered subdomains into webs.txt" {
+  mkdir -p webs .tmp subdomains
+  printf '%s\n' 'https://target.example.com' > webs/webs_all.txt
+
+  _resolve_domains() {
+    cat "$1" > "$2"
+  }
+
+  cat > "$MOCK_BIN/curl" <<'SH'
+#!/usr/bin/env bash
+url="${@: -1}"
+case "$url" in
+  *"/.well-known/security.txt"|*"/security.txt")
+    printf '%s\n' 'Contact: security@auth.target.example.com'
+    ;;
+  *)
+    printf '%s\n' ''
+    ;;
+esac
+SH
+  chmod +x "$MOCK_BIN/curl"
+
+  cat > "$MOCK_BIN/httpx" <<'SH'
+#!/usr/bin/env bash
+while IFS= read -r host; do
+  [[ -z "$host" ]] && continue
+  printf '%s [200]\n' "https://${host}"
+done
+SH
+  chmod +x "$MOCK_BIN/httpx"
+
+  export WELLKNOWN_PIVOTS=true
+  export HTTPX_THREADS=5
+  export HTTPX_RATELIMIT=0
+  export HTTPX_TIMEOUT=5
+
+  run well_known_pivots
+  [ "$status" -eq 0 ]
+  [ -s "subdomains/subdomains.txt" ]
+  [ -s "webs/webs.txt" ]
+  grep -q '^auth.target.example.com$' "subdomains/subdomains.txt"
+  grep -q '^https://auth.target.example.com$' "webs/webs.txt"
 }
 
 @test "wordlist_gen_roboxtractor skips in non-DEEP mode with explicit mode reason" {
@@ -1251,4 +1466,184 @@ SH
   [ "$status" -eq 0 ]
   [ -s "webs/robots_wordlist.txt" ]
   grep -q "https://target.example.com/robots-path" "webs/robots_wordlist.txt"
+}
+
+# ── swagger_check (sj) tests ──────────────────────────────────────────
+
+@test "swagger_check discovers swagger via sj brute and writes swagger_urls.txt" {
+  mkdir -p webs .tmp
+
+  printf '%s\n' 'https://target.example.com' > webs/webs_all.txt
+
+  cat > "$MOCK_BIN/sj" <<'SH'
+#!/usr/bin/env bash
+if [[ "$1" == "brute" ]]; then
+  printf '%s\n' 'Definition file found: https://target.example.com/swagger.json'
+fi
+SH
+  chmod +x "$MOCK_BIN/sj"
+
+  cat > "$MOCK_BIN/interlace" <<'SH'
+#!/usr/bin/env bash
+targets="" cmd="" outdir=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -tL) targets="$2"; shift 2 ;;
+    -c)  cmd="$2"; shift 2 ;;
+    -o)  outdir="$2"; shift 2 ;;
+    *)   shift ;;
+  esac
+done
+mkdir -p "$outdir"
+while IFS= read -r target; do
+  clean=$(echo "$target" | sed 's|[^a-zA-Z0-9._-]|_|g')
+  real_cmd=$(echo "$cmd" | sed "s|_target_|$target|g" | sed "s|_output_|$outdir|g" | sed "s|_cleantarget_|$clean|g")
+  eval "$real_cmd"
+done < "$targets"
+SH
+  chmod +x "$MOCK_BIN/interlace"
+
+  cat > "$MOCK_BIN/anew" <<'SH'
+#!/usr/bin/env bash
+if [[ "$1" == "-q" ]]; then
+  target="$2"
+else
+  target="$1"
+fi
+while IFS= read -r line; do
+  if [[ -n "$target" ]]; then
+    printf '%s\n' "$line" >> "$target"
+  else
+    printf '%s\n' "$line"
+  fi
+done
+SH
+  chmod +x "$MOCK_BIN/anew"
+
+  export SJ_CHECK=true
+  export SJ_BRUTE=true
+  export SJ_AUTOMATE=false
+  export SJ_TIMEOUT=10
+  export SJ_MAX_TARGETS=100
+  export INTERLACE_THREADS=1
+  export NUCLEI_SEVERITY="info"
+  export DIFF=false
+
+  run swagger_check
+  [ "$status" -eq 0 ]
+  [ -s "webs/swagger_urls.txt" ]
+  grep -q "target.example.com/swagger.json" "webs/swagger_urls.txt"
+}
+
+@test "swagger_check aggregates nuclei swagger-api findings" {
+  mkdir -p webs .tmp nuclei_output
+
+  cat > "$MOCK_BIN/sj" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  chmod +x "$MOCK_BIN/sj"
+
+  cat > "$MOCK_BIN/anew" <<'SH'
+#!/usr/bin/env bash
+if [[ "$1" == "-q" ]]; then
+  target="$2"
+else
+  target="$1"
+fi
+while IFS= read -r line; do
+  if [[ -n "$target" ]]; then
+    printf '%s\n' "$line" >> "$target"
+  else
+    printf '%s\n' "$line"
+  fi
+done
+SH
+  chmod +x "$MOCK_BIN/anew"
+
+  # Nuclei output with swagger-api finding
+  printf '%s\n' '{"template-id":"swagger-api","matched-at":"https://target.example.com/v2/swagger.json","info":{"severity":"info"}}' \
+    > nuclei_output/info_json.txt
+
+  export SJ_CHECK=true
+  export SJ_BRUTE=false
+  export SJ_AUTOMATE=false
+  export SJ_TIMEOUT=10
+  export NUCLEI_SEVERITY="info"
+  export DIFF=false
+
+  run swagger_check
+  [ "$status" -eq 0 ]
+  [ -s "webs/swagger_urls.txt" ]
+  grep -q "target.example.com/v2/swagger.json" "webs/swagger_urls.txt"
+}
+
+@test "swagger_check runs sj automate and extracts accessible endpoints" {
+  mkdir -p webs .tmp vulns/swagger/automate
+
+  printf '%s\n' 'https://target.example.com/swagger.json' > .tmp/swagger_urls_all.txt
+  printf '%s\n' 'https://target.example.com/swagger.json' > webs/swagger_urls.txt
+
+  cat > "$MOCK_BIN/sj" <<'SH'
+#!/usr/bin/env bash
+if [[ "$1" == "endpoints" ]]; then
+  printf '%s\n' '/api/v1/users' '/api/v1/pets'
+elif [[ "$1" == "automate" ]]; then
+  outfile=""
+  for arg in "$@"; do
+    case "$prev" in
+      -o) outfile="$arg" ;;
+    esac
+    prev="$arg"
+  done
+  if [[ -n "$outfile" ]]; then
+    printf '%s\n' '{"method":"GET","status":200,"target":"/api/v1/users"}' > "$outfile"
+    printf '%s\n' '{"method":"POST","status":401,"target":"/api/v1/pets"}' >> "$outfile"
+  fi
+fi
+SH
+  chmod +x "$MOCK_BIN/sj"
+
+  cat > "$MOCK_BIN/anew" <<'SH'
+#!/usr/bin/env bash
+if [[ "$1" == "-q" ]]; then
+  target="$2"
+else
+  target="$1"
+fi
+while IFS= read -r line; do
+  if [[ -n "$target" ]]; then
+    printf '%s\n' "$line" >> "$target"
+  else
+    printf '%s\n' "$line"
+  fi
+done
+SH
+  chmod +x "$MOCK_BIN/anew"
+
+  export SJ_CHECK=true
+  export SJ_BRUTE=false
+  export SJ_AUTOMATE=true
+  export SJ_TIMEOUT=10
+  export NUCLEI_SEVERITY="info"
+  export DIFF=false
+
+  run swagger_check
+  [ "$status" -eq 0 ]
+  [ -s "vulns/swagger/endpoints_all.txt" ]
+  grep -q "/api/v1/users" "vulns/swagger/endpoints_all.txt"
+  [ -s "vulns/swagger/accessible_endpoints.txt" ]
+  grep -q "GET /api/v1/users" "vulns/swagger/accessible_endpoints.txt"
+  # 401 endpoint should NOT be in accessible list
+  ! grep -q "/api/v1/pets" "vulns/swagger/accessible_endpoints.txt"
+}
+
+@test "swagger_check skips when SJ_CHECK=false" {
+  mkdir -p webs .tmp
+
+  export SJ_CHECK=false
+
+  run swagger_check
+  [ "$status" -eq 0 ]
+  [ ! -f "webs/swagger_urls.txt" ]
 }

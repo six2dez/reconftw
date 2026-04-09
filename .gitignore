@@ -12,6 +12,7 @@ test/
 *.tar.*
 *.zip
 .DS_Store
+install.log
 reconftw.cfg-personal
 secrets.cfg
 .env.cache/

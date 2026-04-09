@@ -120,7 +120,7 @@ function github_repos() {
             return 0
         fi
 
-        local secrets_engine="${SECRETS_ENGINE:-gitleaks}"
+        local secrets_engine="${SECRETS_ENGINE:-titus}"
         local titus_bin=""
         if command -v titus >/dev/null 2>&1; then
             titus_bin="$(command -v titus)"
@@ -131,50 +131,31 @@ function github_repos() {
         fi
 
         case "$secrets_engine" in
-            gitleaks|hybrid)
-                if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "gitleaks detect --source .tmp/github_repos/_target_ --no-banner --no-color -r .tmp/github/gh_secret_cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
-                    _print_error "interlace gitleaks command failed"
-                    end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}" FAIL
+            noseyparker)
+                if ! command -v noseyparker >/dev/null 2>&1; then
+                    _print_msg WARN "noseyparker not found; skipping secrets scan"
+                    end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}" WARN
+                    return 0
+                fi
+                local np_scan_opts=""
+                [[ "${SECRETS_SCAN_GIT_HISTORY:-false}" == "true" ]] && np_scan_opts="--git-history"
+                if ! run_command interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "noseyparker scan ${np_scan_opts} --datastore .tmp/github/np_ds__cleantarget_ .tmp/github_repos/_target_ >/dev/null 2>>${LOGFILE}; noseyparker report --datastore .tmp/github/np_ds__cleantarget_ --format json > .tmp/github/nosey__cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
+                    _print_error "interlace noseyparker command failed"
                     return 1
                 fi
                 ;;
-            titus)
+            titus|*)
+                [[ "$secrets_engine" != "titus" ]] && _print_msg WARN "Unknown SECRETS_ENGINE='${secrets_engine}', using titus"
                 if [[ -z "$titus_bin" ]]; then
-                    _print_msg WARN "titus requested but not found; falling back to gitleaks"
-                    if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "gitleaks detect --source .tmp/github_repos/_target_ --no-banner --no-color -r .tmp/github/gh_secret_cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
-                        _print_error "interlace gitleaks fallback failed"
-                        return 1
-                    fi
-                else
-                    local titus_opts=""
-                    [[ "${SECRETS_SCAN_GIT_HISTORY:-false}" == "true" ]] && titus_opts="${titus_opts} --git"
-                    [[ "${SECRETS_VALIDATE:-false}" == "true" ]] && titus_opts="${titus_opts} --validate"
-                    if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "\"${titus_bin}\" scan --format json ${titus_opts} .tmp/github_repos/_target_ > .tmp/github/titus__cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
-                        _print_error "interlace titus command failed"
-                        return 1
-                    fi
+                    _print_msg WARN "titus not found; skipping secrets scan"
+                    end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}" WARN
+                    return 0
                 fi
-                ;;
-            noseyparker)
-                if ! command -v noseyparker >/dev/null 2>&1; then
-                    _print_msg WARN "noseyparker requested but not found; falling back to gitleaks"
-                    if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "gitleaks detect --source .tmp/github_repos/_target_ --no-banner --no-color -r .tmp/github/gh_secret_cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
-                        _print_error "interlace gitleaks fallback failed"
-                        return 1
-                    fi
-                else
-                    local np_scan_opts=""
-                    [[ "${SECRETS_SCAN_GIT_HISTORY:-false}" == "true" ]] && np_scan_opts="--git-history"
-                    if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "noseyparker scan ${np_scan_opts} --datastore .tmp/github/np_ds__cleantarget_ .tmp/github_repos/_target_ >/dev/null 2>>${LOGFILE}; noseyparker report --datastore .tmp/github/np_ds__cleantarget_ --format json > .tmp/github/nosey__cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
-                        _print_error "interlace noseyparker command failed"
-                        return 1
-                    fi
-                fi
-                ;;
-            *)
-                _print_msg WARN "Unknown SECRETS_ENGINE='${secrets_engine}', using gitleaks"
-                if ! interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "gitleaks detect --source .tmp/github_repos/_target_ --no-banner --no-color -r .tmp/github/gh_secret_cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
-                    _print_error "interlace gitleaks fallback failed"
+                local titus_opts=""
+                [[ "${SECRETS_SCAN_GIT_HISTORY:-false}" == "true" ]] && titus_opts="${titus_opts} --git"
+                [[ "${SECRETS_VALIDATE:-false}" == "true" ]] && titus_opts="${titus_opts} --validate"
+                if ! run_command interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "\"${titus_bin}\" scan --format json ${titus_opts} .tmp/github_repos/_target_ > .tmp/github/titus__cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
+                    _print_error "interlace titus command failed"
                     return 1
                 fi
                 ;;
@@ -182,7 +163,7 @@ function github_repos() {
 
         # Keep trufflehog enrichment (all engines).
         if [[ -s ".tmp/company_repos_url.txt" ]]; then
-            if ! interlace -tL .tmp/company_repos_url.txt -threads "$INTERLACE_THREADS" -c "trufflehog git _target_ -j 2>&1 | jq -c > _output_/_cleantarget_" -o .tmp/github/ 2>>"$LOGFILE" >/dev/null; then
+            if ! run_command interlace -tL .tmp/company_repos_url.txt -threads "$INTERLACE_THREADS" -c "trufflehog git _target_ -j 2>&1 | jq -c > _output_/_cleantarget_" -o .tmp/github/ 2>>"$LOGFILE" >/dev/null; then
                 _print_error "interlace trufflehog command failed"
                 return 1
             fi
@@ -311,37 +292,61 @@ function github_actions_audit() {
 }
 
 function metadata() {
-    ensure_dirs osint
+    ensure_dirs osint .tmp
 
     # Check if the function should run
     if { [[ ! -f "${called_fn_dir}/.${FUNCNAME[0]}" ]] || [[ ${DIFF} == true ]]; } && [[ ${METADATA} == true ]] && [[ ${OSINT} == true ]] && ! [[ ${domain} =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         start_func "${FUNCNAME[0]}" "Scanning metadata in public files"
 
-        ensure_dirs ".tmp/metagoofil_${domain}"
-        (
-            cd "${tools}/metagoofil" || exit 1
-            if ! run_command "${tools}/metagoofil/venv/bin/python3" "${tools}/metagoofil/metagoofil.py" -d "${domain}" -t pdf,docx,xlsx -l 10 -w -o "${dir}/.tmp/metagoofil_${domain}/" 2>>"${LOGFILE}" >/dev/null; then
-                log_note "metadata: metagoofil failed; skipping metadata extraction" "${FUNCNAME[0]}" "${LINENO}"
+        if command -v exifray &>/dev/null; then
+            if ! run_command exifray -d "${domain}" --show-urls \
+                --timeout "${EXIFRAY_TIMEOUT:-30}" \
+                --max-retries "${EXIFRAY_RETRIES:-2}" \
+                -o "${dir}/osint/metadata.json" 2>>"${LOGFILE}"; then
+                log_note "metadata: exifray failed" "${FUNCNAME[0]}" "${LINENO}"
             fi
-        )
 
-        # Check if exiftool is installed before running
-        if command -v exiftool &>/dev/null; then
-            if find ".tmp/metagoofil_${domain}" -type f -print -quit 2>/dev/null | grep -q .; then
-                run_command exiftool -r ".tmp/metagoofil_${domain}" 2>>"${LOGFILE}" \
-                    | tee /dev/null \
-                    | egrep -i "Author|Creator|Email|Producer|Template" \
+            # Extract human-readable summary from JSON output
+            if [[ -s "${dir}/osint/metadata.json" ]]; then
+                jq -r '.findings[] | "\(.category): \(.details.Value) (\(.file))"' \
+                    "${dir}/osint/metadata.json" 2>/dev/null \
                     | sort -u \
                     | anew -q "osint/metadata_results.txt" || true
-            else
-                log_note "metadata: no files downloaded by metagoofil; skipping exif extraction" "${FUNCNAME[0]}" "${LINENO}"
+            fi
+
+            # Complement with urlfinder-discovered URLs
+            if [[ ${METADATA_URLFINDER:-true} == true ]] && command -v urlfinder &>/dev/null; then
+                run_command urlfinder -d "${domain}" -all \
+                    -o .tmp/metadata_urlfinder_raw.txt 2>>"${LOGFILE}" >/dev/null || true
+
+                if [[ -s ".tmp/metadata_urlfinder_raw.txt" ]]; then
+                    # Filter for metadata-relevant extensions only
+                    grep -aiE '\.(pdf|docx?|xlsx?|pptx?|odt|ods|odp|jpe?g|png|gif|tiff?|svg|webp|mp3)([?#].*)?$' \
+                        .tmp/metadata_urlfinder_raw.txt \
+                        | sort -u > .tmp/metadata_urlfinder_urls.txt || true
+
+                    if [[ -s ".tmp/metadata_urlfinder_urls.txt" ]]; then
+                        run_command exifray --urls .tmp/metadata_urlfinder_urls.txt \
+                            --timeout "${EXIFRAY_TIMEOUT:-30}" \
+                            --max-retries "${EXIFRAY_RETRIES:-2}" \
+                            -o "${dir}/osint/metadata_urlfinder.json" 2>>"${LOGFILE}" || true
+
+                        # Merge findings into main results
+                        if [[ -s "${dir}/osint/metadata_urlfinder.json" ]]; then
+                            jq -r '.findings[] | "\(.category): \(.details.Value) (\(.file))"' \
+                                "${dir}/osint/metadata_urlfinder.json" 2>/dev/null \
+                                | sort -u \
+                                | anew -q "osint/metadata_results.txt" || true
+                        fi
+                    fi
+                fi
             fi
         else
-            _print_error "exiftool is not installed. Skipping metadata extraction"
-            printf "exiftool not installed - metadata extraction skipped\n" >>"${LOGFILE}"
+            _print_error "exifray is not installed. Skipping metadata extraction"
+            printf "exifray not installed - metadata extraction skipped\n" >>"${LOGFILE}"
         fi
 
-        end_func "Results are saved in ${domain}/osint/metadata_results.txt" "${FUNCNAME[0]}"
+        end_func "Results are saved in ${domain}/osint/metadata[.json|_results.txt]" "${FUNCNAME[0]}"
     else
         if [[ ${METADATA} == false ]] || [[ ${OSINT} == false ]]; then
             skip_notification "disabled"
@@ -427,18 +432,21 @@ function apileaks() {
             return
         fi
 
-            # Analyze leaks with trufflehog
-            if [[ -s "${dir}/osint/postman_leaks.txt" ]]; then
-                run_command trufflehog filesystem "${dir}/osint/postman_leaks.txt" -j 2>/dev/null | jq -c | anew -q "${dir}/osint/postman_leaks_trufflehog.json"
-            fi
-            if [[ -d "${dir}/osint/postman_leaks_postleaksng" ]]; then
-                run_command trufflehog filesystem "${dir}/osint/postman_leaks_postleaksng" -j 2>/dev/null | jq -c | anew -q "${dir}/osint/postman_leaks_trufflehog.json"
-            fi
-        
-            if [[ -s "${dir}/osint/swagger_leaks.txt" ]]; then
-                run_command trufflehog filesystem "${dir}/osint/swagger_leaks.txt" -j 2>/dev/null | jq -c | anew -q "${dir}/osint/swagger_leaks_trufflehog.json"
-            fi
-                end_func "Results are saved in $domain/osint/[postman_leaks_trufflehog.json, swagger_leaks_trufflehog.json]" "${FUNCNAME[0]}"
+        merge_scoped_urls_into_url_extract "${dir}/osint/postman_leaks.txt" "apileaks_postman"
+        merge_scoped_urls_into_url_extract "${dir}/osint/swagger_leaks.txt" "apileaks_swagger"
+
+        # Analyze leaks with trufflehog
+        if [[ -s "${dir}/osint/postman_leaks.txt" ]]; then
+            run_command trufflehog filesystem "${dir}/osint/postman_leaks.txt" -j 2>/dev/null | jq -c | anew -q "${dir}/osint/postman_leaks_trufflehog.json"
+        fi
+        if [[ -d "${dir}/osint/postman_leaks_postleaksng" ]]; then
+            run_command trufflehog filesystem "${dir}/osint/postman_leaks_postleaksng" -j 2>/dev/null | jq -c | anew -q "${dir}/osint/postman_leaks_trufflehog.json"
+        fi
+
+        if [[ -s "${dir}/osint/swagger_leaks.txt" ]]; then
+            run_command trufflehog filesystem "${dir}/osint/swagger_leaks.txt" -j 2>/dev/null | jq -c | anew -q "${dir}/osint/swagger_leaks_trufflehog.json"
+        fi
+        end_func "Results are saved in $domain/osint/[postman_leaks_trufflehog.json, swagger_leaks_trufflehog.json]" "${FUNCNAME[0]}"
     else
         if [[ $API_LEAKS == false ]] || [[ $OSINT == false ]]; then
             skip_notification "disabled"
