@@ -174,9 +174,16 @@ function check_version() {
         return 1
     fi
 
-    # Fetch updates with a timeout (supports gtimeout on macOS)
-    if ! { [[ -n $TIMEOUT_CMD ]] && $TIMEOUT_CMD 10 git fetch >/dev/null 2>&1; } && ! git fetch >/dev/null 2>&1; then
-        _print_error "Unable to check updates (git fetch timed out)"
+    # Fetch updates with a bounded timeout when available.
+    # Do not run an unbounded fallback fetch after a timeout, otherwise callers
+    # wrapped by `timeout` (tests/CI) can be killed before main logic runs.
+    if [[ -n $TIMEOUT_CMD ]]; then
+        if ! $TIMEOUT_CMD 10 git fetch >/dev/null 2>&1; then
+            _print_error "Unable to check updates (git fetch timed out)"
+            return 1
+        fi
+    elif ! git fetch >/dev/null 2>&1; then
+        _print_error "Unable to check updates"
         return 1
     fi
 

@@ -7,9 +7,23 @@ set -E
 set +e
 IFS=$'\n\t'
 
-# Detect if the script is being run in MacOS with Homebrew Bash
-if [[ $OSTYPE == "darwin"* && $BASH != "/opt/homebrew/bin/bash" ]]; then
-    exec /opt/homebrew/bin/bash "$0" "$@"
+# Detect if the script is being run in macOS and re-exec with modern Bash.
+# Supports both Apple Silicon (/opt/homebrew) and Intel (/usr/local) Homebrew prefixes.
+if [[ $OSTYPE == "darwin"* ]]; then
+    _mac_bash=""
+    for _candidate in /opt/homebrew/bin/bash /usr/local/bin/bash /bin/bash; do
+        if [[ -x "$_candidate" ]]; then
+            _major="$("$_candidate" -lc 'echo "${BASH_VERSINFO[0]}"' 2>/dev/null || echo 0)"
+            if [[ "$_major" =~ ^[0-9]+$ ]] && [[ "$_major" -ge 4 ]]; then
+                _mac_bash="$_candidate"
+                break
+            fi
+        fi
+    done
+    if [[ -n "$_mac_bash" ]] && [[ "$BASH" != "$_mac_bash" ]]; then
+        exec "$_mac_bash" "$0" "$@"
+    fi
+    unset _mac_bash _candidate _major
 fi
 
 # Load main configuration
@@ -321,7 +335,7 @@ declare -A gotools=(
 # Declare uv tool-managed Python tools and their GitHub paths
 declare -A pipxtools=(
     ["dnsvalidator"]="vortexau/dnsvalidator"
-    ["interlace"]="codingo/Interlace"
+    ["interlace"]="pry0cc/interlace"
     ["wafw00f"]="EnableSecurity/wafw00f"
     ["commix"]="commixproject/commix"
     ["waymore"]="xnl-h4ck3r/waymore"
@@ -467,8 +481,18 @@ function install_tools() {
              tool_args+=("--with" "jellyfish>=1.1.3")
         fi
 
-        # Always force install/reinstall from the selected source.
-        # This handles both initial installs and upgrades correctly.
+        # Special case for interlace: colorclass is abandoned and broken on Python 3.10+
+        # PR https://github.com/Robpol86/colorclass/pull/27 never merged
+        if [[ "$pipxtool" == "interlace" ]]; then
+            local cc_codes
+            cc_codes="$(dirname "$(uv tool run --from interlace python -c 'import colorclass; print(colorclass.__file__)')")/codes.py" 2>/dev/null
+            if [[ -f "$cc_codes" ]]; then
+                sed -i 's/from collections import Mapping/from collections.abc import Mapping/' "$cc_codes"
+            fi
+        fi
+
+        # Always force install/reinstall from the git URL
+        # This handles both initial install and upgrades correctly
         if q uv tool install "${tool_args[@]}" "$tool_url" --force; then
              ((++px_ok))
              msg_ok "[$pipx_step/$total_px] ${pipxtool} ready"

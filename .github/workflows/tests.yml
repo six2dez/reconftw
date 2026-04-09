@@ -61,6 +61,32 @@ jobs:
       - name: Run integration smoke tests
         run: ./tests/run_tests.sh --smoke
 
+  macos-smoke:
+    name: macos-smoke
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew update
+          brew install bash bats-core jq coreutils gnu-getopt gnu-sed
+
+      - name: Configure GNU toolchain PATH
+        run: |
+          BREW_PREFIX="$(brew --prefix)"
+          echo "$BREW_PREFIX/bin" >> "$GITHUB_PATH"
+          echo "$BREW_PREFIX/opt/coreutils/libexec/gnubin" >> "$GITHUB_PATH"
+          echo "$BREW_PREFIX/opt/gnu-getopt/bin" >> "$GITHUB_PATH"
+          echo "$BREW_PREFIX/opt/gnu-sed/libexec/gnubin" >> "$GITHUB_PATH"
+
+      - name: Run unit tests
+        run: ./tests/run_tests.sh --unit
+
+      - name: Run integration smoke tests
+        run: ./tests/run_tests.sh --smoke
+
   integration-full:
     name: integration-full
     runs-on: ubuntu-latest
