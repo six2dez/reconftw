@@ -1247,10 +1247,9 @@ function remove_big_files() {
 
 function notification() {
     if [[ -n $1 ]] && [[ -n $2 ]]; then
+        local -a notify_cmd=()
         if [[ $NOTIFICATION == true ]]; then
-            NOTIFY="notify -silent"
-        else
-            NOTIFY=""
+            notify_cmd=(notify -silent)
         fi
         local level="INFO"
         case $2 in
@@ -1283,8 +1282,8 @@ function notification() {
 
         if [[ "$should_print" != true ]]; then
             # Still send to notify if enabled, just skip terminal print
-            if [[ -n $NOTIFY ]]; then
-                printf "%s" "[${level}] ${1} - ${domain}" | $NOTIFY >/dev/null 2>&1
+            if [[ ${#notify_cmd[@]} -gt 0 ]]; then
+                printf "%s" "[${level}] ${1} - ${domain}" | "${notify_cmd[@]}" >/dev/null 2>&1
             fi
             return 0
         fi
@@ -1294,11 +1293,11 @@ function notification() {
         if [[ "$level" == "WARN" || "$level" == "FAIL" ]]; then
             record_incident "$level" "${FUNCNAME[1]:-notice}" "$1"
         fi
- 
+
         # Send to notify if notifications are enabled
-        if [[ -n $NOTIFY ]]; then
+        if [[ ${#notify_cmd[@]} -gt 0 ]]; then
             # Remove color codes for the notification
-            printf "%s" "[${level}] ${1} - ${domain}" | $NOTIFY >/dev/null 2>&1
+            printf "%s" "[${level}] ${1} - ${domain}" | "${notify_cmd[@]}" >/dev/null 2>&1
         fi
     fi
 }

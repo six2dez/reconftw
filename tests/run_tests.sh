@@ -48,6 +48,7 @@ run_smoke() {
         "$SCRIPT_DIR"/integration/test_smoke.bats \
         "$SCRIPT_DIR"/integration/test_report_only.bats \
         "$SCRIPT_DIR"/integration/test_export_cli.bats \
+        "$SCRIPT_DIR"/integration/test_notifications.bats \
         "$SCRIPT_DIR"/integration/test_monitor_mode.bats
 }
 

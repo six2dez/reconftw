@@ -39,8 +39,15 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./Docker
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: six2dez/reconftw:main
+
+      - name: Verify published manifest
+        run: |
+          docker buildx imagetools inspect six2dez/reconftw:main > /tmp/reconftw-manifest.txt
+          grep -q 'linux/amd64' /tmp/reconftw-manifest.txt
+          grep -q 'linux/arm64' /tmp/reconftw-manifest.txt
 
       - name: Verify image health
         run: |

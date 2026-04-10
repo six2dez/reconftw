@@ -426,6 +426,43 @@ clone_repo() {
     done
 }
 
+function interlace_tool_python() {
+    local tool_python
+    tool_python="$(uv tool dir 2>/dev/null)/interlace/bin/python"
+    [[ -x "$tool_python" ]] || return 1
+    printf '%s\n' "$tool_python"
+}
+
+function interlace_colorclass_codes_path() {
+    local tool_python
+    tool_python="$(interlace_tool_python)" || return 1
+    "$tool_python" -c 'import importlib.util, os; spec = importlib.util.find_spec("colorclass"); print("" if spec is None or spec.origin is None else os.path.join(os.path.dirname(spec.origin), "codes.py"))' 2>/dev/null
+}
+
+function interlace_colorclass_imports_ok() {
+    local tool_python
+    tool_python="$(interlace_tool_python)" || return 1
+    "$tool_python" -c 'import colorclass' >/dev/null 2>&1
+}
+
+function ensure_interlace_colorclass_healthy() {
+    local cc_codes
+
+    if interlace_colorclass_imports_ok; then
+        return 0
+    fi
+
+    cc_codes="$(interlace_colorclass_codes_path)" || return 1
+    [[ -n "$cc_codes" && -f "$cc_codes" ]] || return 1
+
+    if grep -q 'from collections import Mapping' "$cc_codes"; then
+        sed -i.bak 's/from collections import Mapping/from collections.abc import Mapping/' "$cc_codes" || return 1
+        rm -f "${cc_codes}.bak" 2>/dev/null || true
+    fi
+
+    interlace_colorclass_imports_ok
+}
+
 # Function to install Go tools
 function install_tools() {
     header "Installing Golang tools (${#gotools[@]})"
@@ -481,19 +518,16 @@ function install_tools() {
              tool_args+=("--with" "jellyfish>=1.1.3")
         fi
 
-        # Special case for interlace: colorclass is abandoned and broken on Python 3.10+
-        # PR https://github.com/Robpol86/colorclass/pull/27 never merged
-        if [[ "$pipxtool" == "interlace" ]]; then
-            local cc_codes
-            cc_codes="$(dirname "$(uv tool run --from interlace python -c 'import colorclass; print(colorclass.__file__)')")/codes.py" 2>/dev/null
-            if [[ -f "$cc_codes" ]]; then
-                sed -i 's/from collections import Mapping/from collections.abc import Mapping/' "$cc_codes"
-            fi
-        fi
-
         # Always force install/reinstall from the git URL
         # This handles both initial install and upgrades correctly
         if q uv tool install "${tool_args[@]}" "$tool_url" --force; then
+             if [[ "$pipxtool" == "interlace" ]] && ! ensure_interlace_colorclass_healthy; then
+                 failed_pipx_tools+=("$pipxtool")
+                 ((++px_fail))
+                 double_check=true
+                 msg_err "[$pipx_step/$total_px] ${pipxtool} failed health check"
+                 continue
+             fi
              ((++px_ok))
              msg_ok "[$pipx_step/$total_px] ${pipxtool} ready"
         else
