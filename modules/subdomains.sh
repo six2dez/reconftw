@@ -1177,11 +1177,12 @@ function sub_scraping() {
             subdomains_count=$(wc -l <"$dir/subdomains/subdomains.txt")
             if [[ $subdomains_count -le $DEEP_LIMIT ]] || [[ $DEEP == true ]]; then
 
-                run_command urlfinder -d $domain -all -o .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
+                run_command urlfinder -d "$domain" -all -o .tmp/url_extract_tmp.txt 2>>"$LOGFILE" >/dev/null
 
                 if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
-                    cat .tmp/url_extract_tmp.txt | grep -a "$domain" \
-                        | grep -aEo 'https?://[^ ]+' \
+                    # Anchored scope filter (filter_in_scope_urls) replaces grep -a "$domain".
+                    cat .tmp/url_extract_tmp.txt | grep -aEo 'https?://[^ ]+' \
+                        | filter_in_scope_urls "$domain" \
                         | sed "s/^\*\.//" | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt || true
                 fi
 
@@ -1191,8 +1192,8 @@ function sub_scraping() {
                         log_note "sub_scraping: waymore failed or timed out; continuing" "${FUNCNAME[0]}" "${LINENO}"
                     fi
                     if [[ -s ".tmp/waymore_urls_subs.txt" ]]; then
-                        cat .tmp/waymore_urls_subs.txt | grep -a "$domain" \
-                            | grep -aEo 'https?://[^ ]+' \
+                        cat .tmp/waymore_urls_subs.txt | grep -aEo 'https?://[^ ]+' \
+                            | filter_in_scope_urls "$domain" \
                             | sed "s/^\*\.//" | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt || true
                     fi
                 else
@@ -1209,8 +1210,8 @@ function sub_scraping() {
 
                     if [[ -s ".tmp/web_full_info1.txt" ]]; then
                         cat .tmp/web_full_info1.txt | jq -r 'try .url' 2>/dev/null \
-                            | grep -a "$domain" \
                             | grep -aEo 'https?://[^ ]+' \
+                            | filter_in_scope_urls "$domain" \
                             | sed "s/^\*\.//" \
                             | anew .tmp/probed_tmp_scrap.txt \
                             | unfurl -u domains 2>>"$LOGFILE" \
@@ -1218,7 +1219,8 @@ function sub_scraping() {
                     fi
 
                     if [[ -s ".tmp/probed_tmp_scrap.txt" ]]; then
-                        cat .tmp/probed_tmp_scrap.txt | run_command csprecon -s | grep -a "$domain" | sed "s/^\*\.//" | sort -u \
+                        # csprecon output is hostnames, not URLs -> filter_in_scope_hosts
+                        cat .tmp/probed_tmp_scrap.txt | run_command csprecon -s | sed "s/^\*\.//" | filter_in_scope_hosts "$domain" | sort -u \
                             | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt || true
                     fi
 
@@ -1232,8 +1234,8 @@ function sub_scraping() {
 
                     if [[ -s ".tmp/web_full_info1.txt" ]]; then
                         cat .tmp/web_full_info1.txt | jq -r 'try .url' 2>/dev/null \
-                            | grep -a "$domain" \
                             | grep -aEo 'https?://[^ ]+' \
+                            | filter_in_scope_urls "$domain" \
                             | sed "s/^\*\.//" \
                             | anew .tmp/probed_tmp_scrap.txt \
                             | unfurl -u domains 2>>"$LOGFILE" \
@@ -1241,7 +1243,7 @@ function sub_scraping() {
                     fi
 
                     if [[ -s ".tmp/probed_tmp_scrap.txt" ]]; then
-                        cat .tmp/probed_tmp_scrap.txt | run_command csprecon -s | grep -a "$domain" | sed "s/^\*\.//" | sort -u \
+                        cat .tmp/probed_tmp_scrap.txt | run_command csprecon -s | sed "s/^\*\.//" | filter_in_scope_hosts "$domain" | sort -u \
                             | unfurl -u domains 2>>"$LOGFILE" | anew -q .tmp/scrap_subs.txt || true
                     fi
 
@@ -1278,8 +1280,8 @@ function sub_scraping() {
 
                     if [[ -s ".tmp/web_full_info3.txt" ]]; then
                         cat .tmp/web_full_info3.txt | jq -r 'try .url' 2>/dev/null \
-                            | grep -a "$domain" \
                             | grep -aEo 'https?://[^ ]+' \
+                            | filter_in_scope_urls "$domain" \
                             | sed "s/^\*\.//" \
                             | anew .tmp/probed_tmp_scrap.txt \
                             | unfurl -u domains 2>>"$LOGFILE" \

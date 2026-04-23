@@ -71,6 +71,56 @@ setup() {
     [ "$result" = "example.com" ]
 }
 
+@test "sanitize_domain strips https:// scheme" {
+    result=$(sanitize_domain "https://example.com")
+    [ "$result" = "example.com" ]
+}
+
+@test "sanitize_domain strips http:// scheme with subdomain" {
+    result=$(sanitize_domain "http://sub.example.com")
+    [ "$result" = "sub.example.com" ]
+}
+
+@test "sanitize_domain strips path" {
+    result=$(sanitize_domain "https://example.com/path/to/x")
+    [ "$result" = "example.com" ]
+}
+
+@test "sanitize_domain strips port" {
+    result=$(sanitize_domain "https://example.com:8443")
+    [ "$result" = "example.com" ]
+}
+
+@test "sanitize_domain strips query and fragment" {
+    result=$(sanitize_domain "https://example.com?q=1#frag")
+    [ "$result" = "example.com" ]
+}
+
+@test "sanitize_domain strips userinfo" {
+    result=$(sanitize_domain "https://user:pass@example.com/")
+    [ "$result" = "example.com" ]
+}
+
+@test "sanitize_domain handles @ in path (not userinfo)" {
+    result=$(sanitize_domain "https://example.com/path@x")
+    [ "$result" = "example.com" ]
+}
+
+@test "sanitize_domain rejects URL with invalid IP octet" {
+    run sanitize_domain "https://1.2.3.999/"
+    [ "$status" -ne 0 ]
+}
+
+@test "sanitize_domain accepts URL with valid IP" {
+    result=$(sanitize_domain "https://1.2.3.4:8080/")
+    [ "$result" = "1.2.3.4" ]
+}
+
+@test "sanitize_domain normalizes URL with all parts" {
+    result=$(sanitize_domain "https://user:pass@sub.example.com:8443/path?q=1#f")
+    [ "$result" = "sub.example.com" ]
+}
+
 @test "sanitize_interlace_input removes shell metacharacters" {
     local tmpfile
     tmpfile=$(mktemp)

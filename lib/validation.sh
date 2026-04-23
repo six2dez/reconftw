@@ -183,6 +183,110 @@ function sanitize_interlace_input() {
 	return 0
 }
 
+# is_in_scope_host()
+# Description: Returns 0 if $1 (hostname) is exactly $2 (domain) or a proper
+# subdomain of it. Prevents substring false positives (exampleXcom.evil) used by
+# raw "grep -a $domain" checks.
+# Arguments: $1 - hostname, $2 - in-scope domain
+# Returns: 0 if in scope, 1 otherwise
+function is_in_scope_host() {
+	local host="${1,,}"
+	local domain="${2,,}"
+	host="${host%.}"
+	domain="${domain%.}"
+	[[ -n "$host" && -n "$domain" ]] || return 1
+	[[ "$host" == "$domain" || "$host" == *.".$domain" || "$host" == *."$domain" ]]
+}
+
+# filter_in_scope_urls()
+# Description: Reads URLs from stdin, writes to stdout only those whose parsed
+# hostname is exactly $1 or a subdomain of $1. Rejects URLs containing userinfo
+# (user:pass@) to block SSRF-via-basic-auth tricks, non-http(s) schemes, and
+# substring look-alikes. Depends on python3.
+# Arguments: $1 - in-scope domain
+function filter_in_scope_urls() {
+	local domain="$1"
+	[[ -z "$domain" ]] && return 0
+
+	# Use `python3 -c` (not `- <<HEREDOC`) so sys.stdin stays wired to the
+	# incoming pipe; heredoc consumes fd 0 and breaks the pipeline.
+	#
+	# "Multi" is a sentinel used by list-mode (-l) runs where there is no single
+	# in-scope root. In that case, accept any URL with an http/https scheme and
+	# no userinfo — the scope is enforced upstream by the list itself.
+	python3 -c '
+import sys
+from urllib.parse import urlsplit
+
+domain = sys.argv[1].rstrip(".").lower()
+multi_mode = domain == "multi"
+if not domain:
+    sys.exit(0)
+
+for raw in sys.stdin:
+    url = raw.strip()
+    if not url:
+        continue
+    try:
+        parsed = urlsplit(url)
+    except ValueError:
+        continue
+    if parsed.scheme not in ("http", "https"):
+        continue
+    if parsed.username is not None or parsed.password is not None:
+        continue
+    host = (parsed.hostname or "").rstrip(".").lower()
+    if not host:
+        continue
+    if multi_mode or host == domain or host.endswith("." + domain):
+        print(url)
+' "$domain"
+}
+
+# filter_in_scope_hosts()
+# Description: Reads hostnames (one per line) from stdin, writes only those
+# equal to $1 or a subdomain of $1 to stdout. Strips wildcard and trailing
+# dots. Unlike `grep -a "$domain"` this anchors the match so `exampleXcom.evil`
+# does NOT pass.
+# Arguments: $1 - in-scope domain
+function filter_in_scope_hosts() {
+	local domain="$1"
+	[[ -z "$domain" ]] && return 0
+
+	python3 -c '
+import sys
+
+domain = sys.argv[1].rstrip(".").lower()
+if not domain:
+    sys.exit(0)
+
+for raw in sys.stdin:
+    host = raw.strip().rstrip(".")
+    if not host:
+        continue
+    if host.startswith("*."):
+        host = host[2:]
+    host = host.lower()
+    if host == domain or host.endswith("." + domain):
+        print(host)
+' "$domain"
+}
+
+# is_in_scope_url()
+# Description: Single-URL wrapper around filter_in_scope_urls. Prints the URL
+# to stdout if it passes all scope checks (scheme, no userinfo, host match),
+# otherwise exits non-zero.
+# Arguments: $1 - URL, $2 - in-scope domain
+# Returns: 0 if in scope, 1 otherwise
+function is_in_scope_url() {
+	local url="$1"
+	local domain="$2"
+	local result
+	result=$(printf '%s\n' "$url" | filter_in_scope_urls "$domain")
+	[[ -n "$result" ]] || return 1
+	printf '%s\n' "$result"
+}
+
 # is_empty()
 # Description: Checks if a value is empty
 # Arguments: $1 - Value to check

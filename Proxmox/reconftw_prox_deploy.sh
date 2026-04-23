@@ -8,7 +8,12 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 # Logging configuration
+# umask 077 so only root can read the log (it records container hostname,
+# IDs and other metadata). The container root password is NOT written to this
+# log; it is printed only to the controlling TTY (fd 3) at the end of the run.
+umask 077
 LOGFILE="/var/log/reconftw_deploy_$(date +%Y%m%d_%H%M%S).log"
+exec 3>/dev/tty 2>/dev/null || exec 3>&1
 exec 1> >(tee -a "$LOGFILE") 2>&1
 
 # Logging function
@@ -146,5 +151,8 @@ log "${GREEN}Installation completed${NC}"
 echo "Container information:"
 echo "ID: $CONTAINER_ID"
 echo "Hostname: $HOSTNAME"
-echo "Password: $PASSWORD"
+# Print the root password only to the controlling TTY (fd 3) so it is not
+# captured by the global `tee -a "$LOGFILE"` stdout redirection above.
+printf 'Password: %s\n' "$PASSWORD" >&3
+echo "Password: [printed to terminal only; not stored in log]"
 echo "Log file: $LOGFILE"

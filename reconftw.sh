@@ -770,16 +770,18 @@ case $opt_mode in
         fi
         ;;
     'w')
-        if [[ -n $list ]]; then
-            start
-            if [[ $list == /* ]]; then
-                cp "$list" "$dir/webs/webs.txt"
-            else
-                cp "${SCRIPTPATH}/$list" "$dir/webs/webs.txt"
-            fi
-        else
-            _print_error "Web mode needs a website list file as target (./reconftw.sh -l target.txt -w)"
+        if [[ -z $list ]] && [[ -z $domain ]]; then
+            _print_error "Web mode needs a target: use -d <domain|url> or -l <file>"
             exit $E_INVALID_INPUT
+        fi
+        # DIFF=true forces every web function to re-run; the shared output dir is
+        # reused across runs and without this the checkpoint from a prior -w would
+        # skip the probe leaving the (just-cleaned) output files empty.
+        export DIFF=true
+        start
+        if ! prepare_web_mode_scope; then
+            _print_error "Web mode scope preparation failed (tmpfile/cp error); aborting to avoid running against stale scope."
+            exit 1
         fi
         webs_menu
         exit 0

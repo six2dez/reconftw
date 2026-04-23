@@ -18,56 +18,110 @@ pt_header() { :; }
 # If LOGFILE is unset or empty, send logs to /dev/null until later initialization
 : "${LOGFILE:=/dev/null}"
 
-# List of environment variables containing secrets that should be redacted in logs
+# List of environment-variable names whose VALUES should be redacted from logs
+# and dry-run previews. Values resolved via ${!var} indirection from the
+# current shell scope.
 REDACT_VARS=(
     "SHODAN_API_KEY"
     "WHOISXML_API"
     "PDCP_API_KEY"
     "GITHUB_TOKEN"
+    "GH_TOKEN"
     "GITLAB_TOKEN"
     "DISCORD_WEBHOOK_URL"
     "SLACK_WEBHOOK_URL"
+    "SLACK_BOT_TOKEN"
+    "TELEGRAM_BOT_TOKEN"
     "slack_auth"
+    "telegram_key"
+    "telegram_api_key"
+    "discord_url"
+    "discord_webhook_url"
     "XSS_SERVER"
     "COLLAB_SERVER"
 )
 
+# Values (not names) registered at runtime from config files or CLI parsing.
+# Used when a secret lives in a local var that `${!var}` can't reach from
+# inside redact_secrets, e.g. telegram_key parsed inside sendToNotify().
+REGISTERED_SECRETS=()
+
+# register_secret()
+# Description: Adds a raw secret VALUE to REGISTERED_SECRETS so later redaction
+# passes will replace it with [REDACTED]. Safe to call repeatedly (deduped).
+# Arguments: $1 - secret value
+function register_secret() {
+    local value="$1"
+    [[ -z "$value" || ${#value} -le 4 ]] && return 0
+
+    local existing
+    for existing in "${REGISTERED_SECRETS[@]}"; do
+        [[ "$existing" == "$value" ]] && return 0
+    done
+    REGISTERED_SECRETS+=("$value")
+}
+
 # redact_secrets()
-# Description: Redacts sensitive values from a string
+# Description: Redacts sensitive values from a string. Consults both the
+# REDACT_VARS list (env-var-name lookups) and REGISTERED_SECRETS (raw values
+# from config files).
 # Arguments: $1 - String to redact
 # Returns: Redacted string via stdout
 function redact_secrets() {
     local text="$1"
     local redacted="$text"
-    
+    local var value secret
+
     for var in "${REDACT_VARS[@]}"; do
-        local value="${!var:-}"
+        value="${!var:-}"
         if [[ -n "$value" && ${#value} -gt 4 ]]; then
-            # Replace the secret with [REDACTED]
             redacted="${redacted//$value/[REDACTED]}"
         fi
     done
-    
+
+    for secret in "${REGISTERED_SECRETS[@]}"; do
+        if [[ -n "$secret" && ${#secret} -gt 4 ]]; then
+            redacted="${redacted//$secret/[REDACTED]}"
+        fi
+    done
+
     echo "$redacted"
 }
 
+# _trace_redact_stream()
+# Description: Reads xtrace lines from stdin, runs each through redact_secrets()
+# and appends the scrubbed line to $LOGFILE. Used as the sink for
+# BASH_XTRACEFD so SHOW_COMMANDS=true never writes raw secrets to disk.
+_trace_redact_stream() {
+    local line
+    while IFS= read -r line; do
+        if declare -F redact_secrets >/dev/null 2>&1; then
+            line=$(redact_secrets "$line")
+        fi
+        printf '%s\n' "$line"
+    done >>"$LOGFILE"
+}
+
 enable_command_trace() {
-    # Enable bash xtrace to the current LOGFILE when SHOW_COMMANDS=true
-    # WARNING: This may log sensitive data. Use redact_secrets() when reviewing logs.
+    # Enable bash xtrace to the current LOGFILE when SHOW_COMMANDS=true.
+    # xtrace output is routed through _trace_redact_stream so registered
+    # secrets (REDACT_VARS + REGISTERED_SECRETS) are replaced with [REDACTED]
+    # before the line reaches disk.
     if [[ ${SHOW_COMMANDS:-false} != true ]]; then
         return
     fi
     [[ -z ${LOGFILE:-} ]] && return
 
-    _print_status WARN "Command tracing enabled" "Logs may contain sensitive data"
+    _print_status WARN "Command tracing enabled" "Logs routed through redact_secrets"
 
     # Close any previous trace descriptor (native bash {varname} redirect syntax)
     if [[ -n ${TRACE_FD:-} ]]; then
         exec {TRACE_FD}>&- 2>/dev/null || true
     fi
 
-    # Open a new descriptor against the active log
-    if ! exec {TRACE_FD}>>"$LOGFILE"; then
+    # Open a new descriptor against a redaction filter (process substitution).
+    # Each xtrace line passes through _trace_redact_stream before hitting LOGFILE.
+    if ! exec {TRACE_FD}> >(_trace_redact_stream); then
         return
     fi
     export BASH_XTRACEFD=$TRACE_FD
@@ -1346,11 +1400,13 @@ function sendToNotify {
             notification "Sending ${domain} data over Telegram" info
             telegram_chat_id=$(sed -n '/^telegram:/,/^[^ ]/p' ${NOTIFY_CONFIG} | sed -n 's/^[ ]*telegram_chat_id:[ ]*"\([^"]*\)".*/\1/p')
             telegram_key=$(sed -n '/^telegram:/,/^[^ ]/p' ${NOTIFY_CONFIG} | sed -n 's/^[ ]*telegram_api_key:[ ]*"\([^"]*\)".*/\1/p')
+            register_secret "$telegram_key"
             run_command curl -F "chat_id=${telegram_chat_id}" -F "document=@${1}" https://api.telegram.org/bot${telegram_key}/sendDocument 2>>"$LOGFILE" >/dev/null
         fi
         if grep -q '^ discord\|^discord\|^    discord' $NOTIFY_CONFIG; then
             notification "Sending ${domain} data over Discord" info
             discord_url=$(sed -n '/^discord:/,/^[^ ]/p' ${NOTIFY_CONFIG} | sed -n 's/^[ ]*discord_webhook_url:[ ]*"\([^"]*\)".*/\1/p')
+            register_secret "$discord_url"
             run_command curl -v -i -H "Accept: application/json" -H "Content-Type: multipart/form-data" -X POST -F 'payload_json={"username": "test", "content": "hello"}' -F file1=@${1} $discord_url 2>>"$LOGFILE" >/dev/null
         fi
         if [[ -n $slack_channel ]] && [[ -n $slack_auth ]]; then

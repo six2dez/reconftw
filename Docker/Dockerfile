@@ -114,7 +114,11 @@ rm -rf /root/.cache
 rm -rf /root/go/pkg /root/go/src
 eot
 
-COPY github_tokens.txt /root/Tools/.github_tokens
+# Tokens for github-subdomains / gitdorks_go / github-endpoints / trufflehog are
+# expected at runtime via the GITHUB_TOKENS env var (one token per line, or a
+# path to a file that contains them). See Docker/entrypoint.sh — building them
+# into the image would ship a tracked "shape of a secret" that invites users
+# to fill it with real tokens and accidentally commit them.
 COPY notify.conf /root/.config/notify/provider-config.yaml
 
 ###>> Configure Axiom Provider <<###

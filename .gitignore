@@ -14,9 +14,40 @@ test/
 .DS_Store
 install.log
 reconftw.cfg-personal
+
+# Secrets and credential-shaped files (never commit)
 secrets.cfg
+secrets.cfg.*
+!secrets.cfg.example
+.env
+.env.*
+!.env.example
 .env.cache/
+*.tokens
+**/*_tokens*
+**/.github_tokens
+*.pem
+*.key
+.shodan.cfg
+
 documentation/
 
 # Vendored wordlists that are stored compressed in-repo (expanded on-demand)
 data/wordlists/subdomains.txt
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+crash.log
+crash.*.log
+override.tf
+*_override.tf
+override.tf.json
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+.claude

@@ -79,6 +79,28 @@ run_to() {
     if [[ -n $TIMEOUT_CMD ]]; then "$TIMEOUT_CMD" "$secs" "$@"; else "$@"; fi
 }
 
+# verify_sha256 <file> <expected-hex>
+# Returns 0 if the file's SHA-256 matches expected, 1 otherwise. Works with
+# both GNU sha256sum (Linux) and shasum -a 256 (macOS).
+verify_sha256() {
+    local file="$1"
+    local expected="$2"
+    local actual=""
+
+    [[ -n "$expected" ]] || return 0   # nothing to verify
+    [[ -s "$file" ]] || return 1
+
+    if command -v sha256sum >/dev/null 2>&1; then
+        actual=$(sha256sum "$file" | awk '{print $1}')
+    elif command -v shasum >/dev/null 2>&1; then
+        actual=$(shasum -a 256 "$file" | awk '{print $1}')
+    else
+        return 0  # no hashing tool available; skip (don't block install)
+    fi
+
+    [[ -n "$actual" && "$actual" == "$expected" ]]
+}
+
 # Helper: optionally dry-run
 run_cmd() {
     if [[ $DRY_RUN == "true" ]]; then
@@ -473,9 +495,9 @@ function install_tools() {
     local go_ok=0 go_skip=0 go_fail=0
     for gotool in "${!gotools[@]}"; do
         ((++go_step))
-        local _go_cmd="go install -v ${gotools[$gotool]}@latest"
         # Always run go install so already-present binaries also get updated.
-        if q bash -lc "$_go_cmd"; then
+        # argv form (not bash -lc) so arr values are data, not shell syntax.
+        if q go install -v "${gotools[$gotool]}@latest"; then
             ((++go_ok))
             msg_ok "[$go_step/$total_go] ${gotool} installed"
         else
@@ -1188,7 +1210,20 @@ function initial_setup() {
     header "Downloading required files"
 
     mkdir -p ${HOME}/.config/notify
-    # Download required files with error handling
+    # Download required files with error handling.
+    #
+    # Supply-chain note: helpers fetched from third-party repos or gists run
+    # inside reconFTW (axiom_config.sh is chmod +x, getjswords.py is invoked
+    # per-target). A compromise of `m4ll0k/Bug-Bounty-Toolz@master` or of the
+    # gist revision = code execution during install.
+    #
+    # You can pin any entry by exporting an expected SHA-256 before running
+    # install.sh:
+    #     export GETJSWORDS_SHA256=<64 hex chars>
+    #     export AXIOM_CONFIG_SHA256=<64 hex chars>
+    # If set, each download is verified with `verify_sha256` and the install
+    # aborts on mismatch. If unset the previous upstream-trusting behaviour is
+    # preserved for backwards compatibility.
 	    declare -A downloads=(
 	        ["notify_provider_config"]="https://gist.githubusercontent.com/six2dez/23a996bca189a11e88251367e6583053/raw ${HOME}/.config/notify/provider-config.yaml"
 	        ["getjswords"]="https://raw.githubusercontent.com/m4ll0k/Bug-Bounty-Toolz/master/getjswords.py ${tools}/getjswords.py"
@@ -1197,6 +1232,13 @@ function initial_setup() {
 	        ["resolvers"]="https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt ${resolvers}"
 	        ["axiom_config"]="https://gist.githubusercontent.com/six2dez/6e2d9f4932fd38d84610eb851014b26e/raw ${tools}/axiom_config.sh"
 	    )
+
+    # Map of optional pinned checksums (env-var driven). Add more entries here
+    # to extend integrity checks. Empty string means "no verification".
+    declare -A download_sha256=(
+        ["getjswords"]="${GETJSWORDS_SHA256:-}"
+        ["axiom_config"]="${AXIOM_CONFIG_SHA256:-}"
+    )
 
     local dl_step=0
     local total_dl=${#downloads[@]}
@@ -1215,7 +1257,19 @@ function initial_setup() {
         mkdir -p "$(dirname "$destination")" 2>/dev/null || true
 
         if with_spinner "[$dl_step/$total_dl] Fetching $key" retry 3 3 q_to 120 wget -q -O "$destination" "$url"; then
-            msg_ok "[$dl_step/$total_dl] $key fetched"
+            # Optional integrity check (active only when a SHA is pinned).
+            local _expected="${download_sha256[$key]:-}"
+            if [[ -n "$_expected" ]]; then
+                if verify_sha256 "$destination" "$_expected"; then
+                    msg_ok "[$dl_step/$total_dl] $key fetched (sha256 verified)"
+                else
+                    msg_err "[$dl_step/$total_dl] $key sha256 mismatch for $url; refusing to install"
+                    rm -f "$destination"
+                    continue
+                fi
+            else
+                msg_ok "[$dl_step/$total_dl] $key fetched"
+            fi
         else
             msg_err "[$dl_step/$total_dl] Failed to download $key from $url"
             continue

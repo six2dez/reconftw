@@ -1,0 +1,5 @@
+external-sources=true
+severity=warning
+source-path=SCRIPTDIR
+source-path=SCRIPTDIR/lib
+source-path=SCRIPTDIR/modules

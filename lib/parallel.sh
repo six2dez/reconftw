@@ -23,6 +23,24 @@ PARALLEL_TRACE_SLOW_SECONDS="${PARALLEL_TRACE_SLOW_SECONDS:-30}"
 declare -a _PARALLEL_PIDS=()
 _PARALLEL_LAST_BADGE=""
 
+###############################################################################
+# Background-job throttle used by modules/{web,vulns,osint}.sh to parallelise
+# per-target loops that replaced `interlace -c` (removed in the Naxus audit
+# fix for command injection). Each iteration launches a subshell in the
+# background; this helper blocks until the running-job count falls below the
+# requested cap. Requires bash 4.3+ for `wait -n`.
+###############################################################################
+_throttle_jobs() {
+    local max="${1:-4}"
+    # Clamp to sane minimum so a misconfigured var doesn't busy-spawn.
+    [[ "$max" =~ ^[0-9]+$ ]] || max=4
+    (( max < 1 )) && max=1
+
+    while (( $(jobs -rp | wc -l) >= max )); do
+        wait -n 2>/dev/null || break
+    done
+}
+
 _parallel_live_break() {
     if declare -F ui_live_progress_break >/dev/null 2>&1; then
         ui_live_progress_break

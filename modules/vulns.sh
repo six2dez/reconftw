@@ -339,7 +339,6 @@ function lfi() {
                 _print_msg INFO "Running: LFI Fuzzing with FFUF"
 
                 local lfi_interlace_threads="${LFI_INTERLACE_THREADS:-4}"
-                local lfi_interlace_timeout="${LFI_INTERLACE_TIMEOUT:-180}"
                 local lfi_ffuf_threads="${LFI_FFUF_THREADS:-20}"
                 local lfi_ffuf_rate="${LFI_FFUF_RATELIMIT:-50}"
                 local lfi_ffuf_timeout="${LFI_FFUF_TIMEOUT:-10}"
@@ -348,10 +347,37 @@ function lfi() {
                 local lfi_redirect_flag=""
                 [[ "$lfi_follow_redirects" == true ]] && lfi_redirect_flag="-r"
 
-                # Use Interlace to parallelize FFUF scanning
-                run_command interlace -tL ".tmp/tmp_lfi.txt" -threads "$lfi_interlace_threads" -timeout "$lfi_interlace_timeout" \
-                    -c "ffuf -v -noninteractive ${lfi_redirect_flag} -t ${lfi_ffuf_threads} -rate ${lfi_ffuf_rate} -timeout ${lfi_ffuf_timeout} -maxtime ${lfi_ffuf_maxtime} -H \"${HEADER}\" -w \"${lfi_wordlist}\" -u \"_target_\" -mr \"root:\" " 2>>"$LOGFILE" \
+                # argv-safe parallel replacement for interlace -c. Each ffuf runs in a
+                # background subshell, writing its output to a per-target temp file;
+                # outputs are merged once all workers complete. Concurrency capped at
+                # lfi_interlace_threads (same as the removed `interlace -threads`).
+                local -a _lfi_ffuf_args
+                _lfi_ffuf_args=(-v -noninteractive)
+                [[ -n "$lfi_redirect_flag" ]] && _lfi_ffuf_args+=("$lfi_redirect_flag")
+                _lfi_ffuf_args+=(
+                    -t "$lfi_ffuf_threads"
+                    -rate "$lfi_ffuf_rate"
+                    -timeout "$lfi_ffuf_timeout"
+                    -maxtime "$lfi_ffuf_maxtime"
+                    -H "$HEADER"
+                    -w "$lfi_wordlist"
+                    -mr "root:"
+                )
+                local _lfi_parts
+                _lfi_parts=$(mktemp -d)
+                while IFS= read -r _lfi_target; do
+                    [[ -z "$_lfi_target" ]] && continue
+                    (
+                        _lfi_hash=$(printf '%s' "$_lfi_target" | sha256sum | cut -d' ' -f1)
+                        ffuf "${_lfi_ffuf_args[@]}" -u "$_lfi_target" \
+                            >"$_lfi_parts/$_lfi_hash" 2>>"$LOGFILE" || true
+                    ) &
+                    _throttle_jobs "$lfi_interlace_threads"
+                done <".tmp/tmp_lfi.txt"
+                wait
+                cat "$_lfi_parts"/* 2>/dev/null \
                     | grep "URL" | sed 's/| URL | //' | anew -q "vulns/lfi.txt"
+                rm -rf "$_lfi_parts"
 
                 end_func "Results are saved in vulns/lfi.txt" "${FUNCNAME[0]}"
             else
@@ -511,8 +537,20 @@ function sqli() {
                 if [[ $GHAURI == true ]]; then
                     _print_msg INFO "Running: Ghauri for SQLi Checks"
                     mkdir -p .tmp/ghauri_parts
-                    run_command interlace -tL ".tmp/tmp_sqli.txt" -threads "$INTERLACE_THREADS" -c "ghauri -u _target_ --batch -H \"${HEADER}\" --force-ssl >> .tmp/ghauri_parts/_cleantarget_.txt" 2>>"$LOGFILE" >/dev/null
-                    # Merge per-target outputs to avoid concurrent write corruption
+                    # argv-safe parallel replacement for interlace -c. Each target runs
+                    # ghauri in a background subshell writing to its own per-target file.
+                    while IFS= read -r _sqli_target; do
+                        [[ -z "$_sqli_target" ]] && continue
+                        (
+                            _sqli_safe=$(printf '%s' "$_sqli_target" | sha256sum | cut -d' ' -f1)
+                            ghauri -u "$_sqli_target" --batch -H "$HEADER" --force-ssl \
+                                >".tmp/ghauri_parts/${_sqli_safe}.txt" 2>>"$LOGFILE" || true
+                        ) &
+                        _throttle_jobs "${INTERLACE_THREADS:-10}"
+                    done <".tmp/tmp_sqli.txt"
+                    wait
+                    # Merge per-target outputs (each process writes its own file, so
+                    # there is no concurrent-write corruption).
                     cat .tmp/ghauri_parts/*.txt 2>/dev/null | anew -q vulns/ghauri_log.txt || true
                     rm -rf .tmp/ghauri_parts
                 fi

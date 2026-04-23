@@ -1,0 +1,49 @@
+name: Semgrep
+
+# Replaces the previous CodeQL workflow, which was configured for JavaScript
+# and Python — neither language exists in this repo. Semgrep covers bash and
+# other languages reconFTW actually ships.
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+  schedule:
+    - cron: '46 8 * * 3'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  semgrep:
+    name: Semgrep SAST
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        # No --error so the job does not fail CI on findings; results are
+        # uploaded to the GitHub security tab for review. Flip to --error
+        # once the backlog is burned down.
+        run: |
+          semgrep scan \
+            --config p/bash \
+            --config p/security-audit \
+            --config p/secrets \
+            --config p/dockerfile \
+            --config p/github-actions \
+            --sarif \
+            --output=semgrep.sarif \
+            --metrics=off
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep

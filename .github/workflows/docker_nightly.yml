@@ -34,6 +34,22 @@ jobs:
         run: |
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache
           sudo docker system prune -af || true
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: six2dez/reconftw
+          # Tagging strategy:
+          #   release        -> vX.Y.Z, X.Y, X, latest, main
+          #   schedule (cron)-> nightly, main
+          #   push to main   -> main
+          tags: |
+            type=raw,value=main,enable={{is_default_branch}}
+            type=raw,value=nightly,enable=${{ github.event_name == 'schedule' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'release' }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
       - name: Build and push
         id: docker_build
         uses: docker/build-push-action@v5
@@ -41,16 +57,20 @@ jobs:
           context: ./Docker
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: six2dez/reconftw:main
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
       - name: Verify published manifest
         run: |
-          docker buildx imagetools inspect six2dez/reconftw:main > /tmp/reconftw-manifest.txt
+          # Pick the first pushed tag to inspect.
+          first_tag=$(printf '%s\n' "${{ steps.meta.outputs.tags }}" | head -n1)
+          docker buildx imagetools inspect "$first_tag" > /tmp/reconftw-manifest.txt
           grep -q 'linux/amd64' /tmp/reconftw-manifest.txt
           grep -q 'linux/arm64' /tmp/reconftw-manifest.txt
 
       - name: Verify image health
         run: |
-          docker pull six2dez/reconftw:main
-          docker run --rm six2dez/reconftw:main --help
-          docker run --rm six2dez/reconftw:main --health-check
+          first_tag=$(printf '%s\n' "${{ steps.meta.outputs.tags }}" | head -n1)
+          docker pull "$first_tag"
+          docker run --rm "$first_tag" --help
+          docker run --rm "$first_tag" --health-check

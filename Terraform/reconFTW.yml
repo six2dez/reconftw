@@ -5,6 +5,8 @@
     reconftw_repo: "https://github.com/six2dez/reconftw.git"
     reconftw_dest: "/opt/reconftw"
     reconftw_branch_default: "main"
+    reconftw_commit: ""                # passed from Terraform; "" means branch-based deploy
+    reconftw_owner: "admin"            # OS user that owns reconftw.cfg (not root)
   tasks:
     - name: Update apt cache
       ansible.builtin.apt:
@@ -16,22 +18,57 @@
         name: git
         state: present
 
-    - name: Clone reconFTW
+    # If reconftw_commit is supplied we pin to that exact SHA. Otherwise fall
+    # back to branch-based deploys (backwards compatible). Pinned deploys also
+    # run a follow-up assert to fail fast if the ref resolved to anything other
+    # than the expected commit.
+    - name: Clone reconFTW (pinned commit)
+      when: reconftw_commit | length > 0
+      ansible.builtin.git:
+        repo: "{{ reconftw_repo }}"
+        dest: "{{ reconftw_dest }}"
+        version: "{{ reconftw_commit }}"
+        update: false
+        depth: 1
+
+    - name: Clone reconFTW (branch)
+      when: reconftw_commit | length == 0
       ansible.builtin.git:
         repo: "{{ reconftw_repo }}"
         dest: "{{ reconftw_dest }}"
         version: "{{ reconftw_branch | default(reconftw_branch_default) }}"
-        update: yes
+        update: true
+
+    - name: Verify checked-out HEAD matches reconftw_commit
+      when: reconftw_commit | length > 0
+      ansible.builtin.command: git rev-parse HEAD
+      args:
+        chdir: "{{ reconftw_dest }}"
+      register: _reconftw_head
+      changed_when: false
+
+    - name: Abort on unexpected revision
+      when: reconftw_commit | length > 0
+      ansible.builtin.assert:
+        that:
+          - _reconftw_head.stdout == reconftw_commit
+        fail_msg: >-
+          Checked out reconFTW revision {{ _reconftw_head.stdout }} does not
+          match the pinned commit {{ reconftw_commit }}.
+
+    # Copy the operator-controlled reconftw.cfg BEFORE running install.sh so
+    # install.sh sources the trusted config (not whatever was in the cloned
+    # repo). Mode 0600 + owner reconftw_owner means only that account — and
+    # root — can read any API keys the operator placed in the file.
+    - name: Copy reconftw.cfg with restricted permissions
+      ansible.builtin.copy:
+        src: files/reconftw.cfg
+        dest: "{{ reconftw_dest }}/reconftw.cfg"
+        owner: "{{ reconftw_owner }}"
+        group: "{{ reconftw_owner }}"
+        mode: "0600"
 
     - name: Install reconFTW dependencies and tools
       ansible.builtin.command: ./install.sh --verbose
       args:
         chdir: "{{ reconftw_dest }}"
-
-    - name: Copy reconftw.cfg
-      ansible.builtin.copy:
-        src: files/reconftw.cfg
-        dest: "{{ reconftw_dest }}/reconftw.cfg"
-        owner: root
-        group: root
-        mode: "0644"

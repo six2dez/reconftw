@@ -162,6 +162,127 @@ function start() {
 
 }
 
+# Prepare the web-mode output dir for a clean run. Behavior differs between
+# `-l` (shared "Multi" dir, scope redefined per invocation) and `-d`
+# (per-domain dir, scope stable across invocations):
+#
+# The Multi dir is created only by the `-l -w` flow, so nothing in it predates
+# a `-w` invocation — the entire contents (other than cross-run tracking) can
+# be wiped to guarantee scope isolation between distinct lists.
+#
+# Per-domain dirs may have been populated by prior `-a`/`-s`/`-p` runs, so
+# non-web state must survive.
+#
+# Always wiped (pure web-pipeline artifacts that anew-accumulate):
+#   webs/*, .tmp/*, js/*, fuzzing/*, gf/*, screenshots/*, assets.jsonl
+#
+# Additionally wiped in `-l` Multi mode (no prior non-web state to protect):
+#   vulns/*      — nuclei/cms/swagger/graphql findings
+#   subdomains/* — subtakeover, sub_js_extract, tls_ip_pivots artifacts
+#   hosts/*      — grpc_reflection.txt and any hosts/ writer in webs_menu
+#   osint/*      — defensive wipe (no webs_menu writers today, but prevents
+#                   accidental leakage if a module grows an osint/ output path)
+#
+# Always preserved (cross-run tracking):
+#   .log/*, .incremental/*, .called_fn/*, debug.log
+#
+# For `-d`: vulns/, subdomains/ (except subdomains.txt append), hosts/, osint/
+# are preserved so prior recon state survives. webs_menu modules using anew
+# will add new findings atop old ones (default incremental-but-untracked
+# behavior).
+#
+# subdomains/subdomains.txt handling:
+#   -l Multi:   OVERWRITE with sanitized hostnames from the list (scope reset)
+#   -d <dom>:   APPEND the target via anew so enumerated subs from prior
+#               `-a`/`-s` remain as probe input
+#
+# Used by: reconftw.sh -w dispatch, monitor_mode 'w' case (every cycle).
+function prepare_web_mode_scope() {
+    if [[ -n $list ]]; then
+        # Defense-in-depth for the user's input file: treat $flist as strictly
+        # read-only. One initial `cp` to a tmp snapshot outside $dir; every
+        # subsequent operation uses the snapshot. The original is never written,
+        # deleted, or re-referenced — so even if -path matching has edge cases
+        # (trailing slash, symlinks, case folding) the original is untouched.
+        local _list_snapshot
+        if ! _list_snapshot=$(mktemp -t reconftw_web_list.XXXXXX); then
+            return 1
+        fi
+        if ! cp "$flist" "$_list_snapshot" 2>/dev/null; then
+            rm -f "$_list_snapshot" 2>/dev/null
+            return 1
+        fi
+
+        # Sanitize + stage OUTSIDE $dir first. Only wipe $dir after we know we
+        # have a non-empty, validated new scope — otherwise a fail-close path
+        # would destroy prior output dirs and leave the caller with no scope
+        # AND no prior state. `| sort -u > file` hides the while-loop rc, so
+        # we capture `$?` of the whole pipeline (which is `sort`'s + the
+        # redirection) and also check the staged file is non-empty.
+        local _subs_stage
+        if ! _subs_stage=$(mktemp -t reconftw_web_subs.XXXXXX); then
+            rm -f "$_list_snapshot" 2>/dev/null
+            return 1
+        fi
+        local _t _write_rc
+        while IFS= read -r _t <&3 || [[ -n "$_t" ]]; do
+            _t=${_t%$'\r'}
+            [[ -z "$_t" ]] && continue
+            _t=$(_sanitize_list_entry "$_t") || continue
+            printf '%s\n' "$_t"
+        done 3<"$_list_snapshot" | sort -u >"$_subs_stage"
+        _write_rc=$?
+
+        rm -f "$_list_snapshot" 2>/dev/null
+
+        if (( _write_rc != 0 )) || [[ ! -s "$_subs_stage" ]]; then
+            # Empty/failed staging → every entry rejected by sanitization, or
+            # the write failed. Abort WITHOUT wiping $dir so prior state
+            # survives the failed prep.
+            rm -f "$_subs_stage" 2>/dev/null
+            return 1
+        fi
+
+        # Validation passed → safe to wipe and install the new scope atomically.
+        # -l Multi: the dir is only ever created/populated by -l -w flow, so no
+        # non-web state needs protecting. Wipe every file under $dir except
+        # cross-run tracking and $flist (belt-and-suspenders in case the user's
+        # list path lives inside $dir).
+        find "$dir" -mindepth 1 -type f \
+            -not -path "$dir/.log/*" \
+            -not -path "$dir/.incremental/*" \
+            -not -path "$dir/.called_fn/*" \
+            -not -path "$dir/debug.log" \
+            -not -path "$flist" \
+            -delete 2>/dev/null || true
+
+        mkdir -p "$dir/subdomains" 2>/dev/null
+        if ! mv "$_subs_stage" "$dir/subdomains/subdomains.txt"; then
+            rm -f "$_subs_stage" 2>/dev/null
+            return 1
+        fi
+        return 0
+    else
+        # -d <domain>: the per-domain dir may hold prior -a/-s/-p recon state
+        # that must survive (hosts/ips.txt for virtualhosts, subdomains enum,
+        # vulns/ findings history, osint/, etc.). Wipe only pure web-pipeline
+        # artifacts that modules append via anew/>> and would otherwise mix
+        # prior-run data with this run's probe output.
+        local _p
+        for _p in webs .tmp js fuzzing gf screenshots; do
+            [[ -d "$dir/$_p" ]] && find "$dir/$_p" -mindepth 1 -type f -delete 2>/dev/null || true
+        done
+        : >"$dir/assets.jsonl" 2>/dev/null || true
+
+        mkdir -p "$dir/subdomains" 2>/dev/null
+        if ! printf '%s\n' "$domain" | anew -q "$dir/subdomains/subdomains.txt"; then
+            return 1
+        fi
+        [[ -s "$dir/subdomains/subdomains.txt" ]] || return 1
+        return 0
+    fi
+}
+
 function end() {
 
     if [[ $opt_ai ]]; then
@@ -1162,22 +1283,30 @@ function multi_custom() {
     custom_function_list=$(echo "$custom_function" | tr ',' '\n')
     func_total=$(echo "$custom_function_list" | wc -l)
 
+    # Iterate each target line through _sanitize_list_entry instead of loading
+    # the whole file into $domain. Loading the whole file exposed every sink
+    # that expands $domain unquoted (urlfinder, EmailHarvester) to CLI option
+    # injection and accidental word-splitting across multiple targets.
     func_count=0
-    domain=$(cat "$flist")
-    for custom_f in $custom_function_list; do
-        ((func_count = func_count + 1))
+    while IFS= read -r raw_domain || [[ -n "$raw_domain" ]]; do
+        [[ -z "$raw_domain" ]] && continue
+        domain=$(_sanitize_list_entry "$raw_domain") || continue
 
-        loopstart=$(date +%s)
+        for custom_f in $custom_function_list; do
+            ((func_count = func_count + 1))
 
-        run_module_with_axiom_failover "$custom_f"
+            loopstart=$(date +%s)
 
-        currently=$(date +"%H:%M:%S")
-        loopend=$(date +%s)
-        local duration=$((loopend - loopstart))
-        _print_status OK "$custom_f" "${duration}s"
-        [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && \
-            print_notice INFO "$custom_f" "entries ${entries} (${func_count}/${func_total}) at ${currently}"
-    done
+            run_module_with_axiom_failover "$custom_f"
+
+            currently=$(date +"%H:%M:%S")
+            loopend=$(date +%s)
+            local duration=$((loopend - loopstart))
+            _print_status OK "$custom_f" "${duration}s (${domain})"
+            [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && \
+                print_notice INFO "$custom_f" "entries ${entries} (${func_count}/${func_total}) at ${currently}"
+        done
+    done <"$flist"
 
     if [[ $AXIOM == true ]]; then
         axiom_shutdown
@@ -1350,17 +1479,24 @@ function monitor_mode() {
                 all
                 ;;
             'w')
-                if [[ -n $list ]]; then
-                    start
-                    if [[ $list == /* ]]; then
-                        cp "$list" "$dir/webs/webs.txt"
-                    else
-                        cp "${SCRIPTPATH}/$list" "$dir/webs/webs.txt"
-                    fi
-                    webs_menu
-                else
+                if [[ -z $list ]]; then
                     notification "Web mode in monitor requires -l list file" error
                     return 1
+                fi
+                # Same scope-prep as the one-shot -w dispatch: wipe stale module
+                # output, preserve cross-run state (.log/.incremental/.called_fn/
+                # debug.log), and populate subdomains/subdomains.txt with sanitized
+                # hostnames so webprobe_full picks them up. DIFF=true is already
+                # set by monitor_mode above. If scope prep fails (mktemp / cp
+                # error) skip webs_menu so we don't probe a stale scope, but
+                # fall through to the normal post-case (monitor_snapshot,
+                # max-cycles check, sleep) — `continue` here would busy-loop and
+                # bypass MONITOR_MAX_CYCLES.
+                start
+                if prepare_web_mode_scope; then
+                    webs_menu
+                else
+                    notification "Web-scope preparation failed this cycle; skipping webs_menu until next interval" warn
                 fi
                 ;;
             'n')

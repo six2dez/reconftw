@@ -84,7 +84,12 @@ resource "aws_instance" "reconftw" {
 
   provisioner "local-exec" {
     working_dir = path.module
-    command     = "ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i '${self.public_ip},' -u ${var.ssh_user} --private-key ${var.private_key_path} -e reconftw_branch=${var.reconftw_branch} reconFTW.yml"
+    # Quote extra-vars values so they reach ansible-playbook as a single argv
+    # token. reconftw_branch is regex-validated in variables.tf, so shell
+    # metacharacters cannot appear here, but quoting keeps the guarantee
+    # future-proof. reconftw_commit is passed too; the playbook ignores it
+    # when empty.
+    command = "ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i '${self.public_ip},' -u ${var.ssh_user} --private-key ${var.private_key_path} -e 'reconftw_branch=${var.reconftw_branch}' -e 'reconftw_commit=${var.reconftw_commit}' reconFTW.yml"
   }
 }
 

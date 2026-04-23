@@ -77,6 +77,7 @@ function github_repos() {
         fi
 
         GH_TOKEN=$(head -n 1 "$GITHUB_TOKENS")
+        register_secret "$GH_TOKEN"
         echo "$domain" | unfurl format %r >.tmp/company_name.txt
 
         # Use temp file for token to avoid exposing it in process list
@@ -97,9 +98,27 @@ function github_repos() {
         ensure_dirs .tmp/github_repos .tmp/github
 
         if [[ -s ".tmp/company_repos_url.txt" ]]; then
-            if ! run_command interlace -tL .tmp/company_repos_url.txt -threads "$INTERLACE_THREADS" -c "git clone _target_ .tmp/github_repos/_cleantarget_" 2>>"$LOGFILE" >/dev/null; then
-                _print_error "interlace git clone command failed"
-                return 1
+            # argv-safe parallel replacement for interlace -c. Each clone runs in a
+            # background subshell; failures are recorded via a marker file so the
+            # caller can log a summary after wait.
+            local _clone_fail_dir
+            _clone_fail_dir=$(mktemp -d)
+            while IFS= read -r _repo_target; do
+                [[ -z "$_repo_target" ]] && continue
+                (
+                    _repo_safe=$(printf '%s' "$_repo_target" | sha256sum | cut -d' ' -f1)
+                    if ! git clone "$_repo_target" ".tmp/github_repos/${_repo_safe}" 2>>"$LOGFILE" >/dev/null; then
+                        : >"$_clone_fail_dir/$_repo_safe"
+                    fi
+                ) &
+                _throttle_jobs "${INTERLACE_THREADS:-10}"
+            done <.tmp/company_repos_url.txt
+            wait
+            local _clone_failures
+            _clone_failures=$(find "$_clone_fail_dir" -type f 2>/dev/null | wc -l | tr -d ' ')
+            rm -rf "$_clone_fail_dir"
+            if [[ "$_clone_failures" -gt 0 ]]; then
+                _print_error "git clone failed for $_clone_failures repo(s); continuing with successful clones"
             fi
         else
             log_note "No GitHub repos found for ${domain}; continuing" "${FUNCNAME[0]}" "${LINENO}"
@@ -137,11 +156,32 @@ function github_repos() {
                     end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}" WARN
                     return 0
                 fi
-                local np_scan_opts=""
-                [[ "${SECRETS_SCAN_GIT_HISTORY:-false}" == "true" ]] && np_scan_opts="--git-history"
-                if ! run_command interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "noseyparker scan ${np_scan_opts} --datastore .tmp/github/np_ds__cleantarget_ .tmp/github_repos/_target_ >/dev/null 2>>${LOGFILE}; noseyparker report --datastore .tmp/github/np_ds__cleantarget_ --format json > .tmp/github/nosey__cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
-                    _print_error "interlace noseyparker command failed"
-                    return 1
+                local -a np_scan_opts=()
+                [[ "${SECRETS_SCAN_GIT_HISTORY:-false}" == "true" ]] && np_scan_opts+=(--git-history)
+                # argv-safe parallel replacement for interlace -c.
+                local _np_fail_dir
+                _np_fail_dir=$(mktemp -d)
+                while IFS= read -r _np_target; do
+                    [[ -z "$_np_target" ]] && continue
+                    (
+                        _np_safe=$(printf '%s' "$_np_target" | sha256sum | cut -d' ' -f1)
+                        if ! noseyparker scan "${np_scan_opts[@]}" \
+                            --datastore ".tmp/github/np_ds_${_np_safe}" \
+                            ".tmp/github_repos/${_np_target}" >/dev/null 2>>"$LOGFILE"; then
+                            : >"$_np_fail_dir/$_np_safe"
+                        elif ! noseyparker report --datastore ".tmp/github/np_ds_${_np_safe}" --format json \
+                                >".tmp/github/nosey_${_np_safe}.json" 2>>"$LOGFILE"; then
+                            : >"$_np_fail_dir/$_np_safe"
+                        fi
+                    ) &
+                    _throttle_jobs "${INTERLACE_THREADS:-10}"
+                done <.tmp/github_repos_folders.txt
+                wait
+                local _np_failures
+                _np_failures=$(find "$_np_fail_dir" -type f 2>/dev/null | wc -l | tr -d ' ')
+                rm -rf "$_np_fail_dir"
+                if [[ "$_np_failures" -gt 0 ]]; then
+                    _print_error "noseyparker failed for $_np_failures repo(s); continuing"
                 fi
                 ;;
             titus|*)
@@ -151,21 +191,54 @@ function github_repos() {
                     end_func "Results are saved in $domain/osint/github_company_secrets.json" "${FUNCNAME[0]}" WARN
                     return 0
                 fi
-                local titus_opts=""
-                [[ "${SECRETS_SCAN_GIT_HISTORY:-false}" == "true" ]] && titus_opts="${titus_opts} --git"
-                [[ "${SECRETS_VALIDATE:-false}" == "true" ]] && titus_opts="${titus_opts} --validate"
-                if ! run_command interlace -tL .tmp/github_repos_folders.txt -threads "$INTERLACE_THREADS" -c "\"${titus_bin}\" scan --format json ${titus_opts} .tmp/github_repos/_target_ > .tmp/github/titus__cleantarget_.json" 2>>"$LOGFILE" >/dev/null; then
-                    _print_error "interlace titus command failed"
-                    return 1
+                local -a titus_opts=()
+                [[ "${SECRETS_SCAN_GIT_HISTORY:-false}" == "true" ]] && titus_opts+=(--git)
+                [[ "${SECRETS_VALIDATE:-false}" == "true" ]] && titus_opts+=(--validate)
+                # argv-safe parallel replacement for interlace -c.
+                local _titus_fail_dir
+                _titus_fail_dir=$(mktemp -d)
+                while IFS= read -r _titus_target; do
+                    [[ -z "$_titus_target" ]] && continue
+                    (
+                        _titus_safe=$(printf '%s' "$_titus_target" | sha256sum | cut -d' ' -f1)
+                        "$titus_bin" scan --format json "${titus_opts[@]}" \
+                            ".tmp/github_repos/${_titus_target}" \
+                            >".tmp/github/titus_${_titus_safe}.json" 2>>"$LOGFILE" \
+                            || : >"$_titus_fail_dir/$_titus_safe"
+                    ) &
+                    _throttle_jobs "${INTERLACE_THREADS:-10}"
+                done <.tmp/github_repos_folders.txt
+                wait
+                local _titus_failures
+                _titus_failures=$(find "$_titus_fail_dir" -type f 2>/dev/null | wc -l | tr -d ' ')
+                rm -rf "$_titus_fail_dir"
+                if [[ "$_titus_failures" -gt 0 ]]; then
+                    _print_error "titus scan failed for $_titus_failures repo(s); continuing"
                 fi
                 ;;
         esac
 
         # Keep trufflehog enrichment (all engines).
         if [[ -s ".tmp/company_repos_url.txt" ]]; then
-            if ! run_command interlace -tL .tmp/company_repos_url.txt -threads "$INTERLACE_THREADS" -c "trufflehog git _target_ -j 2>&1 | jq -c > _output_/_cleantarget_" -o .tmp/github/ 2>>"$LOGFILE" >/dev/null; then
-                _print_error "interlace trufflehog command failed"
-                return 1
+            # argv-safe parallel replacement for interlace -c.
+            local _th_fail_dir
+            _th_fail_dir=$(mktemp -d)
+            while IFS= read -r _th_target; do
+                [[ -z "$_th_target" ]] && continue
+                (
+                    _th_safe=$(printf '%s' "$_th_target" | sha256sum | cut -d' ' -f1)
+                    if ! trufflehog git "$_th_target" -j 2>&1 | jq -c >".tmp/github/${_th_safe}" 2>>"$LOGFILE"; then
+                        : >"$_th_fail_dir/$_th_safe"
+                    fi
+                ) &
+                _throttle_jobs "${INTERLACE_THREADS:-10}"
+            done <.tmp/company_repos_url.txt
+            wait
+            local _th_failures
+            _th_failures=$(find "$_th_fail_dir" -type f 2>/dev/null | wc -l | tr -d ' ')
+            rm -rf "$_th_fail_dir"
+            if [[ "$_th_failures" -gt 0 ]]; then
+                _print_error "trufflehog failed for $_th_failures repo(s); continuing"
             fi
         fi
 
@@ -201,6 +274,7 @@ function github_leaks() {
 
         if [[ -s $GITHUB_TOKENS ]]; then
             GH_TOKEN=$(head -n 1 "$GITHUB_TOKENS")
+        register_secret "$GH_TOKEN"
             local -a ghleaks_cmd=(
                 "${tools}/ghleaks/ghleaks"
                 -q "$domain"
@@ -468,7 +542,7 @@ function emails() {
 
         start_func "${FUNCNAME[0]}" "Searching for emails/users/passwords leaks"
 
-        run_command env PYTHONWARNINGS=ignore "${tools}/EmailHarvester/venv/bin/python3" "${tools}/EmailHarvester/EmailHarvester.py" -d ${domain} -e all -l 20 2>>"$LOGFILE" | anew -q .tmp/EmailHarvester.txt || true
+        run_command env PYTHONWARNINGS=ignore "${tools}/EmailHarvester/venv/bin/python3" "${tools}/EmailHarvester/EmailHarvester.py" -d "$domain" -e all -l 20 2>>"$LOGFILE" | anew -q .tmp/EmailHarvester.txt || true
 
         # Process emailfinder results
         if [[ -s ".tmp/EmailHarvester.txt" ]]; then

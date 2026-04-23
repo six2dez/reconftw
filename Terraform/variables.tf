@@ -43,6 +43,26 @@ variable "reconftw_branch" {
   description = "Git branch/tag to deploy on the instance via Ansible."
   type        = string
   default     = "main"
+
+  validation {
+    # Restrict to the characters Git ref names commonly use. Blocks shell
+    # metacharacters (space, ;, |, &, $, backtick, newline, quotes) that would
+    # otherwise break out of the `-e reconftw_branch=...` arg to ansible-playbook
+    # in the local-exec provisioner.
+    condition     = can(regex("^[0-9A-Za-z._/-]+$", var.reconftw_branch))
+    error_message = "reconftw_branch may contain only letters, digits, dot, underscore, slash, and dash."
+  }
+}
+
+variable "reconftw_commit" {
+  description = "Optional immutable reconFTW commit SHA (40 hex chars). If set, the Ansible playbook checks out this exact commit and aborts if HEAD does not match, mitigating unpinned-ref supply-chain drift. Leave empty to keep branch-based deploys."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.reconftw_commit == "" || can(regex("^[0-9a-fA-F]{40}$", var.reconftw_commit))
+    error_message = "reconftw_commit must be empty or a 40-character hex commit SHA."
+  }
 }
 
 variable "tags" {

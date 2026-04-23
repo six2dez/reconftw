@@ -35,6 +35,9 @@ _validate_probe_jsonl() {
 }
 
 # Extract in-scope URLs from a JSONL probe file.
+# Uses filter_in_scope_urls (lib/validation.sh) to anchor the host match and
+# reject URLs with userinfo (`user@host`), which previously allowed off-scope
+# hosts like `http://victim.example@127.0.0.1:8080/` to slip into webs_all.txt.
 # Usage: _extract_probe_urls_from_json <input_file> <domain_filter> <output_file>
 _extract_probe_urls_from_json() {
     local input_file="$1"
@@ -44,7 +47,7 @@ _extract_probe_urls_from_json() {
     [[ ! -s "$input_file" ]] && return 0
 
     jq -r 'try (.url // empty)' "$input_file" 2>/dev/null \
-        | awk -v dom="$dom_filter" 'index($0, dom) && $0 ~ /^https?:\/\// {print}' \
+        | filter_in_scope_urls "$dom_filter" \
         | _normalize_probe_urls \
         | sed '/^$/d' \
         | anew_q_safe "$output_file"
@@ -59,9 +62,16 @@ _write_plain_webinfo() {
 
     [[ ! -s "$json_file" ]] && return 0
 
-    jq -r 'try . | "\(.url) [\(.status_code)] [\(.title)] [\(.webserver)] \(.tech)"' "$json_file" \
-        | awk -v dom="$dom_filter" 'index($0, dom)' \
-        | anew_q_safe "$output_file"
+    # "Multi" is the sentinel for list-mode runs (no single in-scope root);
+    # accept every line in that case. Otherwise require the domain substring.
+    if [[ "$dom_filter" == "Multi" ]]; then
+        jq -r 'try . | "\(.url) [\(.status_code)] [\(.title)] [\(.webserver)] \(.tech)"' "$json_file" \
+            | anew_q_safe "$output_file"
+    else
+        jq -r 'try . | "\(.url) [\(.status_code)] [\(.title)] [\(.webserver)] \(.tech)"' "$json_file" \
+            | awk -v dom="$dom_filter" 'index($0, dom)' \
+            | anew_q_safe "$output_file"
+    fi
 }
 
 # Send URLs to proxy if enabled
@@ -207,7 +217,7 @@ function webprobe_full() {
                     elif ((.url // "") | startswith("http://")) then "80"
                     else ""
                     end;
-                select((.url // "") | contains($dom))
+                select($dom == "Multi" or ((.url // "") | contains($dom)))
                 | select(effective_port == "80" or effective_port == "443")
             ' "$probe_out" 2>>"$LOGFILE" >"$common_json_tmp"
 
@@ -219,7 +229,7 @@ function webprobe_full() {
                     elif ((.url // "") | startswith("http://")) then "80"
                     else ""
                     end;
-                select((.url // "") | contains($dom))
+                select($dom == "Multi" or ((.url // "") | contains($dom)))
                 | select(effective_port != "80" and effective_port != "443")
             ' "$probe_out" 2>>"$LOGFILE" >"$uncommon_json_tmp"
         fi
@@ -1654,9 +1664,15 @@ function swagger_check() {
                 cp webs/webs_all.txt "$brute_targets"
             fi
 
-            run_command interlace -tL "$brute_targets" -threads "$INTERLACE_THREADS" \
-                -c "sj brute -u _target_ -qi -t ${SJ_TIMEOUT:-30} 2>/dev/null | grep -o 'Definition file found: .*' > _output_/_cleantarget_.txt" \
-                -o .tmp/sj_brute 2>>"$LOGFILE" >/dev/null || true
+            # Wrap the whole interlace+sj pool in run_with_heartbeat_shell so the
+            # UI shows "Running: sj brute (swagger) | elapsed Xm Ys | ETA: --"
+            # every 20s — otherwise swagger_check appears to hang in -l/-z modes
+            # where sj brute can run for tens of minutes against 200 targets.
+            local _brute_targets_count
+            _brute_targets_count=$(wc -l <"$brute_targets" 2>/dev/null | tr -d ' ' || echo "?")
+            run_with_heartbeat_shell "sj brute (swagger, ${_brute_targets_count} targets)" \
+                "interlace -tL \"$brute_targets\" -threads \"$INTERLACE_THREADS\" -c \"sj brute -u _target_ -qi -t ${SJ_TIMEOUT:-30} 2>/dev/null | grep -o 'Definition file found: .*' > _output_/_cleantarget_.txt\" -o .tmp/sj_brute 2>>\"$LOGFILE\" >/dev/null" \
+                || true
 
             find .tmp/sj_brute/ -type f -name "*.txt" -print0 2>/dev/null \
                 | xargs -0 grep -hoP 'Definition file found: \K\S+' 2>/dev/null \
@@ -1983,13 +1999,32 @@ function urlchecks() {
             fi
 
             if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
-                grep -a "$domain" .tmp/url_extract_tmp.txt | grep -aEo 'https?://[^ ]+' | grep -iE '\.js([?#].*)?$|\.js([/?&].*)' | anew -q .tmp/url_extract_js.txt || true
-                grep -a "$domain" .tmp/url_extract_tmp.txt | grep -aEo 'https?://[^ ]+' | grep -iE '\.map([/?#].*)?$' | anew -q .tmp/url_extract_jsmap.txt || true
+                # Use filter_in_scope_urls (validation.sh) to anchor host match and
+                # reject userinfo/off-scope look-alikes. Replaces fragile grep -a "$domain".
+                grep -aEo 'https?://[^ ]+' .tmp/url_extract_tmp.txt | filter_in_scope_urls "$domain" | grep -iE '\.js([?#].*)?$|\.js([/?&].*)' | anew -q .tmp/url_extract_js.txt || true
+                grep -aEo 'https?://[^ ]+' .tmp/url_extract_tmp.txt | filter_in_scope_urls "$domain" | grep -iE '\.map([/?#].*)?$' | anew -q .tmp/url_extract_jsmap.txt || true
                 if [[ $DEEP == true ]] && [[ -s ".tmp/url_extract_js.txt" ]]; then
-                    run_command interlace -tL .tmp/url_extract_js.txt -threads 10 -c "${tools}/JSA/venv/bin/python3 ${tools}/JSA/jsa.py -f _target_ | anew -q .tmp/url_extract_tmp.txt" &>/dev/null
+                    # argv-safe parallel replacement for interlace -c. Each target runs
+                    # in a background subshell; outputs are written to per-target temp
+                    # files (anew is not safe for concurrent writes) then merged once
+                    # all workers finish.
+                    local _jsa_parts
+                    _jsa_parts=$(mktemp -d)
+                    while IFS= read -r _jsa_target; do
+                        [[ -z "$_jsa_target" ]] && continue
+                        (
+                            _jsa_hash=$(printf '%s' "$_jsa_target" | sha256sum | cut -d' ' -f1)
+                            "${tools}/JSA/venv/bin/python3" "${tools}/JSA/jsa.py" -f "$_jsa_target" \
+                                >"$_jsa_parts/$_jsa_hash" 2>/dev/null || true
+                        ) &
+                        _throttle_jobs "${INTERLACE_THREADS:-10}"
+                    done <.tmp/url_extract_js.txt
+                    wait
+                    cat "$_jsa_parts"/* 2>/dev/null | anew -q .tmp/url_extract_tmp.txt
+                    rm -rf "$_jsa_parts"
                 fi
 
-                grep -a "$domain" .tmp/url_extract_tmp.txt | grep -aEo 'https?://[^ ]+' | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg)$" | anew -q .tmp/url_extract_tmp2.txt || true
+                grep -aEo 'https?://[^ ]+' .tmp/url_extract_tmp.txt | filter_in_scope_urls "$domain" | grep "=" | qsreplace -a 2>>"$LOGFILE" | grep -aEiv "\.(eot|jpg|jpeg|gif|css|tif|tiff|png|ttf|otf|woff|woff2|ico|pdf|svg)$" | anew -q .tmp/url_extract_tmp2.txt || true
 
                 if [[ -s ".tmp/url_extract_tmp2.txt" ]]; then
                     urless <.tmp/url_extract_tmp2.txt | anew -q .tmp/url_extract_uddup.txt 2>>"$LOGFILE" >/dev/null || true
@@ -2254,15 +2289,30 @@ function jschecks() {
                 print_warnf "Failed to create sourcemapper directory."
             fi
             if [[ -s "js/js_livelinks.txt" ]]; then
-                run_command interlace -tL js/js_livelinks.txt -threads "$INTERLACE_THREADS" \
-                    -c "sourcemapper -jsurl '_target_' -output _output_/_cleantarget_" \
-                    -o .tmp/sourcemapper 2>>"$LOGFILE" >/dev/null
+                # argv-safe parallel replacement for interlace -c. sourcemapper writes
+                # its own per-target output dir so no post-merge is needed.
+                while IFS= read -r _sm_target; do
+                    [[ -z "$_sm_target" ]] && continue
+                    (
+                        _sm_safe=$(printf '%s' "$_sm_target" | sha256sum | cut -d' ' -f1)
+                        sourcemapper -jsurl "$_sm_target" -output ".tmp/sourcemapper/${_sm_safe}" 2>>"$LOGFILE" >/dev/null || true
+                    ) &
+                    _throttle_jobs "${INTERLACE_THREADS:-10}"
+                done <js/js_livelinks.txt
+                wait
             fi
 
             if [[ -s ".tmp/url_extract_jsmap.txt" ]]; then
-                run_command interlace -tL .tmp/url_extract_jsmap.txt -threads "$INTERLACE_THREADS" \
-                    -c "sourcemapper -url '_target_' -output _output_/_cleantarget_" \
-                    -o .tmp/sourcemapper 2>>"$LOGFILE" >/dev/null
+                # argv-safe parallel replacement for interlace -c.
+                while IFS= read -r _smu_target; do
+                    [[ -z "$_smu_target" ]] && continue
+                    (
+                        _smu_safe=$(printf '%s' "$_smu_target" | sha256sum | cut -d' ' -f1)
+                        sourcemapper -url "$_smu_target" -output ".tmp/sourcemapper/${_smu_safe}" 2>>"$LOGFILE" >/dev/null || true
+                    ) &
+                    _throttle_jobs "${INTERLACE_THREADS:-10}"
+                done <.tmp/url_extract_jsmap.txt
+                wait
             fi
 
             find .tmp/sourcemapper/ \( -name "*.js" -o -name "*.ts" \) -type f \
@@ -2307,8 +2357,22 @@ function jschecks() {
                             # shellcheck source=/dev/null
                             source "${GETJSWORDS_VENV}/bin/activate"
                             if python3 -c "import jsbeautifier, requests" 2>/dev/null; then
-                                run_command interlace -tL js/js_livelinks.txt -threads "$INTERLACE_THREADS" \
-                                    -c "python3 ${tools}/getjswords.py '_target_' | anew -q webs/dict_words.txt" 2>>"$LOGFILE" >/dev/null
+                                # argv-safe parallel replacement for interlace -c. Per-target
+                                # output is written to a temp dir, then merged into dict_words.txt
+                                # (anew is not concurrent-write safe).
+                                _gjs_parts=$(mktemp -d)
+                                while IFS= read -r _gjs_target; do
+                                    [[ -z "$_gjs_target" ]] && continue
+                                    (
+                                        _gjs_hash=$(printf '%s' "$_gjs_target" | sha256sum | cut -d' ' -f1)
+                                        python3 "${tools}/getjswords.py" "$_gjs_target" \
+                                            >"$_gjs_parts/$_gjs_hash" 2>>"$LOGFILE" || true
+                                    ) &
+                                    _throttle_jobs "${INTERLACE_THREADS:-10}"
+                                done <js/js_livelinks.txt
+                                wait
+                                cat "$_gjs_parts"/* 2>/dev/null | anew -q webs/dict_words.txt
+                                rm -rf "$_gjs_parts"
                             else
                                 log_note "jschecks: jsbeautifier/requests missing in venv ${GETJSWORDS_VENV}; skipping getjswords wordlist step" "${FUNCNAME[0]}" "${LINENO}"
                             fi
@@ -2322,8 +2386,20 @@ function jschecks() {
                     if ! command -v "$getjs_py" >/dev/null 2>&1; then
                         log_note "getjswords python not found: ${getjs_py}; skipping wordlist step" "${FUNCNAME[0]}" "${LINENO}"
                     elif "$getjs_py" -c "import jsbeautifier, requests" 2>/dev/null; then
-                        run_command interlace -tL js/js_livelinks.txt -threads "$INTERLACE_THREADS" \
-                            -c "${getjs_py} ${tools}/getjswords.py '_target_' | anew -q webs/dict_words.txt" 2>>"$LOGFILE" >/dev/null
+                        # argv-safe parallel replacement for interlace -c.
+                        _gjs_parts=$(mktemp -d)
+                        while IFS= read -r _gjs_target; do
+                            [[ -z "$_gjs_target" ]] && continue
+                            (
+                                _gjs_hash=$(printf '%s' "$_gjs_target" | sha256sum | cut -d' ' -f1)
+                                "$getjs_py" "${tools}/getjswords.py" "$_gjs_target" \
+                                    >"$_gjs_parts/$_gjs_hash" 2>>"$LOGFILE" || true
+                            ) &
+                            _throttle_jobs "${INTERLACE_THREADS:-10}"
+                        done <js/js_livelinks.txt
+                        wait
+                        cat "$_gjs_parts"/* 2>/dev/null | anew -q webs/dict_words.txt
+                        rm -rf "$_gjs_parts"
                     else
                         log_note "jschecks: jsbeautifier/requests missing in ${getjs_py}; skipping getjswords wordlist step" "${FUNCNAME[0]}" "${LINENO}"
                     fi
@@ -2448,6 +2524,10 @@ function well_known_pivots() {
 
         head -n "$max_targets" webs/webs_all.txt | while IFS= read -r url; do
             [[ -z "$url" ]] && continue
+
+            # Defense-in-depth: even if something bypasses _extract_probe_urls_from_json,
+            # re-validate each URL here and skip if it contains userinfo or is off-scope.
+            url=$(is_in_scope_url "$url" "$domain") || continue
 
             # security.txt (RFC 9116)
             local resp

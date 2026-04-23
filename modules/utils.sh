@@ -721,21 +721,53 @@ function run_with_adaptive_rate() {
 ####################################### SECURITY ################################################
 ###############################################################################################################
 
-# Sanitize domain input to prevent command injection
-# Usage: sanitize_domain <domain>
-# Returns: sanitized domain string (lowercase)
+# Sanitize domain input to prevent command injection.
+# Accepts bare domains, URLs (strips scheme/userinfo/path/query/fragment/port),
+# and IPv4 addresses (validated inline — octets > 255 rejected).
+# Usage: sanitize_domain <domain_or_url>
+# Returns: sanitized domain (lowercase) or IPv4
 function sanitize_domain() {
     local input_domain="$1"
+    local working="$input_domain"
 
-    # Remove any characters that are not alphanumeric, dots, or hyphens
-    # This prevents command injection via malicious domain names
+    # 1) Strip scheme (scheme://) — RFC 3986 scheme charset
+    if [[ "$working" =~ ^[a-zA-Z][a-zA-Z0-9+.-]*:// ]]; then
+        working="${working#*://}"
+    fi
+
+    # 2) Cut at first / ? # (path / query / fragment).
+    #    Must happen BEFORE userinfo strip: an @ inside a path is not userinfo.
+    working="${working%%[/?#]*}"
+
+    # 3) Strip userinfo (user:pass@host)
+    if [[ "$working" == *@* ]]; then
+        working="${working##*@}"
+    fi
+
+    # 4) Strip :port (bare IPv6 literals are not supported elsewhere in reconFTW)
+    working="${working%%:*}"
+
+    # 5) IPv4 post-normalization: redirect to inline octet validation.
+    if [[ "$working" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        local IFS_bak="$IFS"
+        IFS='.'
+        local -a _octs=($working)
+        IFS="$IFS_bak"
+        local _o
+        for _o in "${_octs[@]}"; do
+            if (( _o > 255 )); then
+                print_errorf "Invalid IP octet in '%s'" "$input_domain"
+                return 1
+            fi
+        done
+        echo "$working"
+        return 0
+    fi
+
+    # 6) Hardening: char whitelist + lowercase + trim leading/trailing dots/hyphens
     local sanitized
-    sanitized=$(echo "$input_domain" | tr -cd 'a-zA-Z0-9.-')
-
-    # Convert to lowercase for consistency
+    sanitized=$(echo "$working" | tr -cd 'a-zA-Z0-9.-')
     sanitized=$(echo "$sanitized" | tr '[:upper:]' '[:lower:]')
-
-    # Remove leading/trailing dots and hyphens
     sanitized=$(echo "$sanitized" | sed 's/^[.-]*//; s/[.-]*$//')
 
     # Check if domain is empty after sanitization
@@ -751,8 +783,11 @@ function sanitize_domain() {
         print_warnf "Domain '%s' has no TLD, may be invalid" "$sanitized" >&2
     fi
 
-    # If sanitization removed characters, warn user
-    if [[ "$input_domain" != "$sanitized" ]]; then
+    # Log only when the tr whitelist actually removed characters beyond case/trim.
+    # URL normalization (scheme/userinfo/path/port strip) is silent — that's the expected path.
+    local working_trivial
+    working_trivial=$(echo "$working" | tr '[:upper:]' '[:lower:]' | sed 's/^[.-]*//; s/[.-]*$//')
+    if [[ "$working_trivial" != "$sanitized" ]]; then
         print_notice INFO "sanitize_domain" "Domain sanitized from '${input_domain}' to '${sanitized}'" >&2
     fi
 
@@ -944,8 +979,13 @@ function cached_download_typed() {
 
     mkdir -p "$(dirname "$cache_file")"
     # Download fresh copy
-    printf "%b[%s] Downloading: %s%b\n" \
-        "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$(basename "$url")" "$reset"
+    if _ui_human_output_enabled; then
+        printf "%b[%s] Downloading: %s%b\n" \
+            "$bblue" "$(date +'%Y-%m-%d %H:%M:%S')" "$(basename "$url")" "$reset"
+    elif [[ -n "${LOGFILE:-}" ]]; then
+        printf "[%s] Downloading: %s\n" \
+            "$(date +'%Y-%m-%d %H:%M:%S')" "$(basename "$url")" >>"$LOGFILE" 2>/dev/null || true
+    fi
 
     curl_cmd=(curl -sL "$url" -o "$destination")
     if [[ "$cache_type" == "resolvers" ]]; then
