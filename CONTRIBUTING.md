@@ -53,7 +53,7 @@ reconftw/
 │   ├── web.sh               # Web analysis, fuzzing, JS checks
 │   ├── vulns.sh             # Vulnerability scanning functions
 │   ├── osint.sh             # OSINT module functions
-│   ├── axiom.sh             # Axiom/Ax fleet management helpers
+│   ├── axiom.sh             # Ax/Axiom fleet management helpers
 │   └── utils.sh             # Shared utilities, sanitization, validation
 ├── tests/
 │   ├── run_tests.sh         # Test runner (--all for integration)

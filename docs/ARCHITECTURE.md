@@ -15,7 +15,7 @@ reconftw/
 │   ├── subdomains.sh    # Subdomain enumeration
 │   ├── web.sh           # Web analysis and crawling
 │   ├── vulns.sh         # Vulnerability scanning
-│   ├── axiom.sh         # Axiom distributed scanning
+│   ├── axiom.sh         # Ax (formerly Axiom) distributed scanning
 │   └── modes.sh         # Scan mode orchestration
 ├── lib/                 # Pure utility libraries (how to do it)
 │   ├── config.sh        # [FUTURE] Modular config loader

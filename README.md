@@ -244,7 +244,7 @@ reconftw/
 │   ├── web.sh           # Web analysis, fuzzing, JS checks (1712 lines)
 │   ├── vulns.sh         # Vulnerability scanning (926 lines)
 │   ├── osint.sh         # OSINT functions (500 lines)
-│   ├── axiom.sh         # Axiom/Ax fleet helpers (143 lines)
+│   ├── axiom.sh         # Ax/Axiom fleet helpers (143 lines)
 │   └── utils.sh         # Utilities, sanitization, validation (508 lines)
 ├── tests/
 │   ├── run_tests.sh     # Test runner
@@ -267,7 +267,7 @@ reconftw/
 | `vulns.sh` | 926 | Vulnerability scanning (XSS, SQLi, SSRF, etc.) |
 | `osint.sh` | 500 | OSINT functions (WHOIS, emails, dorks, metadata) |
 | `utils.sh` | 508 | Shared utilities, input sanitization, validation |
-| `axiom.sh` | 143 | Axiom/Ax distributed fleet management |
+| `axiom.sh` | 143 | Ax/Axiom distributed fleet management |
 
 The `--source-only` flag allows sourcing `reconftw.sh` without executing the main logic, enabling unit testing of individual functions.
 
@@ -357,7 +357,7 @@ cd reconftw
 
 4. **Customization**:
    - Modify the Docker image or build your own; see the [Docker Guide](https://github.com/six2dez/reconftw/wiki/4.-Docker).
-   - To skip Axiom tooling in custom builds, pass `--build-arg INSTALL_AXIOM=false`.
+   - To skip Ax tooling in custom builds, pass `--build-arg INSTALL_AXIOM=false`.
    - Mount your notify config at `~/.config/notify/provider-config.yaml` inside the container if you use notifications.
 
 5. **Secrets at Runtime**:
@@ -428,7 +428,7 @@ The `reconftw.cfg` file controls the entire execution of reconFTW. It allows fin
 - **Adaptive Rate Limiting**: Automatically back off on 429/503 errors (`ADAPTIVE_RATE_LIMIT`, `MIN_RATE_LIMIT`, `MAX_RATE_LIMIT`).
 - **Incremental Scanning**: Only scan new findings since last run (`INCREMENTAL_MODE`).
 - **Notifications**: Set up Slack, Discord, or Telegram notifications (`NOTIFY_CONFIG`).
-- **Axiom**: Configure distributed scanning and resolver paths (`AXIOM_FLEET_NAME`, `AXIOM_FLEET_COUNT`, `AXIOM_RESOLVERS_PATH`).
+- **Ax (formerly Axiom)**: Configure distributed scanning and resolver paths (`AXIOM_FLEET_NAME`, `AXIOM_FLEET_COUNT`, `AXIOM_RESOLVERS_PATH`).
 - **AI Reporting**: Configure model/profile/format and context controls (`AI_MODEL`, `AI_REPORT_PROFILE`, `AI_REPORT_TYPE`, `AI_MAX_CHARS_PER_FILE`).
 - **Advanced Web Checks**: Toggle GraphQL introspection, parameter discovery, WebSocket testing, gRPC probing, and IPv6 scanning.
 - **Automation & Data**: Control quick rescan heuristics, asset logging, chunk sizes, hotlists, and debug tracing (`QUICK_RESCAN`, `ASSET_STORE`, `CHUNK_LIMIT`, `HOTLIST_TOP`, `SHOW_COMMANDS`).
@@ -471,7 +471,7 @@ RESOLVER_DOWNLOAD_CONNECT_TIMEOUT=10 # Seconds to wait for resolver download TCP
 RESOLVER_DOWNLOAD_MAX_TIME=120 # Hard cap in seconds for resolver downloads
 RESOLVER_DOWNLOAD_RETRY=2 # Retry count for resolver downloads
 RESOLVER_DOWNLOAD_RETRY_DELAY=2 # Delay in seconds between resolver download retries
-fuzzing_remote_list="https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt" # Used to send to axiom(if used) on fuzzing
+fuzzing_remote_list="https://raw.githubusercontent.com/six2dez/OneListForAll/main/onelistforallmicro.txt" # Used to send to Ax (if used) on fuzzing
 proxy_url="http://127.0.0.1:8080/" # Proxy url
 install_golang=true # Set it to false if you already have Golang configured and ready
 upgrade_tools=true
@@ -754,8 +754,8 @@ headers_inject=${WORDLISTS_DIR}/headers_inject.txt
 resolvers=${tools}/resolvers.txt
 resolvers_trusted=${tools}/resolvers_trusted.txt
 
-# Axiom Fleet
-# Resolver paths on Axiom instances (change if your fleet uses a different home dir)
+# Ax Fleet (formerly Axiom — uses attacksurge/ax)
+# Resolver paths on Ax instances (change if your fleet uses a different home dir)
 AXIOM_RESOLVERS_PATH="/home/op/lists/resolvers.txt"
 AXIOM_RESOLVERS_TRUSTED_PATH="/home/op/lists/resolvers_trusted.txt"
 # Will not start a new fleet if one exist w/ same name and size (or larger)
@@ -888,8 +888,8 @@ reconFTW supports multiple modes and options for flexible reconnaissance. Use th
 | `--deep`          | Enable deep scanning (slower, VPS recommended)           |
 | `-f`              | Custom configuration file path                           |
 | `-o`              | Output directory for results                             |
-| `-v`              | Enable Axiom distributed scanning                        |
-| `--vps-count`     | Override Axiom fleet instance count for this run         |
+| `-v`              | Enable Ax distributed scanning                           |
+| `--vps-count`     | Override Ax fleet instance count for this run            |
 | `-q`              | Set rate limit (requests per second)                     |
 | `-y`              | Enables AI results analysis                              |
 | `--check-tools`   | Exit if required tools are missing                       |
@@ -944,13 +944,13 @@ reconFTW supports multiple modes and options for flexible reconnaissance. Use th
    ./reconftw.sh -m company -l domains.txt -r
    ```
 
-7. **Axiom Integration**:
+7. **Ax Integration**:
 
    ```bash
    ./reconftw.sh -d target.com -r -v
    ```
 
-8. **Axiom Integration with fleet override**:
+8. **Ax Integration with fleet override**:
 
    ```bash
    ./reconftw.sh -d target.com -r -v 30
@@ -995,7 +995,7 @@ reconFTW supports multiple modes and options for flexible reconnaissance. Use th
 
 reconFTW integrates with [Ax](https://github.com/attacksurge/ax) for distributed scanning, reducing execution time by distributing tasks across multiple cloud instances.
 
-- **Setup**: Select `reconftw` as the provisioner during Axiom configuration.
+- **Setup**: Select `reconftw` as the provisioner during Ax configuration (`axiom-configure`).
 - **Fleet Management**: Automatically create and destroy fleets (`AXIOM_FLEET_LAUNCH`, `AXIOM_FLEET_SHUTDOWN`) or use an existing fleet.
 - **Configuration**: Set fleet size, region, and name in `reconftw.cfg` (`AXIOM_FLEET_COUNT`, `AXIOM_FLEET_REGIONS`, `AXIOM_FLEET_NAME`).
 
@@ -1005,7 +1005,7 @@ reconFTW integrates with [Ax](https://github.com/attacksurge/ax) for distributed
 ./reconftw.sh -d target.com -r -v
 ```
 
-**Details**: See the [Axiom Guide](https://github.com/six2dez/reconftw/wiki/5.-Axiom-version) and official [Ax Docs](https://ax.attacksurge.com/).
+**Details**: See the official [Ax Docs](https://ax.attacksurge.com/) and the [attacksurge/ax repo](https://github.com/attacksurge/ax).
 
 ---
 
@@ -1295,7 +1295,7 @@ reconftw/
 │   ├── web.sh           # Web analysis, nuclei scans
 │   ├── vulns.sh         # Vulnerability scanning
 │   ├── osint.sh         # OSINT functions
-│   └── axiom.sh         # Axiom/Ax fleet helpers
+│   └── axiom.sh         # Ax/Axiom fleet helpers
 ├── lib/                 # Pure utility libraries
 │   └── validation.sh    # Input validation functions
 ├── tests/               # Test suite (100+ tests)
