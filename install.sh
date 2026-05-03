@@ -292,7 +292,7 @@ fi
 # Declare Go tools: name -> module path (always installed @latest)
 declare -A gotools=(
     ["gf"]="github.com/tomnomnom/gf"
-    ["brutespray"]="github.com/x90skysn3k/brutespray"
+    ["brutespray"]="github.com/x90skysn3k/brutespray/v2"
     ["qsreplace"]="github.com/tomnomnom/qsreplace"
     ["ffuf"]="github.com/ffuf/ffuf/v2"
     ["github-subdomains"]="github.com/gwen001/github-subdomains"
@@ -327,7 +327,7 @@ declare -A gotools=(
     ["Web-Cache-Vulnerability-Scanner"]="github.com/Hackmanit/Web-Cache-Vulnerability-Scanner"
     ["subfinder"]="github.com/projectdiscovery/subfinder/v2/cmd/subfinder"
     ["hakip2host"]="github.com/hakluke/hakip2host"
-    ["mantra"]="github.com/Brosck/mantra"
+    ["mantra"]="github.com/brosck/mantra"
     ["crt"]="github.com/cemulus/crt"
     ["s3scanner"]="github.com/sa7mon/s3scanner"
     ["nmapurls"]="github.com/sdcampbell/nmapurls"
@@ -338,7 +338,7 @@ declare -A gotools=(
     ["jsluice"]="github.com/BishopFox/jsluice/cmd/jsluice"
     ["sj"]="github.com/BishopFox/sj"
     ["urlfinder"]="github.com/projectdiscovery/urlfinder/cmd/urlfinder"
-    ["cent"]="github.com/xm1k3/cent"
+    ["cent"]="github.com/xm1k3/cent/v2"
     ["csprecon"]="github.com/edoardottt/csprecon/cmd/csprecon"
     ["exifray"]="github.com/mmarting/exifray"
     ["VhostFinder"]="github.com/wdahlenburg/VhostFinder"
@@ -383,7 +383,7 @@ declare -A repos=(
     ["sus_params"]="g0ldencybersec/sus_params"
     ["CMSeeK"]="Tuhinshubhra/CMSeeK"
     ["massdns"]="blechschmidt/massdns"
-    ["testssl.sh"]="drwetter/testssl.sh"
+    ["testssl.sh"]="testssl/testssl.sh"
     ["JSA"]="w9w/JSA"
     ["cloud_enum"]="initstring/cloud_enum"
     ["ultimate-nmap-parser"]="shifty0g/ultimate-nmap-parser"
@@ -488,6 +488,11 @@ function ensure_interlace_colorclass_healthy() {
 # Function to install Go tools
 function install_tools() {
     header "Installing Golang tools (${#gotools[@]})"
+
+    # Force module-mode resolution so vendored or GOPATH-mode environments
+    # don't break go install for tools whose modules use SIV (e.g. /v2, /v3).
+    export GOFLAGS="-mod=mod"
+    export GO111MODULE="on"
 
     local go_step=0
     local failed_tools=()
@@ -624,6 +629,14 @@ function install_tools() {
             continue
         }
 
+        # Update origin URL if the entry in the repos array has changed (e.g. org rename)
+        local _expected_url="https://github.com/${repos[$repo]}"
+        local _current_url
+        _current_url=$(git remote get-url origin 2>/dev/null || echo "")
+        if [[ -n "$_current_url" && "${_current_url%.git}" != "${_expected_url%.git}" ]]; then
+            git remote set-url origin "$_expected_url" &>/dev/null || true
+        fi
+
         # Return to default branch if stuck in detached HEAD (e.g. from a previous tag checkout)
         if ! git symbolic-ref -q HEAD &>/dev/null; then
             local _default_branch
@@ -671,7 +684,6 @@ function install_tools() {
                 fi
                 ;;
             "nomore403")
-                go get &>/dev/null || true
                 if ! go build &>/dev/null; then
                     msg_warn "[$repos_step/$total_repo] $repo: go build failed"
                 else
@@ -688,7 +700,7 @@ function install_tools() {
                 fi
                 ;;
             "trufflehog")
-                go install &>/dev/null || msg_warn "[$repos_step/$total_repo] $repo: go install failed"
+                go install github.com/trufflesecurity/trufflehog/v3@latest &>/dev/null || msg_warn "[$repos_step/$total_repo] $repo: go install failed"
                 ;;
             "gato")
                 if [[ ! -d "venv" ]]; then
@@ -759,6 +771,7 @@ function install_tools() {
 function reset_git_proxies() {
     git config --global --unset http.proxy || true
     git config --global --unset https.proxy || true
+    export GIT_TERMINAL_PROMPT=0
 }
 
 # Function to check for updates
