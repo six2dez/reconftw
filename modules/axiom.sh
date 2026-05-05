@@ -128,8 +128,9 @@ function axiom_launch() {
         print_notice RUN "axiom_launch" "launching axiom fleet"
         # Count nodes whose name starts with our fleet prefix so we don't
         # mis-count sibling fleets that happen to share this prefix (e.g.
-        # "reconftw" vs "reconftw-dev").
-        NUMOFNODES=$(timeout 30 axiom-ls 2>>"$LOGFILE" | grep -c "^${AXIOM_FLEET_NAME}" || true)
+        # "reconftw" vs "reconftw-dev"). Use `--list` because the default
+        # `axiom-ls` output is colorized via ANSI escapes that break `^prefix`.
+        NUMOFNODES=$(timeout 30 axiom-ls --list 2>>"$LOGFILE" | grep -c "^${AXIOM_FLEET_NAME}" || true)
         if [[ $NUMOFNODES -ge $AXIOM_FLEET_COUNT ]]; then
             if ! axiom-select "$AXIOM_FLEET_NAME*" 2>>"$LOGFILE" >/dev/null; then
                 axiom_disable_runtime \
@@ -165,7 +166,7 @@ function axiom_launch() {
                 bash -lc "$AXIOM_POST_START" 2>>"$LOGFILE" >/dev/null
             fi
 
-            NUMOFNODES=$(timeout 30 axiom-ls 2>>"$LOGFILE" | grep -c "^${AXIOM_FLEET_NAME}" || true)
+            NUMOFNODES=$(timeout 30 axiom-ls --list 2>>"$LOGFILE" | grep -c "^${AXIOM_FLEET_NAME}" || true)
             if [[ $fleet_rc -ne 0 ]] || [[ $NUMOFNODES -lt $AXIOM_FLEET_COUNT ]]; then
                 axiom_disable_runtime \
                     "fleet launch incomplete (${NUMOFNODES}/${AXIOM_FLEET_COUNT} nodes, rc=${fleet_rc}); see ${LOGFILE}" \
@@ -190,7 +191,7 @@ function axiom_shutdown() {
             return
         fi
         axiom-rm -f "$AXIOM_FLEET_NAME*" 2>>"$LOGFILE" >/dev/null || true
-        axiom-ls 2>>"$LOGFILE" | grep "^${AXIOM_FLEET_NAME}" >>"$LOGFILE" || true
+        axiom-ls --list 2>>"$LOGFILE" | grep "^${AXIOM_FLEET_NAME}" >>"$LOGFILE" || true
         [[ "${OUTPUT_VERBOSITY:-1}" -ge 2 ]] && notification "Axiom fleet $AXIOM_FLEET_NAME shutdown" info
     fi
 }
@@ -202,7 +203,7 @@ function axiom_selected() {
     # `tail -n +2 | sed '$ d'` header/footer stripping which under-counts by one
     # when axiom-ls has no trailing footer line.
     local running_nodes
-    running_nodes=$(axiom-ls 2>>"${LOGFILE:-/dev/null}" | grep -c "^${AXIOM_FLEET_NAME}" 2>/dev/null || echo 0)
+    running_nodes=$(axiom-ls --list 2>>"${LOGFILE:-/dev/null}" | grep -c "^${AXIOM_FLEET_NAME}" 2>/dev/null || echo 0)
     if [[ "$running_nodes" -le 0 ]]; then
         end_func "No axiom instances running" "${FUNCNAME[0]}" warn
         axiom_disable_runtime "no axiom instances running" "axiom-ls"
