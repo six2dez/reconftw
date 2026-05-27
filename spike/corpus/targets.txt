@@ -1,0 +1,3 @@
+hackerone.com
+example.com
+controlled-lab.test

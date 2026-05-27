@@ -52,3 +52,15 @@ terraform.rc
 
 .claude
 .planning/
+
+# Spike PoC — generated outputs (Phase 1 ADR)
+spike/go/out/
+spike/python/out/
+spike/go/bin/
+spike/python/.venv/
+spike/comparison.json
+spike/corpus/.tokens.*
+spike/baselines/.regen-*
+spike/go/.spike_session_start
+spike/python/.spike_session_start
+spike/.spike_sessions.log
