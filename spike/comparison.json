@@ -1,0 +1,24 @@
+{
+  "target":    "hackerone.com",
+  "timestamp": "2026-05-27T20:28:03+02:00",
+  "platform":  "Darwin 25.5.0 arm64",
+  "go": {
+    "loc":             null,
+    "hours":           0.416667,
+    "binary_bytes":    3046450,
+    "killtree":        "PASS",
+    "rss_kb":          227248,
+    "xplat_ordinal":   1
+  },
+  "python": {
+    "loc":             null,
+    "hours":           0.166667,
+    "venv_kb":         null,
+    "pyinstaller_bin": 12781568,
+    "killtree":        "PASS",
+    "rss_kb":          220416,
+    "xplat_ordinal":   1
+  },
+  "mcp_lib_support": { "go": 1, "python": 1, "note": "Both v1.x stable per RESEARCH.md §5; not a tie-breaker" },
+  "subdomain_set_diff_lines": null
+}
