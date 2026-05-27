@@ -4,6 +4,7 @@
 # Locked scope: spike/README.md §Scope
 # Pattern reference: .planning/phases/01-language-adr-spike/01-RESEARCH.md §1.1
 
+import asyncio
 import json
 from typing import Callable
 
@@ -40,6 +41,3 @@ async def run(target: str, collect: Callable[[str], None]) -> None:
         raise
     except Exception as e:
         ui.warn(f"subfinder: {e}")
-
-
-import asyncio  # noqa: E402  (stdlib; deferred to after proc import for clarity)
