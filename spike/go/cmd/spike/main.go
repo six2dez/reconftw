@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Spike PoC — DO NOT EVOLVE INTO PRODUCTION
-// Source: .planning/phases/01-language-adr-spike/01-02-PLAN.md
+// Source: .planning/phases/01-language-adr-spike/01-02-PLAN.md Task 3
 // Locked scope: spike/README.md §Scope
 // Pattern reference: .planning/phases/01-language-adr-spike/01-RESEARCH.md §Pattern 1
 //
@@ -12,7 +12,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -45,7 +44,7 @@ func main() {
 			// Signal handler: SIGINT/SIGTERM cancel the entire pipeline context.
 			// Go's signal.NotifyContext ensures ctx is cancelled on first signal;
 			// proc.Run's Cancel handler propagates SIGTERM to the process group.
-			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
 
 			if err := os.MkdirAll("out", 0o755); err != nil {
@@ -53,23 +52,16 @@ func main() {
 			}
 
 			// Phase 1: passive subdomain fan-out → out/subs.jsonl
-			ui.Info("passive: starting")
-			subsFile := "out/subs.jsonl"
-			subsF, err := os.Create(subsFile)
-			if err != nil {
-				return fmt.Errorf("create subs file: %w", err)
-			}
-			subsF.Close()
-
-			if err := passive.Run(ctx, target, nil); err != nil {
-				ui.Err(fmt.Sprintf("passive: %v", err))
+			ui.Info("passive: starting for target=" + target)
+			if err := passive.Run(ctx, target, "out/subs.jsonl"); err != nil {
+				ui.Err("passive: " + err.Error())
 				os.Exit(1)
 			}
 
 			// Phase 2: httpx probe → out/hosts.jsonl
 			ui.Info("httpx: probing")
-			if err := httpxprobe.Run(ctx, nil, nil); err != nil {
-				ui.Err(fmt.Sprintf("httpx: %v", err))
+			if err := httpxprobe.Run(ctx, "out/subs.jsonl", "out/hosts.jsonl"); err != nil {
+				ui.Err("httpx: " + err.Error())
 				os.Exit(1)
 			}
 
