@@ -8,6 +8,42 @@ reconFTW is a comprehensive bash-based reconnaissance automation framework used 
 
 Run one command, get a complete recon picture of a target — passive, active, and vulnerability layers — with resumable checkpoints, structured output, and zero-touch tool orchestration.
 
+## Current Milestone: v2.0 — Complete Core Migration (Bash → Go/Python)
+
+**Goal:** Reescribir reconFTW completo de bash a un lenguaje compilado/estáticamente tipado (Go o Python — decisión por spike paralelo comparativo), preservando 100% de la funcionalidad existente, las 70+ herramientas orquestadas, todos los modos, integraciones, y comportamiento observable. Termina cuando el nuevo reconFTW es funcionalmente equivalente o superior al actual y puede sustituirlo en `main`.
+
+**Por qué migrar:** Cuatro dolores estructurales del bash actual motivan el rewrite:
+1. **Robustez & refactor** — Sin tipos, sin tests sólidos a nivel de unidad lógica, vars globales por todos lados; refactorizar 30+ módulos es ruleta rusa.
+2. **Concurrencia & estado** — `parallel_funcs` + globals compartidos + checkpoints + axiom = estado frágil con race conditions sutiles y debugging brutal.
+3. **Packaging & cross-platform** — Bash 4.3+, GNU coreutils en macOS, install.sh enorme, dependencias no pineadas, BSD vs GNU diff sin parar.
+4. **Onboarding & velocidad de cambio** — Pocas personas leen 3000 líneas de bash con globals y source guards a gusto; cada cambio se siente arriesgado.
+
+**Target features (16 deliverables — el roadmapper los desglosa en ~14-18 phases internas):**
+
+1. **ADR de lenguaje** — Research + spike paralelo Go vs Python (mismo PoC en ambos) + comparativa medible + decisión firmada
+2. **Arquitectura v2** — Diseño completo: módulos como unidades primera clase, scheduler paralelo, checkpoint engine, config TOML, output tree rediseñado, plugin/tool registry, observability, test strategy, packaging
+3. **Foundation/scaffolding** — CLI con paridad de flags, config loader, scheduler con throttle+heartbeat+timeout, checkpoint engine, validators/sanitizers, structured logging con redaction de secrets, output tree writer, test framework, CI inicial
+4. **`--subdomains` E2E** — Passive + brute + permutations + dnsx + scope filter + takeover + s3buckets + geo_info + ASN mapping, **paridad medible** contra bash
+5. **`--web` E2E** — Probe + screenshots + fuzz + JS analysis + nuclei + WAF detection + sourcemaps + favicon recon + ~20 funciones, **paridad medible** contra bash
+6. **`--vulns` E2E** — XSS (dalfox), SQLi (sqlmap/ghauri), SSRF, LFI, SSTI, CRLF, smuggling, command injection, nuclei DAST, cache poisoning, fuzz params
+7. **`--osint` E2E** — Domain info, IP info, emails, GitHub dorks/leaks/actions audit, cloud enum (AWS/GCP/Azure), Postman leaks, Spoofy, msftrecon, CMSeeK
+8. **Modos compuestos** — `-r/--recon`, `-a/--all`, `-p/--passive`, `--zen`, `--deep`, `--quick-rescan`, `--refresh-cache`, `--gen-resolvers`
+9. **Axiom integration** — `axiom_launch`, `axiom_shutdown`, `axiom_selected`, `resolvers_update`, `axiom-exec`, failover wrapper, fleet sizing
+10. **Monitor mode** — `--monitor`, `--monitor-interval`, `--monitor-cycles`, `--incremental`, diff detection, notification triggers
+11. **Reporting** — JSON/HTML/CSV reports, AI report (opt-in vía OpenAI/Anthropic), Faraday export, hotlist risk scoring
+12. **Notifications** — Slack/Telegram/Discord vía `notify`, secret redaction en logs y mensajes
+13. **Installer & deps** — Reemplazo de `install.sh`: instalación de 70+ herramientas externas (Go tools, Python tools, system deps, Rust toolchain)
+14. **Cross-platform** — Linux (Debian/Ubuntu/RHEL/Arch) + macOS (Apple Silicon + Intel) — single binary (Go) o paquete uv (Python)
+15. **Docker** — Imagen Docker actualizada con el nuevo binario/paquete
+16. **Cutover & migración** — Plan de cutover, packaging final, documentación de migración para usuarios actuales, migrador opcional `reconftw.cfg` → nuevo formato
+
+**Working model:**
+- **Branch:** `rewrite/v2` desde `dev` HEAD — rama larga; sustituye `main` al hacer cutover
+- **`main` policy:** Frozen — sólo bugfixes críticos/seguridad. Todo lo nuevo va a `rewrite/v2`.
+- **Compatibilidad:** Rediseñar con libertad — nueva CLI, nueva config (TOML), nuevo output tree; migrador opcional para usuarios actuales
+- **Cadencia:** Sin entregables intermedios shippables. El nuevo reconFTW no es utilizable hasta que todos los modos están portados. Decisión consciente.
+- **Tamaño estimado:** 12-18 meses trabajando en solitario; los phases internos del roadmap son los checkpoints reales de pivot/parada.
+
 ## Requirements
 
 ### Validated
@@ -46,26 +82,39 @@ Run one command, get a complete recon picture of a target — passive, active, a
 
 ### Active
 
-<!-- Audit-surfaced improvements being driven through the next milestone. -->
+<!-- v2.0 Complete Core Migration deliverables — driven through phases in ROADMAP.md. -->
 
-- [ ] **Perf: thread-count upper bounds** — Add `FFUF_THREADS_MAX`, `HTTPX_THREADS_MAX`, `DALFOX_THREADS_MAX` caps so multi-core scaling does not overwhelm targets or hit FD limits
-- [ ] **Test coverage: `parallel_funcs` batch behaviour** — Tests for barrier sync, heartbeat polling, failure counter propagation
-- [ ] **Test coverage: end-to-end module pipelines** — Mocked integration between subdomains → web → vulns to catch handoff regressions
-- [ ] **Test coverage: axiom failover path** — `axiom_disable_runtime` invocation, partial-fleet fallback, host-key auto-repair
-- [ ] **Docs: surface undocumented config knobs** — `PARALLEL_MAX_JOBS`, `ALLOW_TRANSFER`, `RAISE_ULIMIT`, `ULIMIT_TARGET`, `AXIOM_EXTRA_ARGS` semantics added to `reconftw.cfg` comments
-- [ ] **Docs: disk-space default alignment** — Resolve `MIN_DISK_SPACE_GB=2` (cfg) vs `:-5` (modes.sh) mismatch
-- [ ] **Scope-check unification** — Reconcile `is_in_scope_host()` (Python-backed) vs `domain_match_regex()` (ERE) so a subdomain accepted by one path is accepted by the other; cross-check tests
+- [ ] **Language ADR** — Spike paralelo Go vs Python + comparativa medible + decisión firmada antes de cualquier código de producción
+- [ ] **Architecture v2** — Diseño de módulos, scheduler, checkpoint engine, config TOML, output tree, plugin/tool registry, observability, test strategy
+- [ ] **Foundation/scaffolding** — CLI, config loader, scheduler paralelo, checkpoint engine, validators, structured logging con redaction, output tree writer, test framework, CI
+- [ ] **`--subdomains` E2E ported** — Passive + brute + permutations + dnsx + scope + takeover + s3buckets + geo_info + ASN, paridad bash medida
+- [ ] **`--web` E2E ported** — Probe + screenshots + fuzz + JS + nuclei + WAF + sourcemaps + favicon + 20 funciones, paridad bash medida
+- [ ] **`--vulns` E2E ported** — XSS, SQLi, SSRF, LFI, SSTI, CRLF, smuggling, command injection, nuclei DAST, cache poisoning, fuzz params
+- [ ] **`--osint` E2E ported** — Domain/IP info, emails, GitHub dorks/leaks/actions audit, cloud enum, Postman leaks, Spoofy, msftrecon, CMSeeK
+- [ ] **Composite modes** — `-r/--recon`, `-a/--all`, `-p/--passive`, `--zen`, `--deep`, `--quick-rescan`, `--refresh-cache`, `--gen-resolvers`
+- [ ] **Axiom integration** — Launch/shutdown/selected, resolvers update, axiom-exec, failover wrapper, fleet sizing
+- [ ] **Monitor mode** — `--monitor`, `--monitor-interval`, `--monitor-cycles`, `--incremental`, diff detection, notification triggers
+- [ ] **Reporting** — JSON/HTML/CSV reports, AI report (OpenAI/Anthropic), Faraday export, hotlist risk scoring
+- [ ] **Notifications** — Slack/Telegram/Discord vía notify-equivalent, secret redaction en logs y mensajes
+- [ ] **Installer & deps** — Reemplazo de `install.sh`: 70+ herramientas externas (Go tools, Python tools, system deps, Rust toolchain)
+- [ ] **Cross-platform** — Linux (Debian/Ubuntu/RHEL/Arch) + macOS (Apple Silicon + Intel)
+- [ ] **Docker** — Imagen Docker actualizada con el nuevo binario/paquete
+- [ ] **Cutover & migration** — Plan de cutover, packaging final, documentación de migración, migrador opcional `reconftw.cfg` → nuevo formato
 
 ### Out of Scope
 
 <!-- Explicit boundaries to prevent scope creep. -->
 
 - **Active exploitation / payload delivery** — reconFTW maps attack surface and flags candidate vulns; weaponized exploitation belongs in user-driven tooling
-- **GUI / web dashboard** — CLI-first by design; report HTML is read-only output, not an interactive UI
+- **GUI / web dashboard** — CLI-first by design; report HTML is read-only output, not an interactive UI. (Nota: dirs `reconftw-web/` y `web/` en working tree son experimentación separada, no parte de v2.0)
 - **Real-time streaming results** — Output is file-based and post-run; live dashboards would require a fundamentally different architecture
 - **Multi-user collaboration** — Single-operator CLI tool; team workflows handled by external systems (Faraday, custom report aggregation)
 - **Cloud SaaS hosting** — Self-hosted CLI by design; Axiom is opt-in distributed execution, not managed hosting
-- **Replacing individual tools** — Wraps existing best-of-breed tools rather than re-implementing subfinder/nuclei/httpx/etc.
+- **Replacing individual tools** — Wraps existing best-of-breed tools rather than re-implementing subfinder/nuclei/httpx/etc. (Aplica a v2.0 también — las 70+ herramientas siguen siendo binarios externos invocados vía subprocess)
+- **Drop-in CLI compat con bash** — v2 rediseña libremente CLI/config/output tree; migrador opcional cubre usuarios actuales pero no se garantiza paridad de flags exacta
+- **Backporting v2 features a bash** — Bash en `main` queda frozen; mejoras del rewrite no se portan atrás
+- **bash v1.0 audit phases 3-5 (PERF-01, FIX-02, TEST-01/02/03, DOCS-01/02)** — Superseded por v2.0 migration; los issues se resuelven by design en el rewrite (single scope impl, tipos en scheduler, tests en framework nuevo, config nueva)
+- **bash refactor/cleanup activos previos** (thread-count caps, test coverage del bash, docs hidden tunables, scope-check unification) — Superseded por v2.0 migration: el rewrite tiene esos problemas resueltos by design
 
 ## Context
 
@@ -75,6 +124,8 @@ Run one command, get a complete recon picture of a target — passive, active, a
 - 2026-03: Comprehensive audit — CLI override unification, dead-code removal (`parallel_run`, `parallel_vulns_full`, `parallel_subdomains_full`), security hardening (XSS in HTML report, scope filter sed-escape, transfer() opt-in gate), parallel-safe timing in `start_func`/`end_func`, pushd/popd → subshell migration
 - UI overhaul — Dot-fill status format, single-line dependency summaries, parallel group rebalancing (zonetransfer + favicon parallel), removal of redundant `resolvers_update_quick_*` calls
 - 2026-05: Codebase mapped via `/gsd-map-codebase` (`.planning/codebase/*`)
+- 2026-05: v1.0 audit milestone partially shipped — Phase 1 (Resilience) + Phase 2 (Security Quoting) merged. Phases 3-5 (Concurrency Caps, Test Coverage, Docs Alignment) **superseded** by v2.0 migration.
+- 2026-05-27: **v2.0 milestone initialized** — Decision to migrate the framework completely from bash to Go/Python via language spike + complete rewrite on `rewrite/v2` branch.
 
 **Existing intel** — `.planning/codebase/ARCHITECTURE.md`, `STACK.md`, `STRUCTURE.md`, `CONVENTIONS.md`, `TESTING.md`, `CONCERNS.md`, `INTEGRATIONS.md` are the authoritative source for system behaviour. The CONCERNS.md inventory is the primary driver for the Active requirements above.
 
@@ -96,10 +147,16 @@ Run one command, get a complete recon picture of a target — passive, active, a
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | Brownfield GSD initialization | Codebase is mature, mapped, and actively maintained — questioning-driven greenfield setup would discard known context | ✓ Good |
-| CONCERNS.md drives Active requirements | Audit inventory already classifies severity and provides remediation guidance — using it as the backlog avoids re-deriving the same list | — Pending |
-| Audit-mode milestone first (not features) | The 2026-03 audit surfaced concrete reliability/security gaps that block confident feature work | — Pending |
-| Skip domain research | Bash recon tooling is the maintainer's own domain; codebase already documents stack/architecture; further research would not change requirements | — Pending |
-| Coarse granularity / parallel execution | Few, broader phases align with single-maintainer cadence; parallel plans inside a phase reduce calendar time | — Pending |
+| CONCERNS.md drove v1.0 audit Active requirements | Audit inventory already classified severity and provided remediation guidance — used it as the backlog instead of re-deriving | ⚠️ Superseded — v2.0 migration resuelve los mismos issues de raíz; phases 3-5 del audit no se ejecutan |
+| Audit-mode milestone first (not features) | The 2026-03 audit surfaced concrete reliability/security gaps that blocked confident feature work | ✓ Good — Phase 1+2 entregaron las mejoras críticas (resilience, security quoting, supply-chain hygiene) en bash antes del rewrite |
+| Skip domain research (for v1.0) | Bash recon tooling is the maintainer's own domain; codebase already documents stack/architecture; further research would not change v1.0 requirements | ✓ Good |
+| Coarse granularity / parallel execution | Few, broader phases align with single-maintainer cadence; parallel plans inside a phase reduce calendar time | ✓ Good |
+| **v2.0 — Complete migration of reconFTW from bash to Go/Python** | Cuatro dolores estructurales (robustez, concurrencia, packaging, onboarding) no se resuelven incrementalmente en bash sin un esfuerzo desproporcionado; un rewrite con tipos + concurrencia nativa + packaging único es la solución de raíz | — Pending |
+| **Single mega-milestone v2.0 (no v2.0→v2.5 staging)** | User priorizó "migrar todo" sobre "ship en fases" — milestone único acepta el riesgo (12-18m sin entregable shippable) a cambio de coherencia arquitectural y evitar arrastrar bash+nuevo lang en paralelo más tiempo del necesario | — Pending |
+| **Lenguaje elegido vía spike paralelo Go vs Python** | No comprometerse a un lenguaje antes de medirlo en el problema real; el spike PoC del mismo slice en ambos lenguajes da evidencia comparable de ergonomía/concurrencia/packaging/dev velocity | — Pending |
+| **Rediseñar libremente CLI/config/output tree** | La oportunidad de arreglar lo que en bash no se podía cambiar sin romper usuarios; migrador opcional cubre la transición de configs | — Pending |
+| **Bash en `main` frozen durante la migración** | Evita arrastrar paralelamente bash+nuevo lang más tiempo del necesario; sólo bugfixes críticos/security en `main` hasta cutover de `rewrite/v2` | — Pending |
+| **Branch larga `rewrite/v2` desde `dev` HEAD** | Mantiene planning artifacts y v1.0 audit shipped accessible; rewrite construye desde el último estado conocido bueno del bash | — Pending |
 
 ## Evolution
 
@@ -119,4 +176,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-13 after Phase 2 (Security Quoting & Supply-Chain Hygiene) completion*
+*Last updated: 2026-05-27 after milestone v2.0 (Complete Core Migration) initialization*
