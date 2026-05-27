@@ -18,7 +18,7 @@ Run one command, get a complete recon picture of a target — passive, active, a
 3. **Packaging & cross-platform** — Bash 4.3+, GNU coreutils en macOS, install.sh enorme, dependencias no pineadas, BSD vs GNU diff sin parar.
 4. **Onboarding & velocidad de cambio** — Pocas personas leen 3000 líneas de bash con globals y source guards a gusto; cada cambio se siente arriesgado.
 
-**Target features (16 deliverables — el roadmapper los desglosa en ~14-18 phases internas):**
+**Target features (17 deliverables — el roadmapper los desglosa en ~14-18 phases internas):**
 
 1. **ADR de lenguaje** — Research + spike paralelo Go vs Python (mismo PoC en ambos) + comparativa medible + decisión firmada
 2. **Arquitectura v2** — Diseño completo: módulos como unidades primera clase, scheduler paralelo, checkpoint engine, config TOML, output tree rediseñado, plugin/tool registry, observability, test strategy, packaging
@@ -35,7 +35,8 @@ Run one command, get a complete recon picture of a target — passive, active, a
 13. **Installer & deps** — Reemplazo de `install.sh`: instalación de 70+ herramientas externas (Go tools, Python tools, system deps, Rust toolchain)
 14. **Cross-platform** — Linux (Debian/Ubuntu/RHEL/Arch) + macOS (Apple Silicon + Intel) — single binary (Go) o paquete uv (Python)
 15. **Docker** — Imagen Docker actualizada con el nuevo binario/paquete
-16. **Cutover & migración** — Plan de cutover, packaging final, documentación de migración para usuarios actuales, migrador opcional `reconftw.cfg` → nuevo formato
+16. **Cutover & migración** — Plan de cutover con bug-bug parity test + 1-2m beta period, packaging final, MIGRATION.md, migrador REQUERIDO `reconftw.cfg` → TOML con corpus testing de 20+ configs reales bloqueando cutover, 6 meses de compat symlinks `Recon/<domain>/`
+17. **MCP server** *(añadido 2026-05-27 por decisión del usuario)* — Model Context Protocol server (`reconftw mcp serve`) que expone los modos de recon como tools MCP; auth por API key con redaction de secrets; resource limits via scheduler global; SARIF-compatible findings; OpenAPI schema; opt-in en config (default off). Promueve EMG-15 OpenAPI schema (requerido por MCP) a v2.0.
 
 **Working model:**
 - **Branch:** `rewrite/v2` desde `dev` HEAD — rama larga; sustituye `main` al hacer cutover
@@ -99,7 +100,8 @@ Run one command, get a complete recon picture of a target — passive, active, a
 - [ ] **Installer & deps** — Reemplazo de `install.sh`: 70+ herramientas externas (Go tools, Python tools, system deps, Rust toolchain)
 - [ ] **Cross-platform** — Linux (Debian/Ubuntu/RHEL/Arch) + macOS (Apple Silicon + Intel)
 - [ ] **Docker** — Imagen Docker actualizada con el nuevo binario/paquete
-- [ ] **Cutover & migration** — Plan de cutover, packaging final, documentación de migración, migrador opcional `reconftw.cfg` → nuevo formato
+- [ ] **Cutover & migration** — Plan de cutover (bug-bug parity test + beta 1-2m + community sign-off), packaging final, MIGRATION.md, migrador REQUERIDO `reconftw.cfg` → TOML con corpus testing de 20+ configs reales, 6 meses compat symlinks
+- [ ] **MCP server** — Model Context Protocol server (`reconftw mcp serve`); expone modos recon como tools MCP; auth por API key + redaction; SARIF-compat findings; OpenAPI schema; opt-in en config
 
 ### Out of Scope
 
@@ -125,7 +127,7 @@ Run one command, get a complete recon picture of a target — passive, active, a
 - UI overhaul — Dot-fill status format, single-line dependency summaries, parallel group rebalancing (zonetransfer + favicon parallel), removal of redundant `resolvers_update_quick_*` calls
 - 2026-05: Codebase mapped via `/gsd-map-codebase` (`.planning/codebase/*`)
 - 2026-05: v1.0 audit milestone partially shipped — Phase 1 (Resilience) + Phase 2 (Security Quoting) merged. Phases 3-5 (Concurrency Caps, Test Coverage, Docs Alignment) **superseded** by v2.0 migration.
-- 2026-05-27: **v2.0 milestone initialized** — Decision to migrate the framework completely from bash to Go/Python via language spike + complete rewrite on `rewrite/v2` branch.
+- 2026-05-27: **v2.0 milestone initialized** — Decision to migrate the framework completely from bash to Go/Python via language spike + complete rewrite on `rewrite/v2` branch. 4 parallel research agents (Stack, Features, Architecture, Pitfalls) + synthesizer produced `.planning/research/` foundation. Requirements defined: 17 deliverables, ~120 REQ-IDs, MCP server added as #17 per user decision.
 
 **Existing intel** — `.planning/codebase/ARCHITECTURE.md`, `STACK.md`, `STRUCTURE.md`, `CONVENTIONS.md`, `TESTING.md`, `CONCERNS.md`, `INTEGRATIONS.md` are the authoritative source for system behaviour. The CONCERNS.md inventory is the primary driver for the Active requirements above.
 
@@ -157,6 +159,15 @@ Run one command, get a complete recon picture of a target — passive, active, a
 | **Rediseñar libremente CLI/config/output tree** | La oportunidad de arreglar lo que en bash no se podía cambiar sin romper usuarios; migrador opcional cubre la transición de configs | — Pending |
 | **Bash en `main` frozen durante la migración** | Evita arrastrar paralelamente bash+nuevo lang más tiempo del necesario; sólo bugfixes críticos/security en `main` hasta cutover de `rewrite/v2` | — Pending |
 | **Branch larga `rewrite/v2` desde `dev` HEAD** | Mantiene planning artifacts y v1.0 audit shipped accessible; rewrite construye desde el último estado conocido bueno del bash | — Pending |
+| **CLI surface: subcommands primary + v1 short flags como deprecated aliases** | Convención 2026 (ProjectDiscovery, Amass, recon-ng); preserva muscle memory v1 con warning de deprecación por 2 minor versions para migración suave | — Pending |
+| **Config migrator REQUIRED + corpus testing de 20+ configs reales bloqueando cutover** | Pitfall top-5: "usuario pierde customizaciones" = rewrite muerto al arrancar. Corpus testing es el único escudo creíble; unknown keys producen warnings ruidosos, NUNCA silent drop | — Pending |
+| **MCP server INCLUIDO en v2.0 como deliverable #17 (mandatory, opt-in via config)** | Decisión proactiva por dirección AI 2026+; expande deliverables 16→17; promueve OpenAPI schema (EMG-15) de v2.1+ a v2.0 porque MCP lo necesita; opt-in en config (default off) preserva opcionalidad para usuarios hostiles a IA | — Pending |
+| **Cutover criterion: bug-bug parity test + 1-2 mes beta period + community sign-off** | Equilibra rigor (parity automated test contra 3-5 canonical targets) con realismo (no 100% match imposible por ordering/timing); beta period detecta lo que tests automáticos no ven | — Pending |
+| **Output tree: nuevo `workspaces/<target-id>/` + 6 meses compat symlinks `Recon/<domain>/`** | Permite rediseño limpio (tipos JSONL, atomic writes, schema versioning) sin romper scripts downstream de usuarios; ventana de 6m forzada por compat symlink writer | — Pending |
+| **Installer: rewrite completo en el lenguaje elegido, NO bootstrap shell** | El bash `install.sh` v1 es uno de los pain points en Constraints; rewrite con `tools.lock` + SHA-256 verification es uno de los wins más claros del milestone | — Pending |
+| **Performance acceptance: within 10% bash v1 throughput en canonical benchmark** | Orchestration es I/O-bound — ambos langs deberían matchear bash en throughput; 10% margin acepta overhead de tipos sin permitir regresión silenciosa | — Pending |
+| **Resource budget: Go binary <50MB OR Python uv tool <500MB; RSS <2GB en typical load** | Establece techo medible; previene scope creep en dependencias | — Pending |
+| **Test parity: feature-parity coverage de 351 bats scenarios + branch coverage gate** | NO line-for-line port (bats no traduce 1:1); cubre los escenarios funcionales con framework nativo nuevo | — Pending |
 
 ## Evolution
 
@@ -176,4 +187,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-27 after milestone v2.0 (Complete Core Migration) initialization*
+*Last updated: 2026-05-27 after milestone v2.0 (Complete Core Migration) initialization + requirements definition (17 deliverables including MCP server)*
