@@ -55,7 +55,16 @@ terraform.rc
 
 # Spike PoC — generated outputs (Phase 1 ADR)
 spike/go/out/
-spike/python/out/
+spike/python/out/*.jsonl
+spike/python/out/*.log
+spike/python/out/*.err
+spike/python/out/*.tmp.*
+spike/python/build/
+spike/python/dist/*.spec
+spike/python/__pycache__/
+spike/python/src/**/__pycache__/
+spike/python/tests/__pycache__/
+spike/python/.pytest_cache/
 spike/go/bin/
 spike/python/.venv/
 spike/comparison.json
@@ -64,3 +73,4 @@ spike/baselines/.regen-*
 spike/go/.spike_session_start
 spike/python/.spike_session_start
 spike/.spike_sessions.log
+out/
