@@ -1,0 +1,9 @@
+M6 cross-platform pain ordinal: 1 (first try on macOS arm64 Darwin 25.5.0, Go 1.26.1)
+
+go mod init, go get (cobra v1.9.1, testify v1.11.1, errgroup), go build, and make test
+all passed on first try with no platform-specific tweaks. No brew installs or env vars needed.
+
+One correctness fix was needed for proc.Run: Go's WaitDelay sends SIGKILL to the direct child
+only (not the process group). A goroutine was added to send SIGKILL to the entire process group
+after WaitDelay — this is a cross-platform correctness issue, not a macOS-specific one.
+Rating: 1 (the fix is the same on all platforms; no platform branching required).
