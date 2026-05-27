@@ -202,7 +202,7 @@ Calendar parallelization (within constraint that dependencies are met):
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Language ADR & Spike | 1/5 | In Progress|  |
+| 1. Language ADR & Spike | 2/5 | In Progress|  |
 | 2. Architecture v2 Design | 0/? | Not started | - |
 | 3. Foundation Kernel | 0/? | Not started | - |
 | 4. Subdomains E2E + Axiom Integration | 0/? | Not started | - |
