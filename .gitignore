@@ -73,3 +73,4 @@ spike/baselines/.regen-*
 spike/go/.spike_session_start
 spike/python/.spike_session_start
 spike/.spike_sessions.log
+out/

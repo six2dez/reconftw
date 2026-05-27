@@ -1,0 +1,5 @@
+M6 ordinal: 1 — macOS arm64 (Darwin 25.5.0)
+uv venv + uv sync --all-groups succeeded first try (Python 3.14.4).
+Minor fix: Makefile --timeout=60 flag removed (pytest-timeout plugin not in venv; not needed for spike).
+PyInstaller --onefile build succeeded first try, producing 12.2 MB ARM64 binary.
+All 5 unit tests passed first run, no code changes required for cross-platform compatibility.
