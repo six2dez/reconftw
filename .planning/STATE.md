@@ -4,8 +4,8 @@ milestone: v2.0
 milestone_name: Complete Core Migration
 status: executing
 stopped_at: Phase 1 context gathered
-last_updated: "2026-05-27T12:08:13.654Z"
-last_activity: 2026-05-27 -- Phase 1 planning complete
+last_updated: "2026-05-27T12:40:12.169Z"
+last_activity: 2026-05-27 -- Phase 01 execution started
 progress:
   total_phases: 12
   completed_phases: 0
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-27)
 
 **Core value:** Run one command, get a complete recon picture of a target — passive, active, and vulnerability layers — with resumable checkpoints, structured output, and zero-touch tool orchestration.
-**Current focus:** Milestone v2.0 — Complete Core Migration (Bash → Go/Python). Roadmap created (12 phases, 197 REQ-IDs mapped 100%); next step is planning Phase 1 (Language ADR & Spike).
+**Current focus:** Phase 01 — language-adr-spike
 
 ## Current Position
 
-Phase: Phase 1 — Language ADR & Spike (not started; awaiting plan-phase)
-Plan: —
-Status: Ready to execute
-Last activity: 2026-05-27 -- Phase 1 planning complete
+Phase: 01 (language-adr-spike) — EXECUTING
+Plan: 1 of 5
+Status: Executing Phase 01
+Last activity: 2026-05-27 -- Phase 01 execution started
 
 ## Performance Metrics
 
