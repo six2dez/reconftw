@@ -3,8 +3,9 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Complete Core Migration
 status: planning
-last_updated: "2026-05-27T09:00:00.000Z"
-last_activity: 2026-05-27
+stopped_at: Phase 1 context gathered
+last_updated: "2026-05-27T10:31:44.274Z"
+last_activity: 2026-05-27 — Roadmap created (12 phases, 197 REQ-IDs mapped)
 progress:
   total_phases: 12
   completed_phases: 0
@@ -113,6 +114,6 @@ Items captured durante v1.0 que deben informar el diseño de arquitectura v2 (no
 
 ## Session Continuity
 
-Last session: 2026-05-27 — Roadmap created (12 phases, 197 REQ-IDs mapped 100%)
-Stopped at: Awaiting Phase 1 plan creation
-Resume file: .planning/ROADMAP.md → next step `/gsd:plan-phase 1` to begin Language ADR & Spike
+Last session: 2026-05-27T10:31:44.268Z
+Stopped at: Phase 1 context gathered
+Resume file: .planning/phases/01-language-adr-spike/01-CONTEXT.md
