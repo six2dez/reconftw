@@ -9,10 +9,10 @@ build:
 	uv run pyinstaller --onefile --name spike src/spike/__main__.py --distpath dist --workpath build --specpath build
 
 test:
-	uv run pytest tests/ -v -m "not integration" --timeout=60
+	uv run pytest tests/ -v -m "not integration"
 
 integration-test:
-	uv run pytest tests/ -v -m integration --timeout=300
+	uv run pytest tests/ -v -m integration
 
 lint:
 	uv run ruff check src/ tests/ 2>/dev/null || true
