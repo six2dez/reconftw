@@ -321,13 +321,209 @@ Explicitly excluded. Documented to prevent scope creep.
 
 ## Traceability
 
-Filled by roadmapper agent during phase creation. Each REQ-ID maps to exactly one phase.
+Each REQ-ID maps to exactly one phase. Populated by roadmapper agent 2026-05-27.
+
+**Coverage: 197/197 (100%)** — every REQ-ID above is mapped to a phase.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (Empty — populated by roadmapper) | — | — |
-
-**Coverage target:** 100% — every REQ-ID above must be mapped to a phase before roadmap is approved.
+| DEC-01 | Phase 1 — Language ADR & Spike | Pending |
+| DEC-02 | Phase 1 — Language ADR & Spike | Pending |
+| DEC-03 | Phase 1 — Language ADR & Spike | Pending |
+| DEC-04 | Phase 1 — Language ADR & Spike | Pending |
+| DEC-05 | Phase 1 — Language ADR & Spike | Pending |
+| ARCH-01 | Phase 2 — Architecture v2 Design | Pending |
+| ARCH-02 | Phase 2 — Architecture v2 Design | Pending |
+| ARCH-03 | Phase 2 — Architecture v2 Design | Pending |
+| ARCH-04 | Phase 2 — Architecture v2 Design | Pending |
+| ARCH-05 | Phase 2 — Architecture v2 Design | Pending |
+| ARCH-06 | Phase 2 — Architecture v2 Design | Pending |
+| ARCH-07 | Phase 2 — Architecture v2 Design | Pending |
+| ARCH-08 | Phase 2 — Architecture v2 Design | Pending |
+| ARCH-09 | Phase 2 — Architecture v2 Design | Pending |
+| ARCH-10 | Phase 2 — Architecture v2 Design | Pending |
+| ARCH-11 | Phase 2 — Architecture v2 Design | Pending |
+| ARCH-12 | Phase 2 — Architecture v2 Design | Pending |
+| FOUND-01 | Phase 3 — Foundation Kernel | Pending |
+| FOUND-02 | Phase 3 — Foundation Kernel | Pending |
+| FOUND-03 | Phase 3 — Foundation Kernel | Pending |
+| FOUND-04 | Phase 3 — Foundation Kernel | Pending |
+| FOUND-05 | Phase 3 — Foundation Kernel | Pending |
+| FOUND-06 | Phase 3 — Foundation Kernel | Pending |
+| FOUND-07 | Phase 3 — Foundation Kernel | Pending |
+| FOUND-08 | Phase 3 — Foundation Kernel | Pending |
+| FOUND-09 | Phase 3 — Foundation Kernel | Pending |
+| FOUND-10 | Phase 3 — Foundation Kernel | Pending |
+| FOUND-11 | Phase 3 — Foundation Kernel | Pending |
+| FOUND-12 | Phase 3 — Foundation Kernel | Pending |
+| FOUND-13 | Phase 3 — Foundation Kernel | Pending |
+| FOUND-14 | Phase 3 — Foundation Kernel | Pending |
+| FOUND-15 | Phase 3 — Foundation Kernel | Pending |
+| FOUND-16 | Phase 3 — Foundation Kernel | Pending |
+| SUBD-01 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| SUBD-02 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| SUBD-03 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| SUBD-04 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| SUBD-05 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| SUBD-06 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| SUBD-07 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| SUBD-08 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| SUBD-09 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| SUBD-10 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| SUBD-11 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| AXIOM-01 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| AXIOM-02 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| AXIOM-03 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| AXIOM-04 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| AXIOM-05 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| AXIOM-06 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| AXIOM-07 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| AXIOM-08 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| AXIOM-09 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| WEB-01 | Phase 5 — Web Pipeline E2E | Pending |
+| WEB-02 | Phase 5 — Web Pipeline E2E | Pending |
+| WEB-03 | Phase 5 — Web Pipeline E2E | Pending |
+| WEB-04 | Phase 5 — Web Pipeline E2E | Pending |
+| WEB-05 | Phase 5 — Web Pipeline E2E | Pending |
+| WEB-06 | Phase 5 — Web Pipeline E2E | Pending |
+| WEB-07 | Phase 5 — Web Pipeline E2E | Pending |
+| WEB-08 | Phase 5 — Web Pipeline E2E | Pending |
+| WEB-09 | Phase 5 — Web Pipeline E2E | Pending |
+| WEB-10 | Phase 5 — Web Pipeline E2E | Pending |
+| WEB-11 | Phase 5 — Web Pipeline E2E | Pending |
+| WEB-12 | Phase 5 — Web Pipeline E2E | Pending |
+| WEB-13 | Phase 5 — Web Pipeline E2E | Pending |
+| WEB-14 | Phase 5 — Web Pipeline E2E | Pending |
+| WEB-15 | Phase 5 — Web Pipeline E2E | Pending |
+| WEB-16 | Phase 5 — Web Pipeline E2E | Pending |
+| VULN-01 | Phase 6 — Vulnerability Scanning E2E | Pending |
+| VULN-02 | Phase 6 — Vulnerability Scanning E2E | Pending |
+| VULN-03 | Phase 6 — Vulnerability Scanning E2E | Pending |
+| VULN-04 | Phase 6 — Vulnerability Scanning E2E | Pending |
+| VULN-05 | Phase 6 — Vulnerability Scanning E2E | Pending |
+| VULN-06 | Phase 6 — Vulnerability Scanning E2E | Pending |
+| VULN-07 | Phase 6 — Vulnerability Scanning E2E | Pending |
+| VULN-08 | Phase 6 — Vulnerability Scanning E2E | Pending |
+| VULN-09 | Phase 6 — Vulnerability Scanning E2E | Pending |
+| VULN-10 | Phase 6 — Vulnerability Scanning E2E | Pending |
+| VULN-11 | Phase 6 — Vulnerability Scanning E2E | Pending |
+| VULN-12 | Phase 6 — Vulnerability Scanning E2E | Pending |
+| VULN-13 | Phase 6 — Vulnerability Scanning E2E | Pending |
+| VULN-14 | Phase 6 — Vulnerability Scanning E2E | Pending |
+| OSINT-01 | Phase 7 — OSINT E2E | Pending |
+| OSINT-02 | Phase 7 — OSINT E2E | Pending |
+| OSINT-03 | Phase 7 — OSINT E2E | Pending |
+| OSINT-04 | Phase 7 — OSINT E2E | Pending |
+| OSINT-05 | Phase 7 — OSINT E2E | Pending |
+| OSINT-06 | Phase 7 — OSINT E2E | Pending |
+| OSINT-07 | Phase 7 — OSINT E2E | Pending |
+| OSINT-08 | Phase 7 — OSINT E2E | Pending |
+| OSINT-09 | Phase 7 — OSINT E2E | Pending |
+| OSINT-10 | Phase 7 — OSINT E2E | Pending |
+| OSINT-11 | Phase 7 — OSINT E2E | Pending |
+| OSINT-12 | Phase 7 — OSINT E2E | Pending |
+| OSINT-13 | Phase 7 — OSINT E2E | Pending |
+| OSINT-14 | Phase 7 — OSINT E2E | Pending |
+| OSINT-15 | Phase 7 — OSINT E2E | Pending |
+| OSINT-16 | Phase 7 — OSINT E2E | Pending |
+| MCP-01 | Phase 8 — MCP Server | Pending |
+| MCP-02 | Phase 8 — MCP Server | Pending |
+| MCP-03 | Phase 8 — MCP Server | Pending |
+| MCP-04 | Phase 8 — MCP Server | Pending |
+| MCP-05 | Phase 8 — MCP Server | Pending |
+| MCP-06 | Phase 8 — MCP Server | Pending |
+| MCP-07 | Phase 8 — MCP Server | Pending |
+| MCP-08 | Phase 8 — MCP Server | Pending |
+| MCP-09 | Phase 8 — MCP Server | Pending |
+| MCP-10 | Phase 8 — MCP Server | Pending |
+| MODE-01 | Phase 9 — Composite Modes | Pending |
+| MODE-02 | Phase 9 — Composite Modes | Pending |
+| MODE-03 | Phase 9 — Composite Modes | Pending |
+| MODE-04 | Phase 9 — Composite Modes | Pending |
+| MODE-05 | Phase 9 — Composite Modes | Pending |
+| MODE-06 | Phase 9 — Composite Modes | Pending |
+| MODE-07 | Phase 9 — Composite Modes | Pending |
+| MODE-08 | Phase 9 — Composite Modes | Pending |
+| MODE-09 | Phase 9 — Composite Modes | Pending |
+| MODE-10 | Phase 9 — Composite Modes | Pending |
+| MODE-11 | Phase 9 — Composite Modes | Pending |
+| MODE-12 | Phase 9 — Composite Modes | Pending |
+| MON-01 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| MON-02 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| MON-03 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| MON-04 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| MON-05 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| MON-06 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| MON-07 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| MON-08 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| REPORT-01 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| REPORT-02 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| REPORT-03 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| REPORT-04 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| REPORT-05 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| REPORT-06 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| REPORT-07 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| REPORT-08 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| REPORT-09 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| NOTIF-01 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| NOTIF-02 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| NOTIF-03 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| NOTIF-04 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| NOTIF-05 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| NOTIF-06 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| NOTIF-07 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| INST-01 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| INST-02 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| INST-03 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| INST-04 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| INST-05 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| INST-06 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| INST-07 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| INST-08 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| INST-09 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| INST-10 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| INST-11 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| INST-12 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| XPLAT-01 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| XPLAT-02 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| XPLAT-03 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| XPLAT-04 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| XPLAT-05 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| XPLAT-06 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| XPLAT-07 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| XPLAT-08 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| XPLAT-09 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| DOCK-01 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| DOCK-02 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| DOCK-03 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| DOCK-04 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| DOCK-05 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| DOCK-06 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| DOCK-07 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| CUT-01 | Phase 12 — Cutover & Migration | Pending |
+| CUT-02 | Phase 12 — Cutover & Migration | Pending |
+| CUT-03 | Phase 12 — Cutover & Migration | Pending |
+| CUT-04 | Phase 12 — Cutover & Migration | Pending |
+| CUT-05 | Phase 12 — Cutover & Migration | Pending |
+| CUT-06 | Phase 12 — Cutover & Migration | Pending |
+| CUT-07 | Phase 12 — Cutover & Migration | Pending |
+| CUT-08 | Phase 12 — Cutover & Migration | Pending |
+| CUT-09 | Phase 12 — Cutover & Migration | Pending |
+| CUT-10 | Phase 12 — Cutover & Migration | Pending |
+| CUT-11 | Phase 12 — Cutover & Migration | Pending |
+| CUT-12 | Phase 12 — Cutover & Migration | Pending |
+| CUT-13 | Phase 12 — Cutover & Migration | Pending |
+| CUT-14 | Phase 12 — Cutover & Migration | Pending |
+| CUT-15 | Phase 12 — Cutover & Migration | Pending |
+| XCUT-01 | Phase 12 — Cutover & Migration (baseline est. Phase 3, validated per-module phase) | Pending |
+| XCUT-02 | Phase 3 — Foundation Kernel | Pending |
+| XCUT-03 | Phase 12 — Cutover & Migration (gate established Phase 3) | Pending |
+| XCUT-04 | Phase 3 — Foundation Kernel (CI runs every phase) | Pending |
+| XCUT-05 | Phase 12 — Cutover & Migration | Pending |
+| XCUT-06 | Phase 12 — Cutover & Migration | Pending |
+| XCUT-07 | Phase 3 — Foundation Kernel (lint + tested every phase) | Pending |
+| XCUT-08 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
+| XCUT-09 | Phase 3 — Foundation Kernel (heartbeat tested every phase) | Pending |
 
 ---
 
@@ -355,5 +551,5 @@ These shaped REQ-IDs above. Captured for future reference.
 ---
 
 *Requirements defined: 2026-05-27*
-*Last updated: 2026-05-27 after milestone v2.0 initialization*
+*Last updated: 2026-05-27 after milestone v2.0 initialization + roadmapper traceability population (197/197 REQ-IDs mapped to 12 phases)*
 *Source: PROJECT.md (17 deliverables) + `.planning/research/SUMMARY.md` + user decisions 2026-05-27*
