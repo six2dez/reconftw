@@ -129,21 +129,21 @@ func TestOutputTreeRejectsOutOfScope(t *testing.T) {
 		t.Errorf("OutOfScope.Value = %q; want %q", oos.Value, "evil.com")
 	}
 
+	// Sentinel check on errors.Is — must traverse to ErrScope.
+	if !stderrors.Is(err, coreerrors.ErrScope) {
+		t.Fatal("errors.Is(err, ErrScope) must be true for *OutOfScope")
+	}
+
 	// The original content must still be on disk (no partial write).
-	body, err := os.ReadFile(filepath.Join(tree.Root, "artefacts", "subdomains.jsonl"))
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
+	body, readErr := os.ReadFile(filepath.Join(tree.Root, "artefacts", "subdomains.jsonl"))
+	if readErr != nil {
+		t.Fatalf("ReadFile: %v", readErr)
 	}
 	if !strings.Contains(string(body), "first.example.com") {
 		t.Fatalf("scope-rejected batch overwrote original: %s", body)
 	}
 	if strings.Contains(string(body), "evil.com") {
 		t.Fatal("out-of-scope value was written")
-	}
-
-	// Sentinel check on errors.Is — must traverse to ErrScope.
-	if !stderrors.Is(err, coreerrors.ErrScope) {
-		t.Fatal("errors.Is(err, ErrScope) must be true for *OutOfScope")
 	}
 }
 
