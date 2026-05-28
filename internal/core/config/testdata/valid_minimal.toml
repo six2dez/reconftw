@@ -1,0 +1,3 @@
+# Minimal valid override — used by validation passes + property test seed.
+[concurrency]
+max_jobs = 5

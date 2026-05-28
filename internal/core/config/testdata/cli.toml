@@ -1,0 +1,3 @@
+# Simulated --config FILE
+[concurrency]
+max_jobs = 11

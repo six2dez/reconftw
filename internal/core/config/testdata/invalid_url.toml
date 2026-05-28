@@ -1,0 +1,4 @@
+# Validation gate — slack.webhook_url is not a URL.
+# Must produce *errors.ConfigError; error message MUST NOT contain raw value.
+[notifications.slack]
+webhook_url = "REDACT_THIS_SENTINEL_VALUE_abcdef123"

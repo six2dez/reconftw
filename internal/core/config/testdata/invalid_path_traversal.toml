@@ -1,0 +1,4 @@
+# Validation gate — paths.resolvers contains ".." (path traversal).
+# Must produce *errors.ConfigError; error message MUST mention the key but NOT the raw value verbatim.
+[paths]
+resolvers = "/etc/../etc/passwd"

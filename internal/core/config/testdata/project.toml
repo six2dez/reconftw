@@ -1,0 +1,7 @@
+# Simulated ./reconftw.toml
+[concurrency]
+max_jobs = 10
+tail_lines = 50
+
+[web.probe]
+rate_limit = 200

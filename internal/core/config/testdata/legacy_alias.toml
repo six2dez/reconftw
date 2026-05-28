@@ -1,0 +1,10 @@
+# Exercises the [legacy] table mechanism.
+# Each entry maps to a v2-native key via legacyAliasMap.
+# Per ADR §2.3: when both legacy and v2-native are set, v2-native wins
+# and a WARN is logged per collision.
+[legacy]
+PARALLEL_MAX_JOBS = 8
+OSINT = true
+SUBDOMAINS_GENERAL = false
+SHODAN_API_KEY = "test-legacy-shodan-key-aaa-12345"
+AXIOM_FLEET_COUNT = 20
