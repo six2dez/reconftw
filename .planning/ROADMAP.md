@@ -30,7 +30,7 @@ This milestone delivers a **complete rewrite** of reconFTW from Bash to a typed/
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Language ADR & Spike** — Identical recon slice in BOTH Go and Python; measured comparison; signed ADR before any production code
-- [ ] **Phase 2: Architecture v2 Design** — Lock TOML schema, output tree, Task/Backend/AppContext/Error interfaces, CLI surface, test policy, failure isolation — Foundation depends on these
+- [x] **Phase 2: Architecture v2 Design** — Lock TOML schema, output tree, Task/Backend/AppContext/Error interfaces, CLI surface, test policy, failure isolation — Foundation depends on these (completed 2026-05-28)
 - [ ] **Phase 3: Foundation Kernel** — Errors + Logger + Config + OutputTree + Checkpoint + Scheduler + Tools + AppContext + CLI + Mocks + CI from day 1
 - [ ] **Phase 4: Subdomains E2E + Axiom Integration** — Canonical reference port; passive+brute+permut+dnsx+scope+takeover+buckets+geo+ASN with Axiom distributed execution; output-equivalence test gates phase end
 - [ ] **Phase 5: Web Pipeline E2E** — Probe + screenshots + fuzz + JS + nuclei + WAF + sourcemaps + favicon + CSP + vhost + 4xx-bypass + URL discovery + 20-function surface with parity test
@@ -74,7 +74,7 @@ Plans:
 - [x] 02-04-PLAN.md — §5 Interface Signatures + §6 Error Class Hierarchy + §7 Failure Policy
 - [x] 02-05-PLAN.md — §8 CLI Surface + §9 Test Ring Policy + §10 Logging Policy
 - [x] 02-06-PLAN.md — Integration pass: §1 Overview + TL;DR + Glossary + Consequences
-- [ ] 02-07-PLAN.md — Pre-sign gate + sign-off ceremony (checkpoint: autonomous: false)
+- [x] 02-07-PLAN.md — Pre-sign gate + sign-off ceremony (checkpoint: autonomous: false)
 
 ### Phase 3: Foundation Kernel
 **Goal**: Ship the kernel — typed errors, structured logger with redaction, layered config loader, atomic output tree, SQLite checkpoint, bounded scheduler, tool registry with kill-tree-safe LocalBackend, AppContext, CLI binary, test mocks, and CI gate — so module ports can begin against a stable foundation.
@@ -211,7 +211,7 @@ Calendar parallelization (within constraint that dependencies are met):
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Language ADR & Spike | 4/5 | In Progress|  |
-| 2. Architecture v2 Design | 6/7 | In Progress|  |
+| 2. Architecture v2 Design | 7/7 | Complete   | 2026-05-28 |
 | 3. Foundation Kernel | 0/? | Not started | - |
 | 4. Subdomains E2E + Axiom Integration | 0/? | Not started | - |
 | 5. Web Pipeline E2E | 0/? | Not started | - |

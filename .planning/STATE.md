@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Complete Core Migration
 status: ready_to_plan
-stopped_at: Phase 2 complete (7/7) — ADR 0002 signed; ready to discuss Phase 3
-last_updated: "2026-05-28T14:30:00.000Z"
+stopped_at: Phase 02 complete (7/7) — ready to discuss Phase 3
+last_updated: 2026-05-28T12:40:22.502Z
 last_activity: 2026-05-28 -- Phase 2 ADR signed (architecture v2 locked)
 progress:
   total_phases: 12
   completed_phases: 2
   total_plans: 12
   completed_plans: 12
-  percent: 16
+  percent: 17
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-27)
 
 **Core value:** Run one command, get a complete recon picture of a target — passive, active, and vulnerability layers — with resumable checkpoints, structured output, and zero-touch tool orchestration.
-**Current focus:** Phase 3 — Foundation Kernel (architecture v2 locked by ADR 0002)
+**Current focus:** Phase 3 — foundation kernel
 
 ## Current Position
 
-Phase: 02 (architecture-v2-design) — EXECUTING
-Plan: 1 of 7
-Status: Phase 2 complete; ready to plan Phase 3
-Last activity: 2026-05-28 -- Phase 2 ADR signed (architecture v2 locked)
+Phase: 3
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-28
 
 ## Performance Metrics
 
@@ -36,7 +36,7 @@ Last activity: 2026-05-28 -- Phase 2 ADR signed (architecture v2 locked)
 
 - Phases planned: 12 (coarse granularity; parallelization enabled within phases)
 - Total REQ-IDs: 197 (100% mapped to phases)
-- Total plans completed: 12
+- Total plans completed: 19
 - Total execution time: 0.0 hours
 
 **v2.0 phase status:**
