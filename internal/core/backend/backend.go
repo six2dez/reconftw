@@ -61,6 +61,13 @@ type Tool struct {
 	DefaultArgs []string
 	Timeout     time.Duration // per-invocation timeout; 0 = no timeout
 	Critical    bool          // FOUND-08 missing-and-critical tier (Blocker 5; ADR §0 D-07 non-breaking field)
+	// InputFlag is the CLI flag (or empty string for positional last arg) that
+	// receives the input file in Axiom fleet splits. E.g. puredns uses
+	// InputFlag="" (positional), dnsx uses InputFlag="-l", tlsx uses
+	// InputFlag="-l", s3scanner uses InputFlag="--bucket-file". Empty string =
+	// positional last argument. Used by AxiomBackend.Exec to split the correct
+	// argument; prevents the extractInputFile heuristic bug (REVIEWS finding #5).
+	InputFlag string
 }
 
 // Backend abstracts local subprocess execution from distributed (Axiom) execution.

@@ -33,6 +33,7 @@ description     = "Passive multi-source subdomain enumeration"
 default_args    = []
 timeout_seconds = 180
 critical        = true
+input_flag      = ""
 
 [[tools]]
 name            = "httpx"
@@ -42,6 +43,7 @@ description     = "HTTP probe with tech detection"
 default_args    = []
 timeout_seconds = 0
 critical        = true
+input_flag      = "-l"
 
 [[tools]]
 name            = "dnsx"
@@ -51,6 +53,7 @@ description     = "DNS toolkit (A/CNAME/MX/TXT resolver)"
 default_args    = []
 timeout_seconds = 14400
 critical        = true
+input_flag      = "-l"
 
 [[tools]]
 name            = "crt"
@@ -60,15 +63,17 @@ description     = "crt.sh search"
 default_args    = []
 timeout_seconds = 60
 critical        = false
+input_flag      = ""
 
 [[tools]]
 name            = "puredns"
 kind            = "go"
 go_module       = "github.com/d3mondev/puredns/v2"
-description     = "Mass DNS resolution with wildcard filtering"
+description     = "Mass DNS resolution with wildcard filtering; positional: puredns bruteforce <wordlist> -d <domain> OR puredns resolve <domains>"
 default_args    = []
-timeout_seconds = 0
-critical        = false
+timeout_seconds = 3600
+critical        = true
+input_flag      = ""
 
 [[tools]]
 name            = "gotator"
@@ -78,6 +83,7 @@ description     = "Subdomain permutations"
 default_args    = []
 timeout_seconds = 600
 critical        = false
+input_flag      = ""
 
 [[tools]]
 name            = "anew"
@@ -87,6 +93,7 @@ description     = "Append new lines only (dedup)"
 default_args    = []
 timeout_seconds = 30
 critical        = false
+input_flag      = ""
 
 [[tools]]
 name            = "asnmap"
@@ -96,6 +103,7 @@ description     = "ASN-to-CIDR mapping"
 default_args    = []
 timeout_seconds = 120
 critical        = false
+input_flag      = ""
 
 [[tools]]
 name            = "s3scanner"
@@ -105,6 +113,7 @@ description     = "S3/GCS/Azure Blob misconfiguration scanner"
 default_args    = []
 timeout_seconds = 600
 critical        = false
+input_flag      = "--bucket-file"
 
 [[tools]]
 name            = "subzy"
@@ -114,3 +123,167 @@ description     = "Subdomain takeover detection"
 default_args    = []
 timeout_seconds = 600
 critical        = false
+input_flag      = ""
+
+# Phase 4 expansion — plan-00
+
+[[tools]]
+name            = "github-subdomains"
+kind            = "go"
+go_module       = "github.com/gwen001/github-subdomains"
+description     = "GitHub-based subdomain search"
+default_args    = []
+timeout_seconds = 120
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "gitlab-subdomains"
+kind            = "go"
+go_module       = "github.com/gwen001/gitlab-subdomains"
+description     = "GitLab-based subdomain search"
+default_args    = []
+timeout_seconds = 120
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "tlsx"
+kind            = "go"
+go_module       = "github.com/projectdiscovery/tlsx/cmd/tlsx"
+description     = "TLS certificate harvesting"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+input_flag      = "-l"
+
+[[tools]]
+name            = "dnstake"
+kind            = "go"
+go_module       = "github.com/pwnesia/dnstake"
+description     = "Subdomain takeover detection via DNS"
+default_args    = []
+timeout_seconds = 600
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "regulator"
+kind            = "python"
+pip_package     = "git+https://github.com/cramppet/regulator"
+description     = "Regex-based subdomain permutations"
+default_args    = []
+timeout_seconds = 600
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "hakip2host"
+kind            = "go"
+go_module       = "github.com/hakluke/hakip2host"
+description     = "Reverse IP lookup"
+default_args    = []
+timeout_seconds = 120
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "analyticsrelationships"
+kind            = "go"
+go_module       = "github.com/Josue87/analyticsrelationships"
+description     = "Google Analytics-based subdomain pivoting"
+default_args    = []
+timeout_seconds = 120
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "favirecon"
+kind            = "go"
+go_module       = "github.com/edoardottt/favirecon/cmd/favirecon"
+description     = "Favicon-based technology reconnaissance"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "subjs"
+kind            = "go"
+go_module       = "github.com/lc/subjs"
+description     = "JavaScript URL extractor"
+default_args    = []
+timeout_seconds = 120
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "jsluice"
+kind            = "go"
+go_module       = "github.com/BishopFox/jsluice/cmd/jsluice"
+description     = "JS secret/URL extractor"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "massdns"
+kind            = "system"
+description     = "High-performance DNS stub resolver (build from source)"
+default_args    = []
+timeout_seconds = 0
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "urlfinder"
+kind            = "go"
+go_module       = "github.com/projectdiscovery/urlfinder/cmd/urlfinder"
+description     = "URL discovery"
+default_args    = []
+timeout_seconds = 180
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "unfurl"
+kind            = "go"
+go_module       = "github.com/tomnomnom/unfurl"
+description     = "URL parser"
+default_args    = []
+timeout_seconds = 30
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "axiom-scan"
+kind            = "system"
+description     = "Axiom distributed scan CLI (part of axiom installation)"
+default_args    = []
+timeout_seconds = 0
+critical        = false
+input_flag      = ""
+
+[[tools]]
+# dnscewl: DNS permutation wordlist generator (B1/W1 — SUBD-03 third permut tool named in D-01)
+# INSTALL AMBIGUITY: go_module path requires verification against pkg before installing
+# (slopcheck protocol — verify at pkg.go.dev/github.com/codingo/dnscewl)
+name            = "dnscewl"
+kind            = "go"
+go_module       = "github.com/codingo/dnscewl"
+description     = "DNS permutation wordlist generator (SUBD-03 third permut tool)"
+default_args    = []
+timeout_seconds = 600
+critical        = false
+input_flag      = "-f"
+
+[[tools]]
+name            = "csprecon"
+kind            = "go"
+go_module       = "github.com/edoardottt/csprecon/cmd/csprecon"
+description     = "CSP-based subdomain discovery"
+default_args    = []
+timeout_seconds = 120
+critical        = false
+input_flag      = ""
