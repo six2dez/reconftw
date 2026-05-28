@@ -1540,23 +1540,308 @@ global bash vars are the v1 testability anti-pattern this design explicitly reje
 
 <!-- ARCH-08 -->
 
-[STUB — populated in Wave 2]
+reconFTW v2 uses a hybrid sentinel + typed-struct error taxonomy. The seven classes span
+two use cases: (1) **decision errors** where the caller branches on the error type
+(use `errors.As`) and (2) **signal errors** where the caller just re-tags or logs
+(use `errors.Is`). Both are supported via the `Is()` sentinel bridge on each struct.
 
-This section will contain: the 7-class typed error hierarchy (ToolError, ToolTimeout,
-OutOfScope, AxiomFailure, ConfigError, ScopeError, ChecksumMismatch), Go type definitions
-with fields and Error() string implementations, error wrapping conventions, and the rule
-that ConfigError.Message must never include raw Secret field values.
+The `Is()` bridge allows `errors.Is(err, ErrTool)` without exposing `ToolError` to
+callers that don't need the metadata. Callers that DO need metadata use
+`errors.As(&te, err)`. This is the pattern recommended by the Go team in
+"Working with Errors in Go 1.13".
+
+> **PITFALL NOTE — secret leak via ConfigError:** `ConfigError.Message` MUST NOT include
+> raw secret values. Say "invalid format" or "value out of range", NOT the actual value.
+> Violating this causes secret leak via error logging. (RESEARCH.md §Pitfall 2, T-02-04-02)
+
+> **PITFALL NOTE — circular DependsOn:** `Registry.Build()` MUST perform topological sort
+> cycle detection before any task runs. Circular `DependsOn` chains are a `ConfigError`,
+> NOT a runtime error. A detected cycle must halt startup, not deadlock the scheduler.
+> (RESEARCH.md §Pitfall 3, T-02-04-03)
+
+```go
+// internal/core/errors/errors.go
+// Source: .planning/research/ARCHITECTURE.md §11a
+package errors
+
+import (
+	"errors"
+	"fmt"
+	"time"
+)
+
+// --- Sentinel anchors (for errors.Is traversal) ---
+//
+// Callers check category with errors.Is(err, ErrTool); callers that need
+// structured metadata use errors.As to unwrap to the concrete type.
+var (
+	ErrTool     = errors.New("tool execution failure")
+	ErrTimeout  = errors.New("tool execution timeout")
+	ErrScope    = errors.New("out of scope")
+	ErrAxiom    = errors.New("axiom infrastructure failure")
+	ErrConfig   = errors.New("configuration error")
+	ErrChecksum = errors.New("checksum mismatch")
+)
+
+// --- Typed structs (carry structured metadata for serialization / Faraday / SARIF) ---
+//
+// Each struct implements error, Unwrap (where applicable), and an Is() sentinel
+// bridge so that errors.Is(err, ErrXxx) traverses the error chain correctly.
+
+// ToolError wraps a tool exit with structured metadata.
+// Used for: non-zero exit codes, tool-level parsing failures.
+// Serializes to: Faraday JSON {tool, exit_code, stderr_excerpt}.
+type ToolError struct {
+	Tool     string // e.g. "subfinder"
+	ExitCode int
+	Stderr   string // last 1KB of stderr (truncated to prevent runaway allocation)
+	Inner    error
+}
+
+func (e *ToolError) Error() string {
+	return fmt.Sprintf("tool %s (exit %d): %v", e.Tool, e.ExitCode, e.Inner)
+}
+func (e *ToolError) Unwrap() error { return e.Inner }
+func (e *ToolError) Is(target error) bool { return target == ErrTool } // sentinel bridge
+
+// ToolTimeout is returned when a tool's per-task context deadline is exceeded.
+type ToolTimeout struct {
+	Tool    string
+	Timeout time.Duration
+}
+
+func (e *ToolTimeout) Error() string {
+	return fmt.Sprintf("tool %s timed out after %v", e.Tool, e.Timeout)
+}
+func (e *ToolTimeout) Is(target error) bool { return target == ErrTimeout }
+
+// OutOfScope is returned by OutputTree.Append when a finding fails scope check.
+// The scope filter is enforced at the OutputTree.Append boundary, not inside
+// Task.Run(); Tasks do NOT own scope filtering (T-02-04-01 mitigation).
+type OutOfScope struct {
+	Value  string // the rejected value (domain, IP, URL)
+	Reason string // e.g. "not in wildcard *.example.com"
+}
+
+func (e *OutOfScope) Error() string {
+	return fmt.Sprintf("out of scope: %s (%s)", e.Value, e.Reason)
+}
+func (e *OutOfScope) Is(target error) bool { return target == ErrScope }
+
+// AxiomFailure signals axiom infrastructure failure (SSH timeout, fleet unreachable).
+// Distinct from ToolError because it triggers FailoverBackend retry (local fallback).
+//
+// SECURITY NOTE: Inner MUST NOT contain raw credential values. Use Redactor.Redact()
+// on error strings before constructing AxiomFailure. (T-02-04-05)
+type AxiomFailure struct {
+	Operation string // "exec", "healthcheck", "launch", "shutdown"
+	Inner     error
+}
+
+func (e *AxiomFailure) Error() string {
+	return fmt.Sprintf("axiom %s: %v", e.Operation, e.Inner)
+}
+func (e *AxiomFailure) Unwrap() error { return e.Inner }
+func (e *AxiomFailure) Is(target error) bool { return target == ErrAxiom }
+
+// ConfigError is returned during config load/validation with file:line context.
+//
+// SECURITY NOTE: Message MUST NOT include raw secret values. Say "invalid format",
+// NOT the value itself. Violating this causes secret leak via error logging. (T-02-04-02)
+type ConfigError struct {
+	File    string
+	Line    int
+	Key     string
+	Message string // human-readable description — NEVER the raw value
+}
+
+func (e *ConfigError) Error() string {
+	return fmt.Sprintf("%s:%d key %q: %s", e.File, e.Line, e.Key, e.Message)
+}
+func (e *ConfigError) Is(target error) bool { return target == ErrConfig }
+
+// ScopeError wraps domain/IP validation failures at input time.
+// Distinct from OutOfScope (which is a write-time rejection) — ScopeError is
+// returned when the input itself is structurally invalid (metacharacters, bad CIDR).
+type ScopeError struct {
+	Input  string
+	Reason string // e.g. "domain contains shell metacharacters", "IP octet out of range"
+}
+
+func (e *ScopeError) Error() string {
+	return fmt.Sprintf("scope validation: %q rejected: %s", e.Input, e.Reason)
+}
+func (e *ScopeError) Is(target error) bool { return target == ErrScope }
+
+// ChecksumMismatch is returned by the installer when a downloaded binary or script
+// does not match its expected SHA-256 hash.
+type ChecksumMismatch struct {
+	URL      string
+	Expected string // full SHA-256 hex
+	Got      string // full SHA-256 hex
+}
+
+func (e *ChecksumMismatch) Error() string {
+	return fmt.Sprintf("checksum mismatch for %s: expected %s got %s",
+		e.URL, e.Expected[:8]+"...", e.Got[:8]+"...")
+}
+func (e *ChecksumMismatch) Is(target error) bool { return target == ErrChecksum }
+```
+
+**Serialization:** Each typed struct has exported fields — they marshal cleanly to JSON
+for Faraday export and SARIF output. Adding `LogValue() slog.Value` to each type is the
+ARCH-12 bridge between error taxonomy and structured logging (Phase 3 implementation
+detail; not locked here).
+
+**Caller patterns summary:**
+
+| Need | Pattern |
+|------|---------|
+| Check error category | `errors.Is(err, ErrTool)` |
+| Extract structured fields | `var te *ToolError; errors.As(err, &te)` |
+| Wrap with context | `fmt.Errorf("subfinder: %w", &ToolError{...})` |
 
 ## §7 Failure Policy Model
 
 <!-- ARCH-09 -->
 
-[STUB — populated in Wave 2]
+The `failure_policy` is a config-driven, per-module-group enum that controls how the
+Scheduler handles task errors within a stage. It maps directly to the v1 mental model:
 
-This section will contain: the `failure_policy` enum (fail_fast vs best_effort) per module
-group, scheduler enforcement via errgroup.SetLimit(PARALLEL_MAX_JOBS=4), how failure_policy
-interacts with the compat layer and checkpoint store, and the spine vs OSINT/vulns posture
-distinction.
+| v1 pattern | v2 equivalent |
+|-----------|---------------|
+| `CONTINUE_ON_TOOL_ERROR=true` | `failure_policy = "best_effort"` (default) |
+| `recon()` spine for subdomains | `subdomains = "fail_fast"` override |
+| `parallel_funcs` for OSINT/vulns | `osint = "best_effort"`, `vulns = "best_effort"` |
+
+**Rationale for per-module-group granularity (not per-task or per-backend):**
+- Per-task is too fine: a single failed `subfinder` should not stop the entire passive
+  enumeration stage when `amass`, `assetfinder`, and `crt` can still contribute results.
+- Per-backend is too coarse: `LocalBackend` vs `AxiomBackend` is orthogonal to failure
+  semantics; the same `best_effort` policy applies regardless of backend.
+- Per-module-group matches the v1 mental model exactly: OSINT and vulns are "nice to
+  have"; the subdomain spine is "required for everything downstream" — web probing,
+  vuln scanning, and OSINT all depend on a usable subdomain set.
+
+### §7.1 TOML Configuration
+
+```toml
+# v2 TOML: failure_policy per stage
+# ARCH-09 | Source: .planning/phases/02-architecture-v2-design/02-RESEARCH.md §Failure Policy Model
+[scheduler]
+  failure_policy = "best_effort"  # default for the whole run; one of: "best_effort" | "fail_fast"
+
+  [scheduler.overrides]
+    subdomains = "fail_fast"   # spine: if passive enum fails, abort stage — don't brute empty list
+    web        = "best_effort" # web analysis: continue even if one tool errors
+    vulns      = "best_effort" # vuln scan: don't stop on one finding miss
+    osint      = "best_effort" # OSINT: independent sources; best-effort collection
+```
+
+### §7.2 Scheduler Go Implementation
+
+```go
+// internal/core/scheduler/scheduler.go
+// Source: .planning/phases/02-architecture-v2-design/02-RESEARCH.md §Failure Policy Model
+//         + spike/go/internal/passive/passive.go (errgroup fan-out pattern)
+package scheduler
+
+import (
+	"context"
+	"log/slog"
+
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
+)
+
+// FailurePolicy controls how a stage handles task errors.
+type FailurePolicy string
+
+const (
+	// PolicyBestEffort continues all sibling tasks when one errors.
+	// The stage error is logged as a warning; the stage itself returns nil.
+	// v1 analog: CONTINUE_ON_TOOL_ERROR=true + parallel_funcs for OSINT/vulns.
+	PolicyBestEffort FailurePolicy = "best_effort"
+
+	// PolicyFailFast cancels all sibling tasks when one errors.
+	// Uses errgroup.WithContext — first error cancels the context for all peers.
+	// v1 analog: recon() spine for subdomains (sequential dependencies).
+	PolicyFailFast FailurePolicy = "fail_fast"
+)
+
+// Scheduler provides bounded concurrent task execution with per-module-group
+// failure policies. maxConcurrent maps to concurrency.max_jobs (default: 4).
+type Scheduler struct {
+	maxConcurrent int64
+	sem           *semaphore.Weighted
+	policies      map[string]FailurePolicy // module → policy (from [scheduler.overrides])
+	log           *slog.Logger
+}
+
+// runStage executes a group of tasks with the policy for their module group.
+//
+// fail_fast: errgroup.WithContext → first error cancels the context for all peers
+// via context propagation. The stage returns the first non-nil error.
+//
+// best_effort: zero-value errgroup (no context cancel) → all tasks complete
+// regardless of peer errors. Per-task errors are logged as warnings; the stage
+// returns nil so the Scheduler proceeds to the next stage.
+func (s *Scheduler) runStage(ctx context.Context, module string, tasks []Task) error {
+	if len(tasks) == 0 {
+		return nil
+	}
+	policy := s.policyFor(module)
+
+	if policy == PolicyFailFast {
+		// fail_fast: first error cancels all peers via context.
+		g, gctx := errgroup.WithContext(ctx)
+		g.SetLimit(int(s.maxConcurrent))
+		for _, t := range tasks {
+			t := t
+			g.Go(func() error { return s.runOne(gctx, t) })
+		}
+		return g.Wait() // first non-nil error returned; peers see cancelled ctx
+	}
+
+	// best_effort: all tasks complete; errors are warnings, not failures.
+	g := new(errgroup.Group)
+	g.SetLimit(int(s.maxConcurrent))
+	for _, t := range tasks {
+		t := t
+		g.Go(func() error {
+			if err := s.runOne(ctx, t); err != nil {
+				s.log.Warn("task_error_best_effort",
+					slog.String("task", t.Name()),
+					slog.String("module", t.Module()),
+					slog.Any("err", err))
+				return nil // swallow: best_effort continues
+			}
+			return nil
+		})
+	}
+	return g.Wait() // always nil in best_effort (errors swallowed above)
+}
+
+func (s *Scheduler) policyFor(module string) FailurePolicy {
+	if p, ok := s.policies[module]; ok {
+		return p
+	}
+	return PolicyBestEffort // safe default: don't abort on unknown module
+}
+```
+
+**Key distinction:**
+- `fail_fast` uses `errgroup.WithContext` — first error cancels all peers via context
+  propagation. The caller sees the first non-nil error.
+- `best_effort` uses a zero-value `errgroup.Group` (no `WithContext`) — all tasks
+  complete regardless. Per-task errors are logged as `Warn` and swallowed; the stage
+  always returns `nil` to allow progression to the next stage.
+
+**Checkpoint interaction:** In `best_effort` mode, tasks that succeed write their
+checkpoint sentinel before errored peers are still running. Checkpoint reads are
+consistent because `checkpoint.Store` uses SQLite WAL mode (concurrent readers always
+see a consistent snapshot). In `fail_fast` mode, cancelled tasks do NOT write their
+checkpoint — they re-run on the next invocation against the same target.
 
 ## §8 CLI Surface
 
