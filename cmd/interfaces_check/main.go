@@ -1,130 +1,186 @@
 // SPDX-License-Identifier: MIT
-// interfaces_check — compile-only build target for ADR 0002 pre-sign gate (D-14).
-// Source: .planning/phases/02-architecture-v2-design/02-RESEARCH.md §Pre-Sign Verification Gate
-// Reference: .planning/decisions/0002-architecture-v2.md §5 Interface Signatures
-// DO NOT import into production code — this package exists only to verify that
-// the Go interface snippets in 0002-architecture-v2.md are syntactically valid.
+// interfaces_check — compile-only BINDING-signature delta detector.
+//
+// Source:
+//   - .planning/decisions/0002-architecture-v2.md §5 Interface Signatures (BINDING).
+//   - .planning/decisions/verify-0002.sh Check 3 (Go snippets compile).
+//   - .planning/phases/03-foundation-kernel/03-07-PLAN.md Task 3.
+//
+// Phase 2 D-14 shipped this binary with placeholder `interface{}` types
+// so it could compile before the real internal/core/{task,backend,appctx}
+// packages existed.
+//
+// Phase 3 Plan 07 Task 3 UPGRADES it to import the real packages and
+// declares compile-time assertions: if the real interface signatures
+// drift from what ADR §5 specifies, this file fails to compile and the
+// CI lint job (and `bash .planning/decisions/verify-0002.sh`) breaks.
+// That is the canonical BINDING enforcement gate end-to-end:
+//
+//   - var _ task.Task = (*placeholderTask)(nil)          (ADR §5.1)
+//   - var _ task.LifecycleAware = (*placeholderLifecycle)(nil) (ADR §5.1)
+//   - var _ backend.Backend = (*placeholderBackend)(nil) (ADR §5.2)
+//   - var _ appctx.SchedulerRunner = (*placeholderSched)(nil) (Plan 05 cycle-break)
+//
+// If any signature is renamed, removed, or changed (D-06 amendment),
+// these assertions will fail at compile time before the change can
+// reach trunk. Adding interface methods (D-07 non-breaking) will also
+// fail and require the placeholder type to grow new methods — explicit
+// caller acknowledgement of the extension.
+//
+// This binary is NEVER executed in production. main() is a no-op.
+// `go build ./cmd/interfaces_check/...` is the only invocation.
+
 package main
 
 import (
 	"context"
 	"time"
+
+	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/backend"
+	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/task"
 )
 
 // --------------------------------------------------------------------------
-// §5.1 — Task interface (ARCH-05)
-// Mirrors internal/core/task/task.go; uses interface{} for cross-package types
-// so this file compiles standalone without module dependencies.
+// §5.1 — Task interface (ARCH-05) — real type assertion
 // --------------------------------------------------------------------------
 
-// Status enumerates the terminal states a task may reach.
-type Status string
+// placeholderTask satisfies task.Task. Adding a method to task.Task forces
+// this struct to grow a new method — a compile error here surfaces the
+// BINDING change at the verify-0002.sh gate.
+type placeholderTask struct{}
 
-const (
-	StatusDone      Status = "done"
-	StatusErrored   Status = "errored"
-	StatusCancelled Status = "cancelled"
-	StatusSkipped   Status = "skipped"
-)
-
-// Result carries the outcome of a single task execution.
-type Result struct {
-	Status   Status
-	Duration time.Duration
-	Outputs  []string
-	Stats    map[string]int
+func (placeholderTask) Name() string                  { return "" }
+func (placeholderTask) Module() string                { return "" }
+func (placeholderTask) Description() string           { return "" }
+func (placeholderTask) Enabled(_ *config.Config) bool { return false }
+func (placeholderTask) DependsOn() []string           { return nil }
+func (placeholderTask) Run(_ context.Context, _ *appctx.AppContext) (task.Result, error) {
+	return task.Result{}, nil
 }
 
-// AppContext is the dependency kernel (placeholder — real type is in internal/core/appctx).
-// Fields use interface{} here so this file compiles without importing all dependencies.
-type AppContext struct {
-	Log        interface{} // *slog.Logger
-	Cfg        interface{} // *config.Config
-	Scheduler  interface{} // *scheduler.Scheduler
-	Tools      interface{} // *backend.Runner
-	Tree       interface{} // *output.OutputTree
-	Checkpoint interface{} // *checkpoint.Store
-	Notify     interface{} // notifier.Notifier
-	Target     interface{} // *Target
-	UI         interface{} // *ui.Printer
+// placeholderLifecycle satisfies task.LifecycleAware (optional extension).
+type placeholderLifecycle struct{}
+
+func (placeholderLifecycle) OnStart(_ context.Context, _ *appctx.AppContext) error {
+	return nil
 }
 
-// Task is the smallest schedulable unit of recon work. Self-registers via init().
-// BINDING: renaming a method, changing a method signature, or removing a method
-// requires an ADR amendment (D-06). Adding new methods is non-breaking (D-07).
-type Task interface {
-	Name() string
-	Module() string
-	Description() string
-	Enabled(cfg interface{}) bool
-	DependsOn() []string
-	Run(ctx context.Context, app *AppContext) (Result, error)
-}
-
-// LifecycleAware is an optional lifecycle extension Tasks may implement.
-type LifecycleAware interface {
-	OnStart(ctx context.Context, app *AppContext) error
-	OnEnd(ctx context.Context, app *AppContext, r Result) error
+func (placeholderLifecycle) OnEnd(_ context.Context, _ *appctx.AppContext, _ task.Result) error {
+	return nil
 }
 
 // --------------------------------------------------------------------------
-// §5.2 — Backend interface (ARCH-06)
-// Mirrors internal/core/backend/backend.go.
+// §5.2 — Backend interface (ARCH-06) — real type assertion
 // --------------------------------------------------------------------------
 
-// Event is a single streaming output unit from a running tool.
-type Event struct {
-	Line   []byte
-	Source string
-	IsErr  bool
+// placeholderBackend satisfies backend.Backend. Compile error here ⇒
+// backend.Backend's signature drifted from ADR §5.2 BINDING.
+type placeholderBackend struct{}
+
+func (placeholderBackend) Exec(_ context.Context, _ *backend.Tool, _ []string) (*backend.Result, error) {
+	return nil, nil
 }
 
-// ExecResult holds the complete output of a buffered Exec call.
-type ExecResult struct {
-	Stdout   []byte
-	Stderr   []byte
-	ExitCode int
-	Duration time.Duration
+func (placeholderBackend) Stream(_ context.Context, _ *backend.Tool, _ []string) (<-chan backend.Event, error) {
+	return nil, nil
 }
 
-// Tool describes a single external binary resolved at startup.
-type Tool struct {
-	Name        string
-	Path        string
-	Version     string
-	DefaultArgs []string
-	Timeout     time.Duration
-}
-
-// Backend abstracts local subprocess execution from distributed (Axiom) execution.
-// BINDING: adding methods is non-breaking (D-07); renaming, removing, or changing
-// method signatures requires an ADR amendment (D-06).
-type Backend interface {
-	Exec(ctx context.Context, t *Tool, args []string) (*ExecResult, error)
-	Stream(ctx context.Context, t *Tool, args []string) (<-chan Event, error)
-	HealthCheck(ctx context.Context) error
-	Capacity() int
-}
+func (placeholderBackend) HealthCheck(_ context.Context) error { return nil }
+func (placeholderBackend) Capacity() int                       { return 0 }
 
 // --------------------------------------------------------------------------
-// §6 — Error class hierarchy (ARCH-08)
+// §5.3 — AppContext cycle-break (Plan 05) — SchedulerRunner assertion
 // --------------------------------------------------------------------------
 
-// FailurePolicy controls how a stage handles task errors.
-type FailurePolicy string
+// placeholderScheduler satisfies appctx.SchedulerRunner. Plan 05's
+// interface-inversion cycle-break is captured here: AppContext.Scheduler
+// is typed on this interface so `appctx → scheduler` import edge stays
+// broken. The concrete *scheduler.Scheduler satisfies it.
+type placeholderScheduler struct{}
 
-const (
-	PolicyBestEffort FailurePolicy = "best_effort"
-	PolicyFailFast   FailurePolicy = "fail_fast"
+func (placeholderScheduler) MaxConcurrency() int { return 0 }
+
+// --------------------------------------------------------------------------
+// Compile-time BINDING assertions
+// --------------------------------------------------------------------------
+//
+// These assertions live at package level so they run at every `go build`
+// invocation — not just `go test`. The verify-0002.sh Check 3 step is
+// `go build ./cmd/interfaces_check/...`, which exits non-zero if ANY of
+// these assertions fails.
+
+var (
+	_ task.Task              = (*placeholderTask)(nil)
+	_ task.LifecycleAware    = (*placeholderLifecycle)(nil)
+	_ backend.Backend        = (*placeholderBackend)(nil)
+	_ appctx.SchedulerRunner = (*placeholderScheduler)(nil)
 )
 
 // --------------------------------------------------------------------------
-// main — required for `go build ./interfaces_check/...`
+// §5.3 — AppContext shape spot-check (informational, not asserted)
 // --------------------------------------------------------------------------
+//
+// AppContext is a struct, not an interface, so a "satisfies" assertion is
+// not directly applicable. We instead reference each field by name so
+// renaming a field surfaces here. ADR §5.3 BINDING field names:
+// {Log, Cfg, Scheduler, Tools, Tree, Checkpoint, Notify, Target, UI}.
+
+var _ = func() {
+	var app appctx.AppContext
+	_ = app.Log
+	_ = app.Cfg
+	_ = app.Scheduler
+	_ = app.Tools
+	_ = app.Tree
+	_ = app.Checkpoint
+	_ = app.Notify
+	_ = app.Target
+	_ = app.UI
+
+	// Target subfields (ADR §5.3 lines 1736-1742 — 5 fields).
+	var tgt appctx.Target
+	_ = tgt.Domain
+	_ = tgt.IsCIDR
+	_ = tgt.IsIP
+	_ = tgt.Scope
+	_ = tgt.WorkDir
+}
+
+// --------------------------------------------------------------------------
+// §5.1 — Status / Result constants
+// --------------------------------------------------------------------------
+
+// Reference the Status enum values so renaming them surfaces here.
+var _ = []task.Status{
+	task.StatusDone,
+	task.StatusErrored,
+	task.StatusCancelled,
+	task.StatusSkipped,
+}
+
+// Reference the Result fields so renaming them surfaces here.
+var _ = func() {
+	var r task.Result
+	_ = r.Status
+	_ = r.Duration
+	_ = r.Outputs
+	_ = r.Stats
+}
+
+// Reference time.Duration to keep the import live (task.Result.Duration is time.Duration).
+var _ time.Duration
+
+// --------------------------------------------------------------------------
+// main — required for `go build ./cmd/interfaces_check/...`
+// --------------------------------------------------------------------------
+//
+// Compile-only gate. main() is a no-op; the build itself is the test.
 
 func main() {
-	// Compile-only gate. This binary is never executed in production.
-	// Running it is a no-op; its value is that it compiles without errors.
-	_ = StatusDone
-	_ = PolicyBestEffort
+	// All assertions live at package init time — main is a no-op.
+	_ = task.StatusDone
+	_ = backend.Default
+	_ = task.Default
 }

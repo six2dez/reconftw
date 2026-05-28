@@ -25,7 +25,7 @@ type Record struct {
 	InputHash   string
 	Status      checkpoint.Status
 	StartedAt   time.Time
-	FinishedAt *time.Time
+	FinishedAt  *time.Time
 	OutputPaths []string
 	ErrorClass  string
 }

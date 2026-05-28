@@ -30,11 +30,11 @@ type fakeTask struct {
 	enabled     bool
 }
 
-func (f *fakeTask) Name() string                          { return f.name }
-func (f *fakeTask) Module() string                        { return f.module }
-func (f *fakeTask) Description() string                   { return f.description }
-func (f *fakeTask) Enabled(cfg *config.Config) bool       { return f.enabled }
-func (f *fakeTask) DependsOn() []string                   { return f.dependsOn }
+func (f *fakeTask) Name() string                    { return f.name }
+func (f *fakeTask) Module() string                  { return f.module }
+func (f *fakeTask) Description() string             { return f.description }
+func (f *fakeTask) Enabled(cfg *config.Config) bool { return f.enabled }
+func (f *fakeTask) DependsOn() []string             { return f.dependsOn }
 func (f *fakeTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	return task.Result{Status: task.StatusDone}, nil
 }
@@ -64,24 +64,42 @@ func TestTaskInterfaceMatchesADR(t *testing.T) {
 	}
 }
 
-// Test 2: interfaces_check still compiles. We can't invoke `go build` from
-// a unit test reliably (CI vs local toolchain divergence) — instead, this
-// test asserts the signature shape via AST inspection on the local
-// interfaces_check/main.go file. If we drift, the manual verify-0002.sh
-// gate will still catch it.
+// Test 2: interfaces_check still references the BINDING shape. We can't
+// invoke `go build` from a unit test reliably (CI vs local toolchain
+// divergence) — instead, this test asserts that the upgraded
+// cmd/interfaces_check/main.go references the canonical pieces of
+// ADR §5.1: imports the real internal/core/task package and declares
+// compile-time assertions on task.Task + task.LifecycleAware.
+//
+// Plan 03-07 Task 3 UPGRADED this file from placeholder `interface{}`
+// types to real `internal/core/{task,backend,appctx,config}` imports
+// with compile-time assertions. The shape this test verifies is now the
+// real-package shape, not the Phase 2 placeholder shape.
 func TestInterfacesCheckSignaturesMatch(t *testing.T) {
 	root := repoRoot(t)
 	body, err := os.ReadFile(filepath.Join(root, "cmd", "interfaces_check", "main.go"))
 	if err != nil {
 		t.Fatalf("read interfaces_check/main.go: %v", err)
 	}
-	src := string(body)
+	// Use whitespace-tolerant substring tests: collapse runs of whitespace
+	// in the source to single spaces before substring matching. gofumpt
+	// re-aligns var-block padding based on the widest identifier, so any
+	// future additions would otherwise break the literal substring match.
+	src := collapseWhitespace(string(body))
 	want := []string{
-		"Name() string",
-		"Module() string",
-		"Description() string",
-		"DependsOn() []string",
-		"Run(ctx context.Context, app *AppContext) (Result, error)",
+		// Plan 07 Task 3 — real-package imports (BINDING gate).
+		`"github.com/six2dez/reconftw/internal/core/task"`,
+		`"github.com/six2dez/reconftw/internal/core/backend"`,
+		`"github.com/six2dez/reconftw/internal/core/appctx"`,
+		`"github.com/six2dez/reconftw/internal/core/config"`,
+		// Compile-time assertions on Task + LifecycleAware (ADR §5.1) + Backend (§5.2)
+		// + SchedulerRunner (Plan 05 cycle-break).
+		"_ task.Task = (*placeholderTask)(nil)",
+		"_ task.LifecycleAware = (*placeholderLifecycle)(nil)",
+		"_ backend.Backend = (*placeholderBackend)(nil)",
+		"_ appctx.SchedulerRunner = (*placeholderScheduler)(nil)",
+		// Run signature on the placeholder concrete type — must match real shape.
+		"Run(_ context.Context, _ *appctx.AppContext) (task.Result, error)",
 	}
 	for _, w := range want {
 		if !strings.Contains(src, w) {
@@ -158,4 +176,25 @@ func repoRoot(t *testing.T) string {
 	_, file, _, _ := runtime.Caller(0)
 	// task_test.go → internal/core/task → root
 	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", "..", ".."))
+}
+
+// collapseWhitespace replaces runs of any whitespace (spaces, tabs,
+// newlines) with a single space. Used for substring tests that should be
+// resilient to gofumpt re-alignment.
+func collapseWhitespace(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	inWS := false
+	for _, r := range s {
+		if r == ' ' || r == '\t' || r == '\n' || r == '\r' {
+			if !inWS {
+				b.WriteByte(' ')
+				inWS = true
+			}
+			continue
+		}
+		inWS = false
+		b.WriteRune(r)
+	}
+	return b.String()
 }
