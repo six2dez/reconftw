@@ -4,9 +4,10 @@
 // Go. Honours OUTPUT_VERBOSITY=0/1/2 and PARALLEL_LOG_MODE=summary|tail|full
 // per the v1 contract.
 //
-// NO TUI library imported. Per RESEARCH.md library blacklist, no
-// bubbletea / tview / charmbracelet TUI dependency. Plain text output
-// over an io.Writer (stderr by default).
+// NO TUI library imported. Per RESEARCH.md library blacklist (see
+// research/STACK.md §"library blacklist"), no full-screen TUI dependency
+// is permitted in this package. Plain text output over an io.Writer
+// (stderr by default).
 //
 // Phase 3 Plan 5 split:
 //   - Plan 05 Task 1 ships only the Printer type skeleton (enough for
@@ -36,8 +37,12 @@
 package ui
 
 import (
+	"fmt"
 	"io"
 	"os"
+	"strings"
+	"sync"
+	"time"
 )
 
 // Verbosity controls which message levels the Printer emits. Mirrors v1
@@ -77,8 +82,11 @@ const (
 // Printer is the v2 terminal UI presenter. Constructed by appctx.Boot via
 // NewPrinter(os.Stderr, cfg.Output.Verbosity).
 //
-// Plan 05 Task 1 ships only the type skeleton (so AppContext compiles);
-// Plan 05 Task 2 ships the full implementation + tests.
+// Plan 05 Task 2 ships the full implementation + tests (verbatim port of
+// lib/ui.sh dot-fill semantics).
+//
+// Thread-safety: the counters map is mu-protected; the io.Writer is
+// expected to be safe for concurrent writes (os.Stderr satisfies this).
 type Printer struct {
 	W            io.Writer
 	Verbosity    Verbosity
@@ -86,23 +94,154 @@ type Printer struct {
 	TailLines    int
 	NoColor      bool
 
-	// Counters incremented per badge by countInc; printed by Summary.
+	mu     sync.Mutex
 	counts map[Badge]int
 }
 
 // NewPrinter constructs a Printer wrapping w at the given verbosity.
-// w may be nil — defaults to os.Stderr.
-//
-// Plan 05 Task 2 expands this constructor (TTY detection, color setup).
+// w may be nil — defaults to os.Stderr. NoColor is auto-derived from TTY
+// detection; callers may override the field after construction.
 func NewPrinter(w io.Writer, verbosity Verbosity) *Printer {
 	if w == nil {
 		w = os.Stderr
 	}
-	return &Printer{
+	p := &Printer{
 		W:            w,
 		Verbosity:    verbosity,
 		ParallelMode: ParallelSummary,
 		TailLines:    20,
 		counts:       map[Badge]int{},
 	}
+	// NO_COLOR convention + non-TTY default → no color.
+	if os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb" {
+		p.NoColor = true
+	}
+	if !IsTTY(w) {
+		p.NoColor = true
+	}
+	return p
+}
+
+// Status emits the dot-fill status line per v1 lib/ui.sh _print_status:
+//
+//	[BADGE] name<padding>.......... duration
+//
+// VerbosityQuiet suppresses everything except FAIL. INFO badges are
+// suppressed unless VerbosityVerbose.
+//
+// The counter for badge is always incremented (so the Summary line is
+// accurate even at VerbosityQuiet — the operator wants the run summary
+// regardless of which individual lines were shown).
+func (p *Printer) Status(badge Badge, name string, dur time.Duration) {
+	p.countInc(badge)
+	if !p.shouldEmit(badge) {
+		return
+	}
+	const pad = 26
+	display := name
+	if len(display) > pad {
+		display = display[:pad-3] + "..."
+	}
+	gap := pad - len(display)
+	if gap < 1 {
+		gap = 1
+	}
+	dots := strings.Repeat(".", gap)
+	fmt.Fprintf(p.W, "[%-5s] %s %s %s\n", string(badge), display, dots, formatDuration(dur))
+}
+
+// Msg emits an INFO/WARN/FAIL/OK message line. Mirrors v1 _print_msg.
+// INFO suppressed unless VerbosityVerbose.
+func (p *Printer) Msg(level string, msg string) {
+	switch strings.ToUpper(level) {
+	case "INFO":
+		if p.Verbosity < VerbosityVerbose {
+			return
+		}
+	case "OK", "WARN", "FAIL":
+		if p.Verbosity < VerbosityNormal {
+			// Allow FAIL even at quiet level — operator must see errors.
+			if strings.ToUpper(level) != "FAIL" {
+				return
+			}
+		}
+	}
+	fmt.Fprintf(p.W, "%-5s %s\n", strings.ToUpper(level), msg)
+}
+
+// Rule emits a thin ─── separator line, optionally prefixed with title.
+// Mirrors v1 lib/common.sh _print_rule.
+func (p *Printer) Rule(title string) {
+	if p.Verbosity < VerbosityNormal {
+		return
+	}
+	if title != "" {
+		fmt.Fprintf(p.W, "─── %s ───────────────────────────────────────────────\n", title)
+	} else {
+		fmt.Fprintln(p.W, "────────────────────────────────────────────────────────")
+	}
+}
+
+// Section emits a section header with timestamp — mirrors v1
+// _print_module_start (used by _print_section for major phases like
+// "OSINT", "Subdomains", etc.).
+func (p *Printer) Section(title string) {
+	if p.Verbosity < VerbosityNormal {
+		return
+	}
+	fmt.Fprintf(p.W, "\n── %s ───────────────────────────────────────────────\n", strings.ToUpper(title))
+	fmt.Fprintf(p.W, "Started: %s\n", time.Now().UTC().Format(time.RFC3339))
+}
+
+// ProgressModule emits a module-level progress indicator. Mirrors v1
+// progress_module function in modules/core.sh. Suppressed unless
+// VerbosityVerbose.
+func (p *Printer) ProgressModule(name string) {
+	if p.Verbosity < VerbosityVerbose {
+		return
+	}
+	fmt.Fprintf(p.W, "▸ %s\n", name)
+}
+
+// BatchEnd closes a parallel-batch UI block per v1 ui_batch_end semantics.
+// VerbosityQuiet emits nothing; VerbosityNormal+ emits a summary line.
+func (p *Printer) BatchEnd(name string) {
+	if p.Verbosity < VerbosityNormal {
+		return
+	}
+	p.mu.Lock()
+	ok := p.counts[BadgeOK]
+	warn := p.counts[BadgeWARN]
+	fail := p.counts[BadgeFAIL]
+	skip := p.counts[BadgeSKIP]
+	cache := p.counts[BadgeCACHE]
+	p.mu.Unlock()
+	fmt.Fprintf(p.W, "── %s: ok:%d warn:%d fail:%d skip:%d cache:%d ──\n",
+		name, ok, warn, fail, skip, cache)
+}
+
+// shouldEmit applies the verbosity gate for Status.
+func (p *Printer) shouldEmit(badge Badge) bool {
+	switch badge {
+	case BadgeFAIL:
+		return true // always emit FAIL
+	case BadgeINFO:
+		return p.Verbosity >= VerbosityVerbose
+	default:
+		return p.Verbosity >= VerbosityNormal
+	}
+}
+
+// formatDuration mirrors v1 format_duration (lib/common.sh) — seconds
+// for short, m+s for ≥1 min. Defensive against negative durations.
+func formatDuration(d time.Duration) string {
+	if d < 0 {
+		d = 0
+	}
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	}
+	mins := int(d.Minutes())
+	secs := int(d.Seconds()) % 60
+	return fmt.Sprintf("%dm%02ds", mins, secs)
 }

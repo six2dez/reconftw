@@ -26,7 +26,10 @@
 // without a forward-declaration loop.
 package notifier
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
 // Level enumerates notification severity. Maps to slog levels at the
 // LogSink boundary.
@@ -50,3 +53,38 @@ type Notifier interface {
 	// the ctx for cancellation and per-call deadlines.
 	Notify(ctx context.Context, level Level, msg string, attrs ...any) error
 }
+
+// Multi is the fan-out Notifier — calls Notify on every wrapped sink and
+// joins the errors. AppContext.Notify is typed as Notifier; in practice
+// Boot wires a Multi wrapping LogSink + 3 service stubs (CONTEXT default
+// option (a)).
+//
+// Error semantics: errors are collected via errors.Join — callers that
+// want category-level traversal use errors.Is on the result.
+type Multi struct {
+	Sinks []Notifier
+}
+
+// NewMulti constructs a Multi wrapping the given sinks. Empty Multi is
+// legal — Notify on it returns nil.
+func NewMulti(sinks ...Notifier) *Multi { return &Multi{Sinks: sinks} }
+
+// Notify dispatches to every sink. Each sink's error is collected;
+// errors.Join produces the final error. nil is returned if no sink errors.
+func (m *Multi) Notify(ctx context.Context, lvl Level, msg string, attrs ...any) error {
+	if len(m.Sinks) == 0 {
+		return nil
+	}
+	errs := make([]error, 0, len(m.Sinks))
+	for _, s := range m.Sinks {
+		if s == nil {
+			continue
+		}
+		if err := s.Notify(ctx, lvl, msg, attrs...); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+var _ Notifier = (*Multi)(nil)
