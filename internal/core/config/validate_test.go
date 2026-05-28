@@ -54,7 +54,7 @@ func TestNucleiSeverity(t *testing.T) {
 		{"with spaces", "info, low, medium", false},
 		{"bad severity word", "info,low,xxx", true},
 		{"capital case rejected", "Info,Low", true},
-		{"empty rejected (validator behavior — empty input fails)", "", true},
+		{"empty allowed (omitempty pairing in tag)", "", false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

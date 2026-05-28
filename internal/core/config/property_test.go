@@ -12,6 +12,7 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/config"
 	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
+	"github.com/six2dez/reconftw/internal/core/log"
 	"pgregory.net/rapid"
 )
 
@@ -37,10 +38,10 @@ func TestValidate_PropertyNoPanic(t *testing.T) {
 		}).Draw(t, "Severity")
 		cfg.MCP.Port = rapid.IntRange(0, 70000).Draw(t, "Port")
 		cfg.MCP.Transport = rapid.SampledFrom([]string{"stdio", "http", "", "tcp"}).Draw(t, "Transport")
-		cfg.Notifications.Slack.WebhookURL = rapid.SampledFrom([]string{
+		cfg.Notifications.Slack.WebhookURL = log.Secret(rapid.SampledFrom([]string{
 			"", "https://hooks.slack.com/services/aaa/bbb/ccc",
 			"http://not-https.example.com/", "not-a-url",
-		}).Draw(t, "Webhook")
+		}).Draw(t, "Webhook"))
 		cfg.Paths.Resolvers = rapid.SampledFrom([]string{
 			"", "/etc/resolvers.txt", "../etc/passwd", "/a/./b",
 		}).Draw(t, "Resolvers")
@@ -67,13 +68,18 @@ func TestValidate_PropertyNoPanic(t *testing.T) {
 // strings. For ANY input that does not parse, Load must return an error with
 // no panic. For inputs that parse + validate clean, Load must return a non-nil
 // *Config. This is a structural invariant test, not a value-correctness one.
+//
+// rapid.T doesn't expose TempDir(); we use a stable per-property tempdir
+// allocated by the enclosing *testing.T via t.TempDir() at the rapid.Check
+// boundary.
 func TestLoadRoundtrip_Property(t *testing.T) {
+	outer := t.TempDir()
 	rapid.Check(t, func(t *rapid.T) {
 		// Generate a small TOML body within known-safe schema choices.
 		maxJobs := rapid.IntRange(-5, 100).Draw(t, "max_jobs")
 		body := genMinimalTOML(maxJobs)
 
-		tmp := t.TempDir() + "/cfg.toml"
+		tmp := outer + "/cfg.toml"
 		if err := writeFile(tmp, body); err != nil {
 			t.Fatalf("write: %v", err)
 		}

@@ -30,7 +30,7 @@ func copyFixtureTo(t *testing.T, src, dst string) {
 // Step through each source level, asserting the resolved Concurrency.MaxJobs
 // matches the highest-priority source that has set it.
 func TestEightSourcePrecedence(t *testing.T) {
-	t.Parallel()
+	// Cannot use t.Parallel here — sub-cases call t.Setenv.
 	tmp := t.TempDir()
 	fixtures := "testdata"
 
@@ -237,7 +237,7 @@ func TestLegacyAliasCollision(t *testing.T) {
 // (Covered as a sub-case of TestEightSourcePrecedence above; kept as a focused test for clarity.)
 
 func TestEnvVarOverridesDefault(t *testing.T) {
-	t.Parallel()
+	// Cannot use t.Parallel — t.Setenv requires sequential execution.
 	t.Setenv("RECONFTW_CONCURRENCY_MAX_JOBS", "13")
 	cfg, err := config.Load(config.LoadOptions{})
 	if err != nil {
