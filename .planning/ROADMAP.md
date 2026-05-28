@@ -140,7 +140,29 @@ Plans:
   4. Axiom Backend implementation is swappable at construction: `reconftw subs --target X --axiom` provisions a fleet (`axiom_launch` with configurable count), runs the pipeline distributed, releases the fleet at end (`axiom_shutdown`), and produces an artefact set equivalent (same scope, same dedup) to the local run — output-equivalence test green (AXIOM-01, AXIOM-02, AXIOM-03, AXIOM-04, AXIOM-09)
   5. Axiom resilience features work: resolver list propagation to fleet (`resolvers_update`), failover wrapper detects infrastructure failures (SSH timeout, fleet unreachable, partial-fleet) and retries locally without losing work, `AXIOM_AUTO_FIX_HOSTKEY` repair logic preserved, `axiom_disable_runtime` flag disables axiom mid-run and all subsequent calls run locally (AXIOM-05, AXIOM-06, AXIOM-07, AXIOM-08)
 
-**Plans**: TBD
+**Plans**: 7 plans
+Plans:
+**Wave 1**
+
+- [ ] 04-01-PLAN.md — Housekeeping + JSONL schema lock + tools.lock expansion (25 tools) + 6 passive Tasks + passiveBarrierTask + SUBD-05 scope cross-check
+
+**Wave 2** *(parallel — blocked on Wave 1)*
+
+- [ ] 04-02-PLAN.md — Active DNS resolution Tasks (SubActive, SubTLS, SubNoerror, SubDNS, SubSRV, SubPTR) + SubBruteTask + resolver health gate + activeBarrierTask
+- [ ] 04-03-PLAN.md — Shared extractor packages (favicon/JS/analytics — D-02) + SubScrapingTask + SubAnalyticsTask + SubNSDelegationTask
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 04-04-PLAN.md — Permutation Tasks (gotator/regulator/IA permut + memory back-pressure) + SubRecursivePassiveTask + SubRecursiveBruteTask + resolvedBarrierTask
+
+**Wave 4** *(parallel — blocked on Wave 3)*
+
+- [ ] 04-05-PLAN.md — Takeover (subzy+dnstake) + Buckets (s3scanner) + ASN (asnmap) + Geo + ZoneTransfer Tasks
+- [ ] 04-06-PLAN.md — Real AxiomBackend + FailoverBackend + wire newSubsCmd RunE
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 04-07-PLAN.md — Frozen-replay parity harness + AXIOM-09 equivalence test + phase acceptance checkpoint
 
 ### Phase 5: Web Pipeline E2E
 
@@ -280,7 +302,7 @@ Calendar parallelization (within constraint that dependencies are met):
 | 1. Language ADR & Spike | 4/5 | In Progress|  |
 | 2. Architecture v2 Design | 7/7 | Complete   | 2026-05-28 |
 | 3. Foundation Kernel | 7/7 | Complete   | 2026-05-28 |
-| 4. Subdomains E2E + Axiom Integration | 0/? | Not started | - |
+| 4. Subdomains E2E + Axiom Integration | 0/7 | Planned     | - |
 | 5. Web Pipeline E2E | 0/? | Not started | - |
 | 6. Vulnerability Scanning E2E | 0/? | Not started | - |
 | 7. OSINT E2E | 0/? | Not started | - |
