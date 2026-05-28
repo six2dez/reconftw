@@ -109,7 +109,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 03-03-PLAN.md — Output tree (AtomicWriter) + Checkpoint store (modernc/sqlite WAL) + CompatWriter skeleton + interface introductions (W15) + snapshot migration (W19) + per-file 90% coverage (W20)
+- [x] 03-03-PLAN.md — Output tree (AtomicWriter) + Checkpoint store (modernc/sqlite WAL) + CompatWriter skeleton + interface introductions (W15) + snapshot migration (W19) + per-file 90% coverage (W20)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -279,7 +279,7 @@ Calendar parallelization (within constraint that dependencies are met):
 |-------|----------------|--------|-----------|
 | 1. Language ADR & Spike | 4/5 | In Progress|  |
 | 2. Architecture v2 Design | 7/7 | Complete   | 2026-05-28 |
-| 3. Foundation Kernel | 2/7 | In Progress|  |
+| 3. Foundation Kernel | 3/7 | In Progress|  |
 | 4. Subdomains E2E + Axiom Integration | 0/? | Not started | - |
 | 5. Web Pipeline E2E | 0/? | Not started | - |
 | 6. Vulnerability Scanning E2E | 0/? | Not started | - |
