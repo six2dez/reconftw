@@ -86,7 +86,14 @@ Plans:
   3. Subprocess safety enforced: every subprocess uses `Setpgid`+`WaitDelay` (Go) or `start_new_session=True`+`os.killpg` (Python); a lint rule (custom golangci-lint check or ruff plugin) forbids raw `exec.Command`/`subprocess.Popen` outside the Tool wrapper and fails CI on violation; an integration test starts a slow mock tool and SIGINT-kills the parent — all children dead within 10s (FOUND-09, FOUND-10)
   4. Scheduler enforces bounded concurrency via semaphore (max_jobs default 4), per-task timeout via context, and heartbeat events at configurable cadence; rate limiter supports per-tool/per-target/global caps from TOML; tool registry self-registers tools via `func init()` (Go) or `@register_tool` (Python) and emits structured warnings on missing-but-required tools and structured errors on missing-and-critical; notifier interface + log sink + Slack/Telegram/Discord stubs are wired through the redactor — no message body can reach a notifier with unredacted secrets (FOUND-06, FOUND-07, FOUND-08, FOUND-11, FOUND-12, XCUT-09)
   5. Test mocks ship alongside real implementations (MockBackend deterministic; MockCheckpoint in-memory; MockOutputTree in-memory FS); CI on every push runs lint + format-check + unit + integration smoke + `-race` (Go) or `mypy --strict` (Python); branch coverage gate ≥75% on lib code is enforced (no merge below threshold); Go binary stripped is <50MB (if Go won) OR Python `uv tool` installed footprint is <500MB (if Python won) at the end of Foundation; no secret patterns leak in test logs under varied input (CI test asserts) (FOUND-15, FOUND-16, XCUT-02, XCUT-04, XCUT-07)
-**Plans**: TBD
+**Plans**: 6 plans
+Plans:
+- [ ] 03-01-PLAN.md — Errors + Logger + Secret + Redactor + scaffold internal/core/ + CI seed + spike/python/ cleanup
+- [ ] 03-02-PLAN.md — Config loader (koanf 8-source) + per-key validation + snapshot writer
+- [ ] 03-03-PLAN.md — Output tree (AtomicWriter) + Checkpoint store (modernc/sqlite WAL) + CompatWriter skeleton
+- [ ] 03-04-PLAN.md — Scheduler (errgroup + failure_policy) + LocalBackend (kill-tree) + AxiomBackend stub + ToolRegistry + RateLimiter + FOUND-10 lint rule
+- [ ] 03-05-PLAN.md — AppContext + CLI (15 subcommands + v1 aliases + version + health-check) + UI (dot-fill) + Notifier stubs + Task interface final + noop.demo
+- [ ] 03-06-PLAN.md — Test mocks (FOUND-15) + tools.lock seed (10 Phase 4 tools) + integration smoke + XCUT-02 binary-size gate + Phase 3 acceptance + interfaces_check real-import upgrade
 
 ### Phase 4: Subdomains E2E + Axiom Integration
 **Goal**: Port the subdomain pipeline end-to-end (passive + brute + permutations + dnsx + scope + takeover + buckets + geo + ASN) with Axiom distributed execution as a swappable Backend, validated against bash v1 output on 3+ canonical targets — this is the canonical reference port that proves the kernel works.
@@ -212,7 +219,7 @@ Calendar parallelization (within constraint that dependencies are met):
 |-------|----------------|--------|-----------|
 | 1. Language ADR & Spike | 4/5 | In Progress|  |
 | 2. Architecture v2 Design | 7/7 | Complete   | 2026-05-28 |
-| 3. Foundation Kernel | 0/? | Not started | - |
+| 3. Foundation Kernel | 0/6 | Not started | - |
 | 4. Subdomains E2E + Axiom Integration | 0/? | Not started | - |
 | 5. Web Pipeline E2E | 0/? | Not started | - |
 | 6. Vulnerability Scanning E2E | 0/? | Not started | - |
