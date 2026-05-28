@@ -2616,7 +2616,7 @@ each and continues to Check 2.
 
 ### Check 2: TOML Blocks Parse as Valid TOML
 
-Extracts every ` ```toml ` code block from the ADR using `awk`, writes each block to a
+Extracts every triple-backtick `toml` code block from the ADR using `awk`, writes each block to a
 temp buffer, and pipes it through `tomljson`. Ensures that every TOML sample embedded in
 the schema documentation is syntactically valid TOML — no missing quotes, invalid keys,
 or malformed nested tables. Expected pass condition: `tomljson` exits 0 for every block;
