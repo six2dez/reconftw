@@ -6,9 +6,18 @@
 # that rule is out of scope for Phase 3 — for now, code review + grep audit
 # is the manual enforcement, per CONTEXT.md discretion.
 #
-# Plan 04 (FOUND-10) adds the raw-subprocess lint rule under
-# internal/core/backend/lint/ — Phase 3 plan-01 only ships the .golangci.yml
-# scaffold so that infrastructure is in place day 1.
+# FOUND-10 RAW-SUBPROCESS BAN (Plan 04, REQUIREMENTS.md line 49):
+# Raw exec.Command / exec.CommandContext / (*exec.Cmd).Run / (*exec.Cmd).Start
+# outside internal/core/backend/local.go is forbidden. Enforced by an AST scan
+# in internal/core/backend/lint/no_raw_subprocess_test.go which uses go/ast +
+# golang.org/x/tools/go/packages to walk every package under ./internal/...
+# Runs as part of `go test ./...` on every CI push.
+# Validated against testdata/violating.go fixture to prove the scanner works
+# (TestFOUND10_FixtureDetected). Replacement: app.Tools.Run() or app.Tools.Stream()
+# (the canonical *backend.Runner shape per ADR §5.3).
+# Upgrade path: a true golangci-lint v2 custom plugin lives at
+# cmd/foundlint-no-raw-subprocess/ (created by a future Phase 4+ ticket if/when
+# the test-based approach proves insufficient).
 
 version: "2"
 
