@@ -101,7 +101,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 03-01-PLAN.md — Errors + Logger + Secret + Redactor + scaffold internal/core/ + CI seed + spike/python/ cleanup
+- [x] 03-01-PLAN.md — Errors + Logger + Secret + Redactor + scaffold internal/core/ + CI seed + spike/python/ cleanup
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -279,7 +279,7 @@ Calendar parallelization (within constraint that dependencies are met):
 |-------|----------------|--------|-----------|
 | 1. Language ADR & Spike | 4/5 | In Progress|  |
 | 2. Architecture v2 Design | 7/7 | Complete   | 2026-05-28 |
-| 3. Foundation Kernel | 0/6 | Not started | - |
+| 3. Foundation Kernel | 1/7 | In Progress|  |
 | 4. Subdomains E2E + Axiom Integration | 0/? | Not started | - |
 | 5. Web Pipeline E2E | 0/? | Not started | - |
 | 6. Vulnerability Scanning E2E | 0/? | Not started | - |
