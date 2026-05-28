@@ -65,10 +65,18 @@ help:
 # =============================================================================
 
 # build: production-quality static binary; XCUT-02 budget <50MB.
-# This target fails until Plan 03-05 lands cmd/reconftw/main.go — intentional fail-fast
-# so CI surfaces the binary-size gate the moment the first main.go commits.
+#
+# VERSION + BUILD_DATE per Plan 06 D-04 ldflag wiring — main.Version, main.CommitSHA,
+# main.BuildDate are populated at link time so `reconftw version` prints real info.
+# VERSION sourced from `git describe --tags --always --dirty`; BUILD_DATE is ISO-8601 UTC.
+# Overridable at the make CLI: `make build VERSION=v2.0.0-rc1`.
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+COMMIT_SHA ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+BUILD_DATE ?= $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
+LDFLAGS := -s -w -X main.Version=$(VERSION) -X main.CommitSHA=$(COMMIT_SHA) -X main.BuildDate=$(BUILD_DATE)
+
 build:
-	go build -ldflags="-s -w" -trimpath -o bin/reconftw ./cmd/reconftw
+	go build -ldflags="$(LDFLAGS)" -trimpath -o bin/reconftw ./cmd/reconftw
 
 # test: Ring 1 (unit) + Ring 4 (property-based). Fast (<90s budget per push).
 test:
