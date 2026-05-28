@@ -1,0 +1,3 @@
+{"input":"https://api.example.com","host":"api.example.com","port":443,"status_code":200,"title":"API","tech":["nginx"]}
+{"input":"https://www.example.com","host":"www.example.com","port":443,"status_code":200,"title":"Example Domain","tech":["nginx"]}
+{"input":"https://mail.example.com","host":"mail.example.com","port":443,"status_code":403,"title":"Forbidden","tech":[]}

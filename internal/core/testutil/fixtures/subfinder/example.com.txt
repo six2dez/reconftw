@@ -1,0 +1,6 @@
+api.example.com
+www.example.com
+mail.example.com
+admin.example.com
+dev.example.com
+staging.example.com
