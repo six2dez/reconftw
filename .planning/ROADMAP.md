@@ -113,7 +113,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 03-04-PLAN.md — Backend interface + LocalBackend (kill-tree) + AxiomBackend stub + ToolRegistry (with Critical tier per Blocker 5) + RateLimiter + FOUND-10 lint rule (AST scan per Blocker 8). Scheduler moved to Plan 05.
+- [x] 03-04-PLAN.md — Backend interface + LocalBackend (kill-tree) + AxiomBackend stub + ToolRegistry (with Critical tier per Blocker 5) + RateLimiter + FOUND-10 lint rule (AST scan per Blocker 8). Scheduler moved to Plan 05.
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
@@ -279,7 +279,7 @@ Calendar parallelization (within constraint that dependencies are met):
 |-------|----------------|--------|-----------|
 | 1. Language ADR & Spike | 4/5 | In Progress|  |
 | 2. Architecture v2 Design | 7/7 | Complete   | 2026-05-28 |
-| 3. Foundation Kernel | 3/7 | In Progress|  |
+| 3. Foundation Kernel | 4/7 | In Progress|  |
 | 4. Subdomains E2E + Axiom Integration | 0/? | Not started | - |
 | 5. Web Pipeline E2E | 0/? | Not started | - |
 | 6. Vulnerability Scanning E2E | 0/? | Not started | - |
