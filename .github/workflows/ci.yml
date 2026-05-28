@@ -1,0 +1,153 @@
+# Phase 3 Foundation Kernel CI pipeline — Go v2 kernel gates.
+# Source: ADR 0002 §9.3 lines 2270-2326 (canonical seed).
+#
+# This workflow is ADDITIVE to the existing bats v1 workflows
+# (tests.yml, semgrep.yml, docker_nightly.yml) — those remain untouched
+# until Phase 12 cutover per CONTEXT.md.
+#
+# Jobs (single-platform ubuntu-latest per CONTEXT.md Claude-discretion
+# default (a); XPLAT-05 cross-platform matrix is Phase 11):
+#   - lint        — gofumpt format-check + golangci-lint (errcheck/govet/
+#                   staticcheck/unused/gofumpt enabled)
+#   - unit        — go test -race -short ./...  + XCUT-07 sentinel
+#                   explicit gate step
+#   - integration — go test -race ./... + XCUT-04 ≥75% coverage gate on
+#                   internal/core/...
+#   - smoke       — go test -race -tags smoke ./...  (PR + scheduled
+#                   only); MANDATORY per plan 03-01 W12 revision iter 1
+#                   for FOUND-04 SIGKILL atomicity + FOUND-09 kill-tree
+#                   tests that the unit ring cannot deliver
+#   - binary-size — XCUT-02 build with -ldflags="-s -w" -trimpath; size
+#                   gate <50MB (52428800 bytes). Skipped via hashFiles()
+#                   until Plan 03-05 lands cmd/reconftw/main.go.
+
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request: {}
+  schedule:
+    # Run smoke job weekly on Sundays at 03:17 UTC.
+    - cron: "17 3 * * 0"
+
+permissions:
+  contents: read  # least privilege (supply-chain hygiene)
+
+jobs:
+  lint:
+    name: Lint + format-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Install gofumpt
+        run: go install mvdan.cc/gofumpt@v0.7.0
+      - name: gofumpt format-check
+        run: |
+          DIFF=$(gofumpt -d .)
+          if [ -n "$DIFF" ]; then
+            echo "::error::gofumpt found formatting issues:"
+            echo "$DIFF"
+            exit 1
+          fi
+      - name: Install golangci-lint v2.12.2
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
+            sh -s -- -b "$(go env GOPATH)/bin" v2.12.2
+      - name: golangci-lint
+        run: golangci-lint run --timeout=5m ./...
+
+  unit:
+    name: Unit + Property tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: go test -race -short ./...
+        run: go test -race -short ./...
+      - name: XCUT-07 sentinel gate (logging hygiene)
+        # Runs explicitly to make the gate visible in CI logs as a named
+        # step — even though the test is already in the previous step,
+        # surfacing it as its own job step prevents accidental rename or
+        # deletion regressions.
+        run: |
+          go test -race -run 'TestXCUT07Sentinel|TestSentinel' \
+            ./internal/core/log/...
+
+  integration:
+    name: Integration tests + coverage gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: go test -race ./...
+        run: go test -race ./...
+      - name: XCUT-04 coverage gate (≥75% on internal/core/...)
+        # XCUT-04 lib-code coverage gate. Phase 3 plan-01 ships only
+        # internal/core/errors/ and internal/core/log/ — both at 90%+
+        # — so the gate passes trivially. Later plans extend the
+        # measured packages while keeping the gate at ≥75%.
+        run: |
+          go test -race -coverprofile=coverage.out -covermode=atomic ./internal/core/...
+          go tool cover -func=coverage.out | tail -1 | awk '{
+            pct=substr($3,1,length($3)-1)+0
+            if (pct < 75.0) {
+              print "Coverage below 75% gate:", $3
+              exit 1
+            } else {
+              print "Coverage:", $3
+            }
+          }'
+
+  smoke:
+    name: Smoke tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: go test -race -tags smoke ./...
+        # Smoke ring per ADR §9 — build-tagged tests that gate atomicity
+        # proofs the unit ring cannot deliver (FOUND-04 subprocess SIGKILL
+        # atomicity in Plan 03; FOUND-09 kill-tree in Plan 04). Plan 03-01
+        # ships no smoke tests yet — the suite is empty so this job is a
+        # placeholder that succeeds. Adding `-tags smoke` files lands in
+        # Plans 03-03/04 per W12 revision iter 1.
+        run: go test -race -tags smoke ./...
+
+  binary-size:
+    name: Binary size budget (XCUT-02)
+    runs-on: ubuntu-latest
+    # Gated until Plan 03-05 lands cmd/reconftw/main.go. The hashFiles()
+    # check returns the empty string when the file is absent, which evaluates
+    # to falsy in GitHub Actions if conditions.
+    if: hashFiles('cmd/reconftw/main.go') != ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build with XCUT-02 strip/trimpath
+        run: go build -ldflags="-s -w" -trimpath -o bin/reconftw ./cmd/reconftw
+      - name: Assert binary <50MB (52428800 bytes)
+        run: |
+          SIZE=$(stat --printf=%s bin/reconftw 2>/dev/null || stat -f%z bin/reconftw)
+          echo "binary size: $SIZE bytes"
+          if [ "$SIZE" -ge 52428800 ]; then
+            echo "::error::binary >=50MB (XCUT-02 gate)"
+            exit 1
+          fi
