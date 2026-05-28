@@ -144,7 +144,7 @@ Plans:
 Plans:
 **Wave 0** *(new — kernel-contract foundations before any Task code)*
 
-- [ ] 04-00-PLAN.md — Missing config fields (MinResolvers/MinFreeMemGB/FailoverThreshold) + Tool.InputFlag + tools.lock to 25 + staging contract doc
+- [x] 04-00-PLAN.md — Missing config fields (MinResolvers/MinFreeMemGB/FailoverThreshold) + Tool.InputFlag + tools.lock to 25 + staging contract doc
 
 **Wave 1** *(blocked on Wave 0)*
 
@@ -159,12 +159,15 @@ Plans:
 
 - [ ] 04-04-PLAN.md — Permutation Tasks with gopsutil OS memory back-pressure (not runtime.ReadMemStats) + SubRecursivePassive/Brute
 
-**Wave 4** *(parallel — blocked on Wave 3)*
+**Wave 4** *(blocked on Wave 3)*
 
 - [ ] 04-05-PLAN.md — Takeover + Buckets + ASN + Geo (real City+ASN via ipinfo) + ZoneTransfer (in-Run gate)
+
+**Wave 5** *(blocked on Wave 4 — depends on 04-05's enrichment Task registrations)*
+
 - [ ] 04-06-PLAN.md — Real AxiomBackend (Tool.InputFlag split) + FailoverBackend (safe Stream) + sequential 5-stage RunStage + filterByModuleAndEnabled
 
-**Wave 5** *(blocked on Wave 4)*
+**Wave 6** *(blocked on Wave 5)*
 
 - [ ] 04-07-PLAN.md — Frozen-replay parity harness (real v1-captured fixtures) + AXIOM-09 equivalence test + phase acceptance checkpoint
 
@@ -306,7 +309,7 @@ Calendar parallelization (within constraint that dependencies are met):
 | 1. Language ADR & Spike | 4/5 | In Progress|  |
 | 2. Architecture v2 Design | 7/7 | Complete   | 2026-05-28 |
 | 3. Foundation Kernel | 7/7 | Complete   | 2026-05-28 |
-| 4. Subdomains E2E + Axiom Integration | 0/7 | Planned     | - |
+| 4. Subdomains E2E + Axiom Integration | 1/8 | In Progress|  |
 | 5. Web Pipeline E2E | 0/? | Not started | - |
 | 6. Vulnerability Scanning E2E | 0/? | Not started | - |
 | 7. OSINT E2E | 0/? | Not started | - |

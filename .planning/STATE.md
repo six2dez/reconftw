@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Complete Core Migration
 status: executing
-stopped_at: Phase 3 complete (7/7 plans, 20/20 REQ-IDs verified)
-last_updated: "2026-05-28T18:13:33.116Z"
-last_activity: 2026-05-28 -- Phase 3 execution started
+stopped_at: Phase 4 context gathered
+last_updated: "2026-05-28T23:57:26.629Z"
+last_activity: 2026-05-28
 progress:
   total_phases: 12
   completed_phases: 3
-  total_plans: 19
-  completed_plans: 19
+  total_plans: 27
+  completed_plans: 20
   percent: 25
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-27)
 
 **Core value:** Run one command, get a complete recon picture of a target — passive, active, and vulnerability layers — with resumable checkpoints, structured output, and zero-touch tool orchestration.
-**Current focus:** Phase 3 — Foundation Kernel
+**Current focus:** Phase 04 — subdomains-e2e-axiom-integration
 
 ## Current Position
 
-Phase: 3 (Foundation Kernel) — EXECUTING
-Plan: 1 of 7
-Status: Executing Phase 3
-Last activity: 2026-05-28 -- Phase 3 execution started
+Phase: 04 (subdomains-e2e-axiom-integration) — EXECUTING
+Plan: 2 of 8
+Status: Ready to execute
+Last activity: 2026-05-28
 
 ## Performance Metrics
 
@@ -67,6 +67,7 @@ Last activity: 2026-05-28 -- Phase 3 execution started
 - Trend: Closed v1.0 early; opened v2.0 (full rewrite); roadmap ready to begin planning
 
 *Updated after each plan completion*
+| Phase 04-subdomains-e2e-axiom-integration P00 | 3 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -88,6 +89,7 @@ Recent decisions affecting v2.0 work:
 - v2.0 roadmap: ADR (Phase 1) and Architecture Design (Phase 2) gate all production code; Foundation (Phase 3) ships kernel; Subdomains+Axiom (Phase 4) is canonical reference port
 - v2.0 roadmap: Cutover (Phase 12) explicitly blocked by CUT-04 (migrator corpus) and CUT-12 (sign-off criteria including parity test + beta period)
 - v1.0 close: Phases 3-5 (PERF-01, FIX-02, TEST-01/02/03, DOCS-01/02) superseded by v2.0 — los issues se resuelven by design en el rewrite
+- [Phase ?]: 04-00: csprecon added as 26th tools.lock entry to resolve plan count ambiguity
 
 ### Pending Todos
 
@@ -115,6 +117,6 @@ Items captured durante v1.0 que deben informar el diseño de arquitectura v2 (no
 
 ## Session Continuity
 
-Last session: 2026-05-28T18:13:33.109Z
-Stopped at: Phase 3 complete (7/7 plans, 20/20 REQ-IDs verified)
-Resume file: .planning/phases/03-foundation-kernel/03-VERIFICATION.md
+Last session: 2026-05-28T23:57:26.624Z
+Stopped at: Phase 4 context gathered
+Resume file: None
