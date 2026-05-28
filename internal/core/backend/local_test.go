@@ -82,15 +82,16 @@ func TestLocalBackend_Exec_NonZeroExit_ReturnsToolErrorWithTruncatedStderr(t *te
 }
 
 // Test 7b: Exec on a stream that produces > 1KB of stderr is truncated to 1KB.
-// Uses `sh -c` to pipe a large stream to stderr. Asserts the < 1KB invariant explicitly.
+// Uses `sh -c` to emit a bounded large stream to stderr and exit non-zero.
+// Asserts the <= 1KB invariant explicitly per W9.
 func TestLocalBackend_Exec_LargeStderr_TruncatedTo1KB(t *testing.T) {
 	b := backend.NewLocalBackend(0)
-	// /bin/sh -c 'yes ABCDEFGHIJ | head -c 5000 >&2; exit 7'
-	// Generates ~5KB of stderr, then exits non-zero.
+	// Print 5000 'X' bytes to stderr via awk, then exit 7. Bounded — no streaming pipe.
+	// printf would be portable but its repeat semantics aren't POSIX; awk is on every Linux + macOS.
 	res, err := b.Exec(
 		context.Background(),
 		&backend.Tool{Name: "sh", Path: "/bin/sh"},
-		[]string{"-c", "yes ABCDEFGHIJ 1>&2 | head -c 5000 1>&2; exit 7"},
+		[]string{"-c", "awk 'BEGIN { for (i=0; i<5000; i++) printf \"X\" > \"/dev/stderr\" }'; exit 7"},
 	)
 	_ = res
 	var te *coreerrors.ToolError
@@ -100,6 +101,10 @@ func TestLocalBackend_Exec_LargeStderr_TruncatedTo1KB(t *testing.T) {
 	// W9 — explicit stderr-truncation assertion.
 	if len(te.Stderr) > 1024 {
 		t.Errorf("ToolError.Stderr length = %d bytes, want <= 1024 (W9 truncation, ADR §6 line 1806)", len(te.Stderr))
+	}
+	// Sanity: there should actually BE stderr (otherwise the test is vacuous).
+	if len(te.Stderr) == 0 {
+		t.Errorf("ToolError.Stderr is empty — expected truncated large-stderr content")
 	}
 }
 
@@ -185,6 +190,45 @@ func TestResult_StructFields(t *testing.T) {
 	checkType("Stderr", "[]uint8")
 	checkType("ExitCode", "int")
 	checkType("Duration", "time.Duration")
+}
+
+// Auxiliary: Stream yields events for a short, bounded command. Ring-1 coverage
+// for the Stream code path so the smoke-only kill-tree tests don't gate basic
+// stream-event verification. Uses `printf` to emit two lines and exit cleanly.
+func TestLocalBackend_Stream_BoundedOutput_YieldsEventsAndCloses(t *testing.T) {
+	b := backend.NewLocalBackend(0)
+	ch, err := b.Stream(
+		context.Background(),
+		&backend.Tool{Name: "sh", Path: "/bin/sh"},
+		[]string{"-c", "printf 'alpha\\nbeta\\n'; echo 'errline' 1>&2; exit 0"},
+	)
+	if err != nil {
+		t.Fatalf("Stream returned err=%v, want nil", err)
+	}
+	var lines []string
+	var sawErr bool
+	timeout := time.After(5 * time.Second)
+	for {
+		select {
+		case ev, ok := <-ch:
+			if !ok {
+				goto done
+			}
+			lines = append(lines, string(ev.Line))
+			if ev.IsErr {
+				sawErr = true
+			}
+		case <-timeout:
+			t.Fatalf("Stream channel did not close within 5s; lines so far: %v", lines)
+		}
+	}
+done:
+	if len(lines) < 3 {
+		t.Errorf("Stream emitted %d lines, want >= 3 (alpha+beta+errline): %v", len(lines), lines)
+	}
+	if !sawErr {
+		t.Errorf("Stream did not yield any IsErr=true events from stderr")
+	}
 }
 
 // Auxiliary: Exec with deadline-cancelled ctx returns *ToolTimeout (not part of
