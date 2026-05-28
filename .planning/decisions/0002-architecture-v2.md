@@ -30,16 +30,225 @@ class hierarchy are fixed. Breaking changes require an inline amendment block in
 following the format: `Amended: YYYY-MM-DD | Section: §N | Reason: …` (D-06). Non-breaking
 additions (new methods, new error types, new AppContext fields) do not require an amendment.
 
+## TL;DR
+
+reconFTW v2.0 locks 12 architecture contracts in this ADR; all Phase 3-12 implementers
+read this one file. **§2** documents the complete TOML config schema: all ~290-310 v1
+`reconftw.cfg` flags are mapped to a clean v2-native hierarchy (`[subdomains.passive]`,
+`[web.fuzz]`, `[axiom]`, etc.) plus a `[legacy]` alias table for backward compat; per-key
+validation rules (type, range, regex, allowlist, mutex groups) are locked here for Phase 3
+to implement. **§3** specifies the new `workspaces/<target-id>/` output tree with typed JSONL
+artefacts, SQLite checkpoints, and `AtomicWriter`-only write semantics (tempfile + fsync +
+rename + parent-fsync). **§4** defines the `CompatWriter` that maintains `Recon/<domain>/`
+symlinks for 6 months post-cutover via `LifecycleAware.OnEnd()` hooks. **§5** is the
+dependency kernel: three BINDING interfaces — `Task` (6 methods), `Backend` (4 methods),
+`AppContext` (9 fields) — are the sole runtime contracts; no package-level globals anywhere.
+**§6** establishes a 7-class typed error hierarchy (`ToolError`, `ToolTimeout`, `OutOfScope`,
+`AxiomFailure`, `ConfigError`, `ScopeError`, `ChecksumMismatch`) with sentinel anchors for
+`errors.Is` and typed structs for `errors.As`. **§7** makes `failure_policy` config-driven
+per module group: `subdomains = fail_fast`; `web/vulns/osint = best_effort`; the
+`Scheduler` uses `errgroup.SetLimit(N)` with `errgroup.WithContext` for fail-fast stages.
+**§8** defines a subcommand-first CLI; all v1 short flags become deprecated aliases via
+`cobra.MarkDeprecated()` and are removed at v2.2.0 (2 minor versions). **§9** mandates four
+test rings (unit / integration / smoke / property-based) with `MockBackend` / `MockCheckpoint`
+/ `MockOutputTree` test infrastructure built in Phase 3 before any module; all rings use
+`goleak` for goroutine hygiene. **§10** requires two-layer secret redaction: `Secret` string
+type with `LogValue()` returning `"***"` (Layer 1) and `RedactingHandler` sink (Layer 2);
+secrets registered before the first log line. **§11** describes the 4-check pre-sign
+verification gate (ARCH-NN grep, TOML parse, Go compile, glossary count) at
+`.planning/decisions/verify-0002.sh`. **§12** establishes the amendment log format (D-06)
+and the D-07 breaking-change threshold that governs when an amendment is required.
+
+## Glossary
+
+One-line definitions for every new term used in interface signatures and section headings.
+Listed alphabetically.
+
+**AppContext** — dependency kernel struct passed by pointer to every `Task.Run()`; wired
+once at startup in `cmd/reconftw/main.go`; holds all 9 kernel components (Log, Cfg,
+Scheduler, Tools, Tree, Checkpoint, Notify, Target, UI).
+
+**AtomicWriter** — write pattern: create tempfile in same directory → write + fsync →
+`rename(2)` over target → fsync parent directory; the only sanctioned write path for
+artefact files in `workspaces/<target>/artefacts/`.
+
+**AxiomFailure** — error class for Axiom infrastructure failure (SSH timeout, fleet
+unreachable); distinct from `ToolError`; triggers failover to `LocalBackend`.
+
+**Backend** — interface abstracting local subprocess execution (`LocalBackend`) from
+distributed Axiom execution (`AxiomBackend`); 4 methods: `Exec`, `Stream`,
+`HealthCheck`, `Capacity`.
+
+**ChecksumMismatch** — error class returned by the installer when a downloaded binary
+or script does not match its expected SHA-256 hash.
+
+**CompatWriter** — writes bash-shape files to `_compat/` as a `LifecycleAware.OnEnd()`
+hook after each successful task; maintains the `Recon/<domain>/` symlink farm for 6
+months post-cutover.
+
+**ConfigError** — error class for config load/validation failures; carries file:line:key
+context; `Message` MUST NOT contain raw secret values.
+
+**failure_policy** — `"best_effort"` or `"fail_fast"` configured per module group in
+`[scheduler.overrides]`; `fail_fast` cancels sibling tasks on first error via
+`errgroup.WithContext`; `best_effort` logs errors as warnings and continues.
+
+**FailurePolicy** — the Go type alias for `failure_policy` values: `PolicyBestEffort` and
+`PolicyFailFast` constants in `internal/core/scheduler`.
+
+**OutOfScope** — error returned by `OutputTree.Append` when a finding fails scope check;
+prevents out-of-scope data from being written to artefact files.
+
+**Result** — outcome struct returned by `Task.Run()`: `Status` + `Duration` + `Outputs`
+(paths written) + `Stats` (optional counters).
+
+**ScopeError** — error class for domain/IP input validation failures (metacharacters, bad
+CIDR); distinct from `OutOfScope` which is a write-time artefact rejection.
+
+**Scheduler** — bounded concurrency engine wrapping `errgroup.SetLimit(N)` +
+`failure_policy` dispatch; the `runStage` method is the fail-fast vs best-effort fork.
+
+**Secret** — `type Secret string` with `LogValue() slog.Value` returning `"***"`; used
+for all credential fields in `Config`, `AppContext`, and `Tool` structs; no `String()`
+method (intentional — prevents accidental `fmt.Sprintf` exposure).
+
+**Status** — task terminal state enum: `done` | `errored` | `cancelled` | `skipped`;
+written to `checkpoints.db` by the Scheduler on task completion.
+
+**Task** — smallest schedulable unit of recon work; self-registers via `init()`; declares
+`DependsOn` for DAG ordering; implements 6 methods: `Name`, `Module`, `Description`,
+`Enabled`, `DependsOn`, `Run`.
+
+**ToolError** — error class for non-zero tool exit codes; carries tool name, exit code,
+and last 1 KB of stderr; implements `Is(ErrTool)` sentinel bridge.
+
+**ToolTimeout** — error class for per-task context deadline exceeded; carries tool name
+and configured timeout; implements `Is(ErrTimeout)` sentinel bridge.
+
+## Reading Order
+
+Use the guide below to read the minimum required sections for your phase.
+
+**If implementing Phase 3 (Foundation Kernel):** read §2 (config struct shape and
+validation rules to implement), §3 (output tree to build), §4 (compat writer contract),
+§5 (interfaces to implement), §10 (logger bootstrap order — CRITICAL: logger before
+config load) first. Then §6 (error types to implement) and §9 (test infrastructure to
+build before any module).
+
+**If implementing Phase 4-7 (module ports — subdomains / web / vulns / osint):** read
+§5 (`Task` interface — what you are implementing), §7 (`failure_policy` — which policy
+applies to your module group), §6 (error types you must return) first. Then §3 (where
+and how to write artefacts via `OutputTree.Append`).
+
+**If implementing Phase 8 (MCP server):** read §5 (`Backend.Stream()` — the channel you
+multiplex), §8 (CLI surface for the `reconftw mcp` subcommand) first.
+
+**If implementing Phase 9 (composite modes):** read §8 (CLI subcommand surface), §7
+(`failure_policy` per mode — `recon` uses subdomains fail-fast; `all` inherits all
+overrides) first.
+
+**If implementing Phase 11 (installer + migrator):** read §2 (the TOML target schema the
+migrator must emit) and §2.4 (the D-11 drop list) first.
+
+**If implementing Phase 12 (cutover):** read §4 (compat layer lifecycle and 6-month
+timeline), §8 (deprecated flag removal at v2.2.0) first.
+
 ## §1 Overview & System Diagram
 
 <!-- ARCH-01 -->
 
-[STUB — populated in Wave 2]
+### §1.1 System Architecture Diagram
 
-This section will contain: TL;DR summary of every locked decision, glossary of all new
-terms (AppContext, Backend, Task, Tool, FailurePolicy, Secret, ToolError, ToolTimeout,
-OutOfScope, AxiomFailure, ConfigError, ScopeError, ChecksumMismatch), suggested reading
-order for Phase 3 implementers, and a top-level Mermaid system architecture diagram.
+The diagram below shows all 12 architectural nodes and the dependency edges between them.
+Read top-to-bottom: the CLI parses flags and resolves config; the Application Kernel wires
+all components and passes `*AppContext` to every Task; the Scheduler dispatches Tasks to the
+Module Layer; Modules call Backend for tool execution and write artefacts to the Output Tree.
+
+```mermaid
+graph TD
+    CLI["CLI Layer\ncobra + pflag\nreconftw run / subs / web / vulns / osint"]
+    CFG["Config Layer\nkoanf v2 + go-toml v2\n8-source precedence chain"]
+    KERNEL["Application Kernel\nAppContext struct (pointer)\nLog | Cfg | Scheduler | Tools | Tree | Checkpoint | Notify | Target | UI"]
+    SCHED["Scheduler\nerrgroup.SetLimit(N)\nbest_effort vs fail_fast per stage"]
+    TOOLS["Tool Registry + Backend\nLocalBackend / AxiomBackend\nSetpgid + Kill(-pgid) pattern"]
+    OUTPUT["Output Tree\nworkspaces/<target>/artefacts/ JSONL\nAtomicWriter: tempfile+fsync+rename+parent fsync"]
+    COMPAT["Compat Writer\nRecon/<domain>/ symlink farm\n6 months post-cutover"]
+    CHECKPOINT["Checkpoint Store\ncheckpoints.db (SQLite WAL)\ntask_name + input_hash + status"]
+    MODULES["Module Layer\ninternal/modules/subdomains | web | vulns | osint\nSelf-registering via init()"]
+    ERRORS["Error Package\n7-class typed hierarchy\nToolError | ToolTimeout | OutOfScope | AxiomFailure | ConfigError | ScopeError | ChecksumMismatch"]
+    LOG["Logger\nlog/slog + RedactingHandler\nSecret type via LogValuer\nregistered BEFORE first log line"]
+    EXTERNAL["External Tools Layer\n70+ binaries on PATH\nsubfinder | httpx | nuclei | dalfox | sqlmap..."]
+
+    CLI --> CFG
+    CFG --> KERNEL
+    KERNEL --> SCHED
+    KERNEL --> TOOLS
+    KERNEL --> OUTPUT
+    KERNEL --> CHECKPOINT
+    KERNEL --> LOG
+    SCHED --> MODULES
+    MODULES --> TOOLS
+    TOOLS --> EXTERNAL
+    MODULES --> OUTPUT
+    OUTPUT --> COMPAT
+    MODULES --> CHECKPOINT
+    MODULES --> ERRORS
+    LOG --> ERRORS
+```
+
+### §1.2 Recommended Project Structure
+
+The layout below maps directly to the ARCH-NN requirements. Each `internal/core/` sub-package
+is the implementation home for one or more contract sections. Phase 3 creates this tree;
+all subsequent phases add Task implementations under `internal/modules/`.
+
+```text
+cmd/reconftw/
+├── main.go                  # signal.NotifyContext + AppContext.Boot() + cobra.Execute()
+└── modules.go               # blank imports to trigger module init() registrations
+
+internal/
+├── core/
+│   ├── errors/              # ARCH-08: 7-class typed error hierarchy
+│   ├── log/                 # ARCH-12: Secret type + RedactingHandler + logger factory
+│   ├── config/              # ARCH-02: Config struct (koanf), 8-source loader, validator
+│   ├── task/                # ARCH-05: Task interface + Registry
+│   ├── scheduler/           # ARCH-09: Scheduler (errgroup + semaphore + failure_policy)
+│   ├── backend/             # ARCH-06: Backend interface + LocalBackend + AxiomBackend
+│   ├── output/              # ARCH-03/04: OutputTree + AtomicWriter + CompatWriter
+│   ├── checkpoint/          # ARCH-03: SQLite checkpoint store (modernc/sqlite)
+│   ├── appctx/              # ARCH-07: AppContext struct (wiring kernel)
+│   ├── notifier/            # Notifier interface + stubs
+│   └── ui/                  # Dot-fill UI (port of lib/ui.sh verbatim)
+└── modules/
+    ├── subdomains/          # Task implementations (self-register via init())
+    ├── web/
+    ├── vulns/
+    └── osint/
+
+interfaces_check/            # D-14: standalone build target for Go snippet compile check
+├── main.go                  # imports core/task, core/backend, core/appctx; verifies signatures
+
+.planning/decisions/
+└── 0002-architecture-v2.md  # THE deliverable
+```
+
+### §1.3 Contract Map
+
+The table below maps each section to its ARCH-NN requirement(s), the Phase 3 package that
+implements the contract, and the downstream phases that consume it.
+
+| Section | ARCH-NN | Phase 3 Component | Phase 4+ Consumer |
+|---------|---------|-------------------|-------------------|
+| §2 TOML Schema | ARCH-02 | `internal/config` + `config.Load()` | Phase 11 migrator |
+| §3 Output Tree | ARCH-03 | `internal/output OutputTree` | Phase 4-7 `Task.Run()` |
+| §4 Compat Layer | ARCH-04 | `internal/output CompatWriter` | Phase 12 cutover window |
+| §5 Interfaces | ARCH-05/06/07 | `internal/core/{task,backend,appctx}` | Phase 4-12 Task impl. |
+| §6 Error Hierarchy | ARCH-08 | `internal/core/errors` | Phase 4-12 error handling |
+| §7 Failure Policy | ARCH-09 | `internal/scheduler` | Phase 4-12 module groups |
+| §8 CLI Surface | ARCH-10 | `cmd/reconftw/main.go` + cobra | Phase 9 composite modes |
+| §9 Test Policy | ARCH-11 | `internal/core/testutil` + CI | All phases |
+| §10 Logging Policy | ARCH-12 | `internal/core/log` | All phases |
 
 ## §2 TOML Configuration Schema
 
@@ -2387,42 +2596,136 @@ output, ever, under any code path. The sentinel-value test is the enforcement me
 
 <!-- ARCH-01 — process -->
 
-[STUB — populated in Wave 2]
+Before Status is flipped from `Proposed` to `Accepted`, the maintainer runs a
+programmatic pre-sign gate (D-14). The gate script lives at
+`.planning/decisions/verify-0002.sh`. It performs four checks in sequence; any failure
+exits non-zero and halts sign-off.
 
-This section will contain: the 4-step programmatic pre-sign verification gate (D-14):
-(1) ARCH-NN requirement grep coverage check, (2) TOML block parse validation via tomljson,
-(3) Go interface snippet compile via `go build ./interfaces_check/...`, and (4) glossary
-term completeness check. The gate script is at `.planning/decisions/verify-0002.sh`.
+**Run as:** `bash .planning/decisions/verify-0002.sh` from the repository root.
+All 4 checks must pass before Status is flipped from Proposed to Accepted (D-14).
+
+**Dependency note:** Check 2 requires `tomljson` on PATH. Install via:
+`go install github.com/pelletier/go-toml/cmd/tomljson@latest`
+
+### Check 1: ARCH-NN Requirement Coverage
+
+Greps for each of `ARCH-01` through `ARCH-12` in the ADR file. Ensures every requirement
+has at least one reference in the document body, so no contract section was accidentally
+omitted. Expected pass condition: all 12 IDs found; script prints `OK: ARCH-0N found` for
+each and continues to Check 2.
+
+### Check 2: TOML Blocks Parse as Valid TOML
+
+Extracts every ` ```toml ` code block from the ADR using `awk`, writes each block to a
+temp buffer, and pipes it through `tomljson`. Ensures that every TOML sample embedded in
+the schema documentation is syntactically valid TOML — no missing quotes, invalid keys,
+or malformed nested tables. Expected pass condition: `tomljson` exits 0 for every block;
+script prints `OK: TOML block at line N` for each and continues to Check 3.
+
+### Check 3: Go Interface Snippets Compile
+
+Runs `go build -o /tmp/interfaces_check_verify ./interfaces_check/...` from the repository
+root. The `interfaces_check/` package imports the interface declarations from the ADR's Go
+blocks; a successful build proves that every Go snippet in the ADR is syntactically valid
+and type-checks against the declared imports. Expected pass condition: `go build` exits 0;
+script prints `OK: Go snippets compile` and continues to Check 4.
+
+### Check 4: Glossary Completeness
+
+Greps for each of the following contract terms in the ADR:
+`AppContext`, `Backend`, `Task`, `Result`, `FailurePolicy`, `Secret`, `ToolError`,
+`ToolTimeout`, `OutOfScope`, `AxiomFailure`, `ConfigError`, `ScopeError`,
+`ChecksumMismatch`. Ensures every term used in interface signatures has a definition
+somewhere in the document. Expected pass condition: all 13 terms found; script prints
+`OK: <term> in glossary` for each and concludes with `=== ALL CHECKS PASSED — safe to sign ===`.
 
 ## §12 Amendment Log
 
 <!-- D-06 -->
 
-[STUB — populated in Wave 2]
+No amendments as of sign-off date. Amendments are appended at the END of this file,
+never inline-edited into original section text. Git history is the audit trail. Each
+amendment block uses the following format (D-06):
 
-This section will contain: an ordered log of all inline amendments to this ADR after
-sign-off. Each amendment entry follows the format:
-`Amended: YYYY-MM-DD | Section: §N | Reason: … | SHA: <git-sha>`.
-Amendments are append-only; original text is struck through but not removed.
+```
+---
+**Amended:** YYYY-MM-DD | **Section:** §N | **Reason:** one-line rationale
+[changed content here — replaces or supplements the original]
+---
+```
+
+**Amendment governance:** Amendment gate = solo same-day (D-08, same gate as original
+sign-off). Consistent rule: "changing the ADR uses the same ceremony as signing it."
+
+**D-07 Breaking-change threshold.** Amendment REQUIRED for:
+- Renaming a method on `Task`, `Backend`, or `AppContext`
+- Changing a method signature (parameter types, return types, parameter count)
+- Removing a field from `AppContext` or a method from `Task` / `Backend`
+- Changing a field's type in `AppContext`, `Result`, or any error struct
+- Redefining error semantics (e.g. changing when `OutOfScope` vs `ScopeError` is returned)
+
+Amendment NOT required for:
+- Adding new fields to `AppContext` (additive, non-breaking)
+- Adding new methods to `Task` or `Backend` (additive, non-breaking)
+- Adding new error types to the hierarchy (additive)
+- Tightening internal validation rules (e.g. lowering a range cap) that do not change the
+  public type signatures
+
+### Amendments
+
+_No amendments yet._
 
 ## Consequences
 
 ### Positive
 
-[STUB — populated in Wave 3]
+- Single ADR governs all 12 locked contracts; Phase 3-12 implementers read one file for
+  every dependency they need — no scattered spec documents or tribal-knowledge gaps.
+- BINDING interface signatures (`Task` / `Backend` / `AppContext`) eliminate the
+  "what does Task look like?" question across 12 phases; Phase 4-12 can start planning
+  against exact signatures without waiting for Phase 3 to complete.
+- Per-key validation rules locked in Phase 2 mean the Phase 3 config loader has zero
+  ambiguity; security rules (path-traversal rejection, URL scheme allowlists, DoS-
+  prevention rate caps) are part of the contract, not the implementation.
+- `failure_policy` model replaces bash's implicit "continue on error" with an explicit,
+  config-driven contract that matches the v1 mental model while being testable and auditable.
+- `Secret` type at the Go type level means secret leakage is a compile-time concern,
+  not a runtime surprise; `golangci-lint` enforces the type in CI on every commit.
+- Compat layer design gives users a 6-month migration window after v2.0 GA without
+  breaking downstream scripts, parsers, or CI pipelines that read `Recon/<domain>/`.
+- SQLite WAL checkpoint store replaces bash `touch` sentinels with content-addressed,
+  crash-safe, queryable idempotency — no more partial-run ambiguity.
 
 ### Negative
 
-[STUB — populated in Wave 3]
+- ~80-150 page ADR is a reading investment for new contributors; the TL;DR + Reading
+  Order sections mitigate this but cannot eliminate it for a 12-phase architecture spec.
+- BINDING interface signatures mean any Phase 3-12 deviation triggers the amendment
+  process (D-06 overhead); even small API adjustments need a formal amendment entry.
+- TOML schema with ~290-310 keys and a `[legacy]` table adds config loader complexity
+  in Phase 3; the migrator must handle both the v2-native and legacy key paths.
+- Test ring policy requires `MockBackend` / `MockCheckpoint` / `MockOutputTree` to be
+  built in Phase 3 before any module can be tested; no module test can be written until
+  the test infrastructure wave completes.
+- koanf v2 (not viper) is mandated by the `[legacy]` alias requirement; contributors
+  familiar with viper will need to learn koanf's provider/parser model.
 
 ## References
 
-- `.planning/REQUIREMENTS.md` — ARCH-01 through ARCH-12 requirements (source of contract scope)
-- `.planning/ROADMAP.md` — Phase 2: Architecture v2 Design section (goal + success criteria)
-- `.planning/research/ARCHITECTURE.md` — 15-section architecture research synthesis (primary input for §3-§12)
-- `.planning/research/STACK.md` — 14-dimension library stack with verified versions (cobra, koanf, slog, errgroup, modernc-sqlite)
-- `.planning/decisions/0001-language.md` — ADR 0001 (Status: Accepted); language locked as Go
-- `.planning/phases/02-architecture-v2-design/02-RESEARCH.md` — Phase 2 research (interface patterns, TOML schema, error hierarchy, test rings, logging, CLI deprecation)
+- Phase requirements: `.planning/REQUIREMENTS.md` ARCH-01 through ARCH-12
+- Phase roadmap: `.planning/ROADMAP.md` Phase 2 success criteria
+- Phase context (user decisions): `.planning/phases/02-architecture-v2-design/02-CONTEXT.md`
+- Phase research (technical base): `.planning/phases/02-architecture-v2-design/02-RESEARCH.md`
+- Language ADR (predecessor): `.planning/decisions/0001-language.md` (Status: Accepted, 2026-05-28)
+- Project architecture research: `.planning/research/ARCHITECTURE.md`
+- Library stack research: `.planning/research/STACK.md`
+- Pitfalls reference: `.planning/research/PITFALLS.md`
+- Spike reference implementations: `spike/go/internal/proc/proc.go` (kill-tree), `spike/go/internal/output/atomic.go` (atomic writer), `spike/go/internal/passive/passive.go` (errgroup fan-out)
+- Pre-sign gate script: `.planning/decisions/verify-0002.sh`
+- Compile check package: `interfaces_check/main.go`
+- Go stdlib: `log/slog` LogValuer interface (official example: golang.org/go src/log/slog/example_logvaluer_secret_test.go)
+- errgroup docs: https://pkg.go.dev/golang.org/x/sync/errgroup
+- cobra MarkDeprecated: https://pkg.go.dev/github.com/spf13/cobra
 
 ## Signed
 
