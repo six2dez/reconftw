@@ -66,7 +66,15 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. The doc contains signed signatures for `Task`, `Backend`, `AppContext`, and the error class hierarchy (`ToolError`, `ToolTimeout`, `OutOfScope`, `AxiomFailure`, `ConfigError`, `ScopeError`, `ChecksumMismatch`) plus the per-stage `failure_policy` model (ARCH-05, ARCH-06, ARCH-07, ARCH-08, ARCH-09)
   4. The doc specifies the CLI surface (subcommands `reconftw recon|subs|web|...` primary; v1 short flags `-r/-s/-p/-a/-d/-l` preserved as deprecated aliases with 2-minor-version warning window) and the test-ring policy (unit / integration / smoke / property-based) (ARCH-10, ARCH-11)
   5. The doc specifies the logging policy with type-level secret tagging (Go `Secret`+`LogValuer` OR Python `SecretStr`) and sink-level redaction registered BEFORE first log line (ARCH-12)
-**Plans**: TBD
+**Plans**: 7 plans
+Plans:
+- [ ] 02-01-PLAN.md — ADR skeleton + verify-0002.sh + interfaces_check/
+- [ ] 02-02-PLAN.md — §2 TOML Configuration Schema (all v1 flags, [legacy] aliases, per-key validation)
+- [ ] 02-03-PLAN.md — §3 Output Tree Layout + §4 Compat Symlink Layer
+- [ ] 02-04-PLAN.md — §5 Interface Signatures + §6 Error Class Hierarchy + §7 Failure Policy
+- [ ] 02-05-PLAN.md — §8 CLI Surface + §9 Test Ring Policy + §10 Logging Policy
+- [ ] 02-06-PLAN.md — Integration pass: §1 Overview + TL;DR + Glossary + Consequences
+- [ ] 02-07-PLAN.md — Pre-sign gate + sign-off ceremony (checkpoint: autonomous: false)
 
 ### Phase 3: Foundation Kernel
 **Goal**: Ship the kernel — typed errors, structured logger with redaction, layered config loader, atomic output tree, SQLite checkpoint, bounded scheduler, tool registry with kill-tree-safe LocalBackend, AppContext, CLI binary, test mocks, and CI gate — so module ports can begin against a stable foundation.
@@ -203,7 +211,7 @@ Calendar parallelization (within constraint that dependencies are met):
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Language ADR & Spike | 4/5 | In Progress|  |
-| 2. Architecture v2 Design | 0/? | Not started | - |
+| 2. Architecture v2 Design | 0/7 | Ready to execute | - |
 | 3. Foundation Kernel | 0/? | Not started | - |
 | 4. Subdomains E2E + Axiom Integration | 0/? | Not started | - |
 | 5. Web Pipeline E2E | 0/? | Not started | - |
