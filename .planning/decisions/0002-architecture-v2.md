@@ -1847,23 +1847,274 @@ checkpoint — they re-run on the next invocation against the same target.
 
 <!-- ARCH-10 -->
 
-[STUB — populated in Wave 2]
+_Requirement:_ ARCH-10 — CLI surface: subcommands are primary; v1 short flags are deprecated
+aliases with a warning for 2 minor versions (removed in v2.2.0). Decisions: CLI-over-config
+pattern (CLI flags set `CLI_*` vars that override config after load); cobra `MarkDeprecated()`
+emits a warning to stderr on every use; exit codes are preserved identical to v1.
 
-This section will contain: the v2 cobra subcommand surface (reconftw run / subs / web /
-vulns / osint / mcp / health / migrate), all v1 short-flag deprecated aliases with 2-minor-
-version sunset, the `MarkDeprecated()` cobra pattern, and the `--dry-run` / `--verbose` /
-`--quiet` / `--output` universal flags.
+### §8.1 Subcommand Surface
+
+The v2 binary replaces all v1 positional-mode flags with explicit subcommands. The table
+below maps each v2 subcommand to its v1 long flag equivalent and the v1 short flag that
+becomes a deprecated alias. See §2 for the `[legacy]` TOML alias table; see §8.3 for the
+`cobra.MarkDeprecated()` pattern that bridges the two.
+
+| Subcommand | v1 Long Flag Alias | v1 Short Flag (deprecated) | Description |
+|------------|-------------------|---------------------------|-------------|
+| `reconftw recon` | `--recon` | `-r` | Passive subs + web probe + web analysis + OSINT (no vulns) |
+| `reconftw all` | `--all` | `-a` | Run everything (recon + vulns) |
+| `reconftw passive` | `--passive` | `-p` | Passive-only sources; no active probing |
+| `reconftw subs` | `--subdomains` | `-s` | Subdomain enumeration pipeline |
+| `reconftw web` | `--web` | `-w` | Web analysis pipeline |
+| `reconftw vulns` | — | — | Vulnerability scanning pipeline (no v1 short flag) |
+| `reconftw osint` | `--osint` | `-n` | OSINT pipeline (note: `-o` is taken by `--output` in v2) |
+| `reconftw zen` | — | `-z` | Stealth/quiet mode (extra OPSEC; no active noisy probing) |
+| `reconftw deep` | — | `-y` | Deep brute force + extended permutations |
+| `reconftw monitor` | `--monitor` | — | Monitor mode with configurable interval |
+| `reconftw report` | — | — | Regenerate reports without re-running scans |
+| `reconftw mcp` | — | — | Start MCP server (requires `mcp.enabled = true` in TOML) |
+| `reconftw migrate` | — | — | Migrate `reconftw.cfg` to TOML (implemented Phase 11) |
+| `reconftw install` | — | — | Install / update orchestrated tools (implemented Phase 11) |
+| `reconftw health-check` | `--health-check` | — | Verify all tool binaries reachable + backend operational |
+
+### §8.2 Persistent Global Flags
+
+The following flags are available on every subcommand (registered on `rootCmd` as
+`PersistentFlags()`). Short flags marked `(deprecated alias)` emit a stderr warning when
+used.
+
+| Flag | Short | Deprecated? | Description |
+|------|-------|-------------|-------------|
+| `--target` | _(none)_ | `-d` is deprecated alias | Single target domain, IP, or CIDR |
+| `--list` | _(none)_ | `-l` is deprecated alias | File with one target per line |
+| `--config` | — | — | Override default `reconftw.toml` location |
+| `--dry-run` | — | — | Show what would execute; no subprocess invocations |
+| `--force` | — | — | Bypass checkpoints; re-run everything (equiv v1 `DIFF=true`) |
+| `--log-level` | — | — | `error`\|`warn`\|`info`\|`debug` (maps to slog levels) |
+| `--axiom` | — | `--vps` / `-v` are deprecated aliases | Use Axiom distributed backend |
+| `--quiet` | `-q` | — | Shorthand for `--log-level error` |
+| `--verbose` | `-V` (uppercase) | — | Shorthand for `--log-level debug` |
+| `--output` | `-o` | — | Output directory root (default: `workspaces/`) |
+| `--no-color` | — | — | Disable ANSI colour output |
+
+**Note on `-o`:** v1 had no `-o` flag; `-o` is unused in v1. In v2, `-o` is assigned to
+`--output` so that `-o example.com` is unambiguous. The v1 `-n` (osint) collision was resolved
+by using `-n` for `osint` since `-o` was available for a more natural assignment.
+
+### §8.3 Cobra Deprecation Pattern
+
+All v1 short flags that map to v2 subcommands are registered as deprecated persistent flags
+on the root command. `cobra.MarkDeprecated()` prints to `cmd.ErrOrStderr()` automatically;
+the flag remains functional and exit code is unchanged.
+
+```go
+// cmd/reconftw/root.go — deprecated v1 short flags registered on rootCmd.
+// Source: RESEARCH.md §CLI Surface Design §Cobra Deprecation Pattern
+
+// Subcommand-mode flags (v1 short flags → v2 subcommands)
+rootCmd.PersistentFlags().BoolP("recon", "r", false, "Run recon mode")
+rootCmd.PersistentFlags().MarkDeprecated("recon",
+    "use subcommand 'recon' instead: `reconftw recon -d example.com`")
+
+rootCmd.PersistentFlags().BoolP("all", "a", false, "Run all modules")
+rootCmd.PersistentFlags().MarkDeprecated("all",
+    "use subcommand 'all' instead: `reconftw all -d example.com`")
+
+rootCmd.PersistentFlags().BoolP("passive", "p", false, "Passive-only mode")
+rootCmd.PersistentFlags().MarkDeprecated("passive",
+    "use subcommand 'passive' instead: `reconftw passive -d example.com`")
+
+rootCmd.PersistentFlags().BoolP("subdomains", "s", false, "Subdomain enumeration")
+rootCmd.PersistentFlags().MarkDeprecated("subdomains",
+    "use subcommand 'subs' instead: `reconftw subs -d example.com`")
+
+// Global target flags (v1 -d / -l → v2 --target / --list)
+rootCmd.PersistentFlags().StringP("target-deprecated", "d", "", "Target domain (deprecated)")
+rootCmd.PersistentFlags().MarkDeprecated("target-deprecated",
+    "use --target flag instead: `reconftw recon --target example.com`")
+
+rootCmd.PersistentFlags().StringP("list-deprecated", "l", "", "Target list (deprecated)")
+rootCmd.PersistentFlags().MarkDeprecated("list-deprecated",
+    "use --list flag instead: `reconftw recon --list targets.txt`")
+
+// Axiom backend flag (v1 --vps / -v → v2 --axiom)
+rootCmd.PersistentFlags().BoolP("vps", "v", false, "Use Axiom (deprecated)")
+rootCmd.PersistentFlags().MarkDeprecated("vps",
+    "use --axiom flag instead: `reconftw recon --axiom -d example.com`")
+```
+
+**Resulting stderr warning (cobra default format):**
+
+```
+Flag --recon has been deprecated, use subcommand 'recon' instead: `reconftw recon -d example.com`
+```
+
+The warning is printed once per invocation where the deprecated flag is used. Cobra does not
+deduplicate across multiple calls in a single invocation. Exit code is unchanged: the flag
+remains functional until v2.2.0.
+
+**A unit test asserts** that every deprecated flag, when used, emits exactly one deprecation
+warning line to stderr and exits 0. This test runs in Ring 1 (unit) with no subprocess.
+
+### §8.4 Removal Timeline
+
+Deprecated v1 flags remain **fully functional** through v2.1.x. They emit a warning to
+stderr on every use (no error, no non-zero exit code). They are **REMOVED in v2.2.0**.
+
+**"2 minor versions" measurement:** v1 release cadence shows tags like v4.1, v4.0.1, v3.2.1,
+v3.1.0, etc. — approximately 3–6 minor releases per calendar year (source: `git log --tags
+--simplify-by-decoration`). "2 minor versions" for v2.x means: deprecated flags removed at
+v2.2.0 (two minor-version bumps after v2.0.0 GA). **Calendar time is NOT the unit; release
+count is.** At current cadence this is approximately 4–8 months, but the binding commitment
+is the version number, not the date.
+
+Per ARCH-10 (`.planning/REQUIREMENTS.md`): CLI-over-config pattern is preserved — the
+deprecated flags, when used, set the same `CLI_*` override variables as their v2 equivalents
+before config is loaded; the config-override re-application step described in §2 still fires.
+
+**Cross-reference:** The `[legacy]` TOML table (§2) and the deprecated CLI flags (§8) both
+serve the same purpose — soft migration landing for v1 users. The `[legacy]` table is removed
+from koanf loading in v2.2.0 on the same schedule.
 
 ## §9 Test Ring Policy
 
 <!-- ARCH-11 -->
 
-[STUB — populated in Wave 2]
+_Requirement:_ ARCH-11 — Test ring policy documented: unit / integration / smoke /
+property-based, with CI gate assignments, ring membership examples, and foundation
+test-infrastructure requirements. This section specifies the policy; Phase 3 implements
+the foundation layer.
 
-This section will contain: the 4-ring test ring policy (unit / integration / smoke /
-property-based), CI gate assignments per ring, what belongs in each ring, go-test invocation
-patterns, goroutine leak detection via go.uber.org/goleak in every TestMain, and the CI
-budget split (unit+smoke per-push vs integration-full weekly cron).
+### §9.1 Four-Ring Policy
+
+| Ring | What Counts | Go Tooling | CI Cadence | Max Duration |
+|------|-------------|------------|------------|--------------|
+| **Unit** | Mock AppContext; no subprocess; no filesystem I/O; no network | `testing` + `testify` + `goleak` | Every commit, every push | < 30 s total |
+| **Integration** | Real Scheduler + Checkpoint + OutputTree; `MockBackend` (deterministic from testdata); SQLite `:memory:` | same + table-driven fixtures | Every commit | < 5 min |
+| **Smoke** | Real binaries against `httpbin.org` or a local `scope.local` target in Docker; 1 mode per test | `testing` + real tool execution | Every PR + weekly cron | < 20 min |
+| **Property** | Random inputs via `pgregory.net/rapid`; scope filter, config parser, input-hash determinism | `pgregory.net/rapid` | Every commit | < 60 s |
+
+**go test invocation patterns:**
+
+```bash
+# Unit + Property rings (run on every push; -short tag excludes integration fixtures)
+go test -race -short ./...
+
+# Integration ring (every commit; full test run without -short)
+go test -race ./...
+
+# Smoke ring (every PR + weekly cron; explicit build tag required)
+go test -race -tags smoke ./...
+```
+
+**Goroutine leak detection:** Every test file's `TestMain` must include:
+
+```go
+func TestMain(m *testing.M) {
+    // setup ...
+    code := m.Run()
+    goleak.VerifyNone(nil) // or goleak.VerifyNone(t) in subtests
+    os.Exit(code)
+}
+```
+
+`go.uber.org/goleak` is a test-only dependency. It detects goroutines still running after
+`TestMain` returns — which catches unclosed `Backend.Stream()` channels and leaked scheduler
+goroutines.
+
+### §9.2 Ring Membership Examples
+
+**Unit Ring — mock backend, no I/O:**
+
+- Scheduler topological sort for `DependsOn()` chains (no goroutines, just DAG logic)
+- Checkpoint store queries (in-memory SQLite via `:memory:` — unit-safe, no disk)
+- Scope filter: `IsInScopeHost()` equivalents — anchored hostname checks, substring false-positive prevention
+- Config validator for individual keys (range checks, URL allowlists, path-traversal rejection)
+- Error type `Is()` / `As()` traversal across the 7-class hierarchy
+- `Secret.LogValue()` returns `"***"` not the actual value
+- UI dot-fill format output (string comparison against expected badge format)
+
+**Integration Ring — MockBackend from testdata:**
+
+- Every Task has one happy-path test and one error-path test using `MockBackend` with deterministic fixture data from `internal/core/testutil/fixtures/`
+- Scheduler runs a DAG of 3–5 tasks in dependency order; verifies execution sequence and checkpoint writes
+- Checkpoint store: begin task → simulate crash (close DB) → reopen → verify `status=running` is detected → re-run task; verify idempotent output
+- `OutputTree.Append()` scope filter at write boundary: out-of-scope values are rejected with `OutOfScope` error and NOT written to the JSONL artefact
+- Notifier: mock sink receives task completion messages; asserts zero log lines contain unredacted secret values (XCUT-07 integration gate)
+
+**Smoke Ring — real tools, real network, Docker-gated:**
+
+- One test per mode: `reconftw subs -d hackerone.com`, `reconftw web -d hackerone.com`
+- Asserts: output JSONL files exist, line count > 0, no panic, exit code 0
+- Run inside Docker image with all 70+ tools installed (same image as CI integration)
+- Gated by `//go:build smoke` build tag; excluded from normal `go test ./...`
+
+**Property Ring — rapid generators:**
+
+- `rapid.String()` corpus through the scope filter → assert no substring false positives
+  (every match must be anchored; `sub.example.com` must not match `notexample.com`)
+- `rapid.SliceOf(rapid.StringMatching(...))` config keys through the validator → assert
+  validator never panics (any valid string input returns an error or nil, never panics)
+- `rapid.IntRange(1, 512)` thread count through the Scheduler → assert scheduler never
+  deadlocks (context with 1 s timeout; test fails if context expires without completion)
+
+### §9.3 Foundation Wave 0 Requirements
+
+The following test-infrastructure must exist BEFORE Phase 3 task implementations begin.
+Phase 3 creates these packages as its first commit; all subsequent task tests import them.
+
+**Required packages in `internal/core/testutil/`:**
+
+- `MockBackend` — deterministic `Backend` implementation; reads tool output from
+  `internal/core/testutil/fixtures/<tool>/<scenario>.txt`; returns configurable exit codes
+  and simulated errors; never spawns a subprocess
+- `MockCheckpoint` — in-memory `checkpoint.Store` implementation; holds state in a `map`;
+  supports all query patterns; no SQLite required in unit tests
+- `MockOutputTree` — in-memory `output.OutputTree` implementation; holds JSONL lines in
+  memory slices; exposes `Lines(artefact string) []string` for assertion; no disk I/O
+
+**CI configuration (`.github/workflows/ci.yml` additions for Phase 3):**
+
+```yaml
+jobs:
+  unit:
+    name: Unit + Property tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+      - run: go test -race -short ./...     # Ring 1 + Ring 4
+
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+      - run: go test -race ./...             # Ring 1 + Ring 2 + Ring 4
+
+  smoke:
+    name: Smoke tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+      - run: go test -race -tags smoke ./... # Ring 3
+```
+
+**Smoke tests build tag:** All smoke test files begin with:
+
+```go
+//go:build smoke
+```
+
+This tag excludes them from `go test ./...` and `go test -short ./...`. They only run
+when `-tags smoke` is passed explicitly.
+
+Per ARCH-11 (`.planning/REQUIREMENTS.md`): the CI budget constraint is respected — unit +
+property rings run on every push (< 90 s budget); integration ring runs on every commit
+(< 5 min budget); smoke ring runs weekly via cron and on every PR only.
 
 ## §10 Logging Policy & Secret Redaction
 
