@@ -1300,35 +1300,548 @@ within the 6-month window. MIGRATION.md documents both migration paths with exam
 
 <!-- ARCH-05, ARCH-06, ARCH-07 -->
 
-[STUB — populated in Wave 2]
+This section specifies the three core binding contracts of the reconFTW v2.0 kernel:
+the `Task` interface (ARCH-05), the `Backend` interface (ARCH-06), and the `AppContext`
+struct (ARCH-07). All signatures are BINDING after sign-off per D-05. Breaking changes
+(method rename, signature change, field removal) require an inline amendment block per
+D-06. Non-breaking additions (new methods, new fields) do not.
 
-This section will contain: the `Task` interface signature (Name / Module / Enabled(cfg) /
-DependsOn() / Run(ctx, app) → Result), the `Backend` interface signature (Exec / Stream /
-HealthCheck / Capacity), the `AppContext` struct shape (Log, Cfg, Scheduler, Tools, Tree,
-Checkpoint, Notify, Target, UI — no package-level state), and Go godoc-style code blocks
-for each. All signatures are BINDING after sign-off (D-05).
+### §5.1 Task Interface (ARCH-05)
+
+The `Task` interface is the smallest schedulable unit of recon work. Every module
+function in v1 (`sub_passive`, `nuclei_check`, `xss`, etc.) becomes a `Task`
+implementation in v2. Tasks self-register via `init()` and are scheduled by the
+`Scheduler` after dependency resolution and config-based enablement filtering.
+
+```go
+// internal/core/task/task.go
+// Source: .planning/research/ARCHITECTURE.md §2a + spike/go/internal/passive/passive.go
+package task
+
+import (
+	"context"
+	"time"
+
+	"github.com/six2dez/reconftw/internal/config"
+	"github.com/six2dez/reconftw/internal/core/appctx"
+)
+
+// Task is the smallest schedulable unit of recon work. Implementors live in
+// internal/modules/<domain>/ and self-register via init().
+// BINDING: renaming a method, changing a method signature, or removing a method
+// requires an ADR amendment (D-06). Adding new methods is non-breaking (D-07).
+type Task interface {
+	// Name returns the globally unique dot-namespaced task identifier.
+	// Convention: "<module>.<action>" e.g. "subdomains.passive", "web.fuzz"
+	Name() string
+
+	// Module returns the owning module group for grouping and failure_policy lookup.
+	// One of: "subdomains", "web", "vulns", "osint", "axiom"
+	Module() string
+
+	// Description returns a human-readable one-line description for UI badges.
+	Description() string
+
+	// Enabled reports whether this task should run given the resolved config.
+	// Called by Scheduler before Run; return false → SKIP badge, no checkpoint written.
+	Enabled(cfg *config.Config) bool
+
+	// DependsOn returns names of tasks that must complete (status=done) before this
+	// task may be scheduled. Empty slice = no dependencies (runs in parallel with peers).
+	// Registry.Build() performs topological sort cycle detection; circular DependsOn
+	// is a ConfigError, not a runtime error (see §6 and RESEARCH.md §Pitfall 3).
+	DependsOn() []string
+
+	// Run executes the task. ctx is cancellable; cancel = SIGINT or task timeout.
+	// MUST respect ctx.Done() promptly; MUST NOT call os.Exit.
+	// Returns (Result, nil) on success; (Result, error) on partial or full failure.
+	// Non-nil error → Scheduler records status=errored or status=cancelled per policy.
+	Run(ctx context.Context, app *appctx.AppContext) (Result, error)
+}
+
+// Result carries the outcome of a single task execution.
+type Result struct {
+	Status   Status            // done | errored | cancelled | skipped
+	Duration time.Duration
+	Outputs  []string          // paths written (for checkpoint.output_paths)
+	Stats    map[string]int    // optional counters (e.g. "subdomains_found": 42)
+}
+
+// Status enumerates the terminal states a task may reach.
+type Status string
+
+const (
+	StatusDone      Status = "done"
+	StatusErrored   Status = "errored"
+	StatusCancelled Status = "cancelled"
+	StatusSkipped   Status = "skipped"
+)
+
+// Registry holds all registered tasks. Default is the process-singleton.
+// Build() must be called once at startup to perform dependency resolution and
+// topological sort cycle detection before the Scheduler accepts any submissions.
+type Registry struct{ tasks map[string]Task }
+
+// Default is the process-singleton task registry.
+var Default = &Registry{tasks: map[string]Task{}}
+
+// Register adds t to the registry. Panics on duplicate name (caught at startup).
+// Called from each module package's init() function.
+func Register(t Task) {
+	if _, ok := Default.tasks[t.Name()]; ok {
+		panic("reconftw: duplicate task registration: " + t.Name())
+	}
+	Default.tasks[t.Name()] = t
+}
+
+// LifecycleAware is an optional lifecycle extension that Tasks may implement.
+// The Scheduler checks for this interface via type assertion before each Run.
+// OnStart is called immediately before Run; OnEnd is called after Run completes
+// (including on error or cancellation).
+type LifecycleAware interface {
+	OnStart(ctx context.Context, app *appctx.AppContext) error
+	OnEnd(ctx context.Context, app *appctx.AppContext, r Result) error
+}
+```
+
+### §5.2 Backend Interface (ARCH-06)
+
+The `Backend` interface abstracts local subprocess execution from distributed
+(Axiom) execution. `LocalBackend` wraps `exec.Cmd` with process-group isolation
+(`Setpgid: true`, `Kill(-pgid)`) as proven in the Phase 1 spike at
+`spike/go/internal/proc/proc.go`. `AxiomBackend` delegates to the Axiom fleet.
+The Scheduler uses a `Backend` via `AppContext.Tools`; Tasks never call the Backend
+directly — they call `app.Tools.Run(ctx, toolName, args)` which resolves the Tool
+and dispatches to the appropriate Backend.
+
+```go
+// internal/core/backend/backend.go
+// Source: .planning/research/ARCHITECTURE.md §6a + spike/go/internal/proc/proc.go
+package backend
+
+import (
+	"context"
+	"time"
+)
+
+// Event is a single streaming output unit from a running tool.
+type Event struct {
+	Line   []byte // raw stdout line (no trailing newline)
+	Source string // tool name, e.g. "nuclei"
+	IsErr  bool   // true if line came from stderr
+}
+
+// Result holds the complete output of a buffered Exec call.
+type Result struct {
+	Stdout   []byte
+	Stderr   []byte
+	ExitCode int
+	Duration time.Duration
+}
+
+// Tool describes a single external binary. Resolved at startup by ToolRegistry
+// via exec.LookPath and version detection.
+type Tool struct {
+	Name        string
+	Path        string        // absolute path from exec.LookPath
+	Version     string        // parsed from `tool --version` at health-check
+	DefaultArgs []string
+	Timeout     time.Duration // per-invocation timeout; 0 = no timeout
+}
+
+// Backend abstracts local subprocess execution from distributed (Axiom) execution.
+// Implementations: LocalBackend (default), AxiomBackend (when axiom.enabled = true).
+// BINDING: adding methods is non-breaking (D-07); renaming, removing, or changing
+// method signatures requires an ADR amendment (D-06).
+type Backend interface {
+	// Exec runs tool with args, buffers stdout+stderr, returns when done.
+	// Suitable for tools with bounded, short-lived output (subfinder, dnsx, crt).
+	// The tool's process group is killed on ctx cancellation.
+	Exec(ctx context.Context, t *Tool, args []string) (*Result, error)
+
+	// Stream runs tool with args, yields stdout and stderr lines as Events on
+	// the returned channel. Channel closes when tool exits (clean or error).
+	// Suitable for long-running tools (nuclei, dalfox, katana).
+	// Caller MUST drain the channel until closed to avoid goroutine leak.
+	//
+	// Phase 8 MCP server wraps this channel via SSE notifications; see
+	// §MCP integration note. Backend.Stream() shape is sufficient for MCP —
+	// no protocol-level change anticipated.
+	Stream(ctx context.Context, t *Tool, args []string) (<-chan Event, error)
+
+	// HealthCheck verifies the backend is operational (binaries reachable,
+	// axiom fleet up and authenticated). Called at startup and by the
+	// `reconftw health-check` subcommand. Returns nil if healthy.
+	HealthCheck(ctx context.Context) error
+
+	// Capacity returns the number of concurrent tool invocations this backend
+	// supports. LocalBackend returns runtime.NumCPU() * 2; AxiomBackend returns
+	// the configured fleet_count. Used by Scheduler as a hint for SetLimit(N).
+	Capacity() int
+}
+```
+
+### §5.3 AppContext (ARCH-07)
+
+`AppContext` is the dependency kernel. It is wired once at startup in
+`cmd/reconftw/main.go` and passed by pointer into every `Task.Run()`. There are
+NO package-level globals in v2. The v1 bash codebase's biggest testability
+problem is that all 80 module-enable flags, `$dir`, `$LOGFILE`, and `$DIFF` are
+process-level globals — any module can corrupt any other. `AppContext` passed by
+pointer is zero-overhead and makes every dependency explicit at the call site.
+
+```go
+// internal/core/appctx/appctx.go
+// Source: .planning/research/ARCHITECTURE.md §2a §12
+package appctx
+
+import (
+	"log/slog"
+
+	"github.com/six2dez/reconftw/internal/checkpoint"
+	"github.com/six2dez/reconftw/internal/config"
+	"github.com/six2dez/reconftw/internal/core/backend"
+	"github.com/six2dez/reconftw/internal/notifier"
+	"github.com/six2dez/reconftw/internal/output"
+	"github.com/six2dez/reconftw/internal/scheduler"
+	"github.com/six2dez/reconftw/internal/ui"
+)
+
+// AppContext is the dependency kernel. Wired ONCE at startup in cmd/reconftw/main.go;
+// passed by pointer into every Task.Run(). NO package-level globals permitted.
+// BINDING: adding fields is non-breaking (D-07); removing or renaming fields requires
+// an ADR amendment (D-06).
+type AppContext struct {
+	Log        *slog.Logger         // structured logger (RedactingHandler applied at construction)
+	Cfg        *config.Config       // resolved and validated config (all 323 flags)
+	Scheduler  *scheduler.Scheduler // bounded concurrency + failure_policy enforcement
+	Tools      *backend.Runner      // wraps Backend + ToolRegistry; Tasks call app.Tools.Run()
+	Tree       *output.OutputTree   // atomic JSONL writer + scope filter + compat layer
+	Checkpoint *checkpoint.Store    // SQLite-backed checkpoint store (checkpoints.db)
+	Notify     notifier.Notifier    // multi-channel notification dispatcher (Slack/Telegram/Discord)
+	Target     *Target              // immutable scan target description
+	UI         *ui.Printer          // terminal UI printer (badges, progress, verbosity-gated output)
+}
+
+// Target describes the scan target. Immutable after construction in main.go.
+type Target struct {
+	Domain  string   // sanitized domain, IP, or CIDR (validated by lib/validation)
+	IsCIDR  bool
+	IsIP    bool
+	Scope   []string // wildcard patterns from scope file (e.g. "*.example.com")
+	WorkDir string   // absolute path to workspaces/<target-id>/
+}
+```
+
+**NO package-level globals.** See RESEARCH.md §AppContext Shape for the rationale —
+global bash vars are the v1 testability anti-pattern this design explicitly rejects.
 
 ## §6 Error Class Hierarchy
 
 <!-- ARCH-08 -->
 
-[STUB — populated in Wave 2]
+reconFTW v2 uses a hybrid sentinel + typed-struct error taxonomy. The seven classes span
+two use cases: (1) **decision errors** where the caller branches on the error type
+(use `errors.As`) and (2) **signal errors** where the caller just re-tags or logs
+(use `errors.Is`). Both are supported via the `Is()` sentinel bridge on each struct.
 
-This section will contain: the 7-class typed error hierarchy (ToolError, ToolTimeout,
-OutOfScope, AxiomFailure, ConfigError, ScopeError, ChecksumMismatch), Go type definitions
-with fields and Error() string implementations, error wrapping conventions, and the rule
-that ConfigError.Message must never include raw Secret field values.
+The `Is()` bridge allows `errors.Is(err, ErrTool)` without exposing `ToolError` to
+callers that don't need the metadata. Callers that DO need metadata use
+`errors.As(&te, err)`. This is the pattern recommended by the Go team in
+"Working with Errors in Go 1.13".
+
+> **PITFALL NOTE — secret leak via ConfigError:** `ConfigError.Message` MUST NOT include
+> raw secret values. Say "invalid format" or "value out of range", NOT the actual value.
+> Violating this causes secret leak via error logging. (RESEARCH.md §Pitfall 2, T-02-04-02)
+
+> **PITFALL NOTE — circular DependsOn:** `Registry.Build()` MUST perform topological sort
+> cycle detection before any task runs. Circular `DependsOn` chains are a `ConfigError`,
+> NOT a runtime error. A detected cycle must halt startup, not deadlock the scheduler.
+> (RESEARCH.md §Pitfall 3, T-02-04-03)
+
+```go
+// internal/core/errors/errors.go
+// Source: .planning/research/ARCHITECTURE.md §11a
+package errors
+
+import (
+	"errors"
+	"fmt"
+	"time"
+)
+
+// --- Sentinel anchors (for errors.Is traversal) ---
+//
+// Callers check category with errors.Is(err, ErrTool); callers that need
+// structured metadata use errors.As to unwrap to the concrete type.
+var (
+	ErrTool     = errors.New("tool execution failure")
+	ErrTimeout  = errors.New("tool execution timeout")
+	ErrScope    = errors.New("out of scope")
+	ErrAxiom    = errors.New("axiom infrastructure failure")
+	ErrConfig   = errors.New("configuration error")
+	ErrChecksum = errors.New("checksum mismatch")
+)
+
+// --- Typed structs (carry structured metadata for serialization / Faraday / SARIF) ---
+//
+// Each struct implements error, Unwrap (where applicable), and an Is() sentinel
+// bridge so that errors.Is(err, ErrXxx) traverses the error chain correctly.
+
+// ToolError wraps a tool exit with structured metadata.
+// Used for: non-zero exit codes, tool-level parsing failures.
+// Serializes to: Faraday JSON {tool, exit_code, stderr_excerpt}.
+type ToolError struct {
+	Tool     string // e.g. "subfinder"
+	ExitCode int
+	Stderr   string // last 1KB of stderr (truncated to prevent runaway allocation)
+	Inner    error
+}
+
+func (e *ToolError) Error() string {
+	return fmt.Sprintf("tool %s (exit %d): %v", e.Tool, e.ExitCode, e.Inner)
+}
+func (e *ToolError) Unwrap() error { return e.Inner }
+func (e *ToolError) Is(target error) bool { return target == ErrTool } // sentinel bridge
+
+// ToolTimeout is returned when a tool's per-task context deadline is exceeded.
+type ToolTimeout struct {
+	Tool    string
+	Timeout time.Duration
+}
+
+func (e *ToolTimeout) Error() string {
+	return fmt.Sprintf("tool %s timed out after %v", e.Tool, e.Timeout)
+}
+func (e *ToolTimeout) Is(target error) bool { return target == ErrTimeout }
+
+// OutOfScope is returned by OutputTree.Append when a finding fails scope check.
+// The scope filter is enforced at the OutputTree.Append boundary, not inside
+// Task.Run(); Tasks do NOT own scope filtering (T-02-04-01 mitigation).
+type OutOfScope struct {
+	Value  string // the rejected value (domain, IP, URL)
+	Reason string // e.g. "not in wildcard *.example.com"
+}
+
+func (e *OutOfScope) Error() string {
+	return fmt.Sprintf("out of scope: %s (%s)", e.Value, e.Reason)
+}
+func (e *OutOfScope) Is(target error) bool { return target == ErrScope }
+
+// AxiomFailure signals axiom infrastructure failure (SSH timeout, fleet unreachable).
+// Distinct from ToolError because it triggers FailoverBackend retry (local fallback).
+//
+// SECURITY NOTE: Inner MUST NOT contain raw credential values. Use Redactor.Redact()
+// on error strings before constructing AxiomFailure. (T-02-04-05)
+type AxiomFailure struct {
+	Operation string // "exec", "healthcheck", "launch", "shutdown"
+	Inner     error
+}
+
+func (e *AxiomFailure) Error() string {
+	return fmt.Sprintf("axiom %s: %v", e.Operation, e.Inner)
+}
+func (e *AxiomFailure) Unwrap() error { return e.Inner }
+func (e *AxiomFailure) Is(target error) bool { return target == ErrAxiom }
+
+// ConfigError is returned during config load/validation with file:line context.
+//
+// SECURITY NOTE: Message MUST NOT include raw secret values. Say "invalid format",
+// NOT the value itself. Violating this causes secret leak via error logging. (T-02-04-02)
+type ConfigError struct {
+	File    string
+	Line    int
+	Key     string
+	Message string // human-readable description — NEVER the raw value
+}
+
+func (e *ConfigError) Error() string {
+	return fmt.Sprintf("%s:%d key %q: %s", e.File, e.Line, e.Key, e.Message)
+}
+func (e *ConfigError) Is(target error) bool { return target == ErrConfig }
+
+// ScopeError wraps domain/IP validation failures at input time.
+// Distinct from OutOfScope (which is a write-time rejection) — ScopeError is
+// returned when the input itself is structurally invalid (metacharacters, bad CIDR).
+type ScopeError struct {
+	Input  string
+	Reason string // e.g. "domain contains shell metacharacters", "IP octet out of range"
+}
+
+func (e *ScopeError) Error() string {
+	return fmt.Sprintf("scope validation: %q rejected: %s", e.Input, e.Reason)
+}
+func (e *ScopeError) Is(target error) bool { return target == ErrScope }
+
+// ChecksumMismatch is returned by the installer when a downloaded binary or script
+// does not match its expected SHA-256 hash.
+type ChecksumMismatch struct {
+	URL      string
+	Expected string // full SHA-256 hex
+	Got      string // full SHA-256 hex
+}
+
+func (e *ChecksumMismatch) Error() string {
+	return fmt.Sprintf("checksum mismatch for %s: expected %s got %s",
+		e.URL, e.Expected[:8]+"...", e.Got[:8]+"...")
+}
+func (e *ChecksumMismatch) Is(target error) bool { return target == ErrChecksum }
+```
+
+**Serialization:** Each typed struct has exported fields — they marshal cleanly to JSON
+for Faraday export and SARIF output. Adding `LogValue() slog.Value` to each type is the
+ARCH-12 bridge between error taxonomy and structured logging (Phase 3 implementation
+detail; not locked here).
+
+**Caller patterns summary:**
+
+| Need | Pattern |
+|------|---------|
+| Check error category | `errors.Is(err, ErrTool)` |
+| Extract structured fields | `var te *ToolError; errors.As(err, &te)` |
+| Wrap with context | `fmt.Errorf("subfinder: %w", &ToolError{...})` |
 
 ## §7 Failure Policy Model
 
 <!-- ARCH-09 -->
 
-[STUB — populated in Wave 2]
+The `failure_policy` is a config-driven, per-module-group enum that controls how the
+Scheduler handles task errors within a stage. It maps directly to the v1 mental model:
 
-This section will contain: the `failure_policy` enum (fail_fast vs best_effort) per module
-group, scheduler enforcement via errgroup.SetLimit(PARALLEL_MAX_JOBS=4), how failure_policy
-interacts with the compat layer and checkpoint store, and the spine vs OSINT/vulns posture
-distinction.
+| v1 pattern | v2 equivalent |
+|-----------|---------------|
+| `CONTINUE_ON_TOOL_ERROR=true` | `failure_policy = "best_effort"` (default) |
+| `recon()` spine for subdomains | `subdomains = "fail_fast"` override |
+| `parallel_funcs` for OSINT/vulns | `osint = "best_effort"`, `vulns = "best_effort"` |
+
+**Rationale for per-module-group granularity (not per-task or per-backend):**
+- Per-task is too fine: a single failed `subfinder` should not stop the entire passive
+  enumeration stage when `amass`, `assetfinder`, and `crt` can still contribute results.
+- Per-backend is too coarse: `LocalBackend` vs `AxiomBackend` is orthogonal to failure
+  semantics; the same `best_effort` policy applies regardless of backend.
+- Per-module-group matches the v1 mental model exactly: OSINT and vulns are "nice to
+  have"; the subdomain spine is "required for everything downstream" — web probing,
+  vuln scanning, and OSINT all depend on a usable subdomain set.
+
+### §7.1 TOML Configuration
+
+```toml
+# v2 TOML: failure_policy per stage
+# ARCH-09 | Source: .planning/phases/02-architecture-v2-design/02-RESEARCH.md §Failure Policy Model
+[scheduler]
+  failure_policy = "best_effort"  # default for the whole run; one of: "best_effort" | "fail_fast"
+
+  [scheduler.overrides]
+    subdomains = "fail_fast"   # spine: if passive enum fails, abort stage — don't brute empty list
+    web        = "best_effort" # web analysis: continue even if one tool errors
+    vulns      = "best_effort" # vuln scan: don't stop on one finding miss
+    osint      = "best_effort" # OSINT: independent sources; best-effort collection
+```
+
+### §7.2 Scheduler Go Implementation
+
+```go
+// internal/core/scheduler/scheduler.go
+// Source: .planning/phases/02-architecture-v2-design/02-RESEARCH.md §Failure Policy Model
+//         + spike/go/internal/passive/passive.go (errgroup fan-out pattern)
+package scheduler
+
+import (
+	"context"
+	"log/slog"
+
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
+)
+
+// FailurePolicy controls how a stage handles task errors.
+type FailurePolicy string
+
+const (
+	// PolicyBestEffort continues all sibling tasks when one errors.
+	// The stage error is logged as a warning; the stage itself returns nil.
+	// v1 analog: CONTINUE_ON_TOOL_ERROR=true + parallel_funcs for OSINT/vulns.
+	PolicyBestEffort FailurePolicy = "best_effort"
+
+	// PolicyFailFast cancels all sibling tasks when one errors.
+	// Uses errgroup.WithContext — first error cancels the context for all peers.
+	// v1 analog: recon() spine for subdomains (sequential dependencies).
+	PolicyFailFast FailurePolicy = "fail_fast"
+)
+
+// Scheduler provides bounded concurrent task execution with per-module-group
+// failure policies. maxConcurrent maps to concurrency.max_jobs (default: 4).
+type Scheduler struct {
+	maxConcurrent int64
+	sem           *semaphore.Weighted
+	policies      map[string]FailurePolicy // module → policy (from [scheduler.overrides])
+	log           *slog.Logger
+}
+
+// runStage executes a group of tasks with the policy for their module group.
+//
+// fail_fast: errgroup.WithContext → first error cancels the context for all peers
+// via context propagation. The stage returns the first non-nil error.
+//
+// best_effort: zero-value errgroup (no context cancel) → all tasks complete
+// regardless of peer errors. Per-task errors are logged as warnings; the stage
+// returns nil so the Scheduler proceeds to the next stage.
+func (s *Scheduler) runStage(ctx context.Context, module string, tasks []Task) error {
+	if len(tasks) == 0 {
+		return nil
+	}
+	policy := s.policyFor(module)
+
+	if policy == PolicyFailFast {
+		// fail_fast: first error cancels all peers via context.
+		g, gctx := errgroup.WithContext(ctx)
+		g.SetLimit(int(s.maxConcurrent))
+		for _, t := range tasks {
+			t := t
+			g.Go(func() error { return s.runOne(gctx, t) })
+		}
+		return g.Wait() // first non-nil error returned; peers see cancelled ctx
+	}
+
+	// best_effort: all tasks complete; errors are warnings, not failures.
+	g := new(errgroup.Group)
+	g.SetLimit(int(s.maxConcurrent))
+	for _, t := range tasks {
+		t := t
+		g.Go(func() error {
+			if err := s.runOne(ctx, t); err != nil {
+				s.log.Warn("task_error_best_effort",
+					slog.String("task", t.Name()),
+					slog.String("module", t.Module()),
+					slog.Any("err", err))
+				return nil // swallow: best_effort continues
+			}
+			return nil
+		})
+	}
+	return g.Wait() // always nil in best_effort (errors swallowed above)
+}
+
+func (s *Scheduler) policyFor(module string) FailurePolicy {
+	if p, ok := s.policies[module]; ok {
+		return p
+	}
+	return PolicyBestEffort // safe default: don't abort on unknown module
+}
+```
+
+**Key distinction:**
+- `fail_fast` uses `errgroup.WithContext` — first error cancels all peers via context
+  propagation. The caller sees the first non-nil error.
+- `best_effort` uses a zero-value `errgroup.Group` (no `WithContext`) — all tasks
+  complete regardless. Per-task errors are logged as `Warn` and swallowed; the stage
+  always returns `nil` to allow progression to the next stage.
+
+**Checkpoint interaction:** In `best_effort` mode, tasks that succeed write their
+checkpoint sentinel before errored peers are still running. Checkpoint reads are
+consistent because `checkpoint.Store` uses SQLite WAL mode (concurrent readers always
+see a consistent snapshot). In `fail_fast` mode, cancelled tasks do NOT write their
+checkpoint — they re-run on the next invocation against the same target.
 
 ## §8 CLI Surface
 
