@@ -163,10 +163,8 @@ jobs:
   binary-size:
     name: Binary size budget (XCUT-02)
     runs-on: ubuntu-latest
-    # Gated until Plan 03-05 lands cmd/reconftw/main.go. The hashFiles()
-    # check returns the empty string when the file is absent, which evaluates
-    # to falsy in GitHub Actions if conditions.
-    if: hashFiles('cmd/reconftw/main.go') != ''
+    # Plan 03-06 landed cmd/reconftw/main.go; Plan 03-07 activates the gate
+    # unconditionally. XCUT-02 budget: <50MB stripped (52428800 bytes).
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -183,3 +181,30 @@ jobs:
             echo "::error::binary >=50MB (XCUT-02 gate)"
             exit 1
           fi
+
+  integration-smoke:
+    name: Integration smoke (kernel-demo)
+    runs-on: ubuntu-latest
+    # Plan 03-07 acceptance integration: builds the binary inside the test,
+    # invokes `kernel-demo --target example.com`, asserts manifest +
+    # artefacts/demo.jsonl + checkpoints.db. NOT smoke-tagged because it
+    # exercises the binary end-to-end without external tools.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: TestKernelDemoEndToEnd
+        run: go test -race -run TestKernelDemoEndToEnd ./cmd/reconftw/...
+      - name: interfaces_check (BINDING delta detector)
+        # Plan 03-07 upgraded cmd/interfaces_check/main.go to import real
+        # packages + compile-time assertions. ADR §5 signature drift now
+        # fails this build step.
+        run: go build ./cmd/interfaces_check/...
+      - name: verify-0002.sh (ADR pre-sign gate)
+        run: |
+          # Install tomljson (used by verify-0002.sh Check 2).
+          go install github.com/pelletier/go-toml/v2/cmd/tomljson@latest
+          export PATH="$(go env GOPATH)/bin:$PATH"
+          bash .planning/decisions/verify-0002.sh

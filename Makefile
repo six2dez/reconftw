@@ -20,7 +20,7 @@ GH_CLI := $(shell command -v gh 2> /dev/null)
 # Default: reconftw-data.
 
 .PHONY: help \
-        build test test-integration test-smoke lint fmt fmt-check check coverage coverage-critical ci clean \
+        build test test-integration test-smoke integration-smoke lint fmt fmt-check check coverage coverage-critical ci clean \
         sync upload bootstrap rm \
         bash-lint bash-lint-fix bash-fmt bash-test bash-test-unit bash-test-integration-smoke \
         bash-test-integration-full bash-test-security bash-test-all bash-test-release-gate \
@@ -33,6 +33,7 @@ help:
 	@echo "  make test               - Ring 1 + Ring 4 (go test -race -short ./...)"
 	@echo "  make test-integration   - Ring 1 + Ring 2 + Ring 4 (go test -race ./...)"
 	@echo "  make test-smoke         - Ring 3 (go test -race -tags smoke ./...)"
+	@echo "  make integration-smoke  - Phase 3 acceptance: TestKernelDemoEndToEnd"
 	@echo "  make lint               - golangci-lint run ./..."
 	@echo "  make fmt                - gofumpt -w ."
 	@echo "  make fmt-check          - gofumpt -d . (non-zero on any diff)"
@@ -90,6 +91,13 @@ test-integration:
 test-smoke:
 	go test -race -tags smoke ./...
 
+# integration-smoke: Phase 3 acceptance integration test (Plan 07).
+# Builds the binary in-test then invokes `kernel-demo --target X` and
+# asserts manifest + artefacts/demo.jsonl + checkpoints.db. Validates
+# Scheduler + LocalBackend + OutputTree + Checkpoint cooperate end-to-end.
+integration-smoke:
+	go test -race -run TestKernelDemoEndToEnd ./cmd/reconftw/...
+
 lint:
 	golangci-lint run ./...
 
@@ -100,7 +108,8 @@ fmt-check:
 	gofumpt -d . | (! grep .)
 
 # check: composite local-gate matching CI's lint+test sequence.
-check: fmt-check lint test
+# Plan 07: includes integration-smoke (Phase 3 acceptance integration test).
+check: fmt-check lint test integration-smoke
 
 # coverage: Phase 3 XCUT-04 gate (≥75% on lib code; ≥90% on critical paths per XCUT-03).
 coverage:
