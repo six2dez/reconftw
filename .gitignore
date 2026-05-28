@@ -83,4 +83,11 @@ coverage.out
 # without -o. Ignore it (the binary is just a verification scaffold; verify-0002.sh
 # builds it explicitly to /tmp/).
 /interfaces_check
+# `reconftw kernel-demo` (Plan 06) writes workspaces/<target>-<timestamp>/ when
+# run from the repo root. Phase 4 plan-01 deletes the kernel-demo subcommand,
+# but keep workspaces/ ignored for production users running `reconftw run` etc.
+workspaces/
+# Stray Go binary built into repo root when running `go build ./cmd/reconftw`
+# without -o. Production builds use `make build` → bin/reconftw.
+/reconftw
 
