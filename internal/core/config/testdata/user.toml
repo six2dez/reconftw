@@ -1,0 +1,4 @@
+# Simulated ~/.config/reconftw/config.toml
+[concurrency]
+max_jobs = 9
+log_mode = "tail"

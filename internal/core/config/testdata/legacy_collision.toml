@@ -1,0 +1,6 @@
+# Both legacy and v2-native present — v2-native (max_jobs=12) must win.
+[concurrency]
+max_jobs = 12
+
+[legacy]
+PARALLEL_MAX_JOBS = 8

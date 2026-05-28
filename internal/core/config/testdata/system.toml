@@ -1,0 +1,3 @@
+# Simulated /etc/reconftw/config.toml
+[concurrency]
+max_jobs = 8
