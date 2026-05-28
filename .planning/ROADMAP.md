@@ -32,7 +32,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Language ADR & Spike** — Identical recon slice in BOTH Go and Python; measured comparison; signed ADR before any production code
 - [x] **Phase 2: Architecture v2 Design** — Lock TOML schema, output tree, Task/Backend/AppContext/Error interfaces, CLI surface, test policy, failure isolation — Foundation depends on these (completed 2026-05-28)
-- [ ] **Phase 3: Foundation Kernel** — Errors + Logger + Config + OutputTree + Checkpoint + Scheduler + Tools + AppContext + CLI + Mocks + CI from day 1
+- [x] **Phase 3: Foundation Kernel** — Errors + Logger + Config + OutputTree + Checkpoint + Scheduler + Tools + AppContext + CLI + Mocks + CI from day 1 (completed 2026-05-28)
 - [ ] **Phase 4: Subdomains E2E + Axiom Integration** — Canonical reference port; passive+brute+permut+dnsx+scope+takeover+buckets+geo+ASN with Axiom distributed execution; output-equivalence test gates phase end
 - [ ] **Phase 5: Web Pipeline E2E** — Probe + screenshots + fuzz + JS + nuclei + WAF + sourcemaps + favicon + CSP + vhost + 4xx-bypass + URL discovery + 20-function surface with parity test
 - [ ] **Phase 6: Vulnerability Scanning E2E** — XSS + SQLi + SSRF + LFI + SSTI + CRLF + smuggling + cmdi + nuclei-DAST + cache poisoning + gf patterns + 4xx-bypass
@@ -125,7 +125,7 @@ Plans:
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
-- [ ] 03-07-PLAN.md — Test mocks (FOUND-15) + tools.lock seed (10 Phase 4 tools, 3 critical per Blocker 5) + integration smoke + XCUT-02 binary-size gate + Phase 3 acceptance + interfaces_check real-import upgrade
+- [x] 03-07-PLAN.md — Test mocks (FOUND-15) + tools.lock seed (10 Phase 4 tools, 3 critical per Blocker 5) + integration smoke + XCUT-02 binary-size gate + Phase 3 acceptance + interfaces_check real-import upgrade
 
 ### Phase 4: Subdomains E2E + Axiom Integration
 
@@ -279,7 +279,7 @@ Calendar parallelization (within constraint that dependencies are met):
 |-------|----------------|--------|-----------|
 | 1. Language ADR & Spike | 4/5 | In Progress|  |
 | 2. Architecture v2 Design | 7/7 | Complete   | 2026-05-28 |
-| 3. Foundation Kernel | 6/7 | In Progress|  |
+| 3. Foundation Kernel | 7/7 | Complete   | 2026-05-28 |
 | 4. Subdomains E2E + Axiom Integration | 0/? | Not started | - |
 | 5. Web Pipeline E2E | 0/? | Not started | - |
 | 6. Vulnerability Scanning E2E | 0/? | Not started | - |
