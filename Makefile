@@ -20,7 +20,7 @@ GH_CLI := $(shell command -v gh 2> /dev/null)
 # Default: reconftw-data.
 
 .PHONY: help \
-        build test test-integration test-smoke lint fmt fmt-check check coverage ci clean \
+        build test test-integration test-smoke lint fmt fmt-check check coverage coverage-critical ci clean \
         sync upload bootstrap rm \
         bash-lint bash-lint-fix bash-fmt bash-test bash-test-unit bash-test-integration-smoke \
         bash-test-integration-full bash-test-security bash-test-all bash-test-release-gate \
@@ -38,6 +38,7 @@ help:
 	@echo "  make fmt-check          - gofumpt -d . (non-zero on any diff)"
 	@echo "  make check              - fmt-check + lint + test (composite local gate)"
 	@echo "  make coverage           - go test -coverprofile on internal/core/..."
+	@echo "  make coverage-critical  - XCUT-03 per-file ≥90% gate on critical paths"
 	@echo "  make ci                 - fmt-check + lint + test + coverage (matches CI)"
 	@echo "  make clean              - rm -rf bin/ coverage.out"
 	@echo ""
@@ -97,6 +98,11 @@ check: fmt-check lint test
 coverage:
 	go test -race -coverprofile=coverage.out -covermode=atomic ./internal/core/...
 	go tool cover -func=coverage.out | tail -1
+
+# coverage-critical: XCUT-03 per-file ≥90% gate on the kernel critical paths.
+# Files seeded across Plan 03 plans 01-05; see scripts/coverage-critical.sh.
+coverage-critical:
+	@./scripts/coverage-critical.sh
 
 # ci: composite gate matching the .github/workflows/ci.yml pipeline.
 ci: fmt-check lint test coverage

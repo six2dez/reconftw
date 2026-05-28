@@ -108,6 +108,38 @@ jobs:
               print "Coverage:", $3
             }
           }'
+      - name: Critical-path coverage gate (XCUT-03 per W20)
+        # XCUT-03 per-file ≥90% gate on the kernel critical paths.
+        # Files added incrementally as plans land:
+        #   Plan 03-01: log/redactor.go, log/redacting_handler.go
+        #   Plan 03-03: output/atomic.go, output/scope.go, checkpoint/store.go
+        # Files that do not yet exist on a given push are skipped silently
+        # via the [ -f "$f" ] guard.
+        run: |
+          # Coverage profile already written above; reuse it.
+          CRITICAL_FILES=(
+            "internal/core/log/redactor.go"
+            "internal/core/log/redacting_handler.go"
+            "internal/core/output/atomic.go"
+            "internal/core/output/scope.go"
+            "internal/core/checkpoint/store.go"
+          )
+          GATE=90.0
+          FAIL=0
+          for f in "${CRITICAL_FILES[@]}"; do
+            if [ ! -f "$f" ]; then
+              echo "skip (file absent): $f"
+              continue
+            fi
+            PCT=$(go tool cover -func=coverage.out \
+              | awk -v f="$f" '$1 ~ f { gsub("%","",$NF); sum+=$NF; n++ } END { if (n>0) printf "%.2f", sum/n; else print "100" }')
+            echo "$f: ${PCT}%"
+            awk -v pct="$PCT" -v gate="$GATE" 'BEGIN { exit (pct+0 < gate ? 1 : 0) }' || {
+              echo "::error::$f below XCUT-03 ${GATE}% gate (got ${PCT}%)"
+              FAIL=1
+            }
+          done
+          exit $FAIL
 
   smoke:
     name: Smoke tests
