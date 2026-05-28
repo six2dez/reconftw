@@ -1,0 +1,116 @@
+# reconFTW v2.0 — Tools Lock
+# Phase 3 seed: 10 tools needed by Phase 4 (Subdomains E2E + Axiom Integration).
+# Phase 11 (Installer + Cross-Platform + Docker) extends this to the full 70+ tool
+# inventory with SHA-256 verification per INST-02..04.
+#
+# Format: per-tool table; required keys:
+#   name              — exec.LookPath name
+#   kind              — go | python | system | rust
+#   go_module         — Go module path (Go tools only)
+#   description       — one-line description for health-check / docs
+#   default_args      — args prepended to every invocation (currently empty)
+#   timeout_seconds   — per-invocation timeout; 0 = no hard timeout
+#   critical          — bool; FOUND-08 + Blocker 5: critical tools cause
+#                       `reconftw health-check` to exit 1 when absent
+#
+# Critical tier (3 tools — the smallest passive+probe+resolve trio needed
+# for any meaningful Phase 4 run):
+#   subfinder — passive subdomain enumeration
+#   httpx     — HTTP probe + tech detection
+#   dnsx      — DNS resolver toolkit
+#
+# Required-but-not-critical (7 tools): missing-required → WARN in health-check.
+
+schema_version = "0.1"
+generated_by   = "phase-3-plan-07"
+generated_at   = "2026-05-28"
+
+[[tools]]
+name            = "subfinder"
+kind            = "go"
+go_module       = "github.com/projectdiscovery/subfinder/v2/cmd/subfinder"
+description     = "Passive multi-source subdomain enumeration"
+default_args    = []
+timeout_seconds = 180
+critical        = true
+
+[[tools]]
+name            = "httpx"
+kind            = "go"
+go_module       = "github.com/projectdiscovery/httpx/cmd/httpx"
+description     = "HTTP probe with tech detection"
+default_args    = []
+timeout_seconds = 0
+critical        = true
+
+[[tools]]
+name            = "dnsx"
+kind            = "go"
+go_module       = "github.com/projectdiscovery/dnsx/cmd/dnsx"
+description     = "DNS toolkit (A/CNAME/MX/TXT resolver)"
+default_args    = []
+timeout_seconds = 14400
+critical        = true
+
+[[tools]]
+name            = "crt"
+kind            = "go"
+go_module       = "github.com/cemulus/crt"
+description     = "crt.sh search"
+default_args    = []
+timeout_seconds = 60
+critical        = false
+
+[[tools]]
+name            = "puredns"
+kind            = "go"
+go_module       = "github.com/d3mondev/puredns/v2"
+description     = "Mass DNS resolution with wildcard filtering"
+default_args    = []
+timeout_seconds = 0
+critical        = false
+
+[[tools]]
+name            = "gotator"
+kind            = "go"
+go_module       = "github.com/Josue87/gotator"
+description     = "Subdomain permutations"
+default_args    = []
+timeout_seconds = 600
+critical        = false
+
+[[tools]]
+name            = "anew"
+kind            = "go"
+go_module       = "github.com/tomnomnom/anew"
+description     = "Append new lines only (dedup)"
+default_args    = []
+timeout_seconds = 30
+critical        = false
+
+[[tools]]
+name            = "asnmap"
+kind            = "go"
+go_module       = "github.com/projectdiscovery/asnmap/cmd/asnmap"
+description     = "ASN-to-CIDR mapping"
+default_args    = []
+timeout_seconds = 120
+critical        = false
+
+[[tools]]
+name            = "s3scanner"
+kind            = "go"
+go_module       = "github.com/sa7mon/s3scanner"
+description     = "S3/GCS/Azure Blob misconfiguration scanner"
+default_args    = []
+timeout_seconds = 600
+critical        = false
+
+[[tools]]
+name            = "subzy"
+kind            = "go"
+go_module       = "github.com/PentestPad/subzy"
+description     = "Subdomain takeover detection"
+default_args    = []
+timeout_seconds = 600
+critical        = false
