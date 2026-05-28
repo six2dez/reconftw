@@ -1,7 +1,7 @@
 # 0001 — Language Choice for reconFTW v2.0
 
-* Status: Proposed
-* Date: 2026-05-27
+* Status: Accepted
+* Date: 2026-05-28
 * Deciders: six2dez (solo maintainer, project owner)
 * Tags: language, v2.0, foundational
 
@@ -23,7 +23,7 @@ Spike PoC implemented in both languages: passive subdomain enum (4 sources: subf
 
 Slice scope locked in `.planning/phases/01-language-adr-spike/01-PLAN.md` (across plans 01-01 through 01-05) before either spike began.
 
-Spike code committed at `spike/go/` and `spike/python/` (git SHAs to be filled at sign-off by Plan 01-05).
+Spike code committed at `spike/go/` and `spike/python/` (git SHA: `4a8d8890`).
 
 | Metric | Go | Python | Ratio | Winner |
 |--------|-----|--------|-------|--------|
@@ -81,8 +81,8 @@ DEC-04 default tie-breaker rule (from `.planning/REQUIREMENTS.md`): "Choose Go i
 
 ## References
 
-- Spike code (final state): `spike/go/` (commit SHA: TBD by Plan 01-05 sign-off), `spike/python/` (commit SHA: TBD)
-- Comparison runner output: `spike/comparison.json` (commit SHA: TBD — canonical run 2026-05-27T20:28:03+02:00)
+- Spike code (final state): `spike/go/` and `spike/python/` (commit SHA: `4a8d8890` — feat(01-04): salvage spike comparison + ADR draft)
+- Comparison runner output: `spike/comparison.json` (canonical run 2026-05-27T20:28:03+02:00)
 - Measurement worksheet: `spike/measurement-worksheet.md` (full scoring trace including ratios + killer-feature gate evaluation + RSS variance analysis)
 - Research synthesis: `.planning/research/SUMMARY.md`
 - Stack research: `.planning/research/STACK.md` (14-dim Go-vs-Python stack with verified May-2026 versions)
@@ -99,10 +99,6 @@ DEC-04 default tie-breaker rule (from `.planning/REQUIREMENTS.md`): "Choose Go i
 ## Signed
 
 **Signed by:** six2dez (single maintainer, project owner)
-**Date:** YYYY-MM-DD (to be filled at sign-off by Plan 01-05)
-**Git SHA (this ADR):** <will be filled by git after Plan 01-05 commits>
-**Git SHA (spike final):** <SHA of the spike's last commit before ADR sign>
-
----
-
-*This ADR is currently in `Status: Proposed`. Plan 01-05 (sign-off + post-ADR collapse) flips Status to `Accepted`, fills the signed date and SHAs, applies the D-03 research-file collapse, and the maintainer commits the result.*
+**Date:** 2026-05-28
+**Git SHA (this ADR):** <see git log -- .planning/decisions/0001-language.md>
+**Git SHA (spike final):** 4a8d8890
