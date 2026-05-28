@@ -131,7 +131,8 @@ type SubAnalytics struct {
 }
 
 type SubBrute struct {
-	Enabled bool `koanf:"enabled"`
+	Enabled      bool `koanf:"enabled"`
+	MinResolvers int  `koanf:"min_resolvers" validate:"min=0,max=10000"`
 }
 
 type SubScraping struct {
@@ -145,6 +146,7 @@ type SubPermut struct {
 	RegexEnabled   bool   `koanf:"regex_enabled"`
 	WordlistMode   string `koanf:"wordlist_mode"    validate:"oneof=auto full short"`
 	ShortThreshold int    `koanf:"short_threshold"  validate:"min=0,max=1000000"`
+	MinFreeMemGB   int    `koanf:"min_free_mem_gb"  validate:"min=0,max=1024"`
 }
 
 type SubTakeover struct {
@@ -595,14 +597,15 @@ type NotificationsDiscord struct {
 
 // AxiomConfig mirrors ADR §2.2 [axiom].
 type AxiomConfig struct {
-	Enabled         bool   `koanf:"enabled"`
-	FleetName       string `koanf:"fleet_name"`
-	FleetCount      int    `koanf:"fleet_count"        validate:"min=1,max=1000"`
-	FleetRegions    string `koanf:"fleet_regions"`
-	ShutdownOnEnd   bool   `koanf:"shutdown_on_end"`
-	AutoFixHostkey  bool   `koanf:"auto_fix_hostkey"`
-	FleetLaunch     bool   `koanf:"fleet_launch"`
-	ExtraArgs       string `koanf:"extra_args"`
+	Enabled            bool   `koanf:"enabled"`
+	FleetName          string `koanf:"fleet_name"`
+	FleetCount         int    `koanf:"fleet_count"         validate:"min=1,max=1000"`
+	FleetRegions       string `koanf:"fleet_regions"`
+	ShutdownOnEnd      bool   `koanf:"shutdown_on_end"`
+	AutoFixHostkey     bool   `koanf:"auto_fix_hostkey"`
+	FleetLaunch        bool   `koanf:"fleet_launch"`
+	ExtraArgs          string `koanf:"extra_args"`
+	FailoverThreshold  int    `koanf:"failover_threshold"  validate:"min=1,max=100"`
 }
 
 // ---------------- MCP ----------------
