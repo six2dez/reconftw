@@ -117,7 +117,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 03-05-PLAN.md — Task interface (final, no placeholders per Blocker 4) + Scheduler (moved from old Plan 04) + AppContext + UI (dot-fill + lib/ui.sh behavior map per W13) + Notifier stubs + noop.demo
+- [x] 03-05-PLAN.md — Task interface (final, no placeholders per Blocker 4) + Scheduler (moved from old Plan 04) + AppContext + UI (dot-fill + lib/ui.sh behavior map per W13) + Notifier stubs + noop.demo
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
@@ -279,7 +279,7 @@ Calendar parallelization (within constraint that dependencies are met):
 |-------|----------------|--------|-----------|
 | 1. Language ADR & Spike | 4/5 | In Progress|  |
 | 2. Architecture v2 Design | 7/7 | Complete   | 2026-05-28 |
-| 3. Foundation Kernel | 4/7 | In Progress|  |
+| 3. Foundation Kernel | 5/7 | In Progress|  |
 | 4. Subdomains E2E + Axiom Integration | 0/? | Not started | - |
 | 5. Web Pipeline E2E | 0/? | Not started | - |
 | 6. Vulnerability Scanning E2E | 0/? | Not started | - |
