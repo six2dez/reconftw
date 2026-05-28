@@ -68,7 +68,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   5. The doc specifies the logging policy with type-level secret tagging (Go `Secret`+`LogValuer` OR Python `SecretStr`) and sink-level redaction registered BEFORE first log line (ARCH-12)
 **Plans**: 7 plans
 Plans:
-- [ ] 02-01-PLAN.md — ADR skeleton + verify-0002.sh + interfaces_check/
+- [x] 02-01-PLAN.md — ADR skeleton + verify-0002.sh + interfaces_check/
 - [ ] 02-02-PLAN.md — §2 TOML Configuration Schema (all v1 flags, [legacy] aliases, per-key validation)
 - [ ] 02-03-PLAN.md — §3 Output Tree Layout + §4 Compat Symlink Layer
 - [ ] 02-04-PLAN.md — §5 Interface Signatures + §6 Error Class Hierarchy + §7 Failure Policy
@@ -211,7 +211,7 @@ Calendar parallelization (within constraint that dependencies are met):
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Language ADR & Spike | 4/5 | In Progress|  |
-| 2. Architecture v2 Design | 0/7 | Ready to execute | - |
+| 2. Architecture v2 Design | 1/7 | In Progress|  |
 | 3. Foundation Kernel | 0/? | Not started | - |
 | 4. Subdomains E2E + Axiom Integration | 0/? | Not started | - |
 | 5. Web Pipeline E2E | 0/? | Not started | - |
