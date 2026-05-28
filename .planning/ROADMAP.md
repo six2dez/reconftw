@@ -140,29 +140,33 @@ Plans:
   4. Axiom Backend implementation is swappable at construction: `reconftw subs --target X --axiom` provisions a fleet (`axiom_launch` with configurable count), runs the pipeline distributed, releases the fleet at end (`axiom_shutdown`), and produces an artefact set equivalent (same scope, same dedup) to the local run — output-equivalence test green (AXIOM-01, AXIOM-02, AXIOM-03, AXIOM-04, AXIOM-09)
   5. Axiom resilience features work: resolver list propagation to fleet (`resolvers_update`), failover wrapper detects infrastructure failures (SSH timeout, fleet unreachable, partial-fleet) and retries locally without losing work, `AXIOM_AUTO_FIX_HOSTKEY` repair logic preserved, `axiom_disable_runtime` flag disables axiom mid-run and all subsequent calls run locally (AXIOM-05, AXIOM-06, AXIOM-07, AXIOM-08)
 
-**Plans**: 7 plans
+**Plans**: 8 plans (revised after cross-AI review — Wave 0 added for kernel-contract foundations)
 Plans:
-**Wave 1**
+**Wave 0** *(new — kernel-contract foundations before any Task code)*
 
-- [ ] 04-01-PLAN.md — Housekeeping + JSONL schema lock + tools.lock expansion (25 tools) + 6 passive Tasks + passiveBarrierTask + SUBD-05 scope cross-check
+- [ ] 04-00-PLAN.md — Missing config fields (MinResolvers/MinFreeMemGB/FailoverThreshold) + Tool.InputFlag + tools.lock to 25 + staging contract doc
+
+**Wave 1** *(blocked on Wave 0)*
+
+- [ ] 04-01-PLAN.md — Demo scaffold delete + JSONL schemas + MergeStage helper + 6 passive Tasks (staging files) + SUBD-05 scope cross-check
 
 **Wave 2** *(parallel — blocked on Wave 1)*
 
-- [ ] 04-02-PLAN.md — Active DNS resolution Tasks (SubActive, SubTLS, SubNoerror, SubDNS, SubSRV, SubPTR) + SubBruteTask + resolver health gate + activeBarrierTask
-- [ ] 04-03-PLAN.md — Shared extractor packages (favicon/JS/analytics — D-02) + SubScrapingTask + SubAnalyticsTask + SubNSDelegationTask
+- [ ] 04-02-PLAN.md — Active DNS resolution Tasks + SubBruteTask with in-Run() resolver gate + extend MergeStage for resolved stage
+- [ ] 04-03-PLAN.md — Shared extractor packages (favicon/JS/analytics) + SubScrapingTask/Analytics/NSDelegation (staging files + temp-file subjs→jsluice)
 
-**Wave 3** *(blocked on Wave 2 completion)*
+**Wave 3** *(blocked on Wave 2)*
 
-- [ ] 04-04-PLAN.md — Permutation Tasks (gotator/regulator/IA permut + memory back-pressure) + SubRecursivePassiveTask + SubRecursiveBruteTask + resolvedBarrierTask
+- [ ] 04-04-PLAN.md — Permutation Tasks with gopsutil OS memory back-pressure (not runtime.ReadMemStats) + SubRecursivePassive/Brute
 
 **Wave 4** *(parallel — blocked on Wave 3)*
 
-- [ ] 04-05-PLAN.md — Takeover (subzy+dnstake) + Buckets (s3scanner) + ASN (asnmap) + Geo + ZoneTransfer Tasks
-- [ ] 04-06-PLAN.md — Real AxiomBackend + FailoverBackend + wire newSubsCmd RunE
+- [ ] 04-05-PLAN.md — Takeover + Buckets + ASN + Geo (real City+ASN via ipinfo) + ZoneTransfer (in-Run gate)
+- [ ] 04-06-PLAN.md — Real AxiomBackend (Tool.InputFlag split) + FailoverBackend (safe Stream) + sequential 5-stage RunStage + filterByModuleAndEnabled
 
-**Wave 5** *(blocked on Wave 4 completion)*
+**Wave 5** *(blocked on Wave 4)*
 
-- [ ] 04-07-PLAN.md — Frozen-replay parity harness + AXIOM-09 equivalence test + phase acceptance checkpoint
+- [ ] 04-07-PLAN.md — Frozen-replay parity harness (real v1-captured fixtures) + AXIOM-09 equivalence test + phase acceptance checkpoint
 
 ### Phase 5: Web Pipeline E2E
 
