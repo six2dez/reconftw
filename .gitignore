@@ -1,6 +1,7 @@
 #Ignoring output directories
 Recon/
-output/
+# Root-only — do NOT shadow internal/core/output (Phase 3 plan 03-03).
+/output/
 .obsidian/
 test/
 .trunk/
