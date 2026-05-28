@@ -34,12 +34,98 @@ additions (new methods, new error types, new AppContext fields) do not require a
 
 <!-- ARCH-01 -->
 
-[STUB — populated in Wave 2]
+### §1.1 System Architecture Diagram
 
-This section will contain: TL;DR summary of every locked decision, glossary of all new
-terms (AppContext, Backend, Task, Tool, FailurePolicy, Secret, ToolError, ToolTimeout,
-OutOfScope, AxiomFailure, ConfigError, ScopeError, ChecksumMismatch), suggested reading
-order for Phase 3 implementers, and a top-level Mermaid system architecture diagram.
+The diagram below shows all 12 architectural nodes and the dependency edges between them.
+Read top-to-bottom: the CLI parses flags and resolves config; the Application Kernel wires
+all components and passes `*AppContext` to every Task; the Scheduler dispatches Tasks to the
+Module Layer; Modules call Backend for tool execution and write artefacts to the Output Tree.
+
+```mermaid
+graph TD
+    CLI["CLI Layer\ncobra + pflag\nreconftw run / subs / web / vulns / osint"]
+    CFG["Config Layer\nkoanf v2 + go-toml v2\n8-source precedence chain"]
+    KERNEL["Application Kernel\nAppContext struct (pointer)\nLog | Cfg | Scheduler | Tools | Tree | Checkpoint | Notify | Target | UI"]
+    SCHED["Scheduler\nerrgroup.SetLimit(N)\nbest_effort vs fail_fast per stage"]
+    TOOLS["Tool Registry + Backend\nLocalBackend / AxiomBackend\nSetpgid + Kill(-pgid) pattern"]
+    OUTPUT["Output Tree\nworkspaces/<target>/artefacts/ JSONL\nAtomicWriter: tempfile+fsync+rename+parent fsync"]
+    COMPAT["Compat Writer\nRecon/<domain>/ symlink farm\n6 months post-cutover"]
+    CHECKPOINT["Checkpoint Store\ncheckpoints.db (SQLite WAL)\ntask_name + input_hash + status"]
+    MODULES["Module Layer\ninternal/modules/subdomains | web | vulns | osint\nSelf-registering via init()"]
+    ERRORS["Error Package\n7-class typed hierarchy\nToolError | ToolTimeout | OutOfScope | AxiomFailure | ConfigError | ScopeError | ChecksumMismatch"]
+    LOG["Logger\nlog/slog + RedactingHandler\nSecret type via LogValuer\nregistered BEFORE first log line"]
+    EXTERNAL["External Tools Layer\n70+ binaries on PATH\nsubfinder | httpx | nuclei | dalfox | sqlmap..."]
+
+    CLI --> CFG
+    CFG --> KERNEL
+    KERNEL --> SCHED
+    KERNEL --> TOOLS
+    KERNEL --> OUTPUT
+    KERNEL --> CHECKPOINT
+    KERNEL --> LOG
+    SCHED --> MODULES
+    MODULES --> TOOLS
+    TOOLS --> EXTERNAL
+    MODULES --> OUTPUT
+    OUTPUT --> COMPAT
+    MODULES --> CHECKPOINT
+    MODULES --> ERRORS
+    LOG --> ERRORS
+```
+
+### §1.2 Recommended Project Structure
+
+The layout below maps directly to the ARCH-NN requirements. Each `internal/core/` sub-package
+is the implementation home for one or more contract sections. Phase 3 creates this tree;
+all subsequent phases add Task implementations under `internal/modules/`.
+
+```text
+cmd/reconftw/
+├── main.go                  # signal.NotifyContext + AppContext.Boot() + cobra.Execute()
+└── modules.go               # blank imports to trigger module init() registrations
+
+internal/
+├── core/
+│   ├── errors/              # ARCH-08: 7-class typed error hierarchy
+│   ├── log/                 # ARCH-12: Secret type + RedactingHandler + logger factory
+│   ├── config/              # ARCH-02: Config struct (koanf), 8-source loader, validator
+│   ├── task/                # ARCH-05: Task interface + Registry
+│   ├── scheduler/           # ARCH-09: Scheduler (errgroup + semaphore + failure_policy)
+│   ├── backend/             # ARCH-06: Backend interface + LocalBackend + AxiomBackend
+│   ├── output/              # ARCH-03/04: OutputTree + AtomicWriter + CompatWriter
+│   ├── checkpoint/          # ARCH-03: SQLite checkpoint store (modernc/sqlite)
+│   ├── appctx/              # ARCH-07: AppContext struct (wiring kernel)
+│   ├── notifier/            # Notifier interface + stubs
+│   └── ui/                  # Dot-fill UI (port of lib/ui.sh verbatim)
+└── modules/
+    ├── subdomains/          # Task implementations (self-register via init())
+    ├── web/
+    ├── vulns/
+    └── osint/
+
+interfaces_check/            # D-14: standalone build target for Go snippet compile check
+├── main.go                  # imports core/task, core/backend, core/appctx; verifies signatures
+
+.planning/decisions/
+└── 0002-architecture-v2.md  # THE deliverable
+```
+
+### §1.3 Contract Map
+
+The table below maps each section to its ARCH-NN requirement(s), the Phase 3 package that
+implements the contract, and the downstream phases that consume it.
+
+| Section | ARCH-NN | Phase 3 Component | Phase 4+ Consumer |
+|---------|---------|-------------------|-------------------|
+| §2 TOML Schema | ARCH-02 | `internal/config` + `config.Load()` | Phase 11 migrator |
+| §3 Output Tree | ARCH-03 | `internal/output OutputTree` | Phase 4-7 `Task.Run()` |
+| §4 Compat Layer | ARCH-04 | `internal/output CompatWriter` | Phase 12 cutover window |
+| §5 Interfaces | ARCH-05/06/07 | `internal/core/{task,backend,appctx}` | Phase 4-12 Task impl. |
+| §6 Error Hierarchy | ARCH-08 | `internal/core/errors` | Phase 4-12 error handling |
+| §7 Failure Policy | ARCH-09 | `internal/scheduler` | Phase 4-12 module groups |
+| §8 CLI Surface | ARCH-10 | `cmd/reconftw/main.go` + cobra | Phase 9 composite modes |
+| §9 Test Policy | ARCH-11 | `internal/core/testutil` + CI | All phases |
+| §10 Logging Policy | ARCH-12 | `internal/core/log` | All phases |
 
 ## §2 TOML Configuration Schema
 
@@ -2387,23 +2473,84 @@ output, ever, under any code path. The sentinel-value test is the enforcement me
 
 <!-- ARCH-01 — process -->
 
-[STUB — populated in Wave 2]
+Before Status is flipped from `Proposed` to `Accepted`, the maintainer runs a
+programmatic pre-sign gate (D-14). The gate script lives at
+`.planning/decisions/verify-0002.sh`. It performs four checks in sequence; any failure
+exits non-zero and halts sign-off.
 
-This section will contain: the 4-step programmatic pre-sign verification gate (D-14):
-(1) ARCH-NN requirement grep coverage check, (2) TOML block parse validation via tomljson,
-(3) Go interface snippet compile via `go build ./interfaces_check/...`, and (4) glossary
-term completeness check. The gate script is at `.planning/decisions/verify-0002.sh`.
+**Run as:** `bash .planning/decisions/verify-0002.sh` from the repository root.
+All 4 checks must pass before Status is flipped from Proposed to Accepted (D-14).
+
+**Dependency note:** Check 2 requires `tomljson` on PATH. Install via:
+`go install github.com/pelletier/go-toml/cmd/tomljson@latest`
+
+### Check 1: ARCH-NN Requirement Coverage
+
+Greps for each of `ARCH-01` through `ARCH-12` in the ADR file. Ensures every requirement
+has at least one reference in the document body, so no contract section was accidentally
+omitted. Expected pass condition: all 12 IDs found; script prints `OK: ARCH-0N found` for
+each and continues to Check 2.
+
+### Check 2: TOML Blocks Parse as Valid TOML
+
+Extracts every ` ```toml ` code block from the ADR using `awk`, writes each block to a
+temp buffer, and pipes it through `tomljson`. Ensures that every TOML sample embedded in
+the schema documentation is syntactically valid TOML — no missing quotes, invalid keys,
+or malformed nested tables. Expected pass condition: `tomljson` exits 0 for every block;
+script prints `OK: TOML block at line N` for each and continues to Check 3.
+
+### Check 3: Go Interface Snippets Compile
+
+Runs `go build -o /tmp/interfaces_check_verify ./interfaces_check/...` from the repository
+root. The `interfaces_check/` package imports the interface declarations from the ADR's Go
+blocks; a successful build proves that every Go snippet in the ADR is syntactically valid
+and type-checks against the declared imports. Expected pass condition: `go build` exits 0;
+script prints `OK: Go snippets compile` and continues to Check 4.
+
+### Check 4: Glossary Completeness
+
+Greps for each of the following contract terms in the ADR:
+`AppContext`, `Backend`, `Task`, `Result`, `FailurePolicy`, `Secret`, `ToolError`,
+`ToolTimeout`, `OutOfScope`, `AxiomFailure`, `ConfigError`, `ScopeError`,
+`ChecksumMismatch`. Ensures every term used in interface signatures has a definition
+somewhere in the document. Expected pass condition: all 13 terms found; script prints
+`OK: <term> in glossary` for each and concludes with `=== ALL CHECKS PASSED — safe to sign ===`.
 
 ## §12 Amendment Log
 
 <!-- D-06 -->
 
-[STUB — populated in Wave 2]
+No amendments as of sign-off date. Amendments are appended at the END of this file,
+never inline-edited into original section text. Git history is the audit trail. Each
+amendment block uses the following format (D-06):
 
-This section will contain: an ordered log of all inline amendments to this ADR after
-sign-off. Each amendment entry follows the format:
-`Amended: YYYY-MM-DD | Section: §N | Reason: … | SHA: <git-sha>`.
-Amendments are append-only; original text is struck through but not removed.
+```
+---
+**Amended:** YYYY-MM-DD | **Section:** §N | **Reason:** one-line rationale
+[changed content here — replaces or supplements the original]
+---
+```
+
+**Amendment governance:** Amendment gate = solo same-day (D-08, same gate as original
+sign-off). Consistent rule: "changing the ADR uses the same ceremony as signing it."
+
+**D-07 Breaking-change threshold.** Amendment REQUIRED for:
+- Renaming a method on `Task`, `Backend`, or `AppContext`
+- Changing a method signature (parameter types, return types, parameter count)
+- Removing a field from `AppContext` or a method from `Task` / `Backend`
+- Changing a field's type in `AppContext`, `Result`, or any error struct
+- Redefining error semantics (e.g. changing when `OutOfScope` vs `ScopeError` is returned)
+
+Amendment NOT required for:
+- Adding new fields to `AppContext` (additive, non-breaking)
+- Adding new methods to `Task` or `Backend` (additive, non-breaking)
+- Adding new error types to the hierarchy (additive)
+- Tightening internal validation rules (e.g. lowering a range cap) that do not change the
+  public type signatures
+
+### Amendments
+
+_No amendments yet._
 
 ## Consequences
 
