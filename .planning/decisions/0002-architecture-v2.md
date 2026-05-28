@@ -1300,13 +1300,241 @@ within the 6-month window. MIGRATION.md documents both migration paths with exam
 
 <!-- ARCH-05, ARCH-06, ARCH-07 -->
 
-[STUB — populated in Wave 2]
+This section specifies the three core binding contracts of the reconFTW v2.0 kernel:
+the `Task` interface (ARCH-05), the `Backend` interface (ARCH-06), and the `AppContext`
+struct (ARCH-07). All signatures are BINDING after sign-off per D-05. Breaking changes
+(method rename, signature change, field removal) require an inline amendment block per
+D-06. Non-breaking additions (new methods, new fields) do not.
 
-This section will contain: the `Task` interface signature (Name / Module / Enabled(cfg) /
-DependsOn() / Run(ctx, app) → Result), the `Backend` interface signature (Exec / Stream /
-HealthCheck / Capacity), the `AppContext` struct shape (Log, Cfg, Scheduler, Tools, Tree,
-Checkpoint, Notify, Target, UI — no package-level state), and Go godoc-style code blocks
-for each. All signatures are BINDING after sign-off (D-05).
+### §5.1 Task Interface (ARCH-05)
+
+The `Task` interface is the smallest schedulable unit of recon work. Every module
+function in v1 (`sub_passive`, `nuclei_check`, `xss`, etc.) becomes a `Task`
+implementation in v2. Tasks self-register via `init()` and are scheduled by the
+`Scheduler` after dependency resolution and config-based enablement filtering.
+
+```go
+// internal/core/task/task.go
+// Source: .planning/research/ARCHITECTURE.md §2a + spike/go/internal/passive/passive.go
+package task
+
+import (
+	"context"
+	"time"
+
+	"github.com/six2dez/reconftw/internal/config"
+	"github.com/six2dez/reconftw/internal/core/appctx"
+)
+
+// Task is the smallest schedulable unit of recon work. Implementors live in
+// internal/modules/<domain>/ and self-register via init().
+// BINDING: renaming a method, changing a method signature, or removing a method
+// requires an ADR amendment (D-06). Adding new methods is non-breaking (D-07).
+type Task interface {
+	// Name returns the globally unique dot-namespaced task identifier.
+	// Convention: "<module>.<action>" e.g. "subdomains.passive", "web.fuzz"
+	Name() string
+
+	// Module returns the owning module group for grouping and failure_policy lookup.
+	// One of: "subdomains", "web", "vulns", "osint", "axiom"
+	Module() string
+
+	// Description returns a human-readable one-line description for UI badges.
+	Description() string
+
+	// Enabled reports whether this task should run given the resolved config.
+	// Called by Scheduler before Run; return false → SKIP badge, no checkpoint written.
+	Enabled(cfg *config.Config) bool
+
+	// DependsOn returns names of tasks that must complete (status=done) before this
+	// task may be scheduled. Empty slice = no dependencies (runs in parallel with peers).
+	// Registry.Build() performs topological sort cycle detection; circular DependsOn
+	// is a ConfigError, not a runtime error (see §6 and RESEARCH.md §Pitfall 3).
+	DependsOn() []string
+
+	// Run executes the task. ctx is cancellable; cancel = SIGINT or task timeout.
+	// MUST respect ctx.Done() promptly; MUST NOT call os.Exit.
+	// Returns (Result, nil) on success; (Result, error) on partial or full failure.
+	// Non-nil error → Scheduler records status=errored or status=cancelled per policy.
+	Run(ctx context.Context, app *appctx.AppContext) (Result, error)
+}
+
+// Result carries the outcome of a single task execution.
+type Result struct {
+	Status   Status            // done | errored | cancelled | skipped
+	Duration time.Duration
+	Outputs  []string          // paths written (for checkpoint.output_paths)
+	Stats    map[string]int    // optional counters (e.g. "subdomains_found": 42)
+}
+
+// Status enumerates the terminal states a task may reach.
+type Status string
+
+const (
+	StatusDone      Status = "done"
+	StatusErrored   Status = "errored"
+	StatusCancelled Status = "cancelled"
+	StatusSkipped   Status = "skipped"
+)
+
+// Registry holds all registered tasks. Default is the process-singleton.
+// Build() must be called once at startup to perform dependency resolution and
+// topological sort cycle detection before the Scheduler accepts any submissions.
+type Registry struct{ tasks map[string]Task }
+
+// Default is the process-singleton task registry.
+var Default = &Registry{tasks: map[string]Task{}}
+
+// Register adds t to the registry. Panics on duplicate name (caught at startup).
+// Called from each module package's init() function.
+func Register(t Task) {
+	if _, ok := Default.tasks[t.Name()]; ok {
+		panic("reconftw: duplicate task registration: " + t.Name())
+	}
+	Default.tasks[t.Name()] = t
+}
+
+// LifecycleAware is an optional lifecycle extension that Tasks may implement.
+// The Scheduler checks for this interface via type assertion before each Run.
+// OnStart is called immediately before Run; OnEnd is called after Run completes
+// (including on error or cancellation).
+type LifecycleAware interface {
+	OnStart(ctx context.Context, app *appctx.AppContext) error
+	OnEnd(ctx context.Context, app *appctx.AppContext, r Result) error
+}
+```
+
+### §5.2 Backend Interface (ARCH-06)
+
+The `Backend` interface abstracts local subprocess execution from distributed
+(Axiom) execution. `LocalBackend` wraps `exec.Cmd` with process-group isolation
+(`Setpgid: true`, `Kill(-pgid)`) as proven in the Phase 1 spike at
+`spike/go/internal/proc/proc.go`. `AxiomBackend` delegates to the Axiom fleet.
+The Scheduler uses a `Backend` via `AppContext.Tools`; Tasks never call the Backend
+directly — they call `app.Tools.Run(ctx, toolName, args)` which resolves the Tool
+and dispatches to the appropriate Backend.
+
+```go
+// internal/core/backend/backend.go
+// Source: .planning/research/ARCHITECTURE.md §6a + spike/go/internal/proc/proc.go
+package backend
+
+import (
+	"context"
+	"time"
+)
+
+// Event is a single streaming output unit from a running tool.
+type Event struct {
+	Line   []byte // raw stdout line (no trailing newline)
+	Source string // tool name, e.g. "nuclei"
+	IsErr  bool   // true if line came from stderr
+}
+
+// Result holds the complete output of a buffered Exec call.
+type Result struct {
+	Stdout   []byte
+	Stderr   []byte
+	ExitCode int
+	Duration time.Duration
+}
+
+// Tool describes a single external binary. Resolved at startup by ToolRegistry
+// via exec.LookPath and version detection.
+type Tool struct {
+	Name        string
+	Path        string        // absolute path from exec.LookPath
+	Version     string        // parsed from `tool --version` at health-check
+	DefaultArgs []string
+	Timeout     time.Duration // per-invocation timeout; 0 = no timeout
+}
+
+// Backend abstracts local subprocess execution from distributed (Axiom) execution.
+// Implementations: LocalBackend (default), AxiomBackend (when axiom.enabled = true).
+// BINDING: adding methods is non-breaking (D-07); renaming, removing, or changing
+// method signatures requires an ADR amendment (D-06).
+type Backend interface {
+	// Exec runs tool with args, buffers stdout+stderr, returns when done.
+	// Suitable for tools with bounded, short-lived output (subfinder, dnsx, crt).
+	// The tool's process group is killed on ctx cancellation.
+	Exec(ctx context.Context, t *Tool, args []string) (*Result, error)
+
+	// Stream runs tool with args, yields stdout and stderr lines as Events on
+	// the returned channel. Channel closes when tool exits (clean or error).
+	// Suitable for long-running tools (nuclei, dalfox, katana).
+	// Caller MUST drain the channel until closed to avoid goroutine leak.
+	//
+	// Phase 8 MCP server wraps this channel via SSE notifications; see
+	// §MCP integration note. Backend.Stream() shape is sufficient for MCP —
+	// no protocol-level change anticipated.
+	Stream(ctx context.Context, t *Tool, args []string) (<-chan Event, error)
+
+	// HealthCheck verifies the backend is operational (binaries reachable,
+	// axiom fleet up and authenticated). Called at startup and by the
+	// `reconftw health-check` subcommand. Returns nil if healthy.
+	HealthCheck(ctx context.Context) error
+
+	// Capacity returns the number of concurrent tool invocations this backend
+	// supports. LocalBackend returns runtime.NumCPU() * 2; AxiomBackend returns
+	// the configured fleet_count. Used by Scheduler as a hint for SetLimit(N).
+	Capacity() int
+}
+```
+
+### §5.3 AppContext (ARCH-07)
+
+`AppContext` is the dependency kernel. It is wired once at startup in
+`cmd/reconftw/main.go` and passed by pointer into every `Task.Run()`. There are
+NO package-level globals in v2. The v1 bash codebase's biggest testability
+problem is that all 80 module-enable flags, `$dir`, `$LOGFILE`, and `$DIFF` are
+process-level globals — any module can corrupt any other. `AppContext` passed by
+pointer is zero-overhead and makes every dependency explicit at the call site.
+
+```go
+// internal/core/appctx/appctx.go
+// Source: .planning/research/ARCHITECTURE.md §2a §12
+package appctx
+
+import (
+	"log/slog"
+
+	"github.com/six2dez/reconftw/internal/checkpoint"
+	"github.com/six2dez/reconftw/internal/config"
+	"github.com/six2dez/reconftw/internal/core/backend"
+	"github.com/six2dez/reconftw/internal/notifier"
+	"github.com/six2dez/reconftw/internal/output"
+	"github.com/six2dez/reconftw/internal/scheduler"
+	"github.com/six2dez/reconftw/internal/ui"
+)
+
+// AppContext is the dependency kernel. Wired ONCE at startup in cmd/reconftw/main.go;
+// passed by pointer into every Task.Run(). NO package-level globals permitted.
+// BINDING: adding fields is non-breaking (D-07); removing or renaming fields requires
+// an ADR amendment (D-06).
+type AppContext struct {
+	Log        *slog.Logger         // structured logger (RedactingHandler applied at construction)
+	Cfg        *config.Config       // resolved and validated config (all 323 flags)
+	Scheduler  *scheduler.Scheduler // bounded concurrency + failure_policy enforcement
+	Tools      *backend.Runner      // wraps Backend + ToolRegistry; Tasks call app.Tools.Run()
+	Tree       *output.OutputTree   // atomic JSONL writer + scope filter + compat layer
+	Checkpoint *checkpoint.Store    // SQLite-backed checkpoint store (checkpoints.db)
+	Notify     notifier.Notifier    // multi-channel notification dispatcher (Slack/Telegram/Discord)
+	Target     *Target              // immutable scan target description
+	UI         *ui.Printer          // terminal UI printer (badges, progress, verbosity-gated output)
+}
+
+// Target describes the scan target. Immutable after construction in main.go.
+type Target struct {
+	Domain  string   // sanitized domain, IP, or CIDR (validated by lib/validation)
+	IsCIDR  bool
+	IsIP    bool
+	Scope   []string // wildcard patterns from scope file (e.g. "*.example.com")
+	WorkDir string   // absolute path to workspaces/<target-id>/
+}
+```
+
+**NO package-level globals.** See RESEARCH.md §AppContext Shape for the rationale —
+global bash vars are the v1 testability anti-pattern this design explicitly rejects.
 
 ## §6 Error Class Hierarchy
 
