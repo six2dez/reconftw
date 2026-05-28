@@ -1847,34 +1847,541 @@ checkpoint — they re-run on the next invocation against the same target.
 
 <!-- ARCH-10 -->
 
-[STUB — populated in Wave 2]
+_Requirement:_ ARCH-10 — CLI surface: subcommands are primary; v1 short flags are deprecated
+aliases with a warning for 2 minor versions (removed in v2.2.0). Decisions: CLI-over-config
+pattern (CLI flags set `CLI_*` vars that override config after load); cobra `MarkDeprecated()`
+emits a warning to stderr on every use; exit codes are preserved identical to v1.
 
-This section will contain: the v2 cobra subcommand surface (reconftw run / subs / web /
-vulns / osint / mcp / health / migrate), all v1 short-flag deprecated aliases with 2-minor-
-version sunset, the `MarkDeprecated()` cobra pattern, and the `--dry-run` / `--verbose` /
-`--quiet` / `--output` universal flags.
+### §8.1 Subcommand Surface
+
+The v2 binary replaces all v1 positional-mode flags with explicit subcommands. The table
+below maps each v2 subcommand to its v1 long flag equivalent and the v1 short flag that
+becomes a deprecated alias. See §2 for the `[legacy]` TOML alias table; see §8.3 for the
+`cobra.MarkDeprecated()` pattern that bridges the two.
+
+| Subcommand | v1 Long Flag Alias | v1 Short Flag (deprecated) | Description |
+|------------|-------------------|---------------------------|-------------|
+| `reconftw recon` | `--recon` | `-r` | Passive subs + web probe + web analysis + OSINT (no vulns) |
+| `reconftw all` | `--all` | `-a` | Run everything (recon + vulns) |
+| `reconftw passive` | `--passive` | `-p` | Passive-only sources; no active probing |
+| `reconftw subs` | `--subdomains` | `-s` | Subdomain enumeration pipeline |
+| `reconftw web` | `--web` | `-w` | Web analysis pipeline |
+| `reconftw vulns` | — | — | Vulnerability scanning pipeline (no v1 short flag) |
+| `reconftw osint` | `--osint` | `-n` | OSINT pipeline (note: `-o` is taken by `--output` in v2) |
+| `reconftw zen` | — | `-z` | Stealth/quiet mode (extra OPSEC; no active noisy probing) |
+| `reconftw deep` | — | `-y` | Deep brute force + extended permutations |
+| `reconftw monitor` | `--monitor` | — | Monitor mode with configurable interval |
+| `reconftw report` | — | — | Regenerate reports without re-running scans |
+| `reconftw mcp` | — | — | Start MCP server (requires `mcp.enabled = true` in TOML) |
+| `reconftw migrate` | — | — | Migrate `reconftw.cfg` to TOML (implemented Phase 11) |
+| `reconftw install` | — | — | Install / update orchestrated tools (implemented Phase 11) |
+| `reconftw health-check` | `--health-check` | — | Verify all tool binaries reachable + backend operational |
+
+### §8.2 Persistent Global Flags
+
+The following flags are available on every subcommand (registered on `rootCmd` as
+`PersistentFlags()`). Short flags marked `(deprecated alias)` emit a stderr warning when
+used.
+
+| Flag | Short | Deprecated? | Description |
+|------|-------|-------------|-------------|
+| `--target` | _(none)_ | `-d` is deprecated alias | Single target domain, IP, or CIDR |
+| `--list` | _(none)_ | `-l` is deprecated alias | File with one target per line |
+| `--config` | — | — | Override default `reconftw.toml` location |
+| `--dry-run` | — | — | Show what would execute; no subprocess invocations |
+| `--force` | — | — | Bypass checkpoints; re-run everything (equiv v1 `DIFF=true`) |
+| `--log-level` | — | — | `error`\|`warn`\|`info`\|`debug` (maps to slog levels) |
+| `--axiom` | — | `--vps` / `-v` are deprecated aliases | Use Axiom distributed backend |
+| `--quiet` | `-q` | — | Shorthand for `--log-level error` |
+| `--verbose` | `-V` (uppercase) | — | Shorthand for `--log-level debug` |
+| `--output` | `-o` | — | Output directory root (default: `workspaces/`) |
+| `--no-color` | — | — | Disable ANSI colour output |
+
+**Note on `-o`:** v1 had no `-o` flag; `-o` is unused in v1. In v2, `-o` is assigned to
+`--output` so that `-o example.com` is unambiguous. The v1 `-n` (osint) collision was resolved
+by using `-n` for `osint` since `-o` was available for a more natural assignment.
+
+### §8.3 Cobra Deprecation Pattern
+
+All v1 short flags that map to v2 subcommands are registered as deprecated persistent flags
+on the root command. `cobra.MarkDeprecated()` prints to `cmd.ErrOrStderr()` automatically;
+the flag remains functional and exit code is unchanged.
+
+```go
+// cmd/reconftw/root.go — deprecated v1 short flags registered on rootCmd.
+// Source: RESEARCH.md §CLI Surface Design §Cobra Deprecation Pattern
+
+// Subcommand-mode flags (v1 short flags → v2 subcommands)
+rootCmd.PersistentFlags().BoolP("recon", "r", false, "Run recon mode")
+rootCmd.PersistentFlags().MarkDeprecated("recon",
+    "use subcommand 'recon' instead: `reconftw recon -d example.com`")
+
+rootCmd.PersistentFlags().BoolP("all", "a", false, "Run all modules")
+rootCmd.PersistentFlags().MarkDeprecated("all",
+    "use subcommand 'all' instead: `reconftw all -d example.com`")
+
+rootCmd.PersistentFlags().BoolP("passive", "p", false, "Passive-only mode")
+rootCmd.PersistentFlags().MarkDeprecated("passive",
+    "use subcommand 'passive' instead: `reconftw passive -d example.com`")
+
+rootCmd.PersistentFlags().BoolP("subdomains", "s", false, "Subdomain enumeration")
+rootCmd.PersistentFlags().MarkDeprecated("subdomains",
+    "use subcommand 'subs' instead: `reconftw subs -d example.com`")
+
+// Global target flags (v1 -d / -l → v2 --target / --list)
+rootCmd.PersistentFlags().StringP("target-deprecated", "d", "", "Target domain (deprecated)")
+rootCmd.PersistentFlags().MarkDeprecated("target-deprecated",
+    "use --target flag instead: `reconftw recon --target example.com`")
+
+rootCmd.PersistentFlags().StringP("list-deprecated", "l", "", "Target list (deprecated)")
+rootCmd.PersistentFlags().MarkDeprecated("list-deprecated",
+    "use --list flag instead: `reconftw recon --list targets.txt`")
+
+// Axiom backend flag (v1 --vps / -v → v2 --axiom)
+rootCmd.PersistentFlags().BoolP("vps", "v", false, "Use Axiom (deprecated)")
+rootCmd.PersistentFlags().MarkDeprecated("vps",
+    "use --axiom flag instead: `reconftw recon --axiom -d example.com`")
+```
+
+**Resulting stderr warning (cobra default format):**
+
+```
+Flag --recon has been deprecated, use subcommand 'recon' instead: `reconftw recon -d example.com`
+```
+
+The warning is printed once per invocation where the deprecated flag is used. Cobra does not
+deduplicate across multiple calls in a single invocation. Exit code is unchanged: the flag
+remains functional until v2.2.0.
+
+**A unit test asserts** that every deprecated flag, when used, emits exactly one deprecation
+warning line to stderr and exits 0. This test runs in Ring 1 (unit) with no subprocess.
+
+### §8.4 Removal Timeline
+
+Deprecated v1 flags remain **fully functional** through v2.1.x. They emit a warning to
+stderr on every use (no error, no non-zero exit code). They are **REMOVED in v2.2.0**.
+
+**"2 minor versions" measurement:** v1 release cadence shows tags like v4.1, v4.0.1, v3.2.1,
+v3.1.0, etc. — approximately 3–6 minor releases per calendar year (source: `git log --tags
+--simplify-by-decoration`). "2 minor versions" for v2.x means: deprecated flags removed at
+v2.2.0 (two minor-version bumps after v2.0.0 GA). **Calendar time is NOT the unit; release
+count is.** At current cadence this is approximately 4–8 months, but the binding commitment
+is the version number, not the date.
+
+Per ARCH-10 (`.planning/REQUIREMENTS.md`): CLI-over-config pattern is preserved — the
+deprecated flags, when used, set the same `CLI_*` override variables as their v2 equivalents
+before config is loaded; the config-override re-application step described in §2 still fires.
+
+**Cross-reference:** The `[legacy]` TOML table (§2) and the deprecated CLI flags (§8) both
+serve the same purpose — soft migration landing for v1 users. The `[legacy]` table is removed
+from koanf loading in v2.2.0 on the same schedule.
 
 ## §9 Test Ring Policy
 
 <!-- ARCH-11 -->
 
-[STUB — populated in Wave 2]
+_Requirement:_ ARCH-11 — Test ring policy documented: unit / integration / smoke /
+property-based, with CI gate assignments, ring membership examples, and foundation
+test-infrastructure requirements. This section specifies the policy; Phase 3 implements
+the foundation layer.
 
-This section will contain: the 4-ring test ring policy (unit / integration / smoke /
-property-based), CI gate assignments per ring, what belongs in each ring, go-test invocation
-patterns, goroutine leak detection via go.uber.org/goleak in every TestMain, and the CI
-budget split (unit+smoke per-push vs integration-full weekly cron).
+### §9.1 Four-Ring Policy
+
+| Ring | What Counts | Go Tooling | CI Cadence | Max Duration |
+|------|-------------|------------|------------|--------------|
+| **Unit** | Mock AppContext; no subprocess; no filesystem I/O; no network | `testing` + `testify` + `goleak` | Every commit, every push | < 30 s total |
+| **Integration** | Real Scheduler + Checkpoint + OutputTree; `MockBackend` (deterministic from testdata); SQLite `:memory:` | same + table-driven fixtures | Every commit | < 5 min |
+| **Smoke** | Real binaries against `httpbin.org` or a local `scope.local` target in Docker; 1 mode per test | `testing` + real tool execution | Every PR + weekly cron | < 20 min |
+| **Property** | Random inputs via `pgregory.net/rapid`; scope filter, config parser, input-hash determinism | `pgregory.net/rapid` | Every commit | < 60 s |
+
+**go test invocation patterns:**
+
+```bash
+# Unit + Property rings (run on every push; -short tag excludes integration fixtures)
+go test -race -short ./...
+
+# Integration ring (every commit; full test run without -short)
+go test -race ./...
+
+# Smoke ring (every PR + weekly cron; explicit build tag required)
+go test -race -tags smoke ./...
+```
+
+**Goroutine leak detection:** Every test file's `TestMain` must include:
+
+```go
+func TestMain(m *testing.M) {
+    // setup ...
+    code := m.Run()
+    goleak.VerifyNone(nil) // or goleak.VerifyNone(t) in subtests
+    os.Exit(code)
+}
+```
+
+`go.uber.org/goleak` is a test-only dependency. It detects goroutines still running after
+`TestMain` returns — which catches unclosed `Backend.Stream()` channels and leaked scheduler
+goroutines.
+
+### §9.2 Ring Membership Examples
+
+**Unit Ring — mock backend, no I/O:**
+
+- Scheduler topological sort for `DependsOn()` chains (no goroutines, just DAG logic)
+- Checkpoint store queries (in-memory SQLite via `:memory:` — unit-safe, no disk)
+- Scope filter: `IsInScopeHost()` equivalents — anchored hostname checks, substring false-positive prevention
+- Config validator for individual keys (range checks, URL allowlists, path-traversal rejection)
+- Error type `Is()` / `As()` traversal across the 7-class hierarchy
+- `Secret.LogValue()` returns `"***"` not the actual value
+- UI dot-fill format output (string comparison against expected badge format)
+
+**Integration Ring — MockBackend from testdata:**
+
+- Every Task has one happy-path test and one error-path test using `MockBackend` with deterministic fixture data from `internal/core/testutil/fixtures/`
+- Scheduler runs a DAG of 3–5 tasks in dependency order; verifies execution sequence and checkpoint writes
+- Checkpoint store: begin task → simulate crash (close DB) → reopen → verify `status=running` is detected → re-run task; verify idempotent output
+- `OutputTree.Append()` scope filter at write boundary: out-of-scope values are rejected with `OutOfScope` error and NOT written to the JSONL artefact
+- Notifier: mock sink receives task completion messages; asserts zero log lines contain unredacted secret values (XCUT-07 integration gate)
+
+**Smoke Ring — real tools, real network, Docker-gated:**
+
+- One test per mode: `reconftw subs -d hackerone.com`, `reconftw web -d hackerone.com`
+- Asserts: output JSONL files exist, line count > 0, no panic, exit code 0
+- Run inside Docker image with all 70+ tools installed (same image as CI integration)
+- Gated by `//go:build smoke` build tag; excluded from normal `go test ./...`
+
+**Property Ring — rapid generators:**
+
+- `rapid.String()` corpus through the scope filter → assert no substring false positives
+  (every match must be anchored; `sub.example.com` must not match `notexample.com`)
+- `rapid.SliceOf(rapid.StringMatching(...))` config keys through the validator → assert
+  validator never panics (any valid string input returns an error or nil, never panics)
+- `rapid.IntRange(1, 512)` thread count through the Scheduler → assert scheduler never
+  deadlocks (context with 1 s timeout; test fails if context expires without completion)
+
+### §9.3 Foundation Wave 0 Requirements
+
+The following test-infrastructure must exist BEFORE Phase 3 task implementations begin.
+Phase 3 creates these packages as its first commit; all subsequent task tests import them.
+
+**Required packages in `internal/core/testutil/`:**
+
+- `MockBackend` — deterministic `Backend` implementation; reads tool output from
+  `internal/core/testutil/fixtures/<tool>/<scenario>.txt`; returns configurable exit codes
+  and simulated errors; never spawns a subprocess
+- `MockCheckpoint` — in-memory `checkpoint.Store` implementation; holds state in a `map`;
+  supports all query patterns; no SQLite required in unit tests
+- `MockOutputTree` — in-memory `output.OutputTree` implementation; holds JSONL lines in
+  memory slices; exposes `Lines(artefact string) []string` for assertion; no disk I/O
+
+**CI configuration (`.github/workflows/ci.yml` additions for Phase 3):**
+
+```yaml
+jobs:
+  unit:
+    name: Unit + Property tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+      - run: go test -race -short ./...     # Ring 1 + Ring 4
+
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+      - run: go test -race ./...             # Ring 1 + Ring 2 + Ring 4
+
+  smoke:
+    name: Smoke tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+      - run: go test -race -tags smoke ./... # Ring 3
+```
+
+**Smoke tests build tag:** All smoke test files begin with:
+
+```go
+//go:build smoke
+```
+
+This tag excludes them from `go test ./...` and `go test -short ./...`. They only run
+when `-tags smoke` is passed explicitly.
+
+Per ARCH-11 (`.planning/REQUIREMENTS.md`): the CI budget constraint is respected — unit +
+property rings run on every push (< 90 s budget); integration ring runs on every commit
+(< 5 min budget); smoke ring runs weekly via cron and on every PR only.
 
 ## §10 Logging Policy & Secret Redaction
 
 <!-- ARCH-12 -->
 
-[STUB — populated in Wave 2]
+_Requirement:_ ARCH-12 — Logging policy: secret tagging at TYPE level (Go `Secret` type +
+`slog.LogValuer`); redaction at sink (`RedactingHandler`); secrets registered BEFORE the
+first log line is emitted. This is a two-layer defense: layer 1 prevents structured attribute
+leaks; layer 2 catches secrets that escape through error messages or untyped format strings.
 
-This section will contain: the slog-based logging architecture, the `Secret` type
-implementing `slog.LogValuer` for type-level secret tagging, the RedactingHandler sink
-pattern, the rule that secrets must be registered BEFORE the first log line that could
-reference them, and sink-level redaction as a defense-in-depth backstop.
+**Two-Layer Defense Overview:** Any slog attribute containing a `Secret`-typed value
+auto-redacts to `"***"` via the type's `LogValue()` method (Layer 1). In parallel, the
+`RedactingHandler` wraps every slog handler and performs substring replacement on ALL log
+records — messages, attributes, and error strings — using the set of secret values
+registered at config load time (Layer 2). Both layers are required: Layer 1 handles
+structured attributes typed correctly; Layer 2 catches secrets that leak through error
+messages, `fmt.Sprintf` into untyped string fields, or third-party log calls that bypass
+the type system.
+
+**v1 parity:** v1 `lib/common.sh` uses `redact_secrets()` (which scrubs `REDACT_VARS` and
+`REGISTERED_SECRETS` from log lines) and `register_secret "$value"`. Layer 2's
+`Redactor.Register()` + `Redactor.Redact()` is the direct Go equivalent of those functions.
+
+### §10.1 Layer 1: Secret Type
+
+The `Secret` type lives in `internal/core/log/secret.go`. It implements `slog.LogValuer`
+so that any `slog.Attr` whose value is a `Secret` (or a struct embedding one) automatically
+logs as `"***"` without any per-call redaction code.
+
+```go
+// internal/core/log/secret.go
+// Source: golang.org/go src/log/slog/example_logvaluer_secret_test.go (official stdlib example)
+package log
+
+import "log/slog"
+
+// Secret is a string that auto-redacts itself in all slog output.
+// Any field in AppContext, Config, or Tool structs holding a secret MUST use this type.
+// BINDING: do not add a Secret.String() method — the absence of String() prevents accidental
+// fmt.Sprintf("%s", s) exposure. If a caller needs the raw value (e.g. to register it with
+// the Redactor), they must explicitly cast: string(mySecret).
+type Secret string
+
+// LogValue implements slog.LogValuer. Returns "***" for any slog attribute.
+// This is the official Go stdlib pattern — see golang.org/go src/log/slog/example_logvaluer_secret_test.go.
+func (Secret) LogValue() slog.Value {
+    return slog.StringValue("***")
+}
+```
+
+**Config struct usage (example showing `NotificationsConfig`):**
+
+```go
+// internal/config/config.go (excerpt)
+type NotificationsConfig struct {
+    Slack struct {
+        WebhookURL log.Secret `koanf:"webhook_url" validate:"omitempty,url"`
+        Channel    string     `koanf:"channel"     validate:"omitempty"`
+    } `koanf:"slack"`
+    Telegram struct {
+        BotToken   log.Secret `koanf:"bot_token"   validate:"omitempty"`
+        ChatID     string     `koanf:"chat_id"     validate:"omitempty"`
+    } `koanf:"telegram"`
+    Discord struct {
+        WebhookURL log.Secret `koanf:"webhook_url" validate:"omitempty,url"`
+    } `koanf:"discord"`
+}
+```
+
+**Enforcement note:** Every field in `AppContext`, `Config`, or `Tool` structs that holds a
+secret MUST use `log.Secret` as its type. This is enforced by code review. Phase 3 adds a
+`golangci-lint` custom rule that flags any exported field whose name ends with `Key`, `Token`,
+`Password`, or `Secret` that is NOT typed as `log.Secret`. The lint rule runs in CI on every
+commit (Ring 1 gate).
+
+**Why no `Secret.String()` method:** If `Secret.String()` existed, `fmt.Sprintf("%s", s)`
+would call it and expose the raw value. The absence of `String()` forces the compiler to
+use the default `string` representation of the underlying type, which in `%s` format would
+show the raw value. Callers who need the raw value for `Redactor.Register()` must use the
+explicit cast `string(mySecret)` — this makes the security-sensitive operation visible in
+code review. See T-02-05-02 in the threat register above.
+
+### §10.2 Layer 2: RedactingHandler
+
+The `RedactingHandler` is a `slog.Handler` chain wrapper in
+`internal/core/log/redacting_handler.go`. It intercepts ALL slog records after they are
+constructed and performs string replacement on every string attribute value and on the
+message itself, replacing any registered secret substring with `"***"`.
+
+```go
+// internal/core/log/redacting_handler.go
+// Pattern: Arcjet blog — "Redacting sensitive data from logs with Go log/slog" (2024)
+// Source: RESEARCH.md §Logging Policy §Layer 2 — Sink Level
+package log
+
+import (
+    "context"
+    "log/slog"
+    "strings"
+    "sync"
+)
+
+// Redactor holds a set of substrings that must never appear in log output.
+// Thread-safe: all methods safe for concurrent use from multiple goroutines.
+type Redactor struct {
+    mu      sync.RWMutex
+    secrets []string
+}
+
+// Register adds a secret value to the redaction list.
+// Called once per secret field immediately after config load (see §10.3 build order).
+// Values with length ≤ 4 are ignored (too short to be a meaningful secret;
+// avoids redacting common short strings like "true" or "http").
+// MUST be called BEFORE the first log line that could reference this value.
+func (r *Redactor) Register(value string) {
+    if len(value) <= 4 {
+        return // too short to be meaningful
+    }
+    r.mu.Lock()
+    defer r.mu.Unlock()
+    for _, s := range r.secrets {
+        if s == value {
+            return // dedup: already registered
+        }
+    }
+    r.secrets = append(r.secrets, value)
+}
+
+// Redact replaces all registered secret substrings in s with "***".
+// Called on every string value passing through the handler chain.
+func (r *Redactor) Redact(s string) string {
+    r.mu.RLock()
+    defer r.mu.RUnlock()
+    for _, secret := range r.secrets {
+        s = strings.ReplaceAll(s, secret, "***")
+    }
+    return s
+}
+
+// RedactingHandler wraps a slog.Handler and passes every string Attr and the record
+// Message through the Redactor before forwarding to the inner handler.
+type RedactingHandler struct {
+    inner   slog.Handler
+    redactor *Redactor
+}
+
+// NewRedactingHandler creates a new RedactingHandler wrapping inner.
+// The same Redactor instance must be used for both NewRedactingHandler and for
+// Redactor.Register() calls at config load time.
+func NewRedactingHandler(inner slog.Handler, r *Redactor) *RedactingHandler {
+    return &RedactingHandler{inner: inner, redactor: r}
+}
+
+// Enabled delegates to the inner handler (no redaction needed for level checks).
+func (h *RedactingHandler) Enabled(ctx context.Context, l slog.Level) bool {
+    return h.inner.Enabled(ctx, l)
+}
+
+// Handle redacts the record Message and all string Attr values before forwarding.
+// Note: redacts both Message and all string Attr values. Does NOT recurse into
+// KindGroup attrs in this version — Phase 3 may extend if needed.
+func (h *RedactingHandler) Handle(ctx context.Context, r slog.Record) error {
+    r2 := slog.NewRecord(r.Time, r.Level, h.redactor.Redact(r.Message), r.PC)
+    r.Attrs(func(a slog.Attr) bool {
+        r2.AddAttrs(h.redactAttr(a))
+        return true
+    })
+    return h.inner.Handle(ctx, r2)
+}
+
+// WithAttrs returns a new handler with the given attrs pre-applied and redacted.
+func (h *RedactingHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+    redacted := make([]slog.Attr, len(attrs))
+    for i, a := range attrs {
+        redacted[i] = h.redactAttr(a)
+    }
+    return &RedactingHandler{inner: h.inner.WithAttrs(redacted), redactor: h.redactor}
+}
+
+// WithGroup returns a new handler with the given group name applied.
+func (h *RedactingHandler) WithGroup(name string) slog.Handler {
+    return &RedactingHandler{inner: h.inner.WithGroup(name), redactor: h.redactor}
+}
+
+// redactAttr returns a copy of a with its string value redacted.
+// Non-string Attrs are returned unchanged.
+func (h *RedactingHandler) redactAttr(a slog.Attr) slog.Attr {
+    if a.Value.Kind() == slog.KindString {
+        return slog.String(a.Key, h.redactor.Redact(a.Value.String()))
+    }
+    return a
+}
+```
+
+### §10.3 Build-Order Requirement
+
+The initialization order in `cmd/reconftw/main.go` is CRITICAL and must NOT be changed.
+The logger must be active with the redactor attached BEFORE any other subsystem initializes,
+because config load itself may emit log lines (validation errors, missing key warnings).
+Secrets must be registered BEFORE any task or module code runs.
+
+```go
+// cmd/reconftw/main.go — CRITICAL initialization order (ARCH-12 enforcement)
+// Source: RESEARCH.md §Logging Policy §Build-Order Requirement
+func main() {
+    ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+    defer stop()
+
+    // STEP 1: Create the redactor and logger FIRST.
+    // The logger must be active before any other subsystem because config load
+    // may emit slog lines (validation errors, deprecation warnings).
+    redactor := &log.Redactor{}
+    logger := log.New(cfg, redactor) // builds slog.Logger with RedactingHandler chain
+    slog.SetDefault(logger)          // STEP 2: set as the process-wide default logger
+
+    // STEP 3: Load config. Config load may emit log lines — logger must be active first.
+    cfg, err := config.Load(cliFlags)
+    if err != nil {
+        slog.Error("config_load_failed", "err", err)
+        os.Exit(1)
+    }
+
+    // STEP 4: Register all Secret field values with the redactor.
+    // This MUST happen immediately after config load, before any task or module runs.
+    // Use explicit string() cast to extract the raw value from the Secret type.
+    redactor.Register(string(cfg.Notifications.Slack.WebhookURL))
+    redactor.Register(string(cfg.Notifications.Telegram.BotToken))
+    redactor.Register(string(cfg.Notifications.Discord.WebhookURL))
+    // ... register all other log.Secret fields from cfg here ...
+
+    // STEP 5: Boot AppContext and run cobra command tree.
+    app := appctx.New(logger, cfg, /* ... */)
+    if err := rootCmd.ExecuteContext(ctx); err != nil {
+        os.Exit(1)
+    }
+}
+```
+
+**This order is enforced by convention and documented here.** Phase 3 MUST NOT reorder these
+steps. A unit test (Ring 1) verifies that a config containing a known fake API key sentinel
+value produces zero log lines containing the raw sentinel value, even if config load emits
+validation errors that reference the key name. This is the XCUT-07 CI gate (see §10.4).
+
+**Error chain caveat:** `ConfigError.Message` MUST NOT include the raw value of a `Secret`
+field. If a config key fails validation, the error message should describe the format
+violation (`"invalid URL format"`) not echo the value (`"invalid URL: http://...")`.
+Incorrect error messages that include raw secret values will bypass both layers of defense.
+See RESEARCH.md §Pitfall 2 for the full analysis.
+
+### §10.4 CI Gate (XCUT-07)
+
+An integration test in Ring 1 (unit ring, MockBackend) implements the XCUT-07 logging
+hygiene gate:
+
+1. Create a config struct with a known fake API key sentinel:
+   `cfg.Notifications.Slack.WebhookURL = log.Secret("test_sentinel_value_not_a_real_key_abc123")`
+2. Register the sentinel with the redactor: `redactor.Register("test_sentinel_value_not_a_real_key_abc123")`
+3. Trigger a code path that logs the config (e.g., config validation, task startup banner)
+4. Capture all log output (via a `bytes.Buffer` handler)
+5. Assert: zero log lines contain the raw string `test_sentinel_value_not_a_real_key_abc123`
+
+This test runs on every commit. Failure blocks merge. It verifies both Layer 1 (the sentinel
+value stored as `log.Secret` auto-redacts via `LogValue()`) and Layer 2 (even if the value
+were passed through an untyped field, `RedactingHandler.Redact()` would catch it).
+
+Per XCUT-07 (`.planning/REQUIREMENTS.md` cross-cutting concern): no secrets in any log
+output, ever, under any code path. The sentinel-value test is the enforcement mechanism.
 
 ## §11 Pre-Sign Verification Gate
 
