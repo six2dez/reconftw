@@ -2120,12 +2120,268 @@ property rings run on every push (< 90 s budget); integration ring runs on every
 
 <!-- ARCH-12 -->
 
-[STUB — populated in Wave 2]
+_Requirement:_ ARCH-12 — Logging policy: secret tagging at TYPE level (Go `Secret` type +
+`slog.LogValuer`); redaction at sink (`RedactingHandler`); secrets registered BEFORE the
+first log line is emitted. This is a two-layer defense: layer 1 prevents structured attribute
+leaks; layer 2 catches secrets that escape through error messages or untyped format strings.
 
-This section will contain: the slog-based logging architecture, the `Secret` type
-implementing `slog.LogValuer` for type-level secret tagging, the RedactingHandler sink
-pattern, the rule that secrets must be registered BEFORE the first log line that could
-reference them, and sink-level redaction as a defense-in-depth backstop.
+**Two-Layer Defense Overview:** Any slog attribute containing a `Secret`-typed value
+auto-redacts to `"***"` via the type's `LogValue()` method (Layer 1). In parallel, the
+`RedactingHandler` wraps every slog handler and performs substring replacement on ALL log
+records — messages, attributes, and error strings — using the set of secret values
+registered at config load time (Layer 2). Both layers are required: Layer 1 handles
+structured attributes typed correctly; Layer 2 catches secrets that leak through error
+messages, `fmt.Sprintf` into untyped string fields, or third-party log calls that bypass
+the type system.
+
+**v1 parity:** v1 `lib/common.sh` uses `redact_secrets()` (which scrubs `REDACT_VARS` and
+`REGISTERED_SECRETS` from log lines) and `register_secret "$value"`. Layer 2's
+`Redactor.Register()` + `Redactor.Redact()` is the direct Go equivalent of those functions.
+
+### §10.1 Layer 1: Secret Type
+
+The `Secret` type lives in `internal/core/log/secret.go`. It implements `slog.LogValuer`
+so that any `slog.Attr` whose value is a `Secret` (or a struct embedding one) automatically
+logs as `"***"` without any per-call redaction code.
+
+```go
+// internal/core/log/secret.go
+// Source: golang.org/go src/log/slog/example_logvaluer_secret_test.go (official stdlib example)
+package log
+
+import "log/slog"
+
+// Secret is a string that auto-redacts itself in all slog output.
+// Any field in AppContext, Config, or Tool structs holding a secret MUST use this type.
+// BINDING: do not add a Secret.String() method — the absence of String() prevents accidental
+// fmt.Sprintf("%s", s) exposure. If a caller needs the raw value (e.g. to register it with
+// the Redactor), they must explicitly cast: string(mySecret).
+type Secret string
+
+// LogValue implements slog.LogValuer. Returns "***" for any slog attribute.
+// This is the official Go stdlib pattern — see golang.org/go src/log/slog/example_logvaluer_secret_test.go.
+func (Secret) LogValue() slog.Value {
+    return slog.StringValue("***")
+}
+```
+
+**Config struct usage (example showing `NotificationsConfig`):**
+
+```go
+// internal/config/config.go (excerpt)
+type NotificationsConfig struct {
+    Slack struct {
+        WebhookURL log.Secret `koanf:"webhook_url" validate:"omitempty,url"`
+        Channel    string     `koanf:"channel"     validate:"omitempty"`
+    } `koanf:"slack"`
+    Telegram struct {
+        BotToken   log.Secret `koanf:"bot_token"   validate:"omitempty"`
+        ChatID     string     `koanf:"chat_id"     validate:"omitempty"`
+    } `koanf:"telegram"`
+    Discord struct {
+        WebhookURL log.Secret `koanf:"webhook_url" validate:"omitempty,url"`
+    } `koanf:"discord"`
+}
+```
+
+**Enforcement note:** Every field in `AppContext`, `Config`, or `Tool` structs that holds a
+secret MUST use `log.Secret` as its type. This is enforced by code review. Phase 3 adds a
+`golangci-lint` custom rule that flags any exported field whose name ends with `Key`, `Token`,
+`Password`, or `Secret` that is NOT typed as `log.Secret`. The lint rule runs in CI on every
+commit (Ring 1 gate).
+
+**Why no `Secret.String()` method:** If `Secret.String()` existed, `fmt.Sprintf("%s", s)`
+would call it and expose the raw value. The absence of `String()` forces the compiler to
+use the default `string` representation of the underlying type, which in `%s` format would
+show the raw value. Callers who need the raw value for `Redactor.Register()` must use the
+explicit cast `string(mySecret)` — this makes the security-sensitive operation visible in
+code review. See T-02-05-02 in the threat register above.
+
+### §10.2 Layer 2: RedactingHandler
+
+The `RedactingHandler` is a `slog.Handler` chain wrapper in
+`internal/core/log/redacting_handler.go`. It intercepts ALL slog records after they are
+constructed and performs string replacement on every string attribute value and on the
+message itself, replacing any registered secret substring with `"***"`.
+
+```go
+// internal/core/log/redacting_handler.go
+// Pattern: Arcjet blog — "Redacting sensitive data from logs with Go log/slog" (2024)
+// Source: RESEARCH.md §Logging Policy §Layer 2 — Sink Level
+package log
+
+import (
+    "context"
+    "log/slog"
+    "strings"
+    "sync"
+)
+
+// Redactor holds a set of substrings that must never appear in log output.
+// Thread-safe: all methods safe for concurrent use from multiple goroutines.
+type Redactor struct {
+    mu      sync.RWMutex
+    secrets []string
+}
+
+// Register adds a secret value to the redaction list.
+// Called once per secret field immediately after config load (see §10.3 build order).
+// Values with length ≤ 4 are ignored (too short to be a meaningful secret;
+// avoids redacting common short strings like "true" or "http").
+// MUST be called BEFORE the first log line that could reference this value.
+func (r *Redactor) Register(value string) {
+    if len(value) <= 4 {
+        return // too short to be meaningful
+    }
+    r.mu.Lock()
+    defer r.mu.Unlock()
+    for _, s := range r.secrets {
+        if s == value {
+            return // dedup: already registered
+        }
+    }
+    r.secrets = append(r.secrets, value)
+}
+
+// Redact replaces all registered secret substrings in s with "***".
+// Called on every string value passing through the handler chain.
+func (r *Redactor) Redact(s string) string {
+    r.mu.RLock()
+    defer r.mu.RUnlock()
+    for _, secret := range r.secrets {
+        s = strings.ReplaceAll(s, secret, "***")
+    }
+    return s
+}
+
+// RedactingHandler wraps a slog.Handler and passes every string Attr and the record
+// Message through the Redactor before forwarding to the inner handler.
+type RedactingHandler struct {
+    inner   slog.Handler
+    redactor *Redactor
+}
+
+// NewRedactingHandler creates a new RedactingHandler wrapping inner.
+// The same Redactor instance must be used for both NewRedactingHandler and for
+// Redactor.Register() calls at config load time.
+func NewRedactingHandler(inner slog.Handler, r *Redactor) *RedactingHandler {
+    return &RedactingHandler{inner: inner, redactor: r}
+}
+
+// Enabled delegates to the inner handler (no redaction needed for level checks).
+func (h *RedactingHandler) Enabled(ctx context.Context, l slog.Level) bool {
+    return h.inner.Enabled(ctx, l)
+}
+
+// Handle redacts the record Message and all string Attr values before forwarding.
+// Note: redacts both Message and all string Attr values. Does NOT recurse into
+// KindGroup attrs in this version — Phase 3 may extend if needed.
+func (h *RedactingHandler) Handle(ctx context.Context, r slog.Record) error {
+    r2 := slog.NewRecord(r.Time, r.Level, h.redactor.Redact(r.Message), r.PC)
+    r.Attrs(func(a slog.Attr) bool {
+        r2.AddAttrs(h.redactAttr(a))
+        return true
+    })
+    return h.inner.Handle(ctx, r2)
+}
+
+// WithAttrs returns a new handler with the given attrs pre-applied and redacted.
+func (h *RedactingHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+    redacted := make([]slog.Attr, len(attrs))
+    for i, a := range attrs {
+        redacted[i] = h.redactAttr(a)
+    }
+    return &RedactingHandler{inner: h.inner.WithAttrs(redacted), redactor: h.redactor}
+}
+
+// WithGroup returns a new handler with the given group name applied.
+func (h *RedactingHandler) WithGroup(name string) slog.Handler {
+    return &RedactingHandler{inner: h.inner.WithGroup(name), redactor: h.redactor}
+}
+
+// redactAttr returns a copy of a with its string value redacted.
+// Non-string Attrs are returned unchanged.
+func (h *RedactingHandler) redactAttr(a slog.Attr) slog.Attr {
+    if a.Value.Kind() == slog.KindString {
+        return slog.String(a.Key, h.redactor.Redact(a.Value.String()))
+    }
+    return a
+}
+```
+
+### §10.3 Build-Order Requirement
+
+The initialization order in `cmd/reconftw/main.go` is CRITICAL and must NOT be changed.
+The logger must be active with the redactor attached BEFORE any other subsystem initializes,
+because config load itself may emit log lines (validation errors, missing key warnings).
+Secrets must be registered BEFORE any task or module code runs.
+
+```go
+// cmd/reconftw/main.go — CRITICAL initialization order (ARCH-12 enforcement)
+// Source: RESEARCH.md §Logging Policy §Build-Order Requirement
+func main() {
+    ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+    defer stop()
+
+    // STEP 1: Create the redactor and logger FIRST.
+    // The logger must be active before any other subsystem because config load
+    // may emit slog lines (validation errors, deprecation warnings).
+    redactor := &log.Redactor{}
+    logger := log.New(cfg, redactor) // builds slog.Logger with RedactingHandler chain
+    slog.SetDefault(logger)          // STEP 2: set as the process-wide default logger
+
+    // STEP 3: Load config. Config load may emit log lines — logger must be active first.
+    cfg, err := config.Load(cliFlags)
+    if err != nil {
+        slog.Error("config_load_failed", "err", err)
+        os.Exit(1)
+    }
+
+    // STEP 4: Register all Secret field values with the redactor.
+    // This MUST happen immediately after config load, before any task or module runs.
+    // Use explicit string() cast to extract the raw value from the Secret type.
+    redactor.Register(string(cfg.Notifications.Slack.WebhookURL))
+    redactor.Register(string(cfg.Notifications.Telegram.BotToken))
+    redactor.Register(string(cfg.Notifications.Discord.WebhookURL))
+    // ... register all other log.Secret fields from cfg here ...
+
+    // STEP 5: Boot AppContext and run cobra command tree.
+    app := appctx.New(logger, cfg, /* ... */)
+    if err := rootCmd.ExecuteContext(ctx); err != nil {
+        os.Exit(1)
+    }
+}
+```
+
+**This order is enforced by convention and documented here.** Phase 3 MUST NOT reorder these
+steps. A unit test (Ring 1) verifies that a config containing a known fake API key sentinel
+value produces zero log lines containing the raw sentinel value, even if config load emits
+validation errors that reference the key name. This is the XCUT-07 CI gate (see §10.4).
+
+**Error chain caveat:** `ConfigError.Message` MUST NOT include the raw value of a `Secret`
+field. If a config key fails validation, the error message should describe the format
+violation (`"invalid URL format"`) not echo the value (`"invalid URL: http://...")`.
+Incorrect error messages that include raw secret values will bypass both layers of defense.
+See RESEARCH.md §Pitfall 2 for the full analysis.
+
+### §10.4 CI Gate (XCUT-07)
+
+An integration test in Ring 1 (unit ring, MockBackend) implements the XCUT-07 logging
+hygiene gate:
+
+1. Create a config struct with a known fake API key sentinel:
+   `cfg.Notifications.Slack.WebhookURL = log.Secret("test_sentinel_value_not_a_real_key_abc123")`
+2. Register the sentinel with the redactor: `redactor.Register("test_sentinel_value_not_a_real_key_abc123")`
+3. Trigger a code path that logs the config (e.g., config validation, task startup banner)
+4. Capture all log output (via a `bytes.Buffer` handler)
+5. Assert: zero log lines contain the raw string `test_sentinel_value_not_a_real_key_abc123`
+
+This test runs on every commit. Failure blocks merge. It verifies both Layer 1 (the sentinel
+value stored as `log.Secret` auto-redacts via `LogValue()`) and Layer 2 (even if the value
+were passed through an untyped field, `RedactingHandler.Redact()` would catch it).
+
+Per XCUT-07 (`.planning/REQUIREMENTS.md` cross-cutting concern): no secrets in any log
+output, ever, under any code path. The sentinel-value test is the enforcement mechanism.
 
 ## §11 Pre-Sign Verification Gate
 
