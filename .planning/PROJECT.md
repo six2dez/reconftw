@@ -8,9 +8,11 @@ reconFTW is a comprehensive bash-based reconnaissance automation framework used 
 
 Run one command, get a complete recon picture of a target — passive, active, and vulnerability layers — with resumable checkpoints, structured output, and zero-touch tool orchestration.
 
-## Current Milestone: v2.0 — Complete Core Migration (Bash → Go/Python)
+## Current Milestone: v2.0 — Complete Core Migration (Bash → Go)
 
-**Goal:** Reescribir reconFTW completo de bash a un lenguaje compilado/estáticamente tipado (Go o Python — decisión por spike paralelo comparativo), preservando 100% de la funcionalidad existente, las 70+ herramientas orquestadas, todos los modos, integraciones, y comportamiento observable. Termina cuando el nuevo reconFTW es funcionalmente equivalente o superior al actual y puede sustituirlo en `main`.
+**Language: Go** — Decided: ADR 0001 (signed 2026-05-28). Spike measured 6 metrics (M1-M6 + MCP); noise band within 25% → tie-breaker DEC-04 invoked (single-binary distribution advantage). See `.planning/decisions/0001-language.md`.
+
+**Goal:** Reescribir reconFTW completo de bash a Go, preservando 100% de la funcionalidad existente, las 70+ herramientas orquestadas, todos los modos, integraciones, y comportamiento observable. Termina cuando el nuevo reconFTW es funcionalmente equivalente o superior al actual y puede sustituirlo en `main`.
 
 **Por qué migrar:** Cuatro dolores estructurales del bash actual motivan el rewrite:
 1. **Robustez & refactor** — Sin tipos, sin tests sólidos a nivel de unidad lógica, vars globales por todos lados; refactorizar 30+ módulos es ruleta rusa.
@@ -85,7 +87,7 @@ Run one command, get a complete recon picture of a target — passive, active, a
 
 <!-- v2.0 Complete Core Migration deliverables — driven through phases in ROADMAP.md. -->
 
-- [ ] **Language ADR** — Spike paralelo Go vs Python + comparativa medible + decisión firmada antes de cualquier código de producción
+- [x] **Language ADR** — Spike paralelo Go vs Python + comparativa medible + decisión firmada. **Go chosen** (ADR 0001, 2026-05-28)
 - [ ] **Architecture v2** — Diseño de módulos, scheduler, checkpoint engine, config TOML, output tree, plugin/tool registry, observability, test strategy
 - [ ] **Foundation/scaffolding** — CLI, config loader, scheduler paralelo, checkpoint engine, validators, structured logging con redaction, output tree writer, test framework, CI
 - [ ] **`--subdomains` E2E ported** — Passive + brute + permutations + dnsx + scope + takeover + s3buckets + geo_info + ASN, paridad bash medida
@@ -153,9 +155,10 @@ Run one command, get a complete recon picture of a target — passive, active, a
 | Audit-mode milestone first (not features) | The 2026-03 audit surfaced concrete reliability/security gaps that blocked confident feature work | ✓ Good — Phase 1+2 entregaron las mejoras críticas (resilience, security quoting, supply-chain hygiene) en bash antes del rewrite |
 | Skip domain research (for v1.0) | Bash recon tooling is the maintainer's own domain; codebase already documents stack/architecture; further research would not change v1.0 requirements | ✓ Good |
 | Coarse granularity / parallel execution | Few, broader phases align with single-maintainer cadence; parallel plans inside a phase reduce calendar time | ✓ Good |
-| **v2.0 — Complete migration of reconFTW from bash to Go/Python** | Cuatro dolores estructurales (robustez, concurrencia, packaging, onboarding) no se resuelven incrementalmente en bash sin un esfuerzo desproporcionado; un rewrite con tipos + concurrencia nativa + packaging único es la solución de raíz | — Pending |
+| **2026-05-28 — v2.0 language: Go** (ADR 0001) | Spike measured 6 metrics vs Python; noise band within 25% → tie-breaker DEC-04 invoked (single-binary distribution wins). ADR signed by six2dez. See `.planning/decisions/0001-language.md` + `spike/measurement-worksheet.md` | ✓ Decided |
+| **v2.0 — Complete migration of reconFTW from bash to Go** | Cuatro dolores estructurales (robustez, concurrencia, packaging, onboarding) no se resuelven incrementalmente en bash sin un esfuerzo desproporcionado; un rewrite con tipos + concurrencia nativa + packaging único es la solución de raíz | — Pending |
 | **Single mega-milestone v2.0 (no v2.0→v2.5 staging)** | User priorizó "migrar todo" sobre "ship en fases" — milestone único acepta el riesgo (12-18m sin entregable shippable) a cambio de coherencia arquitectural y evitar arrastrar bash+nuevo lang en paralelo más tiempo del necesario | — Pending |
-| **Lenguaje elegido vía spike paralelo Go vs Python** | No comprometerse a un lenguaje antes de medirlo en el problema real; el spike PoC del mismo slice en ambos lenguajes da evidencia comparable de ergonomía/concurrencia/packaging/dev velocity | — Pending |
+| **Lenguaje elegido vía spike paralelo Go vs Python** | No comprometerse a un lenguaje antes de medirlo en el problema real; el spike PoC del mismo slice en ambos lenguajes da evidencia comparable de ergonomía/concurrencia/packaging/dev velocity | ✓ Go — ADR 0001 signed 2026-05-28 |
 | **Rediseñar libremente CLI/config/output tree** | La oportunidad de arreglar lo que en bash no se podía cambiar sin romper usuarios; migrador opcional cubre la transición de configs | — Pending |
 | **Bash en `main` frozen durante la migración** | Evita arrastrar paralelamente bash+nuevo lang más tiempo del necesario; sólo bugfixes críticos/security en `main` hasta cutover de `rewrite/v2` | — Pending |
 | **Branch larga `rewrite/v2` desde `dev` HEAD** | Mantiene planning artifacts y v1.0 audit shipped accessible; rewrite construye desde el último estado conocido bueno del bash | — Pending |

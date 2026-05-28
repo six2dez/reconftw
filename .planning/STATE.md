@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Complete Core Migration
 status: executing
-stopped_at: Phase 1 context gathered
-last_updated: "2026-05-27T12:40:12.169Z"
-last_activity: 2026-05-27 -- Phase 01 execution started
+stopped_at: Phase 1 complete — ADR signed and research collapsed
+last_updated: "2026-05-28T00:00:00Z"
+last_activity: 2026-05-28 -- Phase 1 ADR signed (language: Go)
 progress:
   total_phases: 12
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 5
-  completed_plans: 0
-  percent: 0
+  completed_plans: 5
+  percent: 8
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-27)
 
 ## Current Position
 
-Phase: 01 (language-adr-spike) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 01
-Last activity: 2026-05-27 -- Phase 01 execution started
+Phase: Phase 1 complete; Phase 2 (Architecture v2 Design) is next
+Plan: —
+Status: Phase 1 closed; awaiting `/gsd:plan-phase 2`
+Last activity: 2026-05-28 — Phase 1 ADR signed, language = Go
 
 ## Performance Metrics
 
@@ -43,7 +43,7 @@ Last activity: 2026-05-27 -- Phase 01 execution started
 
 | Phase | Name | Plans Complete | Status | Completed |
 |-------|------|----------------|--------|-----------|
-| 1 | Language ADR & Spike | 0/? | Not started | - |
+| 1 | Language ADR & Spike | 5/5 | Complete | 2026-05-28 |
 | 2 | Architecture v2 Design | 0/? | Not started | - |
 | 3 | Foundation Kernel | 0/? | Not started | - |
 | 4 | Subdomains E2E + Axiom Integration | 0/? | Not started | - |
@@ -75,7 +75,8 @@ Last activity: 2026-05-27 -- Phase 01 execution started
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting v2.0 work:
 
-- v2.0 init: Migrate complete reconFTW from bash to Go/Python — robustez/concurrencia/packaging/onboarding no se resuelven incrementalmente en bash sin esfuerzo desproporcionado
+- Phase 1 ADR (2026-05-28): Chose **Go** per ADR 0001 — 6-metric spike comparison; noise band within 25% → tie-breaker DEC-04 invoked (single-binary distribution wins); measurements at spike/measurement-worksheet.md
+- v2.0 init: Migrate complete reconFTW from bash to Go — robustez/concurrencia/packaging/onboarding no se resuelven incrementalmente en bash sin esfuerzo desproporcionado
 - v2.0 init: Single mega-milestone (no v2.0→v2.5 staging) — usuario priorizó coherencia arquitectural sobre entregables intermedios
 - v2.0 init: Lenguaje vía spike paralelo Go vs Python — no decidir hasta tener PoC comparativa en ambos (Phase 1)
 - v2.0 init: Rediseñar libremente CLI/config/output tree — migrador opcional para usuarios actuales
@@ -90,14 +91,14 @@ Recent decisions affecting v2.0 work:
 
 ### Pending Todos
 
-None yet. Next action: run `/gsd:plan-phase 1` to plan Phase 1 (Language ADR & Spike).
+Next action: run `/gsd:plan-phase 2` (Architecture v2 Design).
 
 ### Blockers/Concerns
 
-- **Decisión de lenguaje pendiente** — Phase 1 (Language ADR & Spike) firmará el ADR. Hasta entonces, todas las decisiones de arquitectura (config TOML schema, scheduler API, test framework, packaging) están en standby — Phase 2 las locked.
 - **Roadmap calendar risk** — 12 phases over 12-18 months sin entregable shippable intermedio (decisión consciente). Los phases SON los checkpoints reales; sustainability via `/gsd:transition` y `/gsd:complete-milestone` ceremonies.
 - **Cross-cutting placement assumptions** — XCUT-01 (perf benchmark) baseline lives in Foundation but final validation is Phase 12; XCUT-03 (test coverage) gate established Phase 3 but final ≥90%-on-critical-paths assertion in Phase 12. Per-phase progress must validate these continuously, not defer all to cutover.
-- **Phase 11 Docker base image choice (DOCK-02)** — distroless vs minimal Ubuntu; locked when Phase 11 plans are written (depends partially on Phase 1 ADR outcome — Go favors distroless, Python may prefer ubuntu).
+- **Phase 11 Docker base image choice (DOCK-02)** — distroless vs minimal Ubuntu; locked when Phase 11 plans are written. Go (ADR 0001) favors distroless.
+- **Spike code disposition pending Phase 2 plan** — decide whether to delete `spike/python/` tree, archive in a tarball, or leave in git history only — Phase 2 planner decides.
 
 ## v2 Architecture Considerations (from v1.0 deferred backlog)
 
@@ -114,6 +115,6 @@ Items captured durante v1.0 que deben informar el diseño de arquitectura v2 (no
 
 ## Session Continuity
 
-Last session: 2026-05-27T10:31:44.268Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-language-adr-spike/01-CONTEXT.md
+Last session: 2026-05-28T00:00:00Z
+Stopped at: Phase 1 complete — ADR signed
+Resume file: .planning/decisions/0001-language.md
