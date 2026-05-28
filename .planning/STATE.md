@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Complete Core Migration
-status: ready_to_plan
-stopped_at: Phase 02 complete (7/7) — ready to discuss Phase 3
-last_updated: 2026-05-28T12:40:22.502Z
-last_activity: 2026-05-28 -- Phase 2 ADR signed (architecture v2 locked)
+status: planning
+stopped_at: Phase 3 context gathered
+last_updated: "2026-05-28T13:01:45.594Z"
+last_activity: 2026-05-28
 progress:
   total_phases: 12
   completed_phases: 2
@@ -115,6 +115,6 @@ Items captured durante v1.0 que deben informar el diseño de arquitectura v2 (no
 
 ## Session Continuity
 
-Last session: 2026-05-28T10:21:07.030Z
-Stopped at: Phase 2 context gathered
-Resume file: .planning/phases/02-architecture-v2-design/02-CONTEXT.md
+Last session: 2026-05-28T13:01:45.586Z
+Stopped at: Phase 3 context gathered
+Resume file: .planning/phases/03-foundation-kernel/03-CONTEXT.md
