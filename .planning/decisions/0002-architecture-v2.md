@@ -964,23 +964,337 @@ When `vulns.enabled = false` AND any `[vulns.*].enabled = true` (e.g. `vulns.xss
 
 <!-- ARCH-03 -->
 
-[STUB — populated in Wave 2]
+_Requirement:_ ARCH-03 — Output tree layout fully specified: workspaces/<target-id>/
+directory structure, all file schemas, checkpoints.db schema with idempotency rule, and
+AtomicWriter contract. These contracts replace bash's `Recon/<domain>/` layout; see §4
+for the compat bridge.
 
-This section will contain: the canonical `workspaces/<target-id>/` directory structure,
-all 6 SQLite databases (checkpoints.db, state.db, artefacts.db, results.db, audit.db,
-cache.db), JSONL artefact file layout, and the AtomicWriter pattern (tempfile + fsync +
-rename + parent dir fsync).
+### §3.1 Directory Structure
+
+**target-id definition:** `target-id` is the slug of the sanitized domain, IP, or CIDR
+input — lowercase, scheme stripped, shell metacharacters rejected. Equivalent to Go's
+implementation of `sanitize_domain()` from v1 `lib/validation.sh`. Examples:
+`hackerone.com`, `192.168.1.0-24`, `api.example.com`.
+
+```text
+workspaces/
+└── <target-id>/                          # one directory per unique target input
+    ├── manifest.json                     # workspace metadata (see §3.3)
+    ├── checkpoints.db                    # SQLite WAL: task idempotency (see §3.4)
+    ├── state.db                          # incremental/monitor baselines + diff state
+    ├── inputs/
+    │   ├── config.snapshot.toml          # resolved effective config (secrets redacted, for audit)
+    │   └── wordlists.lock                # sha256 of each wordlist file used in this run
+    ├── artefacts/
+    │   ├── subdomains.jsonl              # one JSON object per line — see §3.2
+    │   ├── hosts.jsonl                   # probed+alive hosts with metadata
+    │   ├── urls.jsonl                    # discovered URLs (passive + active)
+    │   ├── findings.jsonl                # vulnerability findings (SARIF-compatible)
+    │   └── notes.jsonl                   # human notes / hotlist entries
+    ├── raw/
+    │   ├── subfinder/                    # raw per-tool stdout (forensics + replay)
+    │   ├── nuclei/                       # nuclei raw output (template hits, debug)
+    │   ├── screenshots/                  # gowitness / eyewitness screenshot files
+    │   └── <toolname>/                   # one subdirectory per tool that produces raw output
+    ├── reports/
+    │   ├── report.html                   # rendered HTML recon summary
+    │   ├── findings.sarif                # SARIF 2.1.0 findings export
+    │   └── report.json                   # machine-readable summary
+    ├── logs/
+    │   ├── run-<timestamp>.jsonl         # structured slog output for this run (RFC3339 ts)
+    │   └── debug.log                     # human-readable debug log (verbosity=2 equivalent)
+    └── _compat/                          # compat writer output — bash-shape files (see §4)
+        ├── subdomains/
+        ├── webs/
+        ├── vulns/
+        ├── nuclei_output/                # direct symlink → raw/nuclei/
+        ├── screenshots/                  # direct symlink → raw/screenshots/
+        └── osint/
+```
+
+**`state.db`** stores baselines for incremental and monitor modes: previous-run subdomain
+counts, finding fingerprints (SHA-256 of rule_id+host+url), and alert-suppression hashes.
+It is separate from `checkpoints.db` to allow independent clearing — users can force a
+full rescan by deleting `checkpoints.db` without losing the monitor-mode alert history.
+
+**`inputs/config.snapshot.toml`** is written by the config loader at workspace init. All
+`Secret` type fields are redacted before writing (same `Secret` type + `Redactor` used for
+logging — see §10). Raw API key values are never written to disk in the snapshot.
+
+### §3.2 Artefact JSONL Schemas
+
+All artefact files use newline-delimited JSON (JSONL). Each line is a self-contained JSON
+object. AtomicWriter (§3.5) is the **only** write path — direct appends are forbidden.
+
+| File | Schema | Notes |
+|------|--------|-------|
+| `subdomains.jsonl` | `{"subdomain":"x.e.com","source":"subfinder","first_seen":"<RFC3339>","resolved":true}` | `source` = tool name; `resolved` = DNS lookup succeeded |
+| `hosts.jsonl` | `{"host":"x.e.com","ip":"1.2.3.4","cdn":false,"asn":"AS12345","status":200,"title":"...","tech":["nginx","php"]}` | Only alive HTTP/HTTPS hosts; `cdn` = cdncheck result |
+| `urls.jsonl` | `{"url":"https://x.e.com/path","status":200,"source":"katana","first_seen":"<RFC3339>"}` | `source` = discovery tool (katana, waymore, passive) |
+| `findings.jsonl` | `{"rule_id":"nuclei:cve-2023-1234","severity":"high","confidence":"medium","host":"x.e.com","url":"https://x.e.com/vuln","evidence":"...","tool":"nuclei","timestamp":"<RFC3339>"}` | SARIF-compatible field names; `confidence` = high/medium/low/unknown |
+| `notes.jsonl` | `{"note":"Manual finding: admin panel exposed","created_at":"<RFC3339>","tags":["hotlist","manual"]}` | Human-authored via CLI or reconftw-web; `tags` includes `"hotlist"` for top-N display |
+
+**Deduplication:** The OutputTree layer deduplicates on append. For `subdomains.jsonl`,
+the key is `subdomain`. For `findings.jsonl`, the key is `(rule_id, host, url)`. Duplicate
+lines are dropped with a WARN log; no error is returned to the caller.
+
+**Out-of-scope guard:** `OutputTree.Append()` checks every record against the configured
+scope before writing. Records outside scope return `OutOfScope` error class (§6). Task
+code cannot bypass this boundary. This closes threat T-02-03-02.
+
+### §3.3 manifest.json Schema
+
+Written by `WorkspaceInit()` at scan start. Updated by `WorkspaceFinalize()` at scan end.
+The file uses standard JSON (not JSONL). Example with all fields populated:
+
+```json
+{
+  "workspace_version": "2.0",
+  "target": "hackerone.com",
+  "target_id": "hackerone.com",
+  "started_at": "2026-05-28T09:00:00Z",
+  "finished_at": "2026-05-28T12:34:56Z",
+  "config_hash": "sha256:abcd1234...",
+  "tool_versions": {
+    "subfinder":  "v2.6.6",
+    "httpx":      "v1.6.7",
+    "nuclei":     "v3.2.4",
+    "ffuf":       "v2.1.0",
+    "katana":     "v1.1.0"
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `workspace_version` | string (semver) | Schema version of this workspace, e.g. `"2.0"` |
+| `target` | string | The input target exactly as provided by the user |
+| `target_id` | string | Slugged target-id (result of `sanitize_domain()` equivalent) |
+| `started_at` | string (RFC3339) | Timestamp when `WorkspaceInit()` was called |
+| `finished_at` | string (RFC3339) or `null` | Set by `WorkspaceFinalize()`; `null` if run is incomplete |
+| `config_hash` | string | SHA-256 of `inputs/config.snapshot.toml` (hex-encoded, `"sha256:..."` prefix) |
+| `tool_versions` | object | Tool name → version string; populated at startup by ToolRegistry querying each binary's `--version` output |
+
+**manifest.json** is written atomically (AtomicWriter §3.5) on both init and finalize.
+`tool_versions` is populated only for tools that successfully respond to a `--version`
+query at startup. Tools that fail version detection are omitted with a WARN log.
+
+### §3.4 checkpoints.db Schema
+
+SQLite database in WAL mode. Used by the Scheduler for task-level idempotency.
+
+**Table: `tasks`**
+
+```sql
+CREATE TABLE IF NOT EXISTS tasks (
+    task_name    TEXT    NOT NULL,  -- dot-namespaced e.g. "subdomains.passive"
+    target       TEXT    NOT NULL,  -- target_id value
+    input_hash   TEXT    NOT NULL,  -- SHA-256 of relevant inputs (config slice + wordlist hashes)
+    status       TEXT    NOT NULL,  -- "done" | "errored" | "cancelled" | "skipped"
+    started_at   TEXT,              -- RFC3339, set when task begins
+    finished_at  TEXT,              -- RFC3339, set by Scheduler on task completion
+    duration_ms  INTEGER,           -- wall-clock milliseconds
+    output_paths TEXT,              -- JSON array of artefact file paths written by this task
+    error_class  TEXT,              -- populated on status="errored" (ToolError, ToolTimeout, etc.)
+    PRIMARY KEY (task_name, target, input_hash)
+);
+```
+
+**Idempotency rule:**
+- If a row exists with `(task_name, target, input_hash)` and `status = "done"`, the
+  Scheduler **skips** the task without running it. A SKIP badge is emitted.
+- If the row exists but `status = "errored"` or `"cancelled"`, the Scheduler re-runs
+  the task (error recovery).
+- If no row exists, the task runs normally.
+
+**Re-run trigger:** `input_hash` is computed as `SHA-256(config_slice_json + wordlists.lock_content)` where `config_slice_json` is the subset of the resolved config relevant to that task (e.g., `subdomains.passive.*` fields for the `subdomains.passive` task). When config changes, wordlists are updated, or scope changes, the hash changes → new row → task re-runs. This replaces v1's bash `touch "$called_fn_dir/.${fn}"` sentinel files with a content-addressed checkpoint that is atomic, queryable, and crash-safe.
+
+**Scheduler read/write ordering:**
+1. `BEGIN IMMEDIATE` transaction
+2. Check for existing `done` row → skip if found
+3. Insert `status="in-progress"` row (or update existing non-done row)
+4. `COMMIT`
+5. Run task
+6. `UPDATE tasks SET status=?, finished_at=?, duration_ms=?, output_paths=? WHERE ...`
+
+SQLite WAL mode ensures concurrent reads do not block writes and a crash mid-task leaves
+the row in `"in-progress"` state, which the Scheduler treats as `"cancelled"` on next
+startup (safe re-run).
+
+### §3.5 AtomicWriter Contract
+
+**Canonical implementation:** `spike/go/internal/output/atomic.go`
+
+The AtomicWriter enforces a mandatory 4-step write pattern for all artefact files. This
+pattern is the ONLY sanctioned write path for files in `artefacts/` and `reports/`. Direct
+`os.WriteFile`, unbuffered `os.OpenFile`, or append-only writes are **forbidden** by design.
+Violation closes threat T-02-03-01.
+
+**4-step pattern:**
+
+1. **Create tempfile in the same directory as the target** — same filesystem guarantees
+   that `rename(2)` never crosses a filesystem boundary (cross-device rename would fail or
+   silently produce a copy-and-delete, which is not atomic).
+2. **Write all content + `fsync` the tempfile** — ensures data bytes are on persistent
+   storage before the rename. A crash after write but before fsync means the tempfile may
+   contain a partial write; the rename never happens, so the target is unaffected.
+3. **`rename(2)` the tempfile over the target** — on POSIX filesystems (Linux ext4/xfs,
+   macOS APFS), `rename(2)` is atomic with respect to the directory entry. A reader that
+   opens the target at any point either sees the old complete file or the new complete file;
+   it never sees a torn write.
+4. **`fsync` the parent directory** — **the often-missed critical step.** Without this step,
+   a crash between the rename and the directory update (which the OS flushes lazily) can
+   leave the directory still pointing to the old inode. The rename survives a clean shutdown
+   but not a power failure without parent-dir fsync.
+
+Go's `os.Rename` calls `rename(2)` directly on POSIX — it is atomic. The `os.CreateTemp`
+call with the same directory as the target guarantees same-filesystem placement.
+
+**Usage rule:** Every call to `OutputTree.Append(artefact, records)` batches records and
+flushes via AtomicWriter on each append. The `OutputTree` type owns the AtomicWriter; task
+code calls `Append()` and never touches the filesystem directly.
 
 ## §4 Compat Symlink Layer
 
 <!-- ARCH-04 -->
 
-[STUB — populated in Wave 2]
+_Requirement:_ ARCH-04 — The compat symlink layer maintains `Recon/<domain>/` as the v1
+output contract for users whose downstream scripts, parsers, and CI pipelines depend on it.
+This contract is upheld for **6 months post v2.0 GA cutover** per CUT-08, then dropped per
+the documented timeline in MIGRATION.md. This section specifies the AtomicSymlink pattern,
+compat directory layout, representative v1→v2 file mappings, and lifecycle policy.
 
-This section will contain: the compat-writer design that maintains `Recon/<domain>/` as a
-symlink farm pointing into `workspaces/<target-id>/`, lifecycle of symlinks (created on
-task-end via OnEnd hook), 6-month post-cutover deletion timeline, and representative
-mapping examples.
+### §4.1 AtomicSymlink Pattern
+
+Symlink creation uses the same atomic temp-then-rename approach as file writes. On POSIX
+(Linux ext4/xfs, macOS APFS), `symlink(2)` + `rename(2)` is atomic when both paths are on
+the same filesystem. Go's `os.Rename` calls `rename(2)` directly — POSIX-correct on macOS;
+the BSD `mv -T` portability concern is irrelevant when using Go stdlib.
+
+**macOS APFS note:** APFS supports atomic `rename(2)` for both regular files and symlinks.
+`os.Rename` on macOS calls the native `rename(2)` syscall directly — no intermediate copy.
+
+```go
+// internal/core/output/compat.go
+// Source: .planning/phases/02-architecture-v2-design/02-RESEARCH.md §Compat Symlink Layer
+// Atomic symlink: create temp symlink → rename over existing.
+// On POSIX (Linux ext4, macOS APFS), symlink(2) + rename(2) is atomic
+// when both paths are on the same filesystem.
+// Go's os.Rename on POSIX calls rename(2) directly — atomic.
+func AtomicSymlink(target, link string) error {
+    // Temp path in same directory as link (same filesystem guaranteed).
+    dir := filepath.Dir(link)
+    tmp, err := os.CreateTemp(dir, ".symlink-tmp.*")
+    if err != nil { return err }
+    tmpName := tmp.Name()
+    tmp.Close()
+    os.Remove(tmpName) // remove file placeholder — we need only the name slot
+
+    if err := os.Symlink(target, tmpName); err != nil { return err }
+    return os.Rename(tmpName, link) // atomic swap — overwrites any existing symlink
+}
+```
+
+`AtomicSymlink` is idempotent: calling it twice with the same arguments overwrites the
+previous symlink atomically. No stale or broken symlink state is possible — a reader that
+opens `Recon/<domain>/` at any point sees either the old complete tree or the new complete
+tree. This closes threat T-02-03-03.
+
+### §4.2 Compat Directory Structure
+
+The compat writer produces the `_compat/` subdirectory inside the workspace, then points
+`Recon/<domain>` at it via a top-level directory symlink.
+
+```text
+workspaces/<target-id>/_compat/
+├── subdomains/
+│   ├── all.txt           (plain list — .subdomain field extracted from artefacts/subdomains.jsonl)
+│   └── alive.txt         (plain list — .host field extracted from artefacts/hosts.jsonl)
+├── webs/
+│   └── webs.txt          (plain list — .url field extracted from artefacts/hosts.jsonl)
+├── vulns/
+│   └── findings.txt      (summary lines — formatted from artefacts/findings.jsonl)
+├── nuclei_output/        (directory symlink → ../../raw/nuclei/)
+├── screenshots/          (directory symlink → ../../raw/screenshots/)
+└── osint/                (extracted from relevant artefacts — domain_info, emails, etc.)
+```
+
+**Top-level compat symlink** (created by `WorkspaceInit()` equivalent at scan start):
+
+```text
+Recon/<domain>  →  workspaces/<target-id>/_compat/
+```
+
+This single directory symlink makes `Recon/<domain>/subdomains/all.txt` resolve correctly
+for any script that was reading the v1 `Recon/<domain>/subdomains/subdomains.txt` path
+(after the compat writer maps it). For direct pass-through directories (`nuclei_output/`,
+`screenshots/`), the compat writer uses a nested symlink pointing to the raw/ subdirectory
+so no extraction step is needed.
+
+### §4.3 Representative V1→V2 Mapping Table
+
+The table below lists the 7 representative mappings that unblock Phase 3-4 planning. A
+full file-by-file mapping (40+ v1 output types) will be completed in Phase 11 (Installer)
+when the compat writer is implemented against the real tool output inventory.
+
+| V1 Path | V2 Canonical | Compat Path |
+|---------|-------------|-------------|
+| `Recon/<d>/subdomains/subdomains.txt` | `artefacts/subdomains.jsonl` | `_compat/subdomains/all.txt` (extracted: `.subdomain` field) |
+| `Recon/<d>/subdomains/subdomains_alive.txt` | `artefacts/hosts.jsonl` | `_compat/subdomains/alive.txt` (extracted: `.host` field) |
+| `Recon/<d>/webs/webs.txt` | `artefacts/hosts.jsonl` | `_compat/webs/webs.txt` (extracted: `.url` field) |
+| `Recon/<d>/vulns/` | `artefacts/findings.jsonl` | `_compat/vulns/findings.txt` (formatted summary lines) |
+| `Recon/<d>/nuclei_output/` | `raw/nuclei/` | `_compat/nuclei_output/` (direct directory symlink) |
+| `Recon/<d>/screenshots/` | `raw/screenshots/` | `_compat/screenshots/` (direct directory symlink) |
+| `Recon/<d>/osint/` | `artefacts/` (various fields) | `_compat/osint/` (extracted from relevant artefacts) |
+
+**Extraction principle:** Where V1 produced a plain-text list (one entry per line), the
+compat writer reads the canonical JSONL artefact, extracts the relevant field using
+`encoding/json`, and writes a plain-text file with one value per line via AtomicWriter.
+Where V1 produced a directory of raw tool output, the compat writer uses a directory
+symlink pointing directly to the `raw/<toolname>/` subdirectory — no extraction needed.
+
+**Scope of full mapping:** The complete per-file mapping (all 40+ v1 output types across
+`subdomains/`, `webs/`, `hosts/`, `vulns/`, `osint/`, `screenshots/`, `nuclei_output/`,
+`.tmp/`, `.incremental/`) is implemented in Phase 11 with the compat writer.
+
+### §4.4 Compat Writer Lifecycle
+
+The compat writer runs as a `LifecycleAware.OnEnd()` hook registered on Tasks that produce
+compat-relevant artefacts. The hook fires **after** each successful task completion
+(`Result.Status == Done`). It reads the task's `Result.Outputs` paths, identifies which
+artefact files were updated, and re-writes the corresponding compat files.
+
+**Init-time symlink:** The top-level `Recon/<domain>` symlink is created by the workspace
+initializer (`WorkspaceInit()`) when the workspace directory is first created. If the
+symlink already exists and points to the correct target, it is left unchanged. If it points
+elsewhere (stale from a previous run), `AtomicSymlink` overwrites it atomically.
+
+**Idempotency:** All compat writer operations use `AtomicSymlink` and `AtomicWriter`.
+Running the compat writer twice produces the same result — safe to call on retry or on
+incremental rescan.
+
+**Error isolation:** Compat writer failures do NOT fail the task. If the compat writer
+returns an error, it is logged at WARN level with the task name and the specific compat
+file path that failed. The scan continues. This matches the v1 posture where missing
+`Recon/<domain>/` files never stopped the overall scan.
+
+### §4.5 Timeline
+
+The compat layer is maintained for **6 months** after v2.0 GA cutover. During this window:
+- `Recon/<domain>/` continues to resolve for all v1 scripts unchanged
+- The compat writer runs on every task completion
+- No deprecation warnings are emitted to end users in this window
+
+After the 6-month window (per CUT-08 in MIGRATION.md):
+- The `Recon/<domain>` top-level symlink is no longer created by `WorkspaceInit()`
+- The `_compat/` subdirectory is still written (for one additional minor version) but not
+  exposed at the `Recon/<domain>/` mount point
+- The compat writer is fully removed in the subsequent minor release
+
+**User migration target:** Scripts that read `Recon/<domain>/subdomains/subdomains.txt`
+must migrate to reading `workspaces/<target-id>/artefacts/subdomains.jsonl` (structured)
+or `workspaces/<target-id>/_compat/subdomains/all.txt` (plain list, no symlink required)
+within the 6-month window. MIGRATION.md documents both migration paths with examples.
 
 ## §5 Interface Signatures
 
