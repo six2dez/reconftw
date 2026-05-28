@@ -1,0 +1,3 @@
+# Placeholder — Plan 03-05 populates this package with main.go + the cobra root command + 15 subcommands.
+# Per ADR 0002 §8 + CONTEXT.md D-01/D-02/D-03/D-04.
+# Until Plan 05 lands main.go, the Makefile `build` target will fail-fast in CI — intentional per Plan 03-01.

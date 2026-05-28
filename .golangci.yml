@@ -1,0 +1,31 @@
+# golangci-lint v2.12.2 config — RESEARCH.md §Stack Snapshot row "Lint: golangci-lint v2.12.2".
+#
+# Phase 3 scaffold; Phase 4-7 may extend with reusable custom rule packages
+# flagging exported *Key/*Token/*Password/*Secret fields not typed as
+# log.Secret (ADR §10.1 lines 2396-2400). A custom golangci-lint plugin for
+# that rule is out of scope for Phase 3 — for now, code review + grep audit
+# is the manual enforcement, per CONTEXT.md discretion.
+#
+# Plan 04 (FOUND-10) adds the raw-subprocess lint rule under
+# internal/core/backend/lint/ — Phase 3 plan-01 only ships the .golangci.yml
+# scaffold so that infrastructure is in place day 1.
+
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - errcheck     # check return-value errors not handled
+    - govet        # standard go vet checks
+    - staticcheck  # 200+ correctness checks (includes simple/style)
+    - unused       # find unused code (dead-code detection)
+    - gofumpt      # stricter format than gofmt
+  disable: []
+
+formatters:
+  enable:
+    - gofumpt
+
+run:
+  timeout: 5m
+  tests: true

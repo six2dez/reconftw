@@ -1,0 +1,2 @@
+# Placeholder — Plan 03-05 populates this package with Notifier interface + LogSink + Slack/Telegram/Discord stubs.
+# Per FOUND-11 + CONTEXT.md notifier-stub-depth default (a) — LogSink only.
