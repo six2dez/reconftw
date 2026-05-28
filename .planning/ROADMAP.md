@@ -121,7 +121,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 03-06-PLAN.md — CLI binary (cmd/reconftw: 15 subcommands + v1 aliases + version + health-check + hidden kernel-demo per W16) + parseEarlyFlags (W14) + Makefile XCUT-02 ldflags
+- [x] 03-06-PLAN.md — CLI binary (cmd/reconftw: 15 subcommands + v1 aliases + version + health-check + hidden kernel-demo per W16) + parseEarlyFlags (W14) + Makefile XCUT-02 ldflags
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
@@ -279,7 +279,7 @@ Calendar parallelization (within constraint that dependencies are met):
 |-------|----------------|--------|-----------|
 | 1. Language ADR & Spike | 4/5 | In Progress|  |
 | 2. Architecture v2 Design | 7/7 | Complete   | 2026-05-28 |
-| 3. Foundation Kernel | 5/7 | In Progress|  |
+| 3. Foundation Kernel | 6/7 | In Progress|  |
 | 4. Subdomains E2E + Axiom Integration | 0/? | Not started | - |
 | 5. Web Pipeline E2E | 0/? | Not started | - |
 | 6. Vulnerability Scanning E2E | 0/? | Not started | - |
