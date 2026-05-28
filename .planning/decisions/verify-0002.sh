@@ -23,9 +23,11 @@ grep -n '```toml' "$ADR" | while read -r line; do
 done
 
 echo "=== Check 3: Go interface snippets compile ==="
-mkdir -p interfaces_check
-# Build to temp output to avoid collision with the interfaces_check/ directory
-go build -o /tmp/interfaces_check_verify ./interfaces_check/... && echo "  OK: Go snippets compile"
+# Phase 3 plan-01 moved this scaffold from interfaces_check/ to cmd/interfaces_check/
+# so that `go build ./...` no longer collides with a same-named directory at repo root.
+# Build to temp output as the existing Phase 2 pattern (binary not committed).
+mkdir -p cmd/interfaces_check
+go build -o /tmp/interfaces_check_verify ./cmd/interfaces_check/... && echo "  OK: Go snippets compile"
 
 echo "=== Check 4: Glossary completeness ==="
 # Every term in interface signatures must have a glossary entry

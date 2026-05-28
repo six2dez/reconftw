@@ -1,28 +1,112 @@
+# reconFTW v2 Makefile — Phase 3 plan-01 (Foundation Kernel)
+#
+# Primary targets (Go v2 kernel): build, test, test-integration, test-smoke, lint,
+#   fmt, fmt-check, check, coverage, ci, clean.
+# Sources: .planning/decisions/0002-architecture-v2.md §9, RESEARCH.md §"Stack Snapshot",
+#   spike/go/Makefile (Phase 1 winner — port).
+#
+# v1 bash targets (transitional, preserved until Phase 12 cutover): bash-lint,
+#   bash-fmt, bash-test, bash-test-unit, bash-test-integration-smoke,
+#   bash-test-integration-full, bash-test-security, bash-test-all,
+#   bash-test-release-gate, bash-setup-dev, sync, upload, bootstrap, rm.
+#
+# XCUT-02 binary-size rationale: -ldflags="-s -w" strips symbols + DWARF debug info
+# (per goreleaser convention); -trimpath removes the build host's filesystem paths
+# from panic stacks and embedded build-id metadata (reproducibility + smaller binary).
+
 GH_CLI := $(shell command -v gh 2> /dev/null)
 # PRIV_REPO is read from the environment by each recipe below (not interpolated
 # via $(shell ...) so that shell metacharacters stay as data rather than syntax).
 # Default: reconftw-data.
 
-.PHONY: sync upload bootstrap rm lint lint-fix fmt test test-all test-security test-unit test-integration-smoke test-integration-full test-release-gate setup-dev help
+.PHONY: help \
+        build test test-integration test-smoke lint fmt fmt-check check coverage ci clean \
+        sync upload bootstrap rm \
+        bash-lint bash-lint-fix bash-fmt bash-test bash-test-unit bash-test-integration-smoke \
+        bash-test-integration-full bash-test-security bash-test-all bash-test-release-gate \
+        bash-setup-dev
 
 help:
-	@echo "reconFTW Development Commands"
+	@echo "reconFTW v2 — Primary Go (kernel) targets"
 	@echo ""
-	@echo "  make test          - Run unit tests"
-	@echo "  make test-unit     - Run unit tests"
-	@echo "  make test-integration-smoke - Run integration smoke tests"
-	@echo "  make test-integration-full  - Run full integration tests"
-	@echo "  make test-release-gate - Run release quality gate checks"
-	@echo "  make test-all      - Run all tests (unit + integration)"
-	@echo "  make test-security - Run security tests"
-	@echo "  make lint          - Check code with shellcheck"
-	@echo "  make lint-fix      - Show shellcheck issues with context"
-	@echo "  make fmt           - Format code with shfmt"
-	@echo "  make setup-dev     - Install pre-commit hooks"
+	@echo "  make build              - Strip + trimpath build to bin/reconftw (XCUT-02 <50MB gate)"
+	@echo "  make test               - Ring 1 + Ring 4 (go test -race -short ./...)"
+	@echo "  make test-integration   - Ring 1 + Ring 2 + Ring 4 (go test -race ./...)"
+	@echo "  make test-smoke         - Ring 3 (go test -race -tags smoke ./...)"
+	@echo "  make lint               - golangci-lint run ./..."
+	@echo "  make fmt                - gofumpt -w ."
+	@echo "  make fmt-check          - gofumpt -d . (non-zero on any diff)"
+	@echo "  make check              - fmt-check + lint + test (composite local gate)"
+	@echo "  make coverage           - go test -coverprofile on internal/core/..."
+	@echo "  make ci                 - fmt-check + lint + test + coverage (matches CI)"
+	@echo "  make clean              - rm -rf bin/ coverage.out"
 	@echo ""
-	@echo "  make bootstrap     - Create private data repo"
-	@echo "  make sync          - Sync with upstream"
-	@echo "  make upload        - Upload data to private repo"
+	@echo "reconFTW v1 — Transitional bash targets (until Phase 12 cutover)"
+	@echo ""
+	@echo "  make bash-test          - bats unit tests"
+	@echo "  make bash-test-unit     - bats unit tests"
+	@echo "  make bash-test-integration-smoke - bats smoke tests"
+	@echo "  make bash-test-integration-full  - bats full integration tests"
+	@echo "  make bash-test-release-gate - bats release-quality gate"
+	@echo "  make bash-test-all      - bats unit + integration"
+	@echo "  make bash-test-security - bats security tests"
+	@echo "  make bash-lint          - shellcheck (error level)"
+	@echo "  make bash-lint-fix      - shellcheck (warning, gcc-format)"
+	@echo "  make bash-fmt           - shfmt -bn -ci -i 4"
+	@echo "  make bash-setup-dev     - pre-commit install"
+	@echo ""
+	@echo "  make bootstrap          - Create private data repo"
+	@echo "  make sync               - Sync with upstream"
+	@echo "  make upload             - Upload data to private repo"
+
+# =============================================================================
+# v2 Go targets (primary; Phase 3 Foundation Kernel)
+# =============================================================================
+
+# build: production-quality static binary; XCUT-02 budget <50MB.
+# This target fails until Plan 03-05 lands cmd/reconftw/main.go — intentional fail-fast
+# so CI surfaces the binary-size gate the moment the first main.go commits.
+build:
+	go build -ldflags="-s -w" -trimpath -o bin/reconftw ./cmd/reconftw
+
+# test: Ring 1 (unit) + Ring 4 (property-based). Fast (<90s budget per push).
+test:
+	go test -race -short ./...
+
+# test-integration: Ring 1 + Ring 2 + Ring 4. Per-commit (<5min budget).
+test-integration:
+	go test -race ./...
+
+# test-smoke: Ring 3 (smoke; build-tagged). Weekly cron + every PR.
+test-smoke:
+	go test -race -tags smoke ./...
+
+lint:
+	golangci-lint run ./...
+
+fmt:
+	gofumpt -w .
+
+fmt-check:
+	gofumpt -d . | (! grep .)
+
+# check: composite local-gate matching CI's lint+test sequence.
+check: fmt-check lint test
+
+# coverage: Phase 3 XCUT-04 gate (≥75% on lib code; ≥90% on critical paths per XCUT-03).
+coverage:
+	go test -race -coverprofile=coverage.out -covermode=atomic ./internal/core/...
+	go tool cover -func=coverage.out | tail -1
+
+# ci: composite gate matching the .github/workflows/ci.yml pipeline.
+ci: fmt-check lint test coverage
+
+clean:
+	rm -rf bin/ coverage.out
+
+# =============================================================================
+# v1 bash targets (transitional; preserved until Phase 12 cutover)
+# =============================================================================
 
 # bootstrap a private repo to store data
 #
@@ -73,7 +157,7 @@ upload:
 	git check-ref-format --branch "$$branch" >/dev/null || { echo "invalid default branch: $$branch"; exit 1; } && \
 	git push origin "$$branch"
 
-lint:
+bash-lint:
 	@if command -v shellcheck >/dev/null 2>&1; then \
 		shellcheck -S error reconftw.sh modules/*.sh lib/*.sh install.sh; \
 	else \
@@ -81,7 +165,7 @@ lint:
 		exit 1; \
 	fi
 
-lint-fix:
+bash-lint-fix:
 	@if command -v shellcheck >/dev/null 2>&1; then \
 		shellcheck -S warning -f gcc reconftw.sh modules/*.sh lib/*.sh install.sh; \
 	else \
@@ -89,7 +173,7 @@ lint-fix:
 		exit 1; \
 	fi
 
-fmt:
+bash-fmt:
 	@if command -v shfmt >/dev/null 2>&1; then \
 		shfmt -w -i 4 -bn -ci install.sh reconftw.sh modules/*.sh lib/*.sh; \
 	else \
@@ -97,7 +181,7 @@ fmt:
 		exit 1; \
 	fi
 
-test:
+bash-test:
 	@if command -v bats >/dev/null 2>&1; then \
 		./tests/run_tests.sh --unit; \
 	else \
@@ -105,7 +189,7 @@ test:
 		exit 1; \
 	fi
 
-test-unit:
+bash-test-unit:
 	@if command -v bats >/dev/null 2>&1; then \
 		./tests/run_tests.sh --unit; \
 	else \
@@ -113,7 +197,7 @@ test-unit:
 		exit 1; \
 	fi
 
-test-integration-smoke:
+bash-test-integration-smoke:
 	@if command -v bats >/dev/null 2>&1; then \
 		./tests/run_tests.sh --smoke; \
 	else \
@@ -121,7 +205,7 @@ test-integration-smoke:
 		exit 1; \
 	fi
 
-test-integration-full:
+bash-test-integration-full:
 	@if command -v bats >/dev/null 2>&1; then \
 		./tests/run_tests.sh --integration; \
 	else \
@@ -129,7 +213,7 @@ test-integration-full:
 		exit 1; \
 	fi
 
-test-security:
+bash-test-security:
 	@if command -v bats >/dev/null 2>&1; then \
 		bats tests/security/*.bats; \
 	else \
@@ -137,7 +221,7 @@ test-security:
 		exit 1; \
 	fi
 
-test-all:
+bash-test-all:
 	@if command -v bats >/dev/null 2>&1; then \
 		./tests/run_tests.sh --all; \
 	else \
@@ -145,7 +229,7 @@ test-all:
 		exit 1; \
 	fi
 
-test-release-gate:
+bash-test-release-gate:
 	@bash -n reconftw.sh modules/*.sh lib/*.sh
 	@./tests/run_tests.sh --unit
 	@./tests/run_tests.sh --smoke
@@ -156,7 +240,7 @@ test-release-gate:
 		echo "[INFO] No perf summary found under Recon/*/.log; skipping perf regression gate"; \
 	fi
 
-setup-dev:
+bash-setup-dev:
 	@if command -v pre-commit >/dev/null 2>&1; then \
 		pre-commit install; \
 		echo "Pre-commit hooks installed!"; \

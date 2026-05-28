@@ -74,3 +74,12 @@ spike/go/.spike_session_start
 spike/python/.spike_session_start
 spike/.spike_sessions.log
 out/
+
+# v2 Go kernel build outputs (Phase 3+)
+bin/
+coverage.out
+# `go build ./...` writes the interfaces_check binary into the repo root when run
+# without -o. Ignore it (the binary is just a verification scaffold; verify-0002.sh
+# builds it explicitly to /tmp/).
+/interfaces_check
+

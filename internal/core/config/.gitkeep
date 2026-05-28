@@ -1,0 +1,3 @@
+# Placeholder — Plan 03-02 populates this package with the koanf 8-source config loader.
+# Per ADR 0002 §1.2 + §2; this directory must exist before Plan 03-01 commits so
+# the `internal/core/` skeleton is complete from day 1 of Phase 3.
