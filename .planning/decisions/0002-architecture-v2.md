@@ -1,7 +1,7 @@
 # 0002 — Architecture v2 Design for reconFTW
 
-* Status: Proposed
-* Date:
+* Status: Accepted
+* Date: 2026-05-28
 * Deciders: six2dez (solo maintainer, project owner)
 * Tags: architecture, v2.0, go, toml, interfaces, output-tree, cli, testing, logging
 
@@ -2730,5 +2730,6 @@ _No amendments yet._
 ## Signed
 
 **Signed by:** six2dez (single maintainer, project owner)
-**Date:** [to be filled at sign-off]
+**Date:** 2026-05-28
 **Git SHA (this ADR):** <see git log -- .planning/decisions/0002-architecture-v2.md>
+**Git SHA (spike final):** 4a8d8890 (feat(01-04): salvage spike comparison + ADR draft)
