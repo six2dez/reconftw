@@ -45,6 +45,11 @@ Ship the v2.0 Go kernel — the dependency core that every Phase 4-12 module por
   - `reconftw health-check` — runs `LocalBackend.HealthCheck(ctx)` (always true in Phase 3 since LocalBackend is local subprocess) + iterates `ToolRegistry.Default()` calling `exec.LookPath` for each registered tool (registry is empty in Phase 3 — passes trivially; Phase 4-7 add tools and they show up automatically) + parses `reconftw.toml` from the config loader's 8-source chain and reports parse-time / validation errors. Output: dot-fill format per `lib/ui.sh` port (`[OK  ] tool.name .......... reachable` per registered tool; `[OK  ] config.parse .......... 0.012s`). Exit 0 if all checks pass; 1 if any check fails.
   Rationale: a Phase 3 binary that can self-check is dramatically more useful for Phase 4 development — `reconftw health-check` after `reconftw install` (when Phase 11 ships) gives the smoke test for free; CI integration tests in Phase 3 can use `reconftw health-check` as the kernel sanity gate; v2 users get a familiar v1 command (`--health-check` was a v1 flag).
 
+
+### Revision-iter-1 Amendments
+
+- **D-05 (W16 — Revision iter 1 amendment, 2026-05-28):** **Hidden `kernel-demo` subcommand authorized** per ADR §0 D-07 non-breaking addition. Plan 06 ships `cmd/reconftw/kernel_demo.go` with `Hidden: true` (not listed in `reconftw --help`). Plan 07 acceptance integration test (`TestKernelDemoEndToEnd`) invokes it to prove Scheduler + Backend + Tree + Checkpoint cooperate end-to-end with the noop.demo Task. The Phase-3-only nature is documented in the file header comment; Phase 4 plan-01 deletes both `cmd/reconftw/kernel_demo.go` and `internal/modules/demo/noop.go`. This amends the original CONTEXT default for the run-vs-ADR §8 inconsistency ("shorthand for any subcommand") by adding a concrete hidden subcommand that satisfies ROADMAP success criterion 1 deterministically without breaking D-02 stub semantics on the 12 stubbed public subcommands.
+
 ### Claude's Discretion (defer to researcher + planner)
 
 These gray areas were NOT discussed in detail — planner/researcher resolve with sensible defaults grounded in ADR 0002, REQUIREMENTS.md FOUND-01..16 + XCUT-02/04/07/09, the spike code at `spike/go/`, and the codebase maps:
