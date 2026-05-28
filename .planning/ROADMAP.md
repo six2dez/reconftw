@@ -105,7 +105,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 03-02-PLAN.md — Config loader (koanf 8-source) + per-key validation + snapshot writer
+- [x] 03-02-PLAN.md — Config loader (koanf 8-source) + per-key validation + snapshot writer
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -279,7 +279,7 @@ Calendar parallelization (within constraint that dependencies are met):
 |-------|----------------|--------|-----------|
 | 1. Language ADR & Spike | 4/5 | In Progress|  |
 | 2. Architecture v2 Design | 7/7 | Complete   | 2026-05-28 |
-| 3. Foundation Kernel | 1/7 | In Progress|  |
+| 3. Foundation Kernel | 2/7 | In Progress|  |
 | 4. Subdomains E2E + Axiom Integration | 0/? | Not started | - |
 | 5. Web Pipeline E2E | 0/? | Not started | - |
 | 6. Vulnerability Scanning E2E | 0/? | Not started | - |
