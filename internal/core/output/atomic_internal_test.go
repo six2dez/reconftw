@@ -215,3 +215,118 @@ func TestWriteJSONLWithHookSuccess(t *testing.T) {
 		t.Fatal("hook was not invoked")
 	}
 }
+
+// failingWriter returns errFakeWriteFailure on Nth write to exercise
+// the writeJSONLLines error branches. Used to cover the deep-write
+// failure paths that real OS error injection cannot easily produce.
+type failingWriter struct {
+	failOn int
+	n      int
+}
+
+var errFakeWriteFailure = errors.New("fake write failure")
+
+func (f *failingWriter) Write(p []byte) (int, error) {
+	f.n++
+	if f.n == f.failOn {
+		return 0, errFakeWriteFailure
+	}
+	return len(p), nil
+}
+
+// TestWriteJSONLLinesFailsOnLine covers the "write line failed" branch.
+func TestWriteJSONLLinesFailsOnLine(t *testing.T) {
+	t.Parallel()
+	err := writeJSONLLines(&failingWriter{failOn: 1}, [][]byte{[]byte(`{"x":1}`)})
+	if err == nil {
+		t.Fatal("expected error from failing Write on line")
+	}
+	if !errors.Is(err, errFakeWriteFailure) {
+		t.Fatalf("expected errFakeWriteFailure wrap; got %v", err)
+	}
+}
+
+// TestWriteJSONLLinesFailsOnNewline covers the "write newline failed" branch.
+func TestWriteJSONLLinesFailsOnNewline(t *testing.T) {
+	t.Parallel()
+	err := writeJSONLLines(&failingWriter{failOn: 2}, [][]byte{[]byte(`{"x":1}`)})
+	if err == nil {
+		t.Fatal("expected error from failing Write on newline")
+	}
+	if !errors.Is(err, errFakeWriteFailure) {
+		t.Fatalf("expected errFakeWriteFailure wrap; got %v", err)
+	}
+}
+
+// TestWriteJSONLLinesSuccess — sanity, no-error path.
+func TestWriteJSONLLinesSuccess(t *testing.T) {
+	t.Parallel()
+	if err := writeJSONLLines(&failingWriter{failOn: -1}, [][]byte{[]byte(`{"x":1}`)}); err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+}
+
+// stubSyncable implements syncableWriter and lets tests control each
+// operation's error result. Used to cover the write/chmod/sync failure
+// branches in writeFilePayload.
+type stubSyncable struct {
+	writeErr error
+	chmodErr error
+	syncErr  error
+	written  []byte
+}
+
+func (s *stubSyncable) Write(p []byte) (int, error) {
+	if s.writeErr != nil {
+		return 0, s.writeErr
+	}
+	s.written = append(s.written, p...)
+	return len(p), nil
+}
+
+func (s *stubSyncable) Chmod(os.FileMode) error { return s.chmodErr }
+func (s *stubSyncable) Sync() error             { return s.syncErr }
+
+// TestWriteFilePayloadWriteFails covers the write-failure branch.
+func TestWriteFilePayloadWriteFails(t *testing.T) {
+	t.Parallel()
+	s := &stubSyncable{writeErr: errFakeWriteFailure}
+	err := writeFilePayload(s, []byte("x"), 0o644)
+	if err == nil || !errors.Is(err, errFakeWriteFailure) {
+		t.Fatalf("expected wrapped errFakeWriteFailure; got %v", err)
+	}
+}
+
+// TestWriteFilePayloadChmodFails covers the chmod-failure branch.
+func TestWriteFilePayloadChmodFails(t *testing.T) {
+	t.Parallel()
+	wantErr := errors.New("chmod boom")
+	s := &stubSyncable{chmodErr: wantErr}
+	err := writeFilePayload(s, []byte("x"), 0o644)
+	if err == nil || !errors.Is(err, wantErr) {
+		t.Fatalf("expected wrapped chmod error; got %v", err)
+	}
+}
+
+// TestWriteFilePayloadSyncFails covers the sync-failure branch.
+func TestWriteFilePayloadSyncFails(t *testing.T) {
+	t.Parallel()
+	wantErr := errors.New("sync boom")
+	s := &stubSyncable{syncErr: wantErr}
+	err := writeFilePayload(s, []byte("x"), 0o644)
+	if err == nil || !errors.Is(err, wantErr) {
+		t.Fatalf("expected wrapped sync error; got %v", err)
+	}
+}
+
+// TestWriteFilePayloadSuccess — sanity, no-error path.
+func TestWriteFilePayloadSuccess(t *testing.T) {
+	t.Parallel()
+	s := &stubSyncable{}
+	if err := writeFilePayload(s, []byte("hello"), 0o644); err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if string(s.written) != "hello" {
+		t.Fatalf("written = %q; want hello", s.written)
+	}
+}

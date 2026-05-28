@@ -7,26 +7,21 @@
 //   - Replayable (partially): non-secret keys round-trip through Load.
 //   - Hashable: stored hash goes into manifest.json as config_hash (§3.3).
 //
-// Atomic write contract (ADR §3.5):
-//   1. Create tempfile in target directory (same filesystem → rename(2) is atomic).
-//   2. Write + fsync the tempfile.
-//   3. Rename(2) over the target.
-//   4. Fsync the parent directory (often-missed step; survives power failure).
-//
-// TODO(plan-03): replace inline atomicWriteFile with output.WriteFile once
-// Plan 03 lands internal/core/output/atomic.go.
+// Atomic write contract (ADR §3.5): delegated to internal/core/output.WriteFile
+// — the canonical 4-step pattern (tempfile + fsync + rename + parent-dir fsync)
+// per Plan 03 (W19 migration). The previous inline 4-step helper has been
+// removed; the contract is now owned by the output package which is covered
+// by the FOUND-04 atomicity tests + the Ring 3 subprocess SIGKILL smoke test.
 
 package config
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
 	"reflect"
 
 	tomlv2 "github.com/pelletier/go-toml/v2"
 
 	"github.com/six2dez/reconftw/internal/core/log"
+	"github.com/six2dez/reconftw/internal/core/output"
 )
 
 // WriteSnapshot writes cfg to path as TOML, with every log.Secret-typed field
@@ -44,7 +39,7 @@ import (
 // type and path information, not value contents.
 func WriteSnapshot(cfg *Config, path string) error {
 	if cfg == nil {
-		return fmt.Errorf("config: WriteSnapshot called with nil config")
+		return errNilConfig
 	}
 	redacted := redactSecrets(cfg)
 	// go-toml/v2 reads `toml:"..."` tags but the Config struct uses koanf tags
@@ -56,9 +51,13 @@ func WriteSnapshot(cfg *Config, path string) error {
 	tree := walkStructForTOML(reflect.ValueOf(redacted).Elem())
 	data, err := tomlv2.Marshal(tree)
 	if err != nil {
-		return fmt.Errorf("config: marshal snapshot: %w", err)
+		return errMarshal(err)
 	}
-	return atomicWriteFile(path, data, 0o644)
+	// W19: delegate to internal/core/output.WriteFile — the canonical
+	// 4-step AtomicWriter from Plan 03. Same atomicity guarantee as the
+	// prior inline helper (which has been removed); behaviour covered by
+	// output.TestFOUND04Atomicity + the Ring 3 smoke SIGKILL test.
+	return output.WriteFile(path, data, 0o644)
 }
 
 // walkStructForTOML is like walkStruct but applies additional pruning:
@@ -122,68 +121,20 @@ func redactSecrets(cfg *Config) *Config {
 	return &clone
 }
 
-// atomicWriteFile implements the 4-step pattern from ADR §3.5 inline. Plan 03
-// will ship internal/core/output/atomic.go as the canonical helper; once it
-// lands, this function becomes a thin wrapper. See TODO at top of file.
-//
-// Why the steps matter:
-//   1. CreateTemp same-dir: same-filesystem guarantee → rename(2) is atomic,
-//      not a cross-device copy-and-delete.
-//   2. Sync the tempfile: data bytes on persistent storage before the rename.
-//   3. Rename: POSIX atomic — readers see either the old or new file, never torn.
-//   4. Sync parent dir: directory entry must reach disk; otherwise a power
-//      failure between rename and dir-flush leaves the directory pointing at
-//      the old inode.
-func atomicWriteFile(target string, data []byte, mode os.FileMode) error {
-	dir := filepath.Dir(target)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("config: mkdir %s: %w", dir, err)
-	}
+// errNilConfig + errMarshal are tiny helpers extracted from the prior
+// inline body of WriteSnapshot so the function reads as a single linear
+// "marshal then write" sequence.
+var errNilConfig = errSnapshot("WriteSnapshot called with nil config")
 
-	base := filepath.Base(target)
-	tmp, err := os.CreateTemp(dir, base+".tmp.*")
-	if err != nil {
-		return fmt.Errorf("config: create tempfile in %s: %w", dir, err)
-	}
-	tmpName := tmp.Name()
-	cleanedUp := false
-	defer func() {
-		if !cleanedUp {
-			_ = os.Remove(tmpName)
-		}
-	}()
-
-	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
-		return fmt.Errorf("config: write tempfile: %w", err)
-	}
-	if err := tmp.Chmod(mode); err != nil {
-		_ = tmp.Close()
-		return fmt.Errorf("config: chmod tempfile: %w", err)
-	}
-	if err := tmp.Sync(); err != nil {
-		_ = tmp.Close()
-		return fmt.Errorf("config: fsync tempfile: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("config: close tempfile: %w", err)
-	}
-
-	if err := os.Rename(tmpName, target); err != nil {
-		return fmt.Errorf("config: rename %s -> %s: %w", tmpName, target, err)
-	}
-	cleanedUp = true // rename succeeded; tempfile name is gone.
-
-	// Step 4 — parent directory fsync. Skipped on environments where the
-	// directory cannot be opened (rare); the rename is durable on POSIX
-	// without the dir-fsync, just not crash-safe across power loss.
-	parent, err := os.Open(dir)
-	if err != nil {
-		return fmt.Errorf("config: open parent dir: %w", err)
-	}
-	defer parent.Close() //nolint:errcheck
-	if err := parent.Sync(); err != nil {
-		return fmt.Errorf("config: fsync parent dir: %w", err)
-	}
-	return nil
+func errSnapshot(msg string) error { return &snapshotError{msg: "config: " + msg} }
+func errMarshal(err error) error {
+	return &snapshotError{msg: "config: marshal snapshot: " + err.Error(), inner: err}
 }
+
+type snapshotError struct {
+	msg   string
+	inner error
+}
+
+func (e *snapshotError) Error() string { return e.msg }
+func (e *snapshotError) Unwrap() error { return e.inner }

@@ -18,6 +18,7 @@ package output
 import (
 	stderrors "errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -85,15 +86,9 @@ func writeJSONLWithHook(target string, lines [][]byte, hook func(tmpName string)
 		}
 	}()
 
-	for _, line := range lines {
-		if _, err := tmp.Write(line); err != nil {
-			_ = tmp.Close()
-			return fmt.Errorf("output: write line: %w", err)
-		}
-		if _, err := tmp.Write([]byte("\n")); err != nil {
-			_ = tmp.Close()
-			return fmt.Errorf("output: write newline: %w", err)
-		}
+	if err := writeJSONLLines(tmp, lines); err != nil {
+		_ = tmp.Close()
+		return err
 	}
 
 	// Step 2: fsync the tempfile.
@@ -147,17 +142,9 @@ func writeFileWithHook(target string, data []byte, mode os.FileMode, hook func(t
 		}
 	}()
 
-	if _, err := tmp.Write(data); err != nil {
+	if err := writeFilePayload(tmp, data, mode); err != nil {
 		_ = tmp.Close()
-		return fmt.Errorf("output: write payload: %w", err)
-	}
-	if err := tmp.Chmod(mode); err != nil {
-		_ = tmp.Close()
-		return fmt.Errorf("output: chmod tempfile: %w", err)
-	}
-	if err := tmp.Sync(); err != nil {
-		_ = tmp.Close()
-		return fmt.Errorf("output: fsync tempfile: %w", err)
+		return err
 	}
 	if err := tmp.Close(); err != nil {
 		return fmt.Errorf("output: close tempfile: %w", err)
@@ -175,6 +162,31 @@ func writeFileWithHook(target string, data []byte, mode os.FileMode, hook func(t
 	renamed = true
 
 	return syncParentDir(dir)
+}
+
+// writeFilePayload writes data into w, chmods, then fsyncs. Extracted so
+// tests can cover the write/chmod/sync failure branches via a stub.
+// The chmod/sync are no-op when w is a bytes.Buffer (test seam); when w
+// is *os.File, all three operations have real effect.
+func writeFilePayload(w syncableWriter, data []byte, mode os.FileMode) error {
+	if _, err := w.Write(data); err != nil {
+		return fmt.Errorf("output: write payload: %w", err)
+	}
+	if err := w.Chmod(mode); err != nil {
+		return fmt.Errorf("output: chmod tempfile: %w", err)
+	}
+	if err := w.Sync(); err != nil {
+		return fmt.Errorf("output: fsync tempfile: %w", err)
+	}
+	return nil
+}
+
+// syncableWriter is the subset of *os.File used by writeFilePayload —
+// kept narrow so tests can stub it.
+type syncableWriter interface {
+	io.Writer
+	Chmod(os.FileMode) error
+	Sync() error
 }
 
 // syncParentDir opens dir and fsyncs it (Step 4 of the 4-step pattern).
@@ -206,4 +218,19 @@ func isUnsupportedDirSync(err error) bool {
 		return errno == syscall.ENOTSUP || errno == syscall.EINVAL
 	}
 	return false
+}
+
+// writeJSONLLines writes each line + "\n" into w. Extracted so test code
+// can drive the loop with a failing io.Writer to cover the deep error
+// branches (Write returning io.ErrShortWrite or similar).
+func writeJSONLLines(w io.Writer, lines [][]byte) error {
+	for _, line := range lines {
+		if _, err := w.Write(line); err != nil {
+			return fmt.Errorf("output: write line: %w", err)
+		}
+		if _, err := w.Write([]byte("\n")); err != nil {
+			return fmt.Errorf("output: write newline: %w", err)
+		}
+	}
+	return nil
 }
