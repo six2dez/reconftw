@@ -71,7 +71,7 @@ Plans:
 - [x] 02-01-PLAN.md — ADR skeleton + verify-0002.sh + interfaces_check/
 - [x] 02-02-PLAN.md — §2 TOML Configuration Schema (all v1 flags, [legacy] aliases, per-key validation)
 - [x] 02-03-PLAN.md — §3 Output Tree Layout + §4 Compat Symlink Layer
-- [ ] 02-04-PLAN.md — §5 Interface Signatures + §6 Error Class Hierarchy + §7 Failure Policy
+- [x] 02-04-PLAN.md — §5 Interface Signatures + §6 Error Class Hierarchy + §7 Failure Policy
 - [ ] 02-05-PLAN.md — §8 CLI Surface + §9 Test Ring Policy + §10 Logging Policy
 - [ ] 02-06-PLAN.md — Integration pass: §1 Overview + TL;DR + Glossary + Consequences
 - [ ] 02-07-PLAN.md — Pre-sign gate + sign-off ceremony (checkpoint: autonomous: false)
@@ -211,7 +211,7 @@ Calendar parallelization (within constraint that dependencies are met):
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Language ADR & Spike | 4/5 | In Progress|  |
-| 2. Architecture v2 Design | 3/7 | In Progress|  |
+| 2. Architecture v2 Design | 4/7 | In Progress|  |
 | 3. Foundation Kernel | 0/? | Not started | - |
 | 4. Subdomains E2E + Axiom Integration | 0/? | Not started | - |
 | 5. Web Pipeline E2E | 0/? | Not started | - |
