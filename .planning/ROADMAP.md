@@ -153,7 +153,7 @@ Plans:
 **Wave 2** *(parallel — blocked on Wave 1)*
 
 - [x] 04-02-PLAN.md — Active DNS resolution Tasks + SubBruteTask with in-Run() resolver gate + extend MergeStage for resolved stage
-- [ ] 04-03-PLAN.md — Shared extractor packages (favicon/JS/analytics) + SubScrapingTask/Analytics/NSDelegation (staging files + temp-file subjs→jsluice)
+- [x] 04-03-PLAN.md — Shared extractor packages (favicon/JS/analytics) + SubScrapingTask/Analytics/NSDelegation (staging files + temp-file subjs→jsluice)
 
 **Wave 3** *(blocked on Wave 2)*
 
@@ -309,7 +309,7 @@ Calendar parallelization (within constraint that dependencies are met):
 | 1. Language ADR & Spike | 4/5 | In Progress|  |
 | 2. Architecture v2 Design | 7/7 | Complete   | 2026-05-28 |
 | 3. Foundation Kernel | 7/7 | Complete   | 2026-05-28 |
-| 4. Subdomains E2E + Axiom Integration | 3/8 | In Progress|  |
+| 4. Subdomains E2E + Axiom Integration | 4/8 | In Progress|  |
 | 5. Web Pipeline E2E | 0/? | Not started | - |
 | 6. Vulnerability Scanning E2E | 0/? | Not started | - |
 | 7. OSINT E2E | 0/? | Not started | - |

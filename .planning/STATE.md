@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: Complete Core Migration
 status: executing
 stopped_at: Phase 4 context gathered
-last_updated: "2026-05-29T00:27:49.803Z"
+last_updated: "2026-05-29T00:36:45.259Z"
 last_activity: 2026-05-29
 progress:
   total_phases: 12
   completed_phases: 3
   total_plans: 27
-  completed_plans: 22
+  completed_plans: 23
   percent: 25
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-05-27)
 ## Current Position
 
 Phase: 04 (subdomains-e2e-axiom-integration) — EXECUTING
-Plan: 4 of 8
+Plan: 5 of 8
 Status: Ready to execute
 Last activity: 2026-05-29
 
@@ -69,6 +69,7 @@ Last activity: 2026-05-29
 *Updated after each plan completion*
 | Phase 04-subdomains-e2e-axiom-integration P00 | 3 | 2 tasks | 4 files |
 | Phase 04 P01 | 10m | 2 tasks | 9 files |
+| Phase 04 P03 | 15 | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -91,6 +92,7 @@ Recent decisions affecting v2.0 work:
 - v2.0 roadmap: Cutover (Phase 12) explicitly blocked by CUT-04 (migrator corpus) and CUT-12 (sign-off criteria including parity test + beta period)
 - v1.0 close: Phases 3-5 (PERF-01, FIX-02, TEST-01/02/03, DOCS-01/02) superseded by v2.0 — los issues se resuelven by design en el rewrite
 - [Phase ?]: 04-00: csprecon added as 26th tools.lock entry to resolve plan count ambiguity
+- [Phase ?]: D-02 pure-transform extractor API: Extract(rawOutput, domain) in internal/extract/{favicon,js,analytics} — no internal/core imports, Phase 5 reuse contract
 
 ### Pending Todos
 
@@ -118,6 +120,6 @@ Items captured durante v1.0 que deben informar el diseño de arquitectura v2 (no
 
 ## Session Continuity
 
-Last session: 2026-05-29T00:27:49.797Z
+Last session: 2026-05-29T00:36:29.978Z
 Stopped at: Phase 4 context gathered
 Resume file: None
