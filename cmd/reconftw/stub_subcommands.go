@@ -232,20 +232,28 @@ func runSubsCmd(cmd *cobra.Command) error {
 	// Fixes REVIEWS Scheduler-ordering finding: RunStage fires ALL tasks in a slice
 	// concurrently under the MaxConcurrent semaphore. DependsOn ordering is NOT
 	// enforced within a single RunStage call. Sequential stage calls provide ordering.
+	//
+	// GAP-2: stageSpec.module carries the scheduler module name. The passive stage
+	// uses "subdomains.passive" → PolicyBestEffort (independent sources; single-source
+	// flakiness is non-fatal). All other stages use "subdomains" → PolicyFailFast
+	// (the spine — empty resolved list breaks every downstream stage).
 	type stageSpec struct {
 		name     string
+		module   string // scheduler module name → determines FailurePolicy via policyFor
 		prefixes []string
 	}
 
 	stages := []stageSpec{
 		{
-			name: "passive",
+			name:   "passive",
+			module: "subdomains.passive", // GAP-2: best_effort — independent sources
 			prefixes: []string{
 				"subdomains.passive.",
 			},
 		},
 		{
-			name: "resolve",
+			name:   "resolve",
+			module: "subdomains", // fail_fast — spine; resolve failure aborts run
 			prefixes: []string{
 				"subdomains.active",
 				"subdomains.tls",
@@ -261,14 +269,16 @@ func runSubsCmd(cmd *cobra.Command) error {
 			},
 		},
 		{
-			name: "permut",
+			name:   "permut",
+			module: "subdomains", // fail_fast — spine
 			prefixes: []string{
 				"subdomains.permut",
 				"subdomains.recursive.",
 			},
 		},
 		{
-			name: "enrichment",
+			name:   "enrichment",
+			module: "subdomains", // fail_fast — spine
 			prefixes: []string{
 				"subdomains.takeover.",
 				"subdomains.buckets",
@@ -282,7 +292,7 @@ func runSubsCmd(cmd *cobra.Command) error {
 	for _, stage := range stages {
 		stageSlice := filterByModuleAndEnabled(allTasks, "subdomains", cfg, stage.prefixes)
 
-		if err := sched.RunStage(ctx, "subdomains", stageSlice); err != nil {
+		if err := sched.RunStage(ctx, stage.module, stageSlice); err != nil {
 			return fmt.Errorf("subs: stage %s: %w", stage.name, err)
 		}
 
@@ -306,15 +316,18 @@ func runSubsCmd(cmd *cobra.Command) error {
 
 // printDryRun lists the tasks that would run per stage and returns nil.
 func printDryRun(cmd *cobra.Command, allTasks []task.Task, cfg *config.Config) error {
+	// stageSpec mirrors the struct in runSubsCmd (same module field for consistency).
+	// Policy is unused in dry-run but the field keeps struct shapes aligned.
 	type stageSpec struct {
 		name     string
+		module   string
 		prefixes []string
 	}
 	stages := []stageSpec{
-		{"passive", []string{"subdomains.passive."}},
-		{"resolve", []string{"subdomains.active", "subdomains.tls", "subdomains.noerror", "subdomains.dns", "subdomains.srv", "subdomains.ptr", "subdomains.brute", "subdomains.resolvers.", "subdomains.scraping", "subdomains.analytics", "subdomains.ns_delegation"}},
-		{"permut", []string{"subdomains.permut", "subdomains.recursive."}},
-		{"enrichment", []string{"subdomains.takeover.", "subdomains.buckets", "subdomains.asn", "subdomains.geo", "subdomains.zonetransfer"}},
+		{"passive", "subdomains.passive", []string{"subdomains.passive."}},
+		{"resolve", "subdomains", []string{"subdomains.active", "subdomains.tls", "subdomains.noerror", "subdomains.dns", "subdomains.srv", "subdomains.ptr", "subdomains.brute", "subdomains.resolvers.", "subdomains.scraping", "subdomains.analytics", "subdomains.ns_delegation"}},
+		{"permut", "subdomains", []string{"subdomains.permut", "subdomains.recursive."}},
+		{"enrichment", "subdomains", []string{"subdomains.takeover.", "subdomains.buckets", "subdomains.asn", "subdomains.geo", "subdomains.zonetransfer"}},
 	}
 	fmt.Fprintln(cmd.OutOrStdout(), "[dry-run] subs pipeline stages:")
 	for i, stage := range stages {
