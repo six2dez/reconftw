@@ -28,6 +28,7 @@ import (
 	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/scheduler"
 	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/internal/core/ui"
 	"github.com/six2dez/reconftw/internal/modules/subdomains"
 )
 
@@ -199,8 +200,20 @@ func runSubsCmd(cmd *cobra.Command) error {
 	sched.Checkpoint = app.Checkpoint
 
 	// Step 6: Wire RunTask closure (cycle-break #2 — can only close after Boot).
+	// GAP-3: construct StageProgress before the RunTask closure so the closure
+	// can reference it. progress.StageStart is called inside the stages loop
+	// (step 10) before each RunStage; progress.TaskStart/TaskDone are called
+	// inside this closure around t.Run so every task completion is reflected.
+	//
+	// XCUT-07: the closure passes only t.Name() and badge/duration to progress —
+	// never result.Stdout, result.Stderr, or any other tool output.
+	progress := ui.NewStageProgress(app.UI.W, app.UI.NoColor, app.UI.Verbosity)
 	sched.RunTask = func(rctx context.Context, t task.Task) (task.Result, error) {
-		return t.Run(rctx, app)
+		progress.TaskStart(t.Name())
+		result, err := t.Run(rctx, app)
+		badge := badgeForStatus(result.Status)
+		progress.TaskDone(t.Name(), badge, result.Duration)
+		return result, err
 	}
 
 	// Step 7: Launch Axiom fleet if applicable.
@@ -292,6 +305,9 @@ func runSubsCmd(cmd *cobra.Command) error {
 	for _, stage := range stages {
 		stageSlice := filterByModuleAndEnabled(allTasks, "subdomains", cfg, stage.prefixes)
 
+		// GAP-3: signal stage beginning to the progress UI.
+		progress.StageStart(stage.name, len(stageSlice))
+
 		if err := sched.RunStage(ctx, stage.module, stageSlice); err != nil {
 			return fmt.Errorf("subs: stage %s: %w", stage.name, err)
 		}
@@ -309,6 +325,10 @@ func runSubsCmd(cmd *cobra.Command) error {
 		if mergeErr := subdomains.MergeStage(ctx, app, stage.name); mergeErr != nil {
 			app.Log.Warn("subs: merge_stage_failed", "stage", stage.name, "err", mergeErr)
 		}
+
+		// GAP-3: signal stage completion. foundCount=0 for now — MergeStage does
+		// not return a count; foundCount can be enhanced in a later plan.
+		progress.StageDone(stage.name, 0)
 	}
 
 	return nil

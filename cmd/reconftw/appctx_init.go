@@ -18,7 +18,25 @@ import (
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
 	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/internal/core/ui"
 )
+
+// badgeForStatus maps a task.Status to the corresponding ui.Badge for progress display.
+// Used by the StageProgress TaskDone callback wired in runSubsCmd.
+//
+// task.StatusDone → BadgeOK (tool completed successfully)
+// task.StatusSkipped → BadgeSKIP (task disabled or dependency not met)
+// task.StatusErrored / StatusCancelled → BadgeFAIL (tool failed or run cancelled)
+func badgeForStatus(s task.Status) ui.Badge {
+	switch s {
+	case task.StatusDone:
+		return ui.BadgeOK
+	case task.StatusSkipped:
+		return ui.BadgeSKIP
+	default:
+		return ui.BadgeFAIL
+	}
+}
 
 // filterByModuleAndEnabled returns tasks where:
 //   - t.Module() == module
