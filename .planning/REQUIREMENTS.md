@@ -148,7 +148,7 @@
 - [x] **AXIOM-06**: Failover wrapper detects infrastructure failures (SSH timeout, fleet unreachable, partial-fleet); retries locally without losing work
 - [x] **AXIOM-07**: `AXIOM_AUTO_FIX_HOSTKEY` repair logic preserved
 - [x] **AXIOM-08**: `axiom_disable_runtime` flag disables axiom mid-run on failure, all subsequent module calls run locally
-- [ ] **AXIOM-09**: Output equivalence test: axiom vs local execution of same module produces equivalent output (same scope, same dedup)
+- [x] **AXIOM-09**: Output equivalence test: axiom vs local execution of same module produces equivalent output (same scope, same dedup)
 
 ### Monitor Mode (Deliverable #10)
 
@@ -379,7 +379,7 @@ Each REQ-ID maps to exactly one phase. Populated by roadmapper agent 2026-05-27.
 | AXIOM-06 | Phase 4 — Subdomains E2E + Axiom | Complete |
 | AXIOM-07 | Phase 4 — Subdomains E2E + Axiom | Complete |
 | AXIOM-08 | Phase 4 — Subdomains E2E + Axiom | Complete |
-| AXIOM-09 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| AXIOM-09 | Phase 4 — Subdomains E2E + Axiom | Complete |
 | WEB-01 | Phase 5 — Web Pipeline E2E | Pending |
 | WEB-02 | Phase 5 — Web Pipeline E2E | Pending |
 | WEB-03 | Phase 5 — Web Pipeline E2E | Pending |
