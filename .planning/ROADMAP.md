@@ -148,7 +148,7 @@ Plans:
 
 **Wave 1** *(blocked on Wave 0)*
 
-- [ ] 04-01-PLAN.md — Demo scaffold delete + JSONL schemas + MergeStage helper + 6 passive Tasks (staging files) + SUBD-05 scope cross-check
+- [x] 04-01-PLAN.md — Demo scaffold delete + JSONL schemas + MergeStage helper + 6 passive Tasks (staging files) + SUBD-05 scope cross-check
 
 **Wave 2** *(parallel — blocked on Wave 1)*
 
@@ -309,7 +309,7 @@ Calendar parallelization (within constraint that dependencies are met):
 | 1. Language ADR & Spike | 4/5 | In Progress|  |
 | 2. Architecture v2 Design | 7/7 | Complete   | 2026-05-28 |
 | 3. Foundation Kernel | 7/7 | Complete   | 2026-05-28 |
-| 4. Subdomains E2E + Axiom Integration | 1/8 | In Progress|  |
+| 4. Subdomains E2E + Axiom Integration | 2/8 | In Progress|  |
 | 5. Web Pipeline E2E | 0/? | Not started | - |
 | 6. Vulnerability Scanning E2E | 0/? | Not started | - |
 | 7. OSINT E2E | 0/? | Not started | - |

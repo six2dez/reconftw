@@ -56,11 +56,11 @@
 
 ### Subdomains E2E (Deliverable #4)
 
-- [ ] **SUBD-01**: Passive subdomain enumeration uses ≥6 sources: subfinder, crt.sh (via `crt`), github-subdomains, gitlab-subdomains, urlfinder, hackertarget; outputs merged via `anew`-equivalent dedup
-- [ ] **SUBD-02**: Active brute force via `puredns` with wordlist validation, resolver health gate (abort if <N resolvers reachable), and wildcard filtering
-- [ ] **SUBD-03**: Subdomain permutations via `gotator`, `regulator`, `dnscewl`; memory-aware throttling (back-pressure when free RAM < threshold)
+- [x] **SUBD-01**: Passive subdomain enumeration uses ≥6 sources: subfinder, crt.sh (via `crt`), github-subdomains, gitlab-subdomains, urlfinder, hackertarget; outputs merged via `anew`-equivalent dedup
+- [x] **SUBD-02**: Active brute force via `puredns` with wordlist validation, resolver health gate (abort if <N resolvers reachable), and wildcard filtering
+- [x] **SUBD-03**: Subdomain permutations via `gotator`, `regulator`, `dnscewl`; memory-aware throttling (back-pressure when free RAM < threshold)
 - [ ] **SUBD-04**: DNS resolution via `dnsx` with per-batch timeout enforcement (default 4h via `DNS_RESOLVE_TIMEOUT`)
-- [ ] **SUBD-05**: Scope filter uses SINGLE canonical implementation (reconciles v1's `is_in_scope_host` / `domain_match_regex` split); cross-check unit test feeds same corpus through old/new and asserts equivalence
+- [x] **SUBD-05**: Scope filter uses SINGLE canonical implementation (reconciles v1's `is_in_scope_host` / `domain_match_regex` split); cross-check unit test feeds same corpus through old/new and asserts equivalence
 - [ ] **SUBD-06**: Subdomain takeover detection via `subzy` and `dnstake`; outputs structured findings to `artefacts/findings.jsonl`
 - [ ] **SUBD-07**: S3/GCS/Azure bucket discovery via `s3scanner`; outputs `artefacts/buckets.jsonl`
 - [ ] **SUBD-08**: Per-subdomain geo info (country, city, ASN) via lookup against geolite/ipinfo
@@ -144,10 +144,10 @@
 - [ ] **AXIOM-02**: `axiom_launch` provisions fleet with configurable sizing (`AXIOM_FLEET_COUNT`)
 - [ ] **AXIOM-03**: `axiom_shutdown` releases fleet at end of run (or on interrupt)
 - [ ] **AXIOM-04**: `axiom_selected` fleet target — uses Axiom's own selection
-- [ ] **AXIOM-05**: Resolver list propagation to fleet (`resolvers_update`)
-- [ ] **AXIOM-06**: Failover wrapper detects infrastructure failures (SSH timeout, fleet unreachable, partial-fleet); retries locally without losing work
-- [ ] **AXIOM-07**: `AXIOM_AUTO_FIX_HOSTKEY` repair logic preserved
-- [ ] **AXIOM-08**: `axiom_disable_runtime` flag disables axiom mid-run on failure, all subsequent module calls run locally
+- [x] **AXIOM-05**: Resolver list propagation to fleet (`resolvers_update`)
+- [x] **AXIOM-06**: Failover wrapper detects infrastructure failures (SSH timeout, fleet unreachable, partial-fleet); retries locally without losing work
+- [x] **AXIOM-07**: `AXIOM_AUTO_FIX_HOSTKEY` repair logic preserved
+- [x] **AXIOM-08**: `axiom_disable_runtime` flag disables axiom mid-run on failure, all subsequent module calls run locally
 - [ ] **AXIOM-09**: Output equivalence test: axiom vs local execution of same module produces equivalent output (same scope, same dedup)
 
 ### Monitor Mode (Deliverable #10)
@@ -360,11 +360,11 @@ Each REQ-ID maps to exactly one phase. Populated by roadmapper agent 2026-05-27.
 | FOUND-14 | Phase 3 — Foundation Kernel | Pending |
 | FOUND-15 | Phase 3 — Foundation Kernel | Pending |
 | FOUND-16 | Phase 3 — Foundation Kernel | Pending |
-| SUBD-01 | Phase 4 — Subdomains E2E + Axiom | Pending |
-| SUBD-02 | Phase 4 — Subdomains E2E + Axiom | Pending |
-| SUBD-03 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| SUBD-01 | Phase 4 — Subdomains E2E + Axiom | Complete |
+| SUBD-02 | Phase 4 — Subdomains E2E + Axiom | Complete |
+| SUBD-03 | Phase 4 — Subdomains E2E + Axiom | Complete |
 | SUBD-04 | Phase 4 — Subdomains E2E + Axiom | Pending |
-| SUBD-05 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| SUBD-05 | Phase 4 — Subdomains E2E + Axiom | Complete |
 | SUBD-06 | Phase 4 — Subdomains E2E + Axiom | Pending |
 | SUBD-07 | Phase 4 — Subdomains E2E + Axiom | Pending |
 | SUBD-08 | Phase 4 — Subdomains E2E + Axiom | Pending |
@@ -375,10 +375,10 @@ Each REQ-ID maps to exactly one phase. Populated by roadmapper agent 2026-05-27.
 | AXIOM-02 | Phase 4 — Subdomains E2E + Axiom | Pending |
 | AXIOM-03 | Phase 4 — Subdomains E2E + Axiom | Pending |
 | AXIOM-04 | Phase 4 — Subdomains E2E + Axiom | Pending |
-| AXIOM-05 | Phase 4 — Subdomains E2E + Axiom | Pending |
-| AXIOM-06 | Phase 4 — Subdomains E2E + Axiom | Pending |
-| AXIOM-07 | Phase 4 — Subdomains E2E + Axiom | Pending |
-| AXIOM-08 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| AXIOM-05 | Phase 4 — Subdomains E2E + Axiom | Complete |
+| AXIOM-06 | Phase 4 — Subdomains E2E + Axiom | Complete |
+| AXIOM-07 | Phase 4 — Subdomains E2E + Axiom | Complete |
+| AXIOM-08 | Phase 4 — Subdomains E2E + Axiom | Complete |
 | AXIOM-09 | Phase 4 — Subdomains E2E + Axiom | Pending |
 | WEB-01 | Phase 5 — Web Pipeline E2E | Pending |
 | WEB-02 | Phase 5 — Web Pipeline E2E | Pending |
