@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 1: Language ADR & Spike** — Identical recon slice in BOTH Go and Python; measured comparison; signed ADR before any production code
 - [x] **Phase 2: Architecture v2 Design** — Lock TOML schema, output tree, Task/Backend/AppContext/Error interfaces, CLI surface, test policy, failure isolation — Foundation depends on these (completed 2026-05-28)
 - [x] **Phase 3: Foundation Kernel** — Errors + Logger + Config + OutputTree + Checkpoint + Scheduler + Tools + AppContext + CLI + Mocks + CI from day 1 (completed 2026-05-28)
-- [x] **Phase 4: Subdomains E2E + Axiom Integration** — Canonical reference port; passive+brute+permut+dnsx+scope+takeover+buckets+geo+ASN with Axiom distributed execution; output-equivalence test gates phase end (completed 2026-05-29)
+- [ ] **Phase 4: Subdomains E2E + Axiom Integration** — Canonical reference port; passive+brute+permut+dnsx+scope+takeover+buckets+geo+ASN with Axiom distributed execution; output-equivalence test gates phase end (gap closure in progress)
 - [ ] **Phase 5: Web Pipeline E2E** — Probe + screenshots + fuzz + JS + nuclei + WAF + sourcemaps + favicon + CSP + vhost + 4xx-bypass + URL discovery + 20-function surface with parity test
 - [ ] **Phase 6: Vulnerability Scanning E2E** — XSS + SQLi + SSRF + LFI + SSTI + CRLF + smuggling + cmdi + nuclei-DAST + cache poisoning + gf patterns + 4xx-bypass
 - [ ] **Phase 7: OSINT E2E** — Domain/IP info + emails + GitHub dorks/leaks/actions + cloud enum + Postman + Swagger + Spoofy + msftrecon + CMSeeK + GraphQL + Google dorks
@@ -140,7 +140,7 @@ Plans:
   4. Axiom Backend implementation is swappable at construction: `reconftw subs --target X --axiom` provisions a fleet (`axiom_launch` with configurable count), runs the pipeline distributed, releases the fleet at end (`axiom_shutdown`), and produces an artefact set equivalent (same scope, same dedup) to the local run — output-equivalence test green (AXIOM-01, AXIOM-02, AXIOM-03, AXIOM-04, AXIOM-09)
   5. Axiom resilience features work: resolver list propagation to fleet (`resolvers_update`), failover wrapper detects infrastructure failures (SSH timeout, fleet unreachable, partial-fleet) and retries locally without losing work, `AXIOM_AUTO_FIX_HOSTKEY` repair logic preserved, `axiom_disable_runtime` flag disables axiom mid-run and all subsequent calls run locally (AXIOM-05, AXIOM-06, AXIOM-07, AXIOM-08)
 
-**Plans**: 8 plans (revised after cross-AI review — Wave 0 added for kernel-contract foundations)
+**Plans**: 12 plans (8 original + 4 gap-closure plans 04-08..04-11)
 Plans:
 **Wave 0** *(new — kernel-contract foundations before any Task code)*
 
@@ -170,6 +170,19 @@ Plans:
 **Wave 6** *(blocked on Wave 5)*
 
 - [x] 04-07-PLAN.md — Frozen-replay parity harness (real v1-captured fixtures) + AXIOM-09 equivalence test + phase acceptance checkpoint
+
+**Gap Closure Wave 1** *(parallel — gap-closure plans, independent of each other)*
+
+- [ ] 04-08-PLAN.md — GAP-1: crt arg fix (positional) + full real-tool arg audit across all 10 stage files + tagged smoke test (realtools build tag)
+- [ ] 04-10-PLAN.md — GAP-3: StageProgress UI infrastructure (internal/core/ui/progress.go) + wire subs pipeline
+
+**Gap Closure Wave 2** *(blocked on 04-08)*
+
+- [ ] 04-09-PLAN.md — GAP-2: passive stage best_effort policy (subdomains.passive module name) + ScopeError re-propagation + TestPassiveSoftFail
+
+**Gap Closure Wave 3** *(blocked on 04-08 + 04-09 — human gate)*
+
+- [ ] 04-11-PLAN.md — Live parity sign-off re-attempt: bash v1 vs Go v2 ±5% per-category on hackerone.com + tesla.com (autonomous: false)
 
 ### Phase 5: Web Pipeline E2E
 
@@ -309,7 +322,7 @@ Calendar parallelization (within constraint that dependencies are met):
 | 1. Language ADR & Spike | 4/5 | In Progress|  |
 | 2. Architecture v2 Design | 7/7 | Complete   | 2026-05-28 |
 | 3. Foundation Kernel | 7/7 | Complete   | 2026-05-28 |
-| 4. Subdomains E2E + Axiom Integration | 8/8 | Complete   | 2026-05-29 |
+| 4. Subdomains E2E + Axiom Integration | 8/12 | Gap Closure | - |
 | 5. Web Pipeline E2E | 0/? | Not started | - |
 | 6. Vulnerability Scanning E2E | 0/? | Not started | - |
 | 7. OSINT E2E | 0/? | Not started | - |

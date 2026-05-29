@@ -147,9 +147,13 @@ func (CrtTask) Enabled(cfg *config.Config) bool {
 func (CrtTask) DependsOn() []string { return nil }
 
 // Run executes the crt tool and writes raw hostnames to the staging file.
+//
+// cemulus/crt CLI takes the domain as a POSITIONAL argument — there is no -d
+// flag. Passing -d causes "flag provided but not defined: -d" (exit 2).
+// See: crt --help → "Usage: crt [options...] <domain name>"
 func (CrtTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	const toolName = "crt"
-	args := []string{"-d", app.Target.Domain}
+	args := []string{app.Target.Domain}
 	return runPassiveTask(ctx, app, toolName, args)
 }
 
