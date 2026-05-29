@@ -165,7 +165,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 — depends on 04-05's enrichment Task registrations)*
 
-- [ ] 04-06-PLAN.md — Real AxiomBackend (Tool.InputFlag split) + FailoverBackend (safe Stream) + sequential 5-stage RunStage + filterByModuleAndEnabled
+- [x] 04-06-PLAN.md — Real AxiomBackend (Tool.InputFlag split) + FailoverBackend (safe Stream) + sequential 5-stage RunStage + filterByModuleAndEnabled
 
 **Wave 6** *(blocked on Wave 5)*
 
@@ -309,7 +309,7 @@ Calendar parallelization (within constraint that dependencies are met):
 | 1. Language ADR & Spike | 4/5 | In Progress|  |
 | 2. Architecture v2 Design | 7/7 | Complete   | 2026-05-28 |
 | 3. Foundation Kernel | 7/7 | Complete   | 2026-05-28 |
-| 4. Subdomains E2E + Axiom Integration | 6/8 | In Progress|  |
+| 4. Subdomains E2E + Axiom Integration | 7/8 | In Progress|  |
 | 5. Web Pipeline E2E | 0/? | Not started | - |
 | 6. Vulnerability Scanning E2E | 0/? | Not started | - |
 | 7. OSINT E2E | 0/? | Not started | - |

@@ -66,7 +66,7 @@
 - [x] **SUBD-08**: Per-subdomain geo info (country, city, ASN) via lookup against geolite/ipinfo
 - [x] **SUBD-09**: ASN mapping via `asnmap`; outputs `artefacts/asns.jsonl`
 - [x] **SUBD-10**: Zone transfer attempt (only if `ALLOW_TRANSFER=true` opt-in) — preserves v1 safety gate
-- [ ] **SUBD-11**: Output equivalence test: against 3+ canonical targets (e.g., `hackerone.com`, `tesla.com`), v2 outputs match bash v1 outputs modulo ordering and timing noise (same domain set ± 5% tolerance)
+- [x] **SUBD-11**: Output equivalence test: against 3+ canonical targets (e.g., `hackerone.com`, `tesla.com`), v2 outputs match bash v1 outputs modulo ordering and timing noise (same domain set ± 5% tolerance)
 
 ### Web E2E (Deliverable #5)
 
@@ -140,10 +140,10 @@
 
 ### Axiom Integration (Deliverable #9)
 
-- [ ] **AXIOM-01**: AxiomBackend implements `Backend` interface; shells to `axiom-scan` / `axiom-exec` (does NOT reinvent fleet provisioning)
-- [ ] **AXIOM-02**: `axiom_launch` provisions fleet with configurable sizing (`AXIOM_FLEET_COUNT`)
-- [ ] **AXIOM-03**: `axiom_shutdown` releases fleet at end of run (or on interrupt)
-- [ ] **AXIOM-04**: `axiom_selected` fleet target — uses Axiom's own selection
+- [x] **AXIOM-01**: AxiomBackend implements `Backend` interface; shells to `axiom-scan` / `axiom-exec` (does NOT reinvent fleet provisioning)
+- [x] **AXIOM-02**: `axiom_launch` provisions fleet with configurable sizing (`AXIOM_FLEET_COUNT`)
+- [x] **AXIOM-03**: `axiom_shutdown` releases fleet at end of run (or on interrupt)
+- [x] **AXIOM-04**: `axiom_selected` fleet target — uses Axiom's own selection
 - [x] **AXIOM-05**: Resolver list propagation to fleet (`resolvers_update`)
 - [x] **AXIOM-06**: Failover wrapper detects infrastructure failures (SSH timeout, fleet unreachable, partial-fleet); retries locally without losing work
 - [x] **AXIOM-07**: `AXIOM_AUTO_FIX_HOSTKEY` repair logic preserved
@@ -370,11 +370,11 @@ Each REQ-ID maps to exactly one phase. Populated by roadmapper agent 2026-05-27.
 | SUBD-08 | Phase 4 — Subdomains E2E + Axiom | Complete |
 | SUBD-09 | Phase 4 — Subdomains E2E + Axiom | Complete |
 | SUBD-10 | Phase 4 — Subdomains E2E + Axiom | Complete |
-| SUBD-11 | Phase 4 — Subdomains E2E + Axiom | Pending |
-| AXIOM-01 | Phase 4 — Subdomains E2E + Axiom | Pending |
-| AXIOM-02 | Phase 4 — Subdomains E2E + Axiom | Pending |
-| AXIOM-03 | Phase 4 — Subdomains E2E + Axiom | Pending |
-| AXIOM-04 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| SUBD-11 | Phase 4 — Subdomains E2E + Axiom | Complete |
+| AXIOM-01 | Phase 4 — Subdomains E2E + Axiom | Complete |
+| AXIOM-02 | Phase 4 — Subdomains E2E + Axiom | Complete |
+| AXIOM-03 | Phase 4 — Subdomains E2E + Axiom | Complete |
+| AXIOM-04 | Phase 4 — Subdomains E2E + Axiom | Complete |
 | AXIOM-05 | Phase 4 — Subdomains E2E + Axiom | Complete |
 | AXIOM-06 | Phase 4 — Subdomains E2E + Axiom | Complete |
 | AXIOM-07 | Phase 4 — Subdomains E2E + Axiom | Complete |
