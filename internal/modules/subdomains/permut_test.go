@@ -15,9 +15,10 @@ import (
 	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
 	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/internal/modules/subdomains/sysinfo"
 
-	// Blank import triggers all init() registrations in the subdomains package.
-	_ "github.com/six2dez/reconftw/internal/modules/subdomains"
+	// Direct import for type assertions on SubPermutTask, SubDNSCewlTask, etc.
+	subds "github.com/six2dez/reconftw/internal/modules/subdomains"
 )
 
 // -------------------------------------------------------------------------
@@ -55,6 +56,16 @@ func TestPermutMemGateWaitsOnLowMemory(t *testing.T) {
 	tsk, ok := task.Default.Lookup("subdomains.permut")
 	if !ok {
 		t.Fatal("subdomains.permut not registered")
+	}
+
+	// Inject a zero-returning MemProvider so the gate always blocks.
+	// Type-assert to *SubPermutTask to set the MemProv field.
+	if ptsk, ok := tsk.(*subds.SubPermutTask); ok {
+		ptsk.MemProv = zeroMemProvider{}
+		// Restore after test so subsequent tests use OSMemProvider.
+		t.Cleanup(func() { ptsk.MemProv = nil })
+	} else {
+		t.Skip("cannot inject MemProv: task not *SubPermutTask")
 	}
 
 	res, err := tsk.Run(ctx, app)
@@ -390,6 +401,27 @@ func (m *permutStreamBackend) Stream(_ context.Context, _ *backend.Tool, _ []str
 func (m *permutStreamBackend) HealthCheck(_ context.Context) error { return nil }
 
 func (m *permutStreamBackend) Capacity() int { return 1 }
+
+// -------------------------------------------------------------------------
+// zeroMemProvider — MemProvider that always returns 0 (simulates no memory)
+// -------------------------------------------------------------------------
+
+// zeroMemProvider satisfies sysinfo.MemProvider and always returns 0.
+// Used in tests to ensure the memory gate always blocks.
+type zeroMemProvider struct{}
+
+func (zeroMemProvider) Available() uint64 { return 0 }
+
+// compile-time interface check.
+var _ sysinfo.MemProvider = zeroMemProvider{}
+
+// -------------------------------------------------------------------------
+// Ensure we use the subds import to avoid "imported and not used" error.
+// -------------------------------------------------------------------------
+
+// _ is a dummy usage of the subds import at package level.
+// The actual type assertions in tests consume it, but we add this for safety.
+var _ = subds.SubPermutTask{}
 
 // permutSplitLines splits a string by newlines.
 func permutSplitLines(s string) []string {
