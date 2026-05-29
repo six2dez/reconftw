@@ -6,6 +6,7 @@ import "testing"
 
 // Test 16: policyFor("subdomains") = fail_fast; "osint" = best_effort;
 // "custom" falls through to best_effort (the conservative default).
+// GAP-2: "subdomains.passive" → best_effort (passive stage is non-fatal).
 //
 // Lives in the scheduler package (not _test) so it can call the unexported
 // policyFor.
@@ -16,6 +17,7 @@ func TestPolicyFor(t *testing.T) {
 	}{
 		{"subdomains", PolicyFailFast},
 		{"scheduler", PolicyFailFast},
+		{"subdomains.passive", PolicyBestEffort}, // GAP-2: passive stage is non-fatal
 		{"osint", PolicyBestEffort},
 		{"web", PolicyBestEffort},
 		{"vulns", PolicyBestEffort},

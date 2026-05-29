@@ -33,12 +33,14 @@ package scheduler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"time"
 
 	"golang.org/x/sync/errgroup"
 
 	"github.com/six2dez/reconftw/internal/core/checkpoint"
+	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -150,6 +152,14 @@ func (s *Scheduler) RunStage(ctx context.Context, module string, tasks []task.Ta
 		t := t
 		g.Go(func() error {
 			if err := s.runOne(ctx, t); err != nil {
+				// GAP-2 / T-04-09-01: ScopeError and OutOfScope are NOT swallowed.
+				// Only ToolError/ToolTimeout (network flakiness) may be silently
+				// logged. Scope violations indicate a security/scope misconfiguration
+				// and must surface to the caller. The sentinel bridge is the ONLY
+				// detection mechanism — no string matching permitted (ADR §6).
+				if errors.Is(err, coreerrors.ErrScope) {
+					return err // scope/security violation — surface it, never swallow
+				}
 				s.log().Warn("task_error_best_effort",
 					slog.String("task", t.Name()),
 					slog.String("module", t.Module()),

@@ -49,6 +49,11 @@ func policyFor(module string, override map[string]FailurePolicy) FailurePolicy {
 	switch module {
 	case "subdomains", "scheduler":
 		return PolicyFailFast
+	case "subdomains.passive":
+		// GAP-2: passive stage runs independent sources concurrently; a single
+		// flaky crt.sh timeout must NOT abort the entire subs run. The resolve/
+		// brute/enrichment stages keep module="subdomains" → PolicyFailFast.
+		return PolicyBestEffort
 	case "web", "vulns", "osint":
 		return PolicyBestEffort
 	default:
