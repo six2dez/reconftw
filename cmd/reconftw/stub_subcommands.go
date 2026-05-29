@@ -15,7 +15,21 @@
 
 package main
 
-import "github.com/spf13/cobra"
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/spf13/cobra"
+
+	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/backend"
+	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/output"
+	"github.com/six2dez/reconftw/internal/core/scheduler"
+	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/internal/modules/subdomains"
+)
 
 // stubPhase carries the (Phase N, Phase Name) tuple used by the phase-pointer message.
 type stubPhase struct {
@@ -74,9 +88,243 @@ func newPassiveCmd() *cobra.Command {
 	return newStubCmd("passive", "Run passive-only modules (no active probes)")
 }
 
-// newSubsCmd — Phase 4 (Subdomains E2E). Stubbed per D-02.
+// newSubsCmd — Phase 4 (Subdomains E2E). Real implementation replacing D-02 stub.
+//
+// Wires the full subdomain enumeration pipeline:
+//  1. Config load + target construction
+//  2. Scheduler construction BEFORE Boot (cycle-break — checkpoint wired post-Boot)
+//  3. FailoverBackend when --axiom flag is set; otherwise Boot selects LocalBackend
+//  4. appctx.Boot with BootOptions{Backend: chosenBackend}
+//  5. sched.Checkpoint = app.Checkpoint (B3 fix — per-tool resume operational)
+//  6. sched.RunTask closure (cycle-break #2 — wired after Boot)
+//  7. Optional Axiom fleet launch / shutdown
+//  8. 5 sequential RunStage calls (passive → resolve → permut → enrichment);
+//     each stage slice filtered by filterByModuleAndEnabled (REVIEWS finding #4 fix)
+//  9. mergeTakeoverFindings after enrichment stage (B2 fix — single findings writer)
+// 10. MergeStage after each stage (produces merged.txt for next stage)
 func newSubsCmd() *cobra.Command {
-	return newStubCmd("subs", "Run subdomain enumeration (passive + active + permut + takeover)")
+	cmd := &cobra.Command{
+		Use:   "subs",
+		Short: "Run subdomain enumeration (passive + active + permut + takeover)",
+		Long: `Run the full subdomain enumeration pipeline:
+  Stage 1 (passive):    subfinder, crt.sh, GitHub, GitLab, urlfinder, hackertarget
+  Stage 2 (resolve):    DNS resolution, brute-force, TLS cert harvest, scraping, analytics
+  Stage 3 (permut):     gotator permutations, regex permutations, DNS cewl, recursive
+  Stage 4 (enrichment): subdomain takeover, S3/GCS buckets, ASN mapping, geo, zone transfer
+
+Output: workspaces/<target>/artefacts/subdomains.jsonl`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runSubsCmd(cmd)
+		},
+	}
+	cmd.Flags().String("target", "", "Target domain")
+	cmd.Flags().Bool("dry-run", false, "Preview tasks without executing tools")
+	return cmd
+}
+
+// runSubsCmd is the extracted RunE body for newSubsCmd. Returns an error on any
+// hard failure; soft failures (single-stage errors in best_effort mode) are logged.
+func runSubsCmd(cmd *cobra.Command) error {
+	ctx := cmd.Context()
+
+	// Step 1: Load config with CLI overrides.
+	targetFlag, _ := cmd.Flags().GetString("target")
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+
+	// Inherit --target from parent (persistent flag) if not set locally.
+	if targetFlag == "" {
+		if pf := cmd.InheritedFlags().Lookup("target"); pf != nil {
+			targetFlag = pf.Value.String()
+		}
+	}
+	if targetFlag == "" {
+		return fmt.Errorf("--target is required for subs subcommand")
+	}
+
+	cfg, err := config.Load(config.LoadOptions{})
+	if err != nil {
+		return fmt.Errorf("subs: config load: %w", err)
+	}
+
+	// Step 2: Build target.
+	tgt, err := appctx.NewTarget(targetFlag, nil, "")
+	if err != nil {
+		return fmt.Errorf("subs: invalid target: %w", err)
+	}
+	workdir, err := output.WorkspaceInit(cfg.Paths.DataDir, tgt.Domain)
+	if err != nil {
+		workdir, err = output.WorkspaceInit("workspaces", tgt.Domain)
+		if err != nil {
+			return fmt.Errorf("subs: workspace init: %w", err)
+		}
+	}
+	tgt.WorkDir = workdir
+
+	// Step 3: Construct logger and Scheduler BEFORE Boot (cycle-break).
+	// checkpoint is passed as nil — it will be set to app.Checkpoint after Boot returns.
+	sched := scheduler.NewScheduler(cfg.Concurrency.MaxJobs, cfg.Concurrency.HeartbeatSeconds, nil, nil)
+
+	// Step 4: Choose backend (FailoverBackend when axiom flag is set).
+	var chosenBackend backend.Backend
+	axiomEnabled, _ := cmd.Flags().GetBool("axiom")
+	if axiomEnabled || cfg.Axiom.Enabled {
+		axiomBE := backend.NewAxiomBackend(cfg, backend.Default, nil)
+		localBE := backend.NewLocalBackend(time.Duration(cfg.Concurrency.KillGraceSeconds) * time.Second)
+		chosenBackend = &backend.FailoverBackend{
+			Primary:   axiomBE,
+			Fallback:  localBE,
+			Threshold: cfg.Axiom.FailoverThreshold,
+		}
+	}
+	// nil chosenBackend → Boot.pickBackend selects LocalBackend.
+
+	// Step 5: Boot the AppContext.
+	// Dry-run mode: disable tool execution (will be handled via config override).
+	if dryRun {
+		cfg.Advanced.Diff = false // ensure checkpoint bypass doesn't activate
+	}
+	app, err := appctx.Boot(ctx, nil, cfg, tgt, sched, appctx.BootOptions{Backend: chosenBackend})
+	if err != nil {
+		return fmt.Errorf("subs: appctx boot: %w", err)
+	}
+	defer func() {
+		if closer, ok := app.Checkpoint.(interface{ Close() error }); ok {
+			_ = closer.Close()
+		}
+	}()
+
+	// Step 5b: Wire sched.Checkpoint AFTER Boot returns (B3 fix — per-tool resume).
+	// Without this, sched.Checkpoint remains nil and all checkpoint integration is
+	// silently disabled (D-07 per-tool resume semantics broken).
+	sched.Checkpoint = app.Checkpoint
+
+	// Step 6: Wire RunTask closure (cycle-break #2 — can only close after Boot).
+	sched.RunTask = func(rctx context.Context, t task.Task) (task.Result, error) {
+		return t.Run(rctx, app)
+	}
+
+	// Step 7: Launch Axiom fleet if applicable.
+	var axiomBE *backend.AxiomBackend
+	if fb, ok := chosenBackend.(*backend.FailoverBackend); ok {
+		if abe, ok := fb.Primary.(*backend.AxiomBackend); ok {
+			axiomBE = abe
+		}
+	}
+	if axiomBE != nil {
+		if err := axiomBE.Launch(ctx); err != nil {
+			return fmt.Errorf("subs: axiom launch: %w", err)
+		}
+		defer func() { _ = axiomBE.Shutdown(context.Background()) }()
+	}
+
+	// Step 8: Build the task DAG.
+	allTasks, err := task.Default.Build()
+	if err != nil {
+		return fmt.Errorf("subs: task DAG: %w", err)
+	}
+
+	// Step 9: Dry-run mode — list tasks and exit.
+	if dryRun {
+		return printDryRun(cmd, allTasks, cfg)
+	}
+
+	// Step 10: Sequential 5-stage RunStage execution.
+	// Fixes REVIEWS Scheduler-ordering finding: RunStage fires ALL tasks in a slice
+	// concurrently under the MaxConcurrent semaphore. DependsOn ordering is NOT
+	// enforced within a single RunStage call. Sequential stage calls provide ordering.
+	type stageSpec struct {
+		name     string
+		prefixes []string
+	}
+
+	stages := []stageSpec{
+		{
+			name: "passive",
+			prefixes: []string{
+				"subdomains.passive.",
+			},
+		},
+		{
+			name: "resolve",
+			prefixes: []string{
+				"subdomains.active",
+				"subdomains.tls",
+				"subdomains.noerror",
+				"subdomains.dns",
+				"subdomains.srv",
+				"subdomains.ptr",
+				"subdomains.brute",
+				"subdomains.resolvers.",
+				"subdomains.scraping",
+				"subdomains.analytics",
+				"subdomains.ns_delegation",
+			},
+		},
+		{
+			name: "permut",
+			prefixes: []string{
+				"subdomains.permut",
+				"subdomains.recursive.",
+			},
+		},
+		{
+			name: "enrichment",
+			prefixes: []string{
+				"subdomains.takeover.",
+				"subdomains.buckets",
+				"subdomains.asn",
+				"subdomains.geo",
+				"subdomains.zonetransfer",
+			},
+		},
+	}
+
+	for _, stage := range stages {
+		stageSlice := filterByModuleAndEnabled(allTasks, "subdomains", cfg, stage.prefixes)
+
+		if err := sched.RunStage(ctx, "subdomains", stageSlice); err != nil {
+			return fmt.Errorf("subs: stage %s: %w", stage.name, err)
+		}
+
+		// B2 fix: after enrichment stage, merge takeover staging files into findings.jsonl.
+		if stage.name == "enrichment" {
+			if mergeErr := mergeTakeoverFindings(ctx, app); mergeErr != nil {
+				app.Log.Warn("subs: takeover_merge_failed", "err", mergeErr)
+				// Non-fatal: continue with best-effort findings.
+			}
+		}
+
+		// MergeStage: consolidate stage outputs into subdomains.jsonl + merged.txt.
+		// Non-fatal: log and continue — subsequent stages use best-effort input set.
+		if mergeErr := subdomains.MergeStage(ctx, app, stage.name); mergeErr != nil {
+			app.Log.Warn("subs: merge_stage_failed", "stage", stage.name, "err", mergeErr)
+		}
+	}
+
+	return nil
+}
+
+// printDryRun lists the tasks that would run per stage and returns nil.
+func printDryRun(cmd *cobra.Command, allTasks []task.Task, cfg *config.Config) error {
+	type stageSpec struct {
+		name     string
+		prefixes []string
+	}
+	stages := []stageSpec{
+		{"passive", []string{"subdomains.passive."}},
+		{"resolve", []string{"subdomains.active", "subdomains.tls", "subdomains.noerror", "subdomains.dns", "subdomains.srv", "subdomains.ptr", "subdomains.brute", "subdomains.resolvers.", "subdomains.scraping", "subdomains.analytics", "subdomains.ns_delegation"}},
+		{"permut", []string{"subdomains.permut", "subdomains.recursive."}},
+		{"enrichment", []string{"subdomains.takeover.", "subdomains.buckets", "subdomains.asn", "subdomains.geo", "subdomains.zonetransfer"}},
+	}
+	fmt.Fprintln(cmd.OutOrStdout(), "[dry-run] subs pipeline stages:")
+	for i, stage := range stages {
+		filtered := filterByModuleAndEnabled(allTasks, "subdomains", cfg, stage.prefixes)
+		fmt.Fprintf(cmd.OutOrStdout(), "  Stage %d (%s): %d task(s)\n", i+1, stage.name, len(filtered))
+		for _, t := range filtered {
+			fmt.Fprintf(cmd.OutOrStdout(), "    - %s: %s\n", t.Name(), t.Description())
+		}
+	}
+	return nil
 }
 
 // newWebCmd — Phase 5 (Web Pipeline E2E). Stubbed per D-02.
