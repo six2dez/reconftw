@@ -52,8 +52,11 @@ func (SubBucketsTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 
 	resolvedFile := filepath.Join(app.Target.WorkDir, "inputs", "resolved.merged.txt")
 
-	// --bucket-file is the InputFlag declared in tools.lock (plan-00).
-	args := []string{"scan", "--bucket-file", resolvedFile}
+	// s3scanner takes --bucket-file as a TOP-LEVEL flag — there is no "scan"
+	// subcommand. Passing "scan" made it positional, so --bucket-file was never
+	// parsed → "exactly one of: -bucket, -bucket-file, -mq required" (exit 1).
+	// Verified against the installed s3scanner CLI.
+	args := []string{"--bucket-file", resolvedFile}
 
 	res, err := app.Tools.Run(ctx, toolName, args)
 	if err != nil {

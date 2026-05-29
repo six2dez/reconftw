@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -146,15 +147,73 @@ func (CrtTask) Enabled(cfg *config.Config) bool {
 // DependsOn returns nil.
 func (CrtTask) DependsOn() []string { return nil }
 
-// Run executes the crt tool and writes raw hostnames to the staging file.
+// Run executes the crt tool and writes parsed hostnames to the staging file.
 //
-// cemulus/crt CLI takes the domain as a POSITIONAL argument — there is no -d
-// flag. Passing -d causes "flag provided but not defined: -d" (exit 2).
-// See: crt --help → "Usage: crt [options...] <domain name>"
+// cemulus/crt CLI quirks (verified against crt v0.1.0 --help and live runs):
+//   - The domain is a POSITIONAL argument (no -d flag).
+//   - DEFAULT output is a decorated ANSI box-table and can PANIC
+//     (index out of range in CertResult.Table) on some inputs.
+//   - Even `-s` (enumerate subdomains) prints a colored box-table whose
+//     border lines (`+———+`) are NOT hostnames — feeding them through the
+//     line scanner pollutes the staging set and trips the scope filter.
+//   - Only `-s -json` yields machine-parseable output:
+//     `[{"subdomain": "<value>"}, ...]`. Values can include certificate-CN
+//     noise (e.g. "AS207960 Test Intermediate - example.com"); we keep only
+//     values shaped like real hostnames (no whitespace, contains a dot) and
+//     strip any leading "*." wildcard label. The scope filter (merge.go) is
+//     the final authority on in-scope membership.
 func (CrtTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	const toolName = "crt"
-	args := []string{app.Target.Domain}
-	return runPassiveTask(ctx, app, toolName, args)
+	args := []string{"-s", "-json", app.Target.Domain}
+
+	res, err := app.Tools.Run(ctx, toolName, args)
+	if err != nil {
+		return task.Result{Status: task.StatusErrored},
+			fmt.Errorf("%s: tool execution failed: %w", toolName, err)
+	}
+
+	hostnames := parseCrtJSON(res.Stdout)
+
+	stagingPath, writeErr := writeStagingFile(app, toolName, hostnames)
+	if writeErr != nil {
+		return task.Result{Status: task.StatusErrored}, writeErr
+	}
+
+	return task.Result{
+		Status:  task.StatusDone,
+		Outputs: []string{stagingPath},
+		Stats:   map[string]int{"subdomains_found": len(hostnames)},
+	}, nil
+}
+
+// parseCrtJSON parses `crt -s -json` output (a JSON array of {"subdomain": ...})
+// into a deduplicated list of hostname-shaped values. Non-hostname values
+// (certificate CNs with spaces, blanks) are dropped; leading "*." wildcard
+// labels are stripped. Falls back to empty on malformed JSON rather than
+// erroring — a passive source producing garbage must not abort the stage.
+func parseCrtJSON(stdout []byte) []string {
+	var records []struct {
+		Subdomain string `json:"subdomain"`
+	}
+	if err := json.Unmarshal(bytes.TrimSpace(stdout), &records); err != nil {
+		return nil
+	}
+	seen := make(map[string]bool, len(records))
+	var hostnames []string
+	for _, rec := range records {
+		h := strings.ToLower(strings.TrimSpace(rec.Subdomain))
+		h = strings.TrimPrefix(h, "*.")
+		// Reject cert-CN noise: a hostname has no whitespace and at least one dot.
+		if h == "" || strings.ContainsAny(h, " \t") || !strings.Contains(h, ".") {
+			continue
+		}
+		if seen[h] {
+			continue
+		}
+		seen[h] = true
+		hostnames = append(hostnames, h)
+	}
+	return hostnames
 }
 
 // GithubSubdomainsTask discovers subdomains via GitHub search using a token file.

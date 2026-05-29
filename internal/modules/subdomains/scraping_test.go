@@ -9,9 +9,9 @@ package subdomains_test
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
@@ -151,7 +151,10 @@ func TestSubScrapingTaskWritesStagingFile(t *testing.T) {
 		t.Errorf("staging file is empty, want subdomain entries")
 	}
 
-	// Verify content is valid JSON lines (SubdomainRecord format).
+	// Verify content is PLAIN hostnames (one per line) — the staging contract
+	// (doc.go) that MergeStage's line-based readStagingFile consumes. JSON
+	// lines here would be mangled by the merge reader (the bug this asserts
+	// against).
 	content := string(data)
 	lines := splitStringLines(content)
 	found := false
@@ -159,19 +162,16 @@ func TestSubScrapingTaskWritesStagingFile(t *testing.T) {
 		if line == "" {
 			continue
 		}
-		var record struct {
-			Subdomain string `json:"subdomain"`
-		}
-		if err := json.Unmarshal([]byte(line), &record); err != nil {
-			t.Errorf("staging file line %q is not valid JSON: %v", line, err)
+		if strings.ContainsAny(line, "{}\"") {
+			t.Errorf("staging file line %q looks like JSON; staging files must be plain hostnames", line)
 			continue
 		}
-		if record.Subdomain != "" {
+		if strings.Contains(line, ".") {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("no valid SubdomainRecord entries found in staging file")
+		t.Errorf("no plain hostname entries found in staging file")
 	}
 }
 

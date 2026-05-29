@@ -28,12 +28,10 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
@@ -76,7 +74,10 @@ func (SubScrapingTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	var candidates []string
 
 	// Step 1: favirecon — favicon hash subdomain discovery.
-	faviRes, err := app.Tools.Run(ctx, "favirecon", []string{"-d", domain, "-t", "50", "-timeout", "10"})
+	// favirecon takes the domain via -u (NOT -d, which does not exist → exit 2)
+	// and -t is an ALIAS for -timeout (not a thread count). Verified against the
+	// installed favirecon CLI.
+	faviRes, err := app.Tools.Run(ctx, "favirecon", []string{"-u", domain, "-timeout", "10"})
 	if err == nil {
 		favResults, _ := favicon.Extract(faviRes.Stdout, domain)
 		for _, r := range favResults {
@@ -139,8 +140,17 @@ func (SubScrapingTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	}, nil
 }
 
-// writeScrapingStagingFile writes subdomain candidates as SubdomainRecord JSON lines
-// to inputs/resolved.<toolName>.txt. Creates the inputs/ directory if needed.
+// writeScrapingStagingFile writes subdomain candidates as PLAIN hostnames
+// (one per line) to inputs/resolved.<toolName>.txt. Creates the inputs/
+// directory if needed.
+//
+// STAGING CONTRACT (doc.go): staging files are plain newline-delimited
+// hostnames — MergeStage's readStagingFile reads them line-by-line. This
+// MUST match writeStagingFile (passive) and writeResolvedStagingFile
+// (resolve); writing JSON SubdomainRecord lines here (the prior behavior)
+// made MergeStage treat each JSON blob as a single bogus "hostname", which
+// the scope filter then rejected — losing every scraping/analytics result
+// and (with the old whole-batch-reject Append) the rest of the merge too.
 func writeScrapingStagingFile(app *appctx.AppContext, toolName string, candidates []string) (string, error) {
 	inputsDir := filepath.Join(app.Target.WorkDir, "inputs")
 	if err := os.MkdirAll(inputsDir, 0o755); err != nil {
@@ -148,23 +158,11 @@ func writeScrapingStagingFile(app *appctx.AppContext, toolName string, candidate
 	}
 	stagingPath := filepath.Join(inputsDir, "resolved."+toolName+".txt")
 
-	now := time.Now().UTC().Format(time.RFC3339)
-	var buf bytes.Buffer
-	for _, sub := range candidates {
-		rec := SubdomainRecord{
-			Subdomain: sub,
-			Source:    toolName,
-			FirstSeen: now,
-		}
-		line, err := json.Marshal(rec)
-		if err != nil {
-			continue
-		}
-		buf.Write(line)
-		buf.WriteByte('\n')
+	content := strings.Join(candidates, "\n")
+	if len(candidates) > 0 {
+		content += "\n"
 	}
-
-	if err := os.WriteFile(stagingPath, buf.Bytes(), 0o644); err != nil { //nolint:gosec
+	if err := os.WriteFile(stagingPath, []byte(content), 0o644); err != nil { //nolint:gosec
 		return "", fmt.Errorf("scraping %s: write staging file: %w", toolName, err)
 	}
 	return stagingPath, nil
@@ -205,20 +203,38 @@ func (SubAnalyticsTask) Enabled(cfg *config.Config) bool {
 	return cfg.Subdomains.Analytics.Enabled
 }
 
-// Run executes analyticsrelationships -d <domain>, parses the output via
+// Run executes analyticsrelationships against the target, parses the output via
 // analytics.Extract, and writes candidate domains as SubdomainRecord JSON
 // lines to inputs/resolved.analytics.txt.
+//
+// CLI contract (verified against the installed binary): the tool is
+// `analyticsrelationships -u <URL> [--chain-mode]`. There is NO -d flag —
+// passing `-d <domain>` prints usage and exits 2, which previously aborted the
+// whole resolve stage. `--chain-mode` is required so stdout is undecorated
+// (one bare related-domain per line) instead of the banner/">> "/"|__ "
+// decorations that analytics.Extract cannot parse.
+//
+// The tool also panics (exit 2) on transient builtwith.com server errors even
+// with valid args, so a non-zero exit is treated as a non-fatal degrade: log a
+// warning and write whatever (possibly empty) candidate set was parsed. The
+// task never returns StatusErrored for a tool failure — it is an independent
+// best-effort discovery source (see the resolve-stage failure-policy split).
 func (SubAnalyticsTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	const toolName = "analytics"
 	domain := app.Target.Domain
+	targetURL := "https://" + domain
 
-	res, err := app.Tools.Run(ctx, "analyticsrelationships", []string{"-d", domain})
+	res, err := app.Tools.Run(ctx, "analyticsrelationships", []string{"-u", targetURL, "--chain-mode"})
+	var stdout []byte
 	if err != nil {
-		return task.Result{Status: task.StatusErrored},
-			fmt.Errorf("analyticsrelationships: Run failed: %w", err)
+		if app.Log != nil {
+			app.Log.Warn("analytics: analyticsrelationships failed (non-fatal)", "error", err.Error())
+		}
+	} else {
+		stdout = res.Stdout
 	}
 
-	results, _ := analytics.Extract(res.Stdout, domain)
+	results, _ := analytics.Extract(stdout, domain)
 	var candidates []string
 	for _, r := range results {
 		if r.Subdomain != "" {
