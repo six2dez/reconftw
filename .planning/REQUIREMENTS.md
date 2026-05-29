@@ -59,7 +59,7 @@
 - [x] **SUBD-01**: Passive subdomain enumeration uses ≥6 sources: subfinder, crt.sh (via `crt`), github-subdomains, gitlab-subdomains, urlfinder, hackertarget; outputs merged via `anew`-equivalent dedup
 - [x] **SUBD-02**: Active brute force via `puredns` with wordlist validation, resolver health gate (abort if <N resolvers reachable), and wildcard filtering
 - [x] **SUBD-03**: Subdomain permutations via `gotator`, `regulator`, `dnscewl`; memory-aware throttling (back-pressure when free RAM < threshold)
-- [ ] **SUBD-04**: DNS resolution via `dnsx` with per-batch timeout enforcement (default 4h via `DNS_RESOLVE_TIMEOUT`)
+- [x] **SUBD-04**: DNS resolution via `dnsx` with per-batch timeout enforcement (default 4h via `DNS_RESOLVE_TIMEOUT`)
 - [x] **SUBD-05**: Scope filter uses SINGLE canonical implementation (reconciles v1's `is_in_scope_host` / `domain_match_regex` split); cross-check unit test feeds same corpus through old/new and asserts equivalence
 - [ ] **SUBD-06**: Subdomain takeover detection via `subzy` and `dnstake`; outputs structured findings to `artefacts/findings.jsonl`
 - [ ] **SUBD-07**: S3/GCS/Azure bucket discovery via `s3scanner`; outputs `artefacts/buckets.jsonl`
@@ -363,7 +363,7 @@ Each REQ-ID maps to exactly one phase. Populated by roadmapper agent 2026-05-27.
 | SUBD-01 | Phase 4 — Subdomains E2E + Axiom | Complete |
 | SUBD-02 | Phase 4 — Subdomains E2E + Axiom | Complete |
 | SUBD-03 | Phase 4 — Subdomains E2E + Axiom | Complete |
-| SUBD-04 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| SUBD-04 | Phase 4 — Subdomains E2E + Axiom | Complete |
 | SUBD-05 | Phase 4 — Subdomains E2E + Axiom | Complete |
 | SUBD-06 | Phase 4 — Subdomains E2E + Axiom | Pending |
 | SUBD-07 | Phase 4 — Subdomains E2E + Axiom | Pending |
