@@ -161,7 +161,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3)*
 
-- [ ] 04-05-PLAN.md — Takeover + Buckets + ASN + Geo (real City+ASN via ipinfo) + ZoneTransfer (in-Run gate)
+- [x] 04-05-PLAN.md — Takeover + Buckets + ASN + Geo (real City+ASN via ipinfo) + ZoneTransfer (in-Run gate)
 
 **Wave 5** *(blocked on Wave 4 — depends on 04-05's enrichment Task registrations)*
 
@@ -309,7 +309,7 @@ Calendar parallelization (within constraint that dependencies are met):
 | 1. Language ADR & Spike | 4/5 | In Progress|  |
 | 2. Architecture v2 Design | 7/7 | Complete   | 2026-05-28 |
 | 3. Foundation Kernel | 7/7 | Complete   | 2026-05-28 |
-| 4. Subdomains E2E + Axiom Integration | 5/8 | In Progress|  |
+| 4. Subdomains E2E + Axiom Integration | 6/8 | In Progress|  |
 | 5. Web Pipeline E2E | 0/? | Not started | - |
 | 6. Vulnerability Scanning E2E | 0/? | Not started | - |
 | 7. OSINT E2E | 0/? | Not started | - |

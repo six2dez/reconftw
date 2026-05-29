@@ -61,11 +61,11 @@
 - [x] **SUBD-03**: Subdomain permutations via `gotator`, `regulator`, `dnscewl`; memory-aware throttling (back-pressure when free RAM < threshold)
 - [x] **SUBD-04**: DNS resolution via `dnsx` with per-batch timeout enforcement (default 4h via `DNS_RESOLVE_TIMEOUT`)
 - [x] **SUBD-05**: Scope filter uses SINGLE canonical implementation (reconciles v1's `is_in_scope_host` / `domain_match_regex` split); cross-check unit test feeds same corpus through old/new and asserts equivalence
-- [ ] **SUBD-06**: Subdomain takeover detection via `subzy` and `dnstake`; outputs structured findings to `artefacts/findings.jsonl`
-- [ ] **SUBD-07**: S3/GCS/Azure bucket discovery via `s3scanner`; outputs `artefacts/buckets.jsonl`
-- [ ] **SUBD-08**: Per-subdomain geo info (country, city, ASN) via lookup against geolite/ipinfo
-- [ ] **SUBD-09**: ASN mapping via `asnmap`; outputs `artefacts/asns.jsonl`
-- [ ] **SUBD-10**: Zone transfer attempt (only if `ALLOW_TRANSFER=true` opt-in) — preserves v1 safety gate
+- [x] **SUBD-06**: Subdomain takeover detection via `subzy` and `dnstake`; outputs structured findings to `artefacts/findings.jsonl`
+- [x] **SUBD-07**: S3/GCS/Azure bucket discovery via `s3scanner`; outputs `artefacts/buckets.jsonl`
+- [x] **SUBD-08**: Per-subdomain geo info (country, city, ASN) via lookup against geolite/ipinfo
+- [x] **SUBD-09**: ASN mapping via `asnmap`; outputs `artefacts/asns.jsonl`
+- [x] **SUBD-10**: Zone transfer attempt (only if `ALLOW_TRANSFER=true` opt-in) — preserves v1 safety gate
 - [ ] **SUBD-11**: Output equivalence test: against 3+ canonical targets (e.g., `hackerone.com`, `tesla.com`), v2 outputs match bash v1 outputs modulo ordering and timing noise (same domain set ± 5% tolerance)
 
 ### Web E2E (Deliverable #5)
@@ -365,11 +365,11 @@ Each REQ-ID maps to exactly one phase. Populated by roadmapper agent 2026-05-27.
 | SUBD-03 | Phase 4 — Subdomains E2E + Axiom | Complete |
 | SUBD-04 | Phase 4 — Subdomains E2E + Axiom | Complete |
 | SUBD-05 | Phase 4 — Subdomains E2E + Axiom | Complete |
-| SUBD-06 | Phase 4 — Subdomains E2E + Axiom | Pending |
-| SUBD-07 | Phase 4 — Subdomains E2E + Axiom | Pending |
-| SUBD-08 | Phase 4 — Subdomains E2E + Axiom | Pending |
-| SUBD-09 | Phase 4 — Subdomains E2E + Axiom | Pending |
-| SUBD-10 | Phase 4 — Subdomains E2E + Axiom | Pending |
+| SUBD-06 | Phase 4 — Subdomains E2E + Axiom | Complete |
+| SUBD-07 | Phase 4 — Subdomains E2E + Axiom | Complete |
+| SUBD-08 | Phase 4 — Subdomains E2E + Axiom | Complete |
+| SUBD-09 | Phase 4 — Subdomains E2E + Axiom | Complete |
+| SUBD-10 | Phase 4 — Subdomains E2E + Axiom | Complete |
 | SUBD-11 | Phase 4 — Subdomains E2E + Axiom | Pending |
 | AXIOM-01 | Phase 4 — Subdomains E2E + Axiom | Pending |
 | AXIOM-02 | Phase 4 — Subdomains E2E + Axiom | Pending |

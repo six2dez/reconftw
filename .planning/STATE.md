@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Complete Core Migration
 status: executing
-stopped_at: Phase 4 context gathered
-last_updated: "2026-05-29T00:52:38.225Z"
+stopped_at: Completed 04-05-PLAN.md
+last_updated: "2026-05-29T01:04:59.530Z"
 last_activity: 2026-05-29
 progress:
   total_phases: 12
   completed_phases: 3
   total_plans: 27
-  completed_plans: 24
+  completed_plans: 25
   percent: 25
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-05-27)
 ## Current Position
 
 Phase: 04 (subdomains-e2e-axiom-integration) — EXECUTING
-Plan: 6 of 8
+Plan: 7 of 8
 Status: Ready to execute
 Last activity: 2026-05-29
 
@@ -71,6 +71,7 @@ Last activity: 2026-05-29
 | Phase 04 P01 | 10m | 2 tasks | 9 files |
 | Phase 04 P03 | 15 | 2 tasks | 8 files |
 | Phase 04 P04 | 12 | 2 tasks | 8 files |
+| Phase 04-subdomains-e2e-axiom-integration P05 | 7 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -94,6 +95,8 @@ Recent decisions affecting v2.0 work:
 - v1.0 close: Phases 3-5 (PERF-01, FIX-02, TEST-01/02/03, DOCS-01/02) superseded by v2.0 — los issues se resuelven by design en el rewrite
 - [Phase ?]: 04-00: csprecon added as 26th tools.lock entry to resolve plan count ambiguity
 - [Phase ?]: D-02 pure-transform extractor API: Extract(rawOutput, domain) in internal/extract/{favicon,js,analytics} — no internal/core imports, Phase 5 reuse contract
+- [Phase ?]: TakeoverSubzyTask and TakeoverDNSTakeTask write to separate staging files (B2 fix — OutputTree.Append REPLACE semantics prevent concurrent findings writes)
+- [Phase ?]: ZoneTransferTask in-Run gate returns StatusSkipped when ZoneTransfer.Enabled==false (REVIEWS #4 fix)
 
 ### Pending Todos
 
@@ -121,6 +124,6 @@ Items captured durante v1.0 que deben informar el diseño de arquitectura v2 (no
 
 ## Session Continuity
 
-Last session: 2026-05-29T00:52:38.219Z
-Stopped at: Phase 4 context gathered
+Last session: 2026-05-29T01:04:59.525Z
+Stopped at: Completed 04-05-PLAN.md
 Resume file: None
