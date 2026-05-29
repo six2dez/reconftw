@@ -130,13 +130,13 @@ func TestLocalBackend_Exec_MissingBinary_ReturnsToolError(t *testing.T) {
 // Test 16: Tool struct exposes the documented fields (incl. Critical per Blocker 5).
 func TestTool_StructFields_MatchADRWithCriticalExtension(t *testing.T) {
 	tt := reflect.TypeOf(backend.Tool{})
-	want := []string{"Name", "Path", "Version", "DefaultArgs", "Timeout", "Critical"}
+	want := []string{"Name", "Path", "Version", "DefaultArgs", "Timeout", "Critical", "InputFlag"}
 	got := make([]string, tt.NumField())
 	for i := 0; i < tt.NumField(); i++ {
 		got[i] = tt.Field(i).Name
 	}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("Tool struct fields = %v, want %v (ADR §5.2 + Blocker 5 Critical extension)", got, want)
+		t.Errorf("Tool struct fields = %v, want %v (ADR §5.2 + Critical + InputFlag extensions; InputFlag added Phase 4 plan 04-00 for Axiom input-file split)", got, want)
 	}
 	if tt.NumField() != len(want) {
 		t.Errorf("Tool NumField = %d, want %d", tt.NumField(), len(want))

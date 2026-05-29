@@ -72,7 +72,7 @@ go_module       = "github.com/d3mondev/puredns/v2"
 description     = "Mass DNS resolution with wildcard filtering; positional: puredns bruteforce <wordlist> -d <domain> OR puredns resolve <domains>"
 default_args    = []
 timeout_seconds = 3600
-critical        = true
+critical        = false
 input_flag      = ""
 
 [[tools]]
