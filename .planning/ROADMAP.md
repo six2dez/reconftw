@@ -171,16 +171,19 @@ Plans:
 
 - [x] 04-07-PLAN.md — Frozen-replay parity harness (real v1-captured fixtures) + AXIOM-09 equivalence test + phase acceptance checkpoint
 
-**Gap Closure Wave 1** *(parallel — gap-closure plans, independent of each other)*
+**Gap Closure Wave 1**
 
-- [ ] 04-08-PLAN.md — GAP-1: crt arg fix (positional) + full real-tool arg audit across all 10 stage files + tagged smoke test (realtools build tag)
-- [ ] 04-10-PLAN.md — GAP-3: StageProgress UI infrastructure (internal/core/ui/progress.go) + wire subs pipeline
+- [x] 04-08-PLAN.md — GAP-1: crt arg fix (positional) + full real-tool arg audit across all 10 stage files (per-tool grep acceptance criteria) + tagged smoke test (realtools build tag)
 
 **Gap Closure Wave 2** *(blocked on 04-08)*
 
-- [ ] 04-09-PLAN.md — GAP-2: passive stage best_effort policy (subdomains.passive module name) + ScopeError re-propagation + TestPassiveSoftFail
+- [x] 04-09-PLAN.md — GAP-2: passive stage best_effort policy (subdomains.passive module name) + ScopeError re-propagation via errors.Is(err, coreerrors.ErrScope) + TestPassiveSoftFail; owns the stageSpec.module struct change in stub_subcommands.go
 
-**Gap Closure Wave 3** *(blocked on 04-08 + 04-09 — human gate)*
+**Gap Closure Wave 3** *(blocked on 04-09 — shares stub_subcommands.go, sequenced after 04-09's stageSpec change)*
+
+- [ ] 04-10-PLAN.md — GAP-3: StageProgress UI infrastructure (internal/core/ui/progress.go, unexported test hooks only) + wire subs pipeline around the existing RunStage loop (does not touch stageSpec)
+
+**Gap Closure Wave 4** *(blocked on 04-08 + 04-09 + 04-10 — human gate)*
 
 - [ ] 04-11-PLAN.md — Live parity sign-off re-attempt: bash v1 vs Go v2 ±5% per-category on hackerone.com + tesla.com (autonomous: false)
 
@@ -322,7 +325,7 @@ Calendar parallelization (within constraint that dependencies are met):
 | 1. Language ADR & Spike | 4/5 | In Progress|  |
 | 2. Architecture v2 Design | 7/7 | Complete   | 2026-05-28 |
 | 3. Foundation Kernel | 7/7 | Complete   | 2026-05-28 |
-| 4. Subdomains E2E + Axiom Integration | 8/12 | Gap Closure | - |
+| 4. Subdomains E2E + Axiom Integration | 10/12 | In Progress|  |
 | 5. Web Pipeline E2E | 0/? | Not started | - |
 | 6. Vulnerability Scanning E2E | 0/? | Not started | - |
 | 7. OSINT E2E | 0/? | Not started | - |

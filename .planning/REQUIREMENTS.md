@@ -261,7 +261,7 @@
 - [ ] **XCUT-06**: Documentation — godoc/sphinx API docs auto-generated from code; README rewritten with v2 examples + quickstart; INSTALL.md updated; CONTRIBUTING.md for new contributors
 - [ ] **XCUT-07**: Logging hygiene — NO secrets in any log output ever; redaction tested per channel (file, stdout, stderr, notifier, debug); CI test asserts no known secret patterns leak under varied input
 - [ ] **XCUT-08**: Supply chain — tools.lock pins all 70+ tools to specific versions with SHA-256 where supplied; CI verifies pins on update; 24-72h quarantine window for new tool versions before lockfile bump
-- [ ] **XCUT-09**: Observability — every long-running task emits heartbeat events; failed tasks emit structured error events with classification; CI test asserts heartbeat cadence
+- [x] **XCUT-09**: Observability — every long-running task emits heartbeat events; failed tasks emit structured error events with classification; CI test asserts heartbeat cadence
 
 ---
 
@@ -523,7 +523,7 @@ Each REQ-ID maps to exactly one phase. Populated by roadmapper agent 2026-05-27.
 | XCUT-06 | Phase 12 — Cutover & Migration | Pending |
 | XCUT-07 | Phase 3 — Foundation Kernel (lint + tested every phase) | Pending |
 | XCUT-08 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
-| XCUT-09 | Phase 3 — Foundation Kernel (heartbeat tested every phase) | Pending |
+| XCUT-09 | Phase 3 — Foundation Kernel (heartbeat tested every phase) | Complete |
 
 ---
 
