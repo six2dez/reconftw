@@ -11,6 +11,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
@@ -293,11 +294,17 @@ func (m *mockTree) Append(_ string, lines [][]byte) error {
 	return nil
 }
 
-// containsWord checks if s contains word as a substring.
+// containsWord checks if s contains word as a complete dot-delimited component.
+// For example, containsWord("subdomains.barrier.check", "barrier") == true,
+// but containsWord("subdomains.noerror", "barrier") == false.
 func containsWord(s, word string) bool {
-	return len(s) >= len(word) && (s == word ||
-		len(s) > len(word) && (s[len(s)-len(word)-1] == '.' || s[:len(word)+1] == word+".") ||
-		contains(s, word))
+	if s == word {
+		return true
+	}
+	// Check as a dot-delimited segment anywhere in the string.
+	return contains(s, "."+word+".") ||
+		strings.HasPrefix(s, word+".") ||
+		strings.HasSuffix(s, "."+word)
 }
 
 func contains(s, sub string) bool {

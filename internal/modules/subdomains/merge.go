@@ -1,14 +1,21 @@
-// merge.go — MergeStage: the single app.Tree.Append caller for the passive stage.
+// merge.go — MergeStage: the single app.Tree.Append caller for the subdomains artefact.
 //
 // STAGING CONTRACT (doc.go): MergeStage reads all inputs/<stage>.*.txt staging
-// files written by passive Tasks, deduplicates, converts to SubdomainRecord JSON,
+// files written by Tasks, deduplicates, converts to SubdomainRecord JSON,
 // and calls app.Tree.Append("subdomains", records) EXACTLY ONCE.
+//
+// MERGED-TXT CONTRACT (04-02):
+// After calling Append, MergeStage writes inputs/<stage>.merged.txt — a plain
+// newline-delimited hostname file used by subsequent-stage Tasks as their input
+// list (e.g. SubActiveTask reads inputs/passive.merged.txt, permutation Tasks
+// read inputs/resolved.merged.txt). This keeps the tool invocation pattern
+// simple (Task reads one file) and avoids redundant glob+dedup per tool.
 //
 // This function is NOT a Task. It is called by the command layer (newSubsCmd in
 // cmd/reconftw/stub_subcommands.go) after each sequential RunStage call returns.
 //
 // Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-01-PLAN.md
-// Task 1 Step C (MergeStage).
+// Task 1 Step C (MergeStage). Extended by 04-02 to write merged.txt.
 package subdomains
 
 import (
@@ -116,8 +123,35 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 		return fmt.Errorf("MergeStage %s: Tree.Append: %w", stage, err)
 	}
 
+	// Write inputs/<stage>.merged.txt — plain newline-delimited hostname list
+	// used by downstream Tasks as their input file (MERGED-TXT CONTRACT 04-02).
+	// Non-fatal: if this write fails we log at Debug and continue — the artefact
+	// was already written to Tree successfully.
+	mergedPath := filepath.Join(app.Target.WorkDir, "inputs", stage+".merged.txt")
+	if writeErr := writeMergedTxt(mergedPath, hosts); writeErr != nil {
+		if app.Log != nil {
+			app.Log.Debug("MergeStage: write merged.txt failed",
+				"path", mergedPath, "err", writeErr)
+		}
+		// Non-fatal: log and continue.
+	}
+
 	_ = ctx // context available for future cancellation checks
 	return nil
+}
+
+// writeMergedTxt writes a sorted, newline-delimited list of hostnames to path.
+// Creates the parent directory if it does not exist.
+func writeMergedTxt(path string, hosts []string) error {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("writeMergedTxt: mkdir %q: %w", dir, err)
+	}
+	content := strings.Join(hosts, "\n")
+	if len(hosts) > 0 {
+		content += "\n"
+	}
+	return os.WriteFile(path, []byte(content), 0o644) //nolint:gosec
 }
 
 // extractToolName parses the tool name from a staging filename.
