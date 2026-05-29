@@ -1,5 +1,8 @@
-// root_test.go — Tests for the cobra root command: subcommand surfacing,
-// v1 deprecated aliases (D-03), and the hidden kernel-demo subcommand (W16).
+// root_test.go — Tests for the cobra root command: subcommand surfacing
+// and v1 deprecated aliases (D-03).
+//
+// Phase 4 plan-01: kernel-demo subcommand tests removed (hidden subcommand
+// deleted along with kernel_demo.go and internal/modules/demo/noop.go).
 package main
 
 import (
@@ -8,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
 	"github.com/six2dez/reconftw/internal/core/config"
@@ -16,6 +18,7 @@ import (
 
 // Test 1 (D-01): rootCmd surfaces all 15 visible v2 subcommands per ADR §8.1
 // plus version (1 working from D-04 augmentation).
+// Phase 4 plan-01: kernel-demo hidden subcommand deleted — no longer checked here.
 func TestRootListsFifteenSubcommandsPlusVersion(t *testing.T) {
 	root := newRootCmd(nil, &config.Config{})
 	wantVisible := []string{
@@ -42,23 +45,6 @@ func TestRootListsFifteenSubcommandsPlusVersion(t *testing.T) {
 	// `completion` and `help` automatically — we count only OURS).
 	if len(wantVisible) != 16 {
 		t.Fatalf("wantVisible slice has wrong length: %d", len(wantVisible))
-	}
-	// The 15 v2 subcommands per ADR §8.1 must all be visible (recon..health-check).
-	if t.Failed() {
-		return
-	}
-	// Hidden subcommand present and Hidden=true.
-	var demo *cobra.Command
-	for _, c := range root.Commands() {
-		if c.Name() == "kernel-demo" {
-			demo = c
-			break
-		}
-	}
-	if demo == nil {
-		t.Errorf("kernel-demo subcommand not registered")
-	} else if !demo.Hidden {
-		t.Errorf("kernel-demo should be Hidden:true (W16); got Hidden=%v", demo.Hidden)
 	}
 }
 
@@ -229,31 +215,20 @@ func TestShortAliasShorthandsWired(t *testing.T) {
 	}
 }
 
-// Test 7 (W16): kernel-demo NOT in --help output.
-func TestKernelDemoHidden(t *testing.T) {
+// Test 7 (Phase 4 plan-01): kernel-demo is gone — verify it does NOT appear
+// in --help and does NOT exist as a registered subcommand.
+func TestKernelDemoGone(t *testing.T) {
 	root := newRootCmd(nil, &config.Config{})
 	var out bytes.Buffer
 	root.SetOut(&out)
 	root.SetArgs([]string{"--help"})
 	_ = root.Execute()
 	if strings.Contains(out.String(), "kernel-demo") {
-		t.Errorf("kernel-demo should be hidden but appears in --help: %q", out.String())
+		t.Errorf("kernel-demo should be gone but appears in --help: %q", out.String())
 	}
-}
-
-// Test 8 (W16): kernel-demo subcommand is invokable by name (Hidden:true does
-// not block direct invocation). With nil app, RunE returns *exitCodeError{code:2}.
-func TestKernelDemoInvokableWithoutTarget(t *testing.T) {
-	root := newRootCmd(nil, &config.Config{})
-	root.SetArgs([]string{"kernel-demo"})
-	var errBuf bytes.Buffer
-	root.SetErr(&errBuf)
-	err := root.Execute()
-	var ec *exitCodeError
-	if !errors.As(err, &ec) {
-		t.Fatalf("expected *exitCodeError when --target absent, got %T: %v", err, err)
-	}
-	if ec.code != 2 {
-		t.Errorf("expected exit code 2 (missing --target), got %d", ec.code)
+	for _, c := range root.Commands() {
+		if c.Name() == "kernel-demo" {
+			t.Errorf("kernel-demo subcommand still registered (should have been deleted in Phase 4 plan-01)")
+		}
 	}
 }

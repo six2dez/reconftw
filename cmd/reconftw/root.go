@@ -1,4 +1,4 @@
-// root.go — cobra root command: 15 visible v2 subcommands + 1 hidden + v1 aliases.
+// root.go — cobra root command: 15 visible v2 subcommands + v1 aliases.
 //
 // Source: ADR 0002 §8 (BINDING — CLI Surface):
 //   - §8.1 lines 2064-2088: subcommand inventory (15 visible + version + 12 stubbed + 3 working).
@@ -11,8 +11,8 @@
 //   - D-02: Stubbed subcommands exit 64 with phase-pointer message.
 //   - D-03: All v1 deprecated aliases wired with cobra.MarkDeprecated.
 //   - D-04: version + health-check ship fully working.
-//   - D-05 (W16): Hidden kernel-demo subcommand authorized per ADR §0 D-07 non-breaking
-//                 addition. Plan 07 acceptance integration test invokes it.
+//   - D-05 (W16): Hidden kernel-demo subcommand deleted in Phase 4 plan-01 per
+//                 its own header — demo scaffold replaced by subdomains module.
 
 package main
 
@@ -68,9 +68,9 @@ remain functional with deprecation warnings until v2.2.0 per ADR 0002 §8.4.`,
 	// 1 additional working subcommand per D-04 (version).
 	root.AddCommand(newVersionCmd())
 
-	// 1 hidden subcommand per W16 / ADR §0 D-07 non-breaking addition.
-	// NOT in `reconftw --help`. Used by Plan 07 acceptance integration test.
-	root.AddCommand(newKernelDemoCmd(app))
+	// Phase 4 plan-01: kernel-demo hidden subcommand deleted (along with
+	// internal/modules/demo/noop.go and cmd/reconftw/kernel_demo.go).
+	// Blank import of subdomains package now wires the 6 passive Tasks.
 
 	return root
 }
