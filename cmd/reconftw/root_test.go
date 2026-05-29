@@ -48,37 +48,16 @@ func TestRootListsFifteenSubcommandsPlusVersion(t *testing.T) {
 	}
 }
 
-// Test 2 (D-02): Stub subcommand exits with code 64 (EX_USAGE) and emits
-// the phase-pointer message.
-func TestSubsStubExit64(t *testing.T) {
-	root := newRootCmd(nil, &config.Config{})
-	root.SetArgs([]string{"subs", "--target", "example.com"})
-	var errBuf bytes.Buffer
-	root.SetErr(&errBuf)
-	err := root.Execute()
-	var ec *exitCodeError
-	if !errors.As(err, &ec) {
-		t.Fatalf("expected *exitCodeError, got %T: %v", err, err)
-	}
-	if ec.code != 64 {
-		t.Errorf("expected exit code 64, got %d", ec.code)
-	}
-	stderr := errBuf.String()
-	if !strings.Contains(stderr, "Phase 4") {
-		t.Errorf("phase-pointer message missing 'Phase 4': %q", stderr)
-	}
-	if !strings.Contains(stderr, "ROADMAP.md") {
-		t.Errorf("phase-pointer message missing 'ROADMAP.md': %q", stderr)
-	}
-	if !strings.Contains(stderr, "subs") {
-		t.Errorf("phase-pointer message missing subcommand name 'subs': %q", stderr)
-	}
-}
+// Test 2 (D-02) REMOVED in Phase 4 plan 04-06: `subs` is no longer a stub —
+// newSubsCmd now wires the real sequential per-stage subdomain pipeline RunE.
+// Its behavior is covered by the binary smoke test (`subs --help` / `subs
+// --dry-run`) and the internal/modules/subdomains parity tests. The other
+// subcommands remain stubs and are still guarded by TestEveryStubReturnsExit64.
 
 // Test 3 (D-02): Every stub subcommand returns *exitCodeError{code:64}.
 func TestEveryStubReturnsExit64(t *testing.T) {
 	stubs := []string{
-		"recon", "all", "passive", "subs", "web", "vulns", "osint", "zen", "deep",
+		"recon", "all", "passive", "web", "vulns", "osint", "zen", "deep",
 		"monitor", "report", "mcp", "migrate", "install",
 	}
 	for _, name := range stubs {
