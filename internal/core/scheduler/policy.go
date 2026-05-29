@@ -49,10 +49,21 @@ func policyFor(module string, override map[string]FailurePolicy) FailurePolicy {
 	switch module {
 	case "subdomains", "scheduler":
 		return PolicyFailFast
-	case "subdomains.passive":
-		// GAP-2: passive stage runs independent sources concurrently; a single
-		// flaky crt.sh timeout must NOT abort the entire subs run. The resolve/
-		// brute/enrichment stages keep module="subdomains" → PolicyFailFast.
+	case "subdomains.passive", "subdomains.aux":
+		// GAP-2 + live-run follow-up: independent-discovery and post-processing
+		// groups run best-effort. A flaky/missing source (crt.sh timeout, an
+		// uninstalled tool, analyticsrelationships panicking on a builtwith
+		// error) must NOT abort the whole subs run — this mirrors bash v1, where
+		// sub_passive/sub_scraping/sub_analytics/sub_ns_delegation, permutations,
+		// and the takeover/buckets/asn/geo enrichment steps are all best-effort.
+		//   - "subdomains.passive" → passive enumeration sources
+		//   - "subdomains.aux"     → resolve-stage aux discovery (scraping/
+		//     analytics/ns_delegation), permutations, and enrichment
+		// Only the TRUE spine (active/brute/resolvers.health/dns/tls/srv,
+		// module="subdomains") stays PolicyFailFast — an empty resolved set
+		// breaks every downstream module. ScopeError/OutOfScope STILL
+		// re-propagate even in best_effort (scheduler.go errors.Is(ErrScope)
+		// guard is policy-keyed, not module-keyed).
 		return PolicyBestEffort
 	case "web", "vulns", "osint":
 		return PolicyBestEffort

@@ -44,6 +44,10 @@ func (m *MockOutputTree) Append(artefact string, lines [][]byte) error {
 	return nil
 }
 
+// InScope admits all hosts (the mock does not model scope filtering, so
+// MergeStage's pre-Append scope filter is a pass-through under test).
+func (m *MockOutputTree) InScope(_ string) bool { return true }
+
 // Lines returns the appended lines for an artefact as []string (for easy
 // assertion). Returns an empty slice if the artefact has not been written.
 func (m *MockOutputTree) Lines(artefact string) []string {

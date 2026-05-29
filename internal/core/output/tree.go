@@ -98,6 +98,17 @@ func (t *OutputTree) Append(artefact string, lines [][]byte) error {
 	return WriteJSONL(target, lines)
 }
 
+// InScope reports whether host is within the configured scope. Returns true
+// when no scope filter is configured (nil tree or nil Scope), matching the
+// "no scope = admit all" convention. Multi-source aggregators use this to
+// pre-filter out-of-scope hosts before Append (see Interface.InScope).
+func (t *OutputTree) InScope(host string) bool {
+	if t == nil || t.Scope == nil {
+		return true
+	}
+	return t.Scope.IsInScope(host)
+}
+
 // artefactScopeField returns the JSON field used for the scope check on
 // a given artefact. Empty string means "no scope check (pass-through)" —
 // applied to notes.jsonl and any future schemaless artefact.

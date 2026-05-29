@@ -294,6 +294,9 @@ func (m *mockTree) Append(_ string, lines [][]byte) error {
 	return nil
 }
 
+// InScope admits all hosts (the mock does not model scope filtering).
+func (m *mockTree) InScope(_ string) bool { return true }
+
 // containsWord checks if s contains word as a complete dot-delimited component.
 // For example, containsWord("subdomains.barrier.check", "barrier") == true,
 // but containsWord("subdomains.noerror", "barrier") == false.

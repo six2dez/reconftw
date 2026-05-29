@@ -71,6 +71,16 @@ func NewTarget(domain string, scope []string, workDir string) (*Target, error) {
 			Reason: "domain contains shell metacharacters or invalid characters",
 		}
 	}
+	// Default scope: when no scope file is provided (the common `--target X`
+	// case), admit the apex AND all of its subdomains. The DefaultScopeFilter
+	// rejects everything when Patterns is empty, so without this default a
+	// plain `--target example.com` run would discard every discovered host
+	// ("0 found"). `*.example.com` matches the apex (host == base) and any
+	// subdomain (HasSuffix ".example.com") per matchScopePattern. An explicit
+	// user-provided scope (non-empty) is always honored verbatim.
+	if len(scope) == 0 {
+		scope = []string{"*." + domain}
+	}
 	return &Target{
 		Domain:  domain,
 		Scope:   scope,

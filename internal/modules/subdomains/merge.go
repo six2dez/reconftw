@@ -85,6 +85,33 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 	}
 	sort.Strings(hosts)
 
+	// Pre-filter out-of-scope hosts BEFORE Append. Append rejects the WHOLE
+	// batch on the first out-of-scope line (kernel contract), so a single
+	// noisy source line (a cross-domain SAN from crt.sh, an API error string)
+	// would otherwise discard every merged host. Dropping them here keeps the
+	// multi-source merge resilient while preserving Append's strict per-Task
+	// guard. merged.txt is also written from the filtered set so downstream
+	// stages only consume in-scope hosts.
+	if app.Tree != nil {
+		filtered := hosts[:0:0]
+		var dropped int
+		for _, h := range hosts {
+			if app.Tree.InScope(h) {
+				filtered = append(filtered, h)
+			} else {
+				dropped++
+			}
+		}
+		if dropped > 0 && app.Log != nil {
+			app.Log.Debug("MergeStage: dropped out-of-scope hosts",
+				"stage", stage, "dropped", dropped, "kept", len(filtered))
+		}
+		hosts = filtered
+		if len(hosts) == 0 {
+			return nil
+		}
+	}
+
 	now := stagingTimestamp()
 	records := make([][]byte, 0, len(hosts))
 	for _, host := range hosts {
@@ -137,6 +164,83 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 	}
 
 	_ = ctx // context available for future cancellation checks
+	return nil
+}
+
+// subdomainStagingPrefixes are the per-source staging prefixes that
+// contribute hostnames to the subdomains.jsonl artefact, in first-seen
+// precedence order. ".merged.txt" derived files are excluded by MergeAllSubdomains.
+var subdomainStagingPrefixes = []string{"passive", "resolved", "permut", "recursive"}
+
+// MergeAllSubdomains consolidates the UNION of every per-source subdomain
+// staging file (passive/resolved/permut/recursive) into subdomains.jsonl,
+// scope-filtered. It is the single source of truth for the final artefact.
+//
+// Why this exists: Tree.Append has REPLACE (truncate) semantics, so the
+// per-stage MergeStage calls each OVERWRITE subdomains.jsonl with only that
+// stage's hosts — the artefact would end up holding just the last stage's
+// output, not the cumulative union. Call this ONCE after all stages complete
+// to write the full union. Per-stage MergeStage still produces the
+// <stage>.merged.txt files that downstream stages consume as input.
+//
+// Out-of-scope hosts are dropped (non-fatal); *.merged.txt derived files are
+// skipped to avoid double counting.
+func MergeAllSubdomains(ctx context.Context, app *appctx.AppContext) error {
+	inputsDir := filepath.Join(app.Target.WorkDir, "inputs")
+	dedupe := make(map[string]string)
+
+	for _, prefix := range subdomainStagingPrefixes {
+		matches, err := filepath.Glob(filepath.Join(inputsDir, prefix+".*.txt"))
+		if err != nil {
+			continue
+		}
+		sort.Strings(matches)
+		for _, fpath := range matches {
+			if strings.HasSuffix(fpath, ".merged.txt") {
+				continue // derived output, not a source
+			}
+			toolName := extractToolName(fpath, prefix)
+			if rerr := readStagingFile(fpath, toolName, dedupe); rerr != nil && app.Log != nil {
+				app.Log.Debug("MergeAllSubdomains: read staging file failed", "file", fpath, "err", rerr)
+			}
+		}
+	}
+
+	if len(dedupe) == 0 {
+		return nil
+	}
+
+	hosts := make([]string, 0, len(dedupe))
+	for h := range dedupe {
+		hosts = append(hosts, h)
+	}
+	sort.Strings(hosts)
+
+	now := stagingTimestamp()
+	records := make([][]byte, 0, len(hosts))
+	var dropped int
+	for _, host := range hosts {
+		if app.Tree != nil && !app.Tree.InScope(host) {
+			dropped++
+			continue
+		}
+		line, err := json.Marshal(SubdomainRecord{Subdomain: host, Source: dedupe[host], FirstSeen: now})
+		if err != nil {
+			continue
+		}
+		records = append(records, line)
+	}
+	if dropped > 0 && app.Log != nil {
+		app.Log.Debug("MergeAllSubdomains: dropped out-of-scope hosts", "dropped", dropped, "kept", len(records))
+	}
+	if len(records) == 0 {
+		return nil
+	}
+
+	if err := app.Tree.Append("subdomains", records); err != nil {
+		return fmt.Errorf("MergeAllSubdomains: Tree.Append: %w", err)
+	}
+	_ = ctx
 	return nil
 }
 

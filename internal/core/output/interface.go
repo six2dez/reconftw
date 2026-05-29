@@ -14,8 +14,17 @@ package output
 type Interface interface {
 	// Append writes lines to artefacts/<artefact>.jsonl, validating each
 	// line against the configured ScopeFilter. Out-of-scope lines cause
-	// the WHOLE batch to be rejected with *errors.OutOfScope.
+	// the WHOLE batch to be rejected with *errors.OutOfScope. This strict
+	// contract is intentional for direct single-source Task writes (a Task
+	// emitting out-of-scope findings/hosts is a bug worth surfacing).
 	Append(artefact string, lines [][]byte) error
+
+	// InScope reports whether a hostname value is within the configured
+	// scope. Multi-source aggregators (e.g. subdomains MergeStage) use this
+	// to DROP out-of-scope noise BEFORE calling Append — a single noisy
+	// source line (e.g. a cross-domain SAN from crt.sh) must not reject the
+	// whole merged batch. Returns true when no scope filter is configured.
+	InScope(value string) bool
 }
 
 // Compile-time assertion: concrete *OutputTree satisfies Interface.
