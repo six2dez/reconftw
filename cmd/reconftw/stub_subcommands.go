@@ -16,8 +16,12 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"log/slog"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -25,6 +29,7 @@ import (
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/log"
 	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/scheduler"
 	"github.com/six2dez/reconftw/internal/core/task"
@@ -184,7 +189,38 @@ func runSubsCmd(cmd *cobra.Command) error {
 	if dryRun {
 		cfg.Advanced.Diff = false // ensure checkpoint bypass doesn't activate
 	}
-	app, err := appctx.Boot(ctx, nil, cfg, tgt, sched, appctx.BootOptions{Backend: chosenBackend})
+
+	// GAP-3 log routing: the UI Printer and the default slog logger BOTH write
+	// to stderr, so structured JSON log lines clobber the in-place progress UI
+	// ("anticuado y estático" + JSON soup). When the live UI is active
+	// (interactive TTY, not quiet, not dry-run) route slog to <workdir>/run.log
+	// so stderr carries ONLY the human UI; otherwise (piped / quiet / dry-run)
+	// keep the default stderr logger. Redaction (XCUT-07) is preserved by
+	// re-registering secrets on the file logger's redactor.
+	verbosity := ui.Verbosity(cfg.Output.Verbosity)
+	liveUI := !dryRun && verbosity != ui.VerbosityQuiet && ui.IsTTY(os.Stderr)
+	var subLogger *slog.Logger
+	var runLogPath string
+	if liveUI {
+		p := filepath.Join(workdir, "run.log")
+		if f, ferr := os.Create(p); ferr == nil { //nolint:gosec // path derived from validated workdir
+			defer f.Close() //nolint:errcheck // best-effort close of the run log
+			runLogPath = p
+			rdct := &log.Redactor{}
+			registerSecrets(cfg, rdct)
+			lc := cfg.AsLoggerConfig()
+			lc.Output = f
+			subLogger = log.New(lc, rdct)
+			// Route ALL slog output (not just app.Log) to the file: the Scheduler
+			// was constructed with a nil logger and falls back to slog.Default(),
+			// so heartbeats / task_error_best_effort warnings would otherwise
+			// still hit stderr and clobber the UI. SetDefault redirects them too.
+			slog.SetDefault(subLogger)
+			fmt.Fprintf(os.Stderr, "  logs → %s\n", runLogPath)
+		}
+	}
+
+	app, err := appctx.Boot(ctx, subLogger, cfg, tgt, sched, appctx.BootOptions{Backend: chosenBackend})
 	if err != nil {
 		return fmt.Errorf("subs: appctx boot: %w", err)
 	}
@@ -210,9 +246,16 @@ func runSubsCmd(cmd *cobra.Command) error {
 	progress := ui.NewStageProgress(app.UI.W, app.UI.NoColor, app.UI.Verbosity)
 	sched.RunTask = func(rctx context.Context, t task.Task) (task.Result, error) {
 		progress.TaskStart(t.Name())
+		started := time.Now()
 		result, err := t.Run(rctx, app)
+		// GAP-3 duration fix: Tasks do not all populate Result.Duration, so the
+		// UI showed "0s". Fall back to the measured wall-clock when unset.
+		dur := result.Duration
+		if dur <= 0 {
+			dur = time.Since(started)
+		}
 		badge := badgeForStatus(result.Status)
-		progress.TaskDone(t.Name(), badge, result.Duration)
+		progress.TaskDone(t.Name(), badge, dur)
 		return result, err
 	}
 
@@ -250,23 +293,41 @@ func runSubsCmd(cmd *cobra.Command) error {
 	// uses "subdomains.passive" → PolicyBestEffort (independent sources; single-source
 	// flakiness is non-fatal). All other stages use "subdomains" → PolicyFailFast
 	// (the spine — empty resolved list breaks every downstream stage).
+	// stageSpec.module → scheduler FailurePolicy (policyFor). stageSpec.merge →
+	// the staging-file PREFIX that MergeStage globs (inputs/<merge>.*.txt); this
+	// is intentionally distinct from the display name because resolve-stage Tasks
+	// write inputs/resolved.*.txt (with a 'd'), not resolve.*.txt — passing the
+	// display name "resolve" to MergeStage globbed nothing and silently dropped
+	// the entire resolved set (live-run bug). merge="" means "no subdomains
+	// artefact merge for this stage" (enrichment writes its own artefacts).
+	//
+	// FAILURE POLICY (live-run follow-up to GAP-2): only the resolve SPINE
+	// (active/brute/resolvers.health/dns/tls/srv) is fail_fast — an empty
+	// resolved set breaks every downstream stage. Everything else is best_effort
+	// (module "subdomains.passive"/"subdomains.aux") so a flaky source, an
+	// uninstalled tool, or a panicking aux tool degrades instead of aborting —
+	// matching bash v1. ScopeError/OutOfScope still re-propagate even in
+	// best_effort (scheduler errors.Is(ErrScope) guard is policy-keyed).
 	type stageSpec struct {
 		name     string
 		module   string // scheduler module name → determines FailurePolicy via policyFor
+		merge    string // staging-file prefix for MergeStage glob ("" = skip merge)
 		prefixes []string
 	}
 
 	stages := []stageSpec{
 		{
 			name:   "passive",
-			module: "subdomains.passive", // GAP-2: best_effort — independent sources
+			module: "subdomains.passive", // best_effort — independent sources
+			merge:  "passive",
 			prefixes: []string{
 				"subdomains.passive.",
 			},
 		},
 		{
 			name:   "resolve",
-			module: "subdomains", // fail_fast — spine; resolve failure aborts run
+			module: "subdomains", // fail_fast — TRUE SPINE
+			merge:  "resolved",   // Tasks write inputs/resolved.*.txt
 			prefixes: []string{
 				"subdomains.active",
 				"subdomains.tls",
@@ -276,6 +337,13 @@ func runSubsCmd(cmd *cobra.Command) error {
 				"subdomains.ptr",
 				"subdomains.brute",
 				"subdomains.resolvers.",
+			},
+		},
+		{
+			name:   "discovery",
+			module: "subdomains.aux", // best_effort — aux independent discovery
+			merge:  "resolved",       // scraping/analytics/ns_delegation write resolved.*.txt
+			prefixes: []string{
 				"subdomains.scraping",
 				"subdomains.analytics",
 				"subdomains.ns_delegation",
@@ -283,7 +351,8 @@ func runSubsCmd(cmd *cobra.Command) error {
 		},
 		{
 			name:   "permut",
-			module: "subdomains", // fail_fast — spine
+			module: "subdomains.aux", // best_effort — permutations augment, never gate
+			merge:  "permut",
 			prefixes: []string{
 				"subdomains.permut",
 				"subdomains.recursive.",
@@ -291,7 +360,8 @@ func runSubsCmd(cmd *cobra.Command) error {
 		},
 		{
 			name:   "enrichment",
-			module: "subdomains", // fail_fast — spine
+			module: "subdomains.aux", // best_effort — post-processing; own artefacts
+			merge:  "",               // takeover/buckets/asn/geo write their own *.jsonl
 			prefixes: []string{
 				"subdomains.takeover.",
 				"subdomains.buckets",
@@ -320,18 +390,81 @@ func runSubsCmd(cmd *cobra.Command) error {
 			}
 		}
 
-		// MergeStage: consolidate stage outputs into subdomains.jsonl + merged.txt.
+		// MergeStage: consolidate stage outputs into subdomains.jsonl + <merge>.merged.txt.
 		// Non-fatal: log and continue — subsequent stages use best-effort input set.
-		if mergeErr := subdomains.MergeStage(ctx, app, stage.name); mergeErr != nil {
-			app.Log.Warn("subs: merge_stage_failed", "stage", stage.name, "err", mergeErr)
+		if stage.merge != "" {
+			if mergeErr := subdomains.MergeStage(ctx, app, stage.merge); mergeErr != nil {
+				app.Log.Warn("subs: merge_stage_failed", "stage", stage.name, "merge", stage.merge, "err", mergeErr)
+			}
 		}
 
-		// GAP-3: signal stage completion. foundCount=0 for now — MergeStage does
-		// not return a count; foundCount can be enhanced in a later plan.
-		progress.StageDone(stage.name, 0)
+		// GAP-3: signal stage completion with the running subdomain count so the
+		// user sees live cumulative results per stage (not a static "0 found").
+		progress.StageDone(stage.name, countFileLines(filepath.Join(workdir, "artefacts", "subdomains.jsonl")))
 	}
 
+	// Final consolidation: per-stage MergeStage calls only REPLACE subdomains.jsonl
+	// (Tree.Append truncates), so write the cumulative UNION of every stage's
+	// staging files once at the end. Non-fatal.
+	if mergeErr := subdomains.MergeAllSubdomains(ctx, app); mergeErr != nil {
+		app.Log.Warn("subs: final_union_merge_failed", "err", mergeErr)
+	}
+
+	// GAP-3 results summary: per-artefact counts + output paths + a pointer to
+	// run.log when logs were routed there. Replaces the old "no results shown".
+	printSubsSummary(os.Stderr, workdir, runLogPath, verbosity)
+
 	return nil
+}
+
+// countFileLines returns the number of non-empty lines in path, or 0 if the
+// file does not exist / cannot be read. Used for live subdomain counts.
+func countFileLines(path string) int {
+	f, err := os.Open(path) //nolint:gosec // path derived from validated workdir
+	if err != nil {
+		return 0
+	}
+	defer f.Close() //nolint:errcheck
+	n := 0
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for sc.Scan() {
+		if len(sc.Bytes()) > 0 {
+			n++
+		}
+	}
+	return n
+}
+
+// printSubsSummary writes an end-of-run results table to w: one row per
+// produced artefact (subdomains/findings/buckets/asns/hosts) with its count
+// and path, plus a pointer to run.log when logs were routed off the terminal.
+// Suppressed entirely in quiet mode.
+func printSubsSummary(w *os.File, workdir, runLogPath string, verbosity ui.Verbosity) {
+	if verbosity == ui.VerbosityQuiet {
+		return
+	}
+	artefacts := []struct{ label, file string }{
+		{"subdomains", "subdomains.jsonl"},
+		{"findings", "findings.jsonl"},
+		{"buckets", "buckets.jsonl"},
+		{"asns", "asns.jsonl"},
+		{"hosts", "hosts.jsonl"},
+	}
+	fmt.Fprintf(w, "\n  ── results ──────────────────────────────\n")
+	for _, a := range artefacts {
+		p := filepath.Join(workdir, "artefacts", a.file)
+		n := countFileLines(p)
+		if n == 0 {
+			continue // skip empty/absent artefacts to keep the summary tight
+		}
+		fmt.Fprintf(w, "  %-11s %6d   %s\n", a.label, n, p)
+	}
+	fmt.Fprintf(w, "  workspace   %s\n", workdir)
+	if runLogPath != "" {
+		fmt.Fprintf(w, "  logs        %s\n", runLogPath)
+	}
+	fmt.Fprintf(w, "  ─────────────────────────────────────────\n")
 }
 
 // printDryRun lists the tasks that would run per stage and returns nil.
@@ -345,9 +478,10 @@ func printDryRun(cmd *cobra.Command, allTasks []task.Task, cfg *config.Config) e
 	}
 	stages := []stageSpec{
 		{"passive", "subdomains.passive", []string{"subdomains.passive."}},
-		{"resolve", "subdomains", []string{"subdomains.active", "subdomains.tls", "subdomains.noerror", "subdomains.dns", "subdomains.srv", "subdomains.ptr", "subdomains.brute", "subdomains.resolvers.", "subdomains.scraping", "subdomains.analytics", "subdomains.ns_delegation"}},
-		{"permut", "subdomains", []string{"subdomains.permut", "subdomains.recursive."}},
-		{"enrichment", "subdomains", []string{"subdomains.takeover.", "subdomains.buckets", "subdomains.asn", "subdomains.geo", "subdomains.zonetransfer"}},
+		{"resolve", "subdomains", []string{"subdomains.active", "subdomains.tls", "subdomains.noerror", "subdomains.dns", "subdomains.srv", "subdomains.ptr", "subdomains.brute", "subdomains.resolvers."}},
+		{"discovery", "subdomains.aux", []string{"subdomains.scraping", "subdomains.analytics", "subdomains.ns_delegation"}},
+		{"permut", "subdomains.aux", []string{"subdomains.permut", "subdomains.recursive."}},
+		{"enrichment", "subdomains.aux", []string{"subdomains.takeover.", "subdomains.buckets", "subdomains.asn", "subdomains.geo", "subdomains.zonetransfer"}},
 	}
 	fmt.Fprintln(cmd.OutOrStdout(), "[dry-run] subs pipeline stages:")
 	for i, stage := range stages {
