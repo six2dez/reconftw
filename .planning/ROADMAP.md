@@ -157,7 +157,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 04-04-PLAN.md — Permutation Tasks with gopsutil OS memory back-pressure (not runtime.ReadMemStats) + SubRecursivePassive/Brute
+- [x] 04-04-PLAN.md — Permutation Tasks with gopsutil OS memory back-pressure (not runtime.ReadMemStats) + SubRecursivePassive/Brute
 
 **Wave 4** *(blocked on Wave 3)*
 
@@ -309,7 +309,7 @@ Calendar parallelization (within constraint that dependencies are met):
 | 1. Language ADR & Spike | 4/5 | In Progress|  |
 | 2. Architecture v2 Design | 7/7 | Complete   | 2026-05-28 |
 | 3. Foundation Kernel | 7/7 | Complete   | 2026-05-28 |
-| 4. Subdomains E2E + Axiom Integration | 4/8 | In Progress|  |
+| 4. Subdomains E2E + Axiom Integration | 5/8 | In Progress|  |
 | 5. Web Pipeline E2E | 0/? | Not started | - |
 | 6. Vulnerability Scanning E2E | 0/? | Not started | - |
 | 7. OSINT E2E | 0/? | Not started | - |
