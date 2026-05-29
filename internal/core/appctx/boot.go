@@ -96,7 +96,7 @@ func Boot(ctx context.Context, logger *slog.Logger, cfg *config.Config, target *
 	// 3. Backend + Runner.
 	be := opt.Backend
 	if be == nil {
-		be = pickBackend(cfg)
+		be = pickBackend(cfg, logger)
 	}
 	// Discover() is tolerant of an empty registry — Plan 04 tests already
 	// validate this; Plan 07 seeds the canonical tools.lock.
@@ -169,11 +169,11 @@ func Boot(ctx context.Context, logger *slog.Logger, cfg *config.Config, target *
 	return app, nil
 }
 
-// pickBackend chooses LocalBackend (default) or AxiomBackend (stub —
-// Phase 3 returns *AxiomFailure on every call; Phase 4 wires real SSH).
-func pickBackend(cfg *config.Config) backend.Backend {
+// pickBackend chooses LocalBackend (default) or AxiomBackend per cfg.Axiom.Enabled.
+// logger is required for AxiomBackend (repairKnownHosts logging).
+func pickBackend(cfg *config.Config, logger *slog.Logger) backend.Backend {
 	if cfg.Axiom.Enabled {
-		return backend.NewAxiomBackend()
+		return backend.NewAxiomBackend(cfg, backend.Default, logger)
 	}
 	killGrace := time.Duration(cfg.Concurrency.KillGraceSeconds) * time.Second
 	return backend.NewLocalBackend(killGrace)

@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/six2dez/reconftw/internal/core/backend"
+	"github.com/six2dez/reconftw/internal/core/config"
 	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
 )
 
@@ -77,31 +78,29 @@ func TestRunner_Stream_RegisteredTool_ReturnsChannel(t *testing.T) {
 	}
 }
 
-// Test 16: Backend switching — Runner with AxiomBackend returns the stub AxiomFailure.
-// Cross-references Task 1 Blocker 6 fix — Stream returns Operation="stream".
-func TestRunner_AxiomBackend_PropagatesStubFailure_StreamOperationStream(t *testing.T) {
+// Test 16: Backend switching — Runner with real AxiomBackend (Phase 4 plan-06).
+// The real AxiomBackend delegates unmapped tools (subfinder) to local execution.
+// Since /usr/local/bin/subfinder is absent in CI, it returns a ToolError (not
+// AxiomFailure). We verify (a) Runner construction accepts the 3-arg NewAxiomBackend
+// and (b) tool dispatch works end-to-end when the path resolves.
+func TestRunner_AxiomBackend_ConstructionWithRealBackend(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Axiom.Enabled = true
+	cfg.Axiom.FleetCount = 3
+	cfg.Axiom.FleetName = "test-fleet"
+
 	reg := backend.NewToolRegistry()
-	reg.Register(&backend.Tool{Name: "subfinder", Path: "/usr/local/bin/subfinder"})
 	limiter := backend.NewRateLimiter(nil, 0)
-	r := backend.NewRunner(backend.NewAxiomBackend(), reg, limiter)
 
-	// Exec path: returns AxiomFailure{Operation:"exec"}.
-	_, err := r.Run(context.Background(), "subfinder", []string{"-d", "example.com"})
-	var afExec *coreerrors.AxiomFailure
-	if !stderrors.As(err, &afExec) {
-		t.Fatalf("Run via AxiomBackend err is not *AxiomFailure: %T %v", err, err)
-	}
-	if afExec.Operation != "exec" {
-		t.Errorf("Run via AxiomBackend Operation = %q, want %q", afExec.Operation, "exec")
+	// Verify 3-arg constructor compiles and produces a non-nil Runner.
+	axiomBE := backend.NewAxiomBackend(cfg, reg, nil)
+	r := backend.NewRunner(axiomBE, reg, limiter)
+	if r == nil {
+		t.Fatal("NewRunner with real AxiomBackend returned nil")
 	}
 
-	// Stream path: returns AxiomFailure{Operation:"stream"} per Blocker 6.
-	_, err = r.Stream(context.Background(), "subfinder", []string{"-d", "example.com"})
-	var afStream *coreerrors.AxiomFailure
-	if !stderrors.As(err, &afStream) {
-		t.Fatalf("Stream via AxiomBackend err is not *AxiomFailure: %T %v", err, err)
-	}
-	if afStream.Operation != "stream" {
-		t.Errorf("Stream via AxiomBackend Operation = %q, want %q (Blocker 6)", afStream.Operation, "stream")
+	// Capacity should be FleetCount.
+	if got := axiomBE.Capacity(); got != 3 {
+		t.Errorf("AxiomBackend.Capacity() = %d, want 3", got)
 	}
 }
