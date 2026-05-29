@@ -1,102 +1,151 @@
 //go:build realtools
 
-// Package backend_test — real-tool arg smoke test.
+// Package backend_test — real-tool ARG-VECTOR smoke test.
 //
-// TestRealToolArgSmoke probes each registered tool binary with --help and
-// asserts that the output does NOT contain "flag provided but not defined" or
-// "unknown flag", which are the sentinels for arg drift against the installed CLI.
+// TestRealToolArgVectors runs each subdomain tool with the EXACT argument
+// vector its Task passes (against benign/throwaway inputs) and fails only when
+// the tool reports a flag-parse / usage error. This catches the class of bug
+// the live Phase-4 run exposed — crt's table output, analyticsrelationships'
+// missing -u, s3scanner's bogus `scan` subcommand, favirecon's nonexistent -d —
+// which the previous `--help`-only probe could never see (help short-circuits
+// before flag parsing of the real args).
 //
-// BUILD TAG: this file is gated by //go:build realtools so that a plain
-// `go test ./...` does NOT require any external binaries. Normal CI is hermetic.
-// Run manually with:
+// WHY help-only was insufficient: `tool --help` exits 0 even when the tool's
+// real invocation args are wrong, so it validates that the binary's help works,
+// not that the args the Task passes are accepted. This test substitutes a safe
+// target/input into each Task's real arg vector and asserts the tool does not
+// reject the flags.
+//
+// CLASSIFICATION: a non-zero exit alone is NOT a failure (many tools exit
+// non-zero on no-input / no-findings / network errors). The test fails ONLY
+// when stderr/stdout contains a flag-parse/usage sentinel. Tools not on PATH
+// are skipped (not failed) so the suite stays usable without the full toolchain.
+//
+// BUILD TAG: //go:build realtools keeps plain `go test ./...` hermetic. Run with:
 //
 //	go test -tags realtools ./internal/core/backend/...
 //
-// For the crt regression guard specifically the test also runs:
-//
-//	crt probe.example.com (harmless — probes the binary, not a real target)
-//
-// and verifies the output does not contain "flag provided but not defined"
-// (confirming the positional-arg fix from passive.go Task 1 holds).
-//
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-08-PLAN.md Task 2.
+// Source: live-run remediation (supersedes the 04-08 --help probe).
 package backend_test
 
 import (
 	"bytes"
 	"context"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/six2dez/reconftw/internal/core/backend"
 )
 
-// TestRealToolArgSmoke iterates over every tool registered in backend.Default
-// and probes each binary with --help. The test fails if any binary emits
-// "flag provided but not defined" or "unknown flag", which indicate arg drift.
-//
-// Tools not on PATH are skipped (not failed) so the test stays hermetic on
-// environments without the full toolchain installed.
-//
-// Special case — crt regression guard: if the crt binary is on PATH, the test
-// additionally runs `crt probe.example.com` (positional domain, no -d flag)
-// to confirm the GAP-1 fix in passive.go holds.
-func TestRealToolArgSmoke(t *testing.T) {
-	for _, tool := range backend.Default.All() {
-		tool := tool // capture range variable
-		t.Run(tool.Name, func(t *testing.T) {
-			// Locate binary on PATH.
-			binPath, err := exec.LookPath(tool.Name)
+// usageSentinels are substrings that indicate the tool REJECTED the arg vector
+// (flag-parse / unknown-subcommand / required-flag errors). These — not the
+// exit code — are the failure condition.
+var usageSentinels = []string{
+	"flag provided but not defined",
+	"unknown flag",
+	"unknown shorthand flag",
+	"unknown command",
+	"unexpected argument",
+	"flag needs an argument",
+	"no such flag",
+	"exactly one of", // s3scanner: signals --bucket-file wasn't parsed
+}
+
+// toolProbe pairs a tool name with the representative real arg vector its Task
+// uses. {F}=hosts file, {R}=resolvers file, {W}=wordlist file, {J}=JS file,
+// {O}=output file path — substituted with throwaway temp paths at runtime.
+type toolProbe struct {
+	name string
+	args []string
+	// stdin, when true, feeds empty stdin (for stdin-reading tools).
+	stdin bool
+}
+
+func TestRealToolArgVectors(t *testing.T) {
+	dir := t.TempDir()
+	hosts := filepath.Join(dir, "hosts.txt")
+	resolvers := filepath.Join(dir, "resolvers.txt")
+	wordlist := filepath.Join(dir, "words.txt")
+	jsFile := filepath.Join(dir, "in.js")
+	outFile := filepath.Join(dir, "out.json")
+	mustWrite(t, hosts, "a.example.com\nb.example.com\n")
+	mustWrite(t, resolvers, "8.8.8.8\n1.1.1.1\n")
+	mustWrite(t, wordlist, "dev\napi\n")
+	mustWrite(t, jsFile, "var u = \"https://api.example.com/v1\";\n")
+
+	sub := func(args []string) []string {
+		out := make([]string, len(args))
+		rep := strings.NewReplacer("{F}", hosts, "{R}", resolvers, "{W}", wordlist, "{J}", jsFile, "{O}", outFile)
+		for i, a := range args {
+			out[i] = rep.Replace(a)
+		}
+		return out
+	}
+
+	// Each probe mirrors the real Task invocation (internal/modules/subdomains/*.go).
+	probes := []toolProbe{
+		{name: "subfinder", args: []string{"-all", "-d", "example.com", "-max-time", "1", "-silent"}},
+		{name: "crt", args: []string{"-s", "-json", "example.com"}},
+		{name: "urlfinder", args: []string{"-d", "example.com", "-silent"}},
+		{name: "github-subdomains", args: []string{"-d", "example.com", "-t", "dummytoken"}},
+		{name: "gitlab-subdomains", args: []string{"-d", "example.com", "-t", "dummytoken"}},
+		{name: "httpx", args: []string{"-silent", "-u", "https://example.com"}},
+		{name: "puredns", args: []string{"resolve", "{F}", "-r", "{R}", "--wildcard-tests", "1", "--wildcard-batch", "1", "--rate-limit", "1", "--rate-limit-trusted", "1", "-rt", "{R}", "--quiet"}},
+		{name: "puredns", args: []string{"bruteforce", "{W}", "example.com", "-r", "{R}", "--quiet"}},
+		{name: "tlsx", args: []string{"-l", "{F}", "-silent", "-san", "-cn", "-re", "example.com"}},
+		{name: "dnsx", args: []string{"-l", "{F}", "-ns", "-resp", "-silent"}},
+		{name: "gotator", args: []string{"-sub", "{F}", "-depth", "1", "-numbers", "3", "-md"}},
+		{name: "regulator", args: []string{"{F}", "example.com"}},
+		{name: "dnscewl", args: []string{"-f", "{F}"}},
+		{name: "subwiz", args: []string{"-i", "{F}", "--no-resolve"}},
+		{name: "subzy", args: []string{"run", "--targets", "{F}", "--verify-ssl", "--output", "{O}"}},
+		{name: "dnstake", args: []string{"-f", "{F}", "-silent"}},
+		{name: "s3scanner", args: []string{"--bucket-file", "{F}"}},
+		{name: "asnmap", args: []string{"-d", "example.com", "-json", "-silent"}},
+		{name: "favirecon", args: []string{"-u", "example.com", "-timeout", "5"}},
+		{name: "analyticsrelationships", args: []string{"-u", "https://example.com", "--chain-mode"}},
+		{name: "jsluice", args: []string{"urls", "-i", "{J}"}},
+		{name: "subjs", args: []string{"-i", "-"}, stdin: true},
+	}
+
+	for _, p := range probes {
+		p := p
+		label := p.name + " " + strings.Join(p.args, " ")
+		t.Run(label, func(t *testing.T) {
+			binPath, err := exec.LookPath(p.name)
 			if err != nil {
-				t.Skipf("binary %q not on PATH — skipping (not a CI failure)", tool.Name)
+				t.Skipf("binary %q not on PATH — skipping (not a CI failure)", p.name)
 				return
 			}
-
-			// Probe with --help. Use a 5-second timeout to avoid stalling the test
-			// suite on a tool that hangs on --help (some interactive CLIs do).
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
 
-			cmd := exec.CommandContext(ctx, binPath, "--help")
+			cmd := exec.CommandContext(ctx, binPath, sub(p.args)...)
+			if p.stdin {
+				cmd.Stdin = strings.NewReader("")
+			}
 			var out bytes.Buffer
 			cmd.Stdout = &out
 			cmd.Stderr = &out
-			// Ignore exit code — many tools exit 1 or 2 on --help; that is not
-			// the failure condition we are testing for.
-			_ = cmd.Run()
+			_ = cmd.Run() // exit code is NOT the failure condition — sentinels are.
 
-			combined := out.String()
-			if strings.Contains(combined, "flag provided but not defined") {
-				t.Errorf("%s: --help output contains 'flag provided but not defined' — arg drift detected:\n%s",
-					tool.Name, combined)
-			}
-			if strings.Contains(combined, "unknown flag") {
-				t.Errorf("%s: --help output contains 'unknown flag' — arg drift detected:\n%s",
-					tool.Name, combined)
-			}
-
-			// crt regression guard (GAP-1): confirm the positional-arg fix holds.
-			// Run `crt probe.example.com` — a harmless invocation that exercises
-			// the crt binary's arg parsing without returning real CT records.
-			if tool.Name == "crt" {
-				crtCtx, crtCancel := context.WithTimeout(context.Background(), 10*time.Second)
-				defer crtCancel()
-
-				// Pass domain positionally (no -d flag) — this is the fixed behaviour.
-				crtCmd := exec.CommandContext(crtCtx, binPath, "probe.example.com")
-				var crtOut bytes.Buffer
-				crtCmd.Stdout = &crtOut
-				crtCmd.Stderr = &crtOut
-				_ = crtCmd.Run()
-
-				crtCombined := crtOut.String()
-				if strings.Contains(crtCombined, "flag provided but not defined") {
-					t.Errorf("crt regression: positional invocation produced 'flag provided but not defined'"+
-						" — GAP-1 fix may have regressed:\n%s", crtCombined)
+			combined := strings.ToLower(out.String())
+			for _, sentinel := range usageSentinels {
+				if strings.Contains(combined, sentinel) {
+					t.Errorf("%s rejected its real arg vector (sentinel %q):\n  args: %v\n  output:\n%s",
+						p.name, sentinel, sub(p.args), out.String())
+					break
 				}
 			}
 		})
+	}
+}
+
+func mustWrite(t *testing.T, path, body string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatalf("write %s: %v", path, err)
 	}
 }
