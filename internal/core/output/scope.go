@@ -73,12 +73,23 @@ func (f *DefaultScopeFilter) IsInScope(host string) bool {
 }
 
 // IsInScopeURL parses rawurl and applies IsInScope to its host.
+//
+// SUBD-05 userinfo rejection: URLs containing userinfo (user:password@ or
+// user@ prefix) are unconditionally rejected — regardless of whether the
+// hostname itself matches. Userinfo in HTTP(S) URLs is a credential-leak
+// vector; the v1 filter_in_scope_urls Python implementation rejects them
+// via urllib.parse.urlparse(url).userinfo != "" check (see
+// modules/subdomains.sh filter_in_scope_urls helper).
 func (f *DefaultScopeFilter) IsInScopeURL(rawurl string) bool {
 	if f == nil || strings.TrimSpace(rawurl) == "" {
 		return false
 	}
 	u, err := url.Parse(rawurl)
 	if err != nil {
+		return false
+	}
+	// SUBD-05: reject URLs with userinfo (e.g. "http://u:p@example.com/").
+	if u.User != nil {
 		return false
 	}
 	host := u.Hostname()

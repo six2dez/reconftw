@@ -416,7 +416,7 @@ func stagingTimestamp() string {
 }
 
 // -------------------------------------------------------------------------
-// init() — self-registration via task.Register (staging contract doc.go).
+// init() — self-registration via the task registry (staging contract doc.go).
 // Blank-import this package in cmd/reconftw/modules.go to trigger these.
 // -------------------------------------------------------------------------
 
