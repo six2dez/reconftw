@@ -71,11 +71,11 @@
 ### Web E2E (Deliverable #5)
 
 - [x] **WEB-01**: HTTP probe via `httpx` with tech detection, status codes, titles, response sizes; writes to `artefacts/hosts.jsonl`
-- [ ] **WEB-02**: Screenshots via `nuclei -headless -id screenshot`; diff detection across monitor runs; stored under `raw/screenshots/<hash>.png`
-- [ ] **WEB-03**: Web directory/file fuzz via `ffuf` with `FFUF_THREADS_MAX` cap respected; results in `artefacts/fuzz.jsonl`
+- [x] **WEB-02**: Screenshots via `nuclei -headless -id screenshot`; diff detection across monitor runs; stored under `raw/screenshots/<hash>.png`
+- [x] **WEB-03**: Web directory/file fuzz via `ffuf` with `FFUF_THREADS_MAX` cap respected; results in `artefacts/fuzz.jsonl`
 - [ ] **WEB-04**: JS analysis: URL/secret extraction via `subjs`, `jsluice`, `mantra`, `JSA`; results structured per artifact type
 - [ ] **WEB-05**: Source map extraction via `sourcemapper`; sources written to `raw/sourcemaps/<host>/`
-- [ ] **WEB-06**: Nuclei templated scanning with `NUCLEI_RATELIMIT` and per-tool thread cap; findings go to `artefacts/findings.jsonl` (SARIF-compatible schema)
+- [x] **WEB-06**: Nuclei templated scanning with `NUCLEI_RATELIMIT` and per-tool thread cap; findings go to `artefacts/findings.jsonl` (SARIF-compatible schema)
 - [ ] **WEB-07**: WAF detection via `wafw00f` + `cdncheck`; outputs to `artefacts/waf.jsonl`
 - [ ] **WEB-08**: CDN/origin discovery via `hakoriginfinder`; outputs to `artefacts/origins.jsonl`
 - [ ] **WEB-09**: CSP analysis via `csprecon`; surfaces subdomains found in CSP headers
@@ -381,11 +381,11 @@ Each REQ-ID maps to exactly one phase. Populated by roadmapper agent 2026-05-27.
 | AXIOM-08 | Phase 4 — Subdomains E2E + Axiom | Complete |
 | AXIOM-09 | Phase 4 — Subdomains E2E + Axiom | Complete |
 | WEB-01 | Phase 5 — Web Pipeline E2E | Complete |
-| WEB-02 | Phase 5 — Web Pipeline E2E | Pending |
-| WEB-03 | Phase 5 — Web Pipeline E2E | Pending |
+| WEB-02 | Phase 5 — Web Pipeline E2E | Complete |
+| WEB-03 | Phase 5 — Web Pipeline E2E | Complete |
 | WEB-04 | Phase 5 — Web Pipeline E2E | Pending |
 | WEB-05 | Phase 5 — Web Pipeline E2E | Pending |
-| WEB-06 | Phase 5 — Web Pipeline E2E | Pending |
+| WEB-06 | Phase 5 — Web Pipeline E2E | Complete |
 | WEB-07 | Phase 5 — Web Pipeline E2E | Pending |
 | WEB-08 | Phase 5 — Web Pipeline E2E | Pending |
 | WEB-09 | Phase 5 — Web Pipeline E2E | Pending |

@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: Complete Core Migration
 status: executing
 stopped_at: Completed 04-05-PLAN.md
-last_updated: "2026-06-02T14:28:57.577Z"
+last_updated: "2026-06-02T14:47:07.465Z"
 last_activity: 2026-06-02
 progress:
   total_phases: 12
   completed_phases: 3
   total_plans: 38
-  completed_plans: 31
+  completed_plans: 32
   percent: 25
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-05-27)
 ## Current Position
 
 Phase: 05 (web-pipeline-e2e) — EXECUTING
-Plan: 2 of 7
+Plan: 3 of 7
 Status: Ready to execute
 NEXT (you, the maintainer): provision resolvers + install subzy/dnstake/regulator/dnscewl, then run the bash-v1-vs-v2 ±5% parity (SUBD-11/D-04) on hackerone.com+tesla.com, sign off in 04-11-SUMMARY.md, flip 04-VERIFICATION.md status→passed. See 04-VERIFICATION.md §"WHAT YOU MUST DO". Then Phase 5 (Web Pipeline E2E) — which REUSES Phase 4 extractors + copies its pattern, so add the real-arg smoke test + a real E2E run to its DoD.
 Last activity: 2026-06-02
@@ -74,6 +74,7 @@ Last activity: 2026-06-02
 | Phase 04 P04 | 12 | 2 tasks | 8 files |
 | Phase 04-subdomains-e2e-axiom-integration P05 | 7 | 2 tasks | 7 files |
 | Phase 05-web-pipeline-e2e P01 | 30 | 2 tasks | 8 files |
+| Phase 05-web-pipeline-e2e P02 | 35 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -99,6 +100,7 @@ Recent decisions affecting v2.0 work:
 - [Phase ?]: D-02 pure-transform extractor API: Extract(rawOutput, domain) in internal/extract/{favicon,js,analytics} — no internal/core imports, Phase 5 reuse contract
 - [Phase ?]: TakeoverSubzyTask and TakeoverDNSTakeTask write to separate staging files (B2 fix — OutputTree.Append REPLACE semantics prevent concurrent findings writes)
 - [Phase ?]: ZoneTransferTask in-Run gate returns StatusSkipped when ZoneTransfer.Enabled==false (REVIEWS #4 fix)
+- [Phase ?]: existing config field, not a separate cfg.Web.Fuzz.ThreadsMax
 
 ### Pending Todos
 
@@ -132,6 +134,6 @@ Items captured durante v1.0 que deben informar el diseño de arquitectura v2 (no
 
 ## Session Continuity
 
-Last session: 2026-06-02T14:28:57.571Z
+Last session: 2026-06-02T14:47:07.460Z
 Stopped at: Completed 04-05-PLAN.md
 Resume file: None

@@ -208,7 +208,7 @@ Plans:
 
 **Wave 2** *(parallel — blocked on Wave 1)*
 
-- [ ] 05-02-PLAN.md — NucleiTask (WEB-06) + ScreenshotTask (WEB-02; nuclei-headless) + FfufTask (WEB-03)
+- [x] 05-02-PLAN.md — NucleiTask (WEB-06) + ScreenshotTask (WEB-02; nuclei-headless) + FfufTask (WEB-03)
 - [ ] 05-03-PLAN.md — Infra Tasks (WEB-07/08/09/10/11): wafw00f/cdncheck/hakoriginfinder/csprecon/favirecon/VhostFinder + extractor siblings waf/csp/favicon.ExtractWeb
 - [ ] 05-04-PLAN.md — URL discovery (WEB-14): katana/urlfinder/waymore/urldedup + JS Tasks (WEB-04/05): subjs/jsluice/mantra/JSA/sourcemapper + extractor extensions js/secrets/urls/sourcemap
 
@@ -349,7 +349,7 @@ Calendar parallelization (within constraint that dependencies are met):
 | 2. Architecture v2 Design | 7/7 | Complete   | 2026-05-28 |
 | 3. Foundation Kernel | 7/7 | Complete   | 2026-05-28 |
 | 4. Subdomains E2E + Axiom Integration | 11/12 | In Progress|  |
-| 5. Web Pipeline E2E | 1/7 | In Progress|  |
+| 5. Web Pipeline E2E | 2/7 | In Progress|  |
 | 6. Vulnerability Scanning E2E | 0/? | Not started | - |
 | 7. OSINT E2E | 0/? | Not started | - |
 | 8. MCP Server | 0/? | Not started | - |
