@@ -181,7 +181,7 @@ Plans:
 
 **Gap Closure Wave 3** *(blocked on 04-09 — shares stub_subcommands.go, sequenced after 04-09's stageSpec change)*
 
-- [ ] 04-10-PLAN.md — GAP-3: StageProgress UI infrastructure (internal/core/ui/progress.go, unexported test hooks only) + wire subs pipeline around the existing RunStage loop (does not touch stageSpec)
+- [x] 04-10-PLAN.md — GAP-3: StageProgress UI infrastructure (internal/core/ui/progress.go, unexported test hooks only) + wire subs pipeline around the existing RunStage loop (does not touch stageSpec)
 
 **Gap Closure Wave 4** *(blocked on 04-08 + 04-09 + 04-10 — human gate)*
 
@@ -325,7 +325,7 @@ Calendar parallelization (within constraint that dependencies are met):
 | 1. Language ADR & Spike | 4/5 | In Progress|  |
 | 2. Architecture v2 Design | 7/7 | Complete   | 2026-05-28 |
 | 3. Foundation Kernel | 7/7 | Complete   | 2026-05-28 |
-| 4. Subdomains E2E + Axiom Integration | 10/12 | In Progress|  |
+| 4. Subdomains E2E + Axiom Integration | 11/12 | In Progress|  |
 | 5. Web Pipeline E2E | 0/? | Not started | - |
 | 6. Vulnerability Scanning E2E | 0/? | Not started | - |
 | 7. OSINT E2E | 0/? | Not started | - |
