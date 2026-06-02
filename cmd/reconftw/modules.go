@@ -20,4 +20,8 @@ import (
 	// SubfinderTask, CrtTask, GithubSubdomainsTask, GitlabSubdomainsTask,
 	// UrlfinderTask, HackertargetTask via passive.go init() calls.
 	_ "github.com/six2dez/reconftw/internal/modules/subdomains"
+
+	// Phase 5 web Tasks — triggers task.Register for HTTPXTask via
+	// internal/modules/web/httpx.go init() call.
+	_ "github.com/six2dez/reconftw/internal/modules/web"
 )

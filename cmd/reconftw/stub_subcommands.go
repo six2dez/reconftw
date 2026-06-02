@@ -35,6 +35,7 @@ import (
 	"github.com/six2dez/reconftw/internal/core/task"
 	"github.com/six2dez/reconftw/internal/core/ui"
 	"github.com/six2dez/reconftw/internal/modules/subdomains"
+	"github.com/six2dez/reconftw/internal/modules/web"
 )
 
 // stubPhase carries the (Phase N, Phase Name) tuple used by the phase-pointer message.
@@ -503,9 +504,324 @@ func printDryRun(cmd *cobra.Command, allTasks []task.Task, cfg *config.Config) e
 	return nil
 }
 
-// newWebCmd — Phase 5 (Web Pipeline E2E). Stubbed per D-02.
+// newWebCmd — Phase 5 (Web Pipeline E2E). Real implementation replacing D-02 stub.
+//
+// Wires the full web analysis pipeline:
+//  1. Config load + target construction
+//  2. Scheduler construction BEFORE Boot (cycle-break — checkpoint wired post-Boot)
+//  3. FailoverBackend when --axiom flag is set; otherwise Boot selects LocalBackend
+//  4. appctx.Boot with BootOptions{Backend: chosenBackend}
+//  5. sched.Checkpoint = app.Checkpoint (B3 fix — per-tool resume operational)
+//  6. sched.RunTask closure (cycle-break #2 — wired after Boot)
+//  7. Optional Axiom fleet launch / shutdown
+//  8. 4 sequential best_effort RunStage calls (wave1: httpx → wave2a: analysis →
+//     wave2b: url-discovery → wave3: bypass/param)
+//  9. MergeAllWebArtefacts after all stages (consolidates parallel staging writes)
+//
+// ALL stages are best_effort per D-W12 — no fail_fast anywhere in the web pipeline.
 func newWebCmd() *cobra.Command {
-	return newStubCmd("web", "Run web probing + analysis (httpx + screenshots + nuclei + fuzz + JS)")
+	cmd := &cobra.Command{
+		Use:   "web",
+		Short: "Run web probing + analysis (httpx + screenshots + nuclei + fuzz + JS + WAF + URLs)",
+		Long: `Run the full web analysis pipeline:
+  Stage 1 (probe):     httpx HTTP probe + tech detection → hosts.jsonl
+  Stage 2a (analysis): nuclei, screenshot, ffuf, wafw00f, cdncheck, favirecon, VhostFinder,
+                       hakoriginfinder, csprecon
+  Stage 2b (urls):     katana, urlfinder, waymore, urldedup, subjs, jsluice, mantra, jsa,
+                       sourcemapper
+  Stage 3 (bypass):    nomore403, shortscan, Gxss, arjun
+
+All stages are best_effort (D-W12) — pipeline completes even if individual tools fail.
+
+Output: workspaces/<target>/artefacts/hosts.jsonl (+ findings, fuzz, waf, origins, urls)`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runWebCmd(cmd)
+		},
+	}
+	cmd.Flags().String("target", "", "Target domain")
+	cmd.Flags().Bool("dry-run", false, "Preview tasks without executing tools")
+	cmd.Flags().String("hosts", "", "Seed host list file (overrides prior subs artefacts)")
+	return cmd
+}
+
+// runWebCmd is the extracted RunE body for newWebCmd. Mirrors runSubsCmd structure
+// but implements the web pipeline with all-best_effort stages (D-W12).
+func runWebCmd(cmd *cobra.Command) error {
+	ctx := cmd.Context()
+
+	// Step 1: Load config with CLI overrides.
+	targetFlag, _ := cmd.Flags().GetString("target")
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+	hostsFlag, _ := cmd.Flags().GetString("hosts")
+
+	// Inherit --target from parent (persistent flag) if not set locally.
+	if targetFlag == "" {
+		if pf := cmd.InheritedFlags().Lookup("target"); pf != nil {
+			targetFlag = pf.Value.String()
+		}
+	}
+	if targetFlag == "" {
+		return fmt.Errorf("--target is required for web subcommand")
+	}
+
+	// Honor --config / --secrets (mirrors runSubsCmd pattern).
+	efs := parseEarlyFlags(os.Args[1:])
+	cfg, err := config.Load(config.LoadOptions{
+		ExplicitConfigPath: efs.configPath,
+		SecretsPath:        efs.secretsPath,
+	})
+	if err != nil {
+		return fmt.Errorf("web: config load: %w", err)
+	}
+
+	// Step 2: Build target.
+	tgt, err := appctx.NewTarget(targetFlag, nil, "")
+	if err != nil {
+		return fmt.Errorf("web: invalid target: %w", err)
+	}
+	workdir, err := output.WorkspaceInit(cfg.Paths.DataDir, tgt.Domain)
+	if err != nil {
+		workdir, err = output.WorkspaceInit("workspaces", tgt.Domain)
+		if err != nil {
+			return fmt.Errorf("web: workspace init: %w", err)
+		}
+	}
+	tgt.WorkDir = workdir
+
+	// Step 3: Construct Scheduler BEFORE Boot (cycle-break).
+	sched := scheduler.NewScheduler(cfg.Concurrency.MaxJobs, cfg.Concurrency.HeartbeatSeconds, nil, nil)
+
+	// Step 4: Choose backend.
+	var chosenBackend backend.Backend
+	axiomEnabled, _ := cmd.Flags().GetBool("axiom")
+	if axiomEnabled || cfg.Axiom.Enabled {
+		axiomBE := backend.NewAxiomBackend(cfg, backend.Default, nil)
+		localBE := backend.NewLocalBackend(time.Duration(cfg.Concurrency.KillGraceSeconds) * time.Second)
+		chosenBackend = &backend.FailoverBackend{
+			Primary:   axiomBE,
+			Fallback:  localBE,
+			Threshold: cfg.Axiom.FailoverThreshold,
+		}
+	}
+
+	// Step 5: Boot.
+	if dryRun {
+		cfg.Advanced.Diff = false
+	}
+
+	verbosity := ui.Verbosity(cfg.Output.Verbosity)
+	liveUI := !dryRun && verbosity != ui.VerbosityQuiet && ui.IsTTY(os.Stderr)
+	var subLogger *slog.Logger
+	var runLogPath string
+	if liveUI {
+		p := filepath.Join(workdir, "run.log")
+		if f, ferr := os.Create(p); ferr == nil { //nolint:gosec
+			defer f.Close() //nolint:errcheck
+			runLogPath = p
+			rdct := &log.Redactor{}
+			registerSecrets(cfg, rdct)
+			lc := cfg.AsLoggerConfig()
+			lc.Output = f
+			subLogger = log.New(lc, rdct)
+			slog.SetDefault(subLogger)
+			fmt.Fprintf(os.Stderr, "  logs → %s\n", runLogPath)
+		}
+	}
+
+	app, err := appctx.Boot(ctx, subLogger, cfg, tgt, sched, appctx.BootOptions{Backend: chosenBackend})
+	if err != nil {
+		return fmt.Errorf("web: appctx boot: %w", err)
+	}
+	defer func() {
+		if closer, ok := app.Checkpoint.(interface{ Close() error }); ok {
+			_ = closer.Close()
+		}
+	}()
+
+	// Step 5b: Wire sched.Checkpoint AFTER Boot (B3 fix).
+	sched.Checkpoint = app.Checkpoint
+
+	// Step 6: Wire RunTask closure with progress UI.
+	progress := ui.NewStageProgress(app.UI.W, app.UI.NoColor, app.UI.Verbosity)
+	sched.RunTask = func(rctx context.Context, t task.Task) (task.Result, error) {
+		progress.TaskStart(t.Name())
+		started := time.Now()
+		result, err := t.Run(rctx, app)
+		dur := result.Duration
+		if dur <= 0 {
+			dur = time.Since(started)
+		}
+		badge := badgeForStatus(result.Status)
+		progress.TaskDone(t.Name(), badge, dur)
+		return result, err
+	}
+
+	// Step 7: Launch Axiom fleet if applicable.
+	var axiomBE *backend.AxiomBackend
+	if fb, ok := chosenBackend.(*backend.FailoverBackend); ok {
+		if abe, ok := fb.Primary.(*backend.AxiomBackend); ok {
+			axiomBE = abe
+		}
+	}
+	if axiomBE != nil {
+		if err := axiomBE.Launch(ctx); err != nil {
+			return fmt.Errorf("web: axiom launch: %w", err)
+		}
+		defer func() { _ = axiomBE.Shutdown(context.Background()) }()
+	}
+
+	// Step 8: Build the task DAG.
+	allTasks, err := task.Default.Build()
+	if err != nil {
+		return fmt.Errorf("web: task DAG: %w", err)
+	}
+
+	// Step 9: Dry-run mode — list tasks and exit.
+	if dryRun {
+		return printWebDryRun(cmd, allTasks, cfg)
+	}
+
+	// Step 10: Inject --hosts flag into context for HTTPXTask.Run (D-W10).
+	if hostsFlag != "" {
+		ctx = web.CtxWithHostsFile(ctx, hostsFlag)
+	}
+
+	// Step 11: Sequential best_effort RunStage execution (D-W12).
+	// ALL stages use module "web" → best_effort policy throughout.
+	// No fail_fast stage — httpx empty output → downstream runs with empty input.
+	type stageSpec struct {
+		name     string
+		prefixes []string
+	}
+	stages := []stageSpec{
+		{
+			// Wave 1: httpx probe — DAG root; feeds everything downstream.
+			name: "probe",
+			prefixes: []string{
+				"web.httpx",
+			},
+		},
+		{
+			// Wave 2a: analysis tools — all DependsOn httpx (implemented in plan-02+).
+			name: "analysis",
+			prefixes: []string{
+				"web.nuclei",
+				"web.screenshot",
+				"web.ffuf",
+				"web.wafw00f",
+				"web.cdncheck",
+				"web.favirecon",
+				"web.vhostfinder",
+				"web.hakoriginfinder",
+				"web.csprecon",
+			},
+		},
+		{
+			// Wave 2b: URL discovery + JS analysis — all DependsOn httpx.
+			name: "url-discovery",
+			prefixes: []string{
+				"web.katana",
+				"web.urlfinder",
+				"web.waymore",
+				"web.urldedup",
+				"web.subjs",
+				"web.jsluice",
+				"web.mantra",
+				"web.jsa",
+				"web.sourcemapper",
+			},
+		},
+		{
+			// Wave 3: bypass + param discovery — depend on fuzz/nuclei outputs.
+			name: "bypass",
+			prefixes: []string{
+				"web.nomore403",
+				"web.shortscan",
+				"web.gxss",
+				"web.arjun",
+			},
+		},
+	}
+
+	for _, stage := range stages {
+		stageSlice := filterByModuleAndEnabled(allTasks, "web", cfg, stage.prefixes)
+		progress.StageStart(stage.name, len(stageSlice))
+
+		// Pass ctx (possibly carrying hostsFlag) through RunStage.
+		if err := sched.RunStage(ctx, "web", stageSlice); err != nil {
+			// best_effort: log the error and continue to the next stage.
+			if app.Log != nil {
+				app.Log.Warn("web: stage failed (best_effort — continuing)",
+					"stage", stage.name, "err", err)
+			}
+		}
+
+		progress.StageDone(stage.name, countFileLines(filepath.Join(workdir, "artefacts", "hosts.jsonl")))
+	}
+
+	// Final consolidation of parallel staging writes.
+	if mergeErr := web.MergeAllWebArtefacts(ctx, app); mergeErr != nil {
+		if app.Log != nil {
+			app.Log.Warn("web: merge_all_artefacts_failed", "err", mergeErr)
+		}
+	}
+
+	printWebSummary(os.Stderr, workdir, runLogPath, verbosity)
+
+	return nil
+}
+
+// printWebDryRun lists the tasks that would run per stage and returns nil.
+func printWebDryRun(cmd *cobra.Command, allTasks []task.Task, cfg *config.Config) error {
+	type stageSpec struct {
+		name     string
+		prefixes []string
+	}
+	stages := []stageSpec{
+		{"probe", []string{"web.httpx"}},
+		{"analysis", []string{"web.nuclei", "web.screenshot", "web.ffuf", "web.wafw00f", "web.cdncheck", "web.favirecon", "web.vhostfinder", "web.hakoriginfinder", "web.csprecon"}},
+		{"url-discovery", []string{"web.katana", "web.urlfinder", "web.waymore", "web.urldedup", "web.subjs", "web.jsluice", "web.mantra", "web.jsa", "web.sourcemapper"}},
+		{"bypass", []string{"web.nomore403", "web.shortscan", "web.gxss", "web.arjun"}},
+	}
+	fmt.Fprintln(cmd.OutOrStdout(), "[dry-run] web pipeline stages:")
+	for i, stage := range stages {
+		filtered := filterByModuleAndEnabled(allTasks, "web", cfg, stage.prefixes)
+		fmt.Fprintf(cmd.OutOrStdout(), "  Stage %d (%s): %d task(s)\n", i+1, stage.name, len(filtered))
+		for _, t := range filtered {
+			fmt.Fprintf(cmd.OutOrStdout(), "    - %s: %s\n", t.Name(), t.Description())
+		}
+	}
+	return nil
+}
+
+// printWebSummary writes an end-of-run results table to w: one row per
+// produced artefact with its count and path.
+func printWebSummary(w *os.File, workdir, runLogPath string, verbosity ui.Verbosity) {
+	if verbosity == ui.VerbosityQuiet {
+		return
+	}
+	artefacts := []struct{ label, file string }{
+		{"hosts", "hosts.jsonl"},
+		{"findings", "findings.jsonl"},
+		{"fuzz", "fuzz.jsonl"},
+		{"waf", "waf.jsonl"},
+		{"origins", "origins.jsonl"},
+		{"urls", "urls.jsonl"},
+	}
+	fmt.Fprintf(w, "\n  ── results ──────────────────────────────\n")
+	for _, a := range artefacts {
+		p := filepath.Join(workdir, "artefacts", a.file)
+		n := countFileLines(p)
+		if n == 0 {
+			continue
+		}
+		fmt.Fprintf(w, "  %-11s %6d   %s\n", a.label, n, p)
+	}
+	fmt.Fprintf(w, "  workspace   %s\n", workdir)
+	if runLogPath != "" {
+		fmt.Fprintf(w, "  logs        %s\n", runLogPath)
+	}
+	fmt.Fprintf(w, "  ─────────────────────────────────────────\n")
 }
 
 // newVulnsCmd — Phase 6 (Vulnerability Scanning E2E). Stubbed per D-02.

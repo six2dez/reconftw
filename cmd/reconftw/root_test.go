@@ -53,11 +53,15 @@ func TestRootListsFifteenSubcommandsPlusVersion(t *testing.T) {
 // Its behavior is covered by the binary smoke test (`subs --help` / `subs
 // --dry-run`) and the internal/modules/subdomains parity tests. The other
 // subcommands remain stubs and are still guarded by TestEveryStubReturnsExit64.
+//
+// Phase 5 plan 05-01: `web` is no longer a stub — newWebCmd wires the real
+// web pipeline RunE (mirrors the Phase 4 pattern for subs). `web` removed from
+// the stubs list; its behavior is covered by `web --help` / `web --dry-run` smoke.
 
 // Test 3 (D-02): Every stub subcommand returns *exitCodeError{code:64}.
 func TestEveryStubReturnsExit64(t *testing.T) {
 	stubs := []string{
-		"recon", "all", "passive", "web", "vulns", "osint", "zen", "deep",
+		"recon", "all", "passive", "vulns", "osint", "zen", "deep",
 		"monitor", "report", "mcp", "migrate", "install",
 	}
 	for _, name := range stubs {
