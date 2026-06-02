@@ -200,7 +200,30 @@ Plans:
   4. Bypass and IIS flows ship: 4xx bypass via nomore403, IIS short filename scanner via shortscan; outputs structured to `artefacts/findings.jsonl` with proper severity/confidence tagging (WEB-12, WEB-13)
   5. Output equivalence test green against 3+ canonical web targets (e.g., `hackerone.com`, `tesla.com`, controlled lab) — v2 output matches v1 modulo ordering/timing noise within ±5% tolerance for host/URL/finding counts (WEB-16)
 
-**Plans**: TBD
+**Plans**: 7 plans
+Plans:
+**Wave 1**
+
+- [x] 05-01-PLAN.md — Housekeeping (WEB-02 stale text fix) + web package scaffold + HTTPXTask (DAG root) + tools.lock 17 new entries + web subcommand RunE wiring
+
+**Wave 2** *(parallel — blocked on Wave 1)*
+
+- [ ] 05-02-PLAN.md — NucleiTask (WEB-06) + ScreenshotTask (WEB-02; nuclei-headless) + FfufTask (WEB-03)
+- [ ] 05-03-PLAN.md — Infra Tasks (WEB-07/08/09/10/11): wafw00f/cdncheck/hakoriginfinder/csprecon/favirecon/VhostFinder + extractor siblings waf/csp/favicon.ExtractWeb
+- [ ] 05-04-PLAN.md — URL discovery (WEB-14): katana/urlfinder/waymore/urldedup + JS Tasks (WEB-04/05): subjs/jsluice/mantra/JSA/sourcemapper + extractor extensions js/secrets/urls/sourcemap
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 05-05-PLAN.md — Bypass + param: nomore403 (WEB-12) + shortscan (WEB-13) + Gxss/arjun (WEB-15)
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 05-06-PLAN.md — Frozen-replay parity harness (D-W7) + fixtures + DoD-1 smoke test all 23 tools (D-W9)
+
+**Wave 5** *(blocked on Wave 4 — human gate)*
+
+- [ ] 05-07-PLAN.md — DoD-2 seeded-local E2E run + fixture population + VPS/Axiom parity sign-off (autonomous: false)
+
 **UI hint**: yes
 
 ### Phase 6: Vulnerability Scanning E2E
@@ -326,7 +349,7 @@ Calendar parallelization (within constraint that dependencies are met):
 | 2. Architecture v2 Design | 7/7 | Complete   | 2026-05-28 |
 | 3. Foundation Kernel | 7/7 | Complete   | 2026-05-28 |
 | 4. Subdomains E2E + Axiom Integration | 11/12 | In Progress|  |
-| 5. Web Pipeline E2E | 0/? | Not started | - |
+| 5. Web Pipeline E2E | 1/7 | In Progress|  |
 | 6. Vulnerability Scanning E2E | 0/? | Not started | - |
 | 7. OSINT E2E | 0/? | Not started | - |
 | 8. MCP Server | 0/? | Not started | - |

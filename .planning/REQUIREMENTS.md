@@ -70,7 +70,7 @@
 
 ### Web E2E (Deliverable #5)
 
-- [ ] **WEB-01**: HTTP probe via `httpx` with tech detection, status codes, titles, response sizes; writes to `artefacts/hosts.jsonl`
+- [x] **WEB-01**: HTTP probe via `httpx` with tech detection, status codes, titles, response sizes; writes to `artefacts/hosts.jsonl`
 - [ ] **WEB-02**: Screenshots via `nuclei -headless -id screenshot`; diff detection across monitor runs; stored under `raw/screenshots/<hash>.png`
 - [ ] **WEB-03**: Web directory/file fuzz via `ffuf` with `FFUF_THREADS_MAX` cap respected; results in `artefacts/fuzz.jsonl`
 - [ ] **WEB-04**: JS analysis: URL/secret extraction via `subjs`, `jsluice`, `mantra`, `JSA`; results structured per artifact type
@@ -85,7 +85,7 @@
 - [ ] **WEB-13**: IIS short filename scanner via `shortscan`
 - [ ] **WEB-14**: URL discovery via `katana` + `urlfinder` + `waymore`; results deduplicated via `urless` / `p1radup`
 - [ ] **WEB-15**: Reflection / parameter discovery via `Gxss` + `arjun`
-- [ ] **WEB-16**: Output equivalence test against 3+ canonical web targets
+- [x] **WEB-16**: Output equivalence test against 3+ canonical web targets
 
 ### Vulns E2E (Deliverable #6)
 
@@ -380,7 +380,7 @@ Each REQ-ID maps to exactly one phase. Populated by roadmapper agent 2026-05-27.
 | AXIOM-07 | Phase 4 — Subdomains E2E + Axiom | Complete |
 | AXIOM-08 | Phase 4 — Subdomains E2E + Axiom | Complete |
 | AXIOM-09 | Phase 4 — Subdomains E2E + Axiom | Complete |
-| WEB-01 | Phase 5 — Web Pipeline E2E | Pending |
+| WEB-01 | Phase 5 — Web Pipeline E2E | Complete |
 | WEB-02 | Phase 5 — Web Pipeline E2E | Pending |
 | WEB-03 | Phase 5 — Web Pipeline E2E | Pending |
 | WEB-04 | Phase 5 — Web Pipeline E2E | Pending |
@@ -395,7 +395,7 @@ Each REQ-ID maps to exactly one phase. Populated by roadmapper agent 2026-05-27.
 | WEB-13 | Phase 5 — Web Pipeline E2E | Pending |
 | WEB-14 | Phase 5 — Web Pipeline E2E | Pending |
 | WEB-15 | Phase 5 — Web Pipeline E2E | Pending |
-| WEB-16 | Phase 5 — Web Pipeline E2E | Pending |
+| WEB-16 | Phase 5 — Web Pipeline E2E | Complete |
 | VULN-01 | Phase 6 — Vulnerability Scanning E2E | Pending |
 | VULN-02 | Phase 6 — Vulnerability Scanning E2E | Pending |
 | VULN-03 | Phase 6 — Vulnerability Scanning E2E | Pending |

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Complete Core Migration
-status: verifying
+status: executing
 stopped_at: Completed 04-05-PLAN.md
-last_updated: "2026-05-29T07:52:52.916Z"
-last_activity: 2026-05-29
+last_updated: "2026-06-02T14:28:57.577Z"
+last_activity: 2026-06-02
 progress:
   total_phases: 12
   completed_phases: 3
-  total_plans: 31
-  completed_plans: 30
+  total_plans: 38
+  completed_plans: 31
   percent: 25
 ---
 
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-27)
 
 **Core value:** Run one command, get a complete recon picture of a target — passive, active, and vulnerability layers — with resumable checkpoints, structured output, and zero-touch tool orchestration.
-**Current focus:** Phase 04 — subdomains-e2e-axiom-integration
+**Current focus:** Phase 05 — web-pipeline-e2e
 
 ## Current Position
 
-Phase: 04 (subdomains-e2e-axiom-integration) — CODE COMPLETE, awaiting human live-parity sign-off
-Plan: 04-08/09/10 done + a deeper live-run remediation done (commits d31fe4d0,9fec6f0b,f1d23005,482305bc) — 04-11 = the human gate
-Status: GAP-1/2/3 + a deeper class of pipeline bugs (crt/analytics/s3scanner/favirecon args, empty default scope, Append batch-abort, merge prefix + REPLACE-not-union, JSON-vs-plain staging, over-broad fail_fast) all FIXED. `go test ./...` green; real-arg smoke test green; live example.com now yields 6 subs (was 0). Root lesson: Phase 4 passed CI on mocks only, never ran real tools.
+Phase: 05 (web-pipeline-e2e) — EXECUTING
+Plan: 2 of 7
+Status: Ready to execute
 NEXT (you, the maintainer): provision resolvers + install subzy/dnstake/regulator/dnscewl, then run the bash-v1-vs-v2 ±5% parity (SUBD-11/D-04) on hackerone.com+tesla.com, sign off in 04-11-SUMMARY.md, flip 04-VERIFICATION.md status→passed. See 04-VERIFICATION.md §"WHAT YOU MUST DO". Then Phase 5 (Web Pipeline E2E) — which REUSES Phase 4 extractors + copies its pattern, so add the real-arg smoke test + a real E2E run to its DoD.
-Last activity: 2026-05-29
+Last activity: 2026-06-02
 
 ## Performance Metrics
 
@@ -73,6 +73,7 @@ Last activity: 2026-05-29
 | Phase 04 P03 | 15 | 2 tasks | 8 files |
 | Phase 04 P04 | 12 | 2 tasks | 8 files |
 | Phase 04-subdomains-e2e-axiom-integration P05 | 7 | 2 tasks | 7 files |
+| Phase 05-web-pipeline-e2e P01 | 30 | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -110,6 +111,12 @@ Next action: run `/gsd:plan-phase 2` (Architecture v2 Design).
 - **Phase 11 Docker base image choice (DOCK-02)** — distroless vs minimal Ubuntu; locked when Phase 11 plans are written. Go (ADR 0001) favors distroless.
 - **Spike code disposition pending Phase 2 plan** — decide whether to delete `spike/python/` tree, archive in a tarball, or leave in git history only — Phase 2 planner decides.
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260602-config-explicit-path-warn | Config loader: WARN to WarnSink on explicit --config/--secrets pointing at a missing file (silent-skip→nil preserved) | 2026-06-02 | staged (maintainer) | [260602-config-explicit-path-warn](./quick/260602-config-explicit-path-warn/) |
+
 ## v2 Architecture Considerations (from v1.0 deferred backlog)
 
 Items captured durante v1.0 que deben informar el diseño de arquitectura v2 (no son requirements directos — son input al design phase):
@@ -125,6 +132,6 @@ Items captured durante v1.0 que deben informar el diseño de arquitectura v2 (no
 
 ## Session Continuity
 
-Last session: 2026-05-29T07:52:52.911Z
+Last session: 2026-06-02T14:28:57.571Z
 Stopped at: Completed 04-05-PLAN.md
 Resume file: None
