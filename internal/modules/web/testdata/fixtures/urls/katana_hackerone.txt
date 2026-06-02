@@ -1,0 +1,1 @@
+# TODO: capture from: katana -silent -list hosts_seed.txt -jc -kf all -c 5 -d 2 -fs rdn | date: pending

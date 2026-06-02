@@ -1,0 +1,1 @@
+# TODO: capture from: nuclei -l hosts_seed.txt -severity info,low,medium,high,critical -nh -rl 150 -silent -retries 2 -t ~/nuclei-templates -j | date: pending
