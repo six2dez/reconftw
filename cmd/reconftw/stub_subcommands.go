@@ -147,7 +147,16 @@ func runSubsCmd(cmd *cobra.Command) error {
 		return fmt.Errorf("--target is required for subs subcommand")
 	}
 
-	cfg, err := config.Load(config.LoadOptions{})
+	// Honor --config / --secrets for the subs reload (was config.Load(LoadOptions{}),
+	// which silently ignored both — the user's reconftw.toml + secrets.cfg never
+	// applied to a `subs` run). Mirror main.go's early-flag extraction so the same
+	// explicit TOML config + secrets file drive the subs pipeline (resolvers paths,
+	// API keys, wordlists, per-task toggles). Env vars (RECONFTW_*) still layer on top.
+	efs := parseEarlyFlags(os.Args[1:])
+	cfg, err := config.Load(config.LoadOptions{
+		ExplicitConfigPath: efs.configPath,
+		SecretsPath:        efs.secretsPath,
+	})
 	if err != nil {
 		return fmt.Errorf("subs: config load: %w", err)
 	}
