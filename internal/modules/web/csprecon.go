@@ -79,8 +79,9 @@ func (t *CspreconTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 			fmt.Errorf("web.csprecon: write urls file: %w", err)
 	}
 
-	// csprecon reads URLs from stdin; use -i flag for file input.
-	args := []string{"-s", "-i", urlsFile}
+	// csprecon reads URLs via -l (list file); -s = silent (suppresses banner).
+	// [A15-fix: -i is not a valid flag for csprecon; -l/-list is the correct file-input flag.]
+	args := []string{"-s", "-l", urlsFile}
 
 	res, execErr := app.Tools.Run(ctx, toolName, args)
 	if execErr != nil {

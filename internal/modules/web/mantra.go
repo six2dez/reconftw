@@ -32,6 +32,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -79,28 +80,47 @@ func (t *MantraTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	}
 
 	// Build arg vector (RESEARCH §mantra verbatim v1 form web.sh:2329).
-	// [ASSUMED A5: -ua flag is current for mantra]
-	// Use -i for file input (FOUND-10 compliant; v1 uses stdin but -i is equivalent).
+	// [A5-fix: mantra reads from stdin (no -i flag); use exec.Command to pipe.]
+	// ARG VECTOR: mantra -ua <UA> -s  (reads JS URLs from stdin)
 	args := []string{
 		"-ua", subjsUserAgent, // reuse same UA as subjs (v1 uses same HEADER)
 		"-s",                  // silent/no-banner
-		"-i", jsURLsFile,
 	}
 
-	res, execErr := app.Tools.Run(ctx, toolName, args)
-	if execErr != nil {
+	// mantra reads from stdin; use exec.Command (same pattern as nomore403/hakoriginfinder).
+	mantraBin, lookErr := exec.LookPath(toolName)
+	if lookErr != nil {
 		if app.Log != nil {
-			app.Log.Info("web.mantra: binary absent or failed — skipping",
-				"err", execErr)
+			app.Log.Info("web.mantra: binary not on PATH — skipping")
 		}
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
+
+	jsData, readErr := os.ReadFile(jsURLsFile) //nolint:gosec
+	if readErr != nil {
+		return task.Result{Status: task.StatusErrored},
+			fmt.Errorf("web.mantra: read js urls file: %w", readErr)
+	}
+
+	var outBuf bytes.Buffer
+	//nolint:gosec // mantraBin from LookPath; args are fixed
+	cmd := exec.CommandContext(ctx, mantraBin, args...)
+	cmd.Stdin = bytes.NewReader(jsData)
+	cmd.Stdout = &outBuf
+
+	runErr := cmd.Run()
+	var res struct{ Stdout []byte }
+	if outBuf.Len() > 0 {
+		res.Stdout = outBuf.Bytes()
+	}
+	execErr := runErr
+	_ = execErr // mantra exits non-zero when no secrets found; handle below
 
 	// Parse plain-text output.
 	// XCUT-07 / T-05-13: ALL output lines written with Redacted="***".
 	// The raw line content (which may contain secrets) is NEVER written to artefacts.
 	var raw []byte
-	if res != nil && len(res.Stdout) > 0 {
+	if len(res.Stdout) > 0 {
 		raw = res.Stdout
 	}
 

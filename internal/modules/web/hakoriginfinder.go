@@ -25,10 +25,12 @@
 package web
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -80,30 +82,64 @@ func (t *HakoriginfinderTask) Run(ctx context.Context, app *appctx.AppContext) (
 			fmt.Errorf("web.hakoriginfinder: mkdir inputs/: %w", err)
 	}
 
-	hostsFile := filepath.Join(inputsDir, "hakoriginfinder.hosts.txt")
-	if err := os.WriteFile(hostsFile, []byte(strings.Join(hosts, "\n")+"\n"), 0o644); err != nil { //nolint:gosec
-		return task.Result{Status: task.StatusErrored},
-			fmt.Errorf("web.hakoriginfinder: write hosts file: %w", err)
-	}
-
-	// hakoriginfinder reads stdin; use -i flag or stdin redirect.
-	// The tool accepts hostnames via stdin; we pass via a file through -i if supported,
-	// otherwise use the stdin piping approach. v1 uses stdin redirect.
-	args := []string{"-i", hostsFile}
-
-	res, execErr := app.Tools.Run(ctx, toolName, args)
-	if execErr != nil {
+	// [A14-fix: hakoriginfinder reads IPs from stdin (not -i flag) + -h <url> for target.
+	// The actual installed tool signature:
+	//   prips <cidr> | hakoriginfinder -h <target_url>
+	// We write IPs from hosts.jsonl (the 'ip' field) to a temp file, read it as stdin.
+	// The target domain URL is derived from app.Target.Domain.]
+	ips, err := readIPsFromJSONL(app)
+	if err != nil || len(ips) == 0 {
 		if app.Log != nil {
-			app.Log.Info("web.hakoriginfinder: binary absent or failed — skipping",
-				"err", execErr)
+			app.Log.Info("web.hakoriginfinder: no IPs in hosts.jsonl — skipping")
 		}
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
-	// Extract IPv4 addresses from raw output text (RESEARCH §hakoriginfinder).
+	ipsFile := filepath.Join(inputsDir, "hakoriginfinder.ips.txt")
+	if err := os.WriteFile(ipsFile, []byte(strings.Join(ips, "\n")+"\n"), 0o644); err != nil { //nolint:gosec
+		return task.Result{Status: task.StatusErrored},
+			fmt.Errorf("web.hakoriginfinder: write ips file: %w", err)
+	}
+
+	// hakoriginfinder reads IPs from stdin; -h specifies the target URL.
+	// ARG VECTOR (A14-fix): hakoriginfinder -h https://<domain>
+	targetURL := "https://" + app.Target.Domain
+	args := []string{"-h", targetURL}
+
+	// Pass IPs via stdin — read the ips file as stdin content.
+	ipsData, readErr := os.ReadFile(ipsFile) //nolint:gosec
+	if readErr != nil {
+		return task.Result{Status: task.StatusErrored},
+			fmt.Errorf("web.hakoriginfinder: read ips file: %w", readErr)
+	}
+
+	// Use exec.Command directly (same pattern as nomore403.go) to pipe stdin.
+	// Backend.Run does not expose cmd.Stdin; exec.Command is the workaround.
+	//nolint:gosec // toolName is a fixed constant; args from validated domain
+	hakoBin, lookErr := exec.LookPath(toolName)
+	if lookErr != nil {
+		if app.Log != nil {
+			app.Log.Info("web.hakoriginfinder: binary not on PATH — skipping")
+		}
+		return task.Result{Status: task.StatusSkipped}, nil
+	}
+
+	var outBuf bytes.Buffer
+	//nolint:gosec // hakoBin from LookPath; args from validated config
+	cmd := exec.CommandContext(ctx, hakoBin, args...)
+	cmd.Stdin = bytes.NewReader(ipsData)
+	cmd.Stdout = &outBuf
+
+	if runErr := cmd.Run(); runErr != nil {
+		// hakoriginfinder exits non-zero on no-results; not fatal.
+		if app.Log != nil {
+			app.Log.Debug("web.hakoriginfinder: process exited non-zero (may be normal)", "err", runErr)
+		}
+	}
+
 	var rawOutput []byte
-	if res != nil && len(res.Stdout) > 0 {
-		rawOutput = res.Stdout
+	if outBuf.Len() > 0 {
+		rawOutput = outBuf.Bytes()
 	}
 
 	origins := parseHakoriginfinderOutput(rawOutput, hosts)
@@ -185,6 +221,39 @@ func parseHakoriginfinderOutput(rawOutput []byte, hosts []string) []OriginRecord
 		}
 	}
 	return records
+}
+
+// readIPsFromJSONL reads artefacts/hosts.jsonl and returns the list of
+// IP addresses (the 'ip' field from HostRecord) for hakoriginfinder stdin.
+// Skips records with empty IPs.
+func readIPsFromJSONL(app *appctx.AppContext) ([]string, error) {
+	hostsPath := filepath.Join(app.Target.WorkDir, "artefacts", "hosts.jsonl")
+	data, err := os.ReadFile(hostsPath) //nolint:gosec // path within WorkDir
+	if err != nil {
+		return nil, fmt.Errorf("read hosts.jsonl for IPs: %w", err)
+	}
+	seen := make(map[string]bool)
+	var ips []string
+
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var rec struct {
+			IP string `json:"ip"`
+		}
+		if err := json.Unmarshal([]byte(line), &rec); err != nil {
+			continue
+		}
+		ip := strings.TrimSpace(rec.IP)
+		if ip == "" || seen[ip] {
+			continue
+		}
+		seen[ip] = true
+		ips = append(ips, ip)
+	}
+	return ips, nil
 }
 
 // readHostnamesFromJSONL reads artefacts/hosts.jsonl and returns the list of
