@@ -200,7 +200,7 @@ Plans:
   4. Bypass and IIS flows ship: 4xx bypass via nomore403, IIS short filename scanner via shortscan; outputs structured to `artefacts/findings.jsonl` with proper severity/confidence tagging (WEB-12, WEB-13)
   5. Output equivalence test green against 3+ canonical web targets (e.g., `hackerone.com`, `tesla.com`, controlled lab) — v2 output matches v1 modulo ordering/timing noise within ±5% tolerance for host/URL/finding counts (WEB-16)
 
-**Plans**: 7 plans
+**Plans**: 10 plans (7 original + 3 gap-closure plans 05-09..05-11)
 Plans:
 **Wave 1**
 
@@ -223,6 +223,18 @@ Plans:
 **Wave 5** *(blocked on Wave 4 — human gate)*
 
 - [ ] 05-07-PLAN.md — DoD-2 seeded-local E2E run + fixture population + VPS/Axiom parity sign-off (autonomous: false)
+
+**Gap Closure Wave 1** *(independent — run after 05-07 or in parallel with open waves)*
+
+- [ ] 05-09-PLAN.md — TDD RED→GREEN: multi-writer test + staging contract (CR-01/CR-02/CR-05/WR-01/WR-03-jsa-fanout/WR-03-shortscan-fallback); go test ./... GREEN at wave end
+
+**Gap Closure Wave 2** *(blocked on 05-09)*
+
+- [ ] 05-10-PLAN.md — Stage ordering: split 4 stages into 8; wire per-stage MergeStage calls (CR-04)
+
+**Gap Closure Wave 3** *(blocked on 05-09 + 05-10)*
+
+- [ ] 05-11-PLAN.md — Localized fixes + behavioral tests: CR-03 jsa (direct exec + TestJSAUsesDirectExec), CR-06 hakoriginfinder (TestHakoriginfinderPerHostAttribution), CR-07 timeouts, WR-02..WR-09 (incl. checkHostsFileReadable rename), IN-01, IN-02
 
 **UI hint**: yes
 
@@ -349,7 +361,7 @@ Calendar parallelization (within constraint that dependencies are met):
 | 2. Architecture v2 Design | 7/7 | Complete   | 2026-05-28 |
 | 3. Foundation Kernel | 7/7 | Complete   | 2026-05-28 |
 | 4. Subdomains E2E + Axiom Integration | 11/12 | In Progress|  |
-| 5. Web Pipeline E2E | 2/7 | In Progress|  |
+| 5. Web Pipeline E2E | 2/11 | In Progress (gap closure)|  |
 | 6. Vulnerability Scanning E2E | 0/? | Not started | - |
 | 7. OSINT E2E | 0/? | Not started | - |
 | 8. MCP Server | 0/? | Not started | - |
