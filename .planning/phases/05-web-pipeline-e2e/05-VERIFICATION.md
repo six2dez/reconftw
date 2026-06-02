@@ -1,14 +1,48 @@
 ---
-status: code-complete-pending-vps
+status: gaps-found
 phase: 05-web-pipeline-e2e
 verified: 2026-06-02
-verifier: orchestrator (inline, 05-07 acceptance)
+verifier: orchestrator (inline, 05-07 acceptance) + gsd-code-reviewer
 dod_1: pass (web tools)
 dod_2_leg_a: pass
 dod_2_leg_b: pending-vps
+code_review: 7 blockers / 9 warnings / 5 info (see 05-REVIEW.md)
 ---
 
 # Phase 5 — Web Pipeline E2E — Verification
+
+## ⛔ BLOCKED — Code review found 7 confirmed blockers (2026-06-02)
+
+The DoD acceptance below (DoD-1, DoD-2 leg a) is real, BUT an independent code review
+(`05-REVIEW.md`) found systemic correctness defects that mean the pipeline is NOT
+production-correct. Orchestrator-confirmed the headline blocker against kernel code:
+
+- **Concurrent-write DATA LOSS (CR-01/CR-02/CR-04/CR-05):** web tasks call
+  `app.Tree.Append("urls"|"findings"|"waf", …)` DIRECTLY, but `OutputTree.Append` is
+  REPLACE-semantics (atomic rename over target), and `RunStage` runs same-stage tasks
+  CONCURRENTLY. 6 tasks write `urls` in stage 3 (katana/urlfinder/waymore/subjs/jsluice/jsa),
+  5 write `findings` (nuclei stage-2 then arjun/gxss/nomore403/shortscan stage-4), 2 write
+  `waf` — each Append clobbers the prior → only the last writer survives. The web module
+  abandoned Phase 4's staging-contract (per-task `inputs/<stage>.*` staging + single
+  `MergeStage` Append writer); `MergeAllWebArtefacts` is effectively dead for these artefacts.
+- **CR-03:** `web.jsa` passes an absolute python path as the tool *name* to `Tools.Run`
+  (registry name-lookup) → always fails → JSA never runs but reports success.
+- **CR-06:** `hakoriginfinder` attributes origin IPs to hosts by output line index → wrong data.
+- **CR-07:** 5 tasks shell out via raw `exec.Command`, bypassing rate-limit/timeout/circuit-breaker
+  governance (no per-tool timeout → a hung tool stalls the whole stage).
+
+Why isolated tests passed: `parity_test.go` exercises each task ALONE, so the multi-writer
+clobber and stage-ordering races are never exercised. `go build`/`go test ./...` are green but
+do not cover the concurrent pipeline.
+
+**Phase status: gaps-found — needs a gap-closure cycle before it can be marked verified.**
+Recommended fix: mirror Phase 4 (`internal/modules/subdomains/passive.go` + `merge.go`) —
+tasks write per-task staging files, MergeStage is the single Append caller per artefact; fix
+stage/DependsOn assignment so same-artefact writers don't share a concurrent stage; fix JSA
+tool invocation; route exec through `Tools.Run`/`Stream` governance.
+
+---
+
 
 Mirrors Phase 4's 04-11 model: code-complete with the authoritative VPS/Axiom parity
 sign-off (DoD-2 leg b) deferred. Everything Claude-executable for acceptance is done.
