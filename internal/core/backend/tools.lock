@@ -287,3 +287,175 @@ default_args    = []
 timeout_seconds = 120
 critical        = false
 input_flag      = ""
+
+# Phase 5 additions (Web Pipeline E2E)
+
+[[tools]]
+name            = "katana"
+kind            = "go"
+go_module       = "github.com/projectdiscovery/katana/cmd/katana"
+description     = "Web crawler with JS rendering and scope filtering"
+default_args    = []
+timeout_seconds = 14400
+critical        = false
+input_flag      = "-list"
+
+[[tools]]
+name            = "nuclei"
+kind            = "go"
+go_module       = "github.com/projectdiscovery/nuclei/v3/cmd/nuclei"
+description     = "Template-based vulnerability and misconfiguration scanner"
+default_args    = []
+timeout_seconds = 0
+critical        = false
+input_flag      = "-l"
+
+[[tools]]
+name            = "ffuf"
+kind            = "go"
+go_module       = "github.com/ffuf/ffuf/v2"
+description     = "Fast web fuzzer for directory/file brute-forcing"
+default_args    = []
+timeout_seconds = 900
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "wafw00f"
+kind            = "python"
+pip_package     = "wafw00f"
+description     = "WAF fingerprinting tool"
+default_args    = []
+timeout_seconds = 120
+critical        = false
+input_flag      = "-i"
+
+[[tools]]
+name            = "cdncheck"
+kind            = "go"
+go_module       = "github.com/projectdiscovery/cdncheck/cmd/cdncheck"
+description     = "CDN/WAF IP classification"
+default_args    = []
+timeout_seconds = 120
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "hakoriginfinder"
+kind            = "go"
+go_module       = "github.com/hakluke/hakoriginfinder"
+description     = "CDN origin IP discovery"
+default_args    = []
+timeout_seconds = 120
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "VhostFinder"
+kind            = "go"
+go_module       = "github.com/wdahlenburg/VhostFinder"
+description     = "Virtual host discovery"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+input_flag      = "-ips"
+
+[[tools]]
+name            = "shortscan"
+kind            = "go"
+go_module       = "github.com/bitquark/shortscan/cmd/shortscan"
+description     = "IIS short filename scanner"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "nomore403"
+kind            = "go_clone"
+repo_url        = "https://github.com/devploit/nomore403"
+description     = "4xx bypass tool (repo-clone Go binary)"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "mantra"
+kind            = "go"
+go_module       = "github.com/brosck/mantra"
+description     = "JS/secret scanner"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "sourcemapper"
+kind            = "go"
+go_module       = "github.com/denandz/sourcemapper"
+description     = "JavaScript source map extractor"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "waymore"
+kind            = "python"
+pip_package     = "git+https://github.com/xnl-h4ck3r/waymore"
+description     = "Passive URL collection (Wayback/CommonCrawl/etc)"
+default_args    = []
+timeout_seconds = 1800
+critical        = false
+input_flag      = "-i"
+
+[[tools]]
+name            = "urless"
+kind            = "python"
+pip_package     = "git+https://github.com/xnl-h4ck3r/urless"
+description     = "URL deduplication tool"
+default_args    = []
+timeout_seconds = 60
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "p1radup"
+kind            = "python"
+pip_package     = "git+https://github.com/iambouali/p1radup"
+description     = "URL parameter deduplication"
+default_args    = []
+timeout_seconds = 60
+critical        = false
+input_flag      = "-i"
+
+[[tools]]
+name            = "Gxss"
+kind            = "go"
+go_module       = "github.com/KathanP19/Gxss"
+description     = "Reflected XSS parameter finder"
+default_args    = []
+timeout_seconds = 120
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "arjun"
+kind            = "python"
+pip_package     = "git+https://github.com/s0md3v/Arjun"
+description     = "HTTP parameter discovery"
+default_args    = []
+timeout_seconds = 7200
+critical        = false
+input_flag      = "-i"
+
+[[tools]]
+name            = "JSA"
+kind            = "python_venv"
+repo_url        = "https://github.com/w9w/JSA"
+description     = "JavaScript analysis (repo-clone Python venv)"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+input_flag      = "-f"

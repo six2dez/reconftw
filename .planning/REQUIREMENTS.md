@@ -71,7 +71,7 @@
 ### Web E2E (Deliverable #5)
 
 - [ ] **WEB-01**: HTTP probe via `httpx` with tech detection, status codes, titles, response sizes; writes to `artefacts/hosts.jsonl`
-- [ ] **WEB-02**: Screenshots via `gowitness` or `killshot`; diff detection across monitor runs; stored under `raw/screenshots/<hash>.png`
+- [ ] **WEB-02**: Screenshots via `nuclei -headless -id screenshot`; diff detection across monitor runs; stored under `raw/screenshots/<hash>.png`
 - [ ] **WEB-03**: Web directory/file fuzz via `ffuf` with `FFUF_THREADS_MAX` cap respected; results in `artefacts/fuzz.jsonl`
 - [ ] **WEB-04**: JS analysis: URL/secret extraction via `subjs`, `jsluice`, `mantra`, `JSA`; results structured per artifact type
 - [ ] **WEB-05**: Source map extraction via `sourcemapper`; sources written to `raw/sourcemaps/<host>/`
