@@ -33,6 +33,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
@@ -95,8 +96,14 @@ func (t *Nomore403Task) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	// Backend.Stream/Run does not expose cmd.Dir or Stdin; exec.Cmd is used
 	// directly here as the sanctioned approach for repo-clone tools.
 	toolDir := filepath.Join(toolsDir, "nomore403")
+
+	// CR-07: derive bounded context from tools.lock nomore403.timeout_seconds=300.
+	toolTimeout := 300 * time.Second
+	cmdCtx, cancel := context.WithTimeout(ctx, toolTimeout)
+	defer cancel()
+
 	//nolint:gosec // binaryPath validated by os.Stat; toolDir from validated config
-	cmd := exec.CommandContext(ctx, binaryPath)
+	cmd := exec.CommandContext(cmdCtx, binaryPath)
 	cmd.Dir = toolDir // CRITICAL: nomore403 resolves wordlists relative to its own dir
 	cmd.Stdin = bytes.NewReader(inputData)
 

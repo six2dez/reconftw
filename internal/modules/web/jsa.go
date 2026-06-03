@@ -23,11 +23,15 @@
 package web
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
@@ -91,8 +95,12 @@ func (t *JsaTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	}
 
 	// Fan-out: bounded goroutines per JS URL.
-	// Conservative concurrency for python venv tools.
-	const maxConcurrency = 5
+	// Concurrency derived from config (WR-04: not hardcoded).
+	// Conservative fallback for python venv tools.
+	maxConcurrency := cfg.Concurrency.MaxJobs
+	if maxConcurrency <= 0 {
+		maxConcurrency = 5
+	}
 
 	sem := make(chan struct{}, maxConcurrency)
 	var mu sync.Mutex
@@ -140,23 +148,33 @@ func (t *JsaTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 }
 
 // runJSAForURL invokes jsa.py for a single JS URL and returns URLRecord JSONL lines.
+// Uses direct exec.CommandContext (CR-03 fix: repo-clone venv tools bypass registry).
 // Returns nil on error or no results (best_effort).
 func runJSAForURL(ctx context.Context, app *appctx.AppContext,
 	jsaPython, jsaScript, jsURL string) [][]byte {
-	// Invoke: python3 <tools_dir>/JSA/jsa.py -f <url>
-	// We call jsaPython directly as the tool name, with jsaScript + -f <url> as args.
-	// jsaPython is an absolute path validated by os.Stat above.
-	args := []string{jsaScript, "-f", jsURL}
+	// Conservative per-URL timeout (no JSA entry in tools.lock for per-URL cap).
+	const toolTimeout = 30 * time.Second
 
-	res, err := app.Tools.Run(ctx, jsaPython, args)
-	if err != nil {
+	// CR-03 fix: direct exec.CommandContext (registry lookup is wrong for absolute paths).
+	// jsaPython is an absolute path validated by os.Stat in Run().
+	cmdCtx, cancel := context.WithTimeout(ctx, toolTimeout)
+	defer cancel()
+
+	//nolint:gosec // jsaPython validated by os.Stat; jsaScript validated by os.Stat; jsURL scope-filtered
+	cmd := exec.CommandContext(cmdCtx, jsaPython, jsaScript, "-f", jsURL)
+	var outBuf bytes.Buffer
+	cmd.Stdout = &outBuf
+	cmd.Stderr = io.Discard
+
+	if err := cmd.Run(); err != nil {
+		if app.Log != nil {
+			app.Log.Debug("web.jsa: jsa invocation failed (non-fatal)",
+				"url", jsURL, "err", err)
+		}
 		return nil
 	}
 
-	var raw []byte
-	if res != nil && len(res.Stdout) > 0 {
-		raw = res.Stdout
-	}
+	raw := outBuf.Bytes()
 	if len(raw) == 0 {
 		return nil
 	}

@@ -34,7 +34,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
@@ -102,9 +104,14 @@ func (t *MantraTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 			fmt.Errorf("web.mantra: read js urls file: %w", readErr)
 	}
 
+	// CR-07: derive bounded context from tools.lock mantra.timeout_seconds=300.
+	toolTimeout := 300 * time.Second
+	cmdCtx, cancel := context.WithTimeout(ctx, toolTimeout)
+	defer cancel()
+
 	var outBuf bytes.Buffer
 	//nolint:gosec // mantraBin from LookPath; args are fixed
-	cmd := exec.CommandContext(ctx, mantraBin, args...)
+	cmd := exec.CommandContext(cmdCtx, mantraBin, args...)
 	cmd.Stdin = bytes.NewReader(jsData)
 	cmd.Stdout = &outBuf
 
@@ -174,18 +181,24 @@ func (t *MantraTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	}, nil
 }
 
+// ansiRE matches ANSI escape sequences (e.g. color codes) in terminal output.
+// mantra colorizes output by default; strip before tokenizing (WR-07).
+var ansiRE = regexp.MustCompile(`\x1b\[[0-9;]*[A-Za-z]`)
+
 // extractURLFromMantraLine extracts the URL portion from a mantra output line.
-// mantra output is plain text; the URL typically appears as the first field.
-// Returns the full line if no URL separator is found.
+// mantra output is plain text; the URL typically appears as the first http(s):// field.
+// Returns empty string if no http(s):// prefix token is found.
 func extractURLFromMantraLine(line string) string {
-	// mantra output format is typically: "<url>  <secret_type>: <value>"
-	// Extract first whitespace-delimited token as the URL reference.
+	// WR-07: strip ANSI escape codes before tokenizing (mantra colorizes by default).
+	line = ansiRE.ReplaceAllString(line, "")
+	// Scan all fields for the first http(s):// token.
 	fields := strings.Fields(line)
-	if len(fields) > 0 && (strings.HasPrefix(fields[0], "http://") ||
-		strings.HasPrefix(fields[0], "https://")) {
-		return fields[0]
+	for _, f := range fields {
+		if strings.HasPrefix(f, "http://") || strings.HasPrefix(f, "https://") {
+			return f
+		}
 	}
-	// If no clear URL prefix, return empty (unknown URL context).
+	// No URL token found — return empty (unknown URL context).
 	return ""
 }
 

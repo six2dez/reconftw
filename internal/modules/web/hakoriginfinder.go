@@ -2,20 +2,19 @@
 //
 // Name: "web.hakoriginfinder"  DependsOn: ["web.httpx"]
 //
-// HakoriginfinderTask feeds hostnames via stdin to hakoriginfinder, then
-// extracts IPv4 addresses from the raw text output via a regex pattern.
-// Per RESEARCH §hakoriginfinder, v1 uses:
+// HakoriginfinderTask runs hakoriginfinder per host, feeding each host's IP
+// via stdin and parsing the tool's output for origin IP attribution.
 //
-//	hakoriginfinder < hosts.txt > raw_output.txt
-//	grep -aoE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' raw_output.txt
+// Per-host run strategy (CR-06 fix): feeding all IPs in a single batch
+// and attributing by line index produces wrong host↔IP mappings.
+// Instead, we run hakoriginfinder once per host using that host's specific IP,
+// so every OriginRecord has unambiguous host attribution.
 //
 // D-W11 origins.jsonl schema: {host, origin_ip, method, confidence}
 //
 // ARG VECTOR (RESEARCH §hakoriginfinder):
 //
-//	hakoriginfinder  (stdin: hostname list)
-//
-// [ASSUMED A14: output format contains IPs parseable by IPv4 regex.]
+//	hakoriginfinder -h https://<hostname>  (stdin: one IP)
 //
 // T-05-10: tool stdout routed to run.log only (never INFO terminal, GAP-3).
 //
@@ -25,6 +24,7 @@
 package web
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -34,6 +34,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
@@ -52,6 +53,12 @@ type OriginRecord struct {
 // RESEARCH §hakoriginfinder: grep -aoE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b'
 var ipv4RE = regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}\b`)
 
+// hostIPPair holds the per-record host and IP fields from hosts.jsonl.
+type hostIPPair struct {
+	host string
+	ip   string
+}
+
 // HakoriginfinderTask runs hakoriginfinder to discover origin IPs.
 type HakoriginfinderTask struct{}
 
@@ -63,15 +70,15 @@ func (t *HakoriginfinderTask) Enabled(cfg *config.Config) bool {
 }
 func (t *HakoriginfinderTask) DependsOn() []string { return []string{"web.httpx"} }
 
-// Run executes hakoriginfinder and writes origin records to origins.jsonl.
+// Run executes hakoriginfinder per host and writes origin records to origins.jsonl.
 func (t *HakoriginfinderTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	const toolName = "hakoriginfinder"
 
-	// Collect hostnames from hosts.jsonl (host field, not URL).
-	hosts, err := readHostnamesFromJSONL(app)
-	if err != nil || len(hosts) == 0 {
+	// CR-06: read host+IP pairs together so per-host attribution is unambiguous.
+	pairs, err := readHostIPPairsFromJSONL(app)
+	if err != nil || len(pairs) == 0 {
 		if app.Log != nil {
-			app.Log.Info("web.hakoriginfinder: no hosts in hosts.jsonl — skipping")
+			app.Log.Info("web.hakoriginfinder: no host/IP pairs in hosts.jsonl — skipping")
 		}
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
@@ -82,40 +89,6 @@ func (t *HakoriginfinderTask) Run(ctx context.Context, app *appctx.AppContext) (
 			fmt.Errorf("web.hakoriginfinder: mkdir inputs/: %w", err)
 	}
 
-	// [A14-fix: hakoriginfinder reads IPs from stdin (not -i flag) + -h <url> for target.
-	// The actual installed tool signature:
-	//   prips <cidr> | hakoriginfinder -h <target_url>
-	// We write IPs from hosts.jsonl (the 'ip' field) to a temp file, read it as stdin.
-	// The target domain URL is derived from app.Target.Domain.]
-	ips, err := readIPsFromJSONL(app)
-	if err != nil || len(ips) == 0 {
-		if app.Log != nil {
-			app.Log.Info("web.hakoriginfinder: no IPs in hosts.jsonl — skipping")
-		}
-		return task.Result{Status: task.StatusSkipped}, nil
-	}
-
-	ipsFile := filepath.Join(inputsDir, "hakoriginfinder.ips.txt")
-	if err := os.WriteFile(ipsFile, []byte(strings.Join(ips, "\n")+"\n"), 0o644); err != nil { //nolint:gosec
-		return task.Result{Status: task.StatusErrored},
-			fmt.Errorf("web.hakoriginfinder: write ips file: %w", err)
-	}
-
-	// hakoriginfinder reads IPs from stdin; -h specifies the target URL.
-	// ARG VECTOR (A14-fix): hakoriginfinder -h https://<domain>
-	targetURL := "https://" + app.Target.Domain
-	args := []string{"-h", targetURL}
-
-	// Pass IPs via stdin — read the ips file as stdin content.
-	ipsData, readErr := os.ReadFile(ipsFile) //nolint:gosec
-	if readErr != nil {
-		return task.Result{Status: task.StatusErrored},
-			fmt.Errorf("web.hakoriginfinder: read ips file: %w", readErr)
-	}
-
-	// Use exec.Command directly (same pattern as nomore403.go) to pipe stdin.
-	// Backend.Run does not expose cmd.Stdin; exec.Command is the workaround.
-	//nolint:gosec // toolName is a fixed constant; args from validated domain
 	hakoBin, lookErr := exec.LookPath(toolName)
 	if lookErr != nil {
 		if app.Log != nil {
@@ -124,25 +97,29 @@ func (t *HakoriginfinderTask) Run(ctx context.Context, app *appctx.AppContext) (
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
-	var outBuf bytes.Buffer
-	//nolint:gosec // hakoBin from LookPath; args from validated config
-	cmd := exec.CommandContext(ctx, hakoBin, args...)
-	cmd.Stdin = bytes.NewReader(ipsData)
-	cmd.Stdout = &outBuf
+	// CR-07: per-invocation timeout from tools.lock hakoriginfinder.timeout_seconds=120.
+	const toolTimeout = 120 * time.Second
 
-	if runErr := cmd.Run(); runErr != nil {
-		// hakoriginfinder exits non-zero on no-results; not fatal.
-		if app.Log != nil {
-			app.Log.Debug("web.hakoriginfinder: process exited non-zero (may be normal)", "err", runErr)
+	var origins []OriginRecord
+	for _, pair := range pairs {
+		if pair.ip == "" || pair.host == "" {
+			continue
+		}
+		originIP, runErr := runHakoriginfinderForHost(ctx, hakoBin, pair.host, pair.ip, toolTimeout)
+		if runErr != nil && app.Log != nil {
+			app.Log.Debug("web.hakoriginfinder: per-host run error",
+				"host", pair.host, "err", runErr)
+		}
+		if originIP != "" {
+			origins = append(origins, OriginRecord{
+				Host:       pair.host,
+				OriginIP:   originIP,
+				Method:     "hakoriginfinder",
+				Confidence: "low", // CR-06: unambiguous attribution but tool output is uncertain
+			})
 		}
 	}
 
-	var rawOutput []byte
-	if outBuf.Len() > 0 {
-		rawOutput = outBuf.Bytes()
-	}
-
-	origins := parseHakoriginfinderOutput(rawOutput, hosts)
 	if len(origins) == 0 {
 		return task.Result{Status: task.StatusDone,
 			Stats: map[string]int{"origins_found": 0}}, nil
@@ -179,71 +156,113 @@ func (t *HakoriginfinderTask) Run(ctx context.Context, app *appctx.AppContext) (
 	}, nil
 }
 
-// parseHakoriginfinderOutput extracts IP addresses from hakoriginfinder's raw
-// text output. The output typically shows hostname → IP mappings; we extract
-// all IPv4 addresses and associate them positionally with the input host list
-// when possible. When we can't associate a specific host, we use the first
-// hostname as a best-effort fallback per [ASSUMED A14].
-func parseHakoriginfinderOutput(rawOutput []byte, hosts []string) []OriginRecord {
-	if len(rawOutput) == 0 || len(hosts) == 0 {
-		return nil
+// runHakoriginfinderForHost runs hakoriginfinder for a single host/IP pair.
+// Returns the first origin IP found in the output, or "" if none.
+// Each call has an unambiguous host↔IP relationship (CR-06 fix).
+func runHakoriginfinderForHost(ctx context.Context, hakoBin, targetHost, inputIP string,
+	timeout time.Duration) (string, error) {
+	// Derive per-invocation bounded context (CR-07).
+	cmdCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	// ARG VECTOR: hakoriginfinder -h https://<hostname>  (stdin: the host's IP)
+	targetURL := "https://" + targetHost
+	//nolint:gosec // hakoBin from LookPath; targetURL from validated hostname
+	cmd := exec.CommandContext(cmdCtx, hakoBin, "-h", targetURL)
+	cmd.Stdin = strings.NewReader(inputIP + "\n")
+	var outBuf bytes.Buffer
+	cmd.Stdout = &outBuf
+
+	if err := cmd.Run(); err != nil {
+		// Non-zero exit is normal when no origin is found.
+		if outBuf.Len() == 0 {
+			return "", nil
+		}
 	}
 
-	// Extract all unique IPs from the output.
-	lines := strings.Split(string(rawOutput), "\n")
-	seen := make(map[string]bool)
-	var records []OriginRecord
+	return parseHakoriginOutput(outBuf.String(), targetHost), nil
+}
 
-	for i, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
+// parseHakoriginOutput extracts the first IPv4 address from hakoriginfinder
+// output for the given host. The host parameter is used only for context
+// in the attribution — it is NOT used for index-based selection.
+// Returns "" if no IPv4 is found in the output.
+func parseHakoriginOutput(output, _ string) string {
+	if output == "" {
+		return ""
+	}
+	ips := ipv4RE.FindAllString(output, -1)
+	if len(ips) == 0 {
+		return ""
+	}
+	return ips[0]
+}
+
+// readHostIPPairsFromJSONL reads artefacts/hosts.jsonl and returns host+IP pairs.
+// WR-06: uses bufio.Scanner with 4MiB buffer (not os.ReadFile+strings.Split).
+// Pairs with empty host or empty IP are not filtered here; callers skip them.
+func readHostIPPairsFromJSONL(app *appctx.AppContext) ([]hostIPPair, error) {
+	hostsPath := filepath.Join(app.Target.WorkDir, "artefacts", "hosts.jsonl")
+	f, err := os.Open(hostsPath) //nolint:gosec // path within WorkDir
+	if err != nil {
+		return nil, fmt.Errorf("read hosts.jsonl for host/IP pairs: %w", err)
+	}
+	defer f.Close() //nolint:errcheck
+
+	seen := make(map[string]bool)
+	var pairs []hostIPPair
+
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for scanner.Scan() {
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 {
 			continue
 		}
-		ips := ipv4RE.FindAllString(line, -1)
-		for _, ip := range ips {
-			if seen[ip] {
-				continue
-			}
-			seen[ip] = true
-			// Associate with host by line index (best-effort per A14).
-			host := ""
-			if i < len(hosts) {
-				host = hosts[i]
-			} else if len(hosts) > 0 {
-				host = hosts[0]
-			}
-			records = append(records, OriginRecord{
-				Host:       host,
-				OriginIP:   ip,
-				Method:     "hakoriginfinder",
-				Confidence: "medium",
-			})
+		var rec struct {
+			Host string `json:"host"`
+			IP   string `json:"ip"`
 		}
+		if err := json.Unmarshal(line, &rec); err != nil {
+			continue
+		}
+		host := strings.TrimSpace(rec.Host)
+		ip := strings.TrimSpace(rec.IP)
+		if host == "" || seen[host] {
+			continue
+		}
+		seen[host] = true
+		pairs = append(pairs, hostIPPair{host: host, ip: ip})
 	}
-	return records
+	return pairs, scanner.Err()
 }
 
 // readIPsFromJSONL reads artefacts/hosts.jsonl and returns the list of
 // IP addresses (the 'ip' field from HostRecord) for hakoriginfinder stdin.
+// WR-06: uses bufio.Scanner with 4MiB buffer (not os.ReadFile+strings.Split).
 // Skips records with empty IPs.
 func readIPsFromJSONL(app *appctx.AppContext) ([]string, error) {
 	hostsPath := filepath.Join(app.Target.WorkDir, "artefacts", "hosts.jsonl")
-	data, err := os.ReadFile(hostsPath) //nolint:gosec // path within WorkDir
+	f, err := os.Open(hostsPath) //nolint:gosec // path within WorkDir
 	if err != nil {
 		return nil, fmt.Errorf("read hosts.jsonl for IPs: %w", err)
 	}
+	defer f.Close() //nolint:errcheck
+
 	seen := make(map[string]bool)
 	var ips []string
 
-	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for scanner.Scan() {
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 {
 			continue
 		}
 		var rec struct {
 			IP string `json:"ip"`
 		}
-		if err := json.Unmarshal([]byte(line), &rec); err != nil {
+		if err := json.Unmarshal(line, &rec); err != nil {
 			continue
 		}
 		ip := strings.TrimSpace(rec.IP)
@@ -253,29 +272,34 @@ func readIPsFromJSONL(app *appctx.AppContext) ([]string, error) {
 		seen[ip] = true
 		ips = append(ips, ip)
 	}
-	return ips, nil
+	return ips, scanner.Err()
 }
 
 // readHostnamesFromJSONL reads artefacts/hosts.jsonl and returns the list of
 // host field values (bare hostnames, not URLs) for hakoriginfinder stdin.
+// WR-06: uses bufio.Scanner with 4MiB buffer (not os.ReadFile+strings.Split).
 func readHostnamesFromJSONL(app *appctx.AppContext) ([]string, error) {
 	hostsPath := filepath.Join(app.Target.WorkDir, "artefacts", "hosts.jsonl")
-	data, err := os.ReadFile(hostsPath) //nolint:gosec // path within WorkDir
+	f, err := os.Open(hostsPath) //nolint:gosec // path within WorkDir
 	if err != nil {
 		return nil, fmt.Errorf("read hosts.jsonl: %w", err)
 	}
+	defer f.Close() //nolint:errcheck
+
 	seen := make(map[string]bool)
 	var hostnames []string
 
-	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for scanner.Scan() {
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 {
 			continue
 		}
 		var rec struct {
 			Host string `json:"host"`
 		}
-		if err := json.Unmarshal([]byte(line), &rec); err != nil {
+		if err := json.Unmarshal(line, &rec); err != nil {
 			continue
 		}
 		h := strings.TrimSpace(rec.Host)
@@ -285,7 +309,7 @@ func readHostnamesFromJSONL(app *appctx.AppContext) ([]string, error) {
 		seen[h] = true
 		hostnames = append(hostnames, h)
 	}
-	return hostnames, nil
+	return hostnames, scanner.Err()
 }
 
 func init() { task.Register(&HakoriginfinderTask{}) }

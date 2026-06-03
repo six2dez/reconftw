@@ -30,6 +30,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
@@ -86,8 +87,13 @@ func (t *GxssTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	// ARG VECTOR: Gxss -c 100 -p Xss (RESEARCH §Gxss vulns.sh:27).
 	stdinData := []byte(strings.Join(fuzzedURLs, "\n") + "\n")
 
+	// CR-07: derive bounded context from tools.lock Gxss.timeout_seconds=120.
+	toolTimeout := 120 * time.Second
+	cmdCtx, cancel := context.WithTimeout(ctx, toolTimeout)
+	defer cancel()
+
 	//nolint:gosec // gxssPath from exec.LookPath; stdinData built from scope-filtered URLs
-	cmd := exec.CommandContext(ctx, gxssPath, "-c", "100", "-p", "Xss")
+	cmd := exec.CommandContext(cmdCtx, gxssPath, "-c", "100", "-p", "Xss")
 	cmd.Stdin = bytes.NewReader(stdinData)
 
 	var outBuf bytes.Buffer

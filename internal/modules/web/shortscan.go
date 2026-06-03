@@ -33,6 +33,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
@@ -126,8 +127,13 @@ func (t *ShortscanTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 // ARG VECTOR: shortscan <url> -F -s -p 1  (RESEARCH §shortscan, web.sh:1610).
 // Returns findings only if stdout contains "Vulnerable: Yes" (v1 output filter).
 func runShortscan(ctx context.Context, shortscanPath, targetURL string) ([]FindingRecord, error) {
+	// CR-07: derive bounded context from tools.lock shortscan.timeout_seconds=300.
+	toolTimeout := 300 * time.Second
+	cmdCtx, cancel := context.WithTimeout(ctx, toolTimeout)
+	defer cancel()
+
 	//nolint:gosec // shortscanPath from exec.LookPath; targetURL scope-filtered upstream
-	cmd := exec.CommandContext(ctx, shortscanPath, targetURL, "-F", "-s", "-p", "1")
+	cmd := exec.CommandContext(cmdCtx, shortscanPath, targetURL, "-F", "-s", "-p", "1")
 	var outBuf bytes.Buffer
 	cmd.Stdout = &outBuf
 
