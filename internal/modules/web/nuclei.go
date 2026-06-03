@@ -375,12 +375,29 @@ func readWAFHostsSet(app *appctx.AppContext) map[string]struct{} {
 	return set
 }
 
-// normalizeHost strips scheme and port from a URL/host string for WAF set lookup.
+// normalizeHost strips scheme, path, and port from a URL/host string for WAF
+// set lookup.
+//
+// IN-04: kept byte-for-byte behavior-equivalent to extract/waf.normalizeHost
+// (waf.go:131) — including port stripping with an IPv6 guard. nuclei keys the
+// WAF-host set produced from waf.jsonl with this function; if those two
+// implementations diverged on port handling, WAF rate-halving would
+// mis-classify any host that ever carried an explicit port. (waf records are
+// port-free today, so this aligns behavior pre-emptively rather than fixing a
+// present bug; the two functions live in different packages, so they are not
+// yet consolidated into one shared helper.)
 func normalizeHost(h string) string {
 	h = strings.TrimPrefix(h, "https://")
 	h = strings.TrimPrefix(h, "http://")
 	if idx := strings.IndexByte(h, '/'); idx >= 0 {
 		h = h[:idx]
+	}
+	// Strip port (IPv6 guard: only strip when the remaining host has no other
+	// colon, i.e. it is not a bare IPv6 literal).
+	if idx := strings.LastIndex(h, ":"); idx >= 0 {
+		if !strings.Contains(h[:idx], ":") {
+			h = h[:idx]
+		}
 	}
 	return strings.ToLower(h)
 }

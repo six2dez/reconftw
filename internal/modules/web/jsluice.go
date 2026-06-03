@@ -132,8 +132,12 @@ func (t *JsluiceTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 				}
 				if len(lines) > 0 {
 					if appendErr := app.Tree.Append("js_secrets", lines); appendErr != nil {
+						// WR-02: promote to Warn — a swallowed Append means redacted
+						// secret records counted in secrets_found never reached
+						// js_secrets.jsonl. Non-fatal per best_effort (D-W12).
 						if app.Log != nil {
-							app.Log.Debug("web.jsluice: Tree.Append js_secrets failed", "err", appendErr)
+							app.Log.Warn("web.jsluice: Tree.Append(js_secrets) failed — records not persisted",
+								"records", len(lines), "err", appendErr)
 						}
 					}
 				}

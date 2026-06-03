@@ -133,6 +133,10 @@ func (t *UrlDedupTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 
 	// Step 2: Write urless-equivalent output for p1radup input.
 	p1radupInputFile := filepath.Join(inputsDir, "urldedup_p1radup_in.txt.tmp")
+	// WR-03: defer cleanup immediately after creation so an early StatusErrored
+	// return between here and the success path does not leak the temp file
+	// across resumed/re-run invocations (mirrors arjun.go:105).
+	defer os.Remove(p1radupInputFile) //nolint:errcheck
 	if err := os.WriteFile(p1radupInputFile,
 		[]byte(strings.Join(dedupedAfterUrless, "\n")+"\n"), 0o644); err != nil { //nolint:gosec
 		return task.Result{Status: task.StatusErrored},
@@ -141,6 +145,7 @@ func (t *UrlDedupTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 
 	// Step 3: Run p1radup via app.Tools.Run (-i file -o file -s for silent).
 	p1radupOutputFile := filepath.Join(inputsDir, "urldedup_deduped.txt.tmp")
+	defer os.Remove(p1radupOutputFile) //nolint:errcheck // WR-03: cleanup on any return path
 	p1radupArgs := []string{"-i", p1radupInputFile, "-o", p1radupOutputFile, "-s"}
 	p1radupRes, p1radupErr := app.Tools.Run(ctx, "p1radup", p1radupArgs)
 
@@ -194,15 +199,25 @@ func (t *UrlDedupTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	// Step 5: Route deduplicated records through app.Tree.Append("urls") — the scope-
 	// enforcement boundary (T-05-09-01 mitigation: replaces the prior direct-write bypass).
 	// This is the SINGLE semantic-dedup Append writer for urls (WEB-14).
+	//
+	// WR-02: urldedup is the SOLE authoritative writer of artefacts/urls.jsonl — it
+	// has no fallback writer. A swallowed Append failure (scope rejection, atomic-write
+	// failure, disk full) would leave the final URL artefact empty/stale while the task
+	// reports success with a nonzero urls_after_dedup. Propagate as StatusErrored so the
+	// failure is observable; best_effort (D-W12) is applied by the caller (stage loop
+	// logs and continues), not by hiding the error here.
 	if len(newLines) > 0 {
-		if appendErr := app.Tree.Append("urls", newLines); appendErr != nil && app.Log != nil {
-			app.Log.Debug("web.urldedup: Tree.Append failed", "err", appendErr)
+		if appendErr := app.Tree.Append("urls", newLines); appendErr != nil {
+			if app.Log != nil {
+				app.Log.Warn("web.urldedup: Tree.Append(urls) failed — final urls.jsonl not written",
+					"records", len(newLines), "err", appendErr)
+			}
+			return task.Result{Status: task.StatusErrored},
+				fmt.Errorf("web.urldedup: Tree.Append(urls): %w", appendErr)
 		}
 	}
 
-	// Clean up temporary files.
-	os.Remove(p1radupInputFile)  //nolint:errcheck
-	os.Remove(p1radupOutputFile) //nolint:errcheck
+	// Temp files are removed by the deferred os.Remove calls registered at creation (WR-03).
 
 	if app.Log != nil {
 		app.Log.Debug("web.urldedup: completed",
@@ -263,16 +278,33 @@ func splitURLLines(data []byte) []string {
 }
 
 // extractHostFromURL extracts the lowercase hostname from a URL string.
+//
+// WR-05: accepts BOTH schemed URLs ("https://example.com/path") and scheme-less
+// authorities ("example.com/path 200"). Plain-text tool findings from
+// nomore403/Gxss/arjun are not guaranteed to be schemed; the prior "://"-only
+// implementation dropped their host, weakening the SARIF FindingRecord.Host.
+// The first whitespace-delimited token is taken, an optional scheme is stripped,
+// then path/query/fragment and port are removed (bracketed IPv6 ports preserved).
 func extractHostFromURL(rawURL string) string {
 	rawURL = strings.TrimSpace(rawURL)
 	if rawURL == "" {
 		return ""
 	}
-	idx := strings.Index(rawURL, "://")
-	if idx < 0 {
-		return ""
+	// Tool output lines may be "<url-or-host> <status> ..."; the host/URL is the
+	// first whitespace-delimited token.
+	if i := strings.IndexAny(rawURL, " \t"); i >= 0 {
+		rawURL = rawURL[:i]
 	}
-	rest := rawURL[idx+3:]
+	// Strip an optional scheme ("https://example.com" -> "example.com"); leave
+	// scheme-less authorities untouched.
+	if idx := strings.Index(rawURL, "://"); idx >= 0 {
+		rawURL = rawURL[idx+3:]
+	}
+	rest := rawURL
+	// Strip userinfo ("user:pass@host" -> "host") so credentials never leak into host.
+	if at := strings.LastIndex(rest, "@"); at >= 0 {
+		rest = rest[at+1:]
+	}
 	// Strip path, query, fragment.
 	for _, sep := range []string{"/", "?", "#"} {
 		if i := strings.Index(rest, sep); i >= 0 {

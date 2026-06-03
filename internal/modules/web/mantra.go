@@ -30,6 +30,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -120,8 +121,43 @@ func (t *MantraTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	if outBuf.Len() > 0 {
 		res.Stdout = outBuf.Bytes()
 	}
-	execErr := runErr
-	_ = execErr // mantra exits non-zero when no secrets found; handle below
+
+	// WR-04: mantra exits non-zero when no secrets are found, but a real failure
+	// (timeout, missing shared lib, OOM-kill, panic) also exits non-zero. The
+	// premise "non-zero == no secrets" silently swallows those, returning
+	// StatusDone with secrets_found:0 — dropping ALL JS-secret coverage with no
+	// signal (XCUT-07: we must not silently miss secrets). Distinguish the cases:
+	//   - context deadline exceeded  → the 300s timeout fired → Warn (real failure)
+	//   - non-zero exit WITH stdout  → benign (mantra printed findings then exited
+	//     non-zero, or printed nothing meaningful) — proceed to parse
+	//   - non-zero exit with NO stdout and NOT an *exec.ExitError (e.g. exec
+	//     failure) → Warn so a broken install is distinguishable from "0 secrets"
+	if runErr != nil {
+		switch {
+		case cmdCtx.Err() == context.DeadlineExceeded:
+			if app.Log != nil {
+				app.Log.Warn("web.mantra: timed out — JS-secret results may be incomplete",
+					"timeout", toolTimeout, "err", runErr)
+			}
+		case outBuf.Len() == 0:
+			var exitErr *exec.ExitError
+			if !errors.As(runErr, &exitErr) {
+				// Not a clean tool exit and no output — the binary likely failed
+				// to launch / crashed before producing anything.
+				if app.Log != nil {
+					app.Log.Warn("web.mantra: tool failed to run (no output) — distinct from 'no secrets'",
+						"err", runErr)
+				}
+			} else if app.Log != nil {
+				// Documented "no findings" non-zero exit with empty output.
+				app.Log.Debug("web.mantra: non-zero exit, no output (likely no secrets)", "err", runErr)
+			}
+		default:
+			if app.Log != nil {
+				app.Log.Debug("web.mantra: non-zero exit with output (may be normal)", "err", runErr)
+			}
+		}
+	}
 
 	// Parse plain-text output.
 	// XCUT-07 / T-05-13: ALL output lines written with Redacted="***".
@@ -158,11 +194,14 @@ func (t *MantraTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 
 	if len(lines) > 0 {
 		if appendErr := app.Tree.Append("js_secrets", lines); appendErr != nil {
+			// WR-02: promote to Warn — a dropped Append means redacted JS-secret
+			// records reported in secrets_found never reached js_secrets.jsonl.
+			// Non-fatal per best_effort (D-W12): mantra has the js_secrets writer
+			// shared with jsluice, so we continue rather than erroring the task.
 			if app.Log != nil {
-				app.Log.Debug("web.mantra: Tree.Append failed",
+				app.Log.Warn("web.mantra: Tree.Append(js_secrets) failed — records not persisted",
 					"records", len(lines), "err", appendErr)
 			}
-			// Non-fatal per best_effort (D-W12).
 		}
 	}
 

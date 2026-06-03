@@ -29,6 +29,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -183,19 +184,25 @@ func runHakoriginfinderForHost(ctx context.Context, hakoBin, targetHost, inputIP
 	return parseHakoriginOutput(outBuf.String(), targetHost), nil
 }
 
-// parseHakoriginOutput extracts the first IPv4 address from hakoriginfinder
-// output for the given host. The host parameter is used only for context
-// in the attribution — it is NOT used for index-based selection.
-// Returns "" if no IPv4 is found in the output.
+// parseHakoriginOutput extracts the first VALID IPv4 address from
+// hakoriginfinder output for the given host. The host parameter is used only
+// for context in the attribution — it is NOT used for index-based selection.
+// Returns "" if no valid IPv4 is found in the output.
+//
+// IN-02: the ipv4RE regex matches octets up to 999 (e.g. "999.999.999.999").
+// Validate each regex match with net.ParseIP and require a 4-octet (non-IPv6)
+// result so an out-of-range string can never land in OriginRecord.OriginIP.
 func parseHakoriginOutput(output, _ string) string {
 	if output == "" {
 		return ""
 	}
-	ips := ipv4RE.FindAllString(output, -1)
-	if len(ips) == 0 {
-		return ""
+	for _, candidate := range ipv4RE.FindAllString(output, -1) {
+		ip := net.ParseIP(candidate)
+		if ip != nil && ip.To4() != nil {
+			return candidate
+		}
 	}
-	return ips[0]
+	return ""
 }
 
 // readHostIPPairsFromJSONL reads artefacts/hosts.jsonl and returns host+IP pairs.
@@ -237,46 +244,13 @@ func readHostIPPairsFromJSONL(app *appctx.AppContext) ([]hostIPPair, error) {
 	return pairs, scanner.Err()
 }
 
-// readIPsFromJSONL reads artefacts/hosts.jsonl and returns the list of
-// IP addresses (the 'ip' field from HostRecord) for hakoriginfinder stdin.
-// WR-06: uses bufio.Scanner with 4MiB buffer (not os.ReadFile+strings.Split).
-// Skips records with empty IPs.
-func readIPsFromJSONL(app *appctx.AppContext) ([]string, error) {
-	hostsPath := filepath.Join(app.Target.WorkDir, "artefacts", "hosts.jsonl")
-	f, err := os.Open(hostsPath) //nolint:gosec // path within WorkDir
-	if err != nil {
-		return nil, fmt.Errorf("read hosts.jsonl for IPs: %w", err)
-	}
-	defer f.Close() //nolint:errcheck
-
-	seen := make(map[string]bool)
-	var ips []string
-
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for scanner.Scan() {
-		line := bytes.TrimSpace(scanner.Bytes())
-		if len(line) == 0 {
-			continue
-		}
-		var rec struct {
-			IP string `json:"ip"`
-		}
-		if err := json.Unmarshal(line, &rec); err != nil {
-			continue
-		}
-		ip := strings.TrimSpace(rec.IP)
-		if ip == "" || seen[ip] {
-			continue
-		}
-		seen[ip] = true
-		ips = append(ips, ip)
-	}
-	return ips, scanner.Err()
-}
+// IN-01: readIPsFromJSONL was removed — after the CR-06 per-host rewrite, Run
+// uses only readHostIPPairsFromJSONL. It had no production or test callers, so
+// it was dead code. readHostnamesFromJSONL below is KEPT: it is still called by
+// vhostfinder.go (VhostFinderTask reads bare hostnames from hosts.jsonl).
 
 // readHostnamesFromJSONL reads artefacts/hosts.jsonl and returns the list of
-// host field values (bare hostnames, not URLs) for hakoriginfinder stdin.
+// host field values (bare hostnames, not URLs). Used by vhostfinder.go.
 // WR-06: uses bufio.Scanner with 4MiB buffer (not os.ReadFile+strings.Split).
 func readHostnamesFromJSONL(app *appctx.AppContext) ([]string, error) {
 	hostsPath := filepath.Join(app.Target.WorkDir, "artefacts", "hosts.jsonl")

@@ -174,7 +174,11 @@ func TestParseHakoriginOutputIPv4Variants(t *testing.T) {
 		{"[+] 172.16.0.1 is the real IP", "172.16.0.1"},
 		{"no ip address here", ""},
 		{"", ""},
-		{"partial 999.999.999.999 invalid", "999.999.999.999"}, // regex matches; validation is caller's concern
+		// IN-02: out-of-range octets are now rejected (net.ParseIP validation),
+		// so a 999.x string yields "" instead of leaking into OriginRecord.OriginIP.
+		{"partial 999.999.999.999 invalid", ""},
+		// IN-02: a valid IPv4 appearing after an invalid candidate is still found.
+		{"bad 256.1.1.1 then good 10.20.30.40", "10.20.30.40"},
 	}
 
 	for _, tc := range cases {
