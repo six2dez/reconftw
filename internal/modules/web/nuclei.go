@@ -36,6 +36,7 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -195,7 +196,8 @@ func (t *NucleiTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 		allFindings = append(allFindings, findings...)
 	}
 
-	// Write findings to artefacts/findings.jsonl via app.Tree.Append.
+	// Write findings to staging file inputs/findings.nuclei.jsonl (staging contract).
+	// MergeAllWebArtefacts is the single app.Tree.Append caller for findings.
 	if len(allFindings) > 0 {
 		var lines [][]byte
 		for _, rec := range allFindings {
@@ -206,12 +208,10 @@ func (t *NucleiTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 			lines = append(lines, b)
 		}
 		if len(lines) > 0 {
-			if appendErr := app.Tree.Append("findings", lines); appendErr != nil {
-				if app.Log != nil {
-					app.Log.Debug("web.nuclei: Tree.Append failed",
-						"records", len(lines), "err", appendErr)
-				}
-				// Non-fatal per best_effort (D-W12).
+			stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "findings.nuclei.jsonl")
+			if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+				app.Log.Debug("web.nuclei: staging write failed",
+					"path", stagingPath, "err", wErr)
 			}
 		}
 	}

@@ -38,6 +38,7 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -163,9 +164,10 @@ func (t *ArjunTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 			lines = append(lines, b)
 		}
 		if len(lines) > 0 {
-			if appendErr := app.Tree.Append("findings", lines); appendErr != nil && app.Log != nil {
-				app.Log.Debug("web.arjun: Tree.Append failed",
-					"records", len(lines), "err", appendErr)
+			stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "findings.arjun.jsonl")
+			if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+				app.Log.Debug("web.arjun: staging write failed",
+					"path", stagingPath, "err", wErr)
 			}
 		}
 	}

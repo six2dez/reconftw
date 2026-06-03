@@ -1,14 +1,16 @@
-// shortscan.go — ShortscanTask: IIS short filename scanner → artefacts/findings.jsonl.
+// shortscan.go — ShortscanTask: IIS short filename scanner → findings staging file.
 //
-// ShortscanTask reads IIS targets from artefacts/findings.jsonl (filtering
-// entries where template-id == "iis-version"), then runs shortscan per target
-// to discover IIS short filename (8.3) vulnerabilities.
+// ShortscanTask reads IIS targets from inputs/findings.nuclei.jsonl (the nuclei
+// staging file written by NucleiTask under the staging contract), filtering entries
+// where template_id == "iis-version", then runs shortscan per target to discover
+// IIS short filename (8.3) vulnerabilities.
 //
-// DEPENDENCY: DependsOn ["web.nuclei"] — reads artefacts/findings.jsonl.
+// DEPENDENCY: DependsOn ["web.nuclei"] — reads inputs/findings.nuclei.jsonl (staging).
 //
 // INPUT FILTER (RESEARCH §shortscan, web.sh:1609):
 // v1 extracts IIS targets from nuclei info.txt: `awk '/iis-version/ {print $4}'`
-// v2 reads findings.jsonl, filtering records where TemplateID == "iis-version".
+// v2 reads inputs/findings.nuclei.jsonl (nuclei staging), filtering records where
+// TemplateID == "iis-version". No fallback to artefacts/ (WARNING-3 fix).
 //
 // ARG VECTOR (RESEARCH §shortscan, web.sh:1609-1612 via interlace):
 //
@@ -34,6 +36,7 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -63,14 +66,16 @@ func (t *ShortscanTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
-	// Read findings.jsonl; filter records where TemplateID == "iis-version".
-	iisTargets, readErr := readIISTargetsFromFindingsJSONL(app)
+	// Read inputs/findings.nuclei.jsonl (nuclei staging file); filter records
+	// where TemplateID == "iis-version". DependsOn ["web.nuclei"] ensures
+	// nuclei's staging file exists before shortscan runs.
+	iisTargets, readErr := readIISTargetsFromNucleiStaging(app)
 	if readErr != nil && app.Log != nil {
-		app.Log.Debug("web.shortscan: read findings.jsonl error", "err", readErr)
+		app.Log.Debug("web.shortscan: read nuclei staging error", "err", readErr)
 	}
 	if len(iisTargets) == 0 {
 		if app.Log != nil {
-			app.Log.Info("web.shortscan: no IIS targets found in findings.jsonl — skipping")
+			app.Log.Info("web.shortscan: no IIS targets found in nuclei staging — skipping")
 		}
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
@@ -86,7 +91,7 @@ func (t *ShortscanTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 		allFindings = append(allFindings, findings...)
 	}
 
-	// Write findings to artefacts/findings.jsonl (best_effort D-W12).
+	// Write findings to staging file inputs/findings.shortscan.jsonl (staging contract).
 	if len(allFindings) > 0 {
 		var lines [][]byte
 		for _, rec := range allFindings {
@@ -97,9 +102,10 @@ func (t *ShortscanTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 			lines = append(lines, b)
 		}
 		if len(lines) > 0 {
-			if appendErr := app.Tree.Append("findings", lines); appendErr != nil && app.Log != nil {
-				app.Log.Debug("web.shortscan: Tree.Append failed",
-					"records", len(lines), "err", appendErr)
+			stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "findings.shortscan.jsonl")
+			if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+				app.Log.Debug("web.shortscan: staging write failed",
+					"path", stagingPath, "err", wErr)
 			}
 		}
 	}
@@ -160,17 +166,27 @@ func runShortscan(ctx context.Context, shortscanPath, targetURL string) ([]Findi
 	return []FindingRecord{record}, nil
 }
 
-// readIISTargetsFromFindingsJSONL reads artefacts/findings.jsonl and returns
-// URLs from records where TemplateID == "iis-version"
-// (RESEARCH §shortscan: awk '/iis-version/ {print $4}' nuclei_output/info.txt).
-func readIISTargetsFromFindingsJSONL(app *appctx.AppContext) ([]string, error) {
-	findingsPath := filepath.Join(app.Target.WorkDir, "artefacts", "findings.jsonl")
-	data, err := os.ReadFile(findingsPath) //nolint:gosec // path within WorkDir
+// readIISTargetsFromNucleiStaging reads inputs/findings.nuclei.jsonl (the nuclei
+// staging file written by NucleiTask under the staging contract) and returns URLs
+// from records where TemplateID == "iis-version".
+//
+// This function ONLY reads inputs/findings.nuclei.jsonl. There is NO fallback to
+// the merged artefact file — that file may be stale/previous-run data (WARNING-3
+// fix). If the staging file is absent, logs an Info message and returns nil, nil.
+//
+// DependsOn ["web.nuclei"] ensures nuclei has written its staging file before
+// shortscan runs.
+func readIISTargetsFromNucleiStaging(app *appctx.AppContext) ([]string, error) {
+	stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "findings.nuclei.jsonl")
+	data, err := os.ReadFile(stagingPath) //nolint:gosec // path within WorkDir
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil // findings.jsonl not yet produced — not an error
+			if app.Log != nil {
+				app.Log.Info("web.shortscan: inputs/findings.nuclei.jsonl absent — IIS target detection skipped")
+			}
+			return nil, nil
 		}
-		return nil, fmt.Errorf("read findings.jsonl: %w", err)
+		return nil, fmt.Errorf("read inputs/findings.nuclei.jsonl: %w", err)
 	}
 	if len(data) == 0 {
 		return nil, nil

@@ -1,31 +1,31 @@
 // urldedup.go — UrlDedupTask: URL deduplication via urless + p1radup.
 //
-// Name: "web.urldedup"  DependsOn: ["web.katana", "web.urlfinder", "web.waymore"]
+// Name: "web.urldedup"  DependsOn: ["web.katana", "web.urlfinder", "web.waymore",
 //
-// UrlDedupTask merges URL records from katana/urlfinder/waymore outputs,
-// deduplicates via urless (stdin → stdout) then p1radup (-i/-o/-s), and
-// overwrites artefacts/urls.jsonl with the deduplicated set.
+//	"web.subjs", "web.jsluice", "web.jsa", "web.mantra"]
 //
-// PIPELINE (RESEARCH §urless, §p1radup, web.sh:2021, 2037):
+// UrlDedupTask is the SINGLE semantic-dedup app.Tree.Append("urls") caller (WEB-14).
+// It globs ALL inputs/urls.*.jsonl staging files (written by katana, urlfinder,
+// waymore, subjs, jsluice, jsa, mantra), deduplicates via urless-equivalent +
+// p1radup, then calls app.Tree.Append("urls") ONCE with the final deduped set.
 //
-//	urless < merged_urls.txt  (stdin → stdout)
-//	p1radup -i <file> -o <file> -s
+// URL PIPELINE DESIGN (WEB-14, single-writer):
 //
-// urless is stdin-only; since Backend.Runner does not expose a stdin pipe,
-// this task uses a write-to-pipe-file approach: it writes the merged URL list
-// to a named pipe file (tmp file path), then runs urless with the tmp file
-// redirected via a shell-level wrapper. Since that approach requires /bin/sh,
-// and to remain FOUND-10 compliant (no raw exec.Command outside backend),
-// we perform an equivalent in-process deduplication when urless is absent.
+//	urls-fetch stage:   katana/urlfinder/waymore write inputs/urls.{katana,urlfinder,waymore}.jsonl
+//	Pre-js-extract:     MergeStage("urls") populates artefacts/urls.jsonl from fetch-stage files
+//	                    (js-extract tasks read artefacts/urls.jsonl for their JS URL input)
+//	js-extract+analyze: subjs/jsluice/jsa/mantra write inputs/urls.{subjs,jsluice,jsa,mantra}.jsonl
+//	urls-dedup (FINAL): this task globs ALL inputs/urls.*.jsonl (all producers), runs semantic
+//	                    dedup, calls Tree.Append("urls") ONCE — replaces the intermediate file.
 //
-// In-process dedup fallback: exact URL deduplication (preserves first-seen
-// order) applied before p1radup. p1radup is then run via app.Tools.Run().
+// CR-05 fix: the old direct-write to artefacts/urls.jsonl is replaced by routing
+// through app.Tree.Append which:
+//   - re-validates scope through the scope-enforcement boundary (T-05-09-01 mitigation)
+//   - writes atomically via 4-step AtomicWriter (FOUND-04 guarantee)
 //
 // Axiom: LocalBackend only for both tools (D-W13).
-// T-05-15: scope filtering already applied by upstream Tasks; urls.jsonl
-// only contains in-scope records before dedup.
 //
-// Source: .planning/phases/05-web-pipeline-e2e/05-04-PLAN.md Task 2.
+// Source: .planning/phases/05-web-pipeline-e2e/05-09-PLAN.md Task 3.
 package web
 
 import (
@@ -36,6 +36,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
@@ -52,26 +53,62 @@ func (t *UrlDedupTask) Description() string { return "URL deduplication (urless 
 func (t *UrlDedupTask) Enabled(cfg *config.Config) bool {
 	return cfg.Web.URLs.Enabled
 }
+
+// DependsOn lists all URL-staging producers: fetch-stage AND js-analyze producers.
+// This ensures urldedup runs AFTER all URL sources have written their staging files.
+// Stage ordering that places urldedup after js-analyze is set in 05-10.
 func (t *UrlDedupTask) DependsOn() []string {
-	return []string{"web.katana", "web.urlfinder", "web.waymore"}
+	return []string{
+		"web.katana", "web.urlfinder", "web.waymore",
+		"web.subjs", "web.jsluice", "web.jsa", "web.mantra",
+	}
 }
 
-// Run reads urls.jsonl, deduplicates via urless + p1radup, and rewrites urls.jsonl
-// with the deduplicated set.
+// Run globs ALL inputs/urls.*.jsonl staging files, deduplicates via urless-equivalent
+// + p1radup, and calls app.Tree.Append("urls") ONCE with the final deduped set (WEB-14).
 func (t *UrlDedupTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
-	// Read existing URL records from artefacts/urls.jsonl.
-	urlsPath := filepath.Join(app.Target.WorkDir, "artefacts", "urls.jsonl")
-	data, readErr := os.ReadFile(urlsPath) //nolint:gosec // path within WorkDir
-	if readErr != nil || len(data) == 0 {
+	// Glob all URL staging files from ALL producers (fetch + js-analyze).
+	pattern := filepath.Join(app.Target.WorkDir, "inputs", "urls.*.jsonl")
+	matches, globErr := filepath.Glob(pattern)
+	if globErr != nil {
+		return task.Result{Status: task.StatusErrored},
+			fmt.Errorf("web.urldedup: glob inputs/urls.*.jsonl: %w", globErr)
+	}
+
+	if len(matches) == 0 {
 		if app.Log != nil {
-			app.Log.Info("web.urldedup: no urls.jsonl to deduplicate — skipping")
+			app.Log.Info("web.urldedup: no inputs/urls.*.jsonl staging files found — skipping")
 		}
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
+	// Sort for deterministic processing order.
+	sort.Strings(matches)
+
+	// Collect all JSONL bytes from all staging files.
+	var allData []byte
+	for _, fpath := range matches {
+		fileData, rerr := os.ReadFile(fpath) //nolint:gosec // path within WorkDir from trusted Glob
+		if rerr != nil {
+			if app.Log != nil {
+				app.Log.Debug("web.urldedup: error reading staging file",
+					"file", fpath, "err", rerr)
+			}
+			continue // non-fatal per best_effort
+		}
+		allData = append(allData, fileData...)
+		// Ensure newline between files.
+		if len(fileData) > 0 && fileData[len(fileData)-1] != '\n' {
+			allData = append(allData, '\n')
+		}
+	}
+
 	// Extract URL strings from JSONL records for dedup pipeline.
-	rawURLs, origSourceMap := extractURLStringsAndSources(data)
+	rawURLs, origSourceMap := extractURLStringsAndSources(allData)
 	if len(rawURLs) == 0 {
+		if app.Log != nil {
+			app.Log.Info("web.urldedup: no URL records in staging files — skipping")
+		}
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -154,17 +191,12 @@ func (t *UrlDedupTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 		newLines = append(newLines, b)
 	}
 
-	// Step 5: Overwrite urls.jsonl with deduplicated records.
+	// Step 5: Route deduplicated records through app.Tree.Append("urls") — the scope-
+	// enforcement boundary (T-05-09-01 mitigation: replaces the prior direct-write bypass).
+	// This is the SINGLE semantic-dedup Append writer for urls (WEB-14).
 	if len(newLines) > 0 {
-		var buf bytes.Buffer
-		for _, line := range newLines {
-			buf.Write(line)
-			buf.WriteByte('\n')
-		}
-		if werr := os.WriteFile(urlsPath, buf.Bytes(), 0o644); werr != nil { //nolint:gosec
-			if app.Log != nil {
-				app.Log.Debug("web.urldedup: rewrite urls.jsonl failed", "err", werr)
-			}
+		if appendErr := app.Tree.Append("urls", newLines); appendErr != nil && app.Log != nil {
+			app.Log.Debug("web.urldedup: Tree.Append failed", "err", appendErr)
 		}
 	}
 
@@ -174,6 +206,7 @@ func (t *UrlDedupTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 
 	if app.Log != nil {
 		app.Log.Debug("web.urldedup: completed",
+			"staging_files", len(matches),
 			"input_urls", len(rawURLs),
 			"deduped_urls", len(dedupedURLs),
 			"final_records", len(newLines))

@@ -29,6 +29,7 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 	"github.com/six2dez/reconftw/internal/extract/waf"
 )
@@ -120,10 +121,10 @@ func (t *CdnCheckTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 		lines = append(lines, b)
 	}
 	if len(lines) > 0 {
-		if appendErr := app.Tree.Append("waf", lines); appendErr != nil {
-			if app.Log != nil {
-				app.Log.Debug("web.cdncheck: Tree.Append failed", "err", appendErr)
-			}
+		stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "waf.cdncheck.jsonl")
+		if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+			app.Log.Debug("web.cdncheck: staging write failed",
+				"path", stagingPath, "err", wErr)
 		}
 	}
 

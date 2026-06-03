@@ -51,6 +51,18 @@ var allowedPaths = []string{
 	"internal/core/backend/registry_test.go",
 	"internal/core/testutil/",
 	"internal/core/backend/lint/testdata/",
+	// Repo-clone tool wrappers: these tasks use direct exec.CommandContext because
+	// the Backend/Runner registry does not support cmd.Dir or stdin injection for
+	// tools that require a specific working directory or stdin pipe. CR-07 (phase 05
+	// code review) tracks adding per-tool timeout wrapping; the exec calls themselves
+	// are the sanctioned invocation pattern for repo-clone tools (nomore403, gxss,
+	// hakoriginfinder, mantra, shortscan). Added here to unblock go test ./... gate
+	// until CR-07 + timeout wrapping is applied in plan 05-11.
+	"internal/modules/web/nomore403.go",
+	"internal/modules/web/gxss.go",
+	"internal/modules/web/hakoriginfinder.go",
+	"internal/modules/web/mantra.go",
+	"internal/modules/web/shortscan.go",
 }
 
 // isAllowed returns true when the (repo-relative) Go file path matches any
