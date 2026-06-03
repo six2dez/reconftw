@@ -63,7 +63,11 @@ func (t *SourcemapperTask) Run(ctx context.Context, app *appctx.AppContext) (tas
 	}
 
 	// Fan-out: bounded goroutines per JS URL.
-	const maxConcurrency = 5 // conservative default for sourcemapper
+	// WR-04: derive from config rather than hardcoded 5.
+	maxConcurrency := app.Cfg.Concurrency.MaxJobs
+	if maxConcurrency <= 0 {
+		maxConcurrency = 5
+	}
 	sem := make(chan struct{}, maxConcurrency)
 	var wg sync.WaitGroup
 	var totalRan int

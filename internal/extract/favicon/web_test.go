@@ -24,7 +24,7 @@ func TestExtractWeb(t *testing.T) {
 			input:  `[{"URL":"https://example.com","Name":"Apache","Hash":"-12345"}]`,
 			domain: "example.com",
 			want: []favicon.WebResult{
-				{URL: "https://example.com", Tech: "Apache", Hash: "-12345", Domain: "example.com"},
+				{URL: "https://example.com", Tech: "Apache", Hash: "-12345", Host: "example.com"},
 			},
 		},
 		{
@@ -32,7 +32,7 @@ func TestExtractWeb(t *testing.T) {
 			input:  `[{"url":"https://sub.example.com","name":"Nginx","hash":"67890"}]`,
 			domain: "example.com",
 			want: []favicon.WebResult{
-				{URL: "https://sub.example.com", Tech: "Nginx", Hash: "67890", Domain: "sub.example.com"},
+				{URL: "https://sub.example.com", Tech: "Nginx", Hash: "67890", Host: "sub.example.com"},
 			},
 		},
 		{
@@ -40,8 +40,8 @@ func TestExtractWeb(t *testing.T) {
 			input:  `{"URL":"https://example.com","Name":"Apache","Hash":"111"}` + "\n" + `{"url":"https://api.example.com","name":"Nginx","hash":"222"}`,
 			domain: "example.com",
 			want: []favicon.WebResult{
-				{URL: "https://example.com", Tech: "Apache", Hash: "111", Domain: "example.com"},
-				{URL: "https://api.example.com", Tech: "Nginx", Hash: "222", Domain: "api.example.com"},
+				{URL: "https://example.com", Tech: "Apache", Hash: "111", Host: "example.com"},
+				{URL: "https://api.example.com", Tech: "Nginx", Hash: "222", Host: "api.example.com"},
 			},
 		},
 		{
@@ -49,7 +49,7 @@ func TestExtractWeb(t *testing.T) {
 			input:  `[{"URL":"https://evil.com","Name":"Apache","Hash":"111"},{"URL":"https://example.com","Name":"Nginx","Hash":"222"}]`,
 			domain: "example.com",
 			want: []favicon.WebResult{
-				{URL: "https://example.com", Tech: "Nginx", Hash: "222", Domain: "example.com"},
+				{URL: "https://example.com", Tech: "Nginx", Hash: "222", Host: "example.com"},
 			},
 		},
 		{
@@ -57,7 +57,7 @@ func TestExtractWeb(t *testing.T) {
 			input:  `[{"Name":"Apache","Hash":"111"},{"URL":"https://example.com","Name":"Nginx","Hash":"222"}]`,
 			domain: "example.com",
 			want: []favicon.WebResult{
-				{URL: "https://example.com", Tech: "Nginx", Hash: "222", Domain: "example.com"},
+				{URL: "https://example.com", Tech: "Nginx", Hash: "222", Host: "example.com"},
 			},
 		},
 		{
@@ -87,8 +87,8 @@ func TestExtractWeb(t *testing.T) {
 				if got[i].Hash != tc.want[i].Hash {
 					t.Errorf("[%d] Hash: got %q, want %q", i, got[i].Hash, tc.want[i].Hash)
 				}
-				if got[i].Domain != tc.want[i].Domain {
-					t.Errorf("[%d] Domain: got %q, want %q", i, got[i].Domain, tc.want[i].Domain)
+				if got[i].Host != tc.want[i].Host {
+					t.Errorf("[%d] Host: got %q, want %q", i, got[i].Host, tc.want[i].Host)
 				}
 			}
 		})

@@ -144,7 +144,7 @@ func (t *FaviReconTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 			URL:    r.URL,
 			Tech:   r.Tech,
 			Hash:   r.Hash,
-			Domain: r.Domain,
+			Domain: r.Host, // WR-03 co-change: WebResult.Domain renamed to Host; FaviconRecord.Domain kept (output schema)
 		}
 		b, err := json.Marshal(rec)
 		if err != nil {

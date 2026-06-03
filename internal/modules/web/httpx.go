@@ -134,8 +134,8 @@ func (t *HTTPXTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 		return task.Result{Status: task.StatusErrored}, err
 	}
 
-	// Validate --hosts path against path traversal (T-05-01).
-	if err := validateHostsPath(inputFile); err != nil {
+	// Validate --hosts path (T-05-01 / WR-08: operator-trust model).
+	if err := checkHostsFileReadable(inputFile); err != nil {
 		return task.Result{Status: task.StatusErrored}, err
 	}
 
@@ -324,12 +324,13 @@ func extractHostsFromSubdomainsJSONL(subdomainsPath string, app *appctx.AppConte
 	return hostsPath, nil
 }
 
-// validateHostsPath guards against path traversal in --hosts values (T-05-01).
-func validateHostsPath(path string) error {
-	// Reject paths containing ".." traversal sequences.
-	if strings.Contains(filepath.Clean(path), "..") {
-		return fmt.Errorf("web.httpx: --hosts path contains path traversal: %q", path)
-	}
+// checkHostsFileReadable checks that path is accessible and is a regular file.
+// The --hosts flag is operator-supplied on the operator's local machine;
+// arbitrary absolute paths are allowed by design — the operator controls the
+// machine running reconftw. The ".." substring check was removed (WR-08): it
+// was over-inclusive (blocked legitimate filenames containing "..") and under-
+// inclusive (did not prevent absolute path reads, which are the actual exposure).
+func checkHostsFileReadable(path string) error {
 	info, err := os.Stat(path)
 	if err != nil {
 		return fmt.Errorf("web.httpx: --hosts file not accessible %q: %w", path, err)

@@ -10,7 +10,7 @@
 //
 // jsluice secrets mode field names (RESEARCH §Extractor Extension Shape / A6):
 //
-//	{"type":"AWS_ACCESS_KEY","value":"AKIA...","filename":"/path/to/file.js","severity":"high"}
+//	{"kind":"AWS_ACCESS_KEY","value":"AKIA...","filename":"/path/to/file.js","severity":"high"}
 //
 // CRITICAL: jsluice uses "filename" (not "url") for the source file path.
 //
@@ -28,7 +28,7 @@ import (
 // The raw credential value is intentionally NEVER stored (XCUT-07).
 type SecretRecord struct {
 	URL      string `json:"url"`              // filename/source path from jsluice
-	Type     string `json:"type"`             // e.g. "AWS_ACCESS_KEY"
+	Type     string `json:"type"`             // secret kind (from jsluice "kind" field)
 	Severity string `json:"severity"`         // jsluice severity level
 	Redacted string `json:"secret_redacted"`  // always "***" — never the raw value
 }

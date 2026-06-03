@@ -29,11 +29,13 @@ import (
 )
 
 // WebResult is the D-W11 favicons.jsonl record shape for favirecon JSON output.
+// Host is the per-record hostname (from u.Hostname()) — not the apex domain.
+// Field renamed from Domain to Host (WR-03: the value is a hostname, not a domain).
 type WebResult struct {
-	URL    string `json:"url"`
-	Tech   string `json:"tech"`
-	Hash   string `json:"hash"` // Shodan mmh3 favicon hash
-	Domain string `json:"domain"`
+	URL  string `json:"url"`
+	Tech string `json:"tech"`
+	Hash string `json:"hash"` // Shodan mmh3 favicon hash
+	Host string `json:"host"` // WR-03: renamed from Domain (value is per-record hostname)
 }
 
 // rawFaviconItem is used for case-insensitive field access (Open Question 4).
@@ -100,8 +102,10 @@ func ExtractWeb(jsonBytes []byte, domain string) ([]WebResult, error) {
 	}
 
 	var results []WebResult
-	for _, item := range item(items) {
-		rawURL := item.getString("URL", "url")
+	// WR-03: iterate items directly with non-shadowing loop variable fi.
+	// Removed item() identity function — it was dead-weight indirection.
+	for _, fi := range items {
+		rawURL := fi.getString("URL", "url")
 		if rawURL == "" {
 			continue
 		}
@@ -117,13 +121,13 @@ func ExtractWeb(jsonBytes []byte, domain string) ([]WebResult, error) {
 		if !inScope(host, domain) {
 			continue
 		}
-		tech := item.getString("Name", "name")
-		hash := item.getString("Hash", "hash")
+		tech := fi.getString("Name", "name")
+		hash := fi.getString("Hash", "hash")
 		results = append(results, WebResult{
-			URL:    rawURL,
-			Tech:   tech,
-			Hash:   hash,
-			Domain: host,
+			URL:  rawURL,
+			Tech: tech,
+			Hash: hash,
+			Host: host, // WR-03: renamed from Domain; value is hostname not apex
 		})
 	}
 
@@ -132,8 +136,3 @@ func ExtractWeb(jsonBytes []byte, domain string) ([]WebResult, error) {
 	}
 	return results, nil
 }
-
-// item is an identity function to avoid "range over slice of interface" lint.
-// The for-range over []rawFaviconItem is fine in Go; this just sidesteps the
-// variable shadowing between item (function) and items (slice).
-func item(items []rawFaviconItem) []rawFaviconItem { return items }

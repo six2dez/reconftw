@@ -55,13 +55,15 @@ func ExtractWafw00f(text []byte, domain string) ([]WAFResult, error) {
 		if line == "" || strings.Contains(line, "(None)") {
 			continue
 		}
-		// Expected format: "<url> : <waf_name>" (whitespace-flexible).
-		idx := strings.LastIndex(line, ":")
-		if idx < 0 {
+		// Expected format: "<url> : <waf_name>" — split on " : " separator (WR-05).
+		// WR-05 fix: use SplitN on " : " (the actual wafw00f delimiter) so that
+		// scheme colons (https://) and colons in WAF names split at the wrong point.
+		parts := strings.SplitN(line, " : ", 2)
+		if len(parts) != 2 {
 			continue
 		}
-		host := strings.TrimSpace(line[:idx])
-		wafName := strings.TrimSpace(line[idx+1:])
+		host := strings.TrimSpace(parts[0])
+		wafName := strings.TrimSpace(parts[1])
 		if host == "" || wafName == "" {
 			continue
 		}

@@ -7,10 +7,10 @@
 // the task logs an explicit SKIP message and returns StatusSkipped — it NEVER
 // blocks the pipeline (best_effort policy, D-W12).
 //
-// ARG VECTOR (RESEARCH §nuclei screenshot — verbatim v1 form):
+// ARG VECTOR (RESEARCH §nuclei screenshot — corrected WR-02):
 //
 //	nuclei -headless -id screenshot -V dir=<abs-temp-dir>
-//	       < hosts.txt  (stdin)
+//	       -l <hosts_file>  (hosts file via -l flag, not stdin)
 //
 // D-W5 content-addressed rename: after nuclei writes PNGs to a temp dir,
 // Walk the dir, compute sha256.Sum256 of each PNG's bytes, rename to
@@ -38,6 +38,13 @@ import (
 
 // ScreenshotTask runs nuclei in headless mode to capture screenshots and
 // stores them as content-addressed PNGs under raw/screenshots/.
+//
+// ARG VECTOR (corrected — WR-02): nuclei is invoked as:
+//
+//	nuclei -headless -id screenshot -V dir=<dir> -l <hosts_file>
+//
+// The -l flag is used for host-file input (not stdin as the original
+// header claimed). Both code and doc now agree on -l.
 type ScreenshotTask struct{}
 
 // Name returns the globally unique dot-namespaced task identifier.
@@ -161,9 +168,16 @@ func (t *ScreenshotTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 	}
 
 	// D-W6: if 0 PNGs produced (headless unavailable), return StatusSkipped — not fail.
+	// WR-02: emit explicit Warn when hosts were non-empty to distinguish
+	// "headless unavailable" from "wrong nuclei invocation".
 	if count == 0 {
 		if app.Log != nil {
-			app.Log.Info("web.screenshot: 0 PNGs produced (headless likely unavailable) — skipping (D-W6)")
+			if len(allHosts) > 0 {
+				app.Log.Warn("web.screenshot: no screenshots produced but hosts were non-empty — verify nuclei headless + templates",
+					"hosts", len(allHosts))
+			} else {
+				app.Log.Info("web.screenshot: 0 PNGs produced (headless likely unavailable) — skipping (D-W6)")
+			}
 		}
 		return task.Result{Status: task.StatusSkipped}, nil
 	}

@@ -71,18 +71,8 @@ func (t *CdnCheckTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 			fmt.Errorf("web.cdncheck: write ips file: %w", err)
 	}
 
-	// cdncheck reads stdin: pipe through a stdin file redirect.
-	args := []string{"-silent", "-resp", "-nc"}
-
-	// app.Tools.Run does not provide stdin injection directly; we use a
-	// workaround: pass the IPs file via -i flag if supported, else fall
-	// back to reading the file ourselves and embedding in the invocation.
-	// The v1 call uses stdin; we replicate by writing a stdin-pipe helper
-	// that passes the file as stdin to the process via os/exec.
-	// Since app.Tools.Run maps directly to backend.Exec which uses os/exec,
-	// we write the IPs to a file and use the -i flag form for cdncheck.
-	// NOTE: cdncheck also supports -i <file> for file input (no stdin needed).
-	args = append(args, "-i", ipsFile)
+	// cdncheck reads IPs via -i <file> flag.
+	args := []string{"-silent", "-resp", "-nc", "-i", ipsFile}
 
 	res, execErr := app.Tools.Run(ctx, toolName, args)
 	if execErr != nil {
