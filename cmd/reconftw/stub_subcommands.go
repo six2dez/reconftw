@@ -693,15 +693,21 @@ func runWebCmd(cmd *cobra.Command) error {
 	// Stages are split to honor all declared DependsOn edges (CR-04 fix, plan 05-10).
 	// RunStage fires every task in a slice CONCURRENTLY; ordering comes from the
 	// sequential stage calls below, not from DependsOn enforcement within a stage.
+	// The stage order MUST agree with every declared DependsOn edge — a stage that
+	// runs before its task's declared dependency is a latent correctness bug
+	// (CR-02). The TestWebDAGStageOrderConsistency guard asserts this invariant.
 	//
 	// URL PIPELINE (WEB-14 single-writer):
 	//   urls-fetch   → katana/urlfinder/waymore write inputs/urls.{katana,...}.jsonl
 	//   [intermediate] → intermediate merge populates artefacts/urls.jsonl for js tasks
 	//   js-extract   → subjs/sourcemapper read artefacts/urls.jsonl for JS URL input
+	//                  (subjs DependsOn katana/urlfinder/waymore — CR-01: NOT urldedup)
 	//   js-analyze   → jsluice/jsa/mantra write inputs/urls.{jsluice,jsa,mantra}.jsonl
 	//   urls-dedup   → globs ALL inputs/urls.*.jsonl, runs semantic dedup, calls
-	//                  Tree.Append("urls") ONCE — replaces the intermediate file.
-	//   No second intermediate merge after js-analyze: urldedup IS the merge step.
+	//                  Tree.Append("urls") ONCE — writes the FINAL artefacts/urls.jsonl.
+	//                  No second intermediate merge after js-analyze: urldedup IS the merge.
+	//   bypass       → gxss/arjun read the FINAL deduped artefacts/urls.jsonl, so this
+	//                  stage MUST run AFTER urls-dedup (CR-02), not before it.
 	type stageSpec struct {
 		name     string
 		prefixes []string
@@ -768,23 +774,32 @@ func runWebCmd(cmd *cobra.Command) error {
 			},
 		},
 		{
-			// Stage 7: bypass + param discovery — depend on fuzz/nuclei outputs.
+			// Stage 7: URL deduplication — single-writer for urls (WEB-14).
+			// Globs ALL inputs/urls.*.jsonl (from urls-fetch AND js-analyze),
+			// runs urless/p1radup semantic dedup, calls Tree.Append("urls") ONCE,
+			// writing the FINAL deduped artefacts/urls.jsonl. web.urldedup DependsOn
+			// all URL producers ✓ (urls-fetch + js-extract + js-analyze all ran first).
+			//
+			// CR-02: this MUST run BEFORE the bypass stage. gxss/arjun DependsOn
+			// web.urldedup and read the final deduped artefacts/urls.jsonl; running
+			// bypass first would feed them the stale intermediate (fetch-only) URL set
+			// and skip every JS-discovered parameterized URL.
+			name: "urls-dedup",
+			prefixes: []string{
+				"web.urldedup",
+			},
+		},
+		{
+			// Stage 8: bypass + param discovery — LAST stage.
+			// gxss/arjun DependsOn web.urldedup ✓ (urls-dedup ran first), so they
+			// read the FINAL deduped artefacts/urls.jsonl. nomore403/shortscan read
+			// fuzz/nuclei outputs produced in the analysis stage.
 			name: "bypass",
 			prefixes: []string{
 				"web.nomore403",
 				"web.shortscan",
 				"web.gxss",
 				"web.arjun",
-			},
-		},
-		{
-			// Stage 8: URL deduplication — LAST stage (WEB-14 single-writer).
-			// Globs ALL inputs/urls.*.jsonl (from urls-fetch AND js-analyze),
-			// runs urless/p1radup semantic dedup, calls Tree.Append("urls") ONCE.
-			// web.urldedup DependsOn all URL producers ✓ (all prior stages ran first).
-			name: "urls-dedup",
-			prefixes: []string{
-				"web.urldedup",
 			},
 		},
 	}
@@ -868,11 +883,12 @@ func runWebCmd(cmd *cobra.Command) error {
 }
 
 // printWebDryRun lists the tasks that would run per stage and returns nil.
-// Stage ordering mirrors the live RunE stages (CR-04 fix, plan 05-10):
+// Stage ordering mirrors the live RunE stages (CR-04 fix, plan 05-10; CR-02
+// reorder so urls-dedup precedes bypass):
 //
 //	probe → analysis-waf [+merge waf] → analysis [+merge findings]
 //	→ urls-fetch [+intermediate merge urls] → js-extract → js-analyze
-//	→ bypass [+merge findings] → urls-dedup
+//	→ urls-dedup → bypass [+merge findings]
 func printWebDryRun(cmd *cobra.Command, allTasks []task.Task, cfg *config.Config) error {
 	type stageSpec struct {
 		name        string
@@ -913,15 +929,16 @@ func printWebDryRun(cmd *cobra.Command, allTasks []task.Task, cfg *config.Config
 			// No intermediate urls merge here: urldedup (urls-dedup stage) IS the merge step.
 		},
 		{
+			name:     "urls-dedup",
+			prefixes: []string{"web.urldedup"},
+			// urldedup calls Tree.Append("urls") once after semantic dedup — no MergeStage needed.
+			// CR-02: runs BEFORE bypass so gxss/arjun read the final deduped urls.jsonl.
+		},
+		{
 			name:       "bypass",
 			prefixes:   []string{"web.nomore403", "web.shortscan", "web.gxss", "web.arjun"},
 			mergeAfter: "findings",
 			mergeNote:  "MergeStage(\"findings\") — merges nomore403/shortscan/gxss/arjun staging",
-		},
-		{
-			name:     "urls-dedup",
-			prefixes: []string{"web.urldedup"},
-			// urldedup calls Tree.Append("urls") once after semantic dedup — no MergeStage needed.
 		},
 	}
 	fmt.Fprintln(cmd.OutOrStdout(), "[dry-run] web pipeline stages:")

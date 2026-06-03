@@ -1,9 +1,18 @@
 // subjs.go — SubjsTask: JavaScript URL extraction via subjs.
 //
-// Name: "web.subjs"  DependsOn: ["web.urldedup"]
+// Name: "web.subjs"  DependsOn: ["web.katana", "web.urlfinder", "web.waymore"]
 //
 // SubjsTask reads JavaScript URLs from urls.jsonl, runs subjs to extract
 // all linked JS files, and appends new URL records to artefacts/urls.jsonl.
+//
+// DEPENDENCY DIRECTION (CR-01 fix): subjs is a URL *producer* that urldedup
+// CONSUMES, so subjs MUST run BEFORE urldedup — it cannot DependsOn urldedup
+// (that backwards edge formed the web.urldedup → web.subjs → web.urldedup cycle
+// that aborted the entire `web` subcommand at startup). subjs's real data input
+// is artefacts/urls.jsonl, which the intermediate MergeStage("urls") populates
+// from the fetch-stage producers (katana/urlfinder/waymore) after urls-fetch.
+// Declaring DependsOn on those fetch producers sequences subjs after the data it
+// reads while keeping the DAG acyclic; urldedup unions every producer afterward.
 //
 // ARG VECTOR (RESEARCH §subjs — verbatim v1 form, web.sh:2244):
 //
@@ -51,7 +60,13 @@ func (t *SubjsTask) Description() string { return "JS URL extraction (subjs → 
 func (t *SubjsTask) Enabled(cfg *config.Config) bool {
 	return cfg.Web.JS.Enabled
 }
-func (t *SubjsTask) DependsOn() []string { return []string{"web.urldedup"} }
+// DependsOn returns the fetch-stage URL producers whose output the intermediate
+// MergeStage("urls") consolidates into artefacts/urls.jsonl — subjs reads that
+// file. subjs is itself a urldedup producer, so it MUST NOT depend on urldedup
+// (CR-01: that backwards edge created a cycle and the web pipeline never ran).
+func (t *SubjsTask) DependsOn() []string {
+	return []string{"web.katana", "web.urlfinder", "web.waymore"}
+}
 
 // Run reads JS URLs from urls.jsonl, runs subjs, and appends new URL records.
 func (t *SubjsTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
