@@ -689,27 +689,47 @@ func runWebCmd(cmd *cobra.Command) error {
 	// Step 11: Sequential best_effort RunStage execution (D-W12).
 	// ALL stages use module "web" → best_effort policy throughout.
 	// No fail_fast stage — httpx empty output → downstream runs with empty input.
+	//
+	// Stages are split to honor all declared DependsOn edges (CR-04 fix, plan 05-10).
+	// RunStage fires every task in a slice CONCURRENTLY; ordering comes from the
+	// sequential stage calls below, not from DependsOn enforcement within a stage.
+	//
+	// URL PIPELINE (WEB-14 single-writer):
+	//   urls-fetch   → katana/urlfinder/waymore write inputs/urls.{katana,...}.jsonl
+	//   [intermediate] → intermediate merge populates artefacts/urls.jsonl for js tasks
+	//   js-extract   → subjs/sourcemapper read artefacts/urls.jsonl for JS URL input
+	//   js-analyze   → jsluice/jsa/mantra write inputs/urls.{jsluice,jsa,mantra}.jsonl
+	//   urls-dedup   → globs ALL inputs/urls.*.jsonl, runs semantic dedup, calls
+	//                  Tree.Append("urls") ONCE — replaces the intermediate file.
+	//   No second intermediate merge after js-analyze: urldedup IS the merge step.
 	type stageSpec struct {
 		name     string
 		prefixes []string
 	}
 	stages := []stageSpec{
 		{
-			// Wave 1: httpx probe — DAG root; feeds everything downstream.
+			// Stage 1: httpx probe — DAG root; feeds everything downstream.
 			name: "probe",
 			prefixes: []string{
 				"web.httpx",
 			},
 		},
 		{
-			// Wave 2a: analysis tools — all DependsOn httpx (implemented in plan-02+).
+			// Stage 2: WAF/CDN analysis — must complete before nuclei reads waf.jsonl.
+			// web.nuclei DependsOn ["web.httpx", "web.wafw00f"] — wafw00f must precede nuclei.
+			name: "analysis-waf",
+			prefixes: []string{
+				"web.wafw00f",
+				"web.cdncheck",
+			},
+		},
+		{
+			// Stage 3: main analysis — nuclei DependsOn wafw00f ✓ (analysis-waf ran first).
 			name: "analysis",
 			prefixes: []string{
 				"web.nuclei",
 				"web.screenshot",
 				"web.ffuf",
-				"web.wafw00f",
-				"web.cdncheck",
 				"web.favirecon",
 				"web.vhostfinder",
 				"web.hakoriginfinder",
@@ -717,28 +737,54 @@ func runWebCmd(cmd *cobra.Command) error {
 			},
 		},
 		{
-			// Wave 2b: URL discovery + JS analysis — all DependsOn httpx.
-			name: "url-discovery",
+			// Stage 4: URL fetch — katana/urlfinder/waymore write inputs/urls.*.jsonl.
+			// An intermediate merge runs after this stage to populate
+			// artefacts/urls.jsonl before js-extract tasks read it.
+			name: "urls-fetch",
 			prefixes: []string{
 				"web.katana",
 				"web.urlfinder",
 				"web.waymore",
-				"web.urldedup",
+			},
+		},
+		{
+			// Stage 5: JS extraction — reads artefacts/urls.jsonl populated by the intermediate
+			// merge after urls-fetch. subjs/sourcemapper must complete before
+			// jsluice (web.jsluice DependsOn ["web.subjs", "web.sourcemapper"]).
+			name: "js-extract",
+			prefixes: []string{
 				"web.subjs",
-				"web.jsluice",
-				"web.mantra",
-				"web.jsa",
 				"web.sourcemapper",
 			},
 		},
 		{
-			// Wave 3: bypass + param discovery — depend on fuzz/nuclei outputs.
+			// Stage 6: JS analysis — jsluice DependsOn subjs/sourcemapper ✓ (js-extract ran first).
+			// jsa/mantra DependsOn subjs ✓. All write inputs/urls.{jsluice,jsa,mantra}.jsonl.
+			name: "js-analyze",
+			prefixes: []string{
+				"web.jsluice",
+				"web.jsa",
+				"web.mantra",
+			},
+		},
+		{
+			// Stage 7: bypass + param discovery — depend on fuzz/nuclei outputs.
 			name: "bypass",
 			prefixes: []string{
 				"web.nomore403",
 				"web.shortscan",
 				"web.gxss",
 				"web.arjun",
+			},
+		},
+		{
+			// Stage 8: URL deduplication — LAST stage (WEB-14 single-writer).
+			// Globs ALL inputs/urls.*.jsonl (from urls-fetch AND js-analyze),
+			// runs urless/p1radup semantic dedup, calls Tree.Append("urls") ONCE.
+			// web.urldedup DependsOn all URL producers ✓ (all prior stages ran first).
+			name: "urls-dedup",
+			prefixes: []string{
+				"web.urldedup",
 			},
 		},
 	}
@@ -757,12 +803,62 @@ func runWebCmd(cmd *cobra.Command) error {
 		}
 
 		progress.StageDone(stage.name, countFileLines(filepath.Join(workdir, "artefacts", "hosts.jsonl")))
+
+		// Per-stage MergeStage calls immediately after each stage that has
+		// multi-writer participants, so consumers in the next stage read a
+		// merged artefact rather than individual staging files.
+		switch stage.name {
+		case "analysis-waf":
+			// Merge wafw00f + cdncheck staging into artefacts/waf.jsonl.
+			if mergeErr := web.MergeStage(ctx, app, "waf"); mergeErr != nil {
+				if app.Log != nil {
+					app.Log.Warn("web: MergeStage failed (best_effort — continuing)",
+						"stage", "waf", "err", mergeErr)
+				}
+			}
+		case "analysis":
+			// Merge nuclei (and other analysis) staging into artefacts/findings.jsonl.
+			if mergeErr := web.MergeStage(ctx, app, "findings"); mergeErr != nil {
+				if app.Log != nil {
+					app.Log.Warn("web: MergeStage failed (best_effort — continuing)",
+						"stage", "findings", "err", mergeErr)
+				}
+			}
+		case "urls-fetch":
+			// intermediate merge: populate artefacts/urls.jsonl from katana/urlfinder/waymore
+			// staging so js-extract/js-analyze tasks can read their JS URL input.
+			// urldedup (urls-dedup stage) will replace this with the final
+			// semantically-deduped union after js-analyze completes.
+			if mergeErr := web.MergeStage(ctx, app, "urls"); mergeErr != nil {
+				if app.Log != nil {
+					app.Log.Warn("web: MergeStage failed (best_effort — continuing)",
+						"stage", "urls", "err", mergeErr)
+				}
+			}
+		case "bypass":
+			// Merge nomore403/shortscan/gxss/arjun staging into artefacts/findings.jsonl.
+			if mergeErr := web.MergeStage(ctx, app, "findings"); mergeErr != nil {
+				if app.Log != nil {
+					app.Log.Warn("web: MergeStage failed (best_effort — continuing)",
+						"stage", "findings", "err", mergeErr)
+				}
+			}
+		// urls-dedup stage: urldedup already called app.Tree.Append("urls") — no merge needed.
+		// js-analyze stage: no urls merge here — urldedup (urls-dedup stage) IS the merge step.
+		}
 	}
 
-	// Final consolidation of parallel staging writes.
-	if mergeErr := web.MergeAllWebArtefacts(ctx, app); mergeErr != nil {
-		if app.Log != nil {
-			app.Log.Warn("web: merge_all_artefacts_failed", "err", mergeErr)
+	// Final safety sweep: merge any remaining findings/waf staging files that may
+	// not have been captured by the per-stage merges (e.g. if a stage was partially
+	// skipped). "urls" is intentionally excluded — urldedup (urls-dedup stage) is the
+	// sole semantic-dedup Tree.Append("urls") writer; re-merging inputs/urls.*.jsonl
+	// here would clobber urldedup's urless/p1radup result (REPLACE semantics, WEB-14).
+	for _, prefix := range []string{"waf", "findings"} {
+		if mergeErr := web.MergeStage(ctx, app, prefix); mergeErr != nil {
+			if app.Log != nil {
+				app.Log.Warn("web: final sweep MergeStage failed (best_effort — continuing)",
+					"stage", prefix, "err", mergeErr)
+			}
 		}
 	}
 
@@ -772,16 +868,61 @@ func runWebCmd(cmd *cobra.Command) error {
 }
 
 // printWebDryRun lists the tasks that would run per stage and returns nil.
+// Stage ordering mirrors the live RunE stages (CR-04 fix, plan 05-10):
+//
+//	probe → analysis-waf [+merge waf] → analysis [+merge findings]
+//	→ urls-fetch [+intermediate merge urls] → js-extract → js-analyze
+//	→ bypass [+merge findings] → urls-dedup
 func printWebDryRun(cmd *cobra.Command, allTasks []task.Task, cfg *config.Config) error {
 	type stageSpec struct {
-		name     string
-		prefixes []string
+		name        string
+		prefixes    []string
+		mergeAfter  string // artefact name merged after this stage, or ""
+		mergeNote   string // human-readable note about the merge call
 	}
 	stages := []stageSpec{
-		{"probe", []string{"web.httpx"}},
-		{"analysis", []string{"web.nuclei", "web.screenshot", "web.ffuf", "web.wafw00f", "web.cdncheck", "web.favirecon", "web.vhostfinder", "web.hakoriginfinder", "web.csprecon"}},
-		{"url-discovery", []string{"web.katana", "web.urlfinder", "web.waymore", "web.urldedup", "web.subjs", "web.jsluice", "web.mantra", "web.jsa", "web.sourcemapper"}},
-		{"bypass", []string{"web.nomore403", "web.shortscan", "web.gxss", "web.arjun"}},
+		{
+			name:     "probe",
+			prefixes: []string{"web.httpx"},
+		},
+		{
+			name:       "analysis-waf",
+			prefixes:   []string{"web.wafw00f", "web.cdncheck"},
+			mergeAfter: "waf",
+			mergeNote:  "MergeStage(\"waf\") — merges wafw00f+cdncheck staging",
+		},
+		{
+			name:       "analysis",
+			prefixes:   []string{"web.nuclei", "web.screenshot", "web.ffuf", "web.favirecon", "web.vhostfinder", "web.hakoriginfinder", "web.csprecon"},
+			mergeAfter: "findings",
+			mergeNote:  "MergeStage(\"findings\") — merges nuclei staging",
+		},
+		{
+			name:       "urls-fetch",
+			prefixes:   []string{"web.katana", "web.urlfinder", "web.waymore"},
+			mergeAfter: "urls",
+			mergeNote:  "intermediate MergeStage(\"urls\") — populates artefacts/urls.jsonl for js-extract input",
+		},
+		{
+			name:     "js-extract",
+			prefixes: []string{"web.subjs", "web.sourcemapper"},
+		},
+		{
+			name:     "js-analyze",
+			prefixes: []string{"web.jsluice", "web.jsa", "web.mantra"},
+			// No intermediate urls merge here: urldedup (urls-dedup stage) IS the merge step.
+		},
+		{
+			name:       "bypass",
+			prefixes:   []string{"web.nomore403", "web.shortscan", "web.gxss", "web.arjun"},
+			mergeAfter: "findings",
+			mergeNote:  "MergeStage(\"findings\") — merges nomore403/shortscan/gxss/arjun staging",
+		},
+		{
+			name:     "urls-dedup",
+			prefixes: []string{"web.urldedup"},
+			// urldedup calls Tree.Append("urls") once after semantic dedup — no MergeStage needed.
+		},
 	}
 	fmt.Fprintln(cmd.OutOrStdout(), "[dry-run] web pipeline stages:")
 	for i, stage := range stages {
@@ -790,7 +931,11 @@ func printWebDryRun(cmd *cobra.Command, allTasks []task.Task, cfg *config.Config
 		for _, t := range filtered {
 			fmt.Fprintf(cmd.OutOrStdout(), "    - %s: %s\n", t.Name(), t.Description())
 		}
+		if stage.mergeAfter != "" {
+			fmt.Fprintf(cmd.OutOrStdout(), "    [after stage] %s\n", stage.mergeNote)
+		}
 	}
+	fmt.Fprintln(cmd.OutOrStdout(), "  [final sweep] MergeStage(\"waf\"), MergeStage(\"findings\") — safety backstop (urls excluded: urldedup is sole urls writer)")
 	return nil
 }
 
