@@ -30,6 +30,7 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 	urlsextract "github.com/six2dez/reconftw/internal/extract/urls"
 )
@@ -113,12 +114,10 @@ func (t *WaymoreTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 		lines = append(lines, b)
 	}
 	if len(lines) > 0 {
-		if appendErr := app.Tree.Append("urls", lines); appendErr != nil {
-			if app.Log != nil {
-				app.Log.Debug("web.waymore: Tree.Append failed",
-					"records", len(lines), "err", appendErr)
-			}
-			// Non-fatal per best_effort (D-W12).
+		stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "urls.waymore.jsonl")
+		if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+			app.Log.Debug("web.waymore: staging write failed",
+				"path", stagingPath, "err", wErr)
 		}
 	}
 

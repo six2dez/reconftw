@@ -27,11 +27,11 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 	urlsextract "github.com/six2dez/reconftw/internal/extract/urls"
 )
@@ -117,13 +117,13 @@ func (t *JsaTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	}
 	wg.Wait()
 
+	// WriteJSONL called ONCE after all goroutines join (wg.Wait above).
+	// allRecords is fully populated (mutex-protected collector) — no concurrent writes.
 	if len(allRecords) > 0 {
-		if appendErr := app.Tree.Append("urls", allRecords); appendErr != nil {
-			if app.Log != nil {
-				app.Log.Debug("web.jsa: Tree.Append failed",
-					"records", len(allRecords), "err", appendErr)
-			}
-			// Non-fatal per best_effort (D-W12).
+		stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "urls.jsa.jsonl")
+		if wErr := output.WriteJSONL(stagingPath, allRecords); wErr != nil && app.Log != nil {
+			app.Log.Debug("web.jsa: staging write failed",
+				"path", stagingPath, "err", wErr)
 		}
 	}
 
@@ -190,8 +190,5 @@ func resolveToolsDir(cfg *config.Config) string {
 	}
 	return filepath.Join(home, "Tools")
 }
-
-// suppress unused import warning for strings (used in filterJSURLs in subjs.go).
-var _ = strings.TrimSpace
 
 func init() { task.Register(&JsaTask{}) }

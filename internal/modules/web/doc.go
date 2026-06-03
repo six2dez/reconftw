@@ -1,5 +1,33 @@
 // Package web implements reconFTW v2's web analysis pipeline.
 //
+// JSONL STAGING CONTRACT (mirrors internal/modules/subdomains/doc.go — D-W2):
+//
+// Tasks writing MULTI-WRITER artefacts (urls / findings / waf) MUST NOT call
+// app.Tree.Append directly. Each task writes a unique per-task staging file:
+//
+//	inputs/urls.<toolName>.jsonl      — katana, urlfinder, waymore, subjs, jsluice, jsa, mantra
+//	inputs/findings.<toolName>.jsonl  — nuclei, arjun, gxss, nomore403, shortscan
+//	inputs/waf.<toolName>.jsonl       — wafw00f, cdncheck
+//
+// For findings/waf: MergeStage / MergeAllWebArtefacts (merge.go) is the SINGLE
+// app.Tree.Append caller — it globs inputs/<artefact>.*.jsonl, deduplicates by raw
+// JSON line bytes, and calls Append once.
+//
+// For urls: urldedup is the SINGLE semantic-dedup Append caller for urls. It globs
+// ALL inputs/urls.*.jsonl (fetch-stage producers: katana/urlfinder/waymore AND
+// js-analyze producers: subjs/jsluice/jsa/mantra) after the full js-analyze stage
+// completes, runs urless/p1radup semantic dedup over the full union, then calls
+// app.Tree.Append once. This makes urldedup the authoritative single-writer for
+// artefacts/urls.jsonl (WEB-14).
+//
+// Single-writer artefacts (hosts / origins / vhosts / favicons / csprecon_hosts /
+// fuzz / js_secrets) KEEP calling app.Tree.Append directly — they have exactly one
+// producer task and no REPLACE-semantics data-loss risk.
+//
+// jsa fan-out guarantee: jsa.go goroutines accumulate results in a mutex-protected
+// allRecords slice; output.WriteJSONL is called ONCE after wg.Wait() — no concurrent
+// writes to inputs/urls.jsa.jsonl.
+//
 // STAGING CONTRACT (mirrors internal/modules/subdomains — D-W2):
 //
 // Each Tool has its own Task file (httpx.go, nuclei.go, ffuf.go, …).

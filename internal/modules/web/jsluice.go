@@ -28,8 +28,8 @@
 package web
 
 import (
-	"bytes"
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -39,6 +39,7 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 	extractjs "github.com/six2dez/reconftw/internal/extract/js"
 	extractsourcemap "github.com/six2dez/reconftw/internal/extract/sourcemap"
@@ -95,10 +96,10 @@ func (t *JsluiceTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 				lines = append(lines, b)
 			}
 			if len(lines) > 0 {
-				if appendErr := app.Tree.Append("urls", lines); appendErr != nil {
-					if app.Log != nil {
-						app.Log.Debug("web.jsluice: Tree.Append urls failed", "err", appendErr)
-					}
+				stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "urls.jsluice.jsonl")
+				if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+					app.Log.Debug("web.jsluice: staging write failed",
+						"path", stagingPath, "err", wErr)
 				}
 			}
 			totalURLs = len(entries)
