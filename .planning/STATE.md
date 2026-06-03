@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: Complete Core Migration
 status: executing
 stopped_at: Completed 04-05-PLAN.md
-last_updated: "2026-06-02T14:47:07.465Z"
-last_activity: 2026-06-02
+last_updated: "2026-06-02T20:44:19.800Z"
+last_activity: 2026-06-02 -- Phase 05 execution started
 progress:
   total_phases: 12
   completed_phases: 3
-  total_plans: 38
-  completed_plans: 32
+  total_plans: 41
+  completed_plans: 37
   percent: 25
 ---
 
@@ -26,10 +26,10 @@ See: .planning/PROJECT.md (updated 2026-05-27)
 ## Current Position
 
 Phase: 05 (web-pipeline-e2e) — EXECUTING
-Plan: 3 of 7
-Status: Ready to execute
+Plan: 1 of 10
+Status: Executing Phase 05
 NEXT (you, the maintainer): provision resolvers + install subzy/dnstake/regulator/dnscewl, then run the bash-v1-vs-v2 ±5% parity (SUBD-11/D-04) on hackerone.com+tesla.com, sign off in 04-11-SUMMARY.md, flip 04-VERIFICATION.md status→passed. See 04-VERIFICATION.md §"WHAT YOU MUST DO". Then Phase 5 (Web Pipeline E2E) — which REUSES Phase 4 extractors + copies its pattern, so add the real-arg smoke test + a real E2E run to its DoD.
-Last activity: 2026-06-02
+Last activity: 2026-06-02 -- Phase 05 execution started
 
 ## Performance Metrics
 

@@ -34,7 +34,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Architecture v2 Design** — Lock TOML schema, output tree, Task/Backend/AppContext/Error interfaces, CLI surface, test policy, failure isolation — Foundation depends on these (completed 2026-05-28)
 - [x] **Phase 3: Foundation Kernel** — Errors + Logger + Config + OutputTree + Checkpoint + Scheduler + Tools + AppContext + CLI + Mocks + CI from day 1 (completed 2026-05-28)
 - [ ] **Phase 4: Subdomains E2E + Axiom Integration** — Canonical reference port; passive+brute+permut+dnsx+scope+takeover+buckets+geo+ASN with Axiom distributed execution; output-equivalence test gates phase end (gap closure in progress)
-- [ ] **Phase 5: Web Pipeline E2E** — Probe + screenshots + fuzz + JS + nuclei + WAF + sourcemaps + favicon + CSP + vhost + 4xx-bypass + URL discovery + 20-function surface with parity test
+- [x] **Phase 5: Web Pipeline E2E** — Probe + screenshots + fuzz + JS + nuclei + WAF + sourcemaps + favicon + CSP + vhost + 4xx-bypass + URL discovery + 20-function surface with parity test (completed 2026-06-03)
 - [ ] **Phase 6: Vulnerability Scanning E2E** — XSS + SQLi + SSRF + LFI + SSTI + CRLF + smuggling + cmdi + nuclei-DAST + cache poisoning + gf patterns + 4xx-bypass
 - [ ] **Phase 7: OSINT E2E** — Domain/IP info + emails + GitHub dorks/leaks/actions + cloud enum + Postman + Swagger + Spoofy + msftrecon + CMSeeK + GraphQL + Google dorks
 - [ ] **Phase 8: MCP Server** — Model Context Protocol server exposing recon modes as MCP tools; auth + redaction + scope sandboxing + OpenAPI schema; opt-in in config
@@ -209,32 +209,32 @@ Plans:
 **Wave 2** *(parallel — blocked on Wave 1)*
 
 - [x] 05-02-PLAN.md — NucleiTask (WEB-06) + ScreenshotTask (WEB-02; nuclei-headless) + FfufTask (WEB-03)
-- [ ] 05-03-PLAN.md — Infra Tasks (WEB-07/08/09/10/11): wafw00f/cdncheck/hakoriginfinder/csprecon/favirecon/VhostFinder + extractor siblings waf/csp/favicon.ExtractWeb
-- [ ] 05-04-PLAN.md — URL discovery (WEB-14): katana/urlfinder/waymore/urldedup + JS Tasks (WEB-04/05): subjs/jsluice/mantra/JSA/sourcemapper + extractor extensions js/secrets/urls/sourcemap
+- [x] 05-03-PLAN.md — Infra Tasks (WEB-07/08/09/10/11): wafw00f/cdncheck/hakoriginfinder/csprecon/favirecon/VhostFinder + extractor siblings waf/csp/favicon.ExtractWeb
+- [x] 05-04-PLAN.md — URL discovery (WEB-14): katana/urlfinder/waymore/urldedup + JS Tasks (WEB-04/05): subjs/jsluice/mantra/JSA/sourcemapper + extractor extensions js/secrets/urls/sourcemap
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 05-05-PLAN.md — Bypass + param: nomore403 (WEB-12) + shortscan (WEB-13) + Gxss/arjun (WEB-15)
+- [x] 05-05-PLAN.md — Bypass + param: nomore403 (WEB-12) + shortscan (WEB-13) + Gxss/arjun (WEB-15)
 
 **Wave 4** *(blocked on Wave 3)*
 
-- [ ] 05-06-PLAN.md — Frozen-replay parity harness (D-W7) + fixtures + DoD-1 smoke test all 23 tools (D-W9)
+- [x] 05-06-PLAN.md — Frozen-replay parity harness (D-W7) + fixtures + DoD-1 smoke test all 23 tools (D-W9)
 
 **Wave 5** *(blocked on Wave 4 — human gate)*
 
-- [ ] 05-07-PLAN.md — DoD-2 seeded-local E2E run + fixture population + VPS/Axiom parity sign-off (autonomous: false)
+- [x] 05-07-PLAN.md — DoD-2 seeded-local E2E run + fixture population + VPS/Axiom parity sign-off (autonomous: false)
 
 **Gap Closure Wave 1** *(independent — run after 05-07 or in parallel with open waves)*
 
-- [ ] 05-09-PLAN.md — TDD RED→GREEN: multi-writer test + staging contract (CR-01/CR-02/CR-05/WR-01/WR-03-jsa-fanout/WR-03-shortscan-fallback); go test ./... GREEN at wave end
+- [x] 05-09-PLAN.md — TDD RED→GREEN: multi-writer test + staging contract (CR-01/CR-02/CR-05/WR-01/WR-03-jsa-fanout/WR-03-shortscan-fallback); go test ./... GREEN at wave end
 
 **Gap Closure Wave 2** *(blocked on 05-09)*
 
-- [ ] 05-10-PLAN.md — Stage ordering: split 4 stages into 8; wire per-stage MergeStage calls (CR-04)
+- [x] 05-10-PLAN.md — Stage ordering: split 4 stages into 8; wire per-stage MergeStage calls (CR-04)
 
 **Gap Closure Wave 3** *(blocked on 05-09 + 05-10)*
 
-- [ ] 05-11-PLAN.md — Localized fixes + behavioral tests: CR-03 jsa (direct exec + TestJSAUsesDirectExec), CR-06 hakoriginfinder (TestHakoriginfinderPerHostAttribution), CR-07 timeouts, WR-02..WR-09 (incl. checkHostsFileReadable rename), IN-01, IN-02
+- [x] 05-11-PLAN.md — Localized fixes + behavioral tests: CR-03 jsa (direct exec + TestJSAUsesDirectExec), CR-06 hakoriginfinder (TestHakoriginfinderPerHostAttribution), CR-07 timeouts, WR-02..WR-09 (incl. checkHostsFileReadable rename), IN-01, IN-02
 
 **UI hint**: yes
 
@@ -361,7 +361,7 @@ Calendar parallelization (within constraint that dependencies are met):
 | 2. Architecture v2 Design | 7/7 | Complete   | 2026-05-28 |
 | 3. Foundation Kernel | 7/7 | Complete   | 2026-05-28 |
 | 4. Subdomains E2E + Axiom Integration | 11/12 | In Progress|  |
-| 5. Web Pipeline E2E | 2/11 | In Progress (gap closure)|  |
+| 5. Web Pipeline E2E | 10/10 | Complete   | 2026-06-03 |
 | 6. Vulnerability Scanning E2E | 0/? | Not started | - |
 | 7. OSINT E2E | 0/? | Not started | - |
 | 8. MCP Server | 0/? | Not started | - |
