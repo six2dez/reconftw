@@ -167,22 +167,21 @@ func (t *LFITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	if rateLimit <= 0 {
 		rateLimit = 50 // v1 LFI_FFUF_RATELIMIT default
 	}
-	timeoutSeconds := 10  // v1 LFI_FFUF_TIMEOUT default
-	maxTimeSeconds := 90  // v1 LFI_FFUF_MAXTIME default
+	timeoutSeconds := 10 // v1 LFI_FFUF_TIMEOUT default
+	maxTimeSeconds := 90 // v1 LFI_FFUF_MAXTIME default
 	header := cfg.Advanced.Header
 
 	// Step 5: Run ffuf per candidate URL.
 	var findings []VulnFindingRecord
 
 	for i, candidate := range candidates {
-		// Check for context cancellation between candidates.
-		select {
-		case <-ctx.Done():
+		// Stop early on context cancellation (SA4011: a bare break inside a
+		// select would only exit the select, not this loop).
+		if ctx.Err() != nil {
 			if app.Log != nil {
 				app.Log.Debug("vulns.lfi: cancelled", "processed", i, "total", len(candidates))
 			}
 			break
-		default:
 		}
 
 		hits := runLFIFFUF(ctx, app, toolName, candidate, lfiWordlist,
@@ -373,7 +372,7 @@ func runLFIFFUF(ctx context.Context, app *appctx.AppContext,
 			Confidence: "medium",
 			// Phase 6 vuln-class fields.
 			VulnClass:       "lfi",
-			MatchedParam:    host, // hostname only — no raw payload (XCUT-07)
+			MatchedParam:    host,  // hostname only — no raw payload (XCUT-07)
 			PayloadRedacted: "***", // XCUT-07: raw LFI path never written
 			PoCRedacted:     "***", // XCUT-07: raw matching URL never written
 			Engine:          "ffuf",

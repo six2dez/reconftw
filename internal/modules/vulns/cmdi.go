@@ -296,16 +296,6 @@ func cmdiReplaceParams(data []byte) []byte {
 	return out.Bytes()
 }
 
-// cmdiExtractHost extracts a hostname from a URL for XCUT-07-safe record storage.
-// Kept as a helper for potential per-URL cmdi extensions; not used in -m batch mode.
-func cmdiExtractHost(rawURL string) string {
-	parsed, err := url.Parse(rawURL)
-	if err != nil || parsed.Host == "" {
-		return ""
-	}
-	return strings.ToLower(parsed.Hostname())
-}
-
 // init self-registers CMDITask with the Default task registry.
 // cmd/reconftw/modules.go blank-imports this package to trigger registration.
 func init() { task.Register(&CMDITask{}) }

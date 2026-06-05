@@ -44,7 +44,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
@@ -265,24 +264,5 @@ func resolveToolsDirVulns(cfg *config.Config) string {
 	return "Tools"
 }
 
-// extractHostFromVulnURL extracts the hostname from a raw URL string for
-// XCUT-07-safe VulnFindingRecord.Engine storage. Mirrors the web package helper.
-func extractHostFromVulnURL(rawURL string) string {
-	rawURL = strings.TrimSpace(rawURL)
-	if rawURL == "" {
-		return ""
-	}
-	// Take the first whitespace-delimited token (tool output may include status codes).
-	if i := strings.IndexAny(rawURL, " \t"); i >= 0 {
-		rawURL = rawURL[:i]
-	}
-	// Strip optional scheme.
-	if idx := strings.Index(rawURL, "://"); idx >= 0 {
-		rawURL = rawURL[idx+3:]
-	}
-	// Strip path, query, fragment.
-	if i := strings.IndexAny(rawURL, "/?#"); i >= 0 {
-		rawURL = rawURL[:i]
-	}
-	return strings.ToLower(rawURL)
-}
+// (host-extraction helper removed — unused; the web package owns the canonical
+// implementation if FuzzparamsTask ever needs per-URL host attribution.)
