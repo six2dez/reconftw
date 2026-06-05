@@ -392,6 +392,19 @@ type WebKatana struct {
 // ---------------- Vulns ----------------
 
 // VulnsConfig mirrors ADR §2.2 [vulns.*].
+//
+// Phase 6 additions (D-V6 WAF-friendly caps, D-V3 folded-in tools):
+//   - NucleiDAST VulnNucleiDAST — distinct from WebConfig.NucleiDAST; owns
+//     vulns.nuclei_dast.* TOML keys (template_path, extra_args).
+//   - Fray VulnFray — fray WAF-aware modern-payload scanner
+//     (ai_prompt_injection / prototype_pollution / api_security / modern_bypasses).
+//
+// Existing struct additions:
+//   - VulnXSS.Threads — WAF-friendly dalfox thread cap (D-V6 default 5).
+//   - VulnLFI.MaxURLs — cap on single-param LFI candidates (D-V6 default 150).
+//   - VulnFuzzParams.TemplatesPath — independently overridable template dir
+//     (default cfg.Paths.NucleiTemplates+"/dast" same as NucleiDAST, but a
+//     separate TOML key so users can diverge: vulns.fuzz_params.templates_path).
 type VulnsConfig struct {
 	Enabled       bool                `koanf:"enabled"`
 	XSS           VulnXSS             `koanf:"xss"`
@@ -405,14 +418,20 @@ type VulnsConfig struct {
 	Cache         VulnCache           `koanf:"cache"`
 	Bypass4xx     VulnBypass4xx       `koanf:"bypass_4xx"`
 	FuzzParams    VulnFuzzParams      `koanf:"fuzz_params"`
+	NucleiDAST    VulnNucleiDAST      `koanf:"nuclei_dast"`
+	Fray          VulnFray            `koanf:"fray"`
 	Spray         VulnSpray           `koanf:"spray"`
 	BrokenLinks   VulnBrokenLinks     `koanf:"broken_links"`
 	SSL           VulnSSL             `koanf:"ssl"`
 	Metadata      VulnMetadata        `koanf:"metadata"`
 }
 
+// VulnXSS configures the dalfox-based XSS scanner.
+// Threads is the WAF-friendly dalfox worker count (D-V6 default 5,
+// reduced from v1's AVAILABLE_CORES*15 to avoid triggering WAFs).
 type VulnXSS struct {
 	Enabled bool `koanf:"enabled"`
+	Threads int  `koanf:"threads" validate:"min=0,max=1000"`
 }
 
 type VulnSQLi struct {
@@ -426,8 +445,12 @@ type VulnSSRF struct {
 	AltMatchRegex string `koanf:"alt_match_regex"`
 }
 
+// VulnLFI configures the LFI param-fuzz scanner.
+// MaxURLs caps single-parameter LFI candidates per target (D-V6 default 150;
+// v1 LFI_MAX_URLS=150; 0 = unlimited).
 type VulnLFI struct {
 	Enabled bool `koanf:"enabled"`
+	MaxURLs int  `koanf:"max_urls" validate:"min=0,max=1000000"`
 }
 
 type VulnSSTI struct {
@@ -456,8 +479,36 @@ type VulnBypass4xx struct {
 	Enabled bool `koanf:"enabled"`
 }
 
+// VulnFuzzParams configures the parameterized fuzzing pass (nuclei DAST on
+// deduped URL corpus). TemplatesPath is a DISTINCT TOML key from
+// VulnNucleiDAST.TemplatesPath so users can diverge the two template dirs
+// independently (vulns.fuzz_params.templates_path vs
+// vulns.nuclei_dast.templates_path). Both default to
+// cfg.Paths.NucleiTemplates+"/dast" when empty.
 type VulnFuzzParams struct {
-	Enabled bool `koanf:"enabled"`
+	Enabled       bool   `koanf:"enabled"`
+	TemplatesPath string `koanf:"templates_path" validate:"omitempty,nopath_traversal"`
+}
+
+// VulnNucleiDAST configures the dedicated nuclei DAST module (VULN-11).
+// Distinct from WebConfig.NucleiDAST — this owns the vulns.nuclei_dast.*
+// TOML keys. TemplatesPath defaults to cfg.Paths.NucleiTemplates+"/dast"
+// (v1 NUCLEI_DAST_TEMPLATE_PATH="${NUCLEI_TEMPLATES_PATH}/dast").
+type VulnNucleiDAST struct {
+	Enabled       bool   `koanf:"enabled"`
+	TemplatesPath string `koanf:"templates_path" validate:"omitempty,nopath_traversal"`
+	ExtraArgs     string `koanf:"extra_args"`
+}
+
+// VulnFray configures the fray WAF-aware modern-payload scanner (D-V3 fold-in).
+// v1 equivalents: FRAY_CATEGORIES, FRAY_MAX_PAYLOADS, FRAY_TIMEOUT, FRAY_DELAY.
+// D-V6 WAF-friendly defaults: MaxPayloads=20, Delay=0.5s.
+type VulnFray struct {
+	Enabled     bool    `koanf:"enabled"`
+	Categories  string  `koanf:"categories"`
+	MaxPayloads int     `koanf:"max_payloads" validate:"min=0,max=10000"`
+	Timeout     int     `koanf:"timeout"      validate:"min=0,max=3600"`
+	Delay       float64 `koanf:"delay"        validate:"min=0,max=60"`
 }
 
 type VulnSpray struct {

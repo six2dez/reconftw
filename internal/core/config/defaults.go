@@ -179,18 +179,34 @@ func Defaults() *Config {
 			},
 		},
 		Vulns: VulnsConfig{
-			Enabled:     false,
-			XSS:         VulnXSS{Enabled: true},
-			SQLi:        VulnSQLi{Enabled: true, SQLMap: true, Ghauri: false},
-			SSRF:        VulnSSRF{Enabled: true, AltMatchRegex: `169\.254\.169\.254|latest/meta-data|root:|127\.0\.0\.1|localhost|gopher://|dict://|file://`},
-			LFI:         VulnLFI{Enabled: true},
-			SSTI:        VulnSSTI{Enabled: true, Engine: "TInjA"},
-			CRLF:        VulnCRLF{Enabled: true},
-			Smuggling:   VulnSmuggling{Enabled: true},
-			CMDi:        VulnCMDi{Enabled: true},
-			Cache:       VulnCache{Enabled: true, Toxicache: true},
-			Bypass4xx:   VulnBypass4xx{Enabled: true},
-			FuzzParams:  VulnFuzzParams{Enabled: true},
+			Enabled: false,
+			// D-V6: WAF-friendly dalfox cap — reduced from v1 AVAILABLE_CORES*15.
+			XSS: VulnXSS{Enabled: true, Threads: 5},
+			// D-V6: sqlmap on / ghauri off (opt-in, more invasive).
+			SQLi: VulnSQLi{Enabled: true, SQLMap: true, Ghauri: false},
+			SSRF: VulnSSRF{Enabled: true, AltMatchRegex: `169\.254\.169\.254|latest/meta-data|root:|127\.0\.0\.1|localhost|gopher://|dict://|file://`},
+			// D-V6: cap at 150 LFI candidates per target (v1 LFI_MAX_URLS=150).
+			LFI:       VulnLFI{Enabled: true, MaxURLs: 150},
+			SSTI:      VulnSSTI{Enabled: true, Engine: "TInjA"},
+			CRLF:      VulnCRLF{Enabled: true},
+			Smuggling: VulnSmuggling{Enabled: true},
+			CMDi:      VulnCMDi{Enabled: true},
+			Cache:     VulnCache{Enabled: true, Toxicache: true},
+			Bypass4xx: VulnBypass4xx{Enabled: true},
+			// D-V6: TemplatesPath="" → fallback to cfg.Paths.NucleiTemplates+"/dast" at runtime.
+			FuzzParams: VulnFuzzParams{Enabled: true, TemplatesPath: ""},
+			// VULN-11: D-V6 TemplatesPath="" → fallback to cfg.Paths.NucleiTemplates+"/dast".
+			// Distinct from WebConfig.NucleiDAST (web.nuclei_dast.*).
+			NucleiDAST: VulnNucleiDAST{Enabled: true, TemplatesPath: "", ExtraArgs: ""},
+			// D-V3 fold-in: fray WAF-aware modern payloads.
+			// D-V6: MaxPayloads=20 + Delay=0.5 keep requests WAF-friendly.
+			Fray: VulnFray{
+				Enabled:     true,
+				Categories:  "ai_prompt_injection,prototype_pollution,api_security,modern_bypasses",
+				MaxPayloads: 20,
+				Timeout:     10,
+				Delay:       0.5,
+			},
 			Spray:       VulnSpray{Enabled: true, Engine: "brutespray", DeepOnly: true},
 			BrokenLinks: VulnBrokenLinks{Enabled: true, Engine: "second-order"},
 			SSL:         VulnSSL{Enabled: true},
