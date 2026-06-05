@@ -459,3 +459,165 @@ default_args    = []
 timeout_seconds = 300
 critical        = false
 input_flag      = "-f"
+
+# Phase 6 additions (Vulnerability Scanning E2E)
+# All Phase 6 vuln tools are critical=false — per-tool gating handles absence (D-V6).
+# SHA-256 pins deferred to Phase 11 (INST-02); manual slopcheck before install (T-06-01-SC).
+
+[[tools]]
+name            = "gf"
+kind            = "go"
+go_module       = "github.com/tomnomnom/gf"
+description     = "URL gf-pattern classifier (xss/sqli/ssrf/lfi/rce/redirect/ssti/potential)"
+default_args    = []
+timeout_seconds = 60
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "qsreplace"
+kind            = "go"
+go_module       = "github.com/tomnomnom/qsreplace"
+description     = "Querystring replacer for payload injection"
+default_args    = []
+timeout_seconds = 30
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "dalfox"
+kind            = "go"
+go_module       = "github.com/hahwul/dalfox/v2"
+description     = "XSS scanner (parameter-based; D-V6 WAF-friendly thread cap)"
+default_args    = []
+timeout_seconds = 0
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "sqlmap"
+kind            = "system"
+description     = "SQL injection scanner (system Python3 script or PATH binary)"
+default_args    = []
+timeout_seconds = 0
+critical        = false
+input_flag      = "-m"
+
+[[tools]]
+name            = "ghauri"
+kind            = "python"
+pip_package     = "git+https://github.com/r0oth3x49/ghauri"
+description     = "SQLi scanner alternative engine (opt-in; D-V6 default off)"
+default_args    = []
+timeout_seconds = 0
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "interactsh-client"
+kind            = "go"
+go_module       = "github.com/projectdiscovery/interactsh/cmd/interactsh-client"
+description     = "OOB callback server client for SSRF/blind-XSS (VULN-03)"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "crlfuzz"
+kind            = "go"
+go_module       = "github.com/dwisiswant0/crlfuzz/cmd/crlfuzz"
+description     = "CRLF injection scanner (VULN-06)"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+input_flag      = "-l"
+
+[[tools]]
+name            = "TInjA"
+kind            = "go"
+go_module       = "github.com/Hackmanit/TInjA"
+description     = "SSTI scanner (primary engine; VULN-05)"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "SSTImap"
+kind            = "python_venv"
+repo_url        = "https://github.com/vladko312/SSTImap"
+description     = "SSTI scanner alternative engine (VULN-05 SSTI_ENGINE=SSTImap)"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "commix"
+kind            = "python"
+pip_package     = "git+https://github.com/commixproject/commix"
+description     = "Command injection scanner (VULN-08)"
+default_args    = []
+timeout_seconds = 0
+critical        = false
+input_flag      = "-l"
+
+[[tools]]
+name            = "smugglex"
+kind            = "rust"
+cargo_package   = "smugglex"
+description     = "HTTP request smuggling detector (VULN-07; Rust/Cargo install)"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "Web-Cache-Vulnerability-Scanner"
+kind            = "go"
+go_module       = "github.com/Hackmanit/Web-Cache-Vulnerability-Scanner"
+description     = "Web cache poisoning scanner WCVS (VULN-09)"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "toxicache"
+kind            = "go"
+go_module       = "github.com/xhzeem/toxicache"
+description     = "Web cache poisoning scanner toxicache (VULN-09 supplemental)"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "second-order"
+kind            = "go"
+go_module       = "github.com/mhmdiaa/second-order"
+description     = "Second-order injection + broken-link checker (VULN-12)"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "fray"
+kind            = "python"
+pip_package     = "fray"
+description     = "WAF-aware modern-payload scanner (D-V3: ai_prompt_injection/prototype_pollution/api_security)"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "testssl.sh"
+kind            = "system"
+description     = "TLS/SSL misconfiguration testing (D-V3 fold-in; bash script)"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+input_flag      = ""

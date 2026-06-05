@@ -36,6 +36,7 @@ import (
 	"github.com/six2dez/reconftw/internal/core/ui"
 	"github.com/six2dez/reconftw/internal/modules/subdomains"
 	"github.com/six2dez/reconftw/internal/modules/web"
+	"github.com/six2dez/reconftw/internal/modules/vulns"
 )
 
 // stubPhase carries the (Phase N, Phase Name) tuple used by the phase-pointer message.
@@ -986,9 +987,331 @@ func printWebSummary(w *os.File, workdir, runLogPath string, verbosity ui.Verbos
 	fmt.Fprintf(w, "  ─────────────────────────────────────────\n")
 }
 
-// newVulnsCmd — Phase 6 (Vulnerability Scanning E2E). Stubbed per D-02.
+// newVulnsCmd — Phase 6 (Vulnerability Scanning E2E). Real implementation replacing D-02 stub.
+//
+// Wires the full vulnerability scanning pipeline:
+//  1. Config load + target construction
+//  2. Scheduler construction BEFORE Boot (cycle-break — checkpoint wired post-Boot)
+//  3. FailoverBackend when --axiom flag is set; otherwise Boot selects LocalBackend
+//  4. appctx.Boot with BootOptions{Backend: chosenBackend}
+//  5. sched.Checkpoint = app.Checkpoint (B3 fix — per-tool resume operational)
+//  6. sched.RunTask closure (cycle-break #2 — wired after Boot)
+//  7. Optional Axiom fleet launch / shutdown
+//  8. 4 sequential best_effort RunStage calls:
+//     gf-classify → injection → oob-advanced → dast-extended
+//  9. MergeAllVulnsArtefacts after all stages
+//
+// ALL stages are best_effort per D-V7 — no fail_fast anywhere in the vulns pipeline.
+// GFTask is the DAG root; empty gf bucket → downstream runs with empty input → completes.
 func newVulnsCmd() *cobra.Command {
-	return newStubCmd("vulns", "Run vulnerability scanning (XSS, SQLi, SSRF, LFI, SSTI, etc.)")
+	cmd := &cobra.Command{
+		Use:   "vulns",
+		Short: "Run vulnerability scanning (XSS, SQLi, SSRF, LFI, SSTI, CRLF, smuggling, etc.)",
+		Long: `Run the full vulnerability scanning pipeline:
+  Stage 1 (gf-classify):  URL gf-pattern classification -> per-class bucket files
+  Stage 2 (injection):    dalfox (XSS), sqlmap/ghauri (SQLi), crlfuzz (CRLF),
+                          commix (CMDi), TInjA/SSTImap (SSTI), LFI param-fuzz
+  Stage 3 (oob-advanced): SSRF+interactsh OOB, smugglex (HTTP smuggling),
+                          WCVS+toxicache (web cache), second-order injection
+  Stage 4 (dast-extended): nuclei DAST, fuzzparams, 4xx-bypass, testssl,
+                            fray, GraphQL, gRPC, LLM probe, WebSocket checks
+
+All stages are best_effort (D-V7) — pipeline completes even if individual tools fail.
+Run "reconftw web" first, or pass --urls to seed the URL corpus (D-V5).
+
+Master gate: vulns.enabled defaults false in config (D-V7). Running this subcommand
+is the explicit opt-in and bypasses the master gate.
+
+Output: workspaces/<target>/artefacts/findings.jsonl`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runVulnsCmd(cmd)
+		},
+	}
+	cmd.Flags().String("target", "", "Target domain")
+	cmd.Flags().Bool("dry-run", false, "Preview tasks without executing tools")
+	cmd.Flags().String("urls", "", "Seed URL list file (overrides prior web artefacts; D-V5)")
+	return cmd
+}
+
+// runVulnsCmd is the extracted RunE body for newVulnsCmd. Mirrors runWebCmd structure
+// but implements the vulns pipeline with all-best_effort stages (D-V7).
+func runVulnsCmd(cmd *cobra.Command) error {
+	ctx := cmd.Context()
+
+	// Step 1: Load config with CLI overrides.
+	targetFlag, _ := cmd.Flags().GetString("target")
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+	urlsFlag, _ := cmd.Flags().GetString("urls")
+
+	// Inherit --target from parent (persistent flag) if not set locally.
+	if targetFlag == "" {
+		if pf := cmd.InheritedFlags().Lookup("target"); pf != nil {
+			targetFlag = pf.Value.String()
+		}
+	}
+	if targetFlag == "" {
+		return fmt.Errorf("--target is required for vulns subcommand")
+	}
+
+	// Honor --config / --secrets (mirrors runWebCmd pattern).
+	efs := parseEarlyFlags(os.Args[1:])
+	cfg, err := config.Load(config.LoadOptions{
+		ExplicitConfigPath: efs.configPath,
+		SecretsPath:        efs.secretsPath,
+	})
+	if err != nil {
+		return fmt.Errorf("vulns: config load: %w", err)
+	}
+
+	// Step 2: Build target.
+	tgt, err := appctx.NewTarget(targetFlag, nil, "")
+	if err != nil {
+		return fmt.Errorf("vulns: invalid target: %w", err)
+	}
+	workdir, err := output.WorkspaceInit(cfg.Paths.DataDir, tgt.Domain)
+	if err != nil {
+		workdir, err = output.WorkspaceInit("workspaces", tgt.Domain)
+		if err != nil {
+			return fmt.Errorf("vulns: workspace init: %w", err)
+		}
+	}
+	tgt.WorkDir = workdir
+
+	// Step 3: Construct Scheduler BEFORE Boot (cycle-break).
+	sched := scheduler.NewScheduler(cfg.Concurrency.MaxJobs, cfg.Concurrency.HeartbeatSeconds, nil, nil)
+
+	// Step 4: Choose backend.
+	var chosenBackend backend.Backend
+	axiomEnabled, _ := cmd.Flags().GetBool("axiom")
+	if axiomEnabled || cfg.Axiom.Enabled {
+		axiomBE := backend.NewAxiomBackend(cfg, backend.Default, nil)
+		localBE := backend.NewLocalBackend(time.Duration(cfg.Concurrency.KillGraceSeconds) * time.Second)
+		chosenBackend = &backend.FailoverBackend{
+			Primary:   axiomBE,
+			Fallback:  localBE,
+			Threshold: cfg.Axiom.FailoverThreshold,
+		}
+	}
+
+	// Step 5: Boot.
+	if dryRun {
+		cfg.Advanced.Diff = false
+	}
+
+	verbosity := ui.Verbosity(cfg.Output.Verbosity)
+	liveUI := !dryRun && verbosity != ui.VerbosityQuiet && ui.IsTTY(os.Stderr)
+	var subLogger *slog.Logger
+	var runLogPath string
+	if liveUI {
+		p := filepath.Join(workdir, "run.log")
+		if f, ferr := os.Create(p); ferr == nil { //nolint:gosec
+			defer f.Close() //nolint:errcheck
+			runLogPath = p
+			rdct := &log.Redactor{}
+			registerSecrets(cfg, rdct)
+			lc := cfg.AsLoggerConfig()
+			lc.Output = f
+			subLogger = log.New(lc, rdct)
+			slog.SetDefault(subLogger)
+			fmt.Fprintf(os.Stderr, "  logs → %s\n", runLogPath)
+		}
+	}
+
+	app, err := appctx.Boot(ctx, subLogger, cfg, tgt, sched, appctx.BootOptions{Backend: chosenBackend})
+	if err != nil {
+		return fmt.Errorf("vulns: appctx boot: %w", err)
+	}
+	defer func() {
+		if closer, ok := app.Checkpoint.(interface{ Close() error }); ok {
+			_ = closer.Close()
+		}
+	}()
+
+	// Step 5b: Wire sched.Checkpoint AFTER Boot (B3 fix).
+	sched.Checkpoint = app.Checkpoint
+
+	// Step 6: Wire RunTask closure with progress UI.
+	progress := ui.NewStageProgress(app.UI.W, app.UI.NoColor, app.UI.Verbosity)
+	sched.RunTask = func(rctx context.Context, t task.Task) (task.Result, error) {
+		progress.TaskStart(t.Name())
+		started := time.Now()
+		result, err := t.Run(rctx, app)
+		dur := result.Duration
+		if dur <= 0 {
+			dur = time.Since(started)
+		}
+		badge := badgeForStatus(result.Status)
+		progress.TaskDone(t.Name(), badge, dur)
+		return result, err
+	}
+
+	// Step 7: Launch Axiom fleet if applicable.
+	var axiomBE *backend.AxiomBackend
+	if fb, ok := chosenBackend.(*backend.FailoverBackend); ok {
+		if abe, ok := fb.Primary.(*backend.AxiomBackend); ok {
+			axiomBE = abe
+		}
+	}
+	if axiomBE != nil {
+		if err := axiomBE.Launch(ctx); err != nil {
+			return fmt.Errorf("vulns: axiom launch: %w", err)
+		}
+		defer func() { _ = axiomBE.Shutdown(context.Background()) }()
+	}
+
+	// Step 8: Build the task DAG.
+	allTasks, err := task.Default.Build()
+	if err != nil {
+		return fmt.Errorf("vulns: task DAG: %w", err)
+	}
+
+	// Step 9: Dry-run mode — list tasks and exit.
+	if dryRun {
+		return printVulnsDryRun(cmd, allTasks, cfg)
+	}
+
+	// Step 10: Inject --urls flag into context for GFTask.Run (D-V5).
+	// CtxWithURLsFile sets the context value that GFTask.Run reads in resolveURLInput.
+	if urlsFlag != "" {
+		ctx = vulns.CtxWithURLsFile(ctx, urlsFlag)
+	}
+
+	// Step 11: Sequential best_effort RunStage execution (D-V7).
+	// ALL stages use module "vulns" → best_effort policy throughout.
+	// No fail_fast stage — empty gf output → downstream runs with empty input.
+	//
+	// Stage ordering mirrors DependsOn edges: gf-classify MUST run first so all
+	// scanner Tasks that DependsOn "vulns.gf" have their bucket files available.
+	type stageSpec struct {
+		name     string
+		prefixes []string
+	}
+	stages := []stageSpec{
+		{
+			// Stage 1: gf-classify — DAG root; produces inputs/gf/<class>.txt buckets.
+			// No merge after (gf writes bucket files directly, not through staging pipeline).
+			name: "gf-classify",
+			prefixes: []string{
+				"vulns.gf",
+			},
+		},
+		{
+			// Stage 2: injection scanners — all DependsOn vulns.gf; read their buckets.
+			// SQLiTask (vulns.sqli) handles both sqlmap+ghauri internally per D-V6 dual-engine.
+			name: "injection",
+			prefixes: []string{
+				"vulns.xss",
+				"vulns.sqli",
+				"vulns.lfi",
+				"vulns.ssti",
+				"vulns.crlf",
+				"vulns.cmdi",
+			},
+		},
+		{
+			// Stage 3: OOB/advanced — blind detection (SSRF, smuggling, cache, second-order).
+			name: "oob-advanced",
+			prefixes: []string{
+				"vulns.ssrf",
+				"vulns.smuggling",
+				"vulns.webcache_wcvs",
+				"vulns.webcache_toxicache",
+				"vulns.second_order",
+			},
+		},
+		{
+			// Stage 4: DAST-extended — nuclei DAST, fuzzparams, 4xx-bypass, testssl,
+			// fray, and the Phase-5-routed graphql/grpc/llm/websocket probes (D-V3).
+			name: "dast-extended",
+			prefixes: []string{
+				"vulns.nuclei_dast",
+				"vulns.fuzzparams",
+				"vulns.bypass4xx",
+				"vulns.testssl",
+				"vulns.fray",
+				"vulns.graphql",
+				"vulns.grpc",
+				"vulns.llm",
+				"vulns.websocket",
+			},
+		},
+	}
+
+	for _, stage := range stages {
+		stageSlice := filterByModuleAndEnabled(allTasks, "vulns", cfg, stage.prefixes)
+		progress.StageStart(stage.name, len(stageSlice))
+
+		if err := sched.RunStage(ctx, "vulns", stageSlice); err != nil {
+			// best_effort: log the error and continue to the next stage.
+			if app.Log != nil {
+				app.Log.Warn("vulns: stage failed (best_effort — continuing)",
+					"stage", stage.name, "err", err)
+			}
+		}
+
+		progress.StageDone(stage.name, countFileLines(filepath.Join(workdir, "artefacts", "findings.jsonl")))
+	}
+
+	// Final merge: consolidate all findings staging files into artefacts/findings.jsonl.
+	// gf-classify buckets (inputs/gf/*.txt) are excluded — single-writer, no merge needed.
+	if mergeErr := vulns.MergeAllVulnsArtefacts(ctx, app); mergeErr != nil {
+		if app.Log != nil {
+			app.Log.Warn("vulns: final merge failed (best_effort — continuing)", "err", mergeErr)
+		}
+	}
+
+	printVulnsSummary(os.Stderr, workdir, runLogPath, verbosity)
+
+	return nil
+}
+
+// printVulnsDryRun lists the tasks that would run per stage and returns nil.
+func printVulnsDryRun(cmd *cobra.Command, allTasks []task.Task, cfg *config.Config) error {
+	type stageSpec struct {
+		name     string
+		prefixes []string
+	}
+	stages := []stageSpec{
+		{"gf-classify", []string{"vulns.gf"}},
+		{"injection", []string{"vulns.xss", "vulns.sqli", "vulns.lfi", "vulns.ssti", "vulns.crlf", "vulns.cmdi"}},
+		{"oob-advanced", []string{"vulns.ssrf", "vulns.smuggling", "vulns.webcache_wcvs", "vulns.webcache_toxicache", "vulns.second_order"}},
+		{"dast-extended", []string{"vulns.nuclei_dast", "vulns.fuzzparams", "vulns.bypass4xx", "vulns.testssl", "vulns.fray", "vulns.graphql", "vulns.grpc", "vulns.llm", "vulns.websocket"}},
+	}
+	fmt.Fprintln(cmd.OutOrStdout(), "[dry-run] vulns pipeline stages:")
+	for i, stage := range stages {
+		filtered := filterByModuleAndEnabled(allTasks, "vulns", cfg, stage.prefixes)
+		fmt.Fprintf(cmd.OutOrStdout(), "  Stage %d (%s): %d task(s)\n", i+1, stage.name, len(filtered))
+		for _, t := range filtered {
+			fmt.Fprintf(cmd.OutOrStdout(), "    - %s: %s\n", t.Name(), t.Description())
+		}
+	}
+	fmt.Fprintln(cmd.OutOrStdout(), "  [final] MergeAllVulnsArtefacts(\"findings\")")
+	return nil
+}
+
+// printVulnsSummary writes an end-of-run results table to w: one row per
+// produced artefact with its count and path.
+func printVulnsSummary(w *os.File, workdir, runLogPath string, verbosity ui.Verbosity) {
+	if verbosity == ui.VerbosityQuiet {
+		return
+	}
+	artefacts := []struct{ label, file string }{
+		{"findings", "findings.jsonl"},
+	}
+	fmt.Fprintf(w, "\n  ── results ──────────────────────────────\n")
+	for _, a := range artefacts {
+		p := filepath.Join(workdir, "artefacts", a.file)
+		n := countFileLines(p)
+		if n == 0 {
+			continue
+		}
+		fmt.Fprintf(w, "  %-11s %6d   %s\n", a.label, n, p)
+	}
+	fmt.Fprintf(w, "  workspace   %s\n", workdir)
+	if runLogPath != "" {
+		fmt.Fprintf(w, "  logs        %s\n", runLogPath)
+	}
+	fmt.Fprintf(w, "  ─────────────────────────────────────────\n")
 }
 
 // newOSINTCmd — Phase 7 (OSINT E2E). Stubbed per D-02.

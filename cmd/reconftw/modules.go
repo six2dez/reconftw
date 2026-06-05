@@ -24,4 +24,8 @@ import (
 	// Phase 5 web Tasks — triggers task.Register for HTTPXTask via
 	// internal/modules/web/httpx.go init() call.
 	_ "github.com/six2dez/reconftw/internal/modules/web"
+
+	// Phase 6 vulns Tasks — triggers task.Register for GFTask and all vuln
+	// scanner Tasks (plan-07+) via internal/modules/vulns/ init() calls.
+	_ "github.com/six2dez/reconftw/internal/modules/vulns"
 )

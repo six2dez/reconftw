@@ -59,9 +59,12 @@ func TestRootListsFifteenSubcommandsPlusVersion(t *testing.T) {
 // the stubs list; its behavior is covered by `web --help` / `web --dry-run` smoke.
 
 // Test 3 (D-02): Every stub subcommand returns *exitCodeError{code:64}.
+// Phase 6 plan 06-01: `vulns` is no longer a stub — newVulnsCmd wires the real
+// vulns pipeline RunE (mirrors the Phase 4/5 pattern for subs/web). `vulns` removed
+// from the stubs list; its behavior is covered by `vulns --help` / `vulns --dry-run`.
 func TestEveryStubReturnsExit64(t *testing.T) {
 	stubs := []string{
-		"recon", "all", "passive", "vulns", "osint", "zen", "deep",
+		"recon", "all", "passive", "osint", "zen", "deep",
 		"monitor", "report", "mcp", "migrate", "install",
 	}
 	for _, name := range stubs {
