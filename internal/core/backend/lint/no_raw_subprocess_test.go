@@ -69,6 +69,14 @@ var allowedPaths = []string{
 	// sanctioned invocation pattern. XCUT-09 heartbeat via goroutine stdout
 	// reader; XCUT-07 redaction applied before any logging.
 	"internal/modules/vulns/xss.go",
+	// vulns/ssrf.go: interactsh-client is a long-running OOB callback server
+	// subprocess that requires per-task lifecycle management (start on Run entry,
+	// SIGTERM on exit via defer). The Backend/Runner registry does not support
+	// long-running background subprocesses with persistent stdout pipes; direct
+	// exec.CommandContext with SysProcAttr{Setpgid:true} is the sanctioned pattern
+	// (FOUND-09 kill-tree safety). XCUT-07 redaction applied; callback URLs never
+	// logged at Info/Warn (only count). Mirrors web/gxss.go precedent.
+	"internal/modules/vulns/ssrf.go",
 }
 
 // isAllowed returns true when the (repo-relative) Go file path matches any
