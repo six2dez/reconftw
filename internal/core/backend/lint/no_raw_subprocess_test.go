@@ -63,6 +63,12 @@ var allowedPaths = []string{
 	"internal/modules/web/mantra.go",
 	"internal/modules/web/shortscan.go",
 	"internal/modules/web/jsa.go",
+	// vulns/xss.go: dalfox `pipe` mode and Gxss both read candidate URLs from
+	// stdin (identical to web/gxss.go); the name-keyed Backend/Runner registry
+	// does not support stdin injection, so direct exec.CommandContext is the
+	// sanctioned invocation pattern. XCUT-09 heartbeat via goroutine stdout
+	// reader; XCUT-07 redaction applied before any logging.
+	"internal/modules/vulns/xss.go",
 }
 
 // isAllowed returns true when the (repo-relative) Go file path matches any
