@@ -1,0 +1,51 @@
+# DVWA seed URLs for Phase 6 DoD-2 smoke test.
+# Adjust port if your docker container uses a different binding.
+#
+# Lab setup:
+#   docker run --rm -d -p 8080:80 vulnerables/web-dvwa
+#   Then browse to http://localhost:8080/setup.php and click "Create / Reset Database".
+#   Set security level to "Low" at http://localhost:8080/security.php.
+#
+# These are real DVWA vulnerability paths with GET parameters.
+# gf patterns will classify entries from these URLs:
+#   - sqli:    ?id=  matches gf/sqli pattern
+#   - xss_r:   ?name= matches gf/xss pattern
+#   - xss_d:   ?default= matches gf/xss pattern
+#   - lfi:     ?page= matches gf/lfi pattern
+#   - rce:     ?ip= matches gf/rce pattern
+#   - redirect: ?redirect= matches gf/redirect pattern
+#
+# Juice Shop alternative (no auth wall — works out of the box):
+#   docker run --rm -d -p 3000:3000 bkimminich/juice-shop
+# Juice Shop seed URLs (append to this file if using Juice Shop):
+#   http://localhost:3000/rest/user/login
+#   http://localhost:3000/#/search?q=test
+#   http://localhost:3000/api/Products/1
+#   http://localhost:3000/rest/products/search?q=test
+
+# SQLi vulnerable endpoint
+http://localhost:8080/vulnerabilities/sqli/?id=1&Submit=Submit
+
+# XSS reflected vulnerable endpoint
+http://localhost:8080/vulnerabilities/xss_r/?name=test
+
+# XSS DOM-based vulnerable endpoint
+http://localhost:8080/vulnerabilities/xss_d/?default=English
+
+# LFI (File Inclusion) vulnerable endpoint
+http://localhost:8080/vulnerabilities/fi/?page=include.php
+
+# Command injection vulnerable endpoint (RCE class in gf)
+http://localhost:8080/vulnerabilities/exec/?ip=127.0.0.1&Submit=Submit
+
+# CSRF vulnerable endpoint
+http://localhost:8080/vulnerabilities/csrf/?password_new=test&password_conf=test&Change=Change
+
+# SQL injection (blind) vulnerable endpoint
+http://localhost:8080/vulnerabilities/sqli_blind/?id=1&Submit=Submit
+
+# Open redirect vulnerable endpoint
+http://localhost:8080/vulnerabilities/open_redirect/?redirect=info
+
+# SSRF — if DVWA has server-side request forgery module
+http://localhost:8080/vulnerabilities/ssrf/?url=http%3A%2F%2Flocalhost%2F
