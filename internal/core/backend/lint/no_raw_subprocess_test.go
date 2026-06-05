@@ -77,6 +77,12 @@ var allowedPaths = []string{
 	// (FOUND-09 kill-tree safety). XCUT-07 redaction applied; callback URLs never
 	// logged at Info/Warn (only count). Mirrors web/gxss.go precedent.
 	"internal/modules/vulns/ssrf.go",
+	// vulns/bypass4xx.go: nomore403 is a repo-clone tool that resolves wordlists
+	// at paths relative to its own directory; it also reads candidate URLs from
+	// stdin. The name-keyed Backend/Runner registry does not support cmd.Dir or
+	// stdin injection, so direct exec.CommandContext is the sanctioned invocation
+	// pattern. Mirrors web/nomore403.go precedent (VULN-13 / plan 06-07).
+	"internal/modules/vulns/bypass4xx.go",
 }
 
 // isAllowed returns true when the (repo-relative) Go file path matches any
