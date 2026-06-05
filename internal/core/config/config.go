@@ -424,6 +424,12 @@ type VulnsConfig struct {
 	BrokenLinks   VulnBrokenLinks     `koanf:"broken_links"`
 	SSL           VulnSSL             `koanf:"ssl"`
 	Metadata      VulnMetadata        `koanf:"metadata"`
+	// D-V3 folded-in web.sh orphans (plan 06-08): routed from Phase 5 web domain
+	// into Phase 6 vulns pipeline. These four probes are vuln-class by nature.
+	GraphQL   VulnGraphQL   `koanf:"graphql"`
+	GRPC      VulnGRPC      `koanf:"grpc"`
+	LLM       VulnLLM       `koanf:"llm"`
+	Websocket VulnWebsocket `koanf:"websocket"`
 }
 
 // VulnXSS configures the dalfox-based XSS scanner.
@@ -527,6 +533,37 @@ type VulnSSL struct {
 }
 
 type VulnMetadata struct {
+	Enabled bool `koanf:"enabled"`
+}
+
+// VulnGraphQL configures the gqlspection-based GraphQL introspection scanner
+// (D-V3 fold-in from web.sh graphql_scan; routes to vulns pipeline per plan 06-08).
+// v1 equivalent: GRAPHQL_CHECK + GQLSPECTION flags.
+type VulnGraphQL struct {
+	Enabled bool `koanf:"enabled"`
+}
+
+// VulnGRPC configures the grpcurl-based gRPC reflection scanner
+// (D-V3 fold-in from web.sh grpc_reflection; routes to vulns pipeline per plan 06-08).
+// v1 equivalent: GRPC_SCAN flag.
+type VulnGRPC struct {
+	Enabled bool `koanf:"enabled"`
+}
+
+// VulnLLM configures the julius-based LLM endpoint probe
+// (D-V3 fold-in from web.sh llm_probe; routes to vulns pipeline per plan 06-08).
+// XCUT-07 binding: response content NEVER logged or written raw — only
+// detected:bool + endpoint URL is recorded.
+// v1 equivalent: LLM_PROBE + LLM_PROBE_AUGUSTUS flags.
+type VulnLLM struct {
+	Enabled  bool `koanf:"enabled"`
+	Augustus bool `koanf:"augustus"`
+}
+
+// VulnWebsocket configures WebSocket endpoint detection via HTTP Upgrade probe
+// (D-V3 fold-in from web.sh websocket_checks; routes to vulns pipeline per plan 06-08).
+// v1 equivalent: URL_CHECK flag (websocket_checks ran under URL_CHECK gate).
+type VulnWebsocket struct {
 	Enabled bool `koanf:"enabled"`
 }
 
