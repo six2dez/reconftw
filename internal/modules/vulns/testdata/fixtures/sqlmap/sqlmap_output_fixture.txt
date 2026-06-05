@@ -1,0 +1,3 @@
+# TODO: capture from: python3 sqlmap.py -m tmp_sqli.txt -b -o --smart --batch --disable-coloring --random-agent --output-dir=<outdir>
+# Populate this fixture by running sqlmap against a controlled lab (DVWA or similar)
+# and capturing the stdout here. Replace this header line after capture.

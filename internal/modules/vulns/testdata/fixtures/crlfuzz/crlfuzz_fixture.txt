@@ -1,0 +1,2 @@
+https://fake-target-aaaa.example.com/redirect?url=FAKE_CRLF_AAAA
+https://fake-target-aaaa.example.com/login?next=FAKE_CRLF_BBBB

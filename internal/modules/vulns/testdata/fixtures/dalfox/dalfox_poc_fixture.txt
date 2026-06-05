@@ -1,0 +1,2 @@
+[POC][G][FOUND] https://fake-target-aaaa.example.com/search?q=FAKE_XSS_MARKER_AAAA--poc-here
+[POC][G][FOUND] https://fake-target-aaaa.example.com/page?input=FAKE_XSS_MARKER_AAAA--poc-second

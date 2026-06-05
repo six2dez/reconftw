@@ -1,0 +1,2 @@
+https://fake-target-aaaa.example.com/products?id=FAKE_SQLI_AAAA
+https://fake-target-aaaa.example.com/user?uid=FAKE_SQLI_BBBB&order=asc

@@ -1,0 +1,2 @@
+https://fake-target-aaaa.example.com/load?file=FAKE_LFI_AAAA
+https://fake-target-aaaa.example.com/include?path=FAKE_LFI_BBBB&lang=en

@@ -1,0 +1,3 @@
+https://fake-target-aaaa.example.com/search?q=FAKE_XSS_PARAM_AAAA
+https://fake-target-aaaa.example.com/page?input=FAKE_XSS_PARAM_BBBB&ref=test
+https://fake-target-aaaa.example.com/api/v1/items?callback=FAKE_XSS_PARAM_CCCC
