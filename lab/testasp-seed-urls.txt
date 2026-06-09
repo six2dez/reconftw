@@ -1,0 +1,35 @@
+# testasp.vulnweb.com seed URLs for Phase 6 DoD-2 smoke test.
+#
+# Public, intentionally-vulnerable Acunetix ASP test site — NO auth required.
+# Use when testphp.vulnweb.com is unreachable. Param-rich GET endpoints so gf
+# classifies real xss/sqli/lfi/redirect buckets and the param-aware scanners
+# (dalfox / sqlmap / lfi) are actually exercised against pages that exist.
+#
+# Usage:
+#   ./scripts/vulns-smoke.sh http://testasp.vulnweb.com --urls lab/testasp-seed-urls.txt
+#
+# NOTE: third-party host published by Acunetix for testing. Do not point active
+# scanners at any target you don't own or lack permission to test.
+
+# --- SQLi (forum id params) ---
+http://testasp.vulnweb.com/showforum.asp?id=0
+http://testasp.vulnweb.com/showforum.asp?id=2
+http://testasp.vulnweb.com/showthread.asp?id=0
+http://testasp.vulnweb.com/showthread.asp?id=2
+http://testasp.vulnweb.com/getInfo.asp?id=1
+
+# --- Reflected XSS (search reflects tfSearch; forum id reflected in errors) ---
+http://testasp.vulnweb.com/Search.asp?tfSearch=test
+http://testasp.vulnweb.com/Search.asp?tfSearch=query&x=1
+http://testasp.vulnweb.com/showforum.asp?id=test
+
+# --- LFI / path traversal / RFI (Templatize item param — the classic) ---
+http://testasp.vulnweb.com/Templatize.asp?item=html/about.html
+http://testasp.vulnweb.com/Templatize.asp?item=about.html
+
+# --- Open redirect (RetURL param) ---
+http://testasp.vulnweb.com/Login.asp?RetURL=/Default.asp
+
+# --- Misc parameterized endpoints (broad coverage) ---
+http://testasp.vulnweb.com/showforum.asp?id=1&page=1
+http://testasp.vulnweb.com/showthread.asp?id=1&posts=10
