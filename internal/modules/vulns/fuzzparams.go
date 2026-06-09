@@ -90,14 +90,19 @@ func (t *FuzzparamsTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 			fmt.Errorf("vulns.fuzzparams: mkdir inputs/: %w", err)
 	}
 
-	// Step 1 & 2: Input is artefacts/urls.jsonl ONLY.
+	// Step 1 & 2: Resolve URL corpus via D-V5 precedence (--urls ctx > artefacts/urls.jsonl).
 	// FuzzparamsTask does NOT aggregate gf buckets (distinct from NucleiDASTTask).
 	// Equivalent to v1 fuzzparams() reading webs/url_extract_nodupes.txt.
-	urlsPath := filepath.Join(workDir, "artefacts", "urls.jsonl")
-	info, err := os.Stat(urlsPath)
-	if err != nil || info.Size() == 0 {
+	urlsPath, resolveErr := resolveURLInput(ctx, app)
+	if resolveErr != nil || urlsPath == "" {
 		if app.Log != nil {
-			app.Log.Info("vulns.fuzzparams: artefacts/urls.jsonl absent or empty — skipping")
+			app.Log.Info("vulns.fuzzparams: no URL corpus available — skipping")
+		}
+		return task.Result{Status: task.StatusSkipped}, nil
+	}
+	if info, statErr := os.Stat(urlsPath); statErr != nil || info.Size() == 0 {
+		if app.Log != nil {
+			app.Log.Info("vulns.fuzzparams: URL corpus absent or empty — skipping", "path", urlsPath)
 		}
 		return task.Result{Status: task.StatusSkipped}, nil
 	}

@@ -77,14 +77,14 @@ func (t *WebsocketTask) DependsOn() []string { return []string{"vulns.gf"} }
 func (t *WebsocketTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	const toolName = "httpx"
 
-	// Step 1: Read artefacts/urls.jsonl.
-	urls, err := readURLsJSONL(app.Target.WorkDir)
+	// Step 1: Resolve URL corpus via D-V5 precedence (--urls ctx > artefacts/urls.jsonl).
+	urls, err := readURLsWithCtx(ctx, app)
 	if err != nil && app.Log != nil {
-		app.Log.Debug("vulns.websocket: read urls.jsonl error (best_effort)", "err", err)
+		app.Log.Debug("vulns.websocket: read URL corpus error (best_effort)", "err", err)
 	}
 	if len(urls) == 0 {
 		if app.Log != nil {
-			app.Log.Info("vulns.websocket: no URLs in artefacts/urls.jsonl — skipping")
+			app.Log.Info("vulns.websocket: no URLs in URL corpus — skipping")
 		}
 		return task.Result{Status: task.StatusSkipped}, nil
 	}

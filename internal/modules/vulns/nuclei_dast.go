@@ -95,14 +95,14 @@ func (t *NucleiDASTTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 			fmt.Errorf("vulns.nuclei_dast: mkdir inputs/: %w", err)
 	}
 
-	// Step 1: Collect targets — artefacts/urls.jsonl + inputs/gf/*.txt.
-	targetURLs, err := collectNucleiDASTTargets(workDir)
+	// Step 1: Collect targets — URL corpus (D-V5) + inputs/gf/*.txt.
+	targetURLs, err := collectNucleiDASTTargets(ctx, app, workDir)
 	if err != nil && app.Log != nil {
 		app.Log.Debug("vulns.nuclei_dast: target collection error (best_effort)", "err", err)
 	}
 	if len(targetURLs) == 0 {
 		if app.Log != nil {
-			app.Log.Info("vulns.nuclei_dast: no targets from urls.jsonl + gf buckets — skipping")
+			app.Log.Info("vulns.nuclei_dast: no targets from URL corpus + gf buckets — skipping")
 		}
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
@@ -223,13 +223,16 @@ func (t *NucleiDASTTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 	}, nil
 }
 
-// collectNucleiDASTTargets merges artefacts/urls.jsonl (raw URL lines from the
-// Phase 5 deduped corpus) with all inputs/gf/*.txt bucket files, deduplicating
-// entries. Returns a sorted-stable slice of unique URLs.
+// collectNucleiDASTTargets merges the D-V5 URL corpus (--urls ctx > artefacts/urls.jsonl)
+// with all inputs/gf/*.txt bucket files, deduplicating entries. Returns a
+// stable slice of unique URLs.
 //
 // This mirrors v1 _nuclei_dast_collect_targets() (vulns.sh:1016-1036):
 // reads webs/webs_all.txt + webs/url_extract_nodupes.txt + all gf/*.txt.
-func collectNucleiDASTTargets(workDir string) ([]string, error) {
+//
+// D-V5 fix: Source 1 now resolves via resolveURLInput so --urls seed file
+// is honoured instead of always reading artefacts/urls.jsonl directly.
+func collectNucleiDASTTargets(ctx context.Context, app *appctx.AppContext, workDir string) ([]string, error) {
 	seen := make(map[string]struct{})
 	var urls []string
 
@@ -244,14 +247,10 @@ func collectNucleiDASTTargets(workDir string) ([]string, error) {
 		}
 	}
 
-	// Source 1: artefacts/urls.jsonl — read raw lines (each line is a URL string).
-	urlsJSONL := filepath.Join(workDir, "artefacts", "urls.jsonl")
-	if data, err := os.ReadFile(urlsJSONL); err == nil { //nolint:gosec // path within WorkDir
-		sc := bufio.NewScanner(bytes.NewReader(data))
-		sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-		for sc.Scan() {
-			addURL(sc.Text())
-		}
+	// Source 1: D-V5 URL corpus — resolveURLInput honors --urls ctx > artefacts/urls.jsonl.
+	corpusURLs, _ := readURLsWithCtx(ctx, app)
+	for _, u := range corpusURLs {
+		addURL(u)
 	}
 
 	// Source 2: all inputs/gf/*.txt buckets from GFTask.

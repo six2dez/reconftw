@@ -78,14 +78,14 @@ func (t *CRLFTask) DependsOn() []string { return []string{"vulns.gf"} }
 func (t *CRLFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	const toolName = "crlfuzz"
 
-	// Step 1: Read artefacts/urls.jsonl — host URL list from Phase 5.
-	hostURLs, err := readURLsForCRLF(app)
+	// Step 1: Resolve URL corpus via D-V5 precedence (--urls ctx > artefacts/urls.jsonl).
+	hostURLs, err := readURLsWithCtx(ctx, app)
 	if err != nil && app.Log != nil {
-		app.Log.Debug("vulns.crlf: read urls.jsonl error (best_effort)", "err", err)
+		app.Log.Debug("vulns.crlf: read URL corpus error (best_effort)", "err", err)
 	}
 	if len(hostURLs) == 0 {
 		if app.Log != nil {
-			app.Log.Info("vulns.crlf: no host URLs in artefacts/urls.jsonl — skipping")
+			app.Log.Info("vulns.crlf: no host URLs in URL corpus — skipping")
 		}
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
@@ -214,40 +214,6 @@ func parseCRLFuzzOutput(data []byte) []VulnFindingRecord {
 	return records
 }
 
-// readURLsForCRLF reads artefacts/urls.jsonl and returns all URL strings.
-// Returns nil when the file is absent or empty (non-error for CRLFTask).
-func readURLsForCRLF(app *appctx.AppContext) ([]string, error) {
-	urlsPath := filepath.Join(app.Target.WorkDir, "artefacts", "urls.jsonl")
-	data, err := os.ReadFile(urlsPath) //nolint:gosec // path within WorkDir
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil // urls.jsonl not yet produced — non-error
-		}
-		return nil, err
-	}
-	if len(data) == 0 {
-		return nil, nil
-	}
-	var urls []string
-	sc := bufio.NewScanner(bytes.NewReader(data))
-	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for sc.Scan() {
-		line := bytes.TrimSpace(sc.Bytes())
-		if len(line) == 0 {
-			continue
-		}
-		var rec struct {
-			URL string `json:"url"`
-		}
-		if err := json.Unmarshal(line, &rec); err != nil {
-			continue
-		}
-		if rec.URL != "" {
-			urls = append(urls, rec.URL)
-		}
-	}
-	return urls, nil
-}
 
 // extractCRLFHost extracts the hostname from a crlfuzz output URL.
 // crlfuzz outputs vulnerable URLs; we extract the hostname to avoid

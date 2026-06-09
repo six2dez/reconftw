@@ -92,14 +92,14 @@ func (t *WebCacheTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	)
 	cfg := app.Cfg
 
-	// Step 1: Read artefacts/urls.jsonl — host URL list from Phase 5.
-	hostURLs, err := readURLsForWebCache(app)
+	// Step 1: Resolve URL corpus via D-V5 precedence (--urls ctx > artefacts/urls.jsonl).
+	hostURLs, err := readURLsWithCtx(ctx, app)
 	if err != nil && app.Log != nil {
-		app.Log.Debug("vulns.webcache: read urls.jsonl error (best_effort)", "err", err)
+		app.Log.Debug("vulns.webcache: read URL corpus error (best_effort)", "err", err)
 	}
 	if len(hostURLs) == 0 {
 		if app.Log != nil {
-			app.Log.Info("vulns.webcache: no host URLs in artefacts/urls.jsonl — skipping")
+			app.Log.Info("vulns.webcache: no host URLs in URL corpus — skipping")
 		}
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
@@ -317,45 +317,6 @@ func toxicacheExtractHost(line string) string {
 	return ""
 }
 
-// readURLsForWebCache reads artefacts/urls.jsonl and returns all URL strings.
-// Returns nil when the file is absent or empty (non-error for WebCacheTask).
-func readURLsForWebCache(app *appctx.AppContext) ([]string, error) {
-	urlsPath := filepath.Join(app.Target.WorkDir, "artefacts", "urls.jsonl")
-	data, err := os.ReadFile(urlsPath) //nolint:gosec // path within WorkDir
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil // urls.jsonl not yet produced — non-error
-		}
-		return nil, err
-	}
-	if len(data) == 0 {
-		return nil, nil
-	}
-	var urls []string
-	sc := bufio.NewScanner(bytes.NewReader(data))
-	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for sc.Scan() {
-		line := bytes.TrimSpace(sc.Bytes())
-		if len(line) == 0 {
-			continue
-		}
-		var rec struct {
-			URL string `json:"url"`
-		}
-		if err := json.Unmarshal(line, &rec); err != nil {
-			// Plain URL line (not JSON) — use directly.
-			rawURL := strings.TrimSpace(string(line))
-			if rawURL != "" {
-				urls = append(urls, rawURL)
-			}
-			continue
-		}
-		if rec.URL != "" {
-			urls = append(urls, rec.URL)
-		}
-	}
-	return urls, nil
-}
 
 // init self-registers WebCacheTask with the Default task registry.
 // cmd/reconftw/modules.go blank-imports this package to trigger registration.

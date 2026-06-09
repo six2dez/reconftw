@@ -300,6 +300,25 @@ func writeURLList(path string, urls []string) error {
 	return w.Flush()
 }
 
+// readURLsWithCtx resolves the URL corpus via the D-V5 input precedence
+// (ctx --urls flag > artefacts/urls.jsonl) and returns all URL strings.
+//
+// This is the canonical helper for URL-corpus scanners that previously read
+// artefacts/urls.jsonl directly, ignoring the ctx-carried --urls seed file.
+// All scanners that consume the URL corpus MUST call this instead of
+// os.ReadFile("artefacts/urls.jsonl") directly.
+//
+// Returns nil (not an error) when the resolved file is absent or empty —
+// callers should StatusSkipped in that case per D-V7 best_effort.
+func readURLsWithCtx(ctx context.Context, app *appctx.AppContext) ([]string, error) {
+	resolvedPath, err := resolveURLInput(ctx, app)
+	if err != nil {
+		// No corpus available — non-fatal for best_effort scanners.
+		return nil, nil //nolint:nilerr // intentional: callers treat nil as StatusSkipped
+	}
+	return readURLsJSONL(resolvedPath)
+}
+
 // init self-registers GFTask with the Default task registry.
 // cmd/reconftw/modules.go blank-imports this package to trigger registration.
 func init() { task.Register(&GFTask{}) }

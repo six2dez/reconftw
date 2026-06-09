@@ -93,14 +93,14 @@ func (t *FrayTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	cfg := app.Cfg
 	workDir := app.Target.WorkDir
 
-	// Step 1: Read artefacts/urls.jsonl.
-	urls, err := readURLsJSONL(workDir)
+	// Step 1: Resolve URL corpus via D-V5 precedence (--urls ctx > artefacts/urls.jsonl).
+	urls, err := readURLsWithCtx(ctx, app)
 	if err != nil && app.Log != nil {
-		app.Log.Debug("vulns.fray: read urls.jsonl error (best_effort)", "err", err)
+		app.Log.Debug("vulns.fray: read URL corpus error (best_effort)", "err", err)
 	}
 	if len(urls) == 0 {
 		if app.Log != nil {
-			app.Log.Info("vulns.fray: no URLs in artefacts/urls.jsonl — skipping")
+			app.Log.Info("vulns.fray: no URLs in URL corpus — skipping")
 		}
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
