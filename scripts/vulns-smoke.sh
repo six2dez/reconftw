@@ -128,9 +128,14 @@ or pass --urls <path> to provide your own parameterized URL corpus."
     _seed_count=$(grep -c . "$SEED_URLS" 2>/dev/null | tr -d ' ') || _seed_count=0
     printf '== seed URLs: %s (%s lines) ==\n' "$SEED_URLS" "$_seed_count"
 
-    # Extract just the hostname/IP for the --target flag (strip scheme + port + path).
+    # Extract just the hostname/IP for the --target flag (strip scheme + path + port).
+    # NewTarget validates --target as a bare domain/IP (regex ^[a-zA-Z0-9.-]+$);
+    # a host:port like "localhost:8080" is rejected as invalid. The full URLs
+    # (with :8080) stay in the --urls seed file; the scope filter strips the port
+    # via url.Hostname() so they still match the *.<host> default scope.
     _target_host="${LAB_URL#*://}"
     _target_host="${_target_host%%/*}"
+    _target_host="${_target_host%%:*}"
 
     printf '== running: %s vulns --target %s --urls %s ==\n' "$BIN" "$_target_host" "$SEED_URLS"
     # Run the vulns pipeline. best_effort: don't abort smoke on scanner failures.
