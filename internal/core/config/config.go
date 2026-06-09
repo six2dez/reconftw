@@ -447,8 +447,9 @@ type VulnSQLi struct {
 }
 
 type VulnSSRF struct {
-	Enabled       bool   `koanf:"enabled"`
-	AltMatchRegex string `koanf:"alt_match_regex"`
+	Enabled        bool   `koanf:"enabled"`
+	AltMatchRegex  string `koanf:"alt_match_regex"`
+	TimeoutSeconds int    `koanf:"timeout_seconds" validate:"min=0,max=86400"`
 }
 
 // VulnLFI configures the LFI param-fuzz scanner.

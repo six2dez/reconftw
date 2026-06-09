@@ -9,16 +9,22 @@
 //
 // COLLAB_SERVER PRECEDENCE (D-V6, §Claude's Discretion):
 //  1. cfg.APIKeys.CollabServer != "" → use it directly; no subprocess.
-//  2. interactsh-client found on PATH → start per-task OOB subprocess;
-//     read session URL from stdout within 3 s; defer pgid kill on task exit.
-//  3. Neither available → log.Warn "SSRF OOB skipped — no collab server and
-//     interactsh-client not found" → StatusSkipped (D-V6 best-effort gate).
+//  2. (interactsh PATH path REMOVED — auto-start without explicit server
+//     caused unbounded OOB wait loops in DoD-2 lab runs.)
+//  3. Neither available → run in-band ffuf checks only (no OOB); the
+//     SSRF_ALT_MATCH_REGEX probe still runs. If no collab token is
+//     available, a placeholder "SSRFCHECK" token is used (in-band only).
+//
+// OVERALL TASK TIMEOUT (DoD-2 regression fix):
+// The entire Run body is wrapped in a context.WithTimeout (default 5 min,
+// overridable via cfg.Vulns.SSRF.TimeoutSeconds). This prevents the task
+// from running unbounded even when ffuf or OOB wait hangs.
 //
 // INTERACTSH SUBPROCESS SAFETY (FOUND-09, T-06-05-01):
 // exec.CommandContext with SysProcAttr{Setpgid:true}; defer syscall.Kill(-pgid,
 // syscall.SIGTERM) + cmd.Wait(). Process group kill covers all grandchildren.
 // This file is in the FOUND-10 allowlist (no_raw_subprocess_test.go) because
-// interactsh-client is a long-running OOB server that requires stdin/stdout
+// interactsh-client is a long-running OOB callback server that requires stdin/stdout
 // pipe control outside the Backend/Runner abstraction.
 //
 // PAYLOAD REDACTION (XCUT-07, T-06-05-02):
@@ -56,7 +62,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
@@ -89,26 +94,34 @@ func (t *SSRFTask) DependsOn() []string { return []string{"vulns.gf"} }
 // Run executes the SSRF probe pipeline.
 //
 // Steps:
-//  1. Read inputs/gf/ssrf.txt and inputs/gf/redirect.txt; combine; skip if empty.
-//  2. Determine collab server (COLLAB_SERVER precedence):
-//     a. cfg.APIKeys.CollabServer → extract subdomain token.
-//     b. interactsh-client on PATH → start subprocess; read session URL within 3s.
-//     c. Neither → Warn + StatusSkipped.
-//  3. Deep-limit gate: skip if URL count > DeepLimit and !Deep.
-//  4. qsreplace inline: substitute COLLAB token and URL into all candidate URLs;
+//  1. Apply overall task timeout (cfg.Vulns.SSRF.TimeoutSeconds, default 300s).
+//  2. Read inputs/gf/ssrf.txt and inputs/gf/redirect.txt; combine; skip if empty.
+//  3. Determine collab server (COLLAB_SERVER precedence):
+//     a. cfg.APIKeys.CollabServer non-empty → extract subdomain token (OOB).
+//     b. No CollabServer → use placeholder token for in-band checks only (no OOB).
+//  4. Deep-limit gate: skip if URL count > DeepLimit and !Deep.
+//  5. qsreplace inline: substitute COLLAB token and URL into all candidate URLs;
 //     write inputs/tmp_ssrf.txt.
-//  5. ffuf classic probe with COLLAB tokens in URL position.
-//  6. ffuf header-injection probe (with headers_inject wordlist if available).
-//  7. SSRF alt-protocol: if ssrf_payloads.txt present, substitute {COLLAB}/{COLLAB_URL};
+//  6. ffuf classic probe with COLLAB tokens in URL position.
+//  7. ffuf header-injection probe (with headers_inject wordlist if available).
+//  8. SSRF alt-protocol: if ssrf_payloads.txt present, substitute {COLLAB}/{COLLAB_URL};
 //     ffuf with -mr SSRF_ALT_MATCH_REGEX.
-//  8. time.Sleep(5s) — OOB callback wait (mirrors v1).
-//  9. Read interactsh stdout callbacks (skip first 11 lines per v1 tail -n+11);
+//  9. time.Sleep(5s) — OOB callback wait (only when CollabServer configured).
+//  10. Read interactsh stdout callbacks (skip first 11 lines per v1 tail -n+11);
 //     parse confirmed callbacks; log count only (XCUT-07).
-//  10. Write inputs/findings.ssrf.jsonl.
+//  11. Write inputs/findings.ssrf.jsonl.
 func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	cfg := app.Cfg
 
-	// Step 1: Read gf/ssrf.txt + gf/redirect.txt and combine.
+	// Step 1: Apply overall task timeout so SSRF cannot run unbounded (DoD-2 fix).
+	timeoutSecs := cfg.Vulns.SSRF.TimeoutSeconds
+	if timeoutSecs <= 0 {
+		timeoutSecs = 300 // 5-minute default SSRF budget
+	}
+	taskCtx, taskCancel := context.WithTimeout(ctx, time.Duration(timeoutSecs)*time.Second)
+	defer taskCancel()
+
+	// Step 2: Read gf/ssrf.txt + gf/redirect.txt and combine.
 	gfDir := filepath.Join(app.Target.WorkDir, "inputs", "gf")
 	ssrfURLs := readSSRFURLLines(filepath.Join(gfDir, "ssrf.txt"))
 	redirectURLs := readSSRFURLLines(filepath.Join(gfDir, "redirect.txt"))
@@ -127,9 +140,12 @@ func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 			fmt.Errorf("vulns.ssrf: mkdir inputs/: %w", err)
 	}
 
-	// Step 2: Determine collab server and establish OOB session if needed.
-	collabToken, collabURL, usingInteractsh, interactshCmd, interactshStdout, cleanup, err :=
-		resolveSSRFCollabSession(ctx, cfg, app)
+	// Step 3: Determine collab server and establish OOB session if needed.
+	// D-V6 fix: interactsh subprocess is only started when cfg.APIKeys.CollabServer
+	// is explicitly configured. Auto-starting interactsh merely because it is on PATH
+	// caused unbounded OOB wait loops in the DoD-2 lab run.
+	collabToken, collabURL, usingInteractsh, _, _, cleanup, err :=
+		resolveSSRFCollabSession(taskCtx, cfg, app)
 	if err != nil {
 		// err is only non-nil when we should stop with StatusSkipped.
 		if app.Log != nil {
@@ -141,7 +157,7 @@ func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 		defer cleanup()
 	}
 
-	// Step 3: Deep-limit gate (mirrors v1 vulns.sh:122).
+	// Step 4: Deep-limit gate (mirrors v1 vulns.sh:122).
 	deepLimit := cfg.Advanced.DeepLimit
 	if deepLimit <= 0 {
 		deepLimit = 500 // v1 DEEP_LIMIT default
@@ -170,7 +186,7 @@ func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	}
 	header := cfg.Advanced.Header
 
-	// Step 4: qsreplace inline — replace each URL's param values with
+	// Step 5: qsreplace inline — replace each URL's param values with
 	// collabToken and collabURL (mirrors v1 qsreplace pipeline on gf/ssrf.txt).
 	var tmpSSRFLines []string
 	for _, rawURL := range allURLs {
@@ -200,55 +216,53 @@ func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 
 	var findings []VulnFindingRecord
 
-	// Step 5: ffuf classic probe — FUZZ position in URL (v1 vulns.sh:132).
+	// Step 6: ffuf classic probe — FUZZ position in URL (v1 vulns.sh:132).
 	//
 	// ffuf -v -H <header> -t <threads> -rate <rate>
 	//      -w tmp_ssrf.txt:FUZZ -u FUZZ -s
 	classicArgs := buildFFUFClassicArgs(tmpSSRFFile, header, threads, rateLimit)
-	classicFindings := runSSRFFFUF(ctx, app, classicArgs, "ssrf_classic")
+	classicFindings := runSSRFFFUF(taskCtx, app, classicArgs, "ssrf_classic")
 	findings = append(findings, classicFindings...)
 
-	// Step 6: ffuf header-injection probe (v1 vulns.sh:136-140).
+	// Step 7: ffuf header-injection probe (v1 vulns.sh:136-140).
 	// Only runs if cfg.Paths.HeadersInject is configured and accessible.
 	headersInjectFile := cfg.Paths.HeadersInject
 	if headersInjectFile != "" {
 		if _, statErr := os.Stat(headersInjectFile); statErr == nil {
 			headerInjArgs1 := buildFFUFHeaderInjArgs(tmpSSRFFile, headersInjectFile, header, collabToken, threads, rateLimit)
-			headerFindings1 := runSSRFFFUF(ctx, app, headerInjArgs1, "ssrf_header_inject_token")
+			headerFindings1 := runSSRFFFUF(taskCtx, app, headerInjArgs1, "ssrf_header_inject_token")
 			findings = append(findings, headerFindings1...)
 
 			headerInjArgs2 := buildFFUFHeaderInjArgs(tmpSSRFFile, headersInjectFile, header, collabURL, threads, rateLimit)
-			headerFindings2 := runSSRFFFUF(ctx, app, headerInjArgs2, "ssrf_header_inject_url")
+			headerFindings2 := runSSRFFFUF(taskCtx, app, headerInjArgs2, "ssrf_header_inject_url")
 			findings = append(findings, headerFindings2...)
 		}
 	}
 
-	// Step 7: SSRF alt-protocol payloads (v1 vulns.sh:143-158).
+	// Step 8: SSRF alt-protocol payloads (v1 vulns.sh:143-158).
 	// Only runs if ssrf_payloads.txt exists (config/ssrf_payloads.txt).
 	ssrfPayloadsFile := resolveSSRFPayloadsFile(cfg)
 	if ssrfPayloadsFile != "" {
-		altFindings := runSSRFAltProtocols(ctx, app, ssrfPayloadsFile, allURLs,
+		altFindings := runSSRFAltProtocols(taskCtx, app, ssrfPayloadsFile, allURLs,
 			collabToken, collabURL, header, threads, rateLimit, inputsDir, cfg.Vulns.SSRF.AltMatchRegex)
 		findings = append(findings, altFindings...)
 	}
 
-	// Step 8: Wait for OOB callbacks (v1 sleep 5).
-	if app.Log != nil {
-		app.Log.Info("vulns.ssrf: waiting 5s for OOB callbacks")
-	}
-	select {
-	case <-ctx.Done():
-		// Context cancelled during wait — still proceed to check already-received callbacks.
-	case <-time.After(5 * time.Second):
-	}
-
-	// Step 9: Read interactsh callbacks (XCUT-07 — redact all callback content).
-	if usingInteractsh && interactshCmd != nil && interactshStdout != nil {
-		cbFindings := readInteractshCallbacks(interactshStdout, app)
-		findings = append(findings, cbFindings...)
+	// Step 9: Wait for OOB callbacks — only when an explicit CollabServer is
+	// configured (interactsh subprocess or direct COLLAB_SERVER). In-band-only
+	// mode skips this wait entirely.
+	if usingInteractsh {
+		if app.Log != nil {
+			app.Log.Info("vulns.ssrf: waiting 5s for OOB callbacks")
+		}
+		select {
+		case <-taskCtx.Done():
+			// Context cancelled during wait — still proceed to check already-received callbacks.
+		case <-time.After(5 * time.Second):
+		}
 	}
 
-	// Step 10: Write inputs/findings.ssrf.jsonl.
+	// Step 11: Write inputs/findings.ssrf.jsonl.
 	if len(findings) > 0 {
 		var lines [][]byte
 		for _, rec := range findings {
@@ -278,152 +292,58 @@ func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	}, nil
 }
 
-// resolveSSRFCollabSession determines the collaborator token/URL and optionally
-// starts an interactsh-client subprocess.
+// resolveSSRFCollabSession determines the collaborator token/URL for SSRF probing.
 //
 // Returns:
 //   - collabToken: FFUFHASH.<subdomain> token for URL parameter substitution
 //   - collabURL:   http://FFUFHASH.<subdomain> URL form
-//   - usingInteractsh: true when the subprocess was started
-//   - interactshCmd: the subprocess Cmd (nil when usingInteractsh=false)
-//   - interactshStdout: pipe for reading callback lines (nil when usingInteractsh=false)
-//   - cleanup: defer function to kill the subprocess; nil when usingInteractsh=false
-//   - err: non-nil → skip task with Warn message (error text IS the Warn message)
+//   - usingInteractsh: true when an explicit CollabServer is configured (OOB mode)
+//   - interactshCmd: always nil (interactsh auto-start removed — DoD-2 regression fix)
+//   - interactshStdout: always nil
+//   - cleanup: always nil
+//   - err: always nil (no error path; in-band fallback always available)
 //
-// COLLAB_SERVER precedence (D-V6):
-//  1. cfg.APIKeys.CollabServer → strip scheme → build FFUFHASH.<host> token
-//  2. interactsh-client on PATH → subprocess with Setpgid (FOUND-09); read URL within 3s
-//  3. Neither → return err "SSRF OOB skipped — no collab server and interactsh-client not found"
+// COLLAB_SERVER precedence (D-V6, DoD-2 regression fix):
+//  1. cfg.APIKeys.CollabServer non-empty → OOB mode: strip scheme, build
+//     FFUFHASH.<host> token. usingInteractsh=true (triggers 5s OOB wait).
+//  2. No CollabServer configured → in-band mode only: use placeholder token
+//     "SSRFCHECK" (no OOB wait, no subprocess). Log at Info so the operator
+//     knows OOB callbacks are not active.
+//
+// NOTE: The former "auto-start interactsh-client if found on PATH" behaviour
+// (old precedence 2) has been REMOVED. It caused unbounded OOB wait loops in
+// the DoD-2 lab run when interactsh connected to the public default server and
+// lingered indefinitely. OOB mode now requires an explicit collab_server value.
 func resolveSSRFCollabSession(
 	ctx context.Context,
 	cfg *config.Config,
 	app *appctx.AppContext,
 ) (collabToken, collabURL string, usingInteractsh bool, interactshCmd *exec.Cmd, interactshStdout *bufio.Reader, cleanup func(), err error) {
-	// Precedence 1: explicit COLLAB_SERVER from config.
+	// Silence "ctx declared but not used" — ctx is kept in the signature for future
+	// use (e.g. dialing an explicit interactsh server via HTTP) and to match the
+	// call site that passes taskCtx.
+	_ = ctx
+
+	// Precedence 1: explicit COLLAB_SERVER from config → OOB mode.
 	if cfg.APIKeys.CollabServer != "" {
 		subdomain := stripURLScheme(cfg.APIKeys.CollabServer)
 		collabToken = "FFUFHASH." + subdomain
 		collabURL = "http://" + collabToken
+		// usingInteractsh=true triggers the 5s OOB callback wait in Run.
 		// No subprocess; no cleanup needed.
-		return collabToken, collabURL, false, nil, nil, nil, nil
+		return collabToken, collabURL, true, nil, nil, nil, nil
 	}
 
-	// Precedence 2: interactsh-client on PATH.
-	interactshPath, lookErr := exec.LookPath("interactsh-client")
-	if lookErr != nil {
-		// Precedence 3: neither available → skip.
-		err = fmt.Errorf("SSRF OOB skipped — no collab server and interactsh-client not found")
-		return
+	// Precedence 2: no CollabServer → in-band checks only.
+	// Use a fixed placeholder token. The ffuf probes still run (they test for
+	// in-band reflections via SSRF_ALT_MATCH_REGEX). OOB callbacks are skipped.
+	if app.Log != nil {
+		app.Log.Info("vulns.ssrf: no COLLAB_SERVER configured — running in-band SSRF checks only (no OOB)")
 	}
-
-	// Start interactsh-client subprocess with Setpgid kill-tree safety (FOUND-09).
-	//nolint:gosec // interactshPath from exec.LookPath; no user-controlled args
-	cmd := exec.CommandContext(ctx, interactshPath)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-
-	stdoutPipe, pipeErr := cmd.StdoutPipe()
-	if pipeErr != nil {
-		err = fmt.Errorf("SSRF OOB skipped — could not open interactsh-client stdout pipe: %w", pipeErr)
-		return
-	}
-	// Discard stderr to avoid noise (XCUT-07: no raw subprocess output in logs).
-	cmd.Stderr = nil
-
-	if startErr := cmd.Start(); startErr != nil {
-		err = fmt.Errorf("SSRF OOB skipped — could not start interactsh-client: %w", startErr)
-		return
-	}
-
-	pgid := cmd.Process.Pid
-
-	// Cleanup function: SIGTERM the whole process group then Wait.
-	cleanup = func() {
-		_ = syscall.Kill(-pgid, syscall.SIGTERM)
-		_ = cmd.Wait()
-	}
-
-	// Read the session URL from interactsh stdout within 3s.
-	// v1: sleep 2; tail -n1 .tmp/ssrf_callback.txt | cut -c 16-
-	// interactsh-client prints the session domain on its first output line.
-	sessionDomain, readErr := readInteractshSessionURL(stdoutPipe, 3*time.Second)
-	if readErr != nil || sessionDomain == "" {
-		// Could not read session URL — still run without OOB confirmation.
-		if app.Log != nil {
-			app.Log.Warn("vulns.ssrf: interactsh-client started but session URL not read within 3s — OOB callbacks may be missed",
-				"err", readErr)
-		}
-		// Use a placeholder token; OOB callbacks will not be attributed.
-		sessionDomain = "oob.interactsh.com"
-	}
-
-	collabToken = "FFUFHASH." + sessionDomain
-	collabURL = "http://" + collabToken
-
-	return collabToken, collabURL, true, cmd, bufio.NewReader(stdoutPipe), cleanup, nil
-}
-
-// readInteractshSessionURL reads the first non-empty line from interactsh-client
-// stdout within the deadline. The session URL / domain appears on the first output
-// line (v1 uses: tail -n1 .tmp/ssrf_callback.txt | cut -c 16-).
-//
-// interactsh-client prints lines like:
-//
-//	[INF] Listing on: https://xxxxxxxx.oob.example.com
-//
-// We extract the subdomain by stripping scheme and path.
-func readInteractshSessionURL(r interface{ Read([]byte) (int, error) }, timeout time.Duration) (string, error) {
-	lineCh := make(chan string, 1)
-	errCh := make(chan error, 1)
-
-	go func() {
-		sc := bufio.NewScanner(r)
-		for sc.Scan() {
-			line := strings.TrimSpace(sc.Text())
-			if line == "" {
-				continue
-			}
-			lineCh <- line
-			return
-		}
-		if err := sc.Err(); err != nil {
-			errCh <- err
-			return
-		}
-		lineCh <- ""
-	}()
-
-	select {
-	case line := <-lineCh:
-		// Extract the domain portion from the interactsh output line.
-		// interactsh prints: "[INF] Listing on: https://xyz.oob.example.com"
-		// We want "xyz.oob.example.com".
-		domain := extractInteractshDomain(line)
-		return domain, nil
-	case err := <-errCh:
-		return "", err
-	case <-time.After(timeout):
-		return "", fmt.Errorf("timeout after %s", timeout)
-	}
-}
-
-// extractInteractshDomain parses an interactsh-client output line and returns
-// the bare hostname. Handles URL form and plain domain form.
-func extractInteractshDomain(line string) string {
-	// Try URL parsing first (most common: "https://xxxx.oob.example.com").
-	// Strip "[INF]" or other log prefixes by finding a URL substring.
-	for _, word := range strings.Fields(line) {
-		if strings.Contains(word, "://") {
-			parsed, err := url.Parse(word)
-			if err == nil && parsed.Host != "" {
-				return strings.ToLower(parsed.Host)
-			}
-		}
-	}
-	// Fallback: if the line itself looks like a domain (contains a dot, no spaces).
-	if !strings.Contains(line, " ") && strings.Contains(line, ".") {
-		return strings.ToLower(strings.TrimSpace(line))
-	}
-	return ""
+	collabToken = "SSRFCHECK"
+	collabURL = "http://SSRFCHECK"
+	// usingInteractsh=false → Run skips the 5s OOB wait and callback read.
+	return collabToken, collabURL, false, nil, nil, nil, nil
 }
 
 // stripURLScheme strips the http:// or https:// scheme from a URL string and
@@ -664,89 +584,6 @@ func runSSRFAltProtocols(
 	)
 
 	return runSSRFFFUF(ctx, app, args, "ssrf_alt_protocols")
-}
-
-// readInteractshCallbacks reads remaining interactsh-client stdout lines and
-// returns confirmed OOB callback findings. Skips first 11 lines per v1
-// (tail -n+11 skips banner/session-info lines that precede callback entries).
-//
-// XCUT-07 (T-06-05-02): callback URLs contain collaborator session IDs and
-// MUST NEVER appear in any log message at Info/Warn. Only count is logged.
-func readInteractshCallbacks(r *bufio.Reader, app *appctx.AppContext) []VulnFindingRecord {
-	// Read all remaining lines from the pipe (non-blocking: set a short read deadline).
-	// We use a goroutine with timeout to avoid blocking if interactsh has no more output.
-	type lineResult struct {
-		lines []string
-		err   error
-	}
-	ch := make(chan lineResult, 1)
-	go func() {
-		var lines []string
-		sc := bufio.NewScanner(r)
-		for sc.Scan() {
-			line := sc.Text()
-			lines = append(lines, line)
-		}
-		ch <- lineResult{lines: lines, err: sc.Err()}
-	}()
-
-	var rawLines []string
-	select {
-	case res := <-ch:
-		rawLines = res.lines
-	case <-time.After(3 * time.Second):
-		// Timeout reading remaining output — use what we have.
-	}
-
-	// Skip first 11 lines per v1 (tail -n+11 = skip lines 1-10, start at line 11).
-	// These are interactsh banner / session info lines, not callbacks.
-	const skipLines = 11
-	if len(rawLines) <= skipLines {
-		if app.Log != nil {
-			app.Log.Info("vulns.ssrf: interactsh: 0 callbacks received")
-		}
-		return nil
-	}
-	callbackLines := rawLines[skipLines:]
-
-	// Filter empty lines and count actual callbacks.
-	var callbackCount int
-	for _, line := range callbackLines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
-		}
-		callbackCount++
-		// XCUT-07: callback line contains collab session ID — NEVER log at Info/Warn.
-		if app.Log != nil {
-			app.Log.Debug("vulns.ssrf: interactsh callback received")
-		}
-	}
-
-	// XCUT-07: log only count (no raw content).
-	if app.Log != nil {
-		app.Log.Info("vulns.ssrf: interactsh callbacks received", "count", callbackCount)
-	}
-
-	if callbackCount == 0 {
-		return nil
-	}
-
-	// Emit one VulnFindingRecord per confirmed callback.
-	// All raw callback data is redacted (XCUT-07, T-06-05-02).
-	var records []VulnFindingRecord
-	for i := 0; i < callbackCount; i++ {
-		records = append(records, VulnFindingRecord{
-			Severity:        "high",
-			Confidence:      "high",
-			VulnClass:       "ssrf",
-			MatchedParam:    "", // XCUT-07: host from OOB callback not written
-			PayloadRedacted: "***", // XCUT-07: collaborator callback ID never stored
-			PoCRedacted:     "***", // XCUT-07: raw OOB URL never stored
-			Engine:          "interactsh",
-		})
-	}
-	return records
 }
 
 // resolveSSRFPayloadsFile returns the path to ssrf_payloads.txt if configured
