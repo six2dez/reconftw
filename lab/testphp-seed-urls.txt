@@ -1,0 +1,41 @@
+# testphp.vulnweb.com seed URLs for Phase 6 DoD-2 smoke test.
+#
+# Public, intentionally-vulnerable Acunetix test site — NO auth required.
+# Param-rich GET endpoints so gf classifies real xss/sqli/lfi/redirect buckets
+# and the param-aware scanners (dalfox / sqlmap / lfi-ffuf) are actually exercised.
+#
+# Usage:
+#   ./scripts/vulns-smoke.sh http://testphp.vulnweb.com --urls lab/testphp-seed-urls.txt
+#
+# NOTE: this is a third-party host explicitly published by Acunetix for testing.
+# Do not point active scanners at any target you don't own or lack permission to test.
+
+# --- SQLi (classic numeric / string params) ---
+http://testphp.vulnweb.com/listproducts.php?cat=1
+http://testphp.vulnweb.com/listproducts.php?artist=1
+http://testphp.vulnweb.com/artists.php?artist=1
+http://testphp.vulnweb.com/product.php?pic=1
+http://testphp.vulnweb.com/comment.php?aid=1
+http://testphp.vulnweb.com/AJAX/infoartist.php?id=1
+http://testphp.vulnweb.com/AJAX/infocateg.php?id=1
+http://testphp.vulnweb.com/AJAX/infotitle.php?id=1
+
+# --- Reflected XSS (reflected params) ---
+http://testphp.vulnweb.com/search.php?test=query
+http://testphp.vulnweb.com/listproducts.php?cat=test
+http://testphp.vulnweb.com/hpp/?pp=12
+http://testphp.vulnweb.com/hpp/params.php?p=valid&pp=12
+http://testphp.vulnweb.com/guestbook.php?name=test
+
+# --- LFI / path traversal (file params) ---
+http://testphp.vulnweb.com/showimage.php?file=./pictures/1.jpg
+http://testphp.vulnweb.com/showimage.php?file=./pictures/1.jpg&size=160
+
+# --- Open redirect (redirect params) ---
+http://testphp.vulnweb.com/redir.php?r=http://example.com
+
+# --- Misc parameterized endpoints (broad coverage) ---
+http://testphp.vulnweb.com/listproducts.php?cat=1&page=1
+http://testphp.vulnweb.com/showimage.php?file=1
+http://testphp.vulnweb.com/Mod_Rewrite_Shop/details.php?id=1
+http://testphp.vulnweb.com/Mod_Rewrite_Shop/buy.php?id=1
