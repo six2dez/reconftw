@@ -68,6 +68,27 @@ func (h *RedactingHandler) WithGroup(name string) slog.Handler {
 	return &RedactingHandler{inner: h.inner.WithGroup(name), redactor: h.redactor}
 }
 
+// Redactor returns the underlying *Redactor so callers that discover a live
+// secret VALUE at runtime (e.g. the OSINT github_leaks Task parsing trufflehog /
+// ghleaks output) can Register it (Layer 2) before emitting any log line.
+func (h *RedactingHandler) Redactor() *Redactor { return h.redactor }
+
+// RegisterHandlerSecret registers a runtime-discovered secret value with the
+// Redactor backing logger's handler chain (Layer 2), so the value is scrubbed
+// from ALL subsequent slog output. It is a no-op when logger is nil, its handler
+// is not a *RedactingHandler, or value is too short (Redactor.Register skips
+// values ≤4 chars). This is the supported entry point for Tasks that surface
+// live secrets at scan time (XCUT-07) — they MUST call it BEFORE any log line
+// that could reference the value.
+func RegisterHandlerSecret(logger *slog.Logger, value string) {
+	if logger == nil || value == "" {
+		return
+	}
+	if rh, ok := logger.Handler().(*RedactingHandler); ok && rh.redactor != nil {
+		rh.redactor.Register(value)
+	}
+}
+
 // redactAttr returns a copy of a with its string value redacted.
 // Non-string Attrs are returned unchanged.
 func (h *RedactingHandler) redactAttr(a slog.Attr) slog.Attr {

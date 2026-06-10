@@ -699,6 +699,16 @@ critical        = false
 input_flag      = ""
 
 [[tools]]
+name            = "enumerepo"
+kind            = "go"
+go_module       = "github.com/trickest/enumerepo"
+description     = "GitHub org repo enumeration (OSINT-05 github_repos; feeds github_leaks)"
+default_args    = []
+timeout_seconds = 600
+critical        = false
+input_flag      = ""
+
+[[tools]]
 name            = "gato"
 kind            = "python"
 pip_package     = "praetorian-gato"
