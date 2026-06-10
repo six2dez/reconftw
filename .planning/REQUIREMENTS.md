@@ -259,7 +259,7 @@
 - [ ] **XCUT-04**: CI policy — race detector mandatory on every Go test run; strict mypy on Python; lint zero-tolerance gate; integration-full split: unit+smoke per push, full-arch per nightly, real-tool integration weekly
 - [ ] **XCUT-05**: Backwards compat — zero silent breakages; ALL behavior changes documented in MIGRATION.md with before/after examples
 - [ ] **XCUT-06**: Documentation — godoc/sphinx API docs auto-generated from code; README rewritten with v2 examples + quickstart; INSTALL.md updated; CONTRIBUTING.md for new contributors
-- [ ] **XCUT-07**: Logging hygiene — NO secrets in any log output ever; redaction tested per channel (file, stdout, stderr, notifier, debug); CI test asserts no known secret patterns leak under varied input
+- [x] **XCUT-07**: Logging hygiene — NO secrets in any log output ever; redaction tested per channel (file, stdout, stderr, notifier, debug); CI test asserts no known secret patterns leak under varied input
 - [ ] **XCUT-08**: Supply chain — tools.lock pins all 70+ tools to specific versions with SHA-256 where supplied; CI verifies pins on update; 24-72h quarantine window for new tool versions before lockfile bump
 - [x] **XCUT-09**: Observability — every long-running task emits heartbeat events; failed tasks emit structured error events with classification; CI test asserts heartbeat cadence
 
@@ -521,7 +521,7 @@ Each REQ-ID maps to exactly one phase. Populated by roadmapper agent 2026-05-27.
 | XCUT-04 | Phase 3 — Foundation Kernel (CI runs every phase) | Pending |
 | XCUT-05 | Phase 12 — Cutover & Migration | Pending |
 | XCUT-06 | Phase 12 — Cutover & Migration | Pending |
-| XCUT-07 | Phase 3 — Foundation Kernel (lint + tested every phase) | Pending |
+| XCUT-07 | Phase 3 — Foundation Kernel (lint + tested every phase) | Complete |
 | XCUT-08 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
 | XCUT-09 | Phase 3 — Foundation Kernel (heartbeat tested every phase) | Complete |
 

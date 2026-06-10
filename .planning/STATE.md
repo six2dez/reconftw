@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Complete Core Migration
-status: gaps_found
-stopped_at: Phase 7 (OSINT E2E) — 7/7 plans executed + DoD-2 accepted, but gap-closure pending (07-REVIEW.md: 2 Critical + 1 Warning). NOT marked complete.
-last_updated: "2026-06-10T10:03:39.781Z"
+status: executing
+stopped_at: Phase 7 plan 07-06 complete (verification machinery — DAG guard + frozen-replay parity D-O6 + DoD-1 realtools smoke; OSINT-16)
+last_updated: "2026-06-10T11:11:50.298Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 12
-  completed_phases: 5
-  total_plans: 58
-  completed_plans: 57
-  percent: 47
+  completed_phases: 6
+  total_plans: 60
+  completed_plans: 59
+  percent: 50
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-27)
 
 ## Current Position
 
-Phase: 07 (osint-e2e) — 7/7 plans executed + DoD-2 accepted; 2 gap-closure plans READY (07-08, 07-09)
-Plan: 9 total (7 executed + 2 gap_closure planned, checker: 0 blockers)
-Status: Phase 7 gap-closure in progress — 07-08 (GAP-01: osint stage-split for github_repos→github_leaks ordering, OSINT-05) EXECUTED 2026-06-10 (sequential osintStages() pre-stage + execution-path guard test, full `go test ./...` green). 07-09 (GAP-02: Backend.Exec env seam + gato GH_TOKEN + GAP-03: gato side-file redaction, OSINT-06/XCUT-07) still READY. Touches shared kernel → required full `go test ./...`.
-NEXT (you, the maintainer): execute 07-09 → re-verify → Phase 7 completes. THEN Phase 8 (MCP Server).
+Phase: 07 (osint-e2e) — 7/7 plans executed + DoD-2 accepted; 2 gap-closure plans EXECUTED (07-08, 07-09)
+Plan: 9 total (7 + 2 gap_closure, all executed, checker: 0 blockers)
+Status: Phase 7 gap-closure COMPLETE — 07-08 (GAP-01: osint stage-split for github_repos→github_leaks ordering, OSINT-05) EXECUTED 2026-06-10 (sequential osintStages() pre-stage + execution-path guard test, full `go test ./...` green). 07-09 (GAP-02: Backend env seam ExecEnv/StreamEnv + gato GH_TOKEN registered-secret env + GAP-03: gato raw side-file omitted, OSINT-06/XCUT-07) EXECUTED 2026-06-10 (commits 80f014e5 feat + 70c98fac fix; additive non-breaking interface, all Backend implementers compile, full `go test ./...` green; no raw-secret sink remains per `git grep github_actions_audit.json`).
+NEXT (you, the maintainer): re-verify Phase 7 (07-VERIFICATION.md GAP-02/GAP-03 now closed) → Phase 7 completes. THEN Phase 8 (MCP Server).
 Last activity: 2026-06-10
 
 ## Performance Metrics
@@ -144,6 +144,6 @@ Items captured durante v1.0 que deben informar el diseño de arquitectura v2 (no
 
 ## Session Continuity
 
-Last session: 2026-06-10T10:03:39.775Z
+Last session: 2026-06-10T11:11:50.291Z
 Stopped at: Phase 7 plan 07-06 complete (verification machinery — DAG guard + frozen-replay parity D-O6 + DoD-1 realtools smoke; OSINT-16)
 Resume file: None
