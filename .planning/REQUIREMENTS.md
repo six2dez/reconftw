@@ -109,9 +109,9 @@
 - [x] **OSINT-01**: Domain info: whois, registration data, DNS records (NS/MX/TXT/SOA/DNSSEC)
 - [x] **OSINT-02**: IP info: CIDR ranges (via `mapcidr`), ASN org lookups, geo data
 - [x] **OSINT-03**: Email harvesting via `EmailHarvester`
-- [ ] **OSINT-04**: GitHub dorks via `dorks_hunter` + `gitdorks_go`
-- [ ] **OSINT-05**: GitHub leak scanning via `ghleaks` + `trufflehog`
-- [ ] **OSINT-06**: GitHub Actions audit via `gato` (workflow secrets exposure)
+- [x] **OSINT-04**: GitHub dorks via `dorks_hunter` + `gitdorks_go`
+- [x] **OSINT-05**: GitHub leak scanning via `ghleaks` + `trufflehog`
+- [x] **OSINT-06**: GitHub Actions audit via `gato` (workflow secrets exposure)
 - [ ] **OSINT-07**: Cloud bucket enumeration via `cloud_enum` (AWS S3, GCP, Azure Blob)
 - [ ] **OSINT-08**: Postman leaks via `porch-pirate` + `postleaksNg`
 - [ ] **OSINT-09**: Swagger/OpenAPI leaks via `sj` + `SwaggerSpy`
@@ -413,9 +413,9 @@ Each REQ-ID maps to exactly one phase. Populated by roadmapper agent 2026-05-27.
 | OSINT-01 | Phase 7 — OSINT E2E | Complete |
 | OSINT-02 | Phase 7 — OSINT E2E | Complete |
 | OSINT-03 | Phase 7 — OSINT E2E | Complete |
-| OSINT-04 | Phase 7 — OSINT E2E | Pending |
-| OSINT-05 | Phase 7 — OSINT E2E | Pending |
-| OSINT-06 | Phase 7 — OSINT E2E | Pending |
+| OSINT-04 | Phase 7 — OSINT E2E | Complete |
+| OSINT-05 | Phase 7 — OSINT E2E | Complete |
+| OSINT-06 | Phase 7 — OSINT E2E | Complete |
 | OSINT-07 | Phase 7 — OSINT E2E | Pending |
 | OSINT-08 | Phase 7 — OSINT E2E | Pending |
 | OSINT-09 | Phase 7 — OSINT E2E | Pending |
