@@ -302,11 +302,11 @@ Plans:
 - [x] 07-02-PLAN.md — domain_info (OSINT-01) + ip_info (OSINT-02) + emails (OSINT-03) + spoofy/mail_hygiene (OSINT-10)
 - [x] 07-03-PLAN.md — GitHub cluster: dorks+gitdorks (OSINT-04) + repos+leaks ghleaks/trufflehog REDACTED (OSINT-05) + gato actions (OSINT-06)
 - [x] 07-04-PLAN.md — cloud_enum (OSINT-07) + postman REDACTED (OSINT-08) + swagger REDACTED (OSINT-09) + misconfig fold (D-O10)
-- [ ] 07-05-PLAN.md — msftrecon (OSINT-11) + CMSeeK/favirecon (OSINT-12) + gqlspection (OSINT-13) + cewler (OSINT-14) + xnldorker (OSINT-15) + metadata fold (D-O10)
+- [x] 07-05-PLAN.md — msftrecon (OSINT-11) + CMSeeK/favirecon (OSINT-12) + gqlspection (OSINT-13) + cewler (OSINT-14) + xnldorker (OSINT-15) + metadata fold (D-O10)
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 07-06-PLAN.md — dag_test + frozen-replay parity harness (D-O6) + DoD-1 realtools argv smoke over 24 Phase 7 tools (OSINT-16)
+- [x] 07-06-PLAN.md — dag_test + frozen-replay parity harness (D-O6) + DoD-1 realtools argv smoke over 24 Phase 7 tools (OSINT-16)
 
 **Wave 4** *(human gate; blocked on Wave 3)*
 
@@ -408,7 +408,7 @@ Calendar parallelization (within constraint that dependencies are met):
 | 4. Subdomains E2E + Axiom Integration | 11/12 | In Progress|  |
 | 5. Web Pipeline E2E | 10/10 | Complete   | 2026-06-03 |
 | 6. Vulnerability Scanning E2E | 10/10 | Complete    | 2026-06-09 |
-| 7. OSINT E2E | 4/7 | In Progress|  |
+| 7. OSINT E2E | 6/7 | In Progress|  |
 | 8. MCP Server | 0/? | Not started | - |
 | 9. Composite Modes | 0/? | Not started | - |
 | 10. Monitor Mode + Reporting + Notifications | 0/? | Not started | - |

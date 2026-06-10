@@ -121,7 +121,7 @@
 - [x] **OSINT-13**: GraphQL introspection via `gqlspection`
 - [x] **OSINT-14**: Custom wordlist generation via `cewler`
 - [x] **OSINT-15**: Google dorking automation via `xnldorker`
-- [ ] **OSINT-16**: Output equivalence test against canonical target with known OSINT footprint
+- [x] **OSINT-16**: Output equivalence test against canonical target with known OSINT footprint
 
 ### Composite Modes (Deliverable #8)
 
@@ -425,7 +425,7 @@ Each REQ-ID maps to exactly one phase. Populated by roadmapper agent 2026-05-27.
 | OSINT-13 | Phase 7 — OSINT E2E | Complete |
 | OSINT-14 | Phase 7 — OSINT E2E | Complete |
 | OSINT-15 | Phase 7 — OSINT E2E | Complete |
-| OSINT-16 | Phase 7 — OSINT E2E | Pending |
+| OSINT-16 | Phase 7 — OSINT E2E | Complete |
 | MCP-01 | Phase 8 — MCP Server | Pending |
 | MCP-02 | Phase 8 — MCP Server | Pending |
 | MCP-03 | Phase 8 — MCP Server | Pending |
