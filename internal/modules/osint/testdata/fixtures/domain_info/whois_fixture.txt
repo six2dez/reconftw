@@ -1,0 +1,3 @@
+# TODO: capture from: whois example.com (v1 osint.sh:575 domain_info)
+# Stub fixture — osintParitySkip() t.Skip()s cleanly until captured via an
+# osint E2E lab run against a known-footprint target (D-O7).

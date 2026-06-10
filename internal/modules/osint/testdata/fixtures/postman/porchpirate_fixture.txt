@@ -1,0 +1,2 @@
+https://www.postman.com/collections/example-workspace-1 token=FAKE_SECRET_MARKER_AAAA
+https://www.postman.com/example/environment/prod authorization:FAKE_SECRET_MARKER_AAAA

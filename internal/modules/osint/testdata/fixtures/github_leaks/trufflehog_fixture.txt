@@ -1,0 +1,6 @@
+# SYNTHETIC trufflehog -j JSONL fixture — committed (tests MUST PASS, no Skip).
+# Every secret uses the clearly-FAKE marker FAKE_SECRET_MARKER_AAAA so no real
+# credential is committed (T-07-06-01). The parity test asserts the marker is
+# ABSENT from every parsed record and ValueRedacted=="***".
+{"DetectorName":"AWS","Verified":true,"Raw":"FAKE_SECRET_MARKER_AAAA","RawV2":"FAKE_SECRET_MARKER_AAAA","Redacted":"AKIA****","SourceMetadata":{"Data":{"Git":{"repository":"https://github.com/example/repo","file":"config/prod.env","line":42,"commit":"deadbeef"}}}}
+{"DetectorName":"GitHubToken","Verified":false,"Raw":"FAKE_SECRET_MARKER_AAAA","RawV2":"","Redacted":"ghp_****","SourceMetadata":{"Data":{"Git":{"repository":"https://github.com/example/repo2","file":".github/ci.yml","line":7,"commit":"cafebabe"}}}}

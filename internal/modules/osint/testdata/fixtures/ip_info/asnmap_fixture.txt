@@ -1,0 +1,3 @@
+# TODO: capture from: asnmap -duc -silent -i <ip> (v1 osint.sh:741 ip_info)
+# Stub fixture — osintParitySkip() t.Skip()s cleanly until captured via an
+# osint E2E lab run (D-O7).

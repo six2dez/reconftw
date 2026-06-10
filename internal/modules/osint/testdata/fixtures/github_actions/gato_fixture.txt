@@ -1,0 +1,1 @@
+{"organization":"example","repos":[{"name":"example/ci","workflow_secrets":["FAKE_SECRET_MARKER_AAAA"],"runner_token":"FAKE_SECRET_MARKER_AAAA","artifact":"build-creds.zip"}]}

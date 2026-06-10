@@ -1,0 +1,2 @@
+https://api.example.com/swagger.json apikey=FAKE_SECRET_MARKER_AAAA
+https://api.example.com/v2/openapi.yaml bearer:FAKE_SECRET_MARKER_AAAA

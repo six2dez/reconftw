@@ -1,0 +1,1 @@
+[{"repository":"https://github.com/example/repo","file":"src/app.py","line":13,"ruleID":"generic-api-key","secret":"FAKE_SECRET_MARKER_AAAA","match":"api_key = FAKE_SECRET_MARKER_AAAA"},{"repo":"https://github.com/example/repo2","path":"deploy/secrets.tf","lineNumber":99,"rule":"aws-access-token","secret":"FAKE_SECRET_MARKER_AAAA","match":"AKIAFAKE_SECRET_MARKER_AAAA"}]
