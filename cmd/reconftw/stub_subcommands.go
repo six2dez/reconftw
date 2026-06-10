@@ -1491,18 +1491,36 @@ func runOSINTCmd(cmd *cobra.Command) error {
 		return printOSINTDryRun(cmd, allTasks, cfg)
 	}
 
-	// Step 10: Single best_effort osint stage (D-O8/ARCH-09). Most OSINT Tasks
-	// have no DependsOn edges (root-domain-seeded, D-O1) → the scheduler
-	// semaphore parallelizes them, mirroring v1's 4 parallel osint groups.
-	osintTasks := filterByModuleAndEnabled(allTasks, "osint", cfg, []string{"osint."})
-	progress.StageStart("osint", len(osintTasks))
-	if err := sched.RunStage(ctx, "osint", osintTasks); err != nil {
-		// best_effort: log and continue to the final merge.
-		if app.Log != nil {
-			app.Log.Warn("osint: stage failed (best_effort — continuing)", "err", err)
+	// Step 10: Sequential best_effort osint stages (D-O8/ARCH-09). Mirrors the
+	// web/vulns stageSpec precedent (see runWebCmd above): RunStage fires every
+	// task in a slice CONCURRENTLY under a semaphore; the scheduler does NOT
+	// honor in-stage DependsOn ordering. Cross-task ordering therefore comes
+	// from the SEQUENTIAL stage calls below, not from DependsOn within a stage.
+	//
+	// Most OSINT Tasks have no DependsOn edge (root-domain/company-seeded, D-O1)
+	// → they stay parallel inside the single "osint" stage, preserving v1's 4
+	// parallel osint groups. The ONLY edge that needs sequencing is the D-O10
+	// fold osint.github_leaks DependsOn ["osint.github_repos"]: github_leaks'
+	// trufflehog per-repo scan reads inputs/github_repos.txt, which github_repos
+	// writes. They must NOT run concurrently (GAP-01/CR-01), so github_repos runs
+	// in a pre-stage that fully completes (RunStage returns) before the "osint"
+	// stage containing github_leaks starts.
+	//
+	// ALL stages use module "osint" → the best_effort policy (ARCH-09) applies
+	// throughout via policyFor. osintStages() is the SINGLE source of truth for
+	// the ordering, shared with the TestOSINTStageOrderHonorsDependsOn guard.
+	for _, stage := range osintStages() {
+		stageSlice := filterByModuleAndEnabled(allTasks, "osint", cfg, stage.prefixes)
+		progress.StageStart(stage.name, len(stageSlice))
+		if err := sched.RunStage(ctx, "osint", stageSlice); err != nil {
+			// best_effort: log and continue to the next stage / final merge.
+			if app.Log != nil {
+				app.Log.Warn("osint: stage failed (best_effort — continuing)",
+					"stage", stage.name, "err", err)
+			}
 		}
+		progress.StageDone(stage.name, countFileLines(filepath.Join(workdir, "artefacts", "findings.jsonl")))
 	}
-	progress.StageDone("osint", countFileLines(filepath.Join(workdir, "artefacts", "findings.jsonl")))
 
 	// Final merge: consolidate all findings staging files into artefacts/findings.jsonl.
 	// osint/*.txt single-writer human files are excluded (no merge needed).
@@ -1517,13 +1535,79 @@ func runOSINTCmd(cmd *cobra.Command) error {
 	return nil
 }
 
-// printOSINTDryRun lists the osint tasks that would run and returns nil.
+// osintStageSpec describes one sequential osint execution stage: tasks whose
+// name matches any prefix run CONCURRENTLY within the stage; stages run in slice
+// order. It mirrors the local stageSpec used by the web/vulns pipelines but is
+// package-level so the TestOSINTStageOrderHonorsDependsOn guard can read the
+// SAME ordering the production runOSINTCmd executes (single source of truth — no
+// duplicated ordering literal).
+type osintStageSpec struct {
+	name     string
+	prefixes []string
+}
+
+// osintStages is the authoritative ordered osint pipeline (GAP-01/CR-01 fix).
+//
+// D-O1/D-O8/ARCH-09: most osint tasks have no DependsOn and run in parallel
+// within the single "osint" stage. Only the github_repos→github_leaks fold
+// (D-O10) needs sequencing: github_repos runs in a pre-stage that completes
+// before the "osint" stage containing github_leaks, so github_leaks' trufflehog
+// scan reads the FULLY-written inputs/github_repos.txt instead of a partial list.
+//
+// github_repos appears in EXACTLY ONE stage. The "osint" stage uses an explicit
+// prefix list (NOT a catch-all "osint." prefix) so github_repos is not matched
+// twice — matching the readable explicit-prefix approach the web/vulns stages use.
+func osintStages() []osintStageSpec {
+	return []osintStageSpec{
+		{
+			// Pre-stage: produce inputs/github_repos.txt before any reader runs.
+			// github_leaks DependsOn ["osint.github_repos"] — this stage MUST
+			// complete (RunStage returns) before the "osint" stage below.
+			name:     "github-repos",
+			prefixes: []string{"osint.github_repos"},
+		},
+		{
+			// Main stage: every OTHER osint task, run in parallel under the
+			// scheduler semaphore (D-O1). Includes github_leaks, which now reads
+			// the fully-written repo list. Explicit prefixes (NOT "osint.")
+			// deliberately EXCLUDE osint.github_repos so it runs exactly once.
+			name: "osint",
+			prefixes: []string{
+				"osint.domain_info",
+				"osint.ip_info",
+				"osint.emails",
+				"osint.spoofy",
+				"osint.github_dorks",
+				"osint.gitdorks",
+				"osint.github_leaks",
+				"osint.github_actions",
+				"osint.cloud_enum",
+				"osint.postman",
+				"osint.swagger",
+				"osint.misconfig",
+				"osint.msftrecon",
+				"osint.cmseek",
+				"osint.favirecon",
+				"osint.gqlspection",
+				"osint.cewler",
+				"osint.xnldorker",
+				"osint.metadata",
+			},
+		},
+	}
+}
+
+// printOSINTDryRun lists the osint tasks that would run, in sequential stage
+// order, and returns nil. Mirrors the ordered web dry-run so --dry-run reflects
+// the REAL execution order (github-repos pre-stage before the github_leaks stage).
 func printOSINTDryRun(cmd *cobra.Command, allTasks []task.Task, cfg *config.Config) error {
-	filtered := filterByModuleAndEnabled(allTasks, "osint", cfg, []string{"osint."})
-	fmt.Fprintln(cmd.OutOrStdout(), "[dry-run] osint pipeline (single best_effort stage):")
-	fmt.Fprintf(cmd.OutOrStdout(), "  Stage (osint): %d task(s)\n", len(filtered))
-	for _, t := range filtered {
-		fmt.Fprintf(cmd.OutOrStdout(), "    - %s: %s\n", t.Name(), t.Description())
+	fmt.Fprintln(cmd.OutOrStdout(), "[dry-run] osint pipeline (sequential best_effort stages):")
+	for _, stage := range osintStages() {
+		filtered := filterByModuleAndEnabled(allTasks, "osint", cfg, stage.prefixes)
+		fmt.Fprintf(cmd.OutOrStdout(), "  Stage (%s): %d task(s)\n", stage.name, len(filtered))
+		for _, t := range filtered {
+			fmt.Fprintf(cmd.OutOrStdout(), "    - %s: %s\n", t.Name(), t.Description())
+		}
 	}
 	fmt.Fprintln(cmd.OutOrStdout(), "  [final] MergeAllOSINTArtefacts(\"findings\")")
 	return nil
