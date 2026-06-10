@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Complete Core Migration
-status: executing
-stopped_at: Phase 7 (OSINT E2E) COMPLETE 7/7 — plan 07-07 DoD-2 real dev-Mac E2E ACCEPTED (maintainer approved 2026-06-10; VERDICT PASS, 8 osint-class findings, XCUT-07 CLEAN)
+status: gaps_found
+stopped_at: Phase 7 (OSINT E2E) — 7/7 plans executed + DoD-2 accepted, but gap-closure pending (07-REVIEW.md: 2 Critical + 1 Warning). NOT marked complete.
 last_updated: "2026-06-10T10:03:39.781Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 12
-  completed_phases: 6
+  completed_phases: 5
   total_plans: 58
   completed_plans: 57
-  percent: 50
+  percent: 47
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-27)
 
 ## Current Position
 
-Phase: 07 (osint-e2e) — COMPLETE (7/7, accepted 2026-06-10)
-Plan: 7 of 7 (all complete)
-Status: Phase 7 accepted — DoD-2 signed off by maintainer
-NEXT (you, the maintainer): Phase 8 (MCP Server), or close the Phase 4 open gate (04-11 parity sign-off on hackerone.com+tesla.com) if VPS is now provisioned. Phase 7 and Phase 6 (both depend on Phase 5 only) are now done.
+Phase: 07 (osint-e2e) — 7/7 plans executed + DoD-2 accepted; GAP-CLOSURE PENDING (not complete)
+Plan: 7 of 7 executed; 3 code-review gaps open (07-REVIEW.md / 07-VERIFICATION.md)
+Status: Phase 7 gaps_found — code review found 2 Critical latent defects (github_leaks↔github_repos in-stage ordering; gato GH_TOKEN env seam missing in Backend.Exec) + 1 Warning (gato side-file unredacted). All only manifest WITH a GitHub token (keyless DoD-2 run skipped them).
+NEXT (you, the maintainer): `/gsd-plan-phase 7 --gaps` → creates gap_closure fix plans from 07-VERIFICATION.md gaps → `/gsd-execute-phase 7 --gaps-only` → re-verify. THEN Phase 7 completes and Phase 8 (MCP Server) is next.
 Last activity: 2026-06-10
 
 ## Performance Metrics
