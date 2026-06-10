@@ -13,6 +13,7 @@ import (
 	stderrors "errors"
 	"reflect"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -248,5 +249,69 @@ func TestLocalBackend_Exec_DeadlineExceeded_ReturnsToolTimeout(t *testing.T) {
 	}
 	if tt.Tool != "sleep" {
 		t.Errorf("ToolTimeout.Tool = %q, want %q", tt.Tool, "sleep")
+	}
+}
+
+// Phase 07-09 GAP-02: env seam — a requested KEY=VALUE reaches the child process.
+// Uses `sh -c 'echo $GH_TOKEN'` so the child must read the injected env var to
+// produce the expected stdout. Proves the env entry crosses the process boundary.
+func TestLocalBackend_ExecEnv_ChildSeesEnv(t *testing.T) {
+	b := backend.NewLocalBackend(0)
+	const want = "FAKE_GH_TOKEN_env_seam_AAAA"
+	res, err := b.ExecEnv(
+		context.Background(),
+		&backend.Tool{Name: "sh", Path: "/bin/sh"},
+		[]string{"-c", "echo $GH_TOKEN"},
+		[]string{"GH_TOKEN=" + want},
+	)
+	if err != nil {
+		t.Fatalf("ExecEnv returned err=%v, want nil", err)
+	}
+	got := strings.TrimSpace(string(res.Stdout))
+	if got != want {
+		t.Fatalf("child stdout = %q, want %q (GH_TOKEN did not reach the child env)", got, want)
+	}
+}
+
+// Phase 07-09 GAP-02: the env seam appends to os.Environ() — it does NOT clear the
+// inherited baseline. A var already present in the parent (PATH) must still be
+// visible to the child when an explicit env entry is also requested.
+func TestLocalBackend_ExecEnv_PreservesBaselineEnv(t *testing.T) {
+	b := backend.NewLocalBackend(0)
+	res, err := b.ExecEnv(
+		context.Background(),
+		&backend.Tool{Name: "sh", Path: "/bin/sh"},
+		[]string{"-c", "echo $PATH"},
+		[]string{"GH_TOKEN=irrelevant"},
+	)
+	if err != nil {
+		t.Fatalf("ExecEnv returned err=%v, want nil", err)
+	}
+	if strings.TrimSpace(string(res.Stdout)) == "" {
+		t.Fatal("child $PATH is empty — env seam dropped the os.Environ() baseline")
+	}
+}
+
+// Phase 07-09 GAP-02: backward-compat — Exec (nil env) is byte-for-byte identical
+// to ExecEnv(..., nil). Both leave cmd.Env nil, so the child inherits the parent
+// env exactly as before the seam was added.
+func TestLocalBackend_Exec_NilEnv_UnchangedBehavior(t *testing.T) {
+	b := backend.NewLocalBackend(0)
+	tool := &backend.Tool{Name: "echo", Path: "/bin/echo"}
+
+	resExec, errExec := b.Exec(context.Background(), tool, []string{"hello"})
+	if errExec != nil {
+		t.Fatalf("Exec returned err=%v, want nil", errExec)
+	}
+	resEnv, errEnv := b.ExecEnv(context.Background(), tool, []string{"hello"}, nil)
+	if errEnv != nil {
+		t.Fatalf("ExecEnv(nil) returned err=%v, want nil", errEnv)
+	}
+	if string(resExec.Stdout) != "hello\n" {
+		t.Errorf("Exec stdout = %q, want %q", string(resExec.Stdout), "hello\n")
+	}
+	if string(resExec.Stdout) != string(resEnv.Stdout) || resExec.ExitCode != resEnv.ExitCode {
+		t.Errorf("Exec and ExecEnv(nil) diverged: Exec=%q/%d ExecEnv=%q/%d",
+			string(resExec.Stdout), resExec.ExitCode, string(resEnv.Stdout), resEnv.ExitCode)
 	}
 }

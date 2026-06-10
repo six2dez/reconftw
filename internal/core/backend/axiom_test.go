@@ -162,6 +162,7 @@ func TestAxiomBackend_HealthCheck_AutoFixHostkey_TriggersRepair(t *testing.T) {
 type axiomRecorder struct {
 	tool    *backend.Tool
 	args    []string
+	env     []string
 	execErr error
 }
 
@@ -174,10 +175,20 @@ func (r *axiomRecorder) Exec(_ context.Context, t *backend.Tool, args []string) 
 	return &backend.Result{ExitCode: 0}, nil
 }
 
+func (r *axiomRecorder) ExecEnv(ctx context.Context, t *backend.Tool, args []string, env []string) (*backend.Result, error) {
+	r.env = env
+	return r.Exec(ctx, t, args)
+}
+
 func (r *axiomRecorder) Stream(_ context.Context, _ *backend.Tool, _ []string) (<-chan backend.Event, error) {
 	ch := make(chan backend.Event)
 	close(ch)
 	return ch, nil
+}
+
+func (r *axiomRecorder) StreamEnv(ctx context.Context, t *backend.Tool, args []string, env []string) (<-chan backend.Event, error) {
+	r.env = env
+	return r.Stream(ctx, t, args)
 }
 
 func (r *axiomRecorder) HealthCheck(_ context.Context) error { return nil }
@@ -200,10 +211,18 @@ func (h *hostKeyRecorder) Exec(_ context.Context, _ *backend.Tool, _ []string) (
 	return &backend.Result{ExitCode: 0}, nil
 }
 
+func (h *hostKeyRecorder) ExecEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (*backend.Result, error) {
+	return h.Exec(ctx, t, args)
+}
+
 func (h *hostKeyRecorder) Stream(_ context.Context, _ *backend.Tool, _ []string) (<-chan backend.Event, error) {
 	ch := make(chan backend.Event)
 	close(ch)
 	return ch, nil
+}
+
+func (h *hostKeyRecorder) StreamEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (<-chan backend.Event, error) {
+	return h.Stream(ctx, t, args)
 }
 
 func (h *hostKeyRecorder) HealthCheck(_ context.Context) error { return nil }
@@ -268,9 +287,19 @@ func (m *mockAxiomBackend) Exec(ctx context.Context, t *backend.Tool, args []str
 	return m.local.Exec(ctx, t, args)
 }
 
+// ExecEnv delegates to the inner local backend's ExecEnv (env seam compile guard).
+func (m *mockAxiomBackend) ExecEnv(ctx context.Context, t *backend.Tool, args []string, env []string) (*backend.Result, error) {
+	return m.local.ExecEnv(ctx, t, args, env)
+}
+
 // Stream delegates to local backend Stream.
 func (m *mockAxiomBackend) Stream(ctx context.Context, t *backend.Tool, args []string) (<-chan backend.Event, error) {
 	return m.local.Stream(ctx, t, args)
+}
+
+// StreamEnv delegates to the inner local backend's StreamEnv (env seam compile guard).
+func (m *mockAxiomBackend) StreamEnv(ctx context.Context, t *backend.Tool, args []string, env []string) (<-chan backend.Event, error) {
+	return m.local.StreamEnv(ctx, t, args, env)
 }
 
 // HealthCheck delegates to local.
@@ -404,10 +433,18 @@ func (a *axiomFixtureBackend) Exec(_ context.Context, _ *backend.Tool, _ []strin
 	return &backend.Result{Stdout: []byte(a.content), ExitCode: 0}, nil
 }
 
+func (a *axiomFixtureBackend) ExecEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (*backend.Result, error) {
+	return a.Exec(ctx, t, args)
+}
+
 func (a *axiomFixtureBackend) Stream(_ context.Context, _ *backend.Tool, _ []string) (<-chan backend.Event, error) {
 	ch := make(chan backend.Event)
 	close(ch)
 	return ch, nil
+}
+
+func (a *axiomFixtureBackend) StreamEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (<-chan backend.Event, error) {
+	return a.Stream(ctx, t, args)
 }
 
 func (a *axiomFixtureBackend) HealthCheck(_ context.Context) error { return nil }

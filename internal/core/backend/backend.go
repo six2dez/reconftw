@@ -83,6 +83,24 @@ type Backend interface {
 	// The tool's process group is killed on ctx cancellation.
 	Exec(ctx context.Context, t *Tool, args []string) (*Result, error)
 
+	// ExecEnv is Exec with an additional set of "KEY=VALUE" environment entries
+	// appended onto the os.Environ() baseline for the child process. This is the
+	// secret-safe seam used to pass tokens (e.g. GH_TOKEN) into a tool's child
+	// environment WITHOUT placing them on argv (which would leak into the process
+	// listing) — ARCH-02 (v2 never passes secrets as CLI args).
+	//
+	// Backward-compat contract (ADR §0 D-07, additive non-breaking method):
+	// when env is nil/empty, ExecEnv MUST behave byte-for-byte identically to
+	// Exec. Exec is defined as ExecEnv(ctx, t, args, nil), so there is exactly
+	// one code path and nil-env callers are provably unchanged.
+	//
+	// Scope: implementations MUST inject EXACTLY the requested entries over the
+	// os.Environ() baseline — no extra parent vars beyond the normal inherited
+	// environment. AxiomBackend does not support env passthrough (the fleet split
+	// has no env channel) and returns *AxiomFailure when env is non-empty; OSINT
+	// tools run on LocalBackend (D-O1), so this restriction does not affect them.
+	ExecEnv(ctx context.Context, t *Tool, args []string, env []string) (*Result, error)
+
 	// Stream runs tool with args, yields stdout and stderr lines as Events on
 	// the returned channel. Channel closes when tool exits (clean or error).
 	// Suitable for long-running tools (nuclei, dalfox, katana).
@@ -92,6 +110,11 @@ type Backend interface {
 	// MCP integration note. Backend.Stream() shape is sufficient for MCP —
 	// no protocol-level change anticipated.
 	Stream(ctx context.Context, t *Tool, args []string) (<-chan Event, error)
+
+	// StreamEnv is Stream with additional "KEY=VALUE" child-env entries (see
+	// ExecEnv for the contract). Stream is defined as StreamEnv(ctx, t, args, nil),
+	// so nil-env callers are byte-for-byte unchanged.
+	StreamEnv(ctx context.Context, t *Tool, args []string, env []string) (<-chan Event, error)
 
 	// HealthCheck verifies the backend is operational (binaries reachable,
 	// axiom fleet up and authenticated). Called at startup and by the

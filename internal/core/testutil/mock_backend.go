@@ -72,6 +72,7 @@ type MockBackend struct {
 	exitCode       int
 	runError       error
 	healthCheckErr error
+	lastEnv        []string // env passed to the most recent ExecEnv/StreamEnv call
 }
 
 // NewMockBackend constructs a MockBackend with the given config.
@@ -129,10 +130,31 @@ func (m *MockBackend) SetCapacity(c int) {
 	m.capacity = c
 }
 
+// LastEnv returns a copy of the env slice passed to the most recent ExecEnv /
+// StreamEnv call (nil if the last call used the nil-env Exec/Stream path). Used
+// by tests to assert env-capable dispatch forwards the expected entries.
+func (m *MockBackend) LastEnv() []string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return append([]string(nil), m.lastEnv...)
+}
+
 // Exec reads the fixture file and returns a *Result, or *ToolError /
 // configured error per setter state. Honors ctx.Done() (returns ctx.Err()
 // when cancelled before fixture read).
-func (m *MockBackend) Exec(ctx context.Context, t *backend.Tool, _ []string) (*backend.Result, error) {
+func (m *MockBackend) Exec(ctx context.Context, t *backend.Tool, args []string) (*backend.Result, error) {
+	return m.ExecEnv(ctx, t, args, nil)
+}
+
+// ExecEnv records env (for LastEnv assertions) then behaves like Exec — fixture
+// content is independent of env, so the returned Result is unchanged. This lets
+// tests assert that the env-capable call path (e.g. RunEnv) forwards the expected
+// "KEY=VALUE" entries without spawning a subprocess.
+func (m *MockBackend) ExecEnv(ctx context.Context, t *backend.Tool, _ []string, env []string) (*backend.Result, error) {
+	m.mu.Lock()
+	m.lastEnv = append([]string(nil), env...)
+	m.mu.Unlock()
+
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -178,7 +200,16 @@ func (m *MockBackend) Exec(ctx context.Context, t *backend.Tool, _ []string) (*b
 // Stream reads the fixture file, splits into lines, yields each as a
 // backend.Event on the returned channel. Closes channel on EOF or
 // ctx cancellation.
-func (m *MockBackend) Stream(ctx context.Context, t *backend.Tool, _ []string) (<-chan backend.Event, error) {
+func (m *MockBackend) Stream(ctx context.Context, t *backend.Tool, args []string) (<-chan backend.Event, error) {
+	return m.StreamEnv(ctx, t, args, nil)
+}
+
+// StreamEnv records env (for LastEnv assertions) then behaves like Stream.
+func (m *MockBackend) StreamEnv(ctx context.Context, t *backend.Tool, _ []string, env []string) (<-chan backend.Event, error) {
+	m.mu.Lock()
+	m.lastEnv = append([]string(nil), env...)
+	m.mu.Unlock()
+
 	m.mu.RLock()
 	fd := m.fixturesDir
 	scenario := m.scenario

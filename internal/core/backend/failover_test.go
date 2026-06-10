@@ -371,3 +371,49 @@ func (c *countingStreamFallback) Exec(_ context.Context, t *backend.Tool, args [
 
 func (c *countingStreamFallback) HealthCheck(_ context.Context) error { return nil }
 func (c *countingStreamFallback) Capacity() int                       { return 2 }
+
+// --- env-seam compile guards: these mocks delegate ExecEnv/StreamEnv to their
+// nil-env Exec/Stream (the FailoverBackend env-seam tests only exercise delegation
+// + AxiomFailure failover, which the underlying Exec/Stream already model). ---
+
+func (f *failingPrimary) ExecEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (*backend.Result, error) {
+	return f.Exec(ctx, t, args)
+}
+func (f *failingPrimary) StreamEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (<-chan backend.Event, error) {
+	return f.Stream(ctx, t, args)
+}
+
+func (c *conditionalPrimary) ExecEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (*backend.Result, error) {
+	return c.Exec(ctx, t, args)
+}
+func (c *conditionalPrimary) StreamEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (<-chan backend.Event, error) {
+	return c.Stream(ctx, t, args)
+}
+
+func (s *successFallback) ExecEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (*backend.Result, error) {
+	return s.Exec(ctx, t, args)
+}
+func (s *successFallback) StreamEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (<-chan backend.Event, error) {
+	return s.Stream(ctx, t, args)
+}
+
+func (f *fixedCapacityBackend) ExecEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (*backend.Result, error) {
+	return f.Exec(ctx, t, args)
+}
+func (f *fixedCapacityBackend) StreamEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (<-chan backend.Event, error) {
+	return f.Stream(ctx, t, args)
+}
+
+func (s *streamAxiomFailurePrimary) ExecEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (*backend.Result, error) {
+	return s.Exec(ctx, t, args)
+}
+func (s *streamAxiomFailurePrimary) StreamEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (<-chan backend.Event, error) {
+	return s.Stream(ctx, t, args)
+}
+
+func (c *countingStreamFallback) ExecEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (*backend.Result, error) {
+	return c.Exec(ctx, t, args)
+}
+func (c *countingStreamFallback) StreamEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (<-chan backend.Event, error) {
+	return c.Stream(ctx, t, args)
+}

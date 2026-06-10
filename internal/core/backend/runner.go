@@ -62,6 +62,32 @@ func (r *Runner) Run(ctx context.Context, toolName string, args []string) (*Resu
 	return r.Backend.Exec(ctx, tool, args)
 }
 
+// RunEnv is Run with additional "KEY=VALUE" child-env entries forwarded to
+// Backend.ExecEnv. Use this to pass a secret (e.g. GH_TOKEN) into a tool's child
+// environment WITHOUT placing it on argv (ARCH-02). The env entries are appended
+// onto the os.Environ() baseline by LocalBackend; an empty env is byte-for-byte
+// equivalent to Run. Same unregistered-tool / rate-limit error contract as Run.
+func (r *Runner) RunEnv(ctx context.Context, toolName string, args []string, env []string) (*Result, error) {
+	tool, ok := r.Registry.Lookup(toolName)
+	if !ok {
+		return nil, &coreerrors.ToolError{
+			Tool:     toolName,
+			ExitCode: -1,
+			Inner:    stderrors.New("tool not registered"),
+		}
+	}
+	if r.Limiter != nil {
+		if err := r.Limiter.Wait(ctx, toolName); err != nil {
+			return nil, &coreerrors.ToolError{
+				Tool:     toolName,
+				ExitCode: -1,
+				Inner:    err,
+			}
+		}
+	}
+	return r.Backend.ExecEnv(ctx, tool, args, env)
+}
+
 // Stream looks up toolName, waits on the rate limiter, then dispatches to
 // Backend.Stream. Same error contract as Run for the unregistered-tool case.
 func (r *Runner) Stream(ctx context.Context, toolName string, args []string) (<-chan Event, error) {
@@ -83,4 +109,27 @@ func (r *Runner) Stream(ctx context.Context, toolName string, args []string) (<-
 		}
 	}
 	return r.Backend.Stream(ctx, tool, args)
+}
+
+// StreamEnv is Stream with additional "KEY=VALUE" child-env entries forwarded to
+// Backend.StreamEnv (see RunEnv for the env contract).
+func (r *Runner) StreamEnv(ctx context.Context, toolName string, args []string, env []string) (<-chan Event, error) {
+	tool, ok := r.Registry.Lookup(toolName)
+	if !ok {
+		return nil, &coreerrors.ToolError{
+			Tool:     toolName,
+			ExitCode: -1,
+			Inner:    stderrors.New("tool not registered"),
+		}
+	}
+	if r.Limiter != nil {
+		if err := r.Limiter.Wait(ctx, toolName); err != nil {
+			return nil, &coreerrors.ToolError{
+				Tool:     toolName,
+				ExitCode: -1,
+				Inner:    err,
+			}
+		}
+	}
+	return r.Backend.StreamEnv(ctx, tool, args, env)
 }

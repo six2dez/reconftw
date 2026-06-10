@@ -83,7 +83,15 @@ func (placeholderBackend) Exec(_ context.Context, _ *backend.Tool, _ []string) (
 	return nil, nil
 }
 
+func (placeholderBackend) ExecEnv(_ context.Context, _ *backend.Tool, _ []string, _ []string) (*backend.Result, error) {
+	return nil, nil
+}
+
 func (placeholderBackend) Stream(_ context.Context, _ *backend.Tool, _ []string) (<-chan backend.Event, error) {
+	return nil, nil
+}
+
+func (placeholderBackend) StreamEnv(_ context.Context, _ *backend.Tool, _ []string, _ []string) (<-chan backend.Event, error) {
 	return nil, nil
 }
 

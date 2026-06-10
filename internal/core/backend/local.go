@@ -23,6 +23,7 @@ import (
 	"context"
 	stderrors "errors"
 	"io"
+	"os"
 	"os/exec"
 	"runtime"
 	"sync"
@@ -74,12 +75,32 @@ func (b *LocalBackend) HealthCheck(_ context.Context) error { return nil }
 // per ADR §6 line 1806 + W9 assertion). Returns *coreerrors.ToolTimeout when
 // ctx deadline exceeded.
 func (b *LocalBackend) Exec(ctx context.Context, t *Tool, args []string) (*Result, error) {
+	return b.ExecEnv(ctx, t, args, nil)
+}
+
+// ExecEnv is Exec with additional "KEY=VALUE" child-env entries appended onto the
+// os.Environ() baseline. When env is empty, cmd.Env is left nil — preserving the
+// EXACT current Exec behavior (child inherits the parent environment via os/exec's
+// default). When env is non-empty, cmd.Env = append(os.Environ(), env...).
+//
+// No-extra-parent-vars property (T-07-09-02) holds BY CONSTRUCTION: the child env
+// is the os.Environ() baseline plus EXACTLY the requested env entries — this append
+// cannot introduce any variable that is neither in os.Environ nor the explicit env
+// slice, so no separate negative-env test is required.
+func (b *LocalBackend) ExecEnv(ctx context.Context, t *Tool, args []string, env []string) (*Result, error) {
 	start := time.Now()
 
 	cmd := exec.CommandContext(ctx, t.Path, args...)
 
 	// Process-group isolation: every subprocess gets its own pgid.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+	// Env seam: only override cmd.Env when explicit entries are requested. The
+	// nil-env path leaves cmd.Env nil (os/exec default = inherit parent env),
+	// byte-for-byte identical to the pre-seam behavior.
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
 
 	// WaitDelay: stdlib pause between Cancel and stdlib SIGKILL (kills direct child only).
 	cmd.WaitDelay = b.KillGrace
@@ -173,8 +194,18 @@ func (b *LocalBackend) Exec(ctx context.Context, t *Tool, args []string) (*Resul
 // Uses bufio.Scanner with 1MiB initial / 10MiB max buffer (RESEARCH.md §Pattern 3 +
 // spike proc.go lines 92-94).
 func (b *LocalBackend) Stream(ctx context.Context, t *Tool, args []string) (<-chan Event, error) {
+	return b.StreamEnv(ctx, t, args, nil)
+}
+
+// StreamEnv is Stream with additional "KEY=VALUE" child-env entries (see ExecEnv
+// for the env-scoping contract). When env is empty, cmd.Env is left nil — the
+// nil-env path is byte-for-byte identical to the pre-seam Stream behavior.
+func (b *LocalBackend) StreamEnv(ctx context.Context, t *Tool, args []string, env []string) (<-chan Event, error) {
 	cmd := exec.CommandContext(ctx, t.Path, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
 	cmd.WaitDelay = b.KillGrace
 	cmd.Cancel = func() error {
 		if cmd.Process == nil {

@@ -122,6 +122,34 @@ func (a *AxiomBackend) Exec(ctx context.Context, t *Tool, args []string) (*Resul
 	return res, nil
 }
 
+// ExecEnv implements the Backend env seam. The axiom fleet split has NO env
+// passthrough channel, so AxiomBackend does not support child-env injection: a
+// non-empty env returns *AxiomFailure (not-supported). With a nil/empty env it
+// delegates to Exec (identical behavior). OSINT tools that need GH_TOKEN run on
+// LocalBackend per D-O1, so this restriction never blocks them.
+func (a *AxiomBackend) ExecEnv(ctx context.Context, t *Tool, args []string, env []string) (*Result, error) {
+	if len(env) > 0 {
+		return nil, &coreerrors.AxiomFailure{
+			Operation: "exec_env",
+			Inner:     fmt.Errorf("axiom backend does not support child-env injection (tool %s); run env-requiring tools on LocalBackend", t.Name),
+		}
+	}
+	return a.Exec(ctx, t, args)
+}
+
+// StreamEnv implements the Backend env seam for streaming. Same not-supported
+// contract as ExecEnv: non-empty env returns *AxiomFailure; nil env delegates
+// to Stream.
+func (a *AxiomBackend) StreamEnv(ctx context.Context, t *Tool, args []string, env []string) (<-chan Event, error) {
+	if len(env) > 0 {
+		return nil, &coreerrors.AxiomFailure{
+			Operation: "stream_env",
+			Inner:     fmt.Errorf("axiom backend does not support child-env injection (tool %s); run env-requiring tools on LocalBackend", t.Name),
+		}
+	}
+	return a.Stream(ctx, t, args)
+}
+
 // extractInputFile returns the input file path from tool args using Tool.InputFlag.
 //
 // If Tool.InputFlag is non-empty (e.g. "-l"), returns the arg immediately

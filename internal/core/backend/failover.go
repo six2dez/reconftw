@@ -71,6 +71,62 @@ func (f *FailoverBackend) Exec(ctx context.Context, t *Tool, args []string) (*Re
 	return res, nil
 }
 
+// ExecEnv mirrors Exec for the env seam: dispatches to Primary.ExecEnv unless the
+// kill-switch has tripped, falling back to Fallback.ExecEnv on *AxiomFailure (which
+// includes the AxiomBackend not-supported-when-env-set failure — env-requiring tools
+// therefore transparently land on the local Fallback). Non-AxiomFailure errors
+// propagate without fallback.
+func (f *FailoverBackend) ExecEnv(ctx context.Context, t *Tool, args []string, env []string) (*Result, error) {
+	if f.isKillSwitched() {
+		return f.Fallback.ExecEnv(ctx, t, args, env)
+	}
+
+	res, err := f.Primary.ExecEnv(ctx, t, args, env)
+	if err != nil {
+		var axErr *coreerrors.AxiomFailure
+		if stderrors.As(err, &axErr) {
+			f.recordFailure()
+			return f.Fallback.ExecEnv(ctx, t, args, env)
+		}
+		return nil, err
+	}
+	f.resetFailures()
+	return res, nil
+}
+
+// StreamEnv mirrors Stream for the env seam (see ExecEnv). On *AxiomFailure from
+// Primary it drains any partial channel (ctx-bounded, W4 fix) and falls back to
+// Fallback.StreamEnv.
+func (f *FailoverBackend) StreamEnv(ctx context.Context, t *Tool, args []string, env []string) (<-chan Event, error) {
+	if f.isKillSwitched() {
+		return f.Fallback.StreamEnv(ctx, t, args, env)
+	}
+
+	primaryCh, err := f.Primary.StreamEnv(ctx, t, args, env)
+	if err != nil {
+		var axErr *coreerrors.AxiomFailure
+		if stderrors.As(err, &axErr) {
+			if primaryCh != nil {
+				go func() {
+					for {
+						select {
+						case _, ok := <-primaryCh:
+							if !ok {
+								return
+							}
+						case <-ctx.Done():
+							return
+						}
+					}
+				}()
+			}
+			return f.Fallback.StreamEnv(ctx, t, args, env)
+		}
+		return nil, err
+	}
+	return primaryCh, nil
+}
+
 // Stream dispatches to Primary.Stream unless the kill-switch has tripped.
 //
 // If Primary.Stream returns *AxiomFailure:
