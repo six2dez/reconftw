@@ -12,9 +12,13 @@
 // StatusSkipped (logged-never-silent, web/nuclei.go:108-128).
 //
 // SECRET HANDLING (XCUT-07 / T-07-03-01, T-07-03-02): the GitHub token is read
-// from disk and exported to gato via the GH_TOKEN environment variable through a
-// 0600 temp token-file argument path equivalent — never logged. Surfaced
-// workflow secrets are stripped to "***" before any write.
+// from disk and exported to gato via the GH_TOKEN child-process environment
+// variable (Runner.RunEnv → Backend env seam → cmd.Env) — NEVER placed on argv
+// and NEVER logged. The token value is registered with the slog Redactor before
+// any subsequent log line. Surfaced workflow secrets are stripped to "***" before
+// any write, AND the raw gato JSON side-file is NOT persisted (gato writes to a
+// temp file inside WorkDir; only the redacted findings.jsonl survives) — XCUT-07
+// holds at EVERY sink, not just the canonical findings stream.
 //
 // SEEDING (D-O1): company-org-seeded, no DependsOn edges.
 // FAILURE POLICY (D-O8): best_effort — tool failure / empty output logs Debug
@@ -77,24 +81,26 @@ func (t *GitHubActionsTask) Run(ctx context.Context, app *appctx.AppContext) (ta
 	company := companyName(root)
 
 	// Step 2: GITHUB_TOKEN key gate (D-O8, logged-never-silent).
-	if _, ok := readGitHubToken(app); !ok {
+	token, ok := readGitHubToken(app)
+	if !ok {
 		if app.Log != nil {
 			app.Log.Info("osint.github_actions: no GITHUB_TOKEN (cfg.paths.github_tokens) — skipping")
 		}
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
+	// XCUT-07 / T-07-09-01: register the LIVE token with the slog Redactor BEFORE
+	// any subsequent log line, so it can never leak into structured output. The
+	// token is passed to gato ONLY via the GH_TOKEN child-env entry (never argv).
+	registerSecret(app.Log, token)
 
 	inputsDir := filepath.Join(app.Target.WorkDir, "inputs")
 	if err := os.MkdirAll(inputsDir, 0o755); err != nil {
 		return task.Result{Status: task.StatusErrored},
 			fmt.Errorf("osint.github_actions: mkdir inputs/: %w", err)
 	}
-	osintDir := filepath.Join(app.Target.WorkDir, "osint")
-	if err := os.MkdirAll(osintDir, 0o755); err != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.github_actions: mkdir osint/ failed (best_effort)", "err", err)
-		}
-	}
+	// GAP-03: no osint/ side-file is written (the raw gato JSON would embed live
+	// secrets), so we no longer create osint/. Only redacted findings.jsonl is
+	// persisted (via the multi-writer staging contract under inputs/).
 
 	// Step 3: write the org list (gato -O <file>), run gato writing JSON output.
 	orgsFile := filepath.Join(inputsDir, "gato_orgs.txt")
@@ -102,7 +108,19 @@ func (t *GitHubActionsTask) Run(ctx context.Context, app *appctx.AppContext) (ta
 		return task.Result{Status: task.StatusErrored},
 			fmt.Errorf("osint.github_actions: write gato_orgs.txt: %w", wErr)
 	}
-	gatoJSON := filepath.Join(osintDir, "github_actions_audit.json")
+	// GAP-03 (XCUT-07 / T-07-09-03): gato's raw -oJ output can embed live workflow
+	// secrets, so we NEVER persist it to osint/github_actions_audit.json. gato writes
+	// to a temp file inside WorkDir which we parse (redacting surfaced secrets) and
+	// then DELETE — only the redacted findings.jsonl survives. No raw-secret sink.
+	gatoTmp, tmpErr := os.CreateTemp(app.Target.WorkDir, ".gato_audit_*.json")
+	if tmpErr != nil {
+		return task.Result{Status: task.StatusErrored},
+			fmt.Errorf("osint.github_actions: create gato temp output: %w", tmpErr)
+	}
+	gatoJSON := gatoTmp.Name()
+	_ = gatoTmp.Close()
+	// Best-effort cleanup: the raw gato JSON must not outlive this Task.
+	defer func() { _ = os.Remove(gatoJSON) }()
 
 	// v1 arg vector (osint.sh:330): e --enum_wf_artifacts --skip_sh_runner_enum
 	//                               -O <orgs> -oJ <json>
@@ -114,9 +132,10 @@ func (t *GitHubActionsTask) Run(ctx context.Context, app *appctx.AppContext) (ta
 		args = append(args, "--include_all_artifact_secrets")
 	}
 
-	// gato authenticates via the GH_TOKEN env var (v1 osint.sh:341). The token
-	// is exported to the child process only; it is NEVER placed in argv or logged.
-	if _, err := app.Tools.Run(ctx, "gato", args); err != nil {
+	// gato authenticates via the GH_TOKEN env var (v1 osint.sh:341), delivered
+	// through the kernel env seam (RunEnv → Backend.ExecEnv → cmd.Env). The token
+	// is exported to the child process ONLY; it is NEVER placed in argv or logged.
+	if _, err := app.Tools.RunEnv(ctx, "gato", args, []string{"GH_TOKEN=" + token}); err != nil {
 		if app.Log != nil {
 			app.Log.Debug("osint.github_actions: gato run failed (best_effort)", "err", err)
 		}
@@ -124,7 +143,7 @@ func (t *GitHubActionsTask) Run(ctx context.Context, app *appctx.AppContext) (ta
 	}
 
 	// Step 4: parse gato JSON; redact any surfaced secret.
-	gatoData, readErr := os.ReadFile(gatoJSON) //nolint:gosec // within WorkDir
+	gatoData, readErr := os.ReadFile(gatoJSON) //nolint:gosec // temp file within WorkDir
 	if readErr != nil {
 		if app.Log != nil {
 			app.Log.Info("osint.github_actions: completed", "findings", 0)
