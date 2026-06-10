@@ -245,6 +245,7 @@ func Defaults() *Config {
 			GraphQL:   OSINTGraphQL{Enabled: true},                                          // OSINT-13
 			Cewler:    OSINTCewler{Enabled: true},                                           // OSINT-14
 			Misconfig: OSINTMisconfig{Enabled: true},                                        // fold-in D-O10
+			Metadata:  OSINTMetadata{Enabled: true},                                         // fold-in D-O10 (opportunistic D-O2)
 		},
 		Notifications: NotificationsConfig{
 			Enabled:     false,

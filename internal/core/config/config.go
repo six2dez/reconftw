@@ -594,6 +594,13 @@ type OSINTConfig struct {
 	GraphQL  OSINTGraphQL  `koanf:"graphql"`  // OSINT-13 GraphQL introspection (gqlspection)
 	Cewler   OSINTCewler   `koanf:"cewler"`   // OSINT-14 custom wordlist generation (cewler)
 	Misconfig OSINTMisconfig `koanf:"misconfig"` // fold-in (D-O10) third-party misconfig (misconfig-mapper)
+	Metadata  OSINTMetadata  `koanf:"metadata"`  // fold-in (D-O10) doc-metadata (metafinder/exiftool, opportunistic D-O2)
+}
+
+// OSINTMetadata configures the doc-metadata fold-in (D-O10 via metafinder/
+// exiftool over workspace docs, opportunistic per D-O2). D-O4 additive schema.
+type OSINTMetadata struct {
+	Enabled bool `koanf:"enabled"`
 }
 
 type OSINTGoogleDorks struct {
