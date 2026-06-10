@@ -36,7 +36,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 4: Subdomains E2E + Axiom Integration** — Canonical reference port; passive+brute+permut+dnsx+scope+takeover+buckets+geo+ASN with Axiom distributed execution; output-equivalence test gates phase end (gap closure in progress)
 - [x] **Phase 5: Web Pipeline E2E** — Probe + screenshots + fuzz + JS + nuclei + WAF + sourcemaps + favicon + CSP + vhost + 4xx-bypass + URL discovery + 20-function surface with parity test (completed 2026-06-03)
 - [x] **Phase 6: Vulnerability Scanning E2E** — XSS + SQLi + SSRF + LFI + SSTI + CRLF + smuggling + cmdi + nuclei-DAST + cache poisoning + gf patterns + 4xx-bypass (completed 2026-06-09)
-- [ ] **Phase 7: OSINT E2E** — Domain/IP info + emails + GitHub dorks/leaks/actions + cloud enum + Postman + Swagger + Spoofy + msftrecon + CMSeeK + GraphQL + Google dorks
+- [x] **Phase 7: OSINT E2E** — Domain/IP info + emails + GitHub dorks/leaks/actions + cloud enum + Postman + Swagger + Spoofy + msftrecon + CMSeeK + GraphQL + Google dorks
 - [ ] **Phase 8: MCP Server** — Model Context Protocol server exposing recon modes as MCP tools; auth + redaction + scope sandboxing + OpenAPI schema; opt-in in config
 - [ ] **Phase 9: Composite Modes** — `recon`, `all`, `passive`, `zen`, `deep`, `quick-rescan`, `refresh-cache`, `gen-resolvers` + v1 short-flag aliases with deprecation warnings
 - [ ] **Phase 10: Monitor Mode + Reporting + Notifications** — Monitor loop + diff detection + incremental + JSON/HTML/CSV/AI/Faraday/hotlist/SARIF reports + Slack/Telegram/Discord notifications consolidated
@@ -310,7 +310,7 @@ Plans:
 
 **Wave 4** *(human gate; blocked on Wave 3)*
 
-- [ ] 07-07-PLAN.md — osint-smoke.sh + DoD-2 real dev-Mac E2E + category-presence soft gate + Phase 7 acceptance (autonomous: false)
+- [x] 07-07-PLAN.md — osint-smoke.sh + DoD-2 real dev-Mac E2E + category-presence soft gate + Phase 7 acceptance (autonomous: false) — ACCEPTED, maintainer approved 2026-06-10 (VERDICT: PASS, 8 osint-class findings, XCUT-07 CLEAN)
 
 
 ### Phase 8: MCP Server
@@ -408,7 +408,7 @@ Calendar parallelization (within constraint that dependencies are met):
 | 4. Subdomains E2E + Axiom Integration | 11/12 | In Progress|  |
 | 5. Web Pipeline E2E | 10/10 | Complete   | 2026-06-03 |
 | 6. Vulnerability Scanning E2E | 10/10 | Complete    | 2026-06-09 |
-| 7. OSINT E2E | 6/7 | In Progress|  |
+| 7. OSINT E2E | 7/7 | Complete   | 2026-06-10 |
 | 8. MCP Server | 0/? | Not started | - |
 | 9. Composite Modes | 0/? | Not started | - |
 | 10. Monitor Mode + Reporting + Notifications | 0/? | Not started | - |

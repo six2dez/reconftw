@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Complete Core Migration
 status: executing
-stopped_at: Phase 7 plan 07-06 complete (verification machinery — DAG guard + frozen-replay parity D-O6 + DoD-1 realtools smoke; OSINT-16)
-last_updated: "2026-06-10T09:48:04.580Z"
+stopped_at: Phase 7 (OSINT E2E) COMPLETE 7/7 — plan 07-07 DoD-2 real dev-Mac E2E ACCEPTED (maintainer approved 2026-06-10; VERDICT PASS, 8 osint-class findings, XCUT-07 CLEAN)
+last_updated: "2026-06-10T10:03:39.781Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 12
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 58
-  completed_plans: 56
-  percent: 42
+  completed_plans: 57
+  percent: 50
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-27)
 
 ## Current Position
 
-Phase: 07 (osint-e2e) — EXECUTING
-Plan: 6 of 7
-Status: Ready to execute
-NEXT (you, the maintainer): Phase 7 (OSINT E2E) — depends on Phase 5 only (calendar-parallel with Phase 6 was possible). Alternatively close Phase 4 open gate (04-11 parity sign-off on hackerone.com+tesla.com) if VPS is now provisioned.
+Phase: 07 (osint-e2e) — COMPLETE (7/7, accepted 2026-06-10)
+Plan: 7 of 7 (all complete)
+Status: Phase 7 accepted — DoD-2 signed off by maintainer
+NEXT (you, the maintainer): Phase 8 (MCP Server), or close the Phase 4 open gate (04-11 parity sign-off on hackerone.com+tesla.com) if VPS is now provisioned. Phase 7 and Phase 6 (both depend on Phase 5 only) are now done.
 Last activity: 2026-06-10
 
 ## Performance Metrics
@@ -50,7 +50,7 @@ Last activity: 2026-06-10
 | 4 | Subdomains E2E + Axiom Integration | 0/? | Not started | - |
 | 5 | Web Pipeline E2E | 0/? | Not started | - |
 | 6 | Vulnerability Scanning E2E | 0/? | Not started | - |
-| 7 | OSINT E2E | 0/? | Not started | - |
+| 7 | OSINT E2E | 7/7 | Complete | 2026-06-10 |
 | 8 | MCP Server | 0/? | Not started | - |
 | 9 | Composite Modes | 0/? | Not started | - |
 | 10 | Monitor Mode + Reporting + Notifications | 0/? | Not started | - |
@@ -82,6 +82,7 @@ Last activity: 2026-06-10
 | Phase 07 P03 | ~10m | 2 tasks | 10 files |
 | Phase 07 P04 | 25m | 2 tasks | 6 files |
 | Phase 07 P05 | 6m | 2 tasks | 9 files |
+| Phase 07 P07 | 25m | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -109,6 +110,7 @@ Recent decisions affecting v2.0 work:
 - [Phase ?]: ZoneTransferTask in-Run gate returns StatusSkipped when ZoneTransfer.Enabled==false (REVIEWS #4 fix)
 - [Phase ?]: existing config field, not a separate cfg.Web.Fuzz.ThreadsMax
 - [Phase ?]: 07-05: identity/fingerprint cluster (OSINT-11 msftrecon, OSINT-12 CMSeeK+favirecon, OSINT-13 gqlspection, OSINT-14 cewler, OSINT-15 xnldorker) + D-O10 metadata fold ported; CMSeeK/favirecon/gqlspection/cewler/metadata are D-O2 opportunistic (read workspace hosts/URLs/docs IF present, log-skip StatusSkipped when absent); xnldorker key-gated D-O8; msftrecon preserves osint/azure_tenant_domains.txt single-writer (D-O5)
+- [Phase 7]: 07-07: Phase 7 (OSINT E2E) ACCEPTED 2026-06-10 — DoD-2 real dev-Mac E2E (`scripts/osint-smoke.sh hackerone.com`) maintainer-reproduced VERDICT PASS: 8 osint-class findings (whois×1, third_party_misconfig×6, postman-leak×1) via the multi-writer staging contract; XCUT-07 secret-leak guard CLEAN (1 `value_redacted="***"`, no raw secret); category-presence soft gate evaluates PRESENCE only, counts NOT gated (D-O6); Tree.Append fixed (`19efc4a5`) to admit company-seeded `class=="osint"` records lacking host/url (D-O1) while preserving the strict host/url gate for web/vulns findings; zonetransfer EXCLUDED as relocation-not-regression (D-O10, → MIGRATION.md Phase 12)
 
 ### Pending Todos
 
@@ -142,6 +144,6 @@ Items captured durante v1.0 que deben informar el diseño de arquitectura v2 (no
 
 ## Session Continuity
 
-Last session: 2026-06-10T09:48:04.575Z
+Last session: 2026-06-10T10:03:39.775Z
 Stopped at: Phase 7 plan 07-06 complete (verification machinery — DAG guard + frozen-replay parity D-O6 + DoD-1 realtools smoke; OSINT-16)
 Resume file: None
