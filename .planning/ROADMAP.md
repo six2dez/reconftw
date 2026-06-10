@@ -73,7 +73,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. The doc specifies the CLI surface (subcommands `reconftw recon|subs|web|...` primary; v1 short flags `-r/-s/-p/-a/-d/-l` preserved as deprecated aliases with 2-minor-version warning window) and the test-ring policy (unit / integration / smoke / property-based) (ARCH-10, ARCH-11)
   5. The doc specifies the logging policy with type-level secret tagging (Go `Secret`+`LogValuer` OR Python `SecretStr`) and sink-level redaction registered BEFORE first log line (ARCH-12)
 
-**Plans**: 7 plans
+**Plans**: 9 plans (7 executed + 2 gap-closure)
 Plans:
 
 - [x] 02-01-PLAN.md — ADR skeleton + verify-0002.sh + interfaces_check/
@@ -311,6 +311,11 @@ Plans:
 **Wave 4** *(human gate; blocked on Wave 3)*
 
 - [x] 07-07-PLAN.md — osint-smoke.sh + DoD-2 real dev-Mac E2E + category-presence soft gate + Phase 7 acceptance (autonomous: false) — ACCEPTED, maintainer approved 2026-06-10 (VERDICT: PASS, 8 osint-class findings, XCUT-07 CLEAN)
+
+**Wave 5** *(gap-closure — 07-REVIEW.md; run `/gsd-execute-phase 7 --gaps-only`)*
+
+- [ ] 07-08-PLAN.md — GAP-01: split osint into sequential stages (github_repos pre-stage before github_leaks) + stage-order-vs-DependsOn guard test (OSINT-05)
+- [ ] 07-09-PLAN.md — GAP-02/03: backward-compatible Backend env seam (ExecEnv/StreamEnv) → gato authenticated via registered-secret GH_TOKEN + redact/omit raw gato side-file (OSINT-06, XCUT-07)
 
 
 ### Phase 8: MCP Server
