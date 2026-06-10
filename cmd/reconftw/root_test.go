@@ -62,9 +62,13 @@ func TestRootListsFifteenSubcommandsPlusVersion(t *testing.T) {
 // Phase 6 plan 06-01: `vulns` is no longer a stub — newVulnsCmd wires the real
 // vulns pipeline RunE (mirrors the Phase 4/5 pattern for subs/web). `vulns` removed
 // from the stubs list; its behavior is covered by `vulns --help` / `vulns --dry-run`.
+//
+// Phase 7 plan 07-01: `osint` is no longer a stub — newOSINTCmd wires the real
+// osint pipeline RunE (mirrors the Phase 4/5/6 pattern). `osint` removed from the
+// stubs list; its behavior is covered by `osint --help` / `osint --dry-run`.
 func TestEveryStubReturnsExit64(t *testing.T) {
 	stubs := []string{
-		"recon", "all", "passive", "osint", "zen", "deep",
+		"recon", "all", "passive", "zen", "deep",
 		"monitor", "report", "mcp", "migrate", "install",
 	}
 	for _, name := range stubs {
