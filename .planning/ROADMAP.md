@@ -314,7 +314,7 @@ Plans:
 
 **Wave 5** *(gap-closure — 07-REVIEW.md; run `/gsd-execute-phase 7 --gaps-only`)*
 
-- [ ] 07-08-PLAN.md — GAP-01: split osint into sequential stages (github_repos pre-stage before github_leaks) + stage-order-vs-DependsOn guard test (OSINT-05)
+- [x] 07-08-PLAN.md — GAP-01: split osint into sequential stages (github_repos pre-stage before github_leaks) + stage-order-vs-DependsOn guard test (OSINT-05) — DONE 2026-06-10 (osintStages() shared with TestOSINTStageOrderHonorsDependsOn; full `go test ./...` green)
 - [ ] 07-09-PLAN.md — GAP-02/03: backward-compatible Backend env seam (ExecEnv/StreamEnv) → gato authenticated via registered-secret GH_TOKEN + redact/omit raw gato side-file (OSINT-06, XCUT-07)
 
 

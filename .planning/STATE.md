@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-05-27)
 
 Phase: 07 (osint-e2e) — 7/7 plans executed + DoD-2 accepted; 2 gap-closure plans READY (07-08, 07-09)
 Plan: 9 total (7 executed + 2 gap_closure planned, checker: 0 blockers)
-Status: Phase 7 gap plans ready — 07-08 (GAP-01: osint stage-split for github_repos→github_leaks ordering, OSINT-05), 07-09 (GAP-02: Backend.Exec env seam + gato GH_TOKEN + GAP-03: gato side-file redaction, OSINT-06/XCUT-07). Both Wave 1 (parallel-safe, disjoint files). Touch shared kernel (scheduler stage wiring + Backend.Exec) → require full `go test ./...`.
-NEXT (you, the maintainer): `/gsd-execute-phase 7 --gaps-only` → runs 07-08 + 07-09 → re-verify → Phase 7 completes. THEN Phase 8 (MCP Server).
+Status: Phase 7 gap-closure in progress — 07-08 (GAP-01: osint stage-split for github_repos→github_leaks ordering, OSINT-05) EXECUTED 2026-06-10 (sequential osintStages() pre-stage + execution-path guard test, full `go test ./...` green). 07-09 (GAP-02: Backend.Exec env seam + gato GH_TOKEN + GAP-03: gato side-file redaction, OSINT-06/XCUT-07) still READY. Touches shared kernel → required full `go test ./...`.
+NEXT (you, the maintainer): execute 07-09 → re-verify → Phase 7 completes. THEN Phase 8 (MCP Server).
 Last activity: 2026-06-10
 
 ## Performance Metrics
