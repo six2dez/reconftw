@@ -35,7 +35,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Foundation Kernel** — Errors + Logger + Config + OutputTree + Checkpoint + Scheduler + Tools + AppContext + CLI + Mocks + CI from day 1 (completed 2026-05-28)
 - [ ] **Phase 4: Subdomains E2E + Axiom Integration** — Canonical reference port; passive+brute+permut+dnsx+scope+takeover+buckets+geo+ASN with Axiom distributed execution; output-equivalence test gates phase end (gap closure in progress)
 - [x] **Phase 5: Web Pipeline E2E** — Probe + screenshots + fuzz + JS + nuclei + WAF + sourcemaps + favicon + CSP + vhost + 4xx-bypass + URL discovery + 20-function surface with parity test (completed 2026-06-03)
-- [ ] **Phase 6: Vulnerability Scanning E2E** — XSS + SQLi + SSRF + LFI + SSTI + CRLF + smuggling + cmdi + nuclei-DAST + cache poisoning + gf patterns + 4xx-bypass
+- [x] **Phase 6: Vulnerability Scanning E2E** — XSS + SQLi + SSRF + LFI + SSTI + CRLF + smuggling + cmdi + nuclei-DAST + cache poisoning + gf patterns + 4xx-bypass (completed 2026-06-09)
 - [ ] **Phase 7: OSINT E2E** — Domain/IP info + emails + GitHub dorks/leaks/actions + cloud enum + Postman + Swagger + Spoofy + msftrecon + CMSeeK + GraphQL + Google dorks
 - [ ] **Phase 8: MCP Server** — Model Context Protocol server exposing recon modes as MCP tools; auth + redaction + scope sandboxing + OpenAPI schema; opt-in in config
 - [ ] **Phase 9: Composite Modes** — `recon`, `all`, `passive`, `zen`, `deep`, `quick-rescan`, `refresh-cache`, `gen-resolvers` + v1 short-flag aliases with deprecation warnings
@@ -251,7 +251,32 @@ Plans:
   4. Pattern matching + DAST flows ship: gf pattern matching for XSS/SQLi/SSRF/LFI/RCE signatures on URLs (consuming Phase 5 web outputs), nuclei DAST mode with HTTP traffic replay; 4xx bypass tests integrated into vuln workflows (VULN-10, VULN-11, VULN-13)
   5. Output equivalence test green against a controlled lab target (vuln-bait environment) — finding type set matches v1 modulo timing/payload variability; no silent missing categories (VULN-14)
 
-**Plans**: TBD
+**Plans**: 10 plans
+Plans:
+**Wave 1**
+
+- [x] 06-01-PLAN.md — vulns package scaffold + GFTask (gf-classify DAG root, D-V4/D-V5) + findings schema extension + tools.lock 18 vuln tools + newVulnsCmd RunE wire
+
+**Wave 2** *(parallel — blocked on Wave 1)*
+
+- [x] 06-02-PLAN.md — XSSTask (dalfox+Gxss, VULN-01) + CRLFTask (crlfuzz, VULN-06)
+- [x] 06-03-PLAN.md — SQLiTask dual-engine sqlmap+ghauri (VULN-02) + CMDITask commix (VULN-08)
+- [x] 06-04-PLAN.md — LFITask ffuf+lfi_wordlist (VULN-04) + SSTITask TInjA/SSTImap engine switch (VULN-05)
+- [x] 06-05-PLAN.md — SSRFTask qsreplace+ffuf + interactsh-client per-task OOB session (VULN-03)
+
+**Wave 3** *(parallel — blocked on Wave 2)*
+
+- [x] 06-06-PLAN.md — SmugglingTask smugglex (VULN-07) + WebCacheTask WCVS+toxicache (VULN-09) + SecondOrderTask (VULN-12)
+- [x] 06-07-PLAN.md — NucleiDASTTask -duc heartbeat (VULN-11) + FuzzparamsTask + Bypass4xxTask nomore403 (VULN-13)
+- [x] 06-08-PLAN.md — D-V3 orphans: GraphQLTask + GRPCTask + LLMTask + WebsocketTask + TestSSLTask + FrayTask
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [x] 06-09-PLAN.md — dag_test.go cycle guard + frozen-replay parity harness + DoD-1 realtools smoke 18 tools (VULN-14)
+
+**Wave 5** *(human gate — blocked on Wave 4)*
+
+- [x] 06-10-PLAN.md — vulns-smoke.sh + DoD-2 lab E2E sign-off + Phase 6 acceptance (autonomous: false)
 
 ### Phase 7: OSINT E2E
 
@@ -266,7 +291,27 @@ Plans:
   4. Identity/fingerprint flows ship: Microsoft tenant recon via msftrecon, CMS fingerprint via CMSeeK+favirecon, custom wordlist generation via cewler, Google dorking automation via xnldorker (OSINT-11, OSINT-12, OSINT-14, OSINT-15)
   5. Output equivalence test green against a canonical target with known OSINT footprint — the artefact category set matches v1; no silent missing sources; per-category finding counts within tolerance (OSINT-16)
 
-**Plans**: TBD
+**Plans**: 7 plans
+
+**Wave 1**
+
+- [x] 07-01-PLAN.md — osint package scaffold (doc/record/merge), OSINTConfig additive extension + OSINT.Enabled default-ON (D-O9), tools.lock expansion, newOSINTCmd RunE + modules.go blank import
+
+**Wave 2** *(parallel; blocked on Wave 1)*
+
+- [x] 07-02-PLAN.md — domain_info (OSINT-01) + ip_info (OSINT-02) + emails (OSINT-03) + spoofy/mail_hygiene (OSINT-10)
+- [ ] 07-03-PLAN.md — GitHub cluster: dorks+gitdorks (OSINT-04) + repos+leaks ghleaks/trufflehog REDACTED (OSINT-05) + gato actions (OSINT-06)
+- [ ] 07-04-PLAN.md — cloud_enum (OSINT-07) + postman REDACTED (OSINT-08) + swagger REDACTED (OSINT-09) + misconfig fold (D-O10)
+- [ ] 07-05-PLAN.md — msftrecon (OSINT-11) + CMSeeK/favirecon (OSINT-12) + gqlspection (OSINT-13) + cewler (OSINT-14) + xnldorker (OSINT-15) + metadata fold (D-O10)
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 07-06-PLAN.md — dag_test + frozen-replay parity harness (D-O6) + DoD-1 realtools argv smoke over 24 Phase 7 tools (OSINT-16)
+
+**Wave 4** *(human gate; blocked on Wave 3)*
+
+- [ ] 07-07-PLAN.md — osint-smoke.sh + DoD-2 real dev-Mac E2E + category-presence soft gate + Phase 7 acceptance (autonomous: false)
+
 
 ### Phase 8: MCP Server
 
@@ -362,8 +407,8 @@ Calendar parallelization (within constraint that dependencies are met):
 | 3. Foundation Kernel | 7/7 | Complete   | 2026-05-28 |
 | 4. Subdomains E2E + Axiom Integration | 11/12 | In Progress|  |
 | 5. Web Pipeline E2E | 10/10 | Complete   | 2026-06-03 |
-| 6. Vulnerability Scanning E2E | 0/? | Not started | - |
-| 7. OSINT E2E | 0/? | Not started | - |
+| 6. Vulnerability Scanning E2E | 10/10 | Complete    | 2026-06-09 |
+| 7. OSINT E2E | 2/7 | In progress | 07-02 ✓ domain/IP/email/spoof core (OSINT-01/02/03/10) |
 | 8. MCP Server | 0/? | Not started | - |
 | 9. Composite Modes | 0/? | Not started | - |
 | 10. Monitor Mode + Reporting + Notifications | 0/? | Not started | - |

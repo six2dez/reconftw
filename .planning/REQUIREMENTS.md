@@ -89,33 +89,33 @@
 
 ### Vulns E2E (Deliverable #6)
 
-- [ ] **VULN-01**: XSS scanning via `dalfox` with configurable payloads and rate limits; findings written with severity + confidence
-- [ ] **VULN-02**: SQLi scanning via `sqlmap` AND `ghauri` (both engines available, configurable preference); long-running tool heartbeat preserved
-- [ ] **VULN-03**: SSRF testing with collaborator/interactsh integration via `interactsh-client`
-- [ ] **VULN-04**: LFI testing via parameter fuzzing + payloads from `lfi_wordlist`
-- [ ] **VULN-05**: SSTI testing via `TInjA` and/or `SSTImap`
-- [ ] **VULN-06**: CRLF injection via `crlfuzz`
-- [ ] **VULN-07**: HTTP request smuggling via `smugglex` (Rust binary subprocess)
-- [ ] **VULN-08**: Command injection via `commix`
-- [ ] **VULN-09**: Web cache poisoning via `Web-Cache-Vulnerability-Scanner` + `toxicache`
-- [ ] **VULN-10**: gf pattern matching for known vuln signatures on URLs (XSS, SQLi, SSRF, LFI, RCE patterns)
-- [ ] **VULN-11**: Nuclei DAST mode with HTTP traffic replay
-- [ ] **VULN-12**: Second-order injection via `second-order`
-- [ ] **VULN-13**: 4xx bypass tests integrated with VULN flows
-- [ ] **VULN-14**: Output equivalence test against canonical vuln-bait target (controlled lab env)
+- [x] **VULN-01**: XSS scanning via `dalfox` with configurable payloads and rate limits; findings written with severity + confidence
+- [x] **VULN-02**: SQLi scanning via `sqlmap` AND `ghauri` (both engines available, configurable preference); long-running tool heartbeat preserved
+- [x] **VULN-03**: SSRF testing with collaborator/interactsh integration via `interactsh-client`
+- [x] **VULN-04**: LFI testing via parameter fuzzing + payloads from `lfi_wordlist`
+- [x] **VULN-05**: SSTI testing via `TInjA` and/or `SSTImap`
+- [x] **VULN-06**: CRLF injection via `crlfuzz`
+- [x] **VULN-07**: HTTP request smuggling via `smugglex` (Rust binary subprocess)
+- [x] **VULN-08**: Command injection via `commix`
+- [x] **VULN-09**: Web cache poisoning via `Web-Cache-Vulnerability-Scanner` + `toxicache`
+- [x] **VULN-10**: gf pattern matching for known vuln signatures on URLs (XSS, SQLi, SSRF, LFI, RCE patterns)
+- [x] **VULN-11**: Nuclei DAST mode with HTTP traffic replay
+- [x] **VULN-12**: Second-order injection via `second-order`
+- [x] **VULN-13**: 4xx bypass tests integrated with VULN flows
+- [x] **VULN-14**: Output equivalence test against canonical vuln-bait target (controlled lab env)
 
 ### OSINT E2E (Deliverable #7)
 
-- [ ] **OSINT-01**: Domain info: whois, registration data, DNS records (NS/MX/TXT/SOA/DNSSEC)
-- [ ] **OSINT-02**: IP info: CIDR ranges (via `mapcidr`), ASN org lookups, geo data
-- [ ] **OSINT-03**: Email harvesting via `EmailHarvester`
+- [x] **OSINT-01**: Domain info: whois, registration data, DNS records (NS/MX/TXT/SOA/DNSSEC)
+- [x] **OSINT-02**: IP info: CIDR ranges (via `mapcidr`), ASN org lookups, geo data
+- [x] **OSINT-03**: Email harvesting via `EmailHarvester`
 - [ ] **OSINT-04**: GitHub dorks via `dorks_hunter` + `gitdorks_go`
 - [ ] **OSINT-05**: GitHub leak scanning via `ghleaks` + `trufflehog`
 - [ ] **OSINT-06**: GitHub Actions audit via `gato` (workflow secrets exposure)
 - [ ] **OSINT-07**: Cloud bucket enumeration via `cloud_enum` (AWS S3, GCP, Azure Blob)
 - [ ] **OSINT-08**: Postman leaks via `porch-pirate` + `postleaksNg`
 - [ ] **OSINT-09**: Swagger/OpenAPI leaks via `sj` + `SwaggerSpy`
-- [ ] **OSINT-10**: Email spoofing posture via `Spoofy` (SPF/DMARC/DKIM)
+- [x] **OSINT-10**: Email spoofing posture via `Spoofy` (SPF/DMARC/DKIM)
 - [ ] **OSINT-11**: Microsoft tenant recon via `msftrecon`
 - [ ] **OSINT-12**: CMS fingerprint via `CMSeeK` + `favirecon`
 - [ ] **OSINT-13**: GraphQL introspection via `gqlspection`
@@ -396,30 +396,30 @@ Each REQ-ID maps to exactly one phase. Populated by roadmapper agent 2026-05-27.
 | WEB-14 | Phase 5 — Web Pipeline E2E | Pending |
 | WEB-15 | Phase 5 — Web Pipeline E2E | Pending |
 | WEB-16 | Phase 5 — Web Pipeline E2E | Complete |
-| VULN-01 | Phase 6 — Vulnerability Scanning E2E | Pending |
-| VULN-02 | Phase 6 — Vulnerability Scanning E2E | Pending |
-| VULN-03 | Phase 6 — Vulnerability Scanning E2E | Pending |
-| VULN-04 | Phase 6 — Vulnerability Scanning E2E | Pending |
-| VULN-05 | Phase 6 — Vulnerability Scanning E2E | Pending |
-| VULN-06 | Phase 6 — Vulnerability Scanning E2E | Pending |
-| VULN-07 | Phase 6 — Vulnerability Scanning E2E | Pending |
-| VULN-08 | Phase 6 — Vulnerability Scanning E2E | Pending |
-| VULN-09 | Phase 6 — Vulnerability Scanning E2E | Pending |
-| VULN-10 | Phase 6 — Vulnerability Scanning E2E | Pending |
-| VULN-11 | Phase 6 — Vulnerability Scanning E2E | Pending |
-| VULN-12 | Phase 6 — Vulnerability Scanning E2E | Pending |
-| VULN-13 | Phase 6 — Vulnerability Scanning E2E | Pending |
-| VULN-14 | Phase 6 — Vulnerability Scanning E2E | Pending |
-| OSINT-01 | Phase 7 — OSINT E2E | Pending |
-| OSINT-02 | Phase 7 — OSINT E2E | Pending |
-| OSINT-03 | Phase 7 — OSINT E2E | Pending |
+| VULN-01 | Phase 6 — Vulnerability Scanning E2E | Complete |
+| VULN-02 | Phase 6 — Vulnerability Scanning E2E | Complete |
+| VULN-03 | Phase 6 — Vulnerability Scanning E2E | Complete |
+| VULN-04 | Phase 6 — Vulnerability Scanning E2E | Complete |
+| VULN-05 | Phase 6 — Vulnerability Scanning E2E | Complete |
+| VULN-06 | Phase 6 — Vulnerability Scanning E2E | Complete |
+| VULN-07 | Phase 6 — Vulnerability Scanning E2E | Complete |
+| VULN-08 | Phase 6 — Vulnerability Scanning E2E | Complete |
+| VULN-09 | Phase 6 — Vulnerability Scanning E2E | Complete |
+| VULN-10 | Phase 6 — Vulnerability Scanning E2E | Complete |
+| VULN-11 | Phase 6 — Vulnerability Scanning E2E | Complete |
+| VULN-12 | Phase 6 — Vulnerability Scanning E2E | Complete |
+| VULN-13 | Phase 6 — Vulnerability Scanning E2E | Complete |
+| VULN-14 | Phase 6 — Vulnerability Scanning E2E | Complete |
+| OSINT-01 | Phase 7 — OSINT E2E | Complete |
+| OSINT-02 | Phase 7 — OSINT E2E | Complete |
+| OSINT-03 | Phase 7 — OSINT E2E | Complete |
 | OSINT-04 | Phase 7 — OSINT E2E | Pending |
 | OSINT-05 | Phase 7 — OSINT E2E | Pending |
 | OSINT-06 | Phase 7 — OSINT E2E | Pending |
 | OSINT-07 | Phase 7 — OSINT E2E | Pending |
 | OSINT-08 | Phase 7 — OSINT E2E | Pending |
 | OSINT-09 | Phase 7 — OSINT E2E | Pending |
-| OSINT-10 | Phase 7 — OSINT E2E | Pending |
+| OSINT-10 | Phase 7 — OSINT E2E | Complete |
 | OSINT-11 | Phase 7 — OSINT E2E | Pending |
 | OSINT-12 | Phase 7 — OSINT E2E | Pending |
 | OSINT-13 | Phase 7 — OSINT E2E | Pending |

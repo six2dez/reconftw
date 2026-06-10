@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Complete Core Migration
-status: ready_to_plan
-stopped_at: Phase 05 complete (10/10) — ready to discuss Phase 6
-last_updated: 2026-06-05T08:39:53.668Z
-last_activity: 2026-06-02 -- Phase 05 execution started
+status: executing
+stopped_at: Phase 7 plan 07-02 complete (osint domain/IP/email/spoof core OSINT-01/02/03/10)
+last_updated: "2026-06-10T12:00:00.000Z"
+last_activity: 2026-06-10 -- Phase 07 plan 02 executed (DomainInfo/IPInfo/Emails/Spoofy Tasks)
 progress:
   total_phases: 12
-  completed_phases: 3
-  total_plans: 41
-  completed_plans: 40
-  percent: 25
+  completed_phases: 5
+  total_plans: 58
+  completed_plans: 51
+  percent: 43
 ---
 
 # Project State
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-27)
 
 **Core value:** Run one command, get a complete recon picture of a target — passive, active, and vulnerability layers — with resumable checkpoints, structured output, and zero-touch tool orchestration.
-**Current focus:** Phase 6 — vulnerability scanning e2e
+**Current focus:** Phase 07 — osint-e2e
 
 ## Current Position
 
-Phase: 6
-Plan: Not started
-Status: Ready to plan
-NEXT (you, the maintainer): provision resolvers + install subzy/dnstake/regulator/dnscewl, then run the bash-v1-vs-v2 ±5% parity (SUBD-11/D-04) on hackerone.com+tesla.com, sign off in 04-11-SUMMARY.md, flip 04-VERIFICATION.md status→passed. See 04-VERIFICATION.md §"WHAT YOU MUST DO". Then Phase 5 (Web Pipeline E2E) — which REUSES Phase 4 extractors + copies its pattern, so add the real-arg smoke test + a real E2E run to its DoD.
-Last activity: 2026-06-05
+Phase: 07 (osint-e2e) — EXECUTING
+Plan: 1 of 7
+Status: Executing Phase 07
+NEXT (you, the maintainer): Phase 7 (OSINT E2E) — depends on Phase 5 only (calendar-parallel with Phase 6 was possible). Alternatively close Phase 4 open gate (04-11 parity sign-off on hackerone.com+tesla.com) if VPS is now provisioned.
+Last activity: 2026-06-10 -- Phase 07 execution started
 
 ## Performance Metrics
 
@@ -37,7 +37,7 @@ Last activity: 2026-06-05
 
 - Phases planned: 12 (coarse granularity; parallelization enabled within phases)
 - Total REQ-IDs: 197 (100% mapped to phases)
-- Total plans completed: 29
+- Total plans completed: 39
 - Total execution time: 0.0 hours
 
 **v2.0 phase status:**
@@ -75,6 +75,10 @@ Last activity: 2026-06-05
 | Phase 04-subdomains-e2e-axiom-integration P05 | 7 | 2 tasks | 7 files |
 | Phase 05-web-pipeline-e2e P01 | 30 | 2 tasks | 8 files |
 | Phase 05-web-pipeline-e2e P02 | 35 | 2 tasks | 3 files |
+| Phase 06 P01 | 30m | 2 tasks | 9 files |
+| Phase 06 P04 | 15m | 2 tasks | 2 files |
+| Phase 06 P07 | 20 | 2 tasks | 4 files |
+| Phase 06-vulnerability-scanning-e2e P08 | 20m | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -134,6 +138,6 @@ Items captured durante v1.0 que deben informar el diseño de arquitectura v2 (no
 
 ## Session Continuity
 
-Last session: 2026-06-02T14:47:07.460Z
-Stopped at: Completed 04-05-PLAN.md
-Resume file: None
+Last session: 2026-06-10T12:00:00.000Z
+Stopped at: Phase 7 plan 07-02 complete (osint domain/IP/email/spoof core OSINT-01/02/03/10)
+Resume file: .planning/phases/07-osint-e2e/07-03-PLAN.md
