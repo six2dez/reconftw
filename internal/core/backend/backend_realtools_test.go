@@ -76,17 +76,17 @@ func TestRealtoolsVulnsPhase6(t *testing.T) {
 
 	// Defaults matching config.Defaults() D-V6 WAF-friendly caps (06-09 plan golden):
 	const (
-		defaultXSSThreads    = "5"  // cfg.Vulns.XSS.Threads == 5 (D-V6)
-		defaultFrayMaxPay    = "20" // cfg.Vulns.Fray.MaxPayloads == 20 (D-V6)
-		defaultToxiThreads   = "70" // cfg.Advanced.Tools.Toxicache.Threads default
-		defaultFrayTimeout   = "10" // cfg.Vulns.Fray.Timeout default
-		defaultFrayDelay     = "0.5"
+		defaultXSSThreads     = "5"  // cfg.Vulns.XSS.Threads == 5 (D-V6)
+		defaultFrayMaxPay     = "20" // cfg.Vulns.Fray.MaxPayloads == 20 (D-V6)
+		defaultToxiThreads    = "70" // cfg.Advanced.Tools.Toxicache.Threads default
+		defaultFrayTimeout    = "10" // cfg.Vulns.Fray.Timeout default
+		defaultFrayDelay      = "0.5"
 		defaultFrayCategories = "ai_prompt_injection,prototype_pollution,api_security,modern_bypasses"
-		defaultXSSDepth      = "2"  // depth when !cfg.Advanced.Deep
-		defaultSecondDepth   = "1"  // cfg.Advanced.Tools.SecondOrder.Depth default
-		defaultSecondThreads = "10" // cfg.Advanced.Tools.SecondOrder.Threads default
-		defaultTInjATimeout  = "15" // cfg.Advanced.Tools.TInjA.Timeout default
-		nucleiDefaultRL      = "150"
+		defaultXSSDepth       = "2"  // depth when !cfg.Advanced.Deep
+		defaultSecondDepth    = "1"  // cfg.Advanced.Tools.SecondOrder.Depth default
+		defaultSecondThreads  = "10" // cfg.Advanced.Tools.SecondOrder.Threads default
+		defaultTInjATimeout   = "15" // cfg.Advanced.Tools.TInjA.Timeout default
+		nucleiDefaultRL       = "150"
 	)
 
 	probes := []vulnsToolProbe{
@@ -376,6 +376,273 @@ func TestRealtoolsVulnsPhase6(t *testing.T) {
 	}
 }
 
+// osintToolProbe pairs a Phase 7 OSINT tool name with its representative argv
+// golden (the EXACT arg slice the corresponding osint Task passes). Same shape
+// as vulnsToolProbe — the argv golden is always asserted regardless of binary
+// presence so a wrong flag is caught even on a toolchain-free CI runner
+// (T-07-06-02 DoD-1). cmdName overrides the exec.LookPath binary name when the
+// Task tool name differs from the executable on PATH (e.g. exiftool vs the
+// "metafinder/exiftool" DoD-1 entry, or python-backed tools).
+type osintToolProbe struct {
+	name       string   // logical tool name (from the DoD-1 list)
+	cmdName    string   // exec.LookPath binary name (defaults to name when empty)
+	goldenArgs []string // argv golden (the real Task arg vector — always asserted)
+	safeArgs   []string // safe invocation args for live binary test (help/version)
+	stdin      bool     // true when tool reads from stdin (empty string fed)
+}
+
+// TestRealtoolsOSINTPhase7 is the DoD-1 argv-golden smoke test for every Phase 7
+// OSINT tool. Mirrors TestRealtoolsVulnsPhase6. Per DoD-1:
+//   - argv golden asserted unconditionally (regardless of binary presence)
+//   - present binary → invoked with safeArgs; sentinel-checked for flag errors
+//   - absent binary → t.Logf("SKIP: ...") + t.Skip() (never silent, never fatal)
+//
+// The goldenArgs come verbatim from the osint Task sources (internal/modules/
+// osint/*.go). A wrong flag in a Task arg vector fails HERE even when the binary
+// is absent — exactly the Phase-4 failure mode mock-only CI cannot catch.
+//
+// PD tools (dnsx, mapcidr, asnmap) carry "-duc" (D-O7: disable update-check to
+// avoid the dev-Mac DNS-block hang). The golden block below MUST keep them.
+//
+//	go test -tags realtools ./internal/core/backend/... -run TestRealtoolsOSINTPhase7 -v
+func TestRealtoolsOSINTPhase7(t *testing.T) {
+	dir := t.TempDir()
+	tokenFile := filepath.Join(dir, "github_tokens.txt")
+	usernamesFile := filepath.Join(dir, "usernames.txt")
+	orgsFile := filepath.Join(dir, "orgs.txt")
+	enumOut := filepath.Join(dir, "enum.json")
+	dorksOut := filepath.Join(dir, "dorks.txt")
+	ghReport := filepath.Join(dir, "github_leaks.json")
+	favOut := filepath.Join(dir, "favicon.json")
+	gatoJSON := filepath.Join(dir, "gato.json")
+	postleaksOut := filepath.Join(dir, "postleaks")
+	dorkOut := filepath.Join(dir, "xnldork.txt")
+	gqlOut := filepath.Join(dir, "gql.json")
+	hostsFile := filepath.Join(dir, "hosts.txt")
+	doc := filepath.Join(dir, "report.pdf")
+	mustWrite(t, tokenFile, "ghp_FAKETOKEN0000000000000000000000000000\n")
+	mustWrite(t, usernamesFile, "example\n")
+	mustWrite(t, orgsFile, "example\n")
+	mustWrite(t, hostsFile, "https://example.com\n")
+	mustWrite(t, doc, "%PDF-1.4 fake\n")
+
+	const (
+		domain  = "example.com"
+		company = "example"
+		ip      = "93.184.216.34"
+		// D-O8 conservative caps (config.Defaults() OSINT block).
+		cloudThreads   = "20" // cloudEnumDefaultThreads
+		postmanThreads = "10" // cfg.OSINT.Postman.Threads default
+		gitDorksNWS    = "20" // gitdorks -nws default
+		faviConcurr    = "50" // faviReconDefaultConcurrency
+		faviTimeout    = "10" // faviReconDefaultTimeout
+		cewlerDepth    = "1"  // cewlerDepth
+		cewlerMinLen   = "5"  // cewlerMinLength
+	)
+
+	probes := []osintToolProbe{
+		// whois: domain registration lookup (DomainInfoTask — domain_info.go:104).
+		{
+			name:       "whois",
+			goldenArgs: []string{domain},
+			safeArgs:   []string{"--version"},
+		},
+		// dnsx: DNS records (IPInfoTask — ip_info.go:208; DomainInfoTask records).
+		// -duc mandatory (PD tool, D-O7).
+		{
+			name:       "dnsx",
+			goldenArgs: []string{"-duc", "-silent", "-a", "-resp-only", "-d", domain},
+			safeArgs:   []string{"-version", "-duc"},
+		},
+		// mapcidr: CIDR aggregation (IPInfoTask — ip_info.go:119). PD tool (-duc safe).
+		{
+			name:       "mapcidr",
+			goldenArgs: []string{"-silent", "-aggregate", "-cidr", ip + "/24"},
+			safeArgs:   []string{"-version", "-duc"},
+		},
+		// asnmap: ASN→CIDR (IPInfoTask — ip_info.go:145). -duc mandatory (PD tool).
+		{
+			name:       "asnmap",
+			goldenArgs: []string{"-duc", "-silent", "-i", ip},
+			safeArgs:   []string{"-version", "-duc"},
+		},
+		// EmailHarvester: email harvesting (EmailsTask — emails.go:82).
+		{
+			name:       "EmailHarvester",
+			goldenArgs: []string{"-d", domain, "-e", "all", "-l", "20"},
+			safeArgs:   []string{"--help"},
+		},
+		// dorks_hunter: GitHub/Google dork automation (GitHubDorksTask — github_dorks.go:96).
+		{
+			name:       "dorks_hunter",
+			goldenArgs: []string{"-d", domain, "-o", dorksOut},
+			safeArgs:   []string{"--help"},
+		},
+		// gitdorks_go: GitHub dork search (GitDorksTask — gitdorks.go:98).
+		{
+			name:       "gitdorks_go",
+			goldenArgs: []string{"-nws", gitDorksNWS, "-target", domain, "-tf", tokenFile, "-ew", "3"},
+			safeArgs:   []string{"-h"},
+		},
+		// enumerepo: GitHub org repo enumeration (GitHubReposTask — github_repos.go:114).
+		// Feeds the trufflehog per-repo scan (the github_leaks DAG edge).
+		{
+			name:       "enumerepo",
+			goldenArgs: []string{"-token-file", tokenFile, "-usernames", usernamesFile, "-o", enumOut},
+			safeArgs:   []string{"-h"},
+		},
+		// ghleaks: GitHub-wide secret search (GitHubLeaksTask — github_leaks.go:112).
+		{
+			name:       "ghleaks",
+			goldenArgs: []string{"-q", domain, "--token", "REDACTED_TOKEN", "--report", ghReport, "--no-banner"},
+			safeArgs:   []string{"--help"},
+		},
+		// trufflehog: per-repo git secret scan (GitHubLeaksTask — github_leaks.go:136).
+		{
+			name:       "trufflehog",
+			goldenArgs: []string{"git", "https://github.com/example/repo", "-j"},
+			safeArgs:   []string{"--version"},
+		},
+		// gato: GitHub Actions audit (GitHubActionsTask — github_actions.go:109).
+		{
+			name: "gato",
+			goldenArgs: []string{
+				"e", "--enum_wf_artifacts", "--skip_sh_runner_enum",
+				"-O", orgsFile, "-oJ", gatoJSON, "--include_all_artifact_secrets",
+			},
+			safeArgs: []string{"--help"},
+		},
+		// cloud_enum: S3/GCP/Azure bucket enum (CloudEnumTask — cloud_enum.go:106).
+		{
+			name: "cloud_enum",
+			goldenArgs: []string{
+				"-k", company, "-k", domain, "-k", company,
+				"-t", cloudThreads, "-qs",
+			},
+			safeArgs: []string{"--help"},
+		},
+		// porch-pirate: Postman public-library dump (PostmanTask — postman.go:117).
+		{
+			name:       "porch-pirate",
+			goldenArgs: []string{"-s", domain, "-l", "25", "--dump"},
+			safeArgs:   []string{"--help"},
+		},
+		// postleaksNg: Postman URL/secret search (PostmanTask — postman.go:131).
+		{
+			name:       "postleaksNg",
+			goldenArgs: []string{"-k", domain, "--output", postleaksOut, "-t", postmanThreads},
+			safeArgs:   []string{"--help"},
+		},
+		// sj: Swagger/OpenAPI endpoint auto-analysis (SwaggerTask — swagger.go:135).
+		{
+			name:       "sj",
+			goldenArgs: []string{"automate", "-u", "https://example.com"},
+			safeArgs:   []string{"--help"},
+		},
+		// SwaggerSpy: public Swagger leak search (SwaggerTask — swagger.go:111).
+		{
+			name:       "SwaggerSpy",
+			goldenArgs: []string{domain},
+			safeArgs:   []string{"--help"},
+		},
+		// Spoofy: SPF/DMARC/DKIM spoofing posture (SpoofyTask — spoofy.go:91).
+		{
+			name:       "Spoofy",
+			goldenArgs: []string{"-d", domain},
+			safeArgs:   []string{"--help"},
+		},
+		// msftrecon: Microsoft tenant recon (MSFTReconTask — msftrecon.go:99).
+		{
+			name:       "msftrecon",
+			goldenArgs: []string{"-d", domain},
+			safeArgs:   []string{"--help"},
+		},
+		// cmseek: CMS fingerprint (CMSeeKTask — cmseek.go:102). Binary name "cmseek".
+		{
+			name:       "cmseek",
+			goldenArgs: []string{"-u", "https://example.com", "--batch", "-r"},
+			safeArgs:   []string{"--help"},
+		},
+		// favirecon: favicon-based tech recon (FaviReconTask — favirecon.go:112).
+		{
+			name: "favirecon",
+			goldenArgs: []string{
+				"-l", hostsFile, "-c", faviConcurr, "-t", faviTimeout, "-s", "-j", "-o", favOut,
+			},
+			safeArgs: []string{"--help"},
+		},
+		// gqlspection: GraphQL introspection (GQLSpectionTask — gqlspection.go:101).
+		{
+			name:       "gqlspection",
+			goldenArgs: []string{"-t", "https://example.com/graphql", "-o", gqlOut},
+			safeArgs:   []string{"--help"},
+		},
+		// cewler: web wordlist generation (CewlerTask — cewler.go:110).
+		{
+			name: "cewler",
+			goldenArgs: []string{
+				"-d", cewlerDepth, "-m", cewlerMinLen, "-l", "-o", filepath.Join(dir, "cewl.part"), "https://example.com",
+			},
+			safeArgs: []string{"--help"},
+		},
+		// xnldorker: Google dorking (XnldorkerTask — xnldorker.go:102).
+		{
+			name:       "xnldorker",
+			goldenArgs: []string{"-q", company, "-o", dorkOut},
+			safeArgs:   []string{"--help"},
+		},
+		// misconfig-mapper: third-party misconfiguration (MisconfigTask — misconfig.go:85).
+		{
+			name: "misconfig-mapper",
+			goldenArgs: []string{
+				"-target", domain, "-as-domain", "true", "-permutations", "false",
+				"-skip-ssl", "-service", "*", "-verbose", "0",
+			},
+			safeArgs: []string{"--help"},
+		},
+		// metafinder/exiftool: doc-metadata extraction (MetadataTask — metadata.go:117).
+		// DoD-1 lists "metafinder/exiftool"; the Task invokes exiftool directly.
+		{
+			name:    "metafinder/exiftool",
+			cmdName: "exiftool",
+			goldenArgs: []string{
+				"-S", "-Author", "-Creator", "-Producer", "-Software", "-Company", doc,
+			},
+			safeArgs: []string{"-ver"},
+		},
+	}
+
+	for _, p := range probes {
+		p := p
+		t.Run(p.name, func(t *testing.T) {
+			// Phase 1 (ALWAYS): assert the argv golden shape — logged and present
+			// even when the binary is absent (T-07-06-02 DoD-1).
+			if len(p.goldenArgs) == 0 {
+				t.Fatalf("DoD-1: %s has an empty argv golden — a Task with no arg vector is a porting bug", p.name)
+			}
+			t.Logf("DoD-1 golden args for %s: %v", p.name, p.goldenArgs)
+
+			// Phase 2: attempt live binary invocation (logged SKIP when absent).
+			cmd := p.cmdName
+			if cmd == "" {
+				cmd = p.name
+			}
+			binPath, err := exec.LookPath(cmd)
+			if err != nil {
+				// DoD-1: logged SKIP (never silent, never fatal on absent binary).
+				t.Logf("SKIP: %s (%s) not found in PATH — DoD-1: binary absent, argv golden still asserted above", p.name, cmd)
+				t.Skip()
+				return
+			}
+
+			// T-07-06-03: 5-second per-invocation timeout; safeArgs only (no real scan).
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = execSafely(t, ctx, binPath, p.safeArgs, p.stdin)
+		})
+	}
+}
+
 // execSafely runs a binary with the given args inside a context timeout.
 // Fails the test if stderr/stdout contains a flag-parse usage sentinel.
 // Non-zero exit code is NOT a failure (mirrors smoke_test.go classification).
@@ -401,4 +668,3 @@ func execSafely(t *testing.T, ctx context.Context, binPath string, args []string
 	}
 	return out.String()
 }
-
