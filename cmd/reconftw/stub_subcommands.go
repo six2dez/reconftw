@@ -34,6 +34,7 @@ import (
 	"github.com/six2dez/reconftw/internal/core/scheduler"
 	"github.com/six2dez/reconftw/internal/core/task"
 	"github.com/six2dez/reconftw/internal/core/ui"
+	"github.com/six2dez/reconftw/internal/modules/osint"
 	"github.com/six2dez/reconftw/internal/modules/subdomains"
 	"github.com/six2dez/reconftw/internal/modules/web"
 	"github.com/six2dez/reconftw/internal/modules/vulns"
@@ -1314,9 +1315,218 @@ func printVulnsSummary(w *os.File, workdir, runLogPath string, verbosity ui.Verb
 	fmt.Fprintf(w, "  ─────────────────────────────────────────\n")
 }
 
-// newOSINTCmd — Phase 7 (OSINT E2E). Stubbed per D-02.
+// newOSINTCmd — Phase 7 (OSINT E2E). Wires the real RunE: Build → best_effort
+// RunStage → MergeAllOSINTArtefacts. Root-domain/company-seeded (D-O1) — needs
+// NO --urls corpus. Master gate osint.enabled defaults TRUE (D-O9), but running
+// this subcommand is the explicit opt-in.
 func newOSINTCmd() *cobra.Command {
-	return newStubCmd("osint", "Run OSINT collection (dorks, GitHub leaks, emails, cloud, etc.)")
+	cmd := &cobra.Command{
+		Use:   "osint",
+		Short: "Run OSINT collection (dorks, GitHub leaks, emails, cloud, etc.)",
+		Long: `Run the OSINT collection pipeline (OSINT-01..16):
+  domain_info (whois + DNS records), ip_info (CIDR/ASN/geo), emails,
+  GitHub dorks/repos/leaks/actions, cloud bucket enum, Postman/Swagger leaks,
+  email-spoofing posture, Microsoft tenant recon, CMS fingerprint, GraphQL
+  introspection, custom wordlists, Google dorking, third-party misconfig.
+
+OSINT is root-domain / company-seeded (D-O1) — it needs NO --urls corpus and
+NEVER triggers a subs/web run. metadata/apileaks opportunistically read
+workspace artefacts IF present (D-O2).
+
+All sources are best_effort (D-O8/ARCH-09) — a tool failing or a missing API
+key logs a warning and the run COMPLETES. Heavy/noisy sources (GitHub dorking,
+cloud enum, Google dorking) ship with v1 conservative caps.
+
+Master gate: osint.enabled defaults TRUE in config (D-O9 — the deliberate
+inversion of vulns' default-off, matching v1 OSINT=true). Running this
+subcommand is the explicit opt-in.
+
+Output: workspaces/<target>/artefacts/findings.jsonl (osint-class, XCUT-07 redacted)`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runOSINTCmd(cmd)
+		},
+	}
+	cmd.Flags().String("target", "", "Target domain")
+	cmd.Flags().Bool("dry-run", false, "Preview tasks without executing tools")
+	return cmd
+}
+
+// runOSINTCmd is the RunE body for newOSINTCmd. Mirrors runVulnsCmd structure
+// but seeds from the root domain / company name (D-O1) instead of a URL corpus,
+// and executes a single best_effort osint stage (D-O8/ARCH-09).
+func runOSINTCmd(cmd *cobra.Command) error {
+	ctx := cmd.Context()
+
+	// Step 1: Load config with CLI overrides.
+	targetFlag, _ := cmd.Flags().GetString("target")
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+
+	// Inherit --target from parent (persistent flag) if not set locally.
+	if targetFlag == "" {
+		if pf := cmd.InheritedFlags().Lookup("target"); pf != nil {
+			targetFlag = pf.Value.String()
+		}
+	}
+	if targetFlag == "" {
+		return fmt.Errorf("--target is required for osint subcommand")
+	}
+
+	// Honor --config / --secrets (mirrors runVulnsCmd pattern).
+	efs := parseEarlyFlags(os.Args[1:])
+	cfg, err := config.Load(config.LoadOptions{
+		ExplicitConfigPath: efs.configPath,
+		SecretsPath:        efs.secretsPath,
+	})
+	if err != nil {
+		return fmt.Errorf("osint: config load: %w", err)
+	}
+
+	// Step 2: Build target. The root registrable domain is the OSINT seed
+	// (D-O1, unfurl format %r analog); Wave 2 Tasks derive the company name
+	// from tgt.Domain. No --urls corpus is needed.
+	tgt, err := appctx.NewTarget(targetFlag, nil, "")
+	if err != nil {
+		return fmt.Errorf("osint: invalid target: %w", err)
+	}
+	workdir, err := output.WorkspaceInit(cfg.Paths.DataDir, tgt.Domain)
+	if err != nil {
+		workdir, err = output.WorkspaceInit("workspaces", tgt.Domain)
+		if err != nil {
+			return fmt.Errorf("osint: workspace init: %w", err)
+		}
+	}
+	tgt.WorkDir = workdir
+
+	// Step 3: Construct Scheduler BEFORE Boot (cycle-break).
+	sched := scheduler.NewScheduler(cfg.Concurrency.MaxJobs, cfg.Concurrency.HeartbeatSeconds, nil, nil)
+
+	// Step 4: Choose backend. Most OSINT tools have no axiom module (D-05/D-06);
+	// honor --axiom/cfg for the few that do via FailoverBackend.
+	var chosenBackend backend.Backend
+	axiomEnabled, _ := cmd.Flags().GetBool("axiom")
+	if axiomEnabled || cfg.Axiom.Enabled {
+		axiomBE := backend.NewAxiomBackend(cfg, backend.Default, nil)
+		localBE := backend.NewLocalBackend(time.Duration(cfg.Concurrency.KillGraceSeconds) * time.Second)
+		chosenBackend = &backend.FailoverBackend{
+			Primary:   axiomBE,
+			Fallback:  localBE,
+			Threshold: cfg.Axiom.FailoverThreshold,
+		}
+	}
+
+	// Step 5: Boot.
+	if dryRun {
+		cfg.Advanced.Diff = false
+	}
+
+	verbosity := ui.Verbosity(cfg.Output.Verbosity)
+	liveUI := !dryRun && verbosity != ui.VerbosityQuiet && ui.IsTTY(os.Stderr)
+	var subLogger *slog.Logger
+	var runLogPath string
+	if liveUI {
+		p := filepath.Join(workdir, "run.log")
+		if f, ferr := os.Create(p); ferr == nil { //nolint:gosec
+			defer f.Close() //nolint:errcheck
+			runLogPath = p
+			rdct := &log.Redactor{}
+			registerSecrets(cfg, rdct)
+			lc := cfg.AsLoggerConfig()
+			lc.Output = f
+			subLogger = log.New(lc, rdct)
+			slog.SetDefault(subLogger)
+			fmt.Fprintf(os.Stderr, "  logs → %s\n", runLogPath)
+		}
+	}
+
+	app, err := appctx.Boot(ctx, subLogger, cfg, tgt, sched, appctx.BootOptions{Backend: chosenBackend})
+	if err != nil {
+		return fmt.Errorf("osint: appctx boot: %w", err)
+	}
+	defer func() {
+		if closer, ok := app.Checkpoint.(interface{ Close() error }); ok {
+			_ = closer.Close()
+		}
+	}()
+
+	// Step 5b: Wire sched.Checkpoint AFTER Boot (B3 fix).
+	sched.Checkpoint = app.Checkpoint
+
+	// Step 6: Wire RunTask closure with progress UI.
+	progress := ui.NewStageProgress(app.UI.W, app.UI.NoColor, app.UI.Verbosity)
+	sched.RunTask = func(rctx context.Context, t task.Task) (task.Result, error) {
+		progress.TaskStart(t.Name())
+		started := time.Now()
+		result, err := t.Run(rctx, app)
+		dur := result.Duration
+		if dur <= 0 {
+			dur = time.Since(started)
+		}
+		badge := badgeForStatus(result.Status)
+		progress.TaskDone(t.Name(), badge, dur)
+		return result, err
+	}
+
+	// Step 7: Launch Axiom fleet if applicable.
+	var axiomBE *backend.AxiomBackend
+	if fb, ok := chosenBackend.(*backend.FailoverBackend); ok {
+		if abe, ok := fb.Primary.(*backend.AxiomBackend); ok {
+			axiomBE = abe
+		}
+	}
+	if axiomBE != nil {
+		if err := axiomBE.Launch(ctx); err != nil {
+			return fmt.Errorf("osint: axiom launch: %w", err)
+		}
+		defer func() { _ = axiomBE.Shutdown(context.Background()) }()
+	}
+
+	// Step 8: Build the task DAG.
+	allTasks, err := task.Default.Build()
+	if err != nil {
+		return fmt.Errorf("osint: task DAG: %w", err)
+	}
+
+	// Step 9: Dry-run mode — list tasks and exit.
+	if dryRun {
+		return printOSINTDryRun(cmd, allTasks, cfg)
+	}
+
+	// Step 10: Single best_effort osint stage (D-O8/ARCH-09). Most OSINT Tasks
+	// have no DependsOn edges (root-domain-seeded, D-O1) → the scheduler
+	// semaphore parallelizes them, mirroring v1's 4 parallel osint groups.
+	osintTasks := filterByModuleAndEnabled(allTasks, "osint", cfg, []string{"osint."})
+	progress.StageStart("osint", len(osintTasks))
+	if err := sched.RunStage(ctx, "osint", osintTasks); err != nil {
+		// best_effort: log and continue to the final merge.
+		if app.Log != nil {
+			app.Log.Warn("osint: stage failed (best_effort — continuing)", "err", err)
+		}
+	}
+	progress.StageDone("osint", countFileLines(filepath.Join(workdir, "artefacts", "findings.jsonl")))
+
+	// Final merge: consolidate all findings staging files into artefacts/findings.jsonl.
+	// osint/*.txt single-writer human files are excluded (no merge needed).
+	if mergeErr := osint.MergeAllOSINTArtefacts(ctx, app); mergeErr != nil {
+		if app.Log != nil {
+			app.Log.Warn("osint: final merge failed (best_effort — continuing)", "err", mergeErr)
+		}
+	}
+
+	printVulnsSummary(os.Stderr, workdir, runLogPath, verbosity)
+
+	return nil
+}
+
+// printOSINTDryRun lists the osint tasks that would run and returns nil.
+func printOSINTDryRun(cmd *cobra.Command, allTasks []task.Task, cfg *config.Config) error {
+	filtered := filterByModuleAndEnabled(allTasks, "osint", cfg, []string{"osint."})
+	fmt.Fprintln(cmd.OutOrStdout(), "[dry-run] osint pipeline (single best_effort stage):")
+	fmt.Fprintf(cmd.OutOrStdout(), "  Stage (osint): %d task(s)\n", len(filtered))
+	for _, t := range filtered {
+		fmt.Fprintf(cmd.OutOrStdout(), "    - %s: %s\n", t.Name(), t.Description())
+	}
+	fmt.Fprintln(cmd.OutOrStdout(), "  [final] MergeAllOSINTArtefacts(\"findings\")")
+	return nil
 }
 
 // newZenCmd — Phase 9 (Composite Modes). Stubbed per D-02.

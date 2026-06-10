@@ -28,4 +28,8 @@ import (
 	// Phase 6 vulns Tasks — triggers task.Register for GFTask and all vuln
 	// scanner Tasks (plan-07+) via internal/modules/vulns/ init() calls.
 	_ "github.com/six2dez/reconftw/internal/modules/vulns"
+
+	// Phase 7 osint Tasks — triggers task.Register for all osint scanner Tasks
+	// (Wave 2 plans) via internal/modules/osint/ init() calls.
+	_ "github.com/six2dez/reconftw/internal/modules/osint"
 )
