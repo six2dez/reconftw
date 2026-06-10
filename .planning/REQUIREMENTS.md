@@ -116,11 +116,11 @@
 - [x] **OSINT-08**: Postman leaks via `porch-pirate` + `postleaksNg`
 - [x] **OSINT-09**: Swagger/OpenAPI leaks via `sj` + `SwaggerSpy`
 - [x] **OSINT-10**: Email spoofing posture via `Spoofy` (SPF/DMARC/DKIM)
-- [ ] **OSINT-11**: Microsoft tenant recon via `msftrecon`
-- [ ] **OSINT-12**: CMS fingerprint via `CMSeeK` + `favirecon`
-- [ ] **OSINT-13**: GraphQL introspection via `gqlspection`
-- [ ] **OSINT-14**: Custom wordlist generation via `cewler`
-- [ ] **OSINT-15**: Google dorking automation via `xnldorker`
+- [x] **OSINT-11**: Microsoft tenant recon via `msftrecon`
+- [x] **OSINT-12**: CMS fingerprint via `CMSeeK` + `favirecon`
+- [x] **OSINT-13**: GraphQL introspection via `gqlspection`
+- [x] **OSINT-14**: Custom wordlist generation via `cewler`
+- [x] **OSINT-15**: Google dorking automation via `xnldorker`
 - [ ] **OSINT-16**: Output equivalence test against canonical target with known OSINT footprint
 
 ### Composite Modes (Deliverable #8)
@@ -420,11 +420,11 @@ Each REQ-ID maps to exactly one phase. Populated by roadmapper agent 2026-05-27.
 | OSINT-08 | Phase 7 — OSINT E2E | Complete |
 | OSINT-09 | Phase 7 — OSINT E2E | Complete |
 | OSINT-10 | Phase 7 — OSINT E2E | Complete |
-| OSINT-11 | Phase 7 — OSINT E2E | Pending |
-| OSINT-12 | Phase 7 — OSINT E2E | Pending |
-| OSINT-13 | Phase 7 — OSINT E2E | Pending |
-| OSINT-14 | Phase 7 — OSINT E2E | Pending |
-| OSINT-15 | Phase 7 — OSINT E2E | Pending |
+| OSINT-11 | Phase 7 — OSINT E2E | Complete |
+| OSINT-12 | Phase 7 — OSINT E2E | Complete |
+| OSINT-13 | Phase 7 — OSINT E2E | Complete |
+| OSINT-14 | Phase 7 — OSINT E2E | Complete |
+| OSINT-15 | Phase 7 — OSINT E2E | Complete |
 | OSINT-16 | Phase 7 — OSINT E2E | Pending |
 | MCP-01 | Phase 8 — MCP Server | Pending |
 | MCP-02 | Phase 8 — MCP Server | Pending |

@@ -4,7 +4,7 @@ milestone: v2.0
 milestone_name: Complete Core Migration
 status: executing
 stopped_at: Phase 7 plan 07-02 complete (osint domain/IP/email/spoof core OSINT-01/02/03/10)
-last_updated: "2026-06-10T09:24:39.870Z"
+last_updated: "2026-06-10T09:35:43.288Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 12
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-05-27)
 ## Current Position
 
 Phase: 07 (osint-e2e) — EXECUTING
-Plan: 4 of 7
+Plan: 5 of 7
 Status: Ready to execute
 NEXT (you, the maintainer): Phase 7 (OSINT E2E) — depends on Phase 5 only (calendar-parallel with Phase 6 was possible). Alternatively close Phase 4 open gate (04-11 parity sign-off on hackerone.com+tesla.com) if VPS is now provisioned.
 Last activity: 2026-06-10
@@ -81,6 +81,7 @@ Last activity: 2026-06-10
 | Phase 06-vulnerability-scanning-e2e P08 | 20m | 2 tasks | 7 files |
 | Phase 07 P03 | ~10m | 2 tasks | 10 files |
 | Phase 07 P04 | 25m | 2 tasks | 6 files |
+| Phase 07 P05 | 6m | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -107,6 +108,7 @@ Recent decisions affecting v2.0 work:
 - [Phase ?]: TakeoverSubzyTask and TakeoverDNSTakeTask write to separate staging files (B2 fix — OutputTree.Append REPLACE semantics prevent concurrent findings writes)
 - [Phase ?]: ZoneTransferTask in-Run gate returns StatusSkipped when ZoneTransfer.Enabled==false (REVIEWS #4 fix)
 - [Phase ?]: existing config field, not a separate cfg.Web.Fuzz.ThreadsMax
+- [Phase ?]: 07-05: identity/fingerprint cluster (OSINT-11 msftrecon, OSINT-12 CMSeeK+favirecon, OSINT-13 gqlspection, OSINT-14 cewler, OSINT-15 xnldorker) + D-O10 metadata fold ported; CMSeeK/favirecon/gqlspection/cewler/metadata are D-O2 opportunistic (read workspace hosts/URLs/docs IF present, log-skip StatusSkipped when absent); xnldorker key-gated D-O8; msftrecon preserves osint/azure_tenant_domains.txt single-writer (D-O5)
 
 ### Pending Todos
 
@@ -140,6 +142,6 @@ Items captured durante v1.0 que deben informar el diseño de arquitectura v2 (no
 
 ## Session Continuity
 
-Last session: 2026-06-10T09:24:26.017Z
+Last session: 2026-06-10T09:35:18.482Z
 Stopped at: Phase 7 plan 07-02 complete (osint domain/IP/email/spoof core OSINT-01/02/03/10)
 Resume file: None
