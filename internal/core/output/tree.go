@@ -69,9 +69,17 @@ func (t *OutputTree) Append(artefact string, lines [][]byte) error {
 			}
 			continue
 		}
-		val, isURL, err := extractScopeValue(line, scopeField)
+		val, isURL, skipScope, err := extractScopeValue(line, scopeField)
 		if err != nil {
 			return fmt.Errorf("output: Append %s: %w", artefact, err)
+		}
+		if skipScope {
+			// Company-seeded OSINT record (class=="osint", D-O1): root-domain /
+			// company-derived findings (whois, leaked-secret, postman-leak,
+			// misconfig, asn, …) legitimately carry NEITHER host NOR url — they
+			// are bounded by the company seed, not a host/url. Admit without a
+			// per-host scope check; the line is already validated JSON.
+			continue
 		}
 		if val == "" {
 			// Field is absent: rejection is safer than silent acceptance —
@@ -137,35 +145,47 @@ func artefactScopeField(artefact string) string {
 }
 
 // extractScopeValue parses line as JSON and extracts the scope-relevant
-// value per the field token. Returns (value, isURL, err).
+// value per the field token. Returns (value, isURL, skipScope, err).
 //
 // For findings, prefer host; fall back to url. If url is the chosen field
 // (urls.jsonl), isURL=true so callers route through IsInScopeURL.
-func extractScopeValue(line []byte, field string) (val string, isURL bool, err error) {
+//
+// skipScope=true is returned ONLY for company-seeded OSINT findings (D-O1):
+// a record with class=="osint" that carries neither host nor url. Those are
+// bounded by the company/root-domain seed, not a host, so a per-host scope
+// check is inapplicable and the record is admitted as-is. Non-osint findings
+// (web/vulns) still require a host or url field — the strict gate is preserved.
+func extractScopeValue(line []byte, field string) (val string, isURL, skipScope bool, err error) {
 	var obj map[string]any
 	if err := json.Unmarshal(line, &obj); err != nil {
-		return "", false, fmt.Errorf("invalid JSON line: %s", truncForErr(line))
+		return "", false, false, fmt.Errorf("invalid JSON line: %s", truncForErr(line))
 	}
 	switch field {
 	case "subdomain":
 		s, _ := obj["subdomain"].(string)
-		return s, false, nil
+		return s, false, false, nil
 	case "host":
 		s, _ := obj["host"].(string)
-		return s, false, nil
+		return s, false, false, nil
 	case "url":
 		s, _ := obj["url"].(string)
-		return s, true, nil
+		return s, true, false, nil
 	case "findings:host|url":
 		if s, ok := obj["host"].(string); ok && s != "" {
-			return s, false, nil
+			return s, false, false, nil
 		}
 		if s, ok := obj["url"].(string); ok && s != "" {
-			return s, true, nil
+			return s, true, false, nil
 		}
-		return "", false, nil
+		// No host/url: only OSINT company-seeded records (class=="osint") may
+		// omit both (D-O1). Anything else falls through to the missing-field
+		// rejection in Append.
+		if cls, _ := obj["class"].(string); cls == "osint" {
+			return "", false, true, nil
+		}
+		return "", false, false, nil
 	default:
-		return "", false, nil
+		return "", false, false, nil
 	}
 }
 

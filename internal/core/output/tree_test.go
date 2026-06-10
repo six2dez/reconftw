@@ -3,6 +3,7 @@
 package output_test
 
 import (
+	"bytes"
 	"encoding/json"
 	stderrors "errors"
 	"os"
@@ -211,6 +212,40 @@ func TestOutputTreeFindingsScopeCheck(t *testing.T) {
 	bad := [][]byte{[]byte(`{"rule_id":"x","url":"https://nope.org/","severity":"low"}`)}
 	if err := tree.Append("findings", bad); err == nil {
 		t.Fatal("expected OutOfScope on out-of-scope finding")
+	}
+}
+
+// Company-seeded OSINT findings (D-O1) carry class=="osint" and NEITHER host
+// NOR url (whois, leaked-secret, postman-leak, misconfig, asn, …). They must be
+// ADMITTED without a per-host scope check — the record is bounded by the company
+// seed. A non-osint finding lacking host+url must STILL be rejected (strict gate
+// preserved). Regression for the Phase 7 DoD-2 merge failure where the osint
+// findings.jsonl was silently emptied by the missing-field rejection.
+func TestOutputTreeFindingsOSINTNoHostURLAdmitted(t *testing.T) {
+	t.Parallel()
+	tree := newTestTree(t)
+
+	// class=="osint", no host/url → admitted.
+	osintRecs := [][]byte{
+		[]byte(`{"class":"osint","source":"domain_info","category":"whois","severity":"informational"}`),
+		[]byte(`{"class":"osint","source":"postman","category":"postman-leak","value_redacted":"***"}`),
+	}
+	if err := tree.Append("findings", osintRecs); err != nil {
+		t.Fatalf("company-seeded osint findings (no host/url) must be admitted: %v", err)
+	}
+	body, err := os.ReadFile(filepath.Join(tree.Root, "artefacts", "findings.jsonl"))
+	if err != nil {
+		t.Fatalf("read findings.jsonl: %v", err)
+	}
+	if !bytes.Contains(body, []byte(`"source":"domain_info"`)) ||
+		!bytes.Contains(body, []byte(`"source":"postman"`)) {
+		t.Fatalf("osint findings not written: %s", body)
+	}
+
+	// A NON-osint finding with no host/url is still rejected (strict gate intact).
+	nonOsint := [][]byte{[]byte(`{"rule_id":"x","severity":"high"}`)}
+	if err := tree.Append("findings", nonOsint); err == nil {
+		t.Fatal("non-osint finding lacking host+url must still be rejected")
 	}
 }
 
