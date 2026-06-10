@@ -621,3 +621,228 @@ default_args    = []
 timeout_seconds = 300
 critical        = false
 input_flag      = ""
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 7 — OSINT E2E tools (OSINT-01..16 + folded-in functions, D-O10).
+# No SHA-256 pins yet (Phase 11 scope, D-O canonical_refs). asnmap + favirecon
+# already present above (Phase 4/5). dnsx already present (DNS records OSINT-01).
+# All best_effort (ARCH-09); most → LocalBackend (no axiom module).
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[tools]]
+name            = "whois"
+kind            = "system"
+description     = "Domain registration lookup (OSINT-01 domain_info)"
+default_args    = []
+timeout_seconds = 60
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "mapcidr"
+kind            = "go"
+go_module       = "github.com/projectdiscovery/mapcidr/cmd/mapcidr"
+description     = "CIDR expansion/manipulation (OSINT-02 ip_info)"
+default_args    = []
+timeout_seconds = 120
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "EmailHarvester"
+kind            = "python"
+pip_package     = "EmailHarvester"
+description     = "Email harvesting from public sources (OSINT-03 emails)"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "dorks_hunter"
+kind            = "python"
+pip_package     = "dorks-hunter"
+description     = "Google dork automation (OSINT-04 github/google dorks)"
+default_args    = []
+timeout_seconds = 600
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "gitdorks_go"
+kind            = "go"
+go_module       = "github.com/damit5/gitdorks_go"
+description     = "GitHub dork search (OSINT-04 github_dorks)"
+default_args    = []
+timeout_seconds = 600
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "ghleaks"
+kind            = "go"
+go_module       = "github.com/dinosn/ghleaks"
+description     = "GitHub-wide secret search (OSINT-05 github_leaks; XCUT-07 redact)"
+default_args    = []
+timeout_seconds = 600
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "trufflehog"
+kind            = "go"
+go_module       = "github.com/trufflesecurity/trufflehog/v3"
+description     = "Secrets scanner over git repos (OSINT-05 github_leaks; XCUT-07 redact)"
+default_args    = []
+timeout_seconds = 1800
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "gato"
+kind            = "python"
+pip_package     = "praetorian-gato"
+description     = "GitHub Actions self-hosted-runner audit (OSINT-06 github_actions_audit)"
+default_args    = []
+timeout_seconds = 600
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "cloud_enum"
+kind            = "python"
+pip_package     = "cloud_enum"
+description     = "AWS/GCP/Azure bucket enumeration (OSINT-07 cloud_enum; v1 conservative threads)"
+default_args    = []
+timeout_seconds = 900
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "porch-pirate"
+kind            = "python"
+pip_package     = "porch-pirate"
+description     = "Postman public workspace leak search (OSINT-08 apileaks; XCUT-07 redact)"
+default_args    = []
+timeout_seconds = 600
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "postleaksNg"
+kind            = "python"
+pip_package     = "postleaksNg"
+description     = "Postman public leak search (OSINT-08 apileaks; XCUT-07 redact)"
+default_args    = []
+timeout_seconds = 600
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "sj"
+kind            = "go"
+go_module       = "github.com/BishopFox/sj"
+description     = "Swagger/OpenAPI definition analysis (OSINT-09 apileaks; XCUT-07 redact)"
+default_args    = []
+timeout_seconds = 600
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "SwaggerSpy"
+kind            = "python"
+pip_package     = "SwaggerSpy"
+description     = "Swagger endpoint leak detection (OSINT-09 apileaks; XCUT-07 redact)"
+default_args    = []
+timeout_seconds = 600
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "Spoofy"
+kind            = "python"
+pip_package     = "Spoofy"
+description     = "Email spoofing posture — SPF/DMARC/DKIM (OSINT-10 spoof/mail_hygiene)"
+default_args    = []
+timeout_seconds = 120
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "msftrecon"
+kind            = "python"
+pip_package     = "msftrecon"
+description     = "Microsoft tenant recon (OSINT-11 msftrecon)"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "cmseek"
+kind            = "python"
+pip_package     = "cmseek"
+description     = "CMS fingerprinting (OSINT-12 cms)"
+default_args    = []
+timeout_seconds = 600
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "gqlspection"
+kind            = "python"
+pip_package     = "gqlspection"
+description     = "GraphQL deep introspection (OSINT-13 graphql)"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "cewler"
+kind            = "python"
+pip_package     = "cewler"
+description     = "Custom wordlist generation from a site (OSINT-14 cewler)"
+default_args    = []
+timeout_seconds = 600
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "xnldorker"
+kind            = "python"
+pip_package     = "xnldorker"
+description     = "Google dorking engine (OSINT-15 google dorks)"
+default_args    = []
+timeout_seconds = 600
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "misconfig-mapper"
+kind            = "go"
+go_module       = "github.com/intigriti/misconfig-mapper"
+description     = "Third-party service misconfiguration mapper (fold-in D-O10)"
+default_args    = []
+timeout_seconds = 600
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "metafinder"
+kind            = "python"
+pip_package     = "metafinder"
+description     = "Document metadata OSINT over indexed docs (fold-in metadata, D-O2)"
+default_args    = []
+timeout_seconds = 600
+critical        = false
+input_flag      = ""
+
+[[tools]]
+name            = "exiftool"
+kind            = "system"
+description     = "Document metadata extraction (fold-in metadata, D-O2)"
+default_args    = []
+timeout_seconds = 120
+critical        = false
+input_flag      = ""

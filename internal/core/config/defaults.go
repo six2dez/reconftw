@@ -214,7 +214,8 @@ func Defaults() *Config {
 		},
 		OSINT: OSINTConfig{
 			Enabled:     true,
-			GoogleDorks: OSINTGoogleDorks{Enabled: true},
+			// D-O8: GoogleDorks on but key-gated; xnldorker (OSINT-15) on.
+			GoogleDorks: OSINTGoogleDorks{Enabled: true, XnldorkerEnabled: true},
 			GitHub: OSINTGitHub{
 				Enabled:         true,
 				LeaksEnabled:    true,
@@ -236,8 +237,14 @@ func Defaults() *Config {
 			MailHygiene: OSINTMailHygiene{Enabled: true},
 			MSFT:        OSINTMSFT{Enabled: false},
 			DomainInfo:  OSINTDomainInfo{Enabled: true},
-			IPInfo:      OSINTIPInfo{Enabled: true},
-			IPv6:        OSINTIPv6{Enabled: true},
+			// D-O4 additive: ASN org + CIDR expansion on (OSINT-02).
+			IPInfo: OSINTIPInfo{Enabled: true, ASNEnabled: true, CIDREnabled: true},
+			IPv6:   OSINTIPv6{Enabled: true},
+			// D-O4 additive Phase 7 sub-configs (default-on; key/best-effort gated).
+			CMS:       OSINTCMS{Enabled: true, CMSeeKEnabled: true, FavireconEnabled: true}, // OSINT-12
+			GraphQL:   OSINTGraphQL{Enabled: true},                                          // OSINT-13
+			Cewler:    OSINTCewler{Enabled: true},                                           // OSINT-14
+			Misconfig: OSINTMisconfig{Enabled: true},                                        // fold-in D-O10
 		},
 		Notifications: NotificationsConfig{
 			Enabled:     false,

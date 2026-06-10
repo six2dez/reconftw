@@ -586,9 +586,42 @@ type OSINTConfig struct {
 	DomainInfo    OSINTDomainInfo  `koanf:"domain_info"`
 	IPInfo        OSINTIPInfo      `koanf:"ip_info"`
 	IPv6          OSINTIPv6        `koanf:"ipv6"`
+
+	// D-O4 additive schema (Phase 7 may ADD fields, never remove). These
+	// sub-configs the pre-existing OSINTConfig tree lacked; Wave 2 Tasks gate
+	// their Enabled() on these fields.
+	CMS      OSINTCMS      `koanf:"cms"`      // OSINT-12 CMS fingerprint (CMSeeK + favirecon)
+	GraphQL  OSINTGraphQL  `koanf:"graphql"`  // OSINT-13 GraphQL introspection (gqlspection)
+	Cewler   OSINTCewler   `koanf:"cewler"`   // OSINT-14 custom wordlist generation (cewler)
+	Misconfig OSINTMisconfig `koanf:"misconfig"` // fold-in (D-O10) third-party misconfig (misconfig-mapper)
 }
 
 type OSINTGoogleDorks struct {
+	Enabled bool `koanf:"enabled"`
+	// D-O4 additive: OSINT-15 Google dorking engine (xnldorker).
+	XnldorkerEnabled bool `koanf:"xnldorker_enabled"`
+}
+
+// OSINTCMS configures CMS fingerprinting (OSINT-12). D-O4 additive schema.
+type OSINTCMS struct {
+	Enabled          bool `koanf:"enabled"`
+	CMSeeKEnabled    bool `koanf:"cmseek_enabled"`
+	FavireconEnabled bool `koanf:"favirecon_enabled"`
+}
+
+// OSINTGraphQL configures GraphQL introspection (OSINT-13). D-O4 additive schema.
+type OSINTGraphQL struct {
+	Enabled bool `koanf:"enabled"`
+}
+
+// OSINTCewler configures custom wordlist generation (OSINT-14). D-O4 additive schema.
+type OSINTCewler struct {
+	Enabled bool `koanf:"enabled"`
+}
+
+// OSINTMisconfig configures third-party misconfiguration OSINT (fold-in D-O10
+// via misconfig-mapper). D-O4 additive schema.
+type OSINTMisconfig struct {
 	Enabled bool `koanf:"enabled"`
 }
 
@@ -648,6 +681,10 @@ type OSINTDomainInfo struct {
 
 type OSINTIPInfo struct {
 	Enabled bool `koanf:"enabled"`
+	// D-O4 additive: OSINT-02 ASN org + CIDR expansion sub-flags
+	// (asnmap / mapcidr). Default-on with v1 conservative caps (D-O8).
+	ASNEnabled  bool `koanf:"asn_enabled"`
+	CIDREnabled bool `koanf:"cidr_enabled"`
 }
 
 type OSINTIPv6 struct {
