@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Complete Core Migration
-status: executing
-stopped_at: Phase 7 plan 07-06 complete (verification machinery — DAG guard + frozen-replay parity D-O6 + DoD-1 realtools smoke; OSINT-16)
-last_updated: "2026-06-10T11:11:50.298Z"
+status: ready_to_plan
+stopped_at: Phase 07 complete (9/9) — ready to discuss Phase 8
+last_updated: 2026-06-10T11:22:56.697Z
 last_activity: 2026-06-10
 progress:
   total_phases: 12
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-27)
 
 **Core value:** Run one command, get a complete recon picture of a target — passive, active, and vulnerability layers — with resumable checkpoints, structured output, and zero-touch tool orchestration.
-**Current focus:** Phase 07 — osint-e2e
+**Current focus:** Phase 8 — mcp server
 
 ## Current Position
 
-Phase: 07 (osint-e2e) — 7/7 plans executed + DoD-2 accepted; 2 gap-closure plans EXECUTED (07-08, 07-09)
-Plan: 9 total (7 + 2 gap_closure, all executed, checker: 0 blockers)
-Status: Phase 7 gap-closure COMPLETE — 07-08 (GAP-01: osint stage-split for github_repos→github_leaks ordering, OSINT-05) EXECUTED 2026-06-10 (sequential osintStages() pre-stage + execution-path guard test, full `go test ./...` green). 07-09 (GAP-02: Backend env seam ExecEnv/StreamEnv + gato GH_TOKEN registered-secret env + GAP-03: gato raw side-file omitted, OSINT-06/XCUT-07) EXECUTED 2026-06-10 (commits 80f014e5 feat + 70c98fac fix; additive non-breaking interface, all Backend implementers compile, full `go test ./...` green; no raw-secret sink remains per `git grep github_actions_audit.json`).
+Phase: 8
+Plan: Not started
+Status: Ready to plan
 NEXT (you, the maintainer): re-verify Phase 7 (07-VERIFICATION.md GAP-02/GAP-03 now closed) → Phase 7 completes. THEN Phase 8 (MCP Server).
 Last activity: 2026-06-10
 
@@ -37,7 +37,7 @@ Last activity: 2026-06-10
 
 - Phases planned: 12 (coarse granularity; parallelization enabled within phases)
 - Total REQ-IDs: 197 (100% mapped to phases)
-- Total plans completed: 39
+- Total plans completed: 48
 - Total execution time: 0.0 hours
 
 **v2.0 phase status:**
