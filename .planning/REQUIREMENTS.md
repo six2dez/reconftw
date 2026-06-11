@@ -125,18 +125,18 @@
 
 ### Composite Modes (Deliverable #8)
 
-- [ ] **MODE-01**: `reconftw recon` (alias `-r`) — runs passive subs → web probe → web analysis → OSINT, skipping vulns
-- [ ] **MODE-02**: `reconftw all` (alias `-a`) — runs everything (recon + vulns)
-- [ ] **MODE-03**: `reconftw passive` (alias `-p`) — passive-only sources, no active probing
-- [ ] **MODE-04**: `reconftw zen` (alias `--zen`) — quiet mode with extra OPSEC (stealth profile)
-- [ ] **MODE-05**: `reconftw deep` (alias `--deep`) — adds deep brute force + extended permutations
-- [ ] **MODE-06**: `reconftw quick-rescan` — incremental diff vs last full scan
-- [ ] **MODE-07**: `reconftw refresh-cache` — refresh cached data (DNS, ASN, geo)
-- [ ] **MODE-08**: `reconftw gen-resolvers` — regenerate DNS resolver list via `dnsvalidator`
-- [ ] **MODE-09**: V1 long-flag aliases (`--recon`, `--all`, `--passive`, `--subdomains`, `--web`, `--vulns`, `--osint`) preserved with deprecation warning
-- [ ] **MODE-10**: `--target X` and `--list FILE` input methods work across all modes
-- [ ] **MODE-11**: `--config FILE` overrides default `reconftw.toml` location
-- [ ] **MODE-12**: `--dry-run` shows what would execute without invoking external tools
+- [x] **MODE-01**: `reconftw recon` (alias `-r`) — runs passive subs → web probe → web analysis → OSINT, skipping vulns
+- [x] **MODE-02**: `reconftw all` (alias `-a`) — runs everything (recon + vulns)
+- [x] **MODE-03**: `reconftw passive` (alias `-p`) — passive-only sources, no active probing
+- [x] **MODE-04**: `reconftw zen` (alias `--zen`) — quiet mode with extra OPSEC (stealth profile)
+- [x] **MODE-05**: `reconftw deep` (alias `--deep`) — adds deep brute force + extended permutations
+- [x] **MODE-06**: `reconftw quick-rescan` — incremental diff vs last full scan
+- [x] **MODE-07**: `reconftw refresh-cache` — refresh cached data (DNS, ASN, geo)
+- [x] **MODE-08**: `reconftw gen-resolvers` — regenerate DNS resolver list via `dnsvalidator`
+- [x] **MODE-09**: V1 long-flag aliases (`--recon`, `--all`, `--passive`, `--subdomains`, `--web`, `--vulns`, `--osint`) preserved with deprecation warning
+- [x] **MODE-10**: `--target X` and `--list FILE` input methods work across all modes
+- [x] **MODE-11**: `--config FILE` overrides default `reconftw.toml` location
+- [x] **MODE-12**: `--dry-run` shows what would execute without invoking external tools
 
 ### Axiom Integration (Deliverable #9)
 
@@ -222,16 +222,16 @@
 
 ### MCP Server (Deliverable #17 — added 2026-05-27 per user decision)
 
-- [ ] **MCP-01**: MCP server (`reconftw mcp serve`) implements the standard Model Context Protocol — listens on configurable transport (stdio for agent embedding, optional HTTP/SSE for remote)
-- [ ] **MCP-02**: Exposes recon capabilities as MCP tools: `recon`, `subs`, `web`, `vulns`, `osint`, `monitor`, `report`
-- [ ] **MCP-03**: Streaming JSONL findings via MCP resource subscription — agents can subscribe to live findings during long scans
-- [ ] **MCP-04**: Authentication: API key required (TOML `mcp.api_key` or env `RECONFTW_MCP_API_KEY`); all credentials redacted in logs
-- [ ] **MCP-05**: Resource limits: MCP requests cannot exceed configured `PARALLEL_MAX_JOBS`; MCP-driven scans share the global scheduler
-- [ ] **MCP-06**: Findings exposed via MCP use the same SARIF-compatible schema as REPORT-07
-- [ ] **MCP-07**: MCP enable/disable configurable in TOML (`mcp.enabled = true|false`); defaults to false so MCP is opt-in at config time
-- [ ] **MCP-08**: OpenAPI schema published for MCP HTTP transport endpoints (promoted from EMG-15 — required by MCP)
+- [x] **MCP-01**: MCP server (`reconftw mcp serve`) implements the standard Model Context Protocol — listens on configurable transport (stdio for agent embedding, optional HTTP/SSE for remote)
+- [x] **MCP-02**: Exposes recon capabilities as MCP tools: `recon`, `subs`, `web`, `vulns`, `osint`, `monitor`, `report`
+- [x] **MCP-03**: Streaming JSONL findings via MCP resource subscription — agents can subscribe to live findings during long scans
+- [x] **MCP-04**: Authentication: API key required (TOML `mcp.api_key` or env `RECONFTW_MCP_API_KEY`); all credentials redacted in logs
+- [x] **MCP-05**: Resource limits: MCP requests cannot exceed configured `PARALLEL_MAX_JOBS`; MCP-driven scans share the global scheduler
+- [x] **MCP-06**: Findings exposed via MCP use the same SARIF-compatible schema as REPORT-07
+- [x] **MCP-07**: MCP enable/disable configurable in TOML (`mcp.enabled = true|false`); defaults to false so MCP is opt-in at config time
+- [x] **MCP-08**: OpenAPI schema published for MCP HTTP transport endpoints (promoted from EMG-15 — required by MCP)
 - [ ] **MCP-09**: MCP-specific documentation: agent integration example, supported tools list, rate-limit guidance, security considerations
-- [ ] **MCP-10**: MCP sandboxing: per-target scope passed through MCP cannot be widened via tool arguments — scope is fixed at MCP session start
+- [x] **MCP-10**: MCP sandboxing: per-target scope passed through MCP cannot be widened via tool arguments — scope is fixed at MCP session start
 
 ### Cutover & Migration (Deliverable #16)
 
@@ -426,28 +426,28 @@ Each REQ-ID maps to exactly one phase. Populated by roadmapper agent 2026-05-27.
 | OSINT-14 | Phase 7 — OSINT E2E | Complete |
 | OSINT-15 | Phase 7 — OSINT E2E | Complete |
 | OSINT-16 | Phase 7 — OSINT E2E | Complete |
-| MCP-01 | Phase 8 — MCP Server | Pending |
-| MCP-02 | Phase 8 — MCP Server | Pending |
-| MCP-03 | Phase 8 — MCP Server | Pending |
-| MCP-04 | Phase 8 — MCP Server | Pending |
-| MCP-05 | Phase 8 — MCP Server | Pending |
-| MCP-06 | Phase 8 — MCP Server | Pending |
-| MCP-07 | Phase 8 — MCP Server | Pending |
-| MCP-08 | Phase 8 — MCP Server | Pending |
+| MCP-01 | Phase 8 — MCP Server | Complete |
+| MCP-02 | Phase 8 — MCP Server | Complete |
+| MCP-03 | Phase 8 — MCP Server | Complete |
+| MCP-04 | Phase 8 — MCP Server | Complete |
+| MCP-05 | Phase 8 — MCP Server | Complete |
+| MCP-06 | Phase 8 — MCP Server | Complete |
+| MCP-07 | Phase 8 — MCP Server | Complete |
+| MCP-08 | Phase 8 — MCP Server | Complete |
 | MCP-09 | Phase 8 — MCP Server | Pending |
-| MCP-10 | Phase 8 — MCP Server | Pending |
-| MODE-01 | Phase 9 — Composite Modes | Pending |
-| MODE-02 | Phase 9 — Composite Modes | Pending |
-| MODE-03 | Phase 9 — Composite Modes | Pending |
-| MODE-04 | Phase 9 — Composite Modes | Pending |
-| MODE-05 | Phase 9 — Composite Modes | Pending |
-| MODE-06 | Phase 9 — Composite Modes | Pending |
-| MODE-07 | Phase 9 — Composite Modes | Pending |
-| MODE-08 | Phase 9 — Composite Modes | Pending |
-| MODE-09 | Phase 9 — Composite Modes | Pending |
-| MODE-10 | Phase 9 — Composite Modes | Pending |
-| MODE-11 | Phase 9 — Composite Modes | Pending |
-| MODE-12 | Phase 9 — Composite Modes | Pending |
+| MCP-10 | Phase 8 — MCP Server | Complete |
+| MODE-01 | Phase 9 — Composite Modes | Complete |
+| MODE-02 | Phase 9 — Composite Modes | Complete |
+| MODE-03 | Phase 9 — Composite Modes | Complete |
+| MODE-04 | Phase 9 — Composite Modes | Complete |
+| MODE-05 | Phase 9 — Composite Modes | Complete |
+| MODE-06 | Phase 9 — Composite Modes | Complete |
+| MODE-07 | Phase 9 — Composite Modes | Complete |
+| MODE-08 | Phase 9 — Composite Modes | Complete |
+| MODE-09 | Phase 9 — Composite Modes | Complete |
+| MODE-10 | Phase 9 — Composite Modes | Complete |
+| MODE-11 | Phase 9 — Composite Modes | Complete |
+| MODE-12 | Phase 9 — Composite Modes | Complete |
 | MON-01 | Phase 10 — Monitor + Reporting + Notifications | Pending |
 | MON-02 | Phase 10 — Monitor + Reporting + Notifications | Pending |
 | MON-03 | Phase 10 — Monitor + Reporting + Notifications | Pending |

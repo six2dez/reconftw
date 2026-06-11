@@ -38,7 +38,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 6: Vulnerability Scanning E2E** — XSS + SQLi + SSRF + LFI + SSTI + CRLF + smuggling + cmdi + nuclei-DAST + cache poisoning + gf patterns + 4xx-bypass (completed 2026-06-09)
 - [x] **Phase 7: OSINT E2E** — Domain/IP info + emails + GitHub dorks/leaks/actions + cloud enum + Postman + Swagger + Spoofy + msftrecon + CMSeeK + GraphQL + Google dorks *(9/9 plans: 7 original + 07-08/07-09 gap-closure; DoD-2 accepted; all 3 code-review gaps closed + re-verified passed 2026-06-10)*
 - [ ] **Phase 8: MCP Server** — Model Context Protocol server exposing recon modes as MCP tools; auth + redaction + scope sandboxing + OpenAPI schema; opt-in in config
-- [ ] **Phase 9: Composite Modes** — `recon`, `all`, `passive`, `zen`, `deep`, `quick-rescan`, `refresh-cache`, `gen-resolvers` + v1 short-flag aliases with deprecation warnings
+- [x] **Phase 9: Composite Modes** — `recon`, `all`, `passive`, `zen`, `deep`, `quick-rescan`, `refresh-cache`, `gen-resolvers` + v1 short-flag aliases with deprecation warnings (completed 2026-06-11)
 - [ ] **Phase 10: Monitor Mode + Reporting + Notifications** — Monitor loop + diff detection + incremental + JSON/HTML/CSV/AI/Faraday/hotlist/SARIF reports + Slack/Telegram/Discord notifications consolidated
 - [ ] **Phase 11: Installer + Cross-Platform + Docker** — `reconftw install` (replaces install.sh) + tools.lock for 70+ tools + SHA-256 verification + Linux/macOS/ARM64 + Docker multi-arch
 - [ ] **Phase 12: Cutover & Migration** — Config migrator (corpus-tested) + MIGRATION.md + compat symlinks + beta period + bug-bug parity test + community sign-off + cutover
@@ -372,16 +372,16 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 09-01-PLAN.md — ConfigTransform hook in RunOptions/BootReconApp + ApplyZenProfile/ApplyDeepProfile config transforms (MODE-04, MODE-05)
+- [x] 09-01-PLAN.md — ConfigTransform hook in RunOptions/BootReconApp + ApplyZenProfile/ApplyDeepProfile config transforms (MODE-04, MODE-05)
 
 **Wave 2** *(parallel — blocked on Wave 1)*
 
-- [ ] 09-02-PLAN.md — Composite subcommands (recon/all/passive/zen/deep) + RunCompositeAsync + commonAfterBoot + passive hard-guard (MODE-01, MODE-02, MODE-03, MODE-04, MODE-05, MODE-12)
-- [ ] 09-03-PLAN.md — v1 alias dispatch (translateV1Args) + batch (--list) + unconditional redaction wiring (MODE-09, MODE-10, MODE-11, MODE-12)
+- [x] 09-02-PLAN.md — Composite subcommands (recon/all/passive/zen/deep) + RunCompositeAsync + commonAfterBoot + passive hard-guard (MODE-01, MODE-02, MODE-03, MODE-04, MODE-05, MODE-12)
+- [x] 09-03-PLAN.md — v1 alias dispatch (translateV1Args) + batch (--list) + unconditional redaction wiring (MODE-09, MODE-10, MODE-11, MODE-12)
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 09-04-PLAN.md — Stateful modes (gen-resolvers/refresh-cache/quick-rescan) + root.go registration (MODE-06, MODE-07, MODE-08)
+- [x] 09-04-PLAN.md — Stateful modes (gen-resolvers/refresh-cache/quick-rescan) + root.go registration (MODE-06, MODE-07, MODE-08)
 
 ### Phase 10: Monitor Mode + Reporting + Notifications
 
@@ -450,7 +450,7 @@ Calendar parallelization (within constraint that dependencies are met):
 | 6. Vulnerability Scanning E2E | 10/10 | Complete    | 2026-06-09 |
 | 7. OSINT E2E | 7/7 | Complete   | 2026-06-10 |
 | 8. MCP Server | 5/6 | In Progress|  |
-| 9. Composite Modes | 0/? | Not started | - |
+| 9. Composite Modes | 4/4 | Complete    | 2026-06-11 |
 | 10. Monitor Mode + Reporting + Notifications | 0/? | Not started | - |
 | 11. Installer + Cross-Platform + Docker | 0/? | Not started | - |
 | 12. Cutover & Migration | 0/? | Not started | - |
