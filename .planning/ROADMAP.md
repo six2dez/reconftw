@@ -331,7 +331,29 @@ Plans:
   4. Streaming + schema work: MCP clients can subscribe to findings via MCP resource subscription during long scans (live JSONL feed); findings use the same SARIF-compatible schema as Phase 10's REPORT-07 output; an OpenAPI schema is published for the HTTP transport endpoints (MCP-03, MCP-06, MCP-08)
   5. Opt-in + docs: `mcp.enabled = false` is the default in the TOML config (MCP is opt-in at config time); `docs/mcp.md` exists with agent integration example, supported tools list, rate-limit guidance, and security considerations (MCP-07, MCP-09)
 
-**Plans**: TBD
+**Plans**: 6 plans in 5 waves
+Plans:
+
+**Wave 0** *(prerequisites — SDK dep + filterByModuleAndEnabled relocation + SDK assumption verification)*
+
+- [x] 08-00-PLAN.md — go-sdk v1.6.1 in go.mod + FilterByModuleAndEnabled → internal/core/task/filter.go + SDK assumptions A1-A6 spike
+
+**Wave 1** *(parallel — blocked on Wave 0)*
+
+- [x] 08-01-PLAN.md — SARIF 2.1.0 findings schema package (internal/core/findings/): types + mapper + tests (D-04)
+- [x] 08-02-PLAN.md — MCP infrastructure: SessionRegistry + BearerAuthMiddleware + SessionScope/CheckScope (D-05, D-06, D-07)
+
+**Wave 2** *(blocked on Wave 0 + Wave 1)*
+
+- [x] 08-03-PLAN.md — Shared handler extraction: RunOptions + BootReconApp + RunSubsAsync/RunWebAsync/RunVulnsAsync/RunOSINTAsync (D-02, MCP-02)
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [x] 08-04-PLAN.md — MCP server core (MCPServer + 7 tools + resources) + cmd/reconftw/mcp.go + docs/openapi.json (MCP-01, MCP-03, MCP-07, MCP-08)
+
+**Wave 4** *(human gate — blocked on Wave 3)*
+
+- [ ] 08-05-PLAN.md — Integration test (TestMCPToolList) + docs/mcp.md + human verification checkpoint (MCP-01, MCP-09)
 
 ### Phase 9: Composite Modes
 
@@ -346,7 +368,20 @@ Plans:
   4. Universal CLI surface works across all modes: `--target X` for single target, `--list FILE` for multi-target batch (one per line), `--config FILE` overrides the default `reconftw.toml` location, `--dry-run` shows what would execute (subprocess invocations printed but not run) (MODE-10, MODE-11, MODE-12)
   5. CLI deprecation warnings tested: a unit test asserts every deprecated v1 alias prints the warning to stderr exactly once per invocation; a unit test asserts the warning text references the replacement subcommand and the removal version (MODE-09)
 
-**Plans**: TBD
+**Plans**: 4 plans in 3 waves
+Plans:
+**Wave 1**
+
+- [ ] 09-01-PLAN.md — ConfigTransform hook in RunOptions/BootReconApp + ApplyZenProfile/ApplyDeepProfile config transforms (MODE-04, MODE-05)
+
+**Wave 2** *(parallel — blocked on Wave 1)*
+
+- [ ] 09-02-PLAN.md — Composite subcommands (recon/all/passive/zen/deep) + RunCompositeAsync + commonAfterBoot + passive hard-guard (MODE-01, MODE-02, MODE-03, MODE-04, MODE-05, MODE-12)
+- [ ] 09-03-PLAN.md — v1 alias dispatch (translateV1Args) + batch (--list) + unconditional redaction wiring (MODE-09, MODE-10, MODE-11, MODE-12)
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 09-04-PLAN.md — Stateful modes (gen-resolvers/refresh-cache/quick-rescan) + root.go registration (MODE-06, MODE-07, MODE-08)
 
 ### Phase 10: Monitor Mode + Reporting + Notifications
 
@@ -414,7 +449,7 @@ Calendar parallelization (within constraint that dependencies are met):
 | 5. Web Pipeline E2E | 10/10 | Complete   | 2026-06-03 |
 | 6. Vulnerability Scanning E2E | 10/10 | Complete    | 2026-06-09 |
 | 7. OSINT E2E | 7/7 | Complete   | 2026-06-10 |
-| 8. MCP Server | 0/? | Not started | - |
+| 8. MCP Server | 5/6 | In Progress|  |
 | 9. Composite Modes | 0/? | Not started | - |
 | 10. Monitor Mode + Reporting + Notifications | 0/? | Not started | - |
 | 11. Installer + Cross-Platform + Docker | 0/? | Not started | - |
