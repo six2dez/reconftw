@@ -94,7 +94,7 @@ Run one command, get a complete recon picture of a target — passive, active, a
 - [ ] **`--web` E2E ported** — Probe + screenshots + fuzz + JS + nuclei + WAF + sourcemaps + favicon + 20 funciones, paridad bash medida
 - [ ] **`--vulns` E2E ported** — XSS, SQLi, SSRF, LFI, SSTI, CRLF, smuggling, command injection, nuclei DAST, cache poisoning, fuzz params
 - [ ] **`--osint` E2E ported** — Domain/IP info, emails, GitHub dorks/leaks/actions audit, cloud enum, Postman leaks, Spoofy, msftrecon, CMSeeK
-- [ ] **Composite modes** — `-r/--recon`, `-a/--all`, `-p/--passive`, `--zen`, `--deep`, `--quick-rescan`, `--refresh-cache`, `--gen-resolvers`
+- [x] **Composite modes** — `-r/--recon`, `-a/--all`, `-p/--passive`, `--zen`, `--deep`, `--quick-rescan`, `--refresh-cache`, `--gen-resolvers`. Validated in Phase 9: Composite Modes (2026-06-11)
 - [ ] **Axiom integration** — Launch/shutdown/selected, resolvers update, axiom-exec, failover wrapper, fleet sizing
 - [ ] **Monitor mode** — `--monitor`, `--monitor-interval`, `--monitor-cycles`, `--incremental`, diff detection, notification triggers
 - [ ] **Reporting** — JSON/HTML/CSV reports, AI report (OpenAI/Anthropic), Faraday export, hotlist risk scoring
