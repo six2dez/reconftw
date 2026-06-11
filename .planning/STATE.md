@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Complete Core Migration
-status: ready_to_plan
-stopped_at: Phase 07 complete (9/9) — ready to discuss Phase 8
-last_updated: 2026-06-10T11:22:56.697Z
+status: executing
+stopped_at: Phase 9 context gathered
+last_updated: "2026-06-11T08:45:37.852Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 12
-  completed_phases: 6
-  total_plans: 60
-  completed_plans: 59
-  percent: 50
+  completed_phases: 7
+  total_plans: 66
+  completed_plans: 65
+  percent: 58
 ---
 
 # Project State
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-27)
 
 **Core value:** Run one command, get a complete recon picture of a target — passive, active, and vulnerability layers — with resumable checkpoints, structured output, and zero-touch tool orchestration.
-**Current focus:** Phase 8 — mcp server
+**Current focus:** Phase 08 — mcp-server
 
 ## Current Position
 
-Phase: 8
-Plan: Not started
-Status: Ready to plan
+Phase: 08 (mcp-server) — EXECUTING
+Plan: 6 of 6
+Status: Ready to execute
 NEXT (you, the maintainer): re-verify Phase 7 (07-VERIFICATION.md GAP-02/GAP-03 now closed) → Phase 7 completes. THEN Phase 8 (MCP Server).
 Last activity: 2026-06-10
 
@@ -83,6 +83,9 @@ Last activity: 2026-06-10
 | Phase 07 P04 | 25m | 2 tasks | 6 files |
 | Phase 07 P05 | 6m | 2 tasks | 9 files |
 | Phase 07 P07 | 25m | 2 tasks | 4 files |
+| Phase 08-mcp-server P02 | 18 | 2 tasks | 6 files |
+| Phase 08-mcp-server P03 | 120 | 2 tasks | 7 files |
+| Phase 08-mcp-server P04 | 45 | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -111,6 +114,8 @@ Recent decisions affecting v2.0 work:
 - [Phase ?]: existing config field, not a separate cfg.Web.Fuzz.ThreadsMax
 - [Phase ?]: 07-05: identity/fingerprint cluster (OSINT-11 msftrecon, OSINT-12 CMSeeK+favirecon, OSINT-13 gqlspection, OSINT-14 cewler, OSINT-15 xnldorker) + D-O10 metadata fold ported; CMSeeK/favirecon/gqlspection/cewler/metadata are D-O2 opportunistic (read workspace hosts/URLs/docs IF present, log-skip StatusSkipped when absent); xnldorker key-gated D-O8; msftrecon preserves osint/azure_tenant_domains.txt single-writer (D-O5)
 - [Phase 7]: 07-07: Phase 7 (OSINT E2E) ACCEPTED 2026-06-10 — DoD-2 real dev-Mac E2E (`scripts/osint-smoke.sh hackerone.com`) maintainer-reproduced VERDICT PASS: 8 osint-class findings (whois×1, third_party_misconfig×6, postman-leak×1) via the multi-writer staging contract; XCUT-07 secret-leak guard CLEAN (1 `value_redacted="***"`, no raw secret); category-presence soft gate evaluates PRESENCE only, counts NOT gated (D-O6); Tree.Append fixed (`19efc4a5`) to admit company-seeded `class=="osint"` records lacking host/url (D-O1) while preserving the strict host/url gate for web/vulns findings; zonetransfer EXCLUDED as relocation-not-regression (D-O10, → MIGRATION.md Phase 12)
+- [Phase ?]: MCP session registry concurrency pattern
+- [Phase ?]: Auth at correct HTTP layer per RESEARCH Pitfall 1
 
 ### Pending Todos
 
@@ -144,6 +149,6 @@ Items captured durante v1.0 que deben informar el diseño de arquitectura v2 (no
 
 ## Session Continuity
 
-Last session: 2026-06-10T11:11:50.291Z
-Stopped at: Phase 7 plan 07-06 complete (verification machinery — DAG guard + frozen-replay parity D-O6 + DoD-1 realtools smoke; OSINT-16)
-Resume file: None
+Last session: 2026-06-11T08:45:37.845Z
+Stopped at: Phase 9 context gathered
+Resume file: .planning/phases/09-composite-modes/09-CONTEXT.md
