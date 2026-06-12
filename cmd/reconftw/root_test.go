@@ -66,10 +66,19 @@ func TestRootListsFifteenSubcommandsPlusVersion(t *testing.T) {
 // Phase 7 plan 07-01: `osint` is no longer a stub — newOSINTCmd wires the real
 // osint pipeline RunE (mirrors the Phase 4/5/6 pattern). `osint` removed from the
 // stubs list; its behavior is covered by `osint --help` / `osint --dry-run`.
+//
+// Phase 8 plan 08-04: `mcp` is no longer a stub — newMCPCmd in mcp.go wires the
+// real MCP server (stdio/HTTP transport). `mcp` removed from the stubs list.
+// Phase 9 plan 09-02: `recon`, `all`, `passive`, `zen`, `deep` are no longer stubs —
+// real composite pipeline implementations live in composite_subcommands.go.
+// Their behavior is covered by composite_test.go and dry-run smoke tests.
+//
+// Phase 10 plan 10-03: `report` is no longer a stub — newReportCmd wires the real
+// report renderer (reads store.db, writes reports/ directory). Removed from stubs list;
+// behavior is covered by `report --help` and internal/core/report package tests.
 func TestEveryStubReturnsExit64(t *testing.T) {
 	stubs := []string{
-		"recon", "all", "passive", "zen", "deep",
-		"monitor", "report", "mcp", "migrate", "install",
+		"monitor", "migrate", "install",
 	}
 	for _, name := range stubs {
 		t.Run(name, func(t *testing.T) {

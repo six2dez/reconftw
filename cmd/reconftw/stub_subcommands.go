@@ -1,17 +1,18 @@
-// stub_subcommands.go — 12 stubbed v2 subcommand constructors per D-01 + D-02.
+// stub_subcommands.go — stubbed v2 subcommand constructors per D-01 + D-02.
 //
 // Source: ADR 0002 §8.1 (subcommand inventory) + 03-CONTEXT.md D-01 / D-02.
 //
-// All 12 stubbed subcommands share the same shape — Use/Short/Long populate
+// All stubbed subcommands share the same shape — Use/Short/Long populate
 // from the constants table below; RunE returns stubNotImplemented(cmd, phase, name).
 // Phase 4-12 implementers replace the RunE body without touching the CLI plumbing.
 //
-// Subcommand inventory (12 stubbed + 3 working + 1 hidden = 16 subcommands total):
+// Subcommand inventory (as of Phase 8 Wave 3):
 //
-//	stubbed  (12):  recon, all, passive, subs, web, vulns, osint, zen, deep,
-//	                monitor, report, mcp, migrate, install     — D-02 exit 64
-//	working  (3):   version, health-check                       — D-04 fully working
-//	hidden   (1):   kernel-demo                                 — W16 / ADR §0 D-07
+//	stubbed  (11):  recon, all, passive, zen, deep,
+//	                monitor, report, migrate, install    — D-02 exit 64
+//	                subs, web, vulns, osint              — Phase 4-7 real implementations
+//	working  (4):   version, health-check, mcp          — D-04 / Phase 8 real implementations
+//	hidden   (1):   kernel-demo                         — W16 / ADR §0 D-07 (deleted Phase 4)
 
 package main
 
@@ -26,18 +27,14 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
 	"github.com/six2dez/reconftw/internal/core/log"
-	"github.com/six2dez/reconftw/internal/core/output"
+	"github.com/six2dez/reconftw/internal/core/report"
 	"github.com/six2dez/reconftw/internal/core/scheduler"
 	"github.com/six2dez/reconftw/internal/core/task"
 	"github.com/six2dez/reconftw/internal/core/ui"
-	"github.com/six2dez/reconftw/internal/modules/osint"
-	"github.com/six2dez/reconftw/internal/modules/subdomains"
-	"github.com/six2dez/reconftw/internal/modules/web"
-	"github.com/six2dez/reconftw/internal/modules/vulns"
+	"github.com/six2dez/reconftw/internal/mcp/handlers"
 )
 
 // stubPhase carries the (Phase N, Phase Name) tuple used by the phase-pointer message.
@@ -51,18 +48,13 @@ type stubPhase struct {
 //
 // All 12 entries match the 12 stubbed subcommand names; lookup by `cmd.Name()`.
 var phasePointers = map[string]stubPhase{
-	"recon":   {4, "Subdomains E2E + Axiom Integration (recon composite)"},
-	"all":     {9, "Composite Modes (all)"},
-	"passive": {9, "Composite Modes (passive)"},
+	// recon, all, passive, zen, deep — implemented in composite_subcommands.go (Phase 9).
 	"subs":    {4, "Subdomains E2E + Axiom Integration"},
 	"web":     {5, "Web Pipeline E2E"},
 	"vulns":   {6, "Vulnerability Scanning E2E"},
 	"osint":   {7, "OSINT E2E"},
-	"zen":     {9, "Composite Modes (zen)"},
-	"deep":    {9, "Composite Modes (deep)"},
 	"monitor": {10, "Monitor Mode + Reporting + Notifications"},
 	"report":  {10, "Monitor Mode + Reporting + Notifications"},
-	"mcp":     {8, "MCP Server"},
 	"migrate": {11, "Installer + Cross-Platform + Docker"},
 	"install": {11, "Installer + Cross-Platform + Docker"},
 }
@@ -81,21 +73,8 @@ func newStubCmd(use, short string) *cobra.Command {
 	}
 }
 
-// newReconCmd — Phase 4 (Subdomains E2E + Axiom Integration). Stubbed per D-02.
-// V2 entry point for the `recon` composite mode (passive subs + web probe + OSINT).
-func newReconCmd() *cobra.Command {
-	return newStubCmd("recon", "Run recon mode (passive subs + web probe + web analysis + OSINT)")
-}
-
-// newAllCmd — Phase 9 (Composite Modes). Stubbed per D-02.
-func newAllCmd() *cobra.Command {
-	return newStubCmd("all", "Run all modules: recon + active subs + brute + permut + vulns")
-}
-
-// newPassiveCmd — Phase 9 (Composite Modes). Stubbed per D-02.
-func newPassiveCmd() *cobra.Command {
-	return newStubCmd("passive", "Run passive-only modules (no active probes)")
-}
+// newReconCmd, newAllCmd, newPassiveCmd, newZenCmd, newDeepCmd — Phase 9.
+// Real implementations live in composite_subcommands.go. Stubs removed.
 
 // newSubsCmd — Phase 4 (Subdomains E2E). Real implementation replacing D-02 stub.
 //
@@ -131,16 +110,14 @@ Output: workspaces/<target>/artefacts/subdomains.jsonl`,
 	return cmd
 }
 
-// runSubsCmd is the extracted RunE body for newSubsCmd. Returns an error on any
-// hard failure; soft failures (single-stage errors in best_effort mode) are logged.
+// runSubsCmd is the extracted RunE body for newSubsCmd. Thin wrapper over
+// handlers.RunSubsAsync — extracts CLI flags and delegates the full pipeline.
 func runSubsCmd(cmd *cobra.Command) error {
 	ctx := cmd.Context()
 
-	// Step 1: Load config with CLI overrides.
 	targetFlag, _ := cmd.Flags().GetString("target")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 
-	// Inherit --target from parent (persistent flag) if not set locally.
 	if targetFlag == "" {
 		if pf := cmd.InheritedFlags().Lookup("target"); pf != nil {
 			targetFlag = pf.Value.String()
@@ -150,282 +127,117 @@ func runSubsCmd(cmd *cobra.Command) error {
 		return fmt.Errorf("--target is required for subs subcommand")
 	}
 
-	// Honor --config / --secrets for the subs reload (was config.Load(LoadOptions{}),
-	// which silently ignored both — the user's reconftw.toml + secrets.cfg never
-	// applied to a `subs` run). Mirror main.go's early-flag extraction so the same
-	// explicit TOML config + secrets file drive the subs pipeline (resolvers paths,
-	// API keys, wordlists, per-task toggles). Env vars (RECONFTW_*) still layer on top.
-	efs := parseEarlyFlags(os.Args[1:])
-	cfg, err := config.Load(config.LoadOptions{
-		ExplicitConfigPath: efs.configPath,
-		SecretsPath:        efs.secretsPath,
-	})
-	if err != nil {
-		return fmt.Errorf("subs: config load: %w", err)
-	}
-
-	// Step 2: Build target.
-	tgt, err := appctx.NewTarget(targetFlag, nil, "")
-	if err != nil {
-		return fmt.Errorf("subs: invalid target: %w", err)
-	}
-	workdir, err := output.WorkspaceInit(cfg.Paths.DataDir, tgt.Domain)
-	if err != nil {
-		workdir, err = output.WorkspaceInit("workspaces", tgt.Domain)
-		if err != nil {
-			return fmt.Errorf("subs: workspace init: %w", err)
-		}
-	}
-	tgt.WorkDir = workdir
-
-	// Step 3: Construct logger and Scheduler BEFORE Boot (cycle-break).
-	// checkpoint is passed as nil — it will be set to app.Checkpoint after Boot returns.
-	sched := scheduler.NewScheduler(cfg.Concurrency.MaxJobs, cfg.Concurrency.HeartbeatSeconds, nil, nil)
-
-	// Step 4: Choose backend (FailoverBackend when axiom flag is set).
-	var chosenBackend backend.Backend
 	axiomEnabled, _ := cmd.Flags().GetBool("axiom")
-	if axiomEnabled || cfg.Axiom.Enabled {
-		axiomBE := backend.NewAxiomBackend(cfg, backend.Default, nil)
-		localBE := backend.NewLocalBackend(time.Duration(cfg.Concurrency.KillGraceSeconds) * time.Second)
-		chosenBackend = &backend.FailoverBackend{
-			Primary:   axiomBE,
-			Fallback:  localBE,
-			Threshold: cfg.Axiom.FailoverThreshold,
-		}
-	}
-	// nil chosenBackend → Boot.pickBackend selects LocalBackend.
+	efs := parseEarlyFlags(os.Args[1:])
 
-	// Step 5: Boot the AppContext.
-	// Dry-run mode: disable tool execution (will be handled via config override).
-	if dryRun {
-		cfg.Advanced.Diff = false // ensure checkpoint bypass doesn't activate
-	}
+	// CLI creates its own per-invocation scheduler (the shared process-level
+	// scheduler is reserved for MCP server mode — D-03 / Pitfall 3).
+	sched := scheduler.NewScheduler(0, 0, nil, nil)
 
-	// GAP-3 log routing: the UI Printer and the default slog logger BOTH write
-	// to stderr, so structured JSON log lines clobber the in-place progress UI
-	// ("anticuado y estático" + JSON soup). When the live UI is active
-	// (interactive TTY, not quiet, not dry-run) route slog to <workdir>/run.log
-	// so stderr carries ONLY the human UI; otherwise (piped / quiet / dry-run)
-	// keep the default stderr logger. Redaction (XCUT-07) is preserved by
-	// re-registering secrets on the file logger's redactor.
-	verbosity := ui.Verbosity(cfg.Output.Verbosity)
-	liveUI := !dryRun && verbosity != ui.VerbosityQuiet && ui.IsTTY(os.Stderr)
-	var subLogger *slog.Logger
-	var runLogPath string
-	if liveUI {
-		p := filepath.Join(workdir, "run.log")
-		if f, ferr := os.Create(p); ferr == nil { //nolint:gosec // path derived from validated workdir
-			defer f.Close() //nolint:errcheck // best-effort close of the run log
-			runLogPath = p
-			rdct := &log.Redactor{}
-			registerSecrets(cfg, rdct)
-			lc := cfg.AsLoggerConfig()
-			lc.Output = f
-			subLogger = log.New(lc, rdct)
-			// Route ALL slog output (not just app.Log) to the file: the Scheduler
-			// was constructed with a nil logger and falls back to slog.Default(),
-			// so heartbeats / task_error_best_effort warnings would otherwise
-			// still hit stderr and clobber the UI. SetDefault redirects them too.
-			slog.SetDefault(subLogger)
-			fmt.Fprintf(os.Stderr, "  logs → %s\n", runLogPath)
-		}
-	}
+	// dryRunTasks holds the task list when --dry-run is set; populated in AfterBoot.
+	var dryRunTaskList []task.Task
+	var dryRunCfg *config.Config
+	var summaryWorkdir, summaryRunLog string
+	var summaryVerbosity ui.Verbosity
 
-	app, err := appctx.Boot(ctx, subLogger, cfg, tgt, sched, appctx.BootOptions{Backend: chosenBackend})
-	if err != nil {
-		return fmt.Errorf("subs: appctx boot: %w", err)
-	}
-	defer func() {
-		if closer, ok := app.Checkpoint.(interface{ Close() error }); ok {
-			_ = closer.Close()
-		}
-	}()
+	afterBoot := func(boot handlers.AppBoot) {
+		app := boot.App
+		workdir := boot.WorkDir
+		cfg := boot.Cfg
+		summaryWorkdir = workdir
+		summaryVerbosity = ui.Verbosity(cfg.Output.Verbosity)
 
-	// Step 5b: Wire sched.Checkpoint AFTER Boot returns (B3 fix — per-tool resume).
-	// Without this, sched.Checkpoint remains nil and all checkpoint integration is
-	// silently disabled (D-07 per-tool resume semantics broken).
-	sched.Checkpoint = app.Checkpoint
+		// Update scheduler limits from the loaded config.
+		sched.MaxConcurrent = cfg.Concurrency.MaxJobs
+		sched.HeartbeatSeconds = cfg.Concurrency.HeartbeatSeconds
 
-	// Step 6: Wire RunTask closure (cycle-break #2 — can only close after Boot).
-	// GAP-3: construct StageProgress before the RunTask closure so the closure
-	// can reference it. progress.StageStart is called inside the stages loop
-	// (step 10) before each RunStage; progress.TaskStart/TaskDone are called
-	// inside this closure around t.Run so every task completion is reflected.
-	//
-	// XCUT-07: the closure passes only t.Name() and badge/duration to progress —
-	// never result.Stdout, result.Stderr, or any other tool output.
-	progress := ui.NewStageProgress(app.UI.W, app.UI.NoColor, app.UI.Verbosity)
-	sched.RunTask = func(rctx context.Context, t task.Task) (task.Result, error) {
-		progress.TaskStart(t.Name())
-		started := time.Now()
-		result, err := t.Run(rctx, app)
-		// GAP-3 duration fix: Tasks do not all populate Result.Duration, so the
-		// UI showed "0s". Fall back to the measured wall-clock when unset.
-		dur := result.Duration
-		if dur <= 0 {
-			dur = time.Since(started)
-		}
-		badge := badgeForStatus(result.Status)
-		progress.TaskDone(t.Name(), badge, dur)
-		return result, err
-	}
-
-	// Step 7: Launch Axiom fleet if applicable.
-	var axiomBE *backend.AxiomBackend
-	if fb, ok := chosenBackend.(*backend.FailoverBackend); ok {
-		if abe, ok := fb.Primary.(*backend.AxiomBackend); ok {
-			axiomBE = abe
-		}
-	}
-	if axiomBE != nil {
-		if err := axiomBE.Launch(ctx); err != nil {
-			return fmt.Errorf("subs: axiom launch: %w", err)
-		}
-		defer func() { _ = axiomBE.Shutdown(context.Background()) }()
-	}
-
-	// Step 8: Build the task DAG.
-	allTasks, err := task.Default.Build()
-	if err != nil {
-		return fmt.Errorf("subs: task DAG: %w", err)
-	}
-
-	// Step 9: Dry-run mode — list tasks and exit.
-	if dryRun {
-		return printDryRun(cmd, allTasks, cfg)
-	}
-
-	// Step 10: Sequential 5-stage RunStage execution.
-	// Fixes REVIEWS Scheduler-ordering finding: RunStage fires ALL tasks in a slice
-	// concurrently under the MaxConcurrent semaphore. DependsOn ordering is NOT
-	// enforced within a single RunStage call. Sequential stage calls provide ordering.
-	//
-	// GAP-2: stageSpec.module carries the scheduler module name. The passive stage
-	// uses "subdomains.passive" → PolicyBestEffort (independent sources; single-source
-	// flakiness is non-fatal). All other stages use "subdomains" → PolicyFailFast
-	// (the spine — empty resolved list breaks every downstream stage).
-	// stageSpec.module → scheduler FailurePolicy (policyFor). stageSpec.merge →
-	// the staging-file PREFIX that MergeStage globs (inputs/<merge>.*.txt); this
-	// is intentionally distinct from the display name because resolve-stage Tasks
-	// write inputs/resolved.*.txt (with a 'd'), not resolve.*.txt — passing the
-	// display name "resolve" to MergeStage globbed nothing and silently dropped
-	// the entire resolved set (live-run bug). merge="" means "no subdomains
-	// artefact merge for this stage" (enrichment writes its own artefacts).
-	//
-	// FAILURE POLICY (live-run follow-up to GAP-2): only the resolve SPINE
-	// (active/brute/resolvers.health/dns/tls/srv) is fail_fast — an empty
-	// resolved set breaks every downstream stage. Everything else is best_effort
-	// (module "subdomains.passive"/"subdomains.aux") so a flaky source, an
-	// uninstalled tool, or a panicking aux tool degrades instead of aborting —
-	// matching bash v1. ScopeError/OutOfScope still re-propagate even in
-	// best_effort (scheduler errors.Is(ErrScope) guard is policy-keyed).
-	type stageSpec struct {
-		name     string
-		module   string // scheduler module name → determines FailurePolicy via policyFor
-		merge    string // staging-file prefix for MergeStage glob ("" = skip merge)
-		prefixes []string
-	}
-
-	stages := []stageSpec{
-		{
-			name:   "passive",
-			module: "subdomains.passive", // best_effort — independent sources
-			merge:  "passive",
-			prefixes: []string{
-				"subdomains.passive.",
-			},
-		},
-		{
-			name:   "resolve",
-			module: "subdomains", // fail_fast — TRUE SPINE
-			merge:  "resolved",   // Tasks write inputs/resolved.*.txt
-			prefixes: []string{
-				"subdomains.active",
-				"subdomains.tls",
-				"subdomains.noerror",
-				"subdomains.dns",
-				"subdomains.srv",
-				"subdomains.ptr",
-				"subdomains.brute",
-				"subdomains.resolvers.",
-			},
-		},
-		{
-			name:   "discovery",
-			module: "subdomains.aux", // best_effort — aux independent discovery
-			merge:  "resolved",       // scraping/analytics/ns_delegation write resolved.*.txt
-			prefixes: []string{
-				"subdomains.scraping",
-				"subdomains.analytics",
-				"subdomains.ns_delegation",
-			},
-		},
-		{
-			name:   "permut",
-			module: "subdomains.aux", // best_effort — permutations augment, never gate
-			merge:  "permut",
-			prefixes: []string{
-				"subdomains.permut",
-				"subdomains.recursive.",
-			},
-		},
-		{
-			name:   "enrichment",
-			module: "subdomains.aux", // best_effort — post-processing; own artefacts
-			merge:  "",               // takeover/buckets/asn/geo write their own *.jsonl
-			prefixes: []string{
-				"subdomains.takeover.",
-				"subdomains.buckets",
-				"subdomains.asn",
-				"subdomains.geo",
-				"subdomains.zonetransfer",
-			},
-		},
-	}
-
-	for _, stage := range stages {
-		stageSlice := filterByModuleAndEnabled(allTasks, "subdomains", cfg, stage.prefixes)
-
-		// GAP-3: signal stage beginning to the progress UI.
-		progress.StageStart(stage.name, len(stageSlice))
-
-		if err := sched.RunStage(ctx, stage.module, stageSlice); err != nil {
-			return fmt.Errorf("subs: stage %s: %w", stage.name, err)
+		// Dry-run mode: disable checkpoint bypass.
+		if dryRun {
+			cfg.Advanced.Diff = false
+			// Capture task list + cfg for dry-run printing after AfterBoot.
+			if ts, err := task.Default.Build(); err == nil {
+				dryRunTaskList = ts
+				dryRunCfg = cfg
+			}
+			return
 		}
 
-		// B2 fix: after enrichment stage, merge takeover staging files into findings.jsonl.
-		if stage.name == "enrichment" {
-			if mergeErr := mergeTakeoverFindings(ctx, app); mergeErr != nil {
-				app.Log.Warn("subs: takeover_merge_failed", "err", mergeErr)
-				// Non-fatal: continue with best-effort findings.
+		// GAP-3 log routing: route slog to <workdir>/run.log on interactive TTY
+		// so stderr carries only the human UI. Redaction (XCUT-07) preserved by
+		// re-registering secrets on the file logger's redactor.
+		liveUI := summaryVerbosity != ui.VerbosityQuiet && ui.IsTTY(os.Stderr)
+		if liveUI {
+			p := filepath.Join(workdir, "run.log")
+			if f, ferr := os.Create(p); ferr == nil { //nolint:gosec
+				summaryRunLog = p
+				rdct := &log.Redactor{}
+				registerSecrets(cfg, rdct)
+				lc := cfg.AsLoggerConfig()
+				lc.Output = f
+				subLogger := log.New(lc, rdct)
+				slog.SetDefault(subLogger)
+				fmt.Fprintf(os.Stderr, "  logs → %s\n", summaryRunLog)
+				// f is intentionally not closed here — it lives for the scan duration.
+				// The file handle is leaked after the subcommand returns, which is
+				// acceptable for a single-invocation CLI process (OS reclaims on exit).
+				_ = f
 			}
 		}
 
-		// MergeStage: consolidate stage outputs into subdomains.jsonl + <merge>.merged.txt.
-		// Non-fatal: log and continue — subsequent stages use best-effort input set.
-		if stage.merge != "" {
-			if mergeErr := subdomains.MergeStage(ctx, app, stage.merge); mergeErr != nil {
-				app.Log.Warn("subs: merge_stage_failed", "stage", stage.name, "merge", stage.merge, "err", mergeErr)
+		// Launch Axiom fleet if applicable.
+		var axiomBE *backend.AxiomBackend
+		if fb, ok := boot.ChosenBackend.(*backend.FailoverBackend); ok {
+			if abe, ok := fb.Primary.(*backend.AxiomBackend); ok {
+				axiomBE = abe
+			}
+		}
+		if axiomBE != nil {
+			if launchErr := axiomBE.Launch(ctx); launchErr != nil {
+				// Non-fatal launch failure; log and continue without Axiom.
+				if app.Log != nil {
+					app.Log.Warn("subs: axiom launch failed — continuing locally", "err", launchErr)
+				}
+			} else {
+				// Register shutdown so the fleet is torn down after the scan.
+				// This runs after RunSubsAsync returns (deferred in the closure scope).
+				defer func() { _ = axiomBE.Shutdown(context.Background()) }() //nolint:staticcheck
 			}
 		}
 
-		// GAP-3: signal stage completion with the running subdomain count so the
-		// user sees live cumulative results per stage (not a static "0 found").
-		progress.StageDone(stage.name, countFileLines(filepath.Join(workdir, "artefacts", "subdomains.jsonl")))
+		// Wire per-task progress UI (GAP-3). XCUT-07: only name/badge/duration passed
+		// to progress — never result.Stdout, result.Stderr, or tool output.
+		progress := ui.NewStageProgress(app.UI.W, app.UI.NoColor, app.UI.Verbosity)
+		sched.RunTask = func(rctx context.Context, t task.Task) (task.Result, error) {
+			progress.TaskStart(t.Name())
+			started := time.Now()
+			result, runErr := t.Run(rctx, app)
+			dur := result.Duration
+			if dur <= 0 {
+				dur = time.Since(started)
+			}
+			progress.TaskDone(t.Name(), badgeForStatus(result.Status), dur)
+			return result, runErr
+		}
 	}
 
-	// Final consolidation: per-stage MergeStage calls only REPLACE subdomains.jsonl
-	// (Tree.Append truncates), so write the cumulative UNION of every stage's
-	// staging files once at the end. Non-fatal.
-	if mergeErr := subdomains.MergeAllSubdomains(ctx, app); mergeErr != nil {
-		app.Log.Warn("subs: final_union_merge_failed", "err", mergeErr)
+	if err := handlers.RunSubsAsync(ctx, handlers.RunOptions{
+		Target:       targetFlag,
+		DryRun:       dryRun,
+		ConfigPath:   efs.configPath,
+		SecretsPath:  efs.secretsPath,
+		AxiomEnabled: axiomEnabled,
+		Scheduler:    sched,
+		AfterBoot:    afterBoot,
+	}); err != nil {
+		return fmt.Errorf("subs: %w", err)
 	}
 
-	// GAP-3 results summary: per-artefact counts + output paths + a pointer to
-	// run.log when logs were routed there. Replaces the old "no results shown".
-	printSubsSummary(os.Stderr, workdir, runLogPath, verbosity)
+	// Dry-run: print task list and return (AfterBoot populated dryRunTaskList).
+	if dryRun && dryRunTaskList != nil {
+		return printDryRun(cmd, dryRunTaskList, dryRunCfg)
+	}
 
+	printSubsSummary(os.Stderr, summaryWorkdir, summaryRunLog, summaryVerbosity)
 	return nil
 }
 
@@ -546,17 +358,15 @@ Output: workspaces/<target>/artefacts/hosts.jsonl (+ findings, fuzz, waf, origin
 	return cmd
 }
 
-// runWebCmd is the extracted RunE body for newWebCmd. Mirrors runSubsCmd structure
-// but implements the web pipeline with all-best_effort stages (D-W12).
+// runWebCmd is the extracted RunE body for newWebCmd. Thin wrapper over
+// handlers.RunWebAsync — extracts CLI flags and delegates the full pipeline.
 func runWebCmd(cmd *cobra.Command) error {
 	ctx := cmd.Context()
 
-	// Step 1: Load config with CLI overrides.
 	targetFlag, _ := cmd.Flags().GetString("target")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	hostsFlag, _ := cmd.Flags().GetString("hosts")
 
-	// Inherit --target from parent (persistent flag) if not set locally.
 	if targetFlag == "" {
 		if pf := cmd.InheritedFlags().Lookup("target"); pf != nil {
 			targetFlag = pf.Value.String()
@@ -566,321 +376,97 @@ func runWebCmd(cmd *cobra.Command) error {
 		return fmt.Errorf("--target is required for web subcommand")
 	}
 
-	// Honor --config / --secrets (mirrors runSubsCmd pattern).
-	efs := parseEarlyFlags(os.Args[1:])
-	cfg, err := config.Load(config.LoadOptions{
-		ExplicitConfigPath: efs.configPath,
-		SecretsPath:        efs.secretsPath,
-	})
-	if err != nil {
-		return fmt.Errorf("web: config load: %w", err)
-	}
-
-	// Step 2: Build target.
-	tgt, err := appctx.NewTarget(targetFlag, nil, "")
-	if err != nil {
-		return fmt.Errorf("web: invalid target: %w", err)
-	}
-	workdir, err := output.WorkspaceInit(cfg.Paths.DataDir, tgt.Domain)
-	if err != nil {
-		workdir, err = output.WorkspaceInit("workspaces", tgt.Domain)
-		if err != nil {
-			return fmt.Errorf("web: workspace init: %w", err)
-		}
-	}
-	tgt.WorkDir = workdir
-
-	// Step 3: Construct Scheduler BEFORE Boot (cycle-break).
-	sched := scheduler.NewScheduler(cfg.Concurrency.MaxJobs, cfg.Concurrency.HeartbeatSeconds, nil, nil)
-
-	// Step 4: Choose backend.
-	var chosenBackend backend.Backend
 	axiomEnabled, _ := cmd.Flags().GetBool("axiom")
-	if axiomEnabled || cfg.Axiom.Enabled {
-		axiomBE := backend.NewAxiomBackend(cfg, backend.Default, nil)
-		localBE := backend.NewLocalBackend(time.Duration(cfg.Concurrency.KillGraceSeconds) * time.Second)
-		chosenBackend = &backend.FailoverBackend{
-			Primary:   axiomBE,
-			Fallback:  localBE,
-			Threshold: cfg.Axiom.FailoverThreshold,
+	efs := parseEarlyFlags(os.Args[1:])
+	sched := scheduler.NewScheduler(0, 0, nil, nil)
+
+	var dryRunTaskList []task.Task
+	var dryRunCfg *config.Config
+	var summaryWorkdir, summaryRunLog string
+	var summaryVerbosity ui.Verbosity
+
+	afterBoot := func(boot handlers.AppBoot) {
+		app := boot.App
+		workdir := boot.WorkDir
+		cfg := boot.Cfg
+		summaryWorkdir = workdir
+		summaryVerbosity = ui.Verbosity(cfg.Output.Verbosity)
+		sched.MaxConcurrent = cfg.Concurrency.MaxJobs
+		sched.HeartbeatSeconds = cfg.Concurrency.HeartbeatSeconds
+
+		if dryRun {
+			cfg.Advanced.Diff = false
+			if ts, err := task.Default.Build(); err == nil {
+				dryRunTaskList = ts
+				dryRunCfg = cfg
+			}
+			return
 		}
-	}
 
-	// Step 5: Boot.
-	if dryRun {
-		cfg.Advanced.Diff = false
-	}
-
-	verbosity := ui.Verbosity(cfg.Output.Verbosity)
-	liveUI := !dryRun && verbosity != ui.VerbosityQuiet && ui.IsTTY(os.Stderr)
-	var subLogger *slog.Logger
-	var runLogPath string
-	if liveUI {
-		p := filepath.Join(workdir, "run.log")
-		if f, ferr := os.Create(p); ferr == nil { //nolint:gosec
-			defer f.Close() //nolint:errcheck
-			runLogPath = p
-			rdct := &log.Redactor{}
-			registerSecrets(cfg, rdct)
-			lc := cfg.AsLoggerConfig()
-			lc.Output = f
-			subLogger = log.New(lc, rdct)
-			slog.SetDefault(subLogger)
-			fmt.Fprintf(os.Stderr, "  logs → %s\n", runLogPath)
-		}
-	}
-
-	app, err := appctx.Boot(ctx, subLogger, cfg, tgt, sched, appctx.BootOptions{Backend: chosenBackend})
-	if err != nil {
-		return fmt.Errorf("web: appctx boot: %w", err)
-	}
-	defer func() {
-		if closer, ok := app.Checkpoint.(interface{ Close() error }); ok {
-			_ = closer.Close()
-		}
-	}()
-
-	// Step 5b: Wire sched.Checkpoint AFTER Boot (B3 fix).
-	sched.Checkpoint = app.Checkpoint
-
-	// Step 6: Wire RunTask closure with progress UI.
-	progress := ui.NewStageProgress(app.UI.W, app.UI.NoColor, app.UI.Verbosity)
-	sched.RunTask = func(rctx context.Context, t task.Task) (task.Result, error) {
-		progress.TaskStart(t.Name())
-		started := time.Now()
-		result, err := t.Run(rctx, app)
-		dur := result.Duration
-		if dur <= 0 {
-			dur = time.Since(started)
-		}
-		badge := badgeForStatus(result.Status)
-		progress.TaskDone(t.Name(), badge, dur)
-		return result, err
-	}
-
-	// Step 7: Launch Axiom fleet if applicable.
-	var axiomBE *backend.AxiomBackend
-	if fb, ok := chosenBackend.(*backend.FailoverBackend); ok {
-		if abe, ok := fb.Primary.(*backend.AxiomBackend); ok {
-			axiomBE = abe
-		}
-	}
-	if axiomBE != nil {
-		if err := axiomBE.Launch(ctx); err != nil {
-			return fmt.Errorf("web: axiom launch: %w", err)
-		}
-		defer func() { _ = axiomBE.Shutdown(context.Background()) }()
-	}
-
-	// Step 8: Build the task DAG.
-	allTasks, err := task.Default.Build()
-	if err != nil {
-		return fmt.Errorf("web: task DAG: %w", err)
-	}
-
-	// Step 9: Dry-run mode — list tasks and exit.
-	if dryRun {
-		return printWebDryRun(cmd, allTasks, cfg)
-	}
-
-	// Step 10: Inject --hosts flag into context for HTTPXTask.Run (D-W10).
-	if hostsFlag != "" {
-		ctx = web.CtxWithHostsFile(ctx, hostsFlag)
-	}
-
-	// Step 11: Sequential best_effort RunStage execution (D-W12).
-	// ALL stages use module "web" → best_effort policy throughout.
-	// No fail_fast stage — httpx empty output → downstream runs with empty input.
-	//
-	// Stages are split to honor all declared DependsOn edges (CR-04 fix, plan 05-10).
-	// RunStage fires every task in a slice CONCURRENTLY; ordering comes from the
-	// sequential stage calls below, not from DependsOn enforcement within a stage.
-	// The stage order MUST agree with every declared DependsOn edge — a stage that
-	// runs before its task's declared dependency is a latent correctness bug
-	// (CR-02). The TestWebDAGStageOrderConsistency guard asserts this invariant.
-	//
-	// URL PIPELINE (WEB-14 single-writer):
-	//   urls-fetch   → katana/urlfinder/waymore write inputs/urls.{katana,...}.jsonl
-	//   [intermediate] → intermediate merge populates artefacts/urls.jsonl for js tasks
-	//   js-extract   → subjs/sourcemapper read artefacts/urls.jsonl for JS URL input
-	//                  (subjs DependsOn katana/urlfinder/waymore — CR-01: NOT urldedup)
-	//   js-analyze   → jsluice/jsa/mantra write inputs/urls.{jsluice,jsa,mantra}.jsonl
-	//   urls-dedup   → globs ALL inputs/urls.*.jsonl, runs semantic dedup, calls
-	//                  Tree.Append("urls") ONCE — writes the FINAL artefacts/urls.jsonl.
-	//                  No second intermediate merge after js-analyze: urldedup IS the merge.
-	//   bypass       → gxss/arjun read the FINAL deduped artefacts/urls.jsonl, so this
-	//                  stage MUST run AFTER urls-dedup (CR-02), not before it.
-	type stageSpec struct {
-		name     string
-		prefixes []string
-	}
-	stages := []stageSpec{
-		{
-			// Stage 1: httpx probe — DAG root; feeds everything downstream.
-			name: "probe",
-			prefixes: []string{
-				"web.httpx",
-			},
-		},
-		{
-			// Stage 2: WAF/CDN analysis — must complete before nuclei reads waf.jsonl.
-			// web.nuclei DependsOn ["web.httpx", "web.wafw00f"] — wafw00f must precede nuclei.
-			name: "analysis-waf",
-			prefixes: []string{
-				"web.wafw00f",
-				"web.cdncheck",
-			},
-		},
-		{
-			// Stage 3: main analysis — nuclei DependsOn wafw00f ✓ (analysis-waf ran first).
-			name: "analysis",
-			prefixes: []string{
-				"web.nuclei",
-				"web.screenshot",
-				"web.ffuf",
-				"web.favirecon",
-				"web.vhostfinder",
-				"web.hakoriginfinder",
-				"web.csprecon",
-			},
-		},
-		{
-			// Stage 4: URL fetch — katana/urlfinder/waymore write inputs/urls.*.jsonl.
-			// An intermediate merge runs after this stage to populate
-			// artefacts/urls.jsonl before js-extract tasks read it.
-			name: "urls-fetch",
-			prefixes: []string{
-				"web.katana",
-				"web.urlfinder",
-				"web.waymore",
-			},
-		},
-		{
-			// Stage 5: JS extraction — reads artefacts/urls.jsonl populated by the intermediate
-			// merge after urls-fetch. subjs/sourcemapper must complete before
-			// jsluice (web.jsluice DependsOn ["web.subjs", "web.sourcemapper"]).
-			name: "js-extract",
-			prefixes: []string{
-				"web.subjs",
-				"web.sourcemapper",
-			},
-		},
-		{
-			// Stage 6: JS analysis — jsluice DependsOn subjs/sourcemapper ✓ (js-extract ran first).
-			// jsa/mantra DependsOn subjs ✓. All write inputs/urls.{jsluice,jsa,mantra}.jsonl.
-			name: "js-analyze",
-			prefixes: []string{
-				"web.jsluice",
-				"web.jsa",
-				"web.mantra",
-			},
-		},
-		{
-			// Stage 7: URL deduplication — single-writer for urls (WEB-14).
-			// Globs ALL inputs/urls.*.jsonl (from urls-fetch AND js-analyze),
-			// runs urless/p1radup semantic dedup, calls Tree.Append("urls") ONCE,
-			// writing the FINAL deduped artefacts/urls.jsonl. web.urldedup DependsOn
-			// all URL producers ✓ (urls-fetch + js-extract + js-analyze all ran first).
-			//
-			// CR-02: this MUST run BEFORE the bypass stage. gxss/arjun DependsOn
-			// web.urldedup and read the final deduped artefacts/urls.jsonl; running
-			// bypass first would feed them the stale intermediate (fetch-only) URL set
-			// and skip every JS-discovered parameterized URL.
-			name: "urls-dedup",
-			prefixes: []string{
-				"web.urldedup",
-			},
-		},
-		{
-			// Stage 8: bypass + param discovery — LAST stage.
-			// gxss/arjun DependsOn web.urldedup ✓ (urls-dedup ran first), so they
-			// read the FINAL deduped artefacts/urls.jsonl. nomore403/shortscan read
-			// fuzz/nuclei outputs produced in the analysis stage.
-			name: "bypass",
-			prefixes: []string{
-				"web.nomore403",
-				"web.shortscan",
-				"web.gxss",
-				"web.arjun",
-			},
-		},
-	}
-
-	for _, stage := range stages {
-		stageSlice := filterByModuleAndEnabled(allTasks, "web", cfg, stage.prefixes)
-		progress.StageStart(stage.name, len(stageSlice))
-
-		// Pass ctx (possibly carrying hostsFlag) through RunStage.
-		if err := sched.RunStage(ctx, "web", stageSlice); err != nil {
-			// best_effort: log the error and continue to the next stage.
-			if app.Log != nil {
-				app.Log.Warn("web: stage failed (best_effort — continuing)",
-					"stage", stage.name, "err", err)
+		liveUI := summaryVerbosity != ui.VerbosityQuiet && ui.IsTTY(os.Stderr)
+		if liveUI {
+			p := filepath.Join(workdir, "run.log")
+			if f, ferr := os.Create(p); ferr == nil { //nolint:gosec
+				summaryRunLog = p
+				rdct := &log.Redactor{}
+				registerSecrets(cfg, rdct)
+				lc := cfg.AsLoggerConfig()
+				lc.Output = f
+				subLogger := log.New(lc, rdct)
+				slog.SetDefault(subLogger)
+				fmt.Fprintf(os.Stderr, "  logs → %s\n", summaryRunLog)
+				_ = f
 			}
 		}
 
-		progress.StageDone(stage.name, countFileLines(filepath.Join(workdir, "artefacts", "hosts.jsonl")))
-
-		// Per-stage MergeStage calls immediately after each stage that has
-		// multi-writer participants, so consumers in the next stage read a
-		// merged artefact rather than individual staging files.
-		switch stage.name {
-		case "analysis-waf":
-			// Merge wafw00f + cdncheck staging into artefacts/waf.jsonl.
-			if mergeErr := web.MergeStage(ctx, app, "waf"); mergeErr != nil {
+		var axiomBE *backend.AxiomBackend
+		if fb, ok := boot.ChosenBackend.(*backend.FailoverBackend); ok {
+			if abe, ok := fb.Primary.(*backend.AxiomBackend); ok {
+				axiomBE = abe
+			}
+		}
+		if axiomBE != nil {
+			if launchErr := axiomBE.Launch(ctx); launchErr != nil {
 				if app.Log != nil {
-					app.Log.Warn("web: MergeStage failed (best_effort — continuing)",
-						"stage", "waf", "err", mergeErr)
+					app.Log.Warn("web: axiom launch failed — continuing locally", "err", launchErr)
 				}
+			} else {
+				defer func() { _ = axiomBE.Shutdown(context.Background()) }() //nolint:staticcheck
 			}
-		case "analysis":
-			// Merge nuclei (and other analysis) staging into artefacts/findings.jsonl.
-			if mergeErr := web.MergeStage(ctx, app, "findings"); mergeErr != nil {
-				if app.Log != nil {
-					app.Log.Warn("web: MergeStage failed (best_effort — continuing)",
-						"stage", "findings", "err", mergeErr)
-				}
+		}
+
+		progress := ui.NewStageProgress(app.UI.W, app.UI.NoColor, app.UI.Verbosity)
+		sched.RunTask = func(rctx context.Context, t task.Task) (task.Result, error) {
+			progress.TaskStart(t.Name())
+			started := time.Now()
+			result, runErr := t.Run(rctx, app)
+			dur := result.Duration
+			if dur <= 0 {
+				dur = time.Since(started)
 			}
-		case "urls-fetch":
-			// intermediate merge: populate artefacts/urls.jsonl from katana/urlfinder/waymore
-			// staging so js-extract/js-analyze tasks can read their JS URL input.
-			// urldedup (urls-dedup stage) will replace this with the final
-			// semantically-deduped union after js-analyze completes.
-			if mergeErr := web.MergeStage(ctx, app, "urls"); mergeErr != nil {
-				if app.Log != nil {
-					app.Log.Warn("web: MergeStage failed (best_effort — continuing)",
-						"stage", "urls", "err", mergeErr)
-				}
-			}
-		case "bypass":
-			// Merge nomore403/shortscan/gxss/arjun staging into artefacts/findings.jsonl.
-			if mergeErr := web.MergeStage(ctx, app, "findings"); mergeErr != nil {
-				if app.Log != nil {
-					app.Log.Warn("web: MergeStage failed (best_effort — continuing)",
-						"stage", "findings", "err", mergeErr)
-				}
-			}
-		// urls-dedup stage: urldedup already called app.Tree.Append("urls") — no merge needed.
-		// js-analyze stage: no urls merge here — urldedup (urls-dedup stage) IS the merge step.
+			progress.TaskDone(t.Name(), badgeForStatus(result.Status), dur)
+			return result, runErr
 		}
 	}
 
-	// Final safety sweep: merge any remaining findings/waf staging files that may
-	// not have been captured by the per-stage merges (e.g. if a stage was partially
-	// skipped). "urls" is intentionally excluded — urldedup (urls-dedup stage) is the
-	// sole semantic-dedup Tree.Append("urls") writer; re-merging inputs/urls.*.jsonl
-	// here would clobber urldedup's urless/p1radup result (REPLACE semantics, WEB-14).
-	for _, prefix := range []string{"waf", "findings"} {
-		if mergeErr := web.MergeStage(ctx, app, prefix); mergeErr != nil {
-			if app.Log != nil {
-				app.Log.Warn("web: final sweep MergeStage failed (best_effort — continuing)",
-					"stage", prefix, "err", mergeErr)
-			}
-		}
+	if err := handlers.RunWebAsync(ctx, handlers.RunOptions{
+		Target:       targetFlag,
+		DryRun:       dryRun,
+		ExtraFile:    hostsFlag,
+		ConfigPath:   efs.configPath,
+		SecretsPath:  efs.secretsPath,
+		AxiomEnabled: axiomEnabled,
+		Scheduler:    sched,
+		AfterBoot:    afterBoot,
+	}); err != nil {
+		return fmt.Errorf("web: %w", err)
 	}
 
-	printWebSummary(os.Stderr, workdir, runLogPath, verbosity)
+	if dryRun && dryRunTaskList != nil {
+		return printWebDryRun(cmd, dryRunTaskList, dryRunCfg)
+	}
 
+	printWebSummary(os.Stderr, summaryWorkdir, summaryRunLog, summaryVerbosity)
 	return nil
 }
 
@@ -1034,17 +620,15 @@ Output: workspaces/<target>/artefacts/findings.jsonl`,
 	return cmd
 }
 
-// runVulnsCmd is the extracted RunE body for newVulnsCmd. Mirrors runWebCmd structure
-// but implements the vulns pipeline with all-best_effort stages (D-V7).
+// runVulnsCmd is the extracted RunE body for newVulnsCmd. Thin wrapper over
+// handlers.RunVulnsAsync — extracts CLI flags and delegates the full pipeline.
 func runVulnsCmd(cmd *cobra.Command) error {
 	ctx := cmd.Context()
 
-	// Step 1: Load config with CLI overrides.
 	targetFlag, _ := cmd.Flags().GetString("target")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	urlsFlag, _ := cmd.Flags().GetString("urls")
 
-	// Inherit --target from parent (persistent flag) if not set locally.
 	if targetFlag == "" {
 		if pf := cmd.InheritedFlags().Lookup("target"); pf != nil {
 			targetFlag = pf.Value.String()
@@ -1054,215 +638,97 @@ func runVulnsCmd(cmd *cobra.Command) error {
 		return fmt.Errorf("--target is required for vulns subcommand")
 	}
 
-	// Honor --config / --secrets (mirrors runWebCmd pattern).
-	efs := parseEarlyFlags(os.Args[1:])
-	cfg, err := config.Load(config.LoadOptions{
-		ExplicitConfigPath: efs.configPath,
-		SecretsPath:        efs.secretsPath,
-	})
-	if err != nil {
-		return fmt.Errorf("vulns: config load: %w", err)
-	}
-
-	// Step 2: Build target.
-	tgt, err := appctx.NewTarget(targetFlag, nil, "")
-	if err != nil {
-		return fmt.Errorf("vulns: invalid target: %w", err)
-	}
-	workdir, err := output.WorkspaceInit(cfg.Paths.DataDir, tgt.Domain)
-	if err != nil {
-		workdir, err = output.WorkspaceInit("workspaces", tgt.Domain)
-		if err != nil {
-			return fmt.Errorf("vulns: workspace init: %w", err)
-		}
-	}
-	tgt.WorkDir = workdir
-
-	// Step 3: Construct Scheduler BEFORE Boot (cycle-break).
-	sched := scheduler.NewScheduler(cfg.Concurrency.MaxJobs, cfg.Concurrency.HeartbeatSeconds, nil, nil)
-
-	// Step 4: Choose backend.
-	var chosenBackend backend.Backend
 	axiomEnabled, _ := cmd.Flags().GetBool("axiom")
-	if axiomEnabled || cfg.Axiom.Enabled {
-		axiomBE := backend.NewAxiomBackend(cfg, backend.Default, nil)
-		localBE := backend.NewLocalBackend(time.Duration(cfg.Concurrency.KillGraceSeconds) * time.Second)
-		chosenBackend = &backend.FailoverBackend{
-			Primary:   axiomBE,
-			Fallback:  localBE,
-			Threshold: cfg.Axiom.FailoverThreshold,
+	efs := parseEarlyFlags(os.Args[1:])
+	sched := scheduler.NewScheduler(0, 0, nil, nil)
+
+	var dryRunTaskList []task.Task
+	var dryRunCfg *config.Config
+	var summaryWorkdir, summaryRunLog string
+	var summaryVerbosity ui.Verbosity
+
+	afterBoot := func(boot handlers.AppBoot) {
+		app := boot.App
+		workdir := boot.WorkDir
+		cfg := boot.Cfg
+		summaryWorkdir = workdir
+		summaryVerbosity = ui.Verbosity(cfg.Output.Verbosity)
+		sched.MaxConcurrent = cfg.Concurrency.MaxJobs
+		sched.HeartbeatSeconds = cfg.Concurrency.HeartbeatSeconds
+
+		if dryRun {
+			cfg.Advanced.Diff = false
+			if ts, err := task.Default.Build(); err == nil {
+				dryRunTaskList = ts
+				dryRunCfg = cfg
+			}
+			return
 		}
-	}
 
-	// Step 5: Boot.
-	if dryRun {
-		cfg.Advanced.Diff = false
-	}
-
-	verbosity := ui.Verbosity(cfg.Output.Verbosity)
-	liveUI := !dryRun && verbosity != ui.VerbosityQuiet && ui.IsTTY(os.Stderr)
-	var subLogger *slog.Logger
-	var runLogPath string
-	if liveUI {
-		p := filepath.Join(workdir, "run.log")
-		if f, ferr := os.Create(p); ferr == nil { //nolint:gosec
-			defer f.Close() //nolint:errcheck
-			runLogPath = p
-			rdct := &log.Redactor{}
-			registerSecrets(cfg, rdct)
-			lc := cfg.AsLoggerConfig()
-			lc.Output = f
-			subLogger = log.New(lc, rdct)
-			slog.SetDefault(subLogger)
-			fmt.Fprintf(os.Stderr, "  logs → %s\n", runLogPath)
-		}
-	}
-
-	app, err := appctx.Boot(ctx, subLogger, cfg, tgt, sched, appctx.BootOptions{Backend: chosenBackend})
-	if err != nil {
-		return fmt.Errorf("vulns: appctx boot: %w", err)
-	}
-	defer func() {
-		if closer, ok := app.Checkpoint.(interface{ Close() error }); ok {
-			_ = closer.Close()
-		}
-	}()
-
-	// Step 5b: Wire sched.Checkpoint AFTER Boot (B3 fix).
-	sched.Checkpoint = app.Checkpoint
-
-	// Step 6: Wire RunTask closure with progress UI.
-	progress := ui.NewStageProgress(app.UI.W, app.UI.NoColor, app.UI.Verbosity)
-	sched.RunTask = func(rctx context.Context, t task.Task) (task.Result, error) {
-		progress.TaskStart(t.Name())
-		started := time.Now()
-		result, err := t.Run(rctx, app)
-		dur := result.Duration
-		if dur <= 0 {
-			dur = time.Since(started)
-		}
-		badge := badgeForStatus(result.Status)
-		progress.TaskDone(t.Name(), badge, dur)
-		return result, err
-	}
-
-	// Step 7: Launch Axiom fleet if applicable.
-	var axiomBE *backend.AxiomBackend
-	if fb, ok := chosenBackend.(*backend.FailoverBackend); ok {
-		if abe, ok := fb.Primary.(*backend.AxiomBackend); ok {
-			axiomBE = abe
-		}
-	}
-	if axiomBE != nil {
-		if err := axiomBE.Launch(ctx); err != nil {
-			return fmt.Errorf("vulns: axiom launch: %w", err)
-		}
-		defer func() { _ = axiomBE.Shutdown(context.Background()) }()
-	}
-
-	// Step 8: Build the task DAG.
-	allTasks, err := task.Default.Build()
-	if err != nil {
-		return fmt.Errorf("vulns: task DAG: %w", err)
-	}
-
-	// Step 9: Dry-run mode — list tasks and exit.
-	if dryRun {
-		return printVulnsDryRun(cmd, allTasks, cfg)
-	}
-
-	// Step 10: Inject --urls flag into context for GFTask.Run (D-V5).
-	// CtxWithURLsFile sets the context value that GFTask.Run reads in resolveURLInput.
-	if urlsFlag != "" {
-		ctx = vulns.CtxWithURLsFile(ctx, urlsFlag)
-	}
-
-	// Step 11: Sequential best_effort RunStage execution (D-V7).
-	// ALL stages use module "vulns" → best_effort policy throughout.
-	// No fail_fast stage — empty gf output → downstream runs with empty input.
-	//
-	// Stage ordering mirrors DependsOn edges: gf-classify MUST run first so all
-	// scanner Tasks that DependsOn "vulns.gf" have their bucket files available.
-	type stageSpec struct {
-		name     string
-		prefixes []string
-	}
-	stages := []stageSpec{
-		{
-			// Stage 1: gf-classify — DAG root; produces inputs/gf/<class>.txt buckets.
-			// No merge after (gf writes bucket files directly, not through staging pipeline).
-			name: "gf-classify",
-			prefixes: []string{
-				"vulns.gf",
-			},
-		},
-		{
-			// Stage 2: injection scanners — all DependsOn vulns.gf; read their buckets.
-			// SQLiTask (vulns.sqli) handles both sqlmap+ghauri internally per D-V6 dual-engine.
-			name: "injection",
-			prefixes: []string{
-				"vulns.xss",
-				"vulns.sqli",
-				"vulns.lfi",
-				"vulns.ssti",
-				"vulns.crlf",
-				"vulns.cmdi",
-			},
-		},
-		{
-			// Stage 3: OOB/advanced — blind detection (SSRF, smuggling, cache, second-order).
-			name: "oob-advanced",
-			prefixes: []string{
-				"vulns.ssrf",
-				"vulns.smuggling",
-				"vulns.webcache_wcvs",
-				"vulns.webcache_toxicache",
-				"vulns.second_order",
-			},
-		},
-		{
-			// Stage 4: DAST-extended — nuclei DAST, fuzzparams, 4xx-bypass, testssl,
-			// fray, and the Phase-5-routed graphql/grpc/llm/websocket probes (D-V3).
-			name: "dast-extended",
-			prefixes: []string{
-				"vulns.nuclei_dast",
-				"vulns.fuzzparams",
-				"vulns.bypass4xx",
-				"vulns.testssl",
-				"vulns.fray",
-				"vulns.graphql",
-				"vulns.grpc",
-				"vulns.llm",
-				"vulns.websocket",
-			},
-		},
-	}
-
-	for _, stage := range stages {
-		stageSlice := filterByModuleAndEnabled(allTasks, "vulns", cfg, stage.prefixes)
-		progress.StageStart(stage.name, len(stageSlice))
-
-		if err := sched.RunStage(ctx, "vulns", stageSlice); err != nil {
-			// best_effort: log the error and continue to the next stage.
-			if app.Log != nil {
-				app.Log.Warn("vulns: stage failed (best_effort — continuing)",
-					"stage", stage.name, "err", err)
+		liveUI := summaryVerbosity != ui.VerbosityQuiet && ui.IsTTY(os.Stderr)
+		if liveUI {
+			p := filepath.Join(workdir, "run.log")
+			if f, ferr := os.Create(p); ferr == nil { //nolint:gosec
+				summaryRunLog = p
+				rdct := &log.Redactor{}
+				registerSecrets(cfg, rdct)
+				lc := cfg.AsLoggerConfig()
+				lc.Output = f
+				subLogger := log.New(lc, rdct)
+				slog.SetDefault(subLogger)
+				fmt.Fprintf(os.Stderr, "  logs → %s\n", summaryRunLog)
+				_ = f
 			}
 		}
 
-		progress.StageDone(stage.name, countFileLines(filepath.Join(workdir, "artefacts", "findings.jsonl")))
-	}
+		var axiomBE *backend.AxiomBackend
+		if fb, ok := boot.ChosenBackend.(*backend.FailoverBackend); ok {
+			if abe, ok := fb.Primary.(*backend.AxiomBackend); ok {
+				axiomBE = abe
+			}
+		}
+		if axiomBE != nil {
+			if launchErr := axiomBE.Launch(ctx); launchErr != nil {
+				if app.Log != nil {
+					app.Log.Warn("vulns: axiom launch failed — continuing locally", "err", launchErr)
+				}
+			} else {
+				defer func() { _ = axiomBE.Shutdown(context.Background()) }() //nolint:staticcheck
+			}
+		}
 
-	// Final merge: consolidate all findings staging files into artefacts/findings.jsonl.
-	// gf-classify buckets (inputs/gf/*.txt) are excluded — single-writer, no merge needed.
-	if mergeErr := vulns.MergeAllVulnsArtefacts(ctx, app); mergeErr != nil {
-		if app.Log != nil {
-			app.Log.Warn("vulns: final merge failed (best_effort — continuing)", "err", mergeErr)
+		progress := ui.NewStageProgress(app.UI.W, app.UI.NoColor, app.UI.Verbosity)
+		sched.RunTask = func(rctx context.Context, t task.Task) (task.Result, error) {
+			progress.TaskStart(t.Name())
+			started := time.Now()
+			result, runErr := t.Run(rctx, app)
+			dur := result.Duration
+			if dur <= 0 {
+				dur = time.Since(started)
+			}
+			progress.TaskDone(t.Name(), badgeForStatus(result.Status), dur)
+			return result, runErr
 		}
 	}
 
-	printVulnsSummary(os.Stderr, workdir, runLogPath, verbosity)
+	if err := handlers.RunVulnsAsync(ctx, handlers.RunOptions{
+		Target:       targetFlag,
+		DryRun:       dryRun,
+		ExtraFile:    urlsFlag,
+		ConfigPath:   efs.configPath,
+		SecretsPath:  efs.secretsPath,
+		AxiomEnabled: axiomEnabled,
+		Scheduler:    sched,
+		AfterBoot:    afterBoot,
+	}); err != nil {
+		return fmt.Errorf("vulns: %w", err)
+	}
 
+	if dryRun && dryRunTaskList != nil {
+		return printVulnsDryRun(cmd, dryRunTaskList, dryRunCfg)
+	}
+
+	printVulnsSummary(os.Stderr, summaryWorkdir, summaryRunLog, summaryVerbosity)
 	return nil
 }
 
@@ -1351,17 +817,14 @@ Output: workspaces/<target>/artefacts/findings.jsonl (osint-class, XCUT-07 redac
 	return cmd
 }
 
-// runOSINTCmd is the RunE body for newOSINTCmd. Mirrors runVulnsCmd structure
-// but seeds from the root domain / company name (D-O1) instead of a URL corpus,
-// and executes a single best_effort osint stage (D-O8/ARCH-09).
+// runOSINTCmd is the RunE body for newOSINTCmd. Thin wrapper over
+// handlers.RunOSINTAsync — extracts CLI flags and delegates the full pipeline.
 func runOSINTCmd(cmd *cobra.Command) error {
 	ctx := cmd.Context()
 
-	// Step 1: Load config with CLI overrides.
 	targetFlag, _ := cmd.Flags().GetString("target")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 
-	// Inherit --target from parent (persistent flag) if not set locally.
 	if targetFlag == "" {
 		if pf := cmd.InheritedFlags().Lookup("target"); pf != nil {
 			targetFlag = pf.Value.String()
@@ -1371,167 +834,96 @@ func runOSINTCmd(cmd *cobra.Command) error {
 		return fmt.Errorf("--target is required for osint subcommand")
 	}
 
-	// Honor --config / --secrets (mirrors runVulnsCmd pattern).
-	efs := parseEarlyFlags(os.Args[1:])
-	cfg, err := config.Load(config.LoadOptions{
-		ExplicitConfigPath: efs.configPath,
-		SecretsPath:        efs.secretsPath,
-	})
-	if err != nil {
-		return fmt.Errorf("osint: config load: %w", err)
-	}
-
-	// Step 2: Build target. The root registrable domain is the OSINT seed
-	// (D-O1, unfurl format %r analog); Wave 2 Tasks derive the company name
-	// from tgt.Domain. No --urls corpus is needed.
-	tgt, err := appctx.NewTarget(targetFlag, nil, "")
-	if err != nil {
-		return fmt.Errorf("osint: invalid target: %w", err)
-	}
-	workdir, err := output.WorkspaceInit(cfg.Paths.DataDir, tgt.Domain)
-	if err != nil {
-		workdir, err = output.WorkspaceInit("workspaces", tgt.Domain)
-		if err != nil {
-			return fmt.Errorf("osint: workspace init: %w", err)
-		}
-	}
-	tgt.WorkDir = workdir
-
-	// Step 3: Construct Scheduler BEFORE Boot (cycle-break).
-	sched := scheduler.NewScheduler(cfg.Concurrency.MaxJobs, cfg.Concurrency.HeartbeatSeconds, nil, nil)
-
-	// Step 4: Choose backend. Most OSINT tools have no axiom module (D-05/D-06);
-	// honor --axiom/cfg for the few that do via FailoverBackend.
-	var chosenBackend backend.Backend
 	axiomEnabled, _ := cmd.Flags().GetBool("axiom")
-	if axiomEnabled || cfg.Axiom.Enabled {
-		axiomBE := backend.NewAxiomBackend(cfg, backend.Default, nil)
-		localBE := backend.NewLocalBackend(time.Duration(cfg.Concurrency.KillGraceSeconds) * time.Second)
-		chosenBackend = &backend.FailoverBackend{
-			Primary:   axiomBE,
-			Fallback:  localBE,
-			Threshold: cfg.Axiom.FailoverThreshold,
+	efs := parseEarlyFlags(os.Args[1:])
+	sched := scheduler.NewScheduler(0, 0, nil, nil)
+
+	var dryRunTaskList []task.Task
+	var dryRunCfg *config.Config
+	var summaryWorkdir, summaryRunLog string
+	var summaryVerbosity ui.Verbosity
+
+	afterBoot := func(boot handlers.AppBoot) {
+		app := boot.App
+		workdir := boot.WorkDir
+		cfg := boot.Cfg
+		summaryWorkdir = workdir
+		summaryVerbosity = ui.Verbosity(cfg.Output.Verbosity)
+		sched.MaxConcurrent = cfg.Concurrency.MaxJobs
+		sched.HeartbeatSeconds = cfg.Concurrency.HeartbeatSeconds
+
+		if dryRun {
+			cfg.Advanced.Diff = false
+			if ts, err := task.Default.Build(); err == nil {
+				dryRunTaskList = ts
+				dryRunCfg = cfg
+			}
+			return
 		}
-	}
 
-	// Step 5: Boot.
-	if dryRun {
-		cfg.Advanced.Diff = false
-	}
-
-	verbosity := ui.Verbosity(cfg.Output.Verbosity)
-	liveUI := !dryRun && verbosity != ui.VerbosityQuiet && ui.IsTTY(os.Stderr)
-	var subLogger *slog.Logger
-	var runLogPath string
-	if liveUI {
-		p := filepath.Join(workdir, "run.log")
-		if f, ferr := os.Create(p); ferr == nil { //nolint:gosec
-			defer f.Close() //nolint:errcheck
-			runLogPath = p
-			rdct := &log.Redactor{}
-			registerSecrets(cfg, rdct)
-			lc := cfg.AsLoggerConfig()
-			lc.Output = f
-			subLogger = log.New(lc, rdct)
-			slog.SetDefault(subLogger)
-			fmt.Fprintf(os.Stderr, "  logs → %s\n", runLogPath)
-		}
-	}
-
-	app, err := appctx.Boot(ctx, subLogger, cfg, tgt, sched, appctx.BootOptions{Backend: chosenBackend})
-	if err != nil {
-		return fmt.Errorf("osint: appctx boot: %w", err)
-	}
-	defer func() {
-		if closer, ok := app.Checkpoint.(interface{ Close() error }); ok {
-			_ = closer.Close()
-		}
-	}()
-
-	// Step 5b: Wire sched.Checkpoint AFTER Boot (B3 fix).
-	sched.Checkpoint = app.Checkpoint
-
-	// Step 6: Wire RunTask closure with progress UI.
-	progress := ui.NewStageProgress(app.UI.W, app.UI.NoColor, app.UI.Verbosity)
-	sched.RunTask = func(rctx context.Context, t task.Task) (task.Result, error) {
-		progress.TaskStart(t.Name())
-		started := time.Now()
-		result, err := t.Run(rctx, app)
-		dur := result.Duration
-		if dur <= 0 {
-			dur = time.Since(started)
-		}
-		badge := badgeForStatus(result.Status)
-		progress.TaskDone(t.Name(), badge, dur)
-		return result, err
-	}
-
-	// Step 7: Launch Axiom fleet if applicable.
-	var axiomBE *backend.AxiomBackend
-	if fb, ok := chosenBackend.(*backend.FailoverBackend); ok {
-		if abe, ok := fb.Primary.(*backend.AxiomBackend); ok {
-			axiomBE = abe
-		}
-	}
-	if axiomBE != nil {
-		if err := axiomBE.Launch(ctx); err != nil {
-			return fmt.Errorf("osint: axiom launch: %w", err)
-		}
-		defer func() { _ = axiomBE.Shutdown(context.Background()) }()
-	}
-
-	// Step 8: Build the task DAG.
-	allTasks, err := task.Default.Build()
-	if err != nil {
-		return fmt.Errorf("osint: task DAG: %w", err)
-	}
-
-	// Step 9: Dry-run mode — list tasks and exit.
-	if dryRun {
-		return printOSINTDryRun(cmd, allTasks, cfg)
-	}
-
-	// Step 10: Sequential best_effort osint stages (D-O8/ARCH-09). Mirrors the
-	// web/vulns stageSpec precedent (see runWebCmd above): RunStage fires every
-	// task in a slice CONCURRENTLY under a semaphore; the scheduler does NOT
-	// honor in-stage DependsOn ordering. Cross-task ordering therefore comes
-	// from the SEQUENTIAL stage calls below, not from DependsOn within a stage.
-	//
-	// Most OSINT Tasks have no DependsOn edge (root-domain/company-seeded, D-O1)
-	// → they stay parallel inside the single "osint" stage, preserving v1's 4
-	// parallel osint groups. The ONLY edge that needs sequencing is the D-O10
-	// fold osint.github_leaks DependsOn ["osint.github_repos"]: github_leaks'
-	// trufflehog per-repo scan reads inputs/github_repos.txt, which github_repos
-	// writes. They must NOT run concurrently (GAP-01/CR-01), so github_repos runs
-	// in a pre-stage that fully completes (RunStage returns) before the "osint"
-	// stage containing github_leaks starts.
-	//
-	// ALL stages use module "osint" → the best_effort policy (ARCH-09) applies
-	// throughout via policyFor. osintStages() is the SINGLE source of truth for
-	// the ordering, shared with the TestOSINTStageOrderHonorsDependsOn guard.
-	for _, stage := range osintStages() {
-		stageSlice := filterByModuleAndEnabled(allTasks, "osint", cfg, stage.prefixes)
-		progress.StageStart(stage.name, len(stageSlice))
-		if err := sched.RunStage(ctx, "osint", stageSlice); err != nil {
-			// best_effort: log and continue to the next stage / final merge.
-			if app.Log != nil {
-				app.Log.Warn("osint: stage failed (best_effort — continuing)",
-					"stage", stage.name, "err", err)
+		liveUI := summaryVerbosity != ui.VerbosityQuiet && ui.IsTTY(os.Stderr)
+		if liveUI {
+			p := filepath.Join(workdir, "run.log")
+			if f, ferr := os.Create(p); ferr == nil { //nolint:gosec
+				summaryRunLog = p
+				rdct := &log.Redactor{}
+				registerSecrets(cfg, rdct)
+				lc := cfg.AsLoggerConfig()
+				lc.Output = f
+				subLogger := log.New(lc, rdct)
+				slog.SetDefault(subLogger)
+				fmt.Fprintf(os.Stderr, "  logs → %s\n", summaryRunLog)
+				_ = f
 			}
 		}
-		progress.StageDone(stage.name, countFileLines(filepath.Join(workdir, "artefacts", "findings.jsonl")))
-	}
 
-	// Final merge: consolidate all findings staging files into artefacts/findings.jsonl.
-	// osint/*.txt single-writer human files are excluded (no merge needed).
-	if mergeErr := osint.MergeAllOSINTArtefacts(ctx, app); mergeErr != nil {
-		if app.Log != nil {
-			app.Log.Warn("osint: final merge failed (best_effort — continuing)", "err", mergeErr)
+		var axiomBE *backend.AxiomBackend
+		if fb, ok := boot.ChosenBackend.(*backend.FailoverBackend); ok {
+			if abe, ok := fb.Primary.(*backend.AxiomBackend); ok {
+				axiomBE = abe
+			}
+		}
+		if axiomBE != nil {
+			if launchErr := axiomBE.Launch(ctx); launchErr != nil {
+				if app.Log != nil {
+					app.Log.Warn("osint: axiom launch failed — continuing locally", "err", launchErr)
+				}
+			} else {
+				defer func() { _ = axiomBE.Shutdown(context.Background()) }() //nolint:staticcheck
+			}
+		}
+
+		progress := ui.NewStageProgress(app.UI.W, app.UI.NoColor, app.UI.Verbosity)
+		sched.RunTask = func(rctx context.Context, t task.Task) (task.Result, error) {
+			progress.TaskStart(t.Name())
+			started := time.Now()
+			result, runErr := t.Run(rctx, app)
+			dur := result.Duration
+			if dur <= 0 {
+				dur = time.Since(started)
+			}
+			progress.TaskDone(t.Name(), badgeForStatus(result.Status), dur)
+			return result, runErr
 		}
 	}
 
-	printVulnsSummary(os.Stderr, workdir, runLogPath, verbosity)
+	if err := handlers.RunOSINTAsync(ctx, handlers.RunOptions{
+		Target:       targetFlag,
+		DryRun:       dryRun,
+		ConfigPath:   efs.configPath,
+		SecretsPath:  efs.secretsPath,
+		AxiomEnabled: axiomEnabled,
+		Scheduler:    sched,
+		AfterBoot:    afterBoot,
+	}); err != nil {
+		return fmt.Errorf("osint: %w", err)
+	}
 
+	if dryRun && dryRunTaskList != nil {
+		return printOSINTDryRun(cmd, dryRunTaskList, dryRunCfg)
+	}
+
+	printVulnsSummary(os.Stderr, summaryWorkdir, summaryRunLog, summaryVerbosity)
 	return nil
 }
 
@@ -1613,29 +1005,84 @@ func printOSINTDryRun(cmd *cobra.Command, allTasks []task.Task, cfg *config.Conf
 	return nil
 }
 
-// newZenCmd — Phase 9 (Composite Modes). Stubbed per D-02.
-func newZenCmd() *cobra.Command {
-	return newStubCmd("zen", "Run zen mode (minimal noise — passive only + safe probes)")
-}
-
-// newDeepCmd — Phase 9 (Composite Modes). Stubbed per D-02.
-func newDeepCmd() *cobra.Command {
-	return newStubCmd("deep", "Run deep mode (all + recursive subdomain enum + advanced fuzz)")
-}
-
 // newMonitorCmd — Phase 10 (Monitor + Reporting). Stubbed per D-02.
 func newMonitorCmd() *cobra.Command {
 	return newStubCmd("monitor", "Run monitor loop (periodic re-scan with diff notifications)")
 }
 
-// newReportCmd — Phase 10 (Monitor + Reporting). Stubbed per D-02.
+// newReportCmd — Phase 10 (Monitor + Reporting). Real implementation replacing D-02 stub.
+//
+// Opens store.db read-only for the given target, resolves the latest completed scan
+// (or a specific scan via --scan-id), and writes all report formats to reports/
+// without re-running scans (D-03, REPORT-08).
 func newReportCmd() *cobra.Command {
-	return newStubCmd("report", "Generate report from prior scan workspace")
+	cmd := &cobra.Command{
+		Use:   "report",
+		Short: "Generate report from prior scan workspace without re-running scans",
+		Long: `Generate all report formats from a prior scan stored in store.db.
+
+Opens store.db in the configured data directory read-only, resolves the latest
+completed scan for the target (or a specific scan via --scan-id), and writes:
+  reports/report.html    — self-contained offline HTML dashboard
+  reports/findings.sarif — SARIF 2.1.0 findings export
+  reports/hotlist.json   — top N findings by risk score (D-08)
+  reports/faraday.json   — Faraday fplugin-compatible JSON (when enabled)
+  reports/notes.jsonl    — canonical empty JSONL artefact (REPORT-01)
+  reports/findings.csv   — CSV findings export
+  reports/hosts.csv      — CSV hosts/subdomains export
+  reports/urls.csv       — CSV URLs export
+
+No scan execution occurs. Use reconftw recon --target <domain> to run a scan first.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runReportCmd(cmd)
+		},
+	}
+	cmd.Flags().String("target", "", "Target domain (required)")
+	cmd.Flags().String("scan-id", "", "Specific scan ID to render (default: latest completed)")
+	cmd.Flags().Bool("allow-partial", false, "Also accept incomplete scans (use with --scan-id)")
+	return cmd
 }
 
-// newMCPCmd — Phase 8 (MCP Server). Stubbed per D-02.
-func newMCPCmd() *cobra.Command {
-	return newStubCmd("mcp", "Run MCP server (Model Context Protocol — SSE multiplexing)")
+func runReportCmd(cmd *cobra.Command) error {
+	ctx := cmd.Context()
+
+	targetFlag, _ := cmd.Flags().GetString("target")
+	if targetFlag == "" {
+		return fmt.Errorf("--target is required for the report subcommand")
+	}
+	scanIDFlag, _ := cmd.Flags().GetString("scan-id")
+
+	efs := parseEarlyFlags(os.Args[1:])
+	cfg, err := config.Load(config.LoadOptions{
+		ExplicitConfigPath: efs.configPath,
+		SecretsPath:        efs.secretsPath,
+	})
+	if err != nil {
+		return fmt.Errorf("report: config load: %w", err)
+	}
+
+	// Resolve the data directory where store.db lives.
+	dataDir := cfg.Paths.DataDir
+	if dataDir == "" {
+		dataDir = "data"
+	}
+
+	rdct := &log.Redactor{}
+	registerSecrets(cfg, rdct)
+
+	renderer, err := report.NewReportRenderer(dataDir, cfg, slog.Default(), rdct)
+	if err != nil {
+		return fmt.Errorf("report: open renderer: %w", err)
+	}
+	defer renderer.Close() //nolint:errcheck
+
+	if err := renderer.RenderAll(ctx, targetFlag, scanIDFlag); err != nil {
+		return fmt.Errorf("report: render: %w", err)
+	}
+
+	reportsDir := filepath.Join(dataDir, "reports")
+	fmt.Fprintf(cmd.OutOrStdout(), "reports written to: %s\n", reportsDir)
+	return nil
 }
 
 // newMigrateCmd — Phase 11 (Installer + Cross-Platform). Stubbed per D-02.
