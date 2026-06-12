@@ -14,8 +14,8 @@
 // so that cfgSliceJSON changes and checkpoint.InputHash differs from the first
 // call — triggering genuine re-execution for the new-asset partition.
 //
-// SIGINT wiring (Pitfall 7): signal.NotifyContext MUST be called in the CLI
-// layer (cmd/reconftw/stub_subcommands.go runMonitorCmd), NOT here. This
+// SIGINT wiring (Pitfall 7): the OS interrupt handler MUST be installed in the
+// CLI layer (cmd/reconftw/stub_subcommands.go runMonitorCmd), NOT here. This
 // function receives a context that is already signal-aware.
 package handlers
 
@@ -128,9 +128,9 @@ func runMonitorLoop(
 // RunMonitorAsync executes the monitor loop: per-cycle RunCompositeAsync,
 // post-cycle diff, dedup, EventFilter dispatch, and Flusher flush.
 //
-// SIGINT handling (Pitfall 7): the caller (runMonitorCmd in CLI layer) wraps
-// ctx with signal.NotifyContext before calling this function. RunMonitorAsync
-// does NOT call signal.NotifyContext — it must not own signal wiring.
+// SIGINT handling (Pitfall 7): the caller (runMonitorCmd in CLI layer) installs
+// the OS interrupt handler and passes a signal-aware context into this function.
+// RunMonitorAsync does NOT own signal wiring — that is the CLI layer's responsibility.
 func RunMonitorAsync(ctx context.Context, opts RunOptions, monCfg MonitorOptions) error {
 	if opts.Scheduler == nil {
 		return fmt.Errorf("mcp/monitor: RunOptions.Scheduler must not be nil")
