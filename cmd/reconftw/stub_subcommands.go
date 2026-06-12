@@ -22,7 +22,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -1005,9 +1007,107 @@ func printOSINTDryRun(cmd *cobra.Command, allTasks []task.Task, cfg *config.Conf
 	return nil
 }
 
-// newMonitorCmd — Phase 10 (Monitor + Reporting). Stubbed per D-02.
+// newMonitorCmd — Phase 10 real implementation replacing the D-02 stub.
+//
+// Runs a periodic re-scan loop against a target, diffing each cycle against
+// the previous scan via DiffBetweenScans/DiffScansFindings/DiffScansHosts/
+// DiffScansURLs sqlc queries. New findings are dispatched via EventFilter
+// (honoring notifications.events TOML rules), coalesced into digests, and
+// flushed at cycle-end via the Flusher interface.
+//
+// SIGINT (Pitfall 7): signal.NotifyContext is wired here in the CLI layer,
+// NOT inside RunMonitorAsync. The context passed down is already signal-aware.
 func newMonitorCmd() *cobra.Command {
-	return newStubCmd("monitor", "Run monitor loop (periodic re-scan with diff notifications)")
+	cmd := &cobra.Command{
+		Use:   "monitor",
+		Short: "Run monitor loop (periodic re-scan with diff notifications)",
+		Long: `Run a periodic re-scan loop that diffs each cycle against the previous scan.
+
+After each scan completes, new subdomains, hosts, URLs and findings are
+compared against the prior scan baseline. New critical findings are dispatched
+via EventFilter (honoring the notifications.events TOML rules) and coalesced
+into a per-channel digest before sending.
+
+SIGINT (Ctrl-C): the current task completes, checkpoints are written, and the
+monitor loop exits cleanly. No partial scan state is lost.
+
+Examples:
+  reconftw monitor --target example.com --interval 6h
+  reconftw monitor --target example.com --interval 30m --monitor-cycles 3
+  reconftw monitor --target example.com --incremental --interval 12h`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runMonitorCmd(cmd)
+		},
+	}
+	cmd.Flags().String("target", "", "Target domain (required)")
+	cmd.Flags().String("interval", "6h", "Scan interval between cycles (e.g. 6h, 30m, 1h30m)")
+	cmd.Flags().Int("monitor-cycles", 0, "Number of cycles to run (0 = infinite)")
+	cmd.Flags().Bool("incremental", false, "Re-run only on new assets from diff (D-04/D-05)")
+	cmd.Flags().Bool("dry-run", false, "Preview tasks without executing tools")
+	cmd.Flags().String("recon-mode", "recon", "Pipeline mode: recon or all")
+	return cmd
+}
+
+// runMonitorCmd is the RunE body for newMonitorCmd.
+//
+// SIGINT handling (Pitfall 7): signal.NotifyContext is called HERE in the
+// CLI layer. RunMonitorAsync receives a context that is already signal-aware
+// and must NOT call signal.NotifyContext internally.
+func runMonitorCmd(cmd *cobra.Command) error {
+	// Wire SIGINT/SIGTERM at the CLI layer (Pitfall 7 fix).
+	// The context passed to RunMonitorAsync is already signal-aware.
+	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	targetFlag, _ := cmd.Flags().GetString("target")
+	if targetFlag == "" {
+		return fmt.Errorf("--target is required for monitor subcommand")
+	}
+
+	intervalStr, _ := cmd.Flags().GetString("interval")
+	interval, err := time.ParseDuration(intervalStr)
+	if err != nil {
+		return fmt.Errorf("monitor: invalid --interval %q: %w", intervalStr, err)
+	}
+
+	maxCycles, _ := cmd.Flags().GetInt("monitor-cycles")
+	incremental, _ := cmd.Flags().GetBool("incremental")
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+	reconModeStr, _ := cmd.Flags().GetString("recon-mode")
+
+	reconMode := handlers.ModeRecon
+	if reconModeStr == "all" {
+		reconMode = handlers.ModeAll
+	}
+
+	efs := parseEarlyFlags(os.Args[1:])
+	sched := scheduler.NewScheduler(0, 0, nil, nil)
+
+	// commonAfterBoot wires scheduler limits, log routing, and per-task
+	// progress UI — same pattern as composite subcommands.
+	capture := &dryRunCapture{}
+	afterBoot := func(boot handlers.AppBoot) {
+		commonAfterBoot(ctx, boot, sched, dryRun, "monitor", capture)
+	}
+
+	monOpts := handlers.MonitorOptions{
+		Mode:        reconMode,
+		Interval:    interval,
+		MaxCycles:   maxCycles,
+		Incremental: incremental,
+	}
+
+	// FlushNow is wired inside RunMonitorAsync via the notifier.Flusher interface
+	// assertion on boot.App.Notify (*notifier.Multi implements Flusher via Plan 02).
+	// The CLI layer does NOT need to wire or inject a coalescer reference.
+	return handlers.RunMonitorAsync(ctx, handlers.RunOptions{
+		Target:      targetFlag,
+		DryRun:      dryRun,
+		ConfigPath:  efs.configPath,
+		SecretsPath: efs.secretsPath,
+		Scheduler:   sched,
+		AfterBoot:   afterBoot,
+	}, monOpts)
 }
 
 // newReportCmd — Phase 10 (Monitor + Reporting). Real implementation replacing D-02 stub.

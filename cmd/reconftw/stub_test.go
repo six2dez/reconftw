@@ -40,11 +40,16 @@ func TestStubNotImplementedFormat(t *testing.T) {
 	}
 }
 
-// Test 2 (D-02): phasePointers covers all 12 stubbed subcommand names.
+// Test 2 (D-02): phasePointers covers all stubbed subcommand names.
+// Phase 8 plan 08-04: "mcp" removed — newMCPCmd in mcp.go is a real implementation.
+// Phase 4-7: "subs", "web", "vulns", "osint" removed — real implementations.
+// Phase 9 plan 09-02: "recon", "all", "passive", "zen", "deep" removed —
+// composite_subcommands.go provides real implementations.
+// Phase 10 plan 10-03: "report" removed — newReportCmd is a real implementation.
+// Phase 10 plan 10-04: "monitor" removed — newMonitorCmd is a real implementation.
 func TestPhasePointersCoverAllStubs(t *testing.T) {
 	wantStubs := []string{
-		"recon", "all", "passive", "subs", "web", "vulns", "osint", "zen", "deep",
-		"monitor", "report", "mcp", "migrate", "install",
+		"report", "migrate", "install",
 	}
 	for _, name := range wantStubs {
 		if _, ok := phasePointers[name]; !ok {

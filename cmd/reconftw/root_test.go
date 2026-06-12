@@ -76,9 +76,13 @@ func TestRootListsFifteenSubcommandsPlusVersion(t *testing.T) {
 // Phase 10 plan 10-03: `report` is no longer a stub — newReportCmd wires the real
 // report renderer (reads store.db, writes reports/ directory). Removed from stubs list;
 // behavior is covered by `report --help` and internal/core/report package tests.
+//
+// Phase 10 plan 10-04: `monitor` is no longer a stub — newMonitorCmd wires the real
+// monitor loop (RunMonitorAsync). Removed from stubs list; behavior is covered by
+// `monitor --help` and internal/mcp/handlers/monitor_test.go.
 func TestEveryStubReturnsExit64(t *testing.T) {
 	stubs := []string{
-		"monitor", "migrate", "install",
+		"migrate", "install",
 	}
 	for _, name := range stubs {
 		t.Run(name, func(t *testing.T) {
