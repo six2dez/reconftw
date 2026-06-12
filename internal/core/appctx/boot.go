@@ -33,6 +33,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -63,6 +64,12 @@ type BootOptions struct {
 	// NotifySinks overrides the default Notifier sinks. nil → LogSink +
 	// 3 stubs (Slack/Telegram/Discord per CONTEXT default option (a)).
 	NotifySinks []notifier.Notifier
+	// PassiveMode wraps the chosen backend with PassiveBackend, hard-blocking
+	// any tool in the active-tool set (D-09: defense-in-depth beyond composition
+	// guard). When true, LocalBackend.Exec/Stream for puredns/nmap/etc. return
+	// ErrPassiveViolation instead of executing. Ignored when Backend is already
+	// a PassiveBackend (idempotent).
+	PassiveMode bool
 }
 
 // Boot constructs the AppContext. Returns the wired *AppContext or an
@@ -97,6 +104,15 @@ func Boot(ctx context.Context, logger *slog.Logger, cfg *config.Config, target *
 	be := opt.Backend
 	if be == nil {
 		be = pickBackend(cfg, logger)
+	}
+	// D-09: Wrap with PassiveBackend when PassiveMode is requested.
+	// PassiveBackend hard-blocks active tools (puredns/nmap/etc.) as
+	// defense-in-depth beyond the composition-level guard (ModePassive only
+	// schedules passive-prefixed tasks).
+	if opt.PassiveMode {
+		if _, already := be.(*backend.PassiveBackend); !already {
+			be = backend.NewPassiveBackend(be)
+		}
 	}
 	// Discover() is tolerant of an empty registry — Plan 04 tests already
 	// validate this; Plan 07 seeds the canonical tools.lock.
@@ -188,21 +204,40 @@ func pickLimiter(_ *config.Config) *backend.RateLimiter {
 	return backend.NewRateLimiter(map[string]int{}, 0)
 }
 
-// defaultNotifierSinks returns the canonical Phase 3 sink set per
-// CONTEXT default option (a):
+// defaultNotifierSinks builds the Phase 10 real-webhook sink set.
 //
-//	[LogSink, Slack-stub, Telegram-stub, Discord-stub]
+// When Notifications.Enabled is false, returns only LogSink (same as
+// Phase 3 behaviour — backward-compatible).
 //
-// All sinks share the same logger so Layer 2 redaction (RedactingHandler)
-// scrubs every "would-send" log line.
+// When enabled, real HTTP dispatchers replace the stubs and are wrapped
+// in a DigestCoalescer (D-06) to prevent channel flooding on critical-
+// finding bursts. The outer Multi (constructed by Boot's caller) wraps
+// the single DigestCoalescer element — so app.Notify.(notifier.Flusher)
+// succeeds via Multi.FlushNow delegating to DigestCoalescer.FlushNow.
+//
+// target is passed as "" because Boot is process-scoped; per-scan target
+// context is set by the monitor loop via its own DigestCoalescer instance.
+//
+// Pitfall 6 fix: wraps REAL HTTP dispatchers, not stubs, when enabled.
 func defaultNotifierSinks(logger *slog.Logger, cfg *config.Config) []notifier.Notifier {
 	sinks := []notifier.Notifier{notifier.NewLogSink(logger)}
-	// Stubs are zero-cost — instantiate unconditionally so Phase 10's
-	// "drop-in replacement" pattern works without conditional wiring.
-	sinks = append(sinks,
-		notifier.NewSlack(logger, string(cfg.Notifications.Slack.WebhookURL)),
-		notifier.NewTelegram(logger, string(cfg.Notifications.Telegram.BotToken)),
-		notifier.NewDiscord(logger, string(cfg.Notifications.Discord.WebhookURL)),
-	)
-	return sinks
+	if !cfg.Notifications.Enabled {
+		return sinks // Phase 3 behaviour preserved when not enabled
+	}
+	// Phase 10: real HTTP dispatchers (Pitfall 6: real, not stubs).
+	httpClient := &http.Client{Timeout: 10 * time.Second}
+	if wh := string(cfg.Notifications.Slack.WebhookURL); wh != "" {
+		sinks = append(sinks, notifier.NewSlack(logger, httpClient, wh))
+	}
+	if tok := string(cfg.Notifications.Telegram.BotToken); tok != "" {
+		chatID := cfg.Notifications.Telegram.ChatID
+		sinks = append(sinks, notifier.NewTelegram(logger, httpClient, tok, chatID))
+	}
+	if wh := string(cfg.Notifications.Discord.WebhookURL); wh != "" {
+		sinks = append(sinks, notifier.NewDiscord(logger, httpClient, wh))
+	}
+	multi := notifier.NewMulti(sinks...)
+	// Wrap Multi in DigestCoalescer (D-06: burst coalescing, nothing dropped).
+	// target is "" at Boot time; the monitor loop sets its own per-scan target.
+	return []notifier.Notifier{notifier.NewDigestCoalescer(multi, cfg.Notifications, "")}
 }

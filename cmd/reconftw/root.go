@@ -62,6 +62,14 @@ remain functional with deprecation warnings until v2.2.0 per ADR 0002 §8.4.`,
 	root.AddCommand(newMigrateCmd())
 	root.AddCommand(newInstallCmd())
 
+	// 3 stateful utility subcommands (Phase 9 plan 09-04 — MODE-06/07/08).
+	root.AddCommand(newGenResolversCmd())
+	root.AddCommand(newRefreshCacheCmd())
+	root.AddCommand(newQuickRescanCmd())
+
+	// Phase 10 plan 02: notify --test reachability subcommand (NOTIF-04).
+	root.AddCommand(newNotifyCmd())
+
 	// 1 working v2 subcommand from the §8.1 visible inventory (per D-04).
 	root.AddCommand(newHealthCheckCmd(app, cfg))
 
@@ -182,7 +190,9 @@ func addV1DeprecatedAliases(root *cobra.Command) {
 func mustMarkDeprecated(fs interface {
 	MarkDeprecated(name, usageMessage string) error
 }, name, message string) {
-	if err := fs.MarkDeprecated(name, message); err != nil {
+	// Append the removal version (ADR 0002 §8.4) so every deprecation warning
+	// states when the alias goes away — MODE-09 criterion 5.
+	if err := fs.MarkDeprecated(name, message+" — will be removed in v2.2"); err != nil {
 		panic("reconftw: MarkDeprecated " + name + ": " + err.Error())
 	}
 }
