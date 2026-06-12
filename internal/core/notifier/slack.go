@@ -1,50 +1,91 @@
-// Source: CONTEXT default option (a) — Slack stub returns nil after
-// logging the would-send intent. Phase 10 wires real HTTP webhook
-// dispatch (chi/retryablehttp + JSON body + interactive button echo).
+// Phase 10: real Slack webhook dispatcher.
 //
-// TODO(phase-10): replace with real webhook dispatch
+// Replaces the Phase 3 stub with a real net/http POST to a Slack
+// Incoming Webhook URL. Per D-07, scan-time Notify returns nil on failure
+// (best-effort, never blocks the pipeline). The private send() method
+// propagates errors for the notify --test reachability path.
 //
-// The webhook URL is held as a string (typed log.Secret at the config
-// boundary); after registration with the Redactor it is scrubbed from
-// every "slack_notify_stub" log line.
+// NOTIF-01: webhook URL is log.Secret-typed at the config boundary and
+// registered with the Redactor in Boot; this file receives a plain string
+// because the secret value has already been registered and the slog logger
+// carries a RedactingHandler chain that will scrub it from log lines.
+//
+// Source: 10-02-PLAN.md Task 1 + 10-PATTERNS.md § SlackNotifier.
 
 package notifier
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"log/slog"
+	"net/http"
+	"time"
 )
 
-// SlackNotifier is the Phase 3 stub. Phase 10 ships a real
-// retryablehttp.Client wrapping a Slack webhook POST.
+// SlackNotifier dispatches notifications to a Slack Incoming Webhook URL
+// via a real HTTP POST.
 type SlackNotifier struct {
 	Log        *slog.Logger
-	webhookURL string // log.Secret at the config boundary; here plain
+	webhookURL string      // log.Secret at the config boundary; here plain
+	httpClient *http.Client
 }
 
-// NewSlack constructs a SlackNotifier stub. logger may be nil → slog.Default.
-func NewSlack(logger *slog.Logger, webhookURL string) *SlackNotifier {
+// NewSlack constructs a SlackNotifier. logger may be nil → slog.Default().
+// client may be nil → &http.Client{Timeout: 10s}.
+func NewSlack(logger *slog.Logger, client *http.Client, webhookURL string) *SlackNotifier {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &SlackNotifier{Log: logger, webhookURL: webhookURL}
+	if client == nil {
+		client = &http.Client{Timeout: 10 * time.Second}
+	}
+	return &SlackNotifier{Log: logger, httpClient: client, webhookURL: webhookURL}
 }
 
-// Notify is a Phase 3 stub — logs the would-send intent at INFO and
-// returns nil without performing any HTTP request.
+// Notify dispatches msg to the Slack webhook. Returns nil on any failure
+// per D-07 (best-effort — never blocks the scan pipeline).
 func (s *SlackNotifier) Notify(ctx context.Context, lvl Level, msg string, attrs ...any) error {
-	args := append([]any{
-		slog.String("notify_level", levelString(lvl)),
-		slog.String("notify_msg", msg),
-	}, attrs...)
-	s.Log.Log(ctx, slog.LevelInfo, "slack_notify_stub", args...)
+	//nolint:errcheck
+	_ = s.send(ctx, msg) // discard error per D-07
 	return nil
 }
 
-var _ Notifier = (*SlackNotifier)(nil)
+// send performs the actual HTTP POST and returns the error to the caller.
+// Used by notify --test (which propagates errors) and wrapped by Notify
+// (which discards the error per D-07).
+func (s *SlackNotifier) Send(ctx context.Context, msg string) error {
+	return s.send(ctx, msg)
+}
 
-// levelString maps Level → human label for log fields. Shared by the 3
-// service stubs.
+func (s *SlackNotifier) send(ctx context.Context, msg string) error {
+	if s.webhookURL == "" {
+		return nil
+	}
+	payload, err := json.Marshal(map[string]string{"text": msg})
+	if err != nil {
+		return fmt.Errorf("slack: marshal payload: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.webhookURL,
+		bytes.NewReader(payload))
+	if err != nil {
+		return fmt.Errorf("slack: build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("slack: send: %w", err)
+	}
+	defer func() { _, _ = io.Copy(io.Discard, resp.Body); resp.Body.Close() }()
+	if resp.StatusCode >= 300 {
+		return fmt.Errorf("slack: non-2xx status %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// levelString maps Level → human label for log fields.
 func levelString(lvl Level) string {
 	switch lvl {
 	case LevelError:
@@ -55,3 +96,5 @@ func levelString(lvl Level) string {
 		return "info"
 	}
 }
+
+var _ Notifier = (*SlackNotifier)(nil)

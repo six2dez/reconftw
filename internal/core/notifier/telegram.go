@@ -1,44 +1,96 @@
-// Source: CONTEXT default option (a) — Telegram stub returns nil after
-// logging the would-send intent. Phase 10 wires real HTTPS POST to the
-// Bot API endpoint.
+// Phase 10: real Telegram Bot API dispatcher.
 //
-// TODO(phase-10): replace with real webhook dispatch
+// Replaces the Phase 3 stub with a real net/http POST to
+// https://api.telegram.org/bot<token>/sendMessage.
 //
-// The bot token is held as a string (typed log.Secret at the config
-// boundary); after registration with the Redactor it is scrubbed from
-// every "telegram_notify_stub" log line.
+// Pitfall 1: parse_mode is intentionally omitted. MarkdownV2 causes 400
+// errors when finding titles contain underscores, periods, or parentheses
+// (common in security tool output). Plain text is safe.
+//
+// Per D-07, scan-time Notify returns nil on failure (best-effort).
+// The private send() method propagates errors for notify --test.
+//
+// Source: 10-02-PLAN.md Task 1 + 10-PATTERNS.md § TelegramNotifier.
 
 package notifier
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"log/slog"
+	"net/http"
+	"time"
 )
 
-// TelegramNotifier is the Phase 3 stub. Phase 10 ships a real
-// retryablehttp.Client wrapping
-// https://api.telegram.org/bot<token>/sendMessage.
+// TelegramNotifier dispatches notifications to a Telegram chat via the
+// Bot API sendMessage endpoint.
 type TelegramNotifier struct {
-	Log      *slog.Logger
-	botToken string // log.Secret at the config boundary; here plain
+	Log        *slog.Logger
+	botToken   string // log.Secret at the config boundary; here plain
+	chatID     string
+	httpClient *http.Client
 }
 
-// NewTelegram constructs a TelegramNotifier stub. logger may be nil → slog.Default.
-func NewTelegram(logger *slog.Logger, botToken string) *TelegramNotifier {
+// telegramPayload is the JSON body for sendMessage.
+// parse_mode is intentionally omitted (Pitfall 1).
+type telegramPayload struct {
+	ChatID string `json:"chat_id"`
+	Text   string `json:"text"`
+	// parse_mode intentionally omitted — plain text avoids MarkdownV2
+	// escaping issues with special chars in finding titles.
+}
+
+// NewTelegram constructs a TelegramNotifier. logger may be nil → slog.Default().
+// client may be nil → &http.Client{Timeout: 10s}.
+func NewTelegram(logger *slog.Logger, client *http.Client, botToken, chatID string) *TelegramNotifier {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &TelegramNotifier{Log: logger, botToken: botToken}
+	if client == nil {
+		client = &http.Client{Timeout: 10 * time.Second}
+	}
+	return &TelegramNotifier{Log: logger, httpClient: client, botToken: botToken, chatID: chatID}
 }
 
-// Notify is a Phase 3 stub — logs the would-send intent at INFO and
-// returns nil without performing any HTTP request.
+// Notify dispatches msg to the Telegram chat. Returns nil on any failure
+// per D-07 (best-effort — never blocks the scan pipeline).
 func (t *TelegramNotifier) Notify(ctx context.Context, lvl Level, msg string, attrs ...any) error {
-	args := append([]any{
-		slog.String("notify_level", levelString(lvl)),
-		slog.String("notify_msg", msg),
-	}, attrs...)
-	t.Log.Log(ctx, slog.LevelInfo, "telegram_notify_stub", args...)
+	//nolint:errcheck
+	_ = t.send(ctx, msg) // discard error per D-07
+	return nil
+}
+
+// Send exposes the error-propagating send path for notify --test.
+func (t *TelegramNotifier) Send(ctx context.Context, msg string) error {
+	return t.send(ctx, msg)
+}
+
+func (t *TelegramNotifier) send(ctx context.Context, msg string) error {
+	if t.botToken == "" || t.chatID == "" {
+		return nil
+	}
+	url := "https://api.telegram.org/bot" + t.botToken + "/sendMessage"
+	payload, err := json.Marshal(telegramPayload{ChatID: t.chatID, Text: msg})
+	if err != nil {
+		return fmt.Errorf("telegram: marshal payload: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url,
+		bytes.NewReader(payload))
+	if err != nil {
+		return fmt.Errorf("telegram: build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := t.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("telegram: send: %w", err)
+	}
+	defer func() { _, _ = io.Copy(io.Discard, resp.Body); resp.Body.Close() }()
+	if resp.StatusCode >= 300 {
+		return fmt.Errorf("telegram: non-2xx status %d", resp.StatusCode)
+	}
 	return nil
 }
 

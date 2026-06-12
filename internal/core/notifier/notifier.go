@@ -3,27 +3,29 @@
 // Phase 3 stub depth per CONTEXT default option (a) + FOUND-11:
 //   - Notifier interface (Notify method)
 //   - LogSink — writes notification to slog at the corresponding level
-//   - Slack / Telegram / Discord — stubs returning nil after logging
+//   - Slack / Telegram / Discord — real HTTP webhook dispatchers (Phase 10)
 //   - Multi — fan-out multiplexer wrapping multiple sinks
+//   - Flusher — interface for coalescer flush (Phase 10, BLOCKER 2 fix)
 //
 // Phase 10 (Monitor + Reporting + Notifications) wires real HTTP webhooks
 // for Slack/Telegram/Discord; Phase 3's stubs let the AppContext.Notify
 // field be non-nil from day 1 so Tasks can call app.Notify.Notify(...)
 // without nil checks.
 //
+// BLOCKER 2 fix (FlushNow reachability): Boot wires app.Notify =
+// notifier.NewMulti(sinks...) — type *notifier.Multi. A type assertion
+// app.Notify.(*notifier.DigestCoalescer) fails at runtime because the outer
+// type is *Multi. Fix: Flusher interface + Multi.FlushNow delegation —
+// the monitor loop calls app.Notify.(notifier.Flusher).FlushNow(ctx) which
+// succeeds because *Multi implements Flusher by delegating to any Flusher
+// sink (DigestCoalescer).
+//
 // XCUT-07 invariant: all message bodies pass through the Redactor before
 // being emitted. LogSink uses the AppContext logger (which has a
 // RedactingHandler chain) — the wired chain provides the redaction.
-// Slack/Telegram/Discord stubs that log their "would send" intent also
-// flow through the wired logger, inheriting the redaction guarantee.
 //
 // Source: ADR 0002 §5.3 (AppContext.Notify field) + REQUIREMENTS.md
 // FOUND-11.
-//
-// Phase 3 Plan 5 Task 2 ships the full implementation (LogSink + 3 stubs
-// + Multi + tests). Plan 05 Task 1 ships only this skeleton so that
-// `internal/core/appctx/appctx.go` can declare `Notify notifier.Notifier`
-// without a forward-declaration loop.
 package notifier
 
 import (
@@ -42,8 +44,8 @@ const (
 )
 
 // Notifier is the notification dispatch interface. Implementations
-// include LogSink (slog passthrough), and stubs for Slack/Telegram/Discord
-// (Phase 3 returns nil; Phase 10 wires real webhooks).
+// include LogSink (slog passthrough), and real HTTP dispatchers for
+// Slack/Telegram/Discord (Phase 10).
 //
 // BINDING per ADR §5.3 line 1730: adding methods is non-breaking;
 // renaming/removing requires an ADR amendment.
@@ -54,9 +56,22 @@ type Notifier interface {
 	Notify(ctx context.Context, level Level, msg string, attrs ...any) error
 }
 
+// Flusher is implemented by coalescing notifiers (DigestCoalescer) that
+// buffer messages and flush them as a single digest. Multi also implements
+// Flusher by delegating to any Flusher sink — this is the BLOCKER 2 fix
+// that allows the monitor loop to call:
+//
+//	app.Notify.(notifier.Flusher).FlushNow(ctx)
+//
+// The assertion succeeds because app.Notify is *Multi (not *DigestCoalescer),
+// and *Multi now satisfies Flusher.
+type Flusher interface {
+	FlushNow(ctx context.Context) error
+}
+
 // Multi is the fan-out Notifier — calls Notify on every wrapped sink and
 // joins the errors. AppContext.Notify is typed as Notifier; in practice
-// Boot wires a Multi wrapping LogSink + 3 service stubs (CONTEXT default
+// Boot wires a Multi wrapping LogSink + service notifiers (CONTEXT default
 // option (a)).
 //
 // Error semantics: errors are collected via errors.Join — callers that
@@ -87,4 +102,24 @@ func (m *Multi) Notify(ctx context.Context, lvl Level, msg string, attrs ...any)
 	return errors.Join(errs...)
 }
 
+// FlushNow implements Flusher by ranging over Sinks and delegating to any
+// sink that also implements Flusher (e.g. DigestCoalescer). This makes
+// *Multi satisfy the Flusher interface so the monitor loop can call:
+//
+//	app.Notify.(notifier.Flusher).FlushNow(ctx)
+//
+// Errors from each Flusher sink are collected and joined.
+func (m *Multi) FlushNow(ctx context.Context) error {
+	errs := make([]error, 0, len(m.Sinks))
+	for _, s := range m.Sinks {
+		if f, ok := s.(Flusher); ok {
+			if err := f.FlushNow(ctx); err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+	return errors.Join(errs...)
+}
+
 var _ Notifier = (*Multi)(nil)
+var _ Flusher = (*Multi)(nil)
