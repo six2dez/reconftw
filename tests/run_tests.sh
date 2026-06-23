@@ -37,8 +37,24 @@ if [[ -z "${BATS_SHELL:-}" ]]; then
     done
 fi
 
+run_python() {
+    echo "Running Python unit tests (pytest)..."
+    local root="${SCRIPT_DIR}/.."
+    if command -v pytest >/dev/null 2>&1; then
+        pytest "$SCRIPT_DIR/unit/python" -q
+    elif python3 -m pytest --version >/dev/null 2>&1; then
+        python3 -m pytest "$SCRIPT_DIR/unit/python" -q
+    else
+        echo "pytest not found; running unittest modules..."
+        for f in "$SCRIPT_DIR"/unit/python/test_*.py; do
+            python3 "$f"
+        done
+    fi
+}
+
 run_unit() {
     echo "Running unit tests..."
+    run_python
     "$BATS" "$SCRIPT_DIR"/unit/*.bats
 }
 

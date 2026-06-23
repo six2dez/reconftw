@@ -271,11 +271,9 @@ function github_actions_audit() {
         local gato_cmd=""
         if command -v gato >/dev/null 2>&1; then
             gato_cmd="$(command -v gato)"
-        elif [[ -x "${tools}/gato/venv/bin/gato" ]]; then
-            gato_cmd="${tools}/gato/venv/bin/gato"
         fi
         if [[ -z "$gato_cmd" ]]; then
-            _print_msg WARN "${FUNCNAME[0]}: gato not found in PATH or ${tools}/gato/venv/bin/gato"
+            _print_msg WARN "${FUNCNAME[0]}: gato not found in PATH (install via uv: uv tool install git+https://github.com/praetorian-inc/gato)"
             end_func "gato not available, github_actions_audit skipped" "${FUNCNAME[0]}" SKIP
             return 0
         fi
@@ -391,10 +389,20 @@ function apileaks() {
             fi
         )
 
-        # Optional postleaksNg integration (Postman public library leaks)
+        # Optional postleaks integration (Postman public library leaks)
         if [[ ${API_LEAKS_POSTLEAKS:-true} == true ]]; then
-            local postleaks_bin
-            postleaks_bin="$(command -v postleaksNg 2>/dev/null || true)"
+            local postleaks_bin postleaks_name
+            postleaks_name="${POSTLEAKS_BIN:-auto}"
+            if [[ "$postleaks_name" == "auto" ]]; then
+                if command -v postleaksNg >/dev/null 2>&1; then
+                    postleaks_name="postleaksNg"
+                elif command -v postleaks >/dev/null 2>&1; then
+                    postleaks_name="postleaks"
+                else
+                    postleaks_name=""
+                fi
+            fi
+            postleaks_bin="$(command -v "$postleaks_name" 2>/dev/null || true)"
             local postleaks_out="${dir}/osint/postman_leaks_postleaksng"
             mkdir -p "$postleaks_out"
             if [[ -n "$postleaks_bin" && -x "$postleaks_bin" ]]; then
@@ -402,13 +410,16 @@ function apileaks() {
                     "$postleaks_bin"
                     -k "$domain"
                     --output "$postleaks_out"
-                    -t "${POSTLEAKS_THREADS:-10}"
                 )
+                # Thread flag only exists on postleaksNg (six2dez fork of cosad3s/postleaks)
+                if [[ "$postleaks_name" == "postleaksNg" ]]; then
+                    postleaks_cmd+=(-t "${POSTLEAKS_THREADS:-10}")
+                fi
                 [[ -n "${POSTLEAKS_INCLUDE:-}" ]] && postleaks_cmd+=(--include "${POSTLEAKS_INCLUDE}")
                 [[ -n "${POSTLEAKS_EXCLUDE:-}" ]] && postleaks_cmd+=(--exclude "${POSTLEAKS_EXCLUDE}")
 
                 if ! run_command "${postleaks_cmd[@]}" 2>>"$LOGFILE" >/dev/null; then
-                    log_note "apileaks: postleaksNg failed" "${FUNCNAME[0]}" "${LINENO}"
+                    log_note "apileaks: ${postleaks_name} failed" "${FUNCNAME[0]}" "${LINENO}"
                 fi
 
                 # Aggregate discovered URLs into the existing postman leaks artifact.
@@ -418,7 +429,7 @@ function apileaks() {
                         | anew -q "${dir}/osint/postman_leaks.txt"
                 fi
             else
-                log_note "apileaks: postleaksNg not found in PATH" "${FUNCNAME[0]}" "${LINENO}"
+                log_note "apileaks: postleaksNg/postleaks not found in PATH (install: uv tool install git+https://github.com/six2dez/postleaksNG)" "${FUNCNAME[0]}" "${LINENO}"
             fi
         fi
 
@@ -550,15 +561,12 @@ function third_party_misconfigs() {
         # Extract company name from domain
         company_name=$(unfurl format %r <<<"$domain")
 
-        # Run misconfig-mapper in a subshell to avoid CWD pollution
-        (
-            cd "${tools}/misconfig-mapper" || exit 1
-            run_command misconfig-mapper -update-templates 1>>"$LOGFILE"
-            run_command misconfig-mapper -target "$domain" -as-domain true -permutations false -skip-ssl \
-                -service "*" -verbose 0 | anew -q "${dir}/osint/3rdparts_misconfigurations.txt"
-            run_command misconfig-mapper -target "$company_name" -skip-ssl -verbose 0 -service "*" \
-                | anew -q "${dir}/osint/3rdparts_misconfigurations.txt"
-        )
+        # Run misconfig-mapper (installed via go install; no repo clone needed)
+        run_command misconfig-mapper -update-templates 1>>"$LOGFILE"
+        run_command misconfig-mapper -target "$domain" -as-domain true -permutations false -skip-ssl \
+            -service "*" -verbose 0 | anew -q "${dir}/osint/3rdparts_misconfigurations.txt"
+        run_command misconfig-mapper -target "$company_name" -skip-ssl -verbose 0 -service "*" \
+            | anew -q "${dir}/osint/3rdparts_misconfigurations.txt"
 
         end_func "Results are saved in $domain/osint/3rdparts_misconfigurations.txt" "${FUNCNAME[0]}"
 

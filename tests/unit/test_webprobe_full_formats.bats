@@ -114,6 +114,60 @@ SH
   grep -q "^80,443,8080,8443$" "$ARGS_LOG"
 }
 
+@test "webprobe_full emits RUN notice before httpx" {
+  mkdir -p .tmp webs subdomains
+  printf "a.example.com\nb.example.com\n" > subdomains/subdomains.txt
+
+  cat > "$MOCK_BIN/httpx" <<'SH'
+#!/usr/bin/env bash
+sleep 1
+out=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o) out="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+printf '%s\n' '{"url":"https://app.example.com","port":"443","status_code":200,"title":"ok","webserver":"nginx","tech":["nginx"]}' > "$out"
+SH
+  chmod +x "$MOCK_BIN/httpx"
+
+  run webprobe_full
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"RUN"* ]]
+  [[ "$output" == *"webprobe_full"* ]]
+  [[ "$output" == *"httpx probing 2 hosts"* ]]
+}
+
+@test "webprobe_full caps host list when above WEBPROBE_MAX_HOSTS" {
+  mkdir -p .tmp webs subdomains
+  export domain="example.com"
+  export WEBPROBE_MAX_HOSTS=3
+  export WEBPROBE_INCLUDE_UNCOMMON_PORTS=false
+  export WEBPROBE_PORTS_COMMON="80,443"
+  export DEEP=false
+  for i in $(seq 1 10); do printf 'host%02d.example.com\n' "$i"; done > subdomains/subdomains.txt
+
+  cat > "$MOCK_BIN/httpx" <<'SH'
+#!/usr/bin/env bash
+out=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o) out="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+printf '%s\n' '{"url":"https://example.com","port":"443","status_code":200,"title":"ok","webserver":"nginx","tech":["nginx"]}' > "$out"
+SH
+  chmod +x "$MOCK_BIN/httpx"
+
+  run webprobe_full
+  [ "$status" -eq 0 ]
+  [ -f ".tmp/webprobe_hosts.txt" ]
+  [ "$(wc -l <.tmp/webprobe_hosts.txt | tr -d ' ')" -le 3 ]
+  grep -qx 'example.com' .tmp/webprobe_hosts.txt
+}
+
 @test "webprobe_full fails when httpx output is not JSON" {
   mkdir -p .tmp webs subdomains
   printf "a.example.com\n" > subdomains/subdomains.txt

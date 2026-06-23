@@ -81,6 +81,7 @@ source "${_INIT_SCRIPTPATH}/lib/validation.sh"
 source "${_INIT_SCRIPTPATH}/lib/common.sh"
 source "${_INIT_SCRIPTPATH}/lib/ui.sh"
 source "${_INIT_SCRIPTPATH}/lib/parallel.sh"
+source "${_INIT_SCRIPTPATH}/lib/config.sh"
 
 # Source all modules in dependency order
 source "${_INIT_SCRIPTPATH}/modules/utils.sh"
@@ -156,7 +157,7 @@ fi
 
 CLI_ARGS=()
 mapfile -d '' -t CLI_ARGS < <(normalize_vps_count_args "$@")
-PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:zrspanwvyh' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,vps-count:,ai,check-tools,health-check,quick-rescan,incremental,adaptive-rate,dry-run,parallel,no-parallel,monitor,monitor-interval:,monitor-cycles:,refresh-cache,gen-resolvers,force,export:,report-only,no-report,parallel-log:,quiet,verbose,no-color,log-format:,show-cache,banner,no-banner,legal' -n 'reconFTW' -- "${CLI_ARGS[@]}")
+PROGARGS=$(getopt -o 'd:m:l:x:i:o:f:q:c:zrspanwvyh' --long 'domain:,list:,recon,subdomains,passive,all,web,osint,zen,deep,help,vps,vps-count:,ai,check-tools,health-check,quick-rescan,incremental,adaptive-rate,dry-run,parallel,no-parallel,monitor,monitor-interval:,monitor-cycles:,refresh-cache,gen-resolvers,force,export:,report-only,no-report,parallel-log:,quiet,verbose,no-color,log-format:,show-cache,banner,no-banner,legal,mcp-init' -n 'reconFTW' -- "${CLI_ARGS[@]}")
 
 exit_status=$?
 if [[ $exit_status -ne 0 ]]; then
@@ -172,6 +173,8 @@ CLI_AXIOM_FLEET_COUNT=""
 SHOW_CACHE=false
 SHOW_BANNER=false
 SHOW_LEGAL=false
+opt_ai=false
+opt_deep=false
 
 while true; do
     case "$1" in
@@ -297,6 +300,11 @@ while true; do
             ;;
         '-z' | '--zen')
             opt_mode='z'
+            shift
+            continue
+            ;;
+        '--mcp-init')
+            opt_mode='mcp_init'
             shift
             continue
             ;;
@@ -499,15 +507,20 @@ SCRIPTPATH="$(
     exit 1
 }
 
-# Source optional secrets file (gitignored, for API keys and tokens)
-[[ -f "${SCRIPTPATH}/secrets.cfg" ]] && . "${SCRIPTPATH}/secrets.cfg"
+# secrets.cfg + export AI/MCP/API vars for child processes (Python CLI, axiom, tools)
+if [[ -f "${SCRIPTPATH}/secrets.cfg" ]]; then
+    # shellcheck source=/dev/null
+    . "${SCRIPTPATH}/secrets.cfg"
+fi
+export_reconftw_runtime_env
 
 if [[ -s $CUSTOM_CONFIG ]]; then
-    # shellcheck source=/home/six2dez/Tools/reconftw/custom_config.cfg
+    # shellcheck source=/dev/null
     . "${CUSTOM_CONFIG}" || {
         _print_error "Error importing custom config"
         exit 1
     }
+    export_reconftw_runtime_env
 fi
 
 # Re-apply CLI overrides after config load (config defaults should not clobber CLI flags)
@@ -600,6 +613,15 @@ fi
 
 if [[ $opt_deep ]]; then
     DEEP=true
+fi
+
+# Auto-enable AI analysis when secrets.cfg is configured (unless -y/--ai already set)
+if [[ "${opt_ai:-false}" != "true" && "${AI_AUTO_ENABLE:-false}" == "true" ]]; then
+    if [[ "${AI_PROVIDER:-}" == "mock" ]] \
+        || [[ -n "${AI_BASE_URL:-}" ]] \
+        || [[ -n "${AI_API_KEY:-}${OPENAI_API_KEY:-}${ANTHROPIC_API_KEY:-}" ]]; then
+        opt_ai=true
+    fi
 fi
 
 if [[ $rate_limit ]]; then
@@ -721,6 +743,7 @@ case $opt_mode in
             start
             recon
             end
+            exit 0
         fi
         ;;
     's')
@@ -820,6 +843,10 @@ case $opt_mode in
             zen_menu
         fi
         ;;
+    'mcp_init')
+        start
+        exit 0
+        ;;
     'c')
         if [[ -n $multi ]]; then
             if [[ $AXIOM == true ]]; then
@@ -829,12 +856,18 @@ case $opt_mode in
         else
             export DIFF=true
             dir="${SCRIPTPATH}/Recon/$domain"
+            NOW=${NOW:-$(date +"%F")}
+            NOWT=${NOWT:-$(date +"%T")}
+            mkdir -p "${dir}/.called_fn" "${dir}/.log" 2>/dev/null || true
             cd "$dir" || {
                 echo "Failed to cd directory '$dir'"
                 exit 1
             }
+            called_fn_dir="${dir}/.called_fn"
             LOGFILE="${dir}/.log/${NOW}_${NOWT}.txt"
-            called_fn_dir=$dir/.called_fn
+            DEBUG_LOG="${dir}/debug.log"
+            touch "$LOGFILE" "$DEBUG_LOG" 2>/dev/null || true
+            init_dns_resolver 2>>"$LOGFILE" || true
             run_module_with_axiom_failover "$custom_function"
             cd "${SCRIPTPATH}" || {
                 echo "Failed to cd directory '${SCRIPTPATH}'"
@@ -852,3 +885,5 @@ case $opt_mode in
         fi
         ;;
 esac
+
+exit "${E_SUCCESS:-0}"

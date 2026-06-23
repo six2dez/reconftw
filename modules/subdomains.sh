@@ -286,6 +286,8 @@ _subdomains_enumerate() {
                 fi
             fi
         done
+        # Free gotator/regulator temp files before parallel DNS-heavy phases (reduces OOM risk).
+        remove_big_files
 
         # Phase 4: Dependent active enrichment (runs after sub_active is ready)
         parallel_funcs "${PAR_SUB_DEP_ACTIVE_GROUP_SIZE:-3}" sub_noerror sub_dns sub_srv sub_ptr_cidrs
@@ -1510,9 +1512,53 @@ _run_permutation_engine() {
 _generate_permutation_candidates() {
     local source_file="$1"
     local output_file="$2"
+    local raw_file="${output_file}.raw"
+    local max_candidates="${PERMUTATIONS_MAX_CANDIDATES:-50000}"
+    local count=0
+
     : >"$output_file"
     [[ -s "$source_file" ]] || return 0
-    _run_permutation_engine "$source_file" | sed '/^\s*$/d' | head -c "$PERMUTATIONS_LIMIT" >"$output_file"
+
+    _run_permutation_engine "$source_file" | sed '/^\s*$/d' | head -c "$PERMUTATIONS_LIMIT" >"$raw_file"
+    if [[ ! -s "$raw_file" ]]; then
+        rm -f "$raw_file" 2>/dev/null || true
+        return 0
+    fi
+
+    sort -u "$raw_file" >"$output_file"
+    rm -f "$raw_file" 2>/dev/null || true
+
+    count=$(wc -l <"$output_file" 2>/dev/null | tr -d ' ')
+    [[ "$count" =~ ^[0-9]+$ ]] || count=0
+
+    if [[ "$max_candidates" =~ ^[0-9]+$ ]] && [[ "$max_candidates" -gt 0 ]] && [[ "$count" -gt "$max_candidates" ]]; then
+        head -n "$max_candidates" "$output_file" >"${output_file}.trim"
+        mv "${output_file}.trim" "$output_file"
+        _print_msg WARN "Permutation candidates truncated: ${count} -> ${max_candidates} (PERMUTATIONS_MAX_CANDIDATES)"
+        count="$max_candidates"
+    fi
+
+    printf '%s' "$count"
+}
+
+# Resolve a gotator candidate file with ETA logging (dnsx/puredns is the slow step).
+_resolve_permutation_candidates() {
+    local input_file="$1"
+    local output_file="$2"
+    local count=0 rate=50 eta_secs=0
+
+    [[ -s "$input_file" ]] || return 0
+
+    count=$(wc -l <"$input_file" 2>/dev/null | tr -d ' ')
+    [[ "$count" =~ ^[0-9]+$ ]] || count=0
+    [[ "$count" -eq 0 ]] && return 0
+
+    rate="${DNSX_RATE_LIMIT:-50}"
+    [[ "$rate" =~ ^[0-9]+$ ]] && [[ "$rate" -gt 0 ]] || rate=50
+    eta_secs=$((count / rate))
+
+    print_notice RUN "sub_permut" "dns resolve (${count} candidates, ~$(format_duration "$eta_secs") at ${rate} qps)"
+    _resolve_domains "$input_file" "$output_file"
 }
 
 function sub_permut() {
@@ -1521,7 +1567,13 @@ function sub_permut() {
 
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBPERMUTE == true ]]; then
         start_subfunc "${FUNCNAME[0]}" "Running: Permutations Subdomain Enumeration"
-        print_notice RUN "sub_permut" "generating permutations"
+        local permute_rounds="${SUBPERMUTE_ROUNDS:-1}"
+        [[ "$permute_rounds" =~ ^[12]$ ]] || permute_rounds=1
+
+        if [[ "${WORKLOAD_SAFE:-false}" == "true" && "${DEEP:-false}" != "true" && "${SUBPERMUTE_FORCE:-false}" != "true" ]]; then
+            end_subfunc "skipped (WORKLOAD_SAFE; set DEEP=true or SUBPERMUTE_FORCE=true)" "${FUNCNAME[0]}" "SKIP"
+            return 0
+        fi
 
         # If in multi mode and subdomains.txt doesn't exist, create it with the domain
         if [[ -n $multi ]] && [[ ! -f "$dir/subdomains/subdomains.txt" ]]; then
@@ -1543,23 +1595,21 @@ function sub_permut() {
 
         # Check if DEEP mode is enabled or subdomains are within DEEP_LIMIT
         if [[ $DEEP == true ]] || [[ $subdomain_count -le $DEEP_LIMIT ]]; then
-
-            _generate_permutation_candidates "subdomains/subdomains.txt" ".tmp/gotator1.txt"
+            print_notice RUN "sub_permut" "generating candidates (round 1)"
+            _generate_permutation_candidates "subdomains/subdomains.txt" ".tmp/gotator1.txt" >/dev/null
 
         elif [[ "$subs_no_resolved_count" -le $DEEP_LIMIT2 ]]; then
-
-            _generate_permutation_candidates ".tmp/subs_no_resolved.txt" ".tmp/gotator1.txt"
+            print_notice RUN "sub_permut" "generating candidates (round 1, unresolved subs)"
+            _generate_permutation_candidates ".tmp/subs_no_resolved.txt" ".tmp/gotator1.txt" >/dev/null
 
         else
             end_subfunc "Skipping Permutations: Too Many Subdomains" "${FUNCNAME[0]}"
             return 0
         fi
 
-        # Resolve the permutations
+        # Resolve the permutations (slow step: one DNS query per candidate)
         if [[ $AXIOM != true ]]; then
-            if [[ -s ".tmp/gotator1.txt" ]]; then
-                _resolve_domains .tmp/gotator1.txt .tmp/permute1.txt
-            fi
+            _resolve_permutation_candidates ".tmp/gotator1.txt" ".tmp/permute1.txt"
         else
             if [[ -s ".tmp/gotator1.txt" ]]; then
                 run_command axiom-scan .tmp/gotator1.txt -m puredns-resolve -r "${AXIOM_RESOLVERS_PATH}" \
@@ -1569,21 +1619,25 @@ function sub_permut() {
             fi
         fi
 
-        # Generate second round of permutations
-        _generate_permutation_candidates ".tmp/permute1.txt" ".tmp/gotator2.txt"
+        if [[ "$permute_rounds" == "2" ]]; then
+            # Generate second round of permutations from resolved subs
+            print_notice RUN "sub_permut" "generating candidates (round 2)"
+            _generate_permutation_candidates ".tmp/permute1.txt" ".tmp/gotator2.txt" >/dev/null
 
-        # Resolve the second round of permutations
-        if [[ $AXIOM != true ]]; then
-            if [[ -s ".tmp/gotator2.txt" ]]; then
-                _resolve_domains .tmp/gotator2.txt .tmp/permute2.txt
+            # Resolve the second round of permutations
+            if [[ $AXIOM != true ]]; then
+                _resolve_permutation_candidates ".tmp/gotator2.txt" ".tmp/permute2.txt"
+            else
+                if [[ -s ".tmp/gotator2.txt" ]]; then
+                    run_command axiom-scan .tmp/gotator2.txt -m puredns-resolve -r "${AXIOM_RESOLVERS_PATH}" \
+                        --resolvers-trusted "${AXIOM_RESOLVERS_TRUSTED_PATH}" \
+                        --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
+                        -o .tmp/permute2.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
+                fi
             fi
         else
-            if [[ -s ".tmp/gotator2.txt" ]]; then
-                run_command axiom-scan .tmp/gotator2.txt -m puredns-resolve -r "${AXIOM_RESOLVERS_PATH}" \
-                    --resolvers-trusted "${AXIOM_RESOLVERS_TRUSTED_PATH}" \
-                    --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
-                    -o .tmp/permute2.txt "$AXIOM_EXTRA_ARGS" 2>>"$LOGFILE" >/dev/null
-            fi
+            : >".tmp/gotator2.txt"
+            : >".tmp/permute2.txt"
         fi
 
         # Combine results
@@ -1635,6 +1689,10 @@ function sub_regex_permut() {
 
     # Check if the function should run
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $SUBREGEXPERMUTE == true ]]; then
+        if [[ "${WORKLOAD_SAFE:-false}" == "true" && "${DEEP:-false}" != "true" ]]; then
+            end_subfunc "skipped (WORKLOAD_SAFE)" "${FUNCNAME[0]}" "SKIP"
+            return 0
+        fi
         start_subfunc "${FUNCNAME[0]}" "Running: Permutations by regex analysis"
 
         # If in multi mode and subdomains.txt doesn't exist, create it

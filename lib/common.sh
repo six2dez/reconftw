@@ -712,8 +712,25 @@ run_with_heartbeat() {
         now_ts=$(date +%s)
         if ((now_ts - last_hb >= interval)); then
             elapsed=$((now_ts - start_ts))
+            local progress_extra=""
+            if [[ -n "${HEARTBEAT_PROGRESS_FILE:-}" && -f "${HEARTBEAT_PROGRESS_FILE}" ]]; then
+                local prog_lines
+                prog_lines=$(wc -l <"${HEARTBEAT_PROGRESS_FILE}" 2>/dev/null | tr -d ' ')
+                [[ "$prog_lines" =~ ^[0-9]+$ ]] || prog_lines=0
+                if [[ -n "${HEARTBEAT_PROGRESS_LABEL:-}" ]]; then
+                    progress_extra=" | ${HEARTBEAT_PROGRESS_LABEL}: ${prog_lines}"
+                elif [[ "${HEARTBEAT_PROGRESS_TOTAL:-0}" =~ ^[0-9]+$ && "${HEARTBEAT_PROGRESS_TOTAL}" -gt 0 ]]; then
+                    local pct=$((prog_lines * 100 / HEARTBEAT_PROGRESS_TOTAL))
+                    ((pct > 100)) && pct=100
+                    progress_extra=" | progress: ${prog_lines}/${HEARTBEAT_PROGRESS_TOTAL} (${pct}%)"
+                else
+                    progress_extra=" | lines: ${prog_lines}"
+                fi
+            fi
             if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && [[ "$use_live" == true ]] && declare -F ui_live_progress_update >/dev/null 2>&1; then
-                ui_live_progress_update "Running: ${label} | elapsed $(format_duration "$elapsed") | ETA: --"
+                ui_live_progress_update "Running: ${label} | elapsed $(format_duration "$elapsed") | ETA: --${progress_extra}"
+            elif [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]] && _ui_human_output_enabled; then
+                printf "Running: %s | elapsed %s | ETA: --%s\n" "$label" "$(format_duration "$elapsed")" "$progress_extra"
             fi
             last_hb="$now_ts"
         fi
@@ -742,7 +759,8 @@ run_with_heartbeat_shell() {
     if [[ -z "$shell_cmd" ]]; then
         return 1
     fi
-    run_with_heartbeat "$label" /bin/bash -lc "$shell_cmd"
+    local work_dir="${dir:-$PWD}"
+    run_with_heartbeat "$label" /bin/bash -c "cd $(printf '%q' "$work_dir") && $shell_cmd"
 }
 
 # Count non-empty lines in a file safely

@@ -160,68 +160,216 @@ function start() {
         tools_installed
     fi
 
+    if [[ "${opt_ai:-false}" == "true" ]]; then
+        if _ai_configured; then
+            if [[ "${AI_PROVIDER:-}" == "mock" ]] || _ai_deps_ready; then
+                print_notice INFO "ai_analysis" "scheduled — $(_ai_endpoint_label) model=${AI_MODEL}"
+                log_note "ai_analysis scheduled (-y): provider=${AI_PROVIDER:-auto} model=${AI_MODEL} endpoint=$(_ai_endpoint_label)" "start" "${LINENO}"
+            else
+                print_notice WARN "ai_analysis" "scheduled but pydantic-ai missing — re-run ./install.sh"
+                log_note "ai_analysis preflight: pydantic-ai not installed; re-run ./install.sh" "start" "${LINENO}"
+            fi
+        else
+            print_notice WARN "ai_analysis" "requested (-y) but not configured — set AI_BASE_URL in secrets.cfg"
+            log_note "ai_analysis preflight: -y set but AI_BASE_URL/API key missing in secrets.cfg" "start" "${LINENO}"
+        fi
+    fi
+
+}
+
+function _ai_configured() {
+    if [[ "${AI_PROVIDER:-}" == "mock" ]]; then
+        return 0
+    fi
+    if [[ -n "${AI_BASE_URL:-}" ]]; then
+        return 0
+    fi
+    if [[ -n "${AI_API_KEY:-}${OPENAI_API_KEY:-}${ANTHROPIC_API_KEY:-}" ]]; then
+        return 0
+    fi
+    return 1
+}
+
+function _ai_endpoint_label() {
+    local label=""
+    if [[ -n "${AI_BASE_URL:-}" ]]; then
+        label="${AI_BASE_URL}"
+    elif [[ -n "${OPENAI_API_KEY:-}" ]]; then
+        label="OpenAI API"
+    elif [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+        label="Anthropic API"
+    elif [[ "${AI_PROVIDER:-}" == "mock" ]]; then
+        label="mock (offline)"
+    else
+        label="(not configured)"
+    fi
+    printf '%s' "$label" | sed -E 's#(://)[^@/]+@#\1[REDACTED]@#'
+}
+
+function _ai_deps_ready() {
+    local ai_python="${SCRIPTPATH}/.venv/bin/python3"
+    if [[ ! -x "${ai_python}" ]]; then
+        ai_python="${AI_EXECUTABLE:-python3}"
+    fi
+    command -v "${ai_python}" >/dev/null 2>&1 || return 1
+    "${ai_python}" -c "import pydantic_ai" 2>/dev/null
+}
+
+function _run_ai_analysis() {
+    [[ "${opt_ai:-false}" == "true" ]] || return 0
+    [[ -n "${dir:-}" ]] || return 0
+
+    if ! _ai_configured; then
+        notification "AI skipped: set AI_BASE_URL in secrets.cfg (or AI_PROVIDER=mock)" warn
+        print_notice WARN "ai_analysis" "not configured — see secrets.cfg"
+        log_note "ai_analysis skipped: no AI_BASE_URL or API key configured" "_run_ai_analysis" "${LINENO}"
+        return 0
+    fi
+
+    if [[ "${AI_PROVIDER:-}" != "mock" ]] && ! _ai_deps_ready; then
+        local ai_deps_hint="re-run ./install.sh or: uv pip install -r lib/ai/requirements.txt --python .venv/bin/python3"
+        if [[ -d "${SCRIPTPATH}/.venv" ]] && [[ ! -w "${SCRIPTPATH}/.venv/lib" ]]; then
+            ai_deps_hint=".venv not writable (often root/docker) — chown -R \$USER .venv then reinstall AI deps"
+        fi
+        notification "AI skipped: pydantic-ai not installed. ${ai_deps_hint}" warn
+        print_notice WARN "ai_analysis" "pydantic-ai missing — ${ai_deps_hint}"
+        log_note "ai_analysis skipped: pydantic-ai not importable (${ai_deps_hint})" "_run_ai_analysis" "${LINENO}"
+        return 0
+    fi
+
+    local ai_script ai_prompts_file ai_venv_python ai_python ai_json_output ai_redact_flag ai_pull_flag ai_strict_flag
+    local ai_skip_health_flag ai_endpoint ai_start ai_elapsed ai_rc latest_report
+    local -a ai_cmd
+
+    ai_script="${SCRIPTPATH}/lib/ai/cli.py"
+    ai_prompts_file="${AI_PROMPTS_FILE:-${SCRIPTPATH}/data/ai/prompts.json}"
+    ai_venv_python="${SCRIPTPATH}/.venv/bin/python3"
+    ai_python="${AI_EXECUTABLE:-python3}"
+    ai_json_output="${dir}/ai_result/reconftw_analysis.json"
+    ai_redact_flag="--redact"
+    ai_pull_flag=""
+    ai_strict_flag=""
+    ai_skip_health_flag=""
+
+    if [[ "${AI_REDACT:-true}" != "true" ]]; then
+        ai_redact_flag="--no-redact"
+    fi
+    if [[ "${AI_ALLOW_MODEL_PULL:-false}" == "true" ]]; then
+        ai_pull_flag="--allow-model-pull"
+    fi
+    if [[ "${AI_STRICT:-false}" == "true" ]]; then
+        ai_strict_flag="--strict"
+    fi
+    if [[ "${AI_SKIP_HEALTHCHECK:-false}" == "true" ]]; then
+        ai_skip_health_flag="--skip-healthcheck"
+    fi
+
+    if [[ -x "${ai_venv_python}" ]]; then
+        ai_python="${ai_venv_python}"
+    elif ! command -v "${ai_python}" >/dev/null 2>&1; then
+        notification "AI skipped: Python executable not found (${ai_python})" warn
+        print_notice WARN "ai_analysis" "python not found (${ai_python})"
+        log_note "ai_analysis skipped: python executable not found (${ai_python})" "_run_ai_analysis" "${LINENO}"
+        return 0
+    fi
+
+    if [[ ! -f "${ai_script}" && -f "${tools}/reconftw_ai/reconftw_ai.py" ]]; then
+        ai_script="${tools}/reconftw_ai/reconftw_ai.py"
+        if [[ -x "${tools}/reconftw_ai/venv/bin/python3" ]]; then
+            ai_python="${tools}/reconftw_ai/venv/bin/python3"
+        fi
+        ai_prompts_file="${AI_PROMPTS_FILE:-${tools}/reconftw_ai/prompts.json}"
+    fi
+
+    if [[ ! -f "${ai_script}" ]]; then
+        notification "AI skipped: built-in module not found at ${SCRIPTPATH}/lib/ai/cli.py" warn
+        print_notice WARN "ai_analysis" "cli.py not found"
+        return 0
+    fi
+
+    mkdir -p "${dir}/ai_result" 2>>"${LOGFILE:-/dev/null}"
+
+    if [[ "${ai_script}" == *"/lib/ai/cli.py" ]]; then
+        ai_cmd=(
+            "${ai_python}" "${ai_script}"
+            --results-dir "${dir}"
+            --output-dir "${dir}/ai_result"
+            --output-json "${ai_json_output}"
+            --model "${AI_MODEL}"
+            --provider "${AI_PROVIDER:-auto}"
+            --integrator "${AI_INTEGRATOR:-pydantic_ai}"
+            --output-format "${AI_REPORT_TYPE}"
+            --report-type "${AI_REPORT_PROFILE}"
+            --prompts-file "${ai_prompts_file}"
+            --max-chars-per-file "${AI_MAX_CHARS_PER_FILE:-50000}"
+            --max-files-per-category "${AI_MAX_FILES_PER_CATEGORY:-200}"
+            --timeout "${AI_TIMEOUT_SECONDS:-120}"
+            "${ai_redact_flag}"
+        )
+        [[ -n "${AI_BASE_URL:-}" ]] && ai_cmd+=(--base-url "${AI_BASE_URL}")
+        _ai_key="${AI_API_KEY:-${OPENAI_API_KEY:-}}"
+        [[ -n "${_ai_key}" ]] && ai_cmd+=(--api-key "${_ai_key}")
+        [[ -n "${ai_pull_flag}" ]] && ai_cmd+=("${ai_pull_flag}")
+        [[ -n "${ai_strict_flag}" ]] && ai_cmd+=("${ai_strict_flag}")
+        [[ -n "${ai_skip_health_flag}" ]] && ai_cmd+=("${ai_skip_health_flag}")
+        if [[ "${AI_PROVIDER:-}" == "mock" ]]; then
+            ai_cmd+=(--mock)
+        fi
+    else
+        ai_cmd=(
+            "${ai_python}" "${ai_script}"
+            --results-dir "${dir}"
+            --output-dir "${dir}/ai_result"
+            --model "${AI_MODEL}"
+            --output-format "${AI_REPORT_TYPE}"
+            --report-type "${AI_REPORT_PROFILE}"
+            --prompts-file "${ai_prompts_file}"
+        )
+    fi
+
+    ai_endpoint="$(_ai_endpoint_label)"
+    _print_section "AI Analysis"
+    print_notice RUN "ai_analysis" "provider=${AI_PROVIDER:-auto} model=${AI_MODEL} endpoint=${ai_endpoint}"
+    log_note "ai_analysis command: $(redact_secrets "${ai_cmd[*]}")" "_run_ai_analysis" "${LINENO}"
+
+    ai_start=$(date +%s)
+    ai_rc=0
+    if [[ "${OUTPUT_VERBOSITY:-1}" -ge 1 ]]; then
+        "${ai_cmd[@]}" 2>&1 | tee -a "${LOGFILE:-/dev/null}"
+        ai_rc=${PIPESTATUS[0]}
+    else
+        if ! "${ai_cmd[@]}" >>"${LOGFILE:-/dev/null}" 2>&1; then
+            ai_rc=$?
+        fi
+    fi
+    ai_elapsed=$(($(date +%s) - ai_start))
+
+    latest_report=""
+    if compgen -G "${dir}/ai_result/reconftw_analysis_*" >/dev/null; then
+        latest_report=$(ls -t "${dir}/ai_result"/reconftw_analysis_* 2>/dev/null | head -1)
+    fi
+
+    if [[ $ai_rc -eq 0 ]]; then
+        _print_status OK "ai_analysis" "${ai_elapsed}s"
+        if [[ -n "$latest_report" ]]; then
+            print_artifacts "AI report -> ${latest_report#${dir}/}"
+        fi
+        log_note "ai_analysis completed in ${ai_elapsed}s" "_run_ai_analysis" "${LINENO}"
+        return 0
+    fi
+
+    _print_status WARN "ai_analysis" "failed (${ai_elapsed}s)"
+    notification "AI report failed; see ${LOGFILE:-${dir}/.log} for details" warn
+    log_note "ai_analysis failed rc=${ai_rc}" "_run_ai_analysis" "${LINENO}"
+    if [[ "${AI_SKIP_HEALTHCHECK:-false}" != "true" ]]; then
+        log_note "ai_analysis hint: set AI_SKIP_HEALTHCHECK=true in reconftw.cfg if /models healthcheck fails on your endpoint" "_run_ai_analysis" "${LINENO}"
+    fi
+    return "$ai_rc"
 }
 
 function end() {
 
-    if [[ $opt_ai ]]; then
-        notification "Sending ${domain} data to AI" info
-        mkdir -p "${dir}/ai_result" 2>>"${LOGFILE}"
-        local ai_script ai_prompts_file ai_venv_python ai_python ai_json_output ai_redact_flag ai_pull_flag ai_strict_flag
-        local -a ai_cmd
-        ai_script="${tools}/reconftw_ai/reconftw_ai.py"
-        ai_prompts_file="${AI_PROMPTS_FILE:-${tools}/reconftw_ai/prompts.json}"
-        ai_venv_python="${tools}/reconftw_ai/venv/bin/python3"
-        ai_python="${AI_EXECUTABLE:-python3}"
-        ai_json_output="${dir}/ai_result/reconftw_analysis.json"
-        ai_redact_flag="--redact"
-        ai_pull_flag=""
-        ai_strict_flag=""
-
-        if [[ "${AI_REDACT:-true}" != "true" ]]; then
-            ai_redact_flag="--no-redact"
-        fi
-        if [[ "${AI_ALLOW_MODEL_PULL:-false}" == "true" ]]; then
-            ai_pull_flag="--allow-model-pull"
-        fi
-        if [[ "${AI_STRICT:-false}" == "true" ]]; then
-            ai_strict_flag="--strict"
-        fi
-
-        if [[ -x "${ai_venv_python}" ]]; then
-            ai_python="${ai_venv_python}"
-        elif ! command -v "${ai_python}" >/dev/null 2>&1; then
-            notification "AI skipped: Python executable not found (${ai_python})" warn
-            ai_python=""
-        fi
-
-        if [[ -n "${ai_python}" && -f "${ai_script}" ]]; then
-            ai_cmd=(
-                "${ai_python}" "${ai_script}"
-                --results-dir "${dir}" \
-                --output-dir "${dir}/ai_result" \
-                --output-json "${ai_json_output}" \
-                --model "${AI_MODEL}" \
-                --output-format "${AI_REPORT_TYPE}" \
-                --report-type "${AI_REPORT_PROFILE}" \
-                --prompts-file "${ai_prompts_file}" \
-                --max-chars-per-file "${AI_MAX_CHARS_PER_FILE:-50000}" \
-                --max-files-per-category "${AI_MAX_FILES_PER_CATEGORY:-200}" \
-                "${ai_redact_flag}"
-            )
-            if [[ -n "${ai_pull_flag}" ]]; then
-                ai_cmd+=("${ai_pull_flag}")
-            fi
-            if [[ -n "${ai_strict_flag}" ]]; then
-                ai_cmd+=("${ai_strict_flag}")
-            fi
-            if ! "${ai_cmd[@]}" 2>>"${LOGFILE}" >/dev/null; then
-                notification "AI report failed; check ${DEBUG_LOG} for details" warn
-            fi
-        elif [[ -n "${ai_python}" ]]; then
-            notification "AI skipped: reconftw_ai script not found at ${ai_script}" warn
-        fi
-    fi
+    _run_ai_analysis || true
 
     find "$dir" -type f -empty -print | grep -v '.called_fn' | grep -v '.log' | grep -v '.tmp' | xargs -r rm -f -- 2>>"$LOGFILE" >/dev/null
     find "$dir" -type d -empty -print -delete 2>>"$LOGFILE" >/dev/null
@@ -337,6 +485,19 @@ function end() {
         ui_summary "$domain" "$runtime" "$finaldir" "$mode_label" "${subs_count:-0}" "${webs_count:-0}" \
             "${vulns_count[critical]}" "${vulns_count[high]}" "${vulns_count[medium]}" \
             "${vulns_count[low]}" "${vulns_count[info]}"
+        if [[ "${opt_ai:-false}" == "true" ]]; then
+            local ai_report_path=""
+            if compgen -G "${dir}/ai_result/reconftw_analysis_*" >/dev/null; then
+                ai_report_path=$(ls -t "${dir}/ai_result"/reconftw_analysis_* 2>/dev/null | head -1)
+            fi
+            if declare -F ui_human_output_enabled >/dev/null 2>&1 && ui_human_output_enabled; then
+                if [[ -n "$ai_report_path" ]]; then
+                    printf "AI report: %s\n" "${ai_report_path#${finaldir}/}"
+                elif ! _ai_configured; then
+                    printf "AI report: skipped (not configured)\n"
+                fi
+            fi
+        fi
         print_incidents "${DEBUG_LOG:-}"
     else
         _print_section "Scan Complete"
@@ -346,6 +507,13 @@ function end() {
         printf "%b  Target:   %s%b\n" "${bgreen:-}" "$domain" "${reset:-}"
         printf "%b  Duration: %s%b\n" "${bgreen:-}" "$runtime" "${reset:-}"
         printf "%b  Output:   %s%b\n" "${bgreen:-}" "$finaldir" "${reset:-}"
+        if [[ "${opt_ai:-false}" == "true" ]]; then
+            local ai_report_path=""
+            if compgen -G "${dir}/ai_result/reconftw_analysis_*" >/dev/null; then
+                ai_report_path=$(ls -t "${dir}/ai_result"/reconftw_analysis_* 2>/dev/null | head -1)
+                printf "%b  AI:       %s%b\n" "${bgreen:-}" "${ai_report_path#${dir}/}" "${reset:-}"
+            fi
+        fi
         _print_rule
         print_incidents "${DEBUG_LOG:-}"
     fi
@@ -831,11 +999,14 @@ function recon() {
 
         run_module_with_axiom_failover waf_checks
         run_module_with_axiom_failover nuclei_check
+        wscan_check
         run_module_with_axiom_failover graphql_scan
         run_module_with_axiom_failover fuzz
         run_module_with_axiom_failover iishortname
         run_module_with_axiom_failover urlchecks
+        js_extract
         run_module_with_axiom_failover jschecks
+        spiderjs_scan
         sub_js_extract
         well_known_pivots
         websocket_checks
@@ -1044,7 +1215,9 @@ function multi_recon() {
         run_module_with_axiom_failover fuzz
         run_module_with_axiom_failover iishortname
         run_module_with_axiom_failover urlchecks
+        js_extract
         run_module_with_axiom_failover jschecks
+        spiderjs_scan
         currently=$(date +"%H:%M:%S")
         loopend=$(date +%s)
         getElapsedTime "$loopstart" "$loopend"
@@ -1218,13 +1391,16 @@ function webs_menu() {
 
     run_module_with_axiom_failover waf_checks
     run_module_with_axiom_failover nuclei_check
+    wscan_check
     run_module_with_axiom_failover graphql_scan
     run_module_with_axiom_failover fuzz
     cms_scanner
     run_module_with_axiom_failover iishortname
     run_module_with_axiom_failover urlchecks
-    run_module_with_axiom_failover param_discovery
+    js_extract
     run_module_with_axiom_failover jschecks
+    spiderjs_scan
+    run_module_with_axiom_failover param_discovery
     sub_js_extract
     well_known_pivots
     websocket_checks
@@ -1414,6 +1590,7 @@ function report_only_mode() {
         generate_consolidated_report || true
         export_reports || true
     fi
+    _run_ai_analysis || true
     notification "Report-only rebuild completed for ${domain}" good
 }
 
@@ -1437,7 +1614,7 @@ function help() {
     printf "   -n, --osint       OSINT - Checks for public intel data\n"
     printf "   -z, --zen         Zen - Performs a recon process covering the basics and some vulns\n"
     printf "   -c, --custom      Custom - Launches specific function against target, u need to know the function name first\n"
-    printf "   -y, --ai          AI - Analyzes ReconFTW results using a local LLM\n"
+    printf "   -y, --ai          AI - Analyze scan results with a remote LLM (configure AI_BASE_URL in secrets.cfg)\n"
     printf "   -h                Help - Show help section\n"
     printf " \n"
     printf " %bGENERAL OPTIONS%b\n" "${bblue}" "${reset}"

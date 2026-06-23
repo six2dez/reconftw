@@ -131,6 +131,74 @@ ensure_git_dir() {
     fi
 }
 
+# Ensure tools directory exists and is writable by the current user.
+# Fixes Docker/root installs that leave $HOME/Tools owned by root.
+ensure_tools_dir() {
+    if [[ -z "${dir:-}" ]]; then
+        msg_warn "[!] tools path (dir) is unset"
+        return 1
+    fi
+    mkdir -p "$dir" 2>/dev/null || true
+    if [[ -w "$dir" ]]; then
+        return 0
+    fi
+    msg_warn "[!] ${dir} is not writable by $(id -un); fixing ownership..."
+    if $SUDO chown -R "$(id -u):$(id -g)" "$dir" 2>/dev/null; then
+        return 0
+    fi
+    msg_err "[!] Cannot fix ownership of ${dir}"
+    return 1
+}
+
+# Sync a cloned repository: fix remote URL, fetch, checkout pinned version.
+# Handles detached HEAD and root-owned .git directories from prior installs.
+sync_git_repo() {
+    local repo_name="$1"
+    local repo_slug="$2"
+    local repo_path="${dir}/${repo_name}"
+    local expected_url="https://github.com/${repo_slug}.git"
+
+    if [[ -d "$repo_path/.git" && ! -w "$repo_path/.git" ]]; then
+        msg_warn "[$repo_name] fixing repository ownership..."
+        $SUDO chown -R "$(id -u):$(id -g)" "$repo_path" 2>/dev/null || true
+    fi
+
+    if [[ -d "$repo_path/.git" ]]; then
+        local current_url
+        current_url=$(git -C "$repo_path" config --get remote.origin.url 2>/dev/null || true)
+        if [[ -n "$current_url" && "$current_url" != *"${repo_slug}"* ]]; then
+            git -C "$repo_path" remote set-url origin "$expected_url" 2>/dev/null || true
+        fi
+    fi
+
+    if ! retry 3 3 q_to 120 git -C "$repo_path" fetch --tags --prune origin; then
+        return 1
+    fi
+
+    local _repo_ver _checkout_ok=false
+    _repo_ver=$(get_tool_version "$repo_name" "repo:")
+    if [[ "$_repo_ver" != "latest" && "$_repo_ver" != "HEAD" ]]; then
+        for _ref in "$_repo_ver" "tags/${_repo_ver}" "v${_repo_ver#v}"; do
+            if git -C "$repo_path" checkout "$_ref" &>/dev/null; then
+                _checkout_ok=true
+                break
+            fi
+        done
+        if [[ $_checkout_ok != true ]]; then
+            git -C "$repo_path" checkout FETCH_HEAD &>/dev/null || return 1
+        fi
+    else
+        if git -C "$repo_path" checkout -B main origin/main &>/dev/null; then
+            git -C "$repo_path" merge --ff-only origin/main &>/dev/null || true
+        elif git -C "$repo_path" checkout -B master origin/master &>/dev/null; then
+            git -C "$repo_path" merge --ff-only origin/master &>/dev/null || true
+        else
+            git -C "$repo_path" checkout FETCH_HEAD &>/dev/null || return 1
+        fi
+    fi
+    return 0
+}
+
 # Install Rust toolchain, uv package manager, smugglex, and shodan CLI.
 # Called from install_apt/install_yum/install_pacman/install_brew to avoid duplication.
 install_rust_uv() {
@@ -345,6 +413,13 @@ declare -A gotools=(
     ["brutus"]="github.com/praetorian-inc/brutus/cmd/brutus"
     ["julius"]="github.com/praetorian-inc/julius/cmd/julius"
     ["titus"]="github.com/praetorian-inc/titus/cmd/titus"
+    ["gitleaks"]="github.com/gitleaks/gitleaks/v8"
+    ["trufflehog"]="github.com/trufflesecurity/trufflehog/v3"
+    ["nomore403"]="github.com/devploit/nomore403"
+    ["getJS"]="github.com/003random/getJS/v2/cmd/getJS"
+    ["alterx"]="github.com/projectdiscovery/alterx/cmd/alterx"
+    ["uncover"]="github.com/projectdiscovery/uncover/cmd/uncover"
+    ["vulnx"]="github.com/projectdiscovery/vulnx/cmd/vulnx"
 )
 
 # Declare uv tool-managed Python tools and their GitHub paths
@@ -363,8 +438,9 @@ declare -A pipxtools=(
     ["subwiz"]="hadriansecurity/subwiz"
     ["arjun"]="s0md3v/Arjun"
     ["gqlspection"]="doyensec/GQLSpection"
-    ["postleaksNg"]="six2dez/postleaksNG"
+    ["postleaksNg"]="six2dez/postleaksNG" # reconftw fork of cosad3s/postleaks (+ threading)
     ["cewler"]="roys/cewler"
+    ["gato"]="praetorian-inc/gato"
 )
 
 # Declare repositories and their paths
@@ -380,24 +456,19 @@ declare -A repos=(
     ["cloud_enum"]="initstring/cloud_enum"
     ["ultimate-nmap-parser"]="shifty0g/ultimate-nmap-parser"
     ["gitdorks_go"]="damit5/gitdorks_go"
-    ["Web-Cache-Vulnerability-Scanner"]="Hackmanit/Web-Cache-Vulnerability-Scanner"
     ["regulator"]="cramppet/regulator"
-    ["gitleaks"]="gitleaks/gitleaks"
     ["ghleaks"]="dinosn/ghleaks"
-    ["trufflehog"]="trufflesecurity/trufflehog"
-    ["nomore403"]="devploit/nomore403"
     ["SwaggerSpy"]="UndeadSec/SwaggerSpy"
     ["LeakSearch"]="JoelGMSec/LeakSearch"
     ["ffufPostprocessing"]="Damian89/ffufPostprocessing"
-    ["misconfig-mapper"]="intigriti/misconfig-mapper"
     ["Spoofy"]="MattKeeley/Spoofy"
     ["msftrecon"]="Arcanum-Sec/msftrecon"
     ["Scopify"]="Arcanum-Sec/Scopify"
     ["metagoofil"]="opsdisk/metagoofil"
     ["EmailHarvester"]="maldevel/EmailHarvester"
     ["reconftw_ai"]="six2dez/reconftw_ai"
-    ["gato"]="praetorian-inc/gato"
     ["SSTImap"]="vladko312/SSTImap"
+    ["spiderjs"]="ibrahmsql/spiderjs"
 )
 
 # Function to display the banner
@@ -422,6 +493,8 @@ EOF
 
 # Function to install Go tools
 function install_tools() {
+    ensure_tools_dir || true
+
     header "Installing Golang tools (${#gotools[@]})"
 
     local go_step=0
@@ -555,26 +628,14 @@ function install_tools() {
             continue
         }
 
-        # Pull the latest changes
-        msg_run "[$repos_step/${#repos[@]}] $repo (pull)"
-        retry 3 3 q_to 60 git pull
-        exit_status=$?
-        if [[ $exit_status -ne 0 ]]; then
-            msg_err "[$repos_step/$total_repo] $repo pull failed"
+        # Sync repository (fetch + checkout; handles detached HEAD and stale remotes)
+        msg_run "[$repos_step/${#repos[@]}] $repo (sync)"
+        if ! sync_git_repo "$repo" "${repos[$repo]}"; then
+            msg_err "[$repos_step/$total_repo] $repo sync failed"
             failed_repos+=("$repo")
             ((++repo_fail))
             double_check=true
             continue
-        fi
-
-        # Checkout pinned version from manifest if available
-        local _repo_ver
-        _repo_ver=$(get_tool_version "$repo" "repo:")
-        if [[ "$_repo_ver" != "latest" && "$_repo_ver" != "HEAD" ]]; then
-            git fetch --tags &>/dev/null || true
-            if ! git checkout "$_repo_ver" &>/dev/null; then
-                msg_warn "[$repos_step/$total_repo] $repo: could not checkout $_repo_ver, staying on HEAD"
-            fi
         fi
 
         # Install requirements inside a virtual environment
@@ -595,26 +656,11 @@ function install_tools() {
                     $SUDO cp bin/massdns /usr/local/bin/ &>/dev/null
                 fi
                 ;;
-            "gitleaks")
-                if ! make build &>/dev/null; then
-                    msg_warn "[$repos_step/$total_repo] $repo: make build failed"
-                else
-                    $SUDO cp ./gitleaks /usr/local/bin/ &>/dev/null
-                fi
-                ;;
             "ghleaks")
                 if ! go build -o ghleaks . &>/dev/null; then
                     msg_warn "[$repos_step/$total_repo] $repo: go build failed"
                 else
                     chmod +x ./ghleaks
-                fi
-                ;;
-            "nomore403")
-                go get &>/dev/null || true
-                if ! go build &>/dev/null; then
-                    msg_warn "[$repos_step/$total_repo] $repo: go build failed"
-                else
-                    chmod +x ./nomore403
                 fi
                 ;;
             "ffufPostprocessing")
@@ -626,20 +672,18 @@ function install_tools() {
                     chmod +x ./ffufPostprocessing
                 fi
                 ;;
-            "trufflehog")
-                go install &>/dev/null || msg_warn "[$repos_step/$total_repo] $repo: go install failed"
-                ;;
-            "gato")
-                if [[ ! -d "venv" ]]; then
-                    uv venv venv &>/dev/null || true
-                fi
-                uv pip install --upgrade -e . --python venv/bin/python3 &>/dev/null || true
-                ;;
             "SSTImap")
                 if [[ ! -d "venv" ]]; then
                     uv venv venv &>/dev/null || true
                 fi
                 uv pip install --upgrade -r requirements.txt --python venv/bin/python3 &>/dev/null || true
+                ;;
+            "spiderjs")
+                if go build -o spiderjs_bin ./cmd/spiderjs &>/dev/null; then
+                    chmod +x spiderjs_bin
+                else
+                    msg_warn "[$repos_step/$total_repo] $repo: go build spiderjs_bin failed"
+                fi
                 ;;
         esac
 
@@ -1030,6 +1074,53 @@ function install_pacman() {
 }
 
 # Setup reconftw venv for python-only helpers (e.g., getjswords)
+function install_wscan_binary() {
+    local dest="${tools}/wscan"
+    mkdir -p "$dest"
+    if [[ -x "${dest}/wscan" ]]; then
+        return 0
+    fi
+    if ! command -v curl >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
+        msg_warn "[!] curl/jq required to download wscan; skipping"
+        return 0
+    fi
+    local asset_url arch uname_m
+    uname_m="$(uname -m)"
+    case "$uname_m" in
+        x86_64 | amd64) arch="amd64" ;;
+        aarch64 | arm64) arch="arm64" ;;
+        *)
+            msg_warn "[!] wscan: unsupported architecture ${uname_m}"
+            return 0
+            ;;
+    esac
+    asset_url=$(curl -fsSL "https://api.github.com/repos/chushuai/wscan/releases/latest" \
+        | jq -r --arg a "$arch" '.assets[] | select(.name | test("linux.*" + $a)) | .browser_download_url' | head -1)
+    if [[ -z "$asset_url" || "$asset_url" == "null" ]]; then
+        msg_warn "[!] wscan: no linux/${arch} release asset found"
+        return 0
+    fi
+    local tmp="${dest}/wscan_download"
+    if curl -fsSL "$asset_url" -o "$tmp"; then
+        if file "$tmp" | grep -qi 'gzip'; then
+            tar -xzf "$tmp" -C "$dest" 2>/dev/null || true
+        elif file "$tmp" | grep -qi 'zip'; then
+            unzip -o -q "$tmp" -d "$dest" 2>/dev/null || true
+        else
+            mv "$tmp" "${dest}/wscan" 2>/dev/null || true
+        fi
+        rm -f "$tmp"
+        find "$dest" -maxdepth 2 -name 'wscan' -type f -exec chmod +x {} \; 2>/dev/null || true
+        if [[ -x "${dest}/wscan" ]]; then
+            msg_ok "wscan binary ready at ${dest}/wscan"
+        else
+            msg_warn "[!] wscan downloaded but binary not found at ${dest}/wscan"
+        fi
+    else
+        msg_warn "[!] wscan download failed"
+    fi
+}
+
 function setup_reconftw_venv() {
     local root_dir="${SCRIPTPATH:-$(pwd)}"
     local venv_dir="${root_dir}/.venv"
@@ -1046,6 +1137,18 @@ function setup_reconftw_venv() {
     uv pip install jsbeautifier requests --python "${venv_dir}/bin/python3" &>/dev/null || {
         msg_warn "[!] Failed to install getjswords deps in ${venv_dir}"
     }
+    if [[ -f "${root_dir}/lib/ai/requirements.txt" ]]; then
+        uv pip install -r "${root_dir}/lib/ai/requirements.txt" --python "${venv_dir}/bin/python3" &>/dev/null || {
+            msg_warn "[!] Failed to install AI module deps in ${venv_dir}"
+        }
+    fi
+    if [[ -f "${root_dir}/pyproject.toml" ]]; then
+        uv pip install -e "${root_dir}[dev]" --python "${venv_dir}/bin/python3" &>/dev/null || {
+            uv pip install -e "${root_dir}" --python "${venv_dir}/bin/python3" &>/dev/null || {
+                msg_warn "[!] Failed to install reconftw Python package in ${venv_dir}"
+            }
+        }
+    fi
 }
 
 # Function to perform initial setup
@@ -1056,6 +1159,7 @@ function initial_setup() {
     if [[ $TOOLS_ONLY == "true" ]]; then
         header "Tools-only mode"
         with_spinner "Installing/validating Golang" install_golang_version
+        ensure_tools_dir || true
         mkdir -p ${HOME}/.gf
         mkdir -p "$tools"
         mkdir -p ${HOME}/.config/notify/
@@ -1068,6 +1172,7 @@ function initial_setup() {
 
         install_tools
         setup_reconftw_venv
+        install_wscan_binary
         return
     fi
 
@@ -1076,6 +1181,7 @@ function initial_setup() {
     with_spinner "Installing system packages" install_system_packages
     check_network
     with_spinner "Installing/validating Golang" install_golang_version
+    ensure_tools_dir || true
     mkdir -p ${HOME}/.gf
     mkdir -p "$tools"
     mkdir -p ${HOME}/.config/notify/
@@ -1091,6 +1197,7 @@ function initial_setup() {
 
     install_tools
     setup_reconftw_venv
+    install_wscan_binary
 
     # Repositories with special configurations
     header "Configuring special repositories"

@@ -68,6 +68,13 @@ nerva=v1.0.0
 brutus=v1.1.0
 julius=v1.2.0
 titus=v1.1.3
+gitleaks=v8.30.0
+trufflehog=v3.93.6
+nomore403=v1.1.8
+getJS=v2.0.0
+alterx=latest
+uncover=latest
+vulnx=latest
 
 # ============================================================
 # Python/uv tools (installed via uv tool install git+https://...)
@@ -90,6 +97,7 @@ arjun=2.2.7
 gqlspection=0.2.3
 postleaksNg=HEAD
 cewler=v1.4.1
+gato=1.7
 
 # ============================================================
 # Git repositories (cloned via git clone)
@@ -108,21 +116,16 @@ JSA=HEAD
 cloud_enum=0.7
 ultimate-nmap-parser=HEAD
 gitdorks_go=v0.1
-Web-Cache-Vulnerability-Scanner=2.0.0
 regulator=HEAD
-gitleaks=v8.30.0
 ghleaks=HEAD
-trufflehog=v3.93.6
-nomore403=v1.1.8
 SwaggerSpy=HEAD
 LeakSearch=HEAD
 ffufPostprocessing=HEAD
-misconfig-mapper=v1.15.2
 Spoofy=v1.0.3
 msftrecon=HEAD
 Scopify=HEAD
 metagoofil=v1.4.0
 EmailHarvester=1.3.2
 reconftw_ai=HEAD
-gato=1.7
 SSTImap=v1.3
+spiderjs=HEAD

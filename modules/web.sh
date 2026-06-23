@@ -5,7 +5,7 @@
 #           favirecon_tech,
 #           portscan, cdnprovider, waf_checks, nuclei_check, graphql_scan,
 #           param_discovery, grpc_reflection, fuzz, iishortname, cms_scanner,
-#           urlchecks, url_gf, url_ext, jschecks, websocket_checks,
+#           urlchecks, js_extract, url_gf, url_ext, jschecks, spiderjs_scan, wscan_check,
 #           wordlist_gen, wordlist_gen_roboxtractor, password_dict, brokenLinks
 # This file is sourced by reconftw.sh - do not execute directly
 [[ -z "${SCRIPTPATH:-}" ]] && {
@@ -23,6 +23,41 @@
 #   https://*.api.example.com -> https://api.example.com
 _normalize_probe_urls() {
     sed -E 's#^(https?://)\*\.#\1#; s#^\*\.##'
+}
+
+# Cap URL/host list files for home-safe module limits.
+_web_cap_url_file() {
+    local src="$1" dest="$2" limit="$3"
+    [[ -s "$src" ]] || return 1
+    if [[ "$limit" =~ ^[0-9]+$ && "$limit" -gt 0 ]]; then
+        head -n "$limit" "$src" >"$dest"
+    else
+        cp "$src" "$dest"
+    fi
+}
+
+_wscan_binary_path() {
+    if [[ -x "${tools}/wscan/wscan" ]]; then
+        printf '%s\n' "${tools}/wscan/wscan"
+        return 0
+    fi
+    if command -v wscan >/dev/null 2>&1; then
+        command -v wscan
+        return 0
+    fi
+    return 1
+}
+
+_spiderjs_binary_path() {
+    if [[ -x "${tools}/spiderjs/spiderjs_bin" ]]; then
+        printf '%s\n' "${tools}/spiderjs/spiderjs_bin"
+        return 0
+    fi
+    if command -v spiderjs_bin >/dev/null 2>&1; then
+        command -v spiderjs_bin
+        return 0
+    fi
+    return 1
 }
 
 # Validate probe output as JSONL. Empty files are valid.
@@ -97,6 +132,48 @@ print_webs_summary() {
 # Main Web Functions  
 ###############################################################################
 
+# Resolve httpx port list from profile (home = 80/443 only unless DEEP).
+_webprobe_resolve_ports() {
+    local ports=""
+    if [[ "${DEEP:-false}" == "true" ]]; then
+        ports="${WEBPROBE_PORTS_DEEP:-${WEBPROBE_PORTS:-80,443}}"
+    elif [[ "${WEBPROBE_INCLUDE_UNCOMMON_PORTS:-false}" == "true" ]]; then
+        ports="${WEBPROBE_PORTS:-80,443,${UNCOMMON_PORTS_WEB:-}}"
+    else
+        ports="${WEBPROBE_PORTS_COMMON:-80,443}"
+    fi
+    printf '%s' "$ports" | sed -E 's/,+/,/g; s/^,//; s/,$//'
+}
+
+# Cap httpx host list on large targets; always keep apex domain first.
+_webprobe_prepare_host_list() {
+    local source_file="$1"
+    local outfile="$2"
+    local limit="${3:-0}"
+
+    : >"$outfile"
+    [[ ! -s "$source_file" ]] && return 0
+    [[ "$limit" =~ ^[0-9]+$ ]] || limit=0
+    ((limit < 1)) && limit=0
+
+    if [[ -n "${domain:-}" ]] && ! [[ "$domain" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        printf '%s\nwww.%s\n' "$domain" "$domain" >>"$outfile"
+    fi
+
+    if ((limit == 0)); then
+        cat "$source_file" >>"$outfile"
+    else
+        local used room
+        used=$(wc -l <"$outfile" | tr -d ' ')
+        [[ "$used" =~ ^[0-9]+$ ]] || used=0
+        room=$((limit - used))
+        if ((room > 0)); then
+            grep -Fvx -f "$outfile" "$source_file" 2>/dev/null | head -n "$room" >>"$outfile" || true
+        fi
+    fi
+    sort -u "$outfile" -o "$outfile"
+}
+
 function webprobe_full() {
 
     # Create necessary directories
@@ -126,8 +203,22 @@ function webprobe_full() {
             return 0
         fi
 
-        local probe_ports="${WEBPROBE_PORTS:-80,443,${UNCOMMON_PORTS_WEB:-}}"
-        probe_ports=$(printf '%s' "$probe_ports" | sed -E 's/,+/,/g; s/^,//; s/,$//')
+        local probe_ports httpx_input host_total
+        probe_ports=$(_webprobe_resolve_ports)
+        httpx_input="subdomains/subdomains.txt"
+        host_total=$(wc -l <subdomains/subdomains.txt 2>/dev/null | tr -d ' ')
+        [[ "$host_total" =~ ^[0-9]+$ ]] || host_total=0
+
+        if [[ "${DEEP:-false}" != "true" ]]; then
+            local max_hosts="${WEBPROBE_MAX_HOSTS:-${DEEP_LIMIT2:-1500}}"
+            if [[ "$max_hosts" =~ ^[0-9]+$ && "$max_hosts" -gt 0 && "$host_total" -gt "$max_hosts" ]]; then
+                _webprobe_prepare_host_list "subdomains/subdomains.txt" ".tmp/webprobe_hosts.txt" "$max_hosts"
+                httpx_input=".tmp/webprobe_hosts.txt"
+                _print_msg INFO "webprobe capped at ${max_hosts} of ${host_total} hosts (use --deep for full list)"
+                log_note "webprobe_full: capped hosts ${host_total} -> ${max_hosts}" "${FUNCNAME[0]}" "${LINENO}"
+            fi
+        fi
+
         local probe_out=".tmp/web_full_info_probe.txt"
         local common_json_tmp=".tmp/web_full_info_common_current.txt"
         local uncommon_json_tmp=".tmp/web_full_info_uncommon_current.txt"
@@ -144,6 +235,26 @@ function webprobe_full() {
             IFS="$_ifs"
         fi
 
+        local host_count=0 port_count=0
+        local -a httpx_extra_args=()
+        host_count=$(wc -l <"$httpx_input" 2>/dev/null | tr -d ' ')
+        [[ "$host_count" =~ ^[0-9]+$ ]] || host_count=0
+        port_count=$(tr ',' '\n' <<<"$probe_ports" | sed '/^$/d' | wc -l | tr -d ' ')
+        [[ "$port_count" =~ ^[0-9]+$ ]] || port_count=0
+        if [[ "$host_total" -gt "$host_count" ]]; then
+            print_notice RUN "${FUNCNAME[0]}" "httpx probing ${host_count}/${host_total} hosts on ${port_count} ports"
+        else
+            print_notice RUN "${FUNCNAME[0]}" "httpx probing ${host_count} hosts on ${port_count} ports"
+        fi
+        log_note "webprobe_full: httpx ${host_count}/${host_total} hosts x ${port_count} ports -> ${probe_out}" "${FUNCNAME[0]}" "${LINENO}"
+
+        if [[ -n "${WEBPROBE_HTTPX_EXTRA:-}" ]]; then
+            local _ifs="$IFS"
+            IFS=' '
+            read -r -a httpx_extra_args <<<"$WEBPROBE_HTTPX_EXTRA"
+            IFS="$_ifs"
+        fi
+
         if [[ $AXIOM != true ]]; then
             local -a httpx_cmd=(
                 httpx
@@ -155,7 +266,7 @@ function webprobe_full() {
                 -rl "$HTTPX_RATELIMIT"
                 -timeout "$HTTPX_UNCOMMONPORTS_TIMEOUT"
                 -silent
-                -retries 2
+                -retries "${HTTPX_RETRIES:-2}"
                 -title
                 -web-server
                 -tech-detect
@@ -164,11 +275,21 @@ function webprobe_full() {
                 -json
                 -o "$probe_out"
             )
-            run_command "${httpx_cmd[@]}" <subdomains/subdomains.txt 2>>"$LOGFILE" >/dev/null
+            if [[ ${#httpx_extra_args[@]} -gt 0 ]]; then
+                httpx_cmd+=("${httpx_extra_args[@]}")
+            fi
+            HEARTBEAT_PROGRESS_FILE="$probe_out"
+            HEARTBEAT_PROGRESS_LABEL="live hosts"
+            run_with_heartbeat "webprobe_full httpx (${host_count} hosts, ${port_count} ports)" "${httpx_cmd[@]}" <"$httpx_input"
+            local httpx_rc=$?
+            unset HEARTBEAT_PROGRESS_FILE HEARTBEAT_PROGRESS_LABEL
+            if ((httpx_rc != 0)); then
+                print_warnf "httpx webprobe failed (exit %s)" "$httpx_rc"
+            fi
         else
             local -a axiom_cmd=(
                 axiom-scan
-                subdomains/subdomains.txt
+                "$httpx_input"
                 -m httpx
                 -follow-host-redirects
                 -H "${HEADER}"
@@ -189,7 +310,14 @@ function webprobe_full() {
             if [[ ${#axiom_extra_args[@]} -gt 0 ]]; then
                 axiom_cmd+=("${axiom_extra_args[@]}")
             fi
-            run_command "${axiom_cmd[@]}" 2>>"$LOGFILE" >/dev/null
+            HEARTBEAT_PROGRESS_FILE="$probe_out"
+            HEARTBEAT_PROGRESS_LABEL="live hosts"
+            run_with_heartbeat "webprobe_full axiom httpx (${host_count} hosts, ${port_count} ports)" "${axiom_cmd[@]}"
+            local httpx_rc=$?
+            unset HEARTBEAT_PROGRESS_FILE HEARTBEAT_PROGRESS_LABEL
+            if ((httpx_rc != 0)); then
+                print_warnf "axiom httpx webprobe failed (exit %s)" "$httpx_rc"
+            fi
         fi
 
         if [[ -s "$probe_out" ]] && ! _validate_probe_jsonl "$probe_out"; then
@@ -717,6 +845,12 @@ function portscan() {
         fi
 
         if [[ $PORTSCAN_ACTIVE == true ]]; then
+            if [[ -s ".tmp/ips_nocdn.txt" ]]; then
+                local ip_count
+                ip_count=$(wc -l <.tmp/ips_nocdn.txt | tr -d ' ')
+                [[ "$ip_count" =~ ^[0-9]+$ ]] || ip_count=0
+                print_notice RUN "${FUNCNAME[0]}" "active scan on ${ip_count} non-CDN IPs"
+            fi
             # Resolve active nmap options (deep profile optional).
             local active_opts_raw
             active_opts_raw="${PORTSCAN_ACTIVE_OPTIONS:-}"
@@ -1674,6 +1808,86 @@ function cms_scanner() {
     fi
 }
 
+_katana_depth() {
+    if [[ "${DEEP:-false}" == true ]]; then
+        printf '%s' "${KATANA_DEPTH_DEEP:-3}"
+    else
+        printf '%s' "${KATANA_DEPTH:-2}"
+    fi
+}
+
+_katana_timeout() {
+    if [[ "${DEEP:-false}" == true ]]; then
+        printf '%s' "${KATANA_TIMEOUT_DEEP:-4h}"
+    else
+        printf '%s' "${KATANA_TIMEOUT:-3h}"
+    fi
+}
+
+# Normalize bare hostnames to https URLs for katana -list.
+_katana_normalize_targets() {
+    local infile="$1"
+    local outfile="$2"
+    : >"$outfile"
+    [[ ! -s "$infile" ]] && return 0
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line//$'\r'/}"
+        line="${line#"${line%%[![:space:]]*}"}"
+        line="${line%"${line##*[![:space:]]}"}"
+        [[ -z "$line" ]] && continue
+        if [[ "$line" =~ ^https?:// ]]; then
+            printf '%s\n' "$line"
+        else
+            line="${line#//}"
+            printf 'https://%s\n' "$line"
+        fi
+    done <"$infile" | sort -u >"$outfile"
+}
+
+# Build katana seed list: apex domain + web targets, capped when not DEEP.
+_katana_build_target_list() {
+    local source_file="${1:-webs/webs_all.txt}"
+    local outfile="${2:-.tmp/katana_targets_effective.txt}"
+    local limit="${KATANA_TARGET_LIMIT:-${DEEP_LIMIT2:-1500}}"
+    local tmp_norm=".tmp/katana_targets_norm.txt"
+
+    : >"$tmp_norm"
+
+    if [[ "${KATANA_DOMAIN_SEED:-true}" == true && -n "${domain:-}" ]] \
+        && ! [[ "$domain" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        printf 'https://%s\nhttps://www.%s\n' "$domain" "$domain" >>"$tmp_norm"
+    fi
+
+    if [[ -s "$source_file" ]]; then
+        _katana_normalize_targets "$source_file" ".tmp/katana_targets_from_webs.txt"
+        cat ".tmp/katana_targets_from_webs.txt" >>"$tmp_norm"
+    fi
+
+    sort -u "$tmp_norm" -o "$tmp_norm"
+
+    local count
+    count=$(wc -l <"$tmp_norm" | tr -d ' ')
+    [[ "$count" =~ ^[0-9]+$ ]] || count=0
+
+    if [[ "${DEEP:-false}" != "true" && "$limit" =~ ^[0-9]+$ && "$limit" -gt 0 && "$count" -gt "$limit" ]]; then
+        : >"$outfile"
+        if [[ "${KATANA_DOMAIN_SEED:-true}" == true && -n "${domain:-}" ]] \
+            && ! [[ "$domain" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            printf 'https://%s\nhttps://www.%s\n' "$domain" "$domain" >>"$outfile"
+        fi
+        local room=$((limit - $(wc -l <"$outfile" | tr -d ' ')))
+        if [[ "$room" -gt 0 ]]; then
+            grep -Fvx -f "$outfile" "$tmp_norm" 2>/dev/null | head -n "$room" >>"$outfile" || true
+        fi
+        sort -u "$outfile" -o "$outfile"
+        log_note "urlchecks: katana targets capped at ${limit} (had ${count}); use --deep for full crawl" "_katana_build_target_list" "${LINENO}"
+        _print_msg INFO "katana targets capped at ${limit} of ${count} (use --deep for full list)"
+    else
+        cp "$tmp_norm" "$outfile"
+    fi
+}
+
 _katana_headless_flags() {
     local target_count="${1:-0}"
     local profile="${KATANA_HEADLESS_PROFILE:-off}"
@@ -1694,6 +1908,78 @@ _katana_headless_flags() {
     esac
 }
 
+# Run katana against a prepared target list (argv-based, no fragile shell strings).
+_katana_run_list() {
+    local list_file="$1"
+    local output_file="$2"
+    local label="${3:-katana}"
+    local concurrency="${4:-${KATANA_THREADS:-20}}"
+    local mode="${5:-append}"
+
+    [[ ! -s "$list_file" ]] && return 0
+    if ! command -v katana >/dev/null 2>&1; then
+        _print_msg WARN "katana not found in PATH; skipping active URL crawl"
+        return 0
+    fi
+
+    local target_count depth timeout_val katana_timeout_cmd headless_flag part_out
+    target_count=$(wc -l <"$list_file" | tr -d ' ')
+    depth=$(_katana_depth)
+    timeout_val=$(_katana_timeout)
+    katana_timeout_cmd="${TIMEOUT_CMD:-timeout}"
+    headless_flag=$(_katana_headless_flags "$target_count")
+    part_out="$output_file"
+    if [[ "$mode" == append ]]; then
+        part_out=".tmp/katana_run_$(basename "$list_file").txt"
+        : >"$part_out"
+    fi
+
+    local -a cmd=("$katana_timeout_cmd" "$timeout_val" katana -silent -list "$list_file")
+    if [[ -n "$headless_flag" ]]; then
+        cmd+=(-headless)
+    fi
+    cmd+=(-jc -kf all -c "$concurrency" -d "$depth" -fs rdn -o "$part_out")
+
+    run_with_heartbeat "$label" "${cmd[@]}"
+    local rc=$?
+
+    if [[ "$mode" == append && -s "$part_out" && "$part_out" != "$output_file" ]]; then
+        cat "$part_out" >>"$output_file"
+        rm -f "$part_out"
+    fi
+    return "$rc"
+}
+
+# Crawl targets, chunking large lists.
+_katana_crawl_targets() {
+    local list_file="$1"
+    local output_file="$2"
+    local label_prefix="${3:-katana}"
+    local concurrency="${4:-${KATANA_THREADS:-20}}"
+
+    [[ ! -s "$list_file" ]] && return 0
+
+    local lines chunk_size
+    lines=$(wc -l <"$list_file" | tr -d ' ')
+    chunk_size="${CHUNK_LIMIT:-2000}"
+
+    if [[ "$lines" -le "$chunk_size" ]]; then
+        _katana_run_list "$list_file" "$output_file" "$label_prefix" "$concurrency" append
+        return $?
+    fi
+
+    mkdir -p .tmp/chunks
+    rm -f .tmp/chunks/katana_part_*
+    split -l "$chunk_size" -d "$list_file" .tmp/chunks/katana_part_
+    local part n=0 rc=0
+    for part in .tmp/chunks/katana_part_*; do
+        ((n++))
+        _katana_run_list "$part" "$output_file" "${label_prefix} chunk ${n}" "$concurrency" append || rc=$?
+    done
+    rm -f .tmp/chunks/katana_part_*
+    return "$rc"
+}
+
 function urlchecks() {
 
     # Create necessary directories
@@ -1703,17 +1989,12 @@ function urlchecks() {
     if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ $URL_CHECK == true ]]; then
         start_func "${FUNCNAME[0]}" "URL Extraction"
         local end_message="Results are saved in $domain/webs/url_extract.txt"
-        local katana_timeout_cmd="${TIMEOUT_CMD:-timeout}"
         local waymore_timeout_cmd="${TIMEOUT_CMD:-timeout}"
-        local katana_headless_flags=""
 
         ensure_webs_all || true
+        _katana_build_target_list "webs/webs_all.txt" ".tmp/katana_targets_effective.txt"
 
-        if [[ -s "webs/webs_all.txt" ]]; then
-            local katana_target_count=0
-            katana_target_count=$(wc -l <"webs/webs_all.txt" 2>/dev/null || echo 0)
-            katana_headless_flags=$(_katana_headless_flags "$katana_target_count")
-
+        if [[ -s ".tmp/katana_targets_effective.txt" || "$URL_CHECK_PASSIVE" == true ]]; then
             if [[ $URL_CHECK_PASSIVE == true ]]; then
                 if [[ -s ".tmp/url_extract_tmp.txt" ]]; then
                     log_note "urlchecks: reusing urlfinder output from sub_scraping" "${FUNCNAME[0]}" "${LINENO}"
@@ -1753,63 +2034,36 @@ function urlchecks() {
                 fi
                 if [[ $diff_webs != "0" ]] || [[ ! -s ".tmp/katana.txt" ]]; then
                     if [[ $URL_CHECK_ACTIVE == true ]]; then
-                        # Only crawl NEW URLs when previous results exist (incremental)
-                        local katana_input_file="webs/webs_all.txt"
+                        local katana_input_file=".tmp/katana_targets_effective.txt"
                         if [[ -s ".tmp/katana.txt" ]] && [[ -s ".tmp/probed_tmp.txt" ]] && [[ -s "webs/webs_all.txt" ]]; then
-                            comm -23 <(sort -u webs/webs_all.txt) <(sort -u .tmp/probed_tmp.txt) > .tmp/katana_new_webs.txt 2>/dev/null || true
+                            comm -23 <(sort -u webs/webs_all.txt) <(sort -u .tmp/probed_tmp.txt) >.tmp/katana_new_webs.txt 2>/dev/null || true
                             if [[ -s ".tmp/katana_new_webs.txt" ]]; then
-                                katana_input_file=".tmp/katana_new_webs.txt"
+                                _katana_build_target_list ".tmp/katana_new_webs.txt" ".tmp/katana_targets_effective.txt"
+                                katana_input_file=".tmp/katana_targets_effective.txt"
                             fi
                         fi
-                        # Split slow vs normal targets based on httpx status (403/429)
+                        _katana_normalize_targets "$katana_input_file" ".tmp/katana_targets_prepared.txt"
+
                         : >.tmp/katana_targets_slow.txt
                         : >.tmp/katana_targets_normal.txt
                         if [[ -s .tmp/slow_hosts.txt ]]; then
                             while read -r host; do
-                                grep "://${host}[:/\n]" "$katana_input_file" | anew -q .tmp/katana_targets_slow.txt
+                                [[ -z "$host" ]] && continue
+                                awk -v h="$host" -F/ '{u=$3; sub(/:.*/,"",u); if (u==h) print $0}' ".tmp/katana_targets_prepared.txt" | anew -q .tmp/katana_targets_slow.txt
                             done <.tmp/slow_hosts.txt
-                            comm -23 <(sort -u "$katana_input_file") <(sort -u .tmp/katana_targets_slow.txt) >.tmp/katana_targets_normal.txt
+                            comm -23 <(sort -u ".tmp/katana_targets_prepared.txt") <(sort -u .tmp/katana_targets_slow.txt) >.tmp/katana_targets_normal.txt
                         else
-                            cp "$katana_input_file" .tmp/katana_targets_normal.txt
+                            cp ".tmp/katana_targets_prepared.txt" .tmp/katana_targets_normal.txt
                         fi
 
                         : >.tmp/katana.txt
-                        # Normal targets
                         if [[ -s .tmp/katana_targets_normal.txt ]]; then
-                            LINES=$(wc -l <.tmp/katana_targets_normal.txt)
-                            if [[ $LINES -gt ${CHUNK_LIMIT:-2000} ]]; then
-                                if [[ $DEEP == true ]]; then
-                                    process_in_chunks .tmp/katana_targets_normal.txt "${CHUNK_LIMIT:-2000}" "katana -silent -list _chunk_ ${katana_headless_flags} -jc -kf all -c $KATANA_THREADS -d 3 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\" >/dev/null"
-                                else
-                                    process_in_chunks .tmp/katana_targets_normal.txt "${CHUNK_LIMIT:-2000}" "katana -silent -list _chunk_ ${katana_headless_flags} -jc -kf all -c $KATANA_THREADS -d 2 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\""
-                                fi
-                            else
-                                if [[ $DEEP == true ]]; then
-                                    run_with_heartbeat_shell "katana normal targets (deep)" "$katana_timeout_cmd 4h katana -silent -list .tmp/katana_targets_normal.txt ${katana_headless_flags} -jc -kf all -c $KATANA_THREADS -d 3 -fs rdn >> .tmp/katana.txt 2>> \"$LOGFILE\""
-                                else
-                                    run_with_heartbeat_shell "katana normal targets" "$katana_timeout_cmd 3h katana -silent -list .tmp/katana_targets_normal.txt ${katana_headless_flags} -jc -kf all -c $KATANA_THREADS -d 2 -fs rdn >> .tmp/katana.txt 2>> \"$LOGFILE\""
-                                fi
-                            fi
+                            _katana_crawl_targets ".tmp/katana_targets_normal.txt" ".tmp/katana.txt" "katana normal targets" "$KATANA_THREADS"
                         fi
-
-                        # Slow targets with reduced concurrency
                         if [[ -s .tmp/katana_targets_slow.txt ]]; then
-                            slow_c=$((KATANA_THREADS / 3))
+                            local slow_c=$((KATANA_THREADS / 3))
                             [[ $slow_c -lt 2 ]] && slow_c=2
-                            LINES=$(wc -l <.tmp/katana_targets_slow.txt)
-                            if [[ $LINES -gt ${CHUNK_LIMIT:-2000} ]]; then
-                                if [[ $DEEP == true ]]; then
-                                    process_in_chunks .tmp/katana_targets_slow.txt "${CHUNK_LIMIT:-2000}" "katana -silent -list _chunk_ ${katana_headless_flags} -jc -kf all -c $slow_c -d 3 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\""
-                                else
-                                    process_in_chunks .tmp/katana_targets_slow.txt "${CHUNK_LIMIT:-2000}" "katana -silent -list _chunk_ ${katana_headless_flags} -jc -kf all -c $slow_c -d 2 -fs rdn >> .tmp/katana.txt 2>>\"$LOGFILE\""
-                                fi
-                            else
-                                if [[ $DEEP == true ]]; then
-                                    run_with_heartbeat_shell "katana slow targets (deep)" "$katana_timeout_cmd 4h katana -silent -list .tmp/katana_targets_slow.txt ${katana_headless_flags} -jc -kf all -c $slow_c -d 3 -fs rdn >> .tmp/katana.txt 2>> \"$LOGFILE\""
-                                else
-                                    run_with_heartbeat_shell "katana slow targets" "$katana_timeout_cmd 3h katana -silent -list .tmp/katana_targets_slow.txt ${katana_headless_flags} -jc -kf all -c $slow_c -d 2 -fs rdn >> .tmp/katana.txt 2>> \"$LOGFILE\""
-                                fi
-                            fi
+                            _katana_crawl_targets ".tmp/katana_targets_slow.txt" ".tmp/katana.txt" "katana slow targets" "$slow_c"
                         fi
                     fi
                 fi
@@ -1822,11 +2076,13 @@ function urlchecks() {
                 fi
                 if [[ $diff_webs != "0" ]] || [[ ! -s ".tmp/katana.txt" ]]; then
                     if [[ $URL_CHECK_ACTIVE == true ]]; then
-                        if [[ $DEEP == true ]]; then
-                            run_with_heartbeat "axiom katana (deep)" axiom-scan webs/webs_all.txt -m katana $katana_headless_flags -jc -kf all -d 3 -fs rdn --max-runtime 4h -o .tmp/katana.txt "$AXIOM_EXTRA_ARGS"
-                        else
-                            run_with_heartbeat "axiom katana" axiom-scan webs/webs_all.txt -m katana $katana_headless_flags -jc -kf all -d 2 -fs rdn --max-runtime 3h -o .tmp/katana.txt "$AXIOM_EXTRA_ARGS"
-                        fi
+                        local axiom_depth
+                        axiom_depth=$(_katana_depth)
+                        local axiom_runtime
+                        axiom_runtime=$(_katana_timeout)
+                        local axiom_headless
+                        axiom_headless=$(_katana_headless_flags "$(wc -l <".tmp/katana_targets_effective.txt" 2>/dev/null || echo 0)")
+                        run_with_heartbeat "axiom katana" axiom-scan .tmp/katana_targets_effective.txt -m katana $axiom_headless -jc -kf all -d "$axiom_depth" -fs rdn --max-runtime "$axiom_runtime" -o .tmp/katana.txt "$AXIOM_EXTRA_ARGS"
                     fi
                 fi
             fi
@@ -1878,8 +2134,8 @@ function urlchecks() {
                 _print_msg WARN "No URL extraction candidates generated."
             fi
         else
-            end_message="No web targets available for URL extraction."
-            _print_msg WARN "No web targets available for URL extraction."
+            end_message="No web targets or passive URL sources available for URL extraction."
+            _print_msg WARN "No web targets or passive URL sources available for URL extraction."
         fi
         if [[ "$end_message" == No\ * ]]; then
             end_func "${end_message}" "${FUNCNAME[0]}" "SKIP_NOINPUT"
@@ -2048,6 +2304,57 @@ function url_ext() {
 
 }
 
+function js_extract() {
+
+    if ! mkdir -p .tmp js webs; then
+        print_warnf "Failed to create directories."
+        return 1
+    fi
+
+    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ ${GETJS_EXTRACT:-false} == true ]]; then
+        start_func "${FUNCNAME[0]}" "getJS extraction"
+
+        if ! command -v getJS >/dev/null 2>&1; then
+            end_func "getJS binary not found (install via ./install.sh --tools)" "${FUNCNAME[0]}" "SKIP_NODEP"
+            return 0
+        fi
+
+        ensure_webs_all || true
+        if [[ ! -s "webs/webs_all.txt" ]]; then
+            end_func "No webs/webs_all.txt file found, getJS extraction skipped." "${FUNCNAME[0]}" "SKIP_NOINPUT"
+            return 0
+        fi
+
+        local max_hosts="${GETJS_MAX_HOSTS:-${DEEP_LIMIT:-500}}"
+        if [[ ${DEEP:-false} == "true" ]]; then
+            max_hosts="${GETJS_MAX_HOSTS_DEEP:-${DEEP_LIMIT2:-1500}}"
+        fi
+        _web_cap_url_file "webs/webs_all.txt" ".tmp/getjs_hosts.txt" "$max_hosts"
+
+        : >.tmp/getjs_js_urls.txt
+        run_command getJS -input .tmp/getjs_hosts.txt -complete \
+            -threads "${GETJS_THREADS:-5}" -timeout "${GETJS_TIMEOUT:-8s}" \
+            -output .tmp/getjs_js_urls.txt 2>>"$LOGFILE" >/dev/null || true
+
+        if [[ -s ".tmp/getjs_js_urls.txt" ]]; then
+            touch .tmp/url_extract_js.txt
+            grep -iE '\.js([?#].*)?$|/js/' .tmp/getjs_js_urls.txt | anew -q js/getjs_links.txt || true
+            grep -iE '\.js([?#].*)?$|/js/' .tmp/getjs_js_urls.txt | anew -q .tmp/url_extract_js.txt || true
+            urless <.tmp/url_extract_js.txt | anew -q js/url_extract_js.txt 2>>"$LOGFILE" >/dev/null || true
+        fi
+
+        local js_count=0
+        [[ -s js/getjs_links.txt ]] && js_count=$(wc -l <js/getjs_links.txt | tr -d ' ')
+        end_func "${js_count} JS URLs -> js/getjs_links.txt" "${FUNCNAME[0]}"
+    else
+        if [[ ${GETJS_EXTRACT:-false} == false ]]; then
+            skip_notification "disabled"
+        else
+            skip_notification "processed"
+        fi
+    fi
+}
+
 function jschecks() {
 
     # Create necessary directories
@@ -2194,6 +2501,142 @@ function jschecks() {
 
 }
 
+function spiderjs_scan() {
+
+    if ! mkdir -p .tmp js webs; then
+        print_warnf "Failed to create directories."
+        return 1
+    fi
+
+    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ ${SPIDERJS:-false} == true ]]; then
+        start_func "${FUNCNAME[0]}" "SpiderJS API/JS discovery"
+
+        local spiderjs_bin=""
+        spiderjs_bin=$(_spiderjs_binary_path) || true
+        if [[ -z "$spiderjs_bin" ]]; then
+            end_func "spiderjs_bin not found (install via ./install.sh --tools)" "${FUNCNAME[0]}" "SKIP_NODEP"
+            return 0
+        fi
+
+        ensure_webs_all || true
+        if [[ ! -s "webs/webs_all.txt" ]]; then
+            end_func "No webs/webs_all.txt file found, SpiderJS skipped." "${FUNCNAME[0]}" "SKIP_NOINPUT"
+            return 0
+        fi
+
+        local max_hosts="${SPIDERJS_MAX_HOSTS:-150}"
+        if [[ ${DEEP:-false} == "true" ]]; then
+            max_hosts="${SPIDERJS_MAX_HOSTS_DEEP:-400}"
+        fi
+        _web_cap_url_file "webs/webs_all.txt" ".tmp/spiderjs_hosts.txt" "$max_hosts"
+
+        mkdir -p .tmp/spiderjs js
+        : >js/spiderjs_discover.txt
+        : >js/spiderjs_discover.jsonl
+
+        while IFS= read -r target_url; do
+            [[ -z "$target_url" ]] && continue
+            local slug out_file
+            slug=$(printf '%s' "$target_url" | sed -E 's#^https?://##; s#[^a-zA-Z0-9._-]+#_#g')
+            out_file=".tmp/spiderjs/${slug}.json"
+            run_command "$spiderjs_bin" discover "$target_url" \
+                --output "$out_file" --format json \
+                --timeout "${SPIDERJS_TIMEOUT:-45s}" \
+                --max-depth "${SPIDERJS_MAX_DEPTH:-2}" \
+                --concurrent "${SPIDERJS_THREADS:-3}" \
+                2>>"$LOGFILE" >/dev/null || true
+            if [[ -s "$out_file" ]]; then
+                cat "$out_file" >>js/spiderjs_discover.jsonl
+                if command -v jq >/dev/null 2>&1; then
+                    jq -r '.. | strings' "$out_file" 2>/dev/null \
+                        | grep -E '^https?://' \
+                        | anew -q js/spiderjs_discover.txt || true
+                else
+                    grep -aoE 'https?://[^"[:space:]<>]+' "$out_file" \
+                        | anew -q js/spiderjs_discover.txt || true
+                fi
+            fi
+        done <.tmp/spiderjs_hosts.txt
+
+        local discover_count=0
+        [[ -s js/spiderjs_discover.txt ]] && discover_count=$(wc -l <js/spiderjs_discover.txt | tr -d ' ')
+        if [[ "$discover_count" -gt 0 ]]; then
+            touch .tmp/url_extract_js.txt
+            cat js/spiderjs_discover.txt | anew -q .tmp/url_extract_js.txt || true
+        fi
+
+        end_func "${discover_count} endpoints -> js/spiderjs_discover.txt" "${FUNCNAME[0]}"
+    else
+        if [[ ${SPIDERJS:-false} == false ]]; then
+            skip_notification "disabled"
+        else
+            skip_notification "processed"
+        fi
+    fi
+}
+
+function wscan_check() {
+
+    local wscan_enabled=false
+    if [[ ${WSCAN:-false} == true ]]; then
+        wscan_enabled=true
+    elif [[ ${WSCAN_DEEP:-false} == true && ${DEEP:-false} == true ]]; then
+        wscan_enabled=true
+    fi
+
+    if ! mkdir -p .tmp vulns webs; then
+        print_warnf "Failed to create directories."
+        return 1
+    fi
+
+    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } && [[ "$wscan_enabled" == true ]]; then
+        start_func "${FUNCNAME[0]}" "Wscan web vulnerability scan"
+
+        local wscan_bin=""
+        wscan_bin=$(_wscan_binary_path) || true
+        if [[ -z "$wscan_bin" ]]; then
+            end_func "wscan binary not found (install via ./install.sh --tools)" "${FUNCNAME[0]}" "SKIP_NODEP"
+            return 0
+        fi
+
+        ensure_webs_all || true
+        local url_src="webs/webs_all.txt"
+        if [[ -s "webs/url_extract_nodupes.txt" ]]; then
+            url_src="webs/url_extract_nodupes.txt"
+        elif [[ ! -s "$url_src" ]]; then
+            end_func "No URL list for wscan" "${FUNCNAME[0]}" "SKIP_NOINPUT"
+            return 0
+        fi
+
+        local max_urls="${WSCAN_MAX_URLS:-80}"
+        if [[ ${DEEP:-false} == "true" ]]; then
+            max_urls="${WSCAN_MAX_URLS_DEEP:-200}"
+        fi
+        _web_cap_url_file "$url_src" ".tmp/wscan_urls.txt" "$max_urls"
+
+        run_command "$wscan_bin" --log-level "${WSCAN_LOG_LEVEL:-warn}" ws \
+            --basic-crawler --url-file .tmp/wscan_urls.txt \
+            --json-output vulns/wscan_results.json \
+            2>>"$LOGFILE" >/dev/null || true
+
+        : >vulns/wscan.txt
+        if [[ -s vulns/wscan_results.json ]] && command -v jq >/dev/null 2>&1; then
+            jq -r '.[]? | [.url?, .vuln_type?, .detail?] | map(select(. != null)) | join(" | ")' \
+                vulns/wscan_results.json 2>/dev/null | sed '/^$/d' | anew -q vulns/wscan.txt || true
+        fi
+
+        local finding_count=0
+        [[ -s vulns/wscan.txt ]] && finding_count=$(wc -l <vulns/wscan.txt | tr -d ' ')
+        end_func "${finding_count} findings -> vulns/wscan.txt" "${FUNCNAME[0]}"
+    else
+        if [[ "$wscan_enabled" != true ]]; then
+            skip_notification "disabled"
+        else
+            skip_notification "processed"
+        fi
+    fi
+}
+
 function sub_js_extract() {
     ensure_dirs .tmp subdomains webs
 
@@ -2203,7 +2646,7 @@ function sub_js_extract() {
         : >.tmp/js_extracted_hosts.txt
 
         # Extract hostnames from URLs in JS/crawl output files
-        for f in js/nojs_links.txt js/js_livelinks.txt .tmp/subjslinks.txt .tmp/katana.txt webs/url_extract.txt; do
+        for f in js/getjs_links.txt js/spiderjs_discover.txt js/nojs_links.txt js/js_livelinks.txt .tmp/subjslinks.txt .tmp/katana.txt webs/url_extract.txt; do
             if [[ -s "$f" ]]; then
                 grep -aoE 'https?://[a-zA-Z0-9][-a-zA-Z0-9]*(\.[a-zA-Z0-9][-a-zA-Z0-9]*)+' "$f" \
                     | sed -E 's|^https?://||' \
@@ -2664,30 +3107,21 @@ function brokenLinks() {
                     fi
                 done <"webs/webs_all.txt"
             else
-                local katana_legacy_headless=""
-                katana_legacy_headless=$(_katana_headless_flags "$(wc -l <webs/webs_all.txt 2>/dev/null || echo 0)")
+                _katana_build_target_list "webs/webs_all.txt" ".tmp/katana_targets_effective.txt"
                 if [[ $AXIOM != true ]]; then
-                    # Use katana for scanning
-                    if [[ ! -s ".tmp/katana.txt" ]]; then
-                        if [[ $DEEP == true ]]; then
-                            timeout 4h katana -silent -list "webs/webs_all.txt" $katana_legacy_headless -jc -kf all -c "$KATANA_THREADS" -d 3 -o ".tmp/katana.txt" 2>>"$LOGFILE" >/dev/null
-                        else
-                            timeout 3h katana -silent -list "webs/webs_all.txt" $katana_legacy_headless -jc -kf all -c "$KATANA_THREADS" -d 2 -o ".tmp/katana.txt" 2>>"$LOGFILE" >/dev/null
-                        fi
+                    if [[ ! -s ".tmp/katana.txt" && -s ".tmp/katana_targets_effective.txt" ]]; then
+                        _katana_crawl_targets ".tmp/katana_targets_effective.txt" ".tmp/katana.txt" "katana broken-links" "$KATANA_THREADS"
                     fi
-                    # Remove lines longer than 2048 characters
                     if [[ -s ".tmp/katana.txt" ]]; then
                         sed_i '/^.\{2048\}./d' ".tmp/katana.txt"
                     fi
                 else
-                    # Use axiom-scan for scanning
-                    if [[ ! -s ".tmp/katana.txt" ]]; then
-                        if [[ $DEEP == true ]]; then
-                            run_command axiom-scan "webs/webs_all.txt" -m katana $katana_legacy_headless -jc -kf all -d 3 --max-runtime 4h -o ".tmp/katana.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
-                        else
-                            run_command axiom-scan "webs/webs_all.txt" -m katana $katana_legacy_headless -jc -kf all -d 2 --max-runtime 3h -o ".tmp/katana.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
-                        fi
-                        # Remove lines longer than 2048 characters
+                    if [[ ! -s ".tmp/katana.txt" && -s ".tmp/katana_targets_effective.txt" ]]; then
+                        local axiom_depth axiom_runtime axiom_headless
+                        axiom_depth=$(_katana_depth)
+                        axiom_runtime=$(_katana_timeout)
+                        axiom_headless=$(_katana_headless_flags "$(wc -l <".tmp/katana_targets_effective.txt" 2>/dev/null || echo 0)")
+                        run_command axiom-scan ".tmp/katana_targets_effective.txt" -m katana $axiom_headless -jc -kf all -d "$axiom_depth" --max-runtime "$axiom_runtime" -o ".tmp/katana.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
                         if [[ -s ".tmp/katana.txt" ]]; then
                             sed_i '/^.\{2048\}./d' ".tmp/katana.txt"
                         fi

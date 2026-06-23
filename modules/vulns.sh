@@ -634,13 +634,21 @@ function 4xxbypass() {
 
         if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT ]]; then
 
-            # Run nomore403 in a subshell to avoid CWD pollution
-            (
-                cd "${tools}/nomore403" || exit 1
-                ./nomore403 <"$dir/.tmp/403test.txt" >"$dir/.tmp/4xxbypass.txt" 2>>"$LOGFILE"
-            )
+            local nomore403_cmd=""
+            if command -v nomore403 >/dev/null 2>&1; then
+                nomore403_cmd="$(command -v nomore403)"
+            elif [[ -x "${tools}/nomore403/nomore403" ]]; then
+                nomore403_cmd="${tools}/nomore403/nomore403"
+            fi
+            if [[ -z "$nomore403_cmd" ]]; then
+                print_warnf "nomore403 not found in PATH (install via go install or ./install.sh)."
+                end_func "nomore403 not available, 403 Bypass skipped." "${FUNCNAME[0]}" "SKIP_MISSING_TOOL"
+                return 0
+            fi
+
+            run_command "$nomore403_cmd" <"$dir/.tmp/403test.txt" >"$dir/.tmp/4xxbypass.txt" 2>>"$LOGFILE"
             if [[ $? -ne 0 ]]; then
-                print_warnf "nomore403 failed or directory not found."
+                print_warnf "nomore403 failed."
                 end_func "Failed during 403 Bypass." "${FUNCNAME[0]}"
                 return 1
             fi
@@ -748,14 +756,10 @@ function webcache() {
 
             _print_msg INFO "Running: Web Cache Poisoning Checks"
 
-            # Run Web-Cache-Vulnerability-Scanner in a subshell to avoid CWD pollution
-            (
-                cd "${tools}/Web-Cache-Vulnerability-Scanner" || exit 1
-                Web-Cache-Vulnerability-Scanner -u "file:$dir/webs/webs_all.txt" -v 0 2>>"$LOGFILE" \
-                    | anew -q "$dir/.tmp/webcache.txt"
-            )
+            Web-Cache-Vulnerability-Scanner -u "file:$dir/webs/webs_all.txt" -v 0 2>>"$LOGFILE" \
+                | anew -q "$dir/.tmp/webcache.txt"
             if [[ $? -ne 0 ]]; then
-                print_warnf "Web-Cache-Vulnerability-Scanner failed or directory not found."
+                print_warnf "Web-Cache-Vulnerability-Scanner failed."
             fi
 
             # Append unique findings to vulns/webcache.txt

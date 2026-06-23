@@ -1,0 +1,68 @@
+[project]
+name = "reconftw"
+version = "0.1.0"
+description = "reconFTW Python components — AI analysis (lib/ai) and MCP server (reconftw_mcp)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "reconFTW contributors" }]
+keywords = ["reconftw", "security", "reconnaissance", "osint", "mcp"]
+dependencies = [
+    "pydantic>=2.0",
+    "httpx>=0.27",
+    "pydantic-ai>=0.2.0",
+]
+
+[project.optional-dependencies]
+mcp = ["mcp>=1.2.0"]
+langchain = ["langchain-openai>=0.2.0", "langchain-core>=0.3.0"]
+dev = [
+    "mcp>=1.2.0",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+]
+test = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+]
+
+[project.scripts]
+reconftw-mcp = "reconftw_mcp.server:main"
+reconftw-ai = "lib.ai.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["reconftw_mcp", "lib"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"config/mcp" = "config/mcp"
+"data/mcp" = "data/mcp"
+"data/ai" = "data/ai"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "reconftw_mcp",
+    "lib/ai",
+    "config/mcp",
+    "data/mcp",
+    "data/ai",
+    "reconftw.sh",
+    "reconftw.cfg",
+    "modules",
+    "install.sh",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit/python"]
+pythonpath = ["."]
+addopts = "-q --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::ResourceWarning",
+]
+
+[tool.pytest_asyncio]
+mode = "auto"

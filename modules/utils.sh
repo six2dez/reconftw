@@ -224,7 +224,48 @@ function apply_performance_profile() {
     fi
 
     ((PARALLEL_MAX_JOBS < 1)) && PARALLEL_MAX_JOBS=1
-    PERF_PROFILE_INFO="PERF_PROFILE=${profile} | cores=${cores} mem=${mem_gb}GB | jobs=${PARALLEL_MAX_JOBS} ffuf=${FFUF_THREADS} httpx=${HTTPX_THREADS}"
+
+    # Workload guards: cap DNS/portscan pressure when not in DEEP mode.
+    _apply_workload_guards "$cores" "$mem_gb"
+
+    PERF_PROFILE_INFO="PERF_PROFILE=${profile} | cores=${cores} mem=${mem_gb}GB | jobs=${PARALLEL_MAX_JOBS} ffuf=${FFUF_THREADS} httpx=${HTTPX_THREADS} dnsx_qps=${DNSX_RATE_LIMIT}"
+}
+
+# Reduce burst load on low-memory hosts (especially after subdomain permutations).
+function _apply_workload_guards() {
+    local cores="${1:-4}" mem_gb="${2:-8}"
+    local mem_avail_mb=4096
+
+    if [[ -r /proc/meminfo ]]; then
+        mem_avail_mb=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo 2>/dev/null || echo 4096)
+    fi
+    [[ "$mem_avail_mb" =~ ^[0-9]+$ ]] || mem_avail_mb=4096
+
+    case "${PERF_PROFILE:-balanced}" in
+        low)
+            DNSX_THREADS=$(( ${DNSX_THREADS:-15} > 10 ? 10 : DNSX_THREADS ))
+            DNSX_RATE_LIMIT=$(( ${DNSX_RATE_LIMIT:-50} > 50 ? 50 : DNSX_RATE_LIMIT ))
+            NAABU_RATE=$(( ${NAABU_RATE:-150} > 150 ? 150 : NAABU_RATE ))
+            INTERLACE_THREADS=$(( ${INTERLACE_THREADS:-10} > 6 ? 6 : INTERLACE_THREADS ))
+            ;;
+    esac
+
+    if [[ "${DEEP:-false}" != "true" ]]; then
+        if [[ "$mem_avail_mb" -lt 3072 ]]; then
+            DNSX_RATE_LIMIT=$(( ${DNSX_RATE_LIMIT:-50} > 25 ? 25 : DNSX_RATE_LIMIT ))
+            DNSX_THREADS=$(( ${DNSX_THREADS:-10} > 6 ? 6 : DNSX_THREADS ))
+            PARALLEL_MAX_JOBS=1
+            PERMUTATIONS_MAX_CANDIDATES=$(( ${PERMUTATIONS_MAX_CANDIDATES:-10000} > 5000 ? 5000 : PERMUTATIONS_MAX_CANDIDATES ))
+            _print_msg WARN "Low memory (${mem_avail_mb}MB free): throttling DNS parallel jobs"
+        elif [[ "${WORKLOAD_SAFE:-false}" == "true" && "$cores" -le 4 && "$mem_gb" -le 16 ]]; then
+            NAABU_RATE=$(( ${NAABU_RATE:-150} > 150 ? 150 : NAABU_RATE ))
+            DNSX_RATE_LIMIT=$(( ${DNSX_RATE_LIMIT:-50} > 50 ? 50 : DNSX_RATE_LIMIT ))
+            HTTPX_RATELIMIT=$(( ${HTTPX_RATELIMIT:-150} > 80 ? 80 : HTTPX_RATELIMIT ))
+            if [[ "${WEBPROBE_INCLUDE_UNCOMMON_PORTS:-false}" != "true" ]]; then
+                WEBPROBE_PORTS="${WEBPROBE_PORTS_COMMON:-80,443}"
+            fi
+        fi
+    fi
 }
 
 function getElapsedTime {

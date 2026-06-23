@@ -1252,3 +1252,172 @@ SH
   [ -s "webs/robots_wordlist.txt" ]
   grep -q "https://target.example.com/robots-path" "webs/robots_wordlist.txt"
 }
+
+@test "js_extract runs getJS and writes js/getjs_links.txt" {
+  mkdir -p webs .tmp js
+  printf '%s\n' 'https://target.example.com' 'https://api.target.example.com' > webs/webs_all.txt
+
+  cat > "$MOCK_BIN/getJS" <<'SH'
+#!/usr/bin/env bash
+out=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -output)
+      out="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+printf '%s\n' 'https://target.example.com/static/app.js' 'https://target.example.com/js/main.js' > "$out"
+SH
+  chmod +x "$MOCK_BIN/getJS"
+
+  cat > "$MOCK_BIN/anew" <<'SH'
+#!/usr/bin/env bash
+quiet=false
+if [[ "${1:-}" == "-q" ]]; then
+  quiet=true
+  shift
+fi
+outfile="$1"
+touch "$outfile"
+while IFS= read -r line; do
+  [[ -z "$line" ]] && continue
+  if ! grep -Fxq -- "$line" "$outfile"; then
+    printf '%s\n' "$line" >> "$outfile"
+  fi
+done
+SH
+  chmod +x "$MOCK_BIN/anew"
+
+  cat > "$MOCK_BIN/urless" <<'SH'
+#!/usr/bin/env bash
+cat
+SH
+  chmod +x "$MOCK_BIN/urless"
+
+  export GETJS_EXTRACT=true
+  export GETJS_MAX_HOSTS=10
+  export DEEP=false
+
+  run js_extract
+  [ "$status" -eq 0 ]
+  [ -s "js/getjs_links.txt" ]
+  grep -q "app.js" "js/getjs_links.txt"
+}
+
+@test "spiderjs_scan writes discovery artifacts from spiderjs_bin" {
+  mkdir -p webs .tmp js
+  printf '%s\n' 'https://target.example.com' > webs/webs_all.txt
+  export tools="$TEST_DIR/tools"
+  mkdir -p "$tools/spiderjs"
+
+  cat > "$tools/spiderjs/spiderjs_bin" <<'SH'
+#!/usr/bin/env bash
+url=""
+out=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    discover)
+      shift
+      url="$1"
+      shift
+      ;;
+    --output)
+      out="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+printf '%s\n' "{\"url\":\"${url}\",\"endpoints\":[\"https://target.example.com/api/v1/users\"]}" > "$out"
+SH
+  chmod +x "$tools/spiderjs/spiderjs_bin"
+
+  cat > "$MOCK_BIN/anew" <<'SH'
+#!/usr/bin/env bash
+quiet=false
+if [[ "${1:-}" == "-q" ]]; then
+  quiet=true
+  shift
+fi
+outfile="$1"
+touch "$outfile"
+while IFS= read -r line; do
+  [[ -z "$line" ]] && continue
+  if ! grep -Fxq -- "$line" "$outfile"; then
+    printf '%s\n' "$line" >> "$outfile"
+  fi
+done
+SH
+  chmod +x "$MOCK_BIN/anew"
+
+  export SPIDERJS=true
+  export SPIDERJS_MAX_HOSTS=5
+  export DEEP=false
+
+  run spiderjs_scan
+  [ "$status" -eq 0 ]
+  [ -s "js/spiderjs_discover.jsonl" ]
+  [ -s "js/spiderjs_discover.txt" ]
+  grep -q "api/v1/users" "js/spiderjs_discover.txt"
+}
+
+@test "wscan_check runs in DEEP mode when WSCAN_DEEP=true" {
+  mkdir -p webs .tmp vulns
+  printf '%s\n' 'https://target.example.com/page' > webs/webs_all.txt
+  export tools="$TEST_DIR/tools"
+  mkdir -p "$tools/wscan"
+
+  cat > "$tools/wscan/wscan" <<'SH'
+#!/usr/bin/env bash
+json_out=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --json-output)
+      json_out="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+printf '%s\n' '[{"url":"https://target.example.com/page","vuln_type":"xss","detail":"reflected"}]' > "$json_out"
+SH
+  chmod +x "$tools/wscan/wscan"
+
+  cat > "$MOCK_BIN/anew" <<'SH'
+#!/usr/bin/env bash
+quiet=false
+if [[ "${1:-}" == "-q" ]]; then
+  quiet=true
+  shift
+fi
+outfile="$1"
+touch "$outfile"
+while IFS= read -r line; do
+  [[ -z "$line" ]] && continue
+  if ! grep -Fxq -- "$line" "$outfile"; then
+    printf '%s\n' "$line" >> "$outfile"
+  fi
+done
+SH
+  chmod +x "$MOCK_BIN/anew"
+
+  export WSCAN=false
+  export WSCAN_DEEP=true
+  export DEEP=true
+  export WSCAN_MAX_URLS_DEEP=10
+
+  run wscan_check
+  [ "$status" -eq 0 ]
+  [ -s "vulns/wscan_results.json" ]
+  [ -s "vulns/wscan.txt" ]
+  grep -q "xss" "vulns/wscan.txt"
+}
