@@ -1,0 +1,784 @@
+[
+    {
+        "id": 0,
+        "request": {
+            "method": "GET",
+            "baseURL": "https://{TARGET}.atlassian.net",
+            "path": [
+                "/secure/Signup!default.jspa"
+            ],
+            "body": null
+        },
+        "response": {
+            "statusCode": 200,
+            "detectionFingerprints": ["atl-traceid:"],
+            "fingerprints": ["Sign up for Jira"]
+        },
+        "metadata": {
+            "service": "atlassian",
+            "serviceName": "Atlassian Jira Open Signups",
+            "description": "Atlassian Jira Open Signups",
+            "reproductionSteps": [
+                "Visit the URL",
+                "Follow the steps in the references"
+            ],
+            "references": [
+                "https://bugology.intigriti.io/misconfig-mapper-docs/services/atlassian-jira/open-user-registration",
+                "https://confluence.atlassian.com/adminjiraserver072/enabling-public-signup-and-captcha-828787685.html"
+            ]
+        }
+    },
+    {
+        "id": 1,
+        "request": {
+            "method": "GET",
+            "baseURL": "https://{TARGET}.atlassian.net",
+            "path": ["/servicedesk/customer/user/login"],
+            "body": null
+        },
+        "response": {
+            "statusCode": 200,
+            "detectionFingerprints": [
+                "atl-traceid:",
+                "&quot;sdUserSignUpEnabled&quot;:true",
+                "Log in to Jira, Confluence, and all other Atlassian Cloud products here."
+            ],
+            "fingerprints": [
+                "&quot;sdUserSignUpEnabled&quot;:true",
+                "Log in to Jira, Confluence, and all other Atlassian Cloud products here."
+            ]
+        },
+        "metadata": {
+            "service": "atlassian",
+            "serviceName": "Atlassian Jira Service Desk",
+            "description": "Atlassian Jira Service Desk Open Signups",
+            "reproductionSteps": [
+                "Visit the URL",
+                "Follow the instructions to signup"
+            ],
+            "references": [
+                "https://bugology.intigriti.io/misconfig-mapper-docs/services/atlassian-jira/atlassian-jira-service-desk-open-signups",
+                "https://medium.com/@intideceukelaire/hundreds-of-internal-servicedesks-exposed-due-to-covid-19-ecd0baec87bd",
+                "https://medium.com/@intideceukelaire/hundreds-of-internal-servicedesks-exposed-due-to-covid-19-ecd0baec87bdhttps://support.atlassian.com/jira-service-management-cloud/docs/customer-permissions-for-your-service-project-and-jira-site/",
+                "https://support.atlassian.com/user-management/docs/control-how-users-get-access-to-products/"
+            ]
+        }
+    },
+    {
+        "id": 2,
+        "request": {
+            "method": "GET",
+            "baseURL": "https://{TARGET}.slack.com",
+            "path": ["/"],
+            "body": null
+        },
+        "response": {
+            "statusCode": 200,
+            "detectionFingerprints": [
+                "src=\"https://a.slack-edge.com",
+                "<title>Slack</title>",
+                "aria-label=\"Slack homepage\""
+            ],
+            "fingerprints": [
+                "src=\"https://a.slack-edge.com",
+                "<title>Slack</title>",
+                "aria-label=\"Slack homepage\""
+            ],
+            "exclusionPatterns": [
+                "This workspace has been deleted",
+                "This workspace has been suspended",
+                "This workspace is no longer available"
+            ]
+        },
+        "metadata": {
+            "service": "slack",
+            "serviceName": "Slack",
+            "description": "Slack messaging service",
+            "reproductionSteps": [
+                "Visit the URL",
+                "Follow the steps in the references"
+            ],
+            "references": [
+                "https://bugology.intigriti.io/misconfig-mapper-docs/services/slack/no-admin-approval-for-invitations",
+                "https://slack.com/help/articles/115004854783-Require-admin-approval-for-workspace-invitations",
+                "https://slack.com/help/articles/115004155306-Security-tips-to-protect-your-workspace"
+            ]
+        }
+    },
+    {
+        "id": 3,
+        "request": {
+            "method": "GET",
+            "baseURL": "https://groups.google.com",
+            "path": ["/g/{TARGET}"],
+            "body": null
+        },
+        "response": {
+            "statusCode": 200,
+            "detectionFingerprints": [
+                "continue=https%3A%2F%2Fgroups.google.com",
+                "<base href=\"https://groups.google.com/\">",
+                "<meta name=\"(application-name|apple-mobile-web-app-title)\" content=\"Google Groups\">",
+                "<link rel=\"manifest\" crossorigin=\"use-credentials\" href=\"_/GroupsFrontendUi/manifest.json\">"
+            ],
+            "fingerprints": [
+                "</u>This is the group for <a href=\"",
+                "(aria-placeholder|value|aria-label)=\"Search conversations within "
+            ]
+        },
+        "metadata": {
+            "service": "google",
+            "serviceName": "Google Groups Misconfigured Read Permissions",
+            "description": "Google Groups can be left misconfigured and leak sensitive company data if access permissions aren't properly set",
+            "reproductionSteps": [
+                "Visit the URL",
+                "Follow the steps in the references"
+            ],
+            "references": [
+                "https://bugology.intigriti.io/misconfig-mapper-docs/services/google-groups/google-groups",
+                "https://workspaceupdates.googleblog.com/2018/06/configure-your-google-groups-settings.html"
+            ]
+        }
+    },
+    {
+        "id": 4,
+        "request": {
+            "method": "GET",
+            "baseURL": "https://{TARGET}.storage.googleapis.com",
+            "path": ["/"],
+            "body": null
+        },
+        "response": {
+            "statusCode": 200,
+            "detectionFingerprints": [
+                "<ListBucketResult",
+                "<Code>AccessDenied</Code>",
+                "<Message>Access denied.</Message>",
+                "<Details>Anonymous caller does not have storage.objects.list access to the Google Cloud Storage bucket. Permission 'storage.objects.list' denied on resource (or it may not exist).</Details>"
+            ],
+            "fingerprints": [
+                "<ListBucketResult",
+                "<Code>AccessDenied</Code>",
+                "<Message>Access denied.</Message>",
+                "<Details>Anonymous caller does not have storage.objects.list access to the Google Cloud Storage bucket. Permission 'storage.objects.list' denied on resource (or it may not exist).</Details>"
+            ]
+        },
+        "metadata": {
+            "service": "google",
+            "serviceName": "Google CloudStorage Bucket Misconfigured Read Permissions",
+            "description": "GCP Storage Bucket can be left misconfigured and allow anyone to access files and objects potentially containing sensitive data if access permissions aren't properly enforced",
+            "reproductionSteps": [
+                "Visit the URL",
+                "Observe the response for any disclosed information (like private files). View the references for more information."
+            ],
+            "references": [
+                "https://bugology.intigriti.io/misconfig-mapper-docs/services/google-cloud-storage-bucket/google-cloud-storage-bucket",
+                "https://cloud.google.com/storage/docs/access-control/making-data-public#buckets",
+                "https://cloud.google.com/storage/docs/public-access-prevention"
+            ]
+        }
+    },
+    {
+        "id": 5,
+        "request": {
+            "method": "GET",
+            "baseURL": "https://jenkins.{TARGET}",
+            "path": [
+            	"/signup",
+				"/jenkins/signup"
+            ],
+            "body": null
+        },
+        "response": {
+            "statusCode": 200,
+            "detectionFingerprints": [
+                "<title>Sign in \\[Jenkins\\]</title>",
+                "<title>Signup not supported \\[Jenkins\\]</title>",
+                "<title>Register \\[Jenkins\\]</title>"
+            ],
+            "fingerprints": [
+                "<title>Sign up \\[Jenkins\\]</title>",
+                "<title>Register \\[Jenkins\\]</title>",
+                "<title>Create an account! \\[Jenkins\\]</title>",
+                "If you already have a Jenkins account,"
+            ]
+        },
+        "metadata": {
+            "service": "jenkins",
+            "serviceName": "Jenkins Open Signups",
+            "description": "In case signups are not turned off, any user can create an account on the Jenkins instance and gain (privileged) access to (internal) developer resources.",
+            "reproductionSteps": [
+                "Visit the URL",
+                "Observe the response and follow the steps to create an account. View the references for more information."
+            ],
+            "references": [
+                "https://bugology.intigriti.io/misconfig-mapper-docs/services/jenkins/open-signups",
+                "https://rohit-soni.medium.com/chaining-multiple-vulnerabilities-leads-to-remote-code-execution-rce-on-paytm-e77f2fd2295e"
+            ]
+        }
+    },
+    {
+        "id": 6,
+        "request": {
+            "method": "GET",
+            "baseURL": "https://jenkins.{TARGET}",
+            "path": ["/script", "/jenkins/script"],
+            "body": null
+        },
+        "response": {
+            "statusCode": 200,
+            "detectionFingerprints": [
+                "Authentication required",
+                "You are authenticated as:",
+                "Groups that you are in:",
+                "<title>Dashboard - Jenkins</title>"
+            ],
+            "fingerprints": ["Script Console", "Groovy Script"]
+        },
+        "metadata": {
+            "service": "jenkins",
+            "serviceName": "Jenkins Public Groovy Script Console",
+            "description": "Groovy Script Console provides developers a way to run Groovy Script code right from their browser. However, in case permissions aren't configured properly, it could introduce another attack vector and often lead to remote code execution.",
+            "reproductionSteps": [
+                "Visit the URL",
+                "Observe the response and follow the steps to check for code execution. View the references for more information."
+            ],
+            "references": [
+                "https://bugology.intigriti.io/misconfig-mapper-docs/services/jenkins/public-groovy-script-console",
+                "https://www.jenkins.io/doc/book/managing/script-console/",
+                "https://www.jenkins.io/doc/book/security/access-control/permissions/",
+                "https://rohit-soni.medium.com/chaining-multiple-vulnerabilities-leads-to-remote-code-execution-rce-on-paytm-e77f2fd2295e"
+            ]
+        }
+    },
+    {
+        "id": 7,
+        "request": {
+            "method": "GET",
+            "baseURL": "https://gitlab.{TARGET}",
+            "path": ["/explore/snippets"],
+            "body": null
+        },
+        "response": {
+            "statusCode": 200,
+            "detectionFingerprints": ["x-gitlab-meta:"],
+            "fingerprints": [
+                "<title>Explore snippets · GitLab</title>",
+                "<meta content=\"GitLab\" property=\"og:site_name\">",
+                "Discover projects, groups and snippets. Share your projects with others",
+                "No snippets found"
+            ]
+        },
+        "metadata": {
+            "service": "gitlab",
+            "serviceName": "Gitlab Private Source Code Snippets Exposed",
+            "description": "Your GitLab instance may expose sensitive source code or private repositories if read permissions on Project Snippets have been misconfigured.",
+            "reproductionSteps": [
+                "Visit the URL",
+                "Observe the response and follow the steps to check public snippets. View the references for more information."
+            ],
+            "references": [
+                "https://bugology.intigriti.io/misconfig-mapper-docs/services/gitlab/gitlab-private-source-code-snippets-exposed",
+                "https://docs.gitlab.com/ee/user/snippets.html"
+            ]
+        }
+    },
+    {
+        "id": 8,
+        "request": {
+            "method": "GET",
+            "baseURL": "https://{TARGET}",
+            "path": ["/node/1"],
+            "body": null
+        },
+        "response": {
+            "statusCode": 200,
+            "detectionFingerprints": [
+                "<meta name=\"generator\" content=\"Drupal",
+                "(https://www.drupal.org)",
+                "/sites/default/files/css/"
+            ],
+            "fingerprints": ["<meta name=\"generator\" content=\"Drupal"]
+        },
+        "metadata": {
+            "service": "drupal",
+            "serviceName": "Drupal Nodes with Misconfigured Access Controls",
+            "description": "Drupal Nodes can contain sensitive data and if permissions are not enforced, they can leak private data to unauthorized users.",
+            "reproductionSteps": [
+                "Visit the URL",
+                "Observe the response and follow the steps to check public snippets. View the references for more information."
+            ],
+            "references": [
+                "https://bugology.intigriti.io/misconfig-mapper-docs/services/drupal/drupal-nodes-with-misconfigured-access-controls",
+                "https://twitter.com/adrien_jeanneau/status/1273952564430725123",
+                "https://www.drupal.org/docs/core-modules-and-themes/core-modules/node-module/about-nodes",
+                "https://web.archive.org/web/20220203132234/https://0xblackbird.github.io/blog/post1"
+            ]
+        }
+    },
+    {
+        "id": 9,
+        "request": {
+            "method": "GET",
+            "baseURL": "https://{TARGET}",
+            "path": ["/profiles"],
+            "body": null
+        },
+        "response": {
+            "statusCode": 500,
+            "detectionFingerprints": ["Set-Cookie: XSRF-TOKEN=eyJpd"],
+            "fingerprints": [
+                "Illuminate\\\\Foundation\\\\Bootstrap\\\\HandleExceptions::handleError",
+                "Illuminate\\\\Foundation\\\\Http\\\\Kernel"
+            ]
+        },
+        "metadata": {
+            "service": "laravel",
+            "serviceName": "Laravel Debug Mode Enabled",
+            "description": "Laravel can expose sensitive data when debug mode is left enabled.",
+            "reproductionSteps": [
+                "Visit the URL",
+                "Observe the response manually and check if debug mode is enabled on your target's Laravel application. View the references for more information."
+            ],
+            "references": [
+                "https://bugology.intigriti.io/misconfig-mapper-docs/services/laravel/debug-mode-enabled",
+                "https://laravel.com/docs/10.x/deployment#debug-mode"
+            ]
+        }
+    },
+    {
+        "id": 10,
+        "request": {
+            "method": "GET",
+            "baseURL": "https://{TARGET}",
+            "path": ["/telescope/requests"],
+            "body": null
+        },
+        "response": {
+            "statusCode": 200,
+            "detectionFingerprints": ["Set-Cookie: XSRF-TOKEN=eyJpd"],
+            "fingerprints": [
+                "<title>Requests - Telescope</title>",
+                "Laravel Telescope"
+            ]
+        },
+        "metadata": {
+            "service": "laravel",
+            "serviceName": "Laravel Telescope enabled in production",
+            "description": "Telescope can help developers look at incoming HTTP requests, view exceptions, logs, database queries and much more.",
+            "reproductionSteps": [
+                "Visit the URL",
+                "Observe the response manually and check if Telescope is installed and used in your target's Laravel application. View the references for more information."
+            ],
+            "references": [
+                "https://bugology.intigriti.io/misconfig-mapper-docs/services/laravel/laravel-telescope-enabled-in-production",
+                "https://laravel.com/docs/10.x/telescope"
+            ]
+        }
+    },
+    {
+        "id": 11,
+        "request": {
+            "method": "POST",
+            "baseURL": "https://{TARGET}",
+            "path": [
+                "/graphql",
+                "/graphql/v1",
+                "/graph",
+                "/graphiql",
+                "/api/graphql",
+                "/v1/explorer",
+                "/v1/graphiql",
+                "/graphql/console",
+                "/graphql.php",
+                "/graphiql.php"
+            ],
+            "headers": [
+                {
+                    "Content-Type": "application/json"
+                }
+            ],
+            "body": "{\"query\":\"{__schema { types { name } } }\"}"
+        },
+        "response": {
+            "statusCode": 200,
+            "detectionFingerprints": [],
+            "fingerprints": [
+                "\"__schema\"",
+                "\"name\":(.*)?\"__Directive\"",
+                "The __Directive type represents a Directive that a server supports."
+            ]
+        },
+        "metadata": {
+            "service": "graphql",
+            "serviceName": "GraphQL Introspection Query Enabled",
+            "description": "The introspection query returns a GraphQL schema with all the information about the GraphQL API, including what queries it supports like schemas, mutations, fields, but also in some cases, private fields.",
+            "reproductionSteps": [
+                "Replicate the POST request",
+                "Observe the response manually and check if GraphQL returned back the entire schema with all the information. View the references for more information."
+            ],
+            "references": [
+                "https://bugology.intigriti.io/misconfig-mapper-docs/services/graphql/graphql-introspection-query-enabled",
+                "https://graphql.org/learn/introspection/",
+                "https://cheatsheetseries.owasp.org/cheatsheets/GraphQL_Cheat_Sheet.html#introspection-graphiql",
+                "https://www.apollographql.com/blog/graphql/security/why-you-should-disable-graphql-introspection-in-production/"
+            ]
+        }
+    },
+    {
+        "id": 12,
+        "request": {
+            "method": "GET",
+            "baseURL": "https://{TARGET}.freshservice.com",
+            "path": [
+                "/support/signup"
+            ],
+            "body": null
+        },
+        "response": {
+            "statusCode": 200,
+            "detectionFingerprints": [
+                "<h2>Browse help articles</h2>",
+                "(<h2>)?Announcements</(h2|h3)>",
+                "var TICKET_SITE_KEY"
+            ],
+            "fingerprints": [
+                "<title>Signup for a new account"
+            ]
+        },
+        "metadata": {
+            "service": "freshworks",
+            "serviceName": "Freshworks Freshservice Open Signups",
+            "description": "Freshworks Freshservice Open Signups",
+            "reproductionSteps": [
+                "Visit the URL",
+                "Follow the steps in the references"
+            ],
+            "references": [
+                "https://bugology.intigriti.io/misconfig-mapper-docs/services/freshworks-freshservice/open-user-registration",
+                "https://infosecwriteups.com/hundreds-of-companies-internal-data-exposed-part-2-the-freshservice-misconfiguration-a9432c0b5dc8",
+                "https://partnersupport.freshworks.com/en/support/solutions/articles/225287-how-can-i-disable-the-option-for-requesters-to-sign-up-to-our-helpdesk-"
+            ]
+        }
+    },
+    {
+        "id": 13,
+        "request": {
+            "method": "GET",
+            "baseURL": "https://{TARGET}.atlassian.net",
+            "path": [
+                "/wiki/spaces"
+            ],
+            "body": null
+        },
+        "response": {
+            "statusCode": 200,
+            "detectionFingerprints": [
+                "location: /wiki",
+                "<title>Log in with Atlassian account</title>"
+            ],
+            "fingerprints": [
+                "<meta id=\"confluence-context-path\" name=\"confluence-context-path\" content=\"/wiki\">",
+                "<meta id=\"confluence-base-url\" name=\"confluence-base-url\" content=\"https://[^\\.]+.atlassian.net/wiki\">"
+            ]
+        },
+        "metadata": {
+            "service": "atlassian",
+            "serviceName": "Atlassian Misconfigured Spaces",
+            "description": "Atlassian Misconfigured Spaces",
+            "reproductionSteps": [
+                "Visit the URL",
+                "Follow the steps in the references"
+            ],
+            "references": [
+                "https://bugology.intigriti.io/misconfig-mapper-docs/services/atlassian-confluence/misconfigured-spaces",
+                "https://infosecwriteups.com/hundreds-of-companies-internal-data-exposed-the-confluence-cloud-misconfiguration-63cbc143caea",
+                "https://confluence.atlassian.com/doc/assign-space-permissions-139460.html",
+                "https://support.atlassian.com/confluence-cloud/docs/make-a-space-public/"
+            ]
+        }
+    },
+    {
+        "id": 14,
+        "request": {
+            "method": "POST",
+            "baseURL": "https://{TARGET}.lightning.force.com",
+            "path": [
+                "/aura",
+                "/sfsites/aura",
+                "/s/sfsites/aura"
+            ],
+            "headers": [
+                {
+                    "Content-Type": "application/json"
+                }
+            ],
+            "body": "{}"
+        },
+        "response": {
+            "statusCode": 401,
+            "detectionFingerprints": [
+                "markup:\/\/aura:invalidSession",
+                "aura:\/\/String"
+            ],
+            "fingerprints": [
+                "markup:\/\/aura:invalidSession",
+                "aura:\/\/String"
+            ]
+        },
+        "metadata": {
+            "service": "salesforce",
+            "serviceName": "Salesforce Lightning Aura Component Enabled",
+            "description": "Salesforce Lightning Aura Component is enabled and if access controls are not properly enforced, it may introduce several security issues such as data leaks and potential privilege escalations.",
+            "reproductionSteps": [
+                "Replicate the POST request",
+                "Observe the response manually and further enumerate global and custom Salesforce Objects. View the references for more information."
+            ],
+            "references": [
+                "https://bugology.intigriti.io/misconfig-mapper-docs/services/salesforce/salesforce-lightning-aura-components-enabled",
+                "https://www.enumerated.ie/index/salesforce",
+                "https://www.enumerated.ie/index/salesforce-lightning-tinting-the-windows",
+                "https://infosecwriteups.com/in-simple-words-pen-testing-salesforce-saas-application-part-1-the-essentials-ffae632a00e5",
+                "https://infosecwriteups.com/in-simple-words-pen-testing-salesforce-saas-application-part-2-fuzz-exploit-eefae11ba5ae",
+                "https://infosecwriteups.com/salesforce-bug-hunting-to-critical-bug-b5da44789d3",
+                "https://www.biswajeetsamal.com/blog/salesforce-object-key-prefix-list/",
+                "https://www.varonis.com/blog/abusing-salesforce-communities",
+                "https://web.archive.org/web/20210116171949/https://mcafee.com/blogs/enterprise/cloud-security/17-must-enable-salesforce-security-capabilities-and-other-best-practices/",
+                "https://developer.salesforce.com/docs/atlas.en-us.lightning.meta/lightning/intro_lightning.htm",
+                "https://help.salesforce.com/s/articleView?id=ind.media_asm_Disable_Lightning_Web_Security.htm&type=5",
+                "https://trailhead.salesforce.com/content/learn/modules/data_security/data_security_records"
+            ]
+        }
+    },
+    {
+        "id": 15,
+        "request": {
+            "method": "GET",
+            "baseURL": "https://{TARGET}.s3.amazonaws.com",
+            "path": ["/"],
+            "body": null
+        },
+        "response": {
+            "statusCode": [
+                200,
+                403
+            ],
+            "detectionFingerprints": [
+                "<ListBucketResult",
+                "<Code>AccessDenied</Code>",
+                "<Message>Access denied.</Message>",
+                "x-amz-bucket-region"
+            ],
+            "fingerprints": [
+                "<ListBucketResult",
+                "<Name>"
+            ]
+        },
+        "metadata": {
+            "service": "aws-s3",
+            "serviceName": "AWS S3 Bucket with Misconfigured List Permissions",
+            "description": "AWS S3 Bucket can be left misconfigured and allow anyone to list files and objects potentially containing sensitive data if access permissions aren't properly enforced",
+            "reproductionSteps": [
+                "Visit the S3 Bucket API endpoint",
+                "Observe the response for any disclosed information (like private files). View the references for more information."
+            ],
+            "references": [
+                "https://bugology.intigriti.io/misconfig-mapper-docs/services/aws-s3/misconfigured-list-permissions",
+                "https://blog.intigriti.com/hacking-tools/hacking-misconfigured-aws-s3-buckets-a-complete-guide"
+            ]
+        }
+    },
+    {
+        "id": 16,
+        "request": {
+            "method": "GET",
+            "baseURL": "https://pub-{TARGET}.r2.dev",
+            "path": ["/"],
+            "body": null
+        },
+        "response": {
+            "statusCode": [
+                200,
+                401,
+                404
+            ],
+            "detectionFingerprints": [
+                "<p id=\"error-title\">You are not authorized to view this bucket</p>",
+                "<p id=\"footer-title\">Is this your bucket?</p>",
+                "href=\"https\\:\/\/developers.cloudflare.com\/r2\/data-access\/public-buckets\/\""
+            ],
+            "fingerprints": [
+                "<h3>Object not found<\\/h3>",
+                "<p id=\"footer-title\">Is this your bucket\\?<\\/p>",
+                "href=\"https\\:\\/\\/developers.cloudflare.com\\/r2\\/data-access\\/public-buckets\\/\""
+            ]
+        },
+        "metadata": {
+            "service": "cf-r2",
+            "serviceName": "Cloudflare R2 with R2.DEV Enabled",
+            "description": "Cloudflare R2 with R2.DEV enabled can allow bad actors to view objects in buckets",
+            "reproductionSteps": [
+                "Visit the Cloudflare R2 Bucket API endpoint",
+                "Observe the response for any disclosed information (such as private files). View the references for more information."
+            ],
+            "references": [
+                "https://bugology.intigriti.io/misconfig-mapper-docs/services/cloudflare-r2/r2-dev-enabled",
+                "https://blog.intigriti.com/hacking-tools/hacking-misconfigured-cloudflare-r2-buckets-a-complete-guide"
+            ]
+        }
+    },
+    {
+        "id": 17,
+        "request": {
+            "method": "GET",
+            "baseURL": "https://dev.azure.com/{TARGET}",
+            "path": [
+                "/"
+            ],
+            "body": null
+        },
+        "response": {
+            "statusCode": 203,
+            "detectionFingerprints": [
+                "Azure DevOps Services | Sign In"
+            ],
+            "fingerprints": [
+                "Azure DevOps Services | Sign In"
+            ]
+        },
+        "metadata": {
+            "service": "azuredevops",
+            "serviceName": "Azure DevOps",
+            "description": "Azure DevOps service",
+            "reproductionSteps": [
+                "Visit the URL"
+            ],
+            "references": [
+                "https://github.com/synacktiv/nord-stream",
+                "https://www.synacktiv.com/publications/cicd-secrets-extraction-tips-and-tricks"
+            ]
+        }
+    },
+    {
+        "id": 18,
+        "request": {
+            "method": "GET",
+            "baseURL": "https://{TARGET}.goskope.com",
+            "path": ["/"],
+            "body": null
+        },
+        "response": {
+            "statusCode": [200, 302],
+            "detectionFingerprints": [
+                "X-Netskope-Request-Id",
+                "goskope"
+            ],
+            "fingerprints": [
+                "goskope"
+            ]
+        },
+        "metadata": {
+            "service": "netskope",
+            "serviceName": "Netskope Tenant Admin Console (US)",
+            "description": "Netskope Security Cloud administration console. Detection includes potential redirects to SSO or login portals.",
+            "reproductionSteps": [
+                "Visit the URL",
+                "Observe if the page redirects to a Netskope login or a third-party Identity Provider (IDP)"
+            ],
+            "references": [
+                "https://docs.netskope.com/en/"
+            ]
+        }
+    },
+    {
+        "id": 19,
+        "request": {
+            "method": "GET",
+            "baseURL": "https://{TARGET}.eu.goskope.com",
+            "path": ["/"],
+            "body": null
+        },
+        "response": {
+            "statusCode": [200, 302],
+            "detectionFingerprints": [
+                "X-Netskope-Request-Id",
+                "goskope"
+            ],
+            "fingerprints": [
+                "goskope"
+            ]
+        },
+        "metadata": {
+            "service": "netskope",
+            "serviceName": "Netskope Tenant Admin Console (EU)",
+            "description": "Netskope Security Cloud administration console for EU-based tenants.",
+            "reproductionSteps": [
+                "Visit the URL"
+            ],
+            "references": [
+                "https://docs.netskope.com/en/"
+            ]
+        }
+    },
+    {
+        "id": 20,
+        "request": {
+            "method": "GET",
+            "baseURL": "https://{TARGET}.de.goskope.com",
+            "path": ["/"],
+            "body": null
+        },
+        "response": {
+            "statusCode": [200, 302],
+            "detectionFingerprints": [
+                "X-Netskope-Request-Id",
+                "goskope"
+            ],
+            "fingerprints": [
+               "goskope"
+            ]
+        },
+        "metadata": {
+            "service": "netskope",
+            "serviceName": "Netskope Tenant Admin Console (Frankfurt)",
+            "description": "Netskope Security Cloud administration console for German/Frankfurt-based tenants.",
+            "reproductionSteps": [
+                "Visit the URL"
+            ],
+            "references": [
+                "https://www.workday.com/"
+            ]
+        }
+    },
+    {
+        "id": 21,
+        "request": {
+            "method": "GET",
+            "baseURL": "https://wd3.myworkday.com",
+            "path": [
+                "/{TARGET}/d/home.htmld"
+            ],
+            "body": null
+        },
+        "response": {
+            "statusCode": 200,
+            "detectionFingerprints": [
+                "https://wd3.myworkday.com/wday/authgwy/"
+            ],
+            "fingerprints": [
+                "https://wd3.myworkday.com/wday/authgwy/"
+            ]
+        },
+        "metadata": {
+            "service": "workday",
+            "serviceName": "Workday",
+            "description": "Workday instance",
+            "reproductionSteps": [
+                "Visit the URL"
+            ],
+            "references": [
+                "https://www.workday.com/"
+            ]
+        }
+    }
+]
