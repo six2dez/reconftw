@@ -1,0 +1,239 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "reconFTW MCP Server",
+    "version": "2.0.0",
+    "description": "Model Context Protocol server for reconFTW v2. Exposes recon modes as MCP tools with async execution and live JSONL findings streams."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8765",
+      "description": "Default localhost binding (D-05 — localhost-only by design)"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/mcp": {
+      "post": {
+        "summary": "MCP JSON-RPC endpoint",
+        "description": "Accepts MCP protocol requests (tool calls, resource reads, subscriptions). All requests must carry a valid Bearer token in the Authorization header.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "MCP JSON-RPC 2.0 request envelope"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP response (may be SSE stream for streaming responses)"
+          },
+          "401": {
+            "description": "Unauthorized — missing or invalid Bearer token"
+          },
+          "400": {
+            "description": "Bad Request — malformed MCP JSON-RPC envelope"
+          }
+        }
+      },
+      "get": {
+        "summary": "Open standalone SSE stream",
+        "description": "Opens a server-sent events stream for server-initiated messages (ResourceUpdated notifications, etc).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE stream",
+            "content": {
+              "text/event-stream": {}
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "summary": "OpenAPI schema (self-describing)",
+        "description": "Returns this OpenAPI 3.1.0 schema. Served unauthenticated — the schema contains no secrets.",
+        "responses": {
+          "200": {
+            "description": "OpenAPI schema",
+            "content": {
+              "application/json": {}
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "MCP API key configured via mcp.api_key in reconftw.toml or RECONFTW_MCP_API_KEY environment variable"
+      }
+    },
+    "schemas": {
+      "SubsInput": {
+        "type": "object",
+        "required": ["target"],
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "Target domain for subdomain enumeration"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "description": "Preview tasks without executing tools",
+            "default": false
+          }
+        }
+      },
+      "WebInput": {
+        "type": "object",
+        "required": ["target"],
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "Target domain for web analysis"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "description": "Preview tasks without executing tools",
+            "default": false
+          },
+          "hosts": {
+            "type": "string",
+            "description": "Path to seed host list file (optional)"
+          }
+        }
+      },
+      "VulnsInput": {
+        "type": "object",
+        "required": ["target"],
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "Target domain for vulnerability scanning"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "description": "Preview tasks without executing tools",
+            "default": false
+          },
+          "urls": {
+            "type": "string",
+            "description": "Path to seed URL list file (optional)"
+          }
+        }
+      },
+      "OSINTInput": {
+        "type": "object",
+        "required": ["target"],
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "Target domain for OSINT collection"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "description": "Preview tasks without executing tools",
+            "default": false
+          }
+        }
+      },
+      "MonitorInput": {
+        "type": "object",
+        "required": ["target"],
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "Target domain to monitor"
+          },
+          "interval": {
+            "type": "string",
+            "description": "Polling interval (e.g. 1h, 30m)",
+            "default": "1h"
+          },
+          "cycles": {
+            "type": "integer",
+            "description": "Number of monitor cycles (0 = infinite)",
+            "default": 0
+          }
+        }
+      },
+      "ReportInput": {
+        "type": "object",
+        "required": ["target"],
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "Target domain to generate report for"
+          }
+        }
+      },
+      "ReconInput": {
+        "type": "object",
+        "required": ["target"],
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "Target domain for subdomain enumeration (recon = subs only; composite Phase 9 scope)"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "description": "Preview tasks without executing tools",
+            "default": false
+          }
+        }
+      },
+      "ToolCallResponse": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "description": "Unique 32-character hex run ID (128-bit entropy)"
+          },
+          "resource": {
+            "type": "string",
+            "description": "Resource URI for subscribing to live findings: scan://{runID}/findings"
+          }
+        }
+      },
+      "StubToolResponse": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "description": "Unique run ID"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["not_implemented"],
+            "description": "Phase 10 stub — tool not yet implemented"
+          }
+        }
+      }
+    }
+  }
+}
