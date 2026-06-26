@@ -83,6 +83,15 @@ var allowedPaths = []string{
 	// stdin injection, so direct exec.CommandContext is the sanctioned invocation
 	// pattern. Mirrors web/nomore403.go precedent (VULN-13 / plan 06-07).
 	"internal/modules/vulns/bypass4xx.go",
+	// internal/installer/: the Phase 11 installer runs TOOLCHAIN + package-manager
+	// commands (go install, uv tool install, apt-get/brew/pacman, git clone, cargo,
+	// tar) plus version probes (go version -m, uv tool list) and the SHA-256-verified
+	// toolchain bootstrap. None of these are registered recon tools — the name-keyed
+	// Backend/Runner registry exists to run the tools in tools.lock, not to install
+	// them, and it supports neither cmd.Dir, stdin, nor the bootstrap download flow.
+	// Direct exec.CommandContext is therefore the sanctioned pattern here (INST-06..09);
+	// all calls are mockable package vars (runCmd/runCmdDir/runOutput) for hermetic tests.
+	"internal/installer/",
 }
 
 // isAllowed returns true when the (repo-relative) Go file path matches any
