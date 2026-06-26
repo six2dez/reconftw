@@ -44,6 +44,13 @@ type toolsLockSchema struct {
 		DefaultArgs    []string `toml:"default_args"`
 		TimeoutSeconds int      `toml:"timeout_seconds"`
 		Critical       bool     `toml:"critical"`
+		// Phase 11 install-metadata extensions (INST-02/03/04/06/07/08/09).
+		PipPackage   string `toml:"pip_package"`
+		RepoURL      string `toml:"repo_url"`
+		CargoPackage string `toml:"cargo_package"`
+		Version      string `toml:"version"`
+		Sha256       string `toml:"sha256"`
+		InputFlag    string `toml:"input_flag"`
 	} `toml:"tools"`
 }
 
@@ -66,6 +73,16 @@ func init() {
 			DefaultArgs: append([]string(nil), t.DefaultArgs...),
 			Timeout:     time.Duration(t.TimeoutSeconds) * time.Second,
 			Critical:    t.Critical, // Blocker 5 — Critical field per ADR §0 D-07 non-breaking
+			// Phase 11 install metadata (INST-02..09) — lets the installer
+			// resolve each tool's install coordinate off backend.Default.
+			Kind:         t.Kind,
+			GoModule:     t.GoModule,
+			PipPackage:   t.PipPackage,
+			RepoURL:      t.RepoURL,
+			CargoPackage: t.CargoPackage,
+			Version:      t.Version,
+			Sha256:       t.Sha256,
+			InputFlag:    t.InputFlag,
 		}
 		Default.Register(tool)
 	}

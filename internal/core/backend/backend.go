@@ -55,12 +55,25 @@ type Result struct {
 // ToolRegistry.MissingRequired() returns the union of both tiers; MissingCritical()
 // returns only the latter.
 type Tool struct {
-	Name        string
-	Path        string        // absolute path from exec.LookPath
-	Version     string        // parsed from `tool --version` at health-check
-	DefaultArgs []string
-	Timeout     time.Duration // per-invocation timeout; 0 = no timeout
-	Critical    bool          // FOUND-08 missing-and-critical tier (Blocker 5; ADR §0 D-07 non-breaking field)
+	Name string
+	Path string // absolute path from exec.LookPath
+	// Version is the PINNED version from tools.lock (INST-02 / XCUT-08),
+	// populated at init() from the embedded manifest. The installer (INST-11)
+	// and `install --health-check` (INST-10) compare it against the probed
+	// installed version (`go version -m` / `uv tool list`) for D-04 idempotency.
+	Version string
+	// Install metadata copied from tools.lock so the Phase 11 installer can
+	// resolve each tool's install coordinate off backend.Default without
+	// re-parsing the manifest (INST-02/05/06/07/08/09).
+	Kind         string // go | python | system | rust | go_clone | python_venv
+	GoModule     string // Go module path for `go install <go_module>@<version>` (kind=go)
+	PipPackage   string // uv/pip target for `uv tool install <pip_package>==<version>` (kind=python)
+	RepoURL      string // git URL for repo-clone build (kind=go_clone | python_venv)
+	CargoPackage string // cargo crate/path for `cargo install` (kind=rust)
+	Sha256       string // expected SHA-256 for downloaded binaries/bootstrappers (INST-03/04); "" for go.sum/PyPI-backed kinds (D-01)
+	DefaultArgs  []string
+	Timeout      time.Duration // per-invocation timeout; 0 = no timeout
+	Critical     bool          // FOUND-08 missing-and-critical tier (Blocker 5; ADR §0 D-07 non-breaking field)
 	// InputFlag is the CLI flag (or empty string for positional last arg) that
 	// receives the input file in Axiom fleet splits. E.g. puredns uses
 	// InputFlag="" (positional), dnsx uses InputFlag="-l", tlsx uses

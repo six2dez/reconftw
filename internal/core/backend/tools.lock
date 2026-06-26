@@ -21,9 +21,9 @@
 #
 # Required-but-not-critical (7 tools): missing-required → WARN in health-check.
 
-schema_version = "0.1"
-generated_by   = "phase-3-plan-07"
-generated_at   = "2026-05-28"
+schema_version = "1.0"
+generated_by   = "phase-11-plan-01"
+generated_at   = "2026-06-16"
 
 [[tools]]
 name            = "subfinder"
@@ -33,8 +33,8 @@ description     = "Passive multi-source subdomain enumeration"
 default_args    = []
 timeout_seconds = 180
 critical        = true
+version         = "v2.14.0"
 input_flag      = ""
-
 [[tools]]
 name            = "httpx"
 kind            = "go"
@@ -43,8 +43,8 @@ description     = "HTTP probe with tech detection"
 default_args    = []
 timeout_seconds = 0
 critical        = true
+version         = "v1.9.0"
 input_flag      = "-l"
-
 [[tools]]
 name            = "dnsx"
 kind            = "go"
@@ -53,8 +53,8 @@ description     = "DNS toolkit (A/CNAME/MX/TXT resolver)"
 default_args    = []
 timeout_seconds = 14400
 critical        = true
+version         = "v1.2.1"
 input_flag      = "-l"
-
 [[tools]]
 name            = "crt"
 kind            = "go"
@@ -63,8 +63,8 @@ description     = "crt.sh search"
 default_args    = []
 timeout_seconds = 60
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "puredns"
 kind            = "go"
@@ -73,8 +73,8 @@ description     = "Mass DNS resolution with wildcard filtering; positional: pure
 default_args    = []
 timeout_seconds = 3600
 critical        = false
+version         = "v2.1.1"
 input_flag      = ""
-
 [[tools]]
 name            = "gotator"
 kind            = "go"
@@ -83,8 +83,8 @@ description     = "Subdomain permutations"
 default_args    = []
 timeout_seconds = 600
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "anew"
 kind            = "go"
@@ -93,8 +93,8 @@ description     = "Append new lines only (dedup)"
 default_args    = []
 timeout_seconds = 30
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "asnmap"
 kind            = "go"
@@ -103,8 +103,8 @@ description     = "ASN-to-CIDR mapping"
 default_args    = []
 timeout_seconds = 120
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "s3scanner"
 kind            = "go"
@@ -113,8 +113,8 @@ description     = "S3/GCS/Azure Blob misconfiguration scanner"
 default_args    = []
 timeout_seconds = 600
 critical        = false
+version         = "latest"
 input_flag      = "--bucket-file"
-
 [[tools]]
 name            = "subzy"
 kind            = "go"
@@ -123,10 +123,10 @@ description     = "Subdomain takeover detection"
 default_args    = []
 timeout_seconds = 600
 critical        = false
+version         = "latest"
 input_flag      = ""
 
 # Phase 4 expansion — plan-00
-
 [[tools]]
 name            = "github-subdomains"
 kind            = "go"
@@ -135,8 +135,8 @@ description     = "GitHub-based subdomain search"
 default_args    = []
 timeout_seconds = 120
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "gitlab-subdomains"
 kind            = "go"
@@ -145,8 +145,8 @@ description     = "GitLab-based subdomain search"
 default_args    = []
 timeout_seconds = 120
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "tlsx"
 kind            = "go"
@@ -155,8 +155,8 @@ description     = "TLS certificate harvesting"
 default_args    = []
 timeout_seconds = 300
 critical        = false
+version         = "v1.1.7"
 input_flag      = "-l"
-
 [[tools]]
 name            = "dnstake"
 kind            = "go"
@@ -165,8 +165,8 @@ description     = "Subdomain takeover detection via DNS"
 default_args    = []
 timeout_seconds = 600
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "regulator"
 kind            = "python"
@@ -175,8 +175,8 @@ description     = "Regex-based subdomain permutations"
 default_args    = []
 timeout_seconds = 600
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "hakip2host"
 kind            = "go"
@@ -185,8 +185,8 @@ description     = "Reverse IP lookup"
 default_args    = []
 timeout_seconds = 120
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "analyticsrelationships"
 kind            = "go"
@@ -195,8 +195,8 @@ description     = "Google Analytics-based subdomain pivoting"
 default_args    = []
 timeout_seconds = 120
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "favirecon"
 kind            = "go"
@@ -205,8 +205,8 @@ description     = "Favicon-based technology reconnaissance"
 default_args    = []
 timeout_seconds = 300
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "subjs"
 kind            = "go"
@@ -215,8 +215,8 @@ description     = "JavaScript URL extractor"
 default_args    = []
 timeout_seconds = 120
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "jsluice"
 kind            = "go"
@@ -225,8 +225,8 @@ description     = "JS secret/URL extractor"
 default_args    = []
 timeout_seconds = 300
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "massdns"
 kind            = "system"
@@ -234,8 +234,8 @@ description     = "High-performance DNS stub resolver (build from source)"
 default_args    = []
 timeout_seconds = 0
 critical        = false
+version         = ""
 input_flag      = ""
-
 [[tools]]
 name            = "urlfinder"
 kind            = "go"
@@ -244,8 +244,8 @@ description     = "URL discovery"
 default_args    = []
 timeout_seconds = 180
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "unfurl"
 kind            = "go"
@@ -254,8 +254,8 @@ description     = "URL parser"
 default_args    = []
 timeout_seconds = 30
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "axiom-scan"
 kind            = "system"
@@ -263,8 +263,8 @@ description     = "Axiom distributed scan CLI (part of axiom installation)"
 default_args    = []
 timeout_seconds = 0
 critical        = false
+version         = ""
 input_flag      = ""
-
 [[tools]]
 # dnscewl: DNS permutation wordlist generator (B1/W1 — SUBD-03 third permut tool named in D-01)
 # INSTALL AMBIGUITY: go_module path requires verification against pkg before installing
@@ -276,8 +276,8 @@ description     = "DNS permutation wordlist generator (SUBD-03 third permut tool
 default_args    = []
 timeout_seconds = 600
 critical        = false
+version         = "latest"
 input_flag      = "-f"
-
 [[tools]]
 name            = "csprecon"
 kind            = "go"
@@ -286,10 +286,10 @@ description     = "CSP-based subdomain discovery"
 default_args    = []
 timeout_seconds = 120
 critical        = false
+version         = "latest"
 input_flag      = ""
 
 # Phase 5 additions (Web Pipeline E2E)
-
 [[tools]]
 name            = "katana"
 kind            = "go"
@@ -298,8 +298,8 @@ description     = "Web crawler with JS rendering and scope filtering"
 default_args    = []
 timeout_seconds = 14400
 critical        = false
+version         = "v1.1.2"
 input_flag      = "-list"
-
 [[tools]]
 name            = "nuclei"
 kind            = "go"
@@ -308,8 +308,8 @@ description     = "Template-based vulnerability and misconfiguration scanner"
 default_args    = []
 timeout_seconds = 0
 critical        = false
+version         = "v3.8.0"
 input_flag      = "-l"
-
 [[tools]]
 name            = "ffuf"
 kind            = "go"
@@ -318,8 +318,8 @@ description     = "Fast web fuzzer for directory/file brute-forcing"
 default_args    = []
 timeout_seconds = 900
 critical        = false
+version         = "v2.1.0"
 input_flag      = ""
-
 [[tools]]
 name            = "wafw00f"
 kind            = "python"
@@ -328,8 +328,8 @@ description     = "WAF fingerprinting tool"
 default_args    = []
 timeout_seconds = 120
 critical        = false
+version         = "latest"
 input_flag      = "-i"
-
 [[tools]]
 name            = "cdncheck"
 kind            = "go"
@@ -338,8 +338,8 @@ description     = "CDN/WAF IP classification"
 default_args    = []
 timeout_seconds = 120
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "hakoriginfinder"
 kind            = "go"
@@ -348,8 +348,8 @@ description     = "CDN origin IP discovery"
 default_args    = []
 timeout_seconds = 120
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "VhostFinder"
 kind            = "go"
@@ -358,8 +358,8 @@ description     = "Virtual host discovery"
 default_args    = []
 timeout_seconds = 300
 critical        = false
+version         = "latest"
 input_flag      = "-ips"
-
 [[tools]]
 name            = "shortscan"
 kind            = "go"
@@ -368,8 +368,8 @@ description     = "IIS short filename scanner"
 default_args    = []
 timeout_seconds = 300
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "nomore403"
 kind            = "go_clone"
@@ -378,8 +378,8 @@ description     = "4xx bypass tool (repo-clone Go binary)"
 default_args    = []
 timeout_seconds = 300
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "mantra"
 kind            = "go"
@@ -388,8 +388,8 @@ description     = "JS/secret scanner"
 default_args    = []
 timeout_seconds = 300
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "sourcemapper"
 kind            = "go"
@@ -398,8 +398,8 @@ description     = "JavaScript source map extractor"
 default_args    = []
 timeout_seconds = 300
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "waymore"
 kind            = "python"
@@ -408,8 +408,8 @@ description     = "Passive URL collection (Wayback/CommonCrawl/etc)"
 default_args    = []
 timeout_seconds = 1800
 critical        = false
+version         = "latest"
 input_flag      = "-i"
-
 [[tools]]
 name            = "urless"
 kind            = "python"
@@ -418,8 +418,8 @@ description     = "URL deduplication tool"
 default_args    = []
 timeout_seconds = 60
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "p1radup"
 kind            = "python"
@@ -428,8 +428,8 @@ description     = "URL parameter deduplication"
 default_args    = []
 timeout_seconds = 60
 critical        = false
+version         = "latest"
 input_flag      = "-i"
-
 [[tools]]
 name            = "Gxss"
 kind            = "go"
@@ -438,8 +438,8 @@ description     = "Reflected XSS parameter finder"
 default_args    = []
 timeout_seconds = 120
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "arjun"
 kind            = "python"
@@ -448,8 +448,8 @@ description     = "HTTP parameter discovery"
 default_args    = []
 timeout_seconds = 7200
 critical        = false
+version         = "latest"
 input_flag      = "-i"
-
 [[tools]]
 name            = "JSA"
 kind            = "python_venv"
@@ -458,12 +458,12 @@ description     = "JavaScript analysis (repo-clone Python venv)"
 default_args    = []
 timeout_seconds = 300
 critical        = false
+version         = "latest"
 input_flag      = "-f"
 
 # Phase 6 additions (Vulnerability Scanning E2E)
 # All Phase 6 vuln tools are critical=false — per-tool gating handles absence (D-V6).
 # SHA-256 pins deferred to Phase 11 (INST-02); manual slopcheck before install (T-06-01-SC).
-
 [[tools]]
 name            = "gf"
 kind            = "go"
@@ -472,8 +472,8 @@ description     = "URL gf-pattern classifier (xss/sqli/ssrf/lfi/rce/redirect/sst
 default_args    = []
 timeout_seconds = 60
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "qsreplace"
 kind            = "go"
@@ -482,8 +482,8 @@ description     = "Querystring replacer for payload injection"
 default_args    = []
 timeout_seconds = 30
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "dalfox"
 kind            = "go"
@@ -492,8 +492,8 @@ description     = "XSS scanner (parameter-based; D-V6 WAF-friendly thread cap)"
 default_args    = []
 timeout_seconds = 0
 critical        = false
+version         = "v2.9.2"
 input_flag      = ""
-
 [[tools]]
 name            = "sqlmap"
 kind            = "system"
@@ -501,8 +501,8 @@ description     = "SQL injection scanner (system Python3 script or PATH binary)"
 default_args    = []
 timeout_seconds = 0
 critical        = false
+version         = ""
 input_flag      = "-m"
-
 [[tools]]
 name            = "ghauri"
 kind            = "python"
@@ -511,8 +511,8 @@ description     = "SQLi scanner alternative engine (opt-in; D-V6 default off)"
 default_args    = []
 timeout_seconds = 0
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "interactsh-client"
 kind            = "go"
@@ -521,8 +521,8 @@ description     = "OOB callback server client for SSRF/blind-XSS (VULN-03)"
 default_args    = []
 timeout_seconds = 300
 critical        = false
+version         = "v1.2.2"
 input_flag      = ""
-
 [[tools]]
 name            = "crlfuzz"
 kind            = "go"
@@ -531,8 +531,8 @@ description     = "CRLF injection scanner (VULN-06)"
 default_args    = []
 timeout_seconds = 300
 critical        = false
+version         = "latest"
 input_flag      = "-l"
-
 [[tools]]
 name            = "TInjA"
 kind            = "go"
@@ -541,8 +541,8 @@ description     = "SSTI scanner (primary engine; VULN-05)"
 default_args    = []
 timeout_seconds = 300
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "SSTImap"
 kind            = "python_venv"
@@ -551,8 +551,8 @@ description     = "SSTI scanner alternative engine (VULN-05 SSTI_ENGINE=SSTImap)
 default_args    = []
 timeout_seconds = 300
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "commix"
 kind            = "python"
@@ -561,8 +561,8 @@ description     = "Command injection scanner (VULN-08)"
 default_args    = []
 timeout_seconds = 0
 critical        = false
+version         = "latest"
 input_flag      = "-l"
-
 [[tools]]
 name            = "smugglex"
 kind            = "rust"
@@ -571,8 +571,8 @@ description     = "HTTP request smuggling detector (VULN-07; Rust/Cargo install)
 default_args    = []
 timeout_seconds = 300
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "Web-Cache-Vulnerability-Scanner"
 kind            = "go"
@@ -581,8 +581,8 @@ description     = "Web cache poisoning scanner WCVS (VULN-09)"
 default_args    = []
 timeout_seconds = 300
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "toxicache"
 kind            = "go"
@@ -591,8 +591,8 @@ description     = "Web cache poisoning scanner toxicache (VULN-09 supplemental)"
 default_args    = []
 timeout_seconds = 300
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "second-order"
 kind            = "go"
@@ -601,8 +601,8 @@ description     = "Second-order injection + broken-link checker (VULN-12)"
 default_args    = []
 timeout_seconds = 300
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "fray"
 kind            = "python"
@@ -611,8 +611,8 @@ description     = "WAF-aware modern-payload scanner (D-V3: ai_prompt_injection/p
 default_args    = []
 timeout_seconds = 300
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "testssl.sh"
 kind            = "system"
@@ -620,6 +620,7 @@ description     = "TLS/SSL misconfiguration testing (D-V3 fold-in; bash script)"
 default_args    = []
 timeout_seconds = 300
 critical        = false
+version         = ""
 input_flag      = ""
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -628,7 +629,6 @@ input_flag      = ""
 # already present above (Phase 4/5). dnsx already present (DNS records OSINT-01).
 # All best_effort (ARCH-09); most → LocalBackend (no axiom module).
 # ─────────────────────────────────────────────────────────────────────────────
-
 [[tools]]
 name            = "whois"
 kind            = "system"
@@ -636,8 +636,8 @@ description     = "Domain registration lookup (OSINT-01 domain_info)"
 default_args    = []
 timeout_seconds = 60
 critical        = false
+version         = ""
 input_flag      = ""
-
 [[tools]]
 name            = "mapcidr"
 kind            = "go"
@@ -646,8 +646,8 @@ description     = "CIDR expansion/manipulation (OSINT-02 ip_info)"
 default_args    = []
 timeout_seconds = 120
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "EmailHarvester"
 kind            = "python"
@@ -656,8 +656,8 @@ description     = "Email harvesting from public sources (OSINT-03 emails)"
 default_args    = []
 timeout_seconds = 300
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "dorks_hunter"
 kind            = "python"
@@ -666,8 +666,8 @@ description     = "Google dork automation (OSINT-04 github/google dorks)"
 default_args    = []
 timeout_seconds = 600
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "gitdorks_go"
 kind            = "go"
@@ -676,8 +676,8 @@ description     = "GitHub dork search (OSINT-04 github_dorks)"
 default_args    = []
 timeout_seconds = 600
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "ghleaks"
 kind            = "go"
@@ -686,8 +686,8 @@ description     = "GitHub-wide secret search (OSINT-05 github_leaks; XCUT-07 red
 default_args    = []
 timeout_seconds = 600
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "trufflehog"
 kind            = "go"
@@ -696,8 +696,8 @@ description     = "Secrets scanner over git repos (OSINT-05 github_leaks; XCUT-0
 default_args    = []
 timeout_seconds = 1800
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "enumerepo"
 kind            = "go"
@@ -706,8 +706,8 @@ description     = "GitHub org repo enumeration (OSINT-05 github_repos; feeds git
 default_args    = []
 timeout_seconds = 600
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "gato"
 kind            = "python"
@@ -716,8 +716,8 @@ description     = "GitHub Actions self-hosted-runner audit (OSINT-06 github_acti
 default_args    = []
 timeout_seconds = 600
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "cloud_enum"
 kind            = "python"
@@ -726,8 +726,8 @@ description     = "AWS/GCP/Azure bucket enumeration (OSINT-07 cloud_enum; v1 con
 default_args    = []
 timeout_seconds = 900
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "porch-pirate"
 kind            = "python"
@@ -736,8 +736,8 @@ description     = "Postman public workspace leak search (OSINT-08 apileaks; XCUT
 default_args    = []
 timeout_seconds = 600
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "postleaksNg"
 kind            = "python"
@@ -746,8 +746,8 @@ description     = "Postman public leak search (OSINT-08 apileaks; XCUT-07 redact
 default_args    = []
 timeout_seconds = 600
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "sj"
 kind            = "go"
@@ -756,8 +756,8 @@ description     = "Swagger/OpenAPI definition analysis (OSINT-09 apileaks; XCUT-
 default_args    = []
 timeout_seconds = 600
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "SwaggerSpy"
 kind            = "python"
@@ -766,8 +766,8 @@ description     = "Swagger endpoint leak detection (OSINT-09 apileaks; XCUT-07 r
 default_args    = []
 timeout_seconds = 600
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "Spoofy"
 kind            = "python"
@@ -776,8 +776,8 @@ description     = "Email spoofing posture — SPF/DMARC/DKIM (OSINT-10 spoof/mai
 default_args    = []
 timeout_seconds = 120
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "msftrecon"
 kind            = "python"
@@ -786,8 +786,8 @@ description     = "Microsoft tenant recon (OSINT-11 msftrecon)"
 default_args    = []
 timeout_seconds = 300
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "cmseek"
 kind            = "python"
@@ -796,8 +796,8 @@ description     = "CMS fingerprinting (OSINT-12 cms)"
 default_args    = []
 timeout_seconds = 600
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "gqlspection"
 kind            = "python"
@@ -806,8 +806,8 @@ description     = "GraphQL deep introspection (OSINT-13 graphql)"
 default_args    = []
 timeout_seconds = 300
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "cewler"
 kind            = "python"
@@ -816,8 +816,8 @@ description     = "Custom wordlist generation from a site (OSINT-14 cewler)"
 default_args    = []
 timeout_seconds = 600
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "xnldorker"
 kind            = "python"
@@ -826,8 +826,8 @@ description     = "Google dorking engine (OSINT-15 google dorks)"
 default_args    = []
 timeout_seconds = 600
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "misconfig-mapper"
 kind            = "go"
@@ -836,8 +836,8 @@ description     = "Third-party service misconfiguration mapper (fold-in D-O10)"
 default_args    = []
 timeout_seconds = 600
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "metafinder"
 kind            = "python"
@@ -846,8 +846,8 @@ description     = "Document metadata OSINT over indexed docs (fold-in metadata, 
 default_args    = []
 timeout_seconds = 600
 critical        = false
+version         = "latest"
 input_flag      = ""
-
 [[tools]]
 name            = "exiftool"
 kind            = "system"
@@ -855,4 +855,181 @@ description     = "Document metadata extraction (fold-in metadata, D-O2)"
 default_args    = []
 timeout_seconds = 120
 critical        = false
+version         = ""
+input_flag      = ""
+
+[[tools]]
+name            = "naabu"
+kind            = "go"
+go_module       = "github.com/projectdiscovery/naabu/v2/cmd/naabu"
+description     = "Fast SYN/CONNECT port scanner"
+default_args    = []
+timeout_seconds = 0
+critical        = false
+version         = "v2.3.3"
+input_flag      = "-list"
+
+[[tools]]
+name            = "notify"
+kind            = "go"
+go_module       = "github.com/projectdiscovery/notify/cmd/notify"
+description     = "Multi-channel notification dispatch (Slack/Telegram/Discord)"
+default_args    = []
+timeout_seconds = 0
+critical        = false
+version         = "latest"
+input_flag      = ""
+
+[[tools]]
+name            = "github-endpoints"
+kind            = "go"
+go_module       = "github.com/gwen001/github-endpoints"
+description     = "GitHub endpoint discovery"
+default_args    = []
+timeout_seconds = 120
+critical        = false
+version         = "latest"
+input_flag      = ""
+
+[[tools]]
+name            = "roboxtractor"
+kind            = "go"
+go_module       = "github.com/Josue87/roboxtractor"
+description     = "robots.txt endpoint extractor"
+default_args    = []
+timeout_seconds = 120
+critical        = false
+version         = "latest"
+input_flag      = ""
+
+[[tools]]
+name            = "smap"
+kind            = "go"
+go_module       = "github.com/s0md3v/smap/cmd/smap"
+description     = "Passive Shodan-powered port scan"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+version         = "latest"
+input_flag      = ""
+
+[[tools]]
+name            = "dsieve"
+kind            = "go"
+go_module       = "github.com/trickest/dsieve"
+description     = "Subdomain filtering by level"
+default_args    = []
+timeout_seconds = 60
+critical        = false
+version         = "latest"
+input_flag      = ""
+
+[[tools]]
+name            = "inscope"
+kind            = "go"
+go_module       = "github.com/tomnomnom/hacks/inscope"
+description     = "Scope filtering for URLs/hosts"
+default_args    = []
+timeout_seconds = 30
+critical        = false
+version         = "latest"
+input_flag      = ""
+
+[[tools]]
+name            = "nmapurls"
+kind            = "go"
+go_module       = "github.com/sdcampbell/nmapurls"
+description     = "Extract URLs from Nmap XML"
+default_args    = []
+timeout_seconds = 60
+critical        = false
+version         = "latest"
+input_flag      = ""
+
+[[tools]]
+name            = "cent"
+kind            = "go"
+go_module       = "github.com/xm1k3/cent"
+description     = "Nuclei template manager/aggregator"
+default_args    = []
+timeout_seconds = 120
+critical        = false
+version         = "latest"
+input_flag      = ""
+
+[[tools]]
+name            = "grpcurl"
+kind            = "go"
+go_module       = "github.com/fullstorydev/grpcurl/cmd/grpcurl"
+description     = "gRPC reflection client"
+default_args    = []
+timeout_seconds = 120
+critical        = false
+version         = "latest"
+input_flag      = ""
+
+[[tools]]
+name            = "brutespray"
+kind            = "go"
+go_module       = "github.com/x90skysn3k/brutespray"
+description     = "Service credential spraying"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+version         = "latest"
+input_flag      = ""
+
+[[tools]]
+name            = "dnsvalidator"
+kind            = "python"
+pip_package     = "git+https://github.com/vortexau/dnsvalidator"
+description     = "DNS resolver validation"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+version         = "latest"
+input_flag      = ""
+
+[[tools]]
+name            = "interlace"
+kind            = "python"
+pip_package     = "git+https://github.com/pry0cc/interlace"
+description     = "Parallel command runner"
+default_args    = []
+timeout_seconds = 0
+critical        = false
+version         = "latest"
+input_flag      = ""
+
+[[tools]]
+name            = "xnLinkFinder"
+kind            = "python"
+pip_package     = "git+https://github.com/xnl-h4ck3r/xnLinkFinder"
+description     = "Deep link/endpoint finder"
+default_args    = []
+timeout_seconds = 600
+critical        = false
+version         = "latest"
+input_flag      = ""
+
+[[tools]]
+name            = "subwiz"
+kind            = "python"
+pip_package     = "subwiz"
+description     = "ML-based subdomain prediction"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+version         = "latest"
+input_flag      = ""
+
+[[tools]]
+name            = "LeakSearch"
+kind            = "python"
+pip_package     = "git+https://github.com/JoelGMSec/LeakSearch"
+description     = "Credential leak search"
+default_args    = []
+timeout_seconds = 600
+critical        = false
+version         = "latest"
 input_flag      = ""

@@ -97,3 +97,85 @@ func TestRegistrySeed_TOMLParseSucceeded(t *testing.T) {
 		t.Fatal("backend.Default empty — tools.lock failed to parse OR init() didn't fire")
 	}
 }
+
+// --- Phase 11 (Installer) — tools.lock schema + inventory coverage ---
+
+func toolByName(name string) *backend.Tool {
+	for _, t := range backend.Default.All() {
+		if t.Name == name {
+			return t
+		}
+	}
+	return nil
+}
+
+// TestToolsLockSchemaFields asserts the Phase 11 schema extension is wired:
+// a pinned tool carries its Version + install metadata copied from tools.lock.
+func TestToolsLockSchemaFields(t *testing.T) {
+	sf := toolByName("subfinder")
+	if sf == nil {
+		t.Fatal("subfinder not registered from tools.lock")
+	}
+	if sf.Version != "v2.14.0" {
+		t.Errorf("subfinder Version = %q, want v2.14.0 (pinned in tools.lock)", sf.Version)
+	}
+	if sf.Kind != "go" {
+		t.Errorf("subfinder Kind = %q, want go", sf.Kind)
+	}
+	if sf.GoModule == "" {
+		t.Error("subfinder GoModule empty — install metadata not copied from tools.lock to Tool")
+	}
+}
+
+// TestToolsLockVersionsPopulated (BLOCKER 2 fix) — every go/python/rust/
+// go_clone/python_venv kind tool MUST carry a non-empty, non-zero Version so
+// `go install module@version` / `uv tool install pkg==version` resolve and the
+// D-04 idempotency probe has something to compare against. system kind is
+// exempt (the OS package manager owns versioning).
+func TestToolsLockVersionsPopulated(t *testing.T) {
+	for _, tool := range backend.Default.All() {
+		switch tool.Kind {
+		case "go", "python", "rust", "go_clone", "python_venv":
+			if tool.Version == "" || tool.Version == "v0.0.0" {
+				t.Errorf("tool %q (kind=%s) has invalid Version %q — must be a real tag or \"latest\"",
+					tool.Name, tool.Kind, tool.Version)
+			}
+		case "system":
+			// exempt — pkg manager handles versioning
+		default:
+			t.Errorf("tool %q has unexpected kind %q (extend this switch if a new kind is added)",
+				tool.Name, tool.Kind)
+		}
+	}
+}
+
+// TestToolsLockNameCoverage (BLOCKER 4 fix) — every orchestrated tool from
+// install.sh that is a real installable binary MUST have a tools.lock entry.
+// Enforces the install.sh-vs-tools.lock audit at test time; a count floor
+// alone is insufficient (INST-02). Add names here as install.sh grows.
+func TestToolsLockNameCoverage(t *testing.T) {
+	expected := []string{
+		// subdomain + DNS
+		"subfinder", "httpx", "dnsx", "puredns", "naabu", "asnmap", "dnsvalidator",
+		"gotator", "subwiz", "dsieve", "subzy", "mapcidr",
+		// web + crawling + JS + fuzzing
+		"katana", "ffuf", "nuclei", "dalfox", "anew", "qsreplace", "unfurl", "gf",
+		"xnLinkFinder", "roboxtractor", "nmapurls", "smap", "inscope", "mantra",
+		// osint + notify + collab + misc
+		"notify", "github-endpoints", "cent", "grpcurl", "interlace",
+		"interactsh-client", "tlsx", "brutespray", "LeakSearch",
+	}
+	have := map[string]bool{}
+	for _, tool := range backend.Default.All() {
+		have[tool.Name] = true
+	}
+	var missing []string
+	for _, name := range expected {
+		if !have[name] {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) > 0 {
+		t.Errorf("tools.lock missing %d orchestrated tool(s) from install.sh: %v", len(missing), missing)
+	}
+}
