@@ -1,166 +1,105 @@
 # syntax=docker/dockerfile:1.4
+#
+# reconFTW v2 — multi-stage image (Phase 11, DOCK-01..07).
+#
+#   builder stage  : golang:bookworm + build deps + uv → runs `reconftw install`
+#                    to populate every orchestrated tool (DOCK-04).
+#   final stage    : debian:bookworm-slim (D-07 — distroless/Alpine rejected,
+#                    see Docker/README.md) with only the runtime deps + the
+#                    installed tools, running as a NON-ROOT user (DOCK-07) with
+#                    cap_net_raw granted to naabu + nmap via setcap.
+#
+# Tools install under /opt (GOPATH=/opt/go, uv → /opt/uv) so the non-root
+# `reconftw` user can execute them — /root is 0700 and unusable post-USER-switch.
+#
+# Build (multi-arch) from the REPO ROOT (context = ., so `bin/reconftw` is
+# available — build it first with `make build`):
+#   docker buildx build --platform linux/amd64,linux/arm64 \
+#     -f Docker/Dockerfile -t ghcr.io/six2dez/reconftw:latest .
 
-## Secrets should be passed at runtime, not build time:
-##   docker run -e COLLAB_SERVER=xxx -e XSS_SERVER=xxx -e SHODAN_API_KEY=xxx ...
-
-ARG LANG=en_US.UTF-8
-ARG LANGUAGE=en_US
+ARG GO_VERSION=1.25.0
+ARG DEBIAN_CODENAME=bookworm
 
 ##################################################
-###> Do NOT change anything beyond this point <###
+### Builder — full toolchain + `reconftw install`
 ##################################################
+FROM golang:${GO_VERSION}-${DEBIAN_CODENAME} AS builder
 
-FROM ubuntu:24.04 AS base
+ENV DEBIAN_FRONTEND=noninteractive \
+    GOPATH=/opt/go \
+    UV_TOOL_DIR=/opt/uv/tools \
+    UV_TOOL_BIN_DIR=/opt/uv/bin \
+    PATH=/opt/go/bin:/opt/uv/bin:/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin
 
-# NOTE: This image intentionally runs as root. Some recon tooling relies on privileged operations
-# (e.g., raw sockets/capabilities) and is commonly executed with elevated permissions.
+# Build-time system deps for compiling/installing the tool zoo.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip curl git build-essential libpcap-dev libssl-dev \
+    cmake ruby nmap whois jq exiftool ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-LABEL org.label-schema.name='reconftw'
-LABEL org.label-schema.description='A simple script for full recon'
-LABEL org.label-schema.usage='https://github.com/six2dez/reconftw'
-LABEL org.label-schema.url='https://github.com/six2dez/reconftw'
-LABEL org.label-schema.docker.cmd.devel='docker run --rm -ti six2dez/reconftw'
-LABEL MAINTAINER="six2dez"
-
-ARG LANG
-ARG LANGUAGE
-
-ARG GIT_REPOSITORY_AXIOM="https://github.com/attacksurge/ax.git"
-ARG GIT_REPOSITORY_RECONFTW="https://github.com/six2dez/reconftw"
-ARG INSTALL_AXIOM=true
-
-ENV LANG=$LANG
-ENV LANGUAGE=$LANGUAGE
-ENV LC_ALL=$LANG
-
-ENV GIT_REPOSITORY_AXIOM=$GIT_REPOSITORY_AXIOM
-ENV GIT_REPOSITORY_RECONFTW=$GIT_REPOSITORY_RECONFTW
-
-ENV INSTALL_AXIOM=$INSTALL_AXIOM
-
-ENV DEBIAN_FRONTEND=noninteractive
-ENV DEBCONF_NONINTERACTIVE_SEEN=true
-
-ENV GOROOT='/usr/local/go'
-ENV GOPATH='/root/go'
-ENV AXIOMPATH='/root/.axiom/interact'
-ENV CARGOPATH='/root/.cargo/bin'
-ENV PATH="${GOROOT}/bin:${GOPATH}/bin:${AXIOMPATH}:${CARGOPATH}:${PATH}"
-
-SHELL [ "/bin/bash", "-c" ]
-
-COPY 01_nodoc /etc/dpkg/dpkg.cfg.d/
+# uv (Python tool manager) from the official image — avoids the network
+# bootstrap path (and its placeholder SHA pin) during the build.
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-RUN <<eot
-#!/bin/bash
-set -euxo pipefail
+# The pre-built v2 binary (built by `make build` before `docker build`); the
+# image therefore ships exactly the tagged binary rather than a Docker rebuild.
+COPY bin/reconftw /usr/local/bin/reconftw
 
-###>> Backup .bashrc <<###
-cp /root/.bashrc /root/original.bashrc
+# Install every tool from tools.lock. Non-interactive (no TTY) for the build
+# context. Go + uv are already present, so the installer's bootstrap steps
+# short-circuit and never hit the (fail-closed) placeholder SHA pins.
+RUN --mount=type=cache,target=/opt/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/uv \
+    reconftw install --non-interactive
 
-###>> System Configuration <<###
-apt clean all
-apt update
-apt full-upgrade -f -y --allow-downgrades
-apt install -y --no-install-recommends apt-utils ca-certificates curl git lsb-release nano wget vim jq htop net-tools dnsutils nmap python3 unzip whois
+##################################################
+### Final — slim runtime, non-root, setcap
+##################################################
+FROM debian:${DEBIAN_CODENAME}-slim AS final
 
-###>> Configure Locales <<###
-apt install -y --no-install-recommends locales
-sed -i -- "/${LANG}/s/^# //g" /etc/locale.gen
-dpkg-reconfigure locales
-update-locale LANG=${LANG}
+ENV GOPATH=/opt/go \
+    UV_TOOL_BIN_DIR=/opt/uv/bin \
+    PATH=/opt/go/bin:/opt/uv/bin:/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin
 
-###>> Configure localepurge <<###
-apt install -y --no-install-recommends localepurge
-sed -i -- '/^USE_DPKG/s/^/#/' /etc/locale.nopurge
-dpkg-reconfigure localepurge
-localepurge
+# Runtime deps only. libcap2-bin provides `setcap` (D-08) and MUST be in the
+# FINAL stage; python3 + libpcap0.8 support the Python + capture-based tools.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 libpcap0.8 ca-certificates curl git nmap whois jq exiftool libcap2-bin \
+    && rm -rf /var/lib/apt/lists/*
 
-###>> Configure Axiom <<###
-if [ "${INSTALL_AXIOM}" = "true" ]; then
-    mkdir -p /root/.axiom/
-    git clone ${GIT_REPOSITORY_AXIOM} /root/.axiom/
-    cd /root/.axiom/interact
-    ./axiom-configure --unattended --shell Bash || echo "Axiom configure failed or was skipped; continue without cloud fleet."
-    ## This avoids useless error messages later.
-    touch /root/.axiom/axiom.json
-    touch /root/.axiom/interact/includes/functions.sh
-else
-    echo "INSTALL_AXIOM=${INSTALL_AXIOM}; skipping Axiom tooling."
-fi
+# Bring over the Go SDK (some tools shell out to `go`), installed tool trees,
+# and the reconftw binary. ALL COPY --from=builder lines MUST precede the
+# setcap RUNs below — Docker COPY strips the security.capability xattr, so a
+# capability granted in the builder would be silently lost (RESEARCH Pitfall 1).
+COPY --from=builder /usr/local/go /usr/local/go
+COPY --from=builder /opt/go /opt/go
+COPY --from=builder /opt/uv /opt/uv
+COPY --from=builder /usr/local/bin/uv /usr/local/bin/uv
+COPY --from=builder /usr/local/bin/reconftw /usr/local/bin/reconftw
 
-###>> Install reconFTW <<###
-mkdir -p /root/Tools
-mkdir -p /reconftw
-git clone ${GIT_REPOSITORY_RECONFTW} /reconftw
-cd /reconftw
-sh -c 'echo 1 | ./install.sh'
+# CRITICAL (D-08): grant raw-socket capability to naabu + nmap AFTER the last
+# COPY, in the final stage. `|| true` keeps the build resilient if a tool is
+# absent on a given arch; runtimes that filter file caps need `--cap-add=NET_RAW`.
+RUN setcap cap_net_raw,cap_net_admin+eip /usr/bin/nmap 2>/dev/null || true
+RUN setcap cap_net_raw,cap_net_admin+eip /opt/go/bin/naabu 2>/dev/null || true
 
-###>> Restore .bashrc <<###
-mv /root/original.bashrc /root/.bashrc
-find /root -type f \( -name '.bashrc*' -not -name '.bashrc' \) -delete
+# Non-root user (DOCK-07). /workspace is its home + working dir, pre-created and
+# owned at build time so nothing needs root at runtime. /opt is world-rX so the
+# tools remain executable for the non-root user.
+RUN groupadd -r reconftw \
+    && useradd -r -g reconftw -d /workspace -s /bin/bash reconftw \
+    && mkdir -p /workspace \
+    && chown -R reconftw:reconftw /workspace \
+    && chmod -R a+rX /opt/go /opt/uv
 
-###>> Clean up <<###
-apt update
-apt remove --purge -y build-essential
-apt autoremove -y
-apt clean all
-find /var/lib/apt/lists -type f -delete
-find /var/cache -type f -delete
-find /var/log -type f -delete
-find /tmp -type f -delete
-rm -rf /root/.cache
-rm -rf /root/go/pkg /root/go/src
-eot
+COPY Docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# Tokens for github-subdomains / gitdorks_go / github-endpoints / trufflehog are
-# expected at runtime via the GITHUB_TOKENS env var (one token per line, or a
-# path to a file that contains them). See Docker/entrypoint.sh — building them
-# into the image would ship a tracked "shape of a secret" that invites users
-# to fill it with real tokens and accidentally commit them.
-COPY notify.conf /root/.config/notify/provider-config.yaml
-
-###>> Configure Axiom Provider <<###
-RUN <<eot
-#!/bin/bash
-set -euxo pipefail
-if [ "${INSTALL_AXIOM}" = "true" ]; then
-    apt update && apt install -y --no-install-recommends openssh-client
-
-    mkdir -p /root/.ssh
-    mkdir -p /root/.axiom/configs
-
-    apt remove --purge -y openssh-client && apt autoremove -y && apt clean all
-    find /var/lib/apt/lists -type f -delete
-    find /var/cache -type f -delete
-    find /var/log -type f -delete
-    find /tmp -type f -delete
-    rm -rf /root/.cache
-else
-    echo "INSTALL_AXIOM=${INSTALL_AXIOM}; skipping Axiom provider setup."
-fi
-eot
-
-#COPY axiom-config.ini /root/.axiom/configs/config.ini
-#COPY axiom-custom-provider.json /root/.axiom/accounts/personal.json
-RUN if [ "${INSTALL_AXIOM}" = "true" ]; then axiom-account personal || echo "Axiom account not configured; provide provider config to enable it."; fi
-# RUN az group delete --name axiom --yes --no-wait
-
- # This command exits with return code 1, so leave the '|| :' or the build will fail.
-# COPY axiom-custom-provider.json /root/.axiom/accounts/personal.json
-RUN if [ "${INSTALL_AXIOM}" = "true" ]; then axiom-build reconftw || :; fi
-
-## Issue 271
-EXPOSE 85-90
-
-WORKDIR /reconftw
+WORKDIR /workspace
+USER reconftw
 
 HEALTHCHECK --interval=60s --timeout=30s --retries=3 \
-  CMD ./reconftw.sh --health-check || exit 1
+    CMD /usr/local/bin/reconftw health-check || exit 1
 
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-ENTRYPOINT [ "/entrypoint.sh" ]
-CMD [ "--help" ]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["--help"]
