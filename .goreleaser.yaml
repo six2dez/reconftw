@@ -1,0 +1,109 @@
+# GoReleaser v2 — reconFTW cross-platform release pipeline (Phase 11, D-05).
+#
+# Produces, on a `v*` tag push (see .github/workflows/release.yml):
+#   - Linux glibc binaries  (amd64, arm64)      — XPLAT-01, XPLAT-09
+#   - Linux musl static     (amd64, arm64)      — XPLAT-02 (Alpine)
+#   - macOS binaries        (amd64, arm64)      — XPLAT-03, XPLAT-04
+#   - tar.gz archives, .deb + .rpm packages     — XPLAT-08
+#   - checksums.txt (sha256)
+#
+# macOS is ALSO distributed via the Homebrew source-build tap (D-06,
+# six2dez/homebrew-reconftw) — see the formula template in release.yml. There is
+# deliberately NO `brews:` section here (GoReleaser's brews only emits
+# binary-download formulas, which would reintroduce the Gatekeeper notarization
+# requirement D-06 avoids), and NO `dockers:` (the multi-arch image is built by
+# the dedicated docker_nightly.yml), and NO `signs:`/`sboms:` (cosign/SLSA are
+# deferred per D-05).
+version: 2
+
+project_name: reconftw
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  # glibc / standard build — Linux + macOS, amd64 + arm64. The binary is
+  # CGO-free (modernc.org/sqlite) so CGO_ENABLED=0 cross-compiles cleanly.
+  - id: reconftw
+    main: ./cmd/reconftw
+    binary: reconftw
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X main.Version={{.Version}}
+      - -X main.CommitSHA={{.Commit}}
+      - -X main.BuildDate={{.Date}}
+
+  # musl static build — fully static Linux binary for Alpine (XPLAT-02).
+  - id: reconftw-musl
+    main: ./cmd/reconftw
+    binary: reconftw
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+      - -tags=netgo
+      - -a
+    ldflags:
+      - -s -w
+      - '-extldflags "-static"'
+      - -X main.Version={{.Version}}
+      - -X main.CommitSHA={{.Commit}}
+      - -X main.BuildDate={{.Date}}
+
+archives:
+  - id: default
+    ids:
+      - reconftw
+    formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+  - id: musl
+    ids:
+      - reconftw-musl
+    formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}_musl"
+
+nfpms:
+  - package_name: reconftw
+    ids:
+      - reconftw
+    vendor: six2dez
+    homepage: https://github.com/six2dez/reconftw
+    maintainer: six2dez <six2dez@gmail.com>
+    description: Comprehensive reconnaissance automation framework
+    license: MIT
+    formats:
+      - deb
+      - rpm
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+changelog:
+  use: github
+  sort: asc
+
+release:
+  github:
+    owner: six2dez
+    name: reconftw
+  prerelease: auto
+  name_template: "{{ .ProjectName }} v{{ .Version }}"

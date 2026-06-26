@@ -1,0 +1,71 @@
+# Release — builds + publishes cross-platform artifacts via GoReleaser on a
+# `v*` tag push (Phase 11, D-05). macOS ships through the Homebrew source-build
+# tap (D-06); the formula template is documented at the bottom of this file.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # create the GitHub Release + upload artifacts
+  packages: write # future: ghcr publish if wired here
+  id-token: write # future: cosign/OIDC (deferred per D-05)
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # REQUIRED — GoReleaser needs full tag history (RESEARCH Pitfall 3)
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}  # uncomment to auto-update the Homebrew tap
+
+      # Manual until github.com/six2dez/homebrew-reconftw exists + TAP_GITHUB_TOKEN is set.
+      # - name: Update Homebrew tap
+      #   run: |
+      #     # scripts/update-tap.sh patches Formula/reconftw.rb (url, sha256, version).
+      #     # The formula is source-build (depends_on "go" => :build) so it sidesteps
+      #     # Apple Gatekeeper notarization (D-06). See the template below.
+      #     echo "Homebrew tap update: manual step — see scripts/update-tap.sh"
+
+# ─────────────────────────────────────────────────────────────────────
+# HOMEBREW TAP FORMULA TEMPLATE (D-06 source-build — no Apple notarization)
+# Repo: github.com/six2dez/homebrew-reconftw
+# File: Formula/reconftw.rb
+# ─────────────────────────────────────────────────────────────────────
+# class Reconftw < Formula
+#   desc "Comprehensive reconnaissance automation framework"
+#   homepage "https://github.com/six2dez/reconftw"
+#   url "https://github.com/six2dez/reconftw/archive/refs/tags/v#{version}.tar.gz"
+#   sha256 "{{release_sha256}}"
+#   license "MIT"
+#   depends_on "go" => :build
+#   def install
+#     system "go", "build",
+#       "-ldflags", "-s -w -X main.Version=#{version}",
+#       "-trimpath", "-o", "reconftw", "./cmd/reconftw"
+#     bin.install "reconftw"
+#   end
+#   test do
+#     system "#{bin}/reconftw", "version"
+#   end
+# end
+# ─────────────────────────────────────────────────────────────────────
