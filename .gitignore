@@ -91,3 +91,18 @@ workspaces/
 # without -o. Production builds use `make build` → bin/reconftw.
 /reconftw
 
+
+# --- Phase 11 cleanup: runtime artifacts + separate experimentation (NEVER commit) ---
+# reconftw-web / web experimentation (PROJECT.md: "no parte de v2.0"; node_modules-heavy)
+web/
+reconftw-web/
+# runtime data: SQLite store, master key (SECRET), caches, manifests
+data/
+# stray scratch + local config
+.config/
+.planning.bak-*/
+reconftw.cfg.local
+/hackerone.com.txt
+internal/core/backend/example.com.txt
+# stray binary from `go build ./cmd/reconftw` without -o (prod uses make build → bin/)
+cmd/reconftw/reconftw
