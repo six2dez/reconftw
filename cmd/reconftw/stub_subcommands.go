@@ -1190,7 +1190,5 @@ func newMigrateCmd() *cobra.Command {
 	return newStubCmd("migrate", "Migrate v1 reconftw.cfg to v2 reconftw.toml")
 }
 
-// newInstallCmd — Phase 11 (Installer + Cross-Platform). Stubbed per D-02.
-func newInstallCmd() *cobra.Command {
-	return newStubCmd("install", "Install or update reconFTW tool dependencies (per tools.lock)")
-}
+// The `install` subcommand is now a real implementation in
+// cmd/reconftw/install.go — its exit-64 stub was removed in Phase 11 plan 03.

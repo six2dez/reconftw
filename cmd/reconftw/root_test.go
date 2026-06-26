@@ -80,9 +80,12 @@ func TestRootListsFifteenSubcommandsPlusVersion(t *testing.T) {
 // Phase 10 plan 10-04: `monitor` is no longer a stub — newMonitorCmd wires the real
 // monitor loop (RunMonitorAsync). Removed from stubs list; behavior is covered by
 // `monitor --help` and internal/mcp/handlers/monitor_test.go.
+// Phase 11 plan 11-03: `install` is no longer a stub — newInstallCmd (install.go)
+// wires the real internal/installer package. Removed from stubs list; behavior is
+// covered by `install --help` and internal/installer tests.
 func TestEveryStubReturnsExit64(t *testing.T) {
 	stubs := []string{
-		"migrate", "install",
+		"migrate",
 	}
 	for _, name := range stubs {
 		t.Run(name, func(t *testing.T) {
