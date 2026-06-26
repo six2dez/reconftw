@@ -208,3 +208,34 @@ jobs:
           go install github.com/pelletier/go-toml/v2/cmd/tomljson@latest
           export PATH="$(go env GOPATH)/bin:$PATH"
           bash .planning/decisions/verify-0002.sh
+
+  platform-smoke:
+    name: Platform smoke (${{ matrix.os }})
+    # XPLAT-05: build + smoke-test the binary on every supported platform on
+    # each PR/push (Linux + macOS, x86_64 + Apple Silicon via macos-latest).
+    # The weekly integration-full run lives in the scheduled jobs above.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-22.04, macos-latest, macos-13]
+    runs-on: ${{ matrix.os }}
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build
+        run: go build -ldflags="-s -w" -trimpath -o bin/reconftw ./cmd/reconftw
+      - name: Smoke test
+        run: go test -race -tags smoke ./...
+      - name: Binary size gate (XCUT-02)
+        shell: bash
+        run: |
+          SIZE=$(stat --printf=%s bin/reconftw 2>/dev/null || stat -f%z bin/reconftw)
+          echo "binary size: $SIZE bytes"
+          if [ "$SIZE" -ge 52428800 ]; then
+            echo "::error::binary >=50MB (XCUT-02 gate)"
+            exit 1
+          fi
