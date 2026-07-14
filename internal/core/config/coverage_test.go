@@ -144,6 +144,57 @@ func TestLoadSilentSkipOnMissingFile(t *testing.T) {
 	}
 }
 
+// An explicit --config / --secrets path that is named but missing must emit a
+// WARN to the sink — yet must NOT error: the silent-skip→nil contract holds.
+func TestLoadWarnsOnMissingExplicitPath(t *testing.T) {
+	t.Parallel()
+	var sink strings.Builder
+	cfg, err := config.Load(config.LoadOptions{
+		ExplicitConfigPath: "/nonexistent/explicit-config.toml",
+		SecretsPath:        "/nonexistent/explicit-secrets.toml",
+		WarnSink:           &sink,
+	})
+	if err != nil {
+		t.Fatalf("Load(missing explicit paths) err = %v; want nil (silent-skip→nil)", err)
+	}
+	if cfg == nil {
+		t.Fatal("Load returned nil cfg")
+	}
+	out := sink.String()
+	if !strings.Contains(out, "--config") || !strings.Contains(out, "explicit-config.toml") {
+		t.Errorf("WARN sink missing --config warning: %q", out)
+	}
+	if !strings.Contains(out, "--secrets") || !strings.Contains(out, "explicit-secrets.toml") {
+		t.Errorf("WARN sink missing --secrets warning: %q", out)
+	}
+	// Defaults must remain intact — the missing files contributed nothing.
+	if cfg.Concurrency.MaxJobs != 4 {
+		t.Errorf("Concurrency.MaxJobs = %d; want defaults (4)", cfg.Concurrency.MaxJobs)
+	}
+}
+
+// Auto-discovered layers (system/user/project) stay silent when missing — only
+// the operator-named explicit paths warn.
+func TestLoadSilentOnMissingAutoDiscoveredPath(t *testing.T) {
+	t.Parallel()
+	var sink strings.Builder
+	cfg, err := config.Load(config.LoadOptions{
+		SystemPath:  "/nonexistent/system.toml",
+		UserPath:    "/nonexistent/user.toml",
+		ProjectPath: "/nonexistent/project.toml",
+		WarnSink:    &sink,
+	})
+	if err != nil {
+		t.Fatalf("Load(missing auto-discovered paths) err = %v; want nil", err)
+	}
+	if cfg == nil {
+		t.Fatal("Load returned nil cfg")
+	}
+	if sink.Len() != 0 {
+		t.Errorf("auto-discovered missing paths must not warn; sink = %q", sink.String())
+	}
+}
+
 // Validate with cfg==nil returns a ConfigError (defensive).
 func TestValidateNilConfig(t *testing.T) {
 	t.Parallel()

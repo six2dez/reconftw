@@ -277,7 +277,7 @@ func CompositePipelinePrefixes(mode CompositeMode) []string {
 // Axiom lifecycle ownership (T-09-02-03): ONLY this function calls
 // axiomBE.Launch() and defers axiomBE.Shutdown() for composite modes.
 // commonAfterBoot (called via opts.AfterBoot) does NOT call Launch/Shutdown.
-func RunCompositeAsync(ctx context.Context, opts RunOptions, mode CompositeMode) error {
+func RunCompositeAsync(ctx context.Context, opts RunOptions, mode CompositeMode) (err error) {
 	if opts.Scheduler == nil {
 		return fmt.Errorf("mcp/composite: RunOptions.Scheduler must not be nil")
 	}
@@ -310,6 +310,18 @@ func RunCompositeAsync(ctx context.Context, opts RunOptions, mode CompositeMode)
 	if opts.DryRun {
 		return nil
 	}
+
+	// INTEG-02: real scan — fire scan-start + arm on-failure. The mode label is
+	// compositeModeLabel(mode) so it matches persistScanToStore below (scan-start /
+	// scan-complete pair up as "recon"/"all"/"passive"/"zen"/"deep"). Both are
+	// best-effort and stay silent under the monitor loop (opts.SuppressScanNotify).
+	label := compositeModeLabel(mode)
+	defer func() {
+		if err != nil {
+			notifyScanFailure(ctx, boot, opts, label, err)
+		}
+	}()
+	notifyScanStart(ctx, boot, opts, label)
 
 	// Wire checkpoint to scheduler (B3 fix).
 	sched.Checkpoint = app.Checkpoint
@@ -373,7 +385,25 @@ func RunCompositeAsync(ctx context.Context, opts RunOptions, mode CompositeMode)
 	// Final merges: consolidate all pipeline artefacts sequentially (single-writer).
 	compositeFinalMerge(ctx, app, mode)
 
+	persistScanToStore(ctx, boot, opts, compositeModeLabel(mode))
 	return nil
+}
+
+// compositeModeLabel maps a CompositeMode to the scan.mode string recorded in
+// store.db (mirrors the subcommand names users invoke).
+func compositeModeLabel(mode CompositeMode) string {
+	switch mode {
+	case ModeAll:
+		return "all"
+	case ModePassive:
+		return "passive"
+	case ModeZen:
+		return "zen"
+	case ModeDeep:
+		return "deep"
+	default:
+		return "recon"
+	}
 }
 
 // isBestEffortModule returns true for modules with best_effort failure policy.

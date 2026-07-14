@@ -11,15 +11,30 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 )
 
-// WorkspaceInit creates a new workspace directory under rootDir for the
-// given target and returns the absolute workspace path. The directory
-// name is "<sanitized-target>-<timestamp>" per ADR §3.1.
+// WorkspaceInit creates (or reuses) the STABLE per-target workspace directory
+// under rootDir and returns its path. The directory name is the sanitized
+// target slug with NO timestamp suffix: filepath.Join(rootDir, "<slug>").
 //
-// Sanitization mirrors v1 lib/validation.sh:sanitize_domain — strips
-// URL scheme, lowercases, replaces non-alphanumeric characters with `_`.
+// STABILITY RATIONALE (INTEG-03 — resume across runs): a stable, timestamp-free
+// directory is what lets <workspace>/checkpoints.db persist across invocations,
+// so a second `reconftw <mode> --target X` run resumes from checkpoints instead
+// of redoing completed work. A fresh timestamped dir each run would orphan the
+// prior checkpoints.db and defeat resume entirely. The queryable cross-run scan
+// history lives in the SHARED <dataDir>/store.db (INTEG-01), not in per-run
+// workspace copies, so dropping the timestamp loses no history. This is the
+// "one dir per target" option from 12-CONTEXT.md (Claude's Discretion), and is
+// consistent with the single-operator / no-concurrent-runs-per-target contract
+// (CLAUDE.md).
+//
+// Idempotent: a second call for the same (rootDir, target) returns the same
+// path and re-creates the standard subdirs via os.MkdirAll without error,
+// preserving any files (checkpoints.db, artefacts, …) written by a prior run.
+//
+// Sanitization mirrors v1 lib/validation.sh:sanitize_domain — strips URL scheme,
+// drops any path component, lowercases, replaces non-alphanumeric characters
+// with `_`.
 func WorkspaceInit(rootDir, target string) (string, error) {
 	if rootDir == "" {
 		return "", fmt.Errorf("output: WorkspaceInit: empty rootDir")
@@ -31,8 +46,7 @@ func WorkspaceInit(rootDir, target string) (string, error) {
 	if slug == "" {
 		return "", fmt.Errorf("output: WorkspaceInit: target sanitized to empty: %q", target)
 	}
-	timestamp := time.Now().UTC().Format("20060102-150405")
-	workspace := filepath.Join(rootDir, fmt.Sprintf("%s-%s", slug, timestamp))
+	workspace := filepath.Join(rootDir, slug)
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
 		return "", fmt.Errorf("output: WorkspaceInit: mkdir workspace: %w", err)
 	}

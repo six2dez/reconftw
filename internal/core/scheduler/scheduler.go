@@ -38,6 +38,7 @@ import (
 	"time"
 
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/six2dez/reconftw/internal/core/checkpoint"
 	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
@@ -95,6 +96,23 @@ type Scheduler struct {
 	// Hash computes the checkpoint input_hash for (taskName, target). Test
 	// hook — production uses checkpoint.InputHash via the runOne default.
 	Hash InputHasher
+
+	// ForceRerun, when true, skips the checkpoint Done() early-return so
+	// already-completed tasks re-execute — but Begin/Complete still run, so the
+	// forced run records FRESH checkpoints for the next run (never drops the
+	// resumable state). Wired from cfg.Advanced.Diff / --force by BootReconApp
+	// (INTEG-03). Default false = normal resume-from-checkpoint behavior. Has no
+	// effect when Checkpoint is nil (all checkpoint steps skipped regardless).
+	ForceRerun bool
+
+	// Limiter, when non-nil, is a process-wide weighted semaphore that bounds
+	// the TOTAL number of concurrently-executing tasks across ALL Scheduler
+	// instances that share it. MCP server mode gives each scan session its OWN
+	// Scheduler — so the per-scan RunTask / Checkpoint / Hash fields never race
+	// across concurrent sessions — but injects one shared Limiter so the
+	// sessions collectively cannot exceed PARALLEL_MAX_JOBS (MCP-05). nil = no
+	// global cap (single-scan CLI mode, where per-stage MaxConcurrent suffices).
+	Limiter *semaphore.Weighted
 }
 
 // MaxConcurrency implements the appctx.SchedulerRunner interface — the
@@ -187,17 +205,35 @@ func (s *Scheduler) runOne(ctx context.Context, t task.Task) error {
 	hash := s.hashFor(t.Name(), target)
 
 	if s.Checkpoint != nil {
-		done, err := s.Checkpoint.Done(ctx, t.Name(), target, hash)
-		if err != nil {
-			return err
-		}
-		if done {
-			s.log().Info("task_skipped_checkpoint_hit", slog.String("task", t.Name()))
-			return nil
+		// ForceRerun (INTEG-03): bypass ONLY the Done() early-return so a forced
+		// run re-executes completed tasks. Begin() below and Complete() at the end
+		// still run, so the forced run records fresh checkpoints for the next run.
+		if !s.ForceRerun {
+			done, err := s.Checkpoint.Done(ctx, t.Name(), target, hash)
+			if err != nil {
+				return err
+			}
+			if done {
+				s.log().Info("task_skipped_checkpoint_hit", slog.String("task", t.Name()))
+				return nil
+			}
 		}
 		if err := s.Checkpoint.Begin(ctx, t.Name(), target, hash); err != nil {
 			return err
 		}
+	}
+
+	// Global concurrency gate (MCP-05): when a shared Limiter is set, block
+	// until a process-wide slot is free so concurrent scan sessions cannot
+	// collectively exceed PARALLEL_MAX_JOBS. The per-stage errgroup SetLimit
+	// only bounds a single scan's stage; the Limiter is the cross-session cap.
+	// nil Limiter (CLI single-scan mode) skips this entirely. Acquire honors
+	// ctx cancellation so a cancelled scan does not block forever.
+	if s.Limiter != nil {
+		if err := s.Limiter.Acquire(ctx, 1); err != nil {
+			return err
+		}
+		defer s.Limiter.Release(1)
 	}
 
 	// LifecycleAware OnStart — errors logged as warnings; do not abort.

@@ -18,13 +18,17 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/backend"
+	"github.com/six2dez/reconftw/internal/core/checkpoint"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/ingest"
 	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/scheduler"
 )
@@ -97,6 +101,19 @@ type RunOptions struct {
 	// re-feed path (D-04/D-05 fix — checkpoint hash alone does not change between
 	// monitor cycles with identical opts).
 	TargetListPath string
+	// Force is the --force / checkpoint-bypass flag. When true, BootReconApp
+	// ORs it into cfg.Advanced.Diff, which then drives Scheduler.ForceRerun so
+	// completed tasks re-execute while still recording fresh checkpoints
+	// (INTEG-03). Dry-run must NOT bypass — the dry-run early-return in each
+	// RunXAsync is the real guard, so a stray --dry-run --force is harmless.
+	Force bool
+	// SuppressScanNotify silences the in-scan notification seam (notifyScanStart/
+	// notifyScanComplete/notifyScanFailure) for this run. Set by the monitor loop
+	// so its per-cycle RunCompositeAsync calls stay quiet — the monitor owns its
+	// own cross-cycle diff notifications (INTEG-04); firing the in-scan seam every
+	// cycle would re-alert every critical finding on every cycle. Ordinary CLI/MCP
+	// scans leave it false (INTEG-02).
+	SuppressScanNotify bool
 }
 
 // AppBoot is the return bundle from BootReconApp.
@@ -105,6 +122,33 @@ type AppBoot struct {
 	WorkDir       string
 	Cfg           *config.Config
 	ChosenBackend backend.Backend // nil when Axiom is not enabled
+}
+
+// persistScanToStore ingests the just-completed run's merged JSONL artefacts into
+// the shared store.db so `report` / monitor / SARIF / AI / faraday can read a
+// completed scan. It is best-effort: any failure is logged and never aborts the
+// pipeline — the JSONL artefacts on disk remain the source of truth. Callers
+// invoke it once, after the final merge, before returning nil.
+func persistScanToStore(ctx context.Context, boot AppBoot, opts RunOptions, mode string) {
+	var dataDir string
+	if boot.Cfg != nil {
+		dataDir = boot.Cfg.Paths.DataDir
+	}
+	var logger *slog.Logger
+	if boot.App != nil {
+		logger = boot.App.Log
+	}
+	res, err := ingest.ScanIntoStore(ctx, dataDir, boot.WorkDir, opts.Target, mode, logger)
+	if err != nil && logger != nil {
+		logger.WarnContext(ctx, "store ingest failed (non-fatal)", "mode", mode, "err", err)
+	}
+	// INTEG-02: fire scan-complete + critical-finding from the SAME finalization
+	// seam, reusing the ingest.Result counts and the findings.jsonl the ingest
+	// already read. Best-effort — a notifier failure never aborts the pipeline.
+	// On an ingest error res is the zero Result; scan-complete still fires (counts
+	// may read 0) and criticals are read straight from the artefact, so a store
+	// hiccup never suppresses the critical-finding alerts.
+	notifyScanComplete(ctx, boot, opts, mode, res)
 }
 
 // BootReconApp wires config → target → workspace → backend → appctx.Boot.
@@ -138,6 +182,13 @@ func BootReconApp(ctx context.Context, opts RunOptions) (AppBoot, error) {
 	// Pitfall 5: applying after Boot means Boot already wired stale values.
 	if opts.ConfigTransform != nil {
 		opts.ConfigTransform(cfg)
+	}
+
+	// --force consumption (INTEG-03): OR the flag into cfg.Advanced.Diff so a
+	// single knob drives Scheduler.ForceRerun below. quick-rescan already sets
+	// Diff=true via its ConfigTransform, so both paths converge here.
+	if opts.Force {
+		cfg.Advanced.Diff = true
 	}
 
 	// Step 2: Build target.
@@ -183,12 +234,166 @@ func BootReconApp(ctx context.Context, opts RunOptions) (AppBoot, error) {
 		return AppBoot{}, fmt.Errorf("handlers: appctx boot: %w", err)
 	}
 
+	// INTEG-04: consume opts.TargetListPath — the monitor incremental re-feed's
+	// new-asset seed file. Fold the FQDNs into the subdomains resolve-stage
+	// staging contract so the hash-forced re-run's MergeStage("resolved") folds
+	// them into subdomains.jsonl (which web.httpx then probes). Best-effort: a
+	// missing/unreadable seed or an empty set is logged and ignored (never abort).
+	if opts.TargetListPath != "" {
+		var logger *slog.Logger
+		if app != nil {
+			logger = app.Log
+		}
+		seedIncrementalStaging(workdir, opts.TargetListPath, logger)
+	}
+
 	// Checkpoint wiring happens in each RunXxxAsync (sched.Checkpoint =
 	// app.Checkpoint) and is race-free because opts.Scheduler is this scan's
 	// own instance, not a shared one. RunXxxAsync also owns the app.Checkpoint
 	// lifecycle (closed via defer).
 
+	// INTEG-03: wire the REAL InputHash + ForceRerun onto this scan's scheduler.
+	// opts.Scheduler is a per-scan instance (per the common.go header), so
+	// mutating Hash/ForceRerun here mirrors the existing per-scan Checkpoint
+	// wiring and never races across concurrent sessions.
+	//
+	// The cfg-slice is computed ONCE (best-effort): on SnapshotBytes error we
+	// fall back to nil bytes — the hash still covers taskName + target +
+	// TargetListPath, so it never degenerates to taskName-only again. We fold
+	// opts.TargetListPath into the slice with a null-separated "tlp=" marker so a
+	// list-mode / monitor-incremental re-feed produces a DIFFERENT InputHash and
+	// genuinely re-runs the listed assets (the mechanism monitor.go assumes).
+	cfgSlice, _ := config.SnapshotBytes(cfg)
+	hashSlice := make([]byte, 0, len(cfgSlice)+len(opts.TargetListPath)+8)
+	hashSlice = append(hashSlice, cfgSlice...)
+	hashSlice = append(hashSlice, 0) // null separator (prefix-collision safety)
+	hashSlice = append(hashSlice, "tlp="...)
+	hashSlice = append(hashSlice, opts.TargetListPath...)
+	wordlistsLock := wordlistsLockContent(cfg)
+	tgtDomain := tgt.Domain
+	opts.Scheduler.Hash = func(taskName, _ string) string {
+		// Ignore the passed-in target arg (scheduler.targetFor() returns "");
+		// the closure uses the captured tgt.Domain so the hash covers the real
+		// target even though the Scheduler holds no AppContext reference.
+		return checkpoint.InputHash(taskName, tgtDomain, hashSlice, wordlistsLock)
+	}
+	opts.Scheduler.ForceRerun = cfg.Advanced.Diff
+
 	return AppBoot{App: app, WorkDir: workdir, Cfg: cfg, ChosenBackend: chosenBackend}, nil
+}
+
+// seedIncrementalStaging consumes the monitor incremental re-feed's TargetListPath
+// (INTEG-04). It reads the new-asset FQDNs (one per line; blank lines and '#'
+// comments skipped) and writes them as BARE TEXT to inputs/resolved.incremental.txt
+// — a resolve-stage staging file per the subdomains STAGING CONTRACT
+// (internal/modules/subdomains/doc.go). The hash-forced re-run's
+// MergeStage("resolved") globs inputs/resolved.*.txt, dedups (anew-equivalent, so
+// re-injecting already-known hosts is idempotent), and folds these into
+// artefacts/subdomains.jsonl as the single writer — which web.httpx then probes.
+//
+// It deliberately does NOT call app.Tree.Append for the seed: Append has REPLACE
+// semantics (would clobber subdomains.jsonl), is scope-checked, and is
+// schema-on-write (rejects bare-FQDN text that is not valid JSON). The staging
+// file is the correct, non-clobbering seam.
+//
+// Best-effort throughout: a missing/unreadable seed, an empty asset set, or a
+// write error is logged and ignored — it never aborts BootReconApp (mirrors the
+// INTEG-01/02 finalization discipline).
+func seedIncrementalStaging(workDir, seedPath string, logger *slog.Logger) {
+	fqdns, err := readSeedFQDNs(seedPath)
+	if err != nil {
+		if logger != nil {
+			logger.Warn("handlers: TargetListPath unreadable — skipping incremental seed (best-effort)",
+				"path", seedPath, "err", err)
+		}
+		return
+	}
+	if len(fqdns) == 0 {
+		return
+	}
+	inputsDir := filepath.Join(workDir, "inputs")
+	if err := os.MkdirAll(inputsDir, 0o755); err != nil {
+		if logger != nil {
+			logger.Warn("handlers: mkdir inputs/ failed — skipping incremental seed", "err", err)
+		}
+		return
+	}
+	stagePath := filepath.Join(inputsDir, "resolved.incremental.txt")
+	if err := atomicWriteLines(stagePath, fqdns); err != nil {
+		if logger != nil {
+			logger.Warn("handlers: write resolved.incremental.txt failed — skipping incremental seed", "err", err)
+		}
+		return
+	}
+	if logger != nil {
+		logger.Debug("handlers: seeded incremental assets into resolve staging",
+			"count", len(fqdns), "path", stagePath)
+	}
+}
+
+// readSeedFQDNs reads a newline-delimited FQDN seed file, trimming whitespace and
+// skipping blank lines and '#' comments. Returns the ordered FQDN slice.
+func readSeedFQDNs(path string) ([]string, error) {
+	f, err := os.Open(path) //nolint:gosec // path is the monitor-written seed under workDir
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close() //nolint:errcheck
+	var out []string
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		out = append(out, line)
+	}
+	return out, sc.Err()
+}
+
+// atomicWriteLines writes lines (newline-terminated) to path via a temp file +
+// rename so a concurrent MergeStage glob never observes a half-written file.
+func atomicWriteLines(path string, lines []string) error {
+	content := strings.Join(lines, "\n") + "\n"
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, []byte(content), 0o644); err != nil { //nolint:gosec
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
+}
+
+// wordlistsLockContent returns a best-effort fingerprint of the primary wordlist
+// files (path + size + modtime) to fold into the checkpoint InputHash. Wordlist
+// PATHS are already captured by the cfg snapshot; this adds CONTENT sensitivity
+// so an edited wordlist invalidates the checkpoint (INTEG-03/04 correctness).
+// Missing/unset files contribute nothing — an empty result is the acceptable
+// default (the dominant invalidation drivers are the cfg-slice + target +
+// TargetListPath). Never fails: any stat error is silently skipped.
+func wordlistsLockContent(cfg *config.Config) []byte {
+	if cfg == nil {
+		return nil
+	}
+	var buf bytes.Buffer
+	for _, p := range []string{
+		cfg.Paths.SubsWordlist,
+		cfg.Paths.SubsWordlistBig,
+		cfg.Paths.FuzzWordlist,
+	} {
+		if p == "" {
+			continue
+		}
+		info, err := os.Stat(p)
+		if err != nil {
+			continue
+		}
+		fmt.Fprintf(&buf, "%s\x00%d\x00%d\n", p, info.Size(), info.ModTime().UnixNano())
+	}
+	return buf.Bytes()
 }
 
 // countJSONLLines returns the number of non-empty lines in a JSONL file.

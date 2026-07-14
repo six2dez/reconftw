@@ -17,7 +17,7 @@ import (
 //
 // All stages are best_effort (D-V7). B3 fix: app.Checkpoint closed via defer;
 // opts.Scheduler.Checkpoint NOT written on the shared scheduler.
-func RunVulnsAsync(ctx context.Context, opts RunOptions) error {
+func RunVulnsAsync(ctx context.Context, opts RunOptions) (err error) {
 	if opts.Scheduler == nil {
 		return fmt.Errorf("mcp/vulns: RunOptions.Scheduler must not be nil")
 	}
@@ -44,6 +44,15 @@ func RunVulnsAsync(ctx context.Context, opts RunOptions) error {
 	if opts.DryRun {
 		return nil
 	}
+
+	// INTEG-02: real scan — fire scan-start + arm on-failure (mode "vulns" matches
+	// persistScanToStore). Best-effort; suppressed in monitor mode.
+	defer func() {
+		if err != nil {
+			notifyScanFailure(ctx, boot, opts, "vulns", err)
+		}
+	}()
+	notifyScanStart(ctx, boot, opts, "vulns")
 
 	sched.Checkpoint = app.Checkpoint
 
@@ -114,5 +123,6 @@ func RunVulnsAsync(ctx context.Context, opts RunOptions) error {
 		}
 	}
 
+	persistScanToStore(ctx, boot, opts, "vulns")
 	return nil
 }

@@ -143,11 +143,67 @@ func TestDefaults(t *testing.T) {
 		{"Output.Verbosity", cfg.Output.Verbosity, 1},
 		{"Output.LogFormat", cfg.Output.LogFormat, "json"},
 		{"Output.LogLevel", cfg.Output.LogLevel, "info"},
+
+		// INTEG-06: coherent AI default (local-first Ollama, opt-in).
+		{"AI.Enabled", cfg.AI.Enabled, false},
+		{"AI.Provider", cfg.AI.Provider, "ollama"},
+		{"AI.Model", cfg.AI.Model, "llama3:8b"},
+		{"AI.OllamaHost", cfg.AI.OllamaHost, "http://localhost:11434"},
 	}
 	for _, tc := range tests {
 		if tc.got != tc.want {
 			t.Errorf("%s = %v (%T); want %v (%T)", tc.name, tc.got, tc.got, tc.want, tc.want)
 		}
+	}
+}
+
+// --- Test 3b: AI provider oneof + OllamaHost scheme validation (INTEG-06) ---
+//
+// The Provider field guards against an unknown provider silently falling
+// through to a cloud path; OllamaHost is restricted to http/https so a stray
+// scheme can't be used as an SSRF/exfil vector (T-12-02-03).
+func TestAIProviderValidation(t *testing.T) {
+	t.Parallel()
+	providers := []struct {
+		provider string
+		wantErr  bool
+	}{
+		{"ollama", false},
+		{"openai", false},
+		{"anthropic", false},
+		{"", false}, // omitempty — empty is allowed (treated as anthropic default)
+		{"banana", true},
+	}
+	for _, tc := range providers {
+		t.Run("provider="+tc.provider, func(t *testing.T) {
+			cfg := config.Defaults()
+			cfg.AI.Provider = tc.provider
+			err := config.Validate(cfg)
+			if (err != nil) != tc.wantErr {
+				t.Errorf("Validate(ai.provider=%q) err=%v; wantErr=%v", tc.provider, err, tc.wantErr)
+			}
+		})
+	}
+
+	hosts := []struct {
+		host    string
+		wantErr bool
+	}{
+		{"http://localhost:11434", false},
+		{"https://ollama.internal:11434", false},
+		{"", false}, // omitempty
+		{"file:///etc/passwd", true},
+		{"gopher://attacker/", true},
+	}
+	for _, tc := range hosts {
+		t.Run("ollama_host="+tc.host, func(t *testing.T) {
+			cfg := config.Defaults()
+			cfg.AI.OllamaHost = tc.host
+			err := config.Validate(cfg)
+			if (err != nil) != tc.wantErr {
+				t.Errorf("Validate(ai.ollama_host=%q) err=%v; wantErr=%v", tc.host, err, tc.wantErr)
+			}
+		})
 	}
 }
 

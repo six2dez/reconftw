@@ -136,6 +136,15 @@ func RunMonitorAsync(ctx context.Context, opts RunOptions, monCfg MonitorOptions
 		return fmt.Errorf("mcp/monitor: RunOptions.Scheduler must not be nil")
 	}
 
+	// INTEG-02: suppress the in-scan notification seam for every per-cycle
+	// RunCompositeAsync (and the pre-boot below). The monitor owns its own
+	// cross-cycle diff notifications (steps 5/7 via EventFilter); firing the
+	// in-scan seam per cycle would re-alert every critical finding on every
+	// cycle. opts is a value copy, so this scopes to this monitor run only, and
+	// incrementalOpts (a copy of opts) inherits the flag. INTEG-04 owns monitor
+	// notifications.
+	opts.SuppressScanNotify = true
+
 	// D-02 dedup: in-memory content-hash set — lives for the process lifetime
 	// of the monitor run. Prevents re-alerting on findings already notified in
 	// a prior cycle even if they re-appear in later diff results.
@@ -162,15 +171,29 @@ func RunMonitorAsync(ctx context.Context, opts RunOptions, monCfg MonitorOptions
 	// so that notifications.events TOML rules gate dispatch (NOTIF-04).
 	ef := notifier.NewEventFilter(boot.App.Notify, boot.App.Cfg.Notifications.Events)
 
-	// Open store.db read-only for diff queries.
-	dbPath := filepath.Join(boot.WorkDir, "store.db")
-	db, err := sql.Open("sqlite", dbPath+"?mode=ro")
-	if err != nil {
-		return fmt.Errorf("mcp/monitor: open store.db: %w", err)
+	// INTEG-04: the diff store is the SHARED <dataDir>/store.db that the ingest
+	// writes (persistScanToStore → ingest.ScanIntoStore), NOT <workDir>/store.db.
+	// Per-run fresh workspaces never populated the <workDir> copy, so the diff
+	// always saw an empty store and produced no deltas — a silent-failure bug.
+	// Fall back to "data" when DataDir is unset, mirroring ScanIntoStore.
+	dataDir := "data"
+	if boot.Cfg != nil && boot.Cfg.Paths.DataDir != "" {
+		dataDir = boot.Cfg.Paths.DataDir
 	}
-	defer db.Close() //nolint:errcheck
+	dbPath := filepath.Join(dataDir, "store.db")
 
-	q := sqlcgen.New(db)
+	// The store is opened LAZILY inside runCycle, AFTER the first cycle's
+	// RunCompositeAsync → persistScanToStore has created <dataDir>/store.db.
+	// Opening at loop-start would race a not-yet-created file (and "?mode=ro"
+	// hard-fails on a missing file in modernc). Once opened, db/q persist across
+	// cycles; the deferred close releases the handle when the loop exits.
+	var db *sql.DB
+	var q *sqlcgen.Queries
+	defer func() {
+		if db != nil {
+			_ = db.Close()
+		}
+	}()
 
 	runCycle := func(cycleCtx context.Context, cycleNum int) error {
 		cycleStart := time.Now()
@@ -181,6 +204,21 @@ func RunMonitorAsync(ctx context.Context, opts RunOptions, monCfg MonitorOptions
 		// owns its own checkpoint lifecycle. Each cycle records a new scan row.
 		if err := RunCompositeAsync(cycleCtx, opts, monCfg.Mode); err != nil {
 			return fmt.Errorf("monitor: cycle %d: pipeline: %w", cycleNum, err)
+		}
+
+		// Lazy-open the shared store now that this cycle's pipeline has created
+		// it. sql.Open is connection-lazy; a plain open (no "?mode=ro") tolerates
+		// a first-cycle file that the ingest has just written. A genuinely empty
+		// store still surfaces as ErrNoRows below (warn + skip), never an error.
+		if q == nil {
+			opened, oerr := sql.Open("sqlite", dbPath)
+			if oerr != nil {
+				slog.Warn("monitor: open store.db failed — skipping diff",
+					"cycle", cycleNum, "path", dbPath, "err", oerr)
+				return nil
+			}
+			db = opened
+			q = sqlcgen.New(db)
 		}
 
 		// Step 2: Resolve current scan from the store.

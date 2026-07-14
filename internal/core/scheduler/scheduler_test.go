@@ -297,6 +297,69 @@ func TestCheckpointBeginErrorPropagates(t *testing.T) {
 	}
 }
 
+// TestForceRerunFalseSkipsOnCheckpointHit (INTEG-03): with ForceRerun=false
+// (default), a Done()==true task is skipped — the baseline resume behavior.
+func TestForceRerunFalseSkipsOnCheckpointHit(t *testing.T) {
+	cp := &stubCheckpoint{doneMap: map[string]bool{"skipme": true}}
+	s := newScheduler(cp) // ForceRerun defaults to false
+	a := &fakeTask{name: "skipme", module: "subdomains"}
+	if err := s.RunStage(context.Background(), "subdomains", []task.Task{a}); err != nil {
+		t.Fatalf("RunStage error = %v", err)
+	}
+	if a.started.Load() != 0 {
+		t.Errorf("ForceRerun=false: Done-hit task ran (started=%d), want skipped", a.started.Load())
+	}
+	cp.mu.Lock()
+	defer cp.mu.Unlock()
+	if cp.beginN != 0 || cp.complN != 0 {
+		t.Errorf("ForceRerun=false skip should not Begin/Complete: beginN=%d complN=%d", cp.beginN, cp.complN)
+	}
+}
+
+// TestForceRerunTrueRunsAndRecords (INTEG-03): with ForceRerun=true, a task whose
+// Done() would return true STILL runs (bypass), and Begin+Complete are still
+// called so the forced run records fresh checkpoints. Done() is not even queried.
+func TestForceRerunTrueRunsAndRecords(t *testing.T) {
+	cp := &stubCheckpoint{doneMap: map[string]bool{"a": true}}
+	s := newScheduler(cp)
+	s.ForceRerun = true
+	a := &fakeTask{name: "a", module: "subdomains"}
+	if err := s.RunStage(context.Background(), "subdomains", []task.Task{a}); err != nil {
+		t.Fatalf("RunStage error = %v", err)
+	}
+	if a.started.Load() != 1 {
+		t.Errorf("ForceRerun=true: task did not re-run (started=%d), want 1", a.started.Load())
+	}
+	cp.mu.Lock()
+	defer cp.mu.Unlock()
+	if cp.beginN != 1 {
+		t.Errorf("ForceRerun=true: Begin called %d times, want 1 (checkpoint must still be recorded)", cp.beginN)
+	}
+	if cp.complN != 1 {
+		t.Errorf("ForceRerun=true: Complete called %d times, want 1 (checkpoint must still be recorded)", cp.complN)
+	}
+	if cp.doneN != 0 {
+		t.Errorf("ForceRerun=true: Done called %d times, want 0 (early-return must be bypassed)", cp.doneN)
+	}
+}
+
+// TestForceRerunDoesNotSwallowError (INTEG-03): ForceRerun does not change error
+// propagation — a failing task under fail_fast still returns its error.
+func TestForceRerunDoesNotSwallowError(t *testing.T) {
+	cp := &stubCheckpoint{}
+	s := newScheduler(cp)
+	s.ForceRerun = true
+	wantErr := errors.New("task-failed")
+	a := &fakeTask{name: "a", module: "subdomains", err: wantErr}
+	err := s.RunStage(context.Background(), "subdomains", []task.Task{a})
+	if err == nil {
+		t.Fatal("ForceRerun=true swallowed a task error under fail_fast")
+	}
+	if !errors.Is(err, wantErr) {
+		t.Errorf("RunStage error = %v; want %v", err, wantErr)
+	}
+}
+
 // Test (smoke): RunTask hook is called when set; receives task by value.
 func TestRunTaskHookInvoked(t *testing.T) {
 	s := newScheduler(nil)

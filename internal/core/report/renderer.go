@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	// modernc.org/sqlite registers the "sqlite" driver name (XCUT-02 pure-Go).
@@ -222,12 +223,19 @@ func (r *ReportRenderer) RenderAll(ctx context.Context, targetID, scanID string)
 	}
 
 	// Step 10: AI report (best-effort — errors are logged but do not abort).
+	//
+	// INTEG-06: provider-ready gate. This MIRRORS the in-Generate cloud-egress
+	// guard (defense-in-depth): the local ollama provider runs WITHOUT a key
+	// (so the coherent local-first default actually executes through the
+	// production `reconftw report` path), while a cloud provider only runs when
+	// its key is present — an empty cloud key opens no gate and makes no call.
+	// An empty provider is treated as the historical anthropic cloud default.
 	if r.cfg != nil && r.cfg.AI.Enabled {
-		aiKey := string(r.cfg.AI.AnthropicKey)
-		if r.cfg.AI.Provider == "openai" {
-			aiKey = string(r.cfg.AI.OpenAIKey)
-		}
-		if aiKey != "" {
+		provider := strings.ToLower(r.cfg.AI.Provider)
+		ready := provider == "ollama" ||
+			(provider == "openai" && string(r.cfg.AI.OpenAIKey) != "") ||
+			((provider == "anthropic" || provider == "") && string(r.cfg.AI.AnthropicKey) != "")
+		if ready {
 			reporter := NewAIReporter(&r.cfg.AI, r.redactor, r.log)
 			aiText, aiErr := reporter.Generate(ctx, &scan, findings)
 			if aiErr != nil {

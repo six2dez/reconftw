@@ -61,7 +61,7 @@ func osintHandlerStages() []osintStageSpec {
 // OSINT is root-domain / company-seeded (D-O1) — no --urls corpus needed.
 // All stages are best_effort (D-O8/ARCH-09). B3 fix: app.Checkpoint closed
 // via defer; opts.Scheduler.Checkpoint NOT written on the shared scheduler.
-func RunOSINTAsync(ctx context.Context, opts RunOptions) error {
+func RunOSINTAsync(ctx context.Context, opts RunOptions) (err error) {
 	if opts.Scheduler == nil {
 		return fmt.Errorf("mcp/osint: RunOptions.Scheduler must not be nil")
 	}
@@ -88,6 +88,15 @@ func RunOSINTAsync(ctx context.Context, opts RunOptions) error {
 	if opts.DryRun {
 		return nil
 	}
+
+	// INTEG-02: real scan — fire scan-start + arm on-failure (mode "osint" matches
+	// persistScanToStore). Best-effort; suppressed in monitor mode.
+	defer func() {
+		if err != nil {
+			notifyScanFailure(ctx, boot, opts, "osint", err)
+		}
+	}()
+	notifyScanStart(ctx, boot, opts, "osint")
 
 	sched.Checkpoint = app.Checkpoint
 
@@ -123,5 +132,6 @@ func RunOSINTAsync(ctx context.Context, opts RunOptions) error {
 		}
 	}
 
+	persistScanToStore(ctx, boot, opts, "osint")
 	return nil
 }

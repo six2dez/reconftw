@@ -189,8 +189,8 @@ func (r *AIReporter) callAnthropic(ctx context.Context, prompt string) (string, 
 
 // openAIRequest is the request body for the OpenAI Chat Completions API.
 type openAIRequest struct {
-	Model    string           `json:"model"`
-	Messages []openAIMessage  `json:"messages"`
+	Model    string          `json:"model"`
+	Messages []openAIMessage `json:"messages"`
 }
 
 type openAIMessage struct {
@@ -259,20 +259,108 @@ func (r *AIReporter) callOpenAI(ctx context.Context, prompt string) (string, err
 	return oresp.Choices[0].Message.Content, nil
 }
 
+// ollamaRequest is the request body for the local Ollama /api/generate API.
+// stream=false requests a single non-streamed JSON response.
+type ollamaRequest struct {
+	Model  string `json:"model"`
+	Prompt string `json:"prompt"`
+	Stream bool   `json:"stream"`
+}
+
+type ollamaResponse struct {
+	Response string `json:"response"`
+}
+
+// callOllama sends the prompt to a LOCAL Ollama endpoint (INTEG-06). No API key
+// is attached — the request never leaves the host. The endpoint is derived from
+// the operator-configured OllamaHost (validated to http/https scheme upstream),
+// falling back to the canonical local default; r.baseURL is honoured as a
+// secondary test seam.
+func (r *AIReporter) callOllama(ctx context.Context, prompt string) (string, error) {
+	host := r.cfg.OllamaHost
+	if host == "" {
+		host = "http://localhost:11434"
+	}
+	if r.baseURL != "" {
+		host = r.baseURL
+	}
+	endpoint := strings.TrimRight(host, "/") + "/api/generate"
+
+	model := r.cfg.Model
+	if model == "" {
+		model = "llama3:8b"
+	}
+
+	reqBody, err := json.Marshal(ollamaRequest{
+		Model:  model,
+		Prompt: prompt,
+		Stream: false,
+	})
+	if err != nil {
+		return "", fmt.Errorf("ai: ollama: marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(reqBody))
+	if err != nil {
+		return "", fmt.Errorf("ai: ollama: build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := r.client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("ai: ollama: request: %w", err)
+	}
+	defer resp.Body.Close() //nolint:errcheck
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("ai: ollama: status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("ai: ollama: read response: %w", err)
+	}
+
+	var oresp ollamaResponse
+	if err := json.Unmarshal(body, &oresp); err != nil {
+		return "", fmt.Errorf("ai: ollama: parse response: %w", err)
+	}
+	if oresp.Response == "" {
+		return "", fmt.Errorf("ai: ollama: empty response")
+	}
+	return oresp.Response, nil
+}
+
 // Generate assembles the prompt, redacts secrets, then dispatches to the
 // configured AI provider.
 //
 // REPORT-04 invariant: r.redactor.Redact(rawPrompt) is called BEFORE the HTTP
 // request. The order is enforced in-process and verified by TestAIReporter_RedactBeforeSend.
+//
+// Cloud-egress guard (INTEG-06 / T-12-02-01): a cloud provider (openai/anthropic)
+// is dispatched ONLY when its key is present. An empty cloud key returns a clear
+// error and makes NO HTTP request — recon data is never silently sent to the
+// cloud. An unknown provider errors instead of falling through to a cloud path.
 func (r *AIReporter) Generate(ctx context.Context, scan *sqlcgen.Scan, findings []*sqlcgen.Finding) (string, error) {
 	raw := r.buildPrompt(scan, findings)
 	// REPORT-04: Redact MUST happen before the HTTP call.
 	prompt := r.redactor.Redact(raw) //nolint:gocritic
 
 	switch strings.ToLower(r.cfg.Provider) {
+	case "ollama":
+		// Local provider — no key required, no cloud egress.
+		return r.callOllama(ctx, prompt)
 	case "openai":
+		if strings.TrimSpace(string(r.cfg.OpenAIKey)) == "" {
+			return "", fmt.Errorf("ai: openai provider selected but openai_key is empty — refusing to send recon data to the cloud")
+		}
 		return r.callOpenAI(ctx, prompt)
-	default: // "anthropic" or "" — Anthropic/Claude is the default per D-09
+	case "anthropic", "": // "" — Anthropic/Claude is the historical cloud default per D-09
+		if strings.TrimSpace(string(r.cfg.AnthropicKey)) == "" {
+			return "", fmt.Errorf("ai: anthropic provider selected but anthropic_key is empty — refusing to send recon data to the cloud")
+		}
 		return r.callAnthropic(ctx, prompt)
+	default:
+		return "", fmt.Errorf("ai: unknown provider %q (expected ollama, openai, or anthropic)", r.cfg.Provider)
 	}
 }

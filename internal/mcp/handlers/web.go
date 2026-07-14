@@ -18,7 +18,7 @@ import (
 // All stages are best_effort (D-W12) — pipeline completes even if individual
 // tools fail. B3 fix: app.Checkpoint is closed via defer; opts.Scheduler.Checkpoint
 // is NOT written on the shared scheduler.
-func RunWebAsync(ctx context.Context, opts RunOptions) error {
+func RunWebAsync(ctx context.Context, opts RunOptions) (err error) {
 	if opts.Scheduler == nil {
 		return fmt.Errorf("mcp/web: RunOptions.Scheduler must not be nil")
 	}
@@ -45,6 +45,15 @@ func RunWebAsync(ctx context.Context, opts RunOptions) error {
 	if opts.DryRun {
 		return nil
 	}
+
+	// INTEG-02: real scan — fire scan-start + arm on-failure (mode "web" matches
+	// persistScanToStore). Best-effort; suppressed in monitor mode.
+	defer func() {
+		if err != nil {
+			notifyScanFailure(ctx, boot, opts, "web", err)
+		}
+	}()
+	notifyScanStart(ctx, boot, opts, "web")
 
 	sched.Checkpoint = app.Checkpoint
 
@@ -139,5 +148,6 @@ func RunWebAsync(ctx context.Context, opts RunOptions) error {
 		}
 	}
 
+	persistScanToStore(ctx, boot, opts, "web")
 	return nil
 }

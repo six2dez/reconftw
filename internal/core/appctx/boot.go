@@ -195,13 +195,64 @@ func pickBackend(cfg *config.Config, logger *slog.Logger) backend.Backend {
 	return backend.NewLocalBackend(killGrace)
 }
 
-// pickLimiter constructs a RateLimiter from per-tool configuration. Phase
-// 3 wires an empty per-tool map + zero global RPS — the limiter then no-
-// ops every Wait. Phase 4-7 tasks set their own RateLimit values inside
-// their config sections; the limiter is rebuilt as part of the runner
-// initialisation per-tool. For now, return a nil-safe limiter.
-func pickLimiter(_ *config.Config) *backend.RateLimiter {
-	return backend.NewRateLimiter(map[string]int{}, 0)
+// pickLimiter constructs the central RateLimiter from per-tool + global
+// rate-limit configuration (INTEG-05).
+//
+// Previously this returned backend.NewRateLimiter(map[string]int{}, 0) — an
+// empty per-tool map and zero global RPS — so RateLimiter.Wait returned
+// immediately for every tool and the configured *_RATELIMIT / adaptive-rate
+// settings were never enforced centrally. The enforcement path itself already
+// exists: backend.Runner.Run/Stream call Limiter.Wait(ctx, toolName) before
+// every dispatch (runner.go), so feeding a populated map is all that is needed
+// to make the central throttle take effect — no Runner or RateLimiter change.
+//
+// The per-tool map is keyed by the registered tool binary name the Runner
+// passes to Limiter.Wait ("httpx", "nuclei", "ffuf", "favirecon", "dnsx").
+func pickLimiter(cfg *config.Config) *backend.RateLimiter {
+	perToolRPS, globalRPS := buildLimiterConfig(cfg)
+	return backend.NewRateLimiter(perToolRPS, globalRPS)
+}
+
+// buildLimiterConfig derives the per-tool RPS map and the optional global RPS
+// cap from config. It is split out from pickLimiter so tests can assert the
+// derived values deterministically (map contents + global int) instead of
+// relying on wall-clock timing.
+//
+// Only tool classes with a configured RateLimit > 0 are inserted: a 0 means
+// "no per-tool cap", so the key is left out and NewRateLimiter treats that tool
+// as unlimited (Wait returns immediately). This keeps unlisted / zero-rate
+// tools from being accidentally throttled.
+//
+// A global cap is applied only when adaptive_rate.enabled is true (using
+// adaptive_rate.max_rate); when disabled there is no aggregate cap. A nil cfg
+// yields an empty map + 0 global, preserving the prior nil-safe contract.
+func buildLimiterConfig(cfg *config.Config) (map[string]int, int) {
+	perToolRPS := map[string]int{}
+	if cfg == nil {
+		return perToolRPS, 0
+	}
+
+	// Rate-limited tool classes, keyed by the binary name the Runner passes to
+	// Limiter.Wait. Insert only positive caps (0 == unlimited → omit the key).
+	candidates := map[string]int{
+		"httpx":     cfg.Web.Probe.RateLimit,
+		"nuclei":    cfg.Web.Nuclei.RateLimit,
+		"ffuf":      cfg.Web.Fuzz.RateLimit,
+		"favirecon": cfg.Web.Favirecon.RateLimit,
+		"dnsx":      cfg.Subdomains.DNSResolve.DNSXRateLimit,
+	}
+	for name, rps := range candidates {
+		if rps > 0 {
+			perToolRPS[name] = rps
+		}
+	}
+
+	// Global aggregate cap only when adaptive rate is enabled.
+	globalRPS := 0
+	if cfg.AdaptiveRate.Enabled {
+		globalRPS = cfg.AdaptiveRate.MaxRate
+	}
+	return perToolRPS, globalRPS
 }
 
 // defaultNotifierSinks builds the Phase 10 real-webhook sink set.

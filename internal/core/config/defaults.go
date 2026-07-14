@@ -250,7 +250,7 @@ func Defaults() *Config {
 		Notifications: NotificationsConfig{
 			Enabled:     false,
 			SoftEnabled: false,
-			Events:      []string{"on-critical-finding", "on-scan-complete", "on-failure"},
+			Events:      []string{"on-critical-finding", "on-scan-complete", "on-failure", "on-scan-start"},
 			Slack:       NotificationsSlack{Channel: "", WebhookURL: ""},
 			Telegram:    NotificationsTelegram{BotToken: "", ChatID: ""},
 			Discord:     NotificationsDiscord{WebhookURL: ""},
@@ -301,9 +301,10 @@ func Defaults() *Config {
 		},
 		AI: AIConfig{
 			Enabled:             false,
-			Provider:            "openai",
+			Provider:            "ollama",
 			Executable:          "python3",
 			Model:               "llama3:8b",
+			OllamaHost:          "http://localhost:11434",
 			ReportType:          "md",
 			ReportProfile:       "bughunter",
 			PromptsFile:         "",

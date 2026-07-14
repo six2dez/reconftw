@@ -706,7 +706,7 @@ type OSINTIPv6 struct {
 type NotificationsConfig struct {
 	Enabled     bool             `koanf:"enabled"`
 	SoftEnabled bool             `koanf:"soft_enabled"`
-	Events      []string         `koanf:"events" validate:"dive,oneof=on-critical-finding on-scan-complete on-failure"`
+	Events      []string         `koanf:"events" validate:"dive,oneof=on-critical-finding on-scan-complete on-failure on-scan-start"`
 	Slack       NotificationsSlack    `koanf:"slack"`
 	Telegram    NotificationsTelegram `koanf:"telegram"`
 	Discord     NotificationsDiscord  `koanf:"discord"`
@@ -810,9 +810,10 @@ type OutputLogRotation struct {
 // the plan's must_haves explicitly enumerate these as Secret-typed.
 type AIConfig struct {
 	Enabled              bool       `koanf:"enabled"`
-	Provider             string     `koanf:"provider"`
+	Provider             string     `koanf:"provider"              validate:"omitempty,oneof=ollama openai anthropic"`
 	Executable           string     `koanf:"executable"`
 	Model                string     `koanf:"model"`
+	OllamaHost           string     `koanf:"ollama_host"           validate:"omitempty,url,oneof_scheme=http https"`
 	ReportType           string     `koanf:"report_type"           validate:"omitempty,oneof=md txt"`
 	ReportProfile        string     `koanf:"report_profile"        validate:"omitempty,oneof=executive brief bughunter"`
 	PromptsFile          string     `koanf:"prompts_file"          validate:"omitempty,nopath_traversal"`

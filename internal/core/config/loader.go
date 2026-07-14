@@ -86,14 +86,37 @@ func Load(opts LoadOptions) (*Config, error) {
 		return nil, fmt.Errorf("config: merge defaults: %w", err)
 	}
 
-	// Layers 2-6: TOML files. Silent skip on file-not-found (a missing
-	// /etc/reconftw/config.toml is the normal case).
-	for _, p := range []string{opts.SystemPath, opts.UserPath, opts.ProjectPath, opts.ExplicitConfigPath, opts.SecretsPath} {
+	// Layers 2-6: TOML files.
+	//
+	// A missing file is never fatal — the silent-skip→nil contract holds at
+	// every layer (a missing /etc/reconftw/config.toml is the normal case).
+	// But the two explicit layers (--config / --secrets) are named by the
+	// operator, so a missing one is almost certainly a typo: emit a WARN to the
+	// sink before skipping. The auto-discovered layers (system/user/project)
+	// stay silent. Because parseEarlyFlags leaves the --config/--secrets paths
+	// empty when the flag is absent (cmd/reconftw/main_test.go), the p=="" guard
+	// already separates "flag not passed" (silent) from "flag passed but file
+	// missing" (warn) — no extra LoadOptions field is needed.
+	fileLayers := []struct {
+		path string
+		flag string // non-empty ⇒ explicit (operator-named --config/--secrets) layer
+	}{
+		{opts.SystemPath, ""},
+		{opts.UserPath, ""},
+		{opts.ProjectPath, ""},
+		{opts.ExplicitConfigPath, "--config"},
+		{opts.SecretsPath, "--secrets"},
+	}
+	for _, layer := range fileLayers {
+		p := layer.path
 		if p == "" {
 			continue
 		}
 		if _, err := os.Stat(p); os.IsNotExist(err) {
-			// Silent skip — file may legitimately not exist (system layer).
+			if layer.flag != "" {
+				fmt.Fprintf(opts.WarnSink, "WARN config: %s file %q not found — skipped\n", layer.flag, p)
+			}
+			// Silent skip — file may legitimately not exist (auto-discovered layer).
 			continue
 		} else if err != nil {
 			return nil, fmt.Errorf("config: stat %s: %w", p, err)

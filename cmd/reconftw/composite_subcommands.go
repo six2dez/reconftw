@@ -191,6 +191,7 @@ func runCompositeCmd(
 
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	axiomEnabled, _ := cmd.Flags().GetBool("axiom")
+	force, _ := cmd.Flags().GetBool("force")
 	efs := parseEarlyFlags(os.Args[1:])
 	sched := scheduler.NewScheduler(0, 0, nil, nil)
 
@@ -219,6 +220,7 @@ func runCompositeCmd(
 		AfterBoot:       afterBoot,
 		ConfigTransform: ct,
 		PassiveMode:     passiveMode,
+		Force:           force,
 	}, mode); err != nil {
 		return fmt.Errorf("%s: %w", subcommandName, err)
 	}
@@ -243,6 +245,7 @@ func runCompositeList(
 	ctx := cmd.Context()
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	axiomEnabled, _ := cmd.Flags().GetBool("axiom")
+	force, _ := cmd.Flags().GetBool("force")
 	efs := parseEarlyFlags(os.Args[1:])
 
 	results, err := runBatch(ctx, listFlag, func(bctx context.Context, target string) error {
@@ -261,6 +264,7 @@ func runCompositeList(
 			AfterBoot:       afterBoot,
 			ConfigTransform: configTransform,
 			PassiveMode:     passiveMode,
+			Force:           force,
 		}, mode)
 	})
 	_ = results

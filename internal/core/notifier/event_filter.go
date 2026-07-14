@@ -26,6 +26,8 @@ const (
 	EventScanComplete EventKind = "on-scan-complete"
 	// EventFailure fires when a scan cycle fails or a critical tool errors out.
 	EventFailure EventKind = "on-failure"
+	// EventScanStart fires when a scan run begins (a soft/informational event).
+	EventScanStart EventKind = "on-scan-start"
 )
 
 // EventFilter gates notification dispatch by event kind. It does NOT

@@ -222,6 +222,7 @@ func runSubsCmd(cmd *cobra.Command) error {
 		}
 	}
 
+	force, _ := cmd.Flags().GetBool("force")
 	if err := handlers.RunSubsAsync(ctx, handlers.RunOptions{
 		Target:       targetFlag,
 		DryRun:       dryRun,
@@ -230,6 +231,7 @@ func runSubsCmd(cmd *cobra.Command) error {
 		AxiomEnabled: axiomEnabled,
 		Scheduler:    sched,
 		AfterBoot:    afterBoot,
+		Force:        force,
 	}); err != nil {
 		return fmt.Errorf("subs: %w", err)
 	}
@@ -451,6 +453,7 @@ func runWebCmd(cmd *cobra.Command) error {
 		}
 	}
 
+	force, _ := cmd.Flags().GetBool("force")
 	if err := handlers.RunWebAsync(ctx, handlers.RunOptions{
 		Target:       targetFlag,
 		DryRun:       dryRun,
@@ -460,6 +463,7 @@ func runWebCmd(cmd *cobra.Command) error {
 		AxiomEnabled: axiomEnabled,
 		Scheduler:    sched,
 		AfterBoot:    afterBoot,
+		Force:        force,
 	}); err != nil {
 		return fmt.Errorf("web: %w", err)
 	}
@@ -713,6 +717,7 @@ func runVulnsCmd(cmd *cobra.Command) error {
 		}
 	}
 
+	force, _ := cmd.Flags().GetBool("force")
 	if err := handlers.RunVulnsAsync(ctx, handlers.RunOptions{
 		Target:       targetFlag,
 		DryRun:       dryRun,
@@ -722,6 +727,7 @@ func runVulnsCmd(cmd *cobra.Command) error {
 		AxiomEnabled: axiomEnabled,
 		Scheduler:    sched,
 		AfterBoot:    afterBoot,
+		Force:        force,
 	}); err != nil {
 		return fmt.Errorf("vulns: %w", err)
 	}
@@ -909,6 +915,7 @@ func runOSINTCmd(cmd *cobra.Command) error {
 		}
 	}
 
+	force, _ := cmd.Flags().GetBool("force")
 	if err := handlers.RunOSINTAsync(ctx, handlers.RunOptions{
 		Target:       targetFlag,
 		DryRun:       dryRun,
@@ -917,6 +924,7 @@ func runOSINTCmd(cmd *cobra.Command) error {
 		AxiomEnabled: axiomEnabled,
 		Scheduler:    sched,
 		AfterBoot:    afterBoot,
+		Force:        force,
 	}); err != nil {
 		return fmt.Errorf("osint: %w", err)
 	}
@@ -1073,6 +1081,7 @@ func runMonitorCmd(cmd *cobra.Command) error {
 	maxCycles, _ := cmd.Flags().GetInt("monitor-cycles")
 	incremental, _ := cmd.Flags().GetBool("incremental")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
+	force, _ := cmd.Flags().GetBool("force")
 	reconModeStr, _ := cmd.Flags().GetString("recon-mode")
 
 	reconMode := handlers.ModeRecon
@@ -1107,6 +1116,7 @@ func runMonitorCmd(cmd *cobra.Command) error {
 		SecretsPath: efs.secretsPath,
 		Scheduler:   sched,
 		AfterBoot:   afterBoot,
+		Force:       force,
 	}, monOpts)
 }
 

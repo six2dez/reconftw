@@ -13,7 +13,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
@@ -38,37 +37,20 @@ func badgeForStatus(s task.Status) ui.Badge {
 	}
 }
 
-// filterByModuleAndEnabled returns tasks where:
-//   - t.Module() == module
-//   - t.Enabled(cfg) == true (REVIEWS finding #4 fix — Scheduler never calls Enabled())
-//   - t.Name() has a prefix matching any element of prefixes
+// filterByModuleAndEnabled is a package-private forwarding shim.
+// The implementation lives in internal/core/task.FilterByModuleAndEnabled
+// so that internal/mcp/handlers (which cannot import cmd/reconftw) can
+// call it directly.
 //
-// Calling t.Enabled(cfg) here is the canonical REVIEWS finding #4 fix: the Scheduler
-// never calls Enabled() before Run(), so the command layer MUST gate tasks here.
+// Source: .planning/phases/08-mcp-server/08-00-PLAN.md Task 1 (Pitfall 7 resolution).
 func filterByModuleAndEnabled(tasks []task.Task, module string, cfg *config.Config, prefixes []string) []task.Task {
-	var result []task.Task
-	for _, t := range tasks {
-		if t.Module() != module {
-			continue
-		}
-		if !t.Enabled(cfg) {
-			continue
-		}
-		if matchesAnyPrefix(t.Name(), prefixes) {
-			result = append(result, t)
-		}
-	}
-	return result
+	return task.FilterByModuleAndEnabled(tasks, module, cfg, prefixes)
 }
 
-// matchesAnyPrefix returns true if name has any of the given prefixes.
+// matchesAnyPrefix is a package-private forwarding shim.
+// The implementation lives in internal/core/task.MatchesAnyPrefix.
 func matchesAnyPrefix(name string, prefixes []string) bool {
-	for _, p := range prefixes {
-		if strings.HasPrefix(name, p) {
-			return true
-		}
-	}
-	return false
+	return task.MatchesAnyPrefix(name, prefixes)
 }
 
 // mergeTakeoverFindings reads inputs/takeover.subzy.jsonl and

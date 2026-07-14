@@ -38,6 +38,11 @@ var (
 	ErrAxiom    = stderrors.New("axiom infrastructure failure")
 	ErrConfig   = stderrors.New("configuration error")
 	ErrChecksum = stderrors.New("checksum mismatch")
+	// ErrPassiveViolation is returned by PassiveBackend.Exec/Stream when
+	// PassiveMode=true and the tool is in the active-tool hard-block set (D-09).
+	// It is a defense-in-depth sentinel; the primary guard is composition-level
+	// (passive composite only schedules passive-prefixed tasks).
+	ErrPassiveViolation = stderrors.New("passive mode violation: active tool blocked")
 )
 
 // --- Typed structs ---
@@ -153,6 +158,19 @@ func (e *ScopeError) Error() string {
 
 // Is is the sentinel bridge enabling errors.Is(err, ErrScope).
 func (e *ScopeError) Is(target error) bool { return target == ErrScope }
+
+// PassiveViolation is returned by PassiveBackend.Exec/Stream when the tool
+// is in the active-tool hard-block set and PassiveMode=true (D-09).
+type PassiveViolation struct {
+	Tool string // tool name that was blocked (e.g. "puredns", "nmap")
+}
+
+func (e *PassiveViolation) Error() string {
+	return fmt.Sprintf("passive mode violation: active tool %q is blocked in passive mode", e.Tool)
+}
+
+// Is is the sentinel bridge enabling errors.Is(err, ErrPassiveViolation).
+func (e *PassiveViolation) Is(target error) bool { return target == ErrPassiveViolation }
 
 // ChecksumMismatch is returned by the installer when a downloaded binary or
 // script does not match its expected SHA-256 hash.

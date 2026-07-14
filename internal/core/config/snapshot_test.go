@@ -217,6 +217,82 @@ func TestSnapshotIdempotent(t *testing.T) {
 	}
 }
 
+// --- SnapshotBytes (INTEG-03) — the cfg-slice fed into checkpoint.InputHash ---
+
+// TestSnapshotBytesDeterministic: two identical Configs produce byte-equal
+// output. This is the property the input-hash relies on to stay stable across
+// runs (threat T-12-01-01) so unchanged config yields a checkpoint hit.
+func TestSnapshotBytesDeterministic(t *testing.T) {
+	t.Parallel()
+	a := config.Defaults()
+	b := config.Defaults()
+	da, err := config.SnapshotBytes(a)
+	if err != nil {
+		t.Fatalf("SnapshotBytes(a): %v", err)
+	}
+	db, err := config.SnapshotBytes(b)
+	if err != nil {
+		t.Fatalf("SnapshotBytes(b): %v", err)
+	}
+	if !bytes.Equal(da, db) {
+		t.Errorf("SnapshotBytes not deterministic for identical configs:\nA:\n%s\nB:\n%s", da, db)
+	}
+	if len(da) == 0 {
+		t.Error("SnapshotBytes returned empty output for a default config")
+	}
+}
+
+// TestSnapshotBytesDiffersOnChange: mutating a single scalar field changes the
+// bytes, so the cfg-slice invalidates the InputHash on any config change
+// (threat T-12-01-03). Concurrency.MaxJobs is used as a representative field
+// (any snapshotted field would do).
+func TestSnapshotBytesDiffersOnChange(t *testing.T) {
+	t.Parallel()
+	a := config.Defaults()
+	b := config.Defaults()
+	b.Concurrency.MaxJobs = a.Concurrency.MaxJobs + 1
+
+	da, err := config.SnapshotBytes(a)
+	if err != nil {
+		t.Fatalf("SnapshotBytes(a): %v", err)
+	}
+	db, err := config.SnapshotBytes(b)
+	if err != nil {
+		t.Fatalf("SnapshotBytes(b): %v", err)
+	}
+	if bytes.Equal(da, db) {
+		t.Error("SnapshotBytes identical after changing Concurrency.MaxJobs — the cfg-slice would NOT invalidate the checkpoint hash on config change")
+	}
+}
+
+// TestSnapshotBytesRedactsSecrets: log.Secret fields are redacted, so no raw
+// secret byte ever reaches the InputHash input (threat T-12-01-02).
+func TestSnapshotBytesRedactsSecrets(t *testing.T) {
+	t.Parallel()
+	cfg := config.Defaults()
+	const sentinel = "snapshotbytes_secret_sentinel_do_not_leak_9x8y7z"
+	cfg.Notifications.Slack.WebhookURL = log.Secret(sentinel)
+	cfg.AI.OpenAIKey = log.Secret(sentinel)
+	cfg.APIKeys.Shodan = log.Secret(sentinel)
+	cfg.MCP.APIKey = log.Secret(sentinel)
+
+	data, err := config.SnapshotBytes(cfg)
+	if err != nil {
+		t.Fatalf("SnapshotBytes: %v", err)
+	}
+	if bytes.Contains(data, []byte(sentinel)) {
+		t.Fatalf("SnapshotBytes leaked secret sentinel into hash input:\n%s", data)
+	}
+}
+
+// TestSnapshotBytesNilConfig: nil config returns an error, not a panic.
+func TestSnapshotBytesNilConfig(t *testing.T) {
+	t.Parallel()
+	if _, err := config.SnapshotBytes(nil); err == nil {
+		t.Error("SnapshotBytes(nil) returned nil error, want non-nil")
+	}
+}
+
 // --- Test: WriteSnapshot creates intermediate directories ---
 
 func TestSnapshotCreatesIntermediateDir(t *testing.T) {

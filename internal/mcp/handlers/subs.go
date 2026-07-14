@@ -23,7 +23,7 @@ import (
 // When opts.ProgressSink is non-nil, a StageEvent is sent before and after
 // each RunStage call. This is used by the MCP layer for server.ResourceUpdated
 // notifications. The CLI passes nil and relies on sched.RunTask for per-task UI.
-func RunSubsAsync(ctx context.Context, opts RunOptions) error {
+func RunSubsAsync(ctx context.Context, opts RunOptions) (err error) {
 	if opts.Scheduler == nil {
 		return fmt.Errorf("mcp/subs: RunOptions.Scheduler must not be nil")
 	}
@@ -56,6 +56,17 @@ func RunSubsAsync(ctx context.Context, opts RunOptions) error {
 	if opts.DryRun {
 		return nil
 	}
+
+	// INTEG-02: this is a real (non-dry-run) scan — fire scan-start and arm the
+	// on-failure notifier. Mode label "subs" matches persistScanToStore so
+	// scan-start / scan-complete pair up. Both are best-effort and stay silent in
+	// monitor mode (opts.SuppressScanNotify).
+	defer func() {
+		if err != nil {
+			notifyScanFailure(ctx, boot, opts, "subs", err)
+		}
+	}()
+	notifyScanStart(ctx, boot, opts, "subs")
 
 	// Step 5b: Wire sched.Checkpoint to enable per-tool resume (D-07).
 	// Safe because each RunSubsAsync call has its own app and its own goroutine;
@@ -179,5 +190,6 @@ func RunSubsAsync(ctx context.Context, opts RunOptions) error {
 		}
 	}
 
+	persistScanToStore(ctx, boot, opts, "subs")
 	return nil
 }

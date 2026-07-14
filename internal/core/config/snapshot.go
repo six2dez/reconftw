@@ -38,8 +38,33 @@ import (
 // failure stems from marshaling a secret field — go-toml/v2 errors carry only
 // type and path information, not value contents.
 func WriteSnapshot(cfg *Config, path string) error {
+	data, err := SnapshotBytes(cfg)
+	if err != nil {
+		return err
+	}
+	// W19: delegate to internal/core/output.WriteFile — the canonical
+	// 4-step AtomicWriter from Plan 03. Same atomicity guarantee as the
+	// prior inline helper (which has been removed); behaviour covered by
+	// output.TestFOUND04Atomicity + the Ring 3 smoke SIGKILL test.
+	return output.WriteFile(path, data, 0o644)
+}
+
+// SnapshotBytes returns the deterministic, redacted TOML representation of cfg —
+// every log.Secret-typed field rendered as the literal "***". This is the exact
+// byte stream WriteSnapshot persists; it is exported so BootReconApp can feed it
+// into checkpoint.InputHash as the cfg-slice (INTEG-03), making a task's input
+// hash invalidate whenever ANY config byte changes.
+//
+// Deterministic: redaction is a fixed per-field enumeration and go-toml/v2 sorts
+// map keys, so two identical Configs produce byte-equal output — the property the
+// input-hash relies on to be stable across runs (threat T-12-01-01).
+//
+// SECURITY: reuses redactSecrets, so no raw secret value can leak into the hash
+// input (threat T-12-01-02). The returned error NEVER contains a raw secret value
+// (go-toml/v2 errors carry only type/path information).
+func SnapshotBytes(cfg *Config) ([]byte, error) {
 	if cfg == nil {
-		return errNilConfig
+		return nil, errNilConfig
 	}
 	redacted := redactSecrets(cfg)
 	// go-toml/v2 reads `toml:"..."` tags but the Config struct uses koanf tags
@@ -51,13 +76,9 @@ func WriteSnapshot(cfg *Config, path string) error {
 	tree := walkStructForTOML(reflect.ValueOf(redacted).Elem())
 	data, err := tomlv2.Marshal(tree)
 	if err != nil {
-		return errMarshal(err)
+		return nil, errMarshal(err)
 	}
-	// W19: delegate to internal/core/output.WriteFile — the canonical
-	// 4-step AtomicWriter from Plan 03. Same atomicity guarantee as the
-	// prior inline helper (which has been removed); behaviour covered by
-	// output.TestFOUND04Atomicity + the Ring 3 smoke SIGKILL test.
-	return output.WriteFile(path, data, 0o644)
+	return data, nil
 }
 
 // walkStructForTOML is like walkStruct but applies additional pruning:

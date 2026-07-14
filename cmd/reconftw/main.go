@@ -94,6 +94,10 @@ func run() error {
 	// STEP 3: Bootstrap logger BEFORE config load.
 	// A zero-value log.Config means JSON to stderr at info level — enough to
 	// surface parse / validation errors from STEP 5 with proper redaction.
+	//
+	// Bootstrap logger is always a RedactingHandler (D-10 XCUT-07); secrets
+	// registered in STEP 7. This means the default logger is always redacting
+	// regardless of TTY/piped/quiet/dry-run path — no inert redactor bypass.
 	bootstrapLogger := log.New(&log.Config{}, redactor)
 	slog.SetDefault(bootstrapLogger)
 
@@ -173,7 +177,12 @@ func run() error {
 	}
 
 	// STEP 10: cobra.ExecuteContext — dispatches subcommand.
+	// Phase 9 (D-08): rewrite v1 alias forms into v2 invocations before cobra
+	// parses. translateV1Args leaves the original flag in the slice so
+	// MarkDeprecated still emits its one-time warning (MODE-09).
+	translated := translateV1Args(os.Args[1:])
 	rootCmd := newRootCmd(app, cfg)
+	rootCmd.SetArgs(translated)
 	return rootCmd.ExecuteContext(ctx)
 }
 
