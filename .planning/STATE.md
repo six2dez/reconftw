@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: milestone
 status: executing
 stopped_at: context exhaustion at 75% (2026-06-26)
-last_updated: "2026-07-15T18:05:00.000Z"
-last_activity: 2026-07-15 -- Phase 13 plan 13-05 executed (osint LeakSearch passwords + Scopify + ip_info WHOISXML reverse-IP/IP-target restore)
+last_updated: "2026-07-15T19:00:00.000Z"
+last_activity: 2026-07-15 -- Phase 13 plan 13-06 executed (osint company-repo secret scan: enumerepo → clone → titus + trufflehog → github_company_secrets.json + redacted findings, PAR-03)
 progress:
   total_phases: 12
   completed_phases: 9
   total_plans: 81
-  completed_plans: 77
+  completed_plans: 78
   percent: 75
 ---
 
@@ -26,10 +26,10 @@ See: .planning/PROJECT.md (updated 2026-05-27)
 ## Current Position
 
 Phase: 13 — Domain Parity (EXECUTING — osint wave)
-Plan: 13-05 executed + committed (3 task commits b165e83, adf6407, 802a025). Earlier: 13-04 (f887da0, 0fc69a7, 4c280d0), 13-03 (fe1e3f5, 82625a7), 13-02 (3b45229, 748ee15), 13-01 (9b0ceb2, 792c99f, 86a82f5); Phase 12 (c62eead).
-Status: 13-05 done — three OSINT parity gaps (PAR-03) folded into existing tasks (no new stage wiring; osint.emails/domain_info/ip_info already staged). (1) EmailsTask now runs LeakSearch after EmailHarvester (bash emails() osint.sh:552-561): LeakSearch -k <domain> -o <tmp> → plaintext osint/passwords.txt (0600 single-writer) + REDACTED inputs/findings.passwords.jsonl (ValueRedacted="***"); each raw password registered with the log Redactor before any log line (XCUT-07/T-13-05-02); LeakSearch runs even if EmailHarvester yields nothing (bash subshell parity). (2) DomainInfoTask now runs Scopify (bash domain_info() osint.sh:606-607): scopify.py -c <companyName> (registrable-name = unfurl format %r analog) → osint/scopify.txt single-writer. (3) IPInfoTask restores the bash ip_info() IP-target path (osint.sh:741-775): for an IP-shaped target, three native WHOISXML GETs (reverse-ip/whois/geolocation) → v1 trio osint/ip_<ip>_relations/whois/location.txt + reverse-IP relation findings; key-gated on cfg.APIKeys.WhoisXML (unset → warning + StatusSkipped); apiKey ONLY in the outbound HTTPS query of a native http.Get (never argv), registered+redacted (XCUT-07/T-13-05-01); IP targets no longer rejected; domain-target ASN/CIDR/ipinfo.io path unregressed. All best-effort (D-O8). Symbol-hygiene: new helpers namespaced (parseLeakSearchPasswords, runScopify, whoisXML*/writeIPInfoTextFile) so edits stay disjoint from 13-06's github_repos.go. Build+vet+gofmt clean; osint suite green; full non-resolvers suite green (31 ok, 0 FAIL); internal/core/resolvers still the pre-existing UDP/53 env-hang (untouched).
-NEXT: Phase 13 continues — 13-06 (osint github repo-secret engines: titus/noseyparker + trufflehog), 13-07 (vulns spraying brutespray/brutus + SSRF-OOB interactsh auto-start), 13-08 (pipeline wiring — add subdomains.csprecon + web.portscan + web.url_ext/wellknown/wordlistgen to stage lists, wire web.MergeStage "hosts" after portscan+wellknown in web.go+composite.go, confirm zen ApplyZenProfile disables Web.Portscan.ActiveEnabled+UDPEnabled, remove dead subdomains.ptr).
-Last activity: 2026-07-15 -- 13-05 executed (3 tasks, TDD) + committed; osint LeakSearch passwords + Scopify + ip_info WHOISXML reverse-IP/IP-target restore.
+Plan: 13-06 executed + committed (2 task commits: e94a817 test, 1c361e6 feat — TDD). Earlier: 13-05 (b165e83, adf6407, 802a025 + docs db921c6), 13-04 (f887da0, 0fc69a7, 4c280d0), 13-03 (fe1e3f5, 82625a7), 13-02 (3b45229, 748ee15), 13-01 (9b0ceb2, 792c99f, 86a82f5); Phase 12 (c62eead).
+Status: 13-06 done — closed the highest-complexity OSINT gap (PAR-03): GithubReposTask now performs the full bash github_repos pipeline (osint.sh:105-256) after enumerepo. Clone every company repo (git clone → .tmp/github_repos/<sha256(url)>, bounded concurrency = cfg.OSINT.GitHub.Threads/INTERLACE_THREADS analog; FOUND-10-allowlisted exec seam behind githubReposGitClone var — git is a base system dep, not a tools.lock recon binary; GIT_TERMINAL_PROMPT=0 fail-fast) → titus scan --format json [--git|--validate] (bash's DEFAULT engine) + trufflehog git <url> -j enrichment → merge .tmp/github/* into osint/github_company_secrets.json (0600; native structure preserved, raw secret VALUES scrubbed to ***) + REDACTED inputs/findings.github_secrets.jsonl (Class osint / Source github_repos / Category leaked-secret / ValueRedacted="***"). Previously ONLY enumerepo ran (no clone/scan/artefact). noseyparker DEFERRED to Phase 14 (absent from tools.lock this phase, non-default engine) → SecretsEngine=="noseyparker" logs a deferral note + falls back to titus (titus/hybrid/gitleaks/unset all → titus). XCUT-07 (T-13-06-01/02): GitHub token via -token-file 0600 temp (off argv, removed after run); every raw secret registered with the log Redactor BEFORE any log/file write; the JSONL findings stream carries only ValueRedacted="***" — redaction proven by TitusScan + Trufflehog tests (raw marker absent from findings.jsonl AND the log buffer). Best-effort throughout (D-O8): missing tool/token/repo → StatusDone/Skipped + warning, never aborts the osint pipeline. enumerepo/titus/trufflehog route through app.Tools; only git clone uses the allowlisted subprocess seam. TDD (RED failing-test commit → GREEN feat commit). Symbol-hygiene: all NEW helpers namespaced githubRepos* (GitClone/scanCompanyRepos/runTitusScan/runTrufflehogScan/mergeSecretOutputs/ExtractSecrets/WalkRecord/ToolAvailable/Threads/Bounded/SHA256) — file-disjoint from 13-05. gofmt+vet clean; osint suite green; FOUND-10 lint gate green; full non-resolvers suite green (31 ok, 0 FAIL); internal/core/resolvers still the pre-existing UDP/53 env-hang (untouched).
+NEXT: Phase 13 continues — 13-07 (vulns spraying brutespray/brutus + SSRF-OOB interactsh auto-start), 13-08 (pipeline wiring — add subdomains.csprecon + web.portscan + web.url_ext/wellknown/wordlistgen to stage lists, wire web.MergeStage "hosts" after portscan+wellknown in web.go+composite.go, confirm zen ApplyZenProfile disables Web.Portscan.ActiveEnabled+UDPEnabled, remove dead subdomains.ptr).
+Last activity: 2026-07-15 -- 13-06 executed (1 task, TDD) + committed; osint company-repo secret scan (titus + trufflehog) → github_company_secrets.json + redacted findings (PAR-03).
 
 ## Performance Metrics
 
@@ -91,6 +91,7 @@ Last activity: 2026-07-15 -- 13-05 executed (3 tasks, TDD) + committed; osint Le
 | Phase 13 P03 | ~35m | 2 tasks | 2 files |
 | Phase 13 P04 | ~40m | 3 tasks | 4 files |
 | Phase 13 P05 | ~35m | 3 tasks | 6 files |
+| Phase 13 P06 | ~30m | 1 task (TDD) | 3 files |
 
 ## Accumulated Context
 
