@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: milestone
 status: executing
 stopped_at: context exhaustion at 75% (2026-06-26)
-last_updated: "2026-06-26T14:05:19.158Z"
-last_activity: 2026-06-16 -- Phase 11 planning complete
+last_updated: "2026-07-15T00:00:00.000Z"
+last_activity: 2026-07-15 -- Phase 13 plan 13-02 executed (csprecon subs-stage + dsieve top-N recursion)
 progress:
   total_phases: 12
   completed_phases: 9
   total_plans: 81
-  completed_plans: 74
+  completed_plans: 75
   percent: 75
 ---
 
@@ -26,10 +26,10 @@ See: .planning/PROJECT.md (updated 2026-05-27)
 ## Current Position
 
 Phase: 13 — Domain Parity (EXECUTING — subs first)
-Plan: 13-01 executed + committed (3 task commits 9b0ceb2, 792c99f, 86a82f5). Phase 12 committed earlier (c62eead).
-Status: 13-01 done — SubDNSTask now persists artefacts/subdomains_dnsregs.json + subdomains/subdomains_ips.txt + folds hakip2host reverse-IP (gated); resolve tasks degrade tool-exec errors to StatusDone (CONTINUE_ON_TOOL_ERROR parity, scope/ctx still propagate); dead SubPTRTask removed; tls+reverse-ip default-on; 5 tools added to tools.lock (nmap/nerva/brutus/titus/Scopify). Full `go test ./...` green EXCEPT internal/core/resolvers (pre-existing environmental hang — real dnsvalidator subprocess on blocked UDP/53, NOT touched by 13-01). noseyparker + full ASN-CIDR PTR sweep deferred to Phase 14.
-NEXT: Phase 13 continues — 13-02 (csprecon in subs pipeline + dsieve top-N recursion) completes PAR-01, then vulns/osint/web plans.
-Last activity: 2026-07-15 -- 13-01 executed (3 tasks, TDD) + committed; resolve pipeline dnsregs/IP-seed/reverse-IP/degrade/PTR-removal/defaults/tools.lock.
+Plan: 13-02 executed + committed (2 task commits 3b45229, 748ee15). 13-01 earlier (9b0ceb2, 792c99f, 86a82f5); Phase 12 (c62eead).
+Status: 13-02 done — SubCspreconTask ("subdomains.csprecon") added: CSP-header subdomain discovery in the subs discovery stage, writing plain in-scope hostnames to inputs/resolved.csprecon.txt (extract/csp.Extract filter, Scraping.Enabled gate, aux best-effort degrade); mirrors web/csprecon.go via -s -l <file>. SubRecursivePassiveTask now selects seeds via `dsieve -if <resolved.merged> -f 3 -top <PassiveDepth>` (bash parity) instead of the naive subdomains[:depth] first-N slice, with graceful fallback on dsieve error. Task self-registers but is UNSELECTED until 13-08 wires the stage list. PAR-01 FULLY CLOSED (13-01 resolve core + 13-02 csprecon/dsieve). Build+vet clean; full non-resolvers suite green (0 FAIL, 31 ok); internal/core/resolvers still the pre-existing env-hang (untouched).
+NEXT: Phase 13 continues — 13-03/04 (web portscan/nerva/url_ext/well-known/wordlists), 13-05/06 (osint), 13-07 (vulns spraying/SSRF-OOB), 13-08 (pipeline wiring — must add the subdomains.csprecon prefix to the discovery stage list + remove dead subdomains.ptr).
+Last activity: 2026-07-15 -- 13-02 executed (2 tasks, TDD) + committed; csprecon subs-stage discovery + dsieve top-N recursion seeds.
 
 ## Performance Metrics
 

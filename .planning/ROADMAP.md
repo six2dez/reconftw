@@ -505,7 +505,7 @@ Plans:
 Plans:
 
 - [x] 13-01-PLAN.md — Subs resolve core: dnsregs artefact + subdomains_ips.txt + folded hakip2host reverse-IP; resolve best-effort degrade; delete dead SubPTRTask; tls/reverse-ip default-on; tools.lock (nmap/nerva/brutus/Scopify/titus; noseyparker deferred to Ph14)
-- [ ] 13-02-PLAN.md — Subs pipeline: csprecon in the discovery stage + dsieve top-N recursion
+- [x] 13-02-PLAN.md — Subs pipeline: csprecon in the discovery stage + dsieve top-N recursion
 - [ ] 13-03-PLAN.md — Web active portscan (naabu/nmap) + nerva service fingerprint
 - [ ] 13-04-PLAN.md — Web light producers: url_ext bucketing + .well-known pivots + roboxtractor/getjswords wordlists (pydictor deferred)
 - [ ] 13-05-PLAN.md — OSINT: LeakSearch passwords + Scopify + ip_info WHOISXML reverse-IP/IP-target
