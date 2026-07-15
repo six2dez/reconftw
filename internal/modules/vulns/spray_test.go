@@ -15,7 +15,9 @@
 package vulns
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,6 +27,7 @@ import (
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/log"
 )
 
 // -------------------------------------------------------------------------
@@ -505,6 +508,65 @@ func TestParseBrutusHitsRedacts(t *testing.T) {
 	}
 	if strings.Contains(hits[0].MatchedParam, "SECRET_DDDD") || hits[0].PayloadRedacted != "***" {
 		t.Errorf("credential not redacted: %+v", hits[0])
+	}
+}
+
+// TestSprayBrutusConfinesRawOutput proves the WR-13-03 secret-at-rest fix: after
+// brutus writes its raw --json hit file (0644, carrying a live user:pass), the
+// task (1) restricts it to owner-only 0600 and (2) registers the discovered
+// credential with the log Redactor so a later log line echoing it is scrubbed.
+// The redacted findings stream still carries only "***".
+func TestSprayBrutusConfinesRawOutput(t *testing.T) {
+	be := newSprayFakeBackend()
+	cfg := sprayTestCfg()
+	cfg.Vulns.Spray.Engine = "brutus"
+	cfg.Advanced.Deep = true
+	app := newSprayTestApp(t, be, cfg)
+	writeGnmapFixture(t, app)
+	writeServiceFPFixture(t, app)
+
+	// Redacting logger so registration of the discovered credential is observable.
+	buf := &bytes.Buffer{}
+	app.Log = slog.New(log.NewRedactingHandler(
+		slog.NewJSONHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug}), &log.Redactor{}))
+
+	const rawPass = "FAKEBRUTUSPASS_WR13_03"
+	restore := swapBrutusRunner(func(_ context.Context, _ string, args []string) error {
+		outPath := argValue(args, "-o")
+		if outPath == "" {
+			t.Fatal("brutus args missing -o output path")
+		}
+		// brutus writes the raw hit at world-readable 0644 — the exposure WR-13-03
+		// closes. Note the file is created 0644 here; the task must tighten it.
+		return os.WriteFile(outPath,
+			[]byte(`{"host":"1.2.3.4","port":22,"service":"ssh","username":"operator","password":"`+rawPass+`","success":true}`+"\n"),
+			0o644)
+	})
+	defer restore()
+
+	if _, err := (&SprayTask{}).Run(context.Background(), app); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	// (1) The raw brutus output file must be restricted to owner-only 0600.
+	info, err := os.Stat(filepath.Join(app.Target.WorkDir, "vulns", "brutus.jsonl"))
+	if err != nil {
+		t.Fatalf("stat brutus.jsonl: %v", err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o600 {
+		t.Errorf("brutus.jsonl perm = %04o, want 0600 (WR-13-03: not world-readable)", perm)
+	}
+
+	// (2) The discovered credential must be registered with the Redactor: logging
+	// it now must emit "***", never the raw value.
+	app.Log.Info("probe", "cred", rawPass)
+	if strings.Contains(buf.String(), rawPass) {
+		t.Fatalf("WR-13-03 VIOLATION: raw brutus credential not registered — leaked to logs:\n%s", buf.String())
+	}
+
+	// The redacted findings stream still carries only "***".
+	if f := readFindings(t, app); strings.Contains(f, rawPass) {
+		t.Fatalf("XCUT-07 VIOLATION: raw credential leaked into findings:\n%s", f)
 	}
 }
 

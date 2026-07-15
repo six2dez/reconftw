@@ -49,6 +49,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -59,6 +60,7 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/log"
 	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
@@ -221,6 +223,14 @@ func (t *SprayTask) runBrutespray(
 	if res != nil {
 		stdout = res.Stdout
 	}
+
+	// WR-13-03: confine brutespray's raw output (native files under outDir + the
+	// user:pass on stdout success lines) to owner-only perms and register every
+	// discovered credential with the log Redactor (L2) BEFORE any log line. The
+	// findings stream still carries only "***" (parseBrutesprayHits redacts).
+	sprayHardenDir(app.Log, outDir)
+	sprayRegisterBrutesprayCreds(app.Log, stdout)
+
 	findings := parseBrutesprayHits(stdout)
 
 	sprayWriteFindings(app, findings)
@@ -287,6 +297,13 @@ func (t *SprayTask) runBrutus(
 		}
 		// A brutus error may still have produced partial output — try to parse it.
 	}
+
+	// WR-13-03: brutus wrote raw --json hits (live user:pass) to outPath at
+	// tool-native perms (0644). Confine it to 0600 and register every discovered
+	// credential with the log Redactor (L2) BEFORE any log line — mirrors
+	// emails.go/github_repos.go. The findings stream still carries only "***".
+	sprayHardenFile(app.Log, outPath)
+	sprayRegisterBrutusCreds(app.Log, outPath)
 
 	// Parse brutus JSONL output; XCUT-07: only host/service/port recorded, creds redacted.
 	findings := parseBrutusHits(outPath)
@@ -367,6 +384,111 @@ func sprayWriteFindings(app *appctx.AppContext, findings []VulnFindingRecord) {
 	stagingPath := filepath.Join(inputsDir, "findings.spray.jsonl")
 	if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
 		app.Log.Debug("vulns.spray: staging write failed", "path", stagingPath, "err", wErr)
+	}
+}
+
+// sprayHardenFile restricts a spray tool's raw hit file (which can contain live
+// user:pass) to owner-only 0600 so it is not world-readable (WR-13-03).
+// Best-effort: a missing file or chmod failure is logged at Debug, never fatal.
+func sprayHardenFile(logger *slog.Logger, path string) {
+	if path == "" {
+		return
+	}
+	if err := os.Chmod(path, 0o600); err != nil && !os.IsNotExist(err) && logger != nil {
+		logger.Debug("vulns.spray: could not restrict spray output perms", "path", path, "err", err.Error())
+	}
+}
+
+// sprayHardenDir restricts every file under dir to 0600 and every directory to
+// 0700 (WR-13-03) — brutespray writes native output there that can carry live
+// credentials. Best-effort; unreadable entries are skipped.
+func sprayHardenDir(logger *slog.Logger, dir string) {
+	if dir == "" {
+		return
+	}
+	_ = filepath.WalkDir(dir, func(p string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return nil // best-effort: skip entries we cannot stat
+		}
+		mode := os.FileMode(0o600)
+		if d.IsDir() {
+			mode = 0o700
+		}
+		if err := os.Chmod(p, mode); err != nil && logger != nil {
+			logger.Debug("vulns.spray: could not restrict spray output perms", "path", p, "err", err.Error())
+		}
+		return nil
+	})
+}
+
+// sprayRegisterBrutusCreds reads brutus's raw --json hit file and registers every
+// discovered credential (username/password/key) with the log Redactor (L2) so a
+// later log line echoing it is scrubbed (WR-13-03). Values are read transiently
+// and NEVER copied into a finding (XCUT-07 — findings carry "***").
+func sprayRegisterBrutusCreds(logger *slog.Logger, outPath string) {
+	if logger == nil {
+		return
+	}
+	data, err := os.ReadFile(outPath) //nolint:gosec // path within WorkDir
+	if err != nil || len(bytes.TrimSpace(data)) == 0 {
+		return
+	}
+	sc := bufio.NewScanner(bytes.NewReader(data))
+	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for sc.Scan() {
+		line := bytes.TrimSpace(sc.Bytes())
+		if len(line) == 0 {
+			continue
+		}
+		var creds struct {
+			Username string `json:"username"`
+			Password string `json:"password"`
+			Key      string `json:"key"`
+		}
+		if json.Unmarshal(line, &creds) != nil {
+			continue
+		}
+		for _, v := range []string{creds.Username, creds.Password, creds.Key} {
+			if s := strings.TrimSpace(v); s != "" {
+				log.RegisterHandlerSecret(logger, s)
+			}
+		}
+	}
+}
+
+// sprayRegisterBrutesprayCreds extracts the trailing user:pass from each
+// brutespray success line and registers it with the log Redactor (L2) so a later
+// log line echoing it is scrubbed (WR-13-03). The credential is NEVER copied into
+// a finding (XCUT-07 — parseBrutesprayHits redacts to "***").
+func sprayRegisterBrutesprayCreds(logger *slog.Logger, stdout []byte) {
+	if logger == nil || len(bytes.TrimSpace(stdout)) == 0 {
+		return
+	}
+	sc := bufio.NewScanner(bytes.NewReader(stdout))
+	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" {
+			continue
+		}
+		lower := strings.ToLower(line)
+		if !strings.Contains(lower, "login successful") &&
+			!strings.Contains(lower, "success") &&
+			!strings.HasPrefix(line, "[+]") {
+			continue
+		}
+		// brutespray hit format: "... - <host:port> - <user>:<pass>". The final
+		// " - " section is the credential; register the whole token plus the
+		// post-colon secret so either form is scrubbed from logs.
+		sections := strings.Split(line, " - ")
+		cred := strings.TrimSpace(sections[len(sections)-1])
+		if !strings.Contains(cred, ":") {
+			continue
+		}
+		log.RegisterHandlerSecret(logger, cred)
+		if idx := strings.LastIndexByte(cred, ':'); idx >= 0 && idx < len(cred)-1 {
+			log.RegisterHandlerSecret(logger, cred[idx+1:])
+		}
 	}
 }
 
