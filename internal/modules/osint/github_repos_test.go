@@ -368,3 +368,27 @@ func TestGithubReposTask_TrufflehogFindingsRedacted(t *testing.T) {
 		t.Errorf("Stats[secrets] = %d, want >= 1 (trufflehog)", res.Stats["secrets"])
 	}
 }
+
+// TestGithubReposGitCloneRejectsNonURL proves the WR-13-04 hardening: the git
+// clone seam refuses any target that is not an http(s)/git URL BEFORE invoking
+// git, so an option-injection value (leading "-", ext:: transport, file://) can
+// never reach git's argv. The scheme check runs before exec.LookPath, so this is
+// deterministic regardless of whether git is installed on the runner.
+func TestGithubReposGitCloneRejectsNonURL(t *testing.T) {
+	for _, bad := range []string{
+		"--upload-pack=touch /tmp/pwned", // option injection
+		"-oProxyCommand=evil",            // option injection
+		"ext::sh -c whoami",              // ext:: transport → RCE
+		"file:///etc/passwd",             // non-http(s)/git scheme
+		"",                               // empty
+	} {
+		err := githubReposGitClone(context.Background(), bad, t.TempDir())
+		if err == nil {
+			t.Errorf("githubReposGitClone(%q) = nil; want rejection error", bad)
+			continue
+		}
+		if !strings.Contains(err.Error(), "refusing to clone") {
+			t.Errorf("githubReposGitClone(%q) err = %v; want 'refusing to clone'", bad, err)
+		}
+	}
+}

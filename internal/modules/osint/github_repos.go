@@ -85,14 +85,25 @@ const githubReposCloneTimeout = 300 * time.Second
 // makes an auth-required clone fail fast instead of hanging on an interactive
 // credential prompt.
 var githubReposGitClone = func(ctx context.Context, url, dest string) error {
+	// WR-13-04: validate the clone target BEFORE doing any work. Reject anything
+	// that is not an http(s)/git clone URL so a value beginning with "-" (enumerepo
+	// schema drift or plaintext-fallback garbage) can never be consumed by git as
+	// an option (git option-injection, e.g. --upload-pack=…, or an "ext::"
+	// transport → RCE where enabled).
+	if !(strings.HasPrefix(url, "https://") || strings.HasPrefix(url, "http://") ||
+		strings.HasPrefix(url, "git@")) {
+		return fmt.Errorf("refusing to clone non-URL %q", url)
+	}
 	bin, err := exec.LookPath("git")
 	if err != nil {
 		return err // git not installed — caller degrades best-effort
 	}
 	cmdCtx, cancel := context.WithTimeout(ctx, githubReposCloneTimeout)
 	defer cancel()
-	//nolint:gosec // bin resolved via LookPath; url is an enumerepo-sourced github clone URL; dest is workspace tmp
-	cmd := exec.CommandContext(cmdCtx, bin, "clone", url, dest)
+	// protocol.ext.allow=never disables git's ext:: transport; "--" ends option
+	// parsing so the validated URL is always treated as a positional argument.
+	//nolint:gosec // bin resolved via LookPath; url validated as http(s)/git URL above; "--" separates it from options; dest is workspace tmp
+	cmd := exec.CommandContext(cmdCtx, bin, "-c", "protocol.ext.allow=never", "clone", "--", url, dest)
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 	return cmd.Run()
 }
