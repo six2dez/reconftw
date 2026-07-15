@@ -142,6 +142,11 @@ func runSubsCmd(cmd *cobra.Command) error {
 	var dryRunCfg *config.Config
 	var summaryWorkdir, summaryRunLog string
 	var summaryVerbosity ui.Verbosity
+	// axiomBE is assigned in afterBoot (which holds boot.ChosenBackend) and torn
+	// down via the Shutdown deferred just before the RunXAsync call — AFTER the
+	// stage loop runs (WR-13-01). Declared at function scope so the afterBoot
+	// closure and the outer defer share the SAME variable.
+	var axiomBE *backend.AxiomBackend
 
 	afterBoot := func(boot handlers.AppBoot) {
 		app := boot.App
@@ -187,8 +192,10 @@ func runSubsCmd(cmd *cobra.Command) error {
 			}
 		}
 
-		// Launch Axiom fleet if applicable.
-		var axiomBE *backend.AxiomBackend
+		// Launch Axiom fleet if applicable. The matching Shutdown is deferred in
+		// runSubsCmd (around RunSubsAsync) so teardown runs AFTER the stage loop —
+		// mirroring RunCompositeAsync (WR-13-01). A defer HERE would fire when
+		// afterBoot returns, before any task runs, tearing the fleet down early.
 		if fb, ok := boot.ChosenBackend.(*backend.FailoverBackend); ok {
 			if abe, ok := fb.Primary.(*backend.AxiomBackend); ok {
 				axiomBE = abe
@@ -196,14 +203,11 @@ func runSubsCmd(cmd *cobra.Command) error {
 		}
 		if axiomBE != nil {
 			if launchErr := axiomBE.Launch(ctx); launchErr != nil {
-				// Non-fatal launch failure; log and continue without Axiom.
+				// Non-fatal launch failure; log, drop the handle, continue locally.
 				if app.Log != nil {
 					app.Log.Warn("subs: axiom launch failed — continuing locally", "err", launchErr)
 				}
-			} else {
-				// Register shutdown so the fleet is torn down after the scan.
-				// This runs after RunSubsAsync returns (deferred in the closure scope).
-				defer func() { _ = axiomBE.Shutdown(context.Background()) }() //nolint:staticcheck
+				axiomBE = nil // launch failed → nothing to tear down
 			}
 		}
 
@@ -224,6 +228,14 @@ func runSubsCmd(cmd *cobra.Command) error {
 	}
 
 	force, _ := cmd.Flags().GetBool("force")
+	// Axiom teardown deferred HERE so Shutdown fires after RunSubsAsync's stage
+	// loop returns (WR-13-01) — not inside afterBoot, which runs before any stage.
+	// axiomBE is nil unless the fleet actually launched.
+	defer func() {
+		if axiomBE != nil {
+			_ = axiomBE.Shutdown(context.Background()) //nolint:staticcheck
+		}
+	}()
 	if err := handlers.RunSubsAsync(ctx, handlers.RunOptions{
 		Target:       targetFlag,
 		DryRun:       dryRun,
@@ -389,6 +401,11 @@ func runWebCmd(cmd *cobra.Command) error {
 	var dryRunCfg *config.Config
 	var summaryWorkdir, summaryRunLog string
 	var summaryVerbosity ui.Verbosity
+	// axiomBE is assigned in afterBoot (which holds boot.ChosenBackend) and torn
+	// down via the Shutdown deferred just before the RunXAsync call — AFTER the
+	// stage loop runs (WR-13-01). Declared at function scope so the afterBoot
+	// closure and the outer defer share the SAME variable.
+	var axiomBE *backend.AxiomBackend
 
 	afterBoot := func(boot handlers.AppBoot) {
 		app := boot.App
@@ -424,7 +441,10 @@ func runWebCmd(cmd *cobra.Command) error {
 			}
 		}
 
-		var axiomBE *backend.AxiomBackend
+		// Launch Axiom fleet if applicable. Shutdown is deferred in runWebCmd
+		// (around RunWebAsync) so teardown runs AFTER the stage loop — mirroring
+		// RunCompositeAsync (WR-13-01). A defer HERE would fire when afterBoot
+		// returns, before any task runs, tearing the fleet down early.
 		if fb, ok := boot.ChosenBackend.(*backend.FailoverBackend); ok {
 			if abe, ok := fb.Primary.(*backend.AxiomBackend); ok {
 				axiomBE = abe
@@ -435,8 +455,7 @@ func runWebCmd(cmd *cobra.Command) error {
 				if app.Log != nil {
 					app.Log.Warn("web: axiom launch failed — continuing locally", "err", launchErr)
 				}
-			} else {
-				defer func() { _ = axiomBE.Shutdown(context.Background()) }() //nolint:staticcheck
+				axiomBE = nil // launch failed → nothing to tear down
 			}
 		}
 
@@ -455,6 +474,14 @@ func runWebCmd(cmd *cobra.Command) error {
 	}
 
 	force, _ := cmd.Flags().GetBool("force")
+	// Axiom teardown deferred HERE so Shutdown fires after RunWebAsync's stage
+	// loop returns (WR-13-01) — not inside afterBoot, which runs before any stage.
+	// axiomBE is nil unless the fleet actually launched.
+	defer func() {
+		if axiomBE != nil {
+			_ = axiomBE.Shutdown(context.Background()) //nolint:staticcheck
+		}
+	}()
 	if err := handlers.RunWebAsync(ctx, handlers.RunOptions{
 		Target:       targetFlag,
 		DryRun:       dryRun,
@@ -665,6 +692,11 @@ func runVulnsCmd(cmd *cobra.Command) error {
 	var dryRunCfg *config.Config
 	var summaryWorkdir, summaryRunLog string
 	var summaryVerbosity ui.Verbosity
+	// axiomBE is assigned in afterBoot (which holds boot.ChosenBackend) and torn
+	// down via the Shutdown deferred just before the RunXAsync call — AFTER the
+	// stage loop runs (WR-13-01). Declared at function scope so the afterBoot
+	// closure and the outer defer share the SAME variable.
+	var axiomBE *backend.AxiomBackend
 
 	afterBoot := func(boot handlers.AppBoot) {
 		app := boot.App
@@ -700,7 +732,10 @@ func runVulnsCmd(cmd *cobra.Command) error {
 			}
 		}
 
-		var axiomBE *backend.AxiomBackend
+		// Launch Axiom fleet if applicable. Shutdown is deferred in runVulnsCmd
+		// (around RunVulnsAsync) so teardown runs AFTER the stage loop — mirroring
+		// RunCompositeAsync (WR-13-01). A defer HERE would fire when afterBoot
+		// returns, before any task runs, tearing the fleet down early.
 		if fb, ok := boot.ChosenBackend.(*backend.FailoverBackend); ok {
 			if abe, ok := fb.Primary.(*backend.AxiomBackend); ok {
 				axiomBE = abe
@@ -711,8 +746,7 @@ func runVulnsCmd(cmd *cobra.Command) error {
 				if app.Log != nil {
 					app.Log.Warn("vulns: axiom launch failed — continuing locally", "err", launchErr)
 				}
-			} else {
-				defer func() { _ = axiomBE.Shutdown(context.Background()) }() //nolint:staticcheck
+				axiomBE = nil // launch failed → nothing to tear down
 			}
 		}
 
@@ -731,6 +765,14 @@ func runVulnsCmd(cmd *cobra.Command) error {
 	}
 
 	force, _ := cmd.Flags().GetBool("force")
+	// Axiom teardown deferred HERE so Shutdown fires after RunVulnsAsync's stage
+	// loop returns (WR-13-01) — not inside afterBoot, which runs before any stage.
+	// axiomBE is nil unless the fleet actually launched.
+	defer func() {
+		if axiomBE != nil {
+			_ = axiomBE.Shutdown(context.Background()) //nolint:staticcheck
+		}
+	}()
 	if err := handlers.RunVulnsAsync(ctx, handlers.RunOptions{
 		Target:       targetFlag,
 		DryRun:       dryRun,
@@ -864,6 +906,11 @@ func runOSINTCmd(cmd *cobra.Command) error {
 	var dryRunCfg *config.Config
 	var summaryWorkdir, summaryRunLog string
 	var summaryVerbosity ui.Verbosity
+	// axiomBE is assigned in afterBoot (which holds boot.ChosenBackend) and torn
+	// down via the Shutdown deferred just before the RunXAsync call — AFTER the
+	// stage loop runs (WR-13-01). Declared at function scope so the afterBoot
+	// closure and the outer defer share the SAME variable.
+	var axiomBE *backend.AxiomBackend
 
 	afterBoot := func(boot handlers.AppBoot) {
 		app := boot.App
@@ -899,7 +946,10 @@ func runOSINTCmd(cmd *cobra.Command) error {
 			}
 		}
 
-		var axiomBE *backend.AxiomBackend
+		// Launch Axiom fleet if applicable. Shutdown is deferred in runOSINTCmd
+		// (around RunOSINTAsync) so teardown runs AFTER the stage loop — mirroring
+		// RunCompositeAsync (WR-13-01). A defer HERE would fire when afterBoot
+		// returns, before any task runs, tearing the fleet down early.
 		if fb, ok := boot.ChosenBackend.(*backend.FailoverBackend); ok {
 			if abe, ok := fb.Primary.(*backend.AxiomBackend); ok {
 				axiomBE = abe
@@ -910,8 +960,7 @@ func runOSINTCmd(cmd *cobra.Command) error {
 				if app.Log != nil {
 					app.Log.Warn("osint: axiom launch failed — continuing locally", "err", launchErr)
 				}
-			} else {
-				defer func() { _ = axiomBE.Shutdown(context.Background()) }() //nolint:staticcheck
+				axiomBE = nil // launch failed → nothing to tear down
 			}
 		}
 
@@ -930,6 +979,14 @@ func runOSINTCmd(cmd *cobra.Command) error {
 	}
 
 	force, _ := cmd.Flags().GetBool("force")
+	// Axiom teardown deferred HERE so Shutdown fires after RunOSINTAsync's stage
+	// loop returns (WR-13-01) — not inside afterBoot, which runs before any stage.
+	// axiomBE is nil unless the fleet actually launched.
+	defer func() {
+		if axiomBE != nil {
+			_ = axiomBE.Shutdown(context.Background()) //nolint:staticcheck
+		}
+	}()
 	if err := handlers.RunOSINTAsync(ctx, handlers.RunOptions{
 		Target:       targetFlag,
 		DryRun:       dryRun,
