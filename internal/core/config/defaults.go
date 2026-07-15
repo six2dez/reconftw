@@ -157,11 +157,21 @@ func Defaults() *Config {
 				Enabled:        true,
 				PassiveEnabled: true,
 				ActiveEnabled:  true,
-				Strategy:       "legacy",
-				UDPEnabled:     false,
-				GeoInfo:        true,
-				CDNCheck:       true,
-				CDNBypass:      true,
+				// IN-13-02: Strategy "legacy" (bash-parity default) runs a plain full
+				// nmap over every non-CDN IP. The Naabu block below ONLY takes effect
+				// under Strategy=="naabu_nmap" — portscan.go gates the naabu→nmap
+				// targeted path on (Strategy=="naabu_nmap" && Naabu.Enabled). Under the
+				// default "legacy" strategy naabu never runs, so Naabu.Enabled:true is
+				// latent config, not active behaviour. Flipping this default changes
+				// every scan and is a deliberate Phase-14 product decision — do NOT
+				// change the value here (this note only documents the coupling).
+				Strategy:   "legacy",
+				UDPEnabled: false,
+				GeoInfo:    true,
+				CDNCheck:   true,
+				CDNBypass:  true,
+				// Naabu applies only under Strategy "naabu_nmap" (see the Strategy note
+				// above); it is inert under the default "legacy" strategy.
 				Naabu: WebNaabu{
 					Enabled: true,
 					Rate:    1000,
