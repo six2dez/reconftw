@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: milestone
 status: executing
 stopped_at: context exhaustion at 75% (2026-06-26)
-last_updated: "2026-07-15T00:00:00.000Z"
-last_activity: 2026-07-15 -- Phase 13 plan 13-02 executed (csprecon subs-stage + dsieve top-N recursion)
+last_updated: "2026-07-15T12:00:00.000Z"
+last_activity: 2026-07-15 -- Phase 13 plan 13-03 executed (web active portscan naabu/nmap + nerva service fingerprint)
 progress:
   total_phases: 12
   completed_phases: 9
   total_plans: 81
-  completed_plans: 75
+  completed_plans: 76
   percent: 75
 ---
 
@@ -25,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-05-27)
 
 ## Current Position
 
-Phase: 13 — Domain Parity (EXECUTING — subs first)
-Plan: 13-02 executed + committed (2 task commits 3b45229, 748ee15). 13-01 earlier (9b0ceb2, 792c99f, 86a82f5); Phase 12 (c62eead).
-Status: 13-02 done — SubCspreconTask ("subdomains.csprecon") added: CSP-header subdomain discovery in the subs discovery stage, writing plain in-scope hostnames to inputs/resolved.csprecon.txt (extract/csp.Extract filter, Scraping.Enabled gate, aux best-effort degrade); mirrors web/csprecon.go via -s -l <file>. SubRecursivePassiveTask now selects seeds via `dsieve -if <resolved.merged> -f 3 -top <PassiveDepth>` (bash parity) instead of the naive subdomains[:depth] first-N slice, with graceful fallback on dsieve error. Task self-registers but is UNSELECTED until 13-08 wires the stage list. PAR-01 FULLY CLOSED (13-01 resolve core + 13-02 csprecon/dsieve). Build+vet clean; full non-resolvers suite green (0 FAIL, 31 ok); internal/core/resolvers still the pre-existing env-hang (untouched).
-NEXT: Phase 13 continues — 13-03/04 (web portscan/nerva/url_ext/well-known/wordlists), 13-05/06 (osint), 13-07 (vulns spraying/SSRF-OOB), 13-08 (pipeline wiring — must add the subdomains.csprecon prefix to the discovery stage list + remove dead subdomains.ptr).
-Last activity: 2026-07-15 -- 13-02 executed (2 tasks, TDD) + committed; csprecon subs-stage discovery + dsieve top-N recursion seeds.
+Phase: 13 — Domain Parity (EXECUTING — web wave)
+Plan: 13-03 executed + committed (2 task commits fe1e3f5, 82625a7). Earlier: 13-02 (3b45229, 748ee15), 13-01 (9b0ceb2, 792c99f, 86a82f5); Phase 12 (c62eead).
+Status: 13-03 done — WebPortscanTask ("web.portscan") added: reads the previously-dead cfg.Web.Portscan so naabu/nmap/nerva are actually invoked (PAR-04). Flow (bash web.sh:600-923 parity): IP-seed from subdomains/subdomains_ips.txt (13-01, field-3) → cdncheck CDN filter → PASSIVE smap + shodan internetdb (unprivileged, keyless) → ACTIVE naabu→nmap targeted scan producing hosts/portscan_active.gnmap (spray input PAR-02/13-07) → nmapurls feedback via NATIVE nmap-XML parse (nmapurls is stdin-only) → nerva service fingerprint → hosts/service_fingerprints.jsonl + inputs/hosts.{portscan,nerva}.jsonl staging. Naabu Ports split into argv (T-13-03-02) + -duc (T-13-03-03). Missing tool / no privilege degrades to StatusDone (D-O2), never fails the web pipeline. Task self-registers but is UNSELECTED until 13-08 wires the stage list + web.MergeStage(ctx,app,"hosts"). Build+vet clean; full non-resolvers suite green (0 FAIL); internal/core/resolvers still the pre-existing UDP/53 env-hang (untouched).
+NEXT: Phase 13 continues — 13-04 (web url_ext/well-known/wordlists), 13-05/06 (osint), 13-07 (vulns spraying/SSRF-OOB), 13-08 (pipeline wiring — add subdomains.csprecon + web.portscan to stage lists, wire web.MergeStage "hosts" after portscan in web.go+composite.go, confirm zen ApplyZenProfile disables Web.Portscan.ActiveEnabled+UDPEnabled, remove dead subdomains.ptr).
+Last activity: 2026-07-15 -- 13-03 executed (2 tasks, TDD) + committed; web active portscan (naabu/nmap) + nerva service fingerprint.
 
 ## Performance Metrics
 
@@ -88,6 +88,7 @@ Last activity: 2026-07-15 -- 13-02 executed (2 tasks, TDD) + committed; csprecon
 | Phase 08-mcp-server P04 | 45 | 2 tasks | 11 files |
 | Phase 10 P02 | 35 | 2 tasks | 10 files |
 | Phase 10 P04 | 25m | 2 tasks | 7 files |
+| Phase 13 P03 | ~35m | 2 tasks | 2 files |
 
 ## Accumulated Context
 
