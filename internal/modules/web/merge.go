@@ -14,10 +14,12 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 )
@@ -30,9 +32,13 @@ import (
 //   - glob files matching filepath.Join(app.Target.WorkDir, "inputs", stage+".*.jsonl")
 //   - write to app.Tree.Append(stage, ...)
 //
-// Unlike the subdomains MergeStage which deduplicates plain hostnames,
-// the web MergeStage deduplicates by raw JSON line bytes. This is correct
-// for structured artefacts where the full record is the unit of uniqueness.
+// The web MergeStage deduplicates by raw JSON line bytes for every stage EXCEPT
+// "hosts", which dedups by DECODED host identity (one artefact line per host —
+// IN-13-03) because httpx/wellknown/portscan emit different JSON shapes for the
+// SAME host ({"host":"x","tech":[…]} vs {"host":"x","ip":…,"port":…}); raw-byte
+// dedup would let all of them survive and a line-counting consumer would over-count.
+// Raw-byte dedup remains correct for the other structured artefacts where the full
+// record is the unit of uniqueness.
 //
 // Empty glob (no staging files found) is a no-op; returns nil.
 // app.Tree.Append errors are returned — callers should log and continue
@@ -54,7 +60,15 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 	// Sort for deterministic processing order.
 	sort.Strings(matches)
 
-	// dedup maps raw JSON line (as string) → present, preserving first-seen order.
+	// dedup key: the "hosts" stage keys by DECODED host identity so same-host
+	// records of different JSON shape collapse to one artefact line (IN-13-03);
+	// every other stage keys by raw JSON bytes (full-record uniqueness).
+	keyFor := func(line []byte) string { return string(line) }
+	if stage == "hosts" {
+		keyFor = hostsDedupKey
+	}
+
+	// dedup maps the stage key → present, preserving first-seen order.
 	dedup := make(map[string]struct{})
 	var ordered [][]byte
 
@@ -71,7 +85,7 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 		existingArtefact := filepath.Join(app.Target.WorkDir, "artefacts", stage+".jsonl")
 		if existingLines, rerr := readJSONLFile(existingArtefact); rerr == nil {
 			for _, line := range existingLines {
-				key := string(line)
+				key := keyFor(line)
 				if _, exists := dedup[key]; !exists {
 					dedup[key] = struct{}{}
 					ordered = append(ordered, line)
@@ -90,7 +104,7 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 			continue // non-fatal per best_effort policy
 		}
 		for _, line := range lines {
-			key := string(line)
+			key := keyFor(line)
 			if _, exists := dedup[key]; !exists {
 				dedup[key] = struct{}{}
 				ordered = append(ordered, line)
@@ -112,6 +126,25 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 
 	_ = ctx // available for future cancellation checks
 	return nil
+}
+
+// hostsDedupKey returns the dedup identity for a "hosts"-stage JSON line (IN-13-03).
+// httpx, wellknown and portscan all emit a "host" field but with different record
+// shapes; keying by the decoded, trimmed, lower-cased host collapses those to ONE
+// artefact line per host (DNS hostnames are case-insensitive). A line that is not
+// parseable JSON, or that carries no non-empty host, falls back to its raw bytes in
+// a separate namespace ("raw\x00…") so malformed or host-less records are never
+// merged together and never collide with a real host key.
+func hostsDedupKey(line []byte) string {
+	var rec struct {
+		Host string `json:"host"`
+	}
+	if err := json.Unmarshal(line, &rec); err == nil {
+		if h := strings.ToLower(strings.TrimSpace(rec.Host)); h != "" {
+			return "host\x00" + h
+		}
+	}
+	return "raw\x00" + string(line)
 }
 
 // readJSONLFile reads a JSONL file and returns each non-empty, non-whitespace

@@ -127,3 +127,53 @@ func TestMergeStageHostsNoStagingIsNoOp(t *testing.T) {
 		t.Errorf("no-staging merge wiped the httpx artefact\ngot:\n%s", got)
 	}
 }
+
+// TestMergeStageHostsDedupsSameHostDifferentShape guards IN-13-03: the hosts merge
+// keys by decoded host identity, so an httpx artefact record and a portscan staging
+// record for the SAME host but a DIFFERENT JSON shape collapse to a single artefact
+// line — a line-counting consumer must see one host, not two. Under the old raw-byte
+// dedup both byte-distinct shapes survived and the host was double-counted.
+func TestMergeStageHostsDedupsSameHostDifferentShape(t *testing.T) {
+	app := newHostsMergeApp(t)
+
+	// httpx wrote a rich record for host "a"; portscan staged a DIFFERENT-shape
+	// record for the SAME host, plus a genuinely new host "b".
+	writeLines(t, filepath.Join(app.Target.WorkDir, "artefacts", "hosts.jsonl"),
+		`{"host":"a.example.com","tech":["nginx"],"source":"httpx"}`)
+	writeLines(t, filepath.Join(app.Target.WorkDir, "inputs", "hosts.portscan.jsonl"),
+		`{"host":"a.example.com","ip":"192.0.2.1","port":"80"}`,
+		`{"host":"b.example.com","ip":"192.0.2.2","port":"443"}`)
+
+	if err := MergeStage(context.Background(), app, "hosts"); err != nil {
+		t.Fatalf("MergeStage(hosts): %v", err)
+	}
+
+	got := readArtefactHosts(t, app)
+
+	// Same host "a" must appear exactly once (httpx's first-seen record wins).
+	if n := strings.Count(got, "a.example.com"); n != 1 {
+		t.Errorf("a.example.com appears %d times, want 1 (same-host different-shape not deduped)\ngot:\n%s", n, got)
+	}
+	// The new host "b" is still admitted.
+	if n := strings.Count(got, "b.example.com"); n != 1 {
+		t.Errorf("b.example.com appears %d times, want 1\ngot:\n%s", n, got)
+	}
+	// The httpx record (seeded first) is the survivor for host "a"; the portscan
+	// same-host shape is the one dropped.
+	if !strings.Contains(got, `"tech":["nginx"]`) {
+		t.Errorf("expected httpx record for host a to survive\ngot:\n%s", got)
+	}
+	if strings.Contains(got, `"port":"80"`) {
+		t.Errorf("portscan same-host shape (port 80) should have been deduped away\ngot:\n%s", got)
+	}
+	// Exactly two lines total: one per host.
+	lines := 0
+	for _, ln := range strings.Split(strings.TrimSpace(got), "\n") {
+		if strings.TrimSpace(ln) != "" {
+			lines++
+		}
+	}
+	if lines != 2 {
+		t.Errorf("hosts.jsonl has %d lines, want 2 (one per host)\ngot:\n%s", lines, got)
+	}
+}
