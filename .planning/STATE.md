@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: milestone
 status: executing
 stopped_at: context exhaustion at 75% (2026-06-26)
-last_updated: "2026-07-15T15:30:00.000Z"
-last_activity: 2026-07-15 -- Phase 13 plan 13-04 executed (web url_ext bucketing + .well-known pivots + roboxtractor/getjswords wordlists; pydictor deferred)
+last_updated: "2026-07-15T18:05:00.000Z"
+last_activity: 2026-07-15 -- Phase 13 plan 13-05 executed (osint LeakSearch passwords + Scopify + ip_info WHOISXML reverse-IP/IP-target restore)
 progress:
   total_phases: 12
   completed_phases: 9
   total_plans: 81
-  completed_plans: 76
+  completed_plans: 77
   percent: 75
 ---
 
@@ -25,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-05-27)
 
 ## Current Position
 
-Phase: 13 — Domain Parity (EXECUTING — web wave)
-Plan: 13-04 executed + committed (3 task commits f887da0, 0fc69a7, 4c280d0). Earlier: 13-03 (fe1e3f5, 82625a7), 13-02 (3b45229, 748ee15), 13-01 (9b0ceb2, 792c99f, 86a82f5); Phase 12 (c62eead).
-Status: 13-04 done — three light web producer/pivot tasks close the remaining PAR-04 gaps by reading previously-dead config. (1) WebURLExtTask ("web.url_ext", cfg.Web.URLs.ExtClassify): pure awk-style transform buckets the deduped URL corpus (artefacts/urls.jsonl) by the ~130-entry sensitive-extension set into webs/urls_by_ext.txt (bash url_ext parity); IP-target + empty-corpus skip; ZERO tool calls. (2) WebWellKnownTask ("web.wellknown", cfg.Web.WellKnown.Enabled, DEFAULT-OFF bash parity): native net/http probes security.txt + openid-configuration + oauth-authorization-server over the web targets, extracts in-scope hostnames → inputs/hosts.wellknown.jsonl staging; SSRF/scope guard (T-13-04-01) re-validates each target in-scope + rejects userinfo BEFORE fetch; MaxTargets cap; best-effort (never StatusErrored). (3) WebWordlistGenTask ("web.wordlistgen", cfg.Web.Wordlist.*): roboxtractor (robots→webs/robots_wordlist.txt) + getjswords (JS words→webs/dict_words.txt), each degrading INDEPENDENTLY (T-13-04-02); stdin/python-script tools via timeout-bounded exec seams (FOUND-10 allowlist entry added); pydictor DEFERRED to Phase 14 (documented sentinel, never invoked). All three self-register but are UNSELECTED until 13-08 wires the stage lists + web.MergeStage(ctx,app,"hosts") for wellknown. Build+vet+gofmt clean; full non-resolvers suite green (31 ok, 0 FAIL); internal/core/resolvers still the pre-existing UDP/53 env-hang (untouched).
-NEXT: Phase 13 continues — 13-05/06 (osint LeakSearch/Scopify/ip_info + github repo-secrets), 13-07 (vulns spraying/SSRF-OOB), 13-08 (pipeline wiring — add subdomains.csprecon + web.portscan + web.url_ext/wellknown/wordlistgen to stage lists, wire web.MergeStage "hosts" after portscan+wellknown in web.go+composite.go, confirm zen ApplyZenProfile disables Web.Portscan.ActiveEnabled+UDPEnabled, remove dead subdomains.ptr).
-Last activity: 2026-07-15 -- 13-04 executed (3 tasks, TDD) + committed; web url_ext/well-known/wordlists (pydictor deferred).
+Phase: 13 — Domain Parity (EXECUTING — osint wave)
+Plan: 13-05 executed + committed (3 task commits b165e83, adf6407, 802a025). Earlier: 13-04 (f887da0, 0fc69a7, 4c280d0), 13-03 (fe1e3f5, 82625a7), 13-02 (3b45229, 748ee15), 13-01 (9b0ceb2, 792c99f, 86a82f5); Phase 12 (c62eead).
+Status: 13-05 done — three OSINT parity gaps (PAR-03) folded into existing tasks (no new stage wiring; osint.emails/domain_info/ip_info already staged). (1) EmailsTask now runs LeakSearch after EmailHarvester (bash emails() osint.sh:552-561): LeakSearch -k <domain> -o <tmp> → plaintext osint/passwords.txt (0600 single-writer) + REDACTED inputs/findings.passwords.jsonl (ValueRedacted="***"); each raw password registered with the log Redactor before any log line (XCUT-07/T-13-05-02); LeakSearch runs even if EmailHarvester yields nothing (bash subshell parity). (2) DomainInfoTask now runs Scopify (bash domain_info() osint.sh:606-607): scopify.py -c <companyName> (registrable-name = unfurl format %r analog) → osint/scopify.txt single-writer. (3) IPInfoTask restores the bash ip_info() IP-target path (osint.sh:741-775): for an IP-shaped target, three native WHOISXML GETs (reverse-ip/whois/geolocation) → v1 trio osint/ip_<ip>_relations/whois/location.txt + reverse-IP relation findings; key-gated on cfg.APIKeys.WhoisXML (unset → warning + StatusSkipped); apiKey ONLY in the outbound HTTPS query of a native http.Get (never argv), registered+redacted (XCUT-07/T-13-05-01); IP targets no longer rejected; domain-target ASN/CIDR/ipinfo.io path unregressed. All best-effort (D-O8). Symbol-hygiene: new helpers namespaced (parseLeakSearchPasswords, runScopify, whoisXML*/writeIPInfoTextFile) so edits stay disjoint from 13-06's github_repos.go. Build+vet+gofmt clean; osint suite green; full non-resolvers suite green (31 ok, 0 FAIL); internal/core/resolvers still the pre-existing UDP/53 env-hang (untouched).
+NEXT: Phase 13 continues — 13-06 (osint github repo-secret engines: titus/noseyparker + trufflehog), 13-07 (vulns spraying brutespray/brutus + SSRF-OOB interactsh auto-start), 13-08 (pipeline wiring — add subdomains.csprecon + web.portscan + web.url_ext/wellknown/wordlistgen to stage lists, wire web.MergeStage "hosts" after portscan+wellknown in web.go+composite.go, confirm zen ApplyZenProfile disables Web.Portscan.ActiveEnabled+UDPEnabled, remove dead subdomains.ptr).
+Last activity: 2026-07-15 -- 13-05 executed (3 tasks, TDD) + committed; osint LeakSearch passwords + Scopify + ip_info WHOISXML reverse-IP/IP-target restore.
 
 ## Performance Metrics
 
@@ -90,6 +90,7 @@ Last activity: 2026-07-15 -- 13-04 executed (3 tasks, TDD) + committed; web url_
 | Phase 10 P04 | 25m | 2 tasks | 7 files |
 | Phase 13 P03 | ~35m | 2 tasks | 2 files |
 | Phase 13 P04 | ~40m | 3 tasks | 4 files |
+| Phase 13 P05 | ~35m | 3 tasks | 6 files |
 
 ## Accumulated Context
 

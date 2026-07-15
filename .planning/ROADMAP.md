@@ -508,7 +508,7 @@ Plans:
 - [x] 13-02-PLAN.md — Subs pipeline: csprecon in the discovery stage + dsieve top-N recursion
 - [x] 13-03-PLAN.md — Web active portscan (naabu/nmap) + nerva service fingerprint
 - [x] 13-04-PLAN.md — Web light producers: url_ext bucketing + .well-known pivots + roboxtractor/getjswords wordlists (pydictor deferred)
-- [ ] 13-05-PLAN.md — OSINT: LeakSearch passwords + Scopify + ip_info WHOISXML reverse-IP/IP-target
+- [x] 13-05-PLAN.md — OSINT: LeakSearch passwords + Scopify + ip_info WHOISXML reverse-IP/IP-target
 - [ ] 13-06-PLAN.md — OSINT: github repo-secret engines (titus/noseyparker + trufflehog)
 - [ ] 13-07-PLAN.md — Vulns: password spraying (brutespray/brutus) + SSRF OOB interactsh auto-start
 - [ ] 13-08-PLAN.md — Pipeline wiring (all stage-list sites) + capability parity audit (>=95%)
