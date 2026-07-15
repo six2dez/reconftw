@@ -199,6 +199,13 @@ func (t *IPInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	// Step 4: ipinfo.io geo per IP + preserve osint/ip_<ip>_whois.txt (D-O5).
 	// XCUT-07: PDCP key used only in the Authorization header, never logged.
 	pdcpKey := string(cfg.APIKeys.PDCP)
+	// XCUT-07 L2 (IN-13-01): register the PDCP key with the Redactor ONCE before the
+	// per-IP loop — mirroring the WHOISXML-key registration in runWhoisXML — so any
+	// accidental header/URL log line is scrubbed. Defense-in-depth consistency with
+	// the WHOISXML path in this same file.
+	if pdcpKey != "" {
+		registerSecret(app.Log, pdcpKey)
+	}
 	client := &http.Client{Timeout: 2 * time.Second}
 	base := ipInfoBaseURL()
 	for _, ip := range ips {
