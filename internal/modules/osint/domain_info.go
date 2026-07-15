@@ -1,4 +1,4 @@
-// domain_info.go — DomainInfoTask: whois + DNS records (OSINT-01).
+// domain_info.go — DomainInfoTask: whois + DNS records + Scopify (OSINT-01 / PAR-03).
 //
 // DomainInfoTask runs whois on the root domain and dnsx for the NS/MX/TXT/SOA
 // DNS record set (v1 modules/osint.sh:575 domain_info + mail_hygiene's TXT/DMARC
@@ -6,6 +6,13 @@
 // is written to inputs/findings.domain_info.jsonl per the multi-writer staging
 // contract (doc.go — D-O3). The raw whois text is preserved as the single-writer
 // human file osint/domain_info_general.txt (D-O5).
+//
+// It then runs Scopify (v1 domain_info() osint.sh:606-607) over the registrable
+// company name (the `unfurl format %r` analog, companyName) → osint/scopify.txt.
+// This restored a PAR-03 gap: the Go task previously had no Scopify call, so no
+// scopify.txt was produced. Scopify is a python-venv repo-clone tool invoked by
+// name through app.Tools (mirroring the other python-venv osint tools) and, like
+// bash, writes its report to STDOUT which we capture to the single-writer file.
 //
 // SEEDING (D-O1): root-domain-seeded — runs from app.Target.Domain alone, no URL
 // corpus, no DependsOn edges, never bootstraps subs/web.
@@ -70,13 +77,14 @@ var dnsRecordTypes = []struct {
 	{"-soa", "dns-soa"},
 }
 
-// Run executes whois + dnsx record lookups against the root domain.
+// Run executes whois + dnsx record lookups + Scopify against the root domain.
 //
 // Steps:
 //  1. Derive + validate the root domain from app.Target.
 //  2. Run whois; preserve osint/domain_info_general.txt (D-O5); emit a whois record.
 //  3. Run dnsx per record type with -duc (D-O7); emit one record per result.
-//  4. Write inputs/findings.domain_info.jsonl (multi-writer staging).
+//  4. Run Scopify over the company name → osint/scopify.txt (D-O5 single-writer).
+//  5. Write inputs/findings.domain_info.jsonl (multi-writer staging).
 func (t *DomainInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	root := rootDomain(app)
 	if root == "" {
@@ -135,16 +143,19 @@ func (t *DomainInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 		}
 		for _, val := range splitNonEmptyLines(res.Stdout) {
 			records = append(records, OSINTFindingRecord{
-				Severity: "informational",
-				Class:    "osint",
-				Source:   "domain_info",
-				Category: rt.category,
+				Severity:    "informational",
+				Class:       "osint",
+				Source:      "domain_info",
+				Category:    rt.category,
 				PoCRedacted: val, // DNS record value (non-secret; informational, T-07-02-03 accept)
 			})
 		}
 	}
 
-	// Step 4: write staging JSONL (multi-writer contract).
+	// Step 4: Scopify scope enumeration (v1 domain_info() osint.sh:606-607).
+	t.runScopify(ctx, app, root, osintDir)
+
+	// Step 5: write staging JSONL (multi-writer contract).
 	writeOSINTStaging(app, inputsDir, "findings.domain_info.jsonl", records)
 
 	if app.Log != nil {
@@ -154,6 +165,38 @@ func (t *DomainInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 		Status: task.StatusDone,
 		Stats:  map[string]int{"findings": len(records)},
 	}, nil
+}
+
+// runScopify runs Scopify over the registrable company name (v1 domain_info()
+// osint.sh:606-607): `company_name=$(unfurl format %r <<< $domain)` then
+// `scopify.py -c <company_name> > osint/scopify.txt`. company_name is derived via
+// the in-package companyName helper (the `unfurl format %r` analog). Scopify
+// writes its report to STDOUT, which we capture to the single-writer human file
+// osint/scopify.txt (D-O5, matching bash's `> osint/scopify.txt`).
+//
+// Best_effort (D-O8): a missing tool / venv / empty output logs Debug and returns
+// without disturbing the whois/dnsx path (the task never fails on Scopify).
+func (t *DomainInfoTask) runScopify(ctx context.Context, app *appctx.AppContext, root, osintDir string) {
+	company := companyName(root)
+	if company == "" {
+		return
+	}
+	// v1 arg vector (osint.sh:607): scopify.py -c <company_name>; report → STDOUT.
+	res, err := app.Tools.Run(ctx, "Scopify", []string{"-c", company})
+	if err != nil {
+		if app.Log != nil {
+			app.Log.Debug("osint.domain_info: Scopify run failed (best_effort)", "err", err)
+		}
+		return
+	}
+	if len(bytes.TrimSpace(res.Stdout)) == 0 {
+		return
+	}
+	// D-O5 single-writer human file: osint/scopify.txt (bash `> osint/scopify.txt`).
+	scopifyFile := filepath.Join(osintDir, "scopify.txt")
+	if wErr := os.WriteFile(scopifyFile, res.Stdout, 0o644); wErr != nil && app.Log != nil { //nolint:gosec
+		app.Log.Debug("osint.domain_info: write scopify.txt failed", "err", wErr)
+	}
 }
 
 // init self-registers DomainInfoTask with the Default task registry.
