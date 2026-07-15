@@ -7,15 +7,17 @@
 //
 // It then performs the heavy bash github_repos secret pipeline (osint.sh:105-256,
 // PAR-03): clone every company repo into an isolated workspace tmp dir
-// (sha256-named), run titus (bash's DEFAULT secrets engine) + trufflehog over
-// the clones, merge the per-repo scan output into osint/github_company_secrets.json
-// (bash-parity human artefact), and emit REDACTED OSINTFindingRecords. Previously
-// only enumerepo ran — no clone, no secret scan, no github_company_secrets.json.
+// (sha256-named), run the titus + trufflehog secret-scan pair over the clones
+// (cfg.OSINT.GitHub.SecretsEngine defaults to "hybrid" — and every value other than
+// "noseyparker" runs this same pair), merge the per-repo scan output into
+// osint/github_company_secrets.json (bash-parity human artefact), and emit REDACTED
+// OSINTFindingRecords. Previously only enumerepo ran — no clone, no secret scan, no
+// github_company_secrets.json.
 //
-// noseyparker (bash's alternate engine) is DEFERRED to Phase 14 (absent from
-// tools.lock this phase — the non-default engine). SecretsEngine=="noseyparker"
-// logs a "deferred — using titus" note and falls back to titus, which covers the
-// ≥95% recon/all path.
+// noseyparker is the sole non-default engine and is DEFERRED to Phase 14 (absent
+// from tools.lock this phase). SecretsEngine=="noseyparker" logs a "deferred — using
+// titus" note and falls back to the titus + trufflehog pair, which covers the ≥95%
+// recon/all path.
 //
 // The repo list is written to inputs/github_repos.txt as a SINGLE-WRITER
 // artefact (D-O5) — one URL per line — which GitHubLeaksTask reads via its
@@ -236,11 +238,12 @@ func (t *GitHubReposTask) Run(ctx context.Context, app *appctx.AppContext) (task
 }
 
 // scanCompanyRepos performs the heavy bash github_repos secret pipeline
-// (osint.sh:105-256) over the enumerated repo URLs: clone each repo, run titus
-// (bash's default engine; noseyparker deferred to Phase 14) + trufflehog, merge
-// the per-repo scan output into osint/github_company_secrets.json (bash-parity
-// human artefact), and emit REDACTED findings. Returns the count of secrets
-// surfaced. Every step is best-effort (D-O8).
+// (osint.sh:105-256) over the enumerated repo URLs: clone each repo, run the titus +
+// trufflehog pair (the cfg SecretsEngine default "hybrid" — and any value other than
+// "noseyparker" — runs this pair; noseyparker is deferred to Phase 14), merge the
+// per-repo scan output into osint/github_company_secrets.json (bash-parity human
+// artefact), and emit REDACTED findings. Returns the count of secrets surfaced.
+// Every step is best-effort (D-O8).
 func (t *GitHubReposTask) scanCompanyRepos(ctx context.Context, app *appctx.AppContext, urls []string) int {
 	if len(urls) == 0 {
 		return 0
@@ -290,9 +293,10 @@ func (t *GitHubReposTask) scanCompanyRepos(ctx context.Context, app *appctx.AppC
 		cloned[i] = dest
 	})
 
-	// Step B: secrets-engine selection. titus is bash's DEFAULT; noseyparker is
-	// DEFERRED to Phase 14 (not in tools.lock) — a "noseyparker" selection logs a
-	// deferral note and falls back to titus.
+	// Step B: secrets-engine selection. The cfg SecretsEngine default is "hybrid",
+	// which — like every value other than "noseyparker" — runs the titus + trufflehog
+	// pair below. noseyparker is DEFERRED to Phase 14 (not in tools.lock); a
+	// "noseyparker" selection logs a deferral note and falls back to that pair.
 	if cfg != nil && strings.EqualFold(strings.TrimSpace(cfg.OSINT.GitHub.SecretsEngine), "noseyparker") && app.Log != nil {
 		app.Log.Info("osint.github_repos: noseyparker deferred to Phase 14 — using titus")
 	}
