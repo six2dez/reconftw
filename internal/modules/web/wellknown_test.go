@@ -213,3 +213,52 @@ func TestWebWellKnownNoTargetsSkips(t *testing.T) {
 		t.Errorf("status = %v, want skipped (no web targets)", res.Status)
 	}
 }
+
+// TestWellknownHTTPClientRefusesRedirect proves the SSRF-pivot guard (CR-13-01):
+// wellknownHTTPClient must NOT follow redirects. The Run-time scope/userinfo check
+// covers only the initial target URL, so an in-scope but attacker-influenceable
+// response that 302-redirects toward internal space (169.254.169.254 cloud
+// metadata, 127.0.0.1 services) must never cause the scanner to fetch the redirect
+// target. Both redirect hops below point at internal addresses; neither may fire.
+func TestWellknownHTTPClientRefusesRedirect(t *testing.T) {
+	var secretHits int32
+	mux := http.NewServeMux()
+	// Loopback redirect: 302 -> /secret on this same (127.0.0.1) test server.
+	mux.HandleFunc("/redirect-loopback", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/secret", http.StatusFound)
+	})
+	mux.HandleFunc("/secret", func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt32(&secretHits, 1)
+		_, _ = w.Write([]byte("INTERNAL-SECRET"))
+	})
+	// Metadata redirect: 302 -> link-local cloud-metadata endpoint. The client must
+	// return the un-followed 302 stub body (which echoes the href) and never dial
+	// the link-local target.
+	mux.HandleFunc("/redirect-metadata", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "http://169.254.169.254/latest/meta-data/", http.StatusFound)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	// 127.0.0.1 loopback redirect must be refused: /secret is never fetched.
+	body, err := wellknownGet(context.Background(), srv.URL+"/redirect-loopback")
+	if err != nil {
+		t.Fatalf("wellknownGet(loopback redirect) errored (refusal should not error): %v", err)
+	}
+	if got := atomic.LoadInt32(&secretHits); got != 0 {
+		t.Errorf("redirect followed to internal 127.0.0.1 /secret endpoint: %d hit(s), want 0", got)
+	}
+	if strings.Contains(string(body), "INTERNAL-SECRET") {
+		t.Errorf("redirect target body leaked into result: %q", string(body))
+	}
+
+	// 169.254.169.254 metadata redirect must be refused: the link-local target is
+	// never dialed; we receive the 302 stub body (which echoes the href) instead.
+	body, err = wellknownGet(context.Background(), srv.URL+"/redirect-metadata")
+	if err != nil {
+		t.Fatalf("wellknownGet(metadata redirect) errored (refusal should not error): %v", err)
+	}
+	if !strings.Contains(string(body), "169.254.169.254") {
+		t.Errorf("expected the un-followed 302 stub body echoing the href, got: %q", string(body))
+	}
+}

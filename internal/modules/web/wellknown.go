@@ -64,9 +64,24 @@ var wellknownPaths = []string{
 var wellknownHostRE = regexp.MustCompile(`[a-zA-Z0-9][-a-zA-Z0-9]*(?:\.[a-zA-Z0-9][-a-zA-Z0-9]*)+`)
 
 // wellknownHTTPClient is the bounded client for the best-effort .well-known GETs
-// (bash curl -m 5 -L). A per-target timeout keeps a slow endpoint from stalling
-// the pipeline.
-var wellknownHTTPClient = &http.Client{Timeout: 8 * time.Second}
+// (bash curl -m 5). A per-target timeout keeps a slow endpoint from stalling the
+// pipeline.
+//
+// SSRF-pivot guard (CR-13-01): the per-target scope + userinfo check in Run
+// validates only the INITIAL target URL. A default http.Client follows up to 10
+// redirects with no per-hop check, so an in-scope but attacker-influenceable
+// response (subdomain takeover, malicious app, or a plain 302) could redirect the
+// scanner into internal space — cloud metadata (169.254.169.254), loopback
+// services (127.0.0.1), or internal port probing. CheckRedirect refuses to follow
+// ANY redirect, which closes that pivot for both internal and off-scope external
+// targets. .well-known probing does not need redirects; bash's curl -L carries the
+// same footgun but parity with a vulnerable default does not justify reproducing it.
+var wellknownHTTPClient = &http.Client{
+	Timeout: 8 * time.Second,
+	CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	},
+}
 
 // wellknownGet fetches rawurl and returns up to 1 MiB of the response body. It is
 // a package var so tests may inject a canned response without real network I/O
