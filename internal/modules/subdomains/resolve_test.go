@@ -191,6 +191,73 @@ func TestResolveTasksBuildNoPanic(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------
+// Test 7 (13-01 Task 1): SubDNSTask persists the dnsregs records artefact +
+// subdomains_ips.txt AND stages in-scope hostnames harvested from the records.
+// -------------------------------------------------------------------------
+
+func TestSubDNSPersistsDnsregsAndIPs(t *testing.T) {
+	workDir := t.TempDir()
+
+	// dnsx -recon -json JSONL: two hosts, an in-scope cname, A + AAAA addresses.
+	dnsregs := `{"host":"api.example.com","a":["1.2.3.4"],"cname":["cdn.example.com"]}
+{"host":"mail.example.com","a":["5.6.7.8"],"aaaa":["2606:4700::1111"]}
+`
+	mockBe := &mockBackend{result: &backend.Result{Stdout: []byte(dnsregs), ExitCode: 0}}
+	reg := backend.NewToolRegistry()
+	reg.Register(&backend.Tool{Name: "dnsx"})
+	runner := backend.NewRunner(mockBe, reg, nil)
+
+	app := newTestApp(workDir, runner, &mockTree{}) // ReverseIP defaults false
+
+	tsk, ok := task.Default.Lookup("subdomains.dns")
+	if !ok {
+		t.Fatal("subdomains.dns not registered")
+	}
+	res, err := tsk.Run(context.Background(), app)
+	if err != nil {
+		t.Fatalf("SubDNSTask.Run: unexpected error: %v", err)
+	}
+	if res.Status != task.StatusDone {
+		t.Fatalf("status = %q, want done", res.Status)
+	}
+
+	// 1. Records artefact persisted VERBATIM (PAR-01 — previously discarded).
+	artefact, err := os.ReadFile(filepath.Join(workDir, "artefacts", "subdomains_dnsregs.json"))
+	if err != nil {
+		t.Fatalf("artefacts/subdomains_dnsregs.json not written: %v", err)
+	}
+	if string(artefact) != dnsregs {
+		t.Errorf("dnsregs artefact = %q, want verbatim dnsx output", string(artefact))
+	}
+
+	// 2. host→IP pairs (A + AAAA) written to subdomains/subdomains_ips.txt.
+	ips, err := os.ReadFile(filepath.Join(workDir, "subdomains", "subdomains_ips.txt"))
+	if err != nil {
+		t.Fatalf("subdomains/subdomains_ips.txt not written: %v", err)
+	}
+	for _, want := range []string{
+		"api.example.com - 1.2.3.4",
+		"mail.example.com - 5.6.7.8",
+		"mail.example.com - 2606:4700::1111",
+	} {
+		if !strings.Contains(string(ips), want) {
+			t.Errorf("subdomains_ips.txt missing %q; got:\n%s", want, string(ips))
+		}
+	}
+
+	// 3. In-scope hostnames (host + in-scope cname) reach inputs/resolved.dns.txt.
+	staged, err := os.ReadFile(filepath.Join(workDir, "inputs", "resolved.dns.txt"))
+	if err != nil {
+		t.Fatalf("inputs/resolved.dns.txt not written: %v", err)
+	}
+	for _, want := range []string{"api.example.com", "mail.example.com", "cdn.example.com"} {
+		if !strings.Contains(string(staged), want) {
+			t.Errorf("resolved.dns.txt missing %q; got:\n%s", want, string(staged))
+		}
+	}
+}
+
+// -------------------------------------------------------------------------
 // Test helpers specific to resolve tests
 // -------------------------------------------------------------------------
 

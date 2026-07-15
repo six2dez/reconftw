@@ -20,8 +20,9 @@
 //   - (*exec.Cmd).Start(...)    — method call on a Cmd receiver
 //
 // REPLACEMENT:
-//   app.Tools.Run(ctx, name, args)    or
-//   app.Tools.Stream(ctx, name, args)
+//
+//	app.Tools.Run(ctx, name, args)    or
+//	app.Tools.Stream(ctx, name, args)
 //
 // ALLOWLIST: see no_raw_subprocess.go package comment.
 package lint_test
@@ -83,6 +84,13 @@ var allowedPaths = []string{
 	// stdin injection, so direct exec.CommandContext is the sanctioned invocation
 	// pattern. Mirrors web/nomore403.go precedent (VULN-13 / plan 06-07).
 	"internal/modules/vulns/bypass4xx.go",
+	// subdomains/reverseip.go: hakip2host is a hakluke stdin-only tool (reads a
+	// newline-delimited IP list on stdin). The name-keyed Backend/Runner registry
+	// does not support stdin injection, so direct exec.CommandContext with
+	// cmd.Stdin is the sanctioned invocation pattern (mirrors web/hakoriginfinder.go,
+	// another hakluke stdin tool). Behind the hakip2hostRunner package var for
+	// hermetic tests; per-invocation context.WithTimeout applied (PAR-01 / plan 13-01).
+	"internal/modules/subdomains/reverseip.go",
 	// internal/installer/: the Phase 11 installer runs TOOLCHAIN + package-manager
 	// commands (go install, uv tool install, apt-get/brew/pacman, git clone, cargo,
 	// tar) plus version probes (go version -m, uv tool list) and the SHA-256-verified
