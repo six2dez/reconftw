@@ -1033,3 +1033,56 @@ timeout_seconds = 600
 critical        = false
 version         = "latest"
 input_flag      = ""
+
+# Phase 13 additions (Domain Parity) — tools this phase invokes that were absent.
+# Module paths verified against install.sh (source of truth). noseyparker DEFERRED
+# to Phase 14 (absent from install.sh; non-default engine — titus is bash's default).
+[[tools]]
+name            = "nmap"
+kind            = "system"
+description     = "Active port + service scanning (PAR-04 portscan; Docker setcap set in Phase 11)"
+default_args    = []
+timeout_seconds = 0
+critical        = false
+version         = ""
+input_flag      = ""
+[[tools]]
+name            = "nerva"
+kind            = "go"
+go_module       = "github.com/praetorian-inc/nerva/cmd/nerva"
+description     = "Service fingerprinting (PAR-04 service_fingerprint)"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+version         = "latest"
+input_flag      = ""
+[[tools]]
+name            = "brutus"
+kind            = "go"
+go_module       = "github.com/praetorian-inc/brutus/cmd/brutus"
+description     = "Credential spraying (PAR-02 deep spray, service-fingerprint input)"
+default_args    = []
+timeout_seconds = 0
+critical        = false
+version         = "latest"
+input_flag      = ""
+[[tools]]
+name            = "titus"
+kind            = "go"
+go_module       = "github.com/praetorian-inc/titus/cmd/titus"
+description     = "Secrets engine (PAR-03 github repo secrets; bash default engine)"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+version         = "latest"
+input_flag      = ""
+[[tools]]
+name            = "Scopify"
+kind            = "python_venv"
+repo_url        = "https://github.com/Arcanum-Sec/Scopify"
+description     = "Scope management / infra recon (PAR-03 scope)"
+default_args    = []
+timeout_seconds = 120
+critical        = false
+version         = "latest"
+input_flag      = ""

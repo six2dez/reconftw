@@ -110,6 +110,9 @@ func TestDefaults(t *testing.T) {
 		{"Subdomains.Passive.TimeoutMinutes", cfg.Subdomains.Passive.TimeoutMinutes, 180},
 		{"Subdomains.CRT.Limit", cfg.Subdomains.CRT.Limit, 999999},
 		{"Subdomains.Permut.LimitBytes", cfg.Subdomains.Permut.LimitBytes, int64(2147483648)},
+		// 13-01 PAR-01: tls + reverse-ip default-on (bash parity).
+		{"Subdomains.TLSPivot.Enabled", cfg.Subdomains.TLSPivot.Enabled, true},
+		{"Subdomains.ReverseIP.Enabled", cfg.Subdomains.ReverseIP.Enabled, true},
 
 		{"Web.Probe.Enabled", cfg.Web.Probe.Enabled, true},
 		{"Web.Probe.RateLimit", cfg.Web.Probe.RateLimit, 150},

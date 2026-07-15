@@ -164,6 +164,8 @@ func TestToolsLockNameCoverage(t *testing.T) {
 		// osint + notify + collab + misc
 		"notify", "github-endpoints", "cent", "grpcurl", "interlace",
 		"interactsh-client", "tlsx", "brutespray", "LeakSearch",
+		// Phase 13 (Domain Parity) additions — verified against install.sh.
+		"nmap", "nerva", "brutus", "titus", "Scopify",
 	}
 	have := map[string]bool{}
 	for _, tool := range backend.Default.All() {

@@ -51,7 +51,12 @@ func Defaults() *Config {
 			},
 			ZoneTransfer: SubZoneTransfer{Enabled: true},
 			S3Buckets:    SubS3Buckets{Enabled: true},
-			ReverseIP:    SubReverseIP{Enabled: false},
+			// ReverseIP default-on (13-01 PAR-01): the hakip2host reverse-IP
+			// step folds into the default sub_dns path (bash runs it by default).
+			ReverseIP: SubReverseIP{Enabled: true},
+			// PTRSweep: dead scaffold — the full ASN-CIDR PTR sweep is deferred to
+			// Phase 14; SubPTRTask was removed in 13-01. Default stays off (bash
+			// PTR_SWEEP=false; not on the recon/all default path).
 			PTRSweep: SubPTRSweep{
 				Enabled: false,
 				MaxIPs:  50000,
@@ -77,8 +82,9 @@ func Defaults() *Config {
 				GenerateResolvers:         false,
 				UpdateResolvers:           true,
 			},
+			// TLSPivot default-on (13-01 PAR-01): bash runs sub_tls by default.
 			TLSPivot: SubTLSPivot{
-				Enabled:      false,
+				Enabled:      true,
 				SNIBatchSize: 1000,
 				DeltaProbe:   true,
 			},
@@ -213,7 +219,7 @@ func Defaults() *Config {
 			Metadata:    VulnMetadata{Enabled: true},
 		},
 		OSINT: OSINTConfig{
-			Enabled:     true,
+			Enabled: true,
 			// D-O8: GoogleDorks on but key-gated; xnldorker (OSINT-15) on.
 			GoogleDorks: OSINTGoogleDorks{Enabled: true, XnldorkerEnabled: true},
 			GitHub: OSINTGitHub{
