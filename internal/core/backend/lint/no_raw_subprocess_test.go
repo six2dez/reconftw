@@ -64,6 +64,14 @@ var allowedPaths = []string{
 	"internal/modules/web/mantra.go",
 	"internal/modules/web/shortscan.go",
 	"internal/modules/web/jsa.go",
+	// wordlistgen.go: roboxtractor is a stdin-only tool and getjswords is a repo
+	// Python script invoked once per JS URL; neither routes through the name-keyed
+	// Backend/Runner registry (no stdin / cmd-path injection). Direct
+	// exec.CommandContext behind overridable package-var runners is the sanctioned
+	// pattern (mirrors web/gxss.go + subdomains/reverseip.go). Per-invocation
+	// context.WithTimeout applied; XCUT-07 keeps URLs/paths on argv, secrets off it
+	// (PAR-04 / plan 13-04).
+	"internal/modules/web/wordlistgen.go",
 	// vulns/xss.go: dalfox `pipe` mode and Gxss both read candidate URLs from
 	// stdin (identical to web/gxss.go); the name-keyed Backend/Runner registry
 	// does not support stdin injection, so direct exec.CommandContext is the
