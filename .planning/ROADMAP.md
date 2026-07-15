@@ -510,7 +510,7 @@ Plans:
 - [x] 13-04-PLAN.md — Web light producers: url_ext bucketing + .well-known pivots + roboxtractor/getjswords wordlists (pydictor deferred)
 - [x] 13-05-PLAN.md — OSINT: LeakSearch passwords + Scopify + ip_info WHOISXML reverse-IP/IP-target
 - [x] 13-06-PLAN.md — OSINT: github repo-secret scan — enumerepo → clone → titus (default) + trufflehog → github_company_secrets.json + redacted findings (noseyparker deferred to Ph14 → titus fallback)
-- [ ] 13-07-PLAN.md — Vulns: password spraying (brutespray/brutus) + SSRF OOB interactsh auto-start
+- [x] 13-07-PLAN.md — Vulns: password spraying (brutespray/brutus) + SSRF OOB bounded interactsh auto-start
 - [ ] 13-08-PLAN.md — Pipeline wiring (all stage-list sites) + capability parity audit (>=95%)
 
 ### Phase 14: Cutover & Migration

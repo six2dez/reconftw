@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: milestone
 status: executing
 stopped_at: context exhaustion at 75% (2026-06-26)
-last_updated: "2026-07-15T19:00:00.000Z"
-last_activity: 2026-07-15 -- Phase 13 plan 13-06 executed (osint company-repo secret scan: enumerepo → clone → titus + trufflehog → github_company_secrets.json + redacted findings, PAR-03)
+last_updated: "2026-07-15T21:30:00.000Z"
+last_activity: 2026-07-15 -- Phase 13 plan 13-07 executed (vulns parity: SprayTask brutespray/brutus deep-gated + bounded interactsh-client SSRF-OOB auto-start, PAR-02)
 progress:
   total_phases: 12
   completed_phases: 9
   total_plans: 81
-  completed_plans: 78
+  completed_plans: 79
   percent: 75
 ---
 
@@ -25,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-05-27)
 
 ## Current Position
 
-Phase: 13 — Domain Parity (EXECUTING — osint wave)
-Plan: 13-06 executed + committed (2 task commits: e94a817 test, 1c361e6 feat — TDD). Earlier: 13-05 (b165e83, adf6407, 802a025 + docs db921c6), 13-04 (f887da0, 0fc69a7, 4c280d0), 13-03 (fe1e3f5, 82625a7), 13-02 (3b45229, 748ee15), 13-01 (9b0ceb2, 792c99f, 86a82f5); Phase 12 (c62eead).
-Status: 13-06 done — closed the highest-complexity OSINT gap (PAR-03): GithubReposTask now performs the full bash github_repos pipeline (osint.sh:105-256) after enumerepo. Clone every company repo (git clone → .tmp/github_repos/<sha256(url)>, bounded concurrency = cfg.OSINT.GitHub.Threads/INTERLACE_THREADS analog; FOUND-10-allowlisted exec seam behind githubReposGitClone var — git is a base system dep, not a tools.lock recon binary; GIT_TERMINAL_PROMPT=0 fail-fast) → titus scan --format json [--git|--validate] (bash's DEFAULT engine) + trufflehog git <url> -j enrichment → merge .tmp/github/* into osint/github_company_secrets.json (0600; native structure preserved, raw secret VALUES scrubbed to ***) + REDACTED inputs/findings.github_secrets.jsonl (Class osint / Source github_repos / Category leaked-secret / ValueRedacted="***"). Previously ONLY enumerepo ran (no clone/scan/artefact). noseyparker DEFERRED to Phase 14 (absent from tools.lock this phase, non-default engine) → SecretsEngine=="noseyparker" logs a deferral note + falls back to titus (titus/hybrid/gitleaks/unset all → titus). XCUT-07 (T-13-06-01/02): GitHub token via -token-file 0600 temp (off argv, removed after run); every raw secret registered with the log Redactor BEFORE any log/file write; the JSONL findings stream carries only ValueRedacted="***" — redaction proven by TitusScan + Trufflehog tests (raw marker absent from findings.jsonl AND the log buffer). Best-effort throughout (D-O8): missing tool/token/repo → StatusDone/Skipped + warning, never aborts the osint pipeline. enumerepo/titus/trufflehog route through app.Tools; only git clone uses the allowlisted subprocess seam. TDD (RED failing-test commit → GREEN feat commit). Symbol-hygiene: all NEW helpers namespaced githubRepos* (GitClone/scanCompanyRepos/runTitusScan/runTrufflehogScan/mergeSecretOutputs/ExtractSecrets/WalkRecord/ToolAvailable/Threads/Bounded/SHA256) — file-disjoint from 13-05. gofmt+vet clean; osint suite green; FOUND-10 lint gate green; full non-resolvers suite green (31 ok, 0 FAIL); internal/core/resolvers still the pre-existing UDP/53 env-hang (untouched).
-NEXT: Phase 13 continues — 13-07 (vulns spraying brutespray/brutus + SSRF-OOB interactsh auto-start), 13-08 (pipeline wiring — add subdomains.csprecon + web.portscan + web.url_ext/wellknown/wordlistgen to stage lists, wire web.MergeStage "hosts" after portscan+wellknown in web.go+composite.go, confirm zen ApplyZenProfile disables Web.Portscan.ActiveEnabled+UDPEnabled, remove dead subdomains.ptr).
-Last activity: 2026-07-15 -- 13-06 executed (1 task, TDD) + committed; osint company-repo secret scan (titus + trufflehog) → github_company_secrets.json + redacted findings (PAR-03).
+Phase: 13 — Domain Parity (EXECUTING — vulns wave)
+Plan: 13-07 executed + committed (2 task commits: 26ea133 feat spray, 6831888 feat ssrf-oob). Earlier: 13-06 (e94a817 test, 1c361e6 feat + docs 5520500), 13-05 (b165e83, adf6407, 802a025 + docs db921c6), 13-04 (f887da0, 0fc69a7, 4c280d0), 13-03 (fe1e3f5, 82625a7), 13-02 (3b45229, 748ee15), 13-01 (9b0ceb2, 792c99f, 86a82f5); Phase 12 (c62eead).
+Status: 13-07 done — closed the two vulns parity gaps (PAR-02). (1) SprayTask (internal/modules/vulns/spray.go, Name "vulns.spray", DependsOn nil) reads the previously-orphaned cfg.Vulns.Spray{Enabled,Engine,DeepOnly} (defaults.go:216, consumed by zero tasks): brutespray (default) `-f hosts/portscan_active.gnmap -T <concurrence> -o vulns/brutespray` via app.Tools; brutus (alternate, DEEP-gated) reads hosts/service_fingerprints.jsonl (from 13-03; or nerva-generated from naabu_open.txt) on STDIN via the brutusRunner exec seam (FOUND-10-allowlisted, mirrors reverseip.go — brutus is stdin-only) → `brutus --json -o vulns/brutus.jsonl [-u/-p/-k file]`. Gating matches bash spraying() (vulns.sh:615): StatusSkipped on IP-literal target / absent-or-empty gnmap / (Spray.DeepOnly && !Deep); brutus additionally deep-gated (SPRAY_BRUTUS_ONLY_DEEP default true) → never sprays outside --deep. XCUT-07 (T-13-07-03): discovered credentials NEVER persisted — only host/service/port recorded in inputs/findings.spray.jsonl (VulnClass credential-spray), credential redacted to *** (Payload/PoCRedacted); brutus wordlists cross as FILE PATHS (-u/-p/-k), never raw values on argv. Best-effort (D-V7): missing brutespray/brutus → StatusSkipped, never StatusErrored. (2) SSRFTask (ssrf.go) re-adds the interactsh-client auto-start the DoD-2 fix REMOVED — now BOUNDED: when cfg.APIKeys.CollabServer unset AND interactsh-client on PATH, startInteractshClient (package-var seam) exec's it under taskCtx (SysProcAttr Setpgid + process-group SIGTERM on cleanup/cancel, mirrors local.go), reads the registered callback domain with a wait bounded by BOTH interactshStartupTimeout (30s sub-timeout) AND the overall task context.WithTimeout — no-callback → group-kill + fall through to in-band; NO infinite poll (DoD-2 unbounded-wait regression prevented, test-proven by TestSSRFRunBoundedNoHang: a never-emitting stub does not hang past TimeoutSeconds). XCUT-07 (T-13-07-02): callback domain (session secret) NEVER logged — only "oob_enabled" + counts; token seeds workspace OOB payloads only, never a log line or finding (TestSSRFXCUT07NoCallbackURLInLogs). CollabServer-set path unchanged (regression guard). spray.go added to the FOUND-10 allowlist (brutus stdin). TDD-developed, committed test+impl together per task (feat). gofmt+vet clean; vulns suite green; FOUND-10 lint gate green; go build ./... exit 0; full non-resolvers suite green (31 ok, 0 FAIL); internal/core/resolvers still the pre-existing UDP/53 env-hang (untouched).
+NEXT: Phase 13 final plan — 13-08 (pipeline wiring: add subdomains.csprecon + web.portscan + web.url_ext/wellknown/wordlistgen + vulns.spray to the stage lists, wire web.MergeStage "hosts" after portscan+wellknown in web.go+composite.go, confirm zen ApplyZenProfile disables Web.Portscan.ActiveEnabled+UDPEnabled, remove dead subdomains.ptr; capability parity audit ≥95%). SSRFTask is already wired (vulns.ssrf); vulns.spray self-registers but is UNSELECTED until 13-08 adds its prefix to the vulns stage list.
+Last activity: 2026-07-15 -- 13-07 executed (2 tasks) + committed; vulns password spraying (brutespray/brutus deep-gated) + bounded interactsh SSRF-OOB auto-start (PAR-02).
 
 ## Performance Metrics
 
@@ -92,6 +92,7 @@ Last activity: 2026-07-15 -- 13-06 executed (1 task, TDD) + committed; osint com
 | Phase 13 P04 | ~40m | 3 tasks | 4 files |
 | Phase 13 P05 | ~35m | 3 tasks | 6 files |
 | Phase 13 P06 | ~30m | 1 task (TDD) | 3 files |
+| Phase 13 P07 | ~40m | 2 tasks | 6 files |
 
 ## Accumulated Context
 
