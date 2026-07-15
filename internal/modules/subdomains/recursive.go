@@ -69,6 +69,67 @@ func readLines(fpath string) ([]string, error) {
 	return lines, scanner.Err()
 }
 
+// dsieveTopN selects the top-N recursion seeds via dsieve frequency filtering,
+// mirroring bash sub_recursive_passive (modules/subdomains.sh:1802):
+//
+//	dsieve -if <resolved.merged> -f 3 -top <depth>
+//
+// `-f 3` groups/filters by DNS depth level 3; `-top N` keeps the N most frequent
+// hosts. This replaces the previous naive subdomains[:depth] first-N prefix slice
+// with bash's frequency-ranked selection so recursion targets the right
+// high-value seeds instead of an arbitrary list prefix (PAR-01).
+//
+// Degrade (T-13-02-02): on a dsieve tool-execution error OR empty output it logs
+// a warning and falls back to the first-N slice of fallback — recursion is a
+// best-effort deep aux source, so a dsieve failure must never abort it.
+func dsieveTopN(ctx context.Context, app *appctx.AppContext, inputFile string, depth int, fallback []string) []string {
+	firstN := func() []string {
+		n := depth
+		if n > len(fallback) {
+			n = len(fallback)
+		}
+		if n < 0 {
+			n = 0
+		}
+		return fallback[:n]
+	}
+
+	res, err := app.Tools.Run(ctx, "dsieve", []string{
+		"-if", inputFile,
+		"-f", "3",
+		"-top", strconv.Itoa(depth),
+	})
+	if err != nil {
+		if app.Log != nil {
+			app.Log.Warn("recursive.passive: dsieve failed — falling back to first-N slice",
+				"tool", "dsieve", "error", err.Error())
+		}
+		return firstN()
+	}
+
+	seen := make(map[string]struct{})
+	var seeds []string
+	for _, raw := range strings.Split(string(res.Stdout), "\n") {
+		line := strings.ToLower(strings.TrimSpace(raw))
+		if line == "" {
+			continue
+		}
+		if _, dup := seen[line]; dup {
+			continue
+		}
+		seen[line] = struct{}{}
+		seeds = append(seeds, line)
+	}
+	if len(seeds) == 0 {
+		if app.Log != nil {
+			app.Log.Warn("recursive.passive: dsieve returned no seeds — falling back to first-N slice",
+				"tool", "dsieve")
+		}
+		return firstN()
+	}
+	return seeds
+}
+
 // -------------------------------------------------------------------------
 // SubRecursivePassiveTask
 // -------------------------------------------------------------------------
@@ -112,15 +173,15 @@ func (SubRecursivePassiveTask) Run(ctx context.Context, app *appctx.AppContext) 
 		}, nil
 	}
 
-	// Limit to PassiveDepth top-level subdomains (first N from list).
+	// Select the top-N recursion seeds via dsieve frequency filtering (bash
+	// sub_recursive_passive parity) instead of the naive subdomains[:depth]
+	// first-N prefix slice. PassiveDepth maps to bash DEEP_RECURSIVE_PASSIVE.
+	// dsieveTopN degrades to the first-N slice on a dsieve error/empty output.
 	depth := cfg.Subdomains.Recursive.PassiveDepth
 	if depth <= 0 {
 		depth = 1
 	}
-	if depth > len(subdomains) {
-		depth = len(subdomains)
-	}
-	targets := subdomains[:depth]
+	targets := dsieveTopN(ctx, app, inputFile, depth, subdomains)
 
 	// Deduplicate seen hostnames across subfinder calls.
 	seen := make(map[string]struct{})
@@ -183,8 +244,10 @@ func (SubRecursivePassiveTask) Run(ctx context.Context, app *appctx.AppContext) 
 // -------------------------------------------------------------------------
 
 // SubRecursiveBruteTask runs puredns bruteforce on each resolved subdomain.
-// This mirrors v1 sub_recursive_brute (brute each top-N subdomain with
-// short wordlist via puredns).
+// This mirrors v1 sub_recursive_brute, which brute-forces EVERY resolved sub
+// with a short wordlist via puredns — NOT a dsieve top-N subset (unlike
+// SubRecursivePassiveTask). That full-set behavior is intentional bash parity
+// and is deliberately left unchanged here (13-02 Task 2 scope note).
 // Writes staging file: inputs/recursive.brute.txt
 type SubRecursiveBruteTask struct{}
 
