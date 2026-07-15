@@ -4,8 +4,8 @@ milestone: v2.0
 milestone_name: milestone
 status: executing
 stopped_at: context exhaustion at 75% (2026-06-26)
-last_updated: "2026-07-15T12:00:00.000Z"
-last_activity: 2026-07-15 -- Phase 13 plan 13-03 executed (web active portscan naabu/nmap + nerva service fingerprint)
+last_updated: "2026-07-15T15:30:00.000Z"
+last_activity: 2026-07-15 -- Phase 13 plan 13-04 executed (web url_ext bucketing + .well-known pivots + roboxtractor/getjswords wordlists; pydictor deferred)
 progress:
   total_phases: 12
   completed_phases: 9
@@ -26,10 +26,10 @@ See: .planning/PROJECT.md (updated 2026-05-27)
 ## Current Position
 
 Phase: 13 — Domain Parity (EXECUTING — web wave)
-Plan: 13-03 executed + committed (2 task commits fe1e3f5, 82625a7). Earlier: 13-02 (3b45229, 748ee15), 13-01 (9b0ceb2, 792c99f, 86a82f5); Phase 12 (c62eead).
-Status: 13-03 done — WebPortscanTask ("web.portscan") added: reads the previously-dead cfg.Web.Portscan so naabu/nmap/nerva are actually invoked (PAR-04). Flow (bash web.sh:600-923 parity): IP-seed from subdomains/subdomains_ips.txt (13-01, field-3) → cdncheck CDN filter → PASSIVE smap + shodan internetdb (unprivileged, keyless) → ACTIVE naabu→nmap targeted scan producing hosts/portscan_active.gnmap (spray input PAR-02/13-07) → nmapurls feedback via NATIVE nmap-XML parse (nmapurls is stdin-only) → nerva service fingerprint → hosts/service_fingerprints.jsonl + inputs/hosts.{portscan,nerva}.jsonl staging. Naabu Ports split into argv (T-13-03-02) + -duc (T-13-03-03). Missing tool / no privilege degrades to StatusDone (D-O2), never fails the web pipeline. Task self-registers but is UNSELECTED until 13-08 wires the stage list + web.MergeStage(ctx,app,"hosts"). Build+vet clean; full non-resolvers suite green (0 FAIL); internal/core/resolvers still the pre-existing UDP/53 env-hang (untouched).
-NEXT: Phase 13 continues — 13-04 (web url_ext/well-known/wordlists), 13-05/06 (osint), 13-07 (vulns spraying/SSRF-OOB), 13-08 (pipeline wiring — add subdomains.csprecon + web.portscan to stage lists, wire web.MergeStage "hosts" after portscan in web.go+composite.go, confirm zen ApplyZenProfile disables Web.Portscan.ActiveEnabled+UDPEnabled, remove dead subdomains.ptr).
-Last activity: 2026-07-15 -- 13-03 executed (2 tasks, TDD) + committed; web active portscan (naabu/nmap) + nerva service fingerprint.
+Plan: 13-04 executed + committed (3 task commits f887da0, 0fc69a7, 4c280d0). Earlier: 13-03 (fe1e3f5, 82625a7), 13-02 (3b45229, 748ee15), 13-01 (9b0ceb2, 792c99f, 86a82f5); Phase 12 (c62eead).
+Status: 13-04 done — three light web producer/pivot tasks close the remaining PAR-04 gaps by reading previously-dead config. (1) WebURLExtTask ("web.url_ext", cfg.Web.URLs.ExtClassify): pure awk-style transform buckets the deduped URL corpus (artefacts/urls.jsonl) by the ~130-entry sensitive-extension set into webs/urls_by_ext.txt (bash url_ext parity); IP-target + empty-corpus skip; ZERO tool calls. (2) WebWellKnownTask ("web.wellknown", cfg.Web.WellKnown.Enabled, DEFAULT-OFF bash parity): native net/http probes security.txt + openid-configuration + oauth-authorization-server over the web targets, extracts in-scope hostnames → inputs/hosts.wellknown.jsonl staging; SSRF/scope guard (T-13-04-01) re-validates each target in-scope + rejects userinfo BEFORE fetch; MaxTargets cap; best-effort (never StatusErrored). (3) WebWordlistGenTask ("web.wordlistgen", cfg.Web.Wordlist.*): roboxtractor (robots→webs/robots_wordlist.txt) + getjswords (JS words→webs/dict_words.txt), each degrading INDEPENDENTLY (T-13-04-02); stdin/python-script tools via timeout-bounded exec seams (FOUND-10 allowlist entry added); pydictor DEFERRED to Phase 14 (documented sentinel, never invoked). All three self-register but are UNSELECTED until 13-08 wires the stage lists + web.MergeStage(ctx,app,"hosts") for wellknown. Build+vet+gofmt clean; full non-resolvers suite green (31 ok, 0 FAIL); internal/core/resolvers still the pre-existing UDP/53 env-hang (untouched).
+NEXT: Phase 13 continues — 13-05/06 (osint LeakSearch/Scopify/ip_info + github repo-secrets), 13-07 (vulns spraying/SSRF-OOB), 13-08 (pipeline wiring — add subdomains.csprecon + web.portscan + web.url_ext/wellknown/wordlistgen to stage lists, wire web.MergeStage "hosts" after portscan+wellknown in web.go+composite.go, confirm zen ApplyZenProfile disables Web.Portscan.ActiveEnabled+UDPEnabled, remove dead subdomains.ptr).
+Last activity: 2026-07-15 -- 13-04 executed (3 tasks, TDD) + committed; web url_ext/well-known/wordlists (pydictor deferred).
 
 ## Performance Metrics
 
@@ -89,6 +89,7 @@ Last activity: 2026-07-15 -- 13-03 executed (2 tasks, TDD) + committed; web acti
 | Phase 10 P02 | 35 | 2 tasks | 10 files |
 | Phase 10 P04 | 25m | 2 tasks | 7 files |
 | Phase 13 P03 | ~35m | 2 tasks | 2 files |
+| Phase 13 P04 | ~40m | 3 tasks | 4 files |
 
 ## Accumulated Context
 
