@@ -1,0 +1,4 @@
+# Nmap 7.94 scan initiated as: nmap -p- -oA portscan_active 1.2.3.4
+Host: 1.2.3.4 ()	Status: Up
+Host: 1.2.3.4 ()	Ports: 22/open/tcp//ssh///, 3306/open/tcp//mysql///, 5432/open/tcp//postgresql///	Ignored State: closed (997)
+# Nmap done -- 1 IP address (1 host up) scanned

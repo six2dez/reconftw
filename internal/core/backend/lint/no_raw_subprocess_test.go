@@ -99,6 +99,14 @@ var allowedPaths = []string{
 	// another hakluke stdin tool). Behind the hakip2hostRunner package var for
 	// hermetic tests; per-invocation context.WithTimeout applied (PAR-01 / plan 13-01).
 	"internal/modules/subdomains/reverseip.go",
+	// vulns/spray.go: brutus is a stdin-only spraying tool — it reads the service-
+	// fingerprint JSON on stdin (bash: `brutus ... <input`, vulns.sh:665). The name-
+	// keyed Backend/Runner registry does not support stdin injection, so brutus is
+	// invoked via a direct, timeout-bounded exec.CommandContext with cmd.Stdin behind
+	// the brutusRunner package var (hermetic tests). brutespray/nerva still route
+	// through app.Tools. Mirrors reverseip.go / github_repos.go; XCUT-07 keeps
+	// credentials off argv and out of findings (PAR-02 / plan 13-07).
+	"internal/modules/vulns/spray.go",
 	// osint/github_repos.go: `git clone` fetches every company repo into an
 	// isolated workspace tmp dir for read-only titus/trufflehog secret scanning
 	// (bash github_repos, osint.sh:110). git is a base system dependency, not a
