@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.0
-milestone_name: Complete Core Migration
-status: ready_to_plan
-stopped_at: Phase 9 complete (4/4) — ready to discuss Phase 10
-last_updated: 2026-06-11T10:57:20.613Z
-last_activity: 2026-06-11 -- Phase 9 execution started
+milestone_name: milestone
+status: executing
+stopped_at: context exhaustion at 75% (2026-06-26)
+last_updated: "2026-06-26T14:05:19.158Z"
+last_activity: 2026-06-16 -- Phase 11 planning complete
 progress:
   total_phases: 12
-  completed_phases: 7
-  total_plans: 70
-  completed_plans: 69
-  percent: 58
+  completed_phases: 9
+  total_plans: 81
+  completed_plans: 74
+  percent: 75
 ---
 
 # Project State
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-27)
 
 **Core value:** Run one command, get a complete recon picture of a target — passive, active, and vulnerability layers — with resumable checkpoints, structured output, and zero-touch tool orchestration.
-**Current focus:** Phase 10 — monitor mode + reporting + notifications
+**Current focus:** Phase 12 — Integration Hardening (Wave 0: wire subsystems end-to-end). Roadmap extended (2026-07-14) with Phases 12 Integration Hardening, 13 Domain Parity, 14 Cutover & Migration (Cutover renumbered 12→14). Phases 1-11 implemented (code is the reliable signal; the phase-status table below is stale). INTEG-01 (store ingest) already landed this session.
 
 ## Current Position
 
-Phase: 10
-Plan: Not started
-Status: Ready to plan
-NEXT (you, the maintainer): re-verify Phase 7 (07-VERIFICATION.md GAP-02/GAP-03 now closed) → Phase 7 completes. THEN Phase 8 (MCP Server).
-Last activity: 2026-06-11
+Phase: 13 — Domain Parity (EXECUTING — subs first)
+Plan: 13-01 executed + committed (3 task commits 9b0ceb2, 792c99f, 86a82f5). Phase 12 committed earlier (c62eead).
+Status: 13-01 done — SubDNSTask now persists artefacts/subdomains_dnsregs.json + subdomains/subdomains_ips.txt + folds hakip2host reverse-IP (gated); resolve tasks degrade tool-exec errors to StatusDone (CONTINUE_ON_TOOL_ERROR parity, scope/ctx still propagate); dead SubPTRTask removed; tls+reverse-ip default-on; 5 tools added to tools.lock (nmap/nerva/brutus/titus/Scopify). Full `go test ./...` green EXCEPT internal/core/resolvers (pre-existing environmental hang — real dnsvalidator subprocess on blocked UDP/53, NOT touched by 13-01). noseyparker + full ASN-CIDR PTR sweep deferred to Phase 14.
+NEXT: Phase 13 continues — 13-02 (csprecon in subs pipeline + dsieve top-N recursion) completes PAR-01, then vulns/osint/web plans.
+Last activity: 2026-07-15 -- 13-01 executed (3 tasks, TDD) + committed; resolve pipeline dnsregs/IP-seed/reverse-IP/degrade/PTR-removal/defaults/tools.lock.
 
 ## Performance Metrics
 
@@ -37,7 +37,7 @@ Last activity: 2026-06-11
 
 - Phases planned: 12 (coarse granularity; parallelization enabled within phases)
 - Total REQ-IDs: 197 (100% mapped to phases)
-- Total plans completed: 52
+- Total plans completed: 57
 - Total execution time: 0.0 hours
 
 **v2.0 phase status:**
@@ -86,6 +86,8 @@ Last activity: 2026-06-11
 | Phase 08-mcp-server P02 | 18 | 2 tasks | 6 files |
 | Phase 08-mcp-server P03 | 120 | 2 tasks | 7 files |
 | Phase 08-mcp-server P04 | 45 | 2 tasks | 11 files |
+| Phase 10 P02 | 35 | 2 tasks | 10 files |
+| Phase 10 P04 | 25m | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -149,6 +151,6 @@ Items captured durante v1.0 que deben informar el diseño de arquitectura v2 (no
 
 ## Session Continuity
 
-Last session: 2026-06-11T08:45:37.845Z
-Stopped at: Phase 9 context gathered
-Resume file: .planning/phases/09-composite-modes/09-CONTEXT.md
+Last session: 2026-06-26T14:05:19.150Z
+Stopped at: context exhaustion at 75% (2026-06-26)
+Resume file: None

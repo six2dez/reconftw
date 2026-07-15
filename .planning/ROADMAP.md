@@ -15,7 +15,7 @@ This milestone delivers a **complete rewrite** of reconFTW from Bash to a typed/
 7. **Composite modes (Phase 9)** — Only after 4-7 done (they compose the ported underlying modules).
 8. **Monitor + Reporting + Notifications LATE (Phase 10)** — Need all modules + findings data model stable + dedup-ready data.
 9. **Installer + XPlat + Docker grouped (Phase 11)** — Single packaging phase.
-10. **Cutover LAST (Phase 12)** — CUT-04 explicitly blocks cutover until migrator corpus test passes. CUT-11 parity + CUT-12 sign-off close the milestone.
+10. **Cutover LAST (Phase 14)** — CUT-04 explicitly blocks cutover until migrator corpus test passes. CUT-11 parity + CUT-12 sign-off close the milestone.
 
 **Parallelization within phases:** Plans inside a phase can execute concurrently where independent (per `config.json:parallelization=true`). Granularity is **coarse** — broader phases consistent with single-maintainer cadence.
 
@@ -39,9 +39,11 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 7: OSINT E2E** — Domain/IP info + emails + GitHub dorks/leaks/actions + cloud enum + Postman + Swagger + Spoofy + msftrecon + CMSeeK + GraphQL + Google dorks *(9/9 plans: 7 original + 07-08/07-09 gap-closure; DoD-2 accepted; all 3 code-review gaps closed + re-verified passed 2026-06-10)*
 - [ ] **Phase 8: MCP Server** — Model Context Protocol server exposing recon modes as MCP tools; auth + redaction + scope sandboxing + OpenAPI schema; opt-in in config
 - [x] **Phase 9: Composite Modes** — `recon`, `all`, `passive`, `zen`, `deep`, `quick-rescan`, `refresh-cache`, `gen-resolvers` + v1 short-flag aliases with deprecation warnings (completed 2026-06-11)
-- [ ] **Phase 10: Monitor Mode + Reporting + Notifications** — Monitor loop + diff detection + incremental + JSON/HTML/CSV/AI/Faraday/hotlist/SARIF reports + Slack/Telegram/Discord notifications consolidated
+- [x] **Phase 10: Monitor Mode + Reporting + Notifications** — Monitor loop + diff detection + incremental + JSON/HTML/CSV/AI/Faraday/hotlist/SARIF reports + Slack/Telegram/Discord notifications consolidated (completed 2026-06-12)
 - [ ] **Phase 11: Installer + Cross-Platform + Docker** — `reconftw install` (replaces install.sh) + tools.lock for 70+ tools + SHA-256 verification + Linux/macOS/ARM64 + Docker multi-arch
-- [ ] **Phase 12: Cutover & Migration** — Config migrator (corpus-tested) + MIGRATION.md + compat symlinks + beta period + bug-bug parity test + community sign-off + cutover
+- [ ] **Phase 12: Integration Hardening** — Wire subsystems end-to-end: store ingest (done) + in-scan notifications + resume/checkpoint + monitor diff + global rate limiter + AI/Ollama
+- [ ] **Phase 13: Domain Parity** — Close bash-vs-Go gaps: subs (PTR/hakip2host/dnsregs/csprecon/dsieve) + vulns (spraying/SSRF-OOB) + osint (LeakSearch/Scopify/repo-secrets) + web (portscan/nerva/wordlists/url_ext)
+- [ ] **Phase 14: Cutover & Migration** — Config migrator (corpus-tested) + MIGRATION.md + compat symlinks + beta period + bug-bug parity test + community sign-off + `main`→Go, bash→legacy branch
 
 ## Phase Details
 
@@ -317,7 +319,6 @@ Plans:
 - [x] 07-08-PLAN.md — GAP-01: split osint into sequential stages (github_repos pre-stage before github_leaks) + stage-order-vs-DependsOn guard test (OSINT-05) — DONE 2026-06-10 (osintStages() shared with TestOSINTStageOrderHonorsDependsOn; full `go test ./...` green)
 - [x] 07-09-PLAN.md — GAP-02/03: backward-compatible Backend env seam (ExecEnv/StreamEnv) → gato authenticated via registered-secret GH_TOKEN + redact/omit raw gato side-file (OSINT-06, XCUT-07)
 
-
 ### Phase 8: MCP Server
 
 **Goal**: Ship a Model Context Protocol server (`reconftw mcp serve`) that exposes recon modes as MCP tools with authentication, secret redaction, resource limits, scope sandboxing, and an OpenAPI schema — opt-in in config (default off) to preserve user choice.
@@ -396,12 +397,28 @@ Plans:
   4. AI/security-platform/SARIF outputs ship: AI report (opt-in via `AI_REPORT=true` + `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`) — all PII/secrets pass through the redactor before the API call; Faraday-compatible JSON export for security platform integration; risk-scored hotlist `reports/hotlist.json` (top N by severity × confidence × asset criticality); SARIF output `reports/findings.sarif` for CodeQL/GitHub Code Scanning consumption (REPORT-04, REPORT-05, REPORT-06, REPORT-07)
   5. Notifications consolidated: Slack/Telegram/Discord notifications work with FOUND-02-grade redaction (secret tagging in the type system means NO opt-in raw mode — secrets cannot reach a notifier unredacted by API design); per-event rules configurable in TOML (`notifications.events = ["on-critical-finding", "on-scan-complete", "on-failure"]`); per-channel rate limit prevents flooding on critical-finding burst; `reconftw notify --test` validates each configured channel reachable (NOTIF-01, NOTIF-02, NOTIF-03, NOTIF-04, NOTIF-05, NOTIF-06, NOTIF-07)
 
-**Plans**: TBD
-**UI hint**: yes
+**Plans**: 5 plans in 4 waves
+Plans:
+**Wave 1** *(prerequisite sqlc query — blocks report path)*
+
+- [x] 10-01-PLAN.md — GetLatestCompletedScanForTarget sqlc query + querier.go interface (REPORT-08, REPORT-09, MON-03)
+
+**Wave 2** *(parallel — blocked on Wave 1)*
+
+- [x] 10-02-PLAN.md — Real Slack/Telegram/Discord webhook dispatchers + DigestCoalescer + EventFilter + boot.go wiring + reconftw notify --test (NOTIF-01..07)
+- [x] 10-03-PLAN.md — internal/core/report/ package (renderer + html + csv + sarif + hotlist + faraday + ai) + real reconftw report subcommand (REPORT-01..09)
+
+**Wave 3** *(blocked on Wave 2 — composes notifier + report)*
+
+- [x] 10-04-PLAN.md — RunMonitorAsync loop + diff + dedup + SIGINT + incremental + real reconftw monitor subcommand (MON-01..08)
+
+**Wave 4** *(human gate — blocked on Wave 3)*
+
+- [x] 10-05-PLAN.md — Full build+test gate + human acceptance verification (all 24 REQ-IDs)
 
 ### Phase 11: Installer + Cross-Platform + Docker
 
-**Goal**: Replace `install.sh` with a `reconftw install` subcommand reading from a `tools.lock` manifest pinning all 70+ orchestrated tools with SHA-256 verification; support Linux (Debian/Ubuntu/RHEL/Arch — glibc + musl + ARM64) + macOS (Apple Silicon + Intel) with signed/notarized binaries; ship updated multi-arch Docker image — the packaging story is the single clearest win of the rewrite, so it ships as one phase.
+**Goal**: Replace `install.sh` with a `reconftw install` subcommand reading from a `tools.lock` manifest pinning all 70+ orchestrated tools with SHA-256 verification; support Linux (Debian/Ubuntu/RHEL/Arch — glibc + musl + ARM64) + macOS (Apple Silicon + Intel) via a Homebrew source-build tap (XPLAT-06 re-scoped per D-06 — no Apple notarization day-1); ship updated multi-arch Docker image — the packaging story is the single clearest win of the rewrite, so it ships as one phase.
 **Depends on**: Phases 4, 5, 6, 7 (need stable subprocess + AppContext + binary to install); calendar-parallel-capable with Phase 9/10
 **Requirements**: INST-01, INST-02, INST-03, INST-04, INST-05, INST-06, INST-07, INST-08, INST-09, INST-10, INST-11, INST-12, XPLAT-01, XPLAT-02, XPLAT-03, XPLAT-04, XPLAT-05, XPLAT-06, XPLAT-07, XPLAT-08, XPLAT-09, DOCK-01, DOCK-02, DOCK-03, DOCK-04, DOCK-05, DOCK-06, DOCK-07, XCUT-08
 **Success Criteria** (what must be TRUE):
@@ -409,15 +426,97 @@ Plans:
   1. `reconftw install` runs end-to-end on a clean machine: reads `tools.lock` (pins ALL 70+ orchestrated tools — Go tools by `module@version`, Python tools by name+version, system deps by name); installs Go tools via `go install <module>@<version>`, Python tools via `uv tool install <package>==<version>` with per-tool isolation, system deps via platform-appropriate package manager (apt/yum/dnf/pacman/brew); the installer is idempotent (re-running installs only missing/outdated tools), fails fast with a clear error on unsupported platform, and never leaves partial-install state behind (INST-01, INST-02, INST-06, INST-07, INST-08, INST-11, INST-12)
   2. Supply-chain hygiene: SHA-256 verification on installer bootstrappers (rustup-init.sh, uv installer) against pinned hashes; SHA-256 verification on pre-built tool binaries where vendor publishes hashes; Rust toolchain bootstrap (only if `smugglex` or other Rust deps enabled) via verified rustup-init; CI verifies pins on update; 24-72h quarantine window for new tool versions before lockfile bump (documented in the lockfile update workflow) (INST-03, INST-04, INST-09, XCUT-08)
   3. Platform detection + health check: installer correctly detects Debian/Ubuntu (apt), RHEL/Fedora/CentOS (yum/dnf), Arch (pacman), macOS Intel (brew), macOS Apple Silicon (brew arm64); post-install `reconftw install --health-check` verifies every tool present on PATH and runnable (`--version` or equivalent) — and CI matrix runs install + smoke on every supported platform on every PR (INST-05, INST-10, XPLAT-05)
-  4. Cross-platform binaries: Linux glibc (Debian 12+, Ubuntu 24.04+, RHEL/Rocky 9+, Arch rolling), Linux musl (Alpine 3.20+ — static binary), macOS arm64 (primary), macOS amd64, ARM64 Linux (cloud / Raspberry Pi) all build + run with passing smoke test; macOS binary is signed with developer ID + notarized via Apple notarization service in CI from day 1; Homebrew tap published for `brew install reconftw`; Linux distribution offers standalone binary + tar.gz + optional `.deb`/`.rpm` packages (XPLAT-01, XPLAT-02, XPLAT-03, XPLAT-04, XPLAT-06, XPLAT-07, XPLAT-08, XPLAT-09)
-  5. Docker image ships: Dockerfile updated with new binary baked in; base image (distroless or minimal Ubuntu) chosen to minimize size — documented in `Docker/README.md`; multi-arch build (amd64 + arm64) via `docker buildx`; all 70+ orchestrated tools available in the image (installer runs at build time); image published to `ghcr.io/six2dez/reconftw` on every release, tagged with semantic version + `latest` + git SHA; image runs as non-root user with selective elevation where required for raw sockets (DOCK-01, DOCK-02, DOCK-03, DOCK-04, DOCK-05, DOCK-06, DOCK-07)
+  4. Cross-platform binaries: Linux glibc (Debian 12+, Ubuntu 24.04+, RHEL/Rocky 9+, Arch rolling), Linux musl (Alpine 3.20+ — static binary), macOS arm64 (primary), macOS amd64, ARM64 Linux (cloud / Raspberry Pi) all build + run with passing smoke test; macOS distributed via Homebrew tap (six2dez/homebrew-reconftw) with source-build formula — sidesteps Gatekeeper (XPLAT-06 re-scoped per D-06: no Apple Developer ID/notarization day-1); Homebrew tap published for `brew install reconftw`; Linux distribution offers standalone binary + tar.gz + optional `.deb`/`.rpm` packages (XPLAT-01, XPLAT-02, XPLAT-03, XPLAT-04, XPLAT-06, XPLAT-07, XPLAT-08, XPLAT-09)
+  5. Docker image ships: Dockerfile updated with new binary baked in; base image (debian:bookworm-slim — distroless rejected, see Docker/README.md) chosen per D-07; multi-arch build (amd64 + arm64) via `docker buildx`; all 95+ orchestrated tools available in the image (installer runs at build time non-interactively); image published to `ghcr.io/six2dez/reconftw` on every release, tagged with semantic version + `latest` + git SHA; image runs as non-root user (reconftw) with setcap on naabu+nmap for raw sockets (DOCK-01, DOCK-02, DOCK-03, DOCK-04, DOCK-05, DOCK-06, DOCK-07)
 
-**Plans**: TBD
+**Plans**: 6 plans in 5 waves
+Plans:
 
-### Phase 12: Cutover & Migration
+**Wave 1**
+
+- [ ] 11-01-PLAN.md — tools.lock inventory audit + schema extension (version/sha256/pip_package/repo_url/cargo_package) + add 15+ missing tools (naabu, notify, grpcurl, inscope, smap, cent, brutespray, dsieve, roboxtractor, xnLinkFinder, nmapurls, subwiz, dnsvalidator, interlace, LeakSearch) + XPLAT-06 reconciliation in REQUIREMENTS.md + ROADMAP.md
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 11-02-PLAN.md — internal/installer/ package: all per-kind handlers (go/python/system/go_clone/python_venv/rust) + bootstrap (Go+uv+Rust SHA-256 verified) + platform detection + D-04 version probe + errors.ChecksumMismatch reuse
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 11-03-PLAN.md — cmd/reconftw/install.go real command (stub removed) + --health-check reconciliation with healthcheck.go runHealthCheck() + scripts/update-tools-lock.sh (XCUT-08 quarantine workflow)
+
+**Wave 4** *(parallel — blocked on Wave 3)*
+
+- [ ] 11-04-PLAN.md — .goreleaser.yaml (glibc+musl+darwin, nfpm .deb/.rpm, checksums.txt) + .github/workflows/release.yml (goreleaser-action@v7, fetch-depth:0) + Homebrew tap formula template (D-06 source-build)
+- [ ] 11-05-PLAN.md — Docker/Dockerfile multi-stage rewrite (builder+final, setcap in final, non-root reconftw) + .github/workflows/docker_nightly.yml extension (ghcr.io, multi-arch, semver+sha tags) + Docker/README.md
+
+**Wave 5** *(blocked on Wave 4 — human gate)*
+
+- [ ] 11-06-PLAN.md — ci.yml XPLAT-05 platform-smoke matrix (ubuntu-latest/22.04 + macos-latest/13) + Phase 11 acceptance checkpoint (autonomous: false)
+
+### Phase 12: Integration Hardening
+
+**Goal**: Make every "implemented" v2 subsystem actually connect end-to-end, eliminating the silent-failure integration bugs surfaced by the bash-vs-Go audit. The pipeline must populate the queryable store (so `report`/SARIF/AI/hotlist/monitor read real data), notifications must fire during ordinary scans (not only `monitor`), resume must survive across runs, the monitor must produce real diffs, the global rate limiter must be enforced, and AI reporting must support a local (Ollama) provider. This is the "make it work, not just build" phase — cheap wiring fixes with outsized user impact.
+**Depends on**: Phases 3, 9, 10 (kernel scheduler/checkpoint/store + composite modes + monitor/reporting/notifications must exist to wire together)
+**Requirements**: INTEG-01, INTEG-02, INTEG-03, INTEG-04, INTEG-05, INTEG-06
+**Success Criteria** (what must be TRUE):
+
+  1. Store population: after `reconftw all/recon/web/vulns/osint --target X`, the shared `store.db` holds a completed scan with findings/hosts/urls linked to the target; `reconftw report --target X` renders HTML/SARIF/CSV/hotlist with real data (was: "no completed scan found" hard error). *(DONE this session — `internal/core/ingest` + hand-authored `internal/store/sqlc/schema.{sql,go}`; verified E2E)* (INTEG-01)
+  2. In-scan notifications: Slack/Telegram/Discord fire during recon/all/web/vulns/osint runs (scan-start + completion + critical-finding events), not only under `monitor`; `soft_enabled` / `send_zip_notify` / event routing honored (INTEG-02)
+  3. Resume across runs: a second invocation against the same target resumes from checkpoints instead of a fresh timestamped workspace; `--force` / `Advanced.Diff` bypasses checkpoints as documented; InputHash invalidates on cfg/wordlist/target change (INTEG-03)
+  4. Monitor diff/incremental: the monitor loop produces real cross-cycle diffs (reading the now-populated store) and the incremental re-feed consumes `TargetListPath` (INTEG-04)
+  5. Global rate limiter: the central limiter is enforced (`pickLimiter` no longer a no-op) so `*_RATELIMIT` / adaptive-rate settings actually throttle (INTEG-05)
+  6. AI reporting: provider default is coherent and a local Ollama path works; no unexpected cloud egress of recon data by default (INTEG-06)
+
+**Plans**: 5 plans in 3 waves (INTEG-01 landed pre-plan)
+Plans:
+
+**Landed pre-plan**
+
+- [x] Store ingest (INTEG-01) — landed pre-plan this session (`internal/core/ingest`, `internal/store/sqlc/schema.{sql,go}`, `persistScanToStore` wiring across all 5 handlers)
+
+**Wave 1** *(parallel — independent files)*
+
+- [x] 12-01-PLAN.md — INTEG-03 resume across runs: stable per-target workspace + wired InputHash (target+cfgSnapshot+TargetListPath+wordlists) + `--force`/`Advanced.Diff` checkpoint bypass
+- [x] 12-02-PLAN.md — INTEG-06 AI provider default + local Ollama path; coherent default (ollama+llama3:8b), no unexpected cloud egress by default
+- [x] 12-03-PLAN.md — INTEG-05 global rate limiter enforced: `pickLimiter` builds per-tool + global RPS from config (Runner already calls `Limiter.Wait`)
+
+**Wave 2** *(blocked on 12-01 common.go + 12-02 config.go)*
+
+- [x] 12-04-PLAN.md — INTEG-02 in-scan notifications: scan-start/complete/critical-finding fire during recon/all/web/vulns/osint via the INTEG-01 finalization seam; best-effort, `soft_enabled`/`enabled`/routing honored (`send_zip_notify` deferred → Phase 14)
+
+**Wave 3** *(blocked on 12-01 hash + 12-04 common.go)*
+
+- [x] 12-05-PLAN.md — INTEG-04 monitor diff/incremental: diff reads shared `<dataDir>/store.db` + incremental re-feed consumes `TargetListPath` (seeds new assets + hash-forced re-execution)
+
+### Phase 13: Domain Parity
+
+**Goal**: Close the per-domain capability gaps between bash and Go found in the parity audit so a `recon`/`all` run reaches ≥95% functional parity with bash v1. Prioritize subdomains (the foundation — lowest at ~70%, with dead code), then vulns/osint/web. Genuinely niche or rarely-run capabilities may ship post-cutover if documented, since bash remains available on the legacy branch.
+**Depends on**: Phase 12 (integration seams must be solid before adding capability surface)
+**Requirements**: PAR-01, PAR-02, PAR-03, PAR-04
+**Success Criteria** (what must be TRUE):
+
+  1. Subdomains parity: PTR sweep wired (or dead code removed), hakip2host reverse-IP, `subdomains_dnsregs` records artefact, csprecon in the subs pipeline, dsieve top-N recursion, resolve stage best-effort (not fail-fast); default-on alignment with bash (tls/recursive) (PAR-01)
+  2. Vulns parity: password spraying implemented (brutespray/brutus), SSRF OOB auto-starts interactsh when `COLLAB_SERVER` unset (PAR-02)
+  3. OSINT parity: LeakSearch (passwords), Scopify, titus/noseyparker repo-secret engines, WHOISXML reverse-IP, metadata/ip_info corrected (PAR-03)
+  4. Web parity: active portscan (naabu/nmap), nerva service fingerprint, `.well-known` pivots, roboxtractor/getjswords/pydictor wordlists, `url_ext` sensitive-extension bucketing (PAR-04)
+  5. A refreshed parity audit shows ≥95% capability coverage on recon/all; any deferred capability is listed in MIGRATION.md as post-cutover (all)
+
+**Plans**: 8 plans in 3 waves
+Plans:
+
+- [x] 13-01-PLAN.md — Subs resolve core: dnsregs artefact + subdomains_ips.txt + folded hakip2host reverse-IP; resolve best-effort degrade; delete dead SubPTRTask; tls/reverse-ip default-on; tools.lock (nmap/nerva/brutus/Scopify/titus; noseyparker deferred to Ph14)
+- [ ] 13-02-PLAN.md — Subs pipeline: csprecon in the discovery stage + dsieve top-N recursion
+- [ ] 13-03-PLAN.md — Web active portscan (naabu/nmap) + nerva service fingerprint
+- [ ] 13-04-PLAN.md — Web light producers: url_ext bucketing + .well-known pivots + roboxtractor/getjswords wordlists (pydictor deferred)
+- [ ] 13-05-PLAN.md — OSINT: LeakSearch passwords + Scopify + ip_info WHOISXML reverse-IP/IP-target
+- [ ] 13-06-PLAN.md — OSINT: github repo-secret engines (titus/noseyparker + trufflehog)
+- [ ] 13-07-PLAN.md — Vulns: password spraying (brutespray/brutus) + SSRF OOB interactsh auto-start
+- [ ] 13-08-PLAN.md — Pipeline wiring (all stage-list sites) + capability parity audit (>=95%)
+
+### Phase 14: Cutover & Migration
 
 **Goal**: Replace bash `main` with `rewrite/v2` via a corpus-tested config migrator (`reconftw.cfg` → TOML), a 1-2-month beta period with community feedback, an automated bug-bug parity test against canonical targets, MIGRATION.md, a 6-month compat-symlink window for `Recon/<domain>/`, and explicit sign-off criteria — cutover is BLOCKED until CUT-04 passes and CUT-12 sign-off is met.
-**Depends on**: Phases 9, 10, 11 (need composite modes, monitor+reporting+notifications, installer/xplat/docker all green before cutover can start)
+**Depends on**: Phases 11, 12, 13 (installer/xplat/docker + integration hardening + domain parity all green before cutover can start)
 **Requirements**: CUT-01, CUT-02, CUT-03, CUT-04, CUT-05, CUT-06, CUT-07, CUT-08, CUT-09, CUT-10, CUT-11, CUT-12, CUT-13, CUT-14, CUT-15, XCUT-01, XCUT-03, XCUT-05, XCUT-06
 **Success Criteria** (what must be TRUE):
 
@@ -451,8 +550,8 @@ Calendar parallelization (within constraint that dependencies are met):
 | 7. OSINT E2E | 7/7 | Complete   | 2026-06-10 |
 | 8. MCP Server | 5/6 | In Progress|  |
 | 9. Composite Modes | 4/4 | Complete    | 2026-06-11 |
-| 10. Monitor Mode + Reporting + Notifications | 0/? | Not started | - |
-| 11. Installer + Cross-Platform + Docker | 0/? | Not started | - |
+| 10. Monitor Mode + Reporting + Notifications | 5/5 | Complete    | 2026-06-12 |
+| 11. Installer + Cross-Platform + Docker | 0/6 | Not started | - |
 | 12. Cutover & Migration | 0/? | Not started | - |
 
 ## Coverage
@@ -634,39 +733,39 @@ Calendar parallelization (within constraint that dependencies are met):
 | DOCK-05 | Phase 11 |
 | DOCK-06 | Phase 11 |
 | DOCK-07 | Phase 11 |
-| CUT-01 | Phase 12 |
-| CUT-02 | Phase 12 |
-| CUT-03 | Phase 12 |
-| CUT-04 | Phase 12 |
-| CUT-05 | Phase 12 |
-| CUT-06 | Phase 12 |
-| CUT-07 | Phase 12 |
-| CUT-08 | Phase 12 |
-| CUT-09 | Phase 12 |
-| CUT-10 | Phase 12 |
-| CUT-11 | Phase 12 |
-| CUT-12 | Phase 12 |
-| CUT-13 | Phase 12 |
-| CUT-14 | Phase 12 |
-| CUT-15 | Phase 12 |
-| XCUT-01 | Phase 12 |
+| CUT-01 | Phase 14 |
+| CUT-02 | Phase 14 |
+| CUT-03 | Phase 14 |
+| CUT-04 | Phase 14 |
+| CUT-05 | Phase 14 |
+| CUT-06 | Phase 14 |
+| CUT-07 | Phase 14 |
+| CUT-08 | Phase 14 |
+| CUT-09 | Phase 14 |
+| CUT-10 | Phase 14 |
+| CUT-11 | Phase 14 |
+| CUT-12 | Phase 14 |
+| CUT-13 | Phase 14 |
+| CUT-14 | Phase 14 |
+| CUT-15 | Phase 14 |
+| XCUT-01 | Phase 14 |
 | XCUT-02 | Phase 3 |
-| XCUT-03 | Phase 12 |
+| XCUT-03 | Phase 14 |
 | XCUT-04 | Phase 3 |
-| XCUT-05 | Phase 12 |
-| XCUT-06 | Phase 12 |
+| XCUT-05 | Phase 14 |
+| XCUT-06 | Phase 14 |
 | XCUT-07 | Phase 3 |
 | XCUT-08 | Phase 11 |
 | XCUT-09 | Phase 3 |
 
 **Cross-cutting placement rationale:**
 
-- **XCUT-01** (perf benchmark) → Phase 12 (final assertion); baseline established Phase 3, validated per-module phase
+- **XCUT-01** (perf benchmark) → Phase 14 (final assertion); baseline established Phase 3, validated per-module phase
 - **XCUT-02** (resource budget Go <50MB OR Python <500MB) → Phase 3 (locked at Foundation)
-- **XCUT-03** (test coverage ≥75% lib, ≥90% critical paths) → Phase 12 (final validation); gate set up Phase 3
+- **XCUT-03** (test coverage ≥75% lib, ≥90% critical paths) → Phase 14 (final validation); gate set up Phase 3
 - **XCUT-04** (CI policy race detector + mypy + coverage gate) → Phase 3 (set up at Foundation, runs every phase)
-- **XCUT-05** (zero silent breakages → MIGRATION.md) → Phase 12 (MIGRATION.md is the artifact)
-- **XCUT-06** (docs: README + INSTALL.md + CONTRIBUTING.md + auto-gen API docs) → Phase 12 (final docs)
+- **XCUT-05** (zero silent breakages → MIGRATION.md) → Phase 14 (MIGRATION.md is the artifact)
+- **XCUT-06** (docs: README + INSTALL.md + CONTRIBUTING.md + auto-gen API docs) → Phase 14 (final docs)
 - **XCUT-07** (logging hygiene — no secrets in logs) → Phase 3 (FOUND-02 + lint rule; tested every phase)
 - **XCUT-08** (supply chain tools.lock) → Phase 11 (where INST-02/03/04 live)
 - **XCUT-09** (observability heartbeat) → Phase 3 (scheduler emits heartbeats; tested every phase)
