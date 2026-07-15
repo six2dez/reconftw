@@ -269,6 +269,12 @@ func (t *GitHubReposTask) scanCompanyRepos(ctx context.Context, app *appctx.AppC
 	// Free the heavy clones after scanning (the small JSON scan outputs in
 	// githubDir are what the merge reads).
 	defer os.RemoveAll(cloneRoot) //nolint:errcheck
+	// IN-13-04: the per-repo titus/trufflehog scan outputs in githubDir hold RAW
+	// (unscrubbed) secret values at 0600. Remove the whole scan-tmp dir on return so
+	// they do not linger in .tmp/github after the run (the merged artefact scrubs
+	// values to "***", but these upstream files do not). Deferred → fires at function
+	// return, AFTER mergeSecretOutputs (the return expression below) has read them.
+	defer os.RemoveAll(githubDir) //nolint:errcheck
 
 	// Step A: clone all repos (bounded concurrency, sha256-named dirs). Each
 	// goroutine writes its own index — no shared mutable state.
