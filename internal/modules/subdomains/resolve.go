@@ -51,11 +51,13 @@ func passiveMergedPath(app *appctx.AppContext) string {
 // runStreamTask runs a tool via Stream, collects non-empty stdout lines
 // (ignoring stderr), writes them to the resolved staging file, and returns
 // the task.Result. Used for puredns and long-running dnsx invocations (XCUT-09).
+//
+// A tool-execution error degrades to StatusDone (CONTINUE_ON_TOOL_ERROR bash
+// parity) via degradeResolveTool; scope/ctx-cancel errors still propagate.
 func runStreamTask(ctx context.Context, app *appctx.AppContext, toolName string, args []string) (task.Result, error) {
 	ch, err := app.Tools.Stream(ctx, toolName, args)
 	if err != nil {
-		return task.Result{Status: task.StatusErrored},
-			fmt.Errorf("%s: Stream failed: %w", toolName, err)
+		return degradeResolveTool(ctx, app, toolName, err)
 	}
 
 	var lines []string
@@ -84,11 +86,13 @@ func runStreamTask(ctx context.Context, app *appctx.AppContext, toolName string,
 // runExecTask runs a tool via Run (buffered), collects stdout lines, writes to
 // the resolved staging file, and returns the task.Result. Used for short-lived
 // dnsx calls where streaming is unnecessary.
+//
+// A tool-execution error degrades to StatusDone (CONTINUE_ON_TOOL_ERROR bash
+// parity) via degradeResolveTool; scope/ctx-cancel errors still propagate.
 func runExecTask(ctx context.Context, app *appctx.AppContext, toolName string, args []string) (task.Result, error) {
 	res, err := app.Tools.Run(ctx, toolName, args)
 	if err != nil {
-		return task.Result{Status: task.StatusErrored},
-			fmt.Errorf("%s: Run failed: %w", toolName, err)
+		return degradeResolveTool(ctx, app, toolName, err)
 	}
 
 	var lines []string
@@ -315,6 +319,40 @@ func isPropagatingError(ctx context.Context, err error) bool {
 	return stderrors.Is(err, coreerrors.ErrScope) ||
 		stderrors.Is(err, context.Canceled) ||
 		stderrors.Is(err, context.DeadlineExceeded)
+}
+
+// degradeResolveTool implements CONTINUE_ON_TOOL_ERROR (bash) parity for the
+// resolve DNS spine (module="subdomains", fail_fast). A tool-EXECUTION error
+// from app.Tools.Run/Stream is non-fatal: log a warning and write an (empty)
+// staging file so one flaky puredns/dnsx does not abort the whole subs run —
+// mirroring the established SubAnalyticsTask best-effort precedent. Scope
+// violations (ErrScope) and context cancellation/deadline STILL return
+// StatusErrored so the scheduler's ErrScope re-propagation guard (scheduler.go
+// errors.Is(ErrScope)) and cancellation keep working. A staging-file WRITE error
+// is a real local FS fault and stays fatal (StatusErrored).
+//
+// Accepted trade-off (checker LOW #5): degrading across all ~6 resolve callers
+// means a TOTAL resolver outage yields an empty-but-Done subs run rather than an
+// aborted one — the intended bash parity. The resolvers.health gate remains the
+// real pre-resolution guard.
+func degradeResolveTool(ctx context.Context, app *appctx.AppContext, toolName string, cause error) (task.Result, error) {
+	if isPropagatingError(ctx, cause) {
+		return task.Result{Status: task.StatusErrored},
+			fmt.Errorf("%s: %w", toolName, cause)
+	}
+	if app.Log != nil {
+		app.Log.Warn("resolve: tool failed (non-fatal degrade)",
+			"tool", toolName, "error", cause.Error())
+	}
+	stagingPath, writeErr := writeResolvedStagingFile(app, toolName, nil)
+	if writeErr != nil {
+		return task.Result{Status: task.StatusErrored}, writeErr
+	}
+	return task.Result{
+		Status:  task.StatusDone,
+		Outputs: []string{stagingPath},
+		Stats:   map[string]int{"resolved_found": 0},
+	}, nil
 }
 
 // -------------------------------------------------------------------------
@@ -620,41 +658,13 @@ func (SubSRVTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	return runExecTask(ctx, app, toolName, args)
 }
 
-// -------------------------------------------------------------------------
-// SubPTRTask — puredns reverse PTR sweep (Stream)
-// -------------------------------------------------------------------------
-
-// SubPTRTask performs reverse PTR lookups on discovered IP ranges via puredns.
-// Input: inputs/asn.ips.txt (written by ASN enrichment stage, plan-05).
-// Writes staging file: inputs/resolved.ptr.txt
-type SubPTRTask struct{}
-
-func (SubPTRTask) Name() string        { return "subdomains.ptr" }
-func (SubPTRTask) Module() string      { return "subdomains" }
-func (SubPTRTask) DependsOn() []string { return nil }
-
-func (SubPTRTask) Description() string {
-	return "Reverse PTR sweep of ASN IP ranges via puredns"
-}
-
-func (SubPTRTask) Enabled(cfg *config.Config) bool {
-	return cfg.Subdomains.PTRSweep.Enabled
-}
-
-// Run runs puredns reverse on the IP list from inputs/asn.ips.txt, writing
-// reverse-PTR hostnames to inputs/resolved.ptr.txt. Uses Stream for XCUT-09.
-func (SubPTRTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
-	const toolName = "puredns"
-	cfg := app.Cfg
-	ipsFile := filepath.Join(app.Target.WorkDir, "inputs", "asn.ips.txt")
-	args := []string{
-		"reverse",
-		ipsFile,
-		"-r", cfg.Paths.Resolvers,
-		"--quiet",
-	}
-	return runStreamTask(ctx, app, toolName, args)
-}
+// SubPTRTask REMOVED (13-01 Task 2): it was dead code — it read inputs/asn.ips.txt
+// which no task ever writes, and it ran in the resolve stage BEFORE the asn task
+// that would produce IPs. The default-path reverse-IP capability is now covered by
+// the hakip2host fold in SubDNSTask (reverseip.go). The full ASN-CIDR PTR sweep
+// (bash sub_ptr_cidrs, gated PTR_SWEEP=false by default — not on the recon/all
+// default path) is DEFERRED to Phase 14; the SubPTRSweep config struct + PTRSweep
+// default are retained as dead scaffold for that deferred feature.
 
 // -------------------------------------------------------------------------
 // init() — self-registration (staging contract doc.go)
@@ -665,4 +675,3 @@ func init() { task.Register(SubTLSTask{}) }
 func init() { task.Register(SubNoerrorTask{}) }
 func init() { task.Register(SubDNSTask{}) }
 func init() { task.Register(SubSRVTask{}) }
-func init() { task.Register(SubPTRTask{}) }

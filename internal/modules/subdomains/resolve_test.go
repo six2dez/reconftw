@@ -6,6 +6,7 @@ package subdomains_test
 
 import (
 	"context"
+	stderrors "errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
+	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
 	"github.com/six2dez/reconftw/internal/core/task"
 
 	// Blank import triggers init() Task registrations in passive.go and resolve.go.
@@ -162,7 +164,6 @@ func TestResolveTasks_Module(t *testing.T) {
 		"subdomains.noerror",
 		"subdomains.dns",
 		"subdomains.srv",
-		"subdomains.ptr",
 	}
 	for _, name := range names {
 		t.Run(name, func(t *testing.T) {
@@ -189,6 +190,112 @@ func TestResolveTasksBuildNoPanic(t *testing.T) {
 		t.Errorf("task.Default.Build() returned error: %v", err)
 	}
 }
+
+// -------------------------------------------------------------------------
+// Test 8 (13-01 Task 2): resolve DNS tasks degrade a tool-exec error to
+// StatusDone (CONTINUE_ON_TOOL_ERROR parity) instead of aborting the subs run.
+// -------------------------------------------------------------------------
+
+func TestResolveDegradesOnToolError(t *testing.T) {
+	// SubSRVTask → runExecTask; SubNoerrorTask → runStreamTask. Both must degrade.
+	for _, name := range []string{"subdomains.srv", "subdomains.noerror"} {
+		t.Run(name, func(t *testing.T) {
+			workDir := t.TempDir()
+			be := &erroringBackend{err: &coreerrors.ToolError{
+				Tool: "dnsx", ExitCode: 1, Inner: stderrors.New("boom")}}
+			reg := backend.NewToolRegistry()
+			reg.Register(&backend.Tool{Name: "dnsx"})
+			runner := backend.NewRunner(be, reg, nil)
+			app := newTestApp(workDir, runner, &mockTree{})
+
+			tsk, ok := task.Default.Lookup(name)
+			if !ok {
+				t.Fatalf("%s not registered", name)
+			}
+			res, err := tsk.Run(context.Background(), app)
+			if err != nil {
+				t.Fatalf("degrade must NOT return an error, got %v", err)
+			}
+			if res.Status != task.StatusDone {
+				t.Errorf("status = %q, want done (CONTINUE_ON_TOOL_ERROR degrade)", res.Status)
+			}
+		})
+	}
+}
+
+// TestResolvePropagatesScopeError proves the degrade does NOT swallow scope
+// violations — the scheduler ErrScope re-propagation guard depends on them.
+func TestResolvePropagatesScopeError(t *testing.T) {
+	workDir := t.TempDir()
+	be := &erroringBackend{err: &coreerrors.OutOfScope{Value: "x.evil", Reason: "off scope"}}
+	reg := backend.NewToolRegistry()
+	reg.Register(&backend.Tool{Name: "dnsx"})
+	runner := backend.NewRunner(be, reg, nil)
+	app := newTestApp(workDir, runner, &mockTree{})
+
+	tsk, _ := task.Default.Lookup("subdomains.srv")
+	res, err := tsk.Run(context.Background(), app)
+	if err == nil {
+		t.Fatal("scope error must propagate (not degrade), got nil")
+	}
+	if !stderrors.Is(err, coreerrors.ErrScope) {
+		t.Errorf("propagated err is not ErrScope: %v", err)
+	}
+	if res.Status != task.StatusErrored {
+		t.Errorf("status = %q, want errored", res.Status)
+	}
+}
+
+// TestResolvePropagatesContextCancel proves context cancellation still surfaces.
+func TestResolvePropagatesContextCancel(t *testing.T) {
+	workDir := t.TempDir()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	be := &erroringBackend{err: &coreerrors.ToolError{
+		Tool: "dnsx", ExitCode: -1, Inner: context.Canceled}}
+	reg := backend.NewToolRegistry()
+	reg.Register(&backend.Tool{Name: "dnsx"})
+	runner := backend.NewRunner(be, reg, nil)
+	app := newTestApp(workDir, runner, &mockTree{})
+
+	tsk, _ := task.Default.Lookup("subdomains.srv")
+	res, err := tsk.Run(ctx, app)
+	if err == nil {
+		t.Fatal("canceled context must propagate (not degrade), got nil")
+	}
+	if res.Status != task.StatusErrored {
+		t.Errorf("status = %q, want errored", res.Status)
+	}
+}
+
+// TestSubPTRTaskRemoved proves the dead SubPTRTask is gone (13-01 Task 2).
+func TestSubPTRTaskRemoved(t *testing.T) {
+	if _, ok := task.Default.Lookup("subdomains.ptr"); ok {
+		t.Error("subdomains.ptr still registered — dead SubPTRTask must be removed (13-01 Task 2)")
+	}
+}
+
+// erroringBackend returns a fixed error from Exec/Stream (tool-exec failure).
+type erroringBackend struct{ err error }
+
+func (b *erroringBackend) Exec(_ context.Context, _ *backend.Tool, _ []string) (*backend.Result, error) {
+	return nil, b.err
+}
+
+func (b *erroringBackend) ExecEnv(_ context.Context, _ *backend.Tool, _ []string, _ []string) (*backend.Result, error) {
+	return nil, b.err
+}
+
+func (b *erroringBackend) Stream(_ context.Context, _ *backend.Tool, _ []string) (<-chan backend.Event, error) {
+	return nil, b.err
+}
+
+func (b *erroringBackend) StreamEnv(_ context.Context, _ *backend.Tool, _ []string, _ []string) (<-chan backend.Event, error) {
+	return nil, b.err
+}
+
+func (b *erroringBackend) HealthCheck(_ context.Context) error { return nil }
+func (b *erroringBackend) Capacity() int                       { return 1 }
 
 // -------------------------------------------------------------------------
 // Test 7 (13-01 Task 1): SubDNSTask persists the dnsregs records artefact +
