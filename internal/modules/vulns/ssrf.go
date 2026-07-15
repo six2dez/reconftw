@@ -7,10 +7,16 @@
 //
 // DEPENDENCY: DependsOn ["vulns.gf"] — reads inputs/gf/ssrf.txt bucket.
 //
-// COLLAB_SERVER PRECEDENCE (D-V6, §Claude's Discretion):
+// COLLAB_SERVER PRECEDENCE (D-V6, §Claude's Discretion; interactsh RESTORED 13-07):
 //  1. cfg.APIKeys.CollabServer != "" → use it directly; no subprocess.
-//  2. (interactsh PATH path REMOVED — auto-start without explicit server
-//     caused unbounded OOB wait loops in DoD-2 lab runs.)
+//  2. CollabServer unset AND interactsh-client resolvable on PATH → auto-start it
+//     (BOUNDED) and read its registered callback domain, restoring OOB detection
+//     (bash auto-spawn parity, PAR-02). The DoD-2 unbounded-wait regression that
+//     forced the original removal is now prevented by TWO guards: the overall task
+//     context.WithTimeout wrapping Run (below) AND interactshStartupTimeout on the
+//     callback-domain read. If no domain arrives before the deadline the process
+//     GROUP is SIGTERM-killed and we fall through to in-band — there is NO infinite
+//     poll anywhere in the path.
 //  3. Neither available → run in-band ffuf checks only (no OOB); the
 //     SSRF_ALT_MATCH_REGEX probe still runs. If no collab token is
 //     available, a placeholder "SSRFCHECK" token is used (in-band only).
@@ -60,8 +66,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
@@ -140,20 +148,14 @@ func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 			fmt.Errorf("vulns.ssrf: mkdir inputs/: %w", err)
 	}
 
-	// Step 3: Determine collab server and establish OOB session if needed.
-	// D-V6 fix: interactsh subprocess is only started when cfg.APIKeys.CollabServer
-	// is explicitly configured. Auto-starting interactsh merely because it is on PATH
-	// caused unbounded OOB wait loops in the DoD-2 lab run.
-	collabToken, collabURL, usingInteractsh, _, _, cleanup, err :=
+	// Step 3: Determine collab server and establish an OOB session if needed.
+	// Precedence: explicit COLLAB_SERVER → auto-started interactsh-client (bounded
+	// by taskCtx + interactshStartupTimeout) → in-band only. The auto-start CANNOT
+	// hang the task: taskCtx (the overall WithTimeout) tears it down (DoD-2 guard).
+	collabToken, collabURL, usingInteractsh, cleanup :=
 		resolveSSRFCollabSession(taskCtx, cfg, app)
-	if err != nil {
-		// err is only non-nil when we should stop with StatusSkipped.
-		if app.Log != nil {
-			app.Log.Warn("vulns.ssrf: " + err.Error())
-		}
-		return task.Result{Status: task.StatusSkipped}, nil
-	}
 	if cleanup != nil {
+		// Process-group SIGTERM + reap on task completion/timeout (XCUT-07/FOUND-09).
 		defer cleanup()
 	}
 
@@ -297,53 +299,171 @@ func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 // Returns:
 //   - collabToken: FFUFHASH.<subdomain> token for URL parameter substitution
 //   - collabURL:   http://FFUFHASH.<subdomain> URL form
-//   - usingInteractsh: true when an explicit CollabServer is configured (OOB mode)
-//   - interactshCmd: always nil (interactsh auto-start removed — DoD-2 regression fix)
-//   - interactshStdout: always nil
-//   - cleanup: always nil
-//   - err: always nil (no error path; in-band fallback always available)
+//   - usingInteractsh: true when an OOB session is active (configured server OR
+//     an auto-started interactsh-client) → triggers the bounded 5s OOB wait in Run
+//   - cleanup: non-nil ONLY when interactsh-client was auto-started — the caller
+//     defers it to SIGTERM the process group and reap the subprocess
 //
-// COLLAB_SERVER precedence (D-V6, DoD-2 regression fix):
+// COLLAB_SERVER precedence (D-V6; interactsh auto-start RESTORED in 13-07):
 //  1. cfg.APIKeys.CollabServer non-empty → OOB mode: strip scheme, build
-//     FFUFHASH.<host> token. usingInteractsh=true (triggers 5s OOB wait).
-//  2. No CollabServer configured → in-band mode only: use placeholder token
-//     "SSRFCHECK" (no OOB wait, no subprocess). Log at Info so the operator
-//     knows OOB callbacks are not active.
+//     FFUFHASH.<host> token. No subprocess (cleanup=nil).
+//  2. CollabServer unset AND interactsh-client on PATH → auto-start it (BOUNDED
+//     by ctx + interactshStartupTimeout via startInteractshClient), read its
+//     callback domain, build the OOB token. cleanup tears the subprocess down.
+//  3. Neither → in-band mode only: placeholder token "SSRFCHECK" (no OOB wait,
+//     no subprocess). Log at Info so the operator knows OOB is not active.
 //
-// NOTE: The former "auto-start interactsh-client if found on PATH" behaviour
-// (old precedence 2) has been REMOVED. It caused unbounded OOB wait loops in
-// the DoD-2 lab run when interactsh connected to the public default server and
-// lingered indefinitely. OOB mode now requires an explicit collab_server value.
+// DoD-2 SAFETY: the auto-start in (2) can NEVER hang the task — the callback read
+// is bounded by interactshStartupTimeout AND by ctx (the overall task WithTimeout).
+// If no domain arrives the process group is killed and we fall through to in-band.
+//
+// XCUT-07: the interactsh callback domain is a session secret. It is NEVER logged
+// (only "oob_enabled" is surfaced at Info); the FFUFHASH token it seeds flows only
+// into the workspace OOB payloads, never into a log line or a findings record.
 func resolveSSRFCollabSession(
 	ctx context.Context,
 	cfg *config.Config,
 	app *appctx.AppContext,
-) (collabToken, collabURL string, usingInteractsh bool, interactshCmd *exec.Cmd, interactshStdout *bufio.Reader, cleanup func(), err error) {
-	// Silence "ctx declared but not used" — ctx is kept in the signature for future
-	// use (e.g. dialing an explicit interactsh server via HTTP) and to match the
-	// call site that passes taskCtx.
-	_ = ctx
-
-	// Precedence 1: explicit COLLAB_SERVER from config → OOB mode.
+) (collabToken, collabURL string, usingInteractsh bool, cleanup func()) {
+	// Precedence 1: explicit COLLAB_SERVER from config → OOB mode, no subprocess.
 	if cfg.APIKeys.CollabServer != "" {
 		subdomain := stripURLScheme(cfg.APIKeys.CollabServer)
 		collabToken = "FFUFHASH." + subdomain
 		collabURL = "http://" + collabToken
-		// usingInteractsh=true triggers the 5s OOB callback wait in Run.
-		// No subprocess; no cleanup needed.
-		return collabToken, collabURL, true, nil, nil, nil, nil
+		return collabToken, collabURL, true, nil
 	}
 
-	// Precedence 2: no CollabServer → in-band checks only.
-	// Use a fixed placeholder token. The ffuf probes still run (they test for
-	// in-band reflections via SSRF_ALT_MATCH_REGEX). OOB callbacks are skipped.
-	if app.Log != nil {
-		app.Log.Info("vulns.ssrf: no COLLAB_SERVER configured — running in-band SSRF checks only (no OOB)")
+	// Precedence 2: auto-start interactsh-client (bounded) when it is on PATH.
+	// This RESTORES OOB detection that the DoD-2 fix removed; the unbounded-wait
+	// regression is prevented by the bounds inside startInteractshClient.
+	if sess, ok := startInteractshClient(ctx, app); ok {
+		collabToken = "FFUFHASH." + sess.callbackDomain
+		collabURL = "http://" + collabToken
+		if app.Log != nil {
+			// XCUT-07: log ONLY that OOB is enabled — NEVER the callback domain/URL.
+			app.Log.Info("vulns.ssrf: interactsh OOB session auto-started (bounded)", "oob_enabled", true)
+		}
+		return collabToken, collabURL, true, sess.cleanup
 	}
-	collabToken = "SSRFCHECK"
-	collabURL = "http://SSRFCHECK"
-	// usingInteractsh=false → Run skips the 5s OOB wait and callback read.
-	return collabToken, collabURL, false, nil, nil, nil, nil
+
+	// Precedence 3: neither available → in-band checks only.
+	// The ffuf probes still run (they test for in-band reflections via
+	// SSRF_ALT_MATCH_REGEX). OOB callbacks are skipped.
+	if app.Log != nil {
+		app.Log.Info("vulns.ssrf: no COLLAB_SERVER and interactsh-client unavailable — in-band SSRF checks only (no OOB)")
+	}
+	return "SSRFCHECK", "http://SSRFCHECK", false, nil
+}
+
+// interactshSession describes an auto-started interactsh-client subprocess.
+type interactshSession struct {
+	callbackDomain string // the registered OOB callback domain (session secret — XCUT-07)
+	cleanup        func() // SIGTERM the process group + reap; deferred by the caller
+}
+
+// interactshStartupTimeout bounds how long we wait for interactsh-client to emit
+// its registered callback domain on startup. The overall task WithTimeout is the
+// outer guard; this short sub-timeout guarantees the task never blocks waiting for
+// a domain that never arrives — the exact DoD-2 unbounded-wait cause.
+const interactshStartupTimeout = 30 * time.Second
+
+// startInteractshClient auto-starts interactsh-client (when resolvable on PATH)
+// and reads its registered callback domain from stdout, BOUNDED by both ctx and
+// interactshStartupTimeout. Returns (nil, false) when the binary is absent or no
+// callback domain arrives before the deadline — the caller then falls through to
+// in-band-only SSRF. Overridable in tests via the package var.
+//
+// FOUND-09 subprocess safety: SysProcAttr{Setpgid:true} + process-group SIGTERM on
+// cleanup / ctx-cancel (mirrors internal/core/backend/local.go). FOUND-10: this
+// file is allowlisted for the raw subprocess (interactsh-client is a long-running
+// OOB server needing a persistent stdout pipe outside the Backend abstraction).
+var startInteractshClient = func(ctx context.Context, app *appctx.AppContext) (*interactshSession, bool) {
+	bin, err := exec.LookPath("interactsh-client")
+	if err != nil {
+		return nil, false // not installed → in-band fallback
+	}
+
+	// Launch under the task ctx so the overall task timeout / cancellation tears
+	// the subprocess (and its whole group) down (DoD-2 guard).
+	//nolint:gosec // bin resolved via LookPath; no user-controlled arguments.
+	cmd := exec.CommandContext(ctx, bin)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error {
+		if cmd.Process == nil {
+			return nil
+		}
+		return syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
+	}
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, false
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, false
+	}
+
+	pgid := cmd.Process.Pid
+	cleanup := func() {
+		// Process-group SIGTERM (FOUND-09 kill-tree) + reap.
+		_ = syscall.Kill(-pgid, syscall.SIGTERM)
+		_ = cmd.Wait()
+	}
+
+	// Read the callback domain in a goroutine; bound the wait with a sub-context.
+	domainCh := make(chan string, 1)
+	go func() {
+		sc := bufio.NewScanner(stdout)
+		sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+		for sc.Scan() {
+			if d := parseInteractshDomain(sc.Text()); d != "" {
+				domainCh <- d
+				return
+			}
+		}
+		domainCh <- "" // stdout closed without ever printing a domain
+	}()
+
+	readCtx, cancel := context.WithTimeout(ctx, interactshStartupTimeout)
+	defer cancel()
+
+	select {
+	case d := <-domainCh:
+		if d == "" {
+			cleanup()
+			return nil, false
+		}
+		return &interactshSession{callbackDomain: d, cleanup: cleanup}, true
+	case <-readCtx.Done():
+		// No callback domain before the deadline (or task cancelled) — tear the
+		// subprocess down and fall back to in-band. THIS is the DoD-2 mitigation.
+		cleanup()
+		return nil, false
+	}
+}
+
+// interactshDomainRE matches a bare hostname (dotted labels, no scheme/port/path).
+var interactshDomainRE = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$`)
+
+// parseInteractshDomain extracts the registered OOB callback domain from an
+// interactsh-client stdout line. interactsh-client prints a banner then the
+// payload domain (bash reads it via `tail -n+11`). We accept the last
+// whitespace-separated token (handles a leading "[INF]" log prefix) when it looks
+// like a bare hostname with a dot and no scheme/port/path. Returns "" otherwise.
+func parseInteractshDomain(line string) string {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return ""
+	}
+	fields := strings.Fields(line)
+	cand := strings.TrimRight(fields[len(fields)-1], ".,;")
+	if strings.ContainsAny(cand, "/\\:@") || !strings.Contains(cand, ".") {
+		return ""
+	}
+	if !interactshDomainRE.MatchString(cand) {
+		return ""
+	}
+	return strings.ToLower(cand)
 }
 
 // stripURLScheme strips the http:// or https:// scheme from a URL string and
