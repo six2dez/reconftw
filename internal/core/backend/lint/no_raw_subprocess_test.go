@@ -99,6 +99,16 @@ var allowedPaths = []string{
 	// another hakluke stdin tool). Behind the hakip2hostRunner package var for
 	// hermetic tests; per-invocation context.WithTimeout applied (PAR-01 / plan 13-01).
 	"internal/modules/subdomains/reverseip.go",
+	// osint/github_repos.go: `git clone` fetches every company repo into an
+	// isolated workspace tmp dir for read-only titus/trufflehog secret scanning
+	// (bash github_repos, osint.sh:110). git is a base system dependency, not a
+	// tools.lock recon binary — the name-keyed Backend/Runner registry runs recon
+	// tools, not the VCS. Direct exec.CommandContext behind the githubReposGitClone
+	// package var (hermetic tests) with per-invocation context.WithTimeout +
+	// GIT_TERMINAL_PROMPT=0 is the sanctioned pattern (mirrors reverseip.go /
+	// wordlistgen.go). enumerepo/titus/trufflehog still route through app.Tools
+	// (PAR-03 / plan 13-06).
+	"internal/modules/osint/github_repos.go",
 	// internal/installer/: the Phase 11 installer runs TOOLCHAIN + package-manager
 	// commands (go install, uv tool install, apt-get/brew/pacman, git clone, cargo,
 	// tar) plus version probes (go version -m, uv tool list) and the SHA-256-verified
