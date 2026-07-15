@@ -94,8 +94,10 @@ workspaces/
 
 # --- Phase 11 cleanup: runtime artifacts + separate experimentation (NEVER commit) ---
 # reconftw-web / web experimentation (PROJECT.md: "no parte de v2.0"; node_modules-heavy)
-web/
-reconftw-web/
+# NOTE: keep these anchored to the repo root with a leading slash. A bare, unanchored
+# `web/` also matches internal/modules/web/ (the Go web module) and silently un-tracks it.
+/web/
+/reconftw-web/
 # runtime data: SQLite store, master key (SECRET), caches, manifests
 data/
 # stray scratch + local config
