@@ -650,15 +650,18 @@ func parseEnumerepoOutput(path string) []string {
 		out = append(out, u)
 	}
 
+	// WR-13-05: only fall back to plain-text parsing when the payload is NOT valid
+	// JSON. enumerepo emits JSON; if it parses but collectRepoURLs recognizes no
+	// repo keys (schema drift), an empty list is the correct result — shredding the
+	// pretty-printed JSON into per-line "{"/"}" garbage would pollute the repo list,
+	// the informational findings, and the git-clone seam (WR-13-04).
 	var generic interface{}
 	if jErr := json.Unmarshal(data, &generic); jErr == nil {
 		collectRepoURLs(generic, add)
-		if len(out) > 0 {
-			return out
-		}
+		return out
 	}
 
-	// Plain-text fallback: one repo URL / full_name per line.
+	// Plain-text fallback: one repo URL / full_name per line (JSON parse failed).
 	for _, line := range splitNonEmptyLines(data) {
 		add(line)
 	}

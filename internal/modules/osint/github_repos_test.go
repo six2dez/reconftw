@@ -392,3 +392,43 @@ func TestGithubReposGitCloneRejectsNonURL(t *testing.T) {
 		}
 	}
 }
+
+// TestParseEnumerepoOutputFallbackOnlyOnParseFailure proves the WR-13-05 gate:
+// the plain-text fallback runs ONLY when the payload is not valid JSON. Valid
+// JSON whose repo keys are unrecognized (schema drift) must yield an empty list —
+// NOT the pretty-printed JSON shredded into per-line "{"/"}" garbage.
+func TestParseEnumerepoOutputFallbackOnlyOnParseFailure(t *testing.T) {
+	write := func(t *testing.T, content string) string {
+		t.Helper()
+		p := filepath.Join(t.TempDir(), "enumerepo.json")
+		if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
+			t.Fatalf("write: %v", err)
+		}
+		return p
+	}
+
+	t.Run("recognized JSON yields repo URLs", func(t *testing.T) {
+		got := parseEnumerepoOutput(write(t, `[{"repos":[{"clone_url":"https://github.com/example/repo1"}]}]`))
+		if len(got) != 1 || got[0] != "https://github.com/example/repo1" {
+			t.Errorf("got %v, want [https://github.com/example/repo1]", got)
+		}
+	})
+
+	t.Run("valid but unrecognized JSON yields empty (not shredded)", func(t *testing.T) {
+		// Pretty-printed JSON whose keys collectRepoURLs does not match. The OLD
+		// (len(out)>0) gate would shred this into 5 bogus per-line "repos".
+		pretty := "{\n  \"unexpected\": [\n    {\"name\": \"repo1\"}\n  ]\n}\n"
+		got := parseEnumerepoOutput(write(t, pretty))
+		if len(got) != 0 {
+			t.Errorf("schema-drift JSON shredded into %d bogus entries: %v; want empty", len(got), got)
+		}
+	})
+
+	t.Run("non-JSON plaintext falls back to per-line URLs", func(t *testing.T) {
+		got := parseEnumerepoOutput(write(t,
+			"https://github.com/example/repo1\nhttps://github.com/example/repo2\n"))
+		if len(got) != 2 {
+			t.Errorf("plaintext fallback got %v, want 2 URLs", got)
+		}
+	})
+}
