@@ -92,7 +92,6 @@ func subsReconStages() []compositeStageGroup {
 				"subdomains.noerror",
 				"subdomains.dns",
 				"subdomains.srv",
-				"subdomains.ptr",
 				"subdomains.resolvers.",
 			},
 		},
@@ -101,6 +100,7 @@ func subsReconStages() []compositeStageGroup {
 			module: "subdomains.aux",
 			prefixes: []string{
 				"subdomains.scraping",
+				"subdomains.csprecon",
 				"subdomains.analytics",
 				"subdomains.ns_delegation",
 			},
@@ -126,7 +126,6 @@ func subsAllStages() []compositeStageGroup {
 				"subdomains.noerror",
 				"subdomains.dns",
 				"subdomains.srv",
-				"subdomains.ptr",
 				"subdomains.brute",
 				"subdomains.resolvers.",
 			},
@@ -136,6 +135,7 @@ func subsAllStages() []compositeStageGroup {
 			module: "subdomains.aux",
 			prefixes: []string{
 				"subdomains.scraping",
+				"subdomains.csprecon",
 				"subdomains.analytics",
 				"subdomains.ns_delegation",
 			},
@@ -166,6 +166,10 @@ func subsAllStages() []compositeStageGroup {
 func webStageGroups() []compositeStageGroup {
 	return []compositeStageGroup{
 		{name: "web-probe", module: "web", prefixes: []string{"web.httpx"}},
+		// web-portscan mirrors RunWebAsync's "portscan" stage: runs after probe so its
+		// discovered services + host:port records feed downstream analysis/url stages.
+		// A "hosts" merge follows in compositeStagePostMerge (13-08 checker LOW #3).
+		{name: "web-portscan", module: "web", prefixes: []string{"web.portscan"}},
 		{name: "web-analysis-waf", module: "web", prefixes: []string{"web.wafw00f", "web.cdncheck"}},
 		{
 			name:   "web-analysis",
@@ -180,6 +184,10 @@ func webStageGroups() []compositeStageGroup {
 		{name: "web-js-analyze", module: "web", prefixes: []string{"web.jsluice", "web.jsa", "web.mantra"}},
 		{name: "web-urls-dedup", module: "web", prefixes: []string{"web.urldedup"}},
 		{name: "web-bypass", module: "web", prefixes: []string{"web.nomore403", "web.shortscan", "web.gxss", "web.arjun"}},
+		// web-producers runs last (url_ext needs the deduped corpus; wellknown +
+		// wordlistgen need the web/JS surface). wellknown's HostRecord staging is
+		// folded into artefacts/hosts.jsonl by the "hosts" merge in postMerge.
+		{name: "web-producers", module: "web", prefixes: []string{"web.url_ext", "web.wellknown", "web.wordlistgen"}},
 	}
 }
 
@@ -226,6 +234,10 @@ func vulnsStageGroupsComposite() []compositeStageGroup {
 				"vulns.grpc", "vulns.llm", "vulns.websocket",
 			},
 		},
+		// spray runs last (reads hosts/portscan_active.gnmap from the web portscan
+		// stage). vulns groups run only in ModeAll/ModeDeep, so spray is all/deep-only
+		// automatically; SprayTask's DeepOnly + gnmap + IP-target gates do the rest.
+		{name: "vulns-spray", module: "vulns", prefixes: []string{"vulns.spray"}},
 	}
 }
 
@@ -448,6 +460,15 @@ func compositeStagePostMerge(ctx context.Context, app *appctx.AppContext, group 
 			}
 		}
 	// Web stages: mirrors RunWebAsync per-stage merges.
+	case "web-portscan", "web-producers":
+		// Fold portscan/nerva (web-portscan) and wellknown (web-producers) HostRecord
+		// staging into artefacts/hosts.jsonl so the host/port records reach the store
+		// (13-08 checker LOW #3). Union-preserving (merge.go) → httpx hosts survive.
+		if err := web.MergeStage(ctx, app, "hosts"); err != nil {
+			if app.Log != nil {
+				app.Log.Warn("mcp/composite: web MergeStage failed", "stage", "hosts", "err", err)
+			}
+		}
 	case "web-analysis-waf":
 		if err := web.MergeStage(ctx, app, "waf"); err != nil {
 			if app.Log != nil {

@@ -94,6 +94,11 @@ func RunVulnsAsync(ctx context.Context, opts RunOptions) (err error) {
 				"vulns.grpc", "vulns.llm", "vulns.websocket",
 			},
 		},
+		// spray runs last: brutespray reads hosts/portscan_active.gnmap produced by
+		// the web portscan stage (which runs before vulns in all/deep). SprayTask's
+		// own DeepOnly + gnmap-presence + IP-target gates handle the runtime skip; the
+		// vulns pipeline itself only runs in ModeAll/ModeDeep.
+		{name: "spray", prefixes: []string{"vulns.spray"}},
 	}
 
 	for _, stage := range stages {

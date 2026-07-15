@@ -58,6 +58,28 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 	dedup := make(map[string]struct{})
 	var ordered [][]byte
 
+	// REPLACE-preservation for the "hosts" artefact (13-08): web.httpx is a DIRECT
+	// writer of artefacts/hosts.jsonl via app.Tree.Append, which has REPLACE
+	// semantics. A hosts merge sourced from the portscan/nerva/wellknown staging
+	// files (inputs/hosts.*.jsonl) must therefore UNION the existing artefact FIRST,
+	// otherwise the subsequent Tree.Append would overwrite httpx's probed hosts.
+	// The existing artefact lines are seeded first (preserving order + dedup key) so
+	// portscan/nerva/wellknown records are ADDED to, not substituted for, httpx's.
+	// Other stages (waf/findings/urls) have no direct artefact writer preceding their
+	// merge, so they are unaffected and keep the staging-only union semantics.
+	if stage == "hosts" {
+		existingArtefact := filepath.Join(app.Target.WorkDir, "artefacts", stage+".jsonl")
+		if existingLines, rerr := readJSONLFile(existingArtefact); rerr == nil {
+			for _, line := range existingLines {
+				key := string(line)
+				if _, exists := dedup[key]; !exists {
+					dedup[key] = struct{}{}
+					ordered = append(ordered, line)
+				}
+			}
+		}
+	}
+
 	for _, fpath := range matches {
 		lines, rerr := readJSONLFile(fpath)
 		if rerr != nil {

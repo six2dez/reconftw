@@ -4,11 +4,12 @@
 // All tests use --dry-run so no external tools or workspaces are required.
 //
 // Test coverage:
-//   TestReconPipelineOrder       — ModeRecon prefix ordering (subs → web → osint, NO vulns)
-//   TestAllPipelineIncludesVulns — ModeAll prefix ordering (subs → web → osint → vulns)
-//   TestPassiveModeBlocksActiveTool — D-09: PassiveBackend rejects active tools
-//   TestCompositeDryRun          — --dry-run early-return (no workspace / no tool exec)
-//   TestDryRunRedactsSecrets     — D-10: dry-run output ordering + no accidental secret leaks
+//
+//	TestReconPipelineOrder       — ModeRecon prefix ordering (subs → web → osint, NO vulns)
+//	TestAllPipelineIncludesVulns — ModeAll prefix ordering (subs → web → osint → vulns)
+//	TestPassiveModeBlocksActiveTool — D-09: PassiveBackend rejects active tools
+//	TestCompositeDryRun          — --dry-run early-return (no workspace / no tool exec)
+//	TestDryRunRedactsSecrets     — D-10: dry-run output ordering + no accidental secret leaks
 package main
 
 import (
@@ -144,8 +145,8 @@ func TestCompositeDryRun(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name    string
-		newCmd  func() *cobra.Command
+		name   string
+		newCmd func() *cobra.Command
 	}{
 		{"recon", newReconCmd},
 		{"all", newAllCmd},
@@ -240,7 +241,119 @@ func TestDryRunRedactsSecrets(t *testing.T) {
 	})
 }
 
+// TestNewTaskPrefixesWiredIntoComposite is the 13-08 anti-dead-code drift guard
+// (composite-side). Every task registered by waves 1-2 is built into the DAG but
+// NEVER selected unless its name prefix is in a stage list. This asserts the new
+// prefixes are present in CompositePipelinePrefixes for the correct modes and that
+// the dead subdomains.ptr prefix (SubPTRTask deleted in 13-01) is gone.
+func TestNewTaskPrefixesWiredIntoComposite(t *testing.T) {
+	t.Parallel()
+
+	recon := handlers.CompositePipelinePrefixes(handlers.ModeRecon)
+	all := handlers.CompositePipelinePrefixes(handlers.ModeAll)
+
+	// New subs/web task prefixes that MUST be selected on BOTH recon and all.
+	reconAndAllWant := []string{
+		"subdomains.csprecon", // 13-02 (subs discovery stage)
+		"web.portscan",        // 13-03 (web portscan stage)
+		"web.url_ext",         // 13-04 (web producers stage)
+		"web.wellknown",       // 13-04 (web producers stage)
+		"web.wordlistgen",     // 13-04 (web producers stage)
+	}
+	for _, p := range reconAndAllWant {
+		if !containsExact(recon, p) {
+			t.Errorf("ModeRecon: new task prefix %q missing — built into DAG but NEVER selected", p)
+		}
+		if !containsExact(all, p) {
+			t.Errorf("ModeAll: new task prefix %q missing", p)
+		}
+	}
+
+	// vulns.spray (13-07) is all/deep-only: vulns groups run only in ModeAll/ModeDeep.
+	if !containsExact(all, "vulns.spray") {
+		t.Error("ModeAll: vulns.spray prefix missing — spray task never selected")
+	}
+	if containsExact(recon, "vulns.spray") {
+		t.Error("ModeRecon: vulns.spray must NOT appear (vulns is all/deep-only per D-01)")
+	}
+
+	// Dead subdomains.ptr prefix must be removed from every subs stage-list site.
+	for _, m := range []struct {
+		name     string
+		prefixes []string
+	}{{"ModeRecon", recon}, {"ModeAll", all}} {
+		if containsExact(m.prefixes, "subdomains.ptr") {
+			t.Errorf("%s: dead subdomains.ptr prefix still present (SubPTRTask deleted in 13-01)", m.name)
+		}
+	}
+}
+
+// TestNewTaskPrefixesAppearInDryRun is the 13-08 drift guard (stub-side). The CLI
+// stub stage lists are function-local literals inside cobra closures, unreachable
+// from a Go import, so they can only be asserted through --dry-run OUTPUT (the
+// TestDryRunRedactsSecrets precedent). This proves the stub literals were updated
+// in lockstep with the handler/composite sites.
+func TestNewTaskPrefixesAppearInDryRun(t *testing.T) {
+	t.Parallel()
+
+	t.Run("subs_has_csprecon_not_ptr", func(t *testing.T) {
+		t.Parallel()
+		stdout, stderr, err := runDryRunCmd(newSubsCmd(), []string{"--target", "example.com", "--dry-run"})
+		if err != nil {
+			t.Fatalf("subs --dry-run error: %v\nstderr:%s", err, stderr)
+		}
+		if !strings.Contains(stdout, "subdomains.csprecon") {
+			t.Errorf("subs --dry-run: expected subdomains.csprecon (13-02) in output:\n%s", stdout)
+		}
+		if strings.Contains(stdout, "subdomains.ptr") {
+			t.Errorf("subs --dry-run: dead subdomains.ptr must not appear:\n%s", stdout)
+		}
+	})
+
+	t.Run("web_has_portscan_url_ext_wordlistgen", func(t *testing.T) {
+		t.Parallel()
+		stdout, stderr, err := runDryRunCmd(newWebCmd(), []string{"--target", "example.com", "--dry-run"})
+		if err != nil {
+			t.Fatalf("web --dry-run error: %v\nstderr:%s", err, stderr)
+		}
+		// web.wellknown is default-OFF (WellKnown.Enabled=false) so it is NOT listed
+		// here; its prefix presence is asserted via CompositePipelinePrefixes above.
+		for _, want := range []string{"web.portscan", "web.url_ext", "web.wordlistgen"} {
+			if !strings.Contains(stdout, want) {
+				t.Errorf("web --dry-run: expected %q in output:\n%s", want, stdout)
+			}
+		}
+	})
+
+	t.Run("all_has_vulns_spray", func(t *testing.T) {
+		t.Parallel()
+		stdout, stderr, err := runDryRunCmd(newAllCmd(), []string{"--target", "example.com", "--dry-run"})
+		if err != nil {
+			t.Fatalf("all --dry-run error: %v\nstderr:%s", err, stderr)
+		}
+		if !strings.Contains(stdout, "vulns.spray") {
+			t.Errorf("all --dry-run: expected vulns.spray (13-07) in output:\n%s", stdout)
+		}
+		// The composite all dry-run also carries the new subs/web tasks (combined output).
+		for _, want := range []string{"subdomains.csprecon", "web.portscan", "web.url_ext"} {
+			if !strings.Contains(stdout, want) {
+				t.Errorf("all --dry-run: expected %q in combined output:\n%s", want, stdout)
+			}
+		}
+	})
+}
+
 // --- helpers ---
+
+// containsExact returns true if ss contains an element exactly equal to want.
+func containsExact(ss []string, want string) bool {
+	for _, s := range ss {
+		if s == want {
+			return true
+		}
+	}
+	return false
+}
 
 // anyHasPrefix returns true if any element of ss has the given prefix.
 func anyHasPrefix(ss []string, prefix string) bool {

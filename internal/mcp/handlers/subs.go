@@ -108,7 +108,6 @@ func RunSubsAsync(ctx context.Context, opts RunOptions) (err error) {
 				"subdomains.noerror",
 				"subdomains.dns",
 				"subdomains.srv",
-				"subdomains.ptr",
 				"subdomains.brute",
 				"subdomains.resolvers.",
 			},
@@ -116,9 +115,10 @@ func RunSubsAsync(ctx context.Context, opts RunOptions) (err error) {
 		{
 			name:   "discovery",
 			module: "subdomains.aux", // best_effort — aux independent discovery
-			merge:  "resolved",       // scraping/analytics/ns_delegation write resolved.*.txt
+			merge:  "resolved",       // scraping/analytics/ns_delegation/csprecon write resolved.*.txt
 			prefixes: []string{
 				"subdomains.scraping",
+				"subdomains.csprecon",
 				"subdomains.analytics",
 				"subdomains.ns_delegation",
 			},

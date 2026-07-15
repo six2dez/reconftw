@@ -73,6 +73,12 @@ func RunWebAsync(ctx context.Context, opts RunOptions) (err error) {
 	}
 	stages := []stageSpec{
 		{name: "probe", prefixes: []string{"web.httpx"}},
+		// portscan runs right after probe so its nmapurls-discovered web services
+		// (hosts/webs.txt) and open host:port records feed the downstream analysis /
+		// url stages. It reads the subs artefact subdomains/subdomains_ips.txt, so no
+		// DAG edge is needed. A "hosts" merge follows (below) to fold the
+		// portscan/nerva HostRecord staging into artefacts/hosts.jsonl (13-08).
+		{name: "portscan", prefixes: []string{"web.portscan"}},
 		{name: "analysis-waf", prefixes: []string{"web.wafw00f", "web.cdncheck"}},
 		{
 			name: "analysis",
@@ -86,6 +92,11 @@ func RunWebAsync(ctx context.Context, opts RunOptions) (err error) {
 		{name: "js-analyze", prefixes: []string{"web.jsluice", "web.jsa", "web.mantra"}},
 		{name: "urls-dedup", prefixes: []string{"web.urldedup"}},
 		{name: "bypass", prefixes: []string{"web.nomore403", "web.shortscan", "web.gxss", "web.arjun"}},
+		// web-producers runs last: url_ext needs the deduped URL corpus, wellknown +
+		// wordlistgen need the web target / JS surface. wellknown stages HostRecords
+		// (inputs/hosts.wellknown.jsonl) folded into artefacts/hosts.jsonl by the
+		// "hosts" merge that follows (13-08).
+		{name: "web-producers", prefixes: []string{"web.url_ext", "web.wellknown", "web.wordlistgen"}},
 	}
 
 	for _, stage := range stages {
@@ -105,6 +116,16 @@ func RunWebAsync(ctx context.Context, opts RunOptions) (err error) {
 
 		// Per-stage MergeStage calls so consumers in the next stage read merged artefacts.
 		switch stage.name {
+		case "portscan", "web-producers":
+			// Fold the portscan/nerva (portscan stage) and wellknown (web-producers
+			// stage) HostRecord staging files into artefacts/hosts.jsonl so the
+			// host/port records reach the store. The "hosts" merge is union-preserving
+			// (merge.go) so httpx's directly-written probed hosts are NOT overwritten.
+			if mergeErr := web.MergeStage(ctx, app, "hosts"); mergeErr != nil {
+				if app.Log != nil {
+					app.Log.Warn("mcp/web: MergeStage failed", "stage", "hosts", "err", mergeErr)
+				}
+			}
 		case "analysis-waf":
 			if mergeErr := web.MergeStage(ctx, app, "waf"); mergeErr != nil {
 				if app.Log != nil {

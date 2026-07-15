@@ -91,6 +91,7 @@ func newStubCmd(use, short string) *cobra.Command {
 //  8. 5 sequential RunStage calls (passive → resolve → permut → enrichment);
 //     each stage slice filtered by filterByModuleAndEnabled (REVIEWS finding #4 fix)
 //  9. mergeTakeoverFindings after enrichment stage (B2 fix — single findings writer)
+//
 // 10. MergeStage after each stage (produces merged.txt for next stage)
 func newSubsCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -306,8 +307,8 @@ func printDryRun(cmd *cobra.Command, allTasks []task.Task, cfg *config.Config) e
 	}
 	stages := []stageSpec{
 		{"passive", "subdomains.passive", []string{"subdomains.passive."}},
-		{"resolve", "subdomains", []string{"subdomains.active", "subdomains.tls", "subdomains.noerror", "subdomains.dns", "subdomains.srv", "subdomains.ptr", "subdomains.brute", "subdomains.resolvers."}},
-		{"discovery", "subdomains.aux", []string{"subdomains.scraping", "subdomains.analytics", "subdomains.ns_delegation"}},
+		{"resolve", "subdomains", []string{"subdomains.active", "subdomains.tls", "subdomains.noerror", "subdomains.dns", "subdomains.srv", "subdomains.brute", "subdomains.resolvers."}},
+		{"discovery", "subdomains.aux", []string{"subdomains.scraping", "subdomains.csprecon", "subdomains.analytics", "subdomains.ns_delegation"}},
 		{"permut", "subdomains.aux", []string{"subdomains.permut", "subdomains.recursive."}},
 		{"enrichment", "subdomains.aux", []string{"subdomains.takeover.", "subdomains.buckets", "subdomains.asn", "subdomains.geo", "subdomains.zonetransfer"}},
 	}
@@ -485,15 +486,21 @@ func runWebCmd(cmd *cobra.Command) error {
 //	→ urls-dedup → bypass [+merge findings]
 func printWebDryRun(cmd *cobra.Command, allTasks []task.Task, cfg *config.Config) error {
 	type stageSpec struct {
-		name        string
-		prefixes    []string
-		mergeAfter  string // artefact name merged after this stage, or ""
-		mergeNote   string // human-readable note about the merge call
+		name       string
+		prefixes   []string
+		mergeAfter string // artefact name merged after this stage, or ""
+		mergeNote  string // human-readable note about the merge call
 	}
 	stages := []stageSpec{
 		{
 			name:     "probe",
 			prefixes: []string{"web.httpx"},
+		},
+		{
+			name:       "portscan",
+			prefixes:   []string{"web.portscan"},
+			mergeAfter: "hosts",
+			mergeNote:  "MergeStage(\"hosts\") — folds portscan/nerva HostRecord staging into artefacts/hosts.jsonl (union-preserving)",
 		},
 		{
 			name:       "analysis-waf",
@@ -533,6 +540,12 @@ func printWebDryRun(cmd *cobra.Command, allTasks []task.Task, cfg *config.Config
 			prefixes:   []string{"web.nomore403", "web.shortscan", "web.gxss", "web.arjun"},
 			mergeAfter: "findings",
 			mergeNote:  "MergeStage(\"findings\") — merges nomore403/shortscan/gxss/arjun staging",
+		},
+		{
+			name:       "web-producers",
+			prefixes:   []string{"web.url_ext", "web.wellknown", "web.wordlistgen"},
+			mergeAfter: "hosts",
+			mergeNote:  "MergeStage(\"hosts\") — folds wellknown HostRecord staging into artefacts/hosts.jsonl (union-preserving)",
 		},
 	}
 	fmt.Fprintln(cmd.OutOrStdout(), "[dry-run] web pipeline stages:")
@@ -751,6 +764,7 @@ func printVulnsDryRun(cmd *cobra.Command, allTasks []task.Task, cfg *config.Conf
 		{"injection", []string{"vulns.xss", "vulns.sqli", "vulns.lfi", "vulns.ssti", "vulns.crlf", "vulns.cmdi"}},
 		{"oob-advanced", []string{"vulns.ssrf", "vulns.smuggling", "vulns.webcache_wcvs", "vulns.webcache_toxicache", "vulns.second_order"}},
 		{"dast-extended", []string{"vulns.nuclei_dast", "vulns.fuzzparams", "vulns.bypass4xx", "vulns.testssl", "vulns.fray", "vulns.graphql", "vulns.grpc", "vulns.llm", "vulns.websocket"}},
+		{"spray", []string{"vulns.spray"}},
 	}
 	fmt.Fprintln(cmd.OutOrStdout(), "[dry-run] vulns pipeline stages:")
 	for i, stage := range stages {
