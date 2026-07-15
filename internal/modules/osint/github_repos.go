@@ -36,6 +36,11 @@ import (
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
+// githubReposGitClone is the git-clone seam. RED-phase stub (no-op); the GREEN
+// phase replaces it with a FOUND-10-allowlisted, timeout-bounded
+// exec.CommandContext wrapper. Overridable so hermetic tests inject a fake clone.
+var githubReposGitClone = func(_ context.Context, _ string, _ string) error { return nil }
+
 // GitHubReposTask runs enumerepo for OSINT-05 (key-gated, feeds github_leaks).
 type GitHubReposTask struct{}
 
