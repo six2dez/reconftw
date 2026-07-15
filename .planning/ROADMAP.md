@@ -42,7 +42,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 10: Monitor Mode + Reporting + Notifications** — Monitor loop + diff detection + incremental + JSON/HTML/CSV/AI/Faraday/hotlist/SARIF reports + Slack/Telegram/Discord notifications consolidated (completed 2026-06-12)
 - [ ] **Phase 11: Installer + Cross-Platform + Docker** — `reconftw install` (replaces install.sh) + tools.lock for 70+ tools + SHA-256 verification + Linux/macOS/ARM64 + Docker multi-arch
 - [ ] **Phase 12: Integration Hardening** — Wire subsystems end-to-end: store ingest (done) + in-scan notifications + resume/checkpoint + monitor diff + global rate limiter + AI/Ollama
-- [ ] **Phase 13: Domain Parity** — Close bash-vs-Go gaps: subs (PTR/hakip2host/dnsregs/csprecon/dsieve) + vulns (spraying/SSRF-OOB) + osint (LeakSearch/Scopify/repo-secrets) + web (portscan/nerva/wordlists/url_ext)
+- [x] **Phase 13: Domain Parity** — Close bash-vs-Go gaps: subs (PTR/hakip2host/dnsregs/csprecon/dsieve) + vulns (spraying/SSRF-OOB) + osint (LeakSearch/Scopify/repo-secrets) + web (portscan/nerva/wordlists/url_ext). COMPLETE 2026-07-15 — all wave-1/2 tasks wired into recon/all; ≥95% per-domain parity (13-PARITY-AUDIT.md)
 - [ ] **Phase 14: Cutover & Migration** — Config migrator (corpus-tested) + MIGRATION.md + compat symlinks + beta period + bug-bug parity test + community sign-off + `main`→Go, bash→legacy branch
 
 ## Phase Details
@@ -511,7 +511,7 @@ Plans:
 - [x] 13-05-PLAN.md — OSINT: LeakSearch passwords + Scopify + ip_info WHOISXML reverse-IP/IP-target
 - [x] 13-06-PLAN.md — OSINT: github repo-secret scan — enumerepo → clone → titus (default) + trufflehog → github_company_secrets.json + redacted findings (noseyparker deferred to Ph14 → titus fallback)
 - [x] 13-07-PLAN.md — Vulns: password spraying (brutespray/brutus) + SSRF OOB bounded interactsh auto-start
-- [ ] 13-08-PLAN.md — Pipeline wiring (all stage-list sites) + capability parity audit (>=95%)
+- [x] 13-08-PLAN.md — Pipeline wiring (all stage-list sites: csprecon/portscan/url_ext/wellknown/wordlistgen/spray) + dead subdomains.ptr removed + union-preserving hosts merge; 13-PARITY-AUDIT.md proves ≥95% per-domain (subs 95.5%/vulns 100%/osint ≥95%/web 96.4%) + 8-item Phase-14 deferral ledger
 
 ### Phase 14: Cutover & Migration
 
