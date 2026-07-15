@@ -431,3 +431,144 @@ func TestWebPortscanNmapURLsFeedback(t *testing.T) {
 		t.Errorf("webs/webs.txt missing discovered URL; got:\n%s", targetSet)
 	}
 }
+
+// -------------------------------------------------------------------------
+// Task 2: nerva service fingerprint
+// -------------------------------------------------------------------------
+
+// fixtureNervaJSONL is a stand-in for `nerva --json` output (one JSON obj/line).
+const fixtureNervaJSONL = `{"host":"8.8.8.8","port":80,"protocol":"http"}
+{"ip":"8.8.8.8","port":443,"service":"https"}`
+
+func TestPortscanServiceFingerprintFromNaabu(t *testing.T) {
+	be := newFakeToolBackend()
+	be.stdout["nerva"] = []byte(fixtureNervaJSONL)
+	app := newPortscanTestApp(t, be, portscanTestCfg())
+	hostsDir := filepath.Join(app.Target.WorkDir, "hosts")
+	if err := os.MkdirAll(hostsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// NF==2 numeric lines kept; the IPv6 (multi-colon) + no-colon lines dropped.
+	if err := os.WriteFile(filepath.Join(hostsDir, "naabu_open.txt"),
+		[]byte("8.8.8.8:80\n8.8.8.8:443\ngarbage-line\n2001:db8::1:22\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	ps := app.Cfg.Web.Portscan
+	portscanServiceFingerprint(context.Background(), app, ps, hostsDir)
+
+	// nerva arg vector: --json -l <targets> -w 2000 -o <service_fingerprints.jsonl>.
+	nArgs, ok := be.argsFor("nerva")
+	if !ok {
+		t.Fatal("nerva was not invoked")
+	}
+	targetsFile := filepath.Join(app.Target.WorkDir, ".tmp", "service_fp_targets.txt")
+	fpPath := filepath.Join(hostsDir, "service_fingerprints.jsonl")
+	if !containsToken(nArgs, "--json") {
+		t.Errorf("nerva args missing --json; got %v", nArgs)
+	}
+	if !hasSubsequence(nArgs, "-l", targetsFile) {
+		t.Errorf("nerva args missing -l <targets>; got %v", nArgs)
+	}
+	if !hasSubsequence(nArgs, "-w", "2000") {
+		t.Errorf("nerva args missing -w 2000 (TimeoutMS); got %v", nArgs)
+	}
+	if !hasSubsequence(nArgs, "-o", fpPath) {
+		t.Errorf("nerva args missing -o <service_fingerprints.jsonl>; got %v", nArgs)
+	}
+
+	// Targets file built from naabu NF==2 lines.
+	targets, _ := os.ReadFile(targetsFile)
+	if !strings.Contains(string(targets), "8.8.8.8:80") || !strings.Contains(string(targets), "8.8.8.8:443") {
+		t.Errorf("targets file missing naabu host:port; got:\n%s", targets)
+	}
+	if strings.Contains(string(targets), "garbage-line") {
+		t.Errorf("non host:port line leaked into targets; got:\n%s", targets)
+	}
+
+	// service_fingerprints.jsonl (bash-contract) produced from nerva stdout.
+	if data, _ := os.ReadFile(fpPath); !strings.Contains(string(data), "8.8.8.8") {
+		t.Errorf("service_fingerprints.jsonl missing/empty; got:\n%s", data)
+	}
+
+	// Fingerprints reach the store via the hosts.nerva.jsonl staging file.
+	staged, _ := os.ReadFile(filepath.Join(app.Target.WorkDir, "inputs", "hosts.nerva.jsonl"))
+	if !strings.Contains(string(staged), "8.8.8.8") {
+		t.Errorf("inputs/hosts.nerva.jsonl missing fingerprint records; got:\n%s", staged)
+	}
+	if !strings.Contains(string(staged), "http") {
+		t.Errorf("inputs/hosts.nerva.jsonl missing service in tech; got:\n%s", staged)
+	}
+}
+
+func TestPortscanServiceFingerprintGnmapFallback(t *testing.T) {
+	be := newFakeToolBackend()
+	be.stdout["nerva"] = []byte(fixtureNervaJSONL)
+	app := newPortscanTestApp(t, be, portscanTestCfg())
+	hostsDir := filepath.Join(app.Target.WorkDir, "hosts")
+	if err := os.MkdirAll(hostsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// No naabu_open.txt → targets must come from the gnmap.
+	gnmap := "Host: 1.2.3.4 ()\tPorts: 80/open/tcp//http///, 443/open/tcp//https///\tIgnored State: closed (0)\n"
+	if err := os.WriteFile(filepath.Join(hostsDir, "portscan_active.gnmap"), []byte(gnmap), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	ps := app.Cfg.Web.Portscan
+	portscanServiceFingerprint(context.Background(), app, ps, hostsDir)
+
+	if _, ok := be.argsFor("nerva"); !ok {
+		t.Fatal("nerva was not invoked from the gnmap fallback")
+	}
+	targets, _ := os.ReadFile(filepath.Join(app.Target.WorkDir, ".tmp", "service_fp_targets.txt"))
+	if !strings.Contains(string(targets), "1.2.3.4:80") || !strings.Contains(string(targets), "1.2.3.4:443") {
+		t.Errorf("gnmap-derived targets missing; got:\n%s", targets)
+	}
+}
+
+func TestPortscanServiceFingerprintSkips(t *testing.T) {
+	writeNaabu := func(app *appctx.AppContext) string {
+		hostsDir := filepath.Join(app.Target.WorkDir, "hosts")
+		_ = os.MkdirAll(hostsDir, 0o755)
+		_ = os.WriteFile(filepath.Join(hostsDir, "naabu_open.txt"), []byte("8.8.8.8:80\n"), 0o644)
+		return hostsDir
+	}
+
+	t.Run("disabled", func(t *testing.T) {
+		be := newFakeToolBackend()
+		cfg := portscanTestCfg()
+		cfg.Web.Portscan.ServiceFingerprint.Enabled = false
+		app := newPortscanTestApp(t, be, cfg)
+		hostsDir := writeNaabu(app)
+		portscanServiceFingerprint(context.Background(), app, cfg.Web.Portscan, hostsDir)
+		if be.countCalls("nerva") != 0 {
+			t.Error("nerva invoked despite ServiceFingerprint.Enabled=false")
+		}
+	})
+
+	t.Run("wrong_engine", func(t *testing.T) {
+		be := newFakeToolBackend()
+		cfg := portscanTestCfg()
+		cfg.Web.Portscan.ServiceFingerprint.Engine = "somethingelse"
+		app := newPortscanTestApp(t, be, cfg)
+		hostsDir := writeNaabu(app)
+		portscanServiceFingerprint(context.Background(), app, cfg.Web.Portscan, hostsDir)
+		if be.countCalls("nerva") != 0 {
+			t.Error("nerva invoked despite Engine!=nerva")
+		}
+	})
+
+	t.Run("nerva_absent", func(t *testing.T) {
+		be := newFakeToolBackend()
+		be.errs["nerva"] = os.ErrNotExist
+		cfg := portscanTestCfg()
+		app := newPortscanTestApp(t, be, cfg)
+		hostsDir := writeNaabu(app)
+		// Must not panic and must not write the staging record file.
+		portscanServiceFingerprint(context.Background(), app, cfg.Web.Portscan, hostsDir)
+		if _, err := os.Stat(filepath.Join(app.Target.WorkDir, "inputs", "hosts.nerva.jsonl")); err == nil {
+			t.Error("fingerprint records written despite nerva being absent")
+		}
+	})
+}

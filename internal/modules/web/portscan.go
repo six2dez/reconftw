@@ -167,6 +167,10 @@ func (t *WebPortscanTask) Run(ctx context.Context, app *appctx.AppContext) (task
 	// reaches the store via web.MergeStage(ctx, app, "hosts") (wired in 13-08).
 	portscanWriteHostRecords(app, openPorts, "portscan")
 
+	// 7. nerva service fingerprint (best-effort enrichment tail; bash parity —
+	// portscan calls service_fingerprint at its tail, web.sh:842).
+	portscanServiceFingerprint(ctx, app, ps, hostsDir)
+
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"ips": len(ips), "ips_no_cdn": len(ipsNoCDN), "open_ports": len(openPorts)},
@@ -779,6 +783,197 @@ func portscanAppendLines(path string, lines []string) {
 	}
 	if added {
 		_ = os.WriteFile(path, buf.Bytes(), 0o644) //nolint:gosec,errcheck
+	}
+}
+
+// -------------------------------------------------------------------------
+// nerva service fingerprint (bash service_fingerprint, web.sh:878-923)
+// -------------------------------------------------------------------------
+
+// portscanServiceFingerprint runs nerva over the discovered open host:port
+// targets and writes hosts/service_fingerprints.jsonl (the bash-contract file
+// spray/brutus may read) plus a "hosts" staging file so the fingerprints reach
+// the store. Gated on ServiceFingerprint.Enabled && Engine=="nerva" && nerva
+// present. It is a best-effort tail: a missing/failed nerva logs and returns —
+// it NEVER fails the portscan task (bash web.sh:884-895 parity).
+func portscanServiceFingerprint(ctx context.Context, app *appctx.AppContext, ps config.WebPortscan, hostsDir string) {
+	fp := ps.ServiceFingerprint
+	if !fp.Enabled {
+		return
+	}
+	if fp.Engine != "nerva" {
+		if app.Log != nil {
+			app.Log.Info("web.portscan: unsupported service-fingerprint engine — skipping",
+				"engine", fp.Engine)
+		}
+		return
+	}
+
+	// Build the host:port targets: prefer hosts/naabu_open.txt (awk NF==2 numeric),
+	// fall back to the nmap gnmap (bash _build_service_fp_targets_from_nmap).
+	var targets []string
+	if data, err := os.ReadFile(filepath.Join(hostsDir, "naabu_open.txt")); err == nil { //nolint:gosec
+		targets = portscanServiceFPTargets(portscanNaabuNF2Pairs(data))
+	}
+	if len(targets) == 0 {
+		for _, gn := range []string{"portscan_active.gnmap", "portscan_active_targeted.gnmap"} {
+			data, err := os.ReadFile(filepath.Join(hostsDir, gn)) //nolint:gosec
+			if err != nil {
+				continue
+			}
+			if targets = portscanServiceFPTargets(portscanParseGnmap(data)); len(targets) > 0 {
+				break
+			}
+		}
+	}
+	if len(targets) == 0 {
+		return
+	}
+
+	tmpDir := filepath.Join(app.Target.WorkDir, ".tmp")
+	if err := os.MkdirAll(tmpDir, 0o755); err != nil {
+		return
+	}
+	targetsFile := filepath.Join(tmpDir, "service_fp_targets.txt")
+	if err := os.WriteFile(targetsFile, []byte(strings.Join(targets, "\n")+"\n"), 0o644); err != nil { //nolint:gosec
+		return
+	}
+
+	timeoutMS := fp.TimeoutMS
+	if timeoutMS <= 0 {
+		timeoutMS = 2000
+	}
+	fpPath := filepath.Join(hostsDir, "service_fingerprints.jsonl")
+	// ARG VECTOR: nerva --json -l <targets> -w <TimeoutMS> -o service_fingerprints.jsonl.
+	args := []string{"--json", "-l", targetsFile, "-w", strconv.Itoa(timeoutMS), "-o", fpPath}
+	res, err := app.Tools.Run(ctx, "nerva", args)
+	if err != nil {
+		if app.Log != nil {
+			app.Log.Info("web.portscan: nerva absent/failed — skipping service fingerprint", "err", err)
+		}
+		return
+	}
+
+	raw := portscanReadOrStdout(fpPath, res)
+	// Ensure the bash-contract file exists even when the backend streamed stdout.
+	if info, statErr := os.Stat(fpPath); (statErr != nil || info.Size() == 0) && len(bytes.TrimSpace(raw)) > 0 {
+		_ = os.WriteFile(fpPath, raw, 0o644) //nolint:gosec,errcheck
+	}
+	portscanWriteFingerprintRecords(app, raw)
+	if app.Log != nil {
+		app.Log.Debug("web.portscan: nerva service fingerprint complete", "targets", len(targets))
+	}
+}
+
+// portscanNaabuNF2Pairs parses naabu_open.txt lines with EXACTLY one colon and a
+// numeric port (bash awk -F: 'NF==2 && $2 ~ /^[0-9]+$/'). Multi-colon (IPv6)
+// lines are dropped, matching the bash NF==2 gate.
+func portscanNaabuNF2Pairs(data []byte) []portscanHostPort {
+	var out []portscanHostPort
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		parts := strings.Split(line, ":")
+		if len(parts) != 2 {
+			continue // NF==2
+		}
+		if _, err := strconv.Atoi(parts[1]); err != nil {
+			continue
+		}
+		out = append(out, portscanHostPort{ip: parts[0], port: parts[1]})
+	}
+	return out
+}
+
+// portscanServiceFPTargets renders host:port pairs into sorted, unique target
+// lines for the nerva targets file.
+func portscanServiceFPTargets(pairs []portscanHostPort) []string {
+	seen := make(map[string]bool)
+	var out []string
+	for _, p := range pairs {
+		key := p.ip + ":" + p.port
+		if p.ip == "" || p.port == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, key)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// portscanWriteFingerprintRecords parses nerva JSONL and emits HostRecord JSONL
+// to inputs/hosts.nerva.jsonl (a distinct "hosts" single-writer staging file so
+// the fingerprints reach the store via web.MergeStage(ctx, app, "hosts")).
+func portscanWriteFingerprintRecords(app *appctx.AppContext, raw []byte) {
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return
+	}
+	var lines [][]byte
+	scanner := bufio.NewScanner(bytes.NewReader(raw))
+	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for scanner.Scan() {
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 {
+			continue
+		}
+		var rec struct {
+			Host     string `json:"host"`
+			IP       string `json:"ip"`
+			Target   string `json:"target"`
+			Port     any    `json:"port"`
+			Protocol string `json:"protocol"`
+			Service  string `json:"service"`
+		}
+		if json.Unmarshal(line, &rec) != nil {
+			continue
+		}
+		host := portscanFirstNonEmpty(rec.Host, rec.IP, rec.Target)
+		if host == "" {
+			continue
+		}
+		hr := HostRecord{Host: host, IP: rec.IP, Port: portscanPortToString(rec.Port)}
+		if svc := portscanFirstNonEmpty(rec.Protocol, rec.Service); svc != "" {
+			hr.Tech = []string{svc}
+		}
+		if b, err := json.Marshal(hr); err == nil {
+			lines = append(lines, b)
+		}
+	}
+	if len(lines) == 0 {
+		return
+	}
+	staging := filepath.Join(app.Target.WorkDir, "inputs", "hosts.nerva.jsonl")
+	if err := output.WriteJSONL(staging, lines); err != nil && app.Log != nil {
+		app.Log.Debug("web.portscan: nerva staging write failed", "path", staging, "err", err)
+	}
+}
+
+// portscanFirstNonEmpty returns the first non-empty trimmed string.
+func portscanFirstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v = strings.TrimSpace(v); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// portscanPortToString normalizes a JSON port (number or string) to a string.
+func portscanPortToString(v any) string {
+	switch p := v.(type) {
+	case string:
+		return p
+	case float64:
+		return strconv.Itoa(int(p))
+	case int:
+		return strconv.Itoa(p)
+	default:
+		return ""
 	}
 }
 
