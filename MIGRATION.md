@@ -27,9 +27,9 @@ flags, output paths, config keys, changed defaults — appears here.
    - [2.4 Default-behavior changes](#24-default-behavior-changes-cut-07)
 3. [Rollback — reverting v2 → v1](#3-rollback--reverting-v2--v1-cut-15)
 4. [Deprecation timeline (two distinct clocks)](#4-deprecation-timeline-two-distinct-clocks-cut-14)
-
-> Sections 5–7 (the consolidated deferral ledger, the documented-as-deferred manual
-> process, and the zero-silent-breakages attestation) are appended below.
+5. [Consolidated deferral ledger](#5-consolidated-deferral-ledger-d-06) — capabilities intentionally deferred past cutover
+6. [Documented as deferred — manual / out of this phase](#6-documented-as-deferred--manual--out-of-this-phase) — beta, sign-off, branch swap, comms, doc rewrites
+7. [Zero silent breakages attestation](#7-zero-silent-breakages-attestation-xcut-05)
 
 ---
 
@@ -730,3 +730,129 @@ release count (two minor bumps after v2.0.0), not months.
 | A — compat output window | **6 months** | `Recon/<domain>/` compat tree stays populated | ADR §4.5 |
 | B — v1 branch freeze | **12 months** | `archive/v1.x` gets security-only fixes; rollback supported | CUT-14 |
 | (related) CLI/`[legacy]` removal | v2.2.0 (release-based) | deprecated short flags + `[legacy]` table removed | ADR §8.4 |
+
+---
+
+## 5. Consolidated deferral ledger (D-06)
+
+Phases 1–13 delivered **≥95% per-domain parity** on the default `recon`/`all` path
+(`13-PARITY-AUDIT.md`). A small set of niche, default-off, or intentional-divergence
+capabilities were deliberately **not** ported to v2. This is the single, complete ledger
+of them. **Every deferred capability remains available on the frozen bash legacy branch**
+(§3/§4), so default recon parity is unaffected — nothing here is a silent drop.
+
+### 5.1 Phase-13 parity-audit deferrals (8 items)
+
+Folded verbatim from `13-PARITY-AUDIT.md` §3, each with its rationale:
+
+| # | Capability | Domain | Default state | Rationale |
+|---|---|---|---|---|
+| 1 | **PTR** full ASN→CIDR sweep (`sub_ptr_cidrs`) | subs | default-off (`PTR_SWEEP=false`) | Niche; `hakip2host` covers the default-path reverse-IP lookup. The dead `SubPTRTask` scaffold was removed in 13-01. Opt-in only. |
+| 2 | `deep_wildcard_filter` (**wildcard** deep-filter) | subs | config-only flag | Puredns `--wildcard-tests` covers the baseline wildcard filtering; the deep variant is niche. |
+| 3 | `ip.**thc**.org` secondary reverse-DNS source (`sub_dns`) | subs | secondary source | A secondary/niche reverse-IP source; the primary reverse-IP path is implemented. |
+| 4 | **metadata** active-discovery (exifray + urlfinder) | osint | intentional divergence (D-O2) | v2 keeps exiftool-over-existing-docs; bash's active exifray+urlfinder document discovery+download is an opportunistic divergence, deferred by design. |
+| 5 | `mail_hygiene` dedicated file | osint | niche sub-report | The core email-spoofing posture is covered by `osint.spoofy`; the standalone `mail_hygiene.txt` report is niche. |
+| 6 | `apileaks` trufflehog enrichment | osint | niche enrichment | Core postman/swagger leak detection **is** implemented; only the trufflehog enrichment pass is deferred. |
+| 7 | `pydictor` leet wordlists | web | niche fuzz augmentation | A "deferred idea" that only augments fuzzing wordlists; `roboxtractor` + `getjswords` + `cewler` cover wordlist generation. |
+| 8 | `noseyparker` secrets engine | osint | non-default engine | Absent from `install.sh` (unverifiable module path); `osint.github.secrets_engine` defaults to `"hybrid"` and every value except `"noseyparker"` runs the titus (default) + trufflehog pair, which covers the path (13-01/13-06). |
+
+### 5.2 Code-review deferrals (13-REVIEW / 13-REVIEW-FIX)
+
+**WR-02 — interactsh out-of-band (OOB) callback harvesting (`vulns.ssrf`).**
+13-07 landed a **bounded** interactsh auto-start (the SSRF task starts and stops
+`interactsh-client` under a `WithTimeout` + `interactshStartupTimeout` guard, closing
+the earlier DoD-2 unbounded-hang regression). **Residual deferral:** the restored OOB
+path does not yet **read** interactsh callbacks back into `VulnFindingRecord`s — genuine
+OOB SSRF hits are not captured as findings; the OOB feature is currently decorative. A
+fully-bounded, safe OOB-**harvesting** implementation (keep the stdout reader alive past
+domain parse, ingest late callbacks) is tracked as a Phase-14 follow-up. Nuclei-based and
+regex-match SSRF detection are unaffected and fully implemented.
+
+**IN-02 — naabu default-strategy coupling (`web.portscan`).** `web.portscan.strategy`
+defaults to **`"legacy"`** (a plain full nmap over every non-CDN IP — the bash-parity
+default). The naabu→nmap targeted path (`portscan.go`) is gated on
+`strategy == "naabu_nmap" && naabu.enabled`, so the fully-populated
+`web.portscan.naabu.*` block is **latent** under the default strategy — naabu never runs
+unless you set `strategy = "naabu_nmap"`. **This is a documented coupling, NOT a default
+change:** the value was deliberately left at `"legacy"` (defaults.go, commit `c5567d4`);
+flipping it to `"naabu_nmap"` changes every scan and is a deliberate product decision, not
+made here.
+
+### 5.3 Niche "deferred ideas" (13-CONTEXT)
+
+The 13-CONTEXT "Deferred Ideas" list — `deep_wildcard_filter`, `pydictor` leet wordlists,
+`mail_hygiene` dedicated file, `apileaks` trufflehog enrichment, and `metadata`
+active-discovery — is **already folded into §5.1** (items 2, 7, 5, 6, and 4 respectively).
+No additional niche capability is outstanding beyond those enumerated above; §5 is the
+complete post-cutover ledger for all four domains.
+
+---
+
+## 6. Documented as deferred — manual / out of this phase
+
+The following are **release and community-gated process steps**, not cutover-blocking
+code. **This phase does NOT execute them** — it does NOT run a beta, does NOT perform the
+`main`→v2 branch swap, and does NOT rewrite the README. For each item the **in-phase
+deliverable IS this documentation**; **execution is manual and happens post-phase**, on
+the maintainer's own timeline.
+
+### 6.1 Beta period + `v2-beta` binary (CUT-09)
+
+- **Deferred (manual, out of phase):** distribute a `reconftw v2-beta` binary for a
+  ~1–2 month beta **prior** to cutover; existing users opt in.
+- **Deliverable here:** this note. **Execution:** manual, post-phase (calendar-gated).
+
+### 6.2 Beta feedback template + triage (CUT-10)
+
+- **Deferred (manual, out of phase):** a GitHub Issues template `v2-beta-feedback` plus a
+  monthly issue-triage cadence with the community during the beta window.
+- **Deliverable here:** this note. **Execution:** manual, post-phase.
+
+### 6.3 Community sign-off criteria (CUT-12)
+
+- **Deferred (manual, out of phase):** cutover sign-off requires **(a)** the migrator
+  corpus passing (CUT-03), **(b)** the parity harness green (CUT-11), **(c)** the beta
+  period clean of P0/P1 issues, and **(d)** a user-community survey / GitHub Discussions
+  thread reaching a sign-off threshold. This is a human-judgment gate that cannot be
+  automated.
+- **Deliverable here:** the criteria above. **Execution:** manual, post-phase.
+
+### 6.4 Cutover-gate policy + the branch swap (CUT-04)
+
+- **Cutover-gate policy (CUT-04):** the cutover is **BLOCKED** until the migrator corpus
+  (CUT-03), the parity harness (CUT-11), and the §6.3 sign-off criteria are all met;
+  milestone v2.0 cannot ship until then.
+- **The branch swap is out of scope (manual, out of phase):** the irreversible release
+  action — flipping `main` to Go, moving bash to `archive/v1.x`, the `complete-milestone`
+  ceremony, and the post-cutover PROJECT.md/STATE.md updates — is gated on beta feedback
+  and is **not performed by this phase**. (As noted in §3, an earlier SPEC draft
+  mislabeled this branch swap "CUT-15"; the authoritative CUT-15 is the rollback doc.)
+- **Deliverable here:** the gate policy + scope note. **Execution:** manual, post-phase.
+
+### 6.5 Release communications (CUT-13)
+
+- **Deferred (manual, out of phase):** the cutover announcement — README rewrite, GitHub
+  release notes, and social announcement on the project's user comms channels.
+- **Deliverable here:** this note. **Execution:** manual, post-phase (overlaps §6.6).
+
+### 6.6 Documentation rewrites (XCUT-06)
+
+- **Deferred (manual, out of phase):** auto-generated godoc/API docs, a README rewritten
+  with v2 examples + quickstart, an updated `INSTALL.md`, and a `CONTRIBUTING.md` for new
+  contributors. This is release marketing/docs, not cutover-blocking code.
+- **Deliverable here:** this note. **Execution:** manual, post-phase.
+
+---
+
+## 7. Zero silent breakages attestation (XCUT-05)
+
+**MIGRATION.md is the zero-silent-breakages record for the bash→Go cutover.** Every
+behavior change discoverable in the codebase is documented here with a before/after:
+CLI flags (§2.1), the output tree (§2.2), the 312 config-key renames (§2.3, drift-guarded
+against `legacyAliasMap`), and default-behavior changes (§2.4). Every intentionally
+deferred capability is enumerated with a rationale in the consolidated ledger (§5), and
+every manual/community-gated release step is documented-as-deferred (§6). There are **no
+silent breakages**: a config rename cannot ship without appearing in §2.3 (enforced by
+`TestMigrationDocRenameTableCoversLegacyAliasMap`), and no capability is dropped without a
+ledger entry. This attestation satisfies XCUT-05; it cross-references the before/after
+evidence authored in §2.
