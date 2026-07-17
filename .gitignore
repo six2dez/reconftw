@@ -79,6 +79,7 @@ out/
 # v2 Go kernel build outputs (Phase 3+)
 bin/
 coverage.out
+coverage-lib.out
 # `go build ./...` writes the interfaces_check binary into the repo root when run
 # without -o. Ignore it (the binary is just a verification scaffold; verify-0002.sh
 # builds it explicitly to /tmp/).

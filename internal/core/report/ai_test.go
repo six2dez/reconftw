@@ -96,6 +96,54 @@ func TestAIReporter_OllamaSuccess(t *testing.T) {
 	}
 }
 
+// TestAIReporter_OpenAISuccess drives the callOpenAI HTTP path (ai.go:211),
+// which was previously 0.0% — TestAIReporter_EmptyCloudKeyGuard returns via the
+// empty-key guard BEFORE reaching callOpenAI. A non-empty OpenAIKey plus an
+// httptest stub returning an OpenAI-shape body exercises the full
+// build/send/parse cycle offline (no live call). Mirrors the anthropic/ollama
+// success tests.
+func TestAIReporter_OpenAISuccess(t *testing.T) {
+	const wantResp = "OPENAI_CLOUD_SUMMARY_77"
+
+	var gotPath, gotAuth, gotCT string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotAuth = r.Header.Get("Authorization")
+		gotCT = r.Header.Get("Content-Type")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, `{"choices":[{"message":{"content":"`+wantResp+`"}}]}`)
+	}))
+	defer srv.Close()
+
+	aiCfg := &config.AIConfig{
+		Enabled:   true,
+		Provider:  "openai",
+		Model:     "gpt-4o",
+		OpenAIKey: log.Secret("sk-test-key-123"),
+	}
+	// baseURL override routes callOpenAI at the httptest server.
+	reporter := report.NewAIReporterWithClient(aiCfg, &log.Redactor{}, nil, srv.Client(), srv.URL)
+
+	scan := &sqlcgen.Scan{ID: "scan-01", TargetID: "example.com"}
+	got, err := reporter.Generate(t.Context(), scan, nil)
+	if err != nil {
+		t.Fatalf("Generate(openai) err = %v; want nil", err)
+	}
+	if got != wantResp {
+		t.Errorf("Generate(openai) = %q; want %q", got, wantResp)
+	}
+	if gotPath != "/v1/chat/completions" {
+		t.Errorf("openai request path = %q; want /v1/chat/completions", gotPath)
+	}
+	if gotAuth != "Bearer sk-test-key-123" {
+		t.Errorf("openai Authorization = %q; want Bearer sk-test-key-123", gotAuth)
+	}
+	if gotCT != "application/json" {
+		t.Errorf("openai Content-Type = %q; want application/json", gotCT)
+	}
+}
+
 // TestAIReporter_OllamaRedactBeforeSend proves REPORT-04 holds on the LOCAL
 // path too: a registered secret in a finding title must not appear in the
 // outbound Ollama request body.

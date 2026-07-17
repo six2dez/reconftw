@@ -20,7 +20,7 @@ GH_CLI := $(shell command -v gh 2> /dev/null)
 # Default: reconftw-data.
 
 .PHONY: help \
-        build test test-integration test-smoke integration-smoke lint fmt fmt-check check coverage coverage-critical ci clean \
+        build test test-integration test-smoke integration-smoke lint fmt fmt-check check coverage coverage-critical coverage-lib ci clean \
         sync upload bootstrap rm \
         bash-lint bash-lint-fix bash-fmt bash-test bash-test-unit bash-test-integration-smoke \
         bash-test-integration-full bash-test-security bash-test-all bash-test-release-gate \
@@ -40,7 +40,8 @@ help:
 	@echo "  make check              - fmt-check + lint + test (composite local gate)"
 	@echo "  make coverage           - go test -coverprofile on internal/core/..."
 	@echo "  make coverage-critical  - XCUT-03 per-file ≥90% gate on critical paths"
-	@echo "  make ci                 - fmt-check + lint + test + coverage (matches CI)"
+	@echo "  make coverage-lib       - XCUT-03 ≥75% lib-aggregate gate (resolvers-excluded)"
+	@echo "  make ci                 - fmt-check + lint + test + both coverage gates (matches CI)"
 	@echo "  make clean              - rm -rf bin/ coverage.out"
 	@echo ""
 	@echo "reconFTW v1 — Transitional bash targets (until Phase 12 cutover)"
@@ -121,11 +122,20 @@ coverage:
 coverage-critical:
 	@./scripts/coverage-critical.sh
 
+# coverage-lib: XCUT-03 ≥75% lib-aggregate gate. Excludes internal/core/resolvers
+# (UDP/53 hang offline) — the full lib-wide figure incl. resolvers is a tracked
+# risk measured on a network host. See scripts/coverage-lib.sh.
+coverage-lib:
+	@./scripts/coverage-lib.sh
+
 # ci: composite gate matching the .github/workflows/ci.yml pipeline.
-ci: fmt-check lint test coverage
+# Both XCUT-03 coverage gates run here (they replace the bare, non-gating
+# `coverage` target, which additionally hangs on resolvers offline). Both gates
+# are resolvers-excluded and therefore runnable offline.
+ci: fmt-check lint test coverage-critical coverage-lib
 
 clean:
-	rm -rf bin/ coverage.out
+	rm -rf bin/ coverage.out coverage-lib.out
 
 # =============================================================================
 # v1 bash targets (transitional; preserved until Phase 12 cutover)
