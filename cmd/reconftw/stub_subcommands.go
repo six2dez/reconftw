@@ -1266,10 +1266,8 @@ func runReportCmd(cmd *cobra.Command) error {
 	return nil
 }
 
-// newMigrateCmd — Phase 11 (Installer + Cross-Platform). Stubbed per D-02.
-func newMigrateCmd() *cobra.Command {
-	return newStubCmd("migrate", "Migrate v1 reconftw.cfg to v2 reconftw.toml")
-}
-
+// The `migrate` subcommand is now a real implementation in
+// cmd/reconftw/migrate.go — its exit-64 stub was removed in Phase 14 plan 14-01.
+//
 // The `install` subcommand is now a real implementation in
 // cmd/reconftw/install.go — its exit-64 stub was removed in Phase 11 plan 03.

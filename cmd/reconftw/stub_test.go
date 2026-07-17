@@ -47,9 +47,10 @@ func TestStubNotImplementedFormat(t *testing.T) {
 // composite_subcommands.go provides real implementations.
 // Phase 10 plan 10-03: "report" removed — newReportCmd is a real implementation.
 // Phase 10 plan 10-04: "monitor" removed — newMonitorCmd is a real implementation.
+// Phase 14 plan 14-01: "migrate" removed — newMigrateCmd (migrate.go) is a real implementation.
 func TestPhasePointersCoverAllStubs(t *testing.T) {
 	wantStubs := []string{
-		"report", "migrate", "install",
+		"report", "install",
 	}
 	for _, name := range wantStubs {
 		if _, ok := phasePointers[name]; !ok {

@@ -83,10 +83,11 @@ func TestRootListsFifteenSubcommandsPlusVersion(t *testing.T) {
 // Phase 11 plan 11-03: `install` is no longer a stub — newInstallCmd (install.go)
 // wires the real internal/installer package. Removed from stubs list; behavior is
 // covered by `install --help` and internal/installer tests.
+// Phase 14 plan 14-01: `migrate` is no longer a stub — newMigrateCmd (migrate.go)
+// wires the real config migrator. Removed from stubs list — the slice is now empty
+// (all §8.1 subcommands are real); the loop still guards any future regression.
 func TestEveryStubReturnsExit64(t *testing.T) {
-	stubs := []string{
-		"migrate",
-	}
+	var stubs []string
 	for _, name := range stubs {
 		t.Run(name, func(t *testing.T) {
 			root := newRootCmd(nil, &config.Config{})
