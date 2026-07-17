@@ -397,6 +397,11 @@ func RunCompositeAsync(ctx context.Context, opts RunOptions, mode CompositeMode)
 	// Final merges: consolidate all pipeline artefacts sequentially (single-writer).
 	compositeFinalMerge(ctx, app, mode)
 
+	// CUT-08: end-of-scan finalization — materialize the v1 bash-shape
+	// Recon/<domain>/ (_compat/) tree from the now-final artefacts. Best-effort:
+	// compat writing must never fail the scan (WriteCompat returns nil by contract).
+	writeCompatTree(app, workdir)
+
 	persistScanToStore(ctx, boot, opts, compositeModeLabel(mode))
 	return nil
 }

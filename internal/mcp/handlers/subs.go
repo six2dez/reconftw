@@ -190,6 +190,12 @@ func RunSubsAsync(ctx context.Context, opts RunOptions) (err error) {
 		}
 	}
 
+	// CUT-08: a standalone subs scan also finalizes a workspace, so produce the
+	// v1 bash-shape _compat/ tree from the final subdomains.jsonl (+ any takeover/
+	// enrichment artefacts). Missing hosts/urls/findings sources are skipped, not
+	// fatal — best-effort, never fails the scan.
+	writeCompatTree(app, workdir)
+
 	persistScanToStore(ctx, boot, opts, "subs")
 	return nil
 }

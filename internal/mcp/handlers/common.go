@@ -151,6 +151,45 @@ func persistScanToStore(ctx context.Context, boot AppBoot, opts RunOptions, mode
 	notifyScanComplete(ctx, boot, opts, mode, res)
 }
 
+// writeCompatTree materializes the v1 bash-shape Recon/<domain>/ (_compat/) tree
+// from the finalized workspace artefacts (CUT-08). This is the SOLE production
+// caller of output.CompatWriter.WriteCompat — without it a completed v2 scan
+// leaves an empty compat tree and the 6-month bash→Go compat contract (ADR §4.5)
+// is unmet.
+//
+// Placement (14-02-SUMMARY "OnEnd hook-point note"): call this at end-of-scan
+// finalization AFTER the final merges have written the definitive
+// artefacts/*.jsonl (subdomains/hosts/urls/findings). Reading a mid-pipeline
+// state would miss web/osint/vulns records that land after subs enrichment.
+//
+// Error isolation (ADR §4.4): WriteCompat is best-effort by contract — it always
+// returns nil, logging its own per-file problems at WARN. We still check the
+// return defensively and NEVER let compat writing fail or abort the scan.
+//
+// workdir is the workspace root (boot.WorkDir == the *output.OutputTree Root);
+// it is the authoritative fallback root. app.Tree is passed through when it is a
+// concrete *output.OutputTree so WriteCompat reads tree.Root directly; a mock or
+// nil tree degrades to WorkspaceRoot. ReconDir is intentionally left empty: the
+// _compat/ subtree under the workspace root IS the bash-shape tree (the store's
+// per-target ReconDir is likewise the workspace root, ingest.ensureTarget), and
+// no top-level Recon/<domain> symlink convention is established elsewhere.
+func writeCompatTree(app *appctx.AppContext, workdir string) {
+	var tree *output.OutputTree
+	if app != nil {
+		if ot, ok := app.Tree.(*output.OutputTree); ok {
+			tree = ot
+		}
+	}
+	cw := &output.CompatWriter{WorkspaceRoot: workdir}
+	if err := cw.WriteCompat(tree); err != nil {
+		// Defensive: WriteCompat returns nil today, but never let a future
+		// non-nil return abort the scan.
+		if app != nil && app.Log != nil {
+			app.Log.Warn("compat: WriteCompat failed (non-fatal)", "err", err)
+		}
+	}
+}
+
 // BootReconApp wires config → target → workspace → backend → appctx.Boot.
 // It mirrors steps 1-5a of runSubsCmd in cmd/reconftw/stub_subcommands.go
 // exactly.
