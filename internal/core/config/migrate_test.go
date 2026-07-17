@@ -12,12 +12,30 @@ package config
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 )
+
+// updateGolden regenerates the *.golden.toml fixtures: `go test -run TestMigrateGolden -update`.
+var updateGolden = flag.Bool("update", false, "regenerate migrator golden files")
+
+// repoRoot is the path from internal/core/config to the repository root, where
+// reconftw.cfg + config/reconftw_*.cfg live.
+const repoRoot = "../../.."
+
+// CUT-03 SCOPE NOTE: the literal "20+ community-collected config corpus" (CUT-03)
+// is a beta stretch, DEFERRED per 14-SPEC (collected during the beta period).
+// The offline validation set below stands in for it: the real reconftw.cfg, the
+// three config/reconftw_{full,quick,stealth}.cfg presets, and the hand-authored
+// testdata/migrate/*.cfg golden pairs — each migrated with zero hard errors and
+// round-tripped through config.Load with zero WarnSink output (D-02 verified E2E).
 
 // TestMigrateSchemaPathValidity iterates every Case-A entry and asserts the
 // target path resolves to a real, scalar schema field.
@@ -229,5 +247,147 @@ func TestMigrateArithmeticRejectsIdentifiers(t *testing.T) {
 	}
 	if n, err := evalIntExpr("(4 + 2) * 3"); err != nil || n != 18 {
 		t.Errorf("evalIntExpr((4+2)*3) = %d, %v; want 18, nil", n, err)
+	}
+}
+
+// migratePath migrates a cfg file on disk with a captured WarnSink.
+func migratePath(t *testing.T, path string) (MigrateResult, string) {
+	t.Helper()
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open %s: %v", path, err)
+	}
+	defer f.Close() //nolint:errcheck
+	var warn bytes.Buffer
+	res, err := Migrate(f, MigrateOptions{WarnSink: &warn})
+	if err != nil {
+		t.Fatalf("Migrate(%s): %v", path, err)
+	}
+	return res, warn.String()
+}
+
+// TestMigrateCorpus — the CUT-03-scoped corpus: the real reconftw.cfg + all three
+// presets migrate with ZERO hard errors and an empty unknown-disposition set.
+func TestMigrateCorpus(t *testing.T) {
+	t.Parallel()
+	corpus := []string{
+		filepath.Join(repoRoot, "reconftw.cfg"),
+		filepath.Join(repoRoot, "config", "reconftw_full.cfg"),
+		filepath.Join(repoRoot, "config", "reconftw_quick.cfg"),
+		filepath.Join(repoRoot, "config", "reconftw_stealth.cfg"),
+	}
+	for _, path := range corpus {
+		path := path
+		t.Run(filepath.Base(path), func(t *testing.T) {
+			t.Parallel()
+			if _, err := os.Stat(path); err != nil {
+				t.Skipf("corpus file not present: %v", path)
+			}
+			res, warn := migratePath(t, path)
+			if res.UnknownCount != 0 {
+				t.Errorf("%s: %d unknown keys (want 0 — every v1 key must be mapped or superseded); warn:\n%s",
+					filepath.Base(path), res.UnknownCount, warn)
+			}
+			if res.MappedCount == 0 {
+				t.Errorf("%s: 0 mapped keys — migration produced nothing", filepath.Base(path))
+			}
+		})
+	}
+}
+
+// TestMigrateRoundTrip — every migrated corpus output loads through config.Load
+// with an EMPTY WarnSink and no error, proving the D-02 comment mechanism trips
+// zero unknown-key warnings and the emitted values all validate (D-02 E2E).
+func TestMigrateRoundTrip(t *testing.T) {
+	t.Parallel()
+	inputs := []string{
+		filepath.Join(repoRoot, "reconftw.cfg"),
+		filepath.Join(repoRoot, "config", "reconftw_full.cfg"),
+		filepath.Join(repoRoot, "config", "reconftw_quick.cfg"),
+		filepath.Join(repoRoot, "config", "reconftw_stealth.cfg"),
+		filepath.Join("testdata", "migrate", "basic.cfg"),
+	}
+	for _, path := range inputs {
+		path := path
+		t.Run(filepath.Base(path), func(t *testing.T) {
+			t.Parallel()
+			if _, err := os.Stat(path); err != nil {
+				t.Skipf("input not present: %v", path)
+			}
+			res, _ := migratePath(t, path)
+
+			out := filepath.Join(t.TempDir(), "migrated.toml")
+			if err := os.WriteFile(out, res.TOML, 0o644); err != nil {
+				t.Fatalf("write migrated toml: %v", err)
+			}
+			var sink bytes.Buffer
+			if _, err := Load(LoadOptions{ExplicitConfigPath: out, WarnSink: &sink}); err != nil {
+				t.Fatalf("Load(migrated %s) failed: %v\n--- migrated TOML ---\n%s", filepath.Base(path), err, string(res.TOML))
+			}
+			if sink.Len() != 0 {
+				t.Errorf("%s: config.Load emitted WarnSink output (want empty — D-02 comments must not warn):\n%s",
+					filepath.Base(path), sink.String())
+			}
+		})
+	}
+}
+
+// TestMigrateGolden — migrating basic.cfg byte-equals basic.golden.toml. The
+// host-dependent auto-scaled thread number (NumCPU*10) is normalized to <NCPU10>
+// so the golden is portable across machines. Regenerate with -update.
+func TestMigrateGolden(t *testing.T) {
+	res, _ := migratePath(t, filepath.Join("testdata", "migrate", "basic.cfg"))
+	norm := func(b []byte) []byte {
+		return []byte(strings.ReplaceAll(string(b), strconv.Itoa(runtime.NumCPU()*10), "<NCPU10>"))
+	}
+	got := norm(res.TOML)
+	goldenPath := filepath.Join("testdata", "migrate", "basic.golden.toml")
+
+	if *updateGolden {
+		if err := os.WriteFile(goldenPath, got, 0o644); err != nil {
+			t.Fatalf("update golden: %v", err)
+		}
+		t.Logf("wrote golden %s", goldenPath)
+	}
+	want, err := os.ReadFile(goldenPath)
+	if err != nil {
+		t.Fatalf("read golden (run with -update to generate): %v", err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Errorf("migrated basic.cfg != basic.golden.toml (run -update to refresh)\n--- got ---\n%s\n--- want ---\n%s",
+			string(got), string(want))
+	}
+}
+
+// TestMigrateUnknownKeyFixture — the unknown_key.cfg fixture triggers the loud
+// warning AND the # UNKNOWN comment while its neighbors migrate cleanly.
+func TestMigrateUnknownKeyFixture(t *testing.T) {
+	t.Parallel()
+	res, warn := migratePath(t, filepath.Join("testdata", "migrate", "unknown_key.cfg"))
+	if !strings.Contains(warn, "⚠ unknown key THIS_IS_NOT_A_REAL_KEY") {
+		t.Errorf("expected loud stderr for the fixture's unknown key; got:\n%s", warn)
+	}
+	if !strings.Contains(string(res.TOML), "# UNKNOWN (needs human review): THIS_IS_NOT_A_REAL_KEY") {
+		t.Errorf("expected # UNKNOWN comment preserving the key; got:\n%s", string(res.TOML))
+	}
+	if !strings.Contains(string(res.TOML), "# was OSINT") {
+		t.Errorf("neighbor keys should still migrate cleanly; got:\n%s", string(res.TOML))
+	}
+}
+
+// TestMigrateDryRunEngineWritesNothing — MigrateFile with DryRun writes no file.
+func TestMigrateDryRunEngineWritesNothing(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "in.cfg")
+	if err := os.WriteFile(cfg, []byte("OSINT=true\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(dir, "out.toml")
+	if _, err := MigrateFile(cfg, target, MigrateOptions{DryRun: true}); err != nil {
+		t.Fatalf("MigrateFile dry-run: %v", err)
+	}
+	if _, err := os.Stat(target); !os.IsNotExist(err) {
+		t.Errorf("DryRun must not write %s", target)
 	}
 }

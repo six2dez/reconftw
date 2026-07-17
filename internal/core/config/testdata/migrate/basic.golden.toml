@@ -1,0 +1,22 @@
+# reconftw v2 configuration — migrated from reconftw.cfg by `reconftw migrate`.
+# Mapped v1 keys are live v2-native keys (inline `# was KEY`). Superseded/unknown
+# v1 keys are preserved as comments so this file loads with zero warnings.
+
+[subdomains]
+enabled = true  # was SUBDOMAINS_GENERAL
+
+[subdomains.crt]
+limit = 999999  # was CTR_LIMIT
+
+[web.nuclei]
+severity = "info,low,medium,high,critical"  # was NUCLEI_SEVERITY
+
+[web.urls]
+waymore_timeout = "30m"  # was WAYMORE_TIMEOUT
+
+# ---------------------------------------------
+# Superseded / unknown v1 keys (preserved for reference — NOT active v2 config)
+# ---------------------------------------------
+# SUPERSEDED: FFUF_THREADS = <NCPU10>  — v2 auto-scales fuzz threads (0 = auto); to pin manually set web.fuzz.threads = <NCPU10>
+# SUPERSEDED: TLS_PORTS = $(cat "${SCRIPTPATH}/config/tls_ports.txt" 2>/dev/null | tr -d '\n')  — v2 reads config/tls_ports.txt directly; no config key needed
+# UNKNOWN (needs human review): SOME_INVENTED_KEY = whatever
