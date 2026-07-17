@@ -12,8 +12,8 @@ import (
 	"database/sql"
 	"path/filepath"
 
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
 	"github.com/six2dez/reconftw/internal/core/checkpoint"
+	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
 )
 
 func newTestStore(t *testing.T) *checkpoint.Store {
@@ -362,6 +362,64 @@ func TestCheckpointStoreIndexes(t *testing.T) {
 	}
 	if !found["idx_target"] {
 		t.Error("missing idx_target")
+	}
+}
+
+// XCUT-03 gap (store.go:56 NewStore 72.7%): an unopenable DB path (parent
+// directory absent) makes db.Ping fail — exercises the ping-error branch,
+// the compensating db.Close(), and the wrapped-error return.
+func TestCheckpointStoreNewStorePingError(t *testing.T) {
+	t.Parallel()
+	badPath := filepath.Join(t.TempDir(), "no-such-dir", "checkpoints.db")
+	s, err := checkpoint.NewStore(badPath)
+	if err == nil {
+		if s != nil {
+			_ = s.Close()
+		}
+		t.Fatal("NewStore(unopenable path) err = nil; want a ping/open error")
+	}
+	if s != nil {
+		t.Fatalf("NewStore returned non-nil Store alongside error: %v", err)
+	}
+}
+
+// XCUT-03 gap (store.go Done error branch): a query error that is NOT
+// sql.ErrNoRows must propagate. Closing the DB before the call forces the
+// QueryRowContext.Scan to fail with a non-ErrNoRows error.
+func TestCheckpointStoreDoneQueryErrorAfterClose(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "checkpoints.db")
+	s, err := checkpoint.NewStore(path)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	got, err := s.Done(context.Background(), "t.x", "tgt", "h1")
+	if err == nil {
+		t.Fatal("Done on closed DB err = nil; want a query error")
+	}
+	if got {
+		t.Fatal("Done on closed DB returned true; want false")
+	}
+}
+
+// XCUT-03 gap (store.go Complete started_at read error branch): closing the
+// DB before Complete forces the started_at read (the first DB op inside
+// Complete) to return a non-ErrNoRows error, which must propagate.
+func TestCheckpointStoreCompleteReadErrorAfterClose(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "checkpoints.db")
+	s, err := checkpoint.NewStore(path)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if err := s.Complete(context.Background(), "t.x", "tgt", "h1", []string{"a"}, nil); err == nil {
+		t.Fatal("Complete on closed DB err = nil; want a read/update error")
 	}
 }
 

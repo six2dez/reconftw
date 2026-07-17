@@ -120,6 +120,24 @@ func TestScopeEmptyPatterns(t *testing.T) {
 	}
 }
 
+// XCUT-03 critical-path stability: an EMPTY-STRING entry inside the pattern
+// list must match nothing — this deterministically exercises
+// matchScopePattern's empty-pattern guard (scope.go:111). Without this the
+// guard is only hit non-deterministically by the rapid property test
+// (random pattern slices that happen to draw ""), which made the scope.go
+// ≥90% gate flaky (89.17% ↔ 93.9%). This pins it stably at 93.9%.
+func TestScopeEmptyPatternEntryMatchesNothing(t *testing.T) {
+	t.Parallel()
+	f := &output.DefaultScopeFilter{Patterns: []string{"", "example.com"}}
+	// The empty pattern must never match; only the real "example.com" does.
+	if f.IsInScope("anything.test") {
+		t.Fatal("empty pattern entry must not match an arbitrary host")
+	}
+	if !f.IsInScope("example.com") {
+		t.Fatal("a real pattern following an empty entry must still match")
+	}
+}
+
 // Injection rejection: shell metacharacters fail the domain regex.
 func TestScopeRejectsInjection(t *testing.T) {
 	t.Parallel()
@@ -143,8 +161,8 @@ func TestScopeRejectsInjection(t *testing.T) {
 // scope filter must never panic, must be idempotent (same input → same
 // result), and the anchored semantics MUST hold:
 //
-//   for every match host h matched by pattern *.b:
-//       h == b  OR  strings.HasSuffix(h, "."+b)
+//	for every match host h matched by pattern *.b:
+//	    h == b  OR  strings.HasSuffix(h, "."+b)
 //
 // We do a positive-side property: if rapid produces a *.b pattern and a
 // random subdomain `<random>.b`, the filter must return true.

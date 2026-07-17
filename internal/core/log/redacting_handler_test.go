@@ -169,3 +169,70 @@ func TestRedactingHandler_SubstringReplacement(t *testing.T) {
 		t.Errorf("expected substring 'body=[***]' in output; got %q", got)
 	}
 }
+
+// --- XCUT-03 gap: Redactor() accessor (redacting_handler.go:74) ---
+//
+// Runtime secret-discovery callers (OSINT github_leaks Task) fetch the live
+// Redactor via this accessor to Register a just-found secret. Assert it hands
+// back the exact same instance the handler was built with.
+func TestRedactingHandler_RedactorAccessor(t *testing.T) {
+	t.Parallel()
+	r := &log.Redactor{}
+	inner := slog.NewJSONHandler(&bytes.Buffer{}, nil)
+	h := log.NewRedactingHandler(inner, r)
+	if h.Redactor() != r {
+		t.Errorf("Redactor() = %p; want the redactor passed to NewRedactingHandler (%p)", h.Redactor(), r)
+	}
+}
+
+// --- XCUT-03 gap: RegisterHandlerSecret (redacting_handler.go:83) ---
+//
+// The supported XCUT-07 entry point for Tasks that surface a live secret at
+// scan time: after registration, the value must be scrubbed from ALL
+// subsequent slog output. This is the no-secret-in-logs guarantee.
+func TestRegisterHandlerSecret_RedactsAfterRegistration(t *testing.T) {
+	t.Parallel()
+	h, _, buf := newTestHandler()
+	logger := slog.New(h)
+
+	log.RegisterHandlerSecret(logger, "runtime-secret-98765")
+	logger.Info("leaked value: runtime-secret-98765")
+
+	if bytes.Contains(buf.Bytes(), []byte("runtime-secret-98765")) {
+		t.Errorf("raw secret leaked after RegisterHandlerSecret: %s", buf.String())
+	}
+	if !bytes.Contains(buf.Bytes(), []byte("***")) {
+		t.Errorf("expected redaction marker in output: %s", buf.String())
+	}
+}
+
+// nil logger is a documented no-op (must not panic).
+func TestRegisterHandlerSecret_NilLoggerNoOp(t *testing.T) {
+	t.Parallel()
+	log.RegisterHandlerSecret(nil, "some-secret-value")
+}
+
+// Empty value is a documented no-op — nothing is registered, so an unrelated
+// string passes through the Redactor untouched.
+func TestRegisterHandlerSecret_EmptyValueNoOp(t *testing.T) {
+	t.Parallel()
+	h, r, _ := newTestHandler()
+	logger := slog.New(h)
+	log.RegisterHandlerSecret(logger, "")
+	if got := r.Redact("plain-text-value"); got != "plain-text-value" {
+		t.Errorf("empty value must register nothing; Redact mutated output: %q", got)
+	}
+}
+
+// A logger whose handler is NOT a *RedactingHandler is a no-op (the type
+// assertion fails) — must not panic and must not redact.
+func TestRegisterHandlerSecret_NonRedactingHandlerNoOp(t *testing.T) {
+	t.Parallel()
+	buf := &bytes.Buffer{}
+	logger := slog.New(slog.NewJSONHandler(buf, nil))
+	log.RegisterHandlerSecret(logger, "another-secret-value")
+	logger.Info("value: another-secret-value")
+	if !bytes.Contains(buf.Bytes(), []byte("another-secret-value")) {
+		t.Errorf("plain (non-redacting) handler must not redact; value missing: %s", buf.String())
+	}
+}
