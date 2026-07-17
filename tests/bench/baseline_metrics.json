@@ -1,4 +1,14 @@
 {
-  "total_duration_sec": 600,
-  "notes": "Synthetic baseline for CI gate; tune with real smoke baseline"
+  "total_duration_sec": 0,
+  "status": "PLACEHOLDER — no real baseline captured yet; gate skips until an operator fills total_duration_sec (0 = un-measured, never a fabricated pass)",
+  "gate": "XCUT-01: Go v2 must run within 10% of bash v1 (compare_baseline.sh MAX_DEGRADATION_PCT default = 10)",
+  "operator_run": true,
+  "never_in_ci": "Live/network/nondeterministic — NOT wired into `make ci`; run by hand on a reference host.",
+  "reference_host": "8-core / 16 GB RAM, working outbound UDP/53, full external toolchain (this dev box blocks UDP/53 and cannot produce this value)",
+  "canonical_target": "~1000-subdomain target (operator-defined lab target, repeatable)",
+  "capture_procedure": {
+    "1_baseline_v1": "git worktree add ../reconftw-v1-baseline v4.1 && ( cd ../reconftw-v1-baseline && time ./reconftw.sh -d <target> -r ) — record wall-clock seconds into this file's total_duration_sec",
+    "2_current_v2": "time ./bin/reconftw recon --target <target> --no-update — write {\"total_duration_sec\": <sec>} to current_perf_summary.json",
+    "3_gate": "tests/bench/compare_baseline.sh tests/bench/baseline_metrics.json current_perf_summary.json  →  [OK] within 10%, [FAIL] over"
+  }
 }
