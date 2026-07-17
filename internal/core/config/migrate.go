@@ -97,7 +97,8 @@ type mergedEntry struct {
 	literal    string // real TOML literal (secret written verbatim to file)
 	sourceKeys []string
 	secret     bool
-	boolVal    bool // tracked for OR-combine on bool collisions
+	boolVal    bool   // tracked for OR-combine on bool collisions
+	clampNote  string // WR-02: non-empty when the value was clamped to a v2 cap
 }
 
 var (
@@ -122,6 +123,11 @@ func Migrate(in io.Reader, opts MigrateOptions) (MigrateResult, error) {
 
 	emit := map[string]*mergedEntry{}
 	var res MigrateResult
+
+	// WR-02: the v2 field range caps (validate:"min=…,max=…"), keyed by koanf
+	// path. Built once from the schema; used to clamp out-of-range mapped values
+	// so a "successful" migration can never emit an unloadable config.
+	caps := schemaCaps()
 
 	for _, key := range order {
 		raw := values[key]
@@ -156,7 +162,17 @@ func Migrate(in io.Reader, opts MigrateOptions) (MigrateResult, error) {
 				res.SupersededCount++
 				continue
 			}
-			addToEmit(emit, path, kind, literal, key, secret, ev.value)
+			// WR-02: honor the v2 field's validate min/max cap. A value legal in v1
+			// bash (no caps) but exceeding a v2 cap would make the emitted TOML
+			// UNLOADABLE. Clamp it to the boundary, annotate the original in-line,
+			// and warn LOUDLY (never silent — the original stays visible in both the
+			// comment and the warning, honoring D-02 keep-all).
+			clampedLit, clampNote, warnMsg, clamped := clampToCap(caps, path, kind, literal)
+			if clamped {
+				fmt.Fprintf(opts.WarnSink, "⚠ %s=%s %s\n", key, redact(ev.value, secret), warnMsg)
+				literal = clampedLit
+			}
+			addToEmit(emit, path, kind, literal, key, secret, ev.value, clampNote)
 			res.Entries = append(res.Entries, DispositionEntry{
 				Key:       key,
 				Case:      CaseMapped,
@@ -458,17 +474,150 @@ func coerceForPath(path, val string) (reflect.Kind, string, error) {
 	}
 }
 
+// ---------- WR-02: v2 range-cap clamp ----------
+
+// fieldCap is the parsed min/max range of one numeric v2 field. Bounds are held
+// as float64 so the same struct covers both integer and float leaves.
+type fieldCap struct {
+	hasMin bool
+	hasMax bool
+	min    float64
+	max    float64
+}
+
+// schemaCaps reflects the Config struct and returns the validate:"min=…,max=…"
+// range for every NUMERIC leaf, keyed by its dotted koanf path (mirroring the
+// path_helpers.go reflection style + schemaLeafOrder's walk). String leaves are
+// deliberately skipped: a `max=256` on a log.Secret is a string-LENGTH cap, not
+// a numeric value cap, and must never trigger numeric clamping. Leaves with no
+// min/max are omitted entirely (nothing to clamp).
+func schemaCaps() map[string]fieldCap {
+	caps := map[string]fieldCap{}
+	var walk func(t reflect.Type, prefix string)
+	walk = func(t reflect.Type, prefix string) {
+		for i := 0; i < t.NumField(); i++ {
+			f := t.Field(i)
+			tag := f.Tag.Get("koanf")
+			if tag == "" || tag == "-" {
+				continue
+			}
+			full := tag
+			if prefix != "" {
+				full = prefix + "." + tag
+			}
+			switch f.Type.Kind() {
+			case reflect.Struct:
+				walk(f.Type, full)
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+				reflect.Float32, reflect.Float64:
+				if fc, ok := parseCapTag(f.Tag.Get("validate")); ok {
+					caps[full] = fc
+				}
+			default:
+				// string / bool / slice / map / interface — no numeric range cap.
+			}
+		}
+	}
+	walk(reflect.TypeOf(Config{}), "")
+	return caps
+}
+
+// parseCapTag extracts min=/max= numeric bounds from a validator tag. ok is true
+// only when at least one bound was found. Non-numeric constraints (oneof, url,
+// omitempty, startswith, …) are ignored.
+func parseCapTag(tag string) (fieldCap, bool) {
+	var fc fieldCap
+	for _, part := range strings.Split(tag, ",") {
+		part = strings.TrimSpace(part)
+		switch {
+		case strings.HasPrefix(part, "min="):
+			if f, err := strconv.ParseFloat(part[len("min="):], 64); err == nil {
+				fc.hasMin, fc.min = true, f
+			}
+		case strings.HasPrefix(part, "max="):
+			if f, err := strconv.ParseFloat(part[len("max="):], 64); err == nil {
+				fc.hasMax, fc.max = true, f
+			}
+		}
+	}
+	return fc, fc.hasMin || fc.hasMax
+}
+
+// clampToCap checks a numeric TOML literal against the v2 field's cap for path.
+// On violation it returns the clamped literal, an inline annotation ("CLAMPED
+// from <orig> (v2 max=<cap>)"), a stderr-warning suffix ("exceeds v2 cap <cap> —
+// clamped to <cap>"), and clamped=true. Otherwise it returns the literal
+// unchanged with clamped=false. Paths without a cap and non-numeric kinds never
+// clamp.
+func clampToCap(caps map[string]fieldCap, path string, kind reflect.Kind, literal string) (outLit, note, warn string, clamped bool) {
+	fc, ok := caps[path]
+	if !ok {
+		return literal, "", "", false
+	}
+	switch kind {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		n, err := strconv.ParseInt(literal, 10, 64)
+		if err != nil {
+			return literal, "", "", false
+		}
+		if fc.hasMax && float64(n) > fc.max {
+			c := int64(fc.max)
+			return strconv.FormatInt(c, 10),
+				fmt.Sprintf("CLAMPED from %d (v2 max=%d)", n, c),
+				fmt.Sprintf("exceeds v2 cap %d — clamped to %d", c, c), true
+		}
+		if fc.hasMin && float64(n) < fc.min {
+			c := int64(fc.min)
+			return strconv.FormatInt(c, 10),
+				fmt.Sprintf("CLAMPED from %d (v2 min=%d)", n, c),
+				fmt.Sprintf("below v2 floor %d — clamped to %d", c, c), true
+		}
+	case reflect.Float32, reflect.Float64:
+		f, err := strconv.ParseFloat(literal, 64)
+		if err != nil {
+			return literal, "", "", false
+		}
+		if fc.hasMax && f > fc.max {
+			c := floatLit(fc.max)
+			return c,
+				fmt.Sprintf("CLAMPED from %s (v2 max=%s)", literal, c),
+				fmt.Sprintf("exceeds v2 cap %s — clamped to %s", c, c), true
+		}
+		if fc.hasMin && f < fc.min {
+			c := floatLit(fc.min)
+			return c,
+				fmt.Sprintf("CLAMPED from %s (v2 min=%s)", literal, c),
+				fmt.Sprintf("below v2 floor %s — clamped to %s", c, c), true
+		}
+	}
+	return literal, "", "", false
+}
+
+// floatLit renders f as a TOML float literal, always carrying a fractional part
+// (or exponent) so go-toml/v2 parses it back into a float64 field rather than an
+// integer (e.g. a clamp to a whole-number bound like 1 emits "1.0", not "1").
+func floatLit(f float64) string {
+	s := strconv.FormatFloat(f, 'g', -1, 64)
+	if !strings.ContainsAny(s, ".eE") {
+		s += ".0"
+	}
+	return s
+}
+
 // addToEmit merges a Case-A value into the emit map, applying the collision
 // policy for many-v1→one-v2 keys: OR-combine for booleans, last-wins otherwise,
 // recording every source key for the `# was KEY1 / KEY2` provenance comment.
-func addToEmit(m map[string]*mergedEntry, path string, kind reflect.Kind, literal, key string, secret bool, val string) {
+// clampNote (WR-02) rides with the winning literal: last-wins on numeric
+// collisions so the emitted annotation always describes the emitted value.
+func addToEmit(m map[string]*mergedEntry, path string, kind reflect.Kind, literal, key string, secret bool, val, clampNote string) {
 	if ex, ok := m[path]; ok {
 		if kind == reflect.Bool {
 			b, _ := strconv.ParseBool(strings.ToLower(strings.TrimSpace(val)))
 			ex.boolVal = ex.boolVal || b
 			ex.literal = boolLit(ex.boolVal)
 		} else {
-			ex.literal = literal // last-wins
+			ex.literal = literal     // last-wins
+			ex.clampNote = clampNote // last-wins: annotation tracks the emitted value
 		}
 		ex.sourceKeys = append(ex.sourceKeys, key)
 		if secret {
@@ -476,7 +625,7 @@ func addToEmit(m map[string]*mergedEntry, path string, kind reflect.Kind, litera
 		}
 		return
 	}
-	me := &mergedEntry{kind: kind, literal: literal, sourceKeys: []string{key}, secret: secret}
+	me := &mergedEntry{kind: kind, literal: literal, sourceKeys: []string{key}, secret: secret, clampNote: clampNote}
 	if kind == reflect.Bool {
 		me.boolVal, _ = strconv.ParseBool(strings.ToLower(strings.TrimSpace(val)))
 	}
@@ -591,11 +740,18 @@ func emitTOML(emit map[string]*mergedEntry, entries []DispositionEntry) []byte {
 	return []byte(b.String())
 }
 
-// formatLeafLine renders one live v2-native key with sorted `# was KEY` provenance.
+// formatLeafLine renders one live v2-native key with sorted `# was KEY`
+// provenance. When the value was clamped to a v2 cap (WR-02) the inline comment
+// leads with the CLAMPED annotation (preserving the original value + the cap) so
+// the emitted TOML both loads AND keeps the user's original intent visible.
 func formatLeafLine(leaf string, me *mergedEntry) string {
 	keys := append([]string(nil), me.sourceKeys...)
 	sort.Strings(keys)
-	return fmt.Sprintf("%s = %s  # was %s", leaf, me.literal, strings.Join(keys, " / "))
+	prov := strings.Join(keys, " / ")
+	if me.clampNote != "" {
+		return fmt.Sprintf("%s = %s  # %s — was %s", leaf, me.literal, me.clampNote, prov)
+	}
+	return fmt.Sprintf("%s = %s  # was %s", leaf, me.literal, prov)
 }
 
 // ---------- small utilities ----------

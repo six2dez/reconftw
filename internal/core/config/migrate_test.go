@@ -410,6 +410,115 @@ func TestMigrateFilePerm0600(t *testing.T) {
 	}
 }
 
+// loadMigratedTOML writes the migrated bytes to a temp file and loads them via
+// config.Load, failing the test if the emitted config does not load cleanly.
+func loadMigratedTOML(t *testing.T, toml []byte) *Config {
+	t.Helper()
+	out := filepath.Join(t.TempDir(), "migrated.toml")
+	if err := os.WriteFile(out, toml, 0o600); err != nil {
+		t.Fatalf("write migrated toml: %v", err)
+	}
+	var sink bytes.Buffer
+	cfg, err := Load(LoadOptions{ExplicitConfigPath: out, WarnSink: &sink})
+	if err != nil {
+		t.Fatalf("Load(migrated) failed — WR-02 requires migrate to ALWAYS emit a loadable config: %v\n--- TOML ---\n%s", err, string(toml))
+	}
+	return cfg
+}
+
+// TestMigrateClampsOutOfRange — the headline WR-02 case: PARALLEL_MAX_JOBS=200 is
+// legal v1 bash but exceeds the v2 concurrency.max_jobs cap (max=64). The migrator
+// must (a) emit max_jobs = 64 with a CLAMPED annotation preserving the original,
+// (b) record a loud stderr warning, and (c) emit a config that LOADS. A bare
+// coercion (pre-WR-02) produced max_jobs = 200 that failed config.Load.
+func TestMigrateClampsOutOfRange(t *testing.T) {
+	t.Parallel()
+	res, warn := migrateString(t, "PARALLEL_MAX_JOBS=200\n")
+	toml := string(res.TOML)
+
+	// (a) emitted TOML carries the clamped value + the CLAMPED annotation that
+	// preserves both the original (200) and the cap (64).
+	if !strings.Contains(toml, "max_jobs = 64") {
+		t.Errorf("expected max_jobs clamped to 64; got:\n%s", toml)
+	}
+	if !strings.Contains(toml, "CLAMPED from 200") || !strings.Contains(toml, "v2 max=64") {
+		t.Errorf("expected inline CLAMPED annotation preserving original 200 + cap 64; got:\n%s", toml)
+	}
+	if !strings.Contains(toml, "was PARALLEL_MAX_JOBS") {
+		t.Errorf("clamp annotation must keep the `was KEY` provenance; got:\n%s", toml)
+	}
+
+	// (b) a loud migrate-time warning naming the original value and the cap.
+	if !strings.Contains(warn, "PARALLEL_MAX_JOBS=200") || !strings.Contains(warn, "clamped to 64") {
+		t.Errorf("expected a loud ⚠ clamp warning; got warn=%q", warn)
+	}
+
+	// (c) the emitted TOML LOADS, and the loaded value is the clamped 64.
+	cfg := loadMigratedTOML(t, res.TOML)
+	if cfg.Concurrency.MaxJobs != 64 {
+		t.Errorf("loaded concurrency.max_jobs = %d; want 64 (clamped)", cfg.Concurrency.MaxJobs)
+	}
+}
+
+// TestMigrateWithinRangeNoClamp — a mapped value within the v2 cap is emitted
+// verbatim: no clamp, no CLAMPED annotation, no warning.
+func TestMigrateWithinRangeNoClamp(t *testing.T) {
+	t.Parallel()
+	res, warn := migrateString(t, "PARALLEL_MAX_JOBS=32\n")
+	toml := string(res.TOML)
+	if !strings.Contains(toml, "max_jobs = 32  # was PARALLEL_MAX_JOBS") {
+		t.Errorf("expected max_jobs = 32 emitted verbatim; got:\n%s", toml)
+	}
+	if strings.Contains(toml, "CLAMPED") {
+		t.Errorf("within-range value must NOT be clamped/annotated; got:\n%s", toml)
+	}
+	if strings.Contains(warn, "clamped") {
+		t.Errorf("within-range value must NOT warn; got warn=%q", warn)
+	}
+	if cfg := loadMigratedTOML(t, res.TOML); cfg.Concurrency.MaxJobs != 32 {
+		t.Errorf("loaded concurrency.max_jobs = %d; want 32 (verbatim)", cfg.Concurrency.MaxJobs)
+	}
+}
+
+// TestMigrateClampBoundaries — exercises the int-min and float-max clamp branches
+// (the headline test covers int-max). Each still emits a config that LOADS.
+func TestMigrateClampBoundaries(t *testing.T) {
+	t.Parallel()
+
+	// int MIN clamp: max_jobs floor is 1 → PARALLEL_MAX_JOBS=0 clamps up to 1.
+	t.Run("int-min", func(t *testing.T) {
+		t.Parallel()
+		res, warn := migrateString(t, "PARALLEL_MAX_JOBS=0\n")
+		toml := string(res.TOML)
+		if !strings.Contains(toml, "max_jobs = 1") || !strings.Contains(toml, "CLAMPED from 0") || !strings.Contains(toml, "v2 min=1") {
+			t.Errorf("expected max_jobs clamped up to floor 1 with annotation; got:\n%s", toml)
+		}
+		if !strings.Contains(warn, "below v2 floor 1") {
+			t.Errorf("expected a below-floor warning; got warn=%q", warn)
+		}
+		if cfg := loadMigratedTOML(t, res.TOML); cfg.Concurrency.MaxJobs != 1 {
+			t.Errorf("loaded max_jobs = %d; want 1", cfg.Concurrency.MaxJobs)
+		}
+	})
+
+	// float MAX clamp: backoff_factor cap is 1 → RATE_LIMIT_BACKOFF_FACTOR=2.5
+	// clamps to 1.0 (a proper float literal, not "1", so it re-parses as float64).
+	t.Run("float-max", func(t *testing.T) {
+		t.Parallel()
+		res, warn := migrateString(t, "RATE_LIMIT_BACKOFF_FACTOR=2.5\n")
+		toml := string(res.TOML)
+		if !strings.Contains(toml, "backoff_factor = 1.0") || !strings.Contains(toml, "CLAMPED from 2.5") || !strings.Contains(toml, "v2 max=1") {
+			t.Errorf("expected backoff_factor clamped to 1.0 with annotation; got:\n%s", toml)
+		}
+		if !strings.Contains(warn, "clamped to 1") {
+			t.Errorf("expected a clamp warning; got warn=%q", warn)
+		}
+		if cfg := loadMigratedTOML(t, res.TOML); cfg.AdaptiveRate.BackoffFactor != 1.0 {
+			t.Errorf("loaded backoff_factor = %v; want 1.0", cfg.AdaptiveRate.BackoffFactor)
+		}
+	})
+}
+
 // TestMigrateDryRunEngineWritesNothing — MigrateFile with DryRun writes no file.
 func TestMigrateDryRunEngineWritesNothing(t *testing.T) {
 	t.Parallel()
