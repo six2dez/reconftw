@@ -202,7 +202,11 @@ func MigrateFile(fromPath, toPath string, opts MigrateOptions) (MigrateResult, e
 	if opts.DryRun || toPath == "" || toPath == "-" {
 		return res, nil
 	}
-	if err := output.WriteFile(toPath, res.TOML, 0o644); err != nil {
+	// WR-01 (CWE-732): the migrated .toml carries EVERY key verbatim — including
+	// the secret-typed api_keys.* and notifications.*.webhook_url — so it must NOT
+	// be group/world-readable. Write it 0o600 (owner rw only). output.WriteFile
+	// honors this perm via fchmod on the tempfile before the atomic rename.
+	if err := output.WriteFile(toPath, res.TOML, 0o600); err != nil {
 		return res, fmt.Errorf("migrate: write %s: %w", toPath, err)
 	}
 	return res, nil

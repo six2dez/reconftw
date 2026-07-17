@@ -375,6 +375,41 @@ func TestMigrateUnknownKeyFixture(t *testing.T) {
 	}
 }
 
+// TestMigrateFilePerm0600 — the migrated .toml (which carries cleartext API keys
+// / webhooks verbatim) is written 0o600, never group/world-readable (WR-01,
+// CWE-732). Any relaxation of the perm is a local-credential-disclosure regression.
+func TestMigrateFilePerm0600(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	in := filepath.Join(dir, "in.cfg")
+	if err := os.WriteFile(in, []byte("SHODAN_API_KEY=supersecretshodankey123\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(dir, "out.toml")
+
+	var warn bytes.Buffer
+	if _, err := MigrateFile(in, out, MigrateOptions{WarnSink: &warn}); err != nil {
+		t.Fatalf("MigrateFile: %v", err)
+	}
+
+	info, err := os.Stat(out)
+	if err != nil {
+		t.Fatalf("stat migrated file: %v", err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o600 {
+		t.Errorf("migrated .toml mode = %04o; want 0600 (WR-01 — the file holds cleartext secrets)", perm)
+	}
+
+	// Sanity: the secret really IS written verbatim, so the 0600 guarantee matters.
+	b, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), "supersecretshodankey123") {
+		t.Errorf("expected the migrated file to contain the secret verbatim; got:\n%s", string(b))
+	}
+}
+
 // TestMigrateDryRunEngineWritesNothing — MigrateFile with DryRun writes no file.
 func TestMigrateDryRunEngineWritesNothing(t *testing.T) {
 	t.Parallel()
