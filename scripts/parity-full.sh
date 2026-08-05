@@ -60,7 +60,8 @@
 #     resolve) → the subdomain-set leg is UNVALIDATABLE locally. Run on a host
 #     with working outbound DNS.
 #   • Pass `-duc` to ProjectDiscovery tools (httpx/nuclei/…) or they hang on the
-#     update-check when run non-interactively (v2 is invoked with --no-update).
+#     update-check when run non-interactively (the reconftw v2 binary has no
+#     --no-update flag; -duc is applied to the PD tools internally by v2).
 #   • Any shell copy inside the harness uses `\cp -f` to dodge the macOS `cp -i`
 #     interactive-alias trap (MEMORY: it silently stalls execute-phase).
 #
@@ -440,11 +441,11 @@ if [ "$COMPARE_ONLY" -eq 0 ]; then
     (cd "$BASELINE_DIR" && ./reconftw.sh -d "$TARGET" -r) || die "v1 baseline run failed"
 
     printf '== v2 (Go) run against %s ==\n' "$TARGET"
-    "$BIN" recon --target "$TARGET" --no-update || die "v2 run failed"
+    "$BIN" recon --target "$TARGET" || die "v2 run failed"
 fi
 
 # ── locate the two output trees ──
-W=$(ls -dt "workspaces/${TARGET}"-*/ 2>/dev/null | head -1)
+W=$(ls -dt "workspaces/${TARGET}"-*/ "workspaces/${TARGET}/" 2>/dev/null | head -1)
 [ -n "$W" ] || die "no v2 workspace under workspaces/${TARGET}-*/ — run without --compare-only"
 W="${W%/}"
 [ -d "$V1DIR" ] || die "v1 reference dir missing: $V1DIR — run the harness without --compare-only, or point --baseline-dir at a completed v1 Recon parent"
