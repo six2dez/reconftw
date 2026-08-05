@@ -456,16 +456,21 @@ func filterModuleFor(groupModule string) string {
 // Mirrors the per-stage merge logic in the single-pipeline handlers.
 func compositeStagePostMerge(ctx context.Context, app *appctx.AppContext, group compositeStageGroup) {
 	switch group.name {
-	// Subs stages: merge after enrichment.
+	// Subs stages mirror subs.go's per-stage MergeStage sequence: passive→"passive",
+	// resolve/discovery→"resolved", permut→"permut", enrichment→takeover only. The
+	// passive merge MUST run right after the passive stage so resolve/web receive the
+	// passive.merged input; misplacing it under subs-enrichment left recon (which has
+	// no enrichment stage) with 0 resolved hosts despite finding subdomains.
+	case "subs-passive":
+		if err := subdomains.MergeStage(ctx, app, "passive"); err != nil {
+			if app.Log != nil {
+				app.Log.Warn("mcp/composite: subs merge_stage_failed", "merge", "passive", "err", err)
+			}
+		}
 	case "subs-enrichment":
 		if err := mergeTakeoverFindings(ctx, app); err != nil {
 			if app.Log != nil {
 				app.Log.Warn("mcp/composite: takeover_merge_failed", "err", err)
-			}
-		}
-		if err := subdomains.MergeStage(ctx, app, "passive"); err != nil {
-			if app.Log != nil {
-				app.Log.Warn("mcp/composite: subs merge_stage_failed", "merge", "passive", "err", err)
 			}
 		}
 	case "subs-resolve":
