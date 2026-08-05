@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/backend"
@@ -367,7 +368,11 @@ func RunCompositeAsync(ctx context.Context, opts RunOptions, mode CompositeMode)
 	// Stage loop: run each pipeline group sequentially.
 	stageGroups := compositePipelineStages(mode)
 	for _, group := range stageGroups {
-		stageSlice := task.FilterByModuleAndEnabled(allTasks, group.module, cfg, group.prefixes)
+		// Select by the task's REAL Module() via filterModuleFor — NOT group.module.
+		// group.module is the failure-policy label (used by RunStage +
+		// isBestEffortModule below); filtering by it selected zero passive/aux/
+		// permut/enrichment tasks (the composite recon/all "0 subdomains" bug).
+		stageSlice := task.FilterByModuleAndEnabled(allTasks, filterModuleFor(group.module), cfg, group.prefixes)
 
 		if opts.ProgressSink != nil {
 			opts.ProgressSink <- StageEvent{Stage: group.name, Done: false}
@@ -428,6 +433,23 @@ func compositeModeLabel(mode CompositeMode) string {
 // else in composites is best_effort.
 func isBestEffortModule(module string) bool {
 	return module != "subdomains"
+}
+
+// filterModuleFor derives the task-SELECTION module (a task's real Module(),
+// which is the top-level segment) from a stage group's failure-POLICY label.
+// "subdomains.passive" / "subdomains.aux" → "subdomains"; "web"/"osint"/"vulns"
+// are returned unchanged. This split is required because every subdomains task
+// reports Module()=="subdomains" regardless of its stage, while the composite
+// stage groups carry finer policy labels ("subdomains.passive", "subdomains.aux")
+// so isBestEffortModule can treat passive/aux as best_effort and the resolve
+// spine as fail_fast. Filtering task selection by the policy label matched zero
+// passive/aux/permut/enrichment tasks — the composite recon/all "0 subdomains"
+// regression. See TestCompositeStageSelectionCoversPassive.
+func filterModuleFor(groupModule string) string {
+	if dot := strings.IndexByte(groupModule, '.'); dot >= 0 {
+		return groupModule[:dot]
+	}
+	return groupModule
 }
 
 // compositeStagePostMerge runs per-stage merge calls after a stage completes.
