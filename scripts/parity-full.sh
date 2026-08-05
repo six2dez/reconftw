@@ -145,11 +145,14 @@ normalize_plain() {
     tr '[:upper:]' '[:lower:]' <"$1" 2>/dev/null | sed 's/[[:space:]]//g; /^$/d' | LC_ALL=C sort -u
 }
 
-# v2_finding_classes <jsonl> — sorted-unique finding-class labels. Picks the
-# first present class-like field across the union finding shape (web/vulns/osint).
+# v2_finding_classes <jsonl> — sorted-unique finding labels. Prefers the nuclei
+# .template_id (the fine-grained common unit both engines emit) so nuclei findings
+# compare like-for-like against v1's template-ids, falling back to vuln_class/class/
+# type/severity for non-nuclei findings (xss/osint). Filtering by the coarse .type
+# collapsed all 271 nuclei findings to a single "nuclei-finding" class vs v1's 77.
 v2_finding_classes() {
     [ -f "$1" ] || return 0
-    jq -r '(.class // .vuln_class // .type // .severity) // empty' "$1" 2>/dev/null \
+    jq -r '(.template_id // .vuln_class // .class // .type // .severity) // empty' "$1" 2>/dev/null \
         | sed '/^[[:space:]]*$/d' | LC_ALL=C sort -u
 }
 
@@ -472,7 +475,7 @@ v2_finding_classes "$W/artefacts/findings.jsonl" >"$WORK/v2_find"
 # v1 finding-class proxy: nuclei template ids + vulns/* basenames, class-ish tokens.
 {
     find "$V1DIR/nuclei_output" -type f -name '*_json.txt' -exec cat {} + 2>/dev/null \
-        | jq -r '.info.tags[]? // .["template-id"]? // empty' 2>/dev/null
+        | jq -r '.["template-id"]? // .info.tags[]? // empty' 2>/dev/null
     find "$V1DIR/vulns" -type f 2>/dev/null | sed -E 's#.*/##; s/\.[a-z]+$//'
 } | sed '/^[[:space:]]*$/d' | LC_ALL=C sort -u >"$WORK/v1_find"
 
