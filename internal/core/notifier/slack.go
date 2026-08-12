@@ -29,7 +29,7 @@ import (
 // via a real HTTP POST.
 type SlackNotifier struct {
 	Log        *slog.Logger
-	webhookURL string      // log.Secret at the config boundary; here plain
+	webhookURL string // log.Secret at the config boundary; here plain
 	httpClient *http.Client
 }
 

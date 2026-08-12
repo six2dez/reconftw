@@ -44,9 +44,12 @@ type FaviconRecord struct {
 // FaviReconTask runs favirecon favicon tech recon.
 type FaviReconTask struct{}
 
-func (t *FaviReconTask) Name() string        { return "web.favirecon" }
-func (t *FaviReconTask) Module() string      { return "web" }
-func (t *FaviReconTask) Description() string { return "Favicon tech recon (favirecon → favicons.jsonl)" }
+func (t *FaviReconTask) Name() string   { return "web.favirecon" }
+func (t *FaviReconTask) Module() string { return "web" }
+func (t *FaviReconTask) Description() string {
+	return "Favicon tech recon (favirecon → favicons.jsonl)"
+}
+
 func (t *FaviReconTask) Enabled(cfg *config.Config) bool {
 	return cfg.Web.Favirecon.Enabled
 }
@@ -100,8 +103,8 @@ func (t *FaviReconTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 		"-l", urlsFile,
 		"-c", fmt.Sprintf("%d", concurrency),
 		"-t", fmt.Sprintf("%d", timeout),
-		"-s",           // silent
-		"-j",           // JSON output (CRITICAL: must use -j for ExtractWeb)
+		"-s", // silent
+		"-j", // JSON output (CRITICAL: must use -j for ExtractWeb)
 		"-o", stagingFile,
 	}
 	// Optional proxy (from config).
@@ -134,8 +137,10 @@ func (t *FaviReconTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	webResults, _ := favicon.ExtractWeb(raw, app.Target.Domain)
 
 	if len(webResults) == 0 {
-		return task.Result{Status: task.StatusDone,
-			Stats: map[string]int{"favicons_found": 0}}, nil
+		return task.Result{
+			Status: task.StatusDone,
+			Stats:  map[string]int{"favicons_found": 0},
+		}, nil
 	}
 
 	var lines [][]byte

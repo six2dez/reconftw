@@ -14,7 +14,7 @@
 //     `internal/core/appctx/appctx.go` to declare `UI *ui.Printer`).
 //   - Plan 05 Task 2 ships the full implementation (Status / Msg / Rule /
 //     Section / ProgressModule / Summary / BatchEnd / parallel-log modes
-//     + the W13 behavior-map MAPPING comment block).
+//   - the W13 behavior-map MAPPING comment block).
 //
 // MAPPING: lib/ui.sh → internal/core/ui/printer.go
 //

@@ -1,7 +1,7 @@
 // Source: .planning/phases/03-foundation-kernel/03-03-PLAN.md Task 3 (hash.go).
 // Validates the input_hash formula per ADR §3.4 line 1319:
 //
-//   input_hash = SHA-256(task_name + target + config_slice_json + wordlists.lock_content)
+//	input_hash = SHA-256(task_name + target + config_slice_json + wordlists.lock_content)
 //
 // Plus determinism + change-detection (one-byte diff produces a different
 // hash).

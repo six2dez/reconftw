@@ -28,7 +28,8 @@
     "skip_discuss": false,
     "code_review": true,
     "code_review_depth": "standard",
-    "_auto_chain_active": true
+    "_auto_chain_active": false,
+    "use_worktrees": true
   },
   "hooks": {
     "context_warnings": true

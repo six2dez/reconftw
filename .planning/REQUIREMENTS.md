@@ -152,36 +152,36 @@
 
 ### Monitor Mode (Deliverable #10)
 
-- [ ] **MON-01**: `reconftw monitor --target X --interval 6h` runs scans on a configurable interval indefinitely
-- [ ] **MON-02**: `--monitor-cycles N` runs N cycles then exits
-- [ ] **MON-03**: Diff detection: each cycle compares findings against last cycle's baseline (stored in `state.db`)
-- [ ] **MON-04**: `--incremental` mode: only re-runs functions affected by detected deltas
-- [ ] **MON-05**: New findings trigger notifications via configured Notifier(s)
-- [ ] **MON-06**: Findings dedup across monitor cycles (uses `artefacts/findings.jsonl` history with content hash)
-- [ ] **MON-07**: Long-running mode respects `OUTPUT_VERBOSITY=0/1/2` for log volume control
-- [ ] **MON-08**: Graceful shutdown on SIGINT/SIGTERM mid-cycle: completes current task, writes checkpoint, exits clean
+- [x] **MON-01**: `reconftw monitor --target X --interval 6h` runs scans on a configurable interval indefinitely
+- [x] **MON-02**: `--monitor-cycles N` runs N cycles then exits
+- [x] **MON-03**: Diff detection: each cycle compares findings against last cycle's baseline (stored in `state.db`)
+- [x] **MON-04**: `--incremental` mode: only re-runs functions affected by detected deltas
+- [x] **MON-05**: New findings trigger notifications via configured Notifier(s)
+- [x] **MON-06**: Findings dedup across monitor cycles (uses `artefacts/findings.jsonl` history with content hash)
+- [x] **MON-07**: Long-running mode respects `OUTPUT_VERBOSITY=0/1/2` for log volume control
+- [x] **MON-08**: Graceful shutdown on SIGINT/SIGTERM mid-cycle: completes current task, writes checkpoint, exits clean
 
 ### Reporting (Deliverable #11)
 
-- [ ] **REPORT-01**: Canonical artefacts written as JSONL: `subdomains.jsonl`, `hosts.jsonl`, `urls.jsonl`, `findings.jsonl`, `notes.jsonl`
-- [ ] **REPORT-02**: HTML report (`reports/report.html`) renders findings with no JavaScript dependencies required; all user-controlled values HTML-escaped to prevent XSS in the report itself
-- [ ] **REPORT-03**: CSV exports per category (`reports/subdomains.csv`, etc.) for spreadsheet workflows
-- [ ] **REPORT-04**: AI report opt-in via `AI_REPORT=true` config + API key (`OPENAI_API_KEY` or `ANTHROPIC_API_KEY`); all PII/secrets pass through redactor before API call
-- [ ] **REPORT-05**: Faraday export (Faraday-compatible JSON format) for security platform integration
-- [ ] **REPORT-06**: Risk-scored hotlist (`reports/hotlist.json`) — top N findings by severity × confidence × asset criticality
-- [ ] **REPORT-07**: SARIF output (`reports/findings.sarif`) — industry-standard format for findings consumption by external tools (CodeQL, GitHub Code Scanning, etc.) — promoted from EMG-03
-- [ ] **REPORT-08**: Reports rebuilt deterministically from `artefacts/` — `reconftw report` subcommand regenerates without re-running scans
-- [ ] **REPORT-09**: Reports include workspace metadata: target, start/end time, config snapshot, tool versions used
+- [x] **REPORT-01**: Canonical artefacts written as JSONL: `subdomains.jsonl`, `hosts.jsonl`, `urls.jsonl`, `findings.jsonl`, `notes.jsonl`
+- [x] **REPORT-02**: HTML report (`reports/report.html`) renders findings with no JavaScript dependencies required; all user-controlled values HTML-escaped to prevent XSS in the report itself
+- [x] **REPORT-03**: CSV exports per category (`reports/subdomains.csv`, etc.) for spreadsheet workflows
+- [x] **REPORT-04**: AI report opt-in via `AI_REPORT=true` config + API key (`OPENAI_API_KEY` or `ANTHROPIC_API_KEY`); all PII/secrets pass through redactor before API call
+- [x] **REPORT-05**: Faraday export (Faraday-compatible JSON format) for security platform integration
+- [x] **REPORT-06**: Risk-scored hotlist (`reports/hotlist.json`) — top N findings by severity × confidence × asset criticality
+- [x] **REPORT-07**: SARIF output (`reports/findings.sarif`) — industry-standard format for findings consumption by external tools (CodeQL, GitHub Code Scanning, etc.) — promoted from EMG-03
+- [x] **REPORT-08**: Reports rebuilt deterministically from `artefacts/` — `reconftw report` subcommand regenerates without re-running scans
+- [x] **REPORT-09**: Reports include workspace metadata: target, start/end time, config snapshot, tool versions used
 
 ### Notifications (Deliverable #12)
 
-- [ ] **NOTIF-01**: Slack notifications via webhook URL; all message bodies pass through redactor before send (no API keys, no internal IPs, no secrets ever sent)
-- [ ] **NOTIF-02**: Telegram bot notifications with same redaction guarantee
-- [ ] **NOTIF-03**: Discord webhook notifications with same redaction
-- [ ] **NOTIF-04**: Per-event notification rules: on-critical-finding, on-scan-complete, on-failure; configurable in TOML (`notifications.events`)
-- [ ] **NOTIF-05**: Secret tagging in the type system enforces redaction at sink — there is NO opt-in raw mode; secrets cannot reach a notifier unredacted by API design
-- [ ] **NOTIF-06**: Notification rate limit per channel (avoid flooding on critical findings burst)
-- [ ] **NOTIF-07**: Notifier health check via `reconftw notify --test` — validates each configured channel reachable
+- [x] **NOTIF-01**: Slack notifications via webhook URL; all message bodies pass through redactor before send (no API keys, no internal IPs, no secrets ever sent)
+- [x] **NOTIF-02**: Telegram bot notifications with same redaction guarantee
+- [x] **NOTIF-03**: Discord webhook notifications with same redaction
+- [x] **NOTIF-04**: Per-event notification rules: on-critical-finding, on-scan-complete, on-failure; configurable in TOML (`notifications.events`)
+- [x] **NOTIF-05**: Secret tagging in the type system enforces redaction at sink — there is NO opt-in raw mode; secrets cannot reach a notifier unredacted by API design
+- [x] **NOTIF-06**: Notification rate limit per channel (avoid flooding on critical findings burst)
+- [x] **NOTIF-07**: Notifier health check via `reconftw notify --test` — validates each configured channel reachable
 
 ### Installer & Deps (Deliverable #13)
 
@@ -205,7 +205,7 @@
 - [ ] **XPLAT-03**: macOS Apple Silicon (arm64) — primary mac target
 - [ ] **XPLAT-04**: macOS Intel (amd64)
 - [ ] **XPLAT-05**: CI matrix runs build + unit + smoke test on every supported platform on each PR; weekly cron runs integration-full
-- [ ] **XPLAT-06**: macOS binary signed with developer ID; notarized via Apple notarization service in CI from day 1
+- [ ] **XPLAT-06**: [RE-SCOPED per D-06] macOS distribution via Homebrew source-build tap (six2dez/homebrew-reconftw); the formula builds from source locally, sidestepping Apple Gatekeeper without requiring an Apple Developer ID or notarization. Notarized standalone binary/.pkg deferred to v2.1+ (requires a $99/yr Developer ID — see Deferred Ideas in 11-CONTEXT.md)
 - [ ] **XPLAT-07**: Homebrew tap published for `brew install reconftw` on macOS
 - [ ] **XPLAT-08**: Linux distribution: standalone binary download + tar.gz; optional `.deb`/`.rpm` packages
 - [ ] **XPLAT-09**: ARM64 Linux support for cloud / Raspberry Pi deployments
@@ -232,6 +232,26 @@
 - [x] **MCP-08**: OpenAPI schema published for MCP HTTP transport endpoints (promoted from EMG-15 — required by MCP)
 - [ ] **MCP-09**: MCP-specific documentation: agent integration example, supported tools list, rate-limit guidance, security considerations
 - [x] **MCP-10**: MCP sandboxing: per-target scope passed through MCP cannot be widened via tool arguments — scope is fixed at MCP session start
+
+### Integration Hardening (Deliverable #17)
+
+Wave-0 fixes from the bash-vs-Go audit: make every "implemented" subsystem connect end-to-end (no silent-failure bugs).
+
+- [x] **INTEG-01**: Scan pipeline populates the shared `store.db` (a completed scan row + findings/hosts/urls linked to the target) so `report`/SARIF/AI/hotlist/monitor read real data. *(DONE 2026-07-14 — `internal/core/ingest` + hand-authored `internal/store/sqlc/schema.{sql,go}`; wired via `persistScanToStore` across all 5 handlers; verified E2E: `reconftw report` went from "no completed scan found" to full HTML/SARIF/CSV/hotlist output)*
+- [ ] **INTEG-02**: In-scan notifications — Slack/Telegram/Discord fire during recon/all/web/vulns/osint (scan-start + completion + critical-finding), not only under `monitor`; `soft_enabled` / `send_zip_notify` / event routing honored
+- [ ] **INTEG-03**: Resume across runs — a second invocation resumes from checkpoints (not a fresh timestamped workspace); `--force` / `Advanced.Diff` honored; InputHash invalidates on cfg/wordlist/target change
+- [ ] **INTEG-04**: Monitor diff/incremental — the monitor loop produces real cross-cycle diffs (reads the populated store) and the incremental re-feed consumes `TargetListPath`
+- [ ] **INTEG-05**: Global rate limiter enforced (`pickLimiter` no longer a no-op) so `*_RATELIMIT` / adaptive-rate settings actually throttle
+- [ ] **INTEG-06**: AI reporting provider default is coherent and a local Ollama path works; no unexpected cloud egress of recon data by default
+
+### Domain Parity (Deliverable #18)
+
+Wave-1 fixes: close per-domain capability gaps so recon/all reaches ≥95% functional parity with bash v1. Niche capabilities may ship post-cutover if documented (bash stays on the legacy branch).
+
+- [ ] **PAR-01**: Subdomains — PTR sweep wired (or dead code removed), hakip2host reverse-IP, `subdomains_dnsregs` records artefact, csprecon in the subs pipeline, dsieve top-N recursion, resolve stage best-effort (not fail-fast), default-on alignment (tls/recursive)
+- [ ] **PAR-02**: Vulns — password spraying (brutespray/brutus), SSRF OOB auto-starts interactsh when `COLLAB_SERVER` unset
+- [ ] **PAR-03**: OSINT — LeakSearch (passwords), Scopify, titus/noseyparker repo-secret engines, WHOISXML reverse-IP, metadata/ip_info corrected
+- [ ] **PAR-04**: Web — active portscan (naabu/nmap), nerva service fingerprint, `.well-known` pivots, roboxtractor/getjswords/pydictor wordlists, `url_ext` sensitive-extension bucketing
 
 ### Cutover & Migration (Deliverable #16)
 
@@ -448,30 +468,30 @@ Each REQ-ID maps to exactly one phase. Populated by roadmapper agent 2026-05-27.
 | MODE-10 | Phase 9 — Composite Modes | Complete |
 | MODE-11 | Phase 9 — Composite Modes | Complete |
 | MODE-12 | Phase 9 — Composite Modes | Complete |
-| MON-01 | Phase 10 — Monitor + Reporting + Notifications | Pending |
-| MON-02 | Phase 10 — Monitor + Reporting + Notifications | Pending |
-| MON-03 | Phase 10 — Monitor + Reporting + Notifications | Pending |
-| MON-04 | Phase 10 — Monitor + Reporting + Notifications | Pending |
-| MON-05 | Phase 10 — Monitor + Reporting + Notifications | Pending |
-| MON-06 | Phase 10 — Monitor + Reporting + Notifications | Pending |
-| MON-07 | Phase 10 — Monitor + Reporting + Notifications | Pending |
-| MON-08 | Phase 10 — Monitor + Reporting + Notifications | Pending |
-| REPORT-01 | Phase 10 — Monitor + Reporting + Notifications | Pending |
-| REPORT-02 | Phase 10 — Monitor + Reporting + Notifications | Pending |
-| REPORT-03 | Phase 10 — Monitor + Reporting + Notifications | Pending |
-| REPORT-04 | Phase 10 — Monitor + Reporting + Notifications | Pending |
-| REPORT-05 | Phase 10 — Monitor + Reporting + Notifications | Pending |
-| REPORT-06 | Phase 10 — Monitor + Reporting + Notifications | Pending |
-| REPORT-07 | Phase 10 — Monitor + Reporting + Notifications | Pending |
-| REPORT-08 | Phase 10 — Monitor + Reporting + Notifications | Pending |
-| REPORT-09 | Phase 10 — Monitor + Reporting + Notifications | Pending |
-| NOTIF-01 | Phase 10 — Monitor + Reporting + Notifications | Pending |
-| NOTIF-02 | Phase 10 — Monitor + Reporting + Notifications | Pending |
-| NOTIF-03 | Phase 10 — Monitor + Reporting + Notifications | Pending |
-| NOTIF-04 | Phase 10 — Monitor + Reporting + Notifications | Pending |
-| NOTIF-05 | Phase 10 — Monitor + Reporting + Notifications | Pending |
-| NOTIF-06 | Phase 10 — Monitor + Reporting + Notifications | Pending |
-| NOTIF-07 | Phase 10 — Monitor + Reporting + Notifications | Pending |
+| MON-01 | Phase 10 — Monitor + Reporting + Notifications | Complete |
+| MON-02 | Phase 10 — Monitor + Reporting + Notifications | Complete |
+| MON-03 | Phase 10 — Monitor + Reporting + Notifications | Complete |
+| MON-04 | Phase 10 — Monitor + Reporting + Notifications | Complete |
+| MON-05 | Phase 10 — Monitor + Reporting + Notifications | Complete |
+| MON-06 | Phase 10 — Monitor + Reporting + Notifications | Complete |
+| MON-07 | Phase 10 — Monitor + Reporting + Notifications | Complete |
+| MON-08 | Phase 10 — Monitor + Reporting + Notifications | Complete |
+| REPORT-01 | Phase 10 — Monitor + Reporting + Notifications | Complete |
+| REPORT-02 | Phase 10 — Monitor + Reporting + Notifications | Complete |
+| REPORT-03 | Phase 10 — Monitor + Reporting + Notifications | Complete |
+| REPORT-04 | Phase 10 — Monitor + Reporting + Notifications | Complete |
+| REPORT-05 | Phase 10 — Monitor + Reporting + Notifications | Complete |
+| REPORT-06 | Phase 10 — Monitor + Reporting + Notifications | Complete |
+| REPORT-07 | Phase 10 — Monitor + Reporting + Notifications | Complete |
+| REPORT-08 | Phase 10 — Monitor + Reporting + Notifications | Complete |
+| REPORT-09 | Phase 10 — Monitor + Reporting + Notifications | Complete |
+| NOTIF-01 | Phase 10 — Monitor + Reporting + Notifications | Complete |
+| NOTIF-02 | Phase 10 — Monitor + Reporting + Notifications | Complete |
+| NOTIF-03 | Phase 10 — Monitor + Reporting + Notifications | Complete |
+| NOTIF-04 | Phase 10 — Monitor + Reporting + Notifications | Complete |
+| NOTIF-05 | Phase 10 — Monitor + Reporting + Notifications | Complete |
+| NOTIF-06 | Phase 10 — Monitor + Reporting + Notifications | Complete |
+| NOTIF-07 | Phase 10 — Monitor + Reporting + Notifications | Complete |
 | INST-01 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
 | INST-02 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
 | INST-03 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
@@ -500,27 +520,37 @@ Each REQ-ID maps to exactly one phase. Populated by roadmapper agent 2026-05-27.
 | DOCK-05 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
 | DOCK-06 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
 | DOCK-07 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
-| CUT-01 | Phase 12 — Cutover & Migration | Pending |
-| CUT-02 | Phase 12 — Cutover & Migration | Pending |
-| CUT-03 | Phase 12 — Cutover & Migration | Pending |
-| CUT-04 | Phase 12 — Cutover & Migration | Pending |
-| CUT-05 | Phase 12 — Cutover & Migration | Pending |
-| CUT-06 | Phase 12 — Cutover & Migration | Pending |
-| CUT-07 | Phase 12 — Cutover & Migration | Pending |
-| CUT-08 | Phase 12 — Cutover & Migration | Pending |
-| CUT-09 | Phase 12 — Cutover & Migration | Pending |
-| CUT-10 | Phase 12 — Cutover & Migration | Pending |
-| CUT-11 | Phase 12 — Cutover & Migration | Pending |
-| CUT-12 | Phase 12 — Cutover & Migration | Pending |
-| CUT-13 | Phase 12 — Cutover & Migration | Pending |
-| CUT-14 | Phase 12 — Cutover & Migration | Pending |
-| CUT-15 | Phase 12 — Cutover & Migration | Pending |
-| XCUT-01 | Phase 12 — Cutover & Migration (baseline est. Phase 3, validated per-module phase) | Pending |
+| INTEG-01 | Phase 12 — Integration Hardening | Complete |
+| INTEG-02 | Phase 12 — Integration Hardening | Pending |
+| INTEG-03 | Phase 12 — Integration Hardening | Pending |
+| INTEG-04 | Phase 12 — Integration Hardening | Pending |
+| INTEG-05 | Phase 12 — Integration Hardening | Pending |
+| INTEG-06 | Phase 12 — Integration Hardening | Pending |
+| PAR-01 | Phase 13 — Domain Parity | Pending |
+| PAR-02 | Phase 13 — Domain Parity | Pending |
+| PAR-03 | Phase 13 — Domain Parity | Pending |
+| PAR-04 | Phase 13 — Domain Parity | Pending |
+| CUT-01 | Phase 14 — Cutover & Migration | Pending |
+| CUT-02 | Phase 14 — Cutover & Migration | Pending |
+| CUT-03 | Phase 14 — Cutover & Migration | Pending |
+| CUT-04 | Phase 14 — Cutover & Migration | Pending |
+| CUT-05 | Phase 14 — Cutover & Migration | Pending |
+| CUT-06 | Phase 14 — Cutover & Migration | Pending |
+| CUT-07 | Phase 14 — Cutover & Migration | Pending |
+| CUT-08 | Phase 14 — Cutover & Migration | Pending |
+| CUT-09 | Phase 14 — Cutover & Migration | Pending |
+| CUT-10 | Phase 14 — Cutover & Migration | Pending |
+| CUT-11 | Phase 14 — Cutover & Migration | Pending |
+| CUT-12 | Phase 14 — Cutover & Migration | Pending |
+| CUT-13 | Phase 14 — Cutover & Migration | Pending |
+| CUT-14 | Phase 14 — Cutover & Migration | Pending |
+| CUT-15 | Phase 14 — Cutover & Migration | Pending |
+| XCUT-01 | Phase 14 — Cutover & Migration (baseline est. Phase 3, validated per-module phase) | Pending |
 | XCUT-02 | Phase 3 — Foundation Kernel | Pending |
-| XCUT-03 | Phase 12 — Cutover & Migration (gate established Phase 3) | Pending |
+| XCUT-03 | Phase 14 — Cutover & Migration (gate established Phase 3) | Pending |
 | XCUT-04 | Phase 3 — Foundation Kernel (CI runs every phase) | Pending |
-| XCUT-05 | Phase 12 — Cutover & Migration | Pending |
-| XCUT-06 | Phase 12 — Cutover & Migration | Pending |
+| XCUT-05 | Phase 14 — Cutover & Migration | Pending |
+| XCUT-06 | Phase 14 — Cutover & Migration | Pending |
 | XCUT-07 | Phase 3 — Foundation Kernel (lint + tested every phase) | Complete |
 | XCUT-08 | Phase 11 — Installer + Cross-Platform + Docker | Pending |
 | XCUT-09 | Phase 3 — Foundation Kernel (heartbeat tested every phase) | Complete |

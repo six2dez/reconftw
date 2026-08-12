@@ -34,9 +34,12 @@ import (
 // SourcemapperTask runs sourcemapper source extraction per JS URL.
 type SourcemapperTask struct{}
 
-func (t *SourcemapperTask) Name() string        { return "web.sourcemapper" }
-func (t *SourcemapperTask) Module() string      { return "web" }
-func (t *SourcemapperTask) Description() string { return "Source map extraction (sourcemapper → raw/sourcemaps/)" }
+func (t *SourcemapperTask) Name() string   { return "web.sourcemapper" }
+func (t *SourcemapperTask) Module() string { return "web" }
+func (t *SourcemapperTask) Description() string {
+	return "Source map extraction (sourcemapper → raw/sourcemaps/)"
+}
+
 func (t *SourcemapperTask) Enabled(cfg *config.Config) bool {
 	return cfg.Web.JS.Enabled
 }

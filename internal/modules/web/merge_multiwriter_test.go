@@ -144,11 +144,11 @@ func TestMultiWriterFindings(t *testing.T) {
 
 	// Shared record (appears in both staging files — should count once).
 	overlap := map[string]string{
-		"type":       "http",
-		"host":       "example.com",
+		"type":        "http",
+		"host":        "example.com",
 		"template_id": "iis-version",
-		"severity":   "info",
-		"confidence": "high",
+		"severity":    "info",
+		"confidence":  "high",
 	}
 
 	writeJSONLFile(t, dir, "findings.nuclei.jsonl", []map[string]string{

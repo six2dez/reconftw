@@ -113,8 +113,8 @@ func (t *FaviReconTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 		"-l", hostsFile,
 		"-c", fmt.Sprintf("%d", faviReconDefaultConcurrency),
 		"-t", fmt.Sprintf("%d", faviReconDefaultTimeout),
-		"-s",        // silent
-		"-j",        // JSON output
+		"-s", // silent
+		"-j", // JSON output
 		"-o", favOut,
 	}
 
@@ -163,11 +163,11 @@ func parseFaviReconOutput(data []byte) []OSINTFindingRecord {
 			continue
 		}
 		var rec struct {
-			URL  string `json:"URL"`
-			URL2 string `json:"url"`
-			Name string `json:"Name"`
+			URL   string `json:"URL"`
+			URL2  string `json:"url"`
+			Name  string `json:"Name"`
 			Name2 string `json:"name"`
-			Hash string `json:"Hash"`
+			Hash  string `json:"Hash"`
 			Hash2 string `json:"hash"`
 		}
 		if err := json.Unmarshal(line, &rec); err != nil {

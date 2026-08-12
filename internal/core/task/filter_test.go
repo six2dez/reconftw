@@ -21,11 +21,11 @@ type filterFakeTask struct {
 	enabled bool
 }
 
-func (f *filterFakeTask) Name() string                                            { return f.name }
-func (f *filterFakeTask) Module() string                                          { return f.module }
-func (f *filterFakeTask) Description() string                                     { return "fake" }
-func (f *filterFakeTask) Enabled(_ *config.Config) bool                           { return f.enabled }
-func (f *filterFakeTask) DependsOn() []string                                     { return nil }
+func (f *filterFakeTask) Name() string                  { return f.name }
+func (f *filterFakeTask) Module() string                { return f.module }
+func (f *filterFakeTask) Description() string           { return "fake" }
+func (f *filterFakeTask) Enabled(_ *config.Config) bool { return f.enabled }
+func (f *filterFakeTask) DependsOn() []string           { return nil }
 func (f *filterFakeTask) Run(_ context.Context, _ *appctx.AppContext) (task.Result, error) {
 	return task.Result{Status: task.StatusDone, Duration: time.Second}, nil
 }

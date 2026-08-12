@@ -87,7 +87,7 @@ func (t *MantraTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	// ARG VECTOR: mantra -ua <UA> -s  (reads JS URLs from stdin)
 	args := []string{
 		"-ua", subjsUserAgent, // reuse same UA as subjs (v1 uses same HEADER)
-		"-s",                  // silent/no-banner
+		"-s", // silent/no-banner
 	}
 
 	// mantra reads from stdin; use exec.Command (same pattern as nomore403/hakoriginfinder).

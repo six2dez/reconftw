@@ -4,13 +4,12 @@
 package checkpoint_test
 
 import (
-	stderrors "errors"
-	"sync"
-	"testing"
-
 	"context"
 	"database/sql"
+	stderrors "errors"
 	"path/filepath"
+	"sync"
+	"testing"
 
 	"github.com/six2dez/reconftw/internal/core/checkpoint"
 	coreerrors "github.com/six2dez/reconftw/internal/core/errors"

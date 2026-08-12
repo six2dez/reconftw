@@ -101,8 +101,10 @@ func (t *WaymoreTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 	records, _ := urlsextract.ExtractURLs(raw, "waymore", app.Target.Domain)
 
 	if len(records) == 0 {
-		return task.Result{Status: task.StatusDone,
-			Stats: map[string]int{"urls_found": 0}}, nil
+		return task.Result{
+			Status: task.StatusDone,
+			Stats:  map[string]int{"urls_found": 0},
+		}, nil
 	}
 
 	var lines [][]byte

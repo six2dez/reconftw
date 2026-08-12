@@ -92,11 +92,11 @@ func (t *KatanaTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	args := []string{
 		"-silent",
 		"-list", targetsFile,
-		"-jc",         // JS crawling
-		"-kf", "all",  // keep all forms
+		"-jc",        // JS crawling
+		"-kf", "all", // keep all forms
 		"-c", strconv.Itoa(threads),
 		"-d", strconv.Itoa(depth),
-		"-fs", "rdn",  // field scope: root domain name
+		"-fs", "rdn", // field scope: root domain name
 	}
 
 	// Headless mode: "smart" or "full" profile enables -headless.

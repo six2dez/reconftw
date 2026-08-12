@@ -6,7 +6,8 @@
 // Per Blocker 7: NO test in this file may reference backend.Default. Every test
 // constructs a fresh *ToolRegistry{tools: map[string]*Tool{}} instance.
 // Verified at acceptance time via:
-//   grep -r 'backend\.Default' internal/core/backend/*_test.go  (must be empty)
+//
+//	grep -r 'backend\.Default' internal/core/backend/*_test.go  (must be empty)
 package backend_test
 
 import (

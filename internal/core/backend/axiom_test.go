@@ -272,8 +272,8 @@ func argsContainSeq(args []string, a, b string) bool {
 // delegating each shard to the inner local backend, then merging results.
 // This models what axiom-scan does on the fleet: distribute input, collect outputs.
 type mockAxiomBackend struct {
-	local   backend.Backend // inner backend for each shard invocation
-	shards  int             // number of shards to split input into (≥1)
+	local  backend.Backend // inner backend for each shard invocation
+	shards int             // number of shards to split input into (≥1)
 }
 
 // Exec simulates axiom fleet execution by splitting the input file into shards,

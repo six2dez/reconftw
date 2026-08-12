@@ -12,7 +12,7 @@
 //   - .planning/research/PITFALLS.md §3.1 (non-atomic checkpoint writes;
 //     top-5 pitfall).
 //   - ROADMAP success criterion 2: "a SIGKILL injected between tempfile
-//     + fsync and rename leaves the original target file intact."
+//   - fsync and rename leaves the original target file intact."
 package output
 
 import (

@@ -121,5 +121,7 @@ func (m *Multi) FlushNow(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
-var _ Notifier = (*Multi)(nil)
-var _ Flusher = (*Multi)(nil)
+var (
+	_ Notifier = (*Multi)(nil)
+	_ Flusher  = (*Multi)(nil)
+)

@@ -109,8 +109,10 @@ func (t *Wafw00fTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 	results, _ := waf.ExtractWafw00f(raw, app.Target.Domain)
 
 	if len(results) == 0 {
-		return task.Result{Status: task.StatusDone,
-			Stats: map[string]int{"waf_detected": 0}}, nil
+		return task.Result{
+			Status: task.StatusDone,
+			Stats:  map[string]int{"waf_detected": 0},
+		}, nil
 	}
 
 	var lines [][]byte

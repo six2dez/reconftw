@@ -26,10 +26,10 @@ func ApplyZenProfile(cfg *Config) {
 	cfg.Concurrency.MaxJobs = 2
 
 	// Rate-limit all active probing tools to stealth levels.
-	cfg.Web.Probe.RateLimit = 30   // httpx: v1 HTTPX_RATELIMIT=150 → stealth ~30
-	cfg.Web.Nuclei.RateLimit = 15  // nuclei: halved from probe rate
-	cfg.Web.Fuzz.RateLimit = 10    // ffuf: low rate in zen
-	cfg.Web.Fuzz.Threads = 5       // ffuf: thread cap for stealth
+	cfg.Web.Probe.RateLimit = 30  // httpx: v1 HTTPX_RATELIMIT=150 → stealth ~30
+	cfg.Web.Nuclei.RateLimit = 15 // nuclei: halved from probe rate
+	cfg.Web.Fuzz.RateLimit = 10   // ffuf: low rate in zen
+	cfg.Web.Fuzz.Threads = 5      // ffuf: thread cap for stealth
 
 	// Disable active/noisy subdomain sources.
 	cfg.Subdomains.Brute.Enabled = false  // no DNS brute-force in zen

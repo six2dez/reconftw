@@ -54,11 +54,11 @@ type ffufJSON struct {
 
 // ffufResult maps one entry from ffuf's results array.
 type ffufResult struct {
-	Status          int    `json:"status"`
-	Length          int    `json:"length"`
-	Words           int    `json:"words"`
-	Lines           int    `json:"lines"`
-	URL             string `json:"url"`
+	Status           int    `json:"status"`
+	Length           int    `json:"length"`
+	Words            int    `json:"words"`
+	Lines            int    `json:"lines"`
+	URL              string `json:"url"`
 	Redirectlocation string `json:"redirectlocation"`
 }
 

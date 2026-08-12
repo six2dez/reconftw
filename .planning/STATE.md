@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: milestone
 status: executing
-stopped_at: context exhaustion at 75% (2026-06-26)
-last_updated: "2026-07-15T23:10:00.000Z"
-last_activity: 2026-07-15 -- Phase 13 plan 13-08 executed (CAPSTONE: wired all wave-1/2 task prefixes into every stage-list site, removed dead subdomains.ptr, union-preserving hosts merge, ≥95% parity audit) — PHASE 13 COMPLETE
+stopped_at: Phase 14 context gathered
+last_updated: "2026-07-17T08:29:48.914Z"
+last_activity: 2026-07-17 -- Phase 14 execution started
 progress:
-  total_phases: 12
+  total_phases: 14
   completed_phases: 10
-  total_plans: 81
-  completed_plans: 80
-  percent: 83
+  total_plans: 99
+  completed_plans: 82
+  percent: 71
 ---
 
 # Project State
@@ -21,17 +21,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-27)
 
 **Core value:** Run one command, get a complete recon picture of a target — passive, active, and vulnerability layers — with resumable checkpoints, structured output, and zero-touch tool orchestration.
-**Current focus:** Phase 12 — Integration Hardening (Wave 0: wire subsystems end-to-end). Roadmap extended (2026-07-14) with Phases 12 Integration Hardening, 13 Domain Parity, 14 Cutover & Migration (Cutover renumbered 12→14). Phases 1-11 implemented (code is the reliable signal; the phase-status table below is stale). INTEG-01 (store ingest) already landed this session.
+**Current focus:** Phase 14 — Cutover & Migration
 
 ## Current Position
 
-Phase: 13 — Domain Parity (COMPLETE — capstone 13-08 executed)
-Plan: 13-08 executed + committed (1 task commit: 96fa45e feat wiring+hosts-merge-fix; Task 2 audit doc is gitignored on-disk). Earlier: 13-07 (26ea133, 6831888 + docs 1bd4619), 13-06 (e94a817, 1c361e6 + docs 5520500), 13-05 (b165e83, adf6407, 802a025 + docs db921c6), 13-04 (f887da0, 0fc69a7, 4c280d0), 13-03 (fe1e3f5, 82625a7), 13-02 (3b45229, 748ee15), 13-01 (9b0ceb2, 792c99f, 86a82f5); Phase 12 (c62eead).
-Status: 13-08 done — Phase 13 (Domain Parity) COMPLETE. Wired every wave-1/2 task (subdomains.csprecon, web.portscan, web.url_ext/wellknown/wordlistgen, vulns.spray) into all three stage-list sites (single-pipeline handler internal/mcp/handlers/{subs,web,vulns}.go + composite.go subsRecon/subsAll/webStageGroups/vulnsStageGroupsComposite + CLI stub_subcommands.go printX dry-run) so recon/all EXECUTE them; before this plan each self-registered into the DAG but was NEVER selected. Removed the dead subdomains.ptr prefix from all 3 subs sites (SubPTRTask deleted in 13-01; grep across internal/mcp/handlers/ + cmd/reconftw/ = 0). Wired web.MergeStage("hosts") after the portscan + web-producers stages in web.go AND composite.go — and MADE IT UNION-PRESERVING (merge.go special-cases stage=="hosts" to seed from the existing artefact) because web.httpx writes artefacts/hosts.jsonl DIRECTLY via Tree.Append REPLACE semantics; the literal MergeStage would have wiped httpx's probed hosts (Rule 1 bug, regression-tested in merge_hosts_test.go). New tasks all DependsOn nil → no circular DAG. Drift guards in composite_test.go: TestNewTaskPrefixesWiredIntoComposite (composite-side, CompositePipelinePrefixes exact-match, ptr-gone) + TestNewTaskPrefixesAppearInDryRun (stub-side, --dry-run output). 13-PARITY-AUDIT.md (gitignored) proves ≥95% per-domain on recon/all: subs 70%→95.5%, vulns 90%→100%, osint 78%→≥95%, web 78%→96.4%, with an 8-item Phase-14 deferral ledger + zen-stealth audit (ApplyZenProfile ActiveEnabled=false confirmed). go build ./... exit 0; gofmt/vet clean; full non-resolvers suite green (31 ok, 0 FAIL); -race pipeline packages green; DAG-build + FOUND-10 gates green; internal/core/resolvers untouched (pre-existing UDP/53 env-hang).
+Phase: 14 (Cutover & Migration) — EXECUTING
+Plan: 1 of 5
+Status: Executing Phase 14
 NEXT: Phase 14 — Cutover & Migration. Its MIGRATION.md MUST absorb the 8-item deferral ledger from 13-PARITY-AUDIT.md (PTR-sweep, deep_wildcard_filter, ip.thc.org, metadata-active, mail_hygiene, apileaks-enrichment, pydictor, noseyparker). Recommended non-blocking pre-cutover hardening: explicit cfg.Web.Portscan.UDPEnabled=false in ApplyZenProfile.
 Old status (13-07): closed the two vulns parity gaps (PAR-02). (1) SprayTask (internal/modules/vulns/spray.go, Name "vulns.spray", DependsOn nil) reads the previously-orphaned cfg.Vulns.Spray{Enabled,Engine,DeepOnly} (defaults.go:216, consumed by zero tasks): brutespray (default) `-f hosts/portscan_active.gnmap -T <concurrence> -o vulns/brutespray` via app.Tools; brutus (alternate, DEEP-gated) reads hosts/service_fingerprints.jsonl (from 13-03; or nerva-generated from naabu_open.txt) on STDIN via the brutusRunner exec seam (FOUND-10-allowlisted, mirrors reverseip.go — brutus is stdin-only) → `brutus --json -o vulns/brutus.jsonl [-u/-p/-k file]`. Gating matches bash spraying() (vulns.sh:615): StatusSkipped on IP-literal target / absent-or-empty gnmap / (Spray.DeepOnly && !Deep); brutus additionally deep-gated (SPRAY_BRUTUS_ONLY_DEEP default true) → never sprays outside --deep. XCUT-07 (T-13-07-03): discovered credentials NEVER persisted — only host/service/port recorded in inputs/findings.spray.jsonl (VulnClass credential-spray), credential redacted to *** (Payload/PoCRedacted); brutus wordlists cross as FILE PATHS (-u/-p/-k), never raw values on argv. Best-effort (D-V7): missing brutespray/brutus → StatusSkipped, never StatusErrored. (2) SSRFTask (ssrf.go) re-adds the interactsh-client auto-start the DoD-2 fix REMOVED — now BOUNDED: when cfg.APIKeys.CollabServer unset AND interactsh-client on PATH, startInteractshClient (package-var seam) exec's it under taskCtx (SysProcAttr Setpgid + process-group SIGTERM on cleanup/cancel, mirrors local.go), reads the registered callback domain with a wait bounded by BOTH interactshStartupTimeout (30s sub-timeout) AND the overall task context.WithTimeout — no-callback → group-kill + fall through to in-band; NO infinite poll (DoD-2 unbounded-wait regression prevented, test-proven by TestSSRFRunBoundedNoHang: a never-emitting stub does not hang past TimeoutSeconds). XCUT-07 (T-13-07-02): callback domain (session secret) NEVER logged — only "oob_enabled" + counts; token seeds workspace OOB payloads only, never a log line or finding (TestSSRFXCUT07NoCallbackURLInLogs). CollabServer-set path unchanged (regression guard). spray.go added to the FOUND-10 allowlist (brutus stdin). TDD-developed, committed test+impl together per task (feat). gofmt+vet clean; vulns suite green; FOUND-10 lint gate green; go build ./... exit 0; full non-resolvers suite green (31 ok, 0 FAIL); internal/core/resolvers still the pre-existing UDP/53 env-hang (untouched).
 NEXT: Phase 13 final plan — 13-08 (pipeline wiring: add subdomains.csprecon + web.portscan + web.url_ext/wellknown/wordlistgen + vulns.spray to the stage lists, wire web.MergeStage "hosts" after portscan+wellknown in web.go+composite.go, confirm zen ApplyZenProfile disables Web.Portscan.ActiveEnabled+UDPEnabled, remove dead subdomains.ptr; capability parity audit ≥95%). SSRFTask is already wired (vulns.ssrf); vulns.spray self-registers but is UNSELECTED until 13-08 adds its prefix to the vulns stage list.
-Last activity: 2026-07-15 -- 13-07 executed (2 tasks) + committed; vulns password spraying (brutespray/brutus deep-gated) + bounded interactsh SSRF-OOB auto-start (PAR-02).
+Last activity: 2026-08-10 -- Cutover validation: default (local) path READY (recon×3 + all-mode, 3 bugs fixed). Axiom investigated live (4 paid fleets, all torn down $0.11): lifecycle OK but distribution was broken; 4 correct fixes applied (260810-pnj) yet brute STILL 0s under --axiom → PARTIAL, resume in fresh session (memory RESUME HERE). --axiom = not-yet-functional / experimental (NOT a blocker for the default path)
 
 ## Performance Metrics
 
@@ -143,6 +143,10 @@ Next action: run `/gsd:plan-phase 2` (Architecture v2 Design).
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260602-config-explicit-path-warn | Config loader: WARN to WarnSink on explicit --config/--secrets pointing at a missing file (silent-skip→nil preserved) | 2026-06-02 | staged (maintainer) | [260602-config-explicit-path-warn](./quick/260602-config-explicit-path-warn/) |
+| 260806-dsp-repo-hygiene-regression-guard-composite | Regression-guard composite passive-merge placement (bug #2, mutation-proven) + gitignore the stray 26MB reconftw-web build binary | 2026-08-06 | working tree (maintainer) | [260806-dsp-repo-hygiene-regression-guard-composite](./quick/260806-dsp-repo-hygiene-regression-guard-composite/) |
+| 260806-qxt-vulns-nilres-panic-fix | Fix all-mode `reconftw all` nil-pointer panic (testssl/llm/websocket/fray missing res==nil guard); found by live reconbox3 cutover validation, mutation-proven test, live re-run rc=0 | 2026-08-06 | working tree (maintainer) | [260806-vulns-nilres-panic-fix](./quick/260806-vulns-nilres-panic-fix/) |
+| 260810-enq-urls-corpus-double-join | Fix vulns URL-corpus path double-join (readURLsJSONL) — 11 URL-consuming tasks were dead in all/deep ("no URL corpus" despite populated urls.jsonl); mutation-proven test; live re-run rc=0 w/ second_order engaging 1274 targets | 2026-08-10 | working tree (maintainer) | [260810-urls-corpus-double-join](./quick/260810-urls-corpus-double-join/) |
+| 260810-pnj-axiom-distribution-fix | PARTIAL: 4 correct+unit-tested --axiom fixes (Exec output read-back RC-A, input detection RC-B, brute→local RC-C, failover wrap) — but live re-test STILL shows brute=0s under --axiom; blocked by a --log-level-debug no-op. Resume in fresh session (see memory RESUME HERE) | 2026-08-10 | working tree (maintainer) | [260810-axiom-distribution-fix](./quick/260810-axiom-distribution-fix/) |
 
 ## v2 Architecture Considerations (from v1.0 deferred backlog)
 
@@ -159,6 +163,6 @@ Items captured durante v1.0 que deben informar el diseño de arquitectura v2 (no
 
 ## Session Continuity
 
-Last session: 2026-06-26T14:05:19.150Z
-Stopped at: context exhaustion at 75% (2026-06-26)
-Resume file: None
+Last session: 2026-07-16T07:51:09.273Z
+Stopped at: Phase 14 context gathered
+Resume file: .planning/phases/14-cutover-and-migration/14-CONTEXT.md

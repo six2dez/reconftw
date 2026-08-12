@@ -13,17 +13,17 @@ import (
 func TestRenderHTML_XSSEscape(t *testing.T) {
 	findings := []*sqlcgen.Finding{
 		{
-			ID:       1,
-			Severity: "high",
-			Title:    "<script>alert(1)</script>",
+			ID:        1,
+			Severity:  "high",
+			Title:     "<script>alert(1)</script>",
 			MatchedAt: "https://example.com",
-			Tool:     "nuclei",
+			Tool:      "nuclei",
 		},
 	}
 
 	data := report.ReportData{
-		Target:  "example.com",
-		ScanID:  "scan-01",
+		Target:   "example.com",
+		ScanID:   "scan-01",
 		Findings: report.FindingsToRows(findings),
 	}
 

@@ -57,9 +57,12 @@ type jsSecretRecord struct {
 // JsluiceTask runs jsluice URL + secret extraction on sourcemapped JS files.
 type JsluiceTask struct{}
 
-func (t *JsluiceTask) Name() string        { return "web.jsluice" }
-func (t *JsluiceTask) Module() string      { return "web" }
-func (t *JsluiceTask) Description() string { return "JS URL + secret extraction (jsluice → urls.jsonl, js_secrets.jsonl)" }
+func (t *JsluiceTask) Name() string   { return "web.jsluice" }
+func (t *JsluiceTask) Module() string { return "web" }
+func (t *JsluiceTask) Description() string {
+	return "JS URL + secret extraction (jsluice → urls.jsonl, js_secrets.jsonl)"
+}
+
 func (t *JsluiceTask) Enabled(cfg *config.Config) bool {
 	return cfg.Web.JS.Enabled
 }
@@ -168,7 +171,8 @@ func (t *JsluiceTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 //
 // jsluice mode: "urls" or "secrets" (with -j for structured JSON output).
 func runJsluiceWithFileList(ctx context.Context, app *appctx.AppContext,
-	mode string, fileListInput []byte) ([]byte, error) {
+	mode string, fileListInput []byte,
+) ([]byte, error) {
 	inputsDir := filepath.Join(app.Target.WorkDir, "inputs")
 	if err := os.MkdirAll(inputsDir, 0o755); err != nil {
 		return nil, fmt.Errorf("mkdir inputs/: %w", err)

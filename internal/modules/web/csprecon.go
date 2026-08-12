@@ -101,8 +101,10 @@ func (t *CspreconTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	hostResults, _ := csp.Extract(rawOutput, app.Target.Domain)
 
 	if len(hostResults) == 0 {
-		return task.Result{Status: task.StatusDone,
-			Stats: map[string]int{"csp_hostnames": 0}}, nil
+		return task.Result{
+			Status: task.StatusDone,
+			Stats:  map[string]int{"csp_hostnames": 0},
+		}, nil
 	}
 
 	artefactsDir := filepath.Join(app.Target.WorkDir, "artefacts")

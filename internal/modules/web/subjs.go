@@ -60,6 +60,7 @@ func (t *SubjsTask) Description() string { return "JS URL extraction (subjs → 
 func (t *SubjsTask) Enabled(cfg *config.Config) bool {
 	return cfg.Web.JS.Enabled
 }
+
 // DependsOn returns the fetch-stage URL producers whose output the intermediate
 // MergeStage("urls") consolidates into artefacts/urls.jsonl — subjs reads that
 // file. subjs is itself a urldedup producer, so it MUST NOT depend on urldedup
@@ -122,8 +123,10 @@ func (t *SubjsTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 	records, _ := urlsextract.ExtractURLs(raw, "subjs", app.Target.Domain)
 
 	if len(records) == 0 {
-		return task.Result{Status: task.StatusDone,
-			Stats: map[string]int{"urls_found": 0}}, nil
+		return task.Result{
+			Status: task.StatusDone,
+			Stats:  map[string]int{"urls_found": 0},
+		}, nil
 	}
 
 	var lines [][]byte

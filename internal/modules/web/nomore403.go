@@ -45,9 +45,11 @@ import (
 // to artefacts/findings.jsonl.
 type Nomore403Task struct{}
 
-func (t *Nomore403Task) Name() string        { return "web.nomore403" }
-func (t *Nomore403Task) Module() string      { return "web" }
-func (t *Nomore403Task) Description() string { return "4xx bypass scanner (nomore403 → findings.jsonl)" }
+func (t *Nomore403Task) Name() string   { return "web.nomore403" }
+func (t *Nomore403Task) Module() string { return "web" }
+func (t *Nomore403Task) Description() string {
+	return "4xx bypass scanner (nomore403 → findings.jsonl)"
+}
 
 // Enabled reports whether 4xx bypass scanning is configured.
 // Maps to cfg.Vulns.Bypass4xx.Enabled (v1: bypass_4xx flag, default true).

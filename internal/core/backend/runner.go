@@ -17,8 +17,8 @@
 package backend
 
 import (
-	stderrors "errors"
 	"context"
+	stderrors "errors"
 
 	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
 )

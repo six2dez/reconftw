@@ -49,6 +49,7 @@ func stubGetJSW(t *testing.T, fn func(context.Context, *appctx.AppContext, []str
 func robotsPath(app *appctx.AppContext) string {
 	return filepath.Join(app.Target.WorkDir, "webs", "robots_wordlist.txt")
 }
+
 func dictWordsPath(app *appctx.AppContext) string {
 	return filepath.Join(app.Target.WorkDir, "webs", "dict_words.txt")
 }

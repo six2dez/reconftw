@@ -8,10 +8,10 @@ import "testing"
 
 func TestParseCloudEnumLines_ProviderClassification(t *testing.T) {
 	lines := []string{
-		"reconFTW cloud_enum banner — scanning",        // noise, dropped
+		"reconFTW cloud_enum banner — scanning",             // noise, dropped
 		"[+] OPEN S3 BUCKET: http://acme.s3.amazonaws.com/", // s3, public → high
 		"[*] Protected S3 Bucket: acme-private.s3.amazonaws.com",
-		"Google Storage Bucket: storage.googleapis.com/acme",  // gcp
+		"Google Storage Bucket: storage.googleapis.com/acme",          // gcp
 		"[+] PUBLIC Azure Blob Container: acme.blob.core.windows.net", // azure, public → high
 	}
 	recs := parseCloudEnumLines(lines)
@@ -57,10 +57,10 @@ func TestLabelOf(t *testing.T) {
 
 func TestParseMisconfigLines_Severity(t *testing.T) {
 	lines := []string{
-		"misconfig-mapper banner v1.0",                                  // noise, dropped
-		"[+] Detected exposed Jira board: https://acme.atlassian.net",   // hit → medium/high
-		"[+] EXPLOITABLE: public Trello board https://trello.com/acme",  // exploitable → high
-		"checked 42 services",                                           // noise, dropped
+		"misconfig-mapper banner v1.0",                                 // noise, dropped
+		"[+] Detected exposed Jira board: https://acme.atlassian.net",  // hit → medium/high
+		"[+] EXPLOITABLE: public Trello board https://trello.com/acme", // exploitable → high
+		"checked 42 services",                                          // noise, dropped
 	}
 	recs := parseMisconfigLines(lines)
 	if len(recs) != 2 {

@@ -34,9 +34,12 @@ import (
 // UrlfinderTask runs urlfinder passive URL discovery.
 type UrlfinderTask struct{}
 
-func (t *UrlfinderTask) Name() string        { return "web.urlfinder" }
-func (t *UrlfinderTask) Module() string      { return "web" }
-func (t *UrlfinderTask) Description() string { return "Passive URL discovery (urlfinder → urls.jsonl)" }
+func (t *UrlfinderTask) Name() string   { return "web.urlfinder" }
+func (t *UrlfinderTask) Module() string { return "web" }
+func (t *UrlfinderTask) Description() string {
+	return "Passive URL discovery (urlfinder → urls.jsonl)"
+}
+
 func (t *UrlfinderTask) Enabled(cfg *config.Config) bool {
 	return cfg.Web.URLs.PassiveEnabled
 }
@@ -82,8 +85,10 @@ func (t *UrlfinderTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	records, _ := urlsextract.ExtractURLs(raw, "urlfinder", app.Target.Domain)
 
 	if len(records) == 0 {
-		return task.Result{Status: task.StatusDone,
-			Stats: map[string]int{"urls_found": 0}}, nil
+		return task.Result{
+			Status: task.StatusDone,
+			Stats:  map[string]int{"urls_found": 0},
+		}, nil
 	}
 
 	var lines [][]byte

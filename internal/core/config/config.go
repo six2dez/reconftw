@@ -94,25 +94,25 @@ type ConcurrencyConfig struct {
 
 // SubdomainsConfig mirrors ADR §2.2 [subdomains.*].
 type SubdomainsConfig struct {
-	Enabled      bool                 `koanf:"enabled"`
-	Passive      SubPassive           `koanf:"passive"`
-	CRT          SubCRT               `koanf:"crt"`
-	Analytics    SubAnalytics         `koanf:"analytics"`
-	Brute        SubBrute             `koanf:"brute"`
-	Scraping     SubScraping          `koanf:"scraping"`
-	Permut       SubPermut            `koanf:"permut"`
-	Takeover     SubTakeover          `koanf:"takeover"`
-	ASN          SubASN               `koanf:"asn"`
-	Recursive    SubRecursive         `koanf:"recursive"`
-	ZoneTransfer SubZoneTransfer      `koanf:"zone_transfer"`
-	S3Buckets    SubS3Buckets         `koanf:"s3_buckets"`
-	ReverseIP    SubReverseIP         `koanf:"reverse_ip"`
-	PTRSweep     SubPTRSweep          `koanf:"ptr_sweep"`
-	SRVEnum      SubSRVEnum           `koanf:"srv_enum"`
-	NSDelegation SubNSDelegation      `koanf:"ns_delegation"`
-	Scope        SubScope             `koanf:"scope"`
-	DNSResolve   SubDNSResolve        `koanf:"dns_resolve"`
-	TLSPivot     SubTLSPivot          `koanf:"tls_pivot"`
+	Enabled      bool            `koanf:"enabled"`
+	Passive      SubPassive      `koanf:"passive"`
+	CRT          SubCRT          `koanf:"crt"`
+	Analytics    SubAnalytics    `koanf:"analytics"`
+	Brute        SubBrute        `koanf:"brute"`
+	Scraping     SubScraping     `koanf:"scraping"`
+	Permut       SubPermut       `koanf:"permut"`
+	Takeover     SubTakeover     `koanf:"takeover"`
+	ASN          SubASN          `koanf:"asn"`
+	Recursive    SubRecursive    `koanf:"recursive"`
+	ZoneTransfer SubZoneTransfer `koanf:"zone_transfer"`
+	S3Buckets    SubS3Buckets    `koanf:"s3_buckets"`
+	ReverseIP    SubReverseIP    `koanf:"reverse_ip"`
+	PTRSweep     SubPTRSweep     `koanf:"ptr_sweep"`
+	SRVEnum      SubSRVEnum      `koanf:"srv_enum"`
+	NSDelegation SubNSDelegation `koanf:"ns_delegation"`
+	Scope        SubScope        `koanf:"scope"`
+	DNSResolve   SubDNSResolve   `koanf:"dns_resolve"`
+	TLSPivot     SubTLSPivot     `koanf:"tls_pivot"`
 }
 
 type SubPassive struct {
@@ -196,17 +196,17 @@ type SubScope struct {
 }
 
 type SubDNSResolve struct {
-	Resolver                    string `koanf:"resolver"                       validate:"oneof=auto puredns dnsx"`
-	TimeoutMinutes              int    `koanf:"timeout_minutes"                validate:"min=0,max=86400"`
-	BruteTimeout                string `koanf:"brute_timeout"`
-	PurednsPublicLimit          int    `koanf:"puredns_public_limit"           validate:"min=0,max=100000"`
-	PurednsTrustedLimit         int    `koanf:"puredns_trusted_limit"          validate:"min=0,max=100000"`
-	PurednsWildcardtestLimit    int    `koanf:"puredns_wildcardtest_limit"     validate:"min=0,max=10000"`
-	PurednsWildcardbatchLimit   int    `koanf:"puredns_wildcardbatch_limit"    validate:"min=0,max=10000000"`
-	DNSXThreads                 int    `koanf:"dnsx_threads"                   validate:"min=0,max=10000"`
-	DNSXRateLimit               int    `koanf:"dnsx_rate_limit"                validate:"min=0,max=100000"`
-	GenerateResolvers           bool   `koanf:"generate_resolvers"`
-	UpdateResolvers             bool   `koanf:"update_resolvers"`
+	Resolver                  string `koanf:"resolver"                       validate:"oneof=auto puredns dnsx"`
+	TimeoutMinutes            int    `koanf:"timeout_minutes"                validate:"min=0,max=86400"`
+	BruteTimeout              string `koanf:"brute_timeout"`
+	PurednsPublicLimit        int    `koanf:"puredns_public_limit"           validate:"min=0,max=100000"`
+	PurednsTrustedLimit       int    `koanf:"puredns_trusted_limit"          validate:"min=0,max=100000"`
+	PurednsWildcardtestLimit  int    `koanf:"puredns_wildcardtest_limit"     validate:"min=0,max=10000"`
+	PurednsWildcardbatchLimit int    `koanf:"puredns_wildcardbatch_limit"    validate:"min=0,max=10000000"`
+	DNSXThreads               int    `koanf:"dnsx_threads"                   validate:"min=0,max=10000"`
+	DNSXRateLimit             int    `koanf:"dnsx_rate_limit"                validate:"min=0,max=100000"`
+	GenerateResolvers         bool   `koanf:"generate_resolvers"`
+	UpdateResolvers           bool   `koanf:"update_resolvers"`
 }
 
 type SubTLSPivot struct {
@@ -287,11 +287,11 @@ type WebNucleiDAST struct {
 }
 
 type WebFuzz struct {
-	Enabled         bool `koanf:"enabled"`
-	RateLimit       int  `koanf:"rate_limit"        validate:"min=0,max=10000"`
-	Threads         int  `koanf:"threads"           validate:"min=0,max=500"`
-	MaxTimeSeconds  int  `koanf:"max_time_seconds"  validate:"min=0,max=86400"`
-	RecursionDepth  int  `koanf:"recursion_depth"   validate:"min=0,max=20"`
+	Enabled        bool `koanf:"enabled"`
+	RateLimit      int  `koanf:"rate_limit"        validate:"min=0,max=10000"`
+	Threads        int  `koanf:"threads"           validate:"min=0,max=500"`
+	MaxTimeSeconds int  `koanf:"max_time_seconds"  validate:"min=0,max=86400"`
+	RecursionDepth int  `koanf:"recursion_depth"   validate:"min=0,max=20"`
 }
 
 type WebIISShortname struct {
@@ -309,13 +309,13 @@ type WebJS struct {
 }
 
 type WebURLs struct {
-	Enabled         bool   `koanf:"enabled"`
-	PassiveEnabled  bool   `koanf:"passive_enabled"`
-	ActiveEnabled   bool   `koanf:"active_enabled"`
-	WaymoreTimeout  string `koanf:"waymore_timeout"`
-	WaymoreLimit    int    `koanf:"waymore_limit"   validate:"min=0,max=1000000"`
-	GFPatterns      bool   `koanf:"gf_patterns"`
-	ExtClassify     bool   `koanf:"ext_classify"`
+	Enabled        bool   `koanf:"enabled"`
+	PassiveEnabled bool   `koanf:"passive_enabled"`
+	ActiveEnabled  bool   `koanf:"active_enabled"`
+	WaymoreTimeout string `koanf:"waymore_timeout"`
+	WaymoreLimit   int    `koanf:"waymore_limit"   validate:"min=0,max=1000000"`
+	GFPatterns     bool   `koanf:"gf_patterns"`
+	ExtClassify    bool   `koanf:"ext_classify"`
 }
 
 type WebWellKnown struct {
@@ -324,26 +324,26 @@ type WebWellKnown struct {
 }
 
 type WebWordlist struct {
-	Enabled             bool   `koanf:"enabled"`
-	RobotsEnabled       bool   `koanf:"robots_enabled"`
-	PasswordDict        bool   `koanf:"password_dict"`
-	PasswordEngine      string `koanf:"password_engine"      validate:"oneof=cewler pydictor"`
-	PasswordMaxTargets  int    `koanf:"password_max_targets" validate:"min=0,max=10000"`
-	PasswordDepth       int    `koanf:"password_depth"       validate:"min=0,max=20"`
-	PasswordTimeout     int    `koanf:"password_timeout"     validate:"min=0,max=3600"`
-	PasswordMinLen      int    `koanf:"password_min_len"     validate:"min=0,max=256"`
-	PasswordMaxLen      int    `koanf:"password_max_len"     validate:"min=0,max=256"`
+	Enabled            bool   `koanf:"enabled"`
+	RobotsEnabled      bool   `koanf:"robots_enabled"`
+	PasswordDict       bool   `koanf:"password_dict"`
+	PasswordEngine     string `koanf:"password_engine"      validate:"oneof=cewler pydictor"`
+	PasswordMaxTargets int    `koanf:"password_max_targets" validate:"min=0,max=10000"`
+	PasswordDepth      int    `koanf:"password_depth"       validate:"min=0,max=20"`
+	PasswordTimeout    int    `koanf:"password_timeout"     validate:"min=0,max=3600"`
+	PasswordMinLen     int    `koanf:"password_min_len"     validate:"min=0,max=256"`
+	PasswordMaxLen     int    `koanf:"password_max_len"     validate:"min=0,max=256"`
 }
 
 type WebPortscan struct {
-	Enabled            bool   `koanf:"enabled"`
-	PassiveEnabled     bool   `koanf:"passive_enabled"`
-	ActiveEnabled      bool   `koanf:"active_enabled"`
-	Strategy           string `koanf:"strategy"             validate:"oneof=legacy naabu_nmap"`
-	UDPEnabled         bool   `koanf:"udp_enabled"`
-	GeoInfo            bool   `koanf:"geo_info"`
-	CDNCheck           bool   `koanf:"cdn_check"`
-	CDNBypass          bool   `koanf:"cdn_bypass"`
+	Enabled            bool                  `koanf:"enabled"`
+	PassiveEnabled     bool                  `koanf:"passive_enabled"`
+	ActiveEnabled      bool                  `koanf:"active_enabled"`
+	Strategy           string                `koanf:"strategy"             validate:"oneof=legacy naabu_nmap"`
+	UDPEnabled         bool                  `koanf:"udp_enabled"`
+	GeoInfo            bool                  `koanf:"geo_info"`
+	CDNCheck           bool                  `koanf:"cdn_check"`
+	CDNBypass          bool                  `koanf:"cdn_bypass"`
 	Naabu              WebNaabu              `koanf:"naabu"`
 	ServiceFingerprint WebServiceFingerprint `koanf:"service_fingerprint"`
 }
@@ -406,24 +406,24 @@ type WebKatana struct {
 //     (default cfg.Paths.NucleiTemplates+"/dast" same as NucleiDAST, but a
 //     separate TOML key so users can diverge: vulns.fuzz_params.templates_path).
 type VulnsConfig struct {
-	Enabled       bool                `koanf:"enabled"`
-	XSS           VulnXSS             `koanf:"xss"`
-	SQLi          VulnSQLi            `koanf:"sqli"`
-	SSRF          VulnSSRF            `koanf:"ssrf"`
-	LFI           VulnLFI             `koanf:"lfi"`
-	SSTI          VulnSSTI            `koanf:"ssti"`
-	CRLF          VulnCRLF            `koanf:"crlf"`
-	Smuggling     VulnSmuggling       `koanf:"smuggling"`
-	CMDi          VulnCMDi            `koanf:"cmdi"`
-	Cache         VulnCache           `koanf:"cache"`
-	Bypass4xx     VulnBypass4xx       `koanf:"bypass_4xx"`
-	FuzzParams    VulnFuzzParams      `koanf:"fuzz_params"`
-	NucleiDAST    VulnNucleiDAST      `koanf:"nuclei_dast"`
-	Fray          VulnFray            `koanf:"fray"`
-	Spray         VulnSpray           `koanf:"spray"`
-	BrokenLinks   VulnBrokenLinks     `koanf:"broken_links"`
-	SSL           VulnSSL             `koanf:"ssl"`
-	Metadata      VulnMetadata        `koanf:"metadata"`
+	Enabled     bool            `koanf:"enabled"`
+	XSS         VulnXSS         `koanf:"xss"`
+	SQLi        VulnSQLi        `koanf:"sqli"`
+	SSRF        VulnSSRF        `koanf:"ssrf"`
+	LFI         VulnLFI         `koanf:"lfi"`
+	SSTI        VulnSSTI        `koanf:"ssti"`
+	CRLF        VulnCRLF        `koanf:"crlf"`
+	Smuggling   VulnSmuggling   `koanf:"smuggling"`
+	CMDi        VulnCMDi        `koanf:"cmdi"`
+	Cache       VulnCache       `koanf:"cache"`
+	Bypass4xx   VulnBypass4xx   `koanf:"bypass_4xx"`
+	FuzzParams  VulnFuzzParams  `koanf:"fuzz_params"`
+	NucleiDAST  VulnNucleiDAST  `koanf:"nuclei_dast"`
+	Fray        VulnFray        `koanf:"fray"`
+	Spray       VulnSpray       `koanf:"spray"`
+	BrokenLinks VulnBrokenLinks `koanf:"broken_links"`
+	SSL         VulnSSL         `koanf:"ssl"`
+	Metadata    VulnMetadata    `koanf:"metadata"`
 	// D-V3 folded-in web.sh orphans (plan 06-08): routed from Phase 5 web domain
 	// into Phase 6 vulns pipeline. These four probes are vuln-class by nature.
 	GraphQL   VulnGraphQL   `koanf:"graphql"`
@@ -572,27 +572,27 @@ type VulnWebsocket struct {
 
 // OSINTConfig mirrors ADR §2.2 [osint.*].
 type OSINTConfig struct {
-	Enabled       bool             `koanf:"enabled"`
-	GoogleDorks   OSINTGoogleDorks `koanf:"google_dorks"`
-	GitHub        OSINTGitHub      `koanf:"github"`
-	Cloud         OSINTCloud       `koanf:"cloud"`
-	Emails        OSINTEmails      `koanf:"emails"`
-	Postman       OSINTPostman     `koanf:"postman"`
-	APILeaks      OSINTAPILeaks    `koanf:"api_leaks"`
-	Swagger       OSINTSwagger     `koanf:"swagger"`
-	Spoofy        OSINTSpoofy      `koanf:"spoofy"`
-	MailHygiene   OSINTMailHygiene `koanf:"mail_hygiene"`
-	MSFT          OSINTMSFT        `koanf:"msft"`
-	DomainInfo    OSINTDomainInfo  `koanf:"domain_info"`
-	IPInfo        OSINTIPInfo      `koanf:"ip_info"`
-	IPv6          OSINTIPv6        `koanf:"ipv6"`
+	Enabled     bool             `koanf:"enabled"`
+	GoogleDorks OSINTGoogleDorks `koanf:"google_dorks"`
+	GitHub      OSINTGitHub      `koanf:"github"`
+	Cloud       OSINTCloud       `koanf:"cloud"`
+	Emails      OSINTEmails      `koanf:"emails"`
+	Postman     OSINTPostman     `koanf:"postman"`
+	APILeaks    OSINTAPILeaks    `koanf:"api_leaks"`
+	Swagger     OSINTSwagger     `koanf:"swagger"`
+	Spoofy      OSINTSpoofy      `koanf:"spoofy"`
+	MailHygiene OSINTMailHygiene `koanf:"mail_hygiene"`
+	MSFT        OSINTMSFT        `koanf:"msft"`
+	DomainInfo  OSINTDomainInfo  `koanf:"domain_info"`
+	IPInfo      OSINTIPInfo      `koanf:"ip_info"`
+	IPv6        OSINTIPv6        `koanf:"ipv6"`
 
 	// D-O4 additive schema (Phase 7 may ADD fields, never remove). These
 	// sub-configs the pre-existing OSINTConfig tree lacked; Wave 2 Tasks gate
 	// their Enabled() on these fields.
-	CMS      OSINTCMS      `koanf:"cms"`      // OSINT-12 CMS fingerprint (CMSeeK + favirecon)
-	GraphQL  OSINTGraphQL  `koanf:"graphql"`  // OSINT-13 GraphQL introspection (gqlspection)
-	Cewler   OSINTCewler   `koanf:"cewler"`   // OSINT-14 custom wordlist generation (cewler)
+	CMS       OSINTCMS       `koanf:"cms"`       // OSINT-12 CMS fingerprint (CMSeeK + favirecon)
+	GraphQL   OSINTGraphQL   `koanf:"graphql"`   // OSINT-13 GraphQL introspection (gqlspection)
+	Cewler    OSINTCewler    `koanf:"cewler"`    // OSINT-14 custom wordlist generation (cewler)
 	Misconfig OSINTMisconfig `koanf:"misconfig"` // fold-in (D-O10) third-party misconfig (misconfig-mapper)
 	Metadata  OSINTMetadata  `koanf:"metadata"`  // fold-in (D-O10) doc-metadata (metafinder/exiftool, opportunistic D-O2)
 }
@@ -633,12 +633,12 @@ type OSINTMisconfig struct {
 }
 
 type OSINTGitHub struct {
-	Enabled         bool   `koanf:"enabled"`
-	LeaksEnabled    bool   `koanf:"leaks_enabled"`
-	Threads         int    `koanf:"threads"          validate:"min=0,max=1000"`
-	SecretsEngine   string `koanf:"secrets_engine"   validate:"oneof=gitleaks titus noseyparker hybrid"`
-	ScanGitHistory  bool   `koanf:"scan_git_history"`
-	ValidateSecrets bool   `koanf:"validate_secrets"`
+	Enabled         bool                    `koanf:"enabled"`
+	LeaksEnabled    bool                    `koanf:"leaks_enabled"`
+	Threads         int                     `koanf:"threads"          validate:"min=0,max=1000"`
+	SecretsEngine   string                  `koanf:"secrets_engine"   validate:"oneof=gitleaks titus noseyparker hybrid"`
+	ScanGitHistory  bool                    `koanf:"scan_git_history"`
+	ValidateSecrets bool                    `koanf:"validate_secrets"`
 	ActionsAudit    OSINTGitHubActionsAudit `koanf:"actions_audit"`
 }
 
@@ -704,9 +704,9 @@ type OSINTIPv6 struct {
 // 2381-2393 — Slack/Telegram/Discord webhooks are log.Secret-typed so
 // Layer 1 auto-redacts them in slog output.
 type NotificationsConfig struct {
-	Enabled     bool             `koanf:"enabled"`
-	SoftEnabled bool             `koanf:"soft_enabled"`
-	Events      []string         `koanf:"events" validate:"dive,oneof=on-critical-finding on-scan-complete on-failure on-scan-start"`
+	Enabled     bool                  `koanf:"enabled"`
+	SoftEnabled bool                  `koanf:"soft_enabled"`
+	Events      []string              `koanf:"events" validate:"dive,oneof=on-critical-finding on-scan-complete on-failure on-scan-start"`
 	Slack       NotificationsSlack    `koanf:"slack"`
 	Telegram    NotificationsTelegram `koanf:"telegram"`
 	Discord     NotificationsDiscord  `koanf:"discord"`
@@ -730,15 +730,15 @@ type NotificationsDiscord struct {
 
 // AxiomConfig mirrors ADR §2.2 [axiom].
 type AxiomConfig struct {
-	Enabled            bool   `koanf:"enabled"`
-	FleetName          string `koanf:"fleet_name"`
-	FleetCount         int    `koanf:"fleet_count"         validate:"min=1,max=1000"`
-	FleetRegions       string `koanf:"fleet_regions"`
-	ShutdownOnEnd      bool   `koanf:"shutdown_on_end"`
-	AutoFixHostkey     bool   `koanf:"auto_fix_hostkey"`
-	FleetLaunch        bool   `koanf:"fleet_launch"`
-	ExtraArgs          string `koanf:"extra_args"`
-	FailoverThreshold  int    `koanf:"failover_threshold"  validate:"min=1,max=100"`
+	Enabled           bool   `koanf:"enabled"`
+	FleetName         string `koanf:"fleet_name"`
+	FleetCount        int    `koanf:"fleet_count"         validate:"min=1,max=1000"`
+	FleetRegions      string `koanf:"fleet_regions"`
+	ShutdownOnEnd     bool   `koanf:"shutdown_on_end"`
+	AutoFixHostkey    bool   `koanf:"auto_fix_hostkey"`
+	FleetLaunch       bool   `koanf:"fleet_launch"`
+	ExtraArgs         string `koanf:"extra_args"`
+	FailoverThreshold int    `koanf:"failover_threshold"  validate:"min=1,max=100"`
 }
 
 // ---------------- MCP ----------------
@@ -755,8 +755,8 @@ type MCPConfig struct {
 
 // SchedulerConfig mirrors ADR §2.2 [scheduler.*] and §7.1.
 type SchedulerConfig struct {
-	FailurePolicy string                  `koanf:"failure_policy" validate:"oneof=best_effort fail_fast"`
-	Overrides     SchedulerOverrides      `koanf:"overrides"`
+	FailurePolicy string             `koanf:"failure_policy" validate:"oneof=best_effort fail_fast"`
+	Overrides     SchedulerOverrides `koanf:"overrides"`
 }
 
 type SchedulerOverrides struct {
@@ -775,25 +775,25 @@ type SchedulerOverrides struct {
 // koanf for symmetry but keep the LogOutput un-tagged (programmatic-only,
 // never set from TOML — runtime io.Writer).
 type OutputConfig struct {
-	Verbosity         int    `koanf:"verbosity"          validate:"min=0,max=2"`
-	ExportFormat      string `koanf:"export_format"`
-	AssetStore        bool   `koanf:"asset_store"`
-	ReportOnly        bool   `koanf:"report_only"`
-	HotlistTop        int    `koanf:"hotlist_top"        validate:"min=0,max=10000"`
-	ChunkLimit        int    `koanf:"chunk_limit"        validate:"min=0,max=10000000"`
-	RemoveTmp         bool   `koanf:"remove_tmp"`
-	RemoveLog         bool   `koanf:"remove_log"`
-	PreserveCalledFn  bool   `koanf:"preserve_called_fn"`
-	SendZipNotify     bool   `koanf:"send_zip_notify"`
-	StructuredLogging bool   `koanf:"structured_logging"`
-	MinDiskSpaceGB    int    `koanf:"min_disk_space_gb"  validate:"min=0,max=10000"`
+	Verbosity         int               `koanf:"verbosity"          validate:"min=0,max=2"`
+	ExportFormat      string            `koanf:"export_format"`
+	AssetStore        bool              `koanf:"asset_store"`
+	ReportOnly        bool              `koanf:"report_only"`
+	HotlistTop        int               `koanf:"hotlist_top"        validate:"min=0,max=10000"`
+	ChunkLimit        int               `koanf:"chunk_limit"        validate:"min=0,max=10000000"`
+	RemoveTmp         bool              `koanf:"remove_tmp"`
+	RemoveLog         bool              `koanf:"remove_log"`
+	PreserveCalledFn  bool              `koanf:"preserve_called_fn"`
+	SendZipNotify     bool              `koanf:"send_zip_notify"`
+	StructuredLogging bool              `koanf:"structured_logging"`
+	MinDiskSpaceGB    int               `koanf:"min_disk_space_gb"  validate:"min=0,max=10000"`
 	LogRotation       OutputLogRotation `koanf:"log_rotation"`
 
 	// LogLevel / LogFormat support the logger factory (§10.3 build order).
 	// These are not strictly listed in ADR §2.2 but are required by the
 	// logger contract. Defaults: LogLevel=info, LogFormat=json.
-	LogLevel  string    `koanf:"log_level"  validate:"oneof=debug info warn error"`
-	LogFormat string    `koanf:"log_format" validate:"oneof=json text"`
+	LogLevel  string `koanf:"log_level"  validate:"oneof=debug info warn error"`
+	LogFormat string `koanf:"log_format" validate:"oneof=json text"`
 	// LogOutput is the runtime io.Writer; not loaded from TOML. Tests inject
 	// a *bytes.Buffer; production code leaves nil → os.Stderr.
 	LogOutput io.Writer `koanf:"-"`
@@ -809,21 +809,21 @@ type OutputLogRotation struct {
 // AIConfig mirrors ADR §2.2 [ai] PLUS adds OpenAIKey/AnthropicKey/Provider —
 // the plan's must_haves explicitly enumerate these as Secret-typed.
 type AIConfig struct {
-	Enabled              bool       `koanf:"enabled"`
-	Provider             string     `koanf:"provider"              validate:"omitempty,oneof=ollama openai anthropic"`
-	Executable           string     `koanf:"executable"`
-	Model                string     `koanf:"model"`
-	OllamaHost           string     `koanf:"ollama_host"           validate:"omitempty,url,oneof_scheme=http https"`
-	ReportType           string     `koanf:"report_type"           validate:"omitempty,oneof=md txt"`
-	ReportProfile        string     `koanf:"report_profile"        validate:"omitempty,oneof=executive brief bughunter"`
-	PromptsFile          string     `koanf:"prompts_file"          validate:"omitempty,nopath_traversal"`
-	MaxCharsPerFile      int        `koanf:"max_chars_per_file"    validate:"min=0,max=10000000"`
-	MaxFilesPerCategory  int        `koanf:"max_files_per_category" validate:"min=0,max=100000"`
-	Redact               bool       `koanf:"redact"`
-	AllowModelPull       bool       `koanf:"allow_model_pull"`
-	Strict               bool       `koanf:"strict"`
-	OpenAIKey            log.Secret `koanf:"openai_key"            validate:"omitempty,max=256"`
-	AnthropicKey         log.Secret `koanf:"anthropic_key"         validate:"omitempty,max=256"`
+	Enabled             bool       `koanf:"enabled"`
+	Provider            string     `koanf:"provider"              validate:"omitempty,oneof=ollama openai anthropic"`
+	Executable          string     `koanf:"executable"`
+	Model               string     `koanf:"model"`
+	OllamaHost          string     `koanf:"ollama_host"           validate:"omitempty,url,oneof_scheme=http https"`
+	ReportType          string     `koanf:"report_type"           validate:"omitempty,oneof=md txt"`
+	ReportProfile       string     `koanf:"report_profile"        validate:"omitempty,oneof=executive brief bughunter"`
+	PromptsFile         string     `koanf:"prompts_file"          validate:"omitempty,nopath_traversal"`
+	MaxCharsPerFile     int        `koanf:"max_chars_per_file"    validate:"min=0,max=10000000"`
+	MaxFilesPerCategory int        `koanf:"max_files_per_category" validate:"min=0,max=100000"`
+	Redact              bool       `koanf:"redact"`
+	AllowModelPull      bool       `koanf:"allow_model_pull"`
+	Strict              bool       `koanf:"strict"`
+	OpenAIKey           log.Secret `koanf:"openai_key"            validate:"omitempty,max=256"`
+	AnthropicKey        log.Secret `koanf:"anthropic_key"         validate:"omitempty,max=256"`
 }
 
 // ---------------- Integrations ----------------
@@ -864,11 +864,11 @@ type MonitorConfig struct {
 
 // AdaptiveRateConfig mirrors ADR §2.2 [adaptive_rate].
 type AdaptiveRateConfig struct {
-	Enabled         bool    `koanf:"enabled"`
-	MinRate         int     `koanf:"min_rate"        validate:"min=0,max=100000"`
-	MaxRate         int     `koanf:"max_rate"        validate:"min=0,max=1000000"`
-	BackoffFactor   float64 `koanf:"backoff_factor"  validate:"min=0,max=1"`
-	IncreaseFactor  float64 `koanf:"increase_factor" validate:"min=1,max=10"`
+	Enabled        bool    `koanf:"enabled"`
+	MinRate        int     `koanf:"min_rate"        validate:"min=0,max=100000"`
+	MaxRate        int     `koanf:"max_rate"        validate:"min=0,max=1000000"`
+	BackoffFactor  float64 `koanf:"backoff_factor"  validate:"min=0,max=1"`
+	IncreaseFactor float64 `koanf:"increase_factor" validate:"min=1,max=10"`
 }
 
 // ---------------- Cache ----------------
@@ -887,20 +887,20 @@ type CacheConfig struct {
 // PathsConfig mirrors ADR §2.2 [paths.*]. ALL paths get the nopath_traversal
 // validator (ADR §2.5 lines 1123-1124 — T-02-02-01 mitigation).
 type PathsConfig struct {
-	DataDir          string `koanf:"data_dir"          validate:"omitempty,nopath_traversal"`
-	WordlistsDir     string `koanf:"wordlists_dir"     validate:"omitempty,nopath_traversal"`
-	PatternsDir      string `koanf:"patterns_dir"      validate:"omitempty,nopath_traversal"`
-	FuzzWordlist     string `koanf:"fuzz_wordlist"     validate:"omitempty,nopath_traversal"`
-	LFIWordlist      string `koanf:"lfi_wordlist"      validate:"omitempty,nopath_traversal"`
-	SSTIWordlist     string `koanf:"ssti_wordlist"     validate:"omitempty,nopath_traversal"`
-	SubsWordlist     string `koanf:"subs_wordlist"     validate:"omitempty,nopath_traversal"`
-	SubsWordlistBig  string `koanf:"subs_wordlist_big" validate:"omitempty,nopath_traversal"`
-	HeadersInject    string `koanf:"headers_inject"    validate:"omitempty,nopath_traversal"`
-	Resolvers        string `koanf:"resolvers"         validate:"omitempty,nopath_traversal"`
-	ResolversTrusted string `koanf:"resolvers_trusted" validate:"omitempty,nopath_traversal"`
-	GitHubTokens     string `koanf:"github_tokens"     validate:"omitempty,nopath_traversal"`
-	GitLabTokens     string `koanf:"gitlab_tokens"     validate:"omitempty,nopath_traversal"`
-	NucleiTemplates  string `koanf:"nuclei_templates"  validate:"omitempty,nopath_traversal"`
+	DataDir           string                 `koanf:"data_dir"          validate:"omitempty,nopath_traversal"`
+	WordlistsDir      string                 `koanf:"wordlists_dir"     validate:"omitempty,nopath_traversal"`
+	PatternsDir       string                 `koanf:"patterns_dir"      validate:"omitempty,nopath_traversal"`
+	FuzzWordlist      string                 `koanf:"fuzz_wordlist"     validate:"omitempty,nopath_traversal"`
+	LFIWordlist       string                 `koanf:"lfi_wordlist"      validate:"omitempty,nopath_traversal"`
+	SSTIWordlist      string                 `koanf:"ssti_wordlist"     validate:"omitempty,nopath_traversal"`
+	SubsWordlist      string                 `koanf:"subs_wordlist"     validate:"omitempty,nopath_traversal"`
+	SubsWordlistBig   string                 `koanf:"subs_wordlist_big" validate:"omitempty,nopath_traversal"`
+	HeadersInject     string                 `koanf:"headers_inject"    validate:"omitempty,nopath_traversal"`
+	Resolvers         string                 `koanf:"resolvers"         validate:"omitempty,nopath_traversal"`
+	ResolversTrusted  string                 `koanf:"resolvers_trusted" validate:"omitempty,nopath_traversal"`
+	GitHubTokens      string                 `koanf:"github_tokens"     validate:"omitempty,nopath_traversal"`
+	GitLabTokens      string                 `koanf:"gitlab_tokens"     validate:"omitempty,nopath_traversal"`
+	NucleiTemplates   string                 `koanf:"nuclei_templates"  validate:"omitempty,nopath_traversal"`
 	ResolversDownload PathsResolversDownload `koanf:"resolvers_download"`
 }
 
@@ -928,47 +928,47 @@ type APIKeysConfig struct {
 
 // AdvancedConfig mirrors ADR §2.2 [advanced.*].
 type AdvancedConfig struct {
-	Deep                bool   `koanf:"deep"`
-	DeepLimit           int    `koanf:"deep_limit"            validate:"min=0,max=1000000"`
-	DeepLimit2          int    `koanf:"deep_limit2"           validate:"min=0,max=1000000"`
-	Diff                bool   `koanf:"diff"`
-	QuickRescan         bool   `koanf:"quick_rescan"`
-	ShowCommands        bool   `koanf:"show_commands"`
-	InstallGolang       bool   `koanf:"install_golang"`
-	UpgradeTools        bool   `koanf:"upgrade_tools"`
-	UpgradeBeforeRun    bool   `koanf:"upgrade_before_running"`
-	Header              string `koanf:"header"`
-	PerfProfile         string `koanf:"perf_profile" validate:"oneof=low balanced max"`
-	Tools               AdvancedTools `koanf:"tools"`
-	TimingEstimates     AdvancedTimingEstimates `koanf:"timing_estimates"`
-	ParallelBatchSizes  AdvancedParallelBatchSizes `koanf:"parallel_batch_sizes"`
-	ParallelUI          AdvancedParallelUI `koanf:"parallel_ui"`
+	Deep               bool                       `koanf:"deep"`
+	DeepLimit          int                        `koanf:"deep_limit"            validate:"min=0,max=1000000"`
+	DeepLimit2         int                        `koanf:"deep_limit2"           validate:"min=0,max=1000000"`
+	Diff               bool                       `koanf:"diff"`
+	QuickRescan        bool                       `koanf:"quick_rescan"`
+	ShowCommands       bool                       `koanf:"show_commands"`
+	InstallGolang      bool                       `koanf:"install_golang"`
+	UpgradeTools       bool                       `koanf:"upgrade_tools"`
+	UpgradeBeforeRun   bool                       `koanf:"upgrade_before_running"`
+	Header             string                     `koanf:"header"`
+	PerfProfile        string                     `koanf:"perf_profile" validate:"oneof=low balanced max"`
+	Tools              AdvancedTools              `koanf:"tools"`
+	TimingEstimates    AdvancedTimingEstimates    `koanf:"timing_estimates"`
+	ParallelBatchSizes AdvancedParallelBatchSizes `koanf:"parallel_batch_sizes"`
+	ParallelUI         AdvancedParallelUI         `koanf:"parallel_ui"`
 }
 
 // AdvancedTools holds per-tool overrides. Each sub-struct mirrors one
 // [advanced.tools.<tool>] section in ADR §2.2.
 type AdvancedTools struct {
-	Subfinder      AdvToolSubfinder      `koanf:"subfinder"`
-	Nuclei         AdvToolNuclei         `koanf:"nuclei"`
-	FFUF           AdvToolFFUF           `koanf:"ffuf"`
-	HTTPX          AdvToolHTTPX          `koanf:"httpx"`
-	Puredns        AdvToolPuredns        `koanf:"puredns"`
-	GF             AdvToolGF             `koanf:"gf"`
-	Dalfox         AdvToolDalfox         `koanf:"dalfox"`
-	Dnstake        AdvToolDnstake        `koanf:"dnstake"`
-	TLSX           AdvToolTLSX           `koanf:"tlsx"`
-	XnLinkFinder   AdvToolXnLinkFinder   `koanf:"xnlinkfinder"`
-	DNSValidator   AdvToolDNSValidator   `koanf:"dnsvalidator"`
-	Interlace      AdvToolInterlace      `koanf:"interlace"`
-	Brutespray     AdvToolBrutespray     `koanf:"brutespray"`
-	Gotator        AdvToolGotator        `koanf:"gotator"`
-	TInjA          AdvToolTInjA          `koanf:"tinja"`
-	SSTImap        AdvToolSSTImap        `koanf:"sstimap"`
-	SecondOrder    AdvToolSecondOrder    `koanf:"second_order"`
-	Toxicache      AdvToolToxicache      `koanf:"toxicache"`
-	Brutus         AdvToolBrutus         `koanf:"brutus"`
-	Arjun          AdvToolArjun          `koanf:"arjun"`
-	Axiom          AdvToolAxiom          `koanf:"axiom"`
+	Subfinder    AdvToolSubfinder    `koanf:"subfinder"`
+	Nuclei       AdvToolNuclei       `koanf:"nuclei"`
+	FFUF         AdvToolFFUF         `koanf:"ffuf"`
+	HTTPX        AdvToolHTTPX        `koanf:"httpx"`
+	Puredns      AdvToolPuredns      `koanf:"puredns"`
+	GF           AdvToolGF           `koanf:"gf"`
+	Dalfox       AdvToolDalfox       `koanf:"dalfox"`
+	Dnstake      AdvToolDnstake      `koanf:"dnstake"`
+	TLSX         AdvToolTLSX         `koanf:"tlsx"`
+	XnLinkFinder AdvToolXnLinkFinder `koanf:"xnlinkfinder"`
+	DNSValidator AdvToolDNSValidator `koanf:"dnsvalidator"`
+	Interlace    AdvToolInterlace    `koanf:"interlace"`
+	Brutespray   AdvToolBrutespray   `koanf:"brutespray"`
+	Gotator      AdvToolGotator      `koanf:"gotator"`
+	TInjA        AdvToolTInjA        `koanf:"tinja"`
+	SSTImap      AdvToolSSTImap      `koanf:"sstimap"`
+	SecondOrder  AdvToolSecondOrder  `koanf:"second_order"`
+	Toxicache    AdvToolToxicache    `koanf:"toxicache"`
+	Brutus       AdvToolBrutus       `koanf:"brutus"`
+	Arjun        AdvToolArjun        `koanf:"arjun"`
+	Axiom        AdvToolAxiom        `koanf:"axiom"`
 }
 
 type AdvToolSubfinder struct {
@@ -1104,11 +1104,11 @@ type AdvancedParallelBatchSizes struct {
 
 // AdvancedParallelUI mirrors [advanced.parallel_ui].
 type AdvancedParallelUI struct {
-	Mode              string `koanf:"mode"               validate:"oneof=clean balanced trace"`
-	ShowETA           bool   `koanf:"show_eta"`
-	ShowActive        bool   `koanf:"show_active"`
-	CompactActiveMax  int    `koanf:"compact_active_max" validate:"min=0,max=1000"`
-	TraceSlowSeconds  int    `koanf:"trace_slow_seconds" validate:"min=0,max=86400"`
+	Mode             string `koanf:"mode"               validate:"oneof=clean balanced trace"`
+	ShowETA          bool   `koanf:"show_eta"`
+	ShowActive       bool   `koanf:"show_active"`
+	CompactActiveMax int    `koanf:"compact_active_max" validate:"min=0,max=1000"`
+	TraceSlowSeconds int    `koanf:"trace_slow_seconds" validate:"min=0,max=86400"`
 }
 
 // ---------------- AsLoggerConfig ----------------

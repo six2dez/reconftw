@@ -151,5 +151,7 @@ func formatDigest(target string, msgs []string) string {
 	return header + ": " + body + " — see reports/hotlist.json"
 }
 
-var _ Notifier = (*DigestCoalescer)(nil)
-var _ Flusher = (*DigestCoalescer)(nil)
+var (
+	_ Notifier = (*DigestCoalescer)(nil)
+	_ Flusher  = (*DigestCoalescer)(nil)
+)

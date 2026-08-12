@@ -72,7 +72,6 @@ func TestGenResolversFallsBackToHTTP(t *testing.T) {
 
 	ctx := context.Background()
 	err := resolvers.RunGenResolvers(ctx, cfg)
-
 	// Regardless of dnsvalidator presence, the resolver file must exist and be non-empty.
 	if err != nil {
 		_, pathErr := runLookPath("dnsvalidator")

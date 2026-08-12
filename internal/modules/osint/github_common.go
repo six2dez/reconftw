@@ -77,12 +77,12 @@ func writeTokenFile(token string) (string, error) {
 	}
 	name := f.Name()
 	if cErr := f.Chmod(0o600); cErr != nil {
-		f.Close() //nolint:errcheck
+		f.Close()       //nolint:errcheck
 		os.Remove(name) //nolint:errcheck
 		return "", cErr
 	}
 	if _, wErr := f.WriteString(token); wErr != nil {
-		f.Close() //nolint:errcheck
+		f.Close()       //nolint:errcheck
 		os.Remove(name) //nolint:errcheck
 		return "", wErr
 	}

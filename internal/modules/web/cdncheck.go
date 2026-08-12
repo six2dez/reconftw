@@ -92,8 +92,10 @@ func (t *CdnCheckTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	results, _ := waf.ExtractCDNCheck(raw, app.Target.Domain)
 
 	if len(results) == 0 {
-		return task.Result{Status: task.StatusDone,
-			Stats: map[string]int{"cdn_detected": 0}}, nil
+		return task.Result{
+			Status: task.StatusDone,
+			Stats:  map[string]int{"cdn_detected": 0},
+		}, nil
 	}
 
 	var lines [][]byte

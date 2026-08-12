@@ -74,7 +74,7 @@ func TestSDKAssumptionA1(t *testing.T) {
 	}
 
 	var gotSession mcp.Session
-	var sessionCh = make(chan mcp.Session, 1)
+	sessionCh := make(chan mcp.Session, 1)
 
 	srv := newTestServer(nil)
 	mcp.AddTool(srv, &mcp.Tool{Name: "echo"},

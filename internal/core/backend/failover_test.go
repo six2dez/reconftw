@@ -379,6 +379,7 @@ func (c *countingStreamFallback) Capacity() int                       { return 2
 func (f *failingPrimary) ExecEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (*backend.Result, error) {
 	return f.Exec(ctx, t, args)
 }
+
 func (f *failingPrimary) StreamEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (<-chan backend.Event, error) {
 	return f.Stream(ctx, t, args)
 }
@@ -386,6 +387,7 @@ func (f *failingPrimary) StreamEnv(ctx context.Context, t *backend.Tool, args []
 func (c *conditionalPrimary) ExecEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (*backend.Result, error) {
 	return c.Exec(ctx, t, args)
 }
+
 func (c *conditionalPrimary) StreamEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (<-chan backend.Event, error) {
 	return c.Stream(ctx, t, args)
 }
@@ -393,6 +395,7 @@ func (c *conditionalPrimary) StreamEnv(ctx context.Context, t *backend.Tool, arg
 func (s *successFallback) ExecEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (*backend.Result, error) {
 	return s.Exec(ctx, t, args)
 }
+
 func (s *successFallback) StreamEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (<-chan backend.Event, error) {
 	return s.Stream(ctx, t, args)
 }
@@ -400,6 +403,7 @@ func (s *successFallback) StreamEnv(ctx context.Context, t *backend.Tool, args [
 func (f *fixedCapacityBackend) ExecEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (*backend.Result, error) {
 	return f.Exec(ctx, t, args)
 }
+
 func (f *fixedCapacityBackend) StreamEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (<-chan backend.Event, error) {
 	return f.Stream(ctx, t, args)
 }
@@ -407,6 +411,7 @@ func (f *fixedCapacityBackend) StreamEnv(ctx context.Context, t *backend.Tool, a
 func (s *streamAxiomFailurePrimary) ExecEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (*backend.Result, error) {
 	return s.Exec(ctx, t, args)
 }
+
 func (s *streamAxiomFailurePrimary) StreamEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (<-chan backend.Event, error) {
 	return s.Stream(ctx, t, args)
 }
@@ -414,6 +419,7 @@ func (s *streamAxiomFailurePrimary) StreamEnv(ctx context.Context, t *backend.To
 func (c *countingStreamFallback) ExecEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (*backend.Result, error) {
 	return c.Exec(ctx, t, args)
 }
+
 func (c *countingStreamFallback) StreamEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (<-chan backend.Event, error) {
 	return c.Stream(ctx, t, args)
 }

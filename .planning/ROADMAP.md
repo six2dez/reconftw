@@ -43,7 +43,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 11: Installer + Cross-Platform + Docker** — `reconftw install` (replaces install.sh) + tools.lock for 70+ tools + SHA-256 verification + Linux/macOS/ARM64 + Docker multi-arch
 - [ ] **Phase 12: Integration Hardening** — Wire subsystems end-to-end: store ingest (done) + in-scan notifications + resume/checkpoint + monitor diff + global rate limiter + AI/Ollama
 - [x] **Phase 13: Domain Parity** — Close bash-vs-Go gaps: subs (PTR/hakip2host/dnsregs/csprecon/dsieve) + vulns (spraying/SSRF-OOB) + osint (LeakSearch/Scopify/repo-secrets) + web (portscan/nerva/wordlists/url_ext). COMPLETE 2026-07-15 — all wave-1/2 tasks wired into recon/all; ≥95% per-domain parity (13-PARITY-AUDIT.md)
-- [ ] **Phase 14: Cutover & Migration** — Config migrator (corpus-tested) + MIGRATION.md + compat symlinks + beta period + bug-bug parity test + community sign-off + `main`→Go, bash→legacy branch
+- [x] **Phase 14: Cutover & Migration** — Config migrator (corpus-tested) + MIGRATION.md + compat symlinks + beta period + bug-bug parity test + community sign-off + `main`→Go, bash→legacy branch (completed 2026-07-17)
 
 ## Phase Details
 
@@ -526,7 +526,18 @@ Plans:
   4. Migration documentation + compat ships: MIGRATION.md documents every breaking change (CLI flag changes, output tree changes, config key renames, default behavior changes) with before/after examples; zero silent breakages — all behavior changes appear in MIGRATION.md; compat symlink writer maintains `Recon/<domain>/` populated with bash-shape filenames for 6 months post-cutover (then dropped per documented timeline); v1 → v2 rollback path documented: if v2 has a critical issue in production, users can revert to v1 binary via a documented procedure; v1 deprecation timeline: bash `main` becomes `archive/v1.x` branch frozen for 12 months post-cutover with security-critical bugfixes only; README rewrite + GitHub release notes + social announcement on user comms channels; godoc/sphinx API docs auto-generated; INSTALL.md updated; CONTRIBUTING.md updated for new contributors (CUT-07, CUT-08, CUT-13, CUT-14, CUT-15, XCUT-05, XCUT-06)
   5. Cutover lands: `main` branch now points to v2; the `rewrite/v2` long-running branch is merged or fast-forwarded; the milestone `complete-milestone` ceremony has run; PROJECT.md "What This Is" + "Current Milestone" reflect post-cutover reality; STATE.md reports milestone v2.0 status `complete`
 
-**Plans**: TBD
+**Plans**: 5 plans (planned 2026-07-16)
+Plans:
+**Wave 1**
+
+- [x] 14-01-PLAN.md — Config migrator: reconftw.cfg->TOML engine + subcommand + corpus tests (CUT-01/02/03/05/06)
+- [x] 14-02-PLAN.md — Real compat writer: transform v2 JSONL -> bash-shape Recon/<domain>/ .txt (CUT-08)
+- [x] 14-03-PLAN.md — Coverage HARD gate: critical-path >=90% + lib >=75% scripts + uplift (XCUT-03)
+- [x] 14-04-PLAN.md — Parity harness + throughput bench + bats-scenario map (CUT-11, XCUT-01, XCUT-03)
+
+**Wave 2** *(blocked on 14-01 + 14-02)*
+
+- [x] 14-05-PLAN.md — MIGRATION.md: breaking changes + rollback + deprecation + deferral ledger (CUT-04/07/09/10/12/13/14/15, XCUT-05/06)
 
 ## Progress
 

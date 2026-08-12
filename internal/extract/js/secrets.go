@@ -27,10 +27,10 @@ import (
 // SecretRecord is the D-W11 JS-secret artefact record shape.
 // The raw credential value is intentionally NEVER stored (XCUT-07).
 type SecretRecord struct {
-	URL      string `json:"url"`              // filename/source path from jsluice
-	Type     string `json:"type"`             // secret kind (from jsluice "kind" field)
-	Severity string `json:"severity"`         // jsluice severity level
-	Redacted string `json:"secret_redacted"`  // always "***" — never the raw value
+	URL      string `json:"url"`             // filename/source path from jsluice
+	Type     string `json:"type"`            // secret kind (from jsluice "kind" field)
+	Severity string `json:"severity"`        // jsluice severity level
+	Redacted string `json:"secret_redacted"` // always "***" — never the raw value
 }
 
 // jsluiceSecretLine is the internal parse shape for jsluice secrets JSONL.
@@ -41,7 +41,7 @@ type SecretRecord struct {
 type jsluiceSecretLine struct {
 	URL      string `json:"filename"` // CRITICAL: jsluice secrets uses "filename" not "url"
 	Kind     string `json:"kind"`
-	Value    string `json:"value"`    // read-only; NEVER propagated
+	Value    string `json:"value"` // read-only; NEVER propagated
 	Severity string `json:"severity"`
 }
 

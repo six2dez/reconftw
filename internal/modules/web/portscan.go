@@ -93,6 +93,7 @@ func (t *WebPortscanTask) Module() string { return "web" }
 func (t *WebPortscanTask) Description() string {
 	return "Port scan (passive smap/shodan + active naabu→nmap + nerva fingerprint)"
 }
+
 func (t *WebPortscanTask) Enabled(cfg *config.Config) bool {
 	return cfg.Web.Portscan.Enabled
 }

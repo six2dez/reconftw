@@ -114,8 +114,10 @@ func (t *VhostFinderTask) Run(ctx context.Context, app *appctx.AppContext) (task
 
 	hits := parseVhostFinderOutput(rawOutput)
 	if len(hits) == 0 {
-		return task.Result{Status: task.StatusDone,
-			Stats: map[string]int{"vhosts_found": 0}}, nil
+		return task.Result{
+			Status: task.StatusDone,
+			Stats:  map[string]int{"vhosts_found": 0},
+		}, nil
 	}
 
 	artefactsDir := filepath.Join(app.Target.WorkDir, "artefacts")

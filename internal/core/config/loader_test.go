@@ -91,9 +91,9 @@ func TestEightSourcePrecedence(t *testing.T) {
 			wantMax: 11,
 		},
 		{
-			name: "RECONFTW_CONCURRENCY_MAX_JOBS env var overrides secrets",
-			opts: config.LoadOptions{SystemPath: systemPath, UserPath: userPath, ProjectPath: projectPath, ExplicitConfigPath: cliPath, SecretsPath: secretsPath},
-			env:  map[string]string{"RECONFTW_CONCURRENCY_MAX_JOBS": "12"},
+			name:    "RECONFTW_CONCURRENCY_MAX_JOBS env var overrides secrets",
+			opts:    config.LoadOptions{SystemPath: systemPath, UserPath: userPath, ProjectPath: projectPath, ExplicitConfigPath: cliPath, SecretsPath: secretsPath},
+			env:     map[string]string{"RECONFTW_CONCURRENCY_MAX_JOBS": "12"},
 			wantMax: 12,
 		},
 		{

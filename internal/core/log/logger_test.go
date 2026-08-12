@@ -83,12 +83,12 @@ func TestNew_DefaultFormatIsJSON(t *testing.T) {
 // --- Test 15: XCUT-07 sentinel-value gate (THE canonical XCUT-07 test) ---
 //
 // Per ADR §10.4 lines 2576-2593:
-//   1. Construct a Secret-typed sentinel value
-//   2. Register it with the redactor
-//   3. Emit a log line that references it via both a typed Secret attr AND
-//      a raw substring in the message
-//   4. Capture the buffer
-//   5. Assert the raw sentinel string does NOT appear anywhere
+//  1. Construct a Secret-typed sentinel value
+//  2. Register it with the redactor
+//  3. Emit a log line that references it via both a typed Secret attr AND
+//     a raw substring in the message
+//  4. Capture the buffer
+//  5. Assert the raw sentinel string does NOT appear anywhere
 //
 // This test runs on every commit (via CI's `unit` job) per ADR §10.4.
 // If this test ever fails, secret leakage has been re-introduced.

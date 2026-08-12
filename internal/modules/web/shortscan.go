@@ -44,9 +44,11 @@ import (
 // ShortscanTask runs shortscan against IIS targets and writes findings.
 type ShortscanTask struct{}
 
-func (t *ShortscanTask) Name() string        { return "web.shortscan" }
-func (t *ShortscanTask) Module() string      { return "web" }
-func (t *ShortscanTask) Description() string { return "IIS short filename scanner (shortscan → findings.jsonl)" }
+func (t *ShortscanTask) Name() string   { return "web.shortscan" }
+func (t *ShortscanTask) Module() string { return "web" }
+func (t *ShortscanTask) Description() string {
+	return "IIS short filename scanner (shortscan → findings.jsonl)"
+}
 
 // Enabled reports whether IIS shortname scanning is configured.
 func (t *ShortscanTask) Enabled(cfg *config.Config) bool {

@@ -1,9 +1,9 @@
 package findings
 
 import (
-    "strings"
+	"strings"
 
-    sqlcgen "github.com/six2dez/reconftw/internal/store/sqlc"
+	sqlcgen "github.com/six2dez/reconftw/internal/store/sqlc"
 )
 
 // MapSeverity maps a store.Finding Severity string to a SARIF level string.
@@ -11,14 +11,14 @@ import (
 // "low", "info", and any unrecognised value (including empty) map to "note".
 // The comparison is case-insensitive.
 func MapSeverity(severity string) string {
-    switch strings.ToLower(severity) {
-    case "critical", "high":
-        return "error"
-    case "medium":
-        return "warning"
-    default: // "low", "info", "", or anything else
-        return "note"
-    }
+	switch strings.ToLower(severity) {
+	case "critical", "high":
+		return "error"
+	case "medium":
+		return "warning"
+	default: // "low", "info", "", or anything else
+		return "note"
+	}
 }
 
 // MapStoreFinding converts a *sqlcgen.Finding to a SarifResult.
@@ -34,21 +34,21 @@ func MapSeverity(severity string) string {
 // NOTE: Evidence is intentionally excluded from Message.Text (T-08-01-01: may
 // contain raw tool output including secrets).
 func MapStoreFinding(f *sqlcgen.Finding) SarifResult {
-    result := SarifResult{
-        RuleID:  f.TemplateSignature,
-        Level:   MapSeverity(f.Severity),
-        Message: SarifMessage{Text: f.Title + ": " + f.Description},
-    }
-    if f.MatchedAt != "" {
-        result.Locations = []SarifLocation{
-            {
-                PhysicalLocation: SarifPhysicalLocation{
-                    ArtifactLocation: SarifArtifactLocation{URI: f.MatchedAt},
-                },
-            },
-        }
-    }
-    return result
+	result := SarifResult{
+		RuleID:  f.TemplateSignature,
+		Level:   MapSeverity(f.Severity),
+		Message: SarifMessage{Text: f.Title + ": " + f.Description},
+	}
+	if f.MatchedAt != "" {
+		result.Locations = []SarifLocation{
+			{
+				PhysicalLocation: SarifPhysicalLocation{
+					ArtifactLocation: SarifArtifactLocation{URI: f.MatchedAt},
+				},
+			},
+		}
+	}
+	return result
 }
 
 // BuildSarifLog builds a SarifLog from a slice of *sqlcgen.Finding.
@@ -58,38 +58,38 @@ func MapStoreFinding(f *sqlcgen.Finding) SarifResult {
 // A nil or empty findings slice produces a valid SarifLog with an empty
 // Results slice (not nil).
 func BuildSarifLog(toolName, version string, findings []*sqlcgen.Finding) SarifLog {
-    results := make([]SarifResult, 0, len(findings))
-    rules := make([]SarifRule, 0)
-    seen := make(map[string]bool)
+	results := make([]SarifResult, 0, len(findings))
+	rules := make([]SarifRule, 0)
+	seen := make(map[string]bool)
 
-    for _, f := range findings {
-        results = append(results, MapStoreFinding(f))
+	for _, f := range findings {
+		results = append(results, MapStoreFinding(f))
 
-        if !seen[f.TemplateSignature] {
-            seen[f.TemplateSignature] = true
-            rules = append(rules, SarifRule{
-                ID:   f.TemplateSignature,
-                Name: f.Title,
-                DefaultConfig: &SarifRuleConfig{
-                    Level: MapSeverity(f.Severity),
-                },
-            })
-        }
-    }
+		if !seen[f.TemplateSignature] {
+			seen[f.TemplateSignature] = true
+			rules = append(rules, SarifRule{
+				ID:   f.TemplateSignature,
+				Name: f.Title,
+				DefaultConfig: &SarifRuleConfig{
+					Level: MapSeverity(f.Severity),
+				},
+			})
+		}
+	}
 
-    run := SarifRun{
-        Tool: SarifTool{
-            Driver: SarifDriver{
-                Name:    toolName,
-                Version: version,
-                Rules:   rules,
-            },
-        },
-        Results: results,
-    }
+	run := SarifRun{
+		Tool: SarifTool{
+			Driver: SarifDriver{
+				Name:    toolName,
+				Version: version,
+				Rules:   rules,
+			},
+		},
+		Results: results,
+	}
 
-    return SarifLog{
-        Version: "2.1.0",
-        Runs:    []SarifRun{run},
-    }
+	return SarifLog{
+		Version: "2.1.0",
+		Runs:    []SarifRun{run},
+	}
 }

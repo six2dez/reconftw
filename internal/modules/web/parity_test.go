@@ -14,10 +14,11 @@
 //     to verify ExtractSecrets redaction without committing real credentials (T-05-20).
 //
 // FIXTURE CAPTURE INSTRUCTIONS (for stub fixtures):
-//   After running bash v1 against hackerone.com, copy real tool output:
-//     cp Recon/hackerone.com/webs/webs_all.jsonl testdata/fixtures/httpx/httpx_hackerone.jsonl
-//   Then replace the stub header line with:
-//     # captured-from: httpx -follow-host-redirects ... -json -l hosts_seed.txt | date: YYYY-MM-DD
+//
+//	After running bash v1 against hackerone.com, copy real tool output:
+//	  cp Recon/hackerone.com/webs/webs_all.jsonl testdata/fixtures/httpx/httpx_hackerone.jsonl
+//	Then replace the stub header line with:
+//	  # captured-from: httpx -follow-host-redirects ... -json -l hosts_seed.txt | date: YYYY-MM-DD
 //
 // Source: .planning/phases/05-web-pipeline-e2e/05-06-PLAN.md Task 1.
 package web_test

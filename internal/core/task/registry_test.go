@@ -18,11 +18,11 @@ type tinyTask struct {
 	deps []string
 }
 
-func (t *tinyTask) Name() string                   { return t.name }
-func (t *tinyTask) Module() string                 { return "test" }
-func (t *tinyTask) Description() string            { return "test task " + t.name }
-func (t *tinyTask) Enabled(*config.Config) bool    { return true }
-func (t *tinyTask) DependsOn() []string            { return t.deps }
+func (t *tinyTask) Name() string                { return t.name }
+func (t *tinyTask) Module() string              { return "test" }
+func (t *tinyTask) Description() string         { return "test task " + t.name }
+func (t *tinyTask) Enabled(*config.Config) bool { return true }
+func (t *tinyTask) DependsOn() []string         { return t.deps }
 func (t *tinyTask) Run(context.Context, *appctx.AppContext) (task.Result, error) {
 	return task.Result{Status: task.StatusDone}, nil
 }

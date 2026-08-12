@@ -11,10 +11,10 @@ func TestSessionScope_Contains(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name     string
-		scope    *mcp.SessionScope
-		target   string
-		wantIn   bool
+		name   string
+		scope  *mcp.SessionScope
+		target string
+		wantIn bool
 	}{
 		{
 			name:   "nil_scope_returns_false",

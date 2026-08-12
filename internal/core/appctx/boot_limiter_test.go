@@ -7,15 +7,15 @@
 // *_RATELIMIT / adaptive-rate settings were never enforced centrally. These
 // tests prove the fix two ways:
 //
-//   1. Deterministic (no wall-clock): buildLimiterConfig derives the per-tool
-//      map + global cap from config — httpx/nuclei/dnsx present at their
-//      configured RPS on Defaults(); zero-rate tools omitted; global only when
-//      adaptive_rate.enabled; nil/zero-value config is safe.
-//   2. Behavioral (coarse timing, per ratelimiter_test.go style): a
-//      pickLimiter-built limiter throttles a configured tool through the real
-//      backend.Runner exec path, while an unlisted tool passes straight
-//      through. Build/vet alone would pass even with the old no-op limiter, so
-//      this behavioral proof is the one that catches a regression.
+//  1. Deterministic (no wall-clock): buildLimiterConfig derives the per-tool
+//     map + global cap from config — httpx/nuclei/dnsx present at their
+//     configured RPS on Defaults(); zero-rate tools omitted; global only when
+//     adaptive_rate.enabled; nil/zero-value config is safe.
+//  2. Behavioral (coarse timing, per ratelimiter_test.go style): a
+//     pickLimiter-built limiter throttles a configured tool through the real
+//     backend.Runner exec path, while an unlisted tool passes straight
+//     through. Build/vet alone would pass even with the old no-op limiter, so
+//     this behavioral proof is the one that catches a regression.
 //
 // This is an internal (package appctx) test so it can assert buildLimiterConfig
 // and pickLimiter directly — RateLimiter's per-tool/global maps are unexported,
@@ -67,8 +67,8 @@ func TestBuildLimiterConfig_DefaultsPopulatePerToolMap(t *testing.T) {
 // is inserted.
 func TestBuildLimiterConfig_ZeroRateOmittedPositiveInserted(t *testing.T) {
 	cfg := config.Defaults()
-	cfg.Web.Probe.RateLimit = 0  // httpx → unlimited
-	cfg.Web.Fuzz.RateLimit = 42  // ffuf  → throttled
+	cfg.Web.Probe.RateLimit = 0 // httpx → unlimited
+	cfg.Web.Fuzz.RateLimit = 42 // ffuf  → throttled
 
 	perTool, _ := buildLimiterConfig(cfg)
 
@@ -124,10 +124,10 @@ func TestPickLimiter_NilAndZeroValueSafe(t *testing.T) {
 func TestPickLimiter_ThrottlesConfiguredToolThroughRunner(t *testing.T) {
 	// Config: only httpx capped (2 RPS); everything else unlimited; no global.
 	cfg := config.Defaults()
-	cfg.Web.Probe.RateLimit = 2      // httpx → 2 RPS
-	cfg.Web.Nuclei.RateLimit = 0     // omit
+	cfg.Web.Probe.RateLimit = 2                 // httpx → 2 RPS
+	cfg.Web.Nuclei.RateLimit = 0                // omit
 	cfg.Subdomains.DNSResolve.DNSXRateLimit = 0 // omit → unlisted passthrough
-	cfg.AdaptiveRate.Enabled = false // no global cap
+	cfg.AdaptiveRate.Enabled = false            // no global cap
 
 	limiter := pickLimiter(cfg)
 

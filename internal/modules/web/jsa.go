@@ -151,7 +151,8 @@ func (t *JsaTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 // Uses direct exec.CommandContext (CR-03 fix: repo-clone venv tools bypass registry).
 // Returns nil on error or no results (best_effort).
 func runJSAForURL(ctx context.Context, app *appctx.AppContext,
-	jsaPython, jsaScript, jsURL string) [][]byte {
+	jsaPython, jsaScript, jsURL string,
+) [][]byte {
 	// Conservative per-URL timeout (no JSA entry in tools.lock for per-URL cap).
 	const toolTimeout = 30 * time.Second
 

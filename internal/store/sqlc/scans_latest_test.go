@@ -116,4 +116,3 @@ func TestGetLatestCompletedScanForTarget_NoRows_NoTarget(t *testing.T) {
 		t.Errorf("expected sql.ErrNoRows, got: %v", err)
 	}
 }
-

@@ -68,11 +68,11 @@ type fakeTask struct {
 	finished atomic.Int32
 }
 
-func (f *fakeTask) Name() string                    { return f.name }
-func (f *fakeTask) Module() string                  { return f.module }
-func (f *fakeTask) Description() string             { return "fake " + f.name }
-func (f *fakeTask) Enabled(*config.Config) bool     { return true }
-func (f *fakeTask) DependsOn() []string             { return f.deps }
+func (f *fakeTask) Name() string                { return f.name }
+func (f *fakeTask) Module() string              { return f.module }
+func (f *fakeTask) Description() string         { return "fake " + f.name }
+func (f *fakeTask) Enabled(*config.Config) bool { return true }
+func (f *fakeTask) DependsOn() []string         { return f.deps }
 func (f *fakeTask) Run(ctx context.Context, _ *appctx.AppContext) (task.Result, error) {
 	f.started.Add(1)
 	defer f.finished.Add(1)
@@ -102,6 +102,7 @@ func (l *lifecycleTask) OnStart(context.Context, *appctx.AppContext) error {
 	l.onStart.Add(1)
 	return l.onStartErr
 }
+
 func (l *lifecycleTask) OnEnd(context.Context, *appctx.AppContext, task.Result) error {
 	l.onEnd.Add(1)
 	return l.onEndErr
@@ -272,8 +273,8 @@ func TestLifecycleHooksCalled(t *testing.T) {
 func TestLifecycleOnEndErrorIsLoggedNotPropagated(t *testing.T) {
 	s := newScheduler(nil)
 	l := &lifecycleTask{
-		fakeTask:  fakeTask{name: "l", module: "subdomains"},
-		onEndErr:  errors.New("end-err"),
+		fakeTask: fakeTask{name: "l", module: "subdomains"},
+		onEndErr: errors.New("end-err"),
 	}
 	err := s.RunStage(context.Background(), "subdomains", []task.Task{l})
 	if err != nil {

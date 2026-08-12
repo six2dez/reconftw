@@ -122,8 +122,10 @@ func (t *HakoriginfinderTask) Run(ctx context.Context, app *appctx.AppContext) (
 	}
 
 	if len(origins) == 0 {
-		return task.Result{Status: task.StatusDone,
-			Stats: map[string]int{"origins_found": 0}}, nil
+		return task.Result{
+			Status: task.StatusDone,
+			Stats:  map[string]int{"origins_found": 0},
+		}, nil
 	}
 
 	artefactsDir := filepath.Join(app.Target.WorkDir, "artefacts")
@@ -161,7 +163,8 @@ func (t *HakoriginfinderTask) Run(ctx context.Context, app *appctx.AppContext) (
 // Returns the first origin IP found in the output, or "" if none.
 // Each call has an unambiguous host↔IP relationship (CR-06 fix).
 func runHakoriginfinderForHost(ctx context.Context, hakoBin, targetHost, inputIP string,
-	timeout time.Duration) (string, error) {
+	timeout time.Duration,
+) (string, error) {
 	// Derive per-invocation bounded context (CR-07).
 	cmdCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
