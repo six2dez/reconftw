@@ -28,8 +28,10 @@ linters:
     - govet        # standard go vet checks
     - staticcheck  # 200+ correctness checks (includes simple/style)
     - unused       # find unused code (dead-code detection)
-    - gofumpt      # stricter format than gofmt
   disable: []
+  # NOTE: gofumpt is a FORMATTER in golangci-lint v2, not a linter. Listing it under
+  # `linters.enable` makes the whole config fail to load ("gofumpt is a formatter"),
+  # which took the entire lint step down. It is declared under `formatters` below.
 
 formatters:
   enable:
