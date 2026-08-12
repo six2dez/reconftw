@@ -335,10 +335,24 @@ func TestMigrateRoundTrip(t *testing.T) {
 // TestMigrateGolden — migrating basic.cfg byte-equals basic.golden.toml. The
 // host-dependent auto-scaled thread number (NumCPU*10) is normalized to <NCPU10>
 // so the golden is portable across machines. Regenerate with -update.
+//
+// The normalization is ANCHORED to the FFUF_THREADS line, which is the only
+// NumCPU-derived value in the fixture. A bare ReplaceAll of the number rewrote any
+// coincidentally-equal literal too: on a 3-core host (GitHub's macos-latest arm64
+// runners) NumCPU*10 == 30, which silently turned the unrelated literal
+// `waymore_timeout = "30m"` into `"<NCPU10>m"` and failed the comparison. The bug
+// was invisible on 2/4/8-core machines, so it only ever fired on macOS CI.
 func TestMigrateGolden(t *testing.T) {
 	res, _ := migratePath(t, filepath.Join("testdata", "migrate", "basic.cfg"))
+	ncpu10 := strconv.Itoa(runtime.NumCPU() * 10)
 	norm := func(b []byte) []byte {
-		return []byte(strings.ReplaceAll(string(b), strconv.Itoa(runtime.NumCPU()*10), "<NCPU10>"))
+		lines := strings.Split(string(b), "\n")
+		for i, line := range lines {
+			if strings.Contains(line, "FFUF_THREADS") {
+				lines[i] = strings.ReplaceAll(line, ncpu10, "<NCPU10>")
+			}
+		}
+		return []byte(strings.Join(lines, "\n"))
 	}
 	got := norm(res.TOML)
 	goldenPath := filepath.Join("testdata", "migrate", "basic.golden.toml")
