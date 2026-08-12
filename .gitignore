@@ -20,6 +20,16 @@ reconftw.cfg-personal
 secrets.cfg
 secrets.cfg.*
 !secrets.cfg.example
+
+# v2 secret material — API keys live here (config layer 6). Never commit it.
+secrets.toml
+secrets.toml.*
+!secrets.toml.example
+
+# A reconftw.toml in the repo root is config layer 4 and IS auto-loaded, so a
+# personal one would silently apply to anyone running the binary from a checkout
+# (and would leak local paths). Keep it local.
+/reconftw.toml
 .env
 .env.*
 !.env.example
@@ -97,8 +107,11 @@ workspaces/
 # reconftw-web / web experimentation (PROJECT.md: "no parte de v2.0"; node_modules-heavy)
 # NOTE: keep these anchored to the repo root with a leading slash. A bare, unanchored
 # `web/` also matches internal/modules/web/ (the Go web module) and silently un-tracks it.
+# A TRAILING slash (`/reconftw-web/`) matches ONLY a directory — but the local build also
+# emits a ~26MB `reconftw-web` compiled binary (a FILE) at the repo root. Anchor WITHOUT a
+# trailing slash so the pattern matches both the file binary and the experimentation dir.
 /web/
-/reconftw-web/
+/reconftw-web
 # runtime data: SQLite store, master key (SECRET), caches, manifests
 data/
 # stray scratch + local config
