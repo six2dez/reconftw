@@ -39,7 +39,6 @@ func crtRun(ctx context.Context, target string, collect func(subdomain, source s
 		buf.WriteByte('\n')
 		return nil
 	})
-
 	if err != nil {
 		ui.Warn("crt: exited with error: " + err.Error())
 		// Non-fatal.

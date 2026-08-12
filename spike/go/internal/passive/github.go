@@ -47,7 +47,6 @@ func githubRun(ctx context.Context, target string, collect func(subdomain, sourc
 		}
 		return nil
 	})
-
 	if err != nil {
 		ui.Warn("github-subdomains: exited with error: " + err.Error())
 		return nil

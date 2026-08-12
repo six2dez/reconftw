@@ -41,7 +41,6 @@ func subfinderRun(ctx context.Context, target string, collect func(subdomain, so
 		}
 		return nil
 	})
-
 	if err != nil {
 		ui.Warn("subfinder: exited with error: " + err.Error())
 		// Non-fatal: return nil so errgroup doesn't cancel other sources.

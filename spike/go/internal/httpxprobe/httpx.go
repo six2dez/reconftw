@@ -78,7 +78,6 @@ func Run(ctx context.Context, subsFile string, outFile string) error {
 		}
 		return nil
 	})
-
 	if err != nil {
 		ui.Warn("httpx: subprocess error: " + err.Error())
 		// Don't return error — partial results are fine for the spike.
