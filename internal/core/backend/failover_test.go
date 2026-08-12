@@ -16,7 +16,6 @@ package backend_test
 import (
 	"context"
 	stderrors "errors"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -335,8 +334,7 @@ func (f *fixedCapacityBackend) Capacity() int                       { return f.c
 // that may be open (simulating partial results). FailoverBackend drains it
 // in a goroutine bounded by ctx.Done().
 type streamAxiomFailurePrimary struct {
-	ch      <-chan backend.Event
-	drained atomic.Int32
+	ch <-chan backend.Event
 }
 
 func (s *streamAxiomFailurePrimary) Stream(ctx context.Context, t *backend.Tool, args []string) (<-chan backend.Event, error) {

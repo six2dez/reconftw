@@ -79,7 +79,7 @@ func TestScanIntoStore_EndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 	q := sqlcgen.New(db)
 
 	scan, err := q.GetLatestCompletedScanForTarget(ctx, target)
@@ -163,7 +163,7 @@ func TestScanIntoStore_Idempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
-	defer db.Close()
+	defer db.Close() //nolint:errcheck // read/cleanup path
 	q := sqlcgen.New(db)
 
 	findings, err := q.ListFindingsForTarget(ctx, sqlcgen.ListFindingsForTargetParams{

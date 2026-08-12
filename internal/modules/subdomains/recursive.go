@@ -56,7 +56,7 @@ func readLines(fpath string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("readLines %q: %w", fpath, err)
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck // read/cleanup path
 
 	var lines []string
 	scanner := bufio.NewScanner(f)

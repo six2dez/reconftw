@@ -265,8 +265,8 @@ func TestLifecycleHooksCalled(t *testing.T) {
 	if l.onEnd.Load() != 1 {
 		t.Errorf("OnEnd count = %d, want 1", l.onEnd.Load())
 	}
-	if l.fakeTask.started.Load() != 1 {
-		t.Errorf("Run count = %d, want 1", l.fakeTask.started.Load())
+	if l.started.Load() != 1 {
+		t.Errorf("Run count = %d, want 1", l.started.Load())
 	}
 }
 

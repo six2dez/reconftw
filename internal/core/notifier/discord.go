@@ -88,7 +88,7 @@ func (d *DiscordNotifier) send(ctx context.Context, msg string) error {
 	if err != nil {
 		return fmt.Errorf("discord: send: %w", err)
 	}
-	defer func() { _, _ = io.Copy(io.Discard, resp.Body); resp.Body.Close() }()
+	defer func() { _, _ = io.Copy(io.Discard, resp.Body); _ = resp.Body.Close() }()
 	if resp.StatusCode >= 300 {
 		return fmt.Errorf("discord: non-2xx status %d", resp.StatusCode)
 	}

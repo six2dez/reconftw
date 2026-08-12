@@ -46,7 +46,6 @@ const cloudEnumDefaultThreads = 20
 
 // cloudEnumProfile is the conservative v1 default profile (CLOUD_ENUM_S3_PROFILE,
 // core.sh:308). "optimized" maps to cloud_enum quickscan (-qs).
-const cloudEnumProfile = "optimized"
 
 // CloudEnumTask runs cloud_enum for OSINT-07 (S3/GCP/Azure bucket enumeration).
 type CloudEnumTask struct{}

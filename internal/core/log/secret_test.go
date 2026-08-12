@@ -7,7 +7,6 @@ package log_test
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"reflect"
 	"testing"
@@ -69,7 +68,7 @@ func TestSecret_HasNoStringMethod(t *testing.T) {
 	// The point of this test is the absence of the method, not the %s behavior.
 	raw := "untyped"
 	s := log.Secret(raw)
-	_ = fmt.Sprintf("%s", s) // compile sanity: no panic, no specific assertion
+	_ = string(s) // compile sanity: no panic, no specific assertion
 }
 
 // --- Test 4: Explicit string() cast extracts the raw value ---

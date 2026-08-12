@@ -106,7 +106,7 @@ func TestSubGeoTaskEnabledUsesParentFlag(t *testing.T) {
 func TestSubGeoTaskWritesHostRecordWithCityAndCountry(t *testing.T) {
 	// Start test HTTP server simulating ipinfo.io.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"ip":      "93.184.216.34",
 			"city":    "Norwell",
 			"country": "US",
@@ -169,7 +169,7 @@ func TestSubGeoTaskDeduplicatesIPLookups(t *testing.T) {
 	lookupCount := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		lookupCount++
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"ip":      "93.184.216.34",
 			"city":    "Norwell",
 			"country": "US",
@@ -324,7 +324,7 @@ func TestZoneTransferDependsOnNil(t *testing.T) {
 
 func TestSubGeoTaskCallsTreeAppendHosts(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"ip":      "93.184.216.34",
 			"city":    "Norwell",
 			"country": "US",

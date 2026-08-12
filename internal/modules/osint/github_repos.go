@@ -92,8 +92,7 @@ var githubReposGitClone = func(ctx context.Context, url, dest string) error {
 	// schema drift or plaintext-fallback garbage) can never be consumed by git as
 	// an option (git option-injection, e.g. --upload-pack=…, or an "ext::"
 	// transport → RCE where enabled).
-	if !(strings.HasPrefix(url, "https://") || strings.HasPrefix(url, "http://") ||
-		strings.HasPrefix(url, "git@")) {
+	if !strings.HasPrefix(url, "https://") && !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "git@") {
 		return fmt.Errorf("refusing to clone non-URL %q", url)
 	}
 	bin, err := exec.LookPath("git")

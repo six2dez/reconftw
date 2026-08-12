@@ -28,7 +28,7 @@ import (
 func stubNotImplemented(cmd *cobra.Command, phaseNum int, phaseName string) error {
 	msg := fmt.Sprintf("`reconftw %s` is not yet implemented — ships in Phase %d (%s). See .planning/ROADMAP.md for status.",
 		cmd.Name(), phaseNum, phaseName)
-	fmt.Fprintln(cmd.ErrOrStderr(), msg)
+	_, _ = fmt.Fprintln(cmd.ErrOrStderr(), msg)
 	return &exitCodeError{code: 64, msg: ""}
 }
 

@@ -149,11 +149,11 @@ func runHealthCheck(cmd *cobra.Command, app *appctx.AppContext, cfg *config.Conf
 	// are buried in a hundred [OK] rows scrolled off the top of the terminal, and
 	// the operator has to eyeball every line to learn what is actually missing.
 	if len(all) > 0 {
-		fmt.Fprintf(w, "\n  %d tools: %d present, %d missing (%d critical)\n",
+		_, _ = fmt.Fprintf(w, "\n  %d tools: %d present, %d missing (%d critical)\n",
 			len(all), okCount, len(missingNames), missingCriticalCount)
 		if len(missingNames) > 0 {
-			fmt.Fprintf(w, "  missing: %s\n", strings.Join(missingNames, " "))
-			fmt.Fprintf(w, "  install them with: reconftw install\n")
+			_, _ = fmt.Fprintf(w, "  missing: %s\n", strings.Join(missingNames, " "))
+			_, _ = fmt.Fprintf(w, "  install them with: reconftw install\n")
 		}
 	}
 

@@ -33,11 +33,11 @@ func newVersionCmd() *cobra.Command {
 		Short: "Print binary version + commit + build info",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			out := cmd.OutOrStdout()
-			fmt.Fprintf(out, "reconftw version %s\n", Version)
-			fmt.Fprintf(out, "  commit:     %s\n", lookupCommit())
-			fmt.Fprintf(out, "  built:      %s\n", BuildDate)
-			fmt.Fprintf(out, "  go version: %s\n", runtime.Version())
-			fmt.Fprintf(out, "  platform:   %s/%s\n", runtime.GOOS, runtime.GOARCH)
+			_, _ = fmt.Fprintf(out, "reconftw version %s\n", Version)
+			_, _ = fmt.Fprintf(out, "  commit:     %s\n", lookupCommit())
+			_, _ = fmt.Fprintf(out, "  built:      %s\n", BuildDate)
+			_, _ = fmt.Fprintf(out, "  go version: %s\n", runtime.Version())
+			_, _ = fmt.Fprintf(out, "  platform:   %s/%s\n", runtime.GOOS, runtime.GOARCH)
 			return nil
 		},
 	}

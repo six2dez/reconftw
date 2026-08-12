@@ -42,6 +42,6 @@ func (p *Printer) Summary() {
 	skip := p.counts[BadgeSKIP]
 	cache := p.counts[BadgeCACHE]
 	p.mu.Unlock()
-	fmt.Fprintf(p.W, "OK:%d WARN:%d FAIL:%d SKIP:%d CACHE:%d\n",
+	_, _ = fmt.Fprintf(p.W, "OK:%d WARN:%d FAIL:%d SKIP:%d CACHE:%d\n",
 		ok, warn, fail, skip, cache)
 }

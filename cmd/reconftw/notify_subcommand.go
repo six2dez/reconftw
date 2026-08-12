@@ -73,7 +73,7 @@ func runNotifyTestCmd(cmd *cobra.Command) error {
 	}
 
 	if !cfg.Notifications.Enabled {
-		fmt.Fprintln(cmd.OutOrStdout(), "notify --test: notifications.enabled = false — no channels configured")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "notify --test: notifications.enabled = false — no channels configured")
 		return nil
 	}
 
@@ -88,10 +88,10 @@ func runNotifyTestCmd(cmd *cobra.Command) error {
 		anyConfigured = true
 		s := notifier.NewSlack(nil, httpClient, wh)
 		if sendErr := s.Send(ctx, testMsg); sendErr != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "  slack:     FAIL — %v\n", sendErr)
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "  slack:     FAIL — %v\n", sendErr)
 			failCount++
 		} else {
-			fmt.Fprintln(cmd.OutOrStdout(), "  slack:     OK")
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "  slack:     OK")
 		}
 	}
 
@@ -100,10 +100,10 @@ func runNotifyTestCmd(cmd *cobra.Command) error {
 		anyConfigured = true
 		tg := notifier.NewTelegram(nil, httpClient, tok, cfg.Notifications.Telegram.ChatID)
 		if sendErr := tg.Send(ctx, testMsg); sendErr != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "  telegram:  FAIL — %v\n", sendErr)
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "  telegram:  FAIL — %v\n", sendErr)
 			failCount++
 		} else {
-			fmt.Fprintln(cmd.OutOrStdout(), "  telegram:  OK")
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "  telegram:  OK")
 		}
 	}
 
@@ -112,15 +112,15 @@ func runNotifyTestCmd(cmd *cobra.Command) error {
 		anyConfigured = true
 		d := notifier.NewDiscord(nil, httpClient, wh)
 		if sendErr := d.Send(ctx, testMsg); sendErr != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "  discord:   FAIL — %v\n", sendErr)
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "  discord:   FAIL — %v\n", sendErr)
 			failCount++
 		} else {
-			fmt.Fprintln(cmd.OutOrStdout(), "  discord:   OK")
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "  discord:   OK")
 		}
 	}
 
 	if !anyConfigured {
-		fmt.Fprintln(cmd.OutOrStdout(), "notify --test: no notification channels configured in reconftw.toml")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "notify --test: no notification channels configured in reconftw.toml")
 		return nil
 	}
 

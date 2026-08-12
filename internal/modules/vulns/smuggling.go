@@ -157,7 +157,9 @@ func (t *SmugglingTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	rawOutFile := filepath.Join(inputsDir, "smuggling_raw.txt")
 	if confirmedCount == 0 {
 		if data, rErr := os.ReadFile(rawOutFile); rErr == nil { //nolint:gosec
-			confirmedCount = parseSmugglingOutput(data, &findings)
+			// The return is deliberately discarded: confirmedCount is not read again,
+			// and the parse's real output is the findings it appends.
+			parseSmugglingOutput(data, &findings)
 		}
 	}
 

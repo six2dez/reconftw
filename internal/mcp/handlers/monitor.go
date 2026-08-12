@@ -323,10 +323,10 @@ func RunMonitorAsync(ctx context.Context, opts RunOptions, monCfg MonitorOptions
 
 		// Step 8: Print cycle summary per OUTPUT_VERBOSITY (MON-07).
 		verbosity := boot.App.Cfg.Output.Verbosity
-		switch {
-		case verbosity == 0:
+		switch verbosity {
+		case 0:
 			// VerbosityQuiet — suppress cycle summary.
-		case verbosity == 1:
+		case 1:
 			// VerbosityNormal — one summary line.
 			fmt.Fprintf(os.Stderr, "[OK  ] monitor cycle %d  new_findings=%d  new_subs=%d  elapsed=%s\n",
 				cycleNum, newFindingCount, len(newFQDNs), elapsed.Round(time.Second))

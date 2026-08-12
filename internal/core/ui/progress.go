@@ -101,10 +101,10 @@ func (p *StageProgress) StageStart(stageName string, taskCount int) {
 		return
 	}
 	if tty {
-		fmt.Fprintf(p.w, "%s%s▸ [%s] starting... (0/%d tasks)",
+		_, _ = fmt.Fprintf(p.w, "%s%s▸ [%s] starting... (0/%d tasks)",
 			ansiEraseLine, ansiGreen, stageName, taskCount)
 	} else if p.verbosity >= VerbosityNormal {
-		fmt.Fprintf(p.w, "▸ [%s] starting... (%d tasks)\n", stageName, taskCount)
+		_, _ = fmt.Fprintf(p.w, "▸ [%s] starting... (%d tasks)\n", stageName, taskCount)
 	}
 }
 
@@ -122,7 +122,7 @@ func (p *StageProgress) TaskStart(taskName string) {
 	if quiet || !tty {
 		return
 	}
-	fmt.Fprintf(p.w, "%s%s  %c %s%s",
+	_, _ = fmt.Fprintf(p.w, "%s%s  %c %s%s",
 		ansiEraseLine, ansiYellow, frame, taskName, ansiReset)
 }
 
@@ -153,12 +153,13 @@ func (p *StageProgress) TaskDone(taskName string, badge Badge, dur time.Duration
 
 	if tty {
 		color := ansiGreen
-		if badge == BadgeFAIL {
+		switch badge {
+		case BadgeFAIL:
 			color = "\033[31m" // red
-		} else if badge == BadgeWARN {
+		case BadgeWARN:
 			color = "\033[33m" // yellow
 		}
-		fmt.Fprintf(p.w, "%s%s[%-5s]%s %s  (%d/%d done)  %s\n",
+		_, _ = fmt.Fprintf(p.w, "%s%s[%-5s]%s %s  (%d/%d done)  %s\n",
 			ansiEraseLine, color, string(badge), ansiReset,
 			taskName, done, total, formatDuration(dur))
 	} else {
@@ -173,7 +174,7 @@ func (p *StageProgress) TaskDone(taskName string, badge Badge, dur time.Duration
 			gap = 1
 		}
 		dots := strings.Repeat(".", gap)
-		fmt.Fprintf(p.w, "[%-5s] %s %s %s\n",
+		_, _ = fmt.Fprintf(p.w, "[%-5s] %s %s %s\n",
 			string(badge), display, dots, formatDuration(dur))
 	}
 }
@@ -193,6 +194,6 @@ func (p *StageProgress) StageDone(stageName string, foundCount int) {
 	if quiet {
 		return
 	}
-	fmt.Fprintf(p.w, "  [stage %s complete — %d found in %s]\n",
+	_, _ = fmt.Fprintf(p.w, "  [stage %s complete — %d found in %s]\n",
 		stageName, foundCount, formatDuration(elapsed))
 }

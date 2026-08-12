@@ -147,7 +147,7 @@ func (p *Printer) Status(badge Badge, name string, dur time.Duration) {
 		gap = 1
 	}
 	dots := strings.Repeat(".", gap)
-	fmt.Fprintf(p.W, "[%-5s] %s %s %s\n", string(badge), display, dots, formatDuration(dur))
+	_, _ = fmt.Fprintf(p.W, "[%-5s] %s %s %s\n", string(badge), display, dots, formatDuration(dur))
 }
 
 // Msg emits an INFO/WARN/FAIL/OK message line. Mirrors v1 _print_msg.
@@ -166,7 +166,7 @@ func (p *Printer) Msg(level string, msg string) {
 			}
 		}
 	}
-	fmt.Fprintf(p.W, "%-5s %s\n", strings.ToUpper(level), msg)
+	_, _ = fmt.Fprintf(p.W, "%-5s %s\n", strings.ToUpper(level), msg)
 }
 
 // Rule emits a thin ─── separator line, optionally prefixed with title.
@@ -176,9 +176,9 @@ func (p *Printer) Rule(title string) {
 		return
 	}
 	if title != "" {
-		fmt.Fprintf(p.W, "─── %s ───────────────────────────────────────────────\n", title)
+		_, _ = fmt.Fprintf(p.W, "─── %s ───────────────────────────────────────────────\n", title)
 	} else {
-		fmt.Fprintln(p.W, "────────────────────────────────────────────────────────")
+		_, _ = fmt.Fprintln(p.W, "────────────────────────────────────────────────────────")
 	}
 }
 
@@ -189,8 +189,8 @@ func (p *Printer) Section(title string) {
 	if p.Verbosity < VerbosityNormal {
 		return
 	}
-	fmt.Fprintf(p.W, "\n── %s ───────────────────────────────────────────────\n", strings.ToUpper(title))
-	fmt.Fprintf(p.W, "Started: %s\n", time.Now().UTC().Format(time.RFC3339))
+	_, _ = fmt.Fprintf(p.W, "\n── %s ───────────────────────────────────────────────\n", strings.ToUpper(title))
+	_, _ = fmt.Fprintf(p.W, "Started: %s\n", time.Now().UTC().Format(time.RFC3339))
 }
 
 // ProgressModule emits a module-level progress indicator. Mirrors v1
@@ -200,7 +200,7 @@ func (p *Printer) ProgressModule(name string) {
 	if p.Verbosity < VerbosityVerbose {
 		return
 	}
-	fmt.Fprintf(p.W, "▸ %s\n", name)
+	_, _ = fmt.Fprintf(p.W, "▸ %s\n", name)
 }
 
 // BatchEnd closes a parallel-batch UI block per v1 ui_batch_end semantics.
@@ -216,7 +216,7 @@ func (p *Printer) BatchEnd(name string) {
 	skip := p.counts[BadgeSKIP]
 	cache := p.counts[BadgeCACHE]
 	p.mu.Unlock()
-	fmt.Fprintf(p.W, "── %s: ok:%d warn:%d fail:%d skip:%d cache:%d ──\n",
+	_, _ = fmt.Fprintf(p.W, "── %s: ok:%d warn:%d fail:%d skip:%d cache:%d ──\n",
 		name, ok, warn, fail, skip, cache)
 }
 

@@ -43,7 +43,7 @@ func (c *CloneToolInstaller) installGoClone(ctx context.Context, tool *backend.T
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 	if err := runCmd(ctx, "git", []string{"clone", "--depth", "1", tool.RepoURL, dir}, nil); err != nil {
 		return fmt.Errorf("clone %s: %w", tool.Name, err)
 	}

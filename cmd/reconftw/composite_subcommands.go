@@ -102,7 +102,7 @@ func commonAfterBoot(
 			if app != nil {
 				app.Log = subLogger
 			}
-			fmt.Fprintf(os.Stderr, "  logs → %s\n", p)
+			_, _ = fmt.Fprintf(os.Stderr, "  logs → %s\n", p)
 			_ = f
 		}
 	}
@@ -156,17 +156,17 @@ func printCompositeSummary(w *os.File, workdir string, verbosity ui.Verbosity) {
 		{"asns", "asns.jsonl"},
 		{"urls", "urls.jsonl"},
 	}
-	fmt.Fprintf(w, "\n  ── results ──────────────────────────────\n")
+	_, _ = fmt.Fprintf(w, "\n  ── results ──────────────────────────────\n")
 	for _, a := range artefacts {
 		p := filepath.Join(workdir, "artefacts", a.file)
 		n := countFileLines(p)
 		if n == 0 {
 			continue
 		}
-		fmt.Fprintf(w, "  %-11s %6d   %s\n", a.label, n, p)
+		_, _ = fmt.Fprintf(w, "  %-11s %6d   %s\n", a.label, n, p)
 	}
-	fmt.Fprintf(w, "  workspace   %s\n", workdir)
-	fmt.Fprintf(w, "  ─────────────────────────────────────────\n")
+	_, _ = fmt.Fprintf(w, "  workspace   %s\n", workdir)
+	_, _ = fmt.Fprintf(w, "  ─────────────────────────────────────────\n")
 }
 
 // runCompositeCmd is the shared RunE body for composite subcommands. mode and
@@ -295,10 +295,10 @@ func printCompositeDryRun(
 ) error {
 	// Build the header based on mode.
 	header := fmt.Sprintf("[dry-run] %s pipeline:", modeLabel(mode))
-	fmt.Fprintln(cmd.OutOrStdout(), header)
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), header)
 
 	// Print subs stages.
-	fmt.Fprintln(cmd.OutOrStdout(), "--- SUBS ---")
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), "--- SUBS ---")
 	if err := printDryRun(cmd, allTasks, cfg); err != nil {
 		return err
 	}
@@ -308,20 +308,20 @@ func printCompositeDryRun(
 	}
 
 	// Print web stages.
-	fmt.Fprintln(cmd.OutOrStdout(), "--- WEB ---")
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), "--- WEB ---")
 	if err := printWebDryRun(cmd, allTasks, cfg); err != nil {
 		return err
 	}
 
 	// Print osint stages.
-	fmt.Fprintln(cmd.OutOrStdout(), "--- OSINT ---")
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), "--- OSINT ---")
 	if err := printOSINTDryRun(cmd, allTasks, cfg); err != nil {
 		return err
 	}
 
 	// Print vulns for ModeAll/ModeDeep.
 	if mode == handlers.ModeAll || mode == handlers.ModeDeep {
-		fmt.Fprintln(cmd.OutOrStdout(), "--- VULNS ---")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "--- VULNS ---")
 		if err := printVulnsDryRun(cmd, allTasks, cfg); err != nil {
 			return err
 		}

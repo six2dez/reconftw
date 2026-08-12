@@ -194,20 +194,22 @@ func appendUnique(srcPath, dstPath string) error {
 	if err != nil {
 		return err
 	}
-	defer dst.Close()
-
 	for _, line := range splitLines(string(srcData)) {
 		if line == "" {
 			continue
 		}
 		if _, seen := existing[line]; !seen {
 			if _, writeErr := fmt.Fprintln(dst, line); writeErr != nil {
+				_ = dst.Close()
 				return writeErr
 			}
 			existing[line] = struct{}{}
 		}
 	}
-	return nil
+	// Close explicitly rather than by defer: this is a WRITE path, so Close is where
+	// a buffered-flush failure surfaces. Swallowing it would report success on a
+	// half-written resolver file.
+	return dst.Close()
 }
 
 // splitLines splits s into lines, handling both \r\n and \n.
@@ -247,7 +249,7 @@ func httpDownload(ctx context.Context, url, destPath string) error {
 	if err != nil {
 		return fmt.Errorf("GET %s: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // read/cleanup path
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("GET %s: unexpected status %d", url, resp.StatusCode)
@@ -257,7 +259,7 @@ func httpDownload(ctx context.Context, url, destPath string) error {
 	if err != nil {
 		return fmt.Errorf("create %s: %w", destPath, err)
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck // read/cleanup path
 
 	if _, err := io.Copy(f, resp.Body); err != nil {
 		return fmt.Errorf("write %s: %w", destPath, err)

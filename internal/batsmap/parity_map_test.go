@@ -53,7 +53,7 @@ func batsScenarioCounts(t *testing.T, root string) map[string]int {
 		if err != nil {
 			return err
 		}
-		defer f.Close()
+		defer f.Close() //nolint:errcheck
 		base := filepath.Base(path)
 		sc := bufio.NewScanner(f)
 		sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -91,7 +91,7 @@ func mapRowCounts(t *testing.T, root string) map[string]int {
 	if err != nil {
 		t.Fatalf("open %s: %v", path, err)
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 
 	counts := make(map[string]int)
 	sc := bufio.NewScanner(f)

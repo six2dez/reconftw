@@ -249,9 +249,7 @@ func trufflehogLocator(r trufflehogResult) string {
 	if len(r.SourceMetadata) > 0 {
 		var meta map[string]interface{}
 		if err := json.Unmarshal(r.SourceMetadata, &meta); err == nil {
-			for _, loc := range extractGitLocator(meta) {
-				parts = append(parts, loc)
-			}
+			parts = append(parts, extractGitLocator(meta)...)
 		}
 	}
 	return strings.TrimSpace(strings.Join(parts, " "))

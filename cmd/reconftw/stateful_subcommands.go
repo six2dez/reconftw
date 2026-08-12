@@ -82,7 +82,7 @@ func runGenResolversCmd(cmd *cobra.Command) error {
 		home, _ := os.UserHomeDir()
 		resolversPath = filepath.Join(home, ".config", "reconftw", "resolvers.txt")
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "gen-resolvers: resolver list written to %s\n", resolversPath)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "gen-resolvers: resolver list written to %s\n", resolversPath)
 	return nil
 }
 
@@ -361,7 +361,7 @@ func recordQuickRescanBaseline(ctx context.Context, cfg *config.Config, target s
 		slog.WarnContext(ctx, "quick-rescan: store.db unavailable (non-fatal)", "err", err)
 		return
 	}
-	defer db.Close()
+	defer db.Close() //nolint:errcheck // read-only query path
 
 	q := sqlcgen.New(db)
 	scanID := uuid.New().String()

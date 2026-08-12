@@ -64,7 +64,7 @@ func (p *Printer) emitTail(r io.Reader, n int) {
 		ring = append(ring, line)
 	}
 	for _, l := range ring {
-		fmt.Fprintf(p.W, "  %s\n", l)
+		_, _ = fmt.Fprintf(p.W, "  %s\n", l)
 	}
 }
 
@@ -78,6 +78,6 @@ func (p *Printer) emitFull(r io.Reader) {
 	buf := make([]byte, 1<<20)
 	scan.Buffer(buf, 10<<20)
 	for scan.Scan() {
-		fmt.Fprintf(p.W, "  %s\n", strings.TrimRight(scan.Text(), "\r"))
+		_, _ = fmt.Fprintf(p.W, "  %s\n", strings.TrimRight(scan.Text(), "\r"))
 	}
 }

@@ -28,7 +28,7 @@ func TestInputHashDeterministic(t *testing.T) {
 		t.Fatalf("expected 64-char hex; got %d chars", len(h1))
 	}
 	for _, c := range h1 {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
 			t.Fatalf("non-hex byte %q in hash", c)
 		}
 	}

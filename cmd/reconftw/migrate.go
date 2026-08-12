@@ -64,8 +64,8 @@ func runMigrateCmd(cmd *cobra.Command, f *migrateFlags) error {
 
 	if f.dryRun {
 		// Secret-safe: DispositionTable redacts secret values to ***.
-		fmt.Fprint(out, res.DispositionTable())
-		fmt.Fprintln(errOut, "[dry-run] no file written.")
+		_, _ = fmt.Fprint(out, res.DispositionTable())
+		_, _ = fmt.Fprintln(errOut, "[dry-run] no file written.")
 		return nil
 	}
 
@@ -76,14 +76,14 @@ func runMigrateCmd(cmd *cobra.Command, f *migrateFlags) error {
 			return &exitCodeError{code: 1, msg: werr.Error()}
 		}
 	} else {
-		fmt.Fprintf(out, "migrated %s → %s\n", f.fromBash, f.to)
+		_, _ = fmt.Fprintf(out, "migrated %s → %s\n", f.fromBash, f.to)
 	}
 
 	// Secret-safe summary: counts only, no values.
-	fmt.Fprintf(errOut, "disposition: %d mapped, %d superseded, %d unknown\n",
+	_, _ = fmt.Fprintf(errOut, "disposition: %d mapped, %d superseded, %d unknown\n",
 		res.MappedCount, res.SupersededCount, res.UnknownCount)
 	if res.UnknownCount > 0 {
-		fmt.Fprintf(errOut, "⚠ %d unknown key(s) need human review — see the # UNKNOWN comments in the output\n", res.UnknownCount)
+		_, _ = fmt.Fprintf(errOut, "⚠ %d unknown key(s) need human review — see the # UNKNOWN comments in the output\n", res.UnknownCount)
 	}
 	return nil
 }

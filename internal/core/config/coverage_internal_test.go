@@ -193,7 +193,7 @@ func TestDefaultConfigDirHome(t *testing.T) {
 	if err := os.Unsetenv("XDG_CONFIG_HOME"); err != nil {
 		t.Fatalf("unsetenv: %v", err)
 	}
-	defer os.Setenv("XDG_CONFIG_HOME", prev)
+	defer func() { _ = os.Setenv("XDG_CONFIG_HOME", prev) }()
 	got := DefaultConfigDir()
 	if got == "" {
 		t.Skip("HOME-based fallback returned empty; environment isolated")

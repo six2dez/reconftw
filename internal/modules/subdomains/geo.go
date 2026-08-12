@@ -236,7 +236,7 @@ func lookupIPInfo(ctx context.Context, client *http.Client, baseURL, pdcpKey, ip
 		}
 		return geoResult{}
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // read/cleanup path
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 4096))
 	if err != nil {

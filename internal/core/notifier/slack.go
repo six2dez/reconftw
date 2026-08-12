@@ -78,23 +78,11 @@ func (s *SlackNotifier) send(ctx context.Context, msg string) error {
 	if err != nil {
 		return fmt.Errorf("slack: send: %w", err)
 	}
-	defer func() { _, _ = io.Copy(io.Discard, resp.Body); resp.Body.Close() }()
+	defer func() { _, _ = io.Copy(io.Discard, resp.Body); _ = resp.Body.Close() }()
 	if resp.StatusCode >= 300 {
 		return fmt.Errorf("slack: non-2xx status %d", resp.StatusCode)
 	}
 	return nil
-}
-
-// levelString maps Level → human label for log fields.
-func levelString(lvl Level) string {
-	switch lvl {
-	case LevelError:
-		return "error"
-	case LevelWarn:
-		return "warn"
-	default:
-		return "info"
-	}
 }
 
 var _ Notifier = (*SlackNotifier)(nil)

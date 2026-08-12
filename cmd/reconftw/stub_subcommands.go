@@ -61,20 +61,6 @@ var phasePointers = map[string]stubPhase{
 	"install": {11, "Installer + Cross-Platform + Docker"},
 }
 
-// newStubCmd is the shared constructor for all stubbed v2 subcommands.
-// Use/Short are populated from the caller; the RunE looks up phase pointer
-// from phasePointers and returns the D-02 phase-pointer error.
-func newStubCmd(use, short string) *cobra.Command {
-	return &cobra.Command{
-		Use:   use,
-		Short: short,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			p := phasePointers[cmd.Name()]
-			return stubNotImplemented(cmd, p.Phase, p.Name)
-		},
-	}
-}
-
 // newReconCmd, newAllCmd, newPassiveCmd, newZenCmd, newDeepCmd — Phase 9.
 // Real implementations live in composite_subcommands.go. Stubs removed.
 
@@ -295,20 +281,20 @@ func printSubsSummary(w *os.File, workdir, runLogPath string, verbosity ui.Verbo
 		{"asns", "asns.jsonl"},
 		{"hosts", "hosts.jsonl"},
 	}
-	fmt.Fprintf(w, "\n  ── results ──────────────────────────────\n")
+	_, _ = fmt.Fprintf(w, "\n  ── results ──────────────────────────────\n")
 	for _, a := range artefacts {
 		p := filepath.Join(workdir, "artefacts", a.file)
 		n := countFileLines(p)
 		if n == 0 {
 			continue // skip empty/absent artefacts to keep the summary tight
 		}
-		fmt.Fprintf(w, "  %-11s %6d   %s\n", a.label, n, p)
+		_, _ = fmt.Fprintf(w, "  %-11s %6d   %s\n", a.label, n, p)
 	}
-	fmt.Fprintf(w, "  workspace   %s\n", workdir)
+	_, _ = fmt.Fprintf(w, "  workspace   %s\n", workdir)
 	if runLogPath != "" {
-		fmt.Fprintf(w, "  logs        %s\n", runLogPath)
+		_, _ = fmt.Fprintf(w, "  logs        %s\n", runLogPath)
 	}
-	fmt.Fprintf(w, "  ─────────────────────────────────────────\n")
+	_, _ = fmt.Fprintf(w, "  ─────────────────────────────────────────\n")
 }
 
 // printDryRun lists the tasks that would run per stage and returns nil.
@@ -327,12 +313,12 @@ func printDryRun(cmd *cobra.Command, allTasks []task.Task, cfg *config.Config) e
 		{"permut", "subdomains.aux", []string{"subdomains.permut", "subdomains.recursive."}},
 		{"enrichment", "subdomains.aux", []string{"subdomains.takeover.", "subdomains.buckets", "subdomains.asn", "subdomains.geo", "subdomains.zonetransfer"}},
 	}
-	fmt.Fprintln(cmd.OutOrStdout(), "[dry-run] subs pipeline stages:")
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), "[dry-run] subs pipeline stages:")
 	for i, stage := range stages {
 		filtered := filterByModuleAndEnabled(allTasks, "subdomains", cfg, stage.prefixes)
-		fmt.Fprintf(cmd.OutOrStdout(), "  Stage %d (%s): %d task(s)\n", i+1, stage.name, len(filtered))
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  Stage %d (%s): %d task(s)\n", i+1, stage.name, len(filtered))
 		for _, t := range filtered {
-			fmt.Fprintf(cmd.OutOrStdout(), "    - %s: %s\n", t.Name(), t.Description())
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "    - %s: %s\n", t.Name(), t.Description())
 		}
 	}
 	return nil
@@ -581,18 +567,18 @@ func printWebDryRun(cmd *cobra.Command, allTasks []task.Task, cfg *config.Config
 			mergeNote:  "MergeStage(\"hosts\") — folds wellknown HostRecord staging into artefacts/hosts.jsonl (union-preserving)",
 		},
 	}
-	fmt.Fprintln(cmd.OutOrStdout(), "[dry-run] web pipeline stages:")
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), "[dry-run] web pipeline stages:")
 	for i, stage := range stages {
 		filtered := filterByModuleAndEnabled(allTasks, "web", cfg, stage.prefixes)
-		fmt.Fprintf(cmd.OutOrStdout(), "  Stage %d (%s): %d task(s)\n", i+1, stage.name, len(filtered))
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  Stage %d (%s): %d task(s)\n", i+1, stage.name, len(filtered))
 		for _, t := range filtered {
-			fmt.Fprintf(cmd.OutOrStdout(), "    - %s: %s\n", t.Name(), t.Description())
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "    - %s: %s\n", t.Name(), t.Description())
 		}
 		if stage.mergeAfter != "" {
-			fmt.Fprintf(cmd.OutOrStdout(), "    [after stage] %s\n", stage.mergeNote)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "    [after stage] %s\n", stage.mergeNote)
 		}
 	}
-	fmt.Fprintln(cmd.OutOrStdout(), "  [final sweep] MergeStage(\"waf\"), MergeStage(\"findings\") — safety backstop (urls excluded: urldedup is sole urls writer)")
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), "  [final sweep] MergeStage(\"waf\"), MergeStage(\"findings\") — safety backstop (urls excluded: urldedup is sole urls writer)")
 	return nil
 }
 
@@ -610,20 +596,20 @@ func printWebSummary(w *os.File, workdir, runLogPath string, verbosity ui.Verbos
 		{"origins", "origins.jsonl"},
 		{"urls", "urls.jsonl"},
 	}
-	fmt.Fprintf(w, "\n  ── results ──────────────────────────────\n")
+	_, _ = fmt.Fprintf(w, "\n  ── results ──────────────────────────────\n")
 	for _, a := range artefacts {
 		p := filepath.Join(workdir, "artefacts", a.file)
 		n := countFileLines(p)
 		if n == 0 {
 			continue
 		}
-		fmt.Fprintf(w, "  %-11s %6d   %s\n", a.label, n, p)
+		_, _ = fmt.Fprintf(w, "  %-11s %6d   %s\n", a.label, n, p)
 	}
-	fmt.Fprintf(w, "  workspace   %s\n", workdir)
+	_, _ = fmt.Fprintf(w, "  workspace   %s\n", workdir)
 	if runLogPath != "" {
-		fmt.Fprintf(w, "  logs        %s\n", runLogPath)
+		_, _ = fmt.Fprintf(w, "  logs        %s\n", runLogPath)
 	}
-	fmt.Fprintf(w, "  ─────────────────────────────────────────\n")
+	_, _ = fmt.Fprintf(w, "  ─────────────────────────────────────────\n")
 }
 
 // newVulnsCmd — Phase 6 (Vulnerability Scanning E2E). Real implementation replacing D-02 stub.
@@ -817,15 +803,15 @@ func printVulnsDryRun(cmd *cobra.Command, allTasks []task.Task, cfg *config.Conf
 		{"dast-extended", []string{"vulns.nuclei_dast", "vulns.fuzzparams", "vulns.bypass4xx", "vulns.testssl", "vulns.fray", "vulns.graphql", "vulns.grpc", "vulns.llm", "vulns.websocket"}},
 		{"spray", []string{"vulns.spray"}},
 	}
-	fmt.Fprintln(cmd.OutOrStdout(), "[dry-run] vulns pipeline stages:")
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), "[dry-run] vulns pipeline stages:")
 	for i, stage := range stages {
 		filtered := filterByModuleAndEnabled(allTasks, "vulns", cfg, stage.prefixes)
-		fmt.Fprintf(cmd.OutOrStdout(), "  Stage %d (%s): %d task(s)\n", i+1, stage.name, len(filtered))
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  Stage %d (%s): %d task(s)\n", i+1, stage.name, len(filtered))
 		for _, t := range filtered {
-			fmt.Fprintf(cmd.OutOrStdout(), "    - %s: %s\n", t.Name(), t.Description())
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "    - %s: %s\n", t.Name(), t.Description())
 		}
 	}
-	fmt.Fprintln(cmd.OutOrStdout(), "  [final] MergeAllVulnsArtefacts(\"findings\")")
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), "  [final] MergeAllVulnsArtefacts(\"findings\")")
 	return nil
 }
 
@@ -838,20 +824,20 @@ func printVulnsSummary(w *os.File, workdir, runLogPath string, verbosity ui.Verb
 	artefacts := []struct{ label, file string }{
 		{"findings", "findings.jsonl"},
 	}
-	fmt.Fprintf(w, "\n  ── results ──────────────────────────────\n")
+	_, _ = fmt.Fprintf(w, "\n  ── results ──────────────────────────────\n")
 	for _, a := range artefacts {
 		p := filepath.Join(workdir, "artefacts", a.file)
 		n := countFileLines(p)
 		if n == 0 {
 			continue
 		}
-		fmt.Fprintf(w, "  %-11s %6d   %s\n", a.label, n, p)
+		_, _ = fmt.Fprintf(w, "  %-11s %6d   %s\n", a.label, n, p)
 	}
-	fmt.Fprintf(w, "  workspace   %s\n", workdir)
+	_, _ = fmt.Fprintf(w, "  workspace   %s\n", workdir)
 	if runLogPath != "" {
-		fmt.Fprintf(w, "  logs        %s\n", runLogPath)
+		_, _ = fmt.Fprintf(w, "  logs        %s\n", runLogPath)
 	}
-	fmt.Fprintf(w, "  ─────────────────────────────────────────\n")
+	_, _ = fmt.Fprintf(w, "  ─────────────────────────────────────────\n")
 }
 
 // newOSINTCmd — Phase 7 (OSINT E2E). Wires the real RunE: Build → best_effort
@@ -1086,15 +1072,15 @@ func osintStages() []osintStageSpec {
 // order, and returns nil. Mirrors the ordered web dry-run so --dry-run reflects
 // the REAL execution order (github-repos pre-stage before the github_leaks stage).
 func printOSINTDryRun(cmd *cobra.Command, allTasks []task.Task, cfg *config.Config) error {
-	fmt.Fprintln(cmd.OutOrStdout(), "[dry-run] osint pipeline (sequential best_effort stages):")
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), "[dry-run] osint pipeline (sequential best_effort stages):")
 	for _, stage := range osintStages() {
 		filtered := filterByModuleAndEnabled(allTasks, "osint", cfg, stage.prefixes)
-		fmt.Fprintf(cmd.OutOrStdout(), "  Stage (%s): %d task(s)\n", stage.name, len(filtered))
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  Stage (%s): %d task(s)\n", stage.name, len(filtered))
 		for _, t := range filtered {
-			fmt.Fprintf(cmd.OutOrStdout(), "    - %s: %s\n", t.Name(), t.Description())
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "    - %s: %s\n", t.Name(), t.Description())
 		}
 	}
-	fmt.Fprintln(cmd.OutOrStdout(), "  [final] MergeAllOSINTArtefacts(\"findings\")")
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), "  [final] MergeAllOSINTArtefacts(\"findings\")")
 	return nil
 }
 
@@ -1277,7 +1263,7 @@ func runReportCmd(cmd *cobra.Command) error {
 	}
 
 	reportsDir := filepath.Join(dataDir, "reports")
-	fmt.Fprintf(cmd.OutOrStdout(), "reports written to: %s\n", reportsDir)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "reports written to: %s\n", reportsDir)
 	return nil
 }
 

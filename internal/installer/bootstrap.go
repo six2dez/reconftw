@@ -76,7 +76,7 @@ func verifyFile(_ context.Context, path, expectedSHA256, sourceURL string) error
 	if err != nil {
 		return fmt.Errorf("verify %s: %w", path, err)
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck // read-only hash path
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return fmt.Errorf("verify %s: %w", path, err)
@@ -124,7 +124,7 @@ func downloadFile(ctx context.Context, cfg *bootstrapConfig, url, name string) (
 	if err != nil {
 		return "", fmt.Errorf("download %s: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // response drain
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("download %s: HTTP %d", url, resp.StatusCode)
 	}
@@ -132,9 +132,15 @@ func downloadFile(ctx context.Context, cfg *bootstrapConfig, url, name string) (
 	if err != nil {
 		return "", err
 	}
-	defer out.Close()
 	if _, err := io.Copy(out, resp.Body); err != nil {
+		_ = out.Close()
 		return "", err
+	}
+	// Close explicitly rather than by defer: this is a WRITE path, so Close is where a
+	// buffered-flush or disk-full failure surfaces. Ignoring it would hand the caller a
+	// path to a TRUNCATED toolchain archive and report the download as successful.
+	if err := out.Close(); err != nil {
+		return "", fmt.Errorf("download %s: close %s: %w", url, dst, err)
 	}
 	return dst, nil
 }

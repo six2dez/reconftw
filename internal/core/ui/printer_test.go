@@ -137,7 +137,7 @@ func TestIsTTY(t *testing.T) {
 	if err != nil {
 		t.Skipf("open /dev/null: %v", err)
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 	// Don't assert the exact result for /dev/null (varies by OS); just
 	// assert the call doesn't panic on a real *os.File.
 	_ = ui.IsTTY(f)

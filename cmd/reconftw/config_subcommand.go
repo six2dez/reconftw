@@ -89,9 +89,9 @@ ignored" — the usual answer is a config sitting somewhere the loader does not 
 			config.ResolveDefaultPaths(&opts)
 
 			out := cmd.OutOrStdout()
-			fmt.Fprintln(out, "Config sources (later wins):")
-			fmt.Fprintf(out, "  %-9s %-6s %s\n", "LAYER", "STATE", "PATH")
-			fmt.Fprintf(out, "  %-9s %-6s %s\n", "1 default", "built-in", "(compiled defaults)")
+			_, _ = fmt.Fprintln(out, "Config sources (later wins):")
+			_, _ = fmt.Fprintf(out, "  %-9s %-6s %s\n", "LAYER", "STATE", "PATH")
+			_, _ = fmt.Fprintf(out, "  %-9s %-6s %s\n", "1 default", "built-in", "(compiled defaults)")
 
 			for _, layer := range []struct{ name, path string }{
 				{"2 system", opts.SystemPath},
@@ -101,7 +101,7 @@ ignored" — the usual answer is a config sitting somewhere the loader does not 
 				{"6 secrets", opts.SecretsPath},
 			} {
 				if layer.path == "" {
-					fmt.Fprintf(out, "  %-9s %-6s %s\n", layer.name, "unset", "(not supplied)")
+					_, _ = fmt.Fprintf(out, "  %-9s %-6s %s\n", layer.name, "unset", "(not supplied)")
 					continue
 				}
 				abs, err := filepath.Abs(layer.path)
@@ -112,12 +112,12 @@ ignored" — the usual answer is a config sitting somewhere the loader does not 
 				if st, statErr := os.Stat(layer.path); statErr == nil && !st.IsDir() {
 					state = "LOADED"
 				}
-				fmt.Fprintf(out, "  %-9s %-6s %s\n", layer.name, state, abs)
+				_, _ = fmt.Fprintf(out, "  %-9s %-6s %s\n", layer.name, state, abs)
 			}
 
-			fmt.Fprintf(out, "  %-9s %-6s %s\n", "7 env", "always", "RECONFTW_* environment variables")
-			fmt.Fprintf(out, "  %-9s %-6s %s\n", "8 flags", "always", "command-line flags")
-			fmt.Fprintln(out, "\nRun 'reconftw config show' to see the merged result.")
+			_, _ = fmt.Fprintf(out, "  %-9s %-6s %s\n", "7 env", "always", "RECONFTW_* environment variables")
+			_, _ = fmt.Fprintf(out, "  %-9s %-6s %s\n", "8 flags", "always", "command-line flags")
+			_, _ = fmt.Fprintln(out, "\nRun 'reconftw config show' to see the merged result.")
 			return nil
 		},
 	}

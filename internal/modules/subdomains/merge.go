@@ -281,7 +281,7 @@ func readStagingFile(fpath, toolName string, dedupe map[string]string) error {
 	if err != nil {
 		return fmt.Errorf("open %q: %w", fpath, err)
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck // read/cleanup path
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {

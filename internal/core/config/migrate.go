@@ -169,7 +169,7 @@ func Migrate(in io.Reader, opts MigrateOptions) (MigrateResult, error) {
 			// comment and the warning, honoring D-02 keep-all).
 			clampedLit, clampNote, warnMsg, clamped := clampToCap(caps, path, kind, literal)
 			if clamped {
-				fmt.Fprintf(opts.WarnSink, "⚠ %s=%s %s\n", key, redact(ev.value, secret), warnMsg)
+				_, _ = fmt.Fprintf(opts.WarnSink, "⚠ %s=%s %s\n", key, redact(ev.value, secret), warnMsg)
 				literal = clampedLit
 			}
 			addToEmit(emit, path, kind, literal, key, secret, ev.value, clampNote)
@@ -185,7 +185,7 @@ func Migrate(in io.Reader, opts MigrateOptions) (MigrateResult, error) {
 		}
 
 		// Case C — unknown: loud stderr NOW (CUT-06) + a preserved comment.
-		fmt.Fprintf(opts.WarnSink, "⚠ unknown key %s — needs human review\n", key)
+		_, _ = fmt.Fprintf(opts.WarnSink, "⚠ unknown key %s — needs human review\n", key)
 		res.Entries = append(res.Entries, DispositionEntry{
 			Key:       key,
 			Case:      CaseUnknown,

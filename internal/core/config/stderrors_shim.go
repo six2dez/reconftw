@@ -16,4 +16,4 @@ func reflectTypeOf(v any) reflect.Type { return reflect.TypeOf(v) }
 
 // reflectPtr is reflect.Ptr (alias kept inline so validate.go avoids the
 // reflect import).
-const reflectPtr = reflect.Ptr
+const reflectPtr = reflect.Ptr //nolint:govet // deliberate alias: keeps the reflect import out of validate.go

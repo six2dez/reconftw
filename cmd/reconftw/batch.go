@@ -109,7 +109,7 @@ func runBatch(
 // printBatchSummary writes a per-target status table to w. The format mirrors
 // printSubsSummary (── border style with fmt.Fprintf tabular rows).
 func printBatchSummary(w io.Writer, results []batchResult) {
-	fmt.Fprintf(w, "\n  ── batch summary ─────────────────────────\n")
+	_, _ = fmt.Fprintf(w, "\n  ── batch summary ─────────────────────────\n")
 	ok := 0
 	fail := 0
 	for _, r := range results {
@@ -120,8 +120,8 @@ func printBatchSummary(w io.Writer, results []batchResult) {
 		} else {
 			ok++
 		}
-		fmt.Fprintf(w, "  %-40s  %s\n", r.Target, status)
+		_, _ = fmt.Fprintf(w, "  %-40s  %s\n", r.Target, status)
 	}
-	fmt.Fprintf(w, "  ─────────────────────────────────────────\n")
-	fmt.Fprintf(w, "  total: %d  ok: %d  failed: %d\n", len(results), ok, fail)
+	_, _ = fmt.Fprintf(w, "  ─────────────────────────────────────────\n")
+	_, _ = fmt.Fprintf(w, "  total: %d  ok: %d  failed: %d\n", len(results), ok, fail)
 }

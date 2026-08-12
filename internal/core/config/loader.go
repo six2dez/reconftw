@@ -153,7 +153,7 @@ func Load(opts LoadOptions) (*Config, error) {
 		}
 		if _, err := os.Stat(p); os.IsNotExist(err) {
 			if layer.flag != "" {
-				fmt.Fprintf(opts.WarnSink, "WARN config: %s file %q not found — skipped\n", layer.flag, p)
+				_, _ = fmt.Fprintf(opts.WarnSink, "WARN config: %s file %q not found — skipped\n", layer.flag, p)
 			}
 			// Silent skip — file may legitimately not exist (auto-discovered layer).
 			continue
@@ -264,20 +264,20 @@ func applyLegacyAliases(cfg *Config, sink io.Writer) {
 	for legacyKey, value := range cfg.Legacy {
 		nativePath, ok := legacyAliasMap[legacyKey]
 		if !ok {
-			fmt.Fprintf(sink, "WARN config: legacy.%s has no v2-native mapping (drop)\n", legacyKey)
+			_, _ = fmt.Fprintf(sink, "WARN config: legacy.%s has no v2-native mapping (drop)\n", legacyKey)
 			continue
 		}
 		currentNative, defaultNative := readByPath(cfg, nativePath), readByPath(defaults, nativePath)
 		// Collision: v2-native already set to non-default → v2-native wins.
 		if currentNative != nil && !sameValue(currentNative, defaultNative) {
-			fmt.Fprintf(sink,
+			_, _ = fmt.Fprintf(sink,
 				"WARN config: legacy.%s=%v and %s=%v both set — using %s=%v (v2-native wins per ADR §2.3)\n",
 				legacyKey, value, nativePath, currentNative, nativePath, currentNative)
 			continue
 		}
 		// No collision — apply the legacy value to the native path.
 		if err := writeByPath(cfg, nativePath, value); err != nil {
-			fmt.Fprintf(sink, "WARN config: legacy.%s: cannot set %s: %v\n", legacyKey, nativePath, err)
+			_, _ = fmt.Fprintf(sink, "WARN config: legacy.%s: cannot set %s: %v\n", legacyKey, nativePath, err)
 		}
 	}
 }

@@ -40,7 +40,7 @@ func countResolverLines(path string) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("open resolver file %q: %w", path, err)
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck // read-only resolver count
 
 	count := 0
 	scanner := bufio.NewScanner(f)

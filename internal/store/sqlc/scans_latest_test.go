@@ -20,7 +20,7 @@ func openTestDB(t *testing.T) *sql.DB {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { db.Close() }) //nolint:errcheck // read/cleanup path
 
 	schema := `
 CREATE TABLE IF NOT EXISTS scans (
