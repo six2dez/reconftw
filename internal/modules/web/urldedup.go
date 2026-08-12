@@ -34,6 +34,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -47,9 +48,12 @@ import (
 // UrlDedupTask runs urless + p1radup URL deduplication.
 type UrlDedupTask struct{}
 
-func (t *UrlDedupTask) Name() string        { return "web.urldedup" }
-func (t *UrlDedupTask) Module() string      { return "web" }
-func (t *UrlDedupTask) Description() string { return "URL deduplication (urless + p1radup → urls.jsonl)" }
+func (t *UrlDedupTask) Name() string   { return "web.urldedup" }
+func (t *UrlDedupTask) Module() string { return "web" }
+func (t *UrlDedupTask) Description() string {
+	return "URL deduplication (urless + p1radup → urls.jsonl)"
+}
+
 func (t *UrlDedupTask) Enabled(cfg *config.Config) bool {
 	return cfg.Web.URLs.Enabled
 }
@@ -171,6 +175,7 @@ func (t *UrlDedupTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 
 	// Step 4: Rebuild URLRecord JSONL from deduplicated URL strings.
 	var newLines [][]byte
+	droppedOutOfScope := 0
 	for _, u := range dedupedURLs {
 		u = strings.TrimSpace(u)
 		if u == "" {
@@ -184,6 +189,16 @@ func (t *UrlDedupTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 		if host == "" {
 			continue
 		}
+		// Drop what the Append boundary would reject. urldedup is a MULTI-SOURCE
+		// aggregator (it globs every url staging file), and Append is all-or-nothing:
+		// on a live run ONE junk entry — a bare ".json" fragment from a URL extractor —
+		// rejected the whole batch and 1108 good URLs were never written. The output
+		// Interface documents this exact division of labour: aggregators use InScope to
+		// drop noise BEFORE Append, which stays strict as a guard for single-source writes.
+		if !urlPassesScopeGate(app, u) {
+			droppedOutOfScope++
+			continue
+		}
 		rec := map[string]string{
 			"url":    u,
 			"source": source,
@@ -194,6 +209,11 @@ func (t *UrlDedupTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 			continue
 		}
 		newLines = append(newLines, b)
+	}
+
+	if droppedOutOfScope > 0 && app.Log != nil {
+		app.Log.Info("web.urldedup: dropped out-of-scope/malformed URLs before write",
+			"dropped", droppedOutOfScope, "kept", len(newLines))
 	}
 
 	// Step 5: Route deduplicated records through app.Tree.Append("urls") — the scope-
@@ -321,3 +341,24 @@ func extractHostFromURL(rawURL string) string {
 }
 
 func init() { task.Register(&UrlDedupTask{}) }
+
+// urlPassesScopeGate reports whether rawURL will survive OutputTree.Append's scope
+// check, mirroring DefaultScopeFilter.IsInScopeURL exactly: parseable, no userinfo
+// (SUBD-05 credential-leak guard), a real hostname, and that host in workspace scope.
+//
+// Mirroring matters — a filter LOOSER than the boundary still lets the batch be
+// rejected, which is the failure this exists to prevent.
+func urlPassesScopeGate(app *appctx.AppContext, rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.User != nil {
+		return false
+	}
+	host := u.Hostname()
+	if host == "" {
+		return false
+	}
+	if app == nil || app.Tree == nil {
+		return true // no scope configured — the boundary will not reject either
+	}
+	return app.Tree.InScope(host)
+}
