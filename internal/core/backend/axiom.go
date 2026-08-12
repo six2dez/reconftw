@@ -18,7 +18,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/six2dez/reconftw/internal/core/config"
 	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
@@ -38,6 +41,47 @@ func defaultAxiomModuleMap() map[string]string {
 	}
 }
 
+// Fleet-lifecycle timeouts. NONE of these calls is time-bounded by anything else:
+// LocalBackend derives its deadline purely from the context (Tool.Timeout is not
+// enforced there), and AxiomBackend calls it directly rather than through Runner.
+// A live run proved the cost — `axiom-exec` blocked inside Launch for the FULL
+// 120-minute scan budget, so the scan produced nothing and died on ctx cancel.
+// Fleet management is best-effort setup; it must never be able to consume the
+// scan's time budget.
+const (
+	axiomSelectTimeout    = 3 * time.Minute
+	axiomDeployTimeout    = 15 * time.Minute
+	axiomShutdownTimeout  = 5 * time.Minute
+	axiomPropagateTimeout = 2 * time.Minute
+)
+
+// axiomDispatchTimeout caps ONE fleet dispatch, independently of the tool's own
+// (much larger) local budget — dnsx is registered at 4h, puredns at 1h.
+//
+// Live fleets showed axiom-scan frequently never returning: it creates its
+// ~/.axiom/tmp/<uid> directory, the remote work finishes, and the scan-side poll
+// simply never completes. Without a cap of its own, one such dispatch burned 89
+// minutes and (once dispatches were serialized) blocked every tool behind it.
+//
+// The point of distribution is to be FASTER than local. A dispatch still running
+// after this long is not helping, so we treat it as an *AxiomFailure and let
+// FailoverBackend re-run the tool locally with correct results.
+const axiomDispatchTimeout = 10 * time.Minute
+
+// axiomDispatchFailureLatch is how many dispatch failures in a row it takes to give
+// up on the fleet for the rest of the run. A fleet that cannot return two dispatches
+// will not return the next twenty, and each attempt costs axiomDispatchTimeout.
+const axiomDispatchFailureLatch = 2
+
+// isLocalOnlyAxiomOp returns true for tool operations that have no correct axiom-scan
+// module and must run locally even under --axiom. The module map keys by tool name
+// only, so it cannot see the sub-command: `puredns bruteforce` has no fleet module
+// (only "puredns-resolve" exists), and dispatching it would run the wrong op and
+// silently yield zero brute candidates. Keep this in lockstep with defaultAxiomModuleMap.
+func isLocalOnlyAxiomOp(tool string, args []string) bool {
+	return tool == "puredns" && len(args) > 0 && args[0] == "bruteforce"
+}
+
 // AxiomBackend dispatches tools to an Axiom fleet via the axiom-scan CLI.
 //
 // Tools present in moduleMap (with a non-empty module name) are run via
@@ -50,6 +94,60 @@ type AxiomBackend struct {
 	log       *slog.Logger
 	moduleMap map[string]string
 	local     Backend // used to run axiom-scan or fallback local
+
+	// disabled latches true once the fleet is known to be unusable (Launch could
+	// not select any instance, or a dispatch came back with an empty selection).
+	// Every later Exec/Stream then goes straight to local instead of paying the
+	// SSH-preflight cost of an axiom-scan that will abort the same way.
+	disabled atomic.Bool
+
+	// dispatchSem (capacity 1) serializes fleet dispatches; lastDispatch is read and
+	// written only while holding it. See dispatchGate for why both exist.
+	dispatchSem  chan struct{}
+	lastDispatch time.Time
+
+	// dispatchFailures counts CONSECUTIVE failed dispatches; at
+	// axiomDispatchFailureLatch the fleet is abandoned for the rest of the run.
+	dispatchFailures atomic.Int32
+}
+
+// axiomUIDSeparation is the minimum gap between two dispatch starts.
+//
+// axiom-scan derives its scan identity as `uid="$module+$(date +%m-%d_%H-%M-%S-%1N)"`
+// — module name plus a timestamp with ONE-DECISECOND resolution. Two dispatches of the
+// same module inside the same 0.1s therefore share a uid, which means they share the
+// remote /home/op/scan/<uid> directory AND the tmux session name on every node. A live
+// run fired three dnsx dispatches 30ms apart: they collapsed into one axiom log dir,
+// one returned in 5s, and the other two hung until their timeouts (89m).
+const axiomUIDSeparation = 250 * time.Millisecond
+
+// dispatchGate serializes fleet dispatches and spaces them past axiom-scan's uid
+// granularity. It returns a release func, or an error if ctx ends while queuing.
+//
+// Serialization is also the semantically correct model: axiom-scan already splits its
+// input across the WHOLE fleet, so several concurrent scans do not add throughput —
+// they just contend for the same nodes.
+func (a *AxiomBackend) dispatchGate(ctx context.Context) (func(), error) {
+	if a.dispatchSem == nil { // defensive: zero-value backend, never built by New*
+		return func() {}, nil
+	}
+	select {
+	case a.dispatchSem <- struct{}{}:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	if gap := axiomUIDSeparation - time.Since(a.lastDispatch); gap > 0 && !a.lastDispatch.IsZero() {
+		timer := time.NewTimer(gap)
+		select {
+		case <-timer.C:
+		case <-ctx.Done():
+			timer.Stop()
+			<-a.dispatchSem
+			return nil, ctx.Err()
+		}
+	}
+	a.lastDispatch = time.Now()
+	return func() { <-a.dispatchSem }, nil
 }
 
 // NewAxiomBackend constructs the real AxiomBackend with cfg.Axiom.* settings.
@@ -59,11 +157,12 @@ func NewAxiomBackend(cfg *config.Config, reg *ToolRegistry, logger *slog.Logger)
 		logger = slog.Default()
 	}
 	return &AxiomBackend{
-		cfg:       cfg,
-		reg:       reg,
-		log:       logger,
-		moduleMap: defaultAxiomModuleMap(),
-		local:     NewLocalBackend(0), // default kill grace
+		cfg:         cfg,
+		reg:         reg,
+		log:         logger,
+		moduleMap:   defaultAxiomModuleMap(),
+		local:       NewLocalBackend(0), // default kill grace
+		dispatchSem: make(chan struct{}, 1),
 	}
 }
 
@@ -75,11 +174,12 @@ func NewAxiomBackendWithLocal(cfg *config.Config, reg *ToolRegistry, logger *slo
 		logger = slog.Default()
 	}
 	return &AxiomBackend{
-		cfg:       cfg,
-		reg:       reg,
-		log:       logger,
-		moduleMap: defaultAxiomModuleMap(),
-		local:     local,
+		cfg:         cfg,
+		reg:         reg,
+		log:         logger,
+		moduleMap:   defaultAxiomModuleMap(),
+		local:       local,
+		dispatchSem: make(chan struct{}, 1),
 	}
 }
 
@@ -88,8 +188,10 @@ func NewAxiomBackendWithLocal(cfg *config.Config, reg *ToolRegistry, logger *slo
 // heuristic last-non-flag-arg scan (REVIEWS finding #5 fix).
 func (a *AxiomBackend) Exec(ctx context.Context, t *Tool, args []string) (*Result, error) {
 	module, ok := a.moduleMap[t.Name]
-	if !ok || module == "" {
-		// Unmapped or explicitly local-only → transparent local fallback.
+	if !ok || module == "" || isLocalOnlyAxiomOp(t.Name, args) || a.disabled.Load() {
+		// Unmapped, explicitly local-only, an op with no correct axiom module
+		// (puredns bruteforce — the map only has "puredns-resolve", the wrong op),
+		// or a fleet already known to be unusable → transparent local fallback.
 		return a.local.Exec(ctx, t, args)
 	}
 
@@ -104,22 +206,270 @@ func (a *AxiomBackend) Exec(ctx context.Context, t *Tool, args []string) (*Resul
 	// Resolve axiom-scan tool entry from registry (may be nil if not registered).
 	axiomTool := a.axiomScanTool()
 
-	// Build axiom-scan invocation: axiom-scan <inputFile> -m <module> -o <outFile>
-	outFile := inputFile + ".axiom.out"
-	axiomArgs := []string{inputFile, "-m", module, "-o", outFile}
+	// Build the axiom-scan invocation:
+	//   axiom-scan <inputFile> -m <module> <module args…> -o <outFile>
+	//
+	// The module args matter. axiom-scan's canned modules are minimal — dnsx is
+	// literally `cat input | dnsx -r <remote resolvers> -o output` — while v2's
+	// tasks build precise arg vectors and PARSE the matching output shape (dnsx
+	// `-recon -json`, nuclei `-jsonl`, …). Dropping them, as this did, meant even a
+	// perfectly healthy fleet returned output the task could not parse. axiom-scan
+	// forwards any argument it does not recognise to the module command, which is
+	// exactly how v1 drove it (modules/subdomains.sh: `-m nuclei -dast -nh -rl N …`).
+	outFile := axiomOutFile(inputFile, t.Name)
+	moduleArgs := moduleArgsFor(t, args, inputFile)
+	axiomArgs := []string{inputFile, "-m", module}
+	axiomArgs = append(axiomArgs, moduleArgs...)
+	axiomArgs = append(axiomArgs, "-o", outFile)
 	if a.cfg.Axiom.ExtraArgs != "" {
 		axiomArgs = append(axiomArgs, strings.Fields(a.cfg.Axiom.ExtraArgs)...)
 	}
+	// Serialize + space out fleet dispatches (axiom-scan uid collision, see dispatchGate).
+	// Done BEFORE the timeout clock starts so queueing never eats the tool's budget.
+	release, gateErr := a.dispatchGate(ctx)
+	if gateErr != nil {
+		return nil, gateErr
+	}
+	defer release()
 
-	res, err := a.local.Exec(ctx, axiomTool, axiomArgs)
+	// Logged AFTER the gate: this line means "an axiom-scan is starting NOW". Logging
+	// it before made the live reports overcount — four "dispatching" lines when
+	// serialization meant only one axiom-scan had actually run.
+	if a.log != nil {
+		a.log.Debug("axiom_backend: dispatching to fleet",
+			slog.String("tool", t.Name), slog.String("module", module),
+			slog.String("input", inputFile), slog.String("out", outFile),
+			slog.Any("module_args", moduleArgs))
+	}
+
+	// Never let a leftover file from an earlier run masquerade as this run's results.
+	_ = os.Remove(outFile)
+
+	// Bound the dispatch by axiomDispatchTimeout, or by the tool's own registered
+	// budget when that is SHORTER. Distribution must never buy a tool more wall-clock
+	// than running it locally would, and a dispatch that outlives axiomDispatchTimeout
+	// has already lost to simply running local.
+	budget := axiomDispatchTimeout
+	if t.Timeout > 0 && t.Timeout < budget {
+		budget = t.Timeout
+	}
+	execCtx, cancel := context.WithTimeout(ctx, budget)
+	defer cancel()
+
+	res, err := a.local.Exec(execCtx, axiomTool, axiomArgs)
 	if err != nil {
+		// A dispatch that ran out of OUR budget (not the caller's) is a fleet problem,
+		// not a tool problem: report it as an AxiomFailure so the tool re-runs locally.
+		if ctx.Err() == nil && execCtx.Err() != nil {
+			a.recordDispatchFailure("dispatch exceeded " + budget.String())
+			return nil, &coreerrors.AxiomFailure{
+				Operation: "exec",
+				Inner: fmt.Errorf("axiom-scan %s (module %s) did not return within %s — running locally instead",
+					t.Name, module, budget),
+			}
+		}
+		a.recordDispatchFailure("axiom-scan error")
 		return nil, &coreerrors.AxiomFailure{
 			Operation: "exec",
 			Inner:     fmt.Errorf("axiom-scan %s: %w", t.Name, err),
 		}
 	}
+	if res == nil {
+		return nil, &coreerrors.AxiomFailure{
+			Operation: "exec",
+			Inner:     fmt.Errorf("axiom-scan %s: nil result", t.Name),
+		}
+	}
+
+	// axiom-scan writes the fleet's aggregated tool output to outFile; its own stdout
+	// is only progress/status noise (a large ASCII-art banner, then status lines).
+	//
+	// A MISSING outFile is the only reliable failure signal: axiom-scan aborts with
+	// `exit` (no status) after printing e.g. "Unable to reach any instance selected",
+	// so it exits 0 on a dead fleet. Surfacing its stdout in that case wrote the
+	// BANNER TEXT into subdomains_dnsregs.json / resolved.*.txt as if it were tool
+	// output — a silent data-poisoning bug. Returning *AxiomFailure instead lets
+	// FailoverBackend immediately re-run the tool locally with correct results.
+	out, rerr := os.ReadFile(outFile) //nolint:gosec // path derived from inputFile within the workspace
+	if rerr != nil {
+		diag := axiomScanDiagnostic(res)
+		if isFleetUnreachable(diag) {
+			// One dead fleet means every later dispatch dies the same way, each
+			// paying a full SSH preflight. Latch local for the rest of the run.
+			a.markDisabled("fleet unreachable: " + diag)
+		}
+		a.recordDispatchFailure("no output file")
+		return nil, &coreerrors.AxiomFailure{
+			Operation: "exec",
+			Inner: fmt.Errorf("axiom-scan %s (module %s) produced no output file: %s",
+				t.Name, module, diag),
+		}
+	}
+	_ = os.Remove(outFile)
+	res.Stdout = out
+	a.dispatchFailures.Store(0) // a real result — the fleet is healthy again
 
 	return res, nil
+}
+
+// axiomOutSeq numbers dispatch output files so concurrent dispatches never share one.
+var axiomOutSeq atomic.Uint64
+
+// axiomOutFile builds a unique `-o` path for one dispatch.
+//
+// It used to be `inputFile + ".axiom.out"`, derived solely from the input — but
+// several tasks legitimately read the SAME input concurrently. A live run showed
+// four dispatches (puredns-resolve + three dnsx variants) firing within 30ms, all
+// pointed at inputs/passive.merged.txt.axiom.out: each one's pre-dispatch cleanup
+// could delete another's finished results, and a read could pick up the wrong tool's
+// output entirely. Per-dispatch names remove the race.
+func axiomOutFile(inputFile, tool string) string {
+	safe := strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_':
+			return r
+		default:
+			return '-'
+		}
+	}, tool)
+	return fmt.Sprintf("%s.axiom.%s.%d.out", inputFile, safe, axiomOutSeq.Add(1))
+}
+
+// moduleArgsFor returns the tool's own arguments to forward to axiom-scan, which
+// appends anything it does not recognise to the remote module command.
+//
+// Three classes are dropped:
+//
+//  1. The input file (and its flag) — axiom-scan splits and supplies it as the
+//     module's `input` placeholder — plus a leading puredns sub-command verb, which
+//     the module command already contains.
+//  2. Flags axiom-scan owns (-m/-o/-oJ/…), which would fight the ones we set.
+//  3. Arguments naming a path that exists on THIS machine (resolver lists, wordlists,
+//     nuclei template dirs). Fleet nodes have their own copies at their own paths and
+//     the module command already points at them; forwarding a local path makes the
+//     remote tool fail. v1 handled this with a separate AXIOM_RESOLVERS_PATH setting;
+//     the existence check generalises it — a path that is NOT local (already a remote
+//     path) is forwarded untouched, matching v1's behaviour exactly.
+func moduleArgsFor(t *Tool, args []string, inputFile string) []string {
+	out := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+
+		// (1) input file, its flag, and the positional sub-command verb.
+		if t != nil && t.InputFlag != "" && arg == t.InputFlag {
+			i++ // skip the value as well
+			continue
+		}
+		if arg == inputFile || isPurednsVerb(arg) {
+			continue
+		}
+
+		// (2) axiom-scan's own flags.
+		if axiomScanOwnedFlags[arg] {
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				i++
+			}
+			continue
+		}
+
+		// (3) local-only paths (drop the flag with its value).
+		if strings.HasPrefix(arg, "-") && i+1 < len(args) && isExistingLocalPath(args[i+1]) {
+			i++
+			continue
+		}
+		if isExistingLocalPath(arg) {
+			continue
+		}
+
+		out = append(out, arg)
+	}
+	return out
+}
+
+// axiomScanOwnedFlags are the output/module flags axiom-scan consumes itself.
+// Forwarding a tool's own copy would collide with the -m/-o we set.
+var axiomScanOwnedFlags = map[string]bool{
+	"-m": true, "-o": true, "-oJ": true, "-oX": true, "-oD": true,
+	"-csv": true, "-none": true, "--extra-args": true,
+}
+
+// isPurednsVerb reports whether arg is a puredns sub-command verb. The axiom
+// puredns-resolve module command already starts with `puredns resolve`, so
+// forwarding the verb again would corrupt the remote command line.
+func isPurednsVerb(arg string) bool {
+	return arg == "resolve" || arg == "bruteforce"
+}
+
+// isExistingLocalPath reports whether s looks like a filesystem path AND exists on
+// this machine. The separator requirement keeps bare values ("3", "resolve") from
+// accidentally matching a same-named file in the working directory.
+func isExistingLocalPath(s string) bool {
+	if s == "" || !strings.ContainsAny(s, "/\\") {
+		return false
+	}
+	if _, err := os.Stat(s); err != nil {
+		return false
+	}
+	return true
+}
+
+// axiomScanDiagnostic extracts a short, human-readable reason from axiom-scan's
+// output. Its stdout leads with a multi-line ASCII-art banner, so this picks the
+// last non-empty line (where the error lands) with ANSI escapes stripped.
+func axiomScanDiagnostic(res *Result) string {
+	if res == nil {
+		return "no output"
+	}
+	for _, stream := range [][]byte{res.Stderr, res.Stdout} {
+		lines := bytes.Split(stream, []byte("\n"))
+		for i := len(lines) - 1; i >= 0; i-- {
+			if line := strings.TrimSpace(stripANSI(string(lines[i]))); line != "" {
+				return line
+			}
+		}
+	}
+	return "no output"
+}
+
+// stripANSI removes ANSI SGR escape sequences so diagnostics stay readable in
+// JSON logs (axiom-scan colours its error lines).
+func stripANSI(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		if s[i] == 0x1b {
+			for i < len(s) && s[i] != 'm' {
+				i++
+			}
+			continue
+		}
+		b.WriteByte(s[i])
+	}
+	return b.String()
+}
+
+// isFleetUnreachable matches axiom-scan's "no usable instances" abort, the
+// condition that warrants latching local for the rest of the run.
+func isFleetUnreachable(diag string) bool {
+	d := strings.ToLower(diag)
+	return strings.Contains(d, "unable to reach any instance") ||
+		strings.Contains(d, "no instances selected")
+}
+
+// recordDispatchFailure counts a failed dispatch and abandons the fleet once
+// axiomDispatchFailureLatch of them happen in a row. Without this, every remaining
+// tool of the scan pays the full axiomDispatchTimeout before falling back.
+func (a *AxiomBackend) recordDispatchFailure(reason string) {
+	if a.dispatchFailures.Add(1) >= axiomDispatchFailureLatch {
+		a.markDisabled(fmt.Sprintf("%d dispatches in a row failed (%s)", axiomDispatchFailureLatch, reason))
+	}
+}
+
+// markDisabled latches the local-only fallback and logs why (once).
+func (a *AxiomBackend) markDisabled(reason string) {
+	if a.disabled.CompareAndSwap(false, true) && a.log != nil {
+		a.log.Warn("axiom_backend: fleet unusable — running every remaining tool locally",
+			slog.String("reason", reason), slog.String("fleet", a.cfg.Axiom.FleetName))
+	}
 }
 
 // ExecEnv implements the Backend env seam. The axiom fleet split has NO env
@@ -169,8 +519,21 @@ func extractInputFile(t *Tool, args []string) string {
 		}
 		return "" // flag not found
 	}
-	// InputFlag="" — positional: last element.
-	return args[len(args)-1]
+	// InputFlag="" — positional. puredns (the only positional mapped tool) is invoked
+	// verb-first: `puredns resolve <file> …` / `puredns bruteforce <wordlist> …`. Return
+	// the FIRST non-flag arg, skipping a leading sub-command verb. The old "last element"
+	// heuristic returned a trailing flag like "--quiet", so axiom-scan got a bogus input
+	// path and the distributed run silently yielded nothing.
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			continue // skip flags and their inline values are positional-independent here
+		}
+		if arg == "resolve" || arg == "bruteforce" {
+			continue // skip the puredns sub-command verb
+		}
+		return arg
+	}
+	return ""
 }
 
 // axiomScanTool looks up the "axiom-scan" entry from the registry.
@@ -190,7 +553,7 @@ func (a *AxiomBackend) axiomScanTool() *Tool {
 // to local.Stream transparently.
 func (a *AxiomBackend) Stream(ctx context.Context, t *Tool, args []string) (<-chan Event, error) {
 	module, ok := a.moduleMap[t.Name]
-	if !ok || module == "" {
+	if !ok || module == "" || isLocalOnlyAxiomOp(t.Name, args) || a.disabled.Load() {
 		return a.local.Stream(ctx, t, args)
 	}
 	// Axiom: run Exec (buffer whole result), then pipe through a channel.
@@ -220,7 +583,9 @@ func (a *AxiomBackend) Stream(ctx context.Context, t *Tool, args []string) (<-ch
 // "REMOTE HOST IDENTIFICATION HAS CHANGED", triggers repairKnownHosts
 // when AutoFixHostkey=true; otherwise returns *AxiomFailure.
 func (a *AxiomBackend) HealthCheck(ctx context.Context) error {
-	probeResult, err := a.local.Exec(ctx, a.axiomScanTool(), []string{"echo", "reconftw-axiom-probe"})
+	pctx, cancel := context.WithTimeout(ctx, axiomSelectTimeout)
+	defer cancel()
+	probeResult, err := a.local.Exec(pctx, a.axiomScanTool(), []string{"echo", "reconftw-axiom-probe"})
 
 	var stderrBytes []byte
 	if probeResult != nil {
@@ -262,7 +627,9 @@ func (a *AxiomBackend) repairKnownHosts(ctx context.Context, errOutput []byte) e
 	if host == "" {
 		repairArgs = []string{"-R", a.cfg.Axiom.FleetName}
 	}
-	_, err := a.local.Exec(ctx, sshKeygenTool, repairArgs)
+	kctx, cancel := context.WithTimeout(ctx, axiomPropagateTimeout)
+	defer cancel()
+	_, err := a.local.Exec(kctx, sshKeygenTool, repairArgs)
 	if err != nil {
 		a.log.Warn("axiom_backend: repairKnownHosts ssh-keygen failed",
 			slog.String("host", host), slog.Any("err", err))
@@ -301,25 +668,77 @@ func (a *AxiomBackend) Capacity() int {
 // Launch provisions the axiom fleet, selects it, and propagates resolver files.
 // Called by newSubsCmd before the first RunStage.
 func (a *AxiomBackend) Launch(ctx context.Context) error {
-	// Select (or create) the fleet by name.
-	axiomSelectTool := &Tool{Name: "axiom-select", Path: "axiom-select"}
-	if _, err := a.local.Exec(ctx, axiomSelectTool, []string{a.cfg.Axiom.FleetName}); err != nil {
-		return &coreerrors.AxiomFailure{
-			Operation: "launch",
-			Inner:     fmt.Errorf("axiom-select %s: %w", a.cfg.Axiom.FleetName, err),
-		}
-	}
-	// If FleetLaunch is set, provision missing nodes.
+	// If FleetLaunch is set, provision missing nodes FIRST — selecting before the
+	// instances exist can only ever match nothing.
 	if a.cfg.Axiom.FleetLaunch {
 		fleet2Tool := &Tool{Name: "axiom-fleet2", Path: "axiom-fleet2"}
-		fleetArgs := []string{"deploy", a.cfg.Axiom.FleetName,
-			fmt.Sprintf("--count=%d", a.cfg.Axiom.FleetCount)}
-		if _, err := a.local.Exec(ctx, fleet2Tool, fleetArgs); err != nil {
+		fleetArgs := []string{
+			"deploy", a.cfg.Axiom.FleetName,
+			fmt.Sprintf("--count=%d", a.cfg.Axiom.FleetCount),
+		}
+		dctx, cancel := context.WithTimeout(ctx, axiomDeployTimeout)
+		_, err := a.local.Exec(dctx, fleet2Tool, fleetArgs)
+		cancel()
+		if err != nil {
 			a.log.Warn("axiom_backend: fleet2 deploy failed (non-fatal if fleet exists)",
 				slog.String("fleet", a.cfg.Axiom.FleetName), slog.Any("err", err))
 		}
 	}
+
+	// Select the fleet's instances. THE NAME MUST BE A PREFIX GLOB: axiom names a
+	// fleet's members <fleet>01, <fleet>02, … so `axiom-select <fleet>` matches none
+	// of them and writes an EMPTY selected.conf — after which every axiom-scan aborts
+	// with "Unable to reach any instance selected" while still exiting 0. axiom-select's
+	// own help documents the wildcard form (`axiom-select elion*`).
+	axiomSelectTool := &Tool{Name: "axiom-select", Path: "axiom-select"}
+	selector := fleetSelector(a.cfg.Axiom.FleetName)
+	sctx, cancelSelect := context.WithTimeout(ctx, axiomSelectTimeout)
+	res, err := a.local.Exec(sctx, axiomSelectTool, []string{selector})
+	cancelSelect()
+	if err != nil {
+		a.markDisabled("axiom-select failed")
+		return &coreerrors.AxiomFailure{
+			Operation: "launch",
+			Inner:     fmt.Errorf("axiom-select %s: %w", selector, err),
+		}
+	}
+	// axiom-select exits 0 even when it matched nothing; its "Selected: [ … ]" line
+	// is the only signal. Catch it here so the run degrades to local immediately
+	// instead of after N failed dispatches.
+	if res != nil && selectedNoInstances(res.Stdout) {
+		a.markDisabled("axiom-select matched no instances for " + selector)
+		return &coreerrors.AxiomFailure{
+			Operation: "launch",
+			Inner: fmt.Errorf("axiom-select %s matched no instances — is the fleet up? (axiom-ls)",
+				selector),
+		}
+	}
+	if a.log != nil {
+		a.log.Info("axiom_backend: fleet selected", slog.String("selector", selector))
+	}
 	return a.resolversPropagation(ctx)
+}
+
+// fleetSelector turns a fleet name into the instance-matching glob axiom expects.
+// Already-globbed names are passed through untouched.
+func fleetSelector(fleetName string) string {
+	if fleetName == "" || strings.ContainsAny(fleetName, "*?") {
+		return fleetName
+	}
+	return fleetName + "*"
+}
+
+// selectedNoInstances reports whether axiom-select's output shows an empty
+// selection — its final line is `Selected: [  <names…>  ]`.
+func selectedNoInstances(stdout []byte) bool {
+	text := stripANSI(string(stdout))
+	idx := strings.LastIndex(text, "Selected:")
+	if idx < 0 {
+		return false // unrecognised output shape — don't guess, let dispatch decide
+	}
+	sel := text[idx+len("Selected:"):]
+	sel = strings.TrimSpace(strings.Trim(strings.TrimSpace(sel), "[]"))
+	return strings.TrimSpace(sel) == ""
 }
 
 // Shutdown removes the fleet when ShutdownOnEnd=true.
@@ -327,36 +746,71 @@ func (a *AxiomBackend) Shutdown(ctx context.Context) error {
 	if !a.cfg.Axiom.ShutdownOnEnd {
 		return nil
 	}
+	// Same naming rule as Launch — and here it costs MONEY: `axiom-rm <fleet>` matches
+	// no instance (they are <fleet>01, <fleet>02, …), so shutdown_on_end silently left
+	// the paid droplets running. Delete by prefix glob.
 	axiomRmTool := &Tool{Name: "axiom-rm", Path: "axiom-rm"}
-	if _, err := a.local.Exec(ctx, axiomRmTool, []string{a.cfg.Axiom.FleetName, "--force"}); err != nil {
+	selector := fleetSelector(a.cfg.Axiom.FleetName)
+	rctx, cancel := context.WithTimeout(ctx, axiomShutdownTimeout)
+	defer cancel()
+	if _, err := a.local.Exec(rctx, axiomRmTool, []string{selector, "--force"}); err != nil {
 		return &coreerrors.AxiomFailure{
 			Operation: "shutdown",
-			Inner:     fmt.Errorf("axiom-rm %s: %w", a.cfg.Axiom.FleetName, err),
+			Inner:     fmt.Errorf("axiom-rm %s: %w", selector, err),
 		}
 	}
-	a.log.Info("axiom_backend: fleet shut down", slog.String("fleet", a.cfg.Axiom.FleetName))
+	a.log.Info("axiom_backend: fleet shut down", slog.String("fleet", selector))
 	return nil
 }
 
-// resolversPropagation uploads resolver files to the fleet nodes via axiom-exec.
-// Mirrors v1 resolvers_update logic from modules/axiom.sh:55-120 (AXIOM-05).
+// resolversPropagation copies the operator's resolver lists onto the fleet nodes
+// (AXIOM-05), so distributed puredns/dnsx resolve against the same set as a local run.
+//
+// It previously shelled a heredoc through axiom-exec:
+//
+//	axiom-exec "cat > /tmp/resolvers.txt << 'EOF'\n$(cat <path>)\nEOF"
+//
+// which was wrong twice over. The `$(cat …)` expands on the REMOTE node, where that
+// file is what we were trying to create; and it wrote /tmp/resolvers.txt, which no
+// axiom module reads. Worse, on a live run that command HUNG — it burned the entire
+// 120-minute scan budget inside Launch and the scan produced nothing. (It had never
+// hung before only because the fleet-selection bug made axiom-exec abort instantly.)
+//
+// axiom-scp is the purpose-built transfer (`axiom-scp <local> 'fleet*':<remote>`) —
+// no remote shell, no heredoc, no stdin. Per-file deadline and best-effort throughout:
+// the axiom images already ship resolver lists, so a failed refresh must never be
+// more than a warning.
+//
+// Source paths are the operator's LOCAL lists (cfg.Paths.*); destinations are the
+// node-side paths (cfg.Advanced.Tools.Axiom.*Path, default /home/op/lists/*) that the
+// axiom module commands read — the same split v1 used (AXIOM_RESOLVERS_PATH).
 func (a *AxiomBackend) resolversPropagation(ctx context.Context) error {
-	resolversPath := a.cfg.Advanced.Tools.Axiom.ResolversPath
-	trustedPath := a.cfg.Advanced.Tools.Axiom.ResolversTrustedPath
-	if resolversPath == "" && trustedPath == "" {
-		return nil // nothing to propagate
+	uploads := []struct{ local, remote string }{
+		{a.cfg.Paths.Resolvers, a.cfg.Advanced.Tools.Axiom.ResolversPath},
+		{a.cfg.Paths.ResolversTrusted, a.cfg.Advanced.Tools.Axiom.ResolversTrustedPath},
 	}
-	axiomExecTool := &Tool{Name: "axiom-exec", Path: "axiom-exec"}
-	for _, rpath := range []string{resolversPath, trustedPath} {
-		if rpath == "" {
+	selector := fleetSelector(a.cfg.Axiom.FleetName)
+	axiomScpTool := &Tool{Name: "axiom-scp", Path: "axiom-scp"}
+
+	for _, up := range uploads {
+		if up.local == "" || up.remote == "" {
+			continue // nothing configured to send, or nowhere to send it
+		}
+		if _, err := os.Stat(up.local); err != nil {
+			a.log.Debug("axiom_backend: resolver list not present locally — skipping upload",
+				slog.String("file", up.local))
 			continue
 		}
-		// Upload file to each fleet node via axiom-exec scp-style transfer.
-		uploadArgs := []string{fmt.Sprintf("cat > /tmp/resolvers.txt << 'EOF'\n$(cat %s)\nEOF", rpath)}
-		if _, err := a.local.Exec(ctx, axiomExecTool, uploadArgs); err != nil {
-			a.log.Warn("axiom_backend: resolver propagation failed (non-fatal)",
-				slog.String("file", rpath), slog.Any("err", err))
+		uctx, cancel := context.WithTimeout(ctx, axiomPropagateTimeout)
+		_, err := a.local.Exec(uctx, axiomScpTool, []string{up.local, selector + ":" + up.remote})
+		cancel()
+		if err != nil {
+			a.log.Warn("axiom_backend: resolver propagation failed (non-fatal — nodes keep their own lists)",
+				slog.String("from", up.local), slog.String("to", up.remote), slog.Any("err", err))
+			continue
 		}
+		a.log.Debug("axiom_backend: resolvers propagated to fleet",
+			slog.String("from", up.local), slog.String("to", up.remote))
 	}
 	return nil
 }

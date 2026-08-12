@@ -32,7 +32,7 @@ func (s *stubScheduler) MaxConcurrency() int { return s.max }
 // stubCheckpoint satisfies checkpoint.Interface.
 type stubCP struct{}
 
-func (s *stubCP) Begin(_ context.Context, _, _, _ string) error            { return nil }
+func (s *stubCP) Begin(_ context.Context, _, _, _ string) error { return nil }
 func (s *stubCP) Complete(_ context.Context, _, _, _ string, _ []string, _ error) error {
 	return nil
 }
@@ -153,7 +153,7 @@ func TestNewTargetRejectsInjection(t *testing.T) {
 	}
 }
 
-// Test 5: Boot picks AxiomBackend when cfg.Axiom.Enabled = true.
+// Test 5: Boot wraps AxiomBackend in a FailoverBackend when cfg.Axiom.Enabled = true.
 // We verify indirectly by inspecting the Backend type via app.Tools.Backend.
 func TestBootBackendSelection(t *testing.T) {
 	cfg := newTestConfig()
@@ -164,10 +164,12 @@ func TestBootBackendSelection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Boot: %v", err)
 	}
-	// The Backend type-name should be *backend.AxiomBackend.
+	// Since 2026-08, axiom-enabled Boot wraps AxiomBackend in a *FailoverBackend
+	// (AxiomBackend primary + local fallback) so config-only axiom still has failover
+	// AND a consistent type for the composite handler's Launch/Shutdown assertion.
 	bt := fmt.Sprintf("%T", app.Tools.Backend)
-	if !strings.Contains(bt, "AxiomBackend") {
-		t.Errorf("Axiom-enabled Boot picked %s; want *backend.AxiomBackend", bt)
+	if !strings.Contains(bt, "FailoverBackend") {
+		t.Errorf("Axiom-enabled Boot picked %s; want *backend.FailoverBackend (wrapping AxiomBackend)", bt)
 	}
 
 	cfg.Axiom.Enabled = false

@@ -188,10 +188,19 @@ func Boot(ctx context.Context, logger *slog.Logger, cfg *config.Config, target *
 // pickBackend chooses LocalBackend (default) or AxiomBackend per cfg.Axiom.Enabled.
 // logger is required for AxiomBackend (repairKnownHosts logging).
 func pickBackend(cfg *config.Config, logger *slog.Logger) backend.Backend {
-	if cfg.Axiom.Enabled {
-		return backend.NewAxiomBackend(cfg, backend.Default, logger)
-	}
 	killGrace := time.Duration(cfg.Concurrency.KillGraceSeconds) * time.Second
+	if cfg.Axiom.Enabled {
+		// Wrap in a FailoverBackend so config-only axiom (Axiom.Enabled=true WITHOUT the
+		// --axiom flag) still gets a local fallback AND ChosenBackend is consistently a
+		// *FailoverBackend — the composite handler asserts that type to run the fleet
+		// Launch/Shutdown. A bare AxiomBackend here would skip fleet lifecycle entirely
+		// and leave the Runner with no local fallback (mirrors common.go's flag path).
+		return &backend.FailoverBackend{
+			Primary:   backend.NewAxiomBackend(cfg, backend.Default, logger),
+			Fallback:  backend.NewLocalBackend(killGrace),
+			Threshold: cfg.Axiom.FailoverThreshold,
+		}
+	}
 	return backend.NewLocalBackend(killGrace)
 }
 
