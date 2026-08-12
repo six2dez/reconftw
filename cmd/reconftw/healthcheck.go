@@ -26,6 +26,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -124,6 +125,7 @@ func runHealthCheck(cmd *cobra.Command, app *appctx.AppContext, cfg *config.Conf
 		// Phase 3 baseline — Plan 07's tools.lock seed populates real entries.
 		printer.Status(ui.BadgeOK, "tools (0 registered — Phase 3 baseline)", 0)
 	}
+	okCount, missingNames := 0, []string(nil)
 	for _, t := range all {
 		start = time.Now()
 		switch {
@@ -132,11 +134,26 @@ func runHealthCheck(cmd *cobra.Command, app *appctx.AppContext, cfg *config.Conf
 			printer.Status(ui.BadgeFAIL, "tool."+t.Name+" (critical)", time.Since(start))
 			criticalFail = true
 			missingCriticalCount++
+			missingNames = append(missingNames, t.Name)
 		case missingReqSet[t.Name]:
 			// Blocker 5: missing-but-required (Critical=false) → WARN, exit 0.
 			printer.Status(ui.BadgeWARN, "tool."+t.Name+" (required)", time.Since(start))
+			missingNames = append(missingNames, t.Name)
 		default:
 			printer.Status(ui.BadgeOK, "tool."+t.Name, time.Since(start))
+			okCount++
+		}
+	}
+
+	// Closing summary. Without it the interesting lines — a handful of WARN/FAIL —
+	// are buried in a hundred [OK] rows scrolled off the top of the terminal, and
+	// the operator has to eyeball every line to learn what is actually missing.
+	if len(all) > 0 {
+		fmt.Fprintf(w, "\n  %d tools: %d present, %d missing (%d critical)\n",
+			len(all), okCount, len(missingNames), missingCriticalCount)
+		if len(missingNames) > 0 {
+			fmt.Fprintf(w, "  missing: %s\n", strings.Join(missingNames, " "))
+			fmt.Fprintf(w, "  install them with: reconftw install\n")
 		}
 	}
 
