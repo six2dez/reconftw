@@ -75,9 +75,38 @@ func main() {
 			}
 			os.Exit(ec.code)
 		}
-		slog.Error("reconftw_exit_error", "err", err)
+		// Human-readable on stderr, not a JSON log record. This is the message an
+		// operator reads after a typo ("unknown flag: --recno", "--target is
+		// required"), and rendering it as a slog line made ordinary CLI mistakes
+		// look like internal failures. The structured copy stays available at debug.
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if isUsageError(err) {
+			fmt.Fprintf(os.Stderr, "Run 'reconftw --help' for usage.\n")
+		}
+		slog.Debug("reconftw_exit_error", "err", err)
 		os.Exit(1)
 	}
+}
+
+// isUsageError reports whether err is the kind of mistake a usage hint helps with
+// (a mistyped flag, a missing required flag, an unknown subcommand) rather than a
+// runtime failure. cobra/pflag return these as plain errors, so match on their
+// stable message prefixes.
+func isUsageError(err error) bool {
+	msg := err.Error()
+	for _, p := range []string{
+		"unknown flag",
+		"unknown shorthand flag",
+		"unknown command",
+		"flag needs an argument",
+		"invalid argument",
+		"is required",
+	} {
+		if strings.Contains(msg, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // run is the testable entry point — wraps the 10-STEP ADR §10.3 init order.

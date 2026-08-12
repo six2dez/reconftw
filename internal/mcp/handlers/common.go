@@ -107,6 +107,24 @@ type RunOptions struct {
 	// (INTEG-03). Dry-run must NOT bypass — the dry-run early-return in each
 	// RunXAsync is the real guard, so a stray --dry-run --force is harmless.
 	Force bool
+	// OutputDir is the operator's -o/--output workspace root ("" = none). Applied
+	// over cfg.Paths.DataDir so the flag beats the config file. The flag was
+	// declared and documented in --help from the start but read by nothing, so
+	// every run silently landed in the configured/default workspaces/ root.
+	OutputDir string
+	// LogLevel is the operator's --log-level / --quiet / --verbose override
+	// ("" = none). BootReconApp applies it to ITS freshly-loaded config AFTER
+	// ConfigTransform, so the CLI flag wins over both the config file and the
+	// zen/deep profiles. Without this the composite path silently ran at the
+	// config-file level and `--log-level debug` emitted zero DEBUG lines.
+	LogLevel string
+	// Logger is the app logger. nil → slog.Default() (the MCP server sets a
+	// redacted default before starting scans, so nil stays safe there). The CLI
+	// passes the logger it rebuilt from --log-level so AppContext.Log AND
+	// AxiomBackend share one explicitly-levelled logger — AxiomBackend used to
+	// take slog.Default() via a nil argument, which made its fleet-dispatch
+	// diagnostics invisible whenever the default was left at info.
+	Logger *slog.Logger
 	// SuppressScanNotify silences the in-scan notification seam (notifyScanStart/
 	// notifyScanComplete/notifyScanFailure) for this run. Set by the monitor loop
 	// so its per-cycle RunCompositeAsync calls stay quiet — the monitor owns its
@@ -230,6 +248,24 @@ func BootReconApp(ctx context.Context, opts RunOptions) (AppBoot, error) {
 		cfg.Advanced.Diff = true
 	}
 
+	// --log-level / --quiet / --verbose consumption. Applied AFTER ConfigTransform
+	// so the CLI flag beats both the config file and the zen/deep profiles.
+	if opts.LogLevel != "" {
+		cfg.Output.LogLevel = opts.LogLevel
+	}
+
+	// -o/--output consumption. Same precedence rule: the flag beats the config file.
+	if opts.OutputDir != "" {
+		cfg.Paths.DataDir = opts.OutputDir
+	}
+
+	// The app logger. Explicit beats implicit: everything downstream (AppContext.Log,
+	// AxiomBackend) gets THIS logger rather than reaching for slog.Default().
+	logger := opts.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+
 	// Step 2: Build target.
 	tgt, err := appctx.NewTarget(opts.Target, nil, "")
 	if err != nil {
@@ -252,7 +288,7 @@ func BootReconApp(ctx context.Context, opts RunOptions) (AppBoot, error) {
 	// Step 5: Choose backend.
 	var chosenBackend backend.Backend
 	if opts.AxiomEnabled {
-		axiomBE := backend.NewAxiomBackend(cfg, backend.Default, nil)
+		axiomBE := backend.NewAxiomBackend(cfg, backend.Default, logger)
 		localBE := backend.NewLocalBackend(time.Duration(cfg.Concurrency.KillGraceSeconds) * time.Second)
 		chosenBackend = &backend.FailoverBackend{
 			Primary:   axiomBE,
@@ -262,10 +298,10 @@ func BootReconApp(ctx context.Context, opts RunOptions) (AppBoot, error) {
 	}
 	// nil chosenBackend → Boot.pickBackend selects LocalBackend.
 
-	// Step 5a: Boot the AppContext.
-	// Logger nil → uses slog.Default(). The MCP server sets slog.Default to a
-	// redacted logger before starting scans, so this is safe.
-	app, err := appctx.Boot(ctx, nil, cfg, tgt, opts.Scheduler, appctx.BootOptions{
+	// Step 5a: Boot the AppContext with the resolved logger (opts.Logger, or
+	// slog.Default() when the caller supplied none — the MCP server sets a
+	// redacted default before starting scans, so that path stays safe).
+	app, err := appctx.Boot(ctx, logger, cfg, tgt, opts.Scheduler, appctx.BootOptions{
 		Backend:     chosenBackend,
 		PassiveMode: opts.PassiveMode,
 	})

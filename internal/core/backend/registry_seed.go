@@ -86,7 +86,11 @@ func init() {
 		}
 		Default.Register(tool)
 	}
-	slog.Info("tools_lock_loaded",
+	// Debug, not Info: this runs from package init, BEFORE main.run builds the real
+	// logger, so at Info it printed a stray stdlib-formatted line above the output of
+	// EVERY invocation — `reconftw --help`, `version`, shell completion, error paths.
+	// Tool inventory is reported by `health-check`, which is where an operator looks.
+	slog.Debug("tools_lock_loaded",
 		"tool_count", len(lock.Tools),
 		"schema_version", lock.SchemaVersion,
 		"generated_by", lock.GeneratedBy,

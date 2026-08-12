@@ -33,6 +33,10 @@ func newRootCmd(app *appctx.AppContext, cfg *config.Config) *cobra.Command {
 	root := &cobra.Command{
 		Use:   "reconftw",
 		Short: "Comprehensive reconnaissance automation framework",
+		// Setting Version makes cobra provide `--version` for free. The `version`
+		// subcommand (richer: commit, build date, go version, platform) stays; this
+		// covers the flag form every operator tries first.
+		Version: Version,
 		Long: `reconFTW v2 — orchestrates 70+ external security tools across subdomain
 enumeration, web probing, OSINT, and vulnerability scanning. Single binary;
 resumable checkpoints; structured output; optional Axiom distributed execution.
@@ -41,6 +45,15 @@ See subcommands below for v2 modes. v1 flags (--recon, -r, --all, -a, ...)
 remain functional with deprecation warnings until v2.2.0 per ADR 0002 §8.4.`,
 		SilenceUsage:  true, // RunE errors should not dump --help every time
 		SilenceErrors: true, // main() handles error printing
+		// --log-level / --quiet / --verbose are parsed by cobra at STEP 10, long
+		// after main.run built the logger at STEP 6 — this hook is the only place
+		// they can still take effect. See loglevel.go for the full wiring.
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			applyCLILogLevel(cmd.Root(), cfg)
+			applyCLIOutputDir(cmd.Root())
+			warnIfAxiom(cmd.Root())
+			return nil
+		},
 	}
 
 	addPersistentGlobalFlags(root)
@@ -69,6 +82,9 @@ remain functional with deprecation warnings until v2.2.0 per ADR 0002 §8.4.`,
 
 	// Phase 10 plan 02: notify --test reachability subcommand (NOTIF-04).
 	root.AddCommand(newNotifyCmd())
+
+	// Config introspection over the 8-source merge chain.
+	root.AddCommand(newConfigCmd())
 
 	// 1 working v2 subcommand from the §8.1 visible inventory (per D-04).
 	root.AddCommand(newHealthCheckCmd(app, cfg))
@@ -99,7 +115,7 @@ func addPersistentGlobalFlags(root *cobra.Command) {
 	root.PersistentFlags().Bool("dry-run", false, "Preview tool invocations without executing")
 	root.PersistentFlags().Bool("force", false, "Bypass checkpoint cache; re-run completed tasks")
 	root.PersistentFlags().String("log-level", "info", "slog level (debug|info|warn|error)")
-	root.PersistentFlags().Bool("axiom", false, "Enable axiom distributed execution")
+	root.PersistentFlags().Bool("axiom", false, "Enable axiom distributed execution (EXPERIMENTAL — see --help)")
 	root.PersistentFlags().BoolP("quiet", "q", false, "Quiet mode (alias for --log-level=error)")
 	root.PersistentFlags().BoolP("verbose", "V", false, "Verbose mode (alias for --log-level=debug)")
 	root.PersistentFlags().StringP("output", "o", "workspaces", "Output workspace directory root")
@@ -120,7 +136,7 @@ func addPersistentGlobalFlags(root *cobra.Command) {
 //
 // Counts (D-03 spec):
 //   - 9 long-flag aliases:  --recon, --all, --passive, --subdomains, --web,
-//                           --vulns, --osint, --monitor, --health-check
+//     --vulns, --osint, --monitor, --health-check
 //   - 8 short-flag aliases: -r, -a, -p, -s, -w, -n, -z, -y
 //   - 3 global aliases:     -d (target), -l (list), -v (axiom — "vps")
 //
@@ -189,7 +205,8 @@ func addV1DeprecatedAliases(root *cobra.Command) {
 // "flag not registered", which is a programmer mistake (panic-worthy).
 func mustMarkDeprecated(fs interface {
 	MarkDeprecated(name, usageMessage string) error
-}, name, message string) {
+}, name, message string,
+) {
 	// Append the removal version (ADR 0002 §8.4) so every deprecation warning
 	// states when the alias goes away — MODE-09 criterion 5.
 	if err := fs.MarkDeprecated(name, message+" — will be removed in v2.2"); err != nil {

@@ -243,6 +243,9 @@ func runSubsCmd(cmd *cobra.Command) error {
 		SecretsPath:  efs.secretsPath,
 		AxiomEnabled: axiomEnabled,
 		Scheduler:    sched,
+		LogLevel:     cliLogLevel,
+		Logger:       cliLogger,
+		OutputDir:    cliOutputDir,
 		AfterBoot:    afterBoot,
 		Force:        force,
 	}); err != nil {
@@ -490,6 +493,9 @@ func runWebCmd(cmd *cobra.Command) error {
 		SecretsPath:  efs.secretsPath,
 		AxiomEnabled: axiomEnabled,
 		Scheduler:    sched,
+		LogLevel:     cliLogLevel,
+		Logger:       cliLogger,
+		OutputDir:    cliOutputDir,
 		AfterBoot:    afterBoot,
 		Force:        force,
 	}); err != nil {
@@ -781,6 +787,9 @@ func runVulnsCmd(cmd *cobra.Command) error {
 		SecretsPath:  efs.secretsPath,
 		AxiomEnabled: axiomEnabled,
 		Scheduler:    sched,
+		LogLevel:     cliLogLevel,
+		Logger:       cliLogger,
+		OutputDir:    cliOutputDir,
 		AfterBoot:    afterBoot,
 		Force:        force,
 	}); err != nil {
@@ -994,6 +1003,9 @@ func runOSINTCmd(cmd *cobra.Command) error {
 		SecretsPath:  efs.secretsPath,
 		AxiomEnabled: axiomEnabled,
 		Scheduler:    sched,
+		LogLevel:     cliLogLevel,
+		Logger:       cliLogger,
+		OutputDir:    cliOutputDir,
 		AfterBoot:    afterBoot,
 		Force:        force,
 	}); err != nil {
@@ -1186,6 +1198,9 @@ func runMonitorCmd(cmd *cobra.Command) error {
 		ConfigPath:  efs.configPath,
 		SecretsPath: efs.secretsPath,
 		Scheduler:   sched,
+		LogLevel:    cliLogLevel,
+		Logger:      cliLogger,
+		OutputDir:   cliOutputDir,
 		AfterBoot:   afterBoot,
 		Force:       force,
 	}, monOpts)

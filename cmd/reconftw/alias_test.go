@@ -15,7 +15,7 @@ func TestTranslateV1Args(t *testing.T) {
 	type tc struct {
 		name      string
 		input     []string
-		wantHead  string // expected args[0] after translation (subcommand)
+		wantHead  string   // expected args[0] after translation (subcommand)
 		wantFlags []string // strings that must appear somewhere in result
 	}
 	cases := []tc{

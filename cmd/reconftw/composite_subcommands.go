@@ -95,6 +95,13 @@ func commonAfterBoot(
 			lc.Output = f
 			subLogger := log.New(lc, rdct)
 			slog.SetDefault(subLogger)
+			// Point the AppContext at the same sink. app.Log was captured at
+			// Boot time (the stderr logger), so without this every module line —
+			// which goes through app.Log, not slog.Default — kept spilling to the
+			// terminal and run.log stayed nearly empty, contradicting the banner.
+			if app != nil {
+				app.Log = subLogger
+			}
 			fmt.Fprintf(os.Stderr, "  logs → %s\n", p)
 			_ = f
 		}
@@ -217,6 +224,9 @@ func runCompositeCmd(
 		SecretsPath:     efs.secretsPath,
 		AxiomEnabled:    axiomEnabled,
 		Scheduler:       sched,
+		LogLevel:        cliLogLevel,
+		Logger:          cliLogger,
+		OutputDir:       cliOutputDir,
 		AfterBoot:       afterBoot,
 		ConfigTransform: ct,
 		PassiveMode:     passiveMode,
@@ -261,6 +271,9 @@ func runCompositeList(
 			SecretsPath:     efs.secretsPath,
 			AxiomEnabled:    axiomEnabled,
 			Scheduler:       sched,
+			LogLevel:        cliLogLevel,
+			Logger:          cliLogger,
+			OutputDir:       cliOutputDir,
 			AfterBoot:       afterBoot,
 			ConfigTransform: configTransform,
 			PassiveMode:     passiveMode,
