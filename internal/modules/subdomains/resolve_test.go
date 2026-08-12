@@ -202,7 +202,8 @@ func TestResolveDegradesOnToolError(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			workDir := t.TempDir()
 			be := &erroringBackend{err: &coreerrors.ToolError{
-				Tool: "dnsx", ExitCode: 1, Inner: stderrors.New("boom")}}
+				Tool: "dnsx", ExitCode: 1, Inner: stderrors.New("boom"),
+			}}
 			reg := backend.NewToolRegistry()
 			reg.Register(&backend.Tool{Name: "dnsx"})
 			runner := backend.NewRunner(be, reg, nil)
@@ -252,7 +253,8 @@ func TestResolvePropagatesContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	be := &erroringBackend{err: &coreerrors.ToolError{
-		Tool: "dnsx", ExitCode: -1, Inner: context.Canceled}}
+		Tool: "dnsx", ExitCode: -1, Inner: context.Canceled,
+	}}
 	reg := backend.NewToolRegistry()
 	reg.Register(&backend.Tool{Name: "dnsx"})
 	runner := backend.NewRunner(be, reg, nil)

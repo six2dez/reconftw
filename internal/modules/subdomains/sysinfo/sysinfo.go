@@ -51,8 +51,9 @@ type OSMemProvider struct{}
 // proceed when we don't know the memory state).
 //
 // Do NOT use runtime.ReadMemStats here:
-//   runtime.MemStats.Sys - runtime.MemStats.Alloc = Go heap reservation delta
-//   That is NOT OS free memory. gopsutil is correct (REVIEWS finding fix).
+//
+//	runtime.MemStats.Sys - runtime.MemStats.Alloc = Go heap reservation delta
+//	That is NOT OS free memory. gopsutil is correct (REVIEWS finding fix).
 func (OSMemProvider) Available() uint64 {
 	vmStat, err := mem.VirtualMemory()
 	if err != nil {

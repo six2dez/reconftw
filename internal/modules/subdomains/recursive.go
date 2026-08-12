@@ -287,6 +287,16 @@ func (SubRecursiveBruteTask) Run(ctx context.Context, app *appctx.AppContext) (t
 	wordlistPath := cfg.Paths.SubsWordlist
 	resolverPath := cfg.Paths.Resolvers
 
+	// Same gate as SubBruteTask: without a usable wordlist every per-subdomain
+	// puredns invocation fails instantly and the task still reports success.
+	if !wordlistReadable(wordlistPath) {
+		if app.Log != nil {
+			app.Log.Info("subdomains.recursive.brute: subs wordlist missing or unreadable — skipping",
+				"wordlist", wordlistPath)
+		}
+		return task.Result{Status: task.StatusSkipped}, nil
+	}
+
 	seen := make(map[string]struct{})
 	var allFound []string
 

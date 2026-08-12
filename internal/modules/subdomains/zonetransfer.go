@@ -2,10 +2,10 @@
 //
 // AllowTransfer safety gate (SUBD-10):
 // cfg.Subdomains.ZoneTransfer.Enabled is checked TWICE:
-//   1. In Enabled() — used by filterByModuleAndEnabled in the command layer.
-//   2. In Run() — defense in depth because Scheduler does NOT call Enabled()
-//      before Run (REVIEWS finding #4). Run() returns StatusSkipped immediately
-//      if Enabled is false, preventing accidental AXFR without user consent.
+//  1. In Enabled() — used by filterByModuleAndEnabled in the command layer.
+//  2. In Run() — defense in depth because Scheduler does NOT call Enabled()
+//     before Run (REVIEWS finding #4). Run() returns StatusSkipped immediately
+//     if Enabled is false, preventing accidental AXFR without user consent.
 //
 // Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-05-PLAN.md Task 2.
 package subdomains

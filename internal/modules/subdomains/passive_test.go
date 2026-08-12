@@ -30,15 +30,15 @@ import (
 
 // fakeTask is a minimal task.Task implementation for unit tests.
 type fakeTask struct {
-	name   string
-	runFn  func(ctx context.Context) (task.Result, error)
+	name  string
+	runFn func(ctx context.Context) (task.Result, error)
 }
 
-func (f fakeTask) Name() string                   { return f.name }
-func (f fakeTask) Module() string                 { return "subdomains" }
-func (f fakeTask) Description() string            { return "fake task for testing" }
-func (f fakeTask) Enabled(_ *config.Config) bool  { return true }
-func (f fakeTask) DependsOn() []string            { return nil }
+func (f fakeTask) Name() string                  { return f.name }
+func (f fakeTask) Module() string                { return "subdomains" }
+func (f fakeTask) Description() string           { return "fake task for testing" }
+func (f fakeTask) Enabled(_ *config.Config) bool { return true }
+func (f fakeTask) DependsOn() []string           { return nil }
 func (f fakeTask) Run(ctx context.Context, _ *appctx.AppContext) (task.Result, error) {
 	return f.runFn(ctx)
 }

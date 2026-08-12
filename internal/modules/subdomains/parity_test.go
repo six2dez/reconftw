@@ -12,20 +12,21 @@
 //     or "synthetic"
 //
 // FIXTURE CAPTURE INSTRUCTIONS:
-//   Run bash v1 for each target, then copy tool outputs:
-//     bash reconftw.sh -d hackerone.com -s
-//     cp Recon/hackerone.com/passive_subdomains.txt testdata/fixtures/passive/hackerone.com.subfinder.txt
-//   OR capture tools directly:
-//     subfinder -all -d hackerone.com -silent > testdata/fixtures/passive/hackerone.com.subfinder.txt
-//   Then add provenance header line 1:
-//     # captured-from: subfinder -all -d hackerone.com -silent | date: 2024-01-15
-//   Minimum sizes:
-//     hackerone.com subfinder: >= 50 unique subdomains
-//     hackerone.com puredns:   >= 30 resolved subdomains
-//     tesla.com subfinder:     >= 100 unique subdomains
-//   If capture is not available: leave the TODO header. Tests will t.Skip.
-//   NEVER substitute CT-log data, certificate transparency data, or synthetic
-//   hand-authored subdomains (B4 fix).
+//
+//	Run bash v1 for each target, then copy tool outputs:
+//	  bash reconftw.sh -d hackerone.com -s
+//	  cp Recon/hackerone.com/passive_subdomains.txt testdata/fixtures/passive/hackerone.com.subfinder.txt
+//	OR capture tools directly:
+//	  subfinder -all -d hackerone.com -silent > testdata/fixtures/passive/hackerone.com.subfinder.txt
+//	Then add provenance header line 1:
+//	  # captured-from: subfinder -all -d hackerone.com -silent | date: 2024-01-15
+//	Minimum sizes:
+//	  hackerone.com subfinder: >= 50 unique subdomains
+//	  hackerone.com puredns:   >= 30 resolved subdomains
+//	  tesla.com subfinder:     >= 100 unique subdomains
+//	If capture is not available: leave the TODO header. Tests will t.Skip.
+//	NEVER substitute CT-log data, certificate transparency data, or synthetic
+//	hand-authored subdomains (B4 fix).
 //
 // TestLiveSignoff (PARITY_LIVE=1): manual gate — run after capturing real
 // fixtures and performing live bash v1 vs v2 back-to-back comparison.
@@ -401,7 +402,7 @@ func firstNonEmpty(b []byte) string {
 // SubActiveTask + MergeStage(resolved) and asserts exact count parity.
 func TestResolveParity(t *testing.T) {
 	type tc struct {
-		target   string
+		target    string
 		fixtureFx string // relative to testdata/fixtures/resolved/
 	}
 

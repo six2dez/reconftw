@@ -114,6 +114,19 @@ func (SubResolversHealthTask) Run(_ context.Context, app *appctx.AppContext) (ta
 	}, nil
 }
 
+// wordlistReadable reports whether path names an existing, non-empty regular file.
+// An empty path (the default when subs_wordlist is not configured) is never usable.
+func wordlistReadable(path string) bool {
+	if path == "" {
+		return false
+	}
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		return false
+	}
+	return info.Size() > 0
+}
+
 // -------------------------------------------------------------------------
 // SubBruteTask
 // -------------------------------------------------------------------------
@@ -172,6 +185,19 @@ func (SubBruteTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 	wordlistPath := cfg.Paths.SubsWordlist
 	if cfg.Advanced.Deep && cfg.Paths.SubsWordlistBig != "" {
 		wordlistPath = cfg.Paths.SubsWordlistBig
+	}
+
+	// Wordlist gate. Without it an unset or missing subs_wordlist ran
+	// `puredns bruteforce "" -d <domain>`, which fails instantly — and because the
+	// stream loop ignores tool errors the task still reported StatusDone, so brute
+	// showed up as a healthy "[OK] subdomains.brute 0s" while contributing nothing.
+	// Skip loudly instead, mirroring web.ffuf's "no fuzz wordlist configured".
+	if !wordlistReadable(wordlistPath) {
+		if app.Log != nil {
+			app.Log.Info("subdomains.brute: subs wordlist missing or unreadable — skipping",
+				"wordlist", wordlistPath, "deep", cfg.Advanced.Deep)
+		}
+		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
 	args := []string{

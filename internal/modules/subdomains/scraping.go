@@ -8,18 +8,20 @@
 // TEMP-FILE PATTERN (subjs→jsluice):
 // Backend.Runner has no stdin field — a direct pipe from subjs stdout to jsluice
 // stdin CANNOT be replicated through the Runner interface. Instead:
-//   1. Run subjs → collect output
-//   2. Write output to raw/subjs.tmp.txt
-//   3. Run jsluice with -i raw/subjs.tmp.txt (file input, not stdin)
-//   4. Defer os.Remove on the temp file
+//  1. Run subjs → collect output
+//  2. Write output to raw/subjs.tmp.txt
+//  3. Run jsluice with -i raw/subjs.tmp.txt (file input, not stdin)
+//  4. Defer os.Remove on the temp file
+//
 // This resolves the REVIEWS additional finding and the 04-03-PLAN.md constraint.
 //
 // THREAT MODEL (04-03-PLAN.md):
-//   T-04-03-01: tempFile path constructed from WorkDir (validated at Target creation)
-//               — no user-controlled path component.
-//   T-04-03-02: extract/js returns only Subdomain+URL; secret fields NOT written to staging.
-//   T-04-03-03: SubScrapingTask runs once per target per stage; Scheduler ensures
-//               single instance per task name (no temp file race).
+//
+//	T-04-03-01: tempFile path constructed from WorkDir (validated at Target creation)
+//	            — no user-controlled path component.
+//	T-04-03-02: extract/js returns only Subdomain+URL; secret fields NOT written to staging.
+//	T-04-03-03: SubScrapingTask runs once per target per stage; Scheduler ensures
+//	            single instance per task name (no temp file race).
 //
 // Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-03-PLAN.md Task 2.
 package subdomains

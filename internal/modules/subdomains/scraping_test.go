@@ -418,8 +418,8 @@ func TestSubNSDelegationTaskWritesStagingFile(t *testing.T) {
 
 // toolCallTracker wraps a Backend and records args per tool.
 type toolCallTracker struct {
-	inner   backend.Backend
-	calls   map[string][]string
+	inner backend.Backend
+	calls map[string][]string
 }
 
 func (t *toolCallTracker) Exec(ctx context.Context, tool *backend.Tool, args []string) (*backend.Result, error) {

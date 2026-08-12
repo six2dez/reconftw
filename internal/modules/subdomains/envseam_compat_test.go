@@ -15,6 +15,7 @@ import (
 func (m *permutStreamBackend) ExecEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (*backend.Result, error) {
 	return m.Exec(ctx, t, args)
 }
+
 func (m *permutStreamBackend) StreamEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (<-chan backend.Event, error) {
 	return m.Stream(ctx, t, args)
 }
@@ -22,6 +23,7 @@ func (m *permutStreamBackend) StreamEnv(ctx context.Context, t *backend.Tool, ar
 func (t *trackingBackend) ExecEnv(ctx context.Context, tool *backend.Tool, args []string, _ []string) (*backend.Result, error) {
 	return t.Exec(ctx, tool, args)
 }
+
 func (t *trackingBackend) StreamEnv(ctx context.Context, tool *backend.Tool, args []string, _ []string) (<-chan backend.Event, error) {
 	return t.Stream(ctx, tool, args)
 }
@@ -29,6 +31,7 @@ func (t *trackingBackend) StreamEnv(ctx context.Context, tool *backend.Tool, arg
 func (m *mockStreamBackend) ExecEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (*backend.Result, error) {
 	return m.Exec(ctx, t, args)
 }
+
 func (m *mockStreamBackend) StreamEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (<-chan backend.Event, error) {
 	return m.Stream(ctx, t, args)
 }
@@ -36,6 +39,7 @@ func (m *mockStreamBackend) StreamEnv(ctx context.Context, t *backend.Tool, args
 func (m *streamTrackingBackend) ExecEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (*backend.Result, error) {
 	return m.Exec(ctx, t, args)
 }
+
 func (m *streamTrackingBackend) StreamEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (<-chan backend.Event, error) {
 	return m.Stream(ctx, t, args)
 }
@@ -43,6 +47,7 @@ func (m *streamTrackingBackend) StreamEnv(ctx context.Context, t *backend.Tool, 
 func (m *mockBackend) ExecEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (*backend.Result, error) {
 	return m.Exec(ctx, t, args)
 }
+
 func (m *mockBackend) StreamEnv(ctx context.Context, t *backend.Tool, args []string, _ []string) (<-chan backend.Event, error) {
 	return m.Stream(ctx, t, args)
 }
@@ -50,6 +55,7 @@ func (m *mockBackend) StreamEnv(ctx context.Context, t *backend.Tool, args []str
 func (m *mockMultiToolBackend) ExecEnv(ctx context.Context, tool *backend.Tool, args []string, _ []string) (*backend.Result, error) {
 	return m.Exec(ctx, tool, args)
 }
+
 func (m *mockMultiToolBackend) StreamEnv(ctx context.Context, tool *backend.Tool, args []string, _ []string) (<-chan backend.Event, error) {
 	return m.Stream(ctx, tool, args)
 }
@@ -57,6 +63,7 @@ func (m *mockMultiToolBackend) StreamEnv(ctx context.Context, tool *backend.Tool
 func (t *toolCallTracker) ExecEnv(ctx context.Context, tool *backend.Tool, args []string, _ []string) (*backend.Result, error) {
 	return t.Exec(ctx, tool, args)
 }
+
 func (t *toolCallTracker) StreamEnv(ctx context.Context, tool *backend.Tool, args []string, _ []string) (<-chan backend.Event, error) {
 	return t.Stream(ctx, tool, args)
 }

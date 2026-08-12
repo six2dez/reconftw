@@ -258,3 +258,50 @@ func TestMergeStageWritesMergedTxt(t *testing.T) {
 		t.Errorf("MergeStage did not call Tree.Append")
 	}
 }
+
+// -------------------------------------------------------------------------
+// Test 6: SubBruteTask.Run skips loudly when the subs wordlist is unusable
+// -------------------------------------------------------------------------
+
+// An unset or missing subs_wordlist used to run `puredns bruteforce "" -d <domain>`,
+// which fails instantly; because the stream loop swallows tool errors the task still
+// reported StatusDone, so a live `all` run showed a healthy "[OK] subdomains.brute 0s"
+// while contributing zero candidates — the exact "why is brute 0s?" symptom chased
+// across four paid axiom fleets before the logs showed brute was 0s locally too.
+func TestBruteTaskSkipsWhenWordlistUnusable(t *testing.T) {
+	resolvers := "8.8.8.8\n1.1.1.1\n8.8.4.4\n9.9.9.9\n208.67.222.222\n"
+
+	cases := map[string]func(app *appctx.AppContext, workDir string){
+		"unset wordlist": func(app *appctx.AppContext, _ string) { app.Cfg.Paths.SubsWordlist = "" },
+		"missing file":   func(app *appctx.AppContext, wd string) { app.Cfg.Paths.SubsWordlist = filepath.Join(wd, "nope.txt") },
+		"empty wordlist": func(app *appctx.AppContext, wd string) {
+			p := filepath.Join(wd, "empty.txt")
+			if err := os.WriteFile(p, nil, 0o644); err != nil {
+				t.Fatalf("write empty wordlist: %v", err)
+			}
+			app.Cfg.Paths.SubsWordlist = p
+		},
+	}
+
+	tsk, ok := task.Default.Lookup("subdomains.brute")
+	if !ok {
+		t.Fatal("subdomains.brute not registered in task.Default")
+	}
+
+	for name, mutate := range cases {
+		t.Run(name, func(t *testing.T) {
+			app, workDir := buildBruteApp(t, resolvers)
+			app.Cfg.Subdomains.Brute.MinResolvers = 3
+			mutate(app, workDir)
+
+			res, err := tsk.Run(context.Background(), app)
+			if err != nil {
+				t.Fatalf("SubBruteTask.Run: unexpected error: %v", err)
+			}
+			if res.Status != task.StatusSkipped {
+				t.Errorf("status = %q, want skipped — a brute with no wordlist must not "+
+					"report [OK] while producing nothing", res.Status)
+			}
+		})
+	}
+}

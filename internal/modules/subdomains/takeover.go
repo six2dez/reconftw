@@ -8,8 +8,8 @@
 // plan-06 merges them and calls Append("findings", merged) exactly ONCE after
 // RunStage returns.
 //
-//   TakeoverSubzyTask → inputs/takeover.subzy.jsonl
-//   TakeoverDNSTakeTask → inputs/takeover.dnstake.jsonl
+//	TakeoverSubzyTask → inputs/takeover.subzy.jsonl
+//	TakeoverDNSTakeTask → inputs/takeover.dnstake.jsonl
 //
 // DO NOT call app.Tree.Append("findings", ...) here.
 //
