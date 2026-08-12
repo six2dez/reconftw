@@ -4,7 +4,8 @@
 // vulns pipeline per plan 06-08 (VULN-14 parity completeness gate).
 //
 // INPUT: artefacts/urls.jsonl — URL corpus from Phase 5.
-//        Empty → StatusSkipped (best_effort per D-V7).
+//
+//	Empty → StatusSkipped (best_effort per D-V7).
 //
 // ARG VECTOR (v1 web.sh graphql_scan verbatim, gqlspection variant):
 //
@@ -199,12 +200,19 @@ func parseGQLSpectionOutput(tmpFile string, stdout []byte, srcURL string) []grap
 	}}
 }
 
-// readURLsJSONL reads artefacts/urls.jsonl and returns URL strings.
+// readURLsJSONL reads the resolved URL-corpus file and returns URL strings.
 // Each line may be a plain URL string or a JSON object with a "url" field.
 // Returns nil when absent or empty (non-fatal for Task).
-func readURLsJSONL(workDir string) ([]string, error) {
-	urlsPath := filepath.Join(workDir, "artefacts", "urls.jsonl")
-	data, err := os.ReadFile(urlsPath) //nolint:gosec // path within WorkDir
+//
+// The argument is the ALREADY-RESOLVED corpus path from resolveURLInput (which
+// honors the D-V5 precedence: --urls flag > artefacts/urls.jsonl). Read it
+// DIRECTLY: the previous filepath.Join(arg, "artefacts/urls.jsonl") double-joined
+// the resolved path (…/artefacts/urls.jsonl/artefacts/urls.jsonl → ENOENT), so the
+// entire vulns URL corpus silently resolved empty and every URL-consuming vulns
+// task skipped "no URL corpus" despite a populated urls.jsonl (live all-mode
+// regression, 2026-08).
+func readURLsJSONL(path string) ([]string, error) {
+	data, err := os.ReadFile(path) //nolint:gosec // path resolved within WorkDir or via --urls
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil

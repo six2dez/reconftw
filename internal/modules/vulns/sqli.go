@@ -220,7 +220,8 @@ func (t *SQLiTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 //
 // XCUT-07: sqlmap stdout contains raw SQL payloads — NEVER logged at Info/Warn.
 func runSQLMap(ctx context.Context, app *appctx.AppContext,
-	tmpSQLiFile, sqlmapOutDir string) ([]VulnFindingRecord, error) {
+	tmpSQLiFile, sqlmapOutDir string,
+) ([]VulnFindingRecord, error) {
 	const toolName = "sqlmap"
 
 	// v1 arg vector verbatim (vulns.sh:533-534).
@@ -330,7 +331,8 @@ func parseSQLMapOutputDir(dir string) []string {
 //
 // XCUT-07: ghauri stdout contains raw SQL payloads — NEVER logged at Info/Warn.
 func runGhauriPerURL(ctx context.Context, app *appctx.AppContext,
-	urls []string) ([]VulnFindingRecord, error) {
+	urls []string,
+) ([]VulnFindingRecord, error) {
 	const toolName = "ghauri"
 
 	header := app.Cfg.Advanced.Header

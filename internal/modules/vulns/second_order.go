@@ -254,8 +254,8 @@ writefindings:
 	return task.Result{
 		Status: task.StatusDone,
 		Stats: map[string]int{
-			"targets":                processedTargets,
-			"second_order_findings":  len(allFindings),
+			"targets":               processedTargets,
+			"second_order_findings": len(allFindings),
 		},
 	}, nil
 }
@@ -351,7 +351,6 @@ func soExtractHost(rawURL string) string {
 	}
 	return strings.ToLower(parsed.Hostname())
 }
-
 
 // init self-registers SecondOrderTask with the Default task registry.
 // cmd/reconftw/modules.go blank-imports this package to trigger registration.

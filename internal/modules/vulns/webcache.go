@@ -295,9 +295,9 @@ func parseToxicacheOutput(data []byte) []VulnFindingRecord {
 			Severity:        "high",
 			Confidence:      "medium",
 			VulnClass:       "webcache",
-			MatchedParam:    host,       // hostname only — no raw poison headers
-			PayloadRedacted: "***",      // XCUT-07: raw toxicache payload never written
-			PoCRedacted:     "***",      // XCUT-07: raw PoC never written
+			MatchedParam:    host,  // hostname only — no raw poison headers
+			PayloadRedacted: "***", // XCUT-07: raw toxicache payload never written
+			PoCRedacted:     "***", // XCUT-07: raw PoC never written
 			Engine:          "toxicache",
 		})
 	}
@@ -316,7 +316,6 @@ func toxicacheExtractHost(line string) string {
 	}
 	return ""
 }
-
 
 // init self-registers WebCacheTask with the Default task registry.
 // cmd/reconftw/modules.go blank-imports this package to trigger registration.

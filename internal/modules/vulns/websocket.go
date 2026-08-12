@@ -4,7 +4,8 @@
 // the vulns pipeline per plan 06-08 (VULN-14 parity completeness gate).
 //
 // INPUT: artefacts/urls.jsonl — URL corpus from Phase 5.
-//        Empty → StatusSkipped (best_effort per D-V7).
+//
+//	Empty → StatusSkipped (best_effort per D-V7).
 //
 // ARG VECTOR:
 //
@@ -125,6 +126,12 @@ func (t *WebsocketTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	res, runErr := app.Tools.Run(ctx, toolName, args)
 	if runErr != nil && app.Log != nil {
 		app.Log.Debug("vulns.websocket: httpx error (best_effort)", "err", runErr)
+	}
+	// A hard failure (unregistered binary, spawn/rate-limit error) returns a nil
+	// res; guard it so a missing httpx degrades to skipped, never a nil-pointer
+	// panic (same class as the testssl live all-mode regression, 2026-08).
+	if res == nil {
+		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
 	// Step 4: Parse JSONL output for websocket:true hosts.

@@ -152,8 +152,7 @@ func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	// Precedence: explicit COLLAB_SERVER → auto-started interactsh-client (bounded
 	// by taskCtx + interactshStartupTimeout) → in-band only. The auto-start CANNOT
 	// hang the task: taskCtx (the overall WithTimeout) tears it down (DoD-2 guard).
-	collabToken, collabURL, usingInteractsh, cleanup :=
-		resolveSSRFCollabSession(taskCtx, cfg, app)
+	collabToken, collabURL, usingInteractsh, cleanup := resolveSSRFCollabSession(taskCtx, cfg, app)
 	if cleanup != nil {
 		// Process-group SIGTERM + reap on task completion/timeout (XCUT-07/FOUND-09).
 		defer cleanup()
@@ -610,7 +609,7 @@ func runSSRFFFUF(ctx context.Context, app *appctx.AppContext, args []string, lab
 			Severity:        "high",
 			Confidence:      "medium",
 			VulnClass:       "ssrf",
-			MatchedParam:    host, // hostname only — no raw URL or collab ID (XCUT-07)
+			MatchedParam:    host,  // hostname only — no raw URL or collab ID (XCUT-07)
 			PayloadRedacted: "***", // XCUT-07: raw SSRF payload never written
 			PoCRedacted:     "***", // XCUT-07: raw trigger URL never written
 			Engine:          "ffuf",

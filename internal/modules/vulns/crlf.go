@@ -214,7 +214,6 @@ func parseCRLFuzzOutput(data []byte) []VulnFindingRecord {
 	return records
 }
 
-
 // extractCRLFHost extracts the hostname from a crlfuzz output URL.
 // crlfuzz outputs vulnerable URLs; we extract the hostname to avoid
 // storing injected CRLF sequences in records (XCUT-07).

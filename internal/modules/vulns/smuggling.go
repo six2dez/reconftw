@@ -233,9 +233,9 @@ func parseSmugglingOutput(data []byte, findings *[]VulnFindingRecord) int {
 			Severity:        "high",
 			Confidence:      "medium",
 			VulnClass:       "smuggling",
-			MatchedParam:    host,        // hostname only — no raw payload
-			PayloadRedacted: "***",       // XCUT-07: raw smuggling payload never written
-			PoCRedacted:     "***",       // XCUT-07: raw PoC HTTP request never written
+			MatchedParam:    host,  // hostname only — no raw payload
+			PayloadRedacted: "***", // XCUT-07: raw smuggling payload never written
+			PoCRedacted:     "***", // XCUT-07: raw PoC HTTP request never written
 			Engine:          "smugglex",
 		})
 	}
@@ -253,7 +253,6 @@ func smugglingExtractHost(rawURL string) string {
 	}
 	return strings.ToLower(parsed.Hostname())
 }
-
 
 // init self-registers SmugglingTask with the Default task registry.
 // cmd/reconftw/modules.go blank-imports this package to trigger registration.

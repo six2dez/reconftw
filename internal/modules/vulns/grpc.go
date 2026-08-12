@@ -4,7 +4,8 @@
 // vulns pipeline per plan 06-08 (VULN-14 parity completeness gate).
 //
 // INPUT: artefacts/urls.jsonl — URL corpus from Phase 5.
-//        Empty → StatusSkipped (best_effort per D-V7).
+//
+//	Empty → StatusSkipped (best_effort per D-V7).
 //
 // ARG VECTOR (v1 web.sh grpc_reflection verbatim):
 //

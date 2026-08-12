@@ -9,7 +9,8 @@
 // PayloadRedacted = "***" always in VulnFindingRecord.
 //
 // INPUT: artefacts/urls.jsonl — URL corpus from Phase 5.
-//        Empty → StatusSkipped (best_effort per D-V7).
+//
+//	Empty → StatusSkipped (best_effort per D-V7).
 //
 // ARG VECTOR (v1 vulns.sh:1149 verbatim):
 //
@@ -27,7 +28,8 @@
 //   - Timeout=10s    (v1 FRAY_TIMEOUT=10)
 //
 // CATEGORIES (v1 FRAY_CATEGORIES default):
-//   ai_prompt_injection, prototype_pollution, api_security, modern_bypasses
+//
+//	ai_prompt_injection, prototype_pollution, api_security, modern_bypasses
 //
 // OUTPUT: inputs/findings.fray.jsonl — multi-writer staging (doc.go).
 // MergeVulnsFindings merges into artefacts/findings.jsonl.
@@ -84,7 +86,7 @@ func (t *FrayTask) DependsOn() []string { return []string{"vulns.gf"} }
 //  3. Write target list to inputs/fray_targets.txt.
 //  4. For each category:
 //     a. Run fray test -c <category> --max <maxPayloads> -t <timeout> -d <delay> --json
-//        with targets on stdin (via temp file redirect via -l flag for registry compat).
+//     with targets on stdin (via temp file redirect via -l flag for registry compat).
 //     b. Parse JSONL output — filter bypassed > 0.
 //     c. Build VulnFindingRecord (XCUT-07: PayloadRedacted="***" always).
 //  5. Write inputs/findings.fray.jsonl via output.WriteJSONL (multi-writer staging).
@@ -190,9 +192,17 @@ func (t *FrayTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 		}
 
 		res, runErr := app.Tools.Run(ctx, toolName, args)
-		if runErr != nil && app.Log != nil {
-			app.Log.Debug("vulns.fray: fray error (best_effort — continuing)",
-				"category", cat, "err", runErr)
+		if runErr != nil {
+			// Bail regardless of whether app.Log is set — the continue must NOT be
+			// gated on app.Log != nil, or a nil Log would fall through to a
+			// nil-res deref (same class as the testssl live all-mode regression).
+			if app.Log != nil {
+				app.Log.Debug("vulns.fray: fray error (best_effort — continuing)",
+					"category", cat, "err", runErr)
+			}
+			continue
+		}
+		if res == nil {
 			continue
 		}
 
@@ -282,8 +292,8 @@ func parseFrayOutput(data []byte, category string) (findings []VulnFindingRecord
 			Severity:   "medium",
 			Confidence: "medium",
 			// Phase 6 vuln-class fields.
-			VulnClass:       "waf-bypass-" + category,
-			Engine:          "fray",
+			VulnClass: "waf-bypass-" + category,
+			Engine:    "fray",
 			// XCUT-07 (T-06-08-02): payload strings NEVER stored.
 			PayloadRedacted: "***",
 			PoCRedacted:     "***",

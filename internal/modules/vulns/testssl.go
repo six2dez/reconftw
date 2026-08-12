@@ -122,6 +122,13 @@ func (t *TestSSLTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 		app.Log.Debug("vulns.testssl: testssl.sh exit error (best_effort — parsing output)",
 			"err", runErr)
 	}
+	// A hard failure (unregistered binary, spawn/rate-limit error) returns a nil
+	// res; only a non-zero EXIT still returns a populated res whose Stdout may hold
+	// findings. Guard the nil so a missing testssl.sh degrades to skipped, never a
+	// nil-pointer panic (live all-mode regression, 2026-08).
+	if res == nil {
+		return task.Result{Status: task.StatusSkipped}, nil
+	}
 
 	// Step 4: Parse stdout for TLS finding lines.
 	// XCUT-07 / T-06-08-03: raw testssl.sh stdout NEVER logged at Info/Warn.
