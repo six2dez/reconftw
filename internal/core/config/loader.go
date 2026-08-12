@@ -34,7 +34,6 @@ import (
 	"github.com/knadh/koanf/providers/env/v2"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/v2"
-
 )
 
 // LoadOptions controls the 8-source precedence chain. Tests inject explicit
@@ -64,6 +63,45 @@ type LoadOptions struct {
 	EnvironFunc func() []string
 }
 
+// ResolveDefaultPaths fills in the auto-discovered config layers (2 system,
+// 3 user, 4 project) that the caller left empty.
+//
+// These three layers were documented in the header, in LoadOptions ("Empty = use
+// the platform default"), and in the ADR — but nothing ever resolved them, and no
+// production caller set them. So `/etc/reconftw/config.toml`,
+// `~/.config/reconftw/config.toml` and, worst of all, **`./reconftw.toml` were
+// never read**: a config dropped in the working directory was silently ignored and
+// only `--config FILE` had any effect. That is precisely the file `reconftw migrate`
+// writes by default, so the documented v1→v2 quick start produced a config nothing
+// loaded.
+//
+// Exported so `reconftw config` can report the same paths the loader will use.
+// A caller that wants isolation (tests) passes explicit paths, which are respected
+// as-is; only empty fields are filled.
+func ResolveDefaultPaths(opts *LoadOptions) {
+	if opts == nil {
+		return
+	}
+	if opts.SystemPath == "" {
+		opts.SystemPath = filepath.Join(string(filepath.Separator), "etc", "reconftw", "config.toml")
+	}
+	if opts.UserPath == "" {
+		// XDG semantics on EVERY platform, deliberately not os.UserConfigDir: the
+		// documented path is ~/.config/reconftw/config.toml, and os.UserConfigDir
+		// would silently relocate it to ~/Library/Application Support on macOS —
+		// a different path from the one the docs, the Docker image and every Linux
+		// install use. An unset HOME leaves the layer empty and it is skipped.
+		if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" {
+			opts.UserPath = filepath.Join(dir, "reconftw", "config.toml")
+		} else if home, err := os.UserHomeDir(); err == nil && home != "" {
+			opts.UserPath = filepath.Join(home, ".config", "reconftw", "config.toml")
+		}
+	}
+	if opts.ProjectPath == "" {
+		opts.ProjectPath = "reconftw.toml"
+	}
+}
+
 // Load runs the 8-source merge chain and returns a fully-validated *Config.
 // On validation failure, the returned error wraps *errors.ConfigError so
 // callers can use errors.As / errors.Is(err, ErrConfig).
@@ -74,6 +112,7 @@ func Load(opts LoadOptions) (*Config, error) {
 	if opts.WarnSink == nil {
 		opts.WarnSink = os.Stderr
 	}
+	ResolveDefaultPaths(&opts)
 
 	k := koanf.New(".")
 
@@ -147,7 +186,7 @@ func Load(opts LoadOptions) (*Config, error) {
 	// Unmarshal koanf state into a fresh *Config.
 	cfg := Defaults() // start from defaults so any unset nested sub-struct keeps its default values
 	unmarshalOpts := koanf.UnmarshalConf{
-		Tag: "koanf",
+		Tag:           "koanf",
 		DecoderConfig: nil,
 	}
 	if err := k.UnmarshalWithConf("", cfg, unmarshalOpts); err != nil {
