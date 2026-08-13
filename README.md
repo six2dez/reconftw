@@ -1347,4 +1347,4 @@ reconFTW is licensed under the [MIT License](LICENSE).
 
 ## ⭐ Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=six2dez/reconftw&type=Date)](https://www.star-history.com/#six2dez/reconftw&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=six2dez/reconftw&type=Date)](https://star-history.dera.page/#six2dez/reconftw&Date)
