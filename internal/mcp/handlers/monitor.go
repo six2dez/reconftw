@@ -202,7 +202,17 @@ func RunMonitorAsync(ctx context.Context, opts RunOptions, monCfg MonitorOptions
 		// Step 1: Run the composite pipeline.
 		// RunCompositeAsync boots internally (D-01 single-boot-per-call) and
 		// owns its own checkpoint lifecycle. Each cycle records a new scan row.
-		if err := RunCompositeAsync(cycleCtx, opts, monCfg.Mode); err != nil {
+		//
+		// RunGeneration is what makes the cycle actually execute. Every input to
+		// checkpoint.InputHash is identical between cycles, so without it every
+		// task hashed the same, Done() returned true, and cycle 2 onward ran
+		// nothing at all — a monitor that polled forever and could never observe
+		// a change. Stamping the cycle number gives each cycle a distinct hash
+		// while preserving resume WITHIN a cycle (a crashed cycle re-runs with
+		// the same generation and picks up where it stopped).
+		cycleOpts := opts
+		cycleOpts.RunGeneration = fmt.Sprintf("cycle-%d", cycleNum)
+		if err := RunCompositeAsync(cycleCtx, cycleOpts, monCfg.Mode); err != nil {
 			return fmt.Errorf("monitor: cycle %d: pipeline: %w", cycleNum, err)
 		}
 

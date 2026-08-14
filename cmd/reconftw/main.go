@@ -174,16 +174,27 @@ func run() error {
 	target := efs.target
 	var app *appctx.AppContext
 	var sched *scheduler.Scheduler
-	if target != "" {
+	// A dry run must not touch the filesystem. This early boot creates the
+	// workspace tree and the checkpoint SQLite store before cobra dispatches,
+	// so --dry-run had side effects no matter what the subcommand did.
+	if target != "" && !efs.dryRun {
 		tgt, err := appctx.NewTarget(target, nil, "")
 		if err != nil {
 			logger.Error("target_invalid", "err", err)
 			return err
 		}
 		// Workspace directory: workspaces/<target>-<timestamp>/ per ADR §3.1.
-		workdir, err := output.WorkspaceInit(cfg.Paths.DataDir, tgt.Domain)
+		//
+		// -o/--output wins over the configured DataDir, matching what the
+		// subcommand does later. Without it this boot created a second tree
+		// under the configured root alongside the one the operator asked for.
+		workspaceRoot := cfg.Paths.DataDir
+		if efs.outputDir != "" {
+			workspaceRoot = efs.outputDir
+		}
+		workdir, err := output.WorkspaceInit(workspaceRoot, tgt.Domain)
 		if err != nil {
-			// Fallback when DataDir empty — use ./workspaces relative to cwd.
+			// Fallback when the root is empty — use ./workspaces relative to cwd.
 			workdir, err = output.WorkspaceInit("workspaces", tgt.Domain)
 			if err != nil {
 				return fmt.Errorf("workspace init: %w", err)
@@ -220,6 +231,15 @@ type earlyFlagSet struct {
 	configPath  string
 	secretsPath string
 	target      string
+	// outputDir mirrors the subcommand's -o/--output. The early boot below
+	// creates a workspace before cobra has parsed anything, so without this it
+	// used cfg.Paths.DataDir and created a SECOND, unwanted tree: `recon
+	// --target x -o ./wanted` produced both ./wanted/x and ./workspaces/x.
+	outputDir string
+	// dryRun mirrors --dry-run. A dry run must describe the plan and touch
+	// nothing; the early boot was creating a workspace and a SQLite checkpoint
+	// store before the dry-run branch was ever reached.
+	dryRun bool
 }
 
 // parseEarlyFlags scans args for ONLY --config FILE, --secrets FILE, and
@@ -249,6 +269,13 @@ func parseEarlyFlags(args []string) earlyFlagSet {
 			i++
 		case strings.HasPrefix(a, "--target="):
 			efs.target = strings.TrimPrefix(a, "--target=")
+		case (a == "--output" || a == "-o") && i+1 < len(args):
+			efs.outputDir = args[i+1]
+			i++
+		case strings.HasPrefix(a, "--output="):
+			efs.outputDir = strings.TrimPrefix(a, "--output=")
+		case a == "--dry-run":
+			efs.dryRun = true
 		}
 	}
 	return efs

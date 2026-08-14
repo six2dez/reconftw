@@ -473,6 +473,15 @@ func compositeStagePostMerge(ctx context.Context, app *appctx.AppContext, group 
 				app.Log.Warn("mcp/composite: takeover_merge_failed", "err", err)
 			}
 		}
+		// Build the artefact now so a passive run — which returns before the web
+		// findings sweep — still publishes takeover findings. In the other modes
+		// this is redundant but harmless: every findings merge rebuilds the same
+		// union from inputs/findings.*.jsonl.
+		if err := mergeFindingsArtefact(ctx, app); err != nil {
+			if app.Log != nil {
+				app.Log.Warn("mcp/composite: findings_merge_failed", "err", err)
+			}
+		}
 	case "subs-resolve":
 		if err := subdomains.MergeStage(ctx, app, "resolved"); err != nil {
 			if app.Log != nil {

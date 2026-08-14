@@ -19,6 +19,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -51,6 +52,20 @@ func RegisterResources(srv *mcp.Server, registry *SessionRegistry) {
 			runID := extractRunIDFromURI(req.Params.URI)
 			if runID == "" {
 				return nil, fmt.Errorf("mcp: invalid findings URI: %q", req.Params.URI)
+			}
+
+			// Authorise the read against the session that launched the run.
+			// Previously any client that knew (or guessed) a runID could read
+			// another session's findings; runID unpredictability is a speed
+			// bump, not an access-control model. Unknown and unauthorised
+			// return the SAME error so the response does not confirm which
+			// runIDs exist.
+			var sessionID string
+			if sess, ok := req.GetSession().(*mcp.ServerSession); ok && sess != nil {
+				sessionID = sess.ID()
+			}
+			if !registry.OwnedBy(runID, sessionID) {
+				return nil, fmt.Errorf("mcp: no such findings resource: %q", req.Params.URI)
 			}
 
 			workDir := registry.WorkDir(runID)
@@ -90,6 +105,74 @@ func RegisterResources(srv *mcp.Server, registry *SessionRegistry) {
 						MIMEType: "application/x-ndjson",
 						Text:     sb.String(),
 					},
+				},
+			}, nil
+		},
+	)
+
+	registerStatusResource(srv, registry)
+}
+
+// registerStatusResource adds scan://{runID}/status.
+//
+// The findings resource returns JSONL or an empty string, and an empty string
+// is indistinguishable between four very different outcomes: still running,
+// completed with nothing found, failed before producing anything, and
+// completed partially. A client had no way to tell "clean scan" from "the scan
+// died", which is the difference between shipping a report and re-running.
+//
+// The registry has tracked status, workdir and failure cause since MarkFailed
+// landed; this exposes it. Authorised by owner exactly like findings — status
+// leaks whether a run exists and whether it failed.
+func registerStatusResource(srv *mcp.Server, registry *SessionRegistry) {
+	srv.AddResourceTemplate(
+		&mcp.ResourceTemplate{
+			URITemplate: "scan://{runID}/status",
+			Name:        "Scan status",
+			MIMEType:    "application/json",
+			Description: "Lifecycle status for a scan: running, complete or failed, with the failure cause when there is one.",
+		},
+		func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+			runID := extractRunIDFromSuffixedURI(req.Params.URI, "/status")
+			if runID == "" {
+				return nil, fmt.Errorf("mcp: invalid status URI: %q", req.Params.URI)
+			}
+
+			var sessionID string
+			if sess, ok := req.GetSession().(*mcp.ServerSession); ok && sess != nil {
+				sessionID = sess.ID()
+			}
+			// Same message for unknown and unauthorised — the response must not
+			// confirm which runIDs exist.
+			if !registry.OwnedBy(runID, sessionID) {
+				return nil, fmt.Errorf("mcp: no such status resource: %q", req.Params.URI)
+			}
+			entry, ok := registry.Lookup(runID)
+			if !ok {
+				return nil, fmt.Errorf("mcp: no such status resource: %q", req.Params.URI)
+			}
+
+			// Err is already the sanitised message the pipeline produced; the
+			// server-wide redactor scrubs secrets before anything reaches a log
+			// or a client.
+			payload := struct {
+				RunID   string `json:"run_id"`
+				Status  string `json:"status"`
+				Error   string `json:"error,omitempty"`
+				Started bool   `json:"workspace_ready"`
+			}{
+				RunID:   entry.RunID,
+				Status:  string(entry.Status),
+				Error:   entry.Err,
+				Started: entry.WorkDir != "",
+			}
+			body, err := json.Marshal(payload)
+			if err != nil {
+				return nil, fmt.Errorf("mcp: marshal status: %w", err)
+			}
+			return &mcp.ReadResourceResult{
+				Contents: []*mcp.ResourceContents{
+					{URI: req.Params.URI, MIMEType: "application/json", Text: string(body)},
 				},
 			}, nil
 		},

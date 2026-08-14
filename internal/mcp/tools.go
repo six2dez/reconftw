@@ -1,8 +1,10 @@
 // Package mcp — MCP tool registrations.
 //
 // RegisterTools adds all 7 MCP tools to the server using AddTool with typed
-// input structs and jsonschema tags. The tool set covers: recon, subs, web,
-// vulns, osint (real tools), plus monitor and report (Phase-10 stubs).
+// input structs and jsonschema tags: recon, subs, web, vulns, osint, monitor
+// and report. All seven execute the same handlers the CLI uses (MCP-02);
+// monitor and report were stubs answering {"status":"not_implemented"} until
+// they were wired to RunMonitorAsync and RenderReportsForTarget.
 //
 // Each real tool handler follows this pattern (D-02 async + D-06 scope + A2 fallback):
 //
@@ -16,16 +18,19 @@
 //  6. Launch a goroutine with the appropriate RunXxxAsync handler.
 //  7. Return {"run_id":"…","resource":"scan://…/findings"} immediately (non-blocking).
 //
-// STUB TOOLS (W1):
-// monitor and report return {"run_id":"…","status":"not_implemented"} immediately.
-// No goroutine is launched. Tool Description states "Phase 10 scope — stub response only".
+// report is SYNCHRONOUS — it reads the store and writes files in seconds, so it
+// returns the rendered paths directly rather than a run_id whose findings
+// resource would never change.
 package mcp
 
 import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -96,12 +101,21 @@ func RegisterTools(srv *mcp.Server, newSched func() *scheduler.Scheduler, regist
 	_ = rdct
 	_ = cfg
 
-	// 1. recon — runs RunSubsAsync only. Full composite (subs+web+vulns+osint) is Phase 9 scope.
+	// 1. recon — the composite recon pipeline (subs → web → osint), identical to
+	// the CLI `recon` subcommand.
+	//
+	// This used to call RunSubsAsync, a Phase-9-era placeholder: the tool was
+	// named recon, described as recon, and ran subdomain enumeration only, so an
+	// MCP client asking for recon silently got a fraction of it. MCP-02 requires
+	// the CLI and MCP to invoke identical pipeline logic.
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "recon",
-		Description: "Passive subdomain enumeration + DNS resolution + takeover detection. Full composite (subs+web+vulns+osint) is Phase 9 scope.",
+		Description: "Run the full recon pipeline: subdomain enumeration, web probing and analysis, and OSINT collection (no vulnerability scanning — use the vulns tool for that).",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args SubsInput) (*mcp.CallToolResult, any, error) {
-		return realToolHandler(mcpSrv.scanCtx, req, args.Target, args.DryRun, "", newSched, registry, srv, handlers.RunSubsAsync)
+		runRecon := func(ctx context.Context, opts handlers.RunOptions) error {
+			return handlers.RunCompositeAsync(ctx, opts, handlers.ModeRecon)
+		}
+		return realToolHandler(mcpSrv.scanCtx, req, args.Target, args.DryRun, "", newSched, registry, srv, runRecon)
 	})
 
 	// 2. subs — passive + active subdomain enumeration pipeline.
@@ -136,21 +150,94 @@ func RegisterTools(srv *mcp.Server, newSched func() *scheduler.Scheduler, regist
 		return realToolHandler(mcpSrv.scanCtx, req, args.Target, args.DryRun, "", newSched, registry, srv, handlers.RunOSINTAsync)
 	})
 
-	// 6. monitor — Phase-10 stub. Returns not_implemented immediately.
+	// 6. monitor — recurring composite cycles with cross-cycle diffing.
+	//
+	// This and `report` below were registered as tools that answered
+	// {"status":"not_implemented"}. Advertising a capability the server does
+	// not have is worse than not advertising it: a client discovers the tool,
+	// calls it, gets a success-shaped response and no scan. Both now run the
+	// same handlers the CLI uses (MCP-02).
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "monitor",
-		Description: "Monitor mode — Phase 10 scope — stub response only. Returns {\"status\":\"not_implemented\"} immediately; no scan runs.",
+		Description: "Run monitor mode: repeated recon cycles with cross-cycle diffing, reporting newly discovered assets and findings.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args MonitorInput) (*mcp.CallToolResult, any, error) {
-		return stubToolHandler()
+		interval, err := parseMonitorInterval(args.Interval)
+		if err != nil {
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{&mcp.TextContent{
+					Text: fmt.Sprintf(`{"error":"invalid_interval","message":%q}`, err.Error()),
+				}},
+				IsError: true,
+			}, nil, nil
+		}
+		runMonitor := func(ctx context.Context, opts handlers.RunOptions) error {
+			return handlers.RunMonitorAsync(ctx, opts, handlers.MonitorOptions{
+				Mode:      handlers.ModeRecon,
+				Interval:  interval,
+				MaxCycles: args.Cycles,
+			})
+		}
+		return realToolHandler(mcpSrv.scanCtx, req, args.Target, false, "", newSched, registry, srv, runMonitor)
 	})
 
-	// 7. report — Phase-10 stub. Returns not_implemented immediately.
+	// 7. report — regenerate reports for the latest completed scan.
+	//
+	// Synchronous: report rendering reads the store and writes files in
+	// seconds, so there is nothing for the async run/notify machinery to do —
+	// and returning a run_id whose findings resource would never change is
+	// exactly the kind of success-shaped non-answer the stub gave.
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "report",
-		Description: "Report regeneration — Phase 10 scope — stub response only. Returns {\"status\":\"not_implemented\"} immediately; no scan runs.",
+		Description: "Regenerate reports (HTML/JSON/CSV/SARIF) for a target's latest completed scan from the store. Runs no scan.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args ReportInput) (*mcp.CallToolResult, any, error) {
-		return stubToolHandler()
+		var sessionID string
+		if sess, ok := req.GetSession().(*mcp.ServerSession); ok && sess != nil {
+			sessionID = sess.ID()
+		}
+		// Same D-06 scope guard the scanning tools apply: a report exposes a
+		// target's findings, so it must be scope-checked like a scan.
+		if _, exists := registry.Lookup(sessionID); !exists {
+			registry.Register(sessionID, "", nil)
+			registry.SetScope(sessionID, NewSessionScope([]string{args.Target}))
+		}
+		if err := CheckScope(sessionID, args.Target, registry); err != nil {
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{&mcp.TextContent{
+					Text: fmt.Sprintf(`{"error":"out_of_scope","message":%q}`, err.Error()),
+				}},
+				IsError: true,
+			}, nil, nil
+		}
+		paths, err := handlers.RenderReportsForTarget(ctx, args.Target)
+		if err != nil {
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{&mcp.TextContent{
+					Text: fmt.Sprintf(`{"error":"report_failed","message":%q}`, err.Error()),
+				}},
+				IsError: true,
+			}, nil, nil
+		}
+		body, _ := json.Marshal(map[string]any{"target": args.Target, "reports": paths})
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{Text: string(body)}},
+		}, nil, nil
 	})
+}
+
+// parseMonitorInterval turns the tool's "1h"/"30m" string into a Duration.
+// Empty means "use the configured default", signalled as 0.
+func parseMonitorInterval(s string) (time.Duration, error) {
+	if strings.TrimSpace(s) == "" {
+		return 0, nil
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return 0, fmt.Errorf("interval %q is not a duration (try 30m, 1h): %w", s, err)
+	}
+	if d < 0 {
+		return 0, fmt.Errorf("interval %q must not be negative", s)
+	}
+	return d, nil
 }
 
 // --- helpers ---------------------------------------------------------------
@@ -221,8 +308,11 @@ func realToolHandler(
 
 	resourceURI := "scan://" + runID + "/findings"
 
-	// Step 5: Register the runID with empty workdir (set later by BootReconApp).
-	registry.Register(runID, "", nil)
+	// Step 5: Register the runID against the session that launched it. Ownership
+	// is what authorises later resource reads and subscriptions — an
+	// unpredictable runID makes URIs hard to guess, but guessability is not an
+	// access-control model.
+	registry.RegisterRun(runID, sessionID)
 
 	// Step 6: Launch scan goroutine (D-02 async — handler returns immediately).
 	// ctx here is mcpSrv.scanCtx (the server-lifetime context), NOT the tool
@@ -271,6 +361,18 @@ func launchScanAndNotify(
 	progressCh := make(chan handlers.StageEvent, 32)
 	opts.ProgressSink = progressCh
 
+	// Record the workspace as soon as BootReconApp resolves it. The registry was
+	// seeded with an empty workdir and nothing ever filled it in, so
+	// scan://<runID>/findings returned empty content for every successful scan.
+	// AfterBoot is the earliest point the path exists.
+	prevAfterBoot := opts.AfterBoot
+	opts.AfterBoot = func(boot handlers.AppBoot) {
+		registry.SetWorkDir(runID, boot.WorkDir)
+		if prevAfterBoot != nil {
+			prevAfterBoot(boot)
+		}
+	}
+
 	// Drain the ProgressSink in a separate goroutine and emit ResourceUpdated.
 	drainDone := make(chan struct{})
 	go func() {
@@ -282,32 +384,25 @@ func launchScanAndNotify(
 	}()
 
 	// Run the scan synchronously (within this goroutine).
-	_ = fn(ctx, opts)
+	runErr := fn(ctx, opts)
 
 	// Close ProgressSink to unblock the drain goroutine.
 	close(progressCh)
 	<-drainDone
 
-	// Final notification: scan complete.
-	_ = NotifyFindingsUpdated(ctx, srv, runID)
-	registry.MarkComplete(runID)
-}
-
-// stubToolHandler implements the Phase-10 stub response for monitor and report.
-// Returns {"run_id":"…","status":"not_implemented"} immediately.
-// No goroutine is launched; no scan runs (T-08-04-07).
-func stubToolHandler() (*mcp.CallToolResult, any, error) {
-	runID, err := newRunID()
-	if err != nil {
-		runID = "stub-error"
+	// Record the real outcome. The pipeline error used to be discarded with
+	// `_ =` and MarkComplete was called unconditionally, so a scan that failed
+	// outright still reported success to the client — SessionStatusFailed
+	// existed but nothing could ever reach it.
+	if runErr != nil {
+		registry.MarkFailed(runID, runErr)
+	} else {
+		registry.MarkComplete(runID)
 	}
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{
-				Text: fmt.Sprintf(`{"run_id":%q,"status":"not_implemented"}`, runID),
-			},
-		},
-	}, nil, nil
+
+	// Notify either way: the resource content changed (or the status did), and
+	// a client waiting on it must be released rather than left hanging.
+	_ = NotifyFindingsUpdated(ctx, srv, runID)
 }
 
 // newRunID generates a cryptographically-random 32-hex-character run ID

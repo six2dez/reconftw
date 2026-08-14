@@ -31,6 +31,7 @@ import (
 	"github.com/six2dez/reconftw/internal/core/ingest"
 	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/scheduler"
+	"github.com/six2dez/reconftw/internal/modules/web"
 )
 
 // StageEvent is sent on ProgressSink at stage boundaries. Done=false means
@@ -94,6 +95,19 @@ type RunOptions struct {
 	// backend with PassiveBackend so active tools return ErrPassiveViolation.
 	// Set by the passive composite subcommand.
 	PassiveMode bool
+	// RunGeneration makes an otherwise-identical run distinct to the checkpoint.
+	//
+	// checkpoint.InputHash covers taskName + target + cfgSliceJSON + wordlists —
+	// none of which change between monitor cycles. Every task therefore hashed
+	// identically, Done() returned true, and the whole pipeline was skipped from
+	// cycle 2 onward. The incremental re-feed was supposed to compensate by
+	// varying TargetListPath, but it only triggers after NEW FQDNs are observed,
+	// and no discovery ran to observe them — a closed loop that guaranteed a
+	// monitor never discovered anything after its first cycle.
+	//
+	// The monitor sets this to the cycle number; ordinary scans leave it empty
+	// and keep exactly the resume-from-checkpoint behaviour they had.
+	RunGeneration string
 	// TargetListPath carries a path to a file of target FQDNs, one per line.
 	// When set, the run operates in list mode — cfgSliceJSON includes this path,
 	// so checkpoint.InputHash differs from a full-target run, triggering genuine
@@ -344,6 +358,9 @@ func BootReconApp(ctx context.Context, opts RunOptions) (AppBoot, error) {
 	hashSlice = append(hashSlice, 0) // null separator (prefix-collision safety)
 	hashSlice = append(hashSlice, "tlp="...)
 	hashSlice = append(hashSlice, opts.TargetListPath...)
+	hashSlice = append(hashSlice, 0)
+	hashSlice = append(hashSlice, "gen="...)
+	hashSlice = append(hashSlice, opts.RunGeneration...)
 	wordlistsLock := wordlistsLockContent(cfg)
 	tgtDomain := tgt.Domain
 	opts.Scheduler.Hash = func(taskName, _ string) string {
@@ -490,12 +507,21 @@ func countJSONLLines(path string) int {
 	return n
 }
 
-// mergeTakeoverFindings reads both takeover staging files and calls
-// app.Tree.Append("findings", merged) exactly once (B2 fix — single-writer).
+// mergeTakeoverFindings consolidates both takeover staging files into a single
+// findings staging file, inputs/findings.takeover.jsonl.
 //
-// TakeoverSubzyTask and TakeoverDNSTakeTask each write their own staging file
-// to avoid concurrent-write data loss (OutputTree.Append uses REPLACE semantics).
-// This function serializes the merge after the enrichment RunStage completes.
+// It deliberately does NOT write artefacts/findings.jsonl. It used to, under a
+// "single writer per RunStage" invariant (B2) — but that invariant only holds
+// WITHIN a stage. In composite modes a later stage runs web.MergeStage
+// ("findings"), which rebuilds the artefact from inputs/findings.*.jsonl alone
+// and Append has REPLACE semantics, so every takeover finding written directly
+// to the artefact during the subs stage was silently overwritten. Takeover
+// appeared in `subs` and vanished in recon/all/deep.
+//
+// Staging is the fix rather than teaching each merger to preserve the prior
+// artefact: it keeps the artefact a pure function of the staging files, so ANY
+// later findings merge reproduces the takeover records instead of dropping
+// them, and no merger has to know that takeover exists.
 func mergeTakeoverFindings(ctx context.Context, app *appctx.AppContext) error {
 	_ = ctx
 
@@ -514,10 +540,40 @@ func mergeTakeoverFindings(ctx context.Context, app *appctx.AppContext) error {
 		merged = append(merged, lines...)
 	}
 
+	staged := filepath.Join(app.Target.WorkDir, "inputs", "findings.takeover.jsonl")
+
+	// No takeovers this run: REMOVE any staging file a previous run left behind.
+	//
+	// Workspaces are stable across runs by design, so returning early here left
+	// the old file in place and the next merge re-published last run's takeover
+	// as though this run had observed it. A finding that has been remediated
+	// would keep appearing indefinitely, and "no takeovers found" would be
+	// indistinguishable from "the takeover scanners did not run".
 	if len(merged) == 0 {
+		if err := os.Remove(staged); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("mergeTakeoverFindings: clear stale %s: %w", staged, err)
+		}
 		return nil
 	}
-	return app.Tree.Append("findings", merged)
+
+	if err := output.WriteJSONL(staged, merged); err != nil {
+		return fmt.Errorf("mergeTakeoverFindings: stage %s: %w", staged, err)
+	}
+	return nil
+}
+
+// mergeFindingsArtefact rebuilds artefacts/findings.jsonl from every
+// inputs/findings.*.jsonl staging file.
+//
+// web.MergeStage, osint.MergeOSINTFindings and vulns.MergeVulnsFindings are
+// interchangeable for the "findings" artefact — all three glob the same
+// pattern and write the same union, which is why the composite sweeps do not
+// clobber each other. This named seam exists so the subs and passive paths
+// (which run no web/osint/vulns merge) still produce the artefact, and so
+// there is ONE place to change when those three are unified into a single
+// findings aggregator.
+func mergeFindingsArtefact(ctx context.Context, app *appctx.AppContext) error {
+	return web.MergeStage(ctx, app, "findings")
 }
 
 // readJSONLLines reads a JSONL file and returns each non-empty line as []byte.

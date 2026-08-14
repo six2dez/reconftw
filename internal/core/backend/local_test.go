@@ -156,11 +156,20 @@ func TestTool_StructFields_MatchADRWithCriticalExtension(t *testing.T) {
 	}
 }
 
-// Test 17: Event struct exposes Line []byte, Source string, IsErr bool (ADR §5.2 lines 1636-1641).
+// Test 17: Event struct exposes Line []byte, Source string, IsErr bool (ADR §5.2
+// lines 1636-1641) plus Err error.
+//
+// Err was added when streaming stopped discarding scanner.Err() and cmd.Wait():
+// a tool that was truncated mid-output or died non-zero used to be
+// indistinguishable from one that finished, because the only signal reaching
+// the consumer was the channel closing.
 func TestEvent_StructFields(t *testing.T) {
 	et := reflect.TypeOf(backend.Event{})
-	if et.NumField() != 3 {
-		t.Errorf("Event NumField = %d, want 3", et.NumField())
+	if et.NumField() != 4 {
+		t.Errorf("Event NumField = %d, want 4", et.NumField())
+	}
+	if f, ok := et.FieldByName("Err"); !ok || f.Type.String() != "error" {
+		t.Errorf("Event.Err missing or not error: ok=%v type=%v", ok, f.Type)
 	}
 	check := func(name, kind string) {
 		f, ok := et.FieldByName(name)

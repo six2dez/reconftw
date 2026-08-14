@@ -71,14 +71,19 @@ func runHealthCheck(cmd *cobra.Command, app *appctx.AppContext, cfg *config.Conf
 	}
 	printer := ui.NewPrinter(w, verbosity)
 
-	criticalFail := false
+	// criticalFailures names every critical check that failed, so the closing
+	// message can report what actually broke. It used to be a bool paired with
+	// missingCriticalCount, and the message printed the COUNT — so a config or
+	// backend failure exited 1 while announcing "0 critical health checks
+	// failed", which reads as success.
+	var criticalFailures []string
 	missingCriticalCount := 0
 
 	// Check 1: config parse.
 	start := time.Now()
 	if cfg == nil {
 		printer.Status(ui.BadgeFAIL, "config.parse", time.Since(start))
-		criticalFail = true
+		criticalFailures = append(criticalFailures, "config.parse")
 	} else {
 		printer.Status(ui.BadgeOK, "config.parse", time.Since(start))
 	}
@@ -99,7 +104,7 @@ func runHealthCheck(cmd *cobra.Command, app *appctx.AppContext, cfg *config.Conf
 	}
 	if err := local.HealthCheck(ctx); err != nil {
 		printer.Status(ui.BadgeFAIL, "backend.local", time.Since(start))
-		criticalFail = true
+		criticalFailures = append(criticalFailures, "backend.local")
 	} else {
 		printer.Status(ui.BadgeOK, "backend.local", time.Since(start))
 	}
@@ -132,7 +137,7 @@ func runHealthCheck(cmd *cobra.Command, app *appctx.AppContext, cfg *config.Conf
 		case missingCritSet[t.Name]:
 			// Blocker 5: missing-and-critical → FAIL + overall exit 1.
 			printer.Status(ui.BadgeFAIL, "tool."+t.Name+" (critical)", time.Since(start))
-			criticalFail = true
+			criticalFailures = append(criticalFailures, "tool."+t.Name)
 			missingCriticalCount++
 			missingNames = append(missingNames, t.Name)
 		case missingReqSet[t.Name]:
@@ -162,10 +167,11 @@ func runHealthCheck(cmd *cobra.Command, app *appctx.AppContext, cfg *config.Conf
 		printer.Status(ui.BadgeOK, "appctx (target booted)", 0)
 	}
 
-	if criticalFail {
+	if len(criticalFailures) > 0 {
 		return &exitCodeError{
 			code: 1,
-			msg:  fmt.Sprintf("%d critical health checks failed", missingCriticalCount),
+			msg: fmt.Sprintf("%d critical health check(s) failed: %s",
+				len(criticalFailures), strings.Join(criticalFailures, ", ")),
 		}
 	}
 	return nil

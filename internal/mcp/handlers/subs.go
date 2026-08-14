@@ -158,11 +158,20 @@ func RunSubsAsync(ctx context.Context, opts RunOptions) (err error) {
 			return fmt.Errorf("mcp/subs: stage %s: %w", stage.name, runErr)
 		}
 
-		// B2 fix: after enrichment stage, merge takeover staging files into findings.jsonl.
+		// After the enrichment stage, consolidate the takeover staging files into
+		// inputs/findings.takeover.jsonl, then build the artefact from staging.
+		// A standalone `subs` run executes no web/osint/vulns findings merge, so
+		// without this call the takeover findings would stay in staging and never
+		// reach artefacts/findings.jsonl.
 		if stage.name == "enrichment" {
 			if mergeErr := mergeTakeoverFindings(ctx, app); mergeErr != nil {
 				if app.Log != nil {
 					app.Log.Warn("mcp/subs: takeover_merge_failed", "err", mergeErr)
+				}
+			}
+			if mergeErr := mergeFindingsArtefact(ctx, app); mergeErr != nil {
+				if app.Log != nil {
+					app.Log.Warn("mcp/subs: findings_merge_failed", "err", mergeErr)
 				}
 			}
 		}

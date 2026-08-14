@@ -132,7 +132,11 @@ func TestBootReconAppWiresRealInputHash(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SnapshotBytes: %v", err)
 	}
+	// Formula: cfgSlice \0 "tlp=" <TargetListPath> \0 "gen=" <RunGeneration>.
+	// The gen= component was added so monitor cycles hash differently; without
+	// it every cycle after the first skipped every task.
 	hashSlice := append(append(append([]byte{}, cfgSlice...), 0), []byte("tlp=")...)
+	hashSlice = append(append(hashSlice, 0), []byte("gen=")...)
 	want := checkpoint.InputHash(taskName, boot.App.Target.Domain, hashSlice, resumeWordlistsLock(boot.Cfg))
 	if got != want {
 		t.Errorf("wired hash = %s\n           want %s (InputHash formula mismatch)", got, want)
@@ -283,5 +287,26 @@ func TestForceRerunReExecutesAcrossRuns(t *testing.T) {
 	}
 	if t2.started.Load() != 1 {
 		t.Errorf("cycle 2 (force): task did NOT re-run (started=%d), want 1", t2.started.Load())
+	}
+}
+
+// TestInputHashDiffersOnRunGeneration is the monitor fix expressed as a hash
+// property: two runs identical in every other respect must hash differently
+// when the generation differs, or checkpoint.Done() skips the second one.
+func TestInputHashDiffersOnRunGeneration(t *testing.T) {
+	dataDir := t.TempDir()
+	h1 := resumeHashFor(t, dataDir, handlers.RunOptions{Target: "example.com", RunGeneration: "cycle-1"})
+	h2 := resumeHashFor(t, dataDir, handlers.RunOptions{Target: "example.com", RunGeneration: "cycle-2"})
+	if h1 == h2 {
+		t.Error("two monitor cycles produced the same input hash — every task in " +
+			"cycle 2 would be skipped as already done, so the monitor could never " +
+			"observe a change")
+	}
+	// And an unset generation must still be stable, so ordinary scans keep
+	// resuming from their checkpoints exactly as before.
+	a := resumeHashFor(t, dataDir, handlers.RunOptions{Target: "example.com"})
+	b := resumeHashFor(t, dataDir, handlers.RunOptions{Target: "example.com"})
+	if a != b {
+		t.Error("an ordinary scan's hash is not stable — resume-from-checkpoint is broken")
 	}
 }

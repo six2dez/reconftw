@@ -24,11 +24,23 @@ const (
 )
 
 // SessionEntry holds the metadata for a registered scan session.
+//
+// Lookup returns entries BY VALUE. Handing out the internal pointer while the
+// mutex is released let readers observe Status/WorkDir mid-write from the scan
+// goroutine — a data race that no amount of locking inside the registry could
+// fix, because the escape happened after the lock was dropped.
 type SessionEntry struct {
 	RunID   string
 	WorkDir string
 	Scope   *SessionScope
 	Status  SessionStatus
+	// Owner is the MCP session ID that launched this run. Resource reads and
+	// subscriptions are authorised against it: knowing a runID is not
+	// authorisation to read its findings. Empty means "no owner recorded"
+	// (session-scope entries, whose RunID is itself the session ID).
+	Owner string
+	// Err is the failure reason when Status is SessionStatusFailed.
+	Err string
 }
 
 // SessionRegistry maps runIDs to their SessionEntry values.
@@ -62,13 +74,77 @@ func (r *SessionRegistry) Register(runID, workDir string, scope *SessionScope) {
 	}
 }
 
-// Lookup returns the entry for runID and a flag indicating whether it exists.
-// Returns (nil, false) when runID is not found; never panics.
-func (r *SessionRegistry) Lookup(runID string) (*SessionEntry, bool) {
+// Lookup returns a COPY of the entry for runID and a flag indicating whether
+// it exists. Returns (zero, false) when runID is not found; never panics.
+//
+// The copy is the point: the scan goroutine mutates Status, WorkDir and Err
+// concurrently with readers, so returning the live pointer raced.
+func (r *SessionRegistry) Lookup(runID string) (SessionEntry, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	entry, ok := r.entries[runID]
-	return entry, ok
+	if !ok {
+		return SessionEntry{}, false
+	}
+	return *entry, true
+}
+
+// RegisterRun records a scan run owned by ownerSessionID.
+func (r *SessionRegistry) RegisterRun(runID, ownerSessionID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, exists := r.entries[runID]; exists {
+		panic("mcp: session already registered: " + runID)
+	}
+	r.entries[runID] = &SessionEntry{
+		RunID:  runID,
+		Owner:  ownerSessionID,
+		Status: SessionStatusRunning,
+	}
+}
+
+// OwnedBy reports whether runID exists and is readable by sessionID.
+//
+// An entry with no recorded owner is readable by anyone: those are the
+// session-scope entries whose RunID *is* the session ID, plus runs registered
+// before ownership tracking existed. Scan runs always carry an owner.
+func (r *SessionRegistry) OwnedBy(runID, sessionID string) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	entry, ok := r.entries[runID]
+	if !ok {
+		return false
+	}
+	return entry.Owner == "" || entry.Owner == sessionID
+}
+
+// SetWorkDir records the resolved workspace directory for runID.
+//
+// Without this the registry kept the empty string it was registered with, so
+// the scan://<runID>/findings resource resolved to no workdir and returned an
+// empty result for every successful scan. Callers wire it from the AfterBoot
+// hook, which is the first point the workspace path is known.
+func (r *SessionRegistry) SetWorkDir(runID, workDir string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if entry, ok := r.entries[runID]; ok {
+		entry.WorkDir = workDir
+	}
+}
+
+// MarkFailed sets the status of runID to SessionStatusFailed and records why.
+// It is a no-op when runID is not found.
+func (r *SessionRegistry) MarkFailed(runID string, err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	entry, ok := r.entries[runID]
+	if !ok {
+		return
+	}
+	entry.Status = SessionStatusFailed
+	if err != nil {
+		entry.Err = err.Error()
+	}
 }
 
 // SetScope sets the scope for sessionID.

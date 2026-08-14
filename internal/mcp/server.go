@@ -127,9 +127,17 @@ func NewMCPServer(cfg *config.MCPConfig, newSched func() *scheduler.Scheduler, r
 				if runID == "" {
 					return fmt.Errorf("mcp: invalid subscription URI: %q", req.Params.URI)
 				}
-				// Verify the run exists.
-				if _, ok := registry.Lookup(runID); !ok {
-					return fmt.Errorf("mcp: subscription URI references unknown runID: %q", runID)
+				// Verify the run exists AND belongs to the subscribing session.
+				// Existence alone was checked before, so any client holding a
+				// runID could stream another session's findings notifications.
+				// Unknown and unauthorised share one error message so the
+				// response does not confirm which runIDs exist.
+				var subSessID string
+				if sess, ok := req.GetSession().(*mcp.ServerSession); ok && sess != nil {
+					subSessID = sess.ID()
+				}
+				if !registry.OwnedBy(runID, subSessID) {
+					return fmt.Errorf("mcp: no such findings resource: %q", req.Params.URI)
 				}
 				return nil
 			},
@@ -236,9 +244,15 @@ func runMCPServeHTTP(ctx context.Context, s *MCPServer) error {
 // extractRunIDFromURI parses a "scan://<runID>/findings" URI and returns the
 // runID component. Returns "" for unrecognised URI shapes.
 func extractRunIDFromURI(uri string) string {
-	// URI shape: "scan://<runID>/findings"
+	return extractRunIDFromSuffixedURI(uri, "/findings")
+}
+
+// extractRunIDFromSuffixedURI parses "scan://<runID><suffix>" and returns the
+// runID, or "" when the URI does not have that shape. Generalised from the
+// findings-only version when scan://<runID>/status was added, so both
+// resources parse identically and a malformed URI is rejected the same way.
+func extractRunIDFromSuffixedURI(uri, suffix string) string {
 	const prefix = "scan://"
-	const suffix = "/findings"
 	if len(uri) <= len(prefix)+len(suffix) {
 		return ""
 	}

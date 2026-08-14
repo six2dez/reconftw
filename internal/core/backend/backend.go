@@ -27,6 +27,15 @@ type Event struct {
 	Line   []byte // raw stdout/stderr line (no trailing newline)
 	Source string // tool name, e.g. "nuclei"
 	IsErr  bool   // true if line came from stderr
+	// Err is set on a FINAL event when the stream did not end cleanly: the
+	// scanner overflowed (a line longer than scannerMaxBuf, which silently
+	// truncates the tool's output) or the process exited non-zero.
+	//
+	// Both used to be discarded with `_ =`, so a tool that crashed halfway
+	// through, or whose output was cut off mid-stream, was indistinguishable
+	// from one that completed successfully — the consumer just saw the channel
+	// close. Consumers that ignore this field behave exactly as before.
+	Err error
 }
 
 // Result holds the complete output of a buffered Exec call.

@@ -248,6 +248,11 @@ func (b *LocalBackend) StreamEnv(ctx context.Context, t *Tool, args []string, en
 	var wg sync.WaitGroup
 	wg.Add(2)
 
+	// scanErrs collects a scanner failure from either pipe so the closer can
+	// report it as a terminal event.
+	var scanErrMu sync.Mutex
+	var scanErr error
+
 	scanPipe := func(p io.Reader, isErr bool) {
 		defer wg.Done()
 		scanner := bufio.NewScanner(p)
@@ -260,7 +265,17 @@ func (b *LocalBackend) StreamEnv(ctx context.Context, t *Tool, args []string, en
 				return
 			}
 		}
-		_ = scanner.Err() // dropped — long-line overflow yields scanner.Err() but stream continues
+		// A scanner error means the tool's output was TRUNCATED — typically a
+		// line longer than scannerMaxBuf. Dropping it made a partial parse look
+		// like a complete one, which for a findings parser means silently
+		// missing results.
+		if err := scanner.Err(); err != nil {
+			scanErrMu.Lock()
+			if scanErr == nil {
+				scanErr = err
+			}
+			scanErrMu.Unlock()
+		}
 	}
 
 	go scanPipe(stdoutPipe, false)
@@ -269,8 +284,26 @@ func (b *LocalBackend) StreamEnv(ctx context.Context, t *Tool, args []string, en
 	// Close the channel after both readers AND cmd.Wait() are done.
 	go func() {
 		wg.Wait()
-		_ = cmd.Wait()
+		waitErr := cmd.Wait()
 		close(doneCh)
+
+		// Surface a non-clean termination as a final event before closing.
+		// Without it a tool that died mid-stream was indistinguishable from one
+		// that finished, because the only signal the consumer got was the
+		// channel closing.
+		scanErrMu.Lock()
+		termErr := scanErr
+		scanErrMu.Unlock()
+		if termErr == nil {
+			termErr = waitErr
+		}
+		if termErr != nil {
+			select {
+			case out <- Event{Source: t.Name, IsErr: true, Err: termErr}:
+			case <-time.After(time.Second):
+				// Consumer stopped reading; nothing more we can do.
+			}
+		}
 		close(out)
 	}()
 

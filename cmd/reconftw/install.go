@@ -4,16 +4,18 @@
 //
 // The `--health-check` path reuses runHealthCheck() from healthcheck.go (same
 // package) so `reconftw install --health-check` and `reconftw health-check`
-// share one implementation (INST-10, no duplication). It passes nil for both
-// the AppContext and the resolved config — install runs as a standalone
-// operation before config is loaded, and runHealthCheck already nil-guards both
-// (confirmed in healthcheck.go:68/144). No config value is referenced here.
+// share one implementation (INST-10, no duplication). It loads the config the
+// same way the standalone subcommand does: passing nil made runHealthCheck's
+// first check report `[FAIL] config.parse` on a perfectly healthy machine, so
+// `install --health-check` always exited 1 while `health-check` exited 0.
+// nil was nil-guarded, but "guarded" meant "reported as a failure".
 package main
 
 import (
 	"github.com/spf13/cobra"
 
 	"github.com/six2dez/reconftw/internal/core/backend"
+	"github.com/six2dez/reconftw/internal/core/config"
 	"github.com/six2dez/reconftw/internal/installer"
 )
 
@@ -37,9 +39,16 @@ func newInstallCmd() *cobra.Command {
 			"Idempotent: re-running installs only missing or outdated tools.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if f.healthCheck {
-				// Reuse the health-check kernel; nil app + nil config are
-				// intentional and nil-guarded in runHealthCheck (BLOCKER 3).
-				return runHealthCheck(cmd, nil, nil, backend.Default)
+				// Load the config so config.parse reflects reality. A genuine
+				// parse failure still surfaces as [FAIL] — which is the point;
+				// what must not happen is reporting failure because the caller
+				// never tried to load it. app stays nil: health-check runs
+				// without --target and runHealthCheck treats app as optional.
+				cfg, err := config.Load(config.LoadOptions{})
+				if err != nil {
+					cfg = nil // real failure — runHealthCheck reports config.parse FAIL
+				}
+				return runHealthCheck(cmd, nil, cfg, backend.Default)
 			}
 			if f.updateLock {
 				cmd.Println("tools.lock version pins are updated via the XCUT-08 quarantine workflow:")

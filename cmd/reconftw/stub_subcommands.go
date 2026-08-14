@@ -1233,6 +1233,9 @@ func runReportCmd(cmd *cobra.Command) error {
 		return fmt.Errorf("--target is required for the report subcommand")
 	}
 	scanIDFlag, _ := cmd.Flags().GetString("scan-id")
+	// --allow-partial was registered and documented but never read, so the flag
+	// silently did nothing.
+	allowPartial, _ := cmd.Flags().GetBool("allow-partial")
 
 	efs := parseEarlyFlags(os.Args[1:])
 	cfg, err := config.Load(config.LoadOptions{
@@ -1258,7 +1261,7 @@ func runReportCmd(cmd *cobra.Command) error {
 	}
 	defer renderer.Close() //nolint:errcheck
 
-	if err := renderer.RenderAll(ctx, targetFlag, scanIDFlag); err != nil {
+	if err := renderer.RenderAll(ctx, targetFlag, scanIDFlag, allowPartial); err != nil {
 		return fmt.Errorf("report: render: %w", err)
 	}
 

@@ -258,7 +258,10 @@ func TestMonitorDiff_RealCrossCycleDeltas(t *testing.T) {
 
 	// Cycle 1 workspace: one host (alpha), one finding (exposed-panel).
 	ws1 := filepath.Join(tmp, "ws1")
-	writeStoreArtefact(t, ws1, "subdomains.jsonl", `{"host":"alpha.example.com"}`)
+	// subdomains.MergeStage writes {"subdomain",...}, not {"host"} — using the
+	// host shape here made the fixture agree with a decoder that ignored every
+	// real subdomain line.
+	writeStoreArtefact(t, ws1, "subdomains.jsonl", `{"subdomain":"alpha.example.com","source":"subfinder"}`)
 	writeStoreArtefact(t, ws1, "findings.jsonl",
 		`{"template_id":"exposed-panel","host":"alpha.example.com","severity":"high"}`)
 	resA, err := ingest.ScanIntoStore(ctx, dataDir, ws1, target, "recon", discardLogger())
@@ -270,8 +273,8 @@ func TestMonitorDiff_RealCrossCycleDeltas(t *testing.T) {
 	// open-redirect (exposed-panel repeats and must NOT appear in the diff).
 	ws2 := filepath.Join(tmp, "ws2")
 	writeStoreArtefact(t, ws2, "subdomains.jsonl",
-		`{"host":"alpha.example.com"}`,
-		`{"host":"bravo.example.com"}`)
+		`{"subdomain":"alpha.example.com","source":"subfinder"}`,
+		`{"subdomain":"bravo.example.com","source":"subfinder"}`)
 	writeStoreArtefact(t, ws2, "findings.jsonl",
 		`{"template_id":"exposed-panel","host":"alpha.example.com","severity":"high"}`,
 		`{"template_id":"open-redirect","host":"bravo.example.com","severity":"medium"}`)

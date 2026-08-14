@@ -38,9 +38,36 @@ func NewRunner(b Backend, reg *ToolRegistry, lim *RateLimiter) *Runner {
 	return &Runner{Backend: b, Registry: reg, Limiter: lim}
 }
 
+// applyToolContract prepends Tool.DefaultArgs to args and derives a
+// Tool.Timeout-bounded context.
+//
+// Both fields are loaded from tools.lock and were carried on every Tool while
+// no code path applied them: default_args never reached a command line, and
+// timeout_seconds bounded nothing on the local backend, so a hung tool ran
+// until the whole scan's context expired. The returned cancel is always
+// non-nil and must be called by the caller.
+func applyToolContract(ctx context.Context, t *Tool, args []string) (context.Context, context.CancelFunc, []string) {
+	if len(t.DefaultArgs) > 0 {
+		// DefaultArgs first so a caller-supplied flag of the same name wins on
+		// tools that take last-one-wins semantics.
+		merged := make([]string, 0, len(t.DefaultArgs)+len(args))
+		merged = append(merged, t.DefaultArgs...)
+		args = append(merged, args...)
+	}
+	if t.Timeout > 0 {
+		c, cancel := context.WithTimeout(ctx, t.Timeout)
+		return c, cancel, args
+	}
+	return ctx, func() {}, args
+}
+
 // Run looks up toolName, waits on the rate limiter, then dispatches to
 // Backend.Exec. Returns *ToolError{ExitCode:-1, Inner: "tool not registered"}
 // if the tool is unknown.
+//
+// Tool.DefaultArgs and Tool.Timeout from tools.lock are applied here — the
+// Runner is the single seam every tool invocation passes through, so honouring
+// the manifest in one place covers every caller.
 func (r *Runner) Run(ctx context.Context, toolName string, args []string) (*Result, error) {
 	tool, ok := r.Registry.Lookup(toolName)
 	if !ok {
@@ -59,6 +86,8 @@ func (r *Runner) Run(ctx context.Context, toolName string, args []string) (*Resu
 			}
 		}
 	}
+	ctx, cancel, args := applyToolContract(ctx, tool, args)
+	defer cancel()
 	return r.Backend.Exec(ctx, tool, args)
 }
 
@@ -85,6 +114,8 @@ func (r *Runner) RunEnv(ctx context.Context, toolName string, args []string, env
 			}
 		}
 	}
+	ctx, cancel, args := applyToolContract(ctx, tool, args)
+	defer cancel()
 	return r.Backend.ExecEnv(ctx, tool, args, env)
 }
 
@@ -108,7 +139,9 @@ func (r *Runner) Stream(ctx context.Context, toolName string, args []string) (<-
 			}
 		}
 	}
-	return r.Backend.Stream(ctx, tool, args)
+	return r.streamWithContract(ctx, tool, args, func(c context.Context, a []string) (<-chan Event, error) {
+		return r.Backend.Stream(c, tool, a)
+	})
 }
 
 // StreamEnv is Stream with additional "KEY=VALUE" child-env entries forwarded to
@@ -131,5 +164,47 @@ func (r *Runner) StreamEnv(ctx context.Context, toolName string, args []string, 
 			}
 		}
 	}
-	return r.Backend.StreamEnv(ctx, tool, args, env)
+	return r.streamWithContract(ctx, tool, args, func(c context.Context, a []string) (<-chan Event, error) {
+		return r.Backend.StreamEnv(c, tool, a, env)
+	})
+}
+
+// streamWithContract applies the tools.lock contract to a streaming call.
+//
+// A stream keeps running after the call returns, so the Tool.Timeout context
+// cannot be released with a plain defer — that would cancel the command the
+// instant it started. Instead the cancel is deferred onto a relay goroutine
+// that lives exactly as long as the event channel, so the timeout bounds the
+// whole stream and the context is released as soon as it closes.
+func (r *Runner) streamWithContract(
+	ctx context.Context,
+	tool *Tool,
+	args []string,
+	dispatch func(context.Context, []string) (<-chan Event, error),
+) (<-chan Event, error) {
+	ctx, cancel, args := applyToolContract(ctx, tool, args)
+	src, err := dispatch(ctx, args)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	out := make(chan Event, 64)
+	go func() {
+		defer cancel()
+		defer close(out)
+		for ev := range src {
+			select {
+			case out <- ev:
+			case <-ctx.Done():
+				// The consumer abandoned the channel. A bare `out <- ev` would
+				// block this goroutine forever, holding the Tool.Timeout context
+				// open and leaking both the relay and the child process it
+				// bounds. Drain the source so the producer can finish, then stop.
+				for range src { //nolint:revive // intentional drain
+				}
+				return
+			}
+		}
+	}()
+	return out, nil
 }
