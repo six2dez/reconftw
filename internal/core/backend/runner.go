@@ -192,6 +192,13 @@ func (r *Runner) streamWithContract(
 	go func() {
 		defer cancel()
 		defer close(out)
+		// CONTRACT-PRESERVING RELAY: `ev` is forwarded wholesale and never
+		// rewritten, so Event.Err — the terminal error the Drain/Collect helpers
+		// exist to surface — reaches the consumer unmodified. Any future change
+		// that reconstructs the Event field-by-field, filters on ev.Err, or drops
+		// events on a non-cancellation path silently re-breaks audit finding F6:
+		// a tool that exits non-zero would once again look identical to one that
+		// finished cleanly.
 		for ev := range src {
 			select {
 			case out <- ev:
