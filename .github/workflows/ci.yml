@@ -136,38 +136,38 @@ jobs:
               print "Coverage:", $3
             }
           }'
+      - name: Critical-path coverage gate self-test (proves the gate can fail)
+        # Runs BEFORE the gate. scripts/coverage-critical.sh was incapable of
+        # failing for its entire life — it averaged per-function percentages
+        # without weighting them by statement count, and scored a file with no
+        # entries in the profile a perfect 100. Nothing noticed, because nothing
+        # ever fed it an input it was supposed to reject.
+        #
+        # This step feeds it exactly those inputs and asserts a non-zero exit, so
+        # a future edit that re-breaks the gate's ability to fail is caught in
+        # the same job rather than discovered by an audit. Synthetic profiles
+        # only; it runs no tests and takes about a second.
+        run: make coverage-critical-selftest
       - name: Critical-path coverage gate (XCUT-03 per W20)
-        # XCUT-03 per-file ≥90% gate on the kernel critical paths.
-        # Files added incrementally as plans land:
-        #   Plan 03-01: log/redactor.go, log/redacting_handler.go
-        #   Plan 03-03: output/atomic.go, output/scope.go, checkpoint/store.go
-        # Files that do not yet exist on a given push are skipped silently
-        # via the [ -f "$f" ] guard.
-        run: |
-          # Coverage profile already written above; reuse it.
-          CRITICAL_FILES=(
-            "internal/core/log/redactor.go"
-            "internal/core/log/redacting_handler.go"
-            "internal/core/output/atomic.go"
-            "internal/core/output/scope.go"
-            "internal/core/checkpoint/store.go"
-          )
-          GATE=90.0
-          FAIL=0
-          for f in "${CRITICAL_FILES[@]}"; do
-            if [ ! -f "$f" ]; then
-              echo "skip (file absent): $f"
-              continue
-            fi
-            PCT=$(go tool cover -func=coverage.out \
-              | awk -v f="$f" '$1 ~ f { gsub("%","",$NF); sum+=$NF; n++ } END { if (n>0) printf "%.2f", sum/n; else print "100" }')
-            echo "$f: ${PCT}%"
-            awk -v pct="$PCT" -v gate="$GATE" 'BEGIN { exit (pct+0 < gate ? 1 : 0) }' || {
-              echo "::error::$f below XCUT-03 ${GATE}% gate (got ${PCT}%)"
-              FAIL=1
-            }
-          done
-          exit $FAIL
+        # XCUT-03 per-file ≥90% statement-weighted gate on the kernel critical
+        # paths. scripts/coverage-critical.sh is the SINGLE SOURCE OF TRUTH: it
+        # owns the file list, the package list and the threshold. This step owns
+        # nothing but the invocation.
+        #
+        # It used to carry a byte-identical copy of the script's awk one-liner
+        # plus its own hardcoded list of critical files, and the two had already
+        # drifted — CI enforced 5 files while the script enforced 13, so
+        # log/secret.go, three checkpoint/*.go files and the whole scheduler
+        # package were gated locally and not here. Two lists that must be kept
+        # in sync will drift; deleting one is the only fix that holds.
+        #
+        # REFRESH_COVERAGE=1 is explicit rather than implied by the default: the
+        # script MUST build its own profile from CRITICAL_PKGS and must never
+        # inherit the ./internal/core/... profile the XCUT-04 step above wrote,
+        # which covers a different package set (and includes resolvers).
+        env:
+          REFRESH_COVERAGE: "1"
+        run: make coverage-critical
 
   smoke:
     name: Smoke tests
