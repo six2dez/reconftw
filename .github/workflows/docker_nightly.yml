@@ -20,6 +20,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history + tags: VERSION below is `git describe --tags`, the same
+          # derivation the Makefile uses. At the default fetch-depth of 1 a
+          # scheduled run sees no tags at all and every nightly image would be
+          # stamped with a bare SHA instead of a real version.
+          fetch-depth: 0
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3 # arm64 emulation on amd64 runners (DOCK-03)
       - name: Set up Docker Buildx
@@ -41,15 +47,22 @@ jobs:
         run: |
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache
           sudo docker system prune -af || true
-      # The Dockerfile bakes in a pre-built binary (COPY bin/reconftw), so build
-      # it on the host first; the image then ships exactly this binary.
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: Build reconftw binary
-        run: make build
+      # No host-side Go build any more. The Dockerfile's `gobuild` stage
+      # cross-compiles per target platform, because a binary compiled once on
+      # this amd64 runner was being copied into the linux/arm64 image too.
+      # Go therefore no longer needs to be set up in this job at all.
+      - name: Compute build metadata
+        id: buildmeta
+        run: |
+          set -euo pipefail
+          # Mirrors the Makefile's VERSION and BUILD_DATE derivations
+          # (Makefile:75-77) so an image-built binary stamps the values a
+          # locally built one would. COMMIT_SHA comes from github.sha below.
+          version=$(git describe --tags --always --dirty 2>/dev/null || echo dev)
+          build_date=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "build_date=${build_date}" >> "$GITHUB_OUTPUT"
+          echo "VERSION=${version} BUILD_DATE=${build_date} COMMIT_SHA=${GITHUB_SHA}"
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -71,7 +84,7 @@ jobs:
         id: docker_build
         uses: docker/build-push-action@v5
         with:
-          context: . # repo root — Dockerfile copies bin/reconftw + Docker/entrypoint.sh
+          context: . # repo root — the Dockerfile compiles from cmd/ + internal/ and copies Docker/entrypoint.sh
           file: ./Docker/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
@@ -83,9 +96,22 @@ jobs:
           # and building the published image with a toolchain whose stdlib has
           # reachable vulnerabilities — the nightly image was the one artefact
           # NOT covered by the version bump.
+          #
+          # VERSION / COMMIT_SHA / BUILD_DATE feed the gobuild stage's -ldflags.
+          # Omitting them leaves the source defaults (dev/unknown/unknown), which
+          # the per-platform verification steps below reject.
           build-args: |
             DEBIAN_CODENAME=bookworm
+            VERSION=${{ steps.buildmeta.outputs.version }}
+            COMMIT_SHA=${{ github.sha }}
+            BUILD_DATE=${{ steps.buildmeta.outputs.build_date }}
 
+      # Manifest presence is necessary but NOT sufficient, and this step is the
+      # proof: it passed on every nightly for months while the published
+      # linux/arm64 entry contained the amd64 binary built on this runner. A
+      # manifest lists the platforms an image CLAIMS; it cannot show that the
+      # layers under an entry are executable on that platform. The two runtime
+      # steps below are what actually enforce acceptance gate 11.
       - name: Verify published manifest
         run: |
           # Pick the first pushed tag to inspect.
@@ -94,9 +120,83 @@ jobs:
           grep -q 'linux/amd64' /tmp/reconftw-manifest.txt
           grep -q 'linux/arm64' /tmp/reconftw-manifest.txt
 
-      - name: Verify image health
+      # Two explicit steps rather than a matrix, deliberately. Phase 15's gate
+      # table cites gate 11's owner as job `docker` plus the per-platform step
+      # name written out below, and resolves that citation by grepping this file
+      # for exactly one occurrence of it. A matrix step named from an expression
+      # never puts the literal platform string on its `name:` line, so the
+      # citation would dangle and gate 11 — the one gate with no Go test behind
+      # it — would be signed off against evidence that cannot be found. Three
+      # lines of duplication is a cheap price for a greppable name. Do not
+      # collapse these into a matrix; do not rename them without updating the
+      # gate table that cites them.
+      - name: Verify image health (linux/amd64)
         run: |
-          first_tag=$(printf '%s\n' "${{ steps.meta.outputs.tags }}" | head -n1)
-          docker pull "$first_tag"
-          docker run --rm "$first_tag" --help
-          docker run --rm "$first_tag" health-check
+          set -euo pipefail
+          tags="${{ steps.meta.outputs.tags }}"
+          first_tag="${tags%%$'\n'*}"
+          verout=/tmp/reconftw-version-amd64.txt
+
+          docker pull --platform linux/amd64 "$first_tag"
+
+          # Redirect rather than pipe: the exit status stays docker's.
+          docker run --rm --platform linux/amd64 "$first_tag" version > "$verout"
+          cat "$verout"
+
+          # `platform:` prints runtime.GOARCH, which is fixed at COMPILE time —
+          # so this asserts the binary inside the image was built for amd64.
+          grep -Eq '^[[:space:]]*platform:[[:space:]]+linux/amd64$' "$verout"
+
+          # The ldflags actually landed: a non-empty version that is not the
+          # unstamped `dev` default, a real commit SHA, a real build date.
+          grep -Eq '^reconftw version [^[:space:]]+$' "$verout"
+          if grep -Eq '^reconftw version dev$' "$verout"; then
+            echo "::error::version is the unstamped default 'dev' — VERSION build-arg did not arrive"
+            exit 1
+          fi
+          grep -Eq '^[[:space:]]*commit:[[:space:]]+[0-9a-f]{7,40}$' "$verout"
+          grep -Eq '^[[:space:]]*built:[[:space:]]+[0-9]{4}-[0-9]{2}-[0-9]{2}T' "$verout"
+
+          docker run --rm --platform linux/amd64 "$first_tag" --help
+
+          # health-check exits non-zero by design on a minimal image with an
+          # incomplete PATH, so its exit code is tolerated — but its output is
+          # the point (it names every missing tool, smugglex included) and must
+          # reach the job log.
+          docker run --rm --platform linux/amd64 "$first_tag" health-check || true
+
+      # ACCEPTANCE GATE 11 lives here: `docker run --platform linux/arm64 <image>
+      # version` must work on emulated ARM64. Do not rename this step without
+      # updating the phase gate table that cites it.
+      - name: Verify image health (linux/arm64)
+        run: |
+          set -euo pipefail
+          tags="${{ steps.meta.outputs.tags }}"
+          first_tag="${tags%%$'\n'*}"
+          verout=/tmp/reconftw-version-arm64.txt
+
+          docker pull --platform linux/arm64 "$first_tag"
+
+          # Gate 11's assertion. NEVER `|| true`-suppress this line: an image
+          # carrying the wrong architecture fails here with `exec format error`,
+          # which is exactly the failure the gate exists to catch.
+          docker run --rm --platform linux/arm64 "$first_tag" version > "$verout"
+          cat "$verout"
+
+          # `platform:` prints runtime.GOARCH, fixed at COMPILE time — so this
+          # line, and nothing in a manifest, is what proves the arm64 image
+          # really contains an arm64 binary.
+          grep -Eq '^[[:space:]]*platform:[[:space:]]+linux/arm64$' "$verout"
+
+          grep -Eq '^reconftw version [^[:space:]]+$' "$verout"
+          if grep -Eq '^reconftw version dev$' "$verout"; then
+            echo "::error::version is the unstamped default 'dev' — VERSION build-arg did not arrive"
+            exit 1
+          fi
+          grep -Eq '^[[:space:]]*commit:[[:space:]]+[0-9a-f]{7,40}$' "$verout"
+          grep -Eq '^[[:space:]]*built:[[:space:]]+[0-9]{4}-[0-9]{2}-[0-9]{2}T' "$verout"
+
+          docker run --rm --platform linux/arm64 "$first_tag" --help
+
+          # See the amd64 step: exit code tolerated, output required.
+          docker run --rm --platform linux/arm64 "$first_tag" health-check || true
