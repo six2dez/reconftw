@@ -41,7 +41,18 @@ import (
 // Raw-byte dedup remains correct for the other structured artefacts where the full
 // record is the unit of uniqueness.
 //
-// Empty glob (no staging files found) is a no-op; returns nil.
+// EMPTY UNION (F3, 15-03). An empty glob, an empty post-dedup set or an empty
+// post-scope-filter set is NOT a no-op. Workspaces are stable across runs, so
+// returning nil left the PREVIOUS run's artefact in place and every downstream
+// consumer — report, SARIF, store, notifications — reported a stale finding as
+// though this run had observed it. The empty case now dispatches through
+// publishEmptyStage:
+//
+//   - Case A (waf, findings — no direct artefact writer): publish a present,
+//     empty artefact, so "this run found nothing" is representable.
+//   - Case B (directArtefactWriterStages): never truncate a non-empty artefact
+//     the merge does not own.
+//
 // app.Tree.Append errors are returned — callers should log and continue
 // (best_effort policy, D-W12).
 func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error {
@@ -55,7 +66,7 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 			app.Log.Debug("web.MergeStage: no staging files found",
 				"stage", stage, "pattern", pattern)
 		}
-		return nil
+		return publishEmptyStage(app, stage, "no staging files")
 	}
 
 	// Sort for deterministic processing order.
@@ -91,7 +102,7 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 	// the staging files and no preservation branch is needed here. Any future
 	// direct writer of artefacts/findings.jsonl reintroduces the bug; stage it
 	// instead.
-	if stage == "hosts" {
+	if artefactSeedStages[stage] {
 		existingArtefact := filepath.Join(app.Target.WorkDir, "artefacts", stage+".jsonl")
 		if existingLines, rerr := readJSONLFile(existingArtefact); rerr == nil {
 			for _, line := range existingLines {
@@ -123,7 +134,7 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 	}
 
 	if len(ordered) == 0 {
-		return nil
+		return publishEmptyStage(app, stage, "staging files held no records")
 	}
 
 	// Multi-source aggregator: drop what the scope gate would reject before
@@ -137,7 +148,7 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 			"stage", stage, "dropped", dropped, "kept", len(kept))
 	}
 	if len(kept) == 0 {
-		return nil
+		return publishEmptyStage(app, stage, "every record was rejected by the scope gate")
 	}
 	ordered = kept
 
@@ -151,6 +162,97 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 
 	_ = ctx // available for future cancellation checks
 	return nil
+}
+
+// artefactSeedStages lists the stages whose merge must SEED the union with the
+// EXISTING artefact before folding in the staging files. This is the 13-08
+// union-preservation behaviour and it is scoped to "hosts" ALONE: the
+// portscan/nerva/wellknown host records must be ADDED to httpx's probed hosts,
+// not substituted for them.
+//
+// Do NOT widen this set. Applying it to "urls" would re-import the pre-dedup
+// staging URLs on top of urldedup's deduplicated artefact, undoing WEB-14.
+//
+// This is a DIFFERENT concern from directArtefactWriterStages below (which is
+// about never TRUNCATING an artefact the merge does not own); they are two
+// named sets precisely so a later reader cannot conflate them.
+var artefactSeedStages = map[string]bool{"hosts": true}
+
+// directArtefactWriterStages lists the merged stages whose artefact ALSO has a
+// direct app.Tree.Append writer OUTSIDE the merge path. Evidence, verified on
+// the tree (grep -rn 'Tree\.Append(' internal/ --include='*.go' | grep -v _test):
+//
+//	hosts   → internal/modules/web/httpx.go:228, internal/modules/subdomains/geo.go:196
+//	          (staging producers: web/portscan.go, web/wellknown.go)
+//	fuzz    → internal/modules/web/ffuf.go:203            (NO staging producer — glob is permanently empty)
+//	origins → internal/modules/web/hakoriginfinder.go:146 (NO staging producer — glob is permanently empty)
+//	urls    → internal/modules/web/urldedup.go:230
+//	          (staging producers: katana, urlfinder, waymore, subjs, jsluice, jsa)
+//
+// THE RULE THIS SET ENCODES IS ABOUT THE MERGE ONLY: the merge is not the
+// authoritative writer of these four artefacts and must never truncate them.
+// An unconditional empty-publish would zero artefacts/fuzz.jsonl and
+// artefacts/origins.jsonl in the very run ffuf and hakoriginfinder produced
+// them — their globs are permanently empty — and web/nomore403.go,
+// vulns/bypass4xx.go and web/portscan.go would then consume the empty files.
+//
+// IT DOES NOT SAY THESE FOUR ARTEFACTS ARE NEVER EMPTIED. They MUST be emptied
+// when their own direct writer RUNS and finds nothing — that is F3 for them,
+// and it is delivered by plan 15-13 Task 3 at web/ffuf.go,
+// web/hakoriginfinder.go, web/urldedup.go and web/httpx.go. The empty-publish
+// belongs to the producer because only the producer can tell "did not run"
+// (preserve) from "ran and found nothing" (empty); the merge cannot, which is
+// exactly why the never-truncate rule belongs here.
+var directArtefactWriterStages = map[string]bool{
+	"hosts":   true,
+	"fuzz":    true,
+	"origins": true,
+	"urls":    true,
+}
+
+// publishEmptyStage handles a merge whose union came out EMPTY (F3, 15-03).
+//
+// Case A (stage NOT in directArtefactWriterStages — waf, findings): publish a
+// present, zero-length artefact so "this run found nothing" is representable
+// and distinguishable from "this run did not look".
+//
+// Case B (stage IN directArtefactWriterStages): publish empty ONLY when the
+// existing artefact is also empty (absent, or zero non-blank lines). Otherwise
+// leave it untouched and log the retained line count at Debug.
+func publishEmptyStage(app *appctx.AppContext, stage, reason string) error {
+	if directArtefactWriterStages[stage] {
+		existing := filepath.Join(app.Target.WorkDir, "artefacts", stage+".jsonl")
+		if n := countArtefactLines(existing); n > 0 {
+			if app.Log != nil {
+				app.Log.Debug("web.MergeStage: empty union — artefact retained, the merge does not own it",
+					"stage", stage, "reason", reason, "retained", n)
+			}
+			return nil
+		}
+	}
+	// output.PublishArtefact bypasses app.Tree.Append deliberately: Append
+	// short-circuits at len(lines) == 0 (internal/core/output/tree.go:59-61) and
+	// so cannot express an empty publish. Bypassing the scope-enforcement
+	// boundary is safe HERE SPECIFICALLY because there are no records to
+	// scope-check.
+	if err := output.PublishArtefact(app.Target.WorkDir, stage, nil); err != nil {
+		return fmt.Errorf("web.MergeStage %s: publish empty artefact: %w", stage, err)
+	}
+	if app.Log != nil {
+		app.Log.Debug("web.MergeStage: empty union — published empty artefact",
+			"stage", stage, "reason", reason)
+	}
+	return nil
+}
+
+// countArtefactLines returns the number of non-blank lines in a JSONL file.
+// A missing or unreadable file counts as 0.
+func countArtefactLines(path string) int {
+	lines, err := readJSONLFile(path)
+	if err != nil {
+		return 0
+	}
+	return len(lines)
 }
 
 // hostsDedupKey returns the dedup identity for a "hosts"-stage JSON line (IN-13-03).
@@ -204,15 +306,17 @@ var webStagingPrefixes = []string{"hosts", "fuzz", "waf", "origins", "urls", "fi
 // MergeAllWebArtefacts consolidates each web staging artefact into its
 // final artefact file. Called once after all web pipeline stages complete.
 // Non-fatal: errors are logged at Debug level and the function continues.
+//
+// The pre-glob "no staging files → skip" shortcut this function used to carry
+// was removed in 15-03: MergeStage now OWNS the empty case (publish empty for
+// Case A, never truncate for Case B), and skipping the call here would have
+// left the previous run's artefact in place. NOTE this function is called only
+// from tests and doc comments — production calls MergeStage directly
+// (internal/mcp/handlers/web.go, internal/mcp/handlers/composite.go), which is
+// why the fix has to live in MergeStage and not here.
 func MergeAllWebArtefacts(ctx context.Context, app *appctx.AppContext) error {
 	var firstErr error
 	for _, prefix := range webStagingPrefixes {
-		// Check if any staging files exist before attempting merge.
-		pattern := filepath.Join(app.Target.WorkDir, "inputs", prefix+".*.jsonl")
-		matches, err := filepath.Glob(pattern)
-		if err != nil || len(matches) == 0 {
-			continue
-		}
 		if mergeErr := MergeStage(ctx, app, prefix); mergeErr != nil {
 			if app.Log != nil {
 				app.Log.Debug("web.MergeAllWebArtefacts: MergeStage failed",

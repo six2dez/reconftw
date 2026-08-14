@@ -41,7 +41,15 @@ import (
 // Like MergeVulnsFindings, this deduplicates by raw JSON line bytes — correct
 // for structured artefacts where the full record is the unit of uniqueness.
 //
-// Empty glob (no staging files found) is a no-op; returns nil.
+// EMPTY UNION (F3, 15-03). An empty glob, an empty post-dedup set or an empty
+// post-scope-filter set PUBLISHES A PRESENT, EMPTY ARTEFACT rather than
+// returning nil. "findings" is a Case-A stage: nothing writes
+// artefacts/findings.jsonl outside the merge path, so replacing it is safe.
+// Returning nil left the PREVIOUS run's findings on disk — workspaces are
+// stable across runs — and a stale OSINT finding was republished into the
+// report, SARIF, store and notifications of every later run as though this run
+// had observed it.
+//
 // app.Tree.Append errors are returned — callers should log and continue
 // (best_effort policy, D-O8).
 func MergeOSINTFindings(ctx context.Context, app *appctx.AppContext, stage string) error {
@@ -55,7 +63,7 @@ func MergeOSINTFindings(ctx context.Context, app *appctx.AppContext, stage strin
 			app.Log.Debug("osint.MergeOSINTFindings: no staging files found",
 				"stage", stage, "pattern", pattern)
 		}
-		return nil
+		return publishEmptyOSINTStage(app, stage, "no staging files")
 	}
 
 	// Sort for deterministic processing order.
@@ -84,7 +92,7 @@ func MergeOSINTFindings(ctx context.Context, app *appctx.AppContext, stage strin
 	}
 
 	if len(ordered) == 0 {
-		return nil
+		return publishEmptyOSINTStage(app, stage, "staging files held no records")
 	}
 
 	// Multi-source aggregator: drop what the scope gate would reject before
@@ -98,7 +106,7 @@ func MergeOSINTFindings(ctx context.Context, app *appctx.AppContext, stage strin
 			"stage", stage, "dropped", dropped, "kept", len(kept))
 	}
 	if len(kept) == 0 {
-		return nil
+		return publishEmptyOSINTStage(app, stage, "every record was rejected by the scope gate")
 	}
 	ordered = kept
 
@@ -111,6 +119,26 @@ func MergeOSINTFindings(ctx context.Context, app *appctx.AppContext, stage strin
 	}
 
 	_ = ctx // available for future cancellation checks
+	return nil
+}
+
+// publishEmptyOSINTStage publishes a present, zero-length artefact for an empty
+// merge union (F3, 15-03). osintStagingPrefixes holds only "findings", which has
+// NO direct app.Tree.Append writer outside the merge path, so this is a Case-A
+// stage and an unconditional empty publish is safe.
+//
+// output.PublishArtefact bypasses app.Tree.Append deliberately: Append
+// short-circuits at len(lines) == 0 (internal/core/output/tree.go:59-61) and so
+// cannot express an empty publish. Bypassing the scope-enforcement boundary is
+// safe HERE SPECIFICALLY because there are no records to scope-check.
+func publishEmptyOSINTStage(app *appctx.AppContext, stage, reason string) error {
+	if err := output.PublishArtefact(app.Target.WorkDir, stage, nil); err != nil {
+		return fmt.Errorf("osint.MergeOSINTFindings %s: publish empty artefact: %w", stage, err)
+	}
+	if app.Log != nil {
+		app.Log.Debug("osint.MergeOSINTFindings: empty union — published empty artefact",
+			"stage", stage, "reason", reason)
+	}
 	return nil
 }
 
@@ -148,15 +176,13 @@ var osintStagingPrefixes = []string{"findings"}
 // final artefact file. Called once after all osint pipeline stages complete.
 // Non-fatal: errors are logged at Debug level and the function continues
 // (best_effort, D-O8).
+//
+// The pre-glob "no staging files → skip" shortcut was removed in 15-03:
+// MergeOSINTFindings now OWNS the empty case, and skipping the call here would
+// have left the previous run's findings artefact in place (F3).
 func MergeAllOSINTArtefacts(ctx context.Context, app *appctx.AppContext) error {
 	var firstErr error
 	for _, prefix := range osintStagingPrefixes {
-		// Check if any staging files exist before attempting merge.
-		pattern := filepath.Join(app.Target.WorkDir, "inputs", prefix+".*.jsonl")
-		matches, err := filepath.Glob(pattern)
-		if err != nil || len(matches) == 0 {
-			continue
-		}
 		if mergeErr := MergeOSINTFindings(ctx, app, prefix); mergeErr != nil {
 			if app.Log != nil {
 				app.Log.Debug("osint.MergeAllOSINTArtefacts: MergeOSINTFindings failed",
