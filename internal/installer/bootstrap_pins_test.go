@@ -76,28 +76,27 @@ func TestZeroPinNeverValidates(t *testing.T) {
 	}
 }
 
-// TestPlaceholderPinsAreDeclared makes the outstanding work visible: it lists
-// which bootstrap pins are still placeholders. It does not fail — a hard
-// failure would keep CI permanently red for a known, documented gap — but the
-// names are printed on every run so the gap cannot be forgotten, and the moment
-// a pin becomes real it disappears from the list.
-func TestPlaceholderPinsAreDeclared(t *testing.T) {
+// TestNoPlaceholderPinsRemain is the hard successor to the old soft
+// TestPlaceholderPinsAreDeclared, which merely LOGGED that the pins were
+// all-zero placeholders. Logging kept CI green over a bootstrap that always
+// aborted; now that every pin is a real vendor digest, a placeholder
+// reappearing is a regression and must fail.
+//
+// Deliberately scans the pins by value rather than by name so a newly added
+// matrix entry is covered automatically.
+func TestNoPlaceholderPinsRemain(t *testing.T) {
 	t.Parallel()
-	pins := map[string]string{
-		"goInstallerSHA256": goInstallerSHA256,
-		"uvInstallerSHA256": uvInstallerSHA256,
-		"rustupInitSHA256":  rustupInitSHA256,
-	}
-	var placeholders []string
-	for name, pin := range pins {
+	for platform, pin := range GoToolchainSHA256 {
 		if strings.Trim(pin, "0") == "" {
-			placeholders = append(placeholders, name)
+			t.Errorf("GoToolchainSHA256[%q] is an all-zero placeholder", platform)
 		}
 	}
-	if len(placeholders) > 0 {
-		t.Logf("OUTSTANDING: %d bootstrap pin(s) are still all-zero placeholders "+
-			"(%s) — clean-machine bootstrap of those toolchains fails closed by "+
-			"design and cannot work until real vendor digests are pinned",
-			len(placeholders), strings.Join(placeholders, ", "))
+	for platform, pin := range RustupInitSHA256 {
+		if strings.Trim(pin, "0") == "" {
+			t.Errorf("RustupInitSHA256[%q] is an all-zero placeholder", platform)
+		}
+	}
+	if strings.Trim(uvInstallerSHA256, "0") == "" {
+		t.Error("uvInstallerSHA256 is an all-zero placeholder")
 	}
 }
