@@ -20,7 +20,7 @@ GH_CLI := $(shell command -v gh 2> /dev/null)
 # Default: reconftw-data.
 
 .PHONY: help \
-        build test test-integration test-smoke integration-smoke lint fmt fmt-check check coverage coverage-critical coverage-lib ci clean \
+        build test test-integration test-smoke integration-smoke lint fmt fmt-check check coverage coverage-critical coverage-critical-selftest coverage-lib ci clean \
         sync upload bootstrap rm \
         bash-lint bash-lint-fix bash-fmt bash-test bash-test-unit bash-test-integration-smoke \
         bash-test-integration-full bash-test-security bash-test-all bash-test-release-gate \
@@ -40,6 +40,7 @@ help:
 	@echo "  make check              - fmt-check + lint + test (composite local gate)"
 	@echo "  make coverage           - go test -coverprofile on internal/core/..."
 	@echo "  make coverage-critical  - XCUT-03 per-file ≥90% gate on critical paths"
+	@echo "  make coverage-critical-selftest - Prove the critical gate can actually fail"
 	@echo "  make coverage-lib       - XCUT-03 ≥75% lib-aggregate gate (resolvers-excluded)"
 	@echo "  make ci                 - fmt-check + lint + test + both coverage gates (matches CI)"
 	@echo "  make clean              - rm -rf bin/ coverage.out"
@@ -130,8 +131,24 @@ coverage:
 
 # coverage-critical: XCUT-03 per-file ≥90% gate on the kernel critical paths.
 # Files seeded across Plan 03 plans 01-05; see scripts/coverage-critical.sh.
+#
+# The script is the SINGLE SOURCE OF TRUTH for the file list, the package list
+# and the threshold — .github/workflows/ci.yml calls this target rather than
+# carrying its own copy (the two copies had already drifted: CI enforced 5 files,
+# the script 13). GATE, REFRESH_COVERAGE and CRITICAL_COVERAGE_PROFILE reach the
+# script through the recipe's environment, so both `GATE=95 make coverage-critical`
+# and `make coverage-critical GATE=95` override the default.
 coverage-critical:
 	@./scripts/coverage-critical.sh
+
+# coverage-critical-selftest: proves the gate above is CAPABLE of failing.
+# It feeds coverage-critical.sh synthetic coverprofiles and asserts a non-zero
+# exit on (a) a file whose statement-weighted coverage is below the gate but
+# whose per-function average is above it, and (b) a listed file with no measured
+# statements. Both inputs PASSED the pre-15-07 implementation. Cheap (no
+# `go test`), so it runs in CI immediately before the gate itself.
+coverage-critical-selftest:
+	@./scripts/coverage_critical_test.sh
 
 # coverage-lib: XCUT-03 ≥75% lib-aggregate gate. Excludes internal/core/resolvers
 # (UDP/53 hang offline) — the full lib-wide figure incl. resolvers is a tracked
