@@ -37,23 +37,11 @@ func swapRunCmd(t *testing.T, fn func(context.Context, string, []string, []strin
 	t.Cleanup(func() { runCmd = orig })
 }
 
-// --- BLOCKER 1: bootstrapper hash pins must be non-empty 64-char hex ---
-
-func TestBootstrapHashPinsNonEmpty(t *testing.T) {
-	pins := map[string]string{
-		"goInstallerSHA256": goInstallerSHA256,
-		"uvInstallerSHA256": uvInstallerSHA256,
-		"rustupInitSHA256":  rustupInitSHA256,
-	}
-	for name, pin := range pins {
-		if len(pin) != 64 {
-			t.Errorf("%s: length %d, want 64 (a SHA-256 hex digest)", name, len(pin))
-		}
-		if _, err := hex.DecodeString(pin); err != nil {
-			t.Errorf("%s: not valid hex: %v", name, err)
-		}
-	}
-}
+// BLOCKER 1 (bootstrapper hash pins) is now covered by bootstrap_test.go:
+// TestBootstrapPinsAreRealDigests and the completeness tests. The old
+// TestBootstrapHashPinsNonEmpty asserted only that the three scalar pins were
+// 64 chars of valid hex — which the 64-zero placeholders satisfied, so it
+// passed for the entire period during which a real bootstrap could not work.
 
 func TestVerifyFile(t *testing.T) {
 	dir := t.TempDir()

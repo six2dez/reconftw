@@ -17,32 +17,12 @@ import (
 
 // --- Bootstrapper SHA-256 pins (INST-03 / INST-09 / XCUT-08) ---
 //
-// These are the expected SHA-256 digests of the toolchain installers/tarballs
-// that `reconftw install` downloads on a clean machine. Each MUST be a real
-// 64-char hex digest from the vendor's published checksum for the pinned
-// version (goVersion / uvVersion / rustup channel) before a production
-// clean-machine bootstrap.
-//
-// ⚠ PLACEHOLDER VALUES — FAIL-CLOSED. The 64-zero strings below are intentional
-// sentinels: no real download will ever hash to all-zeros, so verifyFile()
-// returns ChecksumMismatch and the bootstrap ABORTS rather than running an
-// unverified installer. Replace each with the vendor digest (see RESEARCH.md
-// §Bootstrap pins) when pinning a concrete toolchain version. They are
-// non-empty + valid hex so the package builds and TestBootstrapHashPinsNonEmpty
-// passes; they are NOT yet trustworthy for a real install.
-const (
-	// goVersion is the toolchain the bootstrapper installs on a clean machine.
-	// It MUST match the `go` directive in go.mod and ARG GO_VERSION in
-	// Docker/Dockerfile — otherwise a freshly bootstrapped host builds with a
-	// different (here: older, vulnerable) toolchain than CI and Docker do.
-	// It drifted to 1.25.0 while both of those moved on.
-	// TestGoVersionMatchesGoMod enforces the match.
-	goVersion = "1.25.13"
-
-	goInstallerSHA256 = "0000000000000000000000000000000000000000000000000000000000000000" // dl.google.com/go/go<goVersion>.<os>-<arch>.tar.gz
-	uvInstallerSHA256 = "0000000000000000000000000000000000000000000000000000000000000000" // astral.sh uv install script
-	rustupInitSHA256  = "0000000000000000000000000000000000000000000000000000000000000000" // static.rust-lang.org rustup-init
-)
+// The pins, the versions they describe, and their provenance now live in
+// checksums.go. They used to be three 64-zero sentinels here. Those were
+// honest about being fail-closed, but the practical effect was that a real
+// clean-machine bootstrap ALWAYS aborted, while the test suite only asserted
+// the sentinels were non-empty hex — so CI stayed green over a feature that
+// could not work. See checksums.go for the vendor sources of every digest.
 
 // bootstrapConfig carries the few knobs the bootstrappers need; kept as a struct
 // so callers (and tests) can redirect downloads to a temp dir.
@@ -82,10 +62,13 @@ func (c *bootstrapConfig) client() *http.Client {
 //
 // Integrity model (D-01): go/python/system tool kinds rely on go.sum / PyPI for
 // integrity, so an empty expectedSHA256 is a legitimate "no explicit pin"
-// (returns nil). Bootstrappers and go_clone binaries MUST pass a non-empty pin
-// — TestBootstrapHashPinsNonEmpty guarantees the bootstrap constants are never
-// empty, so the empty-string fast path can never silently disable a
-// bootstrapper's supply-chain check (BLOCKER 1).
+// (returns nil). Bootstrappers and go_clone binaries MUST pass a non-empty pin.
+//
+// That empty-string fast path is why the bootstrappers resolve their digests
+// through goToolchainDigest / rustupInitDigest, which return an ERROR on a
+// lookup miss rather than the zero value: passing "" here would not "fail to
+// find a pin", it would silently switch verification OFF for that platform
+// while every log line still said the download was verified (BLOCKER 1).
 func verifyFile(_ context.Context, path, expectedSHA256, sourceURL string) error {
 	if expectedSHA256 == "" {
 		return nil // no explicit pin (go.sum / PyPI integrity, Pattern 7)
@@ -186,8 +169,8 @@ func downloadFile(ctx context.Context, cfg *bootstrapConfig, url, name string) (
 }
 
 // bootstrapGo installs the pinned Go toolchain to cfg.GoRoot when `go` is absent
-// (D-02). It downloads the official tarball, verifies it against
-// goInstallerSHA256 (fail-closed on the placeholder pin), and extracts via tar.
+// (D-02). It downloads the official tarball, verifies it against the
+// per-platform pin from checksums.go, and extracts via tar.
 // Mirrors install.sh:install_golang_version().
 func bootstrapGo(ctx context.Context, cfg *bootstrapConfig) error {
 	if onPath("go") {
@@ -197,8 +180,14 @@ func bootstrapGo(ctx context.Context, cfg *bootstrapConfig) error {
 	if goRoot == "" {
 		goRoot = "/usr/local/go"
 	}
-	tarball := fmt.Sprintf("go%s.%s-%s.tar.gz", goVersion, runtime.GOOS, runtime.GOARCH)
-	url := "https://dl.google.com/go/" + tarball
+	// Resolve the pin FIRST. An unsupported platform must cost zero bandwidth
+	// and, more importantly, must never reach verifyFile with an empty digest.
+	want, err := goToolchainDigest(runtime.GOOS, runtime.GOARCH)
+	if err != nil {
+		return fmt.Errorf("bootstrap go: %w", err)
+	}
+	tarball := goToolchainArchive(runtime.GOOS, runtime.GOARCH)
+	url := goToolchainURL(runtime.GOOS, runtime.GOARCH)
 	var path string
 	if err := retry(ctx, 3, 2*time.Second, func() error {
 		p, err := downloadFile(ctx, cfg, url, tarball)
@@ -207,7 +196,7 @@ func bootstrapGo(ctx context.Context, cfg *bootstrapConfig) error {
 	}); err != nil {
 		return fmt.Errorf("bootstrap go: %w", err)
 	}
-	if err := verifyFile(ctx, path, goInstallerSHA256, url); err != nil {
+	if err := verifyFile(ctx, path, want, url); err != nil {
 		return fmt.Errorf("bootstrap go: %w", err)
 	}
 	if err := os.RemoveAll(goRoot); err != nil {
@@ -219,11 +208,16 @@ func bootstrapGo(ctx context.Context, cfg *bootstrapConfig) error {
 
 // bootstrapUV installs the astral.sh uv tool manager when absent (D-02),
 // verifying the install script against uvInstallerSHA256 before running it.
+//
+// The URL is the immutable versioned release asset rather than the classic
+// https://astral.sh/uv/install.sh, which 301s to a "latest" path whose body
+// changes on every uv release. Verifying a moving target against a fixed
+// digest is not a supply-chain control, it is a scheduled outage.
 func bootstrapUV(ctx context.Context, cfg *bootstrapConfig) error {
 	if onPath("uv") {
 		return nil
 	}
-	const url = "https://astral.sh/uv/install.sh"
+	const url = uvInstallerURL
 	var path string
 	if err := retry(ctx, 3, 2*time.Second, func() error {
 		p, err := downloadFile(ctx, cfg, url, "uv-install.sh")
@@ -239,23 +233,43 @@ func bootstrapUV(ctx context.Context, cfg *bootstrapConfig) error {
 }
 
 // bootstrapRust installs the Rust toolchain via rustup-init when absent
-// (INST-09 — only invoked when a kind=rust tool is enabled). The installer
-// script is SHA-256-verified against rustupInitSHA256 before execution.
+// (INST-09 — only invoked when a kind=rust tool is enabled).
+//
+// This fetches the VERSIONED, PER-TARGET rustup-init BINARY, not the classic
+// https://sh.rustup.rs shell script. The script is floating and the Rust
+// project publishes no checksum for it anywhere, so there was no honest value
+// to put in its pin; the archived binary does publish a .sha256 per target.
+// Being per-target is what makes this a matrix lookup rather than a scalar.
 func bootstrapRust(ctx context.Context, cfg *bootstrapConfig) error {
 	if onPath("cargo") {
 		return nil
 	}
-	const url = "https://sh.rustup.rs"
+	// Resolve URL + pin before spending bandwidth; an unsupported platform is
+	// an explicit refusal, never an unverified install.
+	url, err := rustupInitURL(runtime.GOOS, runtime.GOARCH)
+	if err != nil {
+		return fmt.Errorf("bootstrap rust: %w", err)
+	}
+	want, err := rustupInitDigest(runtime.GOOS, runtime.GOARCH)
+	if err != nil {
+		return fmt.Errorf("bootstrap rust: %w", err)
+	}
 	var path string
 	if err := retry(ctx, 3, 2*time.Second, func() error {
-		p, err := downloadFile(ctx, cfg, url, "rustup-init.sh")
+		p, err := downloadFile(ctx, cfg, url, "rustup-init")
 		path = p
 		return err
 	}); err != nil {
 		return fmt.Errorf("bootstrap rust: %w", err)
 	}
-	if err := verifyFile(ctx, path, rustupInitSHA256, url); err != nil {
+	if err := verifyFile(ctx, path, want, url); err != nil {
 		return fmt.Errorf("bootstrap rust: %w", err)
 	}
-	return runCmd(ctx, "sh", []string{path, "-s", "--", "--default-toolchain", "stable", "--no-modify-path", "-y"}, nil)
+	// Only made executable AFTER the digest matched: downloadFile creates the
+	// file 0600, so a rustup-init that fails verification is never a file the
+	// kernel would agree to run.
+	if err := os.Chmod(path, 0o700); err != nil { //nolint:gosec // 0700 owner-only exec is the minimum for a verified installer binary
+		return fmt.Errorf("bootstrap rust: chmod %s: %w", path, err)
+	}
+	return runCmd(ctx, path, []string{"-y", "--default-toolchain", "stable", "--no-modify-path"}, nil)
 }
