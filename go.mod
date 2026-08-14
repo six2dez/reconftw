@@ -1,6 +1,11 @@
 module github.com/six2dez/reconftw
 
-go 1.25.0
+// 1.25.13 is the patched 1.25 branch. At 1.25.0 govulncheck reported reachable
+// stdlib vulnerabilities (TLS/x509, html/template, net/http2, mail) that are
+// fixed in later 1.25 patch releases. CI resolves its toolchain from this file,
+// so the floor here is what the release binary is actually built with.
+// Staying on 1.25 rather than jumping to 1.26 keeps the source-build floor low.
+go 1.25.13
 
 require (
 	github.com/go-playground/validator/v10 v10.30.2

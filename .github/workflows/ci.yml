@@ -64,6 +64,31 @@ jobs:
       - name: golangci-lint
         run: golangci-lint run --timeout=5m ./...
 
+  govulncheck:
+    name: Vulnerability scan (govulncheck)
+    runs-on: ubuntu-latest
+    # Reachability-based scan of the stdlib and every dependency. This gate was
+    # absent while go.mod pinned 1.25.0, whose stdlib carried reachable
+    # TLS/x509, html/template, net/http2 and mail advisories — a security tool
+    # shipping a known-vulnerable runtime. go.mod now floors at a patched
+    # release and this job keeps it that way.
+    #
+    # govulncheck reports only vulnerabilities that are actually REACHABLE from
+    # this code, so a finding here is real exposure, not advisory noise.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Install govulncheck
+        # Pinned, not @latest: an unpinned scanner makes the gate's verdict
+        # depend on when it ran, so a green build is not reproducible and a new
+        # release can turn CI red with no change to this repo.
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+      - name: govulncheck
+        run: govulncheck ./...
+
   unit:
     name: Unit + Property tests
     runs-on: ubuntu-latest
@@ -186,20 +211,34 @@ jobs:
           fi
 
   integration-smoke:
-    name: Integration smoke (kernel-demo)
+    name: Integration smoke (E2E)
     runs-on: ubuntu-latest
-    # Plan 03-07 acceptance integration: builds the binary inside the test,
-    # invokes `kernel-demo --target example.com`, asserts manifest +
-    # artefacts/demo.jsonl + checkpoints.db. NOT smoke-tagged because it
-    # exercises the binary end-to-end without external tools.
+    # Hermetic end-to-end gate: drives production record types through the real
+    # staging write, merge and scope gate, and asserts artefact CONTENT — not
+    # just exit codes. No external tools, no network.
+    #
+    # This job previously ran `-run TestKernelDemoEndToEnd`, a test deleted in
+    # Phase 4. `go test -run` exits 0 when its pattern matches nothing, so the
+    # job reported green for months while executing zero tests. The match-count
+    # guard below is the actual fix: a gate that cannot fail is worse than no
+    # gate, because it manufactures confidence.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: true
-      - name: TestKernelDemoEndToEnd
-        run: go test -race -run TestKernelDemoEndToEnd ./cmd/reconftw/...
+      - name: E2E gate
+        run: |
+          set -euo pipefail
+          PATTERN='^TestE2E'
+          MATCHED=$(go test -list "$PATTERN" ./... 2>/dev/null | grep -c '^TestE2E' || true)
+          echo "E2E tests selected by ${PATTERN}: ${MATCHED}"
+          if [ "$MATCHED" -eq 0 ]; then
+            echo "::error::E2E gate selected ZERO tests. A -run pattern matching nothing exits 0 and produces a false green — failing loudly instead."
+            exit 1
+          fi
+          go test -race -run "$PATTERN" ./...
       - name: interfaces_check (BINDING delta detector)
         # Plan 03-07 upgraded cmd/interfaces_check/main.go to import real
         # packages + compile-time assertions. ADR §5 signature drift now
@@ -215,12 +254,14 @@ jobs:
   platform-smoke:
     name: Platform smoke (${{ matrix.os }})
     # XPLAT-05: build + smoke-test the binary on every supported platform on
-    # each PR/push (Linux + macOS, x86_64 + Apple Silicon via macos-latest).
+    # each PR/push (Linux + macOS; Apple Silicon via macos-latest, Intel x86_64
+    # via macos-15-intel — macos-13 was retired 2025-12-04 and jobs targeting a
+    # retired label queue forever. macos-15-intel is supported until Aug 2027).
     # The weekly integration-full run lives in the scheduled jobs above.
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, ubuntu-22.04, macos-latest, macos-13]
+        os: [ubuntu-latest, ubuntu-22.04, macos-latest, macos-15-intel]
     runs-on: ${{ matrix.os }}
     if: github.event_name == 'pull_request' || github.event_name == 'push'
     steps:

@@ -77,8 +77,13 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # GO_VERSION is intentionally NOT passed: the Dockerfile's ARG default
+          # is the single source of truth and is kept in step with go.mod. This
+          # job used to hardcode GO_VERSION=1.25.0, silently overriding the pin
+          # and building the published image with a toolchain whose stdlib has
+          # reachable vulnerabilities — the nightly image was the one artefact
+          # NOT covered by the version bump.
           build-args: |
-            GO_VERSION=1.25.0
             DEBIAN_CODENAME=bookworm
 
       - name: Verify published manifest

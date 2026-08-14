@@ -1,3 +1,15 @@
+# ⚠ THIS FILE BELONGS TO THE v1 BASH INSTALLER (install.sh) ONLY.
+#
+# It is NOT the v2 manifest. The Go binary embeds a completely different file,
+# internal/core/backend/tools.lock, in a different format (a per-tool TOML
+# table with kind/description/default_args/timeout_seconds/critical) covering
+# the full 100+ tool inventory. This one is a flat
+# `<binary>=<go-module>@<version>` list of pins read by install.sh:528.
+#
+# The two are NOT copies and MUST NOT be synchronised — a code review already
+# mistook them for duplicates and proposed generating one from the other, which
+# would corrupt both. This file retires with install.sh at the v2 cutover.
+#
 # tools.lock — pinned Go tool versions for stability-critical tools.
 # Format: <binary>=<go-module>@<version>
 # - Comment lines start with '#'

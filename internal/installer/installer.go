@@ -37,12 +37,24 @@ type Installer struct {
 // installer package never references that global so it stays hermetically
 // testable.
 func New(opts Options) *Installer {
+	logger := slog.Default()
+	if opts.NonInteractive {
+		// Honour the flag instead of merely storing it. This package has no
+		// spinners or prompts to suppress, so --non-interactive was accepted,
+		// carried all the way into Options, and then read by nothing — the
+		// documented behaviour did not exist. What a CI or Docker-builder
+		// caller actually wants is quiet progress, so drop the per-tool
+		// install_tool_ok stream to Warn and keep failures visible.
+		logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+			Level: slog.LevelWarn,
+		}))
+	}
 	return &Installer{
 		Options:        opts,
 		goInstaller:    NewGoToolInstaller(),
 		pyInstaller:    NewPythonToolInstaller(),
 		cloneInstaller: NewCloneToolInstaller(),
-		log:            slog.Default(),
+		log:            logger,
 	}
 }
 

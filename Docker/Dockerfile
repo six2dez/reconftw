@@ -17,7 +17,7 @@
 #   docker buildx build --platform linux/amd64,linux/arm64 \
 #     -f Docker/Dockerfile -t ghcr.io/six2dez/reconftw:latest .
 
-ARG GO_VERSION=1.25.0
+ARG GO_VERSION=1.25.13
 ARG DEBIAN_CODENAME=bookworm
 
 ##################################################
@@ -39,7 +39,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # uv (Python tool manager) from the official image — avoids the network
 # bootstrap path (and its placeholder SHA pin) during the build.
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+#
+# Pinned by DIGEST, not by :latest. A floating tag means two builds of the same
+# commit can ship different uv binaries, and it hands whoever controls that tag
+# an unreviewed write into the image — the same supply-chain exposure the
+# checksum pins elsewhere in this repo exist to prevent.
+#
+# To move it: docker buildx imagetools inspect ghcr.io/astral-sh/uv:<version>
+COPY --from=ghcr.io/astral-sh/uv@sha256:2d890623d310b57771ce840f0da5eed5fc6d657da05ffaa45d82797b53fa3abc /uv /usr/local/bin/uv
 
 # The pre-built v2 binary (built by `make build` before `docker build`); the
 # image therefore ships exactly the tagged binary rather than a Docker rebuild.

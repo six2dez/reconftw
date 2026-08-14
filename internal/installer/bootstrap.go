@@ -31,7 +31,13 @@ import (
 // non-empty + valid hex so the package builds and TestBootstrapHashPinsNonEmpty
 // passes; they are NOT yet trustworthy for a real install.
 const (
-	goVersion = "1.25.0" // keep in sync with Docker/Dockerfile ARG GO_VERSION
+	// goVersion is the toolchain the bootstrapper installs on a clean machine.
+	// It MUST match the `go` directive in go.mod and ARG GO_VERSION in
+	// Docker/Dockerfile — otherwise a freshly bootstrapped host builds with a
+	// different (here: older, vulnerable) toolchain than CI and Docker do.
+	// It drifted to 1.25.0 while both of those moved on.
+	// TestGoVersionMatchesGoMod enforces the match.
+	goVersion = "1.25.13"
 
 	goInstallerSHA256 = "0000000000000000000000000000000000000000000000000000000000000000" // dl.google.com/go/go<goVersion>.<os>-<arch>.tar.gz
 	uvInstallerSHA256 = "0000000000000000000000000000000000000000000000000000000000000000" // astral.sh uv install script
@@ -53,11 +59,23 @@ func (c *bootstrapConfig) tmp() string {
 	return os.TempDir()
 }
 
+// bootstrapDownloadTimeout bounds a single toolchain download end to end. The
+// default client has NO timeout, so a server that accepts the connection and
+// then stalls hangs `reconftw install` forever with no output — on a clean
+// machine that is the very first thing a new user runs.
+const bootstrapDownloadTimeout = 15 * time.Minute
+
+// maxBootstrapDownloadBytes caps a single download. The Go tarball is the
+// largest legitimate artefact at roughly 250 MB, so 1 GiB is generous while
+// still bounding a misbehaving or hostile server that would otherwise stream
+// until the disk fills.
+const maxBootstrapDownloadBytes = 1 << 30
+
 func (c *bootstrapConfig) client() *http.Client {
 	if c.HTTPClient != nil {
 		return c.HTTPClient
 	}
-	return http.DefaultClient
+	return &http.Client{Timeout: bootstrapDownloadTimeout}
 }
 
 // verifyFile compares the SHA-256 of the file at path against expectedSHA256.
@@ -113,9 +131,18 @@ func retry(ctx context.Context, attempts int, baseDelay time.Duration, fn func()
 	return last
 }
 
-// downloadFile fetches url into a file under cfg.tmp() and returns its path.
+// downloadFile fetches url into a private temp file under cfg.tmp() and
+// returns its path.
+//
+// The destination is created with os.CreateTemp rather than a fixed
+// filepath.Join(tmp, name): a predictable path in a world-writable /tmp lets a
+// local attacker pre-create or symlink the target and have the installer write
+// a toolchain archive through it — and this code runs as root on a clean
+// machine. CreateTemp uses an unpredictable suffix, O_EXCL and mode 0600.
+//
+// The body is read through an io.LimitReader so a server streaming without end
+// cannot fill the disk, and the transfer is bounded by the client timeout.
 func downloadFile(ctx context.Context, cfg *bootstrapConfig, url, name string) (string, error) {
-	dst := filepath.Join(cfg.tmp(), name)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return "", err
@@ -128,13 +155,26 @@ func downloadFile(ctx context.Context, cfg *bootstrapConfig, url, name string) (
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("download %s: HTTP %d", url, resp.StatusCode)
 	}
-	out, err := os.Create(dst) //nolint:gosec // dst is installer-controlled temp path
+
+	out, err := os.CreateTemp(cfg.tmp(), name+"-*")
 	if err != nil {
+		return "", fmt.Errorf("download %s: create temp file: %w", url, err)
+	}
+	dst := out.Name()
+
+	// LimitReader n+1 so hitting exactly the cap is distinguishable from a
+	// file that legitimately ends at the limit.
+	written, err := io.Copy(out, io.LimitReader(resp.Body, maxBootstrapDownloadBytes+1))
+	if err != nil {
+		_ = out.Close()
+		_ = os.Remove(dst)
 		return "", err
 	}
-	if _, err := io.Copy(out, resp.Body); err != nil {
+	if written > maxBootstrapDownloadBytes {
 		_ = out.Close()
-		return "", err
+		_ = os.Remove(dst)
+		return "", fmt.Errorf("download %s: exceeded %d byte limit — refusing to continue",
+			url, int64(maxBootstrapDownloadBytes))
 	}
 	// Close explicitly rather than by defer: this is a WRITE path, so Close is where a
 	// buffered-flush or disk-full failure surfaces. Ignoring it would hand the caller a

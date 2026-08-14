@@ -33,7 +33,7 @@ help:
 	@echo "  make test               - Ring 1 + Ring 4 (go test -race -short ./...)"
 	@echo "  make test-integration   - Ring 1 + Ring 2 + Ring 4 (go test -race ./...)"
 	@echo "  make test-smoke         - Ring 3 (go test -race -tags smoke ./...)"
-	@echo "  make integration-smoke  - Phase 3 acceptance: TestKernelDemoEndToEnd"
+	@echo "  make integration-smoke  - Hermetic E2E gate (fails if zero tests match)"
 	@echo "  make lint               - golangci-lint run ./..."
 	@echo "  make fmt                - gofumpt -w ."
 	@echo "  make fmt-check          - gofumpt -d . (non-zero on any diff)"
@@ -92,12 +92,23 @@ test-integration:
 test-smoke:
 	go test -race -tags smoke ./...
 
-# integration-smoke: Phase 3 acceptance integration test (Plan 07).
-# Builds the binary in-test then invokes `kernel-demo --target X` and
-# asserts manifest + artefacts/demo.jsonl + checkpoints.db. Validates
-# Scheduler + LocalBackend + OutputTree + Checkpoint cooperate end-to-end.
+# integration-smoke: hermetic end-to-end gate.
+# Drives production record types through the real staging write, merge and
+# scope gate, asserting artefact CONTENT rather than exit codes.
+#
+# The match-count guard is load-bearing: `go test -run` exits 0 when its
+# pattern matches nothing, which is how the deleted TestKernelDemoEndToEnd
+# kept this target (and CI) green while running no tests at all.
+E2E_PATTERN ?= ^TestE2E
+
 integration-smoke:
-	go test -race -run TestKernelDemoEndToEnd ./cmd/reconftw/...
+	@matched=$$(go test -list '$(E2E_PATTERN)' ./... 2>/dev/null | grep -c '^TestE2E' || true); \
+	echo "E2E tests selected by $(E2E_PATTERN): $$matched"; \
+	if [ "$$matched" -eq 0 ]; then \
+		echo "ERROR: E2E gate selected ZERO tests — refusing to report success."; \
+		exit 1; \
+	fi
+	go test -race -run '$(E2E_PATTERN)' ./...
 
 lint:
 	golangci-lint run ./...
