@@ -47,6 +47,17 @@ const (
 // defaultKillGrace is the duration from ctx-cancel to group-SIGKILL escalation.
 const defaultKillGrace = 5 * time.Second
 
+// terminalSendBackstop bounds the terminal-error send in StreamEnv's closer
+// goroutine when the caller's context can never be cancelled.
+//
+// The primary release path is ctx.Done(): every dispatch through Runner wraps the
+// stream in a cancellable context (see runner.streamWithContract) whose cancel
+// fires as soon as the relay stops, so an abandoned stream frees this goroutine
+// immediately. Only a caller that passes an uncancellable context AND stops
+// reading reaches this arm, which is why it is generous rather than tight — it
+// exists to guarantee termination, not to bound latency.
+const terminalSendBackstop = 30 * time.Second
+
 // LocalBackend executes external tools as local subprocesses with kill-tree safety.
 type LocalBackend struct {
 	// KillGrace is the duration cmd.WaitDelay waits between Cancel and stdlib SIGKILL.
@@ -300,8 +311,17 @@ func (b *LocalBackend) StreamEnv(ctx context.Context, t *Tool, args []string, en
 		if termErr != nil {
 			select {
 			case out <- Event{Source: t.Name, IsErr: true, Err: termErr}:
-			case <-time.After(time.Second):
-				// Consumer stopped reading; nothing more we can do.
+			case <-ctx.Done():
+				// The consumer abandoned the stream. ctx is the same context that
+				// bounds the child process, so its cancellation is the earliest
+				// truthful signal that nobody is listening — a fixed wall-clock
+				// timeout instead pinned this goroutine (and the context) for a
+				// full second on EVERY abandoned invocation.
+			case <-time.After(terminalSendBackstop):
+				// Backstop for a caller that passed a context with neither a
+				// deadline nor a cancel (e.g. context.Background()) and then
+				// stopped reading: ctx.Done() would never fire, so without this
+				// arm the goroutine would block forever.
 			}
 		}
 		close(out)

@@ -16,6 +16,16 @@
 // W4 fix: The partial-drain goroutine is ALWAYS ctx-bounded. A hung primary channel
 // (e.g. fleet timeout) cannot leak a goroutine — it exits when context is cancelled.
 //
+// F6 (phase 15): a fleet tool can fail in a way Primary.Stream's return value never
+// shows. Dispatch succeeds, the fleet runs the tool, the tool exits non-zero, and the
+// only trace is Event.Err on the stream's terminal event. Both consumption paths now
+// observe that field: the partial-drain goroutine and the success-path relay each
+// record it as a fleet failure (counting toward Threshold exactly like an
+// *AxiomFailure dispatch error), and the relay forwards the event to the caller
+// unmodified so the task-level contract in backend/stream.go still applies. Before
+// this, a fleet whose tools all crashed reported a clean run forever and the
+// kill-switch never tripped.
+//
 // Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-06-PLAN.md Task 1b.
 package backend
 
@@ -96,7 +106,9 @@ func (f *FailoverBackend) ExecEnv(ctx context.Context, t *Tool, args []string, e
 
 // StreamEnv mirrors Stream for the env seam (see ExecEnv). On *AxiomFailure from
 // Primary it drains any partial channel (ctx-bounded, W4 fix) and falls back to
-// Fallback.StreamEnv.
+// Fallback.StreamEnv. On success the primary channel is wrapped by
+// observePrimaryStream so a fleet tool's terminal Event.Err counts toward the
+// failover threshold (F6).
 func (f *FailoverBackend) StreamEnv(ctx context.Context, t *Tool, args []string, env []string) (<-chan Event, error) {
 	if f.isKillSwitched() {
 		return f.Fallback.StreamEnv(ctx, t, args, env)
@@ -106,35 +118,24 @@ func (f *FailoverBackend) StreamEnv(ctx context.Context, t *Tool, args []string,
 	if err != nil {
 		var axErr *coreerrors.AxiomFailure
 		if stderrors.As(err, &axErr) {
-			if primaryCh != nil {
-				go func() {
-					for {
-						select {
-						case _, ok := <-primaryCh:
-							if !ok {
-								return
-							}
-						case <-ctx.Done():
-							return
-						}
-					}
-				}()
-			}
+			f.drainPrimaryPartial(ctx, primaryCh)
 			return f.Fallback.StreamEnv(ctx, t, args, env)
 		}
 		return nil, err
 	}
-	return primaryCh, nil
+	return f.observePrimaryStream(ctx, primaryCh), nil
 }
 
 // Stream dispatches to Primary.Stream unless the kill-switch has tripped.
 //
 // If Primary.Stream returns *AxiomFailure:
 //   - If the returned channel is non-nil (partial results), spawns a ctx-bounded
-//     drain goroutine (W4 fix) to prevent goroutine leaks.
+//     drain goroutine (W4 fix) to prevent goroutine leaks. That goroutine records
+//     a terminal Event.Err on the partial channel as a fleet failure (F6).
 //   - Returns Fallback.Stream(ctx, t, args).
 //
-// If Primary.Stream succeeds, returns the Primary channel directly.
+// If Primary.Stream succeeds, returns a relay over the Primary channel that
+// forwards every event unmodified while watching for the terminal Event.Err.
 func (f *FailoverBackend) Stream(ctx context.Context, t *Tool, args []string) (<-chan Event, error) {
 	if f.isKillSwitched() {
 		return f.Fallback.Stream(ctx, t, args)
@@ -144,29 +145,97 @@ func (f *FailoverBackend) Stream(ctx context.Context, t *Tool, args []string) (<
 	if err != nil {
 		var axErr *coreerrors.AxiomFailure
 		if stderrors.As(err, &axErr) {
-			// W4 fix: drain the partial channel (if non-nil) in a ctx-bounded goroutine.
-			// This goroutine exits cleanly when ctx is cancelled OR primaryCh is closed.
-			// A hung fleet channel (never closes) does NOT leak a goroutine.
-			if primaryCh != nil {
-				go func() {
-					for {
-						select {
-						case _, ok := <-primaryCh:
-							if !ok {
-								return // channel closed — exit cleanly
-							}
-						case <-ctx.Done():
-							return // context cancelled — exit, no leak
-						}
-					}
-				}()
-			}
+			f.drainPrimaryPartial(ctx, primaryCh)
 			return f.Fallback.Stream(ctx, t, args)
 		}
 		return nil, err
 	}
-	// Primary succeeded.
-	return primaryCh, nil
+	// Primary dispatch succeeded — but the tool it launched may still exit
+	// non-zero, which only Event.Err reports.
+	return f.observePrimaryStream(ctx, primaryCh), nil
+}
+
+// drainPrimaryPartial consumes an abandoned primary channel after Primary.Stream
+// returned *AxiomFailure and the caller was handed the Fallback stream instead.
+//
+// W4: the goroutine is ALWAYS ctx-bounded, so a hung fleet channel that never
+// closes cannot leak it. A nil channel is a no-op — the fleet reported the
+// failure without opening a stream at all.
+//
+// F6: the partial channel can still carry a terminal Event.Err (the fleet started
+// the tool, the tool exited non-zero, and only then did dispatch report failure).
+// Recording it here is what makes such a run count toward Threshold. It is NOT
+// forwarded to the caller: the caller is consuming the Fallback stream, and
+// injecting the primary's error there would report the local retry as failed when
+// it may well have succeeded — the exact outcome failover exists to produce.
+func (f *FailoverBackend) drainPrimaryPartial(ctx context.Context, primaryCh <-chan Event) {
+	if primaryCh == nil {
+		return
+	}
+	go func() {
+		observed := false
+		for {
+			select {
+			case ev, ok := <-primaryCh:
+				if !ok {
+					return // channel closed — exit cleanly
+				}
+				if ev.Err != nil && !observed {
+					observed = true
+					f.recordFailure()
+				}
+			case <-ctx.Done():
+				return // context cancelled — exit, no leak
+			}
+		}
+	}()
+}
+
+// observePrimaryStream relays a successful primary stream to the caller while
+// watching for the terminal Event.Err that reports a fleet tool exiting non-zero
+// or overflowing its scanner.
+//
+// Events are forwarded WHOLESALE and never rewritten, so backend.Drain and
+// backend.Collect behave over a failover stream exactly as they do over a local
+// one. The relay's only side effect is bookkeeping: the first error-carrying event
+// records a fleet failure (counting toward Threshold like an *AxiomFailure
+// dispatch error), and a stream that ends without one resets the consecutive
+// failure counter, mirroring Exec's on-success reset.
+//
+// The ctx.Done() arm is the same abandonment guard as runner.streamWithContract:
+// a bare send would block this goroutine forever if the consumer stopped reading.
+// The post-cancellation drain keeps watching for the terminal error so an
+// abandoned fleet run still counts.
+func (f *FailoverBackend) observePrimaryStream(ctx context.Context, primaryCh <-chan Event) <-chan Event {
+	if primaryCh == nil {
+		return nil
+	}
+	out := make(chan Event, 64)
+	go func() {
+		defer close(out)
+		observed := false
+		note := func(ev Event) {
+			if ev.Err != nil && !observed {
+				observed = true
+				f.recordFailure()
+			}
+		}
+		for ev := range primaryCh {
+			note(ev)
+			select {
+			case out <- ev:
+			case <-ctx.Done():
+				for rest := range primaryCh {
+					note(rest)
+				}
+				return
+			}
+		}
+		if !observed {
+			f.resetFailures()
+		}
+	}()
+	return out
 }
 
 // HealthCheck calls Primary.HealthCheck; on *AxiomFailure falls back to Fallback.HealthCheck.
