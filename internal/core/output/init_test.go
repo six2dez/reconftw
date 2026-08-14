@@ -12,6 +12,7 @@ package output_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/six2dez/reconftw/internal/core/output"
@@ -35,9 +36,20 @@ func TestWorkspaceInitStablePath(t *testing.T) {
 	if first != second {
 		t.Errorf("workspace not stable: first=%q second=%q (timestamp suffix not removed?)", first, second)
 	}
-	want := filepath.Join(root, "example.com")
+	// F2: the directory name is now the canonical identity slug
+	// ("<readable>-<hash8>"), not the bare sanitized hostname. The fixture is
+	// derived from CanonicalTargetID rather than hardcoded so the assertion
+	// keeps testing STABILITY, which is what checkpoints.db resume depends on.
+	id, err := output.CanonicalTargetID("example.com")
+	if err != nil {
+		t.Fatalf("CanonicalTargetID: %v", err)
+	}
+	want := filepath.Join(root, id.Slug)
 	if first != want {
 		t.Errorf("workspace path = %q, want %q (no timestamp suffix)", first, want)
+	}
+	if !strings.HasPrefix(filepath.Base(first), "example.com-") {
+		t.Errorf("workspace name %q lost its readable component", filepath.Base(first))
 	}
 }
 
@@ -101,11 +113,11 @@ func TestWorkspaceInitPersistsFiles(t *testing.T) {
 	}
 }
 
-// TestWorkspaceInitSanitizes: scheme is stripped, path dropped, and the slug is
-// lowercased — regression guard on the EXISTING sanitizeTargetName behavior,
-// asserted via the returned path. (Scheme strip is case-sensitive on the
-// lowercase "https://" prefix, then the host is lowercased — unchanged by this
-// plan.)
+// TestWorkspaceInitSanitizes: scheme is stripped, path dropped, and the host is
+// lowercased — the URL form and the bare hostname must address the SAME
+// workspace. Asserted against the plain-hostname workspace rather than a
+// hardcoded name, because the directory is now the canonical identity slug
+// (F2) and the property under test is the fold, not the spelling.
 func TestWorkspaceInitSanitizes(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -114,9 +126,34 @@ func TestWorkspaceInitSanitizes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("WorkspaceInit: %v", err)
 	}
-	want := filepath.Join(root, "example.com")
-	if ws != want {
-		t.Errorf("sanitized workspace = %q, want %q (scheme strip + path drop + lowercase)", ws, want)
+	plain, err := output.WorkspaceInit(root, "example.com")
+	if err != nil {
+		t.Fatalf("WorkspaceInit(example.com): %v", err)
+	}
+	if ws != plain {
+		t.Errorf("sanitized workspace = %q, want %q (scheme strip + path drop + lowercase)", ws, plain)
+	}
+}
+
+// TestWorkspaceInitDistinctPrefixes is ACCEPTANCE GATE 2 asserted at the
+// workspace layer: /24, /16 and the bare IP must be three directories.
+func TestWorkspaceInitDistinctPrefixes(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+
+	seen := make(map[string]string, 3)
+	for _, tgt := range []string{"10.0.0.0/24", "10.0.0.0/16", "10.0.0.0"} {
+		ws, err := output.WorkspaceInit(root, tgt)
+		if err != nil {
+			t.Fatalf("WorkspaceInit(%q): %v", tgt, err)
+		}
+		if prev, dup := seen[ws]; dup {
+			t.Errorf("workspace collision: %q and %q both use %q", prev, tgt, ws)
+		}
+		seen[ws] = tgt
+	}
+	if len(seen) != 3 {
+		t.Fatalf("gate 2 FAILED: got %d workspaces for 3 targets: %v", len(seen), seen)
 	}
 }
 
