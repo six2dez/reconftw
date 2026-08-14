@@ -86,7 +86,7 @@ func TestRenderAll_OllamaWritesAIReport(t *testing.T) {
 	}
 	defer renderer.Close() //nolint:errcheck
 
-	if err := renderer.RenderAll(ctx, target, ""); err != nil {
+	if err := renderer.RenderAll(ctx, target, "", false); err != nil {
 		t.Fatalf("RenderAll: %v", err)
 	}
 
@@ -119,7 +119,7 @@ func TestRenderAll_AnthropicEmptyKeyWritesNothing(t *testing.T) {
 	}
 	defer renderer.Close() //nolint:errcheck
 
-	if err := renderer.RenderAll(ctx, target, ""); err != nil {
+	if err := renderer.RenderAll(ctx, target, "", false); err != nil {
 		t.Fatalf("RenderAll: %v", err)
 	}
 
@@ -145,7 +145,7 @@ func TestRenderAll_AIDisabledWritesNothing(t *testing.T) {
 	}
 	defer renderer.Close() //nolint:errcheck
 
-	if err := renderer.RenderAll(ctx, target, ""); err != nil {
+	if err := renderer.RenderAll(ctx, target, "", false); err != nil {
 		t.Fatalf("RenderAll: %v", err)
 	}
 

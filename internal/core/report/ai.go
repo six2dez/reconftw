@@ -34,6 +34,14 @@ type AIReporter struct {
 }
 
 // NewAIReporter constructs an AIReporter with a 120s HTTP timeout for slow AI calls.
+// maxAIResponseBytes caps how much of an AI provider's response is read into
+// memory. io.ReadAll was unbounded, so a provider (or anything able to answer
+// in its place — these endpoints are configurable, including a local ollama
+// URL) could stream until the process died. The request timeout does not help:
+// a server that keeps sending fast enough never trips it. Report summaries are
+// kilobytes; 8 MiB is far beyond any legitimate answer.
+const maxAIResponseBytes = 8 << 20
+
 func NewAIReporter(cfg *config.AIConfig, rdct *log.Redactor, logger *slog.Logger) *AIReporter {
 	return NewAIReporterWithClient(cfg, rdct, logger, nil, "")
 }
@@ -172,7 +180,13 @@ func (r *AIReporter) callAnthropic(ctx context.Context, prompt string) (string, 
 		return "", fmt.Errorf("ai: anthropic: status %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	// max+1 so hitting the cap is detectable: reading exactly max bytes cannot
+	// distinguish "the answer ends here" from "the answer was cut off", and a
+	// truncated body would be parsed as if it were the whole response.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxAIResponseBytes+1))
+	if err == nil && int64(len(body)) > maxAIResponseBytes {
+		return "", fmt.Errorf("ai: response exceeded %d bytes — refusing to parse a truncated reply", int64(maxAIResponseBytes))
+	}
 	if err != nil {
 		return "", fmt.Errorf("ai: anthropic: read response: %w", err)
 	}
@@ -244,7 +258,13 @@ func (r *AIReporter) callOpenAI(ctx context.Context, prompt string) (string, err
 		return "", fmt.Errorf("ai: openai: status %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	// max+1 so hitting the cap is detectable: reading exactly max bytes cannot
+	// distinguish "the answer ends here" from "the answer was cut off", and a
+	// truncated body would be parsed as if it were the whole response.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxAIResponseBytes+1))
+	if err == nil && int64(len(body)) > maxAIResponseBytes {
+		return "", fmt.Errorf("ai: response exceeded %d bytes — refusing to parse a truncated reply", int64(maxAIResponseBytes))
+	}
 	if err != nil {
 		return "", fmt.Errorf("ai: openai: read response: %w", err)
 	}
@@ -316,7 +336,13 @@ func (r *AIReporter) callOllama(ctx context.Context, prompt string) (string, err
 		return "", fmt.Errorf("ai: ollama: status %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	// max+1 so hitting the cap is detectable: reading exactly max bytes cannot
+	// distinguish "the answer ends here" from "the answer was cut off", and a
+	// truncated body would be parsed as if it were the whole response.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxAIResponseBytes+1))
+	if err == nil && int64(len(body)) > maxAIResponseBytes {
+		return "", fmt.Errorf("ai: response exceeded %d bytes — refusing to parse a truncated reply", int64(maxAIResponseBytes))
+	}
 	if err != nil {
 		return "", fmt.Errorf("ai: ollama: read response: %w", err)
 	}

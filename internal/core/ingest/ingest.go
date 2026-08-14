@@ -25,6 +25,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -156,13 +157,33 @@ func ensureTarget(ctx context.Context, q *sqlcgen.Queries, target, workDir strin
 	return nil
 }
 
-// hostRecord is the union of subdomains.HostRecord and web.HostRecord — omitempty
-// on both producers means one struct unmarshals either shape.
+// hostRecord decodes artefacts/hosts.jsonl. Both writers of that artefact
+// (web.HostRecord and subdomains.HostRecord, the geo enrichment shape) key the
+// hostname on "host", so one struct covers both.
+//
+// It does NOT cover artefacts/subdomains.jsonl — see subdomainRecord.
 type hostRecord struct {
 	Host string `json:"host"`
 	IP   string `json:"ip"`
 	CDN  string `json:"cdn"`
 }
+
+// subdomainRecord decodes artefacts/subdomains.jsonl, which
+// subdomains.MergeStage writes as {"subdomain","source","first_seen"} —
+// NOT {"host"}.
+//
+// Both files used to be decoded with hostRecord, so every subdomain line
+// unmarshalled to an empty Host and was skipped: the store received nothing
+// from the single largest artefact in the tree. The unit test hid it by
+// fabricating a subdomains.jsonl full of {"host":…} lines, a shape no
+// producer emits — the fixture encoded the bug instead of catching it.
+type subdomainRecord struct {
+	Subdomain string `json:"subdomain"`
+	Source    string `json:"source"`
+}
+
+// fqdn returns the hostname carried by a subdomains.jsonl line.
+func (r subdomainRecord) fqdn() string { return strings.TrimSpace(r.Subdomain) }
 
 // ingestHosts upserts every host in hosts.jsonl + subdomains.jsonl and links it
 // to the target. Returns fqdn → host id for finding/url linkage. It also records
@@ -171,20 +192,50 @@ type hostRecord struct {
 // guard ensures each unique host is observed exactly once per scan.
 func ingestHosts(ctx context.Context, q *sqlcgen.Queries, scanID, target, artefacts string, now int64, logger *slog.Logger) map[string]int64 {
 	ids := make(map[string]int64)
-	for _, name := range []string{"hosts.jsonl", "subdomains.jsonl"} {
-		forEachJSONL(filepath.Join(artefacts, name), logger, func(line []byte) {
-			var rec hostRecord
-			if err := json.Unmarshal(line, &rec); err != nil {
+
+	// Each artefact gets the decoder for ITS schema. hosts.jsonl keys the
+	// hostname on "host"; subdomains.jsonl keys it on "subdomain".
+	sources := []struct {
+		file   string
+		decode func([]byte) (fqdn, ip, cdn string, ok bool)
+	}{
+		{
+			file: "hosts.jsonl",
+			decode: func(line []byte) (string, string, string, bool) {
+				var rec hostRecord
+				if err := json.Unmarshal(line, &rec); err != nil {
+					return "", "", "", false
+				}
+				return strings.TrimSpace(rec.Host), rec.IP, rec.CDN, true
+			},
+		},
+		{
+			file: "subdomains.jsonl",
+			decode: func(line []byte) (string, string, string, bool) {
+				var rec subdomainRecord
+				if err := json.Unmarshal(line, &rec); err != nil {
+					return "", "", "", false
+				}
+				// subdomains.jsonl carries no IP or CDN; hosts.jsonl enriches
+				// those for the hosts that were probed.
+				return rec.fqdn(), "", "", true
+			},
+		},
+	}
+
+	for _, src := range sources {
+		forEachJSONL(filepath.Join(artefacts, src.file), logger, func(line []byte) {
+			fqdn, recIP, recCDN, ok := src.decode(line)
+			if !ok {
 				return
 			}
-			fqdn := strings.TrimSpace(rec.Host)
 			if fqdn == "" || ids[fqdn] != 0 {
 				return
 			}
 			host, err := q.UpsertHost(ctx, sqlcgen.UpsertHostParams{
 				FQDN:      fqdn,
-				IpCurrent: ptrIfSet(rec.IP),
-				CDN:       ptrIfSet(rec.CDN),
+				IpCurrent: ptrIfSet(recIP),
+				CDN:       ptrIfSet(recCDN),
 				Now:       now,
 			})
 			if err != nil {
@@ -279,6 +330,50 @@ type findingRecord struct {
 	Class    string `json:"class"`
 	Source   string `json:"source"`
 	Category string `json:"category"`
+	// URL is the vulns locator (vulns.VulnFindingRecord.URL) and the web
+	// producers' url field. Together with MatchedAt it supplies the per-finding
+	// path used for identity — see findingPath.
+	URL string `json:"url"`
+}
+
+// findingPath derives the location component of a finding's identity.
+//
+// The findings unique key is (template_signature, tool, host_id, port_id,
+// path), and ingest always passed path = "". Every finding of one class on one
+// host therefore collapsed into a single row: two distinct SQL injections, on
+// two different endpoints or two different parameters of the same host, became
+// one finding and one of them vanished from the store.
+//
+// The path is normalised — scheme, host and fragment dropped, query keys sorted
+// and their VALUES discarded — so it identifies the vulnerable location without
+// carrying payloads or secrets into the database (XCUT-07). Query keys are kept
+// because ?id= and ?user= on the same path are genuinely different findings.
+func findingPath(rec findingRecord) string {
+	raw := firstNonEmpty(rec.URL, rec.MatchedAt)
+	if raw == "" {
+		// No locator: fall back to the matched parameter, which several vulns
+		// producers use to carry the affected field name.
+		return rec.MatchedParam
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Path == "" && u.RawQuery == "" {
+		return rec.MatchedParam
+	}
+	path := u.Path
+	if path == "" {
+		path = "/"
+	}
+	if u.RawQuery != "" {
+		keys := make([]string, 0, 4)
+		for k := range u.Query() {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		if len(keys) > 0 {
+			path += "?" + strings.Join(keys, "&")
+		}
+	}
+	return path
 }
 
 func ingestFindings(ctx context.Context, q *sqlcgen.Queries, scanID, target, artefacts string, hostIDs map[string]int64, now int64, logger *slog.Logger) int {
@@ -292,7 +387,16 @@ func ingestFindings(ctx context.Context, q *sqlcgen.Queries, scanID, target, art
 		if err := json.Unmarshal(line, &rec); err != nil {
 			return
 		}
-		sig := firstNonEmpty(rec.TemplateID, rec.VulnClass, joinNonEmpty("/", rec.Source, rec.Category), rec.MatcherName)
+		// rec.Type is the last fallback so existing signatures are unchanged for
+		// records that carry a template id or vuln class. It matters because
+		// subdomains.TakeoverRecord emits ONLY {type, host, service, confidence,
+		// severity, refs} — no template_id, no vuln_class, no source/category,
+		// no matcher_name. Without Type in this chain every real takeover
+		// produced sig == "" and was dropped on the floor during ingest, so the
+		// store never learned about a class of finding the pipeline had already
+		// found, merged and written to disk.
+		sig := firstNonEmpty(rec.TemplateID, rec.VulnClass,
+			joinNonEmpty("/", rec.Source, rec.Category), rec.MatcherName, rec.Type)
 		if sig == "" {
 			return // nothing identifiable to key on
 		}
@@ -301,7 +405,8 @@ func ingestFindings(ctx context.Context, q *sqlcgen.Queries, scanID, target, art
 			Tool:              firstNonEmpty(rec.Engine, rec.Service, rec.Type, rec.Source, "reconftw"),
 			Severity:          normalizeSeverity(rec.Severity),
 			Title:             firstNonEmpty(rec.MatcherName, rec.VulnClass, rec.Category, rec.TemplateID, sig),
-			MatchedAt:         firstNonEmpty(rec.MatchedAt, rec.MatchedParam),
+			MatchedAt:         firstNonEmpty(rec.MatchedAt, rec.URL, rec.MatchedParam),
+			Path:              findingPath(rec),
 			Now:               now,
 		}
 		if id, ok := hostIDs[rec.Host]; ok {

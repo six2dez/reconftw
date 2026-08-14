@@ -14,6 +14,7 @@
 package output
 
 import (
+	"net/netip"
 	"net/url"
 	"regexp"
 	"strings"
@@ -52,6 +53,18 @@ type DefaultScopeFilter struct {
 var domainRe = regexp.MustCompile(`^[a-zA-Z0-9.-]+$`)
 
 // IsInScope reports whether host is in scope.
+//
+// The value may be a hostname OR an IP literal, and the two are matched by
+// disjoint rules — a hostname pattern NEVER admits an IP, and an IP/CIDR
+// pattern NEVER admits a hostname. That separation is deliberate: on shared
+// hosting or behind a CDN, one IP serves third-party assets, so letting a
+// domain-scoped run admit an IP because some in-scope host resolved to it
+// would pull assets outside the engagement into scanning and reporting.
+// IPs enter scope only when the operator scoped the run to an IP or CIDR.
+//
+// Before this, the canonical domain regex was applied to every value, so an
+// IPv6 literal was rejected outright — including when the operator had
+// explicitly scoped the run to that exact address.
 func (f *DefaultScopeFilter) IsInScope(host string) bool {
 	if f == nil {
 		return false
@@ -60,14 +73,57 @@ func (f *DefaultScopeFilter) IsInScope(host string) bool {
 	if host == "" {
 		return false
 	}
-	// Reject shell metacharacters / structurally invalid hostnames.
+
+	// IP-shaped value: only IP and CIDR patterns can admit it. Unmap so an
+	// IPv4-mapped IPv6 form compares equal to its plain IPv4 pattern.
+	if addr, err := netip.ParseAddr(host); err == nil {
+		addr = addr.Unmap()
+		for _, pat := range f.Patterns {
+			if matchScopeAddr(addr, pat) {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Hostname value: reject shell metacharacters / structurally invalid names.
 	if !domainRe.MatchString(host) {
 		return false
 	}
 	for _, pat := range f.Patterns {
+		if isAddrPattern(pat) {
+			continue // an IP/CIDR pattern never admits a hostname
+		}
 		if matchScopePattern(host, pat) {
 			return true
 		}
+	}
+	return false
+}
+
+// isAddrPattern reports whether pat is an IP literal or a CIDR prefix rather
+// than a hostname pattern.
+func isAddrPattern(pat string) bool {
+	pat = strings.ToLower(strings.TrimSpace(pat))
+	if _, err := netip.ParsePrefix(pat); err == nil {
+		return true
+	}
+	_, err := netip.ParseAddr(pat)
+	return err == nil
+}
+
+// matchScopeAddr matches an IP value against one pattern: exact equality for
+// an IP literal, containment for a CIDR prefix. Hostname patterns never match.
+func matchScopeAddr(addr netip.Addr, pat string) bool {
+	pat = strings.ToLower(strings.TrimSpace(pat))
+	if pat == "" {
+		return false
+	}
+	if prefix, err := netip.ParsePrefix(pat); err == nil {
+		return prefix.Contains(addr)
+	}
+	if patAddr, err := netip.ParseAddr(pat); err == nil {
+		return patAddr.Unmap() == addr
 	}
 	return false
 }

@@ -45,7 +45,17 @@ func NewTarget(domain string, scope []string, workDir string) (*Target, error) {
 	}
 
 	// Try IP first.
+	//
+	// The default-scope rule below is the same one the hostname branch has
+	// always had, and its absence here was silent and total: DefaultScopeFilter
+	// rejects everything when Patterns is empty, so `--target 10.0.0.5` built an
+	// empty scope and every artefact write was refused — an IP or CIDR scan
+	// produced nothing at all. The hostname branch got the fix because it
+	// returns last; these two return early and were missed.
 	if ip := net.ParseIP(domain); ip != nil {
+		if len(scope) == 0 {
+			scope = []string{domain} // exactly this address, nothing else
+		}
 		return &Target{
 			Domain:  domain,
 			IsIP:    true,
@@ -56,6 +66,9 @@ func NewTarget(domain string, scope []string, workDir string) (*Target, error) {
 
 	// Try CIDR next.
 	if _, _, err := net.ParseCIDR(domain); err == nil {
+		if len(scope) == 0 {
+			scope = []string{domain} // the prefix; DefaultScopeFilter does containment
+		}
 		return &Target{
 			Domain:  domain,
 			IsCIDR:  true,

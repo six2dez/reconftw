@@ -53,8 +53,12 @@ func TestScanIntoStore_EndToEnd(t *testing.T) {
 	writeArtefact(t, workDir, "hosts.jsonl",
 		`{"host":"api.example.com","ip":"1.2.3.4","cdn":"cloudflare"}`,
 	)
+	// subdomains.MergeStage writes {"subdomain","source","first_seen"} — NOT
+	// {"host"}. This fixture previously used the host shape, which no producer
+	// emits, so it validated a decoder that silently dropped every real
+	// subdomain line.
 	writeArtefact(t, workDir, "subdomains.jsonl",
-		`{"host":"www.example.com","ip":"5.6.7.8"}`,
+		`{"subdomain":"www.example.com","source":"subfinder","first_seen":"2026-08-13T00:00:00Z"}`,
 	)
 	writeArtefact(t, workDir, "urls.jsonl",
 		`{"url":"https://api.example.com/admin?q=1","host":"api.example.com"}`,
