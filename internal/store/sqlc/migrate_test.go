@@ -13,7 +13,10 @@ import (
 	"errors"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -260,7 +263,7 @@ func TestMigrateLegacyStampsV1BeforeReplaying(t *testing.T) {
 	steps := []migrationStep{{
 		To:   2,
 		Name: "observer",
-		Apply: func(ctx context.Context, tx *sql.Tx) error {
+		Apply: func(ctx context.Context, tx DBTX) error {
 			return tx.QueryRowContext(ctx, `PRAGMA user_version`).Scan(&sawFrom)
 		},
 	}}
@@ -314,7 +317,7 @@ func TestMigrateFailedStepAdvancesNothing(t *testing.T) {
 	steps := []migrationStep{{
 		To:   2,
 		Name: "deliberately broken step",
-		Apply: func(ctx context.Context, tx *sql.Tx) error {
+		Apply: func(ctx context.Context, tx DBTX) error {
 			if _, err := tx.ExecContext(ctx, `CREATE TABLE half_applied (x INTEGER)`); err != nil {
 				return err
 			}
@@ -353,7 +356,7 @@ func TestMigrateFailedStepRetriesWholeStep(t *testing.T) {
 	failFirst := []migrationStep{{
 		To:   2,
 		Name: "flaky step",
-		Apply: func(_ context.Context, _ *sql.Tx) error {
+		Apply: func(_ context.Context, _ DBTX) error {
 			attempts++
 			if attempts == 1 {
 				return errors.New("boom")
@@ -421,7 +424,7 @@ func TestEnsureSchemaDelegatesToMigrate(t *testing.T) {
 }
 
 // TestEnsureSchemaOnLegacyDatabase is the regression this whole plan exists for:
-// the old EnsureSchema re-ran CREATE IF NOT EXISTS DDL and left a pre-existing
+// the old EnsureSchema re-ran conditional-CREATE DDL and left a pre-existing
 // database completely unversioned.
 func TestEnsureSchemaOnLegacyDatabase(t *testing.T) {
 	db := openFileDB(t, t.TempDir())
@@ -431,5 +434,315 @@ func TestEnsureSchemaOnLegacyDatabase(t *testing.T) {
 	}
 	if got := userVersion(t, db); got != SchemaVersion {
 		t.Errorf("legacy db left at user_version %d, want %d", got, SchemaVersion)
+	}
+}
+
+// --- Concurrency ----------------------------------------------------------
+
+// countingStep returns a step that records how many times its body actually ran.
+// A DDL statement with no IF NOT EXISTS is deliberate: it reproduces the real
+// failure mode (the second application blowing up on "table already exists"),
+// so a broken runner fails loudly rather than passing by idempotence.
+func countingStep(applied *atomic.Int64) []migrationStep {
+	return []migrationStep{{
+		To:   2,
+		Name: "counted step",
+		Apply: func(ctx context.Context, tx DBTX) error {
+			applied.Add(1)
+			_, err := tx.ExecContext(ctx, `CREATE TABLE counted_step (x INTEGER)`)
+			return err
+		},
+	}}
+}
+
+// TestMigrateConcurrentOverlappingAppliesStepExactlyOnce is the load-bearing
+// concurrency test.
+//
+// Releasing two goroutines from a barrier (see the test below) is NOT sufficient:
+// the migration takes about a millisecond, so in practice one goroutine finishes
+// the whole thing before the other reads the version, the second then sees
+// user_version already at SchemaVersion, skips the step in the OUTER loop, and the
+// in-transaction guard is never exercised. That test passes even with the guard
+// deleted — a false green of exactly the kind this phase exists to remove.
+//
+// So this one forces the overlap instead of hoping for it. The step body parks
+// mid-migration while holding the write transaction, and the second goroutine is
+// started only once the first is provably inside it. The second therefore reads
+// the PRE-migration version outside the transaction, blocks at BEGIN IMMEDIATE,
+// and can only avoid re-applying the step by re-reading user_version after it
+// acquires the lock.
+//
+// The assertion that matters is the application COUNT, not that both calls
+// returned nil: a runner that applied the step twice with idempotent DDL would
+// also produce two nils, and the real v1->v2 step is not idempotent.
+func TestMigrateConcurrentOverlappingAppliesStepExactlyOnce(t *testing.T) {
+	dir := t.TempDir()
+	dbA := openFileDB(t, dir)
+	dbB := openFileDB(t, dir)
+	ctx := context.Background()
+
+	// Put the database in the legacy state and stamp it to v1 with an empty
+	// registry, so both goroutines below start from "v1, step 2 pending" and
+	// neither has to win the bootstrap race first.
+	seedLegacyDB(t, dbA)
+	if err := migrateWithSteps(ctx, dbA, nil); err != nil {
+		t.Fatalf("bootstrap to legacy version: %v", err)
+	}
+	if got := userVersion(t, dbA); got != legacyVersion {
+		t.Fatalf("setup left user_version at %d, want %d", got, legacyVersion)
+	}
+
+	var applied atomic.Int64
+	entered := make(chan struct{}) // closed once a step body is executing
+	proceed := make(chan struct{}) // closed to let that step body finish
+	var enterOnce sync.Once
+
+	steps := []migrationStep{{
+		To:   2,
+		Name: "parked step",
+		Apply: func(ctx context.Context, tx DBTX) error {
+			applied.Add(1)
+			enterOnce.Do(func() { close(entered) })
+			<-proceed
+			// No IF NOT EXISTS: a second application must fail loudly rather than
+			// pass by idempotence, mirroring the real "duplicate column" /
+			// "index already exists" failure.
+			_, err := tx.ExecContext(ctx, `CREATE TABLE counted_step (x INTEGER)`)
+			return err
+		},
+	}}
+
+	firstDone := make(chan error, 1)
+	go func() { firstDone <- migrateWithSteps(ctx, dbA, steps) }()
+
+	select {
+	case <-entered:
+	case err := <-firstDone:
+		t.Fatalf("first Migrate finished without entering the step: %v", err)
+	case <-time.After(10 * time.Second):
+		t.Fatal("first Migrate never entered the step body")
+	}
+
+	// The first goroutine now holds the write lock with the v2 stamp uncommitted.
+	secondDone := make(chan error, 1)
+	go func() { secondDone <- migrateWithSteps(ctx, dbB, steps) }()
+
+	// Give the second goroutine time to read the version and block at
+	// BEGIN IMMEDIATE. It must NOT have completed by now.
+	select {
+	case err := <-secondDone:
+		t.Fatalf("second Migrate completed (%v) while the first held the write lock", err)
+	case <-time.After(300 * time.Millisecond):
+	}
+
+	close(proceed)
+
+	for i, ch := range []chan error{firstDone, secondDone} {
+		select {
+		case err := <-ch:
+			if err != nil {
+				t.Errorf("concurrent Migrate %d returned %v; the loser of the race must succeed, not error", i, err)
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatalf("concurrent Migrate %d never returned", i)
+		}
+	}
+
+	if got := applied.Load(); got != 1 {
+		t.Errorf("step body ran %d times, want exactly 1", got)
+	}
+	if got := userVersion(t, dbA); got != SchemaVersion {
+		t.Errorf("user_version = %d, want %d", got, SchemaVersion)
+	}
+	if !tableExists(t, dbA, "counted_step") {
+		t.Error("step never applied: table counted_step is missing")
+	}
+}
+
+// TestMigrateConcurrentAppliesStepExactlyOnce releases two goroutines from a
+// barrier against the same file. See the note on the overlapping test above for
+// why this one is a smoke test rather than the real gate: it usually does not
+// overlap, so it cannot be relied on to catch a missing in-transaction guard.
+func TestMigrateConcurrentAppliesStepExactlyOnce(t *testing.T) {
+	dir := t.TempDir()
+	dbA := openFileDB(t, dir)
+	dbB := openFileDB(t, dir)
+
+	// Seed the legacy shape so BOTH goroutines face a real v1->v2 advance. A
+	// fresh database would be stamped straight to SchemaVersion and skip the step
+	// entirely, making the count trivially 0.
+	seedLegacyDB(t, dbA)
+
+	var applied atomic.Int64
+	steps := countingStep(&applied)
+
+	handles := []*sql.DB{dbA, dbB}
+	errs := make([]error, len(handles))
+
+	// A closed channel releases both goroutines at the same instant; the
+	// WaitGroup collects them.
+	release := make(chan struct{})
+	var ready, done sync.WaitGroup
+	for i, db := range handles {
+		ready.Add(1)
+		done.Add(1)
+		go func(i int, db *sql.DB) {
+			defer done.Done()
+			ready.Done()
+			<-release
+			errs[i] = migrateWithSteps(context.Background(), db, steps)
+		}(i, db)
+	}
+	ready.Wait()
+	close(release)
+	done.Wait()
+
+	for i, err := range errs {
+		if err != nil {
+			t.Errorf("concurrent Migrate %d returned %v; the loser of the race must succeed, not error", i, err)
+		}
+	}
+	if got := applied.Load(); got != 1 {
+		t.Errorf("step body ran %d times, want exactly 1", got)
+	}
+	if got := userVersion(t, dbA); got != SchemaVersion {
+		t.Errorf("user_version = %d, want %d", got, SchemaVersion)
+	}
+	if !tableExists(t, dbA, "counted_step") {
+		t.Error("step never applied: table counted_step is missing")
+	}
+}
+
+// TestMigrateOnCurrentDatabaseDoesNotReapply covers the cheap path every ingest
+// after the first one takes.
+func TestMigrateOnCurrentDatabaseDoesNotReapply(t *testing.T) {
+	db := openFileDB(t, t.TempDir())
+	seedLegacyDB(t, db)
+	ctx := context.Background()
+
+	var applied atomic.Int64
+	steps := countingStep(&applied)
+
+	if err := migrateWithSteps(ctx, db, steps); err != nil {
+		t.Fatalf("first migrateWithSteps: %v", err)
+	}
+	if got := applied.Load(); got != 1 {
+		t.Fatalf("first run applied step %d times, want 1", got)
+	}
+	first := userVersion(t, db)
+
+	if err := migrateWithSteps(ctx, db, steps); err != nil {
+		t.Fatalf("second migrateWithSteps: %v", err)
+	}
+	if got := applied.Load(); got != 1 {
+		t.Errorf("second run re-applied the step (count %d, want 1)", got)
+	}
+	if second := userVersion(t, db); second != first {
+		t.Errorf("second run changed user_version: %d -> %d", first, second)
+	}
+}
+
+// TestMigrateWaitsForAnotherWriter proves migrateBusyTimeoutMS is load-bearing
+// rather than decorative: with no busy timeout, BEGIN IMMEDIATE against a locked
+// database returns SQLITE_BUSY immediately instead of waiting.
+//
+// The migrating handle is opened with a BARE DSN — no pragmas at all. Migrate is
+// handed a *sql.DB it did not open and cannot change the DSN of, so relying on the
+// caller having set busy_timeout would be an unverifiable assumption. This test
+// fails unless Migrate sets the timeout on the connection it owns.
+func TestMigrateWaitsForAnotherWriter(t *testing.T) {
+	dir := t.TempDir()
+	dbA := openFileDB(t, dir)
+	ctx := context.Background()
+
+	dbB, err := sql.Open("sqlite", filepath.Join(dir, "store.db"))
+	if err != nil {
+		t.Fatalf("open bare-DSN sqlite: %v", err)
+	}
+	t.Cleanup(func() { _ = dbB.Close() })
+
+	seedLegacyDB(t, dbA)
+
+	// Hold the write lock on a connection of dbA.
+	connA, err := dbA.Conn(ctx)
+	if err != nil {
+		t.Fatalf("acquire conn: %v", err)
+	}
+	if _, err := connA.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
+		t.Fatalf("begin immediate: %v", err)
+	}
+	if _, err := connA.ExecContext(ctx,
+		`UPDATE scans SET status = 'held' WHERE id = 'legacy-scan-1'`); err != nil {
+		t.Fatalf("write under held lock: %v", err)
+	}
+
+	done := make(chan error, 1)
+	go func() { done <- Migrate(ctx, dbB) }()
+
+	select {
+	case err := <-done:
+		t.Fatalf("Migrate returned (%v) while another writer held the lock; "+
+			"busy_timeout is not in effect on the migration connection", err)
+	case <-time.After(200 * time.Millisecond):
+		// Still waiting, as it should be.
+	}
+
+	if _, err := connA.ExecContext(ctx, "COMMIT"); err != nil {
+		t.Fatalf("release lock: %v", err)
+	}
+	if err := connA.Close(); err != nil {
+		t.Fatalf("close conn: %v", err)
+	}
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("Migrate after the lock was released: %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Migrate never completed after the write lock was released")
+	}
+
+	if got := userVersion(t, dbB); got != SchemaVersion {
+		t.Errorf("user_version = %d, want %d", got, SchemaVersion)
+	}
+}
+
+// TestMigrateFailedStepReleasesWriteLock guards the rollback defer: a step that
+// errors must not leave the transaction open on the pooled connection, or the
+// next writer blocks until busy_timeout and the store wedges.
+func TestMigrateFailedStepReleasesWriteLock(t *testing.T) {
+	dir := t.TempDir()
+	db := openFileDB(t, dir)
+	seedLegacyDB(t, db)
+	ctx := context.Background()
+
+	broken := []migrationStep{{
+		To:   2,
+		Name: "broken step",
+		Apply: func(_ context.Context, _ DBTX) error {
+			return errors.New("boom")
+		},
+	}}
+	if err := migrateWithSteps(ctx, db, broken); err == nil {
+		t.Fatal("migrateWithSteps should have failed")
+	}
+
+	// If the failed step leaked its transaction, this write blocks for
+	// migrateBusyTimeoutMS and then fails.
+	other := openFileDB(t, dir)
+	writeDone := make(chan error, 1)
+	go func() {
+		_, err := other.ExecContext(ctx,
+			`UPDATE scans SET status = 'after' WHERE id = 'legacy-scan-1'`)
+		writeDone <- err
+	}()
+	select {
+	case err := <-writeDone:
+		if err != nil {
+			t.Fatalf("write after failed migration: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("write after a failed migration blocked: the rollback did not release the write lock")
 	}
 }
