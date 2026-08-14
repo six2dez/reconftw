@@ -27,6 +27,7 @@ import (
 	"sort"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/output"
 )
 
 // MergeOSINTFindings reads all inputs/<stage>.*.jsonl staging files written by
@@ -85,6 +86,21 @@ func MergeOSINTFindings(ctx context.Context, app *appctx.AppContext, stage strin
 	if len(ordered) == 0 {
 		return nil
 	}
+
+	// Multi-source aggregator: drop what the scope gate would reject before
+	// Append. Company-seeded OSINT records (class=="osint" with neither host
+	// nor url, D-O1) are preserved by FilterInScope — it applies the same
+	// skipScope exemption the gate does, so this filter cannot silently eat
+	// the whois/postman/ASN findings that legitimately carry no locator.
+	kept, dropped := output.FilterInScope(app.Tree, stage, ordered)
+	if dropped > 0 && app.Log != nil {
+		app.Log.Warn("osint.MergeOSINTFindings: dropped records the scope gate would reject",
+			"stage", stage, "dropped", dropped, "kept", len(kept))
+	}
+	if len(kept) == 0 {
+		return nil
+	}
+	ordered = kept
 
 	if err := app.Tree.Append(stage, ordered); err != nil {
 		if app.Log != nil {

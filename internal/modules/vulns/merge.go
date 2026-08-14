@@ -25,6 +25,7 @@ import (
 	"sort"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/output"
 )
 
 // MergeVulnsFindings reads all inputs/<stage>.*.jsonl staging files written by
@@ -84,6 +85,29 @@ func MergeVulnsFindings(ctx context.Context, app *appctx.AppContext, stage strin
 	if len(ordered) == 0 {
 		return nil
 	}
+
+	// Pre-filter before Append. MergeVulnsFindings is a MULTI-SOURCE aggregator
+	// over every scanner's staging file, and Tree.Append is all-or-nothing by
+	// design: one record the scope gate rejects would discard the entire merged
+	// batch, destroying well-formed findings from every other scanner. This is
+	// the same division of labour output.Interface documents for web.urldedup —
+	// aggregators drop noise here, Append stays strict as the guard for
+	// single-source Task writes.
+	//
+	// This is a safety net, not the primary mechanism: producers are required to
+	// populate VulnFindingRecord.Host/URL. A record reaching here without a
+	// locator is a producer bug, so it is logged loudly rather than dropped in
+	// silence.
+	kept, dropped := output.FilterInScope(app.Tree, stage, ordered)
+	if dropped > 0 && app.Log != nil {
+		app.Log.Warn("vulns.MergeVulnsFindings: dropped findings the scope gate would reject "+
+			"(missing host/url locator, or out of scope) — check the producing scanner",
+			"stage", stage, "dropped", dropped, "kept", len(kept))
+	}
+	if len(kept) == 0 {
+		return nil
+	}
+	ordered = kept
 
 	if err := app.Tree.Append(stage, ordered); err != nil {
 		if app.Log != nil {

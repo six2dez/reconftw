@@ -50,6 +50,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -231,7 +232,7 @@ func (t *SprayTask) runBrutespray(
 	sprayHardenDir(app.Log, outDir)
 	sprayRegisterBrutesprayCreds(app.Log, stdout)
 
-	findings := parseBrutesprayHits(stdout)
+	findings := sprayResolveScopeHosts(app, parseBrutesprayHits(stdout))
 
 	sprayWriteFindings(app, findings)
 
@@ -306,7 +307,7 @@ func (t *SprayTask) runBrutus(
 	sprayRegisterBrutusCreds(app.Log, outPath)
 
 	// Parse brutus JSONL output; XCUT-07: only host/service/port recorded, creds redacted.
-	findings := parseBrutusHits(outPath)
+	findings := sprayResolveScopeHosts(app, parseBrutusHits(outPath))
 	sprayWriteFindings(app, findings)
 
 	if app.Log != nil {
@@ -526,6 +527,7 @@ func parseBrutesprayHits(stdout []byte) []VulnFindingRecord {
 			matched = service + " " + hostPort
 		}
 		findings = append(findings, VulnFindingRecord{
+			Host:            findingHost(hostPort), // scope-gate locator, port stripped
 			Severity:        "high",
 			Confidence:      "high",
 			VulnClass:       "credential-spray",
@@ -541,6 +543,88 @@ func parseBrutesprayHits(stdout []byte) []VulnFindingRecord {
 // sprayExtractTarget pulls the host:port and (best-effort) service name from a
 // brutespray hit line, discarding any credential material. Returns
 // ("host:port", "service") — either may be "" if not found.
+// sprayResolveScopeHosts rewrites IP-literal locators back to the in-scope
+// hostname that resolved to them.
+//
+// brutespray and brutus both take their targets from the nmap .gnmap, so their
+// hits identify services by IP. Under a domain scope (*.example.com) an IP
+// literal is out of scope, so the findings merge dropped every credential-spray
+// result — the highest-severity findings the pipeline can produce, discarded
+// silently. The scan already knows the mapping: artefacts/hosts.jsonl pairs
+// host and ip (written by web.httpx and the subdomains geo enrichment).
+//
+// A finding whose IP is not in that index keeps the IP as its locator. That is
+// correct, not a fallback: under an IP or CIDR target scope the IP is exactly
+// the right locator, and under a domain scope an unmappable IP genuinely has no
+// in-scope identity.
+func sprayResolveScopeHosts(app *appctx.AppContext, findings []VulnFindingRecord) []VulnFindingRecord {
+	if len(findings) == 0 || app == nil || app.Target == nil {
+		return findings
+	}
+	// Only pay for the index if at least one locator is an IP literal.
+	needed := false
+	for _, f := range findings {
+		if net.ParseIP(f.Host) != nil {
+			needed = true
+			break
+		}
+	}
+	if !needed {
+		return findings
+	}
+
+	index := sprayHostsByIP(app)
+	if len(index) == 0 {
+		return findings
+	}
+	for i := range findings {
+		if net.ParseIP(findings[i].Host) == nil {
+			continue
+		}
+		if host, ok := index[findings[i].Host]; ok && host != "" {
+			if app.Log != nil {
+				app.Log.Debug("vulns.spray: mapped service IP back to its in-scope host",
+					"ip", findings[i].Host, "host", host)
+			}
+			findings[i].Host = host
+		}
+	}
+	return findings
+}
+
+// sprayHostsByIP builds an ip → hostname index from artefacts/hosts.jsonl.
+// Both writers of that artefact (web.httpx HostRecord and the subdomains geo
+// HostRecord) carry "host" and "ip", so one decode shape covers both. The first
+// host seen for an IP wins, keeping the result deterministic for shared IPs.
+func sprayHostsByIP(app *appctx.AppContext) map[string]string {
+	path := filepath.Join(app.Target.WorkDir, "artefacts", "hosts.jsonl")
+	f, err := os.Open(path) //nolint:gosec // path is workspace-internal
+	if err != nil {
+		return nil
+	}
+	defer f.Close() //nolint:errcheck
+
+	index := make(map[string]string)
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for sc.Scan() {
+		var rec struct {
+			Host string `json:"host"`
+			IP   string `json:"ip"`
+		}
+		if err := json.Unmarshal(sc.Bytes(), &rec); err != nil {
+			continue
+		}
+		if rec.IP == "" || rec.Host == "" {
+			continue
+		}
+		if _, seen := index[rec.IP]; !seen {
+			index[rec.IP] = rec.Host
+		}
+	}
+	return index
+}
+
 func sprayExtractTarget(line string) (hostPort, service string) {
 	// service: first " - "-delimited token after a leading "[+]" marker.
 	trimmed := strings.TrimPrefix(line, "[+]")
@@ -634,6 +718,7 @@ func parseBrutusHits(outPath string) []VulnFindingRecord {
 			matched = strings.TrimSpace(hit.Service + " " + matched)
 		}
 		findings = append(findings, VulnFindingRecord{
+			Host:            findingHost(host), // scope-gate locator, port stripped
 			Severity:        "high",
 			Confidence:      "high",
 			VulnClass:       "credential-spray",

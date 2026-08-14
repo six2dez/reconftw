@@ -200,6 +200,7 @@ func parseCRLFuzzOutput(data []byte) []VulnFindingRecord {
 		// XCUT-07: extract hostname only; do NOT write raw vulnerable URL to record.
 		host := extractCRLFHost(line)
 		records = append(records, VulnFindingRecord{
+			Host: host, // scope-gate locator (findings:host|url)
 			// Phase 4/5 inherited SARIF-compatible fields.
 			Severity:   "medium",
 			Confidence: "high",

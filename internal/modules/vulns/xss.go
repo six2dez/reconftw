@@ -237,7 +237,10 @@ func (t *XSSTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 			Engine:          "dalfox",
 		}
 		// Extract host from the PoC URL without storing the raw URL.
+		// Host is the scope-gate locator; MatchedParam is kept for
+		// backwards compatibility with existing findings consumers.
 		rec.MatchedParam = extractHostFromPoC(poc)
+		rec.Host = rec.MatchedParam
 		records = append(records, rec)
 	}
 

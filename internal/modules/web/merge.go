@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/output"
 )
 
 // MergeStage reads all inputs/<stage>.*.jsonl staging files written by web
@@ -79,8 +80,17 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 	// otherwise the subsequent Tree.Append would overwrite httpx's probed hosts.
 	// The existing artefact lines are seeded first (preserving order + dedup key) so
 	// portscan/nerva/wellknown records are ADDED to, not substituted for, httpx's.
-	// Other stages (waf/findings/urls) have no direct artefact writer preceding their
-	// merge, so they are unaffected and keep the staging-only union semantics.
+	// Other stages (waf/findings/urls) have no direct artefact writer preceding
+	// their merge, so they keep the staging-only union semantics.
+	//
+	// "findings" used to be an exception that this comment wrongly denied:
+	// mergeTakeoverFindings wrote takeover records straight to the artefact
+	// during the subs stage, and the REPLACE here erased them in every composite
+	// mode. That was fixed at the source — takeover now stages to
+	// inputs/findings.takeover.jsonl — so the artefact stays a pure function of
+	// the staging files and no preservation branch is needed here. Any future
+	// direct writer of artefacts/findings.jsonl reintroduces the bug; stage it
+	// instead.
 	if stage == "hosts" {
 		existingArtefact := filepath.Join(app.Target.WorkDir, "artefacts", stage+".jsonl")
 		if existingLines, rerr := readJSONLFile(existingArtefact); rerr == nil {
@@ -115,6 +125,21 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 	if len(ordered) == 0 {
 		return nil
 	}
+
+	// Multi-source aggregator: drop what the scope gate would reject before
+	// Append, so one noisy record from one producer cannot discard the merged
+	// batch from all the others. Pass-through artefacts (fuzz, waf, origins)
+	// keep every syntactically valid line — FilterInScope dispatches on the
+	// artefact exactly as Append does.
+	kept, dropped := output.FilterInScope(app.Tree, stage, ordered)
+	if dropped > 0 && app.Log != nil {
+		app.Log.Warn("web.MergeStage: dropped records the scope gate would reject",
+			"stage", stage, "dropped", dropped, "kept", len(kept))
+	}
+	if len(kept) == 0 {
+		return nil
+	}
+	ordered = kept
 
 	if err := app.Tree.Append(stage, ordered); err != nil {
 		if app.Log != nil {

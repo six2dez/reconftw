@@ -266,24 +266,43 @@ func runSQLMap(ctx context.Context, app *appctx.AppContext,
 		return nil, nil
 	}
 
-	// Build VulnFindingRecord entries.
-	// Deduplicate: prefer dir-parsed count; fall back to stream count.
-	total := len(dirFindings)
-	if total == 0 {
-		total = injectable
-	}
-	var records []VulnFindingRecord
-	for i := 0; i < total; i++ {
-		records = append(records, VulnFindingRecord{
-			// Phase 4/5 inherited SARIF-compatible fields.
-			Severity:   "critical",
-			Confidence: "high",
-			// Phase 6 vuln-class fields.
+	// Build VulnFindingRecord entries, one per injectable TARGET.
+	//
+	// parseSQLMapOutputDir returns the per-target subdirectory names sqlmap
+	// creates, which are the target hostnames — real per-finding identity.
+	// This used to take len(dirFindings) and emit that many records all
+	// stamped with app.Target.Domain: an injection on shop.example.com was
+	// attributed to example.com, and because the merger deduplicates by raw
+	// JSON bytes, N byte-identical records collapsed into a single finding.
+	newRec := func(host string) VulnFindingRecord {
+		return VulnFindingRecord{
+			Host:            host, // scope-gate locator
+			Severity:        "critical",
+			Confidence:      "high",
 			VulnClass:       "sqli",
 			PayloadRedacted: "***", // XCUT-07: raw SQL payload never written
 			PoCRedacted:     "***", // XCUT-07: raw sqlmap PoC never written
 			Engine:          "sqlmap",
-		})
+		}
+	}
+
+	var records []VulnFindingRecord
+	for _, target := range dirFindings {
+		records = append(records, newRec(findingHost(target)))
+	}
+
+	// Fallback: sqlmap printed injectable indicators to the stream but wrote no
+	// per-target output dir. That path carries NO identity, only a count, so
+	// emit ONE record against the scan target rather than `injectable` copies
+	// of it — identical records convey nothing extra and collapse in the merge
+	// anyway. The count stays in the log.
+	if len(records) == 0 && injectable > 0 {
+		if app.Log != nil {
+			app.Log.Debug("vulns.sqli: sqlmap stream reported injections with no "+
+				"per-target output dir — recording one finding against the scan target",
+				"indicators", injectable)
+		}
+		records = append(records, newRec(app.Target.Domain))
 	}
 	return records, nil
 }
@@ -386,6 +405,7 @@ func runGhauriPerURL(ctx context.Context, app *appctx.AppContext,
 			// Extract host only (XCUT-07: no raw payload or PoC URL written).
 			host := sqliExtractHost(rawURL)
 			records = append(records, VulnFindingRecord{
+				Host: host, // scope-gate locator (findings:host|url)
 				// Phase 4/5 inherited SARIF-compatible fields.
 				Severity:   "critical",
 				Confidence: "high",

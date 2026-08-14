@@ -302,8 +302,12 @@ func parseNucleiOutput(data []byte) []FindingRecord {
 			refs = []string{}
 		}
 		records = append(records, FindingRecord{
-			Type:             "nuclei-finding",
-			Host:             nl.Host,
+			Type: "nuclei-finding",
+			// normalizeHost, not nl.Host raw: nuclei reports the full origin
+			// for HTTP templates ("https://target.example.com"), and the
+			// findings scope gate matches host values as hostnames — a raw
+			// origin is rejected and takes the whole merged batch with it.
+			Host:             normalizeHost(nl.Host),
 			TemplateID:       nl.TemplateID,
 			MatcherName:      nl.MatcherName,
 			Severity:         nl.Info.Severity,

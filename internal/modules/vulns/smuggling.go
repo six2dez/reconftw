@@ -232,6 +232,7 @@ func parseSmugglingOutput(data []byte, findings *[]VulnFindingRecord) int {
 		// XCUT-07: extract hostname only; PayloadRedacted/PoCRedacted always "***".
 		host := smugglingExtractHost(sf.Target)
 		*findings = append(*findings, VulnFindingRecord{
+			Host:            host, // scope-gate locator (findings:host|url)
 			Severity:        "high",
 			Confidence:      "medium",
 			VulnClass:       "smuggling",

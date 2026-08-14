@@ -311,6 +311,16 @@ func parseNucleiDAST(data []byte) []VulnFindingRecord {
 			vulnClass = nl.Info.Tags[0]
 		}
 		records = append(records, VulnFindingRecord{
+			// Scope-gate locator, normalised through findingHost.
+			//
+			// nuclei's "host" is NOT always a bare hostname — for HTTP
+			// templates it is the full origin, e.g.
+			// "host":"https://target.example.com" (see the v1 fixture in
+			// tests/unit/test_new_tool_integrations.bats). Passing that
+			// straight through meant the scope gate, which matches host
+			// values as hostnames, rejected every DAST finding. findingHost
+			// reduces either form to the hostname and drops the port.
+			Host: findingHost(nl.Host),
 			// Phase 4/5 SARIF-compatible fields.
 			Severity:   nl.Info.Severity,
 			Confidence: "high",

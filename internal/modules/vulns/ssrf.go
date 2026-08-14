@@ -606,6 +606,7 @@ func runSSRFFFUF(ctx context.Context, app *appctx.AppContext, args []string, lab
 	var records []VulnFindingRecord
 	for _, host := range matchedHosts {
 		records = append(records, VulnFindingRecord{
+			Host:            host, // scope-gate locator (findings:host|url)
 			Severity:        "high",
 			Confidence:      "medium",
 			VulnClass:       "ssrf",

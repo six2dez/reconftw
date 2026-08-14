@@ -157,6 +157,7 @@ func (t *WebCacheTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 			if wcvsIsConfirmedPoison(line) {
 				host := wcvsExtractHost(line)
 				allFindings = append(allFindings, VulnFindingRecord{
+					Host:            host, // scope-gate locator (findings:host|url)
 					Severity:        "high",
 					Confidence:      "high",
 					VulnClass:       "webcache",
@@ -292,6 +293,7 @@ func parseToxicacheOutput(data []byte) []VulnFindingRecord {
 		// XCUT-07: extract hostname only; raw poison header never stored.
 		host := toxicacheExtractHost(line)
 		records = append(records, VulnFindingRecord{
+			Host:            host, // scope-gate locator (findings:host|url)
 			Severity:        "high",
 			Confidence:      "medium",
 			VulnClass:       "webcache",

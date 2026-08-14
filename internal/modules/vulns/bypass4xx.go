@@ -249,6 +249,10 @@ func parseBypass4xxOutput(data []byte) []VulnFindingRecord {
 			continue
 		}
 		records = append(records, VulnFindingRecord{
+			// Scope-gate locator: nomore403 prints the bypassed URL inside the
+			// result line (e.g. "200 https://host/path"), so the per-finding
+			// host is recoverable without falling back to the scan target.
+			Host: bypass4xxExtractHost(line),
 			// Phase 4/5 SARIF-compatible fields.
 			Severity:   "low",
 			Confidence: "medium",
@@ -260,6 +264,21 @@ func parseBypass4xxOutput(data []byte) []VulnFindingRecord {
 		})
 	}
 	return records
+}
+
+// bypass4xxExtractHost pulls the hostname out of a nomore403 result line.
+// The tool prints free-form text with the tested URL embedded (e.g.
+// "200 https://api.example.com/admin"), so the first URL-looking token wins.
+// Returns "" when no token carries a scheme — the caller then has no
+// per-finding locator and the record is dropped by the merge scope filter
+// rather than poisoning the batch.
+func bypass4xxExtractHost(line string) string {
+	for _, tok := range strings.Fields(line) {
+		if strings.Contains(tok, "://") {
+			return findingHost(tok)
+		}
+	}
+	return ""
 }
 
 // init self-registers Bypass4xxTask with the Default task registry.

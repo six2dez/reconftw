@@ -367,6 +367,7 @@ func runLFIFFUF(ctx context.Context, app *appctx.AppContext,
 	var records []VulnFindingRecord
 	for i := 0; i < matchCount; i++ {
 		records = append(records, VulnFindingRecord{
+			Host: host, // scope-gate locator (findings:host|url)
 			// Phase 4/5 inherited SARIF-compatible fields.
 			Severity:   "high",
 			Confidence: "medium",

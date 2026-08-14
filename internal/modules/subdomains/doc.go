@@ -26,8 +26,14 @@ package subdomains
 // TakeoverSubzyTask and TakeoverDNSTakeTask do NOT call app.Tree.Append("findings", ...)
 // directly during Run. Each writes its own staging file:
 //   inputs/takeover.subzy.jsonl and inputs/takeover.dnstake.jsonl
-// The command layer reads both files and calls app.Tree.Append("findings", merged) ONCE
-// after the enrichment RunStage completes (single-writer-per-artefact invariant).
+// The command layer reads both files after the enrichment RunStage completes and
+// consolidates them into a THIRD staging file, inputs/findings.takeover.jsonl —
+// it does NOT write the artefact directly. The single-writer-per-artefact
+// invariant holds only within one RunStage, and composite modes run a later
+// web.MergeStage("findings") whose REPLACE semantics erased anything written to
+// the artefact earlier. Routing through staging keeps artefacts/findings.jsonl a
+// pure function of inputs/findings.*.jsonl, so every later merge reproduces the
+// takeover records instead of dropping them.
 // Similarly: buckets, asns, hosts artefacts each have exactly ONE writer per RunStage.
 //
 // All Tasks in this package self-register via init() calls. Blank-import

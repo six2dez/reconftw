@@ -288,6 +288,8 @@ func parseFrayOutput(data []byte, category string) (findings []VulnFindingRecord
 		bypassed += fl.Bypassed
 		// VulnFindingRecord with XCUT-07 compliant fields.
 		findings = append(findings, VulnFindingRecord{
+			// Scope-gate locator, derived from the target fray reported.
+			Host: findingHost(fl.Target),
 			// Phase 4/5 SARIF-compatible fields.
 			Severity:   "medium",
 			Confidence: "medium",

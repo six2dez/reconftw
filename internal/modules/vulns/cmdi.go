@@ -185,24 +185,44 @@ func (t *CMDITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 
 	// Also scan the commix output directory for session files that indicate
 	// successful exploitation (commix writes per-target session files on confirm).
-	dirCount := parseCommixOutputDir(commixOutDir)
-	if dirCount > confirmedCount {
-		confirmedCount = dirCount
-	}
+	// The subdirectory names ARE the target hosts, so this path carries real
+	// per-finding identity — unlike the stdout scan, which only yields a count.
+	dirTargets := parseCommixOutputDir(commixOutDir)
 
-	// Build VulnFindingRecord entries.
-	var findings []VulnFindingRecord
-	for i := 0; i < confirmedCount; i++ {
-		findings = append(findings, VulnFindingRecord{
-			// Phase 4/5 inherited SARIF-compatible fields.
-			Severity:   "critical",
-			Confidence: "high",
-			// Phase 6 vuln-class fields.
+	// Build VulnFindingRecord entries, one per confirmed TARGET.
+	//
+	// This used to emit confirmedCount records all stamped with
+	// app.Target.Domain: an RCE on shop.example.com was attributed to
+	// example.com, and since the merger deduplicates by raw JSON bytes, N
+	// byte-identical records collapsed into one finding.
+	newRec := func(host string) VulnFindingRecord {
+		return VulnFindingRecord{
+			Host:            host, // scope-gate locator
+			Severity:        "critical",
+			Confidence:      "high",
 			VulnClass:       "rce",
 			PayloadRedacted: "***", // XCUT-07: raw commix payload never written
 			PoCRedacted:     "***", // XCUT-07: raw commix PoC never written
 			Engine:          "commix",
-		})
+		}
+	}
+
+	var findings []VulnFindingRecord
+	for _, target := range dirTargets {
+		findings = append(findings, newRec(findingHost(target)))
+	}
+
+	// Fallback: commix confirmed on stdout but wrote no per-target dir. No
+	// identity is recoverable, only a count, so record ONE finding against the
+	// scan target instead of confirmedCount identical copies that would collapse
+	// in the merge regardless. The count stays in the log.
+	if len(findings) == 0 && confirmedCount > 0 {
+		if app.Log != nil {
+			app.Log.Debug("vulns.cmdi: commix confirmed on stdout with no per-target "+
+				"output dir — recording one finding against the scan target",
+				"indicators", confirmedCount)
+		}
+		findings = append(findings, newRec(app.Target.Domain))
 	}
 
 	// Step 6: Write inputs/findings.cmdi.jsonl.
@@ -238,12 +258,15 @@ func (t *CMDITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 // parseCommixOutputDir scans the commix output directory for session files
 // that indicate confirmed command injection exploits. commix creates a
 // subdirectory per target hostname containing a "session" file on success.
-func parseCommixOutputDir(dir string) int {
+// Returns the per-target subdirectory NAMES (commix creates one per target,
+// named after the target host), not just a count — the caller needs that
+// identity as the scope-gate locator and to keep separate findings distinct.
+func parseCommixOutputDir(dir string) []string {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return 0
+		return nil
 	}
-	var count int
+	var confirmed []string
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
@@ -260,12 +283,12 @@ func parseCommixOutputDir(dir string) int {
 				strings.HasSuffix(name, ".log") ||
 				name == "session" {
 				// Any session or result file in a per-target subdir signals a confirmed find.
-				count++
+				confirmed = append(confirmed, e.Name())
 				break
 			}
 		}
 	}
-	return count
+	return confirmed
 }
 
 // cmdiReplaceParams replaces all query-parameter values with "FUZZ" in each

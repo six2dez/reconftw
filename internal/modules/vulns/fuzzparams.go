@@ -238,6 +238,11 @@ func parseFuzzparamsOutput(data []byte) []VulnFindingRecord {
 			vulnClass = nl.Info.Tags[0]
 		}
 		records = append(records, VulnFindingRecord{
+			// Scope-gate locator, normalised through findingHost: nuclei's
+			// "host" is the full origin for HTTP templates
+			// ("https://target.example.com"), which the hostname-matching
+			// scope gate would reject outright.
+			Host: findingHost(nl.Host),
 			// Phase 4/5 SARIF-compatible fields.
 			Severity:   nl.Info.Severity,
 			Confidence: "medium",

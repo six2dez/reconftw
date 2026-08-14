@@ -327,6 +327,7 @@ func parseTInjAReports(reportDir string, app *appctx.AppContext) ([]VulnFindingR
 				app.Log.Debug("vulns.ssti: TInjA SSTI confirmed", "host", host)
 			}
 			records = append(records, VulnFindingRecord{
+				Host: host, // scope-gate locator (findings:host|url)
 				// Phase 4/5 inherited SARIF-compatible fields.
 				Severity:   "critical",
 				Confidence: "high",
@@ -434,8 +435,12 @@ func runSSTImap(ctx context.Context, app *appctx.AppContext,
 			if u := extractSSTImapURL(rawLine); u != "" {
 				confirmedURLs = append(confirmedURLs, u)
 			} else {
-				// Confirmation detected but URL extraction failed — still record a finding.
-				confirmedURLs = append(confirmedURLs, "")
+				// Confirmation detected but URL extraction failed. Recording ""
+				// "to keep the finding" no longer works: an empty locator yields
+				// an empty Host, which the findings scope filter drops — so the
+				// gesture silently discarded a CONFIRMED SSTI. Fall back to the
+				// scan target, the least-specific locator that is still true.
+				confirmedURLs = append(confirmedURLs, app.Target.Domain)
 			}
 		}
 	}
@@ -448,6 +453,7 @@ func runSSTImap(ctx context.Context, app *appctx.AppContext,
 	for _, rawURL := range confirmedURLs {
 		host := sstiExtractHost(rawURL)
 		records = append(records, VulnFindingRecord{
+			Host: host, // scope-gate locator (findings:host|url)
 			// Phase 4/5 inherited SARIF-compatible fields.
 			Severity:   "critical",
 			Confidence: "high",

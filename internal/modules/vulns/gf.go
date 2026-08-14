@@ -33,6 +33,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -86,6 +87,16 @@ var gfClasses = [8]string{
 // canary values, blind-XSS callbacks, or OOB tokens stripped before write.
 // Engine identifies which tool produced the finding.
 type VulnFindingRecord struct {
+	// Target locator. The OutputTree scope gate (artefactScopeField "findings")
+	// requires one of these on every non-OSINT finding: it prefers Host and
+	// falls back to URL. A record carrying NEITHER is rejected, and because
+	// MergeVulnsFindings makes a single all-or-nothing Tree.Append over every
+	// staging file, one such record destroys the whole merged batch — including
+	// well-formed findings from other scanners. Producers MUST populate at
+	// least one of these. See e2e_findings_test.go for the regression gate.
+	Host string `json:"host,omitempty"`
+	URL  string `json:"url,omitempty"`
+
 	// Phase 4/5 inherited SARIF-compatible fields.
 	Severity   string   `json:"severity,omitempty"`
 	Confidence string   `json:"confidence,omitempty"`
@@ -97,6 +108,46 @@ type VulnFindingRecord struct {
 	PayloadRedacted string `json:"payload_redacted,omitempty"`
 	PoCRedacted     string `json:"poc_redacted,omitempty"`
 	Engine          string `json:"engine,omitempty"`
+}
+
+// findingHost normalises an arbitrary scanner target into the hostname the
+// scope gate checks. It accepts both a full URL and a bare host, strips any
+// port (IsInScope matches hostnames, not host:port), and lowercases.
+//
+// NOTE: this package carries ~10 near-identical per-scanner extractors
+// (sqliExtractHost, smugglingExtractHost, sstiExtractHost, …). They predate
+// this helper and are left alone here to keep the locator fix reviewable;
+// consolidating them onto findingHost is worthwhile follow-up cleanup.
+func findingHost(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	if parsed, err := url.Parse(raw); err == nil && parsed.Hostname() != "" {
+		return strings.ToLower(parsed.Hostname())
+	}
+	host := raw
+
+	// Bracketed IPv6, with or without a port: "[2001:db8::1]" / "[2001:db8::1]:443".
+	// url.Parse handles this inside a URL, but scanners also report the bare
+	// authority, and the brackets are not part of the hostname the scope gate
+	// matches against.
+	if strings.HasPrefix(host, "[") {
+		if end := strings.IndexByte(host, ']'); end > 0 {
+			return strings.ToLower(host[1:end])
+		}
+	}
+
+	// Bare host, possibly with a port. Only trim when the prefix holds no
+	// further colon and the suffix is all digits — otherwise an unbracketed
+	// IPv6 literal like "::1" would be mangled into ":".
+	if idx := strings.LastIndexByte(host, ':'); idx > 0 && !strings.Contains(host[:idx], ":") {
+		if port := host[idx+1:]; port != "" && strings.IndexFunc(port, func(r rune) bool {
+			return r < '0' || r > '9'
+		}) < 0 {
+			host = host[:idx]
+		}
+	}
+	return strings.ToLower(host)
 }
 
 // GFTask runs gf-pattern classification over the URL corpus and produces

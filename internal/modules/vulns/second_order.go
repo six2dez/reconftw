@@ -327,6 +327,7 @@ func parseSecondOrderOutput(outDir, sourceURL string) []VulnFindingRecord {
 				// XCUT-07: extract dangling hostname only; never store full dangling URL.
 				danglingHost := soExtractHost(du)
 				records = append(records, VulnFindingRecord{
+					Host:       sourceHost, // scope-gate locator: the in-scope source, not the dangling target
 					Severity:   "medium",
 					Confidence: "medium",
 					// VulnClass reflects second-order / broken-link category.
