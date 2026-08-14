@@ -156,7 +156,11 @@ func goToolchainDigest(goos, goarch string) (string, error) {
 // binary tarballs and the source archive — uv-installer.sh is NOT listed in
 // it. The attestation is therefore the strongest available vendor statement
 // about this specific file, and it binds this exact digest to astral's build.
-const uvInstallerSHA256 = "f1ee4a249799525a330df57643335120150c9102db7483b1d37546cc43af3a16"
+//
+// A var rather than a const only so the cleanup tests can drive bootstrapUV's
+// success path with a stub payload; its value is guarded by
+// TestBootstrapPinsAreRealDigests and TestNoPlaceholderPinsRemain.
+var uvInstallerSHA256 = "f1ee4a249799525a330df57643335120150c9102db7483b1d37546cc43af3a16"
 
 // uvInstallerURL is the immutable, versioned release asset. GitHub release
 // assets cannot be rewritten once published, so this digest stays valid until

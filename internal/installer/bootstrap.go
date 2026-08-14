@@ -6,10 +6,14 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"strconv"
+	"strings"
 	"time"
 
 	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
@@ -163,18 +167,37 @@ func downloadFile(ctx context.Context, cfg *bootstrapConfig, url, name string) (
 	// buffered-flush or disk-full failure surfaces. Ignoring it would hand the caller a
 	// path to a TRUNCATED toolchain archive and report the download as successful.
 	if err := out.Close(); err != nil {
+		// This branch used to be the one failure path that leaked: it returned
+		// without removing dst, so a disk-full flush left the partial archive
+		// behind forever — and disk-full is exactly when that matters.
+		_ = os.Remove(dst)
 		return "", fmt.Errorf("download %s: close %s: %w", url, dst, err)
 	}
 	return dst, nil
 }
 
-// bootstrapGo installs the pinned Go toolchain to cfg.GoRoot when `go` is absent
-// (D-02). It downloads the official tarball, verifies it against the
-// per-platform pin from checksums.go, and extracts via tar.
-// Mirrors install.sh:install_golang_version().
+// removeTemp deletes a downloaded artefact once the caller is done with it.
+//
+// downloadFile removes its temp file on every FAILURE path, but nothing removed
+// it on SUCCESS, so each completed bootstrap left the artefact behind: a Go
+// tarball is ~100 MB, and `reconftw install` runs on every Docker build layer
+// and every CI job. Repeated runs filled /tmp with copies of a file that had
+// already been extracted. Deferred by the callers so the artefact goes away
+// whether verification passed, extraction passed, or either failed.
+func removeTemp(path string) {
+	if path == "" {
+		return
+	}
+	_ = os.Remove(path)
+}
+
+// bootstrapGo installs the pinned Go toolchain to cfg.GoRoot when the host has
+// no `go` at least as new as goVersion (D-02). It downloads the official
+// tarball, verifies it against the per-platform pin from checksums.go, and
+// extracts via tar. Mirrors install.sh:install_golang_version().
 func bootstrapGo(ctx context.Context, cfg *bootstrapConfig) error {
-	if onPath("go") {
-		return nil // already present (idempotent)
+	if goToolchainUpToDate(ctx) {
+		return nil // present and new enough (idempotent)
 	}
 	goRoot := cfg.GoRoot
 	if goRoot == "" {
@@ -196,6 +219,7 @@ func bootstrapGo(ctx context.Context, cfg *bootstrapConfig) error {
 	}); err != nil {
 		return fmt.Errorf("bootstrap go: %w", err)
 	}
+	defer removeTemp(path)
 	if err := verifyFile(ctx, path, want, url); err != nil {
 		return fmt.Errorf("bootstrap go: %w", err)
 	}
@@ -226,6 +250,7 @@ func bootstrapUV(ctx context.Context, cfg *bootstrapConfig) error {
 	}); err != nil {
 		return fmt.Errorf("bootstrap uv: %w", err)
 	}
+	defer removeTemp(path)
 	if err := verifyFile(ctx, path, uvInstallerSHA256, url); err != nil {
 		return fmt.Errorf("bootstrap uv: %w", err)
 	}
@@ -262,6 +287,7 @@ func bootstrapRust(ctx context.Context, cfg *bootstrapConfig) error {
 	}); err != nil {
 		return fmt.Errorf("bootstrap rust: %w", err)
 	}
+	defer removeTemp(path)
 	if err := verifyFile(ctx, path, want, url); err != nil {
 		return fmt.Errorf("bootstrap rust: %w", err)
 	}
@@ -272,4 +298,130 @@ func bootstrapRust(ctx context.Context, cfg *bootstrapConfig) error {
 		return fmt.Errorf("bootstrap rust: chmod %s: %w", path, err)
 	}
 	return runCmd(ctx, path, []string{"-y", "--default-toolchain", "stable", "--no-modify-path"}, nil)
+}
+
+// --- pre-existing toolchain probe -------------------------------------------
+
+// goVersionTokenRe finds the go1.X[.Y][suffix] token in `go version` output
+// ("go version go1.25.13 darwin/arm64"). The digit immediately after "go" is
+// what stops it matching the literal word "go" in "go version".
+var goVersionTokenRe = regexp.MustCompile(`\bgo(\d+(?:\.\d+)*[^\s]*)`)
+
+// goVersionComponents is a parsed Go version: numeric major/minor/patch plus a
+// prerelease marker for rc/beta builds.
+type goVersionComponents struct {
+	major, minor, patch int
+	prerelease          bool
+}
+
+// goVersionRe splits "1.25.13" / "1.26rc1" / "1.25" into components.
+var goVersionRe = regexp.MustCompile(`^(\d+)(?:\.(\d+))?(?:\.(\d+))?(.*)$`)
+
+// parseGoVersion parses a Go version string, tolerating an optional leading
+// "go" and an optional prerelease suffix. A missing minor or patch counts as 0,
+// which is what makes "1.25" correctly compare BELOW "1.25.13".
+func parseGoVersion(v string) (goVersionComponents, error) {
+	var out goVersionComponents
+	s := strings.TrimSpace(v)
+	s = strings.TrimPrefix(s, "go")
+	m := goVersionRe.FindStringSubmatch(s)
+	if m == nil {
+		return out, fmt.Errorf("unparseable Go version %q", v)
+	}
+	// Errors here are unreachable: the regex groups are \d+ and are bounded in
+	// practice, but ignoring the error silently would hide a genuine surprise.
+	var err error
+	if out.major, err = strconv.Atoi(m[1]); err != nil {
+		return goVersionComponents{}, fmt.Errorf("unparseable Go major in %q: %w", v, err)
+	}
+	if m[2] != "" {
+		if out.minor, err = strconv.Atoi(m[2]); err != nil {
+			return goVersionComponents{}, fmt.Errorf("unparseable Go minor in %q: %w", v, err)
+		}
+	}
+	if m[3] != "" {
+		if out.patch, err = strconv.Atoi(m[3]); err != nil {
+			return goVersionComponents{}, fmt.Errorf("unparseable Go patch in %q: %w", v, err)
+		}
+	}
+	out.prerelease = m[4] != ""
+	return out, nil
+}
+
+// goVersionAtLeast reports whether `have` (e.g. "go1.25.13") is at least `want`
+// (e.g. "1.25.13").
+//
+// The comparison is NUMERIC per component, not lexicographic. String comparison
+// is the trap this function exists to avoid: "1.9.7" > "1.25.13" as text, so a
+// host stuck on Go 1.9 would be accepted as up to date, every `go install` of
+// the ~55 tools would then build against a stdlib full of known reachable
+// CVEs, and the govulncheck gate would be scanning a binary whose vulnerable
+// dependency is the compiler's own standard library.
+//
+// A prerelease (go1.26rc1) sorts below the same numeric release, which is the
+// conservative direction: we would rather install the pinned toolchain than
+// accept an rc as equivalent to a GA release.
+func goVersionAtLeast(have, want string) (bool, error) {
+	h, err := parseGoVersion(have)
+	if err != nil {
+		return false, err
+	}
+	w, err := parseGoVersion(want)
+	if err != nil {
+		return false, err
+	}
+	for _, pair := range [][2]int{{h.major, w.major}, {h.minor, w.minor}, {h.patch, w.patch}} {
+		if pair[0] != pair[1] {
+			return pair[0] > pair[1], nil
+		}
+	}
+	// Numerically equal: an rc of the pinned version is not the pinned version.
+	if h.prerelease && !w.prerelease {
+		return false, nil
+	}
+	return true, nil
+}
+
+// goToolchainUpToDate reports whether the host already has a `go` at least as
+// new as goVersion.
+//
+// It replaces a bare onPath("go") check, which accepted ANY pre-existing Go.
+// That silently pinned the entire tool build to whatever the distro shipped —
+// Debian oldstable still carries 1.19 — and the resulting failures surfaced far
+// away from the cause, as obscure `go install` errors on tools whose modules
+// require a newer language version.
+//
+// Every uncertain outcome returns false ("proceed with the pinned install")
+// rather than true. Assuming a toolchain we could not identify is good enough
+// is how an unverifiable environment gets silently blessed; installing the pin
+// on top of it is merely redundant work.
+func goToolchainUpToDate(ctx context.Context) bool {
+	if !onPath("go") {
+		return false
+	}
+	out, err := runOutput(ctx, "go", "version")
+	if err != nil {
+		slog.Default().Warn("go_version_probe_failed",
+			"err", err, "action", "installing pinned toolchain", "pinned", goVersion)
+		return false
+	}
+	m := goVersionTokenRe.FindStringSubmatch(out)
+	if m == nil {
+		// Log the RAW output: a nonstandard wrapper on PATH is the interesting
+		// case, and it is unrecoverable without seeing what it actually printed.
+		slog.Default().Warn("go_version_unparseable",
+			"output", strings.TrimSpace(out), "action", "installing pinned toolchain")
+		return false
+	}
+	ok, err := goVersionAtLeast(m[1], goVersion)
+	if err != nil {
+		slog.Default().Warn("go_version_compare_failed",
+			"found", m[1], "pinned", goVersion, "err", err)
+		return false
+	}
+	if !ok {
+		slog.Default().Info("go_version_below_pin",
+			"found", m[1], "pinned", goVersion, "action", "installing pinned toolchain")
+	}
+	return ok
 }

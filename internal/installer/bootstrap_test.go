@@ -9,14 +9,22 @@
 package installer
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	stderrors "errors"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
 )
@@ -270,4 +278,300 @@ func TestBootstrapRustRefusesUnknownPlatformBeforeAnyRequest(t *testing.T) {
 	if tr.called.Load() {
 		t.Error("bootstrapRust issued an HTTP request before resolving the pin")
 	}
+}
+
+// --- version comparison ----------------------------------------------------
+
+func TestGoVersionAtLeast(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		have, want string
+		expect     bool
+	}{
+		{"go1.25.13", "1.25.13", true},     // exactly the pin
+		{"go1.26.0", "1.25.13", true},      // newer minor
+		{"go1.25.14", "1.25.13", true},     // newer patch
+		{"go1.25.2", "1.25.13", false},     // 2 < 13 numerically, ">" as text
+		{"go1.9.7", "1.25.13", false},      // THE trap: "1.9" sorts above "1.25"
+		{"go1.25", "1.25.13", false},       // missing patch counts as .0
+		{"go1.26", "1.25.13", true},        // missing patch, still newer minor
+		{"go2.0.0", "1.25.13", true},       // major bump
+		{"1.25.13", "1.25.13", true},       // bare version, no "go" prefix
+		{"go1.25.13rc1", "1.25.13", false}, // prerelease is not the release
+		{"go1.26rc1", "1.25.13", true},     // but an rc of a NEWER minor still wins
+	}
+	for _, c := range cases {
+		got, err := goVersionAtLeast(c.have, c.want)
+		if err != nil {
+			t.Errorf("goVersionAtLeast(%q,%q) unexpected error: %v", c.have, c.want, err)
+			continue
+		}
+		if got != c.expect {
+			t.Errorf("goVersionAtLeast(%q,%q) = %v, want %v", c.have, c.want, got, c.expect)
+		}
+	}
+
+	for _, bad := range []string{"banana", "go", "", "vNext"} {
+		if _, err := goVersionAtLeast(bad, "1.25.13"); err == nil {
+			t.Errorf("goVersionAtLeast(%q, …) returned nil error for malformed input", bad)
+		}
+	}
+}
+
+// --- pre-existing toolchain probe -------------------------------------------
+
+// presentGo makes lookPath resolve every binary, so onPath("go") is true.
+func presentGo(t *testing.T) {
+	t.Helper()
+	swapLookPath(t, func(string) (string, error) { return "/usr/local/go/bin/go", nil })
+}
+
+// briefCtx bounds the tests that deliberately let the download fail. retry runs
+// its first attempt BEFORE consulting ctx, so the transport is always invoked
+// at least once; the deadline then short-circuits the 2s/4s backoff instead of
+// costing six seconds per test. retry's own attempt count and backoff are
+// unchanged — only the test's patience is.
+func briefCtx(t *testing.T) context.Context {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	t.Cleanup(cancel)
+	return ctx
+}
+
+// TestBootstrapGoAcceptsNewerToolchain and TestBootstrapGoRejectsOldToolchain
+// are the behavioural replacement for the bare onPath("go") early return. A
+// grep can only show the call site changed; these show that an OLD Go actually
+// triggers the pinned install, which is the property that matters.
+func TestBootstrapGoAcceptsNewerToolchain(t *testing.T) {
+	presentGo(t)
+	swapRunOutput(t, func(context.Context, string, ...string) (string, error) {
+		return "go version go1.99.0 linux/amd64\n", nil
+	})
+	tr := &refusingTransport{}
+	cfg := &bootstrapConfig{TmpDir: t.TempDir(), HTTPClient: &http.Client{Transport: tr}}
+
+	if err := bootstrapGo(context.Background(), cfg); err != nil {
+		t.Fatalf("bootstrapGo with an up-to-date toolchain returned %v, want nil", err)
+	}
+	if tr.called.Load() {
+		t.Error("bootstrapGo downloaded despite a newer toolchain already present")
+	}
+}
+
+func TestBootstrapGoRejectsOldToolchain(t *testing.T) {
+	presentGo(t)
+	// Debian oldstable ships 1.19; under the old bare onPath check this host
+	// was accepted and every `go install` of the ~55 tools built against it.
+	swapRunOutput(t, func(context.Context, string, ...string) (string, error) {
+		return "go version go1.19.13 linux/amd64\n", nil
+	})
+	tr := &refusingTransport{}
+	cfg := &bootstrapConfig{TmpDir: t.TempDir(), HTTPClient: &http.Client{Transport: tr}}
+
+	if err := bootstrapGo(briefCtx(t), cfg); err == nil {
+		t.Fatal("bootstrapGo accepted a Go 1.19 host (the refusing transport should have failed the download)")
+	}
+	if !tr.called.Load() {
+		t.Error("bootstrapGo did NOT attempt an install for a Go 1.19 host — " +
+			"the bare onPath early return is still in effect")
+	}
+}
+
+// TestBootstrapGoProceedsOnUnparseableVersion covers the nonstandard-wrapper
+// case: an unidentifiable toolchain must NOT be assumed good enough.
+func TestBootstrapGoProceedsOnUnparseableVersion(t *testing.T) {
+	presentGo(t)
+	swapRunOutput(t, func(context.Context, string, ...string) (string, error) {
+		return "corporate go wrapper v4 (build 991)\n", nil
+	})
+	tr := &refusingTransport{}
+	cfg := &bootstrapConfig{TmpDir: t.TempDir(), HTTPClient: &http.Client{Transport: tr}}
+
+	_ = bootstrapGo(briefCtx(t), cfg)
+	if !tr.called.Load() {
+		t.Error("an unparseable `go version` silently satisfied the pin")
+	}
+}
+
+func TestBootstrapGoProceedsWhenProbeFails(t *testing.T) {
+	presentGo(t)
+	swapRunOutput(t, func(context.Context, string, ...string) (string, error) {
+		return "", stderrors.New("exec format error")
+	})
+	tr := &refusingTransport{}
+	cfg := &bootstrapConfig{TmpDir: t.TempDir(), HTTPClient: &http.Client{Transport: tr}}
+
+	_ = bootstrapGo(briefCtx(t), cfg)
+	if !tr.called.Load() {
+		t.Error("a failing `go version` probe silently satisfied the pin")
+	}
+}
+
+// --- temp-directory cleanup -------------------------------------------------
+
+// stubTransport serves a fixed body for any request.
+type stubTransport struct{ body []byte }
+
+func (s *stubTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(bytes.NewReader(s.body)),
+		Header:     make(http.Header),
+		Request:    req,
+	}, nil
+}
+
+func assertTmpEmpty(t *testing.T, dir, what string) {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		var names []string
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		t.Errorf("%s left %d artefact(s) in TmpDir: %v — a ~100 MB tarball per "+
+			"invocation fills /tmp in CI and in the Docker builder", what, len(entries), names)
+	}
+}
+
+// TestBootstrapGoRemovesDownloadOnSuccess is the success-path counterpart to
+// downloadFile's failure-path cleanup. Nothing removed a COMPLETED download, so
+// every finished bootstrap left its tarball behind permanently.
+func TestBootstrapGoRemovesDownloadOnSuccess(t *testing.T) {
+	payload := []byte("pretend this is a go tarball")
+	sum := sha256.Sum256(payload)
+
+	swapLookPath(t, func(string) (string, error) { return "", stderrors.New("absent") })
+	swapRunCmd(t, func(context.Context, string, []string, []string) error { return nil })
+
+	platform := runtime.GOOS + "/" + runtime.GOARCH
+	orig := GoToolchainSHA256
+	GoToolchainSHA256 = map[string]string{platform: hex.EncodeToString(sum[:])}
+	t.Cleanup(func() { GoToolchainSHA256 = orig })
+
+	tmp := t.TempDir()
+	cfg := &bootstrapConfig{
+		TmpDir:     tmp,
+		GoRoot:     filepath.Join(t.TempDir(), "go"),
+		HTTPClient: &http.Client{Transport: &stubTransport{body: payload}},
+	}
+
+	if err := bootstrapGo(context.Background(), cfg); err != nil {
+		t.Fatalf("bootstrapGo returned %v, want nil", err)
+	}
+	assertTmpEmpty(t, tmp, "bootstrapGo (success)")
+}
+
+// TestBootstrapGoRemovesDownloadOnChecksumMismatch proves the artefact is
+// removed on the path that matters most: a rejected download is exactly the
+// file you least want left lying around in a world-writable /tmp.
+func TestBootstrapGoRemovesDownloadOnChecksumMismatch(t *testing.T) {
+	swapLookPath(t, func(string) (string, error) { return "", stderrors.New("absent") })
+	swapRunCmd(t, func(context.Context, string, []string, []string) error { return nil })
+
+	platform := runtime.GOOS + "/" + runtime.GOARCH
+	orig := GoToolchainSHA256
+	GoToolchainSHA256 = map[string]string{platform: strings.Repeat("a", 64)}
+	t.Cleanup(func() { GoToolchainSHA256 = orig })
+
+	tmp := t.TempDir()
+	cfg := &bootstrapConfig{
+		TmpDir:     tmp,
+		GoRoot:     filepath.Join(t.TempDir(), "go"),
+		HTTPClient: &http.Client{Transport: &stubTransport{body: []byte("tampered")}},
+	}
+
+	err := bootstrapGo(context.Background(), cfg)
+	if err == nil {
+		t.Fatal("bootstrapGo accepted a payload that does not match the pin")
+	}
+	var cm *coreerrors.ChecksumMismatch
+	if !stderrors.As(err, &cm) {
+		t.Errorf("error is not *ChecksumMismatch: %T (%v)", err, err)
+	}
+	assertTmpEmpty(t, tmp, "bootstrapGo (checksum mismatch)")
+}
+
+func TestBootstrapUVRemovesDownload(t *testing.T) {
+	payload := []byte("#!/bin/sh\necho pretend uv installer\n")
+	sum := sha256.Sum256(payload)
+
+	swapLookPath(t, func(string) (string, error) { return "", stderrors.New("absent") })
+	swapRunCmd(t, func(context.Context, string, []string, []string) error { return nil })
+
+	origPin := uvInstallerSHA256
+	uvInstallerSHA256 = hex.EncodeToString(sum[:])
+	t.Cleanup(func() { uvInstallerSHA256 = origPin })
+
+	tmp := t.TempDir()
+	cfg := &bootstrapConfig{
+		TmpDir:     tmp,
+		HTTPClient: &http.Client{Transport: &stubTransport{body: payload}},
+	}
+	if err := bootstrapUV(context.Background(), cfg); err != nil {
+		t.Fatalf("bootstrapUV returned %v, want nil", err)
+	}
+	assertTmpEmpty(t, tmp, "bootstrapUV (success)")
+
+	// …and on rejection.
+	uvInstallerSHA256 = strings.Repeat("b", 64)
+	tmp2 := t.TempDir()
+	cfg2 := &bootstrapConfig{
+		TmpDir:     tmp2,
+		HTTPClient: &http.Client{Transport: &stubTransport{body: payload}},
+	}
+	if err := bootstrapUV(context.Background(), cfg2); err == nil {
+		t.Fatal("bootstrapUV accepted a payload that does not match the pin")
+	}
+	assertTmpEmpty(t, tmp2, "bootstrapUV (checksum mismatch)")
+}
+
+func TestBootstrapRustRemovesDownload(t *testing.T) {
+	payload := []byte("pretend this is the rustup-init binary")
+	sum := sha256.Sum256(payload)
+
+	swapLookPath(t, func(string) (string, error) { return "", stderrors.New("absent") })
+	swapRunCmd(t, func(context.Context, string, []string, []string) error { return nil })
+
+	platform := runtime.GOOS + "/" + runtime.GOARCH
+	origPins, origTargets := RustupInitSHA256, rustupTargets
+	RustupInitSHA256 = map[string]string{platform: hex.EncodeToString(sum[:])}
+	rustupTargets = map[string]string{platform: "stub-target"}
+	t.Cleanup(func() { RustupInitSHA256, rustupTargets = origPins, origTargets })
+
+	tmp := t.TempDir()
+	cfg := &bootstrapConfig{
+		TmpDir:     tmp,
+		HTTPClient: &http.Client{Transport: &stubTransport{body: payload}},
+	}
+	if err := bootstrapRust(context.Background(), cfg); err != nil {
+		t.Fatalf("bootstrapRust returned %v, want nil", err)
+	}
+	assertTmpEmpty(t, tmp, "bootstrapRust (success)")
+}
+
+// TestDownloadFileRemovesOnOversizeBody keeps downloadFile's own failure-path
+// cleanup covered, since the caller-side defer must ADD to it, not replace it.
+func TestDownloadFileRemovesOnOversizeBody(t *testing.T) {
+	tmp := t.TempDir()
+	cfg := &bootstrapConfig{
+		TmpDir:     tmp,
+		HTTPClient: &http.Client{Transport: &stubTransport{body: []byte("small")}},
+	}
+	path, err := downloadFile(context.Background(), cfg, "https://example/x", "blob")
+	if err != nil {
+		t.Fatalf("downloadFile: %v", err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("downloadFile did not produce a readable file: %v", err)
+	}
+	// downloadFile itself keeps the file on success — removal is the caller's
+	// deferred responsibility, which is what the bootstrap tests above assert.
+	removeTemp(path)
+	assertTmpEmpty(t, tmp, "removeTemp")
+	// removeTemp must tolerate the empty path a failed download leaves behind.
+	removeTemp("")
 }
