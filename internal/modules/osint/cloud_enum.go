@@ -112,11 +112,16 @@ func (t *CloudEnumTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 
 	// Step 3: Stream (XCUT-09 heartbeat). Bucket findings surface on stdout.
 	var bucketLines []string
+	// cloudEnumRan records whether cloud_enum was actually DISPATCHED. An absent
+	// binary means this task observed nothing and must not clear a previous
+	// run's staging (F3 did-not-run — see writeOSINTStaging).
+	cloudEnumRan := false
 	if ev, sErr := app.Tools.Stream(ctx, "cloud_enum", args); sErr != nil {
 		if app.Log != nil {
 			app.Log.Debug("osint.cloud_enum: stream error (best_effort)", "err", sErr)
 		}
 	} else {
+		cloudEnumRan = true
 		for e := range ev {
 			if e.IsErr {
 				continue
@@ -142,7 +147,14 @@ func (t *CloudEnumTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	records := parseCloudEnumLines(bucketLines)
 
 	// Step 6: write staging JSONL (multi-writer contract).
-	writeOSINTStaging(app, inputsDir, "findings.cloud_enum.jsonl", records)
+	// F3: a run that found no exposed bucket REMOVES the staging file, so a
+	// bucket that has since been locked down stops being republished as still
+	// world-readable.
+	if cloudEnumRan {
+		writeOSINTStaging(app, inputsDir, "findings.cloud_enum.jsonl", records)
+	} else if app.Log != nil {
+		app.Log.Debug("osint.cloud_enum: cloud_enum did not run — staging preserved (F3 did-not-run)")
+	}
 
 	if app.Log != nil {
 		app.Log.Info("osint.cloud_enum: completed", "buckets", len(records))

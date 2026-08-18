@@ -37,7 +37,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -48,7 +47,6 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -173,6 +171,13 @@ func (t *LFITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 
 	// Step 5: Run ffuf per candidate URL.
 	var findings []VulnFindingRecord
+	// ffufRan records whether AT LEAST ONE candidate was actually probed. If
+	// ffuf is absent every dispatch fails, the task observed nothing, and it
+	// must not clear a previous run's staging (F3 did-not-run — staging.go).
+	ffufRan := false
+	// cancelled records that the loop stopped early on context cancellation, so
+	// a partially-probed corpus is not mistaken for a completed clean run.
+	cancelled := false
 
 	for i, candidate := range candidates {
 		// Stop early on context cancellation (SA4011: a bare break inside a
@@ -181,32 +186,29 @@ func (t *LFITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 			if app.Log != nil {
 				app.Log.Debug("vulns.lfi: cancelled", "processed", i, "total", len(candidates))
 			}
+			cancelled = true
 			break
 		}
 
-		hits := runLFIFFUF(ctx, app, toolName, candidate, lfiWordlist,
+		hits, ffufErr := runLFIFFUF(ctx, app, toolName, candidate, lfiWordlist,
 			threads, rateLimit, timeoutSeconds, maxTimeSeconds, header)
+		if ffufErr == nil {
+			ffufRan = true
+		}
 		findings = append(findings, hits...)
 	}
 
 	// Step 6: Write inputs/findings.lfi.jsonl.
-	if len(findings) > 0 {
-		var lines [][]byte
-		for _, rec := range findings {
-			b, mErr := json.Marshal(rec)
-			if mErr != nil {
-				continue
-			}
-			lines = append(lines, b)
-		}
-		if len(lines) > 0 {
-			stagingPath := filepath.Join(inputsDir, "findings.lfi.jsonl")
-			if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-				app.Log.Debug("vulns.lfi: staging write failed",
-					"path", stagingPath, "err", wErr)
-			}
-		}
-	}
+	//
+	// F3 (phase 15): staged through stageVulnFindings so a run in which ffuf
+	// matched nothing REMOVES the previous run's staging. A CANCELLED run only
+	// probed part of the corpus, so it is treated as did-not-run: an interrupted
+	// scan must never be the reason a finding disappears.
+	//
+	// NOTE inputs/tmp_lfi_candidates.txt above is a scratch/inspection file, not
+	// staging, and keeps its raw unconditional write.
+	stagingPath := filepath.Join(inputsDir, "findings.lfi.jsonl")
+	stageVulnFindings(app, "vulns.lfi", stagingPath, ffufRan && !cancelled, findings)
 
 	// XCUT-07: log only count, never raw LFI payload or file contents.
 	if app.Log != nil {
@@ -291,6 +293,10 @@ func prepareLFICandidates(data []byte, maxURLs int) []string {
 
 // runLFIFFUF runs ffuf for a single LFI candidate URL and returns any findings.
 //
+// The error return distinguishes the two ffuf failure channels. A DISPATCH
+// error (ffuf absent) is returned bare and means this candidate was never
+// probed — the caller must not count it as an observation (F3 did-not-run).
+//
 // v1 arg vector (modules/vulns.sh:355-366):
 //
 //	ffuf -v -noninteractive -t <threads> -rate <rate>
@@ -305,7 +311,7 @@ func runLFIFFUF(ctx context.Context, app *appctx.AppContext,
 	toolName, candidateURL, lfiWordlist string,
 	threads, rateLimit, timeoutSeconds, maxTimeSeconds int,
 	header string,
-) []VulnFindingRecord {
+) ([]VulnFindingRecord, error) {
 	// v1 arg vector: ffuf -v -noninteractive -t <t> -rate <r>
 	//                     -timeout <to> -maxtime <mt> -H <h>
 	//                     -w lfi_wordlist:LFI -mr "root:" -u <candidate>
@@ -333,11 +339,12 @@ func runLFIFFUF(ctx context.Context, app *appctx.AppContext,
 	// XCUT-09: Backend.Stream for heartbeat; ffuf per URL can run up to maxtime.
 	eventCh, streamErr := app.Tools.Stream(ctx, toolName, args)
 	if streamErr != nil {
+		// DISPATCH failure — ffuf is not on PATH; this candidate never ran.
 		if app.Log != nil {
 			app.Log.Debug("vulns.lfi: ffuf stream error (best_effort, continuing)",
 				"err", streamErr)
 		}
-		return nil
+		return nil, fmt.Errorf("vulns.lfi: ffuf stream: %w", streamErr)
 	}
 
 	// Drain stream — Backend contract requires full drain.
@@ -358,7 +365,7 @@ func runLFIFFUF(ctx context.Context, app *appctx.AppContext,
 	}
 
 	if matchCount == 0 {
-		return nil
+		return nil, nil
 	}
 
 	// Extract host for XCUT-07-safe record storage (no raw payload).
@@ -379,7 +386,7 @@ func runLFIFFUF(ctx context.Context, app *appctx.AppContext,
 			Engine:          "ffuf",
 		})
 	}
-	return records
+	return records, nil
 }
 
 // resolveLFIThreads computes the effective ffuf thread count for LFI.

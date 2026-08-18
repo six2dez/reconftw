@@ -13,7 +13,7 @@
 // ARG VECTOR (v1 vulns.sh:1037-1055 verbatim):
 //
 //	nuclei -l <targetsFile> -dast -nh -rl <rateLimit> -silent -retries 2
-//	       -duc -t <dastTemplatesPath> -j -o <stagingFile>
+//	       -duc -t <dastTemplatesPath> -j -o <rawOutFile>
 //	       [ExtraArgs fields...]
 //
 // -duc: disable update check — mandatory on dev Mac where UDP/53 is blocked
@@ -50,7 +50,6 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -148,8 +147,25 @@ func (t *NucleiDASTTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 		rl = 150
 	}
 
-	// Staging file — distinct from fuzzparams staging.
-	stagingFile := filepath.Join(inputsDir, "findings.nuclei_dast_raw.jsonl")
+	// nuclei's own -o output, in nuclei's NATIVE schema — raw tool output this
+	// task parses into VulnFindingRecords below, not producer staging.
+	//
+	// It used to be called inputs/findings.nuclei_dast_raw.jsonl, which MATCHES
+	// the vulnsStagingPrefixes merge glob inputs/findings.*.jsonl. MergeVulnsFindings
+	// therefore published nuclei's raw records into artefacts/findings.jsonl
+	// ALONGSIDE the parsed ones, in a foreign schema, and — because nothing
+	// cleared it — kept republishing a previous run's raw output for every later
+	// run. Renamed out of the glob, matching the sibling fuzzparams task's
+	// inputs/fuzzparams_raw.jsonl. No producer leaves the merge: the real
+	// staging file below keeps its name.
+	rawOutFile := filepath.Join(inputsDir, "nuclei_dast_raw.jsonl")
+	// Discard any previous run's raw output BEFORE dispatching: nuclei creates
+	// the file lazily, so a run that finds nothing would otherwise be handed the
+	// last run's hits and republish them as this run's findings (F3).
+	if rmErr := os.Remove(rawOutFile); rmErr != nil && !os.IsNotExist(rmErr) && app.Log != nil {
+		app.Log.Debug("vulns.nuclei_dast: could not clear stale raw output",
+			"path", rawOutFile, "err", rmErr)
+	}
 
 	// Step 5: Build arg vector and run via Backend.Stream.
 	// -duc: disable update check (T-06-07-02 — mandatory; dev Mac DNS block).
@@ -163,7 +179,7 @@ func (t *NucleiDASTTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 		"-duc", // disable update check — always present (XCUT memory/project_local_dns_block)
 		"-t", dastTemplates,
 		"-j",
-		"-o", stagingFile,
+		"-o", rawOutFile,
 	}
 	// Append ExtraArgs fields if configured.
 	if cfg.Vulns.NucleiDAST.ExtraArgs != "" {
@@ -172,6 +188,10 @@ func (t *NucleiDASTTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 
 	// Backend.Stream for XCUT-09 heartbeat (nuclei DAST can run hours).
 	eventCh, streamErr := app.Tools.Stream(ctx, toolName, args)
+	// nucleiRan records whether nuclei was actually DISPATCHED. A dispatch
+	// failure means the binary is absent: the task observed nothing and must not
+	// clear a previous run's staging (F3 did-not-run — staging.go).
+	nucleiRan := streamErr == nil
 	if streamErr != nil {
 		if app.Log != nil {
 			app.Log.Debug("vulns.nuclei_dast: stream error (best_effort)", "err", streamErr)
@@ -185,7 +205,7 @@ func (t *NucleiDASTTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 	}
 
 	// Step 6: Parse staging file → VulnFindingRecord slice.
-	data, readErr := os.ReadFile(stagingFile) //nolint:gosec // path within WorkDir
+	data, readErr := os.ReadFile(rawOutFile) //nolint:gosec // path within WorkDir
 	if readErr != nil && !os.IsNotExist(readErr) {
 		if app.Log != nil {
 			app.Log.Debug("vulns.nuclei_dast: read staging file error", "err", readErr)
@@ -194,23 +214,13 @@ func (t *NucleiDASTTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 	findings := parseNucleiDAST(data)
 
 	// Step 7: Write inputs/findings.nuclei_dast.jsonl (staging contract — doc.go).
-	if len(findings) > 0 {
-		var lines [][]byte
-		for _, rec := range findings {
-			b, mErr := json.Marshal(rec)
-			if mErr != nil {
-				continue
-			}
-			lines = append(lines, b)
-		}
-		if len(lines) > 0 {
-			stagingPath := filepath.Join(inputsDir, "findings.nuclei_dast.jsonl")
-			if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-				app.Log.Debug("vulns.nuclei_dast: staging write failed",
-					"path", stagingPath, "err", wErr)
-			}
-		}
-	}
+	//
+	// F3 (phase 15): staged through stageVulnFindings so a clean DAST run REMOVES
+	// the previous run's staging instead of republishing findings that have since
+	// been remediated. The staging NAME is unchanged — it is the file the
+	// inputs/findings.*.jsonl merge glob reaches.
+	stagingPath := filepath.Join(inputsDir, "findings.nuclei_dast.jsonl")
+	stageVulnFindings(app, "vulns.nuclei_dast", stagingPath, nucleiRan, findings)
 
 	// XCUT-07: log only template-id + severity + count, never raw matched-at / extracted-results.
 	if app.Log != nil {

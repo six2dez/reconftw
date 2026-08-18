@@ -208,8 +208,14 @@ func (t *IPInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	}
 	client := &http.Client{Timeout: 2 * time.Second}
 	base := ipInfoBaseURL()
+	// cancelled records an interrupted loop: a run that only probed part of the
+	// IP list did not observe the corpus and must not clear a previous run's
+	// staging (F3 did-not-run — see writeOSINTStaging). ipinfo.io is an HTTP API
+	// rather than a local binary, so there is no "tool absent" case here.
+	cancelled := false
 	for _, ip := range ips {
 		if ctx.Err() != nil {
+			cancelled = true
 			break
 		}
 		body, geoStr := lookupIPInfoGeo(ctx, client, base, pdcpKey, ip, app)
@@ -232,7 +238,13 @@ func (t *IPInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	}
 
 	// Step 5: write staging JSONL (multi-writer contract).
-	writeOSINTStaging(app, inputsDir, "findings.ip_info.jsonl", records)
+	// F3: a completed run that geolocated nothing REMOVES the staging file
+	// rather than republishing the previous run's geo records.
+	if !cancelled {
+		writeOSINTStaging(app, inputsDir, "findings.ip_info.jsonl", records)
+	} else if app.Log != nil {
+		app.Log.Debug("osint.ip_info: cancelled before probing every IP — staging preserved (F3 did-not-run)")
+	}
 
 	if app.Log != nil {
 		app.Log.Info("osint.ip_info: completed", "findings", len(records), "ips", len(ips))

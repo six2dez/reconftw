@@ -62,7 +62,6 @@ import (
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
 	"github.com/six2dez/reconftw/internal/core/log"
-	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -234,7 +233,9 @@ func (t *SprayTask) runBrutespray(
 
 	findings := sprayResolveScopeHosts(app, parseBrutesprayHits(stdout))
 
-	sprayWriteFindings(app, findings)
+	// brutespray RAN: an absent or failing binary returned StatusSkipped above,
+	// so reaching here means zero findings is a real observation (F3).
+	sprayWriteFindings(app, true, findings)
 
 	if app.Log != nil {
 		// XCUT-07: log only the count, never the discovered credential.
@@ -287,6 +288,11 @@ func (t *SprayTask) runBrutus(
 	}
 
 	err := brutusRunner(ctx, serviceFP, args)
+	// brutusRan is false only when the binary is absent: brutus never observed
+	// the service list, so it must not clear a previous run's staging (F3
+	// did-not-run — staging.go). Any OTHER error still means brutus ran and may
+	// have produced partial output, which is parsed below.
+	brutusRan := !errors.Is(err, errBrutusNotInstalled)
 	if err != nil {
 		// best_effort (D-V7): missing/failing brutus never aborts vulns.
 		if errors.Is(err, errBrutusNotInstalled) {
@@ -308,7 +314,7 @@ func (t *SprayTask) runBrutus(
 
 	// Parse brutus JSONL output; XCUT-07: only host/service/port recorded, creds redacted.
 	findings := sprayResolveScopeHosts(app, parseBrutusHits(outPath))
-	sprayWriteFindings(app, findings)
+	sprayWriteFindings(app, brutusRan, findings)
 
 	if app.Log != nil {
 		// XCUT-07: log only the count, never the discovered credential.
@@ -358,34 +364,26 @@ func (t *SprayTask) resolveServiceFingerprintInput(ctx context.Context, app *app
 }
 
 // sprayWriteFindings writes redacted credential findings to the vulns staging
-// file inputs/findings.spray.jsonl (consumed by MergeAllVulnsArtefacts). No-op
-// when there are no findings.
-func sprayWriteFindings(app *appctx.AppContext, findings []VulnFindingRecord) {
-	if len(findings) == 0 {
-		return
-	}
+// file inputs/findings.spray.jsonl (consumed by MergeAllVulnsArtefacts).
+//
+// F3 (phase 15): the write is UNCONDITIONAL. `ran` says whether the spray engine
+// was actually dispatched; when it was and no credential was accepted, the
+// staging file is REMOVED, so a password that has since been rotated stops being
+// reported as still weak by every later run. XCUT-07 is unaffected: the records
+// handed here already carry "***" in PayloadRedacted/PoCRedacted and no
+// credential value ever reaches this function.
+func sprayWriteFindings(app *appctx.AppContext, ran bool, findings []VulnFindingRecord) {
 	inputsDir := filepath.Join(app.Target.WorkDir, "inputs")
-	if err := os.MkdirAll(inputsDir, 0o755); err != nil {
-		if app.Log != nil {
-			app.Log.Debug("vulns.spray: mkdir inputs/ failed (best_effort)", "error", err.Error())
+	if len(findings) > 0 {
+		if err := os.MkdirAll(inputsDir, 0o755); err != nil {
+			if app.Log != nil {
+				app.Log.Debug("vulns.spray: mkdir inputs/ failed (best_effort)", "error", err.Error())
+			}
+			return
 		}
-		return
-	}
-	var lines [][]byte
-	for _, rec := range findings {
-		b, mErr := json.Marshal(rec)
-		if mErr != nil {
-			continue
-		}
-		lines = append(lines, b)
-	}
-	if len(lines) == 0 {
-		return
 	}
 	stagingPath := filepath.Join(inputsDir, "findings.spray.jsonl")
-	if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-		app.Log.Debug("vulns.spray: staging write failed", "path", stagingPath, "err", wErr)
-	}
+	stageVulnFindings(app, "vulns.spray", stagingPath, ran, findings)
 }
 
 // sprayHardenFile restricts a spray tool's raw hit file (which can contain live

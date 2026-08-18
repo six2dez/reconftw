@@ -55,7 +55,6 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -162,23 +161,17 @@ func (t *SSTITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	}
 
 	// Step 6: Write inputs/findings.ssti.jsonl.
-	if len(findings) > 0 {
-		var lines [][]byte
-		for _, rec := range findings {
-			b, mErr := json.Marshal(rec)
-			if mErr != nil {
-				continue
-			}
-			lines = append(lines, b)
-		}
-		if len(lines) > 0 {
-			stagingPath := filepath.Join(inputsDir, "findings.ssti.jsonl")
-			if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-				app.Log.Debug("vulns.ssti: staging write failed",
-					"path", stagingPath, "err", wErr)
-			}
-		}
-	}
+	//
+	// F3 (phase 15): staged through stageVulnFindings so a run in which the
+	// engine confirmed no template injection REMOVES the previous run's staging
+	// instead of republishing an SSTI that has since been fixed.
+	//
+	// scanErr != nil covers BOTH "the engine binary is absent" and "the engine
+	// failed", and in neither case did this task observe the corpus — so it does
+	// not clear. NOTE inputs/tmp_ssti.txt is SSTImap's --load-urls TOOL-INPUT
+	// file, not staging.
+	stagingPath := filepath.Join(inputsDir, "findings.ssti.jsonl")
+	stageVulnFindings(app, "vulns.ssti", stagingPath, scanErr == nil, findings)
 
 	// XCUT-07 (T-06-04-02): log only count; NEVER log template evaluation results
 	// (e.g., "49" from {{7*7}}).

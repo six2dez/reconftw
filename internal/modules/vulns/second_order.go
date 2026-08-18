@@ -50,7 +50,6 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -151,6 +150,12 @@ func (t *SecondOrderTask) Run(ctx context.Context, app *appctx.AppContext) (task
 
 	var allFindings []VulnFindingRecord
 	var processedTargets int
+	// toolRan records whether AT LEAST ONE second-order invocation succeeded, and
+	// cancelled records that the loop was interrupted. Neither an uninstalled
+	// second-order nor a cancelled run observed the corpus, so neither may clear
+	// a previous run's staging (F3 did-not-run — staging.go).
+	toolRan := false
+	cancelled := false
 
 	// Step 3: For each base host URL, run second-order.
 	// v1 mirrors: while IFS= read -r target; do second-order -target "$target" ...
@@ -161,6 +166,7 @@ func (t *SecondOrderTask) Run(ctx context.Context, app *appctx.AppContext) (task
 			if app.Log != nil {
 				app.Log.Debug("vulns.second_order: context cancelled", "processed", processedTargets)
 			}
+			cancelled = true
 			goto writefindings
 		default:
 		}
@@ -209,6 +215,7 @@ func (t *SecondOrderTask) Run(ctx context.Context, app *appctx.AppContext) (task
 			processedTargets++
 			continue
 		}
+		toolRan = true
 
 		// Parse second-order JSON output: non-200-url-attributes.json.
 		// v1 (web.sh:2890-2893):
@@ -226,23 +233,14 @@ func (t *SecondOrderTask) Run(ctx context.Context, app *appctx.AppContext) (task
 
 writefindings:
 	// Step 5: Write inputs/findings.second_order.jsonl.
-	if len(allFindings) > 0 {
-		var lines [][]byte
-		for _, rec := range allFindings {
-			b, mErr := json.Marshal(rec)
-			if mErr != nil {
-				continue
-			}
-			lines = append(lines, b)
-		}
-		if len(lines) > 0 {
-			stagingPath := filepath.Join(inputsDir, "findings.second_order.jsonl")
-			if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-				app.Log.Debug("vulns.second_order: staging write failed",
-					"path", stagingPath, "err", wErr)
-			}
-		}
-	}
+	//
+	// F3 (phase 15): staged through stageVulnFindings so a run that found no
+	// dangling links REMOVES the previous run's staging instead of republishing
+	// links that have since been fixed. The `goto writefindings` cancellation
+	// path lands here too, which is exactly why `cancelled` is part of the
+	// did-not-run test: an interrupted scan must not delete findings.
+	stagingPath := filepath.Join(inputsDir, "findings.second_order.jsonl")
+	stageVulnFindings(app, "vulns.second_order", stagingPath, toolRan && !cancelled, allFindings)
 
 	// XCUT-07: log only count, never raw dangling link URLs.
 	if app.Log != nil {

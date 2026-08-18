@@ -50,7 +50,6 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -162,6 +161,11 @@ func (t *FrayTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 
 	var allFindings []VulnFindingRecord
 	totalBypassed := 0
+	// frayRan records whether AT LEAST ONE category invocation was dispatched.
+	// If fray is not installed every category fails, the task observed nothing,
+	// and it must not clear a previous run's staging (F3 did-not-run —
+	// staging.go).
+	frayRan := false
 
 	// Step 4: Per-category fray invocation.
 	for _, cat := range catList {
@@ -205,6 +209,7 @@ func (t *FrayTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 		if res == nil {
 			continue
 		}
+		frayRan = true
 
 		// Parse JSONL output — filter bypassed > 0.
 		// XCUT-07 (T-06-08-02): bypass payload strings NEVER logged.
@@ -221,23 +226,15 @@ func (t *FrayTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 
 	// Step 5: Write inputs/findings.fray.jsonl (multi-writer staging contract — doc.go).
 	// MergeVulnsFindings will merge into artefacts/findings.jsonl.
-	if len(allFindings) > 0 {
-		var lines [][]byte
-		for _, rec := range allFindings {
-			b, mErr := json.Marshal(rec)
-			if mErr != nil {
-				continue
-			}
-			lines = append(lines, b)
-		}
-		if len(lines) > 0 {
-			stagingPath := filepath.Join(inputsDir, "findings.fray.jsonl")
-			if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-				app.Log.Debug("vulns.fray: staging write failed",
-					"path", stagingPath, "err", wErr)
-			}
-		}
-	}
+	//
+	// F3 (phase 15): staged through stageVulnFindings so a run in which fray
+	// bypassed nothing REMOVES the previous run's staging instead of leaving a
+	// fixed WAF bypass to be republished. The cancellation path above returns
+	// StatusCancelled BEFORE reaching here, so a cancelled run never clears.
+	//
+	// NOTE inputs/fray_targets.txt above is the -l TOOL-INPUT list, not staging.
+	stagingPath := filepath.Join(inputsDir, "findings.fray.jsonl")
+	stageVulnFindings(app, "vulns.fray", stagingPath, frayRan, allFindings)
 
 	if app.Log != nil {
 		app.Log.Info("vulns.fray: completed", "total_bypassed", totalBypassed)

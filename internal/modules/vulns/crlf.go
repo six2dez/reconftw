@@ -32,7 +32,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -41,7 +40,6 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -112,6 +110,10 @@ func (t *CRLFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	args := []string{"-l", hostsFile, "-o", stagingTxt}
 
 	eventCh, streamErr := app.Tools.Stream(ctx, toolName, args)
+	// crlfuzzRan records whether crlfuzz was actually DISPATCHED. A dispatch
+	// failure means the binary is absent: the task observed nothing and must not
+	// clear a previous run's staging (F3 did-not-run — staging.go).
+	crlfuzzRan := streamErr == nil
 	if streamErr != nil {
 		if app.Log != nil {
 			app.Log.Debug("vulns.crlf: crlfuzz stream error (best_effort)", "err", streamErr)
@@ -126,47 +128,34 @@ func (t *CRLFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	}
 
 	// Step 4: Read and parse crlfuzz staging output.
+	//
+	// F3 (phase 15): both read-failure paths used to `return StatusDone` HERE,
+	// one statement before the staging write. That is the same run-isolation bug
+	// as an unconditional write, and no AST guard can see it — the detector
+	// reports raw WRITES, not a return placed in front of a correct one. A clean
+	// target (no output file at all) therefore republished the previous run's
+	// CRLF injections forever. Both paths now fall through to the staging call
+	// with zero records, which CLEARS the file.
 	stagingData, readErr := os.ReadFile(stagingTxt) //nolint:gosec // path within WorkDir
-	if readErr != nil {
+	if readErr != nil && app.Log != nil {
 		if os.IsNotExist(readErr) {
-			// No findings — normal for a clean target.
-			if app.Log != nil {
-				app.Log.Info("vulns.crlf: completed", "findings", 0)
-			}
-			return task.Result{
-				Status: task.StatusDone,
-				Stats:  map[string]int{"findings": 0},
-			}, nil
-		}
-		if app.Log != nil {
+			// No output file — normal for a clean target.
+			app.Log.Debug("vulns.crlf: no crlfuzz output file — zero findings this run")
+		} else {
 			app.Log.Debug("vulns.crlf: read staging file error (best_effort)", "err", readErr)
 		}
-		return task.Result{
-			Status: task.StatusDone,
-			Stats:  map[string]int{"findings": 0},
-		}, nil
 	}
 
 	records := parseCRLFuzzOutput(stagingData)
 
 	// Step 5: Write inputs/findings.crlf.jsonl.
-	if len(records) > 0 {
-		var lines [][]byte
-		for _, rec := range records {
-			b, mErr := json.Marshal(rec)
-			if mErr != nil {
-				continue
-			}
-			lines = append(lines, b)
-		}
-		if len(lines) > 0 {
-			stagingPath := filepath.Join(inputsDir, "findings.crlf.jsonl")
-			if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-				app.Log.Debug("vulns.crlf: staging write failed",
-					"path", stagingPath, "err", wErr)
-			}
-		}
-	}
+	//
+	// NOTE the OTHER inputs/ writes in this function — inputs/crlfuzz_hosts.txt
+	// (the -l TOOL-INPUT list) and inputs/findings.crlfuzz.txt (crlfuzz's own -o
+	// plain-text output, which the subdomains .txt merger globs do not cover) —
+	// are not staging and keep their existing handling.
+	stagingPath := filepath.Join(inputsDir, "findings.crlf.jsonl")
+	stageVulnFindings(app, "vulns.crlf", stagingPath, crlfuzzRan, records)
 
 	// XCUT-07: log only the count, never the raw CRLF payload lines.
 	if app.Log != nil {

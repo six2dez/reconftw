@@ -91,11 +91,16 @@ func (t *MisconfigTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 		"-verbose", "0",
 	}
 	var outLines []string
+	// toolRan records whether misconfig-mapper was actually dispatched. An
+	// absent binary means this task observed nothing, so it must not clear a
+	// previous run's staging (F3 did-not-run — see writeOSINTStaging).
+	toolRan := false
 	if res, err := app.Tools.Run(ctx, "misconfig-mapper", args); err != nil {
 		if app.Log != nil {
 			app.Log.Debug("osint.misconfig: misconfig-mapper run failed (best_effort)", "err", err)
 		}
 	} else {
+		toolRan = true
 		outLines = splitNonEmptyLines(res.Stdout)
 	}
 
@@ -112,7 +117,14 @@ func (t *MisconfigTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	records := parseMisconfigLines(outLines)
 
 	// Step 5: write staging JSONL (multi-writer contract).
-	writeOSINTStaging(app, inputsDir, "findings.misconfig.jsonl", records)
+	// F3: writeOSINTStaging REMOVES the file when misconfig-mapper ran and found
+	// nothing, so a third-party misconfiguration that has since been fixed stops
+	// being republished.
+	if toolRan {
+		writeOSINTStaging(app, inputsDir, "findings.misconfig.jsonl", records)
+	} else if app.Log != nil {
+		app.Log.Debug("osint.misconfig: misconfig-mapper did not run — staging preserved (F3 did-not-run)")
+	}
 
 	if app.Log != nil {
 		app.Log.Info("osint.misconfig: completed", "misconfigs", len(records))

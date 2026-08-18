@@ -104,6 +104,12 @@ func (t *GitHubLeaksTask) Run(ctx context.Context, app *appctx.AppContext) (task
 	_ = os.MkdirAll(osintDir, 0o755) //nolint:errcheck // best_effort
 
 	var records []OSINTFindingRecord
+	// engineRan records whether AT LEAST ONE engine invocation was dispatched.
+	// If neither ghleaks nor trufflehog is installed the task observed nothing
+	// and must not clear a previous run's staging (F3 did-not-run — see
+	// writeOSINTStaging). Deleting a previous run's leak findings because the
+	// scanner is missing would silently retract a reported secret exposure.
+	engineRan := false
 
 	// --- Engine 1: ghleaks (GitHub-wide secret search by query) ---------------
 	// v1 arg vector (osint.sh:272): -q <domain> --token <tok> --report <json>
@@ -122,6 +128,7 @@ func (t *GitHubLeaksTask) Run(ctx context.Context, app *appctx.AppContext) (task
 			app.Log.Debug("osint.github_leaks: ghleaks stream error (best_effort)", "err", sErr)
 		}
 	} else {
+		engineRan = true
 		for range ev { //nolint:revive // intentional drain — raw secret lines NOT logged
 		}
 	}
@@ -140,11 +147,19 @@ func (t *GitHubLeaksTask) Run(ctx context.Context, app *appctx.AppContext) (task
 			}
 			continue
 		}
+		engineRan = true
 		records = append(records, parseTrufflehogOutput(res.Stdout, app.Log)...)
 	}
 
 	// Write staging JSONL — every record is already REDACTED (ValueRedacted="***").
-	writeOSINTStaging(app, inputsDir, "findings.github_leaks.jsonl", records)
+	// F3: a run that found no leaked secret REMOVES the staging file, so a
+	// credential that has since been rotated and purged stops being reported as
+	// still exposed by every later run.
+	if engineRan {
+		writeOSINTStaging(app, inputsDir, "findings.github_leaks.jsonl", records)
+	} else if app.Log != nil {
+		app.Log.Debug("osint.github_leaks: no engine ran — staging preserved (F3 did-not-run)")
+	}
 
 	// XCUT-07: log ONLY the count, never the raw matches.
 	if app.Log != nil {

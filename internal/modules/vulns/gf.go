@@ -248,11 +248,22 @@ func (t *GFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, 
 		}
 
 		// Write matched URLs to the bucket file.
+		//
+		// F3 (phase 15, hand-verified — inputs/gf/<class>.txt is a SUBDIRECTORY
+		// path no merger glob can reach, so the staging-contract detector is
+		// structurally blind to it): every class must be rewritten on every run,
+		// or a stale bucket silently redirects sqli, xss, lfi and ssrf at last
+		// run's targets. The tool-failure and zero-match paths above both write
+		// an EMPTY bucket; this was the ONE path that left the previous run's
+		// bucket in place — writeURLList opens with O_TRUNC, so a failure here
+		// leaves either a stale file (open failed) or a half-written one (write
+		// failed), and both are worse than an empty bucket. Truncate it.
 		if writeErr := writeURLList(bucketFile, matched); writeErr != nil {
 			if app.Log != nil {
 				app.Log.Debug("vulns.gf: failed to write bucket file (best_effort)",
 					"class", class, "bucket", bucketFile, "err", writeErr)
 			}
+			_ = os.WriteFile(bucketFile, nil, 0o644) //nolint:gosec
 			continue
 		}
 

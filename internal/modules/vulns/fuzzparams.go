@@ -47,7 +47,6 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -149,6 +148,10 @@ func (t *FuzzparamsTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 
 	// Backend.Stream for XCUT-09 heartbeat.
 	eventCh, streamErr := app.Tools.Stream(ctx, toolName, args)
+	// nucleiRan records whether nuclei was actually DISPATCHED. A dispatch
+	// failure means the binary is absent: the task observed nothing and must not
+	// clear a previous run's staging (F3 did-not-run — staging.go).
+	nucleiRan := streamErr == nil
 	if streamErr != nil {
 		if app.Log != nil {
 			app.Log.Debug("vulns.fuzzparams: stream error (best_effort)", "err", streamErr)
@@ -171,23 +174,16 @@ func (t *FuzzparamsTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 	findings := parseFuzzparamsOutput(data)
 
 	// Step 6: Write inputs/findings.fuzzparams.jsonl (staging contract — doc.go).
-	if len(findings) > 0 {
-		var lines [][]byte
-		for _, rec := range findings {
-			b, mErr := json.Marshal(rec)
-			if mErr != nil {
-				continue
-			}
-			lines = append(lines, b)
-		}
-		if len(lines) > 0 {
-			stagingPath := filepath.Join(inputsDir, "findings.fuzzparams.jsonl")
-			if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-				app.Log.Debug("vulns.fuzzparams: staging write failed",
-					"path", stagingPath, "err", wErr)
-			}
-		}
-	}
+	//
+	// F3 (phase 15): staged through stageVulnFindings so a clean run REMOVES the
+	// previous run's staging rather than republishing DAST findings that have
+	// since been fixed.
+	//
+	// NOTE inputs/fuzzparams_raw.jsonl is nuclei's own -o output in nuclei's
+	// native schema — raw tool output this task parses, not staging. It is
+	// deliberately named OUTSIDE the inputs/findings.*.jsonl merge glob.
+	stagingPath := filepath.Join(inputsDir, "findings.fuzzparams.jsonl")
+	stageVulnFindings(app, "vulns.fuzzparams", stagingPath, nucleiRan, findings)
 
 	// XCUT-07: log only template-id + severity + count, never raw matched-at / extracted-results.
 	if app.Log != nil {

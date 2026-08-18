@@ -107,8 +107,15 @@ func (t *MetadataTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	}
 
 	var records []OSINTFindingRecord
+	// exiftoolRan records whether AT LEAST ONE document was actually processed,
+	// and cancelled records an interrupted loop. Neither an absent exiftool nor a
+	// cancelled run observed the corpus, so neither may clear a previous run's
+	// staging (F3 did-not-run — see writeOSINTStaging).
+	exiftoolRan := false
+	cancelled := false
 	for _, doc := range docs {
 		if ctx.Err() != nil {
+			cancelled = true
 			break
 		}
 		// v1 metadata extraction (osint.sh:368): exiftool over each doc. Use -S
@@ -122,11 +129,18 @@ func (t *MetadataTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 			}
 			continue
 		}
+		exiftoolRan = true
 		records = append(records, parseMetadataOutput(res.Stdout, doc)...)
 	}
 
 	// Step 4: write staging JSONL (multi-writer contract).
-	writeOSINTStaging(app, inputsDir, "findings.metadata.jsonl", records)
+	// F3: a run in which exiftool extracted no author/software metadata REMOVES
+	// the staging file rather than republishing the previous run's metadata.
+	if exiftoolRan && !cancelled {
+		writeOSINTStaging(app, inputsDir, "findings.metadata.jsonl", records)
+	} else if app.Log != nil {
+		app.Log.Debug("osint.metadata: exiftool did not process the corpus — staging preserved (F3 did-not-run)")
+	}
 
 	if app.Log != nil {
 		app.Log.Info("osint.metadata: completed", "findings", len(records), "docs_scanned", len(docs))

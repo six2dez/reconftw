@@ -66,6 +66,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
@@ -190,7 +191,12 @@ func (t *GitHubReposTask) Run(ctx context.Context, app *appctx.AppContext) (task
 
 	// v1 arg vector (osint.sh:83): -token-file <f> -usernames <file> -o <out>.
 	args := []string{"-token-file", tokenFile, "-usernames", usernamesFile, "-o", enumOut}
+	// enumerepoRan records whether enumerepo was actually dispatched. An absent
+	// binary means this task observed nothing and must not clear a previous
+	// run's staging (F3 did-not-run — see writeOSINTStaging).
+	enumerepoRan := true
 	if _, err := app.Tools.Run(ctx, "enumerepo", args); err != nil {
+		enumerepoRan = false
 		if app.Log != nil {
 			app.Log.Debug("osint.github_repos: enumerepo run failed (best_effort)", "err", err)
 		}
@@ -221,7 +227,13 @@ func (t *GitHubReposTask) Run(ctx context.Context, app *appctx.AppContext) (task
 			PoCRedacted: r,
 		})
 	}
-	writeOSINTStaging(app, inputsDir, "findings.github_repos.jsonl", records)
+	// F3: a run that enumerated no repo REMOVES the staging file rather than
+	// republishing repos the org has since deleted or made private.
+	if enumerepoRan {
+		writeOSINTStaging(app, inputsDir, "findings.github_repos.jsonl", records)
+	} else if app.Log != nil {
+		app.Log.Debug("osint.github_repos: enumerepo did not run — staging preserved (F3 did-not-run)")
+	}
 
 	// Step 7: full company-repo secret scan (PAR-03 / 13-06). Best-effort — a
 	// missing tool / clone failure never breaks the osint pipeline.
@@ -301,25 +313,28 @@ func (t *GitHubReposTask) scanCompanyRepos(ctx context.Context, app *appctx.AppC
 	}
 
 	// Step C: titus scan over each cloned repo dir (best-effort).
-	t.runTitusScan(ctx, app, urls, cloned, githubDir)
+	titusRan := t.runTitusScan(ctx, app, urls, cloned, githubDir)
 
 	// Step D: trufflehog enrichment over each repo URL (all engines, best-effort).
-	t.runTrufflehogScan(ctx, app, urls, githubDir)
+	trufflehogRan := t.runTrufflehogScan(ctx, app, urls, githubDir)
 
 	// Step E: merge per-repo scan outputs → github_company_secrets.json + findings.
-	return t.mergeSecretOutputs(app, githubDir)
+	// scannerRan carries the F3 did-not-run decision down to the staging write:
+	// when NEITHER engine was dispatched the task observed nothing and must not
+	// delete a previously reported secret exposure (see writeOSINTStaging).
+	return t.mergeSecretOutputs(app, githubDir, titusRan || trufflehogRan)
 }
 
 // runTitusScan runs `titus scan --format json [--git] [--validate] <repoDir>`
 // over each cloned repo (bash osint.sh:190-215). titus stdout (per-repo JSON) is
 // captured and written to githubDir/titus_<h>.json. Best-effort: a missing titus
 // binary logs a single warning; a per-repo error is skipped.
-func (t *GitHubReposTask) runTitusScan(ctx context.Context, app *appctx.AppContext, urls, cloned []string, githubDir string) {
+func (t *GitHubReposTask) runTitusScan(ctx context.Context, app *appctx.AppContext, urls, cloned []string, githubDir string) bool {
 	if !githubReposToolAvailable(app, "titus") {
 		if app.Log != nil {
 			app.Log.Warn("osint.github_repos: titus not found — skipping secret scan (best_effort)")
 		}
-		return
+		return false
 	}
 	base := []string{"scan", "--format", "json"}
 	if app.Cfg != nil && app.Cfg.OSINT.GitHub.ScanGitHistory {
@@ -329,6 +344,9 @@ func (t *GitHubReposTask) runTitusScan(ctx context.Context, app *appctx.AppConte
 		base = append(base, "--validate")
 	}
 	threads := githubReposThreads(app)
+	// dispatched records whether AT LEAST ONE titus scan actually ran. The
+	// goroutines below run concurrently, so it must be atomic.
+	var dispatched atomic.Bool
 	githubReposBounded(threads, len(cloned), func(i int) {
 		dir := cloned[i]
 		if dir == "" {
@@ -342,6 +360,7 @@ func (t *GitHubReposTask) runTitusScan(ctx context.Context, app *appctx.AppConte
 			}
 			return
 		}
+		dispatched.Store(true)
 		if len(bytes.TrimSpace(res.Stdout)) == 0 {
 			return
 		}
@@ -350,16 +369,20 @@ func (t *GitHubReposTask) runTitusScan(ctx context.Context, app *appctx.AppConte
 			app.Log.Debug("osint.github_repos: write titus output failed", "err", wErr)
 		}
 	})
+	return dispatched.Load()
 }
 
 // runTrufflehogScan runs `trufflehog git <url> -j` over each repo URL (bash
 // osint.sh:220-240, kept for all engines). Best-effort — a missing binary /
 // per-repo error is skipped.
-func (t *GitHubReposTask) runTrufflehogScan(ctx context.Context, app *appctx.AppContext, urls []string, githubDir string) {
+func (t *GitHubReposTask) runTrufflehogScan(ctx context.Context, app *appctx.AppContext, urls []string, githubDir string) bool {
 	if !githubReposToolAvailable(app, "trufflehog") {
-		return
+		return false
 	}
 	threads := githubReposThreads(app)
+	// dispatched records whether AT LEAST ONE trufflehog scan actually ran. The
+	// goroutines below run concurrently, so it must be atomic.
+	var dispatched atomic.Bool
 	githubReposBounded(threads, len(urls), func(i int) {
 		res, err := app.Tools.Run(ctx, "trufflehog", []string{"git", urls[i], "-j"})
 		if err != nil || res == nil {
@@ -368,6 +391,7 @@ func (t *GitHubReposTask) runTrufflehogScan(ctx context.Context, app *appctx.App
 			}
 			return
 		}
+		dispatched.Store(true)
 		if len(bytes.TrimSpace(res.Stdout)) == 0 {
 			return
 		}
@@ -376,6 +400,7 @@ func (t *GitHubReposTask) runTrufflehogScan(ctx context.Context, app *appctx.App
 			app.Log.Debug("osint.github_repos: write trufflehog output failed", "err", wErr)
 		}
 	})
+	return dispatched.Load()
 }
 
 // mergeSecretOutputs reads every per-repo scan output in githubDir (bash: cat
@@ -385,10 +410,26 @@ func (t *GitHubReposTask) runTrufflehogScan(ctx context.Context, app *appctx.App
 // REDACTED OSINTFindingRecord per surfaced secret. Every raw secret is registered
 // with the log Redactor BEFORE any log line or file write (XCUT-07 L2). Returns
 // the number of secret findings.
-func (t *GitHubReposTask) mergeSecretOutputs(app *appctx.AppContext, githubDir string) int {
+func (t *GitHubReposTask) mergeSecretOutputs(app *appctx.AppContext, githubDir string, scannerRan bool) int {
+	// F3 (phase 15): each of the three "nothing to merge" paths below used to
+	// `return 0` WITHOUT touching the staging file — the same run-isolation bug
+	// as an unconditional write, and invisible to any AST guard that looks for
+	// raw WRITES. When a scanner RAN and surfaced no secret, that is a real
+	// observation and the staging file must be cleared, or a credential that has
+	// since been rotated keeps being reported as still leaked. When NO scanner
+	// ran, staging is preserved.
+	clearIfRan := func() int {
+		if scannerRan {
+			writeOSINTStaging(app, filepath.Join(app.Target.WorkDir, "inputs"),
+				"findings.github_secrets.jsonl", nil)
+		} else if app.Log != nil {
+			app.Log.Debug("osint.github_repos: no secret scanner ran — staging preserved (F3 did-not-run)")
+		}
+		return 0
+	}
 	entries, err := os.ReadDir(githubDir)
 	if err != nil {
-		return 0
+		return clearIfRan()
 	}
 	names := make([]string, 0, len(entries))
 	for _, e := range entries {
@@ -397,7 +438,7 @@ func (t *GitHubReposTask) mergeSecretOutputs(app *appctx.AppContext, githubDir s
 		}
 	}
 	if len(names) == 0 {
-		return 0
+		return clearIfRan()
 	}
 	sort.Strings(names) // deterministic merge order
 
@@ -432,7 +473,7 @@ func (t *GitHubReposTask) mergeSecretOutputs(app *appctx.AppContext, githubDir s
 		}
 	}
 	if len(merged) == 0 {
-		return 0
+		return clearIfRan()
 	}
 
 	// bash-parity human artefact osint/github_company_secrets.json — the native
