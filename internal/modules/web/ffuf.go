@@ -42,6 +42,7 @@ import (
 	"strings"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
@@ -183,9 +184,18 @@ func (t *FfufTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 		results, err := runFFUFHost(ctx, app, toolName, hostURL, wordlist,
 			threads, rateLimit, maxTime, header, extraArgs,
 			deepMode, recursionDepth, stagingFile)
-		if err != nil && app.Log != nil {
-			app.Log.Debug("web.ffuf: host run error",
-				"host", hostURL, "err", err)
+		if err != nil {
+			// F6: a TERMINAL error means ffuf RAN on this host and ended badly.
+			// Fail the task rather than silently publishing the hosts fuzzed so
+			// far as a complete fuzz of every host.
+			if isTerminalStreamError(err) {
+				os.Remove(stagingFile) //nolint:errcheck // best effort cleanup
+				return task.Result{Status: task.StatusErrored}, err
+			}
+			if app.Log != nil {
+				app.Log.Debug("web.ffuf: host run error",
+					"host", hostURL, "err", err)
+			}
 		}
 		totalResults += len(results)
 
@@ -269,10 +279,16 @@ func runFFUFHost(ctx context.Context, app *appctx.AppContext, toolName, hostURL 
 	// Pitfall 5 mitigation).
 	eventCh, err := app.Tools.Stream(ctx, toolName, args)
 	if err != nil {
+		// DISPATCH failure — ffuf is not on PATH; nothing ran for this host.
 		return nil, fmt.Errorf("ffuf stream for %s: %w", hostURL, err)
 	}
-	// Drain stream (Backend contract: caller MUST drain until closed).
-	for range eventCh { //nolint:revive // intentional drain
+
+	// F6 (phase 15): consume the TERMINAL error before reading stagingFile. A
+	// ffuf that hits -maxtime and is killed, or dies on a malformed wordlist,
+	// leaves a truncated -o JSON document; parsing it would report a partial
+	// fuzz as this host's complete result set.
+	if drainErr := backend.Drain(eventCh); drainErr != nil {
+		return nil, terminalStreamError(toolName, drainErr)
 	}
 
 	// Parse staging JSON file.

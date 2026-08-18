@@ -114,8 +114,20 @@ func (t *KatanaTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	}
 
 	// Collect URL lines from streamed output.
+	//
+	// F6 (phase 15): ACCUMULATOR shape — latch the terminal Event.Err inside the
+	// loop and check it after. A katana that crawls for three hours and then
+	// exits non-zero has produced a PARTIAL corpus; publishing it as a complete
+	// crawl is the failure this closes.
 	var urlLines []string
+	var streamErr error
 	for ev := range eventCh {
+		if ev.Err != nil {
+			if streamErr == nil {
+				streamErr = ev.Err
+			}
+			continue
+		}
 		if ev.IsErr {
 			continue
 		}
@@ -123,6 +135,12 @@ func (t *KatanaTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 		if line != "" {
 			urlLines = append(urlLines, line)
 		}
+	}
+	if streamErr != nil {
+		// Discard the partial in-memory corpus and stage nothing: a half crawl
+		// must not be presented as this run's URL set.
+		return task.Result{Status: task.StatusErrored},
+			terminalStreamError(toolName, streamErr)
 	}
 
 	// Extract and scope-filter URLs via extract/urls.

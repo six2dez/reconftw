@@ -84,19 +84,8 @@ import (
 //
 // DELETE entries as you migrate. NEVER add one.
 var streamContractAllowlist = map[string][]string{
-	// internal/modules/web — 6 sites
-	"internal/modules/web/ffuf.go":       {"runFFUFHost"},
-	"internal/modules/web/waymore.go":    {"WaymoreTask.Run"},
-	"internal/modules/web/nuclei.go":     {"runNucleiGroup"},
-	"internal/modules/web/arjun.go":      {"ArjunTask.Run"},
-	"internal/modules/web/katana.go":     {"KatanaTask.Run"},
-	"internal/modules/web/screenshot.go": {"ScreenshotTask.Run"},
-
-	// internal/modules/subdomains — 4 sites
-	"internal/modules/subdomains/resolve.go":   {"runStreamTask"},
-	"internal/modules/subdomains/brute.go":     {"SubBruteTask.Run"},
-	"internal/modules/subdomains/permut.go":    {"SubPermutTask.Run"},
-	"internal/modules/subdomains/recursive.go": {"SubRecursiveBruteTask.Run"},
+	// internal/modules/web — 0 sites (all 6 migrated by plan 15-13 Task 2)
+	// internal/modules/subdomains — 0 sites (all 4 migrated by plan 15-13 Task 2)
 
 	// internal/modules/vulns — 11 sites (sqli.go and ssti.go have two each)
 	"internal/modules/vulns/cmdi.go":        {"CMDITask.Run"},
@@ -118,7 +107,12 @@ var streamContractAllowlist = map[string][]string{
 // TestStreamContractAllowlistShrinks pins it so the list cannot grow by
 // accident. Lower it as plans 15-13 and 15-14 migrate sites; plan 15-17 asserts
 // it is 0.
-const streamContractAllowlistSize = 23
+//
+// 15-02 seed: 23 (web 6, subdomains 4, vulns 11, osint 2).
+// 15-13 lowered it to 13 by migrating all 10 web + subdomains sites.
+// 15-14 drives it to 0 (vulns 11 + osint 2).
+// 15-17 asserts 0.
+const streamContractAllowlistSize = 13
 
 // TestStreamContract is the ratchet itself.
 func TestStreamContract(t *testing.T) {

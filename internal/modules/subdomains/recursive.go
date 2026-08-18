@@ -334,7 +334,20 @@ func (SubRecursiveBruteTask) Run(ctx context.Context, app *appctx.AppContext) (t
 			continue
 		}
 
+		// F6 (phase 15): ACCUMULATOR shape — latch the terminal Event.Err inside
+		// the loop and check it immediately after. Note the variable above,
+		// streamErr, is the DISPATCH error ("puredns is not on PATH") and keeps
+		// its non-fatal log-and-continue handling verbatim; termErr is the
+		// different thing — puredns RAN on this subdomain and ended badly, so
+		// what it emitted is a partial bruteforce.
+		var termErr error
 		for ev := range ch {
+			if ev.Err != nil {
+				if termErr == nil {
+					termErr = ev.Err
+				}
+				continue
+			}
 			if ev.IsErr {
 				continue
 			}
@@ -346,6 +359,14 @@ func (SubRecursiveBruteTask) Run(ctx context.Context, app *appctx.AppContext) (t
 				seen[line] = struct{}{}
 				allFound = append(allFound, line)
 			}
+		}
+		if termErr != nil {
+			// Discard everything accumulated across ALL subdomains and stage
+			// nothing: a recursive brute that failed on one branch has not
+			// enumerated the tree, and publishing the branches that did finish
+			// would understate the remaining surface.
+			return task.Result{Status: task.StatusErrored},
+				fmt.Errorf("puredns: tool stream ended badly for %s: %w", sub, termErr)
 		}
 	}
 

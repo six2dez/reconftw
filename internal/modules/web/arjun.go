@@ -37,6 +37,7 @@ import (
 	"strings"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
 	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
@@ -136,8 +137,16 @@ func (t *ArjunTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 		}
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
-	// Drain stream (Backend contract: caller MUST drain until closed).
-	for range eventCh { //nolint:revive // intentional drain
+	// F6 (phase 15): consume the TERMINAL error before touching stagingFile.
+	// An arjun killed mid-run leaves a partial -oT file, or none at all while a
+	// PREVIOUS run's file sits at the same path — either way its contents are
+	// not this run's result. Return StatusErrored and parse nothing.
+	//
+	// This is NOT the same as the Stream() error above: that one means arjun is
+	// not on PATH and keeps its StatusSkipped handling (D-W12 best-effort).
+	if drainErr := backend.Drain(eventCh); drainErr != nil {
+		return task.Result{Status: task.StatusErrored},
+			terminalStreamError(toolName, drainErr)
 	}
 
 	// Parse staging file (plain text, one endpoint per line).

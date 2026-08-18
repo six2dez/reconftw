@@ -35,6 +35,7 @@ import (
 	"strings"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
 	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
@@ -180,8 +181,17 @@ func (t *NucleiTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	if len(normalHosts) > 0 {
 		findings, err := runNucleiGroup(ctx, app, toolName, normalHosts,
 			severity, rl, templatesPath, extraArgs, "normal", inputsDir, artefactsDir)
-		if err != nil && app.Log != nil {
-			app.Log.Debug("web.nuclei: normal group error", "err", err)
+		if err != nil {
+			// F6: a TERMINAL error means nuclei ran and ended badly, so its
+			// output is partial. Discard everything accumulated so far —
+			// publishing half a scan as a complete result is precisely the
+			// failure this closes — and fail the task.
+			if isTerminalStreamError(err) {
+				return task.Result{Status: task.StatusErrored}, err
+			}
+			if app.Log != nil {
+				app.Log.Debug("web.nuclei: normal group error", "err", err)
+			}
 		}
 		allFindings = append(allFindings, findings...)
 	}
@@ -190,8 +200,13 @@ func (t *NucleiTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	if len(wafHostList) > 0 {
 		findings, err := runNucleiGroup(ctx, app, toolName, wafHostList,
 			severity, wafRL, templatesPath, extraArgs, "waf", inputsDir, artefactsDir)
-		if err != nil && app.Log != nil {
-			app.Log.Debug("web.nuclei: waf group error", "err", err)
+		if err != nil {
+			if isTerminalStreamError(err) {
+				return task.Result{Status: task.StatusErrored}, err
+			}
+			if app.Log != nil {
+				app.Log.Debug("web.nuclei: waf group error", "err", err)
+			}
 		}
 		allFindings = append(allFindings, findings...)
 	}
@@ -263,10 +278,19 @@ func runNucleiGroup(ctx context.Context, app *appctx.AppContext, toolName string
 	// nuclei output routed to run.log via stream drain, never to terminal).
 	eventCh, err := app.Tools.Stream(ctx, toolName, args)
 	if err != nil {
+		// DISPATCH failure — nuclei is not on PATH; the scan never ran.
 		return nil, fmt.Errorf("nuclei stream %s: %w", groupLabel, err)
 	}
-	// Drain stream (Backend contract: caller MUST drain until closed).
-	for range eventCh { //nolint:revive // intentional drain
+
+	// F6 (phase 15): consume the TERMINAL error. This is the highest-value site
+	// in the sweep — the very next statement reads stagingFile, so a nuclei
+	// killed by OOM or a template panic used to lead straight to parsing a
+	// TRUNCATED file, or (when it died before writing anything) the file a
+	// PREVIOUS run left at the same path. A security scanner reporting stale
+	// "clean" results is the worst failure mode available to us. Return before
+	// the read: partial output is not a result.
+	if drainErr := backend.Drain(eventCh); drainErr != nil {
+		return nil, terminalStreamError(toolName, drainErr)
 	}
 
 	// Parse staging file.

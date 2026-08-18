@@ -78,8 +78,21 @@ func (t *WaymoreTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 	}
 
 	// Drain stream (collect any stdout lines as fallback in case -oU not honored).
+	//
+	// F6 (phase 15): ACCUMULATOR shape — latch the terminal Event.Err inside the
+	// loop and check it after. Without this, a waymore that exits non-zero part
+	// way through the archive fetch was treated as a complete pass, and the
+	// -oU staging file read below could be truncated or left over from an
+	// earlier run.
 	var stdoutLines []string
+	var streamErr error
 	for ev := range eventCh {
+		if ev.Err != nil {
+			if streamErr == nil {
+				streamErr = ev.Err
+			}
+			continue
+		}
 		if ev.IsErr {
 			continue
 		}
@@ -87,6 +100,11 @@ func (t *WaymoreTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 		if line != "" {
 			stdoutLines = append(stdoutLines, line)
 		}
+	}
+	if streamErr != nil {
+		// Do NOT read stagingFile and do NOT stage the partial stdout lines.
+		return task.Result{Status: task.StatusErrored},
+			terminalStreamError(toolName, streamErr)
 	}
 
 	// Read output file (-oU writes URLs here); fall back to streamed stdout.

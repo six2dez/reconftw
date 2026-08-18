@@ -61,8 +61,26 @@ func runStreamTask(ctx context.Context, app *appctx.AppContext, toolName string,
 		return degradeResolveTool(ctx, app, toolName, err)
 	}
 
+	// F6 (phase 15): ACCUMULATOR shape — latch the terminal Event.Err inside the
+	// loop and check it after. A puredns or dnsx that dies half way through the
+	// resolve leaves a PARTIAL hostname set; staging it would silently shrink
+	// the resolved corpus that every later stage builds on, and the run would
+	// still be reported clean.
+	//
+	// NOTE the Stream() error above is deliberately left byte-identical: it
+	// means the resolver binary is NOT on PATH, and degradeResolveTool's
+	// CONTINUE_ON_TOOL_ERROR posture must survive. `subdomains` is
+	// PolicyFailFast (internal/core/scheduler/policy.go), so escalating a
+	// missing optional binary there would abort the whole spine.
 	var lines []string
+	var streamErr error
 	for ev := range ch {
+		if ev.Err != nil {
+			if streamErr == nil {
+				streamErr = ev.Err
+			}
+			continue
+		}
 		if ev.IsErr {
 			continue // skip stderr lines
 		}
@@ -70,6 +88,12 @@ func runStreamTask(ctx context.Context, app *appctx.AppContext, toolName string,
 		if line != "" {
 			lines = append(lines, line)
 		}
+	}
+	if streamErr != nil {
+		// Discard the partial set and stage NOTHING — the previous run's staging
+		// is left untouched because this run cannot vouch for a replacement.
+		return task.Result{Status: task.StatusErrored},
+			fmt.Errorf("%s: tool stream ended badly: %w", toolName, streamErr)
 	}
 
 	stagingPath, writeErr := writeResolvedStagingFile(app, toolName, lines)
