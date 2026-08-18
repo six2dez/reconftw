@@ -293,3 +293,58 @@ func waitForHelperLock(r interface{ Read([]byte) (int, error) }, timeout time.Du
 		return 0, fmt.Errorf("timed out after %s waiting for the helper to lock", timeout)
 	}
 }
+
+func TestLockAcquireRejectsEmptyWorkspaceDir(t *testing.T) {
+	l, err := output.AcquireWorkspaceLock("")
+	if err == nil {
+		_ = l.Release()
+		t.Fatal("an empty workspaceDir must be rejected, not silently locked in the cwd")
+	}
+	if errors.Is(err, output.ErrWorkspaceBusy) {
+		t.Fatalf("an invalid argument must not masquerade as contention: %v", err)
+	}
+}
+
+func TestLockAcquireFailsOnMissingWorkspace(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "no-such-workspace")
+
+	l, err := output.AcquireWorkspaceLock(missing)
+	if err == nil {
+		_ = l.Release()
+		t.Fatal("locking a nonexistent workspace succeeded — the lock must never CREATE the workspace it guards")
+	}
+	if errors.Is(err, output.ErrWorkspaceBusy) {
+		t.Fatalf("a missing workspace must not be reported as contention: %v", err)
+	}
+	if _, statErr := os.Stat(missing); !os.IsNotExist(statErr) {
+		t.Errorf("the failed acquisition created %s", missing)
+	}
+}
+
+// TestLockBusyErrorSurvivesUnreadablePayload pins the degradation contract: the
+// holder's stamp is DIAGNOSTIC, so a corrupt or truncated payload must still
+// produce a correct rejection — just a vaguer one. Mutual exclusion may never
+// depend on parsing that file.
+func TestLockBusyErrorSurvivesUnreadablePayload(t *testing.T) {
+	dir := t.TempDir()
+
+	held, err := output.AcquireWorkspaceLock(dir)
+	if err != nil {
+		t.Fatalf("acquire: %v", err)
+	}
+	defer func() { _ = held.Release() }()
+
+	// Truncate-in-place (same inode, so the flock is untouched) and write junk.
+	if err := os.WriteFile(held.Path(), []byte("{not json"), 0o644); err != nil {
+		t.Fatalf("corrupt payload: %v", err)
+	}
+
+	l, err := output.AcquireWorkspaceLock(dir)
+	if err == nil {
+		_ = l.Release()
+		t.Fatal("a corrupt payload disabled the lock — exclusion must not depend on the stamp")
+	}
+	if !errors.Is(err, output.ErrWorkspaceBusy) {
+		t.Fatalf("want ErrWorkspaceBusy with an unreadable payload, got %v", err)
+	}
+}
