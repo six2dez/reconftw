@@ -37,6 +37,7 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 	"github.com/six2dez/reconftw/internal/extract/analytics"
 	"github.com/six2dez/reconftw/internal/extract/favicon"
@@ -160,11 +161,11 @@ func writeScrapingStagingFile(app *appctx.AppContext, toolName string, candidate
 	}
 	stagingPath := filepath.Join(inputsDir, "resolved."+toolName+".txt")
 
-	content := strings.Join(candidates, "\n")
-	if len(candidates) > 0 {
-		content += "\n"
-	}
-	if err := os.WriteFile(stagingPath, []byte(content), 0o644); err != nil { //nolint:gosec
+	// F3 (phase 15): write-or-REMOVE via output.StageLines. Calling this asserts
+	// "this scraping source RAN and found exactly these candidates", so a
+	// zero-result run clears the previous run's file instead of leaving it for
+	// MergeAllSubdomains (which globs inputs/resolved.*.txt) to republish.
+	if err := output.StageLines(stagingPath, candidates); err != nil {
 		return "", fmt.Errorf("scraping %s: write staging file: %w", toolName, err)
 	}
 	return stagingPath, nil

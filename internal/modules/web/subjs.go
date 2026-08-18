@@ -122,13 +122,11 @@ func (t *SubjsTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 	// Extract and scope-filter URLs via extract/urls.
 	records, _ := urlsextract.ExtractURLs(raw, "subjs", app.Target.Domain)
 
-	if len(records) == 0 {
-		return task.Result{
-			Status: task.StatusDone,
-			Stats:  map[string]int{"urls_found": 0},
-		}, nil
-	}
-
+	// F3 (phase 15): the old `if len(records) == 0 { return StatusDone }`
+	// short-circuit here left a previous run's inputs/urls.subjs.jsonl on disk
+	// for the urls merge to republish. subjs RAN (the absent-binary case
+	// returned StatusSkipped above), so stage unconditionally and let
+	// StageJSONL remove the file when this run extracted no JS links.
 	var lines [][]byte
 	for _, rec := range records {
 		b, merr := json.Marshal(rec)
@@ -137,12 +135,10 @@ func (t *SubjsTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 		}
 		lines = append(lines, b)
 	}
-	if len(lines) > 0 {
-		stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "urls.subjs.jsonl")
-		if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-			app.Log.Debug("web.subjs: staging write failed",
-				"path", stagingPath, "err", wErr)
-		}
+	stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "urls.subjs.jsonl")
+	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+		app.Log.Debug("web.subjs: staging write failed",
+			"path", stagingPath, "err", wErr)
 	}
 
 	// Clean up temp file.

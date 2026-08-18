@@ -196,24 +196,26 @@ func (t *NucleiTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 		allFindings = append(allFindings, findings...)
 	}
 
-	// Write findings to staging file inputs/findings.nuclei.jsonl (staging contract).
+	// Stage findings into inputs/findings.nuclei.jsonl (staging contract).
 	// MergeAllWebArtefacts is the single app.Tree.Append caller for findings.
-	if len(allFindings) > 0 {
-		var lines [][]byte
-		for _, rec := range allFindings {
-			b, err := json.Marshal(rec)
-			if err != nil {
-				continue
-			}
-			lines = append(lines, b)
+	//
+	// F3 (phase 15): staged UNCONDITIONALLY — StageJSONL removes the staging
+	// file when this scan produced no findings, so a remediated vulnerability
+	// from a previous run cannot reappear in the merged findings artefact.
+	// Reaching here means nuclei RAN; every "not configured / no hosts" path
+	// returns StatusSkipped above and stages nothing.
+	var lines [][]byte
+	for _, rec := range allFindings {
+		b, err := json.Marshal(rec)
+		if err != nil {
+			continue
 		}
-		if len(lines) > 0 {
-			stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "findings.nuclei.jsonl")
-			if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-				app.Log.Debug("web.nuclei: staging write failed",
-					"path", stagingPath, "err", wErr)
-			}
-		}
+		lines = append(lines, b)
+	}
+	stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "findings.nuclei.jsonl")
+	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+		app.Log.Debug("web.nuclei: staging write failed",
+			"path", stagingPath, "err", wErr)
 	}
 
 	if app.Log != nil {

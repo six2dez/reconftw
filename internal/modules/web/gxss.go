@@ -109,23 +109,23 @@ func (t *GxssTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 
 	findings := parseGxssOutput(outBuf.Bytes())
 
-	// Write reflection hits to artefacts/findings.jsonl (best_effort D-W12).
-	if len(findings) > 0 {
-		var lines [][]byte
-		for _, rec := range findings {
-			b, merr := json.Marshal(rec)
-			if merr != nil {
-				continue
-			}
-			lines = append(lines, b)
+	// Stage reflection hits for the findings merge (best_effort D-W12).
+	//
+	// F3 (phase 15): staged UNCONDITIONALLY — StageJSONL removes the staging
+	// file when this run found no reflections, so a previous run's hits cannot
+	// be republished.
+	var lines [][]byte
+	for _, rec := range findings {
+		b, merr := json.Marshal(rec)
+		if merr != nil {
+			continue
 		}
-		if len(lines) > 0 {
-			stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "findings.gxss.jsonl")
-			if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-				app.Log.Debug("web.gxss: staging write failed",
-					"path", stagingPath, "err", wErr)
-			}
-		}
+		lines = append(lines, b)
+	}
+	stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "findings.gxss.jsonl")
+	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+		app.Log.Debug("web.gxss: staging write failed",
+			"path", stagingPath, "err", wErr)
 	}
 
 	if app.Log != nil {

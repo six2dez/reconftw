@@ -155,12 +155,16 @@ func TestCspreconTaskDegradesOnToolError(t *testing.T) {
 		t.Errorf("status = %q, want done (aux best-effort degrade)", res.Status)
 	}
 
-	// An (empty) staging file must exist so MergeStage sees a consistent set.
-	staged, err := os.ReadFile(filepath.Join(workDir, "inputs", "resolved.csprecon.txt"))
-	if err != nil {
-		t.Fatalf("empty staging file not written on degrade: %v", err)
-	}
-	if strings.TrimSpace(string(staged)) != "" {
-		t.Errorf("degrade staging file should be empty, got: %q", string(staged))
+	// F3 (phase 15): the degrade path contributes NO hostnames, and
+	// writeResolvedStagingFile is now write-or-REMOVE, so the staging file must
+	// be ABSENT rather than present-and-empty. MergeAllSubdomains globs
+	// inputs/resolved.*.txt, so absent and empty are identical for the merge —
+	// but absent additionally guarantees a previous run's csprecon hostnames
+	// cannot survive a degraded run.
+	staged := filepath.Join(workDir, "inputs", "resolved.csprecon.txt")
+	if _, err := os.Stat(staged); !os.IsNotExist(err) {
+		body, _ := os.ReadFile(staged) //nolint:gosec // test-controlled temp path
+		t.Errorf("degrade must leave no staging file at %s (write-or-remove, F3); "+
+			"stat err = %v, contents = %q", staged, err, string(body))
 	}
 }

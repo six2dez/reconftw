@@ -94,23 +94,23 @@ func (t *ShortscanTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 		allFindings = append(allFindings, findings...)
 	}
 
-	// Write findings to staging file inputs/findings.shortscan.jsonl (staging contract).
-	if len(allFindings) > 0 {
-		var lines [][]byte
-		for _, rec := range allFindings {
-			b, merr := json.Marshal(rec)
-			if merr != nil {
-				continue
-			}
-			lines = append(lines, b)
+	// Stage findings into inputs/findings.shortscan.jsonl (staging contract).
+	//
+	// F3 (phase 15): staged UNCONDITIONALLY — StageJSONL removes the staging
+	// file when this run found no IIS short names, so a previous run's findings
+	// cannot be republished.
+	var lines [][]byte
+	for _, rec := range allFindings {
+		b, merr := json.Marshal(rec)
+		if merr != nil {
+			continue
 		}
-		if len(lines) > 0 {
-			stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "findings.shortscan.jsonl")
-			if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-				app.Log.Debug("web.shortscan: staging write failed",
-					"path", stagingPath, "err", wErr)
-			}
-		}
+		lines = append(lines, b)
+	}
+	stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "findings.shortscan.jsonl")
+	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+		app.Log.Debug("web.shortscan: staging write failed",
+			"path", stagingPath, "err", wErr)
 	}
 
 	if app.Log != nil {

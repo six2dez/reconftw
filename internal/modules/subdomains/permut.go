@@ -42,6 +42,7 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 	"github.com/six2dez/reconftw/internal/modules/subdomains/sysinfo"
 )
@@ -94,18 +95,20 @@ func resolvedMergedPath(app *appctx.AppContext) string {
 }
 
 // writePermutStagingFile writes permutation candidates (one per line) to
-// inputs/permut.<tool>.txt. Returns the absolute path written.
+// inputs/permut.<tool>.txt, or REMOVES that file when lines is empty. Returns
+// the staging path in both cases.
+//
+// F3 (phase 15): write-or-REMOVE via output.StageLines. Calling it asserts
+// "this permutation source RAN and produced exactly these candidates", so a
+// zero-result run clears the previous run's file instead of leaving it for
+// MergeAllSubdomains (which globs inputs/permut.*.txt) to republish.
 func writePermutStagingFile(app *appctx.AppContext, toolName string, lines []string) (string, error) {
 	inputsDir := filepath.Join(app.Target.WorkDir, "inputs")
 	if err := os.MkdirAll(inputsDir, 0o755); err != nil {
 		return "", fmt.Errorf("permut %s: mkdir inputs/: %w", toolName, err)
 	}
 	stagingPath := filepath.Join(inputsDir, "permut."+toolName+".txt")
-	content := strings.Join(lines, "\n")
-	if len(lines) > 0 {
-		content += "\n"
-	}
-	if err := os.WriteFile(stagingPath, []byte(content), 0o644); err != nil { //nolint:gosec
+	if err := output.StageLines(stagingPath, lines); err != nil {
 		return "", fmt.Errorf("permut %s: write staging file: %w", toolName, err)
 	}
 	return stagingPath, nil

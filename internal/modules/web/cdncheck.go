@@ -91,12 +91,11 @@ func (t *CdnCheckTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 
 	results, _ := waf.ExtractCDNCheck(raw, app.Target.Domain)
 
-	if len(results) == 0 {
-		return task.Result{
-			Status: task.StatusDone,
-			Stats:  map[string]int{"cdn_detected": 0},
-		}, nil
-	}
+	// F3 (phase 15): the old `if len(results) == 0 { return StatusDone }`
+	// short-circuit here SKIPPED the staging write below, leaving a previous
+	// run's inputs/waf.cdncheck.jsonl for the waf merge to republish. cdncheck
+	// RAN (absent binary returned StatusSkipped above), so fall through to the
+	// unconditional StageJSONL and let it clear the file.
 
 	var lines [][]byte
 	for _, r := range results {
@@ -112,12 +111,13 @@ func (t *CdnCheckTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 		}
 		lines = append(lines, b)
 	}
-	if len(lines) > 0 {
-		stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "waf.cdncheck.jsonl")
-		if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-			app.Log.Debug("web.cdncheck: staging write failed",
-				"path", stagingPath, "err", wErr)
-		}
+	// F3 (phase 15): staged UNCONDITIONALLY — StageJSONL removes the staging
+	// file when this run detected nothing, so a previous run's CDN records
+	// cannot be republished by the waf merge.
+	stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "waf.cdncheck.jsonl")
+	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+		app.Log.Debug("web.cdncheck: staging write failed",
+			"path", stagingPath, "err", wErr)
 	}
 
 	if app.Log != nil {

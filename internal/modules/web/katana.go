@@ -126,13 +126,18 @@ func (t *KatanaTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	}
 
 	// Extract and scope-filter URLs via extract/urls.
+	//
+	// F3 (phase 15): staged UNCONDITIONALLY — StageJSONL removes the staging
+	// file when this crawl found nothing, so a previous run's katana URLs
+	// cannot be republished by the urls merge. Reaching here means katana RAN
+	// (the StatusSkipped return above covers the absent-binary case).
 	var totalRecords int
+	var lines [][]byte
 	if len(urlLines) > 0 {
 		rawText := []byte(strings.Join(urlLines, "\n"))
 		records, _ := urlsextract.ExtractURLs(rawText, "katana", app.Target.Domain)
 		totalRecords = len(records)
 
-		var lines [][]byte
 		for _, rec := range records {
 			b, merr := json.Marshal(rec)
 			if merr != nil {
@@ -140,13 +145,11 @@ func (t *KatanaTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 			}
 			lines = append(lines, b)
 		}
-		if len(lines) > 0 {
-			stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "urls.katana.jsonl")
-			if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-				app.Log.Debug("web.katana: staging write failed",
-					"path", stagingPath, "err", wErr)
-			}
-		}
+	}
+	stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "urls.katana.jsonl")
+	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+		app.Log.Debug("web.katana: staging write failed",
+			"path", stagingPath, "err", wErr)
 	}
 
 	if app.Log != nil {

@@ -22,6 +22,7 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -29,18 +30,20 @@ import (
 // Recursive staging file helpers
 // -------------------------------------------------------------------------
 
-// writeRecursiveStagingFile writes hostnames to inputs/recursive.<name>.txt.
+// writeRecursiveStagingFile writes hostnames to inputs/recursive.<name>.txt, or
+// REMOVES that file when lines is empty. Returns the staging path in both cases.
+//
+// F3 (phase 15): write-or-REMOVE via output.StageLines. Calling it asserts
+// "this recursive source RAN and found exactly these hostnames", so a
+// zero-result run clears the previous run's file instead of leaving it for
+// MergeAllSubdomains (which globs inputs/recursive.*.txt) to republish.
 func writeRecursiveStagingFile(app *appctx.AppContext, name string, lines []string) (string, error) {
 	inputsDir := filepath.Join(app.Target.WorkDir, "inputs")
 	if err := os.MkdirAll(inputsDir, 0o755); err != nil {
 		return "", fmt.Errorf("recursive %s: mkdir inputs/: %w", name, err)
 	}
 	stagingPath := filepath.Join(inputsDir, "recursive."+name+".txt")
-	content := strings.Join(lines, "\n")
-	if len(lines) > 0 {
-		content += "\n"
-	}
-	if err := os.WriteFile(stagingPath, []byte(content), 0o644); err != nil { //nolint:gosec
+	if err := output.StageLines(stagingPath, lines); err != nil {
 		return "", fmt.Errorf("recursive %s: write staging file: %w", name, err)
 	}
 	return stagingPath, nil

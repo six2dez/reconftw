@@ -84,13 +84,11 @@ func (t *UrlfinderTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	// Extract and scope-filter URLs.
 	records, _ := urlsextract.ExtractURLs(raw, "urlfinder", app.Target.Domain)
 
-	if len(records) == 0 {
-		return task.Result{
-			Status: task.StatusDone,
-			Stats:  map[string]int{"urls_found": 0},
-		}, nil
-	}
-
+	// F3 (phase 15): the old `if len(records) == 0 { return StatusDone }`
+	// short-circuit here left a previous run's inputs/urls.urlfinder.jsonl on
+	// disk for the urls merge to republish. urlfinder RAN (the absent-binary
+	// case returned StatusSkipped above), so stage unconditionally and let
+	// StageJSONL remove the file when this run found no URLs.
 	var lines [][]byte
 	for _, rec := range records {
 		b, merr := json.Marshal(rec)
@@ -99,12 +97,10 @@ func (t *UrlfinderTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 		}
 		lines = append(lines, b)
 	}
-	if len(lines) > 0 {
-		stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "urls.urlfinder.jsonl")
-		if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-			app.Log.Debug("web.urlfinder: staging write failed",
-				"path", stagingPath, "err", wErr)
-		}
+	stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "urls.urlfinder.jsonl")
+	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+		app.Log.Debug("web.urlfinder: staging write failed",
+			"path", stagingPath, "err", wErr)
 	}
 
 	// Clean up staging file.
