@@ -280,6 +280,10 @@ func CompositePipelinePrefixes(mode CompositeMode) []string {
 
 // RunCompositeAsync executes the composite pipeline for the given mode.
 //
+// The opts.DryRun gate is the FIRST thing the function does (F1) — before the
+// boot, before any axiom Launch. A dry run must create no workspace, open no
+// checkpoint store and start no fleet.
+//
 // D-01 invariants:
 //   - Single BootReconApp call (one AppContext, one workspace, one checkpoint).
 //   - Single axiomBE.Launch and single defer axiomBE.Shutdown for the whole run.
@@ -293,6 +297,21 @@ func CompositePipelinePrefixes(mode CompositeMode) []string {
 func RunCompositeAsync(ctx context.Context, opts RunOptions, mode CompositeMode) (err error) {
 	if opts.Scheduler == nil {
 		return fmt.Errorf("mcp/composite: RunOptions.Scheduler must not be nil")
+	}
+
+	// F1: a dry run resolves the plan and stops. This precedes the boot (which
+	// MkdirAll's the workspace and opens checkpoints.db) AND every axiom
+	// Launch() below — a preview must not spin up a fleet. AfterBoot still
+	// fires: it is what feeds dryRunCapture and printCompositeDryRun.
+	if opts.DryRun {
+		boot, err := ResolveDryRunBoot(opts)
+		if err != nil {
+			return fmt.Errorf("mcp/composite: %w", err)
+		}
+		if opts.AfterBoot != nil {
+			opts.AfterBoot(boot)
+		}
+		return nil
 	}
 
 	// Single Boot (D-01).
@@ -317,11 +336,6 @@ func RunCompositeAsync(ctx context.Context, opts RunOptions, mode CompositeMode)
 	// axiomBE.Launch/Shutdown — those are handled below (T-09-02-03).
 	if opts.AfterBoot != nil {
 		opts.AfterBoot(boot)
-	}
-
-	// Dry-run: AfterBoot captured what it needs; return early.
-	if opts.DryRun {
-		return nil
 	}
 
 	// INTEG-02: real scan — fire scan-start + arm on-failure. The mode label is

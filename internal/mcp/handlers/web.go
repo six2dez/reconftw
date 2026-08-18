@@ -23,6 +23,20 @@ func RunWebAsync(ctx context.Context, opts RunOptions) (err error) {
 		return fmt.Errorf("mcp/web: RunOptions.Scheduler must not be nil")
 	}
 
+	// F1: a dry run resolves the plan and stops, BEFORE the boot creates the
+	// workspace tree and opens checkpoints.db. AfterBoot still fires so the CLI
+	// keeps its dry-run task capture.
+	if opts.DryRun {
+		boot, err := ResolveDryRunBoot(opts)
+		if err != nil {
+			return fmt.Errorf("mcp/web: %w", err)
+		}
+		if opts.AfterBoot != nil {
+			opts.AfterBoot(boot)
+		}
+		return nil
+	}
+
 	boot, err := BootReconApp(ctx, opts)
 	if err != nil {
 		return fmt.Errorf("mcp/web: %w", err)
@@ -40,10 +54,6 @@ func RunWebAsync(ctx context.Context, opts RunOptions) (err error) {
 
 	if opts.AfterBoot != nil {
 		opts.AfterBoot(boot)
-	}
-
-	if opts.DryRun {
-		return nil
 	}
 
 	// INTEG-02: real scan — fire scan-start + arm on-failure (mode "web" matches

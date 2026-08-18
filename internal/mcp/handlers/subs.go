@@ -12,9 +12,13 @@ import (
 
 // RunSubsAsync executes the full subdomain enumeration pipeline.
 //
-// Pipeline: BootReconApp → sched.Checkpoint wiring → task DAG build →
-// 5 sequential RunStage calls (passive → resolve → discovery → permut →
+// Pipeline: opts.DryRun gate → BootReconApp → sched.Checkpoint wiring → task DAG
+// build → 5 sequential RunStage calls (passive → resolve → discovery → permut →
 // enrichment) → MergeAllSubdomains.
+//
+// The opts.DryRun gate comes FIRST and must stay first (F1): the boot creates the
+// workspace tree and opens checkpoints.db, so checking dry-run after it made
+// `--dry-run` write to disk.
 //
 // B3 fix: app.Checkpoint is closed via defer in this function (not via the
 // shared scheduler's Checkpoint field). opts.Scheduler.Checkpoint is NOT
@@ -26,6 +30,20 @@ import (
 func RunSubsAsync(ctx context.Context, opts RunOptions) (err error) {
 	if opts.Scheduler == nil {
 		return fmt.Errorf("mcp/subs: RunOptions.Scheduler must not be nil")
+	}
+
+	// F1: a dry run resolves the plan and stops. This MUST precede BootReconApp,
+	// whose tail MkdirAll's the workspace and opens checkpoints.db. AfterBoot
+	// still fires — it is what captures the task list the operator asked to see.
+	if opts.DryRun {
+		boot, err := ResolveDryRunBoot(opts)
+		if err != nil {
+			return fmt.Errorf("mcp/subs: %w", err)
+		}
+		if opts.AfterBoot != nil {
+			opts.AfterBoot(boot)
+		}
+		return nil
 	}
 
 	// Step 1-5a: Boot the app context.
@@ -46,15 +64,10 @@ func RunSubsAsync(ctx context.Context, opts RunOptions) (err error) {
 	}()
 
 	// Optional AfterBoot hook: called before stage loop so the CLI can inject
-	// per-task UI into sched.RunTask after app is available. The CLI also uses
-	// AfterBoot to capture task lists for --dry-run output.
+	// per-task UI into sched.RunTask after app is available. The dry-run capture
+	// is handled by the gate above, which returns before this point.
 	if opts.AfterBoot != nil {
 		opts.AfterBoot(boot)
-	}
-
-	// Dry-run: AfterBoot has captured what it needs; return early without stages.
-	if opts.DryRun {
-		return nil
 	}
 
 	// INTEG-02: this is a real (non-dry-run) scan — fire scan-start and arm the

@@ -41,33 +41,124 @@ func buildBinary(t *testing.T) string {
 	return bin
 }
 
-// TestE2EBinaryDryRunHasNoSideEffects is the regression for the pre-cobra boot.
+// assertNoEntries fails the test unless dir contains exactly zero entries,
+// naming everything it found. Acceptance gate 1 is "the filesystem is unchanged",
+// so the assertion is on ABSENCE, never on emptiness: an earlier version of this
+// test tolerated a created-but-empty `wanted` directory and therefore passed
+// against the very defect it was written for.
+func assertNoEntries(t *testing.T, dir, label string) {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir(%s): %v", dir, err)
+	}
+	if len(entries) == 0 {
+		return
+	}
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	t.Errorf("%s created %d entr(ies) in a pristine working directory: %v — "+
+		"a dry run must leave the filesystem byte-for-byte unchanged",
+		label, len(entries), names)
+}
+
+// TestE2EBinaryDryRunHasNoSideEffects enforces acceptance gate 1 at the process
+// boundary: `--dry-run` creates NOTHING.
 //
-// `recon --target X --dry-run -o ./wanted` used to create BOTH ./wanted/X and
-// ./workspaces/X — the second under the configured root, because the startup
-// boot ran before cobra had parsed -o and knew nothing about --dry-run. A dry
-// run that writes to a directory the operator never named is the kind of thing
-// only a process-level test sees.
+// Two defects met here. The startup boot ran before cobra had parsed -o and knew
+// nothing about --dry-run, so `recon --target X --dry-run -o ./wanted` created
+// ./workspaces/X under the configured root; and every RunXxxAsync booted before
+// checking opts.DryRun, so ./wanted/X plus its checkpoints.db appeared too.
+//
+// Tolerating any created entry is exactly the regression this test exists to
+// prevent — assert on absence, and assert stdout still carries the plan so the
+// test cannot be satisfied by a binary that simply does nothing.
 func TestE2EBinaryDryRunHasNoSideEffects(t *testing.T) {
 	bin := buildBinary(t)
 	work := t.TempDir()
+	wanted := filepath.Join(work, "wanted")
 
 	cmd := exec.Command(bin, "recon", "--target", "example.com", "--dry-run",
-		"-o", filepath.Join(work, "wanted"))
+		"-o", wanted)
 	cmd.Dir = work
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("dry-run should succeed: %v\n%s", err, out)
 	}
 
-	if _, statErr := os.Stat(filepath.Join(work, "workspaces")); statErr == nil {
-		t.Error("dry-run created ./workspaces/ — the startup boot is ignoring -o/--output")
+	// The feature must still work — a dry run that prints nothing is not a fix.
+	s := string(out)
+	if strings.TrimSpace(s) == "" {
+		t.Error("dry-run produced no output at all — the plan preview was removed, not fixed")
 	}
-	entries, _ := os.ReadDir(work)
-	for _, e := range entries {
-		if e.Name() != "wanted" {
-			t.Errorf("dry-run created unexpected entry %q in the working directory", e.Name())
-		}
+	if !strings.Contains(s, "subdomains.") {
+		t.Errorf("dry-run output does not name any task (expected a 'subdomains.*' entry):\n%s", s)
+	}
+
+	if _, statErr := os.Stat(filepath.Join(work, "workspaces")); statErr == nil {
+		t.Error("dry-run created ./workspaces/ — something is still booting a workspace")
+	}
+	if _, statErr := os.Stat(wanted); statErr == nil {
+		t.Errorf("dry-run created the -o root %s", wanted)
+	}
+	// Explicit absence checks for the two artefacts a partial regression would
+	// leave behind even if the tree above were suppressed.
+	matches, _ := filepath.Glob(filepath.Join(wanted, "*", "checkpoints.db"))
+	if len(matches) > 0 {
+		t.Errorf("dry-run created a checkpoint store: %v", matches)
+	}
+	matches, _ = filepath.Glob(filepath.Join(wanted, "*", "inputs"))
+	if len(matches) > 0 {
+		t.Errorf("dry-run created workspace subdirectories: %v", matches)
+	}
+
+	assertNoEntries(t, work, "dry-run with -o")
+}
+
+// TestE2EBinaryDryRunWithoutOutputFlagCreatesNothing covers the default-root
+// path: with no -o, an unfixed build falls back to ./workspaces relative to the
+// process working directory, which is the operator's cwd.
+func TestE2EBinaryDryRunWithoutOutputFlagCreatesNothing(t *testing.T) {
+	bin := buildBinary(t)
+	work := t.TempDir()
+
+	cmd := exec.Command(bin, "recon", "--target", "example.com", "--dry-run")
+	cmd.Dir = work
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("dry-run should succeed: %v\n%s", err, out)
+	}
+	if _, statErr := os.Stat(filepath.Join(work, "workspaces")); statErr == nil {
+		t.Error("dry-run created ./workspaces/ in the working directory")
+	}
+	assertNoEntries(t, work, "dry-run without -o")
+}
+
+// TestE2EBinaryNoTargetCommandsCreateNoWorkspace covers F18's second cost: a
+// command that needs no workspace must not get one. `version` and `health-check`
+// take no --target, and the pre-cobra boot is gone, so neither may write.
+//
+// health-check legitimately exits non-zero on a clean PATH (dnsx/httpx/subfinder
+// are CRITICAL tools), so this asserts on the filesystem only — never the exit
+// code. See TestE2EBinaryHealthCheckIsSelfConsistent for the exit-code contract.
+func TestE2EBinaryNoTargetCommandsCreateNoWorkspace(t *testing.T) {
+	bin := buildBinary(t)
+
+	for _, args := range [][]string{
+		{"version"},
+		{"health-check"},
+		{"--target", "example.com", "version"},
+	} {
+		label := strings.Join(args, " ")
+		t.Run(label, func(t *testing.T) {
+			work := t.TempDir()
+			cmd := exec.Command(bin, args...)
+			cmd.Dir = work
+			_, _ = cmd.CombinedOutput() // exit code intentionally ignored
+			assertNoEntries(t, work, label)
+		})
 	}
 }
 
