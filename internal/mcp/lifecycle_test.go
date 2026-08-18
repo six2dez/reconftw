@@ -227,6 +227,39 @@ func TestCancelScanRefusesOtherSessionsAndDoesNotLeakRunIDs(t *testing.T) {
 	awaitCancel(t, cancelled, "cleanup")
 }
 
+// TestCancelScanCannotDestroyASessionScopeEntry: a session-scope entry lives in
+// the same map as the runs, keyed by the session id, and carries no owner. If
+// cancel_scan accepted it, naming another session's id would mark that entry
+// cancelled and hand it to the sweeper — quietly destroying a live session's
+// captured scope, which is its authorisation state.
+func TestCancelScanCannotDestroyASessionScopeEntry(t *testing.T) {
+	srv, _ := newLifecycleServer(t)
+
+	const victim = "victim-session"
+	if _, err := srv.registry.CaptureScopeIfUnset(victim, "victim.example"); err != nil {
+		t.Fatalf("CaptureScopeIfUnset: %v", err)
+	}
+
+	res, _, err := srv.tools.cancelScan("attacker-session", CancelScanInput{RunID: victim})
+	if err != nil {
+		t.Fatalf("cancel_scan: %v", err)
+	}
+	if !res.IsError {
+		t.Fatal("cancel_scan accepted a SESSION id as a run id")
+	}
+
+	entry, ok := srv.registry.Lookup(victim)
+	if !ok {
+		t.Fatal("the victim session entry was removed")
+	}
+	if entry.Status == SessionStatusCancelled {
+		t.Error("a session-scope entry was marked cancelled and is now sweeper-eligible")
+	}
+	if !entry.Scope.Contains("victim.example") {
+		t.Error("the victim session lost its captured scope")
+	}
+}
+
 // TestStatusResourceRedactsSecretsInErrors is T-15-15-02. A pipeline error can
 // embed an API key; the status resource hands it to the client.
 func TestStatusResourceRedactsSecretsInErrors(t *testing.T) {

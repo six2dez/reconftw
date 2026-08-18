@@ -146,8 +146,9 @@ func (r *SessionRegistry) RegisterRun(runID, ownerSessionID string) {
 //
 // The cancel hook is stored WITH the entry, in one locked write, so a
 // cancel_scan call can never observe a registered run that has no way to be
-// cancelled. A nil cancel is allowed (tests, and runs with nothing to stop);
-// CancelRunOwnedBy then still marks the entry cancelled.
+// cancelled. A nil cancel is allowed (tests, and pre-existing callers), but
+// CancelRunOwnedBy then refuses: an entry with no way to stop it is not a
+// cancellable run.
 func (r *SessionRegistry) RegisterRunWithCancel(runID, ownerSessionID string, cancel context.CancelFunc) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -170,6 +171,12 @@ func (r *SessionRegistry) RegisterRunWithCancel(runID, ownerSessionID string, ca
 // sessions' run ids (T-15-15-03). Cancelling an already-terminal run is a no-op
 // that returns false: there is nothing left to stop.
 //
+// An entry with NO cancel hook is refused too. That is what separates a run from
+// a session-scope entry, whose RunID is the session id and which carries no
+// owner: without this check, naming another session's id would mark that
+// session's entry cancelled and hand it to the sweeper, silently destroying a
+// live session's captured scope.
+//
 // The CancelFunc is invoked AFTER the lock is released. Cancelling wakes the
 // scan goroutine, which calls straight back into the registry (MarkFailed /
 // MarkComplete); calling it under the lock would make that a lock-ordering
@@ -177,7 +184,9 @@ func (r *SessionRegistry) RegisterRunWithCancel(runID, ownerSessionID string, ca
 func (r *SessionRegistry) CancelRunOwnedBy(runID, sessionID string) bool {
 	r.mu.Lock()
 	entry, ok := r.entries[runID]
-	if !ok || (entry.Owner != "" && entry.Owner != sessionID) || entry.Status.isTerminal() {
+	if !ok || entry.cancel == nil ||
+		(entry.Owner != "" && entry.Owner != sessionID) ||
+		entry.Status.isTerminal() {
 		r.mu.Unlock()
 		return false
 	}
@@ -186,9 +195,7 @@ func (r *SessionRegistry) CancelRunOwnedBy(runID, sessionID string) bool {
 	entry.TerminalAt = time.Now()
 	r.mu.Unlock()
 
-	if cancel != nil {
-		cancel()
-	}
+	cancel()
 	return true
 }
 
