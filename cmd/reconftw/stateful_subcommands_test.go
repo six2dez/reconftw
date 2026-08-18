@@ -9,10 +9,18 @@
 //	T-15-12-04  the dry-run preview must be produced by the same function that
 //	            performs the deletion, or it eventually lies.
 //	T-15-12-05  -o/--output must beat paths.data_dir BEFORE any path is computed.
+//	T-15-12-01  workspace selection compared name PREFIXES, so `--target
+//	            example.com` also deleted cache under example.com.evil.
+//	T-15-12-06  a legacy-named workspace that plan 15-01 refused to adopt must
+//	            never be a deletion target.
+//	T-15-12-03  quick-rescan inserted a "running" scan row nothing ever closed.
 //
 // Every assertion here is made against a seeded workspace / store on disk, never
-// by reading the implementation — except TestStatefulDryRunReadPrecedesMutation,
-// which is deliberately a source-order guard because ordering is the whole bug.
+// by reading the implementation — except the two source guards
+// (TestStatefulDryRunReadPrecedesMutation, TestRefreshCacheHasNoLegacyFallback),
+// which pin invariants that are about the SHAPE of the code: statement ordering
+// and the absence of a fallback. A behavioural test can only catch the cases
+// someone thought to exercise; those two must hold for every case.
 package main
 
 import (
@@ -30,6 +38,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
+
+	// modernc.org/sqlite registers the "sqlite" driver name. Production code in
+	// this package no longer opens a database directly (the quick-rescan
+	// baseline insert is gone), so this file owns the registration it needs.
+	_ "modernc.org/sqlite"
 
 	"github.com/six2dez/reconftw/internal/core/config"
 	"github.com/six2dez/reconftw/internal/core/output"
@@ -353,6 +366,135 @@ func TestRefreshCacheHonoursOutputDirOverConfig(t *testing.T) {
 	}
 }
 
+// TestRefreshCacheDoesNotTouchSiblingTarget is the T-15-12-01 regression, run in
+// BOTH directions. The old selector was
+// `entry.Name()[:len(target)] != target`, a prefix comparison: refreshing
+// example.com also matched a workspace whose name began with "example.com",
+// which includes example.com.evil.
+func TestRefreshCacheDoesNotTouchSiblingTarget(t *testing.T) {
+	const (
+		base    = "example.com"
+		sibling = "example.com.evil"
+	)
+
+	for _, tc := range []struct{ refresh, spare string }{
+		{refresh: base, spare: sibling},
+		{refresh: sibling, spare: base},
+	} {
+		t.Run(tc.refresh, func(t *testing.T) {
+			statefulTestEnv(t)
+			dataDir := t.TempDir()
+
+			refreshWS := seedWorkspace(t, dataDir, tc.refresh, cacheFileFixture(tc.refresh))
+			spareWS := seedWorkspace(t, dataDir, tc.spare, cacheFileFixture(tc.spare))
+			if refreshWS == spareWS {
+				t.Fatalf("fixture invalid: both targets resolved to %s", refreshWS)
+			}
+
+			spareBefore := snapshotTree(t, spareWS)
+			if len(spareBefore) == 0 {
+				t.Fatal("precondition: spare workspace snapshot is empty")
+			}
+
+			cfg := config.Defaults()
+			cfg.Paths.DataDir = dataDir
+			if err := invalidateCacheFiles(cfg, tc.refresh); err != nil {
+				t.Fatalf("invalidateCacheFiles(%q): %v", tc.refresh, err)
+			}
+
+			// The refreshed target's cache really is gone (otherwise the
+			// untouched-sibling assertion below would be vacuous).
+			for _, rel := range []string{"inputs/geo.example.txt", "inputs/asn.jsonl", "inputs/resolvers.txt"} {
+				if _, err := os.Stat(filepath.Join(refreshWS, rel)); !os.IsNotExist(err) {
+					t.Errorf("refresh-cache did not delete %s from the refreshed workspace (err=%v)", rel, err)
+				}
+			}
+			// ...and the artefact was left alone.
+			if _, err := os.Stat(filepath.Join(refreshWS, "artefacts/findings.jsonl")); err != nil {
+				t.Errorf("refresh-cache deleted a findings artefact: %v", err)
+			}
+
+			assertNoneRemovedOrModified(t, spareBefore, snapshotTree(t, spareWS),
+				"refresh-cache --target "+tc.refresh+" (sibling "+tc.spare+")")
+		})
+	}
+}
+
+// TestRefreshCacheIgnoresUnadoptedLegacyWorkspace is the T-15-12-06 regression.
+//
+// Plan 15-01 adopts a pre-upgrade workspace by renaming it onto the new slug,
+// but refuses when the new-slug directory already exists (adoptLegacyWorkspace
+// never merges two trees). The fixture reproduces exactly that refusal: create
+// the new-slug workspace first, then plant the legacy-named directory beside it.
+// The legacy tree's ownership is unresolved, so refresh-cache must not delete
+// anything inside it.
+func TestRefreshCacheIgnoresUnadoptedLegacyWorkspace(t *testing.T) {
+	statefulTestEnv(t)
+	dataDir := t.TempDir()
+	const target = "example.com"
+
+	workspace := seedWorkspace(t, dataDir, target, cacheFileFixture("current"))
+
+	legacyName := output.LegacyTargetSlug(target)
+	id, err := output.CanonicalTargetID(target)
+	if err != nil {
+		t.Fatalf("CanonicalTargetID: %v", err)
+	}
+	if legacyName == id.Slug {
+		t.Fatalf("fixture invalid: legacy name %q equals the canonical slug", legacyName)
+	}
+
+	legacyDir := filepath.Join(dataDir, legacyName)
+	legacyFile := filepath.Join(legacyDir, "inputs", "geo.txt")
+	if err := os.MkdirAll(filepath.Dir(legacyFile), 0o755); err != nil {
+		t.Fatalf("mkdir legacy workspace: %v", err)
+	}
+	if err := os.WriteFile(legacyFile, []byte("legacy geo"), 0o644); err != nil {
+		t.Fatalf("write legacy file: %v", err)
+	}
+	legacyBefore := snapshotTree(t, legacyDir)
+
+	cfg := config.Defaults()
+	cfg.Paths.DataDir = dataDir
+	if err := invalidateCacheFiles(cfg, target); err != nil {
+		t.Fatalf("invalidateCacheFiles: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(workspace, "inputs", "resolvers.txt")); !os.IsNotExist(err) {
+		t.Fatalf("precondition: the canonical workspace cache was not deleted (err=%v) — "+
+			"the legacy assertion below would be vacuous", err)
+	}
+	assertNoneRemovedOrModified(t, legacyBefore, snapshotTree(t, legacyDir),
+		"refresh-cache against an un-adopted legacy workspace")
+}
+
+// TestRefreshCacheHasNoLegacyFallback pins the SHAPE of the selector, which is
+// what T-15-12-01 and T-15-12-06 actually depend on. A behavioural test proves
+// the fallback is absent for the targets it happens to try; this proves it is
+// absent, full stop.
+func TestRefreshCacheHasNoLegacyFallback(t *testing.T) {
+	src, err := os.ReadFile("stateful_subcommands.go")
+	if err != nil {
+		t.Fatalf("read source: %v", err)
+	}
+	text := string(src)
+
+	if n := strings.Count(text, "LegacyTargetSlug"); n != 0 {
+		t.Errorf("stateful_subcommands.go references LegacyTargetSlug %d time(s); "+
+			"a refused adoption leaves ownership unresolved and a delete loop must not resolve it", n)
+	}
+	if strings.Contains(text, "entry.Name()[:len(target)]") {
+		t.Error("the prefix workspace comparison is back — see T-15-12-01")
+	}
+	if !strings.Contains(text, "output.CanonicalTargetID(") {
+		t.Error("workspace selection no longer goes through output.CanonicalTargetID")
+	}
+	if n := strings.Count(text, "isInsideDir"); n < 2 {
+		t.Errorf("the isInsideDir containment guard appears %d time(s); it is a second, "+
+			"independent guard and must not be removed", n)
+	}
+}
+
 // --- quick-rescan ------------------------------------------------------------
 
 // TestQuickRescanDryRunInsertsNoScanRow is the T-15-12-02 regression for the DB
@@ -421,6 +563,72 @@ func TestQuickRescanDryRunLeavesWorkspaceFilesIntact(t *testing.T) {
 	}
 
 	assertNoneRemovedOrModified(t, before, snapshotTree(t, dataDir), "quick-rescan --dry-run")
+}
+
+// TestQuickRescanLeavesNoRunningScanRow is the T-15-12-03 regression.
+//
+// The defect was a scan row inserted with status="running" before the pipeline
+// started, which nothing ever closed: ingest creates its OWN row at end of scan,
+// so the baseline stayed in flight forever and polluted ListScansForTarget,
+// CountScansForTarget and every "is a scan in progress" check.
+//
+// The fix removed the insert outright (see newQuickRescanCmd for the two
+// findings that justified removal over a terminal-state patch), so this test
+// asserts the capability is gone rather than driving a full pipeline run: a real
+// non-dry quick-rescan executes the entire recon DAG against the network, which
+// is not something a unit test can honestly stand in for. What it CAN prove is
+// that no code path in this file is able to write a scan row at all.
+func TestQuickRescanLeavesNoRunningScanRow(t *testing.T) {
+	src, err := os.ReadFile("stateful_subcommands.go")
+	if err != nil {
+		t.Fatalf("read source: %v", err)
+	}
+	text := string(src)
+
+	for _, forbidden := range []string{
+		"recordQuickRescanBaseline",
+		"CreateScan",
+		"sqlcgen",
+		`"database/sql"`,
+	} {
+		if strings.Contains(text, forbidden) {
+			t.Errorf("stateful_subcommands.go still references %q — quick-rescan must not "+
+				"write a scan row of its own (T-15-12-03)", forbidden)
+		}
+	}
+}
+
+// TestQuickRescanRunDoesNotOpenTheStore complements the guard above with a live
+// check: a quick-rescan invocation must not leave a "running" row behind in a
+// store that already exists.
+func TestQuickRescanRunDoesNotOpenTheStore(t *testing.T) {
+	statefulTestEnv(t)
+	dataDir := t.TempDir()
+	const target = "example.com"
+
+	seedStore(t, dataDir, target)
+	seedWorkspace(t, dataDir, target, nil)
+
+	storeBefore := snapshotTree(t, dataDir)
+
+	if _, stderr, err := runStatefulCmd(t,
+		"quick-rescan", "--target", target, "-o", dataDir, "--dry-run"); err != nil {
+		t.Fatalf("quick-rescan --dry-run: %v\nstderr:\n%s", err, stderr)
+	}
+
+	if got := countScans(t, dataDir, "running"); got != 0 {
+		t.Errorf("quick-rescan left %d scan row(s) in status 'running', want 0", got)
+	}
+	// store.db itself must be byte-identical: even opening it under WAL would
+	// rewrite the header.
+	after := snapshotTree(t, dataDir)
+	if before, ok := storeBefore["store.db"]; ok {
+		if got := after["store.db"]; got != before {
+			t.Errorf("quick-rescan modified store.db (%s -> %s)", before, got)
+		}
+	} else {
+		t.Fatal("precondition: seeded store.db not found in snapshot")
+	}
 }
 
 // --- gen-resolvers -----------------------------------------------------------
