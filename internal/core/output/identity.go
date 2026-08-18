@@ -23,6 +23,8 @@ import (
 	"net/netip"
 	"regexp"
 	"strings"
+
+	"golang.org/x/net/idna"
 )
 
 // Target kinds. The kind is part of the hashed identity, so a hostname that
@@ -85,12 +87,17 @@ type TargetIdentity struct {
 //  5. Domain: lowercase, strip exactly ONE trailing dot (the DNS root label),
 //     ASCII-only guard (see the IDNA note below).
 //
-// IDNA NOTE (deliberate, recorded in 15-01-SUMMARY): golang.org/x/net is not a
-// direct or indirect dependency of this module, and this plan is not permitted
-// to add one. Rather than guess at a homograph-safe normalisation, non-ASCII
-// hostnames are REJECTED. Silently slugifying them would let two visually
-// identical targets address two different workspaces (or worse, one).
-// Punycode input (xn--…) is already ASCII and is accepted unchanged.
+// IDNA: internationalised hostnames are folded to their punycode (A-label)
+// form via idna.Lookup.ToASCII, so "münchen.de" and "xn--mnchen-3ya.de" are
+// ONE identity and address ONE workspace. This matters because reconFTW
+// targets IDN domains routinely; rejecting them (the original 15-01 shipping
+// behaviour, which assumed golang.org/x/net was unavailable — it is in fact
+// already in the module graph) made a legitimate target class unscannable.
+//
+// idna.Lookup is the strict profile: it applies the registration-time
+// validity rules (VerifyDNSLength off, BidiRule and ValidateLabels on), so a
+// homograph-ambiguous or structurally invalid label is REJECTED rather than
+// silently slugified into a neighbouring workspace.
 //
 // Hostname SYNTAX is deliberately NOT validated here — that is
 // appctx.NewTarget's boundary responsibility. This function must stay callable
@@ -159,8 +166,8 @@ func isAddrLiteral(s string) bool {
 	return err == nil
 }
 
-// canonicalDomain lowercases, strips the DNS root label and enforces the ASCII
-// carve-out documented on CanonicalTargetID.
+// canonicalDomain lowercases, strips the DNS root label and folds
+// internationalised names to punycode as documented on CanonicalTargetID.
 //
 // The trailing-dot strip is explicit and MUST happen here: appctx.NewTarget
 // accepts "example.com." (a syntactically valid absolute name), so without this
@@ -173,12 +180,35 @@ func canonicalDomain(s string) (string, error) {
 	if d == "" {
 		return "", fmt.Errorf("target normalised to empty")
 	}
-	for i := 0; i < len(d); i++ {
-		if d[i] >= 0x80 {
-			return "", fmt.Errorf("non-ASCII hostname rejected (IDNA normalisation unavailable)")
+	// IDNA is applied ONLY to names that actually carry non-ASCII runes.
+	// idna.Lookup is the strict registration profile: it also rejects ASCII
+	// forms this layer has always accepted (underscores, leading/trailing
+	// hyphens). Running it unconditionally would turn a workspace-addressing
+	// helper into a hostname validator — which the doc comment above
+	// explicitly assigns to appctx.NewTarget — and would reject targets that
+	// scan fine today. So pure-ASCII input passes through untouched and the
+	// blast radius of this fold is exactly the class it exists to fix.
+	if !isASCII(d) {
+		ascii, err := idna.Lookup.ToASCII(d)
+		if err != nil {
+			return "", fmt.Errorf("IDNA normalisation failed for %q: %w", s, err)
 		}
+		if ascii == "" {
+			return "", fmt.Errorf("target normalised to empty")
+		}
+		return ascii, nil
 	}
 	return d, nil
+}
+
+// isASCII reports whether s is entirely single-byte ASCII.
+func isASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] >= 0x80 {
+			return false
+		}
+	}
+	return true
 }
 
 // targetSlug builds "<readable>-<hash8>".

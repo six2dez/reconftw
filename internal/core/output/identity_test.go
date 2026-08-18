@@ -171,18 +171,79 @@ func TestCanonicalTargetIDRejectsEmpty(t *testing.T) {
 	}
 }
 
-// TestCanonicalTargetIDRejectsNonASCII documents the IDNA carve-out: with
-// golang.org/x/net/idna unavailable, a non-ASCII hostname is refused rather
-// than slugified into an unpredictable directory name.
-func TestCanonicalTargetIDRejectsNonASCII(t *testing.T) {
+// TestCanonicalTargetIDFoldsIDNToPunycode pins the IDNA contract: an
+// internationalised hostname and its A-label form are ONE identity and must
+// address ONE workspace. reconFTW targets IDN domains routinely, so the
+// earlier reject-everything-non-ASCII behaviour made a legitimate target
+// class unscannable; folding them apart would be worse still — two visually
+// distinct spellings of the same engagement would grow two workspaces, two
+// checkpoints.db files and two artefact trees, which is F2 in domain form.
+func TestCanonicalTargetIDFoldsIDNToPunycode(t *testing.T) {
 	t.Parallel()
 
-	if _, err := output.CanonicalTargetID("münchen.de"); err == nil {
-		t.Error("non-ASCII hostname accepted; want rejection (IDNA normalisation unavailable)")
+	// Every spelling of the same registered name must collapse to one slug.
+	forms := []string{"münchen.de", "MÜNCHEN.DE", "xn--mnchen-3ya.de", "münchen.de."}
+
+	want, err := output.CanonicalTargetID(forms[0])
+	if err != nil {
+		t.Fatalf("CanonicalTargetID(%q): %v", forms[0], err)
 	}
-	// Punycode is already ASCII and must still be accepted.
-	if _, err := output.CanonicalTargetID("xn--80ak6aa92e.com"); err != nil {
-		t.Errorf("punycode hostname rejected: %v", err)
+	if want.Canonical != "xn--mnchen-3ya.de" {
+		t.Fatalf("canonical = %q; want the punycode A-label xn--mnchen-3ya.de", want.Canonical)
+	}
+
+	for _, in := range forms[1:] {
+		got, err := output.CanonicalTargetID(in)
+		if err != nil {
+			t.Fatalf("CanonicalTargetID(%q): %v", in, err)
+		}
+		if got.Slug != want.Slug {
+			t.Errorf("CanonicalTargetID(%q).Slug = %q; want %q — every spelling of one registered name must share a workspace",
+				in, got.Slug, want.Slug)
+		}
+	}
+
+	// A distinct IDN must stay distinct.
+	other, err := output.CanonicalTargetID("köln.de")
+	if err != nil {
+		t.Fatalf("CanonicalTargetID(köln.de): %v", err)
+	}
+	if other.Slug == want.Slug {
+		t.Error("two different IDN targets collapsed to one slug")
+	}
+}
+
+// TestCanonicalTargetIDRejectsInvalidIDN pins the other half of the contract:
+// for names that actually carry non-ASCII runes, idna.Lookup is the strict
+// registration profile, so a structurally invalid label is refused rather
+// than slugified into a neighbouring workspace.
+func TestCanonicalTargetIDRejectsInvalidIDN(t *testing.T) {
+	t.Parallel()
+
+	// U+0301 COMBINING ACUTE ACCENT as the leading rune is invalid.
+	if _, err := output.CanonicalTargetID("\u0301abc.de"); err == nil {
+		t.Error("CanonicalTargetID accepted an IDNA-invalid leading combining mark; want rejection")
+	}
+}
+
+// TestCanonicalTargetIDASCIIUnaffectedByIDNA pins the blast radius of the
+// IDNA fold. idna.Lookup's registration profile rejects underscores and
+// leading/trailing hyphens; this layer has always accepted them and hostname
+// syntax is appctx.NewTarget's boundary, not this function's. Applying IDNA
+// unconditionally would silently make previously scannable ASCII targets
+// unaddressable.
+func TestCanonicalTargetIDASCIIUnaffectedByIDNA(t *testing.T) {
+	t.Parallel()
+
+	for _, in := range []string{"a_b.de", "-lead.de", "trail-.de", "_dmarc.example.com"} {
+		id, err := output.CanonicalTargetID(in)
+		if err != nil {
+			t.Errorf("CanonicalTargetID(%q) = %v; pure-ASCII input must not be subjected to IDNA validation", in, err)
+			continue
+		}
+		if id.Canonical != strings.ToLower(in) {
+			t.Errorf("CanonicalTargetID(%q).Canonical = %q; ASCII input must pass through unchanged", in, id.Canonical)
+		}
 	}
 }
 
