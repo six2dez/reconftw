@@ -33,17 +33,42 @@ import (
 // *mcp.Server and owns the SessionRegistry, shared scheduler, and config.
 //
 // scanCtx / scanCancel: a server-lifetime context used by scan goroutines
-// launched via launchScanAndNotify. When the server shuts down (or in tests
-// when t.Cleanup calls Cancel()), all in-flight scan goroutines receive a
-// cancellation signal and can exit promptly. This satisfies the W4 goroutine-
-// cleanup requirement (Plan 08-05): use Cancel() in t.Cleanup to bound scan
-// goroutine lifetime without needing test hooks or goleak.IgnoreTopFunction.
+// launched via launchScanAndNotify. It is derived from the context handed to
+// NewMCPServer (the entrypoint's cobra context) and additionally linked to the
+// context Start receives, so transport shutdown or SIGINT cancels every
+// in-flight scan (F9 / T-15-15-06). Tests call Cancel() from t.Cleanup to bound
+// scan goroutine lifetime without test hooks or goleak.IgnoreTopFunction (W4).
+//
+// CONFIG SNAPSHOT (F7 / T-15-15-07, T-15-15-08). cfg, configPath and
+// secretsPath are the configuration the operator STARTED THE SERVER WITH. They
+// are written once, in NewMCPServer, and never mutated afterwards:
+//
+//   - cfg is the resolved *config.Config. It is only ever read (data dir, log
+//     level, MCP transport/port/key) or handed to code that treats it as
+//     read-only (the report renderer). It is NEVER handed to a scan, because
+//     a scan's ConfigTransform MUTATES the config it is given and concurrent
+//     scans would then race on one struct.
+//   - configPath / secretsPath ARE the snapshot for scans: every run carries
+//     them in handlers.RunOptions, so ResolveRunPlan re-loads config into its
+//     OWN instance and applies its own transform to that instance. The paths
+//     are immutable, so the snapshot is race-free by construction.
 type MCPServer struct {
-	srv        *mcp.Server
-	cfg        *config.MCPConfig
-	newSched   func() *scheduler.Scheduler
-	rdct       *log.Redactor
-	registry   *SessionRegistry
+	srv *mcp.Server
+	// cfg is the RESOLVED startup config. Read-only after construction.
+	cfg *config.Config
+	// configPath / secretsPath are the explicit --config / --secrets paths that
+	// produced cfg (empty when the operator supplied none). They travel with
+	// every scan so a run resolves the SAME configuration the server started
+	// with instead of re-running config.Load with no explicit paths at all.
+	configPath  string
+	secretsPath string
+	newSched    func() *scheduler.Scheduler
+	rdct        *log.Redactor
+	registry    *SessionRegistry
+	// tools holds the wiring the tool closures use. Exposed on the struct so
+	// tests can drive the exact code a tool call runs without fabricating an
+	// *mcp.ServerSession with a chosen ID.
+	tools      *toolDeps
 	scanCtx    context.Context    //nolint:containedctx // server owns scan goroutine lifetime
 	scanCancel context.CancelFunc // called by Cancel() to stop all scan goroutines
 }
@@ -75,9 +100,22 @@ func (s *MCPServer) Registry() *SessionRegistry {
 //
 // It creates a SessionRegistry, builds the go-sdk *mcp.Server with
 // SubscribeHandler + UnsubscribeHandler (both required by the SDK — A3),
-// wires an InitializedHandler that sets session scope from client params
-// (HTTP transport only; in-memory returns "" — A2 fallback in tools.go),
-// registers all 7 tools, and registers the scan://… resource template.
+// wires an InitializedHandler that pre-registers HTTP sessions with no scope
+// (the first tool call captures it atomically via CaptureScopeIfUnset),
+// registers the tools, and registers the scan://… resource templates.
+//
+// ctx is the scan root: every scan goroutine runs under a context derived from
+// it, so cancelling ctx (SIGINT at the entrypoint) cancels in-flight scans.
+// Start additionally links the context IT receives, and Cancel() cancels
+// unconditionally. Passing a nil ctx is a programming error and panics in
+// context.WithCancel, exactly as it would anywhere else.
+//
+// cfg is the RESOLVED configuration; configPath and secretsPath are the
+// explicit --config / --secrets paths that produced it. All three are the
+// immutable startup snapshot documented on MCPServer — before this, everything
+// but cfg.MCP was discarded and each scan re-ran config.Load with no explicit
+// paths, so a server started with --config silently scanned under a different
+// configuration (F7).
 //
 // newSched is a factory that creates a fresh per-scan *scheduler.Scheduler for
 // each tool invocation. Every scan gets its OWN scheduler (so the per-scan
@@ -87,7 +125,14 @@ func (s *MCPServer) Registry() *SessionRegistry {
 // (MCP-05). The factory is supplied by runMCPServeCmd.
 //
 // version is embedded in the MCP Implementation.Version field.
-func NewMCPServer(cfg *config.MCPConfig, newSched func() *scheduler.Scheduler, rdct *log.Redactor, version string) *MCPServer {
+func NewMCPServer(
+	ctx context.Context,
+	cfg *config.Config,
+	configPath, secretsPath string,
+	newSched func() *scheduler.Scheduler,
+	rdct *log.Redactor,
+	version string,
+) *MCPServer {
 	registry := NewSessionRegistry()
 
 	srv := mcp.NewServer(
@@ -97,7 +142,7 @@ func NewMCPServer(cfg *config.MCPConfig, newSched func() *scheduler.Scheduler, r
 			// For HTTP transport, sess.ID() is a real random UUID.
 			// For in-memory transports (tests), sess.ID() returns "" — see
 			// A2 fallback in tools.go: first tool call captures scope via SetScope.
-			InitializedHandler: func(ctx context.Context, req *mcp.InitializedRequest) {
+			InitializedHandler: func(_ context.Context, req *mcp.InitializedRequest) {
 				sess, ok := req.GetSession().(*mcp.ServerSession)
 				if !ok || sess == nil {
 					return
@@ -120,7 +165,7 @@ func NewMCPServer(cfg *config.MCPConfig, newSched func() *scheduler.Scheduler, r
 
 			// A3 (08-00-SUMMARY): SubscribeHandler and UnsubscribeHandler MUST
 			// both be set together. Setting only one causes a panic at NewServer.
-			SubscribeHandler: func(ctx context.Context, req *mcp.SubscribeRequest) error {
+			SubscribeHandler: func(_ context.Context, req *mcp.SubscribeRequest) error {
 				// Validate that the subscribing session has scope over the runID's target.
 				// The runID is embedded in the URI: scan://<runID>/findings.
 				runID := extractRunIDFromURI(req.Params.URI)
@@ -141,32 +186,37 @@ func NewMCPServer(cfg *config.MCPConfig, newSched func() *scheduler.Scheduler, r
 				}
 				return nil
 			},
-			UnsubscribeHandler: func(ctx context.Context, req *mcp.UnsubscribeRequest) error {
+			UnsubscribeHandler: func(_ context.Context, _ *mcp.UnsubscribeRequest) error {
 				// Allow all unsubscriptions.
 				return nil
 			},
 		},
 	)
 
-	// Create the server-lifetime scan context. Scan goroutines use this context
-	// so they can be cancelled when the server shuts down (or in tests via
-	// t.Cleanup(srv.Cancel)). This satisfies W4 — no goroutine can outlive the
-	// MCPServer's logical lifetime.
-	scanCtx, scanCancel := context.WithCancel(context.Background())
+	// Create the server-lifetime scan context. Scan goroutines run under it, so
+	// cancelling the caller's ctx — or Cancel(), or the context Start receives —
+	// stops every in-flight scan. It derives from the CALLER's context rather
+	// than context.Background(): an orphaned scan keeps spawning external tool
+	// processes long after the operator believes the server stopped (F9 /
+	// T-15-15-06).
+	scanCtx, scanCancel := context.WithCancel(ctx)
 
 	s := &MCPServer{
-		srv:        srv,
-		cfg:        cfg,
-		newSched:   newSched,
-		rdct:       rdct,
-		registry:   registry,
-		scanCtx:    scanCtx,
-		scanCancel: scanCancel,
+		srv:         srv,
+		cfg:         cfg,
+		configPath:  configPath,
+		secretsPath: secretsPath,
+		newSched:    newSched,
+		rdct:        rdct,
+		registry:    registry,
+		scanCtx:     scanCtx,
+		scanCancel:  scanCancel,
 	}
 
-	// Register all 7 MCP tools and the scan://…/findings resource template.
-	// Pass s (MCPServer) so tool handlers can access the scan context.
-	RegisterTools(srv, newSched, registry, rdct, cfg, s)
+	// Register the MCP tools and the scan://… resource templates. Pass s
+	// (MCPServer) so tool handlers can access the scan context and the config
+	// snapshot.
+	RegisterTools(srv, newSched, registry, rdct, cfg, configPath, secretsPath, s)
 	RegisterResources(srv, registry)
 
 	return s
@@ -175,7 +225,7 @@ func NewMCPServer(cfg *config.MCPConfig, newSched func() *scheduler.Scheduler, r
 // Start dispatches to either the HTTP or stdio transport based on cfg.Transport.
 // Blocks until the context is cancelled or an error occurs.
 func (s *MCPServer) Start(ctx context.Context) error {
-	switch s.cfg.Transport {
+	switch s.cfg.MCP.Transport {
 	case "stdio":
 		return runMCPServeStdio(ctx, s)
 	default:
@@ -214,13 +264,13 @@ func runMCPServeHTTP(ctx context.Context, s *MCPServer) error {
 	// T-08-04-02: BearerAuthMiddleware wraps the MCP handler at the net/http layer.
 	// Auth MUST be here, NOT inside the SDK (cannot read HTTP headers from go-sdk
 	// middleware — see RESEARCH.md Pitfall 1).
-	mux.Handle("/mcp", BearerAuthMiddleware(string(s.cfg.APIKey), mcpHandler))
+	mux.Handle("/mcp", BearerAuthMiddleware(string(s.cfg.MCP.APIKey), mcpHandler))
 	// T-08-04-04: OpenAPI schema served unauthenticated at /openapi.json.
 	// The schema contains no secrets — only endpoint descriptions and input schemas.
 	mux.HandleFunc("/openapi.json", serveOpenAPISchema)
 
 	// T-08-04-01: D-05 localhost-only binding. Port from config (validated min=1024,max=65535).
-	addr := fmt.Sprintf("127.0.0.1:%d", s.cfg.Port)
+	addr := fmt.Sprintf("127.0.0.1:%d", s.cfg.MCP.Port)
 	httpSrv := &http.Server{
 		Addr:              addr,
 		Handler:           mux,

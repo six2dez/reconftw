@@ -149,7 +149,14 @@ func runMCPServeCmd(cmd *cobra.Command) error {
 	}
 
 	// Step 8: Construct the MCPServer (registers tools + resources, builds go-sdk server).
-	mcpSrv := mcplib.NewMCPServer(&cfg.MCP, newSched, rdct, Version)
+	//
+	// The RESOLVED config and the explicit paths that produced it are the
+	// startup snapshot (F7): every scan carries efs.configPath / efs.secretsPath
+	// in its RunOptions and re-resolves from them, and the report tool renders
+	// with this cfg. Before this, only cfg.MCP was passed on and every scan
+	// re-ran config.Load with no explicit paths — a server started with
+	// --config scanned under a different configuration than the operator chose.
+	mcpSrv := mcplib.NewMCPServer(ctx, cfg, efs.configPath, efs.secretsPath, newSched, rdct, Version)
 
 	// Step 9: Start the server (blocks until ctx is cancelled or an error occurs).
 	return mcpSrv.Start(ctx)

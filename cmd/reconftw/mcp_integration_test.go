@@ -38,7 +38,8 @@ import (
 // via CallTool will receive a cancellation signal and exit promptly.
 func buildTestMCPServer(t *testing.T) *mcpsrv.MCPServer {
 	t.Helper()
-	cfg := &config.MCPConfig{
+	cfg := config.Defaults()
+	cfg.MCP = config.MCPConfig{
 		Enabled:   true,
 		APIKey:    corelog.Secret("test-api-key-16chars"),
 		Transport: "stdio",
@@ -54,7 +55,7 @@ func buildTestMCPServer(t *testing.T) *mcpsrv.MCPServer {
 		s.Limiter = limiter
 		return s
 	}
-	srv := mcpsrv.NewMCPServer(cfg, newSched, rdct, "test")
+	srv := mcpsrv.NewMCPServer(context.Background(), cfg, "", "", newSched, rdct, "test")
 	// W4: cancel all scan goroutines when the test exits.
 	t.Cleanup(srv.Cancel)
 	return srv
@@ -247,7 +248,8 @@ func TestMCPRedaction(t *testing.T) {
 	const secretKey = "super-secret-key-32chars-ABCDEFG"
 
 	// Build a server with a recognisable API key.
-	cfg := &config.MCPConfig{
+	cfg := config.Defaults()
+	cfg.MCP = config.MCPConfig{
 		Enabled:   true,
 		APIKey:    corelog.Secret(secretKey),
 		Transport: "stdio",
@@ -261,7 +263,7 @@ func TestMCPRedaction(t *testing.T) {
 		s.Limiter = limiter
 		return s
 	}
-	srv := mcpsrv.NewMCPServer(cfg, newSched, rdct, "test")
+	srv := mcpsrv.NewMCPServer(context.Background(), cfg, "", "", newSched, rdct, "test")
 	// W4: cancel all scan goroutines when the test exits.
 	t.Cleanup(srv.Cancel)
 

@@ -84,7 +84,79 @@ type ReportInput struct {
 
 // --- RegisterTools ---------------------------------------------------------
 
-// RegisterTools registers all 7 MCP tools on srv.
+// toolDeps is the wiring every tool handler needs. It exists so the tool
+// closures are one-liners and so the handler bodies can be driven directly by a
+// test with a chosen session ID — fabricating an *mcp.ServerSession with a
+// non-empty ID() is not possible from outside the SDK, and the first-call scope
+// bug (F8) only reproduces on a session that HAS an id.
+//
+// base is the immutable RunOptions template built from the startup snapshot.
+// Every call copies it by VALUE and fills in the per-call fields, so two
+// concurrent scans can never observe each other's options (T-15-15-08).
+type toolDeps struct {
+	srv      *mcp.Server
+	newSched func() *scheduler.Scheduler
+	registry *SessionRegistry
+	rdct     *log.Redactor
+	cfg      *config.Config
+	base     handlers.RunOptions
+	//nolint:containedctx // the server's scan-lifetime context, by design (W4)
+	scanCtx context.Context
+}
+
+// newToolDeps builds the tool wiring, including the immutable RunOptions
+// template that carries the startup configuration snapshot into every run.
+//
+// ConfigPath / SecretsPath: the explicit --config / --secrets the server was
+// started with. handlers.ResolveRunPlan feeds them straight back into
+// config.Load, so each run resolves the operator's configuration into its OWN
+// instance instead of re-loading defaults (F7 / T-15-15-07).
+//
+// OutputDir / LogLevel: taken from the RESOLVED config so a mid-flight edit of
+// the config file cannot move a running server's workspaces or change its log
+// level. Both are left empty when the resolved config leaves them empty, so the
+// normal fallbacks (workspaces/, the config file's level) still apply.
+func newToolDeps(
+	srv *mcp.Server,
+	newSched func() *scheduler.Scheduler,
+	registry *SessionRegistry,
+	rdct *log.Redactor,
+	cfg *config.Config,
+	configPath, secretsPath string,
+	scanCtx context.Context,
+) *toolDeps {
+	base := handlers.RunOptions{
+		ConfigPath:  configPath,
+		SecretsPath: secretsPath,
+	}
+	if cfg != nil {
+		base.OutputDir = cfg.Paths.DataDir
+		base.LogLevel = cfg.Output.LogLevel
+	}
+	return &toolDeps{
+		srv:      srv,
+		newSched: newSched,
+		registry: registry,
+		rdct:     rdct,
+		cfg:      cfg,
+		base:     base,
+		scanCtx:  scanCtx,
+	}
+}
+
+// runOptions returns a per-call copy of the snapshot template. The copy is the
+// isolation: handlers.ResolveRunPlan applies this run's ConfigTransform to the
+// config IT loads, never to anything shared.
+func (d *toolDeps) runOptions(target string, dryRun bool, extraFile string) handlers.RunOptions {
+	opts := d.base // value copy — never a shared pointer
+	opts.Target = target
+	opts.DryRun = dryRun
+	opts.ExtraFile = extraFile
+	opts.Scheduler = d.newSched()
+	return opts
+}
+
+// RegisterTools registers the MCP tools on srv.
 //
 // Parameters:
 //   - srv: the go-sdk *mcp.Server
@@ -93,13 +165,24 @@ type ReportInput struct {
 //     sessions stay within PARALLEL_MAX_JOBS (MCP-05) while each scan owns its
 //     RunTask/Checkpoint/Hash (no cross-session race)
 //   - registry: session registry for scope lookup + run tracking
-//   - rdct: redactor (unused by tools directly; passed for future log integration)
-//   - cfg: MCP config (unused by tools directly; available for future per-tool flags)
+//   - rdct: the server's redactor, carrying the secrets registered at startup;
+//     it reaches the report renderer and the client-facing error paths
+//   - cfg: the RESOLVED *config.Config the server was started with — its data
+//     dir and log level travel with every run
+//   - configPath / secretsPath: the explicit --config / --secrets paths that
+//     produced cfg; every run re-resolves from them (F7)
 //   - mcpSrv: the MCPServer owning the scanCtx used by scan goroutines (W4 — goroutine lifecycle)
-func RegisterTools(srv *mcp.Server, newSched func() *scheduler.Scheduler, registry *SessionRegistry, rdct *log.Redactor, cfg *config.MCPConfig, mcpSrv *MCPServer) {
-	// Silence unused-parameter lint if redactor/cfg not used yet.
-	_ = rdct
-	_ = cfg
+func RegisterTools(
+	srv *mcp.Server,
+	newSched func() *scheduler.Scheduler,
+	registry *SessionRegistry,
+	rdct *log.Redactor,
+	cfg *config.Config,
+	configPath, secretsPath string,
+	mcpSrv *MCPServer,
+) {
+	d := newToolDeps(srv, newSched, registry, rdct, cfg, configPath, secretsPath, mcpSrv.scanCtx)
+	mcpSrv.tools = d
 
 	// 1. recon — the composite recon pipeline (subs → web → osint), identical to
 	// the CLI `recon` subcommand.
@@ -111,43 +194,43 @@ func RegisterTools(srv *mcp.Server, newSched func() *scheduler.Scheduler, regist
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "recon",
 		Description: "Run the full recon pipeline: subdomain enumeration, web probing and analysis, and OSINT collection (no vulnerability scanning — use the vulns tool for that).",
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args SubsInput) (*mcp.CallToolResult, any, error) {
+	}, func(_ context.Context, req *mcp.CallToolRequest, args SubsInput) (*mcp.CallToolResult, any, error) {
 		runRecon := func(ctx context.Context, opts handlers.RunOptions) error {
 			return handlers.RunCompositeAsync(ctx, opts, handlers.ModeRecon)
 		}
-		return realToolHandler(mcpSrv.scanCtx, req, args.Target, args.DryRun, "", newSched, registry, srv, runRecon)
+		return d.launch(sessionIDFromRequest(req), args.Target, args.DryRun, "", runRecon)
 	})
 
 	// 2. subs — passive + active subdomain enumeration pipeline.
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "subs",
 		Description: "Run subdomain enumeration (passive + active + permut + takeover).",
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args SubsInput) (*mcp.CallToolResult, any, error) {
-		return realToolHandler(mcpSrv.scanCtx, req, args.Target, args.DryRun, "", newSched, registry, srv, handlers.RunSubsAsync)
+	}, func(_ context.Context, req *mcp.CallToolRequest, args SubsInput) (*mcp.CallToolResult, any, error) {
+		return d.launch(sessionIDFromRequest(req), args.Target, args.DryRun, "", handlers.RunSubsAsync)
 	})
 
 	// 3. web — web probe + analysis pipeline.
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "web",
 		Description: "Run web probe + analysis pipeline (HTTP probing, WAF detection, URL crawl, JS analysis).",
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args WebInput) (*mcp.CallToolResult, any, error) {
-		return realToolHandler(mcpSrv.scanCtx, req, args.Target, args.DryRun, args.Hosts, newSched, registry, srv, handlers.RunWebAsync)
+	}, func(_ context.Context, req *mcp.CallToolRequest, args WebInput) (*mcp.CallToolResult, any, error) {
+		return d.launch(sessionIDFromRequest(req), args.Target, args.DryRun, args.Hosts, handlers.RunWebAsync)
 	})
 
 	// 4. vulns — vulnerability scanning pipeline.
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "vulns",
 		Description: "Run vulnerability scanning pipeline (XSS, SQLi, SSRF, SSTI, CRLF, LFI, Nuclei DAST).",
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args VulnsInput) (*mcp.CallToolResult, any, error) {
-		return realToolHandler(mcpSrv.scanCtx, req, args.Target, args.DryRun, args.URLs, newSched, registry, srv, handlers.RunVulnsAsync)
+	}, func(_ context.Context, req *mcp.CallToolRequest, args VulnsInput) (*mcp.CallToolResult, any, error) {
+		return d.launch(sessionIDFromRequest(req), args.Target, args.DryRun, args.URLs, handlers.RunVulnsAsync)
 	})
 
 	// 5. osint — OSINT collection pipeline.
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "osint",
 		Description: "Run OSINT collection pipeline (domain info, emails, GitHub leaks, Google dorks, cloud enum).",
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args OSINTInput) (*mcp.CallToolResult, any, error) {
-		return realToolHandler(mcpSrv.scanCtx, req, args.Target, args.DryRun, "", newSched, registry, srv, handlers.RunOSINTAsync)
+	}, func(_ context.Context, req *mcp.CallToolRequest, args OSINTInput) (*mcp.CallToolResult, any, error) {
+		return d.launch(sessionIDFromRequest(req), args.Target, args.DryRun, "", handlers.RunOSINTAsync)
 	})
 
 	// 6. monitor — recurring composite cycles with cross-cycle diffing.
@@ -160,7 +243,7 @@ func RegisterTools(srv *mcp.Server, newSched func() *scheduler.Scheduler, regist
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "monitor",
 		Description: "Run monitor mode: repeated recon cycles with cross-cycle diffing, reporting newly discovered assets and findings.",
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args MonitorInput) (*mcp.CallToolResult, any, error) {
+	}, func(_ context.Context, req *mcp.CallToolRequest, args MonitorInput) (*mcp.CallToolResult, any, error) {
 		interval, err := parseMonitorInterval(args.Interval)
 		if err != nil {
 			return &mcp.CallToolResult{
@@ -177,7 +260,7 @@ func RegisterTools(srv *mcp.Server, newSched func() *scheduler.Scheduler, regist
 				MaxCycles: args.Cycles,
 			})
 		}
-		return realToolHandler(mcpSrv.scanCtx, req, args.Target, false, "", newSched, registry, srv, runMonitor)
+		return d.launch(sessionIDFromRequest(req), args.Target, false, "", runMonitor)
 	})
 
 	// 7. report — regenerate reports for the latest completed scan.
@@ -190,52 +273,42 @@ func RegisterTools(srv *mcp.Server, newSched func() *scheduler.Scheduler, regist
 		Name:        "report",
 		Description: "Regenerate reports (HTML/JSON/CSV/SARIF) for a target's latest completed scan from the store. Runs no scan.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args ReportInput) (*mcp.CallToolResult, any, error) {
-		var sessionID string
-		if sess, ok := req.GetSession().(*mcp.ServerSession); ok && sess != nil {
-			sessionID = sess.ID()
-		}
-		// Same D-06 scope guard the scanning tools apply: a report exposes a
-		// target's findings, so it must be scope-checked like a scan.
-		if _, exists := registry.Lookup(sessionID); !exists {
-			registry.Register(sessionID, "", nil)
-			registry.SetScope(sessionID, NewSessionScope([]string{args.Target}))
-		}
-		if err := CheckScope(sessionID, args.Target, registry); err != nil {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{&mcp.TextContent{
-					Text: fmt.Sprintf(`{"error":"out_of_scope","message":%q}`, err.Error()),
-				}},
-				IsError: true,
-			}, nil, nil
-		}
-		// TODO(plan 15-15, F7): pass the server's RESOLVED *config.Config here.
-		// MCPServer currently holds only *config.MCPConfig, so there is no full
-		// config at this call site; 15-15 adds the startup snapshot. Until then
-		// the config is explicitly nil (data dir falls back to "data") rather
-		// than a config.Load default, which would look authoritative while
-		// ignoring the --config/--secrets the server was started with.
-		// The redactor IS available and is now threaded through, so report
-		// redaction uses the secrets the server actually registered.
-		result, err := handlers.RenderReportsForTarget(ctx, nil, rdct, args.Target, "", false)
-		if err != nil {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{&mcp.TextContent{
-					Text: fmt.Sprintf(`{"error":"report_failed","message":%q}`, err.Error()),
-				}},
-				IsError: true,
-			}, nil, nil
-		}
-		// The response lists what THIS render wrote, from the manifest.
-		body, _ := json.Marshal(map[string]any{
-			"target":  args.Target,
-			"scan_id": result.ScanID,
-			"dir":     result.Dir,
-			"reports": result.Files,
-		})
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{&mcp.TextContent{Text: string(body)}},
-		}, nil, nil
+		return d.report(ctx, sessionIDFromRequest(req), args)
 	})
+}
+
+// report is the body of the report tool: scope-guard, render, answer with the
+// manifest. Split out of the closure so a test can drive it with a chosen
+// session ID (see toolDeps).
+func (d *toolDeps) report(ctx context.Context, sessionID string, args ReportInput) (*mcp.CallToolResult, any, error) {
+	// Same D-06 scope guard the scanning tools apply: a report exposes a
+	// target's findings, so it must be scope-checked like a scan.
+	if _, exists := d.registry.Lookup(sessionID); !exists {
+		d.registry.Register(sessionID, "", nil)
+		d.registry.SetScope(sessionID, NewSessionScope([]string{args.Target}))
+	}
+	if err := CheckScope(sessionID, args.Target, d.registry); err != nil {
+		return toolErrorf("out_of_scope", err), nil, nil
+	}
+	// The server's RESOLVED config and redactor. The render therefore reads the
+	// operator's data dir and scrubs the operator's registered secrets. This
+	// call site used to pass cfg=nil behind a TODO, because MCPServer held only
+	// the MCP config slice — so an operator with paths.data_dir set got "data"
+	// on the MCP report path (F7 / T-15-11-05). The snapshot closes it.
+	result, err := handlers.RenderReportsForTarget(ctx, d.cfg, d.rdct, args.Target, "", false)
+	if err != nil {
+		return toolErrorf("report_failed", err), nil, nil
+	}
+	// The response lists what THIS render wrote, from the manifest.
+	body, _ := json.Marshal(map[string]any{
+		"target":  args.Target,
+		"scan_id": result.ScanID,
+		"dir":     result.Dir,
+		"reports": result.Files,
+	})
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: string(body)}},
+	}, nil, nil
 }
 
 // parseMonitorInterval turns the tool's "1h"/"30m" string into a Duration.
@@ -259,61 +332,68 @@ func parseMonitorInterval(s string) (time.Duration, error) {
 // runFunc is the shared function signature for RunXxxAsync handlers.
 type runFunc func(ctx context.Context, opts handlers.RunOptions) error
 
-// realToolHandler implements the D-02 async + D-06 scope-guard + A2 fallback
-// pattern shared by all real tool handlers (recon, subs, web, vulns, osint).
+// sessionIDFromRequest extracts the MCP session ID from a tool call.
+//
+// A1 (sdk_assumptions_test.go): the session is always an *mcp.ServerSession.
+// The ID is "" for in-memory transports, which is a legitimate session key —
+// every capture and ownership check treats it as one.
+func sessionIDFromRequest(req *mcp.CallToolRequest) string {
+	if sess, ok := req.GetSession().(*mcp.ServerSession); ok && sess != nil {
+		return sess.ID()
+	}
+	return ""
+}
+
+// toolErrorf builds the shared {"error":…,"message":…} tool-error response.
+// One helper so every tool's error shape is identical by construction rather
+// than by five copies of the same fmt.Sprintf.
+func toolErrorf(code string, err error) *mcp.CallToolResult {
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{
+			Text: fmt.Sprintf(`{"error":%q,"message":%q}`, code, err.Error()),
+		}},
+		IsError: true,
+	}
+}
+
+// launch implements the D-02 async + D-06 scope-guard pattern shared by all
+// scanning tool handlers (recon, subs, web, vulns, osint, monitor).
 //
 // Steps:
-//  1. Extract sessionID from req.GetSession() (A1 type assertion).
-//  2. A2 FALLBACK (W2): if session scope is nil, capture first call's target.
-//  3. CheckScope: hard-reject out-of-scope targets (D-06).
-//  4. Generate crypto/rand runID (T-08-04-06 128-bit entropy).
-//  5. Register the runID in the SessionRegistry.
-//  6. Launch goroutine via launchScanAndNotify (non-blocking return, D-02).
-//  7. Return {"run_id":"…","resource":"scan://…/findings"} immediately.
-func realToolHandler(
-	ctx context.Context,
-	req *mcp.CallToolRequest,
+//  1. Capture the session scope if it is not set yet (first tool call).
+//  2. CheckScope: hard-reject out-of-scope targets (D-06).
+//  3. Generate crypto/rand runID (T-08-04-06 128-bit entropy).
+//  4. Register the runID in the SessionRegistry.
+//  5. Launch goroutine via launchScanAndNotify (non-blocking return, D-02).
+//  6. Return {"run_id":"…","resource":"scan://…/findings"} immediately.
+func (d *toolDeps) launch(
+	sessionID string,
 	target string,
 	dryRun bool,
 	extraFile string,
-	newSched func() *scheduler.Scheduler,
-	registry *SessionRegistry,
-	srv *mcp.Server,
 	fn runFunc,
 ) (*mcp.CallToolResult, any, error) {
-	// Step 1: Extract sessionID (A1 — *mcp.ServerSession cast verified in sdk_assumptions_test.go).
-	var sessionID string
-	if sess, ok := req.GetSession().(*mcp.ServerSession); ok && sess != nil {
-		sessionID = sess.ID()
-	}
-	// sessionID may be "" for in-memory transports (A2 partial).
+	ctx := d.scanCtx
+	registry := d.registry
+	srv := d.srv
 
-	// Step 2: A2 FALLBACK (W2).
-	// If this session has no scope entry yet (ID="" or not yet registered by InitializedHandler),
-	// capture the first tool call's target as the implicit fixed session scope.
-	// BEFORE CheckScope, so CheckScope sees a non-nil scope.
+	// Step 1: capture the first tool call's target as the implicit fixed
+	// session scope, BEFORE CheckScope so CheckScope sees a non-nil scope.
 	entry, exists := registry.Lookup(sessionID)
 	if !exists || entry.Scope == nil {
-		// First tool call for this session: capture target as implicit session scope.
-		// SetScope is a no-op if sessionID is not registered yet; we register first.
 		if !exists {
 			registry.Register(sessionID, "", nil)
 		}
 		registry.SetScope(sessionID, NewSessionScope([]string{target}))
 	}
 
-	// Step 3: CheckScope — hard-reject out-of-scope targets (D-06).
+	// Step 2: CheckScope — hard-reject out-of-scope targets (D-06).
 	// This validates the target against the now-set scope.
 	if err := CheckScope(sessionID, target, registry); err != nil {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{&mcp.TextContent{
-				Text: fmt.Sprintf(`{"error":"out_of_scope","message":%q}`, err.Error()),
-			}},
-			IsError: true,
-		}, nil, nil
+		return toolErrorf("out_of_scope", err), nil, nil
 	}
 
-	// Step 4: Generate crypto/rand runID — 16 random bytes → 32 hex chars (128-bit entropy).
+	// Step 3: Generate crypto/rand runID — 16 random bytes → 32 hex chars (128-bit entropy).
 	// T-08-04-06: unpredictable runIDs prevent cross-session resource URI guessing.
 	runID, err := newRunID()
 	if err != nil {
@@ -322,32 +402,27 @@ func realToolHandler(
 
 	resourceURI := "scan://" + runID + "/findings"
 
-	// Step 5: Register the runID against the session that launched it. Ownership
+	// Step 4: Register the runID against the session that launched it. Ownership
 	// is what authorises later resource reads and subscriptions — an
 	// unpredictable runID makes URIs hard to guess, but guessability is not an
 	// access-control model.
 	registry.RegisterRun(runID, sessionID)
 
-	// Step 6: Launch scan goroutine (D-02 async — handler returns immediately).
-	// ctx here is mcpSrv.scanCtx (the server-lifetime context), NOT the tool
-	// call context. The scan must outlive the MCP request/response cycle (D-02).
-	// Using mcpSrv.scanCtx instead of context.Background() allows tests to
-	// cancel all scan goroutines via t.Cleanup(srv.Cancel) (W4 — goleak-compliant).
-	// srv is passed in from RegisterTools (closure captures the *mcp.Server).
+	// Step 5: Launch scan goroutine (D-02 async — handler returns immediately).
+	// ctx here is the server-lifetime scan context, NOT the tool call context:
+	// the scan must outlive the MCP request/response cycle (D-02), and the
+	// server context is what Cancel() and transport shutdown cancel (W4).
 	//
-	// Create a FRESH per-scan scheduler (newSched). Each concurrent session gets
-	// its own Scheduler so the per-scan RunTask/Checkpoint/Hash fields wired by
-	// appctx.Boot never race across D-03 concurrent sessions; all per-scan
-	// schedulers share one process-wide Limiter (set by the factory) so they
-	// collectively cannot exceed PARALLEL_MAX_JOBS (MCP-05).
-	go launchScanAndNotify(ctx, runID, handlers.RunOptions{
-		Target:    target,
-		DryRun:    dryRun,
-		ExtraFile: extraFile,
-		Scheduler: newSched(),
-	}, srv, registry, fn)
+	// The options are a copy of the startup snapshot template, so this run
+	// carries the operator's --config / --secrets / data dir / log level and
+	// resolves them into its OWN config instance (F7). It also gets a FRESH
+	// per-scan scheduler: each concurrent session owns its RunTask/Checkpoint/
+	// Hash fields (no D-03 cross-session race) while all per-scan schedulers
+	// share one process-wide Limiter so they collectively cannot exceed
+	// PARALLEL_MAX_JOBS (MCP-05).
+	go launchScanAndNotify(ctx, runID, d.runOptions(target, dryRun, extraFile), srv, registry, fn)
 
-	// Step 7: Return immediately with run_id + resource URI.
+	// Step 6: Return immediately with run_id + resource URI.
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{
