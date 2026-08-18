@@ -111,7 +111,7 @@ func OpenMonitorState(workDir string) (*MonitorState, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("monitor: mkdir %s: %w", dir, err)
 	}
-	path := filepath.Join(dir, "state.db")
+	path := MonitorStatePath(workDir)
 	db, err := sql.Open("sqlite", path+monitorStateDSNPragmas)
 	if err != nil {
 		return nil, fmt.Errorf("monitor: open state.db: %w", err)
