@@ -9,7 +9,11 @@
 // read-lock for reads) following the same pattern as internal/core/log.Redactor.
 package mcp
 
-import "sync"
+import (
+	"fmt"
+	"strings"
+	"sync"
+)
 
 // SessionStatus is the lifecycle state of a session entry.
 type SessionStatus string
@@ -147,14 +151,61 @@ func (r *SessionRegistry) MarkFailed(runID string, err error) {
 	}
 }
 
-// SetScope sets the scope for sessionID.
+// SetScope sets the scope for sessionID unconditionally.
 // It is a no-op when sessionID is not found (graceful for async initialise paths).
+//
+// Tools and resources MUST NOT call this: use CaptureScopeIfUnset, which is
+// atomic. SetScope remains for explicit, non-racing scope assignment (tests and
+// any future path that scopes a session from InitializeParams).
 func (r *SessionRegistry) SetScope(sessionID string, scope *SessionScope) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if entry, ok := r.entries[sessionID]; ok {
 		entry.Scope = scope
 	}
+}
+
+// CaptureScopeIfUnset sets the session's scope to target, but only if the
+// session has no usable scope yet. It reports whether THIS call captured it.
+//
+// It is the single scope-capture path for every tool and resource, and it takes
+// the registry mutex ONCE for the whole read-modify-write. The two call sites it
+// replaced were both non-atomic and one was simply wrong:
+//
+//   - the scanning tools did Lookup → Register → SetScope with the lock released
+//     between each step, so two concurrent first calls could capture two
+//     DIFFERENT targets. Scope is this server's authorisation boundary, so that
+//     is an authorisation bypass, not a race-condition nuisance (T-15-15-01).
+//   - the report tool captured only when the session did NOT exist. A session
+//     pre-registered by InitializedHandler with a nil scope EXISTS, so nothing
+//     captured and CheckScope then rejected the first ordinary report call for
+//     an empty scope (F8, acceptance gate 6).
+//
+// "Already scoped" is the normal case and returns (false, nil) — it is not an
+// error. The error is reserved for a genuinely invalid request: an empty target
+// would install a fail-closed scope that rejects everything, including itself,
+// which is far more confusing than a rejection at the door.
+//
+// A session that is not registered yet is registered here, so a caller never
+// needs the Register/SetScope dance that made the old sequence racy.
+func (r *SessionRegistry) CaptureScopeIfUnset(sessionID, target string) (bool, error) {
+	if strings.TrimSpace(target) == "" {
+		return false, fmt.Errorf("mcp: cannot capture session scope from an empty target")
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	entry, ok := r.entries[sessionID]
+	if !ok {
+		entry = &SessionEntry{RunID: sessionID, Status: SessionStatusRunning}
+		r.entries[sessionID] = entry
+	}
+	if !entry.Scope.isEmpty() {
+		return false, nil // already scoped — the normal case for every call after the first
+	}
+	entry.Scope = NewSessionScope([]string{target})
+	return true, nil
 }
 
 // WorkDir returns the work directory for runID, or "" if not found.

@@ -6,12 +6,14 @@
 // monitor and report were stubs answering {"status":"not_implemented"} until
 // they were wired to RunMonitorAsync and RenderReportsForTarget.
 //
-// Each real tool handler follows this pattern (D-02 async + D-06 scope + A2 fallback):
+// Each real tool handler follows this pattern (D-02 async + D-06 scope):
 //
 //  1. Extract sessionID from req.GetSession() (A1 — *mcp.ServerSession cast verified).
-//  2. A2 FALLBACK (W2): if session scope is nil (stdio transport / test), capture
-//     the first call's target as the implicit fixed session scope via SetScope BEFORE
-//     CheckScope. Subsequent calls with a different target are rejected.
+//  2. CaptureScopeIfUnset: atomically capture the first call's target as the
+//     implicit fixed session scope, BEFORE CheckScope. Subsequent calls with a
+//     different target are rejected. This is the ONLY capture path, shared by
+//     every tool — the scanning tools and report used to have divergent copies,
+//     one of which never captured at all (F8).
 //  3. CheckScope: hard-reject (ErrOutOfScope) if target is not in session scope (D-06).
 //  4. Generate a crypto/rand runID (128-bit entropy — T-08-04-06).
 //  5. Register the runID in the SessionRegistry.
@@ -283,9 +285,13 @@ func RegisterTools(
 func (d *toolDeps) report(ctx context.Context, sessionID string, args ReportInput) (*mcp.CallToolResult, any, error) {
 	// Same D-06 scope guard the scanning tools apply: a report exposes a
 	// target's findings, so it must be scope-checked like a scan.
-	if _, exists := d.registry.Lookup(sessionID); !exists {
-		d.registry.Register(sessionID, "", nil)
-		d.registry.SetScope(sessionID, NewSessionScope([]string{args.Target}))
+	//
+	// This used to capture only when the session did NOT exist, which meant it
+	// never captured for an HTTP session — InitializedHandler pre-registers those
+	// with a nil scope — and the first ordinary report call was rejected for an
+	// empty scope (F8, acceptance gate 6).
+	if _, err := d.registry.CaptureScopeIfUnset(sessionID, args.Target); err != nil {
+		return toolErrorf("invalid_target", err), nil, nil
 	}
 	if err := CheckScope(sessionID, args.Target, d.registry); err != nil {
 		return toolErrorf("out_of_scope", err), nil, nil
@@ -378,13 +384,12 @@ func (d *toolDeps) launch(
 	srv := d.srv
 
 	// Step 1: capture the first tool call's target as the implicit fixed
-	// session scope, BEFORE CheckScope so CheckScope sees a non-nil scope.
-	entry, exists := registry.Lookup(sessionID)
-	if !exists || entry.Scope == nil {
-		if !exists {
-			registry.Register(sessionID, "", nil)
-		}
-		registry.SetScope(sessionID, NewSessionScope([]string{target}))
+	// session scope, BEFORE CheckScope so CheckScope sees a non-empty scope.
+	// One atomic read-modify-write: the previous Lookup → Register → SetScope
+	// sequence released the lock between steps, so two concurrent first calls
+	// could capture two different targets (T-15-15-01).
+	if _, err := registry.CaptureScopeIfUnset(sessionID, target); err != nil {
+		return toolErrorf("invalid_target", err), nil, nil
 	}
 
 	// Step 2: CheckScope — hard-reject out-of-scope targets (D-06).

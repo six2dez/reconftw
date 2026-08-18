@@ -11,8 +11,9 @@
 //   - A3: SubscribeHandler and UnsubscribeHandler MUST both be set in ServerOptions
 //     or the SDK panics (server.go:172-176). Setting only one panics at NewServer.
 //   - A6: NewMemoryEventStore(nil) is safe; nil options are accepted.
-//   - A2: InitializedHandler is wired; ID()="" for in-memory transport — fallback
-//     path in tools.go handles the first-tool-call scope capture.
+//   - A2: InitializedHandler is wired; ID()="" for in-memory transport. Either
+//     way the first tool call captures the session scope through the registry's
+//     atomic CaptureScopeIfUnset — there is one capture path, not two.
 package mcp
 
 import (
@@ -138,10 +139,11 @@ func NewMCPServer(
 	srv := mcp.NewServer(
 		&mcp.Implementation{Name: "reconFTW", Version: version},
 		&mcp.ServerOptions{
-			// InitializedHandler: Set session scope from InitializeParams.
-			// For HTTP transport, sess.ID() is a real random UUID.
-			// For in-memory transports (tests), sess.ID() returns "" — see
-			// A2 fallback in tools.go: first tool call captures scope via SetScope.
+			// InitializedHandler: pre-register the session. For HTTP transport
+			// sess.ID() is a real random UUID; for in-memory transports (tests)
+			// it is "". Scope is NOT set here — a session legitimately has no
+			// target until its first tool call, which captures it atomically
+			// via SessionRegistry.CaptureScopeIfUnset.
 			InitializedHandler: func(_ context.Context, req *mcp.InitializedRequest) {
 				sess, ok := req.GetSession().(*mcp.ServerSession)
 				if !ok || sess == nil {
@@ -149,17 +151,15 @@ func NewMCPServer(
 				}
 				sessID := sess.ID()
 				if sessID == "" {
-					// A2 fallback path: ID="" for in-memory transport.
-					// Scope will be captured on the first tool call in tools.go.
+					// ID="" for in-memory transport. Nothing to pre-register;
+					// the first tool call captures scope for the "" session
+					// exactly as it does for a real one.
 					return
 				}
-				// Pre-register the session so SetScope can find it.
-				// Register with empty workdir and nil scope; scope will be set
-				// when the first tool call arrives (A2 fallback), or here if
-				// InitializeParams carries a target list in future extensions.
-				//
-				// For now, initialize with nil scope so the A2 fallback in
-				// each tool handler captures it on first call.
+				// Register with an empty workdir and a NIL scope. That is not an
+				// oversight: it is the honest statement that the session has not
+				// named a target yet, and CheckScope stays fail-closed until the
+				// first call captures one via CaptureScopeIfUnset.
 				registry.Register(sessID, "", nil)
 			},
 
