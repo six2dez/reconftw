@@ -44,6 +44,7 @@ import (
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -170,6 +171,19 @@ func (t *FfufTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 
 	var totalResults int
 
+	// F3 + cross-host accumulation (phase 15).
+	//
+	// allLines accumulates EVERY host's records so the artefact is published
+	// exactly ONCE, after the loop. It used to be published inside the loop, and
+	// OutputTree.Append REPLACES rather than appends (internal/core/output/
+	// tree.go), so artefacts/fuzz.jsonl ended up holding only the LAST host that
+	// produced results — every earlier host's findings were silently overwritten.
+	//
+	// The hoist is not cosmetic: it is a PRECONDITION for the empty publish. An
+	// in-loop PublishArtefact(…, nil) for a barren host would erase every host
+	// fuzzed before it.
+	var allLines [][]byte
+
 	for i, hostURL := range allHosts {
 		// T-05-05: validate URL scheme before interpolating into -u flag.
 		if err := validateFFUFURL(hostURL); err != nil {
@@ -199,29 +213,48 @@ func (t *FfufTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 		}
 		totalResults += len(results)
 
-		// Append to artefacts/fuzz.jsonl via app.Tree.Append.
-		if len(results) > 0 {
-			var lines [][]byte
-			for _, rec := range results {
-				b, merr := json.Marshal(rec)
-				if merr != nil {
-					continue
-				}
-				lines = append(lines, b)
+		// Accumulate this host's records; the publish happens once after the loop.
+		for _, rec := range results {
+			b, merr := json.Marshal(rec)
+			if merr != nil {
+				continue
 			}
-			if len(lines) > 0 {
-				if appendErr := app.Tree.Append("fuzz", lines); appendErr != nil {
-					if app.Log != nil {
-						app.Log.Debug("web.ffuf: Tree.Append failed",
-							"records", len(lines), "err", appendErr)
-					}
-					// Non-fatal per best_effort (D-W12).
-				}
-			}
+			allLines = append(allLines, b)
 		}
 
 		// Clean up staging file.
 		os.Remove(stagingFile) //nolint:errcheck // best effort cleanup
+	}
+
+	// Publish artefacts/fuzz.jsonl ONCE, covering every host.
+	//
+	// ffuf is the sole direct writer of "fuzz" and there is no staging producer
+	// for that stage, so web.MergeStage is barred from touching it (15-03's
+	// directArtefactWriterStages). This is therefore the ONLY place the artefact
+	// can be emptied — and it must be, or a run that fuzzes every host and finds
+	// nothing republishes the previous run's results.
+	//
+	// Reaching here means ffuf RAN: the three StatusSkipped returns above (no
+	// wordlist configured, wordlist not accessible, no hosts) and the
+	// StatusErrored terminal-stream return inside the loop all leave the previous
+	// artefact untouched, which is the "producer did not run → preserve" half of
+	// the invariant.
+	if len(allLines) > 0 {
+		// Tree.Append stays the scope-enforcement boundary for non-empty batches.
+		if appendErr := app.Tree.Append("fuzz", allLines); appendErr != nil {
+			if app.Log != nil {
+				app.Log.Debug("web.ffuf: Tree.Append failed",
+					"records", len(allLines), "err", appendErr)
+			}
+			// Non-fatal per best_effort (D-W12).
+		}
+	} else if pubErr := output.PublishArtefact(app.Target.WorkDir, "fuzz", nil); pubErr != nil {
+		// Append cannot express "empty" — it short-circuits on a zero-length
+		// batch — so the empty case goes through PublishArtefact. No scope check
+		// is needed or possible: there are no records.
+		if app.Log != nil {
+			app.Log.Debug("web.ffuf: empty fuzz publish failed", "err", pubErr)
+		}
 	}
 
 	if app.Log != nil {

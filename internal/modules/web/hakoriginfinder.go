@@ -39,6 +39,7 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -121,19 +122,26 @@ func (t *HakoriginfinderTask) Run(ctx context.Context, app *appctx.AppContext) (
 		}
 	}
 
-	if len(origins) == 0 {
-		return task.Result{
-			Status: task.StatusDone,
-			Stats:  map[string]int{"origins_found": 0},
-		}, nil
-	}
-
 	artefactsDir := filepath.Join(app.Target.WorkDir, "artefacts")
 	if err := os.MkdirAll(artefactsDir, 0o755); err != nil {
 		return task.Result{Status: task.StatusErrored},
 			fmt.Errorf("web.hakoriginfinder: mkdir artefacts/: %w", err)
 	}
 
+	// F3 (phase 15): publish artefacts/origins.jsonl UNCONDITIONALLY.
+	//
+	// hakoriginfinder is the sole direct writer of "origins" and there is no
+	// staging producer for that stage, so web.MergeStage is barred from touching
+	// it (15-03's directArtefactWriterStages). This is therefore the ONLY place
+	// the artefact can be emptied — and it must be. The old
+	// `if len(origins) == 0 { return StatusDone }` short-circuit here meant a run
+	// that probed every host and found no origin republished the PREVIOUS run's
+	// origins, so an origin IP that has since been fixed kept being reported as
+	// exposed.
+	//
+	// Reaching here means the tool RAN: the StatusSkipped returns above (no
+	// host/IP pairs, binary not on PATH) and the StatusErrored mkdir failures
+	// leave the previous artefact untouched — the "did not run → preserve" half.
 	var lines [][]byte
 	for _, r := range origins {
 		b, err := json.Marshal(r)
@@ -143,10 +151,17 @@ func (t *HakoriginfinderTask) Run(ctx context.Context, app *appctx.AppContext) (
 		lines = append(lines, b)
 	}
 	if len(lines) > 0 {
+		// Tree.Append stays the scope-enforcement boundary for non-empty batches.
 		if appendErr := app.Tree.Append("origins", lines); appendErr != nil {
 			if app.Log != nil {
 				app.Log.Debug("web.hakoriginfinder: Tree.Append failed", "err", appendErr)
 			}
+		}
+	} else if pubErr := output.PublishArtefact(app.Target.WorkDir, "origins", nil); pubErr != nil {
+		// Append short-circuits on an empty batch and cannot express "this run
+		// found nothing", so the empty case goes through PublishArtefact.
+		if app.Log != nil {
+			app.Log.Debug("web.hakoriginfinder: empty origins publish failed", "err", pubErr)
 		}
 	}
 

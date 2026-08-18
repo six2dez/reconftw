@@ -191,7 +191,28 @@ func (SubGeoTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 		records = append(records, encoded)
 	}
 
-	// Step 4: single direct Append — SubGeoTask is the only "hosts" writer.
+	// Step 4: direct Append, GUARDED — this task must NOT empty-publish.
+	//
+	// The comment that used to sit here asserted this task was the sole writer
+	// of the "hosts" artefact. That was FALSE, and it was load-bearing in the
+	// wrong direction. There are TWO direct writers of artefacts/hosts.jsonl:
+	// this one and web/httpx.go, which additionally passes the artefact itself
+	// as its httpx -o target.
+	//
+	// The real ordering, verified on the tree: subdomains.geo runs in the
+	// "subs-enrichment" stage group, the LAST subdomains group, and web.httpx
+	// runs in "web-probe", the FIRST web group, with webStageGroups() appended
+	// after the subs groups (internal/mcp/handlers/composite.go). geo therefore
+	// runs strictly BEFORE httpx, and because Tree.Append REPLACES rather than
+	// appends, geo's ASN/country/city enrichment does not survive httpx in any
+	// run that probes. (That loss is a pre-existing defect, out of scope for the
+	// F3 work in phase 15 and recorded rather than silently fixed here.)
+	//
+	// Consequence for F3: httpx (web/httpx.go) is the authoritative "hosts"
+	// writer and owns the empty publish. geo KEEPS this len(records) > 0 guard,
+	// because in a subs-only or passive run httpx never runs, and an empty
+	// publish from geo would erase a previous web run's hosts that no producer
+	// in this run ever looked at — strictly worse than leaving them.
 	if len(records) > 0 {
 		if err := app.Tree.Append("hosts", records); err != nil {
 			if app.Log != nil {

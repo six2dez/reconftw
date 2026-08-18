@@ -42,6 +42,7 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -80,9 +81,17 @@ func (t *UrlDedupTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	}
 
 	if len(matches) == 0 {
+		// F3 (phase 15), PATH 1 OF 3. An empty glob means every URL producer that
+		// ran this invocation found nothing and CLEARED its staging (plan 15-13
+		// Task 1's write-or-remove contract). It does NOT mean the producers were
+		// skipped: a checkpoint-skipped producer leaves its staging file behind,
+		// so the glob would not be empty. urldedup therefore RAN over an empty
+		// corpus and must empty the artefact rather than leave the previous run's
+		// URLs published.
 		if app.Log != nil {
 			app.Log.Info("web.urldedup: no inputs/urls.*.jsonl staging files found — skipping")
 		}
+		publishEmptyURLs(app, "empty staging glob")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -110,9 +119,12 @@ func (t *UrlDedupTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	// Extract URL strings from JSONL records for dedup pipeline.
 	rawURLs, origSourceMap := extractURLStringsAndSources(allData)
 	if len(rawURLs) == 0 {
+		// F3 (phase 15), PATH 2 OF 3. Staging files exist but hold no URL record.
+		// urldedup ran over an empty corpus — same conclusion as path 1.
 		if app.Log != nil {
 			app.Log.Info("web.urldedup: no URL records in staging files — skipping")
 		}
+		publishEmptyURLs(app, "staging held no URL records")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -226,6 +238,18 @@ func (t *UrlDedupTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	// reports success with a nonzero urls_after_dedup. Propagate as StatusErrored so the
 	// failure is observable; best_effort (D-W12) is applied by the caller (stage loop
 	// logs and continues), not by hiding the error here.
+	//
+	// F3 (phase 15), PATH 3 OF 3: every URL was dropped by urlPassesScopeGate.
+	// urldedup ran and the in-scope corpus is empty, so the artefact is emptied
+	// rather than left holding the previous run's URLs.
+	//
+	// urldedup is provably the LAST writer of "urls": the only
+	// MergeStage(…, "urls") calls run at the urls-fetch / web-urls-fetch stage
+	// (internal/mcp/handlers/web.go, composite.go), which precedes
+	// web-urls-dedup, and both end-of-run sweeps are {"waf","findings"} only.
+	// The artefact is a pure function of the staging this task globbed, so an
+	// empty publish cannot resurrect pre-dedup URLs — which is exactly why
+	// "urls" is in directArtefactWriterStages but NOT in artefactSeedStages.
 	if len(newLines) > 0 {
 		if appendErr := app.Tree.Append("urls", newLines); appendErr != nil {
 			if app.Log != nil {
@@ -235,6 +259,8 @@ func (t *UrlDedupTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 			return task.Result{Status: task.StatusErrored},
 				fmt.Errorf("web.urldedup: Tree.Append(urls): %w", appendErr)
 		}
+	} else {
+		publishEmptyURLs(app, "all URLs dropped by the scope gate")
 	}
 
 	// Temp files are removed by the deferred os.Remove calls registered at creation (WR-03).
@@ -361,4 +387,25 @@ func urlPassesScopeGate(app *appctx.AppContext, rawURL string) bool {
 		return true // no scope configured — the boundary will not reject either
 	}
 	return app.Tree.InScope(host)
+}
+
+// publishEmptyURLs truncates artefacts/urls.jsonl to a present, zero-byte file.
+//
+// It exists because OutputTree.Append short-circuits on an empty batch and so
+// cannot express "urldedup ran and the corpus is empty" (internal/core/output/
+// tree.go). PublishArtefact performs no scope check, which is correct and safe
+// here specifically: there are no records to check.
+//
+// Called on all THREE paths where urldedup ran with an empty result — empty
+// staging glob, staging holding no URL records, and every URL dropped by the
+// scope gate. Failure is logged at Debug and never escalated: an empty publish
+// that fails leaves a stale artefact, which is no worse than the pre-F3
+// behaviour and must not turn a zero-result run into a failed task.
+func publishEmptyURLs(app *appctx.AppContext, reason string) {
+	if app == nil || app.Target == nil {
+		return
+	}
+	if err := output.PublishArtefact(app.Target.WorkDir, "urls", nil); err != nil && app.Log != nil {
+		app.Log.Debug("web.urldedup: empty urls publish failed", "reason", reason, "err", err)
+	}
 }
