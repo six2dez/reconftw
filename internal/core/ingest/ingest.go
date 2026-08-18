@@ -48,14 +48,71 @@ type Result struct {
 	URLs     int
 }
 
-// ScanIntoStore ingests the merged JSONL artefacts under workDir/artefacts into
-// the shared store at dataDir/store.db and records a completed scan row for
-// target. mode is the scan mode label ("recon", "all", "web", ...).
+// Scan terminal states. The store's status column is free-form text, so these
+// constants are the one place ingest's vocabulary is defined.
 //
-// It is best-effort per record — malformed lines and missing artefact files are
-// skipped (logged at debug), never fatal. It returns an error only when the
-// store itself cannot be opened / initialised or the scan row cannot be created,
-// so callers can safely log-and-continue.
+//   - statusRunning is written inside the transaction, before any asset row.
+//   - statusCompleted means every record the artefacts offered reached the
+//     store. It is only ever written INSIDE the transaction that wrote those
+//     rows, and only when zero writes were rejected. Every downstream consumer
+//     (report baselines, monitor diffs, SARIF, AI) reads 'completed' as "this
+//     data is whole", so stamping it on a partial ingest is a security-relevant
+//     false negative: the operator sees a short findings list and concludes the
+//     target is clean.
+//   - statusIncomplete means the rows ARE committed but at least one write was
+//     rejected. It is a truthful terminal state, not a synonym for success:
+//     GetLatestCompletedScanForTarget filters on 'completed', so an incomplete
+//     scan can never be picked as a report or monitor-diff baseline.
+//
+// There is deliberately no 'failed' row written from here. When the transaction
+// itself is unusable nothing is committed, so no scan row exists at all — see
+// scanIntoStoreWithDB.
+const (
+	statusRunning    = "running"
+	statusCompleted  = "completed"
+	statusIncomplete = "incomplete"
+)
+
+// dbFailures accumulates writes the STORE rejected.
+//
+// That is deliberately not the same thing as bad input, and conflating the two
+// would let one junk artefact line fail an otherwise good scan:
+//
+//   - a malformed / unparseable / absent artefact record is skipped at Debug
+//     level and is NOT a failure — ingest stays best-effort about its input;
+//   - a rejected database write is recorded here, because the scan can no
+//     longer honestly claim to hold everything the pipeline found.
+type dbFailures struct {
+	n     int
+	first error
+}
+
+// record notes a rejected write. A nil error is ignored so call sites can pass
+// a result straight through.
+func (f *dbFailures) record(err error) {
+	if err == nil {
+		return
+	}
+	f.n++
+	if f.first == nil {
+		f.first = err
+	}
+}
+
+// ScanIntoStore ingests the merged JSONL artefacts under workDir/artefacts into
+// the shared store at dataDir/store.db and records a scan row for target. mode
+// is the scan mode label ("recon", "all", "web", ...).
+//
+// Every asset write happens in ONE transaction, so a concurrent reader never
+// sees a half-ingested scan and a failure part-way through leaves nothing
+// behind — not even the scan row. The returned error therefore now also reports
+// a scan that persisted only partially (status 'incomplete'); Result is still
+// populated in that case so a caller can notify on what did land.
+//
+// It stays best-effort about its INPUT: malformed lines and missing artefact
+// files are skipped (logged at debug), never fatal. Callers (see
+// internal/mcp/handlers/common.go) are expected to keep logging and continuing —
+// the transaction fails the scan STATUS, not the scan run.
 func ScanIntoStore(ctx context.Context, dataDir, workDir, target, mode string, logger *slog.Logger) (Result, error) {
 	if logger == nil {
 		logger = slog.Default()
@@ -68,30 +125,70 @@ func ScanIntoStore(ctx context.Context, dataDir, workDir, target, mode string, l
 		return Result{}, fmt.Errorf("ingest: mkdir data dir: %w", err)
 	}
 	storePath := filepath.Join(dataDir, "store.db")
-	dsn := storePath + "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)"
+	// _txlock=immediate: the ingest transaction is a writer from its first
+	// statement. A deferred transaction takes a read lock and then tries to
+	// upgrade on its first write, which two concurrent ingests of two different
+	// targets against this one shared file can deadlock on — SQLITE_BUSY on an
+	// upgrade is not retryable by busy_timeout, one of the two has to abort.
+	// Same reasoning as the BEGIN IMMEDIATE the migration runner takes.
+	dsn := storePath + "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_txlock=immediate"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return Result{}, fmt.Errorf("ingest: open store: %w", err)
 	}
 	defer db.Close() //nolint:errcheck
 
+	// Schema migration is NOT part of the data transaction: it takes its own
+	// dedicated connection under BEGIN IMMEDIATE (internal/store/sqlc/migrate.go)
+	// precisely so a concurrent ingest cannot be destroyed by it.
 	if err := sqlcgen.EnsureSchema(ctx, db); err != nil {
 		return Result{}, fmt.Errorf("ingest: ensure schema: %w", err)
 	}
 
-	q := sqlcgen.New(db)
+	return scanIntoStoreWithDB(ctx, db, nil, storePath, workDir, target, mode, logger)
+}
+
+// scanIntoStoreWithDB performs the whole ingest in ONE transaction against an
+// already-opened, already-migrated store.
+//
+// wrapTx is nil in production — ScanIntoStore passes nil. The tests pass a
+// wrapper that fails the Nth statement, which is the only way to prove "an
+// injected failure part-way through leaves no completed scan and no partial
+// rows" against a real on-disk database rather than against a mock. It is
+// unexported, adds no hook to the public API and reads no package-level state,
+// so it cannot alter production behaviour.
+func scanIntoStoreWithDB(ctx context.Context, db *sql.DB, wrapTx func(sqlcgen.DBTX) sqlcgen.DBTX,
+	storePath, workDir, target, mode string, logger *slog.Logger,
+) (Result, error) {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	now := time.Now().Unix()
 
-	if err := ensureTarget(ctx, q, target, workDir, now); err != nil {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return Result{}, fmt.Errorf("ingest: begin transaction: %w", err)
+	}
+	// Every early return below discards the scan row together with the rows it
+	// would have claimed to describe. Nothing marks a scan completed outside the
+	// transaction that wrote them.
+	defer func() { _ = tx.Rollback() }()
+
+	qtx := sqlcgen.New(db).WithTx(tx)
+	if wrapTx != nil {
+		qtx = sqlcgen.New(wrapTx(tx))
+	}
+
+	if err := ensureTarget(ctx, qtx, target, workDir, now); err != nil {
 		return Result{}, fmt.Errorf("ingest: ensure target: %w", err)
 	}
 
 	scanID := uuid.New().String()
-	if _, err := q.CreateScan(ctx, sqlcgen.CreateScanParams{
+	if _, err := qtx.CreateScan(ctx, sqlcgen.CreateScanParams{
 		ID:                  scanID,
 		TargetID:            target,
 		Mode:                mode,
-		Status:              "running",
+		Status:              statusRunning,
 		StartedAt:           now,
 		RawArgsJson:         "{}",
 		ConfigOverridesJson: "{}",
@@ -102,39 +199,110 @@ func ScanIntoStore(ctx context.Context, dataDir, workDir, target, mode string, l
 
 	artefacts := filepath.Join(workDir, "artefacts")
 
-	hostIDs := ingestHosts(ctx, q, scanID, target, artefacts, now, logger)
-	urlCount := ingestURLs(ctx, q, scanID, target, artefacts, hostIDs, now, logger)
-	findingCount := ingestFindings(ctx, q, scanID, target, artefacts, hostIDs, now, logger)
+	var fails dbFailures
+	hostIDs := ingestHosts(ctx, qtx, scanID, target, artefacts, now, logger, &fails)
+	ingestURLs(ctx, qtx, scanID, target, artefacts, hostIDs, now, logger, &fails)
+	ingestFindings(ctx, qtx, scanID, target, artefacts, hostIDs, now, logger, &fails)
 
-	if err := q.UpdateScanCounts(ctx, sqlcgen.UpdateScanCountsParams{
-		FindingsCount:  int64(findingCount),
-		SubdomainCount: int64(len(hostIDs)),
-		UrlCount:       int64(urlCount),
-		ID:             scanID,
-	}); err != nil {
-		logger.WarnContext(ctx, "ingest: update scan counts failed", "err", err)
+	// Counters are read back out of the transaction, so they describe rows that
+	// exist — never input lines. A line that failed to upsert, or that
+	// deduplicated onto a row this scan already observed, is not a discovery:
+	// counting lines reports more findings than the store holds and yields a
+	// report that cannot be reconciled against the store it came from.
+	hosts, err := observedCount(ctx, qtx, scanID, "host")
+	if err != nil {
+		return Result{}, err
+	}
+	urls, err := observedCount(ctx, qtx, scanID, "url")
+	if err != nil {
+		return Result{}, err
+	}
+	findings, err := observedCount(ctx, qtx, scanID, "finding")
+	if err != nil {
+		return Result{}, err
 	}
 
+	if err := qtx.UpdateScanCounts(ctx, sqlcgen.UpdateScanCountsParams{
+		FindingsCount:  findings,
+		SubdomainCount: hosts,
+		UrlCount:       urls,
+		ID:             scanID,
+	}); err != nil {
+		// No longer a warning: the counts are part of the scan row, so a
+		// rejected update means the scan is not persisted correctly.
+		return Result{}, fmt.Errorf("ingest: update scan counts: %w", err)
+	}
+
+	status := statusCompleted
+	if fails.n > 0 {
+		status = statusIncomplete
+	}
 	finished := time.Now().Unix()
-	if err := q.UpdateScanStatus(ctx, sqlcgen.UpdateScanStatusParams{
-		Status:     "completed",
+	if err := qtx.UpdateScanStatus(ctx, sqlcgen.UpdateScanStatusParams{
+		Status:     status,
 		FinishedAt: &finished,
 		ID:         scanID,
 	}); err != nil {
-		return Result{}, fmt.Errorf("ingest: mark scan completed: %w", err)
+		return Result{}, fmt.Errorf("ingest: mark scan %s: %w", status, err)
 	}
 
-	res := Result{ScanID: scanID, Findings: findingCount, Hosts: len(hostIDs), URLs: urlCount}
+	if err := tx.Commit(); err != nil {
+		return Result{}, fmt.Errorf("ingest: commit scan: %w", err)
+	}
+
+	res := Result{ScanID: scanID, Findings: int(findings), Hosts: int(hosts), URLs: int(urls)}
 	logger.InfoContext(ctx, "ingest: scan persisted to store",
-		"scan_id", scanID, "target", target, "mode", mode,
+		"scan_id", scanID, "target", target, "mode", mode, "status", status,
 		"findings", res.Findings, "hosts", res.Hosts, "urls", res.URLs, "store", storePath)
+	if fails.n > 0 {
+		// The rows ARE committed and Result is populated, so the caller can
+		// still notify on what landed; the error says the scan is not whole.
+		return res, fmt.Errorf("ingest: scan %s recorded as %s: %d record(s) rejected by the store: %w",
+			scanID, status, fails.n, fails.first)
+	}
 	return res, nil
 }
 
-// ensureTarget makes sure a target row exists (CreateTarget errors on a
-// duplicate id — the store is shared across runs, so a second scan finds the row
-// already present, which is not an error).
+// observedCount reports how many assets of one kind this scan actually
+// committed, counted in scan_observation from inside the ingest transaction.
+func observedCount(ctx context.Context, q *sqlcgen.Queries, scanID, kind string) (int64, error) {
+	n, err := q.CountObservationsForScanByKind(ctx, sqlcgen.CountObservationsForScanByKindParams{
+		ScanID:    scanID,
+		AssetKind: kind,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("ingest: count %s observations: %w", kind, err)
+	}
+	return n, nil
+}
+
+// ensureTarget makes sure a target row exists and that its recon_dir names THIS
+// run's workspace.
+//
+// The refresh is unconditional, and deliberately so. CreateTarget only writes
+// recon_dir when it creates the row, so a target scanned a second time with a
+// different --output kept pointing at the first run's directory forever and
+// every reader that resolves artefacts through targets.recon_dir read an older
+// engagement's tree. It is also the repair path for plan 15-01's workspace
+// rename: that plan moved every existing workspace onto the new canonical slug,
+// which left the recon_dir values already in store.db pointing at paths that no
+// longer exist. Each target is repaired by its next ingest. A "skip when
+// unchanged" optimisation would be one branch away from never repairing them.
 func ensureTarget(ctx context.Context, q *sqlcgen.Queries, target, workDir string, now int64) error {
+	if err := createTargetIfAbsent(ctx, q, target, workDir, now); err != nil {
+		return err
+	}
+	return q.UpdateTargetReconDir(ctx, sqlcgen.UpdateTargetReconDirParams{
+		ReconDir: workDir,
+		Now:      now,
+		ID:       target,
+	})
+}
+
+// createTargetIfAbsent creates the target row when it is missing (CreateTarget
+// errors on a duplicate id — the store is shared across runs, so a second scan
+// finds the row already present, which is not an error).
+func createTargetIfAbsent(ctx context.Context, q *sqlcgen.Queries, target, workDir string, now int64) error {
 	if _, err := q.GetTarget(ctx, target); err == nil {
 		return nil
 	} else if !errors.Is(err, sql.ErrNoRows) {
@@ -190,7 +358,11 @@ func (r subdomainRecord) fqdn() string { return strings.TrimSpace(r.Subdomain) }
 // a per-scan scan_observation row for each host so the cross-cycle diff queries
 // (DiffScansHosts) can see what this scan observed (INTEG-04). The ids[fqdn]
 // guard ensures each unique host is observed exactly once per scan.
-func ingestHosts(ctx context.Context, q *sqlcgen.Queries, scanID, target, artefacts string, now int64, logger *slog.Logger) map[string]int64 {
+//
+// A line that does not decode is skipped and is NOT counted in fails: bad input
+// must never fail an otherwise good scan. A write the store rejects IS counted,
+// because the scan then holds less than the artefacts offered.
+func ingestHosts(ctx context.Context, q *sqlcgen.Queries, scanID, target, artefacts string, now int64, logger *slog.Logger, fails *dbFailures) map[string]int64 {
 	ids := make(map[string]int64)
 
 	// Each artefact gets the decoder for ITS schema. hosts.jsonl keys the
@@ -240,6 +412,7 @@ func ingestHosts(ctx context.Context, q *sqlcgen.Queries, scanID, target, artefa
 			})
 			if err != nil {
 				logger.DebugContext(ctx, "ingest: upsert host failed", "fqdn", fqdn, "err", err)
+				fails.record(fmt.Errorf("upsert host %q: %w", fqdn, err))
 				return
 			}
 			ids[fqdn] = host.ID
@@ -247,8 +420,9 @@ func ingestHosts(ctx context.Context, q *sqlcgen.Queries, scanID, target, artefa
 				TargetID: target, HostID: host.ID,
 			}); err != nil {
 				logger.DebugContext(ctx, "ingest: attach host failed", "fqdn", fqdn, "err", err)
+				fails.record(fmt.Errorf("attach host %q: %w", fqdn, err))
 			}
-			recordObservation(ctx, q, scanID, target, "host", host.ID, now, logger)
+			recordObservation(ctx, q, scanID, target, "host", host.ID, now, logger, fails)
 		})
 	}
 	return ids
@@ -260,8 +434,10 @@ type urlRecord struct {
 	Host string `json:"host"`
 }
 
-func ingestURLs(ctx context.Context, q *sqlcgen.Queries, scanID, target, artefacts string, hostIDs map[string]int64, now int64, logger *slog.Logger) int {
-	count := 0
+// ingestURLs upserts every URL in urls.jsonl, links it to the target and
+// observes it once per scan. It returns nothing: the scan's URL counter is read
+// back out of scan_observation, not accumulated from input lines.
+func ingestURLs(ctx context.Context, q *sqlcgen.Queries, scanID, target, artefacts string, hostIDs map[string]int64, now int64, logger *slog.Logger, fails *dbFailures) {
 	// seen dedups scan_observation inserts when two artefact lines resolve to the
 	// same upserted URL row (UpsertURL ON CONFLICT by url_hash) — the same scan
 	// must not observe the same asset twice (INTEG-04).
@@ -294,20 +470,20 @@ func ingestURLs(ctx context.Context, q *sqlcgen.Queries, scanID, target, artefac
 		row, err := q.UpsertURL(ctx, params)
 		if err != nil {
 			logger.DebugContext(ctx, "ingest: upsert url failed", "url", rec.URL, "err", err)
+			fails.record(fmt.Errorf("upsert url: %w", err))
 			return
 		}
 		if err := q.AttachURLToTarget(ctx, sqlcgen.AttachURLToTargetParams{
 			TargetID: target, URLID: row.ID,
 		}); err != nil {
 			logger.DebugContext(ctx, "ingest: attach url failed", "url", rec.URL, "err", err)
+			fails.record(fmt.Errorf("attach url: %w", err))
 		}
 		if _, dup := seen[row.ID]; !dup {
 			seen[row.ID] = struct{}{}
-			recordObservation(ctx, q, scanID, target, "url", row.ID, now, logger)
+			recordObservation(ctx, q, scanID, target, "url", row.ID, now, logger, fails)
 		}
-		count++
 	})
-	return count
 }
 
 // findingRecord is the union of the three per-domain finding shapes:
@@ -376,8 +552,10 @@ func findingPath(rec findingRecord) string {
 	return path
 }
 
-func ingestFindings(ctx context.Context, q *sqlcgen.Queries, scanID, target, artefacts string, hostIDs map[string]int64, now int64, logger *slog.Logger) int {
-	count := 0
+// ingestFindings upserts every finding in findings.jsonl, links it to the
+// target and observes it once per scan. Like ingestURLs it returns nothing —
+// the scan's findings counter is read back out of scan_observation.
+func ingestFindings(ctx context.Context, q *sqlcgen.Queries, scanID, target, artefacts string, hostIDs map[string]int64, now int64, logger *slog.Logger, fails *dbFailures) {
 	// seen dedups scan_observation inserts when two artefact lines resolve to the
 	// same upserted finding row (UpsertFinding ON CONFLICT) — the same scan must
 	// not observe the same asset twice (INTEG-04).
@@ -419,30 +597,31 @@ func ingestFindings(ctx context.Context, q *sqlcgen.Queries, scanID, target, art
 		row, err := q.UpsertFinding(ctx, params)
 		if err != nil {
 			logger.DebugContext(ctx, "ingest: upsert finding failed", "sig", sig, "err", err)
+			fails.record(fmt.Errorf("upsert finding %q: %w", sig, err))
 			return
 		}
 		if err := q.AttachFindingToTarget(ctx, sqlcgen.AttachFindingToTargetParams{
 			TargetID: target, FindingID: row.ID,
 		}); err != nil {
 			logger.DebugContext(ctx, "ingest: attach finding failed", "sig", sig, "err", err)
+			fails.record(fmt.Errorf("attach finding %q: %w", sig, err))
 			return
 		}
 		if _, dup := seen[row.ID]; !dup {
 			seen[row.ID] = struct{}{}
-			recordObservation(ctx, q, scanID, target, "finding", row.ID, now, logger)
+			recordObservation(ctx, q, scanID, target, "finding", row.ID, now, logger, fails)
 		}
-		count++
 	})
-	return count
 }
 
 // recordObservation writes a scan_observation row linking an asset (host/url/
 // finding) to this scan. The cross-cycle diff queries (DiffScansHosts /
 // DiffScansURLs / DiffScansFindings) read EXCLUSIVELY from scan_observation, so
 // without this the monitor diff is silently empty even against a fully populated
-// store (INTEG-04). Best-effort: any failure is logged at debug and never aborts
-// ingest — the JSONL artefacts remain the source of truth.
-func recordObservation(ctx context.Context, q *sqlcgen.Queries, scanID, target, kind string, assetID, now int64, logger *slog.Logger) {
+// store (INTEG-04). It is also what the scan's counters are computed from, so a
+// rejected insert is recorded as a failure rather than only logged: the row it
+// would have counted is not there.
+func recordObservation(ctx context.Context, q *sqlcgen.Queries, scanID, target, kind string, assetID, now int64, logger *slog.Logger, fails *dbFailures) {
 	if err := q.InsertObservation(ctx, sqlcgen.InsertObservationParams{
 		ScanID:     scanID,
 		TargetID:   target,
@@ -453,6 +632,7 @@ func recordObservation(ctx context.Context, q *sqlcgen.Queries, scanID, target, 
 	}); err != nil {
 		logger.DebugContext(ctx, "ingest: insert observation failed",
 			"kind", kind, "asset_id", assetID, "err", err)
+		fails.record(fmt.Errorf("observe %s %d: %w", kind, assetID, err))
 	}
 }
 
