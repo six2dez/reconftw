@@ -21,6 +21,7 @@ GH_CLI := $(shell command -v gh 2> /dev/null)
 
 .PHONY: help \
         build test test-integration test-smoke integration-smoke lint fmt fmt-check check coverage coverage-critical coverage-critical-selftest coverage-lib ci clean \
+        release-gates release-gates-docker \
         sync upload bootstrap rm \
         bash-lint bash-lint-fix bash-fmt bash-test bash-test-unit bash-test-integration-smoke \
         bash-test-integration-full bash-test-security bash-test-all bash-test-release-gate \
@@ -43,6 +44,8 @@ help:
 	@echo "  make coverage-critical-selftest - Prove the critical gate can actually fail"
 	@echo "  make coverage-lib       - XCUT-03 ≥75% lib-aggregate gate (resolvers-excluded)"
 	@echo "  make ci                 - fmt-check + lint + test + gate self-test + both coverage gates (matches CI)"
+	@echo "  make release-gates      - Phase 15: the 12 acceptance gates + the regression guard"
+	@echo "  make release-gates-docker - release-gates plus acceptance gate 11 (ARM64 docker run)"
 	@echo "  make clean              - rm -rf bin/ coverage.out"
 	@echo ""
 	@echo "reconFTW v1 — Transitional bash targets (until Phase 12 cutover)"
@@ -173,6 +176,27 @@ coverage-lib:
 # deliberately NOT in `make test` or `make check` — those are the per-push loop,
 # and the self-test only guards edits to the gate itself.
 ci: fmt-check lint test coverage-critical-selftest coverage-critical coverage-lib
+
+# release-gates: phase 15's cutover sign-off gate.
+#
+# Runs the eight regression-guard commands from 15-CONTEXT.md, BOTH CI-break
+# classes `go test ./...` cannot catch (a clean-PATH health-check and
+# per-package critical coverage), and one named `go test -run` invocation per
+# TEST-OWNED row of the thirteen-row gate table, each asserting that tests
+# actually ran.
+#
+# Acceptance gate 11 (ARM64 `docker run`) is OFF by default so this target works
+# on a machine without Docker/QEMU; it is reported SKIPPED with its reason
+# rather than omitted. `release-gates-docker` turns it on.
+#
+# Invoked through `bash` for the same reason as coverage-critical: this repo sets
+# core.fileMode=false, so a fresh `actions/checkout` can materialise scripts/
+# without the execute bit.
+release-gates:
+	@bash ./scripts/release-gates.sh
+
+release-gates-docker:
+	@bash ./scripts/release-gates.sh --with-docker
 
 clean:
 	rm -rf bin/ coverage.out coverage-lib.out
