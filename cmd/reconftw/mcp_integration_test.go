@@ -5,7 +5,7 @@
 // stdio or HTTP transport.
 //
 // Tests:
-//   - TestMCPToolList: verifies all 7 tools are listed (MCP-01, MCP-02)
+//   - TestMCPToolList: verifies all 8 tools are listed (MCP-01, MCP-02)
 //   - TestMCPSubsToolAsyncReturn: verifies D-02 async pattern (run_id + resource keys)
 //   - TestMCPScopeRejection: verifies D-06 hard-reject for out-of-scope targets
 //   - TestMCPRedaction: verifies XCUT-07 — API key does not appear in logs
@@ -38,7 +38,8 @@ import (
 // via CallTool will receive a cancellation signal and exit promptly.
 func buildTestMCPServer(t *testing.T) *mcpsrv.MCPServer {
 	t.Helper()
-	cfg := &config.MCPConfig{
+	cfg := config.Defaults()
+	cfg.MCP = config.MCPConfig{
 		Enabled:   true,
 		APIKey:    corelog.Secret("test-api-key-16chars"),
 		Transport: "stdio",
@@ -54,7 +55,7 @@ func buildTestMCPServer(t *testing.T) *mcpsrv.MCPServer {
 		s.Limiter = limiter
 		return s
 	}
-	srv := mcpsrv.NewMCPServer(cfg, newSched, rdct, "test")
+	srv := mcpsrv.NewMCPServer(context.Background(), cfg, "", "", newSched, rdct, "test")
 	// W4: cancel all scan goroutines when the test exits.
 	t.Cleanup(srv.Cancel)
 	return srv
@@ -91,8 +92,9 @@ func connectTestClient(t *testing.T, srv *mcpsrv.MCPServer) *mcp.ClientSession {
 	return cs
 }
 
-// TestMCPToolList connects in-process and asserts exactly 7 tools are listed
-// with the expected names: recon, subs, web, vulns, osint, monitor, report.
+// TestMCPToolList connects in-process and asserts exactly 8 tools are listed
+// with the expected names: recon, subs, web, vulns, osint, monitor, report and
+// cancel_scan.
 //
 // Acceptance gate for MCP-01 and MCP-02.
 func TestMCPToolList(t *testing.T) {
@@ -109,19 +111,20 @@ func TestMCPToolList(t *testing.T) {
 		t.Fatalf("ListTools: %v", err)
 	}
 
-	const wantCount = 7
+	const wantCount = 8
 	if len(result.Tools) != wantCount {
 		t.Errorf("expected %d tools, got %d", wantCount, len(result.Tools))
 	}
 
 	wantNames := map[string]bool{
-		"recon":   true,
-		"subs":    true,
-		"web":     true,
-		"vulns":   true,
-		"osint":   true,
-		"monitor": true,
-		"report":  true,
+		"recon":       true,
+		"subs":        true,
+		"web":         true,
+		"vulns":       true,
+		"osint":       true,
+		"monitor":     true,
+		"report":      true,
+		"cancel_scan": true,
 	}
 	gotNames := make(map[string]bool, len(result.Tools))
 	for _, tool := range result.Tools {
@@ -247,7 +250,8 @@ func TestMCPRedaction(t *testing.T) {
 	const secretKey = "super-secret-key-32chars-ABCDEFG"
 
 	// Build a server with a recognisable API key.
-	cfg := &config.MCPConfig{
+	cfg := config.Defaults()
+	cfg.MCP = config.MCPConfig{
 		Enabled:   true,
 		APIKey:    corelog.Secret(secretKey),
 		Transport: "stdio",
@@ -261,7 +265,7 @@ func TestMCPRedaction(t *testing.T) {
 		s.Limiter = limiter
 		return s
 	}
-	srv := mcpsrv.NewMCPServer(cfg, newSched, rdct, "test")
+	srv := mcpsrv.NewMCPServer(context.Background(), cfg, "", "", newSched, rdct, "test")
 	// W4: cancel all scan goroutines when the test exits.
 	t.Cleanup(srv.Cancel)
 

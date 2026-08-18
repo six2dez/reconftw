@@ -46,6 +46,15 @@ func NewSessionScope(patterns []string) *SessionScope {
 	}
 }
 
+// isEmpty reports whether this scope can never admit anything: a nil receiver,
+// a nil filter, or no patterns at all. CaptureScopeIfUnset uses it to decide
+// whether a session still needs its scope captured — a scope that admits
+// nothing is not a captured scope, it is the absence of one, and treating the
+// two as different is how the first report call ended up rejected (F8).
+func (s *SessionScope) isEmpty() bool {
+	return s == nil || s.filter == nil || len(s.filter.Patterns) == 0
+}
+
 // Contains reports whether target is within this session's scope.
 // Returns false for a nil receiver or nil/empty filter (fail-closed).
 func (s *SessionScope) Contains(target string) bool {

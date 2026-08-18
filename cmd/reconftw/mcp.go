@@ -149,7 +149,20 @@ func runMCPServeCmd(cmd *cobra.Command) error {
 	}
 
 	// Step 8: Construct the MCPServer (registers tools + resources, builds go-sdk server).
-	mcpSrv := mcplib.NewMCPServer(&cfg.MCP, newSched, rdct, Version)
+	//
+	// The RESOLVED config and the explicit paths that produced it are the
+	// startup snapshot (F7): every scan carries efs.configPath / efs.secretsPath
+	// in its RunOptions and re-resolves from them, and the report tool renders
+	// with this cfg. Before this, only cfg.MCP was passed on and every scan
+	// re-ran config.Load with no explicit paths — a server started with
+	// --config scanned under a different configuration than the operator chose.
+	mcpSrv := mcplib.NewMCPServer(ctx, cfg, efs.configPath, efs.secretsPath, newSched, rdct, Version)
+	// Whatever ends this command — SIGINT, a transport error, a normal return —
+	// must also end the scans it started. Start cancels on its own exit paths;
+	// this defer is the belt to that braces, and costs nothing (Cancel is
+	// idempotent). An orphaned scan keeps spawning external tool processes long
+	// after the operator believes the server stopped (F9).
+	defer mcpSrv.Cancel()
 
 	// Step 9: Start the server (blocks until ctx is cancelled or an error occurs).
 	return mcpSrv.Start(ctx)
