@@ -89,11 +89,9 @@ func RunOSINTAsync(ctx context.Context, opts RunOptions) (err error) {
 	cfg := boot.Cfg
 	sched := opts.Scheduler
 
-	defer func() {
-		if closer, ok := app.Checkpoint.(interface{ Close() error }); ok {
-			_ = closer.Close()
-		}
-	}()
+	// Checkpoint + F4 workspace-lock lifecycle: one deferred boot.Close() covers
+	// every exit path, including the error returns below.
+	defer func() { _ = boot.Close() }()
 
 	if opts.AfterBoot != nil {
 		opts.AfterBoot(boot)

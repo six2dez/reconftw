@@ -75,15 +75,16 @@ func resumeBoot(t *testing.T, dataDir string, opts handlers.RunOptions) (handler
 	return boot, sched
 }
 
-// resumeCloseCheckpoint releases the SQLite checkpoint handle so the next boot
-// against the same stable workspace reopens it cleanly.
+// resumeCloseCheckpoint releases the SQLite checkpoint handle AND the F4
+// workspace lock, so the next boot against the same stable workspace reopens it
+// cleanly instead of being rejected with "target already running".
+//
+// It delegates to AppBoot.Close — the same single cleanup path the six
+// production handlers defer. Hand-rolling the checkpoint close here left the
+// lock held; whether the next boot then succeeded depended on when the GC ran
+// os.File's finaliser, which is exactly the kind of flake a test must not have.
 func resumeCloseCheckpoint(b handlers.AppBoot) {
-	if b.App == nil {
-		return
-	}
-	if c, ok := b.App.Checkpoint.(interface{ Close() error }); ok {
-		_ = c.Close()
-	}
+	_ = b.Close()
 }
 
 // resumeWordlistsLock mirrors handlers.wordlistsLockContent so the exact-hash

@@ -17,6 +17,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -149,11 +150,45 @@ type RunOptions struct {
 }
 
 // AppBoot is the return bundle from BootReconApp.
+//
+// Every field except Lock is read-only to the caller. Lock is a RESOURCE the
+// caller must hand back: call Close() (the natural expression is a deferred
+// Close immediately after a successful BootReconApp) on every exit path,
+// including error returns.
 type AppBoot struct {
 	App           *appctx.AppContext
 	WorkDir       string
 	Cfg           *config.Config
 	ChosenBackend backend.Backend // nil when Axiom is not enabled
+	// Lock is this run's exclusive claim on WorkDir (F4 / acceptance gate 4).
+	// It is nil on a dry-run boot, which creates no workspace and therefore has
+	// nothing to lock. Close() tolerates nil, so callers never need to branch.
+	Lock *output.Lock
+}
+
+// Close releases everything BootReconApp acquired: the checkpoint store handle
+// and then the workspace lock, in that order. Closing the checkpoint FIRST
+// matters — checkpoints.db lives inside the locked workspace, so handing the
+// workspace to the next run while this run's sqlite handle is still open would
+// defeat the point of holding the lock at all.
+//
+// It is safe on a zero AppBoot and on a dry-run boot (nil App, nil Lock), and
+// safe to call more than once: Lock.Release is idempotent. This single method
+// is why the six handlers have ONE cleanup path instead of a checkpoint-close
+// defer and a separate, easily-diverging lock-release defer.
+func (b AppBoot) Close() error {
+	var checkpointErr error
+	if b.App != nil {
+		if closer, ok := b.App.Checkpoint.(interface{ Close() error }); ok {
+			checkpointErr = closer.Close()
+		}
+	}
+	lockErr := b.Lock.Release() // nil-safe by construction
+
+	if checkpointErr != nil {
+		return checkpointErr
+	}
+	return lockErr
 }
 
 // persistScanToStore ingests the just-completed run's merged JSONL artefacts into
@@ -371,9 +406,15 @@ func ResolveDryRunBoot(opts RunOptions) (AppBoot, error) {
 	}
 
 	return AppBoot{
-		App:           nil,
-		WorkDir:       filepath.Join(workspaceRootOrFallback(plan.WorkspaceRoot), id.Slug),
-		Cfg:           plan.Cfg,
+		App:     nil,
+		WorkDir: filepath.Join(workspaceRootOrFallback(plan.WorkspaceRoot), id.Slug),
+		Cfg:     plan.Cfg,
+		// Lock is deliberately nil. Acquiring the workspace lock would CREATE
+		// <workdir>/.run.lock — a filesystem mutation — and a dry run creates
+		// nothing at all (F1, acceptance gate 1). There is also nothing to
+		// protect: a dry run enumerates a task plan and writes no artefacts.
+		// AppBoot.Close tolerates the nil, so handlers need no dry-run branch.
+		Lock:          nil,
 		ChosenBackend: plan.Backend,
 	}, nil
 }
@@ -422,6 +463,28 @@ func BootReconApp(ctx context.Context, opts RunOptions) (AppBoot, error) {
 	}
 	tgt.WorkDir = workdir
 
+	// Step 3a: Claim the workspace (F4 / acceptance gate 4). Two concurrent runs
+	// against one target otherwise interleave their staging writes into the same
+	// inputs/*.jsonl glob and merge each other's half-written files.
+	//
+	// ORDERING IS DELIBERATE AND MUST NOT BE "CORRECTED": the lock is acquired
+	// AFTER WorkspaceInit and BEFORE appctx.Boot (which opens checkpoints.db
+	// inside the workspace). The lock file lives inside the directory
+	// WorkspaceInit creates — and, on the first run after an upgrade, may
+	// os.Rename — so there is nothing to lock until WorkspaceInit returns.
+	// Hoisting AcquireWorkspaceLock above it would lock a path that is about to
+	// be renamed away. Plan 15-01 covers that pre-lock window differently:
+	// legacy-workspace adoption is CONVERGENT, so a lost rename race whose
+	// winner produced the new-slug directory returns success rather than an
+	// error. See the package comment in internal/core/output/lock.go.
+	lock, lockErr := output.AcquireWorkspaceLock(workdir)
+	if lockErr != nil {
+		if errors.Is(lockErr, output.ErrWorkspaceBusy) {
+			return AppBoot{}, fmt.Errorf("handlers: target %q is already running: %w", tgt.Domain, lockErr)
+		}
+		return AppBoot{}, fmt.Errorf("handlers: workspace lock: %w", lockErr)
+	}
+
 	// Step 4: Use opts.Scheduler as-is (DO NOT call scheduler.NewScheduler —
 	// Pitfall 3). The shared process-level scheduler owns the MaxJobs ceiling.
 
@@ -433,6 +496,10 @@ func BootReconApp(ctx context.Context, opts RunOptions) (AppBoot, error) {
 		PassiveMode: opts.PassiveMode,
 	})
 	if err != nil {
+		// The lock was acquired above; nothing else will ever see this AppBoot,
+		// so release it here or the target stays claimed by a run that never
+		// started.
+		_ = lock.Release()
 		return AppBoot{}, fmt.Errorf("handlers: appctx boot: %w", err)
 	}
 
@@ -484,7 +551,7 @@ func BootReconApp(ctx context.Context, opts RunOptions) (AppBoot, error) {
 	}
 	opts.Scheduler.ForceRerun = cfg.Advanced.Diff
 
-	return AppBoot{App: app, WorkDir: workdir, Cfg: cfg, ChosenBackend: chosenBackend}, nil
+	return AppBoot{App: app, WorkDir: workdir, Cfg: cfg, ChosenBackend: chosenBackend, Lock: lock}, nil
 }
 
 // seedIncrementalStaging consumes the monitor incremental re-feed's TargetListPath

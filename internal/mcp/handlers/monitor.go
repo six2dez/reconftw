@@ -182,10 +182,25 @@ func RunMonitorAsync(ctx context.Context, opts RunOptions, monCfg MonitorOptions
 	if err != nil {
 		return fmt.Errorf("mcp/monitor: initial boot: %w", err)
 	}
-	// Close the pre-boot checkpoint — cycle boots own their own checkpoints.
-	if closer, ok := boot.App.Checkpoint.(interface{ Close() error }); ok {
-		_ = closer.Close()
-	}
+	// Close the pre-boot checkpoint AND RELEASE THE PRE-BOOT'S WORKSPACE LOCK —
+	// cycle boots own their own checkpoints and their own lock.
+	//
+	// MONITOR SELF-DEADLOCK (F4). This pre-boot exists only to read workDir, cfg
+	// and the notifier; the actual work happens in the per-cycle
+	// RunCompositeAsync, which calls BootReconApp AGAIN and therefore acquires
+	// the same per-target lock. If the pre-boot held its lock for the monitor's
+	// lifetime, EVERY cycle would be rejected by its own process with "target
+	// already running" — the monitor would deadlock against itself on cycle 1.
+	// Releasing here means exactly one holder at a time: the current cycle.
+	// The window between this release and the first cycle's acquisition is
+	// unprotected by design; the monitor holds no run-scoped state there, and an
+	// external run that wins that race is correctly serialised against the cycle
+	// (the cycle is then rejected) rather than silently interleaved.
+	//
+	// GUARD: TestMonitorTwoCyclesDoNotSelfDeadlock in monitor_test.go asserts
+	// both cycles execute. Any rework of this function must keep that test (or
+	// an equivalent two-cycle assertion) alive.
+	_ = boot.Close()
 
 	// EventFilter for WARNING-4 fix: all finding notifications go through ef
 	// so that notifications.events TOML rules gate dispatch (NOTIF-04).

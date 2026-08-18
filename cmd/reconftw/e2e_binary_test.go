@@ -10,12 +10,16 @@
 package main_test
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/six2dez/reconftw/internal/core/output"
 )
 
 // buildBinary compiles the CLI once for the whole file.
@@ -112,6 +116,12 @@ func TestE2EBinaryDryRunHasNoSideEffects(t *testing.T) {
 	matches, _ = filepath.Glob(filepath.Join(wanted, "*", "inputs"))
 	if len(matches) > 0 {
 		t.Errorf("dry-run created workspace subdirectories: %v", matches)
+	}
+	// F4 composes with gate 1: acquiring the workspace lock would CREATE
+	// <workspace>/.run.lock, so a dry run must take no lock at all.
+	matches, _ = filepath.Glob(filepath.Join(wanted, "*", output.LockFileName))
+	if len(matches) > 0 {
+		t.Errorf("dry-run created a workspace lock file: %v", matches)
 	}
 
 	assertNoEntries(t, work, "dry-run with -o")
@@ -245,5 +255,61 @@ func TestE2EBinaryRejectsBadInput(t *testing.T) {
 	}
 	if strings.Contains(s, `"level":"ERROR"`) {
 		t.Errorf("a user mistake was rendered as a JSON log record:\n%s", s)
+	}
+}
+
+// TestE2EBinaryRejectsRunOnALockedWorkspace is acceptance gate 4 at the PROCESS
+// boundary: the level the gate is actually about.
+//
+// The package-level tests in internal/mcp/handlers prove two goroutines cannot
+// share a workspace. They cannot prove two PROCESSES cannot — an in-process
+// mutex would satisfy them exactly as well. Here the test process holds the
+// real advisory lock and the real binary is asked to scan the same target; it
+// must refuse, quickly, with a message an operator can act on.
+//
+// The timeout is load-bearing. If the lock does not work, the binary starts a
+// genuine scan; killing it at the deadline turns "silently ran a real recon"
+// into a test failure instead of a hung CI job.
+func TestE2EBinaryRejectsRunOnALockedWorkspace(t *testing.T) {
+	bin := buildBinary(t)
+	work := t.TempDir()
+	dataDir := filepath.Join(work, "data")
+
+	const target = "example.com"
+
+	// Create the workspace exactly as a real run would, then claim it.
+	ws, err := output.WorkspaceInit(dataDir, target)
+	if err != nil {
+		t.Fatalf("WorkspaceInit: %v", err)
+	}
+	lock, err := output.AcquireWorkspaceLock(ws)
+	if err != nil {
+		t.Fatalf("AcquireWorkspaceLock: %v", err)
+	}
+	defer func() { _ = lock.Release() }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, bin, "subs", "--target", target, "-o", dataDir)
+	cmd.Dir = work
+	out, runErr := cmd.CombinedOutput()
+
+	if ctx.Err() != nil {
+		t.Fatalf("the binary did not refuse a locked workspace — it was still running "+
+			"after the deadline and had to be killed, which means it started a real "+
+			"scan against a target another process owns:\n%s", out)
+	}
+	if runErr == nil {
+		t.Fatalf("the binary exited 0 on a workspace locked by another process:\n%s", out)
+	}
+	if !strings.Contains(string(out), "already running") {
+		t.Errorf("rejection message does not say the target is \"already running\" "+
+			"— an operator cannot tell this apart from a crash:\n%s", out)
+	}
+
+	// And the refusal must be non-destructive: our lock survives it.
+	if _, statErr := os.Stat(filepath.Join(ws, output.LockFileName)); statErr != nil {
+		t.Errorf("the rejected run removed the holder's lock file: %v", statErr)
 	}
 }

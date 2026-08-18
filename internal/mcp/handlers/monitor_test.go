@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/ingest"
 	"github.com/six2dez/reconftw/internal/core/notifier"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/mcp/handlers"
 	sqlcgen "github.com/six2dez/reconftw/internal/store/sqlc"
 )
@@ -401,4 +403,65 @@ func TestRunMonitorLoop_NonCanceledError_Continues(t *testing.T) {
 	if callCount != maxCycles {
 		t.Errorf("expected %d calls despite errors, got %d", maxCycles, callCount)
 	}
+}
+
+// TestMonitorTwoCyclesDoNotSelfDeadlock is the F4 monitor guard.
+//
+// THIS TEST MUST SURVIVE ANY REWRITE OF monitor.go (plan 15-16 rewrites both
+// this file and monitor.go). What it protects:
+//
+// RunMonitorAsync pre-boots ONCE to obtain workDir, cfg and the notifier, and
+// then each cycle calls RunCompositeAsync, which boots AGAIN. Both boots take
+// the SAME per-target workspace lock. If the pre-boot keeps its lock for the
+// monitor's lifetime, every cycle is rejected by its own process with "target
+// already running" and the monitor polls forever while executing nothing — a
+// silent failure that no build, vet or -race run can detect. The resolution is
+// that the pre-boot releases its lock (via boot.Close()) immediately after the
+// pre-boot checkpoint is closed, so only the current cycle ever holds it.
+//
+// The assertion is cycle-count-based on purpose: AfterBoot fires exactly once
+// per cycle (RunCompositeAsync calls it; the pre-boot does not), so a
+// self-deadlocked monitor yields 0 and a working one yields MaxCycles. A test
+// that only asserted "RunMonitorAsync returned nil" would pass against the
+// deadlock, because the loop swallows per-cycle errors and continues.
+func TestMonitorTwoCyclesDoNotSelfDeadlock(t *testing.T) {
+	t.Parallel()
+
+	const wantCycles = 2
+
+	dataDir := t.TempDir()
+	cfgPath := lockTestConfigPath(t, dataDir)
+
+	var cycleBoots atomic.Int32
+
+	err := handlers.RunMonitorAsync(context.Background(), handlers.RunOptions{
+		Target:     "example.com",
+		ConfigPath: cfgPath,
+		OutputDir:  dataDir,
+		Scheduler:  lockTestScheduler(nil),
+		AfterBoot:  func(handlers.AppBoot) { cycleBoots.Add(1) },
+	}, handlers.MonitorOptions{
+		Mode:      handlers.ModeRecon,
+		MaxCycles: wantCycles,
+		Interval:  0,
+	})
+	if err != nil {
+		t.Fatalf("RunMonitorAsync: %v", err)
+	}
+
+	if got := int(cycleBoots.Load()); got != wantCycles {
+		t.Fatalf("%d of %d monitor cycles executed — the monitor deadlocked against "+
+			"its own pre-boot (the pre-boot must release the workspace lock before "+
+			"the cycle loop starts)", got, wantCycles)
+	}
+	// Belt and braces: after the monitor returns, the workspace is free.
+	ws, err := output.WorkspaceInit(dataDir, "example.com")
+	if err != nil {
+		t.Fatalf("WorkspaceInit: %v", err)
+	}
+	l, err := output.AcquireWorkspaceLock(ws)
+	if err != nil {
+		t.Fatalf("workspace still locked after the monitor exited: %v", err)
+	}
+	_ = l.Release()
 }

@@ -56,12 +56,13 @@ func RunSubsAsync(ctx context.Context, opts RunOptions) (err error) {
 	cfg := boot.Cfg
 	sched := opts.Scheduler
 
-	// Checkpoint lifecycle owned here (B3 fix — not via shared scheduler).
-	defer func() {
-		if closer, ok := app.Checkpoint.(interface{ Close() error }); ok {
-			_ = closer.Close()
-		}
-	}()
+	// Checkpoint AND workspace-lock lifecycle owned here (B3 fix — not via the
+	// shared scheduler). boot.Close() closes the checkpoint and releases the F4
+	// workspace lock; deferring it immediately after the boot covers EVERY exit
+	// path, including the error returns below and a panic. Do not split this
+	// back into two defers — a lock leaked on an error path is indistinguishable
+	// from a live run and would block the target until the operator intervenes.
+	defer func() { _ = boot.Close() }()
 
 	// Optional AfterBoot hook: called before stage loop so the CLI can inject
 	// per-task UI into sched.RunTask after app is available. The dry-run capture
