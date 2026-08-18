@@ -26,6 +26,8 @@ import (
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/six2dez/reconftw/internal/core/log"
 )
 
 // RegisterResources adds the scan://{runID}/findings resource template to srv.
@@ -36,7 +38,7 @@ import (
 //   - Reads artefacts/findings.jsonl and returns raw JSONL as text/x-ndjson.
 //   - Returns an empty result (not an error) if the file doesn't exist yet —
 //     the scan may be early in its pipeline.
-func RegisterResources(srv *mcp.Server, registry *SessionRegistry) {
+func RegisterResources(srv *mcp.Server, registry *SessionRegistry, rdct *log.Redactor) {
 	srv.AddResourceTemplate(
 		&mcp.ResourceTemplate{
 			URITemplate: "scan://{runID}/findings",
@@ -110,7 +112,7 @@ func RegisterResources(srv *mcp.Server, registry *SessionRegistry) {
 		},
 	)
 
-	registerStatusResource(srv, registry)
+	registerStatusResource(srv, registry, rdct)
 }
 
 // registerStatusResource adds scan://{runID}/status.
@@ -124,7 +126,7 @@ func RegisterResources(srv *mcp.Server, registry *SessionRegistry) {
 // The registry has tracked status, workdir and failure cause since MarkFailed
 // landed; this exposes it. Authorised by owner exactly like findings — status
 // leaks whether a run exists and whether it failed.
-func registerStatusResource(srv *mcp.Server, registry *SessionRegistry) {
+func registerStatusResource(srv *mcp.Server, registry *SessionRegistry, rdct *log.Redactor) {
 	srv.AddResourceTemplate(
 		&mcp.ResourceTemplate{
 			URITemplate: "scan://{runID}/status",
@@ -152,23 +154,9 @@ func registerStatusResource(srv *mcp.Server, registry *SessionRegistry) {
 				return nil, fmt.Errorf("mcp: no such status resource: %q", req.Params.URI)
 			}
 
-			// Err is already the sanitised message the pipeline produced; the
-			// server-wide redactor scrubs secrets before anything reaches a log
-			// or a client.
-			payload := struct {
-				RunID   string `json:"run_id"`
-				Status  string `json:"status"`
-				Error   string `json:"error,omitempty"`
-				Started bool   `json:"workspace_ready"`
-			}{
-				RunID:   entry.RunID,
-				Status:  string(entry.Status),
-				Error:   entry.Err,
-				Started: entry.WorkDir != "",
-			}
-			body, err := json.Marshal(payload)
+			body, err := statusPayload(entry, rdct)
 			if err != nil {
-				return nil, fmt.Errorf("mcp: marshal status: %w", err)
+				return nil, err
 			}
 			return &mcp.ReadResourceResult{
 				Contents: []*mcp.ResourceContents{
@@ -177,6 +165,43 @@ func registerStatusResource(srv *mcp.Server, registry *SessionRegistry) {
 			}, nil
 		},
 	)
+}
+
+// statusPayload serialises a status response, passing the failure message
+// through the redactor first.
+//
+// The old comment here claimed "the server-wide redactor scrubs secrets before
+// anything reaches a log or a client". It did not: RegisterTools was handed the
+// redactor and discarded it, and nothing on this path ever touched entry.Err.
+// A pipeline error can carry an API key straight out of a tool's argv or a URL
+// (T-15-15-02), and this response goes to the client verbatim. The redaction is
+// now performed here, by code, rather than asserted by a comment.
+func statusPayload(entry SessionEntry, rdct *log.Redactor) ([]byte, error) {
+	payload := struct {
+		RunID   string `json:"run_id"`
+		Status  string `json:"status"`
+		Error   string `json:"error,omitempty"`
+		Started bool   `json:"workspace_ready"`
+	}{
+		RunID:   entry.RunID,
+		Status:  string(entry.Status),
+		Error:   redactText(rdct, entry.Err),
+		Started: entry.WorkDir != "",
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("mcp: marshal status: %w", err)
+	}
+	return body, nil
+}
+
+// redactText scrubs every registered secret out of s. A nil redactor is
+// tolerated (tests, and any caller that has none) and returns s unchanged.
+func redactText(rdct *log.Redactor, s string) string {
+	if rdct == nil {
+		return s
+	}
+	return rdct.Redact(s)
 }
 
 // NotifyFindingsUpdated sends a resources/updated notification for the given

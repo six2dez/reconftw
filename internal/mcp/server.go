@@ -72,7 +72,14 @@ type MCPServer struct {
 	tools      *toolDeps
 	scanCtx    context.Context    //nolint:containedctx // server owns scan goroutine lifetime
 	scanCancel context.CancelFunc // called by Cancel() to stop all scan goroutines
+	// sweeperDone is closed when the terminal-entry sweeper goroutine exits.
+	// Cancel() stops the sweeper; a test waits on this to prove it does not leak.
+	sweeperDone chan struct{}
 }
+
+// eventStoreMaxBytes bounds the streamable-HTTP replay buffer. See the comment
+// at its use site: the SDK bounds it too, but at a default we do not control.
+const eventStoreMaxBytes = 8 << 20 // 8 MiB
 
 // Cancel cancels the server-level context, signalling all in-flight scan
 // goroutines to stop. Safe to call multiple times (idempotent via sync.Once
@@ -211,20 +218,66 @@ func NewMCPServer(
 		registry:    registry,
 		scanCtx:     scanCtx,
 		scanCancel:  scanCancel,
+		sweeperDone: make(chan struct{}),
 	}
 
 	// Register the MCP tools and the scan://… resource templates. Pass s
 	// (MCPServer) so tool handlers can access the scan context and the config
 	// snapshot.
 	RegisterTools(srv, newSched, registry, rdct, cfg, configPath, secretsPath, s)
-	RegisterResources(srv, registry)
+	RegisterResources(srv, registry, rdct)
+
+	// Reclaim terminal registry entries so a long-lived server does not grow
+	// without bound (T-15-15-05). The goroutine is owned by this server and
+	// exits when the scan context is cancelled — Cancel() stops it, and
+	// sweeperDone lets a test prove that it did.
+	go s.sweepTerminalEntries()
 
 	return s
 }
 
+// sweepTerminalEntries periodically reclaims terminal registry entries.
+// It exits when the scan context is cancelled, closing sweeperDone on the way
+// out so its lifetime is observable rather than assumed.
+func (s *MCPServer) sweepTerminalEntries() {
+	defer close(s.sweeperDone)
+
+	ticker := time.NewTicker(terminalSweepInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-s.scanCtx.Done():
+			return
+		case now := <-ticker.C:
+			s.registry.SweepTerminal(now.Add(-completedEntryTTL))
+		}
+	}
+}
+
+// linkShutdown ties ctx to the scan context: cancelling ctx cancels every
+// in-flight scan. The returned stop function detaches the link (call it when
+// the caller's context outlives the reason for linking).
+//
+// Split out of Start so the linkage can be asserted directly, without standing
+// up a transport that reads os.Stdin or binds a port.
+func (s *MCPServer) linkShutdown(ctx context.Context) (stop func() bool) {
+	return context.AfterFunc(ctx, s.Cancel)
+}
+
 // Start dispatches to either the HTTP or stdio transport based on cfg.Transport.
 // Blocks until the context is cancelled or an error occurs.
+//
+// Start owns the shutdown contract (F9 / T-15-15-06): cancelling ctx cancels
+// every in-flight scan, and so does a transport that returns on its own (a
+// listen error, a closed stdin). Scans used to run under a context derived from
+// context.Background() with nothing cancelling it at shutdown, so an operator
+// who stopped the server left scans spawning external tool processes behind it.
 func (s *MCPServer) Start(ctx context.Context) error {
+	stop := s.linkShutdown(ctx)
+	defer stop()
+	defer s.Cancel()
+
 	switch s.cfg.MCP.Transport {
 	case "stdio":
 		return runMCPServeStdio(ctx, s)
@@ -252,11 +305,19 @@ func runMCPServeStdio(ctx context.Context, s *MCPServer) error {
 //   - Pitfall 5 (08-RESEARCH): MemoryEventStore(nil) replays events for reconnecting
 //     clients (A6 — verified safe in sdk_assumptions_test.go).
 func runMCPServeHTTP(ctx context.Context, s *MCPServer) error {
+	// Event store bound (T-15-15-05). The SDK's MemoryEventStore already purges
+	// oldest-first at MaxBytes — verified in the SDK source, default 10 MiB —
+	// so it is not literally unbounded, but the bound was implicit and untuned.
+	// Setting it explicitly makes the resident cost of a long-lived server a
+	// stated number rather than an SDK default that can change under us.
+	eventStore := mcp.NewMemoryEventStore(nil)
+	eventStore.SetMaxBytes(eventStoreMaxBytes)
+
 	mcpHandler := mcp.NewStreamableHTTPHandler(
 		func(r *http.Request) *mcp.Server { return s.srv },
 		&mcp.StreamableHTTPOptions{
 			// A6: nil options are safe (verified in sdk_assumptions_test.go).
-			EventStore: mcp.NewMemoryEventStore(nil),
+			EventStore: eventStore,
 		},
 	)
 

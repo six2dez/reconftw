@@ -192,6 +192,16 @@
           }
         }
       },
+      "CancelScanInput": {
+        "type": "object",
+        "required": ["run_id"],
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "description": "Run ID returned by a scanning tool. Only the session that started the run may cancel it."
+          }
+        }
+      },
       "ReconInput": {
         "type": "object",
         "required": ["target"],

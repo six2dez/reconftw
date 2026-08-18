@@ -59,20 +59,35 @@ port = 8765
 	return path
 }
 
-// newTestServer loads cfgPath/secretsPath exactly as runMCPServeCmd does and
-// builds an MCPServer from the result.
-func newTestServer(t *testing.T, cfgPath, secretsPath string) *MCPServer {
+// mustLoadConfig resolves a config exactly as runMCPServeCmd does.
+func mustLoadConfig(t *testing.T, cfgPath string, secretsPath ...string) *config.Config {
 	t.Helper()
+	var secrets string
+	if len(secretsPath) > 0 {
+		secrets = secretsPath[0]
+	}
 	cfg, err := config.Load(config.LoadOptions{
 		ExplicitConfigPath: cfgPath,
-		SecretsPath:        secretsPath,
+		SecretsPath:        secrets,
 	})
 	if err != nil {
 		t.Fatalf("config.Load: %v", err)
 	}
-	rdct := &corelog.Redactor{}
-	newSched := func() *scheduler.Scheduler { return scheduler.NewScheduler(1, 0, nil, nil) }
-	srv := NewMCPServer(context.Background(), cfg, cfgPath, secretsPath, newSched, rdct, "test")
+	return cfg
+}
+
+// testSchedFactory mirrors the per-scan scheduler factory the entrypoint builds
+// (heartbeat 0 so no heartbeat goroutine outlives the test).
+func testSchedFactory() func() *scheduler.Scheduler {
+	return func() *scheduler.Scheduler { return scheduler.NewScheduler(1, 0, nil, nil) }
+}
+
+// newTestServer loads cfgPath/secretsPath exactly as runMCPServeCmd does and
+// builds an MCPServer from the result.
+func newTestServer(t *testing.T, cfgPath, secretsPath string) *MCPServer {
+	t.Helper()
+	cfg := mustLoadConfig(t, cfgPath, secretsPath)
+	srv := NewMCPServer(context.Background(), cfg, cfgPath, secretsPath, testSchedFactory(), &corelog.Redactor{}, "test")
 	t.Cleanup(srv.Cancel)
 	return srv
 }

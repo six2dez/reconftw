@@ -1,10 +1,12 @@
 // Package mcp — MCP tool registrations.
 //
-// RegisterTools adds all 7 MCP tools to the server using AddTool with typed
-// input structs and jsonschema tags: recon, subs, web, vulns, osint, monitor
-// and report. All seven execute the same handlers the CLI uses (MCP-02);
-// monitor and report were stubs answering {"status":"not_implemented"} until
-// they were wired to RunMonitorAsync and RenderReportsForTarget.
+// RegisterTools adds all 8 MCP tools to the server using AddTool with typed
+// input structs and jsonschema tags: recon, subs, web, vulns, osint, monitor,
+// report and cancel_scan. The six scanning tools execute the same handlers the
+// CLI uses (MCP-02); monitor and report were stubs answering
+// {"status":"not_implemented"} until they were wired to RunMonitorAsync and
+// RenderReportsForTarget; cancel_scan gives a client the only way, short of
+// stopping the server, to stop work it started.
 //
 // Each real tool handler follows this pattern (D-02 async + D-06 scope):
 //
@@ -30,6 +32,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -82,6 +85,11 @@ type MonitorInput struct {
 // ReportInput is the typed input struct for the "report" tool (Phase-10 stub).
 type ReportInput struct {
 	Target string `json:"target" jsonschema:"Target domain to generate report for"`
+}
+
+// CancelScanInput is the typed input struct for the "cancel_scan" tool.
+type CancelScanInput struct {
+	RunID string `json:"run_id" jsonschema:"Run ID returned by a scanning tool"`
 }
 
 // --- RegisterTools ---------------------------------------------------------
@@ -277,6 +285,41 @@ func RegisterTools(
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args ReportInput) (*mcp.CallToolResult, any, error) {
 		return d.report(ctx, sessionIDFromRequest(req), args)
 	})
+
+	// 8. cancel_scan — stop a run this session started.
+	//
+	// Synchronous, like report: cancelling is a registry write plus a context
+	// cancellation. Without it a client could START unbounded work and had no
+	// way to stop it; the only cancellation that existed was shutting the whole
+	// server down.
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "cancel_scan",
+		Description: "Cancel a running scan started by this session, identified by the run_id a scanning tool returned.",
+	}, func(_ context.Context, req *mcp.CallToolRequest, args CancelScanInput) (*mcp.CallToolResult, any, error) {
+		return d.cancelScan(sessionIDFromRequest(req), args)
+	})
+}
+
+// errNoSuchRun is the SINGLE error used for both "no such run" and "that run
+// belongs to another session". One value, so the two responses are byte-
+// identical and cancel_scan cannot be used to probe which run ids exist
+// (T-15-15-03). A test asserts the equality rather than trusting this comment.
+var errNoSuchRun = errors.New("mcp: no such run, or it is not cancellable by this session")
+
+// cancelScan is the body of the cancel_scan tool. Ownership is verified inside
+// the registry, under the same lock that performs the cancellation, so a run
+// cannot change hands between the check and the act.
+func (d *toolDeps) cancelScan(sessionID string, args CancelScanInput) (*mcp.CallToolResult, any, error) {
+	if !d.registry.CancelRunOwnedBy(args.RunID, sessionID) {
+		return toolErrorf("no_such_run", errNoSuchRun), nil, nil
+	}
+	body, _ := json.Marshal(map[string]any{
+		"run_id": args.RunID,
+		"status": string(SessionStatusCancelled),
+	})
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: string(body)}},
+	}, nil, nil
 }
 
 // report is the body of the report tool: scope-guard, render, answer with the
@@ -407,11 +450,15 @@ func (d *toolDeps) launch(
 
 	resourceURI := "scan://" + runID + "/findings"
 
-	// Step 4: Register the runID against the session that launched it. Ownership
-	// is what authorises later resource reads and subscriptions — an
-	// unpredictable runID makes URIs hard to guess, but guessability is not an
-	// access-control model.
-	registry.RegisterRun(runID, sessionID)
+	// Step 4: Register the runID against the session that launched it, together
+	// with this run's cancel hook. Ownership is what authorises later resource
+	// reads, subscriptions and cancellation — an unpredictable runID makes URIs
+	// hard to guess, but guessability is not an access-control model.
+	//
+	// The run context derives from the server scan context, so it is cancelled
+	// by BOTH cancel_scan (per run) and shutdown (all runs).
+	runCtx, runCancel := context.WithCancel(ctx)
+	registry.RegisterRunWithCancel(runID, sessionID, runCancel)
 
 	// Step 5: Launch scan goroutine (D-02 async — handler returns immediately).
 	// ctx here is the server-lifetime scan context, NOT the tool call context:
@@ -425,7 +472,12 @@ func (d *toolDeps) launch(
 	// Hash fields (no D-03 cross-session race) while all per-scan schedulers
 	// share one process-wide Limiter so they collectively cannot exceed
 	// PARALLEL_MAX_JOBS (MCP-05).
-	go launchScanAndNotify(ctx, runID, d.runOptions(target, dryRun, extraFile), srv, registry, fn)
+	go func() {
+		// Releasing the run context when the scan returns keeps a completed run
+		// from pinning its parent's cancellation tree for the server's lifetime.
+		defer runCancel()
+		launchScanAndNotify(runCtx, runID, d.runOptions(target, dryRun, extraFile), srv, registry, fn)
+	}()
 
 	// Step 6: Return immediately with run_id + resource URI.
 	return &mcp.CallToolResult{
@@ -441,8 +493,12 @@ func (d *toolDeps) launch(
 // notifications at each stage via a ProgressSink channel, and a final
 // notification when the scan completes (or fails).
 //
-// Uses context.Background() so the scan is not cancelled when the tool call
-// context is cancelled (D-02: tool call context ends immediately after return).
+// ctx is the PER-RUN context: a child of the server's scan context, cancelled
+// by cancel_scan for this run and by shutdown for all of them. It is
+// deliberately NOT the tool call context, which ends the moment the handler
+// returns (D-02) — and it is no longer context.Background(), which is what let
+// a scan outlive the server that started it (F9). The comment here used to say
+// Background; the code no longer does.
 func launchScanAndNotify(
 	ctx context.Context,
 	runID string,
