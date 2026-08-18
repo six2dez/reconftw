@@ -222,35 +222,68 @@ func writeCompatTree(app *appctx.AppContext, workdir string) {
 	}
 }
 
-// BootReconApp wires config → target → workspace → backend → appctx.Boot.
-// It mirrors steps 1-5a of runSubsCmd in cmd/reconftw/stub_subcommands.go
-// exactly.
+// RunPlan is the pure, filesystem-free half of BootReconApp: everything that can
+// be resolved from the operator's flags and the config files WITHOUT creating
+// anything. Config load, mode transform, --force / --log-level / -o consumption,
+// logger resolution, target parsing and backend selection all live here.
 //
-// opts.Scheduler is a per-scan instance (CLI: per-invocation; MCP: produced by
-// the per-scan factory). appctx.Boot wires this scan's RunTask/Checkpoint onto
-// it; because the scheduler is not shared across sessions, that is race-free.
-// The global concurrency ceiling is enforced by the scheduler's shared Limiter
-// (MCP-05), not by sharing the Scheduler struct.
-//
-// The caller must pass a non-nil opts.Scheduler; returning an error on nil
-// prevents silent DoS bypass of the concurrency ceiling (T-08-03-02).
-func BootReconApp(ctx context.Context, opts RunOptions) (AppBoot, error) {
-	if opts.Scheduler == nil {
-		return AppBoot{}, fmt.Errorf("handlers: RunOptions.Scheduler must not be nil")
-	}
+// The split exists because `--dry-run` must be genuinely dry (F1). Before it,
+// every RunXxxAsync called BootReconApp first and checked opts.DryRun ~25 lines
+// later, by which point the workspace tree had been created and checkpoints.db
+// opened. A dry run is what an operator uses to preview a plan against a
+// production target inside a change-control window; creating a directory tree
+// and a SQLite database there is a real side effect, not a cosmetic one.
+type RunPlan struct {
+	// Cfg is the fully resolved config (file merge + ConfigTransform + CLI flags).
+	Cfg *config.Config
+	// Target is the parsed target. Its WorkDir is deliberately UNSET: assigning
+	// one would imply a workspace that only the mutating tail actually creates.
+	Target *appctx.Target
+	// Logger is opts.Logger, or slog.Default() when the caller supplied none.
+	Logger *slog.Logger
+	// Backend is the chosen backend (nil when Axiom is disabled — Boot.pickBackend
+	// then selects LocalBackend).
+	Backend backend.Backend
+	// WorkspaceRoot is the root WorkspaceInit would be handed (cfg.Paths.DataDir).
+	// It is a path, not a created directory.
+	WorkspaceRoot string
+}
 
+// workspaceFallbackRoot is the relative root used when cfg.Paths.DataDir is empty.
+const workspaceFallbackRoot = "workspaces"
+
+// workspaceRootOrFallback mirrors BootReconApp's workspace fallback: an empty
+// configured root means the workspace lands in ./workspaces relative to cwd.
+// Both the mutating tail and ResolveDryRunBoot route through this one function so
+// a dry run cannot report a root the real run would not use.
+func workspaceRootOrFallback(root string) string {
+	if root == "" {
+		return workspaceFallbackRoot
+	}
+	return root
+}
+
+// ResolveRunPlan performs boot steps 1-2 and step 5 (config → target → backend)
+// with ZERO filesystem effects: no MkdirAll, no sql.Open, no os.WriteFile, no
+// os.Remove, no WorkspaceInit, no appctx.Boot, no seedIncrementalStaging.
+// Anything added here that mutates the filesystem re-opens F1 — the dry-run path
+// calls this function and nothing else.
+//
+// It deliberately does NOT enforce the non-nil Scheduler rule: enumerating a task
+// plan needs no scheduler. BootReconApp keeps that guard.
+func ResolveRunPlan(opts RunOptions) (RunPlan, error) {
 	// Step 1: Load config.
 	cfg, err := config.Load(config.LoadOptions{
 		ExplicitConfigPath: opts.ConfigPath,
 		SecretsPath:        opts.SecretsPath,
 	})
 	if err != nil {
-		return AppBoot{}, fmt.Errorf("handlers: config load: %w", err)
+		return RunPlan{}, fmt.Errorf("handlers: config load: %w", err)
 	}
 
-	// Apply mode transform (zen/deep) AFTER Load and BEFORE Boot.
-	// This ensures appctx.Boot wires the transformed concurrency limits (D-02/D-03).
-	// Pitfall 5: applying after Boot means Boot already wired stale values.
+	// Apply mode transform (zen/deep) AFTER Load and BEFORE the boot tail.
+	// This ensures the boot wires the transformed concurrency limits (D-02/D-03).
+	// Pitfall 5: applying after the boot means it already wired stale values.
 	if opts.ConfigTransform != nil {
 		opts.ConfigTransform(cfg)
 	}
@@ -283,23 +316,11 @@ func BootReconApp(ctx context.Context, opts RunOptions) (AppBoot, error) {
 	// Step 2: Build target.
 	tgt, err := appctx.NewTarget(opts.Target, nil, "")
 	if err != nil {
-		return AppBoot{}, fmt.Errorf("handlers: invalid target: %w", err)
+		return RunPlan{}, fmt.Errorf("handlers: invalid target: %w", err)
 	}
 
-	// Step 3: Workspace init with fallback.
-	workdir, err := output.WorkspaceInit(cfg.Paths.DataDir, tgt.Domain)
-	if err != nil {
-		workdir, err = output.WorkspaceInit("workspaces", tgt.Domain)
-		if err != nil {
-			return AppBoot{}, fmt.Errorf("handlers: workspace init: %w", err)
-		}
-	}
-	tgt.WorkDir = workdir
-
-	// Step 4: Use opts.Scheduler as-is (DO NOT call scheduler.NewScheduler —
-	// Pitfall 3). The shared process-level scheduler owns the MaxJobs ceiling.
-
-	// Step 5: Choose backend.
+	// Step 5: Choose backend. Constructing a backend opens nothing; the axiom
+	// fleet is launched separately and only by RunCompositeAsync.
 	var chosenBackend backend.Backend
 	if opts.AxiomEnabled {
 		axiomBE := backend.NewAxiomBackend(cfg, backend.Default, logger)
@@ -311,6 +332,98 @@ func BootReconApp(ctx context.Context, opts RunOptions) (AppBoot, error) {
 		}
 	}
 	// nil chosenBackend → Boot.pickBackend selects LocalBackend.
+
+	return RunPlan{
+		Cfg:           cfg,
+		Target:        tgt,
+		Logger:        logger,
+		Backend:       chosenBackend,
+		WorkspaceRoot: cfg.Paths.DataDir,
+	}, nil
+}
+
+// ResolveDryRunBoot returns the AppBoot a dry run should see: the resolved config
+// and backend, plus the workspace path a REAL run WOULD create — computed, never
+// created.
+//
+// App is deliberately nil. A dry run boots no AppContext, opens no checkpoint
+// store and creates no workspace, so there is nothing for App to point at. Any
+// consumer that dereferences boot.App on a dry-run path is a bug; the per-handler
+// dry-run subtests exist so that bug fails the build rather than a terminal.
+//
+// WorkDir is computed with output.CanonicalTargetID — the SAME function
+// output.WorkspaceInit calls — over the SAME string the real path hands it
+// (plan.Target.Domain). Re-deriving the slug locally would look correct for
+// plain domains and diverge for exactly the IP and CIDR targets canonical
+// identity exists to disambiguate, so the dry run would confidently name a
+// directory the real run never touches.
+func ResolveDryRunBoot(opts RunOptions) (AppBoot, error) {
+	plan, err := ResolveRunPlan(opts)
+	if err != nil {
+		return AppBoot{}, err
+	}
+
+	id, err := output.CanonicalTargetID(plan.Target.Domain)
+	if err != nil {
+		// Verbatim: a dry run rejects an unclassifiable target with exactly the
+		// error a real run would surface out of WorkspaceInit.
+		return AppBoot{}, err
+	}
+
+	return AppBoot{
+		App:           nil,
+		WorkDir:       filepath.Join(workspaceRootOrFallback(plan.WorkspaceRoot), id.Slug),
+		Cfg:           plan.Cfg,
+		ChosenBackend: plan.Backend,
+	}, nil
+}
+
+// BootReconApp wires config → target → workspace → backend → appctx.Boot.
+// It mirrors steps 1-5a of runSubsCmd in cmd/reconftw/stub_subcommands.go
+// exactly.
+//
+// It is ResolveRunPlan (pure) followed by the MUTATING tail: WorkspaceInit
+// (MkdirAll), appctx.Boot (opens checkpoints.db), the incremental seed write and
+// the scheduler hash wiring. A caller on a dry-run path must NOT reach this
+// function — it calls ResolveDryRunBoot instead.
+//
+// opts.Scheduler is a per-scan instance (CLI: per-invocation; MCP: produced by
+// the per-scan factory). appctx.Boot wires this scan's RunTask/Checkpoint onto
+// it; because the scheduler is not shared across sessions, that is race-free.
+// The global concurrency ceiling is enforced by the scheduler's shared Limiter
+// (MCP-05), not by sharing the Scheduler struct.
+//
+// The caller must pass a non-nil opts.Scheduler; returning an error on nil
+// prevents silent DoS bypass of the concurrency ceiling (T-08-03-02).
+func BootReconApp(ctx context.Context, opts RunOptions) (AppBoot, error) {
+	if opts.Scheduler == nil {
+		return AppBoot{}, fmt.Errorf("handlers: RunOptions.Scheduler must not be nil")
+	}
+
+	// Steps 1-2 + 5: pure resolution, no side effects.
+	plan, err := ResolveRunPlan(opts)
+	if err != nil {
+		return AppBoot{}, err
+	}
+	cfg := plan.Cfg
+	tgt := plan.Target
+	logger := plan.Logger
+	chosenBackend := plan.Backend
+
+	// ---- MUTATING TAIL BEGINS HERE ----
+
+	// Step 3: Workspace init with fallback.
+	workdir, err := output.WorkspaceInit(plan.WorkspaceRoot, tgt.Domain)
+	if err != nil {
+		workdir, err = output.WorkspaceInit(workspaceFallbackRoot, tgt.Domain)
+		if err != nil {
+			return AppBoot{}, fmt.Errorf("handlers: workspace init: %w", err)
+		}
+	}
+	tgt.WorkDir = workdir
+
+	// Step 4: Use opts.Scheduler as-is (DO NOT call scheduler.NewScheduler —
+	// Pitfall 3). The shared process-level scheduler owns the MaxJobs ceiling.
 
 	// Step 5a: Boot the AppContext with the resolved logger (opts.Logger, or
 	// slog.Default() when the caller supplied none — the MCP server sets a

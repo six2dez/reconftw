@@ -4,6 +4,12 @@
 // with after-completion delay between cycles. SIGINT cancels ctx after the
 // current cycle's tasks finish (MON-08).
 //
+// Dry-run (F1): when opts.DryRun is set, RunMonitorAsync resolves the plan,
+// reports it through AfterBoot and returns. It boots nothing, opens no
+// store.db, constructs no notifier and never enters the loop — an operator
+// previewing a monitor must not have a workspace and a checkpoint database
+// created underneath them.
+//
 // Design choice — single-boot per cycle, NOT once-for-all:
 // RunCompositeAsync owns BootReconApp internally and also owns the checkpoint
 // lifecycle (defer app.Checkpoint.Close()). Calling it directly per cycle is
@@ -134,6 +140,20 @@ func runMonitorLoop(
 func RunMonitorAsync(ctx context.Context, opts RunOptions, monCfg MonitorOptions) error {
 	if opts.Scheduler == nil {
 		return fmt.Errorf("mcp/monitor: RunOptions.Scheduler must not be nil")
+	}
+
+	// F1: a dry run resolves the plan and stops — before the pre-boot creates a
+	// workspace and opens checkpoints.db, before the notifier is constructed,
+	// before store.db is touched, and before the loop starts.
+	if opts.DryRun {
+		boot, err := ResolveDryRunBoot(opts)
+		if err != nil {
+			return fmt.Errorf("mcp/monitor: %w", err)
+		}
+		if opts.AfterBoot != nil {
+			opts.AfterBoot(boot)
+		}
+		return nil
 	}
 
 	// INTEG-02: suppress the in-scan notification seam for every per-cycle
