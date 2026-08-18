@@ -541,20 +541,42 @@ func parseBrutesprayHits(stdout []byte) []VulnFindingRecord {
 // sprayExtractTarget pulls the host:port and (best-effort) service name from a
 // brutespray hit line, discarding any credential material. Returns
 // ("host:port", "service") — either may be "" if not found.
-// sprayResolveScopeHosts rewrites IP-literal locators back to the in-scope
-// hostname that resolved to them.
+// sprayResolveScopeHosts attaches every hostname known to resolve to a spray
+// finding's IP, and records a single unambiguous hostname as the locator.
 //
 // brutespray and brutus both take their targets from the nmap .gnmap, so their
-// hits identify services by IP. Under a domain scope (*.example.com) an IP
-// literal is out of scope, so the findings merge dropped every credential-spray
-// result — the highest-severity findings the pipeline can produce, discarded
-// silently. The scan already knows the mapping: artefacts/hosts.jsonl pairs
-// host and ip (written by web.httpx and the subdomains geo enrichment).
+// hits identify a service by IP ADDRESS. That IP is the only claim the result
+// actually supports: a weak credential was accepted at 10.0.0.5:22. It says
+// nothing about which of the names pointing at 10.0.0.5 owns that service.
 //
-// A finding whose IP is not in that index keeps the IP as its locator. That is
-// correct, not a fallback: under an IP or CIDR target scope the IP is exactly
-// the right locator, and under a domain scope an unmappable IP genuinely has no
-// in-scope identity.
+// F20 (audit finding, bullet 3). This function used to overwrite Host with
+// whichever hostname happened to appear FIRST for that IP in hosts.jsonl,
+// justified in a comment as "keeping the result deterministic for shared IPs".
+// Determinism is not correctness. On shared hosting or a CDN edge, dozens of
+// unrelated names share one address, and filing a SUCCESSFUL CREDENTIAL SPRAY
+// against an arbitrary one of them is the highest-consequence attribution error
+// this tool can make: the finding names a domain that may have no relationship
+// to the service, and a disclosure sent on that basis reports unauthorised
+// access against an uninvolved party.
+//
+// The rule now:
+//
+//   - EXACTLY ONE hostname for the IP → unambiguous. Host becomes that hostname
+//     and Hostnames carries it as its single entry. Nothing is guessed.
+//   - MORE THAN ONE → ambiguous. Host stays the IP LITERAL, and Hostnames
+//     carries every candidate in first-seen order so a reviewer sees the full
+//     relation instead of an invented one.
+//   - NOT IN THE INDEX → Host stays the IP literal. That is correct, not a
+//     fallback: under an IP or CIDR target scope the IP is exactly the right
+//     locator, and under a domain scope an unmappable IP genuinely has no
+//     in-scope identity.
+//
+// An IP-literal Host still passes the findings scope gate whenever the address
+// itself is in scope — output.FilterInScope resolves a findings record through
+// Tree.InScope, and the IP/CIDR scope support an earlier audit added admits it.
+// That matters: dropping these at the scope boundary is the failure mode the
+// single-hostname rewrite was originally introduced to avoid, and it must not
+// come back while the attribution is being fixed.
 func sprayResolveScopeHosts(app *appctx.AppContext, findings []VulnFindingRecord) []VulnFindingRecord {
 	if len(findings) == 0 || app == nil || app.Target == nil {
 		return findings
@@ -576,25 +598,47 @@ func sprayResolveScopeHosts(app *appctx.AppContext, findings []VulnFindingRecord
 		return findings
 	}
 	for i := range findings {
-		if net.ParseIP(findings[i].Host) == nil {
+		ip := findings[i].Host
+		if net.ParseIP(ip) == nil {
 			continue
 		}
-		if host, ok := index[findings[i].Host]; ok && host != "" {
-			if app.Log != nil {
-				app.Log.Debug("vulns.spray: mapped service IP back to its in-scope host",
-					"ip", findings[i].Host, "host", host)
-			}
-			findings[i].Host = host
+		hosts := index[ip]
+		if len(hosts) == 0 {
+			continue
+		}
+		// Preserve the relation to EVERY candidate name, always.
+		findings[i].Hostnames = append([]string(nil), hosts...)
+		if len(hosts) == 1 {
+			// Unambiguous: exactly one name resolves here, so naming it is a
+			// statement of fact rather than a guess.
+			findings[i].Host = hosts[0]
+		}
+		if app.Log != nil {
+			// XCUT-07: the IP and hostnames are non-secret locators; the
+			// credential never reaches this function. The previous message said
+			// the service IP had been mapped back to ITS in-scope host — the
+			// singular possessive was itself the unsupported claim. Log what is
+			// actually known: how many names share the address, and whether that
+			// makes the attribution ambiguous.
+			app.Log.Debug("vulns.spray: service IP associated with known hostnames",
+				"ip", ip, "hostnames", len(hosts), "ambiguous", len(hosts) > 1)
 		}
 	}
 	return findings
 }
 
-// sprayHostsByIP builds an ip → hostname index from artefacts/hosts.jsonl.
+// sprayHostsByIP builds an ip → []hostname index from artefacts/hosts.jsonl,
+// in first-seen order and deduplicated.
+//
 // Both writers of that artefact (web.httpx HostRecord and the subdomains geo
-// HostRecord) carry "host" and "ip", so one decode shape covers both. The first
-// host seen for an IP wins, keeping the result deterministic for shared IPs.
-func sprayHostsByIP(app *appctx.AppContext) map[string]string {
+// HostRecord) carry "host" and "ip", so one decode shape covers both.
+//
+// F20: this returned map[string]string with a first-wins guard. A shared IP
+// legitimately has MANY hostnames, and discarding all but one does not make the
+// answer right — it makes a wrong answer stable. Every name is kept so the
+// caller can tell "one name, therefore certain" from "many names, therefore
+// ambiguous"; that distinction is the whole fix.
+func sprayHostsByIP(app *appctx.AppContext) map[string][]string {
 	path := filepath.Join(app.Target.WorkDir, "artefacts", "hosts.jsonl")
 	f, err := os.Open(path) //nolint:gosec // path is workspace-internal
 	if err != nil {
@@ -602,7 +646,8 @@ func sprayHostsByIP(app *appctx.AppContext) map[string]string {
 	}
 	defer f.Close() //nolint:errcheck
 
-	index := make(map[string]string)
+	index := make(map[string][]string)
+	seen := make(map[string]map[string]struct{})
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
 	for sc.Scan() {
@@ -616,9 +661,14 @@ func sprayHostsByIP(app *appctx.AppContext) map[string]string {
 		if rec.IP == "" || rec.Host == "" {
 			continue
 		}
-		if _, seen := index[rec.IP]; !seen {
-			index[rec.IP] = rec.Host
+		if seen[rec.IP] == nil {
+			seen[rec.IP] = make(map[string]struct{})
 		}
+		if _, dup := seen[rec.IP][rec.Host]; dup {
+			continue
+		}
+		seen[rec.IP][rec.Host] = struct{}{}
+		index[rec.IP] = append(index[rec.IP], rec.Host)
 	}
 	return index
 }

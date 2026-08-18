@@ -97,6 +97,24 @@ type VulnFindingRecord struct {
 	Host string `json:"host,omitempty"`
 	URL  string `json:"url,omitempty"`
 
+	// Hostnames carries EVERY hostname known to resolve to an IP-addressed
+	// finding, in first-seen order (F20, audit bullet 3). It is populated by
+	// vulns.spray, whose hits identify a service by IP because brutespray and
+	// brutus both read the nmap .gnmap.
+	//
+	// A shared-hosting address or a CDN edge has many unrelated names. Host
+	// alone cannot express that, and picking one of them files a successful
+	// credential spray against a domain that may not own the service. Host is
+	// therefore only set to a hostname when EXACTLY ONE resolves to the address;
+	// otherwise it stays the IP literal and this field carries the full relation
+	// for review.
+	//
+	// omitempty keeps every other producer's record byte-identical, so nothing
+	// downstream sees a shape change. internal/core/ingest reads findings with
+	// plain encoding/json and does not set DisallowUnknownFields, so an older
+	// reader ignores the field rather than failing.
+	Hostnames []string `json:"hostnames,omitempty"`
+
 	// Phase 4/5 inherited SARIF-compatible fields.
 	Severity   string   `json:"severity,omitempty"`
 	Confidence string   `json:"confidence,omitempty"`
