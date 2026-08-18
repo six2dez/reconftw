@@ -3,15 +3,23 @@ package ingest
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	_ "modernc.org/sqlite"
 
+	"github.com/six2dez/reconftw/internal/extract/urls"
+	"github.com/six2dez/reconftw/internal/modules/osint"
+	"github.com/six2dez/reconftw/internal/modules/subdomains"
+	"github.com/six2dez/reconftw/internal/modules/vulns"
+	"github.com/six2dez/reconftw/internal/modules/web"
 	sqlcgen "github.com/six2dez/reconftw/internal/store/sqlc"
 )
 
@@ -441,5 +449,349 @@ func TestScanIntoStoreFindingsCarryTargetID(t *testing.T) {
 	if got := scalar(t, db, `SELECT count(*) FROM findings WHERE target_id = ?`, target); got != 2 {
 		t.Errorf("%d of 2 findings carry target_id = %q — an empty target_id "+
 			"re-shares one findings row across every engagement", got, target)
+	}
+}
+
+// -------------------------------------------------------------------------
+// The failure-injection seam.
+//
+// Test-only: failingDBTX lives in this file, is never referenced by ingest.go,
+// and reaches the ingest through the unexported scanIntoStoreWithDB's wrapTx
+// PARAMETER — not through an exported hook and not through package-level state
+// that production code reads. Production always passes nil.
+// -------------------------------------------------------------------------
+
+// errInjected is the failure the tests inject. Deliberately not a driver error:
+// the point is a store that REJECTS a write, not a connection that died, and a
+// rejected statement leaves the transaction usable (which is what separates
+// "incomplete" from "no scan row at all").
+var errInjected = errors.New("injected store failure")
+
+// failingDBTX wraps a real DBTX and rejects ExecContext calls chosen by fail.
+//
+// Only ExecContext is intercepted. That is enough to reach every terminal
+// state: the attach / observe / update-scan statements are all :exec, so the
+// seam can fail one record's write (leaving the transaction usable) or every
+// write from a point onwards (which also fails the counts and status updates,
+// so nothing is ever committed).
+type failingDBTX struct {
+	inner sqlcgen.DBTX
+
+	mu       sync.Mutex
+	calls    int
+	failures int
+
+	// fail receives the 1-based ExecContext index and the statement text and
+	// reports whether this call should be rejected.
+	fail func(n int, query string) bool
+}
+
+// failOnce rejects the first ExecContext whose statement contains substr and
+// lets everything else through — one rejected record on a healthy transaction.
+func failOnce(substr string) func(inner sqlcgen.DBTX) sqlcgen.DBTX {
+	return func(inner sqlcgen.DBTX) sqlcgen.DBTX {
+		fired := false
+		return &failingDBTX{inner: inner, fail: func(_ int, query string) bool {
+			if fired || !strings.Contains(query, substr) {
+				return false
+			}
+			fired = true
+			return true
+		}}
+	}
+}
+
+// failFrom rejects the first ExecContext whose statement contains substr and
+// every ExecContext after it — a store that goes away part-way through, which
+// also fails the counts and status updates and therefore the whole ingest.
+func failFrom(substr string) func(inner sqlcgen.DBTX) sqlcgen.DBTX {
+	return func(inner sqlcgen.DBTX) sqlcgen.DBTX {
+		tripped := false
+		return &failingDBTX{inner: inner, fail: func(_ int, query string) bool {
+			if !tripped && strings.Contains(query, substr) {
+				tripped = true
+			}
+			return tripped
+		}}
+	}
+}
+
+func (f *failingDBTX) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+	f.mu.Lock()
+	f.calls++
+	n := f.calls
+	reject := f.fail != nil && f.fail(n, query)
+	if reject {
+		f.failures++
+	}
+	f.mu.Unlock()
+	if reject {
+		return nil, errInjected
+	}
+	return f.inner.ExecContext(ctx, query, args...)
+}
+
+func (f *failingDBTX) PrepareContext(ctx context.Context, query string) (*sql.Stmt, error) {
+	return f.inner.PrepareContext(ctx, query)
+}
+
+func (f *failingDBTX) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+	return f.inner.QueryContext(ctx, query, args...)
+}
+
+func (f *failingDBTX) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
+	return f.inner.QueryRowContext(ctx, query, args...)
+}
+
+// openIngestStore opens and migrates a store the way ScanIntoStore does, so a
+// test driving scanIntoStoreWithDB directly exercises the same DSN.
+func openIngestStore(t *testing.T, dataDir string) *sql.DB {
+	t.Helper()
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatalf("mkdir data dir: %v", err)
+	}
+	path := filepath.Join(dataDir, "store.db")
+	db, err := sql.Open("sqlite",
+		path+"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_txlock=immediate")
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if err := sqlcgen.EnsureSchema(context.Background(), db); err != nil {
+		t.Fatalf("EnsureSchema: %v", err)
+	}
+	return db
+}
+
+// writeGateFixture lays down one host, one url and one finding — enough for the
+// ingest to reach every phase, small enough that a failure's blast radius is
+// unambiguous.
+func writeGateFixture(t *testing.T, workDir, host string) {
+	t.Helper()
+	writeArtefact(t, workDir, "hosts.jsonl",
+		`{"host":"`+host+`","ip":"1.2.3.4","cdn":"cloudflare"}`)
+	writeArtefact(t, workDir, "urls.jsonl",
+		`{"url":"https://`+host+`/admin","source":"katana","host":"`+host+`"}`)
+	writeArtefact(t, workDir, "findings.jsonl",
+		`{"vuln_class":"sqli","engine":"sqlmap","host":"`+host+`","severity":"critical","url":"https://`+host+`/p?id=1"}`)
+}
+
+// TestScanIntoStoreInjectedFailureLeavesNoCompletedScanAndNoPartialData is
+// acceptance gate 7, asserted against a real on-disk database.
+//
+// The store starts rejecting writes at the first scan_observation insert — part
+// way through, after hosts have already been upserted. Before this plan those
+// upserts autocommitted one by one and the run still ended with
+// UpdateScanStatus("completed"), so the store held a scan that ADVERTISED
+// itself as whole while holding a fraction of the data. An operator reading
+// that report sees a short findings list and concludes the target is clean.
+func TestScanIntoStoreInjectedFailureLeavesNoCompletedScanAndNoPartialData(t *testing.T) {
+	tmp := t.TempDir()
+	dataDir := filepath.Join(tmp, "data")
+	workDir := filepath.Join(tmp, "ws")
+	target := "gate7.test"
+	ctx := context.Background()
+
+	writeGateFixture(t, workDir, "a.gate7.test")
+	db := openIngestStore(t, dataDir)
+
+	res, err := scanIntoStoreWithDB(ctx, db, failFrom("INSERT INTO scan_observation"),
+		filepath.Join(dataDir, "store.db"), workDir, target, "all", quietLogger())
+	if err == nil {
+		t.Fatal("ScanIntoStore returned nil error after an injected mid-ingest failure")
+	}
+	if !errors.Is(err, errInjected) {
+		t.Errorf("error = %v, want it to wrap the injected failure", err)
+	}
+	if res.ScanID != "" {
+		t.Errorf("Result carries scan id %q for a scan that was never committed", res.ScanID)
+	}
+
+	if got := scalar(t, db, `SELECT count(*) FROM scans WHERE status = 'completed'`); got != 0 {
+		t.Errorf("completed scans = %d, want 0 — a failed ingest advertised itself as whole", got)
+	}
+	if got := scalar(t, db, `SELECT count(*) FROM scans`); got != 0 {
+		t.Errorf("scan rows = %d, want 0 — the doomed transaction left a scan row behind", got)
+	}
+	for _, table := range []string{"hosts", "urls", "findings", "scan_observation", "targets"} {
+		if got := scalar(t, db, `SELECT count(*) FROM `+table); got != 0 {
+			t.Errorf("%s rows = %d, want 0 — the rollback did not discard partial data", table, got)
+		}
+	}
+}
+
+// TestScanIntoStoreTerminalStates walks the whole state machine as a unit. Each
+// row asserts a DIFFERENT observable outcome, so a regression that collapses two
+// states into one cannot pass.
+func TestScanIntoStoreTerminalStates(t *testing.T) {
+	tests := []struct {
+		name string
+		wrap func(sqlcgen.DBTX) sqlcgen.DBTX
+		// wantScans is how many scan rows survive.
+		wantScans int64
+		// wantStatus is the surviving row's status ("" when none survives).
+		wantStatus string
+		wantErr    bool
+		// wantAssets is whether any asset rows survive.
+		wantAssets bool
+	}{
+		{
+			name:       "completed: every write landed",
+			wrap:       nil,
+			wantScans:  1,
+			wantStatus: "completed",
+			wantErr:    false,
+			wantAssets: true,
+		},
+		{
+			// One rejected record on a transaction that stays usable: the rows
+			// that did land are committed, and the scan says so honestly.
+			// GetLatestCompletedScanForTarget filters on 'completed', so this
+			// scan can never become a report or monitor-diff baseline.
+			name:       "incomplete: one record rejected, transaction still usable",
+			wrap:       failOnce("INSERT INTO target_finding"),
+			wantScans:  1,
+			wantStatus: "incomplete",
+			wantErr:    true,
+			wantAssets: true,
+		},
+		{
+			// The transaction cannot be completed, so nothing is committed —
+			// not even a 'failed' marker, because the row that would carry it
+			// was created inside the transaction being discarded.
+			name:       "no scan row: the transaction never commits",
+			wrap:       failFrom("INSERT INTO scan_observation"),
+			wantScans:  0,
+			wantStatus: "",
+			wantErr:    true,
+			wantAssets: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tmp := t.TempDir()
+			dataDir := filepath.Join(tmp, "data")
+			workDir := filepath.Join(tmp, "ws")
+			target := "states.test"
+			ctx := context.Background()
+
+			writeGateFixture(t, workDir, "a.states.test")
+			db := openIngestStore(t, dataDir)
+
+			_, err := scanIntoStoreWithDB(ctx, db, tc.wrap,
+				filepath.Join(dataDir, "store.db"), workDir, target, "all", quietLogger())
+			if tc.wantErr && err == nil {
+				t.Fatal("want a non-nil error, got nil")
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("want nil error, got %v", err)
+			}
+
+			if got := scalar(t, db, `SELECT count(*) FROM scans`); got != tc.wantScans {
+				t.Fatalf("scan rows = %d, want %d", got, tc.wantScans)
+			}
+			if tc.wantStatus != "" {
+				var status string
+				if err := db.QueryRow(`SELECT status FROM scans`).Scan(&status); err != nil {
+					t.Fatalf("read scan status: %v", err)
+				}
+				if status != tc.wantStatus {
+					t.Errorf("scan status = %q, want %q", status, tc.wantStatus)
+				}
+			}
+			gotAssets := scalar(t, db, `SELECT count(*) FROM hosts`) > 0
+			if gotAssets != tc.wantAssets {
+				t.Errorf("asset rows present = %v, want %v", gotAssets, tc.wantAssets)
+			}
+			// 'failed' is never written from ingest — see the terminal-state
+			// constants. A doomed transaction leaves no row to mark.
+			if got := scalar(t, db, `SELECT count(*) FROM scans WHERE status = 'failed'`); got != 0 {
+				t.Errorf("scans with status 'failed' = %d, want 0", got)
+			}
+		})
+	}
+}
+
+// TestFixturesMatchProducerShapes is the audit the earlier subdomains.jsonl
+// incident demands. A fixture written by hand can encode the bug instead of
+// catching it: this package once fed itself a subdomains.jsonl full of
+// {"host":…} lines, a shape no producer emits, so a decoder that dropped every
+// real subdomain line looked correct.
+//
+// Here each artefact line is MARSHALLED FROM THE PRODUCING STRUCT, so the
+// fixtures cannot drift from the producers without this test failing to
+// compile or failing to ingest.
+func TestFixturesMatchProducerShapes(t *testing.T) {
+	tmp := t.TempDir()
+	dataDir := filepath.Join(tmp, "data")
+	workDir := filepath.Join(tmp, "ws")
+	target := "producers.test"
+	ctx := context.Background()
+
+	marshal := func(v any) string {
+		t.Helper()
+		b, err := json.Marshal(v)
+		if err != nil {
+			t.Fatalf("marshal fixture: %v", err)
+		}
+		return string(b)
+	}
+
+	// artefacts/subdomains.jsonl — subdomains.MergeStage.
+	writeArtefact(t, workDir, "subdomains.jsonl",
+		marshal(subdomains.SubdomainRecord{
+			Subdomain: "sub.producers.test", Source: "subfinder", FirstSeen: "2026-08-18T00:00:00Z",
+		}),
+	)
+	// artefacts/hosts.jsonl — web.HTTPXTask.Run and subdomains' geo enrichment.
+	writeArtefact(t, workDir, "hosts.jsonl",
+		marshal(web.HostRecord{
+			Host: "www.producers.test", URL: "https://www.producers.test",
+			Scheme: "https", Port: "443", Status: 200, IP: "1.2.3.4", CDN: "cloudflare",
+		}),
+		marshal(subdomains.HostRecord{
+			Host: "geo.producers.test", IP: "5.6.7.8", ASN: "AS64500", Country: "ES",
+		}),
+	)
+	// artefacts/urls.jsonl — urls.ExtractURLs.
+	writeArtefact(t, workDir, "urls.jsonl",
+		marshal(urls.URLRecord{
+			URL: "https://www.producers.test/admin", Source: "katana", Host: "www.producers.test",
+		}),
+	)
+	// artefacts/findings.jsonl — the four producing shapes.
+	writeArtefact(t, workDir, "findings.jsonl",
+		marshal(web.FindingRecord{
+			Type: "http", Host: "www.producers.test", TemplateID: "exposed-panel",
+			Severity: "high", MatchedAt: "https://www.producers.test/admin",
+		}),
+		marshal(vulns.VulnFindingRecord{
+			Host: "www.producers.test", URL: "https://www.producers.test/p?id=1",
+			Severity: "critical", VulnClass: "sqli", MatchedParam: "id", Engine: "sqlmap",
+		}),
+		marshal(osint.OSINTFindingRecord{
+			Severity: "info", Class: "osint", Source: "github_leaks", Category: "leaked-secret",
+		}),
+		marshal(subdomains.TakeoverRecord{
+			Type: "subdomain-takeover", Host: "sub.producers.test", Service: "github",
+			Confidence: "high", Severity: "high",
+		}),
+	)
+
+	res, err := ScanIntoStore(ctx, dataDir, workDir, target, "all", quietLogger())
+	if err != nil {
+		t.Fatalf("ScanIntoStore: %v", err)
+	}
+	if res.Hosts != 3 {
+		t.Errorf("hosts = %d, want 3 (one per producer shape) — a hosts/subdomains "+
+			"line from a real producer was decoded to nothing", res.Hosts)
+	}
+	if res.URLs != 1 {
+		t.Errorf("urls = %d, want 1", res.URLs)
+	}
+	if res.Findings != 4 {
+		t.Errorf("findings = %d, want 4 (one per producing shape) — a real "+
+			"producer's record was dropped during ingest", res.Findings)
 	}
 }
