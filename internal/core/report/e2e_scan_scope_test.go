@@ -58,7 +58,7 @@ func TestE2EReportDoesNotLeakAnotherTarget(t *testing.T) {
 	}
 	defer r.Close() //nolint:errcheck
 
-	if err := r.RenderAll(context.Background(), "alpha.example", "", false); err != nil {
+	if err := r.RenderAll(context.Background(), "alpha.example", "", false, false); err != nil {
 		t.Fatalf("RenderAll: %v", err)
 	}
 
@@ -116,7 +116,7 @@ func TestE2EReportRejectsMismatchedScanAndTarget(t *testing.T) {
 	if betaScan == "" {
 		t.Skip("could not resolve beta's scan id")
 	}
-	err = r.RenderAll(context.Background(), "alpha.example", betaScan, false)
+	err = r.RenderAll(context.Background(), "alpha.example", betaScan, false, false)
 	if err == nil {
 		t.Fatal("rendering beta's scan under --target alpha must be refused")
 	}
@@ -168,7 +168,7 @@ func TestE2EReportOfSecondScanExcludesVanishedAsset(t *testing.T) {
 	}
 	defer r.Close() //nolint:errcheck
 
-	if err := r.RenderAll(context.Background(), target, res2.ScanID, false); err != nil {
+	if err := r.RenderAll(context.Background(), target, res2.ScanID, false, false); err != nil {
 		t.Fatalf("RenderAll(scan 2): %v", err)
 	}
 

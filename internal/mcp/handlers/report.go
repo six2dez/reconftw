@@ -44,7 +44,7 @@ func RenderReportsForTarget(ctx context.Context, target string) ([]string, error
 	// finished one. Rendering an unfinished scan as though it were complete is
 	// the failure mode --allow-partial exists to make explicit, and there is no
 	// way for a tool caller to opt in yet.
-	if err := renderer.RenderAll(ctx, target, "", false); err != nil {
+	if err := renderer.RenderAll(ctx, target, "", false, false); err != nil {
 		return nil, fmt.Errorf("report: render: %w", err)
 	}
 

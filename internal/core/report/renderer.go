@@ -31,6 +31,8 @@ type ReportRenderer struct {
 	cfg      *config.Config
 	log      *slog.Logger
 	redactor *log.Redactor
+	// pageSize overrides the query page size; 0 means reportRowLimit.
+	pageSize int64
 }
 
 // NewReportRenderer opens store.db at workDir/store.db in read-only mode and
@@ -63,107 +65,206 @@ func (r *ReportRenderer) Close() error {
 	return r.db.Close()
 }
 
-// RenderAll resolves the scan, fetches findings/hosts/URLs and writes all
-// report formats to workDir/reports/.
-//
-// Scan resolution order:
-//  1. If scanID is non-empty, use GetScan(scanID).
-//  2. Otherwise use GetLatestCompletedScanForTarget(targetID).
-//
-// If --allow-partial is set in the future, the caller should pass
-// allowPartial=true to accept incomplete scans; currently the method
-// requires a completed scan unless scanID is explicitly specified.
-// reportRowLimit caps how many rows of each kind a report renders. Reaching it
-// used to truncate in silence, so a report over a large target looked complete
-// while omitting findings — the one thing a report must never do quietly.
-// warnIfTruncated turns that into an explicit warning.
+// reportRowLimit is the PAGE SIZE for every report query, not a truncation
+// point. It used to be a hard cap: one query per asset kind with LIMIT 10000
+// and no follow-up, so a target with more rows than that silently lost the
+// remainder — and because the fetch was target-wide and filtered afterwards,
+// the rows that fell outside the cap could be exactly the ones the rendered
+// scan observed. Paging with an advancing OFFSET removes that failure mode.
 const reportRowLimit = 10000
 
-// warnIfTruncated logs when a result set came back exactly at the cap, which
-// means there were probably more rows than the report shows.
-func (r *ReportRenderer) warnIfTruncated(ctx context.Context, kind string, got int) {
-	if got >= reportRowLimit {
-		r.log.WarnContext(ctx, "report: result set hit the row cap — the report is TRUNCATED",
-			"kind", kind, "cap", reportRowLimit)
+// reportMaxRows is the sanity ceiling on ACCUMULATED rows of one kind. Paging
+// stops here with a warning so a pathological target cannot exhaust memory in
+// silence. It is deliberately an order of magnitude above any realistic
+// engagement: hitting it means something is wrong, and the log says so.
+const reportMaxRows = 200000
+
+// HistoricalNotice is the marker stamped into a report rendered with
+// includeHistorical=true. A report that silently widened its scope from "what
+// this scan saw" to "everything this target has ever had" is unattributable
+// after the fact (T-15-11-04), so the widening is always visible in the output
+// itself, not only in the log.
+const HistoricalNotice = "SCOPE WARNING: this report includes historical target-wide assets not observed by this scan"
+
+// pageLimit is the effective page size — SetPageSize lowers it for tests that
+// need to exercise the multi-page path without seeding 10 000 rows.
+func (r *ReportRenderer) pageLimit() int64 {
+	if r.pageSize > 0 {
+		return r.pageSize
 	}
+	return reportRowLimit
+}
+
+// SetPageSize overrides the query page size. Zero or negative restores the
+// default (reportRowLimit). This is a test/ops seam: pagination that is only
+// ever exercised at 10 000 rows is pagination that is never exercised.
+func (r *ReportRenderer) SetPageSize(n int64) {
+	r.pageSize = n
+}
+
+// warnIfTruncated logs when accumulation stopped at the reportMaxRows ceiling.
+// The report really is short in that case, and a short report that does not
+// say so is the one thing a report must never be.
+func (r *ReportRenderer) warnIfTruncated(ctx context.Context, kind string, got int) {
+	if int64(got) >= reportMaxRows {
+		r.log.WarnContext(ctx, "report: result set hit the sanity ceiling — the report is TRUNCATED",
+			"kind", kind, "ceiling", reportMaxRows)
+	}
+}
+
+// pageAll drains a LIMIT/OFFSET query into one slice of pointers.
+//
+// Each page is its own backing array, so taking &batch[i] is safe: the pointers
+// keep their page alive and no later append can move the element out from under
+// them.
+func pageAll[T any](
+	ctx context.Context,
+	r *ReportRenderer,
+	kind string,
+	fetch func(limit, offset int64) ([]T, error),
+) ([]*T, error) {
+	limit := r.pageLimit()
+	var out []*T
+	for offset := int64(0); ; offset += limit {
+		batch, err := fetch(limit, offset)
+		if err != nil {
+			return nil, err
+		}
+		for i := range batch {
+			out = append(out, &batch[i])
+		}
+		if int64(len(batch)) < limit {
+			break // short page — the result set is exhausted
+		}
+		if int64(len(out)) >= reportMaxRows {
+			r.warnIfTruncated(ctx, kind, len(out))
+			break
+		}
+	}
+	return out, nil
+}
+
+// fetchForScan reads exactly the assets THIS scan recorded in scan_observation,
+// by JOIN rather than by fetching the target's history and filtering it.
+//
+// The deleted fetch-then-filter predecessor treated "this scan observed no rows
+// of kind K" as "this scan does not produce kind K" and passed the target's
+// whole K inventory through untouched — so a subs-only run emitted every URL
+// the target had ever had into a deliverable report (T-15-11-01, F12). There is
+// no equivalent state here: a kind with no observations returns no rows.
+func (r *ReportRenderer) fetchForScan(ctx context.Context, scanID string) (
+	[]*sqlcgen.Finding, []*sqlcgen.Host, []*sqlcgen.URL, error,
+) {
+	findings, err := pageAll(ctx, r, "findings", func(limit, offset int64) ([]sqlcgen.Finding, error) {
+		return r.q.ListFindingsForScan(ctx, sqlcgen.ListFindingsForScanParams{
+			ScanID: scanID, Limit: limit, Offset: offset,
+		})
+	})
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("report: list findings for scan: %w", err)
+	}
+	hosts, err := pageAll(ctx, r, "hosts", func(limit, offset int64) ([]sqlcgen.Host, error) {
+		return r.q.ListHostsForScan(ctx, sqlcgen.ListHostsForScanParams{
+			ScanID: scanID, Limit: limit, Offset: offset,
+		})
+	})
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("report: list hosts for scan: %w", err)
+	}
+	urls, err := pageAll(ctx, r, "urls", func(limit, offset int64) ([]sqlcgen.URL, error) {
+		return r.q.ListURLsForScan(ctx, sqlcgen.ListURLsForScanParams{
+			ScanID: scanID, Limit: limit, Offset: offset,
+		})
+	})
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("report: list urls for scan: %w", err)
+	}
+	return findings, hosts, urls, nil
+}
+
+// fetchHistorical reads the target's ENTIRE asset history, ignoring which scan
+// saw what. This is the old behaviour, now reachable only through the explicit
+// includeHistorical opt-in and always stamped with HistoricalNotice.
+func (r *ReportRenderer) fetchHistorical(ctx context.Context, targetID string) (
+	[]*sqlcgen.Finding, []*sqlcgen.Host, []*sqlcgen.URL, error,
+) {
+	findings, err := pageAll(ctx, r, "findings", func(limit, offset int64) ([]sqlcgen.Finding, error) {
+		return r.q.ListFindingsForTarget(ctx, sqlcgen.ListFindingsForTargetParams{
+			TargetID: targetID, Limit: limit, Offset: offset,
+		})
+	})
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("report: list findings for target: %w", err)
+	}
+	urls, err := pageAll(ctx, r, "urls", func(limit, offset int64) ([]sqlcgen.URL, error) {
+		return r.q.ListURLsForTarget(ctx, sqlcgen.ListURLsForTargetParams{
+			TargetID: targetID, Limit: limit, Offset: offset,
+		})
+	})
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("report: list urls for target: %w", err)
+	}
+	hosts, err := r.pageHostsForTarget(ctx, targetID)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return findings, hosts, urls, nil
+}
+
+// pageHostsForTarget drains ListHostsCursor, which is keyset- rather than
+// offset-paginated: the cursor is (last_seen_at, id) descending, exactly the
+// ORDER BY the query declares.
+func (r *ReportRenderer) pageHostsForTarget(ctx context.Context, targetID string) ([]*sqlcgen.Host, error) {
+	limit := r.pageLimit()
+	var out []*sqlcgen.Host
+	var curSeenAt, curLastID int64
+	for {
+		batch, err := r.q.ListHostsCursor(ctx, sqlcgen.ListHostsCursorParams{
+			TargetID:     targetID,
+			CdnFilter:    "",
+			CursorSeenAt: curSeenAt,
+			CursorLastID: curLastID,
+			RowLimit:     limit,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("report: list hosts for target: %w", err)
+		}
+		for i := range batch {
+			out = append(out, &batch[i])
+		}
+		if int64(len(batch)) < limit {
+			break
+		}
+		last := batch[len(batch)-1]
+		// A zero last_seen_at cannot advance the cursor (the query reads ?3 = 0
+		// as "no cursor"), so stop rather than loop over the same page forever.
+		if last.LastSeenAt == 0 {
+			r.warnIfTruncated(ctx, "hosts", len(out))
+			break
+		}
+		curSeenAt, curLastID = last.LastSeenAt, last.ID
+		if int64(len(out)) >= reportMaxRows {
+			r.warnIfTruncated(ctx, "hosts", len(out))
+			break
+		}
+	}
+	return out, nil
 }
 
 // RenderAll renders the latest completed scan for targetID, or the explicit
 // scanID when given. allowPartial additionally accepts the most recent
 // INCOMPLETE scan when no completed one exists — the behaviour --allow-partial
 // always advertised while being read by nothing.
-// narrowToScan filters target-wide asset lists down to the rows this scan
-// recorded in scan_observation.
 //
-// Fallback: a scan with NO observations keeps the target-wide lists. Rows
-// predating the observation writer, or a run whose ingest failed partway,
-// would otherwise render as an empty report — silently losing data is worse
-// than the over-broad report this replaces. The fallback is logged so the
-// difference is visible rather than assumed.
-func (r *ReportRenderer) narrowToScan(
-	ctx context.Context,
-	scanID string,
-	findings []*sqlcgen.Finding,
-	hosts []*sqlcgen.Host,
-	urls []*sqlcgen.URL,
-) ([]*sqlcgen.Finding, []*sqlcgen.Host, []*sqlcgen.URL) {
-	obs, err := r.q.ListObservationsForScan(ctx, scanID)
-	if err != nil {
-		r.log.WarnContext(ctx, "report: could not read scan observations — "+
-			"falling back to target-wide asset lists", "scan_id", scanID, "err", err)
-		return findings, hosts, urls
-	}
-	if len(obs) == 0 {
-		r.log.WarnContext(ctx, "report: scan recorded no observations — rendering "+
-			"target-wide asset lists, which may include assets this scan did not see",
-			"scan_id", scanID)
-		return findings, hosts, urls
-	}
-
-	seen := map[string]map[int64]struct{}{}
-	for _, o := range obs {
-		if seen[o.AssetKind] == nil {
-			seen[o.AssetKind] = map[int64]struct{}{}
-		}
-		seen[o.AssetKind][o.AssetID] = struct{}{}
-	}
-	// A kind with no observations at all is left unfiltered: it means this scan
-	// mode does not produce that asset kind (a subs-only run records no URLs),
-	// not that the scan observed none of them.
-	keep := func(kind string, id int64) bool {
-		ids, ok := seen[kind]
-		if !ok {
-			return true
-		}
-		_, found := ids[id]
-		return found
-	}
-
-	outF := findings[:0:0]
-	for _, f := range findings {
-		if keep("finding", f.ID) {
-			outF = append(outF, f)
-		}
-	}
-	outH := hosts[:0:0]
-	for _, h := range hosts {
-		if keep("host", h.ID) {
-			outH = append(outH, h)
-		}
-	}
-	outU := urls[:0:0]
-	for _, u := range urls {
-		if keep("url", u.ID) {
-			outU = append(outU, u)
-		}
-	}
-	r.log.InfoContext(ctx, "report: narrowed to this scan's observations",
-		"scan_id", scanID,
-		"findings", len(outF), "hosts", len(outH), "urls", len(outU))
-	return outF, outH, outU
-}
-
-func (r *ReportRenderer) RenderAll(ctx context.Context, targetID, scanID string, allowPartial bool) error {
+// Scan resolution order:
+//  1. If scanID is non-empty, use GetScan(scanID).
+//  2. Otherwise use GetLatestCompletedScanForTarget(targetID).
+//
+// includeHistorical widens the asset lists from "what this scan observed" to
+// "everything this target has ever had". It defaults to false and there is no
+// implicit fallback into it: a scan that observed nothing renders an EMPTY
+// report, loudly, rather than a target-wide dump wearing one scan's header.
+func (r *ReportRenderer) RenderAll(ctx context.Context, targetID, scanID string, allowPartial, includeHistorical bool) error {
 	// Step 1: resolve scan.
 	var scan sqlcgen.Scan
 	var err error
@@ -224,68 +325,45 @@ func (r *ReportRenderer) RenderAll(ctx context.Context, targetID, scanID string,
 
 	r.log.InfoContext(ctx, "report: rendering scan", "scan_id", scan.ID, "target", scan.TargetID)
 
-	// Step 2: fetch findings (up to 10000 for reports — no cursor pagination needed).
-	rawFindings, err := r.q.ListFindingsForTarget(ctx, sqlcgen.ListFindingsForTargetParams{
-		TargetID: targetID,
-		Limit:    reportRowLimit,
-		Offset:   0,
-	})
-	if err != nil {
-		return fmt.Errorf("report: list findings: %w", err)
-	}
-	r.warnIfTruncated(ctx, "findings", len(rawFindings))
-	findings := make([]*sqlcgen.Finding, len(rawFindings))
-	for i := range rawFindings {
-		findings[i] = &rawFindings[i]
-	}
-
-	// Fetch hosts.
-	rawHosts, err := r.q.ListHostsCursor(ctx, sqlcgen.ListHostsCursorParams{
-		TargetID:     targetID,
-		CdnFilter:    "",
-		CursorSeenAt: 0,
-		CursorLastID: 0,
-		RowLimit:     reportRowLimit,
-	})
-	if err != nil {
-		return fmt.Errorf("report: list hosts: %w", err)
-	}
-	r.warnIfTruncated(ctx, "hosts", len(rawHosts))
-	hosts := make([]*sqlcgen.Host, len(rawHosts))
-	for i := range rawHosts {
-		hosts[i] = &rawHosts[i]
-	}
-
-	// Fetch URLs for THIS target.
+	// Step 2: fetch the assets to render.
 	//
-	// This used to call ListURLsCursor with HostIDFilter 0, which disables the
-	// filter — so the URL section listed every URL in the shared store,
-	// including other targets' and other engagements'. On a store holding
-	// several targets the report leaked them into each other, and the 10000-row
-	// cap meant the actual target's URLs could be crowded out entirely.
-	rawURLs, err := r.q.ListURLsForTarget(ctx, sqlcgen.ListURLsForTargetParams{
-		TargetID: targetID,
-		Limit:    reportRowLimit,
-		Offset:   0,
-	})
-	if err != nil {
-		return fmt.Errorf("report: list urls: %w", err)
+	// Per-scan by default: every list below comes from a JOIN over this scan's
+	// scan_observation rows, so "the scan saw none of these" and "this scan mode
+	// does not produce these" render identically — as nothing. The target-wide
+	// lists are reachable only through the explicit opt-in.
+	var (
+		findings []*sqlcgen.Finding
+		hosts    []*sqlcgen.Host
+		urls     []*sqlcgen.URL
+	)
+	historicalNotice := ""
+	if includeHistorical {
+		findings, hosts, urls, err = r.fetchHistorical(ctx, targetID)
+		if err != nil {
+			return err
+		}
+		historicalNotice = HistoricalNotice
+		r.log.WarnContext(ctx, "report: "+HistoricalNotice,
+			"scan_id", scan.ID, "target", targetID,
+			"findings", len(findings), "hosts", len(hosts), "urls", len(urls))
+	} else {
+		findings, hosts, urls, err = r.fetchForScan(ctx, scan.ID)
+		if err != nil {
+			return err
+		}
+		if len(findings) == 0 && len(hosts) == 0 && len(urls) == 0 {
+			// Not a fallback trigger. A run that found nothing MUST render an
+			// empty report — that is acceptance gate 3's second clause, and
+			// substituting the target's history here would resurrect findings
+			// the operator has already remediated.
+			r.log.WarnContext(ctx, "report: scan recorded no observations — rendering an EMPTY report "+
+				"(pass --include-historical for the target's full asset history)",
+				"scan_id", scan.ID, "target", targetID)
+		}
+		r.log.InfoContext(ctx, "report: scoped to this scan's observations",
+			"scan_id", scan.ID,
+			"findings", len(findings), "hosts", len(hosts), "urls", len(urls))
 	}
-	r.warnIfTruncated(ctx, "urls", len(rawURLs))
-	urls := make([]*sqlcgen.URL, len(rawURLs))
-	for i := range rawURLs {
-		urls[i] = &rawURLs[i]
-	}
-
-	// Narrow the target-wide lists to what THIS scan actually observed.
-	//
-	// Everything above is target-scoped, which is right for a single-scan store
-	// but wrong the moment a target has been scanned twice: a report for scan 2
-	// listed assets that only scan 1 ever saw, so it described a state that
-	// never existed and could not represent an asset disappearing. The
-	// scan_observation rows recorded during ingest are the per-scan record; use
-	// them.
-	findings, hosts, urls = r.narrowToScan(ctx, scan.ID, findings, hosts, urls)
 
 	// Step 3: ensure reports directory exists.
 	reportsDir := filepath.Join(r.workDir, "reports")
@@ -331,6 +409,7 @@ func (r *ReportRenderer) RenderAll(ctx context.Context, targetID, scanID string,
 		URLs:            URLsToRows(urls),
 		ConfigSnapshot:  scan.ConfigOverridesJson,
 		ToolVersions:    toolVersions,
+		ScopeNotice:     historicalNotice,
 	}
 
 	htmlPath := filepath.Join(reportsDir, "report.html")

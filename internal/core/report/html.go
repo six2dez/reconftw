@@ -59,6 +59,10 @@ type ReportData struct {
 	URLs            []URLRow
 	ConfigSnapshot  string // from scans.config_overrides_json
 	ToolVersions    string // from scans.tool_versions_json
+	// ScopeNotice is rendered as a banner above the report metadata when the
+	// report's scope is wider than the scan it names — currently only the
+	// includeHistorical opt-in sets it (report.HistoricalNotice).
+	ScopeNotice string
 }
 
 // FindingsToRows converts a slice of sqlcgen.Finding to FindingRow for template use.
@@ -151,10 +155,15 @@ const reportTemplateStr = `<!DOCTYPE html>
     .badge-info{background:#555;color:#fff}
     .count{font-size:1.5em;font-weight:bold;color:#e94560}
     .empty{color:#666;font-style:italic}
+    .scope-notice{background:#e94560;color:#fff;padding:10px 14px;margin:0 0 16px;
+      border-radius:4px;font-weight:bold}
   </style>
 </head>
 <body>
   <h1>reconFTW Scan Report</h1>
+{{if .ScopeNotice}}
+  <div class="scope-notice">{{.ScopeNotice}}</div>
+{{end}}
 
   <div class="meta">
     <div class="meta-item">
