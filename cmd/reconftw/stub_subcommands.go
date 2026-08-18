@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -1108,6 +1109,14 @@ into a per-channel digest before sending.
 SIGINT (Ctrl-C): the current task completes, checkpoints are written, and the
 monitor loop exits cleanly. No partial scan state is lost.
 
+The scan interval is resolved as: --interval flag, then
+monitor.interval_minutes from the config file, then the built-in default of
+6h. Whatever the source, it is floored at one minute: a monitor with no pause
+issues continuous active scans against third-party infrastructure.
+
+monitor.min_severity and monitor.alert_suppression from the config file are
+applied to the diff notifications (defaults: high, true).
+
 Examples:
   reconftw monitor --target example.com --interval 6h
   reconftw monitor --target example.com --interval 30m --monitor-cycles 3
@@ -1117,8 +1126,11 @@ Examples:
 		},
 	}
 	cmd.Flags().String("target", "", "Target domain (required)")
-	cmd.Flags().String("interval", "6h", "Scan interval between cycles (e.g. 6h, 30m, 1h30m)")
-	cmd.Flags().Int("monitor-cycles", 0, "Number of cycles to run (0 = infinite)")
+	// Empty default, NOT "6h": a literal here silently outranked
+	// monitor.interval_minutes, so the config setting was unreachable. Empty
+	// means "unset" and the resolution chain below fills it in.
+	cmd.Flags().String("interval", "", "Scan interval between cycles (e.g. 6h, 30m, 1h30m); default: monitor.interval_minutes, else 6h")
+	cmd.Flags().Int("monitor-cycles", 0, "Number of cycles to run (0 = monitor.max_cycles, else infinite)")
 	cmd.Flags().Bool("incremental", false, "Re-run only on new assets from diff (D-04/D-05)")
 	cmd.Flags().Bool("dry-run", false, "Preview tasks without executing tools")
 	cmd.Flags().String("recon-mode", "recon", "Pipeline mode: recon or all")
@@ -1142,9 +1154,9 @@ func runMonitorCmd(cmd *cobra.Command) error {
 	}
 
 	intervalStr, _ := cmd.Flags().GetString("interval")
-	interval, err := time.ParseDuration(intervalStr)
+	interval, err := parseMonitorIntervalFlag(intervalStr)
 	if err != nil {
-		return fmt.Errorf("monitor: invalid --interval %q: %w", intervalStr, err)
+		return err
 	}
 
 	maxCycles, _ := cmd.Flags().GetInt("monitor-cycles")
@@ -1168,6 +1180,14 @@ func runMonitorCmd(cmd *cobra.Command) error {
 		commonAfterBoot(ctx, boot, sched, dryRun, "monitor", capture)
 	}
 
+	// Interval and MaxCycles are passed through as "0 = unset". The remaining
+	// resolution (0 -> cfg.Monitor.* -> the package default, then the floor)
+	// happens inside RunMonitorAsync, because BootReconApp performs the only
+	// config.Load on this path and a second one here would diverge from it —
+	// the divergence plan 15-11 recorded as a deferred defect for the MCP
+	// report path. MinSeverity and AlertSuppression are left unset for the same
+	// reason; the handler reads them from cfg.Monitor, where they had been
+	// orphaned settings that nothing consumed.
 	monOpts := handlers.MonitorOptions{
 		Mode:        reconMode,
 		Interval:    interval,
@@ -1190,6 +1210,27 @@ func runMonitorCmd(cmd *cobra.Command) error {
 		AfterBoot:   afterBoot,
 		Force:       force,
 	}, monOpts)
+}
+
+// parseMonitorIntervalFlag turns the --interval flag into a duration.
+//
+// An empty flag returns 0, which RunMonitorAsync reads as "resolve from
+// monitor.interval_minutes, then the package default". The flag used to default
+// to the literal "6h", which meant the config setting could never win and an
+// operator who set monitor.interval_minutes saw it ignored.
+//
+// Pure and exported to the package so cmd tests can assert the resolution chain
+// (explicit flag wins; empty flag defers to config) without booting a monitor.
+func parseMonitorIntervalFlag(s string) (time.Duration, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, nil
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return 0, fmt.Errorf("monitor: invalid --interval %q: %w", s, err)
+	}
+	return d, nil
 }
 
 // newReportCmd — Phase 10 (Monitor + Reporting). Real implementation replacing D-02 stub.

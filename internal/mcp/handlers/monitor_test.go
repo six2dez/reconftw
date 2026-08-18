@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -24,6 +25,12 @@ import (
 	sqlcgen "github.com/six2dez/reconftw/internal/store/sqlc"
 )
 
+// instantWait is the loop's wait replaced by a no-op, so tests never sleep for a
+// real (floored) monitor interval.
+func instantWait(ctx context.Context, _ time.Duration) bool {
+	return handlers.InstantMonitorWaiter(ctx, 0)
+}
+
 // TestRunMonitorLoop_StopsAtMaxCycles verifies that runMonitorLoop calls
 // runCycle exactly maxCycles times and then returns nil.
 func TestRunMonitorLoop_StopsAtMaxCycles(t *testing.T) {
@@ -34,8 +41,9 @@ func TestRunMonitorLoop_StopsAtMaxCycles(t *testing.T) {
 
 	err := handlers.ExportedRunMonitorLoop(
 		context.Background(),
-		0, // zero interval — don't wait
+		time.Minute,
 		maxCycles,
+		instantWait,
 		func(_ context.Context, _ int) error {
 			callCount++
 			return nil
@@ -46,6 +54,82 @@ func TestRunMonitorLoop_StopsAtMaxCycles(t *testing.T) {
 	}
 	if callCount != maxCycles {
 		t.Errorf("expected %d calls, got %d", maxCycles, callCount)
+	}
+}
+
+// TestRunMonitorLoop_ZeroIntervalDoesNotBusyLoop is the T-15-16-01 guard.
+//
+// A zero interval used to reach `case <-time.After(0)`, i.e. a continuous scan
+// loop with no pause against third-party infrastructure. The assertion is on the
+// duration the loop REQUESTS from its wait function (an injected fake clock) —
+// asserting on elapsed wall time would mean actually waiting the floor, and
+// asserting only that the loop terminated would pass against the defect.
+func TestRunMonitorLoop_ZeroIntervalDoesNotBusyLoop(t *testing.T) {
+	t.Parallel()
+
+	_, minInterval, _, _ := handlers.ExportedMonitorConstants()
+
+	var requested []time.Duration
+	err := handlers.ExportedRunMonitorLoop(
+		context.Background(),
+		0, // the defect's input: "no interval configured"
+		3,
+		func(ctx context.Context, d time.Duration) bool {
+			requested = append(requested, d)
+			return handlers.InstantMonitorWaiter(ctx, d)
+		},
+		func(_ context.Context, _ int) error { return nil },
+	)
+	if err != nil {
+		t.Fatalf("runMonitorLoop: %v", err)
+	}
+	if len(requested) != 2 { // 3 cycles → 2 inter-cycle waits
+		t.Fatalf("expected 2 inter-cycle waits, got %d", len(requested))
+	}
+	for i, d := range requested {
+		if d < minInterval {
+			t.Fatalf("wait %d requested %s, want at least the floor %s — a zero "+
+				"interval produced a no-wait scan loop", i, d, minInterval)
+		}
+	}
+}
+
+// TestRealMonitorWait covers the production waiter: every other test injects an
+// instant fake, so without this the one code path that actually sleeps between
+// cycles is never executed.
+func TestRealMonitorWait(t *testing.T) {
+	t.Parallel()
+
+	// Completes normally for a short positive duration.
+	start := time.Now()
+	if !handlers.ExportedRealMonitorWait(context.Background(), 5*time.Millisecond) {
+		t.Fatal("realMonitorWait reported an incomplete wait on a live context")
+	}
+	if time.Since(start) < 5*time.Millisecond {
+		t.Fatal("realMonitorWait returned before its duration elapsed")
+	}
+
+	// Returns false promptly when the context is already done, rather than
+	// sleeping out the (floored) interval.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	start = time.Now()
+	if handlers.ExportedRealMonitorWait(ctx, time.Hour) {
+		t.Fatal("realMonitorWait reported a completed wait on a cancelled context")
+	}
+	if elapsed := time.Since(start); elapsed > 5*time.Second {
+		t.Fatalf("cancelled wait took %s — cancellation is not short-circuiting", elapsed)
+	}
+
+	// A non-positive duration must never become a busy wait, even here.
+	start = time.Now()
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel2()
+	if handlers.ExportedRealMonitorWait(ctx2, 0) {
+		t.Fatal("a zero duration completed instantly — realMonitorWait must clamp it")
+	}
+	if elapsed := time.Since(start); elapsed < 20*time.Millisecond {
+		t.Fatalf("a zero duration waited only %s — that is a busy loop", elapsed)
 	}
 }
 
@@ -61,7 +145,9 @@ func TestRunMonitorLoop_StopsOnContextCancel(t *testing.T) {
 		ctx,
 		1*time.Hour, // long interval — should not be reached
 		0,           // infinite; cancelled context must stop it
-		func(cycleCtx context.Context, _ int) error {
+		nil,         // the REAL waiter: the test must not hang, so this also
+		//              proves cancellation short-circuits the wait
+		func(_ context.Context, _ int) error {
 			callCount++
 			cancel() // cancel after first cycle
 			return nil
@@ -82,8 +168,9 @@ func TestRunMonitorLoop_StopsOnCanceledError(t *testing.T) {
 
 	err := handlers.ExportedRunMonitorLoop(
 		context.Background(),
-		0,
+		time.Minute,
 		5, // would run 5 cycles if not cancelled
+		instantWait,
 		func(_ context.Context, _ int) error {
 			return context.Canceled
 		},
@@ -93,89 +180,312 @@ func TestRunMonitorLoop_StopsOnCanceledError(t *testing.T) {
 	}
 }
 
-// TestFindingContentHash_Stable verifies that findingContentHash is deterministic.
-func TestFindingContentHash_Stable(t *testing.T) {
+func TestRunMonitorLoop_NonCanceledError_Continues(t *testing.T) {
 	t.Parallel()
 
-	h1 := handlers.ExportedFindingContentHash("nuclei:xss-reflected", "high", "https://example.com/path")
-	h2 := handlers.ExportedFindingContentHash("nuclei:xss-reflected", "high", "https://example.com/path")
-	if h1 != h2 {
-		t.Errorf("hash not stable: %q != %q", h1, h2)
+	const maxCycles = 3
+	callCount := 0
+
+	err := handlers.ExportedRunMonitorLoop(
+		context.Background(),
+		time.Minute,
+		maxCycles,
+		instantWait,
+		func(_ context.Context, _ int) error {
+			callCount++
+			return errors.New("some transient error") // best-effort: should continue
+		},
+	)
+	// Non-canceled errors are best-effort; runMonitorLoop should complete all cycles.
+	if err != nil {
+		t.Fatalf("expected nil, got: %v", err)
 	}
-	if len(h1) != 32 {
-		t.Errorf("expected 32-char hex string, got len=%d: %q", len(h1), h1)
-	}
-	// Verify different inputs produce different hashes.
-	h3 := handlers.ExportedFindingContentHash("nuclei:sqli", "critical", "https://example.com/api")
-	if h1 == h3 {
-		t.Error("different inputs produced the same hash")
+	if callCount != maxCycles {
+		t.Errorf("expected %d calls despite errors, got %d", maxCycles, callCount)
 	}
 }
 
-// TestNoReNotify_SameHash verifies that a finding with a hash already in
-// notifiedHashes is not re-notified (D-02 content-hash dedup).
-func TestNoReNotify_SameHash(t *testing.T) {
+// TestResolveMonitorInterval is the interval precedence + floor table.
+func TestResolveMonitorInterval(t *testing.T) {
 	t.Parallel()
 
-	notifyCount := 0
-	stub := &countingNotifier{notify: func() { notifyCount++ }}
-	events := []string{string(notifier.EventCriticalFinding)}
-	ef := notifier.NewEventFilter(stub, events)
+	defInterval, minInterval, _, _ := handlers.ExportedMonitorConstants()
 
-	// Simulate the dedup map pre-populated with the finding's hash.
-	notifiedHashes := make(map[string]struct{})
-	hash := handlers.ExportedFindingContentHash("nuclei:xss-reflected", "high", "https://example.com")
-	notifiedHashes[hash] = struct{}{}
+	cases := []struct {
+		name     string
+		explicit time.Duration
+		cfgMin   int
+		want     time.Duration
+	}{
+		{"explicit wins over config", 30 * time.Minute, 45, 30 * time.Minute},
+		{"config used when no flag", 0, 45, 45 * time.Minute},
+		{"package default when neither", 0, 0, defInterval},
+		{"negative treated as unset", -time.Hour, 45, 45 * time.Minute},
+		{"explicit below the floor is raised", time.Millisecond, 0, minInterval},
+		{"config below the floor is raised", 0, 0, defInterval},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			if got := handlers.ResolveMonitorInterval(c.explicit, c.cfgMin); got != c.want {
+				t.Errorf("ResolveMonitorInterval(%s, %d) = %s, want %s",
+					c.explicit, c.cfgMin, got, c.want)
+			}
+		})
+	}
 
-	// Apply the dedup check exactly as the monitor loop does.
-	handlers.ApplyDedup(context.Background(), ef, notifiedHashes,
-		"nuclei:xss-reflected", "high", "https://example.com", 0)
-
-	if notifyCount != 0 {
-		t.Errorf("expected 0 notifications for already-seen hash, got %d", notifyCount)
+	// The floor is a safety limit, so it must be unreachable from any input.
+	for _, d := range []time.Duration{-1, 0, time.Nanosecond, time.Second} {
+		if got := handlers.ResolveMonitorInterval(d, 0); got < minInterval {
+			t.Fatalf("ResolveMonitorInterval(%s, 0) = %s, below the floor %s", d, got, minInterval)
+		}
 	}
 }
 
-// TestNoReNotify_NewHash verifies that a finding with a NEW hash IS notified.
-func TestNoReNotify_NewHash(t *testing.T) {
+// TestMonitorRetryBudgetStaysBelowIntervalFloor documents the argument recorded
+// in the SUMMARY as an executable assertion: a failing notifier can never stall
+// the loop past its own cadence.
+func TestMonitorRetryBudgetStaysBelowIntervalFloor(t *testing.T) {
 	t.Parallel()
 
-	notifyCount := 0
-	stub := &countingNotifier{notify: func() { notifyCount++ }}
-	events := []string{string(notifier.EventCriticalFinding)}
-	ef := notifier.NewEventFilter(stub, events)
-
-	notifiedHashes := make(map[string]struct{}) // empty — no prior notifications
-
-	handlers.ApplyDedup(context.Background(), ef, notifiedHashes,
-		"nuclei:xss-reflected", "high", "https://example.com", 0)
-
-	if notifyCount != 1 {
-		t.Errorf("expected 1 notification for new hash, got %d", notifyCount)
+	_, minInterval, base, attempts := handlers.ExportedMonitorConstants()
+	// Worst case: base + 2*base + 4*base ... for (attempts-1) waits.
+	var total time.Duration
+	d := base
+	for i := 0; i < attempts-1; i++ {
+		total += d
+		d *= 2
 	}
+	if total >= minInterval {
+		t.Fatalf("worst-case retry sleep %s >= interval floor %s — a failing "+
+			"notifier could stall the monitor past its cadence", total, minInterval)
+	}
+}
+
+// TestMonitorMinSeverityFilter — cfg.Monitor.MinSeverity is actually applied.
+func TestMonitorMinSeverityFilter(t *testing.T) {
+	t.Parallel()
+
+	if handlers.ExportedSeverityMeetsMin("medium", "high") {
+		t.Error("medium passed a MinSeverity of high")
+	}
+	if !handlers.ExportedSeverityMeetsMin("critical", "high") {
+		t.Error("critical was filtered by a MinSeverity of high")
+	}
+	if !handlers.ExportedSeverityMeetsMin("high", "high") {
+		t.Error("high was filtered by a MinSeverity of high (must be inclusive)")
+	}
+	if !handlers.ExportedSeverityMeetsMin("LOW", "low") {
+		t.Error("severity comparison is case-sensitive")
+	}
+	if !handlers.ExportedSeverityMeetsMin("medium", "") {
+		t.Error("an empty MinSeverity must disable the filter, not drop everything")
+	}
+	// Fail-open: an unrecognised severity is dispatched rather than dropped.
+	if !handlers.ExportedSeverityMeetsMin("unclassified", "critical") {
+		t.Error("an unknown severity was silently dropped — it must fail open")
+	}
+}
+
+// TestMonitorEventKindFollowsSeverity — findings are no longer all emitted as
+// EventCriticalFinding.
+func TestMonitorEventKindFollowsSeverity(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		sev  string
+		kind notifier.EventKind
+		lvl  notifier.Level
+	}{
+		{"critical", notifier.EventCriticalFinding, notifier.LevelError},
+		{"high", notifier.EventCriticalFinding, notifier.LevelWarn},
+		{"medium", notifier.EventScanComplete, notifier.LevelWarn},
+		{"low", notifier.EventScanComplete, notifier.LevelInfo},
+		{"info", notifier.EventScanComplete, notifier.LevelInfo},
+		{"", notifier.EventScanComplete, notifier.LevelInfo},
+	}
+	for _, c := range cases {
+		kind, lvl := handlers.ExportedMonitorEventForSeverity(c.sev)
+		if kind != c.kind || lvl != c.lvl {
+			t.Errorf("severity %q → (%v, %v), want (%v, %v)", c.sev, kind, lvl, c.kind, c.lvl)
+		}
+	}
+	// The regression this replaces: everything mapping to one kind.
+	if k1, _ := handlers.ExportedMonitorEventForSeverity("critical"); k1 == mustKind(t, "low") {
+		t.Error("critical and low map to the same event kind — severity is not being honoured")
+	}
+}
+
+func mustKind(t *testing.T, sev string) notifier.EventKind {
+	t.Helper()
+	k, _ := handlers.ExportedMonitorEventForSeverity(sev)
+	return k
+}
+
+// TestNotifyWithRetry_SucceedsAfterTransientFailure — a transient notifier
+// error must not lose the alert.
+func TestNotifyWithRetry_SucceedsAfterTransientFailure(t *testing.T) {
+	t.Parallel()
+
+	var calls atomic.Int32
+	stub := &flakyNotifier{failUntil: 1, calls: &calls}
+	ef := notifier.NewEventFilter(stub, []string{string(notifier.EventCriticalFinding)})
+
+	err := handlers.ExportedNotifyWithRetry(context.Background(), ef,
+		notifier.EventCriticalFinding, notifier.LevelWarn, "msg", instantWait)
+	if err != nil {
+		t.Fatalf("notifyWithRetry: %v", err)
+	}
+	if got := calls.Load(); got != 2 {
+		t.Fatalf("notifier called %d times, want 2 (one failure then one success)", got)
+	}
+}
+
+// TestNotifyWithRetry_GivesUpAfterBudget — the retry is bounded.
+func TestNotifyWithRetry_GivesUpAfterBudget(t *testing.T) {
+	t.Parallel()
+
+	_, _, _, attempts := handlers.ExportedMonitorConstants()
+
+	var calls atomic.Int32
+	stub := &flakyNotifier{failUntil: 1 << 30, calls: &calls}
+	ef := notifier.NewEventFilter(stub, []string{string(notifier.EventCriticalFinding)})
+
+	err := handlers.ExportedNotifyWithRetry(context.Background(), ef,
+		notifier.EventCriticalFinding, notifier.LevelWarn, "msg", instantWait)
+	if err == nil {
+		t.Fatal("notifyWithRetry returned nil against an always-failing notifier")
+	}
+	if got := int(calls.Load()); got != attempts {
+		t.Fatalf("notifier called %d times, want exactly %d", got, attempts)
+	}
+}
+
+// TestDispatchFindingAlert_MarkOrdering is the T-15-16-03 guard: the finding is
+// recorded as notified ONLY after a notification actually succeeded.
+//
+// The previous code inserted the hash and then discarded Notify's error, so a
+// transient outage suppressed a critical finding permanently.
+func TestDispatchFindingAlert_MarkOrdering(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	const target = "example.com"
+	alert := handlers.FindingAlert{
+		Fingerprint: "fp-1",
+		Severity:    "critical",
+		Message:     "new finding: boom",
+	}
+
+	t.Run("not marked when every attempt fails", func(t *testing.T) {
+		t.Parallel()
+		st := openState(t, t.TempDir())
+		var calls atomic.Int32
+		ef := notifier.NewEventFilter(&flakyNotifier{failUntil: 1 << 30, calls: &calls},
+			[]string{string(notifier.EventCriticalFinding)})
+
+		sent, err := handlers.ExportedDispatchFindingAlert(ctx, ef, st, target, alert, true, instantWait)
+		if err == nil {
+			t.Fatal("expected an error from an always-failing notifier")
+		}
+		if sent {
+			t.Fatal("reported a dispatch that never succeeded")
+		}
+		if seen, _ := st.WasNotified(ctx, target, alert.Fingerprint); seen {
+			t.Fatal("finding was marked notified despite a failed dispatch — the " +
+				"next cycle would never retry it")
+		}
+	})
+
+	t.Run("marked after a retry succeeds", func(t *testing.T) {
+		t.Parallel()
+		st := openState(t, t.TempDir())
+		var calls atomic.Int32
+		ef := notifier.NewEventFilter(&flakyNotifier{failUntil: 1, calls: &calls},
+			[]string{string(notifier.EventCriticalFinding)})
+
+		sent, err := handlers.ExportedDispatchFindingAlert(ctx, ef, st, target, alert, true, instantWait)
+		if err != nil {
+			t.Fatalf("dispatchFindingAlert: %v", err)
+		}
+		if !sent {
+			t.Fatal("dispatch reported not-sent after a successful retry")
+		}
+		if seen, _ := st.WasNotified(ctx, target, alert.Fingerprint); !seen {
+			t.Fatal("finding was not marked notified after a successful dispatch")
+		}
+	})
+}
+
+// TestDispatchFindingAlert_SuppressionSwitch — AlertSuppression is actually the
+// switch that enables the WasNotified/MarkNotified path.
+func TestDispatchFindingAlert_SuppressionSwitch(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	const target = "example.com"
+	alert := handlers.FindingAlert{Fingerprint: "fp-x", Severity: "critical", Message: "m"}
+
+	t.Run("true suppresses a repeat", func(t *testing.T) {
+		t.Parallel()
+		st := openState(t, t.TempDir())
+		var calls atomic.Int32
+		ef := notifier.NewEventFilter(&flakyNotifier{calls: &calls},
+			[]string{string(notifier.EventCriticalFinding)})
+
+		for i := 0; i < 3; i++ {
+			if _, err := handlers.ExportedDispatchFindingAlert(ctx, ef, st, target, alert, true, instantWait); err != nil {
+				t.Fatalf("dispatch %d: %v", i, err)
+			}
+		}
+		if got := calls.Load(); got != 1 {
+			t.Fatalf("notifier called %d times with suppression ON, want 1", got)
+		}
+	})
+
+	t.Run("false re-notifies", func(t *testing.T) {
+		t.Parallel()
+		st := openState(t, t.TempDir())
+		var calls atomic.Int32
+		ef := notifier.NewEventFilter(&flakyNotifier{calls: &calls},
+			[]string{string(notifier.EventCriticalFinding)})
+
+		for i := 0; i < 3; i++ {
+			if _, err := handlers.ExportedDispatchFindingAlert(ctx, ef, st, target, alert, false, instantWait); err != nil {
+				t.Fatalf("dispatch %d: %v", i, err)
+			}
+		}
+		if got := calls.Load(); got != 3 {
+			t.Fatalf("notifier called %d times with suppression OFF, want 3", got)
+		}
+		if n, _ := st.CountNotified(ctx, target); n != 0 {
+			t.Fatalf("suppression OFF wrote %d rows to the suppression table, want 0", n)
+		}
+	})
 }
 
 // TestIncrementalSeedFile_Written verifies that writeNewAssetSeedFile creates
-// the expected file with 3 FQDNs and returns the correct path.
+// the expected file with 3 FQDNs and returns the correct path. The filename is
+// keyed on the persistent GENERATION, not the loop index, so a restarted monitor
+// does not overwrite the previous run's seed (and so the seed path — which feeds
+// checkpoint.InputHash — is unique per re-feed).
 func TestIncrementalSeedFile_Written(t *testing.T) {
 	t.Parallel()
 
 	workDir := t.TempDir()
 	newFQDNs := []string{"api.example.com", "staging.example.com", "dev.example.com"}
-	cycleNum := 2
+	const generation = uint64(7)
 
-	seedPath, err := handlers.ExportedWriteNewAssetSeedFile(workDir, cycleNum, newFQDNs)
+	seedPath, err := handlers.ExportedWriteNewAssetSeedFile(workDir, generation, newFQDNs)
 	if err != nil {
 		t.Fatalf("writeNewAssetSeedFile returned error: %v", err)
 	}
 
-	// Verify path structure.
-	expectedPath := filepath.Join(workDir, "monitor", fmt.Sprintf("newassets-cycle-%d.txt", cycleNum))
+	expectedPath := filepath.Join(workDir, "monitor", fmt.Sprintf("newassets-gen-%d.txt", generation))
 	if seedPath != expectedPath {
 		t.Errorf("expected path %q, got %q", expectedPath, seedPath)
 	}
 
-	// Verify file exists and contains 3 lines.
 	data, err := os.ReadFile(seedPath) //nolint:gosec
 	if err != nil {
 		t.Fatalf("cannot read seed file: %v", err)
@@ -188,6 +498,15 @@ func TestIncrementalSeedFile_Written(t *testing.T) {
 		if lines[i] != want {
 			t.Errorf("line %d: want %q, got %q", i, want, lines[i])
 		}
+	}
+
+	// A different generation must produce a DIFFERENT file, not overwrite.
+	other, err := handlers.ExportedWriteNewAssetSeedFile(workDir, generation+1, newFQDNs)
+	if err != nil {
+		t.Fatalf("second writeNewAssetSeedFile: %v", err)
+	}
+	if other == seedPath {
+		t.Fatal("two generations wrote the same seed path")
 	}
 }
 
@@ -224,6 +543,48 @@ func TestRunMonitorAsync_NilSchedulerReturnsError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "Scheduler must not be nil") {
 		t.Errorf("error %q does not mention 'Scheduler must not be nil'", err.Error())
+	}
+}
+
+// TestMonitorDryRunCreatesNoState is the T-15-16-08 guard: the monitor state
+// store is a new mutation and must sit behind plan 15-05's dry-run gate.
+func TestMonitorDryRunCreatesNoState(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	dataDir := filepath.Join(root, "data") // deliberately not created
+	cfgPath := lockTestConfigPath(t, dataDir)
+
+	var booted atomic.Int32
+	err := handlers.RunMonitorAsync(context.Background(), handlers.RunOptions{
+		Target:     "example.com",
+		ConfigPath: cfgPath,
+		OutputDir:  dataDir,
+		DryRun:     true,
+		Scheduler:  lockTestScheduler(nil),
+		AfterBoot:  func(handlers.AppBoot) { booted.Add(1) },
+	}, handlers.MonitorOptions{Mode: handlers.ModeRecon, MaxCycles: 2})
+	if err != nil {
+		t.Fatalf("dry-run RunMonitorAsync: %v", err)
+	}
+	if booted.Load() != 1 {
+		t.Fatalf("dry run reported %d boots, want exactly 1 (the plan preview)", booted.Load())
+	}
+
+	// Nothing at all may exist under the data dir — no workspace, no monitor/,
+	// no state.db.
+	if entries, rerr := os.ReadDir(dataDir); rerr == nil && len(entries) > 0 {
+		t.Fatalf("dry run created %d entries under %s", len(entries), dataDir)
+	}
+	var found []string
+	_ = filepath.Walk(root, func(p string, info os.FileInfo, _ error) error {
+		if info != nil && !info.IsDir() && info.Name() == "state.db" {
+			found = append(found, p)
+		}
+		return nil
+	})
+	if len(found) > 0 {
+		t.Fatalf("dry run created monitor state databases: %v", found)
 	}
 }
 
@@ -362,13 +723,18 @@ func TestMonitorDiff_RealCrossCycleDeltas(t *testing.T) {
 
 // --- helpers ---
 
-// countingNotifier counts Notify calls for dedup tests.
-type countingNotifier struct {
-	notify func()
+// flakyNotifier fails its first failUntil calls and then succeeds, counting
+// every call. failUntil = 0 means "always succeed".
+type flakyNotifier struct {
+	failUntil int32
+	calls     *atomic.Int32
 }
 
-func (c *countingNotifier) Notify(_ context.Context, _ notifier.Level, _ string, _ ...any) error {
-	c.notify()
+func (f *flakyNotifier) Notify(_ context.Context, _ notifier.Level, _ string, _ ...any) error {
+	n := f.calls.Add(1)
+	if n <= f.failUntil {
+		return errors.New("notifier: transient failure")
+	}
 	return nil
 }
 
@@ -379,36 +745,442 @@ func (n *noopNotifier) Notify(_ context.Context, _ notifier.Level, _ string, _ .
 	return nil
 }
 
-// --- verify error wrapping works correctly ---
+// countingLogHandler counts log records whose message contains substr. The
+// monitor's finding alerts reach the default LogSink (appctx wires
+// notifier.NewLogSink(logger) whenever no webhook is configured), so a capturing
+// logger is a real observation of DISPATCH, not of the monitor's bookkeeping.
+type countingLogHandler struct {
+	mu     *sync.Mutex
+	substr string
+	count  *int
+	msgs   *[]string
+}
 
-func TestRunMonitorLoop_NonCanceledError_Continues(t *testing.T) {
-	t.Parallel()
+func (h countingLogHandler) Enabled(context.Context, slog.Level) bool { return true }
 
-	const maxCycles = 3
-	callCount := 0
-
-	err := handlers.ExportedRunMonitorLoop(
-		context.Background(),
-		0,
-		maxCycles,
-		func(_ context.Context, _ int) error {
-			callCount++
-			return errors.New("some transient error") // best-effort: should continue
-		},
-	)
-	// Non-canceled errors are best-effort; runMonitorLoop should complete all cycles.
-	if err != nil {
-		t.Fatalf("expected nil, got: %v", err)
+func (h countingLogHandler) Handle(_ context.Context, r slog.Record) error {
+	if strings.Contains(r.Message, h.substr) {
+		h.mu.Lock()
+		*h.count++
+		*h.msgs = append(*h.msgs, r.Message)
+		h.mu.Unlock()
 	}
-	if callCount != maxCycles {
-		t.Errorf("expected %d calls despite errors, got %d", maxCycles, callCount)
+	return nil
+}
+
+func (h countingLogHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
+func (h countingLogHandler) WithGroup(string) slog.Handler      { return h }
+
+// alertCounter observes monitor finding dispatches through the LogSink.
+type alertCounter struct {
+	mu    sync.Mutex
+	count int
+	msgs  []string
+}
+
+func (a *alertCounter) logger() *slog.Logger {
+	return slog.New(countingLogHandler{mu: &a.mu, substr: "new finding:", count: &a.count, msgs: &a.msgs})
+}
+
+func (a *alertCounter) snapshot() (int, []string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.count, append([]string(nil), a.msgs...)
+}
+
+// stageFindings writes findings staging lines for the current cycle.
+//
+// It writes inputs/findings.monitortest.jsonl rather than
+// artefacts/findings.jsonl: web.MergeStage("findings") has REPLACE semantics over
+// the staging glob and would erase a direct artefact write (merge.go documents
+// this as the takeover bug it fixed). Staging is the sanctioned seam.
+func stageFindings(t *testing.T, workDir string, lines []string) {
+	t.Helper()
+	dir := filepath.Join(workDir, "inputs")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("mkdir inputs: %v", err)
+	}
+	body := strings.Join(lines, "\n") + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "findings.monitortest.jsonl"), []byte(body), 0o600); err != nil {
+		t.Fatalf("write findings staging: %v", err)
 	}
 }
 
-// TestMonitorTwoCyclesDoNotSelfDeadlock is the F4 monitor guard.
+func findingLine(template, host, severity string) string {
+	return fmt.Sprintf(`{"template_id":%q,"host":%q,"severity":%q,"matched_at":"https://%s/panel","type":"nuclei"}`,
+		template, host, severity, host)
+}
+
+// countDistinctInputHashes reports how many DISTINCT checkpoint input_hash
+// values exist for the busiest task in the workspace's checkpoints.db.
 //
-// THIS TEST MUST SURVIVE ANY REWRITE OF monitor.go (plan 15-16 rewrites both
-// this file and monitor.go). What it protects:
+// This is the behavioural observation of RunGeneration: the generation is folded
+// into checkpoint.InputHash (common.go), so N cycles with distinct generations
+// leave N distinct hashes per task. A restarted monitor that replayed
+// "cycle-0"/"cycle-1" would add ZERO new hashes — and, worse, every task would
+// find a done row and skip.
+func countDistinctInputHashes(t *testing.T, workspace string) int {
+	t.Helper()
+	db, err := sql.Open("sqlite", filepath.Join(workspace, "checkpoints.db"))
+	if err != nil {
+		t.Fatalf("open checkpoints.db: %v", err)
+	}
+	defer db.Close() //nolint:errcheck
+
+	var taskName string
+	if err := db.QueryRow(
+		`SELECT task_name FROM tasks GROUP BY task_name ORDER BY COUNT(*) DESC, task_name LIMIT 1`,
+	).Scan(&taskName); err != nil {
+		t.Fatalf("pick a task_name from checkpoints.db: %v", err)
+	}
+	var n int
+	if err := db.QueryRow(
+		`SELECT COUNT(DISTINCT input_hash) FROM tasks WHERE task_name = ?`, taskName,
+	).Scan(&n); err != nil {
+		t.Fatalf("count distinct input_hash: %v", err)
+	}
+	return n
+}
+
+// TestMonitorRestartPreservesBaselineSuppressionAndGeneration is ACCEPTANCE
+// GATE 10, end to end, across a real process/state boundary: two separate
+// RunMonitorAsync invocations, each opening and closing its own MonitorState
+// over one on-disk state.db, exactly as a restarted monitor does.
+//
+// The three assertions, in one test:
+//
+//	(a) generation — run 2's cycles use generations strictly greater than run 1's,
+//	    proven both from the state store AND behaviourally from the distinct
+//	    checkpoint input_hash count (a replayed generation adds none and makes
+//	    every task a no-op).
+//	(b) baseline   — run 2's FIRST cycle diffs against the scan run 1 finished on.
+//	    Observable: it alerts on the one finding that is new relative to that
+//	    baseline. A lost baseline means no diff at all and zero alerts.
+//	(c) suppression — a finding alerted in run 1, which disappears and then
+//	    reappears (so it re-enters a diff), is NOT alerted again in run 2.
+//
+// The cycle artefacts are staged through inputs/findings.*.jsonl so the real
+// merge + ingest path produces the scans; nothing is written straight into the
+// store.
+func TestMonitorRestartPreservesBaselineSuppressionAndGeneration(t *testing.T) {
+	t.Parallel()
+
+	dataDir := t.TempDir()
+	cfgPath := lockTestConfigPath(t, dataDir)
+	const target = "example.com"
+	ctx := context.Background()
+
+	const (
+		panelFinding    = "exposed-panel"
+		redirectFinding = "open-redirect"
+		injectFinding   = "sqli"
+	)
+	// Per-cycle finding sets, consumed in order across BOTH runs.
+	cycleFindings := [][]string{
+		// run 1, cycle 0 — establishes the baseline (no diff yet).
+		{findingLine(panelFinding, "alpha.example.com", "critical")},
+		// run 1, cycle 1 — open-redirect is NEW → alerted, fingerprint stored.
+		{
+			findingLine(panelFinding, "alpha.example.com", "critical"),
+			findingLine(redirectFinding, "bravo.example.com", "critical"),
+		},
+		// run 2, cycle 0 — open-redirect DISAPPEARS, sqli is NEW. Alerting on
+		// sqli is only possible if the baseline carried over from run 1.
+		{
+			findingLine(panelFinding, "alpha.example.com", "critical"),
+			findingLine(injectFinding, "charlie.example.com", "critical"),
+		},
+		// run 2, cycle 1 — open-redirect REAPPEARS, so it is new relative to the
+		// previous cycle's scan and re-enters the diff. Persistent suppression
+		// must keep it silent; an in-memory set would alert it again.
+		{
+			findingLine(panelFinding, "alpha.example.com", "critical"),
+			findingLine(injectFinding, "charlie.example.com", "critical"),
+			findingLine(redirectFinding, "bravo.example.com", "critical"),
+		},
+	}
+
+	var cycleIdx atomic.Int32
+	alerts := &alertCounter{}
+
+	runMonitor := func(t *testing.T, maxCycles int) {
+		t.Helper()
+		err := handlers.RunMonitorAsync(ctx, handlers.RunOptions{
+			Target:     target,
+			ConfigPath: cfgPath,
+			OutputDir:  dataDir,
+			Scheduler:  lockTestScheduler(nil),
+			Logger:     alerts.logger(),
+			AfterBoot: func(b handlers.AppBoot) {
+				i := int(cycleIdx.Add(1)) - 1
+				if i < len(cycleFindings) {
+					stageFindings(t, b.WorkDir, cycleFindings[i])
+				}
+			},
+		}, handlers.WithMonitorWaiter(handlers.MonitorOptions{
+			Mode:      handlers.ModeRecon,
+			MaxCycles: maxCycles,
+		}, instantWait))
+		if err != nil {
+			t.Fatalf("RunMonitorAsync: %v", err)
+		}
+	}
+
+	// ---- run 1 -------------------------------------------------------------
+	runMonitor(t, 2)
+
+	workspace, err := output.WorkspaceInit(dataDir, target)
+	if err != nil {
+		t.Fatalf("WorkspaceInit: %v", err)
+	}
+
+	st1, err := handlers.OpenMonitorState(workspace)
+	if err != nil {
+		t.Fatalf("OpenMonitorState after run 1: %v", err)
+	}
+	genAfterRun1, err := st1.Generation(ctx, target)
+	if err != nil {
+		t.Fatalf("Generation after run 1: %v", err)
+	}
+	baselineAfterRun1, err := st1.Baseline(ctx, target)
+	if err != nil {
+		t.Fatalf("Baseline after run 1: %v", err)
+	}
+	notifiedAfterRun1, err := st1.CountNotified(ctx, target)
+	if err != nil {
+		t.Fatalf("CountNotified after run 1: %v", err)
+	}
+	_ = st1.Close()
+
+	if genAfterRun1 != 2 {
+		t.Fatalf("generation after 2 cycles = %d, want 2", genAfterRun1)
+	}
+	if baselineAfterRun1 == "" {
+		t.Fatal("run 1 finished with no baseline recorded — the next run cannot diff")
+	}
+	alertsRun1, msgsRun1 := alerts.snapshot()
+	if alertsRun1 != 1 {
+		t.Fatalf("run 1 dispatched %d finding alerts, want exactly 1 (%v)", alertsRun1, msgsRun1)
+	}
+	if !strings.Contains(msgsRun1[0], redirectFinding) {
+		t.Fatalf("run 1 alert was %q, want the new %s finding", msgsRun1[0], redirectFinding)
+	}
+	if notifiedAfterRun1 != 1 {
+		t.Fatalf("run 1 recorded %d suppression fingerprints, want 1", notifiedAfterRun1)
+	}
+	hashesAfterRun1 := countDistinctInputHashes(t, workspace)
+	if hashesAfterRun1 != 2 {
+		t.Fatalf("run 1 left %d distinct checkpoint input hashes, want 2 (one per generation)",
+			hashesAfterRun1)
+	}
+
+	// ---- run 2: a fresh RunMonitorAsync over the SAME on-disk state ---------
+	runMonitor(t, 2)
+
+	st2, err := handlers.OpenMonitorState(workspace)
+	if err != nil {
+		t.Fatalf("OpenMonitorState after run 2: %v", err)
+	}
+	defer st2.Close() //nolint:errcheck
+	genAfterRun2, err := st2.Generation(ctx, target)
+	if err != nil {
+		t.Fatalf("Generation after run 2: %v", err)
+	}
+	baselineAfterRun2, err := st2.Baseline(ctx, target)
+	if err != nil {
+		t.Fatalf("Baseline after run 2: %v", err)
+	}
+
+	// (a) generation strictly greater, and behaviourally distinct.
+	if genAfterRun2 <= genAfterRun1 {
+		t.Fatalf("generation after restart = %d, want > %d — a restarted monitor "+
+			"replayed generations, which makes every task's checkpoint.InputHash "+
+			"match the previous run's and the whole cycle a silent no-op",
+			genAfterRun2, genAfterRun1)
+	}
+	if genAfterRun2 != 4 {
+		t.Fatalf("generation after 2+2 cycles = %d, want 4", genAfterRun2)
+	}
+	hashesAfterRun2 := countDistinctInputHashes(t, workspace)
+	if hashesAfterRun2 != 4 {
+		t.Fatalf("run 2 left %d distinct checkpoint input hashes, want 4 — the "+
+			"restarted cycles reused the first run's generations", hashesAfterRun2)
+	}
+
+	// (b) the baseline carried over: run 2's first cycle diffed against run 1's
+	// last scan and alerted on the finding that was new relative to it.
+	alertsTotal, msgsTotal := alerts.snapshot()
+	run2Msgs := msgsTotal[alertsRun1:]
+	if len(run2Msgs) != 1 {
+		t.Fatalf("run 2 dispatched %d finding alerts, want exactly 1 (%v)", len(run2Msgs), run2Msgs)
+	}
+	if !strings.Contains(run2Msgs[0], injectFinding) {
+		t.Fatalf("run 2 alert was %q, want the new %s finding — a lost baseline "+
+			"would have produced no diff and no alert at all", run2Msgs[0], injectFinding)
+	}
+	// The alert carries the finding's resolved LOCATION. That location comes from
+	// the same resolveFindingLocation call that feeds the fingerprint, so an
+	// alert that named no host would mean the fingerprint was built without one —
+	// which is the collision F13 lists (one template on N hosts = one identity).
+	if !strings.Contains(run2Msgs[0], "charlie.example.com") {
+		t.Fatalf("run 2 alert %q does not name the finding's host — the locator "+
+			"lookup that also feeds the fingerprint is not resolving", run2Msgs[0])
+	}
+
+	// (c) suppression survived: the finding alerted in run 1 re-entered a diff in
+	// run 2's second cycle and was NOT alerted again.
+	for _, m := range run2Msgs {
+		if strings.Contains(m, redirectFinding) {
+			t.Fatalf("run 2 re-alerted %s (%q) — the suppression set did not "+
+				"survive the restart", redirectFinding, m)
+		}
+	}
+	if alertsTotal != 2 {
+		t.Fatalf("total finding alerts across both runs = %d, want 2", alertsTotal)
+	}
+	if baselineAfterRun2 == baselineAfterRun1 {
+		t.Fatal("the baseline did not advance during run 2")
+	}
+}
+
+// monitorTestConfigPath writes a reconftw.toml pinning data_dir plus an
+// arbitrary extra section (used here for [monitor]).
+func monitorTestConfigPath(t *testing.T, dataDir, extra string) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "reconftw.toml")
+	body := fmt.Sprintf("[paths]\ndata_dir = %q\n\n%s\n", dataDir, extra)
+	if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	return p
+}
+
+// runMonitorWithStagedFindings drives RunMonitorAsync for len(cycles) cycles,
+// staging cycles[i] into the workspace at the start of cycle i, and returns the
+// finding-alert messages the notifier actually received.
+func runMonitorWithStagedFindings(t *testing.T, cfgPath, dataDir, target string, cycles [][]string) []string {
+	t.Helper()
+	var idx atomic.Int32
+	alerts := &alertCounter{}
+	err := handlers.RunMonitorAsync(context.Background(), handlers.RunOptions{
+		Target:     target,
+		ConfigPath: cfgPath,
+		OutputDir:  dataDir,
+		Scheduler:  lockTestScheduler(nil),
+		Logger:     alerts.logger(),
+		AfterBoot: func(b handlers.AppBoot) {
+			i := int(idx.Add(1)) - 1
+			if i < len(cycles) {
+				stageFindings(t, b.WorkDir, cycles[i])
+			}
+		},
+	}, handlers.WithMonitorWaiter(handlers.MonitorOptions{
+		Mode:      handlers.ModeRecon,
+		MaxCycles: len(cycles),
+	}, instantWait))
+	if err != nil {
+		t.Fatalf("RunMonitorAsync: %v", err)
+	}
+	_, msgs := alerts.snapshot()
+	return msgs
+}
+
+// TestMonitorAppliesConfiguredMinSeverity proves cfg.Monitor.MinSeverity reaches
+// the dispatch decision — not merely that the comparison function works.
+//
+// Both severities would otherwise be dispatched: the default
+// notifications.events set allows on-critical-finding AND on-scan-complete, and
+// the severity-to-event-kind map routes medium to the latter. So a medium
+// finding going missing here can only be the MinSeverity gate.
+func TestMonitorAppliesConfiguredMinSeverity(t *testing.T) {
+	t.Parallel()
+
+	const target = "example.com"
+	cycles := func() [][]string {
+		return [][]string{
+			{findingLine("baseline-only", "alpha.example.com", "critical")},
+			{
+				findingLine("baseline-only", "alpha.example.com", "critical"),
+				findingLine("medium-thing", "bravo.example.com", "medium"),
+				findingLine("critical-thing", "charlie.example.com", "critical"),
+			},
+		}
+	}
+
+	t.Run("min_severity=high drops the medium finding", func(t *testing.T) {
+		t.Parallel()
+		dataDir := t.TempDir()
+		cfg := monitorTestConfigPath(t, dataDir, "[monitor]\nmin_severity = \"high\"")
+		msgs := runMonitorWithStagedFindings(t, cfg, dataDir, target, cycles())
+		if len(msgs) != 1 {
+			t.Fatalf("dispatched %d alerts, want 1 (%v)", len(msgs), msgs)
+		}
+		if !strings.Contains(msgs[0], "critical-thing") {
+			t.Fatalf("alert was %q, want the critical finding", msgs[0])
+		}
+		for _, m := range msgs {
+			if strings.Contains(m, "medium-thing") {
+				t.Fatalf("a medium finding passed a min_severity of high: %q", m)
+			}
+		}
+	})
+
+	t.Run("min_severity=info passes both", func(t *testing.T) {
+		t.Parallel()
+		dataDir := t.TempDir()
+		cfg := monitorTestConfigPath(t, dataDir, "[monitor]\nmin_severity = \"info\"")
+		msgs := runMonitorWithStagedFindings(t, cfg, dataDir, target, cycles())
+		if len(msgs) != 2 {
+			t.Fatalf("dispatched %d alerts, want 2 with min_severity=info (%v)", len(msgs), msgs)
+		}
+	})
+}
+
+// TestMonitorAppliesConfiguredAlertSuppression proves cfg.Monitor.alert_suppression
+// is the switch on the already-notified path, at loop level.
+//
+// The four cycles make one finding FLAP: present, absent, present. The
+// reappearance is new relative to the previous cycle's scan, so it re-enters the
+// diff — which is the only way a suppression decision becomes observable.
+func TestMonitorAppliesConfiguredAlertSuppression(t *testing.T) {
+	t.Parallel()
+
+	const target = "example.com"
+	base := findingLine("steady", "alpha.example.com", "critical")
+	flap := findingLine("flapping", "bravo.example.com", "critical")
+	cycles := func() [][]string {
+		return [][]string{
+			{base},       // baseline
+			{base, flap}, // flapping appears -> alert
+			{base},       // flapping disappears
+			{base, flap}, // flapping returns -> back in the diff
+		}
+	}
+
+	t.Run("suppression on silences the repeat", func(t *testing.T) {
+		t.Parallel()
+		dataDir := t.TempDir()
+		cfg := monitorTestConfigPath(t, dataDir, "[monitor]\nalert_suppression = true")
+		msgs := runMonitorWithStagedFindings(t, cfg, dataDir, target, cycles())
+		if len(msgs) != 1 {
+			t.Fatalf("dispatched %d alerts with suppression ON, want 1 (%v)", len(msgs), msgs)
+		}
+	})
+
+	t.Run("suppression off re-alerts", func(t *testing.T) {
+		t.Parallel()
+		dataDir := t.TempDir()
+		cfg := monitorTestConfigPath(t, dataDir, "[monitor]\nalert_suppression = false")
+		msgs := runMonitorWithStagedFindings(t, cfg, dataDir, target, cycles())
+		if len(msgs) != 2 {
+			t.Fatalf("dispatched %d alerts with suppression OFF, want 2 (%v)", len(msgs), msgs)
+		}
+	})
+}
+
+// TestMonitorTwoCyclesDoNotSelfDeadlock is the F4 monitor guard (plan 15-09).
+//
+// THIS TEST MUST SURVIVE ANY REWRITE OF monitor.go. What it protects:
 //
 // RunMonitorAsync pre-boots ONCE to obtain workDir, cfg and the notifier, and
 // then each cycle calls RunCompositeAsync, which boots AGAIN. Both boots take
@@ -424,6 +1196,12 @@ func TestRunMonitorLoop_NonCanceledError_Continues(t *testing.T) {
 // self-deadlocked monitor yields 0 and a working one yields MaxCycles. A test
 // that only asserted "RunMonitorAsync returned nil" would pass against the
 // deadlock, because the loop swallows per-cycle errors and continues.
+//
+// Plan 15-16 note: the assertion below is UNCHANGED. The only edit this plan
+// made was replacing MonitorOptions.Interval=0 with an injected instant waiter —
+// interval 0 now resolves to the safety floor, so the old form would have made
+// this test wait a real minute between cycles. The wait is not what the test
+// observes; the executed-cycle count is.
 func TestMonitorTwoCyclesDoNotSelfDeadlock(t *testing.T) {
 	t.Parallel()
 
@@ -440,11 +1218,10 @@ func TestMonitorTwoCyclesDoNotSelfDeadlock(t *testing.T) {
 		OutputDir:  dataDir,
 		Scheduler:  lockTestScheduler(nil),
 		AfterBoot:  func(handlers.AppBoot) { cycleBoots.Add(1) },
-	}, handlers.MonitorOptions{
+	}, handlers.WithMonitorWaiter(handlers.MonitorOptions{
 		Mode:      handlers.ModeRecon,
 		MaxCycles: wantCycles,
-		Interval:  0,
-	})
+	}, instantWait))
 	if err != nil {
 		t.Fatalf("RunMonitorAsync: %v", err)
 	}
