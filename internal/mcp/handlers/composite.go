@@ -324,12 +324,11 @@ func RunCompositeAsync(ctx context.Context, opts RunOptions, mode CompositeMode)
 	cfg := boot.Cfg
 	sched := opts.Scheduler
 
-	// Single checkpoint lifecycle (T-09-02-04: Pitfall 2).
-	defer func() {
-		if closer, ok := app.Checkpoint.(interface{ Close() error }); ok {
-			_ = closer.Close()
-		}
-	}()
+	// Single checkpoint lifecycle (T-09-02-04: Pitfall 2), now folded into the
+	// single boot.Close() that ALSO releases the F4 workspace lock. One deferred
+	// call covers every exit path of this function, including the error returns
+	// below and the axiom-launch failure path.
+	defer func() { _ = boot.Close() }()
 
 	// AfterBoot: wires scheduler limits, log routing, progress UI.
 	// commonAfterBoot (called by the CLI AfterBoot closure) does NOT call
