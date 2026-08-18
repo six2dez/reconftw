@@ -304,6 +304,67 @@ func (q *Queries) ListURLsForHost(ctx context.Context, arg ListURLsForHostParams
 	return items, nil
 }
 
+const listURLsForScan = `-- name: ListURLsForScan :many
+SELECT u.id, u.url, u.url_hash, u.scheme, u.host_id, u.port, u.path, u.query_canonical, u.status_code, u.content_type, u.content_length, u.title, u.tech_json, u.screenshot_path, u.first_seen_at, u.last_seen_at, u.status, u.tags_json, u.notes, u.raw_json
+FROM scan_observation so
+JOIN urls u ON u.id = so.asset_id
+WHERE so.scan_id = ? AND so.asset_kind = 'url'
+ORDER BY u.id
+LIMIT ? OFFSET ?
+`
+
+type ListURLsForScanParams struct {
+	ScanID string
+	Limit  int64
+	Offset int64
+}
+
+// Plan 15-18 -- the URLs ONE scan observed, paginated. Same column list as
+// ListURLsForTarget; only the scoping differs.
+func (q *Queries) ListURLsForScan(ctx context.Context, arg ListURLsForScanParams) ([]URL, error) {
+	rows, err := q.db.QueryContext(ctx, listURLsForScan, arg.ScanID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []URL
+	for rows.Next() {
+		var i URL
+		if err := rows.Scan(
+			&i.ID,
+			&i.URL,
+			&i.UrlHash,
+			&i.Scheme,
+			&i.HostID,
+			&i.Port,
+			&i.Path,
+			&i.QueryCanonical,
+			&i.StatusCode,
+			&i.ContentType,
+			&i.ContentLength,
+			&i.Title,
+			&i.TechJson,
+			&i.ScreenshotPath,
+			&i.FirstSeenAt,
+			&i.LastSeenAt,
+			&i.Status,
+			&i.TagsJson,
+			&i.Notes,
+			&i.RawJson,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listURLsForTarget = `-- name: ListURLsForTarget :many
 SELECT u.id, u.url, u.url_hash, u.scheme, u.host_id, u.port, u.path, u.query_canonical, u.status_code, u.content_type, u.content_length, u.title, u.tech_json, u.screenshot_path, u.first_seen_at, u.last_seen_at, u.status, u.tags_json, u.notes, u.raw_json
 FROM target_url tu

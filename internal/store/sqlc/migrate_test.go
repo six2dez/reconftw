@@ -74,6 +74,10 @@ var schemaTables = []string{
 // deliberately a frozen copy and NOT a reference to schemaSQL: the whole point of
 // the legacy path is to be exercised against DDL that has since moved on, so
 // wiring it to the live constant would make the test pass by definition forever.
+//
+// Plan 15-18 added the target_finding table to this copy. Its absence was an
+// omission, not a property of a real v1 database: v1 schema.sql created it, so
+// every legacy store.db on disk has it, and the v1->v2 finding split reads it.
 const legacySchemaSQL = `
 CREATE TABLE IF NOT EXISTS targets (
     id          TEXT PRIMARY KEY,
@@ -144,6 +148,12 @@ CREATE TABLE IF NOT EXISTS findings (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ux_findings_dedup
     ON findings(template_signature, tool, COALESCE(host_id, 0), COALESCE(port_id, 0), path);
+
+CREATE TABLE IF NOT EXISTS target_finding (
+    target_id  TEXT    NOT NULL,
+    finding_id INTEGER NOT NULL,
+    PRIMARY KEY (target_id, finding_id)
+);
 
 CREATE TABLE IF NOT EXISTS scan_observation (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -744,5 +754,358 @@ func TestMigrateFailedStepReleasesWriteLock(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("write after a failed migration blocked: the rollback did not release the write lock")
+	}
+}
+
+// --- v1 -> v2: the finding split, the repointing and the dedupe -----------
+//
+// Plan 15-18. These tests seed a database in the v1 shape (legacySchemaSQL, left
+// at user_version 0) and drive the real Migrate, so they exercise the same code
+// path an operator's existing store.db takes on first run after the upgrade.
+
+// seedV1Finding inserts one findings row in the v1 shape (no target_id column)
+// and returns its id.
+func seedV1Finding(t *testing.T, db *sql.DB, sig string) int64 {
+	t.Helper()
+	res, err := db.Exec(
+		`INSERT INTO findings (template_signature, tool, path, severity, first_seen_at, last_seen_at)
+		 VALUES (?, 'nuclei', '/admin', 'high', 1700000000, 1700000000)`, sig)
+	if err != nil {
+		t.Fatalf("seed v1 finding: %v", err)
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		t.Fatalf("seed v1 finding id: %v", err)
+	}
+	return id
+}
+
+func seedV1Link(t *testing.T, db *sql.DB, targetID string, findingID int64) {
+	t.Helper()
+	if _, err := db.Exec(
+		`INSERT INTO target_finding (target_id, finding_id) VALUES (?, ?)`, targetID, findingID,
+	); err != nil {
+		t.Fatalf("seed target_finding(%s, %d): %v", targetID, findingID, err)
+	}
+}
+
+// seedV1Observation inserts one scan_observation row and returns its id.
+func seedV1Observation(t *testing.T, db *sql.DB, scanID, targetID, kind string, assetID int64) int64 {
+	t.Helper()
+	res, err := db.Exec(
+		`INSERT INTO scan_observation (scan_id, target_id, asset_kind, asset_id, observed_at)
+		 VALUES (?, ?, ?, ?, 1700000000)`, scanID, targetID, kind, assetID)
+	if err != nil {
+		t.Fatalf("seed observation: %v", err)
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		t.Fatalf("seed observation id: %v", err)
+	}
+	return id
+}
+
+func countRows(t *testing.T, db *sql.DB, query string, args ...any) int {
+	t.Helper()
+	var n int
+	if err := db.QueryRow(query, args...).Scan(&n); err != nil {
+		t.Fatalf("count query %q: %v", query, err)
+	}
+	return n
+}
+
+// TestMigrateV1SplitsSharedFindingPerTarget: one v1 findings row linked to two
+// targets must become two rows, each owned by one target, with target_finding
+// pointing at the two distinct ids.
+func TestMigrateV1SplitsSharedFindingPerTarget(t *testing.T) {
+	db := openFileDB(t, t.TempDir())
+	seedLegacyDB(t, db)
+	shared := seedV1Finding(t, db, "nuclei/high/exposed-panel")
+	seedV1Link(t, db, "a.example.com", shared)
+	seedV1Link(t, db, "b.example.com", shared)
+
+	if err := Migrate(context.Background(), db); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+
+	if got := countRows(t, db, `SELECT count(*) FROM findings`); got != 2 {
+		t.Fatalf("findings rows = %d, want 2 (one per target)", got)
+	}
+	rows, err := db.Query(`SELECT id, target_id FROM findings ORDER BY target_id`)
+	if err != nil {
+		t.Fatalf("read findings: %v", err)
+	}
+	defer rows.Close() //nolint:errcheck // read path
+	seenTargets := map[string]int64{}
+	for rows.Next() {
+		var id int64
+		var target string
+		if err := rows.Scan(&id, &target); err != nil {
+			t.Fatalf("scan findings row: %v", err)
+		}
+		if target == "" {
+			t.Errorf("finding %d still has an empty target_id after the split", id)
+		}
+		if prev, dup := seenTargets[target]; dup {
+			t.Errorf("target %s owns two rows (%d and %d); the split duplicated instead of partitioning",
+				target, prev, id)
+		}
+		seenTargets[target] = id
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate findings: %v", err)
+	}
+	if len(seenTargets) != 2 {
+		t.Fatalf("distinct target_ids = %d, want 2: %v", len(seenTargets), seenTargets)
+	}
+
+	for target, wantID := range seenTargets {
+		got := countRows(t, db,
+			`SELECT count(*) FROM target_finding WHERE target_id = ? AND finding_id = ?`, target, wantID)
+		if got != 1 {
+			t.Errorf("target_finding(%s) does not point at that target's own finding %d", target, wantID)
+		}
+	}
+}
+
+// TestMigrateV1RepointsObservationsToOwnTarget is the B3 gate.
+//
+// A migration that performs the split but SKIPS the scan_observation repointing
+// passes every other test in this plan and fails only this one: the second
+// target's historical observation still resolves, through the production join,
+// to the FIRST target's finding row.
+func TestMigrateV1RepointsObservationsToOwnTarget(t *testing.T) {
+	db := openFileDB(t, t.TempDir())
+	seedLegacyDB(t, db)
+	shared := seedV1Finding(t, db, "nuclei/high/exposed-panel")
+	seedV1Link(t, db, "a.example.com", shared)
+	seedV1Link(t, db, "b.example.com", shared)
+	obsA := seedV1Observation(t, db, "scan-a", "a.example.com", "finding", shared)
+	obsB := seedV1Observation(t, db, "scan-b", "b.example.com", "finding", shared)
+
+	if err := Migrate(context.Background(), db); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+
+	// Both observations must SURVIVE. Asserted separately from the resolution
+	// check below because a migration that skips step 5 leaves target b's
+	// observation pointing at target a's row, which step 6 then deletes as
+	// unresolvable — the loss and the mixing are two distinct failure modes of
+	// the same missing statement, and the test names both.
+	if got := countRows(t, db, `SELECT count(*) FROM scan_observation`); got != 2 {
+		t.Errorf("scan_observation rows = %d, want 2 — an observation was lost, "+
+			"which means it did not resolve to its own target's finding after the split", got)
+	}
+
+	for _, obsID := range []int64{obsA, obsB} {
+		var findingTarget, obsTarget string
+		err := db.QueryRow(
+			`SELECT f.target_id, so.target_id
+			 FROM scan_observation so
+			 JOIN findings f ON f.id = so.asset_id
+			 WHERE so.id = ?`, obsID,
+		).Scan(&findingTarget, &obsTarget)
+		if err != nil {
+			t.Fatalf("resolve observation %d: %v", obsID, err)
+		}
+		if findingTarget != obsTarget {
+			t.Errorf("observation %d resolves to target %q's finding but belongs to target %q — "+
+				"the split did not repoint scan_observation.asset_id",
+				obsID, findingTarget, obsTarget)
+		}
+	}
+}
+
+// TestMigrateV1LeavesNoDanglingObservations: after the split, no finding
+// observation may point at an asset_id that no longer resolves.
+func TestMigrateV1LeavesNoDanglingObservations(t *testing.T) {
+	db := openFileDB(t, t.TempDir())
+	seedLegacyDB(t, db)
+	shared := seedV1Finding(t, db, "nuclei/high/exposed-panel")
+	seedV1Link(t, db, "a.example.com", shared)
+	seedV1Link(t, db, "b.example.com", shared)
+	seedV1Observation(t, db, "scan-a", "a.example.com", "finding", shared)
+	seedV1Observation(t, db, "scan-b", "b.example.com", "finding", shared)
+	// An orphan finding (never linked to a target) plus an observation of it:
+	// step 6 must remove both rather than leave a broken join behind.
+	orphan := seedV1Finding(t, db, "nuclei/info/orphan")
+	seedV1Observation(t, db, "scan-a", "a.example.com", "finding", orphan)
+
+	if err := Migrate(context.Background(), db); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+
+	dangling := countRows(t, db,
+		`SELECT count(*) FROM scan_observation so
+		 WHERE so.asset_kind = 'finding'
+		   AND NOT EXISTS (SELECT 1 FROM findings f WHERE f.id = so.asset_id)`)
+	if dangling != 0 {
+		t.Errorf("dangling finding observations = %d, want 0", dangling)
+	}
+	if got := countRows(t, db, `SELECT count(*) FROM findings WHERE target_id = ''`); got != 0 {
+		t.Errorf("findings with an empty target_id = %d, want 0 (orphans must be dropped)", got)
+	}
+}
+
+// TestMigrateV1DedupesObservations: pre-existing duplicate tuples must be
+// collapsed BEFORE ux_scan_observation_dedup is built, or index creation fails
+// and the whole migration rolls back on exactly the databases that need it.
+func TestMigrateV1DedupesObservations(t *testing.T) {
+	db := openFileDB(t, t.TempDir())
+	seedLegacyDB(t, db)
+	f := seedV1Finding(t, db, "nuclei/high/exposed-panel")
+	seedV1Link(t, db, "a.example.com", f)
+	first := seedV1Observation(t, db, "scan-a", "a.example.com", "finding", f)
+	seedV1Observation(t, db, "scan-a", "a.example.com", "finding", f)
+	// A host observation duplicated too — the dedupe is not finding-specific.
+	seedV1Observation(t, db, "scan-a", "a.example.com", "host", 1)
+	seedV1Observation(t, db, "scan-a", "a.example.com", "host", 1)
+
+	if err := Migrate(context.Background(), db); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+
+	if got := countRows(t, db,
+		`SELECT count(*) FROM scan_observation WHERE asset_kind = 'finding'`); got != 1 {
+		t.Errorf("finding observations = %d, want 1 after dedupe", got)
+	}
+	if got := countRows(t, db,
+		`SELECT count(*) FROM scan_observation WHERE asset_kind = 'host'`); got != 1 {
+		t.Errorf("host observations = %d, want 1 after dedupe", got)
+	}
+	if got := countRows(t, db,
+		`SELECT count(*) FROM scan_observation WHERE id = ?`, first); got != 1 {
+		t.Errorf("dedupe kept a row other than the lowest id (%d)", first)
+	}
+
+	var name string
+	if err := db.QueryRow(
+		`SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'ux_scan_observation_dedup'`,
+	).Scan(&name); err != nil {
+		t.Errorf("ux_scan_observation_dedup missing after migration: %v", err)
+	}
+}
+
+// TestMigrateV1SingleTargetFindingIsUpdatedInPlace: the common case must not
+// churn. Its id is stable, so nothing that references it needs rewriting.
+func TestMigrateV1SingleTargetFindingIsUpdatedInPlace(t *testing.T) {
+	db := openFileDB(t, t.TempDir())
+	seedLegacyDB(t, db)
+	f := seedV1Finding(t, db, "nuclei/high/exposed-panel")
+	seedV1Link(t, db, "a.example.com", f)
+	obs := seedV1Observation(t, db, "scan-a", "a.example.com", "finding", f)
+
+	if err := Migrate(context.Background(), db); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+
+	var id int64
+	var target string
+	if err := db.QueryRow(`SELECT id, target_id FROM findings`).Scan(&id, &target); err != nil {
+		t.Fatalf("read finding: %v", err)
+	}
+	if id != f {
+		t.Errorf("single-target finding id changed from %d to %d; it must be updated in place", f, id)
+	}
+	if target != "a.example.com" {
+		t.Errorf("target_id = %q, want a.example.com", target)
+	}
+
+	var resolved int64
+	if err := db.QueryRow(
+		`SELECT f.id FROM scan_observation so JOIN findings f ON f.id = so.asset_id WHERE so.id = ?`, obs,
+	).Scan(&resolved); err != nil {
+		t.Fatalf("resolve observation: %v", err)
+	}
+	if resolved != f {
+		t.Errorf("observation resolves to finding %d, want %d", resolved, f)
+	}
+}
+
+// TestMigratedSchemaMatchesFreshSchema: a database brought forward by the step
+// and one created from schema.sql must have the SAME DDL. Divergence means two
+// schema realities in the field, and every future migration would have to cope
+// with both.
+func TestMigratedSchemaMatchesFreshSchema(t *testing.T) {
+	migrated := openFileDB(t, t.TempDir())
+	seedLegacyDB(t, migrated)
+	f := seedV1Finding(t, migrated, "nuclei/high/exposed-panel")
+	seedV1Link(t, migrated, "a.example.com", f)
+	if err := Migrate(context.Background(), migrated); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+
+	fresh := openFileDB(t, t.TempDir())
+	if err := Migrate(context.Background(), fresh); err != nil {
+		t.Fatalf("Migrate fresh: %v", err)
+	}
+
+	for _, object := range []string{
+		"findings", "scan_observation",
+		"ux_findings_dedup", "ux_scan_observation_dedup",
+		"ix_scan_observation_scan_kind", "ix_scan_observation_asset",
+	} {
+		got := objectDDL(t, migrated, object)
+		want := objectDDL(t, fresh, object)
+		if got != want {
+			t.Errorf("DDL for %s diverges\nmigrated: %s\n   fresh: %s", object, got, want)
+		}
+	}
+}
+
+// objectDDL returns the normalised sqlite_master DDL for one object.
+func objectDDL(t *testing.T, db *sql.DB, name string) string {
+	t.Helper()
+	var ddl sql.NullString
+	if err := db.QueryRow(`SELECT sql FROM sqlite_master WHERE name = ?`, name).Scan(&ddl); err != nil {
+		t.Fatalf("read DDL for %s: %v", name, err)
+	}
+	if !ddl.Valid {
+		t.Fatalf("no DDL recorded for %s", name)
+	}
+	return normalizeSQL(ddl.String)
+}
+
+// TestMigrateV1RollsBackAfterTheDestructiveSteps drives exactly steps 1-5 and
+// then fails. Nothing may survive: not the new column, not the split, and not
+// the version advance.
+func TestMigrateV1RollsBackAfterTheDestructiveSteps(t *testing.T) {
+	db := openFileDB(t, t.TempDir())
+	seedLegacyDB(t, db)
+	shared := seedV1Finding(t, db, "nuclei/high/exposed-panel")
+	seedV1Link(t, db, "a.example.com", shared)
+	seedV1Link(t, db, "b.example.com", shared)
+
+	boom := errors.New("boom after step 5")
+	steps := []migrationStep{{
+		To:   2,
+		Name: "target-scoped finding identity (fails after step 5)",
+		Apply: func(ctx context.Context, tx DBTX) error {
+			if err := splitAndRepointFindings(ctx, tx); err != nil {
+				return err
+			}
+			return boom
+		},
+	}}
+
+	err := migrateWithSteps(context.Background(), db, steps)
+	if !errors.Is(err, boom) {
+		t.Fatalf("migrateWithSteps error = %v, want %v", err, boom)
+	}
+
+	if got := userVersion(t, db); got != legacyVersion {
+		t.Errorf("user_version = %d after a failed step, want %d", got, legacyVersion)
+	}
+	if got := countRows(t, db, `SELECT count(*) FROM findings`); got != 1 {
+		t.Errorf("findings rows = %d after rollback, want 1 (the split must not survive)", got)
+	}
+	// The column itself is rolled back with everything else, so querying it must
+	// fail — the strongest possible assertion that step 1 did not survive.
+	var target string
+	err = db.QueryRow(`SELECT target_id FROM findings`).Scan(&target)
+	if err == nil {
+		t.Errorf("findings.target_id still exists after rollback (value %q)", target)
+	} else if !strings.Contains(err.Error(), "target_id") {
+		t.Errorf("unexpected error reading rolled-back findings: %v", err)
 	}
 }

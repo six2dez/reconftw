@@ -16,6 +16,12 @@ type Querier interface {
 	AttachURLToTarget(ctx context.Context, arg AttachURLToTargetParams) error
 	CountCompanies(ctx context.Context) (int64, error)
 	CountHostsForTarget(ctx context.Context, targetID string) (int64, error)
+	// Plan 15-18 -- how many assets of one kind a scan actually COMMITTED.
+	//
+	// Counting rows in the store rather than lines in an artefact file: an input
+	// line that failed to upsert, or that deduplicated onto an existing row, is not
+	// a discovery, and a scan counter derived from input lines overstates both.
+	CountObservationsForScanByKind(ctx context.Context, arg CountObservationsForScanByKindParams) (int64, error)
 	CountScansForTarget(ctx context.Context, targetID string) (int64, error)
 	CountTargets(ctx context.Context) (int64, error)
 	// Plain INSERT (not UPSERT). ScansCreate-style handlers want a hard
@@ -112,6 +118,14 @@ type Querier interface {
 	// Tag filter deferred to Phase 6 (tags live in JSON column; no normalized
 	// finding_tag table in the v1 schema).
 	ListFindingsCursor(ctx context.Context, arg ListFindingsCursorParams) ([]Finding, error)
+	// Plan 15-18 -- the findings ONE scan observed, paginated.
+	//
+	// Not a filter over ListFindingsForTarget: that query is target-wide and would
+	// make a per-scan report fetch a fixed window of every finding the target has
+	// ever had and then discard most of it. Resolution goes through
+	// scan_observation.asset_id, which the v1->v2 migration repoints so each
+	// observation lands on its own target's finding row.
+	ListFindingsForScan(ctx context.Context, arg ListFindingsForScanParams) ([]Finding, error)
 	ListFindingsForTarget(ctx context.Context, arg ListFindingsForTargetParams) ([]Finding, error)
 	// Plan 04-04 - cursor-paginated hosts list for GET /api/v1/hosts.
 	//
@@ -123,6 +137,10 @@ type Querier interface {
 	//
 	// cursor_seen_at = 0 -> first page (no cursor lower bound).
 	ListHostsCursor(ctx context.Context, arg ListHostsCursorParams) ([]Host, error)
+	// Plan 15-18 -- the hosts ONE scan observed, paginated. Returns whole Host rows
+	// (not ListHostsForTarget's five-column subset) because the per-scan report
+	// renders more than fqdn and status.
+	ListHostsForScan(ctx context.Context, arg ListHostsForScanParams) ([]Host, error)
 	ListHostsForTarget(ctx context.Context, arg ListHostsForTargetParams) ([]ListHostsForTargetRow, error)
 	ListIncludeRoots(ctx context.Context, targetID string) ([]TargetRoot, error)
 	// Plan 04-04 - cursor-paginated JS list for GET /api/v1/js.
@@ -164,6 +182,9 @@ type Querier interface {
 	// table (screenshot_path is a URL column).
 	ListURLsCursorByHost(ctx context.Context, arg ListURLsCursorByHostParams) ([]URL, error)
 	ListURLsForHost(ctx context.Context, arg ListURLsForHostParams) ([]URL, error)
+	// Plan 15-18 -- the URLs ONE scan observed, paginated. Same column list as
+	// ListURLsForTarget; only the scoping differs.
+	ListURLsForScan(ctx context.Context, arg ListURLsForScanParams) ([]URL, error)
 	ListURLsForTarget(ctx context.Context, arg ListURLsForTargetParams) ([]URL, error)
 	// Plan 04-04 - single-finding triage patch (status + tags_json + notes).
 	// COALESCE(sqlc.narg, col) keeps the column unchanged when the named
@@ -205,6 +226,12 @@ type Querier interface {
 	UpdateScanCounts(ctx context.Context, arg UpdateScanCountsParams) error
 	UpdateScanStatus(ctx context.Context, arg UpdateScanStatusParams) error
 	UpdateTarget(ctx context.Context, arg UpdateTargetParams) (Target, error)
+	// Plan 15-18 -- repoint an existing target at its current workspace.
+	//
+	// ensureTarget only writes recon_dir when it CREATES the target, so a target
+	// scanned again with a different --output kept pointing at the first run's
+	// directory forever.
+	UpdateTargetReconDir(ctx context.Context, arg UpdateTargetReconDirParams) error
 	UpdateURLTriage(ctx context.Context, arg UpdateURLTriageParams) error
 	// Phase 1, Plan 05 -- companies query file.
 	//

@@ -31,6 +31,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
+	"strings"
 )
 
 // SchemaVersion is the store.db schema version this binary understands.
@@ -87,15 +89,266 @@ var migrationSteps = []migrationStep{
 	{To: 2, Name: "target-scoped finding identity", Apply: migrateV1ToV2},
 }
 
-// migrateV1ToV2 is a deliberate placeholder. Plan 15-18 fills in the body: the
-// target-scoped finding identity split (ux_findings_dedup gains a target
-// component) and the scan_observation uniqueness constraint.
+// findingCopyColumns is every v1 `findings` column EXCEPT id and target_id, in
+// table order. Enumerated explicitly rather than written as SELECT *: an
+// implicit list silently changes meaning the next time a column is added, and
+// this statement copies rows between two shapes of the same table.
+const findingCopyColumns = "template_signature, tool, host_id, port_id, url_id, path, " +
+	"severity, status, title, description, evidence, matched_at, cvss_score, " +
+	"tags_json, notes, raw_json, first_seen_at, last_seen_at"
+
+// The v2 index set. These strings must stay character-identical to schema.sql,
+// or a migrated database and a freshly created one end up with two different
+// schemas in the field — asserted by TestMigratedSchemaMatchesFreshSchema.
+const (
+	createUxFindingsDedup = `CREATE UNIQUE INDEX IF NOT EXISTS ux_findings_dedup
+    ON findings(target_id, template_signature, tool, COALESCE(host_id, 0), COALESCE(port_id, 0), path)`
+	createUxScanObservationDedup = `CREATE UNIQUE INDEX IF NOT EXISTS ux_scan_observation_dedup
+    ON scan_observation(scan_id, target_id, asset_kind, asset_id)`
+	createIxScanObservationScanKind = `CREATE INDEX IF NOT EXISTS ix_scan_observation_scan_kind
+    ON scan_observation(scan_id, asset_kind)`
+	createIxScanObservationAsset = `CREATE INDEX IF NOT EXISTS ix_scan_observation_asset
+    ON scan_observation(asset_kind, asset_id)`
+)
+
+// findingSplit is one (finding, target) pair and the findings row it resolves to
+// after the split. NewID equals OldID for the first target of each finding,
+// which is updated in place.
+type findingSplit struct {
+	OldID    int64
+	TargetID string
+	NewID    int64
+}
+
+// migrateV1ToV2 gives findings a target-scoped identity (F11) and enforces
+// scan_observation uniqueness (F10) on an EXISTING database.
 //
-// It is registered but empty on purpose. Landing the runner and the data
-// migration together would put a destructive one-way data step and the mechanism
-// that decides whether to run it in the same review and the same blast radius.
-func migrateV1ToV2(_ context.Context, _ DBTX) error {
+// It runs inside the single BEGIN IMMEDIATE transaction applyStep opens, so a
+// failure anywhere below rolls the whole thing back and leaves user_version at 1.
+//
+// The eight steps are strictly ordered. Every data fix must complete BEFORE the
+// unique indexes are created, or index creation fails on rows the migration was
+// about to deduplicate.
+func migrateV1ToV2(ctx context.Context, tx DBTX) error {
+	// Steps 1-5.
+	if err := splitAndRepointFindings(ctx, tx); err != nil {
+		return err
+	}
+
+	// Step 6 — drop orphans and references that no longer resolve.
+	if err := dropUnresolvableRows(ctx, tx); err != nil {
+		return err
+	}
+
+	// Step 7 — dedupe observations. AFTER step 5 on purpose: repointing can
+	// itself create duplicates when two targets' observations collapse onto one
+	// tuple, and the unique index in step 8 would then fail to build.
+	res, err := tx.ExecContext(ctx,
+		`DELETE FROM scan_observation WHERE id NOT IN (
+		     SELECT MIN(id) FROM scan_observation
+		     GROUP BY scan_id, target_id, asset_kind, asset_id
+		 )`)
+	if err != nil {
+		return fmt.Errorf("dedupe scan_observation: %w", err)
+	}
+	logDeleted(ctx, res, "duplicate scan_observation rows")
+
+	// Step 8 — create the v2 indexes, now that the data satisfies them.
+	for _, ddl := range []string{
+		createUxFindingsDedup,
+		createUxScanObservationDedup,
+		createIxScanObservationScanKind,
+		createIxScanObservationAsset,
+	} {
+		if _, err := tx.ExecContext(ctx, ddl); err != nil {
+			return fmt.Errorf("create index (%s): %w", firstLine(ddl), err)
+		}
+	}
 	return nil
+}
+
+// splitAndRepointFindings performs steps 1 to 5: add the column, drop the
+// target-less index, split each shared finding per target, and repoint both
+// target_finding and scan_observation at the row that belongs to each target.
+//
+// Separated from migrateV1ToV2 so a test can drive exactly the destructive
+// prefix and then fail, proving the whole step rolls back rather than leaving a
+// half-split findings table behind.
+func splitAndRepointFindings(ctx context.Context, tx DBTX) error {
+	// Step 1 — add the column. It lands at the END of the table, which is why
+	// schema.sql declares it last too.
+	if _, err := tx.ExecContext(ctx,
+		`ALTER TABLE findings ADD COLUMN target_id TEXT NOT NULL DEFAULT ''`,
+	); err != nil {
+		return fmt.Errorf("add findings.target_id: %w", err)
+	}
+
+	// Step 2 — drop the target-less dedup index before any row is rewritten; the
+	// split deliberately creates rows that would violate it.
+	if _, err := tx.ExecContext(ctx, `DROP INDEX IF EXISTS ux_findings_dedup`); err != nil {
+		return fmt.Errorf("drop v1 ux_findings_dedup: %w", err)
+	}
+
+	// Step 3 — split each shared finding into one row per target.
+	splits, err := splitFindingsByTarget(ctx, tx)
+	if err != nil {
+		return err
+	}
+
+	for _, sp := range splits {
+		if sp.NewID == sp.OldID {
+			continue // first target: updated in place, nothing points elsewhere
+		}
+
+		// Step 4 — point the join row at the copy that belongs to this target.
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE target_finding SET finding_id = ? WHERE target_id = ? AND finding_id = ?`,
+			sp.NewID, sp.TargetID, sp.OldID,
+		); err != nil {
+			return fmt.Errorf("repoint target_finding (%s, %d -> %d): %w",
+				sp.TargetID, sp.OldID, sp.NewID, err)
+		}
+
+		// Step 5 — REPOINT scan_observation. DO NOT DELETE THIS AS REDUNDANT.
+		//
+		// scan_observation stores findings.id in asset_id when asset_kind =
+		// 'finding', and BOTH DiffScansFindings and ListFindingsForScan resolve a
+		// finding through `JOIN findings f ON f.id = so.asset_id`. Step 3 left the
+		// FIRST target on the original id and gave every other target a copy, so
+		// without this statement every historical observation belonging to a
+		// non-first target still resolves to the FIRST target's row: the per-scan
+		// report renders another engagement's finding instance and the
+		// cross-target mixing survives the migration that exists to remove it. A
+		// build missing this step passes on a fresh CI database and fails on every
+		// real operator store.
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE scan_observation SET asset_id = ?
+			 WHERE asset_kind = 'finding' AND target_id = ? AND asset_id = ?`,
+			sp.NewID, sp.TargetID, sp.OldID,
+		); err != nil {
+			return fmt.Errorf("repoint scan_observation (%s, %d -> %d): %w",
+				sp.TargetID, sp.OldID, sp.NewID, err)
+		}
+	}
+	return nil
+}
+
+// splitFindingsByTarget performs step 3 and returns the old->new id map every
+// later step repoints against.
+//
+// A v1 findings row is shared by every target linked to it through
+// target_finding — that sharing IS the F11 bug. The lowest target_id in a
+// deterministic (finding_id, target_id) order keeps the original row, so the
+// overwhelmingly common single-target finding is updated in place and its id
+// never churns; every additional target gets a copy.
+func splitFindingsByTarget(ctx context.Context, tx DBTX) ([]findingSplit, error) {
+	rows, err := tx.QueryContext(ctx,
+		`SELECT finding_id, target_id FROM target_finding ORDER BY finding_id, target_id`)
+	if err != nil {
+		return nil, fmt.Errorf("read target_finding: %w", err)
+	}
+	// Drained fully before any write: the migration owns a single connection, and
+	// issuing statements while a result set is still open on it does not work.
+	var pairs []findingSplit
+	for rows.Next() {
+		var p findingSplit
+		if err := rows.Scan(&p.OldID, &p.TargetID); err != nil {
+			_ = rows.Close()
+			return nil, fmt.Errorf("scan target_finding row: %w", err)
+		}
+		pairs = append(pairs, p)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, fmt.Errorf("close target_finding rows: %w", err)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate target_finding: %w", err)
+	}
+
+	seen := make(map[int64]bool, len(pairs))
+	splits := make([]findingSplit, 0, len(pairs))
+	for _, p := range pairs {
+		if !seen[p.OldID] {
+			seen[p.OldID] = true
+			if _, err := tx.ExecContext(ctx,
+				`UPDATE findings SET target_id = ? WHERE id = ?`, p.TargetID, p.OldID,
+			); err != nil {
+				return nil, fmt.Errorf("claim finding %d for target %s: %w", p.OldID, p.TargetID, err)
+			}
+			p.NewID = p.OldID
+			splits = append(splits, p)
+			continue
+		}
+
+		res, err := tx.ExecContext(ctx,
+			`INSERT INTO findings (`+findingCopyColumns+`, target_id)
+			 SELECT `+findingCopyColumns+`, ? FROM findings WHERE id = ?`,
+			p.TargetID, p.OldID)
+		if err != nil {
+			return nil, fmt.Errorf("copy finding %d for target %s: %w", p.OldID, p.TargetID, err)
+		}
+		newID, err := res.LastInsertId()
+		if err != nil {
+			return nil, fmt.Errorf("read new id for finding %d (target %s): %w", p.OldID, p.TargetID, err)
+		}
+		p.NewID = newID
+		splits = append(splits, p)
+	}
+	return splits, nil
+}
+
+// dropUnresolvableRows performs step 6.
+//
+// Two deletions, both counted and logged, and both narrow by construction:
+//   - findings never linked to any target. They cannot be attributed to an
+//     engagement and, all sharing an empty target_id, would collide with each
+//     other under the new dedup index.
+//   - finding observations that do not resolve to a findings row OF THEIR OWN
+//     TARGET. A dangling asset_id breaks every JOIN downstream; an asset_id
+//     resolving to ANOTHER target's row is the precise cross-target leak this
+//     migration exists to remove, so leaving it would defeat the purpose.
+func dropUnresolvableRows(ctx context.Context, tx DBTX) error {
+	res, err := tx.ExecContext(ctx,
+		`DELETE FROM findings
+		 WHERE target_id = '' AND id NOT IN (SELECT finding_id FROM target_finding)`)
+	if err != nil {
+		return fmt.Errorf("drop orphan findings: %w", err)
+	}
+	logDeleted(ctx, res, "orphan findings rows (no target_finding link)")
+
+	res, err = tx.ExecContext(ctx,
+		`DELETE FROM scan_observation
+		 WHERE asset_kind = 'finding'
+		   AND NOT EXISTS (
+		       SELECT 1 FROM findings f
+		       WHERE f.id = scan_observation.asset_id
+		         AND f.target_id = scan_observation.target_id
+		   )`)
+	if err != nil {
+		return fmt.Errorf("drop unresolvable finding observations: %w", err)
+	}
+	logDeleted(ctx, res, "scan_observation rows not resolving to their own target's finding")
+	return nil
+}
+
+// logDeleted reports a destructive step's row count. A migration that silently
+// deletes operator data is not acceptable; a RowsAffected failure is not worth
+// aborting an otherwise sound transaction over, so it is skipped rather than
+// propagated.
+func logDeleted(ctx context.Context, res sql.Result, what string) {
+	n, err := res.RowsAffected()
+	if err != nil || n == 0 {
+		return
+	}
+	slog.InfoContext(ctx, "store migration v1->v2: deleted rows", "count", n, "rows", what)
+}
+
+// firstLine trims a multi-line DDL string down to something readable in an error.
+func firstLine(s string) string {
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		return s[:i]
+	}
+	return s
 }
 
 // Migrate brings db up to SchemaVersion.

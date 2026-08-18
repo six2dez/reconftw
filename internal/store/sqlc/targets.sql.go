@@ -264,6 +264,31 @@ func (q *Queries) ListTargetsCursor(ctx context.Context, arg ListTargetsCursorPa
 	return items, nil
 }
 
+const updateTargetReconDir = `-- name: UpdateTargetReconDir :exec
+UPDATE targets SET
+    recon_dir  = ?1,
+    updated_at = ?2
+WHERE id = ?3
+`
+
+type UpdateTargetReconDirParams struct {
+	ReconDir string
+	Now      int64
+	ID       string
+}
+
+// Plan 15-18 -- repoint an existing target at its current workspace.
+//
+// ensureTarget only writes recon_dir when it CREATES the target, so a target
+// scanned again with a different --output kept pointing at the first run's
+// directory forever, and every reader that resolves artefacts through
+// targets.recon_dir read a stale tree. It is also what repairs the recon_dir
+// values left behind by the workspace rename in plan 15-01.
+func (q *Queries) UpdateTargetReconDir(ctx context.Context, arg UpdateTargetReconDirParams) error {
+	_, err := q.db.ExecContext(ctx, updateTargetReconDir, arg.ReconDir, arg.Now, arg.ID)
+	return err
+}
+
 const updateTarget = `-- name: UpdateTarget :one
 UPDATE targets SET
     name        = ?1,

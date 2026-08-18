@@ -32,6 +32,10 @@ type Finding struct {
 	RawJson           *string
 	FirstSeenAt       int64
 	LastSeenAt        int64
+	// TargetID scopes the finding to one engagement. It is LAST because the
+	// column is last in the table (see schema.sql), which in turn is what makes
+	// a migrated database textually identical to a fresh one.
+	TargetID string
 }
 
 type FindingsFt struct {

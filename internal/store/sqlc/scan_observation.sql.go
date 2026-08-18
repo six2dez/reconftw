@@ -9,6 +9,27 @@ import (
 	"context"
 )
 
+const countObservationsForScanByKind = `-- name: CountObservationsForScanByKind :one
+SELECT count(*) FROM scan_observation WHERE scan_id = ? AND asset_kind = ?
+`
+
+type CountObservationsForScanByKindParams struct {
+	ScanID    string
+	AssetKind string
+}
+
+// Plan 15-18 -- how many assets of one kind a scan actually COMMITTED.
+//
+// Counting rows in the store rather than lines in an artefact file: an input
+// line that failed to upsert, or that deduplicated onto an existing row, is not
+// a discovery, and a scan counter derived from input lines overstates both.
+func (q *Queries) CountObservationsForScanByKind(ctx context.Context, arg CountObservationsForScanByKindParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countObservationsForScanByKind, arg.ScanID, arg.AssetKind)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const diffBetweenScans = `-- name: DiffBetweenScans :many
 SELECT scan_observation.asset_kind, scan_observation.asset_id
 FROM scan_observation
@@ -71,6 +92,7 @@ INSERT INTO scan_observation (
 ) VALUES (
     ?, ?, ?, ?, ?, ?
 )
+ON CONFLICT(scan_id, target_id, asset_kind, asset_id) DO NOTHING
 `
 
 type InsertObservationParams struct {
@@ -84,9 +106,22 @@ type InsertObservationParams struct {
 
 // Phase 1, Plan 05 -- scan_observation query file.
 //
-// Polymorphic per-scan observation triplet (scan_id, asset_kind, asset_id).
-// Unique on (scan_id, asset_kind, asset_id) -- the same scan cannot observe
-// the same asset twice. DiffBetweenScans is Q3 of the EXPLAIN gate.
+// Polymorphic per-scan observation tuple (scan_id, target_id, asset_kind,
+// asset_id), unique at the DATABASE level via ux_scan_observation_dedup
+// (schema.sql). Until plan 15-18 this comment claimed a uniqueness the DDL
+// never provided -- there was no constraint and no index at all, so the "the
+// same scan cannot observe the same asset twice" invariant callers relied on
+// was enforced nowhere (F10).
+//
+// The key is FOUR columns, not three: one scan legitimately covers several
+// targets, and two targets may observe the same asset id, so target_id is
+// part of the identity.
+//
+// ON CONFLICT DO NOTHING rather than an error: re-observing an asset inside
+// one scan is a normal consequence of two artefact lines resolving to the same
+// upserted row, and must not turn into a failed ingest.
+//
+// DiffBetweenScans is Q3 of the EXPLAIN gate.
 func (q *Queries) InsertObservation(ctx context.Context, arg InsertObservationParams) error {
 	_, err := q.db.ExecContext(ctx, insertObservation,
 		arg.ScanID,

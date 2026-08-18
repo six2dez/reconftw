@@ -159,6 +159,60 @@ func (q *Queries) ListHostsCursor(ctx context.Context, arg ListHostsCursorParams
 	return items, nil
 }
 
+const listHostsForScan = `-- name: ListHostsForScan :many
+SELECT h.id, h.fqdn, h.ip_current, h.asn, h.asn_org, h.cdn, h.first_seen_at, h.last_seen_at, h.status, h.tags_json, h.notes, h.raw_json
+FROM scan_observation so
+JOIN hosts h ON h.id = so.asset_id
+WHERE so.scan_id = ? AND so.asset_kind = 'host'
+ORDER BY h.id
+LIMIT ? OFFSET ?
+`
+
+type ListHostsForScanParams struct {
+	ScanID string
+	Limit  int64
+	Offset int64
+}
+
+// Plan 15-18 -- the hosts ONE scan observed, paginated. Returns whole Host rows
+// (not ListHostsForTarget's five-column subset) because the per-scan report
+// renders more than fqdn and status.
+func (q *Queries) ListHostsForScan(ctx context.Context, arg ListHostsForScanParams) ([]Host, error) {
+	rows, err := q.db.QueryContext(ctx, listHostsForScan, arg.ScanID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Host
+	for rows.Next() {
+		var i Host
+		if err := rows.Scan(
+			&i.ID,
+			&i.FQDN,
+			&i.IpCurrent,
+			&i.ASN,
+			&i.ASNOrg,
+			&i.CDN,
+			&i.FirstSeenAt,
+			&i.LastSeenAt,
+			&i.Status,
+			&i.TagsJson,
+			&i.Notes,
+			&i.RawJson,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listHostsForTarget = `-- name: ListHostsForTarget :many
 SELECT h.id, h.fqdn, h.ip_current, h.status, h.tags_json
 FROM target_host th
