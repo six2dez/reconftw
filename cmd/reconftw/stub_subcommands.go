@@ -1222,6 +1222,9 @@ No scan execution occurs. Use reconftw recon --target <domain> to run a scan fir
 	cmd.Flags().String("target", "", "Target domain (required)")
 	cmd.Flags().String("scan-id", "", "Specific scan ID to render (default: latest completed)")
 	cmd.Flags().Bool("allow-partial", false, "Also accept incomplete scans (use with --scan-id)")
+	cmd.Flags().Bool("include-historical", false,
+		"Include the target's full asset history, not just what this scan observed "+
+			"(the report is stamped with a scope warning)")
 	return cmd
 }
 
@@ -1236,6 +1239,8 @@ func runReportCmd(cmd *cobra.Command) error {
 	// --allow-partial was registered and documented but never read, so the flag
 	// silently did nothing.
 	allowPartial, _ := cmd.Flags().GetBool("allow-partial")
+	// Opt-in only: without it a report describes exactly the scan it names.
+	includeHistorical, _ := cmd.Flags().GetBool("include-historical")
 
 	efs := parseEarlyFlags(os.Args[1:])
 	cfg, err := config.Load(config.LoadOptions{
@@ -1261,12 +1266,20 @@ func runReportCmd(cmd *cobra.Command) error {
 	}
 	defer renderer.Close() //nolint:errcheck
 
-	if err := renderer.RenderAll(ctx, targetFlag, scanIDFlag, allowPartial); err != nil {
+	result, err := renderer.RenderAll(ctx, targetFlag, scanIDFlag, allowPartial, includeHistorical)
+	if err != nil {
 		return fmt.Errorf("report: render: %w", err)
 	}
 
-	reportsDir := filepath.Join(dataDir, "reports")
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "reports written to: %s\n", reportsDir)
+	// Print the directory the renderer ACTUALLY wrote, taken from its manifest.
+	// This used to print the shared reports root under the data dir, which the per-scan
+	// layout no longer writes to — and it is the only pointer a CLI user gets,
+	// so naming a directory the report is not in is a small line with a large
+	// cost.
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "reports written to: %s\n", result.Dir)
+	for _, p := range result.Files {
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", p)
+	}
 	return nil
 }
 

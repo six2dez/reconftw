@@ -22,6 +22,21 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// concatFiles reads every path a render reported and joins the bytes, so an
+// assertion can be made across all rendered formats at once.
+func concatFiles(t *testing.T, paths []string) []byte {
+	t.Helper()
+	var all []byte
+	for _, p := range paths {
+		b, err := os.ReadFile(p) //nolint:gosec // paths come from the renderer's own manifest
+		if err != nil {
+			t.Fatalf("manifest lists %s but it cannot be read: %v", p, err)
+		}
+		all = append(all, b...)
+	}
+	return all
+}
+
 // seedTarget ingests one target's artefacts into the shared store at dataDir.
 func seedTarget(t *testing.T, dataDir, target, host, url string) {
 	t.Helper()
@@ -58,21 +73,15 @@ func TestE2EReportDoesNotLeakAnotherTarget(t *testing.T) {
 	}
 	defer r.Close() //nolint:errcheck
 
-	if err := r.RenderAll(context.Background(), "alpha.example", "", false); err != nil {
+	res, err := r.RenderAll(context.Background(), "alpha.example", "", false, false)
+	if err != nil {
 		t.Fatalf("RenderAll: %v", err)
 	}
 
-	body, err := os.ReadFile(filepath.Join(dataDir, "reports", "report.html"))
-	if err != nil {
-		// Format name may differ; fall back to scanning the whole reports dir.
-		entries, _ := os.ReadDir(filepath.Join(dataDir, "reports"))
-		var all []byte
-		for _, e := range entries {
-			b, _ := os.ReadFile(filepath.Join(dataDir, "reports", e.Name()))
-			all = append(all, b...)
-		}
-		body = all
-	}
+	// Read every file THIS render wrote, from its manifest. The directory scan
+	// this replaces could not survive the per-scan layout (reports/ now holds
+	// directories, not files) and would have silently degraded into t.Skip.
+	body := concatFiles(t, res.Files)
 	if len(body) == 0 {
 		t.Skip("no report artefacts produced in this environment")
 	}
@@ -116,7 +125,7 @@ func TestE2EReportRejectsMismatchedScanAndTarget(t *testing.T) {
 	if betaScan == "" {
 		t.Skip("could not resolve beta's scan id")
 	}
-	err = r.RenderAll(context.Background(), "alpha.example", betaScan, false)
+	_, err = r.RenderAll(context.Background(), "alpha.example", betaScan, false, false)
 	if err == nil {
 		t.Fatal("rendering beta's scan under --target alpha must be refused")
 	}
@@ -168,16 +177,12 @@ func TestE2EReportOfSecondScanExcludesVanishedAsset(t *testing.T) {
 	}
 	defer r.Close() //nolint:errcheck
 
-	if err := r.RenderAll(context.Background(), target, res2.ScanID, false); err != nil {
+	rendered, err := r.RenderAll(context.Background(), target, res2.ScanID, false, false)
+	if err != nil {
 		t.Fatalf("RenderAll(scan 2): %v", err)
 	}
 
-	entries, _ := os.ReadDir(filepath.Join(dataDir, "reports"))
-	var all []byte
-	for _, e := range entries {
-		b, _ := os.ReadFile(filepath.Join(dataDir, "reports", e.Name()))
-		all = append(all, b...)
-	}
+	all := concatFiles(t, rendered.Files)
 	if len(all) == 0 {
 		t.Skip("no report artefacts produced in this environment")
 	}

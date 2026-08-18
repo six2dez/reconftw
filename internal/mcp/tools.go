@@ -208,7 +208,15 @@ func RegisterTools(srv *mcp.Server, newSched func() *scheduler.Scheduler, regist
 				IsError: true,
 			}, nil, nil
 		}
-		paths, err := handlers.RenderReportsForTarget(ctx, args.Target)
+		// TODO(plan 15-15, F7): pass the server's RESOLVED *config.Config here.
+		// MCPServer currently holds only *config.MCPConfig, so there is no full
+		// config at this call site; 15-15 adds the startup snapshot. Until then
+		// the config is explicitly nil (data dir falls back to "data") rather
+		// than a config.Load default, which would look authoritative while
+		// ignoring the --config/--secrets the server was started with.
+		// The redactor IS available and is now threaded through, so report
+		// redaction uses the secrets the server actually registered.
+		result, err := handlers.RenderReportsForTarget(ctx, nil, rdct, args.Target, "", false)
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{&mcp.TextContent{
@@ -217,7 +225,13 @@ func RegisterTools(srv *mcp.Server, newSched func() *scheduler.Scheduler, regist
 				IsError: true,
 			}, nil, nil
 		}
-		body, _ := json.Marshal(map[string]any{"target": args.Target, "reports": paths})
+		// The response lists what THIS render wrote, from the manifest.
+		body, _ := json.Marshal(map[string]any{
+			"target":  args.Target,
+			"scan_id": result.ScanID,
+			"dir":     result.Dir,
+			"reports": result.Files,
+		})
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{&mcp.TextContent{Text: string(body)}},
 		}, nil, nil

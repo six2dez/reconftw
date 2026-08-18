@@ -111,6 +111,12 @@ func WriteURLsCSV(w io.Writer, urls []*sqlcgen.URL) error {
 	return WriteCSV(w, header, rows)
 }
 
+// csvFileNames is every file WriteAllCSV writes, in write order. The render
+// manifest enumerates the CSV outputs from this list rather than repeating the
+// names, so a new CSV cannot be added to the writer and silently omitted from
+// the manifest that claims to list what the render produced.
+var csvFileNames = []string{"findings.csv", "hosts.csv", "urls.csv", "subdomains.csv"}
+
 // WriteAllCSV writes per-category CSV files to reportsDir using output.WriteFile.
 func WriteAllCSV(reportsDir string, findings []*sqlcgen.Finding, hosts []*sqlcgen.Host, urls []*sqlcgen.URL) error {
 	writeOne := func(name string, writeFn func(io.Writer) error) error {
@@ -121,26 +127,22 @@ func WriteAllCSV(reportsDir string, findings []*sqlcgen.Finding, hosts []*sqlcge
 		return output.WriteFile(filepath.Join(reportsDir, name), buf.Bytes(), 0o644)
 	}
 
-	if err := writeOne("findings.csv", func(w io.Writer) error {
-		return WriteFindingsCSV(w, findings)
-	}); err != nil {
-		return err
-	}
-	if err := writeOne("hosts.csv", func(w io.Writer) error {
-		return WriteHostsCSV(w, hosts)
-	}); err != nil {
-		return err
-	}
-	if err := writeOne("urls.csv", func(w io.Writer) error {
-		return WriteURLsCSV(w, urls)
-	}); err != nil {
-		return err
-	}
+	// Keyed by csvFileNames so the writer and the manifest cannot disagree:
 	// subdomains.csv mirrors hosts.csv (subdomains are a subset of hosts).
-	if err := writeOne("subdomains.csv", func(w io.Writer) error {
-		return WriteHostsCSV(w, hosts)
-	}); err != nil {
-		return err
+	writers := map[string]func(io.Writer) error{
+		"findings.csv":   func(w io.Writer) error { return WriteFindingsCSV(w, findings) },
+		"hosts.csv":      func(w io.Writer) error { return WriteHostsCSV(w, hosts) },
+		"urls.csv":       func(w io.Writer) error { return WriteURLsCSV(w, urls) },
+		"subdomains.csv": func(w io.Writer) error { return WriteHostsCSV(w, hosts) },
+	}
+	for _, name := range csvFileNames {
+		writeFn, ok := writers[name]
+		if !ok {
+			return fmt.Errorf("report/csv: %s is listed in csvFileNames but has no writer", name)
+		}
+		if err := writeOne(name, writeFn); err != nil {
+			return err
+		}
 	}
 	return nil
 }
