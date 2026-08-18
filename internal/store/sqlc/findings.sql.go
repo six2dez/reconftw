@@ -25,7 +25,7 @@ func (q *Queries) AttachFindingToTarget(ctx context.Context, arg AttachFindingTo
 }
 
 const getFinding = `-- name: GetFinding :one
-SELECT id, template_signature, tool, host_id, port_id, url_id, path, severity, status, title, description, evidence, matched_at, cvss_score, tags_json, notes, raw_json, first_seen_at, last_seen_at FROM findings WHERE id = ? LIMIT 1
+SELECT id, template_signature, tool, host_id, port_id, url_id, path, severity, status, title, description, evidence, matched_at, cvss_score, tags_json, notes, raw_json, first_seen_at, last_seen_at, target_id FROM findings WHERE id = ? LIMIT 1
 `
 
 func (q *Queries) GetFinding(ctx context.Context, id int64) (Finding, error) {
@@ -51,6 +51,7 @@ func (q *Queries) GetFinding(ctx context.Context, id int64) (Finding, error) {
 		&i.RawJson,
 		&i.FirstSeenAt,
 		&i.LastSeenAt,
+		&i.TargetID,
 	)
 	return i, err
 }
@@ -114,7 +115,7 @@ const listFindingsCursor = `-- name: ListFindingsCursor :many
 SELECT f.id, f.template_signature, f.tool, f.host_id, f.port_id, f.url_id,
        f.path, f.severity, f.status, f.title, f.description, f.evidence,
        f.matched_at, f.cvss_score, f.tags_json, f.notes, f.raw_json,
-       f.first_seen_at, f.last_seen_at
+       f.first_seen_at, f.last_seen_at, f.target_id
 FROM findings f
 LEFT JOIN target_finding tf ON tf.finding_id = f.id
 WHERE (?1 = '' OR tf.target_id = ?1)
@@ -179,6 +180,7 @@ func (q *Queries) ListFindingsCursor(ctx context.Context, arg ListFindingsCursor
 			&i.RawJson,
 			&i.FirstSeenAt,
 			&i.LastSeenAt,
+			&i.TargetID,
 		); err != nil {
 			return nil, err
 		}
@@ -194,7 +196,7 @@ func (q *Queries) ListFindingsCursor(ctx context.Context, arg ListFindingsCursor
 }
 
 const listFindingsForTarget = `-- name: ListFindingsForTarget :many
-SELECT f.id, f.template_signature, f.tool, f.host_id, f.port_id, f.url_id, f.path, f.severity, f.status, f.title, f.description, f.evidence, f.matched_at, f.cvss_score, f.tags_json, f.notes, f.raw_json, f.first_seen_at, f.last_seen_at
+SELECT f.id, f.template_signature, f.tool, f.host_id, f.port_id, f.url_id, f.path, f.severity, f.status, f.title, f.description, f.evidence, f.matched_at, f.cvss_score, f.tags_json, f.notes, f.raw_json, f.first_seen_at, f.last_seen_at, f.target_id
 FROM target_finding tf
 JOIN findings f ON f.id = tf.finding_id
 WHERE tf.target_id = ?
@@ -237,6 +239,7 @@ func (q *Queries) ListFindingsForTarget(ctx context.Context, arg ListFindingsFor
 			&i.RawJson,
 			&i.FirstSeenAt,
 			&i.LastSeenAt,
+			&i.TargetID,
 		); err != nil {
 			return nil, err
 		}
@@ -257,7 +260,7 @@ SET status    = COALESCE(?1,    status),
     tags_json = COALESCE(?2, tags_json),
     notes     = COALESCE(?3,     notes)
 WHERE id = ?4
-RETURNING id, template_signature, tool, host_id, port_id, url_id, path, severity, status, title, description, evidence, matched_at, cvss_score, tags_json, notes, raw_json, first_seen_at, last_seen_at
+RETURNING id, template_signature, tool, host_id, port_id, url_id, path, severity, status, title, description, evidence, matched_at, cvss_score, tags_json, notes, raw_json, first_seen_at, last_seen_at, target_id
 `
 
 type PatchFindingParams struct {
@@ -300,6 +303,7 @@ func (q *Queries) PatchFinding(ctx context.Context, arg PatchFindingParams) (Fin
 		&i.RawJson,
 		&i.FirstSeenAt,
 		&i.LastSeenAt,
+		&i.TargetID,
 	)
 	return i, err
 }
@@ -335,14 +339,14 @@ INSERT INTO findings (
     template_signature, tool, host_id, port_id, url_id, path,
     severity, status, title, description, evidence, matched_at,
     cvss_score, tags_json, notes, raw_json,
-    first_seen_at, last_seen_at
+    first_seen_at, last_seen_at, target_id
 ) VALUES (
     ?1, ?2, ?3, ?4, ?5, ?6,
     ?7, 'open', ?8, ?9, ?10, ?11,
     ?12, '[]', '', ?13,
-    ?14, ?14
+    ?14, ?14, ?15
 )
-ON CONFLICT(template_signature, tool, COALESCE(host_id, 0), COALESCE(port_id, 0), path)
+ON CONFLICT(target_id, template_signature, tool, COALESCE(host_id, 0), COALESCE(port_id, 0), path)
 DO UPDATE SET
     last_seen_at = excluded.last_seen_at,
     description  = excluded.description,
@@ -368,7 +372,7 @@ DO UPDATE SET
         WHEN excluded.cvss_score > findings.cvss_score THEN excluded.cvss_score
         ELSE findings.cvss_score
     END
-RETURNING id, template_signature, tool, host_id, port_id, url_id, path, severity, status, title, description, evidence, matched_at, cvss_score, tags_json, notes, raw_json, first_seen_at, last_seen_at
+RETURNING id, template_signature, tool, host_id, port_id, url_id, path, severity, status, title, description, evidence, matched_at, cvss_score, tags_json, notes, raw_json, first_seen_at, last_seen_at, target_id
 `
 
 type UpsertFindingParams struct {
@@ -386,6 +390,11 @@ type UpsertFindingParams struct {
 	CVSSScore         *float64
 	RawJson           *string
 	Now               int64
+	// TargetID is ?15 -- appended rather than placed first so the existing
+	// placeholder numbering (and every other caller argument) is untouched.
+	// It is part of the ux_findings_dedup key: an empty value would put every
+	// engagement's findings back in one shared row.
+	TargetID string
 }
 
 // Phase 1, Plan 05 -- findings query file.
@@ -414,6 +423,7 @@ func (q *Queries) UpsertFinding(ctx context.Context, arg UpsertFindingParams) (F
 		arg.CVSSScore,
 		arg.RawJson,
 		arg.Now,
+		arg.TargetID,
 	)
 	var i Finding
 	err := row.Scan(
@@ -436,6 +446,7 @@ func (q *Queries) UpsertFinding(ctx context.Context, arg UpsertFindingParams) (F
 		&i.RawJson,
 		&i.FirstSeenAt,
 		&i.LastSeenAt,
+		&i.TargetID,
 	)
 	return i, err
 }

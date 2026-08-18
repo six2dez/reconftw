@@ -401,6 +401,10 @@ func ingestFindings(ctx context.Context, q *sqlcgen.Queries, scanID, target, art
 			return // nothing identifiable to key on
 		}
 		params := sqlcgen.UpsertFindingParams{
+			// TargetID is part of ux_findings_dedup (F11). Leaving it empty would
+			// put every engagement's findings back into one shared global row,
+			// which is the bug plan 15-18 removed.
+			TargetID:          target,
 			TemplateSignature: sig,
 			Tool:              firstNonEmpty(rec.Engine, rec.Service, rec.Type, rec.Source, "reconftw"),
 			Severity:          normalizeSeverity(rec.Severity),

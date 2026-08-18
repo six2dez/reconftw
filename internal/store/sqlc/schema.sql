@@ -152,11 +152,26 @@ CREATE TABLE IF NOT EXISTS findings (
     notes              TEXT    NOT NULL DEFAULT '',
     raw_json           TEXT,
     first_seen_at      INTEGER NOT NULL,
-    last_seen_at       INTEGER NOT NULL
+    last_seen_at       INTEGER NOT NULL,
+    target_id          TEXT    NOT NULL DEFAULT ''
 );
+-- target_id is deliberately the LAST column and carries no inline comment.
+-- `ALTER TABLE ... ADD COLUMN` appends the new column to the end of the stored
+-- CREATE TABLE text in sqlite_master, and a comment written inside the statement
+-- would be stored verbatim here but not there. Keeping it last and comment-free
+-- is what lets a migrated database be textually identical to a fresh one --
+-- asserted by TestMigratedSchemaMatchesFreshSchema.
+--
+-- WHY target_id EXISTS (F11): template_signature is the canonical finding TYPE;
+-- a findings ROW is the per-target INSTANCE of it, carrying its own status,
+-- notes, severity, first_seen_at and last_seen_at. Without target_id in the
+-- dedup key a hostless finding -- the common OSINT shape, where host_id and
+-- port_id are both NULL -- collapsed into ONE global row shared by every
+-- engagement, so triaging it on target A silently triaged it on target B.
+
 -- Matches the UpsertFinding ON CONFLICT target exactly (expression index).
 CREATE UNIQUE INDEX IF NOT EXISTS ux_findings_dedup
-    ON findings(template_signature, tool, COALESCE(host_id, 0), COALESCE(port_id, 0), path);
+    ON findings(target_id, template_signature, tool, COALESCE(host_id, 0), COALESCE(port_id, 0), path);
 
 CREATE TABLE IF NOT EXISTS target_finding (
     target_id  TEXT    NOT NULL,
@@ -209,3 +224,15 @@ CREATE TABLE IF NOT EXISTS scan_observation (
     observed_at INTEGER NOT NULL,
     raw_json    TEXT
 );
+-- F10: the uniqueness InsertObservation's doc-comment used to CLAIM and the DDL
+-- never provided. It is FOUR columns, not three: two targets legitimately
+-- observe the same asset id in the same scan, so target_id is part of the key.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_scan_observation_dedup
+    ON scan_observation(scan_id, target_id, asset_kind, asset_id);
+-- Serves the per-scan asset lists (ListFindingsForScan / ListHostsForScan /
+-- ListURLsForScan) and CountObservationsForScanByKind.
+CREATE INDEX IF NOT EXISTS ix_scan_observation_scan_kind
+    ON scan_observation(scan_id, asset_kind);
+-- Serves ListObservationsForAsset and the DiffScans* NOT EXISTS sub-selects.
+CREATE INDEX IF NOT EXISTS ix_scan_observation_asset
+    ON scan_observation(asset_kind, asset_id);
