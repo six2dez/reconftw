@@ -12,8 +12,11 @@
 //	STEP 6: Rebuild logger from full config (level + format from cfg.Output.{LogLevel,LogFormat})
 //	STEP 7: Register every Secret-typed config field with the Redactor BEFORE AppContext.Boot
 //	STEP 8: task.Default.Build() — topo sort + cycle detection BEFORE scheduler accepts submissions
-//	STEP 9: scheduler.NewScheduler + appctx.Boot if --target supplied
-//	STEP 9b: sched.RunTask closure — closes the appctx ↔ scheduler ↔ task triple cycle
+//	STEP 9/9b: REMOVED (F18) — no pre-cobra scheduler or AppContext boot. Each
+//	           subcommand initialises only what it uses, via handlers.BootReconApp;
+//	           booting here too meant two handles on one checkpoints.db, a workspace
+//	           created for commands that need none, and an argv scan that could
+//	           disagree with cobra about --output. See STEP 9 in run() for detail.
 //	STEP 10: cobra.ExecuteContext — dispatches subcommand
 //
 // W14 — parseEarlyFlags is a pre-cobra os.Args scan that extracts ONLY
@@ -44,11 +47,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
 	"github.com/six2dez/reconftw/internal/core/log"
-	"github.com/six2dez/reconftw/internal/core/output"
-	"github.com/six2dez/reconftw/internal/core/scheduler"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -161,91 +161,65 @@ func run() error {
 		return err
 	}
 
-	// STEP 9 + 9b: Construct the Scheduler and (if --target supplied) the AppContext.
-	// The cycle break: scheduler is built first; appctx.Boot takes it as a parameter;
-	// sched.RunTask closure is set AFTER Boot returns so the closure can capture *app.
+	// STEP 9 + 9b: DELIBERATELY ABSENT — there is no pre-cobra boot (F18).
 	//
-	// Target resolution: parseEarlyFlags does NOT extract --target (cobra owns it).
-	// Instead cobra subcommands that need an AppContext build one lazily, or we use
-	// the pre-built one when a flag is supplied via os.Args. For Phase 3 the binary
-	// boots an AppContext from a target supplied via early flag scan of --target,
-	// so kernel-demo and run can use it. Subcommands with no --target (version,
-	// health-check, stubs) operate on a nil *AppContext.
-	target := efs.target
-	var app *appctx.AppContext
-	var sched *scheduler.Scheduler
-	// A dry run must not touch the filesystem. This early boot creates the
-	// workspace tree and the checkpoint SQLite store before cobra dispatches,
-	// so --dry-run had side effects no matter what the subcommand did.
-	if target != "" && !efs.dryRun {
-		tgt, err := appctx.NewTarget(target, nil, "")
-		if err != nil {
-			logger.Error("target_invalid", "err", err)
-			return err
-		}
-		// Workspace directory: workspaces/<target>-<timestamp>/ per ADR §3.1.
-		//
-		// -o/--output wins over the configured DataDir, matching what the
-		// subcommand does later. Without it this boot created a second tree
-		// under the configured root alongside the one the operator asked for.
-		workspaceRoot := cfg.Paths.DataDir
-		if efs.outputDir != "" {
-			workspaceRoot = efs.outputDir
-		}
-		workdir, err := output.WorkspaceInit(workspaceRoot, tgt.Domain)
-		if err != nil {
-			// Fallback when the root is empty — use ./workspaces relative to cwd.
-			workdir, err = output.WorkspaceInit("workspaces", tgt.Domain)
-			if err != nil {
-				return fmt.Errorf("workspace init: %w", err)
-			}
-		}
-		tgt.WorkDir = workdir
-		sched = scheduler.NewScheduler(cfg.Concurrency.MaxJobs, cfg.Concurrency.HeartbeatSeconds, nil, logger)
-		app, err = appctx.Boot(ctx, logger, cfg, tgt, sched, appctx.BootOptions{})
-		if err != nil {
-			logger.Error("appctx_boot_failed", "err", err)
-			return err
-		}
-		// Wire the scheduler back to the Boot-constructed Checkpoint.
-		sched.Checkpoint = app.Checkpoint
-		// STEP 9b: scheduler.RunTask closure — closes the appctx ↔ scheduler ↔ task
-		// triple cycle. Per Plan 05 SUMMARY "Cycle-break #2".
-		sched.RunTask = func(ctx context.Context, t task.Task) (task.Result, error) {
-			return t.Run(ctx, app)
-		}
-	}
-
+	// main.run used to construct a Scheduler and Boot an AppContext here whenever
+	// argv contained --target. Every subcommand that runs a pipeline boots again
+	// through handlers.BootReconApp, which owns the scheduler/checkpoint wiring,
+	// so the early block was a duplicate with three concrete costs:
+	//
+	//  1. Two handles on one checkpoints.db from a single process. SQLite in WAL
+	//     mode with a busy timeout does not make two writers safe; interleaved
+	//     task state corrupts resume decisions.
+	//  2. A workspace tree created for commands that need none. `--target x
+	//     version` or a mistyped subcommand still produced a directory.
+	//  3. Two roots that could disagree. This block read a hand-rolled argv scan
+	//     that recognised `--output`/`-o`/`--output=` but not every short form
+	//     (`-o=path`), while the subcommand read cobra's parse — so a workspace
+	//     could appear under the configured root as well as the one the operator
+	//     named.
+	//
+	// Consequently newRootCmd receives a nil *appctx.AppContext. The only consumer
+	// is health-check, which is routinely invoked without --target and already
+	// treats a nil app as "no target booted" (cmd/reconftw/healthcheck.go).
+	//
 	// STEP 10: cobra.ExecuteContext — dispatches subcommand.
 	// Phase 9 (D-08): rewrite v1 alias forms into v2 invocations before cobra
 	// parses. translateV1Args leaves the original flag in the slice so
 	// MarkDeprecated still emits its one-time warning (MODE-09).
 	translated := translateV1Args(os.Args[1:])
-	rootCmd := newRootCmd(app, cfg)
+	rootCmd := newRootCmd(nil, cfg)
 	rootCmd.SetArgs(translated)
 	return rootCmd.ExecuteContext(ctx)
 }
 
 // earlyFlagSet is the W14 pre-cobra extraction result.
+//
+// configPath and secretsPath are the load-bearing pair: config.Load must run
+// before cobra owns parsing, so those two paths have to be recovered from raw
+// argv. target, outputDir and dryRun are parsed but no longer drive anything in
+// run() — the pre-cobra boot they existed to correct is gone (F18), and cobra's
+// own parse is now the single source of truth for -o/--output, --target and
+// --dry-run. They are retained because this argv scanner is a shared helper
+// (config/notify/mcp/composite subcommands all call it) and because dropping
+// them would silently narrow a parser whose behaviour is pinned by tests.
 type earlyFlagSet struct {
 	configPath  string
 	secretsPath string
 	target      string
-	// outputDir mirrors the subcommand's -o/--output. The early boot below
-	// creates a workspace before cobra has parsed anything, so without this it
-	// used cfg.Paths.DataDir and created a SECOND, unwanted tree: `recon
-	// --target x -o ./wanted` produced both ./wanted/x and ./workspaces/x.
+	// outputDir mirrors the subcommand's -o/--output. Read by tests only; the
+	// early boot that consumed it (and could disagree with cobra about the root)
+	// no longer exists.
 	outputDir string
-	// dryRun mirrors --dry-run. A dry run must describe the plan and touch
-	// nothing; the early boot was creating a workspace and a SQLite checkpoint
-	// store before the dry-run branch was ever reached.
+	// dryRun mirrors --dry-run. Read by tests only. The dry-run guarantee is now
+	// enforced where it belongs — handlers gate on opts.DryRun before any
+	// mutation — rather than by teaching a pre-cobra boot to skip itself.
 	dryRun bool
 }
 
 // parseEarlyFlags scans args for ONLY --config FILE, --secrets FILE, and
 // --target FILE per W14. All other flags are owned by cobra and parsed inside
-// Execute(). --target is included because Phase 3 main() Boots an AppContext
-// before cobra dispatch when a target is supplied (so kernel-demo + run can use it).
+// Execute().
 //
 // Accepts both `--flag PATH` and `--flag=PATH` forms. Unknown flags are silently
 // ignored — cobra will parse them.
