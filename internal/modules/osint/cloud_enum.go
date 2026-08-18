@@ -112,12 +112,25 @@ func (t *CloudEnumTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 
 	// Step 3: Stream (XCUT-09 heartbeat). Bucket findings surface on stdout.
 	var bucketLines []string
+	// termErr latches a TERMINAL stream error — cloud_enum RAN and ended badly.
+	var termErr error
+	// cloudEnumRan records whether cloud_enum was actually DISPATCHED. An absent
+	// binary means this task observed nothing and must not clear a previous
+	// run's staging (F3 did-not-run — see writeOSINTStaging).
+	cloudEnumRan := false
 	if ev, sErr := app.Tools.Stream(ctx, "cloud_enum", args); sErr != nil {
 		if app.Log != nil {
 			app.Log.Debug("osint.cloud_enum: stream error (best_effort)", "err", sErr)
 		}
 	} else {
+		cloudEnumRan = true
+		// F6 (phase 15) accumulator shape: latch the TERMINAL error inside the
+		// loop and act on it after. `sErr` above is the DISPATCH error and keeps
+		// its untouched best-effort branch.
 		for e := range ev {
+			if e.Err != nil {
+				termErr = e.Err
+			}
 			if e.IsErr {
 				continue
 			}
@@ -126,6 +139,15 @@ func (t *CloudEnumTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 				continue
 			}
 			bucketLines = append(bucketLines, line)
+		}
+		// F6: cloud_enum exited non-zero, so the bucket list above covers only
+		// part of the keyword space. Return before the list is preserved and
+		// before the staging write: publishing a partial enumeration as this
+		// run's result would report a still-open bucket as closed, and clearing
+		// staging on a crashed scanner's word would delete a real exposure.
+		if termErr != nil {
+			return task.Result{Status: task.StatusErrored},
+				fmt.Errorf("osint.cloud_enum: cloud_enum stream ended badly: %w", termErr)
 		}
 	}
 
@@ -142,7 +164,14 @@ func (t *CloudEnumTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	records := parseCloudEnumLines(bucketLines)
 
 	// Step 6: write staging JSONL (multi-writer contract).
-	writeOSINTStaging(app, inputsDir, "findings.cloud_enum.jsonl", records)
+	// F3: a run that found no exposed bucket REMOVES the staging file, so a
+	// bucket that has since been locked down stops being republished as still
+	// world-readable.
+	if cloudEnumRan {
+		writeOSINTStaging(app, inputsDir, "findings.cloud_enum.jsonl", records)
+	} else if app.Log != nil {
+		app.Log.Debug("osint.cloud_enum: cloud_enum did not run — staging preserved (F3 did-not-run)")
+	}
 
 	if app.Log != nil {
 		app.Log.Info("osint.cloud_enum: completed", "buckets", len(records))

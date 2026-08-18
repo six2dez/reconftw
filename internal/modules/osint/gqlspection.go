@@ -92,8 +92,15 @@ func (t *GQLSpectionTask) Run(ctx context.Context, app *appctx.AppContext) (task
 	}
 
 	var records []OSINTFindingRecord
+	// gqlRan records whether AT LEAST ONE endpoint was actually probed, and
+	// cancelled records an interrupted loop. Neither an absent gqlspection nor a
+	// cancelled run observed the corpus, so neither may clear a previous run's
+	// staging (F3 did-not-run — see writeOSINTStaging).
+	gqlRan := false
+	cancelled := false
 	for i, ep := range urls {
 		if ctx.Err() != nil {
+			cancelled = true
 			break
 		}
 		// LITERAL v1 gqlspection arg vector (web.sh:1256): gqlspection -t <ep> -o <out>.
@@ -105,6 +112,7 @@ func (t *GQLSpectionTask) Run(ctx context.Context, app *appctx.AppContext) (task
 			}
 			continue
 		}
+		gqlRan = true
 		// Introspection succeeded if the tool produced a non-empty schema file or
 		// any stdout. The endpoint + a short marker are the OSINT finding.
 		if introspectionSucceeded(outFile, res.Stdout) {
@@ -119,7 +127,13 @@ func (t *GQLSpectionTask) Run(ctx context.Context, app *appctx.AppContext) (task
 	}
 
 	// Step 4: write staging JSONL (multi-writer contract).
-	writeOSINTStaging(app, inputsDir, "findings.gqlspection.jsonl", records)
+	// F3: a run in which no endpoint answered introspection REMOVES the staging
+	// file rather than republishing an endpoint that has since been locked down.
+	if gqlRan && !cancelled {
+		writeOSINTStaging(app, inputsDir, "findings.gqlspection.jsonl", records)
+	} else if app.Log != nil {
+		app.Log.Debug("osint.gqlspection: gqlspection did not probe the endpoints — staging preserved (F3 did-not-run)")
+	}
 
 	if app.Log != nil {
 		app.Log.Info("osint.gqlspection: completed", "findings", len(records), "endpoints", len(urls))

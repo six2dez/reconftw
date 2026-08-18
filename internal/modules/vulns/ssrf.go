@@ -60,7 +60,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -74,7 +73,6 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -216,13 +214,29 @@ func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	}
 
 	var findings []VulnFindingRecord
+	// ffufRan records whether AT LEAST ONE probe was actually dispatched. If ffuf
+	// is absent every probe fails, the task observed nothing, and it must not
+	// clear a previous run's staging (F3 did-not-run — staging.go).
+	ffufRan := false
 
 	// Step 6: ffuf classic probe — FUZZ position in URL (v1 vulns.sh:132).
 	//
 	// ffuf -v -H <header> -t <threads> -rate <rate>
 	//      -w tmp_ssrf.txt:FUZZ -u FUZZ -s
+	// F6 (phase 15): a TERMINAL ffuf failure means the probe ran and ended badly,
+	// so its result is partial — escalate and discard. A DISPATCH error (ffuf
+	// absent) keeps its best-effort path and just leaves ffufRan false. The
+	// interactsh lifecycle is unaffected: `defer cleanup()` was registered before
+	// any of these returns, so the process group is still SIGTERM-killed and
+	// reaped on the way out.
 	classicArgs := buildFFUFClassicArgs(tmpSSRFFile, header, threads, rateLimit)
-	classicFindings := runSSRFFFUF(taskCtx, app, classicArgs, "ssrf_classic")
+	classicFindings, classicErr := runSSRFFFUF(taskCtx, app, classicArgs, "ssrf_classic")
+	if isTerminalStreamError(classicErr) {
+		return task.Result{Status: task.StatusErrored}, classicErr
+	}
+	if classicErr == nil {
+		ffufRan = true
+	}
 	findings = append(findings, classicFindings...)
 
 	// Step 7: ffuf header-injection probe (v1 vulns.sh:136-140).
@@ -231,11 +245,23 @@ func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	if headersInjectFile != "" {
 		if _, statErr := os.Stat(headersInjectFile); statErr == nil {
 			headerInjArgs1 := buildFFUFHeaderInjArgs(tmpSSRFFile, headersInjectFile, header, collabToken, threads, rateLimit)
-			headerFindings1 := runSSRFFFUF(taskCtx, app, headerInjArgs1, "ssrf_header_inject_token")
+			headerFindings1, headerErr1 := runSSRFFFUF(taskCtx, app, headerInjArgs1, "ssrf_header_inject_token")
+			if isTerminalStreamError(headerErr1) {
+				return task.Result{Status: task.StatusErrored}, headerErr1
+			}
+			if headerErr1 == nil {
+				ffufRan = true
+			}
 			findings = append(findings, headerFindings1...)
 
 			headerInjArgs2 := buildFFUFHeaderInjArgs(tmpSSRFFile, headersInjectFile, header, collabURL, threads, rateLimit)
-			headerFindings2 := runSSRFFFUF(taskCtx, app, headerInjArgs2, "ssrf_header_inject_url")
+			headerFindings2, headerErr2 := runSSRFFFUF(taskCtx, app, headerInjArgs2, "ssrf_header_inject_url")
+			if isTerminalStreamError(headerErr2) {
+				return task.Result{Status: task.StatusErrored}, headerErr2
+			}
+			if headerErr2 == nil {
+				ffufRan = true
+			}
 			findings = append(findings, headerFindings2...)
 		}
 	}
@@ -244,8 +270,14 @@ func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	// Only runs if ssrf_payloads.txt exists (config/ssrf_payloads.txt).
 	ssrfPayloadsFile := resolveSSRFPayloadsFile(cfg)
 	if ssrfPayloadsFile != "" {
-		altFindings := runSSRFAltProtocols(taskCtx, app, ssrfPayloadsFile, allURLs,
+		altFindings, altErr := runSSRFAltProtocols(taskCtx, app, ssrfPayloadsFile, allURLs,
 			collabToken, collabURL, header, threads, rateLimit, inputsDir, cfg.Vulns.SSRF.AltMatchRegex)
+		if isTerminalStreamError(altErr) {
+			return task.Result{Status: task.StatusErrored}, altErr
+		}
+		if altErr == nil {
+			ffufRan = true
+		}
 		findings = append(findings, altFindings...)
 	}
 
@@ -264,23 +296,15 @@ func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	}
 
 	// Step 11: Write inputs/findings.ssrf.jsonl.
-	if len(findings) > 0 {
-		var lines [][]byte
-		for _, rec := range findings {
-			b, mErr := json.Marshal(rec)
-			if mErr != nil {
-				continue
-			}
-			lines = append(lines, b)
-		}
-		if len(lines) > 0 {
-			stagingPath := filepath.Join(inputsDir, "findings.ssrf.jsonl")
-			if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-				app.Log.Debug("vulns.ssrf: staging write failed",
-					"path", stagingPath, "err", wErr)
-			}
-		}
-	}
+	//
+	// F3 (phase 15): staged through stageVulnFindings so a run in which no probe
+	// triggered a callback REMOVES the previous run's staging instead of
+	// republishing an SSRF that has since been fixed.
+	//
+	// NOTE inputs/tmp_ssrf.txt and inputs/tmp_ssrf_protocols.txt are ffuf
+	// TOOL-INPUT wordlists, not staging, and keep their raw writes.
+	stagingPath := filepath.Join(inputsDir, "findings.ssrf.jsonl")
+	stageVulnFindings(app, "vulns.ssrf", stagingPath, ffufRan, findings)
 
 	// XCUT-07: log only count, never raw SSRF payload, callback URLs, or collab ID.
 	if app.Log != nil {
@@ -567,23 +591,34 @@ func buildFFUFHeaderInjArgs(tmpSSRFFile, headersInjectFile, header, collabValue 
 
 // runSSRFFFUF runs ffuf with the given args and parses matching lines as
 // VulnFindingRecord instances. Uses app.Tools.Stream for XCUT-09 heartbeat.
-// Returns empty slice on stream error (best_effort, D-V7).
-func runSSRFFFUF(ctx context.Context, app *appctx.AppContext, args []string, label string) []VulnFindingRecord {
+//
+// The error return distinguishes the two ffuf failure channels. A DISPATCH
+// error (ffuf absent) is returned bare and means this probe never ran — the
+// caller must not count it as an observation (F3 did-not-run — staging.go).
+func runSSRFFFUF(ctx context.Context, app *appctx.AppContext, args []string, label string) ([]VulnFindingRecord, error) {
 	const toolName = "ffuf"
 	eventCh, streamErr := app.Tools.Stream(ctx, toolName, args)
 	if streamErr != nil {
+		// DISPATCH failure — ffuf is not on PATH; this probe never ran.
 		if app.Log != nil {
 			app.Log.Debug("vulns.ssrf: ffuf stream error (best_effort)",
 				"label", label, "err", streamErr)
 		}
-		return nil
+		return nil, fmt.Errorf("vulns.ssrf: ffuf stream %s: %w", label, streamErr)
 	}
 
 	// Drain stream — Backend contract requires full drain.
 	// XCUT-07: ffuf -v output may contain SSRF trigger URLs with collab IDs.
 	// NEVER log raw lines at Info/Warn.
+	//
+	// F6 (phase 15) accumulator shape: latch the TERMINAL error inside the loop
+	// and check it after.
 	var matchedHosts []string
+	var termErr error
 	for ev := range eventCh {
+		if ev.Err != nil {
+			termErr = ev.Err
+		}
 		line := string(ev.Line)
 		// ffuf -v output includes "| URL |" entries for matched responses.
 		// -s (silent) suppresses the banner but not match lines.
@@ -599,8 +634,14 @@ func runSSRFFFUF(ctx context.Context, app *appctx.AppContext, args []string, lab
 		}
 	}
 
+	// F6: ffuf ended badly, so this probe covered only part of its wordlist.
+	// Report it rather than let a partial probe read as "no SSRF".
+	if termErr != nil {
+		return nil, terminalStreamError(toolName, termErr)
+	}
+
 	if len(matchedHosts) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	var records []VulnFindingRecord
@@ -616,7 +657,7 @@ func runSSRFFFUF(ctx context.Context, app *appctx.AppContext, args []string, lab
 			Engine:          "ffuf",
 		})
 	}
-	return records
+	return records, nil
 }
 
 // runSSRFAltProtocols runs the alternate-protocol SSRF probe (gopher/dict/file/
@@ -638,11 +679,11 @@ func runSSRFAltProtocols(
 	threads, rateLimit int,
 	inputsDir string,
 	altMatchRegex string,
-) []VulnFindingRecord {
+) ([]VulnFindingRecord, error) {
 	// Read payload file.
 	payloadData, err := os.ReadFile(ssrfPayloadsFile) //nolint:gosec // trusted config path
 	if err != nil || len(bytes.TrimSpace(payloadData)) == 0 {
-		return nil
+		return nil, fmt.Errorf("vulns.ssrf: no alt-protocol payloads to probe")
 	}
 
 	// Default alt-match regex (v1 vulns.sh:156 default).
@@ -671,7 +712,7 @@ func runSSRFAltProtocols(
 	}
 
 	if len(altURLs) == 0 {
-		return nil
+		return nil, fmt.Errorf("vulns.ssrf: no alt-protocol candidates generated")
 	}
 
 	// Write inputs/tmp_ssrf_protocols.txt.
@@ -681,7 +722,7 @@ func runSSRFAltProtocols(
 		if app.Log != nil {
 			app.Log.Debug("vulns.ssrf: write tmp_ssrf_protocols.txt failed (best_effort)", "err", wErr)
 		}
-		return nil
+		return nil, fmt.Errorf("vulns.ssrf: write tmp_ssrf_protocols.txt: %w", wErr)
 	}
 
 	// ffuf alt-protocol probe with -mr (v1 vulns.sh:154-158).

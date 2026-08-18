@@ -48,7 +48,6 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -141,6 +140,10 @@ func (t *SmugglingTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	// Backend.Run collects full stdout; use for smugglex which may produce
 	// structured JSON output after finishing all hosts.
 	res, runErr := app.Tools.Run(ctx, toolName, args)
+	// smugglexRan records whether smugglex was actually DISPATCHED. A dispatch
+	// failure means the binary is absent: the task observed nothing and must not
+	// clear a previous run's staging (F3 did-not-run — staging.go).
+	smugglexRan := runErr == nil
 	if runErr != nil {
 		// Non-fatal per best_effort policy — smugglex may not be installed.
 		if app.Log != nil {
@@ -164,23 +167,16 @@ func (t *SmugglingTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	}
 
 	// Step 6: Write inputs/findings.smuggling.jsonl.
-	if len(findings) > 0 {
-		var lines [][]byte
-		for _, rec := range findings {
-			b, mErr := json.Marshal(rec)
-			if mErr != nil {
-				continue
-			}
-			lines = append(lines, b)
-		}
-		if len(lines) > 0 {
-			stagingPath := filepath.Join(inputsDir, "findings.smuggling.jsonl")
-			if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-				app.Log.Debug("vulns.smuggling: staging write failed",
-					"path", stagingPath, "err", wErr)
-			}
-		}
-	}
+	//
+	// F3 (phase 15): staged through stageVulnFindings so a run that detected no
+	// desync REMOVES the previous run's staging instead of republishing a
+	// smuggling vector that has since been closed.
+	//
+	// NOTE inputs/smuggling_hosts.txt is a TOOL-INPUT list and
+	// inputs/smuggling_raw.txt is smugglex's own output that this task parses —
+	// neither is staging and both keep their existing handling.
+	stagingPath := filepath.Join(inputsDir, "findings.smuggling.jsonl")
+	stageVulnFindings(app, "vulns.smuggling", stagingPath, smugglexRan, findings)
 
 	// XCUT-07: log only count, never raw smuggling payloads or PoC HTTP requests.
 	if app.Log != nil {

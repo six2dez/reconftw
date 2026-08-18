@@ -37,7 +37,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -48,7 +47,6 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -245,23 +243,13 @@ func (t *XSSTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	}
 
 	// Step 7: Write inputs/findings.xss.jsonl.
-	if len(records) > 0 {
-		var lines [][]byte
-		for _, rec := range records {
-			b, mErr := json.Marshal(rec)
-			if mErr != nil {
-				continue
-			}
-			lines = append(lines, b)
-		}
-		if len(lines) > 0 {
-			stagingPath := filepath.Join(inputsDir, "findings.xss.jsonl")
-			if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-				app.Log.Debug("vulns.xss: staging write failed",
-					"path", stagingPath, "err", wErr)
-			}
-		}
-	}
+	//
+	// F3 (phase 15): staged UNCONDITIONALLY. dalfox RAN — an absent binary
+	// returned StatusSkipped at the exec.LookPath gate above and a failed
+	// cmd.Start returned StatusErrored, so reaching here means the scan
+	// completed and zero PoC lines is a real observation.
+	stagingPath := filepath.Join(inputsDir, "findings.xss.jsonl")
+	stageVulnFindings(app, "vulns.xss", stagingPath, true, records)
 
 	if app.Log != nil {
 		app.Log.Info("vulns.xss: completed", "findings", len(records))

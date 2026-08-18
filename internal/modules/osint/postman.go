@@ -115,11 +115,16 @@ func (t *PostmanTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 	// raw secrets — it is parsed for non-secret locators with L2 registration,
 	// NEVER logged.
 	ppArgs := []string{"-s", root, "-l", "25", "--dump"}
+	// engineRan records whether EITHER engine was actually dispatched. If neither
+	// is installed the task observed nothing and must not clear a previous run's
+	// staging (F3 did-not-run — see writeOSINTStaging).
+	engineRan := false
 	if res, err := app.Tools.Run(ctx, "porch-pirate", ppArgs); err != nil {
 		if app.Log != nil {
 			app.Log.Debug("osint.postman: porch-pirate run failed (best_effort)", "err", err)
 		}
 	} else {
+		engineRan = true
 		records = append(records, parsePorchPirateOutput(res.Stdout, logger)...)
 	}
 
@@ -137,12 +142,20 @@ func (t *PostmanTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 		if app.Log != nil {
 			app.Log.Debug("osint.postman: postleaksNg run failed (best_effort)", "err", err)
 		}
+	} else {
+		engineRan = true
 	}
 	// Parse postleaksNg per-result JSON files (best_effort — dir may be empty).
 	records = append(records, parsePostleaksDir(postleaksOut, logger)...)
 
 	// Step 4: write staging JSONL — every record is already REDACTED.
-	writeOSINTStaging(app, inputsDir, "findings.postman.jsonl", records)
+	// F3: a run that found no Postman leak REMOVES the staging file, so a
+	// collection that has since been made private stops being republished.
+	if engineRan {
+		writeOSINTStaging(app, inputsDir, "findings.postman.jsonl", records)
+	} else if app.Log != nil {
+		app.Log.Debug("osint.postman: no engine ran — staging preserved (F3 did-not-run)")
+	}
 
 	// XCUT-07: log ONLY the count, never the raw matches.
 	if app.Log != nil {

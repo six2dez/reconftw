@@ -97,6 +97,24 @@ type VulnFindingRecord struct {
 	Host string `json:"host,omitempty"`
 	URL  string `json:"url,omitempty"`
 
+	// Hostnames carries EVERY hostname known to resolve to an IP-addressed
+	// finding, in first-seen order (F20, audit bullet 3). It is populated by
+	// vulns.spray, whose hits identify a service by IP because brutespray and
+	// brutus both read the nmap .gnmap.
+	//
+	// A shared-hosting address or a CDN edge has many unrelated names. Host
+	// alone cannot express that, and picking one of them files a successful
+	// credential spray against a domain that may not own the service. Host is
+	// therefore only set to a hostname when EXACTLY ONE resolves to the address;
+	// otherwise it stays the IP literal and this field carries the full relation
+	// for review.
+	//
+	// omitempty keeps every other producer's record byte-identical, so nothing
+	// downstream sees a shape change. internal/core/ingest reads findings with
+	// plain encoding/json and does not set DisallowUnknownFields, so an older
+	// reader ignores the field rather than failing.
+	Hostnames []string `json:"hostnames,omitempty"`
+
 	// Phase 4/5 inherited SARIF-compatible fields.
 	Severity   string   `json:"severity,omitempty"`
 	Confidence string   `json:"confidence,omitempty"`
@@ -248,11 +266,22 @@ func (t *GFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, 
 		}
 
 		// Write matched URLs to the bucket file.
+		//
+		// F3 (phase 15, hand-verified — inputs/gf/<class>.txt is a SUBDIRECTORY
+		// path no merger glob can reach, so the staging-contract detector is
+		// structurally blind to it): every class must be rewritten on every run,
+		// or a stale bucket silently redirects sqli, xss, lfi and ssrf at last
+		// run's targets. The tool-failure and zero-match paths above both write
+		// an EMPTY bucket; this was the ONE path that left the previous run's
+		// bucket in place — writeURLList opens with O_TRUNC, so a failure here
+		// leaves either a stale file (open failed) or a half-written one (write
+		// failed), and both are worse than an empty bucket. Truncate it.
 		if writeErr := writeURLList(bucketFile, matched); writeErr != nil {
 			if app.Log != nil {
 				app.Log.Debug("vulns.gf: failed to write bucket file (best_effort)",
 					"class", class, "bucket", bucketFile, "err", writeErr)
 			}
+			_ = os.WriteFile(bucketFile, nil, 0o644) //nolint:gosec
 			continue
 		}
 

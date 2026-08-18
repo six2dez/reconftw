@@ -93,8 +93,15 @@ func (t *CMSeeKTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	}
 
 	var records []OSINTFindingRecord
+	// cmseekRan records whether AT LEAST ONE host was actually scanned, and
+	// cancelled records an interrupted loop. Neither an absent CMSeeK nor a
+	// cancelled run observed the corpus, so neither may clear a previous run's
+	// staging (F3 did-not-run — see writeOSINTStaging).
+	cmseekRan := false
+	cancelled := false
 	for _, host := range hosts {
 		if ctx.Err() != nil {
+			cancelled = true
 			break
 		}
 		// v1 CMSeeK arg vector (web.sh:1784): cmseek.py -u <host> --batch -r.
@@ -106,6 +113,7 @@ func (t *CMSeeKTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 			}
 			continue
 		}
+		cmseekRan = true
 		if cms := parseCMSeeKOutput(res.Stdout); cms != "" {
 			records = append(records, OSINTFindingRecord{
 				Severity:    "informational",
@@ -118,7 +126,13 @@ func (t *CMSeeKTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	}
 
 	// Step 4: write staging JSONL (multi-writer contract).
-	writeOSINTStaging(app, inputsDir, "findings.cmseek.jsonl", records)
+	// F3: a run that fingerprinted no CMS REMOVES the staging file rather than
+	// republishing a CMS the target has since migrated away from.
+	if cmseekRan && !cancelled {
+		writeOSINTStaging(app, inputsDir, "findings.cmseek.jsonl", records)
+	} else if app.Log != nil {
+		app.Log.Debug("osint.cmseek: CMSeeK did not scan the host list — staging preserved (F3 did-not-run)")
+	}
 
 	if app.Log != nil {
 		app.Log.Info("osint.cmseek: completed", "findings", len(records), "hosts_scanned", len(hosts))

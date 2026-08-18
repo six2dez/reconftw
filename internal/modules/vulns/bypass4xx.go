@@ -46,7 +46,6 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -164,23 +163,14 @@ func (t *Bypass4xxTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	findings := parseBypass4xxOutput(outBuf.Bytes())
 
 	// Step 7: Write inputs/findings.bypass4xx.jsonl (staging contract — doc.go).
-	if len(findings) > 0 {
-		var lines [][]byte
-		for _, rec := range findings {
-			b, mErr := json.Marshal(rec)
-			if mErr != nil {
-				continue
-			}
-			lines = append(lines, b)
-		}
-		if len(lines) > 0 {
-			stagingPath := filepath.Join(inputsDir, "findings.bypass4xx.jsonl")
-			if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-				app.Log.Debug("vulns.bypass4xx: staging write failed",
-					"path", stagingPath, "err", wErr)
-			}
-		}
-	}
+	//
+	// F3 (phase 15): staged UNCONDITIONALLY. nomore403 RAN — its binary was
+	// confirmed by os.Stat above and cmd.Run reached completion (a non-zero exit
+	// is nomore403's normal "no bypasses" signal), so zero findings is a real
+	// observation and stageVulnFindings removes the previous run's staging file
+	// rather than leaving a bypass that no longer exists to be republished.
+	stagingPath := filepath.Join(inputsDir, "findings.bypass4xx.jsonl")
+	stageVulnFindings(app, "vulns.bypass4xx", stagingPath, true, findings)
 
 	if app.Log != nil {
 		app.Log.Info("vulns.bypass4xx: completed",

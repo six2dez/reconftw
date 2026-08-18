@@ -17,6 +17,7 @@ package vulns
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -28,6 +29,7 @@ import (
 	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
 	"github.com/six2dez/reconftw/internal/core/log"
+	"github.com/six2dez/reconftw/internal/core/output"
 )
 
 // -------------------------------------------------------------------------
@@ -606,4 +608,226 @@ func argValue(args []string, flag string) string {
 		}
 	}
 	return ""
+}
+
+// -------------------------------------------------------------------------
+// F20 bullet 3 — shared-IP attribution (plan 15-14 Task 3)
+// -------------------------------------------------------------------------
+
+// TestSprayHostsByIPKeepsEveryHostname is the core of the F20 fix. Three
+// unrelated names share 10.0.0.5, as they do on any shared-hosting address or
+// CDN edge. The old index kept the FIRST one and discarded the rest, so a
+// successful credential spray was filed against whichever name happened to be
+// written to hosts.jsonl first.
+func TestSprayHostsByIPKeepsEveryHostname(t *testing.T) {
+	app := newSprayIndexApp(t,
+		`{"host":"a.example.com","ip":"10.0.0.5"}`,
+		`{"host":"b.example.com","ip":"10.0.0.5"}`,
+		`{"host":"c.example.com","ip":"10.0.0.5"}`,
+		// A duplicate must not appear twice.
+		`{"host":"b.example.com","ip":"10.0.0.5"}`,
+		`{"host":"solo.example.com","ip":"10.0.0.9"}`,
+	)
+
+	index := sprayHostsByIP(app)
+	got := index["10.0.0.5"]
+	want := []string{"a.example.com", "b.example.com", "c.example.com"}
+	if len(got) != len(want) {
+		t.Fatalf("10.0.0.5 → %v, want all three names in first-seen order (%v)", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("10.0.0.5 → %v, want first-seen order %v", got, want)
+		}
+	}
+	if solo := index["10.0.0.9"]; len(solo) != 1 || solo[0] != "solo.example.com" {
+		t.Fatalf("10.0.0.9 → %v, want exactly [solo.example.com]", solo)
+	}
+}
+
+// TestSprayAmbiguousIPKeepsIPLocatorAndListsEveryHost is F20's behavioural
+// assertion: with several names on the address the finding must NOT be
+// attributed to any one of them. Filing a confirmed credential spray against
+// the wrong domain sends a disclosure to a party with no relationship to the
+// service.
+func TestSprayAmbiguousIPKeepsIPLocatorAndListsEveryHost(t *testing.T) {
+	app := newSprayIndexApp(t,
+		`{"host":"a.example.com","ip":"10.0.0.5"}`,
+		`{"host":"b.example.com","ip":"10.0.0.5"}`,
+		`{"host":"c.example.com","ip":"10.0.0.5"}`,
+	)
+
+	got := sprayResolveScopeHosts(app, []VulnFindingRecord{
+		{Host: "10.0.0.5", VulnClass: "credential-spray", Engine: "brutespray"},
+	})
+
+	if got[0].Host != "10.0.0.5" {
+		t.Fatalf("Host = %q — a shared IP was attributed to ONE arbitrary hostname; the "+
+			"spray result only supports the claim that the service lives at 10.0.0.5",
+			got[0].Host)
+	}
+	want := []string{"a.example.com", "b.example.com", "c.example.com"}
+	if len(got[0].Hostnames) != len(want) {
+		t.Fatalf("Hostnames = %v, want all three candidates %v", got[0].Hostnames, want)
+	}
+	for i := range want {
+		if got[0].Hostnames[i] != want[i] {
+			t.Fatalf("Hostnames = %v, want first-seen order %v", got[0].Hostnames, want)
+		}
+	}
+}
+
+// TestSprayUnambiguousIPAdoptsTheSingleHostname documents the chosen
+// single-hostname convention: exactly one name resolving to the address is not
+// a guess, so Host BECOMES that hostname and Hostnames carries it as its single
+// entry. This is also what keeps the finding in scope under a domain-only scope,
+// which is why the original (over-broad) rewrite existed at all.
+func TestSprayUnambiguousIPAdoptsTheSingleHostname(t *testing.T) {
+	app := newSprayIndexApp(t, `{"host":"ssh.example.com","ip":"10.0.0.5"}`)
+
+	got := sprayResolveScopeHosts(app, []VulnFindingRecord{
+		{Host: "10.0.0.5", VulnClass: "credential-spray", Engine: "brutespray"},
+	})
+	if got[0].Host != "ssh.example.com" {
+		t.Fatalf("Host = %q, want ssh.example.com — a single resolving name is unambiguous",
+			got[0].Host)
+	}
+	if len(got[0].Hostnames) != 1 || got[0].Hostnames[0] != "ssh.example.com" {
+		t.Fatalf("Hostnames = %v, want exactly [ssh.example.com]", got[0].Hostnames)
+	}
+}
+
+// TestSprayUnmappableIPKeepsIPLocator — an address with no known name keeps the
+// IP. Correct, not a fallback: under an IP or CIDR target scope the IP is
+// exactly the right locator.
+func TestSprayUnmappableIPKeepsIPLocator(t *testing.T) {
+	app := newSprayIndexApp(t, `{"host":"ssh.example.com","ip":"10.0.0.5"}`)
+
+	got := sprayResolveScopeHosts(app, []VulnFindingRecord{
+		{Host: "192.0.2.9", VulnClass: "credential-spray"},
+	})
+	if got[0].Host != "192.0.2.9" {
+		t.Fatalf("Host = %q, want the IP left alone", got[0].Host)
+	}
+	if len(got[0].Hostnames) != 0 {
+		t.Fatalf("Hostnames = %v, want empty for an unmappable IP", got[0].Hostnames)
+	}
+}
+
+// TestSprayIPLiteralSurvivesScopeGate is T-15-14-03. Keeping the IP as the
+// locator is only correct if an IP-literal finding is actually ADMITTED for an
+// in-scope address. Dropping credential-spray results at the scope boundary is
+// the exact class of silent finding loss an earlier audit fixed, and
+// reintroducing it here would be worse than the misattribution being repaired.
+//
+// The assertion is on a NON-ZERO kept count, not merely on the absence of an
+// error.
+func TestSprayIPLiteralSurvivesScopeGate(t *testing.T) {
+	workDir := t.TempDir()
+	// An operator scoped to the CIDR — the case where an IP locator is right.
+	tree, err := output.NewTree(workDir, &output.DefaultScopeFilter{
+		Patterns: []string{"10.0.0.0/24"},
+	})
+	if err != nil {
+		t.Fatalf("output.NewTree: %v", err)
+	}
+
+	rec := VulnFindingRecord{
+		Host:            "10.0.0.5",
+		Hostnames:       []string{"a.example.com", "b.example.com"},
+		Severity:        "critical",
+		VulnClass:       "credential-spray",
+		PayloadRedacted: "***",
+		PoCRedacted:     "***",
+		Engine:          "brutespray",
+	}
+	line, err := json.Marshal(rec)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	kept, dropped := output.FilterInScope(tree, "findings", [][]byte{line})
+	if len(kept) == 0 {
+		t.Fatalf("an IP-literal credential-spray finding was DROPPED at the scope gate "+
+			"(dropped=%d) for an in-scope address — the highest-severity result the "+
+			"pipeline can produce would vanish silently", dropped)
+	}
+}
+
+// TestSprayAttributionKeepsCredentialRedacted — the F20 rewrite must not touch
+// XCUT-07. No raw credential may appear in the record or in any log line
+// produced while resolving attribution.
+func TestSprayAttributionKeepsCredentialRedacted(t *testing.T) {
+	const rawPassword = "Sup3rS3cret!"
+
+	var logBuf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+	app := newSprayIndexApp(t,
+		`{"host":"a.example.com","ip":"10.0.0.5"}`,
+		`{"host":"b.example.com","ip":"10.0.0.5"}`,
+	)
+	app.Log = logger
+
+	findings := parseBrutesprayHits([]byte(
+		"[+] ssh - 10.0.0.5:22 - Login Successful - admin:" + rawPassword + "\n"))
+	if len(findings) == 0 {
+		t.Fatalf("fixture produced no spray finding — the parser changed shape")
+	}
+	got := sprayResolveScopeHosts(app, findings)
+
+	body, err := json.Marshal(got)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if bytes.Contains(body, []byte(rawPassword)) {
+		t.Fatalf("XCUT-07 VIOLATION: the raw credential reached the finding record:\n%s", body)
+	}
+	if !bytes.Contains(body, []byte("***")) {
+		t.Fatalf("the finding must carry the *** redaction marker:\n%s", body)
+	}
+	if strings.Contains(logBuf.String(), rawPassword) {
+		t.Fatalf("XCUT-07 VIOLATION: the raw credential reached a log line:\n%s", logBuf.String())
+	}
+}
+
+// TestSprayDeterminismCommentIsGone pins the removal of the comment that
+// documented the F20 defect while presenting it as a feature ("the first host
+// seen for an IP wins, keeping the result deterministic for shared IPs").
+// Determinism is not correctness; a comment asserting otherwise is how the
+// defect survived review.
+func TestSprayDeterminismCommentIsGone(t *testing.T) {
+	src, err := os.ReadFile("spray.go")
+	if err != nil {
+		t.Fatalf("read spray.go: %v", err)
+	}
+	body := string(src)
+	if strings.Contains(body, "first host seen for an IP wins") {
+		t.Errorf("spray.go still claims the first host seen for an IP wins — that comment " +
+			"describes the F20 defect as if it were the design")
+	}
+	if strings.Contains(body, "mapped the service IP back to its in-scope host") {
+		t.Errorf("spray.go still logs a claim the spray result does not support")
+	}
+	if !strings.Contains(body, "func sprayHostsByIP(app *appctx.AppContext) map[string][]string") {
+		t.Errorf("sprayHostsByIP must return map[string][]string — one hostname per IP " +
+			"cannot express a shared address")
+	}
+}
+
+// newSprayIndexApp writes artefacts/hosts.jsonl with the given raw JSONL lines.
+func newSprayIndexApp(t *testing.T, lines ...string) *appctx.AppContext {
+	t.Helper()
+	workDir := t.TempDir()
+	dir := filepath.Join(workDir, "artefacts")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("mkdir artefacts: %v", err)
+	}
+	body := strings.Join(lines, "\n") + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "hosts.jsonl"), []byte(body), 0o644); err != nil {
+		t.Fatalf("write hosts.jsonl: %v", err)
+	}
+	return &appctx.AppContext{
+		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir},
+	}
 }

@@ -29,7 +29,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -38,7 +37,6 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -151,8 +149,14 @@ func (t *CMDITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	}
 
 	var confirmedCount int
+	// termErr latches a TERMINAL stream error — commix RAN and ended badly.
+	var termErr error
 
 	eventCh, streamErr := app.Tools.Stream(ctx, toolName, args)
+	// commixRan records whether commix was actually DISPATCHED. A dispatch
+	// failure means the binary is absent, so the task observed nothing and must
+	// not clear a previous run's staging (F3 did-not-run — staging.go).
+	commixRan := streamErr == nil
 	if streamErr != nil {
 		// Non-fatal per best_effort policy — commix may not be installed.
 		if app.Log != nil {
@@ -162,7 +166,14 @@ func (t *CMDITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 		// Step 5: Drain event channel; detect injection confirmation lines.
 		// XCUT-07 / T-06-03-02: commix stdout may contain shell output from target.
 		// NEVER log raw lines at Info/Warn. Only count at Debug.
+		//
+		// F6 (phase 15) accumulator shape: latch the TERMINAL error inside the
+		// loop and act on it after. `streamErr` is already taken by the DISPATCH
+		// error above, whose log-and-continue body is untouched.
 		for ev := range eventCh {
+			if ev.Err != nil {
+				termErr = ev.Err
+			}
 			line := strings.TrimSpace(string(ev.Line))
 			if line == "" {
 				continue
@@ -180,6 +191,15 @@ func (t *CMDITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 					app.Log.Debug("vulns.cmdi: commix injection confirmed", "count", confirmedCount)
 				}
 			}
+		}
+		// F6: a commix that exited non-zero produced partial confirmations and
+		// may have left a partial (or a PREVIOUS run's) output directory. Neither
+		// the stdout count nor the directory scan below can be trusted, so return
+		// before either is used — and before the staging write, which leaves the
+		// previous run's file intact rather than clearing it on the word of a
+		// crashed scanner.
+		if termErr != nil {
+			return task.Result{Status: task.StatusErrored}, terminalStreamError(toolName, termErr)
 		}
 	}
 
@@ -226,23 +246,16 @@ func (t *CMDITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	}
 
 	// Step 6: Write inputs/findings.cmdi.jsonl.
-	if len(findings) > 0 {
-		var lines [][]byte
-		for _, rec := range findings {
-			b, mErr := json.Marshal(rec)
-			if mErr != nil {
-				continue
-			}
-			lines = append(lines, b)
-		}
-		if len(lines) > 0 {
-			stagingPath := filepath.Join(inputsDir, "findings.cmdi.jsonl")
-			if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-				app.Log.Debug("vulns.cmdi: staging write failed",
-					"path", stagingPath, "err", wErr)
-			}
-		}
-	}
+	//
+	// F3 (phase 15): staged through stageVulnFindings, which REMOVES the file
+	// when commix ran and confirmed nothing — otherwise an injection that has
+	// since been patched kept being republished by every later merge.
+	//
+	// NOTE the OTHER inputs/ write in this function — inputs/tmp_rce.txt above —
+	// is the -m TOOL-INPUT file handed to commix on argv. It is not staging, no
+	// merger globs it, and it keeps its raw unconditional os.WriteFile.
+	stagingPath := filepath.Join(inputsDir, "findings.cmdi.jsonl")
+	stageVulnFindings(app, "vulns.cmdi", stagingPath, commixRan, findings)
 
 	// XCUT-07: log only count, never raw RCE payloads or target shell output.
 	if app.Log != nil {

@@ -141,30 +141,17 @@ var txtStagingStages = map[string]bool{
 //
 // MUST REACH ZERO. NO NEW ENTRY MAY EVER BE ADDED.
 var stagingContractAllowlist = map[string][]string{
-	// web — 0 (all 16 migrated to output.StageJSONL by plan 15-13 Task 1)
-
-	// vulns — 15
-	"internal/modules/vulns/bypass4xx.go":    {"Run"},
-	"internal/modules/vulns/cmdi.go":         {"Run"},
-	"internal/modules/vulns/crlf.go":         {"Run"},
-	"internal/modules/vulns/fray.go":         {"Run"},
-	"internal/modules/vulns/fuzzparams.go":   {"Run"},
-	"internal/modules/vulns/lfi.go":          {"Run"},
-	"internal/modules/vulns/nuclei_dast.go":  {"Run"},
-	"internal/modules/vulns/second_order.go": {"Run"},
-	"internal/modules/vulns/smuggling.go":    {"Run"},
-	"internal/modules/vulns/spray.go":        {"sprayWriteFindings"},
-	"internal/modules/vulns/sqli.go":         {"Run"},
-	"internal/modules/vulns/ssrf.go":         {"Run"},
-	"internal/modules/vulns/ssti.go":         {"Run"},
-	"internal/modules/vulns/webcache.go":     {"Run"},
-	"internal/modules/vulns/xss.go":          {"Run"},
-
-	// subdomains — 0 (all 6 migrated to output.StageLines / StageJSONL by
-	// plan 15-13 Task 1)
-
-	// osint — 1 (the single staging writer for all 20 osint producer files)
-	"internal/modules/osint/domain_info.go": {"writeOSINTStaging"},
+	// EMPTY — THE RATCHET IS CLOSED. Every producer in internal/modules/ now
+	// stages through output.StageJSONL / output.StageLines.
+	//
+	//	web         0 — all 16 migrated by plan 15-13 Task 1
+	//	subdomains  0 — all  6 migrated by plan 15-13 Task 1
+	//	vulns       0 — all 15 migrated by plan 15-14 Task 1
+	//	osint       0 — the single writeOSINTStaging writer, which fronts 23 call
+	//	                sites across 20 files, migrated by plan 15-14 Task 1
+	//
+	// NO ENTRY MAY EVER BE ADDED BACK. If TestStagingContract fails on code you
+	// just wrote, migrate the write.
 }
 
 // stagingContractAllowlistSize is the FLATTENED entry count of
@@ -176,9 +163,9 @@ var stagingContractAllowlist = map[string][]string{
 //
 //	subdomains 6). Remaining: vulns 15 + osint 1.
 //
-// 15-14 drives it to 0 (vulns + osint migrated).
+// 15-14 drove it to 0 by removing all 16 remaining entries (vulns 15, osint 1).
 // 15-17 asserts 0.
-const stagingContractAllowlistSize = 16
+const stagingContractAllowlistSize = 0
 
 // derivedOutputExemptions maps file → function → the path literal whose write is
 // exempt. See the file header for the two-part justification test. NOT part of
@@ -1114,7 +1101,9 @@ func TestStagingContractToolInputWritesOutOfScope(t *testing.T) {
 		},
 		{
 			file: "internal/modules/vulns/sqli.go", toolInput: "tmp_sqli.txt",
-			staging: "findings.sqli.jsonl",
+			why: "its findings.sqli.jsonl staging was migrated to output.StageJSONL by plan 15-14; " +
+				"only the -m tool-input write remains, and sqli.go Run legitimately " +
+				"contains BOTH shapes",
 		},
 		{
 			file: "internal/modules/subdomains/csprecon.go", toolInput: "csprecon.hosts.txt",
@@ -1147,17 +1136,68 @@ func TestStagingContractToolInputWritesOutOfScope(t *testing.T) {
 	}
 }
 
+// TestStagingContractToolInputWritesStayRaw pins four named TOOL-INPUT writes at
+// the SOURCE level, in the opposite direction from the detector.
+//
+// Sixteen of the nineteen tool-input/scratch writes in vulns + osint share a
+// function with a genuine staging write, so the plan-15-14 sweep had to be
+// surgical: the staging call changes, the tool-input write does not. The
+// detector can only prove those writes were not REPORTED. This test proves they
+// were not MIGRATED — that nobody "finished the job" by routing a file handed to
+// an external binary through a remove-on-empty helper, which would delete
+// sqlmap's -m list, commix's -m list, dalfox's stdin corpus or gato's org list
+// out from under the tool on a zero-result run.
+func TestStagingContractToolInputWritesStayRaw(t *testing.T) {
+	cases := []struct {
+		file   string
+		target string // the tool-input path literal
+		tool   string // what consumes it
+	}{
+		{"internal/modules/vulns/sqli.go", "tmp_sqli.txt", "sqlmap -m"},
+		{"internal/modules/vulns/cmdi.go", "tmp_rce.txt", "commix -m"},
+		{"internal/modules/vulns/xss.go", "xss_reflected.txt", "dalfox pipe stdin"},
+		{"internal/modules/osint/github_actions.go", "gato_orgs.txt", "gato org list"},
+	}
+	for _, c := range cases {
+		// The detector reports repo-relative keys; this test runs with the
+		// package dir as cwd, so read through the same relative path.
+		onDisk := strings.TrimPrefix(c.file, "internal/modules/")
+		src, err := os.ReadFile(onDisk) //nolint:gosec // fixed in-repo path
+		if err != nil {
+			t.Fatalf("read %s: %v", c.file, err)
+		}
+		body := string(src)
+		if !strings.Contains(body, c.target) {
+			t.Errorf("%s no longer writes %s — the %s input list disappeared",
+				c.file, c.target, c.tool)
+			continue
+		}
+		// The literal must still be assembled for a RAW write. Every one of the
+		// four is written with os.WriteFile in the same function that assembles
+		// the path.
+		if !strings.Contains(body, "os.WriteFile(") {
+			t.Errorf("%s no longer contains a raw os.WriteFile — %s (%s) appears to have "+
+				"been routed through a staging helper, which would give a file passed to "+
+				"an external binary remove-on-empty semantics",
+				c.file, c.target, c.tool)
+		}
+	}
+}
+
 // TestStagingContractArgLiteralPropagation pins the live-tree witnesses for the
 // detector's argument-literal propagation — a staging write through a helper
 // that assembles the path from its own PARAMETERS rather than from a literal in
 // its own body. Without propagation the detector reports ZERO osint violations
 // and 20 unmigrated producers pass silently.
 //
-// osint/domain_info.go writeOSINTStaging is the remaining unmigrated witness and
-// must still be REPORTED (plan 15-14 migrates it).
-//
-// subdomains/takeover.go writeTakeoverStagingFile was the second witness; plan
-// 15-13 migrated it to output.StageJSONL, so it must now be ABSENT. It is
+// BOTH live-tree witnesses are now MIGRATED, so both are asserted in the ABSENT
+// direction: subdomains/takeover.go writeTakeoverStagingFile by plan 15-13 and
+// osint/domain_info.go writeOSINTStaging by plan 15-14. That means this test no
+// longer proves propagation still WORKS — a broken propagator would also report
+// nothing. It is not supposed to: the MECHANISM is pinned permanently by the
+// helperArgLiteralOK / helperArgLiteralBad fixtures asserted as an exact set by
+// TestStagingContractDetector, which is why those fixtures exist. What this test
+// pins is the live tree — that neither witness reverts to a raw write. It is
 // asserted in that direction rather than deleted, because it is also the only
 // producer whose staging is read by the FIFTH merger (mergeTakeoverFindings in
 // internal/mcp/handlers/common.go, which appears in no *StagingPrefixes slice) —
@@ -1176,23 +1216,15 @@ func TestStagingContractArgLiteralPropagation(t *testing.T) {
 		got[violationFile(v)+"\t"+violationFunc(v)] = true
 	}
 
-	wantReported := map[string]string{
-		"internal/modules/osint/domain_info.go": "writeOSINTStaging",
-	}
-	for file, fn := range wantReported {
-		if !got[file+"\t"+fn] {
-			t.Errorf("%s %s must be reported via argument-literal propagation — it is the "+
-				"parameter-derived staging writer for its package", file, fn)
-		}
-	}
-
 	wantMigrated := map[string]string{
 		"internal/modules/subdomains/takeover.go": "writeTakeoverStagingFile",
+		"internal/modules/osint/domain_info.go":   "writeOSINTStaging",
 	}
 	for file, fn := range wantMigrated {
 		if got[file+"\t"+fn] {
-			t.Errorf("%s %s was migrated to output.StageJSONL by plan 15-13 and must no longer "+
-				"be reported — a raw staging write has come back", file, fn)
+			t.Errorf("%s %s was migrated to output.StageJSONL (takeover by plan 15-13, "+
+				"writeOSINTStaging by plan 15-14) and must no longer be reported — a raw "+
+				"staging write has come back", file, fn)
 		}
 	}
 }

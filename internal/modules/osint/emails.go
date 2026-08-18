@@ -102,11 +102,16 @@ func (t *EmailsTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	// is best_effort and does NOT short-circuit the LeakSearch step below (bash
 	// runs LeakSearch in its own subshell regardless — osint.sh:552).
 	var emails []string
+	// harvesterRan records whether EmailHarvester was actually dispatched. An
+	// absent binary means this task observed nothing and must not clear a
+	// previous run's staging (F3 did-not-run — see writeOSINTStaging).
+	harvesterRan := false
 	if res, err := app.Tools.Run(ctx, "EmailHarvester", []string{"-d", root, "-e", "all", "-l", "20"}); err != nil {
 		if app.Log != nil {
 			app.Log.Debug("osint.emails: EmailHarvester run failed (best_effort)", "err", err)
 		}
 	} else {
+		harvesterRan = true
 		// Step 3: parse harvested emails (lines containing "@", v1 grep "@").
 		emails = parseHarvestedEmails(res.Stdout)
 	}
@@ -132,7 +137,13 @@ func (t *EmailsTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	}
 
 	// Step 5: write emails staging JSONL (multi-writer contract).
-	writeOSINTStaging(app, inputsDir, "findings.emails.jsonl", records)
+	// F3: a run that harvested no address REMOVES the staging file rather than
+	// republishing addresses that are no longer discoverable.
+	if harvesterRan {
+		writeOSINTStaging(app, inputsDir, "findings.emails.jsonl", records)
+	} else if app.Log != nil {
+		app.Log.Debug("osint.emails: EmailHarvester did not run — staging preserved (F3 did-not-run)")
+	}
 
 	// Step 6: LeakSearch password-leak search (v1 emails() osint.sh:552-561).
 	pwCount := t.runLeakSearch(ctx, app, root, inputsDir, osintDir)
@@ -175,16 +186,19 @@ func (t *EmailsTask) runLeakSearch(ctx context.Context, app *appctx.AppContext, 
 		return 0
 	}
 
+	// F3 (phase 15): these two paths used to `return 0` HERE, before the staging
+	// write below — the same run-isolation bug as an unconditional write, and
+	// invisible to any AST guard that looks for raw WRITES. LeakSearch RAN (an
+	// absent binary returned above), so no output file and an empty parse both
+	// mean "no leaked password this run" and must CLEAR the staging file. Leaving
+	// it kept reporting a credential that has since been rotated as still leaked.
 	data, err := os.ReadFile(pwTmp) //nolint:gosec // within WorkDir
-	if err != nil {
-		// No output file → LeakSearch found nothing / is not installed. best_effort.
-		if app.Log != nil {
-			app.Log.Debug("osint.emails: no LeakSearch passwords output (best_effort)", "err", err)
-		}
-		return 0
+	if err != nil && app.Log != nil {
+		app.Log.Debug("osint.emails: no LeakSearch passwords output (best_effort)", "err", err)
 	}
 	passwords := parseLeakSearchPasswords(data)
 	if len(passwords) == 0 {
+		writeOSINTStaging(app, inputsDir, "findings.passwords.jsonl", nil)
 		return 0
 	}
 

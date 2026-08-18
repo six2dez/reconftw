@@ -127,8 +127,15 @@ func (t *DomainInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 	}
 
 	// Step 3: dnsx per record type with -duc (D-O7).
+	// dnsxRan records whether AT LEAST ONE dnsx lookup was dispatched, and
+	// cancelled records an interrupted loop. Neither an absent dnsx nor a
+	// cancelled run observed the domain, so neither may clear a previous run's
+	// staging (F3 did-not-run — see writeOSINTStaging).
+	dnsxRan := false
+	cancelled := false
 	for _, rt := range dnsRecordTypes {
 		if ctx.Err() != nil {
+			cancelled = true
 			break
 		}
 		// v1 dnsx record lookup arg vector: dnsx -duc -silent -resp-only <type> -d <domain>
@@ -141,6 +148,7 @@ func (t *DomainInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 			}
 			continue
 		}
+		dnsxRan = true
 		for _, val := range splitNonEmptyLines(res.Stdout) {
 			records = append(records, OSINTFindingRecord{
 				Severity:    "informational",
@@ -156,7 +164,13 @@ func (t *DomainInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 	t.runScopify(ctx, app, root, osintDir)
 
 	// Step 5: write staging JSONL (multi-writer contract).
-	writeOSINTStaging(app, inputsDir, "findings.domain_info.jsonl", records)
+	// F3: a run that resolved no DNS record REMOVES the staging file rather than
+	// republishing records the zone no longer serves.
+	if dnsxRan && !cancelled {
+		writeOSINTStaging(app, inputsDir, "findings.domain_info.jsonl", records)
+	} else if app.Log != nil {
+		app.Log.Debug("osint.domain_info: dnsx did not resolve the record types — staging preserved (F3 did-not-run)")
+	}
 
 	if app.Log != nil {
 		app.Log.Info("osint.domain_info: completed", "findings", len(records))
@@ -246,13 +260,27 @@ func splitNonEmptyLines(data []byte) []string {
 	return out
 }
 
-// writeOSINTStaging marshals records and writes inputs/<fileName> via
-// output.WriteJSONL (the per-task staging file — doc.go contract). A no-op when
-// records is empty. Errors are logged at Debug (best_effort).
+// writeOSINTStaging marshals records and writes inputs/<fileName> through
+// output.StageJSONL (the per-task staging file — doc.go contract). Errors are
+// logged at Debug (best_effort).
+//
+// This is the SINGLE staging writer for all 20 osint producer files, so the F3
+// run-isolation contract lives here for the whole package.
+//
+// F3 (phase 15): the write is UNCONDITIONAL. It used to return early when
+// records was empty, so an osint task that RAN and found nothing left the
+// previous run's staging file on disk and MergeOSINTFindings republished it — a
+// leaked credential that has since been rotated, or a cloud bucket that has
+// since been locked down, kept appearing in every later report as though this
+// run had just found it. StageJSONL REMOVES the file instead.
+//
+// CALLER CONTRACT — only call this when the task actually RAN. A task that
+// returned before invoking its tool, or whose tool is not installed, observed
+// nothing and must not delete what a previous run observed. Most osint tasks
+// satisfy this by returning early on a tool error; the ones whose per-item loops
+// can fail for EVERY item guard the call with an explicit "did the tool run"
+// flag. See internal/modules/vulns/staging.go for the same rule stated in full.
 func writeOSINTStaging(app *appctx.AppContext, inputsDir, fileName string, records []OSINTFindingRecord) {
-	if len(records) == 0 {
-		return
-	}
 	var lines [][]byte
 	for _, rec := range records {
 		b, mErr := json.Marshal(rec)
@@ -261,11 +289,8 @@ func writeOSINTStaging(app *appctx.AppContext, inputsDir, fileName string, recor
 		}
 		lines = append(lines, b)
 	}
-	if len(lines) == 0 {
-		return
-	}
 	stagingPath := filepath.Join(inputsDir, fileName)
-	if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
 		app.Log.Debug("osint: staging write failed", "path", stagingPath, "err", wErr)
 	}
 }

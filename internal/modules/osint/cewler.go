@@ -101,6 +101,11 @@ func (t *CewlerTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	// Step 2: loop cewler per host, aggregating words into a deduped set.
 	wordSet := make(map[string]struct{})
 	partFile := filepath.Join(inputsDir, "cewler.part.txt")
+	// cewlerRan records whether AT LEAST ONE host was actually crawled. An absent
+	// cewler means this task observed nothing and must not clear a previous run's
+	// staging (F3 did-not-run — see writeOSINTStaging). A cancelled loop is
+	// covered by the same flag when it fires before the first successful crawl.
+	cewlerRan := false
 	for _, host := range hosts {
 		if ctx.Err() != nil {
 			break
@@ -120,6 +125,7 @@ func (t *CewlerTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 			}
 			continue
 		}
+		cewlerRan = true
 		if data, rErr := os.ReadFile(partFile); rErr == nil { //nolint:gosec // within WorkDir
 			for _, w := range splitNonEmptyLines(data) {
 				if len(w) >= cewlerMinLength {
@@ -155,7 +161,13 @@ func (t *CewlerTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 			PoCRedacted: fmt.Sprintf("cewler_wordlist.txt: %d words from %d hosts", len(words), len(hosts)),
 		})
 	}
-	writeOSINTStaging(app, inputsDir, "findings.cewler.jsonl", records)
+	// F3: a run that crawled no word REMOVES the staging file rather than
+	// republishing the previous run's wordlist-size record.
+	if cewlerRan {
+		writeOSINTStaging(app, inputsDir, "findings.cewler.jsonl", records)
+	} else if app.Log != nil {
+		app.Log.Debug("osint.cewler: cewler did not run — staging preserved (F3 did-not-run)")
+	}
 
 	if app.Log != nil {
 		app.Log.Info("osint.cewler: completed", "words", len(words), "hosts_scanned", len(hosts))

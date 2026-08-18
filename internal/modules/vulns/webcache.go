@@ -38,7 +38,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -48,7 +47,6 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -132,12 +130,18 @@ func (t *WebCacheTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	}
 
 	var allFindings []VulnFindingRecord
+	// termErr latches a TERMINAL stream error — WCVS RAN and ended badly.
+	var termErr error
 
 	// Step 4: Run WCVS via Backend.Stream (XCUT-09 heartbeat).
 	// v1 arg vector (vulns.sh:879): Web-Cache-Vulnerability-Scanner -u "file:hostsFile" -v 0
 	wcvsArgs := []string{"-u", "file:" + hostsFile, "-v", "0"}
 
 	eventCh, streamErr := app.Tools.Stream(ctx, wcvsToolName, wcvsArgs)
+	// engineRan records whether EITHER engine was actually dispatched. If neither
+	// WCVS nor toxicache is installed the task observed nothing and must not
+	// clear a previous run's staging (F3 did-not-run — staging.go).
+	engineRan := streamErr == nil
 	if streamErr != nil {
 		// Non-fatal per best_effort policy — WCVS may not be installed.
 		if app.Log != nil {
@@ -147,7 +151,13 @@ func (t *WebCacheTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 		// Drain event channel for XCUT-09 heartbeat; collect WCVS confirmed findings.
 		// XCUT-07 / T-06-06-02: raw WCVS output lines contain cache poisoning PoC
 		// headers (X-Forwarded-Host etc.). NEVER log raw lines at Info/Warn.
+		// F6 (phase 15) accumulator shape: latch the TERMINAL error inside the
+		// loop and act on it after. `streamErr` is the DISPATCH error and keeps
+		// its untouched best-effort branch above.
 		for ev := range eventCh {
+			if ev.Err != nil {
+				termErr = ev.Err
+			}
 			line := strings.TrimSpace(string(ev.Line))
 			if line == "" {
 				continue
@@ -167,6 +177,13 @@ func (t *WebCacheTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 					Engine:          "wcvs",
 				})
 			}
+		}
+		// F6: WCVS exited non-zero, so the poisoning verdicts collected above are
+		// a partial scan. Return before toxicache and before the staging write —
+		// publishing a crashed scanner's partial result as this run's
+		// cache-poisoning verdict is exactly what gate 5 exists to stop.
+		if termErr != nil {
+			return task.Result{Status: task.StatusErrored}, terminalStreamError(wcvsToolName, termErr)
 		}
 	}
 
@@ -202,6 +219,7 @@ func (t *WebCacheTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 				app.Log.Debug("vulns.webcache: toxicache run error (best_effort)", "err", toxErr)
 			}
 		} else {
+			engineRan = true
 			// Parse toxicache plain-text output for additional findings.
 			if toxData, rErr := os.ReadFile(toxicacheOut); rErr == nil { //nolint:gosec
 				toxFindings := parseToxicacheOutput(toxData)
@@ -211,23 +229,16 @@ func (t *WebCacheTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	}
 
 	// Step 6: Write inputs/findings.webcache.jsonl (merged WCVS + toxicache).
-	if len(allFindings) > 0 {
-		var lines [][]byte
-		for _, rec := range allFindings {
-			b, mErr := json.Marshal(rec)
-			if mErr != nil {
-				continue
-			}
-			lines = append(lines, b)
-		}
-		if len(lines) > 0 {
-			stagingPath := filepath.Join(inputsDir, "findings.webcache.jsonl")
-			if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-				app.Log.Debug("vulns.webcache: staging write failed",
-					"path", stagingPath, "err", wErr)
-			}
-		}
-	}
+	//
+	// F3 (phase 15): staged through stageVulnFindings so a run in which neither
+	// engine confirmed poisoning REMOVES the previous run's staging instead of
+	// republishing a cache-poisoning vector that has since been fixed.
+	//
+	// NOTE inputs/webcache_hosts.txt is a TOOL-INPUT list and
+	// inputs/webcache_toxicache.txt is toxicache's own -o output — neither is
+	// staging.
+	stagingPath := filepath.Join(inputsDir, "findings.webcache.jsonl")
+	stageVulnFindings(app, "vulns.webcache", stagingPath, engineRan, allFindings)
 
 	// XCUT-07: log only count, never raw cache poisoning PoC headers.
 	if app.Log != nil {

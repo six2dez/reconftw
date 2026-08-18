@@ -104,6 +104,11 @@ func (t *SwaggerTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 		logger = app.Log
 	}
 	var records []OSINTFindingRecord
+	// engineRan records whether AT LEAST ONE engine invocation was dispatched.
+	// If neither SwaggerSpy nor sj is installed the task observed nothing and
+	// must not clear a previous run's staging (F3 did-not-run — see
+	// writeOSINTStaging).
+	engineRan := false
 
 	// --- Engine 1: SwaggerSpy (company/domain-seeded public leak search) -------
 	// v1 arg vector (osint.sh:452): swaggerspy.py <domain>. Output may embed raw
@@ -113,6 +118,7 @@ func (t *SwaggerTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 			app.Log.Debug("osint.swagger: SwaggerSpy run failed (best_effort)", "err", err)
 		}
 	} else {
+		engineRan = true
 		records = append(records, parseSwaggerOutput(res.Stdout, "swaggerspy", logger)...)
 	}
 
@@ -139,12 +145,19 @@ func (t *SwaggerTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 				}
 				continue
 			}
+			engineRan = true
 			records = append(records, parseSwaggerOutput(res.Stdout, "sj", logger)...)
 		}
 	}
 
 	// Step 5: write staging JSONL — every record is already REDACTED.
-	writeOSINTStaging(app, inputsDir, "findings.swagger.jsonl", records)
+	// F3: a run that found no exposed Swagger/OpenAPI document REMOVES the
+	// staging file rather than republishing one that has since been secured.
+	if engineRan {
+		writeOSINTStaging(app, inputsDir, "findings.swagger.jsonl", records)
+	} else if app.Log != nil {
+		app.Log.Debug("osint.swagger: no engine ran — staging preserved (F3 did-not-run)")
+	}
 
 	// XCUT-07: log ONLY the count, never the raw matches.
 	if app.Log != nil {

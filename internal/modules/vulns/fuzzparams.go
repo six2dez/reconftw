@@ -46,8 +46,8 @@ import (
 	"strconv"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -149,15 +149,23 @@ func (t *FuzzparamsTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 
 	// Backend.Stream for XCUT-09 heartbeat.
 	eventCh, streamErr := app.Tools.Stream(ctx, toolName, args)
+	// nucleiRan records whether nuclei was actually DISPATCHED. A dispatch
+	// failure means the binary is absent: the task observed nothing and must not
+	// clear a previous run's staging (F3 did-not-run — staging.go).
+	nucleiRan := streamErr == nil
 	if streamErr != nil {
 		if app.Log != nil {
 			app.Log.Debug("vulns.fuzzparams: stream error (best_effort)", "err", streamErr)
 		}
 		// Non-fatal per best_effort policy.
 	} else {
-		// Drain stream — Backend contract: caller MUST drain until closed.
+		// F6 (phase 15): consume the TERMINAL error before reading stagingFile —
+		// a nuclei that exited non-zero leaves a truncated file, or none at all,
+		// in which case the read would return the PREVIOUS run's output.
 		// XCUT-07: raw nuclei output routed to run.log only; never to Info terminal.
-		for range eventCh { //nolint:revive // intentional drain
+		if drainErr := backend.Drain(eventCh); drainErr != nil {
+			return task.Result{Status: task.StatusErrored},
+				terminalStreamError(toolName, drainErr)
 		}
 	}
 
@@ -171,23 +179,16 @@ func (t *FuzzparamsTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 	findings := parseFuzzparamsOutput(data)
 
 	// Step 6: Write inputs/findings.fuzzparams.jsonl (staging contract — doc.go).
-	if len(findings) > 0 {
-		var lines [][]byte
-		for _, rec := range findings {
-			b, mErr := json.Marshal(rec)
-			if mErr != nil {
-				continue
-			}
-			lines = append(lines, b)
-		}
-		if len(lines) > 0 {
-			stagingPath := filepath.Join(inputsDir, "findings.fuzzparams.jsonl")
-			if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-				app.Log.Debug("vulns.fuzzparams: staging write failed",
-					"path", stagingPath, "err", wErr)
-			}
-		}
-	}
+	//
+	// F3 (phase 15): staged through stageVulnFindings so a clean run REMOVES the
+	// previous run's staging rather than republishing DAST findings that have
+	// since been fixed.
+	//
+	// NOTE inputs/fuzzparams_raw.jsonl is nuclei's own -o output in nuclei's
+	// native schema — raw tool output this task parses, not staging. It is
+	// deliberately named OUTSIDE the inputs/findings.*.jsonl merge glob.
+	stagingPath := filepath.Join(inputsDir, "findings.fuzzparams.jsonl")
+	stageVulnFindings(app, "vulns.fuzzparams", stagingPath, nucleiRan, findings)
 
 	// XCUT-07: log only template-id + severity + count, never raw matched-at / extracted-results.
 	if app.Log != nil {
