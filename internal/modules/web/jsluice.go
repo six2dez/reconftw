@@ -87,26 +87,31 @@ func (t *JsluiceTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 
 	// --- Part 1: jsluice urls mode ---
 	urlsOutput, urlsErr := runJsluiceWithFileList(ctx, app, "urls", fileListInput)
-	if urlsErr == nil && len(urlsOutput) > 0 {
+	if urlsErr == nil {
+		// F3 (phase 15): jsluice urls mode RAN cleanly this invocation, so its
+		// staging is authoritative for THIS run — stage unconditionally and let
+		// StageJSONL remove the file when nothing was extracted.
+		//
+		// urlsErr != nil is deliberately NOT staged: it covers "jsluice is not
+		// on PATH" (a dispatch failure from app.Tools.Run) as well as a non-zero
+		// exit, and both mean this run did not observe the corpus. Clearing
+		// there would delete a previous run's URLs on a host that simply has no
+		// jsluice installed.
 		entries, _ := extractsourcemap.ExtractFromJSluice(urlsOutput, app.Target.Domain)
-		if len(entries) > 0 {
-			var lines [][]byte
-			for _, e := range entries {
-				b, merr := json.Marshal(e)
-				if merr != nil {
-					continue
-				}
-				lines = append(lines, b)
+		var lines [][]byte
+		for _, e := range entries {
+			b, merr := json.Marshal(e)
+			if merr != nil {
+				continue
 			}
-			if len(lines) > 0 {
-				stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "urls.jsluice.jsonl")
-				if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-					app.Log.Debug("web.jsluice: staging write failed",
-						"path", stagingPath, "err", wErr)
-				}
-			}
-			totalURLs = len(entries)
+			lines = append(lines, b)
 		}
+		stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "urls.jsluice.jsonl")
+		if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+			app.Log.Debug("web.jsluice: staging write failed",
+				"path", stagingPath, "err", wErr)
+		}
+		totalURLs = len(entries)
 	}
 
 	// --- Part 2: jsluice secrets mode (only .js files) ---

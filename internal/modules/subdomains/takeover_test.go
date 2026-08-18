@@ -83,10 +83,41 @@ func TestTakeoverSubzyWritesStagingFile(t *testing.T) {
 		t.Errorf("TakeoverSubzyTask.Run returned StatusErrored")
 	}
 
-	// Staging file must exist (even if empty — no takeovers found is valid).
+	// F3 (phase 15): the mock produces NO takeovers, so the write-or-REMOVE
+	// contract requires the staging file to be ABSENT. It used to be written as
+	// an empty file, which left "subzy found nothing" indistinguishable from
+	// "subzy did not run" and, on a stable workspace, let a previous run's
+	// takeover survive into this run's merge.
 	stagingPath := filepath.Join(workDir, "inputs", "takeover.subzy.jsonl")
-	if _, err := os.Stat(stagingPath); err != nil {
-		t.Errorf("staging file not found at %s: %v", stagingPath, err)
+	if _, err := os.Stat(stagingPath); !os.IsNotExist(err) {
+		t.Errorf("zero-takeover run must REMOVE %s (write-or-remove, F3), stat err = %v",
+			stagingPath, err)
+	}
+}
+
+// TestTakeoverSubzyClearsStaleStagingFile is the other half of F3: a previous
+// run's staging file must not survive a run that found nothing.
+func TestTakeoverSubzyClearsStaleStagingFile(t *testing.T) {
+	app, workDir := buildEnrichmentApp(t, "subzy", "httpx")
+
+	stagingPath := filepath.Join(workDir, "inputs", "takeover.subzy.jsonl")
+	stale := []byte(`{"host":"old.example.com","service":"github","status":"vulnerable"}` + "\n")
+	if err := os.WriteFile(stagingPath, stale, 0o644); err != nil {
+		t.Fatalf("seed stale staging: %v", err)
+	}
+
+	tsk, ok := task.Default.Lookup("subdomains.takeover.subzy")
+	if !ok {
+		t.Fatal("subdomains.takeover.subzy not registered")
+	}
+	if _, err := tsk.Run(context.Background(), app); err != nil {
+		t.Fatalf("TakeoverSubzyTask.Run: unexpected error: %v", err)
+	}
+
+	if _, err := os.Stat(stagingPath); !os.IsNotExist(err) {
+		t.Errorf("run B found nothing but run A's %s survived — mergeTakeoverFindings "+
+			"would republish a takeover this run never observed (F3); stat err = %v",
+			stagingPath, err)
 	}
 }
 
@@ -110,10 +141,12 @@ func TestTakeoverDNSTakeWritesStagingFile(t *testing.T) {
 		t.Errorf("TakeoverDNSTakeTask.Run returned StatusErrored")
 	}
 
-	// Staging file must exist.
+	// F3 (phase 15): zero records ⇒ the staging file is REMOVED, not written
+	// empty. See TestTakeoverSubzyWritesStagingFile for the rationale.
 	stagingPath := filepath.Join(workDir, "inputs", "takeover.dnstake.jsonl")
-	if _, err := os.Stat(stagingPath); err != nil {
-		t.Errorf("staging file not found at %s: %v", stagingPath, err)
+	if _, err := os.Stat(stagingPath); !os.IsNotExist(err) {
+		t.Errorf("zero-takeover run must REMOVE %s (write-or-remove, F3), stat err = %v",
+			stagingPath, err)
 	}
 }
 

@@ -27,6 +27,7 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -253,9 +254,19 @@ func (TakeoverDNSTakeTask) Run(ctx context.Context, app *appctx.AppContext) (tas
 // -------------------------------------------------------------------------
 
 // writeTakeoverStagingFile writes TakeoverRecord JSON lines to the given
-// staging file at filepath.Join(app.Target.WorkDir, "inputs", name).
-// Creates the inputs/ directory if needed. An empty records slice writes
-// an empty file (never returns error for empty input).
+// staging file at filepath.Join(app.Target.WorkDir, "inputs", name), or REMOVES
+// that file when records is empty. Returns the staging path in both cases.
+//
+// F3 (phase 15): write-or-REMOVE via output.StageJSONL. It previously wrote an
+// EMPTY file for zero records, which is one step short: an empty file still
+// exists, and "the scanner found nothing" stayed indistinguishable from "the
+// scanner did not run" for anything that stats the path.
+//
+// These takeover.*.jsonl files are read by a FIFTH merger, mergeTakeoverFindings
+// (internal/mcp/handlers/common.go), not by any *StagingPrefixes slice.
+// Removing them is safe there: it reads each path through readJSONLLines, whose
+// os.Open error on a missing file is caught and skipped at Debug before the
+// merged set is assembled — verified on the tree at common.go:531-540.
 func writeTakeoverStagingFile(app *appctx.AppContext, name string, records []TakeoverRecord) (string, error) {
 	inputsDir := filepath.Join(app.Target.WorkDir, "inputs")
 	if err := os.MkdirAll(inputsDir, 0o755); err != nil {
@@ -264,17 +275,16 @@ func writeTakeoverStagingFile(app *appctx.AppContext, name string, records []Tak
 
 	stagingPath := filepath.Join(inputsDir, name)
 
-	var buf bytes.Buffer
+	var lines [][]byte
 	for _, rec := range records {
 		line, err := json.Marshal(rec)
 		if err != nil {
 			continue
 		}
-		buf.Write(line)
-		buf.WriteByte('\n')
+		lines = append(lines, line)
 	}
 
-	if err := os.WriteFile(stagingPath, buf.Bytes(), 0o644); err != nil { //nolint:gosec
+	if err := output.StageJSONL(stagingPath, lines); err != nil {
 		return "", fmt.Errorf("takeover staging %s: write: %w", name, err)
 	}
 	return stagingPath, nil

@@ -78,8 +78,21 @@ func (t *WaymoreTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 	}
 
 	// Drain stream (collect any stdout lines as fallback in case -oU not honored).
+	//
+	// F6 (phase 15): ACCUMULATOR shape — latch the terminal Event.Err inside the
+	// loop and check it after. Without this, a waymore that exits non-zero part
+	// way through the archive fetch was treated as a complete pass, and the
+	// -oU staging file read below could be truncated or left over from an
+	// earlier run.
 	var stdoutLines []string
+	var streamErr error
 	for ev := range eventCh {
+		if ev.Err != nil {
+			if streamErr == nil {
+				streamErr = ev.Err
+			}
+			continue
+		}
 		if ev.IsErr {
 			continue
 		}
@@ -87,6 +100,11 @@ func (t *WaymoreTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 		if line != "" {
 			stdoutLines = append(stdoutLines, line)
 		}
+	}
+	if streamErr != nil {
+		// Do NOT read stagingFile and do NOT stage the partial stdout lines.
+		return task.Result{Status: task.StatusErrored},
+			terminalStreamError(toolName, streamErr)
 	}
 
 	// Read output file (-oU writes URLs here); fall back to streamed stdout.
@@ -100,13 +118,10 @@ func (t *WaymoreTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 	// Extract and scope-filter URLs.
 	records, _ := urlsextract.ExtractURLs(raw, "waymore", app.Target.Domain)
 
-	if len(records) == 0 {
-		return task.Result{
-			Status: task.StatusDone,
-			Stats:  map[string]int{"urls_found": 0},
-		}, nil
-	}
-
+	// F3 (phase 15): the old `if len(records) == 0 { return StatusDone }`
+	// short-circuit left a previous run's inputs/urls.waymore.jsonl for the urls
+	// merge to republish. waymore RAN (absent binary returned StatusSkipped
+	// above), so stage unconditionally and let StageJSONL clear it.
 	var lines [][]byte
 	for _, rec := range records {
 		b, merr := json.Marshal(rec)
@@ -115,12 +130,10 @@ func (t *WaymoreTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 		}
 		lines = append(lines, b)
 	}
-	if len(lines) > 0 {
-		stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "urls.waymore.jsonl")
-		if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-			app.Log.Debug("web.waymore: staging write failed",
-				"path", stagingPath, "err", wErr)
-		}
+	stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "urls.waymore.jsonl")
+	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+		app.Log.Debug("web.waymore: staging write failed",
+			"path", stagingPath, "err", wErr)
 	}
 
 	// Clean up staging file.

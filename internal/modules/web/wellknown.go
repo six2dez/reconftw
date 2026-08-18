@@ -187,26 +187,26 @@ func (t *WebWellKnownTask) Run(ctx context.Context, app *appctx.AppContext) (tas
 	}
 
 	hosts := discovered.list()
-	if len(hosts) == 0 {
-		if app.Log != nil {
-			app.Log.Debug("web.wellknown: no in-scope hostnames discovered", "probed", probed)
-		}
-		return task.Result{Status: task.StatusDone, Stats: map[string]int{"wellknown_hosts": 0}}, nil
+	if len(hosts) == 0 && app.Log != nil {
+		app.Log.Debug("web.wellknown: no in-scope hostnames discovered", "probed", probed)
 	}
 
 	// Stage discovered hostnames as HostRecord JSONL (web "hosts" single-writer
 	// staging; consolidated to the store by web.MergeStage("hosts") in 13-08).
+	//
+	// F3 (phase 15): the old zero-host early return left a previous run's
+	// inputs/hosts.wellknown.jsonl for the hosts merge to republish. This task
+	// RAN (the no-targets path returns StatusSkipped above), so stage
+	// unconditionally and let StageJSONL clear it.
 	var lines [][]byte
 	for _, h := range hosts {
 		if b, err := json.Marshal(HostRecord{Host: h, Tech: []string{}}); err == nil {
 			lines = append(lines, b)
 		}
 	}
-	if len(lines) > 0 {
-		staging := filepath.Join(app.Target.WorkDir, "inputs", "hosts.wellknown.jsonl")
-		if err := output.WriteJSONL(staging, lines); err != nil && app.Log != nil {
-			app.Log.Debug("web.wellknown: hosts staging write failed", "path", staging, "err", err)
-		}
+	staging := filepath.Join(app.Target.WorkDir, "inputs", "hosts.wellknown.jsonl")
+	if err := output.StageJSONL(staging, lines); err != nil && app.Log != nil {
+		app.Log.Debug("web.wellknown: hosts staging write failed", "path", staging, "err", err)
 	}
 
 	if app.Log != nil {

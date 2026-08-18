@@ -29,6 +29,7 @@ import (
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
 	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -60,8 +61,26 @@ func runStreamTask(ctx context.Context, app *appctx.AppContext, toolName string,
 		return degradeResolveTool(ctx, app, toolName, err)
 	}
 
+	// F6 (phase 15): ACCUMULATOR shape — latch the terminal Event.Err inside the
+	// loop and check it after. A puredns or dnsx that dies half way through the
+	// resolve leaves a PARTIAL hostname set; staging it would silently shrink
+	// the resolved corpus that every later stage builds on, and the run would
+	// still be reported clean.
+	//
+	// NOTE the Stream() error above is deliberately left byte-identical: it
+	// means the resolver binary is NOT on PATH, and degradeResolveTool's
+	// CONTINUE_ON_TOOL_ERROR posture must survive. `subdomains` is
+	// PolicyFailFast (internal/core/scheduler/policy.go), so escalating a
+	// missing optional binary there would abort the whole spine.
 	var lines []string
+	var streamErr error
 	for ev := range ch {
+		if ev.Err != nil {
+			if streamErr == nil {
+				streamErr = ev.Err
+			}
+			continue
+		}
 		if ev.IsErr {
 			continue // skip stderr lines
 		}
@@ -69,6 +88,12 @@ func runStreamTask(ctx context.Context, app *appctx.AppContext, toolName string,
 		if line != "" {
 			lines = append(lines, line)
 		}
+	}
+	if streamErr != nil {
+		// Discard the partial set and stage NOTHING — the previous run's staging
+		// is left untouched because this run cannot vouch for a replacement.
+		return task.Result{Status: task.StatusErrored},
+			fmt.Errorf("%s: tool stream ended badly: %w", toolName, streamErr)
 	}
 
 	stagingPath, writeErr := writeResolvedStagingFile(app, toolName, lines)
@@ -116,18 +141,28 @@ func runExecTask(ctx context.Context, app *appctx.AppContext, toolName string, a
 }
 
 // writeResolvedStagingFile writes hostnames (one per line) to the per-tool
-// resolved staging file. Creates inputs/ directory if needed.
+// resolved staging file, or REMOVES that file when lines is empty. Returns the
+// staging path in both cases.
+//
+// F3 (phase 15): write-or-REMOVE via output.StageLines, same contract as
+// writeStagingFile (passive) and writeScrapingStagingFile. It previously wrote
+// an EMPTY file for zero hostnames, which is equivalent for the glob-based
+// MergeAllSubdomains but leaves "the resolver ran and resolved nothing"
+// indistinguishable from "the resolver did not run" for anything that stats the
+// path.
+//
+// NOTE this site is NOT reported by internal/modules/staging_contract_test.go:
+// its path comes from resolvedStagingPath(), a THIRD level of indirection that
+// the detector's two-level filepath.Join tracking does not reach. It is a
+// genuine merger-globbed staging write (inputs/resolved.*.txt) all the same, so
+// it is migrated by hand rather than left because the detector was silent.
 func writeResolvedStagingFile(app *appctx.AppContext, toolName string, lines []string) (string, error) {
 	inputsDir := filepath.Join(app.Target.WorkDir, "inputs")
 	if err := os.MkdirAll(inputsDir, 0o755); err != nil {
 		return "", fmt.Errorf("resolve %s: mkdir inputs/: %w", toolName, err)
 	}
 	stagingPath := resolvedStagingPath(app, toolName)
-	content := strings.Join(lines, "\n")
-	if len(lines) > 0 {
-		content += "\n"
-	}
-	if err := os.WriteFile(stagingPath, []byte(content), 0o644); err != nil { //nolint:gosec
+	if err := output.StageLines(stagingPath, lines); err != nil {
 		return "", fmt.Errorf("resolve %s: write staging file: %w", toolName, err)
 	}
 	return stagingPath, nil
@@ -400,7 +435,21 @@ func (SubActiveTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	activePath := resolvedStagingPath(app, "active")
 	if defaultPath != activePath {
 		if renameErr := os.Rename(defaultPath, activePath); renameErr != nil {
-			_ = renameErr // non-fatal if already at the right path
+			// F3 (phase 15): the rename source is ABSENT precisely when this run
+			// resolved nothing — writeResolvedStagingFile removed it. Leaving
+			// the rename to fail silently would strand a PREVIOUS run's
+			// resolved.active.txt for MergeAllSubdomains to republish, which is
+			// the exact leak the write-or-remove contract closes one layer down.
+			// Clear the destination so run B's empty result is what the merge
+			// sees. Any other rename failure is still non-fatal.
+			if os.IsNotExist(renameErr) {
+				if rmErr := os.Remove(activePath); rmErr != nil && !os.IsNotExist(rmErr) {
+					if app.Log != nil {
+						app.Log.Debug("subdomains.active: clear stale active staging failed",
+							"path", activePath, "err", rmErr)
+					}
+				}
+			}
 		}
 		result.Outputs = []string{activePath}
 	}

@@ -125,14 +125,16 @@ func (t *JsaTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	}
 	wg.Wait()
 
-	// WriteJSONL called ONCE after all goroutines join (wg.Wait above).
+	// StageJSONL called ONCE after all goroutines join (wg.Wait above).
 	// allRecords is fully populated (mutex-protected collector) — no concurrent writes.
-	if len(allRecords) > 0 {
-		stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "urls.jsa.jsonl")
-		if wErr := output.WriteJSONL(stagingPath, allRecords); wErr != nil && app.Log != nil {
-			app.Log.Debug("web.jsa: staging write failed",
-				"path", stagingPath, "err", wErr)
-		}
+	//
+	// F3 (phase 15): staged UNCONDITIONALLY — StageJSONL removes the staging
+	// file when this run extracted no URLs, so a previous run's JSA output
+	// cannot be republished by the urls merge.
+	stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "urls.jsa.jsonl")
+	if wErr := output.StageJSONL(stagingPath, allRecords); wErr != nil && app.Log != nil {
+		app.Log.Debug("web.jsa: staging write failed",
+			"path", stagingPath, "err", wErr)
 	}
 
 	if app.Log != nil {

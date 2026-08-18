@@ -42,6 +42,7 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 	"github.com/six2dez/reconftw/internal/modules/subdomains/sysinfo"
 )
@@ -94,18 +95,20 @@ func resolvedMergedPath(app *appctx.AppContext) string {
 }
 
 // writePermutStagingFile writes permutation candidates (one per line) to
-// inputs/permut.<tool>.txt. Returns the absolute path written.
+// inputs/permut.<tool>.txt, or REMOVES that file when lines is empty. Returns
+// the staging path in both cases.
+//
+// F3 (phase 15): write-or-REMOVE via output.StageLines. Calling it asserts
+// "this permutation source RAN and produced exactly these candidates", so a
+// zero-result run clears the previous run's file instead of leaving it for
+// MergeAllSubdomains (which globs inputs/permut.*.txt) to republish.
 func writePermutStagingFile(app *appctx.AppContext, toolName string, lines []string) (string, error) {
 	inputsDir := filepath.Join(app.Target.WorkDir, "inputs")
 	if err := os.MkdirAll(inputsDir, 0o755); err != nil {
 		return "", fmt.Errorf("permut %s: mkdir inputs/: %w", toolName, err)
 	}
 	stagingPath := filepath.Join(inputsDir, "permut."+toolName+".txt")
-	content := strings.Join(lines, "\n")
-	if len(lines) > 0 {
-		content += "\n"
-	}
-	if err := os.WriteFile(stagingPath, []byte(content), 0o644); err != nil { //nolint:gosec
+	if err := output.StageLines(stagingPath, lines); err != nil {
 		return "", fmt.Errorf("permut %s: write staging file: %w", toolName, err)
 	}
 	return stagingPath, nil
@@ -180,8 +183,23 @@ func (t *SubPermutTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 			fmt.Errorf("gotator: Stream failed: %w", err)
 	}
 
+	// F6 (phase 15): ACCUMULATOR shape — latch the terminal Event.Err inside the
+	// loop and check it after. gotator is the heaviest stage in the pipeline; a
+	// run killed by the OOM killer part way through emits a fraction of its
+	// permutations, and staging that fraction as the run's candidate set is
+	// indistinguishable from a genuinely small permutation space.
+	//
+	// The Stream() error above (gotator not on PATH) keeps its existing
+	// handling untouched.
 	var lines []string
+	var streamErr error
 	for ev := range ch {
+		if ev.Err != nil {
+			if streamErr == nil {
+				streamErr = ev.Err
+			}
+			continue
+		}
 		if ev.IsErr {
 			continue
 		}
@@ -190,20 +208,15 @@ func (t *SubPermutTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 			lines = append(lines, line)
 		}
 	}
-
-	if len(lines) == 0 {
-		// No output — could be empty input file; write empty staging file.
-		stagingPath, writeErr := writePermutStagingFile(app, "gotator", nil)
-		if writeErr != nil {
-			return task.Result{Status: task.StatusErrored}, writeErr
-		}
-		return task.Result{
-			Status:  task.StatusDone,
-			Outputs: []string{stagingPath},
-			Stats:   map[string]int{"gotator_candidates": 0},
-		}, nil
+	if streamErr != nil {
+		// Discard the partial permutation set and stage nothing.
+		return task.Result{Status: task.StatusErrored},
+			fmt.Errorf("gotator: tool stream ended badly: %w", streamErr)
 	}
 
+	// A clean run with zero output (typically an empty input file) still goes
+	// through the helper: F3 requires "ran and found nothing" to CLEAR the
+	// staging file rather than leave the previous run's permutations behind.
 	stagingPath, writeErr := writePermutStagingFile(app, "gotator", lines)
 	if writeErr != nil {
 		return task.Result{Status: task.StatusErrored}, writeErr

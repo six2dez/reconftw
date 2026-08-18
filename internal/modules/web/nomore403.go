@@ -122,23 +122,23 @@ func (t *Nomore403Task) Run(ctx context.Context, app *appctx.AppContext) (task.R
 
 	findings := parseNomore403Output(outBuf.Bytes())
 
-	// Write findings to artefacts/findings.jsonl (best_effort D-W12).
-	if len(findings) > 0 {
-		var lines [][]byte
-		for _, rec := range findings {
-			b, merr := json.Marshal(rec)
-			if merr != nil {
-				continue
-			}
-			lines = append(lines, b)
+	// Stage findings for the findings merge (best_effort D-W12).
+	//
+	// F3 (phase 15): staged UNCONDITIONALLY — StageJSONL removes the staging
+	// file when this run found no bypasses, so a previous run's bypasses cannot
+	// be republished.
+	var lines [][]byte
+	for _, rec := range findings {
+		b, merr := json.Marshal(rec)
+		if merr != nil {
+			continue
 		}
-		if len(lines) > 0 {
-			stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "findings.nomore403.jsonl")
-			if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-				app.Log.Debug("web.nomore403: staging write failed",
-					"path", stagingPath, "err", wErr)
-			}
-		}
+		lines = append(lines, b)
+	}
+	stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "findings.nomore403.jsonl")
+	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+		app.Log.Debug("web.nomore403: staging write failed",
+			"path", stagingPath, "err", wErr)
 	}
 
 	if app.Log != nil {

@@ -37,6 +37,7 @@ import (
 	"strings"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
 	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
@@ -136,40 +137,55 @@ func (t *ArjunTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 		}
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
-	// Drain stream (Backend contract: caller MUST drain until closed).
-	for range eventCh { //nolint:revive // intentional drain
+	// F6 (phase 15): consume the TERMINAL error before touching stagingFile.
+	// An arjun killed mid-run leaves a partial -oT file, or none at all while a
+	// PREVIOUS run's file sits at the same path — either way its contents are
+	// not this run's result. Return StatusErrored and parse nothing.
+	//
+	// This is NOT the same as the Stream() error above: that one means arjun is
+	// not on PATH and keeps its StatusSkipped handling (D-W12 best-effort).
+	if drainErr := backend.Drain(eventCh); drainErr != nil {
+		return task.Result{Status: task.StatusErrored},
+			terminalStreamError(toolName, drainErr)
 	}
 
 	// Parse staging file (plain text, one endpoint per line).
-	stagingData, readStagingErr := os.ReadFile(stagingFile) //nolint:gosec // path within WorkDir
-	if readStagingErr != nil {
-		if os.IsNotExist(readStagingErr) {
-			// No results produced — normal when no parameters found.
-			return task.Result{Status: task.StatusDone, Stats: map[string]int{"params": 0}}, nil
+	//
+	// F3 (phase 15): the "no output file" case used to `return StatusDone`
+	// right here, which SKIPPED the staging write below and left a previous
+	// run's inputs/findings.arjun.jsonl for the findings merge to republish.
+	// arjun RAN and found no parameters, so it must fall through to the
+	// unconditional StageJSONL and clear its own staging.
+	var stagingData []byte
+	if data, readStagingErr := os.ReadFile(stagingFile); readStagingErr != nil { //nolint:gosec // path within WorkDir
+		if !os.IsNotExist(readStagingErr) {
+			return task.Result{Status: task.StatusErrored},
+				fmt.Errorf("web.arjun: read staging file: %w", readStagingErr)
 		}
-		return task.Result{Status: task.StatusErrored},
-			fmt.Errorf("web.arjun: read staging file: %w", readStagingErr)
+	} else {
+		stagingData = data
 	}
 
 	findings := parseArjunOutput(stagingData)
 
-	// Write findings to artefacts/findings.jsonl (best_effort D-W12).
-	if len(findings) > 0 {
-		var lines [][]byte
-		for _, rec := range findings {
-			b, merr := json.Marshal(rec)
-			if merr != nil {
-				continue
-			}
-			lines = append(lines, b)
+	// Stage findings for the findings merge (best_effort D-W12).
+	//
+	// F3 (phase 15): staged UNCONDITIONALLY. output.StageJSONL removes the
+	// staging file when this run produced nothing, so a previous run's arjun
+	// findings can never be republished by the merge. This task reaching here
+	// means it RAN; the early StatusSkipped returns above never get here.
+	var lines [][]byte
+	for _, rec := range findings {
+		b, merr := json.Marshal(rec)
+		if merr != nil {
+			continue
 		}
-		if len(lines) > 0 {
-			stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "findings.arjun.jsonl")
-			if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-				app.Log.Debug("web.arjun: staging write failed",
-					"path", stagingPath, "err", wErr)
-			}
-		}
+		lines = append(lines, b)
+	}
+	stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "findings.arjun.jsonl")
+	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+		app.Log.Debug("web.arjun: staging write failed",
+			"path", stagingPath, "err", wErr)
 	}
 
 	if app.Log != nil {

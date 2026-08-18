@@ -218,8 +218,24 @@ func (SubBruteTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 			fmt.Errorf("puredns bruteforce: Stream failed: %w", err)
 	}
 
+	// F6 (phase 15): ACCUMULATOR shape — latch the terminal Event.Err inside the
+	// loop and check it after. A puredns bruteforce killed part way through a
+	// multi-million-word list yields a fraction of the resolvable hosts;
+	// staging that as this run's brute result would silently shrink the
+	// subdomain corpus while the task reported success.
+	//
+	// The Stream() error above is left as-is: it is the DISPATCH failure (the
+	// binary is absent) and already returns StatusErrored here by this task's
+	// own pre-existing choice — do not conflate the two branches.
 	var lines []string
+	var streamErr error
 	for ev := range ch {
+		if ev.Err != nil {
+			if streamErr == nil {
+				streamErr = ev.Err
+			}
+			continue
+		}
 		if ev.IsErr {
 			continue
 		}
@@ -227,6 +243,11 @@ func (SubBruteTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 		if line != "" {
 			lines = append(lines, line)
 		}
+	}
+	if streamErr != nil {
+		// Discard the partial candidate set and stage nothing.
+		return task.Result{Status: task.StatusErrored},
+			fmt.Errorf("%s: tool stream ended badly: %w", toolName, streamErr)
 	}
 
 	stagingPath, writeErr := writeResolvedStagingFile(app, "brute", lines)

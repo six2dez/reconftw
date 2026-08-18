@@ -141,22 +141,7 @@ var txtStagingStages = map[string]bool{
 //
 // MUST REACH ZERO. NO NEW ENTRY MAY EVER BE ADDED.
 var stagingContractAllowlist = map[string][]string{
-	// web — 16
-	"internal/modules/web/arjun.go":     {"Run"},
-	"internal/modules/web/cdncheck.go":  {"Run"},
-	"internal/modules/web/gxss.go":      {"Run"},
-	"internal/modules/web/jsa.go":       {"Run"},
-	"internal/modules/web/jsluice.go":   {"Run"},
-	"internal/modules/web/katana.go":    {"Run"},
-	"internal/modules/web/nomore403.go": {"Run"},
-	"internal/modules/web/nuclei.go":    {"Run"},
-	"internal/modules/web/portscan.go":  {"portscanWriteHostRecords", "portscanWriteFingerprintRecords"},
-	"internal/modules/web/shortscan.go": {"Run"},
-	"internal/modules/web/subjs.go":     {"Run"},
-	"internal/modules/web/urlfinder.go": {"Run"},
-	"internal/modules/web/wafw00f.go":   {"Run"},
-	"internal/modules/web/waymore.go":   {"Run"},
-	"internal/modules/web/wellknown.go": {"Run"},
+	// web — 0 (all 16 migrated to output.StageJSONL by plan 15-13 Task 1)
 
 	// vulns — 15
 	"internal/modules/vulns/bypass4xx.go":    {"Run"},
@@ -175,13 +160,8 @@ var stagingContractAllowlist = map[string][]string{
 	"internal/modules/vulns/webcache.go":     {"Run"},
 	"internal/modules/vulns/xss.go":          {"Run"},
 
-	// subdomains — 6
-	"internal/modules/subdomains/passive.go":      {"writeStagingFile"},
-	"internal/modules/subdomains/permut.go":       {"writePermutStagingFile"},
-	"internal/modules/subdomains/recursive.go":    {"writeRecursiveStagingFile"},
-	"internal/modules/subdomains/scraping.go":     {"writeScrapingStagingFile"},
-	"internal/modules/subdomains/takeover.go":     {"writeTakeoverStagingFile"},
-	"internal/modules/subdomains/zonetransfer.go": {"writeZoneTransferStagingFile"},
+	// subdomains — 0 (all 6 migrated to output.StageLines / StageJSONL by
+	// plan 15-13 Task 1)
 
 	// osint — 1 (the single staging writer for all 20 osint producer files)
 	"internal/modules/osint/domain_info.go": {"writeOSINTStaging"},
@@ -192,10 +172,13 @@ var stagingContractAllowlist = map[string][]string{
 // lowering one without the other fails.
 //
 // 15-03 seed: 38 (web 16, vulns 15, subdomains 6, osint 1).
-// 15-13 lowers it to 16 (web + subdomains migrated).
+// 15-13 lowered it to 16 by removing all 22 web + subdomains entries (web 16,
+//
+//	subdomains 6). Remaining: vulns 15 + osint 1.
+//
 // 15-14 drives it to 0 (vulns + osint migrated).
 // 15-17 asserts 0.
-const stagingContractAllowlistSize = 38
+const stagingContractAllowlistSize = 16
 
 // derivedOutputExemptions maps file → function → the path literal whose write is
 // exempt. See the file header for the two-part justification test. NOT part of
@@ -1087,9 +1070,25 @@ func TestStagingContractReaderOnlyFilesPass(t *testing.T) {
 
 // TestStagingContractToolInputWritesOutOfScope is THE criterion that makes `== 0`
 // reachable. ~35 functions write a tool-input, scratch or subdirectory file into
-// inputs/; none may be reported for that write. Three of the four sites below
-// ALSO contain a genuine staging write, so they DO appear — but the reported
-// path must be the STAGING path, never the tool-input path.
+// inputs/; none may be reported for that write.
+//
+// Each site below still writes its tool-input/scratch file. The assertion has
+// two flavours:
+//
+//   - staging != "" — the file ALSO contains an unmigrated staging write, so it
+//     DOES appear, but the reported path must be the STAGING path and never the
+//     tool-input path.
+//   - staging == "" — the file must be ABSENT from the violation set entirely,
+//     because its only remaining inputs/ writes are tool-input or scratch files
+//     that no merger globs. That is the stronger direction: a write-triggered
+//     rule would report every one of them.
+//
+// Plan 15-13 migrated katana.go and wafw00f.go, so both moved from the first
+// flavour to the second: their staging now goes through output.StageJSONL while
+// inputs/katana_targets.txt and inputs/wafw00f.hosts.txt are still written
+// unconditionally as tool input. Their absence here is what proves the rule
+// stayed staging-glob-triggered rather than being loosened during the sweep.
+// vulns/sqli.go keeps the first flavour until plan 15-14 migrates it.
 func TestStagingContractToolInputWritesOutOfScope(t *testing.T) {
 	violations, _ := checkStagingContract(".", nil, derivedOutputExemptions)
 	byFile := map[string][]string{}
@@ -1101,19 +1100,34 @@ func TestStagingContractToolInputWritesOutOfScope(t *testing.T) {
 		file      string
 		toolInput string // must NEVER appear in a reported path
 		staging   string // "" ⇒ the file must be absent from the set entirely
+		why       string // why it must be absent (staging == "" only)
 	}{
-		{"internal/modules/web/katana.go", "katana_targets.txt", "urls.katana.jsonl"},
-		{"internal/modules/web/wafw00f.go", "wafw00f.hosts.txt", "waf.wafw00f.jsonl"},
-		{"internal/modules/vulns/sqli.go", "tmp_sqli.txt", "findings.sqli.jsonl"},
-		{"internal/modules/subdomains/csprecon.go", "csprecon.hosts.txt", ""},
+		{
+			file: "internal/modules/web/katana.go", toolInput: "katana_targets.txt",
+			why: "its urls.katana.jsonl staging was migrated to output.StageJSONL by plan 15-13; " +
+				"only the tool-input write remains",
+		},
+		{
+			file: "internal/modules/web/wafw00f.go", toolInput: "wafw00f.hosts.txt",
+			why: "its waf.wafw00f.jsonl staging was migrated to output.StageJSONL by plan 15-13; " +
+				"only the tool-input write remains",
+		},
+		{
+			file: "internal/modules/vulns/sqli.go", toolInput: "tmp_sqli.txt",
+			staging: "findings.sqli.jsonl",
+		},
+		{
+			file: "internal/modules/subdomains/csprecon.go", toolInput: "csprecon.hosts.txt",
+			why: "it writes only a scratch file that no merger globs",
+		},
 	}
 	for _, c := range cases {
 		rows := byFile[c.file]
 		if c.staging == "" {
 			if len(rows) > 0 {
-				t.Errorf("%s writes only the scratch file %s, which no merger globs — it must be "+
-					"absent from the violation set entirely, got:%s",
-					c.file, c.toolInput, formatRows(rows))
+				t.Errorf("%s must be absent from the violation set (%s), yet it was reported — "+
+					"the rule must stay staging-glob-triggered, not write-triggered (it still "+
+					"writes %s):%s", c.file, c.why, c.toolInput, formatRows(rows))
 			}
 			continue
 		}
@@ -1133,24 +1147,52 @@ func TestStagingContractToolInputWritesOutOfScope(t *testing.T) {
 	}
 }
 
-// TestStagingContractArgLiteralPropagation pins the two packages whose staging
-// write goes through a helper that assembles the path from its own PARAMETERS.
-// Without argument-literal propagation the detector reports ZERO osint
-// violations and 20 unmigrated producers pass silently.
+// TestStagingContractArgLiteralPropagation pins the live-tree witnesses for the
+// detector's argument-literal propagation — a staging write through a helper
+// that assembles the path from its own PARAMETERS rather than from a literal in
+// its own body. Without propagation the detector reports ZERO osint violations
+// and 20 unmigrated producers pass silently.
+//
+// osint/domain_info.go writeOSINTStaging is the remaining unmigrated witness and
+// must still be REPORTED (plan 15-14 migrates it).
+//
+// subdomains/takeover.go writeTakeoverStagingFile was the second witness; plan
+// 15-13 migrated it to output.StageJSONL, so it must now be ABSENT. It is
+// asserted in that direction rather than deleted, because it is also the only
+// producer whose staging is read by the FIFTH merger (mergeTakeoverFindings in
+// internal/mcp/handlers/common.go, which appears in no *StagingPrefixes slice) —
+// a regression that dropped "takeover" from jsonlStagingStages would silently
+// stop reporting it, and this assertion catches that as a still-reported row
+// once 15-14 has nothing left to migrate.
+//
+// The propagation MECHANISM itself is pinned permanently and independently of
+// the live tree by the helperArgLiteralOK / helperArgLiteralBad fixtures in
+// testdata/stagingcontract/, asserted as an exact set by
+// TestStagingContractDetector.
 func TestStagingContractArgLiteralPropagation(t *testing.T) {
 	violations, _ := checkStagingContract(".", nil, derivedOutputExemptions)
-	want := map[string]string{
-		"internal/modules/osint/domain_info.go":   "writeOSINTStaging",
-		"internal/modules/subdomains/takeover.go": "writeTakeoverStagingFile",
-	}
 	got := map[string]bool{}
 	for _, v := range violations {
 		got[violationFile(v)+"\t"+violationFunc(v)] = true
 	}
-	for file, fn := range want {
+
+	wantReported := map[string]string{
+		"internal/modules/osint/domain_info.go": "writeOSINTStaging",
+	}
+	for file, fn := range wantReported {
 		if !got[file+"\t"+fn] {
 			t.Errorf("%s %s must be reported via argument-literal propagation — it is the "+
 				"parameter-derived staging writer for its package", file, fn)
+		}
+	}
+
+	wantMigrated := map[string]string{
+		"internal/modules/subdomains/takeover.go": "writeTakeoverStagingFile",
+	}
+	for file, fn := range wantMigrated {
+		if got[file+"\t"+fn] {
+			t.Errorf("%s %s was migrated to output.StageJSONL by plan 15-13 and must no longer "+
+				"be reported — a raw staging write has come back", file, fn)
 		}
 	}
 }

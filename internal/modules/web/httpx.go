@@ -44,6 +44,7 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -224,13 +225,50 @@ func (t *HTTPXTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 		inScope = append(inScope, line)
 	}
 
+	// F3 (phase 15): publish artefacts/hosts.jsonl UNCONDITIONALLY.
+	//
+	// "hosts" has TWO direct writers — this one and subdomains/geo.go — and the
+	// empty publish is assigned to httpx ALONE. The ordering evidence, verified
+	// on the tree:
+	//
+	//  1. subdomains.geo sits in the "subs-enrichment" stage group, the LAST
+	//     subdomains group, and web.httpx sits in "web-probe", the FIRST web
+	//     group; webStageGroups() is appended after the subs groups
+	//     (internal/mcp/handlers/composite.go). geo therefore runs strictly
+	//     BEFORE httpx whenever both run.
+	//  2. httpx passes the ARTEFACT ITSELF as its -o target (outputFile above),
+	//     and Tree.Append REPLACES rather than appends, so geo's records already
+	//     do not survive httpx today. Adding the empty publish here removes no
+	//     data that currently survives.
+	//  3. Both MergeStage(…, "hosts") calls run AFTER httpx (web-portscan and
+	//     web-producers) and are union-preserving via merge.go's hosts seed
+	//     branch, so portscan / nerva / wellknown staging still lands on top of
+	//     a now-possibly-empty base.
+	//
+	// Reaching here means httpx RAN: the three StatusErrored returns above
+	// (input resolution, unreadable hosts file, mkdir) all precede this and
+	// leave the previous artefact untouched.
+	//
+	// KNOWN LIMITATION, deliberately not "fixed" here: in a subs-only or passive
+	// run httpx never runs, so a previous run's hosts.jsonl survives even when
+	// geo ran and found nothing. Giving geo the empty publish instead would
+	// erase web hosts that NO producer in that run examined, which is worse.
 	if len(inScope) > 0 {
+		// Tree.Append stays the scope-enforcement boundary for non-empty batches.
 		if appendErr := app.Tree.Append("hosts", inScope); appendErr != nil {
 			if app.Log != nil {
 				app.Log.Debug("web.httpx: Tree.Append failed",
 					"records", len(inScope), "err", appendErr)
 			}
 			// Non-fatal per best_effort (D-W12).
+		}
+	} else if pubErr := output.PublishArtefact(app.Target.WorkDir, "hosts", nil); pubErr != nil {
+		// Append short-circuits on an empty batch and cannot express "this probe
+		// found nothing", so the empty case goes through PublishArtefact. This
+		// also truncates httpx's own raw -o output, which is desirable: that
+		// write is unfiltered and must not survive as the artefact.
+		if app.Log != nil {
+			app.Log.Debug("web.httpx: empty hosts publish failed", "err", pubErr)
 		}
 	}
 

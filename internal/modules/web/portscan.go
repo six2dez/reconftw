@@ -648,10 +648,12 @@ func portscanNmapXMLURLs(data []byte) []string {
 // portscanWriteHostRecords writes the open host:port results as HostRecord JSONL
 // to inputs/hosts.<producer>.jsonl (the web "hosts" single-writer staging file);
 // plan 13-08 wires web.MergeStage(ctx, app, "hosts") to consolidate to the store.
+//
+// F3 (phase 15): this is a write-or-REMOVE stage. Calling it is the statement
+// "portscan ran and these are ALL the open ports it saw this run", so an empty
+// pairs slice clears a previous run's staging rather than leaving it for the
+// hosts merge to republish. Callers that did NOT run the scan must not call it.
 func portscanWriteHostRecords(app *appctx.AppContext, pairs []portscanHostPort, producer string) {
-	if len(pairs) == 0 {
-		return
-	}
 	var lines [][]byte
 	for _, p := range pairs {
 		rec := HostRecord{Host: p.ip, IP: p.ip, Port: p.port}
@@ -659,11 +661,8 @@ func portscanWriteHostRecords(app *appctx.AppContext, pairs []portscanHostPort, 
 			lines = append(lines, b)
 		}
 	}
-	if len(lines) == 0 {
-		return
-	}
 	staging := filepath.Join(app.Target.WorkDir, "inputs", "hosts."+producer+".jsonl")
-	if err := output.WriteJSONL(staging, lines); err != nil && app.Log != nil {
+	if err := output.StageJSONL(staging, lines); err != nil && app.Log != nil {
 		app.Log.Debug("web.portscan: hosts staging write failed", "path", staging, "err", err)
 	}
 }
@@ -828,6 +827,11 @@ func portscanServiceFingerprint(ctx context.Context, app *appctx.AppContext, ps 
 		}
 	}
 	if len(targets) == 0 {
+		// F3 (phase 15): fingerprinting IS enabled and RAN this invocation; it
+		// simply has no open host:port to fingerprint. That is "ran and found
+		// nothing", so clear a previous run's nerva staging. (The disabled and
+		// nerva-absent paths return without clearing — they did not run.)
+		portscanWriteFingerprintRecords(app, nil)
 		return
 	}
 
@@ -910,12 +914,14 @@ func portscanServiceFPTargets(pairs []portscanHostPort) []string {
 // portscanWriteFingerprintRecords parses nerva JSONL and emits HostRecord JSONL
 // to inputs/hosts.nerva.jsonl (a distinct "hosts" single-writer staging file so
 // the fingerprints reach the store via web.MergeStage(ctx, app, "hosts")).
+//
+// F3 (phase 15): write-or-REMOVE. Calling it asserts "nerva ran and these are
+// ALL the fingerprints it produced this run", so empty raw clears a previous
+// run's inputs/hosts.nerva.jsonl instead of letting the hosts merge republish
+// it. The nerva-absent and fingerprint-disabled paths return BEFORE calling it.
 func portscanWriteFingerprintRecords(app *appctx.AppContext, raw []byte) {
-	if len(bytes.TrimSpace(raw)) == 0 {
-		return
-	}
 	var lines [][]byte
-	scanner := bufio.NewScanner(bytes.NewReader(raw))
+	scanner := bufio.NewScanner(bytes.NewReader(bytes.TrimSpace(raw)))
 	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
 	for scanner.Scan() {
 		line := bytes.TrimSpace(scanner.Bytes())
@@ -945,11 +951,8 @@ func portscanWriteFingerprintRecords(app *appctx.AppContext, raw []byte) {
 			lines = append(lines, b)
 		}
 	}
-	if len(lines) == 0 {
-		return
-	}
 	staging := filepath.Join(app.Target.WorkDir, "inputs", "hosts.nerva.jsonl")
-	if err := output.WriteJSONL(staging, lines); err != nil && app.Log != nil {
+	if err := output.StageJSONL(staging, lines); err != nil && app.Log != nil {
 		app.Log.Debug("web.portscan: nerva staging write failed", "path", staging, "err", err)
 	}
 }

@@ -30,6 +30,7 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -451,9 +452,20 @@ func runPassiveTask(ctx context.Context, app *appctx.AppContext, toolName string
 }
 
 // writeStagingFile writes hostnames (one per line) to the per-source staging
-// file at filepath.Join(app.Target.WorkDir, "inputs", "passive."+toolName+".txt").
-// Creates the inputs/ directory if it does not exist. Returns the absolute
-// path written.
+// file at filepath.Join(app.Target.WorkDir, "inputs", "passive."+toolName+".txt"),
+// or REMOVES that file when hostnames is empty. Returns the staging path in
+// both cases (the caller records it in task.Result.Outputs, which is stored as
+// a string and never stat-ed).
+//
+// F3 (phase 15): this is write-or-REMOVE via output.StageLines. Calling it is
+// the statement "this passive source RAN and these are ALL the hostnames it saw
+// this invocation", so a zero-result run clears the file instead of leaving the
+// previous run's hostnames for MergeAllSubdomains to republish. A task skipped
+// by the checkpoint never gets here, so resume still merges its data.
+//
+// The staging NAME is frozen: MergeAllSubdomains globs inputs/passive.*.txt
+// (see doc.go's STAGING CONTRACT), so renaming this file silently drops the
+// source from the merge.
 func writeStagingFile(app *appctx.AppContext, toolName string, hostnames []string) (string, error) {
 	inputsDir := filepath.Join(app.Target.WorkDir, "inputs")
 	if err := os.MkdirAll(inputsDir, 0o755); err != nil {
@@ -461,12 +473,7 @@ func writeStagingFile(app *appctx.AppContext, toolName string, hostnames []strin
 	}
 
 	stagingPath := filepath.Join(inputsDir, "passive."+toolName+".txt")
-	content := strings.Join(hostnames, "\n")
-	if len(hostnames) > 0 {
-		content += "\n"
-	}
-
-	if err := os.WriteFile(stagingPath, []byte(content), 0o644); err != nil { //nolint:gosec
+	if err := output.StageLines(stagingPath, hostnames); err != nil {
 		return "", fmt.Errorf("passive %s: write staging file: %w", toolName, err)
 	}
 	return stagingPath, nil

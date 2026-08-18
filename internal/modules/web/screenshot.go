@@ -32,6 +32,7 @@ import (
 	"strings"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
@@ -157,8 +158,16 @@ func (t *ScreenshotTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 		}
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
-	// Drain stream (Backend contract: caller MUST drain until closed).
-	for range eventCh { //nolint:revive // intentional drain
+	// F6 (phase 15): consume the TERMINAL error. A nuclei headless run that dies
+	// part way leaves a partial set of PNGs in tmpDir; content-addressing them
+	// into raw/screenshots/ would publish an incomplete capture as a complete
+	// one, and the count would silently understate what was not screenshotted.
+	//
+	// The D-W6 StatusSkipped above is deliberately untouched: it means nuclei
+	// headless is UNAVAILABLE (dispatch), which must never become a failure.
+	if drainErr := backend.Drain(eventCh); drainErr != nil {
+		return task.Result{Status: task.StatusErrored},
+			terminalStreamError(toolName, drainErr)
 	}
 
 	// Walk temp dir and content-address rename each PNG (D-W5).

@@ -108,13 +108,16 @@ func (t *Wafw00fTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 
 	results, _ := waf.ExtractWafw00f(raw, app.Target.Domain)
 
-	if len(results) == 0 {
-		return task.Result{
-			Status: task.StatusDone,
-			Stats:  map[string]int{"waf_detected": 0},
-		}, nil
-	}
-
+	// F3 (phase 15): the old `if len(results) == 0 { return StatusDone }`
+	// short-circuit left a previous run's inputs/waf.wafw00f.jsonl for the waf
+	// merge to republish, so a WAF that has since been removed kept appearing.
+	// wafw00f RAN (absent binary returned StatusSkipped above): stage
+	// unconditionally and let StageJSONL clear it on a zero-detection run.
+	//
+	// NOTE the OTHER inputs/ write in this function — inputs/wafw00f.hosts.txt
+	// at the top — is a TOOL-INPUT file handed to wafw00f via -i. It is NOT
+	// staging, no merger globs it, and it must keep its unconditional
+	// os.WriteFile: remove-on-empty semantics there would break the invocation.
 	var lines [][]byte
 	for _, r := range results {
 		rec := WAFRecord{
@@ -129,12 +132,10 @@ func (t *Wafw00fTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 		}
 		lines = append(lines, b)
 	}
-	if len(lines) > 0 {
-		stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "waf.wafw00f.jsonl")
-		if wErr := output.WriteJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
-			app.Log.Debug("web.wafw00f: staging write failed",
-				"path", stagingPath, "err", wErr)
-		}
+	stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "waf.wafw00f.jsonl")
+	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+		app.Log.Debug("web.wafw00f: staging write failed",
+			"path", stagingPath, "err", wErr)
 	}
 
 	if app.Log != nil {

@@ -22,6 +22,7 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -29,18 +30,20 @@ import (
 // Recursive staging file helpers
 // -------------------------------------------------------------------------
 
-// writeRecursiveStagingFile writes hostnames to inputs/recursive.<name>.txt.
+// writeRecursiveStagingFile writes hostnames to inputs/recursive.<name>.txt, or
+// REMOVES that file when lines is empty. Returns the staging path in both cases.
+//
+// F3 (phase 15): write-or-REMOVE via output.StageLines. Calling it asserts
+// "this recursive source RAN and found exactly these hostnames", so a
+// zero-result run clears the previous run's file instead of leaving it for
+// MergeAllSubdomains (which globs inputs/recursive.*.txt) to republish.
 func writeRecursiveStagingFile(app *appctx.AppContext, name string, lines []string) (string, error) {
 	inputsDir := filepath.Join(app.Target.WorkDir, "inputs")
 	if err := os.MkdirAll(inputsDir, 0o755); err != nil {
 		return "", fmt.Errorf("recursive %s: mkdir inputs/: %w", name, err)
 	}
 	stagingPath := filepath.Join(inputsDir, "recursive."+name+".txt")
-	content := strings.Join(lines, "\n")
-	if len(lines) > 0 {
-		content += "\n"
-	}
-	if err := os.WriteFile(stagingPath, []byte(content), 0o644); err != nil { //nolint:gosec
+	if err := output.StageLines(stagingPath, lines); err != nil {
 		return "", fmt.Errorf("recursive %s: write staging file: %w", name, err)
 	}
 	return stagingPath, nil
@@ -331,7 +334,20 @@ func (SubRecursiveBruteTask) Run(ctx context.Context, app *appctx.AppContext) (t
 			continue
 		}
 
+		// F6 (phase 15): ACCUMULATOR shape — latch the terminal Event.Err inside
+		// the loop and check it immediately after. Note the variable above,
+		// streamErr, is the DISPATCH error ("puredns is not on PATH") and keeps
+		// its non-fatal log-and-continue handling verbatim; termErr is the
+		// different thing — puredns RAN on this subdomain and ended badly, so
+		// what it emitted is a partial bruteforce.
+		var termErr error
 		for ev := range ch {
+			if ev.Err != nil {
+				if termErr == nil {
+					termErr = ev.Err
+				}
+				continue
+			}
 			if ev.IsErr {
 				continue
 			}
@@ -343,6 +359,14 @@ func (SubRecursiveBruteTask) Run(ctx context.Context, app *appctx.AppContext) (t
 				seen[line] = struct{}{}
 				allFound = append(allFound, line)
 			}
+		}
+		if termErr != nil {
+			// Discard everything accumulated across ALL subdomains and stage
+			// nothing: a recursive brute that failed on one branch has not
+			// enumerated the tree, and publishing the branches that did finish
+			// would understate the remaining surface.
+			return task.Result{Status: task.StatusErrored},
+				fmt.Errorf("puredns: tool stream ended badly for %s: %w", sub, termErr)
 		}
 	}
 

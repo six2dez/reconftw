@@ -21,6 +21,7 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -193,7 +194,14 @@ func attemptAXFR(ctx context.Context, app *appctx.AppContext, domain, nsServer s
 }
 
 // writeZoneTransferStagingFile writes discovered subdomains (one per line) to
-// inputs/resolved.zonetransfer.txt for consumption by the final MergeStage.
+// inputs/resolved.zonetransfer.txt for consumption by the final MergeStage, or
+// REMOVES that file when subdomains is empty. Returns the staging path in both
+// cases.
+//
+// F3 (phase 15): write-or-REMOVE via output.StageLines. Calling it asserts "the
+// AXFR attempt RAN and yielded exactly these hostnames", so a run where the zone
+// transfer is now refused clears the previous run's file instead of leaving it
+// for MergeAllSubdomains (which globs inputs/resolved.*.txt) to republish.
 func writeZoneTransferStagingFile(app *appctx.AppContext, subdomains []string) (string, error) {
 	inputsDir := filepath.Join(app.Target.WorkDir, "inputs")
 	if err := os.MkdirAll(inputsDir, 0o755); err != nil {
@@ -201,12 +209,7 @@ func writeZoneTransferStagingFile(app *appctx.AppContext, subdomains []string) (
 	}
 
 	stagingPath := filepath.Join(inputsDir, "resolved.zonetransfer.txt")
-	content := strings.Join(subdomains, "\n")
-	if len(subdomains) > 0 {
-		content += "\n"
-	}
-
-	if err := os.WriteFile(stagingPath, []byte(content), 0o644); err != nil { //nolint:gosec
+	if err := output.StageLines(stagingPath, subdomains); err != nil {
 		return "", err
 	}
 	return stagingPath, nil
