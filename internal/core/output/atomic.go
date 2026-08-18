@@ -200,7 +200,7 @@ func syncParentDir(dir string) error {
 		return fmt.Errorf("output: open parent dir: %w", err)
 	}
 	defer parent.Close() //nolint:errcheck
-	if err := parent.Sync(); err != nil {
+	if err := syncFile(parent); err != nil {
 		if isUnsupportedDirSync(err) {
 			return nil
 		}
@@ -215,10 +215,24 @@ func syncParentDir(dir string) error {
 func isUnsupportedDirSync(err error) bool {
 	var errno syscall.Errno
 	if stderrors.As(err, &errno) {
-		return errno == syscall.ENOTSUP || errno == syscall.EINVAL
+		// ENOTSUP/EINVAL are the Linux spellings. darwin reports the same
+		// "this device does not implement fsync" condition as ENODEV
+		// ("operation not supported by device") — verified empirically
+		// against /dev/null, /dev/zero and /dev/random on macOS 25.6, all
+		// of which return ENODEV rather than ENOTSUP. Without ENODEV the
+		// APFS carve-out this function documents never actually fires on
+		// the platform it was written for.
+		return errno == syscall.ENOTSUP || errno == syscall.EINVAL || errno == syscall.ENODEV
 	}
 	return false
 }
+
+// syncFile is the fsync seam for syncParentDir. Production always calls
+// (*os.File).Sync; tests swap it to drive the swallowed-vs-propagated
+// branches deterministically, because no portable device produces both
+// errno classes on demand. Mirrors the existing seam philosophy in this
+// file (writeFilePayload's syncableWriter, the FOUND-04 hook).
+var syncFile = func(f *os.File) error { return f.Sync() }
 
 // writeJSONLLines writes each line + "\n" into w. Extracted so test code
 // can drive the loop with a failing io.Writer to cover the deep error
