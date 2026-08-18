@@ -122,8 +122,8 @@ func newStageTestApp(t *testing.T, be backend.Backend, cfg *config.Config) *appc
 	t.Helper()
 	reg := backend.NewToolRegistry()
 	for _, name := range []string{
-		"crlfuzz", "smugglex", "gf", "sqlmap", "ghauri",
-		"Web-Cache-Vulnerability-Scanner", "toxicache",
+		"crlfuzz", "smugglex", "gf", "sqlmap", "ghauri", "TInjA", "sstimap",
+		"commix", "nuclei", "ffuf", "Web-Cache-Vulnerability-Scanner", "toxicache",
 	} {
 		reg.Register(&backend.Tool{Name: name})
 	}

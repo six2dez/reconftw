@@ -223,8 +223,17 @@ func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	//
 	// ffuf -v -H <header> -t <threads> -rate <rate>
 	//      -w tmp_ssrf.txt:FUZZ -u FUZZ -s
+	// F6 (phase 15): a TERMINAL ffuf failure means the probe ran and ended badly,
+	// so its result is partial — escalate and discard. A DISPATCH error (ffuf
+	// absent) keeps its best-effort path and just leaves ffufRan false. The
+	// interactsh lifecycle is unaffected: `defer cleanup()` was registered before
+	// any of these returns, so the process group is still SIGTERM-killed and
+	// reaped on the way out.
 	classicArgs := buildFFUFClassicArgs(tmpSSRFFile, header, threads, rateLimit)
 	classicFindings, classicErr := runSSRFFFUF(taskCtx, app, classicArgs, "ssrf_classic")
+	if isTerminalStreamError(classicErr) {
+		return task.Result{Status: task.StatusErrored}, classicErr
+	}
 	if classicErr == nil {
 		ffufRan = true
 	}
@@ -237,6 +246,9 @@ func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 		if _, statErr := os.Stat(headersInjectFile); statErr == nil {
 			headerInjArgs1 := buildFFUFHeaderInjArgs(tmpSSRFFile, headersInjectFile, header, collabToken, threads, rateLimit)
 			headerFindings1, headerErr1 := runSSRFFFUF(taskCtx, app, headerInjArgs1, "ssrf_header_inject_token")
+			if isTerminalStreamError(headerErr1) {
+				return task.Result{Status: task.StatusErrored}, headerErr1
+			}
 			if headerErr1 == nil {
 				ffufRan = true
 			}
@@ -244,6 +256,9 @@ func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 
 			headerInjArgs2 := buildFFUFHeaderInjArgs(tmpSSRFFile, headersInjectFile, header, collabURL, threads, rateLimit)
 			headerFindings2, headerErr2 := runSSRFFFUF(taskCtx, app, headerInjArgs2, "ssrf_header_inject_url")
+			if isTerminalStreamError(headerErr2) {
+				return task.Result{Status: task.StatusErrored}, headerErr2
+			}
 			if headerErr2 == nil {
 				ffufRan = true
 			}
@@ -257,6 +272,9 @@ func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	if ssrfPayloadsFile != "" {
 		altFindings, altErr := runSSRFAltProtocols(taskCtx, app, ssrfPayloadsFile, allURLs,
 			collabToken, collabURL, header, threads, rateLimit, inputsDir, cfg.Vulns.SSRF.AltMatchRegex)
+		if isTerminalStreamError(altErr) {
+			return task.Result{Status: task.StatusErrored}, altErr
+		}
 		if altErr == nil {
 			ffufRan = true
 		}
@@ -592,8 +610,15 @@ func runSSRFFFUF(ctx context.Context, app *appctx.AppContext, args []string, lab
 	// Drain stream — Backend contract requires full drain.
 	// XCUT-07: ffuf -v output may contain SSRF trigger URLs with collab IDs.
 	// NEVER log raw lines at Info/Warn.
+	//
+	// F6 (phase 15) accumulator shape: latch the TERMINAL error inside the loop
+	// and check it after.
 	var matchedHosts []string
+	var termErr error
 	for ev := range eventCh {
+		if ev.Err != nil {
+			termErr = ev.Err
+		}
 		line := string(ev.Line)
 		// ffuf -v output includes "| URL |" entries for matched responses.
 		// -s (silent) suppresses the banner but not match lines.
@@ -607,6 +632,12 @@ func runSSRFFFUF(ctx context.Context, app *appctx.AppContext, args []string, lab
 				app.Log.Debug("vulns.ssrf: ffuf match indicator", "label", label)
 			}
 		}
+	}
+
+	// F6: ffuf ended badly, so this probe covered only part of its wordlist.
+	// Report it rather than let a partial probe read as "no SSRF".
+	if termErr != nil {
+		return nil, terminalStreamError(toolName, termErr)
 	}
 
 	if len(matchedHosts) == 0 {

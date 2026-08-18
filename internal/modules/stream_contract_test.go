@@ -84,23 +84,16 @@ import (
 //
 // DELETE entries as you migrate. NEVER add one.
 var streamContractAllowlist = map[string][]string{
-	// internal/modules/web — 0 sites (all 6 migrated by plan 15-13 Task 2)
-	// internal/modules/subdomains — 0 sites (all 4 migrated by plan 15-13 Task 2)
-
-	// internal/modules/vulns — 11 sites (sqli.go and ssti.go have two each)
-	"internal/modules/vulns/cmdi.go":        {"CMDITask.Run"},
-	"internal/modules/vulns/nuclei_dast.go": {"NucleiDASTTask.Run"},
-	"internal/modules/vulns/ssrf.go":        {"runSSRFFFUF"},
-	"internal/modules/vulns/lfi.go":         {"runLFIFFUF"},
-	"internal/modules/vulns/webcache.go":    {"WebCacheTask.Run"},
-	"internal/modules/vulns/sqli.go":        {"runSQLMap", "runGhauriPerURL"},
-	"internal/modules/vulns/ssti.go":        {"runTInjA", "runSSTImap"},
-	"internal/modules/vulns/fuzzparams.go":  {"FuzzparamsTask.Run"},
-	"internal/modules/vulns/crlf.go":        {"CRLFTask.Run"},
-
-	// internal/modules/osint — 2 sites
-	"internal/modules/osint/cloud_enum.go":   {"CloudEnumTask.Run"},
-	"internal/modules/osint/github_leaks.go": {"GitHubLeaksTask.Run"},
+	// EMPTY — THE RATCHET IS CLOSED. Every app.Tools.Stream call site in
+	// internal/modules/ now consumes the terminal Event.Err.
+	//
+	//	web         0 sites — migrated by plan 15-13 Task 2
+	//	subdomains  0 sites — migrated by plan 15-13 Task 2
+	//	vulns       0 sites — all 11 migrated by plan 15-14 Task 2
+	//	osint       0 sites — both migrated by plan 15-14 Task 2
+	//
+	// NO ENTRY MAY EVER BE ADDED BACK. A new Stream call site is expected to
+	// consume the terminal error on the day it is written.
 }
 
 // streamContractAllowlistSize is the number of flattened allowlist entries.
@@ -110,9 +103,9 @@ var streamContractAllowlist = map[string][]string{
 //
 // 15-02 seed: 23 (web 6, subdomains 4, vulns 11, osint 2).
 // 15-13 lowered it to 13 by migrating all 10 web + subdomains sites.
-// 15-14 drives it to 0 (vulns 11 + osint 2).
+// 15-14 drove it to 0 by migrating all 13 remaining sites (vulns 11, osint 2).
 // 15-17 asserts 0.
-const streamContractAllowlistSize = 13
+const streamContractAllowlistSize = 0
 
 // TestStreamContract is the ratchet itself.
 func TestStreamContract(t *testing.T) {

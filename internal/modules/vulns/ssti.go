@@ -54,6 +54,7 @@ import (
 	"strings"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
@@ -156,6 +157,14 @@ func (t *SSTITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 		findings, scanErr = runTInjA(ctx, app, fuzzLines, cfg)
 	}
 
+	// F6 (phase 15): a TERMINAL engine failure (the scanner ran and exited badly)
+	// escalates and discards whatever it had gathered; a DISPATCH failure (the
+	// engine is not installed) keeps its existing best-effort log-and-continue.
+	// Returning here also leaves the staging file untouched — a crashed scanner
+	// has no standing either to publish or to retract a finding.
+	if isTerminalStreamError(scanErr) {
+		return task.Result{Status: task.StatusErrored}, scanErr
+	}
 	if scanErr != nil && app.Log != nil {
 		app.Log.Debug("vulns.ssti: engine error (best_effort)", "engine", engine, "err", scanErr)
 	}
@@ -244,9 +253,15 @@ func runTInjA(ctx context.Context, app *appctx.AppContext,
 		return nil, fmt.Errorf("vulns.ssti: TInjA stream error: %w", streamErr)
 	}
 
-	// Drain stream — Backend contract requires full drain.
+	// F6 (phase 15) — T-15-14-01. This is the highest-value site in the vulns
+	// sweep: the very next statement reads the TInjA report DIRECTORY, and those
+	// reports are not cleared between runs. A TInjA killed mid-scan therefore
+	// used to have LAST run's reports parsed and published as this run's verdict,
+	// with nothing anywhere recording that the scan had died. Return before the
+	// read.
 	// XCUT-07 (T-06-04-02): NEVER log raw TInjA stdout (template eval results).
-	for range eventCh { //nolint:revive // intentional drain — template eval not logged
+	if drainErr := backend.Drain(eventCh); drainErr != nil {
+		return nil, terminalStreamError(toolName, drainErr)
 	}
 
 	// Parse TInjA JSONL report(s) from reportDir.
@@ -412,8 +427,15 @@ func runSSTImap(ctx context.Context, app *appctx.AppContext,
 	// Drain stream; parse for confirmation indicators.
 	// XCUT-07 (T-06-04-02): SSTImap output may contain template eval results (e.g.,
 	// "49" from {{7*7}}). NEVER log raw lines at Info/Warn.
+	//
+	// F6 (phase 15) accumulator shape: latch the TERMINAL error inside the loop
+	// and check it after.
 	var confirmedURLs []string
+	var termErr error
 	for ev := range eventCh {
+		if ev.Err != nil {
+			termErr = ev.Err
+		}
 		line := strings.ToLower(string(ev.Line))
 		// SSTImap prints "confirmed" or "identified" on SSTI confirmation.
 		// Extract only the URL from the line for XCUT-07-safe storage.
@@ -436,6 +458,12 @@ func runSSTImap(ctx context.Context, app *appctx.AppContext,
 				confirmedURLs = append(confirmedURLs, app.Target.Domain)
 			}
 		}
+	}
+
+	// F6: SSTImap ended badly, so the confirmations gathered so far are a partial
+	// scan. Discard them rather than publish them as this run's verdict.
+	if termErr != nil {
+		return nil, terminalStreamError(toolName, termErr)
 	}
 
 	if len(confirmedURLs) == 0 {
@@ -569,15 +597,33 @@ func extractSSTImapURL(line string) string {
 
 // sstiExtractHost extracts the hostname from a URL for XCUT-07-safe record storage.
 // The full URL with SSTI payload is never written to any VulnFindingRecord.
+//
+// It also accepts a BARE hostname, which is not cosmetic. runSSTImap's
+// confirmation path falls back to app.Target.Domain when the URL cannot be
+// extracted from a confirmation line — a previously-landed fix for exactly the
+// data loss described below. But app.Target.Domain is a bare host, and
+// url.Parse("example.com") yields Host == "" (the whole string lands in Path),
+// so this function returned "" and the record was written with an EMPTY
+// locator. output.FilterInScope DROPS a findings record with neither host nor
+// url, so a CONFIRMED CRITICAL SSTI was still being discarded at the scope
+// boundary and the fallback never actually worked. Found by the plan-15-14
+// regression test that was written to prove the fallback was undisturbed;
+// it proved instead that it had never functioned.
+//
+// The fallback statement itself is deliberately untouched — the defect is here,
+// in the normaliser, which is also where the fix belongs for every caller.
 func sstiExtractHost(rawURL string) string {
 	if rawURL == "" {
 		return ""
 	}
 	parsed, err := url.Parse(rawURL)
-	if err != nil || parsed.Host == "" {
-		return ""
+	if err == nil && parsed.Host != "" {
+		return strings.ToLower(parsed.Hostname())
 	}
-	return strings.ToLower(parsed.Hostname())
+	// Bare hostname (no scheme). findingHost is the package's canonical
+	// normaliser: it strips any port and lowercases, and returns "" for
+	// anything that is not host-shaped.
+	return findingHost(rawURL)
 }
 
 // init self-registers SSTITask with the Default task registry.

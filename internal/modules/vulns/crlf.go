@@ -39,6 +39,7 @@ import (
 	"strings"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
@@ -121,9 +122,14 @@ func (t *CRLFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 		// Non-fatal per best_effort policy — proceed; stagingTxt may still have output
 		// if crlfuzz wrote it before exiting, or be absent (handled below).
 	} else {
-		// Drain the event channel — Backend contract requires full drain.
+		// F6 (phase 15): consume the TERMINAL error before reading stagingTxt.
+		// crlfuzz exiting non-zero leaves either a truncated -o file or none at
+		// all, and the read below treats "no file" as "clean target" — so an
+		// unchecked crash reported a vulnerable target as clean.
 		// XCUT-07 / T-06-02-02: events contain raw CRLF sequences; NEVER log at Info.
-		for range eventCh { //nolint:revive // intentional drain — raw CRLF not logged
+		if drainErr := backend.Drain(eventCh); drainErr != nil {
+			return task.Result{Status: task.StatusErrored},
+				terminalStreamError(toolName, drainErr)
 		}
 	}
 

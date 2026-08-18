@@ -149,6 +149,8 @@ func (t *CMDITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	}
 
 	var confirmedCount int
+	// termErr latches a TERMINAL stream error — commix RAN and ended badly.
+	var termErr error
 
 	eventCh, streamErr := app.Tools.Stream(ctx, toolName, args)
 	// commixRan records whether commix was actually DISPATCHED. A dispatch
@@ -164,7 +166,14 @@ func (t *CMDITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 		// Step 5: Drain event channel; detect injection confirmation lines.
 		// XCUT-07 / T-06-03-02: commix stdout may contain shell output from target.
 		// NEVER log raw lines at Info/Warn. Only count at Debug.
+		//
+		// F6 (phase 15) accumulator shape: latch the TERMINAL error inside the
+		// loop and act on it after. `streamErr` is already taken by the DISPATCH
+		// error above, whose log-and-continue body is untouched.
 		for ev := range eventCh {
+			if ev.Err != nil {
+				termErr = ev.Err
+			}
 			line := strings.TrimSpace(string(ev.Line))
 			if line == "" {
 				continue
@@ -182,6 +191,15 @@ func (t *CMDITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 					app.Log.Debug("vulns.cmdi: commix injection confirmed", "count", confirmedCount)
 				}
 			}
+		}
+		// F6: a commix that exited non-zero produced partial confirmations and
+		// may have left a partial (or a PREVIOUS run's) output directory. Neither
+		// the stdout count nor the directory scan below can be trusted, so return
+		// before either is used — and before the staging write, which leaves the
+		// previous run's file intact rather than clearing it on the word of a
+		// crashed scanner.
+		if termErr != nil {
+			return task.Result{Status: task.StatusErrored}, terminalStreamError(toolName, termErr)
 		}
 	}
 

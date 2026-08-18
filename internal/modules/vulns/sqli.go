@@ -166,8 +166,17 @@ func (t *SQLiTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	engineRan := false
 
 	// Step 5: sqlmap (XCUT-09 — Backend.Stream heartbeat; can run hours).
+	//
+	// F6 (phase 15): the helpers return (records, error) into a Run that logs
+	// scanner errors best-effort, so a plain error would be swallowed exactly as
+	// before. isTerminalStreamError separates "the engine RAN and ended badly"
+	// (escalate, discard partial results, leave staging untouched) from "the
+	// engine is not installed" (keep the existing best-effort path).
 	if sqlmapEnabled {
 		recs, sqlmapErr := runSQLMap(ctx, app, tmpSQLiFile, sqlmapOutDir)
+		if isTerminalStreamError(sqlmapErr) {
+			return task.Result{Status: task.StatusErrored}, sqlmapErr
+		}
 		if sqlmapErr != nil && app.Log != nil {
 			app.Log.Debug("vulns.sqli: sqlmap error (best_effort)", "err", sqlmapErr)
 		}
@@ -180,6 +189,9 @@ func (t *SQLiTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	// Step 6: ghauri per-URL (XCUT-09 — Backend.Stream heartbeat per URL).
 	if ghauriEnabled {
 		recs, ghauriErr := runGhauriPerURL(ctx, app, fuzzLines)
+		if isTerminalStreamError(ghauriErr) {
+			return task.Result{Status: task.StatusErrored}, ghauriErr
+		}
 		if ghauriErr != nil && app.Log != nil {
 			app.Log.Debug("vulns.sqli: ghauri error (best_effort)", "err", ghauriErr)
 		}
@@ -249,8 +261,16 @@ func runSQLMap(ctx context.Context, app *appctx.AppContext,
 
 	// Drain stream — Backend contract: caller MUST drain until closed.
 	// XCUT-07: each event.Line may contain raw SQL payloads; NEVER log at Info/Warn.
+	//
+	// F6 (phase 15) accumulator shape: latch the TERMINAL error inside the loop
+	// and check it after. sqlmap can run for hours and be killed by a timeout or
+	// OOM; without this, a half-finished run reported "no injection".
 	var injectable int
+	var termErr error
 	for ev := range eventCh {
+		if ev.Err != nil {
+			termErr = ev.Err
+		}
 		// Parse stream for "injectable" confirmation indicators.
 		// XCUT-07: raw line content NEVER forwarded to Info/Warn logs.
 		line := strings.ToLower(string(ev.Line))
@@ -260,6 +280,13 @@ func runSQLMap(ctx context.Context, app *appctx.AppContext,
 				app.Log.Debug("vulns.sqli: sqlmap injectable indicator detected")
 			}
 		}
+	}
+
+	// F6: sqlmap ended badly. Its output DIRECTORY persists across runs, so the
+	// scan below would read a mixture of this run's partial results and the
+	// previous run's — return before it.
+	if termErr != nil {
+		return nil, terminalStreamError(toolName, termErr)
 	}
 
 	// Also scan the output dir for sqlmap result files (*.log, *.csv) that
@@ -399,8 +426,16 @@ func runGhauriPerURL(ctx context.Context, app *appctx.AppContext,
 
 		// Drain stream — check for injection confirmation.
 		// XCUT-07: raw line content NEVER forwarded to Info/Warn.
+		//
+		// F6 (phase 15) accumulator shape, per URL: latch the TERMINAL error
+		// inside the loop and check it after. A ghauri that died on URL 3 of 40
+		// must not let the remaining 37 be reported as clean.
 		var confirmed bool
+		var termErr error
 		for ev := range eventCh {
+			if ev.Err != nil {
+				termErr = ev.Err
+			}
 			line := strings.ToLower(string(ev.Line))
 			// ghauri prints "parameter ... appears to be ... injectable" on confirm.
 			if strings.Contains(line, "injectable") || strings.Contains(line, "identified") {
@@ -409,6 +444,10 @@ func runGhauriPerURL(ctx context.Context, app *appctx.AppContext,
 					app.Log.Debug("vulns.sqli: ghauri injectable indicator detected")
 				}
 			}
+		}
+
+		if termErr != nil {
+			return records, terminalStreamError(toolName, termErr)
 		}
 
 		if confirmed {

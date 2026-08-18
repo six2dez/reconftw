@@ -49,6 +49,7 @@ import (
 	"strings"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
@@ -198,9 +199,16 @@ func (t *NucleiDASTTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 		}
 		// Non-fatal per best_effort policy.
 	} else {
-		// Drain stream — Backend contract: caller MUST drain until closed.
+		// F6 (phase 15): consume the TERMINAL error. The very next statement reads
+		// rawOutFile, so a nuclei killed by OOM or dying on a bad template used to
+		// lead straight to parsing a TRUNCATED file — or, when it died before
+		// writing anything, whatever a PREVIOUS run left at that path. Return
+		// before the read: partial output is not a result, and staging is left
+		// untouched so nothing is republished OR destroyed.
 		// XCUT-07: raw nuclei output routed to run.log only; never to Info terminal.
-		for range eventCh { //nolint:revive // intentional drain
+		if drainErr := backend.Drain(eventCh); drainErr != nil {
+			return task.Result{Status: task.StatusErrored},
+				terminalStreamError(toolName, drainErr)
 		}
 	}
 

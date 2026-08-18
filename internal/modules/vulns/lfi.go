@@ -192,6 +192,13 @@ func (t *LFITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 
 		hits, ffufErr := runLFIFFUF(ctx, app, toolName, candidate, lfiWordlist,
 			threads, rateLimit, timeoutSeconds, maxTimeSeconds, header)
+		// F6 (phase 15): ffuf RAN and ended badly on this candidate. The corpus is
+		// only partly probed, so escalate and discard rather than let the
+		// remaining candidates read as clean. A DISPATCH error (ffuf absent) keeps
+		// its best-effort path and simply leaves ffufRan false.
+		if isTerminalStreamError(ffufErr) {
+			return task.Result{Status: task.StatusErrored}, ffufErr
+		}
 		if ffufErr == nil {
 			ffufRan = true
 		}
@@ -350,8 +357,15 @@ func runLFIFFUF(ctx context.Context, app *appctx.AppContext,
 	// Drain stream — Backend contract requires full drain.
 	// XCUT-07 (T-06-04-01): raw ffuf output may contain file contents (e.g.,
 	// /etc/passwd lines). NEVER log at Info/Warn. Count matches only at Debug.
+	//
+	// F6 (phase 15) accumulator shape: latch the TERMINAL error inside the loop
+	// and check it after.
 	var matchCount int
+	var termErr error
 	for ev := range eventCh {
+		if ev.Err != nil {
+			termErr = ev.Err
+		}
 		line := strings.ToLower(string(ev.Line))
 		// ffuf -v output includes "| URL |" lines for matches; -mr means only
 		// lines matching "root:" are printed at all. Count presence.
@@ -362,6 +376,12 @@ func runLFIFFUF(ctx context.Context, app *appctx.AppContext,
 				app.Log.Debug("vulns.lfi: ffuf match indicator detected")
 			}
 		}
+	}
+
+	// F6: ffuf ended badly, so this candidate was only partially probed. Report
+	// it rather than let a partial probe read as "no LFI on this URL".
+	if termErr != nil {
+		return nil, terminalStreamError(toolName, termErr)
 	}
 
 	if matchCount == 0 {

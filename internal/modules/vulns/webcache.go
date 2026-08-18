@@ -130,6 +130,8 @@ func (t *WebCacheTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	}
 
 	var allFindings []VulnFindingRecord
+	// termErr latches a TERMINAL stream error — WCVS RAN and ended badly.
+	var termErr error
 
 	// Step 4: Run WCVS via Backend.Stream (XCUT-09 heartbeat).
 	// v1 arg vector (vulns.sh:879): Web-Cache-Vulnerability-Scanner -u "file:hostsFile" -v 0
@@ -149,7 +151,13 @@ func (t *WebCacheTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 		// Drain event channel for XCUT-09 heartbeat; collect WCVS confirmed findings.
 		// XCUT-07 / T-06-06-02: raw WCVS output lines contain cache poisoning PoC
 		// headers (X-Forwarded-Host etc.). NEVER log raw lines at Info/Warn.
+		// F6 (phase 15) accumulator shape: latch the TERMINAL error inside the
+		// loop and act on it after. `streamErr` is the DISPATCH error and keeps
+		// its untouched best-effort branch above.
 		for ev := range eventCh {
+			if ev.Err != nil {
+				termErr = ev.Err
+			}
 			line := strings.TrimSpace(string(ev.Line))
 			if line == "" {
 				continue
@@ -169,6 +177,13 @@ func (t *WebCacheTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 					Engine:          "wcvs",
 				})
 			}
+		}
+		// F6: WCVS exited non-zero, so the poisoning verdicts collected above are
+		// a partial scan. Return before toxicache and before the staging write —
+		// publishing a crashed scanner's partial result as this run's
+		// cache-poisoning verdict is exactly what gate 5 exists to stop.
+		if termErr != nil {
+			return task.Result{Status: task.StatusErrored}, terminalStreamError(wcvsToolName, termErr)
 		}
 	}
 

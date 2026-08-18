@@ -46,6 +46,7 @@ import (
 	"strconv"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
@@ -158,9 +159,13 @@ func (t *FuzzparamsTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 		}
 		// Non-fatal per best_effort policy.
 	} else {
-		// Drain stream — Backend contract: caller MUST drain until closed.
+		// F6 (phase 15): consume the TERMINAL error before reading stagingFile —
+		// a nuclei that exited non-zero leaves a truncated file, or none at all,
+		// in which case the read would return the PREVIOUS run's output.
 		// XCUT-07: raw nuclei output routed to run.log only; never to Info terminal.
-		for range eventCh { //nolint:revive // intentional drain
+		if drainErr := backend.Drain(eventCh); drainErr != nil {
+			return task.Result{Status: task.StatusErrored},
+				terminalStreamError(toolName, drainErr)
 		}
 	}
 

@@ -112,6 +112,8 @@ func (t *CloudEnumTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 
 	// Step 3: Stream (XCUT-09 heartbeat). Bucket findings surface on stdout.
 	var bucketLines []string
+	// termErr latches a TERMINAL stream error — cloud_enum RAN and ended badly.
+	var termErr error
 	// cloudEnumRan records whether cloud_enum was actually DISPATCHED. An absent
 	// binary means this task observed nothing and must not clear a previous
 	// run's staging (F3 did-not-run — see writeOSINTStaging).
@@ -122,7 +124,13 @@ func (t *CloudEnumTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 		}
 	} else {
 		cloudEnumRan = true
+		// F6 (phase 15) accumulator shape: latch the TERMINAL error inside the
+		// loop and act on it after. `sErr` above is the DISPATCH error and keeps
+		// its untouched best-effort branch.
 		for e := range ev {
+			if e.Err != nil {
+				termErr = e.Err
+			}
 			if e.IsErr {
 				continue
 			}
@@ -131,6 +139,15 @@ func (t *CloudEnumTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 				continue
 			}
 			bucketLines = append(bucketLines, line)
+		}
+		// F6: cloud_enum exited non-zero, so the bucket list above covers only
+		// part of the keyword space. Return before the list is preserved and
+		// before the staging write: publishing a partial enumeration as this
+		// run's result would report a still-open bucket as closed, and clearing
+		// staging on a crashed scanner's word would delete a real exposure.
+		if termErr != nil {
+			return task.Result{Status: task.StatusErrored},
+				fmt.Errorf("osint.cloud_enum: cloud_enum stream ended badly: %w", termErr)
 		}
 	}
 

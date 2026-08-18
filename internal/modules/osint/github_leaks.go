@@ -47,6 +47,7 @@ import (
 	"strings"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
 	"github.com/six2dez/reconftw/internal/core/log"
 	"github.com/six2dez/reconftw/internal/core/task"
@@ -129,7 +130,14 @@ func (t *GitHubLeaksTask) Run(ctx context.Context, app *appctx.AppContext) (task
 		}
 	} else {
 		engineRan = true
-		for range ev { //nolint:revive // intentional drain — raw secret lines NOT logged
+		// F6 (phase 15): consume the TERMINAL error before reading ghReport. A
+		// ghleaks that exited non-zero leaves a truncated --report file, or none,
+		// in which case the read picks up whatever a PREVIOUS run wrote there —
+		// publishing stale secret findings as this run's result. Return before
+		// the read; staging is untouched, so nothing is republished or destroyed.
+		if drainErr := backend.Drain(ev); drainErr != nil {
+			return task.Result{Status: task.StatusErrored},
+				fmt.Errorf("osint.github_leaks: ghleaks stream ended badly: %w", drainErr)
 		}
 	}
 	if ghData, rErr := os.ReadFile(ghReport); rErr == nil { //nolint:gosec // within WorkDir
