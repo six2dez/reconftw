@@ -249,13 +249,23 @@ func (q *Queries) DiffScansURLs(ctx context.Context, arg DiffScansURLsParams) ([
 }
 
 const getLatestCompletedScanForTarget = `-- name: GetLatestCompletedScanForTarget :one
-SELECT id, target_id, mode, status, started_at, finished_at, exit_code, reconftw_version, tool_versions_json, raw_args_json, config_overrides_json, output_dir, cancelled_by, findings_count, subdomain_count, url_count FROM scans WHERE target_id = ? AND status = 'completed' ORDER BY started_at DESC LIMIT 1
+SELECT id, target_id, mode, status, started_at, finished_at, exit_code, reconftw_version, tool_versions_json, raw_args_json, config_overrides_json, output_dir, cancelled_by, findings_count, subdomain_count, url_count FROM scans WHERE target_id = ? AND status = 'completed' ORDER BY started_at DESC, rowid DESC LIMIT 1
 `
 
 // GetLatestCompletedScanForTarget returns the most recent scan with
-// status='completed' for the given target_id, ordered by started_at DESC.
+// status='completed' for the given target_id.
 // Returns sql.ErrNoRows when no completed scan exists for the target.
 // Phase 10, Plan 01 — Wave 0 blocker for report and monitor diff loop.
+//
+// Plan 15-18 added the rowid tie-break. started_at is INTEGER SECONDS written
+// from time.Now().Unix() (schema.sql), so two scans of one target started in the
+// same second tie, and SQLite is free to return either — the monitor diff would
+// then compare against an arbitrary one of them. rowid is monotonic in insert
+// order and exists on every non-WITHOUT ROWID table.
+//
+// NOT ordered by id: ingest.go generates a UUID for scans.id, which does not
+// lex-sort by time. (ListScansCursor's comment claiming "ULIDs lex-sort" is
+// inconsistent with that and is recorded as a follow-up, not fixed here.)
 func (q *Queries) GetLatestCompletedScanForTarget(ctx context.Context, targetID string) (Scan, error) {
 	row := q.db.QueryRowContext(ctx, getLatestCompletedScanForTarget, targetID)
 	var i Scan

@@ -9,6 +9,27 @@ import (
 	"context"
 )
 
+const countObservationsForScanByKind = `-- name: CountObservationsForScanByKind :one
+SELECT count(*) FROM scan_observation WHERE scan_id = ? AND asset_kind = ?
+`
+
+type CountObservationsForScanByKindParams struct {
+	ScanID    string
+	AssetKind string
+}
+
+// Plan 15-18 -- how many assets of one kind a scan actually COMMITTED.
+//
+// Counting rows in the store rather than lines in an artefact file: an input
+// line that failed to upsert, or that deduplicated onto an existing row, is not
+// a discovery, and a scan counter derived from input lines overstates both.
+func (q *Queries) CountObservationsForScanByKind(ctx context.Context, arg CountObservationsForScanByKindParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countObservationsForScanByKind, arg.ScanID, arg.AssetKind)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const diffBetweenScans = `-- name: DiffBetweenScans :many
 SELECT scan_observation.asset_kind, scan_observation.asset_id
 FROM scan_observation

@@ -195,6 +195,72 @@ func (q *Queries) ListFindingsCursor(ctx context.Context, arg ListFindingsCursor
 	return items, nil
 }
 
+const listFindingsForScan = `-- name: ListFindingsForScan :many
+SELECT f.id, f.template_signature, f.tool, f.host_id, f.port_id, f.url_id, f.path, f.severity, f.status, f.title, f.description, f.evidence, f.matched_at, f.cvss_score, f.tags_json, f.notes, f.raw_json, f.first_seen_at, f.last_seen_at, f.target_id
+FROM scan_observation so
+JOIN findings f ON f.id = so.asset_id
+WHERE so.scan_id = ? AND so.asset_kind = 'finding'
+ORDER BY f.id
+LIMIT ? OFFSET ?
+`
+
+type ListFindingsForScanParams struct {
+	ScanID string
+	Limit  int64
+	Offset int64
+}
+
+// Plan 15-18 -- the findings ONE scan observed, paginated.
+//
+// Not a filter over ListFindingsForTarget: that query is target-wide and would
+// make a per-scan report fetch a fixed window of every finding the target has
+// ever had and then discard most of it. Resolution goes through
+// scan_observation.asset_id, which the v1->v2 migration repoints so each
+// observation lands on its own target's finding row.
+func (q *Queries) ListFindingsForScan(ctx context.Context, arg ListFindingsForScanParams) ([]Finding, error) {
+	rows, err := q.db.QueryContext(ctx, listFindingsForScan, arg.ScanID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Finding
+	for rows.Next() {
+		var i Finding
+		if err := rows.Scan(
+			&i.ID,
+			&i.TemplateSignature,
+			&i.Tool,
+			&i.HostID,
+			&i.PortID,
+			&i.URLID,
+			&i.Path,
+			&i.Severity,
+			&i.Status,
+			&i.Title,
+			&i.Description,
+			&i.Evidence,
+			&i.MatchedAt,
+			&i.CVSSScore,
+			&i.TagsJson,
+			&i.Notes,
+			&i.RawJson,
+			&i.FirstSeenAt,
+			&i.LastSeenAt,
+			&i.TargetID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listFindingsForTarget = `-- name: ListFindingsForTarget :many
 SELECT f.id, f.template_signature, f.tool, f.host_id, f.port_id, f.url_id, f.path, f.severity, f.status, f.title, f.description, f.evidence, f.matched_at, f.cvss_score, f.tags_json, f.notes, f.raw_json, f.first_seen_at, f.last_seen_at, f.target_id
 FROM target_finding tf
