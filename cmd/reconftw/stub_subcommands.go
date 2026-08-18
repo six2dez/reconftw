@@ -1266,12 +1266,20 @@ func runReportCmd(cmd *cobra.Command) error {
 	}
 	defer renderer.Close() //nolint:errcheck
 
-	if err := renderer.RenderAll(ctx, targetFlag, scanIDFlag, allowPartial, includeHistorical); err != nil {
+	result, err := renderer.RenderAll(ctx, targetFlag, scanIDFlag, allowPartial, includeHistorical)
+	if err != nil {
 		return fmt.Errorf("report: render: %w", err)
 	}
 
-	reportsDir := filepath.Join(dataDir, "reports")
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "reports written to: %s\n", reportsDir)
+	// Print the directory the renderer ACTUALLY wrote, taken from its manifest.
+	// This used to print the shared reports root under the data dir, which the per-scan
+	// layout no longer writes to — and it is the only pointer a CLI user gets,
+	// so naming a directory the report is not in is a small line with a large
+	// cost.
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "reports written to: %s\n", result.Dir)
+	for _, p := range result.Files {
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", p)
+	}
 	return nil
 }
 

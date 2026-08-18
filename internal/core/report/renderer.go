@@ -264,7 +264,12 @@ func (r *ReportRenderer) pageHostsForTarget(ctx context.Context, targetID string
 // "everything this target has ever had". It defaults to false and there is no
 // implicit fallback into it: a scan that observed nothing renders an EMPTY
 // report, loudly, rather than a target-wide dump wearing one scan's header.
-func (r *ReportRenderer) RenderAll(ctx context.Context, targetID, scanID string, allowPartial, includeHistorical bool) error {
+// It returns the RenderResult manifest: the scan, the directory and the exact
+// list of files THIS call wrote. Callers report from the manifest instead of
+// listing a directory, so a stale file from an earlier run cannot be presented
+// as part of this report.
+func (r *ReportRenderer) RenderAll(ctx context.Context, targetID, scanID string, allowPartial, includeHistorical bool) (RenderResult, error) {
+	var res RenderResult
 	// Step 1: resolve scan.
 	var scan sqlcgen.Scan
 	var err error
@@ -292,10 +297,10 @@ func (r *ReportRenderer) RenderAll(ctx context.Context, targetID, scanID string,
 		if !allowPartial {
 			hint += ", or --allow-partial to accept an unfinished one"
 		}
-		return fmt.Errorf("report: no completed scan found for target %q (%s)", targetID, hint)
+		return res, fmt.Errorf("report: no completed scan found for target %q (%s)", targetID, hint)
 	}
 	if err != nil {
-		return fmt.Errorf("report: get scan: %w", err)
+		return res, fmt.Errorf("report: get scan: %w", err)
 	}
 
 	// An explicit --scan-id bypassed the completed-scan requirement entirely, so
@@ -303,7 +308,7 @@ func (r *ReportRenderer) RenderAll(ctx context.Context, targetID, scanID string,
 	// finished assessment while --allow-partial — the flag whose entire purpose
 	// is to opt into that — sat unread. Apply the same rule to both paths.
 	if !allowPartial && scan.Status != "completed" {
-		return fmt.Errorf(
+		return res, fmt.Errorf(
 			"report: scan %s is %q, not completed — pass --allow-partial to render it anyway",
 			scan.ID, scan.Status)
 	}
@@ -314,7 +319,7 @@ func (r *ReportRenderer) RenderAll(ctx context.Context, targetID, scanID string,
 	// A's findings, hosts and URLs — a report that looks authoritative and
 	// describes an asset the scan never touched. Refuse rather than guess.
 	if targetID != "" && scan.TargetID != targetID {
-		return fmt.Errorf(
+		return res, fmt.Errorf(
 			"report: scan %s belongs to target %q, not %q — refusing to render a "+
 				"report mixing one scan's header with another target's data",
 			scan.ID, scan.TargetID, targetID)
@@ -340,7 +345,7 @@ func (r *ReportRenderer) RenderAll(ctx context.Context, targetID, scanID string,
 	if includeHistorical {
 		findings, hosts, urls, err = r.fetchHistorical(ctx, targetID)
 		if err != nil {
-			return err
+			return res, err
 		}
 		historicalNotice = HistoricalNotice
 		r.log.WarnContext(ctx, "report: "+HistoricalNotice,
@@ -349,7 +354,7 @@ func (r *ReportRenderer) RenderAll(ctx context.Context, targetID, scanID string,
 	} else {
 		findings, hosts, urls, err = r.fetchForScan(ctx, scan.ID)
 		if err != nil {
-			return err
+			return res, err
 		}
 		if len(findings) == 0 && len(hosts) == 0 && len(urls) == 0 {
 			// Not a fallback trigger. A run that found nothing MUST render an
@@ -365,10 +370,32 @@ func (r *ReportRenderer) RenderAll(ctx context.Context, targetID, scanID string,
 			"findings", len(findings), "hosts", len(hosts), "urls", len(urls))
 	}
 
-	// Step 3: ensure reports directory exists.
-	reportsDir := filepath.Join(r.workDir, "reports")
+	// Step 3: resolve and create THIS scan's report directory.
+	//
+	// reports/<target-slug>/<scan-id>/ replaces the single shared reports/ dir.
+	// In the shared directory a run inherited whatever the previous run left
+	// behind — a Faraday export written when the integration was enabled, an AI
+	// report from before AI was turned off — and every consumer, including the
+	// MCP tool, presented those files as part of the current report
+	// (T-15-11-03). A per-scan directory has nothing to inherit.
+	//
+	// The slug is output.CanonicalTargetID's, the same identity the workspace
+	// tree uses, so the two trees address a target the same way (15-01).
+	ident, idErr := output.CanonicalTargetID(scan.TargetID)
+	if idErr != nil {
+		return res, fmt.Errorf("report: canonical target id for %q: %w", scan.TargetID, idErr)
+	}
+	targetReportsDir := filepath.Join(r.workDir, "reports", ident.Slug)
+	reportsDir := filepath.Join(targetReportsDir, scan.ID)
 	if err := os.MkdirAll(reportsDir, 0o755); err != nil {
-		return fmt.Errorf("report: mkdir reports: %w", err)
+		return res, fmt.Errorf("report: mkdir reports: %w", err)
+	}
+	res = RenderResult{
+		ScanID:            scan.ID,
+		TargetID:          scan.TargetID,
+		Dir:               reportsDir,
+		IncludeHistorical: includeHistorical,
+		Notice:            historicalNotice,
 	}
 
 	// Build hotlist first (used in HTML).
@@ -414,40 +441,62 @@ func (r *ReportRenderer) RenderAll(ctx context.Context, targetID, scanID string,
 
 	htmlPath := filepath.Join(reportsDir, "report.html")
 	if err := RenderHTML(htmlData, htmlPath); err != nil {
-		return fmt.Errorf("report: html: %w", err)
+		return res, fmt.Errorf("report: html: %w", err)
 	}
+	res.add(htmlPath)
 	r.log.InfoContext(ctx, "report: wrote HTML report", "path", htmlPath)
 
 	// Step 5: write CSV files.
 	if err := WriteAllCSV(reportsDir, findings, hosts, urls); err != nil {
-		return fmt.Errorf("report: csv: %w", err)
+		return res, fmt.Errorf("report: csv: %w", err)
+	}
+	for _, name := range csvFileNames {
+		res.add(filepath.Join(reportsDir, name))
 	}
 
 	// Step 6: write SARIF.
 	sarifPath := filepath.Join(reportsDir, "findings.sarif")
 	if err := WriteSARIF(sarifPath, version, findings); err != nil {
-		return fmt.Errorf("report: sarif: %w", err)
+		return res, fmt.Errorf("report: sarif: %w", err)
 	}
+	res.add(sarifPath)
 
 	// Step 7: write hotlist JSON.
 	hotlistPath := filepath.Join(reportsDir, "hotlist.json")
 	if err := WriteHotlist(hotlistPath, hotlistItems); err != nil {
-		return fmt.Errorf("report: hotlist: %w", err)
+		return res, fmt.Errorf("report: hotlist: %w", err)
 	}
+	res.add(hotlistPath)
 
 	// Step 8: write Faraday export (gated on Integrations.Faraday.Enabled).
+	//
+	// Only a SUCCESSFUL write is recorded: the manifest states what exists, and
+	// a best-effort export that failed does not.
 	if r.cfg != nil && r.cfg.Integrations.Faraday.Enabled {
 		faradayPath := filepath.Join(reportsDir, "faraday.json")
 		if err := WriteFaraday(faradayPath, findings, hosts); err != nil {
 			r.log.WarnContext(ctx, "report: faraday export failed (non-fatal)", "err", err)
 		} else {
+			res.add(faradayPath)
 			r.log.InfoContext(ctx, "report: wrote Faraday export", "path", faradayPath)
 		}
 	}
 
 	// Step 9: write notes.jsonl (canonical REPORT-01 artefact — always written).
 	if err := WriteNotesJSONL(reportsDir); err != nil {
-		return fmt.Errorf("report: notes.jsonl: %w", err)
+		return res, fmt.Errorf("report: notes.jsonl: %w", err)
+	}
+	res.add(filepath.Join(reportsDir, "notes.jsonl"))
+
+	// Step 9b: the historical-scope marker, when the report was widened. The
+	// HTML banner covers a human reader; this covers a consumer that only reads
+	// the machine formats.
+	if includeHistorical {
+		markerPath := filepath.Join(reportsDir, HistoricalMarkerName)
+		if err := output.WriteFile(markerPath, []byte(HistoricalNotice+"\n"), 0o644); err != nil {
+			return res, fmt.Errorf("report: historical marker: %w", err)
+		}
+		res.add(markerPath)
 	}
 
 	// Step 10: AI report (best-effort — errors are logged but do not abort).
@@ -473,11 +522,27 @@ func (r *ReportRenderer) RenderAll(ctx context.Context, targetID, scanID string,
 				if wErr := output.WriteFile(aiPath, []byte(aiText), 0o644); wErr != nil {
 					r.log.WarnContext(ctx, "report: write AI report failed (non-fatal)", "err", wErr)
 				} else {
+					res.add(aiPath)
 					r.log.InfoContext(ctx, "report: wrote AI report", "path", aiPath)
 				}
 			}
 		}
 	}
 
-	return nil
+	// Step 11: the manifest, then the per-target latest pointer.
+	//
+	// manifest.json is deliberately absent from res.Files: Files is the report,
+	// the manifest describes it. Writing the pointer last means it only ever
+	// names a directory whose manifest is already on disk.
+	res.finalise()
+	if err := WriteRenderManifest(&res); err != nil {
+		return res, fmt.Errorf("report: manifest: %w", err)
+	}
+	if err := WriteLatestPointer(targetReportsDir, &res); err != nil {
+		return res, fmt.Errorf("report: latest pointer: %w", err)
+	}
+	r.log.InfoContext(ctx, "report: render complete",
+		"scan_id", res.ScanID, "dir", res.Dir, "files", len(res.Files))
+
+	return res, nil
 }

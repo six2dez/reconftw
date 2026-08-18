@@ -89,11 +89,12 @@ func TestRenderAll_OllamaWritesAIReport(t *testing.T) {
 	}
 	defer renderer.Close() //nolint:errcheck
 
-	if err := renderer.RenderAll(ctx, target, "", false, false); err != nil {
+	res, err := renderer.RenderAll(ctx, target, "", false, false)
+	if err != nil {
 		t.Fatalf("RenderAll: %v", err)
 	}
 
-	aiPath := filepath.Join(workDir, "reports", "ai-report.md")
+	aiPath := filepath.Join(res.Dir, "ai-report.md")
 	data, err := os.ReadFile(aiPath)
 	if err != nil {
 		t.Fatalf("ai-report.md not written (production ollama gate did not fire): %v", err)
@@ -122,11 +123,12 @@ func TestRenderAll_AnthropicEmptyKeyWritesNothing(t *testing.T) {
 	}
 	defer renderer.Close() //nolint:errcheck
 
-	if err := renderer.RenderAll(ctx, target, "", false, false); err != nil {
+	res, err := renderer.RenderAll(ctx, target, "", false, false)
+	if err != nil {
 		t.Fatalf("RenderAll: %v", err)
 	}
 
-	aiPath := filepath.Join(workDir, "reports", "ai-report.md")
+	aiPath := filepath.Join(res.Dir, "ai-report.md")
 	if _, err := os.Stat(aiPath); !os.IsNotExist(err) {
 		t.Errorf("ai-report.md exists for anthropic+empty-key; want no file (gate should be closed), stat err=%v", err)
 	}
@@ -148,11 +150,12 @@ func TestRenderAll_AIDisabledWritesNothing(t *testing.T) {
 	}
 	defer renderer.Close() //nolint:errcheck
 
-	if err := renderer.RenderAll(ctx, target, "", false, false); err != nil {
+	res, err := renderer.RenderAll(ctx, target, "", false, false)
+	if err != nil {
 		t.Fatalf("RenderAll: %v", err)
 	}
 
-	aiPath := filepath.Join(workDir, "reports", "ai-report.md")
+	aiPath := filepath.Join(res.Dir, "ai-report.md")
 	if _, err := os.Stat(aiPath); !os.IsNotExist(err) {
 		t.Errorf("ai-report.md exists with AI.Enabled=false; want no file, stat err=%v", err)
 	}
@@ -279,10 +282,11 @@ func renderScanWithLog(t *testing.T, dataDir, target, scanID string, includeHist
 		t.Fatalf("NewReportRenderer: %v", err)
 	}
 	defer r.Close() //nolint:errcheck
-	if err := r.RenderAll(context.Background(), target, scanID, false, includeHistorical); err != nil {
+	res, err := r.RenderAll(context.Background(), target, scanID, false, includeHistorical)
+	if err != nil {
 		t.Fatalf("RenderAll: %v", err)
 	}
-	return filepath.Join(dataDir, "reports")
+	return res.Dir
 }
 
 // TestRenderAll_Gate9_ScanWithZeroURLsRendersZeroURLs is acceptance gate 9.
@@ -379,11 +383,12 @@ func TestRenderAll_PaginationCoversEveryRowExactlyOnce(t *testing.T) {
 	}
 	defer r.Close() //nolint:errcheck
 	r.SetPageSize(3)
-	if err := r.RenderAll(context.Background(), target, res.ScanID, false, false); err != nil {
+	rendered, err := r.RenderAll(context.Background(), target, res.ScanID, false, false)
+	if err != nil {
 		t.Fatalf("RenderAll: %v", err)
 	}
 
-	rows := csvRows(t, filepath.Join(dataDir, "reports", "findings.csv"))
+	rows := csvRows(t, filepath.Join(rendered.Dir, "findings.csv"))
 	if len(rows) != wantFindings {
 		t.Fatalf("rendered %d findings across 3 pages; want %d", len(rows), wantFindings)
 	}

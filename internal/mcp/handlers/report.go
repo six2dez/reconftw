@@ -9,34 +9,46 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
-	"path/filepath"
-	"sort"
 
 	"github.com/six2dez/reconftw/internal/core/config"
 	"github.com/six2dez/reconftw/internal/core/log"
 	"github.com/six2dez/reconftw/internal/core/report"
 )
 
-// RenderReportsForTarget renders every report format for target's latest
-// completed scan and returns the paths written.
+// RenderReportsForTarget renders every report format for target's scan and
+// returns the render manifest — the files THIS call wrote.
 //
-// It resolves the data directory from the loaded config, exactly as the CLI
-// does, so both surfaces read the same store and write to the same place.
-func RenderReportsForTarget(ctx context.Context, target string) ([]string, error) {
-	cfg, err := config.Load(config.LoadOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("report: config load: %w", err)
+// cfg is the caller's RESOLVED configuration. This function used to load a
+// DEFAULT config of its own here, which discarded the --config and the
+// --secrets the server was started with: the render then read a different data
+// directory and built its redactor from a config that had registered none of
+// the operator's secrets, so redaction silently degraded in the one artefact
+// most likely to be shared outside the engagement (T-15-11-05, F7). A nil cfg
+// is tolerated (the data dir falls back to "data") but is never a substitute
+// for the caller's own configuration.
+//
+// The returned paths come from report.RenderResult, not from listing the
+// reports directory: a directory listing answers "what is here", which returned
+// a previous run's Faraday export, an AI report from a run when AI was still
+// enabled, and on a shared data dir another engagement's files (T-15-11-02).
+func RenderReportsForTarget(
+	ctx context.Context,
+	cfg *config.Config,
+	rdct *log.Redactor,
+	target, scanID string,
+	includeHistorical bool,
+) (report.RenderResult, error) {
+	dataDir := "data"
+	if cfg != nil && cfg.Paths.DataDir != "" {
+		dataDir = cfg.Paths.DataDir
 	}
-	dataDir := cfg.Paths.DataDir
-	if dataDir == "" {
-		dataDir = "data"
+	if rdct == nil {
+		rdct = &log.Redactor{}
 	}
 
-	rdct := &log.Redactor{}
 	renderer, err := report.NewReportRenderer(dataDir, cfg, slog.Default(), rdct)
 	if err != nil {
-		return nil, fmt.Errorf("report: open renderer: %w", err)
+		return report.RenderResult{}, fmt.Errorf("report: open renderer: %w", err)
 	}
 	defer renderer.Close() //nolint:errcheck
 
@@ -44,23 +56,9 @@ func RenderReportsForTarget(ctx context.Context, target string) ([]string, error
 	// finished one. Rendering an unfinished scan as though it were complete is
 	// the failure mode --allow-partial exists to make explicit, and there is no
 	// way for a tool caller to opt in yet.
-	if err := renderer.RenderAll(ctx, target, "", false, false); err != nil {
-		return nil, fmt.Errorf("report: render: %w", err)
-	}
-
-	reportsDir := filepath.Join(dataDir, "reports")
-	entries, err := os.ReadDir(reportsDir)
+	res, err := renderer.RenderAll(ctx, target, scanID, false, includeHistorical)
 	if err != nil {
-		// Rendering succeeded, so report the directory even if it cannot be
-		// listed — the caller still needs to know where to look.
-		return []string{reportsDir}, nil //nolint:nilerr // path is the useful answer
+		return report.RenderResult{}, fmt.Errorf("report: render: %w", err)
 	}
-	paths := make([]string, 0, len(entries))
-	for _, e := range entries {
-		if !e.IsDir() {
-			paths = append(paths, filepath.Join(reportsDir, e.Name()))
-		}
-	}
-	sort.Strings(paths)
-	return paths, nil
+	return res, nil
 }
