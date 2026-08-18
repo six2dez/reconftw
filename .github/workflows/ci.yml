@@ -251,6 +251,40 @@ jobs:
           export PATH="$(go env GOPATH)/bin:$PATH"
           bash .planning/decisions/verify-0002.sh
 
+  release-gates:
+    name: Release gates (phase 15 acceptance)
+    runs-on: ubuntu-latest
+    # Phase 15's twelve acceptance gates plus the regression guard, in ONE
+    # command. This is the evidence the Phase 14 cutover is signed off against.
+    #
+    # Deliberately its OWN job rather than a step in `unit` or `integration`:
+    # this repo already splits a fast per-push loop from heavier work, and
+    # release-gates re-runs `go test -race ./...`, govulncheck and the coverage
+    # gates. Folding it into the per-push job would roughly double every push's
+    # wall time for a check whose audience is the cutover decision.
+    #
+    # ACCEPTANCE GATE 11 IS NOT RUN HERE. Its owner is
+    # .github/workflows/docker_nightly.yml, job `docker`, step
+    # `Verify image health (linux/arm64)`, which builds the multiarch image and
+    # runs it under QEMU. `make release-gates` reports it SKIPPED with that
+    # reason rather than pretending to cover it — so the two workflows do not
+    # duplicate a ~20-minute buildx run, and neither one silently claims the
+    # other's result.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Install gofumpt
+        run: go install mvdan.cc/gofumpt@v0.7.0
+      - name: Install govulncheck
+        # Pinned to the same version as the govulncheck job above: an unpinned
+        # scanner makes a green build depend on when it ran.
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+      - name: make release-gates
+        run: make release-gates
+
   platform-smoke:
     name: Platform smoke (${{ matrix.os }})
     # XPLAT-05: build + smoke-test the binary on every supported platform on

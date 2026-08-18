@@ -9,11 +9,20 @@
 // (plan 15-03 Task 1) write-or-REMOVE; every producer must route its staging
 // write through them.
 //
-// stagingContractAllowlist MUST REACH ZERO BEFORE CUTOVER. Plan 15-13 migrates
-// the web + subdomains share, plan 15-14 the vulns + osint share, plan 15-17
-// asserts 0. NO NEW ENTRY MAY EVER BE ADDED. A new producer writes its staging
-// through the helpers from the start; if this test fails on code you just
-// wrote, migrate the write — do not append to the list.
+// stagingContractAllowlist IS PERMANENTLY EMPTY — THE RATCHET IS CLOSED. Plan
+// 15-13 migrated the web + subdomains share, plan 15-14 the vulns + osint share,
+// and plan 15-17 closed it: stagingContractAllowlistSize is asserted to be
+// exactly 0 by TestStagingContractRatchetIsClosed and the map literal is
+// asserted to be empty. A NON-EMPTY ALLOWLIST IS NOW A REGRESSION, not a
+// migration state — there is no remaining migration.
+//
+// The empty map literal is deliberately KEPT rather than deleted. An empty map
+// plus a zero assertion is a stronger guard than removing the mechanism: a
+// contributor who adds a raw merger-globbed staging write gets a NAMED failure
+// naming the file and function, rather than a silent pass. NO NEW ENTRY MAY
+// EVER BE ADDED. A new producer writes its staging through the helpers from the
+// start; if this test fails on code you just wrote, migrate the write — do not
+// append to the list.
 //
 // ─────────────────────────────────────────────────────────────────────────────
 // THE RULE IS STAGING-GLOB-TRIGGERED.
@@ -64,6 +73,14 @@
 // It is NOT part of the ratchet. It holds exactly ONE entry and stays at one:
 // plans 15-13, 15-14 and 15-17 must not change it. Its size is pinned by a test
 // so growing it is a visible diff.
+//
+// GROWING THIS MAP IS HOW A FUTURE CONTRIBUTOR WOULD SMUGGLE AN UNMIGRATED RAW
+// STAGING WRITE PAST A ZERO-LENGTH ALLOWLIST. A closed allowlist beside an
+// unbounded exemption map is a green gate protecting nothing: every entry moved
+// in here is a producer whose staging file is no longer removed on a zero-result
+// run, which is exactly the F3 defect the allowlist was built to eliminate.
+// derivedOutputExemptionsSize is therefore asserted at 1 permanently, and the
+// single key is named in the assertion so a swap is as visible as a growth.
 //
 // An entry qualifies only if BOTH hold:
 //
@@ -156,7 +173,8 @@ var stagingContractAllowlist = map[string][]string{
 
 // stagingContractAllowlistSize is the FLATTENED entry count of
 // stagingContractAllowlist. Asserted by TestStagingContractAllowlistShrinks so
-// lowering one without the other fails.
+// lowering one without the other fails, and pinned at exactly 0 by
+// TestStagingContractRatchetIsClosed so neither can be raised.
 //
 // 15-03 seed: 38 (web 16, vulns 15, subdomains 6, osint 1).
 // 15-13 lowered it to 16 by removing all 22 web + subdomains entries (web 16,
@@ -164,7 +182,7 @@ var stagingContractAllowlist = map[string][]string{
 //	subdomains 6). Remaining: vulns 15 + osint 1.
 //
 // 15-14 drove it to 0 by removing all 16 remaining entries (vulns 15, osint 1).
-// 15-17 asserts 0.
+// 15-17 CLOSED it: this constant is now a permanent 0 and may never be raised.
 const stagingContractAllowlistSize = 0
 
 // derivedOutputExemptions maps file → function → the path literal whose write is
@@ -963,10 +981,74 @@ func TestDerivedOutputExemptionsPinned(t *testing.T) {
 		t.Fatalf("derivedOutputExemptions has %d entries, want %d — this map is NOT part of "+
 			"the ratchet and must stay at exactly one entry", n, derivedOutputExemptionsSize)
 	}
+	// The CONSTANT itself, not merely map-vs-constant agreement. Raising both
+	// together satisfies the check above; this one does not move.
+	if derivedOutputExemptionsSize != 1 {
+		t.Fatalf("derivedOutputExemptionsSize is %d, want 1.\n"+
+			"  Growing this map is how an unmigrated raw staging write gets past a "+
+			"zero-length allowlist:\n"+
+			"  the allowlist stays at 0, the gate stays green, and a producer stops "+
+			"clearing its staging on a\n"+
+			"  zero-result run — the exact F3 defect. There is one legitimate derived "+
+			"intermediate and it is\n"+
+			"  already here.", derivedOutputExemptionsSize)
+	}
+	if len(derivedOutputExemptions) != 1 {
+		t.Fatalf("derivedOutputExemptions must have exactly ONE file key, got %d: %v",
+			len(derivedOutputExemptions), derivedOutputExemptions)
+	}
 	got, ok := derivedOutputExemptions["internal/modules/subdomains/merge.go"]
 	if !ok || got["MergeStage"] != ".merged.txt" {
 		t.Fatalf("the one exemption must be subdomains/merge.go MergeStage -> .merged.txt, got %v",
 			derivedOutputExemptions)
+	}
+	if len(got) != 1 {
+		t.Fatalf("the subdomains/merge.go exemption must name exactly ONE function, got %v", got)
+	}
+}
+
+// TestStagingContractRatchetIsClosed is phase 15 plan 17's permanent closure of
+// the F3 migration ratchet.
+//
+// TestStagingContractAllowlistShrinks only pins the map AGAINST the constant, so
+// raising BOTH together would satisfy it. This test pins the CONSTANT, so the
+// only way to re-open the ratchet is to edit an assertion whose failure message
+// says that editing it is the regression.
+//
+// It also re-asserts, with an EMPTY allowlist and the one exemption in place,
+// that the detector reports ZERO violations across internal/modules/. That is
+// the substantive claim: "the allowlist is empty" is worthless if the detector
+// would report violations were it consulted.
+func TestStagingContractRatchetIsClosed(t *testing.T) {
+	if stagingContractAllowlistSize != 0 {
+		t.Errorf("stagingContractAllowlistSize is %d, want 0.\n"+
+			"  The F3 staging-contract ratchet was CLOSED by phase 15 plan 17. Every "+
+			"producer under\n"+
+			"  internal/modules/ stages through output.StageJSONL / output.StageLines. "+
+			"If a new write fails\n"+
+			"  TestStagingContract, migrate the write — do NOT raise this constant.",
+			stagingContractAllowlistSize)
+	}
+	if n := len(stagingContractAllowlist); n != 0 {
+		var files []string
+		for f := range stagingContractAllowlist {
+			files = append(files, f)
+		}
+		sort.Strings(files)
+		t.Errorf("stagingContractAllowlist has %d file(s) — %v — but the ratchet is closed.\n"+
+			"  The empty map literal is kept ON PURPOSE so a new raw staging write still "+
+			"gets a named\n"+
+			"  failure; it is not a place to park one.", n, files)
+	}
+
+	violations, stale := checkStagingContract(".", nil, derivedOutputExemptions)
+	if len(violations) > 0 {
+		t.Errorf("with an EMPTY allowlist the detector still reports %d violation(s) — the "+
+			"zero-length allowlist\n"+
+			"  is therefore not evidence of anything:%s", len(violations), formatRows(violations))
+	}
+	if len(stale) > 0 {
+		t.Errorf("an empty allowlist cannot produce stale entries; got:%s", formatRows(stale))
 	}
 }
 

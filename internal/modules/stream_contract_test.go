@@ -14,14 +14,23 @@
 // internal/modules and fails when a function calls app.Tools.Stream without
 // consuming the terminal error.
 //
-// # The allowlist is a temporary migration ratchet
+// # The allowlist is PERMANENTLY EMPTY — the ratchet is closed
 //
 // streamContractAllowlist was introduced by phase 15 plan 02 seeded with the 23
-// known-unmigrated sites, so this test passes on the tree that introduced it.
-// Plans 15-13 and 15-14 migrate those sites and delete their entries; plan 15-17
-// asserts the list is empty. It must reach zero before the Phase 14 cutover, and
-// no new entry may ever be added — a new Stream call site is expected to consume
-// the terminal error on the day it is written.
+// known-unmigrated sites, so the test passed on the tree that introduced it.
+// Plans 15-13 and 15-14 migrated every one of them and deleted their entries.
+// Plan 15-17 closed the ratchet: streamContractAllowlistSize is asserted to be
+// exactly 0 by TestStreamContractRatchetIsClosed, and the map literal is
+// asserted to be empty. A NON-EMPTY ALLOWLIST IS NOW A REGRESSION, not a
+// migration state — there is no remaining migration.
+//
+// The empty map literal is deliberately KEPT rather than deleted. An empty map
+// plus a zero assertion is a stronger guard than removing the mechanism: a
+// contributor who adds an unmigrated app.Tools.Stream site gets a NAMED failure
+// from checkStreamContract rather than a silent pass, and any attempt to
+// re-open the ratchet by appending an entry fails two tests at once
+// (TestStreamContract on the stale/violation axis and
+// TestStreamContractRatchetIsClosed on the size axis).
 //
 // The ratchet fails in both directions on purpose:
 //
@@ -97,14 +106,14 @@ var streamContractAllowlist = map[string][]string{
 }
 
 // streamContractAllowlistSize is the number of flattened allowlist entries.
-// TestStreamContractAllowlistShrinks pins it so the list cannot grow by
-// accident. Lower it as plans 15-13 and 15-14 migrate sites; plan 15-17 asserts
-// it is 0.
+// TestStreamContractAllowlistShrinks pins it against the map so the two cannot
+// drift; TestStreamContractRatchetIsClosed pins it at exactly 0 so neither can
+// be raised.
 //
 // 15-02 seed: 23 (web 6, subdomains 4, vulns 11, osint 2).
 // 15-13 lowered it to 13 by migrating all 10 web + subdomains sites.
 // 15-14 drove it to 0 by migrating all 13 remaining sites (vulns 11, osint 2).
-// 15-17 asserts 0.
+// 15-17 CLOSED it: this constant is now a permanent 0 and may never be raised.
 const streamContractAllowlistSize = 0
 
 // TestStreamContract is the ratchet itself.
@@ -143,6 +152,49 @@ func TestStreamContractAllowlistShrinks(t *testing.T) {
 		t.Errorf("streamContractAllowlist is down to %d entries but streamContractAllowlistSize still says %d.\n"+
 			"  If you migrated a site, lower the constant in the same commit so the ratchet stays tight.",
 			got, streamContractAllowlistSize)
+	}
+}
+
+// TestStreamContractRatchetIsClosed is phase 15 plan 17's permanent closure of
+// the F6 migration ratchet.
+//
+// TestStreamContractAllowlistShrinks only pins the map AGAINST the constant, so
+// raising BOTH together would satisfy it — which is precisely how a migration
+// ratchet gets quietly re-opened once nobody remembers it was supposed to
+// finish. This test pins the CONSTANT itself, so the only way to add an
+// allowlist entry is to edit an assertion that says, in the failure message,
+// that editing it is the regression.
+func TestStreamContractRatchetIsClosed(t *testing.T) {
+	if streamContractAllowlistSize != 0 {
+		t.Errorf("streamContractAllowlistSize is %d, want 0.\n"+
+			"  The F6 stream-contract ratchet was CLOSED by phase 15 plan 17. Every\n"+
+			"  app.Tools.Stream call site under internal/modules/ consumes the terminal\n"+
+			"  Event.Err, and no new entry may ever be added. If you are here because a\n"+
+			"  new call site fails TestStreamContract, consume the terminal error with one\n"+
+			"  of the four accepted shapes documented at the top of this file — do NOT\n"+
+			"  raise this constant.", streamContractAllowlistSize)
+	}
+	if n := len(streamContractAllowlist); n != 0 {
+		var files []string
+		for f := range streamContractAllowlist {
+			files = append(files, f)
+		}
+		sort.Strings(files)
+		t.Errorf("streamContractAllowlist has %d file(s) — %v — but the ratchet is closed.\n"+
+			"  The empty map literal is kept ON PURPOSE so a new unmigrated Stream site\n"+
+			"  still gets a named failure; it is not a place to park one.", n, files)
+	}
+
+	// The substantive claim. "The allowlist is empty" proves nothing unless the
+	// detector, consulted with NO allowlist at all, also reports nothing.
+	violations, stale := checkStreamContract(".", nil)
+	if len(violations) > 0 {
+		t.Errorf("with NO allowlist the detector still reports %d unmigrated Stream site(s) — "+
+			"the zero-length\n  allowlist is therefore not evidence of anything:\n  %s",
+			len(violations), strings.Join(violations, "\n  "))
+	}
+	if len(stale) > 0 {
+		t.Errorf("no allowlist was passed, so there can be no stale entries; got: %v", stale)
 	}
 }
 
