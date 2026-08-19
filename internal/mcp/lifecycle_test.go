@@ -224,7 +224,9 @@ func TestCancelScanRefusesOtherSessionsAndDoesNotLeakRunIDs(t *testing.T) {
 		t.Errorf("the refused call changed the run's state (status=%q)", entry.Status)
 	}
 	srv.Cancel()
-	awaitCancel(t, cancelled, "cleanup")
+	if err := awaitCancel(t, cancelled, "cleanup"); !errors.Is(err, context.Canceled) {
+		t.Errorf("cleanup cancellation = %v; want context.Canceled", err)
+	}
 }
 
 // TestCancelScanCannotDestroyASessionScopeEntry: a session-scope entry lives in

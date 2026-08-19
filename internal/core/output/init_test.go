@@ -226,14 +226,14 @@ func dirFingerprint(t *testing.T, dir string) string {
 			return relErr
 		}
 		if d.IsDir() {
-			fmt.Fprintf(h, "D:%s\n", rel)
+			_, _ = fmt.Fprintf(h, "D:%s\n", rel) // hash.Hash.Write never errors
 			return nil
 		}
 		data, readErr := os.ReadFile(path) //nolint:gosec // test fixture
 		if readErr != nil {
 			return readErr
 		}
-		fmt.Fprintf(h, "F:%s:%x\n", rel, sha256.Sum256(data))
+		_, _ = fmt.Fprintf(h, "F:%s:%x\n", rel, sha256.Sum256(data)) // hash.Hash.Write never errors
 		return nil
 	})
 	if err != nil {

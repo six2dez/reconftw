@@ -45,11 +45,11 @@ func TestLockHelperProcess(t *testing.T) {
 	l, err := output.AcquireWorkspaceLock(dir)
 	if err != nil {
 		fmt.Printf("HELPER-ERROR %v\n", err)
-		os.Stdout.Sync()
+		_ = os.Stdout.Sync() // best-effort flush before _exit
 		os.Exit(3)
 	}
 	fmt.Printf("LOCKED %d\n", os.Getpid())
-	os.Stdout.Sync()
+	_ = os.Stdout.Sync() // best-effort flush before the parent reads
 	// Hold the lock until the parent kills us. A bounded sleep (rather than a
 	// bare block) keeps a leaked helper from surviving the test run, and gives
 	// the runtime a pending timer so the deadlock detector stays quiet.
