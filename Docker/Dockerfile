@@ -89,7 +89,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     GOPATH=/opt/go \
     UV_TOOL_DIR=/opt/uv/tools \
     UV_TOOL_BIN_DIR=/opt/uv/bin \
-    PATH=/opt/go/bin:/opt/uv/bin:/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin
+    PATH=/opt/go/bin:/opt/uv/bin:/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 
 # Build-time system deps for compiling/installing the tool zoo.
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -151,7 +151,7 @@ FROM debian:${DEBIAN_CODENAME}-slim AS final
 
 ENV GOPATH=/opt/go \
     UV_TOOL_BIN_DIR=/opt/uv/bin \
-    PATH=/opt/go/bin:/opt/uv/bin:/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin
+    PATH=/opt/go/bin:/opt/uv/bin:/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 
 # Runtime deps only. libcap2-bin provides `setcap` (D-08) and MUST be in the
 # FINAL stage; python3 + libpcap0.8 support the Python + capture-based tools.
@@ -172,6 +172,12 @@ COPY --from=builder /usr/local/bin/reconftw /usr/local/bin/reconftw
 # CRITICAL (D-08): grant raw-socket capability to naabu + nmap AFTER the last
 # COPY, in the final stage. `|| true` keeps the build resilient if a tool is
 # absent on a given arch; runtimes that filter file caps need `--cap-add=NET_RAW`.
+# `|| true` tolerates a TARGET BINARY being absent on a given arch. It must NOT
+# tolerate setcap itself being missing: when /sbin was off PATH the shell exited
+# 127 and `|| true` swallowed it, so every image built since 267cb2c shipped
+# without CAP_NET_RAW while the build reported success. Assert the tool exists
+# first, then keep the per-binary tolerance.
+RUN command -v setcap >/dev/null || { echo "FATAL: setcap not on PATH (libcap2-bin missing or /sbin unreachable)" >&2; exit 1; }
 RUN setcap cap_net_raw,cap_net_admin+eip /usr/bin/nmap 2>/dev/null || true
 RUN setcap cap_net_raw,cap_net_admin+eip /opt/go/bin/naabu 2>/dev/null || true
 
