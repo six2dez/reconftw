@@ -1,4 +1,4 @@
-name: ci
+name: docker-nightly
 
 permissions:
   contents: read
@@ -6,6 +6,13 @@ permissions:
   id-token: write
 
 on:
+  # Manual trigger: the ONLY way to exercise this workflow — and therefore the
+  # ARM64 image-health gate (gate 11) — from a non-default branch. GitHub runs
+  # `schedule` only from the default branch, so before the cutover swaps main to
+  # the Go line this workflow's dev-go version is otherwise never executed. Run
+  # it once against dev-go before cutting over, or the first real build of the
+  # v2 ARM64 image happens at the worst possible moment.
+  workflow_dispatch: {}
   release:
     types:
       - published
