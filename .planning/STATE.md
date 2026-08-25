@@ -1,17 +1,21 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.0
-milestone_name: milestone
+milestone_name: Complete Core Migration (Bash → Go/Python)
+current_phase: 17
+current_phase_name: Tool Contract & Coverage Integrity
 status: executing
-stopped_at: Phase 14 context gathered
-last_updated: "2026-08-18T11:03:36.273Z"
-last_activity: 2026-08-18 -- Phase 15 planning complete
+stopped_at: Phase 17 planned — ready to execute
+last_updated: "2026-08-24T19:16:43.997Z"
+last_activity: 2026-08-24
+last_activity_desc: Phase 17 planning complete (7 plans, plan-checker 0 blockers)
+state_head: 10eddcb421d9b44de7dc7137c2749d3653417c15
 progress:
-  total_phases: 15
-  completed_phases: 12
-  total_plans: 117
-  completed_plans: 105
-  percent: 80
+  total_phases: 17
+  completed_phases: 8
+  total_plans: 131
+  completed_plans: 112
+  percent: 47
 ---
 
 # Project State
@@ -21,17 +25,36 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-27)
 
 **Core value:** Run one command, get a complete recon picture of a target — passive, active, and vulnerability layers — with resumable checkpoints, structured output, and zero-touch tool orchestration.
-**Current focus:** Phase 15 — Release Gates: Run Isolation & Store Integrity
+**Current focus:** Phase 17 — Tool Contract & Coverage Integrity (planned, ready to execute)
 
 ## Current Position
 
-Phase: 15 (Release Gates: Run Isolation & Store Integrity) — EXECUTED, NOT SIGNED OFF
-Plan: 18 of 18 complete (5 waves)
-Status: Gates 1-10 and 12 PASS. Gate 11 SKIPPED (docker not runnable locally; enforced in CI). One regression-guard step FAILS: govulncheck under a local go1.26.1 toolchain while go.mod pins 1.25.13 — toolchain divergence, recorded as a phase decision, module-level vulns all UNREACHABLE.
-NEXT: `bash scripts/release-gates.sh` is the cutover gate and currently exits non-zero by design. To sign off Phase 14: (1) resolve the govulncheck toolchain divergence, (2) run gate 11 on real or emulated ARM64 (CI job `docker`, step `Verify image health (linux/arm64)`), (3) triage `.planning/phases/15-release-gates-run-isolation-store-integrity/deferred-items.md` (15 items, one needing a RELEASE NOTE about monitor re-alerting once after upgrade).
+Phase: 17 (Tool Contract & Coverage Integrity) — PLANNED, READY TO EXECUTE
+Plans: 7 written, 0 executed. Plan-checker: **0 BLOCKER, 4 WARNING — all four closed** in one revision. All 7 pass `frontmatter.validate --schema plan`.
+Waves: w1 = 17-01 (TC-E) / 17-03 (TC-D) / 17-04 (TC-B) · w2 = 17-02 (TC-C) ← 17-01, 17-05 (TC-A) ← 17-03 · w3 = 17-06 (TC-F/1) ← 17-04 · w4 = 17-07 (TC-F/2) ← 17-02,17-05,17-06
+Two BLOCKING operator checkpoints: 17-05 T3 (production nuclei behaviour change + whether the BLOCKED parity verdict lifts) and 17-07 T3 (`HackertargetTask` disposition: delete / direct-fetch / honest-skip).
+NEXT: `/gsd-execute-phase 17`
+
+## Why Phase 17 exists — the Phase 16 outcome
+
+Phase 16 (Live-Run Observability & Tool Contract Integrity) — ALL 7 PLANS SUMMARIZED, verification `gaps_found` (31/35 must-haves), **NOT MARKED COMPLETE**.
+Its objective was MET: the v2 web layer recovered (live hosts 0/12 -> 12/12, finding classes 2/50 -> 51/50, `hosts.jsonl` 0 bytes -> 3109) and `PARITY_EXIT=0`. But the **operator verdict on the parity re-run is BLOCKED** (2026-08-24), against a machine verdict of PASS.
+
+WHY BLOCKED: two of the three removed finding classes (`keycloak-openid-config`, `oidc-detect`) are proven REPRODUCIBLE REGRESSIONS, not template drift. Both templates exist locally, the endpoint returns HTTP 200 with every matcher word present, the host was in nuclei's input, nuclei exited success — and a targeted two-template re-probe fires both immediately. The full 23-minute run did not.
+Mechanism unknown. v2 cannot distinguish (a) the templates never executed from (b) they executed and did not match under a 150-rps full scan (rate limit / WAF / nuclei's `-mhe` per-host error budget) — OPPOSITE remedies, and no execution accounting exists to choose between them. That is v2's vulnerability layer. (NB: the run's 49 distinct template IDs is a MATCH count, not an execution count — do not cite it as evidence of low coverage.)
+The attribution never explained it because attribution renders only on a tolerance breach, and all three core sets read OK. Full record: `.planning/phases/16-live-run-observability-tool-contract-integrity/16-06-PARITY.md` §6-7.
+
+ALSO OPEN from the phase-16 gates (all folded into phase 17's TC-A..TC-F):
+- `puredns bruteforce -d <bare domain>` (CR-01, CONFIRMED behaviourally): `-d` takes a FILE of domains; v1 passes it POSITIONALLY. `brute.go:245` + `recursive.go:311` — BOTH brute tasks have produced nothing. `subdomains.brute` is in neither `driveCases` nor `undrivableTasks`, so 16-04's hermetic guard cannot see it.
+- `ToolError.Error()` stderr reaching `StageProgress` unredacted — the one item phase 16 may have CREATED rather than revealed. 17-01 owns it, wave 1.
+- CR-02..CR-07 remain UNVERIFIED hypotheses — 17-06/17-07 must prove or discard each before any production change.
+
+CONSOLIDATED PRE-CUTOVER CHECKLIST (20 items, single list): tail of `.planning/phases/15-release-gates-run-isolation-store-integrity/deferred-items.md`.
+
 KNOWN LIMITATION carried into gate 3a: `hosts` is not emptied on a subs-only/passive run, because `web/httpx.go` owns the empty publish and does not run there. Giving `subdomains/geo.go` the publish would erase web hosts no producer in that run examined — worse.
-BLOCKED BEHIND 15: Phase 14 — Cutover & Migration. Its MIGRATION.md must absorb the 8-item deferral ledger from 13-PARITY-AUDIT.md, plus phase-15 path-contract changes (`reports/<target-slug>/<scan-id>/`, slug-named workspaces with one-time legacy adoption).
-Last activity: 2026-08-18 -- Phase 15 planning complete
+BLOCKED BEHIND 16 + 17: Phase 14 — Cutover & Migration.
+Operator action outstanding: commit the 80 staged paths (`scratchpad/stage-groups.sh` regroups into 6 chunks). Nothing from phases 15-17 is committed.
+Last activity: 2026-08-24 — Phase 17 planned (7 plans, 0 blockers)
 
 ## Performance Metrics
 
@@ -175,6 +198,7 @@ Items captured durante v1.0 que deben informar el diseño de arquitectura v2 (no
 
 ## Session Continuity
 
-Last session: 2026-07-16T07:51:09.273Z
-Stopped at: Phase 14 context gathered
-Resume file: .planning/phases/14-cutover-and-migration/14-CONTEXT.md
+Last session: 2026-08-24 (resumed)
+Stopped at: Session resumed from HANDOFF.json — Phase 16, plan 16-06, Task 3 of 3 (operator parity verdict). Proceeding to execute 16-06 Task 3.
+Resume file: .planning/phases/16-live-run-observability-tool-contract-integrity/.continue-here.md
+Handoff: .planning/HANDOFF.json (still present — delete only after 16-06-SUMMARY.md is written)

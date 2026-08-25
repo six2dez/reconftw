@@ -44,6 +44,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 12: Integration Hardening** — Wire subsystems end-to-end: store ingest (done) + in-scan notifications + resume/checkpoint + monitor diff + global rate limiter + AI/Ollama
 - [x] **Phase 13: Domain Parity** — Close bash-vs-Go gaps: subs (PTR/hakip2host/dnsregs/csprecon/dsieve) + vulns (spraying/SSRF-OOB) + osint (LeakSearch/Scopify/repo-secrets) + web (portscan/nerva/wordlists/url_ext). COMPLETE 2026-07-15 — all wave-1/2 tasks wired into recon/all; ≥95% per-domain parity (13-PARITY-AUDIT.md)
 - [x] **Phase 14: Cutover & Migration** — Config migrator (corpus-tested) + MIGRATION.md + compat symlinks + beta period + bug-bug parity test + community sign-off + `main`→Go, bash→legacy branch (completed 2026-07-17)
+- [ ] **Phase 15: Release Gates: Run Isolation & Store Integrity** — Remediation of the fifth pre-cutover audit; 12 acceptance gates. EXECUTED 18/18 plans, NOT SIGNED OFF (gate 11 SKIPPED, govulncheck toolchain divergence)
+- [ ] **Phase 16: Live-Run Observability & Tool Contract Integrity** — Tool I/O persistence + no-silent-success + PD update-check + arg-vector coverage + parity re-validation. 7/7 plans summarized; verification `gaps_found` (31/35); **parity verdict signed BLOCKED 2026-08-24**
+- [ ] **Phase 17: Tool Contract & Coverage Integrity** — Make v2 able to say what its tools actually did: nuclei coverage accounting, arg vectors verified against REAL tools, outcome-label correctness, and the false-green guards in the gate scripts themselves
 
 ## Phase Details
 
@@ -874,26 +877,107 @@ contract integrity) — the six workstreams above, sourced from the five layers 
 `.planning/phases/15-release-gates-run-isolation-store-integrity/deferred-items.md`
 § "CUTOVER BLOCKER" and § "FIRST COMPLETE v2 RUN", plus the sixth found during planning.
 **Depends on:** Phase 15
-**Plans:** 0/7
+**Plans:** 7/7 summarized (phase NOT complete — verification `gaps_found`, parity verdict BLOCKED)
 
 **Wave 1** *(tracer — prove the diagnostic seam end-to-end before expanding)*
 
-- [ ] 16-01-PLAN.md — Tool I/O persistence: workspace tool log, stderr on the terminal error, argv redaction (LR-A) [wave 1]
+- [x] 16-01-PLAN.md — Tool I/O persistence: workspace tool log, stderr on the terminal error, argv redaction (LR-A) [wave 1]
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 16-02-PLAN.md — No silent success: SKIP-with-reason rule, httpx + dnstake, degrade sweep, AST ratchet (LR-B) [wave 2]
-- [ ] 16-03-PLAN.md — PD update-check ROOT CAUSE: reconciliation, discriminating probe matrix, costed decision (LR-C) [wave 2]
-- [ ] 16-04-PLAN.md — Arg-vector coverage: run what the target claims, skip ratchet, drift detector, gate home (LR-D) [wave 2]
-- [ ] 16-07-PLAN.md — Tool output contracts: parity tests that call their parsers, fixture provenance, parser census + ratchet (LR-F) [wave 2]
+- [x] 16-02-PLAN.md — No silent success: SKIP-with-reason rule, httpx + dnstake, degrade sweep, AST ratchet (LR-B) [wave 2]
+- [x] 16-03-PLAN.md — PD update-check ROOT CAUSE: reconciliation, discriminating probe matrix, costed decision (LR-C) [wave 2]
+- [x] 16-04-PLAN.md — Arg-vector coverage: run what the target claims, skip ratchet, drift detector, gate home (LR-D) [wave 2]
+- [x] 16-07-PLAN.md — Tool output contracts: parity tests that call their parsers, fixture provenance, parser census + ratchet (LR-F) [wave 2]
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 16-05-PLAN.md — Conditional PD startup policy from 16-03's verdict, or a recorded no-op (LR-C) [wave 3]
+- [x] 16-05-PLAN.md — Conditional PD startup policy from 16-03's verdict, or a recorded no-op (LR-C) [wave 3]
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 16-06-PLAN.md — Parity re-validation: workspace archival, attribution report, signed verdict (LR-E) [wave 4]
+- [x] 16-06-PLAN.md — Parity re-validation: workspace archival, attribution report, signed verdict (LR-E) [wave 4]
+
+### Phase 17: Tool Contract & Coverage Integrity
+
+**Goal:** Make v2 able to state what its tools actually did. Phase 16 gave the run a voice
+(`logs/tools.jsonl`, 700 records, zero hangs) and that voice immediately reported six separate
+tools being invoked with contracts they do not honour — none of which `go test ./...` can see, and
+it passes 34/34. The parity verdict was signed **BLOCKED** on 2026-08-24 not because a number was
+short, but because the run could not account for what it had covered.
+
+**The evidence this phase exists to close** (all dated 2026-08-24, all backed by an observation —
+full detail in `.planning/phases/16-.../16-06-PARITY.md` §6 and phase 15's `deferred-items.md`):
+
+**Workstreams:**
+
+(A) **Coverage accounting for nuclei — the cutover blocker.** `keycloak-openid-config` and
+`oidc-detect` do not fire in v2's full nuclei run and fire **instantly** in a targeted two-template
+probe against the same host, same box, same template directory. Template drift, target drift, scope
+and the ignore list were each eliminated by observation. v2 cannot distinguish **(a)** the templates
+never executed from **(b)** they executed and did not match under a 150-rps full scan (rate limiting,
+WAF, or nuclei's `-mhe` per-host error budget — default 30, its skip notice suppressed by `-silent`).
+Those have OPPOSITE remedies. The run's 49 distinct template IDs is a MATCH count, not an execution
+count, so it cannot arbitrate. Missing evidence: nuclei's
+own template-execution accounting — loaded / executed / skipped and why. `-silent` suppresses
+`Templates loaded for scan: N` and v2 records no equivalent. This is v2's vulnerability layer.
+
+(B) **Arg vectors verified against REAL tools, not mocks.** Six confirmed bugs across four phases and
+the count is not converging: `subzy --verify-ssl` (16-04), `sj automate -u <bare host>` (100/100
+invocations dead), `dnsx -d <domain>` without `-w` (all five DNS record lookups dead), `subjs -i -`,
+and **`puredns bruteforce -d <bare domain>`** — where `-d` takes a FILE of domains and v1 passes the
+domain positionally, so BOTH brute tasks at `brute.go:245` and `recursive.go:311` have produced
+nothing. `subdomains.brute` is in neither `driveCases` nor `undrivableTasks`, so 16-04's own hermetic
+guard cannot see it. The guard built to catch this class has a hole exactly where the class lives.
+
+(C) **Outcome-label correctness.** `execRecorded` (`internal/core/backend/runner.go:283-309`) has
+three arms and none is `OutcomeDispatchFailed`. A registered tool whose binary is missing has
+`Tool.Path == ""`, `cmd.Start()` returns `exec: no command`, and it lands in the generic `err != nil`
+arm — so **150 of the parity run's 319 `exit_non_zero` outcomes are absent tools wearing the wrong
+label**, and `dnsx` appears under BOTH labels in one log (Stream correct, Exec wrong). This falsifies
+a `must_haves` truth of plan 16-01 while both guarding tests pass.
+
+(D) **The false greens in the gate scripts themselves.** `release-gates.sh` `gate()` passes if **any
+one** of N cited tests emits `--- PASS` (deleting 8 of 9 still passes) and its EXIT trap deletes the
+log directory every FAIL note points at. `parity-full.sh` reads `$ws/logs/run.log` while run.log is
+written to `<workdir>/run.log`, so `attribution_section()` — present, substantive, correctly wired —
+**has never executed**. `core_set_diff` returns OK when the v1 side is empty, so a mis-pathed baseline
+yields `VERDICT: PASS`. And attribution is gated on `CORE_FAILS > 0`, which is precisely why two
+proven regressions hid inside a passing set.
+
+(E) **A redaction regression introduced by phase 16.** Plan 16-01 changed `ToolError.Error()` to embed
+tool stderr; that stderr flows through `Result.Reason` into `StageProgress` unredacted, contradicting
+`progress.go`'s own XCUT-07 header and `recorder.go`'s `0o600` rationale. `newRunRedactor()` registers
+zero config secrets yet is what protects `tools.jsonl`, and the log redactor is a different instance.
+**Verify this one first** — it is the only item where this phase's predecessor may have created the
+exposure rather than revealed it.
+
+(F) **Triage the unverified.** The phase-16 code-review gate returned 7 BLOCKER / 18 WARNING / 4 INFO.
+Two blockers were verified at the gate; CR-02…CR-07 (httpx `-l`/`-o` same path, gotator without
+`-perm`, regulator's argv and stdout parsing, `HackertargetTask` parsing probe output as a response
+body, non-atomic resolver download, `subfinder -max-time` unit mismatch) are **hypotheses**. Each must
+be proven behaviourally or discarded — recorded, not actioned on a code reading. Phase 15's F19
+precedent is permanent: two independent code reads certified a fix that was inert in production.
+
+**Non-goal:** re-running the 47-minute parity scan. The record is banked at
+`reconbox3:/root/parity/v2/workspaces/hackerone.com-ab878537/logs/tools.jsonl` and the v1 baseline
+(1.3 GB, fingerprint `2294:929356714`, one copy) is never to be re-run or written to.
+
+**Requirements:** TC-A (nuclei coverage accounting), TC-B (arg vectors against real tools), TC-C
+(outcome-label correctness), TC-D (gate-script false greens), TC-E (redaction regression), TC-F
+(unverified-finding triage).
+**Depends on:** Phase 16
+**Blocks:** Phase 14 cutover sign-off, jointly with Phase 15's 12 acceptance gates.
+**Plans:** 7 plans
+
+Plans:
+- [ ] 17-01-PLAN.md — TC-E: redaction regression — a config secret in tool stderr must not reach the terminal, tools.jsonl or run.log (wave 1)
+- [ ] 17-03-PLAN.md — TC-D: gate-script false greens — by-name gate assertions, a surviving log dir, attribution on a passing set, an empty baseline is not a pass (wave 1)
+- [ ] 17-04-PLAN.md — TC-B: arg vectors against real tools — a full registry coverage census plus the six confirmed vector fixes (wave 1)
+- [ ] 17-02-PLAN.md — TC-C: outcome-label correctness — dispatch failure at exec time, no tool under two labels, end records name their tool (wave 2)
+- [ ] 17-05-PLAN.md — TC-A: nuclei coverage accounting — the cutover blocker; per-run template accounting, the differential probe, and a coverage gate (wave 2)
+- [ ] 17-06-PLAN.md — TC-F/1: prove or discard CR-02, CR-03, CR-04 before any production change (wave 3)
+- [ ] 17-07-PLAN.md — TC-F/2: prove or discard CR-05, CR-06, CR-07; requirements traceability and the phase record (wave 4)
 
 ---
 *Roadmap created: 2026-05-27*
