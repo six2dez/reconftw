@@ -80,9 +80,33 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 		keyFor = hostsDedupKey
 	}
 
-	// dedup maps the stage key → present, preserving first-seen order.
-	dedup := make(map[string]struct{})
+	// dedup maps the stage key → its index in `ordered`, preserving first-seen
+	// order. It holds an index rather than a presence marker so the "hosts" stage
+	// can REPLACE a previously-kept record in place when a better one arrives
+	// (see hostRecordRank); every other stage keeps strict first-seen-wins.
+	dedup := make(map[string]int)
 	var ordered [][]byte
+
+	// keep records a line under the given key, collapsing duplicates. For "hosts"
+	// the winner is the highest-ranked endpoint, not the first one seen: the
+	// artefact is nuclei's target list, so an arbitrary winner sends the scanner
+	// at a high port that does not serve the application.
+	rankFor := func([]byte) int { return 0 }
+	if stage == "hosts" {
+		rankFor = hostRecordRank
+	}
+	keep := func(line []byte) {
+		key := keyFor(line)
+		idx, exists := dedup[key]
+		if !exists {
+			dedup[key] = len(ordered)
+			ordered = append(ordered, line)
+			return
+		}
+		if rankFor(line) > rankFor(ordered[idx]) {
+			ordered[idx] = line
+		}
+	}
 
 	// REPLACE-preservation for the "hosts" artefact (13-08): web.httpx is a DIRECT
 	// writer of artefacts/hosts.jsonl via app.Tree.Append, which has REPLACE
@@ -106,11 +130,7 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 		existingArtefact := filepath.Join(app.Target.WorkDir, "artefacts", stage+".jsonl")
 		if existingLines, rerr := readJSONLFile(existingArtefact); rerr == nil {
 			for _, line := range existingLines {
-				key := keyFor(line)
-				if _, exists := dedup[key]; !exists {
-					dedup[key] = struct{}{}
-					ordered = append(ordered, line)
-				}
+				keep(line)
 			}
 		}
 	}
@@ -125,11 +145,7 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 			continue // non-fatal per best_effort policy
 		}
 		for _, line := range lines {
-			key := keyFor(line)
-			if _, exists := dedup[key]; !exists {
-				dedup[key] = struct{}{}
-				ordered = append(ordered, line)
-			}
+			keep(line)
 		}
 	}
 
@@ -272,6 +288,70 @@ func hostsDedupKey(line []byte) string {
 		}
 	}
 	return "raw\x00" + string(line)
+}
+
+// hostRecordRank scores a "hosts" record for the collapse below. Higher wins.
+//
+// One artefact line per host (IN-13-03) is the right cardinality — it is what
+// made the live-host core set match v1 exactly, 12 of 12. But WHICH of a host's
+// records survives is not cosmetic, because artefacts/hosts.jsonl is the target
+// list web.nuclei scans. Once the uncommon-port sweep landed, httpx returned
+// several endpoints per host and first-seen order kept an arbitrary one: the run
+// recorded http://api.hackerone.com:2095 and http://hackerone.com:2095 instead of
+// their https :443 endpoints, so nuclei scanned high ports that do not serve the
+// application. Finding classes fell from 48 to 38, losing exactly the templates
+// that match real application paths — graphql-*, oauth2-detect, oidc-detect,
+// keycloak-openid-config, trust-center-detect.
+//
+// Ranking is deliberately about REACHING THE APPLICATION, not about the port
+// being interesting: https beats http, and a standard port beats a high one. A
+// record carrying no port at all (wellknown/portscan shapes) ranks lowest, so a
+// real probed endpoint always beats a bare host mention.
+func hostRecordRank(line []byte) int {
+	var rec struct {
+		Scheme string   `json:"scheme"`
+		Port   string   `json:"port"`
+		URL    string   `json:"url"`
+		Status int      `json:"status"`
+		Tech   []string `json:"tech"`
+	}
+	if err := json.Unmarshal(line, &rec); err != nil {
+		return 0
+	}
+
+	rank := 0
+
+	// DOMINANT TERM: an actual HTTP probe result beats a bare host mention,
+	// whatever ports are involved. A portscan/wellknown record carries a host and
+	// maybe a port; an httpx record carries the URL, title, tech and status that
+	// make the artefact useful. IN-13-03's existing guarantee — httpx's rich
+	// record survives a same-host portscan shape — depends on this outranking
+	// every port preference below, so it stays worth more than all of them
+	// combined.
+	if rec.URL != "" || len(rec.Tech) > 0 || rec.Status != 0 {
+		rank += 64
+	}
+
+	// Endpoint preference, applied BETWEEN comparable probe results — which is
+	// where the real damage was: httpx returns several endpoints per host once the
+	// uncommon-port sweep is on, and an arbitrary winner points nuclei at a port
+	// that does not serve the application.
+	switch strings.ToLower(strings.TrimSpace(rec.Scheme)) {
+	case "https":
+		rank += 8
+	case "http":
+		rank += 4
+	}
+	switch strings.TrimSpace(rec.Port) {
+	case "443":
+		rank += 16
+	case "80":
+		rank += 12
+	}
+	if rec.Status > 0 && rec.Status < 400 {
+		rank += 2 // a live response beats an error page on an otherwise equal endpoint
+	}
+	return rank
 }
 
 // readJSONLFile reads a JSONL file and returns each non-empty, non-whitespace

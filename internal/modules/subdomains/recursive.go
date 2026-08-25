@@ -313,7 +313,9 @@ func (SubRecursiveBruteTask) Run(ctx context.Context, app *appctx.AppContext) (t
 			"-d", sub,
 			"--quiet",
 		}
-		if resolverPath != "" {
+		// resolverListUsable, not `!= ""`: paths.resolvers now always carries a
+		// default path, so an emptiness test no longer proves the file exists.
+		if resolverListUsable(resolverPath) {
 			args = append(args, "-r", resolverPath)
 		}
 		if cfg.Subdomains.DNSResolve.PurednsWildcardtestLimit > 0 {

@@ -374,9 +374,22 @@ func TestHostsArtefactEmptiedByHTTPXOverGeoRecords(t *testing.T) {
 	app := newWebApp(t, workDir, be, "httpx")
 
 	res, err := lookupWebTask(t, "web.httpx").Run(context.Background(), app)
-	if res.Status != task.StatusDone {
+	// PRECONDITION, not the subject: this test is about the F3 empty publish, and
+	// the status check only exists to confirm the probe actually HAPPENED (as
+	// opposed to the did-not-run error path covered by the next test).
+	//
+	// Updated deliberately in phase 16: "the probe ran and produced nothing" is
+	// now StatusSkipped with a Reason rather than StatusDone, because reporting OK
+	// for a task that consumed 1 host and produced 0 is the exact silent success
+	// that emptied the web layer on 2026-08-21. Errored still means did-not-run,
+	// so the distinction this test relies on is intact.
+	if err != nil || res.Status == task.StatusErrored {
 		t.Fatalf("httpx must RUN here (status %q, err %v) — the empty publish only "+
 			"applies on a path where the probe actually happened", res.Status, err)
+	}
+	if res.Status == task.StatusSkipped && res.Reason == "" {
+		t.Error("a skipped result must carry a Reason — an operator reading [SKIP] " +
+			"with no reason learns nothing")
 	}
 	assertArtefactEmptied(t, workDir, "hosts")
 }

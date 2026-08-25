@@ -51,19 +51,51 @@ var usageSentinels = []string{
 	"flag needs an argument",
 	"no such flag",
 	"exactly one of", // s3scanner: signals --bucket-file wasn't parsed
+
+	// NOTE: this list is EXIT-CODE-INDEPENDENT and is shared with
+	// backend_realtools_test.go, which probes some tools with `--help`. Only add a
+	// phrase here if a tool printing its own documentation could never contain it.
+	// Phrases a help text can legitimately contain belong in
+	// semanticRejectionSentinels, which additionally requires a non-zero exit.
 }
 
-// toolProbe pairs a tool name with the representative real arg vector its Task
-// uses. {F}=hosts file, {R}=resolvers file, {W}=wordlist file, {J}=JS file,
-// {O}=output file path — substituted with throwaway temp paths at runtime.
-type toolProbe struct {
-	name string
-	args []string
-	// stdin, when true, feeds empty stdin (for stdin-reading tools).
-	stdin bool
+// semanticRejectionSentinels are rejections the PARSER ACCEPTED — the option
+// validation that runs after parsing. They count as failures ONLY when the tool
+// also exited non-zero.
+//
+// This class is what the sentinel list above was blind to, and it is the class
+// that actually shipped — twice, in one live run:
+//
+//	puredns  "-rt <path>"      → pflag binds the REAL shorthand "-r" to the value
+//	                             "t", parses cleanly, dies opening a file "t".
+//	tlsx     "-san -cn -re D"  → "-re" is -revoked, a boolean probe, not a regex
+//	                             filter, so tlsx refuses the COMBINATION with
+//	                             cause="san or cn flag cannot be used with other
+//	                             probes".
+//
+// The exit-code condition is load-bearing, not caution. "cannot be used with"
+// first shipped unconditional and immediately produced a false positive:
+// misconfig-mapper's own --help documents "This flag cannot be used with
+// -permutations", so probing it with --help "failed" while the tool was fine.
+// A tool printing documentation exits 0; a tool refusing to start does not.
+var semanticRejectionSentinels = []string{
+	"unable to load public resolvers",
+	"unable to load trusted resolvers",
+	"unable to load resolvers",
+	"cannot be used with",
+	"could not validate options",
+	"invalid value",
+	"requires at least",
+	"mutually exclusive",
+	"is not a valid",
 }
 
 func TestRealToolArgVectors(t *testing.T) {
+	// Skip accounting: every probe reports its outcome so the run can say what it
+	// did NOT verify. See realtools_census_test.go.
+	census := newProbeCensus()
+	defer reportRealtoolsCensus(t, "TestRealToolArgVectors", census, smokeKnownAbsent)
+
 	dir := t.TempDir()
 	hosts := filepath.Join(dir, "hosts.txt")
 	resolvers := filepath.Join(dir, "resolvers.txt")
@@ -85,104 +117,11 @@ func TestRealToolArgVectors(t *testing.T) {
 	}
 
 	// Each probe mirrors the real Task invocation (internal/modules/subdomains/*.go).
-	probes := []toolProbe{
-		{name: "subfinder", args: []string{"-all", "-d", "example.com", "-max-time", "1", "-silent"}},
-		{name: "crt", args: []string{"-s", "-json", "example.com"}},
-		{name: "urlfinder", args: []string{"-d", "example.com", "-silent"}},
-		{name: "github-subdomains", args: []string{"-d", "example.com", "-t", "dummytoken"}},
-		{name: "gitlab-subdomains", args: []string{"-d", "example.com", "-t", "dummytoken"}},
-		{name: "httpx", args: []string{"-silent", "-u", "https://example.com"}},
-		{name: "puredns", args: []string{"resolve", "{F}", "-r", "{R}", "--wildcard-tests", "1", "--wildcard-batch", "1", "--rate-limit", "1", "--rate-limit-trusted", "1", "-rt", "{R}", "--quiet"}},
-		{name: "puredns", args: []string{"bruteforce", "{W}", "example.com", "-r", "{R}", "--quiet"}},
-		{name: "tlsx", args: []string{"-l", "{F}", "-silent", "-san", "-cn", "-re", "example.com"}},
-		{name: "dnsx", args: []string{"-l", "{F}", "-ns", "-resp", "-silent"}},
-		{name: "gotator", args: []string{"-sub", "{F}", "-depth", "1", "-numbers", "3", "-md"}},
-		{name: "regulator", args: []string{"{F}", "example.com"}},
-		{name: "dnscewl", args: []string{"-f", "{F}"}},
-		{name: "subwiz", args: []string{"-i", "{F}", "--no-resolve"}},
-		{name: "subzy", args: []string{"run", "--targets", "{F}", "--verify-ssl", "--output", "{O}"}},
-		{name: "dnstake", args: []string{"-f", "{F}", "-silent"}},
-		{name: "s3scanner", args: []string{"--bucket-file", "{F}"}},
-		{name: "asnmap", args: []string{"-d", "example.com", "-json", "-silent"}},
-		{name: "favirecon", args: []string{"-u", "example.com", "-timeout", "5"}},
-		{name: "analyticsrelationships", args: []string{"-u", "https://example.com", "--chain-mode"}},
-		{name: "jsluice", args: []string{"urls", "-i", "{J}"}},
-		{name: "subjs", args: []string{"-i", "-"}, stdin: true},
-
-		// Phase 5 additions — web pipeline (DoD-1)
-		// Each entry uses the EXACT arg vector from internal/modules/web/*.go (D-W9).
-		// A wrong flag is caught even when the binary is absent (golden is checked unconditionally).
-
-		// nuclei: scan mode (NucleiTask — nuclei.go)
-		{name: "nuclei", args: []string{"-u", "https://example.com", "-id", "http-missing-security-headers", "-silent", "-j", "-o", "{O}"}},
-
-		// nuclei: screenshot mode (ScreenshotTask — screenshot.go)
-		// -V dir={O}: nuclei variable sets screenshot output directory.
-		{name: "nuclei", args: []string{"-headless", "-id", "screenshot", "-V", "dir={O}", "-l", "{F}", "-silent"}},
-
-		// ffuf: web directory fuzzer (FfufTask — ffuf.go)
-		{name: "ffuf", args: []string{"-mc", "all", "-fc", "404", "-sf", "-noninteractive", "-of", "json", "-w", "{W}", "-maxtime", "5", "-u", "https://example.com/FUZZ", "-o", "{O}"}},
-
-		// katana: web crawler (KatanaTask — katana.go: -silent -list {F} -jc -kf all -c N -d 2 -fs rdn)
-		{name: "katana", args: []string{"-silent", "-list", "{F}", "-jc", "-kf", "all", "-c", "1", "-d", "2", "-fs", "rdn"}},
-
-		// urlfinder: passive URL discovery (UrlfindlerTask — urlfinder.go: -d domain -all -o {O})
-		{name: "urlfinder", args: []string{"-d", "example.com", "-all", "-o", "{O}"}},
-
-		// waymore: passive URL archive (WaymoreTask — waymore.go: -i domain -mode U -oU {O})
-		{name: "waymore", args: []string{"-i", "example.com", "-mode", "U", "-oU", "{O}"}},
-
-		// urless: URL deduplication (reads stdin, UrldedupTask — urldedup.go)
-		{name: "urless", args: []string{}, stdin: true},
-
-		// p1radup: URL deduplication (-i {F} -o {O} -s, UrldedupTask — urldedup.go)
-		{name: "p1radup", args: []string{"-i", "{F}", "-o", "{O}", "-s"}},
-
-		// subjs: JS URL extraction (-ua <ua> -c 40 -i {F}, SubjsTask — subjs.go)
-		{name: "subjs", args: []string{"-ua", "Mozilla/5.0", "-c", "40", "-i", "{F}"}},
-
-		// jsluice: URL extraction mode (JsluiceTask — jsluice.go: jsluice urls {file...})
-		{name: "jsluice", args: []string{"urls", "{J}"}},
-
-		// jsluice: secrets mode (JsluiceTask — jsluice.go: jsluice secrets -j {file...})
-		{name: "jsluice", args: []string{"secrets", "-j", "{J}"}},
-
-		// mantra: JS secret scanner (-ua <ua> -s via stdin, MantraTask — mantra.go)
-		// [A5-fix: mantra reads from stdin; no -i flag exists]
-		{name: "mantra", args: []string{"-ua", "Mozilla/5.0", "-s"}, stdin: true},
-
-		// sourcemapper: source map extractor (-jsurl <url> -output {O}, SourcemapperTask — sourcemapper.go)
-		{name: "sourcemapper", args: []string{"-jsurl", "https://example.com/app.js", "-output", "{O}"}},
-
-		// wafw00f: WAF detection (-i {F} -o {O}, Wafw00fTask — wafw00f.go)
-		{name: "wafw00f", args: []string{"-i", "{F}", "-o", "{O}"}},
-
-		// cdncheck: CDN/WAF IP classification (-silent -resp -nc -i {F}, CdncheckTask — cdncheck.go)
-		{name: "cdncheck", args: []string{"-silent", "-resp", "-nc", "-i", "{F}"}},
-
-		// hakoriginfinder: origin IP discovery (reads IPs from stdin + -h <url>, HakoriginfinderTask — hakoriginfinder.go)
-		// [A14-fix: tool reads IPs from stdin, not -i flag; -h specifies target URL]
-		{name: "hakoriginfinder", args: []string{"-h", "https://example.com"}, stdin: true},
-
-		// csprecon: CSP hostname extraction (-s -l {F}, CspreconTask — csprecon.go)
-		// [A15-fix: csprecon uses -l/-list for file input, not -i]
-		{name: "csprecon", args: []string{"-s", "-l", "{F}"}},
-
-		// favirecon: favicon tech recon (-l {F} -c N -t N -s -j -o {O}, FavireconTask — favirecon.go)
-		{name: "favirecon", args: []string{"-l", "{F}", "-c", "5", "-t", "5", "-s", "-j", "-o", "{O}"}},
-
-		// VhostFinder: virtual host discovery (-ips {F} -wordlist {F} -verify, VhostFinderTask — vhostfinder.go)
-		{name: "VhostFinder", args: []string{"-ips", "{F}", "-wordlist", "{F}", "-verify"}},
-
-		// shortscan: IIS short filename scanner (positional URL -F -s -p 1, ShortscanTask — shortscan.go)
-		{name: "shortscan", args: []string{"https://example.com", "-F", "-s", "-p", "1"}},
-
-		// Gxss: XSS reflection scanner (-c 100 -p Xss via stdin, GxssTask — gxss.go)
-		{name: "Gxss", args: []string{"-c", "100", "-p", "Xss"}, stdin: true},
-
-		// arjun: parameter discovery (-i {F} -t N -oT {O}, ArjunTask — arjun.go)
-		{name: "arjun", args: []string{"-i", "{F}", "-t", "5", "-oT", "{O}"}},
-	}
+	// The probe table lives in argvector_probes_test.go, WITHOUT a build tag, so
+	// the hermetic drift detector can read the same entries this probe executes.
+	// While it lived here, behind //go:build realtools, nothing untagged could
+	// compare it against the Tasks it claims to mirror.
+	probes := subdomainWebProbes
 	// NOTE (DoD-1): 23 Phase-5 tools covered above + nomore403/JSA repo-clone probes below.
 	// Do not add --help probes — they bypass flag parsing.
 
@@ -192,10 +131,12 @@ func TestRealToolArgVectors(t *testing.T) {
 		t.Run(label, func(t *testing.T) {
 			binPath, err := exec.LookPath(p.name)
 			if err != nil {
-				t.Logf("SKIP: binary %q not on PATH — not a CI failure", p.name)
-				t.Skipf("binary %q not on PATH — skipping (not a CI failure)", p.name)
+				census.recordAbsent(p.name)
+				t.Logf("SKIP: binary %q not on PATH — NOT a pass: this arg vector was not verified", p.name)
+				t.Skipf("binary %q not on PATH — skipping (counted in REALTOOLS_CENSUS)", p.name)
 				return
 			}
+			census.recordPresent(p.name)
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
 
@@ -206,15 +147,42 @@ func TestRealToolArgVectors(t *testing.T) {
 			var out bytes.Buffer
 			cmd.Stdout = &out
 			cmd.Stderr = &out
-			_ = cmd.Run() // exit code is NOT the failure condition — sentinels are.
+			runErr := cmd.Run() // exit code alone is NOT the failure condition — see below.
 
 			combined := strings.ToLower(out.String())
 			for _, sentinel := range usageSentinels {
 				if strings.Contains(combined, sentinel) {
 					t.Errorf("%s rejected its real arg vector (sentinel %q):\n  args: %v\n  output:\n%s",
 						p.name, sentinel, sub(p.args), out.String())
-					break
+					return
 				}
+			}
+
+			// Semantic rejections: parser accepted, option validation refused.
+			// Gated on a non-zero exit so a tool's own help text cannot trip them.
+			if runErr != nil {
+				for _, sentinel := range semanticRejectionSentinels {
+					if strings.Contains(combined, sentinel) {
+						t.Errorf("%s was ACCEPTED by the parser then refused to start (%q):\n"+
+							"  args: %v\n  output:\n%s", p.name, sentinel, sub(p.args), out.String())
+						return
+					}
+				}
+			}
+
+			// FATAL-LEVEL REJECTION, whatever the wording.
+			//
+			// The sentinel list can only ever name rejections someone already knew
+			// to look for, and both bugs this test missed were phrased in ways
+			// nobody had anticipated. projectdiscovery's goflags prints option
+			// validation failures at [FTL] and exits non-zero; that pairing —
+			// fatal-level diagnostic AND non-zero exit — means the tool refused to
+			// start, which is exactly what this probe exists to detect. A tool that
+			// merely finds nothing exits non-zero WITHOUT an [FTL] line, so the
+			// benign case this test was careful to tolerate stays tolerated.
+			if runErr != nil && (strings.Contains(combined, "[ftl]") || strings.Contains(combined, "fatal")) {
+				t.Errorf("%s exited non-zero with a FATAL diagnostic — it refused to start:\n"+
+					"  args: %v\n  output:\n%s", p.name, sub(p.args), out.String())
 			}
 		})
 	}
@@ -270,10 +238,12 @@ func TestRealToolArgVectors(t *testing.T) {
 			}
 
 			if binaryPath == "" {
-				t.Logf("SKIP: %s not found in candidate tools dirs %v — not a CI failure", rp.name, toolsDirCandidates)
-				t.Skipf("SKIP: %s not found at expected path — not a CI failure", rp.name)
+				t.Logf("SKIP: %s not found in candidate tools dirs %v — NOT a pass", rp.name, toolsDirCandidates)
+				census.recordAbsent(rp.name)
+				t.Skipf("SKIP: %s not found at expected path — NOT a pass (counted in REALTOOLS_CENSUS)", rp.name)
 				return
 			}
+			census.recordPresent(rp.name)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()

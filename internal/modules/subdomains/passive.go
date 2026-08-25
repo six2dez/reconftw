@@ -255,7 +255,21 @@ func (GithubSubdomainsTask) Run(ctx context.Context, app *appctx.AppContext) (ta
 			fmt.Errorf("github-subdomains: read token file %q: %w", tokenFile, err)
 	}
 	tokenStr := strings.TrimSpace(string(tokenBytes))
-	// Register token as secret before any logging that may include tool stderr.
+
+	// Register the token the moment it exists in memory and BEFORE dispatch.
+	//
+	// This was promised and not done: the code only logged the token's LENGTH.
+	// Survivable while argv stayed in memory; not survivable once
+	// logs/tools.jsonl began writing argv to disk, because this task puts the
+	// token's CONTENT on the command line (`-t <token>`, below).
+	//
+	// ARCH-02 says v2 never passes a secret as a CLI arg. This site VIOLATES that,
+	// and registering the token does NOT fix the violation — moving to RunEnv
+	// would change the tool's own contract. What this guarantees is that the
+	// violation does not become a plaintext token in a file.
+	if tokenStr != "" && app.Secrets != nil {
+		app.Secrets.Register(tokenStr)
+	}
 	if tokenStr != "" && app.Log != nil {
 		app.Log.Debug("github-subdomains: token file loaded",
 			"file", tokenFile,
@@ -305,6 +319,21 @@ func (GitlabSubdomainsTask) Run(ctx context.Context, app *appctx.AppContext) (ta
 			fmt.Errorf("gitlab-subdomains: read token file %q: %w", tokenFile, err)
 	}
 	tokenStr := strings.TrimSpace(string(tokenBytes))
+
+	// Register the token the moment it exists in memory and BEFORE dispatch.
+	//
+	// This was promised and not done: the code only logged the token's LENGTH.
+	// Survivable while argv stayed in memory; not survivable once
+	// logs/tools.jsonl began writing argv to disk, because this task puts the
+	// token's CONTENT on the command line (`-t <token>`, below).
+	//
+	// ARCH-02 says v2 never passes a secret as a CLI arg. This site VIOLATES that,
+	// and registering the token does NOT fix the violation — moving to RunEnv
+	// would change the tool's own contract. What this guarantees is that the
+	// violation does not become a plaintext token in a file.
+	if tokenStr != "" && app.Secrets != nil {
+		app.Secrets.Register(tokenStr)
+	}
 	if tokenStr != "" && app.Log != nil {
 		app.Log.Debug("gitlab-subdomains: token file loaded",
 			"file", tokenFile,

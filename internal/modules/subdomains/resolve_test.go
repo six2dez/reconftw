@@ -214,11 +214,28 @@ func TestResolveDegradesOnToolError(t *testing.T) {
 				t.Fatalf("%s not registered", name)
 			}
 			res, err := tsk.Run(context.Background(), app)
+			// THE NIL ERROR IS THE PARITY. subdomains is PolicyFailFast, so a
+			// non-nil error here would cancel the errgroup and take the peer
+			// tasks down. This assertion is unchanged and is the load-bearing one.
 			if err != nil {
 				t.Fatalf("degrade must NOT return an error, got %v", err)
 			}
-			if res.Status != task.StatusDone {
-				t.Errorf("status = %q, want done (CONTINUE_ON_TOOL_ERROR degrade)", res.Status)
+
+			// The STATUS expectation is updated deliberately in phase 16.
+			//
+			// It previously demanded StatusDone, which encoded a mistranslation of
+			// the parity requirement: v1's CONTINUE_ON_TOOL_ERROR means the RUN
+			// CONTINUES, not that the failing function reports success — v1 prints
+			// a FAIL/WARN badge for it and keeps going. Reporting Done made a
+			// broken tool indistinguishable from a working one, which is the same
+			// shape that hid dnstake's bad arg vector for months.
+			if res.Status != task.StatusSkipped {
+				t.Errorf("status = %q, want skipped — a tool that FAILED must not "+
+					"report success (the nil error above is what carries the parity)", res.Status)
+			}
+			if res.Reason == "" {
+				t.Error("a degraded result carries no Reason — the operator sees [SKIP] " +
+					"with no explanation")
 			}
 		})
 	}
@@ -370,6 +387,21 @@ func TestSubDNSPersistsDnsregsAndIPs(t *testing.T) {
 // Test helpers specific to resolve tests
 // -------------------------------------------------------------------------
 
+// seedTestResolvers writes a usable resolver list into workDir and points cfg at
+// it. Every resolve task now refuses to run with zero resolvers (the 2026-08-20
+// cutover blocker: puredns was handed `-r ""`, exited 1, and aborted the only
+// fail-fast stage group), so a fixture without one is not a realistic run — it
+// would exercise the guard instead of the behaviour under test. Tests that WANT
+// the guard assert it explicitly; see TestSubActiveNoResolversErrors.
+func seedTestResolvers(cfg *config.Config, workDir string) {
+	main := filepath.Join(workDir, "resolvers.txt")
+	trusted := filepath.Join(workDir, "resolvers_trusted.txt")
+	_ = os.WriteFile(main, []byte("1.1.1.1\n8.8.8.8\n9.9.9.9\n"), 0o644)
+	_ = os.WriteFile(trusted, []byte("1.1.1.1\n8.8.8.8\n"), 0o644)
+	cfg.Paths.Resolvers = main
+	cfg.Paths.ResolversTrusted = trusted
+}
+
 // newTestApp builds a minimal AppContext for resolve Task tests.
 func newTestApp(workDir string, runner *backend.Runner, tree *mockTree) *appctx.AppContext {
 	app := &appctx.AppContext{
@@ -381,6 +413,7 @@ func newTestApp(workDir string, runner *backend.Runner, tree *mockTree) *appctx.
 		},
 		Cfg: &config.Config{},
 	}
+	seedTestResolvers(app.Cfg, workDir)
 	app.Cfg.Subdomains.Passive.Enabled = true
 	app.Cfg.Subdomains.Brute.Enabled = true
 	app.Cfg.Subdomains.DNSResolve.PurednsWildcardtestLimit = 100

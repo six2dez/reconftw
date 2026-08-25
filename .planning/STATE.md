@@ -4,14 +4,14 @@ milestone: v2.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 14 context gathered
-last_updated: "2026-07-17T08:29:48.914Z"
-last_activity: 2026-07-17 -- Phase 14 execution started
+last_updated: "2026-08-18T11:03:36.273Z"
+last_activity: 2026-08-18 -- Phase 15 planning complete
 progress:
-  total_phases: 14
-  completed_phases: 10
-  total_plans: 99
-  completed_plans: 82
-  percent: 71
+  total_phases: 15
+  completed_phases: 12
+  total_plans: 117
+  completed_plans: 105
+  percent: 80
 ---
 
 # Project State
@@ -21,17 +21,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-27)
 
 **Core value:** Run one command, get a complete recon picture of a target — passive, active, and vulnerability layers — with resumable checkpoints, structured output, and zero-touch tool orchestration.
-**Current focus:** Phase 14 — Cutover & Migration
+**Current focus:** Phase 15 — Release Gates: Run Isolation & Store Integrity
 
 ## Current Position
 
-Phase: 14 (Cutover & Migration) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 14
-NEXT: Phase 14 — Cutover & Migration. Its MIGRATION.md MUST absorb the 8-item deferral ledger from 13-PARITY-AUDIT.md (PTR-sweep, deep_wildcard_filter, ip.thc.org, metadata-active, mail_hygiene, apileaks-enrichment, pydictor, noseyparker). Recommended non-blocking pre-cutover hardening: explicit cfg.Web.Portscan.UDPEnabled=false in ApplyZenProfile.
-Old status (13-07): closed the two vulns parity gaps (PAR-02). (1) SprayTask (internal/modules/vulns/spray.go, Name "vulns.spray", DependsOn nil) reads the previously-orphaned cfg.Vulns.Spray{Enabled,Engine,DeepOnly} (defaults.go:216, consumed by zero tasks): brutespray (default) `-f hosts/portscan_active.gnmap -T <concurrence> -o vulns/brutespray` via app.Tools; brutus (alternate, DEEP-gated) reads hosts/service_fingerprints.jsonl (from 13-03; or nerva-generated from naabu_open.txt) on STDIN via the brutusRunner exec seam (FOUND-10-allowlisted, mirrors reverseip.go — brutus is stdin-only) → `brutus --json -o vulns/brutus.jsonl [-u/-p/-k file]`. Gating matches bash spraying() (vulns.sh:615): StatusSkipped on IP-literal target / absent-or-empty gnmap / (Spray.DeepOnly && !Deep); brutus additionally deep-gated (SPRAY_BRUTUS_ONLY_DEEP default true) → never sprays outside --deep. XCUT-07 (T-13-07-03): discovered credentials NEVER persisted — only host/service/port recorded in inputs/findings.spray.jsonl (VulnClass credential-spray), credential redacted to *** (Payload/PoCRedacted); brutus wordlists cross as FILE PATHS (-u/-p/-k), never raw values on argv. Best-effort (D-V7): missing brutespray/brutus → StatusSkipped, never StatusErrored. (2) SSRFTask (ssrf.go) re-adds the interactsh-client auto-start the DoD-2 fix REMOVED — now BOUNDED: when cfg.APIKeys.CollabServer unset AND interactsh-client on PATH, startInteractshClient (package-var seam) exec's it under taskCtx (SysProcAttr Setpgid + process-group SIGTERM on cleanup/cancel, mirrors local.go), reads the registered callback domain with a wait bounded by BOTH interactshStartupTimeout (30s sub-timeout) AND the overall task context.WithTimeout — no-callback → group-kill + fall through to in-band; NO infinite poll (DoD-2 unbounded-wait regression prevented, test-proven by TestSSRFRunBoundedNoHang: a never-emitting stub does not hang past TimeoutSeconds). XCUT-07 (T-13-07-02): callback domain (session secret) NEVER logged — only "oob_enabled" + counts; token seeds workspace OOB payloads only, never a log line or finding (TestSSRFXCUT07NoCallbackURLInLogs). CollabServer-set path unchanged (regression guard). spray.go added to the FOUND-10 allowlist (brutus stdin). TDD-developed, committed test+impl together per task (feat). gofmt+vet clean; vulns suite green; FOUND-10 lint gate green; go build ./... exit 0; full non-resolvers suite green (31 ok, 0 FAIL); internal/core/resolvers still the pre-existing UDP/53 env-hang (untouched).
-NEXT: Phase 13 final plan — 13-08 (pipeline wiring: add subdomains.csprecon + web.portscan + web.url_ext/wellknown/wordlistgen + vulns.spray to the stage lists, wire web.MergeStage "hosts" after portscan+wellknown in web.go+composite.go, confirm zen ApplyZenProfile disables Web.Portscan.ActiveEnabled+UDPEnabled, remove dead subdomains.ptr; capability parity audit ≥95%). SSRFTask is already wired (vulns.ssrf); vulns.spray self-registers but is UNSELECTED until 13-08 adds its prefix to the vulns stage list.
-Last activity: 2026-08-10 -- Cutover validation: default (local) path READY (recon×3 + all-mode, 3 bugs fixed). Axiom investigated live (4 paid fleets, all torn down $0.11): lifecycle OK but distribution was broken; 4 correct fixes applied (260810-pnj) yet brute STILL 0s under --axiom → PARTIAL, resume in fresh session (memory RESUME HERE). --axiom = not-yet-functional / experimental (NOT a blocker for the default path)
+Phase: 15 (Release Gates: Run Isolation & Store Integrity) — EXECUTED, NOT SIGNED OFF
+Plan: 18 of 18 complete (5 waves)
+Status: Gates 1-10 and 12 PASS. Gate 11 SKIPPED (docker not runnable locally; enforced in CI). One regression-guard step FAILS: govulncheck under a local go1.26.1 toolchain while go.mod pins 1.25.13 — toolchain divergence, recorded as a phase decision, module-level vulns all UNREACHABLE.
+NEXT: `bash scripts/release-gates.sh` is the cutover gate and currently exits non-zero by design. To sign off Phase 14: (1) resolve the govulncheck toolchain divergence, (2) run gate 11 on real or emulated ARM64 (CI job `docker`, step `Verify image health (linux/arm64)`), (3) triage `.planning/phases/15-release-gates-run-isolation-store-integrity/deferred-items.md` (15 items, one needing a RELEASE NOTE about monitor re-alerting once after upgrade).
+KNOWN LIMITATION carried into gate 3a: `hosts` is not emptied on a subs-only/passive run, because `web/httpx.go` owns the empty publish and does not run there. Giving `subdomains/geo.go` the publish would erase web hosts no producer in that run examined — worse.
+BLOCKED BEHIND 15: Phase 14 — Cutover & Migration. Its MIGRATION.md must absorb the 8-item deferral ledger from 13-PARITY-AUDIT.md, plus phase-15 path-contract changes (`reports/<target-slug>/<scan-id>/`, slug-named workspaces with one-time legacy adoption).
+Last activity: 2026-08-18 -- Phase 15 planning complete
 
 ## Performance Metrics
 
@@ -127,9 +127,20 @@ Recent decisions affecting v2.0 work:
 - [Phase ?]: MCP session registry concurrency pattern
 - [Phase ?]: Auth at correct HTTP layer per RESEARCH Pitfall 1
 
+### Roadmap Evolution
+
+- Phase 15 added (2026-08-14): **Release Gates: Run Isolation & Store Integrity** — remediation of the
+  fifth pre-cutover audit. 19 findings independently re-verified against `dev-go` @ `4cedba9` with
+  file:line evidence, grouped into 5 workstreams (target identity/run isolation/dry-run purity;
+  stream error contract; store integrity + report scoping; MCP correctness; build/supply-chain/CI
+  gates). Audit finding #17 (untracked production code) was already resolved by commits `855b6b5`/
+  `e602a6e`/`4cedba9` — do not re-open. Full detail and the 12 acceptance gates:
+  `.planning/phases/15-release-gates-run-isolation-store-integrity/15-CONTEXT.md`.
+  **This phase blocks Phase 14 cutover sign-off.**
+
 ### Pending Todos
 
-Next action: run `/gsd:plan-phase 2` (Architecture v2 Design).
+Next action: run `/gsd-plan-phase 15` (Release Gates: Run Isolation & Store Integrity).
 
 ### Blockers/Concerns
 
@@ -147,6 +158,7 @@ Next action: run `/gsd:plan-phase 2` (Architecture v2 Design).
 | 260806-qxt-vulns-nilres-panic-fix | Fix all-mode `reconftw all` nil-pointer panic (testssl/llm/websocket/fray missing res==nil guard); found by live reconbox3 cutover validation, mutation-proven test, live re-run rc=0 | 2026-08-06 | working tree (maintainer) | [260806-vulns-nilres-panic-fix](./quick/260806-vulns-nilres-panic-fix/) |
 | 260810-enq-urls-corpus-double-join | Fix vulns URL-corpus path double-join (readURLsJSONL) — 11 URL-consuming tasks were dead in all/deep ("no URL corpus" despite populated urls.jsonl); mutation-proven test; live re-run rc=0 w/ second_order engaging 1274 targets | 2026-08-10 | working tree (maintainer) | [260810-urls-corpus-double-join](./quick/260810-urls-corpus-double-join/) |
 | 260810-pnj-axiom-distribution-fix | PARTIAL: 4 correct+unit-tested --axiom fixes (Exec output read-back RC-A, input detection RC-B, brute→local RC-C, failover wrap) — but live re-test STILL shows brute=0s under --axiom; blocked by a --log-level-debug no-op. Resume in fresh session (see memory RESUME HERE) | 2026-08-10 | working tree (maintainer) | [260810-axiom-distribution-fix](./quick/260810-axiom-distribution-fix/) |
+| 260820-uby-resolver-acquisition-cutover-blocker | CUTOVER BLOCKER fix: v2 could not complete a default recon — Paths.Resolvers defaulted to "" so puredns ran `-r "" -rt ""` and aborted the only fail-fast group. Boot-time resolver acquisition (v1 parity), resolvers.health now aborts instead of SKIP, deterministic point-of-use guard in SubActiveTask (the health task was never a barrier — subs-resolve is fully concurrent), + `parity-full.sh --v2-only` to reuse the banked 10h v1 baseline. 24 new tests, each mutation-proven. Parity re-run NOT yet executed | 2026-08-20 | working tree (maintainer) | [260820-uby-resolver-acquisition-cutover-blocker](./quick/260820-uby-resolver-acquisition-cutover-blocker/) |
 
 ## v2 Architecture Considerations (from v1.0 deferred backlog)
 

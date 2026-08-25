@@ -781,6 +781,120 @@ Calendar parallelization (within constraint that dependencies are met):
 - **XCUT-08** (supply chain tools.lock) → Phase 11 (where INST-02/03/04 live)
 - **XCUT-09** (observability heartbeat) → Phase 3 (scheduler emits heartbeats; tested every phase)
 
+### Phase 15: Release Gates: Run Isolation & Store Integrity
+
+**Goal:** Close the 18 in-scope findings of the fifth pre-cutover audit so that a run cannot leak
+state into another run, another target, or a report. Five workstreams: (A) canonical target identity,
+per-run isolation and true dry-run purity; (B) an unignorable stream error contract; (C) atomic ingest
+plus per-target finding identity and per-scan report scoping; (D) MCP config propagation, atomic scope
+capture, lifecycle and monitor state; (E) correct multiarch Docker, dry-run-safe stateful commands,
+reproducible bootstrap and a coverage gate that can fail.
+
+**Blocks:** Phase 14 cutover sign-off. Its 12 acceptance gates (see 15-CONTEXT.md) are the definition
+of done for the cutover, not just for this phase.
+
+**Requirements**: audit findings F1-F16, F18, F20 (F17 and F19 already resolved — see 15-CONTEXT.md)
+**Depends on:** Phase 14
+**Plans:** 18/18 plans complete
+Plans:
+**Wave 1**
+
+- [x] 15-01-PLAN.md — Canonical target identity + strict hostname validation + legacy workspace adoption (F2, F20) [wave 1]
+- [x] 15-02-PLAN.md — Unignorable stream error contract in the backend package (F6) [wave 1]
+- [x] 15-03-PLAN.md — Staging lifecycle helper + merger empty-replace + write-triggered guard (F3) [wave 1]
+- [x] 15-04-PLAN.md — Store migration runner with single-writer version advance (F10, F11) [wave 1]
+- [x] 15-06-PLAN.md — Multiarch Docker built in-image with real ARM64 verification (F5) [wave 1]
+- [x] 15-07-PLAN.md — Statement-weighted coverage gate, single source (F16) [wave 1]
+- [x] 15-08-PLAN.md — Reproducible bootstrap: OS/arch hash matrix + cleanup + version probe (F15) [wave 1]
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 15-05-PLAN.md — Dry-run purity + single boot (F1, F18) [wave 2]
+- [x] 15-12-PLAN.md — Stateful subcommands dry-run purity + exact workspace matching (F14) [wave 2]
+- [x] 15-13-PLAN.md — Module sweep: web + subdomains (F3, F6) [wave 2]
+- [x] 15-18-PLAN.md — Target-scoped finding identity, v1→v2 data migration + observation repointing, per-scan queries (F10, F11, F12) [wave 2]
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 15-09-PLAN.md — Workspace lock + per-target mutual exclusion (F4) [wave 3]
+- [x] 15-10-PLAN.md — Atomic ingest transaction (F10) [wave 3]
+- [x] 15-11-PLAN.md — Per-scan report scoping + report manifest + gate-3 empty-report proof (F3, F12, F7) [wave 3]
+- [x] 15-14-PLAN.md — Module sweep: vulns + osint + spray IP attribution (F3, F6, F20) [wave 3]
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [x] 15-15-PLAN.md — MCP config snapshot, atomic scope capture, lifecycle, cancel_scan (F7, F8, F9) [wave 4]
+- [x] 15-16-PLAN.md — Monitor persistence, generation IDs, fingerprints, retry (F13) [wave 4]
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [x] 15-17-PLAN.md — Release gate suite: 12 acceptance gates + regression guard (all) [wave 5]
+
+---
+
+### Phase 16: Live-Run Observability & Tool Contract Integrity
+
+**Goal:** Make a v2 live run diagnosable and make a silently-failing tool impossible, then finish
+the parity validation that Phase 15 unblocked. The first end-to-end v2 run (2026-08-20) took five
+separate investigations to get through five stacked blockers, every one of which presented as the
+same opaque `tool stream ended badly: exit status 1` and every one of which had a task reporting
+success while producing nothing. Subdomain parity now BEATS v1 (30 vs 14); the web layer produces
+zero hosts.
+
+**Workstreams:**
+(A) **Tool I/O persistence.** The workspace `logs/` directory is empty — tool stderr, the exact
+argv, and the exit code are persisted nowhere, so all five blockers had to be diagnosed by
+hand-reproducing invocations over ssh. This is the highest-leverage item in the phase: it converts
+multi-minute investigations into greps.
+(B) **No silent success.** `web.httpx` reported `[OK] 31s` having written zero records; `dnstake`'s
+`flag provided but not defined` was swallowed as "tool not registered" and takeover detection
+produced zero for months. A task that ran a tool and produced no records must SKIP with a reason or
+FAIL — never OK.
+(C) **ProjectDiscovery update-check determinism.** 31 PD call sites; only 7 `-duc` occurrences in
+all of internal/. `~/.config/httpx/` holds no version cache, so every tool start reaches the network.
+An intermittent httpx hang was observed and is NOT yet root-caused — evidence first, then policy.
+(D) **Arg-vector verification coverage.** `make realtools-args` now exists and passes 37/0/9, but 9
+tools were absent from the box and remain unverified. Decide where this gate runs and what it gates.
+(E) **Parity re-validation.** Re-run `--v2-only` against the banked v1 baseline and drive the
+live-host and finding-class core sets to a defensible verdict.
+
+**Blocks:** Phase 14 cutover sign-off, jointly with Phase 15's 12 acceptance gates.
+
+(F) **Tool OUTPUT contract integrity.** Added during planning, 2026-08-21. The dead web layer was
+not the PD hang: `httpxRaw` declared `Port int` against httpx's `"port":"80"` string, so
+`json.Unmarshal` failed on every line and `parseHTTPXOutput` discarded all 20 records. A REAL captured
+fixture containing the falsifying `"port":"443"` had been in the repo since 2026-06-02, and
+`TestWebParityHTTPX` read it — while never calling `parseHTTPXOutput`, decoding instead with an inline
+anonymous struct of its own. Workstream (D) covers the contract on the way IN (argv); this covers the
+way OUT.
+
+**Requirements:** LR-A (tool I/O persistence), LR-B (no silent success), LR-C (PD update-check
+determinism), LR-D (arg-vector verification coverage), LR-E (parity re-validation), LR-F (tool output
+contract integrity) — the six workstreams above, sourced from the five layers recorded in
+`.planning/phases/15-release-gates-run-isolation-store-integrity/deferred-items.md`
+§ "CUTOVER BLOCKER" and § "FIRST COMPLETE v2 RUN", plus the sixth found during planning.
+**Depends on:** Phase 15
+**Plans:** 0/7
+
+**Wave 1** *(tracer — prove the diagnostic seam end-to-end before expanding)*
+
+- [ ] 16-01-PLAN.md — Tool I/O persistence: workspace tool log, stderr on the terminal error, argv redaction (LR-A) [wave 1]
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 16-02-PLAN.md — No silent success: SKIP-with-reason rule, httpx + dnstake, degrade sweep, AST ratchet (LR-B) [wave 2]
+- [ ] 16-03-PLAN.md — PD update-check ROOT CAUSE: reconciliation, discriminating probe matrix, costed decision (LR-C) [wave 2]
+- [ ] 16-04-PLAN.md — Arg-vector coverage: run what the target claims, skip ratchet, drift detector, gate home (LR-D) [wave 2]
+- [ ] 16-07-PLAN.md — Tool output contracts: parity tests that call their parsers, fixture provenance, parser census + ratchet (LR-F) [wave 2]
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 16-05-PLAN.md — Conditional PD startup policy from 16-03's verdict, or a recorded no-op (LR-C) [wave 3]
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 16-06-PLAN.md — Parity re-validation: workspace archival, attribution report, signed verdict (LR-E) [wave 4]
+
 ---
 *Roadmap created: 2026-05-27*
 *Total v2.0 requirements: 197 across 12 phases (100% coverage). Granularity: coarse. Parallelization: yes (within constraints).*

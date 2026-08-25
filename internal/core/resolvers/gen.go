@@ -31,9 +31,16 @@ const (
 	dnsvalidatorPublicDNS = "https://public-dns.info/nameservers.txt"
 	dnsvalidatorMassdns   = "https://raw.githubusercontent.com/blechschmidt/massdns/master/lists/resolvers.txt"
 
-	// Fallback download URLs (v1 resolvers_url / resolvers_trusted_url defaults).
+	// Fallback download URLs, used only when the config leaves the URL empty.
+	// These MUST match reconftw.cfg:26-27 (v1 resolvers_url /
+	// resolvers_trusted_url) and config/defaults.go PathsResolversDownload.
+	// The trusted URL previously named gist 1a48d3b6…, a different gist from the
+	// one v1 and the v2 config default both point at (ae9ed7e5…); it was
+	// unreachable from any run that went through config.Load, which is why the
+	// divergence survived. Aligned here so a hand-built *config.Config gets the
+	// same list as everything else.
 	fallbackResolversURL        = "https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt"
-	fallbackTrustedResolversURL = "https://gist.githubusercontent.com/six2dez/1a48d3b636f0e20c0d628ed82e4b20ec/raw/trusted_resolvers.txt"
+	fallbackTrustedResolversURL = "https://gist.githubusercontent.com/six2dez/ae9ed7e5c786461868abd3f2344401b6/raw/trusted_resolvers.txt"
 
 	// defaultDNSValidatorThreads mirrors v1 DNSVALIDATOR_THREADS=10.
 	defaultDNSValidatorThreads = 10
@@ -54,7 +61,11 @@ const (
 //
 // Standalone — no --target required (D-04).
 func RunGenResolvers(ctx context.Context, cfg *config.Config) error {
-	// Determine output path.
+	// Determine output path. config.Load fills cfg.Paths.Resolvers from the XDG
+	// state dir, so this fallback fires only for a hand-built *config.Config or
+	// when neither XDG_CONFIG_HOME nor a home directory resolves. It must stay in
+	// lockstep with genResolversOutputPath in cmd/reconftw — a divergence would
+	// let `reconftw gen-resolvers` fix a file the scan never reads.
 	resolversPath := cfg.Paths.Resolvers
 	if resolversPath == "" {
 		home, err := os.UserHomeDir()

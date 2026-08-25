@@ -41,7 +41,16 @@ kind            = "go"
 go_module       = "github.com/projectdiscovery/httpx/cmd/httpx"
 description     = "HTTP probe with tech detection"
 default_args    = []
-timeout_seconds = 0
+# 16-05 (P4): was 0 = no deadline at ANY layer. applyToolContract is the only
+# place a tool acquires one, there is no per-task or run-level deadline, so an
+# httpx that blocked blocked until the operator killed the process.
+# DERIVATION: v1 has no process bound for httpx — HTTPX_TIMEOUT=10 is its
+# PER-REQUEST flag, not a process cap. So this is reasoned, not inherited.
+# The 2026-08-20 live run probed 20 hosts in 31s. Probing is host_count x
+# per-request timeout / threads, so an hour is ~116x the observed run and far
+# above any plausible legitimate probe. Peers in this manifest: ffuf 900,
+# tlsx 300, dnsx 14400.
+timeout_seconds = 3600
 critical        = true
 version         = "v1.9.0"
 input_flag      = "-l"
@@ -306,7 +315,15 @@ kind            = "go"
 go_module       = "github.com/projectdiscovery/nuclei/v3/cmd/nuclei"
 description     = "Template-based vulnerability and misconfiguration scanner"
 default_args    = []
-timeout_seconds = 0
+# 16-05 (P4): was 0. DERIVATION: matches katana and dnsx, the two other
+# long-running scanners already bounded at 4h in this manifest — katana's own
+# entry documents a 3-4h runtime. v1 has no bound at all.
+# TRUNCATION RISK, STATED RATHER THAN HIDDEN: a DEEP nuclei run against
+# thousands of hosts could plausibly exceed 4h, and this value is NOT
+# overridable from config (registry_seed.go reads timeout_seconds and nothing
+# else writes Tool.Timeout). If a deep run reports ToolTimeout, raise it HERE;
+# do not read the timeout as a nuclei defect.
+timeout_seconds = 14400
 critical        = false
 version         = "v3.8.0"
 input_flag      = "-l"
@@ -864,7 +881,11 @@ kind            = "go"
 go_module       = "github.com/projectdiscovery/naabu/v2/cmd/naabu"
 description     = "Fast SYN/CONNECT port scanner"
 default_args    = []
-timeout_seconds = 0
+# 16-05 (P4): was 0. DERIVATION: v1 has no process bound. v1 defaults are
+# NAABU_PORTS="--top-ports 1000" at NAABU_RATE=1000/s, so a few hundred IPs is
+# 10^5-10^6 probes = 100-1000s of work. 3600 leaves 3.6-36x headroom and sits
+# beside ffuf's 900 for comparable scanning work.
+timeout_seconds = 3600
 critical        = false
 version         = "v2.3.3"
 input_flag      = "-list"
@@ -875,7 +896,10 @@ kind            = "go"
 go_module       = "github.com/projectdiscovery/notify/cmd/notify"
 description     = "Multi-channel notification dispatch (Slack/Telegram/Discord)"
 default_args    = []
-timeout_seconds = 0
+# 16-05 (P4): was 0. DERIVATION: notify dispatches a handful of HTTP posts to
+# Slack/Discord/Telegram. Five minutes is already far beyond any successful
+# dispatch; a notification that takes longer has failed.
+timeout_seconds = 300
 critical        = false
 version         = "latest"
 input_flag      = ""

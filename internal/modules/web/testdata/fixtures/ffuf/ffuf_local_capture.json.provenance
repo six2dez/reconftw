@@ -1,0 +1,9 @@
+captured-from: ffuf -w <wordlist> -u http://127.0.0.1:8733/FUZZ -of json -o <out> -s
+date: 2026-08-24
+version: ffuf 2.1.0-dev
+seed: a local python3 -m http.server serving robots.txt (200) and admin/ (301)
+redaction: the `config` block (58 keys) and `commandline` were REMOVED — they carry this
+  machine's temp-directory paths and nothing parseFFUFOutput reads. Every remaining value was
+  inspected; the target is 127.0.0.1 throughout, so no third-party host, token or response body
+  appears. `results[].scraper`, `input`, `host` and `resultfile` were dropped for the same reason.
+note: a single JSON document, so a leading `#` comment is not legal — hence this sidecar.

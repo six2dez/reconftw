@@ -123,3 +123,29 @@ func (m *mutexWriter) Write(p []byte) (int, error) {
 	defer m.mu.Unlock()
 	return m.w.Write(p)
 }
+
+// TestTaskDoneReasonIsVisible: the Reason must reach the operator's line, or the
+// whole no-silent-success rule is decoration.
+func TestTaskDoneReasonIsVisible(t *testing.T) {
+	var buf bytes.Buffer
+	p := ui.NewStageProgress(&buf, true, ui.VerbosityNormal)
+	p.TaskDoneReason("web.nuclei", ui.BadgeSKIP, time.Second, "templates path not configured")
+
+	out := buf.String()
+	if !strings.Contains(out, "templates path not configured") {
+		t.Errorf("the SKIP line does not carry its reason — an operator reads "+
+			"\"[SKIP] web.nuclei 1s\" and learns nothing.\ngot: %q", out)
+	}
+}
+
+// TestTaskDoneReasonSuppressedOnOK: a Done result needs no explanation, and
+// printing one on every success would bury the ones that matter.
+func TestTaskDoneReasonSuppressedOnOK(t *testing.T) {
+	var buf bytes.Buffer
+	p := ui.NewStageProgress(&buf, true, ui.VerbosityNormal)
+	p.TaskDoneReason("web.httpx", ui.BadgeOK, time.Second, "should not appear")
+
+	if strings.Contains(buf.String(), "should not appear") {
+		t.Errorf("an OK line rendered a reason: %q", buf.String())
+	}
+}

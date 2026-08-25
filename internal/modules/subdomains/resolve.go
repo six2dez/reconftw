@@ -356,19 +356,32 @@ func isPropagatingError(ctx context.Context, err error) bool {
 }
 
 // degradeResolveTool implements CONTINUE_ON_TOOL_ERROR (bash) parity for the
-// resolve DNS spine (module="subdomains", fail_fast). A tool-EXECUTION error
-// from app.Tools.Run/Stream is non-fatal: log a warning and write an (empty)
-// staging file so one flaky puredns/dnsx does not abort the whole subs run —
-// mirroring the established SubAnalyticsTask best-effort precedent. Scope
-// violations (ErrScope) and context cancellation/deadline STILL return
-// StatusErrored so the scheduler's ErrScope re-propagation guard (scheduler.go
-// errors.Is(ErrScope)) and cancellation keep working. A staging-file WRITE error
-// is a real local FS fault and stays fatal (StatusErrored).
+// resolve DNS spine (module="subdomains", fail_fast).
+//
+// WHAT THE PARITY REQUIREMENT ACTUALLY IS. v1's CONTINUE_ON_TOOL_ERROR means the
+// RUN CONTINUES. It does not mean the failing function reports success — v1
+// prints a FAIL/WARN badge for it and keeps going. This function used to return
+// StatusDone, which was a mistranslation: it made a broken tool indistinguishable
+// from a working one on the operator's screen and in the checkpoint.
+//
+// THE NIL ERROR IS THE PART THAT CARRIES THE PARITY. `subdomains` is
+// PolicyFailFast, so a non-nil error here cancels the errgroup and takes the peer
+// tasks down with it. Returning StatusSkipped WITH a nil error keeps every peer
+// running while telling the truth about this one. Changing either half alone
+// breaks a different guarantee, which is why both are mutation-proven.
+//
+// Unchanged: the isPropagatingError guard runs FIRST, so scope violations
+// (ErrScope) and context cancellation/deadline still return StatusErrored and the
+// scheduler's ErrScope re-propagation guard keeps working. The WARN log stays.
+// The write-or-remove staging contract stays. A staging-file WRITE error is a
+// real local FS fault and stays fatal (StatusErrored).
 //
 // Accepted trade-off (checker LOW #5): degrading across all ~6 resolve callers
-// means a TOTAL resolver outage yields an empty-but-Done subs run rather than an
-// aborted one — the intended bash parity. The resolvers.health gate remains the
-// real pre-resolution guard.
+// means a TOTAL resolver outage yields an empty subs run rather than an aborted
+// one — the intended bash parity. It is no longer an empty-but-DONE run: each
+// degraded task now reports SKIP with a reason naming its tool, so the outage is
+// visible on the operator's screen instead of looking like a clean result. The
+// resolvers.health gate remains the real pre-resolution guard.
 func degradeResolveTool(ctx context.Context, app *appctx.AppContext, toolName string, cause error) (task.Result, error) {
 	if isPropagatingError(ctx, cause) {
 		return task.Result{Status: task.StatusErrored},
@@ -382,11 +395,7 @@ func degradeResolveTool(ctx context.Context, app *appctx.AppContext, toolName st
 	if writeErr != nil {
 		return task.Result{Status: task.StatusErrored}, writeErr
 	}
-	return task.Result{
-		Status:  task.StatusDone,
-		Outputs: []string{stagingPath},
-		Stats:   map[string]int{"resolved_found": 0},
-	}, nil
+	return task.ToolDegraded(toolName, cause, stagingPath), nil
 }
 
 // -------------------------------------------------------------------------
@@ -415,6 +424,23 @@ func (SubActiveTask) Enabled(cfg *config.Config) bool {
 func (SubActiveTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	const toolName = "puredns"
 	cfg := app.Cfg
+
+	// Point-of-use resolver guard. subdomains.resolvers.health checks the same
+	// thing, but EVERY task in the subs-resolve group returns DependsOn() -> nil,
+	// so the group runs fully concurrent and the health task is not a barrier —
+	// it merely happened to be scheduled first on 2026-08-20. Without this guard
+	// the abort would be a race, and the operator's error would read
+	// "puredns: tool stream ended badly: exit status 1" instead of naming the
+	// resolver list. Same rule as the brute.go header: runtime conditions live
+	// in Run(), because Scheduler.runOne never calls Enabled().
+	if !resolverListUsable(cfg.Paths.Resolvers) {
+		if app.Log != nil {
+			app.Log.Error("resolve: no usable DNS resolver list",
+				"resolver_file", cfg.Paths.Resolvers, "tool", toolName)
+		}
+		return task.Result{Status: task.StatusErrored}, errNoResolvers(cfg.Paths.Resolvers, nil)
+	}
+
 	inputFile := passiveMergedPath(app)
 	args := []string{
 		"resolve", inputFile,
@@ -423,8 +449,21 @@ func (SubActiveTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 		"--wildcard-batch", strconv.Itoa(cfg.Subdomains.DNSResolve.PurednsWildcardbatchLimit),
 		"--rate-limit", strconv.Itoa(cfg.Subdomains.DNSResolve.PurednsPublicLimit),
 		"--rate-limit-trusted", strconv.Itoa(cfg.Subdomains.DNSResolve.PurednsTrustedLimit),
-		"-rt", cfg.Paths.ResolversTrusted,
 		"--quiet",
+	}
+	// The trusted list is optional: puredns falls back to its own defaults.
+	//
+	// The flag MUST be the long "--resolvers-trusted". puredns has no "-rt"
+	// shorthand — "-r" IS the shorthand for --resolvers, so pflag reads "-rt" as
+	// "-r" with the attached value "t" and the tool dies with
+	//   unable to load public resolvers: open t: no such file or directory
+	// which surfaces as the generic "puredns: tool stream ended badly: exit
+	// status 1". v1 gets this right in all eight of its invocations
+	// (modules/subdomains.sh). This was latent from the port and stayed hidden
+	// behind the empty-resolver-path bug: with -r "" puredns failed before it
+	// ever parsed the trusted flag.
+	if resolverListUsable(cfg.Paths.ResolversTrusted) {
+		args = append(args, "--resolvers-trusted", cfg.Paths.ResolversTrusted)
 	}
 	result, err := runStreamTask(ctx, app, toolName, args)
 	if err != nil {
@@ -481,12 +520,23 @@ func (SubTLSTask) Enabled(cfg *config.Config) bool {
 func (SubTLSTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	const toolName = "tlsx"
 	inputFile := passiveMergedPath(app)
+	// v1 arg vector (modules/subdomains.sh:732): -san -cn -silent -ro.
+	//
+	// This previously passed "-re", app.Target.Domain, apparently intending a
+	// scope regex. tlsx has no such flag: "-re" is "-revoked", a BOOLEAN
+	// misconfiguration probe. So the domain became a stray positional and tlsx
+	// refused to start with
+	//   cause="san or cn flag cannot be used with other probes"
+	// which the stream contract flattened to "tlsx: tool stream ended badly: exit
+	// status 1", aborting the fail-fast subs-resolve group and the whole run.
+	// Scope filtering is not tlsx's job anyway — runStreamTask already applies the
+	// in-scope filter to what tlsx emits.
 	args := []string{
 		"-l", inputFile,
-		"-silent",
 		"-san",
 		"-cn",
-		"-re", app.Target.Domain,
+		"-silent",
+		"-ro",
 	}
 	return runStreamTask(ctx, app, toolName, args)
 }
@@ -578,11 +628,16 @@ func (SubDNSTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	// (bash uses -o subdomains/subdomains_dnsregs.json).
 	args := []string{
 		"-l", inputFile,
-		"-r", cfg.Paths.ResolversTrusted,
 		"-recon",
 		"-silent",
 		"-retry", "3",
 		"-json",
+	}
+	// dnsx uses the system resolvers when -r is absent, which is a working
+	// degrade; `-r ""` is not. Only pass the flag when the list actually exists
+	// (same shape as permut.go's guard).
+	if resolverListUsable(cfg.Paths.ResolversTrusted) {
+		args = append(args, "-r", cfg.Paths.ResolversTrusted)
 	}
 	if cfg.Subdomains.DNSResolve.DNSXThreads > 0 {
 		args = append(args, "-t", strconv.Itoa(cfg.Subdomains.DNSResolve.DNSXThreads))

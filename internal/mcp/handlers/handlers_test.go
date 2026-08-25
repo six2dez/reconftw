@@ -210,8 +210,26 @@ func lockTestScheduler(runTask func(context.Context, task.Task) (task.Result, er
 // lockTestConfigPath writes a reconftw.toml pinning data_dir to dataDir.
 func lockTestConfigPath(t *testing.T, dataDir string) string {
 	t.Helper()
-	p := filepath.Join(t.TempDir(), "reconftw.toml")
-	body := fmt.Sprintf("[paths]\ndata_dir = %q\n", dataDir)
+	dir := t.TempDir()
+	p := filepath.Join(dir, "reconftw.toml")
+
+	// Seed a resolver list and name it explicitly. RunSubsAsync sets
+	// RequireResolvers, so BootReconApp refuses to start without one — and left to
+	// the default it would DOWNLOAD it, making these lock tests depend on network
+	// egress (green locally, red on a no-egress runner) and write into the real
+	// $HOME. Every lock test routes its config through this helper, so seeding here
+	// covers them all, including ones added later.
+	resolvers := filepath.Join(dir, "resolvers.txt")
+	trusted := filepath.Join(dir, "resolvers_trusted.txt")
+	if err := os.WriteFile(resolvers, []byte("1.1.1.1\n8.8.8.8\n"), 0o600); err != nil {
+		t.Fatalf("seed resolvers: %v", err)
+	}
+	if err := os.WriteFile(trusted, []byte("1.1.1.1\n"), 0o600); err != nil {
+		t.Fatalf("seed trusted resolvers: %v", err)
+	}
+
+	body := fmt.Sprintf("[paths]\ndata_dir = %q\nresolvers = %q\nresolvers_trusted = %q\n",
+		dataDir, resolvers, trusted)
 	if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
 	}

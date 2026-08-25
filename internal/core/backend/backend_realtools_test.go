@@ -62,6 +62,11 @@ type vulnsToolProbe struct {
 //   - present binary → invoked with safeArgs; sentinel-checked for flag errors
 //   - absent binary → t.Logf("SKIP: ...") + t.Skip() (never silent, never fatal)
 func TestRealtoolsVulnsPhase6(t *testing.T) {
+	// Skip accounting: see realtools_census_test.go. This probe had NEVER run
+	// before phase 16 plan 04, so its known-absent list was derived by running it.
+	census := newProbeCensus()
+	defer reportRealtoolsCensus(t, "TestRealtoolsVulnsPhase6", census, vulnsKnownAbsent)
+
 	// Throwaway temp paths substituted in goldenArgs where real files are needed.
 	dir := t.TempDir()
 	hostsFile := filepath.Join(dir, "hosts.txt")
@@ -350,10 +355,12 @@ func TestRealtoolsVulnsPhase6(t *testing.T) {
 				// The live invocation just verifies python3 --version works.
 				binPath, err := exec.LookPath("python3")
 				if err != nil {
-					t.Logf("SKIP: python3 not found in PATH — DoD-1: binary absent, argv golden still asserted above")
+					census.recordAbsent("python3")
+					t.Logf("SKIP: python3 not found in PATH — NOT a pass (counted in REALTOOLS_CENSUS)")
 					t.Skip()
 					return
 				}
+				census.recordPresent("python3")
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
 				_ = execSafely(t, ctx, binPath, p.safeArgs, p.stdin)
@@ -363,10 +370,13 @@ func TestRealtoolsVulnsPhase6(t *testing.T) {
 			binPath, err := exec.LookPath(p.name)
 			if err != nil {
 				// DoD-1: logged SKIP (never silent, never fatal on absent binary).
-				t.Logf("SKIP: %s not found in PATH — DoD-1: binary absent, argv golden still asserted above", p.name)
+				census.recordAbsent(p.name)
+				t.Logf("SKIP: %s not found in PATH — argv golden asserted, live invocation NOT verified "+
+					"(counted in REALTOOLS_CENSUS)", p.name)
 				t.Skip()
 				return
 			}
+			census.recordPresent(p.name)
 
 			// T-06-09-03: 5-second per-invocation timeout.
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -406,6 +416,10 @@ type osintToolProbe struct {
 //
 //	go test -tags realtools ./internal/core/backend/... -run TestRealtoolsOSINTPhase7 -v
 func TestRealtoolsOSINTPhase7(t *testing.T) {
+	// Skip accounting: see realtools_census_test.go.
+	census := newProbeCensus()
+	defer reportRealtoolsCensus(t, "TestRealtoolsOSINTPhase7", census, osintKnownAbsent)
+
 	dir := t.TempDir()
 	tokenFile := filepath.Join(dir, "github_tokens.txt")
 	usernamesFile := filepath.Join(dir, "usernames.txt")
@@ -630,10 +644,13 @@ func TestRealtoolsOSINTPhase7(t *testing.T) {
 			binPath, err := exec.LookPath(cmd)
 			if err != nil {
 				// DoD-1: logged SKIP (never silent, never fatal on absent binary).
-				t.Logf("SKIP: %s (%s) not found in PATH — DoD-1: binary absent, argv golden still asserted above", p.name, cmd)
+				census.recordAbsent(p.name)
+				t.Logf("SKIP: %s (%s) not found in PATH — argv golden asserted, live invocation NOT verified "+
+					"(counted in REALTOOLS_CENSUS)", p.name, cmd)
 				t.Skip()
 				return
 			}
+			census.recordPresent(p.name)
 
 			// T-07-06-03: 5-second per-invocation timeout; safeArgs only (no real scan).
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

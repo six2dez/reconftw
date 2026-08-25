@@ -109,6 +109,21 @@ func subsReconStages() []compositeStageGroup {
 	}
 }
 
+// resolveStageName is the stage group whose tasks hand puredns/dnsx an explicit
+// resolver file. Named once so stagesRequireResolvers and the composite's
+// post-stage merge switch cannot drift apart.
+const resolveStageName = "subs-resolve"
+
+// stagesRequireResolvers reports whether any group in the pipeline resolves DNS.
+func stagesRequireResolvers(groups []compositeStageGroup) bool {
+	for _, g := range groups {
+		if g.name == resolveStageName {
+			return true
+		}
+	}
+	return false
+}
+
 // subsAllStages returns all subs stage groups (ModeAll/ModeDeep): passive →
 // resolve → discovery → permut → enrichment.
 func subsAllStages() []compositeStageGroup {
@@ -313,6 +328,11 @@ func RunCompositeAsync(ctx context.Context, opts RunOptions, mode CompositeMode)
 		}
 		return nil
 	}
+
+	// Derive RequireResolvers from the REAL stage list, not from a mode allowlist:
+	// a mode that gains a subs-resolve stage later inherits the guard automatically.
+	// ModePassive has no resolve stage and stays runnable without a resolver list.
+	opts.RequireResolvers = stagesRequireResolvers(compositePipelineStages(mode))
 
 	// Single Boot (D-01).
 	boot, err := BootReconApp(ctx, opts)

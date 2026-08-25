@@ -46,6 +46,10 @@ func RunSubsAsync(ctx context.Context, opts RunOptions) (err error) {
 		return nil
 	}
 
+	// Every subs run reaches the puredns/dnsx resolve tasks, so a missing resolver
+	// list is a startup error here rather than a mid-run puredns exit 1.
+	opts.RequireResolvers = true
+
 	// Step 1-5a: Boot the app context.
 	boot, err := BootReconApp(ctx, opts)
 	if err != nil {

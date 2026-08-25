@@ -114,6 +114,11 @@ func runGenResolversCmd(cmd *cobra.Command) error {
 // genResolversOutputPath resolves the resolver file path exactly as
 // resolvers.RunGenResolvers does, so the dry-run preview and the real run name
 // the same file.
+//
+// config.Load now fills cfg.Paths.Resolvers from the XDG state dir, so the home
+// fallback below is reached only when neither XDG_CONFIG_HOME nor a home
+// directory resolves. It is kept as a belt-and-braces default for a caller that
+// hand-builds a *config.Config instead of going through Load.
 func genResolversOutputPath(cfg *config.Config) string {
 	if cfg.Paths.Resolvers != "" {
 		return cfg.Paths.Resolvers
@@ -293,6 +298,7 @@ func runRefreshCacheCmd(cmd *cobra.Command) error {
 	}
 
 	if err := handlers.RunCompositeAsync(ctx, handlers.RunOptions{
+		Secrets:         newRunRedactor(),
 		Target:          targetFlag,
 		DryRun:          dryRun,
 		ConfigPath:      efs.configPath,
@@ -561,6 +567,7 @@ func runQuickRescanCmd(cmd *cobra.Command) error {
 	}
 
 	if err := handlers.RunCompositeAsync(ctx, handlers.RunOptions{
+		Secrets:         newRunRedactor(),
 		Target:          targetFlag,
 		DryRun:          dryRun,
 		ConfigPath:      efs.configPath,

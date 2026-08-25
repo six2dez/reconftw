@@ -75,6 +75,55 @@ type Result struct {
 	Duration time.Duration  // populated by Scheduler.runOne (time.Since(start))
 	Outputs  []string       // paths written (for checkpoint.output_paths)
 	Stats    map[string]int // optional counters (e.g. "subdomains_found": 42)
+
+	// Reason explains a non-Done status in one operator-readable sentence.
+	//
+	// THE RULE: a non-Done Status with an empty Reason is a bug. The whole point
+	// is that an operator reading a SKIP can tell WHY without opening the source.
+	// "[SKIP] web.nuclei 0s" answers nothing; "templates path not configured"
+	// answers it.
+	//
+	// Additive field, non-breaking per ADR §0 D-07 — the ADR §5.1 provenance note
+	// above fixes the other four fields, not the struct's size.
+	Reason string
+}
+
+// Produced reports a task that genuinely produced n things.
+//
+// Reason stays empty because a Done status needs no explanation.
+func Produced(statKey string, n int, outputs ...string) Result {
+	return Result{
+		Status:  StatusDone,
+		Outputs: outputs,
+		Stats:   map[string]int{statKey: n},
+	}
+}
+
+// NothingProduced reports rule B2: the tool RAN SUCCESSFULLY and yielded nothing
+// from a non-empty input.
+//
+// This is the shape that cost the most in the first live v2 run. web.httpx
+// reported "[OK] web.httpx 31s" having written zero records, because a parser
+// contract had drifted; every downstream web task then skipped correctly and the
+// run produced 0 live hosts against v1's 12. A task that consumed input and
+// produced nothing is not Done — it is a question that needs an answer.
+func NothingProduced(reason string, outputs ...string) Result {
+	return Result{Status: StatusSkipped, Outputs: outputs, Reason: reason}
+}
+
+// ToolDegraded reports rule B1: the tool FAILED and the task continues by design
+// (bash CONTINUE_ON_TOOL_ERROR parity).
+//
+// Distinct from NothingProduced because the two facts are different and were
+// conflated for months: dnstake's bad arg vector was swallowed as "run failed or
+// tool not registered" and takeover detection silently produced zero. "The tool
+// broke" and "the tool worked and found nothing" must never share a message.
+func ToolDegraded(tool string, cause error, outputs ...string) Result {
+	reason := tool + ": tool failed, continuing"
+	if cause != nil {
+		reason = tool + ": " + cause.Error()
+	}
+	return Result{Status: StatusSkipped, Outputs: outputs, Reason: reason}
 }
 
 // Status enumerates the terminal states a task may reach.

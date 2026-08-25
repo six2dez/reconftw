@@ -84,8 +84,28 @@ type SchedulerRunner interface {
 // MockCheckpoint can substitute without disk/SQLite I/O. The concrete types
 // satisfy the interfaces via the var _ Interface = (*Store)(nil) gates in
 // the respective packages.
+// SecretRegistrar registers a runtime-discovered secret so it is scrubbed from
+// logs and from logs/tools.jsonl.
+//
+// A one-method interface rather than *log.Redactor for the same reason
+// SchedulerRunner is one: the dependency stays explicit at the call site and this
+// package gains no import it needs only for a single call. *log.Redactor
+// satisfies it structurally.
+//
+// It exists because two module sites put a token's CONTENT on argv. The comment
+// at subdomains/passive.go:258 has claimed since phase 4 that the token is
+// "registered as a secret before any logging"; nothing registered it. Now that
+// argv is written to disk, that gap became a plaintext token in a file.
+type SecretRegistrar interface {
+	Register(value string)
+}
+
 type AppContext struct {
-	Log        *slog.Logger
+	Log *slog.Logger
+	// Secrets registers runtime-loaded secrets (token files) with the redactor.
+	// May be nil — callers MUST nil-check; a nil registrar means no redaction,
+	// not a panic.
+	Secrets    SecretRegistrar
 	Cfg        *config.Config
 	Scheduler  SchedulerRunner
 	Tools      *backend.Runner

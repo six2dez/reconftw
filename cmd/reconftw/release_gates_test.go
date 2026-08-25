@@ -82,7 +82,9 @@ func TestReleaseGate2DistinctWorkspacesThroughTheBinary(t *testing.T) {
 
 			cmd := exec.CommandContext(ctx, bin, "subs", "--target", target, "-o", dataDir)
 			cmd.Dir = work
-			cmd.Env = append(os.Environ(), "PATH="+minimalPATH)
+			// A resolving mode refuses to start without a resolver list; seed one
+			// rather than letting the binary download it (see hermeticResolverEnv).
+			cmd.Env = hermeticResolverEnv(t, "PATH="+minimalPATH)
 			out, err := cmd.CombinedOutput()
 			if ctx.Err() != nil {
 				t.Fatalf("subs --target %s did not finish within the deadline — with no tools on "+
@@ -199,4 +201,132 @@ func TestReleaseGate12CleanTreeBuildsAndRuns(t *testing.T) {
 				"first thing\n  every new user runs:\n%s", s)
 		}
 	})
+}
+
+// --- Gate 13: the arg-vector census parser ------------------------------------
+//
+// The gate itself needs the 70-tool runtime and can never run in CI. Its RULE,
+// though — "a partial run is not a pass" — is pure parsing, and that is where
+// the rule actually lives. So the parser is exposed as
+// `release-gates.sh --census-verdict <rc>` and tested here, in the suite that
+// does run on every push.
+//
+// Without these, "the gate reports PASS only when the skipped set is exactly the
+// known-absent list" would be a claim backed by nothing a CI run ever executes.
+
+// repoRoot walks up from the test's working directory to the module root, so the
+// tests can reach scripts/ no matter where `go test` is invoked from.
+func repoRoot(t *testing.T) string {
+	t.Helper()
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	for {
+		if _, statErr := os.Stat(filepath.Join(dir, "go.mod")); statErr == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Fatalf("go.mod not found above %s", dir)
+		}
+		dir = parent
+	}
+}
+
+// runCensusVerdict feeds synthetic census text to the parser and returns its
+// single verdict line.
+func runCensusVerdict(t *testing.T, rc string, census string) string {
+	t.Helper()
+	script := filepath.Join(repoRoot(t), "scripts", "release-gates.sh")
+	if _, err := os.Stat(script); err != nil {
+		t.Fatalf("release-gates.sh not found: %v", err)
+	}
+	cmd := exec.Command("bash", script, "--census-verdict", rc)
+	cmd.Stdin = strings.NewReader(census)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("--census-verdict failed: %v\n%s", err, out)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func TestReleaseGateArgVectorStepExists(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release-gates.sh"))
+	if err != nil {
+		t.Fatalf("read release-gates.sh: %v", err)
+	}
+	src := string(data)
+	for _, want := range []string{
+		"gate_argvector",           // the gate function
+		"argvector_census_verdict", // the parser it decides with
+		"REALTOOLS_REFERENCE=1",    // it must run in the mode where the ratchet is enforced
+		"--census-verdict",         // the seam this test uses
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("release-gates.sh no longer contains %q — the arg-vector gate was removed or "+
+				"renamed, and a gate that is silently omitted is exactly what phase 16 exists to stop", want)
+		}
+	}
+}
+
+func TestReleaseGateArgVectorCensusVerdict(t *testing.T) {
+	const refLine = "REALTOOLS_CENSUS test=TestRealToolArgVectors mode=REFERENCE present=37 skipped=9 " +
+		"skipped_tools=arjun,dnscewl,p1radup,regulator,subwiz,subzy,urless,wafw00f,waymore\n"
+
+	tests := []struct {
+		name   string
+		rc     string
+		census string
+		want   string
+	}{
+		{
+			// The skipped set was verified against the known-absent list by the
+			// Go-side ratchet, which is what REFERENCE mode means.
+			name: "reference mode, clean exit, matching skip set", rc: "0",
+			census: refLine, want: "PASS",
+		},
+		{
+			// THE RULE. A partial run reports CENSUS_ONLY because the ratchet was
+			// not enforced, and an unenforced ratchet cannot tell a correct
+			// known-absent list from a stale one.
+			name: "partial run is NOT a pass", rc: "0",
+			census: strings.Replace(refLine, "mode=REFERENCE", "mode=CENSUS_ONLY", 1), want: "FAIL",
+		},
+		{
+			name: "a probe failed", rc: "1",
+			census: refLine, want: "FAIL",
+		},
+		{
+			// No tool tree: SKIPPED, never PASS, and never a wall of failures.
+			name: "no toolchain", rc: "1",
+			census: strings.Replace(refLine, "mode=REFERENCE", "mode=NOT_EXECUTED", 1) +
+				"REALTOOLS_CENSUS_REASON test=X only 1 of 25 probed tools are on PATH\n",
+			want: "SKIPPED",
+		},
+		{
+			// A run that emitted no census says nothing about its own coverage.
+			name: "no census emitted", rc: "0",
+			census: "some unrelated go test output\n", want: "FAIL",
+		},
+		{
+			// One test in REFERENCE and one not is still a partial run.
+			name: "mixed modes", rc: "0",
+			census: refLine + strings.Replace(refLine, "mode=REFERENCE", "mode=CENSUS_ONLY", 1), want: "FAIL",
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			got := runCensusVerdict(t, tc.rc, tc.census)
+			status := got
+			if i := strings.Index(got, " "); i > 0 {
+				status = got[:i]
+			}
+			if status != tc.want {
+				t.Errorf("verdict = %q, want status %s\n  full: %s", status, tc.want, got)
+			}
+		})
+	}
 }

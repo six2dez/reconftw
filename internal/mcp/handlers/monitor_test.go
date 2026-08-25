@@ -1047,8 +1047,24 @@ func TestMonitorRestartPreservesBaselineSuppressionAndGeneration(t *testing.T) {
 // arbitrary extra section (used here for [monitor]).
 func monitorTestConfigPath(t *testing.T, dataDir, extra string) string {
 	t.Helper()
-	p := filepath.Join(t.TempDir(), "reconftw.toml")
-	body := fmt.Sprintf("[paths]\ndata_dir = %q\n\n%s\n", dataDir, extra)
+	dir := t.TempDir()
+	p := filepath.Join(dir, "reconftw.toml")
+
+	// Seed a resolver list: the monitor drives the recon composite, which sets
+	// RequireResolvers, so every cycle would otherwise try to DOWNLOAD one. Without
+	// egress each cycle failed at boot and dispatched no alerts at all — the test
+	// then measured the download, not the suppression logic it is named for.
+	resolvers := filepath.Join(dir, "resolvers.txt")
+	trusted := filepath.Join(dir, "resolvers_trusted.txt")
+	if err := os.WriteFile(resolvers, []byte("1.1.1.1\n8.8.8.8\n"), 0o600); err != nil {
+		t.Fatalf("seed resolvers: %v", err)
+	}
+	if err := os.WriteFile(trusted, []byte("1.1.1.1\n"), 0o600); err != nil {
+		t.Fatalf("seed trusted resolvers: %v", err)
+	}
+
+	body := fmt.Sprintf("[paths]\ndata_dir = %q\nresolvers = %q\nresolvers_trusted = %q\n\n%s\n",
+		dataDir, resolvers, trusted, extra)
 	if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
 	}

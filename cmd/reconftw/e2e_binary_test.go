@@ -293,6 +293,10 @@ func TestE2EBinaryRejectsRunOnALockedWorkspace(t *testing.T) {
 
 	cmd := exec.CommandContext(ctx, bin, "subs", "--target", target, "-o", dataDir)
 	cmd.Dir = work
+	// A resolving mode refuses to start without a resolver list. Seed one so this
+	// test still reaches the workspace-lock rejection it is actually about,
+	// without a network fetch (see hermeticResolverEnv).
+	cmd.Env = hermeticResolverEnv(t)
 	out, runErr := cmd.CombinedOutput()
 
 	if ctx.Err() != nil {

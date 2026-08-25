@@ -84,15 +84,31 @@ type HostRecord struct {
 
 // httpxRaw is the subset of httpx JSONL fields we parse.
 // httpx outputs more fields; we only map the ones in D-W11.
+//
+// FIELD NAMES AND TYPES ARE LOAD-BEARING — verified against real httpx v1.6
+// `-json` output, not inferred. Three of them were wrong, and the combination
+// meant this parser had NEVER successfully decoded a single real httpx record:
+//
+//	port           httpx emits a STRING ("80"), not a number. Decoding it into
+//	               an int made json.Unmarshal fail, which discarded the WHOLE
+//	               line — "all 20 lines failed to parse". This is what emptied
+//	               artefacts/hosts.jsonl and, through it, the entire web layer:
+//	               0 live hosts and 2 finding classes against v1's 12 and 50.
+//	status_code    underscore, not "status-code". Silent zero.
+//	content_length underscore, not "content-length". Silent zero.
+//
+// The two underscore fields would have been silent data loss on their own; the
+// port type mismatch was fatal. See TestParseHTTPXOutputRealFixture, which pins
+// all three against captured real output.
 type httpxRaw struct {
 	Input         string   `json:"input"`
 	URL           string   `json:"url"`
 	Scheme        string   `json:"scheme"`
-	Port          int      `json:"port"`
-	StatusCode    int      `json:"status-code"`
+	Port          string   `json:"port"`
+	StatusCode    int      `json:"status_code"`
 	Title         string   `json:"title"`
 	Technologies  []string `json:"tech"`
-	ContentLength int      `json:"content-length"`
+	ContentLength int      `json:"content_length"`
 	Host          string   `json:"host"`
 	A             []string `json:"a"` // resolved IPs from httpx
 }
@@ -142,6 +158,10 @@ func (t *HTTPXTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 
 	// Compute input hash for checkpoint idempotency (informational).
 	inputHash, _ := fileHash(inputFile)
+	// The input COUNT is what makes "produced nothing" answerable: nothing from
+	// zero hosts is correct, nothing from 30 hosts is a defect. Cheap — the file
+	// is already being read for fileHash.
+	inputCount := countNonEmptyLines(inputFile)
 
 	// Step 2: Build output file path.
 	artefactsDir := filepath.Join(app.Target.WorkDir, "artefacts")
@@ -161,17 +181,35 @@ func (t *HTTPXTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 		"-random-agent",
 		"-status-code",
 	}
-	if ports := cfg.Web.Probe.Ports; ports != "" {
+	// Ports: 80,443 plus the uncommon list when web.probe.uncommon_enabled, which
+	// is v1's single-pass shape (modules/web.sh:139 probe_ports="${WEBPROBE_PORTS:-
+	// 80,443,${UNCOMMON_PORTS_WEB:-}}"). uncommon_enabled/threads/timeout were
+	// declared in config, defaulted ON, aliased for migrating v1 operators — and
+	// read by nothing, so v2 probed 80,443 only. See uncommon_ports.go.
+	if ports := probePorts(cfg); ports != "" {
 		args = append(args, "-p", ports)
 	}
-	if threads := cfg.Web.Probe.Threads; threads > 0 {
+	// Thread and timeout budgets follow the port set: probing ~94 ports per host
+	// with the two-port budget is what makes a wide sweep look like a hang. v1
+	// switches to HTTPX_UNCOMMONPORTS_THREADS/_TIMEOUT for exactly this reason.
+	threads := cfg.Web.Probe.Threads
+	timeoutSec := cfg.Web.Probe.TimeoutSeconds
+	if uncommonPortsEnabled(cfg) {
+		if cfg.Web.Probe.UncommonThreads > 0 {
+			threads = cfg.Web.Probe.UncommonThreads
+		}
+		if cfg.Web.Probe.UncommonTimeout > 0 {
+			timeoutSec = cfg.Web.Probe.UncommonTimeout
+		}
+	}
+	if threads > 0 {
 		args = append(args, "-threads", strconv.Itoa(threads))
 	}
 	if rl := cfg.Web.Probe.RateLimit; rl > 0 {
 		args = append(args, "-rl", strconv.Itoa(rl))
 	}
-	if to := cfg.Web.Probe.TimeoutSeconds; to > 0 {
-		args = append(args, "-timeout", strconv.Itoa(to))
+	if timeoutSec > 0 {
+		args = append(args, "-timeout", strconv.Itoa(timeoutSec))
 	}
 	args = append(args,
 		"-silent",
@@ -204,8 +242,36 @@ func (t *HTTPXTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 	}
 
 	records, parseErr := parseHTTPXOutput(jsonlSrc)
-	if parseErr != nil && app.Log != nil {
-		app.Log.Debug("web.httpx: parse warnings", "err", parseErr)
+	// A TOTAL parse failure is not a "parse warning". It means the tool's output
+	// format and this parser's expectations have diverged, which is exactly the
+	// 2026-08-21 root cause: httpxRaw.Port was an int against httpx's string
+	// "port", json.Unmarshal failed on all 20 lines, records was empty, the
+	// artefact was truncated and the WHOLE web layer skipped — while this line
+	// logged it at Debug and the task returned OK.
+	//
+	// parseHTTPXOutput only returns non-nil for the total case; the partial case
+	// (some lines parsed) is deliberately NOT fatal, because a few malformed lines
+	// in a long run is a different fact and treating it as fatal would make the
+	// rule useless.
+	if parseErr != nil {
+		if app.Log != nil {
+			app.Log.Warn("web.httpx: output did not parse",
+				"event", "httpx_total_parse_failure",
+				"err", parseErr.Error(),
+				"input_hosts", inputCount,
+			)
+		}
+		// Publish the empty artefact first: the F3 contract (an empty run must
+		// publish an EMPTY artefact, not leave a stale one) holds regardless of
+		// why the run was empty.
+		if pubErr := output.PublishArtefact(app.Target.WorkDir, "hosts", nil); pubErr != nil && app.Log != nil {
+			app.Log.Debug("web.httpx: empty hosts publish failed", "err", pubErr)
+		}
+		return task.Result{
+			Status:  task.StatusSkipped,
+			Outputs: []string{outputFile},
+			Reason:  parseErr.Error(),
+		}, nil
 	}
 
 	// Step 6: Scope-filter and append to artefacts/hosts.jsonl via app.Tree.
@@ -279,11 +345,89 @@ func (t *HTTPXTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 			"records", len(inScope))
 	}
 
+	if len(inScope) == 0 {
+		// Rule B2. Nothing from a NON-EMPTY input is a question that needs an
+		// answer; nothing from an empty input is simply nothing to do, and
+		// collapsing the two would make a first-run `web`-only invocation look
+		// broken.
+		if inputCount > 0 {
+			reason := fmt.Sprintf("probed %d host(s), no live host survived probing or scope filtering", inputCount)
+			if app.Log != nil {
+				app.Log.Warn("web.httpx: produced no hosts from a non-empty input",
+					"event", "httpx_no_hosts_from_input",
+					"input_hosts", inputCount,
+				)
+			}
+			return task.Result{
+				Status:  task.StatusSkipped,
+				Outputs: []string{outputFile},
+				Reason:  reason,
+			}, nil
+		}
+		return task.Result{
+			Status:  task.StatusSkipped,
+			Outputs: []string{outputFile},
+			Reason:  "no hosts to probe",
+		}, nil
+	}
+
 	return task.Result{
 		Status:  task.StatusDone,
 		Outputs: []string{outputFile},
 		Stats:   map[string]int{"hosts_found": len(inScope)},
 	}, nil
+}
+
+// countNonEmptyLines counts non-blank lines in path. Returns 0 when unreadable —
+// the caller uses it only to distinguish "nothing from something" from "nothing
+// from nothing", and an unreadable input is already reported upstream.
+func countNonEmptyLines(path string) int {
+	data, err := os.ReadFile(path) //nolint:gosec // path resolved from the run's own workspace
+	if err != nil {
+		return 0
+	}
+	n := 0
+	for _, ln := range strings.Split(string(data), "\n") {
+		if strings.TrimSpace(ln) != "" {
+			n++
+		}
+	}
+	return n
+}
+
+// uncommonPortsEnabled reports whether the uncommon-port sweep is on.
+func uncommonPortsEnabled(cfg *config.Config) bool {
+	return cfg != nil && cfg.Web.Probe.UncommonEnabled && uncommonWebPorts != ""
+}
+
+// probePorts builds the httpx -p value: the configured ports, plus the uncommon
+// list when enabled. Duplicates are dropped so an operator who already listed
+// 8443 in web.probe.ports does not get it twice.
+//
+// An empty result means "omit -p" and let httpx use its own default, which is
+// the pre-existing contract for an unset web.probe.ports.
+func probePorts(cfg *config.Config) string {
+	base := strings.TrimSpace(cfg.Web.Probe.Ports)
+	if !uncommonPortsEnabled(cfg) {
+		return base
+	}
+
+	seen := make(map[string]struct{}, 128)
+	out := make([]string, 0, 128)
+	for _, group := range []string{base, uncommonWebPorts} {
+		for _, p := range strings.Split(group, ",") {
+			p = strings.TrimSpace(p)
+			if p == "" {
+				continue
+			}
+			if _, dup := seen[p]; dup {
+				continue
+			}
+			seen[p] = struct{}{}
+			out = append(out, p)
+		}
+	}
+	return strings.Join(out, ",")
 }
 
 // resolveHostInput implements the D-W10 input precedence.
@@ -426,11 +570,9 @@ func parseHTTPXOutput(jsonlData []byte) ([]HostRecord, error) {
 			ip = raw.A[0]
 		}
 
-		// Port as string (D-W11 uses string for scheme flexibility).
-		portStr := ""
-		if raw.Port > 0 {
-			portStr = strconv.Itoa(raw.Port)
-		}
+		// Port is already a string in httpx output and HostRecord.Port is a
+		// string too (D-W11), so it passes through verbatim.
+		portStr := strings.TrimSpace(raw.Port)
 
 		rec := HostRecord{
 			Host:          host,

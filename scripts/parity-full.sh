@@ -78,10 +78,19 @@
 #
 #   Options:
 #     --legacy-ref REF   frozen v1 git ref for the worktree   (env LEGACY_REF, default v4.1)
+#     --no-archive       do NOT archive a pre-existing v2 workspace before scanning.
+#                        Archival is ON by default — see ARCHIVE_WS below for why a
+#                        re-run over old checkpoints fabricates the parity number.
 #     --baseline-dir DIR path for the v1 worktree checkout     (env BASELINE_DIR, default ../reconftw-v1-baseline)
 #     --out DIR          report output dir                     (default workspaces/<target>)
 #     --tolerance PCT    removed-ratio REVIEW threshold        (default 10)
 #     --compare-only     skip both scans; diff existing v1 Recon/ + latest v2 workspace
+#     --v2-only          skip the v1 leg; run v2 and diff against the BANKED v1 tree
+#                        at <baseline-dir>/Recon/<target>. The v1 leg is the
+#                        expensive half (10h+ on a real target) and its output does
+#                        not change between v2 iterations, so re-running it to
+#                        re-test v2 is pure waste. --compare-only skips BOTH legs,
+#                        which is not the same thing.
 #     --self-check       run the offline fixture self-test and exit
 #     -h, --help         show this header and exit
 #
@@ -98,6 +107,17 @@ BASELINE_DIR="${BASELINE_DIR:-../reconftw-v1-baseline}"
 OUT_DIR=""
 TOLERANCE=10
 COMPARE_ONLY=0
+V2_ONLY=0
+# ARCHIVE_WS: archive any pre-existing v2 workspace before the scan.
+#
+# DEFAULT ON, DELIBERATELY. This script exists to produce a COMPARABLE
+# measurement, and a re-run over a previous run's workspace cannot produce one:
+# Scheduler.runOne returns early on a Checkpoint.Done hit, so completed tasks are
+# SKIPPED and a partial v2 tree is compared against v1's complete one. That is
+# not a small error — it is a fabricated number, and it looks exactly like a real
+# regression. Opting out must therefore be explicit (--no-archive), and the
+# assertion below refuses to run if the archive did not actually happen.
+ARCHIVE_WS=1
 SELF_CHECK=0
 
 die() {
@@ -259,6 +279,12 @@ emit_markdown() {
         printf -- '- [ ] Lab target result : __________________________  (TODO: paste verdict)\n'
         printf -- '- [ ] Canonical target(s) result : _______________  (TODO: 2-3 public, best-effort)\n'
         printf -- '- [ ] Signed off by : __________  date : __________\n'
+        # Attribution only when something is not OK: a clean run does not need the
+        # run's own logs pasted under it, and a REVIEW verdict is exactly where the
+        # next investigation used to start from zero.
+        if [ "$CORE_FAILS" -gt 0 ]; then
+            attribution_section "$v2ws"
+        fi
     } >"$md"
 }
 
@@ -296,6 +322,155 @@ emit_json() {
 }
 
 # ── OFFLINE self-check: exercise the real extraction + diff logic on fixtures ──
+
+# ── workspace archival, baseline immutability, and run attribution ───────────
+
+# archive_workspaces <target> — MOVE every pre-existing workspace for target to a
+# timestamped archive path. Never deletes: the previous tree is evidence, and the
+# phase-15 record is full of failed runs whose leftovers turned out to be the only
+# copy of something.
+#
+# The WHOLE directory moves, not just checkpoints.db. Stale artefacts matter too:
+# web.httpx prefers a prior non-empty artefacts/hosts.jsonl in its own input
+# precedence, so a leftover host list would feed the next run and the parity
+# number would describe a mixture of two runs. Removing only the checkpoint
+# database fixes the visible hazard and leaves that one.
+archive_workspaces() {
+    local target="$1" stamp archive moved=0 w
+    stamp="$(date -u +'%Y%m%dT%H%M%SZ')"
+    archive="workspaces/.archive/${target}-${stamp}"
+
+    for w in $(ls -d "workspaces/${target}"-*/ "workspaces/${target}/" 2>/dev/null); do
+        w="${w%/}"
+        case "$w" in
+            workspaces/.archive*) continue ;;
+        esac
+        mkdir -p "$archive" || die "cannot create archive dir $archive"
+        mv "$w" "$archive/" || die "cannot archive $w to $archive (a live run holding it?)"
+        printf '   archived %s -> %s/\n' "$w" "$archive"
+        moved=$((moved + 1))
+    done
+    if [ "$moved" -eq 0 ]; then
+        printf '   no pre-existing workspace for %s — nothing to archive\n' "$target"
+    fi
+    LAST_ARCHIVE="$archive"
+}
+
+# assert_no_workspace <target> — refuse to scan while a workspace survives.
+#
+# A silently-failed archive is worse than no archive, because the operator now
+# believes the run was clean.
+assert_no_workspace() {
+    local target="$1" w leftovers=""
+    for w in $(ls -d "workspaces/${target}"-*/ "workspaces/${target}/" 2>/dev/null); do
+        w="${w%/}"
+        case "$w" in
+            workspaces/.archive*) continue ;;
+        esac
+        # A leftover .run.lock FILE is normal: the lock is an advisory flock the
+        # kernel releases on process death, so the file routinely outlives its
+        # run. Only checkpoints.db or artefacts/ mean state that would change the
+        # measurement; a bare lock file does not.
+        if [ -f "$w/checkpoints.db" ] || [ -d "$w/artefacts" ]; then
+            leftovers="$leftovers $w"
+        fi
+    done
+    [ -z "$leftovers" ] || die "workspace still present after archival:$leftovers
+  A silently-failed archive is WORSE than no archive: the run would reuse those checkpoints,
+  skip completed tasks, and report a partial tree as a parity result. Move it by hand and re-run."
+}
+
+# baseline_fingerprint <dir> — file count and total byte size.
+#
+# Deliberately NOT a checksum: the banked baseline is 1.3 GB and cost ten hours,
+# with no second copy. Five seconds of counting is the right price for detecting
+# a write into it; twenty minutes of hashing is not.
+baseline_fingerprint() {
+    local d="$1"
+    [ -d "$d" ] || {
+        echo "MISSING"
+        return
+    }
+    local n b
+    n="$(find "$d" -type f 2>/dev/null | wc -l | tr -d ' ')"
+    b="$(find "$d" -type f -exec wc -c {} + 2>/dev/null | tail -1 | awk '{print $1}')"
+    echo "${n}:${b:-0}"
+}
+
+# attribution_section <v2ws> — explain a non-OK core set from the RUN'S OWN
+# records rather than from inference.
+#
+# Before plans 16-01 and 16-02 a REVIEW verdict was a dead end: three numbers and
+# no way to attribute them without reproducing the run by hand. The run now
+# carries its own explanation — logs/tools.jsonl names every invocation with its
+# argv, exit code and outcome, and every task that produced nothing reports SKIP
+# with a reason. This reads them.
+attribution_section() {
+    local ws="$1" log="$1/logs/tools.jsonl"
+
+    printf '\n## Attribution — what the run itself recorded\n\n'
+
+    if [ ! -f "$log" ]; then
+        printf 'NO TOOL LOG PRESENT at `%s`.\n\n' "$log"
+        printf 'An absent log and a clean log render identically once summarised, so this says which\n'
+        printf 'one it is: nothing below is evidence of a clean run — there is simply no record.\n'
+        return
+    fi
+
+    printf -- '- tool log : `%s`\n\n' "$log"
+
+    printf '### Tool invocations that did not succeed\n\n'
+    local bad
+    bad="$(grep -c '"outcome":"\(exit_non_zero\|dispatch_failed\|timeout\)"' "$log" 2>/dev/null || true)"
+    if [ "${bad:-0}" -eq 0 ]; then
+        printf 'None — every recorded invocation ended with outcome `success`.\n\n'
+    else
+        printf '```\n'
+        grep '"outcome":"\(exit_non_zero\|dispatch_failed\|timeout\)"' "$log" | head -40
+        printf '```\n\n'
+    fi
+
+    printf '### Invocations that started and never ended (the hang shape)\n\n'
+    local unterminated
+    unterminated="$(awk '
+        /"phase":"start"/ { if (match($0, /"id":"[^"]+"/)) { id=substr($0, RSTART+6, RLENGTH-7); starts[id]=$0 } }
+        /"phase":"end"/   { if (match($0, /"id":"[^"]+"/)) { id=substr($0, RSTART+6, RLENGTH-7); delete starts[id] } }
+        END { for (id in starts) print starts[id] }
+    ' "$log" 2>/dev/null)"
+    if [ -z "$unterminated" ]; then
+        printf 'None — every start record has a matching end record.\n\n'
+    else
+        printf 'A start with no end means the process was still running when the run ended.\n\n```\n%s\n```\n\n' "$unterminated"
+    fi
+
+    printf '### Tasks that reported SKIP, with the reason they gave\n\n'
+    local skips=""
+    [ -f "$ws/logs/run.log" ] && skips="$(grep -i 'skip' "$ws/logs/run.log" 2>/dev/null | head -40 || true)"
+    if [ -z "$skips" ]; then
+        printf 'No SKIP lines found in `%s/logs/run.log` (or the file is absent).\n\n' "$ws"
+    else
+        printf '```\n%s\n```\n\n' "$skips"
+    fi
+
+    printf '### Passive sources: zero-contribution and timeout check\n\n'
+    printf 'crt.sh rate-limits after repeated runs against the same target — `subdomains.passive.crt`\n'
+    printf 'failed at exactly 1m00s in the 2026-08-20 run, a timeout shape. A subdomain-set change\n'
+    printf 'caused by a rate-limited source must stay distinguishable from a real regression, so the\n'
+    printf 'per-source records are listed rather than retried or slept around.\n\n'
+    local src
+    for src in crt subfinder github-subdomains gitlab-subdomains urlfinder; do
+        if grep -q "\"tool\":\"${src}\"" "$log" 2>/dev/null; then
+            printf -- '- `%s` : %s\n' "$src" "$(grep "\"tool\":\"${src}\"" "$log" | head -3 | tr '\n' ' ')"
+        else
+            printf -- '- `%s` : no invocation recorded\n' "$src"
+        fi
+    done
+
+    printf '\n**These associations are a GUESS.** The log says which tools failed; it does not say which\n'
+    printf 'core set each failure explains. An attribution that reads as certain and is not would be the\n'
+    printf 'same defect class this phase exists to close.\n'
+}
+
 self_check() {
     command -v jq >/dev/null 2>&1 || die "jq not found on PATH (required for --self-check)"
     local tmp
@@ -335,6 +510,110 @@ self_check() {
     normalize_hosts "$tmp/v1/webs/webs_all.txt" >"$v1host"
     v2_finding_classes "$tmp/ws/artefacts/findings.jsonl" >"$v2find"
     normalize_plain "$tmp/v1/.v1classes" >"$v1find"
+
+    # ── the plan-16-06 assertions: archival, evidence preservation, baseline
+    #    immutability, and attribution rendering. None needs the real binary, the
+    #    real baseline or the network — this is the only part of plan 16-06 that
+    #    can be verified without reconbox3, so it has to carry the logic.
+    local sc_tmp sc_fail=0
+    sc_tmp="$(mktemp -d)" || die "mktemp -d failed"
+    (
+        cd "$sc_tmp" || exit 1
+        mkdir -p "workspaces/selfcheck-tgt-abc/artefacts"
+        : >"workspaces/selfcheck-tgt-abc/checkpoints.db"
+        : >"workspaces/selfcheck-tgt-abc/.run.lock"
+        echo "MARKER" >"workspaces/selfcheck-tgt-abc/artefacts/marker.txt"
+    )
+
+    # 1. archival MOVES the workspace, and the assertion then passes.
+    (
+        cd "$sc_tmp" || exit 1
+        archive_workspaces "selfcheck-tgt" >/dev/null 2>&1
+        assert_no_workspace "selfcheck-tgt" >/dev/null 2>&1
+    )
+    if [ $? -eq 0 ]; then
+        echo "  archival: workspace moved and assertion passes .......... PASS"
+    else
+        echo "  archival: workspace moved and assertion passes .......... FAIL"
+        sc_fail=$((sc_fail + 1))
+    fi
+
+    # 2. THE ARCHIVE IS A MOVE, NOT A DELETE. Asserted on a seeded marker FILE,
+    #    not on the directory existing — a delete-then-mkdir would satisfy the
+    #    weaker check and destroy the evidence this contract exists to keep.
+    if [ -n "$(find "$sc_tmp/workspaces/.archive" -name marker.txt 2>/dev/null)" ]; then
+        echo "  archival: previous run's files survive under .archive/ ... PASS"
+    else
+        echo "  archival: previous run's files survive under .archive/ ... FAIL"
+        sc_fail=$((sc_fail + 1))
+    fi
+
+    # 3. A workspace that could NOT be archived must make the script die.
+    (
+        cd "$sc_tmp" || exit 1
+        mkdir -p "workspaces/selfcheck-stuck-xyz/artefacts"
+        : >"workspaces/selfcheck-stuck-xyz/checkpoints.db"
+        assert_no_workspace "selfcheck-stuck" >/dev/null 2>&1
+    )
+    if [ $? -ne 0 ]; then
+        echo "  archival: an un-archived workspace is refused ............ PASS"
+    else
+        echo "  archival: an un-archived workspace is refused ............ FAIL"
+        sc_fail=$((sc_fail + 1))
+    fi
+
+    # 4. The baseline fingerprint detects a write into the banked tree.
+    local fp_a fp_b
+    mkdir -p "$sc_tmp/baseline"
+    echo "one" >"$sc_tmp/baseline/a.txt"
+    fp_a="$(baseline_fingerprint "$sc_tmp/baseline")"
+    echo "two" >"$sc_tmp/baseline/b.txt"
+    fp_b="$(baseline_fingerprint "$sc_tmp/baseline")"
+    if [ "$fp_a" != "$fp_b" ]; then
+        echo "  baseline: a write into the tree changes the fingerprint .. PASS ($fp_a -> $fp_b)"
+    else
+        echo "  baseline: a write into the tree changes the fingerprint .. FAIL"
+        sc_fail=$((sc_fail + 1))
+    fi
+
+    # 5. Attribution renders a failed invocation AND an unterminated start.
+    local att
+    mkdir -p "$sc_tmp/ws/logs"
+    {
+        echo '{"id":"1","phase":"start","tool":"httpx","argv":["-json"]}'
+        echo '{"id":"1","phase":"end","exit_code":0,"outcome":"success"}'
+        echo '{"id":"2","phase":"start","tool":"subzy","argv":["run"]}'
+        echo '{"id":"2","phase":"end","exit_code":1,"outcome":"exit_non_zero","stderr_tail":"unknown flag"}'
+        echo '{"id":"3","phase":"start","tool":"nuclei","argv":["-duc"]}'
+    } >"$sc_tmp/ws/logs/tools.jsonl"
+    att="$(attribution_section "$sc_tmp/ws")"
+    if printf '%s' "$att" | grep -q 'exit_non_zero'; then
+        echo "  attribution: a failed invocation is reported ............. PASS"
+    else
+        echo "  attribution: a failed invocation is reported ............. FAIL"
+        sc_fail=$((sc_fail + 1))
+    fi
+    if printf '%s' "$att" | grep -q '"tool":"nuclei"'; then
+        echo "  attribution: an unterminated start is reported ........... PASS"
+    else
+        echo "  attribution: an unterminated start is reported ........... FAIL"
+        sc_fail=$((sc_fail + 1))
+    fi
+
+    # 6. An ABSENT log says so. An absent log and a clean log render identically
+    #    once summarised, and only one of them is evidence.
+    mkdir -p "$sc_tmp/empty_ws"
+    if attribution_section "$sc_tmp/empty_ws" | grep -q 'NO TOOL LOG PRESENT'; then
+        echo "  attribution: an ABSENT log is named, not left blank ...... PASS"
+    else
+        echo "  attribution: an ABSENT log is named, not left blank ...... FAIL"
+        sc_fail=$((sc_fail + 1))
+    fi
+
+    rm -rf "$sc_tmp"
+    if [ "$sc_fail" -gt 0 ]; then
+        die "$sc_fail plan-16-06 self-check assertion(s) failed"
+    fi
 
     echo "== self-check: core-set diff on canned fixtures (no network) =="
     CORE_FAILS=0
@@ -391,6 +670,8 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --self-check) SELF_CHECK=1 ;;
         --compare-only) COMPARE_ONLY=1 ;;
+        --v2-only) V2_ONLY=1 ;;
+        --no-archive) ARCHIVE_WS=0 ;;
         --legacy-ref)
             shift
             LEGACY_REF="${1:-}"
@@ -422,7 +703,11 @@ if [ "$SELF_CHECK" -eq 1 ]; then
     exit $?
 fi
 
-[ -n "$TARGET" ] || die "usage: scripts/parity-full.sh <target> [--legacy-ref REF] [--compare-only] | --self-check | --help"
+[ -n "$TARGET" ] || die "usage: scripts/parity-full.sh <target> [--legacy-ref REF] [--v2-only|--compare-only] | --self-check | --help"
+
+if [ "$COMPARE_ONLY" -eq 1 ] && [ "$V2_ONLY" -eq 1 ]; then
+    die "--compare-only and --v2-only are mutually exclusive: the first runs neither leg, the second runs v2"
+fi
 command -v jq >/dev/null 2>&1 || die "jq not found on PATH"
 command -v git >/dev/null 2>&1 || die "git not found on PATH"
 
@@ -431,20 +716,52 @@ V1DIR="${BASELINE_DIR%/}/Recon/${TARGET}"
 # ── set up the frozen legacy checkout (D-05) and run bash v1 ──
 if [ "$COMPARE_ONLY" -eq 0 ]; then
     [ -x "$BIN" ] || die "$BIN not found — run: make build"
-    if [ ! -d "${BASELINE_DIR}/.git" ] && [ ! -f "${BASELINE_DIR}/reconftw.sh" ]; then
-        printf '== frozen v1 worktree: git worktree add %s %s ==\n' "$BASELINE_DIR" "$LEGACY_REF"
-        git worktree add "$BASELINE_DIR" "$LEGACY_REF" \
-            || die "git worktree add failed — is '$LEGACY_REF' a valid ref? (default pin: v4.1)"
+
+    if [ "$V2_ONLY" -eq 1 ]; then
+        # Reuse the banked v1 tree. Assert it exists BEFORE burning hours on the v2
+        # leg — discovering the baseline is missing after the v2 scan would waste
+        # exactly what this flag exists to save.
+        [ -d "$V1DIR" ] || die "--v2-only needs a completed v1 baseline at $V1DIR (point --baseline-dir at its Recon parent)"
+        printf '== v1 leg SKIPPED (--v2-only): reusing banked baseline at %s ==\n' "$V1DIR"
     else
-        printf '== reusing existing v1 baseline checkout at %s (ref pin: %s) ==\n' "$BASELINE_DIR" "$LEGACY_REF"
+        if [ ! -d "${BASELINE_DIR}/.git" ] && [ ! -f "${BASELINE_DIR}/reconftw.sh" ]; then
+            printf '== frozen v1 worktree: git worktree add %s %s ==\n' "$BASELINE_DIR" "$LEGACY_REF"
+            git worktree add "$BASELINE_DIR" "$LEGACY_REF" \
+                || die "git worktree add failed — is '$LEGACY_REF' a valid ref? (default pin: v4.1)"
+        else
+            printf '== reusing existing v1 baseline checkout at %s (ref pin: %s) ==\n' "$BASELINE_DIR" "$LEGACY_REF"
+        fi
+
+        printf '== v1 (bash, frozen %s) run against %s ==\n' "$LEGACY_REF" "$TARGET"
+        printf '   (needs full toolchain + working UDP/53; pass -duc equivalents where prompted)\n'
+        (cd "$BASELINE_DIR" && ./reconftw.sh -d "$TARGET" -r) || die "v1 baseline run failed"
     fi
 
-    printf '== v1 (bash, frozen %s) run against %s ==\n' "$LEGACY_REF" "$TARGET"
-    printf '   (needs full toolchain + working UDP/53; pass -duc equivalents where prompted)\n'
-    (cd "$BASELINE_DIR" && ./reconftw.sh -d "$TARGET" -r) || die "v1 baseline run failed"
+    # Archive BEFORE the scan: see ARCHIVE_WS for why a re-run over old
+    # checkpoints fabricates the number rather than perturbing it.
+    if [ "$ARCHIVE_WS" -eq 1 ]; then
+        printf '== archiving any pre-existing v2 workspace for %s ==\n' "$TARGET"
+        archive_workspaces "$TARGET"
+        assert_no_workspace "$TARGET"
+    else
+        printf '== --no-archive: NOT archiving. A leftover checkpoints.db will make completed tasks\n'
+        printf '   SKIP and the parity number describe a PARTIAL tree. You asked for this explicitly.\n'
+    fi
+
+    BASELINE_FP_BEFORE="$(baseline_fingerprint "$V1DIR")"
+    printf '== banked v1 baseline fingerprint: %s ==\n' "$BASELINE_FP_BEFORE"
 
     printf '== v2 (Go) run against %s ==\n' "$TARGET"
     "$BIN" recon --target "$TARGET" || die "v2 run failed"
+
+    BASELINE_FP_AFTER="$(baseline_fingerprint "$V1DIR")"
+    if [ "$BASELINE_FP_BEFORE" != "$BASELINE_FP_AFTER" ]; then
+        die "THE BANKED v1 BASELINE CHANGED during the v2 run: $V1DIR
+  before=$BASELINE_FP_BEFORE after=$BASELINE_FP_AFTER
+  Something wrote into the baseline, so the comparison is void. That tree cost ten hours and
+  there is no second copy — stop and find out what wrote to it before running anything else."
+    fi
+    printf '== baseline unchanged (%s) ==\n' "$BASELINE_FP_AFTER"
 fi
 
 # ── locate the two output trees ──

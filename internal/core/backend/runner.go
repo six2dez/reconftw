@@ -19,6 +19,7 @@ package backend
 import (
 	"context"
 	stderrors "errors"
+	"time"
 
 	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
 )
@@ -28,6 +29,12 @@ type Runner struct {
 	Backend  Backend
 	Registry *ToolRegistry
 	Limiter  *RateLimiter
+
+	// Recorder appends every dispatch to <workspace>/logs/tools.jsonl. It is a
+	// field rather than a NewRunner parameter so a nil Recorder behaves exactly
+	// as before and no existing caller or test needs to change. appctx.Boot sets
+	// it; see recorder.go for why this seam is the right — and only — place.
+	Recorder *ToolRecorder
 }
 
 // NewRunner constructs a Runner. All three dependencies may be nil-ish:
@@ -71,6 +78,7 @@ func applyToolContract(ctx context.Context, t *Tool, args []string) (context.Con
 func (r *Runner) Run(ctx context.Context, toolName string, args []string) (*Result, error) {
 	tool, ok := r.Registry.Lookup(toolName)
 	if !ok {
+		r.recordDispatchFailure(toolName, ModeExec, args)
 		return nil, &coreerrors.ToolError{
 			Tool:     toolName,
 			ExitCode: -1,
@@ -79,6 +87,7 @@ func (r *Runner) Run(ctx context.Context, toolName string, args []string) (*Resu
 	}
 	if r.Limiter != nil {
 		if err := r.Limiter.Wait(ctx, toolName); err != nil {
+			r.recordDispatchFailure(toolName, ModeExec, args)
 			return nil, &coreerrors.ToolError{
 				Tool:     toolName,
 				ExitCode: -1,
@@ -88,7 +97,9 @@ func (r *Runner) Run(ctx context.Context, toolName string, args []string) (*Resu
 	}
 	ctx, cancel, args := applyToolContract(ctx, tool, args)
 	defer cancel()
-	return r.Backend.Exec(ctx, tool, args)
+	return r.execRecorded(ctx, toolName, args, func() (*Result, error) {
+		return r.Backend.Exec(ctx, tool, args)
+	})
 }
 
 // RunEnv is Run with additional "KEY=VALUE" child-env entries forwarded to
@@ -99,6 +110,7 @@ func (r *Runner) Run(ctx context.Context, toolName string, args []string) (*Resu
 func (r *Runner) RunEnv(ctx context.Context, toolName string, args []string, env []string) (*Result, error) {
 	tool, ok := r.Registry.Lookup(toolName)
 	if !ok {
+		r.recordDispatchFailure(toolName, ModeExec, args)
 		return nil, &coreerrors.ToolError{
 			Tool:     toolName,
 			ExitCode: -1,
@@ -107,6 +119,7 @@ func (r *Runner) RunEnv(ctx context.Context, toolName string, args []string, env
 	}
 	if r.Limiter != nil {
 		if err := r.Limiter.Wait(ctx, toolName); err != nil {
+			r.recordDispatchFailure(toolName, ModeExec, args)
 			return nil, &coreerrors.ToolError{
 				Tool:     toolName,
 				ExitCode: -1,
@@ -116,7 +129,9 @@ func (r *Runner) RunEnv(ctx context.Context, toolName string, args []string, env
 	}
 	ctx, cancel, args := applyToolContract(ctx, tool, args)
 	defer cancel()
-	return r.Backend.ExecEnv(ctx, tool, args, env)
+	return r.execRecorded(ctx, toolName, args, func() (*Result, error) {
+		return r.Backend.ExecEnv(ctx, tool, args, env)
+	})
 }
 
 // Stream looks up toolName, waits on the rate limiter, then dispatches to
@@ -124,6 +139,7 @@ func (r *Runner) RunEnv(ctx context.Context, toolName string, args []string, env
 func (r *Runner) Stream(ctx context.Context, toolName string, args []string) (<-chan Event, error) {
 	tool, ok := r.Registry.Lookup(toolName)
 	if !ok {
+		r.recordDispatchFailure(toolName, ModeStream, args)
 		return nil, &coreerrors.ToolError{
 			Tool:     toolName,
 			ExitCode: -1,
@@ -132,6 +148,7 @@ func (r *Runner) Stream(ctx context.Context, toolName string, args []string) (<-
 	}
 	if r.Limiter != nil {
 		if err := r.Limiter.Wait(ctx, toolName); err != nil {
+			r.recordDispatchFailure(toolName, ModeStream, args)
 			return nil, &coreerrors.ToolError{
 				Tool:     toolName,
 				ExitCode: -1,
@@ -139,7 +156,7 @@ func (r *Runner) Stream(ctx context.Context, toolName string, args []string) (<-
 			}
 		}
 	}
-	return r.streamWithContract(ctx, tool, args, func(c context.Context, a []string) (<-chan Event, error) {
+	return r.streamWithContract(ctx, toolName, tool, args, func(c context.Context, a []string) (<-chan Event, error) {
 		return r.Backend.Stream(c, tool, a)
 	})
 }
@@ -149,6 +166,7 @@ func (r *Runner) Stream(ctx context.Context, toolName string, args []string) (<-
 func (r *Runner) StreamEnv(ctx context.Context, toolName string, args []string, env []string) (<-chan Event, error) {
 	tool, ok := r.Registry.Lookup(toolName)
 	if !ok {
+		r.recordDispatchFailure(toolName, ModeStream, args)
 		return nil, &coreerrors.ToolError{
 			Tool:     toolName,
 			ExitCode: -1,
@@ -157,6 +175,7 @@ func (r *Runner) StreamEnv(ctx context.Context, toolName string, args []string, 
 	}
 	if r.Limiter != nil {
 		if err := r.Limiter.Wait(ctx, toolName); err != nil {
+			r.recordDispatchFailure(toolName, ModeStream, args)
 			return nil, &coreerrors.ToolError{
 				Tool:     toolName,
 				ExitCode: -1,
@@ -164,7 +183,7 @@ func (r *Runner) StreamEnv(ctx context.Context, toolName string, args []string, 
 			}
 		}
 	}
-	return r.streamWithContract(ctx, tool, args, func(c context.Context, a []string) (<-chan Event, error) {
+	return r.streamWithContract(ctx, toolName, tool, args, func(c context.Context, a []string) (<-chan Event, error) {
 		return r.Backend.StreamEnv(c, tool, a, env)
 	})
 }
@@ -178,6 +197,7 @@ func (r *Runner) StreamEnv(ctx context.Context, toolName string, args []string, 
 // whole stream and the context is released as soon as it closes.
 func (r *Runner) streamWithContract(
 	ctx context.Context,
+	toolName string,
 	tool *Tool,
 	args []string,
 	dispatch func(context.Context, []string) (<-chan Event, error),
@@ -186,8 +206,22 @@ func (r *Runner) streamWithContract(
 	src, err := dispatch(ctx, args)
 	if err != nil {
 		cancel()
+		r.recordDispatchFailure(toolName, ModeStream, args)
 		return nil, err
 	}
+
+	// The start record goes here — after applyToolContract, so the argv is the one
+	// the process received, and after dispatch succeeded, so a failed dispatch is
+	// labelled distinctly above rather than looking like a tool that ran.
+	//
+	// The END record goes in the relay goroutine, on BOTH of its exits. It cannot
+	// go in the caller: Stream returns immediately, long before the tool finishes,
+	// so an end record written here would claim completion for a tool still
+	// running — and would erase the start-without-end shape that is the whole
+	// reason a hang is diagnosable from this file.
+	started := time.Now()
+	id := r.Recorder.Start(toolName, ModeStream, args)
+
 	out := make(chan Event, 64)
 	go func() {
 		defer cancel()
@@ -199,19 +233,91 @@ func (r *Runner) streamWithContract(
 		// events on a non-cancellation path silently re-breaks audit finding F6:
 		// a tool that exits non-zero would once again look identical to one that
 		// finished cleanly.
+		streamExit, streamOutcome := 0, OutcomeSuccess
+		streamStderr := ""
 		for ev := range src {
+			// The terminal event is the only place the stream's own failure is
+			// visible. Read it WITHOUT rewriting ev — the relay's contract is that
+			// Event.Err reaches the consumer untouched (audit finding F6).
+			if ev.Err != nil {
+				streamExit, streamOutcome = -1, OutcomeExitNonZero
+				var te *coreerrors.ToolError
+				if stderrors.As(ev.Err, &te) {
+					streamExit = te.ExitCode
+					streamStderr = te.Stderr
+				}
+			}
+			// ctx.Done() fires for BOTH consumer abandonment and the tool's own
+			// Tool.Timeout deadline. Treating them alike dropped the terminal
+			// event on a deadline — LocalBackend emits it, and this relay threw
+			// it away — so the consumer saw a clean close and could not tell a
+			// timed-out tool from one that finished. Plan 16-05 made that path
+			// reachable for six tools by giving them real deadlines.
+			//
+			// On a deadline the consumer is still reading, so forward the event.
+			// The abandonment arm is disabled only for that case; a genuinely
+			// abandoned consumer still hits it and the drain still happens.
+			abandoned := ctx.Done()
+			if stderrors.Is(ctx.Err(), context.DeadlineExceeded) {
+				abandoned = nil
+			}
 			select {
 			case out <- ev:
-			case <-ctx.Done():
+			case <-abandoned:
 				// The consumer abandoned the channel. A bare `out <- ev` would
 				// block this goroutine forever, holding the Tool.Timeout context
 				// open and leaking both the relay and the child process it
 				// bounds. Drain the source so the producer can finish, then stop.
 				for range src { //nolint:revive // intentional drain
 				}
+				r.Recorder.End(id, -1, time.Since(started), OutcomeTimeout, "")
 				return
 			}
 		}
+		r.Recorder.End(id, streamExit, time.Since(started), streamOutcome, streamStderr)
 	}()
 	return out, nil
+}
+
+// execRecorded brackets a buffered dispatch with its start/end records.
+func (r *Runner) execRecorded(ctx context.Context, toolName string, argv []string, do func() (*Result, error)) (*Result, error) {
+	started := time.Now()
+	id := r.Recorder.Start(toolName, ModeExec, argv)
+
+	res, err := do()
+
+	exit, outcome, stderrTail := 0, OutcomeSuccess, ""
+	switch {
+	case ctx.Err() != nil:
+		outcome = OutcomeTimeout
+		exit = -1
+	case err != nil:
+		outcome = OutcomeExitNonZero
+		exit = -1
+		var te *coreerrors.ToolError
+		if stderrors.As(err, &te) {
+			exit = te.ExitCode
+			stderrTail = te.Stderr
+		}
+	case res != nil:
+		exit = res.ExitCode
+		if exit != 0 {
+			outcome = OutcomeExitNonZero
+		}
+	}
+	r.Recorder.End(id, exit, time.Since(started), outcome, stderrTail)
+	return res, err
+}
+
+// recordDispatchFailure records a tool that NEVER RAN — unregistered, absent, or
+// aborted by the rate limiter — as a start/end pair with its own outcome label.
+//
+// The pair is written even though nothing executed, so a grep for a tool name
+// finds evidence that it was attempted. Conflating "never ran" with "ran and
+// failed" is not a hypothetical cost: dnstake's bad arg vector was logged as
+// "run failed or tool not registered" and takeover detection produced zero,
+// invisibly, for months.
+func (r *Runner) recordDispatchFailure(toolName, mode string, argv []string) {
+	id := r.Recorder.Start(toolName, mode, argv)
+	r.Recorder.End(id, -1, 0, OutcomeDispatchFailed, "")
 }

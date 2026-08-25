@@ -68,6 +68,7 @@ func newStreamApp(t *testing.T, workDir string, be backend.Backend, tools ...str
 		reg.Register(&backend.Tool{Name: name})
 	}
 	cfg := &config.Config{}
+	seedTestResolvers(cfg, workDir)
 	cfg.Subdomains.Passive.Enabled = true
 	cfg.Subdomains.Brute.Enabled = true
 	cfg.Subdomains.DNSResolve.PurednsWildcardtestLimit = 100

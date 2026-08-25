@@ -177,3 +177,73 @@ func TestMergeStageHostsDedupsSameHostDifferentShape(t *testing.T) {
 		t.Errorf("hosts.jsonl has %d lines, want 2 (one per host)\ngot:\n%s", lines, got)
 	}
 }
+
+// TestMergeStageHostsKeepsCanonicalEndpoint pins the collapse WINNER, not just the
+// count. artefacts/hosts.jsonl is web.nuclei's target list, so which of a host's
+// endpoints survives decides what actually gets scanned.
+//
+// Observed on the live parity run: once the uncommon-port sweep landed, httpx
+// returned several endpoints per host and first-seen order kept an arbitrary one.
+// The artefact recorded http://api.hackerone.com:2095 instead of the https :443
+// endpoint, nuclei scanned a high port that does not serve the application, and
+// finding classes fell 48 -> 38 — losing precisely the templates that match real
+// application paths (graphql-*, oauth2-detect, oidc-detect, keycloak-openid-config,
+// trust-center-detect). The host COUNT was perfect (12 of 12) throughout, which is
+// why a cardinality-only assertion could never have caught this.
+func TestMergeStageHostsKeepsCanonicalEndpoint(t *testing.T) {
+	app := newHostsMergeApp(t)
+
+	// One host, three real httpx endpoints, canonical one deliberately NOT first.
+	writeLines(t, filepath.Join(app.Target.WorkDir, "inputs", "hosts.httpx.jsonl"),
+		`{"host":"api.example.com","url":"http://api.example.com:2095","scheme":"http","port":"2095","status":400}`,
+		`{"host":"api.example.com","url":"https://api.example.com:443","scheme":"https","port":"443","status":200}`,
+		`{"host":"api.example.com","url":"http://api.example.com:80","scheme":"http","port":"80","status":301}`,
+	)
+
+	if err := MergeStage(context.Background(), app, "hosts"); err != nil {
+		t.Fatalf("MergeStage(hosts): %v", err)
+	}
+	got := readArtefactHosts(t, app)
+
+	// Count LINES, not substring hits: the host name also appears inside the URL
+	// field of its own record, so a substring count reports 2 for a single line.
+	hostLines := 0
+	for _, ln := range strings.Split(strings.TrimSpace(got), "\n") {
+		if strings.Contains(ln, `"host":"api.example.com"`) {
+			hostLines++
+		}
+	}
+	if hostLines != 1 {
+		t.Fatalf("host appears on %d lines, want exactly 1 (IN-13-03)\ngot:\n%s", hostLines, got)
+	}
+	if !strings.Contains(got, `"port":"443"`) {
+		t.Errorf("the https :443 endpoint did not survive the collapse — nuclei would be "+
+			"pointed at a non-application port\ngot:\n%s", got)
+	}
+	if strings.Contains(got, `"port":"2095"`) {
+		t.Errorf("an arbitrary high-port endpoint survived instead of the canonical one\ngot:\n%s", got)
+	}
+}
+
+// TestMergeStageHostsProbeResultBeatsBareHost keeps the IN-13-03 guarantee explicit
+// in the ranking's own terms: a rich httpx record outranks a bare portscan shape for
+// the same host EVEN THOUGH the portscan record carries a standard port and the
+// httpx one carries none. If the port preference ever outgrows the probe-result
+// term, this fails.
+func TestMergeStageHostsProbeResultBeatsBareHost(t *testing.T) {
+	app := newHostsMergeApp(t)
+
+	writeLines(t, filepath.Join(app.Target.WorkDir, "inputs", "hosts.httpx.jsonl"),
+		`{"host":"a.example.com","tech":["nginx"],"status":200}`)
+	writeLines(t, filepath.Join(app.Target.WorkDir, "inputs", "hosts.portscan.jsonl"),
+		`{"host":"a.example.com","ip":"192.0.2.1","port":"443"}`)
+
+	if err := MergeStage(context.Background(), app, "hosts"); err != nil {
+		t.Fatalf("MergeStage(hosts): %v", err)
+	}
+	got := readArtefactHosts(t, app)
+
+	if !strings.Contains(got, `"tech":["nginx"]`) {
+		t.Errorf("the httpx probe result lost to a bare portscan record carrying port 443\ngot:\n%s", got)
+	}
+}

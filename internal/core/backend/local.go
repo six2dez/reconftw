@@ -168,10 +168,15 @@ func (b *LocalBackend) ExecEnv(ctx context.Context, t *Tool, args []string, env 
 
 	// Distinguish deadline-exceeded from a plain non-zero exit.
 	if stderrors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return nil, &coreerrors.ToolTimeout{
-			Tool:    t.Name,
-			Timeout: b.KillGrace,
+		// Report the TOOL'S OWN deadline. b.KillGrace is the post-signal grace
+		// period, not the bound that fired, so it rendered as "timed out after 2s"
+		// for a one-hour deadline — a message that sends the reader looking for a
+		// two-second timeout that does not exist.
+		reported := t.Timeout
+		if reported == 0 {
+			reported = b.KillGrace
 		}
+		return nil, &coreerrors.ToolTimeout{Tool: t.Name, Timeout: reported}
 	}
 
 	if waitErr != nil {
@@ -264,12 +269,33 @@ func (b *LocalBackend) StreamEnv(ctx context.Context, t *Tool, args []string, en
 	var scanErrMu sync.Mutex
 	var scanErr error
 
+	// stderrBuf TEES stderr so the closer can attach the tool's own account of
+	// its failure to the terminal error. This is a tee, NOT a redirect: stderr
+	// lines keep being forwarded as Events below, because modules filter them
+	// with `if ev.IsErr { continue }` and that behaviour must not change.
+	//
+	// Guarded by the SAME mutex as scanErr rather than a second one — one lock
+	// for the two facts the closer reads, so there is no ordering to get wrong.
+	var stderrBuf []byte
+
 	scanPipe := func(p io.Reader, isErr bool) {
 		defer wg.Done()
 		scanner := bufio.NewScanner(p)
 		scanner.Buffer(make([]byte, scannerInitialBuf), scannerMaxBuf)
 		for scanner.Scan() {
 			line := append([]byte(nil), scanner.Bytes()...) // copy — Scan reuses its buffer
+			if isErr {
+				scanErrMu.Lock()
+				// Trim as we go so a chatty tool cannot grow this without bound
+				// between lines; lastKB below applies the same cap once more at
+				// the end. stderrCap is the EXISTING ADR-fixed bound — do not
+				// introduce a second one.
+				stderrBuf = append(append(stderrBuf, line...), '\n')
+				if len(stderrBuf) > stderrCap*2 {
+					stderrBuf = append([]byte(nil), stderrBuf[len(stderrBuf)-stderrCap:]...)
+				}
+				scanErrMu.Unlock()
+			}
 			select {
 			case out <- Event{Line: line, Source: t.Name, IsErr: isErr}:
 			case <-ctx.Done():
@@ -304,14 +330,67 @@ func (b *LocalBackend) StreamEnv(ctx context.Context, t *Tool, args []string, en
 		// channel closing.
 		scanErrMu.Lock()
 		termErr := scanErr
+		stderrTail := lastKB(stderrBuf)
 		scanErrMu.Unlock()
+
+		// PRECEDENCE IS PRESERVED: a scanner error still wins over a wait error.
+		// A truncated stream is a worse fact than a non-zero exit — it means the
+		// output was silently incomplete — and must not be hidden by it.
 		if termErr == nil {
 			termErr = waitErr
 		}
+
+		// Enrich the terminal error with the tool's own stderr. Before this, the
+		// consumer got cmd.Wait()'s raw error, which is literally where the string
+		// "exit status 1" came from — the single most expensive string in the
+		// first live v2 run, because it was the ONLY thing an operator ever saw
+		// for five different root causes.
+		//
+		// Wrapped as *ToolError so errors.Is(err, ErrTool) keeps holding and the
+		// sentinel-bridge discipline (ADR §6: no string matching) still works.
+		// A DEADLINE IS NOT AN ORDINARY FAILURE, and the stream path did not
+		// distinguish it. ExecEnv has checked ctx.Err() for DeadlineExceeded
+		// since phase 3; StreamEnv never did, so a tool killed by its own
+		// Tool.Timeout reached the consumer as a generic ToolError carrying
+		// cmd.Wait()'s "signal: killed" — indistinguishable from a crash. Plan
+		// 16-05 gives httpx, naabu, nuclei and notify real deadlines, and
+		// katana/dnsx have had 4h ones since the manifest was written, so this
+		// path is now reachable for six tools rather than none.
+		if stderrors.Is(ctx.Err(), context.DeadlineExceeded) {
+			// Report the TOOL'S OWN deadline when it has one. KillGrace is the
+			// post-signal grace period, not the bound that fired, and reporting
+			// it produced "timed out after 2s" for a one-hour deadline.
+			reported := t.Timeout
+			if reported == 0 {
+				reported = b.KillGrace
+			}
+			termErr = &coreerrors.ToolTimeout{Tool: t.Name, Timeout: reported}
+		} else if termErr != nil {
+			termErr = &coreerrors.ToolError{
+				Tool:     t.Name,
+				ExitCode: exitCodeOf(cmd, termErr),
+				Stderr:   stderrTail,
+				Inner:    termErr,
+			}
+		}
 		if termErr != nil {
+			// ctx.Done() fires for BOTH consumer abandonment and the tool's own
+			// deadline, and treating them alike dropped the terminal event
+			// exactly when it mattered most: the deadline killed the tool and the
+			// consumer saw a clean channel close — the F6 shape phase 15 spent
+			// two plans closing, reappearing on the timeout path only.
+			//
+			// On a deadline the consumer is usually still reading, so the send is
+			// attempted with the same bounded backstop that protects an abandoned
+			// stream. It cannot wedge: the backstop arm always exists.
+			deadlineFired := stderrors.Is(ctx.Err(), context.DeadlineExceeded)
+			done := ctx.Done()
+			if deadlineFired {
+				done = nil // disable the abandonment arm; the backstop still bounds us
+			}
 			select {
 			case out <- Event{Source: t.Name, IsErr: true, Err: termErr}:
-			case <-ctx.Done():
+			case <-done:
 				// The consumer abandoned the stream. ctx is the same context that
 				// bounds the child process, so its cancellation is the earliest
 				// truthful signal that nobody is listening — a fixed wall-clock
@@ -328,6 +407,19 @@ func (b *LocalBackend) StreamEnv(ctx context.Context, t *Tool, args []string, en
 	}()
 
 	return out, nil
+}
+
+// exitCodeOf derives a tool's exit code the SAME way ExecEnv does, so the Exec
+// and Stream paths cannot report different codes for the same failure.
+func exitCodeOf(cmd *exec.Cmd, err error) int {
+	var ee *exec.ExitError
+	if stderrors.As(err, &ee) {
+		return ee.ExitCode()
+	}
+	if cmd != nil && cmd.ProcessState != nil {
+		return cmd.ProcessState.ExitCode()
+	}
+	return -1
 }
 
 // lastKB returns the last `stderrCap` bytes of buf as a string. Used to bound

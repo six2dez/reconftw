@@ -1,0 +1,20 @@
+{
+ "results": [
+  {
+   "length": 0,
+   "lines": 1,
+   "redirectlocation": "/admin/",
+   "status": 301,
+   "url": "http://127.0.0.1:8733/admin",
+   "words": 1
+  },
+  {
+   "length": 48,
+   "lines": 3,
+   "redirectlocation": "",
+   "status": 200,
+   "url": "http://127.0.0.1:8733/robots.txt",
+   "words": 7
+  }
+ ]
+}

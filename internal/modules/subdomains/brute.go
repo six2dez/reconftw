@@ -58,8 +58,19 @@ func countResolverLines(path string) (int, error) {
 
 // SubResolversHealthTask is a lightweight pre-check that verifies the DNS
 // resolver file has at least cfg.Subdomains.Brute.MinResolvers non-empty lines.
-// Returns StatusSkipped if the gate fails so the command layer can surface
-// the warning without aborting the entire phase.
+//
+// It distinguishes two outcomes that used to be collapsed into one SKIP:
+//
+//   - ZERO usable resolvers (missing file, unreadable file, empty file, empty
+//     path) is a HARD ERROR. Nothing downstream can resolve DNS, and every task
+//     that tries dies on `puredns -r ""` four steps later with an error that
+//     names puredns rather than the resolver list. On 2026-08-20 this exact
+//     shape cost a 10-hour parity run: the check DETECTED the empty path, logged
+//     a WARN, marked itself SKIP, and let the run proceed to its real death. A
+//     precondition check that cannot fail the run is decoration.
+//   - A NON-EMPTY list that merely falls below MinResolvers stays a WARN + SKIP.
+//     That is a plausible deliberate operator choice (a small trusted-only set);
+//     zero resolvers never is.
 type SubResolversHealthTask struct{}
 
 func (SubResolversHealthTask) Name() string        { return "subdomains.resolvers.health" }
@@ -76,25 +87,24 @@ func (SubResolversHealthTask) Enabled(cfg *config.Config) bool {
 	return cfg.Subdomains.Brute.Enabled
 }
 
-// Run reads cfg.Paths.Resolvers and counts non-empty lines. Returns
-// StatusSkipped (not StatusErrored) when the count is below MinResolvers —
-// the operator may have intentionally reduced the resolver set, so a hard
-// error would be too aggressive. The warning log is enough to surface it.
+// Run reads cfg.Paths.Resolvers and counts non-empty lines. Zero usable
+// resolvers returns StatusErrored with an actionable message; a non-empty list
+// below MinResolvers keeps the historical WARN + StatusSkipped.
 func (SubResolversHealthTask) Run(_ context.Context, app *appctx.AppContext) (task.Result, error) {
 	cfg := app.Cfg
 	minResolvers := cfg.Subdomains.Brute.MinResolvers
 	resolverPath := cfg.Paths.Resolvers
 
 	count, err := countResolverLines(resolverPath)
-	if err != nil {
-		// File unreadable — log and skip (not error; user may have not set up resolvers yet).
+	if err != nil || count == 0 {
 		if app.Log != nil {
-			app.Log.Warn("resolver_health_check_failed",
+			app.Log.Error("resolver_health_check_failed",
 				"resolver_file", resolverPath,
-				"error", err.Error(),
+				"count", count,
+				"error", errText(err),
 			)
 		}
-		return task.Result{Status: task.StatusSkipped}, nil
+		return task.Result{Status: task.StatusErrored}, errNoResolvers(resolverPath, err)
 	}
 
 	if count < minResolvers {
@@ -112,6 +122,38 @@ func (SubResolversHealthTask) Run(_ context.Context, app *appctx.AppContext) (ta
 		Status: task.StatusDone,
 		Stats:  map[string]int{"resolver_count": count},
 	}, nil
+}
+
+// errNoResolvers builds the one message the operator needs when DNS resolution
+// cannot proceed. It names the file, the cause, and the fix — deliberately, so
+// nobody has to read a puredns exit code to learn that a list is missing.
+func errNoResolvers(path string, cause error) error {
+	where := path
+	if where == "" {
+		where = "<unset paths.resolvers>"
+	}
+	if cause != nil {
+		return fmt.Errorf("no usable DNS resolvers in %s: %w "+
+			"(fix: run `reconftw gen-resolvers`, or point paths.resolvers at an existing list)", where, cause)
+	}
+	return fmt.Errorf("no usable DNS resolvers in %s: file is empty "+
+		"(fix: run `reconftw gen-resolvers`, or point paths.resolvers at an existing list)", where)
+}
+
+// errText renders an optional error for a structured log field.
+func errText(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
+// resolverListUsable reports whether path holds at least one non-empty line.
+// Shared by the tasks that pass a resolver file to an external tool, so their
+// guard cannot drift from the health task's definition of "usable".
+func resolverListUsable(path string) bool {
+	n, err := countResolverLines(path)
+	return err == nil && n > 0
 }
 
 // wordlistReadable reports whether path names an existing, non-empty regular file.

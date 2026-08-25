@@ -21,7 +21,12 @@
 //	  # captured-from: httpx -follow-host-redirects ... -json -l hosts_seed.txt | date: YYYY-MM-DD
 //
 // Source: .planning/phases/05-web-pipeline-e2e/05-06-PLAN.md Task 1.
-package web_test
+// PACKAGE web, NOT web_test. These tests must call parseHTTPXOutput and
+// parseNucleiOutput, which are unexported — and calling the production parser is
+// the entire point of this file after the 2026-08-21 dead-web-layer bug. The
+// file used zero `web.`-qualified names and shares no helper with the other
+// web_test files, so the move is mechanical.
+package web
 
 import (
 	"bufio"
@@ -64,12 +69,41 @@ func webParitySkip(t *testing.T, fixtureBytes []byte, fixturePath string) {
 func fixturesBase() string { return filepath.Join("testdata", "fixtures") }
 
 // -------------------------------------------------------------------------
-// TestWebParityHTTPX — stub-backed: skips until Plan 05-07 populates fixture.
+// TestWebParityHTTPX / TestWebParityNuclei
+//
+// THESE TWO TESTS USED TO REIMPLEMENT THE PARSERS THEY NAMED.
+//
+// Their doc-comments said "verifies that httpx JSONL output feeds through
+// parseHTTPXOutput" and "feeds through parseNucleiOutput". Neither ever called
+// either function. Each declared a two-field anonymous struct inline, decoded
+// with that, and asserted on the result — so what was validated was a parser
+// written in this file, against a fixture, while the production parser went
+// unexecuted.
+//
+// The cost: testdata/fixtures/httpx/httpx_hackerone.jsonl has been in the repo
+// since 2026-06-02 and contains `"port":"443"` — a STRING. httpxRaw.Port was an
+// `int`, so json.Unmarshal failed on every real line and parseHTTPXOutput
+// returned "all N lines failed to parse". The falsifying evidence sat beside the
+// test for two and a half months, and the first live parity run scored 0 live
+// hosts against v1's 12 because artefacts/hosts.jsonl was truncated to 0 bytes.
+//
+// Two rules follow, and both are enforced below rather than described:
+//
+//  1. CALL THE PRODUCTION PARSER. A test that reimplements the function under
+//     test cannot falsify that function's struct — it can only agree with its
+//     own copy.
+//  2. ASSERT AT FIELD LEVEL, NOT AT COUNT LEVEL. The old tests counted records.
+//     Two of the three real bugs (`status-code` and `content-length` against
+//     httpx's `status_code`/`content_length`) decoded to a silent ZERO, so a
+//     count assertion stayed green through both.
 // -------------------------------------------------------------------------
 
-// TestWebParityHTTPX verifies that httpx JSONL output feeds through parseHTTPXOutput
-// and that the scope-filtered host set matches the golden set from the fixture.
-// Skips cleanly when the fixture has not been captured yet (stub header).
+// TestWebParityHTTPX decodes the June 2026 captured httpx fixture through the
+// PRODUCTION parseHTTPXOutput and asserts, per field, that the three tags/types
+// that were wrong now carry real values from the fixture.
+//
+// This is the regression guard for the dead-web-layer bug, pinned against the
+// fixture that was already present when the bug shipped.
 func TestWebParityHTTPX(t *testing.T) {
 	fixturePath := filepath.Join(fixturesBase(), "httpx", "httpx_hackerone.jsonl")
 	data, err := os.ReadFile(fixturePath)
@@ -77,45 +111,72 @@ func TestWebParityHTTPX(t *testing.T) {
 		t.Fatalf("read fixture %s: %v", fixturePath, err)
 	}
 	webParitySkip(t, data, fixturePath)
+	requireCapturedProvenance(t, data, fixturePath)
 
-	// Parse JSONL — counting non-empty, non-comment lines as the expected host count.
-	var hosts []string
-	scanner := bufio.NewScanner(bytes.NewReader(data))
-	for scanner.Scan() {
-		line := bytes.TrimSpace(scanner.Bytes())
-		if len(line) == 0 || bytes.HasPrefix(line, []byte("#")) {
-			continue
-		}
-		// Each line must be a valid JSON object with a "url" or "host" field.
-		var rec struct {
-			URL  string `json:"url"`
-			Host string `json:"host"`
-		}
-		if err := json.Unmarshal(line, &rec); err != nil {
-			continue
-		}
-		h := rec.URL
-		if h == "" {
-			h = rec.Host
-		}
-		if h != "" {
-			hosts = append(hosts, h)
-		}
+	// THE PRODUCTION PARSER. Not a copy of it.
+	records, parseErr := parseHTTPXOutput(data)
+	if parseErr != nil {
+		t.Fatalf("parseHTTPXOutput rejected REAL captured httpx output: %v\n"+
+			"  fixture: %s\n"+
+			"  This is the exact failure that emptied artefacts/hosts.jsonl and took the whole web\n"+
+			"  layer with it. A struct tag or field type disagrees with what httpx emits.", parseErr, fixturePath)
+	}
+	if len(records) == 0 {
+		t.Fatalf("parseHTTPXOutput returned ZERO records from %s — the state that killed the web layer", fixturePath)
 	}
 
-	if len(hosts) == 0 {
-		t.Error("TestWebParityHTTPX: fixture parsed 0 hosts — fixture may be malformed")
+	// FIELD-LEVEL ASSERTIONS. Each names the field's failure mode, because a
+	// combined "some field is empty" message would not say which contract broke.
+	var sawPort, sawStatus, sawLength, sawHost bool
+	for _, r := range records {
+		if r.Host != "" {
+			sawHost = true
+		}
+		if r.Port != "" {
+			sawPort = true
+		}
+		if r.Status != 0 {
+			sawStatus = true
+		}
+		if r.ContentLength != 0 {
+			sawLength = true
+		}
 	}
-	t.Logf("TestWebParityHTTPX: parsed %d hosts from fixture", len(hosts))
+	if !sawHost {
+		t.Errorf("no decoded record carries a host — parseHTTPXOutput produced records with nothing in them")
+	}
+	if !sawPort {
+		t.Errorf("PORT is empty in every decoded record.\n"+
+			"  httpx emits `\"port\":\"443\"` as a STRING. A numeric httpxRaw.Port makes json.Unmarshal\n"+
+			"  fail on the WHOLE line, which is the fatal form of this bug: every record is lost, not\n"+
+			"  just the port. Fixture: %s", fixturePath)
+	}
+	if !sawStatus {
+		t.Errorf("STATUS is zero in every decoded record.\n"+
+			"  httpx emits `status_code` with an UNDERSCORE. A `status-code` tag decodes to a silent\n"+
+			"  zero — the record survives and the data does not, so a count-only assertion stays green.\n"+
+			"  Fixture: %s", fixturePath)
+	}
+	if !sawLength {
+		t.Errorf("CONTENT LENGTH is zero in every decoded record.\n"+
+			"  httpx emits `content_length` with an UNDERSCORE. Same silent-zero shape as status.\n"+
+			"  Fixture: %s", fixturePath)
+	}
+
+	// Name a specific record so a failure identifies the fixture line.
+	first := records[0]
+	t.Logf("TestWebParityHTTPX: %d record(s) via parseHTTPXOutput; first = host=%q port=%q status=%d len=%d",
+		len(records), first.Host, first.Port, first.Status, first.ContentLength)
 }
 
-// -------------------------------------------------------------------------
-// TestWebParityNuclei — stub-backed: skips until Plan 05-07 populates fixture.
-// -------------------------------------------------------------------------
-
-// TestWebParityNuclei verifies nuclei JSONL output feeds through parseNucleiOutput
-// and that severity-split counts match the expected values from the fixture.
-// Skips cleanly when the fixture has not been captured yet.
+// TestWebParityNuclei decodes the June 2026 captured nuclei fixture through the
+// PRODUCTION parseNucleiOutput and asserts severity counts from the DECODED
+// records rather than from a private copy of the decoder.
+//
+// nuclei's field names are hyphenated (`template-id`, `matched-at`,
+// `extracted-results`) where httpx's are underscored — the two ProjectDiscovery
+// tools disagree with each other, which is precisely why a struct tag can only
+// be validated against captured output.
 func TestWebParityNuclei(t *testing.T) {
 	fixturePath := filepath.Join(fixturesBase(), "nuclei", "nuclei_hackerone.jsonl")
 	data, err := os.ReadFile(fixturePath)
@@ -123,36 +184,78 @@ func TestWebParityNuclei(t *testing.T) {
 		t.Fatalf("read fixture %s: %v", fixturePath, err)
 	}
 	webParitySkip(t, data, fixturePath)
+	requireCapturedProvenance(t, data, fixturePath)
 
-	// Count severity splits in the fixture.
-	severityCounts := make(map[string]int)
+	records := parseNucleiOutput(data)
+	if len(records) == 0 {
+		t.Fatalf("parseNucleiOutput returned ZERO records from REAL captured nuclei output (%s).\n"+
+			"  Every finding would be dropped and the run would report no vulnerabilities — a report\n"+
+			"  that understates risk, which is the worst failure mode available to a security tool.",
+			fixturePath)
+	}
+
+	severity := map[string]int{}
+	var sawTemplateID, sawMatchedAt, sawHost bool
+	for _, r := range records {
+		if s := strings.ToLower(r.Severity); s != "" {
+			severity[s]++
+		}
+		if r.TemplateID != "" {
+			sawTemplateID = true
+		}
+		if r.MatchedAt != "" {
+			sawMatchedAt = true
+		}
+		if r.Host != "" {
+			sawHost = true
+		}
+	}
+	if len(severity) == 0 {
+		t.Errorf("SEVERITY is empty in every decoded record.\n"+
+			"  nuclei nests it as info.severity. An empty severity means every finding is unclassified\n"+
+			"  and triage cannot rank anything. Fixture: %s", fixturePath)
+	}
+	if !sawTemplateID {
+		t.Errorf("TEMPLATE ID is empty in every decoded record — nuclei emits `template-id` with a "+
+			"HYPHEN, unlike httpx's underscored fields. Fixture: %s", fixturePath)
+	}
+	if !sawMatchedAt {
+		t.Errorf("MATCHED-AT is empty in every decoded record — nuclei emits `matched-at`; without it "+
+			"a finding names no location. Fixture: %s", fixturePath)
+	}
+	if !sawHost {
+		t.Errorf("HOST is empty in every decoded record — findings would fail the scope gate and the "+
+			"whole merged batch would be rejected. Fixture: %s", fixturePath)
+	}
+	t.Logf("TestWebParityNuclei: %d record(s) via parseNucleiOutput; severity split %v", len(records), severity)
+}
+
+// requireCapturedProvenance fails a fixture that does not say where it came from.
+//
+// A hand-written fixture for a third-party format AGREES WITH THE STRUCT AND
+// DISAGREES WITH THE TOOL: it is written by reading the Go struct, so it can
+// only ever confirm what the struct already believes. Only captured output can
+// falsify a struct, so a fixture without recorded provenance is not evidence.
+func requireCapturedProvenance(t *testing.T, data []byte, fixturePath string) {
+	t.Helper()
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	for scanner.Scan() {
-		line := bytes.TrimSpace(scanner.Bytes())
-		if len(line) == 0 || bytes.HasPrefix(line, []byte("#")) {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
 			continue
 		}
-		var rec struct {
-			Info struct {
-				Severity string `json:"severity"`
-			} `json:"info"`
-		}
-		if err := json.Unmarshal(line, &rec); err != nil {
+		if strings.HasPrefix(line, "#") {
+			if strings.Contains(line, "captured-from:") {
+				return
+			}
 			continue
 		}
-		if sev := strings.ToLower(rec.Info.Severity); sev != "" {
-			severityCounts[sev]++
-		}
+		break
 	}
-
-	total := 0
-	for _, n := range severityCounts {
-		total += n
-	}
-	if total == 0 {
-		t.Error("TestWebParityNuclei: fixture parsed 0 findings — fixture may be malformed")
-	}
-	t.Logf("TestWebParityNuclei: severity-split counts: %v", severityCounts)
+	t.Fatalf("%s has no `# captured-from:` provenance header.\n"+
+		"  A fixture for a third-party tool's output format is only evidence if it came FROM that\n"+
+		"  tool. A hand-written one agrees with the struct by construction and cannot falsify it —\n"+
+		"  which is how httpxRaw.Port stayed wrong through a passing test suite.", fixturePath)
 }
 
 // -------------------------------------------------------------------------

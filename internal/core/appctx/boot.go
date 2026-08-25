@@ -64,6 +64,21 @@ type BootOptions struct {
 	// NotifySinks overrides the default Notifier sinks. nil → LogSink +
 	// 3 stubs (Slack/Telegram/Discord per CONTEXT default option (a)).
 	NotifySinks []notifier.Notifier
+	// SecretRegistrar lets modules register a runtime-loaded secret (a token read
+	// from a file) so it is scrubbed everywhere. Usually the same *log.Redactor
+	// as Redactor below.
+	SecretRegistrar SecretRegistrar
+	// Redactor scrubs registered secrets from logs/tools.jsonl. Additive field
+	// rather than a Boot signature change (ADR §0 D-07). nil degrades to NO
+	// redaction — see NewToolRecorder for why that is not a safe default.
+	Redactor backend.Redactor
+	// DisableToolRecorder switches off <workspace>/logs/tools.jsonl. Tests that
+	// assert on a hermetic filesystem opt out HERE, explicitly, rather than by
+	// accidentally leaving the Runner field nil.
+	DisableToolRecorder bool
+	// ToolRecorderPath overrides where invocations are recorded.
+	// "" → <target.WorkDir>/logs/tools.jsonl.
+	ToolRecorderPath string
 	// PassiveMode wraps the chosen backend with PassiveBackend, hard-blocking
 	// any tool in the active-tool set (D-09: defense-in-depth beyond composition
 	// guard). When true, LocalBackend.Exec/Stream for puredns/nmap/etc. return
@@ -124,6 +139,20 @@ func Boot(ctx context.Context, logger *slog.Logger, cfg *config.Config, target *
 	limiter := pickLimiter(cfg)
 	runner := backend.NewRunner(be, backend.Default, limiter)
 
+	// Tool invocation recording. target.WorkDir is already the anchor for
+	// checkpoints.db just below, so no new parameter is needed. The recorder
+	// touches no filesystem until the first tool is dispatched, which is what
+	// keeps a tool-less boot — and acceptance gate 1's byte-for-byte dry run —
+	// clean. Opt out explicitly via BootOptions.DisableToolRecorder; do not rely
+	// on a nil Runner field, which would silently lose the diagnostics.
+	if !opt.DisableToolRecorder {
+		recorderPath := opt.ToolRecorderPath
+		if recorderPath == "" {
+			recorderPath = filepath.Join(target.WorkDir, "logs", "tools.jsonl")
+		}
+		runner.Recorder = backend.NewToolRecorder(recorderPath, opt.Redactor)
+	}
+
 	// 4. Checkpoint.
 	cp := opt.Checkpoint
 	if cp == nil {
@@ -173,6 +202,7 @@ func Boot(ctx context.Context, logger *slog.Logger, cfg *config.Config, target *
 
 	app := &AppContext{
 		Log:        logger,
+		Secrets:    opt.SecretRegistrar,
 		Cfg:        cfg,
 		Scheduler:  sched,
 		Tools:      runner,

@@ -19,6 +19,7 @@ package errors
 import (
 	stderrors "errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -62,8 +63,32 @@ type ToolError struct {
 	Inner    error
 }
 
+// renderedStderrCap bounds how much of Stderr appears in the MESSAGE. The full
+// tail stays in the struct field and in logs/tools.jsonl; this only stops a
+// multi-kilobyte burst from dominating a terminal line.
+const renderedStderrCap = 300
+
 func (e *ToolError) Error() string {
-	return fmt.Sprintf("tool %s (exit %d): %v", e.Tool, e.ExitCode, e.Inner)
+	base := fmt.Sprintf("tool %s (exit %d): %v", e.Tool, e.ExitCode, e.Inner)
+
+	// The Stderr field has been carried since phase 3 and shown to NOBODY. That
+	// is why every failure in the first live v2 run read "tool stream ended badly:
+	// exit status 1" — the tool's own account of what went wrong was already in
+	// memory, one field away, and never printed. Rendering it is the difference
+	// between that string and "unable to load public resolvers: open t: no such
+	// file or directory".
+	//
+	// Appended only when non-empty, which keeps the message byte-identical for
+	// every ToolError constructed without stderr (see TestToolError_FormatExact).
+	tail := strings.TrimSpace(e.Stderr)
+	if tail == "" {
+		return base
+	}
+	tail = strings.Join(strings.Fields(tail), " ") // collapse newlines/runs
+	if len(tail) > renderedStderrCap {
+		tail = "..." + tail[len(tail)-renderedStderrCap:]
+	}
+	return base + ": " + tail
 }
 
 func (e *ToolError) Unwrap() error { return e.Inner }

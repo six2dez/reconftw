@@ -196,6 +196,13 @@ func Load(opts LoadOptions) (*Config, error) {
 	// Apply [legacy] table — translate UPPER_CASE keys to v2-native keys.
 	applyLegacyAliases(cfg, opts.WarnSink)
 
+	// Give the resolver files a real path when nothing configured one. This runs
+	// HERE rather than in Defaults() so Defaults() stays a pure literal (the
+	// snapshot/property tests compare it) and so an explicit config still wins:
+	// only a genuinely empty field is filled.
+	resolveResolverPaths(cfg)
+	resolveNucleiTemplatesPath(cfg)
+
 	// Validate post-merge.
 	if err := Validate(cfg); err != nil {
 		return nil, err
@@ -287,6 +294,82 @@ func applyLegacyAliases(cfg *Config, sink io.Writer) {
 // collision) from "user wrote v2-native key X = non-default value" (collision).
 func sameValue(a, b any) bool {
 	return fmt.Sprintf("%v", a) == fmt.Sprintf("%v", b)
+}
+
+// defaultStateDir returns the directory reconFTW keeps operator-level state in
+// (resolver lists today). XDG semantics on every platform, matching
+// ResolveDefaultPaths and DefaultConfigDir — deliberately not os.UserConfigDir,
+// which would relocate the path to ~/Library/Application Support on macOS and
+// diverge from the docs, the Docker image and every Linux install.
+// Returns "" when neither XDG_CONFIG_HOME nor a home directory is available.
+func defaultStateDir() string {
+	if x := os.Getenv("XDG_CONFIG_HOME"); x != "" {
+		return filepath.Join(x, "reconftw")
+	}
+	if h, err := os.UserHomeDir(); err == nil && h != "" {
+		return filepath.Join(h, ".config", "reconftw")
+	}
+	return ""
+}
+
+// resolveResolverPaths fills Paths.Resolvers / Paths.ResolversTrusted when the
+// merged config left them empty.
+//
+// They defaulted to "" for the whole of v2's life, and NOTHING downstream treated
+// that as an error: puredns was handed `-r "" -rt ""` (resolve.go SubActiveTask),
+// exited 1, and — because subs-resolve is the only fail-fast group — aborted every
+// default `recon` run. A v2 with no reconftw.toml could not complete a scan. v1 has
+// no equivalent hole: reconftw.cfg:408-409 always point at ${tools}/resolvers*.txt.
+//
+// The path chosen here is the SAME one `reconftw gen-resolvers` already writes to
+// (see genResolversOutputPath in cmd/reconftw/stateful_subcommands.go), so a manual
+// gen-resolvers run and an automatic boot-time acquisition converge on one file
+// instead of racing over two.
+func resolveResolverPaths(cfg *Config) {
+	if cfg == nil {
+		return
+	}
+	dir := defaultStateDir()
+	if dir == "" {
+		// No home and no XDG: leave the fields empty rather than inventing a
+		// relative path that would land wherever the process happens to be cwd'd.
+		// EnsureResolvers reports this as an actionable startup error.
+		return
+	}
+	if cfg.Paths.Resolvers == "" {
+		cfg.Paths.Resolvers = filepath.Join(dir, "resolvers.txt")
+	}
+	if cfg.Paths.ResolversTrusted == "" {
+		cfg.Paths.ResolversTrusted = filepath.Join(dir, "resolvers_trusted.txt")
+	}
+}
+
+// resolveNucleiTemplatesPath fills Paths.NucleiTemplates when the merged config
+// left it empty.
+//
+// Same shape as the resolver-path hole, and the same consequence: v1 defaults
+// NUCLEI_TEMPLATES_PATH to "$HOME/nuclei-templates" (reconftw.cfg:209), v2
+// defaulted it to "", and THREE capabilities silently switched themselves off —
+// web.nuclei ("templates path not configured — skipping"), web.screenshot (which
+// drives nuclei headless), and vulns.nuclei_dast (which derives its own path as
+// NucleiTemplates + "/dast"). On the first live parity run v2 scored 2 finding
+// classes against v1's 50, and essentially all fifty were nuclei template IDs.
+// The templates were installed on the box the whole time; nothing looked at them.
+//
+// $HOME rather than the XDG state dir on purpose: this is where v1's installer
+// puts them and where `nuclei -update-templates` puts them by default, so the
+// three producers converge on one directory instead of each inventing its own.
+// The path is set unconditionally; whether it EXISTS is the consumer's check,
+// so an absent install skips with a message naming the path it looked for.
+func resolveNucleiTemplatesPath(cfg *Config) {
+	if cfg == nil || cfg.Paths.NucleiTemplates != "" {
+		return
+	}
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return
+	}
+	cfg.Paths.NucleiTemplates = filepath.Join(home, "nuclei-templates")
 }
 
 // DefaultConfigDir resolves the platform-default user config file location.

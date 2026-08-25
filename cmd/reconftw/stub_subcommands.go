@@ -209,7 +209,7 @@ func runSubsCmd(cmd *cobra.Command) error {
 			if dur <= 0 {
 				dur = time.Since(started)
 			}
-			progress.TaskDone(t.Name(), badgeForStatus(result.Status), dur)
+			progress.TaskDoneReason(t.Name(), badgeForStatus(result.Status), dur, result.Reason)
 			return result, runErr
 		}
 	}
@@ -224,6 +224,7 @@ func runSubsCmd(cmd *cobra.Command) error {
 		}
 	}()
 	if err := handlers.RunSubsAsync(ctx, handlers.RunOptions{
+		Secrets:      newRunRedactor(),
 		Target:       targetFlag,
 		DryRun:       dryRun,
 		ConfigPath:   efs.configPath,
@@ -458,7 +459,7 @@ func runWebCmd(cmd *cobra.Command) error {
 			if dur <= 0 {
 				dur = time.Since(started)
 			}
-			progress.TaskDone(t.Name(), badgeForStatus(result.Status), dur)
+			progress.TaskDoneReason(t.Name(), badgeForStatus(result.Status), dur, result.Reason)
 			return result, runErr
 		}
 	}
@@ -473,6 +474,7 @@ func runWebCmd(cmd *cobra.Command) error {
 		}
 	}()
 	if err := handlers.RunWebAsync(ctx, handlers.RunOptions{
+		Secrets:      newRunRedactor(),
 		Target:       targetFlag,
 		DryRun:       dryRun,
 		ExtraFile:    hostsFlag,
@@ -752,7 +754,7 @@ func runVulnsCmd(cmd *cobra.Command) error {
 			if dur <= 0 {
 				dur = time.Since(started)
 			}
-			progress.TaskDone(t.Name(), badgeForStatus(result.Status), dur)
+			progress.TaskDoneReason(t.Name(), badgeForStatus(result.Status), dur, result.Reason)
 			return result, runErr
 		}
 	}
@@ -767,6 +769,7 @@ func runVulnsCmd(cmd *cobra.Command) error {
 		}
 	}()
 	if err := handlers.RunVulnsAsync(ctx, handlers.RunOptions{
+		Secrets:      newRunRedactor(),
 		Target:       targetFlag,
 		DryRun:       dryRun,
 		ExtraFile:    urlsFlag,
@@ -969,7 +972,7 @@ func runOSINTCmd(cmd *cobra.Command) error {
 			if dur <= 0 {
 				dur = time.Since(started)
 			}
-			progress.TaskDone(t.Name(), badgeForStatus(result.Status), dur)
+			progress.TaskDoneReason(t.Name(), badgeForStatus(result.Status), dur, result.Reason)
 			return result, runErr
 		}
 	}
@@ -984,6 +987,7 @@ func runOSINTCmd(cmd *cobra.Command) error {
 		}
 	}()
 	if err := handlers.RunOSINTAsync(ctx, handlers.RunOptions{
+		Secrets:      newRunRedactor(),
 		Target:       targetFlag,
 		DryRun:       dryRun,
 		ConfigPath:   efs.configPath,
@@ -1199,6 +1203,7 @@ func runMonitorCmd(cmd *cobra.Command) error {
 	// assertion on boot.App.Notify (*notifier.Multi implements Flusher via Plan 02).
 	// The CLI layer does NOT need to wire or inject a coalescer reference.
 	return handlers.RunMonitorAsync(ctx, handlers.RunOptions{
+		Secrets:     newRunRedactor(),
 		Target:      targetFlag,
 		DryRun:      dryRun,
 		ConfigPath:  efs.configPath,

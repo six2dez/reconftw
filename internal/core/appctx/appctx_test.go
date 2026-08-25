@@ -40,7 +40,21 @@ func (s *stubCP) Done(_ context.Context, _, _, _ string) (bool, error) { return 
 
 var _ checkpoint.Interface = (*stubCP)(nil)
 
-// Test 1: AppContext has 9 fields per ADR §5.3.
+// Test 1: AppContext's field set is pinned.
+//
+// ADR §5.3 fixed this at NINE fields. It is TEN as of phase 16: `Secrets` was
+// added to give modules an explicit route to the run's redactor.
+//
+// The expectation is updated DELIBERATELY, not adjusted to make a red test green.
+// The reason: subdomains/passive.go's GitHub and GitLab tasks read a token file
+// and put its CONTENT on argv, and phase 16 began writing argv to
+// logs/tools.jsonl — so without a registration route that token becomes plaintext
+// on disk. The appctx header forbids package-level globals ("every dependency is
+// explicit at the call site"), so a global redactor was not an option and the
+// field is the honest alternative.
+//
+// The guard itself is unchanged in kind: it still fails on any field added
+// without this comment being revisited, which is the point.
 func TestAppContextNineFields(t *testing.T) {
 	fset := token.NewFileSet()
 	src := readAppctxSource(t, "appctx.go")
@@ -48,7 +62,7 @@ func TestAppContextNineFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse appctx.go: %v", err)
 	}
-	wantFields := []string{"Log", "Cfg", "Scheduler", "Tools", "Tree", "Checkpoint", "Notify", "Target", "UI"}
+	wantFields := []string{"Log", "Secrets", "Cfg", "Scheduler", "Tools", "Tree", "Checkpoint", "Notify", "Target", "UI"}
 	got := map[string]bool{}
 	ast.Inspect(f, func(n ast.Node) bool {
 		ts, ok := n.(*ast.TypeSpec)
@@ -66,8 +80,8 @@ func TestAppContextNineFields(t *testing.T) {
 		}
 		return false
 	})
-	if len(got) != 9 {
-		t.Errorf("AppContext has %d fields, want 9: %v", len(got), got)
+	if len(got) != len(wantFields) {
+		t.Errorf("AppContext has %d fields, want %d: %v", len(got), len(wantFields), got)
 	}
 	for _, w := range wantFields {
 		if !got[w] {

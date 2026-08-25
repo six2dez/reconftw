@@ -84,20 +84,21 @@ func (TakeoverSubzyTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 	}
 
 	if _, err := app.Tools.Run(ctx, toolName, args); err != nil {
+		// RULE B1, same shape as the dnstake branch below: the tool FAILED, and
+		// reporting that as StatusDone/takeovers_found:0 is indistinguishable from
+		// a clean target. WARN so it is visible at the default log level.
 		if app.Log != nil {
-			app.Log.Debug("subzy run failed or tool not registered",
+			app.Log.Warn("subzy: tool failed — takeover detection did not run",
+				"event", "takeover_tool_failed",
 				"tool", toolName, "err", err.Error())
 		}
-		// Non-fatal: write empty staging file so plan-06 merge doesn't fail.
+		// Still write the empty staging file so the plan-06 merge does not fail.
 		stagingPath, wErr := writeTakeoverStagingFile(app, stagingName, nil)
 		if wErr != nil {
 			return task.Result{Status: task.StatusErrored}, wErr
 		}
-		return task.Result{
-			Status:  task.StatusDone,
-			Outputs: []string{stagingPath},
-			Stats:   map[string]int{"takeovers_found": 0},
-		}, nil
+		// nil error preserves CONTINUE_ON_TOOL_ERROR.
+		return task.ToolDegraded(toolName, err, stagingPath), nil
 	}
 
 	// Parse subzy JSON output. Subzy writes one JSON object per line when
@@ -180,24 +181,37 @@ func (TakeoverDNSTakeTask) Run(ctx context.Context, app *appctx.AppContext) (tas
 
 	resolvedFile := filepath.Join(app.Target.WorkDir, "inputs", "resolved.merged.txt")
 
-	args := []string{"-f", resolvedFile, "-silent"}
+	// dnstake's flags are "-t/--target <HOST/FILE>" and "-s/--silent" (v0.1.1
+	// --help). This passed "-f <file> -silent"; NEITHER exists, so dnstake exited
+	// with `flag provided but not defined: -f` on every run and takeover detection
+	// silently produced nothing — the task still reported success because the
+	// error was swallowed as "tool not registered" below. v1 pipes stdin with
+	// "-c N -s" (modules/subdomains.sh:2084); -t accepts a file, so it is the
+	// direct equivalent of the file-based call here.
+	args := []string{"-t", resolvedFile, "-s"}
 
 	res, err := app.Tools.Run(ctx, toolName, args)
 	if err != nil {
+		// RULE B1: the tool FAILED and this task continues by design. That is not
+		// the same fact as "the tool ran and the target is clean", and conflating
+		// them is not hypothetical — this exact branch swallowed dnstake's
+		// `flag provided but not defined: -f` as a Debug line and returned
+		// StatusDone with takeovers_found: 0, so takeover detection produced zero
+		// for months while every run reported success.
+		//
+		// WARN, not Debug: an operator running at the default level must see it.
 		if app.Log != nil {
-			app.Log.Debug("dnstake run failed or tool not registered",
+			app.Log.Warn("dnstake: tool failed — takeover detection did not run",
+				"event", "takeover_tool_failed",
 				"tool", toolName, "err", err.Error())
 		}
-		// Non-fatal: write empty staging file.
+		// Still write the (empty) staging file: the merge contract is unchanged.
 		stagingPath, wErr := writeTakeoverStagingFile(app, stagingName, nil)
 		if wErr != nil {
 			return task.Result{Status: task.StatusErrored}, wErr
 		}
-		return task.Result{
-			Status:  task.StatusDone,
-			Outputs: []string{stagingPath},
-			Stats:   map[string]int{"takeovers_found": 0},
-		}, nil
+		// nil error preserves CONTINUE_ON_TOOL_ERROR: the stage keeps going.
+		return task.ToolDegraded(toolName, err, stagingPath), nil
 	}
 
 	// dnstake outputs one vulnerable subdomain per line (plain text or JSON).

@@ -138,6 +138,21 @@ func (p *StageProgress) TaskStart(taskName string) {
 // XCUT-07: only taskName (a developer-controlled dot-namespaced string) and
 // badge/duration are rendered. No tool stdout or stderr flows into this method.
 func (p *StageProgress) TaskDone(taskName string, badge Badge, dur time.Duration) {
+	p.taskDone(taskName, badge, dur, "")
+}
+
+// TaskDoneReason is TaskDone with the one-sentence explanation a non-OK result
+// carries (task.Result.Reason).
+//
+// Without it the Reason field is invisible and the whole no-silent-success rule
+// is decoration: an operator reads "[SKIP] web.nuclei 0s" and learns nothing,
+// which is exactly the state that let a config-only capability sit disabled while
+// the templates were installed on the box.
+func (p *StageProgress) TaskDoneReason(taskName string, badge Badge, dur time.Duration, reason string) {
+	p.taskDone(taskName, badge, dur, reason)
+}
+
+func (p *StageProgress) taskDone(taskName string, badge Badge, dur time.Duration, reason string) {
 	p.mu.Lock()
 	p.doneCount++
 	done := p.doneCount
@@ -159,9 +174,9 @@ func (p *StageProgress) TaskDone(taskName string, badge Badge, dur time.Duration
 		case BadgeWARN:
 			color = "\033[33m" // yellow
 		}
-		_, _ = fmt.Fprintf(p.w, "%s%s[%-5s]%s %s  (%d/%d done)  %s\n",
+		_, _ = fmt.Fprintf(p.w, "%s%s[%-5s]%s %s  (%d/%d done)  %s%s\n",
 			ansiEraseLine, color, string(badge), ansiReset,
-			taskName, done, total, formatDuration(dur))
+			taskName, done, total, formatDuration(dur), reasonSuffix(badge, reason))
 	} else {
 		// Plain text: mirror Printer.Status dot-fill format.
 		const pad = 26
@@ -174,8 +189,8 @@ func (p *StageProgress) TaskDone(taskName string, badge Badge, dur time.Duration
 			gap = 1
 		}
 		dots := strings.Repeat(".", gap)
-		_, _ = fmt.Fprintf(p.w, "[%-5s] %s %s %s\n",
-			string(badge), display, dots, formatDuration(dur))
+		_, _ = fmt.Fprintf(p.w, "[%-5s] %s %s %s%s\n",
+			string(badge), display, dots, formatDuration(dur), reasonSuffix(badge, reason))
 	}
 }
 
@@ -196,4 +211,21 @@ func (p *StageProgress) StageDone(stageName string, foundCount int) {
 	}
 	_, _ = fmt.Fprintf(p.w, "  [stage %s complete — %d found in %s]\n",
 		stageName, foundCount, formatDuration(elapsed))
+}
+
+// reasonSuffix renders a Reason for a non-OK badge only.
+//
+// Deliberately suppressed on OK: a Done result needs no explanation, and printing
+// one on every successful task would bury the ones that matter — the same reason
+// the rule says a Done result must carry an EMPTY Reason.
+func reasonSuffix(badge Badge, reason string) string {
+	if reason == "" || badge == BadgeOK {
+		return ""
+	}
+	const cap = 90
+	r := strings.Join(strings.Fields(reason), " ")
+	if len(r) > cap {
+		r = r[:cap-1] + "\u2026"
+	}
+	return "  " + r
 }

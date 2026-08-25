@@ -31,6 +31,7 @@ import (
 	"github.com/six2dez/reconftw/internal/core/config"
 	"github.com/six2dez/reconftw/internal/core/ingest"
 	"github.com/six2dez/reconftw/internal/core/output"
+	"github.com/six2dez/reconftw/internal/core/resolvers"
 	"github.com/six2dez/reconftw/internal/core/scheduler"
 	"github.com/six2dez/reconftw/internal/modules/web"
 )
@@ -92,6 +93,25 @@ type RunOptions struct {
 	// flags. nil = no-op. Must be applied before Boot so appctx.Boot wires the
 	// correct concurrency limits (e.g., zen's MaxJobs=2).
 	ConfigTransform func(*config.Config)
+	// Secrets is the run's redactor. It scrubs registered values from
+	// logs/tools.jsonl, and modules register runtime-loaded tokens with it (the
+	// GitHub/GitLab token files, whose CONTENT reaches argv).
+	//
+	// *log.Redactor satisfies it. nil degrades to NO redaction — see
+	// backend.NewToolRecorder for why that is not a safe default. Before this
+	// field existed there was exactly ONE production path into appctx.Boot
+	// (BootReconApp) and it passed no redactor at all, so a token on argv would
+	// have reached the log file in plaintext.
+	Secrets RunSecrets
+	// RequireResolvers marks a run that cannot produce correct results without a
+	// DNS resolver list. BootReconApp turns an unusable list into a hard startup
+	// error for these runs and into a WARN for every other run.
+	//
+	// Set by RunSubsAsync (always) and by RunCompositeAsync (derived from the real
+	// stage list — any group named "subs-resolve"). Deriving it from the stage list
+	// rather than from a hand-maintained mode allowlist is what keeps it honest: a
+	// mode that gains a resolve stage later cannot forget to flip this flag.
+	RequireResolvers bool
 	// PassiveMode enables the backend-level hard-guard (D-09): wraps the chosen
 	// backend with PassiveBackend so active tools return ErrPassiveViolation.
 	// Set by the passive composite subcommand.
@@ -177,6 +197,15 @@ type AppBoot struct {
 // is why the six handlers have ONE cleanup path instead of a checkpoint-close
 // defer and a separate, easily-diverging lock-release defer.
 func (b AppBoot) Close() error {
+	// The recorder closes FIRST. It holds no lock and blocks nothing, so closing
+	// it before the checkpoint store means a checkpoint-close failure cannot lose
+	// the last invocation records — which are exactly the records describing
+	// whatever went wrong. Nil-tolerant at every level: b.App is nil on a dry-run
+	// boot and b.App.Tools is nil in some tests.
+	if b.App != nil && b.App.Tools != nil {
+		_ = b.App.Tools.Recorder.Close() // nil-receiver safe
+	}
+
 	var checkpointErr error
 	if b.App != nil {
 		if closer, ok := b.App.Checkpoint.(interface{ Close() error }); ok {
@@ -419,6 +448,32 @@ func ResolveDryRunBoot(opts RunOptions) (AppBoot, error) {
 	}, nil
 }
 
+// RunSecrets is the redactor seam: registration (used by modules that load a
+// token at runtime) plus redaction (used by the tool recorder). *log.Redactor
+// satisfies it structurally, so neither this package nor internal/core/backend
+// needs to import it.
+type RunSecrets interface {
+	Register(value string)
+	Redact(string) string
+}
+
+// secretsOrNil / registrarOrNil narrow a possibly-nil RunSecrets WITHOUT
+// producing a non-nil interface wrapping a nil value — which would turn every
+// "redactor == nil" degradation check downstream into a nil dereference.
+func secretsOrNil(s RunSecrets) backend.Redactor {
+	if s == nil {
+		return nil
+	}
+	return s
+}
+
+func registrarOrNil(s RunSecrets) appctx.SecretRegistrar {
+	if s == nil {
+		return nil
+	}
+	return s
+}
+
 // BootReconApp wires config → target → workspace → backend → appctx.Boot.
 // It mirrors steps 1-5a of runSubsCmd in cmd/reconftw/stub_subcommands.go
 // exactly.
@@ -450,6 +505,37 @@ func BootReconApp(ctx context.Context, opts RunOptions) (AppBoot, error) {
 	tgt := plan.Target
 	logger := plan.Logger
 	chosenBackend := plan.Backend
+
+	// Resolver acquisition, BEFORE the mutating tail.
+	//
+	// Placement is deliberate on three counts. (a) It precedes WorkspaceInit and
+	// AcquireWorkspaceLock, so the RequireResolvers abort below leaves no orphan
+	// workspace and no held lock. (b) Every caller gates opts.DryRun and returns
+	// via ResolveDryRunBoot BEFORE reaching this function, so a preview still
+	// downloads nothing (the F14 rule). (c) It writes to the XDG state dir, not
+	// the workspace, so there is nothing it needs the workspace to exist for.
+	//
+	// It is gated on RequireResolvers rather than run unconditionally: osint, web
+	// and vulns never read a resolver list, so fetching one for them would be
+	// unrequested network I/O on every boot — including inside `go test`, where it
+	// also writes into the developer's real $HOME. Before this existed,
+	// cfg.Paths.Resolvers defaulted to "" and puredns was handed `-r "" -rt ""`
+	// inside the ONLY fail-fast stage group, so a default `recon` with no
+	// reconftw.toml could not complete a scan.
+	//
+	// For a run that DOES resolve DNS, an unobtainable list is fatal here. That is
+	// deliberate and it makes such a run require either network access or a
+	// pre-seeded list — tests covering those modes must provide one (see
+	// hermeticResolverEnv in cmd/reconftw), exactly as a real deployment does.
+	if opts.RequireResolvers {
+		resolverStatus, resolverErr := resolvers.EnsureResolvers(ctx, cfg, logger)
+		if resolverErr != nil {
+			return AppBoot{}, fmt.Errorf("handlers: %w", resolverErr)
+		}
+		if resolverStatus.Refreshed && logger != nil {
+			logger.Info("handlers: DNS resolver list refreshed", "path", resolverStatus.Path)
+		}
+	}
 
 	// ---- MUTATING TAIL BEGINS HERE ----
 
@@ -492,8 +578,10 @@ func BootReconApp(ctx context.Context, opts RunOptions) (AppBoot, error) {
 	// slog.Default() when the caller supplied none — the MCP server sets a
 	// redacted default before starting scans, so that path stays safe).
 	app, err := appctx.Boot(ctx, logger, cfg, tgt, opts.Scheduler, appctx.BootOptions{
-		Backend:     chosenBackend,
-		PassiveMode: opts.PassiveMode,
+		Redactor:        secretsOrNil(opts.Secrets),
+		SecretRegistrar: registrarOrNil(opts.Secrets),
+		Backend:         chosenBackend,
+		PassiveMode:     opts.PassiveMode,
 	})
 	if err != nil {
 		// The lock was acquired above; nothing else will ever see this AppBoot,

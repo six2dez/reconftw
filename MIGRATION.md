@@ -549,6 +549,17 @@ are emitted as `# SUPERSEDED` comments by the migrator; see §1 and §5.)
 | `RESOLVER_DOWNLOAD_RETRY` | `paths.resolvers_download.retry` |
 | `RESOLVER_DOWNLOAD_RETRY_DELAY` | `paths.resolvers_download.retry_delay` |
 
+**Resolver lists are acquired automatically.** v1 relied on `install.sh` writing
+`${tools}/resolvers*.txt` and on `resolvers_update` refreshing them at scan time. v2
+needs no equivalent step: leaving `paths.resolvers` / `paths.resolvers_trusted` unset
+defaults them to `$XDG_CONFIG_HOME/reconftw/` (or `~/.config/reconftw/`), and the first
+run that resolves DNS downloads them if they are absent or older than
+`cache.max_age_days_resolvers` (default 7). `subdomains.dns_resolve.update_resolvers =
+false` opts out of the periodic *refresh*, not out of the initial fetch — a scan never
+proceeds with no resolver list at all. `reconftw gen-resolvers` writes the same files
+by hand, and `subdomains.dns_resolve.generate_resolvers = true` uses `dnsvalidator`
+instead of a plain download, exactly as in v1.
+
 #### `[api_keys]`
 
 | v1 `reconftw.cfg` key | v2 TOML path |

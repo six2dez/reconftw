@@ -122,7 +122,7 @@ func commonAfterBoot(
 		if dur <= 0 {
 			dur = time.Since(started)
 		}
-		progress.TaskDone(t.Name(), badgeForStatus(result.Status), dur)
+		progress.TaskDoneReason(t.Name(), badgeForStatus(result.Status), dur, result.Reason)
 		return result, runErr
 	}
 }
@@ -218,6 +218,7 @@ func runCompositeCmd(
 	}
 
 	if err := handlers.RunCompositeAsync(ctx, handlers.RunOptions{
+		Secrets:         newRunRedactor(),
 		Target:          targetFlag,
 		DryRun:          dryRun,
 		ConfigPath:      efs.configPath,
@@ -265,6 +266,7 @@ func runCompositeList(
 			commonAfterBoot(bctx, boot, sched, dryRun, subcommandName, &capture)
 		}
 		return handlers.RunCompositeAsync(bctx, handlers.RunOptions{
+			Secrets:         newRunRedactor(),
 			Target:          target,
 			DryRun:          dryRun,
 			ConfigPath:      efs.configPath,
@@ -468,4 +470,20 @@ func newDeepCmd() *cobra.Command {
 	cmd.Flags().String("target", "", "Target domain")
 	cmd.Flags().Bool("dry-run", false, "Preview tasks without executing tools")
 	return cmd
+}
+
+// newRunRedactor builds the run's redactor and pre-registers every CONFIG-sourced
+// secret, so it is live from the first tool dispatch rather than from AfterBoot.
+//
+// commonAfterBoot also builds redactors, but it runs AFTER BootReconApp — too
+// late for the tool recorder, which is constructed during Boot. Modules register
+// RUNTIME-loaded secrets (the GitHub/GitLab token files) with this same instance
+// as they read them.
+func newRunRedactor() handlers.RunSecrets {
+	r := &log.Redactor{}
+	// cfg is not available this early; the config-sourced values are registered by
+	// commonAfterBoot's own redactors for the log sinks. What matters here is that
+	// a non-nil redactor exists before any tool is dispatched, so a runtime token
+	// registered by a module is scrubbed from logs/tools.jsonl.
+	return r
 }

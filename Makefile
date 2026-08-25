@@ -88,6 +88,66 @@ build:
 test:
 	go test -race -short ./...
 
+# realtools-args: run the real-tool ARG-VECTOR smoke test.
+#
+# internal/core/backend/smoke_test.go is gated behind //go:build realtools and,
+# until this target existed, NOTHING ran it — not this Makefile, not CI, not
+# release-gates. It read like arg-vector coverage while being dead code, and a
+# wrong puredns flag (`-rt`, which pflag silently accepts as `-r` with value "t")
+# shipped straight through it and broke every live recon run.
+#
+# NOT wired into `ci` on purpose: it needs the full 70-tool runtime on PATH, which
+# CI runners do not have. Run it on a provisioned box before a release:
+#
+#	make realtools-args
+#
+# Tools absent from PATH are skipped, so a partial toolchain still reports on
+# whatever it can reach.
+# Runs the WHOLE realtools-tagged package, not one named test. The first version
+# of this target used `-run TestRealToolArgVectors`, which silently excluded
+# TestRealtoolsVulnsPhase6 and TestRealtoolsOSINTPhase7 in the same package — so
+# it revived one third of the dead coverage and reported the result as if it were
+# all of it. That is the same shape as the dead build tag it was written to fix.
+#
+# THE COUNT ASSERTION MUST NAME THE TESTS, NOT COUNT LINES. The previous version
+# counted `^=== RUN   Test` and required >= 3. That was a false green twice over:
+# `-tags realtools` builds the WHOLE package, so the ~42 untagged tests in it
+# already satisfy >= 3 on their own, and the pattern also matches subtest RUN
+# lines. Deleting both realtools files outright would have left this target
+# green. It now greps for each of the three test functions BY NAME and fails
+# naming the missing one — which is the only form of the assertion that a rename
+# or a re-tag cannot slip past.
+#
+# NOT wired into `ci`: it needs the 70-tool runtime on PATH, which CI runners do
+# not have. On a partial toolchain each probe reports CENSUS_ONLY and prints what
+# it did not verify. Set REALTOOLS_REFERENCE=1 on a provisioned box to enforce
+# the known-absent ratchet — see internal/core/backend/realtools_census_test.go.
+REALTOOLS_TESTS := TestRealToolArgVectors TestRealtoolsVulnsPhase6 TestRealtoolsOSINTPhase7
+
+realtools-args:
+	@out=$$(go test -tags realtools -count=1 -v ./internal/core/backend/ 2>&1); \
+	echo "$$out"; \
+	missing=""; \
+	for tn in $(REALTOOLS_TESTS); do \
+		echo "$$out" | grep -qE "^=== RUN   $$tn$$" || missing="$$missing $$tn"; \
+	done; \
+	if [ -n "$$missing" ]; then \
+		echo "ERROR: these realtools test(s) did NOT run:$$missing"; \
+		echo "       A renamed, deleted or re-tagged test makes this target report on coverage"; \
+		echo "       that no longer exists. Fix the test or update REALTOOLS_TESTS — deliberately."; \
+		exit 1; \
+	fi; \
+	census=$$(echo "$$out" | grep -c 'REALTOOLS_CENSUS test=' || true); \
+	if [ "$$census" -ne $(words $(REALTOOLS_TESTS)) ]; then \
+		echo "ERROR: $$census REALTOOLS_CENSUS line(s), expected $(words $(REALTOOLS_TESTS)) (one per test)."; \
+		echo "       Every probe must report what it did NOT verify. A run whose skip count is unknown"; \
+		echo "       reads as coverage and is not."; \
+		exit 1; \
+	fi; \
+	echo "$$out" | grep 'REALTOOLS_CENSUS test='; \
+	echo "realtools: all $(words $(REALTOOLS_TESTS)) arg-vector test(s) executed"; \
+	echo "$$out" | grep -qE '^(FAIL|--- FAIL|    --- FAIL)' && exit 1 || exit 0
+
 # test-integration: Ring 1 + Ring 2 + Ring 4. Per-commit (<5min budget).
 test-integration:
 	go test -race ./...

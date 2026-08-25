@@ -60,12 +60,24 @@ cd "$REPO_ROOT"
 WITH_DOCKER=0
 FAIL_FAST=0
 GATES_ONLY=0
+CENSUS_VERDICT=0
+CENSUS_RC=0
 
 for arg in "$@"; do
     case "$arg" in
         --with-docker) WITH_DOCKER=1 ;;
         --fail-fast) FAIL_FAST=1 ;;
         --gates-only) GATES_ONLY=1 ;;
+        --census-verdict) CENSUS_VERDICT=1 ;;
+        # --census-verdict takes the probe run's exit code as its next argument.
+        [0-9] | [0-9][0-9] | [0-9][0-9][0-9])
+            if [ "$CENSUS_VERDICT" = "1" ]; then
+                CENSUS_RC="$arg"
+            else
+                echo "release-gates: unknown argument: $arg" >&2
+                exit 2
+            fi
+            ;;
         -h | --help)
             sed -n '/^# Usage:/,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
             exit 0
@@ -76,6 +88,73 @@ for arg in "$@"; do
             ;;
     esac
 done
+
+# ─── the arg-vector census parser ───────────────────────────────────────────
+#
+# THIS IS THE SEAM THE RULE LIVES ON, and it is exposed as a mode
+# (`--census-verdict`) so cmd/reconftw/release_gates_test.go can test it in CI,
+# where the gate itself can never run. Reads the realtools output on stdin, takes
+# the run's exit code as $1, and prints one line:
+#
+#	PASS <note>  |  FAIL <note>  |  SKIPPED <note>
+#
+# THE RULE THAT MATTERS: A PARTIAL RUN IS NOT A PASS. "37 PASS / 0 FAIL / 9
+# SKIPPED" reads like success while nine tools were never probed at all. The
+# gate therefore PASSES only when every census line reports mode=REFERENCE —
+# which is the mode in which the Go-side ratchet
+# (internal/core/backend/realtools_census_test.go) has asserted, in both
+# directions, that the skipped set is EXACTLY the known-absent list. Any census
+# line reporting NOT_EXECUTED means the box has no tool tree and the gate is
+# SKIPPED, never passed; anything else, or a non-zero exit, is a FAIL.
+# census_skipped_tools flattens every skipped_tools= list into one sorted, DEDUPED
+# set. The realtools target prints the census twice — once echoing the captured
+# output, once grepping it — so a naive join reports every tool twice and the
+# gate's own summary becomes unreadable.
+census_skipped_tools() {
+    local flat
+    flat="$(printf '%s\n' "$1" | grep -o 'skipped_tools=[^ ]*' | sed 's/skipped_tools=//' \
+        | tr ',' '\n' | grep -v '^$' | grep -v '^(none)$' | LC_ALL=C sort -u | paste -sd' ' -)"
+    echo "${flat:-(none)}"
+}
+
+argvector_census_verdict() {
+    local rc="${1:-0}"
+    local out
+    out="$(cat)"
+
+    local census
+    census="$(printf '%s\n' "$out" | grep -c 'REALTOOLS_CENSUS test=' || true)"
+    if [ "$census" -eq 0 ]; then
+        echo "FAIL no REALTOOLS_CENSUS line was emitted — the run reported no skip census at all, so its coverage is unknown"
+        return
+    fi
+
+    if printf '%s\n' "$out" | grep -q 'REALTOOLS_CENSUS .*mode=NOT_EXECUTED'; then
+        local why
+        why="$(printf '%s\n' "$out" | grep -m1 'REALTOOLS_CENSUS_REASON' | sed 's/.*REALTOOLS_CENSUS_REASON test=[^ ]* //')"
+        echo "SKIPPED the tool tree is not installed on this box, so no arg vector was verified: ${why:-no reason recorded}"
+        return
+    fi
+
+    local nonref
+    nonref="$(printf '%s\n' "$out" | grep 'REALTOOLS_CENSUS test=' | grep -vc 'mode=REFERENCE' || true)"
+    if [ "$nonref" -ne 0 ]; then
+        echo "FAIL $nonref census line(s) did not run in REFERENCE mode, so the known-absent ratchet was NOT enforced — a partial run is not a pass"
+        return
+    fi
+
+    if [ "$rc" -ne 0 ]; then
+        echo "FAIL the arg-vector probes failed (exit $rc); skipped tools were: $(census_skipped_tools "$out")"
+        return
+    fi
+
+    echo "PASS $census probe(s) ran in REFERENCE mode; skipped set matched the known-absent list exactly: $(census_skipped_tools "$out")"
+}
+
+if [ "$CENSUS_VERDICT" = "1" ]; then
+    argvector_census_verdict "$CENSUS_RC"
+    exit 0
+fi
 
 # ─── result recording ───────────────────────────────────────────────────────
 #
@@ -474,11 +553,49 @@ gate "Gate 10: restarting monitor preserves baseline, suppression and generation
 # Gate 11 — WORKFLOW-OWNED. Not a `go test` invocation.
 gate11_docker_arm64
 
+# ─── the arg-vector gate ────────────────────────────────────────────────────
+#
+# NOT ATTACHED TO `make ci`, ON PURPOSE. CI runners carry no tool tree, so this
+# would be permanently SKIPPED there — and a gate that is always skipped teaches
+# every reader to ignore the skip column, which is the one column this script
+# exists to make meaningful. Do not "helpfully" add it to the ci target.
+#
+# It runs here, plus one mandatory manual run on a provisioned box before
+# cutover, which is the same posture gate 11 ended up in for the same reason.
+gate_argvector() {
+    local label="Gate 13: real-tool arg vectors (make realtools-args, REFERENCE mode)"
+    banner "$label"
+
+    local log="$LOGDIR/gate13_argvector.log"
+    local rc=0
+    REALTOOLS_REFERENCE=1 make realtools-args >"$log" 2>&1 || rc=$?
+
+    local verdict
+    verdict="$(argvector_census_verdict "$rc" <"$log")"
+    local status="${verdict%% *}"
+    local note="${verdict#* }"
+
+    # Print the skipped NAMES here so a sign-off reader sees them without opening
+    # a log. "9 skipped" is not actionable; "9 skipped: arjun dnscewl …" is.
+    grep 'REALTOOLS_CENSUS test=' "$log" | sed 's/^ *//' || true
+
+    case "$status" in
+        PASS) record "$label" PASS "$note" ;;
+        SKIPPED) record "$label" SKIPPED "$note" ;;
+        *)
+            tail -n 30 "$log"
+            record "$label" FAIL "$note — full log: $log"
+            ;;
+    esac
+}
+
 # Gate 12 — "A clean checkout builds and runs the full suite." The build half is
 # the guard's `go build ./...` above; the RUN half is here.
 gate "Gate 12: a clean checkout builds and runs (version, --help, clean-PATH health-check)" \
     'TestReleaseGate12CleanTreeBuildsAndRuns|TestE2EBinaryVersionAndConfig|TestE2EBinaryHealthCheckIsSelfConsistent' \
     ./cmd/reconftw/
+# Gate 13 runs last: it is the slowest step and the only one that shells out to make.
+gate_argvector
 
 # ═════════════════════════════════════════════════════════════════════════════
 

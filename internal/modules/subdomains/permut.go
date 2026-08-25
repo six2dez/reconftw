@@ -357,7 +357,9 @@ func (t *SubDNSCewlTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 
 	inputFile := resolvedMergedPath(app)
 	args := []string{"-f", inputFile}
-	if cfg.Paths.Resolvers != "" {
+	// resolverListUsable, not `!= ""`: paths.resolvers now always carries a
+	// default path, so an emptiness test no longer proves the file exists.
+	if resolverListUsable(cfg.Paths.Resolvers) {
 		args = append(args, "-r", cfg.Paths.Resolvers)
 	}
 

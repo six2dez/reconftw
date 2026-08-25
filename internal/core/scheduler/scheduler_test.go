@@ -377,3 +377,61 @@ func TestRunTaskHookInvoked(t *testing.T) {
 		t.Errorf("RunTask hook called %d times, want 1", called.Load())
 	}
 }
+
+// TestFailFastStageContinuesOnDegradedTask is the CONTINUE_ON_TOOL_ERROR parity
+// assertion, exercised against the REAL RunStage rather than a stub.
+//
+// `subdomains` is PolicyFailFast, so a non-nil error from one task cancels the
+// errgroup and takes its peers down. degradeResolveTool therefore returns
+// StatusSkipped WITH A NIL ERROR: the run continues (v1 parity) while the failing
+// task stops claiming success.
+//
+// The assertion is on OBSERVED EXECUTION of the peers, not merely on RunStage
+// returning nil. A stage that cancelled its peers would ALSO return nil if the
+// failing task swallowed everything — which is precisely the old behaviour this
+// test has to be able to distinguish from the new one.
+func TestFailFastStageContinuesOnDegradedTask(t *testing.T) {
+	s := newScheduler(nil)
+
+	// The degraded task: skipped + reason, nil error — exactly what
+	// task.ToolDegraded produces.
+	degraded := &degradingTask{name: "degraded", module: "subdomains"}
+	peerA := &fakeTask{name: "peer-a", module: "subdomains"}
+	peerB := &fakeTask{name: "peer-b", module: "subdomains"}
+
+	err := s.RunStage(context.Background(), "subdomains",
+		[]task.Task{degraded, peerA, peerB})
+	if err != nil {
+		t.Fatalf("a degraded task aborted a fail-fast stage: %v", err)
+	}
+	if peerA.started.Load() != 1 || peerB.started.Load() != 1 {
+		t.Errorf("peers did not run (a=%d b=%d) — CONTINUE_ON_TOOL_ERROR parity is broken; "+
+			"a nil error is what keeps the errgroup alive",
+			peerA.started.Load(), peerB.started.Load())
+	}
+	if peerA.finished.Load() != 1 || peerB.finished.Load() != 1 {
+		t.Errorf("peers were cancelled mid-run (a=%d b=%d)",
+			peerA.finished.Load(), peerB.finished.Load())
+	}
+}
+
+// degradingTask models task.ToolDegraded's return: a skip carrying a reason, with
+// a nil error.
+type degradingTask struct {
+	name    string
+	module  string
+	started atomic.Int32
+}
+
+func (d *degradingTask) Name() string        { return d.name }
+func (d *degradingTask) Module() string      { return d.module }
+func (d *degradingTask) Description() string { return "degrading " + d.name }
+func (d *degradingTask) DependsOn() []string { return nil }
+func (d *degradingTask) Enabled(_ *config.Config) bool {
+	return true
+}
+
+func (d *degradingTask) Run(_ context.Context, _ *appctx.AppContext) (task.Result, error) {
+	d.started.Add(1)
+	return task.ToolDegraded("puredns", errors.New("exit status 1")), nil
+}
