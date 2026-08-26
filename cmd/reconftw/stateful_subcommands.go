@@ -292,13 +292,14 @@ func runRefreshCacheCmd(cmd *cobra.Command) error {
 	}
 	_ = summaryVerbosity
 
+	runSecrets := newRunRedactor()
 	afterBoot := func(boot handlers.AppBoot) {
 		summaryWorkdir = boot.WorkDir
-		commonAfterBoot(ctx, boot, sched, dryRun, "refresh-cache", &capture)
+		commonAfterBoot(ctx, boot, sched, dryRun, "refresh-cache", &capture, runSecrets)
 	}
 
 	if err := handlers.RunCompositeAsync(ctx, handlers.RunOptions{
-		Secrets:         newRunRedactor(),
+		Secrets:         runSecrets,
 		Target:          targetFlag,
 		DryRun:          dryRun,
 		ConfigPath:      efs.configPath,
@@ -561,13 +562,14 @@ func runQuickRescanCmd(cmd *cobra.Command) error {
 	var capture dryRunCapture
 	var summaryWorkdir string
 
+	runSecrets := newRunRedactor()
 	afterBoot := func(boot handlers.AppBoot) {
 		summaryWorkdir = boot.WorkDir
-		commonAfterBoot(ctx, boot, sched, dryRun, "quick-rescan", &capture)
+		commonAfterBoot(ctx, boot, sched, dryRun, "quick-rescan", &capture, runSecrets)
 	}
 
 	if err := handlers.RunCompositeAsync(ctx, handlers.RunOptions{
-		Secrets:         newRunRedactor(),
+		Secrets:         runSecrets,
 		Target:          targetFlag,
 		DryRun:          dryRun,
 		ConfigPath:      efs.configPath,

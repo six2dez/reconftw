@@ -114,15 +114,60 @@ func (SubfinderTask) DependsOn() []string { return nil }
 // Run executes subfinder and writes raw hostnames to the staging file.
 func (SubfinderTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	const toolName = "subfinder"
-	cfg := app.Cfg
-	timeoutSecs := cfg.Advanced.Tools.Subfinder.TimeoutMinutes * 60
 	args := []string{
 		"-all",
 		"-d", app.Target.Domain,
-		"-max-time", strconv.Itoa(timeoutSecs),
+		"-max-time", strconv.Itoa(subfinderMaxTimeMinutes(app)),
 		"-silent",
 	}
 	return runPassiveTask(ctx, app, toolName, args)
+}
+
+// defaultSubfinderMaxTimeMinutes mirrors reconftw.cfg:384
+// (SUBFINDER_ENUM_TIMEOUT=180 # Minutes) and config.Defaults(). It is the
+// fallback for a hand-built *config.Config that never went through Defaults().
+const defaultSubfinderMaxTimeMinutes = 180
+
+// subfinderMaxTimeMinutes returns the value for subfinder's -max-time flag in
+// the unit subfinder documents.
+//
+// CR-07. `subfinder -h` on v2.14.0:
+//
+//	-timeout int   seconds to wait before timing out (default 30)
+//	-max-time int  minutes to wait for enumeration results (default 10)
+//
+// Two time flags with different units, and v2 passed MINUTES x 60 into the one
+// that takes minutes. subfinder accepts the number without complaint — it is a
+// legal value — so the only visible effect was that subfinder's own budget
+// stopped bounding anything, leaving the tools.lock process deadline as the
+// sole bound. v1 passes the configured value straight through
+// (modules/subdomains.sh:515), with no wrapper and no multiplication.
+//
+// The WARN below exists because the same inversion can return through config:
+// the process deadline in tools.lock silently wins over any -max-time larger
+// than itself, and a budget that is silently overruled is exactly the shape
+// this phase is removing. Nothing is clamped — the operator's configured value
+// is still what subfinder is asked for — but the run says so.
+func subfinderMaxTimeMinutes(app *appctx.AppContext) int {
+	minutes := defaultSubfinderMaxTimeMinutes
+	if app.Cfg != nil && app.Cfg.Advanced.Tools.Subfinder.TimeoutMinutes > 0 {
+		minutes = app.Cfg.Advanced.Tools.Subfinder.TimeoutMinutes
+	}
+	if app.Log == nil || app.Tools == nil || app.Tools.Registry == nil {
+		return minutes
+	}
+	tool, ok := app.Tools.Registry.Lookup("subfinder")
+	if !ok || tool.Timeout <= 0 {
+		return minutes
+	}
+	if requested := time.Duration(minutes) * time.Minute; tool.Timeout < requested {
+		app.Log.Warn("subfinder_budget_exceeds_process_deadline",
+			"requested_minutes", minutes,
+			"process_deadline_seconds", int(tool.Timeout.Seconds()),
+			"effect", "subfinder will be killed at the process deadline; the configured budget is not what it gets",
+			"fix", "raise timeout_seconds for subfinder in tools.lock, or lower advanced.tools.subfinder.timeout_minutes")
+	}
+	return minutes
 }
 
 // CrtTask queries crt.sh for subdomain records.
@@ -375,83 +420,20 @@ func (UrlfinderTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	return runPassiveTask(ctx, app, toolName, args)
 }
 
-// HackertargetTask queries the HackerTarget API for reverse IP/subdomain data.
-// Uses httpx to fetch https://api.hackertarget.com/hostsearch/?q=<domain>.
-// Writes staging file: inputs/passive.hackertarget.txt
-type HackertargetTask struct{}
-
-// Name returns the globally unique dot-namespaced task identifier.
-func (HackertargetTask) Name() string { return "subdomains.passive.hackertarget" }
-
-// Module returns the owning module group.
-func (HackertargetTask) Module() string { return "subdomains" }
-
-// Description returns a human-readable one-line description.
-func (HackertargetTask) Description() string {
-	return "Passive subdomain enumeration via HackerTarget API (hostsearch)"
-}
-
-// Enabled reports whether this task should run.
-func (HackertargetTask) Enabled(cfg *config.Config) bool {
-	return cfg.Subdomains.Passive.Enabled
-}
-
-// DependsOn returns nil.
-func (HackertargetTask) DependsOn() []string { return nil }
-
-// Run uses httpx to fetch the HackerTarget hostsearch API and parses the
-// comma-separated response (subdomain,ip per line). Extracts subdomain column
-// only and writes to the staging file.
-func (HackertargetTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
-	const toolName = "hackertarget"
-	apiURL := "https://api.hackertarget.com/hostsearch/?q=" + app.Target.Domain
-	args := []string{"-silent", "-u", apiURL}
-
-	res, err := app.Tools.Run(ctx, "httpx", args)
-	if err != nil {
-		return task.Result{Status: task.StatusErrored},
-			fmt.Errorf("%s: httpx call failed: %w", toolName, err)
-	}
-
-	// HackerTarget returns lines in the form "subdomain.example.com,1.2.3.4"
-	// Extract only the subdomain (first field).
-	var hostnames []string
-	scanner := bufio.NewScanner(bytes.NewReader(res.Stdout))
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-		// Take first CSV field (subdomain), ignore IP column.
-		if idx := strings.IndexByte(line, ','); idx > 0 {
-			line = line[:idx]
-		}
-		line = strings.ToLower(strings.TrimSpace(line))
-		if line != "" {
-			hostnames = append(hostnames, line)
-		}
-	}
-
-	stagingPath, writeErr := writeStagingFile(app, toolName, hostnames)
-	if writeErr != nil {
-		return task.Result{Status: task.StatusErrored}, writeErr
-	}
-
-	return task.Result{
-		Status:  task.StatusDone,
-		Outputs: []string{stagingPath},
-		Stats:   map[string]int{"subdomains_found": len(hostnames)},
-	}, nil
-}
-
 // -------------------------------------------------------------------------
 // Shared helpers
 // -------------------------------------------------------------------------
 
-// runPassiveTask is the common implementation shared by all passive Tasks that
-// follow the simple pattern: run tool, collect stdout lines as hostnames,
-// write staging file. Tasks with special dispatch (HackertargetTask) call
-// writeStagingFile directly instead.
+// runPassiveTask is the common implementation shared by EVERY passive Task:
+// run tool, collect stdout lines as hostnames, write staging file.
+//
+// It used to say "Tasks with special dispatch (HackertargetTask) call
+// writeStagingFile directly instead". That task was the only exception and it
+// was deleted in 17-07 (CR-05): it ran `httpx -silent -u <api url>` and parsed
+// the result as the API response body, but httpx prints the PROBED URL, so the
+// URL itself was staged as a hostname and the task reported one subdomain found
+// on every run. There is no longer a special-dispatch passive Task; a future one
+// would need its own note here.
 func runPassiveTask(ctx context.Context, app *appctx.AppContext, toolName string, args []string) (task.Result, error) {
 	res, err := app.Tools.Run(ctx, toolName, args)
 	if err != nil {
@@ -524,4 +506,3 @@ func init() { task.Register(CrtTask{}) }
 func init() { task.Register(GithubSubdomainsTask{}) }
 func init() { task.Register(GitlabSubdomainsTask{}) }
 func init() { task.Register(UrlfinderTask{}) }
-func init() { task.Register(HackertargetTask{}) }

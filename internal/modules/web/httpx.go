@@ -169,7 +169,33 @@ func (t *HTTPXTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 		return task.Result{Status: task.StatusErrored},
 			fmt.Errorf("web.httpx: mkdir artefacts/: %w", err)
 	}
-	outputFile := filepath.Join(artefactsDir, "hosts.jsonl")
+	artefactFile := filepath.Join(artefactsDir, "hosts.jsonl")
+
+	// httpx's RAW output goes to a staging path, never onto the artefact.
+	//
+	// CR-02 (phase 16 review, proven in 17-06): this used to be artefactFile
+	// itself, and that is destructive in two separate ways, both observed:
+	//
+	//  1. httpx CREATES AND TRUNCATES its -o file. Verified on httpx v1.9.0:
+	//       $ httpx -l k2in.txt -o k2out.jsonl -silent -duc -json   (no live host)
+	//       $ ls -l k2out.jsonl  ->  0 bytes, exit 0
+	//     A run that finds nothing still leaves a 0-byte -o. Pointing -o at the
+	//     artefact therefore erases it even on a clean, successful run.
+	//  2. Step 5 below reads outputFile back and parses it as httpx output. When
+	//     -o WAS the artefact and httpx wrote nothing, this parsed subdomains.geo's
+	//     enrichment records as if they were httpx's own output and republished
+	//     them stripped — ip/asn/country silently blanked. Observed in the CR-02
+	//     RED run: {"host":"api.example.com",…,"ip":""} where the input carried
+	//     "ip":"93.184.216.34","asn":"AS15133".
+	//
+	// The artefact is still written, exactly as before, through app.Tree.Append
+	// (scope-enforcing) in step 6 — that is the ONLY writer of it here now.
+	inputsDir := filepath.Join(app.Target.WorkDir, "inputs")
+	if err := os.MkdirAll(inputsDir, 0o755); err != nil {
+		return task.Result{Status: task.StatusErrored},
+			fmt.Errorf("web.httpx: mkdir inputs/: %w", err)
+	}
+	outputFile := filepath.Join(inputsDir, "hosts.httpx.raw.jsonl")
 
 	// Step 3: Build arg vector (RESEARCH §httpx verbatim v1 form).
 	// Ports: cfg.Web.Probe.Ports; "" → omit -p flag (httpx uses its default).
@@ -225,6 +251,19 @@ func (t *HTTPXTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 	)
 
 	// Step 4: Execute httpx.
+	//
+	// An input path equal to an output path is never correct, for any tool. This
+	// assertion is the last thing between the argv and the process, and it fails
+	// LOUDLY rather than skipping: a silent skip here is indistinguishable from a
+	// dead target, which is exactly what a 0-byte hosts.jsonl looked like for four
+	// days. Reachable today via `--hosts artefacts/hosts.jsonl`, which priority 1
+	// returns verbatim; the derivation in resolveHostInput closes the other routes
+	// but cannot close an operator-supplied path.
+	if sameFilePath(inputFile, outputFile) {
+		return task.Result{Status: task.StatusErrored},
+			fmt.Errorf("web.httpx: refusing to dispatch: the input list and the output file are the same path (%s); httpx truncates its -o file, so this would destroy the list while reading it", inputFile)
+	}
+
 	// T-05-02: stdout routed to run.log only (GAP-3 pattern via app.Tools).
 	res, err := app.Tools.Run(ctx, toolName, args)
 	if err != nil {
@@ -269,7 +308,7 @@ func (t *HTTPXTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 		}
 		return task.Result{
 			Status:  task.StatusSkipped,
-			Outputs: []string{outputFile},
+			Outputs: []string{artefactFile},
 			Reason:  parseErr.Error(),
 		}, nil
 	}
@@ -302,10 +341,11 @@ func (t *HTTPXTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 	//     group; webStageGroups() is appended after the subs groups
 	//     (internal/mcp/handlers/composite.go). geo therefore runs strictly
 	//     BEFORE httpx whenever both run.
-	//  2. httpx passes the ARTEFACT ITSELF as its -o target (outputFile above),
-	//     and Tree.Append REPLACES rather than appends, so geo's records already
-	//     do not survive httpx today. Adding the empty publish here removes no
-	//     data that currently survives.
+	//  2. Tree.Append REPLACES rather than appends, so geo's records do not
+	//     survive an httpx run that probes. (Until CR-02 was fixed httpx also
+	//     pointed its -o at the artefact, which destroyed geo's records even when
+	//     httpx produced nothing at all; -o now goes to inputs/ — see step 2.)
+	//     Adding the empty publish here removes no data that currently survives.
 	//  3. Both MergeStage(…, "hosts") calls run AFTER httpx (web-portscan and
 	//     web-producers) and are union-preserving via merge.go's hosts seed
 	//     branch, so portscan / nerva / wellknown staging still lands on top of
@@ -360,20 +400,20 @@ func (t *HTTPXTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 			}
 			return task.Result{
 				Status:  task.StatusSkipped,
-				Outputs: []string{outputFile},
+				Outputs: []string{artefactFile},
 				Reason:  reason,
 			}, nil
 		}
 		return task.Result{
 			Status:  task.StatusSkipped,
-			Outputs: []string{outputFile},
+			Outputs: []string{artefactFile},
 			Reason:  "no hosts to probe",
 		}, nil
 	}
 
 	return task.Result{
 		Status:  task.StatusDone,
-		Outputs: []string{outputFile},
+		Outputs: []string{artefactFile},
 		Stats:   map[string]int{"hosts_found": len(inScope)},
 	}, nil
 }
@@ -433,16 +473,43 @@ func probePorts(cfg *config.Config) string {
 // resolveHostInput implements the D-W10 input precedence.
 func resolveHostInput(ctx context.Context, app *appctx.AppContext) (string, error) {
 	// Priority 1: ctx-carried --hosts flag (set by runWebCmd).
+	//
+	// An operator who points --hosts at a JSONL artefact (their own
+	// artefacts/hosts.jsonl is the obvious candidate — it is the file the run
+	// just produced) gets the SAME silent nothing CR-02 describes, because httpx
+	// cannot use a JSON object as a target. Detect that shape and extract, rather
+	// than probing nothing and calling the target dead.
 	if hostsFile := hostsFileFromCtx(ctx); hostsFile != "" {
 		if _, err := os.Stat(hostsFile); err == nil {
+			if looksLikeJSONLines(hostsFile) {
+				if derived, derr := extractHostsFromHostsJSONL(hostsFile, app); derr == nil && derived != "" {
+					return derived, nil
+				}
+			}
 			return hostsFile, nil
 		}
 	}
 
-	// Priority 2: prior artefacts/hosts.jsonl.
+	// Priority 2: prior artefacts/hosts.jsonl — EXTRACTED, never passed through.
+	//
+	// CR-02. This branch used to return the artefact path itself. artefacts/hosts.jsonl
+	// holds JSON objects, and httpx cannot use one as a target. Same binary, same
+	// live host, httpx v1.9.0 on 127.0.0.1 (no third-party host contacted):
+	//
+	//	$ printf '127.0.0.1:18099\n' | httpx -silent -duc -no-color
+	//	http://127.0.0.1:18099
+	//	$ printf '{"host":"127.0.0.1:18099","url":"http://127.0.0.1:18099"}\n' | httpx -silent -duc -no-color
+	//	(no output)
+	//
+	// So every run that took this branch probed nothing and then reported
+	// "probed N host(s), no live host survived probing" — which reads exactly like
+	// a dead target. Priority 3 already derives a text list; this now does the same.
 	hostsJSONL := filepath.Join(app.Target.WorkDir, "artefacts", "hosts.jsonl")
 	if info, err := os.Stat(hostsJSONL); err == nil && info.Size() > 0 {
-		return hostsJSONL, nil
+		hostsFromArtefact, err := extractHostsFromHostsJSONL(hostsJSONL, app)
+		if err == nil && hostsFromArtefact != "" {
+			return hostsFromArtefact, nil
+		}
 	}
 
 	// Priority 3: derive hosts from artefacts/subdomains.jsonl.
@@ -504,6 +571,134 @@ func extractHostsFromSubdomainsJSONL(subdomainsPath string, app *appctx.AppConte
 		return "", fmt.Errorf("write httpx.hosts.txt: %w", err)
 	}
 	return hostsPath, nil
+}
+
+// extractHostsFromHostsJSONL reads a prior artefacts/hosts.jsonl and writes the
+// bare hostnames to inputs/httpx.hosts.txt, returning its path.
+//
+// The `host` field is preferred; `url` is the fallback and is reduced to its
+// host[:port] because httpx accepts either but the artefact's url carries a
+// scheme and path that a bare-host list must not.
+func extractHostsFromHostsJSONL(hostsPath string, app *appctx.AppContext) (string, error) {
+	f, err := os.Open(hostsPath) //nolint:gosec // path from trusted WorkDir
+	if err != nil {
+		return "", fmt.Errorf("open hosts.jsonl: %w", err)
+	}
+	defer f.Close() //nolint:errcheck
+
+	seen := make(map[string]struct{})
+	var hostnames []string
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for scanner.Scan() {
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 {
+			continue
+		}
+		var rec struct {
+			Host string `json:"host"`
+			URL  string `json:"url"`
+		}
+		if err := json.Unmarshal(line, &rec); err != nil {
+			continue
+		}
+		h := strings.TrimSpace(rec.Host)
+		if h == "" {
+			h = hostFromURL(rec.URL)
+		}
+		if h == "" {
+			continue
+		}
+		if _, dup := seen[h]; dup {
+			continue
+		}
+		seen[h] = struct{}{}
+		hostnames = append(hostnames, h)
+	}
+	if len(hostnames) == 0 {
+		return "", fmt.Errorf("hosts.jsonl: no hostnames found")
+	}
+
+	inputsDir := filepath.Join(app.Target.WorkDir, "inputs")
+	if err := os.MkdirAll(inputsDir, 0o755); err != nil {
+		return "", fmt.Errorf("mkdir inputs/: %w", err)
+	}
+	outPath := filepath.Join(inputsDir, "httpx.hosts.txt")
+	content := strings.Join(hostnames, "\n") + "\n"
+	if err := os.WriteFile(outPath, []byte(content), 0o644); err != nil { //nolint:gosec
+		return "", fmt.Errorf("write httpx.hosts.txt: %w", err)
+	}
+	return outPath, nil
+}
+
+// looksLikeJSONLines reports whether the first non-blank line of path is a JSON
+// object. It reads at most the first 1 MiB: the question is about the file's
+// SHAPE, and a host list whose first line is a JSON object is a JSONL artefact
+// however long the rest of it is.
+func looksLikeJSONLines(path string) bool {
+	f, err := os.Open(path) //nolint:gosec // operator-supplied path, operator-trust model (WR-08)
+	if err != nil {
+		return false
+	}
+	defer f.Close() //nolint:errcheck
+
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for scanner.Scan() {
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 {
+			continue
+		}
+		return len(line) > 0 && line[0] == '{' && json.Valid(line)
+	}
+	return false
+}
+
+// hostFromURL reduces a URL to host[:port]. It is deliberately string-based:
+// url.Parse on a bare "api.example.com" returns an empty Host, and this is only
+// ever fed the artefact's own url field.
+func hostFromURL(raw string) string {
+	u := strings.TrimSpace(raw)
+	if u == "" {
+		return ""
+	}
+	if i := strings.Index(u, "://"); i >= 0 {
+		u = u[i+3:]
+	}
+	if i := strings.IndexAny(u, "/?#"); i >= 0 {
+		u = u[:i]
+	}
+	if i := strings.Index(u, "@"); i >= 0 {
+		u = u[i+1:]
+	}
+	return strings.TrimSpace(u)
+}
+
+// sameFilePath reports whether a and b name the same file.
+//
+// It compares the cleaned absolute paths AND, when both exist, the underlying
+// inode via os.SameFile — a symlink or a "./artefacts/hosts.jsonl" spelling of
+// the same file must not slip past a string comparison.
+func sameFilePath(a, b string) bool {
+	if a == "" || b == "" {
+		return false
+	}
+	ca, cb := filepath.Clean(a), filepath.Clean(b)
+	if abs, err := filepath.Abs(ca); err == nil {
+		ca = abs
+	}
+	if abs, err := filepath.Abs(cb); err == nil {
+		cb = abs
+	}
+	if ca == cb {
+		return true
+	}
+	ia, erra := os.Stat(a)
+	ib, errb := os.Stat(b)
+	if erra != nil || errb != nil {
+		return false
+	}
+	return os.SameFile(ia, ib)
 }
 
 // checkHostsFileReadable checks that path is accessible and is a regular file.

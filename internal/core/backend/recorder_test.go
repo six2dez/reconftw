@@ -563,3 +563,116 @@ func TestRecorderAppendsToUndersizeLog(t *testing.T) {
 		t.Error("an undersize log was rotated; rotation must only fire at the ceiling")
 	}
 }
+
+// TestRecorderRedactsSecretPresentOnlyInStderrTail isolates the stderr tail as
+// its own requirement.
+//
+// TestRecorderRedactsSecretsFromFile puts the same token on BOTH argv and the
+// stderr tail and then greps the whole file, so it would go green on an
+// implementation that scrubbed argv and left the tail alone if the tail happened
+// to be empty — and it states nothing about which field carried the protection.
+// The tail is a SECOND tool-controlled field, and it is the one that carries the
+// TC-E exposure: a tool echoing `-t <token>` back in an auth error puts an
+// operator's config secret into a record whose argv never contained it.
+func TestRecorderRedactsSecretPresentOnlyInStderrTail(t *testing.T) {
+	const secret = "Sh0dAnK3y7Qx2Wv9Zb4Nm6Tj"
+	red := &stubRedactor{}
+	red.Register(secret)
+
+	path := filepath.Join(t.TempDir(), "logs", "tools.jsonl")
+	r := NewToolRecorder(path, red)
+	// argv is deliberately CLEAN. Only the tool's own stderr carries the value.
+	id := r.Start("dnstake", ModeExec, []string{"-t", "inputs/resolved.merged.txt", "-s"})
+	r.End(id, 1, time.Second, OutcomeExitNonZero, "auth rejected: key "+secret+" is not valid")
+	if err := r.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	recs := readRecords(t, path)
+	var end *InvocationRecord
+	for i := range recs {
+		if recs[i].Phase == PhaseEnd {
+			end = &recs[i]
+		}
+	}
+	if end == nil {
+		t.Fatalf("no end record written; got %+v", recs)
+	}
+	if strings.Contains(end.StderrTail, secret) {
+		t.Errorf("the secret survives in stderr_tail: %q", end.StderrTail)
+	}
+	if !strings.Contains(end.StderrTail, "[REDACTED]") {
+		t.Errorf("no placeholder in stderr_tail — the field was dropped rather than "+
+			"redacted, which destroys the diagnostic: %q", end.StderrTail)
+	}
+	// The surrounding diagnostic text must survive, or the operator loses the
+	// reason the tool failed along with the secret.
+	if !strings.Contains(end.StderrTail, "auth rejected") {
+		t.Errorf("redaction destroyed the non-secret text of the tail: %q", end.StderrTail)
+	}
+}
+
+// TestRecorderEndRecordNamesItsTool is the unit half of plan 17-02 Task 3; the
+// operator-facing half is TestEndRecordCarriesToolName in cmd/reconftw, driven by
+// a log the real binary wrote.
+//
+// 16-06-PARITY §6.2 opens by noting the end records carried `"tool":""`, so the
+// naive `group by tool` an operator reaches for first returned nothing and the
+// decomposition of 319 failures had to be done with an id-join.
+func TestRecorderEndRecordNamesItsTool(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "logs", "tools.jsonl")
+	r := NewToolRecorder(path, nil)
+
+	id := r.Start("httpx", ModeStream, []string{"-l", "hosts.txt"})
+	r.End(id, 1, time.Second, OutcomeExitNonZero, "boom")
+	if err := r.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	recs := readRecords(t, path)
+	if len(recs) != 2 {
+		t.Fatalf("got %d records, want 2", len(recs))
+	}
+	if recs[1].Phase != PhaseEnd {
+		t.Fatalf("second record phase = %q, want %q", recs[1].Phase, PhaseEnd)
+	}
+	if recs[1].Tool != "httpx" {
+		t.Errorf("end record tool = %q, want %q — without it, "+
+			`jq 'select(.phase=="end") | .tool' prints blanks`, recs[1].Tool, "httpx")
+	}
+	if recs[0].Tool != recs[1].Tool {
+		t.Errorf("start names %q and end names %q — a name that disagrees with the pairing is worse "+
+			"than no name", recs[0].Tool, recs[1].Tool)
+	}
+}
+
+// TestRecorderForgetsFinishedInvocations is T-17-02-06: the id-to-tool memory must
+// be bounded by CONCURRENCY, not by run length, or a monitor-mode process that
+// runs for days grows a map for every invocation it ever made.
+//
+// The hang shape is the reason this is a delete rather than a clear-on-close: the
+// unfinished invocation KEEPS its entry (nothing writes an end record for it), and
+// that is correct — one entry per hung tool, and a hung tool is itself the
+// diagnostic.
+func TestRecorderForgetsFinishedInvocations(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "logs", "tools.jsonl")
+	r := NewToolRecorder(path, nil)
+
+	for i := 0; i < 500; i++ {
+		id := r.Start("httpx", ModeExec, nil)
+		r.End(id, 0, time.Millisecond, OutcomeSuccess, "")
+	}
+	hung := r.Start("nuclei", ModeStream, nil)
+	_ = hung
+
+	r.mu.Lock()
+	n := len(r.inflight)
+	r.mu.Unlock()
+	if n != 1 {
+		t.Errorf("after 500 completed invocations and 1 hung one, the id-to-tool map holds %d "+
+			"entries, want 1 — it is growing with the RUN rather than with concurrency", n)
+	}
+	if err := r.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+}

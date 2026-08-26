@@ -54,11 +54,12 @@ func TestGenResolversCallsDnsvalidator(t *testing.T) {
 func TestGenResolversFallsBackToHTTP(t *testing.T) {
 	const resolverContent = "1.1.1.1\n8.8.8.8\n9.9.9.9\n"
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(resolverContent))
 	}))
 	defer srv.Close()
+	resolvers.SetDownloadClientForTest(t, srv.Client())
 
 	tmp := t.TempDir()
 	resolversPath := filepath.Join(tmp, "resolvers.txt")
@@ -98,11 +99,12 @@ func TestGenResolversFallsBackToHTTP(t *testing.T) {
 func TestGenResolversFallsBackToHTTP_NoDnsvalidator(t *testing.T) {
 	const resolverContent = "1.2.3.4\n5.6.7.8\n"
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(resolverContent))
 	}))
 	defer srv.Close()
+	resolvers.SetDownloadClientForTest(t, srv.Client())
 
 	tmp := t.TempDir()
 	resolversPath := filepath.Join(tmp, "resolvers-fallback.txt")
@@ -136,11 +138,12 @@ func TestGenResolversFallsBackToHTTP_NoDnsvalidator(t *testing.T) {
 func TestGenResolversOutputPathDefaultFallback(t *testing.T) {
 	const resolverContent = "10.0.0.1\n"
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(resolverContent))
 	}))
 	defer srv.Close()
+	resolvers.SetDownloadClientForTest(t, srv.Client())
 
 	// Build a config with empty Paths.Resolvers to trigger default path logic.
 	cfg := config.Defaults()

@@ -33,6 +33,7 @@ package backend_test
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -685,3 +686,146 @@ func execSafely(t *testing.T, ctx context.Context, binPath string, args []string
 	}
 	return out.String()
 }
+
+// ---------------------------------------------------------------------------
+// The six fixed arg vectors, against the real binaries (17-04)
+// ---------------------------------------------------------------------------
+
+// fixedVectorProbe is one of the vectors 17-04 fixed, with the argv to run
+// against the installed binary and the rejection the OLD vector produced.
+type fixedVectorProbe struct {
+	name string
+	// tool is the binary name for exec.LookPath.
+	tool string
+	// args is the FIXED vector, in the shape the module now dispatches.
+	args []string
+	// wasRejectedBy is the substring the OLD vector produced. Asserting its
+	// ABSENCE is what makes this a fix rather than a claim: the check fails if
+	// the tool still reports the very error the fix was supposed to remove.
+	wasRejectedBy string
+	// stdin feeds empty stdin.
+	stdin bool
+}
+
+// TestRealtoolsFixedArgVectors runs each fixed vector against its installed
+// binary and asserts the tool ACCEPTS the invocation.
+//
+// # WHAT THIS PROVES, AND WHAT IT DOES NOT
+//
+// Every one of these six bugs manifested as the tool REFUSING the invocation —
+// before a packet was sent, before a file was read. Acceptance is therefore the
+// exact property the fixes restore, and it is fully checkable on any box that
+// has the binary.
+//
+// It does NOT prove the tool returns RESULTS. The developer box this was written
+// on blocks outbound UDP/53, so puredns and dnsx cannot resolve anything here.
+// A run that resolves nothing and a run that was rejected look identical in a
+// results count and completely different in the tool's own output, which is why
+// this test reads the OUTPUT and not the exit code.
+//
+// EXIT CODE IS NOT THE ORACLE. subzy exits 0 while printing
+// `Error: unknown flag: --verify-ssl`, and sj exits 1 on a refused connection to
+// a closed local port, which is correct acceptance. The oracle is the absence of
+// the specific rejection string the old vector produced.
+//
+// SAFETY (T-17-04-03): every target is example.com (RFC 2606) or a closed port
+// on 127.0.0.1. No live third-party host is contacted.
+func TestRealtoolsFixedArgVectors(t *testing.T) {
+	census := newProbeCensus()
+	defer reportRealtoolsCensus(t, "TestRealtoolsFixedArgVectors", census, fixedVectorKnownAbsent)
+
+	dir := t.TempDir()
+	write := func(name, content string) string {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+		return p
+	}
+	wordlist := write("wl.txt", "www\napi\n")
+	resolvers := write("res.txt", "1.1.1.1\n8.8.8.8\n")
+	oneName := write("one.txt", "example.com\n")
+	targets := write("targets.txt", "api.example.com\n")
+	urls := write("urls.txt", "http://127.0.0.1:1/\n")
+	outJSON := filepath.Join(dir, "out.json")
+
+	probes := []fixedVectorProbe{
+		{
+			name: "puredns bruteforce, POSITIONAL domain (subdomains.brute / subdomains.recursive.brute)",
+			tool: "puredns",
+			args: []string{"bruteforce", wordlist, "example.com", "-r", resolvers, "--quiet"},
+			// OLD: puredns bruteforce wl.txt -d example.com …
+			wasRejectedBy: "no such file or directory",
+		},
+		{
+			name:          "dnsx record lookup via the LIST input (osint.ip_info / osint.domain_info)",
+			tool:          "dnsx",
+			args:          []string{"-duc", "-silent", "-a", "-resp-only", "-l", oneName},
+			wasRejectedBy: "missing wordlist(w) flag required with domain(d) input",
+		},
+		{
+			name:          "subzy with the UNDERSCORE long flag (subdomains.takeover.subzy)",
+			tool:          "subzy",
+			args:          []string{"run", "--targets", targets, "--verify_ssl", "--output", outJSON},
+			wasRejectedBy: "unknown flag",
+		},
+		{
+			name:          "sj with a SCHEME-BEARING url (osint.swagger)",
+			tool:          "sj",
+			args:          []string{"automate", "-q", "-u", "http://127.0.0.1:1/swagger.json"},
+			wasRejectedBy: "unsupported protocol scheme",
+		},
+		{
+			name:          "subjs with a REAL FILE (subdomains.scraping)",
+			tool:          "subjs",
+			args:          []string{"-i", urls},
+			wasRejectedBy: "Could not open input file",
+		},
+	}
+
+	for _, p := range probes {
+		p := p
+		t.Run(p.tool+": "+p.name, func(t *testing.T) {
+			path, err := exec.LookPath(p.tool)
+			if err != nil {
+				census.recordAbsent(p.tool)
+				t.Logf("SKIP: %s not on PATH — this vector's ACCEPTANCE was NOT verified on this box", p.tool)
+				t.Skipf("%s absent", p.tool)
+			}
+			census.recordPresent(p.tool)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, path, p.args...) //nolint:gosec // fixture argv, synthetic targets
+			if p.stdin {
+				cmd.Stdin = strings.NewReader("")
+			}
+			out, _ := cmd.CombinedOutput()
+			got := string(out)
+
+			t.Logf("%s %s\n--- tool output ---\n%s", p.tool, strings.Join(p.args, " "), strings.TrimSpace(got))
+
+			if strings.Contains(got, p.wasRejectedBy) {
+				t.Errorf("%s STILL REJECTS the invocation: output contains %q.\n"+
+					"  That is the exact rejection the old vector produced, so the fix did not take.\n"+
+					"  argv: %v\n  output:\n%s", p.tool, p.wasRejectedBy, p.args, got)
+			}
+			// A usage dump is the other shape a refused vector takes.
+			for _, sentinel := range []string{"unknown flag", "unknown shorthand", "flag provided but not defined"} {
+				if strings.Contains(strings.ToLower(got), sentinel) {
+					t.Errorf("%s reports %q — the vector is not accepted.\n  argv: %v\n  output:\n%s",
+						p.tool, sentinel, p.args, got)
+				}
+			}
+		})
+	}
+}
+
+// fixedVectorKnownAbsent is the expected-absent list for
+// TestRealtoolsFixedArgVectors.
+//
+// EMPTY on purpose. All five binaries are installed on the box this was written
+// on, so any absence here is a real gap in the evidence and must be declared
+// deliberately — via REALTOOLS_KNOWN_ABSENT for a box that genuinely lacks one,
+// not by pre-emptively excusing it here.
+var fixedVectorKnownAbsent = map[string]string{}

@@ -35,7 +35,7 @@ func TestCompositePassiveMergeProducesMergedTxt(t *testing.T) {
 	if err := os.MkdirAll(inputsDir, 0o755); err != nil {
 		t.Fatalf("mkdir inputs: %v", err)
 	}
-	// A passive Task's staging file (what subfinder/crt/hackertarget write).
+	// A passive Task's staging file (what subfinder/crt/urlfinder write).
 	if err := os.WriteFile(filepath.Join(inputsDir, "passive.subfinder.txt"),
 		[]byte("a.example.com\nb.example.com\n"), 0o644); err != nil {
 		t.Fatalf("write staging: %v", err)

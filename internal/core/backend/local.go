@@ -129,12 +129,27 @@ func (b *LocalBackend) ExecEnv(ctx context.Context, t *Tool, args []string, env 
 	cmd.Stderr = &stderrBuf
 
 	if err := cmd.Start(); err != nil {
-		// Binary not found, permission denied, etc.
+		// THE PROCESS WAS NEVER CREATED. Binary absent (Tool.Path == "" for a
+		// registered-but-uninstalled tool, which os/exec reports as "exec: no
+		// command"), not executable, or permission denied.
+		//
+		// NeverStarted is the whole point of this arm. Runner.execRecorded gets
+		// back an error and CANNOT tell a process that never started from one that
+		// started and failed — both are just `err != nil` by the time it looks. This
+		// backend is the only layer that knows, so it says so as data rather than
+		// leaving the Runner to guess from a message string. Without it, every
+		// absent tool on the Exec path was recorded as exit_non_zero: 150 of the
+		// 2026-08-24 parity run's 319 (16-06-PARITY §6.4).
+		//
+		// ExitCode is -1 and Stderr is "" BY CONSTRUCTION — a process that never ran
+		// produced neither — which is also T-17-02-04's mitigation: no OS error
+		// string is smuggled into the record's stderr field.
 		return nil, &coreerrors.ToolError{
-			Tool:     t.Name,
-			ExitCode: -1,
-			Stderr:   "",
-			Inner:    err,
+			Tool:         t.Name,
+			ExitCode:     -1,
+			Stderr:       "",
+			Inner:        err,
+			NeverStarted: true,
 		}
 	}
 
@@ -176,6 +191,23 @@ func (b *LocalBackend) ExecEnv(ctx context.Context, t *Tool, args []string, env 
 		if reported == 0 {
 			reported = b.KillGrace
 		}
+		// 17-07 (CR-07), STATED DECISION: stdoutBytes collected before the kill is
+		// DISCARDED. v1's `subfinder … -o file` keeps whatever reached the file, so
+		// this is a real divergence and it is deliberate, not an oversight.
+		//
+		// Every caller is `res, err := Run(...); if err != nil { return errored }`.
+		// Returning a partial Result would only change anything if a caller then
+		// published it as a complete one — a passive source reporting Done on a
+		// truncated set is the outcome-mislabelling shape phase 16 removed. The
+		// callers that would each have had to make that judgement: runPassiveTask
+		// (subfinder, crt, github-subdomains, gitlab-subdomains, urlfinder),
+		// SubRecursivePassiveTask's per-target loop, and every other buffered
+		// app.Tools.Run call site in internal/modules.
+		//
+		// THE COST: a bounded tool's partial work is unrecoverable. The remedy is
+		// therefore a deadline that does not fire on a healthy run — see the
+		// derivation on subfinder's tools.lock entry. Pinned by
+		// TestDeadlineDiscardsBufferedStdout; change both together or they lie.
 		return nil, &coreerrors.ToolTimeout{Tool: t.Name, Timeout: reported}
 	}
 
@@ -230,17 +262,24 @@ func (b *LocalBackend) StreamEnv(ctx context.Context, t *Tool, args []string, en
 		return syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
 	}
 
+	// All three failures below happen BEFORE the child exists, so each carries
+	// NeverStarted (see the Exec site for why the fact travels as data). The
+	// Stream path already labels a failed dispatch correctly — Runner.Stream gets
+	// the error back before it writes any record — but the two paths must agree on
+	// the FACT, not merely arrive at the same label by different routes: a future
+	// caller that buffers a stream, or a backend that wraps this one, would
+	// otherwise silently lose it.
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, &coreerrors.ToolError{Tool: t.Name, ExitCode: -1, Inner: err}
+		return nil, &coreerrors.ToolError{Tool: t.Name, ExitCode: -1, Inner: err, NeverStarted: true}
 	}
 	stderrPipe, err := cmd.StderrPipe()
 	if err != nil {
-		return nil, &coreerrors.ToolError{Tool: t.Name, ExitCode: -1, Inner: err}
+		return nil, &coreerrors.ToolError{Tool: t.Name, ExitCode: -1, Inner: err, NeverStarted: true}
 	}
 
 	if err := cmd.Start(); err != nil {
-		return nil, &coreerrors.ToolError{Tool: t.Name, ExitCode: -1, Inner: err}
+		return nil, &coreerrors.ToolError{Tool: t.Name, ExitCode: -1, Inner: err, NeverStarted: true}
 	}
 
 	// Group-SIGKILL escalation goroutine (see Exec for the rationale).

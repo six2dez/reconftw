@@ -39,6 +39,22 @@ var (
 	ErrAxiom    = stderrors.New("axiom infrastructure failure")
 	ErrConfig   = stderrors.New("configuration error")
 	ErrChecksum = stderrors.New("checksum mismatch")
+	// ErrDispatch marks a tool that NEVER RAN: the binary was absent, not
+	// executable, or the process could otherwise not be started. It is a
+	// REFINEMENT of ErrTool, not a sibling — errors.Is(err, ErrTool) still holds
+	// for a dispatch failure, so no existing caller changes behaviour.
+	//
+	// WHY A TYPE AND NOT A STRING MATCH. os/exec's message for an empty Path is
+	// "exec: no command"; for a missing binary it is a *fs.PathError. Matching on
+	// either text is a check that passes for the wrong reason today and stops
+	// passing the first time the stdlib rewords itself. The backend is the only
+	// layer that KNOWS the process never started — cmd.Start() returned an error —
+	// so the fact is carried out of the backend as data, on ToolError.NeverStarted.
+	//
+	// Origin: 16-06-PARITY §6.4 — 150 of a live run's 319 exit_non_zero outcomes
+	// were absent tools wearing the wrong label, because execRecorded had no arm
+	// that could tell the two apart.
+	ErrDispatch = stderrors.New("tool dispatch failure: the process never started")
 	// ErrPassiveViolation is returned by PassiveBackend.Exec/Stream when
 	// PassiveMode=true and the tool is in the active-tool hard-block set (D-09).
 	// It is a defense-in-depth sentinel; the primary guard is composition-level
@@ -61,6 +77,21 @@ type ToolError struct {
 	ExitCode int
 	Stderr   string // last 1KB of stderr (truncated to prevent runaway allocation)
 	Inner    error
+
+	// NeverStarted is true when the PROCESS WAS NEVER CREATED — cmd.Start()
+	// failed because the binary is absent, not executable, or the pipes could not
+	// be opened. It is set ONLY by a backend, which is the only layer that can
+	// know it, and it is read by backend.Runner to choose the outcome label.
+	//
+	// WHY A FIELD AND NOT A NEW TYPE. This struct is the published
+	// Faraday/SARIF serialisation contract (ARCH-08): a new error type would give
+	// existing report consumers a shape they have never seen. `omitempty` keeps
+	// the JSON BYTE-IDENTICAL for every ToolError that is not a dispatch failure,
+	// so a consumer sees no change at all except one new optional boolean on the
+	// records that are dispatch failures — where ExitCode is -1 and Stderr is
+	// empty by construction, because a process that never ran produced neither.
+	// Error() is likewise unchanged; see TestToolError_FormatExact.
+	NeverStarted bool `json:"never_started,omitempty"`
 }
 
 // renderedStderrCap bounds how much of Stderr appears in the MESSAGE. The full
@@ -93,8 +124,21 @@ func (e *ToolError) Error() string {
 
 func (e *ToolError) Unwrap() error { return e.Inner }
 
-// Is is the sentinel bridge enabling errors.Is(err, ErrTool).
-func (e *ToolError) Is(target error) bool { return target == ErrTool }
+// Is is the sentinel bridge enabling errors.Is(err, ErrTool), and — for a tool
+// whose process never started — errors.Is(err, ErrDispatch) as well. ErrTool
+// keeps matching in BOTH cases: ErrDispatch narrows the category, it does not
+// leave it, so no existing errors.Is(err, ErrTool) caller changes behaviour.
+func (e *ToolError) Is(target error) bool {
+	if target == ErrDispatch {
+		return e.NeverStarted
+	}
+	return target == ErrTool
+}
+
+// IsDispatchFailure reports whether err anywhere in its chain is a tool that
+// never ran. Provided so callers do not have to know that the fact lives on
+// ToolError.NeverStarted, and so the check can never degrade into a string match.
+func IsDispatchFailure(err error) bool { return stderrors.Is(err, ErrDispatch) }
 
 // ToolTimeout is returned when a tool's per-task context deadline is exceeded.
 type ToolTimeout struct {
@@ -194,8 +238,24 @@ func (e *PassiveViolation) Error() string {
 	return fmt.Sprintf("passive mode violation: active tool %q is blocked in passive mode", e.Tool)
 }
 
-// Is is the sentinel bridge enabling errors.Is(err, ErrPassiveViolation).
-func (e *PassiveViolation) Is(target error) bool { return target == ErrPassiveViolation }
+// Is is the sentinel bridge enabling errors.Is(err, ErrPassiveViolation), and
+// also ErrDispatch.
+//
+// WHY A PASSIVE BLOCK IS A DISPATCH FAILURE. PassiveBackend implements
+// Exec/ExecEnv/Stream/StreamEnv and refuses the call BEFORE the inner backend is
+// reached, so the process is never created — which is what OutcomeDispatchFailed
+// means, and its documented set already includes a policy abort (the rate
+// limiter's), not only an absent binary. Without this bridge a blocked tool would
+// be recorded as `exit_non_zero`: a claim that it ran and failed, about a tool
+// that was deliberately not run. That is the same false statement plan 17-02
+// exists to remove, and it would be harder to spot here because in passive mode
+// it is the EXPECTED outcome.
+//
+// errors.Is(err, ErrPassiveViolation) is unaffected, so the reason a caller
+// distinguishes a policy block from an absent binary remains available.
+func (e *PassiveViolation) Is(target error) bool {
+	return target == ErrPassiveViolation || target == ErrDispatch
+}
 
 // ChecksumMismatch is returned by the installer when a downloaded binary or
 // script does not match its expected SHA-256 hash.

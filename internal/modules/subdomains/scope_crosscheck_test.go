@@ -122,8 +122,16 @@ func TestScopeCrossCheckURL(t *testing.T) {
 // -------------------------------------------------------------------------
 
 // TestPassiveTasksRegistered verifies that blank-importing the subdomains
-// package results in task.Default containing all 6 passive tasks and
+// package results in task.Default containing all 5 passive tasks and
 // NO barrier task.
+//
+// FIVE, not six: subdomains.passive.hackertarget was deleted in 17-07 (CR-05).
+// It dispatched `httpx -silent -u <api url>` and parsed the output as the API
+// response body, but httpx prints the PROBED URL — so the URL itself was
+// lowercased, staged as a hostname and reported as one subdomain found, on every
+// run, while the scope filter silently dropped it downstream. subfinder queries
+// hackertarget among its own sources (`subfinder -ls`), so the SOURCE is
+// retained; only the broken standalone Task is gone.
 func TestPassiveTasksRegistered(t *testing.T) {
 	wantNames := []string{
 		"subdomains.passive.subfinder",
@@ -131,7 +139,6 @@ func TestPassiveTasksRegistered(t *testing.T) {
 		"subdomains.passive.github",
 		"subdomains.passive.gitlab",
 		"subdomains.passive.urlfinder",
-		"subdomains.passive.hackertarget",
 	}
 
 	for _, name := range wantNames {

@@ -85,7 +85,7 @@ func newSubsCmd() *cobra.Command {
 		Use:   "subs",
 		Short: "Run subdomain enumeration (passive + active + permut + takeover)",
 		Long: `Run the full subdomain enumeration pipeline:
-  Stage 1 (passive):    subfinder, crt.sh, GitHub, GitLab, urlfinder, hackertarget
+  Stage 1 (passive):    subfinder, crt.sh, GitHub, GitLab, urlfinder
   Stage 2 (resolve):    DNS resolution, brute-force, TLS cert harvest, scraping, analytics
   Stage 3 (permut):     gotator permutations, regex permutations, DNS cewl, recursive
   Stage 4 (enrichment): subdomain takeover, S3/GCS buckets, ASN mapping, geo, zone transfer
@@ -135,6 +135,11 @@ func runSubsCmd(cmd *cobra.Command) error {
 	// closure and the outer defer share the SAME variable.
 	var axiomBE *backend.AxiomBackend
 
+	// ONE redactor for the whole run — see newRunRedactor. It is handed to
+	// RunOptions.Secrets (the tool recorder holds it), seeded from cfg inside the
+	// closure below, and shared with the run.log logger and the progress sink.
+	runSecrets := newRunRedactor()
+
 	afterBoot := func(boot handlers.AppBoot) {
 		app := boot.App
 		workdir := boot.WorkDir
@@ -157,6 +162,13 @@ func runSubsCmd(cmd *cobra.Command) error {
 			return
 		}
 
+		// Seed the run redactor from cfg UNCONDITIONALLY, before the liveUI
+		// branch. Seeding only inside that branch would leave logs/tools.jsonl
+		// and the progress sink unprotected on every non-TTY run — CI, nohup,
+		// `2>file` — which is exactly where a leaked key gets archived and later
+		// pasted into an issue. Registration is idempotent.
+		wireRunSecrets(runSecrets, cfg)
+
 		// GAP-3 log routing: route slog to <workdir>/run.log on interactive TTY
 		// so stderr carries only the human UI. Redaction (XCUT-07) preserved by
 		// re-registering secrets on the file logger's redactor.
@@ -165,12 +177,29 @@ func runSubsCmd(cmd *cobra.Command) error {
 			p := filepath.Join(workdir, "run.log")
 			if f, ferr := os.Create(p); ferr == nil { //nolint:gosec
 				summaryRunLog = p
-				rdct := &log.Redactor{}
-				registerSecrets(cfg, rdct)
+				// THE SAME instance the tool recorder holds. A fresh
+				// &log.Redactor{} here is what made run.log and
+				// logs/tools.jsonl two different security postures.
+				rdct := wireRunSecrets(runSecrets, cfg)
 				lc := cfg.AsLoggerConfig()
 				lc.Output = f
 				subLogger := log.New(lc, rdct)
 				slog.SetDefault(subLogger)
+				// Point the AppContext at the same sink. app.Log was captured at
+				// Boot time (the stderr logger), so without this every module
+				// line — which goes through app.Log, not slog.Default — keeps
+				// spilling to the terminal and run.log stays nearly empty,
+				// contradicting the banner printed just below.
+				//
+				// commonAfterBoot (composite modes) already did this; these four
+				// single-pipeline paths did not, so `reconftw subs|web|vulns|osint`
+				// produced a run.log with no module lines in it at all. Found by
+				// TestE2EConfigSecretInToolStderrNeverReachesRunLog, whose
+				// reproduction guard refused to assert redaction against a file
+				// that never carried the bytes.
+				if boot.App != nil {
+					boot.App.Log = subLogger
+				}
 				fmt.Fprintf(os.Stderr, "  logs → %s\n", summaryRunLog)
 				// f is intentionally not closed here — it lives for the scan duration.
 				// The file handle is leaked after the subcommand returns, which is
@@ -201,6 +230,9 @@ func runSubsCmd(cmd *cobra.Command) error {
 		// Wire per-task progress UI (GAP-3). XCUT-07: only name/badge/duration passed
 		// to progress — never result.Stdout, result.Stderr, or tool output.
 		progress := ui.NewStageProgress(app.UI.W, app.UI.NoColor, app.UI.Verbosity)
+		// Result.Reason is tool-derived (task.ToolDegraded wraps
+		// errors.ToolError.Error(), which embeds the tool's stderr tail).
+		progress.SetRedactor(runSecrets)
 		sched.RunTask = func(rctx context.Context, t task.Task) (task.Result, error) {
 			progress.TaskStart(t.Name())
 			started := time.Now()
@@ -224,7 +256,7 @@ func runSubsCmd(cmd *cobra.Command) error {
 		}
 	}()
 	if err := handlers.RunSubsAsync(ctx, handlers.RunOptions{
-		Secrets:      newRunRedactor(),
+		Secrets:      runSecrets,
 		Target:       targetFlag,
 		DryRun:       dryRun,
 		ConfigPath:   efs.configPath,
@@ -398,6 +430,11 @@ func runWebCmd(cmd *cobra.Command) error {
 	// closure and the outer defer share the SAME variable.
 	var axiomBE *backend.AxiomBackend
 
+	// ONE redactor for the whole run — see newRunRedactor. It is handed to
+	// RunOptions.Secrets (the tool recorder holds it), seeded from cfg inside the
+	// closure below, and shared with the run.log logger and the progress sink.
+	runSecrets := newRunRedactor()
+
 	afterBoot := func(boot handlers.AppBoot) {
 		app := boot.App
 		workdir := boot.WorkDir
@@ -416,17 +453,41 @@ func runWebCmd(cmd *cobra.Command) error {
 			return
 		}
 
+		// Seed the run redactor from cfg UNCONDITIONALLY, before the liveUI
+		// branch. Seeding only inside that branch would leave logs/tools.jsonl
+		// and the progress sink unprotected on every non-TTY run — CI, nohup,
+		// `2>file` — which is exactly where a leaked key gets archived and later
+		// pasted into an issue. Registration is idempotent.
+		wireRunSecrets(runSecrets, cfg)
+
 		liveUI := summaryVerbosity != ui.VerbosityQuiet && ui.IsTTY(os.Stderr)
 		if liveUI {
 			p := filepath.Join(workdir, "run.log")
 			if f, ferr := os.Create(p); ferr == nil { //nolint:gosec
 				summaryRunLog = p
-				rdct := &log.Redactor{}
-				registerSecrets(cfg, rdct)
+				// THE SAME instance the tool recorder holds. A fresh
+				// &log.Redactor{} here is what made run.log and
+				// logs/tools.jsonl two different security postures.
+				rdct := wireRunSecrets(runSecrets, cfg)
 				lc := cfg.AsLoggerConfig()
 				lc.Output = f
 				subLogger := log.New(lc, rdct)
 				slog.SetDefault(subLogger)
+				// Point the AppContext at the same sink. app.Log was captured at
+				// Boot time (the stderr logger), so without this every module
+				// line — which goes through app.Log, not slog.Default — keeps
+				// spilling to the terminal and run.log stays nearly empty,
+				// contradicting the banner printed just below.
+				//
+				// commonAfterBoot (composite modes) already did this; these four
+				// single-pipeline paths did not, so `reconftw subs|web|vulns|osint`
+				// produced a run.log with no module lines in it at all. Found by
+				// TestE2EConfigSecretInToolStderrNeverReachesRunLog, whose
+				// reproduction guard refused to assert redaction against a file
+				// that never carried the bytes.
+				if boot.App != nil {
+					boot.App.Log = subLogger
+				}
 				fmt.Fprintf(os.Stderr, "  logs → %s\n", summaryRunLog)
 				_ = f
 			}
@@ -451,6 +512,9 @@ func runWebCmd(cmd *cobra.Command) error {
 		}
 
 		progress := ui.NewStageProgress(app.UI.W, app.UI.NoColor, app.UI.Verbosity)
+		// Result.Reason is tool-derived (task.ToolDegraded wraps
+		// errors.ToolError.Error(), which embeds the tool's stderr tail).
+		progress.SetRedactor(runSecrets)
 		sched.RunTask = func(rctx context.Context, t task.Task) (task.Result, error) {
 			progress.TaskStart(t.Name())
 			started := time.Now()
@@ -474,7 +538,7 @@ func runWebCmd(cmd *cobra.Command) error {
 		}
 	}()
 	if err := handlers.RunWebAsync(ctx, handlers.RunOptions{
-		Secrets:      newRunRedactor(),
+		Secrets:      runSecrets,
 		Target:       targetFlag,
 		DryRun:       dryRun,
 		ExtraFile:    hostsFlag,
@@ -693,6 +757,11 @@ func runVulnsCmd(cmd *cobra.Command) error {
 	// closure and the outer defer share the SAME variable.
 	var axiomBE *backend.AxiomBackend
 
+	// ONE redactor for the whole run — see newRunRedactor. It is handed to
+	// RunOptions.Secrets (the tool recorder holds it), seeded from cfg inside the
+	// closure below, and shared with the run.log logger and the progress sink.
+	runSecrets := newRunRedactor()
+
 	afterBoot := func(boot handlers.AppBoot) {
 		app := boot.App
 		workdir := boot.WorkDir
@@ -711,17 +780,41 @@ func runVulnsCmd(cmd *cobra.Command) error {
 			return
 		}
 
+		// Seed the run redactor from cfg UNCONDITIONALLY, before the liveUI
+		// branch. Seeding only inside that branch would leave logs/tools.jsonl
+		// and the progress sink unprotected on every non-TTY run — CI, nohup,
+		// `2>file` — which is exactly where a leaked key gets archived and later
+		// pasted into an issue. Registration is idempotent.
+		wireRunSecrets(runSecrets, cfg)
+
 		liveUI := summaryVerbosity != ui.VerbosityQuiet && ui.IsTTY(os.Stderr)
 		if liveUI {
 			p := filepath.Join(workdir, "run.log")
 			if f, ferr := os.Create(p); ferr == nil { //nolint:gosec
 				summaryRunLog = p
-				rdct := &log.Redactor{}
-				registerSecrets(cfg, rdct)
+				// THE SAME instance the tool recorder holds. A fresh
+				// &log.Redactor{} here is what made run.log and
+				// logs/tools.jsonl two different security postures.
+				rdct := wireRunSecrets(runSecrets, cfg)
 				lc := cfg.AsLoggerConfig()
 				lc.Output = f
 				subLogger := log.New(lc, rdct)
 				slog.SetDefault(subLogger)
+				// Point the AppContext at the same sink. app.Log was captured at
+				// Boot time (the stderr logger), so without this every module
+				// line — which goes through app.Log, not slog.Default — keeps
+				// spilling to the terminal and run.log stays nearly empty,
+				// contradicting the banner printed just below.
+				//
+				// commonAfterBoot (composite modes) already did this; these four
+				// single-pipeline paths did not, so `reconftw subs|web|vulns|osint`
+				// produced a run.log with no module lines in it at all. Found by
+				// TestE2EConfigSecretInToolStderrNeverReachesRunLog, whose
+				// reproduction guard refused to assert redaction against a file
+				// that never carried the bytes.
+				if boot.App != nil {
+					boot.App.Log = subLogger
+				}
 				fmt.Fprintf(os.Stderr, "  logs → %s\n", summaryRunLog)
 				_ = f
 			}
@@ -746,6 +839,9 @@ func runVulnsCmd(cmd *cobra.Command) error {
 		}
 
 		progress := ui.NewStageProgress(app.UI.W, app.UI.NoColor, app.UI.Verbosity)
+		// Result.Reason is tool-derived (task.ToolDegraded wraps
+		// errors.ToolError.Error(), which embeds the tool's stderr tail).
+		progress.SetRedactor(runSecrets)
 		sched.RunTask = func(rctx context.Context, t task.Task) (task.Result, error) {
 			progress.TaskStart(t.Name())
 			started := time.Now()
@@ -769,7 +865,7 @@ func runVulnsCmd(cmd *cobra.Command) error {
 		}
 	}()
 	if err := handlers.RunVulnsAsync(ctx, handlers.RunOptions{
-		Secrets:      newRunRedactor(),
+		Secrets:      runSecrets,
 		Target:       targetFlag,
 		DryRun:       dryRun,
 		ExtraFile:    urlsFlag,
@@ -911,6 +1007,11 @@ func runOSINTCmd(cmd *cobra.Command) error {
 	// closure and the outer defer share the SAME variable.
 	var axiomBE *backend.AxiomBackend
 
+	// ONE redactor for the whole run — see newRunRedactor. It is handed to
+	// RunOptions.Secrets (the tool recorder holds it), seeded from cfg inside the
+	// closure below, and shared with the run.log logger and the progress sink.
+	runSecrets := newRunRedactor()
+
 	afterBoot := func(boot handlers.AppBoot) {
 		app := boot.App
 		workdir := boot.WorkDir
@@ -929,17 +1030,41 @@ func runOSINTCmd(cmd *cobra.Command) error {
 			return
 		}
 
+		// Seed the run redactor from cfg UNCONDITIONALLY, before the liveUI
+		// branch. Seeding only inside that branch would leave logs/tools.jsonl
+		// and the progress sink unprotected on every non-TTY run — CI, nohup,
+		// `2>file` — which is exactly where a leaked key gets archived and later
+		// pasted into an issue. Registration is idempotent.
+		wireRunSecrets(runSecrets, cfg)
+
 		liveUI := summaryVerbosity != ui.VerbosityQuiet && ui.IsTTY(os.Stderr)
 		if liveUI {
 			p := filepath.Join(workdir, "run.log")
 			if f, ferr := os.Create(p); ferr == nil { //nolint:gosec
 				summaryRunLog = p
-				rdct := &log.Redactor{}
-				registerSecrets(cfg, rdct)
+				// THE SAME instance the tool recorder holds. A fresh
+				// &log.Redactor{} here is what made run.log and
+				// logs/tools.jsonl two different security postures.
+				rdct := wireRunSecrets(runSecrets, cfg)
 				lc := cfg.AsLoggerConfig()
 				lc.Output = f
 				subLogger := log.New(lc, rdct)
 				slog.SetDefault(subLogger)
+				// Point the AppContext at the same sink. app.Log was captured at
+				// Boot time (the stderr logger), so without this every module
+				// line — which goes through app.Log, not slog.Default — keeps
+				// spilling to the terminal and run.log stays nearly empty,
+				// contradicting the banner printed just below.
+				//
+				// commonAfterBoot (composite modes) already did this; these four
+				// single-pipeline paths did not, so `reconftw subs|web|vulns|osint`
+				// produced a run.log with no module lines in it at all. Found by
+				// TestE2EConfigSecretInToolStderrNeverReachesRunLog, whose
+				// reproduction guard refused to assert redaction against a file
+				// that never carried the bytes.
+				if boot.App != nil {
+					boot.App.Log = subLogger
+				}
 				fmt.Fprintf(os.Stderr, "  logs → %s\n", summaryRunLog)
 				_ = f
 			}
@@ -964,6 +1089,9 @@ func runOSINTCmd(cmd *cobra.Command) error {
 		}
 
 		progress := ui.NewStageProgress(app.UI.W, app.UI.NoColor, app.UI.Verbosity)
+		// Result.Reason is tool-derived (task.ToolDegraded wraps
+		// errors.ToolError.Error(), which embeds the tool's stderr tail).
+		progress.SetRedactor(runSecrets)
 		sched.RunTask = func(rctx context.Context, t task.Task) (task.Result, error) {
 			progress.TaskStart(t.Name())
 			started := time.Now()
@@ -987,7 +1115,7 @@ func runOSINTCmd(cmd *cobra.Command) error {
 		}
 	}()
 	if err := handlers.RunOSINTAsync(ctx, handlers.RunOptions{
-		Secrets:      newRunRedactor(),
+		Secrets:      runSecrets,
 		Target:       targetFlag,
 		DryRun:       dryRun,
 		ConfigPath:   efs.configPath,
@@ -1180,8 +1308,13 @@ func runMonitorCmd(cmd *cobra.Command) error {
 	// commonAfterBoot wires scheduler limits, log routing, and per-task
 	// progress UI — same pattern as composite subcommands.
 	capture := &dryRunCapture{}
+	// ONE redactor for the whole run — see newRunRedactor. It is handed to
+	// RunOptions.Secrets (the tool recorder holds it), seeded from cfg inside the
+	// closure below, and shared with the run.log logger and the progress sink.
+	runSecrets := newRunRedactor()
+
 	afterBoot := func(boot handlers.AppBoot) {
-		commonAfterBoot(ctx, boot, sched, dryRun, "monitor", capture)
+		commonAfterBoot(ctx, boot, sched, dryRun, "monitor", capture, runSecrets)
 	}
 
 	// Interval and MaxCycles are passed through as "0 = unset". The remaining
@@ -1203,7 +1336,7 @@ func runMonitorCmd(cmd *cobra.Command) error {
 	// assertion on boot.App.Notify (*notifier.Multi implements Flusher via Plan 02).
 	// The CLI layer does NOT need to wire or inject a coalescer reference.
 	return handlers.RunMonitorAsync(ctx, handlers.RunOptions{
-		Secrets:     newRunRedactor(),
+		Secrets:     runSecrets,
 		Target:      targetFlag,
 		DryRun:      dryRun,
 		ConfigPath:  efs.configPath,

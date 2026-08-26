@@ -15,7 +15,6 @@
 package subdomains
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -23,6 +22,7 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/resolvers"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -30,26 +30,17 @@ import (
 // Resolver health helper
 // -------------------------------------------------------------------------
 
-// countResolverLines returns the count of non-empty lines in the resolver file.
-// Returns 0 and an error if the file cannot be read.
+// countResolverLines returns the number of resolver-shaped lines in the resolver
+// file. Returns 0 and an error if the file cannot be read.
+//
+// Delegates to resolvers.CountResolverLines so this gate and the boot-time
+// acquisition in internal/core/resolvers share ONE definition of "usable". They
+// used to differ: this counted any non-empty line, so an HTML error page saved
+// by a mirror that answered 200 passed the gate and was handed to puredns as a
+// nameserver list. Two functions answering the same question differently is how
+// one of them ends up wrong.
 func countResolverLines(path string) (int, error) {
-	if path == "" {
-		return 0, fmt.Errorf("resolver file path is empty")
-	}
-	f, err := os.Open(path) //nolint:gosec // path comes from cfg.Paths.Resolvers (nopath_traversal validated at config load)
-	if err != nil {
-		return 0, fmt.Errorf("open resolver file %q: %w", path, err)
-	}
-	defer f.Close() //nolint:errcheck // read-only resolver count
-
-	count := 0
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		if strings.TrimSpace(scanner.Text()) != "" {
-			count++
-		}
-	}
-	return count, scanner.Err()
+	return resolvers.CountResolverLines(path)
 }
 
 // -------------------------------------------------------------------------
@@ -242,9 +233,23 @@ func (SubBruteTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
+	// THE DOMAIN IS POSITIONAL. `puredns bruteforce --help` (v2.1.1):
+	//
+	//	Usage: puredns bruteforce <wordlist> domain [flags]
+	//	  -d, --domains string   text file containing domains to bruteforce
+	//
+	// `-d` takes a FILE. Passing the bare domain made puredns try to OPEN it:
+	//
+	//	$ puredns bruteforce wl.txt -d example.com -r res.txt --quiet
+	//	puredns error: open example.com: no such file or directory   (exit 1)
+	//	$ puredns bruteforce wl.txt example.com -r res.txt --quiet
+	//	www.example.com                                              (exit 0)
+	//
+	// So this Task produced NOTHING for as long as the vector existed (CR-01,
+	// 16-06 §6.3). v1 passes it positionally too — modules/utils.sh:1550.
 	args := []string{
 		"bruteforce", wordlistPath,
-		"-d", app.Target.Domain,
+		app.Target.Domain,
 		"-r", resolverPath,
 		"--quiet",
 	}

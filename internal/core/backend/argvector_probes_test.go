@@ -45,21 +45,46 @@ var subdomainWebProbes = []toolProbe{
 	{name: "gitlab-subdomains", args: []string{"-d", "example.com", "-t", "dummytoken"}, mirrors: probeMirrorsNoTask},
 	{name: "httpx", args: []string{"-silent", "-u", "https://example.com"}, mirrors: probeMirrorsNoTask},
 	{name: "puredns", args: []string{"resolve", "{F}", "-r", "{R}", "--wildcard-tests", "1", "--wildcard-batch", "1", "--rate-limit", "1", "--rate-limit-trusted", "1", "--resolvers-trusted", "{R}", "--quiet"}, mirrors: probeMirrorsNoTask},
-	{name: "puredns", args: []string{"bruteforce", "{W}", "example.com", "-r", "{R}", "--quiet"}, mirrors: probeMirrorsNoTask},
+	// The POSITIONAL domain form — `puredns bruteforce <wordlist> domain` — which
+	// is what `puredns bruteforce --help` documents and what modules/utils.sh:1550
+	// dispatches in v1. This probe has always had it right; brute.go did not, and
+	// nothing compared the two until this entry named the Task it mirrors.
+	// `--wildcard-tests` is here because config.Defaults() sets
+	// puredns_wildcardtest_limit to 30, so production always emits it.
+	{name: "puredns", args: []string{"bruteforce", "{W}", "example.com", "-r", "{R}", "--quiet", "--wildcard-tests", "1"}, mirrors: "subdomains.brute"},
 	{name: "tlsx", args: []string{"-l", "{F}", "-san", "-cn", "-silent", "-ro"}, mirrors: probeMirrorsNoTask},
 	{name: "dnsx", args: []string{"-l", "{F}", "-ns", "-resp", "-silent"}, mirrors: probeMirrorsNoTask},
 	{name: "gotator", args: []string{"-sub", "{F}", "-depth", "1", "-numbers", "3", "-md"}, mirrors: probeMirrorsNoTask},
-	{name: "regulator", args: []string{"{F}", "example.com"}, mirrors: probeMirrorsNoTask},
+	// CORRECTED 17-06 (CR-04). This entry used to be `{"{F}", "example.com"}` —
+	// a hand-copy of the module's broken vector, mirroring NO Task, so it
+	// validated the CALLER rather than the tool and could never disagree with it.
+	//
+	// regulator's real interface, read from the clone install.sh creates
+	// (cramppet/regulator @2371a06, `main.py -h`): `-t TARGET -f HOSTS [-o OUTPUT]`.
+	// The old form is rejected outright:
+	//   main.py: error: the following arguments are required: -t/--target, -f/--hosts  (exit 2)
+	//
+	// CAVEAT, stated here rather than left to be inferred: v2 resolves tools with
+	// exec.LookPath("regulator"), and install.sh installs regulator as a repo
+	// CLONE run via `${tools}/regulator/venv/bin/python3 main.py` — which puts no
+	// `regulator` binary on PATH. So this probe describes the right arg vector for
+	// a tool the Runner still cannot find. See 17-06-SUMMARY, "Findings for triage".
+	{name: "regulator", args: []string{"-t", "example.com", "-f", "{F}", "-o", "{O}"}, mirrors: "subdomains.permut.regex"},
 	{name: "dnscewl", args: []string{"-f", "{F}"}, mirrors: probeMirrorsNoTask},
 	{name: "subwiz", args: []string{"-i", "{F}", "--no-resolve"}, mirrors: probeMirrorsNoTask},
-	{name: "subzy", args: []string{"run", "--targets", "{F}", "--verify-ssl", "--output", "{O}"}, mirrors: "subdomains.takeover.subzy"},
+	// --verify_ssl, UNDERSCORE (17-04). The probe carried the hyphen because it
+	// was hand-copied from the broken module vector; fixing the module without
+	// fixing the probe would have made the drift detector fire on the FIX.
+	{name: "subzy", args: []string{"run", "--targets", "{F}", "--verify_ssl", "--output", "{O}"}, mirrors: "subdomains.takeover.subzy"},
 	{name: "dnstake", args: []string{"-t", "{F}", "-s"}, mirrors: probeMirrorsNoTask},
 	{name: "s3scanner", args: []string{"--bucket-file", "{F}"}, mirrors: probeMirrorsNoTask},
 	{name: "asnmap", args: []string{"-d", "example.com", "-json", "-silent"}, mirrors: probeMirrorsNoTask},
 	{name: "favirecon", args: []string{"-u", "example.com", "-timeout", "5"}, mirrors: probeMirrorsNoTask},
 	{name: "analyticsrelationships", args: []string{"-u", "https://example.com", "--chain-mode"}, mirrors: probeMirrorsNoTask},
 	{name: "jsluice", args: []string{"urls", "-i", "{J}"}, mirrors: probeMirrorsNoTask},
-	{name: "subjs", args: []string{"-i", "-"}, stdin: true, mirrors: probeMirrorsNoTask},
+	// subjs has NO stdin sentinel: `-i` names a file (`subjs -h`, v1.0.1). The
+	// old `-i -` probe validated a vector the tool rejects outright.
+	{name: "subjs", args: []string{"-i", "{F}"}, mirrors: "subdomains.scraping"},
 
 	// Phase 5 additions — web pipeline (DoD-1)
 	// Each entry uses the EXACT arg vector from internal/modules/web/*.go (D-W9).

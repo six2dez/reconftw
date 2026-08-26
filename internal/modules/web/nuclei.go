@@ -14,7 +14,7 @@
 //
 // ARG VECTOR (RESEARCH §nuclei — verbatim v1 form):
 //
-//	nuclei -l <hostsfile> -severity <sev> -nh -rl <n> -silent -retries 2
+//	nuclei -l <hostsfile> -severity <sev> -nh -rl <n> -retries 2 -stats -sj -si 30
 //	       -t <templates> -j -o <stagingFile>
 //
 // T-05-04 mitigation: nuclei stdout routed to run.log via app.Tools.Stream;
@@ -258,14 +258,33 @@ func runNucleiGroup(ctx context.Context, app *appctx.AppContext, toolName string
 
 	stagingFile := filepath.Join(artefactsDir, "nuclei."+groupLabel+".jsonl.tmp")
 
-	// Build arg vector (RESEARCH §nuclei verbatim v1 form).
+	// Build arg vector (RESEARCH §nuclei verbatim v1 form, plus the 17-05
+	// accounting flags).
+	//
+	// `-silent` IS GONE, DELIBERATELY. It suppressed nuclei's own
+	// `[INF] Skipped <host> from target list as found unresponsive permanently`
+	// notices — the per-host error budget (-mhe, default 30) firing — so the
+	// 2026-08-24 parity run had no record that any host had been dropped, which
+	// is one of the two opposite explanations for the missing OIDC findings.
+	// Measured on nuclei v3.7.1 against an identical fixture, dropping `-silent`
+	// changes NOTHING on stdout: with `-j -o` the findings still arrive as JSONL
+	// on stdout and in the staging file, and every extra line lands on stderr,
+	// which this function consumes and never forwards. It changes no rate limit,
+	// no severity filter, no template set, and no host list — it is an
+	// accounting change, not a coverage change.
+	//
+	// `-stats -sj -si` writes one JSON accounting object per interval, and a
+	// final one at scan end, to stderr. T-17-05-06 (volume): at 30 s the web
+	// group's 23-minute banked runtime yields ~46 objects of ~200 bytes — under
+	// 10 KB, and ~24 KB/hour in the worst case. Bounded, and asserted bounded by
+	// TestNucleiCoverageRecordStaysSmall.
 	args := []string{
 		"-l", hostsFile,
 		"-severity", severity,
 		"-nh", // no-httpx: skip probe, already probed via HTTPXTask
 		"-rl", strconv.Itoa(rateLimit),
-		"-silent",
 		"-retries", "2",
+		"-stats", "-sj", "-si", strconv.Itoa(nucleiStatsIntervalSeconds),
 	}
 	args = append(args, extraArgs...)
 	args = append(args,
@@ -274,11 +293,21 @@ func runNucleiGroup(ctx context.Context, app *appctx.AppContext, toolName string
 		"-o", stagingFile, // write to staging file
 	)
 
+	cov := newNucleiCoverage(groupLabel, len(hosts), args)
+	// The filter-selected count comes from a separate `-tl` listing invocation:
+	// `-tl` is a listing MODE and does not scan. Cost on the reference machine
+	// against ~13k templates: 182 s on a cold signature-verification cache, 1-2 s
+	// warm. It is best-effort — a failure leaves FilterSelected nil (UNKNOWN),
+	// never 0 — because a listing failure must not fail the scan.
+	cov.FilterSelected = nucleiFilterSelected(ctx, app, toolName, severity, templatesPath)
+
 	// Use Backend.Stream for XCUT-09 heartbeat (T-05-04 mitigation: raw
 	// nuclei output routed to run.log via stream drain, never to terminal).
 	eventCh, err := app.Tools.Stream(ctx, toolName, args)
 	if err != nil {
-		// DISPATCH failure — nuclei is not on PATH; the scan never ran.
+		// DISPATCH failure — nuclei is not on PATH; the scan never ran. No
+		// coverage record: there is nothing to account for, and writing one
+		// would assert a scan happened.
 		return nil, fmt.Errorf("nuclei stream %s: %w", groupLabel, err)
 	}
 
@@ -289,7 +318,21 @@ func runNucleiGroup(ctx context.Context, app *appctx.AppContext, toolName string
 	// PREVIOUS run left at the same path. A security scanner reporting stale
 	// "clean" results is the worst failure mode available to us. Return before
 	// the read: partial output is not a result.
-	if drainErr := backend.Drain(eventCh); drainErr != nil {
+	//
+	// Collect, not Drain: the accounting lives in the stream's stderr lines, and
+	// Drain threw every line away. Collect keeps Drain's terminal-error contract
+	// exactly — it returns the first Event.Err and never passes the error-carrying
+	// terminal event to fn.
+	drainErr := backend.Collect(eventCh, func(ev backend.Event) {
+		cov.observeLine(ev.Line, ev.IsErr)
+	})
+	if drainErr != nil {
+		// The record is written for a group that ended badly TOO — marked as
+		// such. Coverage evidence about a failed run is worth more than coverage
+		// evidence about a clean one, and this is the path on which v2 previously
+		// recorded nothing at all.
+		cov.markTerminated(drainErr)
+		finishNucleiCoverage(app, cov)
 		return nil, terminalStreamError(toolName, drainErr)
 	}
 
@@ -297,12 +340,64 @@ func runNucleiGroup(ctx context.Context, app *appctx.AppContext, toolName string
 	data, err := os.ReadFile(stagingFile) //nolint:gosec // path within WorkDir
 	if err != nil {
 		if os.IsNotExist(err) {
+			cov.setFindingsParsed(0)
+			finishNucleiCoverage(app, cov)
 			return nil, nil // no findings produced
 		}
+		finishNucleiCoverage(app, cov)
 		return nil, fmt.Errorf("read nuclei staging %s: %w", groupLabel, err)
 	}
 
-	return parseNucleiOutput(data), nil
+	records := parseNucleiOutput(data)
+	cov.setFindingsParsed(len(records))
+	finishNucleiCoverage(app, cov)
+	return records, nil
+}
+
+// nucleiStatsIntervalSeconds is the `-si` value. See the volume derivation in
+// runNucleiGroup.
+const nucleiStatsIntervalSeconds = 30
+
+// nucleiFilterSelected runs `nuclei -tl` under this group's filters and returns
+// the count of templates the filter set selected, or nil when the listing could
+// not be obtained.
+//
+// Best-effort by design: nil means UNKNOWN. Returning 0 on a failed listing
+// would report "the filter selected no templates", which is a completely
+// different fact with a completely different remedy.
+func nucleiFilterSelected(ctx context.Context, app *appctx.AppContext, toolName, severity, templatesPath string) *int {
+	if app == nil || app.Tools == nil {
+		return nil
+	}
+	res, err := app.Tools.Run(ctx, toolName, []string{
+		"-tl", "-severity", severity, "-t", templatesPath,
+	})
+	if err != nil || res == nil {
+		// Warn, not Debug. The default handler level is Info, so a Debug line
+		// here would be invisible on a normal run — and the thing being reported
+		// is that the run cannot say how many templates its filter selected,
+		// which is half of what this plan exists to make visible.
+		if app.Log != nil {
+			app.Log.Warn("web.nuclei: template listing failed — filter_selected will be UNKNOWN",
+				"err", err)
+		}
+		return nil
+	}
+	return parseNucleiTemplateList(res.Stdout)
+}
+
+// finishNucleiCoverage writes the record and logs (never fails the scan) when it
+// cannot be written.
+func finishNucleiCoverage(app *appctx.AppContext, cov *NucleiCoverage) {
+	if app == nil || app.Target == nil || app.Target.WorkDir == "" {
+		return
+	}
+	if err := writeNucleiCoverage(app.Target.WorkDir, cov); err != nil && app.Log != nil {
+		// Warn: a run whose coverage record did not get written is a run that
+		// cannot account for what it scanned, which is the 2026-08-24 state.
+		app.Log.Warn("web.nuclei: coverage record write FAILED — this run cannot account "+
+			"for what it covered", "err", err)
+	}
 }
 
 // parseNucleiOutput parses nuclei JSONL output into FindingRecord slice.

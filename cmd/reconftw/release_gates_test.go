@@ -330,3 +330,267 @@ func TestReleaseGateArgVectorCensusVerdict(t *testing.T) {
 		})
 	}
 }
+
+// --- Phase 17 (TC-D): the gate rule itself ------------------------------------
+//
+// Two defects in scripts/release-gates.sh, both of the class the script was
+// written to detect:
+//
+//   1. gate() counted `--- PASS` lines and failed only at zero, so a gate citing
+//      nine tests passed with eight of them deleted. Counting answers "did
+//      anything run"; only a by-name assertion answers "did the cited things
+//      run".
+//   2. `trap 'rm -rf "$LOGDIR"' EXIT` deleted the directory every FAIL note
+//      names as `full log: $LOGDIR/...`, so a failing run destroyed the one
+//      artefact it existed to produce.
+//
+// Both are asserted here rather than by reading the script, because this repo's
+// standing precedent (phase 15, finding F19) is that two independent code reads
+// certified a fix that was inert in production.
+
+// runGateVerdict feeds a synthetic `go test -v` log to the by-name rule through
+// the script's --gate-verdict seam and returns its single verdict line.
+func runGateVerdict(t *testing.T, pattern, rc, log string) string {
+	t.Helper()
+	script := filepath.Join(repoRoot(t), "scripts", "release-gates.sh")
+	cmd := exec.Command("bash", script, "--gate-verdict", pattern, rc)
+	cmd.Stdin = strings.NewReader(log)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("--gate-verdict failed: %v\n%s", err, out)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func TestReleaseGatePatternRequiresEveryCitedTest(t *testing.T) {
+	const threeCited = "TestAlpha|TestBeta|TestGamma"
+	allThree := "=== RUN   TestAlpha\n--- PASS: TestAlpha (0.01s)\n" +
+		"--- PASS: TestBeta (0.01s)\n--- PASS: TestGamma (0.01s)\nPASS\n"
+
+	tests := []struct {
+		name    string
+		pattern string
+		rc      string
+		log     string
+		want    string
+		// mustName, when set, has to appear in the verdict note: an operator
+		// needs to know WHICH cited test vanished, not that a count was short.
+		mustName []string
+	}{
+		{
+			name: "every cited test passed", pattern: threeCited, rc: "0",
+			log: allThree, want: "PASS",
+		},
+		{
+			// THE DEFECT. Under the old count-based rule this passed: one
+			// `--- PASS` line was enough for a gate citing three tests.
+			name: "only one of three cited tests passed", pattern: threeCited, rc: "0",
+			log:  "--- PASS: TestAlpha (0.01s)\nPASS\n",
+			want: "FAIL", mustName: []string{"TestBeta", "TestGamma"},
+		},
+		{
+			// The original countermeasure must survive the change.
+			name: "no tests ran at all", pattern: threeCited, rc: "0",
+			log: "testing: warning: no tests to run\nPASS\n", want: "FAIL",
+		},
+		{
+			name: "a cited test failed", pattern: threeCited, rc: "1",
+			log:  strings.Replace(allThree, "--- PASS: TestGamma", "--- FAIL: TestGamma", 1),
+			want: "FAIL", mustName: []string{"TestGamma"},
+		},
+		{
+			// Real pattern from gate 5. An exact citation must not be satisfied
+			// by a LONGER test name that merely starts with it — the two are
+			// separately cited and a prefix match would conflate them.
+			name:    "an anchored citation is not satisfied by a longer name",
+			pattern: "TestStreamContract$|TestStreamContractRatchetIsClosed", rc: "0",
+			log:  "--- PASS: TestStreamContractRatchetIsClosed (0.01s)\n",
+			want: "FAIL", mustName: []string{"TestStreamContract"},
+		},
+		{
+			// Also real: gate 5 cites `ExitSevenErrors`, a suffix shared by six
+			// per-module tests. A substring citation is legitimate and must keep
+			// working — and must be declared as such in the note.
+			name:    "a substring citation is satisfied and declared",
+			pattern: "TestStreamContract$|ExitSevenErrors", rc: "0",
+			log:  "--- PASS: TestStreamContract (0.01s)\n--- PASS: TestWebExitSevenErrors (0.01s)\n",
+			want: "PASS", mustName: []string{"substring citation"},
+		},
+		{
+			name:    "an unsatisfied substring citation fails",
+			pattern: "TestStreamContract$|ExitSevenErrors", rc: "0",
+			log:  "--- PASS: TestStreamContract (0.01s)\n",
+			want: "FAIL", mustName: []string{"ExitSevenErrors"},
+		},
+		{
+			// THE HARNESS ASSERTS ON ITSELF. A pattern that parses to zero cited
+			// names would make the by-name check vacuously true and report PASS
+			// having asserted nothing — the same shape as the extraction bug
+			// that produced 0-byte command files during this phase's planning
+			// and reported PASS having run nothing.
+			name: "a pattern citing no names is not a pass", pattern: "|", rc: "0",
+			log:  "--- PASS: TestAnything (0.01s)\n",
+			want: "FAIL", mustName: []string{"ZERO cited test names"},
+		},
+		{
+			// Subtests are not a substitute for their parent: if the parent
+			// failed, Go prints no top-level PASS for it.
+			name:    "a passing subtest does not satisfy its parent's citation",
+			pattern: "TestAlpha", rc: "1",
+			log:  "    --- PASS: TestAlpha/sub (0.00s)\n--- FAIL: TestAlpha (0.01s)\n",
+			want: "FAIL", mustName: []string{"TestAlpha"},
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			got := runGateVerdict(t, tc.pattern, tc.rc, tc.log)
+			status := got
+			if i := strings.Index(got, " "); i > 0 {
+				status = got[:i]
+			}
+			if status != tc.want {
+				t.Fatalf("verdict = %s, want %s\n  full: %s", status, tc.want, got)
+			}
+			for _, want := range tc.mustName {
+				if !strings.Contains(got, want) {
+					t.Errorf("the verdict does not mention %q — an operator cannot act on it:\n  %s",
+						want, got)
+				}
+			}
+		})
+	}
+}
+
+// writeStubGo installs a fake `go` on a private PATH so the release-gates script
+// can be driven end to end in milliseconds, without running the real suite.
+//
+// failing=true makes every invocation exit 1, which is how the retention branch
+// is reached. failing=false makes it echo a `--- PASS` line for every test the
+// -run pattern cites (and a well-formed realtools census for `make
+// realtools-args`), which is how the removal branch is reached.
+func writeStubGo(t *testing.T, failing bool) string {
+	t.Helper()
+	dir := t.TempDir()
+	body := "#!/bin/sh\n"
+	if failing {
+		body += "echo 'stub go: build failed' >&2\nexit 1\n"
+	} else {
+		body += `case " $* " in
+  *" -tags realtools "*)
+    for t in TestRealToolArgVectors TestRealtoolsVulnsPhase6 TestRealtoolsOSINTPhase7; do
+      echo "=== RUN   $t"
+      echo "REALTOOLS_CENSUS test=$t mode=REFERENCE present=37 skipped=0 skipped_tools=(none)"
+      echo "--- PASS: $t (0.00s)"
+    done
+    echo PASS
+    exit 0
+    ;;
+esac
+pattern=""
+prev=""
+for a in "$@"; do
+  if [ "$prev" = "-run" ]; then pattern="$a"; fi
+  prev="$a"
+done
+if [ -n "$pattern" ]; then
+  echo "$pattern" | tr '|' '\n' | sed 's/^\^//; s/\$$//' | while read -r n; do
+    [ -n "$n" ] || continue
+    echo "=== RUN   $n"
+    echo "--- PASS: $n (0.00s)"
+  done
+fi
+echo PASS
+exit 0
+`
+	}
+	p := filepath.Join(dir, "go")
+	if err := os.WriteFile(p, []byte(body), 0o700); err != nil {
+		t.Fatalf("write stub go: %v", err)
+	}
+	return dir
+}
+
+// logDirFrom pulls the printed LOGDIR path out of the script's output.
+func logDirFrom(t *testing.T, out, marker string) string {
+	t.Helper()
+	for _, line := range strings.Split(out, "\n") {
+		if i := strings.Index(line, marker); i >= 0 {
+			return strings.TrimSpace(line[i+len(marker):])
+		}
+	}
+	t.Fatalf("release-gates.sh never printed %q, so a reader is left guessing where its logs\n"+
+		"  are:\n%s", marker, out)
+	return ""
+}
+
+// TestReleaseGateKeepsLogDirOnFailure drives the REAL script to a real failure
+// and asserts the log directory its FAIL note cites still exists afterwards.
+//
+// It is not a source read. `trap 'rm -rf "$LOGDIR"' EXIT` ran on every path, so
+// the failure output referenced files that were already gone by the time anyone
+// opened the summary — the exact defect a source read would have called fixed
+// while it kept happening.
+func TestReleaseGateKeepsLogDirOnFailure(t *testing.T) {
+	script := filepath.Join(repoRoot(t), "scripts", "release-gates.sh")
+
+	t.Run("a failing run RETAINS the logs its FAIL note cites", func(t *testing.T) {
+		cmd := exec.Command("bash", script, "--gates-only", "--fail-fast")
+		cmd.Dir = repoRoot(t)
+		cmd.Env = append(os.Environ(), "PATH="+writeStubGo(t, true)+":"+minimalPATH)
+		raw, err := cmd.CombinedOutput()
+		out := string(raw)
+		if err == nil {
+			t.Fatalf("the script exited 0 with a stub `go` that always fails — the harness itself is\n"+
+				"  broken, so nothing below would prove anything:\n%s", out)
+		}
+
+		dir := logDirFrom(t, out, "logs RETAINED (a step FAILED):")
+		t.Cleanup(func() { _ = os.RemoveAll(dir) })
+
+		fi, statErr := os.Stat(dir)
+		if statErr != nil || !fi.IsDir() {
+			t.Fatalf("the log directory %s does NOT exist after a failing run. Every FAIL note in the\n"+
+				"  summary above ends with `full log: %s/<step>.log`, so the script's own failure\n"+
+				"  output points at files it deleted on the way out:\n%s", dir, dir, out)
+		}
+
+		// And it must hold the log the note names, not merely exist.
+		entries, readErr := os.ReadDir(dir)
+		if readErr != nil {
+			t.Fatalf("ReadDir(%s): %v", dir, readErr)
+		}
+		var logs int
+		for _, e := range entries {
+			if strings.HasSuffix(e.Name(), ".log") {
+				logs++
+			}
+		}
+		if logs == 0 {
+			t.Errorf("the retained directory %s holds no .log file — it is a name, not evidence:\n%s",
+				dir, out)
+		}
+		if !strings.Contains(out, "full log: "+dir) {
+			t.Errorf("no FAIL note cites a path under the retained directory %s, so retention and the\n"+
+				"  notes have drifted apart:\n%s", dir, out)
+		}
+	})
+
+	t.Run("a fully passing run REMOVES the logs and says so", func(t *testing.T) {
+		cmd := exec.Command("bash", script, "--gates-only")
+		cmd.Dir = repoRoot(t)
+		cmd.Env = append(os.Environ(), "PATH="+writeStubGo(t, false)+":"+minimalPATH)
+		raw, err := cmd.CombinedOutput()
+		out := string(raw)
+		if err != nil {
+			t.Skipf("the all-pass stub harness did not reach a clean run in this environment "+
+				"(%v); the retention branch above is the mutation-backed assertion:\n%s", err, out)
+		}
+		dir := logDirFrom(t, out, "logs removed (every step passed):")
+		if _, statErr := os.Stat(dir); !os.IsNotExist(statErr) {
+			t.Errorf("a fully passing run left %s behind; one temp directory per run is a real cost "+
+				"and the removal branch is what pays it", dir)
+		}
+	})
+}

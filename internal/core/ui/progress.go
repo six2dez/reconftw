@@ -1,6 +1,26 @@
 // Package ui — StageProgress type.
 //
-// StageProgress renders task names only; never tool stdout/stderr. (XCUT-07)
+// XCUT-07 AT THIS SINK. This header used to read "StageProgress renders task
+// names only; never tool stdout/stderr", and that stopped being true the moment
+// plan 16-01 made errors.ToolError.Error() append the tool's own stderr tail.
+// That string becomes task.Result.Reason via task.ToolDegraded and arrives here
+// through TaskDoneReason, so tool-controlled bytes — which routinely echo the
+// operator's argv and configuration back, `-t <token>`, an auth failure quoting
+// a bearer, a URL with an API key in the query string — were being written
+// verbatim to the operator's screen and to everything that captures it.
+//
+// The fix is NOT to stop carrying the stderr: that message is why a failure now
+// reads "unable to load public resolvers: open t: no such file or directory"
+// instead of "exit status 1". The fix is to redact where the bytes LEAVE the
+// process, which is XCUT-07's own stated posture. So:
+//
+//	Tool-derived text DOES reach this sink, and every byte of it passes through
+//	the redactor installed by SetRedactor before it is formatted.
+//
+// A nil redactor degrades to no redaction and is the zero value, so a
+// construction site that never calls SetRedactor behaves exactly as before —
+// which is why the wiring is asserted end-to-end through the compiled binary
+// (cmd/reconftw/redaction_e2e_test.go) and not only here.
 //
 // This file extends the existing internal/core/ui package with a reusable
 // live-progress type for the subs pipeline (GAP-3 closure) and for Phases 5-7
@@ -61,6 +81,38 @@ type StageProgress struct {
 	doneCount  int
 	stageStart time.Time
 	spinFrame  int
+	// redactor scrubs registered secrets from tool-derived reason text before it
+	// is rendered. Guarded by mu like every other mutable field: SetRedactor may
+	// be called from the command layer while a stage is already running.
+	redactor Redactor
+}
+
+// Redactor is the one method this package needs to scrub a secret from a line
+// it is about to write.
+//
+// Declared here as a one-method interface rather than importing
+// internal/core/log, for the same reason and in the same shape as
+// backend.Redactor: the ui package stays free of a log dependency it would need
+// for exactly one call, and a test can supply a trivial stub. *log.Redactor
+// satisfies it structurally.
+type Redactor interface {
+	Redact(string) string
+}
+
+// SetRedactor installs the redactor applied to every Reason this progress writer
+// renders. Passing nil (or never calling it) keeps the pre-existing behaviour
+// byte-for-byte, so no construction site is forced to change.
+//
+// It is a setter rather than a NewStageProgress parameter deliberately: the
+// redactor a run uses is the SAME instance the tool recorder holds, and at the
+// five StageProgress construction sites that instance is already in hand from
+// the enclosing RunOptions. A new positional parameter would have silently
+// accepted nil at any site the author forgot, which is the split-brain failure
+// this plan exists to remove, reintroduced one layer up.
+func (p *StageProgress) SetRedactor(r Redactor) {
+	p.mu.Lock()
+	p.redactor = r
+	p.mu.Unlock()
 }
 
 // NewStageProgress constructs a StageProgress. IsTTY(w) is evaluated once
@@ -135,8 +187,10 @@ func (p *StageProgress) TaskStart(taskName string) {
 //
 // VerbosityQuiet: only FAIL badges are emitted; all other badges are suppressed.
 //
-// XCUT-07: only taskName (a developer-controlled dot-namespaced string) and
-// badge/duration are rendered. No tool stdout or stderr flows into this method.
+// XCUT-07: this entry point renders only taskName (a developer-controlled
+// dot-namespaced string) and badge/duration — it passes an EMPTY reason. Its
+// sibling TaskDoneReason does carry tool-derived text; see the package header
+// for why that text is redacted here rather than suppressed upstream.
 func (p *StageProgress) TaskDone(taskName string, badge Badge, dur time.Duration) {
 	p.taskDone(taskName, badge, dur, "")
 }
@@ -148,6 +202,11 @@ func (p *StageProgress) TaskDone(taskName string, badge Badge, dur time.Duration
 // is decoration: an operator reads "[SKIP] web.nuclei 0s" and learns nothing,
 // which is exactly the state that let a config-only capability sit disabled while
 // the templates were installed on the box.
+//
+// reason is TOOL-DERIVED and therefore untrusted: task.ToolDegraded builds it
+// from errors.ToolError.Error(), which embeds up to 300 bytes of the tool's own
+// stderr. It is passed through the installed Redactor inside taskDone before any
+// formatting.
 func (p *StageProgress) TaskDoneReason(taskName string, badge Badge, dur time.Duration, reason string) {
 	p.taskDone(taskName, badge, dur, reason)
 }
@@ -159,7 +218,17 @@ func (p *StageProgress) taskDone(taskName string, badge Badge, dur time.Duration
 	total := p.taskCount
 	tty := p.effectiveTTY()
 	quiet := p.verbosity == VerbosityQuiet
+	rdct := p.redactor
 	p.mu.Unlock()
+
+	// THE SEAM. reason is the only untrusted input to this method, and this is
+	// the last point before it is formatted into bytes bound for the operator's
+	// terminal. Redacting here rather than at the construction site in
+	// task.ToolDegraded is deliberate: there is exactly one sink to protect,
+	// whereas there are many places a Reason can be built.
+	if rdct != nil && reason != "" {
+		reason = rdct.Redact(reason)
+	}
 
 	// Quiet mode suppresses everything except FAIL.
 	if quiet && badge != BadgeFAIL {

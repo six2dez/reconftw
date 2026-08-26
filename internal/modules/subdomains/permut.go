@@ -114,6 +114,129 @@ func writePermutStagingFile(app *appctx.AppContext, toolName string, lines []str
 	return stagingPath, nil
 }
 
+// permutationsFullList / permutationsShortList are v1's file names, deliberately.
+// An operator migrating from v1 points paths.wordlists_dir at their existing
+// data/wordlists and the tool finds what it expects; a new name would silently
+// leave them with a skipping permutation stage.
+const (
+	permutationsFullList  = "permutations_list.txt"
+	permutationsShortList = "permutations_list_short.txt"
+)
+
+// selectPermutationsWordlist implements v1's _select_permutations_wordlist
+// (modules/subdomains.sh:1478) against cfg.Subdomains.Permut.WordlistMode,
+// cfg.Subdomains.Permut.ShortThreshold and cfg.Paths.WordlistsDir.
+//
+// Returns ("", reason) when no usable list exists. The reason is returned rather
+// than logged here so the caller can put it on task.Result.Reason: a permutation
+// stage that produces nothing must say why, in the run's own output.
+//
+// The derivation is ONLY from paths.wordlists_dir. It deliberately does not fall
+// back to paths.data_dir: data_dir already means two different things in v2 (the
+// workspace root in stateful_subcommands.go, the tools root in
+// web.resolveToolsDir), and guessing a third meaning would put an unpredictable
+// path on a command line. An unset wordlists_dir skips loudly instead.
+func selectPermutationsWordlist(cfg *config.Config, sourceFile string) (string, string) {
+	dir := strings.TrimSpace(cfg.Paths.WordlistsDir)
+	if dir == "" {
+		return "", "no permutation wordlist: paths.wordlists_dir is not configured (v1: WORDLISTS_DIR, holding " +
+			permutationsFullList + " and " + permutationsShortList + ")"
+	}
+	full := filepath.Join(dir, permutationsFullList)
+	short := filepath.Join(dir, permutationsShortList)
+
+	var want string
+	switch strings.ToLower(strings.TrimSpace(cfg.Subdomains.Permut.WordlistMode)) {
+	case "full":
+		want = full
+	case "short":
+		want = short
+	case "auto", "":
+		// v1's deep short-circuit: deep mode always takes the full list, however
+		// large the seed set is.
+		switch {
+		case cfg.Advanced.Deep:
+			want = full
+		case countNonEmptyFileLines(sourceFile) <= cfg.Subdomains.Permut.ShortThreshold:
+			want = full
+		default:
+			want = short
+		}
+	default:
+		// v1's `*)` arm.
+		want = full
+	}
+
+	if !wordlistReadable(want) {
+		return "", "no permutation wordlist: " + want + " is missing or empty"
+	}
+	return want, ""
+}
+
+// countNonEmptyFileLines counts non-blank lines; an unreadable file counts 0,
+// which sends the "auto" branch to the full list — the same way v1's
+// `[[ -s "$source_file" ]] && count=…` leaves count at 0.
+func countNonEmptyFileLines(path string) int {
+	f, err := os.Open(path) //nolint:gosec // path derived from the run's own workspace
+	if err != nil {
+		return 0
+	}
+	defer f.Close() //nolint:errcheck
+	n := 0
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for scanner.Scan() {
+		if strings.TrimSpace(scanner.Text()) != "" {
+			n++
+		}
+	}
+	return n
+}
+
+// looksLikeHostnameCandidate reports whether line can be staged as a subdomain
+// candidate. Conservative by design: a permutation tool's stdout is the input to
+// the resolve stage, and anything that is not hostname-shaped there is noise at
+// best and an injected candidate at worst.
+func looksLikeHostnameCandidate(line string) bool {
+	if line == "" || len(line) > 253 {
+		return false
+	}
+	if !strings.Contains(line, ".") {
+		return false
+	}
+	for _, r := range line {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+		case r == '.', r == '-', r == '_':
+		default:
+			return false
+		}
+	}
+	// A leading or trailing dot, or an empty label, is not a hostname.
+	if strings.HasPrefix(line, ".") || strings.HasSuffix(line, ".") || strings.Contains(line, "..") {
+		return false
+	}
+	return true
+}
+
+// capCandidateBytes truncates candidates at limit bytes (newline included per
+// line), mirroring v1's `head -c "$PERMUTATIONS_LIMIT"`. limit <= 0 disables it.
+// Truncation is on a LINE boundary: v1's head -c can cut a hostname in half, and
+// half a hostname is a candidate that is simply wrong.
+func capCandidateBytes(lines []string, limit int64) []string {
+	if limit <= 0 {
+		return lines
+	}
+	var used int64
+	for i, l := range lines {
+		used += int64(len(l)) + 1
+		if used > limit {
+			return lines[:i]
+		}
+	}
+	return lines
+}
+
 // -------------------------------------------------------------------------
 // SubPermutTask — gotator permutations (SUBD-03 memory gate)
 // -------------------------------------------------------------------------
@@ -169,11 +292,46 @@ func (t *SubPermutTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	}
 
 	inputFile := resolvedMergedPath(app)
+
+	// CR-03. gotator's -perm is the word list it permutes WITH, and until now v2
+	// never passed one — while cfg.Subdomains.Permut.WordlistMode and
+	// ShortThreshold sat in config read by NOTHING and `deep --help` advertised
+	// "Permut wordlist mode = full". That is the uncommon_ports shape: a
+	// capability ported into config only.
+	//
+	// The review's stated mechanism was WRONG in two places, and the corrections
+	// matter because the fix is built from the mechanism (gotator v1.1, measured):
+	//
+	//   - "without it there is nothing to permute and the tool errors" — FALSE.
+	//     `gotator -sub seed -depth 1 -numbers 3 -md` exits 0 and emits 1602
+	//     candidates for a 5-host seed; it permutes with words it derives from
+	//     the seed list itself. The stage was not producing NOTHING, it was
+	//     producing the wrong, much smaller thing (15185 with the full list).
+	//   - "gotator's banner goes to stdout" — FALSE. The banner is on STDERR,
+	//     and the collector below already drops stderr events. -silent is passed
+	//     anyway: v1 passes it, and it keeps run.log readable.
+	//
+	// What IS unambiguous: `-perm <missing file>` makes gotator PANIC (exit 2),
+	// so the readable gate has to run BEFORE dispatch.
+	wordlist, wlWhy := selectPermutationsWordlist(cfg, inputFile)
+	if wordlist == "" {
+		if app.Log != nil {
+			app.Log.Info("subdomains.permut: no permutation wordlist — skipping",
+				"reason", wlWhy,
+				"wordlists_dir", cfg.Paths.WordlistsDir,
+				"mode", cfg.Subdomains.Permut.WordlistMode,
+			)
+		}
+		return task.Result{Status: task.StatusSkipped, Reason: wlWhy}, nil
+	}
+
 	args := []string{
 		"-sub", inputFile,
+		"-perm", wordlist,
 		"-depth", "1",
 		"-numbers", "3",
 		"-md",
+		"-silent",
 	}
 
 	// Run gotator via Stream for XCUT-09 heartbeat.
@@ -204,7 +362,12 @@ func (t *SubPermutTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 			continue
 		}
 		line := strings.ToLower(strings.TrimSpace(string(ev.Line)))
-		if line != "" {
+		// T-17-06-02. The collector stages what it is given, so what it is given
+		// has to be a hostname. gotator v1.1 puts its banner on stderr (dropped
+		// above), but "the current version prints decoration on the other stream"
+		// is not a property worth depending on — one banner line on stdout would
+		// otherwise become a subdomain candidate.
+		if looksLikeHostnameCandidate(line) {
 			lines = append(lines, line)
 		}
 	}
@@ -213,6 +376,13 @@ func (t *SubPermutTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 		return task.Result{Status: task.StatusErrored},
 			fmt.Errorf("gotator: tool stream ended badly: %w", streamErr)
 	}
+
+	// SUBD-03 / T-17-06-04. cfg.Subdomains.Permut.LimitBytes was the THIRD field
+	// in this struct that nothing read (WordlistMode and ShortThreshold were the
+	// other two). v1 applies it — `head -c "$PERMUTATIONS_LIMIT"`,
+	// modules/subdomains.sh:1517 — and it matters more now than before: giving
+	// gotator a real word list takes a 5-host seed from 1602 candidates to 15185.
+	lines = capCandidateBytes(lines, cfg.Subdomains.Permut.LimitBytes)
 
 	// A clean run with zero output (typically an empty input file) still goes
 	// through the helper: F3 requires "ran and found nothing" to CLEAR the
@@ -269,20 +439,74 @@ func (t *SubRegexPermutTask) Run(ctx context.Context, app *appctx.AppContext) (t
 	}
 
 	inputFile := resolvedMergedPath(app)
-	res, err := app.Tools.Run(ctx, "regulator", []string{inputFile, app.Target.Domain})
-	if err != nil {
+
+	// CR-04, proven behaviourally against regulator at commit 2371a06 (the clone
+	// install.sh creates, run through its own venv). Both halves of the review's
+	// mechanism hold — unusually, since CR-01's did not:
+	//
+	//	$ main.py hosts.txt example.com                       # what v2 dispatched
+	//	main.py: error: the following arguments are required: -t/--target, -f/--hosts
+	//	exit=2, 0 lines on stdout
+	//	$ main.py -t example.com -f hosts.txt -o regulator.out # v1, subdomains.sh:1650
+	//	exit=0, 0 lines on STDOUT, 9 candidates in regulator.out
+	//
+	// regulator's interface is `-t TARGET -f HOSTS [-o OUTPUT]` and it prints
+	// NOTHING on stdout even when it succeeds, so the old vector failed twice
+	// over: it could not parse, and there was nothing to read if it had.
+	// RegexEnabled defaults to true, so every all/deep run took this path and
+	// staged zero candidates.
+	outputsDir := filepath.Join(app.Target.WorkDir, "inputs")
+	if err := os.MkdirAll(outputsDir, 0o755); err != nil {
+		return task.Result{Status: task.StatusErrored},
+			fmt.Errorf("regulator: mkdir inputs/: %w", err)
+	}
+	rawOutput := filepath.Join(outputsDir, "permut.regex.raw.txt")
+	// Remove any previous run's file FIRST. Without this, a regulator that failed
+	// to start would be indistinguishable from one that succeeded, because the
+	// stale file would be read as this run's result.
+	if err := os.Remove(rawOutput); err != nil && !os.IsNotExist(err) {
+		return task.Result{Status: task.StatusErrored},
+			fmt.Errorf("regulator: clear stale output %s: %w", rawOutput, err)
+	}
+
+	if _, err := app.Tools.Run(ctx, "regulator", []string{
+		"-t", app.Target.Domain,
+		"-f", inputFile,
+		"-o", rawOutput,
+	}); err != nil {
 		return task.Result{Status: task.StatusErrored},
 			fmt.Errorf("regulator: Run failed: %w", err)
 	}
 
+	raw, readErr := os.ReadFile(rawOutput) //nolint:gosec // path inside the run's own workspace
+	if readErr != nil || len(bytes.TrimSpace(raw)) == 0 {
+		reason := "regulator produced no output file at " + rawOutput
+		if readErr == nil {
+			reason = "regulator ran and its output file was empty (" + rawOutput + ")"
+		}
+		if app.Log != nil {
+			app.Log.Info("subdomains.permut.regex: no candidates — skipping", "reason", reason)
+		}
+		// Still clear the staging file: F3 requires "ran and found nothing" to
+		// remove the previous run's candidates rather than republish them.
+		if _, werr := writePermutStagingFile(app, "regex", nil); werr != nil {
+			return task.Result{Status: task.StatusErrored}, werr
+		}
+		return task.Result{Status: task.StatusSkipped, Reason: reason}, nil
+	}
+
 	var lines []string
-	scanner := bufio.NewScanner(bytes.NewReader(res.Stdout))
+	scanner := bufio.NewScanner(bytes.NewReader(raw))
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for scanner.Scan() {
 		line := strings.ToLower(strings.TrimSpace(scanner.Text()))
-		if line != "" {
+		// Same rule as the gotator collector (T-17-06-02): only hostname-shaped
+		// lines may become candidates.
+		if looksLikeHostnameCandidate(line) {
 			lines = append(lines, line)
 		}
 	}
+	lines = capCandidateBytes(lines, cfg.Subdomains.Permut.LimitBytes)
 
 	stagingPath, writeErr := writePermutStagingFile(app, "regex", lines)
 	if writeErr != nil {

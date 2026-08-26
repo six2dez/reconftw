@@ -35,8 +35,9 @@ type ResolverStatus struct {
 	// Path / TrustedPath are the files that were checked.
 	Path        string
 	TrustedPath string
-	// Usable is true when Path exists with at least one non-empty line. It is the
-	// only field a caller needs to decide whether a DNS-resolving run can proceed.
+	// Usable is true when Path exists and holds at least one resolver-shaped
+	// line (see CountResolverLines). It is the only field a caller needs to
+	// decide whether a DNS-resolving run can proceed.
 	Usable bool
 	// TrustedUsable is the same check for the trusted list.
 	TrustedUsable bool
@@ -198,14 +199,29 @@ func acquireReason(haveSomething, forced bool) string {
 	}
 }
 
-// fileUsable reports whether path names an existing regular file with content.
-// Size, not line count: the per-line count is the resolvers.health gate's job.
+// fileUsable reports whether path names an existing regular file that holds at
+// least one resolver-shaped line.
+//
+// CONTENT, not size. Size was the original test, and it is the "check that
+// passes for the wrong reason" shape: a 16-byte remnant left by a download that
+// died mid-body passed it, as did an HTML error page from a mirror that answered
+// 200. Both then reached puredns and dnsx as if they were resolver lists, and
+// the run degraded silently — which is the worst outcome available here, because
+// the resolver list is the highest-leverage input in the tool.
+//
+// The count is CountResolverLines, the same function the subdomains resolver
+// gates now call, so boot-time acquisition and the brute-force gate cannot
+// disagree about whether a given file is usable.
 func fileUsable(path string) bool {
 	if path == "" {
 		return false
 	}
 	fi, err := os.Stat(path)
-	return err == nil && !fi.IsDir() && fi.Size() > 0
+	if err != nil || fi.IsDir() || fi.Size() == 0 {
+		return false
+	}
+	n, err := CountResolverLines(path)
+	return err == nil && n > 0
 }
 
 // fileFresh reports whether path is usable AND younger than maxAgeDays.

@@ -190,10 +190,11 @@ func (SubRecursivePassiveTask) Run(ctx context.Context, app *appctx.AppContext) 
 	seen := make(map[string]struct{})
 	var allFound []string
 
-	timeoutSecs := cfg.Advanced.Tools.Subfinder.TimeoutMinutes * 60
-	if timeoutSecs <= 0 {
-		timeoutSecs = 180 // default 3 minutes per call
-	}
+	// CR-07: MINUTES, the unit subfinder's -max-time documents. This call site
+	// carried its own copy of the same minutes-times-sixty arithmetic as
+	// passive.go, which is why the shared helper exists — a duplicated
+	// conversion is a fix that lands in one place and not the other.
+	maxTimeMinutes := subfinderMaxTimeMinutes(app)
 
 	for _, sub := range targets {
 		if ctx.Err() != nil {
@@ -202,7 +203,7 @@ func (SubRecursivePassiveTask) Run(ctx context.Context, app *appctx.AppContext) 
 		args := []string{
 			"-all",
 			"-d", sub,
-			"-max-time", strconv.Itoa(timeoutSecs),
+			"-max-time", strconv.Itoa(maxTimeMinutes),
 			"-silent",
 		}
 		res, runErr := app.Tools.Run(ctx, "subfinder", args)
@@ -308,9 +309,13 @@ func (SubRecursiveBruteTask) Run(ctx context.Context, app *appctx.AppContext) (t
 			break
 		}
 
+		// POSITIONAL domain — same defect and same fix as SubBruteTask; see
+		// brute.go for the `puredns bruteforce --help` citation and the
+		// before/after tool output. `-d` names a FILE of domains, so this loop
+		// asked puredns to open every subdomain as a path and produced nothing.
 		args := []string{
 			"bruteforce", wordlistPath,
-			"-d", sub,
+			sub,
 			"--quiet",
 		}
 		// resolverListUsable, not `!= ""`: paths.resolvers now always carries a

@@ -61,6 +61,7 @@ func commonAfterBoot(
 	dryRun bool,
 	module string,
 	capture *dryRunCapture,
+	runSecrets *log.Redactor,
 ) {
 	_ = module // available for future use (axiom warn message prefix, if refactored)
 	_ = ctx    // available for future log-routing extensions
@@ -74,8 +75,7 @@ func commonAfterBoot(
 
 	if dryRun {
 		cfg.Advanced.Diff = false
-		rdct := &log.Redactor{}
-		registerSecrets(cfg, rdct)
+		rdct := wireRunSecrets(runSecrets, cfg)
 		if ts, err := task.Default.Build(); err == nil {
 			capture.Tasks = ts
 			capture.Cfg = cfg
@@ -84,13 +84,22 @@ func commonAfterBoot(
 		return
 	}
 
+	// Seed the run redactor from cfg UNCONDITIONALLY, before the liveUI branch.
+	// Doing it only inside that branch would leave logs/tools.jsonl unprotected
+	// on every non-TTY run — CI, nohup, `2>file` — which is precisely where a
+	// leaked key is most likely to be archived and pasted into an issue.
+	// Registration is idempotent, so the branch below re-seeding is harmless.
+	wireRunSecrets(runSecrets, cfg)
+
 	// GAP-3 log routing: route slog to <workdir>/run.log on interactive TTY.
 	liveUI := ui.Verbosity(cfg.Output.Verbosity) != ui.VerbosityQuiet && ui.IsTTY(os.Stderr)
 	if liveUI {
 		p := filepath.Join(workdir, "run.log")
 		if f, ferr := os.Create(p); ferr == nil { //nolint:gosec
-			rdct := &log.Redactor{}
-			registerSecrets(cfg, rdct)
+			// THE SAME instance the tool recorder holds, seeded once. A fresh
+			// &log.Redactor{} here is what made run.log and logs/tools.jsonl two
+			// different security postures for the same bytes.
+			rdct := wireRunSecrets(runSecrets, cfg)
 			lc := cfg.AsLoggerConfig()
 			lc.Output = f
 			subLogger := log.New(lc, rdct)
@@ -113,7 +122,13 @@ func commonAfterBoot(
 	// retains its own Launch+Shutdown.
 
 	// Wire per-task progress UI.
+	//
+	// SetRedactor is not optional here despite the nil-safe default: Result.Reason
+	// is built by task.ToolDegraded from errors.ToolError.Error(), which embeds
+	// the tool's stderr tail, so this sink receives tool-controlled bytes on every
+	// degraded task.
 	progress := ui.NewStageProgress(app.UI.W, app.UI.NoColor, app.UI.Verbosity)
+	progress.SetRedactor(runSecrets)
 	sched.RunTask = func(rctx context.Context, t task.Task) (task.Result, error) {
 		progress.TaskStart(t.Name())
 		started := time.Now()
@@ -206,10 +221,15 @@ func runCompositeCmd(
 	var summaryWorkdir string
 	var summaryVerbosity ui.Verbosity
 
+	// ONE redactor for the whole run: handed to RunOptions.Secrets (so the tool
+	// recorder holds it) and to commonAfterBoot (so run.log and the terminal
+	// share it, and so it gets seeded from cfg once cfg exists).
+	runSecrets := newRunRedactor()
+
 	afterBoot := func(boot handlers.AppBoot) {
 		summaryWorkdir = boot.WorkDir
 		summaryVerbosity = ui.Verbosity(boot.Cfg.Output.Verbosity)
-		commonAfterBoot(ctx, boot, sched, dryRun, subcommandName, &capture)
+		commonAfterBoot(ctx, boot, sched, dryRun, subcommandName, &capture, runSecrets)
 	}
 
 	var ct func(*config.Config)
@@ -218,7 +238,7 @@ func runCompositeCmd(
 	}
 
 	if err := handlers.RunCompositeAsync(ctx, handlers.RunOptions{
-		Secrets:         newRunRedactor(),
+		Secrets:         runSecrets,
 		Target:          targetFlag,
 		DryRun:          dryRun,
 		ConfigPath:      efs.configPath,
@@ -262,11 +282,15 @@ func runCompositeList(
 	results, err := runBatch(ctx, listFlag, func(bctx context.Context, target string) error {
 		sched := scheduler.NewScheduler(0, 0, nil, nil)
 		var capture dryRunCapture
+		// Per TARGET, not per batch: two targets in one --list run must not share
+		// a redactor, because a runtime token registered while scanning target A
+		// would then be scrubbed from target B's log for no stated reason.
+		runSecrets := newRunRedactor()
 		afterBoot := func(boot handlers.AppBoot) {
-			commonAfterBoot(bctx, boot, sched, dryRun, subcommandName, &capture)
+			commonAfterBoot(bctx, boot, sched, dryRun, subcommandName, &capture, runSecrets)
 		}
 		return handlers.RunCompositeAsync(bctx, handlers.RunOptions{
-			Secrets:         newRunRedactor(),
+			Secrets:         runSecrets,
 			Target:          target,
 			DryRun:          dryRun,
 			ConfigPath:      efs.configPath,
@@ -472,18 +496,54 @@ func newDeepCmd() *cobra.Command {
 	return cmd
 }
 
-// newRunRedactor builds the run's redactor and pre-registers every CONFIG-sourced
-// secret, so it is live from the first tool dispatch rather than from AfterBoot.
+// newRunRedactor builds THE run's redactor: the single instance every sink in
+// the run shares.
 //
-// commonAfterBoot also builds redactors, but it runs AFTER BootReconApp — too
-// late for the tool recorder, which is constructed during Boot. Modules register
-// RUNTIME-loaded secrets (the GitHub/GitLab token files) with this same instance
-// as they read them.
-func newRunRedactor() handlers.RunSecrets {
-	r := &log.Redactor{}
-	// cfg is not available this early; the config-sourced values are registered by
-	// commonAfterBoot's own redactors for the log sinks. What matters here is that
-	// a non-nil redactor exists before any tool is dispatched, so a runtime token
-	// registered by a module is scrubbed from logs/tools.jsonl.
-	return r
+// WHY IT IS EMPTY HERE, AND WHY THAT IS NOT THE OLD BUG. cfg genuinely is not
+// available at this point. The previous comment claimed the same thing and then
+// stopped, leaving the instance permanently empty — and that instance is what
+// protects logs/tools.jsonl. A different, config-seeded instance protected
+// run.log. So a Shodan key echoed by a tool was scrubbed from one file and
+// written verbatim to the other, and adding a tenth secret to registerSecrets
+// would have protected one sink and missed the other forever. That is the
+// split brain this plan removes.
+//
+// The claim "cfg is available in the afterBoot closures" was CHECKED against all
+// eleven call sites rather than assumed: every one of them sits in a RunOptions
+// composite literal evaluated BEFORE handlers.Run*Async, and therefore before
+// the config.Load inside BootReconApp. None is inside an afterBoot closure. So
+// the seeding cannot happen here; it happens in wireRunSecrets, which every
+// afterBoot path calls against THIS instance before the scheduler dispatches a
+// single task.
+//
+// Returns the concrete *log.Redactor rather than handlers.RunSecrets so the same
+// value can also be handed to log.New for the run.log sink — sharing the
+// instance is the whole point, and an interface return would have forced a
+// second one into existence at that call.
+func newRunRedactor() *log.Redactor {
+	return &log.Redactor{}
+}
+
+// wireRunSecrets seeds the run's redactor with every CONFIG-sourced secret and
+// returns THE SAME INSTANCE, so the terminal sink, logs/tools.jsonl and run.log
+// are all protected by one identity that cannot drift.
+//
+// It is called from every afterBoot path, which runs after BootReconApp (cfg
+// resolved, tool recorder already holding this instance) and before the
+// scheduler dispatches anything — the only window in which both facts hold.
+//
+// Seeding is done through registerSecrets, the same function the process-default
+// logger uses, so the two paths enumerate ONE list. A tenth secret added there
+// reaches all three sinks without a second edit;
+// TestRunRedactorAndLogRedactorShareRegisteredSecrets fails if it does not.
+//
+// A nil runSecrets yields a fresh seeded redactor rather than a panic: a caller
+// that forgot to build one still gets a protected log sink, and the end-to-end
+// guards are what prove the shared-instance path is the one production takes.
+func wireRunSecrets(runSecrets *log.Redactor, cfg *config.Config) *log.Redactor {
+	if runSecrets == nil {
+		runSecrets = &log.Redactor{}
+	}
+	registerSecrets(cfg, runSecrets)
+	return runSecrets
 }

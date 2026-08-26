@@ -88,14 +88,36 @@ func (s toolFlagSet) has(tok string) bool {
 // would then be derived from the arg vectors it is supposed to check.
 var knownToolFlags = map[string]toolFlagSet{
 	"puredns": {
-		source: "puredns resolve --help (v2.1.1)",
+		// RE-SOURCED from the BRUTEFORCE subcommand (17-04). The old table was
+		// read from `puredns resolve --help`, and `bruteforce` defines a flag
+		// `resolve` does not: `-d, --domains string  text file containing domains
+		// to bruteforce`.
+		//
+		// THIS IS THE TRAP, AND IT IS WORTH READING BEFORE TRUSTING THIS LAYER.
+		// With the old table, driving subdomains.brute made assertFlagsDefined
+		// report `-d` as UNDEFINED — a true failure for a FALSE reason. The real
+		// defect is not that `-d` does not exist; it is that `-d` takes a FILE of
+		// domains while brute.go passed a BARE DOMAIN, which puredns then tried to
+		// open:
+		//
+		//	$ puredns bruteforce wl.txt -d example.com -r res.txt --quiet
+		//	puredns error: open example.com: no such file or directory   (exit 1)
+		//	$ puredns bruteforce wl.txt example.com -r res.txt --quiet
+		//	www.example.com                                              (exit 0)
+		//
+		// Correcting this table therefore BLINDS the flag-name layer to the bug,
+		// exactly as it should: the flag IS defined, so an undefined-name check
+		// has nothing to say. See argvector_drift_test.go's header for which layer
+		// catches a defined-but-wrong-meaning flag, and why this one cannot.
+		source: "puredns bruteforce --help (v2.1.1)",
 		flags: []string{
+			"-d", "--domains",
 			"-r", "--resolvers", "--resolvers-trusted",
 			"-l", "--rate-limit", "--rate-limit-trusted",
 			"-t", "--threads", "-n", "--wildcard-tests", "--wildcard-batch",
 			"-b", "--bin", "-w", "--write", "--write-massdns", "--write-wildcards",
 			"--skip-sanitize", "--skip-validation", "--skip-wildcard-filter",
-			"--trusted-only", "-q", "--quiet", "--debug",
+			"--trusted-only", "-q", "--quiet", "--debug", "-h", "--help",
 		},
 	},
 	"subzy": {
@@ -118,6 +140,14 @@ var knownToolFlags = map[string]toolFlagSet{
 			"-random-agent", "-retries", "-timeout", "-threads", "-t", "-rate-limit", "-rl",
 			"-duc", "-disable-update-check", "-probe", "-sr", "-srd", "-ip", "-cdn",
 			"-favicon", "-jarm", "-asn", "-hash", "-irh", "-include-response-header",
+			// Added 17-04: the coverage census drove vulns.websocket for the first
+			// time and reported -websocket undefined. It is NOT undefined —
+			// `httpx -h` (v1.9.0, this box) lists
+			// `-ws, -websocket  display server using websocket`. This was a hole in
+			// the TABLE, not in the arg vector, and it is the same wrong-reason
+			// failure the puredns entry documents: a table read from a narrower
+			// source than the code uses.
+			"-ws", "-websocket",
 			"-H", "-header", "-x", "-method", "-body", "-d", "-delay", "-mc", "-fc",
 			"-ms", "-fs", "-debug", "-v", "-verbose", "-stats", "-dashboard",
 		},
@@ -144,6 +174,60 @@ var knownToolFlags = map[string]toolFlagSet{
 			"-duc", "-disable-update-check", "-nc", "-no-color", "-v", "-verbose",
 			"-config", "-pc", "-provider-config", "-stats", "-active", "-ei",
 			"-exclude-ip", "-m", "-match", "-f", "-filter", "-r", "-rL",
+		},
+	},
+	"sj": {
+		// Added 17-04. `-u` loads the API DEFINITION FILE from a URL, so the
+		// value must carry a scheme; osint/swagger.go passed a bare host and
+		// every one of the parity run's 100 invocations died on
+		// `unsupported protocol scheme ""`. The flag NAME was always fine, which
+		// is why only a shape check catches it.
+		source: "sj automate -h + sj -h (v2.6.1)",
+		flags: []string{
+			"-u", "--url", "-l", "--local-file", "-T", "--target", "-o", "--outfile",
+			"-F", "--output-format", "-f", "--format", "-b", "--base-path",
+			"-A", "--agent", "--randomize-user-agent", "-H", "--headers",
+			"-c", "--custom-url", "-d", "--custom-date", "--custom-email",
+			"-p", "--proxy", "--replay-proxy", "-i", "--insecure",
+			"-q", "--quiet", "-s", "--safe-word", "--force", "-t", "--timeout",
+			"-v", "--verbose", "--get-accessible-endpoints", "--test-string",
+			"--response-preview-length", "-h", "--help",
+		},
+	},
+	"subjs": {
+		// Added 17-04. FIVE FLAGS, and no stdin sentinel among them — `-i` is
+		// "Input file containing URLS", full stop. subdomains/scraping.go passed
+		// `-i -`, which subjs tried to open as a path.
+		source: "subjs -h (v1.0.1)",
+		flags:  []string{"-c", "-i", "-t", "-ua", "-version"},
+	},
+	"gotator": {
+		// Added 17-06 (CR-03). Read from `gotator -h` on this box; gotator prints
+		// its version only via `-version`, which reports 1.1.
+		//
+		// `-perm` is the one that matters: it is the word list gotator permutes
+		// WITH, and v2 never passed it. gotator does NOT error without it — it
+		// exits 0 and permutes with words derived from the -sub list, which is why
+		// the defect produced a plausible-looking 1602 candidates for a 5-host
+		// seed instead of the 15185 the full list produces. A tool that "works"
+		// while doing the wrong thing is the hardest kind to notice.
+		source: "gotator -h (v1.1)",
+		flags: []string{
+			"-adv", "-depth", "-fast", "-md", "-mindup", "-numbers",
+			"-perm", "-prefixes", "-silent", "-sub", "-t", "-version",
+		},
+	},
+	"regulator": {
+		// Added 17-06 (CR-04). Read from the clone install.sh creates
+		// (cramppet/regulator @2371a06) via `./venv/bin/python3 main.py -h`;
+		// regulator publishes no version string, so the COMMIT is the provenance.
+		// Short and long forms both listed because argparse accepts either.
+		source: "regulator main.py -h (cramppet/regulator @2371a06)",
+		flags: []string{
+			"-h", "--help",
+			"-th", "--threshold", "-mr", "--max-ratio", "-ml", "--max-length",
+			"-dl", "--dist-low", "-dh", "--dist-high",
+			"-t", "--target", "-f", "--hosts", "-o", "--output",
 		},
 	},
 	"tlsx": {
@@ -177,7 +261,13 @@ func TestToolFlagSetsHaveProvenance(t *testing.T) {
 	if len(knownToolFlags) == 0 {
 		t.Fatal("knownToolFlags is empty — the guard covers nothing")
 	}
-	versionish := regexp.MustCompile(`\(v[0-9]`)
+	// A VERSION, or — for a tool that publishes none — a pinned COMMIT. regulator
+	// has no --version of any kind; it is a repo clone with a main.py. A commit is
+	// strictly better provenance than a version string anyway (it names one exact
+	// tree), so the guard accepts `@<sha>` with at least 7 hex digits. It does NOT
+	// accept "latest", "HEAD" or a bare date: those cannot be re-derived, which is
+	// the whole property this check defends.
+	versionish := regexp.MustCompile(`\(v[0-9]|@[0-9a-f]{7,40}\)`)
 	for tool, set := range knownToolFlags {
 		switch {
 		case strings.TrimSpace(set.source) == "":
@@ -222,16 +312,16 @@ func TestToolFlagSetsHaveProvenance(t *testing.T) {
 //
 // NEVER add an entry to silence a NEW finding. A new undefined flag is a bug
 // found before it shipped, which is the entire point of this file.
-var knownBadArgVectors = map[string][]string{
-	// internal/modules/subdomains/takeover.go:82 passes --verify-ssl.
-	// subzy defines --verify_ssl (UNDERSCORE), so the tool exits
-	// `unknown flag: --verify-ssl` on every invocation and subzy takeover
-	// detection has produced zero results for as long as this vector existed.
-	// Same file and same class as the dnstake bug; found by plan 16-04 Task 1.
-	"subzy": {"--verify-ssl"},
-}
+//
+// EMPTY, and pinned at zero (17-04). The single entry — subzy's `--verify-ssl`,
+// recorded by 16-04 — was deleted in the same change that fixed the vector at
+// internal/modules/subdomains/takeover.go, exactly as the stale direction of the
+// ratchet forces. Re-populating this map means SHIPPING A KNOWN-BROKEN ARG
+// VECTOR ON PURPOSE, so it needs the constant raised in the same commit and the
+// reason written in the map.
+var knownBadArgVectors = map[string][]string{}
 
-const knownBadArgVectorsSize = 1
+const knownBadArgVectorsSize = 0
 
 // TestKnownBadArgVectorsArePinned stops the list growing without a diff.
 func TestKnownBadArgVectorsArePinned(t *testing.T) {

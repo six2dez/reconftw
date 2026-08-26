@@ -195,6 +195,9 @@ func realtoolsMode(c *probeCensus) (mode, reason string) {
 func reportRealtoolsCensus(t *testing.T, testName string, c *probeCensus, knownAbsent map[string]string) {
 	t.Helper()
 
+	// A SEEDED list wins over the compiled-in one. See resolveKnownAbsent.
+	knownAbsent = resolveKnownAbsent(t, testName, knownAbsent)
+
 	mode, reason := realtoolsMode(c)
 	c.mu.Lock()
 	present := c.sorted(c.present)
@@ -285,4 +288,153 @@ func joinOrNone(s []string) string {
 		return "(none)"
 	}
 	return strings.Join(s, ",")
+}
+
+// ---------------------------------------------------------------------------
+// Per-box seeding of the known-absent list (17-04)
+// ---------------------------------------------------------------------------
+
+// knownAbsentEnv names a file holding the expected-absent set for THIS box.
+//
+// Following REALTOOLS_REFERENCE's convention: an env var, read at test time, no
+// build tag, no flag.
+const knownAbsentEnv = "REALTOOLS_KNOWN_ABSENT"
+
+// resolveKnownAbsent returns the seeded expected-absent set for testName when
+// REALTOOLS_KNOWN_ABSENT names a readable file, and the compiled-in set
+// otherwise.
+//
+// # WHY THE LIST HAD TO BECOME SEEDABLE
+//
+// 16-04 hard-coded three lists into Go source and said plainly that they are a
+// property of ONE BOX. Three boxes have since produced three different censuses:
+// the 2026-08-20 provisioned box, the 2026-08-24 developer laptop, and reconbox3
+// (16-06 §2.2), where Gate 13 FAILed exactly as 16-04 predicted. Hard-coding
+// makes every box but one wrong, and a guard that is wrong everywhere is a guard
+// that gets disabled.
+//
+// # WHAT SEEDING DOES NOT CHANGE
+//
+// BOTH RATCHET DIRECTIONS STILL BITE, against whichever list is in force:
+// absent-and-unlisted still fails forward, listed-and-present still fails stale.
+// Seeding changes WHICH list is compared, never WHETHER it is compared. A seed
+// file that is unreadable, unparseable, or has no section for this test is a
+// FAILURE — silently falling back would let a typo in the path turn an enforced
+// ratchet into an unenforced one while the run still said REFERENCE.
+func resolveKnownAbsent(t *testing.T, testName string, compiledIn map[string]string) map[string]string {
+	t.Helper()
+	path := strings.TrimSpace(os.Getenv(knownAbsentEnv))
+	if path == "" {
+		return compiledIn
+	}
+	seeded, err := parseKnownAbsentFile(path)
+	if err != nil {
+		t.Fatalf("%s=%q could not be read: %v\n"+
+			"  Refusing to fall back to the compiled-in list: a typo in this path would silently turn\n"+
+			"  an enforced ratchet into an unenforced one while the run still reported REFERENCE.",
+			knownAbsentEnv, path, err)
+	}
+	section, ok := seeded[testName]
+	if !ok {
+		t.Fatalf("%s=%q has no [%s] section.\n"+
+			"  Every probe needs its own expected-absent set; an absent section is not an empty one.",
+			knownAbsentEnv, path, testName)
+	}
+	t.Logf("REALTOOLS_KNOWN_ABSENT test=%s source=%s entries=%d (compiled-in list of %d NOT used)",
+		testName, path, len(section), len(compiledIn))
+	return section
+}
+
+// parseKnownAbsentFile reads the INI-ish seed format documented in
+// testdata/known-absent.reconbox3.txt.
+//
+// A reason is REQUIRED on every entry, for the same reason it is required on the
+// compiled-in maps: an unexplained skip is indistinguishable from coverage.
+func parseKnownAbsentFile(path string) (map[string]map[string]string, error) {
+	data, err := os.ReadFile(path) //nolint:gosec // operator-supplied test fixture path
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]map[string]string{}
+	section := ""
+	for n, raw := range strings.Split(string(data), "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+			section = strings.TrimSpace(line[1 : len(line)-1])
+			if section == "" {
+				return nil, fmt.Errorf("%s:%d: empty section header", path, n+1)
+			}
+			if _, dup := out[section]; dup {
+				return nil, fmt.Errorf("%s:%d: section [%s] appears twice", path, n+1, section)
+			}
+			out[section] = map[string]string{}
+			continue
+		}
+		if section == "" {
+			return nil, fmt.Errorf("%s:%d: entry %q before any [section]", path, n+1, line)
+		}
+		k, v, found := strings.Cut(line, "=")
+		if !found {
+			return nil, fmt.Errorf("%s:%d: %q is not `tool = reason`", path, n+1, line)
+		}
+		tool, reason := strings.TrimSpace(k), strings.TrimSpace(v)
+		if tool == "" || reason == "" {
+			return nil, fmt.Errorf("%s:%d: entry %q needs both a tool and a REASON — an unexplained "+
+				"skip is indistinguishable from coverage", path, n+1, line)
+		}
+		out[section][tool] = reason
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("%s parsed to ZERO sections — an empty seed would silently disable the "+
+			"ratchet it is meant to make correct", path)
+	}
+	return out, nil
+}
+
+// TestKnownAbsentSeedFileParses pins the checked-in reconbox3 seed.
+//
+// A seed file nobody parses is a file that rots. This asserts it parses, is
+// non-empty, and carries a section for each of the three probes — so a
+// hand-edit that breaks it fails HERE, on a laptop, rather than on the
+// provisioned box during a cutover sign-off.
+func TestKnownAbsentSeedFileParses(t *testing.T) {
+	const path = "testdata/known-absent.reconbox3.txt"
+	seeded, err := parseKnownAbsentFile(path)
+	if err != nil {
+		t.Fatalf("%s: %v", path, err)
+	}
+	for _, probe := range []string{
+		"TestRealToolArgVectors", "TestRealtoolsVulnsPhase6", "TestRealtoolsOSINTPhase7",
+	} {
+		section, ok := seeded[probe]
+		if !ok {
+			t.Errorf("%s has no [%s] section", path, probe)
+			continue
+		}
+		if len(section) == 0 {
+			t.Errorf("%s: [%s] is empty — an empty section reads as \"nothing is expected absent\", "+
+				"which on this box is false", path, probe)
+		}
+		for tool, reason := range section {
+			if strings.TrimSpace(reason) == "" {
+				t.Errorf("%s: [%s] %q has no reason", path, probe, tool)
+			}
+		}
+	}
+	// The counts recorded in 16-06 §2.2. Pinned so an edit that drops entries is
+	// a visible failure rather than a quietly smaller list.
+	for probe, want := range map[string]int{
+		"TestRealToolArgVectors":   9,
+		"TestRealtoolsVulnsPhase6": 6,
+		"TestRealtoolsOSINTPhase7": 14,
+	} {
+		if got := len(seeded[probe]); got != want {
+			t.Errorf("%s: [%s] holds %d entries, the reconbox3 census recorded %d skipped "+
+				"(16-06-PARITY.md §2.2). Reconcile against that record, not against this box.",
+				path, probe, got, want)
+		}
+	}
 }

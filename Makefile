@@ -122,13 +122,33 @@ test:
 # not have. On a partial toolchain each probe reports CENSUS_ONLY and prints what
 # it did not verify. Set REALTOOLS_REFERENCE=1 on a provisioned box to enforce
 # the known-absent ratchet — see internal/core/backend/realtools_census_test.go.
-REALTOOLS_TESTS := TestRealToolArgVectors TestRealtoolsVulnsPhase6 TestRealtoolsOSINTPhase7
+#
+# 17-04 adds a FOURTH realtools test and a FIFTH, HERMETIC one:
+#
+#   TestRealtoolsFixedArgVectors        runs each of the six fixed arg vectors
+#                                       against its installed binary and asserts
+#                                       the tool ACCEPTS the invocation.
+#   TestEveryRegisteredTaskIsAccountedFor
+#                                       the hermetic completeness census over all
+#                                       97 registered Tasks. It needs no binaries,
+#                                       but it belongs in the same output surface
+#                                       so ONE target reports BOTH the hermetic
+#                                       coverage and the real-tool coverage.
+#
+# The two are guarded separately because they emit DIFFERENT census lines, and a
+# guard that counted them together would be satisfied by four of one and none of
+# the other — the same shape as the `>= 3` count this target already replaced.
+REALTOOLS_TESTS := TestRealToolArgVectors TestRealtoolsVulnsPhase6 TestRealtoolsOSINTPhase7 TestRealtoolsFixedArgVectors
+
+# COVERAGE_TESTS emit ARGV_COVERAGE rather than REALTOOLS_CENSUS. Required BY
+# NAME and by census line, for the same reason as above.
+COVERAGE_TESTS := TestEveryRegisteredTaskIsAccountedFor
 
 realtools-args:
 	@out=$$(go test -tags realtools -count=1 -v ./internal/core/backend/ 2>&1); \
 	echo "$$out"; \
 	missing=""; \
-	for tn in $(REALTOOLS_TESTS); do \
+	for tn in $(REALTOOLS_TESTS) $(COVERAGE_TESTS); do \
 		echo "$$out" | grep -qE "^=== RUN   $$tn$$" || missing="$$missing $$tn"; \
 	done; \
 	if [ -n "$$missing" ]; then \
@@ -144,8 +164,17 @@ realtools-args:
 		echo "       reads as coverage and is not."; \
 		exit 1; \
 	fi; \
+	for tn in $(COVERAGE_TESTS); do \
+		echo "$$out" | grep -qE 'ARGV_COVERAGE registered=[0-9]+ driven=' || { \
+			echo "ERROR: $$tn ran but emitted NO 'ARGV_COVERAGE registered=' line."; \
+			echo "       The hermetic completeness census is the only thing that reports the Tasks"; \
+			echo "       NOBODY is checking. A run without it is a run whose coverage is unknown."; \
+			exit 1; \
+		}; \
+	done; \
 	echo "$$out" | grep 'REALTOOLS_CENSUS test='; \
-	echo "realtools: all $(words $(REALTOOLS_TESTS)) arg-vector test(s) executed"; \
+	echo "$$out" | grep 'ARGV_COVERAGE registered='; \
+	echo "realtools: all $(words $(REALTOOLS_TESTS)) real-tool + $(words $(COVERAGE_TESTS)) coverage test(s) executed"; \
 	echo "$$out" | grep -qE '^(FAIL|--- FAIL|    --- FAIL)' && exit 1 || exit 0
 
 # test-integration: Ring 1 + Ring 2 + Ring 4. Per-commit (<5min budget).

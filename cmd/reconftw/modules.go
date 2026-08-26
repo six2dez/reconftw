@@ -18,7 +18,7 @@ package main
 import (
 	// Phase 4 subdomains passive Tasks — triggers task.Register for
 	// SubfinderTask, CrtTask, GithubSubdomainsTask, GitlabSubdomainsTask,
-	// UrlfinderTask, HackertargetTask via passive.go init() calls.
+	// UrlfinderTask via passive.go init() calls.
 	_ "github.com/six2dez/reconftw/internal/modules/subdomains"
 
 	// Phase 5 web Tasks — triggers task.Register for HTTPXTask via

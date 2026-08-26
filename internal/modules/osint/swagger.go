@@ -38,6 +38,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -123,7 +124,29 @@ func (t *SwaggerTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 	}
 
 	// --- Engine 2: sj (per workspace host, D-O2 opportunistic enrichment) ------
-	hosts := readWorkspaceHosts(app.Target.WorkDir)
+	//
+	// SCHEME-BEARING URLs, not bare hosts. sj resolves the `-u` value as a URL:
+	//
+	//	$ sj automate -q -u api.example.com
+	//	[✗] Error: response not received.
+	//	Get "api.example.com": unsupported protocol scheme ""              (exit 1)
+	//	$ sj automate -q -u http://127.0.0.1:9/swagger.json
+	//	Get "http://…": dial tcp 127.0.0.1:9: connect: connection refused  (accepted)
+	//
+	// readWorkspaceHosts returns hosts.jsonl's "host" field, which is a BARE
+	// HOST — so all 100 sj invocations in the phase-16 parity run were dead
+	// (16-06 §6.3).
+	//
+	// The scheme is READ, never fabricated: hosts.jsonl carries a "url" field
+	// written by HTTPXTask from httpx's own JSONL output, so it records the
+	// scheme httpx actually observed on that host. Concatenating a default
+	// "https://" would have invented a fact — and half the time the wrong one.
+	hosts, droppedNoScheme := readWorkspaceHostURLs(app.Target.WorkDir)
+	if droppedNoScheme > 0 && app.Log != nil {
+		app.Log.Info("osint.swagger: workspace entries without a scheme were skipped for sj",
+			"dropped", droppedNoScheme,
+			"reason", "sj resolves -u as a URL; a bare host yields `unsupported protocol scheme`")
+	}
 	if len(hosts) == 0 {
 		// D-O2: log-skip when absent — best_effort, NOT an error/bootstrap.
 		if app.Log != nil {
@@ -137,7 +160,7 @@ func (t *SwaggerTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 			if ctx.Err() != nil {
 				break
 			}
-			// v1 sj auto-analysis arg vector: sj automate -u <host/url>.
+			// v1 sj auto-analysis arg vector: sj automate -u <url>.
 			res, err := app.Tools.Run(ctx, "sj", []string{"automate", "-u", host})
 			if err != nil {
 				if app.Log != nil {
@@ -277,3 +300,53 @@ func parseHostLines(data []byte, field string) []string {
 
 // init self-registers SwaggerTask with the Default task registry.
 func init() { task.Register(&SwaggerTask{}) }
+
+// readWorkspaceHostURLs returns the workspace's SCHEME-BEARING URLs, plus the
+// number of entries dropped for having no scheme.
+//
+// It is deliberately separate from readWorkspaceHosts, which four other Tasks
+// (osint.cewler, osint.cmseek, osint.favirecon, osint.gqlspection) depend on for
+// BARE HOSTS. Changing that shared function's contract to satisfy sj would have
+// altered four Tasks this plan does not touch and cannot verify.
+//
+// Sources, in order: artefacts/hosts.jsonl "url" (written by HTTPXTask from
+// httpx's own output, so the scheme is observed rather than assumed), then
+// artefacts/urls.jsonl "url".
+//
+// A scheme-less entry is COUNTED AND DROPPED, never repaired with a default. The
+// count is returned so the caller can log it: silently discarding input is how a
+// coverage loss disguises itself as a clean run.
+func readWorkspaceHostURLs(workDir string) (urls []string, droppedNoScheme int) {
+	seen := make(map[string]struct{})
+	add := func(raw string) {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			return
+		}
+		u, err := url.Parse(raw)
+		if err != nil || u.Scheme == "" || u.Host == "" {
+			droppedNoScheme++
+			return
+		}
+		if _, ok := seen[raw]; ok {
+			return
+		}
+		seen[raw] = struct{}{}
+		urls = append(urls, raw)
+	}
+
+	for _, src := range []struct{ file, field string }{
+		{"hosts.jsonl", "url"},
+		{"urls.jsonl", "url"},
+	} {
+		path := filepath.Join(workDir, "artefacts", src.file)
+		data, err := os.ReadFile(path) //nolint:gosec // within WorkDir
+		if err != nil {
+			continue
+		}
+		for _, v := range parseHostLines(data, src.field) {
+			add(v)
+		}
+	}
+	return urls, droppedNoScheme
+}

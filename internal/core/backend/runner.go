@@ -257,6 +257,11 @@ func (r *Runner) streamWithContract(
 			// On a deadline the consumer is still reading, so forward the event.
 			// The abandonment arm is disabled only for that case; a genuinely
 			// abandoned consumer still hits it and the drain still happens.
+			//
+			// ONE POLICY, TWO PLACES: execRecorded below makes the same
+			// deadline-versus-other-cancellation distinction for the buffered
+			// path, and its comment enumerates all four outcome labels. Change
+			// the rule here and revisit it there.
 			abandoned := ctx.Done()
 			if stderrors.Is(ctx.Err(), context.DeadlineExceeded) {
 				abandoned = nil
@@ -280,6 +285,53 @@ func (r *Runner) streamWithContract(
 }
 
 // execRecorded brackets a buffered dispatch with its start/end records.
+//
+// ---------------------------------------------------------------------------
+// THE LABEL SWITCH — all four outcomes, why this order, and why each arm is
+// reachable. Read this before reordering anything.
+// ---------------------------------------------------------------------------
+//
+// The four labels are a PARTITION, and each arm below is judged on EVIDENCE the
+// invocation produced, never on ambient state that merely coincides with it.
+// Both of the defects this ordering fixes were the same mistake in different
+// clothes: asking a question the answer to which was true for the wrong reason.
+//
+//  1. dispatch_failed — the process was never created. Evidence: a backend set
+//     ToolError.NeverStarted at its own cmd.Start() failure. FIRST because it is
+//     the only arm that can distinguish "never ran" from "ran and failed", and by
+//     this point every other arm sees both as an identical `err != nil`.
+//     Reachable: a registered tool with no binary (Tool.Path == "").
+//     WAS MISSING ENTIRELY — 16-06-PARITY §6.4, 150 of 319 outcomes mislabelled.
+//
+//  2. timeout — a deadline ended it. Evidence: a *ToolTimeout from the backend,
+//     or (for a backend that does not construct one) an error TOGETHER WITH a
+//     DeadlineExceeded context. The `err != nil` conjunct is the whole fix for
+//     WR-04: this arm used to be `ctx.Err() != nil` alone and evaluated FIRST, so
+//     a tool that exited 0 microseconds before the parent context was cancelled
+//     was recorded as `timeout, exit_code=-1`, and a genuine non-zero exit under a
+//     cancelled context lost its real exit code and its stderr tail.
+//     Reachable: tool_timeout_test.go drives a real /bin/sleep past a 200ms
+//     Tool.Timeout.
+//
+//  3. exit_non_zero — it ran and failed. Reachable: any tool returning a
+//     *ToolError with a real exit code.
+//
+//  4. success / the result's own exit code — it ran and returned. A non-zero
+//     ExitCode on a non-nil Result is still exit_non_zero.
+//
+// LIMIT, STATED RATHER THAN PAPERED OVER. Consumer cancellation
+// (context.Canceled) and the tool's own deadline are distinguishable here, but a
+// deadline on the CALLER's context is not distinguishable from Tool.Timeout: both
+// surface as DeadlineExceeded on the derived context, because applyToolContract
+// derives one from the other. A consumer-cancelled tool therefore lands in arm 3
+// carrying the real *ToolError, which misleads least of the four: the closed
+// vocabulary has no `cancelled` member, the process DID start (so dispatch_failed
+// would be a lie), and no deadline fired (so timeout would be a lie).
+//
+// This mirrors — deliberately, as one policy in two places — the reasoning at the
+// Stream relay in streamWithContract above, which draws the same
+// deadline-versus-abandonment distinction for the streaming path and explains
+// there why forwarding differs between the two. Change one, revisit the other.
 func (r *Runner) execRecorded(ctx context.Context, toolName string, argv []string, do func() (*Result, error)) (*Result, error) {
 	started := time.Now()
 	id := r.Recorder.Start(toolName, ModeExec, argv)
@@ -288,7 +340,11 @@ func (r *Runner) execRecorded(ctx context.Context, toolName string, argv []strin
 
 	exit, outcome, stderrTail := 0, OutcomeSuccess, ""
 	switch {
-	case ctx.Err() != nil:
+	case coreerrors.IsDispatchFailure(err):
+		outcome = OutcomeDispatchFailed
+		exit = -1
+	case err != nil && (stderrors.Is(err, coreerrors.ErrTimeout) ||
+		stderrors.Is(ctx.Err(), context.DeadlineExceeded)):
 		outcome = OutcomeTimeout
 		exit = -1
 	case err != nil:

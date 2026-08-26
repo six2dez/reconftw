@@ -8,6 +8,10 @@
 // TEMP-FILE PATTERN (subjs→jsluice):
 // Backend.Runner has no stdin field — a direct pipe from subjs stdout to jsluice
 // stdin CANNOT be replicated through the Runner interface. Instead:
+//  0. Write the workspace's scheme-bearing URLs to inputs/scraping_subjs_urls.txt.tmp
+//     and pass THAT to subjs -i. subjs has no stdin sentinel: `-i -` fails with
+//     `Could not open input file: open -: no such file or directory`, and nothing
+//     was ever piped to it either (fixed 17-04).
 //  1. Run subjs → collect output
 //  2. Write output to raw/subjs.tmp.txt
 //  3. Run jsluice with -i raw/subjs.tmp.txt (file input, not stdin)
@@ -30,7 +34,9 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -93,13 +99,50 @@ func (SubScrapingTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	}
 
 	// Step 2a: subjs — collect JavaScript URLs.
-	subjsRes, err := app.Tools.Run(ctx, "subjs", []string{"-i", "-"})
-	if err != nil && app.Log != nil {
-		app.Log.Warn("scraping: subjs failed", "error", err.Error())
+	//
+	// A REAL FILE, not a stdin sentinel. subjs has no `-` convention — `-i`
+	// names a file and nothing else:
+	//
+	//	$ subjs -i - < /dev/null
+	//	Error running subjs: Could not open input file: open -: no such file …  (exit 1)
+	//	$ subjs -i urls.txt
+	//	                                                                       (exit 0)
+	//
+	// `subjs -h` (v1.0.1) lists exactly five flags — `-c -i -t -ua -version` —
+	// and `-i` is documented as "Input file containing URLS". The old vector was
+	// broken twice over: the sentinel is not a file, AND nothing was ever piped
+	// to it, so this leg contributed nothing. Written the same way the file-fed
+	// jsluice call below and web/subjs.go both do it.
+	subjsInputURLs, subjsDropped := scrapingSubjsInput(app)
+	if subjsDropped > 0 && app.Log != nil {
+		app.Log.Debug("scraping: workspace entries without a scheme skipped for subjs",
+			"dropped", subjsDropped)
 	}
 	var subjsOutput []byte
-	if err == nil {
-		subjsOutput = subjsRes.Stdout
+	if len(subjsInputURLs) == 0 {
+		if app.Log != nil {
+			app.Log.Info("scraping: no workspace URLs for subjs — skipping JS URL collection",
+				"source", "artefacts/hosts.jsonl|urls.jsonl")
+		}
+	} else {
+		subjsInputPath := filepath.Join(app.Target.WorkDir, "inputs", "scraping_subjs_urls.txt.tmp")
+		if wErr := os.MkdirAll(filepath.Dir(subjsInputPath), 0o755); wErr != nil {
+			return task.Result{Status: task.StatusErrored},
+				fmt.Errorf("scraping: mkdir inputs/: %w", wErr)
+		}
+		if wErr := os.WriteFile(subjsInputPath,
+			[]byte(strings.Join(subjsInputURLs, "\n")+"\n"), 0o644); wErr != nil { //nolint:gosec
+			return task.Result{Status: task.StatusErrored},
+				fmt.Errorf("scraping: write subjs input: %w", wErr)
+		}
+		subjsRes, sErr := app.Tools.Run(ctx, "subjs", []string{"-i", subjsInputPath})
+		if sErr != nil {
+			if app.Log != nil {
+				app.Log.Warn("scraping: subjs failed", "error", sErr.Error())
+			}
+		} else {
+			subjsOutput = subjsRes.Stdout
+		}
 	}
 
 	// Step 2b: write subjs output to a temp file.
@@ -395,3 +438,54 @@ func parseNSDelegationOutput(output []byte, domain string) []string {
 func init() { task.Register(SubScrapingTask{}) }
 func init() { task.Register(SubAnalyticsTask{}) }
 func init() { task.Register(SubNSDelegationTask{}) }
+
+// scrapingSubjsInput returns the workspace URLs to hand subjs, and the number of
+// scheme-less entries dropped.
+//
+// v1's sub_scraping pipes webs_all.txt — httpx's scheme-bearing URL list — into
+// subjs (web.sh). The v2 equivalent is artefacts/hosts.jsonl's "url" field,
+// which HTTPXTask writes from httpx's own JSONL output, with urls.jsonl as a
+// second source.
+//
+// Scheme-less entries are COUNTED AND DROPPED rather than repaired: subjs
+// fetches each line, and a bare host is not something to guess a scheme for.
+func scrapingSubjsInput(app *appctx.AppContext) (urls []string, droppedNoScheme int) {
+	seen := make(map[string]struct{})
+	for _, src := range []string{"hosts.jsonl", "urls.jsonl"} {
+		path := filepath.Join(app.Target.WorkDir, "artefacts", src)
+		f, err := os.Open(path) //nolint:gosec // within WorkDir
+		if err != nil {
+			continue
+		}
+		sc := bufio.NewScanner(f)
+		sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+		for sc.Scan() {
+			line := strings.TrimSpace(sc.Text())
+			if line == "" {
+				continue
+			}
+			raw := line
+			if strings.HasPrefix(line, "{") {
+				var rec struct {
+					URL string `json:"url"`
+				}
+				if json.Unmarshal([]byte(line), &rec) != nil || rec.URL == "" {
+					continue
+				}
+				raw = rec.URL
+			}
+			u, uErr := url.Parse(raw)
+			if uErr != nil || u.Scheme == "" || u.Host == "" {
+				droppedNoScheme++
+				continue
+			}
+			if _, ok := seen[raw]; ok {
+				continue
+			}
+			seen[raw] = struct{}{}
+			urls = append(urls, raw)
+		}
+		_ = f.Close()
+	}
+	return urls, droppedNoScheme
+}

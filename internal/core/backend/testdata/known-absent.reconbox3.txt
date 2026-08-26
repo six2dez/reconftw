@@ -1,0 +1,72 @@
+# known-absent.reconbox3.txt — the REFERENCE-mode expected-absent set for the
+# provisioned parity box, so the ratchet there compares against the right list
+# instead of failing for a reason nobody needs to re-derive.
+#
+# PROVENANCE
+#   host        reconbox3 (the phase-16 parity box)
+#   date        2026-08-24
+#   source      .planning/phases/16-live-run-observability-tool-contract-integrity/
+#               16-06-PARITY.md §2.2 — "Realtools census — REFERENCE mode, the
+#               first ever on a provisioned box"
+#   census      TestRealToolArgVectors   present=30 skipped=9
+#               TestRealtoolsVulnsPhase6 present=13 skipped=6
+#               TestRealtoolsOSINTPhase7 present=11 skipped=14
+#
+# WHY THIS FILE EXISTS
+#   16-04 seeded three known-absent lists into Go source. `smokeKnownAbsent` was
+#   seeded from a provisioned box and turned out EXACTLY right; the vulns and
+#   OSINT lists were derived on a developer laptop and did not match reconbox3 at
+#   all, which is why Gate 13 FAILed there — the ratchet working, as 16-04
+#   predicted. Three boxes have now produced three different censuses, so the list
+#   is a property of a BOX and belongs in a per-box file, not in the binary.
+#
+# HOW TO USE
+#   REALTOOLS_REFERENCE=1 \
+#   REALTOOLS_KNOWN_ABSENT=internal/core/backend/testdata/known-absent.reconbox3.txt \
+#     make realtools-args
+#
+#   Without REALTOOLS_KNOWN_ABSENT the compiled-in lists are used, unchanged.
+#
+# FORMAT
+#   [<TestFunctionName>]      section per probe
+#   <tool> = <reason>         one entry per tool; the reason is REQUIRED
+#   # comment                 ignored
+#
+# BOTH RATCHET DIRECTIONS STILL BITE. A tool that is absent and unlisted fails
+# (forward); a tool that is listed and present fails as stale. Seeding the list
+# changes WHICH list is compared, never WHETHER it is compared.
+
+[TestRealToolArgVectors]
+arjun     = python tool, uv-installed; absent on reconbox3 2026-08-24
+dnscewl   = repo-clone tool, not on PATH
+p1radup   = python tool, uv-installed
+regulator = repo-clone python tool, run via its own venv
+subwiz    = python tool, uv-installed
+subzy     = go tool; absent on reconbox3 (its production arg vector was ALSO wrong — fixed in 17-04)
+urless    = python tool, uv-installed
+wafw00f   = python tool, uv-installed
+waymore   = python tool, uv-installed
+
+[TestRealtoolsVulnsPhase6]
+commix     = python tool, uv-installed; absent on reconbox3 2026-08-24
+fray       = python tool from PyPI; absent on reconbox3
+ghauri     = python tool, uv-installed; optional SQLi engine
+gqlspection = python tool, uv-installed
+sqlmap     = system/repo-clone tool; absent on reconbox3
+testssl.sh = repo-clone shell tool; absent on reconbox3
+
+[TestRealtoolsOSINTPhase7]
+EmailHarvester = repo-clone python tool; absent on reconbox3 2026-08-24
+Spoofy         = repo-clone python tool; absent on reconbox3
+SwaggerSpy     = repo-clone python tool; absent on reconbox3
+cewler         = python tool, uv-installed; absent on reconbox3
+cloud_enum     = repo-clone python tool; absent on reconbox3
+cmseek         = repo-clone python tool; absent on reconbox3
+dorks_hunter   = repo-clone python tool; absent on reconbox3
+gato           = repo-clone python tool; absent on reconbox3
+ghleaks        = repo-clone go tool; absent on reconbox3
+gqlspection    = python tool, uv-installed; absent on reconbox3
+msftrecon      = repo-clone python tool; absent on reconbox3
+porch-pirate   = python tool, uv-installed; absent on reconbox3
+postleaksNg    = python tool, uv-installed; absent on reconbox3
+xnldorker      = python tool, uv-installed; absent on reconbox3

@@ -31,7 +31,24 @@ kind            = "go"
 go_module       = "github.com/projectdiscovery/subfinder/v2/cmd/subfinder"
 description     = "Passive multi-source subdomain enumeration"
 default_args    = []
-timeout_seconds = 180
+# 17-07 (CR-07): was 180 = THREE MINUTES, while v1 allows 180 MINUTES.
+# DERIVATION: subfinder is the only tool in this manifest that carries its own
+# time budget on the command line — `-max-time`, in MINUTES (subfinder v2.14.0
+# `-max-time int  minutes to wait for enumeration results`). The task passes
+# advanced.tools.subfinder.timeout_minutes into it, default 180
+# (config/defaults.go:391, matching reconftw.cfg:384 SUBFINDER_ENUM_TIMEOUT=180).
+# THE RELATIONSHIP THESE TWO VALUES MUST KEEP: this process deadline must be
+# >= that budget. A process deadline SHORTER than the tool's own budget means
+# the manifest silently wins and the configured budget is decoration — which is
+# what 180 seconds did: it cut the primary passive source off at three minutes,
+# and ExecEnv discards the stdout produced up to that point (see local.go), so
+# the contribution was zero rather than partial. Measured on 2026-08-26:
+# `subfinder -all -d example.com -silent` was still running at 210s having
+# emitted 0 lines, so a 180s kill takes the whole result.
+# 10800s (180 min) + 600s grace for subfinder's own shutdown and flush = 11400.
+# TestSubfinderProcessDeadlineCoversItsOwnBudget asserts the RELATIONSHIP against
+# config.Defaults(), so raising either value without the other fails there.
+timeout_seconds = 11400
 critical        = true
 version         = "v2.14.0"
 input_flag      = ""

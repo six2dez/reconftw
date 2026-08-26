@@ -125,7 +125,25 @@ func applyCLILogLevel(root *cobra.Command, cfg *config.Config) {
 	cfg.Output.LogLevel = level
 
 	// Rebuild through log.New so the RedactingHandler chain (XCUT-07) survives.
-	// A fresh Redactor + registerSecrets mirrors commonAfterBoot's run.log path.
+	//
+	// THIS IS A FOURTH REDACTOR INSTANCE, AND DELIBERATELY SO. applyCLILogLevel
+	// runs in PersistentPreRun, before any subcommand body has built the run's
+	// shared redactor (newRunRedactor is called in the RunOptions literal, which
+	// is evaluated later). There is nothing here to share, so a fresh instance is
+	// the only option — but it is seeded from registerSecrets, the SAME single
+	// enumeration every other sink is seeded from, so the two can never know
+	// different CONFIG secrets.
+	//
+	// NAMED RESIDUAL (see the sink table in internal/core/backend/recorder.go):
+	// this instance does NOT learn RUNTIME-registered secrets — a GitHub/GitLab
+	// token whose file contents a module registers on the run redactor before
+	// dispatch (plan 16-01's pattern). cliLogger is passed as RunOptions.Logger
+	// and can become app.Log, so on a NON-TTY run with an explicit
+	// --log-level/--quiet/--verbose, a runtime-registered token echoed by a tool
+	// would reach stderr unredacted. Config secrets are covered; runtime ones are
+	// not. Closing it means re-routing app.Log onto the shared instance once cfg
+	// and the run redactor both exist, which is a logging-routing change with its
+	// own reproduction to build and is deliberately NOT smuggled into 17-01.
 	rdct := &log.Redactor{}
 	registerSecrets(cfg, rdct)
 	cliLogger = log.New(cfg.AsLoggerConfig(), rdct)

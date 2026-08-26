@@ -258,8 +258,18 @@ func (t *IPInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 // resolveIPs runs dnsx -a -resp-only to resolve the root domain to A-record IPs.
 // Best_effort: a tool failure returns nil and the caller short-circuits.
 func (t *IPInfoTask) resolveIPs(ctx context.Context, app *appctx.AppContext, root string) []string {
-	// v1 arg vector: dnsx -duc -silent -a -resp-only -d <domain>
-	res, err := app.Tools.Run(ctx, "dnsx", []string{"-duc", "-silent", "-a", "-resp-only", "-d", root})
+	// THE LIST INPUT, not the bruteforce-domain input — see
+	// domain_info.go's writeDNSXListInput for the tool output that proves it.
+	// `-d` without `-w` is a fatal error, so this A-record resolve was dead and
+	// every geo finding downstream of it was empty (16-06 §6.3).
+	listFile, lErr := writeDNSXListInput(app, root)
+	if lErr != nil {
+		if app.Log != nil {
+			app.Log.Debug("osint.ip_info: dnsx list input write failed", "err", lErr)
+		}
+		return nil
+	}
+	res, err := app.Tools.Run(ctx, "dnsx", []string{"-duc", "-silent", "-a", "-resp-only", "-l", listFile})
 	if err != nil {
 		if app.Log != nil {
 			app.Log.Debug("osint.ip_info: dnsx resolve failed (best_effort)", "err", err)

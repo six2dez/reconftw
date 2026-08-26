@@ -23,7 +23,53 @@
 // cost the most time.
 //
 // WHY 0o600 RATHER THAN THE WORKSPACE'S USUAL 0o644. This file carries tool
-// stderr, which can contain response fragments from the target.
+// stderr, which can contain response fragments from the target — and, since plan
+// 16-01 made errors.ToolError.Error() embed that stderr, it can carry the
+// operator's own credentials back out of a tool that echoed them. The mode is
+// asserted by TestRecorderFilePermissions, which fails if it is ever widened; a
+// comment alone would not survive a later "normalisation" to 0o644.
+//
+// ------------------------------------------------------------------------
+// THE THREE SINKS THAT CARRY TOOL-DERIVED BYTES (plan 17-01 / TC-E)
+// ------------------------------------------------------------------------
+//
+// A tool's stderr reaches the operator by three routes. Each is protected by a
+// redactor, and this table says WHICH redactor and WHAT it knows, because before
+// 17-01 two of the three were protected by DIFFERENT instances that knew
+// different things and nothing said so.
+//
+//	SINK                      REDACTOR INSTANCE          KNOWS                       DOES NOT KNOW
+//	------------------------  -------------------------  --------------------------  ---------------------------
+//	terminal                  the run redactor           all 9 log.Secret config      secrets never registered
+//	(ui.StageProgress,        (newRunRedactor, seeded    fields (via registerSecrets) with either mechanism —
+//	 Result.Reason)            by wireRunSecrets;        + every RUNTIME secret a     e.g. a token read straight
+//	                           installed via              module registers before      from the environment by a
+//	                           SetRedactor)               dispatch                     tool the process never sees
+//
+//	logs/tools.jsonl          the SAME run redactor      identical set — this is      identical gap
+//	(this file, Argv +        (held by ToolRecorder      the point: one identity,
+//	 StderrTail)               since appctx.Boot)         three sinks
+//
+//	<workdir>/run.log         the SAME run redactor      identical set                identical gap
+//	(routed slog handler,      on the liveUI branch
+//	 module WARN lines)        (wireRunSecrets)
+//
+// NAMED RESIDUAL, not a caveat: on a NON-TTY run the liveUI branch is not taken,
+// no run.log exists, and slog goes to stderr through whichever logger
+// RunOptions.Logger carried — which, when --log-level/--quiet/--verbose was
+// given, is cliLogger from cmd/reconftw/loglevel.go. That is a FOURTH instance.
+// It is seeded from the same registerSecrets list, so it knows every CONFIG
+// secret, but it does NOT learn runtime-registered ones. See the comment at that
+// call site. Config secrets — the TC-E exposure — are covered on every path;
+// runtime-registered secrets are covered on every path EXCEPT that one.
+//
+// RUNTIME vs CONFIG is a distinction of registration TIMING, not of sink.
+// Config secrets are registered once, from cfg, in wireRunSecrets, before the
+// scheduler dispatches anything. Runtime secrets (a GitHub/GitLab token file a
+// module reads) are registered by that module on the same instance at the moment
+// it reads them and BEFORE it dispatches — which is why registering after
+// dispatch does not fix anything: the redactor only ever works from values it
+// already holds.
 
 package backend
 
@@ -70,8 +116,10 @@ type InvocationRecord struct {
 	ID    string `json:"id"`
 	Phase string `json:"phase"`
 	Time  string `json:"time"`
-	Tool  string `json:"tool"`
-	Mode  string `json:"mode"`
+	// Tool is carried on BOTH the start and the end record. On the end record it
+	// is what makes `group by tool` work with no id-join (16-06-PARITY §6.2).
+	Tool string `json:"tool"`
+	Mode string `json:"mode"`
 	// Argv is what the PROCESS received, captured after applyToolContract has
 	// merged Tool.DefaultArgs — not what the module wrote. An operator debugging
 	// a wrong flag needs the real command line.
@@ -117,6 +165,28 @@ type ToolRecorder struct {
 	f   *os.File
 	seq uint64
 
+	// inflight maps an invocation id to its tool name so the END record can name
+	// its tool. Entries are added by Start and DELETED by End.
+	//
+	// WHY A MAP AND NOT A PARAMETER ON End. Threading the name through End would
+	// be explicit and allocation-free, but it touches every call site — including
+	// the Stream relay, which writes its end record from a goroutine that would
+	// then have to capture the name — and every future caller would be able to
+	// pass a name that DISAGREES with the start record. The map cannot: the name
+	// on the end record is by construction the same string Start wrote.
+	//
+	// WHY IT CANNOT GROW WITHOUT BOUND (T-17-02-06). The entry is removed when the
+	// invocation ends, so the map holds only IN-FLIGHT invocations — bounded by
+	// concurrency (PARALLEL_MAX_JOBS), not by run length. A monitor-mode process
+	// running for days retains one entry per HUNG tool and nothing else, and a hung
+	// tool is itself the diagnostic. At ~40 bytes an entry that is unmeasurable.
+	//
+	// WHY IT DOES NOT TOUCH THE HANG SHAPE. Nothing here writes a record; End is
+	// still the only writer of an end record and is still called only by a caller
+	// whose invocation actually ended. A start with no matching end therefore stays
+	// exactly as unmatched as before — see TestRecorderHangShape.
+	inflight map[string]string
+
 	// err latches the FIRST write failure. A recorder that cannot write is a lost
 	// diagnostic; a recorder that fails a scan is a new outage. So write errors
 	// never propagate into the dispatch path — they are latched here and surfaced
@@ -141,7 +211,7 @@ func (r *ToolRecorder) Start(tool, mode string, argv []string) string {
 	if r == nil {
 		return ""
 	}
-	id := r.nextID()
+	id := r.beginInvocation(tool)
 	r.write(InvocationRecord{
 		ID:    id,
 		Phase: PhaseStart,
@@ -161,9 +231,16 @@ func (r *ToolRecorder) End(id string, exitCode int, dur time.Duration, outcome, 
 	}
 	ms := dur.Milliseconds()
 	r.write(InvocationRecord{
-		ID:         id,
-		Phase:      PhaseEnd,
-		Time:       time.Now().Format(time.RFC3339Nano),
+		ID:    id,
+		Phase: PhaseEnd,
+		Time:  time.Now().Format(time.RFC3339Nano),
+		// The tool name, so that
+		//   jq 'select(.phase=="end") | "\(.tool) \(.outcome)"' | sort | uniq -c
+		// — the first command an operator types — answers instead of printing
+		// blanks. Before this, `tool` appeared on the start record only, and
+		// 16-06-PARITY's decomposition of 319 failing invocations had to be done
+		// with an id-join nobody would think to write under pressure.
+		Tool:       r.endInvocation(id),
 		ExitCode:   &exitCode,
 		DurationMS: &ms,
 		Outcome:    outcome,
@@ -191,14 +268,34 @@ func (r *ToolRecorder) Close() error {
 	return closeErr
 }
 
-// nextID returns a per-recorder monotonic id. Monotonic rather than random so the
-// file reads in dispatch order and so tests are deterministic.
-func (r *ToolRecorder) nextID() string {
+// beginInvocation allocates the id and remembers the tool under one lock.
+//
+// The id is a per-recorder monotonic counter — monotonic rather than random so
+// the file reads in dispatch order and so tests are deterministic.
+func (r *ToolRecorder) beginInvocation(tool string) string {
 	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.seq++
-	n := r.seq
-	r.mu.Unlock()
-	return strconv.FormatUint(n, 10)
+	id := strconv.FormatUint(r.seq, 10)
+	if r.inflight == nil {
+		r.inflight = make(map[string]string)
+	}
+	r.inflight[id] = tool
+	return id
+}
+
+// endInvocation returns the tool name Start recorded for id and forgets it.
+//
+// A repeated End for the same id — which no caller does, but which a future one
+// might — yields "" rather than a stale name. An empty tool on an end record is a
+// visible defect (TestEndRecordCarriesToolName fails on it); a WRONG one would not
+// be, so the map deliberately does not retain.
+func (r *ToolRecorder) endInvocation(id string) string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	tool := r.inflight[id]
+	delete(r.inflight, id)
+	return tool
 }
 
 // redact scrubs registered secrets from the record IMMEDIATELY before

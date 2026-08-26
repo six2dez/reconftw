@@ -138,8 +138,24 @@ func (t *DomainInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 			cancelled = true
 			break
 		}
-		// v1 dnsx record lookup arg vector: dnsx -duc -silent -resp-only <type> -d <domain>
-		args := []string{"-duc", "-silent", "-resp-only", rt.flag, "-d", root}
+		// THE LIST INPUT, not the bruteforce-domain input. `-d/-domain` is
+		// dnsx's BRUTEFORCE input and requires `-w`:
+		//
+		//	$ dnsx -duc -silent -resp-only -ns -d example.com
+		//	[FTL] missing wordlist(w) flag required with domain(d) input   (exit 1)
+		//	$ dnsx -duc -silent -resp-only -ns -l one.txt
+		//	hera.ns.cloudflare.com                                         (exit 0)
+		//
+		// So ALL FIVE record lookups were dead for as long as this vector
+		// existed (16-06 §6.3). A single-name lookup goes through `-l`.
+		listFile, lErr := writeDNSXListInput(app, root)
+		if lErr != nil {
+			if app.Log != nil {
+				app.Log.Debug("osint.domain_info: dnsx list input write failed", "err", lErr)
+			}
+			continue
+		}
+		args := []string{"-duc", "-silent", "-resp-only", rt.flag, "-l", listFile}
 		res, err := app.Tools.Run(ctx, "dnsx", args)
 		if err != nil {
 			if app.Log != nil {
@@ -293,4 +309,24 @@ func writeOSINTStaging(app *appctx.AppContext, inputsDir, fileName string, recor
 	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
 		app.Log.Debug("osint: staging write failed", "path", stagingPath, "err", wErr)
 	}
+}
+
+// writeDNSXListInput writes name to a single-line file under inputs/ and
+// returns its path, for dnsx's `-l` list input.
+//
+// dnsx's `-l` accepts "file or stdin"; the Runner seam exposes neither stdin nor
+// cmd.Dir, so a real file is the form available here — and it is the form v2
+// already uses for every other dnsx list invocation in the tree. The file is
+// named after the query name so concurrent record-type lookups for different
+// roots cannot clobber one another.
+func writeDNSXListInput(app *appctx.AppContext, name string) (string, error) {
+	inputsDir := filepath.Join(app.Target.WorkDir, "inputs")
+	if err := os.MkdirAll(inputsDir, 0o755); err != nil {
+		return "", fmt.Errorf("mkdir inputs/: %w", err)
+	}
+	path := filepath.Join(inputsDir, "dnsx."+sanitizeIPForFilename(name)+".list.txt")
+	if err := os.WriteFile(path, []byte(name+"\n"), 0o644); err != nil { //nolint:gosec
+		return "", fmt.Errorf("write dnsx list input: %w", err)
+	}
+	return path, nil
 }

@@ -25,11 +25,12 @@ import (
 func newMirror(t *testing.T, body string) (*httptest.Server, *int) {
 	t.Helper()
 	hits := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		hits++
 		_, _ = w.Write([]byte(body))
 	}))
 	t.Cleanup(srv.Close)
+	resolvers.SetDownloadClientForTest(t, srv.Client())
 	return srv, &hits
 }
 
@@ -172,10 +173,11 @@ func TestEnsureDownloadsDespiteUpdateDisabledWhenNothingOnDisk(t *testing.T) {
 // the operator must get a fix, not a bare transport error.
 func TestEnsureErrorNamesTheRemedy(t *testing.T) {
 	dir := t.TempDir()
-	dead := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	dead := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer dead.Close()
+	resolvers.SetDownloadClientForTest(t, dead.Client())
 	cfg := baseCfg(dir, dead.URL)
 
 	st, err := resolvers.EnsureResolvers(context.Background(), cfg, nil)
@@ -194,10 +196,11 @@ func TestEnsureErrorNamesTheRemedy(t *testing.T) {
 // aborting a scan over an unreachable mirror.
 func TestEnsureFailureIsNonFatalWithExistingList(t *testing.T) {
 	dir := t.TempDir()
-	dead := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	dead := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer dead.Close()
+	resolvers.SetDownloadClientForTest(t, dead.Client())
 	cfg := baseCfg(dir, dead.URL)
 	if err := os.WriteFile(cfg.Paths.Resolvers, []byte("9.9.9.9\n"), 0o644); err != nil {
 		t.Fatalf("seed: %v", err)

@@ -76,10 +76,17 @@ func (TakeoverSubzyTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 
 	tmpOutFile := filepath.Join(rawDir, "subzy.out.json")
 
+	// --verify_ssl, with an UNDERSCORE. subzy defines the underscore form
+	// (`subzy run --help`, v1.2.0 on this box, v2.0.4 in knownToolFlags) and
+	// exits `Error: unknown flag: --verify-ssl` on the hyphenated one, so subzy
+	// takeover detection produced ZERO results for as long as that vector
+	// existed. Found by 16-04 Task 1, fixed here with a real-tool acceptance
+	// check (17-04 Task 2) and the knownBadArgVectors entry deleted in the same
+	// change.
 	args := []string{
 		"run",
 		"--targets", resolvedFile,
-		"--verify-ssl",
+		"--verify_ssl",
 		"--output", tmpOutFile,
 	}
 

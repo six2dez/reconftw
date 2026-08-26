@@ -6,8 +6,11 @@
 // output (D-04 per 09-CONTEXT.md).
 //
 // T-09-04-01 mitigation: download URL comes from config (not user CLI arg);
-// HTTPS enforced by hardcoded https:// scheme; response written to validated
-// cfg.Paths.Resolvers path; no shell execution of downloaded content.
+// httpDownload REFUSES any URL whose scheme is not https:// (the comment here
+// used to claim the scheme was "enforced by hardcoded https://" while nothing
+// checked it, and the URL is config-controlled); response written to a staging
+// file and published by rename onto the validated cfg.Paths.Resolvers path; no
+// shell execution of downloaded content.
 package resolvers
 
 import (
@@ -19,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/six2dez/reconftw/internal/core/backend"
@@ -101,7 +105,8 @@ func RunGenResolvers(ctx context.Context, cfg *config.Config) error {
 	}
 
 	if didFallback {
-		// T-09-04-01: URL from config (not user input); HTTPS enforced.
+		// T-09-04-01: URL from config (not user input); httpDownload refuses any
+		// non-HTTPS scheme before issuing the request.
 		downloadURL := cfg.Paths.ResolversDownload.URL
 		if downloadURL == "" {
 			downloadURL = fallbackResolversURL
@@ -147,18 +152,28 @@ func runDNSValidator(ctx context.Context, dnsvalidatorBin, outputPath string, th
 		Path: dnsvalidatorBin,
 	}
 
+	// Same shape as httpDownload's, found while auditing this package for it:
+	// dnsvalidator used to be handed the REAL destination as its -o, so a
+	// generation sweep that failed part-way (or was cancelled — this one runs for
+	// minutes) left a partial list where a working one had been. Generate into a
+	// staging file and publish by rename, so the previous list survives any
+	// failure below.
+	stagePath := outputPath + ".gen.part"
+	_ = os.Remove(stagePath)
+	defer func() { _ = os.Remove(stagePath) }() // no-op once the rename has moved it away
+
 	// First invocation: public-dns.info source.
 	args1 := []string{
 		"-tL", dnsvalidatorPublicDNS,
 		"-threads", fmt.Sprintf("%d", threads),
-		"-o", outputPath,
+		"-o", stagePath,
 	}
 	if _, err := be.Exec(ctx, tool, args1); err != nil {
 		return outputPath, fmt.Errorf("dnsvalidator (public-dns.info): %w", err)
 	}
 
 	// Second invocation: massdns resolvers source → tmp file then merge.
-	tmpPath := outputPath + ".massdns.tmp"
+	tmpPath := stagePath + ".massdns.tmp"
 	args2 := []string{
 		"-tL", dnsvalidatorMassdns,
 		"-threads", fmt.Sprintf("%d", threads),
@@ -167,17 +182,23 @@ func runDNSValidator(ctx context.Context, dnsvalidatorBin, outputPath string, th
 	if _, err := be.Exec(ctx, tool, args2); err != nil {
 		slog.WarnContext(ctx, "gen-resolvers: dnsvalidator massdns invocation failed (non-fatal)", "err", err)
 	} else {
-		// Merge tmp into main output (anew-style: append unique lines).
-		if mergeErr := appendUnique(tmpPath, outputPath); mergeErr != nil {
+		// Merge tmp into the staging output (anew-style: append unique lines).
+		if mergeErr := appendUnique(tmpPath, stagePath); mergeErr != nil {
 			slog.WarnContext(ctx, "gen-resolvers: merge massdns output failed (non-fatal)", "err", mergeErr)
 		}
 		_ = os.Remove(tmpPath)
 	}
 
 	// Check output is non-empty — if zero output, caller falls back to HTTP.
-	fi, err := os.Stat(outputPath)
+	// Checked on the STAGING file, before it is published: publishing first and
+	// validating afterwards is what would let a zero-output sweep replace a good
+	// list with an empty one and then report the failure.
+	fi, err := os.Stat(stagePath)
 	if err != nil || fi.Size() == 0 {
 		return outputPath, fmt.Errorf("dnsvalidator produced zero output")
+	}
+	if err := os.Rename(stagePath, outputPath); err != nil {
+		return outputPath, fmt.Errorf("publish %s: %w", outputPath, err)
 	}
 
 	return outputPath, nil
@@ -246,10 +267,30 @@ func splitLines(s string) []string {
 	return lines
 }
 
+// newDownloadClient builds the HTTP client used for resolver downloads. It is a
+// variable, not a literal, so package tests can substitute an httptest TLS
+// server's client — the HTTPS refusal below makes a plain-HTTP test mirror
+// unusable, and a loopback carve-out in the scheme check would be a hole in the
+// control it is supposed to enforce. Production never reassigns this.
+var newDownloadClient = func() *http.Client {
+	return &http.Client{Timeout: httpDownloadTimeout}
+}
+
 // httpDownload fetches url (HTTPS only per T-09-04-01) and writes the body to
 // destPath. T-09-04-04: bounded 60-second timeout.
 func httpDownload(ctx context.Context, url, destPath string) error {
-	client := &http.Client{Timeout: httpDownloadTimeout}
+	// T-09-04-01, actually implemented. The package header and RunGenResolvers
+	// both claimed "HTTPS enforced" while no code checked the scheme, and
+	// cfg.Paths.ResolversDownload.URL is config-controlled — reachable, per
+	// WR-11, from a reconftw.toml sitting in the working directory. A named
+	// control that does not exist is worse than an absent one, because the next
+	// reader stops looking. Refused before any request goes out.
+	if !strings.HasPrefix(strings.ToLower(url), "https://") {
+		return fmt.Errorf("resolvers: refusing non-HTTPS download URL %q "+
+			"(set paths.resolvers_download.url to an https:// mirror)", url)
+	}
+
+	client := newDownloadClient()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -266,14 +307,39 @@ func httpDownload(ctx context.Context, url, destPath string) error {
 		return fmt.Errorf("GET %s: unexpected status %d", url, resp.StatusCode)
 	}
 
-	f, err := os.OpenFile(destPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644) //nolint:gosec
+	// Write to a temp file beside the destination and rename only after a clean
+	// close. Opening destPath directly with O_TRUNC destroys a working resolver
+	// list the instant the response headers arrive; a body that then dies
+	// mid-transfer leaves a remnant where a good list used to be, and the run
+	// continues on it. A rename within one directory is atomic on both supported
+	// platforms, so the previous list either survives entirely or is replaced
+	// entirely — there is no third state.
+	f, err := os.CreateTemp(filepath.Dir(destPath), filepath.Base(destPath)+".*.part")
 	if err != nil {
-		return fmt.Errorf("create %s: %w", destPath, err)
+		return fmt.Errorf("create temp for %s: %w", destPath, err)
 	}
-	defer f.Close() //nolint:errcheck // read/cleanup path
+	tmpPath := f.Name()
+	// Any return below this point that is not the successful rename must leave no
+	// debris beside the resolver list.
+	defer func() {
+		_ = f.Close()
+		_ = os.Remove(tmpPath) // no-op once the rename has moved it away
+	}()
 
 	if _, err := io.Copy(f, resp.Body); err != nil {
 		return fmt.Errorf("write %s: %w", destPath, err)
+	}
+	// Close explicitly: this is a write path, so Close is where a buffered-flush
+	// or disk-full failure surfaces. Renaming a file whose Close failed would
+	// publish a truncated list under the good list's name.
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("close %s: %w", tmpPath, err)
+	}
+	if err := os.Chmod(tmpPath, 0o644); err != nil { //nolint:gosec // world-readable resolver list, as before
+		return fmt.Errorf("chmod %s: %w", tmpPath, err)
+	}
+	if err := os.Rename(tmpPath, destPath); err != nil {
+		return fmt.Errorf("publish %s: %w", destPath, err)
 	}
 	return nil
 }
