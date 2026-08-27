@@ -461,3 +461,99 @@ func splitLines(data []byte) []string {
 	}
 	return out
 }
+
+// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
+// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
+// arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
+//
+// It deliberately IGNORES opts.Stdin, opts.StdinPath and opts.Dir: this fake
+// never receives them. A fake that needs to ASSERT on stdin must write its own
+// ExecOpts instead of inheriting this forward — silently discarding the bytes is
+// correct only because nothing here is testing them.
+func (r *axiomRecorder) ExecOpts(ctx context.Context, t *backend.Tool, args []string, opts backend.ExecOptions) (*backend.Result, error) {
+	if len(opts.Env) > 0 {
+		return r.ExecEnv(ctx, t, args, opts.Env)
+	}
+	return r.Exec(ctx, t, args)
+}
+
+// StreamOpts satisfies the backend.Backend options seam (see ExecOpts).
+func (r *axiomRecorder) StreamOpts(ctx context.Context, t *backend.Tool, args []string, opts backend.ExecOptions) (<-chan backend.Event, error) {
+	if len(opts.Env) > 0 {
+		return r.StreamEnv(ctx, t, args, opts.Env)
+	}
+	return r.Stream(ctx, t, args)
+}
+
+// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
+// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
+// arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
+//
+// It deliberately IGNORES opts.Stdin, opts.StdinPath and opts.Dir: this fake
+// never receives them. A fake that needs to ASSERT on stdin must write its own
+// ExecOpts instead of inheriting this forward — silently discarding the bytes is
+// correct only because nothing here is testing them.
+func (h *hostKeyRecorder) ExecOpts(ctx context.Context, t *backend.Tool, args []string, opts backend.ExecOptions) (*backend.Result, error) {
+	if len(opts.Env) > 0 {
+		return h.ExecEnv(ctx, t, args, opts.Env)
+	}
+	return h.Exec(ctx, t, args)
+}
+
+// StreamOpts satisfies the backend.Backend options seam (see ExecOpts).
+func (h *hostKeyRecorder) StreamOpts(ctx context.Context, t *backend.Tool, args []string, opts backend.ExecOptions) (<-chan backend.Event, error) {
+	if len(opts.Env) > 0 {
+		return h.StreamEnv(ctx, t, args, opts.Env)
+	}
+	return h.Stream(ctx, t, args)
+}
+
+// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
+// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
+// arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
+//
+// It deliberately IGNORES opts.Stdin, opts.StdinPath and opts.Dir: this fake
+// never receives them. A fake that needs to ASSERT on stdin must write its own
+// ExecOpts instead of inheriting this forward — silently discarding the bytes is
+// correct only because nothing here is testing them.
+func (m *mockAxiomBackend) ExecOpts(ctx context.Context, t *backend.Tool, args []string, opts backend.ExecOptions) (*backend.Result, error) {
+	if len(opts.Env) > 0 {
+		return m.ExecEnv(ctx, t, args, opts.Env)
+	}
+	return m.Exec(ctx, t, args)
+}
+
+// StreamOpts satisfies the backend.Backend options seam (see ExecOpts).
+func (m *mockAxiomBackend) StreamOpts(ctx context.Context, t *backend.Tool, args []string, opts backend.ExecOptions) (<-chan backend.Event, error) {
+	if len(opts.Env) > 0 {
+		return m.StreamEnv(ctx, t, args, opts.Env)
+	}
+	return m.Stream(ctx, t, args)
+}
+
+// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
+// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
+// arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
+//
+// It deliberately IGNORES opts.Stdin, opts.StdinPath and opts.Dir: this fake
+// never receives them. A fake that needs to ASSERT on stdin must write its own
+// ExecOpts instead of inheriting this forward — silently discarding the bytes is
+// correct only because nothing here is testing them.
+func (a *axiomFixtureBackend) ExecOpts(ctx context.Context, t *backend.Tool, args []string, opts backend.ExecOptions) (*backend.Result, error) {
+	if len(opts.Env) > 0 {
+		return a.ExecEnv(ctx, t, args, opts.Env)
+	}
+	return a.Exec(ctx, t, args)
+}
+
+// StreamOpts satisfies the backend.Backend options seam (see ExecOpts).
+func (a *axiomFixtureBackend) StreamOpts(ctx context.Context, t *backend.Tool, args []string, opts backend.ExecOptions) (<-chan backend.Event, error) {
+	if len(opts.Env) > 0 {
+		return a.StreamEnv(ctx, t, args, opts.Env)
+	}
+	return a.Stream(ctx, t, args)
+}

@@ -21,19 +21,35 @@
 // prefix is wired into the vulns stage list by 13-08. vulns runs only in
 // ModeAll/ModeDeep — never in recon.
 //
-// BRUTUS STDIN SEAM (FOUND-10 allowlisted, mirrors reverseip.go / github_repos.go):
+// BRUTUS STDIN SEAM — 18-04: NO LONGER A BYPASS.
 // brutus reads the service-fingerprint JSON on STDIN (bash: `brutus ... <input`).
-// The name-keyed Backend/Runner (app.Tools) has no stdin seam, so brutus is
-// invoked through the brutusRunner package var (direct, timeout-bounded
-// exec.CommandContext with cmd.Stdin). brutespray takes a `-f <file>` argument
-// and therefore routes through app.Tools.Run normally.
+// The name-keyed Runner had no stdin channel when this landed, so brutus was
+// invoked through the brutusRunner package var with a direct exec.CommandContext.
+// 18-01 shipped ExecOptions.StdinPath — a PATH the backend opens, which is
+// exactly this call's shape (it already opened a file) and the only site in
+// phase 18 that uses it rather than a byte slice. The package var survives as a
+// TEST SEAM only; the dispatch inside it now goes through app.Tools.RunOpts.
+// brutespray takes a `-f <file>` argument and always routed through
+// app.Tools.Run.
+//
+// THE DEADLINE, RECONCILED RATHER THAN INHERITED. This file applied
+// brutusTimeout = 30 minutes while the brutus row in tools.lock declared
+// timeout_seconds = 0, which means NO BOUND. Moving the dispatch onto the Runner
+// makes tools.lock the sole owner of the deadline, so leaving the manifest at 0
+// would have SILENTLY converted a bounded credential-spraying run into an
+// unbounded one against a third party (T-18-04-01). The manifest now carries
+// 1800 with its derivation, and TestBrutusDeadlineMatchesItsFormerBound pins the
+// two together so they cannot drift apart again.
+//
+// DEFAULT ARGS: the brutus row carries default_args = [], so the argv is
+// byte-for-byte the pre-move `--json -o <path> [-u][-p][-k]`.
 //
 // XCUT-07 (T-13-07-03) — SPRAYED CREDENTIALS ARE NEVER PERSISTED:
 // Discovered credentials MUST NOT be written to the JSONL findings. Only the
 // host / service / port that accepted a weak credential is recorded; the
 // user:password (or key) is redacted to "***" (PayloadRedacted/PoCRedacted).
-// brutus credential wordlists cross to the tool as FILE PATHS (-u/-p/-k), never
-// as raw values on argv.
+// brutus -u/-p carry live comma-separated values and are registered with the
+// recorder's redactor before dispatch; -k alone carries a file path.
 //
 // FAILURE POLICY (best_effort, D-V7): a missing brutespray/brutus or a tool
 // error logs a warning and returns StatusSkipped/StatusDone — never
@@ -52,7 +68,6 @@ import (
 	"log/slog"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -60,46 +75,58 @@ import (
 	"time"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
+	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
 	"github.com/six2dez/reconftw/internal/core/log"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
-// brutusTimeout bounds a single brutus spraying invocation. Spraying can be
-// long-running; the timeout is generous but prevents an unbounded hang.
-const brutusTimeout = 30 * time.Minute
+// brutusToolName is the tools.lock registry key.
+const brutusToolName = "brutus"
 
-// errBrutusNotInstalled is the sentinel returned by brutusRunner when the
-// brutus binary is not resolvable on PATH (D-V7 graceful skip).
+// brutusFormerTimeout is the bound THIS FILE used to apply with its own
+// context.WithTimeout, kept as the written derivation for the tools.lock
+// timeout_seconds = 1800 that replaced it.
+//
+// It is not dead: TestBrutusDeadlineMatchesItsFormerBound (in
+// internal/core/backend) asserts the manifest value equals 30 minutes, so
+// silently setting the manifest back to 0 — which would make a credential
+// spraying run unbounded — is a failing diff rather than an invisible one.
+const brutusFormerTimeout = 30 * time.Minute //nolint:unused // retained derivation; see the comment above — the pin test duplicates the literal on purpose
+
+// errBrutusNotInstalled is the sentinel returned by brutusRunner when brutus
+// could not be dispatched at all (D-V7 graceful skip). It is now derived from
+// the Runner's typed dispatch-failure label rather than from exec.LookPath, so
+// it additionally covers a tool that is registered but has no resolved path.
 var errBrutusNotInstalled = errors.New("brutus not installed")
 
 // brutusRunner runs brutus with the service-fingerprint JSON at serviceFPPath
 // piped on STDIN (bash: `brutus ... <input`) and the given argv. Overridable in
-// tests. Returns errBrutusNotInstalled when the binary is absent so a missing
-// optional tool degrades to StatusSkipped instead of failing the pipeline.
+// tests. Returns errBrutusNotInstalled when brutus could not be dispatched so a
+// missing optional tool degrades to StatusSkipped instead of failing the
+// pipeline.
 //
-// Direct exec.CommandContext (FOUND-10 allowlisted) is required because the
-// name-keyed Backend/Runner does not support stdin injection — identical to the
-// hakip2host (reverseip.go) and git-clone (github_repos.go) seams.
-var brutusRunner = func(ctx context.Context, serviceFPPath string, args []string) error {
-	bin, err := exec.LookPath("brutus")
-	if err != nil {
-		return errBrutusNotInstalled // not installed — graceful skip
+// XCUT-07: the service fingerprints cross on STANDARD INPUT and StdinPath never
+// reaches the recorder. Configured -u/-p values do reach argv, so runBrutus must
+// register them with app.Secrets before this call. Both halves are asserted by
+// the spray seam tests rather than assumed to have survived the move.
+var brutusRunner = func(ctx context.Context, app *appctx.AppContext, serviceFPPath string, args []string) error {
+	if app == nil || app.Tools == nil {
+		return errBrutusNotInstalled
 	}
-	cmdCtx, cancel := context.WithTimeout(ctx, brutusTimeout)
-	defer cancel()
-
-	f, err := os.Open(serviceFPPath) //nolint:gosec // path is within WorkDir
+	// StdinPath, not Stdin: the backend opens and closes the file itself, so the
+	// service-fingerprint payload is never held in this process's memory and
+	// never crosses the recorder seam.
+	_, err := app.Tools.RunOpts(ctx, brutusToolName, args,
+		backend.ExecOptions{StdinPath: serviceFPPath})
 	if err != nil {
-		return fmt.Errorf("open service-fingerprint input: %w", err)
+		if coreerrors.IsDispatchFailure(err) {
+			return errBrutusNotInstalled // never started — graceful skip
+		}
+		return err
 	}
-	defer f.Close() //nolint:errcheck
-
-	//nolint:gosec // bin resolved via LookPath; args are tool-controlled; creds
-	// cross as file paths (-u/-p/-k), never raw values (XCUT-07).
-	cmd := exec.CommandContext(cmdCtx, bin, args...)
-	cmd.Stdin = f
-	return cmd.Run()
+	return nil
 }
 
 // SprayTask runs password spraying (brutespray default, brutus deep-gated)
@@ -229,7 +256,7 @@ func (t *SprayTask) runBrutespray(
 	// discovered credential with the log Redactor (L2) BEFORE any log line. The
 	// findings stream still carries only "***" (parseBrutesprayHits redacts).
 	sprayHardenDir(app.Log, outDir)
-	sprayRegisterBrutesprayCreds(app.Log, stdout)
+	sprayRegisterBrutesprayCreds(app, stdout)
 
 	findings := sprayResolveScopeHosts(app, parseBrutesprayHits(stdout))
 
@@ -276,18 +303,63 @@ func (t *SprayTask) runBrutus(
 
 	outPath := filepath.Join(vulnsDir, "brutus.jsonl")
 	args := []string{"--json", "-o", outPath}
-	// Credential wordlists cross as FILE PATHS only (XCUT-07 — never raw values).
+
+	// XCUT-07, CORRECTED IN 18-04. The comment that stood here claimed
+	// "credential wordlists cross as FILE PATHS only (never raw values)". That is
+	// TRUE of -k and FALSE of -u and -p: `brutus --help` on the installed build
+	// documents them as
+	//
+	//	-u <usernames>   Comma-separated usernames (default: "root,admin")
+	//	-p <passwords>   Comma-separated passwords
+	//	-k <keyfile>     SSH private key file
+	//
+	// so a configured advanced.tools.brutus.passwords is a LIST OF LIVE
+	// PASSWORDS placed on argv. That was survivable only while this file
+	// dispatched brutus itself: 18-04 routes it through backend.Runner, whose
+	// recorder writes argv into logs/tools.jsonl — a file operators paste into
+	// issue reports (T-18-04-03).
+	//
+	// So register each configured value BEFORE the dispatch, through app.Secrets —
+	// the SecretRegistrar seam appctx.Boot points at the ToolRecorder's OWN
+	// redactor. The earlier version of this comment claimed the recorder "holds the
+	// SAME redactor instance the logger does"; it does not, and registering only
+	// with app.Log left the credentials in clear text on every non-TTY run (CR-01).
+	// Pinned by TestSprayConfiguredCredentialsAreNotRecorded, which now builds two
+	// distinct redactors so it models production and can fail.
+	//
+	// WR-09: the flag is appended ONLY if registration actually reached the
+	// recorder's redactor. It used to be appended unconditionally, so a run with no
+	// registrar — every MCP-driven scan before V-01 — dispatched live credentials
+	// into logs/tools.jsonl with nothing to scrub them and nothing said about it.
+	// Omitting the flag degrades the scan (brutus falls back to its own defaults);
+	// writing the password to a file operators paste into issue reports does not
+	// degrade anything, it just loses the credential. The loud, lesser harm wins.
 	if u := strings.TrimSpace(app.Cfg.Advanced.Tools.Brutus.Usernames); u != "" {
-		args = append(args, "-u", u)
+		if sprayRegisterConfiguredCreds(app, u) {
+			args = append(args, "-u", u)
+		} else if app.Log != nil {
+			app.Log.Warn("vulns.spray: configured brutus usernames could NOT be registered " +
+				"with the run redactor — omitting -u rather than writing live credentials " +
+				"to logs/tools.jsonl (WR-09)")
+		}
 	}
 	if p := strings.TrimSpace(app.Cfg.Advanced.Tools.Brutus.Passwords); p != "" {
-		args = append(args, "-p", p)
+		if sprayRegisterConfiguredCreds(app, p) {
+			args = append(args, "-p", p)
+		} else if app.Log != nil {
+			app.Log.Warn("vulns.spray: configured brutus passwords could NOT be registered " +
+				"with the run redactor — omitting -p rather than writing live credentials " +
+				"to logs/tools.jsonl (WR-09)")
+		}
 	}
+	// -k is a PATH, not a value: it is left unregistered on purpose, because
+	// redacting a filesystem path would only make the record harder to read
+	// without protecting anything the record did not already lack.
 	if k := strings.TrimSpace(app.Cfg.Advanced.Tools.Brutus.KeyFile); k != "" {
 		args = append(args, "-k", k)
 	}
 
-	err := brutusRunner(ctx, serviceFP, args)
+	err := brutusRunner(ctx, app, serviceFP, args)
 	// brutusRan is false only when the binary is absent: brutus never observed
 	// the service list, so it must not clear a previous run's staging (F3
 	// did-not-run — staging.go). Any OTHER error still means brutus ran and may
@@ -310,7 +382,7 @@ func (t *SprayTask) runBrutus(
 	// credential with the log Redactor (L2) BEFORE any log line — mirrors
 	// emails.go/github_repos.go. The findings stream still carries only "***".
 	sprayHardenFile(app.Log, outPath)
-	sprayRegisterBrutusCreds(app.Log, outPath)
+	sprayRegisterBrutusCreds(app, outPath)
 
 	// Parse brutus JSONL output; XCUT-07: only host/service/port recorded, creds redacted.
 	findings := sprayResolveScopeHosts(app, parseBrutusHits(outPath))
@@ -420,12 +492,68 @@ func sprayHardenDir(logger *slog.Logger, dir string) {
 	})
 }
 
+// sprayRegisterSecret registers one credential value with BOTH redaction sinks.
+//
+// WHY BOTH, and why app.Secrets is the load-bearing one (18-06 code review, CR-01
+// + phase verification Gap 1). 18-04 registered configured brutus credentials with
+// log.RegisterHandlerSecret(app.Log, ...) alone, under a comment asserting "the
+// ToolRecorder holds the SAME redactor instance the logger does". appctx.Boot does
+// not wire them that way:
+//
+//   - the ToolRecorder is built with BootOptions.Redactor (boot.go), which is the
+//     per-run redactor a subcommand creates via newRunRedactor();
+//   - app.Log at Boot time is the CLI logger, backed by a DIFFERENT redactor
+//     instance — loglevel.go documents its own as one that does NOT learn
+//     runtime-registered secrets;
+//   - the two only converge inside `if liveUI {`, i.e. an interactive TTY.
+//
+// So on CI, under nohup, with --quiet, or with stderr redirected — precisely the
+// runs whose logs get archived and pasted into issues — the recorder's redactor
+// never learned the password and wrote it verbatim into logs/tools.jsonl:
+//
+//	"argv":[...,"-u","admin","-p","<the operator's real password>"]
+//
+// app.Secrets is the SecretRegistrar seam Boot points at the SAME redactor the
+// recorder holds, which is why subdomains/passive.go already registers through it.
+// The log sink is kept as well so a later log line echoing one credential is also
+// scrubbed; neither sink subsumes the other.
+//
+// Redactor.Register skips values of four characters or fewer — the redactor's own
+// documented floor, restated here rather than papered over.
+// It REPORTS whether the value actually reached the recorder's sink (WR-09).
+// A caller that is about to put the value on argv must not proceed on a false:
+// registering nowhere and dispatching anyway produces exactly the plaintext record
+// this function exists to prevent, with nothing said about it.
+//
+// Only app.Secrets counts toward the return value. The log sink is registered as
+// well, but it does not protect logs/tools.jsonl — under the MCP transport before
+// V-01 it was the ONLY sink present, and the record was written in clear text
+// regardless. Values of four characters or fewer also return false because the
+// production log.Redactor deliberately refuses to register them; an argv caller
+// must omit such a value rather than mistake a non-nil registrar for protection.
+func sprayRegisterSecret(app *appctx.AppContext, value string) bool {
+	v := strings.TrimSpace(value)
+	if app == nil || len(v) <= 4 {
+		return false
+	}
+	registered := false
+	if app.Secrets != nil {
+		app.Secrets.Register(v)
+		registered = true
+	}
+	if app.Log != nil {
+		log.RegisterHandlerSecret(app.Log, v)
+	}
+	return registered
+}
+
 // sprayRegisterBrutusCreds reads brutus's raw --json hit file and registers every
-// discovered credential (username/password/key) with the log Redactor (L2) so a
-// later log line echoing it is scrubbed (WR-13-03). Values are read transiently
+// discovered credential (username/password/key) with BOTH redaction sinks via
+// sprayRegisterSecret — the recorder's redactor AND the log one (CR-01) — so a
+// later log line or recorded argv echoing it is scrubbed (WR-13-03). Values are read transiently
 // and NEVER copied into a finding (XCUT-07 — findings carry "***").
-func sprayRegisterBrutusCreds(logger *slog.Logger, outPath string) {
-	if logger == nil {
+func sprayRegisterBrutusCreds(app *appctx.AppContext, outPath string) {
+	if app == nil {
 		return
 	}
 	data, err := os.ReadFile(outPath) //nolint:gosec // path within WorkDir
@@ -448,19 +576,51 @@ func sprayRegisterBrutusCreds(logger *slog.Logger, outPath string) {
 			continue
 		}
 		for _, v := range []string{creds.Username, creds.Password, creds.Key} {
-			if s := strings.TrimSpace(v); s != "" {
-				log.RegisterHandlerSecret(logger, s)
-			}
+			sprayRegisterSecret(app, v)
 		}
 	}
 }
 
+// sprayRegisterConfiguredCreds registers a comma-separated brutus credential
+// list, and each of its elements, with the run Redactor (Layer 2) so neither the
+// whole argument nor any single credential survives into logs/tools.jsonl or any
+// later log line.
+//
+// BOTH forms are registered on purpose: the recorder scrubs each argv ELEMENT,
+// which is the joined string, while a log line elsewhere may echo one credential
+// on its own. Redactor.Register skips values of four characters or fewer. If
+// ANY element is that short, registration therefore fails closed and runBrutus
+// omits the whole flag: the child could echo that element alone into the
+// recorder's stderr tail even when the joined argv element was scrubbed.
+func sprayRegisterConfiguredCreds(app *appctx.AppContext, list string) bool {
+	if app == nil || list == "" {
+		return false
+	}
+	parts := strings.Split(list, ",")
+	for _, part := range parts {
+		if len(strings.TrimSpace(part)) <= 4 {
+			return false
+		}
+	}
+	// The WHOLE list is the argv element the recorder scrubs, so its registration
+	// is the one that decides. Element registrations are additive protection for a
+	// later log line or stderr tail echoing one credential on its own. Every
+	// element passed the redactor's length floor above; otherwise the whole flag
+	// is omitted even when the joined argv element itself could be scrubbed.
+	registered := sprayRegisterSecret(app, list)
+	for _, part := range parts {
+		sprayRegisterSecret(app, part)
+	}
+	return registered
+}
+
 // sprayRegisterBrutesprayCreds extracts the trailing user:pass from each
-// brutespray success line and registers it with the log Redactor (L2) so a later
-// log line echoing it is scrubbed (WR-13-03). The credential is NEVER copied into
+// brutespray success line and registers it with BOTH redaction sinks via
+// sprayRegisterSecret (CR-01) so a later log line or recorded argv echoing it is
+// scrubbed (WR-13-03). The credential is NEVER copied into
 // a finding (XCUT-07 — parseBrutesprayHits redacts to "***").
-func sprayRegisterBrutesprayCreds(logger *slog.Logger, stdout []byte) {
-	if logger == nil || len(bytes.TrimSpace(stdout)) == 0 {
+func sprayRegisterBrutesprayCreds(app *appctx.AppContext, stdout []byte) {
+	if app == nil || len(bytes.TrimSpace(stdout)) == 0 {
 		return
 	}
 	sc := bufio.NewScanner(bytes.NewReader(stdout))
@@ -484,9 +644,9 @@ func sprayRegisterBrutesprayCreds(logger *slog.Logger, stdout []byte) {
 		if !strings.Contains(cred, ":") {
 			continue
 		}
-		log.RegisterHandlerSecret(logger, cred)
+		sprayRegisterSecret(app, cred)
 		if idx := strings.LastIndexByte(cred, ':'); idx >= 0 && idx < len(cred)-1 {
-			log.RegisterHandlerSecret(logger, cred[idx+1:])
+			sprayRegisterSecret(app, cred[idx+1:])
 		}
 	}
 }

@@ -229,3 +229,23 @@ func TestMockBackend_Exec_MissingFixture_ReturnsToolError(t *testing.T) {
 		t.Fatal("expected err for missing fixture")
 	}
 }
+
+// TestMockBackend_LastOptsPreservesEmptyNonNilStdin protects the nil-vs-empty
+// distinction ExecOptions makes load-bearing: nil inherits parent stdin, while
+// an empty-but-non-nil slice supplies immediate EOF.
+func TestMockBackend_LastOptsPreservesEmptyNonNilStdin(t *testing.T) {
+	t.Parallel()
+	mb := testutil.NewMockBackend(testutil.MockBackendConfig{
+		FixturesDir: "fixtures",
+		Scenario:    "example.com",
+	})
+	tool := &backend.Tool{Name: "subfinder"}
+	if _, err := mb.ExecOpts(context.Background(), tool, nil, backend.ExecOptions{
+		Stdin: make([]byte, 0),
+	}); err != nil {
+		t.Fatalf("ExecOpts: %v", err)
+	}
+	if got := mb.LastOpts().Stdin; got == nil {
+		t.Fatal("MockBackend collapsed empty-but-non-nil Stdin to nil, so tests cannot distinguish empty stdin from inherited stdin")
+	}
+}

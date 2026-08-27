@@ -95,6 +95,14 @@ func (placeholderBackend) StreamEnv(_ context.Context, _ *backend.Tool, _ []stri
 	return nil, nil
 }
 
+func (placeholderBackend) ExecOpts(_ context.Context, _ *backend.Tool, _ []string, _ backend.ExecOptions) (*backend.Result, error) {
+	return nil, nil
+}
+
+func (placeholderBackend) StreamOpts(_ context.Context, _ *backend.Tool, _ []string, _ backend.ExecOptions) (<-chan backend.Event, error) {
+	return nil, nil
+}
+
 func (placeholderBackend) HealthCheck(_ context.Context) error { return nil }
 func (placeholderBackend) Capacity() int                       { return 0 }
 

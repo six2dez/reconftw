@@ -202,31 +202,11 @@ func TestFuzzArtefactAccumulatesAcrossHosts(t *testing.T) {
 // origins — web.hakoriginfinder
 // ---------------------------------------------------------------------------
 
-// stubHakoriginfinderOnPATH installs a no-output `hakoriginfinder` stub as the
-// ONLY entry on PATH for the duration of the test.
-//
-// hakoriginfinder resolves its binary with exec.LookPath rather than through the
-// backend registry, so without this the two tests below would depend on whether
-// the ambient toolchain happens to have it installed — one of them would silently
-// skip on a developer machine and the other on CI, and gate 3 for "origins" would
-// never actually be asserted anywhere.
-func stubHakoriginfinderOnPATH(t *testing.T) {
-	t.Helper()
-	dir := t.TempDir()
-	script := filepath.Join(dir, "hakoriginfinder")
-	if err := os.WriteFile(script, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil { //nolint:gosec
-		t.Fatalf("write hakoriginfinder stub: %v", err)
-	}
-	t.Setenv("PATH", dir)
-}
-
 // TestOriginsArtefactEmptiedWhenProducerFindsNothing is gate 3 for "origins":
 // the producer RAN over host/IP pairs, found no origin, and must empty the
 // artefact rather than republish the previous run's origins. An origin IP that
 // has since been fixed must stop being reported as exposed.
 func TestOriginsArtefactEmptiedWhenProducerFindsNothing(t *testing.T) {
-	stubHakoriginfinderOnPATH(t)
-
 	workDir := t.TempDir()
 	writeLinesFile(t, artefactFile(workDir, "origins"),
 		`{"host":"api.example.com","origin_ip":"9.9.9.9","method":"hakoriginfinder","confidence":"low"}`)
@@ -252,8 +232,6 @@ func TestOriginsArtefactEmptiedWhenProducerFindsNothing(t *testing.T) {
 // empty ip), so the task would RUN and correctly empty-publish — which is the
 // other test's case, not this one.
 func TestOriginsArtefactPreservedWhenProducerDidNotRun(t *testing.T) {
-	stubHakoriginfinderOnPATH(t)
-
 	workDir := t.TempDir()
 	seed := `{"host":"api.example.com","origin_ip":"9.9.9.9","method":"hakoriginfinder","confidence":"low"}`
 	writeLinesFile(t, artefactFile(workDir, "origins"), seed)

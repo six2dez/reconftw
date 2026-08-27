@@ -25,6 +25,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	stderrors "errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -73,6 +74,20 @@ type MockBackend struct {
 	runError       error
 	healthCheckErr error
 	lastEnv        []string // env passed to the most recent ExecEnv/StreamEnv call
+	// lastOpts is the FULL ExecOptions value passed to the most recent
+	// ExecOpts/StreamOpts call, so a module test can assert that its Task
+	// forwarded stdin (and a working directory) across the seam without spawning
+	// a subprocess. Read it with LastOpts.
+	lastOpts backend.ExecOptions
+}
+
+func cloneBytesPreservingNil(src []byte) []byte {
+	if src == nil {
+		return nil
+	}
+	dst := make([]byte, len(src))
+	copy(dst, src)
+	return dst
 }
 
 // NewMockBackend constructs a MockBackend with the given config.
@@ -130,9 +145,25 @@ func (m *MockBackend) SetCapacity(c int) {
 	m.capacity = c
 }
 
+// LastOpts returns a copy of the ExecOptions passed to the most recent
+// ExecOpts/StreamOpts call. The Stdin slice is copied, so a caller cannot mutate
+// the mock's record through the returned value.
+func (m *MockBackend) LastOpts() backend.ExecOptions {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := m.lastOpts
+	out.Env = append([]string(nil), m.lastOpts.Env...)
+	out.Stdin = cloneBytesPreservingNil(m.lastOpts.Stdin)
+	return out
+}
+
 // LastEnv returns a copy of the env slice passed to the most recent ExecEnv /
 // StreamEnv call (nil if the last call used the nil-env Exec/Stream path). Used
 // by tests to assert env-capable dispatch forwards the expected entries.
+//
+// WR-10: this comment used to sit above LastOpts, which was inserted between it
+// and the function it describes — so godoc attributed it to the wrong method and
+// LastEnv was undocumented.
 func (m *MockBackend) LastEnv() []string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -271,4 +302,63 @@ func readFixture(fixturesDir, tool, scenario string) ([]byte, error) {
 		}
 	}
 	return nil, fmt.Errorf("fixture not found: tried %v", candidates)
+}
+
+// ExecOpts records the FULL options value (env, stdin bytes, stdin path, dir) and
+// then behaves exactly like ExecEnv — fixture content is independent of the
+// options, so the returned Result is unchanged. This is what lets a module test
+// assert that its Task handed the expected bytes to the seam.
+func (m *MockBackend) ExecOpts(ctx context.Context, t *backend.Tool, args []string, opts backend.ExecOptions) (*backend.Result, error) {
+	// WR-10: enforce the mutual exclusion backend.Backend.ExecOpts documents as
+	// MUST-report. Without it the mock is MORE PERMISSIVE than LocalBackend, so a
+	// module test passes on a call the real backend rejects — mock drift, which is
+	// a false green by construction.
+	//
+	// Deliberately `!= nil`, matching LocalBackend after WR-08: an empty-but-non-nil
+	// Stdin is "empty stdin", and pairing it with StdinPath is still the error.
+	if opts.Stdin != nil && opts.StdinPath != "" {
+		return nil, &coreerrors.ToolError{
+			Tool:         t.Name,
+			ExitCode:     -1,
+			Inner:        stderrors.New("ExecOptions.Stdin and ExecOptions.StdinPath are mutually exclusive; exactly one may be set"),
+			NeverStarted: true,
+		}
+	}
+	m.mu.Lock()
+	m.lastOpts = backend.ExecOptions{
+		Env:       append([]string(nil), opts.Env...),
+		Stdin:     cloneBytesPreservingNil(opts.Stdin),
+		StdinPath: opts.StdinPath,
+		Dir:       opts.Dir,
+	}
+	m.mu.Unlock()
+	return m.ExecEnv(ctx, t, args, opts.Env)
+}
+
+// StreamOpts records the FULL options value and then behaves like StreamEnv.
+func (m *MockBackend) StreamOpts(ctx context.Context, t *backend.Tool, args []string, opts backend.ExecOptions) (<-chan backend.Event, error) {
+	// WR-10: enforce the mutual exclusion backend.Backend.ExecOpts documents as
+	// MUST-report. Without it the mock is MORE PERMISSIVE than LocalBackend, so a
+	// module test passes on a call the real backend rejects — mock drift, which is
+	// a false green by construction.
+	//
+	// Deliberately `!= nil`, matching LocalBackend after WR-08: an empty-but-non-nil
+	// Stdin is "empty stdin", and pairing it with StdinPath is still the error.
+	if opts.Stdin != nil && opts.StdinPath != "" {
+		return nil, &coreerrors.ToolError{
+			Tool:         t.Name,
+			ExitCode:     -1,
+			Inner:        stderrors.New("ExecOptions.Stdin and ExecOptions.StdinPath are mutually exclusive; exactly one may be set"),
+			NeverStarted: true,
+		}
+	}
+	m.mu.Lock()
+	m.lastOpts = backend.ExecOptions{
+		Env:       append([]string(nil), opts.Env...),
+		Stdin:     cloneBytesPreservingNil(opts.Stdin),
+		StdinPath: opts.StdinPath,
+		Dir:       opts.Dir,
+	}
+	m.mu.Unlock()
+	return m.StreamEnv(ctx, t, args, opts.Env)
 }

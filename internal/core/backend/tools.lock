@@ -13,6 +13,32 @@
 #   critical          — bool; FOUND-08 + Blocker 5: critical tools cause
 #                       `reconftw health-check` to exit 1 when absent
 #
+# Optional repo-clone coordinates (18-02 / RS-B) — for the tools install.sh
+# clones under the tools root (paths.tools_dir, default $HOME/Tools) instead of
+# putting a binary on PATH. exec.LookPath cannot see any of these; before 18-02
+# they were reported "missing" while sitting on disk. PATH always wins; the
+# clone branch is only consulted when LookPath fails.
+#   clone_dir         — the clone's directory, RELATIVE to the tools root.
+#                       DECLARED, NEVER DERIVED FROM `name`: cmseek lives in
+#                       CMSeeK, and a name-derived guess resolves on macOS
+#                       (case-insensitive) and fails on Linux.
+#   clone_entry       — the executable or script, relative to clone_dir.
+#   clone_interpreter — optional, relative to clone_dir. When set IT becomes the
+#                       executable and clone_entry becomes the argv prefix
+#                       (regulator: venv/bin/python3 + main.py). When empty,
+#                       clone_entry is the executable (gato: venv/bin/gato).
+#   clone_workdir     — optional bool, DEFAULT FALSE. Run the tool with its clone
+#                       directory as cwd. Declare it ONLY for a tool that resolves
+#                       its own data files relative to its clone root (nomore403
+#                       and its payload wordlists). The default is off because the
+#                       default workspace root is RELATIVE ("workspaces"), so
+#                       modules pass cwd-relative argv paths; changing cwd would
+#                       silently re-point them into the tools root.
+# All three MUST be relative and free of upward traversal — the containment
+# check in ToolRegistry.Discover works by joining under the tools root, so an
+# absolute value would bypass it by never being joined (T-18-02-02). Pinned by
+# TestEveryDeclaredCloneEntryIsRelative.
+#
 # Critical tier (3 tools — the smallest passive+probe+resolve trio needed
 # for any meaningful Phase 4 run):
 #   subfinder — passive subdomain enumeration
@@ -203,6 +229,18 @@ timeout_seconds = 600
 critical        = false
 version         = "latest"
 input_flag      = ""
+# Derived by listing ~/Tools/regulator on 2026-08-26, not from the tool's name.
+# clone_workdir: REQUIRED, not a preference. main.py:18 hardcodes
+# LOGFILE_NAME = 'logs/regulator.log' and opens it at logging.basicConfig time
+# (main.py:193), so the tool ABORTS with FileNotFoundError unless cwd contains a
+# logs/ directory. The clone has one; an arbitrary cwd does not. Proven by
+# running it: with clone_workdir off, `--help` exited 1 on exactly that path.
+# It also writes its <target>.rules files into its clone root.
+# This is why appctx.Boot absolutises Target.WorkDir — see the comment there.
+clone_dir         = "regulator"
+clone_interpreter = "venv/bin/python3"
+clone_entry       = "main.py"
+clone_workdir     = true
 [[tools]]
 name            = "hakip2host"
 kind            = "go"
@@ -414,6 +452,16 @@ timeout_seconds = 300
 critical        = false
 version         = "latest"
 input_flag      = ""
+# Go binary at the clone root. It resolves its own payload wordlists RELATIVE TO
+# ITS OWN DIRECTORY, which is why Discover sets Tool.WorkDir to the clone dir.
+# This is the row web/nomore403.go and vulns/bypass4xx.go consume in 18-05.
+# clone_workdir: the ONLY row that declares it. Both existing call sites already
+# set cmd.Dir to this directory by hand for exactly this reason. It is opt-in
+# because the default workspace root is RELATIVE, so changing cwd for a tool
+# whose module passes workspace-relative paths would re-point them into ~/Tools.
+clone_dir         = "nomore403"
+clone_entry       = "nomore403"
+clone_workdir     = true
 [[tools]]
 name            = "mantra"
 kind            = "go"
@@ -490,10 +538,24 @@ kind            = "python_venv"
 repo_url        = "https://github.com/w9w/JSA"
 description     = "JavaScript analysis (repo-clone Python venv)"
 default_args    = []
-timeout_seconds = 300
+timeout_seconds = 30
+# 18-05: 300 -> 30, and this is a LOWERING, which needs at least as much
+# justification as a raising. web/jsa.go used to apply its own per-URL
+# `const toolTimeout = 30 * time.Second` under a comment claiming there was "no
+# JSA entry in tools.lock for per-URL cap" — a claim this row falsifies. 18-05
+# routed that dispatch onto backend.Runner, which makes THIS value the sole
+# owner of the bound. JsaTask dispatches ONCE PER JS URL, so leaving 300 would
+# have multiplied the worst-case per-URL wait tenfold across a whole JS corpus,
+# invisibly, because nothing would have failed. 30 is the bound production has
+# actually been enforcing since phase 5. Pinned in BOTH directions by
+# TestJSADeadlineMatchesItsFormerBound so the two cannot drift apart again.
 critical        = false
 version         = "latest"
 input_flag      = "-f"
+# Coordinates derived by listing ~/Tools/JSA on 2026-08-26, not from the name.
+clone_dir         = "JSA"
+clone_interpreter = "venv/bin/python3"
+clone_entry       = "jsa.py"
 
 # Phase 6 additions (Vulnerability Scanning E2E)
 # All Phase 6 vuln tools are critical=false — per-tool gating handles absence (D-V6).
@@ -537,6 +599,13 @@ timeout_seconds = 0
 critical        = false
 version         = ""
 input_flag      = "-m"
+# sqlmap has no `venv`; its virtualenv is the dot-prefixed `.venv`. Confirmed by
+# `ls -la ~/Tools/sqlmap/.venv/bin/python3`, 2026-08-26. Its shebang is
+# `#!/usr/bin/env python` and `python` is NOT on PATH here, so the interpreter
+# must be declared explicitly rather than relying on the shebang.
+clone_dir         = "sqlmap"
+clone_interpreter = ".venv/bin/python3"
+clone_entry       = "sqlmap.py"
 [[tools]]
 name            = "ghauri"
 kind            = "python"
@@ -553,7 +622,27 @@ kind            = "go"
 go_module       = "github.com/projectdiscovery/interactsh/cmd/interactsh-client"
 description     = "OOB callback server client for SSRF/blind-XSS (VULN-03)"
 default_args    = []
-timeout_seconds = 300
+timeout_seconds = 0
+# 18-05: 300 -> 0, and 0 here means NO MANIFEST BOUND on purpose. It is the ONLY
+# row in this file that should carry it for a reason other than "nobody decided".
+#
+# This tool is not a request/response dispatch. It is a LONG-LIVED out-of-band
+# callback server whose lifetime IS the SSRF task's lifetime, and that lifetime is
+# owned by cfg.Vulns.SSRF.TimeoutSeconds — a value an operator can raise. 18-05
+# routed vulns/ssrf.go onto Runner.StreamOpts, which makes applyToolContract the
+# sole owner of any manifest deadline; leaving 300 here would have SILENTLY killed
+# the OOB session mid-task for every operator who raised the task timeout, and the
+# symptom would have been "SSRF reports no OOB callbacks" with nothing failing.
+#
+# It is the brutus trap (18-04) pointing the other way: there, moving a dispatch
+# would have REMOVED a bound the module was applying; here, moving it would have
+# IMPOSED one the module never had. Both are "a deadline that lives in two places
+# and is owned by neither".
+#
+# NOT UNBOUNDED IN PRACTICE: startInteractshClient derives its session context
+# from the task ctx, so the task's own WithTimeout still tears the process group
+# down (the DoD-2 guarantee, unchanged). Pinned by
+# TestInteractshHasNoManifestDeadline.
 critical        = false
 version         = "v1.2.2"
 input_flag      = ""
@@ -587,6 +676,10 @@ timeout_seconds = 300
 critical        = false
 version         = "latest"
 input_flag      = ""
+# Coordinates derived by listing ~/Tools/SSTImap on 2026-08-26, not from the name.
+clone_dir         = "SSTImap"
+clone_interpreter = "venv/bin/python3"
+clone_entry       = "sstimap.py"
 [[tools]]
 name            = "commix"
 kind            = "python"
@@ -656,6 +749,9 @@ timeout_seconds = 300
 critical        = false
 version         = ""
 input_flag      = ""
+# A bash script at the clone root; kind = "system" but it is installed as a clone.
+clone_dir         = "testssl.sh"
+clone_entry       = "testssl.sh"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Phase 7 — OSINT E2E tools (OSINT-01..16 + folded-in functions, D-O10).
@@ -663,6 +759,52 @@ input_flag      = ""
 # already present above (Phase 4/5). dnsx already present (DNS records OSINT-01).
 # All best_effort (ARCH-09); most → LocalBackend (no axiom module).
 # ─────────────────────────────────────────────────────────────────────────────
+[[tools]]
+# 18-05 VERDICT 2 (RS-D): `git` is REGISTERED, and osint/github_repos.go's clone
+# leg is routed onto backend.Runner rather than justified as a bypass.
+#
+# THE ARGUMENT FOR THE OTHER ANSWER, and why it lost. 18-03's manifest declared
+# this file `non_recon_binary` on the true premise that git is not a tools.lock
+# entry, with the rationale "the registry runs the recon inventory, not the
+# version-control system". But this file already carries SEVEN kind="system"
+# rows — whois, nmap, exiftool, sqlmap, massdns, testssl.sh, axiom-scan — every
+# one a base system dependency rather than something reconFTW builds. That
+# boundary is not one this codebase actually draws, so the premise held while the
+# rationale did not.
+#
+# AND THIS USE OF git IS NOT INFRASTRUCTURE. It fetches UNTRUSTED THIRD-PARTY
+# repositories, at URLs derived from enumerepo output, into a workspace tmp dir
+# for secret scanning (T-13-06-04 / T-18-05-02). Its only mitigations are two
+# hardening measures — `-c protocol.ext.allow=never` (kills the ext:: transport,
+# an RCE vector) and GIT_TERMINAL_PROMPT=0 — and until now NO ARTEFACT OF A RUN
+# could show they were applied. On the seam the flags appear in
+# logs/tools.jsonl's argv and the env moves to ExecOptions.Env, which is the
+# argv-free secret-safe path ARCH-02 requires.
+#
+# The installer's OWN git dispatch is untouched and remains a declared
+# `installer_toolchain` bypass: installing tools and cloning a scan target are
+# different operations at different trust boundaries, and only the second belongs
+# on the recon seam.
+#
+# critical = false, DELIBERATELY. git is required to INSTALL the 15 clone tools,
+# but a box whose tools are already installed runs a full scan without it — only
+# the github_repos clone leg degrades, which is best-effort by design (D-O8).
+# critical = true would make `reconftw health-check` exit 1 on such a box: a
+# false alarm, and FOUND-08 exists to make that exit code mean something.
+#
+# timeout_seconds = 300 is githubReposCloneTimeout moved verbatim from
+# github_repos.go, where the derivation already lives ("company repos can be
+# large ... a hung/auth-prompting clone is still killed"). Pinned by
+# TestGitCloneDeadlineMatchesItsFormerBound.
+name            = "git"
+kind            = "system"
+description     = "Version control client — clones untrusted company repos for the OSINT secret scan (OSINT-05)"
+default_args    = []
+timeout_seconds = 300
+critical        = false
+version         = "latest"
+input_flag      = ""
+
 [[tools]]
 name            = "whois"
 kind            = "system"
@@ -692,6 +834,10 @@ timeout_seconds = 300
 critical        = false
 version         = "latest"
 input_flag      = ""
+# Coordinates derived by listing ~/Tools/EmailHarvester on 2026-08-26, not from the name.
+clone_dir         = "EmailHarvester"
+clone_interpreter = "venv/bin/python3"
+clone_entry       = "EmailHarvester.py"
 [[tools]]
 name            = "dorks_hunter"
 kind            = "python"
@@ -702,6 +848,10 @@ timeout_seconds = 600
 critical        = false
 version         = "latest"
 input_flag      = ""
+# Coordinates derived by listing ~/Tools/dorks_hunter on 2026-08-26, not from the name.
+clone_dir         = "dorks_hunter"
+clone_interpreter = "venv/bin/python3"
+clone_entry       = "dorks_hunter.py"
 [[tools]]
 name            = "gitdorks_go"
 kind            = "go"
@@ -722,6 +872,9 @@ timeout_seconds = 600
 critical        = false
 version         = "latest"
 input_flag      = ""
+# Coordinates derived by listing ~/Tools/ghleaks on 2026-08-26, not from the name.
+clone_dir         = "ghleaks"
+clone_entry       = "ghleaks"
 [[tools]]
 name            = "trufflehog"
 kind            = "go"
@@ -752,6 +905,11 @@ timeout_seconds = 600
 critical        = false
 version         = "latest"
 input_flag      = ""
+# CONSOLE-SCRIPT SHAPE, no interpreter: `venv/bin/gato` is itself executable.
+# Confirmed by `ls ~/Tools/gato/venv/bin` -> gato, 2026-08-26. Keep this row in
+# this shape — it is the fixture that keeps the no-interpreter branch alive.
+clone_dir         = "gato"
+clone_entry       = "venv/bin/gato"
 [[tools]]
 name            = "cloud_enum"
 kind            = "python"
@@ -802,6 +960,10 @@ timeout_seconds = 600
 critical        = false
 version         = "latest"
 input_flag      = ""
+# Coordinates derived by listing ~/Tools/SwaggerSpy on 2026-08-26, not from the name.
+clone_dir         = "SwaggerSpy"
+clone_interpreter = "venv/bin/python3"
+clone_entry       = "swaggerspy.py"
 [[tools]]
 name            = "Spoofy"
 kind            = "python"
@@ -812,6 +974,10 @@ timeout_seconds = 120
 critical        = false
 version         = "latest"
 input_flag      = ""
+# Coordinates derived by listing ~/Tools/Spoofy on 2026-08-26, not from the name.
+clone_dir         = "Spoofy"
+clone_interpreter = "venv/bin/python3"
+clone_entry       = "spoofy.py"
 [[tools]]
 name            = "msftrecon"
 kind            = "python"
@@ -832,6 +998,12 @@ timeout_seconds = 600
 critical        = false
 version         = "latest"
 input_flag      = ""
+# CASE MISMATCH IS REAL AND LOAD-BEARING: the tool is `cmseek`, the directory is
+# `CMSeeK`. A name-derived guess passes on macOS and fails on Linux. Confirmed by
+# `ls -1 ~/Tools | grep -ix cmseek` -> CMSeeK, 2026-08-26.
+clone_dir         = "CMSeeK"
+clone_interpreter = "venv/bin/python3"
+clone_entry       = "cmseek.py"
 [[tools]]
 name            = "gqlspection"
 kind            = "python"
@@ -1074,6 +1246,10 @@ timeout_seconds = 600
 critical        = false
 version         = "latest"
 input_flag      = ""
+# Coordinates derived by listing ~/Tools/LeakSearch on 2026-08-26, not from the name.
+clone_dir         = "LeakSearch"
+clone_interpreter = "venv/bin/python3"
+clone_entry       = "LeakSearch.py"
 
 # Phase 13 additions (Domain Parity) — tools this phase invokes that were absent.
 # Module paths verified against install.sh (source of truth). noseyparker DEFERRED
@@ -1103,7 +1279,24 @@ kind            = "go"
 go_module       = "github.com/praetorian-inc/brutus/cmd/brutus"
 description     = "Credential spraying (PAR-02 deep spray, service-fingerprint input)"
 default_args    = []
-timeout_seconds = 0
+# 18-04: was 0, WHICH MEANS NO BOUND — and that was safe only for as long as
+# vulns/spray.go dispatched brutus itself and applied its own 30-minute
+# context.WithTimeout (brutusTimeout, spray.go). 18-04 routed that dispatch onto
+# backend.Runner, which makes applyToolContract the SOLE owner of the deadline.
+# Leaving this at 0 would therefore have silently converted a bounded
+# credential-spraying run into an unbounded one against a third-party host —
+# the same "the manifest silently wins" class as 17-07's subfinder finding,
+# pointing the other way (T-18-04-01).
+# DERIVATION: 1800 = 30 * 60, the exact bound spray.go used to apply, no more and
+# no less. Spraying is legitimately long-running (many hosts x many services x a
+# credential list), which is why the value is generous; it is not a guess.
+# spray.go keeps the constant as `brutusFormerTimeout` and
+# TestBrutusDeadlineMatchesItsFormerBound asserts this row equals it, so setting
+# this back to 0 is a failing diff rather than an invisible one.
+# NOTE ON PARTIAL WORK: brutus writes its hits to the -o file as it goes, so a
+# deadline that fires does NOT lose everything the way a stdout-buffered tool
+# would (local.go's CR-07 note) — spray.go parses that file on the error path.
+timeout_seconds = 1800
 critical        = false
 version         = "latest"
 input_flag      = ""
@@ -1127,3 +1320,7 @@ timeout_seconds = 120
 critical        = false
 version         = "latest"
 input_flag      = ""
+# Coordinates derived by listing ~/Tools/Scopify on 2026-08-26, not from the name.
+clone_dir         = "Scopify"
+clone_interpreter = "venv/bin/python3"
+clone_entry       = "scopify.py"

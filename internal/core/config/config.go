@@ -887,7 +887,15 @@ type CacheConfig struct {
 // PathsConfig mirrors ADR §2.2 [paths.*]. ALL paths get the nopath_traversal
 // validator (ADR §2.5 lines 1123-1124 — T-02-02-01 mitigation).
 type PathsConfig struct {
-	DataDir           string                 `koanf:"data_dir"          validate:"omitempty,nopath_traversal"`
+	DataDir string `koanf:"data_dir"          validate:"omitempty,nopath_traversal"`
+	// ToolsDir is the root the repo-clone tools are installed under — v1's
+	// ${tools}, default $HOME/Tools. It is a SEPARATE key from data_dir ON
+	// PURPOSE: data_dir already means two different things in v2 (workspace root
+	// AND, via the module-local resolvers, tools root), and guessing a third
+	// would put an unpredictable path on a command line. Resolve it through
+	// Config.ToolsRoot(), never by reading this field directly, so the
+	// $HOME/Tools fallback is applied in exactly one place.
+	ToolsDir          string                 `koanf:"tools_dir"         validate:"omitempty,nopath_traversal"`
 	WordlistsDir      string                 `koanf:"wordlists_dir"     validate:"omitempty,nopath_traversal"`
 	PatternsDir       string                 `koanf:"patterns_dir"      validate:"omitempty,nopath_traversal"`
 	FuzzWordlist      string                 `koanf:"fuzz_wordlist"     validate:"omitempty,nopath_traversal"`

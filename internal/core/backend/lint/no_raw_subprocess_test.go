@@ -40,108 +40,18 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-// allowedPaths are repo-relative file or directory paths where direct os/exec
-// subprocess calls are permitted. Suffix-match for `.go` entries (exact file);
-// prefix-match for entries ending in `/` (directory tree). Match is done against
-// the file's path relative to the repo root.
-var allowedPaths = []string{
-	"internal/core/backend/local.go",
-	"internal/core/backend/local_test.go",
-	"internal/core/backend/local_smoke_test.go",
-	"internal/core/backend/registry.go",
-	"internal/core/backend/registry_test.go",
-	"internal/core/testutil/",
-	"internal/core/backend/lint/testdata/",
-	// Repo-clone tool wrappers: these tasks use direct exec.CommandContext because
-	// the Backend/Runner registry does not support cmd.Dir or stdin injection for
-	// tools that require a specific working directory or stdin pipe. CR-07 (plan 05-11)
-	// applied per-tool context.WithTimeout wrapping to all 6 files. The exec calls
-	// are the sanctioned invocation pattern for repo-clone tools.
-	// jsa.go: CR-03 fix — absolute python3 path cannot route through name-keyed registry.
-	"internal/modules/web/nomore403.go",
-	"internal/modules/web/gxss.go",
-	"internal/modules/web/hakoriginfinder.go",
-	"internal/modules/web/mantra.go",
-	"internal/modules/web/shortscan.go",
-	"internal/modules/web/jsa.go",
-	// wordlistgen.go: roboxtractor is a stdin-only tool and getjswords is a repo
-	// Python script invoked once per JS URL; neither routes through the name-keyed
-	// Backend/Runner registry (no stdin / cmd-path injection). Direct
-	// exec.CommandContext behind overridable package-var runners is the sanctioned
-	// pattern (mirrors web/gxss.go + subdomains/reverseip.go). Per-invocation
-	// context.WithTimeout applied; XCUT-07 keeps URLs/paths on argv, secrets off it
-	// (PAR-04 / plan 13-04).
-	"internal/modules/web/wordlistgen.go",
-	// vulns/xss.go: dalfox `pipe` mode and Gxss both read candidate URLs from
-	// stdin (identical to web/gxss.go); the name-keyed Backend/Runner registry
-	// does not support stdin injection, so direct exec.CommandContext is the
-	// sanctioned invocation pattern. XCUT-09 heartbeat via goroutine stdout
-	// reader; XCUT-07 redaction applied before any logging.
-	"internal/modules/vulns/xss.go",
-	// vulns/ssrf.go: interactsh-client is a long-running OOB callback server
-	// subprocess that requires per-task lifecycle management (start on Run entry,
-	// SIGTERM on exit via defer). The Backend/Runner registry does not support
-	// long-running background subprocesses with persistent stdout pipes; direct
-	// exec.CommandContext with SysProcAttr{Setpgid:true} is the sanctioned pattern
-	// (FOUND-09 kill-tree safety). XCUT-07 redaction applied; callback URLs never
-	// logged at Info/Warn (only count). Mirrors web/gxss.go precedent.
-	"internal/modules/vulns/ssrf.go",
-	// vulns/bypass4xx.go: nomore403 is a repo-clone tool that resolves wordlists
-	// at paths relative to its own directory; it also reads candidate URLs from
-	// stdin. The name-keyed Backend/Runner registry does not support cmd.Dir or
-	// stdin injection, so direct exec.CommandContext is the sanctioned invocation
-	// pattern. Mirrors web/nomore403.go precedent (VULN-13 / plan 06-07).
-	"internal/modules/vulns/bypass4xx.go",
-	// subdomains/reverseip.go: hakip2host is a hakluke stdin-only tool (reads a
-	// newline-delimited IP list on stdin). The name-keyed Backend/Runner registry
-	// does not support stdin injection, so direct exec.CommandContext with
-	// cmd.Stdin is the sanctioned invocation pattern (mirrors web/hakoriginfinder.go,
-	// another hakluke stdin tool). Behind the hakip2hostRunner package var for
-	// hermetic tests; per-invocation context.WithTimeout applied (PAR-01 / plan 13-01).
-	"internal/modules/subdomains/reverseip.go",
-	// vulns/spray.go: brutus is a stdin-only spraying tool — it reads the service-
-	// fingerprint JSON on stdin (bash: `brutus ... <input`, vulns.sh:665). The name-
-	// keyed Backend/Runner registry does not support stdin injection, so brutus is
-	// invoked via a direct, timeout-bounded exec.CommandContext with cmd.Stdin behind
-	// the brutusRunner package var (hermetic tests). brutespray/nerva still route
-	// through app.Tools. Mirrors reverseip.go / github_repos.go; XCUT-07 keeps
-	// credentials off argv and out of findings (PAR-02 / plan 13-07).
-	"internal/modules/vulns/spray.go",
-	// osint/github_repos.go: `git clone` fetches every company repo into an
-	// isolated workspace tmp dir for read-only titus/trufflehog secret scanning
-	// (bash github_repos, osint.sh:110). git is a base system dependency, not a
-	// tools.lock recon binary — the name-keyed Backend/Runner registry runs recon
-	// tools, not the VCS. Direct exec.CommandContext behind the githubReposGitClone
-	// package var (hermetic tests) with per-invocation context.WithTimeout +
-	// GIT_TERMINAL_PROMPT=0 is the sanctioned pattern (mirrors reverseip.go /
-	// wordlistgen.go). enumerepo/titus/trufflehog still route through app.Tools
-	// (PAR-03 / plan 13-06).
-	"internal/modules/osint/github_repos.go",
-	// internal/installer/: the Phase 11 installer runs TOOLCHAIN + package-manager
-	// commands (go install, uv tool install, apt-get/brew/pacman, git clone, cargo,
-	// tar) plus version probes (go version -m, uv tool list) and the SHA-256-verified
-	// toolchain bootstrap. None of these are registered recon tools — the name-keyed
-	// Backend/Runner registry exists to run the tools in tools.lock, not to install
-	// them, and it supports neither cmd.Dir, stdin, nor the bootstrap download flow.
-	// Direct exec.CommandContext is therefore the sanctioned pattern here (INST-06..09);
-	// all calls are mockable package vars (runCmd/runCmdDir/runOutput) for hermetic tests.
-	"internal/installer/",
-}
-
-// isAllowed returns true when the (repo-relative) Go file path matches any
-// allowlist entry. Suffix match for `.go` files; HasPrefix for directory entries.
-func isAllowed(repoRelPath string) bool {
-	for _, entry := range allowedPaths {
-		if strings.HasSuffix(entry, "/") {
-			if strings.HasPrefix(repoRelPath, entry) {
-				return true
-			}
-		} else if repoRelPath == entry || strings.HasSuffix(repoRelPath, "/"+entry) {
-			return true
-		}
-	}
-	return false
-}
+// THE ALLOWLIST IS GONE. It used to live here as a []string of paths carrying
+// free-text comments; plan 18-03 replaced it with two typed sources, both in
+// bypasses_test.go / bypasses.go:
+//
+//   - infrastructureAllowlist — the seam itself and its own tests. These are not
+//     bypasses of the Runner; they ARE the Runner.
+//   - lint.Bypasses — the corroborated bypass manifest. Every entry's reasons are
+//     checked against that file's own syntax tree, its site count is checked
+//     exactly, and a stale entry fails.
+//
+// isAllowed (bypasses_test.go) consults both. See the package doc in
+// no_raw_subprocess.go for the contract.
 
 // violation records a forbidden subprocess call detected by the AST walker.
 type violation struct {

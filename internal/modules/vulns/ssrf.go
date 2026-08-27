@@ -26,12 +26,34 @@
 // overridable via cfg.Vulns.SSRF.TimeoutSeconds). This prevents the task
 // from running unbounded even when ffuf or OOB wait hangs.
 //
-// INTERACTSH SUBPROCESS SAFETY (FOUND-09, T-06-05-01):
-// exec.CommandContext with SysProcAttr{Setpgid:true}; defer syscall.Kill(-pgid,
-// syscall.SIGTERM) + cmd.Wait(). Process group kill covers all grandchildren.
-// This file is in the FOUND-10 allowlist (no_raw_subprocess_test.go) because
-// interactsh-client is a long-running OOB callback server that requires stdin/stdout
-// pipe control outside the Backend/Runner abstraction.
+// INTERACTSH SUBPROCESS SAFETY (FOUND-09, T-06-05-01) — SATISFIED BY THE SEAM
+// SINCE 18-05, NOT BY THIS FILE.
+//
+// This file used to hand-roll the lifecycle: exec.CommandContext with
+// SysProcAttr{Setpgid:true}, a StdoutPipe held open for the task's life, and
+// syscall.Kill(-pgid, SIGTERM) + cmd.Wait() on cleanup. Its bypass reason was
+// `process_lifecycle`, and 18-03 recorded it as the ONE reason 18-01 did not make
+// obsolete, because ExecOptions has no caller-managed background-process mode.
+//
+// 18-05 TESTED THAT CLAIM INSTEAD OF INHERITING IT, and it did not hold. "No
+// background-process MODE" is not "cannot serve this lifecycle":
+// Runner.StreamOpts returns a channel that outlives the call, and
+// LocalBackend.StreamOpts already sets Setpgid, SIGTERMs the whole group via
+// cmd.Cancel on ctx cancellation, and escalates to a group SIGKILL
+// KillGrace+500ms later precisely to reap grandchildren the stdlib will not.
+// TestInteractshLifecycleThroughStreamOpts drives a real process that forks a
+// SIGTERM-IMMUNE grandchild and proves all three properties this file needs:
+// the callback domain arrives on the channel while the process runs, cancelling
+// kills the whole tree, and the channel closes.
+//
+// DEADLINE OWNERSHIP, reconciled deliberately (the brutus trap, pointing the
+// other way): the interactsh-client row declares timeout_seconds = 0 — NO
+// MANIFEST BOUND — because the OOB session's lifetime IS the SSRF task's
+// lifetime, and that is owned by cfg.Vulns.SSRF.TimeoutSeconds, which an
+// operator can raise. A 300s manifest bound would have silently killed the
+// session mid-task for any operator who did, and the symptom would have been
+// "SSRF finds no OOB callbacks" with nothing failing. The session is never
+// unbounded in practice: taskCtx bounds it, as it always did.
 //
 // PAYLOAD REDACTION (XCUT-07, T-06-05-02):
 // interactsh callback URLs (which contain collaborator session IDs) MUST NEVER
@@ -63,15 +85,14 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
@@ -390,64 +411,69 @@ type interactshSession struct {
 // a domain that never arrives — the exact DoD-2 unbounded-wait cause.
 const interactshStartupTimeout = 30 * time.Second
 
-// startInteractshClient auto-starts interactsh-client (when resolvable on PATH)
-// and reads its registered callback domain from stdout, BOUNDED by both ctx and
-// interactshStartupTimeout. Returns (nil, false) when the binary is absent or no
-// callback domain arrives before the deadline — the caller then falls through to
-// in-band-only SSRF. Overridable in tests via the package var.
+// ssrfInteractshTool is the tools.lock entry the OOB session dispatches. Its row
+// declares timeout_seconds = 0 (no manifest bound) BY DESIGN — see this file's
+// header on deadline ownership, and TestInteractshHasNoManifestDeadline.
+const ssrfInteractshTool = "interactsh-client"
+
+// startInteractshClient auto-starts interactsh-client THROUGH backend.Runner and
+// reads its registered callback domain off the event channel, BOUNDED by both ctx
+// and interactshStartupTimeout. Returns (nil, false) when the tool is
+// unresolvable or no callback domain arrives before the deadline — the caller
+// then falls through to in-band-only SSRF. Overridable in tests via the package
+// var.
 //
-// FOUND-09 subprocess safety: SysProcAttr{Setpgid:true} + process-group SIGTERM on
-// cleanup / ctx-cancel (mirrors internal/core/backend/local.go). FOUND-10: this
-// file is allowlisted for the raw subprocess (interactsh-client is a long-running
-// OOB server needing a persistent stdout pipe outside the Backend abstraction).
+// 18-05: THE LIFECYCLE IS THE BACKEND'S NOW. There is no exec.CommandContext, no
+// SysProcAttr and no syscall.Kill here, because LocalBackend.StreamOpts already
+// owns every one of them (see this file's header for the evidence). `cleanup`
+// cancels the session context, which is what triggers the group SIGTERM and the
+// group-SIGKILL escalation; it then DRAINS the channel so the relay goroutine and
+// the recorder's end record are not abandoned. The recorder is the visible gain:
+// an OOB session that failed to start now appears in logs/tools.jsonl as
+// dispatch_failed instead of degrading to in-band silently.
+//
+// The session context is derived from ctx, so the DoD-2 guarantee is unchanged:
+// the overall task WithTimeout still tears the subprocess and its whole group
+// down.
 var startInteractshClient = func(ctx context.Context, app *appctx.AppContext) (*interactshSession, bool) {
-	bin, err := exec.LookPath("interactsh-client")
+	// A session context the caller's cleanup can cancel INDEPENDENTLY of ctx —
+	// this is what gives the caller the "stop the server now" control that the
+	// hand-rolled process-group SIGTERM used to provide.
+	sessCtx, sessCancel := context.WithCancel(ctx)
+
+	events, err := app.Tools.StreamOpts(sessCtx, ssrfInteractshTool, nil, backend.ExecOptions{})
 	if err != nil {
-		return nil, false // not installed → in-band fallback
+		sessCancel()
+		return nil, false // unresolvable → in-band fallback (now RECORDED)
 	}
 
-	// Launch under the task ctx so the overall task timeout / cancellation tears
-	// the subprocess (and its whole group) down (DoD-2 guard).
-	//nolint:gosec // bin resolved via LookPath; no user-controlled arguments.
-	cmd := exec.CommandContext(ctx, bin)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error {
-		if cmd.Process == nil {
-			return nil
-		}
-		return syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
-	}
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, false
-	}
-	if err := cmd.Start(); err != nil {
-		return nil, false
-	}
-
-	pgid := cmd.Process.Pid
-	cleanup := func() {
-		// Process-group SIGTERM (FOUND-09 kill-tree) + reap.
-		_ = syscall.Kill(-pgid, syscall.SIGTERM)
-		_ = cmd.Wait()
-	}
-
-	// Read the callback domain in a goroutine; bound the wait with a sub-context.
+	// drained closes once the relay has finished, so cleanup can wait for the
+	// process to be reaped rather than returning while it is still dying.
+	drained := make(chan struct{})
 	domainCh := make(chan string, 1)
 	go func() {
-		sc := bufio.NewScanner(stdout)
-		sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-		for sc.Scan() {
-			if d := parseInteractshDomain(sc.Text()); d != "" {
+		defer close(drained)
+		sent := false
+		for ev := range events {
+			if sent || ev.IsErr {
+				continue // keep draining: an abandoned channel leaks the relay
+			}
+			if d := parseInteractshDomain(string(ev.Line)); d != "" {
 				domainCh <- d
-				return
+				sent = true
 			}
 		}
-		domainCh <- "" // stdout closed without ever printing a domain
+		if !sent {
+			domainCh <- "" // stream ended without ever printing a domain
+		}
 	}()
 
-	readCtx, cancel := context.WithTimeout(ctx, interactshStartupTimeout)
+	cleanup := func() {
+		sessCancel()
+		<-drained
+	}
+
+	readCtx, cancel := context.WithTimeout(sessCtx, interactshStartupTimeout)
 	defer cancel()
 
 	select {

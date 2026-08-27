@@ -94,40 +94,59 @@ const censusTaskDeadline = 5 * time.Second
 // wrong, and this file exists because inferred coverage was wrong.
 var noDispatchTasks = map[string]string{
 	// --- no external tool at all -------------------------------------------
-	"subdomains.ns_delegation":    "pure Go DNS/zone analysis over the seeded corpus; dispatches no external tool, so there is no arg vector to check",
+	// 18-06 CORRECTION. The old reason read "pure Go DNS/zone analysis over the
+	// seeded corpus; dispatches no external tool, so there is no arg vector to
+	// check". FALSE of the file: SubNSDelegationTask.Run dispatches dnsx through
+	// app.Tools.Run at internal/modules/subdomains/scraping.go:366 and builds a
+	// real arg vector (-l/-ns/-resp/-silent, plus -t and -rl). It lands in this
+	// bucket for an INPUT reason, not an absence-of-tool one. This Task logs
+	// nothing on that early return, so the census's own logger could not
+	// contradict the claim — which is precisely how an inferred reason survives.
+	"subdomains.ns_delegation":    "reads subdomains/subdomains.txt and returns StatusSkipped before its dnsx dispatch when that file is absent; the generic seed writes inputs/subdomains.txt, a DIFFERENT path, so the Task never reaches app.Tools.Run(\"dnsx\", ...) at scraping.go:366. Seeding subdomains/subdomains.txt would drive it, and dnsx HAS a flag table, so it would land in `checked` rather than `notable`",
 	"subdomains.resolvers.health": "reads and scores the resolver file in Go; dispatches no external tool",
 	"web.url_ext":                 "classifies the URL corpus by extension in Go; dispatches no external tool (logged \"completed corpus_urls=3 extensions=0\")",
 	"web.wellknown":               "fetches /.well-known/* with its own net/http client, never a tool; also gated off by default (cfg.Web.WellKnown.Enabled=false)",
 
 	// --- gated on richer input than a generic seed can fabricate ------------
-	"osint.metadata":  "enriches documents already downloaded into the workspace; logs \"no workspace docs — skipping enrichment\". Seeding a realistic document corpus is a fixture, not a seed",
-	"vulns.xss":       "chains behind Gxss: with no Gxss binary the reflection filter yields no candidates, so dalfox is never reached (\"no reflected candidates after Gxss filter\")",
-	"web.wordlistgen": "generates wordlists in Go from robots/JS words; the pydictor leg is deferred and getjswords needs the tools root (\"robots_words=0 js_words=0 pydictor=deferred\")",
+	"osint.metadata": "enriches documents already downloaded into the workspace; logs \"no workspace docs — skipping enrichment\". Seeding a realistic document corpus is a fixture, not a seed",
 
 	// --- DEEP-gated: correct behaviour, not a gap --------------------------
 	"vulns.spray": "DEEP-gated by design — \"use --deep or set spray.deep_only=false\". Flipping the gate in the seed would drive a credential-spraying Task from a unit test",
 	"web.arjun":   "deep_only=true and the census runs in normal mode — \"skipped — deep_only=true and not in deep mode\"",
 
-	// --- BYPASSES backend.Runner: a FINDING, recorded not fixed ------------
+	// --- reaches a dispatch only on richer input, or on a populated PATH ----
 	//
-	// These Tasks build their command with exec.CommandContext DIRECTLY, so the
-	// arg-capturing backend never sees them and NO layer of this harness can
-	// check their arg vectors — not toolflags, not the drift detector, not this
-	// census. That is a structurally larger hole than the one this plan closes,
-	// and it is out of scope here (it is an architectural change to the Runner
-	// seam). Recorded for the phase-17 triage plans.
+	// THIS HEADING USED TO READ "BYPASSES backend.Runner: a FINDING", and it was
+	// false of every entry left under it by the end of phase 18. Phase 18 routed
+	// the whole bypass cohort onto the seam (BYPASS_CENSUS 14 files/30 sites ->
+	// 3 files/5 sites); no Task named below builds a command with
+	// exec.CommandContext any more. What each one still does is decline to reach
+	// its dispatch under the census sandbox — an empty PATH and an empty tools
+	// root — and THAT is what puts it in this bucket.
 	//
-	// Under the census sandbox (empty PATH, empty tools root) each one skips on
-	// "binary not found", which is why they land here rather than being driven.
-	"vulns.bypass4xx":     "exec.CommandContext(binaryPath) at vulns/bypass4xx.go:147, bypassing backend.Runner — its argv is invisible to every layer of this harness (FINDING, see 17-04-SUMMARY)",
-	"vulns.llm":           "julius is not in tools.lock, so the Runner returns \"tool not registered\" and the best-effort branch swallows it; no argv is ever built",
-	"web.gxss":            "exec.CommandContext at web/gxss.go:96, bypassing backend.Runner (FINDING)",
-	"web.hakoriginfinder": "exec.CommandContext at web/hakoriginfinder.go, bypassing backend.Runner (FINDING)",
-	"web.jsa":             "runs JSA from its own venv via exec, bypassing backend.Runner (FINDING)",
-	"web.mantra":          "exec.CommandContext at web/mantra.go:115 (mantra reads stdin), bypassing backend.Runner (FINDING)",
-	"web.nomore403":       "exec.CommandContext at web/nomore403.go:108 with cmd.Dir, bypassing backend.Runner (FINDING)",
-	"web.screenshot":      "exec.CommandContext at web/screenshot.go, bypassing backend.Runner (FINDING)",
-	"web.shortscan":       "exec.CommandContext at web/shortscan.go, bypassing backend.Runner (FINDING)",
+	// 18-06 re-checked all ten reasons in this map against their own files. Two
+	// were wrong: web.screenshot (below) and subdomains.ns_delegation (above).
+	// Both were rewritten rather than deleted, because bucket MEMBERSHIP was
+	// correct in both cases and only the stated cause was false — the same
+	// correction 18-04 made for web.shortscan.
+	"vulns.llm": "julius is not in tools.lock, so the Runner returns \"tool not registered\" and the best-effort branch swallows it; no argv is ever built",
+	// 18-06 CORRECTION. The old reason read "exec.CommandContext at
+	// web/screenshot.go, bypassing backend.Runner (FINDING)". That file contains
+	// NO direct dispatch and never did in this tree: its only tool call is
+	// app.Tools.Stream at web/screenshot.go:152, and its only exec reference is
+	// the exec.LookPath availability gate at :76. Verified with
+	// `grep -n 'CommandContext\|app.Tools' internal/modules/web/screenshot.go`.
+	// The claim was unfalsifiable prose of exactly the shape 18-03's manifest
+	// STALE check now refuses — MUTATION 3 in 18-03 proved the manifest would
+	// reject this very sentence. The true reason is read off the Task's own log.
+	"web.screenshot": "gates on exec.LookPath(\"nuclei\") at web/screenshot.go:76 and the census sandbox has an EMPTY PATH — \"web.screenshot: nuclei binary not found — skipping (D-W6)\". It dispatches through app.Tools.Stream (screenshot.go:152), not around it; seeding a nuclei stub onto PATH plus a templates dir would drive it",
+	// 18-04 brought web.shortscan home to backend.Runner, so its OLD reason here
+	// ("exec.CommandContext ... bypassing backend.Runner") is now FALSE and would
+	// be exactly the stale claim 18-03's manifest checks refuse. It stays in this
+	// bucket for a DIFFERENT and true reason, read off its own log rather than
+	// predicted: the generic seed writes no inputs/findings.nuclei.jsonl, so the
+	// Task skips at its input gate long before it reaches a dispatch.
+	"web.shortscan": "reads IIS targets from inputs/findings.nuclei.jsonl, which the generic seed does not write — \"inputs/findings.nuclei.jsonl absent — IIS target detection skipped\". It DOES now dispatch through backend.Runner (18-04); seeding a nuclei staging file with an iis-version record would drive it",
 }
 
 // censusExcludedTasks names Tasks deliberately kept out of the generic drive,
@@ -157,7 +176,7 @@ var censusExcludedTasks = map[string]string{}
 // sources, so the data source is retained.
 const (
 	censusRegistered = 96
-	censusDriven     = 75
+	censusDriven     = 83
 	// checked 17 -> 20 and notable 59 -> 56 when Task 2 added the sj and subjs
 	// flag tables: three Tasks (osint.swagger, subdomains.scraping, web.subjs)
 	// moved from "dispatched, checked by nothing" to "checked". A rise here is
@@ -169,9 +188,106 @@ const (
 	// to "checked". Both had been dispatching a vector nothing looked at, and
 	// both were wrong.
 	// checked 22 -> 21 when 17-07 deleted subdomains.passive.hackertarget (above).
+	// 18-04 ROUTED SIX BYPASSING FILES ONTO backend.Runner, and coverage goes UP
+	// rather than down. driveTaskGeneric dispatches against a registry seeded
+	// from the whole of tools.lock and never checks Tool.Path, so a Task that
+	// used to skip at its own exec.LookPath gate now reaches the arg-capturing
+	// backend and leaves `nodispatch` for a DRIVEN bucket. Which driven bucket
+	// was read off this test's own failure, never predicted: none of Gxss,
+	// hakoriginfinder, mantra, dalfox or shortscan has an entry in
+	// knownToolFlags, so every one of them lands in `notable` — "dispatched,
+	// checked by nothing" — which is an honest statement of where they now
+	// stand and an invitation to 18-06 to give them flag tables.
+	//
+	//	web.gxss            nodispatch -> notable (Gxss)
+	//	web.hakoriginfinder nodispatch -> notable (hakoriginfinder)
+	//	web.mantra          nodispatch -> notable (mantra)
+	//	vulns.xss           nodispatch -> notable (Gxss; dalfox is still gated
+	//	                    behind a reflection hit the capture backend does not
+	//	                    fabricate, so the second dispatch is not reached)
+	//
+	// TWO OF THE SIX DID NOT MOVE, and the accounting-identity test said so
+	// rather than the prediction being trusted:
+	//
+	//	vulns.spray     DEEP-gated, returns before any dispatch, so brutus coming
+	//	                home changes nothing this census can see.
+	//	web.shortscan   skips at its INPUT gate — the generic seed writes no
+	//	                inputs/findings.nuclei.jsonl — so it never reaches the
+	//	                dispatch it now has. Its noDispatchTasks reason was
+	//	                rewritten to say that instead of the bypass claim, which
+	//	                the move made false.
+	// NET: checked 21 (unchanged — none of these tools has a flag table),
+	// notable 54 -> 58, nodispatch 18 -> 14, driven 75 -> 79.
+	//
+	// 18-05 CONTINUES THE SAME MOVEMENT, and again the bucket was READ OFF THIS
+	// TEST'S OWN FAILURE rather than predicted:
+	//
+	//	web.nomore403  nodispatch -> notable (Task 1). It used to skip at its own
+	//	               os.Stat probe against the census's empty tools root; it now
+	//	               dispatches through the Runner, whose registry seed does not
+	//	               check Tool.Path. "nomore403" has no knownToolFlags entry, so
+	//	               it lands in notable — dispatched, checked by nothing.
+	//	               driven 79 -> 80, notable 58 -> 59, nodispatch 14 -> 13.
+	//
+	// Task 2 moved three more, and ONE OF THEM WAS NOT PREDICTED — the test said
+	// so and the prediction was corrected, not the test:
+	//
+	//	vulns.bypass4xx  nodispatch -> notable (nomore403). Predicted.
+	//	web.jsa          nodispatch -> notable (JSA). Predicted.
+	//	web.wordlistgen  nodispatch -> notable (roboxtractor). NOT PREDICTED. Its
+	//	                 noDispatchTasks reason said the Task "generates wordlists
+	//	                 in Go ... and getjswords needs the tools root", which was
+	//	                 true of BOTH its legs while both bypassed the Runner. Task
+	//	                 2 routed the roboxtractor leg onto the seam, so the Task
+	//	                 now dispatches under the generic seed and the claim became
+	//	                 false. The entry is REMOVED rather than reworded, because
+	//	                 unlike web.shortscan in 18-04 this Task really does reach a
+	//	                 dispatch now. Its getjswords leg remains a declared bypass
+	//	                 (adjudicated in 18-05) and is invisible to this census, as
+	//	                 every bypass is — which is what the BYPASS_CENSUS counts.
+	//
+	// TASK 3 MOVED NO BUCKET AT ALL, and that is recorded rather than left to look
+	// like an oversight. vulns.ssrf and osint.github_repos were ALREADY driven and
+	// notable — ssrf on ffuf, github_repos on enumerepo — so routing their
+	// remaining direct dispatches (interactsh-client, git) onto the seam added
+	// tools to those Tasks without moving either Task between buckets. The change
+	// IS visible, in the gap list: `interactsh-client` and `git` now appear in
+	// ARGV_COVERAGE_GAP, which they could not while nothing dispatched them
+	// through the Runner.
+	//
+	// NET for 18-05: driven 79 -> 83, notable 58 -> 62, nodispatch 14 -> 10,
+	// checked UNCHANGED at 21 — none of nomore403, JSA, roboxtractor,
+	// interactsh-client or git has a knownToolFlags entry, so every Task involved
+	// lands in "dispatched, checked by nothing". That is an honest statement of
+	// where they stand and the same invitation to 18-06 that 18-04 left.
+	//
+	// 18-06 MOVED NO CONSTANT, and the reason is written here rather than left as
+	// an absence. This plan routes nothing onto the seam; it reconciles what the
+	// five plans before it moved. The first thing it did was RUN the census
+	// (`go test -count=1 -v -run TestEveryRegisteredTaskIsAccountedFor
+	// ./internal/core/backend/`, exit 0) and read the reported line —
+	//
+	//	registered=96 driven=83 checked=21 notable=62 nodispatch=10 timedout=0 excluded=3
+	//
+	// — which already agreed with every pin below, because 18-04 and 18-05 each
+	// raised their constants in the SAME diff that moved the Tasks. That is the
+	// mechanism working, not an absent check: a bucket cannot absorb a movement
+	// silently, so by the time the reconciling plan runs there is nothing left to
+	// reconcile. The plan asked for "the failing run that produced the
+	// constants"; there was none, and inventing one would be the fabrication this
+	// file exists to prevent. MUTATION 1 and MUTATION 2 (below, in
+	// TestCensusAccountingIdentity's comment) were run instead, to prove the pins
+	// still FAIL on a wrong value rather than merely agreeing with a right one.
+	//
+	// What 18-06 DID change here is two REASONS, both false of their own files
+	// and neither one visible to any count: web.screenshot claimed a direct
+	// dispatch that file has never had, and subdomains.ns_delegation claimed it
+	// dispatches no external tool while dispatching dnsx. Both are annotated at
+	// their entries above. A wrong reason moves no number, which is exactly why
+	// it needs a check of its own rather than a pin.
 	censusChecked    = 21
-	censusNotable    = 54
-	censusNoDispatch = 18
+	censusNotable    = 62
+	censusNoDispatch = 10
 	// A TIMED-OUT TASK IS A FAILURE, not a bucket to grow. Pinned at zero so a
 	// Task that starts hanging cannot be absorbed as "accounted for".
 	censusTimedOut = 0
@@ -315,6 +431,68 @@ func TestEveryRegisteredTaskIsAccountedFor(t *testing.T) {
 	pin("nodispatch", nNoDispatch, censusNoDispatch)
 	pin("timedout", nTimedOut, censusTimedOut)
 	pin("excluded", nExcluded, censusExcluded)
+}
+
+// TestCensusAccountingIdentity asserts the PINNED CONSTANTS are internally
+// consistent, without driving a single Task.
+//
+// TestEveryRegisteredTaskIsAccountedFor already checks the identity over the
+// LIVE counts and then pins each bucket separately. This test checks the same
+// identity over the CONSTANTS, and it is not a duplicate of that:
+//
+//   - It costs microseconds, so an arithmetically impossible pin set is
+//     rejected before the ~20-second drive even starts.
+//   - It fails on a constant edit that no live count can contradict. Raise
+//     censusRegistered by one and lower nothing, and the live test reports one
+//     disagreement (registered) while the CONSTANTS silently stop summing. Here
+//     that is a second, differently-worded failure that names the identity.
+//   - It pins censusDriven as a DERIVED value (checked+notable). The live test
+//     computes nDriven the same way, so the live test can never see the two
+//     drift apart; only a constants-side check can.
+//
+// # WHY A PER-BUCKET PIN IS ALSO REQUIRED, PROVEN BY MUTATION
+//
+// The identity alone is INSUFFICIENT, and 18-06 proved it rather than asserting
+// it. MUTATION 1 raised censusNotable 62 -> 63 and lowered censusNoDispatch
+// 10 -> 9, keeping the sum at 96. Under the identity alone that is invisible: a
+// Task could move between buckets — coverage going down — with the total
+// balanced. It fails only because TestEveryRegisteredTaskIsAccountedFor pins
+// EVERY bucket individually, which it has done since 17-04:
+//
+//	ARGV_COVERAGE notable=62, pinned constant says 63.
+//	ARGV_COVERAGE nodispatch=10, pinned constant says 9.
+//
+// So the per-bucket pins are the load-bearing guard and this identity is the
+// cheap cross-check that keeps THEM consistent with each other. Deleting either
+// one leaves a hole the other does not cover; say which class you are giving up
+// before removing one.
+func TestCensusAccountingIdentity(t *testing.T) {
+	if sum := censusChecked + censusNotable + censusNoDispatch + censusTimedOut + censusExcluded; sum != censusRegistered {
+		t.Errorf("the pinned buckets sum to %d but censusRegistered = %d.\n"+
+			"  checked=%d + notable=%d + nodispatch=%d + timedout=%d + excluded=%d must equal registered.\n"+
+			"  A pin set that cannot describe any real run is not a pin — it is a number that will be\n"+
+			"  edited until the test passes, which is the failure mode this census exists to remove.",
+			sum, censusRegistered,
+			censusChecked, censusNotable, censusNoDispatch, censusTimedOut, censusExcluded)
+	}
+	if censusChecked+censusNotable != censusDriven {
+		t.Errorf("censusDriven = %d but checked(%d) + notable(%d) = %d.\n"+
+			"  `driven` is DERIVED, not measured: the live census computes it as checked+notable, so it\n"+
+			"  can never report this disagreement. Only a constants-side identity can.",
+			censusDriven, censusChecked, censusNotable, censusChecked+censusNotable)
+	}
+	if censusTimedOut != 0 {
+		t.Errorf("censusTimedOut = %d, want 0. A timed-out Task is NOT COVERED; pinning a non-zero "+
+			"value converts a hang into an accounted bucket, which is the absorption this file forbids.",
+			censusTimedOut)
+	}
+	if len(noDispatchTasks) != censusNoDispatch {
+		t.Errorf("noDispatchTasks holds %d entries but censusNoDispatch = %d.\n"+
+			"  Every Task in the nodispatch bucket must have an entry (the live census errors if one\n"+
+			"  does not), so a surplus entry is a STALE excuse for a Task that has come home, and a\n"+
+			"  shortfall means the pin was raised without writing the reason.",
+			len(noDispatchTasks), censusNoDispatch)
+	}
 }
 
 // TestCensusBucketsCarryReasons asserts the reasoned buckets are reasoned,
@@ -463,27 +641,12 @@ func appendUnique(xs []string, x string) []string {
 func blockNetworkEgress(t *testing.T) {
 	t.Helper()
 
-	// AN EMPTY PATH, and this is not belt-and-braces — it is load-bearing.
-	//
-	// FINDING (17-04, recorded not fixed): fourteen module files dispatch their
-	// tool with exec.CommandContext DIRECTLY, bypassing backend.Runner:
-	//
-	//	web/{gxss,mantra,nomore403,shortscan,screenshot,jsa,hakoriginfinder,wordlistgen}.go
-	//	vulns/{xss,ssrf,bypass4xx,spray}.go
-	//	subdomains/reverseip.go  osint/github_repos.go
-	//
-	// The arg-capturing backend never sees those calls, so no layer of this
-	// harness — not toolflags, not the drift detector, not this census — can
-	// check their arg vectors. Worse, the first census run PROVED they start
-	// real processes from `go test`: vulns.bypass4xx and web.nomore403 both
-	// reported `err="signal: killed"`, meaning a binary ran and was killed by
-	// the per-task deadline. On a provisioned box that is a unit test firing
-	// real security tools.
-	//
-	// Emptying PATH makes exec.LookPath fail inside those Tasks, so they skip
-	// instead of executing, and the census behaves IDENTICALLY on a bare CI
-	// runner and on a fully provisioned box. That determinism is the property
-	// this whole file depends on.
+	// AN EMPTY PATH remains load-bearing even after phase 18 reduced the declared
+	// bypass census to three files/five sites. It prevents the remaining allowed
+	// direct subprocesses and legacy LookPath gates from reaching ambient tools;
+	// Runner-dispatched tools are intercepted by the arg-capturing backend.
+	// Together with the empty tools root seeded below, this keeps the census
+	// identical on bare CI and fully provisioned operator hosts.
 	t.Setenv("PATH", "")
 
 	const dead = "http://127.0.0.1:1"
@@ -567,16 +730,19 @@ func genericSeed(t *testing.T, workDir string, cfg *config.Config) {
 	resolvers := in("resolvers.txt")
 	seedFile(t, resolvers, resolverLines(12))
 
-	// AN EMPTY TOOLS ROOT. resolveToolsDir() falls back to $HOME/Tools, and the
-	// repo-clone Tasks that exec.Command an ABSOLUTE path (nomore403, bypass4xx,
-	// jsa, wordlistgen) are not stopped by an empty PATH — the first census run
-	// on this box ran the real nomore403 binary out of $HOME/Tools and killed it
-	// on the deadline. Pointing DataDir at an empty directory makes os.Stat fail
-	// and the Task skip, on any box.
+	// AN EMPTY TOOLS ROOT. Clone-backed registry entries and the remaining
+	// getjswords clone-path bypass must never resolve against the operator's real
+	// $HOME/Tools during a unit test. Keep the legacy DataDir value isolated too,
+	// because unrelated task inputs still consult it.
 	cfg.Paths.DataDir = filepath.Join(workDir, "tools-root")
 	if err := os.MkdirAll(cfg.Paths.DataDir, 0o755); err != nil {
 		t.Fatalf("mkdir tools-root: %v", err)
 	}
+	// 18-02: paths.tools_dir is now the NAMED tools root and Config.ToolsRoot()
+	// falls back to $HOME/Tools when it is unset — the same fallback, one level
+	// up. Point it at the same empty directory, for the same reason: a census run
+	// must not be able to reach a real binary in the operator's home.
+	cfg.Paths.ToolsDir = cfg.Paths.DataDir
 
 	cfg.Paths.Resolvers = resolvers
 	cfg.Paths.SubsWordlist = wl
@@ -776,3 +942,27 @@ func (c *multiCapture) StreamEnv(ctx context.Context, tl *backend.Tool, args []s
 
 func (c *multiCapture) HealthCheck(_ context.Context) error { return nil }
 func (c *multiCapture) Capacity() int                       { return 1 }
+
+// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
+// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
+// arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
+//
+// It deliberately IGNORES opts.Stdin, opts.StdinPath and opts.Dir: this fake
+// never receives them. A fake that needs to ASSERT on stdin must write its own
+// ExecOpts instead of inheriting this forward — silently discarding the bytes is
+// correct only because nothing here is testing them.
+func (c *multiCapture) ExecOpts(ctx context.Context, t *backend.Tool, args []string, opts backend.ExecOptions) (*backend.Result, error) {
+	if len(opts.Env) > 0 {
+		return c.ExecEnv(ctx, t, args, opts.Env)
+	}
+	return c.Exec(ctx, t, args)
+}
+
+// StreamOpts satisfies the backend.Backend options seam (see ExecOpts).
+func (c *multiCapture) StreamOpts(ctx context.Context, t *backend.Tool, args []string, opts backend.ExecOptions) (<-chan backend.Event, error) {
+	if len(opts.Env) > 0 {
+		return c.StreamEnv(ctx, t, args, opts.Env)
+	}
+	return c.Stream(ctx, t, args)
+}

@@ -626,3 +626,75 @@ func TestAxiomAbandonsFleetAfterRepeatedDispatchFailures(t *testing.T) {
 		t.Errorf("after the latch the tool should run locally; last call was %q with %v", last.tool, last.args)
 	}
 }
+
+// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
+// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
+// arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
+//
+// It deliberately IGNORES opts.Stdin, opts.StdinPath and opts.Dir: this fake
+// never receives them. A fake that needs to ASSERT on stdin must write its own
+// ExecOpts instead of inheriting this forward — silently discarding the bytes is
+// correct only because nothing here is testing them.
+func (f *axiomScriptFake) ExecOpts(ctx context.Context, t *backend.Tool, args []string, opts backend.ExecOptions) (*backend.Result, error) {
+	if len(opts.Env) > 0 {
+		return f.ExecEnv(ctx, t, args, opts.Env)
+	}
+	return f.Exec(ctx, t, args)
+}
+
+// StreamOpts satisfies the backend.Backend options seam (see ExecOpts).
+func (f *axiomScriptFake) StreamOpts(ctx context.Context, t *backend.Tool, args []string, opts backend.ExecOptions) (<-chan backend.Event, error) {
+	if len(opts.Env) > 0 {
+		return f.StreamEnv(ctx, t, args, opts.Env)
+	}
+	return f.Stream(ctx, t, args)
+}
+
+// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
+// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
+// arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
+//
+// It deliberately IGNORES opts.Stdin, opts.StdinPath and opts.Dir: this fake
+// never receives them. A fake that needs to ASSERT on stdin must write its own
+// ExecOpts instead of inheriting this forward — silently discarding the bytes is
+// correct only because nothing here is testing them.
+func (f *axiomCtxFake) ExecOpts(ctx context.Context, t *backend.Tool, args []string, opts backend.ExecOptions) (*backend.Result, error) {
+	if len(opts.Env) > 0 {
+		return f.ExecEnv(ctx, t, args, opts.Env)
+	}
+	return f.Exec(ctx, t, args)
+}
+
+// StreamOpts satisfies the backend.Backend options seam (see ExecOpts).
+func (f *axiomCtxFake) StreamOpts(ctx context.Context, t *backend.Tool, args []string, opts backend.ExecOptions) (<-chan backend.Event, error) {
+	if len(opts.Env) > 0 {
+		return f.StreamEnv(ctx, t, args, opts.Env)
+	}
+	return f.Stream(ctx, t, args)
+}
+
+// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
+// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
+// arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
+//
+// It deliberately IGNORES opts.Stdin, opts.StdinPath and opts.Dir: this fake
+// never receives them. A fake that needs to ASSERT on stdin must write its own
+// ExecOpts instead of inheriting this forward — silently discarding the bytes is
+// correct only because nothing here is testing them.
+func (f *blockingFake) ExecOpts(ctx context.Context, t *backend.Tool, args []string, opts backend.ExecOptions) (*backend.Result, error) {
+	if len(opts.Env) > 0 {
+		return f.ExecEnv(ctx, t, args, opts.Env)
+	}
+	return f.Exec(ctx, t, args)
+}
+
+// StreamOpts satisfies the backend.Backend options seam (see ExecOpts).
+func (f *blockingFake) StreamOpts(ctx context.Context, t *backend.Tool, args []string, opts backend.ExecOptions) (<-chan backend.Event, error) {
+	if len(opts.Env) > 0 {
+		return f.StreamEnv(ctx, t, args, opts.Env)
+	}
+	return f.Stream(ctx, t, args)
+}

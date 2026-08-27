@@ -395,3 +395,27 @@ func wellknownStub(t *testing.T, securityTxt string) string {
 	t.Cleanup(srv.Close)
 	return srv.URL
 }
+
+// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
+// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
+// arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
+//
+// It deliberately IGNORES opts.Stdin, opts.StdinPath and opts.Dir: this fake
+// never receives them. A fake that needs to ASSERT on stdin must write its own
+// ExecOpts instead of inheriting this forward — silently discarding the bytes is
+// correct only because nothing here is testing them.
+func (m *webMockBackend) ExecOpts(ctx context.Context, t *backend.Tool, args []string, opts backend.ExecOptions) (*backend.Result, error) {
+	if len(opts.Env) > 0 {
+		return m.ExecEnv(ctx, t, args, opts.Env)
+	}
+	return m.Exec(ctx, t, args)
+}
+
+// StreamOpts satisfies the backend.Backend options seam (see ExecOpts).
+func (m *webMockBackend) StreamOpts(ctx context.Context, t *backend.Tool, args []string, opts backend.ExecOptions) (<-chan backend.Event, error) {
+	if len(opts.Env) > 0 {
+		return m.StreamEnv(ctx, t, args, opts.Env)
+	}
+	return m.Stream(ctx, t, args)
+}

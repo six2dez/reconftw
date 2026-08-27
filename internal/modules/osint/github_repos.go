@@ -41,11 +41,28 @@
 // / scan error logs a warning and continues; the task returns StatusDone with the
 // count of secrets found. It never aborts the osint pipeline.
 //
-// FOUND-10: enumerepo/titus/trufflehog run through app.Tools (the Runner seam);
-// only `git clone` uses a direct, timeout-bounded exec.CommandContext behind the
-// githubReposGitClone package var (git is a base system dependency, not a
-// tools.lock recon binary — this file is on the FOUND-10 allowlist alongside the
-// other repo-clone/stdin tool wrappers).
+// FOUND-10: EVERY dispatch in this file now runs through app.Tools (the Runner
+// seam) — enumerepo, titus, trufflehog AND `git clone`.
+//
+// 18-05 VERDICT 2. This file's bypass reason was `non_recon_binary`, on the true
+// premise that git had no tools.lock entry. The premise held; the RATIONALE ("the
+// registry runs the recon inventory, not the version-control system") did not,
+// because tools.lock already carries seven kind="system" rows — whois, nmap,
+// exiftool, sqlmap, massdns, testssl.sh, axiom-scan — every one a base system
+// dependency. So `git` is registered (kind = "system", critical = false) and the
+// clone comes home.
+//
+// WHAT THAT BUYS, and it is the reason the verdict went this way rather than
+// standing on a technicality: this clone fetches UNTRUSTED THIRD-PARTY
+// repositories at URLs derived from enumerepo output. Its only mitigations are
+// `-c protocol.ext.allow=never` (kills git's ext:: transport, an RCE vector) and
+// GIT_TERMINAL_PROMPT=0, and until now no artefact of a run could show they were
+// applied. The argv is now in logs/tools.jsonl and the env goes through
+// ExecOptions.Env — the argv-free path ARCH-02 requires for child environment.
+//
+// The INSTALLER's own git dispatch is untouched and remains a declared
+// `installer_toolchain` bypass: installing tools and cloning a scan target are
+// different operations at different trust boundaries.
 //
 // Source: .planning/phases/07-osint-e2e/07-03-PLAN.md Task 2;
 //
@@ -61,7 +78,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -70,6 +86,7 @@ import (
 	"time"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
@@ -77,37 +94,45 @@ import (
 // githubReposCloneTimeout bounds a single `git clone` invocation. Company repos
 // can be large (bash does a full clone so titus --git can walk history), so the
 // ceiling is generous; a hung/auth-prompting clone is still killed.
-const githubReposCloneTimeout = 300 * time.Second
+// 18-05: the bound MOVED to tools.lock's git row (timeout_seconds = 300), which
+// applyToolContract now derives inside the Runner. The constant is retained as
+// githubReposCloneFormerTimeout so the pin that keeps the two from drifting has
+// something to name, and so deleting it is a visible change rather than a silent
+// one. NOTHING READS IT AT RUNTIME.
+const githubReposCloneFormerTimeout = 300 * time.Second //nolint:unused // retained derivation; NOTHING READS IT AT RUNTIME, by design
+
+// githubReposGitTool is the tools.lock entry the clone leg dispatches.
+const githubReposGitTool = "git"
 
 // githubReposGitClone clones url into dest (bash: git clone <url> <dest>,
-// osint.sh:110). It is the FOUND-10-allowlisted subprocess seam for this file:
-// the name-keyed Backend/Runner registry runs tools.lock recon binaries, not
-// `git` (a base system dependency used here to fetch untrusted third-party repos
-// into an isolated workspace tmp dir for read-only scanning — T-13-06-04). The
-// var is overridable so hermetic tests inject a fake clone. GIT_TERMINAL_PROMPT=0
-// makes an auth-required clone fail fast instead of hanging on an interactive
-// credential prompt.
-var githubReposGitClone = func(ctx context.Context, url, dest string) error {
+// osint.sh:110). Since 18-05, git is a kind="system" tools.lock entry and this
+// call routes through backend.Runner; it is no longer a FOUND-10 bypass. The var
+// remains overridable so hermetic tests can inject a fake clone.
+var githubReposGitClone = func(ctx context.Context, app *appctx.AppContext, url, dest string) error {
 	// WR-13-04: validate the clone target BEFORE doing any work. Reject anything
 	// that is not an http(s)/git clone URL so a value beginning with "-" (enumerepo
 	// schema drift or plaintext-fallback garbage) can never be consumed by git as
 	// an option (git option-injection, e.g. --upload-pack=…, or an "ext::"
 	// transport → RCE where enabled).
+	//
+	// THIS CHECK STAYS HERE AND STAYS FIRST. The Runner does not validate argv
+	// content — it records it — so moving the dispatch onto the seam neither adds
+	// nor removes this guard, and deleting it would be a silent regression that
+	// no census would report.
 	if !strings.HasPrefix(url, "https://") && !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "git@") {
 		return fmt.Errorf("refusing to clone non-URL %q", url)
 	}
-	bin, err := exec.LookPath("git")
-	if err != nil {
-		return err // git not installed — caller degrades best-effort
-	}
-	cmdCtx, cancel := context.WithTimeout(ctx, githubReposCloneTimeout)
-	defer cancel()
 	// protocol.ext.allow=never disables git's ext:: transport; "--" ends option
 	// parsing so the validated URL is always treated as a positional argument.
-	//nolint:gosec // bin resolved via LookPath; url validated as http(s)/git URL above; "--" separates it from options; dest is workspace tmp
-	cmd := exec.CommandContext(cmdCtx, bin, "-c", "protocol.ext.allow=never", "clone", "--", url, dest)
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
-	return cmd.Run()
+	// Both survive the move VERBATIM (T-18-05-02) and are now visible in the
+	// invocation record.
+	args := []string{"-c", "protocol.ext.allow=never", "clone", "--", url, dest}
+	// GIT_TERMINAL_PROMPT=0 makes an auth-required clone fail fast instead of
+	// hanging on an interactive credential prompt. It travels as ExecOptions.Env,
+	// NOT on argv — the argv-free child-environment seam (ARCH-02).
+	_, err := app.Tools.RunOpts(ctx, githubReposGitTool, args,
+		backend.ExecOptions{Env: []string{"GIT_TERMINAL_PROMPT=0"}})
+	return err // absent git / clone failure — caller degrades best-effort (D-O8)
 }
 
 // GitHubReposTask runs enumerepo + the company-repo secret scan for OSINT-05 /
@@ -295,7 +320,7 @@ func (t *GitHubReposTask) scanCompanyRepos(ctx context.Context, app *appctx.AppC
 	cloned := make([]string, len(urls)) // cloned[i] = dest dir on success, else ""
 	githubReposBounded(threads, len(urls), func(i int) {
 		dest := filepath.Join(cloneRoot, githubReposSHA256(urls[i]))
-		if err := githubReposGitClone(ctx, urls[i], dest); err != nil {
+		if err := githubReposGitClone(ctx, app, urls[i], dest); err != nil {
 			if app.Log != nil {
 				app.Log.Debug("osint.github_repos: git clone failed (best_effort)", "err", err)
 			}

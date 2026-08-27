@@ -341,7 +341,7 @@ func TestSprayBrutusDeepGate(t *testing.T) {
 	writeServiceFPFixture(t, app)
 
 	brutusCalled := false
-	restore := swapBrutusRunner(func(_ context.Context, _ string, _ []string) error {
+	restore := swapBrutusRunner(func(_ context.Context, _ *appctx.AppContext, _ string, _ []string) error {
 		brutusCalled = true
 		return nil
 	})
@@ -366,12 +366,17 @@ func TestSprayBrutusStdinAndRedaction(t *testing.T) {
 	cfg.Advanced.Deep = true
 	cfg.Advanced.Tools.Brutus = config.AdvToolBrutus{Usernames: "/tmp/users.txt", Passwords: "/tmp/pass.txt"}
 	app := newSprayTestApp(t, be, cfg)
+	// PRODUCTION-SHAPED WIRING (WR-09): appctx.Boot always gives a run a
+	// SecretRegistrar, and runBrutus now appends -u/-p ONLY when the configured
+	// values were actually registered with it. Without this the flags are omitted
+	// by design, and this test would be asserting the failure mode.
+	app.Secrets = &log.Redactor{}
 	writeGnmapFixture(t, app)
 	writeServiceFPFixture(t, app)
 
 	var gotStdinPath string
 	var gotArgs []string
-	restore := swapBrutusRunner(func(_ context.Context, serviceFPPath string, args []string) error {
+	restore := swapBrutusRunner(func(_ context.Context, _ *appctx.AppContext, serviceFPPath string, args []string) error {
 		gotStdinPath = serviceFPPath
 		gotArgs = append([]string(nil), args...)
 		// Emulate brutus writing a hit (with a FAKE credential) to its -o file.
@@ -397,7 +402,10 @@ func TestSprayBrutusStdinAndRedaction(t *testing.T) {
 	if !strings.HasSuffix(gotStdinPath, filepath.Join("hosts", "service_fingerprints.jsonl")) {
 		t.Errorf("brutus stdin path = %q, want hosts/service_fingerprints.jsonl", gotStdinPath)
 	}
-	// arg vector: --json -o vulns/brutus.jsonl -u <userfile> -p <passfile>
+	// arg vector: --json -o vulns/brutus.jsonl -u <usernames> -p <passwords>.
+	// NOTE: brutus documents -u/-p as comma-separated VALUES, not file paths —
+	// 18-04 confirmed that against `brutus --help`. The fixture happens to use
+	// path-shaped strings; nothing here requires them to be paths.
 	joined := strings.Join(gotArgs, " ")
 	if !hasArg(gotArgs, "--json") {
 		t.Errorf("brutus args missing --json: %v", gotArgs)
@@ -406,7 +414,8 @@ func TestSprayBrutusStdinAndRedaction(t *testing.T) {
 		t.Errorf("brutus args missing -o vulns/brutus.jsonl: %v", gotArgs)
 	}
 	if !argPairPresent(gotArgs, "-u", "/tmp/users.txt") || !argPairPresent(gotArgs, "-p", "/tmp/pass.txt") {
-		t.Errorf("brutus creds must cross as file paths -u/-p: %v", gotArgs)
+		t.Errorf("brutus did not receive -u/-p — with a registrar present the flags "+
+			"must be appended (WR-09 omits them only when registration fails): %v", gotArgs)
 	}
 
 	// XCUT-07: finding recorded, raw brutus credential NEVER persisted.
@@ -434,7 +443,7 @@ func TestSprayBrutusDegradesWhenMissing(t *testing.T) {
 	writeGnmapFixture(t, app)
 	writeServiceFPFixture(t, app)
 
-	restore := swapBrutusRunner(func(_ context.Context, _ string, _ []string) error {
+	restore := swapBrutusRunner(func(_ context.Context, _ *appctx.AppContext, _ string, _ []string) error {
 		return errBrutusNotInstalled
 	})
 	defer restore()
@@ -457,7 +466,7 @@ func TestSprayBrutusSkipsWithoutServiceFP(t *testing.T) {
 	writeGnmapFixture(t, app) // gnmap present but NO service-fp and NO naabu_open.txt
 
 	brutusCalled := false
-	restore := swapBrutusRunner(func(_ context.Context, _ string, _ []string) error {
+	restore := swapBrutusRunner(func(_ context.Context, _ *appctx.AppContext, _ string, _ []string) error {
 		brutusCalled = true
 		return nil
 	})
@@ -533,7 +542,7 @@ func TestSprayBrutusConfinesRawOutput(t *testing.T) {
 		slog.NewJSONHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug}), &log.Redactor{}))
 
 	const rawPass = "FAKEBRUTUSPASS_WR13_03"
-	restore := swapBrutusRunner(func(_ context.Context, _ string, args []string) error {
+	restore := swapBrutusRunner(func(_ context.Context, _ *appctx.AppContext, _ string, args []string) error {
 		outPath := argValue(args, "-o")
 		if outPath == "" {
 			t.Fatal("brutus args missing -o output path")
@@ -577,7 +586,7 @@ func TestSprayBrutusConfinesRawOutput(t *testing.T) {
 // -------------------------------------------------------------------------
 
 // swapBrutusRunner replaces the brutusRunner package var and returns a restore fn.
-func swapBrutusRunner(fn func(context.Context, string, []string) error) func() {
+func swapBrutusRunner(fn func(context.Context, *appctx.AppContext, string, []string) error) func() {
 	prev := brutusRunner
 	brutusRunner = fn
 	return func() { brutusRunner = prev }
@@ -829,5 +838,84 @@ func newSprayIndexApp(t *testing.T, lines ...string) *appctx.AppContext {
 	}
 	return &appctx.AppContext{
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir},
+	}
+}
+
+// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
+// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
+// arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
+//
+// It deliberately IGNORES opts.Stdin, opts.StdinPath and opts.Dir: this fake
+// never receives them. A fake that needs to ASSERT on stdin must write its own
+// ExecOpts instead of inheriting this forward — silently discarding the bytes is
+// correct only because nothing here is testing them.
+func (b *sprayFakeBackend) ExecOpts(ctx context.Context, t *backend.Tool, args []string, opts backend.ExecOptions) (*backend.Result, error) {
+	if len(opts.Env) > 0 {
+		return b.ExecEnv(ctx, t, args, opts.Env)
+	}
+	return b.Exec(ctx, t, args)
+}
+
+// StreamOpts satisfies the backend.Backend options seam (see ExecOpts).
+func (b *sprayFakeBackend) StreamOpts(ctx context.Context, t *backend.Tool, args []string, opts backend.ExecOptions) (<-chan backend.Event, error) {
+	if len(opts.Env) > 0 {
+		return b.StreamEnv(ctx, t, args, opts.Env)
+	}
+	return b.Stream(ctx, t, args)
+}
+
+// TestSprayOmitsCredentialFlagsWithoutARegistrar pins the WR-09 fix.
+//
+// runBrutus used to append -u/-p UNCONDITIONALLY after a best-effort registration.
+// A run with no SecretRegistrar — which was EVERY MCP-driven scan before V-01 —
+// therefore dispatched live credentials straight into logs/tools.jsonl with nothing
+// to scrub them, and nothing said so.
+//
+// Omitting the flag degrades the scan: brutus falls back to its own defaults.
+// Writing the operator's password into a file people paste into issue reports does
+// not degrade anything, it just loses the credential. The loud, lesser harm wins.
+func TestSprayOmitsCredentialFlagsWithoutARegistrar(t *testing.T) {
+	be := newSprayFakeBackend()
+	cfg := sprayTestCfg()
+	cfg.Vulns.Spray.Engine = "brutus"
+	cfg.Advanced.Deep = true
+	const passCanary = "WR09-LIVE-PASSWORD-CANARY"
+	cfg.Advanced.Tools.Brutus = config.AdvToolBrutus{
+		Usernames: "admin,root",
+		Passwords: passCanary,
+	}
+	app := newSprayTestApp(t, be, cfg)
+	app.Secrets = nil // no registrar — the pre-V-01 MCP shape
+	writeGnmapFixture(t, app)
+	writeServiceFPFixture(t, app)
+
+	var gotArgs []string
+	restore := swapBrutusRunner(func(_ context.Context, _ *appctx.AppContext, _ string, args []string) error {
+		gotArgs = append([]string(nil), args...)
+		if outPath := argValue(args, "-o"); outPath != "" {
+			return os.WriteFile(outPath, []byte("\n"), 0o644)
+		}
+		return nil
+	})
+	defer restore()
+
+	if _, err := (&SprayTask{}).Run(context.Background(), app); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	joined := strings.Join(gotArgs, " ")
+	if strings.Contains(joined, passCanary) {
+		t.Fatalf("LIVE CREDENTIAL ON ARGV WITH NO REDACTOR TO SCRUB IT — the dispatch "+
+			"would write it to logs/tools.jsonl in clear text (WR-09): %v", gotArgs)
+	}
+	if hasArg(gotArgs, "-p") || hasArg(gotArgs, "-u") {
+		t.Errorf("-u/-p appended despite registration having failed: %v", gotArgs)
+	}
+	// The dispatch must still HAPPEN — omitting the flags degrades the scan, it
+	// does not cancel it. A test that passed because brutus never ran would prove
+	// nothing about the argv.
+	if len(gotArgs) == 0 {
+		t.Fatal("brutus was never dispatched, so this test asserts nothing about its argv")
 	}
 }

@@ -152,7 +152,7 @@ func runGithubReposTask(t *testing.T, fx githubReposFixture) (*appctx.AppContext
 	// repo) so the titus scan step has a directory to target — no real git.
 	prevClone := githubReposGitClone
 	t.Cleanup(func() { githubReposGitClone = prevClone })
-	githubReposGitClone = func(_ context.Context, _ string, dest string) error {
+	githubReposGitClone = func(_ context.Context, _ *appctx.AppContext, _ string, dest string) error {
 		return os.MkdirAll(dest, 0o755)
 	}
 
@@ -372,8 +372,13 @@ func TestGithubReposTask_TrufflehogFindingsRedacted(t *testing.T) {
 // TestGithubReposGitCloneRejectsNonURL proves the WR-13-04 hardening: the git
 // clone seam refuses any target that is not an http(s)/git URL BEFORE invoking
 // git, so an option-injection value (leading "-", ext:: transport, file://) can
-// never reach git's argv. The scheme check runs before exec.LookPath, so this is
-// deterministic regardless of whether git is installed on the runner.
+// never reach git's argv.
+//
+// 18-05: the check now runs before app.Tools.RunOpts rather than before
+// exec.LookPath, and it is passed a NIL AppContext ON PURPOSE. If the validation
+// were ever moved below the dispatch, this test would panic on the nil rather
+// than quietly passing — a stronger guarantee than the old "deterministic
+// regardless of whether git is installed", and the same property that mattered.
 func TestGithubReposGitCloneRejectsNonURL(t *testing.T) {
 	for _, bad := range []string{
 		"--upload-pack=touch /tmp/pwned", // option injection
@@ -382,7 +387,7 @@ func TestGithubReposGitCloneRejectsNonURL(t *testing.T) {
 		"file:///etc/passwd",             // non-http(s)/git scheme
 		"",                               // empty
 	} {
-		err := githubReposGitClone(context.Background(), bad, t.TempDir())
+		err := githubReposGitClone(context.Background(), nil, bad, t.TempDir())
 		if err == nil {
 			t.Errorf("githubReposGitClone(%q) = nil; want rejection error", bad)
 			continue
@@ -431,4 +436,28 @@ func TestParseEnumerepoOutputFallbackOnlyOnParseFailure(t *testing.T) {
 			t.Errorf("plaintext fallback got %v, want 2 URLs", got)
 		}
 	})
+}
+
+// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
+// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
+// arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
+//
+// It deliberately IGNORES opts.Stdin, opts.StdinPath and opts.Dir: this fake
+// never receives them. A fake that needs to ASSERT on stdin must write its own
+// ExecOpts instead of inheriting this forward — silently discarding the bytes is
+// correct only because nothing here is testing them.
+func (b *githubReposBackend) ExecOpts(ctx context.Context, t *backend.Tool, args []string, opts backend.ExecOptions) (*backend.Result, error) {
+	if len(opts.Env) > 0 {
+		return b.ExecEnv(ctx, t, args, opts.Env)
+	}
+	return b.Exec(ctx, t, args)
+}
+
+// StreamOpts satisfies the backend.Backend options seam (see ExecOpts).
+func (b *githubReposBackend) StreamOpts(ctx context.Context, t *backend.Tool, args []string, opts backend.ExecOptions) (<-chan backend.Event, error) {
+	if len(opts.Env) > 0 {
+		return b.StreamEnv(ctx, t, args, opts.Env)
+	}
+	return b.Stream(ctx, t, args)
 }

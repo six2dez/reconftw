@@ -3,53 +3,66 @@
 // PAR-01 (Phase 13-01): folds bash sub_dns's hakip2host reverse-IP step
 // (modules/subdomains.sh:931-935) into SubDNSTask. hakip2host is a hakluke
 // stdin-only tool — it reads newline-delimited IPs on stdin and emits
-// "[TAG] <ip> <hostname>" lines. The name-keyed Backend/Runner (app.Tools) does
-// NOT support stdin injection, so — exactly like the sibling
-// web/hakoriginfinder.go (another hakluke stdin tool) — this file uses a
-// direct, timeout-bounded exec.CommandContext with cmd.Stdin. It is therefore
-// added to the FOUND-10 allowlist (internal/core/backend/lint/
-// no_raw_subprocess_test.go) alongside the other sanctioned stdin-tool wrappers.
+// "[TAG] <ip> <hostname>" lines.
 //
-// The exec call is behind the hakip2hostRunner package var so hermetic tests
+// 18-01: THIS FILE NO LONGER BYPASSES THE SEAM. It used to reach for a direct
+// exec.CommandContext with cmd.Stdin, because the name-keyed Backend/Runner had
+// no way to inject standard input — the justification recorded on its FOUND-10
+// allowlist entry. backend.Runner.RunOpts now carries stdin, so the reason is
+// gone and the entry has been REMOVED from the allowlist. hakip2host was
+// invisible to logs/tools.jsonl, to the arg-vector census and to the tools.lock
+// timeout contract for its whole life; it is now recorded like any other tool.
+//
+// TIMEOUT: the local 120s context.WithTimeout is GONE, deliberately. hakip2host
+// carries timeout_seconds = 120 in tools.lock, and applyToolContract now derives
+// that bound inside the Runner — keeping the local one would mean two bounds for
+// the same tool that drift apart the moment the manifest is edited.
+//
+// BEHAVIOUR CHANGE, STATED RATHER THAN HIDDEN: on a NON-ZERO EXIT the old code
+// returned whatever partial stdout it had captured, and LocalBackend does not —
+// it returns a *ToolError with no Result. Partial output from a failing
+// hakip2host is therefore no longer parsed. This is the same buffered-path
+// decision every other tool on the seam already lives with (see the CR-07 note
+// at local.go's deadline arm); the alternative is keeping this tool outside
+// every guard phases 16-17 built, which is what this phase exists to end.
+//
+// The dispatch stays behind the hakip2hostRunner package var so hermetic tests
 // (reverseip_internal_test.go) can inject canned output without a real binary.
 package subdomains
 
 import (
-	"bytes"
 	"context"
-	"os/exec"
 	"strings"
-	"time"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/backend"
+	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
 )
-
-// hakip2hostTimeout bounds a single hakip2host invocation (mirrors the
-// tools.lock hakip2host timeout_seconds=120).
-const hakip2hostTimeout = 120 * time.Second
 
 // hakip2hostRunner runs hakip2host with the given newline-delimited IP list on
 // stdin and returns raw stdout. Overridable in tests. Returns ("", nil) when the
 // binary is not on PATH (D-O2 graceful skip) so a missing optional tool never
 // fails the resolve stage.
-var hakip2hostRunner = func(ctx context.Context, ips []string) (string, error) {
-	bin, err := exec.LookPath("hakip2host")
+var hakip2hostRunner = func(ctx context.Context, app *appctx.AppContext, ips []string) (string, error) {
+	if app == nil || app.Tools == nil {
+		return "", nil
+	}
+	res, err := app.Tools.RunOpts(ctx, "hakip2host", nil, backend.ExecOptions{
+		Stdin: []byte(strings.Join(ips, "\n") + "\n"),
+	})
 	if err != nil {
-		return "", nil // not installed — graceful skip
+		// A tool that is not registered, or registered but absent from PATH
+		// (Discover leaves Path empty, so cmd.Start fails and LocalBackend
+		// reports NeverStarted), is a GRACEFUL SKIP per D-O2 — a missing
+		// optional tool must never fail the resolve stage. Note the gain over
+		// the old exec.LookPath skip: this path is now RECORDED as
+		// dispatch_failed in logs/tools.jsonl instead of vanishing silently.
+		if coreerrors.IsDispatchFailure(err) {
+			return "", nil
+		}
+		return "", err
 	}
-	cmdCtx, cancel := context.WithTimeout(ctx, hakip2hostTimeout)
-	defer cancel()
-	//nolint:gosec // bin resolved via LookPath; stdin carries caller-validated public IPs only
-	cmd := exec.CommandContext(cmdCtx, bin)
-	cmd.Stdin = strings.NewReader(strings.Join(ips, "\n") + "\n")
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	if runErr := cmd.Run(); runErr != nil {
-		// Non-zero exit / no results is normal — return whatever was captured
-		// so partial output is still parsed (best-effort discovery source).
-		return out.String(), runErr
-	}
-	return out.String(), nil
+	return string(res.Stdout), nil
 }
 
 // reverseIPHosts runs hakip2host over the given public IPs and returns the
@@ -60,7 +73,7 @@ func reverseIPHosts(ctx context.Context, app *appctx.AppContext, ips []string) [
 	if len(ips) == 0 {
 		return nil
 	}
-	out, err := hakip2hostRunner(ctx, ips)
+	out, err := hakip2hostRunner(ctx, app, ips)
 	if err != nil && app.Log != nil {
 		app.Log.Warn("resolve: hakip2host reverse-IP failed (non-fatal)", "error", err.Error())
 	}

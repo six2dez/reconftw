@@ -51,6 +51,17 @@ type toolsLockSchema struct {
 		Version      string `toml:"version"`
 		Sha256       string `toml:"sha256"`
 		InputFlag    string `toml:"input_flag"`
+		// 18-02 repo-clone coordinates (RS-B). All three are optional and
+		// relative to the configured tools root. THREE PLACES MUST CHANGE
+		// TOGETHER and a miss in any one of them is silent: this struct, the
+		// copy block in init() below, and the Clone* fields on backend.Tool.
+		// TestSeedCarriesCloneCoordinates is the guard against forgetting the
+		// middle one, which would otherwise yield a tool with empty
+		// coordinates that then reports "absent" while sitting on disk.
+		CloneDir         string `toml:"clone_dir"`
+		CloneEntry       string `toml:"clone_entry"`
+		CloneInterpreter string `toml:"clone_interpreter"`
+		CloneWorkDir     bool   `toml:"clone_workdir"`
 	} `toml:"tools"`
 }
 
@@ -83,6 +94,11 @@ func init() {
 			Version:      t.Version,
 			Sha256:       t.Sha256,
 			InputFlag:    t.InputFlag,
+			// 18-02 repo-clone coordinates — see toolsLockSchema above.
+			CloneDir:         t.CloneDir,
+			CloneEntry:       t.CloneEntry,
+			CloneInterpreter: t.CloneInterpreter,
+			CloneWorkDir:     t.CloneWorkDir,
 		}
 		Default.Register(tool)
 	}

@@ -354,35 +354,39 @@ func TestRealtoolsVulnsPhase6(t *testing.T) {
 				// python3 is a generic interpreter; skip the golden assertion
 				// for the SSTImap use-case (the arg vector depends on the script path).
 				// The live invocation just verifies python3 --version works.
-				binPath, err := exec.LookPath("python3")
-				if err != nil {
-					census.recordAbsent("python3")
-					t.Logf("SKIP: python3 not found in PATH — NOT a pass (counted in REALTOOLS_CENSUS)")
+				// 18-06: resolution goes through the registry, not PATH. python3
+				// is not a tools.lock row, so realtoolsResolve falls back to PATH
+				// for it — the same answer, reached through the one seam.
+				r := realtoolsResolve(t, "python3")
+				if r.Availability != toolResolved {
+					census.recordUnavailable("python3", r)
+					t.Logf("SKIP: python3 %s — NOT a pass (counted in REALTOOLS_CENSUS)", r.describe())
 					t.Skip()
 					return
 				}
 				census.recordPresent("python3")
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
-				_ = execSafely(t, ctx, binPath, p.safeArgs, p.stdin)
+				_ = execSafely(t, ctx, r, p.safeArgs, p.stdin)
 				return
 			}
 
-			binPath, err := exec.LookPath(p.name)
-			if err != nil {
-				// DoD-1: logged SKIP (never silent, never fatal on absent binary).
-				census.recordAbsent(p.name)
-				t.Logf("SKIP: %s not found in PATH — argv golden asserted, live invocation NOT verified "+
-					"(counted in REALTOOLS_CENSUS)", p.name)
+			r := realtoolsResolve(t, p.name)
+			if r.Availability != toolResolved {
+				// DoD-1: logged SKIP (never silent, never fatal on an unavailable tool).
+				census.recordUnavailable(p.name, r)
+				t.Logf("SKIP: %s %s — argv golden asserted, live invocation NOT verified "+
+					"(counted in REALTOOLS_CENSUS)", p.name, r.describe())
 				t.Skip()
 				return
 			}
 			census.recordPresent(p.name)
+			logResolution(t, r)
 
 			// T-06-09-03: 5-second per-invocation timeout.
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			_ = execSafely(t, ctx, binPath, p.safeArgs, p.stdin)
+			_ = execSafely(t, ctx, r, p.safeArgs, p.stdin)
 		})
 	}
 }
@@ -642,21 +646,26 @@ func TestRealtoolsOSINTPhase7(t *testing.T) {
 			if cmd == "" {
 				cmd = p.name
 			}
-			binPath, err := exec.LookPath(cmd)
-			if err != nil {
-				// DoD-1: logged SKIP (never silent, never fatal on absent binary).
-				census.recordAbsent(p.name)
-				t.Logf("SKIP: %s (%s) not found in PATH — argv golden asserted, live invocation NOT verified "+
-					"(counted in REALTOOLS_CENSUS)", p.name, cmd)
+			// 18-06: the registry, not PATH. Six of this probe's seven
+			// "observed absent" entries were repo clones sitting on disk that
+			// exec.LookPath could not see; they resolve here and their arg
+			// vectors reach the real tool for the first time.
+			r := realtoolsResolve(t, cmd)
+			if r.Availability != toolResolved {
+				// DoD-1: logged SKIP (never silent, never fatal on an unavailable tool).
+				census.recordUnavailable(p.name, r)
+				t.Logf("SKIP: %s (%s) %s — argv golden asserted, live invocation NOT verified "+
+					"(counted in REALTOOLS_CENSUS)", p.name, cmd, r.describe())
 				t.Skip()
 				return
 			}
 			census.recordPresent(p.name)
+			logResolution(t, r)
 
 			// T-07-06-03: 5-second per-invocation timeout; safeArgs only (no real scan).
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			_ = execSafely(t, ctx, binPath, p.safeArgs, p.stdin)
+			_ = execSafely(t, ctx, r, p.safeArgs, p.stdin)
 		})
 	}
 }
@@ -665,9 +674,17 @@ func TestRealtoolsOSINTPhase7(t *testing.T) {
 // Fails the test if stderr/stdout contains a flag-parse usage sentinel.
 // Non-zero exit code is NOT a failure (mirrors smoke_test.go classification).
 // Returns the combined output for diagnostics.
-func execSafely(t *testing.T, ctx context.Context, binPath string, args []string, readStdin bool) string {
+func execSafely(t *testing.T, ctx context.Context, r resolvedTool, args []string, readStdin bool) string {
 	t.Helper()
-	cmd := exec.CommandContext(ctx, binPath, args...) //nolint:gosec // path from exec.LookPath; args are controlled
+	// 18-06: the argv is the RESOLVED one — a clone's interpreter prefix in
+	// front, and the clone's own directory as cwd when it declared
+	// clone_workdir. Running a clone tool with a bare argv and an arbitrary cwd
+	// is how regulator crashed on FileNotFoundError in 18-02; the probe must
+	// invoke it the way the Runner does or it verifies a shape production never
+	// sends.
+	full := r.argv(args)
+	cmd := exec.CommandContext(ctx, r.Path, full...) //nolint:gosec // path from the tool registry; args are controlled
+	cmd.Dir = r.WorkDir
 	if readStdin {
 		cmd.Stdin = strings.NewReader("")
 	}
@@ -680,11 +697,28 @@ func execSafely(t *testing.T, ctx context.Context, binPath string, args []string
 	for _, sentinel := range usageSentinels {
 		if strings.Contains(combined, sentinel) {
 			t.Errorf("%s rejected its safe arg vector (sentinel %q):\n  args: %v\n  output:\n%s",
-				binPath, sentinel, args, out.String())
+				r.Path, sentinel, full, out.String())
 			break
 		}
 	}
 	return out.String()
+}
+
+// logResolution prints how a tool was resolved, so a REFERENCE run's log shows
+// whether a probe reached a PATH binary or a declared clone — and with which
+// interpreter and working directory.
+//
+// Without this the census could report a tool "present" and nobody could tell
+// which of the two routes answered, which is the ambiguity 18-02's three-state
+// partition exists to remove.
+func logResolution(t *testing.T, r resolvedTool) {
+	t.Helper()
+	if r.ViaPath {
+		t.Logf("REALTOOLS_RESOLVED tool=%s via=PATH path=%s", r.Name, r.Path)
+		return
+	}
+	t.Logf("REALTOOLS_RESOLVED tool=%s via=CLONE path=%s argv_prefix=%v workdir=%s",
+		r.Name, r.Path, r.ArgvPrefix, r.WorkDir)
 }
 
 // ---------------------------------------------------------------------------
@@ -786,24 +820,28 @@ func TestRealtoolsFixedArgVectors(t *testing.T) {
 	for _, p := range probes {
 		p := p
 		t.Run(p.tool+": "+p.name, func(t *testing.T) {
-			path, err := exec.LookPath(p.tool)
-			if err != nil {
-				census.recordAbsent(p.tool)
-				t.Logf("SKIP: %s not on PATH — this vector's ACCEPTANCE was NOT verified on this box", p.tool)
-				t.Skipf("%s absent", p.tool)
+			r := realtoolsResolve(t, p.tool)
+			if r.Availability != toolResolved {
+				census.recordUnavailable(p.tool, r)
+				t.Logf("SKIP: %s %s — this vector's ACCEPTANCE was NOT verified on this box",
+					p.tool, r.describe())
+				t.Skipf("%s unavailable", p.tool)
 			}
 			census.recordPresent(p.tool)
+			logResolution(t, r)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
-			cmd := exec.CommandContext(ctx, path, p.args...) //nolint:gosec // fixture argv, synthetic targets
+			fullArgs := r.argv(p.args)
+			cmd := exec.CommandContext(ctx, r.Path, fullArgs...) //nolint:gosec // fixture argv, synthetic targets
+			cmd.Dir = r.WorkDir
 			if p.stdin {
 				cmd.Stdin = strings.NewReader("")
 			}
 			out, _ := cmd.CombinedOutput()
 			got := string(out)
 
-			t.Logf("%s %s\n--- tool output ---\n%s", p.tool, strings.Join(p.args, " "), strings.TrimSpace(got))
+			t.Logf("%s %s\n--- tool output ---\n%s", p.tool, strings.Join(fullArgs, " "), strings.TrimSpace(got))
 
 			if strings.Contains(got, p.wasRejectedBy) {
 				t.Errorf("%s STILL REJECTS the invocation: output contains %q.\n"+
@@ -821,11 +859,6 @@ func TestRealtoolsFixedArgVectors(t *testing.T) {
 	}
 }
 
-// fixedVectorKnownAbsent is the expected-absent list for
-// TestRealtoolsFixedArgVectors.
-//
-// EMPTY on purpose. All five binaries are installed on the box this was written
-// on, so any absence here is a real gap in the evidence and must be declared
-// deliberately — via REALTOOLS_KNOWN_ABSENT for a box that genuinely lacks one,
-// not by pre-emptively excusing it here.
-var fixedVectorKnownAbsent = map[string]string{}
+// fixedVectorKnownAbsent moved to realtools_census_test.go in 18-06, alongside
+// the other three lists, when all four were reclassified into the registry's
+// three availability states.

@@ -168,17 +168,24 @@ func (e *OutOfScope) Error() string {
 // Is is the sentinel bridge enabling errors.Is(err, ErrScope).
 func (e *OutOfScope) Is(target error) bool { return target == ErrScope }
 
-// AxiomFailure signals axiom infrastructure failure (SSH timeout, fleet
-// unreachable). Distinct from ToolError because it triggers FailoverBackend
-// retry (local fallback). The Axiom fleet credentials (SSH key, fleet token)
+// AxiomFailure signals an Axiom dispatch that must retry locally. Most values
+// represent infrastructure failure (SSH timeout, fleet unreachable); Capability
+// marks a healthy transport that cannot carry this invocation shape. It is
+// distinct from ToolError because it triggers FailoverBackend local fallback.
+// The Axiom fleet credentials (SSH key, fleet token)
 // flow through tool stderr and may be echoed in ssh client error strings;
 // use Redactor.Redact() on the inner error string before constructing this
 // value. (ADR §6 PITFALL NOTE; T-02-04-05)
 //
 // SECURITY NOTE: Inner MUST NOT contain raw credential values.
 type AxiomFailure struct {
-	Operation string // "exec", "healthcheck", "launch", "shutdown"
+	Operation string // operation that failed, such as "exec_opts" or "healthcheck"
 	Inner     error
+	// Capability is true when the fleet transport is healthy but cannot carry
+	// this invocation shape (for example stdin, cwd, or child env). Failover must
+	// still retry locally, but this refusal must not count toward the fleet
+	// kill-switch.
+	Capability bool
 }
 
 func (e *AxiomFailure) Error() string {

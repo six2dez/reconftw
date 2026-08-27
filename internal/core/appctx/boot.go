@@ -114,6 +114,28 @@ func Boot(ctx context.Context, logger *slog.Logger, cfg *config.Config, target *
 	if target == nil {
 		return nil, fmt.Errorf("appctx.Boot: nil *Target")
 	}
+	// 18-02: MAKE THE WORKSPACE PATH CWD-INDEPENDENT.
+	//
+	// The default workspace root is the RELATIVE "workspaces" (root.go's -o
+	// default; workspaceRootOrFallback says so in as many words), and modules
+	// build every tool argument with filepath.Join(app.Target.WorkDir, ...). A
+	// cwd-relative argv path is correct only for as long as nothing changes the
+	// child's cwd — and 18-02 introduces exactly that, because some repo-clone
+	// tools cannot run anywhere but their own directory. regulator is the proof:
+	// main.py:18 hardcodes LOGFILE_NAME = 'logs/regulator.log' and aborts with
+	// FileNotFoundError unless cwd contains a logs/ directory, so it MUST run
+	// from its clone, and its -f/-o paths must therefore be absolute.
+	//
+	// Absolutising here is a no-op for an already-absolute path and fixes the
+	// relative one at the single point where the workspace enters the kernel.
+	// It is also independently right: a workspace whose meaning depends on the
+	// operator's cwd is a latent bug for checkpoints.db, logs/tools.jsonl and
+	// every artefact path, not only for tool argv.
+	if target.WorkDir != "" && !filepath.IsAbs(target.WorkDir) {
+		if abs, err := filepath.Abs(target.WorkDir); err == nil {
+			target.WorkDir = abs
+		}
+	}
 
 	// 3. Backend + Runner.
 	be := opt.Backend
@@ -129,6 +151,10 @@ func Boot(ctx context.Context, logger *slog.Logger, cfg *config.Config, target *
 			be = backend.NewPassiveBackend(be)
 		}
 	}
+	// 18-02: the repo-clone tools root, named once. MUST be set before Discover
+	// or the eight python-clone tools (regulator, gato, cmseek, ...) fall back to
+	// exec.LookPath, fail, and are reported absent while sitting on disk.
+	backend.Default.SetToolsDir(cfg.ToolsRoot())
 	// Discover() is tolerant of an empty registry — Plan 04 tests already
 	// validate this; Plan 07 seeds the canonical tools.lock.
 	if err := backend.Default.Discover(ctx); err != nil {

@@ -144,11 +144,36 @@ REALTOOLS_TESTS := TestRealToolArgVectors TestRealtoolsVulnsPhase6 TestRealtools
 # NAME and by census line, for the same reason as above.
 COVERAGE_TESTS := TestEveryRegisteredTaskIsAccountedFor
 
+# JSONL_TESTS emit TOOLS_JSONL_COVERAGE — the fourth census (18-06), which
+# answers "does this tool appear in logs/tools.jsonl at all". A THIRD list rather
+# than an addition to either of the two above, because each list is guarded by
+# the census line its members emit and mixing them makes the guard satisfiable by
+# the wrong members. That is the same defect this target's own history records
+# twice already (the `>= 3` line count, and the one-third `-run` selector).
+JSONL_TESTS := TestToolsJsonlCoverage
+
+# PRESENCE_TESTS must RUN but emit no census line of their own.
+#
+# 18-02 added TestRegulatorDispatchesThroughTheRunner (//go:build realtools) and
+# it was never ratcheted here — an omission 18-06 found and is closing. It could
+# not simply be appended to REALTOOLS_TESTS: that list is cross-checked against
+# the COUNT of REALTOOLS_CENSUS lines, so a fifth name with no census line would
+# have made the target fail for a reason unrelated to coverage.
+#
+# WHAT THIS LIST DOES AND DOES NOT ASSERT, stated because the difference is the
+# whole value. `=== RUN` is printed for a SKIPPED test too, and this one skips
+# cleanly when the regulator clone is absent. So membership here asserts the test
+# still EXISTS, is still selected, and still compiles under the realtools tag —
+# it catches a rename, a deletion or a re-tag. It does NOT assert the regulator
+# leg was verified on this box. Anyone reading a green run must not infer that it
+# was; the REALTOOLS_RESOLVED line in the log is what says so.
+PRESENCE_TESTS := TestRegulatorDispatchesThroughTheRunner
+
 realtools-args:
 	@out=$$(go test -tags realtools -count=1 -v ./internal/core/backend/ 2>&1); \
 	echo "$$out"; \
 	missing=""; \
-	for tn in $(REALTOOLS_TESTS) $(COVERAGE_TESTS); do \
+	for tn in $(REALTOOLS_TESTS) $(COVERAGE_TESTS) $(JSONL_TESTS) $(PRESENCE_TESTS); do \
 		echo "$$out" | grep -qE "^=== RUN   $$tn$$" || missing="$$missing $$tn"; \
 	done; \
 	if [ -n "$$missing" ]; then \
@@ -172,9 +197,18 @@ realtools-args:
 			exit 1; \
 		}; \
 	done; \
+	for tn in $(JSONL_TESTS); do \
+		echo "$$out" | grep -qE 'TOOLS_JSONL_COVERAGE tools=[^ ]' || { \
+			echo "ERROR: $$tn ran but emitted NO 'TOOLS_JSONL_COVERAGE tools=' line, or an empty one."; \
+			echo "       That census names the tools this phase brought onto the seam. An empty list"; \
+			echo "       reads as a clean smaller set and is the shape it exists to refuse."; \
+			exit 1; \
+		}; \
+	done; \
 	echo "$$out" | grep 'REALTOOLS_CENSUS test='; \
 	echo "$$out" | grep 'ARGV_COVERAGE registered='; \
-	echo "realtools: all $(words $(REALTOOLS_TESTS)) real-tool + $(words $(COVERAGE_TESTS)) coverage test(s) executed"; \
+	echo "$$out" | grep 'TOOLS_JSONL_COVERAGE tools='; \
+	echo "realtools: all $(words $(REALTOOLS_TESTS)) real-tool + $(words $(COVERAGE_TESTS)) coverage + $(words $(JSONL_TESTS)) jsonl + $(words $(PRESENCE_TESTS)) presence test(s) executed"; \
 	echo "$$out" | grep -qE '^(FAIL|--- FAIL|    --- FAIL)' && exit 1 || exit 0
 
 # test-integration: Ring 1 + Ring 2 + Ring 4. Per-commit (<5min budget).

@@ -20,6 +20,32 @@
 //
 // hakoriginfinder is a LocalBackend tool only (D-W13).
 //
+// 18-04: THIS FILE NO LONGER BYPASSES THE SEAM. Its only manifest reason was
+// `stdin`, and backend.Runner.RunOpts has carried stdin since 18-01. Its sibling
+// hakip2host came home in 18-01 through exactly this seam.
+//
+// TIMEOUT: the per-invocation 120s context.WithTimeout is GONE. tools.lock OWNS
+// the bound — the hakoriginfinder row carries timeout_seconds = 120, precisely
+// the value this file used to apply, and applyToolContract derives it inside the
+// Runner ONCE PER INVOCATION, which is what the per-host loop needs.
+//
+// DEFAULT ARGS: the hakoriginfinder row carries default_args = [], so the argv
+// is byte-for-byte the pre-move `-h https://<host>`.
+//
+// ONE RECORDER ENTRY PER HOST, and that is intended. The per-host run strategy
+// (CR-06) means N invocations for N hosts, so logs/tools.jsonl now carries N
+// start/end pairs instead of nothing at all. This is the FIRST time per-host
+// origin attribution is visible in the invocation record; the recorder already
+// rotates on size, which is the accepted cost (T-18-04-06).
+//
+// BEHAVIOUR CHANGE, STATED RATHER THAN HIDDEN: on a NON-ZERO EXIT with output,
+// the old code fell through and parsed that partial output; LocalBackend returns
+// a *ToolError with no Result, so it no longer does. Decided for THIS tool on
+// evidence: hakoriginfinder exits 0 when it finds no origin (verified 2026-08-26
+// against the real binary), so the non-zero arm is a genuine failure, and an
+// origin IP scraped from a failed run is exactly the kind of low-confidence
+// attribution that should not be published.
+//
 // Source: .planning/phases/05-web-pipeline-e2e/05-03-PLAN.md Task 2.
 package web
 
@@ -31,14 +57,14 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
+	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
 	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
@@ -61,6 +87,10 @@ type hostIPPair struct {
 	ip   string
 }
 
+// hakoriginfinderToolName is the tools.lock registry key. A named constant so
+// the argv test names the same string the dispatch does.
+const hakoriginfinderToolName = "hakoriginfinder"
+
 // HakoriginfinderTask runs hakoriginfinder to discover origin IPs.
 type HakoriginfinderTask struct{}
 
@@ -74,8 +104,6 @@ func (t *HakoriginfinderTask) DependsOn() []string { return []string{"web.httpx"
 
 // Run executes hakoriginfinder per host and writes origin records to origins.jsonl.
 func (t *HakoriginfinderTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
-	const toolName = "hakoriginfinder"
-
 	// CR-06: read host+IP pairs together so per-host attribution is unambiguous.
 	pairs, err := readHostIPPairsFromJSONL(app)
 	if err != nil || len(pairs) == 0 {
@@ -91,26 +119,37 @@ func (t *HakoriginfinderTask) Run(ctx context.Context, app *appctx.AppContext) (
 			fmt.Errorf("web.hakoriginfinder: mkdir inputs/: %w", err)
 	}
 
-	hakoBin, lookErr := exec.LookPath(toolName)
-	if lookErr != nil {
-		if app.Log != nil {
-			app.Log.Info("web.hakoriginfinder: binary not on PATH — skipping")
-		}
-		return task.Result{Status: task.StatusSkipped}, nil
-	}
-
-	// CR-07: per-invocation timeout from tools.lock hakoriginfinder.timeout_seconds=120.
-	const toolTimeout = 120 * time.Second
-
+	// NO exec.LookPath GATE. An unresolvable hakoriginfinder now returns a typed
+	// dispatch failure from the Runner and is RECORDED as dispatch_failed rather
+	// than vanishing silently. THE TASK'S STATUS IS UNCHANGED: the first host
+	// whose dispatch never started returns StatusSkipped exactly as the old gate
+	// did — including NOT publishing origins, so a run in which the tool never
+	// ran cannot empty a previous run's artefact (F3 did-not-run).
 	var origins []OriginRecord
+	unresolvable := false
 	for _, pair := range pairs {
 		if pair.ip == "" || pair.host == "" {
 			continue
 		}
-		originIP, runErr := runHakoriginfinderForHost(ctx, hakoBin, pair.host, pair.ip, toolTimeout)
-		if runErr != nil && app.Log != nil {
-			app.Log.Debug("web.hakoriginfinder: per-host run error",
-				"host", pair.host, "err", runErr)
+		originIP, runErr := runHakoriginfinderForHost(ctx, app, pair.host, pair.ip)
+		if runErr != nil {
+			// WR-06: LATCH, do not return from inside the loop.
+			//
+			// Returning here threw away every result the earlier iterations had already
+			// collected. With CR-04 fixed, a rate-limiter or context error mid-loop IS a
+			// dispatch failure, so a Ctrl-C or a task deadline part-way through now
+			// reaches this arm and silently discarded a partial but perfectly valid set.
+			// The decision belongs after the loop, where "the tool never ran" and "the
+			// tool ran for a while then the scan was cancelled" are distinguishable —
+			// the pattern web/jsa.go already uses.
+			if coreerrors.IsDispatchFailure(runErr) {
+				unresolvable = true
+				break
+			}
+			if app.Log != nil {
+				app.Log.Debug("web.hakoriginfinder: per-host run error",
+					"host", pair.host, "err", runErr)
+			}
 		}
 		if originIP != "" {
 			origins = append(origins, OriginRecord{
@@ -120,6 +159,21 @@ func (t *HakoriginfinderTask) Run(ctx context.Context, app *appctx.AppContext) (
 				Confidence: "low", // CR-06: unambiguous attribution but tool output is uncertain
 			})
 		}
+	}
+
+	// WR-06: only a run that collected NOTHING is a skip. If earlier hosts produced
+	// origins before the dispatch failure, they are a real observation and are
+	// published; publishing them is also what keeps the F3 contract below honest,
+	// since reaching it means the tool genuinely ran.
+	if unresolvable && len(origins) == 0 {
+		if app.Log != nil {
+			app.Log.Info("web.hakoriginfinder: tool unavailable — skipping")
+		}
+		return task.Result{Status: task.StatusSkipped}, nil
+	}
+	if unresolvable && app.Log != nil {
+		app.Log.Warn("web.hakoriginfinder: dispatch stopped part-way — publishing the origins "+
+			"collected before it (WR-06)", "origins", len(origins))
 	}
 
 	artefactsDir := filepath.Join(app.Target.WorkDir, "artefacts")
@@ -169,37 +223,45 @@ func (t *HakoriginfinderTask) Run(ctx context.Context, app *appctx.AppContext) (
 		app.Log.Debug("web.hakoriginfinder: completed", "origins_found", len(origins))
 	}
 	return task.Result{
-		Status: task.StatusDone,
-		Stats:  map[string]int{"origins_found": len(origins)},
+		Status:     task.StatusDone,
+		Stats:      map[string]int{"origins_found": len(origins)},
+		Incomplete: unresolvable,
 	}, nil
 }
 
-// runHakoriginfinderForHost runs hakoriginfinder for a single host/IP pair.
+// hakoriginfinderArgs returns the arg vector for one host, VERBATIM as it stood
+// before 18-04 moved this dispatch onto the Runner:
+//
+//	hakoriginfinder -h https://<hostname>   (stdin: the host's IP)
+//
+// A function rather than an inline literal so
+// TestHakoriginfinderArgvUnchangedAcrossTheMove can assert the process received
+// exactly this slice and nothing prepended it.
+func hakoriginfinderArgs(targetHost string) []string {
+	return []string{"-h", "https://" + targetHost}
+}
+
+// runHakoriginfinderForHost runs hakoriginfinder for a single host/IP pair
+// through backend.Runner, with that host's IP on standard input.
 // Returns the first origin IP found in the output, or "" if none.
 // Each call has an unambiguous host↔IP relationship (CR-06 fix).
-func runHakoriginfinderForHost(ctx context.Context, hakoBin, targetHost, inputIP string,
-	timeout time.Duration,
+//
+// The returned error is the Runner's, unwrapped: the caller distinguishes a
+// dispatch failure (tool absent — a task-level skip) from a per-host run error
+// (best-effort, logged and stepped over).
+func runHakoriginfinderForHost(ctx context.Context, app *appctx.AppContext,
+	targetHost, inputIP string,
 ) (string, error) {
-	// Derive per-invocation bounded context (CR-07).
-	cmdCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	// ARG VECTOR: hakoriginfinder -h https://<hostname>  (stdin: the host's IP)
-	targetURL := "https://" + targetHost
-	//nolint:gosec // hakoBin from LookPath; targetURL from validated hostname
-	cmd := exec.CommandContext(cmdCtx, hakoBin, "-h", targetURL)
-	cmd.Stdin = strings.NewReader(inputIP + "\n")
-	var outBuf bytes.Buffer
-	cmd.Stdout = &outBuf
-
-	if err := cmd.Run(); err != nil {
-		// Non-zero exit is normal when no origin is found.
-		if outBuf.Len() == 0 {
-			return "", nil
-		}
+	if app == nil || app.Tools == nil {
+		return "", nil
 	}
-
-	return parseHakoriginOutput(outBuf.String(), targetHost), nil
+	res, err := app.Tools.RunOpts(ctx, hakoriginfinderToolName,
+		hakoriginfinderArgs(targetHost),
+		backend.ExecOptions{Stdin: []byte(inputIP + "\n")})
+	if err != nil {
+		return "", err
+	}
+	return parseHakoriginOutput(string(res.Stdout), targetHost), nil
 }
 
 // parseHakoriginOutput extracts the first VALID IPv4 address from

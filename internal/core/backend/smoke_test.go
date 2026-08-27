@@ -129,18 +129,24 @@ func TestRealToolArgVectors(t *testing.T) {
 		p := p
 		label := p.name + " " + strings.Join(p.args, " ")
 		t.Run(label, func(t *testing.T) {
-			binPath, err := exec.LookPath(p.name)
-			if err != nil {
-				census.recordAbsent(p.name)
-				t.Logf("SKIP: binary %q not on PATH — NOT a pass: this arg vector was not verified", p.name)
-				t.Skipf("binary %q not on PATH — skipping (counted in REALTOOLS_CENSUS)", p.name)
+			// 18-06: resolution through ToolRegistry.Discover, which is what
+			// production uses. A PATH-only check reports a declared clone absent
+			// and the tool then goes unprobed while the Runner runs it happily.
+			r := realtoolsResolve(t, p.name)
+			if r.Availability != toolResolved {
+				census.recordUnavailable(p.name, r)
+				t.Logf("SKIP: %s %s — NOT a pass: this arg vector was not verified", p.name, r.describe())
+				t.Skipf("%s unavailable — skipping (counted in REALTOOLS_CENSUS)", p.name)
 				return
 			}
 			census.recordPresent(p.name)
+			logResolution(t, r)
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
 
-			cmd := exec.CommandContext(ctx, binPath, sub(p.args)...)
+			probeArgs := r.argv(sub(p.args))
+			cmd := exec.CommandContext(ctx, r.Path, probeArgs...)
+			cmd.Dir = r.WorkDir
 			if p.stdin {
 				cmd.Stdin = strings.NewReader("")
 			}
@@ -153,7 +159,7 @@ func TestRealToolArgVectors(t *testing.T) {
 			for _, sentinel := range usageSentinels {
 				if strings.Contains(combined, sentinel) {
 					t.Errorf("%s rejected its real arg vector (sentinel %q):\n  args: %v\n  output:\n%s",
-						p.name, sentinel, sub(p.args), out.String())
+						p.name, sentinel, probeArgs, out.String())
 					return
 				}
 			}
@@ -164,7 +170,7 @@ func TestRealToolArgVectors(t *testing.T) {
 				for _, sentinel := range semanticRejectionSentinels {
 					if strings.Contains(combined, sentinel) {
 						t.Errorf("%s was ACCEPTED by the parser then refused to start (%q):\n"+
-							"  args: %v\n  output:\n%s", p.name, sentinel, sub(p.args), out.String())
+							"  args: %v\n  output:\n%s", p.name, sentinel, probeArgs, out.String())
 						return
 					}
 				}
@@ -182,91 +188,61 @@ func TestRealToolArgVectors(t *testing.T) {
 			// benign case this test was careful to tolerate stays tolerated.
 			if runErr != nil && (strings.Contains(combined, "[ftl]") || strings.Contains(combined, "fatal")) {
 				t.Errorf("%s exited non-zero with a FATAL diagnostic — it refused to start:\n"+
-					"  args: %v\n  output:\n%s", p.name, sub(p.args), out.String())
+					"  args: %v\n  output:\n%s", p.name, probeArgs, out.String())
 			}
 		})
 	}
 
 	// --- Repo-clone tool probes (nomore403, JSA) ---
-	// These tools are NOT on PATH; they live under cfg.Paths.DataDir.
-	// Use os.Stat path lookup instead of exec.LookPath (T-05-16/D-W9).
-	// SKIP with explicit logged notice when absent (D-W9: never silent skip).
-
-	repoCloneProbes := []struct {
-		name     string
-		pathHint string // relative path under a standard tools dir
-		args     []string
-		stdin    bool
-	}{
-		{
-			name:     "nomore403",
-			pathHint: "nomore403/nomore403",
-			args:     []string{}, // reads stdin; no positional args in v2 Task
-			stdin:    true,
-		},
-		{
-			name:     "JSA (jsa.py via python3)",
-			pathHint: "JSA/venv/bin/python3",
-			args:     []string{"JSA/jsa.py", "-f", "https://example.com/app.js"},
-			stdin:    false,
-		},
-	}
-
-	// Candidate tools directories to search for repo-clone tools.
-	toolsDirCandidates := []string{
-		os.Getenv("TOOLS_DIR"),
-		filepath.Join(os.Getenv("HOME"), "Tools"),
-		filepath.Join(os.Getenv("HOME"), "tools"),
-	}
-
-	for _, rp := range repoCloneProbes {
-		rp := rp
-		t.Run("repo-clone/"+rp.name, func(t *testing.T) {
-			// Locate the binary via os.Stat across candidate directories.
-			var binaryPath string
-			var toolDir string
-			for _, td := range toolsDirCandidates {
-				if td == "" {
-					continue
-				}
-				candidate := filepath.Join(td, rp.pathHint)
-				if _, err := os.Stat(candidate); err == nil {
-					binaryPath = candidate
-					toolDir = filepath.Dir(candidate)
-					break
-				}
-			}
-
-			if binaryPath == "" {
-				t.Logf("SKIP: %s not found in candidate tools dirs %v — NOT a pass", rp.name, toolsDirCandidates)
-				census.recordAbsent(rp.name)
-				t.Skipf("SKIP: %s not found at expected path — NOT a pass (counted in REALTOOLS_CENSUS)", rp.name)
+	//
+	// 18-06 DELETED THIS BLOCK'S HAND-ROLLED TOOLS-ROOT RESOLVER.
+	//
+	// It used to search a candidate list — $TOOLS_DIR, $HOME/Tools, $HOME/tools —
+	// with os.Stat, which was a FOURTH opinion about where the tools live
+	// (18-05 deleted the three production ones and this test-side one outlived
+	// them by a plan). It carried a live bug of the shape this repo keeps
+	// producing: the binary was located by scanning ALL candidates, but the JSA
+	// script path was then rebuilt from the FIRST non-empty candidate, so a box
+	// whose clone lived in the second or third would run the right interpreter
+	// against a script path that does not exist. It worked only because
+	// $HOME/Tools happens to be first when $TOOLS_DIR is unset.
+	//
+	// Both tools are declared clone rows in tools.lock as of 18-02, so the
+	// registry answers all of it — root, interpreter, script prefix and working
+	// directory — from the same declaration production reads. The probes now go
+	// through the SAME loop as every other tool, which is why there is no
+	// separate block below.
+	for _, name := range []string{"nomore403", "JSA"} {
+		name := name
+		t.Run("repo-clone/"+name, func(t *testing.T) {
+			r := realtoolsResolve(t, name)
+			if r.Availability != toolResolved {
+				census.recordUnavailable(name, r)
+				t.Logf("SKIP: %s %s — NOT a pass", name, r.describe())
+				t.Skipf("%s unavailable (counted in REALTOOLS_CENSUS)", name)
 				return
 			}
-			census.recordPresent(rp.name)
+			census.recordPresent(name)
+			logResolution(t, r)
+
+			// The safe arg vector per tool. nomore403 reads its 4xx candidates
+			// from standard input and takes no positional args (18-05 asserts the
+			// same shape through the Runner); JSA takes -f <js url>.
+			var args []string
+			stdin := false
+			switch name {
+			case "nomore403":
+				stdin = true
+			case "JSA":
+				args = []string{"-f", "https://example.com/app.js"}
+			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
-
-			// Resolve args: for JSA, expand the script path relative to the tools root.
-			resolvedArgs := make([]string, len(rp.args))
-			for i, a := range rp.args {
-				// Replace leading "JSA/" prefix with the actual path.
-				if strings.HasPrefix(a, "JSA/") {
-					for _, td := range toolsDirCandidates {
-						if td != "" {
-							resolvedArgs[i] = filepath.Join(td, a)
-							break
-						}
-					}
-				} else {
-					resolvedArgs[i] = a
-				}
-			}
-
-			cmd := exec.CommandContext(ctx, binaryPath, resolvedArgs...)
-			cmd.Dir = toolDir // nomore403 requires CWD = its own dir (Pitfall 2)
-			if rp.stdin {
+			full := r.argv(args)
+			cmd := exec.CommandContext(ctx, r.Path, full...)
+			cmd.Dir = r.WorkDir // nomore403 declares clone_workdir (Pitfall 2)
+			if stdin {
 				cmd.Stdin = strings.NewReader("https://example.com/404test\n")
 			}
 			var out bytes.Buffer
@@ -278,7 +254,7 @@ func TestRealToolArgVectors(t *testing.T) {
 			for _, sentinel := range usageSentinels {
 				if strings.Contains(combined, sentinel) {
 					t.Errorf("%s rejected its real arg vector (sentinel %q):\n  path: %s\n  args: %v\n  output:\n%s",
-						rp.name, sentinel, binaryPath, resolvedArgs, out.String())
+						name, sentinel, r.Path, full, out.String())
 					break
 				}
 			}

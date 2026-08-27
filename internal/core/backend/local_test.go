@@ -133,11 +133,22 @@ func TestTool_StructFields_MatchADRWithCriticalExtension(t *testing.T) {
 	tt := reflect.TypeOf(backend.Tool{})
 	// ADR §5.2 base shape + Critical (Blocker 5) + InputFlag (Phase 4 plan 04-00)
 	// + Phase 11 install metadata (Kind/GoModule/PipPackage/RepoURL/CargoPackage/
-	// Sha256) — adding fields is a non-breaking extension per ADR §0 D-07.
+	// Sha256) + ArgvPrefix/WorkDir (plan 18-01, populated by 18-02's clone-aware
+	// Discover) + CloneDir/CloneEntry/CloneInterpreter (plan 18-02, the declared
+	// repo-clone coordinates Discover resolves ArgvPrefix/WorkDir FROM) — adding
+	// fields is a non-breaking extension per ADR §0 D-07.
+	//
+	// THIS LIST IS EXTENDED, NEVER RELAXED: the pin exists so a field addition is
+	// a deliberate, reviewed act rather than a silent one, which is exactly the
+	// service it performed for 18-01 (15 fields) and again for 18-02 (19). Note
+	// that go build, go vet and every scoped `-run` gate were green both times
+	// while this test was red — run the PACKAGE suite, not a filter.
 	want := []string{
 		"Name", "Path", "Version",
 		"Kind", "GoModule", "PipPackage", "RepoURL", "CargoPackage", "Sha256",
 		"DefaultArgs", "Timeout", "Critical", "InputFlag",
+		"ArgvPrefix", "WorkDir",
+		"CloneDir", "CloneEntry", "CloneInterpreter", "CloneWorkDir",
 	}
 	got := make([]string, tt.NumField())
 	for i := 0; i < tt.NumField(); i++ {

@@ -20,6 +20,35 @@
 // OUTPUT FILTER: v1 deletes output files not containing "Vulnerable: Yes".
 // Only findings with "Vulnerable: Yes" in stdout are written as records.
 //
+// 18-04: THIS FILE NEVER HAD A REASON TO BYPASS THE SEAM, and it is now home.
+//
+// It was carried for a long time under a blanket allowlist comment asserting
+// that the registry "does not support cmd.Dir or stdin injection" — a claim
+// about two capabilities THIS FILE DEMANDS NEITHER OF. 18-03 replaced that prose
+// with a typed manifest and could find no corroborated reason for it at all, so
+// it was declared `pending_removal` with HomeBy 18-04. The four facts, RE-DERIVED
+// FROM THIS FILE on 2026-08-26 rather than quoted from a plan:
+//
+//	0 assignments to a cmd.Stdin field
+//	0 assignments to a cmd.Dir field
+//	resolution through exec.LookPath("shortscan"), like any registered tool
+//	`shortscan` is a tools.lock entry, timeout_seconds = 300
+//
+// So the verdict is plain: route it onto backend.Runner. It needs no
+// ExecOptions, so it uses Run rather than RunOpts — the simpler call.
+//
+// TIMEOUT: the local 300s context.WithTimeout is GONE. 300 in the manifest, 300
+// in this file: they AGREED, which is why the local one was pure duplication
+// waiting to drift. tools.lock owns the bound.
+//
+// DEFAULT ARGS: the shortscan row carries default_args = [], so the argv is
+// byte-for-byte the pre-move `<url> -F -s -p 1`, positional target first.
+//
+// NON-ZERO EXIT: nothing changes here, and that is worth saying because it is
+// the one file in this cohort where it does not. runShortscan already returned
+// `nil, err` on a non-zero exit and discarded the buffer, so the Runner's
+// no-Result-on-error contract reproduces the old behaviour exactly.
+//
 // Source: .planning/phases/05-web-pipeline-e2e/05-05-PLAN.md Task 1.
 package web
 
@@ -30,13 +59,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
 	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
@@ -60,14 +88,10 @@ func (t *ShortscanTask) DependsOn() []string { return []string{"web.nuclei"} }
 
 // Run reads IIS targets from findings.jsonl and runs shortscan per target.
 func (t *ShortscanTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
-	// Check shortscan binary availability via exec.LookPath.
-	shortscanPath, err := exec.LookPath("shortscan")
-	if err != nil {
-		if app.Log != nil {
-			app.Log.Info("web.shortscan: shortscan binary not found — skipping")
-		}
-		return task.Result{Status: task.StatusSkipped}, nil
-	}
+	// NO exec.LookPath GATE. An unresolvable shortscan now returns a typed
+	// dispatch failure from the Runner and is RECORDED as dispatch_failed rather
+	// than vanishing silently; the task's status on an absent binary is
+	// unchanged (StatusSkipped, in the loop below).
 
 	// Read inputs/findings.nuclei.jsonl (nuclei staging file); filter records
 	// where TemplateID == "iis-version". DependsOn ["web.nuclei"] ensures
@@ -84,14 +108,45 @@ func (t *ShortscanTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	}
 
 	var allFindings []FindingRecord
+	unresolvable := false
 
 	for _, targetURL := range iisTargets {
-		findings, runErr := runShortscan(ctx, shortscanPath, targetURL)
-		if runErr != nil && app.Log != nil {
-			app.Log.Debug("web.shortscan: scan error",
-				"url", targetURL, "err", runErr)
+		findings, runErr := runShortscan(ctx, app, targetURL)
+		if runErr != nil {
+			// The tool never started: the same graceful skip the exec.LookPath
+			// gate gave, including NO staging write, so a run in which shortscan
+			// never ran cannot clear a previous run's findings (F3 did-not-run).
+			// WR-06: LATCH, do not return from inside the loop.
+			//
+			// Returning here threw away every result the earlier iterations had already
+			// collected. With CR-04 fixed, a rate-limiter or context error mid-loop IS a
+			// dispatch failure, so a Ctrl-C or a task deadline part-way through now
+			// reaches this arm and silently discarded a partial but perfectly valid set.
+			// The decision belongs after the loop, where "the tool never ran" and "the
+			// tool ran for a while then the scan was cancelled" are distinguishable —
+			// the pattern web/jsa.go already uses.
+			if coreerrors.IsDispatchFailure(runErr) {
+				unresolvable = true
+				break
+			}
+			if app.Log != nil {
+				app.Log.Debug("web.shortscan: scan error",
+					"url", targetURL, "err", runErr)
+			}
 		}
 		allFindings = append(allFindings, findings...)
+	}
+
+	// WR-06: only a run that collected NOTHING is a skip — see the loop above.
+	if unresolvable && len(allFindings) == 0 {
+		if app.Log != nil {
+			app.Log.Info("web.shortscan: shortscan unavailable — skipping")
+		}
+		return task.Result{Status: task.StatusSkipped}, nil
+	}
+	if unresolvable && app.Log != nil {
+		app.Log.Warn("web.shortscan: dispatch stopped part-way — staging the findings "+
+			"collected before it (WR-06)", "findings", len(allFindings))
 	}
 
 	// Stage findings into inputs/findings.shortscan.jsonl (staging contract).
@@ -120,31 +175,45 @@ func (t *ShortscanTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	}
 
 	return task.Result{
-		Status: task.StatusDone,
-		Stats:  map[string]int{"iis_findings": len(allFindings)},
+		Status:     task.StatusDone,
+		Stats:      map[string]int{"iis_findings": len(allFindings)},
+		Incomplete: unresolvable,
 	}, nil
 }
 
-// runShortscan runs shortscan for a single URL.
-// ARG VECTOR: shortscan <url> -F -s -p 1  (RESEARCH §shortscan, web.sh:1610).
+// shortscanToolName is the tools.lock registry key.
+const shortscanToolName = "shortscan"
+
+// shortscanArgs returns the arg vector for one target, VERBATIM as it stood
+// before 18-04 moved this dispatch onto the Runner:
+//
+//	shortscan <url> -F -s -p 1   (RESEARCH §shortscan, v1 web.sh:1610)
+//
+// The target URL is POSITIONAL and comes FIRST; that ordering is part of the
+// vector, and TestShortscanArgvUnchangedAcrossTheMove asserts it in order.
+func shortscanArgs(targetURL string) []string {
+	return []string{targetURL, "-F", "-s", "-p", "1"}
+}
+
+// runShortscan runs shortscan for a single URL through backend.Runner.
 // Returns findings only if stdout contains "Vulnerable: Yes" (v1 output filter).
-func runShortscan(ctx context.Context, shortscanPath, targetURL string) ([]FindingRecord, error) {
-	// CR-07: derive bounded context from tools.lock shortscan.timeout_seconds=300.
-	toolTimeout := 300 * time.Second
-	cmdCtx, cancel := context.WithTimeout(ctx, toolTimeout)
-	defer cancel()
-
-	//nolint:gosec // shortscanPath from exec.LookPath; targetURL scope-filtered upstream
-	cmd := exec.CommandContext(cmdCtx, shortscanPath, targetURL, "-F", "-s", "-p", "1")
-	var outBuf bytes.Buffer
-	cmd.Stdout = &outBuf
-
-	if err := cmd.Run(); err != nil {
-		// shortscan may exit non-zero on non-vulnerable targets; not a fatal error.
+//
+// The returned error is the Runner's, wrapped: the caller distinguishes a
+// dispatch failure (tool absent — a task-level skip) from a per-target run error
+// (best-effort, logged and stepped over), exactly as before.
+func runShortscan(ctx context.Context, app *appctx.AppContext, targetURL string) ([]FindingRecord, error) {
+	if app == nil || app.Tools == nil {
+		return nil, nil
+	}
+	res, err := app.Tools.Run(ctx, shortscanToolName, shortscanArgs(targetURL))
+	if err != nil {
+		// shortscan may exit non-zero on non-vulnerable targets; not a fatal
+		// error. The old code discarded its buffer on this path too, so the
+		// Runner's no-Result-on-error contract changes nothing here.
 		return nil, fmt.Errorf("shortscan %s: %w", targetURL, err)
 	}
 
-	output := outBuf.String()
+	output := string(res.Stdout)
 
 	// v1 filter: only process output containing "Vulnerable: Yes" (web.sh:1611).
 	if !strings.Contains(output, "Vulnerable: Yes") {

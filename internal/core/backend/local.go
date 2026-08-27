@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"context"
 	stderrors "errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -86,7 +87,7 @@ func (b *LocalBackend) HealthCheck(_ context.Context) error { return nil }
 // per ADR §6 line 1806 + W9 assertion). Returns *coreerrors.ToolTimeout when
 // ctx deadline exceeded.
 func (b *LocalBackend) Exec(ctx context.Context, t *Tool, args []string) (*Result, error) {
-	return b.ExecEnv(ctx, t, args, nil)
+	return b.ExecOpts(ctx, t, args, ExecOptions{})
 }
 
 // ExecEnv is Exec with additional "KEY=VALUE" child-env entries appended onto the
@@ -99,6 +100,77 @@ func (b *LocalBackend) Exec(ctx context.Context, t *Tool, args []string) (*Resul
 // cannot introduce any variable that is neither in os.Environ nor the explicit env
 // slice, so no separate negative-env test is required.
 func (b *LocalBackend) ExecEnv(ctx context.Context, t *Tool, args []string, env []string) (*Result, error) {
+	return b.ExecOpts(ctx, t, args, ExecOptions{Env: env})
+}
+
+// applyExecOptions validates ExecOptions and applies its stdin and working-directory
+// settings to cmd. It returns a cleanup func that MUST be called only AFTER
+// cmd.Wait() has returned — closing the stdin file earlier would take the child's
+// standard input away mid-read.
+//
+// The mutual-exclusion violation is reported as a *ToolError carrying NeverStarted,
+// which is what places it in the dispatch_failed bucket (coreerrors.IsDispatchFailure
+// is satisfied through ToolError.NeverStarted). NO PROCESS IS CREATED, so labelling
+// it as a tool that ran and failed would be a false statement — that is the label
+// partition documented at Runner.execRecorded, and it must keep holding here.
+func applyExecOptions(cmd *exec.Cmd, t *Tool, opts ExecOptions) (func(), error) {
+	noop := func() {}
+
+	// WR-08: `!= nil`, NOT `len() > 0`. ExecOptions documents "a NIL Stdin with an
+	// empty StdinPath leaves the child's stdin exactly as it is today"; `len() > 0`
+	// implements "nil OR EMPTY", a different and more dangerous contract. With
+	// ExecOptions{Stdin: []byte{}} the old test (a) let a simultaneous StdinPath
+	// silently win instead of reporting the programming error, and (b) left
+	// cmd.Stdin nil so the child INHERITED THE OPERATOR'S TERMINAL — every seam
+	// tool that reads stdin to EOF (gxss, mantra, nomore403, hakip2host,
+	// roboxtractor, dalfox pipe, brutus) would block until its deadline fired.
+	if opts.Stdin != nil && opts.StdinPath != "" {
+		return noop, &coreerrors.ToolError{
+			Tool:         t.Name,
+			ExitCode:     -1,
+			Stderr:       "",
+			Inner:        stderrors.New("ExecOptions.Stdin and ExecOptions.StdinPath are mutually exclusive; exactly one may be set"),
+			NeverStarted: true,
+		}
+	}
+
+	// Working directory precedence: opts.Dir wins over Tool.WorkDir. With neither
+	// set, cmd.Dir stays empty — os/exec's "inherit the parent's cwd", which is
+	// today's behaviour byte for byte.
+	switch {
+	case opts.Dir != "":
+		cmd.Dir = opts.Dir
+	case t.WorkDir != "":
+		cmd.Dir = t.WorkDir
+	}
+
+	switch {
+	case opts.Stdin != nil:
+		// An EMPTY-but-non-nil slice means "empty stdin", not "inherit" (WR-08).
+		// A FRESH reader per dispatch, which is exactly why the field is []byte:
+		// FailoverBackend's fallback leg is a second call and builds its own
+		// reader, so a retry cannot be handed an exhausted one.
+		cmd.Stdin = bytes.NewReader(opts.Stdin)
+	case opts.StdinPath != "":
+		f, err := os.Open(opts.StdinPath) //nolint:gosec // caller-supplied in-process path
+		if err != nil {
+			return noop, &coreerrors.ToolError{
+				Tool:         t.Name,
+				ExitCode:     -1,
+				Inner:        fmt.Errorf("open stdin path: %w", err),
+				NeverStarted: true,
+			}
+		}
+		cmd.Stdin = f
+		return func() { _ = f.Close() }, nil
+	}
+
+	return noop, nil
+}
+
+// ExecOpts is the single real buffered dispatch body; Exec and ExecEnv are defined
+// in terms of it, so a zero-valued ExecOptions is byte-for-byte identical to Exec.
+func (b *LocalBackend) ExecOpts(ctx context.Context, t *Tool, args []string, opts ExecOptions) (*Result, error) {
 	start := time.Now()
 
 	cmd := exec.CommandContext(ctx, t.Path, args...)
@@ -109,9 +181,18 @@ func (b *LocalBackend) ExecEnv(ctx context.Context, t *Tool, args []string, env 
 	// Env seam: only override cmd.Env when explicit entries are requested. The
 	// nil-env path leaves cmd.Env nil (os/exec default = inherit parent env),
 	// byte-for-byte identical to the pre-seam behavior.
-	if len(env) > 0 {
-		cmd.Env = append(os.Environ(), env...)
+	if len(opts.Env) > 0 {
+		cmd.Env = append(os.Environ(), opts.Env...)
 	}
+
+	// Stdin + working-directory seam (18-01). Applied and VALIDATED before
+	// cmd.Start, so a mutual-exclusion error creates no process at all.
+	cleanup, optErr := applyExecOptions(cmd, t, opts)
+	if optErr != nil {
+		return nil, optErr
+	}
+	// Deferred, not called inline: the stdin file must outlive cmd.Wait().
+	defer cleanup()
 
 	// WaitDelay: stdlib pause between Cancel and stdlib SIGKILL (kills direct child only).
 	cmd.WaitDelay = b.KillGrace
@@ -242,17 +323,25 @@ func (b *LocalBackend) ExecEnv(ctx context.Context, t *Tool, args []string, env 
 // Uses bufio.Scanner with 1MiB initial / 10MiB max buffer (RESEARCH.md §Pattern 3 +
 // spike proc.go lines 92-94).
 func (b *LocalBackend) Stream(ctx context.Context, t *Tool, args []string) (<-chan Event, error) {
-	return b.StreamEnv(ctx, t, args, nil)
+	return b.StreamOpts(ctx, t, args, ExecOptions{})
 }
 
 // StreamEnv is Stream with additional "KEY=VALUE" child-env entries (see ExecEnv
 // for the env-scoping contract). When env is empty, cmd.Env is left nil — the
 // nil-env path is byte-for-byte identical to the pre-seam Stream behavior.
 func (b *LocalBackend) StreamEnv(ctx context.Context, t *Tool, args []string, env []string) (<-chan Event, error) {
+	return b.StreamOpts(ctx, t, args, ExecOptions{Env: env})
+}
+
+// StreamOpts is the single real streaming dispatch body; Stream and StreamEnv are
+// defined in terms of it, so a zero-valued ExecOptions is byte-for-byte identical
+// to Stream. The stdin file (when StdinPath is used) is closed by the same
+// goroutine that reaps the process, after cmd.Wait() returns.
+func (b *LocalBackend) StreamOpts(ctx context.Context, t *Tool, args []string, opts ExecOptions) (<-chan Event, error) {
 	cmd := exec.CommandContext(ctx, t.Path, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	if len(env) > 0 {
-		cmd.Env = append(os.Environ(), env...)
+	if len(opts.Env) > 0 {
+		cmd.Env = append(os.Environ(), opts.Env...)
 	}
 	cmd.WaitDelay = b.KillGrace
 	cmd.Cancel = func() error {
@@ -275,10 +364,26 @@ func (b *LocalBackend) StreamEnv(ctx context.Context, t *Tool, args []string, en
 	}
 	stderrPipe, err := cmd.StderrPipe()
 	if err != nil {
+		// WR-02: os/exec closes parentIOPipes only inside Start's error path or
+		// Wait, so every pre-Start return must close what it already created.
+		_ = stdoutPipe.Close()
 		return nil, &coreerrors.ToolError{Tool: t.Name, ExitCode: -1, Inner: err, NeverStarted: true}
 	}
 
+	// Stdin + working-directory seam (18-01), installed after the pipes and before
+	// Start so a mutual-exclusion error creates no process.
+	cleanup, optErr := applyExecOptions(cmd, t, opts)
+	if optErr != nil {
+		// WR-02: four descriptors per occurrence otherwise, and this arm is
+		// reachable from ordinary input — a StdinPath naming a file that cannot be
+		// opened, or a Stdin+StdinPath programming error.
+		_ = stdoutPipe.Close()
+		_ = stderrPipe.Close()
+		return nil, optErr
+	}
+
 	if err := cmd.Start(); err != nil {
+		cleanup()
 		return nil, &coreerrors.ToolError{Tool: t.Name, ExitCode: -1, Inner: err, NeverStarted: true}
 	}
 
@@ -362,6 +467,9 @@ func (b *LocalBackend) StreamEnv(ctx context.Context, t *Tool, args []string, en
 		wg.Wait()
 		waitErr := cmd.Wait()
 		close(doneCh)
+		// AFTER Wait, never before: closing the stdin file earlier would take the
+		// child's standard input away mid-read.
+		cleanup()
 
 		// Surface a non-clean termination as a final event before closing.
 		// Without it a tool that died mid-stream was indistinguishable from one

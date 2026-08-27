@@ -61,6 +61,18 @@ func applyToolContract(ctx context.Context, t *Tool, args []string) (context.Con
 		merged = append(merged, t.DefaultArgs...)
 		args = append(merged, args...)
 	}
+	// ArgvPrefix goes AHEAD of DefaultArgs. The prefix is part of the executable's
+	// IDENTITY — an interpreter plus the script it runs — whereas DefaultArgs are
+	// flags TO that program. Reversed, python3 would be handed a flag where it
+	// expects a script path. Pinned by TestApplyToolContractPrefixOrdering.
+	//
+	// An empty ArgvPrefix leaves args EXACTLY as they were, so every existing
+	// caller is byte-for-byte unchanged (TestApplyToolContractEmptyPrefixIsIdentity).
+	if len(t.ArgvPrefix) > 0 {
+		prefixed := make([]string, 0, len(t.ArgvPrefix)+len(args))
+		prefixed = append(prefixed, t.ArgvPrefix...)
+		args = append(prefixed, args...)
+	}
 	if t.Timeout > 0 {
 		c, cancel := context.WithTimeout(ctx, t.Timeout)
 		return c, cancel, args
@@ -76,30 +88,7 @@ func applyToolContract(ctx context.Context, t *Tool, args []string) (context.Con
 // Runner is the single seam every tool invocation passes through, so honouring
 // the manifest in one place covers every caller.
 func (r *Runner) Run(ctx context.Context, toolName string, args []string) (*Result, error) {
-	tool, ok := r.Registry.Lookup(toolName)
-	if !ok {
-		r.recordDispatchFailure(toolName, ModeExec, args)
-		return nil, &coreerrors.ToolError{
-			Tool:     toolName,
-			ExitCode: -1,
-			Inner:    stderrors.New("tool not registered"),
-		}
-	}
-	if r.Limiter != nil {
-		if err := r.Limiter.Wait(ctx, toolName); err != nil {
-			r.recordDispatchFailure(toolName, ModeExec, args)
-			return nil, &coreerrors.ToolError{
-				Tool:     toolName,
-				ExitCode: -1,
-				Inner:    err,
-			}
-		}
-	}
-	ctx, cancel, args := applyToolContract(ctx, tool, args)
-	defer cancel()
-	return r.execRecorded(ctx, toolName, args, func() (*Result, error) {
-		return r.Backend.Exec(ctx, tool, args)
-	})
+	return r.RunOpts(ctx, toolName, args, ExecOptions{})
 }
 
 // RunEnv is Run with additional "KEY=VALUE" child-env entries forwarded to
@@ -108,6 +97,25 @@ func (r *Runner) Run(ctx context.Context, toolName string, args []string) (*Resu
 // onto the os.Environ() baseline by LocalBackend; an empty env is byte-for-byte
 // equivalent to Run. Same unregistered-tool / rate-limit error contract as Run.
 func (r *Runner) RunEnv(ctx context.Context, toolName string, args []string, env []string) (*Result, error) {
+	return r.RunOpts(ctx, toolName, args, ExecOptions{Env: env})
+}
+
+// RunOpts is the single buffered dispatch body: registry lookup (with the same
+// unregistered-tool error contract as Run), rate-limiter wait, applyToolContract,
+// then execRecorded. Run and RunEnv are defined in terms of it, so a zero-valued
+// ExecOptions is byte-for-byte equivalent to Run.
+//
+// This is the seam that removes the REASON for every FOUND-10 stdin bypass: a Task
+// can now hand bytes (ExecOptions.Stdin) or a file (ExecOptions.StdinPath) to a
+// tool's standard input WITHOUT reaching for exec.CommandContext, which means the
+// invocation is recorded in logs/tools.jsonl, bounded by the tools.lock timeout,
+// and visible to the arg-vector census like every other dispatch.
+//
+// STDIN CONTENT NEVER REACHES THE RECORDER, and the mechanism is that it is never
+// handed to it: execRecorded below is passed `args`, the same slice the process
+// receives, and opts is not in scope for it. Proven by observation with a canary
+// in TestRunOptsStdinIsNotRecorded rather than asserted from this comment.
+func (r *Runner) RunOpts(ctx context.Context, toolName string, args []string, opts ExecOptions) (*Result, error) {
 	tool, ok := r.Registry.Lookup(toolName)
 	if !ok {
 		r.recordDispatchFailure(toolName, ModeExec, args)
@@ -115,6 +123,14 @@ func (r *Runner) RunEnv(ctx context.Context, toolName string, args []string, env
 			Tool:     toolName,
 			ExitCode: -1,
 			Inner:    stderrors.New("tool not registered"),
+			// NO PROCESS WAS CREATED. recordDispatchFailure above writes
+			// OutcomeDispatchFailed, and ToolError.Is only matches ErrDispatch when
+			// NeverStarted is set — without this flag the record said dispatch_failed
+			// while IsDispatchFailure(err) returned false, so the graceful-skip arms
+			// the 18-04/18-05 files added never fired and the task fell into the
+			// "exited non-zero" arm instead. Pre-dates phase 18 (verified against
+			// f436d2e); phase 18 made it load-bearing.
+			NeverStarted: true,
 		}
 	}
 	if r.Limiter != nil {
@@ -124,46 +140,37 @@ func (r *Runner) RunEnv(ctx context.Context, toolName string, args []string, env
 				Tool:     toolName,
 				ExitCode: -1,
 				Inner:    err,
+				// Aborted while QUEUED — no process was created. This is the
+				// reachable arm: Limiter.Wait returns ctx.Err() on Ctrl-C or a
+				// task-level deadline, and without this flag the caller's skip arm
+				// was bypassed and its staging wiped on the way out.
+				NeverStarted: true,
 			}
 		}
 	}
 	ctx, cancel, args := applyToolContract(ctx, tool, args)
 	defer cancel()
 	return r.execRecorded(ctx, toolName, args, func() (*Result, error) {
-		return r.Backend.ExecEnv(ctx, tool, args, env)
+		return r.Backend.ExecOpts(ctx, tool, args, opts)
 	})
 }
 
 // Stream looks up toolName, waits on the rate limiter, then dispatches to
 // Backend.Stream. Same error contract as Run for the unregistered-tool case.
 func (r *Runner) Stream(ctx context.Context, toolName string, args []string) (<-chan Event, error) {
-	tool, ok := r.Registry.Lookup(toolName)
-	if !ok {
-		r.recordDispatchFailure(toolName, ModeStream, args)
-		return nil, &coreerrors.ToolError{
-			Tool:     toolName,
-			ExitCode: -1,
-			Inner:    stderrors.New("tool not registered"),
-		}
-	}
-	if r.Limiter != nil {
-		if err := r.Limiter.Wait(ctx, toolName); err != nil {
-			r.recordDispatchFailure(toolName, ModeStream, args)
-			return nil, &coreerrors.ToolError{
-				Tool:     toolName,
-				ExitCode: -1,
-				Inner:    err,
-			}
-		}
-	}
-	return r.streamWithContract(ctx, toolName, tool, args, func(c context.Context, a []string) (<-chan Event, error) {
-		return r.Backend.Stream(c, tool, a)
-	})
+	return r.StreamOpts(ctx, toolName, args, ExecOptions{})
 }
 
 // StreamEnv is Stream with additional "KEY=VALUE" child-env entries forwarded to
 // Backend.StreamEnv (see RunEnv for the env contract).
 func (r *Runner) StreamEnv(ctx context.Context, toolName string, args []string, env []string) (<-chan Event, error) {
+	return r.StreamOpts(ctx, toolName, args, ExecOptions{Env: env})
+}
+
+// StreamOpts is the single streaming dispatch body; Stream and StreamEnv are
+// defined in terms of it. Same unregistered-tool / rate-limit error contract, same
+// zero-value equivalence, same recorder discipline as RunOpts.
+func (r *Runner) StreamOpts(ctx context.Context, toolName string, args []string, opts ExecOptions) (<-chan Event, error) {
 	tool, ok := r.Registry.Lookup(toolName)
 	if !ok {
 		r.recordDispatchFailure(toolName, ModeStream, args)
@@ -171,6 +178,14 @@ func (r *Runner) StreamEnv(ctx context.Context, toolName string, args []string, 
 			Tool:     toolName,
 			ExitCode: -1,
 			Inner:    stderrors.New("tool not registered"),
+			// NO PROCESS WAS CREATED. recordDispatchFailure above writes
+			// OutcomeDispatchFailed, and ToolError.Is only matches ErrDispatch when
+			// NeverStarted is set — without this flag the record said dispatch_failed
+			// while IsDispatchFailure(err) returned false, so the graceful-skip arms
+			// the 18-04/18-05 files added never fired and the task fell into the
+			// "exited non-zero" arm instead. Pre-dates phase 18 (verified against
+			// f436d2e); phase 18 made it load-bearing.
+			NeverStarted: true,
 		}
 	}
 	if r.Limiter != nil {
@@ -180,11 +195,16 @@ func (r *Runner) StreamEnv(ctx context.Context, toolName string, args []string, 
 				Tool:     toolName,
 				ExitCode: -1,
 				Inner:    err,
+				// Aborted while QUEUED — no process was created. This is the
+				// reachable arm: Limiter.Wait returns ctx.Err() on Ctrl-C or a
+				// task-level deadline, and without this flag the caller's skip arm
+				// was bypassed and its staging wiped on the way out.
+				NeverStarted: true,
 			}
 		}
 	}
 	return r.streamWithContract(ctx, toolName, tool, args, func(c context.Context, a []string) (<-chan Event, error) {
-		return r.Backend.StreamEnv(c, tool, a, env)
+		return r.Backend.StreamOpts(c, tool, a, opts)
 	})
 }
 

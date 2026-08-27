@@ -1,0 +1,69 @@
+# known-absent.darwin-dev.txt — the REFERENCE-mode expected-absent set for a
+# macOS development box.
+#
+# PROVENANCE
+#   host        darwin/arm64 developer laptop (the maintainer's)
+#   date        2026-08-27
+#   source      measured directly: `REALTOOLS_REFERENCE=1 make realtools-args`
+#               plus `go run ./cmd/reconftw health-check` (103 tools: 100 present,
+#               3 missing) on this box, phase 18 round 5
+#   census      TestRealToolArgVectors      present=37 skipped=2
+#               TestRealtoolsVulnsPhase6    present=19 skipped=0
+#               TestRealtoolsOSINTPhase7    present=25 skipped=0
+#               TestRealtoolsFixedArgVectors present=5 skipped=0
+#
+# WHY THIS FILE EXISTS
+#   The compiled-in `smokeKnownAbsent` describes the 2026-08-20 provisioned box
+#   and says so, including an explicit instruction NOT to edit it to match a
+#   laptop: doing that would silently retarget a reference set at a developer
+#   machine and make every future REFERENCE run wrong in the other direction.
+#   Seven of its entries (arjun p1radup subwiz subzy urless wafw00f waymore) DO
+#   resolve here, so a REFERENCE run against the compiled-in list fails the STALE
+#   direction — the ratchet working exactly as designed. This file is the
+#   documented way to compare against the right list instead.
+#
+#   NOTE ON THE GATE'S OWN MESSAGE: release-gates.sh reports the failure as
+#   "unverified tools were: dnscewl dnstake", which is the SKIPPED set, not the
+#   cause. The cause is the seven stale entries above. The two named tools are
+#   correctly declared below and were never what failed.
+#
+# HOW TO USE
+#   REALTOOLS_REFERENCE=1 \
+#   REALTOOLS_KNOWN_ABSENT="$PWD/internal/core/backend/testdata/known-absent.darwin-dev.txt" \
+#     make realtools-args
+#
+#   The path must be ABSOLUTE (or relative to internal/core/backend/): `go test` runs
+#   with the PACKAGE directory as its working directory, so a repo-relative path is
+#   not found — and the reader refuses to fall back, so it fails loudly rather than
+#   silently unenforcing the ratchet. That refusal is correct; this note exists so the
+#   next person does not have to rediscover it.
+#
+#   Without REALTOOLS_KNOWN_ABSENT the compiled-in lists are used, unchanged.
+#
+# FORMAT
+#   [<TestFunctionName>]      section per probe
+#   <tool> = <reason>         one entry per tool; the reason is REQUIRED
+#   # comment                 ignored
+#
+# BOTH RATCHET DIRECTIONS STILL BITE. A tool that is absent and unlisted fails
+# (forward); a tool that is listed and present fails as stale. Seeding the list
+# changes WHICH list is compared, never WHETHER it is compared. Three of the four
+# sections below are DELIBERATELY EMPTY: on this box every vulns, OSINT and
+# fixed-vector tool resolves, so any future absence there is a forward failure
+# and must be justified here rather than absorbed.
+
+[TestRealToolArgVectors]
+dnscewl = not available on macOS — declared kind="go" (github.com/codingo/dnscewl) but no darwin build is obtainable here, and no clone exists under paths.tools_dir under any casing (18-02 recorded it as correctly absent)
+dnstake = present on disk as an UNBUILT Go source tree (~/Tools/dnstake: cmd/, go.mod, no binary) and not on PATH, so it resolves nowhere; `go build ./cmd/dnstake` inside that clone is what would fix it
+
+[TestRealtoolsVulnsPhase6]
+# Empty ON PURPOSE: present=19 skipped=0 measured on this box. sqlmap and
+# testssl.sh resolve from their clones since 18-02.
+
+[TestRealtoolsOSINTPhase7]
+# Empty ON PURPOSE: present=25 skipped=0 measured on this box. The eight
+# repo-clone python tools (regulator, EmailHarvester, dorks_hunter, gato,
+# SwaggerSpy, Spoofy, cmseek, LeakSearch) resolve through clone-aware Discover.
+
+[TestRealtoolsFixedArgVectors]
+# Empty ON PURPOSE: present=5 skipped=0 measured on this box.

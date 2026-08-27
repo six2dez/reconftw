@@ -26,9 +26,36 @@
 // Only finding count at Info. PoCRedacted field is always "***".
 //
 // HEARTBEAT (XCUT-09):
-// dalfox pipe can run 30+ min. Uses exec.CommandContext so the OS kills the
-// process on cancellation; a background goroutine reads stdout line-by-line
-// so the UI never appears stuck.
+// dalfox pipe can run 30+ min, so its stdout is consumed line-by-line as it
+// arrives and the UI never appears stuck.
+//
+// 18-04: THIS FILE NO LONGER BYPASSES THE SEAM — BOTH of its shapes came home.
+// Its only manifest reason was `stdin`, which 18-01's ExecOptions.Stdin serves.
+//
+//   - dalfox pipe mode now goes through app.Tools.StreamOpts, NOT RunOpts. This
+//     is not a stylistic choice: the buffered path returns a *ToolError with NO
+//     Result on a non-zero exit, and dalfox routinely exits non-zero WHEN IT HAS
+//     FINDINGS — the very line below says so. Buffering would therefore have
+//     thrown away exactly the PoC lines this task exists to collect, and would
+//     also have held 30+ minutes of output in memory instead of streaming it.
+//     StreamOpts delivers each line as it arrives and carries the terminal error
+//     on the final Event, so the heartbeat and the findings both survive.
+//   - the Gxss reflection pre-pass goes through app.Tools.RunOpts with stdin.
+//     It used gxssCmd.Output(), which is NOT one of the FOUND-10 walker's
+//     forbidden patterns — so that dispatch was uncounted by the bypass census
+//     even while this file was declared (18-03-SUMMARY records the gap). It is
+//     moved anyway: an uncounted bypass is still a bypass.
+//
+// TIMEOUT: dalfox carries timeout_seconds = 0 in tools.lock and this file
+// applied NO deadline of its own — the two AGREE, and the agreement is stated
+// here rather than left for a reader to infer. dalfox pipe is unbounded by
+// design (a 30+ minute scan is normal) and the scan's own context still bounds
+// it. Gxss carries timeout_seconds = 120, which the Runner now applies to the
+// pre-pass; that call previously had NO bound at all, so this is a bound gained,
+// not one lost.
+//
+// DEFAULT ARGS: both rows carry default_args = [], so both argvs are
+// byte-for-byte the pre-move ones.
 //
 // Source: .planning/phases/06-vulnerability-scanning-e2e/06-02-PLAN.md Task 1.
 package vulns
@@ -40,13 +67,14 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
+	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -78,7 +106,7 @@ func (t *XSSTask) DependsOn() []string { return []string{"vulns.gf"} }
 //     filter lines containing "FUZZ"; write to inputs/xss_reflected.txt.
 //  3. If xss_reflected.txt empty — skip (no reflected candidates).
 //  4. Build dalfox pipe args; conditionally add -b BlindServer (D-V6 gate).
-//  5. Run dalfox via exec.CommandContext (XCUT-09 heartbeat via goroutine reader).
+//  5. Run dalfox via Runner.StreamOpts (XCUT-09 heartbeat via streamed events).
 //  6. Parse stdout PoC lines as VulnFindingRecord; redact per XCUT-07.
 //  7. Write inputs/findings.xss.jsonl via output.WriteJSONL.
 func (t *XSSTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
@@ -172,53 +200,48 @@ func (t *XSSTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 		"-d", strconv.Itoa(depth),
 	)
 
-	// Step 4: Locate dalfox binary.
-	dalfoxPath, lookErr := exec.LookPath(toolName)
-	if lookErr != nil {
-		if app.Log != nil {
-			app.Log.Info("vulns.xss: dalfox binary not found — skipping")
+	// Step 4+5: stream dalfox through backend.Runner with the reflected
+	// candidates on stdin (XCUT-09 heartbeat: each line is consumed as it
+	// arrives, so a 30+ minute scan never looks stuck).
+	//
+	// NO exec.LookPath GATE. An unresolvable dalfox now returns a typed dispatch
+	// failure and is RECORDED as dispatch_failed instead of vanishing; the task's
+	// status on an absent binary is unchanged (StatusSkipped), and no staging
+	// write happens on that path (F3 did-not-run).
+	events, streamErr := app.Tools.StreamOpts(ctx, toolName, args, backend.ExecOptions{
+		Stdin: []byte(strings.Join(reflectedLines, "\n") + "\n"),
+	})
+	if streamErr != nil {
+		if coreerrors.IsDispatchFailure(streamErr) {
+			if app.Log != nil {
+				app.Log.Info("vulns.xss: dalfox unavailable — skipping")
+			}
+			return task.Result{Status: task.StatusSkipped}, nil
 		}
-		return task.Result{Status: task.StatusSkipped}, nil
-	}
-
-	// Step 5: Run dalfox with XCUT-09 heartbeat (goroutine reader).
-	//nolint:gosec // dalfoxPath from exec.LookPath; args constructed above
-	cmd := exec.CommandContext(ctx, dalfoxPath, args...)
-	cmd.Stdin = bytes.NewReader([]byte(strings.Join(reflectedLines, "\n") + "\n"))
-
-	outPipe, pipeOpenErr := cmd.StdoutPipe()
-	if pipeOpenErr != nil {
 		return task.Result{Status: task.StatusErrored},
-			fmt.Errorf("vulns.xss: open dalfox stdout pipe: %w", pipeOpenErr)
-	}
-	// Suppress stderr (XCUT-07: no raw tool output at terminal level).
-	cmd.Stderr = nil
-
-	if startErr := cmd.Start(); startErr != nil {
-		return task.Result{Status: task.StatusErrored},
-			fmt.Errorf("vulns.xss: start dalfox: %w", startErr)
+			fmt.Errorf("vulns.xss: start dalfox: %w", streamErr)
 	}
 
-	// XCUT-09: read stdout line-by-line in the same goroutine so the UI
-	// never appears stuck. dalfox pipe can run 30+ minutes.
 	var pocLines []string
-	sc := bufio.NewScanner(outPipe)
-	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
+	// Collect drains to completion and returns the stream's terminal error, so a
+	// dalfox that exits non-zero AFTER printing PoC lines keeps those lines —
+	// which is the routine case, not the exceptional one.
+	if collectErr := backend.Collect(events, func(ev backend.Event) {
+		// Stderr is not a finding (XCUT-07: no raw tool output at terminal level).
+		if ev.IsErr {
+			return
+		}
+		line := strings.TrimSpace(string(ev.Line))
 		if line == "" {
-			continue
+			return
 		}
 		// XCUT-07 / T-06-02-01: raw PoC line is NEVER logged at Info/Warn.
 		if app.Log != nil {
 			app.Log.Debug("vulns.xss: dalfox PoC line received")
 		}
 		pocLines = append(pocLines, line)
-	}
-
-	// Wait for dalfox to exit; non-zero exit is common when findings exist.
-	if waitErr := cmd.Wait(); waitErr != nil && app.Log != nil {
-		app.Log.Debug("vulns.xss: dalfox exited non-zero (may be normal)", "err", waitErr)
+	}); collectErr != nil && app.Log != nil {
+		app.Log.Debug("vulns.xss: dalfox exited non-zero (may be normal)", "err", collectErr)
 	}
 
 	// Step 6: Parse PoC lines as VulnFindingRecord (XCUT-07 — redact all values).
@@ -245,8 +268,8 @@ func (t *XSSTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	// Step 7: Write inputs/findings.xss.jsonl.
 	//
 	// F3 (phase 15): staged UNCONDITIONALLY. dalfox RAN — an absent binary
-	// returned StatusSkipped at the exec.LookPath gate above and a failed
-	// cmd.Start returned StatusErrored, so reaching here means the scan
+	// returned StatusSkipped at the dispatch-failure arm above and a failed
+	// stream open returned StatusErrored, so reaching here means the scan
 	// completed and zero PoC lines is a real observation.
 	stagingPath := filepath.Join(inputsDir, "findings.xss.jsonl")
 	stageVulnFindings(app, "vulns.xss", stagingPath, true, records)
@@ -255,7 +278,6 @@ func (t *XSSTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 		app.Log.Info("vulns.xss: completed", "findings", len(records))
 	}
 
-	_ = toolName // used via dalfoxPath from exec.LookPath
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"findings": len(records)},
@@ -265,8 +287,8 @@ func (t *XSSTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 // runGxssReflectionPipeline runs the three-stage reflection filter:
 // qsreplace FUZZ → Gxss -c 100 -p Xss → qsreplace FUZZ.
 //
-// Implemented with exec.CommandContext to avoid shell interpolation
-// (T-05-17/T-06-02 mitigation). Input URLs come from gf/xss.txt.
+// Implemented with inline URL rewriting plus Runner.RunOpts, without shell
+// interpolation (T-05-17/T-06-02 mitigation). Input URLs come from gf/xss.txt.
 // The final output contains only lines where parameter values were
 // replaced with FUZZ (reflection candidates for dalfox).
 func runGxssReflectionPipeline(ctx context.Context, bucketData []byte, app *appctx.AppContext) ([]byte, error) {
@@ -277,22 +299,47 @@ func runGxssReflectionPipeline(ctx context.Context, bucketData []byte, app *appc
 		return nil, nil
 	}
 
-	// Stage 2: Gxss -c 100 -p Xss (detects reflection candidates).
-	gxssPath, err := exec.LookPath("Gxss")
-	if err != nil {
-		if app.Log != nil {
-			app.Log.Info("vulns.xss: Gxss binary not found — reflection filter skipped")
-		}
-		// Fall back to the FUZZ-replaced URLs directly (best_effort).
+	// Stage 2: Gxss -c 100 -p Xss (detects reflection candidates), through the
+	// Runner with the FUZZ-replaced corpus on stdin. This site used
+	// gxssCmd.Output(), a dispatch shape the FOUND-10 walker does not even count
+	// — moved anyway, because an uncounted bypass is still a bypass.
+	if app == nil || app.Tools == nil {
 		return fuzzed, nil
 	}
-
-	//nolint:gosec // gxssPath from exec.LookPath
-	gxssCmd := exec.CommandContext(ctx, gxssPath, "-c", "100", "-p", "Xss")
-	gxssCmd.Stdin = bytes.NewReader(fuzzed)
-	gxssOut, gxssErr := gxssCmd.Output()
-	if gxssErr != nil && app.Log != nil {
-		app.Log.Debug("vulns.xss: Gxss exited non-zero (best_effort)", "err", gxssErr)
+	gxssRes, gxssErr := app.Tools.RunOpts(ctx, xssGxssToolName, xssGxssArgs(),
+		backend.ExecOptions{Stdin: fuzzed})
+	if gxssErr != nil {
+		if coreerrors.IsDispatchFailure(gxssErr) {
+			if app.Log != nil {
+				app.Log.Info("vulns.xss: Gxss unavailable — reflection filter skipped")
+			}
+			// Fall back to the FUZZ-replaced URLs directly (best_effort) —
+			// byte-for-byte the old exec.LookPath fallback.
+			return fuzzed, nil
+		}
+		// WR-05: ANY other failure gets the SAME fallback, not silence.
+		//
+		// This site used gxssCmd.Output(), which returns captured stdout even on a
+		// non-zero exit or a cancelled context. RunOpts discards it, so after the
+		// move a Gxss deadline produced zero reflected lines, the caller saw an
+		// empty candidate list and returned StatusSkipped — the WHOLE XSS scan went
+		// silent, with an Info line indistinguishable from a genuine zero-reflection
+		// result. The 120s bound the file header calls "a bound gained, not one
+		// lost" is exactly what makes this reachable.
+		//
+		// Gxss is a best-effort NARROWING pre-pass. Failing to narrow means testing
+		// the unfiltered corpus — more work, same coverage. It never means testing
+		// nothing.
+		if app.Log != nil {
+			app.Log.Warn("vulns.xss: Gxss did not complete — proceeding with the UNFILTERED "+
+				"corpus rather than skipping the scan (WR-05)",
+				"candidates", len(fuzzed), "err", gxssErr)
+		}
+		return fuzzed, nil
+	}
+	var gxssOut []byte
+	if gxssRes != nil {
+		gxssOut = gxssRes.Stdout
 	}
 	if len(gxssOut) == 0 {
 		return nil, nil
@@ -303,6 +350,15 @@ func runGxssReflectionPipeline(ctx context.Context, bucketData []byte, app *appc
 	secondFuzz := xssFuzzReplaceParams(gxssOut)
 	return secondFuzz, nil
 }
+
+// xssGxssToolName is the tools.lock registry key for the reflection pre-pass.
+const xssGxssToolName = "Gxss"
+
+// xssGxssArgs returns the reflection pre-pass arg vector, VERBATIM as it stood
+// before 18-04 moved this dispatch onto the Runner: `Gxss -c 100 -p Xss`
+// (v1 vulns.sh:27). Identical to web/gxss.go's vector, and deliberately declared
+// separately: the two sites are independent and must each be pinned.
+func xssGxssArgs() []string { return []string{"-c", "100", "-p", "Xss"} }
 
 // xssFuzzReplaceParams replaces all query-parameter values with "FUZZ" in each
 // line of the input byte slice. Lines that have no query params are dropped.

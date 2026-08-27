@@ -4,7 +4,12 @@
 
 package config
 
-import "log/slog"
+import (
+	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
+)
 
 // Defaults returns a *Config populated with every default value from ADR §2.2.
 // This is the source layer of the koanf 8-source merge chain (loader.go).
@@ -454,6 +459,45 @@ func Defaults() *Config {
 		},
 		Legacy: map[string]any{},
 	}
+}
+
+// ToolsRoot resolves the repo-clone tools root — v1's ${tools}.
+//
+// PRECEDENCE: paths.tools_dir when set, else $HOME/Tools (the v1 default that
+// install.sh clones into), else the relative "Tools" when the home directory
+// cannot be determined.
+//
+// The default is applied HERE rather than in Defaults() on purpose: Defaults()
+// is a pure, host-independent snapshot that feeds the koanf merge chain and is
+// compared byte-for-byte by the dry-run and snapshot gates. Baking an absolute
+// $HOME path into it would make those gates host-dependent, and would also make
+// "the operator set it explicitly" indistinguishable from "we guessed".
+//
+// EVERY consumer of the tools root comes through this method. As of 18-05 that
+// is literally true and it was not before: the three module-local copies this
+// comment used to describe as still existing — web.resolveToolsDir (jsa.go),
+// vulns.resolveToolsDirVulns (fuzzparams.go) and the inline $HOME/Tools join in
+// vulns/second_order.go — were all DELETED, not merely deprecated. ZERO
+// module-local tools-root resolvers survive, which is one better than the "at
+// most one" 18-06 was told to expect. The claim is checked, not asserted:
+// TestToolsRootHasNoModuleLocalRivals (18-06) greps the module tree for a
+// second opinion about where the tools live and fails on any it finds.
+//
+// This paragraph previously said the three copies "still exist" and that
+// "18-05 collapses them" — a sentence that stayed true-looking for exactly as
+// long as nobody re-read it against the tree. 18-06 corrected it from source.
+// A comment asserting an invariant nothing re-checks is the same defect shape
+// as the census reasons this phase rewrote.
+func (c *Config) ToolsRoot() string {
+	if c != nil {
+		if d := strings.TrimSpace(c.Paths.ToolsDir); d != "" {
+			return filepath.Clean(d)
+		}
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		return filepath.Join(home, "Tools")
+	}
+	return "Tools"
 }
 
 // parseLogLevel converts an ADR-recognised log-level string to slog.Level.

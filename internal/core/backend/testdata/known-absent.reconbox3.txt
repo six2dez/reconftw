@@ -22,8 +22,14 @@
 #
 # HOW TO USE
 #   REALTOOLS_REFERENCE=1 \
-#   REALTOOLS_KNOWN_ABSENT=internal/core/backend/testdata/known-absent.reconbox3.txt \
+#   REALTOOLS_KNOWN_ABSENT="$PWD/internal/core/backend/testdata/known-absent.reconbox3.txt" \
 #     make realtools-args
+#
+#   The path must be ABSOLUTE (or relative to internal/core/backend/): `go test` runs
+#   with the PACKAGE directory as its working directory, so a repo-relative path is
+#   not found — and the reader refuses to fall back, so it fails loudly rather than
+#   silently unenforcing the ratchet. That refusal is correct; this note exists so the
+#   next person does not have to rediscover it.
 #
 #   Without REALTOOLS_KNOWN_ABSENT the compiled-in lists are used, unchanged.
 #

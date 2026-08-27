@@ -1,11 +1,26 @@
 module github.com/six2dez/reconftw
 
-// 1.25.13 is the patched 1.25 branch. At 1.25.0 govulncheck reported reachable
-// stdlib vulnerabilities (TLS/x509, html/template, net/http2, mail) that are
-// fixed in later 1.25 patch releases. CI resolves its toolchain from this file,
-// so the floor here is what the release binary is actually built with.
-// Staying on 1.25 rather than jumping to 1.26 keeps the source-build floor low.
-go 1.25.13
+// 1.26.6 is the floor because there is no longer a patched 1.25.
+//
+// This line used to say 1.25.13, justified as "staying on 1.25 rather than
+// jumping to 1.26 keeps the source-build floor low". That reasoning held only
+// while 1.25 was still receiving stdlib security fixes. It is not: govulncheck
+// on 1.25.13 reports **21 reachable stdlib vulnerabilities**, and EVERY ONE of
+// them lists its fix on the 1.26 branch — GO-2026-6218 (net/url), GO-2026-6091
+// (html/template), GO-2026-6090 (crypto/tls), GO-2026-6089 (net/http),
+// GO-2026-6088 (encoding/xml), GO-2026-5972 (encoding/asn1) and the rest, with
+// no 1.25 backport for any of them. Keeping the low floor now means shipping a
+// release binary built against 21 known-reachable vulnerabilities.
+//
+// 1.26.6 (not .7) is the exact version that clears all 21 — it is the highest
+// "Fixed in" across the set, so it is the minimum that closes the gate rather
+// than the newest release for its own sake.
+//
+// CI resolves its toolchain from this file (every `setup-go` step uses
+// `go-version-file: go.mod`), so this is also what the release binary is built
+// with. Raising it raises the source-build floor for users; that cost is real
+// and is accepted deliberately, because the alternative is known vulnerabilities.
+go 1.26.6
 
 require (
 	github.com/go-playground/validator/v10 v10.30.2

@@ -139,6 +139,29 @@ func newToolDeps(
 		ConfigPath:  configPath,
 		SecretsPath: secretsPath,
 	}
+	// V-01: hand the server's redactor to every run this transport starts.
+	//
+	// Without this, secretsOrNil/registrarOrNil both see a nil RunSecrets, the
+	// ToolRecorder is built with a NIL redactor — which recorder.go states
+	// "degrades to NO redaction ... not a safe default" — and app.Secrets is nil.
+	// Every MCP-driven scan therefore wrote logs/tools.jsonl with NO redaction of
+	// any kind, while the CLI path (which sets Secrets from runSecrets at all
+	// seven RunOptions sites) was covered. The redactor was already in hand here,
+	// carrying the secrets registered at startup; it was simply never passed on.
+	//
+	// The exposure predates phase 18 — it already covered the GitHub and GitLab
+	// token argv sites the recorder doc names — and phase 18 widened it by one
+	// tool when vulns/spray.go brought brutus onto the seam with -u/-p carrying
+	// live credential VALUES.
+	//
+	// NIL GUARD, not decoration: RunSecrets is an interface. Assigning a nil
+	// *log.Redactor to it yields a NON-nil interface wrapping a nil pointer, which
+	// is exactly the case secretsOrNil exists to prevent — it would defeat that
+	// narrowing and hand the recorder a live-looking redactor that panics or
+	// silently redacts nothing.
+	if rdct != nil {
+		base.Secrets = rdct
+	}
 	if cfg != nil {
 		base.OutputDir = cfg.Paths.DataDir
 		base.LogLevel = cfg.Output.LogLevel

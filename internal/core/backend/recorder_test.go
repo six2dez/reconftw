@@ -676,3 +676,27 @@ func TestRecorderForgetsFinishedInvocations(t *testing.T) {
 		t.Fatalf("Close: %v", err)
 	}
 }
+
+// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
+// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
+// arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
+//
+// It deliberately IGNORES opts.Stdin, opts.StdinPath and opts.Dir: this fake
+// never receives them. A fake that needs to ASSERT on stdin must write its own
+// ExecOpts instead of inheriting this forward — silently discarding the bytes is
+// correct only because nothing here is testing them.
+func (b *recordingTestBackend) ExecOpts(ctx context.Context, t *Tool, args []string, opts ExecOptions) (*Result, error) {
+	if len(opts.Env) > 0 {
+		return b.ExecEnv(ctx, t, args, opts.Env)
+	}
+	return b.Exec(ctx, t, args)
+}
+
+// StreamOpts satisfies the backend.Backend options seam (see ExecOpts).
+func (b *recordingTestBackend) StreamOpts(ctx context.Context, t *Tool, args []string, opts ExecOptions) (<-chan Event, error) {
+	if len(opts.Env) > 0 {
+		return b.StreamEnv(ctx, t, args, opts.Env)
+	}
+	return b.Stream(ctx, t, args)
+}

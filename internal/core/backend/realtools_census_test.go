@@ -52,12 +52,19 @@
 package backend_test
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"sort"
 	"strings"
 	"sync"
 	"testing"
+
+	tomlv2 "github.com/pelletier/go-toml/v2"
+
+	"github.com/six2dez/reconftw/internal/core/backend"
+	"github.com/six2dez/reconftw/internal/core/config"
 )
 
 // realtoolsMinToolchain is the floor below which a run is NOT EXECUTED rather
@@ -70,55 +77,357 @@ import (
 // fact that matters: the toolchain is not installed.
 const realtoolsMinToolchainRatio = 0.34
 
-// smokeKnownAbsent is the known-absent list for TestRealToolArgVectors.
+// ---------------------------------------------------------------------------
+// Availability: THREE states, resolved the way production resolves (18-06)
+// ---------------------------------------------------------------------------
+//
+// # WHAT WAS WRONG BEFORE
+//
+// Every probe below used to check exec.LookPath and, on failure, record the
+// tool ABSENT. That was already only half true when it was written and 18-02
+// made it a false NEGATIVE: ToolRegistry.Discover resolves a repo-clone tool
+// from declared tools.lock coordinates under paths.tools_dir, so a probe that
+// checks PATH reports "absent" for a tool PRODUCTION WILL HAPPILY RUN.
+//
+// A false-negative census is strictly worse than the false-positive one it
+// replaces. A tool wrongly called absent is a tool nobody probes, listed with a
+// reason that reads plausible forever — and the ratchet's stale direction, the
+// one thing that could notice, never fires because the tool never appears
+// present.
+//
+// MEASURED, not argued: eight of the nine entries the old lists carried
+// (EmailHarvester, dorks_hunter, gato, SwaggerSpy, Spoofy, cmseek, sqlmap,
+// testssl.sh) are ON DISK under ~/Tools on the box this was rewritten on. Their
+// clone directories were listed by hand; the derivations are in 18-06-SUMMARY.
+// They were UNFINDABLE, never absent.
+//
+// # THE THREE STATES, MATCHING 18-02's DEFINITIONS EXACTLY
+//
+//	resolved       Tool.Path is populated — by PATH, or from a declared clone
+//	               with its interpreter and script argv prefix. The probe RUNS.
+//	unresolvable   the clone DIRECTORY exists but its declared entry point does
+//	               not, or containment refused it. Remedy: repair that one clone.
+//	absent         not on PATH and nothing on disk. Remedy: install it.
+//
+// The old vocabulary had one bucket for the last two, which is exactly the
+// conflation Gate 13's skip list inherited and the reason the reconbox3
+// "29 tools absent" figure cannot be read as 29 uninstalled tools.
+
+// toolAvailability is the three-state partition, mirroring
+// ToolRegistry.Absent() / Unresolvable() / a populated Tool.Path.
+type toolAvailability int
+
+const (
+	toolResolved toolAvailability = iota
+	toolUnresolvable
+	toolAbsent
+	// toolStateUnstated is used ONLY by a seeded known-unavailable file whose
+	// entry does not declare a state. It is never an observation.
+	toolStateUnstated
+)
+
+func (a toolAvailability) String() string {
+	switch a {
+	case toolResolved:
+		return "resolved"
+	case toolUnresolvable:
+		return "unresolvable"
+	case toolAbsent:
+		return "absent"
+	default:
+		return "unstated"
+	}
+}
+
+// resolvedTool is one tool's resolution, in the shape a probe needs to RUN it:
+// the executable, the argv prefix a clone interpreter requires, and the working
+// directory a clone that declared clone_workdir must run in.
+type resolvedTool struct {
+	Name         string
+	Availability toolAvailability
+	Path         string
+	ArgvPrefix   []string
+	WorkDir      string
+	// Reason is populated for unresolvable (the registry's own text, which
+	// always names the path it looked for) and for absent.
+	Reason string
+	// Registered records whether the name is a tools.lock entry at all. A tool
+	// that is not (python3, sh) can only ever be answered by PATH.
+	Registered bool
+	// ViaPath records WHICH ROUTE answered, observed rather than inferred.
+	//
+	// 18-06 wrote this field after its own first attempt got it wrong. The first
+	// logResolution decided the route from side effects — "no ArgvPrefix and no
+	// WorkDir means it came from PATH" — and mislabelled THREE clone-resolved
+	// tools as PATH-resolved: `gato` (clone_entry venv/bin/gato), `ghleaks` and
+	// `testssl.sh` are console-script / prebuilt-binary clones that need neither
+	// an interpreter prefix nor a working directory, so they are indistinguishable
+	// from PATH tools by that signal. None of the three is on PATH at all, which a
+	// direct exec.LookPath probe showed immediately.
+	//
+	// The route is now OBSERVED: LookPath is consulted purely as a LABEL, after
+	// the registry has already decided availability. It is not part of the
+	// availability decision and must never become part of it again.
+	ViaPath bool
+}
+
+// argv prepends the clone interpreter's script prefix to a probe's arguments.
+// For a PATH tool the prefix is empty and this is the identity — the same
+// zero-prefix guarantee 18-01 pinned in applyToolContract.
+func (r resolvedTool) argv(args []string) []string {
+	if len(r.ArgvPrefix) == 0 {
+		return args
+	}
+	out := make([]string, 0, len(r.ArgvPrefix)+len(args))
+	out = append(out, r.ArgvPrefix...)
+	return append(out, args...)
+}
+
+// describe renders a one-line SKIP explanation that names the remedy.
+func (r resolvedTool) describe() string {
+	switch r.Availability {
+	case toolUnresolvable:
+		return fmt.Sprintf("UNRESOLVABLE (the clone is on disk; repair or reinstall THAT clone): %s", r.Reason)
+	case toolAbsent:
+		return fmt.Sprintf("ABSENT (install it): %s", r.Reason)
+	default:
+		return "resolved"
+	}
+}
+
+var (
+	realtoolsRegOnce sync.Once
+	realtoolsReg     *backend.ToolRegistry
+	realtoolsRegErr  error
+)
+
+// realtoolsRegistry builds the SAME registry production builds: every tools.lock
+// row including its clone coordinates, with ToolsDir set from
+// Config.ToolsRoot(), Discover()ed once.
+//
+// Parsed from tools.lock on disk rather than read off backend.Default, per this
+// package's Blocker-7 audit gate and following argvector_coverage_test.go's
+// precedent.
+func realtoolsRegistry(t *testing.T) *backend.ToolRegistry {
+	t.Helper()
+	realtoolsRegOnce.Do(func() {
+		data, err := os.ReadFile("tools.lock")
+		if err != nil {
+			realtoolsRegErr = err
+			return
+		}
+		var lock struct {
+			Tools []struct {
+				Name             string   `toml:"name"`
+				DefaultArgs      []string `toml:"default_args"`
+				CloneDir         string   `toml:"clone_dir"`
+				CloneEntry       string   `toml:"clone_entry"`
+				CloneInterpreter string   `toml:"clone_interpreter"`
+				CloneWorkDir     bool     `toml:"clone_workdir"`
+			} `toml:"tools"`
+		}
+		if err := tomlv2.Unmarshal(data, &lock); err != nil {
+			realtoolsRegErr = err
+			return
+		}
+		if len(lock.Tools) == 0 {
+			realtoolsRegErr = fmt.Errorf("tools.lock parsed to ZERO tools — every probe would then " +
+				"report its tool absent, and a census of nothing reads as a clean run")
+			return
+		}
+		reg := backend.NewToolRegistry()
+		for _, tl := range lock.Tools {
+			reg.Register(&backend.Tool{
+				Name:             tl.Name,
+				DefaultArgs:      append([]string(nil), tl.DefaultArgs...),
+				CloneDir:         tl.CloneDir,
+				CloneEntry:       tl.CloneEntry,
+				CloneInterpreter: tl.CloneInterpreter,
+				CloneWorkDir:     tl.CloneWorkDir,
+			})
+		}
+		// The REAL tools root — the same one appctx.Boot and health-check pass.
+		// A probe that resolved against an empty root would reproduce the very
+		// PATH-only blindness this replaces.
+		reg.ToolsDir = config.Defaults().ToolsRoot()
+		if err := reg.Discover(context.Background()); err != nil {
+			realtoolsRegErr = err
+			return
+		}
+		realtoolsReg = reg
+	})
+	if realtoolsRegErr != nil {
+		t.Fatalf("realtools registry: %v", realtoolsRegErr)
+	}
+	return realtoolsReg
+}
+
+// realtoolsResolve answers "can this box run that tool, and how" using the
+// registry rather than PATH.
+func realtoolsResolve(t *testing.T, name string) resolvedTool {
+	t.Helper()
+	reg := realtoolsRegistry(t)
+
+	tool, ok := reg.Lookup(name)
+	if !ok {
+		// Not a tools.lock entry — python3, sh and friends. PATH is the only
+		// possible answer and there is no clone to be unresolvable.
+		if p, err := exec.LookPath(name); err == nil {
+			return resolvedTool{Name: name, Availability: toolResolved, Path: p, ViaPath: true}
+		}
+		return resolvedTool{
+			Name:         name,
+			Availability: toolAbsent,
+			Reason:       "not a tools.lock entry and not on PATH",
+		}
+	}
+	if strings.TrimSpace(tool.Path) != "" {
+		// LABEL ONLY — availability was already decided by Discover above.
+		onPath, lookErr := exec.LookPath(name)
+		return resolvedTool{
+			Name:         name,
+			Availability: toolResolved,
+			Path:         tool.Path,
+			ArgvPrefix:   append([]string(nil), tool.ArgvPrefix...),
+			WorkDir:      tool.WorkDir,
+			Registered:   true,
+			ViaPath:      lookErr == nil && onPath == tool.Path,
+		}
+	}
+	if why, unresolvable := reg.UnresolvableReason(name); unresolvable {
+		return resolvedTool{
+			Name:         name,
+			Availability: toolUnresolvable,
+			Reason:       why,
+			Registered:   true,
+		}
+	}
+	return resolvedTool{
+		Name:         name,
+		Availability: toolAbsent,
+		Reason:       fmt.Sprintf("not on PATH and no clone directory under %s", reg.ToolsDir),
+		Registered:   true,
+	}
+}
+
+// ---------------------------------------------------------------------------
+// The known-unavailable lists, classified by state
+// ---------------------------------------------------------------------------
+
+// unavailability is one list entry: WHICH of the two unavailable states, and
+// what would fix it.
+//
+// The state is part of the entry because the remedy differs and because a list
+// that cannot tell them apart is what produced Gate 13's conflated skip set. An
+// entry claiming a state the box disagrees with FAILS in REFERENCE mode, the
+// same way a stale entry does.
+type unavailability struct {
+	State toolAvailability
+	Why   string
+}
+
+type knownUnavailable map[string]unavailability
+
+// smokeKnownAbsent is the known-unavailable list for TestRealToolArgVectors.
 //
 // SEEDED from the 2026-08-20 provisioned-box run recorded in 16-04-PLAN.md,
 // which reported 37 PASS / 0 FAIL / 9 SKIPPED. It has NOT been re-verified on a
-// provisioned box since — the box that introduced this file is a partial-
-// toolchain developer machine and ran in CENSUS ONLY mode, where the ratchet is
-// deliberately not enforced.
+// provisioned box since.
 //
-// EXPECT THE FIRST REFERENCE RUN TO FAIL, and read that as the ratchet working
-// rather than as a defect in it: this list is nine months of drift away from
-// whatever the box carries today. Delete what is present, add what is absent,
-// and the second run is meaningful.
+// 18-06 removed `regulator` and added `dnstake`. Every other entry is a
+// uv-installed PATH tool with no clone coordinates, so PATH and the registry
+// give the same answer and the entry survives the reclassification unchanged in
+// meaning.
+//
+//	regulator REMOVED — its clone is declared in tools.lock and resolves through
+//	          the registry (REALTOOLS_RESOLVED tool=regulator via=CLONE
+//	          path=~/Tools/regulator/venv/bin/python3). It is not absent on any
+//	          box that has the clone, and leaving it listed fails the stale
+//	          direction. This is the reclassification's first dividend.
+//	dnstake   ADDED — the forward direction demanded it, and it is a verifiable
+//	          universal absence rather than a guess: 18-02 established that
+//	          ~/Tools/dnstake is an UNBUILT Go source tree (cmd/, go.mod, no
+//	          binary), so it resolves nowhere until someone builds it. It was
+//	          absent and unlisted, which is precisely the silent skip this list
+//	          exists to forbid.
+//
+// # WHAT A REFERENCE RUN ON A DEVELOPER BOX SAYS, MEASURED 2026-08-26
+//
+// Recorded rather than papered over. `REALTOOLS_REFERENCE=1 make realtools-args`
+// on the box this was written on FAILS with SEVEN stale entries:
+//
+//	arjun p1radup subwiz subzy urless wafw00f waymore  — all RESOLVE here
+//
+// That is the ratchet WORKING, not a defect in it. This list describes the
+// 2026-08-20 provisioned box and this box is not that box; the seven were
+// evidently installed here in the nine months since. The compiled-in list is NOT
+// edited to match a laptop, because that would silently retarget a reference set
+// at a developer machine and make every future REFERENCE run wrong in the other
+// direction. REALTOOLS_KNOWN_ABSENT exists for exactly this and the delta above
+// is pre-computed so an operator sees it before the provisioned-box run.
+//
+// The seven are left listed KNOWING a REFERENCE run here fails. Anyone tempted
+// to "fix" that by deleting them should first establish which box they intend
+// the compiled-in list to describe, and say so here.
 //
 // DELETE entries as tools are installed. An entry here is a tool NOBODY IS
 // PROBING.
-var smokeKnownAbsent = map[string]string{
-	"arjun":     "python tool, uv-installed; absent on the 2026-08-20 reference box",
-	"dnscewl":   "repo-clone tool, not on PATH",
-	"p1radup":   "python tool, uv-installed",
-	"regulator": "repo-clone python tool, run via its own venv",
-	"subwiz":    "python tool, uv-installed",
-	"subzy":     "go tool; see 16-04-SUMMARY — its PRODUCTION arg vector is wrong",
-	"urless":    "python tool, uv-installed",
-	"wafw00f":   "python tool, uv-installed",
-	"waymore":   "python tool, uv-installed",
+var smokeKnownAbsent = knownUnavailable{
+	"arjun":   {toolAbsent, "python tool, uv-installed; no clone row in tools.lock, so PATH is the only route; absent on the 2026-08-20 reference box"},
+	"dnscewl": {toolAbsent, "no clone under ~/Tools under any casing and not on PATH — 18-02 recorded it as correctly absent"},
+	"dnstake": {toolAbsent, "~/Tools/dnstake is an UNBUILT Go source tree (cmd/, go.mod, no binary) and it is not on PATH — 18-02 derived this by listing the directory. `go build ./cmd/dnstake` inside that clone is what would fix it"},
+	"p1radup": {toolAbsent, "python tool, uv-installed; no clone row"},
+	"subwiz":  {toolAbsent, "python tool, uv-installed; no clone row"},
+	"subzy":   {toolAbsent, "go tool; see 16-04-SUMMARY — its PRODUCTION arg vector is wrong"},
+	"urless":  {toolAbsent, "python tool, uv-installed; no clone row"},
+	"wafw00f": {toolAbsent, "python tool, uv-installed; no clone row"},
+	"waymore": {toolAbsent, "python tool, uv-installed; no clone row"},
 }
 
-// vulnsKnownAbsent is the known-absent list for TestRealtoolsVulnsPhase6.
+// vulnsKnownAbsent is the known-unavailable list for TestRealtoolsVulnsPhase6.
 //
-// DERIVED BY RUNNING IT, not assumed — this probe had never executed before
-// this plan, so no prior list existed. Observed on the 2026-08-24 developer box.
-// It is a partial toolchain, so treat these as a starting point for the first
-// reference run, not as the reference set.
-var vulnsKnownAbsent = map[string]string{
-	"sqlmap":     "system/repo-clone tool; observed absent 2026-08-24",
-	"testssl.sh": "repo-clone shell tool; observed absent 2026-08-24",
-}
+// EMPTIED by 18-06. It held two entries and BOTH were wrong:
+//
+//	sqlmap      "system/repo-clone tool; observed absent 2026-08-24" — the clone
+//	            is at ~/Tools/sqlmap with .venv/bin/python3 and sqlmap.py, both
+//	            declared in tools.lock since 18-02. `ls -d ~/Tools/sqlmap/.venv/bin/python3
+//	            ~/Tools/sqlmap/sqlmap.py` lists both.
+//	testssl.sh  "repo-clone shell tool; observed absent 2026-08-24" — the clone
+//	            is at ~/Tools/testssl.sh and its entry point testssl.sh is a
+//	            1.2 MB executable shell script (`ls -l ~/Tools/testssl.sh/testssl.sh`).
+//
+// Neither was ever absent on this box; both were invisible to exec.LookPath.
+// They now RESOLVE and their arg vectors are verified against the real tools for
+// the first time.
+var vulnsKnownAbsent = knownUnavailable{}
 
-// osintKnownAbsent is the known-absent list for TestRealtoolsOSINTPhase7.
-// Same provenance and same caveat as vulnsKnownAbsent.
-var osintKnownAbsent = map[string]string{
-	"EmailHarvester": "repo-clone python tool; observed absent 2026-08-24",
-	"dorks_hunter":   "repo-clone python tool; observed absent 2026-08-24",
-	"ghleaks":        "repo-clone go tool; observed absent 2026-08-24",
-	"gato":           "repo-clone python tool; observed absent 2026-08-24",
-	"SwaggerSpy":     "repo-clone python tool; observed absent 2026-08-24",
-	"Spoofy":         "repo-clone python tool; observed absent 2026-08-24",
-	"cmseek":         "repo-clone python tool; observed absent 2026-08-24",
-}
+// osintKnownAbsent is the known-unavailable list for TestRealtoolsOSINTPhase7.
+//
+// EMPTIED by 18-06. It held seven entries all reading "repo-clone python tool;
+// observed absent 2026-08-24", and SIX of the seven were on disk the whole time.
+// Re-derived by listing each directory (outputs in 18-06-SUMMARY):
+//
+//	EmailHarvester  ~/Tools/EmailHarvester  -> EmailHarvester.py + venv/
+//	dorks_hunter    ~/Tools/dorks_hunter    -> dorks_hunter.py + venv/
+//	SwaggerSpy      ~/Tools/SwaggerSpy      -> swaggerspy.py + venv/
+//	Spoofy          ~/Tools/Spoofy          -> spoofy.py + venv/
+//	cmseek          ~/Tools/CMSeeK          -> cmseek.py + venv/  (CASE MISMATCH,
+//	                                           which is why a name-derived guess
+//	                                           fails and the declared clone_dir works)
+//	gato            ~/Tools/gato            -> venv/bin/gato (console script, no interpreter)
+//
+// The seventh, `ghleaks`, was ALSO wrong in the same direction:
+// ~/Tools/ghleaks/ghleaks is a 15 MB built Go binary. Seven of seven.
+var osintKnownAbsent = knownUnavailable{}
+
+// fixedVectorKnownAbsent is the expected-unavailable list for
+// TestRealtoolsFixedArgVectors.
+//
+// EMPTY on purpose, unchanged by 18-06. All five binaries are installed on the
+// box this was written on, so any absence here is a real gap in the evidence and
+// must be declared deliberately — via REALTOOLS_KNOWN_ABSENT for a box that
+// genuinely lacks one, not by pre-emptively excusing it here.
+var fixedVectorKnownAbsent = knownUnavailable{}
 
 // probeCensus accumulates one test function's per-tool outcomes.
 //
@@ -128,11 +437,49 @@ var osintKnownAbsent = map[string]string{
 type probeCensus struct {
 	mu      sync.Mutex
 	present map[string]bool
-	absent  map[string]bool
+	// absent is the UNION of the two unavailable states, kept under its original
+	// name because scripts/release-gates.sh's Gate 13 reads `skipped_tools=` off
+	// the census line and the union is what that field has always meant.
+	absent map[string]bool
+	// state and reason carry the 18-06 three-state detail, reported alongside
+	// the union rather than instead of it.
+	state  map[string]toolAvailability
+	reason map[string]string
 }
 
 func newProbeCensus() *probeCensus {
-	return &probeCensus{present: map[string]bool{}, absent: map[string]bool{}}
+	return &probeCensus{
+		present: map[string]bool{},
+		absent:  map[string]bool{},
+		state:   map[string]toolAvailability{},
+		reason:  map[string]string{},
+	}
+}
+
+// recordUnavailable is the 18-06 replacement for recordAbsent: it keeps the
+// union field the gate script parses AND records which of the two states the
+// registry reported, with the registry's own reason text.
+func (c *probeCensus) recordUnavailable(tool string, r resolvedTool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.present[tool] {
+		return
+	}
+	c.absent[tool] = true
+	c.state[tool] = r.Availability
+	c.reason[tool] = r.Reason
+}
+
+// byState returns the sorted names in one unavailable state.
+func (c *probeCensus) byState(want toolAvailability) []string {
+	var out []string
+	for tool := range c.absent {
+		if c.state[tool] == want {
+			out = append(out, tool)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // recordPresent notes that tool's binary was found and its probe ran.
@@ -141,6 +488,8 @@ func (c *probeCensus) recordPresent(tool string) {
 	defer c.mu.Unlock()
 	c.present[tool] = true
 	delete(c.absent, tool)
+	delete(c.state, tool)
+	delete(c.reason, tool)
 }
 
 // recordAbsent notes that tool's binary was not found, so its arg vector was
@@ -192,7 +541,7 @@ func realtoolsMode(c *probeCensus) (mode, reason string) {
 // The census line format is stable and greppable — scripts/release-gates.sh
 // parses it — and it prints tool NAMES, because "9 skipped" is not actionable
 // and "9 skipped: arjun dnscewl …" is.
-func reportRealtoolsCensus(t *testing.T, testName string, c *probeCensus, knownAbsent map[string]string) {
+func reportRealtoolsCensus(t *testing.T, testName string, c *probeCensus, knownAbsent knownUnavailable) {
 	t.Helper()
 
 	// A SEEDED list wins over the compiled-in one. See resolveKnownAbsent.
@@ -201,12 +550,24 @@ func reportRealtoolsCensus(t *testing.T, testName string, c *probeCensus, knownA
 	mode, reason := realtoolsMode(c)
 	c.mu.Lock()
 	present := c.sorted(c.present)
-	absent := c.sorted(c.absent)
+	absentUnion := c.sorted(c.absent)
+	trulyAbsent := c.byState(toolAbsent)
+	unresolvable := c.byState(toolUnresolvable)
 	c.mu.Unlock()
 
-	t.Logf("REALTOOLS_CENSUS test=%s mode=%s present=%d skipped=%d skipped_tools=%s",
-		testName, mode, len(present), len(absent), joinOrNone(absent))
+	// The union field (skipped=/skipped_tools=) is UNCHANGED — Gate 13 parses it
+	// and 17-03 closed four false greens in that script; renaming it would be a
+	// silent parse failure that reads as an empty skip set. The two states are
+	// reported ALONGSIDE it, so a reader can tell "install it" from "repair that
+	// one clone" without the gate's parser changing meaning.
+	t.Logf("REALTOOLS_CENSUS test=%s mode=%s present=%d skipped=%d skipped_tools=%s absent=%d absent_tools=%s unresolvable=%d unresolvable_tools=%s",
+		testName, mode, len(present), len(absentUnion), joinOrNone(absentUnion),
+		len(trulyAbsent), joinOrNone(trulyAbsent),
+		len(unresolvable), joinOrNone(unresolvable))
 	t.Logf("REALTOOLS_CENSUS_REASON test=%s %s", testName, reason)
+	for _, tool := range unresolvable {
+		t.Logf("REALTOOLS_UNRESOLVABLE test=%s tool=%s reason=%s", testName, tool, c.reason[tool])
+	}
 
 	switch mode {
 	case "NOT_EXECUTED":
@@ -214,56 +575,79 @@ func reportRealtoolsCensus(t *testing.T, testName string, c *probeCensus, knownA
 			"  This is a FAILURE and not a pass: no arg vector was verified, so the run says nothing\n"+
 			"  about whether the tools accept what the Tasks send them. Install the toolchain, or run\n"+
 			"  this target only on a provisioned box.\n"+
-			"  tools on PATH: %s", testName, reason, joinOrNone(present))
+			"  tools resolved: %s", testName, reason, joinOrNone(present))
 		return
 
 	case "CENSUS_ONLY":
-		t.Logf("%s: the known-absent ratchet was NOT ENFORCED in this mode. The skip list above is a\n"+
-			"  report, not an assertion. Only a REFERENCE run can tell a correct known-absent list\n"+
-			"  from a stale one.", testName)
+		t.Logf("%s: the known-unavailable ratchet was NOT ENFORCED in this mode. The skip list above is\n"+
+			"  a report, not an assertion. Only a REFERENCE run can tell a correct list from a stale one.",
+			testName)
 		// PREVIEW, not an assertion. A mode that asserts nothing and says nothing
 		// is inert, and an inert mode is the default mode — so it reports what the
 		// ratchet WOULD say. The operator sees the delta before the provisioned-box
 		// run rather than discovering it there.
-		fwd, stale := ratchetDelta(c, present, absent, knownAbsent)
-		if len(fwd) == 0 && len(stale) == 0 {
-			t.Logf("%s: RATCHET PREVIEW — the known-absent list matches this box exactly.", testName)
+		fwd, stale, misstated := ratchetDelta(c, present, absentUnion, knownAbsent)
+		if len(fwd) == 0 && len(stale) == 0 && len(misstated) == 0 {
+			t.Logf("%s: RATCHET PREVIEW — the known-unavailable list matches this box exactly.", testName)
 			return
 		}
 		if len(fwd) > 0 {
-			t.Logf("%s: RATCHET PREVIEW — absent and NOT listed (would FAIL in REFERENCE mode): %s",
+			t.Logf("%s: RATCHET PREVIEW — unavailable and NOT listed (would FAIL in REFERENCE mode): %s",
 				testName, strings.Join(fwd, ","))
 		}
 		if len(stale) > 0 {
-			t.Logf("%s: RATCHET PREVIEW — listed but PRESENT here, so stale on this box (would FAIL in\n"+
+			t.Logf("%s: RATCHET PREVIEW — listed but RESOLVED here, so stale on this box (would FAIL in\n"+
 				"  REFERENCE mode): %s\n"+
 				"  If this box is not the reference box, that is expected and is not a defect.",
 				testName, strings.Join(stale, ","))
 		}
+		if len(misstated) > 0 {
+			t.Logf("%s: RATCHET PREVIEW — listed with the WRONG STATE (would FAIL in REFERENCE mode): %s",
+				testName, strings.Join(misstated, ","))
+		}
 		return
 	}
 
-	// REFERENCE mode: both directions.
-	for _, tool := range absent {
+	// REFERENCE mode: all three directions.
+	//
+	// BOTH ORIGINAL DIRECTIONS ARE PRESERVED EXACTLY. 18-03's manifest work and
+	// 16-04's design both turn on the stale direction — it is what makes a tool
+	// BECOMING resolvable a visible event rather than a silent one, and 18-02
+	// made fourteen tools do precisely that. The third direction is additive: it
+	// catches an entry that names the wrong remedy, which the old single-bucket
+	// list could not express at all.
+	for _, tool := range absentUnion {
 		if _, listed := knownAbsent[tool]; !listed {
-			t.Errorf("%s: %q is ABSENT and not on the known-absent list.\n"+
+			t.Errorf("%s: %q is %s and not on the known-unavailable list.\n"+
 				"  Its arg vector was not verified by this run, and nothing else in the tree verifies it.\n"+
-				"  Either install it, or add it to the list WITH the reason it is missing — a skip that\n"+
-				"  nobody wrote down is indistinguishable from coverage.", testName, tool)
+				"  Either install/repair it, or add it to the list WITH its state and the reason — a skip\n"+
+				"  that nobody wrote down is indistinguishable from coverage.\n"+
+				"  registry reason: %s", testName, tool, c.state[tool], c.reason[tool])
 		}
 	}
-	for tool, why := range knownAbsent {
+	for tool, entry := range knownAbsent {
 		if c.present[tool] {
-			t.Errorf("%s: %q is on the known-absent list (%q) but is PRESENT on this box.\n"+
+			t.Errorf("%s: %q is on the known-unavailable list (%s: %q) but RESOLVES on this box.\n"+
 				"  Delete the entry. A list that outlives its reason quietly excuses the next genuine\n"+
-				"  absence, which is the whole failure mode this ratchet exists to stop.", testName, tool, why)
+				"  absence, which is the whole failure mode this ratchet exists to stop.\n"+
+				"  NOTE (18-06): after clone-aware resolution, \"resolves\" no longer means \"on PATH\" —\n"+
+				"  a declared clone under paths.tools_dir resolves too, and eight entries that had been\n"+
+				"  listed as absent for months were exactly that.", testName, tool, entry.State, entry.Why)
+			continue
+		}
+		if observed, unavailable := c.state[tool]; unavailable &&
+			entry.State != toolStateUnstated && entry.State != observed {
+			t.Errorf("%s: %q is listed as %s but this box reports it %s.\n"+
+				"  The two states carry DIFFERENT REMEDIES — absent means install it, unresolvable means\n"+
+				"  repair that one clone — so a wrong state sends an operator to the wrong fix. Correct\n"+
+				"  the entry.\n  registry reason: %s", testName, tool, entry.State, observed, c.reason[tool])
 		}
 	}
 }
 
-// ratchetDelta computes both ratchet directions without asserting either, so
+// ratchetDelta computes all three ratchet directions without asserting any, so
 // CENSUS_ONLY can preview what REFERENCE would decide.
-func ratchetDelta(c *probeCensus, present, absent []string, knownAbsent map[string]string) (forward, stale []string) {
+func ratchetDelta(c *probeCensus, present, absent []string, knownAbsent knownUnavailable) (forward, stale, misstated []string) {
 	for _, tool := range absent {
 		if _, listed := knownAbsent[tool]; !listed {
 			forward = append(forward, tool)
@@ -273,14 +657,20 @@ func ratchetDelta(c *probeCensus, present, absent []string, knownAbsent map[stri
 	for _, p := range present {
 		presentSet[p] = true
 	}
-	for tool := range knownAbsent {
+	for tool, entry := range knownAbsent {
 		if presentSet[tool] {
 			stale = append(stale, tool)
+			continue
+		}
+		if observed, unavailable := c.state[tool]; unavailable &&
+			entry.State != toolStateUnstated && entry.State != observed {
+			misstated = append(misstated, fmt.Sprintf("%s(listed=%s,observed=%s)", tool, entry.State, observed))
 		}
 	}
 	sort.Strings(forward)
 	sort.Strings(stale)
-	return forward, stale
+	sort.Strings(misstated)
+	return forward, stale, misstated
 }
 
 func joinOrNone(s []string) string {
@@ -321,7 +711,7 @@ const knownAbsentEnv = "REALTOOLS_KNOWN_ABSENT"
 // file that is unreadable, unparseable, or has no section for this test is a
 // FAILURE — silently falling back would let a typo in the path turn an enforced
 // ratchet into an unenforced one while the run still said REFERENCE.
-func resolveKnownAbsent(t *testing.T, testName string, compiledIn map[string]string) map[string]string {
+func resolveKnownAbsent(t *testing.T, testName string, compiledIn knownUnavailable) knownUnavailable {
 	t.Helper()
 	path := strings.TrimSpace(os.Getenv(knownAbsentEnv))
 	if path == "" {
@@ -350,12 +740,12 @@ func resolveKnownAbsent(t *testing.T, testName string, compiledIn map[string]str
 //
 // A reason is REQUIRED on every entry, for the same reason it is required on the
 // compiled-in maps: an unexplained skip is indistinguishable from coverage.
-func parseKnownAbsentFile(path string) (map[string]map[string]string, error) {
+func parseKnownAbsentFile(path string) (map[string]knownUnavailable, error) {
 	data, err := os.ReadFile(path) //nolint:gosec // operator-supplied test fixture path
 	if err != nil {
 		return nil, err
 	}
-	out := map[string]map[string]string{}
+	out := map[string]knownUnavailable{}
 	section := ""
 	for n, raw := range strings.Split(string(data), "\n") {
 		line := strings.TrimSpace(raw)
@@ -370,7 +760,7 @@ func parseKnownAbsentFile(path string) (map[string]map[string]string, error) {
 			if _, dup := out[section]; dup {
 				return nil, fmt.Errorf("%s:%d: section [%s] appears twice", path, n+1, section)
 			}
-			out[section] = map[string]string{}
+			out[section] = knownUnavailable{}
 			continue
 		}
 		if section == "" {
@@ -385,7 +775,31 @@ func parseKnownAbsentFile(path string) (map[string]map[string]string, error) {
 			return nil, fmt.Errorf("%s:%d: entry %q needs both a tool and a REASON — an unexplained "+
 				"skip is indistinguishable from coverage", path, n+1, line)
 		}
-		out[section][tool] = reason
+		// 18-06: an OPTIONAL `absent:` / `unresolvable:` prefix states which of
+		// the two states this box reports, so the seed can express the same
+		// distinction the compiled-in lists now carry.
+		//
+		// A value with no prefix parses as toolStateUnstated and the state
+		// direction of the ratchet is simply not applied to it. That is
+		// deliberate and is NOT a loosening: it is byte-for-byte the behaviour
+		// every seeded entry had before this change, and inventing a default
+		// would be exactly the absent/unresolvable conflation being removed. The
+		// checked-in reconbox3 seed is left unprefixed for that reason — this box
+		// cannot observe that box's states, and guessing them would put an
+		// unverifiable claim into a file a cutover reviewer reads.
+		state := toolStateUnstated
+		if prefix, rest, found := strings.Cut(reason, ":"); found {
+			switch strings.ToLower(strings.TrimSpace(prefix)) {
+			case "absent":
+				state, reason = toolAbsent, strings.TrimSpace(rest)
+			case "unresolvable":
+				state, reason = toolUnresolvable, strings.TrimSpace(rest)
+			}
+			if state != toolStateUnstated && reason == "" {
+				return nil, fmt.Errorf("%s:%d: entry %q states a state but no reason", path, n+1, line)
+			}
+		}
+		out[section][tool] = unavailability{State: state, Why: reason}
 	}
 	if len(out) == 0 {
 		return nil, fmt.Errorf("%s parsed to ZERO sections — an empty seed would silently disable the "+
@@ -418,14 +832,31 @@ func TestKnownAbsentSeedFileParses(t *testing.T) {
 			t.Errorf("%s: [%s] is empty — an empty section reads as \"nothing is expected absent\", "+
 				"which on this box is false", path, probe)
 		}
-		for tool, reason := range section {
-			if strings.TrimSpace(reason) == "" {
+		for tool, entry := range section {
+			if strings.TrimSpace(entry.Why) == "" {
 				t.Errorf("%s: [%s] %q has no reason", path, probe, tool)
 			}
 		}
 	}
 	// The counts recorded in 16-06 §2.2. Pinned so an edit that drops entries is
 	// a visible failure rather than a quietly smaller list.
+	//
+	// 18-06 CAVEAT, recorded and NOT acted on. These three counts were derived
+	// from a PATH-ONLY census on reconbox3, before ToolRegistry.Discover could
+	// resolve a repo clone. On the box this note was written, that same change
+	// moved SIX tools out of the unavailable set (EmailHarvester, dorks_hunter,
+	// SwaggerSpy, Spoofy, cmseek, sqlmap all resolve via=CLONE and none of them
+	// is on PATH). If reconbox3 carries those clones too, its real counts are
+	// LOWER than 9/6/14 by however many it has.
+	//
+	// The numbers are NOT adjusted here, because this box cannot observe that
+	// box and a guessed count is worse than a stale one that says it is stale.
+	// Re-derive them there with:
+	//
+	//	REALTOOLS_REFERENCE=1 make realtools-args 2>&1 | grep REALTOOLS_CENSUS
+	//
+	// and read absent_tools= and unresolvable_tools= separately — the union in
+	// skipped_tools= is what produced the conflated figure in the first place.
 	for probe, want := range map[string]int{
 		"TestRealToolArgVectors":   9,
 		"TestRealtoolsVulnsPhase6": 6,

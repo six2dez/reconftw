@@ -4,13 +4,15 @@
 //   - TestHakoriginfinderPerHostAttribution: verifies that parseHakoriginOutput
 //     correctly extracts origin IPs and that OriginRecord.Host is the host from
 //     the per-host pair, not an index-based guess (CR-06).
-//   - TestJSAUsesDirectExec: verifies that jsa.go uses exec.CommandContext directly
-//     and does NOT route through app.Tools.Run registry lookup (CR-03).
+//   - TestJsaDispatchesThroughTheRunnerNotDirectExec: verifies that jsa.go routes
+//     through backend.Runner and contains no direct subprocess dispatch (18-05).
 //
 // Source: .planning/phases/05-web-pipeline-e2e/05-11-PLAN.md Task 2.
 package web
 
 import (
+	"os"
+	"strings"
 	"testing"
 )
 
@@ -114,50 +116,57 @@ func TestHakoriginfinderAttributionIsIndependent(t *testing.T) {
 	}
 }
 
-// TestJSAUsesDirectExec verifies that jsa.go uses exec.CommandContext directly
-// rather than routing through app.Tools.Run registry lookup (CR-03 fix).
+// TestJsaDispatchesThroughTheRunnerNotDirectExec replaces TestJSAUsesDirectExec,
+// which was BOTH vacuous AND asserting the opposite of what is now true (WR-13).
 //
-// This test confirms the behavioral property at the source-code level by
-// verifying that JsaTask.Run() skips early when jsaPython does not exist
-// (path derived from a non-existent tools dir) — which proves it is checking
-// the absolute path directly (as exec.Command would) rather than via registry.
+// What it used to do: assert that `Name()` returned "web.jsa" and that
+// `Description()` was non-empty — nothing about dispatch at all — and then log
+// "structural verification passed". Its prose claimed jsa.go "does not import the
+// backend package" and cited "our static no_raw_subprocess_test.go allowlist",
+// both of which 18-05 and 18-03 respectively made false: jsa.go dispatches via
+// app.Tools.Run, and that allowlist was deleted as data.
 //
-// A registry-based implementation would never reach the os.Stat check on the
-// absolute python3 path; it would call Tools.Run("..absolute path..") which
-// would return a "tool not registered" error immediately.
-func TestJSAUsesDirectExec(t *testing.T) {
+// A test that cannot fail, under a comment that is no longer true, inside the very
+// phase convened to delete exactly that — so it is replaced by one that observes
+// the property it names.
+func TestJsaDispatchesThroughTheRunnerNotDirectExec(t *testing.T) {
 	t.Parallel()
 
-	// jsa.go resolves jsaPython via os.Stat before executing.
-	// The path is: <toolsDir>/JSA/venv/bin/python3
-	// When the directory does not exist, os.Stat fails and the task returns
-	// StatusSkipped — proving it is performing the direct-exec path check.
-
-	// Provide a non-existent tools dir so jsaPython os.Stat will fail.
-	// If jsa were using app.Tools.Run, it would panic or return an error
-	// about registry lookup, not a clean StatusSkipped.
-	t.Log("TestJSAUsesDirectExec: verifying JsaTask skips gracefully when jsaPython absent")
-
-	// Build a minimal config pointing to a non-existent DataDir.
-	// The task should os.Stat the absolute path and return StatusSkipped.
-	// This confirms the CR-03 fix: direct exec path validation, not registry lookup.
-	jsaT := &JsaTask{}
-	if jsaT.Name() != "web.jsa" {
-		t.Errorf("unexpected task name: %s", jsaT.Name())
+	src, err := os.ReadFile("jsa.go")
+	if err != nil {
+		t.Fatalf("read jsa.go: %v", err)
 	}
-
-	// Verify the task description does not reference registry-based invocation.
-	if jsaT.Description() == "" {
-		t.Error("JsaTask.Description() must return a non-empty string")
+	// CODE ONLY. jsa.go documents its own history in prose — "the pre-move
+	// exec.CommandContext(cmdCtx, jsaPython, ...)" — and a naive substring match
+	// flags those comments, which is how the first version of this test failed on
+	// a file that is perfectly clean. Keeping the history readable is the point;
+	// the check has to be the one that distinguishes code from commentary.
+	var code strings.Builder
+	for _, line := range strings.Split(string(src), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "//") {
+			continue
+		}
+		code.WriteString(line)
+		code.WriteByte('\n')
 	}
+	text := code.String()
 
-	// The structural guarantee: jsa.go does not import the backend package
-	// (registry lookup would require importing it). This is verified by the
-	// successful build: if jsa.go called app.Tools.Run with an absolute path,
-	// the backend Registry.Lookup would fail at runtime (tool not registered),
-	// not at build time — but our static no_raw_subprocess_test.go allowlist
-	// permits the exec.CommandContext call (added in 05-09 deviation fix).
-	t.Log("TestJSAUsesDirectExec: structural verification passed — JsaTask uses direct exec path")
+	// The positive property: dispatch goes through the Runner seam.
+	if !strings.Contains(text, "app.Tools.Run(ctx, jsaToolName") {
+		t.Error("jsa.go no longer dispatches through app.Tools.Run — 18-05 brought this " +
+			"file onto the seam and the FOUND-10 manifest no longer carries an entry " +
+			"permitting it to leave")
+	}
+	// The negative property the old test claimed to check and did not.
+	if strings.Contains(text, "exec.Command") {
+		t.Error("jsa.go contains a direct exec.Command dispatch — it came home to " +
+			"backend.Runner in 18-05, and lint.Bypasses has no entry for it")
+	}
+	// And the tool name is resolved from the registry, not built as a $HOME path.
+	if strings.Contains(text, `os.Getenv("HOME")`) {
+		t.Error("jsa.go hand-rolls a $HOME tools path — 18-05 collapsed all three " +
+			"module-local tools-root resolvers onto config.ToolsRoot()")
+	}
 }
 
 // TestParseHakoriginOutputIPv4Variants confirms the IPv4 regex handles

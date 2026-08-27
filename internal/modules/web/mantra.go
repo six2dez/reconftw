@@ -10,8 +10,34 @@
 //
 //	cat js/js_livelinks.txt | mantra -ua "<HEADER>" -s
 //
-// mantra reads JS URL list from stdin. We pass via -i file flag for
-// Backend.Runner compatibility (FOUND-10 compliant; no raw exec needed).
+// mantra reads its JS URL list on STANDARD INPUT — it has no input flag.
+//
+// 18-04: THIS FILE NO LONGER BYPASSES THE SEAM. Its only manifest reason was
+// `stdin`, and backend.Runner.RunOpts has carried stdin since 18-01. (The
+// comment that stood here claimed a `-i file` flag "for Backend.Runner
+// compatibility"; the code below never used one, and the A5-fix note further
+// down says so. The claim is deleted rather than left to mislead.)
+//
+// TIMEOUT: the local 300s context.WithTimeout is GONE. tools.lock OWNS the
+// bound — the mantra row carries timeout_seconds = 300, exactly the value this
+// file used to apply.
+//
+// DEFAULT ARGS: the mantra row carries default_args = [], so the argv is
+// byte-for-byte the pre-move `-ua <UA> -s`.
+//
+// BEHAVIOUR CHANGE, STATED RATHER THAN HIDDEN: WR-04's switch below used to
+// parse partial stdout on a non-zero exit. LocalBackend returns a *ToolError
+// with no Result, so it can no longer do so. Two things make that acceptable
+// HERE rather than by analogy:
+//   - WR-04's premise ("mantra exits non-zero when no secrets are found") does
+//     NOT hold for the installed build: a run over a JS URL with no secrets
+//     exits 0 (verified 2026-08-26 against the real binary). The non-zero arm is
+//     therefore a genuine failure, not the routine no-findings path.
+//   - WR-04's real requirement was to tell a timeout and a failed launch apart
+//     from "0 secrets" rather than swallow them. The Runner does that BETTER
+//     than the old switch: coreerrors.ErrTimeout, IsDispatchFailure and a typed
+//     *ToolError name each case, and logs/tools.jsonl records the outcome label.
+//     The switch below is rewritten onto those types, not deleted.
 //
 // XCUT-07 / T-05-13 CRITICAL:
 // mantra output is plain text with potential raw secret values. EVERY
@@ -33,14 +59,14 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
+	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -82,79 +108,45 @@ func (t *MantraTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 			fmt.Errorf("web.mantra: write js urls file: %w", err)
 	}
 
-	// Build arg vector (RESEARCH §mantra verbatim v1 form web.sh:2329).
-	// [A5-fix: mantra reads from stdin (no -i flag); use exec.Command to pipe.]
-	// ARG VECTOR: mantra -ua <UA> -s  (reads JS URLs from stdin)
-	args := []string{
-		"-ua", subjsUserAgent, // reuse same UA as subjs (v1 uses same HEADER)
-		"-s", // silent/no-banner
-	}
-
-	// mantra reads from stdin; use exec.Command (same pattern as nomore403/hakoriginfinder).
-	mantraBin, lookErr := exec.LookPath(toolName)
-	if lookErr != nil {
-		if app.Log != nil {
-			app.Log.Info("web.mantra: binary not on PATH — skipping")
-		}
-		return task.Result{Status: task.StatusSkipped}, nil
-	}
-
 	jsData, readErr := os.ReadFile(jsURLsFile) //nolint:gosec
 	if readErr != nil {
 		return task.Result{Status: task.StatusErrored},
 			fmt.Errorf("web.mantra: read js urls file: %w", readErr)
 	}
 
-	// CR-07: derive bounded context from tools.lock mantra.timeout_seconds=300.
-	toolTimeout := 300 * time.Second
-	cmdCtx, cancel := context.WithTimeout(ctx, toolTimeout)
-	defer cancel()
+	// NO exec.LookPath GATE. An unresolvable mantra now returns a typed dispatch
+	// failure and is RECORDED as dispatch_failed instead of vanishing. The task's
+	// status on an absent binary is unchanged (StatusSkipped, below).
+	res, runErr := app.Tools.RunOpts(ctx, toolName, mantraArgs(),
+		backend.ExecOptions{Stdin: jsData})
 
-	var outBuf bytes.Buffer
-	//nolint:gosec // mantraBin from LookPath; args are fixed
-	cmd := exec.CommandContext(cmdCtx, mantraBin, args...)
-	cmd.Stdin = bytes.NewReader(jsData)
-	cmd.Stdout = &outBuf
-
-	runErr := cmd.Run()
-	var res struct{ Stdout []byte }
-	if outBuf.Len() > 0 {
-		res.Stdout = outBuf.Bytes()
-	}
-
-	// WR-04: mantra exits non-zero when no secrets are found, but a real failure
-	// (timeout, missing shared lib, OOM-kill, panic) also exits non-zero. The
-	// premise "non-zero == no secrets" silently swallows those, returning
-	// StatusDone with secrets_found:0 — dropping ALL JS-secret coverage with no
-	// signal (XCUT-07: we must not silently miss secrets). Distinguish the cases:
-	//   - context deadline exceeded  → the 300s timeout fired → Warn (real failure)
-	//   - non-zero exit WITH stdout  → benign (mantra printed findings then exited
-	//     non-zero, or printed nothing meaningful) — proceed to parse
-	//   - non-zero exit with NO stdout and NOT an *exec.ExitError (e.g. exec
-	//     failure) → Warn so a broken install is distinguishable from "0 secrets"
+	// WR-04, REWRITTEN ONTO THE RUNNER'S TYPED ERRORS. The requirement is
+	// unchanged: a timeout, a failed launch or a crash must NEVER be swallowed as
+	// "0 secrets" (XCUT-07 — we must not silently miss secrets). What changed is
+	// that the Runner names each case as data instead of leaving this file to
+	// infer it from an exit code and an empty buffer.
+	//   - dispatch failure     → the process never started → StatusSkipped, the
+	//                            same status the old exec.LookPath gate returned,
+	//                            and NO staging write (F3 did-not-run).
+	//   - deadline exceeded    → the tools.lock 300s bound fired → Warn.
+	//   - any other tool error → Warn: results are incomplete and distinguishable
+	//                            from a clean "no secrets" run, which now exits 0.
 	if runErr != nil {
 		switch {
-		case cmdCtx.Err() == context.DeadlineExceeded:
+		case coreerrors.IsDispatchFailure(runErr):
+			if app.Log != nil {
+				app.Log.Info("web.mantra: mantra unavailable — skipping")
+			}
+			os.Remove(jsURLsFile) //nolint:errcheck
+			return task.Result{Status: task.StatusSkipped}, nil
+		case errors.Is(runErr, coreerrors.ErrTimeout):
 			if app.Log != nil {
 				app.Log.Warn("web.mantra: timed out — JS-secret results may be incomplete",
-					"timeout", toolTimeout, "err", runErr)
-			}
-		case outBuf.Len() == 0:
-			var exitErr *exec.ExitError
-			if !errors.As(runErr, &exitErr) {
-				// Not a clean tool exit and no output — the binary likely failed
-				// to launch / crashed before producing anything.
-				if app.Log != nil {
-					app.Log.Warn("web.mantra: tool failed to run (no output) — distinct from 'no secrets'",
-						"err", runErr)
-				}
-			} else if app.Log != nil {
-				// Documented "no findings" non-zero exit with empty output.
-				app.Log.Debug("web.mantra: non-zero exit, no output (likely no secrets)", "err", runErr)
+					"err", runErr)
 			}
 		default:
 			if app.Log != nil {
-				app.Log.Debug("web.mantra: non-zero exit with output (may be normal)", "err", runErr)
+				app.Log.Warn("web.mantra: tool error — distinct from 'no secrets'", "err", runErr)
 			}
 		}
 	}
@@ -163,7 +155,7 @@ func (t *MantraTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	// XCUT-07 / T-05-13: ALL output lines written with Redacted="***".
 	// The raw line content (which may contain secrets) is NEVER written to artefacts.
 	var raw []byte
-	if len(res.Stdout) > 0 {
+	if res != nil {
 		raw = res.Stdout
 	}
 
@@ -217,7 +209,23 @@ func (t *MantraTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"secrets_found": len(lines)},
+		// V-04: the tool did not finish (deadline, crash, cancellation), so this run
+		// must NOT be checkpointed as done — otherwise the next run with the same
+		// input hash skips it and the deadline becomes a permanent, silent hole.
+		// Status stays non-error on purpose: this is best-effort and must not fail
+		// the scan. See task.Result.Incomplete.
+		Incomplete: res == nil,
 	}, nil
+}
+
+// mantraArgs returns the mantra arg vector, VERBATIM as it stood before 18-04
+// moved this dispatch onto the Runner: `mantra -ua <UA> -s` (RESEARCH §mantra,
+// v1 web.sh:2329; the UA is the same one subjs uses, as in v1).
+func mantraArgs() []string {
+	return []string{
+		"-ua", subjsUserAgent, // reuse same UA as subjs (v1 uses same HEADER)
+		"-s", // silent/no-banner
+	}
 }
 
 // ansiRE matches ANSI escape sequences (e.g. color codes) in terminal output.

@@ -260,20 +260,13 @@ func parseFuzzparamsOutput(data []byte) []VulnFindingRecord {
 // cmd/reconftw/modules.go blank-imports this package to trigger registration.
 func init() { task.Register(&FuzzparamsTask{}) }
 
-// resolveToolsDirVulns returns the tools root directory path from config.
-// nomore403 binary lives at <tools_dir>/nomore403/nomore403.
-// Defined here to support bypass4xx.go in the same package without import cycles.
-// Mirrors internal/modules/web/jsa.go resolveToolsDir.
-// Priority: cfg.Paths.DataDir → $HOME/Tools (v1 default).
-func resolveToolsDirVulns(cfg *config.Config) string {
-	if cfg.Paths.DataDir != "" {
-		return cfg.Paths.DataDir
-	}
-	if home, err := os.UserHomeDir(); err == nil {
-		return filepath.Join(home, "Tools")
-	}
-	return "Tools"
-}
+// resolveToolsDirVulns is GONE (18-05 Task 2). It existed solely so bypass4xx.go
+// could join the tools root itself and reach ~/Tools/nomore403/nomore403, and
+// bypass4xx.go now asks the registry instead. It was one of THREE hand-rolled
+// copies of the same resolver, and — like web.resolveToolsDir — it read
+// cfg.Paths.DataDir, which 17-06 recorded as the hazard: data_dir already meant
+// the workspace root. The tools root is named once, at config.Config.ToolsRoot()
+// over paths.tools_dir (18-02).
 
 // (host-extraction helper removed — unused; the web package owns the canonical
 // implementation if FuzzparamsTask ever needs per-URL host attribution.)

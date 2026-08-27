@@ -43,7 +43,7 @@ func readTargetList(path string) ([]string, error) {
 		return nil, fmt.Errorf("batch: target list %q is a directory, not a file", path)
 	}
 
-	f, err := os.Open(path) //nolint:gosec — path validated above
+	f, err := os.Open(path) //nolint:gosec // path validated above
 	if err != nil {
 		return nil, fmt.Errorf("batch: open target list %q: %w", path, err)
 	}

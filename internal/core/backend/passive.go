@@ -92,6 +92,24 @@ func (b *PassiveBackend) StreamEnv(ctx context.Context, t *Tool, args []string, 
 	return b.Inner.StreamEnv(ctx, t, args, env)
 }
 
+// ExecOpts forwards the full options to the wrapped backend. The passive gate is
+// on the TOOL, not on the options, so the check is unchanged — but the options
+// must be forwarded wholesale or a passive-mode run would silently lose stdin.
+func (b *PassiveBackend) ExecOpts(ctx context.Context, t *Tool, args []string, opts ExecOptions) (*Result, error) {
+	if isActiveTool(t.Name) {
+		return nil, passiveViolation(t.Name)
+	}
+	return b.Inner.ExecOpts(ctx, t, args, opts)
+}
+
+// StreamOpts forwards the full options to the wrapped backend (see ExecOpts).
+func (b *PassiveBackend) StreamOpts(ctx context.Context, t *Tool, args []string, opts ExecOptions) (<-chan Event, error) {
+	if isActiveTool(t.Name) {
+		return nil, passiveViolation(t.Name)
+	}
+	return b.Inner.StreamOpts(ctx, t, args, opts)
+}
+
 func (b *PassiveBackend) HealthCheck(ctx context.Context) error {
 	return b.Inner.HealthCheck(ctx)
 }

@@ -17,6 +17,7 @@ import (
 	"context"
 	"log/slog"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -307,14 +308,34 @@ func extractText(r *mcp.CallToolResult) string {
 }
 
 // logCapture is a minimal io.Writer that accumulates written bytes.
+//
+// MUTEX-GUARDED, and the mutex is the whole point. This writer is installed as a
+// slog sink and the MCP tools under test launch their scan on a DETACHED
+// goroutine (`toolDeps.launch` -> `launchScanAndNotify` -> `BootReconApp`), which
+// keeps logging after the tool call returns. The test body then reads String()
+// while that goroutine is still inside Write(). strings.Builder is not safe for
+// concurrent use, so the unguarded version was a genuine data race between the
+// test goroutine and a live scan goroutine.
+//
+// It never reproduced on darwin — cmd/reconftw passes -race 3/3 locally — and
+// failed reliably on the Linux CI runner, taking six tests down with it
+// (TestMCPRedaction, TestCompositeDryRun, TestDryRunRedactsSecrets,
+// TestNewTaskPrefixesAppearInDryRun, TestE2EEarlyFlagsCaptureOutputAndDryRun,
+// TestPassiveModeBlocksActiveTool). The race is in the HARNESS, not in production
+// code: nothing here is reachable from a real run.
 type logCapture struct {
+	mu  sync.Mutex
 	buf strings.Builder
 }
 
 func (l *logCapture) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	return l.buf.Write(p)
 }
 
 func (l *logCapture) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	return l.buf.String()
 }

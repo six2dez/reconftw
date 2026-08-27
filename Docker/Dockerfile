@@ -24,7 +24,7 @@
 # does; without them `reconftw version` reports the source defaults
 # (dev/unknown/unknown), exactly as a plain `go build` would.
 
-ARG GO_VERSION=1.25.13
+ARG GO_VERSION=1.26.6
 ARG DEBIAN_CODENAME=bookworm
 
 ########################################################################

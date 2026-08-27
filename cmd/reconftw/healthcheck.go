@@ -113,9 +113,21 @@ func runHealthCheck(cmd *cobra.Command, app *appctx.AppContext, cfg *config.Conf
 	if reg == nil {
 		reg = backend.Default
 	}
+	// 18-02: resolve repo-clone tools too, not just PATH. Without this the eight
+	// python-clone tools report absent while sitting on disk, which is what made
+	// gate 13's REFERENCE lists conflate "not installed" with "unfindable".
+	// Guarded on cfg because health-check is callable with a nil Config (the
+	// config.parse FAIL path above already recorded that), and ToolsRoot() on a
+	// nil receiver would still return $HOME/Tools — resolving clones for a run we
+	// have already declared broken.
+	if cfg != nil {
+		reg.SetToolsDir(cfg.ToolsRoot())
+	}
 	_ = reg.Discover(ctx)
 	missingCritical := reg.MissingCritical()
 	missingRequired := reg.MissingRequired()
+	unresolvable := reg.Unresolvable()
+	absent := reg.Absent()
 	missingCritSet := map[string]bool{}
 	for _, n := range missingCritical {
 		missingCritSet[n] = true
@@ -156,9 +168,24 @@ func runHealthCheck(cmd *cobra.Command, app *appctx.AppContext, cfg *config.Conf
 	if len(all) > 0 {
 		_, _ = fmt.Fprintf(w, "\n  %d tools: %d present, %d missing (%d critical)\n",
 			len(all), okCount, len(missingNames), missingCriticalCount)
-		if len(missingNames) > 0 {
-			_, _ = fmt.Fprintf(w, "  missing: %s\n", strings.Join(missingNames, " "))
-			_, _ = fmt.Fprintf(w, "  install them with: reconftw install\n")
+		// 18-02: the two groups have DIFFERENT REMEDIES and used to be printed as
+		// one undifferentiated "missing:" line. An operator reading that line had
+		// no way to tell "this was never installed" from "this is installed and I
+		// cannot find its entry point", and the second one is not fixed by
+		// re-running the installer.
+		if len(absent) > 0 {
+			_, _ = fmt.Fprintf(w, "\n  not installed (%d) — install them with: reconftw install\n", len(absent))
+			_, _ = fmt.Fprintf(w, "    %s\n", strings.Join(absent, " "))
+		}
+		if len(unresolvable) > 0 {
+			_, _ = fmt.Fprintf(w, "\n  installed but unresolvable (%d) — the clone is on disk; repair or reinstall that one clone\n", len(unresolvable))
+			for _, name := range unresolvable {
+				if reason, ok := reg.UnresolvableReason(name); ok {
+					_, _ = fmt.Fprintf(w, "    %s: %s\n", name, reason)
+					continue
+				}
+				_, _ = fmt.Fprintf(w, "    %s\n", name)
+			}
 		}
 	}
 

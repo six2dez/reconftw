@@ -264,7 +264,17 @@ func (s *Scheduler) runOne(ctx context.Context, t task.Task) error {
 	}
 
 	if s.Checkpoint != nil {
-		_ = s.Checkpoint.Complete(ctx, t.Name(), target, hash, result.Outputs, runErr)
+		// V-04: an INCOMPLETE run must not be checkpointed as done, or the next run
+		// with the same input hash skips it forever. Complete() derives its status
+		// from this error alone, so an incomplete-but-not-failed run needs one —
+		// but only for the RECORD. runErr is what the scan sees, and it is
+		// deliberately left untouched: these are best-effort tasks, and a tool
+		// timeout must not fail the whole scan.
+		cpErr := runErr
+		if cpErr == nil && result.Incomplete {
+			cpErr = task.ErrIncompleteRun
+		}
+		_ = s.Checkpoint.Complete(ctx, t.Name(), target, hash, result.Outputs, cpErr)
 	}
 	return runErr
 }

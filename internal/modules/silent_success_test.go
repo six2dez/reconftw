@@ -1076,15 +1076,6 @@ func ssJoin(fs []ssFinding) string {
 	return strings.Join(out, "\n  ")
 }
 
-func ssKeys(fs []ssFinding) []string {
-	out := make([]string, 0, len(fs))
-	for _, f := range fs {
-		out = append(out, f.key())
-	}
-	sort.Strings(out)
-	return out
-}
-
 // ssNamesFor returns the function names reported for one rule, so the two rules
 // can be asserted independently.
 func ssNamesFor(fs []ssFinding, rule ssRule) []string {

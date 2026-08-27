@@ -388,10 +388,9 @@ func TestVulnsParitySQLMapParse(t *testing.T) {
 //  2. Severity is non-empty on every record.
 //  3. XCUT-07 redaction: PayloadRedacted == "***", PoCRedacted == "***".
 //
-// For XSSTask's dalfox pipeline, see TestVulnsParityDalfoxParse which verifies
-// the record construction logic. XSSTask uses exec.CommandContext directly (not
-// app.Tools), so the classify→findings pipeline is verified via the record
-// construction code path rather than a full end-to-end Run call.
+// For XSSTask's dalfox pipeline, see TestVulnsParityDalfoxParse, which verifies
+// the record construction logic. Phase 18 moved dalfox onto Runner.StreamOpts;
+// this synthetic test remains focused on classification rather than dispatch.
 func TestVulnsParityClassifyToFindings(t *testing.T) {
 	fixturePath := filepath.Join(vulnsFixturesBase(), "crlfuzz", "crlfuzz_fixture.txt")
 	data := readVulnsTestFixture(t, fixturePath)

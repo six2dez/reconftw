@@ -416,7 +416,11 @@ type supersededInfo struct {
 // the loader's per-load unknown-key warning (CUT-06).
 var supersededKeys = map[string]supersededInfo{
 	// Bash bootstrap globals / shell introspection (ADR §2.4).
-	"tools":            {reason: "v2 resolves external binaries via PATH; set GOPATH/GOBIN in the environment", pin: ""},
+	// 18-02: v2 DOES have a tools root now. The previous reason ("v2 resolves
+	// external binaries via PATH") stopped being true when ToolRegistry.Discover
+	// gained clone resolution, and a migrator that tells an operator their
+	// ${tools} value has no v2 home would send them straight back to hardcoding it.
+	"tools":            {reason: "v2 resolves binaries via PATH first, then repo clones under paths.tools_dir", pin: "paths.tools_dir"},
 	"SCRIPTPATH":       {reason: "computed at runtime by the Go binary", pin: ""},
 	"_detected_shell":  {reason: "internal bash runtime var; not applicable in a Go binary", pin: ""},
 	"profile_shell":    {reason: "bash shell detection; not applicable in a Go binary", pin: ""},

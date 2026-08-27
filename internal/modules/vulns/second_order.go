@@ -114,9 +114,22 @@ func (t *SecondOrderTask) Run(ctx context.Context, app *appctx.AppContext) (task
 	configFile := cfg.Advanced.Tools.SecondOrder.Config
 	if configFile == "" {
 		// Fallback to the canonical v1 default path.
-		// v1 uses ${tools} which defaults to $HOME/Tools.
-		toolsDir := filepath.Join(os.Getenv("HOME"), "Tools")
-		configFile = filepath.Join(toolsDir, "second-order", "config", "takeover.json")
+		//
+		// 18-05: THE TOOLS ROOT IS NAMED ONCE. This used to be an inline
+		// filepath.Join(os.Getenv("HOME"), "Tools") — the third of the three
+		// hand-rolled resolvers 18-02 named, and the only one that ignored
+		// configuration entirely: an operator who set paths.tools_dir still had
+		// this one path go to $HOME/Tools, and one on a box with no HOME in the
+		// environment got the relative "Tools". cfg.ToolsRoot() honours
+		// paths.tools_dir, falls back to $HOME/Tools via os.UserHomeDir (which
+		// consults the passwd database, not only the environment), and is the
+		// same root ToolRegistry.Discover resolves clones under.
+		//
+		// This is a DATA-FILE path, not an executable one, so it does not become
+		// a registry lookup — second-order itself already dispatches through
+		// app.Tools. What it stops being is a fourth opinion about where the
+		// tools live.
+		configFile = filepath.Join(cfg.ToolsRoot(), "second-order", "config", "takeover.json")
 	}
 	// Validate config file exists (T-06-06-03 — path traversal via os.Stat check).
 	// If not found, omit the -config flag rather than failing (best_effort, D-V7).

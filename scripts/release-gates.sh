@@ -153,15 +153,57 @@ done
 # directions, that the skipped set is EXACTLY the known-absent list. Any census
 # line reporting NOT_EXECUTED means the box has no tool tree and the gate is
 # SKIPPED, never passed; anything else, or a non-zero exit, is a FAIL.
-# census_skipped_tools flattens every skipped_tools= list into one sorted, DEDUPED
-# set. The realtools target prints the census twice — once echoing the captured
+# census_tools flattens every <field>_tools= list into one sorted, DEDUPED set.
+# The realtools target prints the census twice — once echoing the captured
 # output, once grepping it — so a naive join reports every tool twice and the
 # gate's own summary becomes unreadable.
-census_skipped_tools() {
+#
+# 18-06: the field name is now a PARAMETER, because the census reports three of
+# them. The grep is anchored on a leading space so a field name cannot match
+# INSIDE A LONGER ONE — e.g. `tools=` matching `absent_tools=` and
+# `unresolvable_tools=` alike, which would make the three states report
+# identically and re-create the exact conflation this change removes.
+#
+# The anchor is right; its stated reason was not. It used to claim `absent_tools=`
+# could match `unresolvable_tools=`, and `absent` is not a substring of
+# `unresolvable`, so the example was impossible. Corrected rather than dropped:
+# a guard justified by an impossible example is one nobody can check.
+census_tools() {
+    local field="$2"
     local flat
-    flat="$(printf '%s\n' "$1" | grep -o 'skipped_tools=[^ ]*' | sed 's/skipped_tools=//' \
+    flat="$(printf '%s\n' "$1" | grep -oE "(^| )${field}_tools=[^ ]*" | sed "s/.*${field}_tools=//" \
         | tr ',' '\n' | grep -v '^$' | grep -v '^(none)$' | LC_ALL=C sort -u | paste -sd' ' -)"
     echo "${flat:-(none)}"
+}
+
+# census_skipped_tools is the UNION — every tool whose arg vector this run did
+# not verify, whatever the reason. Kept under its original name and meaning
+# because that is what a sign-off reader needs first: how much was not checked.
+census_skipped_tools() {
+    census_tools "$1" skipped
+}
+
+# census_state_breakdown renders the two states SEPARATELY, with their different
+# remedies named.
+#
+# WHY THIS MATTERS AND IS NOT COSMETIC. Until 18-02 the registry could not tell
+# "not installed" from "installed but the declared entry point is missing", so
+# every skip read as "install it". Eight tools carried an "observed absent"
+# reason for months while their clones sat on disk. The reconbox3 figure of
+# "29 tools absent" that pre-cutover checklist item #11 rests on inherits that
+# conflation and CANNOT be read as 29 uninstalled tools.
+#
+# The union above is unchanged; this is additive.
+census_state_breakdown() {
+    local out="$1"
+    local absent unresolvable
+    absent="$(census_tools "$out" absent)"
+    unresolvable="$(census_tools "$out" unresolvable)"
+    if [ "$absent" = "(none)" ] && [ "$unresolvable" = "(none)" ]; then
+        echo "nothing unavailable"
+        return
+    fi
+    echo "NOT INSTALLED (install them): ${absent} | INSTALLED BUT UNRESOLVABLE (repair that one clone): ${unresolvable}"
 }
 
 argvector_census_verdict() {
@@ -191,11 +233,11 @@ argvector_census_verdict() {
     fi
 
     if [ "$rc" -ne 0 ]; then
-        echo "FAIL the arg-vector probes failed (exit $rc); skipped tools were: $(census_skipped_tools "$out")"
+        echo "FAIL the arg-vector probes failed (exit $rc); unverified tools were: $(census_skipped_tools "$out") [$(census_state_breakdown "$out")]"
         return
     fi
 
-    echo "PASS $census probe(s) ran in REFERENCE mode; skipped set matched the known-absent list exactly: $(census_skipped_tools "$out")"
+    echo "PASS $census probe(s) ran in REFERENCE mode; unverified set matched the known-unavailable list exactly: $(census_skipped_tools "$out") [$(census_state_breakdown "$out")]"
 }
 
 if [ "$CENSUS_VERDICT" = "1" ]; then
@@ -927,6 +969,11 @@ gate_argvector() {
     # Print the skipped NAMES here so a sign-off reader sees them without opening
     # a log. "9 skipped" is not actionable; "9 skipped: arjun dnscewl …" is.
     grep 'REALTOOLS_CENSUS test=' "$log" | sed 's/^ *//' || true
+
+    # 18-06: and the per-tool reason for every UNRESOLVABLE one, which always
+    # names the path that was looked for. "installed but unresolvable" without
+    # the path is a verdict an operator cannot act on.
+    grep 'REALTOOLS_UNRESOLVABLE ' "$log" | sed 's/^ *//' || true
 
     case "$status" in
         PASS) record "$label" PASS "$note" ;;

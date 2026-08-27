@@ -472,16 +472,63 @@ func (a *AxiomBackend) markDisabled(reason string) {
 	}
 }
 
+// routesToFleet reports whether a dispatch for tool t with args would actually
+// be sent to the axiom fleet, as opposed to being served by the transparent
+// local fallback. It is the SAME condition Exec applies at its top, extracted so
+// the option/env seams can consult routing BEFORE deciding to refuse.
+//
+// WHY THIS EXISTS (18-06 code review, CR-02). ExecOpts/StreamOpts/ExecEnv/
+// StreamEnv used to refuse an unsupported option FIRST and consult routing never.
+// For an UNMAPPED tool — which Exec would have delegated to a.local without ever
+// touching the fleet — that turned a dispatch guaranteed to succeed locally into
+// a typed *AxiomFailure. Before capability refusals were distinguished from
+// infrastructure failures, FailoverBackend counted that type as evidence the
+// fleet was unhealthy, so three such dispatches abandoned the fleet for the rest
+// of the scan. 18-04/18-05 added ten option-carrying sites, two of which iterate
+// per host or per repo, so three in a row is the normal path of any --vps run.
+//
+// A capability refusal is not evidence of an unhealthy fleet. Refusing loudly is
+// still correct for a tool that WOULD have gone to the fleet (T-18-01-05) — that
+// case is preserved below, unchanged.
+func (a *AxiomBackend) routesToFleet(t *Tool, args []string) bool {
+	// A nil local leg means there is nothing to delegate TO. A zero-valued
+	// AxiomBackend (only constructed in tests — NewAxiomBackend always sets local)
+	// would panic on the delegation below, and its Exec would panic on the very
+	// same local-fallback arm, so the refusal is the only behaviour it can offer.
+	// Reporting "routes to fleet" here keeps that path reachable and preserves the
+	// T-18-01-05 refusal contract asserted by TestAxiomRefusesStdin.
+	if a.local == nil {
+		return true
+	}
+	module, ok := a.moduleMap[t.Name]
+	if !ok || module == "" || isLocalOnlyAxiomOp(t.Name, args) || a.disabled.Load() {
+		return false
+	}
+	// V-02: Exec has a SECOND local-fallback arm — an unresolvable input file
+	// (axiom.go, "no input file found, falling back to local"). The first version
+	// of this helper mirrored only the first arm, so a MAPPED tool dispatched with
+	// options and no resolvable input file would still be refused and still be
+	// counted as a fleet failure: the exact CR-02 shape, one arm deeper. Not
+	// reachable today — the mapped set is {puredns, tlsx, dnsx, s3scanner, nuclei}
+	// and none of the option/env-carrying module sites dispatches any of them — but
+	// "not reachable today" is what the FOUND-10 allowlist said too.
+	return extractInputFile(t, args) != ""
+}
+
 // ExecEnv implements the Backend env seam. The axiom fleet split has NO env
 // passthrough channel, so AxiomBackend does not support child-env injection: a
 // non-empty env returns *AxiomFailure (not-supported). With a nil/empty env it
 // delegates to Exec (identical behavior). OSINT tools that need GH_TOKEN run on
 // LocalBackend per D-O1, so this restriction never blocks them.
 func (a *AxiomBackend) ExecEnv(ctx context.Context, t *Tool, args []string, env []string) (*Result, error) {
+	if !a.routesToFleet(t, args) {
+		return a.local.ExecEnv(ctx, t, args, env)
+	}
 	if len(env) > 0 {
 		return nil, &coreerrors.AxiomFailure{
-			Operation: "exec_env",
-			Inner:     fmt.Errorf("axiom backend does not support child-env injection (tool %s); run env-requiring tools on LocalBackend", t.Name),
+			Operation:  "exec_env",
+			Inner:      fmt.Errorf("axiom backend does not support child-env injection (tool %s); run env-requiring tools on LocalBackend", t.Name),
+			Capability: true,
 		}
 	}
 	return a.Exec(ctx, t, args)
@@ -491,10 +538,90 @@ func (a *AxiomBackend) ExecEnv(ctx context.Context, t *Tool, args []string, env 
 // contract as ExecEnv: non-empty env returns *AxiomFailure; nil env delegates
 // to Stream.
 func (a *AxiomBackend) StreamEnv(ctx context.Context, t *Tool, args []string, env []string) (<-chan Event, error) {
+	if !a.routesToFleet(t, args) {
+		return a.local.StreamEnv(ctx, t, args, env)
+	}
 	if len(env) > 0 {
 		return nil, &coreerrors.AxiomFailure{
-			Operation: "stream_env",
-			Inner:     fmt.Errorf("axiom backend does not support child-env injection (tool %s); run env-requiring tools on LocalBackend", t.Name),
+			Operation:  "stream_env",
+			Inner:      fmt.Errorf("axiom backend does not support child-env injection (tool %s); run env-requiring tools on LocalBackend", t.Name),
+			Capability: true,
+		}
+	}
+	return a.Stream(ctx, t, args)
+}
+
+// unsupportedOpt names the FIRST ExecOptions field the axiom fleet split cannot
+// carry, or "" when the options are servable. Returning the NAME rather than a
+// bare bool is the point: an operator reading logs/tools.jsonl has to be able to
+// tell which capability was refused without reading this file.
+func unsupportedOpt(t *Tool, opts ExecOptions) string {
+	switch {
+	case len(opts.Env) > 0:
+		return "Env"
+	case opts.Stdin != nil:
+		return "Stdin"
+	case opts.StdinPath != "":
+		return "StdinPath"
+	case opts.Dir != "":
+		return "Dir"
+	}
+	// WR-01: a cwd or an interpreter prefix can arrive on the TOOL as well as on
+	// the options, and after 18-02 Tool.WorkDir is the ONLY supported way to
+	// express a clone's working directory — 18-05 routes nomore403 and bypass4xx
+	// through it deliberately. Keying the refusal on the options struct alone meant
+	// a tool whose requirement lived on the Tool was dispatched to the fleet with
+	// that requirement silently dropped: precisely the "a wrapper forgets a
+	// capability" hazard Option A was chosen to make a compile error, reintroduced
+	// one layer down. ArgvPrefix is worse than useless on a fleet node — it carries
+	// absolute LOCAL clone paths.
+	if t != nil {
+		switch {
+		case t.WorkDir != "":
+			return "Tool.WorkDir"
+		case len(t.ArgvPrefix) > 0:
+			return "Tool.ArgvPrefix"
+		}
+	}
+	return ""
+}
+
+// ExecOpts implements the Backend options seam. A fleet split has no stdin
+// channel, no cwd and no env channel, so AxiomBackend REFUSES a dispatch carrying
+// any of them with a typed *AxiomFailure naming the offending field — it does not
+// silently drop the option and run the tool anyway.
+//
+// Refusing loudly is the whole point (T-18-01-05): *AxiomFailure is the error type
+// FailoverBackend keys on, so a stdin-carrying dispatch transparently lands on the
+// local leg WITH its stdin intact, instead of running on the fleet with an empty
+// standard input and reporting a clean zero-finding success.
+func (a *AxiomBackend) ExecOpts(ctx context.Context, t *Tool, args []string, opts ExecOptions) (*Result, error) {
+	if !a.routesToFleet(t, args) {
+		// Never going to the fleet — serve it locally WITH its options, exactly as
+		// Exec's local-fallback arm already does. Refusing here would manufacture a
+		// fleet failure out of a dispatch the fleet was never going to see (CR-02).
+		return a.local.ExecOpts(ctx, t, args, opts)
+	}
+	if field := unsupportedOpt(t, opts); field != "" {
+		return nil, &coreerrors.AxiomFailure{
+			Operation:  "exec_opts",
+			Inner:      fmt.Errorf("axiom backend does not support ExecOptions.%s (tool %s); run option-requiring tools on LocalBackend", field, t.Name),
+			Capability: true,
+		}
+	}
+	return a.Exec(ctx, t, args)
+}
+
+// StreamOpts is ExecOpts for the streaming mode; same refusal contract.
+func (a *AxiomBackend) StreamOpts(ctx context.Context, t *Tool, args []string, opts ExecOptions) (<-chan Event, error) {
+	if !a.routesToFleet(t, args) {
+		return a.local.StreamOpts(ctx, t, args, opts)
+	}
+	if field := unsupportedOpt(t, opts); field != "" {
+		return nil, &coreerrors.AxiomFailure{
+			Operation:  "stream_opts",
+			Inner:      fmt.Errorf("axiom backend does not support ExecOptions.%s (tool %s); run option-requiring tools on LocalBackend", field, t.Name),
+			Capability: true,
 		}
 	}
 	return a.Stream(ctx, t, args)

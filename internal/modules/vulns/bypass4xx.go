@@ -8,15 +8,30 @@
 //
 // REPO-CLONE BINARY (mirrors web/nomore403.go Pitfall 2):
 // nomore403 is NOT a `go install` tool. It is cloned from GitHub and built
-// locally. The binary is resolved via os.Stat (not exec.LookPath) at:
+// locally, at <tools_dir>/nomore403/nomore403.
 //
-//	<tools_dir>/nomore403/nomore403
+// 18-05: IT COMES HOME, ALONGSIDE web/nomore403.go AND BY THE SAME PATH. That
+// sameness is the point of doing the two together. Both files used to join the
+// tools root THEMSELVES — this one through resolveToolsDirVulns, the other
+// through web.resolveToolsDir — so two modules independently decided where one
+// binary lives, which is how they drift. Both now ask the registry, and
+// TestBypass4xxAndNomore403ResolveTheSameBinary asserts they get the same
+// answer.
 //
-// CRITICAL (T-05-16 mitigation carried to vulns phase):
-// nomore403 must run with cmd.Dir = <tools_dir>/nomore403 because it resolves
-// wordlists at paths relative to its own directory. exec.CommandContext is used
-// directly (same sanctioned pattern as web/nomore403.go). This file is in the
-// FOUND-10 allowlist.
+// CRITICAL (T-05-16 mitigation carried to vulns phase), unchanged as a
+// REQUIREMENT: nomore403 must run with its own directory as cwd because it
+// resolves its payload wordlists relative to it. That cwd now comes from
+// Tool.WorkDir (tools.lock clone_workdir = true), NOT from an ExecOptions.Dir
+// built here — passing it from the module would rebuild the module-side notion
+// of where the clone lives that this change removes.
+//
+// DEADLINE: the local 300s context.WithTimeout is GONE; tools.lock's
+// timeout_seconds = 300 is now the single owner (the two agreed).
+//
+// PARTIAL OUTPUT ON A NON-ZERO EXIT IS NO LONGER PARSED. Measured against the
+// real binary on 2026-08-26: it exits 0 on a reachable target, with findings
+// and without, and exits 2 only when it cannot reach the target at all — on
+// which path its stdout is error prose, not bypasses.
 //
 // INPUT FILTER (mirrors web/nomore403.go):
 // Only 4xx responses excluding 404 are meaningful bypass candidates.
@@ -39,15 +54,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
+	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
+
+// bypass4xxToolName is the tools.lock entry this task dispatches — the SAME row
+// web/nomore403.go dispatches.
+const bypass4xxToolName = "nomore403"
+
+// bypass4xxArgs is the arg vector: EMPTY, the captured pre-move value. nomore403
+// takes its targets from standard input and the pre-18-05 call was
+// exec.CommandContext(cmdCtx, binaryPath) with no arguments. tools.lock declares
+// default_args = [] for the row, so applyToolContract prepends nothing.
+func bypass4xxArgs() []string { return nil }
 
 // fuzzJSONLRecord is the minimal fuzz.jsonl record shape for 4xx URL extraction.
 // Matches the FuzzRecord schema from internal/modules/web/ffuf.go (D-W11).
@@ -87,7 +112,6 @@ func (t *Bypass4xxTask) DependsOn() []string { return []string{"vulns.gf"} }
 //  6. Parse stdout for bypass lines.
 //  7. Write inputs/findings.bypass4xx.jsonl.
 func (t *Bypass4xxTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
-	cfg := app.Cfg
 	workDir := app.Target.WorkDir
 
 	inputsDir := filepath.Join(workDir, "inputs")
@@ -96,17 +120,10 @@ func (t *Bypass4xxTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 			fmt.Errorf("vulns.bypass4xx: mkdir inputs/: %w", err)
 	}
 
-	// Step 1: Check nomore403 binary (repo-clone — os.Stat, not exec.LookPath).
-	// T-05-16 / Pitfall 2 mitigation: repo-clone tools use os.Stat for binary check.
-	toolsDir := resolveToolsDirVulns(cfg)
-	binaryPath := filepath.Join(toolsDir, "nomore403", "nomore403")
-	if _, err := os.Stat(binaryPath); err != nil {
-		if app.Log != nil {
-			app.Log.Info("vulns.bypass4xx: nomore403 binary not found — run reconftw install",
-				"path", binaryPath)
-		}
-		return task.Result{Status: task.StatusSkipped}, nil
-	}
+	// Step 1 is GONE: no os.Stat probe and no module-side join into the tools
+	// root. The registry resolves nomore403 from its declared clone coordinates,
+	// and an unresolvable one becomes a recorded dispatch_failed rather than a
+	// silent absence. The task's STATUS on an absent binary is unchanged.
 
 	// Step 2: Read fuzz.jsonl; collect 4xx URLs excluding 404.
 	fuzzURLs, err := read4xxURLsFromVulnsFuzzJSONL(workDir)
@@ -129,48 +146,61 @@ func (t *Bypass4xxTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 			fmt.Errorf("vulns.bypass4xx: write bypass4xx_targets.txt: %w", wErr)
 	}
 
-	// Step 5: Run nomore403 with collected URLs piped as stdin.
-	//
-	// nomore403 is a repo-clone tool with relative-path wordlist dependencies.
-	// Backend.Stream/Run does not expose cmd.Dir or stdin injection; exec.Cmd
-	// is used directly (same sanctioned pattern as web/nomore403.go — FOUND-10
-	// allowlist: internal/modules/vulns/bypass4xx.go).
+	// Step 5: Run nomore403 with collected URLs piped as stdin, THROUGH THE SEAM.
+	// The cwd comes from Tool.WorkDir (clone_workdir), not from here.
 	inputData := []byte(strings.Join(fuzzURLs, "\n") + "\n")
-	toolDir := filepath.Join(toolsDir, "nomore403")
 
-	// Bounded context: nomore403.timeout_seconds=300 (mirrors web/nomore403.go CR-07).
-	toolTimeout := 300 * time.Second
-	cmdCtx, cancel := context.WithTimeout(ctx, toolTimeout)
-	defer cancel()
-
-	//nolint:gosec // binaryPath validated by os.Stat above; toolDir from validated config
-	cmd := exec.CommandContext(cmdCtx, binaryPath)
-	cmd.Dir = toolDir // CRITICAL: nomore403 resolves wordlists relative to its own dir
-	cmd.Stdin = bytes.NewReader(inputData)
-
-	var outBuf bytes.Buffer
-	cmd.Stdout = &outBuf
-
-	if runErr := cmd.Run(); runErr != nil {
-		// nomore403 may exit non-zero when no bypasses are found; treat as empty result.
+	res, runErr := app.Tools.RunOpts(ctx, bypass4xxToolName, bypass4xxArgs(),
+		backend.ExecOptions{Stdin: inputData})
+	if runErr != nil {
+		// Unresolvable tool: the SAME graceful skip the os.Stat gate gave, and
+		// crucially WITHOUT staging — a run in which nomore403 never dispatched
+		// must not clear a previous run's bypasses (F3 did-not-run).
+		if coreerrors.IsDispatchFailure(runErr) {
+			if app.Log != nil {
+				app.Log.Info("vulns.bypass4xx: nomore403 unavailable — run reconftw install")
+			}
+			return task.Result{Status: task.StatusSkipped}, nil
+		}
 		if app.Log != nil {
-			app.Log.Debug("vulns.bypass4xx: nomore403 exited non-zero (may be normal)",
+			app.Log.Debug("vulns.bypass4xx: nomore403 exited non-zero (no partial output on this path)",
 				"err", runErr)
 		}
 	}
 
 	// Step 6: Parse stdout for bypass lines.
-	findings := parseBypass4xxOutput(outBuf.Bytes())
+	var outBytes []byte
+	if res != nil {
+		outBytes = res.Stdout
+	}
+	findings := parseBypass4xxOutput(outBytes)
 
 	// Step 7: Write inputs/findings.bypass4xx.jsonl (staging contract — doc.go).
 	//
-	// F3 (phase 15): staged UNCONDITIONALLY. nomore403 RAN — its binary was
-	// confirmed by os.Stat above and cmd.Run reached completion (a non-zero exit
-	// is nomore403's normal "no bypasses" signal), so zero findings is a real
-	// observation and stageVulnFindings removes the previous run's staging file
-	// rather than leaving a bypass that no longer exists to be republished.
+	// F3 (phase 15): staged UNCONDITIONALLY, and reaching here now MEANS the
+	// tool ran — the dispatch-failure arm above returns before this point, so
+	// zero findings is a real observation and stageVulnFindings removes the
+	// previous run's staging file rather than leaving a bypass that no longer
+	// exists to be republished. Before 18-05 that guarantee rested on an os.Stat
+	// probe that could succeed while the process still failed to start.
+	// F3 DID-NOT-RUN, deadline arm (18-06 code review, CR-03). Reaching here with
+	// res == nil means the tool did NOT complete — a tools.lock deadline, a crash,
+	// or a cancelled context. Before the move each of these files applied its own
+	// context.WithTimeout and PARSED the partially-filled buffer, so a timeout
+	// still staged what it had seen. The move removed both, so res is nil and
+	// findings is empty — and StageJSONL implements an empty input as os.Remove.
+	// A run that never observed the corpus has no standing to delete what a
+	// previous run did observe, which is exactly what the F3 comment below claims
+	// and, on this path, did not deliver.
 	stagingPath := filepath.Join(inputsDir, "findings.bypass4xx.jsonl")
-	stageVulnFindings(app, "vulns.bypass4xx", stagingPath, true, findings)
+	if res == nil {
+		if app.Log != nil {
+			app.Log.Warn("vulns.bypass4xx: incomplete run — previous staging preserved",
+				"err", runErr)
+		}
+	} else {
+		stageVulnFindings(app, "vulns.bypass4xx", stagingPath, true, findings)
+	}
 
 	if app.Log != nil {
 		app.Log.Info("vulns.bypass4xx: completed",
@@ -181,6 +211,12 @@ func (t *Bypass4xxTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"bypasses": len(findings)},
+		// V-04: the tool did not finish (deadline, crash, cancellation), so this run
+		// must NOT be checkpointed as done — otherwise the next run with the same
+		// input hash skips it and the deadline becomes a permanent, silent hole.
+		// Status stays non-error on purpose: this is best-effort and must not fail
+		// the scan. See task.Result.Incomplete.
+		Incomplete: res == nil,
 	}, nil
 }
 

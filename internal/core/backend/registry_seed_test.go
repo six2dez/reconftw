@@ -14,6 +14,9 @@ package backend_test
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/six2dez/reconftw/internal/core/backend"
@@ -179,5 +182,201 @@ func TestToolsLockNameCoverage(t *testing.T) {
 	}
 	if len(missing) > 0 {
 		t.Errorf("tools.lock missing %d orchestrated tool(s) from install.sh: %v", len(missing), missing)
+	}
+}
+
+// TestSeedCarriesCloneCoordinates asserts the tools.lock clone keys survive the
+// round trip onto the *Tool (18-02).
+//
+// THREE PLACES CHANGE TOGETHER for a clone coordinate — the anonymous per-tool
+// struct in toolsLockSchema, the block that copies it onto *Tool, and the Clone*
+// fields on backend.Tool — and a miss in the MIDDLE one is completely silent:
+// the TOML parses, the tool registers, and Discover then reports it absent
+// because its coordinates are empty. That is indistinguishable from "not
+// installed", which is the exact confusion 18-02 exists to remove. Hence a test
+// rather than a comment.
+func TestSeedCarriesCloneCoordinates(t *testing.T) {
+	// regulator is the tracer row: interpreter shape, clone_dir == name.
+	tool, ok := backend.Default.Lookup("regulator")
+	if !ok {
+		t.Fatalf("regulator is not registered — tools.lock did not seed")
+	}
+	if tool.CloneDir != "regulator" {
+		t.Errorf("regulator CloneDir = %q, want %q — the copy block in registry_seed.go "+
+			"dropped clone_dir", tool.CloneDir, "regulator")
+	}
+	if tool.CloneInterpreter != "venv/bin/python3" {
+		t.Errorf("regulator CloneInterpreter = %q, want %q", tool.CloneInterpreter, "venv/bin/python3")
+	}
+	if tool.CloneEntry != "main.py" {
+		t.Errorf("regulator CloneEntry = %q, want %q", tool.CloneEntry, "main.py")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 18-02 Task 3: the declared clone inventory.
+// ---------------------------------------------------------------------------
+
+// cloneCensusDeclared is the PINNED number of tools.lock rows carrying a
+// clone_dir — the coordinate without which a row cannot resolve at all.
+//
+// A pinned constant, following argvector_coverage_test.go's convention: the
+// total is a constant and a change to it must be a visible diff with a written
+// reason. A row silently LOSING its coordinates is coverage draining away —
+// eight tools spent their entire life reported "not installed" while sitting on
+// disk precisely because nothing counted them.
+//
+// 15 as of 2026-08-26: regulator, EmailHarvester, dorks_hunter, SwaggerSpy,
+// Spoofy, cmseek, LeakSearch, gato, SSTImap, Scopify, JSA, ghleaks, nomore403,
+// sqlmap, testssl.sh.
+const cloneCensusDeclared = 15
+
+// cloneCensusWithInterpreter is the PINNED number of those rows that declare an
+// interpreter. It is pinned SEPARATELY because the two shapes are two different
+// code paths in Discover, and a manifest that drifted to all-of-one-shape would
+// leave the other branch unexercised by every real row. 11 interpreter rows
+// (the python venvs + sqlmap) and 4 console-script/binary rows (gato, ghleaks,
+// nomore403, testssl.sh).
+const cloneCensusWithInterpreter = 11
+
+// declaredClones returns every seeded tool carrying ANY clone coordinate.
+//
+// ANY, not all: a row with an entry and no directory is exactly the partial
+// state TestEveryDeclaredCloneEntryIsRelative's completeness check exists to
+// catch, so it must be in this set to be checked at all.
+func declaredClones() []*backend.Tool {
+	var out []*backend.Tool
+	for _, t := range backend.Default.All() {
+		if t.CloneDir != "" || t.CloneEntry != "" || t.CloneInterpreter != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// resolvableClones returns the tools whose clone_dir is declared — the rows that
+// can actually resolve. This, NOT declaredClones, is what the census pins.
+//
+// The distinction is load-bearing and I got it wrong first: with an any-of-three
+// predicate, deleting a row's clone_dir left clone_entry behind, the row stayed
+// "declared", and the census absorbed the deletion without failing. A pin that
+// absorbs the mutation it exists to catch is decorative. MUTATION 7 is what
+// surfaced it.
+func resolvableClones() []*backend.Tool {
+	var out []*backend.Tool
+	for _, t := range backend.Default.All() {
+		if t.CloneDir != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// TestEveryDeclaredCloneEntryIsRelative refuses an absolute or upward-traversing
+// clone coordinate AT THE MANIFEST (T-18-02-02).
+//
+// A manifest row is the ONE place an absolute path would bypass Discover's
+// containment check by never being joined under the tools root at all. Discover
+// refuses it too, but a manifest that can hold the value is a manifest an
+// unreviewed edit can weaponise.
+func TestEveryDeclaredCloneEntryIsRelative(t *testing.T) {
+	for _, tool := range declaredClones() {
+		for label, rel := range map[string]string{
+			"clone_dir":         tool.CloneDir,
+			"clone_entry":       tool.CloneEntry,
+			"clone_interpreter": tool.CloneInterpreter,
+		} {
+			if rel == "" {
+				continue
+			}
+			if filepath.IsAbs(rel) {
+				t.Errorf("%s: %s = %q is ABSOLUTE. Clone coordinates are joined under the "+
+					"tools root; an absolute value bypasses the containment check by never "+
+					"being joined (T-18-02-02).", tool.Name, label, rel)
+			}
+			if rel != filepath.Clean(rel) {
+				t.Errorf("%s: %s = %q is not in cleaned form (want %q) — an uncleaned value "+
+					"hides traversal from a reader", tool.Name, label, rel, filepath.Clean(rel))
+			}
+			for _, seg := range strings.Split(filepath.ToSlash(rel), "/") {
+				if seg == ".." {
+					t.Errorf("%s: %s = %q TRAVERSES UPWARD out of the tools root", tool.Name, label, rel)
+				}
+			}
+		}
+		// A coordinate set must be COMPLETE. A row with an interpreter and no
+		// entry, or an entry and no directory, resolves to nothing and reports
+		// as absent — the silent shape this whole plan exists to remove.
+		if tool.CloneDir == "" || tool.CloneEntry == "" {
+			t.Errorf("%s: incomplete clone coordinates (clone_dir=%q clone_entry=%q). Both are "+
+				"required whenever either is set; a partial row resolves to nothing and reports "+
+				"'absent', which is exactly the false report 18-02 removes",
+				tool.Name, tool.CloneDir, tool.CloneEntry)
+		}
+	}
+}
+
+// TestCloneCoordinatesCensus emits one greppable line and pins the declared
+// count.
+//
+// THE _here COUNTS ARE LOGGED, NOT ASSERTED. They depend on what the operator
+// running the suite happens to have installed, and a gate that depends on the
+// operator's box is a gate that fails for the wrong reason. `declared` does not
+// depend on the box at all, so that is the one that is pinned.
+func TestCloneCoordinatesCensus(t *testing.T) {
+	declared := resolvableClones()
+
+	// Resolve against the REAL tools root, in a FRESH registry holding COPIES —
+	// Discover mutates Path/ArgvPrefix/WorkDir, and clobbering backend.Default
+	// here would leak into every other test in the package.
+	probe := backend.NewToolRegistry()
+	if home, err := os.UserHomeDir(); err == nil {
+		probe.ToolsDir = filepath.Join(home, "Tools")
+	}
+	for _, tool := range declared {
+		clone := *tool
+		clone.Path, clone.ArgvPrefix, clone.WorkDir = "", nil, ""
+		probe.Register(&clone)
+	}
+	if err := probe.Discover(context.Background()); err != nil {
+		t.Fatalf("Discover: %v", err)
+	}
+
+	unresolvableHere := len(probe.Unresolvable())
+	absentHere := len(probe.Absent())
+	resolvedHere := len(declared) - unresolvableHere - absentHere
+
+	t.Logf("CLONE_COVERAGE declared=%d resolved_here=%d unresolvable_here=%d absent_here=%d",
+		len(declared), resolvedHere, unresolvableHere, absentHere)
+	for _, name := range probe.Unresolvable() {
+		reason, _ := probe.UnresolvableReason(name)
+		t.Logf("CLONE_UNRESOLVABLE_HERE %s: %s", name, reason)
+	}
+	if absent := probe.Absent(); len(absent) > 0 {
+		t.Logf("CLONE_ABSENT_HERE %s", strings.Join(absent, " "))
+	}
+
+	if got := len(declared); got != cloneCensusDeclared {
+		t.Errorf("CLONE_COVERAGE declared=%d, pinned constant says %d.\n"+
+			"  If a row GAINED coordinates, raise the constant in the same change. If a row LOST\n"+
+			"  them, say why: a falling number here is a tool going back to being reported\n"+
+			"  'not installed' while sitting on disk, which is the defect this plan closed.",
+			got, cloneCensusDeclared)
+	}
+	withInterp := 0
+	for _, tool := range declared {
+		if tool.CloneInterpreter != "" {
+			withInterp++
+		}
+	}
+	if withInterp != cloneCensusWithInterpreter {
+		t.Errorf("CLONE_COVERAGE with_interpreter=%d, pinned constant says %d — the two shapes "+
+			"(interpreter+script, and bare executable) are two distinct branches in Discover and "+
+			"both must keep at least one real manifest row",
+			withInterp, cloneCensusWithInterpreter)
+	}
+	if withInterp == 0 || withInterp == len(declared) {
+		t.Errorf("every declared clone has the same shape — one of Discover's two branches is no " +
+			"longer exercised by any real row")
 	}
 }
