@@ -17,8 +17,34 @@ flags, output paths, config keys, changed defaults — appears here.
 
 ---
 
+## 0. Beta status — read this first
+
+v2 currently ships as a **pre-release** (`v5.0.0-beta.x`). It is opt-in by
+construction: GitHub never points `releases/latest` at a pre-release, so the
+documented install command keeps serving the bash release until you name a beta tag
+explicitly. See the opt-in section in the README.
+
+**Two things are not settled yet, and one of them is in this document's own
+audience line.**
+
+- **`Recon/<domain>/` is not created by the beta.** The bash-shape compat tree is
+  written under the workspace root as `_compat/` (see §2.2). Whether v2 should also
+  create the top-level `Recon/<domain>/` path is an OPEN decision, tracked as CUT-08.
+  If your pipeline reads `Recon/<domain>/`, **the beta will not feed it** — point it
+  at `_compat/` for now, and please say so on the
+  [v2 beta feedback](https://github.com/six2dez/reconftw/issues/new?template=v2-beta-feedback.md)
+  template, because script authors are exactly who that decision is for.
+- **Bug-for-bug parity is partially measured.** One canonical target has been run
+  side-by-side against bash v1; the acceptance criterion asks for three to five.
+  Treat differences as worth reporting rather than as settled behaviour.
+
+Everything else in this document is stable and applies to the beta as written.
+
+---
+
 ## Table of contents
 
+0. [Beta status — read this first](#0-beta-status--read-this-first)
 1. [Quick start — migrate your config](#1-quick-start--migrate-your-config)
 2. [Breaking changes](#2-breaking-changes) — the four categories, each with before/after
    - [2.1 CLI flags → subcommands](#21-cli-flags--subcommands-cut-07)

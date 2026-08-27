@@ -255,8 +255,69 @@ sudo install -m 755 reconftw /usr/local/bin/reconftw
 reconftw version
 ```
 
+> **Pre-built binaries begin at the first stable release that publishes assets.**
+> `releases/latest` resolves to the newest **stable** release — GitHub never points
+> it at a pre-release — and no stable release has attached binaries yet, so the
+> command above has nothing to fetch until that first one ships. See
+> [the releases page](https://github.com/six2dez/reconftw/releases) for what is
+> downloadable right now.
+>
+> Want a binary today? The Go rewrite ships as a pre-release **with** assets
+> attached — see [Trying the v2 beta](#trying-the-v2-beta-the-go-rewrite--opt-in)
+> just below, which names the tag explicitly. Otherwise, install from source.
+
 `.deb` and `.rpm` packages, plus a fully-static musl build for Alpine, are published
 with every release. macOS and Linux, amd64 and arm64.
+
+### Trying the v2 beta (the Go rewrite) — opt-in
+
+reconFTW is being rewritten in Go. The rewrite ships as a **pre-release** so it
+cannot reach anyone who has not asked for it: the command above resolves
+`releases/latest`, and GitHub never points `latest` at a pre-release. **If you do
+nothing, you keep getting the bash release.** That is deliberate.
+
+Read [**docs/V2-BETA-ANNOUNCEMENT.md**](docs/V2-BETA-ANNOUNCEMENT.md) first — it
+is the canonical announcement, and it states the three things that are *not* done
+(parity measured on one target rather than three to five, throughput unmeasured,
+and the `Recon/<domain>/` decision still open) plus why the tag is `v5.0.0-beta.1`
+and not `v2.0.0-beta`.
+
+To opt in, name the tag:
+
+```bash
+# replace the tag with the current beta from the releases page
+VER=v5.0.0-beta.1
+curl -sSL "https://github.com/six2dez/reconftw/releases/download/${VER}/reconftw_Linux_x86_64.tar.gz" | tar xz
+sudo install -m 755 reconftw /usr/local/bin/reconftw
+reconftw version
+```
+
+The Go binary is `reconftw`; the bash entry point is `reconftw.sh`. They do not
+overwrite each other, so you can keep both and fall back at any time.
+
+**Migrate your config** — v2 reads TOML, not `reconftw.cfg`:
+
+```bash
+reconftw migrate --in reconftw.cfg --out reconftw.toml
+```
+
+Read every `⚠ unknown key` it prints: an unknown key is one the migrator could
+not map, and it is dropped loudly rather than silently. See
+[MIGRATION.md](MIGRATION.md) for the full list of breaking changes.
+
+**Before you file anything**, note that these are known and tracked, so there is
+no need to report them:
+
+- **`Recon/<domain>/` is not created.** The bash-shape tree currently lives under
+  the workspace root as `_compat/`. Whether v2 should also create the top-level
+  `Recon/<domain>/` is an open decision — if that breaks a script of yours, say
+  so, because that is the input needed to settle it.
+- `dnscewl` and `dnstake` do not resolve on macOS in this beta.
+- `dalfox` may exit non-zero on `--no-spinner` if you have dalfox v3.x installed;
+  the pinned arg vector targets v2.9.2.
+
+Feedback goes to the [**v2 beta feedback**](https://github.com/six2dez/reconftw/issues/new?template=v2-beta-feedback.md)
+issue template. Bugs in the bash release still go to the normal Bug report.
 
 ### Install the security tools
 
