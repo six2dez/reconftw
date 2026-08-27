@@ -283,7 +283,77 @@ jobs:
         # scanner makes a green build depend on when it ran.
         run: go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
       - name: make release-gates
+        id: gates
         run: make release-gates
+
+      # ── gate 13 evidence ──────────────────────────────────────────────────
+      # scripts/release-gates.sh writes every gate's log into a `mktemp -d`
+      # directory (line 532) and `cleanup_logdir` RETAINS it only when a gate
+      # recorded a FAIL. That directory never reaches the job log, so gate 13's
+      # verdict has so far been arbitrated by reading the script rather than by
+      # reading the log the script wrote. These two steps carry
+      # `gate13_argvector.log` -- and nothing else out of LOGDIR, which holds
+      # unrelated tool output and would become public on this public repo --
+      # into a downloadable artifact.
+      #
+      # The three conditions are chosen together. `failure()` scopes both steps
+      # to the only case where the log directory can still exist: on a full pass
+      # cleanup_logdir deletes it, and an unconditional `if-no-files-found:
+      # error` would then fail the job on the very success this is driving
+      # toward. The `steps.collect.outputs.found` guard closes the inverse hole:
+      # without it a job that dies before any gate runs -- checkout, setup-go or
+      # an install step -- reddens the upload step for having nothing to upload,
+      # and the job's most visible failure becomes the artifact step instead of
+      # the step that actually broke. With both in place `if-no-files-found:
+      # error` keeps all of its teeth for the case it was written for: the
+      # collect step said it staged a log and the upload then finds none.
+      - name: Collect gate 13 evidence
+        id: collect
+        if: failure()
+        shell: bash
+        run: |
+          shopt -s nullglob
+          tmproot="${TMPDIR:-/tmp}"
+          dest="${{ runner.temp }}/release-gates-logs"
+          mkdir -p "$dest"
+          dirs=("$tmproot"/reconftw-release-gates.*)
+          staged=0
+          for d in "${dirs[@]}"; do
+            [ -d "$d" ] || continue
+            # ONLY this filename. The rest of LOGDIR is other gates' tool output
+            # and is not staged for a public artifact.
+            log="$d/gate13_argvector.log"
+            [ -f "$log" ] || continue
+            cp "$log" "$dest/$(basename "$d")-gate13_argvector.log"
+            staged=$((staged + 1))
+          done
+          if [ "$staged" -gt 0 ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "staged $staged gate13_argvector.log file(s):"
+            ls -l "$dest"
+            exit 0
+          fi
+          echo "found=false" >> "$GITHUB_OUTPUT"
+          if [ "${#dirs[@]}" -eq 0 ]; then
+            echo "No $tmproot/reconftw-release-gates.* directory exists."
+            echo "release-gates.sh retains its log directory only when a gate recorded"
+            echo "a FAIL, so this job failed BEFORE any gate ran. The step that actually"
+            echo "broke is above this one."
+          else
+            echo "A retained log directory exists but carries no gate13_argvector.log,"
+            echo "so gate 13 did not run. The step that actually broke is above this one."
+          fi
+          echo "This step is a reporter, not a gate: it exits 0 on purpose so that a"
+          echo "pre-gate failure leaves exactly one red step, the one that broke."
+          exit 0
+      - name: Upload gate 13 evidence
+        if: failure() && steps.collect.outputs.found == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-gates-gate13
+          path: ${{ runner.temp }}/release-gates-logs/
+          if-no-files-found: error
+          retention-days: 14
 
   platform-smoke:
     name: Platform smoke (${{ matrix.os }})
