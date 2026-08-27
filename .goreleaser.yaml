@@ -130,3 +130,28 @@ release:
     name: reconftw
   prerelease: auto
   name_template: "{{ .ProjectName }} v{{ .Version }}"
+  # Pre-release disclaimer. Guarded by `{{ if .Prerelease }}` so a future stable
+  # release does not inherit a beta banner. Deliberately short: the full text is
+  # docs/V2-BETA-ANNOUNCEMENT.md, and this exists so nobody can download the
+  # tarball without first having been told what is not done.
+  header: |
+    {{ if .Prerelease }}## This is a pre-release of the Go rewrite — opt-in
+
+    `releases/latest` still resolves to bash **v4.1**. GitHub never points `latest` at a
+    pre-release, so if you do nothing you keep getting the bash release.
+
+    **Three things are NOT done, and you should know them before installing:**
+
+    1. **Parity is measured against one target, not three to five.** CUT-11 asks for 3-5
+       canonical targets side-by-side against bash v1; one has been run. Differences on
+       other targets are unmeasured, not verified-absent.
+    2. **Throughput is unmeasured.** No claim is made that this is faster than bash v1,
+       or slower. Nobody has benchmarked them end to end.
+    3. **`Recon/<domain>/` is not created (CUT-08, open).** The bash-shape tree is
+       written under the workspace root as `_compat/` instead. If your pipeline reads
+       `Recon/<domain>/`, it will find nothing — please say so, that report is the input
+       the decision is waiting on.
+
+    Full announcement, version-scheme rationale and feedback channel:
+    [docs/V2-BETA-ANNOUNCEMENT.md](https://github.com/six2dez/reconftw/blob/main/docs/V2-BETA-ANNOUNCEMENT.md)
+    {{ end }}
