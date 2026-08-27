@@ -66,19 +66,42 @@ builds:
       - -X main.CommitSHA={{.Commit}}
       - -X main.BuildDate={{.Date}}
 
+# PUBLIC CONTRACT — these six archive filenames are cited verbatim by README.md's
+# install commands, and users script against them:
+#
+#   reconftw_Linux_x86_64.tar.gz     reconftw_Linux_x86_64_musl.tar.gz
+#   reconftw_Linux_arm64.tar.gz      reconftw_Linux_arm64_musl.tar.gz
+#   reconftw_Darwin_x86_64.tar.gz
+#   reconftw_Darwin_arm64.tar.gz
+#
+# Renaming them after the first release that publishes assets breaks every
+# documented install command in the wild — grep README.md before touching this.
+#
+# The version component is deliberately ABSENT. README.md documents
+# `releases/latest/download/<name>`, which resolves a FIXED filename inside
+# whatever release is latest; an asset whose name carries its own version can
+# never be fetched through that URL for any release.
 archives:
   - id: default
     ids:
       - reconftw
     formats:
       - tar.gz
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else }}{{ .Arch }}{{ end }}
   - id: musl
     ids:
       - reconftw-musl
     formats:
       - tar.gz
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}_musl"
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else }}{{ .Arch }}{{ end }}_musl
 
 nfpms:
   - package_name: reconftw
