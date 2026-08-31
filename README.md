@@ -72,6 +72,7 @@ reconFTW leverages a wide range of techniques, including passive and active subd
   - [Local Installation (PC/VPS/VM)](#local-installation-pcvpsvm)
   - [Docker](#docker)
   - [Terraform + Ansible](#terraform--ansible)
+- [Trying the v2 beta (Go rewrite)](#trying-the-v2-beta-go-rewrite)
 - [⚙️ Configuration](#️-configuration)
 - [🚀 Usage](#-usage)
   - [Target Options](#target-options)
@@ -390,6 +391,22 @@ cd reconftw
 - Follow the guide in [Terraform/README.md](Terraform/README.md) for setup instructions.
 
 ---
+
+## Trying the v2 beta (Go rewrite)
+
+reconFTW is being rewritten in Go. The rewrite ships as an **opt-in pre-release**: it is
+listed on the [releases page](https://github.com/six2dez/reconftw/releases), and GitHub
+never points `releases/latest` at a pre-release — so **if you do nothing, you keep getting
+the bash release.** That is deliberate.
+
+The Go binary is `reconftw`; the bash entry point is `reconftw.sh`. They do not overwrite
+each other, so you can keep both and fall back at any time.
+
+- [**What the beta is, and what it is not**](docs/V2-BETA-ANNOUNCEMENT.md) — including three
+  things that are explicitly not finished yet.
+- [**Report something**](https://github.com/six2dez/reconftw/issues/new?template=v2-beta-feedback.md)
+  — the v2 beta feedback template. Bugs in the bash release still go to the normal Bug report.
+
 
 ## 🛠️ Troubleshooting
 
