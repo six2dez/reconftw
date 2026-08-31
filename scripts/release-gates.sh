@@ -218,9 +218,27 @@ argvector_census_verdict() {
         return
     fi
 
-    if printf '%s\n' "$out" | grep -q 'REALTOOLS_CENSUS .*mode=NOT_EXECUTED'; then
+    # 19-01: this test, and the reason extraction inside it, were both
+    # `printf '%s\n' "$out" | <early-exiting reader>` pipelines. Under the
+    # `set -o pipefail` at line 77 that construct is SIZE-DEPENDENT and silently
+    # wrong. `grep -q` exits at its first match and `grep -m1` at its first
+    # match, closing the pipe while `printf` still has bytes to write; `printf`
+    # then dies of SIGPIPE and pipefail reports the whole pipeline as 141. On CI
+    # run 33372377017 the log was 110042 bytes, all eight census lines reported
+    # the not-executed mode, and this `if` STILL took the false path — so gate 13
+    # recorded FAIL through the nonref branch below, on a runner that simply has
+    # no tool tree. The same input at 1070 bytes took the true path. Reading
+    # `$out` from a here-string removes the pipeline entirely, so the reader's own
+    # exit status is the only thing the `if` can see. Do not put a pipe back here.
+    if grep -q 'REALTOOLS_CENSUS .*mode=NOT_EXECUTED' <<<"$out"; then
+        # One sed, no pipeline: `q` stops at the first reason line, a reason line
+        # carrying no `test=` token falls through to itself, and sed exits 0 when
+        # there is no reason line at all. That last property is what makes the
+        # `no reason recorded` fallback below REACHABLE — it was not. The previous
+        # `grep -m1 | sed` exited non-zero on a log with no reason line, and under
+        # `set -e` that killed the script instead of falling back.
         local why
-        why="$(printf '%s\n' "$out" | grep -m1 'REALTOOLS_CENSUS_REASON' | sed 's/.*REALTOOLS_CENSUS_REASON test=[^ ]* //')"
+        why="$(sed -n '/REALTOOLS_CENSUS_REASON/{s/.*REALTOOLS_CENSUS_REASON test=[^ ]* //;p;q;}' <<<"$out")"
         echo "SKIPPED the tool tree is not installed on this box, so no arg vector was verified: ${why:-no reason recorded}"
         return
     fi

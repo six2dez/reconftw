@@ -28,6 +28,7 @@ package main_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -305,6 +306,15 @@ func TestReleaseGateArgVectorCensusVerdict(t *testing.T) {
 			want: "SKIPPED",
 		},
 		{
+			// The not-executed branch must survive a log that carries no REASON
+			// line: `m612Fd` on CI run 33372377017 was exactly that shape. Until
+			// 19-01 the reason extraction exited non-zero here and `set -e` killed
+			// the script, so the "no reason recorded" fallback was dead code.
+			name: "no toolchain, no reason line", rc: "1",
+			census: strings.Replace(refLine, "mode=REFERENCE", "mode=NOT_EXECUTED", 1),
+			want:   "SKIPPED",
+		},
+		{
 			// A run that emitted no census says nothing about its own coverage.
 			name: "no census emitted", rc: "0",
 			census: "some unrelated go test output\n", want: "FAIL",
@@ -328,6 +338,111 @@ func TestReleaseGateArgVectorCensusVerdict(t *testing.T) {
 				t.Errorf("verdict = %q, want status %s\n  full: %s", status, tc.want, got)
 			}
 		})
+	}
+}
+
+// bigCensusLog builds a realtools log with the SHAPE observed on CI run
+// 33372377017: a census block partway through the stream, a second copy of it in
+// Go's end-of-run summary, and enough surrounding test output that the whole
+// thing is far larger than a pipe buffer.
+//
+// The size is the point, not padding. The defect this test exists for was
+// size-dependent: `argvector_census_verdict` tested the not-executed mode with
+// `printf '%s\n' "$out" | grep -q ...`, and under `set -o pipefail` the early
+// exiting `grep -q` closed the pipe, `printf` died of SIGPIPE, and the pipeline
+// reported 141 — so the `if` took the FALSE path on a log where every census line
+// matched. Gate 13 recorded FAIL through the nonref branch on a runner that
+// simply has no tool tree. The 110042-byte log did this; a 1070-byte log of the
+// same shape did not. A small fixture would therefore have passed against the
+// broken script and proved nothing.
+func bigCensusLog() string {
+	var b strings.Builder
+
+	censusBlock := func() {
+		for _, p := range []struct {
+			test    string
+			present int
+			total   int
+		}{
+			{"TestRealtoolsVulnsPhase6", 1, 19},
+			{"TestRealtoolsOSINTPhase7", 0, 25},
+			{"TestRealtoolsFixedArgVectors", 0, 5},
+			{"TestRealToolArgVectors", 0, 39},
+		} {
+			tools := make([]string, 0, p.total)
+			for i := 0; i < p.total; i++ {
+				tools = append(tools, fmt.Sprintf("tool%02d", i))
+			}
+			list := strings.Join(tools, ",")
+			fmt.Fprintf(&b, "    backend_realtools_test.go:392: REALTOOLS_CENSUS test=%s mode=NOT_EXECUTED "+
+				"present=%d skipped=%d skipped_tools=%s absent=%d absent_tools=%s unresolvable=0 "+
+				"unresolvable_tools=(none)\n", p.test, p.present, p.total, list, p.total, list)
+			fmt.Fprintf(&b, "    backend_realtools_test.go:392: REALTOOLS_CENSUS_REASON test=%s only %d of %d "+
+				"probed tools are on PATH (%d%%, floor 34%%) — this is a box without the toolchain, "+
+				"not a box with findings\n", p.test, p.present, p.total, p.present*100/p.total)
+		}
+	}
+
+	noise := func(n int, tag string) {
+		for i := 0; i < n; i++ {
+			fmt.Fprintf(&b, "=== RUN   Test%s%d\n    %s_test.go:%d: TOOLS_JSONL tool=x task=y records=2 "+
+				"argv=[-ua Mozilla/5.0 (X11; Linux x86_64) -c 100] %s\n", tag, i, tag, i, strings.Repeat("z", 48))
+		}
+	}
+
+	noise(500, "Head")
+	censusBlock() // mid-stream, exactly where the real run emits it
+	noise(900, "Tail")
+	censusBlock() // Go's end-of-run summary repeats it
+	b.WriteString("realtools: all 4 real-tool + 1 coverage + 1 jsonl + 1 presence test(s) executed\n")
+	b.WriteString("make[1]: *** [Makefile:173: realtools-args] Error 1\n")
+	return b.String()
+}
+
+// TestReleaseGateArgVectorCensusVerdictIsSizeIndependent pins the property that
+// was actually broken: the verdict must depend on the census lines and nothing
+// else. The same census content, read from a large log and from a small one, must
+// produce the same verdict. Before 19-01 it produced SKIPPED from the small log
+// and FAIL from the large one.
+func TestReleaseGateArgVectorCensusVerdictIsSizeIndependent(t *testing.T) {
+	big := bigCensusLog()
+
+	// Guard the fixture itself. If a later edit shrinks it below a pipe buffer,
+	// or moves the census to the tail, it stops reproducing the defect and this
+	// test would keep passing while covering nothing.
+	const pipeBuf = 64 << 10
+	if len(big) <= pipeBuf {
+		t.Fatalf("fixture is %d bytes, which is not larger than a %d-byte pipe buffer — it cannot "+
+			"reproduce the SIGPIPE the verdict used to trip on", len(big), pipeBuf)
+	}
+	first := strings.Index(big, "REALTOOLS_CENSUS test=")
+	if first < 0 || first > len(big)-pipeBuf {
+		t.Fatalf("first census line is at byte %d of %d; it must sit far enough from the end that a "+
+			"reader stopping there leaves the writer with bytes still to write", first, len(big))
+	}
+
+	// The small log is the SAME census content with the surrounding test output
+	// removed — the `m612Fd` shape from the same CI run.
+	var small strings.Builder
+	for _, line := range strings.Split(big, "\n") {
+		if strings.Contains(line, "REALTOOLS_CENSUS") {
+			small.WriteString(line + "\n")
+		}
+	}
+
+	// rc=1 on purpose: `make realtools-args` exits 1 on a box with no tool tree,
+	// and the not-executed branch must still win over the exit-code branch.
+	gotBig := runCensusVerdict(t, "1", big)
+	gotSmall := runCensusVerdict(t, "1", small.String())
+
+	for _, tc := range []struct{ name, got string }{{"large log", gotBig}, {"small log", gotSmall}} {
+		if !strings.HasPrefix(tc.got, "SKIPPED ") {
+			t.Errorf("%s: verdict = %q, want a SKIPPED verdict — every census line reports the "+
+				"not-executed mode, which is a box with no tool tree, not a partial run", tc.name, tc.got)
+		}
+	}
+	if gotBig != gotSmall {
+		t.Errorf("verdict depends on log SIZE, not on the census:\n  large: %s\n  small: %s", gotBig, gotSmall)
 	}
 }
 
