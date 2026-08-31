@@ -282,6 +282,73 @@ jobs:
         # Pinned to the same version as the govulncheck job above: an unpinned
         # scanner makes a green build depend on when it ran.
         run: go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+      - name: Install nuclei (pinned)
+        # The version is the pin already recorded on the `nuclei=` line of
+        # tools.lock -- one pin, two consumers. An unpinned scanner is forbidden
+        # here for the same reason the govulncheck comment above gives: a green
+        # build must not depend on when it ran. The comparison below is what
+        # enforces that, rather than a comment asserting the two agree -- bump
+        # tools.lock without touching this file and this step goes red.
+        shell: bash
+        run: |
+          set -euo pipefail
+          want="github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.8.0"
+          lock="$(grep '^nuclei=' tools.lock | head -1 | cut -d '=' -f 2-)"
+          if [ "$want" != "$lock" ]; then
+            echo "::error::nuclei pin drift -- this workflow installs '$want' but tools.lock records '$lock'. One pin, two consumers: change both or neither."
+            exit 1
+          fi
+          go install "$want"
+          gobin="$(go env GOPATH)/bin"
+          # The engine prints its version on stderr. Assert it, so a binary that
+          # is not the pinned one cannot reach the gates step unnoticed.
+          ver="$("$gobin/nuclei" -duc -version 2>&1 || true)"
+          case "$ver" in
+            *"${want##*@}"*) echo "installed nuclei reports ${want##*@}" ;;
+            *) echo "::error::installed nuclei does not report ${want##*@}: $ver" ; exit 1 ;;
+          esac
+          echo "$gobin" >> "$GITHUB_PATH"
+      - name: Install nuclei templates
+        # internal/modules/web/nuclei_coverage_test.go builds these two paths
+        # from os.UserHomeDir() and they are not configurable, so
+        # -update-template-dir pins the tree exactly where the tests read it.
+        #
+        # -duc is deliberately NOT passed to the updater. It suppresses
+        # -update-templates outright: against the pinned binary,
+        # `nuclei -duc -update-templates` exits 0 having downloaded nothing.
+        # That is the false green this step must not produce, so the
+        # update-check guard stays where it belongs -- on the scan the tests
+        # run, via nuclei's registration in nuclei_coverage_test.go.
+        #
+        # The existence assertion is the load-bearing half. The updater's
+        # default layout is a version-dependent detail and the test helpers
+        # hardcode these paths, so a tree that lands anywhere else must redden
+        # this step rather than let both tests skip -- a skipped test is not a
+        # passing test, and gate 14a counts it as a failure.
+        shell: bash
+        run: |
+          set -euo pipefail
+          tpl="$HOME/nuclei-templates"
+          oidc="$HOME/nuclei-templates/http/technologies/oidc-detect.yaml"
+          keycloak="$HOME/nuclei-templates/http/exposures/configs/keycloak-openid-config.yaml"
+          if ! nuclei -update-templates -update-template-dir "$tpl"; then
+            echo "::warning::the nuclei template updater exited non-zero -- the assertion below is what decides this step"
+          fi
+          if [ ! -f "$oidc" ] || [ ! -f "$keycloak" ]; then
+            echo "::warning::the updater did not leave both OIDC templates under $tpl -- falling back to a shallow clone of the template tree"
+            rm -rf "$tpl"
+            git clone --depth 1 https://github.com/projectdiscovery/nuclei-templates "$tpl"
+          fi
+          rc=0
+          for f in "$oidc" "$keycloak"; do
+            if [ -f "$f" ]; then
+              echo "ok $f"
+            else
+              echo "::error::template not installed at $f -- the two nuclei coverage tests read this exact path and would skip"
+              rc=1
+            fi
+          done
+          exit "$rc"
       - name: make release-gates
         id: gates
         run: make release-gates
