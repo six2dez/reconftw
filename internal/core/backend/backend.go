@@ -74,7 +74,7 @@ type Tool struct {
 	// Install metadata copied from tools.lock so the Phase 11 installer can
 	// resolve each tool's install coordinate off backend.Default without
 	// re-parsing the manifest (INST-02/05/06/07/08/09).
-	Kind         string // go | python | system | rust | go_clone | python_venv
+	Kind         string // go | python | system | rust | go_clone | python_venv | make_clone
 	GoModule     string // Go module path for `go install <go_module>@<version>` (kind=go)
 	PipPackage   string // uv/pip target for `uv tool install <pip_package>==<version>` (kind=python)
 	RepoURL      string // git URL for repo-clone build (kind=go_clone | python_venv)

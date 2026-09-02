@@ -331,11 +331,15 @@ version         = ""
 input_flag      = ""
 [[tools]]
 # dnscewl: DNS permutation wordlist generator (B1/W1 — SUBD-03 third permut tool named in D-01)
-# INSTALL AMBIGUITY: go_module path requires verification against pkg before installing
-# (slopcheck protocol — verify at pkg.go.dev/github.com/codingo/dnscewl)
 name            = "dnscewl"
-kind            = "go"
-go_module       = "github.com/codingo/dnscewl"
+# NOT a Go module. The upstream is C++ (main.cpp + Makefile), so
+# `go install github.com/codingo/dnscewl@latest` fails on every clean install
+# with "module found but does not contain package" — the kind was wrong, not the
+# version. v1's install.sh never carried this tool, so nothing was ported from.
+# `make` builds it cleanly (verified 2026-09-02, g++ -std=c++11) and emits
+# `DNScewl`; make_clone copies that artefact to the looked-up name `dnscewl`.
+kind            = "make_clone"
+repo_url        = "https://github.com/codingo/DNSCewl"
 description     = "DNS permutation wordlist generator (SUBD-03 third permut tool)"
 default_args    = []
 timeout_seconds = 600
@@ -981,7 +985,13 @@ clone_entry       = "spoofy.py"
 [[tools]]
 name            = "msftrecon"
 kind            = "python"
-pip_package     = "msftrecon"
+# NOT on PyPI (pypi.org/pypi/msftrecon returns 404) — `uv tool install msftrecon`
+# failed with "not found in the package registry" on every clean install. v1
+# carried it in install.sh's `repos` array as Arcanum-Sec/msftrecon, i.e. a git
+# source, and this entry lost that when it was ported. Verified 2026-09-02:
+# `uv tool install git+https://github.com/Arcanum-Sec/msftrecon` installs
+# msftrecon 0.1.0 and puts the executable on PATH.
+pip_package     = "git+https://github.com/Arcanum-Sec/msftrecon"
 description     = "Microsoft tenant recon (OSINT-11 msftrecon)"
 default_args    = []
 timeout_seconds = 300

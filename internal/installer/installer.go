@@ -117,7 +117,7 @@ func (i *Installer) installOne(ctx context.Context, t *backend.Tool) error {
 		return i.pyInstaller.Install(ctx, t)
 	case "system":
 		return i.sysInstaller.Install(ctx, t)
-	case "go_clone", "python_venv", "rust":
+	case "go_clone", "python_venv", "make_clone", "rust":
 		return i.cloneInstaller.Install(ctx, t)
 	default:
 		return fmt.Errorf("unknown tool kind %q", t.Kind)

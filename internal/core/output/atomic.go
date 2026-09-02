@@ -92,11 +92,17 @@ func writeJSONLWithHook(target string, lines [][]byte, hook func(tmpName string)
 	}
 
 	// Step 2: fsync the tempfile.
-	if err := tmp.Sync(); err != nil {
+	//
+	// Through the syncFile/closeFile seams, not (*os.File).Sync/Close directly.
+	// syncFile already existed and documents itself as "the fsync seam", but
+	// these two call sites bypassed it, so the tempfile's fsync- and
+	// close-failure branches were the only durability paths in this file with no
+	// way to be driven from a test — and they were the uncovered ones.
+	if err := syncFile(tmp); err != nil {
 		_ = tmp.Close()
 		return fmt.Errorf("output: fsync tempfile: %w", err)
 	}
-	if err := tmp.Close(); err != nil {
+	if err := closeFile(tmp); err != nil {
 		return fmt.Errorf("output: close tempfile: %w", err)
 	}
 
@@ -146,7 +152,8 @@ func writeFileWithHook(target string, data []byte, mode os.FileMode, hook func(t
 		_ = tmp.Close()
 		return err
 	}
-	if err := tmp.Close(); err != nil {
+	// closeFile seam — see writeJSONLWithHook's note.
+	if err := closeFile(tmp); err != nil {
 		return fmt.Errorf("output: close tempfile: %w", err)
 	}
 
@@ -233,6 +240,13 @@ func isUnsupportedDirSync(err error) bool {
 // errno classes on demand. Mirrors the existing seam philosophy in this
 // file (writeFilePayload's syncableWriter, the FOUND-04 hook).
 var syncFile = func(f *os.File) error { return f.Sync() }
+
+// closeFile is the close seam for the tempfile written by writeJSONLWithHook
+// and writeFileWithHook. A close that fails AFTER a successful fsync is the
+// case that matters here: on some filesystems the deferred write error is
+// reported at close, so swallowing it would publish a truncated artefact by
+// rename. No portable filesystem produces that on demand, hence the seam.
+var closeFile = func(f *os.File) error { return f.Close() }
 
 // writeJSONLLines writes each line + "\n" into w. Extracted so test code
 // can drive the loop with a failing io.Writer to cover the deep error

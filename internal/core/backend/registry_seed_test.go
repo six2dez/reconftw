@@ -131,14 +131,19 @@ func TestToolsLockSchemaFields(t *testing.T) {
 }
 
 // TestToolsLockVersionsPopulated (BLOCKER 2 fix) — every go/python/rust/
-// go_clone/python_venv kind tool MUST carry a non-empty, non-zero Version so
-// `go install module@version` / `uv tool install pkg==version` resolve and the
-// D-04 idempotency probe has something to compare against. system kind is
-// exempt (the OS package manager owns versioning).
+// go_clone/python_venv/make_clone kind tool MUST carry a non-empty, non-zero
+// Version so `go install module@version` / `uv tool install pkg==version`
+// resolve and the D-04 idempotency probe has something to compare against.
+// system kind is exempt (the OS package manager owns versioning).
+//
+// make_clone is version-bearing for the SECOND reason only: it clones and runs
+// `make`, so there is no registry pin to resolve, but installMakeClone's
+// "already on PATH and Version == latest" fast path reads it. A make_clone entry
+// with an empty Version would reinstall on every run.
 func TestToolsLockVersionsPopulated(t *testing.T) {
 	for _, tool := range backend.Default.All() {
 		switch tool.Kind {
-		case "go", "python", "rust", "go_clone", "python_venv":
+		case "go", "python", "rust", "go_clone", "python_venv", "make_clone":
 			if tool.Version == "" || tool.Version == "v0.0.0" {
 				t.Errorf("tool %q (kind=%s) has invalid Version %q — must be a real tag or \"latest\"",
 					tool.Name, tool.Kind, tool.Version)

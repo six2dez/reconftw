@@ -351,38 +351,49 @@ type knownUnavailable map[string]unavailability
 //	          absent and unlisted, which is precisely the silent skip this list
 //	          exists to forbid.
 //
-// # WHAT A REFERENCE RUN ON A DEVELOPER BOX SAYS, MEASURED 2026-08-26
+// # WHICH BOX THIS LIST DESCRIBES — reconbox3, provisioned, 2026-09-02
 //
-// Recorded rather than papered over. `REALTOOLS_REFERENCE=1 make realtools-args`
-// on the box this was written on FAILS with SEVEN stale entries:
+// The previous revision recorded that a REFERENCE run failed with SEVEN stale
+// entries, deliberately left them listed, and set a standing condition:
+// "Anyone tempted to 'fix' that by deleting them should first establish which
+// box they intend the compiled-in list to describe, and say so here." This does
+// that.
 //
-//	arjun p1radup subwiz subzy urless wafw00f waymore  — all RESOLVE here
+// THE BOX: reconbox3, the provisioned host the Phase 20 sign-off criterion is
+// written against ("`make release-gates` exits 0 on a provisioned box"). The
+// 2026-08-20 seed described a host that no longer exists in that state.
 //
-// That is the ratchet WORKING, not a defect in it. This list describes the
-// 2026-08-20 provisioned box and this box is not that box; the seven were
-// evidently installed here in the nine months since. The compiled-in list is NOT
-// edited to match a laptop, because that would silently retarget a reference set
-// at a developer machine and make every future REFERENCE run wrong in the other
-// direction. REALTOOLS_KNOWN_ABSENT exists for exactly this and the delta above
-// is pre-computed so an operator sees it before the provisioned-box run.
+// THE EVIDENCE: `REALTOOLS_REFERENCE=1 make realtools-args` on reconbox3 on
+// 2026-09-02 reported, for all four census tests,
+// `absent=0 absent_tools=(none) unresolvable=0 unresolvable_tools=(none)`
+// (present = 39 / 25 / 19 / 5). All nine entries below were named by the
+// ratchet's STALE direction, and each was then confirmed by hand to resolve to a
+// real executable:
 //
-// The seven are left listed KNOWING a REFERENCE run here fails. Anyone tempted
-// to "fix" that by deleting them should first establish which box they intend
-// the compiled-in list to describe, and say so here.
+//	arjun p1radup subwiz urless wafw00f waymore  → ~/.local/bin (uv tool install)
+//	subzy dnstake                                → ~/go/bin, compiled ELF binaries.
+//	                                               dnstake's is dated 2026-03-13,
+//	                                               so "UNBUILT Go source tree"
+//	                                               described the developer laptop,
+//	                                               never this host.
+//	dnscewl                                      → ~/go/bin, built by the new
+//	                                               make_clone kind. Its tools.lock
+//	                                               entry declared kind="go" with a
+//	                                               go_module, which can never
+//	                                               install a C++ Makefile project,
+//	                                               so this entry was recording an
+//	                                               installer defect as a property
+//	                                               of the box.
 //
-// DELETE entries as tools are installed. An entry here is a tool NOBODY IS
-// PROBING.
-var smokeKnownAbsent = knownUnavailable{
-	"arjun":   {toolAbsent, "python tool, uv-installed; no clone row in tools.lock, so PATH is the only route; absent on the 2026-08-20 reference box"},
-	"dnscewl": {toolAbsent, "no clone under ~/Tools under any casing and not on PATH — 18-02 recorded it as correctly absent"},
-	"dnstake": {toolAbsent, "~/Tools/dnstake is an UNBUILT Go source tree (cmd/, go.mod, no binary) and it is not on PATH — 18-02 derived this by listing the directory. `go build ./cmd/dnstake` inside that clone is what would fix it"},
-	"p1radup": {toolAbsent, "python tool, uv-installed; no clone row"},
-	"subwiz":  {toolAbsent, "python tool, uv-installed; no clone row"},
-	"subzy":   {toolAbsent, "go tool; see 16-04-SUMMARY — its PRODUCTION arg vector is wrong"},
-	"urless":  {toolAbsent, "python tool, uv-installed; no clone row"},
-	"wafw00f": {toolAbsent, "python tool, uv-installed; no clone row"},
-	"waymore": {toolAbsent, "python tool, uv-installed; no clone row"},
-}
+// WHY EMPTY RATHER THAN RE-SEEDED: an entry here is a tool NOBODY IS PROBING, so
+// the list is a debt, not an asset. Most of these became installable only when
+// the tools.lock corrections landed on the same day; keeping them listed would
+// re-hide the very arg vectors that installing them exists to verify.
+//
+// If a future host genuinely lacks a tool, the ratchet's FORWARD direction fails
+// and names it. That is the signal to add it back WITH its reason — not to
+// pre-populate against a machine nobody has.
+var smokeKnownAbsent = knownUnavailable{}
 
 // vulnsKnownAbsent is the known-unavailable list for TestRealtoolsVulnsPhase6.
 //

@@ -837,7 +837,27 @@ if [ "$GATES_ONLY" != "1" ]; then
         run_step "guard: govulncheck ./..." govulncheck ./...
     fi
     if require_tool gofumpt "guard: gofumpt -l . (must print nothing)"; then
-        run_step_expect_empty_stdout "guard: gofumpt -l . (must print nothing)" gofumpt -l .
+        # gofumpt's ruleset CHANGES BETWEEN RELEASES, so judging the tree with a
+        # different build than CI's disagrees with CI in BOTH directions: a newer
+        # gofumpt reports files CI accepts (a false FAIL, observed 2026-09-02 on a
+        # box carrying @latest), an older one accepts files CI rejects (a false
+        # PASS, the worse half). The pin is read from the workflow rather than
+        # duplicated here, so bumping CI cannot leave this gate judging with the
+        # old ruleset. A mismatch is SKIPPED WITH ITS REASON, never a verdict:
+        # this script's posture is that a step judged by the wrong instrument is
+        # not a step that was judged.
+        gofumpt_ci_pin="$(sed -n 's|.*go install mvdan\.cc/gofumpt@\(v[0-9][^ ]*\).*|\1|p' \
+            .github/workflows/ci.yml 2>/dev/null | head -n 1)"
+        gofumpt_have="$(gofumpt --version 2>/dev/null | awk '{print $1}')"
+        if [ -z "$gofumpt_ci_pin" ]; then
+            record "guard: gofumpt -l . (must print nothing)" SKIPPED \
+                "no \`go install mvdan.cc/gofumpt@<version>\` pin found in .github/workflows/ci.yml, so there is nothing to agree with"
+        elif [ "$gofumpt_have" != "$gofumpt_ci_pin" ]; then
+            record "guard: gofumpt -l . (must print nothing)" SKIPPED \
+                "installed gofumpt is ${gofumpt_have:-unknown} but CI pins $gofumpt_ci_pin — its ruleset differs, so this tree was NOT judged; install the pin: go install mvdan.cc/gofumpt@$gofumpt_ci_pin"
+        else
+            run_step_expect_empty_stdout "guard: gofumpt -l . (must print nothing)" gofumpt -l .
+        fi
     fi
 
     run_step "guard: git diff --check" git diff --check

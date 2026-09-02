@@ -10,6 +10,7 @@
 package output
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -104,5 +105,121 @@ func TestWriteJSONLSurfacesTempfileCreateFailure(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "create tempfile") {
 		t.Fatalf("error should identify the tempfile step, got: %v", err)
+	}
+}
+
+func swapCloseFile(fn func(*os.File) error) (restore func()) {
+	prev := closeFile
+	closeFile = fn
+	return func() { closeFile = prev }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tempfile durability failures.
+//
+// The whole point of this file's write-tempfile → fsync → rename sequence is
+// that a target is either the old bytes or the new ones, never a torn mix. The
+// fsync- and close-failure branches are what keep that promise when the
+// filesystem reports a deferred write error late — and until the syncFile /
+// closeFile seams were threaded through these two functions, they were the only
+// branches here that no test could reach.
+//
+// Each test below asserts the SAME two things, because either alone would be a
+// false pass: the call reports the failure, AND it does not publish the target.
+// A version that surfaced the error but had already renamed would satisfy a
+// single-assertion test while having destroyed the previous artefact.
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestWriteJSONLSurfacesTempfileFsyncFailure(t *testing.T) {
+	target := filepath.Join(t.TempDir(), "subdomains.jsonl")
+	sentinel := errors.New("simulated deferred write error at fsync")
+
+	restore := swapSyncFile(func(*os.File) error { return sentinel })
+	defer restore()
+
+	err := WriteJSONL(target, [][]byte{[]byte(`{"host":"a.example.com"}`)})
+	if err == nil {
+		t.Fatal("WriteJSONL reported success although the tempfile fsync failed — " +
+			"the bytes may never have reached the device and the caller was told they had")
+	}
+	if !errors.Is(err, sentinel) {
+		t.Errorf("error does not wrap the fsync failure: %v", err)
+	}
+	if _, statErr := os.Stat(target); !os.IsNotExist(statErr) {
+		t.Errorf("%s exists after a failed fsync — the rename must not happen once durability is in doubt", target)
+	}
+}
+
+func TestWriteJSONLSurfacesTempfileCloseFailure(t *testing.T) {
+	target := filepath.Join(t.TempDir(), "hosts.jsonl")
+	sentinel := errors.New("simulated deferred write error at close")
+
+	restore := swapCloseFile(func(f *os.File) error {
+		_ = f.Close() // still release the descriptor; only the verdict is simulated
+		return sentinel
+	})
+	defer restore()
+
+	err := WriteJSONL(target, [][]byte{[]byte(`{"host":"b.example.com"}`)})
+	if err == nil {
+		t.Fatal("WriteJSONL reported success although closing the tempfile failed — " +
+			"on filesystems that report write errors at close this publishes a truncated artefact")
+	}
+	if !errors.Is(err, sentinel) {
+		t.Errorf("error does not wrap the close failure: %v", err)
+	}
+	if _, statErr := os.Stat(target); !os.IsNotExist(statErr) {
+		t.Errorf("%s exists after a failed close", target)
+	}
+}
+
+func TestWriteFileSurfacesTempfileCloseFailure(t *testing.T) {
+	target := filepath.Join(t.TempDir(), "report.html")
+	sentinel := errors.New("simulated deferred write error at close")
+
+	restore := swapCloseFile(func(f *os.File) error {
+		_ = f.Close()
+		return sentinel
+	})
+	defer restore()
+
+	err := WriteFile(target, []byte("<html></html>"), 0o644)
+	if err == nil {
+		t.Fatal("WriteFile reported success although closing the tempfile failed")
+	}
+	if !errors.Is(err, sentinel) {
+		t.Errorf("error does not wrap the close failure: %v", err)
+	}
+	if _, statErr := os.Stat(target); !os.IsNotExist(statErr) {
+		t.Errorf("%s exists after a failed close", target)
+	}
+}
+
+// A close failure must not destroy what was already published. This is the
+// half that the "does not create the target" assertions above cannot show.
+func TestFailedCloseLeavesPreviousArtefactIntact(t *testing.T) {
+	target := filepath.Join(t.TempDir(), "findings.jsonl")
+	const previous = `{"id":"kept"}` + "\n"
+	if err := os.WriteFile(target, []byte(previous), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	restore := swapCloseFile(func(f *os.File) error {
+		_ = f.Close()
+		return errors.New("simulated close failure")
+	})
+	defer restore()
+
+	if err := WriteJSONL(target, [][]byte{[]byte(`{"id":"new"}`)}); err == nil {
+		t.Fatal("expected the close failure to be reported")
+	}
+
+	got, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("previous artefact disappeared: %v", err)
+	}
+	if string(got) != previous {
+		t.Errorf("previous artefact was modified by a failed write: got %q, want %q\n"+
+			"  The staging-then-rename contract exists so a failed publish is a no-op.", string(got), previous)
 	}
 }
