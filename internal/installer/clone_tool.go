@@ -68,7 +68,12 @@ func (c *CloneToolInstaller) installPythonVenv(ctx context.Context, tool *backen
 	if tool.RepoURL == "" {
 		return fmt.Errorf("python_venv tool %q: empty repo_url", tool.Name)
 	}
-	dir := filepath.Join(toolsRepoDir(), tool.Name)
+	// Clone into the directory RESOLUTION will look in, not the tool's name.
+	// The two differ whenever upstream capitalises differently from the name the
+	// modules invoke (cmseek vs CMSeeK), and the registry resolves a clone tool
+	// through CloneDir. Cloning to tool.Name there produces the worst outcome
+	// available: the install succeeds, and the tool is still unresolvable.
+	dir := filepath.Join(toolsRepoDir(), cloneTargetName(tool))
 	if _, err := os.Stat(filepath.Join(dir, "venv")); err == nil {
 		return nil // venv already provisioned (idempotent)
 	}
@@ -205,6 +210,21 @@ func goBinDir() string {
 		gp = filepath.Join(home, "go")
 	}
 	return filepath.Join(strings.Split(gp, string(os.PathListSeparator))[0], "bin")
+}
+
+// cloneTargetName is the directory a clone tool is installed into, relative to
+// the tools root. It is CloneDir when set and the tool name otherwise, because
+// the two differ whenever upstream capitalises differently from the name the
+// modules invoke — cmseek's clone_dir is "CMSeeK" — and the registry resolves a
+// clone tool through CloneDir. Installing to tool.Name in that case produces the
+// worst outcome available: the install succeeds and the tool is still
+// unresolvable, which is the class of defect the tools.lock corrections of
+// 2026-09-02 were fixing in the first place.
+func cloneTargetName(tool *backend.Tool) string {
+	if tool.CloneDir != "" {
+		return tool.CloneDir
+	}
+	return tool.Name
 }
 
 // toolsRepoDir is where repo-clone (python_venv) tools live.

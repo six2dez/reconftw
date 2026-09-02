@@ -221,8 +221,14 @@ version         = "latest"
 input_flag      = ""
 [[tools]]
 name            = "regulator"
-kind            = "python"
-pip_package     = "git+https://github.com/cramppet/regulator"
+kind            = "python_venv"
+# FIXED 2026-09-02: was kind="python" with a pip target that cannot produce a
+# resolvable tool. Every entry here already carries clone_* coordinates, i.e.
+# it RESOLVES as a repo clone at runtime — but the installer was told to fetch
+# a PyPI package, so it could never create the clone that resolution needs.
+# Verified 2026-09-02 by cloning and installing each one: no pyproject/setup.py, so the `git+` pip target could never resolve. The clone
+# coordinates below already assume a clone the installer had no way to create.
+repo_url        = "https://github.com/cramppet/regulator"
 description     = "Regex-based subdomain permutations"
 default_args    = []
 timeout_seconds = 600
@@ -849,8 +855,14 @@ clone_interpreter = "venv/bin/python3"
 clone_entry       = "EmailHarvester.py"
 [[tools]]
 name            = "dorks_hunter"
-kind            = "python"
-pip_package     = "dorks-hunter"
+kind            = "python_venv"
+# FIXED 2026-09-02: was kind="python" with a pip target that cannot produce a
+# resolvable tool. Every entry here already carries clone_* coordinates, i.e.
+# it RESOLVES as a repo clone at runtime — but the installer was told to fetch
+# a PyPI package, so it could never create the clone that resolution needs.
+# Verified 2026-09-02 by cloning and installing each one: pip install produces the executable `dorks-hunter`, but osint/github_dorks.go
+# calls app.Tools.Run(ctx, "dorks_hunter", ...) — the hyphen never resolves.
+repo_url        = "https://github.com/six2dez/dorks_hunter"
 description     = "Google dork automation (OSINT-04 github/google dorks)"
 default_args    = []
 timeout_seconds = 600
@@ -906,8 +918,13 @@ version         = "latest"
 input_flag      = ""
 [[tools]]
 name            = "gato"
-kind            = "python"
-pip_package     = "praetorian-gato"
+kind            = "python_venv"
+# FIXED 2026-09-02: was pip_package="praetorian-gato", which is not on PyPI
+# (`uv tool install praetorian-gato` -> "not found in the package registry").
+# clone_entry below is "venv/bin/gato", i.e. this tool resolves through a clone's
+# venv — which the installer had no way to create while it was pointed at a
+# package index. Verified 2026-09-02: the repo clones and installs from git.
+repo_url        = "https://github.com/praetorian-inc/gato"
 description     = "GitHub Actions self-hosted-runner audit (OSINT-06 github_actions_audit)"
 default_args    = []
 timeout_seconds = 600
@@ -961,8 +978,14 @@ version         = "latest"
 input_flag      = ""
 [[tools]]
 name            = "SwaggerSpy"
-kind            = "python"
-pip_package     = "SwaggerSpy"
+kind            = "python_venv"
+# FIXED 2026-09-02: was kind="python" with a pip target that cannot produce a
+# resolvable tool. Every entry here already carries clone_* coordinates, i.e.
+# it RESOLVES as a repo clone at runtime — but the installer was told to fetch
+# a PyPI package, so it could never create the clone that resolution needs.
+# Verified 2026-09-02 by cloning and installing each one: its setup.py declares packages=['swaggerspy'] and no such directory exists —
+# only swaggerspy.py. pip can never build it; requirements.txt + the script can.
+repo_url        = "https://github.com/UndeadSec/SwaggerSpy"
 description     = "Swagger endpoint leak detection (OSINT-09 apileaks; XCUT-07 redact)"
 default_args    = []
 timeout_seconds = 600
@@ -975,8 +998,14 @@ clone_interpreter = "venv/bin/python3"
 clone_entry       = "swaggerspy.py"
 [[tools]]
 name            = "Spoofy"
-kind            = "python"
-pip_package     = "Spoofy"
+kind            = "python_venv"
+# FIXED 2026-09-02: was kind="python" with a pip target that cannot produce a
+# resolvable tool. Every entry here already carries clone_* coordinates, i.e.
+# it RESOLVES as a repo clone at runtime — but the installer was told to fetch
+# a PyPI package, so it could never create the clone that resolution needs.
+# Verified 2026-09-02 by cloning and installing each one: pip install produces `spoofy`; osint/spoofy.go calls "Spoofy". Same-name on
+# macOS, unresolvable on any case-sensitive filesystem.
+repo_url        = "https://github.com/MattKeeley/Spoofy"
 description     = "Email spoofing posture — SPF/DMARC/DKIM (OSINT-10 spoof/mail_hygiene)"
 default_args    = []
 timeout_seconds = 120
@@ -1005,8 +1034,14 @@ version         = "latest"
 input_flag      = ""
 [[tools]]
 name            = "cmseek"
-kind            = "python"
-pip_package     = "cmseek"
+kind            = "python_venv"
+# FIXED 2026-09-02: was kind="python" with a pip target that cannot produce a
+# resolvable tool. Every entry here already carries clone_* coordinates, i.e.
+# it RESOLVES as a repo clone at runtime — but the installer was told to fetch
+# a PyPI package, so it could never create the clone that resolution needs.
+# Verified 2026-09-02 by cloning and installing each one: pip install SUCCEEDS and installs NO `cmseek` executable, so the tool stays
+# invisible to exec.LookPath. It is a repo-clone tool (clone_dir = "CMSeeK").
+repo_url        = "https://github.com/Tuhinshubhra/CMSeeK"
 description     = "CMS fingerprinting (OSINT-12 cms)"
 default_args    = []
 timeout_seconds = 600
@@ -1260,8 +1295,13 @@ input_flag      = ""
 
 [[tools]]
 name            = "LeakSearch"
-kind            = "python"
-pip_package     = "git+https://github.com/JoelGMSec/LeakSearch"
+kind            = "python_venv"
+# FIXED 2026-09-02: was kind="python" with a pip target that cannot produce a
+# resolvable tool. Every entry here already carries clone_* coordinates, i.e.
+# it RESOLVES as a repo clone at runtime — but the installer was told to fetch
+# a PyPI package, so it could never create the clone that resolution needs.
+# Verified 2026-09-02 by cloning and installing each one: no pyproject/setup.py at all, so the `git+` pip target could never resolve.
+repo_url        = "https://github.com/JoelGMSec/LeakSearch"
 description     = "Credential leak search"
 default_args    = []
 timeout_seconds = 600

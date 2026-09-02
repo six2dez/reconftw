@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+
+	"github.com/six2dez/reconftw/internal/core/backend"
 )
 
 // The make_clone kind exists because dnscewl's upstream is a C++ Makefile
@@ -91,5 +93,24 @@ func TestCopyExecutableSetsExecBitAndReplaces(t *testing.T) {
 	}
 	if info.Mode()&0o111 == 0 {
 		t.Error("installed file is not executable — exec.LookPath would find it and the run would fail at exec time")
+	}
+}
+
+// A clone tool is RESOLVED through its clone_dir, so installing it anywhere else
+// succeeds and leaves it unusable. cmseek is the live case: the modules call it
+// "cmseek" and upstream's directory is "CMSeeK".
+func TestCloneTargetNamePrefersCloneDir(t *testing.T) {
+	got := cloneTargetName(&backend.Tool{Name: "cmseek", CloneDir: "CMSeeK"})
+	if got != "CMSeeK" {
+		t.Errorf("cloneTargetName = %q, want %q — installing to the tool name clones to a\n"+
+			"  directory resolution never looks in, so the install 'succeeds' and the tool\n"+
+			"  stays missing on any case-sensitive filesystem", got, "CMSeeK")
+	}
+}
+
+func TestCloneTargetNameFallsBackToToolName(t *testing.T) {
+	got := cloneTargetName(&backend.Tool{Name: "regulator"})
+	if got != "regulator" {
+		t.Errorf("cloneTargetName = %q, want %q for a tool with no clone_dir", got, "regulator")
 	}
 }
