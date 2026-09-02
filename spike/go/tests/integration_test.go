@@ -20,14 +20,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestKillTree_RealTools invokes the real spike binary against hackerone.com and
+// TestKillTree_RealTools invokes the real spike binary against example.com and
 // validates that SIGINT kills all descendant subprocesses within 12s.
 //
 // This test is gated by //go:build integration and is intended for nightly CI,
 // NOT per-push. It requires:
 //   - spike binary to be pre-built (or this test builds it via make)
 //   - subfinder and httpx to be installed
-//   - Internet access to hackerone.com
+//   - Internet access to example.com
 //
 // Per RESEARCH.md §1.3.2 — real-tool kill-tree integration test shape.
 func TestKillTree_RealTools(t *testing.T) {
@@ -47,7 +47,7 @@ func TestKillTree_RealTools(t *testing.T) {
 	}
 
 	// Start the spike binary in the background.
-	cmd := exec.Command(spikeBin, "--target", "hackerone.com")
+	cmd := exec.Command(spikeBin, "--target", "example.com")
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	require.NoError(t, cmd.Start())
 	spikePID := cmd.Process.Pid

@@ -1,7 +1,7 @@
 // httpx_real_fixture_test.go — the guard that closes the dead-web-layer bug.
 //
 // testdata/httpx_real_output.jsonl is VERBATIM output from a real httpx run
-// (v1.6, `-json`), captured on reconbox3 against hackerone.com. It is not
+// (v1.6, `-json`), captured on reconbox3 against example.com. It is not
 // hand-written, because hand-written fixtures are exactly how this bug survived:
 // the pre-existing parser tests used JSON somebody typed to match the struct, so
 // they agreed with the struct and disagreed with httpx.

@@ -278,11 +278,11 @@ func TestOutputTreeRejectsMalformedJSON(t *testing.T) {
 func TestWorkspaceInit(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	ws, err := output.WorkspaceInit(root, "hackerone.com")
+	ws, err := output.WorkspaceInit(root, "example.com")
 	if err != nil {
 		t.Fatalf("WorkspaceInit: %v", err)
 	}
-	if !strings.Contains(ws, "hackerone_com") && !strings.Contains(ws, "hackerone.com") {
+	if !strings.Contains(ws, "example_com") && !strings.Contains(ws, "example.com") {
 		t.Fatalf("workspace path does not include sanitized target: %s", ws)
 	}
 	if !strings.HasPrefix(ws, root) {

@@ -7,7 +7,7 @@
 //
 // Spike-vs-prod difference: in production, large host sets (>1000) would use a persistent
 // writer with incremental atomic flushes. This spike buffers up to 1000 lines in memory
-// then flushes atomically — acceptable for the spike's scope (hackerone.com ~few hundred hosts).
+// then flushes atomically — acceptable for the spike's scope (example.com ~few hundred hosts).
 package httpxprobe
 
 import (

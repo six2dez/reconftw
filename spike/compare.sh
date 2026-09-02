@@ -4,7 +4,7 @@
 # (M1 LoC, M2 hours-from-sessions-log, M3 packaging bytes, M4 kill-tree pass/fail,
 # M5 RSS kB, M6 cross-platform ordinal).
 #
-# Usage: ./spike/compare.sh [TARGET]      # default: hackerone.com
+# Usage: ./spike/compare.sh [TARGET]      # default: example.com
 # Output: spike/comparison.json
 # Exit codes: 0 = both spikes ran cleanly; 1 = at least one spike missing or failed.
 #
@@ -13,7 +13,7 @@
 
 set -euo pipefail
 
-TARGET="${1:-hackerone.com}"
+TARGET="${1:-example.com}"
 OUT="spike/comparison.json"
 SESSIONS_LOG="spike/.spike_sessions.log"
 

@@ -1,4 +1,0 @@
-https://support.hackerone.com : Cloudflare
-https://docs.hackerone.com : (None)
-https://hackerone.com : (None)
-https://api.hackerone.com : Cloudflare

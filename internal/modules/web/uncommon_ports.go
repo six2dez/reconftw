@@ -8,7 +8,7 @@
 // had been carried over — and then used NONE of those fields anywhere in the
 // module code. The capability was configuration-only.
 //
-// The cost of that gap, measured: on hackerone.com, a.ns and b.ns serve HTTP on
+// The cost of that gap, measured: on example.com, a.ns and b.ns serve HTTP on
 // 2096 and 8443. v1 found them, v2 did not, and they were the ENTIRE remaining
 // live-host parity gap (10 of 12 hosts, 16 percent removed against a 10 percent
 // tolerance).

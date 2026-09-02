@@ -20,7 +20,7 @@ func TestManifestSchema(t *testing.T) {
 	started := time.Date(2026, 5, 28, 9, 0, 0, 0, time.UTC)
 	m := &output.Manifest{
 		WorkspaceVersion: "2.0",
-		Target:           "hackerone.com",
+		Target:           "example.com",
 		StartedAt:        started,
 		ConfigHash:       "sha256:abcd1234",
 		ToolVersions: map[string]string{
@@ -48,8 +48,8 @@ func TestManifestSchema(t *testing.T) {
 	if decoded["workspace_version"] != "2.0" {
 		t.Errorf("workspace_version = %v; want 2.0", decoded["workspace_version"])
 	}
-	if decoded["target"] != "hackerone.com" {
-		t.Errorf("target = %v; want hackerone.com", decoded["target"])
+	if decoded["target"] != "example.com" {
+		t.Errorf("target = %v; want example.com", decoded["target"])
 	}
 }
 

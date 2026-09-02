@@ -1,7 +1,7 @@
 # Spike Comparison Measurement Worksheet
 
 **Date:** 2026-05-27
-**Canonical target:** hackerone.com
+**Canonical target:** example.com
 **Phase:** 1 — Language ADR & Spike
 **Source data:** spike/comparison.json (commit will be created by Plan 01-05)
 
@@ -11,10 +11,10 @@
 
 | Target | Go RSS (kB) | Python RSS (kB) | Notes |
 |--------|-------------|-----------------|-------|
-| hackerone.com run 1 | 216,576 | 227,744 | 36 subdomains resolved; subfinder returned early |
-| hackerone.com run 2 | 224,912 | 226,912 | Same target; slight variation in subprocess timing |
-| hackerone.com run 3 | 225,264 | 221,248 | Same target; Python lower than Go on this run |
-| **hackerone.com MEDIAN** | **224,912** | **226,912** | Used in M5 row below; mean also computed in §RSS Variance Analysis |
+| example.com run 1 | 216,576 | 227,744 | 36 subdomains resolved; subfinder returned early |
+| example.com run 2 | 224,912 | 226,912 | Same target; slight variation in subprocess timing |
+| example.com run 3 | 225,264 | 221,248 | Same target; Python lower than Go on this run |
+| **example.com MEDIAN** | **224,912** | **226,912** | Used in M5 row below; mean also computed in §RSS Variance Analysis |
 | example.com | SKIP | SKIP | subfinder ran >40 min against example.com without returning (Pitfall: -max-time 180 is minutes, not seconds; real domain took too long for spike runner). Advisory cross-target run omitted. |
 | controlled-lab.test | SKIP | SKIP | No maintainer-controlled DNS target available; skipped per plan. |
 
@@ -132,7 +132,7 @@ Verdict statement (copy verbatim into ADR Verdict section):
 
 2. **M3 Python venv (gitignored):** The Python `.venv` directory is gitignored and was not present in the execution worktree. M3a venv size (28,104 kB) is taken from 01-03-SUMMARY.md directly. This does not affect the M3 comparison — the canonical metric is M3b PyInstaller binary (12,781,568 bytes), which is committed in git and present at `spike/python/dist/spike`.
 
-3. **example.com cross-target sanity:** The example.com run was attempted but subfinder's `-max-time 180` (180 minutes) caused the run to take >40 minutes without returning results. The cross-target run is advisory per the plan; hackerone.com's 3-run M5 data is the canonical measurement. The example.com and controlled-lab.test sanity checks are documented as SKIP.
+3. **example.com cross-target sanity:** The example.com run was attempted but subfinder's `-max-time 180` (180 minutes) caused the run to take >40 minutes without returning results. The cross-target run is advisory per the plan; example.com's 3-run M5 data is the canonical measurement. The example.com and controlled-lab.test sanity checks are documented as SKIP.
 
 4. **M2 learning effect (Pitfall 2):** Python was built after Go; the 10-min session log reflects working with the Go implementation as prior art. The actual difficulty ratio for a fresh developer writing Python first would likely be different. This caveat is noted but does not change the scoring — M2 ratio exceeds 1.25, so Python scores the win regardless.
 
@@ -140,7 +140,7 @@ Verdict statement (copy verbatim into ADR Verdict section):
 
 ## Audit trail
 
-- `spike/comparison.json` (will be committed by Plan 01-05) — final canonical run: hackerone.com, timestamp 2026-05-27T20:28:03+02:00
+- `spike/comparison.json` (will be committed by Plan 01-05) — final canonical run: example.com, timestamp 2026-05-27T20:28:03+02:00
 - `spike/.rss_measurements.log` (will be committed by Plan 01-05) — 6 lines (3 runs × 2 langs)
 - `spike/comparison.example.com.json` — SKIP (example.com run timed out, advisory only)
 - `.planning/phases/01-language-adr-spike/01-02-SUMMARY.md` — Go spike disposition (timebox_complete: true)

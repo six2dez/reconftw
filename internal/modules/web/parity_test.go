@@ -8,15 +8,15 @@
 // FIXTURE NOTES:
 //   - Stub fixtures (httpx, nuclei, katana): header starts "# TODO: capture from: ..."
 //     → test t.Skip()s cleanly. Populate via Plan 05-07 instructions.
-//   - Synthetic fixtures (jsluice_secrets.jsonl, wafw00f_hackerone.txt): committed
+//   - Synthetic fixtures (jsluice_secrets.jsonl, wafw00f_example.txt): committed
 //     right now. Tests backed by these MUST PASS (no t.Skip).
 //   - jsluice_secrets.jsonl uses clearly-fake token "FAKE_AWS_AAAA0000BBBBCCCC"
 //     to verify ExtractSecrets redaction without committing real credentials (T-05-20).
 //
 // FIXTURE CAPTURE INSTRUCTIONS (for stub fixtures):
 //
-//	After running bash v1 against hackerone.com, copy real tool output:
-//	  cp Recon/hackerone.com/webs/webs_all.jsonl testdata/fixtures/httpx/httpx_hackerone.jsonl
+//	After running bash v1 against example.com, copy real tool output:
+//	  cp Recon/example.com/webs/webs_all.jsonl testdata/fixtures/httpx/httpx_example.jsonl
 //	Then replace the stub header line with:
 //	  # captured-from: httpx -follow-host-redirects ... -json -l hosts_seed.txt | date: YYYY-MM-DD
 //
@@ -80,7 +80,7 @@ func fixturesBase() string { return filepath.Join("testdata", "fixtures") }
 // written in this file, against a fixture, while the production parser went
 // unexecuted.
 //
-// The cost: testdata/fixtures/httpx/httpx_hackerone.jsonl has been in the repo
+// The cost: testdata/fixtures/httpx/httpx_example.jsonl has been in the repo
 // since 2026-06-02 and contains `"port":"443"` — a STRING. httpxRaw.Port was an
 // `int`, so json.Unmarshal failed on every real line and parseHTTPXOutput
 // returned "all N lines failed to parse". The falsifying evidence sat beside the
@@ -105,7 +105,7 @@ func fixturesBase() string { return filepath.Join("testdata", "fixtures") }
 // This is the regression guard for the dead-web-layer bug, pinned against the
 // fixture that was already present when the bug shipped.
 func TestWebParityHTTPX(t *testing.T) {
-	fixturePath := filepath.Join(fixturesBase(), "httpx", "httpx_hackerone.jsonl")
+	fixturePath := filepath.Join(fixturesBase(), "httpx", "httpx_example.jsonl")
 	data, err := os.ReadFile(fixturePath)
 	if err != nil {
 		t.Fatalf("read fixture %s: %v", fixturePath, err)
@@ -178,7 +178,7 @@ func TestWebParityHTTPX(t *testing.T) {
 // tools disagree with each other, which is precisely why a struct tag can only
 // be validated against captured output.
 func TestWebParityNuclei(t *testing.T) {
-	fixturePath := filepath.Join(fixturesBase(), "nuclei", "nuclei_hackerone.jsonl")
+	fixturePath := filepath.Join(fixturesBase(), "nuclei", "nuclei_example.jsonl")
 	data, err := os.ReadFile(fixturePath)
 	if err != nil {
 		t.Fatalf("read fixture %s: %v", fixturePath, err)
@@ -265,7 +265,7 @@ func requireCapturedProvenance(t *testing.T, data []byte, fixturePath string) {
 // TestWebParityFFUF verifies ffuf JSON output structure and status-code buckets.
 // Skips when the fixture contains an empty results array (stub state).
 func TestWebParityFFUF(t *testing.T) {
-	fixturePath := filepath.Join(fixturesBase(), "ffuf", "ffuf_hackerone.json")
+	fixturePath := filepath.Join(fixturesBase(), "ffuf", "ffuf_example.json")
 	data, err := os.ReadFile(fixturePath)
 	if err != nil {
 		t.Fatalf("read fixture %s: %v", fixturePath, err)
@@ -307,7 +307,7 @@ func TestWebParityFFUF(t *testing.T) {
 //
 // This test MUST PASS (not skip) — it uses a committed synthetic fixture.
 func TestWebParityWAF(t *testing.T) {
-	fixturePath := filepath.Join(fixturesBase(), "waf", "wafw00f_hackerone.txt")
+	fixturePath := filepath.Join(fixturesBase(), "waf", "wafw00f_example.txt")
 	data, err := os.ReadFile(fixturePath)
 	if err != nil {
 		t.Fatalf("read fixture %s: %v", fixturePath, err)
@@ -317,13 +317,13 @@ func TestWebParityWAF(t *testing.T) {
 	}
 
 	// Call ExtractWafw00f with the synthetic fixture.
-	results, err := waf.ExtractWafw00f(data, "hackerone.com")
+	results, err := waf.ExtractWafw00f(data, "example.com")
 	if err != nil {
 		t.Fatalf("ExtractWafw00f error: %v", err)
 	}
 
-	// Golden: support.hackerone.com and api.hackerone.com have Cloudflare.
-	// docs.hackerone.com and hackerone.com are "(None)" — must be excluded.
+	// Golden: support.example.com and api.example.com have Cloudflare.
+	// docs.example.com and example.com are "(None)" — must be excluded.
 	if len(results) != 2 {
 		t.Errorf("TestWebParityWAF: expected 2 WAF results (Cloudflare hosts), got %d: %+v",
 			len(results), results)
@@ -335,10 +335,10 @@ func TestWebParityWAF(t *testing.T) {
 		detected[r.Host] = r.WAF
 	}
 
-	// Assert support.hackerone.com and api.hackerone.com detected as Cloudflare.
+	// Assert support.example.com and api.example.com detected as Cloudflare.
 	for _, expectedHost := range []string{
-		"https://support.hackerone.com",
-		"https://api.hackerone.com",
+		"https://support.example.com",
+		"https://api.example.com",
 	} {
 		wafName, ok := detected[expectedHost]
 		if !ok {
@@ -391,7 +391,7 @@ func TestWebParityJSSecrets(t *testing.T) {
 	}
 
 	// Call ExtractSecrets with the synthetic fixture.
-	records, err := js.ExtractSecrets(data, "hackerone.com")
+	records, err := js.ExtractSecrets(data, "example.com")
 	if err != nil {
 		t.Fatalf("ExtractSecrets error: %v", err)
 	}
@@ -446,7 +446,7 @@ func TestWebParityJSSecrets(t *testing.T) {
 // TestWebParityURLDedup verifies URL list fixture can be parsed and counted.
 // Skips cleanly when the fixture has not been captured yet.
 func TestWebParityURLDedup(t *testing.T) {
-	fixturePath := filepath.Join(fixturesBase(), "urls", "katana_hackerone.txt")
+	fixturePath := filepath.Join(fixturesBase(), "urls", "katana_example.txt")
 	data, err := os.ReadFile(fixturePath)
 	if err != nil {
 		t.Fatalf("read fixture %s: %v", fixturePath, err)

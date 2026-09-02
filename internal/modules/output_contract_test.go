@@ -23,7 +23,7 @@
 // falsify a struct.
 //
 // The proof that this is not theoretical: testdata/fixtures/httpx/
-// httpx_hackerone.jsonl has been in the repo since 2026-06-02 and contains
+// httpx_example.jsonl has been in the repo since 2026-06-02 and contains
 // `"port":"443"` — the exact evidence that falsifies httpxRaw. It sat there for
 // two and a half months because TestWebParityHTTPX, whose doc-comment said it
 // "verifies that httpx JSONL output feeds through parseHTTPXOutput", declared
@@ -204,35 +204,35 @@ var outputContractAllowlistSize = len(outputContractAllowlist)
 // FABRICATING the very evidence this rule exists to demand — a worse outcome
 // than an honest gap. Re-capture and delete the entry.
 var fixtureProvenanceAllowlist = map[string]string{
-	"internal/modules/osint/testdata/fixtures/domain_info/whois_fixture.txt":             "predates the rule; true origin unrecorded",
-	"internal/modules/osint/testdata/fixtures/github_actions/gato_fixture.txt":           "predates the rule; true origin unrecorded",
-	"internal/modules/osint/testdata/fixtures/github_leaks/ghleaks_fixture.txt":          "predates the rule; true origin unrecorded",
-	"internal/modules/osint/testdata/fixtures/github_leaks/trufflehog_fixture.txt":       "predates the rule; true origin unrecorded",
-	"internal/modules/osint/testdata/fixtures/ip_info/asnmap_fixture.txt":                "predates the rule; true origin unrecorded",
-	"internal/modules/osint/testdata/fixtures/postman/porchpirate_fixture.txt":           "predates the rule; true origin unrecorded",
-	"internal/modules/osint/testdata/fixtures/swagger/swagger_fixture.txt":               "predates the rule; true origin unrecorded",
-	"internal/modules/subdomains/testdata/fixtures/passive/hackerone.com.crt.txt":        "predates the rule; true origin unrecorded",
-	"internal/modules/subdomains/testdata/fixtures/passive/hackerone.com.subfinder.txt":  "predates the rule; true origin unrecorded",
-	"internal/modules/subdomains/testdata/fixtures/passive/maintainer.subfinder.txt":     "predates the rule; true origin unrecorded",
-	"internal/modules/subdomains/testdata/fixtures/passive/tesla.com.crt.txt":            "predates the rule; true origin unrecorded",
-	"internal/modules/subdomains/testdata/fixtures/passive/tesla.com.subfinder.txt":      "predates the rule; true origin unrecorded",
-	"internal/modules/subdomains/testdata/fixtures/resolved/hackerone.com.puredns.txt":   "predates the rule; true origin unrecorded",
-	"internal/modules/subdomains/testdata/fixtures/resolved/maintainer.puredns.txt":      "predates the rule; true origin unrecorded",
-	"internal/modules/subdomains/testdata/fixtures/resolved/tesla.com.puredns.txt":       "predates the rule; true origin unrecorded",
-	"internal/modules/subdomains/testdata/fixtures/takeover/hackerone.com.dnstake.jsonl": "predates the rule; true origin unrecorded",
-	"internal/modules/vulns/testdata/fixtures/crlfuzz/crlfuzz_fixture.txt":               "predates the rule; true origin unrecorded",
-	"internal/modules/vulns/testdata/fixtures/dalfox/dalfox_poc_fixture.txt":             "predates the rule; true origin unrecorded",
-	"internal/modules/vulns/testdata/fixtures/gf/gf_lfi_fixture.txt":                     "predates the rule; true origin unrecorded",
-	"internal/modules/vulns/testdata/fixtures/gf/gf_sqli_fixture.txt":                    "predates the rule; true origin unrecorded",
-	"internal/modules/vulns/testdata/fixtures/gf/gf_xss_fixture.txt":                     "predates the rule; true origin unrecorded",
-	"internal/modules/vulns/testdata/fixtures/spray/portscan_active.gnmap":               "predates the rule; true origin unrecorded",
-	"internal/modules/vulns/testdata/fixtures/spray/service_fingerprints.jsonl":          "predates the rule; true origin unrecorded",
-	"internal/modules/vulns/testdata/fixtures/sqlmap/sqlmap_output_fixture.txt":          "predates the rule; true origin unrecorded",
-	"internal/modules/web/testdata/fixtures/ffuf/ffuf_hackerone.json":                    "predates the rule; true origin unrecorded",
-	"internal/modules/web/testdata/fixtures/js/jsluice_secrets.jsonl":                    "predates the rule; true origin unrecorded",
-	"internal/modules/web/testdata/fixtures/js/jsluice_urls.jsonl":                       "predates the rule; true origin unrecorded",
-	"internal/modules/web/testdata/fixtures/urls/katana_hackerone.txt":                   "predates the rule; true origin unrecorded",
-	"internal/modules/web/testdata/fixtures/waf/wafw00f_hackerone.txt":                   "predates the rule; true origin unrecorded",
+	"internal/modules/osint/testdata/fixtures/domain_info/whois_fixture.txt":           "predates the rule; true origin unrecorded",
+	"internal/modules/osint/testdata/fixtures/github_actions/gato_fixture.txt":         "predates the rule; true origin unrecorded",
+	"internal/modules/osint/testdata/fixtures/github_leaks/ghleaks_fixture.txt":        "predates the rule; true origin unrecorded",
+	"internal/modules/osint/testdata/fixtures/github_leaks/trufflehog_fixture.txt":     "predates the rule; true origin unrecorded",
+	"internal/modules/osint/testdata/fixtures/ip_info/asnmap_fixture.txt":              "predates the rule; true origin unrecorded",
+	"internal/modules/osint/testdata/fixtures/postman/porchpirate_fixture.txt":         "predates the rule; true origin unrecorded",
+	"internal/modules/osint/testdata/fixtures/swagger/swagger_fixture.txt":             "predates the rule; true origin unrecorded",
+	"internal/modules/subdomains/testdata/fixtures/passive/example.com.crt.txt":        "predates the rule; true origin unrecorded",
+	"internal/modules/subdomains/testdata/fixtures/passive/example.com.subfinder.txt":  "predates the rule; true origin unrecorded",
+	"internal/modules/subdomains/testdata/fixtures/passive/maintainer.subfinder.txt":   "predates the rule; true origin unrecorded",
+	"internal/modules/subdomains/testdata/fixtures/passive/example.net.crt.txt":        "predates the rule; true origin unrecorded",
+	"internal/modules/subdomains/testdata/fixtures/passive/example.net.subfinder.txt":  "predates the rule; true origin unrecorded",
+	"internal/modules/subdomains/testdata/fixtures/resolved/example.com.puredns.txt":   "predates the rule; true origin unrecorded",
+	"internal/modules/subdomains/testdata/fixtures/resolved/maintainer.puredns.txt":    "predates the rule; true origin unrecorded",
+	"internal/modules/subdomains/testdata/fixtures/resolved/example.net.puredns.txt":   "predates the rule; true origin unrecorded",
+	"internal/modules/subdomains/testdata/fixtures/takeover/example.com.dnstake.jsonl": "predates the rule; true origin unrecorded",
+	"internal/modules/vulns/testdata/fixtures/crlfuzz/crlfuzz_fixture.txt":             "predates the rule; true origin unrecorded",
+	"internal/modules/vulns/testdata/fixtures/dalfox/dalfox_poc_fixture.txt":           "predates the rule; true origin unrecorded",
+	"internal/modules/vulns/testdata/fixtures/gf/gf_lfi_fixture.txt":                   "predates the rule; true origin unrecorded",
+	"internal/modules/vulns/testdata/fixtures/gf/gf_sqli_fixture.txt":                  "predates the rule; true origin unrecorded",
+	"internal/modules/vulns/testdata/fixtures/gf/gf_xss_fixture.txt":                   "predates the rule; true origin unrecorded",
+	"internal/modules/vulns/testdata/fixtures/spray/portscan_active.gnmap":             "predates the rule; true origin unrecorded",
+	"internal/modules/vulns/testdata/fixtures/spray/service_fingerprints.jsonl":        "predates the rule; true origin unrecorded",
+	"internal/modules/vulns/testdata/fixtures/sqlmap/sqlmap_output_fixture.txt":        "predates the rule; true origin unrecorded",
+	"internal/modules/web/testdata/fixtures/ffuf/ffuf_example.json":                    "predates the rule; true origin unrecorded",
+	"internal/modules/web/testdata/fixtures/js/jsluice_secrets.jsonl":                  "predates the rule; true origin unrecorded",
+	"internal/modules/web/testdata/fixtures/js/jsluice_urls.jsonl":                     "predates the rule; true origin unrecorded",
+	"internal/modules/web/testdata/fixtures/urls/katana_example.txt":                   "predates the rule; true origin unrecorded",
+	"internal/modules/web/testdata/fixtures/waf/wafw00f_example.txt":                   "predates the rule; true origin unrecorded",
 }
 
 func TestOutputContractCensusIsComplete(t *testing.T) {

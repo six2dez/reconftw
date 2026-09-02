@@ -32,7 +32,7 @@ func TestUncommonPortsMatchV1Config(t *testing.T) {
 }
 
 // TestProbePortsIncludesUncommonByDefault pins the actual regression: the ports
-// that carried the last live-host parity gap. a.ns/b.ns.hackerone.com serve HTTP
+// that carried the last live-host parity gap. a.ns/b.ns.example.com serve HTTP
 // on 2096 and 8443; v2 probed 80,443 only and lost both.
 func TestProbePortsIncludesUncommonByDefault(t *testing.T) {
 	cfg := &config.Config{}

@@ -184,7 +184,7 @@ func TestMergeStageHostsDedupsSameHostDifferentShape(t *testing.T) {
 //
 // Observed on the live parity run: once the uncommon-port sweep landed, httpx
 // returned several endpoints per host and first-seen order kept an arbitrary one.
-// The artefact recorded http://api.hackerone.com:2095 instead of the https :443
+// The artefact recorded http://api.example.com:2095 instead of the https :443
 // endpoint, nuclei scanned a high port that does not serve the application, and
 // finding classes fell 48 -> 38 — losing precisely the templates that match real
 // application paths (graphql-*, oauth2-detect, oidc-detect, keycloak-openid-config,

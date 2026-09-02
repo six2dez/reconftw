@@ -1,0 +1,4 @@
+https://support.example.com : Cloudflare
+https://docs.example.com : (None)
+https://example.com : (None)
+https://api.example.com : Cloudflare

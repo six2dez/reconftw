@@ -1,0 +1,6 @@
+# PLACEHOLDER — regenerate by running: ./reconftw.sh -d example.com -s
+# Then: sort -u Recon/example.com/subdomains/subdomains.txt > spike/baselines/example.com.expected
+# Plans 01-02/01-03 spike implementations will diff against this baseline with ±5% tolerance.
+# Until regenerated, both spikes can still run; the comparison runner reports 0 expected entries
+# and treats subdomain-set-diff as advisory (not a gate). Regeneration MUST happen before Plan 01-04
+# if the ADR is to include a real subdomain-set-diff metric.

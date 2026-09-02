@@ -1,5 +1,5 @@
 {
-  "target":    "hackerone.com",
+  "target":    "example.com",
   "timestamp": "2026-05-27T20:28:03+02:00",
   "platform":  "Darwin 25.5.0 arm64",
   "go": {

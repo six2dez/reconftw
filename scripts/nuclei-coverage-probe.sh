@@ -2,7 +2,7 @@
 # scripts/nuclei-coverage-probe.sh — the differential experiment for plan 17-05.
 #
 # THE QUESTION. On 2026-08-24 `keycloak-openid-config` and `oidc-detect` did not
-# fire in v2's full nuclei run against hackerone.com, and fired INSTANTLY in a
+# fire in v2's full nuclei run against example.com, and fired INSTANTLY in a
 # targeted two-template probe from the same box, against the same host, using the
 # same template directory. Four benign explanations were each eliminated by an
 # observation (16-06-PARITY.md §6.1): both templates are installed, the endpoint
@@ -39,7 +39,7 @@
 # The fixture binds 127.0.0.1 and every arm targets it. A non-loopback target is
 # REFUSED unless --force-nonloopback is passed explicitly, because a probe that
 # accidentally points at a real host is unauthorised scanning (T-17-05-04). No
-# arm here has ever targeted hackerone.com and none may.
+# arm here has ever targeted example.com and none may.
 #
 # ─────────────────────────────────────────────────────────────────────────────
 # THE FIXTURE MAKES BOTH OUTCOMES REACHABLE
@@ -403,7 +403,7 @@ self_check() {
     local rc=0
     (
         FORCE_NONLOOPBACK=0
-        assert_loopback "https://hackerone.com:443"
+        assert_loopback "https://example.com:443"
     ) >/dev/null 2>&1 || rc=$?
     if [ "$rc" -ne 0 ]; then
         note "1. non-loopback target refused ....... PASS (exit $rc)"

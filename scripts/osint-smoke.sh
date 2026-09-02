@@ -23,9 +23,9 @@
 #
 # Usage:
 #   scripts/osint-smoke.sh [TARGET] [--inspect-only]
-#   scripts/osint-smoke.sh                     # default target hackerone.com (D-O7)
-#   scripts/osint-smoke.sh tesla.com           # alternate canonical target
-#   scripts/osint-smoke.sh hackerone.com --inspect-only   # re-check last workspace
+#   scripts/osint-smoke.sh                     # default target example.com (D-O7)
+#   scripts/osint-smoke.sh example.net           # alternate canonical target
+#   scripts/osint-smoke.sh example.com --inspect-only   # re-check last workspace
 #
 # Run from the repo root. Override the binary with BIN=/path/to/reconftw.
 #
@@ -62,7 +62,7 @@ while [ $# -gt 0 ]; do
 done
 
 # Default DoD-2 anchor target (D-O7).
-[ -n "$TARGET" ] || TARGET="hackerone.com"
+[ -n "$TARGET" ] || TARGET="example.com"
 command -v jq >/dev/null 2>&1 || die "jq not found on PATH — install jq first"
 
 if [ "$INSPECT_ONLY" -eq 0 ]; then

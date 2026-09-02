@@ -5,14 +5,14 @@
 //
 // Usage in parity_test.go:
 //
-//	mb := testutil.NewWebMockBackend("/path/to/testdata/fixtures", "hackerone.com", 4)
+//	mb := testutil.NewWebMockBackend("/path/to/testdata/fixtures", "example.com", 4)
 //
 // Source: .planning/phases/05-web-pipeline-e2e/05-06-PLAN.md Task 1.
 package testutil
 
 // NewWebMockBackend returns a MockBackend configured to serve web pipeline
 // fixtures from fixturesDir. The scenario parameter selects which fixture
-// file is returned per tool (e.g. "hackerone.com" → <tool>/hackerone.com.txt).
+// file is returned per tool (e.g. "example.com" → <tool>/example.com.txt).
 // capacity sets the Capacity() return value; <=0 defaults to 4.
 //
 // This is a thin wrapper over NewMockBackend with the same signature shape so

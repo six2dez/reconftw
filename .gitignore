@@ -118,7 +118,12 @@ data/
 .config/
 .planning.bak-*/
 reconftw.cfg.local
-/hackerone.com.txt
+# stray per-target scan outputs dropped in the repo root by a manual run.
+# Pattern, not a name: the previous line hard-coded a real target's domain,
+# which put it in the published tree for anyone reading .gitignore.
+/*.com.txt
+/*.net.txt
+/*.org.txt
 internal/core/backend/example.com.txt
 # stray binary from `go build ./cmd/reconftw` without -o (prod uses make build → bin/)
 cmd/reconftw/reconftw

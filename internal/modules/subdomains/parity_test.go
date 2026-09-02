@@ -14,16 +14,16 @@
 // FIXTURE CAPTURE INSTRUCTIONS:
 //
 //	Run bash v1 for each target, then copy tool outputs:
-//	  bash reconftw.sh -d hackerone.com -s
-//	  cp Recon/hackerone.com/passive_subdomains.txt testdata/fixtures/passive/hackerone.com.subfinder.txt
+//	  bash reconftw.sh -d example.com -s
+//	  cp Recon/example.com/passive_subdomains.txt testdata/fixtures/passive/example.com.subfinder.txt
 //	OR capture tools directly:
-//	  subfinder -all -d hackerone.com -silent > testdata/fixtures/passive/hackerone.com.subfinder.txt
+//	  subfinder -all -d example.com -silent > testdata/fixtures/passive/example.com.subfinder.txt
 //	Then add provenance header line 1:
-//	  # captured-from: subfinder -all -d hackerone.com -silent | date: 2024-01-15
+//	  # captured-from: subfinder -all -d example.com -silent | date: 2024-01-15
 //	Minimum sizes:
-//	  hackerone.com subfinder: >= 50 unique subdomains
-//	  hackerone.com puredns:   >= 30 resolved subdomains
-//	  tesla.com subfinder:     >= 100 unique subdomains
+//	  example.com subfinder: >= 50 unique subdomains
+//	  example.com puredns:   >= 30 resolved subdomains
+//	  example.net subfinder:     >= 100 unique subdomains
 //	If capture is not available: leave the TODO header. Tests will t.Skip.
 //	NEVER substitute CT-log data, certificate transparency data, or synthetic
 //	hand-authored subdomains (B4 fix).
@@ -267,14 +267,14 @@ func TestPassiveParity(t *testing.T) {
 
 	cases := []tc{
 		{
-			target:      "hackerone.com",
-			subfinderFx: "hackerone.com.subfinder.txt",
-			crtFx:       "hackerone.com.crt.txt",
+			target:      "example.com",
+			subfinderFx: "example.com.subfinder.txt",
+			crtFx:       "example.com.crt.txt",
 		},
 		{
-			target:      "tesla.com",
-			subfinderFx: "tesla.com.subfinder.txt",
-			crtFx:       "tesla.com.crt.txt",
+			target:      "example.net",
+			subfinderFx: "example.net.subfinder.txt",
+			crtFx:       "example.net.crt.txt",
 		},
 		{
 			target:      "maintainer",
@@ -409,8 +409,8 @@ func TestResolveParity(t *testing.T) {
 	fixturesBase := filepath.Join("testdata", "fixtures")
 
 	cases := []tc{
-		{target: "hackerone.com", fixtureFx: "hackerone.com.puredns.txt"},
-		{target: "tesla.com", fixtureFx: "tesla.com.puredns.txt"},
+		{target: "example.com", fixtureFx: "example.com.puredns.txt"},
+		{target: "example.net", fixtureFx: "example.net.puredns.txt"},
 		{target: "maintainer", fixtureFx: "maintainer.puredns.txt"},
 	}
 
@@ -519,7 +519,7 @@ func TestTakeoverParity(t *testing.T) {
 	fixturesBase := filepath.Join("testdata", "fixtures")
 
 	cases := []tc{
-		{target: "hackerone.com", fixtureFx: "hackerone.com.dnstake.jsonl"},
+		{target: "example.com", fixtureFx: "example.com.dnstake.jsonl"},
 	}
 
 	for _, c := range cases {
@@ -551,14 +551,14 @@ func TestTakeoverParity(t *testing.T) {
 //	PARITY_LIVE=1 go test ./internal/modules/subdomains/... -run TestLiveSignoff -v
 //
 // Steps (human):
-//  1. Run bash v1: ./reconftw.sh -d hackerone.com -s
+//  1. Run bash v1: ./reconftw.sh -d example.com -s
 //     Note: "Subdomains found: N" in v1 output.
-//  2. Run v2: go run ./cmd/reconftw subs --target hackerone.com
+//  2. Run v2: go run ./cmd/reconftw subs --target example.com
 //     Note subdomain count from v2 output.
 //  3. Compare passive count and resolved count: both must be within ±5%.
-//  4. Repeat for tesla.com.
+//  4. Repeat for example.net.
 //  5. Spot-check artefact content:
-//     cat workspaces/hackerone.com/artefacts/subdomains.jsonl | head -5
+//     cat workspaces/example.com/artefacts/subdomains.jsonl | head -5
 //     (should show SubdomainRecord JSON objects)
 //  6. If counts are within ±5%: type "approved" to phase-accept.
 func TestLiveSignoff(t *testing.T) {
@@ -570,9 +570,9 @@ func TestLiveSignoff(t *testing.T) {
 	// The actual comparison is performed by the human running the commands above.
 	t.Log("=== LIVE PARITY SIGN-OFF GATE ===")
 	t.Log("Instructions:")
-	t.Log("  1. Run: ./reconftw.sh -d hackerone.com -s | grep -i 'Subdomains found'")
-	t.Log("  2. Run: go run ./cmd/reconftw subs --target hackerone.com")
+	t.Log("  1. Run: ./reconftw.sh -d example.com -s | grep -i 'Subdomains found'")
+	t.Log("  2. Run: go run ./cmd/reconftw subs --target example.com")
 	t.Log("  3. Compare passive+resolved counts: within ±5% → PASS")
-	t.Log("  4. Repeat for tesla.com")
+	t.Log("  4. Repeat for example.net")
 	t.Log("  5. Confirm: type 'approved' in the checkpoint prompt")
 }

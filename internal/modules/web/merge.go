@@ -297,7 +297,7 @@ func hostsDedupKey(line []byte) string {
 // records survives is not cosmetic, because artefacts/hosts.jsonl is the target
 // list web.nuclei scans. Once the uncommon-port sweep landed, httpx returned
 // several endpoints per host and first-seen order kept an arbitrary one: the run
-// recorded http://api.hackerone.com:2095 and http://hackerone.com:2095 instead of
+// recorded http://api.example.com:2095 and http://example.com:2095 instead of
 // their https :443 endpoints, so nuclei scanned high ports that do not serve the
 // application. Finding classes fell from 48 to 38, losing exactly the templates
 // that match real application paths — graphql-*, oauth2-detect, oidc-detect,

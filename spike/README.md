@@ -16,7 +16,7 @@ The following Open Questions from `.planning/phases/01-language-adr-spike/01-RES
 
 - **OQ4 (credentials):** Throwaway tokens at `spike/corpus/.tokens.github` and `spike/corpus/.tokens.gitlab` (gitignored). If either absent at spike-time → that source skips gracefully (logged at `[SKIP]` level). Token files MUST NEVER be committed — both are in `.gitignore`. (Per researcher recommendation: accept the graceful-skip branch as a testable code path; real tokens needed for full subdomain set, but the skip path validates the credential-handling code.)
 
-- **OQ5 (target rotation):** `compare.sh <target>` accepts one target arg; defaults to `hackerone.com`. Maintainer runs once per target manually. No automated rotation — the comparison runner is not a cron job. (Per researcher recommendation: simplicity over automation for a 1-week spike harness.)
+- **OQ5 (target rotation):** `compare.sh <target>` accepts one target arg; defaults to `example.com`. Maintainer runs once per target manually. No automated rotation — the comparison runner is not a cron job. (Per researcher recommendation: simplicity over automation for a 1-week spike harness.)
 
 ## Layout
 
@@ -32,7 +32,7 @@ spike/
 │       └── .gitkeep
 ├── baselines/
 │   ├── .gitkeep
-│   └── hackerone.com.expected       # Bash v1 reference subdomain set (or placeholder)
+│   └── example.com.expected       # Bash v1 reference subdomain set (or placeholder)
 ├── go/                              # Go spike implementation (Plan 01-02)
 │   └── .gitkeep
 └── python/                          # Python spike implementation (Plan 01-03)
@@ -72,14 +72,14 @@ make -C spike/python integration-test
 ### Comparison
 
 ```bash
-# Run both spikes against default target (hackerone.com) and emit spike/comparison.json
+# Run both spikes against default target (example.com) and emit spike/comparison.json
 ./spike/compare.sh
 
 # Run against a specific target
-./spike/compare.sh hackerone.com
+./spike/compare.sh example.com
 
 # Run against all 3 corpus targets (manually, one at a time)
-./spike/compare.sh hackerone.com
+./spike/compare.sh example.com
 ./spike/compare.sh example.com
 ./spike/compare.sh controlled-lab.test
 ```
@@ -131,7 +131,7 @@ Both spikes are scored against these 6 metrics. `compare.sh` collects all 6 auto
 | M2 | Dev velocity (hours) | Numeric | Sum of per-session timer logs in `spike/.spike_sessions.log` | No threshold — noise-band tie-breaker |
 | M3 | Packaging footprint | Numeric (bytes) | Go: stripped binary bytes. Python: venv kB (M3a) + PyInstaller binary bytes (M3b) | Go < 80 MB; Python venv < 600 MB (sanity bounds) |
 | M4 | Kill-tree correctness | Binary (PASS/FAIL) | Synthetic mock test: all descendants dead within 10s after SIGINT | **KILLER-FEATURE OVERRIDE — fail = lose regardless of other metrics** |
-| M5 | RSS under load | Numeric (kB) | `/usr/bin/time -l` (macOS) or `-v` (Linux) on spike run against `hackerone.com` | No hard threshold — noise-band tie-breaker |
+| M5 | RSS under load | Numeric (kB) | `/usr/bin/time -l` (macOS) or `-v` (Linux) on spike run against `example.com` | No hard threshold — noise-band tie-breaker |
 | M6 | Cross-platform pain | Ordinal (1/2/3) | 1=first try, 2=config change needed, 3=code change needed | 3 = killer-feature override |
 | + | MCP library support | Ordinal (1/2/3) | 1=official SDK at v1.x stable | **Both langs = 1. NOT a tie-breaker signal.** |
 
