@@ -366,7 +366,12 @@ description     = "Web crawler with JS rendering and scope filtering"
 default_args    = []
 timeout_seconds = 14400
 critical        = false
-version         = "v1.1.2"
+# BUMPED 2026-09-02: v1.1.2 no longer builds. Under Go 1.26 its transitive
+# smacker/go-tree-sitter fails with "undefined: Node", so `reconftw install` could
+# not produce a crawler on any clean machine — and said nothing, because katana is
+# critical=false and the run still exited 0. v1.7.0 builds and reports
+# "Current version: v1.7.0" (verified on reconbox3, go1.26.6).
+version         = "v1.7.0"
 input_flag      = "-list"
 [[tools]]
 name            = "nuclei"
@@ -1086,7 +1091,14 @@ default_args    = []
 # beside ffuf's 900 for comparable scanning work.
 timeout_seconds = 3600
 critical        = false
-version         = "v2.3.3"
+# BUMPED 2026-09-02: v2.3.3 no longer builds. Under Go 1.26 its gopacket/pcap cgo
+# layer fails with "undefined: pcapErrorNotActivated", so a clean machine ended up
+# with no port scanner while the installer reported success. v2.6.1 builds and
+# reports "Current Version: 2.6.1" (verified on reconbox3, go1.26.6).
+# SYSTEM DEPENDENCY: the cgo build needs libpcap headers (Debian: libpcap-dev).
+# That is not expressible in this manifest today — see the `libpcap-dev` note in
+# the system-kind entries.
+version         = "v2.6.1"
 input_flag      = "-list"
 
 [[tools]]
