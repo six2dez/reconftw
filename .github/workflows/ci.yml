@@ -244,12 +244,25 @@ jobs:
         # packages + compile-time assertions. ADR §5 signature drift now
         # fails this build step.
         run: go build ./cmd/interfaces_check/...
-      - name: verify-0002.sh (ADR pre-sign gate)
-        run: |
-          # Install tomljson (used by verify-0002.sh Check 2).
-          go install github.com/pelletier/go-toml/v2/cmd/tomljson@latest
-          export PATH="$(go env GOPATH)/bin:$PATH"
-          bash .planning/decisions/verify-0002.sh
+      # REMOVED: verify-0002.sh (ADR pre-sign gate).
+      #
+      # It ran `bash .planning/decisions/verify-0002.sh`, which reads
+      # .planning/decisions/0002-architecture-v2.md. `.planning/` is no longer
+      # published — a public repo was shipping the full planning tree, including
+      # target names in that very ADR — so a CI checkout does not contain either
+      # file and this step could only fail.
+      #
+      # What it checked, and where that lives now: Check 3 (the ADR's Go
+      # interface snippets compile) is the `interfaces_check` step directly
+      # above, which builds the real compile-time assertions rather than
+      # snippets. Checks 1, 2 and 4 (ARCH-NN coverage, TOML block validity,
+      # glossary completeness) are internal consistency of a document that only
+      # ships to whoever edits it, so they belong where that document does. The
+      # script still runs locally:
+      #
+      #     bash .planning/decisions/verify-0002.sh
+      #
+      # Re-adding it to CI means publishing the ADR again — decide that first.
 
   release-gates:
     name: Release gates (phase 15 acceptance)

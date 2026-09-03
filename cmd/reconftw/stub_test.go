@@ -35,8 +35,15 @@ func TestStubNotImplementedFormat(t *testing.T) {
 	if !strings.Contains(msg, "Subdomains E2E") {
 		t.Errorf("expected message to contain phase name, got %q", msg)
 	}
-	if !strings.Contains(msg, "ROADMAP.md") {
-		t.Errorf("expected message to contain ROADMAP.md pointer, got %q", msg)
+	// The pointer must name a file the USER's checkout actually contains. It said
+	// .planning/ROADMAP.md until 2026-09-02, when `.planning/` stopped being
+	// published — so this assertion was pinning a path that had become a dead end
+	// for everyone who hit the message.
+	if !strings.Contains(msg, "MIGRATION.md") {
+		t.Errorf("expected message to point at MIGRATION.md, got %q", msg)
+	}
+	if strings.Contains(msg, ".planning") {
+		t.Errorf("message points into .planning/, which is not published — a user cannot open it: %q", msg)
 	}
 }
 

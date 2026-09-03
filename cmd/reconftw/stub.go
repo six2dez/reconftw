@@ -21,12 +21,16 @@ import (
 // Format (per D-02):
 //
 //	`reconftw <subcommand>` is not yet implemented — ships in Phase N
-//	(<Phase Name>). See .planning/ROADMAP.md for status.
+//	(<Phase Name>). See MIGRATION.md for status.
+//
+// The pointer was .planning/ROADMAP.md until 2026-09-02. `.planning/` is no
+// longer published, so that path sent every user who hit this message to a file
+// their checkout does not contain.
 //
 // Exit code: 64 (EX_USAGE). Callers (cobra Execute → main.run → main.main)
 // recognize the *exitCodeError type and call os.Exit(ec.code).
 func stubNotImplemented(cmd *cobra.Command, phaseNum int, phaseName string) error {
-	msg := fmt.Sprintf("`reconftw %s` is not yet implemented — ships in Phase %d (%s). See .planning/ROADMAP.md for status.",
+	msg := fmt.Sprintf("`reconftw %s` is not yet implemented — ships in Phase %d (%s). See MIGRATION.md for status.",
 		cmd.Name(), phaseNum, phaseName)
 	_, _ = fmt.Fprintln(cmd.ErrOrStderr(), msg)
 	return &exitCodeError{code: 64, msg: ""}
