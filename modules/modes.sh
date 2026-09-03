@@ -225,7 +225,22 @@ function start() {
 #
 # Used by: reconftw.sh -w dispatch, monitor_mode 'w' case (every cycle).
 function prepare_web_mode_scope() {
-    if [[ -n $list ]]; then
+    # Branch on $flist, NOT $list (issue #1045).
+    #
+    # $flist is the resolved absolute path of the user's -l file and is set ONCE,
+    # at startup in reconftw.sh, from whatever $list held then; with -d it is set
+    # to '' and stays empty for the run. So $flist is the signal for "the user
+    # passed a list", and it is the variable this branch actually operates on
+    # (the cp below, and the -not -path guard further down).
+    #
+    # $list is NOT that signal, because start() reassigns it mid-run: under
+    # AXIOM with -d it writes the domain to target.txt and sets
+    # list="${dir}/target.txt" (modules/modes.sh, start). Branching on $list
+    # therefore sent `reconftw.sh -d example.com -w -v 50` down the -l path with
+    # $flist still empty, so the snapshot `cp "" <tmp>` failed and scope prep
+    # returned 1 — aborting the run before webs_menu with
+    # "Web mode scope preparation failed (tmpfile/cp error)".
+    if [[ -n $flist ]]; then
         # Defense-in-depth for the user's input file: treat $flist as strictly
         # read-only. One initial `cp` to a tmp snapshot outside $dir; every
         # subsequent operation uses the snapshot. The original is never written,
