@@ -682,7 +682,7 @@ function osint() {
             metadata apileaks third_party_misconfigs zonetransfer
         # Group 4: Mail/DNS/Cloud
         parallel_funcs "${PAR_OSINT_GROUP4_SIZE:-3}" \
-            mail_hygiene spoof cloud_enum_scan
+            mail_hygiene spoof cloud_enum_scan lunar_exposure
     else
         domain_info
         ip_info
@@ -699,6 +699,7 @@ function osint() {
         mail_hygiene
         spoof
         cloud_enum_scan
+        lunar_exposure
     fi
 }
 
