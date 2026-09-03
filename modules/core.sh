@@ -1081,6 +1081,17 @@ function monitor_snapshot() {
     local ts snap prev_link prev_dir
     ts=$(date +%Y%m%d_%H%M%S)
     snap=".incremental/history/${ts}"
+    # Second-resolution timestamps collide whenever two cycles land in the same
+    # second. `mkdir -p` then SUCCEEDS on the existing directory, this cycle's
+    # copies overwrite the previous snapshot, and `latest` still points at it —
+    # so the delta below is computed against the very files just overwritten.
+    # Every count comes out zero, the baseline needed to detect the next change
+    # is gone, and nothing reports an error. Disambiguate before creating.
+    local _snap_seq=1
+    while [[ -e "$snap" ]]; do
+        _snap_seq=$((_snap_seq + 1))
+        snap=".incremental/history/${ts}-${_snap_seq}"
+    done
     mkdir -p "$snap"
 
     # Snapshot key artifacts for this cycle.
@@ -1197,7 +1208,13 @@ function monitor_snapshot() {
     elif [[ "$delta_total" -gt 0 ]]; then
         local alert_stats nuclei_u subs_u webs_u nuclei_s subs_s webs_s critical_u high_u
         alert_stats=$(_monitor_alert_summary "$snap")
-        read -r nuclei_u subs_u webs_u nuclei_s subs_s webs_s critical_u high_u <<<"$alert_stats"
+        # IFS=' ' is REQUIRED, not stylistic. reconftw.sh:8 sets IFS=$'\n\t'
+        # process-wide, so a bare `read` does not split on spaces: all eight
+        # fields land in $nuclei_u and every numeric test below then dies with
+        # "[[: 1 1 1 0 0 0 0 1: arithmetic syntax error". The alert summary was
+        # therefore never parsed and monitor alerting could not work. Same
+        # narrowing reconftw.sh:128 already applies for the axiom argv split.
+        IFS=' ' read -r nuclei_u subs_u webs_u nuclei_s subs_s webs_s critical_u high_u <<<"$alert_stats"
 
         if [[ "${nuclei_u:-0}" -gt 0 ]]; then
             notification "[ALERT] New nuclei findings (>=${MONITOR_MIN_SEVERITY:-high}): ${nuclei_u:-0}" warn
@@ -1219,7 +1236,11 @@ function monitor_snapshot() {
     if [[ -L "$prev_link" || -d "$prev_link" ]]; then
         rm -rf -- "$prev_link"
     fi
-    ln -s "$ts" "$prev_link" 2>/dev/null || {
+    # Point at the directory actually written, not at $ts: the collision guard
+    # above may have created ${ts}-2, and a pointer to $ts would then name a
+    # DIFFERENT snapshot than the one just taken — the next cycle would diff
+    # against the wrong baseline.
+    ln -s "${snap##*/}" "$prev_link" 2>/dev/null || {
         cp -R "$snap" "$prev_link"
     }
 

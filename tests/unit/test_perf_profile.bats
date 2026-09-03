@@ -8,8 +8,10 @@ setup() {
 @test "apply_performance_profile sets numeric values for low profile" {
   export PERF_PROFILE="low"
   unset PARALLEL_MAX_JOBS
-  run apply_performance_profile
-  [ "$status" -eq 0 ]
+  # NOT `run`: it executes in a subshell, so the variables the function sets do
+  # not survive into this shell and the assertions below would read the unset
+  # values this test just unset.
+  apply_performance_profile
   [[ "$PARALLEL_MAX_JOBS" =~ ^[0-9]+$ ]]
   [[ "$FFUF_THREADS" =~ ^[0-9]+$ ]]
   [ "$PARALLEL_MAX_JOBS" -ge 1 ]

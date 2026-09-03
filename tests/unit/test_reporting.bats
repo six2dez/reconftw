@@ -31,7 +31,9 @@ teardown() {
   [ -f report/index.html ]
   [ -f report/latest/report.json ]
   [ -f report/latest/index.html ]
-  grep -q '"domain":"example.com"' report/report.json
+  # The report is pretty-printed when jq is available and compact when it is
+  # not, so pin the field, not the whitespace between key and value.
+  grep -qE '"domain":[[:space:]]*"example.com"' report/report.json
 }
 
 @test "report includes delta_since_last when monitor data exists" {
