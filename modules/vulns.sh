@@ -361,7 +361,7 @@ function lfi() {
                     -maxtime "$lfi_ffuf_maxtime"
                     -H "$HEADER"
                     -w "$lfi_wordlist"
-                    -mr "root:"
+                    -mr "root:x:"
                 )
                 local _lfi_parts
                 _lfi_parts=$(mktemp -d)

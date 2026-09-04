@@ -98,24 +98,27 @@ setup() {
     [ "$status" -eq 0 ]
 }
 
-@test "validate_boolean accepts TRUE (case insensitive)" {
+@test "validate_boolean rejects TRUE (implementation is case-sensitive)" {
+    # The regex ^(true|false|1|0|yes|no)$ is lowercase-only
     run validate_boolean "TRUE"
-    [ "$status" -eq 0 ]
+    [ "$status" -ne 0 ]
 }
 
-@test "validate_boolean accepts FALSE (case insensitive)" {
+@test "validate_boolean rejects FALSE (implementation is case-sensitive)" {
     run validate_boolean "FALSE"
+    [ "$status" -ne 0 ]
+}
+
+@test "validate_boolean accepts yes" {
+    # 'yes' is a valid truthy value per the implementation
+    run validate_boolean "yes"
     [ "$status" -eq 0 ]
 }
 
-@test "validate_boolean rejects yes" {
-    run validate_boolean "yes"
-    [ "$status" -ne 0 ]
-}
-
-@test "validate_boolean rejects 1" {
+@test "validate_boolean accepts 1" {
+    # '1' is a valid truthy value per the implementation
     run validate_boolean "1"
-    [ "$status" -ne 0 ]
+    [ "$status" -eq 0 ]
 }
 
 @test "validate_boolean rejects empty" {

@@ -19,7 +19,7 @@
 //	ffuf -v -noninteractive -t <threads> -rate <rate>
 //	     -timeout <timeout> -maxtime <maxtime>
 //	     -H <header> -w lfi_wordlist:LFI
-//	     -mr "root:" -u <candidateURL-with-LFI-slot>
+//	     -mr "root:x:" -u <candidateURL-with-LFI-slot>
 //
 // PAYLOAD REDACTION (XCUT-07, T-06-04-01):
 // ffuf verbose output may contain file contents (e.g., /etc/passwd lines).
@@ -308,7 +308,7 @@ func prepareLFICandidates(data []byte, maxURLs int) []string {
 //
 //	ffuf -v -noninteractive -t <threads> -rate <rate>
 //	     -timeout <timeout> -maxtime <maxtime>
-//	     -H <header> -w <lfi_wordlist>:LFI -mr "root:" -u <candidateURL>
+//	     -H <header> -w <lfi_wordlist>:LFI -mr "root:x:" -u <candidateURL>
 //
 // XCUT-07 (T-06-04-01): ffuf verbose output may contain raw file content lines.
 // Raw output MUST NOT be logged at Info/Warn. Only status count at Debug.
@@ -321,7 +321,7 @@ func runLFIFFUF(ctx context.Context, app *appctx.AppContext,
 ) ([]VulnFindingRecord, error) {
 	// v1 arg vector: ffuf -v -noninteractive -t <t> -rate <r>
 	//                     -timeout <to> -maxtime <mt> -H <h>
-	//                     -w lfi_wordlist:LFI -mr "root:" -u <candidate>
+	//                     -w lfi_wordlist:LFI -mr "root:x:" -u <candidate>
 	args := []string{
 		"-v",
 		"-noninteractive",
@@ -339,8 +339,12 @@ func runLFIFFUF(ctx context.Context, app *appctx.AppContext,
 	}
 	// Wordlist with LFI keyword (ffuf substitutes LFI placeholder in URL).
 	args = append(args, "-w", lfiWordlist+":LFI")
-	// Match on "root:" pattern — typical /etc/passwd first line (v1 -mr "root:").
-	args = append(args, "-mr", "root:")
+	// Match on "root:x:" — the /etc/passwd first field plus the shadow-password
+	// placeholder. Carried from v1 (modules/vulns.sh:364, upstream PR #1038):
+	// the looser "root:" matched any response containing that substring, and
+	// minified JS bundles legitimately contain `root: function(t)` / `root: t,`,
+	// so every such bundle was reported as an LFI hit.
+	args = append(args, "-mr", "root:x:")
 	args = append(args, "-u", candidateURL)
 
 	// XCUT-09: Backend.Stream for heartbeat; ffuf per URL can run up to maxtime.
@@ -368,7 +372,7 @@ func runLFIFFUF(ctx context.Context, app *appctx.AppContext,
 		}
 		line := strings.ToLower(string(ev.Line))
 		// ffuf -v output includes "| URL |" lines for matches; -mr means only
-		// lines matching "root:" are printed at all. Count presence.
+		// lines matching "root:x:" are printed at all. Count presence.
 		if strings.Contains(line, "url") && strings.Contains(line, "lfi") {
 			matchCount++
 			if app.Log != nil {

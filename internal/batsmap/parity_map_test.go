@@ -171,12 +171,12 @@ func TestBatsParityMapMatchesSuite(t *testing.T) {
 }
 
 // TestBatsParityMapBaselineCount is a baseline sentinel documenting the expected
-// XCUT-03 scenario count (348). It is intentionally separate from the drift
+// XCUT-03 scenario count (416). It is intentionally separate from the drift
 // guard: if the bats suite legitimately changes, TestBatsParityMapMatchesSuite
 // still enforces that the map tracks it, while THIS test forces a conscious,
 // reviewed bump of the baseline constant.
 func TestBatsParityMapBaselineCount(t *testing.T) {
-	const wantBaseline = 348
+	const wantBaseline = 416
 	root := repoRoot(t)
 
 	if got := sum(batsScenarioCounts(t, root)); got != wantBaseline {

@@ -21,10 +21,10 @@ from the suite.
 
 | disposition | count |
 |---|--:|
-| covered-by | 298 |
-| superseded | 18 |
+| covered-by | 344 |
+| superseded | 40 |
 | not-applicable | 32 |
-| **total** | **348** |
+| **total** | **416** |
 
 ## Per-file scenario counts
 
@@ -66,10 +66,11 @@ from the suite.
 | test_ui_snapshots.bats | 6 |
 | test_utils.bats | 34 |
 | test_validation.bats | 28 |
+| test_validation_extended.bats | 68 |
 | test_verbosity.bats | 12 |
 | test_vps_count_cli.bats | 6 |
 | test_webprobe_full_formats.bats | 3 |
-| **total** | **348** |
+| **total** | **416** |
 
 ## Scenario map
 
@@ -320,6 +321,74 @@ from the suite.
 | test_validation.bats | validate_directory returns true for existing directory | covered-by:config.TestNoPathTraversal | path/file validation -> config path validators |
 | test_validation.bats | validate_directory returns false for non-existent directory | covered-by:config.TestNoPathTraversal | path/file validation -> config path validators |
 | test_validation.bats | validate_writable_directory returns true for writable dir | covered-by:config.TestNoPathTraversal | path/file validation -> config path validators |
+| test_validation_extended.bats | validate_boolean accepts 'true' | covered-by:config.TestCoerceAndSetBoolFromString | bash bool accept/reject -> typed koanf bool coercion |
+| test_validation_extended.bats | validate_boolean accepts 'false' | covered-by:config.TestCoerceAndSetBoolFromString | bash bool accept/reject -> typed koanf bool coercion |
+| test_validation_extended.bats | validate_boolean accepts '1' | covered-by:config.TestCoerceAndSetBoolFromString | bash bool accept/reject -> typed koanf bool coercion |
+| test_validation_extended.bats | validate_boolean accepts '0' | covered-by:config.TestCoerceAndSetBoolFromString | bash bool accept/reject -> typed koanf bool coercion |
+| test_validation_extended.bats | validate_boolean accepts 'yes' | covered-by:config.TestCoerceAndSetBoolFromString | bash bool accept/reject -> typed koanf bool coercion |
+| test_validation_extended.bats | validate_boolean accepts 'no' | covered-by:config.TestCoerceAndSetBoolFromString | bash bool accept/reject -> typed koanf bool coercion |
+| test_validation_extended.bats | validate_boolean rejects empty string | covered-by:config.TestCoerceAndSetBoolFromString | bash bool accept/reject -> typed koanf bool coercion |
+| test_validation_extended.bats | validate_boolean rejects 'maybe' | covered-by:config.TestCoerceAndSetBoolFromString | bash bool accept/reject -> typed koanf bool coercion |
+| test_validation_extended.bats | validate_boolean rejects 'TRUE' (case-sensitive) | covered-by:config.TestCoerceAndSetBoolFromString | bash bool accept/reject -> typed koanf bool coercion |
+| test_validation_extended.bats | validate_boolean rejects 'YES' (case-sensitive) | covered-by:config.TestCoerceAndSetBoolFromString | bash bool accept/reject -> typed koanf bool coercion |
+| test_validation_extended.bats | validate_boolean rejects '2' | covered-by:config.TestCoerceAndSetBoolFromString | bash bool accept/reject -> typed koanf bool coercion |
+| test_validation_extended.bats | validate_boolean rejects whitespace-padded value | covered-by:config.TestCoerceAndSetBoolFromString | bash bool accept/reject -> typed koanf bool coercion |
+| test_validation_extended.bats | validate_integer accepts positive integer | covered-by:config.TestCoerceAndSetIntFromString | bash int parse/range -> typed koanf int coercion |
+| test_validation_extended.bats | validate_integer accepts zero | covered-by:config.TestCoerceAndSetIntFromString | bash int parse/range -> typed koanf int coercion |
+| test_validation_extended.bats | validate_integer accepts negative integer | covered-by:config.TestCoerceAndSetIntFromString | bash int parse/range -> typed koanf int coercion |
+| test_validation_extended.bats | validate_integer accepts large integer | covered-by:config.TestCoerceAndSetIntFromString | bash int parse/range -> typed koanf int coercion |
+| test_validation_extended.bats | validate_integer rejects float | covered-by:config.TestCoerceAndSetIntFromString | bash int parse/range -> typed koanf int coercion |
+| test_validation_extended.bats | validate_integer rejects empty string | covered-by:config.TestCoerceAndSetIntFromString | bash int parse/range -> typed koanf int coercion |
+| test_validation_extended.bats | validate_integer rejects letters | covered-by:config.TestCoerceAndSetIntFromString | bash int parse/range -> typed koanf int coercion |
+| test_validation_extended.bats | validate_integer rejects alphanumeric | covered-by:config.TestCoerceAndSetIntFromString | bash int parse/range -> typed koanf int coercion |
+| test_validation_extended.bats | validate_integer respects min bound — value below min fails | covered-by:config.TestCoerceAndSetIntFromString | bash int parse/range -> typed koanf int coercion |
+| test_validation_extended.bats | validate_integer respects min bound — value at min passes | covered-by:config.TestCoerceAndSetIntFromString | bash int parse/range -> typed koanf int coercion |
+| test_validation_extended.bats | validate_integer respects min bound — value above min passes | covered-by:config.TestCoerceAndSetIntFromString | bash int parse/range -> typed koanf int coercion |
+| test_validation_extended.bats | validate_integer respects max bound — value above max fails | covered-by:config.TestCoerceAndSetIntFromString | bash int parse/range -> typed koanf int coercion |
+| test_validation_extended.bats | validate_integer respects max bound — value at max passes | covered-by:config.TestCoerceAndSetIntFromString | bash int parse/range -> typed koanf int coercion |
+| test_validation_extended.bats | validate_integer respects both bounds — value within range passes | covered-by:config.TestCoerceAndSetIntFromString | bash int parse/range -> typed koanf int coercion |
+| test_validation_extended.bats | validate_integer respects both bounds — value below range fails | covered-by:config.TestCoerceAndSetIntFromString | bash int parse/range -> typed koanf int coercion |
+| test_validation_extended.bats | validate_integer respects both bounds — value above range fails | covered-by:config.TestCoerceAndSetIntFromString | bash int parse/range -> typed koanf int coercion |
+| test_validation_extended.bats | validate_port accepts port 1 (minimum) | covered-by:config.TestValidateErrorShape | bash port range -> struct-tag min/max enforced by config.Validate |
+| test_validation_extended.bats | validate_port accepts port 80 | covered-by:config.TestValidateErrorShape | bash port range -> struct-tag min/max enforced by config.Validate |
+| test_validation_extended.bats | validate_port accepts port 443 | covered-by:config.TestValidateErrorShape | bash port range -> struct-tag min/max enforced by config.Validate |
+| test_validation_extended.bats | validate_port accepts port 8080 | covered-by:config.TestValidateErrorShape | bash port range -> struct-tag min/max enforced by config.Validate |
+| test_validation_extended.bats | validate_port accepts port 65535 (maximum) | covered-by:config.TestValidateErrorShape | bash port range -> struct-tag min/max enforced by config.Validate |
+| test_validation_extended.bats | validate_port rejects port 0 (below minimum) | covered-by:config.TestValidateErrorShape | bash port range -> struct-tag min/max enforced by config.Validate |
+| test_validation_extended.bats | validate_port rejects port 65536 (above maximum) | covered-by:config.TestValidateErrorShape | bash port range -> struct-tag min/max enforced by config.Validate |
+| test_validation_extended.bats | validate_port rejects negative port | covered-by:config.TestValidateErrorShape | bash port range -> struct-tag min/max enforced by config.Validate |
+| test_validation_extended.bats | validate_port rejects non-numeric string | covered-by:config.TestValidateErrorShape | bash port range -> struct-tag min/max enforced by config.Validate |
+| test_validation_extended.bats | validate_port rejects empty string | covered-by:config.TestValidateErrorShape | bash port range -> struct-tag min/max enforced by config.Validate |
+| test_validation_extended.bats | validate_port rejects float port | covered-by:config.TestValidateErrorShape | bash port range -> struct-tag min/max enforced by config.Validate |
+| test_validation_extended.bats | sanitize_path returns clean path unchanged | covered-by:config.TestNoPathTraversal | bash path normalisation -> traversal rejection in config paths |
+| test_validation_extended.bats | sanitize_path strips trailing slash | covered-by:config.TestNoPathTraversal | bash path normalisation -> traversal rejection in config paths |
+| test_validation_extended.bats | sanitize_path strips multiple trailing slashes | covered-by:config.TestNoPathTraversal | bash path normalisation -> traversal rejection in config paths |
+| test_validation_extended.bats | sanitize_path preserves root slash | covered-by:config.TestNoPathTraversal | bash path normalisation -> traversal rejection in config paths |
+| test_validation_extended.bats | sanitize_path normalizes double slashes in middle | covered-by:config.TestNoPathTraversal | bash path normalisation -> traversal rejection in config paths |
+| test_validation_extended.bats | sanitize_path removes control characters | covered-by:config.TestNoPathTraversal | bash path normalisation -> traversal rejection in config paths |
+| test_validation_extended.bats | sanitize_path handles relative path | covered-by:config.TestNoPathTraversal | bash path normalisation -> traversal rejection in config paths |
+| test_validation_extended.bats | sanitize_interlace_input keeps safe domains | superseded | interlace is a v1-only runner; v2 schedules jobs in-process |
+| test_validation_extended.bats | sanitize_interlace_input removes semicolon lines | superseded | interlace is a v1-only runner; v2 schedules jobs in-process |
+| test_validation_extended.bats | sanitize_interlace_input removes pipe lines | superseded | interlace is a v1-only runner; v2 schedules jobs in-process |
+| test_validation_extended.bats | sanitize_interlace_input removes dollar-substitution lines | superseded | interlace is a v1-only runner; v2 schedules jobs in-process |
+| test_validation_extended.bats | sanitize_interlace_input removes backtick lines | superseded | interlace is a v1-only runner; v2 schedules jobs in-process |
+| test_validation_extended.bats | sanitize_interlace_input in-place edit preserves safe lines | superseded | interlace is a v1-only runner; v2 schedules jobs in-process |
+| test_validation_extended.bats | sanitize_interlace_input supports separate output file | superseded | interlace is a v1-only runner; v2 schedules jobs in-process |
+| test_validation_extended.bats | is_empty returns 0 for empty string | superseded | string-shape helper; Go's type system makes the check unnecessary |
+| test_validation_extended.bats | is_empty returns 0 for whitespace-only string | superseded | string-shape helper; Go's type system makes the check unnecessary |
+| test_validation_extended.bats | is_empty returns 1 for non-empty string | superseded | string-shape helper; Go's type system makes the check unnecessary |
+| test_validation_extended.bats | is_empty returns 1 for string with leading whitespace | superseded | string-shape helper; Go's type system makes the check unnecessary |
+| test_validation_extended.bats | is_empty returns 1 for zero string '0' | superseded | string-shape helper; Go's type system makes the check unnecessary |
+| test_validation_extended.bats | is_numeric returns 0 for positive integer | superseded | string-shape helper; Go's type system makes the check unnecessary |
+| test_validation_extended.bats | is_numeric returns 0 for zero | superseded | string-shape helper; Go's type system makes the check unnecessary |
+| test_validation_extended.bats | is_numeric returns 0 for negative integer | superseded | string-shape helper; Go's type system makes the check unnecessary |
+| test_validation_extended.bats | is_numeric returns 0 for float | superseded | string-shape helper; Go's type system makes the check unnecessary |
+| test_validation_extended.bats | is_numeric returns 0 for negative float | superseded | string-shape helper; Go's type system makes the check unnecessary |
+| test_validation_extended.bats | is_numeric returns 1 for empty string | superseded | string-shape helper; Go's type system makes the check unnecessary |
+| test_validation_extended.bats | is_numeric returns 1 for alphabetic string | superseded | string-shape helper; Go's type system makes the check unnecessary |
+| test_validation_extended.bats | is_numeric returns 1 for alphanumeric string | superseded | string-shape helper; Go's type system makes the check unnecessary |
+| test_validation_extended.bats | is_numeric returns 1 for string with spaces | superseded | string-shape helper; Go's type system makes the check unnecessary |
+| test_validation_extended.bats | is_numeric returns 1 for double dot (malformed float) | superseded | string-shape helper; Go's type system makes the check unnecessary |
 | test_osint_github_repos.bats | github_repos falls back to titus for unknown secrets engine | covered-by:osint.TestGithubReposTask_NoseyparkerDefersToTitus | github_repos secrets-engine fallback |
 | test_osint_github_repos.bats | github_repos uses titus without fallback warning when explicitly configured | covered-by:osint.TestGithubReposTask_NoseyparkerDefersToTitus | github_repos secrets-engine fallback |
 | test_osint_domain_info_msftrecon.bats | domain_info handles msftrecon failure with fail-soft warning and empty artifact | covered-by:osint.TestDomainInfoTask_ScopifyDegrades | msftrecon fail-soft -> domain_info degrade path |
