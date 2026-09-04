@@ -60,17 +60,35 @@ func defaultAxiomModuleMap() map[string]string {
 // v2's tasks parse specific shapes. Getting that wrong does not fail loudly —
 // it returns text the parser reads as zero findings. So each entry stays here
 // until it has been verified against a real fleet, not until it looks right.
+// Reasons were checked against the Ax module definitions and axiom-scan's own
+// source on 2026-09-04 (attacksurge/ax @ 06950c8), not inferred. Three facts
+// from that reading shape the tiers below:
+//
+//   - add_extra_args() inserts forwarded args right after the module's binary,
+//     so a tool flag v2 sends (httpx -json, katana -jc) lands inside the canned
+//     command and takes effect; the txt variant merges by concatenation, which
+//     is exactly right for JSONL.
+//   - `-wL <local file>` uploads a local wordlist to every node and substitutes
+//     the module's _wordlist_ placeholder. moduleArgsFor currently DROPS local
+//     wordlist paths as unreachable; for these modules it should translate them
+//     into -wL instead. That is the whole blocker for ffuf and puredns-single.
+//   - A fleet split has no stdin, so anything v2 feeds through ExecOptions.Stdin
+//     is refused by unsupportedOpt before it gets here (dalfox pipe mode).
 var axiomModulesNotPorted = map[string]string{
-	"httpx":              "the web DAG root; its task parses httpx -json, which the canned module does not emit",
-	"katana":             "crawler output shape not verified against the canned module",
-	"ffuf":               "the task drives ffuf with -of json + a local wordlist; both are dropped by moduleArgsFor",
-	"dalfox":             "not verified against a fleet",
-	"mantra":             "not verified against a fleet",
-	"subjs":              "not verified against a fleet",
-	"wafw00f":            "not verified against a fleet",
+	// Ready to port once a fleet run confirms them: the canned command already
+	// matches what the v2 task sends, and v1 dispatched each of them this way.
+	"httpx":   "canned txt variant + forwarded -json yields JSONL v2 parses (v1 did this); unverified on a fleet",
+	"katana":  "canned per-_target_ variant + forwarded -jc/-kf/-d (v1 web.sh:1979 did this); unverified on a fleet",
+	"wafw00f": "canned `wafw00f -i input -o output` is exactly v2's arg vector; unverified on a fleet",
+	"subjs":   "canned pipe module; v2's -ua/-c forward cleanly; unverified on a fleet",
+	"mantra":  "canned pipe module; unverified on a fleet",
+	// Need a code change first.
+	"ffuf":           "needs moduleArgsFor to turn the local wordlist into -wL (Ax uploads it and fills _wordlist_) instead of dropping it",
+	"puredns-single": "the module exists (bruteforce, input = the WORDLIST split across nodes, domain forwarded — v1's model); needs extractInputFile to pick the wordlist for the bruteforce verb and the isLocalOnlyAxiomOp force lifted",
+	"dalfox":         "v2 drives dalfox in pipe mode over ExecOptions.Stdin, which a fleet split cannot carry; port = rewrite to `file` mode with the reflected list as the input file",
+	// Structurally different or absent in v2.
 	"nmapx":              "v2 has no nmap-over-axiom task",
-	"nuclei-screenshots": "screenshots are content-addressed locally from a temp dir the fleet cannot write to",
-	"puredns-single":     "v2 brute is puredns bruteforce, which isLocalOnlyAxiomOp forces local",
+	"nuclei-screenshots": "output is a directory of PNGs content-addressed locally from a temp dir; needs the -oD dir merge, not the -o file path",
 	"subfinder":          "API-bound; mapped to \"\" above so it is local by declaration, not by omission",
 }
 
@@ -106,11 +124,14 @@ const axiomDispatchTimeout = 10 * time.Minute
 // will not return the next twenty, and each attempt costs axiomDispatchTimeout.
 const axiomDispatchFailureLatch = 2
 
-// isLocalOnlyAxiomOp returns true for tool operations that have no correct axiom-scan
-// module and must run locally even under --axiom. The module map keys by tool name
-// only, so it cannot see the sub-command: `puredns bruteforce` has no fleet module
-// (only "puredns-resolve" exists), and dispatching it would run the wrong op and
-// silently yield zero brute candidates. Keep this in lockstep with defaultAxiomModuleMap.
+// isLocalOnlyAxiomOp returns true for tool operations that must run locally even
+// under --axiom. The module map keys by tool name only, so it cannot see the
+// sub-command: `puredns bruteforce` would be dispatched to "puredns-resolve", the
+// wrong op, and silently yield zero brute candidates. A correct module DOES exist
+// (Ax's "puredns-single": the wordlist is the input split across nodes, the
+// domain a forwarded arg); wiring it needs extractInputFile to pick the wordlist
+// for this verb — see axiomModulesNotPorted. Keep this in lockstep with
+// defaultAxiomModuleMap.
 func isLocalOnlyAxiomOp(tool string, args []string) bool {
 	return tool == "puredns" && len(args) > 0 && args[0] == "bruteforce"
 }
