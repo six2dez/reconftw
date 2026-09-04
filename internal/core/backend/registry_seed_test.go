@@ -3,7 +3,7 @@
 // registry_seed_test.go validates that the embedded tools.lock auto-
 // populates backend.Default at init() time with the 10 Phase 4 tools per
 // CONTEXT default (b), and that the Critical-tier flagging (Blocker 5)
-// for {subfinder, httpx, dnsx} is honored end-to-end.
+// for the critical tier (pinned in TestRegistrySeed_CriticalTier) is honored end-to-end.
 //
 // BLOCKER 7 ALLOWLIST: this is the ONE test file in
 // internal/core/backend/ that references backend.Default. Plan 04 tests
@@ -99,19 +99,28 @@ func TestRegistrySeed_CriticalTier(t *testing.T) {
 	}
 }
 
-// Test 5b: MissingCritical reports critical-tier tools when binaries are
-// absent from PATH. Run Discover on Default; assert the missing-critical
-// list is a subset of {subfinder, httpx, dnsx}.
+// Test 5b: whatever MissingCritical reports must carry Critical=true in the
+// manifest. That is the invariant; it is read from the manifest rather than
+// from a second hand-written copy of the tier.
+//
+// The previous version hard-coded {subfinder, httpx, dnsx} as the allowlist —
+// a duplicate of the set TestRegistrySeed_CriticalTier already pins. When the
+// tier grew to seven, that duplicate was missed, and the miss was INVISIBLE on
+// every box where the four new tools were installed: MissingCritical never
+// listed them there, so the subset check passed vacuously. Only a CI runner
+// with no tools at all exercised it, and there it failed on all four. A test
+// whose verdict depends on which tools the developer happens to have is the
+// false-green shape this repo keeps paying for; the invariant below does not.
 func TestRegistrySeed_MissingCriticalIsCriticalSubset(t *testing.T) {
-	// Discover scans PATH; CI runners may or may not have these tools.
-	// The invariant we assert: whatever IS missing-critical is in the
-	// declared critical set.
 	_ = backend.Default.Discover(context.Background())
-	critical := backend.Default.MissingCritical()
-	allowed := map[string]bool{"subfinder": true, "httpx": true, "dnsx": true}
-	for _, name := range critical {
-		if !allowed[name] {
-			t.Errorf("MissingCritical contains non-critical tool %q (Phase 4 seed allowlist: subfinder/httpx/dnsx)", name)
+	for _, name := range backend.Default.MissingCritical() {
+		tool, ok := backend.Default.Lookup(name)
+		if !ok {
+			t.Errorf("MissingCritical reported %q, which is not in the registry at all", name)
+			continue
+		}
+		if !tool.Critical {
+			t.Errorf("MissingCritical reported %q, whose manifest entry has Critical=false", name)
 		}
 	}
 }
@@ -407,5 +416,46 @@ func TestCloneCoordinatesCensus(t *testing.T) {
 	if withInterp == 0 || withInterp == len(declared) {
 		t.Errorf("every declared clone has the same shape — one of Discover's two branches is no " +
 			"longer exercised by any real row")
+	}
+}
+
+// Test 5c: the same invariant, made impossible to satisfy vacuously.
+//
+// 5b discovers on the developer's real PATH, so on a box with every critical
+// tool installed MissingCritical is empty and the loop body never runs. This
+// copies the seed into a fresh registry and discovers under a PATH that holds
+// nothing, so EVERY critical tool is missing and the check has to do work —
+// and it pins that the missing-critical set is then exactly the declared tier.
+func TestRegistrySeed_MissingCriticalUnderEmptyPATHIsExactlyTheTier(t *testing.T) {
+	reg := backend.NewToolRegistry()
+	for _, tool := range backend.Default.All() {
+		cp := *tool // never hand Default's pointers to a Discover that mutates them
+		reg.Register(&cp)
+	}
+	t.Setenv("PATH", t.TempDir()) // resolves nothing
+	_ = reg.Discover(context.Background())
+
+	want := map[string]bool{}
+	for _, tool := range backend.Default.All() {
+		if tool.Critical {
+			want[tool.Name] = true
+		}
+	}
+	got := map[string]bool{}
+	for _, name := range reg.MissingCritical() {
+		got[name] = true
+	}
+	for name := range want {
+		if !got[name] {
+			t.Errorf("critical tool %q is absent from an empty PATH but MissingCritical did not report it", name)
+		}
+	}
+	for name := range got {
+		if !want[name] {
+			t.Errorf("MissingCritical reported %q, which is not Critical in the manifest", name)
+		}
+	}
+	if len(got) == 0 {
+		t.Fatal("MissingCritical is empty under an empty PATH — the test is vacuous again")
 	}
 }
