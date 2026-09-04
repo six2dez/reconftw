@@ -59,6 +59,36 @@ const defaultKillGrace = 5 * time.Second
 // exists to guarantee termination, not to bound latency.
 const terminalSendBackstop = 30 * time.Second
 
+// sweepProcessGroup SIGKILLs whatever is left of a finished tool's process group.
+//
+// WHY THIS EXISTS (the step-4 goroutine is NOT enough). The kill-tree pattern in
+// this file's header sweeps the group on ONE trigger: ctx cancellation. On the
+// ordinary path — the tool exits by itself, cmd.Wait() returns, doneCh closes —
+// the escalation goroutine takes its `case <-doneCh` arm and exits WITHOUT ever
+// sweeping. Any grandchild the tool failed to reap is then left running, is
+// re-parented to PID 1, and nothing in this process ever looks at it again.
+//
+// That is not hypothetical. nuclei's headless mode leaves its Chromium tree
+// behind on a NORMAL exit: on reconbox3 a single box had accumulated 97 orphaned
+// Chromium processes across 12 trees, ~1.2 GB PSS, the oldest 12 days old. Under
+// monitor mode — which re-runs the same tasks on a timer forever — this grows
+// without bound. TestKillTreeWithin10s did not catch it because it cancels the
+// context, which is the one path that already swept.
+//
+// WHY -pgid IS SAFE HERE. Setpgid made the child a group LEADER, so pgid ==
+// child pid and the group contains exactly this tool's descendants — never this
+// process, never a sibling tool. A process-group ID cannot be recycled while the
+// group still has members, so in the case that matters (a leak: the group is
+// non-empty) the id still denotes OUR group. When the tool cleaned up after
+// itself the group is empty, kill(2) returns ESRCH, and this is a no-op.
+//
+// The error is deliberately discarded: ESRCH ("nothing left to kill") is the
+// expected outcome and the success case, and there is no other outcome a caller
+// could act on.
+func sweepProcessGroup(pgid int) {
+	_ = syscall.Kill(-pgid, syscall.SIGKILL)
+}
+
 // LocalBackend executes external tools as local subprocesses with kill-tree safety.
 type LocalBackend struct {
 	// KillGrace is the duration cmd.WaitDelay waits between Cancel and stdlib SIGKILL.
@@ -256,6 +286,10 @@ func (b *LocalBackend) ExecOpts(ctx context.Context, t *Tool, args []string, opt
 
 	waitErr := cmd.Wait()
 	close(doneCh)
+
+	// The process is gone; anything still in its group is a grandchild it failed
+	// to reap. See sweepProcessGroup.
+	sweepProcessGroup(pgid)
 
 	duration := time.Since(start)
 
@@ -467,6 +501,11 @@ func (b *LocalBackend) StreamOpts(ctx context.Context, t *Tool, args []string, o
 		wg.Wait()
 		waitErr := cmd.Wait()
 		close(doneCh)
+
+		// Same sweep as the Exec path. Reaching this point means the scanners saw
+		// EOF, so a grandchild that survived here is one that CLOSED the inherited
+		// pipes and kept running — precisely the orphaned-Chromium shape.
+		sweepProcessGroup(pgid)
 		// AFTER Wait, never before: closing the stdin file earlier would take the
 		// child's standard input away mid-read.
 		cleanup()
