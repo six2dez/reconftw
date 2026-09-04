@@ -19,7 +19,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -39,6 +41,37 @@ func defaultAxiomModuleMap() map[string]string {
 		"subfinder": "", // API-bound — always local
 		"dnstake":   "", // no official axiom module yet
 	}
+}
+
+// axiomModulesNotPorted names every axiom-scan module the v1 bash tree dispatches
+// that v2 does NOT, each with the reason it was left out.
+//
+// WHY THIS LIST IS IN THE CODE. v1 drives ~14 distinct axiom modules; v2's map
+// above drives five. That is a real reduction in what a paid fleet does, and
+// until this list existed it was recorded nowhere — a reader comparing the two
+// trees had to grep the bash to discover it, and the difference was equally
+// invisible at run time. TestAxiomModuleMapCoversV1Modules holds every `-m
+// <module>` in modules/*.sh to being either mapped above or named here, so the
+// gap can only ever shrink deliberately.
+//
+// PORTING ONE IS NOT A CODE-ONLY CHANGE. A module has to survive moduleArgsFor
+// AND return output the v2 task's parser accepts; the canned axiom modules are
+// minimal (dnsx is literally `cat input | dnsx -r <resolvers> -o output`) while
+// v2's tasks parse specific shapes. Getting that wrong does not fail loudly —
+// it returns text the parser reads as zero findings. So each entry stays here
+// until it has been verified against a real fleet, not until it looks right.
+var axiomModulesNotPorted = map[string]string{
+	"httpx":              "the web DAG root; its task parses httpx -json, which the canned module does not emit",
+	"katana":             "crawler output shape not verified against the canned module",
+	"ffuf":               "the task drives ffuf with -of json + a local wordlist; both are dropped by moduleArgsFor",
+	"dalfox":             "not verified against a fleet",
+	"mantra":             "not verified against a fleet",
+	"subjs":              "not verified against a fleet",
+	"wafw00f":            "not verified against a fleet",
+	"nmapx":              "v2 has no nmap-over-axiom task",
+	"nuclei-screenshots": "screenshots are content-addressed locally from a temp dir the fleet cannot write to",
+	"puredns-single":     "v2 brute is puredns bruteforce, which isLocalOnlyAxiomOp forces local",
+	"subfinder":          "API-bound; mapped to \"\" above so it is local by declaration, not by omission",
 }
 
 // Fleet-lifecycle timeouts. NONE of these calls is time-bounded by anything else:
@@ -106,6 +139,15 @@ type AxiomBackend struct {
 	dispatchSem  chan struct{}
 	lastDispatch time.Time
 
+	// distMu guards the two distribution ledgers below. They exist because a
+	// fleet costs money and, before them, NOTHING anywhere told an operator what
+	// the fleet actually did: an unmapped tool fell back to local silently, and
+	// logs/tools.jsonl has no field naming the backend that ran an invocation.
+	// "Did --axiom distribute anything?" was unanswerable after the fact.
+	distMu     sync.Mutex
+	dispatched map[string]int    // tool -> successful fleet dispatches
+	ranLocally map[string]string // tool -> why it did NOT go to the fleet
+
 	// dispatchFailures counts CONSECUTIVE failed dispatches; at
 	// axiomDispatchFailureLatch the fleet is abandoned for the rest of the run.
 	dispatchFailures atomic.Int32
@@ -150,6 +192,109 @@ func (a *AxiomBackend) dispatchGate(ctx context.Context) (func(), error) {
 	return func() { <-a.dispatchSem }, nil
 }
 
+// axiomLocalReason explains, in operator language, why a tool will NOT be sent to
+// the fleet — or "" when it will be.
+//
+// The condition it replaces was written out three times (Exec, Stream and
+// routesToFleet) and had to be kept in lockstep by hand. Naming the reason is the
+// point: "ran locally" and "ran locally BECAUSE there is no axiom module for this
+// tool" are different facts to someone deciding whether the fleet was worth it.
+func (a *AxiomBackend) axiomLocalReason(t *Tool, args []string) string {
+	module, ok := a.moduleMap[t.Name]
+	switch {
+	case !ok:
+		return "no axiom module for this tool"
+	case module == "":
+		return "declared local-only in the module map"
+	case isLocalOnlyAxiomOp(t.Name, args):
+		return "this sub-command has no correct axiom module"
+	case a.disabled.Load():
+		return "fleet was abandoned earlier in this run"
+	}
+	return ""
+}
+
+// noteLocal records that a tool ran locally, and says so ONCE per tool.
+//
+// Once per tool, not once per call: a module that dispatches per host would
+// otherwise bury the run's real output. Info, not Debug — an operator who paid
+// for instances should not have to re-run at debug level to learn the fleet was
+// idle for a given tool.
+func (a *AxiomBackend) noteLocal(name, reason string) {
+	a.distMu.Lock()
+	if a.ranLocally == nil {
+		a.ranLocally = make(map[string]string)
+	}
+	_, seen := a.ranLocally[name]
+	a.ranLocally[name] = reason
+	a.distMu.Unlock()
+	if !seen && a.log != nil {
+		a.log.Info("axiom_backend: running locally, not on the fleet",
+			slog.String("tool", name), slog.String("reason", reason))
+	}
+}
+
+// noteDispatch records one dispatch that actually returned fleet results.
+func (a *AxiomBackend) noteDispatch(name string) {
+	a.distMu.Lock()
+	if a.dispatched == nil {
+		a.dispatched = make(map[string]int)
+	}
+	a.dispatched[name]++
+	a.distMu.Unlock()
+}
+
+// DistributionSummary reports what the fleet actually did this run: the tools it
+// executed (with dispatch counts) and the tools it did not, each with its reason.
+// Exported so a caller can surface it even when shutdown_on_end is false.
+func (a *AxiomBackend) DistributionSummary() (dispatched map[string]int, local map[string]string) {
+	a.distMu.Lock()
+	defer a.distMu.Unlock()
+	dispatched = make(map[string]int, len(a.dispatched))
+	for k, v := range a.dispatched {
+		dispatched[k] = v
+	}
+	local = make(map[string]string, len(a.ranLocally))
+	for k, v := range a.ranLocally {
+		local[k] = v
+	}
+	return dispatched, local
+}
+
+// logDistributionSummary emits the end-of-run accounting. A run in which the
+// fleet executed NOTHING is reported at Warn: it means billable instances were
+// provisioned and every tool still ran on the operator's own machine.
+func (a *AxiomBackend) logDistributionSummary() {
+	if a.log == nil {
+		return
+	}
+	dispatched, local := a.DistributionSummary()
+	total := 0
+	tools := make([]string, 0, len(dispatched))
+	for name, n := range dispatched {
+		total += n
+		tools = append(tools, name)
+	}
+	sort.Strings(tools)
+
+	localTools := make([]string, 0, len(local))
+	for name := range local {
+		localTools = append(localTools, name)
+	}
+	sort.Strings(localTools)
+
+	if total == 0 {
+		a.log.Warn("axiom_backend: the fleet executed NOTHING this run — every tool ran locally",
+			slog.Int("tools_run_locally", len(localTools)),
+			slog.Any("local", localTools))
+		return
+	}
+	a.log.Info("axiom_backend: distribution summary",
+		slog.Int("dispatches", total),
+		slog.Any("distributed", tools),
+		slog.Any("ran_locally", localTools))
+}
+
 // NewAxiomBackend constructs the real AxiomBackend with cfg.Axiom.* settings.
 // reg is used to look up the axiom-scan tool entry. logger may be nil (slog.Default used).
 func NewAxiomBackend(cfg *config.Config, reg *ToolRegistry, logger *slog.Logger) *AxiomBackend {
@@ -187,19 +332,21 @@ func NewAxiomBackendWithLocal(cfg *config.Config, reg *ToolRegistry, logger *slo
 // local execution. Uses Tool.InputFlag to identify the input file — NOT a
 // heuristic last-non-flag-arg scan (REVIEWS finding #5 fix).
 func (a *AxiomBackend) Exec(ctx context.Context, t *Tool, args []string) (*Result, error) {
-	module, ok := a.moduleMap[t.Name]
-	if !ok || module == "" || isLocalOnlyAxiomOp(t.Name, args) || a.disabled.Load() {
+	if reason := a.axiomLocalReason(t, args); reason != "" {
 		// Unmapped, explicitly local-only, an op with no correct axiom module
 		// (puredns bruteforce — the map only has "puredns-resolve", the wrong op),
 		// or a fleet already known to be unusable → transparent local fallback.
+		// Transparent to the SCAN, but no longer invisible to the operator.
+		a.noteLocal(t.Name, reason)
 		return a.local.Exec(ctx, t, args)
 	}
+	module := a.moduleMap[t.Name]
 
 	inputFile := extractInputFile(t, args)
 	if inputFile == "" {
-		// No input file found — fall back to local silently.
-		a.log.Debug("axiom_backend: no input file found, falling back to local",
-			slog.String("tool", t.Name))
+		// axiom-scan's whole model is splitting an input file across the fleet, so
+		// with nothing to split there is no dispatch to make.
+		a.noteLocal(t.Name, "no input file to split across the fleet")
 		return a.local.Exec(ctx, t, args)
 	}
 
@@ -308,6 +455,7 @@ func (a *AxiomBackend) Exec(ctx context.Context, t *Tool, args []string) (*Resul
 	_ = os.Remove(outFile)
 	res.Stdout = out
 	a.dispatchFailures.Store(0) // a real result — the fleet is healthy again
+	a.noteDispatch(t.Name)
 
 	return res, nil
 }
@@ -500,8 +648,7 @@ func (a *AxiomBackend) routesToFleet(t *Tool, args []string) bool {
 	if a.local == nil {
 		return true
 	}
-	module, ok := a.moduleMap[t.Name]
-	if !ok || module == "" || isLocalOnlyAxiomOp(t.Name, args) || a.disabled.Load() {
+	if a.axiomLocalReason(t, args) != "" {
 		return false
 	}
 	// V-02: Exec has a SECOND local-fallback arm — an unresolvable input file
@@ -679,8 +826,8 @@ func (a *AxiomBackend) axiomScanTool() *Tool {
 // and emits it over the returned channel. If the tool is unmapped, delegates
 // to local.Stream transparently.
 func (a *AxiomBackend) Stream(ctx context.Context, t *Tool, args []string) (<-chan Event, error) {
-	module, ok := a.moduleMap[t.Name]
-	if !ok || module == "" || isLocalOnlyAxiomOp(t.Name, args) || a.disabled.Load() {
+	if reason := a.axiomLocalReason(t, args); reason != "" {
+		a.noteLocal(t.Name, reason)
 		return a.local.Stream(ctx, t, args)
 	}
 	// Axiom: run Exec (buffer whole result), then pipe through a channel.
@@ -870,6 +1017,11 @@ func selectedNoInstances(stdout []byte) bool {
 
 // Shutdown removes the fleet when ShutdownOnEnd=true.
 func (a *AxiomBackend) Shutdown(ctx context.Context) error {
+	// BEFORE the ShutdownOnEnd gate: the accounting is about what the run did, and
+	// an operator who keeps the fleet alive between scans needs it just as much as
+	// one who tears it down.
+	a.logDistributionSummary()
+
 	if !a.cfg.Axiom.ShutdownOnEnd {
 		return nil
 	}
