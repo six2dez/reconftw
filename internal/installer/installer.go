@@ -78,14 +78,41 @@ func (i *Installer) Run(ctx context.Context) error {
 
 	tools := i.selectTools()
 	bcfg := newBootstrapConfig()
+	goBin, gopathBin, uvBin, cargoBin := userBinDirs()
+
 	if err := bootstrapGo(ctx, bcfg); err != nil {
 		return fmt.Errorf("install: %w", err)
 	}
+	// Each bootstrap is followed by the check that it is USABLE. Installing a
+	// toolchain into a directory nothing on this process's PATH points at is not
+	// a success, and treating it as one is what let 24 tools fail in a run that
+	// reported completion — see ensureOnPath.
+	if err := ensureOnPath("go", goBin, gopathBin); err != nil {
+		return fmt.Errorf("install: %w", err)
+	}
+	// The three directories the installers WRITE INTO. Finding `go`, `uv` and
+	// `cargo` is only half the job: what they produce lands in GOPATH/bin,
+	// ~/.local/bin and ~/.cargo/bin, and a tool installed into a directory this
+	// process cannot see is reported missing by the health-check below and by
+	// every later run. smugglex was diagnosed exactly that way on 2026-09-03 —
+	// present at ~/.cargo/bin/smugglex, reported NOT INSTALLED, with the install
+	// having logged no failure at all.
+	if err := prependPath(gopathBin, uvBin, cargoBin); err != nil {
+		return fmt.Errorf("install: %w", err)
+	}
+
 	if err := bootstrapUV(ctx, bcfg); err != nil {
 		return fmt.Errorf("install: %w", err)
 	}
+	if err := ensureOnPath("uv", uvBin, cargoBin); err != nil {
+		return fmt.Errorf("install: %w", err)
+	}
+
 	if anyKind(tools, "rust") {
 		if err := bootstrapRust(ctx, bcfg); err != nil {
+			return fmt.Errorf("install: %w", err)
+		}
+		if err := ensureOnPath("cargo", cargoBin); err != nil {
 			return fmt.Errorf("install: %w", err)
 		}
 	}
@@ -105,7 +132,43 @@ func (i *Installer) Run(ctx context.Context) error {
 	if len(failed) > 0 {
 		i.log.Warn("install_completed_with_failures", "failed_count", len(failed), "failed", failed)
 	}
+
+	// Provisioning runs AFTER the tool loop because it needs gf on disk to be
+	// worth doing, and BEFORE HealthCheck so the check below sees the result.
+	// gf is the only tool in the manifest whose binary is useless without a
+	// separately-shipped data set — see gf_patterns.go.
+	if toolSelected(tools, "gf") {
+		if err := provisionGFPatterns(ctx, i.log); err != nil {
+			if gfIsCritical(tools) {
+				return fmt.Errorf("install: %w", err)
+			}
+			i.log.Warn("gf_patterns_failed", "err", err)
+		}
+	}
+
 	return i.HealthCheck(ctx)
+}
+
+// toolSelected reports whether name survived the Profile/Without filters.
+func toolSelected(tools []*backend.Tool, name string) bool {
+	for _, t := range tools {
+		if t.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// gfIsCritical reports gf's Critical bit as declared in tools.lock, so the
+// severity of a pattern-provisioning failure tracks the manifest rather than
+// being hard-coded here.
+func gfIsCritical(tools []*backend.Tool) bool {
+	for _, t := range tools {
+		if t.Name == "gf" {
+			return t.Critical
+		}
+	}
+	return false
 }
 
 // installOne dispatches a single tool to the handler for its kind.
@@ -143,6 +206,26 @@ func (i *Installer) HealthCheck(ctx context.Context) error {
 	if len(missingCritical) > 0 {
 		return fmt.Errorf("health-check: %d critical tool(s) missing: %s",
 			len(missingCritical), strings.Join(missingCritical, ", "))
+	}
+
+	// A RESOLVABLE gf with no patterns passes every check above and still
+	// classifies nothing, which silently empties every vuln class. lookPath
+	// cannot see that, so ask separately.
+	selected := i.selectTools()
+	if toolSelected(selected, "gf") {
+		if _, err := lookPath("gf"); err == nil {
+			if gfMissing := MissingGFPatterns(); len(gfMissing) > 0 {
+				msg := fmt.Sprintf(
+					"gf resolves but %d/%d pattern(s) are absent from %s (%s) — "+
+						"those vuln classes would produce nothing; run `reconftw install` to provision them",
+					len(gfMissing), len(GFRequiredPatterns), gfPatternDir(),
+					strings.Join(gfMissing, ", "))
+				if gfIsCritical(selected) {
+					return fmt.Errorf("health-check: %s", msg)
+				}
+				i.log.Warn("health_check_gf_patterns_missing", "missing", gfMissing)
+			}
+		}
 	}
 	return nil
 }

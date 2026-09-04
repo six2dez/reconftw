@@ -77,18 +77,59 @@ func (c *CloneToolInstaller) installPythonVenv(ctx context.Context, tool *backen
 	if _, err := os.Stat(filepath.Join(dir, "venv")); err == nil {
 		return nil // venv already provisioned (idempotent)
 	}
-	if err := runCmd(ctx, "git", []string{"clone", "--depth", "1", tool.RepoURL, dir}, nil); err != nil {
+	// A clone WITHOUT a venv is the wreckage of an earlier run that got past git
+	// and died at `uv venv` — which is exactly what an absent uv used to cause,
+	// for every python_venv tool at once. Re-cloning over it fails with "destination
+	// path already exists", so the tool could never recover: the run that broke it
+	// also made it permanently unfixable by re-running, while the installer
+	// advertises itself as idempotent. Resume from the existing clone instead.
+	if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
+		if pullErr := runCmdDir(ctx, dir, "git", []string{"pull", "--ff-only"}, nil); pullErr != nil {
+			// A stale checkout is still buildable; only the refresh failed.
+			_ = pullErr
+		}
+	} else if err := runCmd(ctx, "git", []string{"clone", "--depth", "1", tool.RepoURL, dir}, nil); err != nil {
 		return fmt.Errorf("clone %s: %w", tool.Name, err)
 	}
 	if err := runCmdDir(ctx, dir, "uv", []string{"venv", "venv"}, nil); err != nil {
 		return fmt.Errorf("venv %s: %w", tool.Name, err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "requirements.txt")); err == nil {
-		if err := runCmdDir(ctx, dir, "uv", []string{"pip", "install", "-r", "requirements.txt"}, nil); err != nil {
+	// requirements.txt is only ONE of the two shapes upstream uses. gato ships
+	// pyproject.toml + setup.py and no requirements.txt, so this branch installed
+	// nothing: the venv came out holding only its activate scripts, the declared
+	// clone_entry `venv/bin/gato` was never created, and the tool resolved as
+	// "INSTALLED BUT UNRESOLVABLE" — an install that reported success and left
+	// the tool unusable. Installing the PACKAGE covers the packaged shape and, as
+	// a side effect, its dependencies too.
+	// --python venv/bin/python3 IS LOAD-BEARING, and its absence was invisible.
+	// `uv pip install` with no target resolves an environment of its own choosing
+	// — not the venv two lines above — so it printed "Installed 1 package" and
+	// exited 0 while the venv stayed empty. Nothing failed, nothing was logged,
+	// and the tool was simply unusable: verified on 2026-09-03, where
+	// /root/Tools/gato/venv/bin held only activate scripts after a "successful"
+	// install and gained the gato entry point the moment --python was passed.
+	// v1 always passed it (install.sh: `uv pip install ... --python venv/bin/python3`).
+	const venvPython = "venv/bin/python3"
+	switch {
+	case fileExists(filepath.Join(dir, "requirements.txt")):
+		if err := runCmdDir(ctx, dir, "uv",
+			[]string{"pip", "install", "-r", "requirements.txt", "--python", venvPython}, nil); err != nil {
 			return fmt.Errorf("pip install %s: %w", tool.Name, err)
+		}
+	case fileExists(filepath.Join(dir, "pyproject.toml")), fileExists(filepath.Join(dir, "setup.py")):
+		if err := runCmdDir(ctx, dir, "uv",
+			[]string{"pip", "install", ".", "--python", venvPython}, nil); err != nil {
+			return fmt.Errorf("pip install %s (packaged project): %w", tool.Name, err)
 		}
 	}
 	return nil
+}
+
+// fileExists reports whether path is present. Named rather than inlined so the
+// two-shape switch above reads as the decision it is.
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 func (c *CloneToolInstaller) installRust(ctx context.Context, tool *backend.Tool) error {
@@ -162,24 +203,35 @@ func (c *CloneToolInstaller) installMakeClone(ctx context.Context, tool *backend
 // produces `DNScewl` for a tool looked up as `dnscewl`), so the match is
 // case-insensitive on the file name and requires the file be executable.
 func findBuiltBinary(dir, name string) (string, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return "", err
+	// The clone root first, then bin/. Root-only was enough for dnscewl, whose
+	// Makefile writes beside its sources, but it is NOT the common convention:
+	// massdns's Makefile emits bin/massdns, so a root-only search reported "make
+	// produced no executable" for a build that had in fact succeeded.
+	for _, sub := range []string{"", "bin"} {
+		search := dir
+		if sub != "" {
+			search = filepath.Join(dir, sub)
+		}
+		entries, err := os.ReadDir(search)
+		if err != nil {
+			continue // no such subdirectory — try the next candidate
+		}
+		for _, e := range entries {
+			if e.IsDir() || !strings.EqualFold(e.Name(), name) {
+				continue
+			}
+			info, statErr := e.Info()
+			if statErr != nil {
+				continue
+			}
+			if info.Mode()&0o111 == 0 {
+				continue // matched by name but not executable — not the artefact
+			}
+			return filepath.Join(search, e.Name()), nil
+		}
 	}
-	for _, e := range entries {
-		if e.IsDir() || !strings.EqualFold(e.Name(), name) {
-			continue
-		}
-		info, statErr := e.Info()
-		if statErr != nil {
-			continue
-		}
-		if info.Mode()&0o111 == 0 {
-			continue // matched by name but not executable — not the artefact
-		}
-		return filepath.Join(dir, e.Name()), nil
-	}
-	return "", fmt.Errorf("make produced no executable named %q (case-insensitive) in the clone root", name)
+	return "", fmt.Errorf("make produced no executable named %q (case-insensitive) "+
+		"in the clone root or its bin/ subdirectory", name)
 }
 
 // copyExecutable copies src to dst with the executable bit set, replacing any

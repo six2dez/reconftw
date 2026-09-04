@@ -39,13 +39,44 @@
 # absolute value would bypass it by never being joined (T-18-02-02). Pinned by
 # TestEveryDeclaredCloneEntryIsRelative.
 #
-# Critical tier (3 tools — the smallest passive+probe+resolve trio needed
-# for any meaningful Phase 4 run):
-#   subfinder — passive subdomain enumeration
-#   httpx     — HTTP probe + tech detection
-#   dnsx      — DNS resolver toolkit
+# Critical tier (7 tools). WHAT THE BIT MEANS, because it drives four separate
+# behaviours: `install` ABORTS when a critical tool fails; the post-install
+# HealthCheck and `reconftw health-check` EXIT NON-ZERO when one is absent; and
+# `install --profile core` installs the critical tier AND NOTHING ELSE.
 #
-# Required-but-not-critical (7 tools): missing-required → WARN in health-check.
+# The test for membership is therefore NOT "important tool" — it is: with this
+# absent, does a default run still produce its headline artefact, or does it
+# produce a CONVINCING EMPTY ONE? Everything outside the tier degrades to a
+# visible [SKIP]; everything inside it fails the run silently.
+#
+# The list was originally seeded as "the smallest passive+probe+resolve trio
+# needed for any meaningful Phase 4 run" — scoped to the subdomain milestone,
+# never revisited once it started gating the installer. That left 101 of 104
+# tools able to fail while `install` still exited 0.
+#
+#   subfinder — passive subdomain enumeration; the primary passive source
+#   httpx     — HTTP probe + tech detection; the DAG ROOT of the whole web
+#               module (web/httpx.go: DependsOn() == nil, everything else
+#               depends on it directly or transitively)
+#   dnsx      — DNS resolver toolkit
+#   puredns   — the ONLY wildcard-filtering mass resolver and the ONLY
+#               brute-force resolver (SubActiveTask). Without it the resolved
+#               set is wildcard-polluted rather than absent, which is worse.
+#   massdns   — puredns's resolver engine. v2 NEVER invokes it directly, so an
+#               absent massdns is invisible to every code path except this
+#               declaration; puredns then fails at run time.
+#   nuclei    — the findings deliverable. Runs in `recon` too, not just `all`
+#               (ModeRecon -> webStageGroups -> web.nuclei), so without it
+#               findings.jsonl is empty in every mode that claims to scan.
+#   gf        — fills inputs/gf/<class>.txt, the candidate source for cmdi,
+#               xss, sqli, lfi, ssrf, redirect and ssti. A missing bucket makes
+#               each of those return StatusSkipped (see vulns/cmdi.go), so an
+#               absent gf silently empties SEVEN vuln classes at once.
+#               NOTE: the gf BINARY is not sufficient — it ships no patterns.
+#               installer/gf_patterns.go provisions ~/.gf and health-check
+#               verifies it; `critical` here only covers binary resolution.
+#
+# Required-but-not-critical: missing-required → WARN in health-check.
 
 schema_version = "1.0"
 generated_by   = "phase-11-plan-01"
@@ -124,7 +155,7 @@ go_module       = "github.com/d3mondev/puredns/v2"
 description     = "Mass DNS resolution with wildcard filtering; positional: puredns bruteforce <wordlist> -d <domain> OR puredns resolve <domains>"
 default_args    = []
 timeout_seconds = 3600
-critical        = false
+critical        = true
 version         = "v2.1.1"
 input_flag      = ""
 [[tools]]
@@ -299,12 +330,26 @@ version         = "latest"
 input_flag      = ""
 [[tools]]
 name            = "massdns"
-kind            = "system"
-description     = "High-performance DNS stub resolver (build from source)"
+# NOT an OS package on Linux. The description below already said "build from
+# source" while kind said `system`, i.e. apt/yum — which only ever worked on
+# macOS, where brew does carry a massdns formula. On Ubuntu `apt-get install
+# massdns` fails with "Unable to locate package" (verified 2026-09-03), so the
+# declaration was wrong for the platform this tool is mostly run on. v1 always
+# built it: clone blechschmidt/massdns, `make`, cp bin/massdns (install.sh:723-730).
+# make_clone is that, and it is portable — brew's formula stays usable but is no
+# longer required. Note the artefact lands in bin/, which is why findBuiltBinary
+# searches the clone's bin/ subdirectory as well as its root.
+kind            = "make_clone"
+repo_url        = "https://github.com/blechschmidt/massdns"
+description     = "High-performance DNS stub resolver (built from source via make)"
 default_args    = []
 timeout_seconds = 0
-critical        = false
-version         = ""
+critical        = true
+# "latest": make_clone does `git clone --depth 1` off the default branch, so
+# the default branch IS the pin — same convention as dnscewl. Left empty from
+# its kind=system days, which TestToolsLockVersionsPopulated exempts and
+# make_clone does not.
+version         = "latest"
 input_flag      = ""
 [[tools]]
 name            = "urlfinder"
@@ -394,7 +439,7 @@ default_args    = []
 # else writes Tool.Timeout). If a deep run reports ToolTimeout, raise it HERE;
 # do not read the timeout as a nuclei defect.
 timeout_seconds = 14400
-critical        = false
+critical        = true
 version         = "v3.8.0"
 input_flag      = "-l"
 [[tools]]
@@ -582,7 +627,7 @@ go_module       = "github.com/tomnomnom/gf"
 description     = "URL gf-pattern classifier (xss/sqli/ssrf/lfi/rce/redirect/ssti/potential)"
 default_args    = []
 timeout_seconds = 60
-critical        = false
+critical        = true
 version         = "latest"
 input_flag      = ""
 [[tools]]
@@ -841,8 +886,19 @@ version         = "latest"
 input_flag      = ""
 [[tools]]
 name            = "EmailHarvester"
-kind            = "python"
-pip_package     = "EmailHarvester"
+kind            = "python_venv"
+# FIXED 2026-09-03, the EIGHTH instance of the defect bf5adc0 fixed in seven
+# rows (regulator, dorks_hunter, gato, SwaggerSpy, Spoofy, cmseek, LeakSearch);
+# this row was missed. It declared kind="python" + a PyPI package while ALSO
+# carrying the clone_* coordinates below, so the install path and the resolve
+# path disagreed and neither could work on Linux: `uv tool install EmailHarvester`
+# produces the console script `emailharvester` (LOWERCASE), while emails.go calls
+# app.Tools.Run(ctx, "EmailHarvester", ...) and exec.LookPath is case-SENSITIVE
+# there — and the clone fallback the coordinates describe pointed at a
+# ~/Tools/EmailHarvester the installer was never told to create.
+# Caught by release-gates Gate 13 on reconbox3 (2026-09-03) reporting it
+# "INSTALLED BUT UNRESOLVABLE"; the case mismatch is invisible on macOS.
+repo_url        = "https://github.com/maldevel/EmailHarvester"
 description     = "Email harvesting from public sources (OSINT-03 emails)"
 default_args    = []
 timeout_seconds = 300

@@ -257,6 +257,92 @@ func bootstrapUV(ctx context.Context, cfg *bootstrapConfig) error {
 	return runCmd(ctx, "sh", []string{path}, nil)
 }
 
+// ensureOnPath makes a just-bootstrapped toolchain reachable to everything that
+// runs after it, and PROVES it is rather than assuming.
+//
+// THE BUG THIS FIXES, observed live on 2026-09-03. bootstrapUV ran the upstream
+// installer, which put uv in ~/.local/bin and printed its usual "add this to
+// your PATH" advice. bootstrapUV returned nil — success — and the process PATH
+// was untouched, so every `uv tool install` that followed died with
+// `exec: "uv": executable file not found in $PATH`. TWENTY-FOUR tools failed
+// that way in one run; because none of them is in the critical tier, `install`
+// finished with a warning and `health-check` exited 0. An installer that
+// bootstraps a toolchain it then cannot invoke, and calls that success, is the
+// worst shape of false green in this repo: it is indistinguishable from a good
+// install until a scan silently produces nothing.
+//
+// Bootstrapping a tool and leaving it unreachable is not a partial success, so
+// this returns an error rather than warning: the caller decides, and the reason
+// names the directories that were searched.
+func ensureOnPath(bin string, dirs ...string) error {
+	if onPath(bin) {
+		return nil
+	}
+	tried := make([]string, 0, len(dirs))
+	for _, d := range dirs {
+		if d == "" {
+			continue
+		}
+		tried = append(tried, d)
+		if _, err := os.Stat(filepath.Join(d, bin)); err != nil {
+			continue
+		}
+		// Prepend: a freshly bootstrapped toolchain must win over an older copy
+		// that a system package may have left earlier on the PATH.
+		_ = os.Setenv("PATH", d+string(os.PathListSeparator)+os.Getenv("PATH"))
+		if onPath(bin) {
+			return nil
+		}
+	}
+	return fmt.Errorf("%s was bootstrapped but is not on PATH and was not found in %v — "+
+		"every later invocation of it would fail with \"executable file not found\"", bin, tried)
+}
+
+// prependPath puts each directory at the front of this process's PATH, so the
+// binaries the installers PRODUCE are visible to the steps that follow.
+// Duplicates are skipped so a re-entrant call cannot grow PATH without bound.
+func prependPath(dirs ...string) error {
+	for _, d := range dirs {
+		if d == "" {
+			continue
+		}
+		cur := os.Getenv("PATH")
+		already := false
+		for _, existing := range filepath.SplitList(cur) {
+			if existing == d {
+				already = true
+				break
+			}
+		}
+		if already {
+			continue
+		}
+		if err := os.Setenv("PATH", d+string(os.PathListSeparator)+cur); err != nil {
+			return fmt.Errorf("extend PATH with %s: %w", d, err)
+		}
+	}
+	return nil
+}
+
+// userBinDirs are the directories the bootstrappers install into, in the order
+// this installer should prefer them. Kept in one place so a new bootstrap step
+// cannot forget one.
+func userBinDirs() (goBin, gopathBin, uvBin, cargoBin string) {
+	home, _ := os.UserHomeDir()
+	goBin = "/usr/local/go/bin"
+	gopathBin = filepath.Join(home, "go", "bin")
+	if gp := os.Getenv("GOPATH"); gp != "" {
+		gopathBin = filepath.Join(gp, "bin")
+	}
+	// The uv installer honours these in turn; ~/.local/bin is its default.
+	uvBin = filepath.Join(home, ".local", "bin")
+	if d := os.Getenv("UV_INSTALL_DIR"); d != "" {
+		uvBin = d
+	}
+	cargoBin = filepath.Join(home, ".cargo", "bin")
+	return goBin, gopathBin, uvBin, cargoBin
+}
+
 // bootstrapRust installs the Rust toolchain via rustup-init when absent
 // (INST-09 — only invoked when a kind=rust tool is enabled).
 //

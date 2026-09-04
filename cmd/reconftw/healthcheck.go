@@ -35,6 +35,7 @@ import (
 	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
 	"github.com/six2dez/reconftw/internal/core/ui"
+	"github.com/six2dez/reconftw/internal/installer"
 )
 
 // newHealthCheckCmd creates the working health-check subcommand per D-04.
@@ -159,6 +160,38 @@ func runHealthCheck(cmd *cobra.Command, app *appctx.AppContext, cfg *config.Conf
 		default:
 			printer.Status(ui.BadgeOK, "tool."+t.Name, time.Since(start))
 			okCount++
+		}
+	}
+
+	// gf is the one tool in the manifest whose binary is useless on its own: it
+	// ships no patterns and reads them from ~/.gf at run time. A resolvable gf
+	// with an empty ~/.gf passes the loop above as OK and still classifies
+	// nothing, which empties SEVEN vuln classes with no message above Debug.
+	// LookPath cannot see that, so it is asked separately here — the operator
+	// runs THIS command, not the installer's internal health-check.
+	if t, ok := reg.Lookup("gf"); ok && !missingCritSet["gf"] && !missingReqSet["gf"] {
+		start = time.Now()
+		if gfMissing := installer.MissingGFPatterns(); len(gfMissing) > 0 {
+			// The badge line is kept short because Status truncates a long name,
+			// which would swallow exactly the part an operator needs. The class
+			// names go on their own line below.
+			label := fmt.Sprintf("gf.patterns (%d/%d absent)",
+				len(gfMissing), len(installer.GFRequiredPatterns))
+			level := "WARN"
+			if t.Critical {
+				printer.Status(ui.BadgeFAIL, label, time.Since(start))
+				criticalFailures = append(criticalFailures, "gf.patterns")
+				missingCriticalCount++
+				level = "FAIL"
+			} else {
+				printer.Status(ui.BadgeWARN, label, time.Since(start))
+			}
+			printer.Msg(level, fmt.Sprintf(
+				"gf has no pattern for: %s — those classes yield nothing. "+
+					"Run `reconftw install` to provision ~/.gf.",
+				strings.Join(gfMissing, ", ")))
+		} else {
+			printer.Status(ui.BadgeOK, "gf.patterns", time.Since(start))
 		}
 	}
 

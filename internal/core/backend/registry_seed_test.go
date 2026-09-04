@@ -52,25 +52,49 @@ func TestRegistrySeed_PopulatesDefault(t *testing.T) {
 	}
 }
 
-// Test 6: tools.lock seed marks subfinder, httpx, dnsx as Critical=true;
-// every other Phase 4 seed tool is Critical=false.
+// Test 6: the critical tier in tools.lock is EXACTLY this set — nothing more,
+// nothing less. Membership is deliberately hard to change: the bit aborts
+// `install`, decides the exit code of both health-checks, and defines what
+// `install --profile core` installs, so a tool added here without thought
+// starts failing installs, and one dropped starts passing broken ones.
+//
+// The list grew from the original {subfinder, httpx, dnsx}, which was scoped to
+// "any meaningful Phase 4 run" and never revisited once it began gating the
+// installer — leaving 101 of 104 tools able to fail while `install` exited 0.
+// The rationale for each addition is written out in tools.lock's header.
 func TestRegistrySeed_CriticalTier(t *testing.T) {
 	wantCritical := map[string]bool{
-		"subfinder": true,
-		"httpx":     true,
-		"dnsx":      true,
+		"subfinder": true, // primary passive source
+		"httpx":     true, // DAG root of the entire web module
+		"dnsx":      true, // DNS resolution
+		"puredns":   true, // only wildcard-filtering + brute resolver
+		"massdns":   true, // puredns's engine; never invoked directly
+		"nuclei":    true, // the findings deliverable, in recon as well as all
+		"gf":        true, // candidate source for seven vuln classes
 	}
 	for _, tool := range backend.Default.All() {
 		want, listed := wantCritical[tool.Name]
 		if !listed {
-			// Phase 4 tools not in wantCritical should be Critical=false.
 			if tool.Critical {
-				t.Errorf("tool %q unexpectedly Critical=true", tool.Name)
+				t.Errorf("tool %q is Critical=true but is not in the declared tier — "+
+					"add it here WITH its rationale in tools.lock, or clear the bit", tool.Name)
 			}
 			continue
 		}
 		if tool.Critical != want {
 			t.Errorf("tool %q: expected Critical=%v, got %v", tool.Name, want, tool.Critical)
+		}
+	}
+	// The other direction: a name listed here that the manifest no longer
+	// carries would silently shrink the tier back.
+	for name := range wantCritical {
+		tool, ok := backend.Default.Lookup(name)
+		if !ok {
+			t.Errorf("critical tool %q is not in tools.lock at all", name)
+			continue
+		}
+		if !tool.Critical {
+			t.Errorf("critical tool %q has Critical=false in tools.lock", name)
 		}
 	}
 }
