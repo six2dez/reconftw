@@ -317,7 +317,10 @@ default_args    = []
 timeout_seconds = 120
 critical        = false
 version         = "latest"
-input_flag      = ""
+# "-i" is the flag web/subjs.go actually passes (subjs.go:104). It was declared
+# empty, which made extractInputFile fall back to "first non-flag arg" and pick
+# the -ua VALUE — the user-agent string — as the input file under --axiom.
+input_flag      = "-i"
 [[tools]]
 name            = "jsluice"
 kind            = "go"

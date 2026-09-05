@@ -16,6 +16,7 @@ package backend
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -38,8 +39,15 @@ func defaultAxiomModuleMap() map[string]string {
 		"dnsx":      "dnsx",
 		"s3scanner": "s3scanner",
 		"nuclei":    "nuclei",
-		"subfinder": "", // API-bound — always local
-		"dnstake":   "", // no official axiom module yet
+		// Added 2026-09-04 from the Ax module definitions and VERIFIED on the
+		// 2026-09-05 fleet run (rftwv7011334): each dispatched once, completed,
+		// and its output was parsed — katana 3m05s/1130 URLs, subjs 52s, wafw00f
+		// 53s. httpx was tried too and dropped: see axiomModulesNotPorted.
+		"katana":    "katana",  // per-_target_: katana <fwd: -jc -kf -d …> -u _target_
+		"subjs":     "subjs",   // cat input | subjs <fwd: -ua -c> | tee output
+		"wafw00f":   "wafw00f", // wafw00f -i input -o output — v2 parses the text form
+		"subfinder": "",        // API-bound — always local
+		"dnstake":   "",        // no official axiom module yet
 	}
 }
 
@@ -77,15 +85,12 @@ func defaultAxiomModuleMap() map[string]string {
 var axiomModulesNotPorted = map[string]string{
 	// Ready to port once a fleet run confirms them: the canned command already
 	// matches what the v2 task sends, and v1 dispatched each of them this way.
-	"httpx":   "canned txt variant + forwarded -json yields JSONL v2 parses (v1 did this); unverified on a fleet",
-	"katana":  "canned per-_target_ variant + forwarded -jc/-kf/-d (v1 web.sh:1979 did this); unverified on a fleet",
-	"wafw00f": "canned `wafw00f -i input -o output` is exactly v2's arg vector; unverified on a fleet",
-	"subjs":   "canned pipe module; v2's -ua/-c forward cleanly; unverified on a fleet",
-	"mantra":  "canned pipe module; unverified on a fleet",
+	"httpx": "dispatches and is accepted by the fleet, but on 2026-09-05 (1817 hosts, 3 nodes) it exceeded axiomDispatchTimeout and failed over — every --axiom run would pay that 10m before running httpx locally anyway; needs the cap made per-tool or the fleet sized to the host count",
 	// Need a code change first.
 	"ffuf":           "needs moduleArgsFor to turn the local wordlist into -wL (Ax uploads it and fills _wordlist_) instead of dropping it",
 	"puredns-single": "the module exists (bruteforce, input = the WORDLIST split across nodes, domain forwarded — v1's model); needs extractInputFile to pick the wordlist for the bruteforce verb and the isLocalOnlyAxiomOp force lifted",
 	"dalfox":         "v2 drives dalfox in pipe mode over ExecOptions.Stdin, which a fleet split cannot carry; port = rewrite to `file` mode with the reflected list as the input file",
+	"mantra":         "v2 feeds mantra the JS bodies over ExecOptions.Stdin (mantra.go:121), which a fleet split cannot carry; port = write them to a file and use the canned `cat input | mantra` module",
 	// Structurally different or absent in v2.
 	"nmapx":              "v2 has no nmap-over-axiom task",
 	"nuclei-screenshots": "output is a directory of PNGs content-addressed locally from a temp dir; needs the -oD dir merge, not the -o file path",
@@ -184,6 +189,28 @@ type AxiomBackend struct {
 // one returned in 5s, and the other two hung until their timeouts (89m).
 const axiomUIDSeparation = 250 * time.Millisecond
 
+// axiomQueueWait bounds how long a dispatch waits for the gate before running
+// locally instead.
+//
+// Serialization makes the fleet a queue of one. One axiom-scan costs minutes of
+// wall clock (SSH preflight, split, upload, tmux, poll, download, merge), and
+// every task queued behind it burns ITS OWN deadline while it waits: on the
+// 2026-09-05 run tlsx spent its whole 5m budget at the gate without dispatching,
+// the resulting context error is not an *AxiomFailure so nothing fell back to
+// local, the stage failed on it, and the scan exited 1 after 7 minutes with 61
+// subdomains. The earlier run never hit this only because its fleet was
+// abandoned within two dispatches and everything ran locally, in parallel.
+//
+// A tool that cannot get the fleet promptly gains nothing from waiting for it —
+// distribution exists to be FASTER than local — so past this bound it runs
+// locally with its budget intact. The fleet then does what a one-at-a-time
+// fleet can do, and the rest of the scan proceeds at local speed.
+var axiomQueueWait = 30 * time.Second // a var so a test can shorten the wait it measures
+
+// errGateBusy is dispatchGate's "the fleet is busy and you have waited long
+// enough" — the caller runs the tool locally. Never surfaced to a task.
+var errGateBusy = errors.New("axiom dispatch gate busy")
+
 // dispatchGate serializes fleet dispatches and spaces them past axiom-scan's uid
 // granularity. It returns a release func, or an error if ctx ends while queuing.
 //
@@ -194,8 +221,12 @@ func (a *AxiomBackend) dispatchGate(ctx context.Context) (func(), error) {
 	if a.dispatchSem == nil { // defensive: zero-value backend, never built by New*
 		return func() {}, nil
 	}
+	queue := time.NewTimer(axiomQueueWait)
+	defer queue.Stop()
 	select {
 	case a.dispatchSem <- struct{}{}:
+	case <-queue.C:
+		return nil, errGateBusy
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
@@ -395,10 +426,22 @@ func (a *AxiomBackend) Exec(ctx context.Context, t *Tool, args []string) (*Resul
 	// Serialize + space out fleet dispatches (axiom-scan uid collision, see dispatchGate).
 	// Done BEFORE the timeout clock starts so queueing never eats the tool's budget.
 	release, gateErr := a.dispatchGate(ctx)
+	if errors.Is(gateErr, errGateBusy) {
+		a.noteLocal(t.Name, "fleet busy with another dispatch for "+axiomQueueWait.String()+" — ran locally with its budget intact")
+		return a.local.Exec(ctx, t, args)
+	}
 	if gateErr != nil {
 		return nil, gateErr
 	}
 	defer release()
+	// Re-check AFTER the gate. Dispatches are serialized, so a tool can queue for
+	// minutes; if the fleet was abandoned while it waited, the entry check above
+	// is stale. The 2026-09-04 fleet run abandoned at 22:39:25 and still sent two
+	// queued dispatches (dnsx -srv, tlsx) at 22:40 and 22:41.
+	if a.disabled.Load() {
+		a.noteLocal(t.Name, "fleet was abandoned while this dispatch was queued")
+		return a.local.Exec(ctx, t, args)
+	}
 
 	// Logged AFTER the gate: this line means "an axiom-scan is starting NOW". Logging
 	// it before made the live reports overcount — four "dispatching" lines when
@@ -429,17 +472,57 @@ func (a *AxiomBackend) Exec(ctx context.Context, t *Tool, args []string) (*Resul
 		// A dispatch that ran out of OUR budget (not the caller's) is a fleet problem,
 		// not a tool problem: report it as an AxiomFailure so the tool re-runs locally.
 		if ctx.Err() == nil && execCtx.Err() != nil {
+			a.log.Warn("axiom_backend: dispatch timed out — re-running locally",
+				slog.String("tool", t.Name), slog.String("module", module),
+				slog.Duration("budget", budget), slog.Any("err", err))
 			a.recordDispatchFailure("dispatch exceeded " + budget.String())
+			a.noteLocal(t.Name, "dispatch exceeded "+budget.String()+" — re-run locally by failover")
+			_ = os.Remove(outFile) // whatever a killed merge left behind is not a result
 			return nil, &coreerrors.AxiomFailure{
 				Operation: "exec",
 				Inner: fmt.Errorf("axiom-scan %s (module %s) did not return within %s — running locally instead",
 					t.Name, module, budget),
 			}
 		}
-		a.recordDispatchFailure("axiom-scan error")
-		return nil, &coreerrors.AxiomFailure{
-			Operation: "exec",
-			Inner:     fmt.Errorf("axiom-scan %s: %w", t.Name, err),
+		// AXIOM-SCAN'S EXIT STATUS IS NOT A RESULT SIGNAL. The script has no `set -e`;
+		// its clean_up() ends `rm -r $socket_tmp; stty sane; tput init; exit`, so a
+		// bare `exit` returns whatever `tput init` returned — and with no TTY, which
+		// is how this backend runs it (stdout/stderr into buffers), `tput init`
+		// fails. Every SUCCESSFUL scan therefore exits non-zero here. The 2026-09-04
+		// fleet run proved the cost: puredns/dnsx/tlsx all completed on the fleet in
+		// ~52s with real results in their -o files, every one was classified
+		// "axiom-scan error", the results were never read, each tool re-ran locally
+		// for ~9 minutes, and the fleet was abandoned after two of them.
+		//
+		// The output file is the signal, in BOTH directions: its absence already
+		// means failure below (exit 0 with no file = the dead-fleet banner case);
+		// its presence means clean_up()'s merge_output ran, i.e. the scan phase
+		// completed. v1 read the same file and only ever consulted the status to
+		// spot transport errors in stderr (modules/utils.sh
+		// _handle_axiom_command_result).
+		// Only when the process ended ON ITS OWN. A dispatch we killed — the
+		// caller's context cancelled mid-run (a sibling task failed the stage) —
+		// can leave a file merge_output was writing when the signal landed, and
+		// the second dnsx of the 2026-09-05 run ended exactly so: `signal:
+		// killed` with a file present. That is not a completed scan.
+		if _, statErr := os.Stat(outFile); statErr == nil && ctx.Err() == nil {
+			a.log.Warn("axiom_backend: axiom-scan exited non-zero but wrote its output file — using it",
+				slog.String("tool", t.Name), slog.String("module", module), slog.Any("exit", err))
+			if res == nil {
+				res = &Result{}
+			}
+		} else {
+			// Say WHY, with the tool's own exit and stderr. FailoverBackend re-runs
+			// locally without logging the *AxiomFailure it caught, so before this
+			// line the reason a dispatch failed was recorded nowhere at all.
+			a.log.Warn("axiom_backend: dispatch failed and produced no output file — re-running locally",
+				slog.String("tool", t.Name), slog.String("module", module), slog.Any("err", err))
+			a.recordDispatchFailure("axiom-scan error")
+			a.noteLocal(t.Name, "dispatch failed (axiom-scan error, no output file) — re-run locally by failover")
+			return nil, &coreerrors.AxiomFailure{
+				Operation: "exec",
+				Inner:     fmt.Errorf("axiom-scan %s: %w", t.Name, err),
+			}
 		}
 	}
 	if res == nil {
@@ -467,6 +550,7 @@ func (a *AxiomBackend) Exec(ctx context.Context, t *Tool, args []string) (*Resul
 			a.markDisabled("fleet unreachable: " + diag)
 		}
 		a.recordDispatchFailure("no output file")
+		a.noteLocal(t.Name, "dispatch produced no output file ("+diag+") — re-run locally by failover")
 		return nil, &coreerrors.AxiomFailure{
 			Operation: "exec",
 			Inner: fmt.Errorf("axiom-scan %s (module %s) produced no output file: %s",

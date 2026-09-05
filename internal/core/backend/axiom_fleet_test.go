@@ -516,6 +516,16 @@ func (f *blockingFake) Exec(_ context.Context, t *backend.Tool, args []string) (
 		}
 		f.mu.Unlock()
 		<-f.release
+		// Complete like the real axiom-scan does: the merged results land in the -o
+		// file. Without this every dispatch is a "no output file" failure, two of
+		// which trip the abandon latch — and then the THIRD, queued dispatch goes
+		// local by design (see the post-gate check in Exec), which is not what this
+		// test is about. Serialization must be measured on dispatches that succeed.
+		for i, a := range args {
+			if a == "-o" && i+1 < len(args) {
+				_ = os.WriteFile(args[i+1], []byte("resolved.example.com\n"), 0o644)
+			}
+		}
 		f.mu.Lock()
 		f.inFlusk--
 		f.mu.Unlock()
