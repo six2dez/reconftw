@@ -31,6 +31,32 @@ setup() {
   export LOGFILE="/dev/null"
   export bred='' bblue='' bgreen='' byellow='' yellow='' reset=''
   cd "$BATS_TEST_TMPDIR"
+
+  # `anew` is a runtime dependency of the -d branch under test, and the fast
+  # unit job deliberately runs without reconftw's 70+ external tools installed.
+  # Without this stub the two -d tests fail in CI with `anew: command not found`
+  # while passing on any developer box that has it on PATH — the failure is
+  # invisible exactly where the code is written. Same stubbing approach as
+  # tests/unit/test_proxychains.bats.
+  mkdir -p "$BATS_TEST_TMPDIR/stub_bin"
+  cat > "$BATS_TEST_TMPDIR/stub_bin/anew" <<'ANEW_STUB'
+#!/usr/bin/env bash
+# Minimal `anew`: append stdin lines absent from <file>, -q silences echo.
+quiet=0
+[[ "${1:-}" == "-q" ]] && { quiet=1; shift; }
+target="${1:-}"
+[[ -n "$target" ]] || exit 1
+[[ -f "$target" ]] || : > "$target"
+while IFS= read -r line; do
+  grep -qxF -- "$line" "$target" 2>/dev/null && continue
+  printf '%s\n' "$line" >> "$target"
+  [[ "$quiet" -eq 1 ]] || printf '%s\n' "$line"
+done
+exit 0
+ANEW_STUB
+  chmod +x "$BATS_TEST_TMPDIR/stub_bin/anew"
+  export PATH="$BATS_TEST_TMPDIR/stub_bin:$PATH"
+
   source "$project_root/reconftw.sh" --source-only
   # reconftw.sh:7 runs `set +e`, which disables errexit in THIS shell. bats needs
   # errexit to fail a test at the first failing command; without it only the
