@@ -523,9 +523,25 @@ function _proxychains_applies() {
     local _tool="${1:-}"
     [[ -z "$_tool" ]] && return 1
 
+    # Narrowing IFS here is REQUIRED, not stylistic. reconftw.sh:8 sets
+    # IFS=$'\n\t' process-wide, so an unquoted ${PROXYCHAINS_EXCLUDE} does NOT
+    # split on spaces — and reconftw.cfg documents this variable as
+    # space-separated. PROXYCHAINS_EXCLUDE="httpx nuclei" therefore arrived as
+    # the SINGLE word "httpx nuclei", matched no tool name, and both tools were
+    # proxied anyway: the operator's exclusion silently did nothing. Splitting
+    # on space/tab/newline accepts every separator a user might reach for.
+    local -a _extra=()
+    if [[ -n "${PROXYCHAINS_EXCLUDE:-}" ]]; then
+        local _oifs="$IFS"
+        IFS=$' \t\n'
+        # shellcheck disable=SC2206 # deliberate word splitting, IFS narrowed above
+        _extra=(${PROXYCHAINS_EXCLUDE})
+        IFS="$_oifs"
+    fi
+
     local _skip
     for _skip in massdns puredns dnsx shuffledns naabu nmap masscan \
-        ${PROXYCHAINS_EXCLUDE:-}; do
+        "${_extra[@]}"; do
         [[ "$_tool" == "$_skip" ]] && return 1
     done
     return 0

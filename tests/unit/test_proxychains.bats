@@ -99,6 +99,37 @@ teardown() {
     && [ ! -s "$PC_CALLS" ]
 }
 
+@test "PROXYCHAINS_EXCLUDE splits on spaces, not just a single name" {
+  # The single-name case above passes even when the list is never word-split, so
+  # it cannot see the bug this pins: reconftw.sh:8 sets IFS=$'\n\t' process-wide,
+  # while reconftw.cfg documents PROXYCHAINS_EXCLUDE as space-separated. Unsplit,
+  # "httpx nuclei" is ONE word that matches no tool name and BOTH get proxied —
+  # the operator's exclusion silently does nothing. Assert on the SECOND name:
+  # a list that is never split would still appear to work for the first one.
+  export PROXYCHAINS=true
+  export PROXYCHAINS_EXCLUDE="httpx nuclei"
+
+  cat > bin/nuclei <<'STUB'
+#!/usr/bin/env bash
+echo "nuclei ran"
+STUB
+  chmod +x bin/nuclei
+
+  run run_command nuclei -silent
+  [ "$status" -eq 0 ] \
+    && [ "$output" = "nuclei ran" ] \
+    && [ ! -s "$PC_CALLS" ]
+}
+
+@test "PROXYCHAINS_EXCLUDE still excludes the first name when several are given" {
+  export PROXYCHAINS=true
+  export PROXYCHAINS_EXCLUDE="httpx nuclei"
+  run run_command httpx -silent
+  [ "$status" -eq 0 ] \
+    && [ "$output" = "httpx ran" ] \
+    && [ ! -s "$PC_CALLS" ]
+}
+
 @test "a missing proxychains binary fails the command instead of running it direct" {
   export PROXYCHAINS=true
   export PROXYCHAINS_BIN="proxychains-that-does-not-exist"
