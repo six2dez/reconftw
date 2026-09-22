@@ -176,7 +176,13 @@ func TestBatsParityMapMatchesSuite(t *testing.T) {
 // still enforces that the map tracks it, while THIS test forces a conscious,
 // reviewed bump of the baseline constant.
 func TestBatsParityMapBaselineCount(t *testing.T) {
-	const wantBaseline = 416
+	// 416 -> 440: the v1 suite grew 4 files when #1047/#1048 merged and #1049/#1050
+	// were fixed — test_web_mode_scope (3), test_proxychains (8),
+	// test_lunar_exposure (6), test_cloud_vps_detection (7). All 24 map to
+	// `superseded`: proxychains and Lunar are v1-only features with no v2
+	// implementation, and the cloud-metadata probe feeds v1's per-network
+	// puredns/dnsx auto-switch, which v2 deliberately does not have.
+	const wantBaseline = 440
 	root := repoRoot(t)
 
 	if got := sum(batsScenarioCounts(t, root)); got != wantBaseline {

@@ -501,4 +501,17 @@ var supersededKeys = map[string]supersededInfo{
 	"cyan":    {reason: "bash terminal color code; not config", pin: ""},
 	"yellow":  {reason: "bash terminal color code; not config", pin: ""},
 	"reset":   {reason: "bash terminal color code; not config", pin: ""},
+
+	// v1-only features with no v2 implementation YET (not dropped by design —
+	// simply not ported). Both landed in v1 after the rewrite began (#1041,
+	// #1042) and are off by default there, so an operator migrating a config
+	// that enables them must be told plainly rather than left to discover the
+	// setting silently doing nothing. Move these out of this map to a live
+	// mapping if and when the Go side grows them.
+	"PROXYCHAINS":         {reason: "not implemented in v2; v1 wraps tools via run_command, v2 has no equivalent gate yet (#1041)", pin: ""},
+	"PROXYCHAINS_BIN":     {reason: "not implemented in v2 (#1041)", pin: ""},
+	"PROXYCHAINS_CONF":    {reason: "not implemented in v2 (#1041)", pin: ""},
+	"PROXYCHAINS_EXCLUDE": {reason: "not implemented in v2 (#1041)", pin: ""},
+	"LUNAR_EXPOSURE":      {reason: "not implemented in v2; the Lunar OSINT task is v1-only for now (#1042)", pin: ""},
+	"LUNAR_TIMEOUT":       {reason: "not implemented in v2 (#1042)", pin: ""},
 }
