@@ -489,6 +489,64 @@ function progress_bar() {
 
 # Execute command in dry-run mode if enabled
 # Usage: run_command <command> [args...]
+# _proxychains_bin — echo the proxychains binary to use, or fail.
+# PROXYCHAINS_BIN wins when set; otherwise proxychains4 is preferred because the
+# proxychains-ng fork is what ships as `proxychains4` on Debian/Ubuntu and as
+# `proxychains-ng` (binary `proxychains4`) on Homebrew.
+function _proxychains_bin() {
+    if [[ -n "${PROXYCHAINS_BIN:-}" ]]; then
+        command -v "$PROXYCHAINS_BIN" 2>/dev/null && return 0
+        return 1
+    fi
+    command -v proxychains4 2>/dev/null && return 0
+    command -v proxychains 2>/dev/null && return 0
+    return 1
+}
+
+# _proxychains_applies <tool-name> — false for tools proxychains cannot carry.
+#
+# proxychains hooks libc connect() and covers TCP only. Three classes break
+# under it, and breaking them silently is worse than not proxying them:
+#
+#   * mass-DNS resolvers (massdns, puredns, dnsx, shuffledns) send raw UDP/53
+#     from their own socket code. Under proxychains they either fall back to the
+#     system resolver or return nothing at all — the resolution step then
+#     reports zero hosts and the whole run looks empty for no visible reason.
+#   * naabu/nmap SYN scanning uses raw sockets, which never reach connect().
+#   * statically-linked Go binaries do not resolve libc symbols, so the LD_PRELOAD
+#     hook is a no-op; they leak DIRECTLY while appearing proxied. The
+#     ProjectDiscovery tools are the common case here, which is why the honest
+#     answer for them is their own -proxy flag, not this wrapper.
+#
+# PROXYCHAINS_EXCLUDE lets an operator extend the list without editing code.
+function _proxychains_applies() {
+    local _tool="${1:-}"
+    [[ -z "$_tool" ]] && return 1
+
+    # Narrowing IFS here is REQUIRED, not stylistic. reconftw.sh:8 sets
+    # IFS=$'\n\t' process-wide, so an unquoted ${PROXYCHAINS_EXCLUDE} does NOT
+    # split on spaces — and reconftw.cfg documents this variable as
+    # space-separated. PROXYCHAINS_EXCLUDE="httpx nuclei" therefore arrived as
+    # the SINGLE word "httpx nuclei", matched no tool name, and both tools were
+    # proxied anyway: the operator's exclusion silently did nothing. Splitting
+    # on space/tab/newline accepts every separator a user might reach for.
+    local -a _extra=()
+    if [[ -n "${PROXYCHAINS_EXCLUDE:-}" ]]; then
+        local _oifs="$IFS"
+        IFS=$' \t\n'
+        # shellcheck disable=SC2206 # deliberate word splitting, IFS narrowed above
+        _extra=(${PROXYCHAINS_EXCLUDE})
+        IFS="$_oifs"
+    fi
+
+    local _skip
+    for _skip in massdns puredns dnsx shuffledns naabu nmap masscan \
+        "${_extra[@]}"; do
+        [[ "$_tool" == "$_skip" ]] && return 1
+    done
+    return 0
+}
+
 function run_command() {
     if [[ "${DRY_RUN:-false}" == "true" ]]; then
         # Extract tool name (first word, strip path)
@@ -518,6 +576,24 @@ function run_command() {
     if [[ "$cmd_name" == axiom-* ]]; then
         _run_axiom_command_with_detection "$@"
         return $?
+    fi
+
+    # PROXYCHAINS (#1041): route this tool's traffic through the configured
+    # chain. Applied HERE because run_command is the single gate every external
+    # tool goes through, so one place covers all of them without touching each
+    # tool's own (mutually incompatible) proxy flags.
+    if [[ "${PROXYCHAINS:-false}" == "true" ]] && _proxychains_applies "$cmd_name"; then
+        local _pc
+        if _pc=$(_proxychains_bin); then
+            local -a _pc_argv=("$_pc" -q)
+            [[ -n "${PROXYCHAINS_CONF:-}" ]] && _pc_argv+=(-f "$PROXYCHAINS_CONF")
+            set -- "${_pc_argv[@]}" "$@"
+        else
+            # Fail LOUD, not silently direct: the whole point of enabling this is
+            # that the operator does not want these packets leaving un-proxied.
+            notification "PROXYCHAINS=true but no proxychains binary was found — ${cmd_name} would run UN-PROXIED; skipping it" warn
+            return 1
+        fi
     fi
 
     if [[ "${ADAPTIVE_RATE_LIMIT:-false}" == "true" ]]; then
@@ -1322,7 +1398,27 @@ _ip_is_public_ipv4() {
 # Returns 0 if running on a cloud VPS, 1 otherwise.
 _is_cloud_vps() {
     [[ "${DRY_RUN:-false}" == "true" ]] && return 1
-    curl -sf --max-time 2 -o /dev/null http://169.254.169.254/ 2>/dev/null && return 0
+
+    # Probe for the PRESENCE of a metadata service, not for its willingness to
+    # serve an unauthenticated read (issue #1050).
+    #
+    # The previous `curl -sf` could not tell those apart. IMDSv2 has been the
+    # default on new EC2 instances since 2019 and answers an unauthenticated GET
+    # with 401; `-f` turns any >=400 status into exit 22, so a perfectly live
+    # metadata service was read as "no metadata service at all". Every modern
+    # AWS box was therefore misclassified as a home/NAT network — which is not
+    # cosmetic: _can_use_puredns() uses this to pick the resolver, so
+    # DNS_RESOLVER=auto silently downgraded puredns to dnsx on exactly the hosts
+    # puredns exists to be fast on.
+    #
+    # %{http_code} is '000' only when no HTTP response was received at all
+    # (connection refused, timeout, no route) — which is what a non-cloud host
+    # gives for link-local 169.254.169.254. Any real status (200, 401, 403, 404)
+    # proves something is listening there, and that is the whole question.
+    local _code
+    _code=$(curl -s --max-time 2 -o /dev/null -w '%{http_code}' \
+        http://169.254.169.254/ 2>/dev/null)
+    [[ -n "$_code" ]] && [[ "$_code" != "000" ]] && return 0
     return 1
 }
 
