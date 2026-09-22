@@ -1398,7 +1398,27 @@ _ip_is_public_ipv4() {
 # Returns 0 if running on a cloud VPS, 1 otherwise.
 _is_cloud_vps() {
     [[ "${DRY_RUN:-false}" == "true" ]] && return 1
-    curl -sf --max-time 2 -o /dev/null http://169.254.169.254/ 2>/dev/null && return 0
+
+    # Probe for the PRESENCE of a metadata service, not for its willingness to
+    # serve an unauthenticated read (issue #1050).
+    #
+    # The previous `curl -sf` could not tell those apart. IMDSv2 has been the
+    # default on new EC2 instances since 2019 and answers an unauthenticated GET
+    # with 401; `-f` turns any >=400 status into exit 22, so a perfectly live
+    # metadata service was read as "no metadata service at all". Every modern
+    # AWS box was therefore misclassified as a home/NAT network — which is not
+    # cosmetic: _can_use_puredns() uses this to pick the resolver, so
+    # DNS_RESOLVER=auto silently downgraded puredns to dnsx on exactly the hosts
+    # puredns exists to be fast on.
+    #
+    # %{http_code} is '000' only when no HTTP response was received at all
+    # (connection refused, timeout, no route) — which is what a non-cloud host
+    # gives for link-local 169.254.169.254. Any real status (200, 401, 403, 404)
+    # proves something is listening there, and that is the whole question.
+    local _code
+    _code=$(curl -s --max-time 2 -o /dev/null -w '%{http_code}' \
+        http://169.254.169.254/ 2>/dev/null)
+    [[ -n "$_code" ]] && [[ "$_code" != "000" ]] && return 0
     return 1
 }
 
